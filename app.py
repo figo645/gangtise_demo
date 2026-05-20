@@ -321,6 +321,99 @@ def api_hermes_analyze():
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
     })
 
+def gen_dm_conversations():
+    return [
+        {"id":1,"kol_name":"财经老王","kol_avatar":"👑","tier":"S级","last_msg":"好的，我周四直播会详细讲这个方向，记得来看","time":"5分钟前","unread":1,"vip_only":False},
+        {"id":2,"kol_name":"投资女神Lisa","kol_avatar":"💎","tier":"S级","last_msg":"港股互联网的配置建议我已经发到专属频道了","time":"2小时前","unread":0,"vip_only":False},
+        {"id":3,"kol_name":"量化老师陈明","kol_avatar":"📊","tier":"A级","last_msg":"[付费内容] 本周多因子模型调仓建议","time":"昨天","unread":0,"vip_only":True},
+        {"id":4,"kol_name":"全球宏观James","kol_avatar":"🌐","tier":"A级","last_msg":"美联储会议纪要解读已更新，查看详情","time":"昨天","unread":0,"vip_only":False},
+        {"id":5,"kol_name":"新能源猎手阿强","kol_avatar":"⚡","tier":"B级","last_msg":"固态电池调研纪要整理好了，分享给你","time":"3天前","unread":0,"vip_only":False},
+    ]
+
+def gen_dm_messages(kol_id):
+    conversations = {
+        1: [
+            {"id":1,"sender":"kol","content":"欢迎关注我的专属频道！我会在这里分享一些不方便公开发的深度观点。","time":"2026-05-18 09:00","type":"text"},
+            {"id":2,"sender":"user","content":"老王好！想请教一下，AI算力板块现在还能追吗？感觉涨了不少了","time":"2026-05-18 10:30","type":"text"},
+            {"id":3,"sender":"kol","content":"好问题。短期确实有些过热，但中长期逻辑没变。我的建议是分批建仓，不要一把梭。具体标的我周四直播会讲。","time":"2026-05-18 11:00","type":"text"},
+            {"id":4,"sender":"user","content":"明白，那我先建1/3仓位，等回调再加","time":"2026-05-20 08:15","type":"text"},
+            {"id":5,"sender":"kol","content":"好的，我周四直播会详细讲这个方向，记得来看","time":"2026-05-20 08:20","type":"text"},
+        ],
+        2: [
+            {"id":1,"sender":"kol","content":"Hi～欢迎加入我的专属圈子！港股互联网是我的核心研究方向，有问题随时问。","time":"2026-05-17 14:00","type":"text"},
+            {"id":2,"sender":"user","content":"Lisa姐，南向资金最近流入很多，是不是该加仓港股了？","time":"2026-05-19 09:00","type":"text"},
+            {"id":3,"sender":"kol","content":"港股互联网的配置建议我已经发到专属频道了","time":"2026-05-20 10:00","type":"text"},
+            {"id":4,"sender":"kol","content":"简单说：当前估值20%分位，南向连续14天净买入，我觉得可以加到标配+5%。但注意分散，别只买一只。","time":"2026-05-20 10:02","type":"text"},
+        ],
+        3: [
+            {"id":1,"sender":"kol","content":"欢迎！我的频道主要分享量化策略和因子研究，每周更新调仓建议。","time":"2026-05-15 09:00","type":"text"},
+            {"id":2,"sender":"kol","content":"[付费内容] 本周多因子模型调仓建议","time":"2026-05-19 20:00","type":"paid","price":50,"preview":"本周价值因子持续占优，动量因子衰减...（解锁查看完整内容）"},
+        ],
+    }
+    return conversations.get(kol_id, [
+        {"id":1,"sender":"kol","content":"欢迎关注！有投研问题随时交流。","time":"2026-05-18 09:00","type":"text"},
+    ])
+
+def gen_kol_workbench():
+    return {
+        "kol_name": "财经老王",
+        "kol_avatar": "👑",
+        "tier": "S级合伙人",
+        "stats": {
+            "total_followers": 2800000,
+            "vip_subscribers": 4200,
+            "monthly_revenue": 186000,
+            "revenue_change": 12.5,
+            "unread_messages": 23,
+            "pending_replies": 8,
+            "today_views": 12800,
+            "engagement_rate": 4.2,
+        },
+        "recent_fans": [
+            {"name":"投研达人_小陈","time":"5分钟前","msg":"老王好！AI算力还能追吗？","tier":"专业会员"},
+            {"name":"价值猎人小林","time":"23分钟前","msg":"请问港股互联网怎么看？","tier":"基础会员"},
+            {"name":"量化新手_阿明","time":"1小时前","msg":"想学习多因子模型，有推荐吗？","tier":"免费用户"},
+            {"name":"机构用户_张总","time":"2小时前","msg":"能否安排一次闭门交流？","tier":"机构VIP"},
+            {"name":"小白投资者","time":"3小时前","msg":"新能源板块现在能入吗？","tier":"基础会员"},
+        ],
+        "broadcast_history": [
+            {"id":1,"content":"本周策略更新：科技板块逢低布局，AI算力+国产替代双主线","time":"2026-05-20 08:00","reach":3200,"open_rate":68},
+            {"id":2,"content":"紧急提醒：美联储会议纪要偏鸽，短期利好风险资产","time":"2026-05-19 22:30","reach":4100,"open_rate":82},
+            {"id":3,"content":"周末复盘：本周操作回顾与下周展望","time":"2026-05-18 18:00","reach":2800,"open_rate":55},
+        ],
+    }
+
+@app.route("/api/dm/conversations")
+def api_dm_conversations():
+    return jsonify(gen_dm_conversations())
+
+@app.route("/api/dm/messages/<int:kol_id>")
+def api_dm_messages(kol_id):
+    return jsonify(gen_dm_messages(kol_id))
+
+@app.route("/api/dm/send", methods=["POST"])
+def api_dm_send():
+    kol_id = request.json.get("kol_id")
+    content = request.json.get("content", "")
+    return jsonify({"success": True, "kol_id": kol_id, "msg_id": random.randint(100,999), "auto_reply": "感谢您的消息！我会尽快回复。如果是紧急问题，可以在我的直播间提问哦～"})
+
+@app.route("/api/kol/workbench")
+def api_kol_workbench():
+    return jsonify(gen_kol_workbench())
+
+@app.route("/api/kol/broadcast", methods=["POST"])
+def api_kol_broadcast():
+    content = request.json.get("content", "")
+    target = request.json.get("target", "all")
+    return jsonify({"success": True, "reach": random.randint(2000, 5000), "content": content, "target": target})
+
+@app.route("/api/kol/reply", methods=["POST"])
+def api_kol_reply():
+    fan_name = request.json.get("fan_name", "")
+    content = request.json.get("content", "")
+    is_paid = request.json.get("is_paid", False)
+    return jsonify({"success": True, "fan_name": fan_name, "is_paid": is_paid, "revenue": 50 if is_paid else 0})
+
 @app.route("/prd")
 def prd():
     return render_template("prd.html")
