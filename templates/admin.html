@@ -1,0 +1,1606 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>冈底斯 — 运营管理中心</title>
+<link rel="stylesheet" href="/static/css/style.css">
+<style>
+  .toggle-wrap { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .toggle-label { font-size:13px; color:var(--gray-300,#ccc); flex:1; }
+  .toggle { position:relative; display:inline-block; width:40px; height:22px; }
+  .toggle input { opacity:0; width:0; height:0; }
+  .toggle-slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#1A2E45; border-radius:22px; transition:.3s; border:1px solid rgba(200,169,110,0.2); }
+  .toggle-slider:before { position:absolute; content:""; height:16px; width:16px; left:2px; bottom:2px; background:#4a5568; border-radius:50%; transition:.3s; }
+  .toggle input:checked + .toggle-slider { background:rgba(200,169,110,0.2); border-color:rgba(200,169,110,0.5); }
+  .toggle input:checked + .toggle-slider:before { transform:translateX(18px); background:#C8A96E; }
+  .progress-bar-bg { background:rgba(255,255,255,0.06); border-radius:4px; height:6px; width:100%; }
+  .progress-bar-fill { height:6px; border-radius:4px; background:linear-gradient(90deg,#C8A96E,#e8c98e); }
+  .funnel-wrap { display:flex; align-items:center; gap:0; margin-top:24px; overflow-x:auto; padding-bottom:8px; }
+  .funnel-step { text-align:center; min-width:120px; }
+  .funnel-box { background:rgba(200,169,110,0.1); border:1px solid rgba(200,169,110,0.3); border-radius:8px; padding:12px 8px; }
+  .funnel-name { font-size:12px; color:#C8A96E; font-weight:600; }
+  .funnel-count { font-size:18px; color:#F8F6F0; font-weight:700; margin:4px 0; }
+  .funnel-pct { font-size:11px; color:#8899aa; }
+  .funnel-arrow { font-size:20px; color:rgba(200,169,110,0.4); padding:0 4px; flex-shrink:0; }
+  .funnel-conv { font-size:10px; color:#C8A96E; text-align:center; margin-top:4px; }
+  .config-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .config-card { background:rgba(255,255,255,0.03); border:1px solid rgba(200,169,110,0.12); border-radius:12px; padding:20px; }
+  .config-card-title { font-size:14px; color:#C8A96E; font-weight:600; margin-bottom:16px; padding-bottom:10px; border-bottom:1px solid rgba(200,169,110,0.1); }
+  .config-field { margin-bottom:12px; }
+  .config-field label { display:block; font-size:11px; color:#8899aa; margin-bottom:4px; }
+  .config-field input { width:100%; background:rgba(255,255,255,0.05); border:1px solid rgba(200,169,110,0.2); border-radius:6px; padding:7px 10px; color:#F8F6F0; font-size:13px; box-sizing:border-box; }
+  .config-field input:focus { outline:none; border-color:rgba(200,169,110,0.5); }
+  .keyword-cloud { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .keyword-tag { background:rgba(220,50,50,0.12); border:1px solid rgba(220,50,50,0.3); color:#ff7070; border-radius:20px; padding:4px 12px; font-size:12px; cursor:pointer; }
+  .keyword-tag:hover { background:rgba(220,50,50,0.2); }
+  .segment-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; margin-bottom:24px; }
+  .segment-card { background:rgba(255,255,255,0.03); border:1px solid rgba(200,169,110,0.15); border-radius:12px; padding:18px; }
+  .segment-card-name { font-size:14px; color:#C8A96E; font-weight:600; margin-bottom:12px; }
+  .segment-card-stat { display:flex; justify-content:space-between; font-size:12px; color:#8899aa; margin-bottom:6px; }
+  .segment-card-stat span:last-child { color:#F8F6F0; }
+  .compute-packages { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:12px; margin-top:16px; }
+  .compute-pkg { background:rgba(200,169,110,0.06); border:1px solid rgba(200,169,110,0.2); border-radius:10px; padding:14px; text-align:center; }
+  .compute-pkg-name { font-size:12px; color:#8899aa; margin-bottom:6px; }
+  .compute-pkg-cost { font-size:20px; color:#C8A96E; font-weight:700; }
+  .compute-pkg-unit { font-size:11px; color:#8899aa; margin-bottom:8px; }
+  .compute-pkg-compute { font-size:13px; color:#F8F6F0; }
+  .pool-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:20px; }
+  .pool-card { background:rgba(13,27,42,0.8); border:1px solid rgba(200,169,110,0.2); border-radius:10px; padding:16px; text-align:center; }
+  .pool-card-label { font-size:11px; color:#8899aa; margin-bottom:6px; }
+  .pool-card-value { font-size:22px; color:#C8A96E; font-weight:700; }
+  .pool-card-sub { font-size:11px; color:#8899aa; margin-top:4px; }
+  .search-bar { display:flex; gap:10px; margin-bottom:16px; align-items:center; flex-wrap:wrap; }
+  .search-bar input { background:rgba(255,255,255,0.05); border:1px solid rgba(200,169,110,0.2); border-radius:6px; padding:8px 12px; color:#F8F6F0; font-size:13px; width:220px; }
+  .search-bar input:focus { outline:none; border-color:rgba(200,169,110,0.5); }
+  .search-bar select { background:#0D1B2A; border:1px solid rgba(200,169,110,0.2); border-radius:6px; padding:8px 12px; color:#F8F6F0; font-size:13px; cursor:pointer; }
+  .search-bar select:focus { outline:none; }
+  .btn-sm-red { background:transparent; border:1px solid rgba(220,50,50,0.4); color:#ff7070; border-radius:5px; padding:3px 9px; font-size:11px; cursor:pointer; }
+  .btn-sm-red:hover { background:rgba(220,50,50,0.1); }
+  .btn-sm-blue { background:transparent; border:1px solid rgba(100,160,255,0.4); color:#7ab0ff; border-radius:5px; padding:3px 9px; font-size:11px; cursor:pointer; }
+  .btn-sm-blue:hover { background:rgba(100,160,255,0.1); }
+  .status-gold { color:#C8A96E; font-weight:500; }
+  .status-blue { color:#7ab0ff; font-weight:500; }
+  .status-green { color:#4caf7d; font-weight:500; }
+  .rank-badge { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; font-size:11px; font-weight:700; }
+  .rank-1 { background:#C8A96E; color:#0D1B2A; }
+  .rank-2 { background:#a0a0a0; color:#0D1B2A; }
+  .rank-3 { background:#cd7f32; color:#0D1B2A; }
+  .rank-n { background:rgba(255,255,255,0.08); color:#8899aa; }
+</style>
+</head>
+<body>
+<div class="admin-layout">
+
+  <!-- Sidebar -->
+  <div class="admin-sidebar">
+    <div class="admin-logo">
+      <div class="admin-logo-text">冈底斯</div>
+      <div class="admin-logo-sub">运营管理中心</div>
+    </div>
+    <nav class="admin-nav">
+      <div class="admin-nav-group">
+        <div class="admin-nav-group-title">概览</div>
+        <div class="admin-nav-item active" onclick="showSection('overview')">
+          <span class="admin-nav-icon">&#9783;</span> 运营概览
+        </div>
+      </div>
+      <div class="admin-nav-group">
+        <div class="admin-nav-group-title">用户管理</div>
+        <div class="admin-nav-item" onclick="showSection('users')">
+          <span class="admin-nav-icon">&#9786;</span> 用户列表
+        </div>
+        <div class="admin-nav-item" onclick="showSection('segments')">
+          <span class="admin-nav-icon">&#9670;</span> 用户分层
+        </div>
+        <div class="admin-nav-item" onclick="showSection('points')">
+          <span class="admin-nav-icon">&#9733;</span> 积分管理
+        </div>
+      </div>
+      <div class="admin-nav-group">
+        <div class="admin-nav-group-title">KOL生态</div>
+        <div class="admin-nav-item" onclick="showSection('kols')">
+          <span class="admin-nav-icon">&#9775;</span> 合伙人管理
+        </div>
+        <div class="admin-nav-item" onclick="showSection('commission')">
+          <span class="admin-nav-icon">&#9654;</span> 收益结算
+        </div>
+      </div>
+      <div class="admin-nav-group">
+        <div class="admin-nav-group-title">社区运营</div>
+        <div class="admin-nav-item" onclick="showSection('community')">
+          <span class="admin-nav-icon">&#9998;</span> 帖子审核
+        </div>
+        <div class="admin-nav-item" onclick="showSection('events')">
+          <span class="admin-nav-icon">&#9728;</span> 活动管理
+        </div>
+      </div>
+      <div class="admin-nav-group">
+        <div class="admin-nav-group-title">Hermes管理</div>
+        <div class="admin-nav-item" onclick="showSection('hermes')">
+          <span class="admin-nav-icon">&#9881;</span> 使用统计
+        </div>
+      </div>
+      <div class="admin-nav-group">
+        <div class="admin-nav-group-title">渠道管理</div>
+        <div class="admin-nav-item" onclick="showSection('channels')">
+          <span class="admin-nav-icon">&#9741;</span> 渠道配置
+        </div>
+      </div>
+      <div class="admin-nav-group">
+        <div class="admin-nav-group-title">系统</div>
+        <div class="admin-nav-item" onclick="showSection('settings')">
+          <span class="admin-nav-icon">&#9965;</span> 系统设置
+        </div>
+      </div>
+    </nav>
+    <div style="padding:16px 20px;border-top:1px solid rgba(200,169,110,0.1)">
+      <div style="font-size:11px;color:#8899aa">当前登录</div>
+      <div style="font-size:13px;color:#F8F6F0;margin-top:2px">运营管理员</div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-page-title" id="page-title">运营概览</div>
+      <div style="display:flex;gap:12px;align-items:center">
+        <span style="font-size:12px;color:#8899aa">2026-05-20 实时数据</span>
+        <button class="btn-gold" style="padding:8px 16px;font-size:12px" onclick="showToast('报告生成中，请稍候...')">导出报告</button>
+      </div>
+    </div>
+
+    <div class="admin-content">
+
+      <!-- ===== OVERVIEW ===== -->
+      <div id="section-overview">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">总注册用户</div>
+            <span class="stat-icon">&#9786;</span>
+            <div class="stat-value">251,320</div>
+            <div class="stat-change up">&#9650; +3,240 本月</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">付费用户</div>
+            <span class="stat-icon">&#9830;</span>
+            <div class="stat-value">65,320</div>
+            <div class="stat-change up">&#9650; +1,820 本月</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">月度GMV</div>
+            <span class="stat-icon">&#9775;</span>
+            <div class="stat-value">¥760万</div>
+            <div class="stat-change up">&#9650; +12.4%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">KOL合伙人</div>
+            <span class="stat-icon">&#9733;</span>
+            <div class="stat-value">620</div>
+            <div class="stat-change up">&#9650; +28 本月</div>
+          </div>
+        </div>
+
+        <div class="table-wrap" style="margin-bottom:20px">
+          <div class="table-header">
+            <div class="table-title">渠道获客概览</div>
+            <span class="tag tag-gold">本月数据</span>
+          </div>
+          <table>
+            <thead>
+              <tr><th>渠道</th><th>新增用户</th><th>付费转化率</th><th>月度营收</th><th>ROI</th><th>状态</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span style="color:#F8F6F0;font-weight:500">微信生态</span></td>
+                <td>42,000</td><td><span class="up">3.8%</span></td><td>¥284万</td><td><span class="up">4.2x</span></td>
+                <td><span class="tag tag-green">健康</span></td>
+              </tr>
+              <tr>
+                <td><span style="color:#F8F6F0;font-weight:500">抖音</span></td>
+                <td>31,000</td><td><span class="up">2.9%</span></td><td>¥192万</td><td><span class="up">3.1x</span></td>
+                <td><span class="tag tag-green">健康</span></td>
+              </tr>
+              <tr>
+                <td><span style="color:#F8F6F0;font-weight:500">小红书</span></td>
+                <td>8,900</td><td><span class="up">4.2%</span></td><td>¥92万</td><td><span class="up">5.8x</span></td>
+                <td><span class="tag tag-green">优质</span></td>
+              </tr>
+              <tr>
+                <td><span style="color:#F8F6F0;font-weight:500">微博</span></td>
+                <td>12,500</td><td>2.1%</td><td>¥68万</td><td>2.4x</td>
+                <td><span class="tag tag-blue">观察</span></td>
+              </tr>
+              <tr>
+                <td><span style="color:#F8F6F0;font-weight:500">直接流量</span></td>
+                <td>3,600</td><td><span class="up">6.8%</span></td><td>¥124万</td><td><span class="up">8.2x</span></td>
+                <td><span class="tag tag-green">优质</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="table-wrap">
+          <div class="table-header">
+            <div class="table-title">用户圈层分布</div>
+          </div>
+          <table>
+            <thead>
+              <tr><th>圈层</th><th>用户数</th><th>占比</th><th>ARPU</th><th>月留存</th></tr>
+            </thead>
+            <tbody>
+              {% for seg in segments %}
+              <tr>
+                <td><span style="color:#F8F6F0;font-weight:500">{{ seg.segment }}</span></td>
+                <td>{{ "{:,}".format(seg.count) }}</td>
+                <td>{{ seg.pct }}%</td>
+                <td>{% if seg.segment == '免费用户' %}¥0{% elif seg.segment == '基础会员' %}¥99{% elif seg.segment == '专业会员' %}¥299{% elif seg.segment == '机构VIP' %}¥2,999{% else %}分成{% endif %}</td>
+                <td>{% if seg.segment == '免费用户' %}62%{% elif seg.segment == '基础会员' %}78%{% elif seg.segment == '专业会员' %}89%{% elif seg.segment == '机构VIP' %}96%{% else %}98%{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div><!-- end section-overview -->
+
+      <!-- ===== USERS ===== -->
+      <div id="section-users" style="display:none">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">DAU</div>
+            <span class="stat-icon">&#9786;</span>
+            <div class="stat-value">38,420</div>
+            <div class="stat-change up">&#9650; +2.1%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">今日新增</div>
+            <span class="stat-icon">&#9654;</span>
+            <div class="stat-value">1,240</div>
+            <div class="stat-change up">&#9650; +84</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">7日留存</div>
+            <span class="stat-icon">&#9670;</span>
+            <div class="stat-value">71.2%</div>
+            <div class="stat-change up">&#9650; +1.4pp</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">付费率</div>
+            <span class="stat-icon">&#9733;</span>
+            <div class="stat-value">26.0%</div>
+            <div class="stat-change up">&#9650; +0.7pp</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <div class="table-header">
+            <div class="table-title">用户列表</div>
+            <button class="btn-gold" style="padding:6px 14px;font-size:12px" onclick="showToast('导出任务已创建')">导出用户数据</button>
+          </div>
+          <div class="search-bar">
+            <input type="text" placeholder="搜索用户名 / 手机号">
+            <select><option>会员等级 (全部)</option><option>免费用户</option><option>基础会员</option><option>专业会员</option><option>机构VIP</option><option>KOL合伙人</option></select>
+            <select><option>用户状态 (全部)</option><option>正常</option><option>活跃</option><option>沉默</option><option>已禁用</option></select>
+            <button class="btn-gold" style="padding:8px 16px;font-size:12px">搜索</button>
+          </div>
+          <table>
+            <thead>
+              <tr><th>用户</th><th>等级</th><th>积分</th><th>算力余额</th><th>注册时间</th><th>最近活跃</th><th>状态</th><th>操作</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><span style="color:#F8F6F0;font-weight:500">张伟 <span style="font-size:10px;color:#8899aa">138****8821</span></span></td><td><span class="tag tag-gold">机构VIP</span></td><td style="color:#C8A96E">8,240</td><td>1,200</td><td>2024-03-12</td><td>今日 09:42</td><td><span class="tag tag-green">活跃</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
+              <tr><td><span style="color:#F8F6F0;font-weight:500">李晓梅 <span style="font-size:10px;color:#8899aa">139****4402</span></span></td><td><span class="tag tag-blue">专业会员</span></td><td style="color:#C8A96E">3,580</td><td>480</td><td>2024-06-28</td><td>今日 11:15</td><td><span class="tag tag-green">活跃</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
+              <tr><td><span style="color:#F8F6F0;font-weight:500">王建国 <span style="font-size:10px;color:#8899aa">135****7730</span></span></td><td><span class="tag tag-blue">专业会员</span></td><td style="color:#C8A96E">2,100</td><td>320</td><td>2024-09-05</td><td>昨日 20:33</td><td><span class="tag tag-green">正常</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
+              <tr><td><span style="color:#F8F6F0;font-weight:500">陈思远 <span style="font-size:10px;color:#8899aa">186****2219</span></span></td><td><span style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.2);color:#C8A96E;border-radius:4px;padding:2px 7px;font-size:11px">基础会员</span></td><td style="color:#C8A96E">860</td><td>80</td><td>2025-01-18</td><td>3天前</td><td><span class="tag tag-green">正常</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
+              <tr><td><span style="color:#F8F6F0;font-weight:500">刘芳 <span style="font-size:10px;color:#8899aa">177****6614</span></span></td><td><span style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.2);color:#C8A96E;border-radius:4px;padding:2px 7px;font-size:11px">基础会员</span></td><td style="color:#C8A96E">420</td><td>40</td><td>2025-02-22</td><td>7天前</td><td><span style="color:#8899aa;font-size:12px">沉默</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
+              <tr><td><span style="color:#F8F6F0;font-weight:500">赵磊 <span style="font-size:10px;color:#8899aa">150****9983</span></span></td><td><span style="color:#8899aa;font-size:12px">免费用户</span></td><td style="color:#C8A96E">180</td><td>0</td><td>2025-04-10</td><td>2天前</td><td><span class="tag tag-green">正常</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
+              <tr><td><span style="color:#F8F6F0;font-weight:500">孙雪 <span style="font-size:10px;color:#8899aa">132****5571</span></span></td><td><span style="color:#8899aa;font-size:12px">免费用户</span></td><td style="color:#C8A96E">100</td><td>0</td><td>2025-05-01</td><td>今日 08:20</td><td><span class="tag tag-green">正常</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
+              <tr><td><span style="color:#F8F6F0;font-weight:500">周浩然 <span style="font-size:10px;color:#8899aa">188****3340</span></span></td><td><span class="tag tag-gold">机构VIP</span></td><td style="color:#C8A96E">6,800</td><td>950</td><td>2024-01-08</td><td>今日 10:58</td><td><span class="tag tag-green">活跃</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
+              <tr><td><span style="color:#F8F6F0;font-weight:500">吴静怡 <span style="font-size:10px;color:#8899aa">136****8802</span></span></td><td><span class="tag tag-blue">专业会员</span></td><td style="color:#C8A96E">1,640</td><td>200</td><td>2024-11-30</td><td>5天前</td><td><span style="color:#8899aa;font-size:12px">沉默</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
+              <tr><td><span style="color:#F8F6F0;font-weight:500">郑凯 <span style="font-size:10px;color:#8899aa">159****1127</span></span></td><td><span style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.2);color:#C8A96E;border-radius:4px;padding:2px 7px;font-size:11px">基础会员</span></td><td style="color:#C8A96E">540</td><td>60</td><td>2025-03-14</td><td>昨日 16:44</td><td><span class="tag tag-green">正常</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
+            </tbody>
+          </table>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0 0;font-size:12px;color:#8899aa">
+            <span>共 251,320 条记录，当前显示第 1-10 条</span>
+            <div style="display:flex;gap:6px">
+              <button class="btn-outline" style="padding:4px 10px;font-size:11px">上一页</button>
+              <button class="btn-gold" style="padding:4px 10px;font-size:11px">1</button>
+              <button class="btn-outline" style="padding:4px 10px;font-size:11px">2</button>
+              <button class="btn-outline" style="padding:4px 10px;font-size:11px">3</button>
+              <button class="btn-outline" style="padding:4px 10px;font-size:11px">下一页</button>
+            </div>
+          </div>
+        </div>
+      </div><!-- end section-users -->
+
+      <!-- ===== SEGMENTS ===== -->
+      <div id="section-segments" style="display:none">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">免费→付费转化</div>
+            <span class="stat-icon">&#9654;</span>
+            <div class="stat-value">8.4%</div>
+            <div class="stat-change up">&#9650; +0.6pp</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">基础→专业升级</div>
+            <span class="stat-icon">&#9650;</span>
+            <div class="stat-value">12.1%</div>
+            <div class="stat-change up">&#9650; +1.2pp</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">专业→VIP升级</div>
+            <span class="stat-icon">&#9733;</span>
+            <div class="stat-value">4.8%</div>
+            <div class="stat-change up">&#9650; +0.3pp</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">平均LTV</div>
+            <span class="stat-icon">&#9775;</span>
+            <div class="stat-value">¥1,240</div>
+            <div class="stat-change up">&#9650; +¥84</div>
+          </div>
+        </div>
+        <div class="segment-cards">
+          <div class="segment-card">
+            <div class="segment-card-name">免费用户</div>
+            <div class="segment-card-stat"><span>用户数</span><span>185,920</span></div>
+            <div style="margin:8px 0"><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:74%"></div></div></div>
+            <div class="segment-card-stat"><span>占比</span><span>74.0%</span></div>
+            <div class="segment-card-stat"><span>ARPU</span><span>¥0</span></div>
+            <div class="segment-card-stat"><span>月留存</span><span>62%</span></div>
+            <div class="segment-card-stat"><span>升级率</span><span>8.4%</span></div>
+            <button class="btn-outline" style="width:100%;margin-top:10px;padding:6px;font-size:12px" onclick="showToast('策略配置已打开')">配置运营策略</button>
+          </div>
+          <div class="segment-card">
+            <div class="segment-card-name">基础会员</div>
+            <div class="segment-card-stat"><span>用户数</span><span>42,180</span></div>
+            <div style="margin:8px 0"><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:16.8%"></div></div></div>
+            <div class="segment-card-stat"><span>占比</span><span>16.8%</span></div>
+            <div class="segment-card-stat"><span>ARPU</span><span>¥99</span></div>
+            <div class="segment-card-stat"><span>月留存</span><span>78%</span></div>
+            <div class="segment-card-stat"><span>升级率</span><span>12.1%</span></div>
+            <button class="btn-outline" style="width:100%;margin-top:10px;padding:6px;font-size:12px" onclick="showToast('策略配置已打开')">配置运营策略</button>
+          </div>
+          <div class="segment-card">
+            <div class="segment-card-name">专业会员</div>
+            <div class="segment-card-stat"><span>用户数</span><span>18,640</span></div>
+            <div style="margin:8px 0"><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:7.4%"></div></div></div>
+            <div class="segment-card-stat"><span>占比</span><span>7.4%</span></div>
+            <div class="segment-card-stat"><span>ARPU</span><span>¥299</span></div>
+            <div class="segment-card-stat"><span>月留存</span><span>89%</span></div>
+            <div class="segment-card-stat"><span>升级率</span><span>4.8%</span></div>
+            <button class="btn-outline" style="width:100%;margin-top:10px;padding:6px;font-size:12px" onclick="showToast('策略配置已打开')">配置运营策略</button>
+          </div>
+          <div class="segment-card">
+            <div class="segment-card-name">机构VIP</div>
+            <div class="segment-card-stat"><span>用户数</span><span>3,960</span></div>
+            <div style="margin:8px 0"><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:1.6%"></div></div></div>
+            <div class="segment-card-stat"><span>占比</span><span>1.6%</span></div>
+            <div class="segment-card-stat"><span>ARPU</span><span>¥2,999</span></div>
+            <div class="segment-card-stat"><span>月留存</span><span>96%</span></div>
+            <div class="segment-card-stat"><span>升级率</span><span>2.1%</span></div>
+            <button class="btn-outline" style="width:100%;margin-top:10px;padding:6px;font-size:12px" onclick="showToast('策略配置已打开')">配置运营策略</button>
+          </div>
+          <div class="segment-card">
+            <div class="segment-card-name">KOL合伙人</div>
+            <div class="segment-card-stat"><span>用户数</span><span>620</span></div>
+            <div style="margin:8px 0"><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:0.25%"></div></div></div>
+            <div class="segment-card-stat"><span>占比</span><span>0.25%</span></div>
+            <div class="segment-card-stat"><span>ARPU</span><span>分成收益</span></div>
+            <div class="segment-card-stat"><span>月留存</span><span>98%</span></div>
+            <div class="segment-card-stat"><span>升级率</span><span>—</span></div>
+            <button class="btn-outline" style="width:100%;margin-top:10px;padding:6px;font-size:12px" onclick="showToast('策略配置已打开')">配置运营策略</button>
+          </div>
+        </div>
+        <div class="card" style="padding:20px">
+          <div style="font-size:14px;color:#C8A96E;font-weight:600;margin-bottom:4px">升级路径漏斗</div>
+          <div style="font-size:12px;color:#8899aa;margin-bottom:16px">用户分层转化路径及转化率</div>
+          <div class="funnel-wrap">
+            <div class="funnel-step">
+              <div class="funnel-box"><div class="funnel-name">免费用户</div><div class="funnel-count">185,920</div><div class="funnel-pct">100%</div></div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 4px">
+              <div class="funnel-arrow">&#9654;</div>
+              <div class="funnel-conv">8.4%</div>
+            </div>
+            <div class="funnel-step">
+              <div class="funnel-box"><div class="funnel-name">基础会员</div><div class="funnel-count">42,180</div><div class="funnel-pct">22.7%</div></div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 4px">
+              <div class="funnel-arrow">&#9654;</div>
+              <div class="funnel-conv">12.1%</div>
+            </div>
+            <div class="funnel-step">
+              <div class="funnel-box"><div class="funnel-name">专业会员</div><div class="funnel-count">18,640</div><div class="funnel-pct">10.0%</div></div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 4px">
+              <div class="funnel-arrow">&#9654;</div>
+              <div class="funnel-conv">4.8%</div>
+            </div>
+            <div class="funnel-step">
+              <div class="funnel-box"><div class="funnel-name">机构VIP</div><div class="funnel-count">3,960</div><div class="funnel-pct">2.1%</div></div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 4px">
+              <div class="funnel-arrow">&#9654;</div>
+              <div class="funnel-conv">2.1%</div>
+            </div>
+            <div class="funnel-step">
+              <div class="funnel-box"><div class="funnel-name">KOL合伙人</div><div class="funnel-count">620</div><div class="funnel-pct">0.33%</div></div>
+            </div>
+          </div>
+        </div>
+      </div><!-- end section-segments -->
+
+      <!-- ===== POINTS ===== -->
+      <div id="section-points" style="display:none">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">本月积分发放</div>
+            <span class="stat-icon">&#9733;</span>
+            <div class="stat-value">2,840,000</div>
+            <div class="stat-change up">&#9650; +12.4%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">本月兑换消耗</div>
+            <span class="stat-icon">&#9654;</span>
+            <div class="stat-value">1,260,000</div>
+            <div class="stat-change up">&#9650; +8.2%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">流通积分余额</div>
+            <span class="stat-icon">&#9775;</span>
+            <div class="stat-value">18,400,000</div>
+            <div class="stat-change up">&#9650; +1,580,000</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">兑换率</div>
+            <span class="stat-icon">&#9670;</span>
+            <div class="stat-value">44.4%</div>
+            <div class="stat-change up">&#9650; +1.8pp</div>
+          </div>
+        </div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <div class="table-header">
+            <div class="table-title">积分规则配置</div>
+            <button class="btn-gold" style="padding:6px 14px;font-size:12px" onclick="showToast('规则已保存')">保存规则</button>
+          </div>
+          <table>
+            <thead><tr><th>行为</th><th>积分奖励</th><th>每日上限</th><th>状态</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr><td style="color:#F8F6F0">每日登录</td><td style="color:#C8A96E">+5 分</td><td>5 分</td><td><span class="tag tag-green">启用</span></td><td><button class="btn-sm-red" onclick="showToast('规则已停用')">停用</button></td></tr>
+              <tr><td style="color:#F8F6F0">发布帖子</td><td style="color:#C8A96E">+10 分</td><td>50 分</td><td><span class="tag tag-green">启用</span></td><td><button class="btn-sm-red" onclick="showToast('规则已停用')">停用</button></td></tr>
+              <tr><td style="color:#F8F6F0">帖子获赞</td><td style="color:#C8A96E">+2 分</td><td>20 分</td><td><span class="tag tag-green">启用</span></td><td><button class="btn-sm-red" onclick="showToast('规则已停用')">停用</button></td></tr>
+              <tr><td style="color:#F8F6F0">参与活动</td><td style="color:#C8A96E">+50 分</td><td>100 分</td><td><span class="tag tag-green">启用</span></td><td><button class="btn-sm-red" onclick="showToast('规则已停用')">停用</button></td></tr>
+              <tr><td style="color:#F8F6F0">邀请好友</td><td style="color:#C8A96E">+100 分</td><td>500 分</td><td><span class="tag tag-green">启用</span></td><td><button class="btn-sm-red" onclick="showToast('规则已停用')">停用</button></td></tr>
+              <tr><td style="color:#F8F6F0">完成AI分析</td><td style="color:#C8A96E">+20 分</td><td>100 分</td><td><span class="tag tag-green">启用</span></td><td><button class="btn-sm-red" onclick="showToast('规则已停用')">停用</button></td></tr>
+              <tr><td style="color:#F8F6F0">大V互动</td><td style="color:#C8A96E">+5 分</td><td>30 分</td><td><span class="tag tag-green">启用</span></td><td><button class="btn-sm-red" onclick="showToast('规则已停用')">停用</button></td></tr>
+              <tr><td style="color:#F8F6F0">分享内容</td><td style="color:#C8A96E">+15 分</td><td>60 分</td><td><span style="color:#8899aa;font-size:12px">停用</span></td><td><button class="btn-sm-blue" onclick="showToast('规则已启用')">启用</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <div class="table-header">
+            <div class="table-title">积分排行榜 (本月)</div>
+            <span class="tag tag-gold">Top 8</span>
+          </div>
+          <table>
+            <thead><tr><th>排名</th><th>用户</th><th>等级</th><th>本月积分</th><th>累计积分</th><th>兑换算力次数</th></tr></thead>
+            <tbody>
+              <tr><td><span class="rank-badge rank-1">1</span></td><td style="color:#F8F6F0">张伟</td><td><span class="tag tag-gold">机构VIP</span></td><td style="color:#C8A96E">12,840</td><td>84,200</td><td>42</td></tr>
+              <tr><td><span class="rank-badge rank-2">2</span></td><td style="color:#F8F6F0">周浩然</td><td><span class="tag tag-gold">机构VIP</span></td><td style="color:#C8A96E">10,620</td><td>72,400</td><td>38</td></tr>
+              <tr><td><span class="rank-badge rank-3">3</span></td><td style="color:#F8F6F0">李晓梅</td><td><span class="tag tag-blue">专业会员</span></td><td style="color:#C8A96E">8,940</td><td>48,600</td><td>31</td></tr>
+              <tr><td><span class="rank-badge rank-n">4</span></td><td style="color:#F8F6F0">王建国</td><td><span class="tag tag-blue">专业会员</span></td><td style="color:#C8A96E">7,280</td><td>36,200</td><td>24</td></tr>
+              <tr><td><span class="rank-badge rank-n">5</span></td><td style="color:#F8F6F0">财经老王</td><td><span class="tier-s">S级KOL</span></td><td style="color:#C8A96E">6,840</td><td>124,800</td><td>28</td></tr>
+              <tr><td><span class="rank-badge rank-n">6</span></td><td style="color:#F8F6F0">陈思远</td><td><span style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.2);color:#C8A96E;border-radius:4px;padding:2px 7px;font-size:11px">基础会员</span></td><td style="color:#C8A96E">4,120</td><td>18,400</td><td>12</td></tr>
+              <tr><td><span class="rank-badge rank-n">7</span></td><td style="color:#F8F6F0">吴静怡</td><td><span class="tag tag-blue">专业会员</span></td><td style="color:#C8A96E">3,680</td><td>22,100</td><td>14</td></tr>
+              <tr><td><span class="rank-badge rank-n">8</span></td><td style="color:#F8F6F0">郑凯</td><td><span style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.2);color:#C8A96E;border-radius:4px;padding:2px 7px;font-size:11px">基础会员</span></td><td style="color:#C8A96E">2,940</td><td>14,600</td><td>9</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap">
+          <div class="table-header">
+            <div class="table-title">算力兑换套餐配置</div>
+            <button class="btn-gold" style="padding:6px 14px;font-size:12px" onclick="showToast('套餐已保存')">+ 新增套餐</button>
+          </div>
+          <div class="compute-packages">
+            <div class="compute-pkg">
+              <div class="compute-pkg-name">入门包</div>
+              <div class="compute-pkg-cost">500</div>
+              <div class="compute-pkg-unit">积分</div>
+              <div class="compute-pkg-compute">兑换 50 算力</div>
+              <button class="btn-outline" style="margin-top:10px;padding:4px 12px;font-size:11px;width:100%" onclick="showToast('套餐编辑已打开')">编辑</button>
+            </div>
+            <div class="compute-pkg">
+              <div class="compute-pkg-name">标准包</div>
+              <div class="compute-pkg-cost">1,000</div>
+              <div class="compute-pkg-unit">积分</div>
+              <div class="compute-pkg-compute">兑换 120 算力</div>
+              <button class="btn-outline" style="margin-top:10px;padding:4px 12px;font-size:11px;width:100%" onclick="showToast('套餐编辑已打开')">编辑</button>
+            </div>
+            <div class="compute-pkg">
+              <div class="compute-pkg-name">进阶包</div>
+              <div class="compute-pkg-cost">2,500</div>
+              <div class="compute-pkg-unit">积分</div>
+              <div class="compute-pkg-compute">兑换 320 算力</div>
+              <button class="btn-outline" style="margin-top:10px;padding:4px 12px;font-size:11px;width:100%" onclick="showToast('套餐编辑已打开')">编辑</button>
+            </div>
+            <div class="compute-pkg">
+              <div class="compute-pkg-name">专业包</div>
+              <div class="compute-pkg-cost">5,000</div>
+              <div class="compute-pkg-unit">积分</div>
+              <div class="compute-pkg-compute">兑换 700 算力</div>
+              <button class="btn-outline" style="margin-top:10px;padding:4px 12px;font-size:11px;width:100%" onclick="showToast('套餐编辑已打开')">编辑</button>
+            </div>
+            <div class="compute-pkg">
+              <div class="compute-pkg-name">旗舰包</div>
+              <div class="compute-pkg-cost">10,000</div>
+              <div class="compute-pkg-unit">积分</div>
+              <div class="compute-pkg-compute">兑换 1,500 算力</div>
+              <button class="btn-outline" style="margin-top:10px;padding:4px 12px;font-size:11px;width:100%" onclick="showToast('套餐编辑已打开')">编辑</button>
+            </div>
+          </div>
+        </div>
+      </div><!-- end section-points -->
+
+      <!-- ===== KOLS ===== -->
+      <div id="section-kols" style="display:none">
+        <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div class="stat-card">
+            <div class="stat-label">S级合伙人</div>
+            <span class="stat-icon">&#9812;</span>
+            <div class="stat-value">42</div>
+            <div class="stat-change up">贡献GMV 68%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">本月总佣金</div>
+            <span class="stat-icon">&#9775;</span>
+            <div class="stat-value">¥114万</div>
+            <div class="stat-change up">&#9650; +8.2%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">待审核申请</div>
+            <span class="stat-icon">&#9998;</span>
+            <div class="stat-value">18</div>
+            <div class="stat-change" style="color:#C8A96E">需处理</div>
+          </div>
+        </div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <div class="table-header">
+            <div class="table-title">KOL合伙人列表</div>
+            <button class="btn-gold" style="padding:6px 14px;font-size:12px" onclick="showToast('新增合伙人表单已打开')">+ 新增合伙人</button>
+          </div>
+          <table>
+            <thead><tr><th>KOL名称</th><th>平台</th><th>粉丝数</th><th>本月GMV</th><th>佣金</th><th>等级</th><th>操作</th></tr></thead>
+            <tbody>
+              {% for kol in kols %}
+              <tr>
+                <td><span style="color:#F8F6F0;font-weight:500">{{ kol.name }}</span></td>
+                <td>{{ kol.platform }}</td>
+                <td>{{ "{:,}".format(kol.followers) }}</td>
+                <td>¥{{ "{:,}".format(kol.gmv) }}</td>
+                <td style="color:#C8A96E">¥{{ "{:,}".format(kol.commission) }}</td>
+                <td><span class="{% if kol.tier == 'S级' %}tier-s{% elif kol.tier == 'A级' %}tier-a{% else %}tier-b{% endif %}">{{ kol.tier }}</span></td>
+                <td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-blue" onclick="showToast('结算已发起')">结算</button></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap">
+          <div class="table-header">
+            <div class="table-title">KOL申请审核</div>
+            <span class="tag tag-gold">待审核 18 条</span>
+          </div>
+          <table>
+            <thead><tr><th>申请人</th><th>平台</th><th>粉丝数</th><th>内容方向</th><th>申请等级</th><th>提交时间</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr><td style="color:#F8F6F0">林晓宇</td><td>微信</td><td>128,000</td><td>宏观经济分析</td><td><span class="tier-a">A级</span></td><td>今日 09:12</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
+              <tr><td style="color:#F8F6F0">陈雨桐</td><td>抖音</td><td>84,200</td><td>A股技术分析</td><td><span class="tier-b">B级</span></td><td>今日 08:44</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
+              <tr><td style="color:#F8F6F0">黄志远</td><td>小红书</td><td>210,000</td><td>港股投资策略</td><td><span class="tier-s">S级</span></td><td>昨日 22:30</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
+              <tr><td style="color:#F8F6F0">苏梦琪</td><td>微博</td><td>56,800</td><td>基金定投科普</td><td><span class="tier-b">B级</span></td><td>昨日 18:15</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
+              <tr><td style="color:#F8F6F0">方浩天</td><td>抖音</td><td>320,000</td><td>量化交易策略</td><td><span class="tier-s">S级</span></td><td>昨日 14:08</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div><!-- end section-kols -->
+
+      <!-- ===== COMMISSION ===== -->
+      <div id="section-commission" style="display:none">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">待结算总额</div>
+            <span class="stat-icon">&#9775;</span>
+            <div class="stat-value">¥114万</div>
+            <div class="stat-change" style="color:#C8A96E">待处理</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">本月已结算</div>
+            <span class="stat-icon">&#9654;</span>
+            <div class="stat-value">¥89万</div>
+            <div class="stat-change up">&#9650; +6.4%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">结算KOL数</div>
+            <span class="stat-icon">&#9786;</span>
+            <div class="stat-value">486</div>
+            <div class="stat-change up">&#9650; +32</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">平均佣金</div>
+            <span class="stat-icon">&#9733;</span>
+            <div class="stat-value">¥2,348</div>
+            <div class="stat-change up">&#9650; +¥184</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <div class="table-header">
+            <div class="table-title">结算明细</div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <select style="background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);border-radius:6px;padding:6px 10px;color:#F8F6F0;font-size:12px"><option>结算状态 (全部)</option><option>待结算</option><option>处理中</option><option>已完成</option></select>
+              <select style="background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);border-radius:6px;padding:6px 10px;color:#F8F6F0;font-size:12px"><option>结算周期 (本月)</option><option>上月</option><option>近3月</option></select>
+              <button class="btn-gold" style="padding:6px 14px;font-size:12px" onclick="showToast('批量结算已发起')">批量结算选中</button>
+            </div>
+          </div>
+          <table>
+            <thead><tr><th><input type="checkbox" style="accent-color:#C8A96E"></th><th>KOL名称</th><th>等级</th><th>平台</th><th>本月GMV</th><th>佣金比例</th><th>应付金额</th><th>状态</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">财经老王</td><td><span class="tier-s">S级</span></td><td>微信</td><td>¥284,000</td><td>20%</td><td style="color:#C8A96E">¥56,800</td><td><span class="status-gold">待结算</span></td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px" onclick="showToast('结算已发起')">结算</button></td></tr>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">投资女神Lisa</td><td><span class="tier-s">S级</span></td><td>小红书</td><td>¥196,000</td><td>20%</td><td style="color:#C8A96E">¥39,200</td><td><span class="status-blue">处理中</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">查看</button></td></tr>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">量化小白</td><td><span class="tier-a">A级</span></td><td>抖音</td><td>¥142,000</td><td>18%</td><td style="color:#C8A96E">¥25,560</td><td><span class="status-gold">待结算</span></td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px" onclick="showToast('结算已发起')">结算</button></td></tr>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">宏观策略师</td><td><span class="tier-a">A级</span></td><td>微博</td><td>¥98,000</td><td>18%</td><td style="color:#C8A96E">¥17,640</td><td><span class="status-green">已完成</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">凭证</button></td></tr>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">新能源达人</td><td><span class="tier-b">B级</span></td><td>抖音</td><td>¥76,000</td><td>15%</td><td style="color:#C8A96E">¥11,400</td><td><span class="status-gold">待结算</span></td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px" onclick="showToast('结算已发起')">结算</button></td></tr>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">债券研究员</td><td><span class="tier-b">B级</span></td><td>微信</td><td>¥54,000</td><td>15%</td><td style="color:#C8A96E">¥8,100</td><td><span class="status-blue">处理中</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">查看</button></td></tr>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">期货老手</td><td><span class="tier-a">A级</span></td><td>微博</td><td>¥88,000</td><td>18%</td><td style="color:#C8A96E">¥15,840</td><td><span class="status-green">已完成</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">凭证</button></td></tr>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">科技股猎手</td><td><span class="tier-s">S级</span></td><td>小红书</td><td>¥168,000</td><td>20%</td><td style="color:#C8A96E">¥33,600</td><td><span class="status-gold">待结算</span></td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px" onclick="showToast('结算已发起')">结算</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div><!-- end section-commission -->
+
+      <!-- ===== COMMUNITY ===== -->
+      <div id="section-community" style="display:none">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">今日发帖</div>
+            <span class="stat-icon">&#9998;</span>
+            <div class="stat-value">342</div>
+            <div class="stat-change up">&#9650; +28</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">今日互动</div>
+            <span class="stat-icon">&#9786;</span>
+            <div class="stat-value">8,640</div>
+            <div class="stat-change up">&#9650; +12.4%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">待审核内容</div>
+            <span class="stat-icon">&#9670;</span>
+            <div class="stat-value">7</div>
+            <div class="stat-change" style="color:#C8A96E">需处理</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">违规拦截</div>
+            <span class="stat-icon">&#9888;</span>
+            <div class="stat-value">3</div>
+            <div class="stat-change" style="color:#ff7070">今日</div>
+          </div>
+        </div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <div class="table-header">
+            <div class="table-title">帖子审核队列</div>
+            <span class="tag tag-gold">待审核 7 条</span>
+          </div>
+          <table>
+            <thead><tr><th>作者</th><th>内容摘要</th><th>标签</th><th>点赞</th><th>提交时间</th><th>AI合规检测</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr>
+                <td style="color:#F8F6F0">财经老王</td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#8899aa">美联储降息预期下的A股配置策略分析，重点关注...</td>
+                <td><span class="tag tag-blue">宏观</span></td><td>284</td><td>10:32</td>
+                <td><span class="tag tag-green">通过</span></td>
+                <td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('帖子已发布')">发布</button><button class="btn-outline" style="padding:3px 9px;font-size:11px">详情</button></td>
+              </tr>
+              <tr>
+                <td style="color:#F8F6F0">投资女神Lisa</td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#8899aa">港股互联网板块深度研究：腾讯、阿里、美团估值...</td>
+                <td><span class="tag tag-blue">港股</span></td><td>196</td><td>09:15</td>
+                <td><span class="tag tag-green">通过</span></td>
+                <td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('帖子已发布')">发布</button><button class="btn-outline" style="padding:3px 9px;font-size:11px">详情</button></td>
+              </tr>
+              <tr>
+                <td style="color:#F8F6F0">量化小白</td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#8899aa">某股票明日必涨，快速建仓，稳赚不赔！限时...</td>
+                <td><span class="tag tag-red">违规</span></td><td>12</td><td>08:44</td>
+                <td><span class="tag tag-red">违规</span></td>
+                <td><button class="btn-sm-red" style="margin-right:4px" onclick="showToast('帖子已驳回')">驳回</button><button class="btn-outline" style="padding:3px 9px;font-size:11px">详情</button></td>
+              </tr>
+              <tr>
+                <td style="color:#F8F6F0">宏观策略师</td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#8899aa">新能源产业链2026年投资展望：光伏、储能、...</td>
+                <td><span class="tag tag-blue">新能源</span></td><td>142</td><td>昨日 22:10</td>
+                <td><span class="tag tag-gold">审核中</span></td>
+                <td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('帖子已发布')">发布</button><button class="btn-sm-red" style="margin-right:4px" onclick="showToast('帖子已驳回')">驳回</button><button class="btn-outline" style="padding:3px 9px;font-size:11px">详情</button></td>
+              </tr>
+              <tr>
+                <td style="color:#F8F6F0">债券研究员</td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#8899aa">2026年债券市场展望：利率走势与信用风险...</td>
+                <td><span class="tag tag-blue">债券</span></td><td>88</td><td>昨日 20:05</td>
+                <td><span class="tag tag-green">通过</span></td>
+                <td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('帖子已发布')">发布</button><button class="btn-outline" style="padding:3px 9px;font-size:11px">详情</button></td>
+              </tr>
+              <tr>
+                <td style="color:#F8F6F0">科技股猎手</td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#8899aa">AI芯片产业链深度梳理：英伟达供应链国产替代...</td>
+                <td><span class="tag tag-blue">科技</span></td><td>320</td><td>昨日 16:40</td>
+                <td><span class="tag tag-green">通过</span></td>
+                <td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('帖子已发布')">发布</button><button class="btn-outline" style="padding:3px 9px;font-size:11px">详情</button></td>
+              </tr>
+              <tr>
+                <td style="color:#F8F6F0">期货老手</td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#8899aa">商品期货周报：原油、铜、黄金走势分析与...</td>
+                <td><span class="tag tag-blue">期货</span></td><td>64</td><td>昨日 14:22</td>
+                <td><span class="tag tag-gold">审核中</span></td>
+                <td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('帖子已发布')">发布</button><button class="btn-sm-red" style="margin-right:4px" onclick="showToast('帖子已驳回')">驳回</button><button class="btn-outline" style="padding:3px 9px;font-size:11px">详情</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap">
+          <div class="table-header">
+            <div class="table-title">违规关键词配置</div>
+            <button class="btn-gold" style="padding:6px 14px;font-size:12px" onclick="showToast('关键词已添加')">+ 添加关键词</button>
+          </div>
+          <div style="padding:16px">
+            <div style="font-size:12px;color:#8899aa;margin-bottom:12px">点击关键词可删除。共 24 个违规关键词。</div>
+            <div class="keyword-cloud">
+              <span class="keyword-tag" onclick="showToast('关键词已删除')">稳赚不赔</span>
+              <span class="keyword-tag" onclick="showToast('关键词已删除')">必涨</span>
+              <span class="keyword-tag" onclick="showToast('关键词已删除')">内幕消息</span>
+              <span class="keyword-tag" onclick="showToast('关键词已删除')">保本保收益</span>
+              <span class="keyword-tag" onclick="showToast('关键词已删除')">无风险套利</span>
+              <span class="keyword-tag" onclick="showToast('关键词已删除')">百分百盈利</span>
+              <span class="keyword-tag" onclick="showToast('关键词已删除')">割韭菜</span>
+              <span class="keyword-tag" onclick="showToast('关键词已删除')">庄家操盘</span>
+              <span class="keyword-tag" onclick="showToast('关键词已删除')">跑路</span>
+              <span class="keyword-tag" onclick="showToast('关键词已删除')">洗盘</span>
+              <span class="keyword-tag" onclick="showToast('关键词已删除')">拉升出货</span>
+              <span class="keyword-tag" onclick="showToast('关键词已删除')">坐庄</span>
+              <span class="keyword-tag" onclick="showToast('关键词已删除')">老鼠仓</span>
+              <span class="keyword-tag" onclick="showToast('关键词已删除')">内幕交易</span>
+              <span class="keyword-tag" onclick="showToast('关键词已删除')">操纵市场</span>
+              <span class="keyword-tag" onclick="showToast('关键词已删除')">虚假信息</span>
+            </div>
+          </div>
+        </div>
+      </div><!-- end section-community -->
+
+      <!-- ===== EVENTS ===== -->
+      <div id="section-events" style="display:none">
+
+        <!-- ── 列表视图 ── -->
+        <div id="ev-list">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">进行中活动</div>
+            <span class="stat-icon">&#9728;</span>
+            <div class="stat-value">2</div>
+            <div class="stat-change" style="color:#C8A96E">实时</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">本月参与人次</div>
+            <span class="stat-icon">&#9786;</span>
+            <div class="stat-value">12,840</div>
+            <div class="stat-change up">&#9650; +18.4%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">待发布</div>
+            <span class="stat-icon">&#9670;</span>
+            <div class="stat-value">3</div>
+            <div class="stat-change" style="color:#C8A96E">待处理</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">积分发放</div>
+            <span class="stat-icon">&#9733;</span>
+            <div class="stat-value">284,000</div>
+            <div class="stat-change up">&#9650; +12.1%</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <div class="table-header">
+            <div class="table-title">活动列表</div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <select style="background:#1A2E45;border:1px solid rgba(200,169,110,0.2);color:#9A9590;padding:5px 10px;border-radius:6px;font-size:12px">
+                <option>全部类型</option><option>直播</option><option>活动</option><option>会议</option>
+              </select>
+              <select style="background:#1A2E45;border:1px solid rgba(200,169,110,0.2);color:#9A9590;padding:5px 10px;border-radius:6px;font-size:12px">
+                <option>全部状态</option><option>报名中</option><option>进行中</option><option>待发布</option><option>已结束</option>
+              </select>
+              <button class="btn-gold" style="padding:6px 14px;font-size:12px" onclick="evShowCreate()">+ 创建活动</button>
+            </div>
+          </div>
+          <table>
+            <thead><tr><th><input type="checkbox" id="ev-check-all" onchange="evToggleAll(this)"></th><th>活动标题</th><th>类型</th><th>时间</th><th>主办方</th><th>参与人数</th><th>积分奖励</th><th>状态</th><th>操作</th></tr></thead>
+            <tbody id="ev-table-body">
+              <tr>
+                <td><input type="checkbox" class="ev-check"></td>
+                <td><a href="#" style="color:#F8F6F0;font-weight:500" onclick="evShowDetail(1);return false">2026年中期投资策略峰会</a></td>
+                <td><span class="tag tag-blue">会议</span></td>
+                <td style="white-space:nowrap">2026-06-15 14:00</td><td>冈底斯官方</td>
+                <td>2,840 <span style="font-size:11px;color:#9A9590">/ 上限5000</span></td>
+                <td style="color:#C8A96E">100分</td>
+                <td><span class="tag tag-green">报名中</span></td>
+                <td style="white-space:nowrap">
+                  <button class="btn-outline" style="padding:3px 8px;font-size:11px;margin-right:3px" onclick="evShowDetail(1)">详情</button>
+                  <button class="btn-outline" style="padding:3px 8px;font-size:11px;margin-right:3px" onclick="evShowEdit(1)">编辑</button>
+                  <button style="padding:3px 8px;font-size:11px;border:1px solid rgba(255,100,100,0.4);background:rgba(255,100,100,0.08);color:#ff7070;border-radius:4px;cursor:pointer" onclick="showToast('活动已下线')">下线</button>
+                </td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" class="ev-check"></td>
+                <td><a href="#" style="color:#F8F6F0;font-weight:500" onclick="evShowDetail(2);return false">财经老王直播：A股下半年布局</a></td>
+                <td><span class="tag tag-blue">直播</span></td>
+                <td style="white-space:nowrap">2026-05-22 20:00</td><td>财经老王</td>
+                <td>1,240 <span style="font-size:11px;color:#9A9590">/ 不限</span></td>
+                <td style="color:#C8A96E">50分</td>
+                <td><span class="tag tag-green">进行中</span></td>
+                <td style="white-space:nowrap">
+                  <button class="btn-outline" style="padding:3px 8px;font-size:11px;margin-right:3px" onclick="evShowDetail(2)">详情</button>
+                  <button class="btn-outline" style="padding:3px 8px;font-size:11px;margin-right:3px" onclick="evShowEdit(2)">编辑</button>
+                  <button style="padding:3px 8px;font-size:11px;border:1px solid rgba(255,100,100,0.4);background:rgba(255,100,100,0.08);color:#ff7070;border-radius:4px;cursor:pointer" onclick="showToast('活动已下线')">下线</button>
+                </td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" class="ev-check"></td>
+                <td><a href="#" style="color:#F8F6F0;font-weight:500" onclick="evShowDetail(3);return false">新能源投资沙龙（上海）</a></td>
+                <td><span style="background:rgba(160,100,220,0.15);border:1px solid rgba(160,100,220,0.4);color:#c084fc;border-radius:4px;padding:2px 7px;font-size:11px">线下活动</span></td>
+                <td style="white-space:nowrap">2026-05-28 13:30</td><td>冈底斯官方</td>
+                <td>480 <span style="font-size:11px;color:#9A9590">/ 上限500</span></td>
+                <td style="color:#C8A96E">200分</td>
+                <td><span class="tag tag-gold">报名中</span></td>
+                <td style="white-space:nowrap">
+                  <button class="btn-outline" style="padding:3px 8px;font-size:11px;margin-right:3px" onclick="evShowDetail(3)">详情</button>
+                  <button class="btn-outline" style="padding:3px 8px;font-size:11px;margin-right:3px" onclick="evShowEdit(3)">编辑</button>
+                  <button style="padding:3px 8px;font-size:11px;border:1px solid rgba(255,100,100,0.4);background:rgba(255,100,100,0.08);color:#ff7070;border-radius:4px;cursor:pointer" onclick="showToast('活动已下线')">下线</button>
+                </td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" class="ev-check"></td>
+                <td><a href="#" style="color:#F8F6F0;font-weight:500" onclick="evShowDetail(4);return false">量化因子研讨会</a></td>
+                <td><span class="tag tag-blue">会议</span></td>
+                <td style="white-space:nowrap">2026-06-05 10:00</td><td>量化小白</td>
+                <td>320 <span style="font-size:11px;color:#9A9590">/ 上限400</span></td>
+                <td style="color:#C8A96E">150分</td>
+                <td><span style="color:#8899aa;font-size:12px">待发布</span></td>
+                <td style="white-space:nowrap">
+                  <button class="btn-outline" style="padding:3px 8px;font-size:11px;margin-right:3px" onclick="evShowDetail(4)">详情</button>
+                  <button class="btn-outline" style="padding:3px 8px;font-size:11px;margin-right:3px" onclick="evShowEdit(4)">编辑</button>
+                  <button class="btn-gold" style="padding:3px 8px;font-size:11px" onclick="showToast('活动已发布')">发布</button>
+                </td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" class="ev-check"></td>
+                <td><a href="#" style="color:#9A9590;font-weight:500" onclick="evShowDetail(5);return false">港股通投资策略直播</a></td>
+                <td><span class="tag tag-blue">直播</span></td>
+                <td style="white-space:nowrap">2026-05-18 20:00</td><td>投资女神Lisa</td>
+                <td>3,640</td>
+                <td style="color:#C8A96E">50分</td>
+                <td><span style="color:#8899aa;font-size:12px">已结束</span></td>
+                <td style="white-space:nowrap">
+                  <button class="btn-outline" style="padding:3px 8px;font-size:11px;margin-right:3px" onclick="evShowDetail(5)">详情</button>
+                  <button class="btn-outline" style="padding:3px 8px;font-size:11px" onclick="showToast('活动数据已导出')">导出数据</button>
+                </td>
+              </tr>
+              <tr>
+                <td><input type="checkbox" class="ev-check"></td>
+                <td><a href="#" style="color:#F8F6F0;font-weight:500" onclick="evShowDetail(6);return false">冈底斯5月积分挑战赛</a></td>
+                <td><span style="background:rgba(160,100,220,0.15);border:1px solid rgba(160,100,220,0.4);color:#c084fc;border-radius:4px;padding:2px 7px;font-size:11px">挑战赛</span></td>
+                <td style="white-space:nowrap">2026-05-01 ~ 05-31</td><td>冈底斯官方</td>
+                <td>8,420</td>
+                <td style="color:#C8A96E">500分</td>
+                <td><span class="tag tag-green">进行中</span></td>
+                <td style="white-space:nowrap">
+                  <button class="btn-outline" style="padding:3px 8px;font-size:11px;margin-right:3px" onclick="evShowDetail(6)">详情</button>
+                  <button class="btn-outline" style="padding:3px 8px;font-size:11px;margin-right:3px" onclick="evShowEdit(6)">编辑</button>
+                  <button style="padding:3px 8px;font-size:11px;border:1px solid rgba(255,100,100,0.4);background:rgba(255,100,100,0.08);color:#ff7070;border-radius:4px;cursor:pointer" onclick="showToast('活动已下线')">下线</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(200,169,110,0.08)">
+            <span style="font-size:12px;color:#9A9590">共 6 条活动</span>
+            <div style="display:flex;gap:8px">
+              <button style="padding:4px 12px;font-size:12px;background:#1A2E45;border:1px solid rgba(200,169,110,0.2);color:#9A9590;border-radius:4px;cursor:pointer" onclick="showToast('批量操作：请先勾选活动')">批量下线</button>
+              <button style="padding:4px 12px;font-size:12px;background:#1A2E45;border:1px solid rgba(200,169,110,0.2);color:#9A9590;border-radius:4px;cursor:pointer" onclick="showToast('数据已导出')">批量导出</button>
+            </div>
+          </div>
+        </div>
+        </div><!-- end ev-list -->
+
+        <!-- ══════ 活动详情视图 ══════ -->
+        <div id="ev-detail" style="display:none">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+            <button onclick="evBack()" style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.2);color:#C8A96E;padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer">← 返回列表</button>
+            <div style="font-size:18px;font-weight:700;color:#F8F6F0" id="ev-detail-title">活动详情</div>
+            <span id="ev-detail-status-badge"></span>
+            <div style="flex:1"></div>
+            <button onclick="evShowEdit('current')" style="background:rgba(200,169,110,0.1);border:1px solid rgba(200,169,110,0.3);color:#C8A96E;padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer">✏️ 编辑活动</button>
+            <button onclick="showToast('活动数据已导出')" style="background:#1A2E45;border:1px solid rgba(200,169,110,0.15);color:#9A9590;padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer">导出数据</button>
+          </div>
+
+          <!-- 基本信息卡片 -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+            <div style="background:#1A2E45;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:20px">
+              <div style="font-size:12px;color:#9A9590;margin-bottom:14px;letter-spacing:1px">基本信息</div>
+              <div style="display:grid;gap:10px">
+                <div style="display:flex;justify-content:space-between;font-size:13px">
+                  <span style="color:#9A9590">活动类型</span><span id="ev-d-type" style="color:#F8F6F0"></span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:13px">
+                  <span style="color:#9A9590">主办方</span><span id="ev-d-host" style="color:#F8F6F0"></span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:13px">
+                  <span style="color:#9A9590">活动时间</span><span id="ev-d-date" style="color:#F8F6F0"></span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:13px">
+                  <span style="color:#9A9590">参与上限</span><span id="ev-d-cap" style="color:#F8F6F0"></span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:13px">
+                  <span style="color:#9A9590">积分奖励</span><span id="ev-d-pts" style="color:#C8A96E;font-weight:600"></span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:13px">
+                  <span style="color:#9A9590">算力奖励</span><span id="ev-d-compute" style="color:#C8A96E"></span>
+                </div>
+              </div>
+            </div>
+            <div style="background:#1A2E45;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:20px">
+              <div style="font-size:12px;color:#9A9590;margin-bottom:14px;letter-spacing:1px">参与数据</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div style="text-align:center;padding:12px;background:rgba(200,169,110,0.04);border-radius:8px">
+                  <div style="font-size:22px;font-weight:700;color:#C8A96E" id="ev-d-joined">—</div>
+                  <div style="font-size:11px;color:#9A9590;margin-top:4px">已报名</div>
+                </div>
+                <div style="text-align:center;padding:12px;background:rgba(46,204,113,0.05);border-radius:8px">
+                  <div style="font-size:22px;font-weight:700;color:#2ECC71" id="ev-d-checkin">—</div>
+                  <div style="font-size:11px;color:#9A9590;margin-top:4px">已签到</div>
+                </div>
+                <div style="text-align:center;padding:12px;background:rgba(52,152,219,0.05);border-radius:8px">
+                  <div style="font-size:22px;font-weight:700;color:#3498DB" id="ev-d-pts-given">—</div>
+                  <div style="font-size:11px;color:#9A9590;margin-top:4px">积分已发放</div>
+                </div>
+                <div style="text-align:center;padding:12px;background:rgba(155,89,182,0.05);border-radius:8px">
+                  <div style="font-size:22px;font-weight:700;color:#BB8FCE" id="ev-d-share">—</div>
+                  <div style="font-size:11px;color:#9A9590;margin-top:4px">分享次数</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 活动描述 -->
+          <div style="background:#1A2E45;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:20px;margin-bottom:16px">
+            <div style="font-size:12px;color:#9A9590;margin-bottom:10px;letter-spacing:1px">活动描述</div>
+            <div id="ev-d-desc" style="font-size:13px;color:#D8D4CC;line-height:1.8"></div>
+          </div>
+
+          <!-- 议程 -->
+          <div style="background:#1A2E45;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:20px;margin-bottom:16px">
+            <div style="font-size:12px;color:#9A9590;margin-bottom:14px;letter-spacing:1px">活动议程</div>
+            <div id="ev-d-agenda" style="font-size:13px;color:#D8D4CC;line-height:2"></div>
+          </div>
+
+          <!-- 报名用户列表 -->
+          <div style="background:#1A2E45;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:20px;margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+              <div style="font-size:12px;color:#9A9590;letter-spacing:1px">报名用户（最新10位）</div>
+              <button onclick="showToast('报名名单已导出')" style="font-size:11px;background:transparent;border:1px solid rgba(200,169,110,0.2);color:#C8A96E;padding:4px 10px;border-radius:4px;cursor:pointer">导出名单</button>
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead><tr style="color:#9A9590;border-bottom:1px solid rgba(200,169,110,0.1)">
+                <th style="padding:6px 10px;text-align:left;font-weight:500">用户</th>
+                <th style="padding:6px 10px;text-align:left;font-weight:500">等级</th>
+                <th style="padding:6px 10px;text-align:left;font-weight:500">会员类型</th>
+                <th style="padding:6px 10px;text-align:left;font-weight:500">报名时间</th>
+                <th style="padding:6px 10px;text-align:left;font-weight:500">签到状态</th>
+              </tr></thead>
+              <tbody>
+                <tr style="border-bottom:1px solid rgba(200,169,110,0.05)"><td style="padding:8px 10px;color:#F8F6F0">投研达人_小陈</td><td style="padding:8px 10px">Lv.4</td><td style="padding:8px 10px"><span class="tag tag-gold" style="font-size:10px">专业会员</span></td><td style="padding:8px 10px;color:#9A9590">05-20 14:32</td><td style="padding:8px 10px"><span style="color:#2ECC71;font-size:12px">✓ 已签到</span></td></tr>
+                <tr style="border-bottom:1px solid rgba(200,169,110,0.05)"><td style="padding:8px 10px;color:#F8F6F0">量化猎手_老吴</td><td style="padding:8px 10px">Lv.5</td><td style="padding:8px 10px"><span class="tag tag-blue" style="font-size:10px">机构VIP</span></td><td style="padding:8px 10px;color:#9A9590">05-20 13:18</td><td style="padding:8px 10px"><span style="color:#2ECC71;font-size:12px">✓ 已签到</span></td></tr>
+                <tr style="border-bottom:1px solid rgba(200,169,110,0.05)"><td style="padding:8px 10px;color:#F8F6F0">价值投资者_Amy</td><td style="padding:8px 10px">Lv.3</td><td style="padding:8px 10px"><span class="tag tag-gold" style="font-size:10px">专业会员</span></td><td style="padding:8px 10px;color:#9A9590">05-20 11:54</td><td style="padding:8px 10px"><span style="color:#9A9590;font-size:12px">未签到</span></td></tr>
+                <tr style="border-bottom:1px solid rgba(200,169,110,0.05)"><td style="padding:8px 10px;color:#F8F6F0">新手_阿明</td><td style="padding:8px 10px">Lv.2</td><td style="padding:8px 10px"><span style="font-size:10px;color:#9A9590">基础会员</span></td><td style="padding:8px 10px;color:#9A9590">05-20 10:40</td><td style="padding:8px 10px"><span style="color:#9A9590;font-size:12px">未签到</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 操作按钮区 -->
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn-gold" style="padding:8px 20px;font-size:13px" onclick="showToast('通知已发送给全部报名用户')">📢 发送通知</button>
+            <button class="btn-outline" style="padding:8px 20px;font-size:13px" onclick="showToast('活动数据报告生成中...')">📊 生成报告</button>
+            <button class="btn-outline" style="padding:8px 20px;font-size:13px" onclick="showToast('积分已批量发放')">🎁 批量发放积分</button>
+            <button style="padding:8px 20px;font-size:13px;border:1px solid rgba(255,100,100,0.4);background:rgba(255,100,100,0.08);color:#ff7070;border-radius:6px;cursor:pointer" onclick="showToast('活动已下线')">下线活动</button>
+          </div>
+        </div><!-- end ev-detail -->
+
+        <!-- ══════ 创建 / 编辑活动表单 ══════ -->
+        <div id="ev-form" style="display:none">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+            <button onclick="evBack()" style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.2);color:#C8A96E;padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer">← 返回</button>
+            <div style="font-size:18px;font-weight:700;color:#F8F6F0" id="ev-form-title">创建活动</div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+            <!-- 左列 -->
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <!-- 基本信息 -->
+              <div style="background:#1A2E45;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:20px">
+                <div style="font-size:13px;font-weight:600;color:#C8A96E;margin-bottom:16px;border-bottom:1px solid rgba(200,169,110,0.1);padding-bottom:8px">📋 基本信息</div>
+                <div style="display:flex;flex-direction:column;gap:12px">
+                  <div>
+                    <label style="font-size:12px;color:#9A9590;display:block;margin-bottom:6px">活动标题 <span style="color:#E74C3C">*</span></label>
+                    <input type="text" placeholder="输入活动标题（最多50字）" value="2026年中期投资策略峰会" style="width:100%;background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);color:#F8F6F0;padding:8px 12px;border-radius:6px;font-size:13px;outline:none">
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div>
+                      <label style="font-size:12px;color:#9A9590;display:block;margin-bottom:6px">活动类型 <span style="color:#E74C3C">*</span></label>
+                      <select style="width:100%;background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);color:#F8F6F0;padding:8px 12px;border-radius:6px;font-size:13px">
+                        <option>直播</option><option selected>会议</option><option>线下活动</option><option>挑战赛</option><option>专家电话会</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style="font-size:12px;color:#9A9590;display:block;margin-bottom:6px">主办方 <span style="color:#E74C3C">*</span></label>
+                      <select style="width:100%;background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);color:#F8F6F0;padding:8px 12px;border-radius:6px;font-size:13px">
+                        <option>冈底斯官方</option><option>财经老王</option><option>投资女神Lisa</option><option>宏观策略师</option><option>量化小白</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div>
+                      <label style="font-size:12px;color:#9A9590;display:block;margin-bottom:6px">开始时间 <span style="color:#E74C3C">*</span></label>
+                      <input type="datetime-local" value="2026-06-15T14:00" style="width:100%;background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);color:#F8F6F0;padding:8px 12px;border-radius:6px;font-size:13px;outline:none">
+                    </div>
+                    <div>
+                      <label style="font-size:12px;color:#9A9590;display:block;margin-bottom:6px">结束时间</label>
+                      <input type="datetime-local" value="2026-06-15T16:00" style="width:100%;background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);color:#F8F6F0;padding:8px 12px;border-radius:6px;font-size:13px;outline:none">
+                    </div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div>
+                      <label style="font-size:12px;color:#9A9590;display:block;margin-bottom:6px">参与人数上限</label>
+                      <input type="number" placeholder="不填则不限" value="5000" style="width:100%;background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);color:#F8F6F0;padding:8px 12px;border-radius:6px;font-size:13px;outline:none">
+                    </div>
+                    <div>
+                      <label style="font-size:12px;color:#9A9590;display:block;margin-bottom:6px">报名截止时间</label>
+                      <input type="datetime-local" value="2026-06-14T23:59" style="width:100%;background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);color:#F8F6F0;padding:8px 12px;border-radius:6px;font-size:13px;outline:none">
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 奖励设置 -->
+              <div style="background:#1A2E45;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:20px">
+                <div style="font-size:13px;font-weight:600;color:#C8A96E;margin-bottom:16px;border-bottom:1px solid rgba(200,169,110,0.1);padding-bottom:8px">🎁 奖励配置</div>
+                <div style="display:flex;flex-direction:column;gap:12px">
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div>
+                      <label style="font-size:12px;color:#9A9590;display:block;margin-bottom:6px">报名积分奖励</label>
+                      <div style="display:flex;align-items:center;gap:6px">
+                        <input type="number" value="10" style="flex:1;background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);color:#F8F6F0;padding:8px 12px;border-radius:6px;font-size:13px;outline:none">
+                        <span style="font-size:12px;color:#9A9590">分</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label style="font-size:12px;color:#9A9590;display:block;margin-bottom:6px">参与完成积分奖励 <span style="color:#E74C3C">*</span></label>
+                      <div style="display:flex;align-items:center;gap:6px">
+                        <input type="number" value="100" style="flex:1;background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);color:#F8F6F0;padding:8px 12px;border-radius:6px;font-size:13px;outline:none">
+                        <span style="font-size:12px;color:#9A9590">分</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <div>
+                      <label style="font-size:12px;color:#9A9590;display:block;margin-bottom:6px">算力奖励（可选）</label>
+                      <div style="display:flex;align-items:center;gap:6px">
+                        <input type="number" placeholder="0" style="flex:1;background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);color:#F8F6F0;padding:8px 12px;border-radius:6px;font-size:13px;outline:none">
+                        <span style="font-size:12px;color:#9A9590">次</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label style="font-size:12px;color:#9A9590;display:block;margin-bottom:6px">分享额外奖励</label>
+                      <div style="display:flex;align-items:center;gap:6px">
+                        <input type="number" value="15" style="flex:1;background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);color:#F8F6F0;padding:8px 12px;border-radius:6px;font-size:13px;outline:none">
+                        <span style="font-size:12px;color:#9A9590">分</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <label style="font-size:12px;color:#9A9590;display:block;margin-bottom:6px">积分发放时机</label>
+                    <select style="width:100%;background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);color:#F8F6F0;padding:8px 12px;border-radius:6px;font-size:13px">
+                      <option>活动结束后自动发放</option>
+                      <option>签到时立即发放</option>
+                      <option>手动触发发放</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 权限与可见性 -->
+              <div style="background:#1A2E45;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:20px">
+                <div style="font-size:13px;font-weight:600;color:#C8A96E;margin-bottom:16px;border-bottom:1px solid rgba(200,169,110,0.1);padding-bottom:8px">🔒 权限设置</div>
+                <div style="display:flex;flex-direction:column;gap:10px">
+                  <div>
+                    <label style="font-size:12px;color:#9A9590;display:block;margin-bottom:6px">参与门槛</label>
+                    <select style="width:100%;background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);color:#F8F6F0;padding:8px 12px;border-radius:6px;font-size:13px">
+                      <option>所有用户（含免费）</option>
+                      <option>基础会员及以上</option>
+                      <option selected>专业会员及以上</option>
+                      <option>机构VIP</option>
+                      <option>仅邀请制</option>
+                    </select>
+                  </div>
+                  <div style="display:flex;align-items:center;justify-content:space-between">
+                    <span style="font-size:13px;color:#D8D4CC">允许分享邀请</span>
+                    <label style="position:relative;display:inline-block;width:38px;height:20px;cursor:pointer">
+                      <input type="checkbox" checked style="opacity:0;width:0;height:0">
+                      <span style="position:absolute;inset:0;background:#C8A96E;border-radius:20px;transition:0.2s"></span>
+                      <span style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:0.2s;transform:translateX(18px)"></span>
+                    </label>
+                  </div>
+                  <div style="display:flex;align-items:center;justify-content:space-between">
+                    <span style="font-size:13px;color:#D8D4CC">H5端展示（活动Tab）</span>
+                    <label style="position:relative;display:inline-block;width:38px;height:20px;cursor:pointer">
+                      <input type="checkbox" checked style="opacity:0;width:0;height:0">
+                      <span style="position:absolute;inset:0;background:#C8A96E;border-radius:20px;transition:0.2s"></span>
+                      <span style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:0.2s;transform:translateX(18px)"></span>
+                    </label>
+                  </div>
+                  <div style="display:flex;align-items:center;justify-content:space-between">
+                    <span style="font-size:13px;color:#D8D4CC">首页Banner推广</span>
+                    <label style="position:relative;display:inline-block;width:38px;height:20px;cursor:pointer">
+                      <input type="checkbox" style="opacity:0;width:0;height:0">
+                      <span style="position:absolute;inset:0;background:#2A3F55;border-radius:20px;transition:0.2s"></span>
+                      <span style="position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:0.2s"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 右列 -->
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <!-- 活动描述（富文本区） -->
+              <div style="background:#1A2E45;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:20px">
+                <div style="font-size:13px;font-weight:600;color:#C8A96E;margin-bottom:12px;border-bottom:1px solid rgba(200,169,110,0.1);padding-bottom:8px">📝 活动描述</div>
+                <!-- 工具栏 -->
+                <div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap">
+                  <button onclick="execCmd('bold')" style="padding:4px 8px;background:#0D1B2A;border:1px solid rgba(200,169,110,0.15);color:#9A9590;border-radius:4px;cursor:pointer;font-size:12px;font-weight:700">B</button>
+                  <button onclick="execCmd('italic')" style="padding:4px 8px;background:#0D1B2A;border:1px solid rgba(200,169,110,0.15);color:#9A9590;border-radius:4px;cursor:pointer;font-size:12px;font-style:italic">I</button>
+                  <button onclick="execCmd('insertUnorderedList')" style="padding:4px 8px;background:#0D1B2A;border:1px solid rgba(200,169,110,0.15);color:#9A9590;border-radius:4px;cursor:pointer;font-size:12px">• 列表</button>
+                  <button onclick="execCmd('insertOrderedList')" style="padding:4px 8px;background:#0D1B2A;border:1px solid rgba(200,169,110,0.15);color:#9A9590;border-radius:4px;cursor:pointer;font-size:12px">1. 列表</button>
+                  <button onclick="insertHr()" style="padding:4px 8px;background:#0D1B2A;border:1px solid rgba(200,169,110,0.15);color:#9A9590;border-radius:4px;cursor:pointer;font-size:12px">分割线</button>
+                  <button onclick="execCmd('removeFormat')" style="padding:4px 8px;background:#0D1B2A;border:1px solid rgba(200,169,110,0.15);color:#9A9590;border-radius:4px;cursor:pointer;font-size:12px">清格式</button>
+                </div>
+                <div id="ev-editor" contenteditable="true"
+                  style="min-height:160px;background:#0D1B2A;border:1px solid rgba(200,169,110,0.15);border-radius:6px;padding:12px;font-size:13px;color:#D8D4CC;line-height:1.8;outline:none"
+                  oninput="evUpdatePreview()">
+                  <p><b>活动背景</b></p>
+                  <p>2026年进入年中，全球宏观格局持续演变，A股估值修复逻辑渐趋清晰。冈底斯特邀顶级投研机构，联合旗下S级KOL合伙人，举办2026年中期投资策略峰会。</p>
+                  <p><b>活动亮点</b></p>
+                  <ul>
+                    <li>4位顶级分析师同台，覆盖宏观、行业、量化、港股四大维度</li>
+                    <li>独家披露冈底斯另类数据信号：卫星数据 + 消费热力图</li>
+                    <li>现场Q&A + Hermes实时分析展示</li>
+                    <li>参与即获100积分 + 专属活动纪念章</li>
+                  </ul>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-top:8px">
+                  <span style="font-size:11px;color:#9A9590">支持富文本编辑，H5端同步渲染</span>
+                  <span style="font-size:11px;color:#9A9590">预览字符：<span id="ev-char-count">240</span></span>
+                </div>
+              </div>
+
+              <!-- 议程配置 -->
+              <div style="background:#1A2E45;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:20px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid rgba(200,169,110,0.1);padding-bottom:8px">
+                  <div style="font-size:13px;font-weight:600;color:#C8A96E">🗓️ 活动议程</div>
+                  <button onclick="evAddAgendaItem()" style="font-size:11px;background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.2);color:#C8A96E;padding:4px 10px;border-radius:4px;cursor:pointer">+ 添加</button>
+                </div>
+                <div id="ev-agenda-list" style="display:flex;flex-direction:column;gap:8px">
+                  <div class="ev-agenda-item" style="display:flex;gap:8px;align-items:flex-start">
+                    <input type="time" value="13:30" style="width:76px;background:#0D1B2A;border:1px solid rgba(200,169,110,0.15);color:#C8A96E;padding:6px;border-radius:4px;font-size:12px;outline:none;flex-shrink:0">
+                    <input type="text" value="签到入场" style="flex:1;background:#0D1B2A;border:1px solid rgba(200,169,110,0.15);color:#F8F6F0;padding:6px 10px;border-radius:4px;font-size:12px;outline:none">
+                    <button onclick="this.closest('.ev-agenda-item').remove()" style="background:transparent;border:none;color:#9A9590;cursor:pointer;font-size:14px;padding:4px">✕</button>
+                  </div>
+                  <div class="ev-agenda-item" style="display:flex;gap:8px;align-items:flex-start">
+                    <input type="time" value="14:00" style="width:76px;background:#0D1B2A;border:1px solid rgba(200,169,110,0.15);color:#C8A96E;padding:6px;border-radius:4px;font-size:12px;outline:none;flex-shrink:0">
+                    <input type="text" value="开场致辞 + 2026上半年市场复盘" style="flex:1;background:#0D1B2A;border:1px solid rgba(200,169,110,0.15);color:#F8F6F0;padding:6px 10px;border-radius:4px;font-size:12px;outline:none">
+                    <button onclick="this.closest('.ev-agenda-item').remove()" style="background:transparent;border:none;color:#9A9590;cursor:pointer;font-size:14px;padding:4px">✕</button>
+                  </div>
+                  <div class="ev-agenda-item" style="display:flex;gap:8px;align-items:flex-start">
+                    <input type="time" value="14:30" style="width:76px;background:#0D1B2A;border:1px solid rgba(200,169,110,0.15);color:#C8A96E;padding:6px;border-radius:4px;font-size:12px;outline:none;flex-shrink:0">
+                    <input type="text" value="宏观策略演讲：美联储路径 + A股估值" style="flex:1;background:#0D1B2A;border:1px solid rgba(200,169,110,0.15);color:#F8F6F0;padding:6px 10px;border-radius:4px;font-size:12px;outline:none">
+                    <button onclick="this.closest('.ev-agenda-item').remove()" style="background:transparent;border:none;color:#9A9590;cursor:pointer;font-size:14px;padding:4px">✕</button>
+                  </div>
+                  <div class="ev-agenda-item" style="display:flex;gap:8px;align-items:flex-start">
+                    <input type="time" value="15:30" style="width:76px;background:#0D1B2A;border:1px solid rgba(200,169,110,0.15);color:#C8A96E;padding:6px;border-radius:4px;font-size:12px;outline:none;flex-shrink:0">
+                    <input type="text" value="Hermes现场Demo + 互动问答" style="flex:1;background:#0D1B2A;border:1px solid rgba(200,169,110,0.15);color:#F8F6F0;padding:6px 10px;border-radius:4px;font-size:12px;outline:none">
+                    <button onclick="this.closest('.ev-agenda-item').remove()" style="background:transparent;border:none;color:#9A9590;cursor:pointer;font-size:14px;padding:4px">✕</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- H5预览 -->
+              <div style="background:#1A2E45;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:20px">
+                <div style="font-size:13px;font-weight:600;color:#C8A96E;margin-bottom:12px;border-bottom:1px solid rgba(200,169,110,0.1);padding-bottom:8px">📱 H5端预览</div>
+                <div style="background:#0D1B2A;border-radius:16px;padding:16px;max-width:300px;margin:0 auto;border:1px solid rgba(200,169,110,0.1)">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+                    <span style="font-size:18px">🏛️</span>
+                    <div>
+                      <div style="font-size:13px;font-weight:600;color:#F8F6F0">2026年中期投资策略峰会</div>
+                      <div style="font-size:11px;color:#9A9590;margin-top:2px">冈底斯官方 · 会议</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+                    <span style="font-size:11px;background:rgba(200,169,110,0.1);color:#C8A96E;padding:2px 8px;border-radius:4px">🗓️ 2026-06-15 14:00</span>
+                    <span style="font-size:11px;background:rgba(46,204,113,0.1);color:#2ECC71;padding:2px 8px;border-radius:4px">报名中</span>
+                  </div>
+                  <div style="font-size:11px;color:#9A9590;margin-bottom:10px">已报名 2,840 人 · 上限 5,000 人</div>
+                  <div style="width:100%;height:4px;background:#1A2E45;border-radius:2px;margin-bottom:10px">
+                    <div style="width:57%;height:4px;background:linear-gradient(90deg,#A8893E,#C8A96E);border-radius:2px"></div>
+                  </div>
+                  <div style="display:flex;align-items:center;justify-content:space-between">
+                    <span style="font-size:11px;color:#C8A96E">🎁 参与奖励 100分</span>
+                    <button style="background:linear-gradient(135deg,#A8893E,#C8A96E);color:#0D1B2A;border:none;padding:5px 14px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">立即报名</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 提交操作 -->
+          <div style="margin-top:20px;padding:16px 20px;background:#1A2E45;border:1px solid rgba(200,169,110,0.12);border-radius:10px;display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:13px;color:#9A9590">保存为草稿后可继续编辑，发布后将在H5端立即展示</span>
+            <div style="display:flex;gap:10px">
+              <button onclick="evBack()" style="padding:8px 20px;font-size:13px;background:#1A2E45;border:1px solid rgba(200,169,110,0.2);color:#9A9590;border-radius:6px;cursor:pointer">取消</button>
+              <button onclick="showToast('草稿已保存')" style="padding:8px 20px;font-size:13px;background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.3);color:#C8A96E;border-radius:6px;cursor:pointer">保存草稿</button>
+              <button class="btn-gold" style="padding:8px 24px;font-size:13px" onclick="showToast('活动已发布，H5端即时生效')">发布活动</button>
+            </div>
+          </div>
+        </div><!-- end ev-form -->
+
+      </div><!-- end section-events -->
+
+      <!-- ===== HERMES ===== -->
+      <div id="section-hermes" style="display:none">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">今日调用</div>
+            <span class="stat-icon">&#9881;</span>
+            <div class="stat-value">12,840</div>
+            <div class="stat-change up">&#9650; +8.4%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">本月调用</div>
+            <span class="stat-icon">&#9654;</span>
+            <div class="stat-value">284,000</div>
+            <div class="stat-change up">&#9650; +14.2%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">人均调用</div>
+            <span class="stat-icon">&#9786;</span>
+            <div class="stat-value">7.4次</div>
+            <div class="stat-change up">&#9650; +0.6次</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">算力消耗</div>
+            <span class="stat-icon">&#9733;</span>
+            <div class="stat-value">284,000</div>
+            <div class="stat-change" style="color:#C8A96E">积分</div>
+          </div>
+        </div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <div class="table-header">
+            <div class="table-title">Hermes 模式使用统计</div>
+            <span class="tag tag-gold">6 个模式</span>
+          </div>
+          <table>
+            <thead><tr><th>模式名称</th><th>今日调用</th><th>本月调用</th><th>占比</th><th>平均响应时间</th><th>状态</th></tr></thead>
+            <tbody>
+              <tr>
+                <td style="color:#F8F6F0;font-weight:500">研报精读</td><td>4,494</td><td>99,400</td>
+                <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:35%"></div></div><span style="color:#C8A96E">35%</span></div></td>
+                <td>2.4s</td><td><span class="tag tag-green">正常</span></td>
+              </tr>
+              <tr>
+                <td style="color:#F8F6F0;font-weight:500">专家纪要速读</td><td>2,825</td><td>62,480</td>
+                <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:22%"></div></div><span style="color:#C8A96E">22%</span></div></td>
+                <td>1.8s</td><td><span class="tag tag-green">正常</span></td>
+              </tr>
+              <tr>
+                <td style="color:#F8F6F0;font-weight:500">另类数据解读</td><td>2,311</td><td>51,120</td>
+                <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:18%"></div></div><span style="color:#C8A96E">18%</span></div></td>
+                <td>3.2s</td><td><span class="tag tag-green">正常</span></td>
+              </tr>
+              <tr>
+                <td style="color:#F8F6F0;font-weight:500">投资组合诊断</td><td>1,541</td><td>34,080</td>
+                <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:12%"></div></div><span style="color:#C8A96E">12%</span></div></td>
+                <td>4.1s</td><td><span class="tag tag-green">正常</span></td>
+              </tr>
+              <tr>
+                <td style="color:#F8F6F0;font-weight:500">市场情绪扫描</td><td>1,027</td><td>22,720</td>
+                <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:8%"></div></div><span style="color:#C8A96E">8%</span></div></td>
+                <td>2.8s</td><td><span class="tag tag-green">正常</span></td>
+              </tr>
+              <tr>
+                <td style="color:#F8F6F0;font-weight:500">量化因子筛选</td><td>642</td><td>14,200</td>
+                <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:5%"></div></div><span style="color:#C8A96E">5%</span></div></td>
+                <td>5.6s</td><td><span class="tag tag-gold">高负载</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pool-cards">
+          <div class="pool-card">
+            <div class="pool-card-label">总算力池</div>
+            <div class="pool-card-value">10,000,000</div>
+            <div class="pool-card-sub">积分</div>
+          </div>
+          <div class="pool-card">
+            <div class="pool-card-label">本月消耗</div>
+            <div class="pool-card-value">2,840,000</div>
+            <div class="pool-card-sub">28.4% 使用率</div>
+          </div>
+          <div class="pool-card">
+            <div class="pool-card-label">剩余可用</div>
+            <div class="pool-card-value">7,160,000</div>
+            <div class="pool-card-sub">71.6% 剩余</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <div class="table-header">
+            <div class="table-title">用户算力消耗排行 (本月)</div>
+            <span class="tag tag-gold">Top 8</span>
+          </div>
+          <table>
+            <thead><tr><th>排名</th><th>用户</th><th>等级</th><th>本月调用</th><th>消耗算力</th><th>最常用模式</th></tr></thead>
+            <tbody>
+              <tr><td><span class="rank-badge rank-1">1</span></td><td style="color:#F8F6F0">张伟</td><td><span class="tag tag-gold">机构VIP</span></td><td>284</td><td style="color:#C8A96E">5,680</td><td>研报精读</td></tr>
+              <tr><td><span class="rank-badge rank-2">2</span></td><td style="color:#F8F6F0">周浩然</td><td><span class="tag tag-gold">机构VIP</span></td><td>241</td><td style="color:#C8A96E">4,820</td><td>投资组合诊断</td></tr>
+              <tr><td><span class="rank-badge rank-3">3</span></td><td style="color:#F8F6F0">财经老王</td><td><span class="tier-s">S级KOL</span></td><td>198</td><td style="color:#C8A96E">3,960</td><td>专家纪要速读</td></tr>
+              <tr><td><span class="rank-badge rank-n">4</span></td><td style="color:#F8F6F0">李晓梅</td><td><span class="tag tag-blue">专业会员</span></td><td>164</td><td style="color:#C8A96E">3,280</td><td>研报精读</td></tr>
+              <tr><td><span class="rank-badge rank-n">5</span></td><td style="color:#F8F6F0">方浩天</td><td><span class="tier-s">S级KOL</span></td><td>142</td><td style="color:#C8A96E">2,840</td><td>量化因子筛选</td></tr>
+              <tr><td><span class="rank-badge rank-n">6</span></td><td style="color:#F8F6F0">王建国</td><td><span class="tag tag-blue">专业会员</span></td><td>128</td><td style="color:#C8A96E">2,560</td><td>另类数据解读</td></tr>
+              <tr><td><span class="rank-badge rank-n">7</span></td><td style="color:#F8F6F0">科技股猎手</td><td><span class="tier-a">A级KOL</span></td><td>112</td><td style="color:#C8A96E">2,240</td><td>市场情绪扫描</td></tr>
+              <tr><td><span class="rank-badge rank-n">8</span></td><td style="color:#F8F6F0">吴静怡</td><td><span class="tag tag-blue">专业会员</span></td><td>96</td><td style="color:#C8A96E">1,920</td><td>研报精读</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div><!-- end section-hermes -->
+
+      <!-- ===== CHANNELS ===== -->
+      <div id="section-channels" style="display:none">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">活跃渠道</div>
+            <span class="stat-icon">&#9741;</span>
+            <div class="stat-value">5</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">本月总获客</div>
+            <span class="stat-icon">&#9786;</span>
+            <div class="stat-value">98,000</div>
+            <div class="stat-change up">&#9650; +15.2%</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">综合转化率</div>
+            <span class="stat-icon">&#9670;</span>
+            <div class="stat-value">3.6%</div>
+            <div class="stat-change up">&#9650; +0.4pp</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">获客成本 CAC</div>
+            <span class="stat-icon">&#9775;</span>
+            <div class="stat-value">¥38</div>
+            <div class="stat-change down">&#9660; -¥4 优化</div>
+          </div>
+        </div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <div class="table-header">
+            <div class="table-title">渠道详细数据</div>
+            <span class="tag tag-gold">本月</span>
+          </div>
+          <table>
+            <thead><tr><th>渠道</th><th>曝光量</th><th>点击率</th><th>注册转化</th><th>付费转化</th><th>CAC</th><th>LTV</th><th>ROI</th><th>状态</th></tr></thead>
+            <tbody>
+              <tr><td style="color:#F8F6F0">微信生态</td><td>4,200,000</td><td>2.1%</td><td>1.0%</td><td>3.8%</td><td>¥32</td><td>¥420</td><td><span class="up">4.2x</span></td><td><span class="tag tag-green">健康</span></td></tr>
+              <tr><td style="color:#F8F6F0">抖音</td><td>8,600,000</td><td>0.8%</td><td>0.36%</td><td>2.9%</td><td>¥45</td><td>¥310</td><td><span class="up">3.1x</span></td><td><span class="tag tag-green">健康</span></td></tr>
+              <tr><td style="color:#F8F6F0">小红书</td><td>1,200,000</td><td>1.8%</td><td>0.74%</td><td>4.2%</td><td>¥28</td><td>¥520</td><td><span class="up">5.8x</span></td><td><span class="tag tag-green">优质</span></td></tr>
+              <tr><td style="color:#F8F6F0">微博</td><td>2,800,000</td><td>0.9%</td><td>0.45%</td><td>2.1%</td><td>¥52</td><td>¥240</td><td>2.4x</td><td><span class="tag tag-blue">观察</span></td></tr>
+              <tr><td style="color:#F8F6F0">直接流量</td><td>180,000</td><td>4.2%</td><td>2.0%</td><td>6.8%</td><td>¥18</td><td>¥680</td><td><span class="up">8.2x</span></td><td><span class="tag tag-green">优质</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap">
+          <div class="table-header">
+            <div class="table-title">UTM 追踪参数配置</div>
+            <button class="btn-gold" style="padding:6px 14px;font-size:12px" onclick="showToast('配置已保存')">保存配置</button>
+          </div>
+          <table>
+            <thead><tr><th>渠道</th><th>utm_source</th><th>utm_medium</th><th>utm_campaign</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr><td style="color:#F8F6F0">微信生态</td><td style="font-family:monospace;color:#C8A96E">wechat</td><td style="font-family:monospace;color:#C8A96E">social</td><td style="font-family:monospace;color:#C8A96E">gangtise_wechat_2026</td><td><button class="btn-sm-blue" onclick="showToast('UTM链接已复制')">复制链接</button></td></tr>
+              <tr><td style="color:#F8F6F0">抖音</td><td style="font-family:monospace;color:#C8A96E">douyin</td><td style="font-family:monospace;color:#C8A96E">video</td><td style="font-family:monospace;color:#C8A96E">gangtise_douyin_2026</td><td><button class="btn-sm-blue" onclick="showToast('UTM链接已复制')">复制链接</button></td></tr>
+              <tr><td style="color:#F8F6F0">小红书</td><td style="font-family:monospace;color:#C8A96E">xiaohongshu</td><td style="font-family:monospace;color:#C8A96E">social</td><td style="font-family:monospace;color:#C8A96E">gangtise_xhs_2026</td><td><button class="btn-sm-blue" onclick="showToast('UTM链接已复制')">复制链接</button></td></tr>
+              <tr><td style="color:#F8F6F0">微博</td><td style="font-family:monospace;color:#C8A96E">weibo</td><td style="font-family:monospace;color:#C8A96E">social</td><td style="font-family:monospace;color:#C8A96E">gangtise_weibo_2026</td><td><button class="btn-sm-blue" onclick="showToast('UTM链接已复制')">复制链接</button></td></tr>
+              <tr><td style="color:#F8F6F0">直接流量</td><td style="font-family:monospace;color:#C8A96E">direct</td><td style="font-family:monospace;color:#C8A96E">none</td><td style="font-family:monospace;color:#C8A96E">gangtise_direct_2026</td><td><button class="btn-sm-blue" onclick="showToast('UTM链接已复制')">复制链接</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div><!-- end section-channels -->
+
+      <!-- ===== SETTINGS ===== -->
+      <div id="section-settings" style="display:none">
+        <div class="config-grid">
+          <div class="config-card">
+            <div class="config-card-title">平台基础配置</div>
+            <div class="config-field">
+              <label>站点名称</label>
+              <input type="text" value="冈底斯 Gangtise">
+            </div>
+            <div class="config-field">
+              <label>联系邮箱</label>
+              <input type="text" value="ops@gangtise.com">
+            </div>
+            <div class="config-field">
+              <label>ICP备案号</label>
+              <input type="text" value="沪ICP备2024XXXXXX号">
+            </div>
+            <button class="btn-gold" style="padding:8px 20px;font-size:13px;margin-top:4px" onclick="showToast('基础配置已保存')">保存配置</button>
+          </div>
+          <div class="config-card">
+            <div class="config-card-title">合规规则配置</div>
+            <div class="toggle-wrap">
+              <span class="toggle-label">内容发布前审核</span>
+              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
+              <span class="toggle-label">AI分析免责声明</span>
+              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
+              <span class="toggle-label">敏感词自动拦截</span>
+              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
+              <span class="toggle-label">投资建议水印</span>
+              <label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label>
+            </div>
+          </div>
+          <div class="config-card">
+            <div class="config-card-title">AI引擎配置</div>
+            <div class="config-field">
+              <label>当前模型</label>
+              <input type="text" value="DeepSeek R2 + Kimi 2.6">
+            </div>
+            <div class="config-field">
+              <label>API速率限制</label>
+              <input type="text" value="1000 次/天">
+            </div>
+            <div class="config-field">
+              <label>响应超时</label>
+              <input type="text" value="30s">
+            </div>
+            <button class="btn-gold" style="padding:8px 20px;font-size:13px;margin-top:4px" onclick="showToast('AI引擎配置已保存')">保存配置</button>
+          </div>
+          <div class="config-card">
+            <div class="config-card-title">通知配置</div>
+            <div class="toggle-wrap">
+              <span class="toggle-label">新KOL申请通知</span>
+              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
+              <span class="toggle-label">违规内容告警</span>
+              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
+              <span class="toggle-label">结算提醒</span>
+              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
+              <span class="toggle-label">系统异常告警</span>
+              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+          </div>
+        </div>
+      </div><!-- end section-settings -->
+
+    </div><!-- end admin-content -->
+  </div><!-- end admin-main -->
+</div><!-- end admin-layout -->
+
+<script>
+const sectionTitles = {
+  overview:'运营概览', users:'用户列表', segments:'用户分层', points:'积分管理',
+  kols:'KOL合伙人管理', commission:'收益结算', community:'帖子审核',
+  events:'活动管理', hermes:'Hermes使用统计', channels:'渠道管理', settings:'系统设置'
+};
+function showSection(name) {
+  document.querySelectorAll('[id^="section-"]').forEach(s => s.style.display = 'none');
+  document.getElementById('section-' + name).style.display = 'block';
+  document.querySelectorAll('.admin-nav-item').forEach(i => i.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  document.getElementById('page-title').textContent = sectionTitles[name];
+}
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#1A2E45;border:1px solid rgba(200,169,110,0.3);color:#C8A96E;padding:12px 20px;border-radius:8px;font-size:13px;z-index:9999;transition:opacity 0.3s';
+  t.textContent = msg || '操作成功';
+  document.body.appendChild(t);
+  setTimeout(() => { t.style.opacity='0'; setTimeout(() => t.remove(), 300); }, 2000);
+}
+
+// ── Events rich client ──
+const EV_DATA = {
+  1: { title:'2026年中期投资策略峰会', type:'会议', host:'冈底斯官方', date:'2026-06-15 14:00 ~ 16:00', cap:'5,000', pts:'100分', compute:'—', status:'报名中', joined:'2,840', checkin:'—', ptsGiven:'—', share:'342', desc:'本次峰会汇聚顶级投研机构，联合冈底斯S级KOL合伙人，覆盖宏观、行业、量化、港股四大维度，独家披露冈底斯另类数据信号。', agenda:'13:30 签到入场\n14:00 开场致辞 + 2026上半年市场复盘\n14:30 宏观策略演讲：美联储路径 + A股估值\n15:00 行业精选：新能源 + AI算力\n15:30 Hermes现场Demo + 互动问答\n15:50 抽奖 + 合影结束' },
+  2: { title:'财经老王直播：A股下半年布局', type:'直播', host:'财经老王', date:'2026-05-22 20:00 ~ 21:30', cap:'不限', pts:'50分', compute:'1次', status:'进行中', joined:'1,240', checkin:'1,240', ptsGiven:'62,000', share:'528', desc:'财经老王将深度解析A股下半年配置策略，重点覆盖科技成长与高股息双主线，结合Hermes实时数据展示。', agenda:'20:00 直播开始 + 实时行情解读\n20:20 下半年大势研判\n20:50 重点板块机会梳理\n21:10 用户问答 + Hermes连线' },
+  3: { title:'新能源投资沙龙（上海）', type:'线下活动', host:'冈底斯官方', date:'2026-05-28 13:30 ~ 17:00', cap:'500', pts:'200分', compute:'2次', status:'报名中', joined:'480', checkin:'—', ptsGiven:'—', share:'198', desc:'冈底斯首场线下投研沙龙，落地上海，邀请新能源产业链核心专家，结合冈底斯卫星数据与Hermes分析工具，深度解读产业机会。', agenda:'13:30 签到\n14:00 产业链现状综述\n14:40 固态电池专项研讨\n15:30 圆桌讨论\n16:20 自由交流 + 冈底斯产品体验' },
+  4: { title:'量化因子研讨会', type:'会议', host:'量化小白', date:'2026-06-05 10:00 ~ 12:00', cap:'400', pts:'150分', compute:'1次', status:'待发布', joined:'320', checkin:'—', ptsGiven:'—', share:'86', desc:'冈底斯Hermes量化因子筛选功能深度演示，量化小白分享多因子模型构建经验，适合专业会员及机构VIP。', agenda:'10:00 开场\n10:15 多因子模型原理回顾\n10:50 Hermes量化因子筛选现场演示\n11:30 策略回测对比\n11:50 Q&A' },
+  5: { title:'港股通投资策略直播', type:'直播', host:'投资女神Lisa', date:'2026-05-18 20:00 ~ 21:30', cap:'不限', pts:'50分', compute:'1次', status:'已结束', joined:'3,640', checkin:'3,640', ptsGiven:'182,000', share:'1,240', desc:'复盘港股通本月行情，深度解析互联网板块与南向资金动向，已结束。', agenda:'20:00 港股月度复盘\n20:30 互联网板块估值分析\n21:00 南向资金信号解读\n21:20 Q&A' },
+  6: { title:'冈底斯5月积分挑战赛', type:'挑战赛', host:'冈底斯官方', date:'2026-05-01 ~ 05-31', cap:'不限', pts:'500分', compute:'5次', status:'进行中', joined:'8,420', checkin:'8,420', ptsGiven:'已发放中', share:'3,280', desc:'5月全月积分挑战赛：发帖、互动、使用Hermes均可获得额外积分加成，本月TOP10用户额外获赠算力礼包。', agenda:'05-01 活动开始，积分×2加成生效\n05-15 中期排行榜公布\n05-26 冲刺阶段，积分×3加成\n05-31 23:59 活动结束，次日结算' },
+};
+
+let _currentEv = null;
+function evShowDetail(id) {
+  _currentEv = id;
+  const d = EV_DATA[id]; if (!d) return;
+  document.getElementById('ev-list').style.display = 'none';
+  document.getElementById('ev-form').style.display = 'none';
+  document.getElementById('ev-detail').style.display = 'block';
+  document.getElementById('ev-detail-title').textContent = d.title;
+  const sb = document.getElementById('ev-detail-status-badge');
+  const sc = {进行中:'#2ECC71',报名中:'#C8A96E',已结束:'#9A9590',待发布:'#3498DB'};
+  sb.innerHTML = `<span style="background:${sc[d.status]||'#9A9590'}22;color:${sc[d.status]||'#9A9590'};border:1px solid ${sc[d.status]||'#9A9590'}44;padding:3px 10px;border-radius:4px;font-size:12px">${d.status}</span>`;
+  ['type','host','date','cap','pts','compute'].forEach(k => {
+    const el = document.getElementById('ev-d-'+k); if(el) el.textContent = d[k]||'—';
+  });
+  document.getElementById('ev-d-joined').textContent = d.joined;
+  document.getElementById('ev-d-checkin').textContent = d.checkin;
+  document.getElementById('ev-d-pts-given').textContent = d.ptsGiven;
+  document.getElementById('ev-d-share').textContent = d.share;
+  document.getElementById('ev-d-desc').textContent = d.desc;
+  document.getElementById('ev-d-agenda').innerHTML = d.agenda.split('\n').map(l=>`<div>📍 ${l}</div>`).join('');
+  document.getElementById('page-title').textContent = '活动详情：' + d.title;
+}
+function evShowEdit(id) {
+  if (id === 'current') id = _currentEv;
+  _currentEv = id;
+  document.getElementById('ev-list').style.display = 'none';
+  document.getElementById('ev-detail').style.display = 'none';
+  document.getElementById('ev-form').style.display = 'block';
+  document.getElementById('ev-form-title').textContent = id ? '编辑活动' : '创建活动';
+  document.getElementById('page-title').textContent = id ? '编辑活动' : '创建活动';
+}
+function evShowCreate() { evShowEdit(null); }
+function evBack() {
+  document.getElementById('ev-detail').style.display = 'none';
+  document.getElementById('ev-form').style.display = 'none';
+  document.getElementById('ev-list').style.display = 'block';
+  document.getElementById('page-title').textContent = '活动管理';
+  _currentEv = null;
+}
+function evToggleAll(cb) {
+  document.querySelectorAll('.ev-check').forEach(c => c.checked = cb.checked);
+}
+function evAddAgendaItem() {
+  const li = document.createElement('div');
+  li.className = 'ev-agenda-item';
+  li.style.cssText = 'display:flex;gap:8px;align-items:flex-start';
+  li.innerHTML = `<input type="time" style="width:76px;background:#0D1B2A;border:1px solid rgba(200,169,110,0.15);color:#C8A96E;padding:6px;border-radius:4px;font-size:12px;outline:none;flex-shrink:0"><input type="text" placeholder="议程内容" style="flex:1;background:#0D1B2A;border:1px solid rgba(200,169,110,0.15);color:#F8F6F0;padding:6px 10px;border-radius:4px;font-size:12px;outline:none"><button onclick="this.closest('.ev-agenda-item').remove()" style="background:transparent;border:none;color:#9A9590;cursor:pointer;font-size:14px;padding:4px">✕</button>`;
+  document.getElementById('ev-agenda-list').appendChild(li);
+}
+function execCmd(cmd) { document.execCommand(cmd, false, null); document.getElementById('ev-editor').focus(); }
+function insertHr() { document.execCommand('insertHTML', false, '<hr style="border:none;border-top:1px solid rgba(200,169,110,0.2);margin:8px 0">'); }
+function evUpdatePreview() {
+  const txt = document.getElementById('ev-editor').innerText || '';
+  document.getElementById('ev-char-count').textContent = txt.length;
+}
+</script>
+</body>
+</html>

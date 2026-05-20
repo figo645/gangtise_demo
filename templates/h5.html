@@ -1,0 +1,1695 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>冈底斯金融科技 — 智能投研</title>
+<link rel="stylesheet" href="/static/css/style.css">
+<style>
+/* ===== BASE ===== */
+body { background: var(--navy); }
+.page { display: none; }
+.page.active { display: block; }
+
+/* ===== HEADER TABS (scrollable, 4 items) ===== */
+.h5-tabs {
+  display: flex;
+  gap: 0;
+  margin-top: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.h5-tabs::-webkit-scrollbar { display: none; }
+.h5-tab {
+  flex-shrink: 0;
+  padding: 10px 18px;
+  font-size: 13px;
+  color: var(--gray-400);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.h5-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+
+/* ===== BOTTOM NAV (6 items) ===== */
+.h5-bottom-nav {
+  position: sticky;
+  bottom: 0;
+  background: var(--navy-mid);
+  border-top: 1px solid rgba(200,169,110,0.15);
+  display: flex;
+  padding: 8px 0 16px;
+  z-index: 100;
+}
+.h5-nav-item { flex: 1; text-align: center; cursor: pointer; padding: 6px 0; }
+.h5-nav-icon { font-size: 18px; }
+.h5-nav-label { font-size: 10px; color: var(--gray-400); margin-top: 2px; }
+.h5-nav-item.active .h5-nav-label { color: var(--gold); }
+
+/* ===== COMMUNITY ===== */
+.community-subtabs { display:flex; border-bottom: 1px solid rgba(200,169,110,0.1); }
+.community-subtab { flex:1; text-align:center; padding:10px; font-size:13px; color:var(--gray-400); cursor:pointer; border-bottom:2px solid transparent; }
+.community-subtab.active { color:var(--gold); border-bottom-color:var(--gold); }
+
+.post-card { background:var(--navy-mid); border:1px solid rgba(200,169,110,0.08); border-radius:12px; padding:14px; margin-bottom:10px; }
+.post-author-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.post-avatar { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+.post-avatar.dav { background:linear-gradient(135deg,#C8A96E,#A8893E); }
+.post-avatar.verified { background:linear-gradient(135deg,#3182CE,#2C5282); }
+.post-avatar.normal { background:var(--navy-light); }
+.post-name { font-size:13px; font-weight:600; color:var(--white); }
+.post-badge-dav { font-size:10px; background:rgba(200,169,110,0.2); color:var(--gold); padding:1px 6px; border-radius:8px; border:1px solid rgba(200,169,110,0.3); }
+.post-badge-verified { font-size:10px; background:rgba(49,130,206,0.2); color:#63B3ED; padding:1px 6px; border-radius:8px; }
+.post-time { font-size:11px; color:var(--gray-400); margin-left:auto; }
+.post-content { font-size:13px; color:var(--white); line-height:1.7; margin-bottom:8px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.post-content.expanded { display:block; }
+.post-tags { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+.post-footer { display:flex; gap:16px; align-items:center; }
+.post-action { display:flex; align-items:center; gap:4px; font-size:12px; color:var(--gray-400); cursor:pointer; padding:4px 0; }
+.post-action:active { color:var(--gold); }
+.post-points-badge { margin-left:auto; font-size:10px; color:var(--gold); background:rgba(200,169,110,0.1); padding:2px 8px; border-radius:8px; }
+
+/* KOL cards */
+.kol-card { background:var(--navy-mid); border:1px solid rgba(200,169,110,0.12); border-radius:12px; padding:16px; margin-bottom:10px; }
+.kol-header { display:flex; align-items:flex-start; gap:12px; margin-bottom:10px; }
+.kol-avatar-lg { width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0; background:linear-gradient(135deg,#C8A96E,#A8893E); border:2px solid rgba(200,169,110,0.4); position:relative; }
+.kol-verified-badge { position:absolute; bottom:-2px; right:-2px; font-size:12px; }
+.kol-info { flex:1; }
+.kol-name { font-size:14px; font-weight:700; color:var(--white); }
+.kol-platform { font-size:11px; color:var(--gray-400); margin-top:2px; }
+.kol-followers { font-size:11px; color:var(--gold); margin-top:2px; }
+.kol-preview { font-size:12px; color:var(--gray-400); line-height:1.6; margin-bottom:10px; }
+.kol-footer { display:flex; justify-content:space-between; align-items:center; }
+.kol-stats { display:flex; gap:12px; }
+.kol-stat { font-size:11px; color:var(--gray-400); }
+.kol-stat span { color:var(--gold); font-weight:600; }
+
+/* Event cards */
+.event-card { background:var(--navy-mid); border:1px solid rgba(200,169,110,0.1); border-radius:12px; padding:14px; margin-bottom:10px; }
+.event-type-badge { display:inline-block; font-size:10px; padding:2px 8px; border-radius:4px; font-weight:600; margin-bottom:8px; }
+.event-live { background:rgba(231,76,60,0.2); color:#E74C3C; }
+.event-activity { background:rgba(200,169,110,0.15); color:var(--gold); }
+.event-meeting { background:rgba(49,130,206,0.15); color:#63B3ED; }
+.event-title { font-size:14px; font-weight:600; color:var(--white); margin-bottom:6px; }
+.event-meta { font-size:12px; color:var(--gray-400); margin-bottom:8px; }
+.event-footer { display:flex; justify-content:space-between; align-items:center; }
+.event-info { font-size:11px; color:var(--gray-400); }
+.event-status-open { font-size:11px; color:var(--green); background:rgba(46,204,113,0.1); padding:2px 8px; border-radius:8px; }
+.event-status-closed { font-size:11px; color:var(--gray-400); background:rgba(154,149,144,0.1); padding:2px 8px; border-radius:8px; }
+
+/* Post composer */
+.post-composer { background:var(--navy-mid); border:1px solid rgba(200,169,110,0.1); border-radius:12px; padding:12px 14px; margin-bottom:14px; display:flex; align-items:center; gap:10px; cursor:pointer; }
+.composer-placeholder { flex:1; font-size:13px; color:var(--gray-400); }
+.composer-btn { font-size:12px; color:var(--navy); background:var(--gold); padding:5px 14px; border-radius:16px; font-weight:600; flex-shrink:0; }
+
+/* Compose modal */
+.modal-overlay { position:fixed; inset:0; background:rgba(13,27,42,0.85); z-index:1000; display:none; align-items:flex-end; justify-content:center; backdrop-filter:blur(4px); }
+.modal-overlay.show { display:flex; }
+.modal-sheet { background:var(--navy-mid); border-radius:20px 20px 0 0; padding:20px 16px 32px; width:100%; max-width:390px; border-top:1px solid rgba(200,169,110,0.2); }
+.modal-handle { width:36px; height:4px; background:rgba(200,169,110,0.3); border-radius:2px; margin:0 auto 16px; }
+.modal-title { font-size:15px; font-weight:600; color:var(--white); margin-bottom:12px; }
+.modal-textarea { width:100%; background:rgba(13,27,42,0.6); border:1px solid rgba(200,169,110,0.2); border-radius:10px; color:var(--white); font-size:13px; padding:12px; resize:none; height:100px; font-family:var(--font-main); }
+.modal-textarea::placeholder { color:var(--gray-400); }
+.modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:12px; }
+
+/* ===== HERMES ===== */
+.hermes-header { background:linear-gradient(135deg,var(--navy-mid),#0F2035); padding:14px 16px; border-bottom:1px solid rgba(200,169,110,0.15); display:flex; justify-content:space-between; align-items:center; }
+.hermes-logo { font-size:20px; font-weight:700; color:var(--gold); letter-spacing:1px; }
+.hermes-subtitle { font-size:11px; color:var(--gray-400); margin-top:2px; }
+.hermes-credits { font-size:12px; color:var(--gold); background:rgba(200,169,110,0.1); padding:4px 10px; border-radius:12px; border:1px solid rgba(200,169,110,0.2); white-space:nowrap; }
+
+.hermes-modes { display:flex; gap:8px; overflow-x:auto; padding:12px 16px; scrollbar-width:none; }
+.hermes-modes::-webkit-scrollbar { display:none; }
+.hermes-mode-btn { flex-shrink:0; padding:8px 14px; border-radius:20px; border:1px solid rgba(200,169,110,0.2); background:var(--navy-mid); color:var(--gray-400); font-size:12px; cursor:pointer; white-space:nowrap; transition:all 0.2s; }
+.hermes-mode-btn.active { background:rgba(200,169,110,0.15); color:var(--gold); border-color:var(--gold); }
+
+.hermes-mode-desc { margin:0 16px 12px; background:rgba(200,169,110,0.05); border:1px solid rgba(200,169,110,0.15); border-radius:10px; padding:12px; }
+.hermes-mode-desc-text { font-size:12px; color:var(--gray-400); line-height:1.6; }
+
+.hermes-section-title { font-size:12px; color:var(--gray-400); padding:0 16px 8px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; }
+
+.hermes-options { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:0 16px 12px; }
+.hermes-option-btn { background:var(--navy-mid); border:1px solid rgba(200,169,110,0.15); border-radius:10px; padding:12px; cursor:pointer; text-align:left; transition:all 0.2s; }
+.hermes-option-btn:hover, .hermes-option-btn.selected { border-color:var(--gold); background:rgba(200,169,110,0.08); }
+.hermes-option-label { font-size:12px; color:var(--white); font-weight:500; }
+.hermes-option-tag { font-size:10px; color:var(--gold); margin-top:3px; }
+
+.hermes-chat { padding:0 16px; min-height:200px; }
+.chat-bubble-wrap { margin-bottom:12px; }
+.chat-bubble-wrap.user { display:flex; justify-content:flex-end; }
+.chat-bubble-wrap.ai { display:flex; justify-content:flex-start; }
+.chat-bubble { max-width:85%; border-radius:12px; padding:12px 14px; }
+.chat-bubble.user { background:linear-gradient(135deg,var(--gold-dark),var(--gold)); color:var(--navy); font-size:13px; font-weight:500; border-bottom-right-radius:4px; }
+.chat-bubble.ai { background:var(--navy-mid); border:1px solid rgba(200,169,110,0.15); border-bottom-left-radius:4px; }
+.chat-ai-header { font-size:11px; color:var(--gold); font-weight:600; margin-bottom:6px; }
+.chat-ai-text { font-size:13px; color:var(--white); line-height:1.7; white-space:pre-line; }
+.chat-ai-footer { font-size:10px; color:var(--gray-400); margin-top:8px; padding-top:6px; border-top:1px solid rgba(200,169,110,0.1); }
+
+.hermes-loading { display:flex; align-items:center; gap:8px; padding:12px 16px; }
+.hermes-loading-text { font-size:13px; color:var(--gold); }
+.dot-anim span { display:inline-block; animation:dotBounce 1.2s infinite; }
+.dot-anim span:nth-child(2) { animation-delay:0.2s; }
+.dot-anim span:nth-child(3) { animation-delay:0.4s; }
+@keyframes dotBounce { 0%,80%,100%{opacity:0.3} 40%{opacity:1} }
+
+.hermes-quick-actions { display:flex; gap:6px; flex-wrap:wrap; padding:8px 16px 12px; }
+.hermes-quick-btn { font-size:11px; color:var(--gold); background:rgba(200,169,110,0.08); border:1px solid rgba(200,169,110,0.2); border-radius:16px; padding:5px 12px; cursor:pointer; }
+
+.hermes-shortcuts { display:flex; gap:8px; overflow-x:auto; padding:10px 16px; border-top:1px solid rgba(200,169,110,0.08); scrollbar-width:none; }
+.hermes-shortcuts::-webkit-scrollbar { display:none; }
+.hermes-shortcut { flex-shrink:0; font-size:11px; color:var(--gray-400); background:var(--navy-mid); border:1px solid rgba(200,169,110,0.1); border-radius:16px; padding:6px 12px; cursor:pointer; white-space:nowrap; }
+
+/* ===== PROFILE ===== */
+.profile-header { background:linear-gradient(135deg,var(--navy-mid),#0F2035); padding:24px 16px 20px; text-align:center; }
+.profile-avatar-lg { width:72px; height:72px; border-radius:50%; background:linear-gradient(135deg,var(--gold-dark),var(--gold)); display:flex; align-items:center; justify-content:center; font-size:32px; margin:0 auto 12px; border:3px solid rgba(200,169,110,0.4); }
+.profile-name { font-size:18px; font-weight:700; color:var(--white); }
+.profile-level-badge { display:inline-block; font-size:11px; color:var(--navy); background:var(--gold); padding:2px 10px; border-radius:10px; margin-top:4px; font-weight:600; }
+.profile-stats { display:flex; justify-content:center; gap:24px; margin-top:16px; }
+.profile-stat { text-align:center; }
+.profile-stat-num { font-size:18px; font-weight:700; color:var(--white); }
+.profile-stat-label { font-size:11px; color:var(--gray-400); margin-top:2px; }
+
+.points-card { margin:16px; background:linear-gradient(135deg,rgba(200,169,110,0.1),rgba(168,137,62,0.05)); border:1px solid rgba(200,169,110,0.25); border-radius:14px; padding:16px; }
+.points-main { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
+.points-num { font-size:32px; font-weight:700; color:var(--gold); }
+.points-label { font-size:11px; color:var(--gray-400); margin-top:2px; }
+.points-progress { height:6px; background:rgba(200,169,110,0.15); border-radius:3px; overflow:hidden; }
+.points-progress-bar { height:100%; background:linear-gradient(90deg,var(--gold-dark),var(--gold)); border-radius:3px; transition:width 1s ease; }
+.points-progress-label { display:flex; justify-content:space-between; font-size:10px; color:var(--gray-400); margin-top:4px; }
+
+.level-table { margin:0 16px 16px; background:var(--navy-mid); border-radius:12px; overflow:hidden; }
+.level-row { display:flex; align-items:center; padding:10px 14px; border-bottom:1px solid rgba(200,169,110,0.06); }
+.level-row:last-child { border-bottom:none; }
+.level-row.current { background:rgba(200,169,110,0.08); }
+.level-num { font-size:12px; color:var(--gold); font-weight:700; width:36px; }
+.level-name { font-size:13px; color:var(--white); flex:1; }
+.level-pts { font-size:11px; color:var(--gray-400); width:70px; text-align:right; }
+.level-reward { font-size:11px; color:var(--gold); width:70px; text-align:right; }
+
+.settings-list { margin:0 16px 100px; background:var(--navy-mid); border-radius:12px; overflow:hidden; }
+.settings-item { display:flex; align-items:center; padding:14px 16px; border-bottom:1px solid rgba(200,169,110,0.06); cursor:pointer; }
+.settings-item:last-child { border-bottom:none; }
+.settings-icon { font-size:18px; width:28px; }
+.settings-label { font-size:14px; color:var(--white); flex:1; }
+.settings-arrow { font-size:12px; color:var(--gray-400); }
+
+/* ===== TOAST ===== */
+.toast { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:rgba(200,169,110,0.9); color:var(--navy); padding:8px 20px; border-radius:20px; font-size:13px; font-weight:600; z-index:9999; opacity:0; transition:opacity 0.3s; pointer-events:none; white-space:nowrap; }
+.toast.show { opacity:1; }
+
+/* ===== VIP POINTS BANNER ===== */
+.vip-points-banner { margin:16px 16px 0; background:linear-gradient(135deg,rgba(200,169,110,0.12),rgba(168,137,62,0.06)); border:1px solid rgba(200,169,110,0.25); border-radius:14px; padding:14px 16px; }
+.exchange-grid { display:flex; flex-direction:column; gap:8px; margin:0 16px 16px; }
+.exchange-item { background:var(--navy-mid); border:1px solid rgba(200,169,110,0.12); border-radius:10px; padding:12px 14px; display:flex; align-items:center; gap:12px; }
+.exchange-credits { font-size:20px; font-weight:700; color:var(--gold); min-width:50px; }
+.exchange-info { flex:1; }
+.exchange-name { font-size:13px; color:var(--white); font-weight:500; }
+.exchange-desc { font-size:11px; color:var(--gray-400); margin-top:2px; }
+.exchange-btn { font-size:11px; }
+
+/* ===== BADGES ===== */
+.badges-wrap { display:flex; flex-wrap:wrap; gap:8px; padding:0 16px 16px; }
+.badge-chip { font-size:11px; background:rgba(200,169,110,0.1); color:var(--gold); border:1px solid rgba(200,169,110,0.2); border-radius:16px; padding:4px 12px; }
+
+/* ===== POINTS RULES ===== */
+.points-rules { margin:0 16px 16px; background:var(--navy-mid); border-radius:12px; overflow:hidden; }
+.points-rule-item { display:flex; justify-content:space-between; align-items:center; padding:11px 14px; border-bottom:1px solid rgba(200,169,110,0.06); }
+.points-rule-item:last-child { border-bottom:none; }
+.points-rule-name { font-size:13px; color:var(--white); }
+.points-rule-pts { font-size:13px; color:var(--gold); font-weight:600; }
+
+/* ===== LOADING OVERLAY ===== */
+.loading-overlay {
+  position:fixed; inset:0;
+  background:rgba(13,27,42,0.85);
+  display:none; align-items:center; justify-content:center;
+  z-index:999; backdrop-filter:blur(4px);
+}
+.loading-overlay.show { display:flex; }
+.loading-spinner { text-align:center; color:var(--gold); }
+.spinner { font-size:32px; animation:spin 1s linear infinite; display:block; margin-bottom:12px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="h5-wrap">
+
+  <!-- ===== HEADER ===== -->
+  <div class="h5-header">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div class="h5-logo">冈底斯</div>
+        <div class="h5-tagline">金融科技 · 智能投研</div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span style="font-size:11px;color:var(--gold);background:rgba(200,169,110,0.1);padding:4px 10px;border-radius:12px;border:1px solid rgba(200,169,110,0.3)">资深分析师</span>
+        <div onclick="switchTab('profile')" style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--gold-dark),var(--gold));display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer">👤</div>
+      </div>
+    </div>
+    <!-- Scrollable 4-tab header -->
+    <div class="h5-tabs" id="header-tabs">
+      <div class="h5-tab active" onclick="switchTab('feed')">信息流</div>
+      <div class="h5-tab" onclick="switchTab('community')">社区</div>
+      <div class="h5-tab" onclick="switchTab('hermes')">Hermes</div>
+      <div class="h5-tab" onclick="switchTab('market')">行情</div>
+    </div>
+  </div>
+
+  <!-- ===== TAB 1: 信息流 ===== -->
+  <div id="page-feed" class="page active">
+    <!-- Market ticker -->
+    <div class="h5-section" style="padding-bottom:0">
+      <div class="market-scroll">
+        {% for item in market %}
+        <div class="market-item">
+          <div class="market-name">{{ item.name }}</div>
+          <div class="market-value">{{ "%.2f"|format(item.value) }}</div>
+          <div class="market-change {% if item.change >= 0 %}up{% else %}down{% endif %}">
+            {% if item.change >= 0 %}▲{% else %}▼{% endif %}
+            {{ "%.2f%%"|format(item.change_pct|abs) }}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Today's news -->
+    <div class="h5-section">
+      <div class="h5-section-title">今日要闻</div>
+      {% for item in news %}
+      <div class="news-item">
+        <div class="news-item-header">
+          <div class="news-title">{{ item.title }}</div>
+        </div>
+        <div class="news-meta">
+          <div style="display:flex;gap:8px;align-items:center">
+            <span class="tag tag-gold">{{ item.tag }}</span>
+            <span class="news-time">{{ item.time }}</span>
+          </div>
+          {% if item.hot %}<span class="hot-badge">🔥 热门</span>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- KOL views -->
+    <div class="h5-section">
+      <div class="h5-section-title">KOL 今日观点</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div class="card" style="padding:14px">
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#C8A96E,#A8893E);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">👑</div>
+            <div style="flex:1">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                <span style="font-size:13px;font-weight:600;color:var(--gold)">财经老王</span>
+                <span class="tag tag-gold">S级合伙人</span>
+              </div>
+              <div style="font-size:12px;color:var(--gray-400);margin-bottom:6px">抖音 · 280万粉丝</div>
+              <div style="font-size:13px;color:var(--white);line-height:1.6">美联储降息预期升温，A股科技板块短期有望受益。重点关注AI算力和国产替代两条主线，建议逢低布局。</div>
+              <div style="font-size:11px;color:var(--gray-400);margin-top:6px">基于冈底斯平台数据分析 · 仅供参考</div>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="padding:14px">
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#E2C98A,#C8A96E);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">💎</div>
+            <div style="flex:1">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                <span style="font-size:13px;font-weight:600;color:var(--gold)">投资女神Lisa</span>
+                <span class="tag tag-gold">S级合伙人</span>
+              </div>
+              <div style="font-size:12px;color:var(--gray-400);margin-bottom:6px">小红书 · 156万粉丝</div>
+              <div style="font-size:13px;color:var(--white);line-height:1.6">港股互联网估值修复逻辑仍在，南向资金持续净流入是重要信号。平台经济政策边际改善，可适当增配。</div>
+              <div style="font-size:11px;color:var(--gray-400);margin-top:6px">基于冈底斯平台数据分析 · 仅供参考</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TAB 2: 社区 ===== -->
+  <div id="page-community" class="page">
+    <!-- Sub-tabs -->
+    <div class="community-subtabs" id="community-subtabs">
+      <div class="community-subtab active" onclick="switchCommunityTab('square')">广场</div>
+      <div class="community-subtab" onclick="switchCommunityTab('dav')">大V</div>
+      <div class="community-subtab" onclick="switchCommunityTab('events')">活动</div>
+    </div>
+
+    <!-- Square sub-tab -->
+    <div id="community-square" style="padding:14px">
+      <!-- Composer bar -->
+      <div class="post-composer" onclick="document.getElementById('compose-modal').classList.add('show')">
+        <div class="post-avatar normal" style="font-size:16px">👤</div>
+        <div class="composer-placeholder">分享你的投研观点...</div>
+        <div class="composer-btn">发布</div>
+      </div>
+      <!-- Post feed loaded by JS -->
+      <div id="posts-container">
+        <div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">加载中...</div>
+      </div>
+    </div>
+
+    <!-- 大V sub-tab -->
+    <div id="community-dav" style="padding:14px;display:none">
+      <div style="font-size:12px;color:var(--gray-400);margin-bottom:14px;text-align:center;background:rgba(200,169,110,0.05);border:1px solid rgba(200,169,110,0.1);border-radius:8px;padding:8px">
+        认证大V · 专业投研意见领袖
+      </div>
+      <div id="kol-list">
+        <!-- KOL cards rendered by JS -->
+        <div class="kol-card">
+          <div class="kol-header">
+            <div class="kol-avatar-lg" style="font-size:22px">👑<span class="kol-verified-badge">✅</span></div>
+            <div class="kol-info">
+              <div class="kol-name">财经老王</div>
+              <div class="kol-platform">抖音 · 财经大V</div>
+              <div class="kol-followers">280万粉丝</div>
+            </div>
+            <button class="btn-outline" style="padding:5px 14px;font-size:12px">关注</button>
+          </div>
+          <div class="kol-preview">"科技板块短期估值压力可控，AI算力需求持续超预期，建议关注中游设备端的投资机会..."</div>
+          <div class="kol-footer">
+            <div class="kol-stats">
+              <div class="kol-stat">本月观点 <span>18条</span></div>
+              <div class="kol-stat">准确率 <span>72%</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="kol-card">
+          <div class="kol-header">
+            <div class="kol-avatar-lg" style="font-size:22px">💎<span class="kol-verified-badge">✅</span></div>
+            <div class="kol-info">
+              <div class="kol-name">投资女神Lisa</div>
+              <div class="kol-platform">小红书 · 价值投资</div>
+              <div class="kol-followers">156万粉丝</div>
+            </div>
+            <button class="btn-outline" style="padding:5px 14px;font-size:12px">关注</button>
+          </div>
+          <div class="kol-preview">"港股互联网板块的估值修复还没走完，南向资金持续净流入是最好的佐证..."</div>
+          <div class="kol-footer">
+            <div class="kol-stats">
+              <div class="kol-stat">本月观点 <span>24条</span></div>
+              <div class="kol-stat">准确率 <span>68%</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="kol-card">
+          <div class="kol-header">
+            <div class="kol-avatar-lg" style="font-size:22px">📊<span class="kol-verified-badge">✅</span></div>
+            <div class="kol-info">
+              <div class="kol-name">量化老师陈明</div>
+              <div class="kol-platform">微信公众号 · 量化策略</div>
+              <div class="kol-followers">89万粉丝</div>
+            </div>
+            <button class="btn-outline" style="padding:5px 14px;font-size:12px">关注</button>
+          </div>
+          <div class="kol-preview">"本周多因子模型显示动量因子衰减明显，价值因子重新占优，建议切换配置思路..."</div>
+          <div class="kol-footer">
+            <div class="kol-stats">
+              <div class="kol-stat">本月观点 <span>31条</span></div>
+              <div class="kol-stat">准确率 <span>75%</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="kol-card">
+          <div class="kol-header">
+            <div class="kol-avatar-lg" style="font-size:22px">🌐<span class="kol-verified-badge">✅</span></div>
+            <div class="kol-info">
+              <div class="kol-name">全球宏观James</div>
+              <div class="kol-platform">微博 · 宏观策略</div>
+              <div class="kol-followers">120万粉丝</div>
+            </div>
+            <button class="btn-outline" style="padding:5px 14px;font-size:12px">关注</button>
+          </div>
+          <div class="kol-preview">"美联储点阵图暗示年内两次降息，美元指数承压，大宗商品和新兴市场将是主要受益方向..."</div>
+          <div class="kol-footer">
+            <div class="kol-stats">
+              <div class="kol-stat">本月观点 <span>15条</span></div>
+              <div class="kol-stat">准确率 <span>70%</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="kol-card">
+          <div class="kol-header">
+            <div class="kol-avatar-lg" style="font-size:22px">⚡<span class="kol-verified-badge">✅</span></div>
+            <div class="kol-info">
+              <div class="kol-name">新能源猎手阿强</div>
+              <div class="kol-platform">B站 · 产业研究</div>
+              <div class="kol-followers">67万粉丝</div>
+            </div>
+            <button class="btn-outline" style="padding:5px 14px;font-size:12px">关注</button>
+          </div>
+          <div class="kol-preview">"固态电池产业化节奏超预期，2026年小批量装车可期，中游材料公司值得深入研究..."</div>
+          <div class="kol-footer">
+            <div class="kol-stats">
+              <div class="kol-stat">本月观点 <span>22条</span></div>
+              <div class="kol-stat">准确率 <span>65%</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 活动 sub-tab -->
+    <div id="community-events" style="padding:14px;display:none">
+      <div id="events-container">
+        <div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">加载中...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TAB 3: HERMES ===== -->
+  <div id="page-hermes" class="page">
+    <!-- Hermes branding bar -->
+    <div class="hermes-header">
+      <div>
+        <div class="hermes-logo">🦞 Hermes</div>
+        <div class="hermes-subtitle">冈底斯智能投研引擎 · DeepSeek + Kimi 2.6</div>
+      </div>
+      <div class="hermes-credits" id="hermes-credits-display">⚡ 128次</div>
+    </div>
+
+    <!-- Mode selector -->
+    <div class="hermes-modes" id="hermes-modes">
+      <div class="hermes-mode-btn active" onclick="selectHermesMode('研报精读')">📋 研报精读</div>
+      <div class="hermes-mode-btn" onclick="selectHermesMode('专家纪要速读')">🎙️ 专家纪要速读</div>
+      <div class="hermes-mode-btn" onclick="selectHermesMode('另类数据解读')">🛰️ 另类数据解读</div>
+      <div class="hermes-mode-btn" onclick="selectHermesMode('投资组合诊断')">🔬 投资组合诊断</div>
+      <div class="hermes-mode-btn" onclick="selectHermesMode('市场情绪扫描')">📡 市场情绪扫描</div>
+      <div class="hermes-mode-btn" onclick="selectHermesMode('量化因子筛选')">⚙️ 量化因子筛选</div>
+    </div>
+
+    <!-- Mode description card -->
+    <div class="hermes-mode-desc" id="hermes-mode-desc">
+      <div class="hermes-mode-desc-text" id="hermes-mode-desc-text">选择一个分析模式开始使用 Hermes 智能投研引擎。</div>
+    </div>
+
+    <!-- Analysis object selector -->
+    <div class="hermes-section-title" id="hermes-options-title" style="display:none">选择分析对象</div>
+    <div class="hermes-options" id="hermes-options"></div>
+
+    <!-- Chat / result area -->
+    <div class="hermes-chat" id="hermes-chat"></div>
+
+    <!-- Quick action buttons (shown after AI reply) -->
+    <div class="hermes-quick-actions" id="hermes-quick-actions" style="display:none">
+      <div class="hermes-quick-btn" onclick="hermesQuickAction('深入追问')">深入追问</div>
+      <div class="hermes-quick-btn" onclick="hermesQuickAction('对比分析')">对比分析</div>
+      <div class="hermes-quick-btn" onclick="hermesQuickAction('生成摘要')">生成摘要</div>
+      <div class="hermes-quick-btn" onclick="hermesQuickAction('加入收藏')">⭐ 收藏</div>
+      <div class="hermes-quick-btn" onclick="hermesQuickAction('分享到社区')">📤 分享</div>
+    </div>
+
+    <!-- Shortcut commands (always visible) -->
+    <div style="padding:8px 16px 4px;font-size:11px;color:var(--gray-400)">快捷指令 · 可分析页面任意内容</div>
+    <div class="hermes-shortcuts">
+      <div class="hermes-shortcut" onclick="hermesShortcut('今日市场速览')">📊 今日市场速览</div>
+      <div class="hermes-shortcut" onclick="hermesShortcut('热门研报摘要')">📋 热门研报</div>
+      <div class="hermes-shortcut" onclick="hermesShortcut('大V观点汇总')">👑 大V观点汇总</div>
+      <div class="hermes-shortcut" onclick="hermesShortcut('风险预警扫描')">⚠️ 风险预警</div>
+      <div class="hermes-shortcut" onclick="hermesShortcut('社区热帖解读')">🔥 社区热帖解读</div>
+      <div class="hermes-shortcut" onclick="hermesShortcut('当前行情分析')">📈 当前行情分析</div>
+    </div>
+
+    <!-- Chat input box -->
+    <div style="padding:10px 16px 16px;border-top:1px solid rgba(200,169,110,0.08)">
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <div style="flex:1;background:var(--navy-mid);border:1px solid rgba(200,169,110,0.2);border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:8px">
+          <textarea id="hermes-input" placeholder="直接输入问题，或使用上方模式按钮..." rows="1"
+            style="flex:1;background:transparent;border:none;outline:none;color:var(--white);font-size:13px;resize:none;font-family:inherit;line-height:1.5;max-height:80px;overflow-y:auto"
+            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,80)+'px'"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendHermesChat()}"
+          ></textarea>
+        </div>
+        <button onclick="sendHermesChat()" style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--gold-dark),var(--gold));border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">
+          ↑
+        </button>
+      </div>
+      <div style="font-size:10px;color:var(--gray-400);margin-top:6px;text-align:center">Hermes 可解读信息流、行情、社区帖子等页面内容 · 消耗1算力/次</div>
+    </div>
+  </div>
+
+  <!-- ===== TAB 4: 行情 ===== -->
+  <div id="page-market" class="page">
+    <div class="h5-section">
+      <div class="h5-section-title">全球指数</div>
+      {% for item in market %}
+      <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.08);border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:14px;font-weight:600;color:var(--white)">{{ item.name }}</div>
+          <div style="font-size:11px;color:var(--gray-400);margin-top:2px">实时行情</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:18px;font-weight:700;color:var(--white)">{{ "%.2f"|format(item.value) }}</div>
+          <div style="font-size:12px;{% if item.change >= 0 %}color:var(--red){% else %}color:var(--green){% endif %}">
+            {% if item.change >= 0 %}▲ +{{ "%.2f"|format(item.change) }} (+{{ "%.2f%%"|format(item.change_pct) }}){% else %}▼ {{ "%.2f"|format(item.change) }} ({{ "%.2f%%"|format(item.change_pct) }}){% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="h5-section">
+      <div class="h5-section-title">另类数据信号</div>
+      <div class="card" style="padding:14px">
+        <div style="font-size:13px;color:var(--gold);font-weight:600;margin-bottom:8px">🛰️ 卫星数据</div>
+        <div style="font-size:13px;color:var(--white);line-height:1.6">主要港口吞吐量环比回升8%，工业活动指数上行，与PMI数据形成共振。</div>
+        <div style="font-size:11px;color:var(--gray-400);margin-top:6px">数据来源：冈底斯另类数据库 · 更新于今日</div>
+      </div>
+      <div class="card" style="padding:14px;margin-top:10px">
+        <div style="font-size:13px;color:var(--gold);font-weight:600;margin-bottom:8px">📊 专家会议纪要</div>
+        <div style="font-size:13px;color:var(--white);line-height:1.6">本周共收录12场专家会议纪要，覆盖新能源、AI、消费等核心赛道，已完成AI摘要提炼。</div>
+        <div style="font-size:11px;color:var(--gray-400);margin-top:6px">专业会员可查看完整内容</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TAB 5: 会员 ===== -->
+  <div id="page-vip" class="page">
+    <!-- Points banner -->
+    <div class="vip-points-banner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div>
+          <div style="font-size:11px;color:var(--gray-400);margin-bottom:4px">当前积分</div>
+          <div style="font-size:28px;font-weight:700;color:var(--gold)">3,840</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:12px;color:var(--navy);background:var(--gold);padding:3px 12px;border-radius:10px;font-weight:600;margin-bottom:4px">Lv.4 资深分析师</div>
+          <div style="font-size:11px;color:var(--gray-400)">⚡ 128次算力</div>
+        </div>
+      </div>
+      <div class="points-progress">
+        <div class="points-progress-bar" style="width:76.8%"></div>
+      </div>
+      <div class="points-progress-label">
+        <span>3840 积分</span>
+        <span>距 Lv.5 还差 1160 积分</span>
+      </div>
+    </div>
+
+    <!-- Exchange compute credits -->
+    <div class="h5-section" style="padding-bottom:8px">
+      <div class="h5-section-title">积分兑换算力</div>
+    </div>
+    <div class="exchange-grid" id="exchange-grid">
+      <div class="exchange-item">
+        <div class="exchange-credits">10次</div>
+        <div class="exchange-info">
+          <div class="exchange-name">初级算力包</div>
+          <div class="exchange-desc">消耗 200 积分</div>
+        </div>
+        <button class="btn-outline exchange-btn" onclick="showToast('兑换成功！获得10次算力')">兑换</button>
+      </div>
+      <div class="exchange-item">
+        <div class="exchange-credits">30次</div>
+        <div class="exchange-info">
+          <div class="exchange-name">标准算力包</div>
+          <div class="exchange-desc">消耗 500 积分</div>
+        </div>
+        <button class="btn-outline exchange-btn" onclick="showToast('兑换成功！获得30次算力')">兑换</button>
+      </div>
+      <div class="exchange-item">
+        <div class="exchange-credits">100次</div>
+        <div class="exchange-info">
+          <div class="exchange-name">高级算力包</div>
+          <div class="exchange-desc">消耗 1500 积分</div>
+        </div>
+        <button class="btn-gold exchange-btn" onclick="showToast('兑换成功！获得100次算力')">兑换</button>
+      </div>
+    </div>
+
+    <!-- Tier cards -->
+    <div class="h5-section">
+      <div class="h5-section-title">会员体系</div>
+      <div class="tier-cards">
+        <div class="tier-card tier-free">
+          <div class="tier-name">免费用户</div>
+          <div class="tier-price">¥0 <span>/ 月</span></div>
+          <div class="tier-features">
+            <div class="tier-feature">每日3条信息流</div>
+            <div class="tier-feature">基础行情数据</div>
+            <div class="tier-feature">KOL公开观点</div>
+          </div>
+        </div>
+        <div class="tier-card tier-basic">
+          <div class="tier-name">基础会员</div>
+          <div class="tier-price">¥99 <span>/ 月</span></div>
+          <div class="tier-features">
+            <div class="tier-feature">无限信息流</div>
+            <div class="tier-feature">AI分析 (5次/日)</div>
+            <div class="tier-feature">券商研报摘要</div>
+            <div class="tier-feature">专家纪要摘要</div>
+          </div>
+          <button class="btn-outline" style="margin-top:12px;width:100%">立即订阅</button>
+        </div>
+        <div class="tier-card tier-pro">
+          <div class="tier-badge">热门</div>
+          <div class="tier-name" style="color:var(--green)">专业会员</div>
+          <div class="tier-price" style="color:var(--green)">¥299 <span>/ 月</span></div>
+          <div class="tier-features">
+            <div class="tier-feature">无限AI分析</div>
+            <div class="tier-feature">完整研报原文</div>
+            <div class="tier-feature">专家纪要全文</div>
+            <div class="tier-feature">另类数据信号</div>
+            <div class="tier-feature">KOL专属直播</div>
+          </div>
+          <button class="btn-gold" style="margin-top:12px;width:100%">升级专业版</button>
+        </div>
+        <div class="tier-card tier-vip">
+          <div class="tier-badge" style="background:var(--gold-dark)">顶级</div>
+          <div class="tier-name" style="color:var(--gold)">机构VIP</div>
+          <div class="tier-price">¥2999 <span>/ 月</span></div>
+          <div class="tier-features">
+            <div class="tier-feature">专属投研顾问</div>
+            <div class="tier-feature">定制化数据报告</div>
+            <div class="tier-feature">专家一对一会议</div>
+            <div class="tier-feature">API数据接口</div>
+            <div class="tier-feature">优先新功能体验</div>
+          </div>
+          <button class="btn-gold" style="margin-top:12px;width:100%">联系顾问</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- KOL partner -->
+    <div class="h5-section">
+      <div class="h5-section-title">成为KOL合伙人</div>
+      <div class="card">
+        <div style="font-size:14px;color:var(--gold);font-weight:600;margin-bottom:8px">🤝 收益分成模式</div>
+        <div style="font-size:13px;color:var(--white);line-height:1.7;margin-bottom:12px">
+          冈底斯提供专业数据与证据链，您负责内容创作与粉丝运营。每带来一位付费用户，享受持续分成收益。
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
+          <div style="text-align:center;padding:10px;background:rgba(200,169,110,0.05);border-radius:8px">
+            <div style="font-size:18px;font-weight:700;color:var(--gold)">15%</div>
+            <div style="font-size:11px;color:var(--gray-400)">基础分成</div>
+          </div>
+          <div style="text-align:center;padding:10px;background:rgba(200,169,110,0.05);border-radius:8px">
+            <div style="font-size:18px;font-weight:700;color:var(--gold)">20%</div>
+            <div style="font-size:11px;color:var(--gray-400)">A级合伙人</div>
+          </div>
+          <div style="text-align:center;padding:10px;background:rgba(200,169,110,0.05);border-radius:8px">
+            <div style="font-size:18px;font-weight:700;color:var(--gold)">25%</div>
+            <div style="font-size:11px;color:var(--gray-400)">S级合伙人</div>
+          </div>
+        </div>
+        <button class="btn-gold" style="width:100%">申请成为合伙人</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TAB 6: 我的 ===== -->
+  <div id="page-profile" class="page">
+    <!-- Profile header -->
+    <div class="profile-header">
+      <div class="profile-avatar-lg">👤</div>
+      <div class="profile-name">投研用户</div>
+      <div class="profile-level-badge">Lv.4 资深分析师</div>
+      <div class="profile-stats">
+        <div class="profile-stat">
+          <div class="profile-stat-num">23</div>
+          <div class="profile-stat-label">帖子</div>
+        </div>
+        <div class="profile-stat">
+          <div class="profile-stat-num">456</div>
+          <div class="profile-stat-label">获赞</div>
+        </div>
+        <div class="profile-stat">
+          <div class="profile-stat-num">12</div>
+          <div class="profile-stat-label">关注</div>
+        </div>
+        <div class="profile-stat">
+          <div class="profile-stat-num">89</div>
+          <div class="profile-stat-label">粉丝</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Points & level card -->
+    <div class="points-card">
+      <div class="points-main">
+        <div>
+          <div style="font-size:11px;color:var(--gray-400);margin-bottom:4px">当前积分</div>
+          <div class="points-num">3,840</div>
+          <div class="points-label">Lv.4 资深分析师</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;color:var(--gray-400);margin-bottom:4px">算力余额</div>
+          <div style="font-size:22px;font-weight:700;color:var(--gold)">⚡ 128</div>
+          <div style="font-size:11px;color:var(--gray-400)">次可用</div>
+        </div>
+      </div>
+      <div class="points-progress">
+        <div class="points-progress-bar" style="width:76.8%"></div>
+      </div>
+      <div class="points-progress-label">
+        <span>3840 / 5000</span>
+        <span>下一级：Lv.5 首席分析师</span>
+      </div>
+    </div>
+
+    <!-- Level system table -->
+    <div class="h5-section" style="padding-bottom:8px">
+      <div class="h5-section-title">等级体系</div>
+    </div>
+    <div class="level-table">
+      <div class="level-row">
+        <div class="level-num">Lv.1</div>
+        <div class="level-name">投研新手</div>
+        <div class="level-pts">0</div>
+        <div class="level-reward">10次/月</div>
+      </div>
+      <div class="level-row">
+        <div class="level-num">Lv.2</div>
+        <div class="level-name">初级分析师</div>
+        <div class="level-pts">500</div>
+        <div class="level-reward">30次/月</div>
+      </div>
+      <div class="level-row">
+        <div class="level-num">Lv.3</div>
+        <div class="level-name">中级分析师</div>
+        <div class="level-pts">1500</div>
+        <div class="level-reward">80次/月</div>
+      </div>
+      <div class="level-row current">
+        <div class="level-num" style="font-size:13px">Lv.4 ✓</div>
+        <div class="level-name" style="font-weight:600">资深分析师</div>
+        <div class="level-pts">3000</div>
+        <div class="level-reward">150次/月</div>
+      </div>
+      <div class="level-row">
+        <div class="level-num">Lv.5</div>
+        <div class="level-name">首席分析师</div>
+        <div class="level-pts">5000</div>
+        <div class="level-reward">300次/月</div>
+      </div>
+      <div class="level-row">
+        <div class="level-num">Lv.6</div>
+        <div class="level-name" style="color:var(--gold)">投研大师</div>
+        <div class="level-pts">10000</div>
+        <div class="level-reward" style="color:var(--gold)">无限次</div>
+      </div>
+    </div>
+
+    <!-- Points earning rules -->
+    <div class="h5-section" style="padding-bottom:8px">
+      <div class="h5-section-title">积分获取方式</div>
+    </div>
+    <div class="points-rules">
+      <div class="points-rule-item">
+        <div class="points-rule-name">📝 发布投研帖子</div>
+        <div class="points-rule-pts">+10 积分</div>
+      </div>
+      <div class="points-rule-item">
+        <div class="points-rule-name">👍 帖子获赞</div>
+        <div class="points-rule-pts">+2 积分/赞</div>
+      </div>
+      <div class="points-rule-item">
+        <div class="points-rule-name">💬 评论互动</div>
+        <div class="points-rule-pts">+3 积分</div>
+      </div>
+      <div class="points-rule-item">
+        <div class="points-rule-name">🦞 使用Hermes分析</div>
+        <div class="points-rule-pts">+20 积分</div>
+      </div>
+      <div class="points-rule-item">
+        <div class="points-rule-name">📅 每日签到</div>
+        <div class="points-rule-pts">+5 积分</div>
+      </div>
+      <div class="points-rule-item">
+        <div class="points-rule-name">🎯 参与活动</div>
+        <div class="points-rule-pts">+50 积分</div>
+      </div>
+      <div class="points-rule-item">
+        <div class="points-rule-name">👥 邀请新用户</div>
+        <div class="points-rule-pts">+100 积分</div>
+      </div>
+    </div>
+
+    <!-- Badges -->
+    <div class="h5-section" style="padding-bottom:8px">
+      <div class="h5-section-title">我的勋章</div>
+    </div>
+    <div class="badges-wrap">
+      <div class="badge-chip">🔥 热门创作者</div>
+      <div class="badge-chip">🦞 Hermes达人</div>
+      <div class="badge-chip">📊 投研先锋</div>
+      <div class="badge-chip">🏆 活动达人</div>
+      <div class="badge-chip">💎 付费会员</div>
+      <div class="badge-chip">📅 连续签到30天</div>
+    </div>
+
+    <!-- Settings -->
+    <div class="h5-section" style="padding-bottom:8px">
+      <div class="h5-section-title">账号管理</div>
+    </div>
+    <div class="settings-list">
+      <div class="settings-item" onclick="showToast('功能开发中...')">
+        <div class="settings-icon">⚙️</div>
+        <div class="settings-label">账号设置</div>
+        <div class="settings-arrow">›</div>
+      </div>
+      <div class="settings-item" onclick="showToast('功能开发中...')">
+        <div class="settings-icon">🔔</div>
+        <div class="settings-label">消息通知</div>
+        <div class="settings-arrow">›</div>
+      </div>
+      <div class="settings-item" onclick="showToast('功能开发中...')">
+        <div class="settings-icon">❓</div>
+        <div class="settings-label">帮助中心</div>
+        <div class="settings-arrow">›</div>
+      </div>
+      <div class="settings-item" onclick="showToast('已退出登录')">
+        <div class="settings-icon">🚪</div>
+        <div class="settings-label" style="color:var(--red)">退出登录</div>
+        <div class="settings-arrow">›</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== BOTTOM NAV (6 tabs) ===== -->
+  <div class="h5-bottom-nav">
+    <div class="h5-nav-item active" id="nav-feed" onclick="switchTab('feed')">
+      <div class="h5-nav-icon">📰</div>
+      <div class="h5-nav-label">信息流</div>
+    </div>
+    <div class="h5-nav-item" id="nav-community" onclick="switchTab('community')">
+      <div class="h5-nav-icon">👥</div>
+      <div class="h5-nav-label">社区</div>
+    </div>
+    <div class="h5-nav-item" id="nav-hermes" onclick="switchTab('hermes')">
+      <div class="h5-nav-icon">🦞</div>
+      <div class="h5-nav-label">Hermes</div>
+    </div>
+    <div class="h5-nav-item" id="nav-market" onclick="switchTab('market')">
+      <div class="h5-nav-icon">📈</div>
+      <div class="h5-nav-label">行情</div>
+    </div>
+    <div class="h5-nav-item" id="nav-vip" onclick="switchTab('vip')">
+      <div class="h5-nav-icon">💎</div>
+      <div class="h5-nav-label">会员</div>
+    </div>
+    <div class="h5-nav-item" id="nav-profile" onclick="switchTab('profile')">
+      <div class="h5-nav-icon">👤</div>
+      <div class="h5-nav-label">我的</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== COMPOSE MODAL ===== -->
+<div class="modal-overlay" id="compose-modal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">发布投研观点</div>
+    <textarea class="modal-textarea" id="compose-text" placeholder="分享你的投研观点，可以@大V或添加标签..."></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <span class="tag tag-gold" style="cursor:pointer" onclick="appendTag('#A股')">+ #A股</span>
+      <span class="tag tag-gold" style="cursor:pointer" onclick="appendTag('#港股')">+ #港股</span>
+      <span class="tag tag-gold" style="cursor:pointer" onclick="appendTag('#新能源')">+ #新能源</span>
+      <span class="tag tag-gold" style="cursor:pointer" onclick="appendTag('#AI科技')">+ #AI科技</span>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="document.getElementById('compose-modal').classList.remove('show')">取消</button>
+      <button class="btn-gold" onclick="submitPost()">发布 +10积分</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== EVENT DETAIL MODAL ===== -->
+<div class="modal-overlay" id="event-detail-modal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="modal-sheet" style="max-height:85vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <div id="event-detail-content"></div>
+  </div>
+</div>
+
+<!-- ===== TOAST ===== -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== TAB SWITCHING =====
+const ALL_TABS = ['feed', 'community', 'hermes', 'market', 'vip', 'profile'];
+// Header tabs correspond to first 4 tabs (indices 0-3)
+const HEADER_TAB_NAMES = ['feed', 'community', 'hermes', 'market'];
+
+function switchTab(tab) {
+  // Hide all pages
+  ALL_TABS.forEach(t => {
+    const page = document.getElementById('page-' + t);
+    if (page) page.classList.remove('active');
+  });
+
+  // Remove active from all header tabs
+  document.querySelectorAll('.h5-tab').forEach(el => el.classList.remove('active'));
+
+  // Remove active from all bottom nav items
+  document.querySelectorAll('.h5-nav-item').forEach(el => el.classList.remove('active'));
+
+  // Show selected page
+  const page = document.getElementById('page-' + tab);
+  if (page) page.classList.add('active');
+
+  // Activate header tab if applicable
+  const headerIdx = HEADER_TAB_NAMES.indexOf(tab);
+  if (headerIdx !== -1) {
+    const headerTabs = document.querySelectorAll('.h5-tab');
+    if (headerTabs[headerIdx]) headerTabs[headerIdx].classList.add('active');
+  }
+
+  // Activate bottom nav item
+  const navItem = document.getElementById('nav-' + tab);
+  if (navItem) navItem.classList.add('active');
+}
+
+// ===== COMMUNITY =====
+let communitySubTab = 'square';
+
+function switchCommunityTab(tab) {
+  communitySubTab = tab;
+  // Update sub-tab buttons
+  document.querySelectorAll('.community-subtab').forEach(el => el.classList.remove('active'));
+  const tabs = ['square', 'dav', 'events'];
+  const idx = tabs.indexOf(tab);
+  if (idx !== -1) {
+    document.querySelectorAll('.community-subtab')[idx].classList.add('active');
+  }
+  // Show/hide sub-panels
+  document.getElementById('community-square').style.display = (tab === 'square') ? 'block' : 'none';
+  document.getElementById('community-dav').style.display = (tab === 'dav') ? 'block' : 'none';
+  document.getElementById('community-events').style.display = (tab === 'events') ? 'block' : 'none';
+}
+
+async function loadCommunityPosts() {
+  try {
+    const resp = await fetch('/api/community/posts');
+    const data = await resp.json();
+    // API returns array directly
+    const posts = Array.isArray(data) ? data : (data.posts || []);
+    // Merge API posts with sample posts for richer feed
+    const merged = [...posts.map(p => ({
+      id: p.id, avatar: p.avatar, name: p.author,
+      tier: p.tier === '大V' ? 'dav' : (p.tier === '认证用户' ? 'verified' : 'normal'),
+      platform: p.platform, time: p.time, content: p.content,
+      tags: p.tags, likes: p.likes, comments: p.comments, points: '+' + (p.points_reward||10) + '积分'
+    })), ...getSamplePosts().slice(posts.length > 3 ? 3 : 0)];
+    renderPosts(merged);
+  } catch (e) {
+    renderPosts(getSamplePosts());
+  }
+}
+
+function getSamplePosts() {
+  return [
+    {
+      id: 1, avatar: '👑', name: '财经老王', tier: 'dav', platform: '抖音',
+      time: '10分钟前',
+      content: '今日A股开盘，科技板块继续强势。AI算力链上游出现分歧，建议关注具有自主可控优势的国内设备商。半导体设备板块短期或有调整，但中长期逻辑未变，逢低布局机会值得关注。\n$中微公司 $北方华创 #A股 #半导体',
+      tags: ['A股', '半导体', 'AI'],
+      likes: 234, comments: 56, points: '+10积分'
+    },
+    {
+      id: 2, avatar: '🌐', name: '全球宏观James', tier: 'dav', platform: '微博',
+      time: '32分钟前',
+      content: '美联储官员发表鸽派讲话，年内降息预期升温。美债收益率下行带动风险资产情绪改善，美股科技股普涨。关注国内货币政策是否会跟进宽松，若配合财政发力，A股有望迎来阶段性行情。',
+      tags: ['宏观', '美联储', '美股'],
+      likes: 189, comments: 43, points: '+10积分'
+    },
+    {
+      id: 3, avatar: '⚡', name: '新能源猎手阿强', tier: 'verified', platform: 'B站',
+      time: '1小时前',
+      content: '固态电池最新进展：某头部企业已完成500次循环测试，能量密度突破400Wh/kg。量产时间表可能提前至2026年Q3。产业链中游材料端率先受益，氧化物固态电解质相关标的值得重点关注。',
+      tags: ['新能源', '固态电池', '锂电池'],
+      likes: 312, comments: 78, points: '+10积分'
+    },
+    {
+      id: 4, avatar: '📊', name: '量化老师陈明', tier: 'verified', platform: '公众号',
+      time: '2小时前',
+      content: '本周多因子模型回测显示：价值因子相对动量因子超额收益显著，连续三周价值占优。建议降低高估值成长股配置，增加低PB、高股息品种。风险提示：市场风格切换可能反复，仓位管理很重要。',
+      tags: ['量化', '因子', '策略'],
+      likes: 145, comments: 29, points: '+10积分'
+    },
+    {
+      id: 5, avatar: '💡', name: '价值猎人小林', tier: 'normal', platform: '冈底斯',
+      time: '3小时前',
+      content: '刚用Hermes分析了港股互联网板块，结论很有意思：当前估值处于历史20%分位，南向资金连续14个交易日净买入，基本面拐点信号越来越明显。分享给大家参考。',
+      tags: ['港股', '互联网', 'Hermes'],
+      likes: 67, comments: 18, points: '+10积分'
+    }
+  ];
+}
+
+function renderPosts(posts) {
+  const container = document.getElementById('posts-container');
+  if (!posts || posts.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">暂无帖子</div>';
+    return;
+  }
+  container.innerHTML = posts.map(p => {
+    const avatarClass = p.tier === 'dav' ? 'dav' : (p.tier === 'verified' ? 'verified' : 'normal');
+    const badge = p.tier === 'dav'
+      ? '<span class="post-badge-dav">大V</span>'
+      : (p.tier === 'verified' ? '<span class="post-badge-verified">认证</span>' : '');
+    const tags = (p.tags || []).map(t =>
+      `<span class="tag tag-gold" style="font-size:11px">#${t}</span>`
+    ).join('');
+    return `
+    <div class="post-card" id="post-${p.id}">
+      <div class="post-author-row">
+        <div class="post-avatar ${avatarClass}">${p.avatar}</div>
+        <div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="post-name">${p.name}</span>${badge}
+            <span style="font-size:11px;color:var(--gray-400);background:rgba(154,149,144,0.1);padding:1px 6px;border-radius:4px">${p.platform}</span>
+          </div>
+        </div>
+        <div class="post-time">${p.time}</div>
+      </div>
+      <div class="post-content" id="post-content-${p.id}">${p.content}</div>
+      <div style="margin-bottom:8px">
+        <span onclick="toggleExpand(${p.id})" style="font-size:12px;color:var(--gold);cursor:pointer" id="expand-${p.id}">展开</span>
+      </div>
+      <div class="post-tags">${tags}</div>
+      <div class="post-footer">
+        <div class="post-action" onclick="likePost(${p.id}, this)">
+          <span>👍</span><span id="likes-${p.id}">${p.likes}</span>
+        </div>
+        <div class="post-action">
+          <span>💬</span><span>${p.comments}</span>
+        </div>
+        <div class="post-action">
+          <span>🔗</span><span>分享</span>
+        </div>
+        <div class="post-points-badge">${p.points}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleExpand(postId) {
+  const content = document.getElementById('post-content-' + postId);
+  const btn = document.getElementById('expand-' + postId);
+  if (content.classList.contains('expanded')) {
+    content.classList.remove('expanded');
+    btn.textContent = '展开';
+  } else {
+    content.classList.add('expanded');
+    btn.textContent = '收起';
+  }
+}
+
+async function loadCommunityEvents() {
+  try {
+    const resp = await fetch('/api/community/events');
+    const data = await resp.json();
+    const events = Array.isArray(data) ? data : (data.events || []);
+    const mapped = events.map(e => ({
+      id: e.id,
+      type: e.type,
+      typeClass: e.type === '直播' ? 'event-live' : e.type === '会议' ? 'event-meeting' : 'event-activity',
+      title: e.title,
+      date: e.date,
+      host: e.host,
+      participants: e.participants,
+      points: e.points,
+      statusText: e.status,
+      open: e.status !== '已结束',
+      desc: e.desc || ''
+    }));
+    renderEvents([...mapped, ...getSampleEvents().slice(mapped.length > 2 ? 2 : 0)]);
+  } catch (e) {
+    renderEvents(getSampleEvents());
+  }
+}
+
+function getSampleEvents() {
+  return [
+    {
+      id: 1, type: '直播', typeClass: 'event-live',
+      title: '【大V直播】财经老王：美联储降息周期下的A股配置策略',
+      date: '2026-05-22 20:00', host: '财经老王 · 全球宏观James',
+      participants: 2840, points: 100, statusText: '报名中', open: true,
+      desc: '两位S级大V联合直播，深度解析降息周期对A股各板块的影响，给出具体配置建议。',
+      tags: ['宏观', 'A股', '配置策略'], reward: '参与+100积分，提问被采纳+50积分'
+    },
+    {
+      id: 2, type: '活动', typeClass: 'event-activity',
+      title: '【挑战赛】冈底斯投研大赛第三季 · 最佳分析师评选',
+      date: '2026-05-25 ~ 2026-06-15', host: '冈底斯官方',
+      participants: 1260, points: 500, statusText: '进行中', open: true,
+      desc: '发布原创投研帖子，获赞最多的前10名获得丰厚奖励。一等奖：年度专业会员+1000算力。',
+      tags: ['原创', '竞赛', '奖励'], reward: '一等奖¥2000+年度会员，参与即得+50积分'
+    },
+    {
+      id: 3, type: '会议', typeClass: 'event-meeting',
+      title: '【专家会议】新能源产业链Q2展望 · 固态电池专题',
+      date: '2026-05-24 14:00', host: '新能源猎手阿强 + 行业专家',
+      participants: 680, points: 200, statusText: '名额有限', open: true,
+      desc: '邀请产业链核心专家，深度探讨固态电池商业化进程、碳酸锂价格走势及投资机会。',
+      tags: ['新能源', '固态电池', '专家'], reward: '参与+200积分，仅限专业会员及以上'
+    },
+    {
+      id: 4, type: '活动', typeClass: 'event-activity',
+      title: '【积分翻倍】本周发帖积分×2 · 限时活动',
+      date: '2026-05-20 ~ 2026-05-26', host: '冈底斯官方',
+      participants: 5600, points: 0, statusText: '进行中', open: true,
+      desc: '本周内发布投研帖子，积分翻倍奖励。优质帖子额外获得算力奖励，快来参与！',
+      tags: ['积分', '限时', '福利'], reward: '发帖积分×2，优质帖额外+50算力'
+    },
+    {
+      id: 5, type: '直播', typeClass: 'event-live',
+      title: '【直播回放】量化老师陈明：多因子模型实战讲解',
+      date: '2026-05-18 19:30', host: '量化老师陈明',
+      participants: 3200, points: 30, statusText: '可回放', open: true,
+      desc: '深度讲解价值、动量、质量三因子的构建方法和实战应用，附完整代码示例。',
+      tags: ['量化', '因子', '回放'], reward: '观看回放+30积分'
+    },
+    {
+      id: 6, type: '会议', typeClass: 'event-meeting',
+      title: '【闭门会】港股互联网板块深度研讨',
+      date: '2026-05-28 15:00', host: '投资女神Lisa + 港股研究员',
+      participants: 120, points: 300, statusText: '即将开放', open: false,
+      desc: '仅限机构VIP用户参与，深度研讨港股互联网板块的估值修复逻辑和配置时机。',
+      tags: ['港股', '互联网', 'VIP专属'], reward: '参与+300积分，仅限机构VIP'
+    },
+  ];
+}
+
+function renderEvents(events) {
+  _allEvents = events; // store for detail view
+  const container = document.getElementById('events-container');
+  if (!events || events.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">暂无活动</div>';
+    return;
+  }
+  const ongoing = events.filter(e => ['进行中','报名中','名额有限','可回放'].includes(e.statusText));
+  const other = events.filter(e => !['进行中','报名中','名额有限','可回放'].includes(e.statusText));
+
+  let html = '';
+  if (ongoing.length) {
+    html += `<div style="font-size:12px;color:var(--gold);font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block"></span>进行中 / 即将开始</div>`;
+    html += ongoing.map(ev => renderEventCard(ev)).join('');
+  }
+  if (other.length) {
+    html += `<div style="font-size:12px;color:var(--gray-400);font-weight:600;margin:16px 0 10px;display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--gray-400);display:inline-block"></span>往期 / 即将开放</div>`;
+    html += other.map(ev => renderEventCard(ev)).join('');
+  }
+  container.innerHTML = html;
+}
+
+function renderEventCard(ev) {
+  const tags = (ev.tags || []).map(t => `<span style="font-size:10px;background:rgba(200,169,110,0.1);color:var(--gold);padding:1px 7px;border-radius:8px">${t}</span>`).join('');
+  const statusColor = ev.statusText === '进行中' ? 'var(--green)' : ev.statusText === '报名中' ? '#3498DB' : ev.statusText === '名额有限' ? '#E67E22' : 'var(--gray-400)';
+  const btnHtml = ev.open && ev.statusText !== '即将开放'
+    ? `<button class="btn-gold" style="padding:6px 14px;font-size:12px" onclick="joinEvent(${ev.id}, ${ev.points}, '${ev.statusText}')">
+        ${ev.statusText === '可回放' ? '▶ 观看' : ev.statusText === '进行中' ? '参与' : '报名'}
+       </button>`
+    : `<button class="btn-outline" style="padding:6px 14px;font-size:12px;opacity:0.5;cursor:default">${ev.statusText}</button>`;
+
+  return `
+  <div class="event-card" style="position:relative;overflow:hidden;cursor:pointer" onclick="showEventDetail(${ev.id})">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
+      <span class="event-type-badge ${ev.typeClass}">${ev.type}</span>
+      <span style="font-size:11px;color:${statusColor};font-weight:600">● ${ev.statusText}</span>
+    </div>
+    <div class="event-title">${ev.title}</div>
+    ${ev.desc ? `<div style="font-size:12px;color:var(--gray-400);line-height:1.6;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${ev.desc}</div>` : ''}
+    <div class="event-meta">📅 ${ev.date} &nbsp;·&nbsp; 🎙️ ${ev.host}</div>
+    ${tags ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${tags}</div>` : ''}
+    ${ev.reward ? `<div style="font-size:11px;color:var(--gold);background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.15);border-radius:6px;padding:5px 10px;margin-bottom:10px">🎁 ${ev.reward}</div>` : ''}
+    <div class="event-footer" onclick="event.stopPropagation()">
+      <div class="event-info">👥 ${ev.participants.toLocaleString()}人 ${ev.points > 0 ? `&nbsp;·&nbsp; <span style="color:var(--gold)">+${ev.points}积分</span>` : ''}</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-size:11px;color:var(--gray-400)">详情 ›</span>
+        ${btnHtml}
+      </div>
+    </div>
+  </div>`;
+}
+
+function joinEvent(id, points, status) {
+  if (status === '可回放') {
+    showToast('正在加载回放... +' + points + '积分');
+  } else {
+    showToast('报名成功！+' + points + '积分已到账');
+  }
+}
+
+// Store events for detail view
+let _allEvents = [];
+
+function showEventDetail(id) {
+  const ev = _allEvents.find(e => e.id === id);
+  if (!ev) return;
+  const tags = (ev.tags || []).map(t => `<span style="font-size:11px;background:rgba(200,169,110,0.1);color:var(--gold);padding:2px 10px;border-radius:10px">${t}</span>`).join('');
+  const statusColor = ev.statusText === '进行中' ? 'var(--green)' : ev.statusText === '报名中' ? '#3498DB' : ev.statusText === '名额有限' ? '#E67E22' : 'var(--gray-400)';
+
+  // Agenda / schedule mock
+  const agendas = {
+    1: [
+      { time: '20:00', item: '开场介绍 · 财经老王 & 全球宏观James' },
+      { time: '20:10', item: '美联储降息路径分析 · 全球宏观James' },
+      { time: '20:35', item: 'A股各板块配置策略 · 财经老王' },
+      { time: '21:00', item: '互动问答 · 观众提问环节' },
+      { time: '21:20', item: '总结与投资建议' },
+    ],
+    2: [
+      { time: '第1周', item: '报名参赛，发布第一篇原创投研帖子' },
+      { time: '第2周', item: '社区互动，为优质帖子点赞投票' },
+      { time: '第3周', item: '专家评审，筛选Top20帖子' },
+      { time: '第4周', item: '公众投票，决出最终排名' },
+      { time: '颁奖', item: '直播颁奖典礼，公布获奖名单' },
+    ],
+    3: [
+      { time: '14:00', item: '开场 · 新能源猎手阿强主持' },
+      { time: '14:10', item: '固态电池产业化进展 · 行业专家A' },
+      { time: '14:40', item: '碳酸锂价格走势与投资机会 · 行业专家B' },
+      { time: '15:10', item: '海外市场拓展与竞争格局 · 行业专家C' },
+      { time: '15:40', item: '圆桌讨论 · 投资机会与风险' },
+    ],
+    4: [
+      { time: '19:30', item: '开场 · 量化老师陈明' },
+      { time: '19:40', item: '多因子模型基础讲解' },
+      { time: '20:10', item: '价值、动量、质量因子实战' },
+      { time: '20:40', item: '代码演示与回测结果' },
+      { time: '21:00', item: '问答环节' },
+    ],
+    5: [
+      { time: '19:30', item: '开场 · 量化老师陈明' },
+      { time: '19:40', item: '港股互联网估值框架' },
+      { time: '20:10', item: '南向资金行为分析' },
+      { time: '20:40', item: '个股精选与配置建议' },
+      { time: '21:00', item: '问答环节' },
+    ],
+    6: [
+      { time: '15:00', item: '开场 · 投资女神Lisa' },
+      { time: '15:10', item: '港股互联网深度研讨' },
+      { time: '15:50', item: '港股研究员：个股分析' },
+      { time: '16:20', item: '圆桌讨论' },
+    ],
+  };
+  const agenda = agendas[id] || [];
+  const agendaHtml = agenda.length ? `
+    <div style="margin-bottom:16px">
+      <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:10px">📅 活动议程</div>
+      ${agenda.map(a => `
+        <div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid rgba(200,169,110,0.06)">
+          <div style="font-size:11px;color:var(--gold);min-width:44px;font-weight:600">${a.time}</div>
+          <div style="font-size:13px;color:var(--white)">${a.item}</div>
+        </div>`).join('')}
+    </div>` : '';
+
+  const btnHtml = ev.open && ev.statusText !== '即将开放'
+    ? `<button class="btn-gold" style="width:100%;padding:12px" onclick="joinEvent(${ev.id},${ev.points},'${ev.statusText}');document.getElementById('event-detail-modal').classList.remove('show')">
+        ${ev.statusText === '可回放' ? '▶ 立即观看' : '立即报名 · +' + ev.points + '积分'}
+       </button>`
+    : `<button class="btn-outline" style="width:100%;padding:12px;opacity:0.5">${ev.statusText}</button>`;
+
+  document.getElementById('event-detail-content').innerHTML = `
+    <div style="padding:0 4px 16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <span class="event-type-badge ${ev.typeClass}">${ev.type}</span>
+        <span style="font-size:11px;color:${statusColor};font-weight:600">● ${ev.statusText}</span>
+      </div>
+      <div style="font-size:17px;font-weight:700;color:var(--white);line-height:1.4;margin-bottom:10px">${ev.title}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${tags}</div>
+
+      <div style="background:rgba(200,169,110,0.05);border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:12px;margin-bottom:14px">
+        <div style="font-size:12px;color:var(--gray-400);margin-bottom:4px">活动简介</div>
+        <div style="font-size:13px;color:var(--white);line-height:1.7">${ev.desc || '暂无简介'}</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div style="background:var(--navy-mid);border-radius:8px;padding:10px">
+          <div style="font-size:11px;color:var(--gray-400)">时间</div>
+          <div style="font-size:12px;color:var(--white);margin-top:3px">📅 ${ev.date}</div>
+        </div>
+        <div style="background:var(--navy-mid);border-radius:8px;padding:10px">
+          <div style="font-size:11px;color:var(--gray-400)">主持/主办</div>
+          <div style="font-size:12px;color:var(--white);margin-top:3px">🎙️ ${ev.host}</div>
+        </div>
+        <div style="background:var(--navy-mid);border-radius:8px;padding:10px">
+          <div style="font-size:11px;color:var(--gray-400)">参与人数</div>
+          <div style="font-size:13px;color:var(--gold);font-weight:600;margin-top:3px">👥 ${ev.participants.toLocaleString()}人</div>
+        </div>
+        <div style="background:var(--navy-mid);border-radius:8px;padding:10px">
+          <div style="font-size:11px;color:var(--gray-400)">积分奖励</div>
+          <div style="font-size:13px;color:var(--gold);font-weight:600;margin-top:3px">🎁 +${ev.points}积分</div>
+        </div>
+      </div>
+
+      ${ev.reward ? `<div style="font-size:12px;color:var(--gold);background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.15);border-radius:8px;padding:10px;margin-bottom:14px">🎁 ${ev.reward}</div>` : ''}
+
+      ${agendaHtml}
+
+      <div style="margin-bottom:16px">
+        <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:8px">🤖 Hermes 活动解读</div>
+        <div style="font-size:12px;color:var(--gray-400);background:rgba(200,169,110,0.04);border:1px solid rgba(200,169,110,0.1);border-radius:8px;padding:10px;line-height:1.7">
+          本次活动由冈底斯平台认证大V主持，内容基于平台专业数据支撑。参与活动可获取一手投研信息，结合Hermes AI分析工具，帮助您更好地理解和应用活动中的投研观点。
+        </div>
+      </div>
+
+      ${btnHtml}
+    </div>`;
+  document.getElementById('event-detail-modal').classList.add('show');
+}
+
+function likePost(postId, btn) {
+  fetch('/api/community/like', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ post_id: postId })
+  }).catch(() => {});
+  const likesEl = document.getElementById('likes-' + postId);
+  if (likesEl) {
+    likesEl.textContent = parseInt(likesEl.textContent) + 1;
+  }
+  btn.style.color = 'var(--gold)';
+  showToast('+2积分');
+}
+
+function appendTag(tag) {
+  const ta = document.getElementById('compose-text');
+  ta.value += (ta.value && !ta.value.endsWith(' ') ? ' ' : '') + tag;
+  ta.focus();
+}
+
+function submitPost() {
+  const text = document.getElementById('compose-text').value.trim();
+  if (!text) { showToast('请输入内容'); return; }
+  document.getElementById('compose-modal').classList.remove('show');
+  document.getElementById('compose-text').value = '';
+  showToast('发布成功！+10积分');
+  // Reload posts
+  loadCommunityPosts();
+}
+
+// ===== HERMES =====
+let hermesMode = '研报精读';
+let hermesHistory = [];
+let hermesCredits = 128;
+
+const HERMES_MODES = {
+  '研报精读': {
+    desc: '深度解读券商研报，提取核心观点、盈利预测和投资评级，快速掌握机构最新研判。',
+    options: [
+      { label: '高盛A股策略报告', tag: '最新发布' },
+      { label: '中金新能源深度', tag: '本周热门' },
+      { label: '摩根大通港股展望', tag: '机构重磅' },
+      { label: '国泰君安AI专题', tag: '行业深度' }
+    ]
+  },
+  '专家纪要速读': {
+    desc: '快速提炼专家会议纪要，聚焦一手信息，AI摘要帮您节省80%阅读时间。',
+    options: [
+      { label: '半导体产业专家会', tag: '昨日更新' },
+      { label: '新能源产业链调研', tag: '最新纪要' },
+      { label: '消费行业专家访谈', tag: '独家内容' },
+      { label: '医药行业专家会议', tag: '本周热门' }
+    ]
+  },
+  '另类数据解读': {
+    desc: '解读卫星图像、消费数据、舆情指数等另类数据，发现市场先行指标。',
+    options: [
+      { label: '港口卫星吞吐量', tag: '实时更新' },
+      { label: '全国消费热力图', tag: '高频数据' },
+      { label: '社交媒体情绪指数', tag: 'NLP分析' },
+      { label: '工厂开工率监测', tag: '卫星数据' }
+    ]
+  },
+  '投资组合诊断': {
+    desc: '输入持仓，AI分析集中度风险、因子暴露、历史回撤和优化建议。',
+    options: [
+      { label: 'A股持仓诊断', tag: '上传持仓' },
+      { label: '港美股持仓分析', tag: '跨市场' },
+      { label: '行业配置检查', tag: '分散度评估' },
+      { label: '风险因子分解', tag: '量化分析' }
+    ]
+  },
+  '市场情绪扫描': {
+    desc: '实时扫描市场情绪温度，识别恐慌/贪婪信号，辅助择时判断。',
+    options: [
+      { label: 'A股情绪综合指数', tag: '实时' },
+      { label: '北向资金流向分析', tag: '今日更新' },
+      { label: '期权隐波率监测', tag: '衍生品信号' },
+      { label: '融资融券动向', tag: '杠杆指标' }
+    ]
+  },
+  '量化因子筛选': {
+    desc: '多因子模型实时筛选优质标的，覆盖价值、成长、动量、质量等主流因子。',
+    options: [
+      { label: '价值因子Top20', tag: '本周更新' },
+      { label: '动量因子筛选', tag: '技术面' },
+      { label: '质量因子排名', tag: 'ROE优化' },
+      { label: '多因子复合策略', tag: 'AI组合' }
+    ]
+  }
+};
+
+async function selectHermesMode(mode) {
+  hermesMode = mode;
+  // Update mode buttons
+  document.querySelectorAll('.hermes-mode-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent.includes(mode));
+  });
+  // Show mode description
+  const modeData = HERMES_MODES[mode] || {};
+  document.getElementById('hermes-mode-desc-text').textContent = modeData.desc || '';
+  // Show options
+  const optionsTitle = document.getElementById('hermes-options-title');
+  const optionsGrid = document.getElementById('hermes-options');
+  optionsTitle.style.display = 'block';
+  const opts = modeData.options || [];
+  optionsGrid.innerHTML = opts.map((opt, i) => `
+    <div class="hermes-option-btn" id="opt-${i}" onclick="selectHermesOption('${opt.label}')">
+      <div class="hermes-option-label">${opt.label}</div>
+      <div class="hermes-option-tag">${opt.tag}</div>
+    </div>
+  `).join('');
+  // Fetch mode detail from API (non-blocking)
+  try {
+    const resp = await fetch('/api/hermes/mode-detail?mode=' + encodeURIComponent(mode));
+    const data = await resp.json();
+    if (data.desc) {
+      document.getElementById('hermes-mode-desc-text').textContent = data.desc;
+    }
+  } catch (e) {}
+}
+
+async function selectHermesOption(option) {
+  // Highlight selected option
+  document.querySelectorAll('.hermes-option-btn').forEach(btn => {
+    btn.classList.toggle('selected', btn.querySelector('.hermes-option-label').textContent === option);
+  });
+  // Add user bubble
+  addHermesMessage('user', null, { mode: hermesMode, option: option });
+  // Show loading
+  showHermesLoading(true);
+  document.getElementById('hermes-quick-actions').style.display = 'none';
+  // Scroll to bottom
+  scrollHermesToBottom();
+  try {
+    const resp = await fetch('/api/hermes/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: hermesMode, option: option })
+    });
+    const data = await resp.json();
+    showHermesLoading(false);
+    addHermesMessage('ai', data.result || data.analysis || '分析完成，请查看结果。', { credits: 1, points: 20 });
+  } catch (e) {
+    showHermesLoading(false);
+    // Fallback mock response
+    const mockResult = generateMockHermesResult(hermesMode, option);
+    addHermesMessage('ai', mockResult, { credits: 1, points: 20 });
+  }
+  document.getElementById('hermes-quick-actions').style.display = 'flex';
+  scrollHermesToBottom();
+  // Update credits
+  hermesCredits = Math.max(0, hermesCredits - 1);
+  document.getElementById('hermes-credits-display').textContent = '⚡ ' + hermesCredits + '次';
+}
+
+function generateMockHermesResult(mode, option) {
+  const results = {
+    '研报精读': `【核心观点】\n目标价上调至 52.0元，维持买入评级。\n\n【盈利预测】\n2025E EPS: 2.35元 (+18% YoY)\n2026E EPS: 2.82元 (+20% YoY)\n\n【投资逻辑】\n1. AI算力需求持续超预期，订单能见度延伸至Q3\n2. 国产替代加速，市场份额持续提升\n3. 估值处于历史中枢偏下，性价比凸显\n\n【风险提示】\n宏观经济下行、竞争加剧、政策不确定性`,
+    '专家纪要速读': `【会议要点】\n日期：2026年5月19日\n参与方：产业链核心企业高管\n\n【核心信息】\n1. 下游需求Q2环比改善明显，龙头企业订单饱满\n2. 原材料价格趋于稳定，毛利率有望修复\n3. 新技术路线加速量产，性能指标超预期\n\n【市场影响】\n短期催化明确，建议关注产业链中游核心供应商`,
+    '另类数据解读': `【数据摘要】\n截至2026年5月20日\n\n【关键指标】\n● 港口吞吐量：环比+8.2%，同比+12.5%\n● 工厂开工率：78.3%，高于季节性水平\n● 物流指数：连续4周上行\n\n【信号解读】\n工业活动明显回暖，与PMI数据相互印证。经济基本面改善信号积累，利好顺周期板块。\n\n【投资建议】\n关注工业品、交运、可选消费板块`,
+    '市场情绪扫描': `【情绪指数：62/100 偏乐观】\n\n【多空信号】\n● 北向资金：连续5日净流入，累计 +48亿\n● 融资余额：+1.2%，杠杆适度\n● 期权PCR：0.82，情绪中性偏多\n\n【板块热度】\n🔥 AI算力 · 半导体设备 · 新能源\n❄️ 银行 · 地产 · 消费\n\n【策略建议】\n当前情绪偏暖但未过热，可维持正常仓位，关注科技成长板块的短期交易机会`
+  };
+  return results[mode] || `【${mode}分析完成】\n\n分析对象：${option}\n\n基于冈底斯数据库综合分析，该标的近期基本面改善，技术面处于上升通道，建议持续关注。\n\n详细报告请查看完整版。`;
+}
+
+async function hermesQuickAction(action) {
+  if (action === '加入收藏') { showToast('已加入收藏夹 ⭐'); return; }
+  if (action === '分享到社区') { showToast('已分享到社区广场 +15积分'); return; }
+  addHermesMessage('user', null, { quickAction: action });
+  showHermesLoading(true);
+  scrollHermesToBottom();
+  await new Promise(r => setTimeout(r, 1200));
+  showHermesLoading(false);
+  const actionResults = {
+    '深入追问': '好的，我来进一步深入分析。\n\n从估值角度看，当前PE处于历史25%分位，具备一定的安全边际。未来6个月，如果盈利预测上修兑现，股价有望带来15-25%的潜在回报空间。\n\n关键催化剂：\n① Q2财报季业绩超预期\n② 政策边际改善信号\n③ 外资持续流入确认',
+    '对比分析': '与同类标的横向对比：\n\n● 估值：折价10-15%，优势明显\n● 成长性：营收增速高于行业均值8ppt\n● 盈利质量：自由现金流转化率行业领先\n● 股东回报：分红率持续提升\n\n综合评分：★★★★☆\n\n建议：在同类标的中优先配置。',
+    '生成摘要': '【三句话摘要】\n① 基本面改善，盈利拐点明确；\n② 估值处于历史低位，安全边际充足；\n③ 催化剂明确，建议超配。\n\n适合分享给朋友或发布到社区。'
+  };
+  addHermesMessage('ai', actionResults[action] || '正在处理您的请求...', { credits: 1, points: 10 });
+  scrollHermesToBottom();
+  hermesCredits = Math.max(0, hermesCredits - 1);
+  document.getElementById('hermes-credits-display').textContent = '⚡ ' + hermesCredits + '次';
+}
+
+async function hermesShortcut(action) {
+  addHermesMessage('user', null, { quickAction: action });
+  showHermesLoading(true);
+  scrollHermesToBottom();
+  await new Promise(r => setTimeout(r, 1000));
+  showHermesLoading(false);
+  const shortcutResults = {
+    '今日市场速览': '【今日市场速览 · 2026-05-20】\n\n📈 A股：两市成交9800亿，科技板块领涨+2.3%，北向资金净流入28亿\n🌐 港股：恒指+1.1%，互联网板块+2.8%，南向资金净流入38亿\n🇺🇸 美股：纳指+0.8%，AI概念股普涨，英伟达+3.2%\n🥇 黄金：3342美元/盎司，+0.56%\n\n💡 今日关注：PMI数据发布、美联储官员讲话\n⚠️ 风险提示：地缘政治扰动、汇率波动',
+    '热门研报摘要': '【今日热门研报 Top5】\n\n1. 📋 中金 - AI算力深度研究：需求拐点已现，上调目标价\n2. 📋 高盛 - A股策略：Q2配置建议，超配科技+消费\n3. 📋 中信证券 - 新能源2026年展望：固态电池加速\n4. 📋 国泰君安 - 消费复苏路径：下半年量价齐升\n5. 📋 摩根士丹利 - 港股互联网：估值重估空间测算\n\n点击上方 📋 研报精读 模式查看完整分析',
+    '大V观点汇总': '【今日大V观点汇总 · 5位大V】\n\n👑 财经老王（抖音280万）：科技板块逢低布局，AI算力+国产替代双主线\n💎 投资女神Lisa（小红书156万）：港股互联网配置价值凸显，南向资金是信号\n📊 量化老师陈明（公众号89万）：价值因子持续占优，建议切换配置思路\n🌐 全球宏观James（微博120万）：美元走弱，利好新兴市场和大宗商品\n⚡ 新能源猎手阿强（B站67万）：固态电池节奏超预期，中游材料先行\n\n综合观点：偏多，关注科技+港股+新能源机会',
+    '风险预警扫描': '【当前风险预警 · 实时扫描】\n\n🔴 高关注：美债收益率反弹风险（10Y突破4.5%需警惕）\n🟡 中关注：地缘政治紧张态势（中东局势）\n🟡 中关注：国内经济复苏节奏（Q2数据待验证）\n🟡 中关注：人民币汇率波动（7.25关键位）\n🟢 低关注：A股资金面充裕（融资余额稳定）\n\n建议：维持分散配置，控制单一行业集中度在20%以内，保留10-15%现金仓位',
+    '社区热帖解读': '【社区热帖 Hermes 解读】\n\n🔥 热帖1：财经老王 - A股科技板块布局\n解读：观点偏多，逻辑清晰，基于AI算力需求超预期。可信度：★★★★☆\n\n🔥 热帖2：新能源猎手阿强 - 固态电池进展\n解读：产业链一手信息，时间节点具体，参考价值高。可信度：★★★★★\n\n🔥 热帖3：量化老师陈明 - 因子切换信号\n解读：数据驱动，方法论严谨，适合量化投资者参考。可信度：★★★★☆\n\n综合：社区今日讨论热度高，多头情绪占主导。',
+    '当前行情分析': '【当前行情深度分析 · 2026-05-20 实时】\n\n市场结构：\n● 上证指数 3428.56 (+0.82%) — 温和上涨，量能适中\n● 科技板块领涨，防御板块滞涨，风险偏好回升\n● 北向资金净流入，外资态度积极\n\n技术面：\n● 上证站稳3400点，短期支撑有效\n● MACD金叉形成，动能向上\n● 成交量温和放大，趋势健康\n\nHermes判断：短期偏多，建议维持标配，关注3500点阻力位。'
+  };
+  addHermesMessage('ai', shortcutResults[action] || '正在查询...', { credits: 0, points: 5 });
+  document.getElementById('hermes-quick-actions').style.display = 'flex';
+  scrollHermesToBottom();
+}
+
+async function sendHermesChat() {
+  const input = document.getElementById('hermes-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  input.style.height = 'auto';
+
+  // Show user message
+  addHermesMessage('user', null, { quickAction: text, isChat: true });
+  showHermesLoading(true);
+  scrollHermesToBottom();
+
+  // Call API
+  try {
+    const resp = await fetch('/api/hermes/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: '自由对话', option: text })
+    });
+    const data = await resp.json();
+    showHermesLoading(false);
+    addHermesMessage('ai', data.result || getChatResponse(text), { credits: 1, points: data.points_earned || 20 });
+  } catch(e) {
+    showHermesLoading(false);
+    addHermesMessage('ai', getChatResponse(text), { credits: 1, points: 20 });
+  }
+  document.getElementById('hermes-quick-actions').style.display = 'flex';
+  scrollHermesToBottom();
+  hermesCredits = Math.max(0, hermesCredits - 1);
+  document.getElementById('hermes-credits-display').textContent = '⚡ ' + hermesCredits + '次';
+}
+
+function getChatResponse(text) {
+  const t = text.toLowerCase();
+  if (t.includes('新能源') || t.includes('电池') || t.includes('锂')) {
+    return '【新能源板块分析】\n\n基于冈底斯平台数据：\n● 固态电池商业化节奏超预期，2026年Q3小批量装车可期\n● 碳酸锂价格底部已现，Q3有望反弹\n● 海外市场拓展加速，欧洲工厂投产在即\n\n投资建议：关注中游材料端（固态电解质、正极材料），技术壁垒强的企业优先。\n\n数据来源：专家会议纪要 + 卫星产能数据 + 券商研报综合';
+  }
+  if (t.includes('港股') || t.includes('恒生') || t.includes('互联网')) {
+    return '【港股互联网分析】\n\n基于冈底斯平台数据：\n● 当前估值PE 15x，处于历史20%分位，安全边际充足\n● 南向资金连续14个交易日净买入，累计+280亿\n● 平台经济监管边际改善，政策风险下降\n\n投资建议：可适当增配，目标仓位提升至标配+5%。关注Q2财报季业绩验证。\n\n数据来源：市场数据 + 资金流向 + 政策跟踪';
+  }
+  if (t.includes('a股') || t.includes('上证') || t.includes('科技')) {
+    return '【A股科技板块分析】\n\n基于冈底斯平台数据：\n● AI算力需求持续超预期，国产替代加速推进\n● 外资持续流入，北向资金本月净流入+180亿\n● 估值PE 28x，处于历史中位，性价比合理\n\n投资建议：维持超配，关注AI算力基础设施和应用层双主线。\n\n数据来源：另类数据（专利申请）+ 资金流向 + 券商研报';
+  }
+  if (t.includes('宏观') || t.includes('美联储') || t.includes('降息')) {
+    return '【宏观经济分析】\n\n基于冈底斯平台数据：\n● 美联储降息预期升温，CME利率期货显示年内降息2次概率68%\n● 国内货币政策保持宽松，LPR下调预期增强\n● 通胀数据温和，为政策宽松提供空间\n\n大类资产建议：\n● 增配：债券、黄金、新兴市场股票\n● 减配：美元资产、高估值成长股\n\n数据来源：宏观数据库 + 利率期货 + 专家会议纪要';
+  }
+  return `【Hermes 智能分析】\n\n您的问题：「${text}」\n\n基于冈底斯平台整合的多维度数据（券商研报、专家会议纪要、另类数据），Hermes 已完成初步分析。\n\n核心发现：该领域当前呈现结构性机会，关键指标向好，建议结合个人风险偏好做出决策。\n\n如需更精准的分析，建议使用上方模式按钮选择对应的专业分析模式。\n\n数据来源：冈底斯多维数据库 · AI引擎：DeepSeek + Kimi 2.6`;
+}
+
+function addHermesMessage(type, content, meta) {
+  meta = meta || {};
+  const entry = { type, content, meta };
+  hermesHistory.push(entry);
+  renderHermesHistory();
+}
+
+function renderHermesHistory() {
+  const chat = document.getElementById('hermes-chat');
+  chat.innerHTML = hermesHistory.map(entry => {
+    if (entry.type === 'user') {
+      const label = entry.meta.isChat
+        ? entry.meta.quickAction
+        : entry.meta.quickAction
+          ? `⚡ ${entry.meta.quickAction}`
+          : `📋 ${entry.meta.mode} · ${entry.meta.option}`;
+      return `
+        <div class="chat-bubble-wrap user">
+          <div class="chat-bubble user">${label}</div>
+        </div>`;
+    } else {
+      const footer = (entry.meta.credits != null)
+        ? `⚡ 消耗${entry.meta.credits}算力 · +${entry.meta.points}积分`
+        : '';
+      return `
+        <div class="chat-bubble-wrap ai">
+          <div class="chat-bubble ai">
+            <div class="chat-ai-header">🦞 Hermes</div>
+            <div class="chat-ai-text">${entry.content}</div>
+            ${footer ? `<div class="chat-ai-footer">${footer}</div>` : ''}
+          </div>
+        </div>`;
+    }
+  }).join('');
+}
+
+function showHermesLoading(show) {
+  let loader = document.getElementById('hermes-loading');
+  if (show) {
+    if (!loader) {
+      loader = document.createElement('div');
+      loader.id = 'hermes-loading';
+      loader.className = 'hermes-loading';
+      loader.innerHTML = `
+        <div class="chat-bubble-wrap ai" style="width:100%">
+          <div class="chat-bubble ai">
+            <div class="chat-ai-header">🦞 Hermes</div>
+            <div class="hermes-loading-text">正在分析<span class="dot-anim"><span>.</span><span>.</span><span>.</span></span></div>
+          </div>
+        </div>`;
+      document.getElementById('hermes-chat').appendChild(loader);
+    }
+  } else {
+    if (loader) loader.remove();
+  }
+}
+
+function scrollHermesToBottom() {
+  const chat = document.getElementById('hermes-chat');
+  if (chat) {
+    requestAnimationFrame(() => {
+      chat.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    });
+  }
+}
+
+// ===== TOAST =====
+let toastTimer = null;
+function showToast(msg, duration) {
+  duration = duration || 2000;
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
+}
+
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded', () => {
+  loadCommunityPosts();
+  loadCommunityEvents();
+  selectHermesMode('研报精读');
+});
+</script>
+</body>
+</html>

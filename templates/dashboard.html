@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>冈底斯 — 数据 Dashboard</title>
+<link rel="stylesheet" href="/static/css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ===== DASHBOARD SECTION TITLES ===== */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.section-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-title::before {
+  content: '';
+  width: 4px;
+  height: 20px;
+  background: linear-gradient(to bottom, var(--gold-light), var(--gold-dark));
+  border-radius: 2px;
+}
+.section-subtitle {
+  font-size: 13px;
+  color: var(--gray-400);
+  margin-top: 2px;
+}
+
+/* ===== KPI CARDS ROW ===== */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.kpi-row-5 {
+  grid-template-columns: repeat(5, 1fr);
+}
+.kpi-card {
+  background: var(--navy-mid);
+  border: 1px solid rgba(200,169,110,0.12);
+  border-radius: 12px;
+  padding: 18px;
+  position: relative;
+  overflow: hidden;
+}
+.kpi-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--gold-dark), var(--gold-light));
+  opacity: 0.6;
+}
+.kpi-label { font-size: 11px; color: var(--gray-400); margin-bottom: 8px; letter-spacing: 0.5px; }
+.kpi-value { font-size: 24px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+.kpi-sub { font-size: 12px; color: var(--gray-400); }
+.kpi-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+.kpi-badge-up { background: rgba(46,204,113,0.15); color: #2ECC71; }
+.kpi-badge-down { background: rgba(231,76,60,0.15); color: #E74C3C; }
+.kpi-badge-gold { background: rgba(200,169,110,0.15); color: var(--gold); }
+
+/* ===== CHANNEL QUALITY TABLE ===== */
+.quality-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+.quality-table th {
+  background: rgba(200,169,110,0.06);
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 11px;
+  color: var(--gray-400);
+  border-bottom: 1px solid rgba(200,169,110,0.08);
+}
+.quality-table td {
+  padding: 12px 14px;
+  font-size: 12px;
+  color: var(--gray-200);
+  border-bottom: 1px solid rgba(200,169,110,0.04);
+}
+.trend-up { color: #2ECC71; }
+.trend-down { color: #E74C3C; }
+.trend-flat { color: var(--gray-400); }
+.score-bar {
+  display: inline-block;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--gold-dark), var(--gold));
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* ===== KOL TABLE ===== */
+.kol-tier-s { background: rgba(255,215,0,0.15); color: #FFD700; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+.kol-tier-a { background: rgba(200,169,110,0.15); color: var(--gold); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+.kol-tier-b { background: rgba(90,86,80,0.3); color: var(--gray-200); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+
+/* ===== COHORT TABLE ===== */
+.cohort-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.cohort-table th {
+  background: rgba(200,169,110,0.06);
+  padding: 8px 12px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--gray-400);
+  border-bottom: 1px solid rgba(200,169,110,0.08);
+}
+.cohort-table td {
+  padding: 10px 12px;
+  text-align: center;
+  font-size: 12px;
+  border-bottom: 1px solid rgba(200,169,110,0.04);
+}
+
+/* ===== LIFECYCLE FLOW ===== */
+.lifecycle-flow {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 16px 0;
+  overflow-x: auto;
+}
+.lifecycle-stage {
+  flex: 1;
+  min-width: 120px;
+  text-align: center;
+  padding: 16px 8px;
+  background: var(--navy);
+  border: 1px solid rgba(200,169,110,0.15);
+  border-radius: 8px;
+  position: relative;
+}
+.lifecycle-stage + .lifecycle-stage {
+  margin-left: -1px;
+  border-radius: 0 8px 8px 0;
+}
+.lifecycle-stage:first-child { border-radius: 8px 0 0 8px; }
+.lifecycle-arrow {
+  font-size: 18px;
+  color: var(--gold);
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+.lifecycle-icon { font-size: 24px; margin-bottom: 6px; }
+.lifecycle-name { font-size: 12px; font-weight: 600; color: var(--white); }
+.lifecycle-desc { font-size: 10px; color: var(--gray-400); margin-top: 4px; line-height: 1.4; }
+.lifecycle-num { font-size: 16px; font-weight: 700; color: var(--gold); margin-top: 4px; }
+
+/* ===== RETENTION TABLE ===== */
+.retention-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.retention-table th {
+  background: rgba(200,169,110,0.06);
+  padding: 8px 14px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--gray-400);
+  border-bottom: 1px solid rgba(200,169,110,0.08);
+}
+.retention-table td {
+  padding: 10px 14px;
+  text-align: center;
+  font-size: 12px;
+  border-bottom: 1px solid rgba(200,169,110,0.04);
+}
+
+/* ===== TOPBAR TITLE ===== */
+#topbar-title { font-size: 18px; font-weight: 600; color: var(--white); transition: all 0.2s; }
+
+/* ===== SECTION VISIBILITY ===== */
+.dash-section { display: none; }
+.dash-section.active { display: block; }
+</style>
+</head>
+<body>
+<div class="dashboard-layout">
+  <!-- Sidebar -->
+  <div class="admin-sidebar">
+    <div class="admin-logo">
+      <div class="admin-logo-text">冈底斯</div>
+      <div class="admin-logo-sub">数据分析中心</div>
+    </div>
+    <nav class="admin-nav">
+      <div class="admin-nav-group">
+        <div class="admin-nav-item active" id="nav-funnel" onclick="showDashSection('funnel')">
+          <span class="admin-nav-icon">📊</span> 转化漏斗
+        </div>
+        <div class="admin-nav-item" id="nav-channel" onclick="showDashSection('channel')">
+          <span class="admin-nav-icon">📡</span> 渠道分析
+        </div>
+        <div class="admin-nav-item" id="nav-kol" onclick="showDashSection('kol')">
+          <span class="admin-nav-icon">⭐</span> KOL效能
+        </div>
+        <div class="admin-nav-item" id="nav-revenue" onclick="showDashSection('revenue')">
+          <span class="admin-nav-icon">💰</span> 营收趋势
+        </div>
+        <div class="admin-nav-item" id="nav-segment" onclick="showDashSection('segment')">
+          <span class="admin-nav-icon">🎯</span> 用户分层
+        </div>
+      </div>
+    </nav>
+    <div style="padding:16px 20px;border-top:1px solid rgba(200,169,110,0.1)">
+      <a href="/" style="font-size:12px;color:var(--gray-400);text-decoration:none">← 返回首页</a>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="dashboard-main">
+    <div class="dashboard-topbar">
+      <div id="topbar-title">多渠道多圈层转化分析</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="date-filter">
+          <button class="date-btn" onclick="setDateRange(this,'7d')">7天</button>
+          <button class="date-btn active" onclick="setDateRange(this,'30d')">30天</button>
+          <button class="date-btn" onclick="setDateRange(this,'90d')">90天</button>
+          <button class="date-btn" onclick="setDateRange(this,'1y')">1年</button>
+        </div>
+        <button class="btn-gold" style="padding:7px 16px;font-size:12px">导出</button>
+      </div>
+    </div>
+
+    <div class="dashboard-content">
+
+      <!-- ==================== SECTION: 转化漏斗 ==================== -->
+      <div id="ds-funnel" class="dash-section active">
+        <div class="section-header">
+          <div>
+            <div class="section-title">多渠道多圈层转化分析</div>
+            <div class="section-subtitle">从公域曝光到VIP深度用户的全链路转化追踪</div>
+          </div>
+        </div>
+
+        <!-- KPI row -->
+        <div class="kpi-row" style="margin-bottom:20px">
+          <div class="kpi-card">
+            <div class="kpi-label">总曝光量</div>
+            <div class="kpi-value">980万</div>
+            <div class="kpi-badge kpi-badge-up">▲ +18.4%</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">私域沉淀</div>
+            <div class="kpi-value">24.5万</div>
+            <div class="kpi-badge kpi-badge-gold">转化率 25%</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">付费用户</div>
+            <div class="kpi-value">1.85万</div>
+            <div class="kpi-badge kpi-badge-gold">转化率 1.9%</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">VIP深度用户</div>
+            <div class="kpi-value">4,200</div>
+            <div class="kpi-badge kpi-badge-gold">ARPU ¥1,820</div>
+          </div>
+        </div>
+
+        <!-- Funnel + Channel pie -->
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="chart-title">多圈层转化漏斗</div>
+            <div class="chart-subtitle">公域曝光 → 私域沉淀 → 主动意向 → 付费转化 → VIP深度</div>
+            <div class="funnel-wrap" id="funnel-container"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">渠道用户来源分布</div>
+            <div class="chart-subtitle">各渠道贡献占比</div>
+            <div class="chart-container">
+              <canvas id="channelDonut"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Revenue trend + KOL bar -->
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="chart-title">月度营收趋势</div>
+            <div class="chart-subtitle">近12个月 GMV 与用户增长</div>
+            <div class="chart-container tall">
+              <canvas id="revenueTrend"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">KOL合伙人效能排行</div>
+            <div class="chart-subtitle">本月 GMV 贡献 Top 5</div>
+            <div class="chart-container tall">
+              <canvas id="kolBar"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Heatmap -->
+        <div class="chart-card full" style="margin-bottom:20px">
+          <div class="chart-title">多渠道 × 多圈层 转化矩阵</div>
+          <div class="chart-subtitle">各渠道在不同圈层的转化率热力图</div>
+          <div style="overflow-x:auto;margin-top:16px">
+            <table style="width:100%;min-width:600px">
+              <thead>
+                <tr>
+                  <th style="width:120px">渠道 \ 圈层</th>
+                  <th>公域曝光</th><th>私域沉淀</th><th>主动意向</th><th>付费转化</th><th>VIP深度</th>
+                </tr>
+              </thead>
+              <tbody id="heatmap-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Segment donut + channel revenue -->
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="chart-title">用户圈层分布</div>
+            <div class="chart-subtitle">付费用户结构</div>
+            <div style="display:flex;gap:16px;align-items:center;margin-top:8px">
+              <div style="flex:1;height:200px;position:relative">
+                <canvas id="segmentDonut"></canvas>
+              </div>
+              <div class="segment-legend" id="segment-legend"></div>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">渠道营收贡献</div>
+            <div class="chart-subtitle">各渠道月度营收对比</div>
+            <div class="chart-container">
+              <canvas id="channelRevenue"></canvas>
+            </div>
+          </div>
+        </div>
+      </div><!-- /ds-funnel -->
+
+
+      <!-- ==================== SECTION: 渠道分析 ==================== -->
+      <div id="ds-channel" class="dash-section">
+        <div class="section-header">
+          <div>
+            <div class="section-title">渠道分析</div>
+            <div class="section-subtitle">各渠道获客质量、成本与收益全景对比</div>
+          </div>
+        </div>
+
+        <!-- 5 channel KPI cards -->
+        <div class="kpi-row kpi-row-5" style="margin-bottom:20px" id="channel-kpi-cards">
+          <!-- Rendered by JS -->
+        </div>
+
+        <!-- Stacked bar + Scatter -->
+        <div class="charts-grid" style="margin-bottom:20px">
+          <div class="chart-card">
+            <div class="chart-title">各渠道月度用户获取量</div>
+            <div class="chart-subtitle">近12个月堆叠柱图（万用户）</div>
+            <div class="chart-container tall">
+              <canvas id="channelStackedBar"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">CAC vs LTV 散点图</div>
+            <div class="chart-subtitle">气泡大小代表用户量，横轴CAC，纵轴LTV</div>
+            <div class="chart-container tall">
+              <canvas id="cacLtvScatter"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Channel quality table -->
+        <div class="chart-card full" style="margin-bottom:20px">
+          <div class="chart-title">渠道质量评分</div>
+          <div class="chart-subtitle">综合CAC、转化率、LTV、活跃度的综合评分</div>
+          <div style="overflow-x:auto;margin-top:12px">
+            <table class="quality-table" id="channel-quality-table">
+              <thead>
+                <tr>
+                  <th>渠道</th>
+                  <th>用户量</th>
+                  <th>CAC (¥)</th>
+                  <th>LTV (¥)</th>
+                  <th>转化率</th>
+                  <th>综合评分</th>
+                  <th>趋势</th>
+                </tr>
+              </thead>
+              <tbody id="channel-quality-body">
+                <!-- Rendered by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div><!-- /ds-channel -->
+
+
+      <!-- ==================== SECTION: KOL效能 ==================== -->
+      <div id="ds-kol" class="dash-section">
+        <div class="section-header">
+          <div>
+            <div class="section-title">KOL效能分析</div>
+            <div class="section-subtitle">合伙人GMV贡献、佣金结算与分级成长追踪</div>
+          </div>
+        </div>
+
+        <!-- KOL KPI cards -->
+        <div class="kpi-row" style="margin-bottom:20px" id="kol-kpi-cards">
+          <!-- Rendered by JS -->
+        </div>
+
+        <!-- Top 10 bar + Tier growth line -->
+        <div class="charts-grid" style="margin-bottom:20px">
+          <div class="chart-card">
+            <div class="chart-title">Top 10 KOL GMV 排行</div>
+            <div class="chart-subtitle">本月贡献GMV（万元）水平柱图</div>
+            <div class="chart-container tall" style="height:380px">
+              <canvas id="kolTop10Bar"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">KOL 分级成长趋势</div>
+            <div class="chart-subtitle">S/A/B 级合伙人数量月度变化</div>
+            <div class="chart-container tall">
+              <canvas id="kolTierGrowth"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tier donut + KOL table -->
+        <div class="charts-grid" style="margin-bottom:20px">
+          <div class="chart-card">
+            <div class="chart-title">KOL 分级分布</div>
+            <div class="chart-subtitle">当前S/A/B级合伙人占比</div>
+            <div class="chart-container">
+              <canvas id="kolTierDonut"></canvas>
+            </div>
+          </div>
+          <div class="chart-card" style="overflow:hidden">
+            <div class="chart-title">KOL 合伙人列表</div>
+            <div class="chart-subtitle">Top 8 综合排行</div>
+            <div style="overflow-x:auto;margin-top:8px">
+              <table class="quality-table" id="kol-table">
+                <thead>
+                  <tr>
+                    <th>KOL名称</th>
+                    <th>平台</th>
+                    <th>粉丝量</th>
+                    <th>本月GMV</th>
+                    <th>佣金率</th>
+                    <th>级别</th>
+                    <th>环比</th>
+                  </tr>
+                </thead>
+                <tbody id="kol-table-body">
+                  <!-- Rendered by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div><!-- /ds-kol -->
+
+
+      <!-- ==================== SECTION: 营收趋势 ==================== -->
+      <div id="ds-revenue" class="dash-section">
+        <div class="section-header">
+          <div>
+            <div class="section-title">营收趋势</div>
+            <div class="section-subtitle">MRR/ARR、订阅分层、渠道营收全维度分析</div>
+          </div>
+        </div>
+
+        <!-- Revenue KPI cards -->
+        <div class="kpi-row" style="margin-bottom:20px" id="revenue-kpi-cards">
+          <!-- Rendered by JS -->
+        </div>
+
+        <!-- GMV dual-axis + Stacked area -->
+        <div class="charts-grid" style="margin-bottom:20px">
+          <div class="chart-card">
+            <div class="chart-title">月度 GMV + 用户增长</div>
+            <div class="chart-subtitle">双轴图：左轴GMV（万元），右轴用户数</div>
+            <div class="chart-container tall">
+              <canvas id="revGmvUsers"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">订阅层级收入结构</div>
+            <div class="chart-subtitle">免费/基础/专业/VIP各层月度收入堆叠</div>
+            <div class="chart-container tall">
+              <canvas id="revTierStack"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Channel revenue bar -->
+        <div class="charts-grid" style="margin-bottom:20px">
+          <div class="chart-card">
+            <div class="chart-title">渠道营收对比</div>
+            <div class="chart-subtitle">各渠道月度收入贡献（万元）</div>
+            <div class="chart-container">
+              <canvas id="revChannelBar"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">Cohort 留存矩阵</div>
+            <div class="chart-subtitle">6个月队列留存率（%）</div>
+            <div style="overflow-x:auto;margin-top:12px">
+              <table class="cohort-table" id="cohort-table">
+                <thead>
+                  <tr id="cohort-thead"></tr>
+                </thead>
+                <tbody id="cohort-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div><!-- /ds-revenue -->
+
+
+      <!-- ==================== SECTION: 用户分层 ==================== -->
+      <div id="ds-segment" class="dash-section">
+        <div class="section-header">
+          <div>
+            <div class="section-title">用户分层分析</div>
+            <div class="section-subtitle">各订阅层级用户数、ARPU、留存与生命周期流转</div>
+          </div>
+        </div>
+
+        <!-- Segment funnel HTML -->
+        <div class="chart-card full" style="margin-bottom:20px">
+          <div class="chart-title">订阅层级转化漏斗</div>
+          <div class="chart-subtitle">免费 → 基础 → 专业 → VIP 转化路径</div>
+          <div id="seg-funnel-container" style="padding:16px 0"></div>
+        </div>
+
+        <!-- Tier donut + ARPU bar -->
+        <div class="charts-grid" style="margin-bottom:20px">
+          <div class="chart-card">
+            <div class="chart-title">用户层级分布</div>
+            <div class="chart-subtitle">各层级用户占比</div>
+            <div class="chart-container">
+              <canvas id="segTierDonut"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">各层级 ARPU 对比</div>
+            <div class="chart-subtitle">月度ARPU（元）</div>
+            <div class="chart-container">
+              <canvas id="segArpuBar"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lifecycle flow (HTML/CSS) -->
+        <div class="chart-card full" style="margin-bottom:20px">
+          <div class="chart-title">用户生命周期流转图</div>
+          <div class="chart-subtitle">各阶段用户数量与转化节点</div>
+          <div class="lifecycle-flow" id="lifecycle-flow">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Retention by tier table -->
+        <div class="chart-card full" style="margin-bottom:20px">
+          <div class="chart-title">各层级留存率对比</div>
+          <div class="chart-subtitle">7日 / 30日 / 90日留存率</div>
+          <div style="overflow-x:auto;margin-top:12px">
+            <table class="retention-table" id="retention-table">
+              <thead>
+                <tr>
+                  <th>用户层级</th>
+                  <th>用户数</th>
+                  <th>7日留存</th>
+                  <th>30日留存</th>
+                  <th>90日留存</th>
+                  <th>ARPU (¥)</th>
+                  <th>LTV (¥)</th>
+                </tr>
+              </thead>
+              <tbody id="retention-body">
+                <!-- Rendered by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div><!-- /ds-segment -->
+
+    </div><!-- /dashboard-content -->
+  </div><!-- /dashboard-main -->
+</div><!-- /dashboard-layout -->
+
+<script src="/static/js/charts.js"></script>
+</body>
+</html>
