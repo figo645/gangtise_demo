@@ -1,8 +1,19 @@
-from flask import Flask, render_template, jsonify, request
+import os
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 import random
 from datetime import datetime, timedelta
+from urllib.parse import urlsplit
+from hmac import compare_digest
 
 app = Flask(__name__)
+app.config.update(
+    SECRET_KEY=os.environ.get("GANGTISE_DEMO_SECRET_KEY", os.urandom(32)),
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+)
+
+AUTH_PASSWORD = os.environ.get("GANGTISE_DEMO_PASSWORD", "gangtise")
+AUTH_SESSION_KEY = "gangtise_auth"
 
 # Mock data
 CHANNELS = ["微信生态", "抖音", "微博", "小红书", "直接流量"]
@@ -74,7 +85,57 @@ def gen_user_segments():
         {"segment": "KOL合伙人", "count": 620, "pct": 0.5},
     ]
 
+
+def is_authenticated():
+    return session.get(AUTH_SESSION_KEY) is True
+
+
+def safe_next_target(target):
+    if not target:
+        return "/"
+    parsed = urlsplit(target)
+    if parsed.scheme or parsed.netloc:
+        return "/"
+    if not target.startswith("/") or target.startswith("//"):
+        return "/"
+    return target
+
+
+@app.before_request
+def require_password_gate():
+    public_paths = {"/login", "/unlock", "/logout"}
+    if request.path.startswith("/static/") or request.path in public_paths:
+        return None
+    if is_authenticated():
+        return None
+    if request.path.startswith("/api/"):
+        return jsonify({"success": False, "error": "auth_required"}), 401
+    return redirect(url_for("login", next=safe_next_target(request.full_path.rstrip("?"))))
+
 # Routes
+@app.route("/login", methods=["GET"])
+def login():
+    next_target = safe_next_target(request.args.get("next", "/"))
+    return render_template("login.html", next_target=next_target, error=None)
+
+
+@app.route("/unlock", methods=["POST"])
+def unlock():
+    next_target = safe_next_target(request.form.get("next", "/"))
+    password = request.form.get("password", "")
+    if not compare_digest(password, AUTH_PASSWORD):
+        return render_template("login.html", next_target=next_target, error="密码错误")
+    session[AUTH_SESSION_KEY] = True
+    session.permanent = True
+    return redirect(next_target)
+
+
+@app.route("/logout")
+def logout():
+    session.pop(AUTH_SESSION_KEY, None)
+    return redirect(url_for("login"))
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
