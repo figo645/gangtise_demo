@@ -230,6 +230,49 @@ body { background: var(--navy); }
 .loading-spinner { text-align:center; color:var(--gold); }
 .spinner { font-size:32px; animation:spin 1s linear infinite; display:block; margin-bottom:12px; }
 @keyframes spin { to { transform:rotate(360deg); } }
+
+/* ===== DM / CHAT ===== */
+.dm-conv-item { display:flex; align-items:center; gap:12px; padding:14px; border-bottom:1px solid rgba(200,169,110,0.08); cursor:pointer; }
+.dm-conv-item:active { background:rgba(200,169,110,0.05); }
+.dm-avatar { width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; background:linear-gradient(135deg,#C8A96E,#A8893E); position:relative; }
+.dm-unread-dot { position:absolute; top:0; right:0; width:10px; height:10px; border-radius:50%; background:#E74C3C; border:2px solid var(--navy); }
+.dm-conv-info { flex:1; min-width:0; }
+.dm-conv-name { font-size:14px; font-weight:600; color:var(--white); display:flex; align-items:center; gap:6px; }
+.dm-conv-last { font-size:12px; color:var(--gray-400); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dm-conv-time { font-size:11px; color:var(--gray-400); flex-shrink:0; }
+.dm-chat-header { display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid rgba(200,169,110,0.1); background:var(--navy-mid); position:sticky; top:0; z-index:10; }
+.dm-chat-back { font-size:18px; cursor:pointer; padding:4px; }
+.dm-chat-title { font-size:14px; font-weight:600; color:var(--white); }
+.dm-chat-subtitle { font-size:11px; color:var(--gray-400); }
+.dm-messages { padding:16px; min-height:300px; display:flex; flex-direction:column; gap:10px; }
+.dm-msg { max-width:80%; border-radius:12px; padding:10px 14px; font-size:13px; line-height:1.6; }
+.dm-msg.from-kol { align-self:flex-start; background:var(--navy-mid); border:1px solid rgba(200,169,110,0.15); color:var(--white); border-bottom-left-radius:4px; }
+.dm-msg.from-user { align-self:flex-end; background:linear-gradient(135deg,var(--gold-dark),var(--gold)); color:var(--navy); font-weight:500; border-bottom-right-radius:4px; }
+.dm-msg.paid-msg { border:1px solid rgba(200,169,110,0.4); background:rgba(200,169,110,0.08); }
+.dm-msg-time { font-size:10px; color:var(--gray-400); margin-top:4px; }
+.dm-input-bar { display:flex; gap:8px; padding:10px 16px; border-top:1px solid rgba(200,169,110,0.1); background:var(--navy-mid); position:sticky; bottom:0; }
+.dm-input { flex:1; background:var(--navy); border:1px solid rgba(200,169,110,0.2); border-radius:20px; padding:8px 14px; color:var(--white); font-size:13px; outline:none; }
+.dm-send-btn { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,var(--gold-dark),var(--gold)); border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+
+/* ===== KOL WORKBENCH ===== */
+.wb-stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:0 16px; margin-bottom:16px; }
+.wb-stat-card { background:var(--navy-mid); border:1px solid rgba(200,169,110,0.1); border-radius:10px; padding:12px; }
+.wb-stat-label { font-size:11px; color:var(--gray-400); }
+.wb-stat-value { font-size:20px; font-weight:700; color:var(--gold); margin-top:4px; }
+.wb-stat-change { font-size:11px; color:var(--green); margin-top:2px; }
+.wb-fan-item { display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid rgba(200,169,110,0.06); }
+.wb-fan-avatar { width:36px; height:36px; border-radius:50%; background:var(--navy-light); display:flex; align-items:center; justify-content:center; font-size:14px; }
+.wb-fan-info { flex:1; min-width:0; }
+.wb-fan-name { font-size:13px; font-weight:600; color:var(--white); }
+.wb-fan-msg { font-size:12px; color:var(--gray-400); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wb-fan-meta { text-align:right; flex-shrink:0; }
+.wb-fan-time { font-size:11px; color:var(--gray-400); }
+.wb-fan-tier { font-size:10px; padding:2px 6px; border-radius:6px; margin-top:3px; display:inline-block; }
+.wb-broadcast-item { padding:12px 16px; border-bottom:1px solid rgba(200,169,110,0.06); }
+.wb-broadcast-content { font-size:13px; color:var(--white); line-height:1.6; margin-bottom:6px; }
+.wb-broadcast-meta { font-size:11px; color:var(--gray-400); display:flex; gap:12px; }
+.wb-mode-switch { display:flex; align-items:center; gap:8px; padding:8px 14px; background:rgba(200,169,110,0.1); border:1px solid rgba(200,169,110,0.3); border-radius:20px; cursor:pointer; margin:12px 16px; }
+.wb-mode-switch-label { font-size:12px; color:var(--gold); font-weight:600; }
 </style>
 </head>
 <body>
@@ -368,6 +411,7 @@ body { background: var(--navy); }
               <div class="kol-followers">280万粉丝</div>
             </div>
             <button class="btn-outline" style="padding:5px 14px;font-size:12px">关注</button>
+            <button class="btn-gold" style="padding:5px 14px;font-size:12px" onclick="openDmChat(1,'财经老王','👑','S级')">私信</button>
           </div>
           <div class="kol-preview">"科技板块短期估值压力可控，AI算力需求持续超预期，建议关注中游设备端的投资机会..."</div>
           <div class="kol-footer">
@@ -386,6 +430,7 @@ body { background: var(--navy); }
               <div class="kol-followers">156万粉丝</div>
             </div>
             <button class="btn-outline" style="padding:5px 14px;font-size:12px">关注</button>
+            <button class="btn-gold" style="padding:5px 14px;font-size:12px" onclick="openDmChat(2,'投资女神Lisa','💎','S级')">私信</button>
           </div>
           <div class="kol-preview">"港股互联网板块的估值修复还没走完，南向资金持续净流入是最好的佐证..."</div>
           <div class="kol-footer">
@@ -404,6 +449,7 @@ body { background: var(--navy); }
               <div class="kol-followers">89万粉丝</div>
             </div>
             <button class="btn-outline" style="padding:5px 14px;font-size:12px">关注</button>
+            <button class="btn-gold" style="padding:5px 14px;font-size:12px" onclick="openDmChat(3,'量化老师陈明','📊','A级')">私信</button>
           </div>
           <div class="kol-preview">"本周多因子模型显示动量因子衰减明显，价值因子重新占优，建议切换配置思路..."</div>
           <div class="kol-footer">
@@ -422,6 +468,7 @@ body { background: var(--navy); }
               <div class="kol-followers">120万粉丝</div>
             </div>
             <button class="btn-outline" style="padding:5px 14px;font-size:12px">关注</button>
+            <button class="btn-gold" style="padding:5px 14px;font-size:12px" onclick="openDmChat(4,'全球宏观James','🌐','A级')">私信</button>
           </div>
           <div class="kol-preview">"美联储点阵图暗示年内两次降息，美元指数承压，大宗商品和新兴市场将是主要受益方向..."</div>
           <div class="kol-footer">
@@ -440,6 +487,7 @@ body { background: var(--navy); }
               <div class="kol-followers">67万粉丝</div>
             </div>
             <button class="btn-outline" style="padding:5px 14px;font-size:12px">关注</button>
+            <button class="btn-gold" style="padding:5px 14px;font-size:12px" onclick="openDmChat(5,'新能源猎手阿强','⚡','B级')">私信</button>
           </div>
           <div class="kol-preview">"固态电池产业化节奏超预期，2026年小批量装车可期，中游材料公司值得深入研究..."</div>
           <div class="kol-footer">
@@ -473,12 +521,14 @@ body { background: var(--navy); }
 
     <!-- Mode selector -->
     <div class="hermes-modes" id="hermes-modes">
-      <div class="hermes-mode-btn active" onclick="selectHermesMode('研报精读')">📋 研报精读</div>
-      <div class="hermes-mode-btn" onclick="selectHermesMode('专家纪要速读')">🎙️ 专家纪要速读</div>
-      <div class="hermes-mode-btn" onclick="selectHermesMode('另类数据解读')">🛰️ 另类数据解读</div>
-      <div class="hermes-mode-btn" onclick="selectHermesMode('投资组合诊断')">🔬 投资组合诊断</div>
-      <div class="hermes-mode-btn" onclick="selectHermesMode('市场情绪扫描')">📡 市场情绪扫描</div>
-      <div class="hermes-mode-btn" onclick="selectHermesMode('量化因子筛选')">⚙️ 量化因子筛选</div>
+      <div class="hermes-mode-btn active" onclick="selectHermesMode('AI行情预判')">📈 AI行情预判</div>
+      <div class="hermes-mode-btn" onclick="selectHermesMode('AI资产配置')">🎯 AI资产配置</div>
+      <div class="hermes-mode-btn" onclick="selectHermesMode('研报精读')">📋 研报精读</div>
+      <div class="hermes-mode-btn" onclick="selectHermesMode('专家纪要速读')">🎙️ 专家纪要</div>
+      <div class="hermes-mode-btn" onclick="selectHermesMode('另类数据解读')">🛰️ 另类数据</div>
+      <div class="hermes-mode-btn" onclick="selectHermesMode('投资组合诊断')">🔬 组合诊断</div>
+      <div class="hermes-mode-btn" onclick="selectHermesMode('市场情绪扫描')">📡 情绪扫描</div>
+      <div class="hermes-mode-btn" onclick="selectHermesMode('量化因子筛选')">⚙️ 量化因子</div>
     </div>
 
     <!-- Mode description card -->
@@ -699,6 +749,170 @@ body { background: var(--navy); }
     </div>
   </div>
 
+
+  <!-- ===== TAB: 消息 (DM) ===== -->
+  <div id="page-dm" class="page">
+    <!-- Conversation list view -->
+    <div id="dm-list-view">
+      <div style="padding:16px;display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:16px;font-weight:700;color:var(--white)">专属对话</div>
+        <div style="font-size:11px;color:var(--gray-400);background:rgba(200,169,110,0.08);padding:4px 10px;border-radius:10px">与大V 1对1 交流</div>
+      </div>
+      <div id="dm-conversations-list">
+        <div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">加载中...</div>
+      </div>
+      <!-- Subscription upsell -->
+      <div style="margin:16px;padding:14px;background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.15);border-radius:12px">
+        <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:6px">🔓 解锁更多大V专属对话</div>
+        <div style="font-size:12px;color:var(--gray-400);line-height:1.6;margin-bottom:10px">升级专业会员，可与所有认证大V进行1对1专属对话，获取独家投研观点。</div>
+        <button class="btn-gold" style="width:100%;padding:10px;font-size:13px" onclick="switchTab('vip')">查看会员权益</button>
+      </div>
+    </div>
+    <!-- Chat view (hidden by default) -->
+    <div id="dm-chat-view" style="display:none">
+      <div class="dm-chat-header">
+        <div class="dm-chat-back" onclick="closeDmChat()">‹</div>
+        <div id="dm-chat-avatar" style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#C8A96E,#A8893E);display:flex;align-items:center;justify-content:center;font-size:14px"></div>
+        <div>
+          <div class="dm-chat-title" id="dm-chat-name"></div>
+          <div class="dm-chat-subtitle" id="dm-chat-tier"></div>
+        </div>
+        <div style="margin-left:auto;font-size:11px;color:var(--gray-400);background:rgba(200,169,110,0.08);padding:3px 8px;border-radius:8px">专属频道</div>
+      </div>
+      <!-- 合规横幅 -->
+      <div style="padding:8px 14px;background:rgba(231,76,60,0.06);border-bottom:1px solid rgba(231,76,60,0.15);font-size:11px;color:#E2C98A;line-height:1.5">
+        ⚠️ 大V分享为个人研究观点，仅供参考，不构成投资建议。投资有风险，决策需谨慎。
+      </div>
+      <div class="dm-messages" id="dm-messages-container"></div>
+      <div style="padding:8px 14px 0;display:flex;gap:6px;flex-wrap:wrap;background:var(--navy)">
+        <span style="font-size:10px;color:var(--gray-400);padding:5px 8px">快捷提问:</span>
+        <span class="tag tag-gold" style="font-size:11px;cursor:pointer;padding:4px 10px" onclick="dmQuickAsk('A股科技板块现在能追吗?')">A股科技</span>
+        <span class="tag tag-gold" style="font-size:11px;cursor:pointer;padding:4px 10px" onclick="dmQuickAsk('港股互联网值得配置吗?')">港股互联网</span>
+        <span class="tag tag-gold" style="font-size:11px;cursor:pointer;padding:4px 10px" onclick="dmQuickAsk('新能源板块还有机会吗?')">新能源</span>
+        <span class="tag tag-gold" style="font-size:11px;cursor:pointer;padding:4px 10px" onclick="dmQuickAsk('美联储降息怎么布局?')">宏观</span>
+      </div>
+      <div class="dm-input-bar">
+        <input class="dm-input" id="dm-input" placeholder="多轮提问，大V会基于平台数据回复..." onkeydown="if(event.key==='Enter')sendDm()">
+        <button class="dm-send-btn" onclick="sendDm()">➤</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TAB: 大V工作台 ===== -->
+  <div id="page-workbench" class="page">
+    <div style="padding:16px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:var(--white)">大V工作台</div>
+        <div style="font-size:11px;color:var(--gray-400);margin-top:2px">管理粉丝 · 内容运营 · 收益查看</div>
+      </div>
+      <div style="font-size:11px;color:var(--navy);background:var(--gold);padding:4px 10px;border-radius:10px;font-weight:600">S级合伙人</div>
+    </div>
+    <!-- Stats -->
+    <div class="wb-stat-grid">
+      <div class="wb-stat-card">
+        <div class="wb-stat-label">本月收益</div>
+        <div class="wb-stat-value">¥186,000</div>
+        <div class="wb-stat-change">↑ 12.5%</div>
+      </div>
+      <div class="wb-stat-card">
+        <div class="wb-stat-label">VIP订阅者</div>
+        <div class="wb-stat-value">4,200</div>
+        <div class="wb-stat-change">↑ 8.3%</div>
+      </div>
+      <div class="wb-stat-card">
+        <div class="wb-stat-label">待回复消息</div>
+        <div class="wb-stat-value" style="color:#E74C3C">8</div>
+        <div class="wb-stat-label">23条未读</div>
+      </div>
+      <div class="wb-stat-card">
+        <div class="wb-stat-label">今日浏览</div>
+        <div class="wb-stat-value">12,800</div>
+        <div class="wb-stat-change">互动率 4.2%</div>
+      </div>
+    </div>
+    <!-- Fan messages inbox -->
+    <div style="padding:0 16px 8px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:14px;font-weight:600;color:var(--white)">粉丝消息</div>
+      <div style="font-size:11px;color:var(--gold);cursor:pointer" onclick="showToast('查看全部消息')">查看全部 ›</div>
+    </div>
+    <div id="wb-fan-inbox">
+      <div class="wb-fan-item">
+        <div class="wb-fan-avatar">👤</div>
+        <div class="wb-fan-info">
+          <div class="wb-fan-name">投研达人_小陈</div>
+          <div class="wb-fan-msg">老王好！AI算力还能追吗？</div>
+        </div>
+        <div class="wb-fan-meta">
+          <div class="wb-fan-time">5分钟前</div>
+          <div class="wb-fan-tier" style="background:rgba(46,204,113,0.15);color:var(--green)">专业会员</div>
+        </div>
+      </div>
+      <div class="wb-fan-item">
+        <div class="wb-fan-avatar">👤</div>
+        <div class="wb-fan-info">
+          <div class="wb-fan-name">价值猎人小林</div>
+          <div class="wb-fan-msg">请问港股互联网怎么看？</div>
+        </div>
+        <div class="wb-fan-meta">
+          <div class="wb-fan-time">23分钟前</div>
+          <div class="wb-fan-tier" style="background:rgba(52,152,219,0.15);color:#3498DB">基础会员</div>
+        </div>
+      </div>
+      <div class="wb-fan-item">
+        <div class="wb-fan-avatar">👤</div>
+        <div class="wb-fan-info">
+          <div class="wb-fan-name">机构用户_张总</div>
+          <div class="wb-fan-msg">能否安排一次闭门交流？</div>
+        </div>
+        <div class="wb-fan-meta">
+          <div class="wb-fan-time">2小时前</div>
+          <div class="wb-fan-tier" style="background:rgba(200,169,110,0.2);color:var(--gold)">机构VIP</div>
+        </div>
+      </div>
+    </div>
+    <!-- Quick reply -->
+    <div style="padding:12px 16px">
+      <div style="display:flex;gap:8px">
+        <input id="wb-quick-reply" class="dm-input" placeholder="快速回复选中粉丝..." style="flex:1">
+        <button class="btn-gold" style="padding:8px 14px;font-size:12px;white-space:nowrap" onclick="wbQuickReply()">回复</button>
+        <button class="btn-outline" style="padding:8px 14px;font-size:12px;white-space:nowrap" onclick="wbQuickReply(true)">付费回复 ¥50</button>
+      </div>
+    </div>
+    <!-- Broadcast -->
+    <div style="padding:8px 16px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:14px;font-weight:600;color:var(--white)">群发助手</div>
+      <div style="font-size:11px;color:var(--gray-400)">触达 4,200 订阅者</div>
+    </div>
+    <div style="padding:8px 16px">
+      <textarea id="wb-broadcast-text" style="width:100%;background:var(--navy);border:1px solid rgba(200,169,110,0.2);border-radius:10px;padding:10px;color:var(--white);font-size:13px;min-height:60px;resize:none;outline:none;box-sizing:border-box" placeholder="输入群发内容..."></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <select id="wb-broadcast-target" style="flex:1;background:var(--navy-mid);border:1px solid rgba(200,169,110,0.2);border-radius:8px;padding:8px;color:var(--white);font-size:12px;outline:none">
+          <option value="all">全部订阅者 (4,200人)</option>
+          <option value="vip">仅VIP用户 (680人)</option>
+          <option value="active">活跃用户 (2,100人)</option>
+        </select>
+        <button class="btn-gold" style="padding:8px 16px;font-size:12px" onclick="sendBroadcast()">群发</button>
+      </div>
+    </div>
+    <!-- Recent broadcasts -->
+    <div style="padding:12px 16px 4px">
+      <div style="font-size:13px;font-weight:600;color:var(--gray-400);margin-bottom:8px">最近群发</div>
+    </div>
+    <div class="wb-broadcast-item">
+      <div class="wb-broadcast-content">本周策略更新：科技板块逢低布局，AI算力+国产替代双主线</div>
+      <div class="wb-broadcast-meta"><span>2026-05-20 08:00</span><span>触达 3,200人</span><span style="color:var(--gold)">打开率 68%</span></div>
+    </div>
+    <div class="wb-broadcast-item">
+      <div class="wb-broadcast-content">紧急提醒：美联储会议纪要偏鸽，短期利好风险资产</div>
+      <div class="wb-broadcast-meta"><span>2026-05-19 22:30</span><span>触达 4,100人</span><span style="color:var(--gold)">打开率 82%</span></div>
+    </div>
+    <!-- Switch back -->
+    <div class="wb-mode-switch" onclick="switchTab('profile')">
+      <span>👤</span>
+      <span class="wb-mode-switch-label">切换回普通用户模式</span>
+    </div>
+  </div>
+
   <!-- ===== TAB 6: 我的 ===== -->
   <div id="page-profile" class="page">
     <!-- Profile header -->
@@ -844,6 +1058,12 @@ body { background: var(--navy); }
     <div class="h5-section" style="padding-bottom:8px">
       <div class="h5-section-title">账号管理</div>
     </div>
+    <!-- KOL mode switch -->
+    <div class="wb-mode-switch" onclick="switchTab('workbench')" style="margin-bottom:0;border:1px solid rgba(200,169,110,0.4);background:rgba(200,169,110,0.12)">
+      <span>👑</span>
+      <span class="wb-mode-switch-label">切换到大V工作台</span>
+      <span style="margin-left:auto;font-size:11px;color:#E74C3C;font-weight:600">8条待回复</span>
+    </div>
     <div class="settings-list">
       <div class="settings-item" onclick="showToast('功能开发中...')">
         <div class="settings-icon">⚙️</div>
@@ -878,13 +1098,14 @@ body { background: var(--navy); }
       <div class="h5-nav-icon">👥</div>
       <div class="h5-nav-label">社区</div>
     </div>
+    <div class="h5-nav-item" id="nav-dm" onclick="switchTab('dm')" style="position:relative">
+      <div class="h5-nav-icon">💬</div>
+      <div class="h5-nav-label">消息</div>
+      <span id="dm-nav-badge" style="position:absolute;top:2px;right:calc(50% - 16px);width:8px;height:8px;border-radius:50%;background:#E74C3C;display:block"></span>
+    </div>
     <div class="h5-nav-item" id="nav-hermes" onclick="switchTab('hermes')">
       <div class="h5-nav-icon">🦞</div>
       <div class="h5-nav-label">Hermes</div>
-    </div>
-    <div class="h5-nav-item" id="nav-market" onclick="switchTab('market')">
-      <div class="h5-nav-icon">📈</div>
-      <div class="h5-nav-label">行情</div>
     </div>
     <div class="h5-nav-item" id="nav-vip" onclick="switchTab('vip')">
       <div class="h5-nav-icon">💎</div>
@@ -929,7 +1150,7 @@ body { background: var(--navy); }
 
 <script>
 // ===== TAB SWITCHING =====
-const ALL_TABS = ['feed', 'community', 'hermes', 'market', 'vip', 'profile'];
+const ALL_TABS = ['feed', 'community', 'hermes', 'market', 'vip', 'profile', 'dm', 'workbench'];
 // Header tabs correspond to first 4 tabs (indices 0-3)
 const HEADER_TAB_NAMES = ['feed', 'community', 'hermes', 'market'];
 
@@ -960,6 +1181,14 @@ function switchTab(tab) {
   // Activate bottom nav item
   const navItem = document.getElementById('nav-' + tab);
   if (navItem) navItem.classList.add('active');
+
+  // Load DM list when entering DM tab
+  if (tab === 'dm') {
+    // Always reset to list view when entering
+    document.getElementById('dm-list-view').style.display = 'block';
+    document.getElementById('dm-chat-view').style.display = 'none';
+    loadDmConversations();
+  }
 }
 
 // ===== COMMUNITY =====
@@ -1390,6 +1619,28 @@ let hermesHistory = [];
 let hermesCredits = 128;
 
 const HERMES_MODES = {
+  'AI行情预判': {
+    desc: '🛡️ 合规设计：历史数据可解读，未来仅显示模型推演的概率区间，不做方向判断。',
+    options: [
+      { label: '上证指数', tag: '大盘指数', type:'大盘' },
+      { label: '沪深300', tag: '大盘指数', type:'大盘' },
+      { label: '恒生指数', tag: '港股指数', type:'大盘' },
+      { label: '纳斯达克', tag: '美股指数', type:'大盘' },
+      { label: '贵州茅台', tag: '个股', type:'个股' },
+      { label: '宁德时代', tag: '个股', type:'个股' },
+      { label: '中证白酒', tag: '基金/ETF', type:'基金' },
+      { label: '新能源ETF', tag: '基金/ETF', type:'基金' }
+    ]
+  },
+  'AI资产配置': {
+    desc: '🎯 基于风险偏好与回测引擎生成的资产配置参考方案。不构成投资建议。',
+    options: [
+      { label: '保守型', tag: '低波动 · 求稳' },
+      { label: '稳健型', tag: '均衡 · 推荐' },
+      { label: '积极型', tag: '成长 · 适度激进' },
+      { label: '激进型', tag: '高波动 · 高弹性' }
+    ]
+  },
   '研报精读': {
     desc: '深度解读券商研报，提取核心观点、盈利预测和投资评级，快速掌握机构最新研判。',
     options: [
@@ -1481,6 +1732,15 @@ async function selectHermesOption(option) {
   document.querySelectorAll('.hermes-option-btn').forEach(btn => {
     btn.classList.toggle('selected', btn.querySelector('.hermes-option-label').textContent === option);
   });
+  // Route to specialized handlers for new compliance-driven modes
+  if (hermesMode === 'AI资产配置') {
+    return runAllocation(option);
+  }
+  if (hermesMode === 'AI行情预判') {
+    const modeData = HERMES_MODES['AI行情预判'] || {};
+    const opt = (modeData.options||[]).find(o => o.label === option);
+    return runForecast(option, opt ? opt.type : '大盘');
+  }
   // Add user bubble
   addHermesMessage('user', null, { mode: hermesMode, option: option });
   // Show loading
@@ -1508,6 +1768,182 @@ async function selectHermesOption(option) {
   // Update credits
   hermesCredits = Math.max(0, hermesCredits - 1);
   document.getElementById('hermes-credits-display').textContent = '⚡ ' + hermesCredits + '次';
+}
+
+// ==== AI 资产配置 (合规：仅区间+免责) ====
+async function runAllocation(profile) {
+  addHermesMessage('user', null, { quickAction: '生成 ' + profile + ' 配置方案' });
+  showHermesLoading(true);
+  scrollHermesToBottom();
+  try {
+    const resp = await fetch('/api/ai/allocation', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({risk: profile, horizon:'中期(6-12月)'})
+    });
+    const data = await resp.json();
+    showHermesLoading(false);
+    renderAllocationCard(data);
+  } catch(e) {
+    showHermesLoading(false);
+    showToast('生成失败，请重试');
+  }
+  document.getElementById('hermes-quick-actions').style.display = 'flex';
+  hermesCredits = Math.max(0, hermesCredits - 5);
+  document.getElementById('hermes-credits-display').textContent = '⚡ ' + hermesCredits + '次';
+  scrollHermesToBottom();
+}
+
+function renderAllocationCard(data) {
+  const chat = document.getElementById('hermes-chat');
+  const r = 56, cx = 70, cy = 70;
+  let acc = 0;
+  const pie = data.allocation.filter(a=>a.ratio>0).map(a => {
+    const startAngle = acc * 2 * Math.PI;
+    acc += a.ratio / 100;
+    const endAngle = acc * 2 * Math.PI;
+    const x1 = cx + r * Math.sin(startAngle), y1 = cy - r * Math.cos(startAngle);
+    const x2 = cx + r * Math.sin(endAngle), y2 = cy - r * Math.cos(endAngle);
+    const large = (a.ratio > 50) ? 1 : 0;
+    return `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z" fill="${a.color}" stroke="var(--navy)" stroke-width="1.5"/>`;
+  }).join('');
+  const legend = data.allocation.map(a => `
+    <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(200,169,110,0.06)">
+      <span style="width:10px;height:10px;border-radius:2px;background:${a.color};display:inline-block"></span>
+      <span style="font-size:12px;color:var(--white);flex:1">${a.name}</span>
+      <span style="font-size:13px;color:var(--gold);font-weight:600">${a.ratio}%</span>
+      <span style="font-size:10px;color:var(--gray-400);min-width:54px;text-align:right">${a.range}</span>
+    </div>`).join('');
+  const sectors = (data.sector_focus||[]).map(s => `<span class="tag tag-gold" style="font-size:11px">${s}</span>`).join('');
+  const html = `
+    <div class="chat-bubble-wrap ai">
+      <div class="chat-bubble ai" style="max-width:100%;width:100%">
+        <div class="chat-ai-header">🎯 AI 资产配置参考 · ${data.risk}型</div>
+        <div style="display:flex;gap:12px;align-items:center;margin:10px 0">
+          <svg viewBox="0 0 140 140" width="120" height="120" style="flex-shrink:0">${pie}<circle cx="${cx}" cy="${cy}" r="28" fill="var(--navy-mid)"/><text x="${cx}" y="${cy-2}" text-anchor="middle" fill="var(--gold)" font-size="10">${data.risk}</text><text x="${cx}" y="${cy+12}" text-anchor="middle" fill="var(--gray-400)" font-size="8">${data.horizon}</text></svg>
+          <div style="flex:1;min-width:0">${legend}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0">
+          <div style="background:rgba(46,204,113,0.08);border:1px solid rgba(46,204,113,0.2);border-radius:8px;padding:8px"><div style="font-size:10px;color:var(--gray-400)">回测年化收益区间</div><div style="font-size:13px;color:var(--green);font-weight:600;margin-top:3px">${data.expected_return}</div></div>
+          <div style="background:rgba(231,76,60,0.08);border:1px solid rgba(231,76,60,0.2);border-radius:8px;padding:8px"><div style="font-size:10px;color:var(--gray-400)">最大回撤区间</div><div style="font-size:13px;color:#E74C3C;font-weight:600;margin-top:3px">${data.max_drawdown}</div></div>
+        </div>
+        <div style="margin:8px 0">
+          <div style="font-size:11px;color:var(--gray-400);margin-bottom:6px">建议关注行业</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">${sectors}</div>
+        </div>
+        <div style="font-size:11px;color:var(--gray-400);margin-top:6px">再平衡频率：${data.rebalance}</div>
+        <div class="chat-ai-footer" style="border-color:rgba(231,76,60,0.2);color:#E2C98A;line-height:1.6">⚠️ ${data.disclaimer}</div>
+        <div style="font-size:10px;color:var(--gray-400);margin-top:6px">数据来源：${data.data_source}</div>
+      </div>
+    </div>`;
+  chat.insertAdjacentHTML('beforeend', html);
+}
+
+// ==== AI 行情预判 (合规：历史可解读，未来仅区间) ====
+async function runForecast(target, type) {
+  addHermesMessage('user', null, { quickAction: 'AI预判 · ' + target });
+  showHermesLoading(true);
+  scrollHermesToBottom();
+  try {
+    const resp = await fetch('/api/ai/forecast', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({target, type})
+    });
+    const data = await resp.json();
+    showHermesLoading(false);
+    renderForecastCard(data);
+  } catch(e) {
+    showHermesLoading(false);
+    showToast('生成失败，请重试');
+  }
+  document.getElementById('hermes-quick-actions').style.display = 'flex';
+  hermesCredits = Math.max(0, hermesCredits - 8);
+  document.getElementById('hermes-credits-display').textContent = '⚡ ' + hermesCredits + '次';
+  scrollHermesToBottom();
+}
+
+function renderForecastCard(data) {
+  const W = 320, H = 180, PAD_L = 42, PAD_R = 8, PAD_T = 18, PAD_B = 24;
+  const totalLen = data.history.length + data.forecast_base.length;
+  const all = [...data.history, ...data.forecast_bear, ...data.forecast_base, ...data.forecast_bull];
+  const yMin = Math.min(...all), yMax = Math.max(...all);
+  const yPad = (yMax - yMin) * 0.1 || 1;
+  const lo = yMin - yPad, hi = yMax + yPad;
+  const xScale = (i) => PAD_L + (i / (totalLen-1)) * (W - PAD_L - PAD_R);
+  const yScale = (v) => PAD_T + (1 - (v - lo) / (hi - lo)) * (H - PAD_T - PAD_B);
+  const histPath = data.history.map((v,i) => `${i===0?'M':'L'} ${xScale(i).toFixed(1)} ${yScale(v).toFixed(1)}`).join(' ');
+  const fLen = data.forecast_base.length;
+  const offset = data.history.length;
+  const topPath = data.forecast_bull.map((v,i) => `${i===0?'M':'L'} ${xScale(offset+i).toFixed(1)} ${yScale(v).toFixed(1)}`).join(' ');
+  const botPath = data.forecast_bear.map((v,i) => `L ${xScale(offset+fLen-1-i).toFixed(1)} ${yScale(data.forecast_bear[fLen-1-i]).toFixed(1)}`).join(' ');
+  const fanArea = `${topPath} ${botPath} Z`;
+  const midUpper = data.forecast_base.map((v,i) => v + (data.forecast_bull[i]-v)*0.5);
+  const midLower = data.forecast_base.map((v,i) => v + (data.forecast_bear[i]-v)*0.5);
+  const midUpPath = midUpper.map((v,i) => `${i===0?'M':'L'} ${xScale(offset+i).toFixed(1)} ${yScale(v).toFixed(1)}`).join(' ');
+  const midDownPath = midLower.map((v,i) => `L ${xScale(offset+fLen-1-i).toFixed(1)} ${yScale(midLower[fLen-1-i]).toFixed(1)}`).join(' ');
+  const midFanArea = `${midUpPath} ${midDownPath} Z`;
+  const basePath = data.forecast_base.map((v,i) => `${i===0?'M':'L'} ${xScale(offset+i).toFixed(1)} ${yScale(v).toFixed(1)}`).join(' ');
+  const splitX = xScale(offset - 0.5);
+  const yLabels = [hi, (hi+lo)/2, lo].map(v => v.toFixed(2));
+  const corrBars = data.correlations.map(c => {
+    const abs = Math.abs(c.corr) * 100;
+    const color = c.corr > 0 ? '#2ECC71' : '#E74C3C';
+    return `<div style="display:flex;align-items:center;gap:8px;font-size:11px;padding:4px 0">
+      <div style="flex:0 0 110px;color:var(--white)">${c.name}</div>
+      <div style="flex:1;background:rgba(154,149,144,0.15);border-radius:4px;height:10px;position:relative;overflow:hidden">
+        <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(200,169,110,0.4)"></div>
+        <div style="position:absolute;top:0;bottom:0;${c.corr>=0?'left:50%':'right:50%'};width:${abs/2}%;background:${color};border-radius:2px"></div>
+      </div>
+      <div style="flex:0 0 40px;text-align:right;color:${color};font-weight:600">${c.corr>=0?'+':''}${c.corr.toFixed(2)}</div>
+    </div>`;
+  }).join('');
+  const histCommentary = data.history_commentary.map(c => `<div style="font-size:12px;color:var(--white);padding:3px 0;display:flex;gap:6px"><span style="color:var(--gold)">•</span><span>${c}</span></div>`).join('');
+  const last = data.history[data.history.length-1];
+  const bullEnd = data.forecast_bull[data.forecast_bull.length-1];
+  const bearEnd = data.forecast_bear[data.forecast_bear.length-1];
+  const rangePct = ((bullEnd-bearEnd)/last*100).toFixed(1);
+  const html = `
+    <div class="chat-bubble-wrap ai">
+      <div class="chat-bubble ai" style="max-width:100%;width:100%">
+        <div class="chat-ai-header">📈 AI 行情预判 · ${data.target} <span style="font-size:10px;color:var(--gray-400);font-weight:400">(${data.type})</span></div>
+        <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;margin:8px 0;background:rgba(11,30,58,0.5);border-radius:8px">
+          <line x1="${PAD_L}" y1="${PAD_T}" x2="${PAD_L}" y2="${H-PAD_B}" stroke="rgba(200,169,110,0.2)"/>
+          <line x1="${PAD_L}" y1="${H-PAD_B}" x2="${W-PAD_R}" y2="${H-PAD_B}" stroke="rgba(200,169,110,0.2)"/>
+          <text x="${PAD_L-4}" y="${PAD_T+4}" text-anchor="end" fill="#9A9590" font-size="9">${yLabels[0]}</text>
+          <text x="${PAD_L-4}" y="${(PAD_T+H-PAD_B)/2+3}" text-anchor="end" fill="#9A9590" font-size="9">${yLabels[1]}</text>
+          <text x="${PAD_L-4}" y="${H-PAD_B+3}" text-anchor="end" fill="#9A9590" font-size="9">${yLabels[2]}</text>
+          <line x1="${splitX.toFixed(1)}" y1="${PAD_T}" x2="${splitX.toFixed(1)}" y2="${H-PAD_B}" stroke="rgba(200,169,110,0.35)" stroke-dasharray="3,3"/>
+          <text x="${(splitX-3).toFixed(1)}" y="${PAD_T-4}" text-anchor="end" fill="#C8A96E" font-size="9">历史(可解读)</text>
+          <text x="${(splitX+3).toFixed(1)}" y="${PAD_T-4}" text-anchor="start" fill="#E2C98A" font-size="9">未来(仅区间)</text>
+          <path d="${fanArea}" fill="rgba(200,169,110,0.12)" stroke="none"/>
+          <path d="${midFanArea}" fill="rgba(200,169,110,0.24)" stroke="none"/>
+          <path d="${basePath}" fill="none" stroke="rgba(200,169,110,0.6)" stroke-width="1" stroke-dasharray="2,3"/>
+          <path d="${histPath}" fill="none" stroke="#C8A96E" stroke-width="1.8"/>
+          <circle cx="${xScale(offset-1).toFixed(1)}" cy="${yScale(last).toFixed(1)}" r="3" fill="#C8A96E"/>
+          <text x="${W-PAD_R-2}" y="${(yScale(data.forecast_bull[fLen-1])-2).toFixed(1)}" text-anchor="end" fill="#2ECC71" font-size="9">看好上沿 ${data.forecast_bull[fLen-1]}</text>
+          <text x="${W-PAD_R-2}" y="${(yScale(data.forecast_bear[fLen-1])+10).toFixed(1)}" text-anchor="end" fill="#E74C3C" font-size="9">看空下沿 ${data.forecast_bear[fLen-1]}</text>
+        </svg>
+        <div style="display:flex;gap:10px;justify-content:center;font-size:10px;color:var(--gray-400);margin-bottom:10px;flex-wrap:wrap">
+          <span><span style="display:inline-block;width:12px;height:2px;background:#C8A96E;vertical-align:middle"></span> 历史走势</span>
+          <span><span style="display:inline-block;width:12px;height:8px;background:rgba(200,169,110,0.24);vertical-align:middle"></span> 中性区间</span>
+          <span><span style="display:inline-block;width:12px;height:8px;background:rgba(200,169,110,0.12);vertical-align:middle"></span> 看好/看空带</span>
+        </div>
+        <div style="background:rgba(46,204,113,0.05);border-left:3px solid var(--gold);padding:8px 10px;margin:10px 0;border-radius:4px">
+          <div style="font-size:12px;font-weight:600;color:var(--gold);margin-bottom:6px">📊 历史解读 (合规可读)</div>
+          ${histCommentary}
+        </div>
+        <div style="background:rgba(231,76,60,0.06);border:1px dashed rgba(231,76,60,0.3);padding:10px;margin:10px 0;border-radius:6px">
+          <div style="font-size:12px;font-weight:600;color:#E2C98A;margin-bottom:4px">🔮 未来区间 · 20个交易日</div>
+          <div style="font-size:12px;color:var(--white);line-height:1.7">区间宽度：±${rangePct}% · 看好上沿/中性中枢/看空下沿三条带<br><span style="font-size:11px;color:var(--gray-400)">⚠️ 仅展示模型概率分布，不做方向解读、不做时间点预测</span></div>
+        </div>
+        <div style="margin:10px 0">
+          <div style="font-size:12px;font-weight:600;color:var(--gold);margin-bottom:6px">🔗 多数据源相关性</div>
+          ${corrBars}
+        </div>
+        <div class="chat-ai-footer" style="border-color:rgba(231,76,60,0.2);color:#E2C98A;line-height:1.6">⚠️ ${data.forecast_disclaimer}</div>
+        <div style="font-size:10px;color:var(--gray-400);margin-top:6px">数据来源：${data.data_source}</div>
+      </div>
+    </div>`;
+  document.getElementById('hermes-chat').insertAdjacentHTML('beforeend', html);
 }
 
 function generateMockHermesResult(mode, option) {
@@ -1670,6 +2106,189 @@ function scrollHermesToBottom() {
     requestAnimationFrame(() => {
       chat.scrollIntoView({ behavior: 'smooth', block: 'end' });
     });
+  }
+}
+
+// ===== DM (私信) =====
+let currentDmKol = null;
+let dmConversationsCache = null;
+let dmCurrentHistory = []; // 当前对话上下文 (多轮)
+
+async function loadDmConversations() {
+  const container = document.getElementById('dm-conversations-list');
+  try {
+    const resp = await fetch('/api/dm/conversations');
+    const data = await resp.json();
+    dmConversationsCache = data;
+    renderDmConversations(data);
+  } catch (e) {
+    // fallback
+    renderDmConversations(getMockDmConversations());
+  }
+}
+
+function getMockDmConversations() {
+  return [
+    {id:1,kol_name:'财经老王',kol_avatar:'👑',tier:'S级',last_msg:'好的，我周四直播会详细讲这个方向',time:'5分钟前',unread:1,vip_only:false},
+    {id:2,kol_name:'投资女神Lisa',kol_avatar:'💎',tier:'S级',last_msg:'港股互联网的配置建议已发送',time:'2小时前',unread:0,vip_only:false},
+    {id:3,kol_name:'量化老师陈明',kol_avatar:'📊',tier:'A级',last_msg:'[付费内容] 本周多因子模型调仓建议',time:'昨天',unread:0,vip_only:true},
+  ];
+}
+
+function renderDmConversations(list) {
+  const container = document.getElementById('dm-conversations-list');
+  if (!list || !list.length) {
+    container.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">暂无对话</div>';
+    return;
+  }
+  container.innerHTML = list.map(c => `
+    <div class="dm-conv-item" onclick="openDmChat(${c.id},'${c.kol_name}','${c.kol_avatar}','${c.tier}')">
+      <div class="dm-avatar">${c.kol_avatar}${c.unread>0?'<div class="dm-unread-dot"></div>':''}</div>
+      <div class="dm-conv-info">
+        <div class="dm-conv-name">
+          ${c.kol_name}
+          <span style="font-size:10px;background:rgba(200,169,110,0.15);color:var(--gold);padding:1px 5px;border-radius:4px">${c.tier}</span>
+          ${c.vip_only?'<span style="font-size:10px;background:rgba(231,76,60,0.15);color:#E74C3C;padding:1px 5px;border-radius:4px">VIP</span>':''}
+        </div>
+        <div class="dm-conv-last">${c.last_msg}</div>
+      </div>
+      <div class="dm-conv-time">${c.time}</div>
+    </div>
+  `).join('');
+}
+
+async function openDmChat(kolId, name, avatar, tier) {
+  // Switch to DM tab if not already
+  switchTab('dm');
+  setTimeout(() => {
+    currentDmKol = { id: kolId, name, avatar, tier };
+    document.getElementById('dm-list-view').style.display = 'none';
+    document.getElementById('dm-chat-view').style.display = 'block';
+    document.getElementById('dm-chat-name').textContent = name;
+    document.getElementById('dm-chat-tier').textContent = tier + ' · 认证大V';
+    document.getElementById('dm-chat-avatar').textContent = avatar;
+    loadDmMessages(kolId);
+  }, 50);
+}
+
+function closeDmChat() {
+  document.getElementById('dm-list-view').style.display = 'block';
+  document.getElementById('dm-chat-view').style.display = 'none';
+  currentDmKol = null;
+}
+
+async function loadDmMessages(kolId) {
+  const container = document.getElementById('dm-messages-container');
+  container.innerHTML = '<div style="text-align:center;color:var(--gray-400);font-size:12px;padding:20px">加载中...</div>';
+  try {
+    const resp = await fetch('/api/dm/messages/' + kolId);
+    const data = await resp.json();
+    dmCurrentHistory = data.map(m => ({sender:m.sender, content:m.content}));
+    renderDmMessages(data);
+  } catch (e) {
+    dmCurrentHistory = [];
+    renderDmMessages([{id:1,sender:'kol',content:'欢迎关注！有投研问题随时交流。',time:'刚刚',type:'text'}]);
+  }
+}
+
+function renderDmMessages(messages) {
+  const container = document.getElementById('dm-messages-container');
+  container.innerHTML = messages.map(m => {
+    if (m.type === 'paid') {
+      return `
+        <div class="dm-msg from-kol paid-msg">
+          <div style="font-size:11px;color:var(--gold);font-weight:600;margin-bottom:6px">🔒 付费内容 · ¥${m.price}</div>
+          <div style="font-size:13px;color:var(--white);line-height:1.6">${m.preview||'解锁查看完整内容'}</div>
+          <button class="btn-gold" style="width:100%;margin-top:10px;padding:6px;font-size:12px" onclick="unlockPaidMsg(${m.price})">解锁查看 ¥${m.price}</button>
+          <div class="dm-msg-time">${m.time}</div>
+        </div>`;
+    }
+    return `
+      <div class="dm-msg from-${m.sender}">
+        ${m.content}
+        <div class="dm-msg-time" style="color:${m.sender==='user'?'rgba(11,30,58,0.7)':'var(--gray-400)'}">${m.time}</div>
+      </div>`;
+  }).join('');
+  // Scroll to bottom
+  setTimeout(() => { container.scrollTop = container.scrollHeight; }, 50);
+}
+
+async function sendDm() {
+  const input = document.getElementById('dm-input');
+  const text = input.value.trim();
+  if (!text || !currentDmKol) return;
+  input.value = '';
+  const container = document.getElementById('dm-messages-container');
+  // Append user msg
+  const userMsg = document.createElement('div');
+  userMsg.className = 'dm-msg from-user';
+  userMsg.innerHTML = `${text}<div class="dm-msg-time" style="color:rgba(11,30,58,0.7)">刚刚</div>`;
+  container.appendChild(userMsg);
+  dmCurrentHistory.push({sender:'user', content:text});
+  container.scrollTop = container.scrollHeight;
+  // Typing
+  const typing = document.createElement('div');
+  typing.className = 'dm-msg from-kol';
+  typing.innerHTML = '<span style="color:var(--gray-400);font-size:12px">对方正在输入<span class="dot-anim"><span>.</span><span>.</span><span>.</span></span></span>';
+  container.appendChild(typing);
+  container.scrollTop = container.scrollHeight;
+  try {
+    const resp = await fetch('/api/dm/send', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({kol_id: currentDmKol.id, content: text, history: dmCurrentHistory})
+    });
+    const data = await resp.json();
+    await new Promise(r=>setTimeout(r, 900));
+    typing.remove();
+    const reply = document.createElement('div');
+    reply.className = 'dm-msg from-kol';
+    reply.innerHTML = `${data.auto_reply}
+      <div style="font-size:10px;color:var(--gray-400);margin-top:6px;padding-top:6px;border-top:1px solid rgba(200,169,110,0.1);font-style:italic">${data.disclaimer || '仅供参考，不构成投资建议'}</div>
+      <div class="dm-msg-time">刚刚</div>`;
+    container.appendChild(reply);
+    dmCurrentHistory.push({sender:'kol', content:data.auto_reply});
+    container.scrollTop = container.scrollHeight;
+  } catch (e) {
+    typing.remove();
+  }
+}
+
+function unlockPaidMsg(price) {
+  showToast('解锁成功！消耗 ' + price + ' 积分');
+}
+
+function dmQuickAsk(text) {
+  document.getElementById('dm-input').value = text;
+  sendDm();
+}
+
+// ===== KOL WORKBENCH =====
+function wbQuickReply(isPaid) {
+  const text = document.getElementById('wb-quick-reply').value.trim();
+  if (!text) { showToast('请输入回复内容'); return; }
+  if (isPaid) {
+    showToast('付费回复已发送！收益 +¥50');
+  } else {
+    showToast('回复已发送');
+  }
+  document.getElementById('wb-quick-reply').value = '';
+}
+
+async function sendBroadcast() {
+  const text = document.getElementById('wb-broadcast-text').value.trim();
+  const target = document.getElementById('wb-broadcast-target').value;
+  if (!text) { showToast('请输入群发内容'); return; }
+  try {
+    const resp = await fetch('/api/kol/broadcast', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({content:text, target})
+    });
+    const data = await resp.json();
+    showToast(`群发成功！触达 ${data.reach.toLocaleString()} 位订阅者`);
+    document.getElementById('wb-broadcast-text').value = '';
+  } catch (e) {
+    showToast('群发成功！');
+    document.getElementById('wb-broadcast-text').value = '';
   }
 }
 

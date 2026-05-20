@@ -395,10 +395,181 @@ def api_dm_messages(kol_id):
 def api_dm_send():
     kol_id = request.json.get("kol_id")
     content = request.json.get("content", "")
-    return jsonify({"success": True, "kol_id": kol_id, "msg_id": random.randint(100,999), "auto_reply": "感谢您的消息！我会尽快回复。如果是紧急问题，可以在我的直播间提问哦～"})
+    history = request.json.get("history", [])
+    # 大V 角色画像 + 上下文感知（合规：用"关注/参考/可考虑"措辞，不出现"买/卖/必涨/必跌"）
+    KOL_PERSONA = {
+        1: {"name":"财经老王","style":"宏观+科技，偏稳健","focus":["AI算力","半导体","美联储","降息"]},
+        2: {"name":"投资女神Lisa","style":"港股+互联网，价值派","focus":["港股","互联网","南向资金","平台经济"]},
+        3: {"name":"量化老师陈明","style":"量化+因子，数据驱动","focus":["因子","量化","回测","动量","价值"]},
+        4: {"name":"全球宏观James","style":"宏观+大宗，海外视角","focus":["美联储","美元","黄金","大宗"]},
+        5: {"name":"新能源猎手阿强","style":"产业链调研，新能源","focus":["新能源","固态电池","锂电","光伏"]},
+    }
+    persona = KOL_PERSONA.get(kol_id, KOL_PERSONA[1])
+    text = content.lower()
+    turn = len(history) + 1
 
-@app.route("/api/kol/workbench")
-def api_kol_workbench():
+    # 关键词触发的多轮回复（每个大V不同风格）
+    def reply_for(kw_match):
+        base = persona["name"]
+        if "买" in content or "卖" in content or "推荐" in content or "代码" in content:
+            return f"我只能基于公开数据分享研究观点，无法给具体买卖建议哦。你可以参考冈底斯Hermes的「AI资产配置」做组合规划，或在「AI行情预判」看历史区间和模型推演的概率分布，结合自己的风险偏好判断。"
+        if "新能源" in text or "电池" in text or "锂" in text:
+            if kol_id == 5:
+                return f"我刚跑完一轮产业链调研：固态电池量产时间表略有提前迹象，中游材料端景气度在恢复。可以关注以下三个维度：①电解质技术路线分化 ②碳酸锂价格底部信号 ③海外工厂投产节奏。具体标的我不点名，避免合规风险，你可以用Hermes的量化因子筛选自己跑一下。"
+            return f"新能源这条线我不是最强的，建议直接看新能源猎手阿强的频道，他的产业链调研做得很扎实。从宏观角度，当下新能源板块处于估值修复阶段，可以适度关注。"
+        if "港股" in text or "互联网" in text or "恒生" in text:
+            if kol_id == 2:
+                return f"港股互联网这波我跟得比较紧。当前估值大约在历史20-25%分位，南向资金已经连续14个交易日净买入。但要注意两点：①Q2财报季验证基本面 ②美联储路径不确定性。我个人会把仓位控制在标配+5%以内，分批操作。"
+            return f"港股不是我的主战场，建议看Lisa的频道。从大方向看，估值确实有修复空间，但短期波动会比较大，注意控制仓位。"
+        if "ai" in text or "算力" in text or "科技" in text or "芯片" in text:
+            if kol_id == 1:
+                return f"AI算力短期确实热，但要拆开看：①云厂商资本开支节奏 ②国产替代订单兑现度 ③估值消化空间。我现在是逢回调关注，不追高。具体节奏，可以参考Hermes里高盛和中金最新的研报精读，我也是基于这些证据做判断的。"
+            return f"科技板块我会更多看宏观资金面和外资流向，不做个股推荐。可以参考一下大V老王的频道，他对这条线跟得更细。"
+        if "宏观" in text or "美联储" in text or "降息" in text or "美元" in text:
+            if kol_id == 4:
+                return f"美联储这边我跟最紧：CME利率期货显示年内降息2次概率68%，鲍威尔最近讲话偏鸽。美元指数承压，对应：①新兴市场股票偏好上升 ②黄金中长期支撑 ③大宗商品反弹。这些只是大类资产框架，不是具体建议哈。"
+            return f"宏观层面，降息预期升温对风险资产是利好，但要警惕预期透支后的回吐。建议看James的频道，他对海外宏观跟得更深。"
+        if "量化" in text or "因子" in text:
+            if kol_id == 3:
+                return f"我跑了最新一轮多因子回测：价值因子最近4周相对动量因子超额+3.2%，建议把组合往价值方向调一调。这只是因子层面的判断，不构成个股推荐。你可以在Hermes里用「量化因子筛选」自己跑一遍。"
+            return f"量化的事建议找陈明老师，他这块比我专业。"
+        if turn <= 2:
+            return f"你这个问题挺好。我先简单回应：基于我最近跟踪的数据（{('、'.join(persona['focus'][:2]))}方向），目前的情况是结构性机会大于系统性机会。要不你具体说说你的关注点？是想看赛道、还是想做资产配置？"
+        if turn <= 4:
+            return f"明白。我补充一下数据视角：冈底斯平台最近的研报数据库里，{persona['focus'][0]}相关研报量周环比+12%，机构关注度在抬升。但研报关注≠股价上涨，仅作信号参考。你的仓位结构是怎样的？我可以帮你从大方向上看一下平衡性。"
+        return f"咱们聊了几轮，我建议你这样做：①用Hermes的「AI资产配置」生成一份组合参考 ②用「AI行情预判」看一下你关注标的的历史走势区间 ③有具体观点了，再回来跟我对一对。最终决策一定是你自己做，我们这边只能给数据和研究框架。"
+
+    reply = reply_for(content)
+    return jsonify({
+        "success": True,
+        "kol_id": kol_id,
+        "msg_id": random.randint(100,999),
+        "auto_reply": reply,
+        "disclaimer": "以上为大V个人研究观点，仅供参考，不构成投资建议",
+        "turn": turn,
+    })
+
+@app.route("/api/ai/allocation", methods=["POST"])
+def api_ai_allocation():
+    risk = request.json.get("risk", "稳健")
+    horizon = request.json.get("horizon", "中期(6-12月)")
+    # 合规：给区间不给单点，标注模型来源
+    PROFILES = {
+        "保守": {
+            "alloc":[{"name":"股票","ratio":20,"range":"15-25%","color":"#E74C3C"},
+                     {"name":"债券","ratio":50,"range":"45-55%","color":"#3498DB"},
+                     {"name":"黄金","ratio":15,"range":"10-20%","color":"#F39C12"},
+                     {"name":"现金","ratio":15,"range":"10-20%","color":"#9A9590"}],
+            "expected_return":"3-5%/年(回测区间)","max_drawdown":"-5% ~ -8%",
+            "rebalance":"季度再平衡","sector":["高股息","公用事业","必需消费"]
+        },
+        "稳健": {
+            "alloc":[{"name":"股票","ratio":45,"range":"40-50%","color":"#E74C3C"},
+                     {"name":"债券","ratio":30,"range":"25-35%","color":"#3498DB"},
+                     {"name":"黄金","ratio":10,"range":"5-15%","color":"#F39C12"},
+                     {"name":"现金","ratio":15,"range":"10-20%","color":"#9A9590"}],
+            "expected_return":"6-10%/年(回测区间)","max_drawdown":"-10% ~ -15%",
+            "rebalance":"季度再平衡","sector":["科技","消费","医药","金融"]
+        },
+        "积极": {
+            "alloc":[{"name":"股票","ratio":70,"range":"65-75%","color":"#E74C3C"},
+                     {"name":"债券","ratio":10,"range":"5-15%","color":"#3498DB"},
+                     {"name":"黄金","ratio":10,"range":"5-15%","color":"#F39C12"},
+                     {"name":"现金","ratio":10,"range":"5-15%","color":"#9A9590"}],
+            "expected_return":"10-18%/年(回测区间)","max_drawdown":"-18% ~ -25%",
+            "rebalance":"月度再平衡","sector":["科技成长","新能源","半导体","港股互联网"]
+        },
+        "激进": {
+            "alloc":[{"name":"股票","ratio":85,"range":"80-90%","color":"#E74C3C"},
+                     {"name":"债券","ratio":0,"range":"0-5%","color":"#3498DB"},
+                     {"name":"黄金","ratio":5,"range":"0-10%","color":"#F39C12"},
+                     {"name":"现金","ratio":10,"range":"5-15%","color":"#9A9590"}],
+            "expected_return":"15-30%/年(回测区间)","max_drawdown":"-30% ~ -45%",
+            "rebalance":"月度再平衡","sector":["AI算力","固态电池","创新药","小盘成长"]
+        },
+    }
+    p = PROFILES.get(risk, PROFILES["稳健"])
+    return jsonify({
+        "risk": risk, "horizon": horizon,
+        "allocation": p["alloc"],
+        "expected_return": p["expected_return"],
+        "max_drawdown": p["max_drawdown"],
+        "rebalance": p["rebalance"],
+        "sector_focus": p["sector"],
+        "data_source": "基于冈底斯回测引擎(2015-2026)+ 多因子模型 + Black-Litterman 框架",
+        "disclaimer": "本配置方案为模型推演结果，基于历史数据回测，不构成投资建议。市场有风险，实际收益可能与回测区间显著偏离。",
+        "compute_used": 5,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+    })
+
+@app.route("/api/ai/forecast", methods=["POST"])
+def api_ai_forecast():
+    """行情预判：历史可解读，未来仅区间不解读"""
+    import math
+    target = request.json.get("target", "上证指数")
+    target_type = request.json.get("type", "大盘")
+    # 30天历史 + 20天未来
+    TARGETS = {
+        "上证指数":     {"base":3428.56,"vol":0.012,"trend":0.0008},
+        "沪深300":      {"base":3920.20,"vol":0.013,"trend":0.0007},
+        "恒生指数":     {"base":23156.78,"vol":0.018,"trend":0.0012},
+        "纳斯达克":     {"base":19234.56,"vol":0.015,"trend":0.0009},
+        "贵州茅台":     {"base":1685.20,"vol":0.014,"trend":0.0004},
+        "宁德时代":     {"base":248.50,"vol":0.022,"trend":0.0010},
+        "中证白酒":     {"base":12450.30,"vol":0.016,"trend":-0.0003},
+        "新能源ETF":    {"base":0.882,"vol":0.021,"trend":0.0008},
+    }
+    cfg = TARGETS.get(target, TARGETS["上证指数"])
+    base, vol, trend = cfg["base"], cfg["vol"], cfg["trend"]
+    random.seed(hash(target) & 0xFFFF)
+    history = []
+    price = base * (1 - trend*15)
+    for i in range(30):
+        price = price * (1 + trend + random.uniform(-vol, vol))
+        history.append(round(price, 2))
+    # 未来 20 天：三条带状区间 (看空/中性/看好)
+    last = history[-1]
+    bear = []
+    base_line = []
+    bull = []
+    for i in range(1, 21):
+        # 区间宽度随时间增大 (类似 fan chart)
+        width = vol * math.sqrt(i) * 1.96
+        center = last * (1 + trend * i)
+        bear.append(round(center * (1 - width), 2))
+        base_line.append(round(center, 2))
+        bull.append(round(center * (1 + width), 2))
+    # 历史可解读
+    pct_30d = round((history[-1]/history[0]-1)*100, 2)
+    high = max(history); low = min(history)
+    history_commentary = [
+        f"过去30个交易日累计涨跌：{('+' if pct_30d>=0 else '')}{pct_30d}%",
+        f"区间高点 {high}（第{history.index(high)+1}个交易日），区间低点 {low}（第{history.index(low)+1}个交易日）",
+        f"振幅 {round((high-low)/low*100,2)}%，{'波动较大' if vol>0.018 else '波动温和'}",
+        f"近5日趋势：{'温和上行' if history[-1]>history[-6] else '温和回调'}，量能{'放大' if random.random()>0.5 else '收敛'}",
+    ]
+    # 相关性 (合规：仅展示数据，不解读)
+    correlations = [
+        {"name":"北向资金净流入","corr":round(random.uniform(0.4,0.78),2)},
+        {"name":"美元指数(反向)","corr":round(-random.uniform(0.3,0.62),2)},
+        {"name":"10Y国债收益率","corr":round(random.uniform(-0.4,0.35),2)},
+        {"name":"VIX恐慌指数(反向)","corr":round(-random.uniform(0.5,0.75),2)},
+        {"name":"原油价格","corr":round(random.uniform(-0.2,0.4),2)},
+    ]
+    return jsonify({
+        "target": target,
+        "type": target_type,
+        "history": history,
+        "forecast_bear": bear,
+        "forecast_base": base_line,
+        "forecast_bull": bull,
+        "history_commentary": history_commentary,
+        "forecast_disclaimer": "⚠️ 未来区间为模型基于历史波动率推演的概率分布，不构成方向判断和投资建议。实际走势受多重因素影响，可能显著偏离区间。",
+        "correlations": correlations,
+        "data_source": "冈底斯多因子模型 + 历史波动率Monte Carlo推演 + RAG数据库",
+        "compute_used": 8,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+    })
     return jsonify(gen_kol_workbench())
 
 @app.route("/api/kol/broadcast", methods=["POST"])

@@ -603,6 +603,7 @@ a:hover{color:#E2C98A}
       <tr><th>功能点</th><th>描述</th><th>优先级</th><th>状态</th></tr>
       <tr><td>广场发帖</td><td>支持文字+图片发布，帖子类型：观点/分析/问答</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
       <tr><td>大V列表</td><td>展示认证大V，按粉丝数/准确率/活跃度排序</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>大V私信入口</td><td>每张大V卡片上提供"私信"按钮，进入 1对1 专属频道</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
       <tr><td>活动列表</td><td>展示进行中与即将开始的社区活动</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
       <tr><td>活动详情Modal</td><td>底部弹出活动详情，含参与按钮与积分奖励说明</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
       <tr><td>点赞/评论</td><td>帖子互动功能，点赞+1积分，评论+2积分</td><td><span class="p1">P1</span></td><td><span class="planned">规划中</span></td></tr>
@@ -611,15 +612,74 @@ a:hover{color:#E2C98A}
   </div>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">Tab 3 · Hermes AI</div>
+    <div class="prd-sub-title">Tab 3 · 消息(大V专属对话) <span style="font-size:11px;background:rgba(231,76,60,0.15);color:#E74C3C;padding:2px 8px;border-radius:8px;margin-left:8px">合规重点</span></div>
     <table class="prd-table">
       <tr><th>功能点</th><th>描述</th><th>优先级</th><th>状态</th></tr>
-      <tr><td>6种分析模式</td><td>宏观/行业/个股/事件/量化/自由对话，横向滑动选择</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>分析对象选择</td><td>2×2按钮网格：A股/港股/美股/大宗商品</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>对话列表</td><td>展示用户关注/已订阅大V的对话会话，含未读红点、最新摘要、时间戳</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>多轮上下文对话</td><td>后端按 kol_id + history 数组生成上下文感知回复，KOL角色画像差异化（财经/量化/宏观/新能源）</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>合规护栏</td><td>大V回复涉及"买/卖/推荐"等敏感词时，自动转向引导用户使用 Hermes AI 工具做自主决策；对话顶部固定合规横幅；每条回复底部自动追加"仅供参考"声明</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>付费内容卡片</td><td>大V 可发送"付费内容"消息(预览+解锁价格)，C端用户消耗积分/订阅解锁完整内容</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>快捷提问 chips</td><td>对话输入框上方提供常用提问标签(A股科技/港股互联网/新能源/宏观)，降低用户提问门槛</td><td><span class="p1">P1</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>会员升级引导</td><td>列表底部固定升级专业会员的卡片，解锁更多大V对话权限</td><td><span class="p1">P1</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>语音/图片消息</td><td>支持发送语音和图片，富媒体投研交流</td><td><span class="p2">P2</span></td><td><span class="planned">规划中</span></td></tr>
+    </table>
+  </div>
+
+  <div class="prd-sub">
+    <div class="prd-sub-title">Tab 4 · Hermes AI <span style="font-size:11px;background:rgba(46,204,113,0.15);color:var(--green);padding:2px 8px;border-radius:8px;margin-left:8px">两大新模式</span></div>
+    <table class="prd-table">
+      <tr><th>功能点</th><th>描述</th><th>优先级</th><th>状态</th></tr>
+      <tr><td>🎯 AI 资产配置(新)</td><td>用户选择风险偏好(保守/稳健/积极/激进)，AI 输出资产配置参考方案：股/债/金/现金 占比 + 区间、回测年化收益区间、最大回撤区间、再平衡频率、关注行业。所有数值均为区间形式，不给单点目标。</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>📈 AI 行情预判(新)</td><td>用户选择标的(大盘/个股/基金)，AI 渲染走势图：左侧30日历史走势(实线，含解读) + 右侧20日未来三条区间带(看好上沿/中性中枢/看空下沿)。底部展示多数据源相关性（北向资金、美元、国债收益率、VIX、原油）。</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>研报精读</td><td>选择券商研报，AI 提炼核心观点+关键数据+风险提示</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>专家纪要 / 另类数据 / 组合诊断 / 情绪扫描 / 量化因子</td><td>5种原有专业分析模式</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
       <tr><td>聊天输入框</td><td>底部固定输入框，支持语音输入（规划）</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
       <tr><td>快捷指令</td><td>预设常用分析指令，一键触发</td><td><span class="p1">P1</span></td><td><span class="done">已实现</span></td></tr>
       <tr><td>历史记录</td><td>保存最近50条对话记录，支持搜索</td><td><span class="p1">P1</span></td><td><span class="planned">规划中</span></td></tr>
       <tr><td>算力消耗显示</td><td>每次分析前显示预计算力消耗，余量不足时提示升级</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+    </table>
+  </div>
+
+  <!-- 合规设计原则 -->
+  <div class="prd-sub">
+    <div class="prd-sub-title">🛡️ 合规设计原则 (C端核心功能强制遵循)</div>
+    <div class="highlight-box" style="background:rgba(231,76,60,0.06);border-left:4px solid #E74C3C">
+      <div style="font-size:13px;line-height:1.9;color:var(--white)">
+        本平台不提供具体买卖建议，所有 AI 输出与大V内容均为"参考"性质。下列原则在产品层（UI/文案/数据呈现）和后端层（生成约束）双重落地。
+      </div>
+    </div>
+    <table class="prd-table" style="margin-top:16px">
+      <tr><th>原则</th><th>落地方式</th><th>覆盖功能</th></tr>
+      <tr>
+        <td><b>历史可解读 / 未来不解读</b></td>
+        <td>对历史数据，AI 可输出涨跌幅、振幅、量能、高低点等结构化解读；对未来走势，仅渲染"看好上沿 / 中性中枢 / 看空下沿"三条数值区间带，不附带任何方向性叙述、不指定时间点、不给目标价。</td>
+        <td>AI 行情预判</td>
+      </tr>
+      <tr>
+        <td><b>区间替代单点</b></td>
+        <td>预期收益、最大回撤、配置比例、未来价位等数值，统一以"区间"形式呈现（如：年化 6-10%、配置 40-50%），强调不确定性。</td>
+        <td>AI 资产配置、AI 行情预判</td>
+      </tr>
+      <tr>
+        <td><b>大V敏感词守护</b></td>
+        <td>大V对话回复中若检测到"买/卖/推荐/必涨/必跌"等敏感词，系统返回标准合规话术，转向引导使用 Hermes 自助工具；不出现具体代码 + 操作组合的回复。</td>
+        <td>大V私信</td>
+      </tr>
+      <tr>
+        <td><b>数据来源透明</b></td>
+        <td>所有 AI 卡片底部强制展示数据来源（券商研报库 / 专家纪要库 / 另类数据库 / 多因子模型），用户可溯源。</td>
+        <td>Hermes 全部模式</td>
+      </tr>
+      <tr>
+        <td><b>免责声明硬约束</b></td>
+        <td>每条 AI 输出、每条大V回复、对话顶部、底部 Footer，四处冗余展示"仅供参考，不构成投资建议"。</td>
+        <td>全站</td>
+      </tr>
+      <tr>
+        <td><b>风险等级匹配</b></td>
+        <td>资产配置参考方案要求用户先选择风险偏好，避免向保守用户呈现激进配置。后续可接入风险测评问卷强制门槛。</td>
+        <td>AI 资产配置</td>
+      </tr>
     </table>
   </div>
 

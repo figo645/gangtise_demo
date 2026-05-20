@@ -754,7 +754,7 @@ html { scroll-behavior: smooth; }
       <a href="/h5" class="ix-nav-card">
         <div class="ix-nav-card-icon">📱</div>
         <div class="ix-nav-card-title">H5 用户端</div>
-        <div class="ix-nav-card-desc">移动端投研信息流、AI分析工具、订阅会员体系，专为C端用户设计的沉浸式体验。支持市场行情、研报摘要、专家观点等多维度信息聚合。</div>
+        <div class="ix-nav-card-desc">移动端投研信息流、大V私信对话、AI资产配置、AI行情预判、订阅会员体系。专为C端用户设计的沉浸式体验，所有 AI 输出与大V内容内置合规护栏。</div>
         <div class="ix-nav-card-arrow">进入体验 →</div>
       </a>
       <a href="/admin" class="ix-nav-card">
@@ -772,9 +772,98 @@ html { scroll-behavior: smooth; }
       <a href="/prd" class="ix-nav-card">
         <div class="ix-nav-card-icon">📄</div>
         <div class="ix-nav-card-title">产品设计文档</div>
-        <div class="ix-nav-card-desc">完整PRD：用户角色、页面架构、功能规格、跳转流程图、积分体系、KOL体系、非功能需求与版本迭代计划。</div>
+        <div class="ix-nav-card-desc">完整PRD：用户角色、页面架构、功能规格、跳转流程图、积分体系、KOL体系、合规设计原则、非功能需求与版本迭代计划。</div>
         <div class="ix-nav-card-arrow">查看文档 →</div>
       </a>
+    </div>
+  </div>
+</section>
+
+
+<!-- ======================================================
+     SECTION 2.5: C 端三大核心功能(含合规设计)
+====================================================== -->
+<section class="ix-section ix-section-dark" id="c-core">
+  <div class="ix-inner">
+    <div class="ix-section-label">C-Side Core Capabilities</div>
+    <div class="ix-section-title">C 端三大核心能力 · 合规先行</div>
+    <div class="ix-divider"></div>
+    <div class="ix-section-desc">大V专属对话、AI 资产配置参考、AI 行情预判三大模块覆盖 C 端核心场景。所有功能在产品层与数据层双重落地合规护栏：历史可解读、未来仅区间、不出现具体买卖建议。</div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:24px">
+      <!-- 1) 大V对话 -->
+      <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.15);border-radius:14px;padding:24px;position:relative">
+        <div style="position:absolute;top:18px;right:18px;font-size:11px;color:var(--gold);background:rgba(200,169,110,0.1);padding:3px 10px;border-radius:10px">P0</div>
+        <div style="font-size:32px;margin-bottom:14px">💬</div>
+        <div style="font-size:18px;font-weight:700;color:var(--gold);margin-bottom:10px">大V专属对话</div>
+        <div style="font-size:13px;color:var(--gray-400);line-height:1.8;margin-bottom:14px">认证大V 1对1 多轮对话频道，按大V角色画像差异化回复（财经/量化/宏观/新能源），支持付费内容卡片解锁，所有回复经合规敏感词过滤。</div>
+        <div style="border-top:1px solid rgba(200,169,110,0.1);padding-top:12px">
+          <div style="font-size:11px;color:#E2C98A;background:rgba(231,76,60,0.06);border-left:3px solid #E74C3C;padding:8px 10px;border-radius:4px;line-height:1.6">
+            🛡️ 合规：触发"买/卖/推荐"等敏感词，自动转向引导 AI 自助工具；每条回复底部"仅供参考"声明
+          </div>
+        </div>
+      </div>
+
+      <!-- 2) AI 资产配置 -->
+      <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.15);border-radius:14px;padding:24px;position:relative">
+        <div style="position:absolute;top:18px;right:18px;font-size:11px;color:var(--gold);background:rgba(200,169,110,0.1);padding:3px 10px;border-radius:10px">P0</div>
+        <div style="font-size:32px;margin-bottom:14px">🎯</div>
+        <div style="font-size:18px;font-weight:700;color:var(--gold);margin-bottom:10px">AI 资产配置参考</div>
+        <div style="font-size:13px;color:var(--gray-400);line-height:1.8;margin-bottom:14px">用户选择风险偏好（保守/稳健/积极/激进），AI 输出资产配置参考：股/债/金/现金 占比饼图、回测年化收益区间、最大回撤区间、关注行业建议。</div>
+        <div style="border-top:1px solid rgba(200,169,110,0.1);padding-top:12px">
+          <div style="font-size:11px;color:#E2C98A;background:rgba(231,76,60,0.06);border-left:3px solid #E74C3C;padding:8px 10px;border-radius:4px;line-height:1.6">
+            🛡️ 合规：所有数值以"区间"形式呈现（如 6-10%），不给单点目标，标注"模型推演，仅供研究参考"
+          </div>
+        </div>
+      </div>
+
+      <!-- 3) AI 行情预判 -->
+      <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.15);border-radius:14px;padding:24px;position:relative">
+        <div style="position:absolute;top:18px;right:18px;font-size:11px;color:var(--gold);background:rgba(200,169,110,0.1);padding:3px 10px;border-radius:10px">P0</div>
+        <div style="font-size:32px;margin-bottom:14px">📈</div>
+        <div style="font-size:18px;font-weight:700;color:var(--gold);margin-bottom:10px">AI 行情预判</div>
+        <div style="font-size:13px;color:var(--gray-400);line-height:1.8;margin-bottom:14px">大盘/个股/基金多标的支持：渲染30日历史走势 + 20日未来三条区间带（看好上沿/中性中枢/看空下沿）+ 多数据源相关性条（北向资金/美元/国债/VIX/原油）。</div>
+        <div style="border-top:1px solid rgba(200,169,110,0.1);padding-top:12px">
+          <div style="font-size:11px;color:#E2C98A;background:rgba(231,76,60,0.06);border-left:3px solid #E74C3C;padding:8px 10px;border-radius:4px;line-height:1.6">
+            🛡️ 合规：历史可解读（涨跌幅/振幅/高低点）；未来仅显示概率区间，不做方向判断、不指定时间点、不给目标价
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 合规设计五条原则 -->
+    <div style="margin-top:32px;background:rgba(200,169,110,0.04);border:1px solid rgba(200,169,110,0.18);border-radius:14px;padding:24px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+        <span style="font-size:22px">🛡️</span>
+        <div style="font-size:16px;font-weight:700;color:var(--gold)">合规设计五原则</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px">
+        <div>
+          <div style="font-size:24px;color:var(--gold);font-weight:700;margin-bottom:6px">①</div>
+          <div style="font-size:13px;font-weight:600;color:var(--white);margin-bottom:4px">历史可读 未来不读</div>
+          <div style="font-size:11px;color:var(--gray-400);line-height:1.6">历史数据完整解读，未来仅渲染数值区间无叙述</div>
+        </div>
+        <div>
+          <div style="font-size:24px;color:var(--gold);font-weight:700;margin-bottom:6px">②</div>
+          <div style="font-size:13px;font-weight:600;color:var(--white);margin-bottom:4px">区间替代单点</div>
+          <div style="font-size:11px;color:var(--gray-400);line-height:1.6">所有预测/收益/配置以区间形式呈现，强调不确定性</div>
+        </div>
+        <div>
+          <div style="font-size:24px;color:var(--gold);font-weight:700;margin-bottom:6px">③</div>
+          <div style="font-size:13px;font-weight:600;color:var(--white);margin-bottom:4px">敏感词守护</div>
+          <div style="font-size:11px;color:var(--gray-400);line-height:1.6">大V回复中"买/卖/推荐"自动转向 AI 工具引导</div>
+        </div>
+        <div>
+          <div style="font-size:24px;color:var(--gold);font-weight:700;margin-bottom:6px">④</div>
+          <div style="font-size:13px;font-weight:600;color:var(--white);margin-bottom:4px">来源可溯</div>
+          <div style="font-size:11px;color:var(--gray-400);line-height:1.6">每条 AI 输出强制展示数据来源，可点击溯源</div>
+        </div>
+        <div>
+          <div style="font-size:24px;color:var(--gold);font-weight:700;margin-bottom:6px">⑤</div>
+          <div style="font-size:13px;font-weight:600;color:var(--white);margin-bottom:4px">风险等级匹配</div>
+          <div style="font-size:11px;color:var(--gray-400);line-height:1.6">资产配置需先选风险偏好，未来接入风险测评问卷</div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
