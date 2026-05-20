@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>冈底斯 — 运营管理中心</title>
 <link rel="stylesheet" href="/static/css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   .toggle-wrap { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
   .toggle-label { font-size:13px; color:var(--gray-300,#ccc); flex:1; }
@@ -67,6 +68,12 @@
   .rank-2 { background:#a0a0a0; color:#0D1B2A; }
   .rank-3 { background:#cd7f32; color:#0D1B2A; }
   .rank-n { background:rgba(255,255,255,0.08); color:#8899aa; }
+  .audit-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:20px; }
+  .audit-table { width:100%; border-collapse:collapse; }
+  .audit-table th, .audit-table td { padding:10px 12px; border-bottom:1px solid rgba(200,169,110,0.08); font-size:12px; }
+  .audit-table th { color:#9A9590; background:rgba(200,169,110,0.06); text-align:left; }
+  .audit-table td { color:#D8D4CC; }
+  .audit-chart-wrap { height:280px; }
 </style>
 </head>
 <body>
@@ -131,6 +138,9 @@
         <div class="admin-nav-group-title">系统</div>
         <div class="admin-nav-item" onclick="showSection('settings')">
           <span class="admin-nav-icon">&#9965;</span> 系统设置
+        </div>
+        <div class="admin-nav-item" onclick="showSection('access')">
+          <span class="admin-nav-icon">&#128737;</span> 访问审计
         </div>
       </div>
     </nav>
@@ -1511,6 +1521,32 @@
         </div>
       </div><!-- end section-settings -->
 
+      <!-- ===== ACCESS AUDIT ===== -->
+      <div id="section-access" style="display:none">
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-label">总访问量</div><div class="stat-value" id="audit-total">{{ access_stats.summary.total }}</div></div>
+          <div class="stat-card"><div class="stat-label">独立 IP</div><div class="stat-value" id="audit-unique">{{ access_stats.summary.unique_ips }}</div></div>
+          <div class="stat-card"><div class="stat-label">今日访问</div><div class="stat-value" id="audit-today">{{ access_stats.summary.today }}</div></div>
+          <div class="stat-card"><div class="stat-label">热门路径数</div><div class="stat-value" id="audit-paths">{{ access_stats.summary.paths }}</div></div>
+        </div>
+        <div class="charts-grid" style="margin-bottom:20px">
+          <div class="chart-card"><div class="chart-title">近14日访问趋势</div><div class="chart-subtitle">按日期统计访问量</div><div class="audit-chart-wrap"><canvas id="auditDailyChart"></canvas></div></div>
+          <div class="chart-card"><div class="chart-title">访问路径分布</div><div class="chart-subtitle">最常访问页面 Top 10</div><div class="audit-chart-wrap"><canvas id="auditPathChart"></canvas></div></div>
+        </div>
+        <div class="charts-grid" style="margin-bottom:20px">
+          <div class="chart-card"><div class="chart-title">访问 IP 排行</div><div class="chart-subtitle">外部用户访问频次 Top 10</div><div class="audit-chart-wrap"><canvas id="auditIpChart"></canvas></div></div>
+          <div class="chart-card">
+            <div class="chart-title">访问明细</div><div class="chart-subtitle">最近 50 条记录</div>
+            <div style="overflow-x:auto;margin-top:10px">
+              <table class="audit-table">
+                <thead><tr><th>时间</th><th>IP</th><th>路径</th><th>方法</th><th>状态</th></tr></thead>
+                <tbody id="audit-log-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div><!-- end section-access -->
+
     </div><!-- end admin-content -->
   </div><!-- end admin-main -->
 </div><!-- end admin-layout -->
@@ -1519,7 +1555,7 @@
 const sectionTitles = {
   overview:'运营概览', users:'用户列表', segments:'用户分层', points:'积分管理',
   kols:'KOL合伙人管理', commission:'收益结算', community:'帖子审核',
-  events:'活动管理', hermes:'Hermes使用统计', channels:'渠道管理', settings:'系统设置'
+  events:'活动管理', hermes:'Hermes使用统计', channels:'渠道管理', settings:'系统设置', access:'访问审计'
 };
 function showSection(name) {
   document.querySelectorAll('[id^="section-"]').forEach(s => s.style.display = 'none');
@@ -1534,6 +1570,40 @@ function showToast(msg) {
   t.textContent = msg || '操作成功';
   document.body.appendChild(t);
   setTimeout(() => { t.style.opacity='0'; setTimeout(() => t.remove(), 300); }, 2000);
+}
+
+async function renderAccessAudit() {
+  const res = await fetch('/api/admin/access-stats');
+  if (!res.ok) return;
+  const data = await res.json();
+  const dailyCtx = document.getElementById('auditDailyChart');
+  const pathCtx = document.getElementById('auditPathChart');
+  const ipCtx = document.getElementById('auditIpChart');
+  const logBody = document.getElementById('audit-log-body');
+  if (dailyCtx) {
+    new Chart(dailyCtx, {
+      type: 'line',
+      data: { labels: data.daily_counts.map(i => i.day.slice(5)), datasets: [{ label: '访问量', data: data.daily_counts.map(i => i.count), borderColor: '#C8A96E', backgroundColor: 'rgba(200,169,110,0.12)', fill: true, tension: 0.35 }] },
+      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color:'#F8F6F0' } } }, scales:{ x:{ ticks:{ color:'#9A9590' } }, y:{ ticks:{ color:'#9A9590' } } } }
+    });
+  }
+  if (pathCtx) {
+    new Chart(pathCtx, {
+      type: 'bar',
+      data: { labels: data.top_paths.map(i => i.path), datasets: [{ label: '次数', data: data.top_paths.map(i => i.count), backgroundColor: 'rgba(52,152,219,0.6)', borderColor: '#3498DB', borderWidth: 1 }] },
+      options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color:'#9A9590' } }, y:{ ticks:{ color:'#F8F6F0' } } } }
+    });
+  }
+  if (ipCtx) {
+    new Chart(ipCtx, {
+      type: 'bar',
+      data: { labels: data.top_ips.map(i => i.ip), datasets: [{ label: '次数', data: data.top_ips.map(i => i.count), backgroundColor: 'rgba(46,204,113,0.6)', borderColor: '#2ECC71', borderWidth: 1 }] },
+      options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color:'#9A9590' } }, y:{ ticks:{ color:'#F8F6F0' } } } }
+    });
+  }
+  if (logBody) {
+    logBody.innerHTML = data.recent_logs.map(r => `<tr><td>${r.created_at}</td><td>${r.ip}</td><td>${r.path}</td><td>${r.method}</td><td>${r.status_code}</td></tr>`).join('');
+  }
 }
 
 // ── Events rich client ──
@@ -1601,6 +1671,12 @@ function evUpdatePreview() {
   const txt = document.getElementById('ev-editor').innerText || '';
   document.getElementById('ev-char-count').textContent = txt.length;
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.getElementById('section-access')) {
+    renderAccessAudit();
+  }
+});
 </script>
 </body>
 </html>

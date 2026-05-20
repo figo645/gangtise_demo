@@ -1,5 +1,6 @@
 import os
-from flask import Flask, render_template, jsonify, request, session, redirect, url_for
+import sqlite3
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for, g
 import random
 from datetime import datetime, timedelta
 from urllib.parse import urlsplit
@@ -14,6 +15,7 @@ app.config.update(
 
 AUTH_PASSWORD = os.environ.get("GANGTISE_DEMO_PASSWORD", "gangtise")
 AUTH_SESSION_KEY = "gangtise_auth"
+DB_PATH = os.environ.get("GANGTISE_DEMO_DB", os.path.join(os.path.dirname(__file__), "gangtise_demo.db"))
 
 # Mock data
 CHANNELS = ["微信生态", "抖音", "微博", "小红书", "直接流量"]
@@ -86,6 +88,41 @@ def gen_user_segments():
     ]
 
 
+def init_db():
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS access_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ip TEXT NOT NULL,
+                path TEXT NOT NULL,
+                method TEXT NOT NULL,
+                status_code INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                user_agent TEXT,
+                referrer TEXT
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_access_logs_created_at ON access_logs(created_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_access_logs_ip ON access_logs(ip)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_access_logs_path ON access_logs(path)")
+
+
+def get_db():
+    if "db" not in g:
+        g.db = sqlite3.connect(DB_PATH)
+        g.db.row_factory = sqlite3.Row
+    return g.db
+
+
+@app.teardown_appcontext
+def close_db(exc):
+    db = g.pop("db", None)
+    if db is not None:
+        db.close()
+
+
 def is_authenticated():
     return session.get(AUTH_SESSION_KEY) is True
 
@@ -101,6 +138,46 @@ def safe_next_target(target):
     return target
 
 
+def get_client_ip():
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    real_ip = request.headers.get("X-Real-IP", "")
+    if real_ip:
+        return real_ip.strip()
+    return request.remote_addr or "unknown"
+
+
+def should_log_request():
+    return not request.path.startswith("/static/") and not request.path.startswith("/api/")
+
+
+def record_access(response):
+    if not should_log_request():
+        return response
+    try:
+        db = get_db()
+        db.execute(
+            """
+            INSERT INTO access_logs (ip, path, method, status_code, created_at, user_agent, referrer)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                get_client_ip(),
+                request.path,
+                request.method,
+                response.status_code,
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                request.headers.get("User-Agent", ""),
+                request.headers.get("Referer", ""),
+            ),
+        )
+        db.commit()
+    except Exception:
+        app.logger.exception("Failed to write access log")
+    return response
+
+
 @app.before_request
 def require_password_gate():
     public_paths = {"/login", "/unlock", "/logout"}
@@ -111,6 +188,11 @@ def require_password_gate():
     if request.path.startswith("/api/"):
         return jsonify({"success": False, "error": "auth_required"}), 401
     return redirect(url_for("login", next=safe_next_target(request.full_path.rstrip("?"))))
+
+
+@app.after_request
+def log_access(response):
+    return record_access(response)
 
 # Routes
 @app.route("/login", methods=["GET"])
@@ -150,7 +232,8 @@ def h5():
 def admin():
     kols = gen_kol_data()
     segments = gen_user_segments()
-    return render_template("admin.html", kols=kols, segments=segments)
+    access_stats = get_access_summary()
+    return render_template("admin.html", kols=kols, segments=segments, access_stats=access_stats)
 
 @app.route("/dashboard")
 def dashboard():
@@ -180,6 +263,85 @@ def api_segments():
 @app.route("/api/market")
 def api_market():
     return jsonify(gen_market_data())
+
+
+def get_access_summary():
+    db = get_db()
+    total = db.execute("SELECT COUNT(*) AS c FROM access_logs").fetchone()["c"]
+    unique_ips = db.execute("SELECT COUNT(DISTINCT ip) AS c FROM access_logs").fetchone()["c"]
+    today = datetime.now().strftime("%Y-%m-%d")
+    today_count = db.execute(
+        "SELECT COUNT(*) AS c FROM access_logs WHERE created_at >= ?",
+        (f"{today} 00:00:00",),
+    ).fetchone()["c"]
+    path_rows = db.execute(
+        """
+        SELECT path, COUNT(*) AS c
+        FROM access_logs
+        GROUP BY path
+        ORDER BY c DESC, path ASC
+        LIMIT 10
+        """
+    ).fetchall()
+    ip_rows = db.execute(
+        """
+        SELECT ip, COUNT(*) AS c
+        FROM access_logs
+        GROUP BY ip
+        ORDER BY c DESC, ip ASC
+        LIMIT 10
+        """
+    ).fetchall()
+    daily_rows = db.execute(
+        """
+        SELECT substr(created_at, 1, 10) AS day, COUNT(*) AS c
+        FROM access_logs
+        GROUP BY day
+        ORDER BY day DESC
+        LIMIT 14
+        """
+    ).fetchall()
+    recent_rows = db.execute(
+        """
+        SELECT ip, path, method, status_code, created_at
+        FROM access_logs
+        ORDER BY id DESC
+        LIMIT 50
+        """
+    ).fetchall()
+    return {
+        "summary": {
+            "total": total,
+            "unique_ips": unique_ips,
+            "today": today_count,
+            "paths": len(path_rows),
+        },
+        "top_paths": [{"path": r["path"], "count": r["c"]} for r in path_rows],
+        "top_ips": [{"ip": r["ip"], "count": r["c"]} for r in ip_rows],
+        "daily_counts": [{"day": r["day"], "count": r["c"]} for r in reversed(daily_rows)],
+        "recent_logs": [dict(r) for r in recent_rows],
+    }
+
+
+@app.route("/api/admin/access-stats")
+def api_admin_access_stats():
+    return jsonify(get_access_summary())
+
+
+@app.route("/api/admin/access-logs")
+def api_admin_access_logs():
+    limit = min(int(request.args.get("limit", 50)), 200)
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT ip, path, method, status_code, created_at, user_agent, referrer
+        FROM access_logs
+        ORDER BY id DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    return jsonify([dict(r) for r in rows])
 
 @app.route("/api/ai-analysis", methods=["POST"])
 def api_ai_analysis():
@@ -649,6 +811,8 @@ def api_kol_reply():
 @app.route("/prd")
 def prd():
     return render_template("prd.html")
+
+init_db()
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
