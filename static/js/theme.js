@@ -2,12 +2,19 @@
   const THEME_KEY = 'gangtise_theme_mode';
   const ACCENT_KEY = 'gangtise_theme_accent';
 
+  function emitThemeChange(mode, accent) {
+    document.dispatchEvent(new CustomEvent('gangtise:themechange', {
+      detail: { mode, accent }
+    }));
+  }
+
   function applyTheme(mode, accent) {
     const body = document.body;
     if (!body) return;
     body.classList.remove('theme-light', 'theme-dark');
     body.classList.add(mode === 'dark' ? 'theme-dark' : 'theme-light');
     body.dataset.accent = accent || 'blue';
+    emitThemeChange(mode, accent || 'blue');
   }
 
   function initGangtiseTheme() {

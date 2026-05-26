@@ -3,41 +3,46 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>冈底斯金融科技 · 产品需求文档</title>
+<title>洞见智研金融科技 · 产品需求文档</title>
+<link rel="stylesheet" href="/static/css/style.css">
+<script>
+  window.SITE_CONFIG = {{ site_config | tojson }};
+</script>
+<script src="/static/js/theme.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{display:flex;flex-direction:column;min-height:100vh;background:#0D1B2A;color:#F8F6F0;font-family:'PingFang SC','Helvetica Neue',Arial,sans-serif;font-size:14px;line-height:1.6}
-a{color:#C8A96E;text-decoration:none}
-a:hover{color:#E2C98A}
-.prd-header{position:sticky;top:0;z-index:100;background:rgba(13,27,42,0.95);border-bottom:1px solid rgba(200,169,110,0.15);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(10px)}
+body{display:flex;flex-direction:column;min-height:100vh;background:var(--surface);color:var(--text-main);font-family:'PingFang SC','Helvetica Neue',Arial,sans-serif;font-size:14px;line-height:1.6}
+a{color:var(--gold);text-decoration:none}
+a:hover{color:var(--gold-light)}
+.prd-header{position:sticky;top:0;z-index:100;background:color-mix(in srgb, var(--surface) 92%, transparent);border-bottom:1px solid rgba(200,169,110,0.15);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(10px)}
 .prd-header-left{display:flex;align-items:center;gap:16px}
-.prd-header-title{font-size:16px;font-weight:700;color:#C8A96E;letter-spacing:1px}
-.prd-header-version{font-size:12px;color:#9A9590;background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.15);border-radius:4px;padding:2px 8px}
+.prd-header-title{font-size:16px;font-weight:700;color:var(--gold);letter-spacing:1px}
+.prd-header-version{font-size:12px;color:var(--text-sub);background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.15);border-radius:4px;padding:2px 8px}
 .prd-header-right{display:flex;align-items:center;gap:12px}
-.btn-back{font-size:13px;color:#9A9590;transition:color 0.2s}
-.btn-back:hover{color:#C8A96E}
-.btn-pdf{background:rgba(200,169,110,0.1);border:1px solid rgba(200,169,110,0.3);color:#C8A96E;padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer;transition:all 0.2s}
+.btn-back{font-size:13px;color:var(--text-sub);transition:color 0.2s}
+.btn-back:hover{color:var(--gold)}
+.btn-pdf{background:rgba(200,169,110,0.1);border:1px solid rgba(200,169,110,0.3);color:var(--gold);padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer;transition:all 0.2s}
 .btn-pdf:hover{background:rgba(200,169,110,0.2)}
 .prd-body{display:flex;flex:1}
-.prd-sidebar{width:240px;position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto;background:#1A2E45;border-right:1px solid rgba(200,169,110,0.1);padding:20px 0;flex-shrink:0}
+.prd-sidebar{width:240px;position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto;background:var(--surface-2);border-right:1px solid rgba(200,169,110,0.1);padding:20px 0;flex-shrink:0}
 .prd-sidebar::-webkit-scrollbar{width:4px}
 .prd-sidebar::-webkit-scrollbar-track{background:transparent}
 .prd-sidebar::-webkit-scrollbar-thumb{background:rgba(200,169,110,0.2);border-radius:2px}
-.prd-toc-header{padding:0 20px 12px;font-size:11px;color:#9A9590;letter-spacing:2px;text-transform:uppercase}
-.prd-toc-item{padding:8px 20px;font-size:13px;color:#9A9590;cursor:pointer;border-left:3px solid transparent;transition:all 0.2s;display:flex;align-items:center}
-.prd-toc-item:hover,.prd-toc-item.active{color:#C8A96E;border-left-color:#C8A96E;background:rgba(200,169,110,0.05)}
-.prd-toc-num{font-size:11px;color:#C8A96E;margin-right:8px;min-width:20px}
+.prd-toc-header{padding:0 20px 12px;font-size:11px;color:var(--text-sub);letter-spacing:2px;text-transform:uppercase}
+.prd-toc-item{padding:8px 20px;font-size:13px;color:var(--text-sub);cursor:pointer;border-left:3px solid transparent;transition:all 0.2s;display:flex;align-items:center}
+.prd-toc-item:hover,.prd-toc-item.active{color:var(--gold);border-left-color:var(--gold);background:rgba(200,169,110,0.05)}
+.prd-toc-num{font-size:11px;color:var(--gold);margin-right:8px;min-width:20px}
 .prd-content{flex:1;padding:40px 60px;max-width:960px}
 .prd-section{margin-bottom:64px;scroll-margin-top:80px}
-.prd-section-num{font-size:11px;color:#C8A96E;letter-spacing:3px;margin-bottom:6px;text-transform:uppercase}
-.prd-section-title{font-size:26px;font-weight:700;color:#F8F6F0;margin-bottom:8px}
-.prd-divider{width:40px;height:3px;background:linear-gradient(90deg,#A8893E,#E2C98A);border-radius:2px;margin-bottom:24px}
-.prd-section-desc{font-size:14px;color:#9A9590;line-height:1.8;margin-bottom:24px}
+.prd-section-num{font-size:11px;color:var(--gold);letter-spacing:3px;margin-bottom:6px;text-transform:uppercase}
+.prd-section-title{font-size:26px;font-weight:700;color:var(--text-main);margin-bottom:8px}
+.prd-divider{width:40px;height:3px;background:linear-gradient(90deg,var(--gold-dark),var(--gold-light));border-radius:2px;margin-bottom:24px}
+.prd-section-desc{font-size:14px;color:var(--text-sub);line-height:1.8;margin-bottom:24px}
 .prd-sub{margin-bottom:32px}
-.prd-sub-title{font-size:16px;font-weight:600;color:#C8A96E;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid rgba(200,169,110,0.15)}
+.prd-sub-title{font-size:16px;font-weight:600;color:var(--gold);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid rgba(200,169,110,0.15)}
 .prd-table{width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13px}
-.prd-table th{background:rgba(200,169,110,0.08);padding:10px 14px;text-align:left;color:#9A9590;font-weight:500;border-bottom:1px solid rgba(200,169,110,0.12)}
-.prd-table td{padding:10px 14px;border-bottom:1px solid rgba(200,169,110,0.06);color:#D8D4CC;vertical-align:top}
+.prd-table th{background:rgba(200,169,110,0.08);padding:10px 14px;text-align:left;color:var(--text-sub);font-weight:500;border-bottom:1px solid rgba(200,169,110,0.12)}
+.prd-table td{padding:10px 14px;border-bottom:1px solid rgba(200,169,110,0.06);color:var(--text-main);vertical-align:top}
 .prd-table tr:hover td{background:rgba(200,169,110,0.03)}
 .p0{background:rgba(231,76,60,0.15);color:#E74C3C;padding:1px 8px;border-radius:4px;font-size:11px;font-weight:600}
 .p1{background:rgba(200,169,110,0.15);color:#C8A96E;padding:1px 8px;border-radius:4px;font-size:11px;font-weight:600}
@@ -47,40 +52,40 @@ a:hover{color:#E2C98A}
 .check{color:#2ECC71}
 .cross{color:#E74C3C}
 .partial{color:#C8A96E}
-.flow-box{background:#1A2E45;border:1px solid rgba(200,169,110,0.3);border-radius:8px;padding:8px 16px;font-size:13px;color:#F8F6F0;text-align:center;display:inline-block;white-space:nowrap}
+.flow-box{background:var(--surface);border:1px solid rgba(200,169,110,0.3);border-radius:8px;padding:8px 16px;font-size:13px;color:var(--text-main);text-align:center;display:inline-block;white-space:nowrap}
 .flow-box.entry{border-color:#3498DB;background:rgba(52,152,219,0.1);color:#63B3ED}
 .flow-box.action{border-color:#C8A96E;background:rgba(200,169,110,0.1);color:#C8A96E;font-weight:600}
 .flow-box.success{border-color:#2ECC71;background:rgba(46,204,113,0.1);color:#2ECC71}
 .flow-box.modal{border-color:#9B59B6;background:rgba(155,89,182,0.1);color:#BB8FCE;border-style:dashed}
 .flow-arrow{color:#C8A96E;font-size:16px;margin:0 8px}
 .flow-arrow-down{color:#C8A96E;font-size:16px;text-align:center;display:block;margin:6px 0}
-.info-card{background:#1A2E45;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:16px 20px;margin-bottom:12px}
-.info-card-title{font-size:13px;font-weight:600;color:#C8A96E;margin-bottom:8px}
-.info-card-body{font-size:13px;color:#D8D4CC;line-height:1.7}
-.highlight-box{background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.2);border-left:3px solid #C8A96E;border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#D8D4CC;line-height:1.7}
+.info-card{background:var(--navy-mid);border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:16px 20px;margin-bottom:12px}
+.info-card-title{font-size:13px;font-weight:600;color:var(--gold);margin-bottom:8px}
+.info-card-body{font-size:13px;color:var(--text-main);line-height:1.7}
+.highlight-box{background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.2);border-left:3px solid var(--gold);border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--text-main);line-height:1.7}
 .roadmap{display:flex;gap:0;overflow-x:auto;padding-bottom:8px}
 .roadmap-item{flex-shrink:0;width:200px;padding-right:16px}
 .roadmap-line{height:3px;background:linear-gradient(90deg,#A8893E,#C8A96E);margin:12px 0;position:relative}
 .roadmap-dot{width:12px;height:12px;border-radius:50%;background:#C8A96E;position:absolute;top:-4px;left:0}
-.roadmap-version{font-size:14px;font-weight:700;color:#C8A96E}
-.roadmap-date{font-size:11px;color:#9A9590;margin-bottom:8px}
-.roadmap-feature{font-size:12px;color:#D8D4CC;padding:3px 0}
-.roadmap-feature::before{content:'• ';color:#C8A96E}
-.arch-tree{background:#0D1B2A;border:1px solid rgba(200,169,110,0.1);border-radius:10px;padding:20px;overflow-x:auto}
+.roadmap-version{font-size:14px;font-weight:700;color:var(--gold)}
+.roadmap-date{font-size:11px;color:var(--text-sub);margin-bottom:8px}
+.roadmap-feature{font-size:12px;color:var(--text-main);padding:3px 0}
+.roadmap-feature::before{content:'• ';color:var(--gold)}
+.arch-tree{background:var(--surface-2);border:1px solid rgba(200,169,110,0.1);border-radius:10px;padding:20px;overflow-x:auto}
 .arch-node{display:flex;align-items:center;margin-bottom:6px}
 .arch-indent{color:rgba(200,169,110,0.3);margin-right:4px;white-space:pre;font-size:13px;font-family:monospace}
-.arch-box{background:#1A2E45;border:1px solid rgba(200,169,110,0.2);border-radius:6px;padding:4px 12px;font-size:12px;color:#F8F6F0}
-.arch-box.root{border-color:#C8A96E;color:#C8A96E;font-weight:700;background:rgba(200,169,110,0.08)}
+.arch-box{background:var(--navy-mid);border:1px solid rgba(200,169,110,0.2);border-radius:6px;padding:4px 12px;font-size:12px;color:var(--text-main)}
+.arch-box.root{border-color:var(--gold);color:var(--gold);font-weight:700;background:rgba(200,169,110,0.08)}
 .arch-box.page{border-color:rgba(200,169,110,0.4)}
-.arch-box.sub{border-color:rgba(200,169,110,0.15);color:#9A9590;font-size:11px}
-.arch-route{font-size:10px;color:#9A9590;margin-left:8px;font-family:monospace}
-.flow-grid{background:#0D1B2A;border:1px solid rgba(200,169,110,0.1);border-radius:10px;padding:24px;overflow-x:auto}
+.arch-box.sub{border-color:rgba(200,169,110,0.15);color:var(--text-sub);font-size:11px}
+.arch-route{font-size:10px;color:var(--text-sub);margin-left:8px;font-family:monospace}
+.flow-grid{background:var(--surface-2);border:1px solid rgba(200,169,110,0.1);border-radius:10px;padding:24px;overflow-x:auto}
 .flow-row{display:flex;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px}
 .flow-col{display:flex;flex-direction:column;align-items:center}
 .hermes-steps{display:flex;flex-direction:column;align-items:center;gap:0}
 .hermes-step{display:flex;align-items:center;gap:12px;margin-bottom:4px}
 .hermes-num{width:28px;height:28px;border-radius:50%;background:rgba(200,169,110,0.15);border:1px solid rgba(200,169,110,0.4);display:flex;align-items:center;justify-content:center;font-size:12px;color:#C8A96E;font-weight:700;flex-shrink:0}
-.hermes-box{background:#1A2E45;border:1px solid rgba(200,169,110,0.25);border-radius:8px;padding:10px 20px;font-size:13px;color:#F8F6F0;min-width:200px;text-align:center}
+.hermes-box{background:var(--navy-mid);border:1px solid rgba(200,169,110,0.25);border-radius:8px;padding:10px 20px;font-size:13px;color:var(--text-main);min-width:200px;text-align:center}
 .hermes-box.wide{min-width:320px}
 .hermes-arrow-down{color:#C8A96E;font-size:18px;margin:2px 0 2px 40px}
 .funnel-visual{display:flex;flex-direction:column;align-items:center;gap:2px;padding:16px 0}
@@ -94,11 +99,11 @@ a:hover{color:#E2C98A}
 .tag-green{background:rgba(46,204,113,0.12);color:#2ECC71;border:1px solid rgba(46,204,113,0.2)}
 .tag-red{background:rgba(231,76,60,0.12);color:#E74C3C;border:1px solid rgba(231,76,60,0.2)}
 .metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
-.metric-card{background:#1A2E45;border:1px solid rgba(200,169,110,0.12);border-radius:8px;padding:14px;text-align:center}
-.metric-label{font-size:11px;color:#9A9590;margin-bottom:6px}
-.metric-value{font-size:18px;font-weight:700;color:#C8A96E}
-.metric-sub{font-size:11px;color:#9A9590;margin-top:4px}
-.toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%);background:#1A2E45;border:1px solid rgba(200,169,110,0.3);color:#C8A96E;padding:10px 24px;border-radius:8px;font-size:13px;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none}
+.metric-card{background:var(--navy-mid);border:1px solid rgba(200,169,110,0.12);border-radius:8px;padding:14px;text-align:center}
+.metric-label{font-size:11px;color:var(--text-sub);margin-bottom:6px}
+.metric-value{font-size:18px;font-weight:700;color:var(--gold)}
+.metric-sub{font-size:11px;color:var(--text-sub);margin-top:4px}
+.toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%);background:var(--navy-mid);border:1px solid rgba(200,169,110,0.3);color:var(--gold);padding:10px 24px;border-radius:8px;font-size:13px;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none}
 .toast.show{opacity:1}
 .level-badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:700}
 .lv1{background:rgba(154,149,144,0.15);color:#9A9590}
@@ -107,17 +112,25 @@ a:hover{color:#E2C98A}
 .lv4{background:rgba(200,169,110,0.15);color:#C8A96E}
 .lv5{background:rgba(231,76,60,0.15);color:#E74C3C}
 .lv6{background:rgba(155,89,182,0.15);color:#9B59B6}
+body.theme-light .flow-box.entry{color:#245B96}
+body.theme-light .flow-box.action{color:var(--gold-dark)}
+body.theme-light .flow-box.modal{color:#7A4EA3}
+body.theme-light .hermes-num,
+body.theme-light .funnel-rate-vis{color:var(--text-sub)}
+body.theme-light .funnel-bar-vis{color:#ffffff}
+body.theme-light .tag-gold{color:var(--gold-dark)}
+body.theme-light .lv1{color:var(--text-sub)}
 </style>
 </head>
-<body>
+<body onload="initGangtiseTheme()">
 
 <div class="toast" id="toast">功能开发中，敬请期待</div>
 
 <!-- TOP HEADER -->
 <header class="prd-header">
   <div class="prd-header-left">
-    <span class="prd-header-title">冈底斯 PRD</span>
-    <span class="prd-header-version">v1.0 · 2026-05-20</span>
+    <span class="prd-header-title">洞见智研 PRD</span>
+    <span class="prd-header-version">v1.1 · 2026-05-27</span>
   </div>
   <div class="prd-header-right">
     <a href="/" class="btn-back">← 返回首页</a>
@@ -134,12 +147,12 @@ a:hover{color:#E2C98A}
   <div class="prd-toc-item" onclick="scrollToSection('s2')"><span class="prd-toc-num">02</span>用户角色与权限</div>
   <div class="prd-toc-item" onclick="scrollToSection('s3')"><span class="prd-toc-num">03</span>页面架构与跳转流程</div>
   <div class="prd-toc-item" onclick="scrollToSection('s4')"><span class="prd-toc-num">04</span>H5用户端功能规格</div>
-  <div class="prd-toc-item" onclick="scrollToSection('s5')"><span class="prd-toc-num">05</span>社区功能规格</div>
-  <div class="prd-toc-item" onclick="scrollToSection('s6')"><span class="prd-toc-num">06</span>Hermes AI引擎规格</div>
+  <div class="prd-toc-item" onclick="scrollToSection('s5')"><span class="prd-toc-num">05</span>社区扩展功能规格</div>
+  <div class="prd-toc-item" onclick="scrollToSection('s6')"><span class="prd-toc-num">06</span>Hermes扩展引擎规格</div>
   <div class="prd-toc-item" onclick="scrollToSection('s7')"><span class="prd-toc-num">07</span>中后台管理规格</div>
-  <div class="prd-toc-item" onclick="scrollToSection('s8')"><span class="prd-toc-num">08</span>数据Dashboard规格</div>
-  <div class="prd-toc-item" onclick="scrollToSection('s9')"><span class="prd-toc-num">09</span>积分与算力体系</div>
-  <div class="prd-toc-item" onclick="scrollToSection('s10')"><span class="prd-toc-num">10</span>KOL合伙人体系</div>
+  <div class="prd-toc-item" onclick="scrollToSection('s8')"><span class="prd-toc-num">08</span>后台数据分析规格</div>
+  <div class="prd-toc-item" onclick="scrollToSection('s9')"><span class="prd-toc-num">09</span>积分与算力扩展体系</div>
+  <div class="prd-toc-item" onclick="scrollToSection('s10')"><span class="prd-toc-num">10</span>KOL合伙人扩展体系</div>
   <div class="prd-toc-item" onclick="scrollToSection('s11')"><span class="prd-toc-num">11</span>非功能性需求</div>
   <div class="prd-toc-item" onclick="scrollToSection('s12')"><span class="prd-toc-num">12</span>版本迭代计划</div>
 </nav>
@@ -152,16 +165,16 @@ a:hover{color:#E2C98A}
   <div class="prd-section-num">SECTION 01</div>
   <h2 class="prd-section-title">产品概述</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">冈底斯金融科技（Gangtise Fintech）是面向C端投资者的专业投研数据平台，以AI驱动的证据链赋能投资决策。</p>
+  <p class="prd-section-desc">洞见智研是面向C端投资者的轻量化投研产品，当前以基本面分析、自选股、每日复盘三类高频能力切入，并通过后台控制主题和扩展模块的开放节奏。</p>
 
   <div class="prd-sub">
     <div class="prd-sub-title">基本信息</div>
     <table class="prd-table">
       <tr><th style="width:140px">项目</th><th>内容</th></tr>
-      <tr><td>产品名称</td><td>冈底斯金融科技 · 投研数据平台</td></tr>
-      <tr><td>当前版本</td><td>v1.0</td></tr>
-      <tr><td>文档日期</td><td>2026-05-20</td></tr>
-      <tr><td>产品定位</td><td>面向C端投资者的专业投研数据平台，以AI驱动的证据链赋能投资决策</td></tr>
+      <tr><td>产品名称</td><td>洞见智研金融科技 · 投研数据平台</td></tr>
+      <tr><td>当前版本</td><td>v1.1</td></tr>
+      <tr><td>文档日期</td><td>2026-05-27</td></tr>
+      <tr><td>产品定位</td><td>面向C端投资者的轻量化投研入口，以证据链驱动的研究表达支撑日常观察与复盘</td></tr>
       <tr><td>技术栈</td><td>Flask · Python · HTML5 · CSS3 · JavaScript</td></tr>
     </table>
   </div>
@@ -169,16 +182,16 @@ a:hover{color:#E2C98A}
   <div class="prd-sub">
     <div class="prd-sub-title">核心价值主张</div>
     <div class="info-card">
-      <div class="info-card-title">① 证据链驱动的AI分析</div>
-      <div class="info-card-body">Hermes AI引擎整合研报、专家纪要、另类数据，以结构化证据链输出投资观点，而非单纯的情感判断，帮助投资者建立有据可查的决策依据。</div>
+      <div class="info-card-title">① 研究辅助优先</div>
+      <div class="info-card-body">默认对外只保留基本面分析、自选股、每日复盘三类高频动作，强调研究辅助、低学习成本和稳定表达，不额外堆叠过多复杂能力。</div>
     </div>
     <div class="info-card">
-      <div class="info-card-title">② 专业社区与KOL生态</div>
-      <div class="info-card-body">构建大V认证体系与KOL合伙人机制，形成专业投研内容的生产与分发闭环，通过积分与算力激励优质内容创作。</div>
+      <div class="info-card-title">② 主题一致性与咨询风体验</div>
+      <div class="info-card-body">产品默认采用白底咨询风，并保留深色模式与主题色切换。首页、H5、PRD、admin 共享同一套主题配置，保证文档与产品状态同步。</div>
     </div>
     <div class="info-card">
-      <div class="info-card-title">③ 分层会员与精准变现</div>
-      <div class="info-card-body">四档会员体系（免费/基础/专业/机构VIP）配合积分算力兑换机制，实现从公域流量到付费用户的高效转化漏斗。</div>
+      <div class="info-card-title">③ 后台控开而非一次性放量</div>
+      <div class="info-card-body">社区、Hermes、会员、消息、工作台等能力保留在产品规划内，但默认关闭，由 admin 按运营阶段逐步开启，降低开放风险与运维复杂度。</div>
     </div>
   </div>
 
@@ -186,10 +199,10 @@ a:hover{color:#E2C98A}
     <div class="prd-sub-title">目标用户</div>
     <table class="prd-table">
       <tr><th>用户类型</th><th>特征描述</th><th>核心需求</th><th>规模估算</th></tr>
-      <tr><td>散户投资者</td><td>个人投资者，缺乏专业研究能力</td><td>简单易懂的投资信号与观点</td><td>主要用户群，占比60%</td></tr>
-      <tr><td>专业投资者</td><td>有一定投研经验，需要深度数据</td><td>研报原文、专家纪要、另类数据</td><td>核心付费群体，占比25%</td></tr>
-      <tr><td>KOL内容创作者</td><td>具备专业背景，有粉丝基础</td><td>内容分发渠道与变现机制</td><td>关键生态角色，占比5%</td></tr>
-      <tr><td>机构客户</td><td>私募、券商、资管机构</td><td>API接口、批量数据、定制分析</td><td>高价值客户，占比10%</td></tr>
+      <tr><td>普通投资者</td><td>希望快速获取研究框架，不想面对复杂功能和重交互</td><td>简明分析、自选跟踪、日常复盘</td><td>当前核心目标人群</td></tr>
+      <tr><td>高频跟踪用户</td><td>每天有稳定看盘与记录习惯</td><td>自选维护、主线提炼、日终沉淀</td><td>当前重点留存对象</td></tr>
+      <tr><td>运营管理员</td><td>负责决定对外开放哪些能力与主题策略</td><td>功能开关、主题配置、访问审计、数据分析</td><td>当前关键内部角色</td></tr>
+      <tr><td>社区/KOL/机构用户</td><td>属于后续扩展阶段引入的生态角色</td><td>内容分发、合伙分成、接口服务</td><td>后续阶段拓展</td></tr>
     </table>
   </div>
 
@@ -197,24 +210,24 @@ a:hover{color:#E2C98A}
     <div class="prd-sub-title">核心成功指标</div>
     <div class="metric-grid">
       <div class="metric-card">
-        <div class="metric-label">DAU 目标</div>
-        <div class="metric-value">10,000</div>
-        <div class="metric-sub">v1.0 上线3个月</div>
+        <div class="metric-label">首屏激活率</div>
+        <div class="metric-value">60%+</div>
+        <div class="metric-sub">进入 H5 后完成任一核心动作</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">付费转化率</div>
-        <div class="metric-value">8%</div>
-        <div class="metric-sub">免费→付费</div>
+        <div class="metric-label">自选使用率</div>
+        <div class="metric-value">35%+</div>
+        <div class="metric-sub">首周新增至少1个自选标的</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">月GMV目标</div>
-        <div class="metric-value">50万</div>
-        <div class="metric-sub">v1.0 稳定期</div>
+        <div class="metric-label">复盘完成率</div>
+        <div class="metric-value">25%+</div>
+        <div class="metric-sub">活跃用户当日完成复盘</div>
       </div>
       <div class="metric-card">
-        <div class="metric-label">KOL数量</div>
-        <div class="metric-value">200+</div>
-        <div class="metric-sub">认证KOL合伙人</div>
+        <div class="metric-label">配置一致性</div>
+        <div class="metric-value">100%</div>
+        <div class="metric-sub">首页 / H5 / PRD 与后台配置同步</div>
       </div>
     </div>
   </div>
@@ -225,110 +238,101 @@ a:hover{color:#E2C98A}
   <div class="prd-section-num">SECTION 02</div>
   <h2 class="prd-section-title">用户角色与权限</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">平台定义五种用户角色，权限逐级递增，通过会员订阅与积分体系驱动用户升级。</p>
+  <p class="prd-section-desc">当前版本以“普通用户默认使用三项核心能力 + 管理员后台控开扩展模块”为主。会员、KOL、机构等角色仍保留在规划内，但不作为当前默认开放范围。</p>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">权限矩阵</div>
+    <div class="prd-sub-title">当前版本权限矩阵</div>
     <table class="prd-table">
       <tr>
-        <th>权限项</th>
-        <th>免费用户</th>
-        <th>基础会员</th>
-        <th>专业会员</th>
-        <th>机构VIP</th>
-        <th>KOL合伙人</th>
+        <th>能力 / 角色</th>
+        <th>普通用户</th>
+        <th>管理员</th>
+        <th>扩展模块</th>
+        <th>当前状态</th>
       </tr>
       <tr>
-        <td>信息流访问</td>
-        <td><span class="check">✓</span> 基础</td>
-        <td><span class="check">✓</span> 完整</td>
-        <td><span class="check">✓</span> 完整</td>
-        <td><span class="check">✓</span> 完整</td>
-        <td><span class="check">✓</span> 完整</td>
+        <td>基本面分析</td>
+        <td><span class="check">✓</span></td>
+        <td><span class="check">✓</span></td>
+        <td>否</td>
+        <td>默认开放</td>
       </tr>
       <tr>
-        <td>AI分析次数/日</td>
-        <td>3次</td>
-        <td>20次</td>
-        <td>100次</td>
-        <td>无限制</td>
-        <td>无限制</td>
+        <td>自选股</td>
+        <td><span class="check">✓</span></td>
+        <td><span class="check">✓</span></td>
+        <td>否</td>
+        <td>默认开放</td>
       </tr>
       <tr>
-        <td>研报原文</td>
-        <td><span class="cross">✗</span></td>
-        <td><span class="partial">△</span> 摘要</td>
-        <td><span class="check">✓</span> 完整</td>
-        <td><span class="check">✓</span> 完整</td>
-        <td><span class="check">✓</span> 完整</td>
+        <td>每日复盘</td>
+        <td><span class="check">✓</span></td>
+        <td><span class="check">✓</span></td>
+        <td>否</td>
+        <td>默认开放</td>
       </tr>
       <tr>
-        <td>专家纪要</td>
-        <td><span class="cross">✗</span></td>
-        <td><span class="cross">✗</span></td>
-        <td><span class="check">✓</span></td>
-        <td><span class="check">✓</span></td>
-        <td><span class="check">✓</span></td>
+        <td>主题切换 / 主题色</td>
+        <td><span class="check">✓</span> 本地偏好</td>
+        <td><span class="check">✓</span> 默认配置</td>
+        <td>否</td>
+        <td>已实现</td>
       </tr>
       <tr>
-        <td>另类数据</td>
-        <td><span class="cross">✗</span></td>
-        <td><span class="cross">✗</span></td>
-        <td><span class="partial">△</span> 部分</td>
-        <td><span class="check">✓</span> 完整</td>
-        <td><span class="partial">△</span> 部分</td>
+        <td>社区 / Hermes / 会员 / 消息 / 工作台</td>
+        <td><span class="cross">✗</span> 默认不展示</td>
+        <td><span class="check">✓</span> 可配置</td>
+        <td>是</td>
+        <td>后台控开</td>
       </tr>
       <tr>
-        <td>社区发帖</td>
-        <td><span class="check">✓</span></td>
-        <td><span class="check">✓</span></td>
-        <td><span class="check">✓</span></td>
-        <td><span class="check">✓</span></td>
-        <td><span class="check">✓</span> 置顶权</td>
-      </tr>
-      <tr>
-        <td>Hermes模式数</td>
-        <td>2种</td>
-        <td>4种</td>
-        <td>6种</td>
-        <td>6种+定制</td>
-        <td>6种</td>
-      </tr>
-      <tr>
-        <td>算力/月</td>
-        <td>100</td>
-        <td>500</td>
-        <td>2,000</td>
-        <td>10,000</td>
-        <td>3,000</td>
-      </tr>
-      <tr>
-        <td>直播权限</td>
-        <td><span class="cross">✗</span></td>
-        <td><span class="cross">✗</span></td>
+        <td>admin 数据分析分组</td>
         <td><span class="cross">✗</span></td>
         <td><span class="check">✓</span></td>
-        <td><span class="check">✓</span></td>
-      </tr>
-      <tr>
-        <td>API接口</td>
-        <td><span class="cross">✗</span></td>
-        <td><span class="cross">✗</span></td>
-        <td><span class="cross">✗</span></td>
-        <td><span class="check">✓</span></td>
-        <td><span class="cross">✗</span></td>
+        <td>内部模块</td>
+        <td>已实现</td>
       </tr>
     </table>
   </div>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">会员定价参考</div>
+    <div class="prd-sub-title">扩展角色规划</div>
+    <table class="prd-table">
+      <tr>
+        <th>角色</th>
+        <th>定位</th>
+        <th>主要权益</th>
+        <th>当前阶段</th>
+      </tr>
+      <tr>
+        <td>基础 / 专业会员</td>
+        <td>后续商业化层</td>
+        <td>更多研究深度、更多使用次数、更多专属入口</td>
+        <td>规划中</td>
+      </tr>
+      <tr>
+        <td>KOL合伙人</td>
+        <td>内容生态层</td>
+        <td>内容分发、认证标识、合作分成</td>
+        <td>规划中</td>
+      </tr>
+      <tr>
+        <td>机构VIP / API客户</td>
+        <td>高客单价服务层</td>
+        <td>数据接口、批量分析、定制报告</td>
+        <td>后续阶段</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="prd-sub">
+    <div class="prd-sub-title">扩展商业化定价参考</div>
     <table class="prd-table">
       <tr><th>会员档位</th><th>月费</th><th>年费</th><th>核心权益</th></tr>
-      <tr><td>免费用户</td><td>¥0</td><td>¥0</td><td>基础信息流、每日3次AI分析</td></tr>
-      <tr><td>基础会员</td><td>¥39</td><td>¥299</td><td>完整信息流、研报摘要、每日20次AI</td></tr>
-      <tr><td>专业会员</td><td>¥99</td><td>¥799</td><td>研报原文、专家纪要、全模式Hermes</td></tr>
-      <tr><td>机构VIP</td><td>¥999</td><td>¥8,999</td><td>全部权限、API接口、专属客服</td></tr>
+      <tr><td>普通用户</td><td>¥0</td><td>¥0</td><td>默认开放基本面分析、自选股、每日复盘、我的</td></tr>
+      <tr><td>基础会员</td><td>¥39</td><td>¥299</td><td>扩展研究深度、更多专题内容、更多使用配额</td></tr>
+      <tr><td>专业会员</td><td>¥99</td><td>¥799</td><td>高级研究模块、完整扩展能力、更多个性化服务</td></tr>
+      <tr><td>机构VIP</td><td>¥999</td><td>¥8,999</td><td>接口服务、定制分析、专属支持</td></tr>
     </table>
   </div>
 </section>
@@ -338,37 +342,37 @@ a:hover{color:#E2C98A}
   <div class="prd-section-num">SECTION 03</div>
   <h2 class="prd-section-title">页面架构与跳转流程</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">本节通过可视化图表描述平台整体页面架构、H5端用户跳转路径、Hermes交互流程及社区功能流程。</p>
+  <p class="prd-section-desc">本节聚焦当前版本的真实信息架构，统一描述首页入口、H5当前默认范围、后台控开策略，以及数据分析并入 admin 后的跳转关系。</p>
 
   <!-- 3.1 整体架构图 -->
   <div class="prd-sub">
     <div class="prd-sub-title">3.1 整体页面架构图</div>
     <div class="arch-tree">
-      <div class="arch-node"><span class="arch-indent"></span><span class="arch-box root">冈底斯平台</span><span class="arch-route">gangtise.com</span></div>
+      <div class="arch-node"><span class="arch-indent"></span><span class="arch-box root">洞见智研平台</span><span class="arch-route">品牌域名待配置</span></div>
       <div class="arch-node"><span class="arch-indent">├─ </span><span class="arch-box page">首页</span><span class="arch-route">/</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">H5用户端</span><span class="arch-route">/h5</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">中后台管理</span><span class="arch-route">/admin</span></div>
-      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">数据Dashboard</span><span class="arch-route">/dashboard</span></div>
       <div class="arch-node"><span class="arch-indent">│  └─ </span><span class="arch-box sub">PRD文档</span><span class="arch-route">/prd</span></div>
-      <div class="arch-node" style="margin-top:8px"><span class="arch-indent">├─ </span><span class="arch-box page">H5用户端</span><span class="arch-route">/h5 · 6个Tab</span></div>
-      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">信息流</span><span class="arch-route">Tab 1</span></div>
-      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">社区 [广场/大V/活动]</span><span class="arch-route">Tab 2</span></div>
-      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">Hermes [6种模式]</span><span class="arch-route">Tab 3</span></div>
-      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">行情</span><span class="arch-route">Tab 4</span></div>
-      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">会员</span><span class="arch-route">Tab 5</span></div>
-      <div class="arch-node"><span class="arch-indent">│  └─ </span><span class="arch-box sub">我的</span><span class="arch-route">Tab 6</span></div>
-      <div class="arch-node" style="margin-top:8px"><span class="arch-indent">├─ </span><span class="arch-box page">中后台管理</span><span class="arch-route">/admin · 11个模块</span></div>
+      <div class="arch-node" style="margin-top:8px"><span class="arch-indent">├─ </span><span class="arch-box page">H5用户端</span><span class="arch-route">/h5 · 默认4个底部导航</span></div>
+      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">基本面分析</span><span class="arch-route">默认开放</span></div>
+      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">自选股</span><span class="arch-route">默认开放</span></div>
+      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">每日复盘</span><span class="arch-route">默认开放</span></div>
+      <div class="arch-node"><span class="arch-indent">│  └─ </span><span class="arch-box sub">我的</span><span class="arch-route">默认开放</span></div>
+      <div class="arch-node"><span class="arch-indent">│  └─ </span><span class="arch-box sub">社区 / Hermes / 会员 / 消息 / 工作台</span><span class="arch-route">后台按需开放</span></div>
+      <div class="arch-node" style="margin-top:8px"><span class="arch-indent">├─ </span><span class="arch-box page">中后台管理</span><span class="arch-route">/admin · 运营配置 + 数据分析</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">运营概览</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">用户列表/分层</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">KOL管理/结算</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">内容审核</span></div>
-      <div class="arch-node"><span class="arch-indent">│  └─ </span><span class="arch-box sub">渠道管理</span></div>
-      <div class="arch-node" style="margin-top:8px"><span class="arch-indent">└─ </span><span class="arch-box page">数据Dashboard</span><span class="arch-route">/dashboard · 5个模块</span></div>
+      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">渠道管理</span></div>
+      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">系统设置 / 主题色 / 功能开关</span></div>
+      <div class="arch-node"><span class="arch-indent">│  └─ </span><span class="arch-box sub">访问审计</span></div>
+      <div class="arch-node" style="margin-top:8px"><span class="arch-indent">└─ </span><span class="arch-box page">admin 数据分析分组</span><span class="arch-route">/admin?section=funnel</span></div>
       <div class="arch-node"><span class="arch-indent">   ├─ </span><span class="arch-box sub">转化漏斗</span></div>
       <div class="arch-node"><span class="arch-indent">   ├─ </span><span class="arch-box sub">渠道分析</span></div>
       <div class="arch-node"><span class="arch-indent">   ├─ </span><span class="arch-box sub">KOL效能</span></div>
       <div class="arch-node"><span class="arch-indent">   ├─ </span><span class="arch-box sub">营收趋势</span></div>
-      <div class="arch-node"><span class="arch-indent">   └─ </span><span class="arch-box sub">用户分层</span></div>
+      <div class="arch-node"><span class="arch-indent">   └─ </span><span class="arch-box sub">用户分层分析</span></div>
     </div>
   </div>
 
@@ -382,20 +386,16 @@ a:hover{color:#E2C98A}
         <span class="flow-arrow">→</span>
         <span class="flow-box entry">登录 / 注册</span>
         <span class="flow-arrow">→</span>
-        <span class="flow-box action">首页 · 信息流</span>
+        <span class="flow-box action">首页 · 基本面分析</span>
       </div>
       <!-- Row 2: Tab bar -->
-      <div style="margin:4px 0 4px 0;color:#9A9590;font-size:12px;padding-left:2px">底部导航栏（6 Tab）</div>
+      <div style="margin:4px 0 4px 0;color:var(--text-sub);font-size:12px;padding-left:2px">底部导航栏（默认 4 Tab）</div>
       <div class="flow-row" style="justify-content:flex-start;flex-wrap:wrap;gap:6px;margin-bottom:4px">
-        <span class="flow-box modal">社区</span>
+        <span class="flow-box action">自选股</span>
         <span class="flow-arrow" style="color:#9A9590">↔</span>
-        <span class="flow-box action">首页 · 信息流</span>
+        <span class="flow-box action">首页 · 基本面分析</span>
         <span class="flow-arrow" style="color:#9A9590">↔</span>
-        <span class="flow-box action">Hermes</span>
-        <span class="flow-arrow" style="color:#9A9590">↔</span>
-        <span class="flow-box">行情</span>
-        <span class="flow-arrow" style="color:#9A9590">↔</span>
-        <span class="flow-box">会员</span>
+        <span class="flow-box action">每日复盘</span>
         <span class="flow-arrow" style="color:#9A9590">↔</span>
         <span class="flow-box">我的</span>
       </div>
@@ -403,44 +403,40 @@ a:hover{color:#E2C98A}
       <div class="flow-row" style="justify-content:flex-start;flex-wrap:wrap;gap:24px;margin-bottom:4px;padding-left:4px">
         <div class="flow-col">
           <span style="color:#C8A96E;font-size:14px;margin-bottom:4px">↓</span>
-          <span class="flow-box modal" style="font-size:12px">广场 / 大V / 活动</span>
+          <span class="flow-box" style="font-size:12px">股价 / 涨跌幅 / 板块热度</span>
         </div>
         <div class="flow-col" style="margin-left:80px">
           <span style="color:#C8A96E;font-size:14px;margin-bottom:4px">↓</span>
-          <span class="flow-box action" style="font-size:12px">选择分析模式</span>
+          <span class="flow-box action" style="font-size:12px">阅读核心观点</span>
         </div>
         <div class="flow-col" style="margin-left:40px">
           <span style="color:#C8A96E;font-size:14px;margin-bottom:4px">↓</span>
-          <span class="flow-box success" style="font-size:12px">支付流程</span>
-        </div>
-        <div class="flow-col">
-          <span style="color:#C8A96E;font-size:14px;margin-bottom:4px">↓</span>
-          <span class="flow-box" style="font-size:12px">积分兑换</span>
+          <span class="flow-box success" style="font-size:12px">生成当日复盘</span>
         </div>
       </div>
       <!-- Row 4 -->
       <div class="flow-row" style="justify-content:flex-start;flex-wrap:wrap;gap:24px;margin-bottom:4px;padding-left:4px">
         <div class="flow-col">
           <span style="color:#C8A96E;font-size:14px;margin-bottom:4px">↓</span>
-          <span class="flow-box modal" style="font-size:12px;border-style:dashed">活动详情 Modal</span>
+          <span class="flow-box" style="font-size:12px;border-color:#9A9590;color:var(--text-sub)">加入 / 删除自选</span>
         </div>
         <div class="flow-col" style="margin-left:80px">
           <span style="color:#C8A96E;font-size:14px;margin-bottom:4px">↓</span>
-          <span class="flow-box action" style="font-size:12px">选择分析对象</span>
+          <span class="flow-box action" style="font-size:12px">查看证据链摘要</span>
         </div>
       </div>
       <!-- Row 5 -->
       <div class="flow-row" style="justify-content:flex-start;padding-left:4px;margin-bottom:4px">
         <div class="flow-col" style="margin-left:264px">
           <span style="color:#C8A96E;font-size:14px;margin-bottom:4px">↓</span>
-          <span class="flow-box" style="font-size:12px;border-color:#9A9590;color:#9A9590">AI 分析中…</span>
+          <span class="flow-box success" style="font-size:12px">输出简明分析结果</span>
         </div>
       </div>
       <!-- Row 6 -->
       <div class="flow-row" style="justify-content:flex-start;padding-left:4px;margin-bottom:4px">
         <div class="flow-col" style="margin-left:264px">
           <span style="color:#C8A96E;font-size:14px;margin-bottom:4px">↓</span>
-          <span class="flow-box success" style="font-size:12px">结构化分析结果</span>
+          <span class="flow-box" style="font-size:12px">收藏到自选 / 继续复盘</span>
         </div>
       </div>
       <!-- Row 7 -->
@@ -448,9 +444,9 @@ a:hover{color:#E2C98A}
         <div class="flow-col" style="margin-left:264px">
           <span style="color:#C8A96E;font-size:14px;margin-bottom:4px">↓</span>
           <div style="display:flex;align-items:center;gap:8px">
-            <span class="flow-box action" style="font-size:12px">快捷追问</span>
+            <span class="flow-box action" style="font-size:12px">切换主题</span>
             <span class="flow-arrow" style="color:#9A9590">↔</span>
-            <span class="flow-box modal" style="font-size:12px">分享到社区</span>
+            <span class="flow-box modal" style="font-size:12px">等待后台开放更多模块</span>
           </div>
         </div>
       </div>
@@ -459,52 +455,38 @@ a:hover{color:#E2C98A}
 
   <!-- 3.3 Hermes交互流程 -->
   <div class="prd-sub">
-    <div class="prd-sub-title">3.3 Hermes 交互流程图</div>
+    <div class="prd-sub-title">3.3 后台主题与功能开放流程</div>
     <div class="flow-grid">
       <div class="hermes-steps">
         <div class="hermes-step">
           <div class="hermes-num">1</div>
-          <div class="hermes-box entry">用户进入 Hermes 页面</div>
+          <div class="hermes-box entry">管理员进入系统设置</div>
         </div>
         <div class="hermes-arrow-down">↓</div>
         <div class="hermes-step">
           <div class="hermes-num">2</div>
           <div class="hermes-box wide action">
-            选择分析模式（6种横向展示）<br>
-            <span style="font-size:11px;color:#9A9590;font-weight:400">宏观 · 行业 · 个股 · 事件 · 量化 · 自由</span>
+            设定默认主题模式与主题色<br>
+            <span style="font-size:11px;color:var(--text-sub);font-weight:400">浅色默认 · 深色保留 · 蓝 / 绿 / slate / amber</span>
           </div>
         </div>
         <div class="hermes-arrow-down">↓</div>
         <div class="hermes-step">
           <div class="hermes-num">3</div>
           <div class="hermes-box wide">
-            选择分析对象（2×2 按钮网格）<br>
-            <span style="font-size:11px;color:#9A9590">A股 · 港股 · 美股 · 大宗商品</span>
+            配置功能开关<br>
+            <span style="font-size:11px;color:var(--text-sub)">默认开放：基本面分析 / 自选股 / 每日复盘</span>
           </div>
         </div>
         <div class="hermes-arrow-down">↓</div>
         <div class="hermes-step">
           <div class="hermes-num">4</div>
-          <div class="hermes-box" style="border-color:#9A9590;color:#9A9590">AI 分析中… （Loading 动画）</div>
+          <div class="hermes-box wide modal">按阶段开放社区 / Hermes / 会员 / 消息 / 工作台</div>
         </div>
         <div class="hermes-arrow-down">↓</div>
         <div class="hermes-step">
           <div class="hermes-num">5</div>
-          <div class="hermes-box wide success">结构化结果输出（气泡卡片展示）</div>
-        </div>
-        <div class="hermes-arrow-down">↓</div>
-        <div class="hermes-step">
-          <div class="hermes-num">6</div>
-          <div style="display:flex;align-items:center;gap:12px">
-            <div class="hermes-box action">快捷追问</div>
-            <span style="color:#C8A96E;font-size:16px">↔</span>
-            <div class="hermes-box modal">分享到社区</div>
-          </div>
-        </div>
-        <div class="hermes-arrow-down">↓</div>
-        <div class="hermes-step">
-          <div class="hermes-num">7</div>
-          <div class="hermes-box wide">自由输入（Chat Input 框）</div>
+          <div class="hermes-box wide success">H5 与 PRD 统一按当前配置展示</div>
         </div>
       </div>
     </div>
@@ -512,37 +494,27 @@ a:hover{color:#E2C98A}
 
   <!-- 3.4 社区功能流程 -->
   <div class="prd-sub">
-    <div class="prd-sub-title">3.4 社区功能流程图</div>
+    <div class="prd-sub-title">3.4 首页与后台数据分析入口关系</div>
     <div class="flow-grid">
       <div class="flow-row" style="justify-content:flex-start;margin-bottom:8px">
-        <span class="flow-box entry">进入社区</span>
+        <span class="flow-box entry">首页点击“中后台管理”</span>
         <span class="flow-arrow">→</span>
-        <span class="flow-box">广场 Tab</span>
+        <span class="flow-box">进入 /admin</span>
         <span class="flow-arrow">→</span>
-        <span class="flow-box action">发布帖子</span>
+        <span class="flow-box action">侧边导航查看运营模块</span>
         <span class="flow-arrow">→</span>
-        <span class="flow-box" style="border-color:#9A9590;color:#9A9590">内容审核</span>
-        <span class="flow-arrow">→</span>
-        <span class="flow-box success">发布成功 +积分</span>
+        <span class="flow-box success">同一后台内切到“数据分析”分组</span>
       </div>
       <div class="flow-row" style="justify-content:flex-start;margin-bottom:8px">
-        <span class="flow-box">广场 Tab</span>
+        <span class="flow-box entry">首页点击“后台数据分析”</span>
         <span class="flow-arrow">→</span>
-        <span class="flow-box">大V列表</span>
+        <span class="flow-box">跳转 /admin?section=funnel</span>
         <span class="flow-arrow">→</span>
-        <span class="flow-box action">大V详情页</span>
+        <span class="flow-box action">直接落在数据分析分组</span>
         <span class="flow-arrow">→</span>
-        <span class="flow-box modal">关注 / 订阅</span>
+        <span class="flow-box success">无需再进入独立分析页</span>
       </div>
-      <div class="flow-row" style="justify-content:flex-start">
-        <span class="flow-box">活动 Tab</span>
-        <span class="flow-arrow">→</span>
-        <span class="flow-box">活动列表</span>
-        <span class="flow-arrow">→</span>
-        <span class="flow-box modal" style="border-style:dashed">活动详情 Modal</span>
-        <span class="flow-arrow">→</span>
-        <span class="flow-box success">参与 +积分奖励</span>
-      </div>
+      <div style="margin-top:8px;font-size:12px;color:var(--text-sub)">结论：首页保留两个入口是为了缩短访问路径，但后台内部只保留一套 admin 导航和一套数据分析内容结构。</div>
     </div>
   </div>
 
@@ -583,60 +555,49 @@ a:hover{color:#E2C98A}
   <div class="prd-section-num">SECTION 04</div>
   <h2 class="prd-section-title">H5用户端功能规格</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">H5端为平台核心用户界面，包含6个主Tab，覆盖信息消费、社区互动、AI分析、行情数据、会员管理及个人中心全链路。</p>
+  <p class="prd-section-desc">H5端当前按“少量核心能力先验证”的原则收敛为 4 个默认底部导航：基本面分析、自选股、每日复盘、我的。其余模块作为后台可配置能力存在，不默认对外开放。</p>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">Tab 1 · 信息流</div>
+    <div class="prd-sub-title">Tab 1 · 基本面分析</div>
     <table class="prd-table">
       <tr><th>功能点</th><th>描述</th><th>优先级</th><th>状态</th></tr>
-      <tr><td>行情滚动Ticker</td><td>顶部横向滚动展示主要指数实时行情</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>新闻信息流</td><td>按时间倒序展示财经新闻，支持下拉刷新与上拉加载</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>KOL观点卡片</td><td>展示认证KOL最新观点，带头像、认证标识与互动数据</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>热门话题标签</td><td>展示当日热门投资话题，点击进入话题聚合页</td><td><span class="p1">P1</span></td><td><span class="planned">规划中</span></td></tr>
-      <tr><td>个性化推荐</td><td>基于用户行为与持仓偏好推送相关内容</td><td><span class="p2">P2</span></td><td><span class="planned">规划中</span></td></tr>
+      <tr><td>研究结论卡片</td><td>按固定结构展示核心观点、估值判断、风险提示与证据链来源</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>市场摘要</td><td>顶部展示核心指数、板块温度和当日主线，帮助快速进入上下文</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>证据链摘要</td><td>围绕估值、盈利预期、资金流给出简明研究框架，不输出明确买卖指令</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>扩展研究入口</td><td>更深层的社区、Hermes 等能力由后台开关控制后再显示</td><td><span class="p1">P1</span></td><td><span class="planned">按需开放</span></td></tr>
     </table>
   </div>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">Tab 2 · 社区</div>
+    <div class="prd-sub-title">Tab 2 · 自选股</div>
     <table class="prd-table">
       <tr><th>功能点</th><th>描述</th><th>优先级</th><th>状态</th></tr>
-      <tr><td>广场发帖</td><td>支持文字+图片发布，帖子类型：观点/分析/问答</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>大V列表</td><td>展示认证大V，按粉丝数/准确率/活跃度排序</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>大V私信入口</td><td>每张大V卡片上提供"私信"按钮，进入 1对1 专属频道</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>活动列表</td><td>展示进行中与即将开始的社区活动</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>活动详情Modal</td><td>底部弹出活动详情，含参与按钮与积分奖励说明</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>点赞/评论</td><td>帖子互动功能，点赞+1积分，评论+2积分</td><td><span class="p1">P1</span></td><td><span class="planned">规划中</span></td></tr>
-      <tr><td>积分奖励提示</td><td>互动后弹出积分获得提示动画</td><td><span class="p2">P2</span></td><td><span class="planned">规划中</span></td></tr>
+      <tr><td>自选列表</td><td>用户管理重点关注标的，按价格、涨跌幅、板块进行快速浏览</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>添加/移除自选</td><td>通过轻量交互维护观察池，降低首次使用门槛</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>简版行情信息</td><td>保留核心看盘信息，不叠加复杂社交或会员动作</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>提醒/分组</td><td>后续可扩展价格提醒、分组管理等高级能力</td><td><span class="p1">P1</span></td><td><span class="planned">规划中</span></td></tr>
     </table>
   </div>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">Tab 3 · 消息(大V专属对话) <span style="font-size:11px;background:rgba(231,76,60,0.15);color:#E74C3C;padding:2px 8px;border-radius:8px;margin-left:8px">合规重点</span></div>
+    <div class="prd-sub-title">Tab 3 · 每日复盘</div>
     <table class="prd-table">
       <tr><th>功能点</th><th>描述</th><th>优先级</th><th>状态</th></tr>
-      <tr><td>对话列表</td><td>展示用户关注/已订阅大V的对话会话，含未读红点、最新摘要、时间戳</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>多轮上下文对话</td><td>后端按 kol_id + history 数组生成上下文感知回复，KOL角色画像差异化（财经/量化/宏观/新能源）</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>合规护栏</td><td>大V回复涉及"买/卖/推荐"等敏感词时，自动转向引导用户使用 Hermes AI 工具做自主决策；对话顶部固定合规横幅；每条回复底部自动追加"仅供参考"声明</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>付费内容卡片</td><td>大V 可发送"付费内容"消息(预览+解锁价格)，C端用户消耗积分/订阅解锁完整内容</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>快捷提问 chips</td><td>对话输入框上方提供常用提问标签(A股科技/港股互联网/新能源/宏观)，降低用户提问门槛</td><td><span class="p1">P1</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>会员升级引导</td><td>列表底部固定升级专业会员的卡片，解锁更多大V对话权限</td><td><span class="p1">P1</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>语音/图片消息</td><td>支持发送语音和图片，富媒体投研交流</td><td><span class="p2">P2</span></td><td><span class="planned">规划中</span></td></tr>
+      <tr><td>日终模板</td><td>按固定模板输出主线、情绪、风险点与次日观察项</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>重点标的关联</td><td>支持结合自选股内容生成更贴近用户关注的复盘视图</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>复盘沉淀</td><td>强调连续记录和研究习惯养成，而非复杂互动链路</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>导出/分享</td><td>后续可开放导出、分享或关联社区分发能力</td><td><span class="p1">P1</span></td><td><span class="planned">后台控制</span></td></tr>
     </table>
   </div>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">Tab 4 · Hermes AI <span style="font-size:11px;background:rgba(46,204,113,0.15);color:var(--green);padding:2px 8px;border-radius:8px;margin-left:8px">两大新模式</span></div>
+    <div class="prd-sub-title">Tab 4 · 我的</div>
     <table class="prd-table">
       <tr><th>功能点</th><th>描述</th><th>优先级</th><th>状态</th></tr>
-      <tr><td>🎯 AI 资产配置(新)</td><td>用户选择风险偏好(保守/稳健/积极/激进)，AI 输出资产配置参考方案：股/债/金/现金 占比 + 区间、回测年化收益区间、最大回撤区间、再平衡频率、关注行业。所有数值均为区间形式，不给单点目标。</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>📈 AI 行情预判(新)</td><td>用户选择标的(大盘/个股/基金)，AI 渲染走势图：左侧30日历史走势(实线，含解读) + 右侧20日未来三条区间带(看好上沿/中性中枢/看空下沿)。底部展示多数据源相关性（北向资金、美元、国债收益率、VIX、原油）。</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>研报精读</td><td>选择券商研报，AI 提炼核心观点+关键数据+风险提示</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>专家纪要 / 另类数据 / 组合诊断 / 情绪扫描 / 量化因子</td><td>5种原有专业分析模式</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>聊天输入框</td><td>底部固定输入框，支持语音输入（规划）</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>快捷指令</td><td>预设常用分析指令，一键触发</td><td><span class="p1">P1</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>历史记录</td><td>保存最近50条对话记录，支持搜索</td><td><span class="p1">P1</span></td><td><span class="planned">规划中</span></td></tr>
-      <tr><td>算力消耗显示</td><td>每次分析前显示预计算力消耗，余量不足时提示升级</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>基础个人资料</td><td>展示个人信息、偏好设置与基础账户信息</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>主题设置</td><td>用户可自行切换浅色/深色模式与主题色，覆盖后台默认值</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>功能可见性承接</td><td>当后台开放新模块时，可在个人中心看到相应入口或状态说明</td><td><span class="p1">P1</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>会员/消息等扩展页</td><td>默认不展示，待后台开放后再进入完整链路</td><td><span class="p1">P1</span></td><td><span class="planned">后台控制</span></td></tr>
     </table>
   </div>
 
@@ -645,7 +606,7 @@ a:hover{color:#E2C98A}
     <div class="prd-sub-title">🛡️ 合规设计原则 (C端核心功能强制遵循)</div>
     <div class="highlight-box" style="background:rgba(231,76,60,0.06);border-left:4px solid #E74C3C">
       <div style="font-size:13px;line-height:1.9;color:var(--white)">
-        本平台不提供具体买卖建议，所有 AI 输出与大V内容均为"参考"性质。下列原则在产品层（UI/文案/数据呈现）和后端层（生成约束）双重落地。
+        本平台不提供具体买卖建议，当前默认开放能力均以“研究辅助”和“日常跟踪”为边界。下列原则在产品层（UI/文案/数据呈现）和后端层（生成约束）双重落地。
       </div>
     </div>
     <table class="prd-table" style="margin-top:16px">
@@ -653,22 +614,22 @@ a:hover{color:#E2C98A}
       <tr>
         <td><b>历史可解读 / 未来不解读</b></td>
         <td>对历史数据，AI 可输出涨跌幅、振幅、量能、高低点等结构化解读；对未来走势，仅渲染"看好上沿 / 中性中枢 / 看空下沿"三条数值区间带，不附带任何方向性叙述、不指定时间点、不给目标价。</td>
-        <td>AI 行情预判</td>
+        <td>基本面分析 / 每日复盘</td>
       </tr>
       <tr>
         <td><b>区间替代单点</b></td>
-        <td>预期收益、最大回撤、配置比例、未来价位等数值，统一以"区间"形式呈现（如：年化 6-10%、配置 40-50%），强调不确定性。</td>
-        <td>AI 资产配置、AI 行情预判</td>
+        <td>涉及收益、风险或区间判断时，统一以范围形式表达，强调研究辅助而非确定性结论。</td>
+        <td>基本面分析 / 每日复盘</td>
       </tr>
       <tr>
         <td><b>大V敏感词守护</b></td>
-        <td>大V对话回复中若检测到"买/卖/推荐/必涨/必跌"等敏感词，系统返回标准合规话术，转向引导使用 Hermes 自助工具；不出现具体代码 + 操作组合的回复。</td>
-        <td>大V私信</td>
+        <td>后续开放社区或 Hermes 时，涉及“买/卖/推荐”等敏感表达必须统一套用合规拦截与免责声明。</td>
+        <td>后台可开放模块</td>
       </tr>
       <tr>
         <td><b>数据来源透明</b></td>
-        <td>所有 AI 卡片底部强制展示数据来源（券商研报库 / 专家纪要库 / 另类数据库 / 多因子模型），用户可溯源。</td>
-        <td>Hermes 全部模式</td>
+        <td>分析卡片与复盘内容保留可追溯来源说明，避免只给结论不给依据。</td>
+        <td>基本面分析 / 每日复盘</td>
       </tr>
       <tr>
         <td><b>免责声明硬约束</b></td>
@@ -676,45 +637,22 @@ a:hover{color:#E2C98A}
         <td>全站</td>
       </tr>
       <tr>
-        <td><b>风险等级匹配</b></td>
-        <td>资产配置参考方案要求用户先选择风险偏好，避免向保守用户呈现激进配置。后续可接入风险测评问卷强制门槛。</td>
-        <td>AI 资产配置</td>
+        <td><b>后台控开优先</b></td>
+        <td>高复杂度、高解释成本或高合规风险模块不默认开放，统一由 admin 配置后再进入前台。</td>
+        <td>社区 / Hermes / 会员 / 消息 / 工作台</td>
       </tr>
     </table>
   </div>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">Tab 4 · 行情</div>
+    <div class="prd-sub-title">当前不默认开放的功能</div>
     <table class="prd-table">
-      <tr><th>功能点</th><th>描述</th><th>优先级</th><th>状态</th></tr>
-      <tr><td>全球指数面板</td><td>展示A股/港股/美股/欧股主要指数，含涨跌幅</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>另类数据信号</td><td>卫星数据/社交情绪/资金流向等另类指标（专业会员）</td><td><span class="p1">P1</span></td><td><span class="planned">规划中</span></td></tr>
-      <tr><td>专家纪要预览</td><td>最新专家电话会议纪要摘要（专业会员完整版）</td><td><span class="p1">P1</span></td><td><span class="planned">规划中</span></td></tr>
-      <tr><td>自选股列表</td><td>用户自定义关注股票列表，实时行情</td><td><span class="p2">P2</span></td><td><span class="planned">规划中</span></td></tr>
-    </table>
-  </div>
-
-  <div class="prd-sub">
-    <div class="prd-sub-title">Tab 5 · 会员</div>
-    <table class="prd-table">
-      <tr><th>功能点</th><th>描述</th><th>优先级</th><th>状态</th></tr>
-      <tr><td>积分横幅</td><td>顶部展示当前积分余额与等级进度条</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>算力兑换</td><td>积分兑换算力，100积分=10算力</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>4档会员卡片</td><td>展示各档会员权益对比，含购买按钮</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>KOL申请入口</td><td>满足条件的用户可申请KOL合伙人认证</td><td><span class="p1">P1</span></td><td><span class="planned">规划中</span></td></tr>
-    </table>
-  </div>
-
-  <div class="prd-sub">
-    <div class="prd-sub-title">Tab 6 · 我的</div>
-    <table class="prd-table">
-      <tr><th>功能点</th><th>描述</th><th>优先级</th><th>状态</th></tr>
-      <tr><td>个人资料</td><td>头像、昵称、简介编辑，绑定手机/邮箱</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>积分等级展示</td><td>当前等级徽章、积分余额、下一级所需积分</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>等级体系说明</td><td>Lv.1-6完整等级表，含各级权益说明</td><td><span class="p1">P1</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>积分规则说明</td><td>积分获取与消耗规则详细说明页</td><td><span class="p1">P1</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>成就徽章</td><td>完成特定任务解锁徽章，展示在个人主页</td><td><span class="p2">P2</span></td><td><span class="planned">规划中</span></td></tr>
-      <tr><td>设置</td><td>通知设置、隐私设置、退出登录</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><th>模块</th><th>当前策略</th><th>开放方式</th><th>说明</th></tr>
+      <tr><td>社区</td><td>默认关闭</td><td>后台 feature flag</td><td>避免过早引入额外审核与互动运营负担</td></tr>
+      <tr><td>Hermes</td><td>默认关闭</td><td>后台 feature flag</td><td>等研究表达、合规边界和转化路径更稳定后再放量</td></tr>
+      <tr><td>会员 / VIP</td><td>默认关闭</td><td>后台 feature flag</td><td>避免过早引入复杂付费链路</td></tr>
+      <tr><td>消息 / 大V私信</td><td>默认关闭</td><td>后台 feature flag</td><td>降低合规和客服响应压力</td></tr>
+      <tr><td>工作台</td><td>默认关闭</td><td>后台 feature flag</td><td>保留为后续高阶能力入口</td></tr>
     </table>
   </div>
 </section>
@@ -722,9 +660,9 @@ a:hover{color:#E2C98A}
 <!-- ===== SECTION 5 ===== -->
 <section class="prd-section" id="s5">
   <div class="prd-section-num">SECTION 05</div>
-  <h2 class="prd-section-title">社区功能规格</h2>
+  <h2 class="prd-section-title">社区扩展功能规格</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">社区是平台内容生态的核心，通过UGC内容、KOL影响力与活动运营形成用户粘性与传播裂变。</p>
+  <p class="prd-section-desc">社区模块目前默认关闭。以下内容定义其在后续阶段被后台开启后的扩展规格，便于运营、合规和内容生态统一对齐。</p>
 
   <div class="prd-sub">
     <div class="prd-sub-title">帖子类型规格</div>
@@ -797,9 +735,9 @@ a:hover{color:#E2C98A}
 <!-- ===== SECTION 6 ===== -->
 <section class="prd-section" id="s6">
   <div class="prd-section-num">SECTION 06</div>
-  <h2 class="prd-section-title">Hermes AI引擎规格</h2>
+  <h2 class="prd-section-title">Hermes扩展引擎规格</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">Hermes是平台核心AI分析引擎，整合多源数据，以结构化证据链输出投资分析，支持6种专业分析模式与自由对话。</p>
+  <p class="prd-section-desc">Hermes 当前默认关闭，作为后续扩展研究引擎预留。以下内容定义其打开后的能力边界、数据结构和算力规则。</p>
 
   <div class="prd-sub">
     <div class="prd-sub-title">6种分析模式详细规格</div>
@@ -816,7 +754,7 @@ a:hover{color:#E2C98A}
 
   <div class="prd-sub">
     <div class="prd-sub-title">上下文感知能力</div>
-    <div class="highlight-box">Hermes可感知用户当前浏览的页面内容。例如：用户在行情页查看某只股票时，进入Hermes后可直接分析该股票，无需重新输入。上下文保留最近5次交互记录。</div>
+    <div class="highlight-box">Hermes 开启后可感知用户当前浏览的页面内容。例如：用户在自选股页查看某只股票时，进入 Hermes 后可直接分析该股票，无需重新输入。上下文保留最近5次交互记录。</div>
   </div>
 
   <div class="prd-sub">
@@ -852,10 +790,10 @@ a:hover{color:#E2C98A}
   <div class="prd-section-num">SECTION 07</div>
   <h2 class="prd-section-title">中后台管理规格</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">中后台为运营团队提供11个功能模块：用户管理、用户分层、积分管理、KOL合伙人管理、收益结算、帖子审核、活动管理、Hermes使用统计、渠道管理、运营概览与系统设置，支持四级权限控制（超管/运营/审核员/财务）。</p>
+  <p class="prd-section-desc">中后台既承接运营管理，也承接站点级配置。当前特别强调两类能力：一是主题与功能开关配置，二是把原先独立的数据分析入口合并为后台中的“数据分析”分组。</p>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">11个功能模块（已全部实现）</div>
+    <div class="prd-sub-title">后台模块结构</div>
     <table class="prd-table">
       <tr><th>模块</th><th>核心功能点</th><th>访问权限</th><th>状态</th></tr>
       <tr><td>运营概览</td><td>DAU/MAU趋势、新增用户、付费转化、营收概览、渠道获客表、用户圈层分布</td><td>所有管理员</td><td><span class="done">已实现</span></td></tr>
@@ -866,9 +804,22 @@ a:hover{color:#E2C98A}
       <tr><td>收益结算</td><td>待结算/处理中/已完成状态管理、批量结算、佣金比例展示</td><td>财务、超管</td><td><span class="done">已实现</span></td></tr>
       <tr><td>帖子审核</td><td>待审核队列、AI合规检测结果展示、一键发布/驳回、违规关键词配置</td><td>审核员、超管</td><td><span class="done">已实现</span></td></tr>
       <tr><td>活动管理</td><td>活动列表（含筛选/批量操作）、活动详情页（参与数据/报名用户/议程）、富文本创建/编辑表单（奖励配置/议程配置/权限设置/H5预览）</td><td>运营、超管</td><td><span class="done">已实现</span></td></tr>
-      <tr><td>Hermes使用统计</td><td>6模式调用量/占比/响应时间、算力池状态、用户算力消耗排行</td><td>运营、超管</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>Hermes使用统计</td><td>用于扩展模块开启后的模式调用量/响应时间/算力监控</td><td>运营、超管</td><td><span class="done">已预置</span></td></tr>
       <tr><td>渠道管理</td><td>渠道详细数据（9列含ROI）、UTM参数配置与复制</td><td>运营、超管</td><td><span class="done">已实现</span></td></tr>
-      <tr><td>系统设置</td><td>平台基础配置、合规规则开关、AI引擎配置、通知配置</td><td>超管</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>系统设置</td><td>平台默认主题、主题色、功能开关、基础说明等站点配置</td><td>超管</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>访问审计</td><td>访问量、访问路径、IP排行、近14日趋势与明细记录</td><td>超管</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>数据分析分组</td><td>转化漏斗、渠道分析、KOL效能、营收趋势、用户分层分析统一在 admin 内查看</td><td>运营、超管</td><td><span class="done">已实现</span></td></tr>
+    </table>
+  </div>
+
+  <div class="prd-sub">
+    <div class="prd-sub-title">主题与功能开关配置</div>
+    <table class="prd-table">
+      <tr><th>配置项</th><th>说明</th><th>影响范围</th><th>状态</th></tr>
+      <tr><td>默认主题模式</td><td>支持浅色与深色，浅色为默认</td><td>首页 / H5 / PRD / admin</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>默认主题色</td><td>支持蓝、绿、slate、amber 等主题色</td><td>首页 / H5 / PRD / admin</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>用户本地偏好</td><td>用户可自行覆盖默认主题选择，本地记忆优先</td><td>首页 / H5 / PRD / admin</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>功能开关</td><td>控制基本面分析、自选股、每日复盘及扩展模块的可见性</td><td>H5 首页导航 / 实际页面</td><td><span class="done">已实现</span></td></tr>
     </table>
   </div>
 
@@ -964,12 +915,12 @@ a:hover{color:#E2C98A}
 <!-- ===== SECTION 8 ===== -->
 <section class="prd-section" id="s8">
   <div class="prd-section-num">SECTION 08</div>
-  <h2 class="prd-section-title">数据Dashboard规格</h2>
+  <h2 class="prd-section-title">后台数据分析规格</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">数据Dashboard为运营决策提供可视化数据支持，覆盖用户增长、转化漏斗、渠道效果、KOL效能与营收分析五大维度。</p>
+  <p class="prd-section-desc">首页虽然保留“后台数据分析”入口，但进入后不再跳往独立后台，而是统一进入 admin 内的数据分析分组。这里定义这组能力的结构和使用方式。</p>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">5个分析模块</div>
+    <div class="prd-sub-title">分析分组结构</div>
     <table class="prd-table">
       <tr><th>模块</th><th>核心指标</th><th>图表类型</th><th>数据更新频率</th></tr>
       <tr><td>转化漏斗</td><td>各阶段用户数、转化率、流失节点</td><td>漏斗图+折线图</td><td>每日更新</td></tr>
@@ -977,6 +928,17 @@ a:hover{color:#E2C98A}
       <tr><td>KOL效能</td><td>KOL带来的注册/付费、内容互动率</td><td>排行榜+趋势图</td><td>每日更新</td></tr>
       <tr><td>营收趋势</td><td>GMV、ARPU、LTV、退款率</td><td>折线图+环比</td><td>每日更新</td></tr>
       <tr><td>用户分层</td><td>RFM分层分布、各层级用户行为特征</td><td>热力图+饼图</td><td>每周更新</td></tr>
+    </table>
+  </div>
+
+  <div class="prd-sub">
+    <div class="prd-sub-title">入口与导航原则</div>
+    <table class="prd-table">
+      <tr><th>场景</th><th>入口地址</th><th>实际落点</th><th>说明</th></tr>
+      <tr><td>首页点“中后台管理”</td><td>/admin</td><td>运营概览</td><td>从完整后台起始页进入</td></tr>
+      <tr><td>首页点“后台数据分析”</td><td>/admin?section=funnel</td><td>数据分析分组</td><td>直接定位到分析分组首屏</td></tr>
+      <tr><td>旧 /dashboard 地址</td><td>/dashboard</td><td>302 跳转到 /admin?section=funnel</td><td>兼容旧链接，不再维护独立后台</td></tr>
+      <tr><td>后台内切换分析模块</td><td>侧边栏数据分析分组</td><td>同一 admin 页面内切换</td><td>保持统一导航与主题体验</td></tr>
     </table>
   </div>
 
@@ -994,9 +956,9 @@ a:hover{color:#E2C98A}
 <!-- ===== SECTION 9 ===== -->
 <section class="prd-section" id="s9">
   <div class="prd-section-num">SECTION 09</div>
-  <h2 class="prd-section-title">积分与算力体系</h2>
+  <h2 class="prd-section-title">积分与算力扩展体系</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">积分体系是平台用户激励的核心机制，通过行为奖励驱动用户活跃，并与算力兑换形成付费转化闭环。</p>
+  <p class="prd-section-desc">积分与算力体系属于扩展商业化与激励层，当前不作为默认开放能力，但仍需在 PRD 中保留完整设计，供后续阶段启用。</p>
 
   <div class="prd-sub">
     <div class="prd-sub-title">积分获取规则</div>
@@ -1047,9 +1009,9 @@ a:hover{color:#E2C98A}
 <!-- ===== SECTION 10 ===== -->
 <section class="prd-section" id="s10">
   <div class="prd-section-num">SECTION 10</div>
-  <h2 class="prd-section-title">KOL合伙人体系</h2>
+  <h2 class="prd-section-title">KOL合伙人扩展体系</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">KOL合伙人体系是平台内容生态与商业变现的关键支柱，通过三级体系激励优质内容创作者深度参与平台建设。</p>
+  <p class="prd-section-desc">KOL 合伙人体系属于内容生态扩展层，当前未对普通用户默认开放。以下内容保留为后续开启社区与合作分发生态时的执行标准。</p>
 
   <div class="prd-sub">
     <div class="prd-sub-title">申请条件</div>
@@ -1166,7 +1128,7 @@ a:hover{color:#E2C98A}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="info-card">
         <div class="info-card-title">系统可用性</div>
-        <div class="info-card-body">SLA目标：99.9% uptime（月停机时间 ≤ 43分钟）。核心服务（登录、信息流、Hermes）优先保障。</div>
+        <div class="info-card-body">SLA目标：99.9% uptime（月停机时间 ≤ 43分钟）。核心服务（登录、基本面分析、自选股、每日复盘）优先保障。</div>
       </div>
       <div class="info-card">
         <div class="info-card-title">故障恢复</div>
@@ -1198,33 +1160,33 @@ a:hover{color:#E2C98A}
         <div class="roadmap-version">v1.0</div>
         <div class="roadmap-date">2026年5月 · 当前版本</div>
         <div class="roadmap-line"><div class="roadmap-dot"></div></div>
-        <div class="roadmap-feature">H5基础框架</div>
-        <div class="roadmap-feature">信息流与行情</div>
-        <div class="roadmap-feature">Hermes 6种模式</div>
-        <div class="roadmap-feature">社区广场与大V</div>
-        <div class="roadmap-feature">会员体系</div>
+        <div class="roadmap-feature">白底咨询风 + 深色模式</div>
+        <div class="roadmap-feature">基本面分析</div>
+        <div class="roadmap-feature">自选股</div>
+        <div class="roadmap-feature">每日复盘</div>
         <div class="roadmap-feature">中后台管理</div>
-        <div class="roadmap-feature">数据Dashboard</div>
+        <div class="roadmap-feature">admin 数据分析分组</div>
+        <div class="roadmap-feature">主题色与功能开关</div>
       </div>
       <div class="roadmap-item">
         <div class="roadmap-version">v1.1</div>
         <div class="roadmap-date">2026年6月</div>
         <div class="roadmap-line"><div class="roadmap-dot"></div></div>
-        <div class="roadmap-feature">社区评论功能</div>
-        <div class="roadmap-feature">Hermes历史记录</div>
-        <div class="roadmap-feature">积分任务中心</div>
-        <div class="roadmap-feature">消息通知系统</div>
+        <div class="roadmap-feature">按需开放社区</div>
+        <div class="roadmap-feature">按需开放 Hermes</div>
+        <div class="roadmap-feature">访问审计与运营配置增强</div>
+        <div class="roadmap-feature">首页 / PRD / H5 口径持续同步</div>
         <div class="roadmap-feature">性能优化</div>
       </div>
       <div class="roadmap-item">
         <div class="roadmap-version">v1.2</div>
         <div class="roadmap-date">2026年7月</div>
         <div class="roadmap-line"><div class="roadmap-dot"></div></div>
-        <div class="roadmap-feature">大V直播功能</div>
-        <div class="roadmap-feature">量化回测模块</div>
-        <div class="roadmap-feature">另类数据信号</div>
-        <div class="roadmap-feature">KOL分成结算</div>
-        <div class="roadmap-feature">自选股功能</div>
+        <div class="roadmap-feature">会员 / VIP 渐进开放</div>
+        <div class="roadmap-feature">消息 / 私信能力评估上线</div>
+        <div class="roadmap-feature">高级数据分析与导出增强</div>
+        <div class="roadmap-feature">KOL分成结算优化</div>
+        <div class="roadmap-feature">更深层自选管理能力</div>
       </div>
       <div class="roadmap-item">
         <div class="roadmap-version">v2.0</div>
@@ -1254,6 +1216,7 @@ a:hover{color:#E2C98A}
     <table class="prd-table">
       <tr><th>版本</th><th>日期</th><th>修改内容</th><th>作者</th></tr>
       <tr><td>v1.0</td><td>2026-05-20</td><td>初始版本，完整PRD文档</td><td>产品团队</td></tr>
+      <tr><td>v1.1</td><td>2026-05-27</td><td>同步当前默认能力范围、主题策略、后台控开和 admin 数据分析合并结构</td><td>产品团队</td></tr>
     </table>
   </div>
 </section>

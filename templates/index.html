@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>冈底斯金融科技 — 智能投研平台</title>
+<title>洞见智研金融科技 — 智能投研平台</title>
 <link rel="stylesheet" href="/static/css/style.css">
 <script>
   window.SITE_CONFIG = {{ site_config | tojson }};
@@ -713,15 +713,14 @@ body.theme-dark .tech-layer {
 ====================================================== -->
 <nav class="ix-top-nav">
   <div style="max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:56px">
-    <div style="font-size:18px;font-weight:700;color:var(--gold);letter-spacing:2px">冈底斯</div>
+    <div style="font-size:18px;font-weight:700;color:var(--gold);letter-spacing:2px">洞见智研</div>
     <div style="display:flex;gap:28px;font-size:13px;color:var(--gray-400)">
       <a href="#modules" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">系统模块</a>
       <a href="#business" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">商业模式</a>
+      <a href="#c-core" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">核心能力</a>
       <a href="#funnel-flow" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">转化漏斗</a>
       <a href="#kol" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">KOL生态</a>
-      <a href="#features" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">产品矩阵</a>
-      <a href="#community" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">社区生态</a>
-      <a href="#hermes" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gold)'">🦞 Hermes</a>
+      <a href="#features" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">功能边界</a>
       <a href="#tech" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">技术架构</a>
       <a href="/prd" style="color:var(--gold);text-decoration:none;font-weight:600;border:1px solid rgba(200,169,110,0.4);padding:4px 12px;border-radius:4px;transition:all 0.2s" onmouseover="this.style.background='rgba(200,169,110,0.15)'" onmouseout="this.style.background='transparent'">PRD文档</a>
     </div>
@@ -745,12 +744,12 @@ body.theme-dark .tech-layer {
     </svg>
   </div>
 
-  <div class="hero-logo-text">冈底斯</div>
-  <div class="hero-logo-sub">GANGTISE FINTECH</div>
-  <div class="hero-tagline">专业投研数据 · 智能分析引擎 · KOL合伙生态</div>
+  <div class="hero-logo-text">洞见智研</div>
+  <div class="hero-logo-sub">洞见智研</div>
+  <div class="hero-tagline">聚焦三类高频投研动作</div>
   <div class="hero-desc">
-    整合券商研报、专家会议纪要、另类数据、实时市场数据<br>
-    以 DeepSeek + Kimi 2.6 AI驱动的证据链，赋能每一位投资决策
+    当前默认开放基本面分析、自选股、每日复盘三项核心能力<br>
+    支持浅色默认、黑色模式与主题色切换，社区、Hermes、会员等功能由后台按需开放
   </div>
 
   <div class="hero-kpi-row">
@@ -774,10 +773,10 @@ body.theme-dark .tech-layer {
 
   <div class="hero-cta-row">
     <a href="/h5" class="btn-gold" style="text-decoration:none;font-size:14px;padding:12px 32px">立即体验 H5端</a>
-    <a href="/dashboard" class="btn-outline" style="text-decoration:none;font-size:14px;padding:12px 32px">查看数据大盘</a>
+    <a href="/admin?section=funnel" class="btn-outline" style="text-decoration:none;font-size:14px;padding:12px 32px">查看后台数据分析</a>
   </div>
 
-  <div class="mountain-label">▲ ▲ ▲ &nbsp; 冈底斯山脉 · 海拔6656米 &nbsp; ▲ ▲ ▲</div>
+  <div class="mountain-label">▲ ▲ ▲ &nbsp; 洞见智研山脉 · 海拔6656米 &nbsp; ▲ ▲ ▲</div>
 </section>
 
 
@@ -795,26 +794,20 @@ body.theme-dark .tech-layer {
       <a href="/h5" class="ix-nav-card">
         <div class="ix-nav-card-icon">📱</div>
         <div class="ix-nav-card-title">H5 用户端</div>
-        <div class="ix-nav-card-desc">移动端投研信息流、大V私信对话、AI资产配置、AI行情预判、订阅会员体系。专为C端用户设计的沉浸式体验，所有 AI 输出与大V内容内置合规护栏。</div>
+        <div class="ix-nav-card-desc">当前默认开放基本面分析、自选股、每日复盘与个人中心。顶部只做当前模块提示，页面切换统一走底部导航，降低学习成本。</div>
         <div class="ix-nav-card-arrow">进入体验 →</div>
       </a>
       <a href="/admin" class="ix-nav-card">
         <div class="ix-nav-card-icon">⚙️</div>
         <div class="ix-nav-card-title">中后台管理</div>
-        <div class="ix-nav-card-desc">KOL合伙人管理、用户分层运营、内容审核、收益结算，全链路运营管控中心。支持分级佣金配置与实时收益查看。</div>
+        <div class="ix-nav-card-desc">支持默认主题、主题色、功能开关和访问统计。社区、Hermes、消息、会员、工作台等扩展能力都可由 admin 按阶段控制开放。</div>
         <div class="ix-nav-card-arrow">进入管理 →</div>
       </a>
-      <a href="/dashboard" class="ix-nav-card">
+      <a href="/admin?section=funnel" class="ix-nav-card">
         <div class="ix-nav-card-icon">📊</div>
-        <div class="ix-nav-card-title">数据 Dashboard</div>
-        <div class="ix-nav-card-desc">多渠道转化漏斗、用户圈层分布、KOL效能分析、营收趋势，5大维度实时数据可视化，助力精准决策。</div>
-        <div class="ix-nav-card-arrow">查看数据 →</div>
-      </a>
-      <a href="/prd" class="ix-nav-card">
-        <div class="ix-nav-card-icon">📄</div>
-        <div class="ix-nav-card-title">产品设计文档</div>
-        <div class="ix-nav-card-desc">完整PRD：用户角色、页面架构、功能规格、跳转流程图、积分体系、KOL体系、合规设计原则、非功能需求与版本迭代计划。</div>
-        <div class="ix-nav-card-arrow">查看文档 →</div>
+        <div class="ix-nav-card-title">后台数据分析</div>
+        <div class="ix-nav-card-desc">首页仍保留独立入口，但进入后直接并入 admin 后台的数据分析分组，统一查看转化漏斗、渠道分析、KOL效能、营收趋势和用户分层。</div>
+        <div class="ix-nav-card-arrow">进入分析分组 →</div>
       </a>
     </div>
   </div>
@@ -827,82 +820,76 @@ body.theme-dark .tech-layer {
 <section class="ix-section ix-section-dark" id="c-core">
   <div class="ix-inner">
     <div class="ix-section-label">C-Side Core Capabilities</div>
-    <div class="ix-section-title">C 端三大核心能力 · 合规先行</div>
+    <div class="ix-section-title">三大核心能力</div>
     <div class="ix-divider"></div>
-    <div class="ix-section-desc">大V专属对话、AI 资产配置参考、AI 行情预判三大模块覆盖 C 端核心场景。所有功能在产品层与数据层双重落地合规护栏：历史可解读、未来仅区间、不出现具体买卖建议。</div>
+    <div class="ix-section-desc">当前以高频、低风险、容易理解的三类场景为核心。浅色咨询风为默认外观，黑色模式和主题色切换同步保留。</div>
 
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:24px">
-      <!-- 1) 大V对话 -->
+      <!-- 1) 基本面分析 -->
       <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.15);border-radius:14px;padding:24px;position:relative">
         <div style="position:absolute;top:18px;right:18px;font-size:11px;color:var(--gold);background:rgba(200,169,110,0.1);padding:3px 10px;border-radius:10px">P0</div>
-        <div style="font-size:32px;margin-bottom:14px">💬</div>
-        <div style="font-size:18px;font-weight:700;color:var(--gold);margin-bottom:10px">大V专属对话</div>
-        <div style="font-size:13px;color:var(--gray-400);line-height:1.8;margin-bottom:14px">认证大V 1对1 多轮对话频道，按大V角色画像差异化回复（财经/量化/宏观/新能源），支持付费内容卡片解锁，所有回复经合规敏感词过滤。</div>
+        <div style="font-size:32px;margin-bottom:14px">🧭</div>
+        <div style="font-size:18px;font-weight:700;color:var(--gold);margin-bottom:10px">基本面分析</div>
+        <div style="font-size:13px;color:var(--gray-400);line-height:1.8;margin-bottom:14px">围绕估值、盈利预期、资金流三条证据链给出基础研究判断。页面入口清晰，结果表达克制，适合长期稳定使用。</div>
         <div style="border-top:1px solid rgba(200,169,110,0.1);padding-top:12px">
           <div style="font-size:11px;color:#E2C98A;background:rgba(231,76,60,0.06);border-left:3px solid #E74C3C;padding:8px 10px;border-radius:4px;line-height:1.6">
-            🛡️ 合规：触发"买/卖/推荐"等敏感词，自动转向引导 AI 自助工具；每条回复底部"仅供参考"声明
+            🛡️ 合规：只做结构化研究表达，不给明确买卖动作，保留“仅供参考”边界
           </div>
         </div>
       </div>
 
-      <!-- 2) AI 资产配置 -->
+      <!-- 2) 自选股 -->
       <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.15);border-radius:14px;padding:24px;position:relative">
         <div style="position:absolute;top:18px;right:18px;font-size:11px;color:var(--gold);background:rgba(200,169,110,0.1);padding:3px 10px;border-radius:10px">P0</div>
-        <div style="font-size:32px;margin-bottom:14px">🎯</div>
-        <div style="font-size:18px;font-weight:700;color:var(--gold);margin-bottom:10px">AI 资产配置参考</div>
-        <div style="font-size:13px;color:var(--gray-400);line-height:1.8;margin-bottom:14px">用户选择风险偏好（保守/稳健/积极/激进），AI 输出资产配置参考：股/债/金/现金 占比饼图、回测年化收益区间、最大回撤区间、关注行业建议。</div>
+        <div style="font-size:32px;margin-bottom:14px">⭐</div>
+        <div style="font-size:18px;font-weight:700;color:var(--gold);margin-bottom:10px">自选股</div>
+        <div style="font-size:13px;color:var(--gray-400);line-height:1.8;margin-bottom:14px">保留最直接的跟踪需求，围绕价格、涨跌幅、资金流和板块热度做轻量观察，不强行叠加高门槛的复杂分析路径。</div>
         <div style="border-top:1px solid rgba(200,169,110,0.1);padding-top:12px">
           <div style="font-size:11px;color:#E2C98A;background:rgba(231,76,60,0.06);border-left:3px solid #E74C3C;padding:8px 10px;border-radius:4px;line-height:1.6">
-            🛡️ 合规：所有数值以"区间"形式呈现（如 6-10%），不给单点目标，标注"模型推演，仅供研究参考"
+            🛡️ 运营策略：先保留看盘和跟踪，不额外引入更多社交与付费耦合
           </div>
         </div>
       </div>
 
-      <!-- 3) AI 行情预判 -->
+      <!-- 3) 每日复盘 -->
       <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.15);border-radius:14px;padding:24px;position:relative">
         <div style="position:absolute;top:18px;right:18px;font-size:11px;color:var(--gold);background:rgba(200,169,110,0.1);padding:3px 10px;border-radius:10px">P0</div>
-        <div style="font-size:32px;margin-bottom:14px">📈</div>
-        <div style="font-size:18px;font-weight:700;color:var(--gold);margin-bottom:10px">AI 行情预判</div>
-        <div style="font-size:13px;color:var(--gray-400);line-height:1.8;margin-bottom:14px">大盘/个股/基金多标的支持：渲染30日历史走势 + 20日未来三条区间带（看好上沿/中性中枢/看空下沿）+ 多数据源相关性条（北向资金/美元/国债/VIX/原油）。</div>
+        <div style="font-size:32px;margin-bottom:14px">📝</div>
+        <div style="font-size:18px;font-weight:700;color:var(--gold);margin-bottom:10px">每日复盘</div>
+        <div style="font-size:13px;color:var(--gray-400);line-height:1.8;margin-bottom:14px">用固定模板沉淀当日主线、风险点和次日观察项。既能形成用户习惯，也能减少解释成本和维护复杂度。</div>
         <div style="border-top:1px solid rgba(200,169,110,0.1);padding-top:12px">
           <div style="font-size:11px;color:#E2C98A;background:rgba(231,76,60,0.06);border-left:3px solid #E74C3C;padding:8px 10px;border-radius:4px;line-height:1.6">
-            🛡️ 合规：历史可解读（涨跌幅/振幅/高低点）；未来仅显示概率区间，不做方向判断、不指定时间点、不给目标价
+            🛡️ 产品约束：优先沉淀日常研究习惯，扩展模块统一通过后台 feature flag 控制
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 合规设计五条原则 -->
     <div style="margin-top:32px;background:rgba(200,169,110,0.04);border:1px solid rgba(200,169,110,0.18);border-radius:14px;padding:24px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-        <span style="font-size:22px">🛡️</span>
-        <div style="font-size:16px;font-weight:700;color:var(--gold)">合规设计五原则</div>
+        <span style="font-size:22px">🎨</span>
+        <div style="font-size:16px;font-weight:700;color:var(--gold)">主题与开放策略</div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px">
         <div>
           <div style="font-size:24px;color:var(--gold);font-weight:700;margin-bottom:6px">①</div>
-          <div style="font-size:13px;font-weight:600;color:var(--white);margin-bottom:4px">历史可读 未来不读</div>
-          <div style="font-size:11px;color:var(--gray-400);line-height:1.6">历史数据完整解读，未来仅渲染数值区间无叙述</div>
+          <div style="font-size:13px;font-weight:600;color:var(--white);margin-bottom:4px">浅色默认</div>
+          <div style="font-size:11px;color:var(--gray-400);line-height:1.6">白底咨询风为默认外观，浅色文字统一保持高对比度</div>
         </div>
         <div>
           <div style="font-size:24px;color:var(--gold);font-weight:700;margin-bottom:6px">②</div>
-          <div style="font-size:13px;font-weight:600;color:var(--white);margin-bottom:4px">区间替代单点</div>
-          <div style="font-size:11px;color:var(--gray-400);line-height:1.6">所有预测/收益/配置以区间形式呈现，强调不确定性</div>
+          <div style="font-size:13px;font-weight:600;color:var(--white);margin-bottom:4px">黑色保留</div>
+          <div style="font-size:11px;color:var(--gray-400);line-height:1.6">保留黑色模式供用户自行切换，兼顾不同使用习惯</div>
         </div>
         <div>
           <div style="font-size:24px;color:var(--gold);font-weight:700;margin-bottom:6px">③</div>
-          <div style="font-size:13px;font-weight:600;color:var(--white);margin-bottom:4px">敏感词守护</div>
-          <div style="font-size:11px;color:var(--gray-400);line-height:1.6">大V回复中"买/卖/推荐"自动转向 AI 工具引导</div>
+          <div style="font-size:13px;font-weight:600;color:var(--white);margin-bottom:4px">主题色可选</div>
+          <div style="font-size:11px;color:var(--gray-400);line-height:1.6">支持雪球蓝、青绿、石板灰、琥珀等主题色切换</div>
         </div>
         <div>
           <div style="font-size:24px;color:var(--gold);font-weight:700;margin-bottom:6px">④</div>
-          <div style="font-size:13px;font-weight:600;color:var(--white);margin-bottom:4px">来源可溯</div>
-          <div style="font-size:11px;color:var(--gray-400);line-height:1.6">每条 AI 输出强制展示数据来源，可点击溯源</div>
-        </div>
-        <div>
-          <div style="font-size:24px;color:var(--gold);font-weight:700;margin-bottom:6px">⑤</div>
-          <div style="font-size:13px;font-weight:600;color:var(--white);margin-bottom:4px">风险等级匹配</div>
-          <div style="font-size:11px;color:var(--gray-400);line-height:1.6">资产配置需先选风险偏好，未来接入风险测评问卷</div>
+          <div style="font-size:13px;font-weight:600;color:var(--white);margin-bottom:4px">后台控开</div>
+          <div style="font-size:11px;color:var(--gray-400);line-height:1.6">社区、Hermes、消息、会员、工作台默认关闭，由 admin 决定开放时机</div>
         </div>
       </div>
     </div>
@@ -934,8 +921,8 @@ body.theme-dark .tech-layer {
       <div class="biz-col-center" style="flex-direction:column;gap:20px">
         <div class="biz-arrow-left">→→</div>
         <div class="biz-center-box">
-          <div class="biz-engine-title">冈底斯AI引擎</div>
-          <div class="biz-engine-sub">GANGTISE AI ENGINE</div>
+          <div class="biz-engine-title">洞见智研AI引擎</div>
+          <div class="biz-engine-sub">洞见智研 AI ENGINE</div>
           <div class="biz-engine-tags">
             <span class="biz-engine-tag">RAG检索增强</span>
             <span class="biz-engine-tag">DeepSeek</span>
@@ -1064,14 +1051,14 @@ body.theme-dark .tech-layer {
     <div class="ix-section-label">KOL Partnership</div>
     <div class="ix-section-title">KOL合伙生态</div>
     <div class="ix-divider"></div>
-    <div class="ix-section-desc">冈底斯构建以数据驱动的KOL合伙网络，KOL负责内容传播，平台提供研究证据链与合规支撑</div>
+    <div class="ix-section-desc">洞见智研构建以数据驱动的KOL合伙网络，KOL负责内容传播，平台提供研究证据链与合规支撑</div>
 
     <!-- 3 column model -->
     <div class="kol-three-col">
       <div class="kol-col-card" style="border-color:rgba(200,169,110,0.25)">
         <div class="kol-col-header">
           <div class="kol-col-icon">🏛️</div>
-          <div class="kol-col-title">冈底斯提供</div>
+          <div class="kol-col-title">洞见智研提供</div>
         </div>
         <div class="kol-col-item">专业券商研报与专家纪要内容库</div>
         <div class="kol-col-item">AI生成的可引用证据链报告</div>
@@ -1085,7 +1072,7 @@ body.theme-dark .tech-layer {
           <div class="kol-col-title">KOL负责</div>
         </div>
         <div class="kol-col-item">在微信/抖音/小红书/微博等平台发布内容</div>
-        <div class="kol-col-item">引用冈底斯AI证据链作为分析依据</div>
+        <div class="kol-col-item">引用洞见智研AI证据链作为分析依据</div>
         <div class="kol-col-item">直播讲解研究报告与AI分析成果</div>
         <div class="kol-col-item">推动粉丝通过专属链接订阅付费</div>
         <div class="kol-col-item">维护私域社群与活跃度运营</div>
@@ -1151,7 +1138,7 @@ body.theme-dark .tech-layer {
       <div class="kol-compliance-icon">🛡️</div>
       <div>
         <strong style="color:var(--gold)">合规说明：</strong>
-        冈底斯AI引擎为KOL提供有据可查的研究证据链（引用来源券商报告编号、专家会议纪要条目），KOL在内容中引用平台分析结论而非独立提供投资建议。所有内容须标注"数据来源：冈底斯金融科技"，并附风险提示。平台保留对违规内容的合作终止权，确保内容合法合规。
+        洞见智研AI引擎为KOL提供有据可查的研究证据链（引用来源券商报告编号、专家会议纪要条目），KOL在内容中引用平台分析结论而非独立提供投资建议。所有内容须标注"数据来源：洞见智研金融科技"，并附风险提示。平台保留对违规内容的合作终止权，确保内容合法合规。
       </div>
     </div>
   </div>
@@ -1164,77 +1151,56 @@ body.theme-dark .tech-layer {
 <section class="ix-section ix-section-alt" id="features">
   <div class="ix-inner">
     <div class="ix-section-label">Product Features</div>
-    <div class="ix-section-title">产品功能矩阵</div>
+    <div class="ix-section-title">功能开放矩阵</div>
     <div class="ix-divider"></div>
-    <div class="ix-section-desc">四档订阅方案，满足从散户到机构的全层次需求，专业会员为性价比之选</div>
+    <div class="ix-section-desc">当前代码状态已经收敛为“默认开放、后台可开、后续规划”三层能力边界，首页与 PRD 统一按这个口径表达。</div>
 
     <div class="feature-table-wrap">
       <table class="feature-table">
         <thead>
           <tr>
-            <th style="text-align:left">功能项目</th>
-            <th><span class="tier-badge-free">免费</span></th>
-            <th><span class="tier-badge-basic">基础会员</span><div style="font-size:11px;color:var(--gray-400);margin-top:4px">¥68/月</div></th>
-            <th class="highlight-col"><span class="tier-badge-pro">专业会员 ⭐</span><div style="font-size:11px;color:#2ECC71;margin-top:4px">¥198/月</div></th>
-            <th><span class="tier-badge-vip">VIP机构</span><div style="font-size:11px;color:var(--gray-400);margin-top:4px">¥1,800/月</div></th>
+            <th style="text-align:left">能力项</th>
+            <th>当前默认开放</th>
+            <th class="highlight-col">Admin 可控开放</th>
+            <th>后续规划</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>信息流浏览</td>
-            <td><span class="feat-check">✓</span> 有限</td>
-            <td><span class="feat-check">✓</span> 无限</td>
-            <td class="highlight-col"><span class="feat-check">✓</span> 无限</td>
-            <td><span class="feat-check">✓</span> 无限</td>
+            <td>基本面分析</td>
+            <td><span class="feat-check">✓</span> 核心主入口</td>
+            <td class="highlight-col"><span class="feat-check">✓</span> 始终建议保留</td>
+            <td>持续优化提示词与研究模板</td>
           </tr>
           <tr>
-            <td>AI分析次数</td>
-            <td><span class="feat-num">5次/月</span></td>
-            <td><span class="feat-num">50次/月</span></td>
-            <td class="highlight-col"><span class="feat-num">500次/月</span></td>
-            <td><span class="feat-num">无限次</span></td>
+            <td>自选股</td>
+            <td><span class="feat-check">✓</span> 轻量跟踪</td>
+            <td class="highlight-col"><span class="feat-check">✓</span> 可扩展更多监控维度</td>
+            <td>补充更深的筛选和提醒能力</td>
           </tr>
           <tr>
-            <td>研报原文访问</td>
-            <td><span class="feat-cross">✗</span></td>
-            <td><span class="feat-check">✓</span> 摘要</td>
-            <td class="highlight-col"><span class="feat-check">✓</span> 全文</td>
-            <td><span class="feat-check">✓</span> 全文+历史库</td>
+            <td>每日复盘</td>
+            <td><span class="feat-check">✓</span> 固定模板</td>
+            <td class="highlight-col"><span class="feat-check">✓</span> 可细化为行业模板</td>
+            <td>加入个人复盘沉淀和导出</td>
           </tr>
           <tr>
-            <td>专家会议纪要</td>
-            <td><span class="feat-cross">✗</span></td>
-            <td><span class="feat-cross">✗</span></td>
-            <td class="highlight-col"><span class="feat-check">✓</span> 近3个月</td>
-            <td><span class="feat-check">✓</span> 全量历史</td>
+            <td>主题模式与主题色</td>
+            <td><span class="feat-check">✓</span> 浅色默认 + 黑色保留</td>
+            <td class="highlight-col"><span class="feat-check">✓</span> Admin 可设默认主题</td>
+            <td>继续补充更多主题色</td>
           </tr>
           <tr>
-            <td>另类数据信号</td>
-            <td><span class="feat-cross">✗</span></td>
-            <td><span class="feat-cross">✗</span></td>
-            <td class="highlight-col"><span class="feat-check">✓</span> 基础信号</td>
-            <td><span class="feat-check">✓</span> 全量+定制</td>
+            <td>社区 / Hermes / 消息 / 会员 / 工作台</td>
+            <td><span class="feat-cross">✗</span> 默认关闭</td>
+            <td class="highlight-col"><span class="feat-check">✓</span> 通过 feature flag 按阶段开放</td>
+            <td>逐步验证后再对外放量</td>
           </tr>
           <tr>
-            <td>KOL直播回放</td>
-            <td><span class="feat-cross">✗</span></td>
-            <td><span class="feat-check">✓</span></td>
-            <td class="highlight-col"><span class="feat-check">✓</span> + 实时参与</td>
-            <td><span class="feat-check">✓</span> 专属直播</td>
-          </tr>
-          <tr>
-            <td>API数据接口</td>
-            <td><span class="feat-cross">✗</span></td>
-            <td><span class="feat-cross">✗</span></td>
-            <td class="highlight-col"><span class="feat-cross">✗</span></td>
-            <td><span class="feat-check">✓</span> 企业级API</td>
-          </tr>
-          <tr>
-            <td>专属客户经理</td>
-            <td><span class="feat-cross">✗</span></td>
-            <td><span class="feat-cross">✗</span></td>
-            <td class="highlight-col"><span class="feat-cross">✗</span></td>
-            <td><span class="feat-check">✓</span></td>
+            <td>访问统计与运营设置</td>
+            <td><span class="feat-cross">✗</span> 用户端不感知</td>
+            <td class="highlight-col"><span class="feat-check">✓</span> Admin 中可查看和配置</td>
+            <td>后续接入更多运营指标</td>
           </tr>
         </tbody>
       </table>
@@ -1332,14 +1298,14 @@ body.theme-dark .tech-layer {
     <div class="ix-section-label">Community Ecosystem</div>
     <div class="ix-section-title">投研社区生态</div>
     <div class="ix-divider"></div>
-    <div class="ix-section-desc">大V领衔、用户共创的专业投研社区。积分驱动参与，算力奖励贡献，构建有温度的金融知识共同体。</div>
+    <div class="ix-section-desc">社区能力当前仍保留在产品设计中，但默认不对外开放。只有在 admin 后台开启后，才进入用户端可见范围。</div>
 
     <!-- Community overview 3-col -->
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-bottom:48px">
       <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.15);border-radius:16px;padding:28px 24px">
         <div style="font-size:32px;margin-bottom:12px">👑</div>
         <div style="font-size:17px;font-weight:700;color:var(--gold);margin-bottom:8px">大V生态</div>
-        <div style="font-size:13px;color:var(--gray-400);line-height:1.8">S/A/B三级认证大V，覆盖抖音、小红书、微信、微博四大平台。大V基于冈底斯数据发布专业观点，粉丝可直接互动追问，形成高质量投研讨论场。</div>
+        <div style="font-size:13px;color:var(--gray-400);line-height:1.8">S/A/B三级认证大V，覆盖抖音、小红书、微信、微博四大平台。大V基于洞见智研数据发布专业观点，粉丝可直接互动追问，形成高质量投研讨论场。</div>
         <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
           <span style="font-size:11px;background:rgba(200,169,110,0.1);color:var(--gold);padding:3px 10px;border-radius:10px">620位认证大V</span>
           <span style="font-size:11px;background:rgba(200,169,110,0.1);color:var(--gold);padding:3px 10px;border-radius:10px">日均发帖1,200+</span>
@@ -1442,7 +1408,7 @@ body.theme-dark .tech-layer {
     <div class="ix-section-label">Hermes · AI Engine</div>
     <div class="ix-section-title">🦞 Hermes 智能投研引擎</div>
     <div class="ix-divider"></div>
-    <div class="ix-section-desc">金融行业的"龙虾"——不是自由对话的聊天机器人，而是专为投研场景设计的模式化AI工作台。用户通过选择模式和选项驱动分析，降低使用门槛，提升分析质量。</div>
+    <div class="ix-section-desc">Hermes 仍作为保留的扩展研究能力存在，当前默认关闭。等基础场景稳定后，再由 admin 按策略决定是否开放。</div>
 
     <!-- Hermes vs chatbot comparison -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:48px">
@@ -1579,8 +1545,8 @@ body.theme-dark .tech-layer {
 
     <div class="ix-footer-inner">
       <div>
-        <div class="footer-brand-text">冈底斯</div>
-        <div class="footer-brand-sub">GANGTISE FINTECH</div>
+        <div class="footer-brand-text">洞见智研</div>
+        <div class="footer-brand-sub">洞见智研</div>
         <div class="footer-brand-desc">
           整合券商研报、专家纪要、另类数据，以AI驱动的证据链赋能每一位投资决策者。构建中国最专业的投研数据与KOL合伙生态平台。
         </div>
@@ -1589,27 +1555,27 @@ body.theme-dark .tech-layer {
         <div class="footer-col-title">产品</div>
         <a href="/h5" class="footer-col-link">H5 用户端</a>
         <a href="/admin" class="footer-col-link">中后台管理</a>
-        <a href="/dashboard" class="footer-col-link">数据 Dashboard</a>
+        <a href="/admin?section=funnel" class="footer-col-link">后台数据分析</a>
         <a href="/prd" class="footer-col-link">产品设计文档</a>
       </div>
       <div>
-        <div class="footer-col-title">订阅方案</div>
-        <a href="/h5" class="footer-col-link">免费体验</a>
-        <a href="/h5" class="footer-col-link">基础会员 ¥68/月</a>
-        <a href="/h5" class="footer-col-link">专业会员 ¥198/月</a>
-        <a href="/h5" class="footer-col-link">VIP机构 ¥1,800/月</a>
+        <div class="footer-col-title">核心功能</div>
+        <a href="/h5" class="footer-col-link">基本面分析</a>
+        <a href="/h5" class="footer-col-link">自选股</a>
+        <a href="/h5" class="footer-col-link">每日复盘</a>
+        <a href="/h5" class="footer-col-link">我的</a>
       </div>
       <div>
-        <div class="footer-col-title">合伙人</div>
-        <a href="/admin" class="footer-col-link">申请成为KOL合伙人</a>
-        <a href="/admin" class="footer-col-link">B级合伙人 15%佣金</a>
-        <a href="/admin" class="footer-col-link">A级合伙人 18%佣金</a>
-        <a href="/admin" class="footer-col-link">S级合伙人 20%佣金</a>
+        <div class="footer-col-title">后台控制</div>
+        <a href="/admin" class="footer-col-link">默认主题模式</a>
+        <a href="/admin" class="footer-col-link">主题色配置</a>
+        <a href="/admin" class="footer-col-link">功能开关</a>
+        <a href="/admin" class="footer-col-link">访问统计</a>
       </div>
     </div>
 
     <div class="footer-bottom">
-      © 2024 冈底斯金融科技 GANGTISE FINTECH · 本平台提供金融数据参考服务，不构成投资建议 · 投资有风险，决策需谨慎
+      © 2024 洞见智研金融科技 洞见智研 · 本平台提供金融数据参考服务，不构成投资建议 · 投资有风险，决策需谨慎
     </div>
   </div>
 </footer>

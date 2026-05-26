@@ -4,29 +4,85 @@
 //  Lazy rendering: each section renders once on first visit
 // ============================================================
 
-// ---- Brand palette ----
-const GOLD        = '#C8A96E';
-const GOLD_LIGHT  = '#E2C98A';
-const GOLD_DARK   = '#A8893E';
-const NAVY        = '#0D1B2A';
-const NAVY_MID    = '#1A2E45';
-const WHITE       = '#F8F6F0';
-const GRAY        = '#9A9590';
-const GREEN       = '#2ECC71';
-const RED         = '#E74C3C';
-const BLUE        = '#3498DB';
+function themeVar(name, fallback) {
+  const value = getComputedStyle(document.body).getPropertyValue(name).trim();
+  return value || fallback;
+}
+
+function currentPalette() {
+  return {
+    gold: themeVar('--gold', '#C8A96E'),
+    goldLight: themeVar('--gold-light', '#E2C98A'),
+    goldDark: themeVar('--gold-dark', '#A8893E'),
+    navy: themeVar('--navy', '#0D1B2A'),
+    navyMid: themeVar('--navy-mid', '#1A2E45'),
+    white: themeVar('--white', '#F8F6F0'),
+    gray: themeVar('--gray-400', '#9A9590'),
+    green: '#2ECC71',
+    red: '#E74C3C',
+    blue: '#3498DB',
+  };
+}
+
+let GOLD = '#C8A96E';
+let GOLD_LIGHT = '#E2C98A';
+let GOLD_DARK = '#A8893E';
+let NAVY = '#0D1B2A';
+let NAVY_MID = '#1A2E45';
+let WHITE = '#F8F6F0';
+let GRAY = '#9A9590';
+let GREEN = '#2ECC71';
+let RED = '#E74C3C';
+let BLUE = '#3498DB';
+
+function refreshPalette() {
+  const palette = currentPalette();
+  GOLD = palette.gold;
+  GOLD_LIGHT = palette.goldLight;
+  GOLD_DARK = palette.goldDark;
+  NAVY = palette.navy;
+  NAVY_MID = palette.navyMid;
+  WHITE = palette.white;
+  GRAY = palette.gray;
+  GREEN = palette.green;
+  RED = palette.red;
+  BLUE = palette.blue;
+}
+
+function updateChartDefaults() {
+  refreshPalette();
+  Chart.defaults.color = GRAY;
+  Chart.defaults.borderColor = 'rgba(200,169,110,0.08)';
+  Chart.defaults.font.family = "'PingFang SC', 'Microsoft YaHei', sans-serif";
+}
 
 const CHANNEL_COLORS  = ['#07C160', '#FE2C55', '#FF2442', '#E6162D', '#C8A96E'];
 const SEGMENT_COLORS  = ['#4A5568', '#3182CE', '#38A169', '#C8A96E', '#FFD700'];
 const TIER_COLORS     = ['#4A5568', '#3182CE', '#38A169', '#C8A96E'];
 
-// Chart.js defaults
-Chart.defaults.color           = GRAY;
-Chart.defaults.borderColor     = 'rgba(200,169,110,0.08)';
-Chart.defaults.font.family     = "'PingFang SC', 'Microsoft YaHei', sans-serif";
+updateChartDefaults();
 
 // Track which sections have been rendered
 const renderedSections = new Set();
+const chartRegistry = [];
+
+function registerChart(chart) {
+  chartRegistry.push(chart);
+  return chart;
+}
+
+function destroyRegisteredCharts() {
+  while (chartRegistry.length) {
+    const chart = chartRegistry.pop();
+    if (chart && typeof chart.destroy === 'function') chart.destroy();
+  }
+}
+
+function createChart(ctx, config) {
+  const existing = Chart.getChart(ctx);
+  if (existing) existing.destroy();
+  return registerChart(new Chart(ctx, config));
+}
 
 // ============================================================
 //  SECTION NAVIGATION
@@ -41,7 +97,7 @@ const SECTION_TITLES = {
 
 function showDashSection(section) {
   // Update nav active state
-  document.querySelectorAll('.admin-nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('[id^="nav-"]').forEach(el => el.classList.remove('active'));
   const navEl = document.getElementById('nav-' + section);
   if (navEl) navEl.classList.add('active');
 
@@ -59,6 +115,25 @@ function showDashSection(section) {
     renderedSections.add(section);
     renderSection(section);
   }
+}
+
+function getActiveDashSection() {
+  const active = document.querySelector('.dash-section.active');
+  return active ? active.id.replace('ds-', '') : null;
+}
+
+function rerenderDashboardSection(section) {
+  updateChartDefaults();
+  destroyRegisteredCharts();
+  renderedSections.clear();
+  if (document.getElementById('ds-' + section)) {
+    showDashSection(section);
+  }
+}
+
+function initDashboardCharts(initialSection) {
+  const section = initialSection || getActiveDashSection() || 'funnel';
+  rerenderDashboardSection(section);
 }
 
 function renderSection(section) {
@@ -84,7 +159,14 @@ function fmtWan(n) { return (n / 10000).toFixed(1) + '万'; }
 function fmtMoney(n) { return '¥' + fmtWan(n); }
 
 function makeTooltipOptions(extra) {
-  return Object.assign({ backgroundColor: NAVY_MID, borderColor: GOLD, borderWidth: 1 }, extra || {});
+  const palette = currentPalette();
+  return Object.assign({ backgroundColor: palette.navyMid, borderColor: palette.gold, borderWidth: 1 }, extra || {});
+}
+
+function donutLegendPosition(ctx) {
+  const container = ctx && ctx.parentElement;
+  const width = container ? container.clientWidth : window.innerWidth;
+  return width <= 420 ? 'bottom' : 'right';
 }
 
 // ============================================================
@@ -109,17 +191,23 @@ async function renderFunnel() {
   const container = document.getElementById('funnel-container');
   if (!container) return;
   const maxCount = data[0].count;
+  const minWidthPct = 32;
   container.innerHTML = data.map((item, i) => {
     const widthPct  = Math.round((item.count / maxCount) * 100);
     const dropRate  = i > 0 ? ((data[i-1].count - item.count) / data[i-1].count * 100).toFixed(1) : null;
+    const stageWidth = Math.max(widthPct, minWidthPct);
     return `
-      <div class="funnel-row">
-        <div class="funnel-label">${item.layer}</div>
-        <div class="funnel-bar-wrap">
-          <div class="funnel-bar" style="width:${widthPct}%">${widthPct > 20 ? item.layer : ''}</div>
+      <div class="funnel-stage-group">
+        <div class="funnel-stage" style="width:${stageWidth}%">
+          <div class="funnel-stage-box">
+            <div class="funnel-stage-title">${item.layer}</div>
+            <div class="funnel-stage-stats">
+              <span class="funnel-stage-count">${(item.count/10000).toFixed(1)}万</span>
+              <span class="funnel-stage-share">${item.rate.toFixed(1)}%</span>
+            </div>
+          </div>
         </div>
-        <div class="funnel-count">${(item.count/10000).toFixed(1)}万</div>
-        <div class="funnel-rate">${dropRate ? '↓'+dropRate+'%' : '基准'}</div>
+        <div class="funnel-stage-conv ${dropRate ? '' : 'funnel-stage-conv-base'}">${dropRate ? '↓ 较上一层流失 ' + dropRate + '%' : '基准层'}</div>
       </div>`;
   }).join('');
 }
@@ -130,7 +218,7 @@ async function renderChannelDonut() {
   const data = await res.json();
   const ctx  = document.getElementById('channelDonut');
   if (!ctx) return;
-  new Chart(ctx, {
+  createChart(ctx, {
     type: 'doughnut',
     data: {
       labels: data.map(d => d.name),
@@ -145,7 +233,10 @@ async function renderChannelDonut() {
     options: {
       responsive: true, maintainAspectRatio: false, cutout: '65%',
       plugins: {
-        legend: { position: 'right', labels: { color: WHITE, font: { size: 12 }, padding: 12, boxWidth: 12 } },
+        legend: {
+          position: donutLegendPosition(ctx),
+          labels: { color: WHITE, font: { size: 12 }, padding: 12, boxWidth: 12 }
+        },
         tooltip: { callbacks: { label: c => ` ${c.label}: ${(c.raw/10000).toFixed(1)}万用户` } }
       }
     }
@@ -158,7 +249,7 @@ async function renderRevenueTrend() {
   const data = await res.json();
   const ctx  = document.getElementById('revenueTrend');
   if (!ctx) return;
-  new Chart(ctx, {
+  createChart(ctx, {
     type: 'bar',
     data: {
       labels: data.map(d => d.month.slice(5)),
@@ -200,7 +291,7 @@ async function renderKolBar() {
   const data = await res.json();
   const ctx  = document.getElementById('kolBar');
   if (!ctx) return;
-  new Chart(ctx, {
+  createChart(ctx, {
     type: 'bar',
     data: {
       labels: data.map(d => d.name),
@@ -239,7 +330,7 @@ async function renderSegmentDonut() {
   const data   = await res.json();
   const ctx    = document.getElementById('segmentDonut');
   if (!ctx) return;
-  new Chart(ctx, {
+  createChart(ctx, {
     type: 'doughnut',
     data: {
       labels: data.map(d => d.segment),
@@ -264,7 +355,7 @@ async function renderChannelRevenue() {
   const data = await res.json();
   const ctx  = document.getElementById('channelRevenue');
   if (!ctx) return;
-  new Chart(ctx, {
+  createChart(ctx, {
     type: 'bar',
     data: {
       labels: data.map(d => d.name),
@@ -348,7 +439,7 @@ function renderChannelSection() {
   // Stacked bar – channel monthly acquisition
   const ctxStack = document.getElementById('channelStackedBar');
   if (ctxStack) {
-    new Chart(ctxStack, {
+    createChart(ctxStack, {
       type: 'bar',
       data: {
         labels: MONTHS_12_LABEL,
@@ -378,7 +469,7 @@ function renderChannelSection() {
   // Scatter / Bubble – CAC vs LTV
   const ctxScatter = document.getElementById('cacLtvScatter');
   if (ctxScatter) {
-    new Chart(ctxScatter, {
+    createChart(ctxScatter, {
       type: 'bubble',
       data: {
         datasets: CHANNEL_DATA.map((ch, i) => ({
@@ -491,7 +582,7 @@ function renderKolSection() {
   // Top 10 horizontal bar
   const ctxTop10 = document.getElementById('kolTop10Bar');
   if (ctxTop10) {
-    new Chart(ctxTop10, {
+    createChart(ctxTop10, {
       type: 'bar',
       data: {
         labels: KOL_TOP10.map(k => k.name),
@@ -527,7 +618,7 @@ function renderKolSection() {
   // Tier growth line chart
   const ctxTierGrowth = document.getElementById('kolTierGrowth');
   if (ctxTierGrowth) {
-    new Chart(ctxTierGrowth, {
+    createChart(ctxTierGrowth, {
       type: 'line',
       data: {
         labels: MONTHS_12_LABEL,
@@ -551,7 +642,7 @@ function renderKolSection() {
   // Tier donut
   const ctxTierDonut = document.getElementById('kolTierDonut');
   if (ctxTierDonut) {
-    new Chart(ctxTierDonut, {
+    createChart(ctxTierDonut, {
       type: 'doughnut',
       data: {
         labels: ['S级', 'A级', 'B级'],
@@ -646,7 +737,7 @@ function renderRevenueSection() {
   // GMV + Users dual axis
   const ctxGmvUsers = document.getElementById('revGmvUsers');
   if (ctxGmvUsers) {
-    new Chart(ctxGmvUsers, {
+    createChart(ctxGmvUsers, {
       type: 'bar',
       data: {
         labels: MONTHS_12_LABEL,
@@ -673,7 +764,7 @@ function renderRevenueSection() {
   if (ctxTierStack) {
     const tierColors = ['rgba(90,86,80,0.6)', 'rgba(52,152,219,0.7)', 'rgba(46,204,113,0.7)', 'rgba(200,169,110,0.8)'];
     const tierNames  = Object.keys(TIER_REVENUE);
-    new Chart(ctxTierStack, {
+    createChart(ctxTierStack, {
       type: 'line',
       data: {
         labels: MONTHS_12_LABEL,
@@ -702,7 +793,7 @@ function renderRevenueSection() {
   // Channel revenue bar
   const ctxRevChannel = document.getElementById('revChannelBar');
   if (ctxRevChannel) {
-    new Chart(ctxRevChannel, {
+    createChart(ctxRevChannel, {
       type: 'bar',
       data: {
         labels: CHANNEL_DATA.map(c => c.name),
@@ -788,7 +879,7 @@ function renderSegmentSection() {
   // Tier donut
   const ctxSegDonut = document.getElementById('segTierDonut');
   if (ctxSegDonut) {
-    new Chart(ctxSegDonut, {
+    createChart(ctxSegDonut, {
       type: 'doughnut',
       data: {
         labels: SEG_TIERS.map(t => t.name),
@@ -810,7 +901,7 @@ function renderSegmentSection() {
   // ARPU bar
   const ctxArpu = document.getElementById('segArpuBar');
   if (ctxArpu) {
-    new Chart(ctxArpu, {
+    createChart(ctxArpu, {
       type: 'bar',
       data: {
         labels: SEG_TIERS.filter(t => t.arpu > 0).map(t => t.name),
@@ -871,7 +962,22 @@ function renderSegmentSection() {
 // ============================================================
 //  INIT: render funnel section on load (default section)
 // ============================================================
+window.initDashboardCharts = initDashboardCharts;
+window.showDashSection = showDashSection;
+
+document.addEventListener('gangtise:themechange', () => {
+  const active = getActiveDashSection();
+  if (active) {
+    rerenderDashboardSection(active);
+  } else {
+    updateChartDefaults();
+  }
+});
+
 document.addEventListener('DOMContentLoaded', () => {
-  renderedSections.add('funnel');
-  renderFunnelSection();
+  updateChartDefaults();
+  if (window.AUTO_INIT_DASHBOARD === false) return;
+  if (document.getElementById('ds-funnel')) {
+    initDashboardCharts(window.dashboardDefaultSection || 'funnel');
+  }
 });

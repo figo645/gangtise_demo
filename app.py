@@ -335,7 +335,7 @@ def admin():
 
 @app.route("/dashboard")
 def dashboard():
-    return render_template("dashboard.html")
+    return redirect(url_for("admin", section="funnel"))
 
 # API endpoints
 @app.route("/api/funnel")
@@ -479,8 +479,8 @@ def api_ai_analysis():
         "新能源": "新能源车渗透率突破50%里程碑，产业链进入成熟期竞争。电池技术迭代加速，固态电池商业化时间表前移。关注具备技术壁垒的核心零部件企业。",
         "AI科技": "AI算力需求持续超预期，国产替代加速推进。DeepSeek等国内大模型商业化落地提速，应用层投资机会涌现。关注算力基础设施及AI应用双主线。",
     }
-    result = responses.get(topic, f"针对{topic}的深度分析：基于冈底斯平台整合的券商研报、专家会议纪要及另类数据，当前该领域呈现结构性机会。建议结合个人风险偏好，参考KOL合伙人的专业解读后做出投资决策。")
-    return jsonify({"topic": topic, "analysis": result, "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"), "source": "冈底斯AI分析引擎 (DeepSeek + Kimi 2.6)"})
+    result = responses.get(topic, f"针对{topic}的深度分析：基于洞见智研平台整合的券商研报、专家会议纪要及另类数据，当前该领域呈现结构性机会。建议结合个人风险偏好，参考KOL合伙人的专业解读后做出投资决策。")
+    return jsonify({"topic": topic, "analysis": result, "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"), "source": "洞见智研AI分析引擎 (DeepSeek + Kimi 2.6)"})
 
 def gen_community_posts():
     return [
@@ -489,21 +489,21 @@ def gen_community_posts():
         {"id":2,"author":"投资女神Lisa","avatar":"💎","tier":"大V","badge":"S级合伙人","platform":"小红书","time":"23分钟前",
          "content":"港股互联网这波反弹我觉得还没结束。南向资金连续12个交易日净流入，机构在悄悄加仓。平台经济监管边际改善是核心逻辑，估值还在历史低位。我已经在某互联网龙头上建了底仓，等待催化剂。","likes":218,"comments":64,"shares":31,"tags":["港股","互联网"],"hot":True,"points_reward":50},
         {"id":3,"author":"宏观策略师","avatar":"🎯","tier":"大V","badge":"A级合伙人","platform":"微信","time":"1小时前",
-         "content":"分享一个另类数据视角：冈底斯卫星数据显示，长三角工业园区夜间灯光指数环比+6.2%，这是工业活动回暖的先行信号。结合PMI数据，Q2经济复苏力度可能超预期。关注顺周期板块。","likes":156,"comments":43,"shares":28,"tags":["另类数据","宏观","顺周期"],"hot":False,"points_reward":30},
+         "content":"分享一个另类数据视角：洞见智研卫星数据显示，长三角工业园区夜间灯光指数环比+6.2%，这是工业活动回暖的先行信号。结合PMI数据，Q2经济复苏力度可能超预期。关注顺周期板块。","likes":156,"comments":43,"shares":28,"tags":["另类数据","宏观","顺周期"],"hot":False,"points_reward":30},
         {"id":4,"author":"量化小白","avatar":"📊","tier":"认证用户","badge":"A级合伙人","platform":"微博","time":"2小时前",
-         "content":"用冈底斯的Hermes跑了一个新能源板块的量化筛选，结果很有意思：固态电池产业链中，有3家公司的专利申请数量在过去6个月翻倍，但股价还没有反应。这种信息差就是alpha的来源。","likes":98,"comments":29,"shares":19,"tags":["量化","新能源","固态电池"],"hot":False,"points_reward":30},
+         "content":"用洞见智研的Hermes跑了一个新能源板块的量化筛选，结果很有意思：固态电池产业链中，有3家公司的专利申请数量在过去6个月翻倍，但股价还没有反应。这种信息差就是alpha的来源。","likes":98,"comments":29,"shares":19,"tags":["量化","新能源","固态电池"],"hot":False,"points_reward":30},
         {"id":5,"author":"港股研究员","avatar":"🏙️","tier":"认证用户","badge":"B级合伙人","platform":"抖音","time":"3小时前",
-         "content":"刚参加完某消费品牌的专家电话会议（冈底斯平台组织），核心观点：Q2动销数据好于预期，渠道库存已经基本出清，下半年有望量价齐升。这类一手信息真的很难在公开渠道找到。","likes":76,"comments":22,"shares":14,"tags":["消费","专家纪要"],"hot":False,"points_reward":30},
+         "content":"刚参加完某消费品牌的专家电话会议（洞见智研平台组织），核心观点：Q2动销数据好于预期，渠道库存已经基本出清，下半年有望量价齐升。这类一手信息真的很难在公开渠道找到。","likes":76,"comments":22,"shares":14,"tags":["消费","专家纪要"],"hot":False,"points_reward":30},
         {"id":6,"author":"普通用户_阿明","avatar":"😊","tier":"普通","badge":"","platform":"","time":"4小时前",
-         "content":"第一次用冈底斯的Hermes分析工具，选了「研报精读」模式，把高盛的A股报告喂进去，AI给出的摘要和关键数据提取真的很准。比自己读省了至少2小时。积分也涨了，感觉很值！","likes":45,"comments":18,"shares":8,"tags":["使用体验","Hermes"],"hot":False,"points_reward":10},
+         "content":"第一次用洞见智研的Hermes分析工具，选了「研报精读」模式，把高盛的A股报告喂进去，AI给出的摘要和关键数据提取真的很准。比自己读省了至少2小时。积分也涨了，感觉很值！","likes":45,"comments":18,"shares":8,"tags":["使用体验","Hermes"],"hot":False,"points_reward":10},
     ]
 
 def gen_community_events():
     return [
         {"id":1,"title":"【大V直播】财经老王：下半年A股配置策略","type":"直播","date":"2026-05-22 20:00","host":"财经老王","participants":2840,"points":100,"status":"报名中","badge":"🔴 即将开始"},
-        {"id":2,"title":"【研报解读挑战赛】最佳分析师评选","type":"活动","date":"2026-05-20 ~ 06-05","host":"冈底斯官方","participants":1260,"points":500,"status":"进行中","badge":"🏆 进行中"},
+        {"id":2,"title":"【研报解读挑战赛】最佳分析师评选","type":"活动","date":"2026-05-20 ~ 06-05","host":"洞见智研官方","participants":1260,"points":500,"status":"进行中","badge":"🏆 进行中"},
         {"id":3,"title":"【专家会议】新能源产业链Q2展望","type":"会议","date":"2026-05-24 14:00","host":"行业专家团","participants":680,"points":200,"status":"报名中","badge":"🎙️ 专家"},
-        {"id":4,"title":"【积分翻倍】本周发帖积分×2","type":"活动","date":"2026-05-20 ~ 05-26","host":"冈底斯官方","participants":5600,"points":0,"status":"进行中","badge":"⚡ 限时"},
+        {"id":4,"title":"【积分翻倍】本周发帖积分×2","type":"活动","date":"2026-05-20 ~ 05-26","host":"洞见智研官方","participants":5600,"points":0,"status":"进行中","badge":"⚡ 限时"},
     ]
 
 def gen_user_profile():
@@ -613,9 +613,9 @@ HERMES_MODES = {
 }
 
 HERMES_RESPONSES = {
-    "研报精读_高盛 A股策略报告": "【高盛A股策略报告精读】\n\n核心观点：维持A股「超配」评级，目标点位上调至4200点。\n\n关键数据：\n• 外资净流入连续8周正值，累计+420亿\n• 企业盈利预测上调3.2%\n• 估值PE 12.8x，低于历史均值15%\n\n主要逻辑：政策宽松周期+盈利复苏共振，科技板块受益AI应用落地。\n\n风险提示：地缘政治、汇率波动、房地产尾部风险。\n\n冈底斯评级：★★★★☆ 高质量研报",
+    "研报精读_高盛 A股策略报告": "【高盛A股策略报告精读】\n\n核心观点：维持A股「超配」评级，目标点位上调至4200点。\n\n关键数据：\n• 外资净流入连续8周正值，累计+420亿\n• 企业盈利预测上调3.2%\n• 估值PE 12.8x，低于历史均值15%\n\n主要逻辑：政策宽松周期+盈利复苏共振，科技板块受益AI应用落地。\n\n风险提示：地缘政治、汇率波动、房地产尾部风险。\n\n洞见智研评级：★★★★☆ 高质量研报",
     "专家纪要速读_新能源产业链": "【新能源产业链专家纪要摘要】\n\n会议时间：2026年5月18日\n参与专家：3位产业链核心专家\n\n核心观点：\n• 固态电池量产时间表提前至2027年Q3\n• 碳酸锂价格底部已现，Q3有望反弹\n• 海外市场拓展加速，欧洲工厂投产在即\n\n数据亮点：\n• 某头部电池企业Q2出货量环比+18%\n• 储能业务占比提升至35%\n\n投资含义：产业链底部已过，关注技术壁垒强的核心零部件企业。",
-    "另类数据解读_卫星工业活动指数": "【卫星工业活动指数解读】\n\n数据时间：2026年5月第3周\n覆盖范围：长三角、珠三角、京津冀三大工业区\n\n核心信号：\n• 夜间灯光指数：+6.2%（环比）\n• 工厂烟囱热成像活跃度：+4.8%\n• 停车场占用率（工业园区）：+9.1%\n\n综合判断：工业活动明显回暖，领先PMI约2-3周。预计5月PMI数据将超预期。\n\n交叉验证：与货运数据、用电量数据形成三重共振，信号可靠性高。\n\n冈底斯信号强度：🟢🟢🟢🟢⚪ 强烈看多",
+    "另类数据解读_卫星工业活动指数": "【卫星工业活动指数解读】\n\n数据时间：2026年5月第3周\n覆盖范围：长三角、珠三角、京津冀三大工业区\n\n核心信号：\n• 夜间灯光指数：+6.2%（环比）\n• 工厂烟囱热成像活跃度：+4.8%\n• 停车场占用率（工业园区）：+9.1%\n\n综合判断：工业活动明显回暖，领先PMI约2-3周。预计5月PMI数据将超预期。\n\n交叉验证：与货运数据、用电量数据形成三重共振，信号可靠性高。\n\n洞见智研信号强度：🟢🟢🟢🟢⚪ 强烈看多",
     "市场情绪扫描_A股全市场": "【A股市场情绪扫描报告】\n\n扫描时间：2026-05-20 实时\n\n情绪指标：\n• 恐贪指数：62（偏贪婪区间）\n• 融资余额：+3.2%（周环比）\n• 北向资金：今日净流入+28亿\n• 涨停板数量：47只（近期高位）\n\n情绪解读：市场处于温和乐观状态，未到极度贪婪。短期动能较强，但需警惕情绪过热后的回调风险。\n\n历史对比：当前情绪水平对应历史上未来1个月正收益概率约68%。\n\n操作建议：可适度参与，但控制仓位，避免追高。",
 }
 
@@ -659,7 +659,7 @@ def api_hermes_analyze():
     mode = request.json.get("mode", "研报精读")
     option = request.json.get("option", "")
     key = f"{mode}_{option}"
-    result = HERMES_RESPONSES.get(key, f"【{mode} · {option}】\n\n基于冈底斯平台整合的多维度数据，AI已完成深度分析。\n\n核心发现：该领域当前呈现结构性机会，关键指标向好。建议结合个人风险偏好，参考大V合伙人的专业解读后做出投资决策。\n\n数据来源：券商研报库 + 专家纪要库 + 另类数据库\nAI引擎：DeepSeek R2 + Kimi 2.6 RAG架构\n分析时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    result = HERMES_RESPONSES.get(key, f"【{mode} · {option}】\n\n基于洞见智研平台整合的多维度数据，AI已完成深度分析。\n\n核心发现：该领域当前呈现结构性机会，关键指标向好。建议结合个人风险偏好，参考大V合伙人的专业解读后做出投资决策。\n\n数据来源：券商研报库 + 专家纪要库 + 另类数据库\nAI引擎：DeepSeek R2 + Kimi 2.6 RAG架构\n分析时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
     return jsonify({
         "mode": mode,
         "option": option,
@@ -760,7 +760,7 @@ def api_dm_send():
     def reply_for(kw_match):
         base = persona["name"]
         if "买" in content or "卖" in content or "推荐" in content or "代码" in content:
-            return f"我只能基于公开数据分享研究观点，无法给具体买卖建议哦。你可以参考冈底斯Hermes的「AI资产配置」做组合规划，或在「AI行情预判」看历史区间和模型推演的概率分布，结合自己的风险偏好判断。"
+            return f"我只能基于公开数据分享研究观点，无法给具体买卖建议哦。你可以参考洞见智研Hermes的「AI资产配置」做组合规划，或在「AI行情预判」看历史区间和模型推演的概率分布，结合自己的风险偏好判断。"
         if "新能源" in text or "电池" in text or "锂" in text:
             if kol_id == 5:
                 return f"我刚跑完一轮产业链调研：固态电池量产时间表略有提前迹象，中游材料端景气度在恢复。可以关注以下三个维度：①电解质技术路线分化 ②碳酸锂价格底部信号 ③海外工厂投产节奏。具体标的我不点名，避免合规风险，你可以用Hermes的量化因子筛选自己跑一下。"
@@ -784,7 +784,7 @@ def api_dm_send():
         if turn <= 2:
             return f"你这个问题挺好。我先简单回应：基于我最近跟踪的数据（{('、'.join(persona['focus'][:2]))}方向），目前的情况是结构性机会大于系统性机会。要不你具体说说你的关注点？是想看赛道、还是想做资产配置？"
         if turn <= 4:
-            return f"明白。我补充一下数据视角：冈底斯平台最近的研报数据库里，{persona['focus'][0]}相关研报量周环比+12%，机构关注度在抬升。但研报关注≠股价上涨，仅作信号参考。你的仓位结构是怎样的？我可以帮你从大方向上看一下平衡性。"
+            return f"明白。我补充一下数据视角：洞见智研平台最近的研报数据库里，{persona['focus'][0]}相关研报量周环比+12%，机构关注度在抬升。但研报关注≠股价上涨，仅作信号参考。你的仓位结构是怎样的？我可以帮你从大方向上看一下平衡性。"
         return f"咱们聊了几轮，我建议你这样做：①用Hermes的「AI资产配置」生成一份组合参考 ②用「AI行情预判」看一下你关注标的的历史走势区间 ③有具体观点了，再回来跟我对一对。最终决策一定是你自己做，我们这边只能给数据和研究框架。"
 
     reply = reply_for(content)
@@ -844,7 +844,7 @@ def api_ai_allocation():
         "max_drawdown": p["max_drawdown"],
         "rebalance": p["rebalance"],
         "sector_focus": p["sector"],
-        "data_source": "基于冈底斯回测引擎(2015-2026)+ 多因子模型 + Black-Litterman 框架",
+        "data_source": "基于洞见智研回测引擎(2015-2026)+ 多因子模型 + Black-Litterman 框架",
         "disclaimer": "本配置方案为模型推演结果，基于历史数据回测，不构成投资建议。市场有风险，实际收益可能与回测区间显著偏离。",
         "compute_used": 5,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -914,7 +914,7 @@ def api_ai_forecast():
         "history_commentary": history_commentary,
         "forecast_disclaimer": "⚠️ 未来区间为模型基于历史波动率推演的概率分布，不构成方向判断和投资建议。实际走势受多重因素影响，可能显著偏离区间。",
         "correlations": correlations,
-        "data_source": "冈底斯多因子模型 + 历史波动率Monte Carlo推演 + RAG数据库",
+        "data_source": "洞见智研多因子模型 + 历史波动率Monte Carlo推演 + RAG数据库",
         "compute_used": 8,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
     })

@@ -3,22 +3,46 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>冈底斯系统锁定</title>
+<title>洞见智研系统锁定</title>
 <link rel="stylesheet" href="/static/css/style.css">
+<script>
+  window.SITE_CONFIG = {{ site_config | tojson }};
+</script>
+<script src="/static/js/theme.js"></script>
 <style>
-body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at top,#1A2E45 0%,#0D1B2A 55%,#08111d 100%);font-family:var(--font-main);color:var(--white)}
-.lock-overlay{width:min(92vw,420px);background:rgba(26,46,69,0.92);border:1px solid rgba(200,169,110,0.22);border-radius:18px;padding:28px;box-shadow:0 24px 80px rgba(0,0,0,.45);backdrop-filter:blur(14px)}
+body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at top,var(--surface-3) 0%,var(--surface-2) 55%,var(--surface) 100%);font-family:var(--font-main);color:var(--text-main);transition:background .2s,color .2s}
+.lock-overlay{width:min(92vw,420px);background:color-mix(in srgb,var(--navy-mid) 90%,transparent);border:1px solid rgba(200,169,110,0.22);border-radius:18px;padding:28px;box-shadow:0 24px 80px rgba(0,0,0,.18);backdrop-filter:blur(14px)}
 .lock-title{font-size:24px;font-weight:700;color:var(--gold);letter-spacing:2px;margin-bottom:8px}
-.lock-desc{font-size:13px;color:var(--gray-400);line-height:1.7;margin-bottom:20px}
+.lock-desc{font-size:13px;color:var(--text-sub);line-height:1.7;margin-bottom:20px}
 .lock-form{display:flex;flex-direction:column;gap:12px}
-.lock-input{width:100%;background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);border-radius:10px;padding:12px 14px;color:var(--white);font-size:15px;outline:none}
-.lock-input:focus{border-color:var(--gold)}
+.lock-input{width:100%;border:1px solid rgba(200,169,110,0.2);border-radius:10px;padding:12px 14px;font-size:15px;outline:none;transition:background .2s,color .2s,border-color .2s,box-shadow .2s}
+.lock-input,
+.lock-input[type="password"]{background:#ffffff;color:#182132;-webkit-text-fill-color:#182132;caret-color:#182132}
+.lock-input::placeholder{color:var(--text-sub)}
+.lock-input:focus{border-color:var(--gold);box-shadow:0 0 0 3px color-mix(in srgb,var(--gold) 18%,transparent)}
+.lock-input:-webkit-autofill,
+.lock-input:-webkit-autofill:hover,
+.lock-input:-webkit-autofill:focus,
+.lock-input:-webkit-autofill:active{-webkit-text-fill-color:#182132;box-shadow:0 0 0 1000px #ffffff inset;transition:background-color 9999s ease-out 0s}
 .lock-error{background:rgba(231,76,60,.12);border:1px solid rgba(231,76,60,.25);color:#ff8d80;border-radius:10px;padding:10px 12px;font-size:13px}
-.lock-note{font-size:11px;color:var(--gray-400);margin-top:10px}
+.lock-note{font-size:11px;color:var(--text-sub);margin-top:10px}
 .btn-lock{width:100%;padding:12px 16px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--gold-dark),var(--gold-light));color:var(--navy);font-weight:700;cursor:pointer}
+body.theme-dark .lock-overlay{box-shadow:0 24px 80px rgba(0,0,0,.45)}
+body.theme-light .lock-input,
+body.theme-light .lock-input[type="password"]{background:#ffffff;color:#182132;-webkit-text-fill-color:#182132;caret-color:#182132}
+body.theme-light .lock-input:-webkit-autofill,
+body.theme-light .lock-input:-webkit-autofill:hover,
+body.theme-light .lock-input:-webkit-autofill:focus,
+body.theme-light .lock-input:-webkit-autofill:active{-webkit-text-fill-color:#182132;box-shadow:0 0 0 1000px #ffffff inset}
+body.theme-dark .lock-input,
+body.theme-dark .lock-input[type="password"]{background:#243B55;color:#F8F6F0;-webkit-text-fill-color:#F8F6F0;caret-color:#F8F6F0}
+body.theme-dark .lock-input:-webkit-autofill,
+body.theme-dark .lock-input:-webkit-autofill:hover,
+body.theme-dark .lock-input:-webkit-autofill:focus,
+body.theme-dark .lock-input:-webkit-autofill:active{-webkit-text-fill-color:#F8F6F0;box-shadow:0 0 0 1000px #243B55 inset}
 </style>
 </head>
-<body>
+<body onload="initGangtiseTheme()">
   <div class="lock-overlay">
     <div class="lock-title">系统已锁定</div>
     <div class="lock-desc">请输入访问密码后进入系统。</div>
