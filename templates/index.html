@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>冈底斯金融科技 — 智能投研平台</title>
 <link rel="stylesheet" href="/static/css/style.css">
+<script>
+  window.SITE_CONFIG = {{ site_config | tojson }};
+</script>
+<script src="/static/js/theme.js"></script>
 <style>
 /* ============================================================
    INDEX PAGE – SPECIFIC STYLES
@@ -12,6 +16,7 @@
 ============================================================ */
 
 html { scroll-behavior: smooth; }
+body { background: var(--surface); color: var(--text-main); }
 
 /* ---- SECTION WRAPPERS ---- */
 .ix-section {
@@ -21,10 +26,10 @@ html { scroll-behavior: smooth; }
   overflow: hidden;
 }
 .ix-section-alt {
-  background: linear-gradient(160deg, #0f2135 0%, #0D1B2A 100%);
+  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%);
 }
 .ix-section-dark {
-  background: linear-gradient(160deg, #0D1B2A 0%, #081422 100%);
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
 }
 .ix-inner {
   max-width: 1100px;
@@ -66,7 +71,7 @@ html { scroll-behavior: smooth; }
 ======================================================== */
 .hero-section {
   min-height: 100vh;
-  background: linear-gradient(160deg, var(--navy) 0%, var(--navy-mid) 50%, #0A1628 100%);
+  background: linear-gradient(160deg, var(--surface) 0%, var(--surface-2) 55%, var(--surface-3) 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -191,14 +196,14 @@ html { scroll-behavior: smooth; }
   gap: 24px;
 }
 .ix-nav-card {
-  background: rgba(26,46,69,0.6);
-  border: 1px solid rgba(200,169,110,0.18);
+  background: var(--navy-mid);
+  border: 1px solid var(--border-soft);
   border-radius: 16px;
   padding: 32px 28px;
   text-decoration: none;
-  color: var(--white);
+  color: var(--text-main);
   transition: all 0.3s;
-  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-soft);
   display: block;
   position: relative;
   overflow: hidden;
@@ -255,8 +260,8 @@ html { scroll-behavior: smooth; }
   opacity: 0.7;
 }
 .biz-node {
-  background: rgba(26,46,69,0.8);
-  border: 1px solid rgba(200,169,110,0.15);
+  background: var(--navy-mid);
+  border: 1px solid var(--border-soft);
   border-radius: 10px;
   padding: 14px 18px;
   font-size: 13px;
@@ -346,8 +351,8 @@ html { scroll-behavior: smooth; }
   flex-wrap: wrap;
 }
 .funnel-channel-card {
-  background: rgba(26,46,69,0.7);
-  border: 1px solid rgba(200,169,110,0.15);
+  background: var(--navy-mid);
+  border: 1px solid var(--border-soft);
   border-radius: 10px;
   padding: 14px 20px;
   text-align: center;
@@ -378,8 +383,8 @@ html { scroll-behavior: smooth; }
 .funnel-layer:hover { transform: scaleX(1.01); }
 .funnel-layer-name { font-size: 15px; font-weight: 700; color: var(--white); min-width: 100px; }
 .funnel-layer-count { font-size: 22px; font-weight: 700; color: var(--gold); min-width: 80px; text-align: right; }
-.funnel-layer-desc { font-size: 12px; color: rgba(255,255,255,0.7); flex: 1; text-align: center; line-height: 1.4; }
-.funnel-layer-rate { font-size: 12px; color: rgba(255,255,255,0.6); min-width: 80px; text-align: right; }
+.funnel-layer-desc { font-size: 12px; color: var(--text-sub); flex: 1; text-align: center; line-height: 1.4; }
+.funnel-layer-rate { font-size: 12px; color: var(--text-sub); min-width: 80px; text-align: right; }
 
 /* ========================================================
    SECTION 5: KOL PARTNERSHIP
@@ -391,10 +396,11 @@ html { scroll-behavior: smooth; }
   margin-bottom: 40px;
 }
 .kol-col-card {
-  background: rgba(26,46,69,0.5);
-  border: 1px solid rgba(200,169,110,0.15);
+  background: var(--navy-mid);
+  border: 1px solid var(--border-soft);
   border-radius: 14px;
   padding: 28px 24px;
+  box-shadow: var(--shadow-soft);
 }
 .kol-col-header {
   display: flex;
@@ -466,7 +472,7 @@ html { scroll-behavior: smooth; }
   font-weight: 600;
   background: rgba(200,169,110,0.06);
   border-bottom: 2px solid rgba(200,169,110,0.12);
-  color: var(--gray-200);
+  color: var(--text-main);
 }
 .feature-table th.highlight-col {
   background: rgba(200,169,110,0.14);
@@ -512,13 +518,14 @@ html { scroll-behavior: smooth; }
   margin-top: 8px;
 }
 .tech-layer {
-  background: rgba(26,46,69,0.5);
-  border: 1px solid rgba(200,169,110,0.12);
+  background: var(--navy-mid);
+  border: 1px solid var(--border-soft);
   border-radius: 12px;
   padding: 20px;
   text-align: center;
   position: relative;
   transition: border-color 0.2s;
+  box-shadow: var(--shadow-soft);
 }
 .tech-layer:hover { border-color: rgba(200,169,110,0.35); }
 .tech-layer-label {
@@ -563,7 +570,7 @@ html { scroll-behavior: smooth; }
   content: '→';
   font-size: 16px;
   color: rgba(200,169,110,0.5);
-  background: #0D1B2A;
+  background: var(--surface);
   padding: 0 4px;
 }
 .tech-arch-label {
@@ -577,9 +584,9 @@ html { scroll-behavior: smooth; }
    FOOTER
 ======================================================== */
 .ix-footer {
-  background: linear-gradient(160deg, #081422 0%, #0D1B2A 100%);
+  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%);
   padding: 60px 40px 40px;
-  border-top: 1px solid rgba(200,169,110,0.1);
+  border-top: 1px solid var(--border-soft);
 }
 .ix-footer-inner {
   max-width: 1100px;
@@ -642,6 +649,40 @@ html { scroll-behavior: smooth; }
   color: var(--gray-600);
 }
 
+.ix-top-nav {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-soft);
+  padding: 0 40px;
+}
+
+body.theme-dark .ix-section-alt {
+  background: linear-gradient(160deg, #0f2135 0%, #0D1B2A 100%);
+}
+
+body.theme-dark .ix-section-dark {
+  background: linear-gradient(160deg, #0D1B2A 0%, #081422 100%);
+}
+
+body.theme-dark .ix-footer {
+  background: linear-gradient(160deg, #081422 0%, #0D1B2A 100%);
+}
+
+body.theme-dark .ix-top-nav {
+  background: rgba(13,27,42,0.92);
+}
+
+body.theme-dark .ix-nav-card,
+body.theme-dark .biz-node,
+body.theme-dark .funnel-channel-card,
+body.theme-dark .kol-col-card,
+body.theme-dark .tech-layer {
+  box-shadow: none;
+}
+
 /* ========================================================
    RESPONSIVE
 ======================================================== */
@@ -665,12 +706,12 @@ html { scroll-behavior: smooth; }
 }
 </style>
 </head>
-<body>
+<body onload="initGangtiseTheme()">
 
 <!-- ======================================================
      STICKY TOP NAV
 ====================================================== -->
-<nav style="position:sticky;top:0;z-index:1000;background:rgba(13,27,42,0.92);backdrop-filter:blur(16px);border-bottom:1px solid rgba(200,169,110,0.12);padding:0 40px">
+<nav class="ix-top-nav">
   <div style="max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:56px">
     <div style="font-size:18px;font-weight:700;color:var(--gold);letter-spacing:2px">冈底斯</div>
     <div style="display:flex;gap:28px;font-size:13px;color:var(--gray-400)">

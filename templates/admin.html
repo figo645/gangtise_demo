@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>冈底斯 — 运营管理中心</title>
 <link rel="stylesheet" href="/static/css/style.css">
+<script>
+  window.SITE_CONFIG = {{ site_config | tojson }};
+</script>
+<script src="/static/js/theme.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   .toggle-wrap { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
@@ -74,9 +78,13 @@
   .audit-table th { color:#9A9590; background:rgba(200,169,110,0.06); text-align:left; }
   .audit-table td { color:#D8D4CC; }
   .audit-chart-wrap { height:280px; }
+  .theme-pill-group { display:flex; gap:8px; flex-wrap:wrap; }
+  .theme-pill { padding:6px 10px; border-radius:999px; border:1px solid rgba(200,169,110,0.2); background:transparent; color:var(--white); cursor:pointer; font-size:12px; }
+  .theme-pill.active { background:rgba(200,169,110,0.15); color:var(--gold); border-color:var(--gold); }
+  .feature-note { font-size:12px; color:#8899aa; line-height:1.7; margin-top:10px; }
 </style>
 </head>
-<body>
+<body onload="initGangtiseTheme()">
 <div class="admin-layout">
 
   <!-- Sidebar -->
@@ -1449,73 +1457,84 @@
       <div id="section-settings" style="display:none">
         <div class="config-grid">
           <div class="config-card">
-            <div class="config-card-title">平台基础配置</div>
+            <div class="config-card-title">主题策略</div>
             <div class="config-field">
-              <label>站点名称</label>
-              <input type="text" value="冈底斯 Gangtise">
+              <label>默认模式</label>
+              <div class="theme-pill-group" id="theme-mode-group">
+                <button class="theme-pill" data-mode="light" onclick="pickAdminThemeMode('light')">浅色咨询风</button>
+                <button class="theme-pill" data-mode="dark" onclick="pickAdminThemeMode('dark')">黑色模式</button>
+              </div>
             </div>
             <div class="config-field">
-              <label>联系邮箱</label>
-              <input type="text" value="ops@gangtise.com">
+              <label>默认主题色</label>
+              <div class="theme-pill-group" id="theme-accent-group">
+                <button class="theme-pill" data-accent="blue" onclick="pickAdminAccent('blue')">雪球蓝</button>
+                <button class="theme-pill" data-accent="green" onclick="pickAdminAccent('green')">青绿</button>
+                <button class="theme-pill" data-accent="slate" onclick="pickAdminAccent('slate')">石板灰</button>
+                <button class="theme-pill" data-accent="amber" onclick="pickAdminAccent('amber')">琥珀</button>
+              </div>
             </div>
-            <div class="config-field">
-              <label>ICP备案号</label>
-              <input type="text" value="沪ICP备2024XXXXXX号">
-            </div>
-            <button class="btn-gold" style="padding:8px 20px;font-size:13px;margin-top:4px" onclick="showToast('基础配置已保存')">保存配置</button>
-          </div>
-          <div class="config-card">
-            <div class="config-card-title">合规规则配置</div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">内容发布前审核</span>
-              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">AI分析免责声明</span>
-              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">敏感词自动拦截</span>
-              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">投资建议水印</span>
-              <label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label>
+            <div class="feature-note">
+              默认对外建议使用白底咨询风，保留黑色模式供用户自行切换。用户端仍可通过前台主题功能覆盖默认设置。
             </div>
           </div>
           <div class="config-card">
-            <div class="config-card-title">AI引擎配置</div>
-            <div class="config-field">
-              <label>当前模型</label>
-              <input type="text" value="DeepSeek R2 + Kimi 2.6">
+            <div class="config-card-title">首发功能开关</div>
+            <div class="toggle-wrap">
+              <span class="toggle-label">基本面分析</span>
+              <label class="toggle"><input id="feature-fundamental_analysis" type="checkbox" checked><span class="toggle-slider"></span></label>
             </div>
-            <div class="config-field">
-              <label>API速率限制</label>
-              <input type="text" value="1000 次/天">
+            <div class="toggle-wrap">
+              <span class="toggle-label">自选股</span>
+              <label class="toggle"><input id="feature-watchlist" type="checkbox" checked><span class="toggle-slider"></span></label>
             </div>
-            <div class="config-field">
-              <label>响应超时</label>
-              <input type="text" value="30s">
+            <div class="toggle-wrap">
+              <span class="toggle-label">每日复盘</span>
+              <label class="toggle"><input id="feature-daily_review" type="checkbox" checked><span class="toggle-slider"></span></label>
             </div>
-            <button class="btn-gold" style="padding:8px 20px;font-size:13px;margin-top:4px" onclick="showToast('AI引擎配置已保存')">保存配置</button>
+            <div class="toggle-wrap">
+              <span class="toggle-label">社区</span>
+              <label class="toggle"><input id="feature-community" type="checkbox"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
+              <span class="toggle-label">Hermes</span>
+              <label class="toggle"><input id="feature-hermes" type="checkbox"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
+              <span class="toggle-label">会员页</span>
+              <label class="toggle"><input id="feature-vip" type="checkbox"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
+              <span class="toggle-label">消息/私信</span>
+              <label class="toggle"><input id="feature-dm" type="checkbox"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
+              <span class="toggle-label">大V工作台</span>
+              <label class="toggle"><input id="feature-workbench" type="checkbox"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="feature-note">
+              根据 2026年5月18日访谈和 2026年5月24日产品定位会议，当前建议仅对外保留三项基础功能，其余先通过 admin 控制关闭。
+            </div>
           </div>
           <div class="config-card">
-            <div class="config-card-title">通知配置</div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">新KOL申请通知</span>
-              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+            <div class="config-card-title">对外策略说明</div>
+            <div class="config-field">
+              <label>当前首发范围</label>
+              <input type="text" value="基本面分析 / 自选股 / 每日复盘" readonly>
             </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">违规内容告警</span>
-              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+            <div class="config-field">
+              <label>策略备注</label>
+              <input type="text" value="减少对外功能暴露，优先验证高频低风险能力" readonly>
             </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">结算提醒</span>
-              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+            <div class="feature-note">
+              这套配置适合先服务大V合作导流和少量 C 端承接，避免在早期暴露过多复杂功能与运维负担。
             </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">系统异常告警</span>
-              <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+          </div>
+          <div class="config-card">
+            <div class="config-card-title">保存发布</div>
+            <button class="btn-gold" style="padding:10px 20px;font-size:13px;margin-top:4px;width:100%" onclick="saveSiteConfig()">保存主题与功能配置</button>
+            <div class="feature-note" id="site-config-status">
+              保存后，H5 用户端会按默认主题和功能开关展示；用户自己的主题选择仍然会被本地记住。
             </div>
           </div>
         </div>
@@ -1572,6 +1591,82 @@ function showToast(msg) {
   setTimeout(() => { t.style.opacity='0'; setTimeout(() => t.remove(), 300); }, 2000);
 }
 
+let adminSiteConfig = JSON.parse(JSON.stringify(window.SITE_CONFIG || {}));
+
+function markActivePill(groupId, attr, value) {
+  document.querySelectorAll(`#${groupId} .theme-pill`).forEach(btn => {
+    btn.classList.toggle('active', btn.dataset[attr] === value);
+  });
+}
+
+function renderSiteConfigForm() {
+  const cfg = adminSiteConfig || {};
+  const flags = cfg.feature_flags || {};
+  markActivePill('theme-mode-group', 'mode', cfg.default_theme || 'light');
+  markActivePill('theme-accent-group', 'accent', cfg.default_accent || 'blue');
+  ['fundamental_analysis', 'watchlist', 'daily_review', 'community', 'hermes', 'vip', 'dm', 'workbench'].forEach(key => {
+    const checkbox = document.getElementById('feature-' + key);
+    if (checkbox) checkbox.checked = Boolean(flags[key]);
+  });
+}
+
+function pickAdminThemeMode(mode) {
+  adminSiteConfig.default_theme = mode;
+  renderSiteConfigForm();
+  setGangtiseTheme(mode);
+}
+
+function pickAdminAccent(accent) {
+  adminSiteConfig.default_accent = accent;
+  renderSiteConfigForm();
+  setGangtiseAccent(accent);
+}
+
+async function loadSiteConfig() {
+  try {
+    const res = await fetch('/api/admin/site-config');
+    if (res.ok) {
+      adminSiteConfig = await res.json();
+    }
+  } catch (e) {}
+  renderSiteConfigForm();
+}
+
+async function saveSiteConfig() {
+  const featureFlags = {};
+  ['fundamental_analysis', 'watchlist', 'daily_review', 'community', 'hermes', 'vip', 'dm', 'workbench'].forEach(key => {
+    const checkbox = document.getElementById('feature-' + key);
+    featureFlags[key] = Boolean(checkbox && checkbox.checked);
+  });
+  const payload = {
+    default_theme: adminSiteConfig.default_theme || 'light',
+    default_accent: adminSiteConfig.default_accent || 'blue',
+    feature_flags: featureFlags,
+  };
+  const status = document.getElementById('site-config-status');
+  try {
+    const res = await fetch('/api/admin/site-config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error('save_failed');
+    adminSiteConfig = data.site_config;
+    window.SITE_CONFIG = data.site_config;
+    renderSiteConfigForm();
+    if (status) {
+      status.textContent = '已保存。用户端会按当前默认主题和功能开关展示。';
+    }
+    showToast('站点配置已保存');
+  } catch (e) {
+    if (status) {
+      status.textContent = '保存失败，请重试。';
+    }
+    showToast('保存失败');
+  }
+}
+
 async function renderAccessAudit() {
   const res = await fetch('/api/admin/access-stats');
   if (!res.ok) return;
@@ -1580,25 +1675,28 @@ async function renderAccessAudit() {
   const pathCtx = document.getElementById('auditPathChart');
   const ipCtx = document.getElementById('auditIpChart');
   const logBody = document.getElementById('audit-log-body');
+  const ui = getComputedStyle(document.body);
+  const mainText = (ui.getPropertyValue('--text-main') || '#182132').trim();
+  const subText = (ui.getPropertyValue('--text-sub') || '#445468').trim();
   if (dailyCtx) {
     new Chart(dailyCtx, {
       type: 'line',
       data: { labels: data.daily_counts.map(i => i.day.slice(5)), datasets: [{ label: '访问量', data: data.daily_counts.map(i => i.count), borderColor: '#C8A96E', backgroundColor: 'rgba(200,169,110,0.12)', fill: true, tension: 0.35 }] },
-      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color:'#F8F6F0' } } }, scales:{ x:{ ticks:{ color:'#9A9590' } }, y:{ ticks:{ color:'#9A9590' } } } }
+      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color: mainText } } }, scales:{ x:{ ticks:{ color: subText } }, y:{ ticks:{ color: subText } } } }
     });
   }
   if (pathCtx) {
     new Chart(pathCtx, {
       type: 'bar',
       data: { labels: data.top_paths.map(i => i.path), datasets: [{ label: '次数', data: data.top_paths.map(i => i.count), backgroundColor: 'rgba(52,152,219,0.6)', borderColor: '#3498DB', borderWidth: 1 }] },
-      options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color:'#9A9590' } }, y:{ ticks:{ color:'#F8F6F0' } } } }
+      options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color: subText } }, y:{ ticks:{ color: mainText } } } }
     });
   }
   if (ipCtx) {
     new Chart(ipCtx, {
       type: 'bar',
       data: { labels: data.top_ips.map(i => i.ip), datasets: [{ label: '次数', data: data.top_ips.map(i => i.count), backgroundColor: 'rgba(46,204,113,0.6)', borderColor: '#2ECC71', borderWidth: 1 }] },
-      options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color:'#9A9590' } }, y:{ ticks:{ color:'#F8F6F0' } } } }
+      options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color: subText } }, y:{ ticks:{ color: mainText } } } }
     });
   }
   if (logBody) {
@@ -1673,6 +1771,7 @@ function evUpdatePreview() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  loadSiteConfig();
   if (document.getElementById('section-access')) {
     renderAccessAudit();
   }

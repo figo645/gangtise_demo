@@ -1,4 +1,5 @@
 import os
+import json
 import sqlite3
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for, g
 import random
@@ -16,6 +17,22 @@ app.config.update(
 AUTH_PASSWORD = os.environ.get("GANGTISE_DEMO_PASSWORD", "gangtise")
 AUTH_SESSION_KEY = "gangtise_auth"
 DB_PATH = os.environ.get("GANGTISE_DEMO_DB", os.path.join(os.path.dirname(__file__), "gangtise_demo.db"))
+SITE_CONFIG_KEY = "site_config"
+
+DEFAULT_SITE_CONFIG = {
+    "default_theme": "light",
+    "default_accent": "blue",
+    "feature_flags": {
+        "fundamental_analysis": True,
+        "watchlist": True,
+        "daily_review": True,
+        "community": False,
+        "hermes": False,
+        "vip": False,
+        "dm": False,
+        "workbench": False,
+    },
+}
 
 # Mock data
 CHANNELS = ["微信生态", "抖音", "微博", "小红书", "直接流量"]
@@ -107,6 +124,29 @@ def init_db():
         conn.execute("CREATE INDEX IF NOT EXISTS idx_access_logs_created_at ON access_logs(created_at)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_access_logs_ip ON access_logs(ip)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_access_logs_path ON access_logs(path)")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS app_settings (
+                setting_key TEXT PRIMARY KEY,
+                setting_value TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        row = conn.execute(
+            "SELECT setting_key FROM app_settings WHERE setting_key = ?",
+            (SITE_CONFIG_KEY,),
+        ).fetchone()
+        if row is None:
+            conn.execute(
+                "INSERT INTO app_settings (setting_key, setting_value, updated_at) VALUES (?, ?, ?)",
+                (
+                    SITE_CONFIG_KEY,
+                    json.dumps(DEFAULT_SITE_CONFIG, ensure_ascii=False),
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                ),
+            )
+        conn.commit()
 
 
 def get_db():
@@ -114,6 +154,64 @@ def get_db():
         g.db = sqlite3.connect(DB_PATH)
         g.db.row_factory = sqlite3.Row
     return g.db
+
+
+def _merge_site_config(base, override):
+    merged = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _merge_site_config(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def get_site_config():
+    cached = g.get("site_config")
+    if cached is not None:
+        return cached
+    db = get_db()
+    row = db.execute(
+        "SELECT setting_value FROM app_settings WHERE setting_key = ?",
+        (SITE_CONFIG_KEY,),
+    ).fetchone()
+    config = dict(DEFAULT_SITE_CONFIG)
+    if row and row["setting_value"]:
+        try:
+            stored = json.loads(row["setting_value"])
+            if isinstance(stored, dict):
+                config = _merge_site_config(config, stored)
+        except Exception:
+            app.logger.exception("Failed to parse site config")
+    g.site_config = config
+    return config
+
+
+def save_site_config(config):
+    merged = _merge_site_config(DEFAULT_SITE_CONFIG, config or {})
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO app_settings (setting_key, setting_value, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(setting_key) DO UPDATE SET
+            setting_value = excluded.setting_value,
+            updated_at = excluded.updated_at
+        """,
+        (
+            SITE_CONFIG_KEY,
+            json.dumps(merged, ensure_ascii=False),
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        ),
+    )
+    db.commit()
+    g.site_config = merged
+    return merged
+
+
+@app.context_processor
+def inject_site_config():
+    return {"site_config": get_site_config()}
 
 
 @app.teardown_appcontext
@@ -342,6 +440,33 @@ def api_admin_access_logs():
         (limit,),
     ).fetchall()
     return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/site-config")
+def api_site_config():
+    return jsonify(get_site_config())
+
+
+@app.route("/api/admin/site-config", methods=["GET", "POST"])
+def api_admin_site_config():
+    if request.method == "GET":
+        return jsonify(get_site_config())
+    payload = request.get_json(silent=True) or {}
+    current = get_site_config()
+    feature_flags = dict(current.get("feature_flags", {}))
+    incoming_flags = payload.get("feature_flags", {})
+    for key in feature_flags:
+        if key in incoming_flags:
+            feature_flags[key] = bool(incoming_flags[key])
+    next_config = _merge_site_config(
+        current,
+        {
+            "default_theme": payload.get("default_theme", current.get("default_theme", "light")),
+            "default_accent": payload.get("default_accent", current.get("default_accent", "blue")),
+            "feature_flags": feature_flags,
+        },
+    )
+    return jsonify({"success": True, "site_config": save_site_config(next_config)})
 
 @app.route("/api/ai-analysis", methods=["POST"])
 def api_ai_analysis():

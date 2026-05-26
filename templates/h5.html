@@ -5,39 +5,44 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>冈底斯金融科技 — 智能投研</title>
 <link rel="stylesheet" href="/static/css/style.css">
+<script>
+  window.SITE_CONFIG = {{ site_config | tojson }};
+</script>
+<script src="/static/js/theme.js"></script>
 <style>
 /* ===== BASE ===== */
-body { background: var(--navy); }
+body { background: var(--surface-2); color: var(--text-main); }
 .page { display: none; }
 .page.active { display: block; }
 
-/* ===== HEADER TABS (scrollable, 4 items) ===== */
-.h5-tabs {
+.h5-header-context {
   display: flex;
-  gap: 0;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
   margin-top: 12px;
-  overflow-x: auto;
-  scrollbar-width: none;
+  padding: 10px 12px;
+  background: var(--navy-mid);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
 }
-.h5-tabs::-webkit-scrollbar { display: none; }
-.h5-tab {
-  flex-shrink: 0;
-  padding: 10px 18px;
+.h5-header-section {
   font-size: 13px;
-  color: var(--gray-400);
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s;
-  white-space: nowrap;
+  font-weight: 600;
+  color: var(--text-main);
 }
-.h5-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+.h5-header-hint {
+  font-size: 11px;
+  color: var(--text-sub);
+  text-align: right;
+}
 
 /* ===== BOTTOM NAV (6 items) ===== */
 .h5-bottom-nav {
   position: sticky;
   bottom: 0;
   background: var(--navy-mid);
-  border-top: 1px solid rgba(200,169,110,0.15);
+  border-top: 1px solid var(--border-soft);
   display: flex;
   padding: 8px 0 16px;
   z-index: 100;
@@ -275,7 +280,7 @@ body { background: var(--navy); }
 .wb-mode-switch-label { font-size:12px; color:var(--gold); font-weight:600; }
 </style>
 </head>
-<body>
+<body onload="initGangtiseTheme()">
 <div class="h5-wrap">
 
   <!-- ===== HEADER ===== -->
@@ -283,24 +288,38 @@ body { background: var(--navy); }
     <div style="display:flex;justify-content:space-between;align-items:center">
       <div>
         <div class="h5-logo">冈底斯</div>
-        <div class="h5-tagline">金融科技 · 智能投研</div>
+        <div class="h5-tagline">白底咨询风 · 专业投资研究界面</div>
       </div>
       <div style="display:flex;gap:10px;align-items:center">
-        <span style="font-size:11px;color:var(--gold);background:rgba(200,169,110,0.1);padding:4px 10px;border-radius:12px;border:1px solid rgba(200,169,110,0.3)">资深分析师</span>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="btn-outline" style="padding:4px 8px;font-size:11px" onclick="chooseTheme('light')">浅色</button>
+          <button class="btn-outline" style="padding:4px 8px;font-size:11px" onclick="chooseTheme('dark')">黑色</button>
+        </div>
         <div onclick="switchTab('profile')" style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--gold-dark),var(--gold));display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer">👤</div>
       </div>
     </div>
-    <!-- Scrollable 4-tab header -->
-    <div class="h5-tabs" id="header-tabs">
-      <div class="h5-tab active" onclick="switchTab('feed')">信息流</div>
-      <div class="h5-tab" onclick="switchTab('community')">社区</div>
-      <div class="h5-tab" onclick="switchTab('hermes')">Hermes</div>
-      <div class="h5-tab" onclick="switchTab('market')">行情</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;padding:10px 0 2px">
+      <span style="font-size:11px;color:var(--gray-400)">主题色</span>
+      <button class="btn-outline" style="padding:3px 8px;font-size:11px" onclick="chooseAccent('blue')">雪球蓝</button>
+      <button class="btn-outline" style="padding:3px 8px;font-size:11px" onclick="chooseAccent('green')">青绿</button>
+      <button class="btn-outline" style="padding:3px 8px;font-size:11px" onclick="chooseAccent('slate')">石板灰</button>
+      <button class="btn-outline" style="padding:3px 8px;font-size:11px" onclick="chooseAccent('amber')">琥珀</button>
+    </div>
+    <div class="h5-header-context">
+      <div class="h5-header-section" id="header-section-name">基本面分析</div>
+      <div class="h5-header-hint" id="header-section-hint">底部导航负责页面切换</div>
     </div>
   </div>
 
   <!-- ===== TAB 1: 信息流 ===== -->
-  <div id="page-feed" class="page active">
+  <div id="page-feed" class="page active" data-feature="fundamental_analysis">
+    <div class="h5-section" style="padding-bottom:8px">
+      <div class="card" style="padding:16px;background:linear-gradient(145deg,var(--navy-mid),var(--navy-light))">
+        <div style="font-size:12px;color:var(--gold);font-weight:700;margin-bottom:6px">今日核心判断</div>
+        <div style="font-size:18px;font-weight:700;color:var(--white);line-height:1.5">重点看估值、盈利预期和资金流三条证据链，先做基本面，再做节奏。</div>
+        <div style="font-size:12px;color:var(--gray-400);margin-top:10px">参考你 2026年5月18日和 2026年5月24日会议记录，首发优先聚焦少量高频、低风险场景。</div>
+      </div>
+    </div>
     <!-- Market ticker -->
     <div class="h5-section" style="padding-bottom:0">
       <div class="market-scroll">
@@ -336,21 +355,21 @@ body { background: var(--navy); }
       {% endfor %}
     </div>
 
-    <!-- KOL views -->
+    <!-- Basic analysis -->
     <div class="h5-section">
-      <div class="h5-section-title">KOL 今日观点</div>
+      <div class="h5-section-title">基本面快评</div>
       <div style="display:flex;flex-direction:column;gap:10px">
         <div class="card" style="padding:14px">
           <div style="display:flex;gap:10px;align-items:flex-start">
             <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#C8A96E,#A8893E);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">👑</div>
             <div style="flex:1">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                <span style="font-size:13px;font-weight:600;color:var(--gold)">财经老王</span>
-                <span class="tag tag-gold">S级合伙人</span>
+                <span style="font-size:13px;font-weight:600;color:var(--gold)">科技硬件</span>
+                <span class="tag tag-gold">盈利预期</span>
               </div>
-              <div style="font-size:12px;color:var(--gray-400);margin-bottom:6px">抖音 · 280万粉丝</div>
-              <div style="font-size:13px;color:var(--white);line-height:1.6">美联储降息预期升温，A股科技板块短期有望受益。重点关注AI算力和国产替代两条主线，建议逢低布局。</div>
-              <div style="font-size:11px;color:var(--gray-400);margin-top:6px">基于冈底斯平台数据分析 · 仅供参考</div>
+              <div style="font-size:12px;color:var(--gray-400);margin-bottom:6px">证据链：资本开支 + 订单能见度 + 国产替代</div>
+              <div style="font-size:13px;color:var(--white);line-height:1.6">AI 算力链的中游设备端仍有景气支撑，但更适合跟踪订单兑现和估值消化，不适合只看情绪追涨。</div>
+              <div style="font-size:11px;color:var(--gray-400);margin-top:6px">适合做基础研究，不直接给出交易建议</div>
             </div>
           </div>
         </div>
@@ -359,12 +378,12 @@ body { background: var(--navy); }
             <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#E2C98A,#C8A96E);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">💎</div>
             <div style="flex:1">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                <span style="font-size:13px;font-weight:600;color:var(--gold)">投资女神Lisa</span>
-                <span class="tag tag-gold">S级合伙人</span>
+                <span style="font-size:13px;font-weight:600;color:var(--gold)">港股互联网</span>
+                <span class="tag tag-gold">估值修复</span>
               </div>
-              <div style="font-size:12px;color:var(--gray-400);margin-bottom:6px">小红书 · 156万粉丝</div>
-              <div style="font-size:13px;color:var(--white);line-height:1.6">港股互联网估值修复逻辑仍在，南向资金持续净流入是重要信号。平台经济政策边际改善，可适当增配。</div>
-              <div style="font-size:11px;color:var(--gray-400);margin-top:6px">基于冈底斯平台数据分析 · 仅供参考</div>
+              <div style="font-size:12px;color:var(--gray-400);margin-bottom:6px">证据链：估值分位 + 南向资金 + 政策边际</div>
+              <div style="font-size:13px;color:var(--white);line-height:1.6">更适合做跟踪观察和中期框架研究。先看业绩验证和资金延续性，再决定是否进一步跟踪。</div>
+              <div style="font-size:11px;color:var(--gray-400);margin-top:6px">保留基础分析，不对外开放更多复杂互动</div>
             </div>
           </div>
         </div>
@@ -373,7 +392,7 @@ body { background: var(--navy); }
   </div>
 
   <!-- ===== TAB 2: 社区 ===== -->
-  <div id="page-community" class="page">
+  <div id="page-community" class="page" data-feature="community">
     <!-- Sub-tabs -->
     <div class="community-subtabs" id="community-subtabs">
       <div class="community-subtab active" onclick="switchCommunityTab('square')">广场</div>
@@ -509,7 +528,7 @@ body { background: var(--navy); }
   </div>
 
   <!-- ===== TAB 3: HERMES ===== -->
-  <div id="page-hermes" class="page">
+  <div id="page-hermes" class="page" data-feature="hermes">
     <!-- Hermes branding bar -->
     <div class="hermes-header">
       <div>
@@ -582,9 +601,16 @@ body { background: var(--navy); }
   </div>
 
   <!-- ===== TAB 4: 行情 ===== -->
-  <div id="page-market" class="page">
+  <div id="page-market" class="page" data-feature="watchlist">
     <div class="h5-section">
-      <div class="h5-section-title">全球指数</div>
+      <div class="h5-section-title">自选股</div>
+      <div class="card" style="padding:14px;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-size:14px;font-weight:700;color:var(--white)">我的关注列表</div>
+          <button class="btn-outline" style="padding:5px 10px;font-size:11px" onclick="showToast('演示版暂不支持编辑')">+ 添加</button>
+        </div>
+        <div style="font-size:12px;color:var(--gray-400);line-height:1.6">首发只保留自选股跟踪，不对外开放更复杂的社交和专业工作台功能。</div>
+      </div>
       {% for item in market %}
       <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.08);border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
         <div>
@@ -601,22 +627,46 @@ body { background: var(--navy); }
       {% endfor %}
     </div>
     <div class="h5-section">
-      <div class="h5-section-title">另类数据信号</div>
+      <div class="h5-section-title">跟踪提示</div>
       <div class="card" style="padding:14px">
-        <div style="font-size:13px;color:var(--gold);font-weight:600;margin-bottom:8px">🛰️ 卫星数据</div>
-        <div style="font-size:13px;color:var(--white);line-height:1.6">主要港口吞吐量环比回升8%，工业活动指数上行，与PMI数据形成共振。</div>
-        <div style="font-size:11px;color:var(--gray-400);margin-top:6px">数据来源：冈底斯另类数据库 · 更新于今日</div>
+        <div style="font-size:13px;color:var(--gold);font-weight:600;margin-bottom:8px">观察维度</div>
+        <div style="font-size:13px;color:var(--white);line-height:1.6">围绕价格、涨跌幅、资金流向和板块热度做日常跟踪，减少首发阶段的复杂分析路径。</div>
+        <div style="font-size:11px;color:var(--gray-400);margin-top:6px">后续若后台开放高级功能，可再加入更多研究模块</div>
       </div>
-      <div class="card" style="padding:14px;margin-top:10px">
-        <div style="font-size:13px;color:var(--gold);font-weight:600;margin-bottom:8px">📊 专家会议纪要</div>
-        <div style="font-size:13px;color:var(--white);line-height:1.6">本周共收录12场专家会议纪要，覆盖新能源、AI、消费等核心赛道，已完成AI摘要提炼。</div>
-        <div style="font-size:11px;color:var(--gray-400);margin-top:6px">专业会员可查看完整内容</div>
+    </div>
+  </div>
+
+  <div id="page-review" class="page" data-feature="daily_review">
+    <div class="h5-section">
+      <div class="h5-section-title">每日复盘</div>
+      <div class="card" style="padding:16px;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-size:15px;font-weight:700;color:var(--white)">2026-05-26 收盘复盘</div>
+          <span class="tag tag-gold">演示版</span>
+        </div>
+        <div style="font-size:13px;color:var(--white);line-height:1.8">
+          1. 市场主线仍围绕科技和港股互联网展开，量能没有明显失控。<br>
+          2. 高股息和防御板块偏弱，说明风险偏好尚可。<br>
+          3. 明天重点看北向/南向资金延续性，以及业绩和估值是否继续匹配。
+        </div>
+      </div>
+      <div class="card" style="padding:16px;margin-bottom:12px">
+        <div style="font-size:13px;color:var(--gold);font-weight:700;margin-bottom:8px">复盘模板</div>
+        <div style="font-size:13px;color:var(--white);line-height:1.8">
+          • 今日主线：科技硬件、港股互联网<br>
+          • 风险点：估值透支、情绪回落、外部宏观波动<br>
+          • 明日观察：成交额、资金净流入、龙头反馈
+        </div>
+      </div>
+      <div class="card" style="padding:16px">
+        <div style="font-size:13px;color:var(--gold);font-weight:700;margin-bottom:8px">我的复盘记录</div>
+        <div style="font-size:12px;color:var(--gray-400);line-height:1.8">首发阶段先提供固定模板和简洁记录，不开放复杂社区互动和高级工具，降低维护成本与合规压力。</div>
       </div>
     </div>
   </div>
 
   <!-- ===== TAB 5: 会员 ===== -->
-  <div id="page-vip" class="page">
+  <div id="page-vip" class="page" data-feature="vip">
     <!-- Points banner -->
     <div class="vip-points-banner">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -751,7 +801,7 @@ body { background: var(--navy); }
 
 
   <!-- ===== TAB: 消息 (DM) ===== -->
-  <div id="page-dm" class="page">
+  <div id="page-dm" class="page" data-feature="dm">
     <!-- Conversation list view -->
     <div id="dm-list-view">
       <div style="padding:16px;display:flex;justify-content:space-between;align-items:center">
@@ -799,7 +849,7 @@ body { background: var(--navy); }
   </div>
 
   <!-- ===== TAB: 大V工作台 ===== -->
-  <div id="page-workbench" class="page">
+  <div id="page-workbench" class="page" data-feature="workbench">
     <div style="padding:16px;display:flex;justify-content:space-between;align-items:center">
       <div>
         <div style="font-size:16px;font-weight:700;color:var(--white)">大V工作台</div>
@@ -1090,24 +1140,32 @@ body { background: var(--navy); }
 
   <!-- ===== BOTTOM NAV (6 tabs) ===== -->
   <div class="h5-bottom-nav">
-    <div class="h5-nav-item active" id="nav-feed" onclick="switchTab('feed')">
-      <div class="h5-nav-icon">📰</div>
-      <div class="h5-nav-label">信息流</div>
+    <div class="h5-nav-item active" id="nav-feed" data-feature="fundamental_analysis" onclick="switchTab('feed')">
+      <div class="h5-nav-icon">🧭</div>
+      <div class="h5-nav-label">基本面</div>
     </div>
-    <div class="h5-nav-item" id="nav-community" onclick="switchTab('community')">
+    <div class="h5-nav-item" id="nav-market" data-feature="watchlist" onclick="switchTab('market')">
+      <div class="h5-nav-icon">⭐</div>
+      <div class="h5-nav-label">自选股</div>
+    </div>
+    <div class="h5-nav-item" id="nav-review" data-feature="daily_review" onclick="switchTab('review')">
+      <div class="h5-nav-icon">📝</div>
+      <div class="h5-nav-label">复盘</div>
+    </div>
+    <div class="h5-nav-item" id="nav-community" data-feature="community" onclick="switchTab('community')">
       <div class="h5-nav-icon">👥</div>
       <div class="h5-nav-label">社区</div>
     </div>
-    <div class="h5-nav-item" id="nav-dm" onclick="switchTab('dm')" style="position:relative">
+    <div class="h5-nav-item" id="nav-dm" data-feature="dm" onclick="switchTab('dm')" style="position:relative">
       <div class="h5-nav-icon">💬</div>
       <div class="h5-nav-label">消息</div>
       <span id="dm-nav-badge" style="position:absolute;top:2px;right:calc(50% - 16px);width:8px;height:8px;border-radius:50%;background:#E74C3C;display:block"></span>
     </div>
-    <div class="h5-nav-item" id="nav-hermes" onclick="switchTab('hermes')">
+    <div class="h5-nav-item" id="nav-hermes" data-feature="hermes" onclick="switchTab('hermes')">
       <div class="h5-nav-icon">🦞</div>
       <div class="h5-nav-label">Hermes</div>
     </div>
-    <div class="h5-nav-item" id="nav-vip" onclick="switchTab('vip')">
+    <div class="h5-nav-item" id="nav-vip" data-feature="vip" onclick="switchTab('vip')">
       <div class="h5-nav-icon">💎</div>
       <div class="h5-nav-label">会员</div>
     </div>
@@ -1150,37 +1208,94 @@ body { background: var(--navy); }
 
 <script>
 // ===== TAB SWITCHING =====
-const ALL_TABS = ['feed', 'community', 'hermes', 'market', 'vip', 'profile', 'dm', 'workbench'];
-// Header tabs correspond to first 4 tabs (indices 0-3)
-const HEADER_TAB_NAMES = ['feed', 'community', 'hermes', 'market'];
+const SITE_FEATURES = (window.SITE_CONFIG && window.SITE_CONFIG.feature_flags) || {};
+const ALL_TABS = ['feed', 'community', 'hermes', 'market', 'review', 'vip', 'profile', 'dm', 'workbench'];
+const TAB_LABELS = {
+  feed: '基本面分析',
+  market: '自选股',
+  review: '每日复盘',
+  community: '社区',
+  hermes: 'Hermes',
+  dm: '消息',
+  vip: '会员',
+  profile: '我的',
+  workbench: '大V工作台',
+};
+const TAB_HINTS = {
+  feed: '围绕估值、盈利预期和资金流进行基础分析',
+  market: '仅保留首发阶段的自选股跟踪能力',
+  review: '使用固定模板做日常市场复盘',
+  community: '社区功能默认可由后台按需开放',
+  hermes: '高级 AI 研究能力可由后台决定是否开放',
+  dm: '消息与对话入口集中放在底部导航',
+  vip: '会员与积分权益在此查看',
+  profile: '账号、偏好与个人中心设置',
+  workbench: '面向大V和运营角色的工作区',
+};
+
+function isFeatureEnabled(featureName) {
+  if (!featureName) return true;
+  return SITE_FEATURES[featureName] !== false;
+}
+
+function getFirstEnabledTab() {
+  const priority = [
+    ['feed', 'fundamental_analysis'],
+    ['market', 'watchlist'],
+    ['review', 'daily_review'],
+    ['profile', null],
+    ['community', 'community'],
+    ['hermes', 'hermes'],
+  ];
+  const hit = priority.find(([_, feature]) => isFeatureEnabled(feature));
+  return hit ? hit[0] : 'profile';
+}
+
+function applySiteFeatureFlags() {
+  document.querySelectorAll('[data-feature]').forEach(el => {
+    const featureName = el.dataset.feature;
+    el.style.display = isFeatureEnabled(featureName) ? '' : 'none';
+  });
+}
+
+function syncHeaderContext(tab) {
+  const title = document.getElementById('header-section-name');
+  const hint = document.getElementById('header-section-hint');
+  if (title) title.textContent = TAB_LABELS[tab] || '页面';
+  if (hint) hint.textContent = TAB_HINTS[tab] || '底部导航负责页面切换';
+}
+
+function chooseTheme(mode) {
+  setGangtiseTheme(mode);
+}
+
+function chooseAccent(accent) {
+  setGangtiseAccent(accent);
+}
 
 function switchTab(tab) {
+  let activePage = document.getElementById('page-' + tab);
+  if (activePage && activePage.dataset.feature && !isFeatureEnabled(activePage.dataset.feature)) {
+    tab = getFirstEnabledTab();
+    activePage = document.getElementById('page-' + tab);
+  }
   // Hide all pages
   ALL_TABS.forEach(t => {
-    const page = document.getElementById('page-' + t);
-    if (page) page.classList.remove('active');
+    const pageEl = document.getElementById('page-' + t);
+    if (pageEl) pageEl.classList.remove('active');
   });
-
-  // Remove active from all header tabs
-  document.querySelectorAll('.h5-tab').forEach(el => el.classList.remove('active'));
 
   // Remove active from all bottom nav items
   document.querySelectorAll('.h5-nav-item').forEach(el => el.classList.remove('active'));
 
   // Show selected page
-  const page = document.getElementById('page-' + tab);
-  if (page) page.classList.add('active');
-
-  // Activate header tab if applicable
-  const headerIdx = HEADER_TAB_NAMES.indexOf(tab);
-  if (headerIdx !== -1) {
-    const headerTabs = document.querySelectorAll('.h5-tab');
-    if (headerTabs[headerIdx]) headerTabs[headerIdx].classList.add('active');
-  }
+  if (activePage) activePage.classList.add('active');
 
   // Activate bottom nav item
   const navItem = document.getElementById('nav-' + tab);
   if (navItem) navItem.classList.add('active');
+
+  syncHeaderContext(tab);
 
   // Load DM list when entering DM tab
   if (tab === 'dm') {
@@ -2305,9 +2420,11 @@ function showToast(msg, duration) {
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', () => {
+  applySiteFeatureFlags();
   loadCommunityPosts();
   loadCommunityEvents();
   selectHermesMode('研报精读');
+  switchTab(getFirstEnabledTab());
 });
 </script>
 </body>
