@@ -35,42 +35,282 @@ DEFAULT_SITE_CONFIG = {
 }
 
 # Mock data
-CHANNELS = ["微信生态", "抖音", "微博", "小红书", "直接流量"]
-FUNNEL_LAYERS = ["公域曝光", "私域沉淀", "主动意向", "付费转化", "VIP深度"]
+CHANNELS = ["微信社群", "内容合作", "小红书", "转介绍", "直接流量"]
+FUNNEL_LAYERS = ["内容触达", "私域留资", "激活试用", "首次付费", "高频留存"]
 
 def gen_funnel_data():
-    base = [980000, 245000, 62000, 18500, 4200]
+    base = [68000, 5400, 1260, 128, 36]
     return [{"layer": FUNNEL_LAYERS[i], "count": base[i], "rate": round(base[i]/base[0]*100, 2)} for i in range(5)]
 
 def gen_channel_data():
     data = [
-        {"name": "微信生态", "users": 420000, "conversion": 3.8, "revenue": 2840000, "color": "#07C160"},
-        {"name": "抖音", "users": 310000, "conversion": 2.9, "revenue": 1920000, "color": "#FE2C55"},
-        {"name": "微博", "users": 125000, "conversion": 2.1, "revenue": 680000, "color": "#E6162D"},
-        {"name": "小红书", "users": 89000, "conversion": 4.2, "revenue": 920000, "color": "#FF2442"},
-        {"name": "直接流量", "users": 36000, "conversion": 6.8, "revenue": 1240000, "color": "#C8A96E"},
+        {"name": "微信社群", "users": 2100, "conversion": 6.4, "revenue": 28600, "color": "#07C160"},
+        {"name": "内容合作", "users": 1400, "conversion": 4.8, "revenue": 19200, "color": "#FE2C55"},
+        {"name": "小红书", "users": 980, "conversion": 3.6, "revenue": 13600, "color": "#FF2442"},
+        {"name": "转介绍", "users": 620, "conversion": 12.1, "revenue": 24800, "color": "#E6162D"},
+        {"name": "直接流量", "users": 300, "conversion": 15.0, "revenue": 16800, "color": "#C8A96E"},
     ]
     return data
 
 def gen_kol_data():
     kols = [
-        {"name": "财经老王", "platform": "抖音", "followers": 2800000, "gmv": 1240000, "commission": 186000, "tier": "S级"},
-        {"name": "投资女神Lisa", "platform": "小红书", "followers": 1560000, "gmv": 890000, "commission": 133500, "tier": "S级"},
-        {"name": "宏观策略师", "platform": "微信", "followers": 980000, "gmv": 620000, "commission": 93000, "tier": "A级"},
-        {"name": "量化小白", "platform": "微博", "followers": 720000, "gmv": 380000, "commission": 57000, "tier": "A级"},
-        {"name": "港股研究员", "platform": "抖音", "followers": 450000, "gmv": 210000, "commission": 31500, "tier": "B级"},
+        {"name": "财经老王", "platform": "微信", "followers": 128000, "gmv": 18600, "commission": 2790, "tier": "种子A"},
+        {"name": "投资女神Lisa", "platform": "小红书", "followers": 86000, "gmv": 14200, "commission": 2556, "tier": "种子A"},
+        {"name": "宏观策略师", "platform": "内容合作", "followers": 54000, "gmv": 9600, "commission": 1536, "tier": "观察"},
+        {"name": "量化小白", "platform": "小红书", "followers": 32000, "gmv": 7800, "commission": 1170, "tier": "观察"},
+        {"name": "港股研究员", "platform": "转介绍", "followers": 18000, "gmv": 5400, "commission": 810, "tier": "观察"},
     ]
     return kols
 
 def gen_market_data():
     indices = [
-        {"name": "上证指数", "value": 3428.56, "change": 0.82, "change_pct": 0.024},
-        {"name": "深证成指", "value": 10892.34, "change": -12.45, "change_pct": -0.114},
-        {"name": "恒生指数", "value": 23156.78, "change": 234.12, "change_pct": 1.021},
-        {"name": "纳斯达克", "value": 19234.56, "change": 89.34, "change_pct": 0.466},
-        {"name": "黄金", "value": 3342.80, "change": 18.60, "change_pct": 0.559},
+        {
+            "code": "600519",
+            "name": "贵州茅台",
+            "market": "SH",
+            "value": 1688.20,
+            "change": 12.80,
+            "change_pct": 0.76,
+            "focus": "高端白酒",
+            "authors": ["财经老王", "量化老师陈明"],
+        },
+        {
+            "code": "300750",
+            "name": "宁德时代",
+            "market": "SZ",
+            "value": 212.36,
+            "change": -3.84,
+            "change_pct": -1.78,
+            "focus": "动力电池",
+            "authors": ["新能源猎手阿强", "全球宏观James"],
+        },
+        {
+            "code": "00700",
+            "name": "腾讯控股",
+            "market": "HK",
+            "value": 388.40,
+            "change": 5.60,
+            "change_pct": 1.46,
+            "focus": "港股互联网",
+            "authors": ["投资女神Lisa", "港股研究员"],
+        },
+        {
+            "code": "688981",
+            "name": "中芯国际",
+            "market": "SH",
+            "value": 46.52,
+            "change": 1.18,
+            "change_pct": 2.60,
+            "focus": "半导体制造",
+            "authors": ["财经老王", "宏观策略师"],
+        },
+        {
+            "code": "600036",
+            "name": "招商银行",
+            "market": "SH",
+            "value": 41.86,
+            "change": 0.22,
+            "change_pct": 0.53,
+            "focus": "银行",
+            "authors": ["全球宏观James", "量化老师陈明"],
+        },
     ]
     return indices
+
+
+def gen_watchlist_details():
+    return {
+        "600519": {
+            "code": "600519",
+            "name": "贵州茅台",
+            "market": "SH",
+            "price": 1688.20,
+            "change": 12.80,
+            "change_pct": 0.76,
+            "industry": "高端白酒",
+            "authors": [
+                {"id": 1, "name": "财经老王", "avatar": "👑", "tier": "种子作者", "angle": "消费龙头的现金流韧性仍在，核心要看估值是否已经反映需求修复。"},
+                {"id": 3, "name": "量化老师陈明", "avatar": "📊", "tier": "成长作者", "angle": "从历史分位看，当前更适合做中期配置跟踪，不建议把短期波动当趋势。"},
+            ],
+            "fundamental": {
+                "summary": "品牌力和现金流仍是最大护城河，当前争议主要集中在增速放缓后的估值承受力。",
+                "metrics": [
+                    {"label": "收入增速", "value": "15.2%", "note": "较去年同期放缓但仍稳健"},
+                    {"label": "净利率", "value": "52.4%", "note": "维持高位"},
+                    {"label": "ROE", "value": "31.8%", "note": "资本效率仍强"},
+                    {"label": "估值分位", "value": "43%", "note": "回到中枢附近"},
+                ],
+                "thesis": [
+                    "品牌定价权和渠道控制能力仍强。",
+                    "若消费修复延续，盈利稳定性会继续支撑估值。",
+                    "风险在于市场对高端消费增速放缓的容忍度下降。",
+                ],
+            },
+            "forecast": {
+                "label": "基本面判断",
+                "verdict": "稳健跟踪",
+                "confidence": "中高",
+                "band": "未来 1-2 个季度更像利润兑现验证，而不是高弹性重估。",
+                "drivers": [
+                    {"label": "盈利稳定性", "score": "+2.4", "note": "现金流和利润率支撑强"},
+                    {"label": "估值弹性", "score": "+0.8", "note": "缺少强扩张催化"},
+                    {"label": "行业景气", "score": "+1.2", "note": "消费修复温和"},
+                ],
+            },
+        },
+        "300750": {
+            "code": "300750",
+            "name": "宁德时代",
+            "market": "SZ",
+            "price": 212.36,
+            "change": -3.84,
+            "change_pct": -1.78,
+            "industry": "动力电池",
+            "authors": [
+                {"id": 5, "name": "新能源猎手阿强", "avatar": "⚡", "tier": "观察作者", "angle": "更重要的是看新技术路线和海外出货，而不是单日股价波动。"},
+                {"id": 4, "name": "全球宏观James", "avatar": "🌐", "tier": "成长作者", "angle": "海外需求和原材料价格波动会持续影响预期。"},
+            ],
+            "fundamental": {
+                "summary": "核心变量不在于短期情绪，而在于全球份额、技术迭代和海外市场进度。",
+                "metrics": [
+                    {"label": "收入增速", "value": "18.6%", "note": "出口拉动明显"},
+                    {"label": "毛利率", "value": "24.1%", "note": "原材料波动后修复"},
+                    {"label": "研发占比", "value": "7.8%", "note": "维持高投入"},
+                    {"label": "估值分位", "value": "36%", "note": "低于行业乐观期"},
+                ],
+                "thesis": [
+                    "全球动力电池龙头地位仍稳固。",
+                    "技术升级和海外布局决定中期估值空间。",
+                    "要警惕行业价格竞争压缩利润率。",
+                ],
+            },
+            "forecast": {
+                "label": "基本面判断",
+                "verdict": "继续观察",
+                "confidence": "中",
+                "band": "未来 1-2 个季度需要继续看价格战和新技术兑现。",
+                "drivers": [
+                    {"label": "技术路线", "score": "+2.0", "note": "新产品是正向变量"},
+                    {"label": "价格竞争", "score": "-1.6", "note": "盈利承压"},
+                    {"label": "海外出货", "score": "+1.5", "note": "中期支撑项"},
+                ],
+            },
+        },
+        "00700": {
+            "code": "00700",
+            "name": "腾讯控股",
+            "market": "HK",
+            "price": 388.40,
+            "change": 5.60,
+            "change_pct": 1.46,
+            "industry": "港股互联网",
+            "authors": [
+                {"id": 2, "name": "投资女神Lisa", "avatar": "💎", "tier": "种子作者", "angle": "广告、游戏和回购共同支撑估值修复，关键还是财报兑现。"},
+                {"id": 2, "name": "港股研究员", "avatar": "🏙️", "tier": "观察作者", "angle": "这类资产更适合中期配置，而不是追逐情绪高点。"},
+            ],
+            "fundamental": {
+                "summary": "估值修复逻辑仍在，核心看广告恢复、游戏流水和资本回报延续。",
+                "metrics": [
+                    {"label": "收入增速", "value": "9.8%", "note": "恢复中"},
+                    {"label": "经营利润率", "value": "32.1%", "note": "效率改善"},
+                    {"label": "回购强度", "value": "高", "note": "资本回报积极"},
+                    {"label": "估值分位", "value": "28%", "note": "修复但未过热"},
+                ],
+                "thesis": [
+                    "现金流和资产质量在港股互联网中仍属头部。",
+                    "回购与业务恢复共同支撑估值中枢。",
+                    "风险在于监管和宏观消费修复不及预期。",
+                ],
+            },
+            "forecast": {
+                "label": "基本面判断",
+                "verdict": "偏积极",
+                "confidence": "中高",
+                "band": "若财报继续兑现，估值还有温和修复空间。",
+                "drivers": [
+                    {"label": "业务恢复", "score": "+2.1", "note": "广告与游戏改善"},
+                    {"label": "股东回报", "score": "+1.9", "note": "回购支撑明确"},
+                    {"label": "政策扰动", "score": "-0.8", "note": "仍需观察"},
+                ],
+            },
+        },
+        "688981": {
+            "code": "688981",
+            "name": "中芯国际",
+            "market": "SH",
+            "price": 46.52,
+            "change": 1.18,
+            "change_pct": 2.60,
+            "industry": "半导体制造",
+            "authors": [
+                {"id": 1, "name": "财经老王", "avatar": "👑", "tier": "种子作者", "angle": "要拆开看产能利用率、成熟制程景气和国产替代订单，不要只看情绪。"},
+                {"id": 4, "name": "宏观策略师", "avatar": "🎯", "tier": "成长作者", "angle": "产业政策和资本开支周期决定中期想象空间。"},
+            ],
+            "fundamental": {
+                "summary": "国产替代逻辑稳固，但盈利释放节奏仍依赖景气和产能利用率改善。",
+                "metrics": [
+                    {"label": "收入增速", "value": "14.1%", "note": "受益国产订单"},
+                    {"label": "产能利用率", "value": "82%", "note": "仍在恢复"},
+                    {"label": "资本开支", "value": "高位", "note": "扩产持续"},
+                    {"label": "估值分位", "value": "49%", "note": "预期已反映部分利好"},
+                ],
+                "thesis": [
+                    "国产替代是长期逻辑，订单确定性高。",
+                    "短中期要看景气恢复与盈利兑现速度。",
+                    "资本开支高、回报兑现慢会压制市场耐心。",
+                ],
+            },
+            "forecast": {
+                "label": "基本面判断",
+                "verdict": "积极跟踪",
+                "confidence": "中",
+                "band": "更像中期产业趋势资产，短期波动会比较大。",
+                "drivers": [
+                    {"label": "国产替代", "score": "+2.6", "note": "长期主逻辑"},
+                    {"label": "盈利兑现", "score": "+0.9", "note": "恢复中"},
+                    {"label": "资本开支", "score": "-1.1", "note": "拖累利润释放"},
+                ],
+            },
+        },
+        "600036": {
+            "code": "600036",
+            "name": "招商银行",
+            "market": "SH",
+            "price": 41.86,
+            "change": 0.22,
+            "change_pct": 0.53,
+            "industry": "银行",
+            "authors": [
+                {"id": 4, "name": "全球宏观James", "avatar": "🌐", "tier": "成长作者", "angle": "利率环境和资产质量是银行股的核心框架。"},
+                {"id": 3, "name": "量化老师陈明", "avatar": "📊", "tier": "成长作者", "angle": "这类资产更适合放在组合稳定器角色里看。"},
+            ],
+            "fundamental": {
+                "summary": "核心看息差、资产质量与分红能力，作为组合稳定器价值仍在。",
+                "metrics": [
+                    {"label": "ROE", "value": "14.8%", "note": "银行中仍具优势"},
+                    {"label": "不良率", "value": "0.96%", "note": "资产质量稳"},
+                    {"label": "股息率", "value": "5.1%", "note": "防守价值明显"},
+                    {"label": "估值分位", "value": "33%", "note": "偏低区间"},
+                ],
+                "thesis": [
+                    "资产质量和零售能力构成核心护城河。",
+                    "在低利率阶段，分红和稳健性更受重视。",
+                    "息差继续承压会影响估值弹性。",
+                ],
+            },
+            "forecast": {
+                "label": "基本面判断",
+                "verdict": "稳健配置",
+                "confidence": "高",
+                "band": "适合作为组合中的防守资产，预期收益更平稳。",
+                "drivers": [
+                    {"label": "股息支撑", "score": "+2.2", "note": "分红确定性强"},
+                    {"label": "资产质量", "score": "+1.8", "note": "风险可控"},
+                    {"label": "息差压力", "score": "-0.9", "note": "估值弹性有限"},
+                ],
+            },
+        },
+    }
 
 def gen_news_feed():
     news = [
@@ -85,23 +325,23 @@ def gen_news_feed():
 
 def gen_revenue_trend():
     months = []
-    base_date = datetime(2025, 6, 1)
+    base_date = datetime(2025, 7, 1)
     for i in range(12):
         d = base_date + timedelta(days=30*i)
         months.append({
             "month": d.strftime("%Y-%m"),
-            "revenue": int(800000 + i * 180000 + random.randint(-50000, 80000)),
-            "users": int(12000 + i * 2800 + random.randint(-500, 1200)),
+            "revenue": int(18000 + i * 5200 + random.randint(-1800, 2600)),
+            "users": int(180 + i * 58 + random.randint(-12, 26)),
         })
     return months
 
 def gen_user_segments():
     return [
-        {"segment": "免费用户", "count": 186000, "pct": 72.4},
-        {"segment": "基础会员", "count": 42000, "pct": 16.3},
-        {"segment": "专业会员", "count": 18500, "pct": 7.2},
-        {"segment": "机构VIP", "count": 4200, "pct": 1.6},
-        {"segment": "KOL合伙人", "count": 620, "pct": 0.5},
+        {"segment": "免费用户", "count": 880, "pct": 69.4},
+        {"segment": "基础会员", "count": 214, "pct": 16.9},
+        {"segment": "专业会员", "count": 128, "pct": 10.1},
+        {"segment": "机构试点", "count": 34, "pct": 2.7},
+        {"segment": "种子KOL", "count": 12, "pct": 0.9},
     ]
 
 
@@ -363,6 +603,38 @@ def api_market():
     return jsonify(gen_market_data())
 
 
+@app.route("/api/watchlist")
+def api_watchlist():
+    return jsonify(gen_market_data())
+
+
+@app.route("/api/watchlist/<stock_code>")
+def api_watchlist_detail(stock_code):
+    details = gen_watchlist_details()
+    return jsonify(details.get(stock_code, {
+        "code": stock_code,
+        "name": stock_code,
+        "market": "CN",
+        "price": 0,
+        "change": 0,
+        "change_pct": 0,
+        "industry": "待识别",
+        "authors": [],
+        "fundamental": {
+            "summary": "暂无样本数据，可通过 Hermes 继续补充。",
+            "metrics": [],
+            "thesis": [],
+        },
+        "forecast": {
+            "label": "基本面判断",
+            "verdict": "待分析",
+            "confidence": "低",
+            "band": "等待更多财务、行业和作者样本。",
+            "drivers": [],
+        },
+    }))
+
+
 def get_access_summary():
     db = get_db()
     total = db.execute("SELECT COUNT(*) AS c FROM access_logs").fetchone()["c"]
@@ -479,31 +751,31 @@ def api_ai_analysis():
         "新能源": "新能源车渗透率突破50%里程碑，产业链进入成熟期竞争。电池技术迭代加速，固态电池商业化时间表前移。关注具备技术壁垒的核心零部件企业。",
         "AI科技": "AI算力需求持续超预期，国产替代加速推进。DeepSeek等国内大模型商业化落地提速，应用层投资机会涌现。关注算力基础设施及AI应用双主线。",
     }
-    result = responses.get(topic, f"针对{topic}的深度分析：基于洞见智研平台整合的券商研报、专家会议纪要及另类数据，当前该领域呈现结构性机会。建议结合个人风险偏好，参考KOL合伙人的专业解读后做出投资决策。")
+    result = responses.get(topic, f"针对{topic}的深度分析：基于洞见智研平台整合的券商研报、专家会议纪要及另类数据，当前该领域呈现结构性机会。建议结合个人风险偏好，参考试点作者的研究框架后做出自己的判断。")
     return jsonify({"topic": topic, "analysis": result, "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"), "source": "洞见智研AI分析引擎 (DeepSeek + Kimi 2.6)"})
 
 def gen_community_posts():
     return [
-        {"id":1,"author":"财经老王","avatar":"👑","tier":"大V","badge":"S级合伙人","platform":"抖音","time":"8分钟前",
-         "content":"今天美联储会议纪要出来了，核心信号是通胀预期下修+就业市场降温，降息窗口正在打开。A股科技板块短期受益，但要注意节奏，不要追高。我的操作思路：分批建仓AI算力ETF，止损设在近期低点下方3%。","likes":342,"comments":87,"shares":56,"tags":["宏观","A股","AI"],"hot":True,"points_reward":50},
-        {"id":2,"author":"投资女神Lisa","avatar":"💎","tier":"大V","badge":"S级合伙人","platform":"小红书","time":"23分钟前",
-         "content":"港股互联网这波反弹我觉得还没结束。南向资金连续12个交易日净流入，机构在悄悄加仓。平台经济监管边际改善是核心逻辑，估值还在历史低位。我已经在某互联网龙头上建了底仓，等待催化剂。","likes":218,"comments":64,"shares":31,"tags":["港股","互联网"],"hot":True,"points_reward":50},
-        {"id":3,"author":"宏观策略师","avatar":"🎯","tier":"大V","badge":"A级合伙人","platform":"微信","time":"1小时前",
-         "content":"分享一个另类数据视角：洞见智研卫星数据显示，长三角工业园区夜间灯光指数环比+6.2%，这是工业活动回暖的先行信号。结合PMI数据，Q2经济复苏力度可能超预期。关注顺周期板块。","likes":156,"comments":43,"shares":28,"tags":["另类数据","宏观","顺周期"],"hot":False,"points_reward":30},
-        {"id":4,"author":"量化小白","avatar":"📊","tier":"认证用户","badge":"A级合伙人","platform":"微博","time":"2小时前",
-         "content":"用洞见智研的Hermes跑了一个新能源板块的量化筛选，结果很有意思：固态电池产业链中，有3家公司的专利申请数量在过去6个月翻倍，但股价还没有反应。这种信息差就是alpha的来源。","likes":98,"comments":29,"shares":19,"tags":["量化","新能源","固态电池"],"hot":False,"points_reward":30},
-        {"id":5,"author":"港股研究员","avatar":"🏙️","tier":"认证用户","badge":"B级合伙人","platform":"抖音","time":"3小时前",
-         "content":"刚参加完某消费品牌的专家电话会议（洞见智研平台组织），核心观点：Q2动销数据好于预期，渠道库存已经基本出清，下半年有望量价齐升。这类一手信息真的很难在公开渠道找到。","likes":76,"comments":22,"shares":14,"tags":["消费","专家纪要"],"hot":False,"points_reward":30},
+        {"id":1,"author":"财经老王","avatar":"👑","tier":"试点作者","badge":"种子合作作者","platform":"微信社群","time":"8分钟前",
+         "content":"今天美联储会议纪要出来后，市场会先交易降息预期，但更关键的还是订单兑现和风险偏好是否持续。A股科技板块适合继续跟踪，不建议用单一事件做过度判断。","likes":142,"comments":37,"shares":16,"tags":["宏观","A股","AI"],"hot":True,"points_reward":20},
+        {"id":2,"author":"投资女神Lisa","avatar":"💎","tier":"试点作者","badge":"种子合作作者","platform":"内容合作","time":"23分钟前",
+         "content":"港股互联网仍在估值修复区间，南向资金是信号，但最终还得看业绩验证。更适合做中期框架研究，而不是短线冲动交易。","likes":118,"comments":34,"shares":11,"tags":["港股","互联网"],"hot":True,"points_reward":20},
+        {"id":3,"author":"宏观策略师","avatar":"🎯","tier":"试点作者","badge":"成长作者","platform":"微信社群","time":"1小时前",
+         "content":"分享一个另类数据视角：平台监测到长三角工业园区夜间灯光指数环比回升，说明工业活动有修复迹象。这个信号还需要和 PMI 以及货运数据继续交叉验证。","likes":96,"comments":23,"shares":12,"tags":["另类数据","宏观","顺周期"],"hot":False,"points_reward":15},
+        {"id":4,"author":"量化小白","avatar":"📊","tier":"认证用户","badge":"研究样本","platform":"小红书","time":"2小时前",
+         "content":"用 Hermes 跑了一轮新能源板块因子筛选，发现固态电池相关公司的专利信号在抬升，但价格还没有完全反映。更适合先做样本跟踪。","likes":58,"comments":19,"shares":9,"tags":["量化","新能源","固态电池"],"hot":False,"points_reward":10},
+        {"id":5,"author":"港股研究员","avatar":"🏙️","tier":"认证用户","badge":"研究样本","platform":"转介绍","time":"3小时前",
+         "content":"刚参加完一场消费品牌专家电话会，Q2 动销数据略好于预期，渠道库存也在改善。还需要继续确认持续性，但这类一手纪要对研究判断很有帮助。","likes":46,"comments":12,"shares":6,"tags":["消费","专家纪要"],"hot":False,"points_reward":10},
         {"id":6,"author":"普通用户_阿明","avatar":"😊","tier":"普通","badge":"","platform":"","time":"4小时前",
          "content":"第一次用洞见智研的Hermes分析工具，选了「研报精读」模式，把高盛的A股报告喂进去，AI给出的摘要和关键数据提取真的很准。比自己读省了至少2小时。积分也涨了，感觉很值！","likes":45,"comments":18,"shares":8,"tags":["使用体验","Hermes"],"hot":False,"points_reward":10},
     ]
 
 def gen_community_events():
     return [
-        {"id":1,"title":"【大V直播】财经老王：下半年A股配置策略","type":"直播","date":"2026-05-22 20:00","host":"财经老王","participants":2840,"points":100,"status":"报名中","badge":"🔴 即将开始"},
-        {"id":2,"title":"【研报解读挑战赛】最佳分析师评选","type":"活动","date":"2026-05-20 ~ 06-05","host":"洞见智研官方","participants":1260,"points":500,"status":"进行中","badge":"🏆 进行中"},
-        {"id":3,"title":"【专家会议】新能源产业链Q2展望","type":"会议","date":"2026-05-24 14:00","host":"行业专家团","participants":680,"points":200,"status":"报名中","badge":"🎙️ 专家"},
-        {"id":4,"title":"【积分翻倍】本周发帖积分×2","type":"活动","date":"2026-05-20 ~ 05-26","host":"洞见智研官方","participants":5600,"points":0,"status":"进行中","badge":"⚡ 限时"},
+        {"id":1,"title":"【作者直播】财经老王：下半年A股跟踪框架","type":"直播","date":"2026-05-22 20:00","host":"财经老王","participants":128,"points":100,"status":"报名中","badge":"🔴 即将开始"},
+        {"id":2,"title":"【研报解读挑战赛】最佳分析师评选","type":"活动","date":"2026-05-20 ~ 06-05","host":"洞见智研官方","participants":214,"points":500,"status":"进行中","badge":"🏆 进行中"},
+        {"id":3,"title":"【专家会议】新能源产业链Q2展望","type":"会议","date":"2026-05-24 14:00","host":"行业专家团","participants":68,"points":200,"status":"报名中","badge":"🎙️ 专家"},
+        {"id":4,"title":"【积分翻倍】本周发帖积分×2","type":"活动","date":"2026-05-20 ~ 05-26","host":"洞见智研官方","participants":186,"points":0,"status":"进行中","badge":"⚡ 限时"},
     ]
 
 def gen_user_profile():
@@ -511,14 +783,14 @@ def gen_user_profile():
         "name": "投研达人_小陈",
         "level": 4,
         "level_name": "资深分析师",
-        "points": 3840,
+        "points": 1260,
         "points_to_next": 5000,
-        "compute_credits": 128,
-        "badges": ["早鸟用户","研报达人","社区贡献者"],
-        "posts": 23,
-        "likes_received": 456,
+        "compute_credits": 36,
+        "badges": ["早鸟用户","研报体验官","产品共创"],
+        "posts": 8,
+        "likes_received": 67,
         "following": 12,
-        "followers": 89,
+        "followers": 14,
         "tier": "专业会员",
     }
 
@@ -530,7 +802,7 @@ def gen_points_rules():
         {"action":"参与活动","points":50,"limit":"每活动1次"},
         {"action":"邀请好友注册","points":100,"limit":"每人1次"},
         {"action":"完成AI分析任务","points":20,"limit":"每日3次"},
-        {"action":"大V帖子互动","points":5,"limit":"每日10次"},
+        {"action":"作者帖子互动","points":5,"limit":"每日10次"},
         {"action":"分享内容到社交平台","points":15,"limit":"每日3次"},
     ]
 
@@ -539,7 +811,7 @@ def gen_compute_exchange():
         {"name":"Hermes基础算力包","credits":50,"compute":"100次AI分析","desc":"适合日常使用"},
         {"name":"Hermes专业算力包","credits":200,"compute":"500次AI分析","desc":"适合深度研究"},
         {"name":"Hermes量化算力包","credits":500,"compute":"1500次AI分析+量化回测","desc":"适合量化策略"},
-        {"name":"大V直播门票","credits":100,"compute":"1场专属直播","desc":"与大V实时互动"},
+        {"name":"作者直播席位","credits":100,"compute":"1场专属直播","desc":"与试点作者实时互动"},
         {"name":"专家会议席位","credits":200,"compute":"1场专家电话会议","desc":"一手行业信息"},
     ]
 
@@ -659,7 +931,7 @@ def api_hermes_analyze():
     mode = request.json.get("mode", "研报精读")
     option = request.json.get("option", "")
     key = f"{mode}_{option}"
-    result = HERMES_RESPONSES.get(key, f"【{mode} · {option}】\n\n基于洞见智研平台整合的多维度数据，AI已完成深度分析。\n\n核心发现：该领域当前呈现结构性机会，关键指标向好。建议结合个人风险偏好，参考大V合伙人的专业解读后做出投资决策。\n\n数据来源：券商研报库 + 专家纪要库 + 另类数据库\nAI引擎：DeepSeek R2 + Kimi 2.6 RAG架构\n分析时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    result = HERMES_RESPONSES.get(key, f"【{mode} · {option}】\n\n基于洞见智研平台整合的多维度数据，AI已完成深度分析。\n\n核心发现：该领域当前呈现结构性机会，关键指标向好。建议结合个人风险偏好，参考试点作者的研究框架后做出自己的判断。\n\n数据来源：券商研报库 + 专家纪要库 + 另类数据库\nAI引擎：DeepSeek R2 + Kimi 2.6 RAG架构\n分析时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
     return jsonify({
         "mode": mode,
         "option": option,
@@ -671,11 +943,11 @@ def api_hermes_analyze():
 
 def gen_dm_conversations():
     return [
-        {"id":1,"kol_name":"财经老王","kol_avatar":"👑","tier":"S级","last_msg":"好的，我周四直播会详细讲这个方向，记得来看","time":"5分钟前","unread":1,"vip_only":False},
-        {"id":2,"kol_name":"投资女神Lisa","kol_avatar":"💎","tier":"S级","last_msg":"港股互联网的配置建议我已经发到专属频道了","time":"2小时前","unread":0,"vip_only":False},
-        {"id":3,"kol_name":"量化老师陈明","kol_avatar":"📊","tier":"A级","last_msg":"[付费内容] 本周多因子模型调仓建议","time":"昨天","unread":0,"vip_only":True},
-        {"id":4,"kol_name":"全球宏观James","kol_avatar":"🌐","tier":"A级","last_msg":"美联储会议纪要解读已更新，查看详情","time":"昨天","unread":0,"vip_only":False},
-        {"id":5,"kol_name":"新能源猎手阿强","kol_avatar":"⚡","tier":"B级","last_msg":"固态电池调研纪要整理好了，分享给你","time":"3天前","unread":0,"vip_only":False},
+        {"id":1,"kol_name":"财经老王","kol_avatar":"👑","tier":"种子作者","last_msg":"好的，我周四直播会详细讲这个方向，记得来看","time":"5分钟前","unread":1,"vip_only":False},
+        {"id":2,"kol_name":"投资女神Lisa","kol_avatar":"💎","tier":"种子作者","last_msg":"港股互联网的配置建议我已经发到专属频道了","time":"2小时前","unread":0,"vip_only":False},
+        {"id":3,"kol_name":"量化老师陈明","kol_avatar":"📊","tier":"成长作者","last_msg":"[付费内容] 本周多因子模型调仓建议","time":"昨天","unread":0,"vip_only":True},
+        {"id":4,"kol_name":"全球宏观James","kol_avatar":"🌐","tier":"成长作者","last_msg":"美联储会议纪要解读已更新，查看详情","time":"昨天","unread":0,"vip_only":False},
+        {"id":5,"kol_name":"新能源猎手阿强","kol_avatar":"⚡","tier":"观察作者","last_msg":"固态电池调研纪要整理好了，分享给你","time":"3天前","unread":0,"vip_only":False},
     ]
 
 def gen_dm_messages(kol_id):
@@ -706,28 +978,28 @@ def gen_kol_workbench():
     return {
         "kol_name": "财经老王",
         "kol_avatar": "👑",
-        "tier": "S级合伙人",
+        "tier": "种子合作作者",
         "stats": {
-            "total_followers": 2800000,
-            "vip_subscribers": 4200,
-            "monthly_revenue": 186000,
-            "revenue_change": 12.5,
-            "unread_messages": 23,
-            "pending_replies": 8,
-            "today_views": 12800,
-            "engagement_rate": 4.2,
+            "total_followers": 128000,
+            "vip_subscribers": 36,
+            "monthly_revenue": 18600,
+            "revenue_change": 8.5,
+            "unread_messages": 7,
+            "pending_replies": 3,
+            "today_views": 680,
+            "engagement_rate": 6.8,
         },
         "recent_fans": [
             {"name":"投研达人_小陈","time":"5分钟前","msg":"老王好！AI算力还能追吗？","tier":"专业会员"},
             {"name":"价值猎人小林","time":"23分钟前","msg":"请问港股互联网怎么看？","tier":"基础会员"},
             {"name":"量化新手_阿明","time":"1小时前","msg":"想学习多因子模型，有推荐吗？","tier":"免费用户"},
-            {"name":"机构用户_张总","time":"2小时前","msg":"能否安排一次闭门交流？","tier":"机构VIP"},
+            {"name":"机构用户_张总","time":"2小时前","msg":"能否安排一次闭门交流？","tier":"机构试点"},
             {"name":"小白投资者","time":"3小时前","msg":"新能源板块现在能入吗？","tier":"基础会员"},
         ],
         "broadcast_history": [
-            {"id":1,"content":"本周策略更新：科技板块逢低布局，AI算力+国产替代双主线","time":"2026-05-20 08:00","reach":3200,"open_rate":68},
-            {"id":2,"content":"紧急提醒：美联储会议纪要偏鸽，短期利好风险资产","time":"2026-05-19 22:30","reach":4100,"open_rate":82},
-            {"id":3,"content":"周末复盘：本周操作回顾与下周展望","time":"2026-05-18 18:00","reach":2800,"open_rate":55},
+            {"id":1,"content":"本周策略更新：科技板块适合继续跟踪，重点看 AI 算力订单兑现","time":"2026-05-20 08:00","reach":92,"open_rate":68},
+            {"id":2,"content":"宏观提醒：美联储纪要偏鸽，但还要等国内资金面确认","time":"2026-05-19 22:30","reach":108,"open_rate":82},
+            {"id":3,"content":"周末复盘：本周操作回顾与下周观察重点","time":"2026-05-18 18:00","reach":76,"open_rate":55},
         ],
     }
 
@@ -744,7 +1016,7 @@ def api_dm_send():
     kol_id = request.json.get("kol_id")
     content = request.json.get("content", "")
     history = request.json.get("history", [])
-    # 大V 角色画像 + 上下文感知（合规：用"关注/参考/可考虑"措辞，不出现"买/卖/必涨/必跌"）
+    # 作者角色画像 + 上下文感知（合规：用"关注/参考/可考虑"措辞，不出现"买/卖/必涨/必跌"）
     KOL_PERSONA = {
         1: {"name":"财经老王","style":"宏观+科技，偏稳健","focus":["AI算力","半导体","美联储","降息"]},
         2: {"name":"投资女神Lisa","style":"港股+互联网，价值派","focus":["港股","互联网","南向资金","平台经济"]},
@@ -756,7 +1028,7 @@ def api_dm_send():
     text = content.lower()
     turn = len(history) + 1
 
-    # 关键词触发的多轮回复（每个大V不同风格）
+    # 关键词触发的多轮回复（每个作者不同风格）
     def reply_for(kw_match):
         base = persona["name"]
         if "买" in content or "卖" in content or "推荐" in content or "代码" in content:
@@ -772,7 +1044,7 @@ def api_dm_send():
         if "ai" in text or "算力" in text or "科技" in text or "芯片" in text:
             if kol_id == 1:
                 return f"AI算力短期确实热，但要拆开看：①云厂商资本开支节奏 ②国产替代订单兑现度 ③估值消化空间。我现在是逢回调关注，不追高。具体节奏，可以参考Hermes里高盛和中金最新的研报精读，我也是基于这些证据做判断的。"
-            return f"科技板块我会更多看宏观资金面和外资流向，不做个股推荐。可以参考一下大V老王的频道，他对这条线跟得更细。"
+            return f"科技板块我会更多看宏观资金面和外资流向，不做个股推荐。可以参考一下老王的频道，他对这条线跟得更细。"
         if "宏观" in text or "美联储" in text or "降息" in text or "美元" in text:
             if kol_id == 4:
                 return f"美联储这边我跟最紧：CME利率期货显示年内降息2次概率68%，鲍威尔最近讲话偏鸽。美元指数承压，对应：①新兴市场股票偏好上升 ②黄金中长期支撑 ③大宗商品反弹。这些只是大类资产框架，不是具体建议哈。"
@@ -793,7 +1065,7 @@ def api_dm_send():
         "kol_id": kol_id,
         "msg_id": random.randint(100,999),
         "auto_reply": reply,
-        "disclaimer": "以上为大V个人研究观点，仅供参考，不构成投资建议",
+        "disclaimer": "以上为试点作者个人研究观点，仅供参考，不构成投资建议",
         "turn": turn,
     })
 

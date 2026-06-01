@@ -217,7 +217,7 @@
           <span class="admin-nav-icon">&#128225;</span> 渠道分析
         </div>
         <div class="admin-nav-item" id="nav-kol" onclick="showAnalyticsSection('kol')">
-          <span class="admin-nav-icon">&#11088;</span> KOL效能
+          <span class="admin-nav-icon">&#11088;</span> 作者协同
         </div>
         <div class="admin-nav-item" id="nav-revenue" onclick="showAnalyticsSection('revenue')">
           <span class="admin-nav-icon">&#128176;</span> 营收趋势
@@ -247,7 +247,7 @@
     <div class="admin-topbar">
       <div class="admin-page-title" id="page-title">运营概览</div>
       <div style="display:flex;gap:12px;align-items:center">
-        <span style="font-size:12px;color:#8899aa">2026-05-20 实时数据</span>
+        <span style="font-size:12px;color:#8899aa">2026-06-01 验证期看板</span>
         <button class="btn-gold" style="padding:8px 16px;font-size:12px" onclick="showToast('报告生成中，请稍候...')">导出报告</button>
       </div>
     </div>
@@ -258,64 +258,64 @@
       <div id="section-overview">
         <div class="stats-grid">
           <div class="stat-card">
-            <div class="stat-label">总注册用户</div>
+            <div class="stat-label">累计留资用户</div>
             <span class="stat-icon">&#9786;</span>
-            <div class="stat-value">251,320</div>
-            <div class="stat-change up">&#9650; +3,240 本月</div>
+            <div class="stat-value">1,268</div>
+            <div class="stat-change up">&#9650; +146 本月</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">付费用户</div>
             <span class="stat-icon">&#9830;</span>
-            <div class="stat-value">65,320</div>
-            <div class="stat-change up">&#9650; +1,820 本月</div>
+            <div class="stat-value">128</div>
+            <div class="stat-change up">&#9650; +18 本月</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">月度GMV</div>
+            <div class="stat-label">月度 MRR</div>
             <span class="stat-icon">&#9775;</span>
-            <div class="stat-value">¥760万</div>
-            <div class="stat-change up">&#9650; +12.4%</div>
+            <div class="stat-value">¥68,800</div>
+            <div class="stat-change up">&#9650; +8.5%</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">KOL合伙人</div>
+            <div class="stat-label">试点作者 / 机构线索</div>
             <span class="stat-icon">&#9733;</span>
-            <div class="stat-value">620</div>
-            <div class="stat-change up">&#9650; +28 本月</div>
+            <div class="stat-value">12</div>
+            <div class="stat-change up">&#9650; +3 本月</div>
           </div>
         </div>
 
         <div class="table-wrap" style="margin-bottom:20px">
           <div class="table-header">
-            <div class="table-title">渠道获客概览</div>
-            <span class="tag tag-gold">本月数据</span>
+            <div class="table-title">验证渠道概览</div>
+            <span class="tag tag-gold">试点阶段</span>
           </div>
           <table>
             <thead>
-              <tr><th>渠道</th><th>新增用户</th><th>付费转化率</th><th>月度营收</th><th>ROI</th><th>状态</th></tr>
+              <tr><th>渠道</th><th>留资用户</th><th>首次付费率</th><th>月度营收</th><th>LTV/CAC</th><th>状态</th></tr>
             </thead>
             <tbody>
               <tr>
-                <td><span style="color:#F8F6F0;font-weight:500">微信生态</span></td>
-                <td>42,000</td><td><span class="up">3.8%</span></td><td>¥284万</td><td><span class="up">4.2x</span></td>
+                <td><span style="color:#F8F6F0;font-weight:500">微信社群</span></td>
+                <td>2,100</td><td><span class="up">6.4%</span></td><td>¥28,600</td><td><span class="up">14.8x</span></td>
                 <td><span class="tag tag-green">健康</span></td>
               </tr>
               <tr>
-                <td><span style="color:#F8F6F0;font-weight:500">抖音</span></td>
-                <td>31,000</td><td><span class="up">2.9%</span></td><td>¥192万</td><td><span class="up">3.1x</span></td>
-                <td><span class="tag tag-green">健康</span></td>
+                <td><span style="color:#F8F6F0;font-weight:500">内容合作</span></td>
+                <td>1,400</td><td><span class="up">4.8%</span></td><td>¥19,200</td><td><span class="up">9.6x</span></td>
+                <td><span class="tag tag-green">验证中</span></td>
               </tr>
               <tr>
                 <td><span style="color:#F8F6F0;font-weight:500">小红书</span></td>
-                <td>8,900</td><td><span class="up">4.2%</span></td><td>¥92万</td><td><span class="up">5.8x</span></td>
-                <td><span class="tag tag-green">优质</span></td>
-              </tr>
-              <tr>
-                <td><span style="color:#F8F6F0;font-weight:500">微博</span></td>
-                <td>12,500</td><td>2.1%</td><td>¥68万</td><td>2.4x</td>
+                <td>980</td><td><span class="up">3.6%</span></td><td>¥13,600</td><td><span class="up">8.8x</span></td>
                 <td><span class="tag tag-blue">观察</span></td>
               </tr>
               <tr>
+                <td><span style="color:#F8F6F0;font-weight:500">转介绍</span></td>
+                <td>620</td><td><span class="up">12.1%</span></td><td>¥24,800</td><td><span class="up">47.8x</span></td>
+                <td><span class="tag tag-green">优质</span></td>
+              </tr>
+              <tr>
                 <td><span style="color:#F8F6F0;font-weight:500">直接流量</span></td>
-                <td>3,600</td><td><span class="up">6.8%</span></td><td>¥124万</td><td><span class="up">8.2x</span></td>
+                <td>300</td><td><span class="up">15.0%</span></td><td>¥16,800</td><td><span class="up">78.3x</span></td>
                 <td><span class="tag tag-green">优质</span></td>
               </tr>
             </tbody>
@@ -324,11 +324,11 @@
 
         <div class="table-wrap">
           <div class="table-header">
-            <div class="table-title">用户圈层分布</div>
+            <div class="table-title">用户验证分层</div>
           </div>
           <table>
             <thead>
-              <tr><th>圈层</th><th>用户数</th><th>占比</th><th>ARPU</th><th>月留存</th></tr>
+              <tr><th>圈层</th><th>用户数</th><th>占比</th><th>ARPU</th><th>30日留存</th></tr>
             </thead>
             <tbody>
               {% for seg in segments %}
@@ -336,8 +336,8 @@
                 <td><span style="color:#F8F6F0;font-weight:500">{{ seg.segment }}</span></td>
                 <td>{{ "{:,}".format(seg.count) }}</td>
                 <td>{{ seg.pct }}%</td>
-                <td>{% if seg.segment == '免费用户' %}¥0{% elif seg.segment == '基础会员' %}¥99{% elif seg.segment == '专业会员' %}¥299{% elif seg.segment == '机构VIP' %}¥2,999{% else %}分成{% endif %}</td>
-                <td>{% if seg.segment == '免费用户' %}62%{% elif seg.segment == '基础会员' %}78%{% elif seg.segment == '专业会员' %}89%{% elif seg.segment == '机构VIP' %}96%{% else %}98%{% endif %}</td>
+                <td>{% if seg.segment == '免费用户' %}¥0{% elif seg.segment == '基础会员' %}¥68{% elif seg.segment == '专业会员' %}¥198{% elif seg.segment == '机构试点' %}定制{% else %}试点分成{% endif %}</td>
+                <td>{% if seg.segment == '免费用户' %}16%{% elif seg.segment == '基础会员' %}48%{% elif seg.segment == '专业会员' %}70%{% elif seg.segment == '机构试点' %}84%{% else %}75%{% endif %}</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -380,7 +380,7 @@
           </div>
           <div class="search-bar">
             <input type="text" placeholder="搜索用户名 / 手机号">
-            <select><option>会员等级 (全部)</option><option>免费用户</option><option>基础会员</option><option>专业会员</option><option>机构VIP</option><option>KOL合伙人</option></select>
+            <select><option>会员等级 (全部)</option><option>免费用户</option><option>基础会员</option><option>专业会员</option><option>机构试点</option><option>试点作者</option></select>
             <select><option>用户状态 (全部)</option><option>正常</option><option>活跃</option><option>沉默</option><option>已禁用</option></select>
             <button class="btn-gold" style="padding:8px 16px;font-size:12px">搜索</button>
           </div>
@@ -389,20 +389,20 @@
               <tr><th>用户</th><th>等级</th><th>积分</th><th>算力余额</th><th>注册时间</th><th>最近活跃</th><th>状态</th><th>操作</th></tr>
             </thead>
             <tbody>
-              <tr><td><span style="color:#F8F6F0;font-weight:500">张伟 <span style="font-size:10px;color:#8899aa">138****8821</span></span></td><td><span class="tag tag-gold">机构VIP</span></td><td style="color:#C8A96E">8,240</td><td>1,200</td><td>2024-03-12</td><td>今日 09:42</td><td><span class="tag tag-green">活跃</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
+              <tr><td><span style="color:#F8F6F0;font-weight:500">张伟 <span style="font-size:10px;color:#8899aa">138****8821</span></span></td><td><span class="tag tag-gold">机构试点</span></td><td style="color:#C8A96E">1,240</td><td>180</td><td>2026-03-12</td><td>今日 09:42</td><td><span class="tag tag-green">活跃</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
               <tr><td><span style="color:#F8F6F0;font-weight:500">李晓梅 <span style="font-size:10px;color:#8899aa">139****4402</span></span></td><td><span class="tag tag-blue">专业会员</span></td><td style="color:#C8A96E">3,580</td><td>480</td><td>2024-06-28</td><td>今日 11:15</td><td><span class="tag tag-green">活跃</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
               <tr><td><span style="color:#F8F6F0;font-weight:500">王建国 <span style="font-size:10px;color:#8899aa">135****7730</span></span></td><td><span class="tag tag-blue">专业会员</span></td><td style="color:#C8A96E">2,100</td><td>320</td><td>2024-09-05</td><td>昨日 20:33</td><td><span class="tag tag-green">正常</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
               <tr><td><span style="color:#F8F6F0;font-weight:500">陈思远 <span style="font-size:10px;color:#8899aa">186****2219</span></span></td><td><span style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.2);color:#C8A96E;border-radius:4px;padding:2px 7px;font-size:11px">基础会员</span></td><td style="color:#C8A96E">860</td><td>80</td><td>2025-01-18</td><td>3天前</td><td><span class="tag tag-green">正常</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
               <tr><td><span style="color:#F8F6F0;font-weight:500">刘芳 <span style="font-size:10px;color:#8899aa">177****6614</span></span></td><td><span style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.2);color:#C8A96E;border-radius:4px;padding:2px 7px;font-size:11px">基础会员</span></td><td style="color:#C8A96E">420</td><td>40</td><td>2025-02-22</td><td>7天前</td><td><span style="color:#8899aa;font-size:12px">沉默</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
               <tr><td><span style="color:#F8F6F0;font-weight:500">赵磊 <span style="font-size:10px;color:#8899aa">150****9983</span></span></td><td><span style="color:#8899aa;font-size:12px">免费用户</span></td><td style="color:#C8A96E">180</td><td>0</td><td>2025-04-10</td><td>2天前</td><td><span class="tag tag-green">正常</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
               <tr><td><span style="color:#F8F6F0;font-weight:500">孙雪 <span style="font-size:10px;color:#8899aa">132****5571</span></span></td><td><span style="color:#8899aa;font-size:12px">免费用户</span></td><td style="color:#C8A96E">100</td><td>0</td><td>2025-05-01</td><td>今日 08:20</td><td><span class="tag tag-green">正常</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
-              <tr><td><span style="color:#F8F6F0;font-weight:500">周浩然 <span style="font-size:10px;color:#8899aa">188****3340</span></span></td><td><span class="tag tag-gold">机构VIP</span></td><td style="color:#C8A96E">6,800</td><td>950</td><td>2024-01-08</td><td>今日 10:58</td><td><span class="tag tag-green">活跃</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
+              <tr><td><span style="color:#F8F6F0;font-weight:500">周浩然 <span style="font-size:10px;color:#8899aa">188****3340</span></span></td><td><span class="tag tag-gold">机构试点</span></td><td style="color:#C8A96E">980</td><td>140</td><td>2026-01-08</td><td>今日 10:58</td><td><span class="tag tag-green">活跃</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
               <tr><td><span style="color:#F8F6F0;font-weight:500">吴静怡 <span style="font-size:10px;color:#8899aa">136****8802</span></span></td><td><span class="tag tag-blue">专业会员</span></td><td style="color:#C8A96E">1,640</td><td>200</td><td>2024-11-30</td><td>5天前</td><td><span style="color:#8899aa;font-size:12px">沉默</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
               <tr><td><span style="color:#F8F6F0;font-weight:500">郑凯 <span style="font-size:10px;color:#8899aa">159****1127</span></span></td><td><span style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.2);color:#C8A96E;border-radius:4px;padding:2px 7px;font-size:11px">基础会员</span></td><td style="color:#C8A96E">540</td><td>60</td><td>2025-03-14</td><td>昨日 16:44</td><td><span class="tag tag-green">正常</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
             </tbody>
           </table>
           <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0 0;font-size:12px;color:#8899aa">
-            <span>共 251,320 条记录，当前显示第 1-10 条</span>
+            <span>共 1,268 条记录，当前显示第 1-10 条</span>
             <div style="display:flex;gap:6px">
               <button class="btn-outline" style="padding:4px 10px;font-size:11px">上一页</button>
               <button class="btn-gold" style="padding:4px 10px;font-size:11px">1</button>
@@ -430,104 +430,104 @@
             <div class="stat-change up">&#9650; +1.2pp</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">专业→VIP升级</div>
+            <div class="stat-label">专业→机构试点</div>
             <span class="stat-icon">&#9733;</span>
-            <div class="stat-value">4.8%</div>
-            <div class="stat-change up">&#9650; +0.3pp</div>
+            <div class="stat-value">2.7%</div>
+            <div class="stat-change up">&#9650; +0.4pp</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">平均LTV</div>
             <span class="stat-icon">&#9775;</span>
-            <div class="stat-value">¥1,240</div>
-            <div class="stat-change up">&#9650; +¥84</div>
+            <div class="stat-value">¥538</div>
+            <div class="stat-change up">&#9650; +¥42</div>
           </div>
         </div>
         <div class="segment-cards">
           <div class="segment-card">
             <div class="segment-card-name">免费用户</div>
-            <div class="segment-card-stat"><span>用户数</span><span>185,920</span></div>
-            <div style="margin:8px 0"><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:74%"></div></div></div>
-            <div class="segment-card-stat"><span>占比</span><span>74.0%</span></div>
+            <div class="segment-card-stat"><span>用户数</span><span>880</span></div>
+            <div style="margin:8px 0"><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:69.4%"></div></div></div>
+            <div class="segment-card-stat"><span>占比</span><span>69.4%</span></div>
             <div class="segment-card-stat"><span>ARPU</span><span>¥0</span></div>
-            <div class="segment-card-stat"><span>月留存</span><span>62%</span></div>
+            <div class="segment-card-stat"><span>月留存</span><span>28%</span></div>
             <div class="segment-card-stat"><span>升级率</span><span>8.4%</span></div>
             <button class="btn-outline" style="width:100%;margin-top:10px;padding:6px;font-size:12px" onclick="showToast('策略配置已打开')">配置运营策略</button>
           </div>
           <div class="segment-card">
             <div class="segment-card-name">基础会员</div>
-            <div class="segment-card-stat"><span>用户数</span><span>42,180</span></div>
-            <div style="margin:8px 0"><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:16.8%"></div></div></div>
-            <div class="segment-card-stat"><span>占比</span><span>16.8%</span></div>
-            <div class="segment-card-stat"><span>ARPU</span><span>¥99</span></div>
-            <div class="segment-card-stat"><span>月留存</span><span>78%</span></div>
+            <div class="segment-card-stat"><span>用户数</span><span>214</span></div>
+            <div style="margin:8px 0"><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:16.9%"></div></div></div>
+            <div class="segment-card-stat"><span>占比</span><span>16.9%</span></div>
+            <div class="segment-card-stat"><span>ARPU</span><span>¥68</span></div>
+            <div class="segment-card-stat"><span>月留存</span><span>41%</span></div>
             <div class="segment-card-stat"><span>升级率</span><span>12.1%</span></div>
             <button class="btn-outline" style="width:100%;margin-top:10px;padding:6px;font-size:12px" onclick="showToast('策略配置已打开')">配置运营策略</button>
           </div>
           <div class="segment-card">
             <div class="segment-card-name">专业会员</div>
-            <div class="segment-card-stat"><span>用户数</span><span>18,640</span></div>
-            <div style="margin:8px 0"><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:7.4%"></div></div></div>
-            <div class="segment-card-stat"><span>占比</span><span>7.4%</span></div>
-            <div class="segment-card-stat"><span>ARPU</span><span>¥299</span></div>
-            <div class="segment-card-stat"><span>月留存</span><span>89%</span></div>
-            <div class="segment-card-stat"><span>升级率</span><span>4.8%</span></div>
+            <div class="segment-card-stat"><span>用户数</span><span>128</span></div>
+            <div style="margin:8px 0"><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:10.1%"></div></div></div>
+            <div class="segment-card-stat"><span>占比</span><span>10.1%</span></div>
+            <div class="segment-card-stat"><span>ARPU</span><span>¥198</span></div>
+            <div class="segment-card-stat"><span>月留存</span><span>58%</span></div>
+            <div class="segment-card-stat"><span>升级率</span><span>2.7%</span></div>
             <button class="btn-outline" style="width:100%;margin-top:10px;padding:6px;font-size:12px" onclick="showToast('策略配置已打开')">配置运营策略</button>
           </div>
           <div class="segment-card">
-            <div class="segment-card-name">机构VIP</div>
-            <div class="segment-card-stat"><span>用户数</span><span>3,960</span></div>
-            <div style="margin:8px 0"><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:1.6%"></div></div></div>
-            <div class="segment-card-stat"><span>占比</span><span>1.6%</span></div>
-            <div class="segment-card-stat"><span>ARPU</span><span>¥2,999</span></div>
-            <div class="segment-card-stat"><span>月留存</span><span>96%</span></div>
-            <div class="segment-card-stat"><span>升级率</span><span>2.1%</span></div>
+            <div class="segment-card-name">机构试点</div>
+            <div class="segment-card-stat"><span>用户数</span><span>34</span></div>
+            <div style="margin:8px 0"><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:2.7%"></div></div></div>
+            <div class="segment-card-stat"><span>占比</span><span>2.7%</span></div>
+            <div class="segment-card-stat"><span>ARPU</span><span>¥1,200+</span></div>
+            <div class="segment-card-stat"><span>月留存</span><span>71%</span></div>
+            <div class="segment-card-stat"><span>升级率</span><span>线索制</span></div>
             <button class="btn-outline" style="width:100%;margin-top:10px;padding:6px;font-size:12px" onclick="showToast('策略配置已打开')">配置运营策略</button>
           </div>
           <div class="segment-card">
-            <div class="segment-card-name">KOL合伙人</div>
-            <div class="segment-card-stat"><span>用户数</span><span>620</span></div>
-            <div style="margin:8px 0"><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:0.25%"></div></div></div>
-            <div class="segment-card-stat"><span>占比</span><span>0.25%</span></div>
-            <div class="segment-card-stat"><span>ARPU</span><span>分成收益</span></div>
-            <div class="segment-card-stat"><span>月留存</span><span>98%</span></div>
+            <div class="segment-card-name">试点作者</div>
+            <div class="segment-card-stat"><span>用户数</span><span>12</span></div>
+            <div style="margin:8px 0"><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:0.9%"></div></div></div>
+            <div class="segment-card-stat"><span>占比</span><span>0.9%</span></div>
+            <div class="segment-card-stat"><span>ARPU</span><span>协同收入</span></div>
+            <div class="segment-card-stat"><span>月留存</span><span>83%</span></div>
             <div class="segment-card-stat"><span>升级率</span><span>—</span></div>
             <button class="btn-outline" style="width:100%;margin-top:10px;padding:6px;font-size:12px" onclick="showToast('策略配置已打开')">配置运营策略</button>
           </div>
         </div>
         <div class="card" style="padding:20px">
           <div style="font-size:14px;color:#C8A96E;font-weight:600;margin-bottom:4px">升级路径漏斗</div>
-          <div style="font-size:12px;color:#8899aa;margin-bottom:16px">用户分层转化路径及转化率</div>
+          <div style="font-size:12px;color:#8899aa;margin-bottom:16px">验证期用户分层转化路径及转化率</div>
           <div class="funnel-wrap">
             <div class="funnel-step">
-              <div class="funnel-box"><div class="funnel-name">免费用户</div><div class="funnel-count">185,920</div><div class="funnel-pct">100%</div></div>
+              <div class="funnel-box"><div class="funnel-name">免费用户</div><div class="funnel-count">880</div><div class="funnel-pct">100%</div></div>
             </div>
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 4px">
               <div class="funnel-arrow">&#9654;</div>
               <div class="funnel-conv">8.4%</div>
             </div>
             <div class="funnel-step">
-              <div class="funnel-box"><div class="funnel-name">基础会员</div><div class="funnel-count">42,180</div><div class="funnel-pct">22.7%</div></div>
+              <div class="funnel-box"><div class="funnel-name">基础会员</div><div class="funnel-count">214</div><div class="funnel-pct">24.3%</div></div>
             </div>
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 4px">
               <div class="funnel-arrow">&#9654;</div>
               <div class="funnel-conv">12.1%</div>
             </div>
             <div class="funnel-step">
-              <div class="funnel-box"><div class="funnel-name">专业会员</div><div class="funnel-count">18,640</div><div class="funnel-pct">10.0%</div></div>
+              <div class="funnel-box"><div class="funnel-name">专业会员</div><div class="funnel-count">128</div><div class="funnel-pct">14.5%</div></div>
             </div>
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 4px">
               <div class="funnel-arrow">&#9654;</div>
-              <div class="funnel-conv">4.8%</div>
+              <div class="funnel-conv">2.7%</div>
             </div>
             <div class="funnel-step">
-              <div class="funnel-box"><div class="funnel-name">机构VIP</div><div class="funnel-count">3,960</div><div class="funnel-pct">2.1%</div></div>
+              <div class="funnel-box"><div class="funnel-name">机构试点</div><div class="funnel-count">34</div><div class="funnel-pct">3.9%</div></div>
             </div>
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 4px">
               <div class="funnel-arrow">&#9654;</div>
-              <div class="funnel-conv">2.1%</div>
+              <div class="funnel-conv">共创筛选</div>
             </div>
             <div class="funnel-step">
-              <div class="funnel-box"><div class="funnel-name">KOL合伙人</div><div class="funnel-count">620</div><div class="funnel-pct">0.33%</div></div>
+              <div class="funnel-box"><div class="funnel-name">试点作者</div><div class="funnel-count">12</div><div class="funnel-pct">1.4%</div></div>
             </div>
           </div>
         </div>
@@ -575,7 +575,7 @@
               <tr><td style="color:#F8F6F0">参与活动</td><td style="color:#C8A96E">+50 分</td><td>100 分</td><td><span class="tag tag-green">启用</span></td><td><button class="btn-sm-red" onclick="showToast('规则已停用')">停用</button></td></tr>
               <tr><td style="color:#F8F6F0">邀请好友</td><td style="color:#C8A96E">+100 分</td><td>500 分</td><td><span class="tag tag-green">启用</span></td><td><button class="btn-sm-red" onclick="showToast('规则已停用')">停用</button></td></tr>
               <tr><td style="color:#F8F6F0">完成AI分析</td><td style="color:#C8A96E">+20 分</td><td>100 分</td><td><span class="tag tag-green">启用</span></td><td><button class="btn-sm-red" onclick="showToast('规则已停用')">停用</button></td></tr>
-              <tr><td style="color:#F8F6F0">大V互动</td><td style="color:#C8A96E">+5 分</td><td>30 分</td><td><span class="tag tag-green">启用</span></td><td><button class="btn-sm-red" onclick="showToast('规则已停用')">停用</button></td></tr>
+              <tr><td style="color:#F8F6F0">作者互动</td><td style="color:#C8A96E">+5 分</td><td>30 分</td><td><span class="tag tag-green">启用</span></td><td><button class="btn-sm-red" onclick="showToast('规则已停用')">停用</button></td></tr>
               <tr><td style="color:#F8F6F0">分享内容</td><td style="color:#C8A96E">+15 分</td><td>60 分</td><td><span style="color:#8899aa;font-size:12px">停用</span></td><td><button class="btn-sm-blue" onclick="showToast('规则已启用')">启用</button></td></tr>
             </tbody>
           </table>
@@ -588,11 +588,11 @@
           <table>
             <thead><tr><th>排名</th><th>用户</th><th>等级</th><th>本月积分</th><th>累计积分</th><th>兑换算力次数</th></tr></thead>
             <tbody>
-              <tr><td><span class="rank-badge rank-1">1</span></td><td style="color:#F8F6F0">张伟</td><td><span class="tag tag-gold">机构VIP</span></td><td style="color:#C8A96E">12,840</td><td>84,200</td><td>42</td></tr>
-              <tr><td><span class="rank-badge rank-2">2</span></td><td style="color:#F8F6F0">周浩然</td><td><span class="tag tag-gold">机构VIP</span></td><td style="color:#C8A96E">10,620</td><td>72,400</td><td>38</td></tr>
+              <tr><td><span class="rank-badge rank-1">1</span></td><td style="color:#F8F6F0">张伟</td><td><span class="tag tag-gold">机构试点</span></td><td style="color:#C8A96E">2,840</td><td>12,200</td><td>14</td></tr>
+              <tr><td><span class="rank-badge rank-2">2</span></td><td style="color:#F8F6F0">周浩然</td><td><span class="tag tag-gold">机构试点</span></td><td style="color:#C8A96E">2,320</td><td>10,800</td><td>11</td></tr>
               <tr><td><span class="rank-badge rank-3">3</span></td><td style="color:#F8F6F0">李晓梅</td><td><span class="tag tag-blue">专业会员</span></td><td style="color:#C8A96E">8,940</td><td>48,600</td><td>31</td></tr>
               <tr><td><span class="rank-badge rank-n">4</span></td><td style="color:#F8F6F0">王建国</td><td><span class="tag tag-blue">专业会员</span></td><td style="color:#C8A96E">7,280</td><td>36,200</td><td>24</td></tr>
-              <tr><td><span class="rank-badge rank-n">5</span></td><td style="color:#F8F6F0">财经老王</td><td><span class="tier-s">S级KOL</span></td><td style="color:#C8A96E">6,840</td><td>124,800</td><td>28</td></tr>
+              <tr><td><span class="rank-badge rank-n">5</span></td><td style="color:#F8F6F0">财经老王</td><td><span class="tier-s">种子作者</span></td><td style="color:#C8A96E">1,840</td><td>8,400</td><td>9</td></tr>
               <tr><td><span class="rank-badge rank-n">6</span></td><td style="color:#F8F6F0">陈思远</td><td><span style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.2);color:#C8A96E;border-radius:4px;padding:2px 7px;font-size:11px">基础会员</span></td><td style="color:#C8A96E">4,120</td><td>18,400</td><td>12</td></tr>
               <tr><td><span class="rank-badge rank-n">7</span></td><td style="color:#F8F6F0">吴静怡</td><td><span class="tag tag-blue">专业会员</span></td><td style="color:#C8A96E">3,680</td><td>22,100</td><td>14</td></tr>
               <tr><td><span class="rank-badge rank-n">8</span></td><td style="color:#F8F6F0">郑凯</td><td><span style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.2);color:#C8A96E;border-radius:4px;padding:2px 7px;font-size:11px">基础会员</span></td><td style="color:#C8A96E">2,940</td><td>14,600</td><td>9</td></tr>
@@ -648,31 +648,31 @@
       <div id="section-kols" style="display:none">
         <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
           <div class="stat-card">
-            <div class="stat-label">S级合伙人</div>
+            <div class="stat-label">种子作者</div>
             <span class="stat-icon">&#9812;</span>
-            <div class="stat-value">42</div>
-            <div class="stat-change up">贡献GMV 68%</div>
+            <div class="stat-value">2</div>
+            <div class="stat-change up">贡献协同收入 54%</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">本月总佣金</div>
+            <div class="stat-label">本月总分成</div>
             <span class="stat-icon">&#9775;</span>
-            <div class="stat-value">¥114万</div>
-            <div class="stat-change up">&#9650; +8.2%</div>
+            <div class="stat-value">¥8.9万</div>
+            <div class="stat-change up">&#9650; +6.2%</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">待审核申请</div>
+            <div class="stat-label">待审核作者申请</div>
             <span class="stat-icon">&#9998;</span>
-            <div class="stat-value">18</div>
+            <div class="stat-value">6</div>
             <div class="stat-change" style="color:#C8A96E">需处理</div>
           </div>
         </div>
         <div class="table-wrap" style="margin-bottom:20px">
           <div class="table-header">
-            <div class="table-title">KOL合伙人列表</div>
-            <button class="btn-gold" style="padding:6px 14px;font-size:12px" onclick="showToast('新增合伙人表单已打开')">+ 新增合伙人</button>
+            <div class="table-title">试点作者列表</div>
+            <button class="btn-gold" style="padding:6px 14px;font-size:12px" onclick="showToast('新增作者表单已打开')">+ 新增作者</button>
           </div>
           <table>
-            <thead><tr><th>KOL名称</th><th>平台</th><th>粉丝数</th><th>本月GMV</th><th>佣金</th><th>等级</th><th>操作</th></tr></thead>
+            <thead><tr><th>作者名称</th><th>协同渠道</th><th>关注样本</th><th>本月协同收入</th><th>分成</th><th>阶段</th><th>操作</th></tr></thead>
             <tbody>
               {% for kol in kols %}
               <tr>
@@ -681,7 +681,7 @@
                 <td>{{ "{:,}".format(kol.followers) }}</td>
                 <td>¥{{ "{:,}".format(kol.gmv) }}</td>
                 <td style="color:#C8A96E">¥{{ "{:,}".format(kol.commission) }}</td>
-                <td><span class="{% if kol.tier == 'S级' %}tier-s{% elif kol.tier == 'A级' %}tier-a{% else %}tier-b{% endif %}">{{ kol.tier }}</span></td>
+                <td><span class="{% if '种子' in kol.tier %}tier-s{% elif 'A' in kol.tier or '成长' in kol.tier %}tier-a{% else %}tier-b{% endif %}">{{ kol.tier }}</span></td>
                 <td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-blue" onclick="showToast('结算已发起')">结算</button></td>
               </tr>
               {% endfor %}
@@ -690,17 +690,17 @@
         </div>
         <div class="table-wrap">
           <div class="table-header">
-            <div class="table-title">KOL申请审核</div>
-            <span class="tag tag-gold">待审核 18 条</span>
+            <div class="table-title">作者申请审核</div>
+            <span class="tag tag-gold">待审核 6 条</span>
           </div>
           <table>
-            <thead><tr><th>申请人</th><th>平台</th><th>粉丝数</th><th>内容方向</th><th>申请等级</th><th>提交时间</th><th>操作</th></tr></thead>
+            <thead><tr><th>申请人</th><th>来源</th><th>关注样本</th><th>内容方向</th><th>申请阶段</th><th>提交时间</th><th>操作</th></tr></thead>
             <tbody>
-              <tr><td style="color:#F8F6F0">林晓宇</td><td>微信</td><td>128,000</td><td>宏观经济分析</td><td><span class="tier-a">A级</span></td><td>今日 09:12</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
-              <tr><td style="color:#F8F6F0">陈雨桐</td><td>抖音</td><td>84,200</td><td>A股技术分析</td><td><span class="tier-b">B级</span></td><td>今日 08:44</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
-              <tr><td style="color:#F8F6F0">黄志远</td><td>小红书</td><td>210,000</td><td>港股投资策略</td><td><span class="tier-s">S级</span></td><td>昨日 22:30</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
-              <tr><td style="color:#F8F6F0">苏梦琪</td><td>微博</td><td>56,800</td><td>基金定投科普</td><td><span class="tier-b">B级</span></td><td>昨日 18:15</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
-              <tr><td style="color:#F8F6F0">方浩天</td><td>抖音</td><td>320,000</td><td>量化交易策略</td><td><span class="tier-s">S级</span></td><td>昨日 14:08</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
+              <tr><td style="color:#F8F6F0">林晓宇</td><td>微信社群</td><td>12,800</td><td>宏观经济分析</td><td><span class="tier-a">成长作者</span></td><td>今日 09:12</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
+              <tr><td style="color:#F8F6F0">陈雨桐</td><td>内容合作</td><td>8,420</td><td>A股技术分析</td><td><span class="tier-b">观察作者</span></td><td>今日 08:44</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
+              <tr><td style="color:#F8F6F0">黄志远</td><td>小红书</td><td>21,000</td><td>港股投资策略</td><td><span class="tier-s">种子作者</span></td><td>昨日 22:30</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
+              <tr><td style="color:#F8F6F0">苏梦琪</td><td>转介绍</td><td>5,680</td><td>基金定投科普</td><td><span class="tier-b">观察作者</span></td><td>昨日 18:15</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
+              <tr><td style="color:#F8F6F0">方浩天</td><td>内容合作</td><td>32,000</td><td>量化交易策略</td><td><span class="tier-a">成长作者</span></td><td>昨日 14:08</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
             </tbody>
           </table>
         </div>
@@ -712,26 +712,26 @@
           <div class="stat-card">
             <div class="stat-label">待结算总额</div>
             <span class="stat-icon">&#9775;</span>
-            <div class="stat-value">¥114万</div>
+            <div class="stat-value">¥18,400</div>
             <div class="stat-change" style="color:#C8A96E">待处理</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">本月已结算</div>
             <span class="stat-icon">&#9654;</span>
-            <div class="stat-value">¥89万</div>
-            <div class="stat-change up">&#9650; +6.4%</div>
+            <div class="stat-value">¥42,600</div>
+            <div class="stat-change up">&#9650; +4.4%</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">结算KOL数</div>
+            <div class="stat-label">结算作者数</div>
             <span class="stat-icon">&#9786;</span>
-            <div class="stat-value">486</div>
-            <div class="stat-change up">&#9650; +32</div>
+            <div class="stat-value">12</div>
+            <div class="stat-change up">&#9650; +2</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">平均佣金</div>
+            <div class="stat-label">平均分成</div>
             <span class="stat-icon">&#9733;</span>
-            <div class="stat-value">¥2,348</div>
-            <div class="stat-change up">&#9650; +¥184</div>
+            <div class="stat-value">¥5,083</div>
+            <div class="stat-change up">&#9650; +¥320</div>
           </div>
         </div>
         <div class="table-wrap">
@@ -744,16 +744,15 @@
             </div>
           </div>
           <table>
-            <thead><tr><th><input type="checkbox" style="accent-color:#C8A96E"></th><th>KOL名称</th><th>等级</th><th>平台</th><th>本月GMV</th><th>佣金比例</th><th>应付金额</th><th>状态</th><th>操作</th></tr></thead>
+            <thead><tr><th><input type="checkbox" style="accent-color:#C8A96E"></th><th>作者名称</th><th>阶段</th><th>来源</th><th>本月协同收入</th><th>分成比例</th><th>应付金额</th><th>状态</th><th>操作</th></tr></thead>
             <tbody>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">财经老王</td><td><span class="tier-s">S级</span></td><td>微信</td><td>¥284,000</td><td>20%</td><td style="color:#C8A96E">¥56,800</td><td><span class="status-gold">待结算</span></td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px" onclick="showToast('结算已发起')">结算</button></td></tr>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">投资女神Lisa</td><td><span class="tier-s">S级</span></td><td>小红书</td><td>¥196,000</td><td>20%</td><td style="color:#C8A96E">¥39,200</td><td><span class="status-blue">处理中</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">查看</button></td></tr>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">量化小白</td><td><span class="tier-a">A级</span></td><td>抖音</td><td>¥142,000</td><td>18%</td><td style="color:#C8A96E">¥25,560</td><td><span class="status-gold">待结算</span></td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px" onclick="showToast('结算已发起')">结算</button></td></tr>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">宏观策略师</td><td><span class="tier-a">A级</span></td><td>微博</td><td>¥98,000</td><td>18%</td><td style="color:#C8A96E">¥17,640</td><td><span class="status-green">已完成</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">凭证</button></td></tr>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">新能源达人</td><td><span class="tier-b">B级</span></td><td>抖音</td><td>¥76,000</td><td>15%</td><td style="color:#C8A96E">¥11,400</td><td><span class="status-gold">待结算</span></td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px" onclick="showToast('结算已发起')">结算</button></td></tr>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">债券研究员</td><td><span class="tier-b">B级</span></td><td>微信</td><td>¥54,000</td><td>15%</td><td style="color:#C8A96E">¥8,100</td><td><span class="status-blue">处理中</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">查看</button></td></tr>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">期货老手</td><td><span class="tier-a">A级</span></td><td>微博</td><td>¥88,000</td><td>18%</td><td style="color:#C8A96E">¥15,840</td><td><span class="status-green">已完成</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">凭证</button></td></tr>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">科技股猎手</td><td><span class="tier-s">S级</span></td><td>小红书</td><td>¥168,000</td><td>20%</td><td style="color:#C8A96E">¥33,600</td><td><span class="status-gold">待结算</span></td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px" onclick="showToast('结算已发起')">结算</button></td></tr>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">财经老王</td><td><span class="tier-s">种子作者</span></td><td>微信社群</td><td>¥18,600</td><td>15%</td><td style="color:#C8A96E">¥2,790</td><td><span class="status-gold">待结算</span></td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px" onclick="showToast('结算已发起')">结算</button></td></tr>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">投资女神Lisa</td><td><span class="tier-s">种子作者</span></td><td>内容合作</td><td>¥14,200</td><td>18%</td><td style="color:#C8A96E">¥2,556</td><td><span class="status-blue">处理中</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">查看</button></td></tr>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">量化小白</td><td><span class="tier-a">成长作者</span></td><td>小红书</td><td>¥7,800</td><td>15%</td><td style="color:#C8A96E">¥1,170</td><td><span class="status-gold">待结算</span></td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px" onclick="showToast('结算已发起')">结算</button></td></tr>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">宏观策略师</td><td><span class="tier-a">成长作者</span></td><td>微信社群</td><td>¥9,600</td><td>16%</td><td style="color:#C8A96E">¥1,536</td><td><span class="status-green">已完成</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">凭证</button></td></tr>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">港股研究员</td><td><span class="tier-b">观察作者</span></td><td>转介绍</td><td>¥5,400</td><td>15%</td><td style="color:#C8A96E">¥810</td><td><span class="status-gold">待结算</span></td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px" onclick="showToast('结算已发起')">结算</button></td></tr>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">债券研究员</td><td><span class="tier-b">观察作者</span></td><td>内容合作</td><td>¥4,200</td><td>14%</td><td style="color:#C8A96E">¥588</td><td><span class="status-blue">处理中</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">查看</button></td></tr>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">科技股猎手</td><td><span class="tier-a">成长作者</span></td><td>内容合作</td><td>¥6,800</td><td>15%</td><td style="color:#C8A96E">¥1,020</td><td><span class="status-green">已完成</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">凭证</button></td></tr>
             </tbody>
           </table>
         </div>
@@ -1105,7 +1104,7 @@
               </tr></thead>
               <tbody>
                 <tr style="border-bottom:1px solid rgba(200,169,110,0.05)"><td style="padding:8px 10px;color:#F8F6F0">投研达人_小陈</td><td style="padding:8px 10px">Lv.4</td><td style="padding:8px 10px"><span class="tag tag-gold" style="font-size:10px">专业会员</span></td><td style="padding:8px 10px;color:#9A9590">05-20 14:32</td><td style="padding:8px 10px"><span style="color:#2ECC71;font-size:12px">✓ 已签到</span></td></tr>
-                <tr style="border-bottom:1px solid rgba(200,169,110,0.05)"><td style="padding:8px 10px;color:#F8F6F0">量化猎手_老吴</td><td style="padding:8px 10px">Lv.5</td><td style="padding:8px 10px"><span class="tag tag-blue" style="font-size:10px">机构VIP</span></td><td style="padding:8px 10px;color:#9A9590">05-20 13:18</td><td style="padding:8px 10px"><span style="color:#2ECC71;font-size:12px">✓ 已签到</span></td></tr>
+                <tr style="border-bottom:1px solid rgba(200,169,110,0.05)"><td style="padding:8px 10px;color:#F8F6F0">量化猎手_老吴</td><td style="padding:8px 10px">Lv.5</td><td style="padding:8px 10px"><span class="tag tag-blue" style="font-size:10px">机构试点</span></td><td style="padding:8px 10px;color:#9A9590">05-20 13:18</td><td style="padding:8px 10px"><span style="color:#2ECC71;font-size:12px">✓ 已签到</span></td></tr>
                 <tr style="border-bottom:1px solid rgba(200,169,110,0.05)"><td style="padding:8px 10px;color:#F8F6F0">价值投资者_Amy</td><td style="padding:8px 10px">Lv.3</td><td style="padding:8px 10px"><span class="tag tag-gold" style="font-size:10px">专业会员</span></td><td style="padding:8px 10px;color:#9A9590">05-20 11:54</td><td style="padding:8px 10px"><span style="color:#9A9590;font-size:12px">未签到</span></td></tr>
                 <tr style="border-bottom:1px solid rgba(200,169,110,0.05)"><td style="padding:8px 10px;color:#F8F6F0">新手_阿明</td><td style="padding:8px 10px">Lv.2</td><td style="padding:8px 10px"><span style="font-size:10px;color:#9A9590">基础会员</span></td><td style="padding:8px 10px;color:#9A9590">05-20 10:40</td><td style="padding:8px 10px"><span style="color:#9A9590;font-size:12px">未签到</span></td></tr>
               </tbody>
@@ -1233,7 +1232,7 @@
                       <option>所有用户（含免费）</option>
                       <option>基础会员及以上</option>
                       <option selected>专业会员及以上</option>
-                      <option>机构VIP</option>
+                      <option>机构试点</option>
                       <option>仅邀请制</option>
                     </select>
                   </div>
@@ -1283,7 +1282,7 @@
                   style="min-height:160px;background:#0D1B2A;border:1px solid rgba(200,169,110,0.15);border-radius:6px;padding:12px;font-size:13px;color:#D8D4CC;line-height:1.8;outline:none"
                   oninput="evUpdatePreview()">
                   <p><b>活动背景</b></p>
-                  <p>2026年进入年中，全球宏观格局持续演变，A股估值修复逻辑渐趋清晰。洞见智研特邀顶级投研机构，联合旗下S级KOL合伙人，举办2026年中期投资策略峰会。</p>
+                  <p>2026年进入年中，全球宏观格局持续演变，A股估值修复逻辑渐趋清晰。洞见智研计划联合试点作者和研究协同方，举办一场中期策略分享会，用于验证高价值内容能否带来更强的留存和付费转化。</p>
                   <p><b>活动亮点</b></p>
                   <ul>
                     <li>4位顶级分析师同台，覆盖宏观、行业、量化、港股四大维度</li>
@@ -1406,32 +1405,32 @@
             <thead><tr><th>模式名称</th><th>今日调用</th><th>本月调用</th><th>占比</th><th>平均响应时间</th><th>状态</th></tr></thead>
             <tbody>
               <tr>
-                <td style="color:#F8F6F0;font-weight:500">研报精读</td><td>4,494</td><td>99,400</td>
+                <td style="color:#F8F6F0;font-weight:500">研报精读</td><td>494</td><td>19,400</td>
                 <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:35%"></div></div><span style="color:#C8A96E">35%</span></div></td>
                 <td>2.4s</td><td><span class="tag tag-green">正常</span></td>
               </tr>
               <tr>
-                <td style="color:#F8F6F0;font-weight:500">专家纪要速读</td><td>2,825</td><td>62,480</td>
+                <td style="color:#F8F6F0;font-weight:500">专家纪要速读</td><td>286</td><td>11,280</td>
                 <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:22%"></div></div><span style="color:#C8A96E">22%</span></div></td>
                 <td>1.8s</td><td><span class="tag tag-green">正常</span></td>
               </tr>
               <tr>
-                <td style="color:#F8F6F0;font-weight:500">另类数据解读</td><td>2,311</td><td>51,120</td>
+                <td style="color:#F8F6F0;font-weight:500">另类数据解读</td><td>231</td><td>8,120</td>
                 <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:18%"></div></div><span style="color:#C8A96E">18%</span></div></td>
                 <td>3.2s</td><td><span class="tag tag-green">正常</span></td>
               </tr>
               <tr>
-                <td style="color:#F8F6F0;font-weight:500">投资组合诊断</td><td>1,541</td><td>34,080</td>
+                <td style="color:#F8F6F0;font-weight:500">投资组合诊断</td><td>154</td><td>5,480</td>
                 <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:12%"></div></div><span style="color:#C8A96E">12%</span></div></td>
                 <td>4.1s</td><td><span class="tag tag-green">正常</span></td>
               </tr>
               <tr>
-                <td style="color:#F8F6F0;font-weight:500">市场情绪扫描</td><td>1,027</td><td>22,720</td>
+                <td style="color:#F8F6F0;font-weight:500">市场情绪扫描</td><td>108</td><td>4,120</td>
                 <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:8%"></div></div><span style="color:#C8A96E">8%</span></div></td>
                 <td>2.8s</td><td><span class="tag tag-green">正常</span></td>
               </tr>
               <tr>
-                <td style="color:#F8F6F0;font-weight:500">量化因子筛选</td><td>642</td><td>14,200</td>
+                <td style="color:#F8F6F0;font-weight:500">量化因子筛选</td><td>142</td><td>4,200</td>
                 <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:5%"></div></div><span style="color:#C8A96E">5%</span></div></td>
                 <td>5.6s</td><td><span class="tag tag-gold">高负载</span></td>
               </tr>
@@ -1441,18 +1440,18 @@
         <div class="pool-cards">
           <div class="pool-card">
             <div class="pool-card-label">总算力池</div>
-            <div class="pool-card-value">10,000,000</div>
+            <div class="pool-card-value">480,000</div>
             <div class="pool-card-sub">积分</div>
           </div>
           <div class="pool-card">
             <div class="pool-card-label">本月消耗</div>
-            <div class="pool-card-value">2,840,000</div>
-            <div class="pool-card-sub">28.4% 使用率</div>
+            <div class="pool-card-value">84,000</div>
+            <div class="pool-card-sub">17.5% 使用率</div>
           </div>
           <div class="pool-card">
             <div class="pool-card-label">剩余可用</div>
-            <div class="pool-card-value">7,160,000</div>
-            <div class="pool-card-sub">71.6% 剩余</div>
+            <div class="pool-card-value">396,000</div>
+            <div class="pool-card-sub">82.5% 剩余</div>
           </div>
         </div>
         <div class="table-wrap">
@@ -1463,13 +1462,13 @@
           <table>
             <thead><tr><th>排名</th><th>用户</th><th>等级</th><th>本月调用</th><th>消耗算力</th><th>最常用模式</th></tr></thead>
             <tbody>
-              <tr><td><span class="rank-badge rank-1">1</span></td><td style="color:#F8F6F0">张伟</td><td><span class="tag tag-gold">机构VIP</span></td><td>284</td><td style="color:#C8A96E">5,680</td><td>研报精读</td></tr>
-              <tr><td><span class="rank-badge rank-2">2</span></td><td style="color:#F8F6F0">周浩然</td><td><span class="tag tag-gold">机构VIP</span></td><td>241</td><td style="color:#C8A96E">4,820</td><td>投资组合诊断</td></tr>
-              <tr><td><span class="rank-badge rank-3">3</span></td><td style="color:#F8F6F0">财经老王</td><td><span class="tier-s">S级KOL</span></td><td>198</td><td style="color:#C8A96E">3,960</td><td>专家纪要速读</td></tr>
+              <tr><td><span class="rank-badge rank-1">1</span></td><td style="color:#F8F6F0">张伟</td><td><span class="tag tag-gold">机构试点</span></td><td>84</td><td style="color:#C8A96E">1,680</td><td>研报精读</td></tr>
+              <tr><td><span class="rank-badge rank-2">2</span></td><td style="color:#F8F6F0">周浩然</td><td><span class="tag tag-gold">机构试点</span></td><td>71</td><td style="color:#C8A96E">1,420</td><td>投资组合诊断</td></tr>
+              <tr><td><span class="rank-badge rank-3">3</span></td><td style="color:#F8F6F0">财经老王</td><td><span class="tier-s">种子作者</span></td><td>68</td><td style="color:#C8A96E">1,360</td><td>专家纪要速读</td></tr>
               <tr><td><span class="rank-badge rank-n">4</span></td><td style="color:#F8F6F0">李晓梅</td><td><span class="tag tag-blue">专业会员</span></td><td>164</td><td style="color:#C8A96E">3,280</td><td>研报精读</td></tr>
-              <tr><td><span class="rank-badge rank-n">5</span></td><td style="color:#F8F6F0">方浩天</td><td><span class="tier-s">S级KOL</span></td><td>142</td><td style="color:#C8A96E">2,840</td><td>量化因子筛选</td></tr>
+              <tr><td><span class="rank-badge rank-n">5</span></td><td style="color:#F8F6F0">方浩天</td><td><span class="tier-a">成长作者</span></td><td>42</td><td style="color:#C8A96E">840</td><td>量化因子筛选</td></tr>
               <tr><td><span class="rank-badge rank-n">6</span></td><td style="color:#F8F6F0">王建国</td><td><span class="tag tag-blue">专业会员</span></td><td>128</td><td style="color:#C8A96E">2,560</td><td>另类数据解读</td></tr>
-              <tr><td><span class="rank-badge rank-n">7</span></td><td style="color:#F8F6F0">科技股猎手</td><td><span class="tier-a">A级KOL</span></td><td>112</td><td style="color:#C8A96E">2,240</td><td>市场情绪扫描</td></tr>
+              <tr><td><span class="rank-badge rank-n">7</span></td><td style="color:#F8F6F0">科技股猎手</td><td><span class="tier-a">成长作者</span></td><td>31</td><td style="color:#C8A96E">620</td><td>市场情绪扫描</td></tr>
               <tr><td><span class="rank-badge rank-n">8</span></td><td style="color:#F8F6F0">吴静怡</td><td><span class="tag tag-blue">专业会员</span></td><td>96</td><td style="color:#C8A96E">1,920</td><td>研报精读</td></tr>
             </tbody>
           </table>
@@ -1487,20 +1486,20 @@
           <div class="stat-card">
             <div class="stat-label">本月总获客</div>
             <span class="stat-icon">&#9786;</span>
-            <div class="stat-value">98,000</div>
-            <div class="stat-change up">&#9650; +15.2%</div>
+            <div class="stat-value">5,400</div>
+            <div class="stat-change up">&#9650; +12.2%</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">综合转化率</div>
             <span class="stat-icon">&#9670;</span>
-            <div class="stat-value">3.6%</div>
-            <div class="stat-change up">&#9650; +0.4pp</div>
+            <div class="stat-value">7.9%</div>
+            <div class="stat-change up">&#9650; +0.7pp</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">获客成本 CAC</div>
             <span class="stat-icon">&#9775;</span>
-            <div class="stat-value">¥38</div>
-            <div class="stat-change down">&#9660; -¥4 优化</div>
+            <div class="stat-value">¥29</div>
+            <div class="stat-change down">&#9660; -¥3 优化</div>
           </div>
         </div>
         <div class="table-wrap" style="margin-bottom:20px">
@@ -1509,12 +1508,12 @@
             <span class="tag tag-gold">本月</span>
           </div>
           <table>
-            <thead><tr><th>渠道</th><th>曝光量</th><th>点击率</th><th>注册转化</th><th>付费转化</th><th>CAC</th><th>LTV</th><th>ROI</th><th>状态</th></tr></thead>
+            <thead><tr><th>渠道</th><th>内容触达</th><th>留资率</th><th>试用转化</th><th>付费转化</th><th>CAC</th><th>LTV</th><th>ROI</th><th>状态</th></tr></thead>
             <tbody>
-              <tr><td style="color:#F8F6F0">微信生态</td><td>4,200,000</td><td>2.1%</td><td>1.0%</td><td>3.8%</td><td>¥32</td><td>¥420</td><td><span class="up">4.2x</span></td><td><span class="tag tag-green">健康</span></td></tr>
-              <tr><td style="color:#F8F6F0">抖音</td><td>8,600,000</td><td>0.8%</td><td>0.36%</td><td>2.9%</td><td>¥45</td><td>¥310</td><td><span class="up">3.1x</span></td><td><span class="tag tag-green">健康</span></td></tr>
-              <tr><td style="color:#F8F6F0">小红书</td><td>1,200,000</td><td>1.8%</td><td>0.74%</td><td>4.2%</td><td>¥28</td><td>¥520</td><td><span class="up">5.8x</span></td><td><span class="tag tag-green">优质</span></td></tr>
-              <tr><td style="color:#F8F6F0">微博</td><td>2,800,000</td><td>0.9%</td><td>0.45%</td><td>2.1%</td><td>¥52</td><td>¥240</td><td>2.4x</td><td><span class="tag tag-blue">观察</span></td></tr>
+              <tr><td style="color:#F8F6F0">微信社群</td><td>21,000</td><td>10.0%</td><td>18.0%</td><td>6.1%</td><td>¥24</td><td>¥420</td><td><span class="up">4.4x</span></td><td><span class="tag tag-green">健康</span></td></tr>
+              <tr><td style="color:#F8F6F0">内容合作</td><td>18,000</td><td>7.8%</td><td>16.2%</td><td>5.4%</td><td>¥31</td><td>¥398</td><td><span class="up">3.8x</span></td><td><span class="tag tag-green">健康</span></td></tr>
+              <tr><td style="color:#F8F6F0">小红书</td><td>12,000</td><td>8.1%</td><td>14.8%</td><td>4.7%</td><td>¥28</td><td>¥360</td><td><span class="up">3.6x</span></td><td><span class="tag tag-green">优质</span></td></tr>
+              <tr><td style="color:#F8F6F0">转介绍</td><td>9,000</td><td>6.9%</td><td>18.6%</td><td>7.2%</td><td>¥19</td><td>¥480</td><td>5.4x</td><td><span class="tag tag-green">优质</span></td></tr>
               <tr><td style="color:#F8F6F0">直接流量</td><td>180,000</td><td>4.2%</td><td>2.0%</td><td>6.8%</td><td>¥18</td><td>¥680</td><td><span class="up">8.2x</span></td><td><span class="tag tag-green">优质</span></td></tr>
             </tbody>
           </table>
@@ -1527,10 +1526,10 @@
           <table>
             <thead><tr><th>渠道</th><th>utm_source</th><th>utm_medium</th><th>utm_campaign</th><th>操作</th></tr></thead>
             <tbody>
-              <tr><td style="color:#F8F6F0">微信生态</td><td style="font-family:monospace;color:#C8A96E">wechat</td><td style="font-family:monospace;color:#C8A96E">social</td><td style="font-family:monospace;color:#C8A96E">gangtise_wechat_2026</td><td><button class="btn-sm-blue" onclick="showToast('UTM链接已复制')">复制链接</button></td></tr>
-              <tr><td style="color:#F8F6F0">抖音</td><td style="font-family:monospace;color:#C8A96E">douyin</td><td style="font-family:monospace;color:#C8A96E">video</td><td style="font-family:monospace;color:#C8A96E">gangtise_douyin_2026</td><td><button class="btn-sm-blue" onclick="showToast('UTM链接已复制')">复制链接</button></td></tr>
+              <tr><td style="color:#F8F6F0">微信社群</td><td style="font-family:monospace;color:#C8A96E">wechat_group</td><td style="font-family:monospace;color:#C8A96E">private_domain</td><td style="font-family:monospace;color:#C8A96E">gangtise_wechat_validate_2026</td><td><button class="btn-sm-blue" onclick="showToast('UTM链接已复制')">复制链接</button></td></tr>
+              <tr><td style="color:#F8F6F0">内容合作</td><td style="font-family:monospace;color:#C8A96E">content_partner</td><td style="font-family:monospace;color:#C8A96E">co_create</td><td style="font-family:monospace;color:#C8A96E">gangtise_partner_validate_2026</td><td><button class="btn-sm-blue" onclick="showToast('UTM链接已复制')">复制链接</button></td></tr>
               <tr><td style="color:#F8F6F0">小红书</td><td style="font-family:monospace;color:#C8A96E">xiaohongshu</td><td style="font-family:monospace;color:#C8A96E">social</td><td style="font-family:monospace;color:#C8A96E">gangtise_xhs_2026</td><td><button class="btn-sm-blue" onclick="showToast('UTM链接已复制')">复制链接</button></td></tr>
-              <tr><td style="color:#F8F6F0">微博</td><td style="font-family:monospace;color:#C8A96E">weibo</td><td style="font-family:monospace;color:#C8A96E">social</td><td style="font-family:monospace;color:#C8A96E">gangtise_weibo_2026</td><td><button class="btn-sm-blue" onclick="showToast('UTM链接已复制')">复制链接</button></td></tr>
+              <tr><td style="color:#F8F6F0">转介绍</td><td style="font-family:monospace;color:#C8A96E">referral</td><td style="font-family:monospace;color:#C8A96E">invite</td><td style="font-family:monospace;color:#C8A96E">gangtise_referral_validate_2026</td><td><button class="btn-sm-blue" onclick="showToast('UTM链接已复制')">复制链接</button></td></tr>
               <tr><td style="color:#F8F6F0">直接流量</td><td style="font-family:monospace;color:#C8A96E">direct</td><td style="font-family:monospace;color:#C8A96E">none</td><td style="font-family:monospace;color:#C8A96E">gangtise_direct_2026</td><td><button class="btn-sm-blue" onclick="showToast('UTM链接已复制')">复制链接</button></td></tr>
             </tbody>
           </table>
@@ -1560,38 +1559,38 @@
         <div id="ds-funnel" class="dash-section active">
           <div class="section-header">
             <div>
-              <div class="section-title">多渠道多圈层转化分析</div>
-              <div class="section-subtitle">从公域曝光到VIP深度用户的全链路转化追踪</div>
+              <div class="section-title">验证期增长分析</div>
+              <div class="section-subtitle">从内容触达到高频留存的早期转化追踪</div>
             </div>
           </div>
 
           <div class="kpi-row" style="margin-bottom:20px">
             <div class="kpi-card">
-              <div class="kpi-label">总曝光量</div>
-              <div class="kpi-value">980万</div>
-              <div class="kpi-badge kpi-badge-up">▲ +18.4%</div>
+              <div class="kpi-label">内容触达</div>
+              <div class="kpi-value">6.8万</div>
+              <div class="kpi-badge kpi-badge-up">▲ +12.4%</div>
             </div>
             <div class="kpi-card">
-              <div class="kpi-label">私域沉淀</div>
-              <div class="kpi-value">24.5万</div>
-              <div class="kpi-badge kpi-badge-gold">转化率 25%</div>
+              <div class="kpi-label">私域留资</div>
+              <div class="kpi-value">5,400</div>
+              <div class="kpi-badge kpi-badge-gold">留资率 7.9%</div>
             </div>
             <div class="kpi-card">
-              <div class="kpi-label">付费用户</div>
-              <div class="kpi-value">1.85万</div>
-              <div class="kpi-badge kpi-badge-gold">转化率 1.9%</div>
+              <div class="kpi-label">首次付费</div>
+              <div class="kpi-value">128</div>
+              <div class="kpi-badge kpi-badge-gold">首次付费率 10.2%</div>
             </div>
             <div class="kpi-card">
-              <div class="kpi-label">VIP深度用户</div>
-              <div class="kpi-value">4,200</div>
-              <div class="kpi-badge kpi-badge-gold">ARPU ¥1,820</div>
+              <div class="kpi-label">高频留存</div>
+              <div class="kpi-value">36</div>
+              <div class="kpi-badge kpi-badge-gold">核心验证样本</div>
             </div>
           </div>
 
           <div class="charts-grid">
             <div class="chart-card">
-              <div class="chart-title">多圈层转化漏斗</div>
-              <div class="chart-subtitle">公域曝光 → 私域沉淀 → 主动意向 → 付费转化 → VIP深度</div>
+              <div class="chart-title">验证漏斗</div>
+              <div class="chart-subtitle">内容触达 → 私域留资 → 激活试用 → 首次付费 → 高频留存</div>
               <div class="funnel-wrap" id="funnel-container"></div>
             </div>
             <div class="chart-card">
@@ -1606,14 +1605,14 @@
           <div class="charts-grid">
             <div class="chart-card">
               <div class="chart-title">月度营收趋势</div>
-              <div class="chart-subtitle">近12个月 GMV 与用户增长</div>
+              <div class="chart-subtitle">近12个月 MRR 与激活用户增长</div>
               <div class="chart-container tall">
                 <canvas id="revenueTrend"></canvas>
               </div>
             </div>
             <div class="chart-card">
-              <div class="chart-title">KOL合伙人效能排行</div>
-              <div class="chart-subtitle">本月 GMV 贡献 Top 5</div>
+              <div class="chart-title">试点作者效能排行</div>
+              <div class="chart-subtitle">本月试点协同收入 Top 5</div>
               <div class="chart-container tall">
                 <canvas id="kolBar"></canvas>
               </div>
@@ -1628,7 +1627,7 @@
                 <thead>
                   <tr>
                     <th style="width:120px">渠道 \ 圈层</th>
-                    <th>公域曝光</th><th>私域沉淀</th><th>主动意向</th><th>付费转化</th><th>VIP深度</th>
+                    <th>内容触达</th><th>私域留资</th><th>激活试用</th><th>首次付费</th><th>高频留存</th>
                   </tr>
                 </thead>
                 <tbody id="heatmap-body"></tbody>
@@ -1709,8 +1708,8 @@
         <div id="ds-kol" class="dash-section">
           <div class="section-header">
             <div>
-              <div class="section-title">KOL效能分析</div>
-              <div class="section-subtitle">合伙人GMV贡献、佣金结算与分级成长追踪</div>
+              <div class="section-title">作者协同效能分析</div>
+              <div class="section-subtitle">试点作者协同收入、分成结算与成长阶段追踪</div>
             </div>
           </div>
 
@@ -1718,15 +1717,15 @@
 
           <div class="charts-grid" style="margin-bottom:20px">
             <div class="chart-card">
-              <div class="chart-title">Top 10 KOL GMV 排行</div>
-              <div class="chart-subtitle">本月贡献GMV（万元）水平柱图</div>
+              <div class="chart-title">Top 10 作者协同收入排行</div>
+              <div class="chart-subtitle">本月试点作者协同收入水平柱图</div>
               <div class="chart-container tall" style="height:380px">
                 <canvas id="kolTop10Bar"></canvas>
               </div>
             </div>
             <div class="chart-card">
-              <div class="chart-title">KOL 分级成长趋势</div>
-              <div class="chart-subtitle">S/A/B 级合伙人数量月度变化</div>
+              <div class="chart-title">作者阶段成长趋势</div>
+              <div class="chart-subtitle">种子 / 成长 / 观察作者数量月度变化</div>
               <div class="chart-container tall">
                 <canvas id="kolTierGrowth"></canvas>
               </div>
@@ -1735,25 +1734,25 @@
 
           <div class="charts-grid" style="margin-bottom:20px">
             <div class="chart-card">
-              <div class="chart-title">KOL 分级分布</div>
-              <div class="chart-subtitle">当前S/A/B级合伙人占比</div>
+              <div class="chart-title">作者阶段分布</div>
+              <div class="chart-subtitle">当前种子 / 成长 / 观察作者占比</div>
               <div class="chart-container">
                 <canvas id="kolTierDonut"></canvas>
               </div>
             </div>
             <div class="chart-card" style="overflow:hidden">
-              <div class="chart-title">KOL 合伙人列表</div>
+              <div class="chart-title">试点作者列表</div>
               <div class="chart-subtitle">Top 8 综合排行</div>
               <div style="overflow-x:auto;margin-top:8px">
                 <table class="quality-table">
                   <thead>
                     <tr>
-                      <th>KOL名称</th>
-                      <th>平台</th>
-                      <th>粉丝量</th>
-                      <th>本月GMV</th>
-                      <th>佣金率</th>
-                      <th>级别</th>
+                      <th>作者名称</th>
+                      <th>来源</th>
+                      <th>关注样本</th>
+                      <th>本月协同收入</th>
+                      <th>分成率</th>
+                      <th>阶段</th>
                       <th>环比</th>
                     </tr>
                   </thead>
@@ -1776,15 +1775,15 @@
 
           <div class="charts-grid" style="margin-bottom:20px">
             <div class="chart-card">
-              <div class="chart-title">月度 GMV + 用户增长</div>
-              <div class="chart-subtitle">双轴图：左轴GMV（万元），右轴用户数</div>
+              <div class="chart-title">月度 MRR + 付费用户增长</div>
+              <div class="chart-subtitle">双轴图：左轴 MRR（元），右轴付费用户数</div>
               <div class="chart-container tall">
                 <canvas id="revGmvUsers"></canvas>
               </div>
             </div>
             <div class="chart-card">
               <div class="chart-title">订阅层级收入结构</div>
-              <div class="chart-subtitle">免费/基础/专业/VIP各层月度收入堆叠</div>
+              <div class="chart-subtitle">免费/验证版/专业/机构试点各层月度收入堆叠</div>
               <div class="chart-container tall">
                 <canvas id="revTierStack"></canvas>
               </div>
@@ -1930,7 +1929,7 @@
               <label class="toggle"><input id="feature-dm" type="checkbox"><span class="toggle-slider"></span></label>
             </div>
             <div class="toggle-wrap">
-              <span class="toggle-label">大V工作台</span>
+              <span class="toggle-label">作者工作台</span>
               <label class="toggle"><input id="feature-workbench" type="checkbox"><span class="toggle-slider"></span></label>
             </div>
             <div class="feature-note">
@@ -1948,7 +1947,7 @@
               <input type="text" value="减少对外功能暴露，优先验证高频低风险能力" readonly>
             </div>
             <div class="feature-note">
-              这套配置适合先服务大V合作导流和少量 C 端承接，避免在早期暴露过多复杂功能与运维负担。
+              这套配置适合先服务试点作者合作导流和少量 C 端承接，避免在早期暴露过多复杂功能与运维负担。
             </div>
           </div>
           <div class="config-card">
@@ -1995,13 +1994,13 @@
 <script>
 const sectionTitles = {
   overview:'运营概览', users:'用户列表', segments:'用户分层', points:'积分管理',
-  kols:'KOL合伙人管理', commission:'收益结算', community:'帖子审核',
+  kols:'试点作者管理', commission:'收益结算', community:'帖子审核',
   events:'活动管理', hermes:'Hermes使用统计', channels:'渠道管理', analytics:'数据分析', settings:'系统设置', access:'访问审计'
 };
 const analyticsTitles = {
   funnel: '数据分析 · 转化漏斗',
   channel: '数据分析 · 渠道分析',
-  kol: '数据分析 · KOL效能',
+  kol: '数据分析 · 作者协同效能',
   revenue: '数据分析 · 营收趋势',
   segment: '数据分析 · 用户分层分析',
 };
@@ -2165,10 +2164,10 @@ async function renderAccessAudit() {
 
 // ── Events rich client ──
 const EV_DATA = {
-  1: { title:'2026年中期投资策略峰会', type:'会议', host:'洞见智研官方', date:'2026-06-15 14:00 ~ 16:00', cap:'5,000', pts:'100分', compute:'—', status:'报名中', joined:'2,840', checkin:'—', ptsGiven:'—', share:'342', desc:'本次峰会汇聚顶级投研机构，联合洞见智研S级KOL合伙人，覆盖宏观、行业、量化、港股四大维度，独家披露洞见智研另类数据信号。', agenda:'13:30 签到入场\n14:00 开场致辞 + 2026上半年市场复盘\n14:30 宏观策略演讲：美联储路径 + A股估值\n15:00 行业精选：新能源 + AI算力\n15:30 Hermes现场Demo + 互动问答\n15:50 抽奖 + 合影结束' },
+  1: { title:'2026年中期投资策略验证会', type:'会议', host:'洞见智研官方', date:'2026-06-15 14:00 ~ 16:00', cap:'180', pts:'100分', compute:'—', status:'报名中', joined:'128', checkin:'—', ptsGiven:'—', share:'42', desc:'本次会议聚焦原型阶段的核心验证项，联合试点作者和研究协同方，覆盖宏观、行业、量化、港股四大维度，并观察活动是否带来更强留资与付费。', agenda:'13:30 签到入场\n14:00 开场致辞 + 2026上半年市场复盘\n14:30 宏观策略演讲：美联储路径 + A股估值\n15:00 行业精选：新能源 + AI算力\n15:30 Hermes现场Demo + 互动问答\n15:50 反馈收集 + 结束' },
   2: { title:'财经老王直播：A股下半年布局', type:'直播', host:'财经老王', date:'2026-05-22 20:00 ~ 21:30', cap:'不限', pts:'50分', compute:'1次', status:'进行中', joined:'1,240', checkin:'1,240', ptsGiven:'62,000', share:'528', desc:'财经老王将深度解析A股下半年配置策略，重点覆盖科技成长与高股息双主线，结合Hermes实时数据展示。', agenda:'20:00 直播开始 + 实时行情解读\n20:20 下半年大势研判\n20:50 重点板块机会梳理\n21:10 用户问答 + Hermes连线' },
   3: { title:'新能源投资沙龙（上海）', type:'线下活动', host:'洞见智研官方', date:'2026-05-28 13:30 ~ 17:00', cap:'500', pts:'200分', compute:'2次', status:'报名中', joined:'480', checkin:'—', ptsGiven:'—', share:'198', desc:'洞见智研首场线下投研沙龙，落地上海，邀请新能源产业链核心专家，结合洞见智研卫星数据与Hermes分析工具，深度解读产业机会。', agenda:'13:30 签到\n14:00 产业链现状综述\n14:40 固态电池专项研讨\n15:30 圆桌讨论\n16:20 自由交流 + 洞见智研产品体验' },
-  4: { title:'量化因子研讨会', type:'会议', host:'量化小白', date:'2026-06-05 10:00 ~ 12:00', cap:'400', pts:'150分', compute:'1次', status:'待发布', joined:'320', checkin:'—', ptsGiven:'—', share:'86', desc:'洞见智研Hermes量化因子筛选功能深度演示，量化小白分享多因子模型构建经验，适合专业会员及机构VIP。', agenda:'10:00 开场\n10:15 多因子模型原理回顾\n10:50 Hermes量化因子筛选现场演示\n11:30 策略回测对比\n11:50 Q&A' },
+  4: { title:'量化因子研讨会', type:'会议', host:'量化小白', date:'2026-06-05 10:00 ~ 12:00', cap:'80', pts:'150分', compute:'1次', status:'待发布', joined:'36', checkin:'—', ptsGiven:'—', share:'16', desc:'洞见智研Hermes量化因子筛选功能深度演示，量化小白分享多因子模型构建经验，适合专业会员及机构试点。', agenda:'10:00 开场\n10:15 多因子模型原理回顾\n10:50 Hermes量化因子筛选现场演示\n11:30 策略回测对比\n11:50 Q&A' },
   5: { title:'港股通投资策略直播', type:'直播', host:'投资女神Lisa', date:'2026-05-18 20:00 ~ 21:30', cap:'不限', pts:'50分', compute:'1次', status:'已结束', joined:'3,640', checkin:'3,640', ptsGiven:'182,000', share:'1,240', desc:'复盘港股通本月行情，深度解析互联网板块与南向资金动向，已结束。', agenda:'20:00 港股月度复盘\n20:30 互联网板块估值分析\n21:00 南向资金信号解读\n21:20 Q&A' },
   6: { title:'洞见智研5月积分挑战赛', type:'挑战赛', host:'洞见智研官方', date:'2026-05-01 ~ 05-31', cap:'不限', pts:'500分', compute:'5次', status:'进行中', joined:'8,420', checkin:'8,420', ptsGiven:'已发放中', share:'3,280', desc:'5月全月积分挑战赛：发帖、互动、使用Hermes均可获得额外积分加成，本月TOP10用户额外获赠算力礼包。', agenda:'05-01 活动开始，积分×2加成生效\n05-15 中期排行榜公布\n05-26 冲刺阶段，积分×3加成\n05-31 23:59 活动结束，次日结算' },
 };

@@ -90,7 +90,7 @@ function createChart(ctx, config) {
 const SECTION_TITLES = {
   funnel:  '多渠道多圈层转化分析',
   channel: '渠道分析',
-  kol:     'KOL效能分析',
+  kol:     '作者协同效能分析',
   revenue: '营收趋势',
   segment: '用户分层分析',
 };
@@ -207,7 +207,7 @@ async function renderFunnel() {
             </div>
           </div>
         </div>
-        <div class="funnel-stage-conv ${dropRate ? '' : 'funnel-stage-conv-base'}">${dropRate ? '↓ 较上一层流失 ' + dropRate + '%' : '基准层'}</div>
+        <div class="funnel-stage-conv ${dropRate ? '' : 'funnel-stage-conv-base'}">${dropRate ? '↓ 较上一层流失 ' + dropRate + '%' : '验证起点'}</div>
       </div>`;
   }).join('');
 }
@@ -237,7 +237,7 @@ async function renderChannelDonut() {
           position: donutLegendPosition(ctx),
           labels: { color: WHITE, font: { size: 12 }, padding: 12, boxWidth: 12 }
         },
-        tooltip: { callbacks: { label: c => ` ${c.label}: ${(c.raw/10000).toFixed(1)}万用户` } }
+        tooltip: { callbacks: { label: c => ` ${c.label}: ${c.raw} 留资用户` } }
       }
     }
   });
@@ -255,13 +255,13 @@ async function renderRevenueTrend() {
       labels: data.map(d => d.month.slice(5)),
       datasets: [
         {
-          label: 'GMV (万元)',
-          data: data.map(d => Math.round(d.revenue / 10000)),
+          label: 'MRR (元)',
+          data: data.map(d => d.revenue),
           backgroundColor: 'rgba(200,169,110,0.7)',
           borderColor: GOLD, borderWidth: 1, borderRadius: 4, yAxisID: 'y',
         },
         {
-          label: '新增用户',
+          label: '激活试用用户',
           data: data.map(d => d.users),
           type: 'line', borderColor: BLUE, backgroundColor: 'rgba(52,152,219,0.1)',
           borderWidth: 2, pointRadius: 3, pointBackgroundColor: BLUE,
@@ -278,8 +278,8 @@ async function renderRevenueTrend() {
       },
       scales: {
         x:  { grid: { color: 'rgba(200,169,110,0.06)' }, ticks: { color: GRAY } },
-        y:  { position: 'left',  grid: { color: 'rgba(200,169,110,0.06)' }, ticks: { color: GRAY, callback: v => '¥'+v+'万' } },
-        y1: { position: 'right', grid: { drawOnChartArea: false },           ticks: { color: BLUE,  callback: v => v/1000+'K' } }
+        y:  { position: 'left',  grid: { color: 'rgba(200,169,110,0.06)' }, ticks: { color: GRAY, callback: v => '¥'+v } },
+        y1: { position: 'right', grid: { drawOnChartArea: false },           ticks: { color: BLUE,  callback: v => v } }
       }
     }
   });
@@ -297,7 +297,7 @@ async function renderKolBar() {
       labels: data.map(d => d.name),
       datasets: [
         {
-          label: 'GMV (元)',
+          label: '协同收入 (元)',
           data: data.map(d => d.gmv),
           backgroundColor: data.map((_, i) => i < 2 ? GOLD : 'rgba(200,169,110,0.4)'),
           borderColor: GOLD, borderWidth: 1, borderRadius: 4,
@@ -314,10 +314,10 @@ async function renderKolBar() {
       responsive: true, maintainAspectRatio: false, indexAxis: 'y',
       plugins: {
         legend: { labels: { color: WHITE, font: { size: 12 } } },
-        tooltip: makeTooltipOptions({ callbacks: { label: c => ` ${c.dataset.label}: ¥${(c.raw/10000).toFixed(1)}万` } })
+          tooltip: makeTooltipOptions({ callbacks: { label: c => ` ${c.dataset.label}: ¥${c.raw}` } })
       },
       scales: {
-        x: { grid: { color: 'rgba(200,169,110,0.06)' }, ticks: { color: GRAY, callback: v => '¥'+(v/10000).toFixed(0)+'万' } },
+        x: { grid: { color: 'rgba(200,169,110,0.06)' }, ticks: { color: GRAY, callback: v => '¥'+v } },
         y: { grid: { display: false }, ticks: { color: WHITE } }
       }
     }
@@ -359,14 +359,14 @@ async function renderChannelRevenue() {
     type: 'bar',
     data: {
       labels: data.map(d => d.name),
-      datasets: [{ label: '月度营收 (万元)', data: data.map(d => Math.round(d.revenue/10000)), backgroundColor: CHANNEL_COLORS.map(c => c+'CC'), borderColor: CHANNEL_COLORS, borderWidth: 1, borderRadius: 6 }]
+      datasets: [{ label: '月度营收 (元)', data: data.map(d => d.revenue), backgroundColor: CHANNEL_COLORS.map(c => c+'CC'), borderColor: CHANNEL_COLORS, borderWidth: 1, borderRadius: 6 }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: makeTooltipOptions({ callbacks: { label: c => ` ¥${c.raw}万` } }) },
+      plugins: { legend: { display: false }, tooltip: makeTooltipOptions({ callbacks: { label: c => ` ¥${c.raw}` } }) },
       scales: {
         x: { grid: { display: false }, ticks: { color: GRAY } },
-        y: { grid: { color: 'rgba(200,169,110,0.06)' }, ticks: { color: GRAY, callback: v => '¥'+v+'万' } }
+        y: { grid: { color: 'rgba(200,169,110,0.06)' }, ticks: { color: GRAY, callback: v => '¥'+v } }
       }
     }
   });
@@ -374,13 +374,13 @@ async function renderChannelRevenue() {
 
 // --- Heatmap table ---
 async function renderHeatmap() {
-  const channels = ['微信生态', '抖音', '小红书', '微博', '直接流量'];
+  const channels = ['微信社群', '内容合作', '小红书', '转介绍', '直接流量'];
   const matrix   = [
-    [100, 28.4, 7.2, 2.1, 0.48],
-    [100, 18.6, 4.8, 1.4, 0.32],
-    [100, 32.1, 9.4, 3.9, 0.92],
-    [100, 15.2, 3.8, 0.8, 0.18],
-    [100, 42.8, 14.6, 9.9, 2.24],
+    [100, 12.0, 3.2, 0.9, 0.3],
+    [100, 10.4, 2.7, 1.0, 0.28],
+    [100, 8.1, 2.1, 0.7, 0.19],
+    [100, 16.5, 4.4, 1.6, 0.52],
+    [100, 18.0, 5.1, 2.4, 0.9],
   ];
   const tbody = document.getElementById('heatmap-body');
   if (!tbody) return;
@@ -401,23 +401,23 @@ async function renderHeatmap() {
 //  SECTION 2: 渠道分析  (Channel)
 // ============================================================
 const CHANNEL_DATA = [
-  { name: '微信生态', users: 98400,  convRate: '2.8%', revenue: 2840000, cac: 42,  ltv: 680, score: 88, trend: '▲', trendCls: 'trend-up' },
-  { name: '抖音',     users: 64200,  convRate: '1.4%', revenue: 1560000, cac: 68,  ltv: 420, score: 72, trend: '▲', trendCls: 'trend-up' },
-  { name: '小红书',   users: 42800,  convRate: '3.9%', revenue: 1920000, cac: 55,  ltv: 590, score: 81, trend: '▲', trendCls: 'trend-up' },
-  { name: '微博',     users: 28600,  convRate: '0.8%', revenue: 680000,  cac: 88,  ltv: 310, score: 54, trend: '▼', trendCls: 'trend-down' },
-  { name: '直接流量', users: 17200,  convRate: '9.9%', revenue: 1960000, cac: 18,  ltv: 1240, score: 95, trend: '▲', trendCls: 'trend-up' },
+  { name: '微信社群', users: 2100, convRate: '6.4%', revenue: 28600, cac: 42, ltv: 620, score: 82, trend: '▲', trendCls: 'trend-up' },
+  { name: '内容合作', users: 1400, convRate: '4.8%', revenue: 19200, cac: 56, ltv: 540, score: 74, trend: '▲', trendCls: 'trend-up' },
+  { name: '小红书', users: 980, convRate: '3.6%', revenue: 13600, cac: 48, ltv: 420, score: 68, trend: '▲', trendCls: 'trend-up' },
+  { name: '转介绍', users: 620, convRate: '12.1%', revenue: 24800, cac: 18, ltv: 860, score: 93, trend: '▲', trendCls: 'trend-up' },
+  { name: '直接流量', users: 300, convRate: '15.0%', revenue: 16800, cac: 12, ltv: 940, score: 96, trend: '▲', trendCls: 'trend-up' },
 ];
 
-const MONTHS_12 = ['2024-01','2024-02','2024-03','2024-04','2024-05','2024-06','2024-07','2024-08','2024-09','2024-10','2024-11','2024-12'];
+const MONTHS_12 = ['2025-07','2025-08','2025-09','2025-10','2025-11','2025-12','2026-01','2026-02','2026-03','2026-04','2026-05','2026-06'];
 const MONTHS_12_LABEL = MONTHS_12.map(m => m.slice(5)+'月');
 
 // Monthly channel acquisition (stacked bar data, in thousands)
 const CHANNEL_MONTHLY = [
-  [5.2, 5.4, 5.8, 6.1, 6.4, 6.8, 7.1, 7.4, 7.8, 8.1, 8.4, 8.6],  // 微信
-  [2.8, 3.1, 3.5, 3.8, 4.2, 4.6, 5.0, 5.4, 5.8, 6.1, 6.4, 6.6],  // 抖音
-  [1.6, 1.8, 2.1, 2.4, 2.7, 3.0, 3.3, 3.6, 3.9, 4.1, 4.3, 4.6],  // 小红书
-  [1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3],  // 微博
-  [0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9],  // 直接
+  [120, 136, 148, 165, 172, 186, 194, 201, 214, 228, 241, 252],
+  [82, 88, 94, 102, 110, 118, 126, 132, 139, 148, 156, 164],
+  [56, 62, 68, 72, 79, 84, 88, 93, 96, 102, 108, 112],
+  [28, 34, 38, 42, 45, 48, 52, 56, 60, 64, 68, 72],
+  [12, 16, 18, 20, 23, 24, 26, 29, 31, 34, 36, 39],
 ];
 
 function renderChannelSection() {
@@ -427,9 +427,9 @@ function renderChannelSection() {
     kpiContainer.innerHTML = CHANNEL_DATA.map(ch => `
       <div class="kpi-card">
         <div class="kpi-label">${ch.name}</div>
-        <div class="kpi-value" style="font-size:20px">${(ch.users/10000).toFixed(1)}万</div>
+        <div class="kpi-value" style="font-size:20px">${ch.users}</div>
         <div class="kpi-sub">转化率 ${ch.convRate}</div>
-        <div class="kpi-sub">营收 ${(ch.revenue/10000).toFixed(0)}万</div>
+        <div class="kpi-sub">营收 ¥${ch.revenue}</div>
         <div class="kpi-badge ${ch.trendCls === 'trend-up' ? 'kpi-badge-up' : 'kpi-badge-down'}">
           CAC ¥${ch.cac} · LTV ¥${ch.ltv}
         </div>
@@ -460,7 +460,7 @@ function renderChannelSection() {
         },
         scales: {
           x: { stacked: true, grid: { display: false }, ticks: { color: GRAY } },
-          y: { stacked: true, grid: { color: 'rgba(200,169,110,0.06)' }, ticks: { color: GRAY, callback: v => v+'K' } }
+          y: { stacked: true, grid: { color: 'rgba(200,169,110,0.06)' }, ticks: { color: GRAY, callback: v => v } }
         }
       }
     });
@@ -474,7 +474,7 @@ function renderChannelSection() {
       data: {
         datasets: CHANNEL_DATA.map((ch, i) => ({
           label: ch.name,
-          data: [{ x: ch.cac, y: ch.ltv, r: Math.sqrt(ch.users / 1000) * 2.5 }],
+          data: [{ x: ch.cac, y: ch.ltv, r: Math.max(Math.sqrt(ch.users / 20), 6) }],
           backgroundColor: CHANNEL_COLORS[i] + '99',
           borderColor: CHANNEL_COLORS[i],
           borderWidth: 2,
@@ -511,7 +511,7 @@ function renderChannelSection() {
       const barW = Math.round(ch.score * 0.8);
       return `<tr>
         <td style="color:var(--white);font-weight:500">${ch.name}</td>
-        <td>${(ch.users/10000).toFixed(1)}万</td>
+        <td>${ch.users}</td>
         <td>¥${ch.cac}</td>
         <td>¥${ch.ltv}</td>
         <td>${ch.convRate}</td>
@@ -527,25 +527,25 @@ function renderChannelSection() {
 
 
 // ============================================================
-//  SECTION 3: KOL效能  (KOL)
+//  SECTION 3: 作者协同效能
 // ============================================================
 const KOL_TOP10 = [
-  { name: '财经老王', platform: '抖音',     fans: '128万', gmv: 980000,  commission: 196000, rate: '20%', tier: 'S', trend: '+24%' },
-  { name: '投研精选',  platform: '微信',     fans: '86万',  gmv: 820000,  commission: 164000, rate: '20%', tier: 'S', trend: '+18%' },
-  { name: '量化阿杰',  platform: '小红书',   fans: '54万',  gmv: 640000,  commission: 112000, rate: '18%', tier: 'A', trend: '+12%' },
-  { name: '宏观视野',  platform: '抖音',     fans: '92万',  gmv: 580000,  commission: 104400, rate: '18%', tier: 'A', trend: '+8%' },
-  { name: '策略研究员', platform: '微信',     fans: '38万',  gmv: 450000,  commission: 72000,  rate: '16%', tier: 'A', trend: '+6%' },
-  { name: '行业深度',  platform: '微博',     fans: '62万',  gmv: 380000,  commission: 60800,  rate: '16%', tier: 'A', trend: '-2%' },
-  { name: '晨会纪要',  platform: '小红书',   fans: '29万',  gmv: 290000,  commission: 43500,  rate: '15%', tier: 'B', trend: '+14%' },
-  { name: '大盘解读',  platform: '抖音',     fans: '41万',  gmv: 260000,  commission: 39000,  rate: '15%', tier: 'B', trend: '+3%' },
-  { name: '板块追踪',  platform: '微信',     fans: '18万',  gmv: 210000,  commission: 31500,  rate: '15%', tier: 'B', trend: '-5%' },
-  { name: '新能源专研', platform: '小红书',  fans: '23万',  gmv: 180000,  commission: 27000,  rate: '15%', tier: 'B', trend: '+9%' },
+  { name: '财经老王', platform: '微信', fans: '12.8万', gmv: 18600, commission: 2790, rate: '15%', tier: 'S', trend: '+12%' },
+  { name: '投研精选', platform: '内容合作', fans: '8.6万', gmv: 14200, commission: 2130, rate: '15%', tier: 'S', trend: '+9%' },
+  { name: '量化阿杰', platform: '小红书', fans: '5.4万', gmv: 11800, commission: 1770, rate: '15%', tier: 'A', trend: '+8%' },
+  { name: '宏观视野', platform: '微信', fans: '4.2万', gmv: 9600, commission: 1536, rate: '16%', tier: 'A', trend: '+6%' },
+  { name: '策略研究员', platform: '转介绍', fans: '3.1万', gmv: 7800, commission: 1170, rate: '15%', tier: 'A', trend: '+4%' },
+  { name: '行业深度', platform: '内容合作', fans: '2.6万', gmv: 6200, commission: 930, rate: '15%', tier: 'B', trend: '+3%' },
+  { name: '晨会纪要', platform: '小红书', fans: '2.1万', gmv: 5400, commission: 810, rate: '15%', tier: 'B', trend: '+2%' },
+  { name: '大盘解读', platform: '微信', fans: '1.8万', gmv: 4600, commission: 690, rate: '15%', tier: 'B', trend: '+1%' },
+  { name: '板块追踪', platform: '内容合作', fans: '1.5万', gmv: 3900, commission: 585, rate: '15%', tier: 'B', trend: '+1%' },
+  { name: '新能源专研', platform: '小红书', fans: '1.2万', gmv: 3200, commission: 480, rate: '15%', tier: 'B', trend: '+1%' },
 ];
 
 const KOL_TIER_GROWTH = {
-  S: [2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 8, 9],
-  A: [12, 13, 15, 16, 18, 20, 22, 25, 28, 31, 35, 38],
-  B: [45, 48, 52, 56, 62, 68, 74, 82, 90, 98, 108, 118],
+  S: [1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+  A: [2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 5],
+  B: [3, 3, 4, 4, 5, 5, 6, 7, 7, 8, 9, 10],
 };
 
 function renderKolSection() {
@@ -553,18 +553,18 @@ function renderKolSection() {
   const kpiContainer = document.getElementById('kol-kpi-cards');
   if (kpiContainer) {
     const totalGmv = KOL_TOP10.reduce((s, k) => s + k.gmv, 0);
-    const totalKols = 165;
-    const avgRate = '17.2%';
+    const totalKols = 12;
+    const avgRate = '15.3%';
     const topKol = KOL_TOP10[0].name;
     kpiContainer.innerHTML = `
       <div class="kpi-card">
-        <div class="kpi-label">总KOL合伙人</div>
+        <div class="kpi-label">试点作者总数</div>
         <div class="kpi-value">${totalKols}</div>
         <div class="kpi-badge kpi-badge-up">▲ +14 本月</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">合伙人总GMV</div>
-        <div class="kpi-value">¥${(totalGmv/10000).toFixed(0)}万</div>
+        <div class="kpi-label">试点协同收入</div>
+        <div class="kpi-value">¥${totalGmv}</div>
         <div class="kpi-badge kpi-badge-up">▲ +22%</div>
       </div>
       <div class="kpi-card">
@@ -573,9 +573,9 @@ function renderKolSection() {
         <div class="kpi-badge kpi-badge-gold">加权平均</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">月度最佳 KOL</div>
+        <div class="kpi-label">当前最佳样本</div>
         <div class="kpi-value" style="font-size:18px">${topKol}</div>
-        <div class="kpi-badge kpi-badge-gold">S级合伙人</div>
+        <div class="kpi-badge kpi-badge-gold">种子作者</div>
       </div>`;
   }
 
@@ -588,8 +588,8 @@ function renderKolSection() {
         labels: KOL_TOP10.map(k => k.name),
         datasets: [
           {
-            label: 'GMV (万元)',
-            data: KOL_TOP10.map(k => (k.gmv / 10000).toFixed(1)),
+            label: '试点收入 (元)',
+            data: KOL_TOP10.map(k => k.gmv),
             backgroundColor: KOL_TOP10.map((k, i) => {
               if (k.tier === 'S') return '#FFD700CC';
               if (k.tier === 'A') return GOLD + 'CC';
@@ -605,10 +605,10 @@ function renderKolSection() {
         responsive: true, maintainAspectRatio: false, indexAxis: 'y',
         plugins: {
           legend: { display: false },
-          tooltip: makeTooltipOptions({ callbacks: { label: c => ` GMV: ¥${c.raw}万` } })
+          tooltip: makeTooltipOptions({ callbacks: { label: c => ` 收入: ¥${c.raw}` } })
         },
         scales: {
-          x: { grid: { color: 'rgba(200,169,110,0.06)' }, ticks: { color: GRAY, callback: v => '¥'+v+'万' } },
+          x: { grid: { color: 'rgba(200,169,110,0.06)' }, ticks: { color: GRAY, callback: v => '¥'+v } },
           y: { grid: { display: false }, ticks: { color: WHITE, font: { size: 11 } } }
         }
       }
@@ -647,7 +647,7 @@ function renderKolSection() {
       data: {
         labels: ['S级', 'A级', 'B级'],
         datasets: [{
-          data: [9, 38, 118],
+          data: [2, 5, 10],
           backgroundColor: ['#FFD700CC', GOLD+'CC', 'rgba(90,86,80,0.7)'],
           borderColor: ['#FFD700', GOLD, GRAY],
           borderWidth: 2,
@@ -671,7 +671,7 @@ function renderKolSection() {
         <td style="color:var(--white);font-weight:500">${k.name}</td>
         <td>${k.platform}</td>
         <td>${k.fans}</td>
-        <td style="color:var(--gold);font-weight:600">¥${(k.gmv/10000).toFixed(1)}万</td>
+        <td style="color:var(--gold);font-weight:600">¥${k.gmv}</td>
         <td>${k.rate}</td>
         <td><span class="${tierCls}">${k.tier}级</span></td>
         <td style="color:${trendColor}">${k.trend}</td>
@@ -684,23 +684,23 @@ function renderKolSection() {
 // ============================================================
 //  SECTION 4: 营收趋势  (Revenue)
 // ============================================================
-const REVENUE_MONTHLY = [42, 48, 54, 58, 63, 68, 72, 78, 82, 88, 94, 102]; // 万元
-const USERS_MONTHLY   = [8200, 9400, 10800, 11600, 12800, 13900, 14800, 16200, 17400, 18600, 19800, 21200];
+const REVENUE_MONTHLY = [18000, 22400, 26800, 31200, 35600, 40200, 44800, 49200, 53800, 58600, 63400, 68800];
+const USERS_MONTHLY   = [180, 238, 286, 332, 388, 446, 504, 566, 628, 688, 742, 806];
 
 const TIER_REVENUE = {
   '免费':   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  '基础会员': [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20],
-  '专业会员': [18, 21, 24, 26, 28, 30, 32, 34, 36, 38, 41, 44],
-  'VIP机构':  [16, 18, 20, 21, 23, 25, 26, 29, 30, 33, 35, 38],
+  '验证版会员': [6200, 7400, 8600, 9800, 11200, 12600, 13800, 15100, 16200, 17400, 18600, 19800],
+  '专业会员': [8400, 10800, 13200, 15400, 17600, 19800, 22400, 24600, 27200, 29600, 32200, 34800],
+  '机构试点':  [3400, 4200, 5000, 6000, 6800, 7800, 8600, 9500, 10400, 11600, 12600, 14000],
 };
 
 const COHORT_DATA = [
-  { cohort: '2024-07', data: [100, 72, 58, 48, 41, 36] },
-  { cohort: '2024-08', data: [100, 74, 61, 51, 44, null] },
-  { cohort: '2024-09', data: [100, 76, 63, 53, null, null] },
-  { cohort: '2024-10', data: [100, 78, 65, null, null, null] },
-  { cohort: '2024-11', data: [100, 80, null, null, null, null] },
-  { cohort: '2024-12', data: [100, null, null, null, null, null] },
+  { cohort: '2026-01', data: [100, 61, 48, 40, 34, 28] },
+  { cohort: '2026-02', data: [100, 64, 52, 43, 36, null] },
+  { cohort: '2026-03', data: [100, 66, 55, 46, null, null] },
+  { cohort: '2026-04', data: [100, 68, 57, null, null, null] },
+  { cohort: '2026-05', data: [100, 69, null, null, null, null] },
+  { cohort: '2026-06', data: [100, null, null, null, null, null] },
 ];
 
 function renderRevenueSection() {
@@ -714,12 +714,12 @@ function renderRevenueSection() {
     kpiContainer.innerHTML = `
       <div class="kpi-card">
         <div class="kpi-label">MRR (本月)</div>
-        <div class="kpi-value">¥${mrr}万</div>
+        <div class="kpi-value">¥${mrr}</div>
         <div class="kpi-badge kpi-badge-up">▲ +${mom}% MoM</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">ARR 预测</div>
-        <div class="kpi-value">¥${arr}万</div>
+        <div class="kpi-value">¥${arr}</div>
         <div class="kpi-badge kpi-badge-gold">基于当月×12</div>
       </div>
       <div class="kpi-card">
@@ -729,12 +729,12 @@ function renderRevenueSection() {
       </div>
       <div class="kpi-card">
         <div class="kpi-label">付费用户数</div>
-        <div class="kpi-value">21,200</div>
-        <div class="kpi-badge kpi-badge-up">▲ +1,400</div>
+        <div class="kpi-value">128</div>
+        <div class="kpi-badge kpi-badge-up">▲ +18</div>
       </div>`;
   }
 
-  // GMV + Users dual axis
+  // MRR + paid users dual axis
   const ctxGmvUsers = document.getElementById('revGmvUsers');
   if (ctxGmvUsers) {
     createChart(ctxGmvUsers, {
@@ -742,7 +742,7 @@ function renderRevenueSection() {
       data: {
         labels: MONTHS_12_LABEL,
         datasets: [
-          { label: 'GMV (万元)', data: REVENUE_MONTHLY, backgroundColor: 'rgba(200,169,110,0.7)', borderColor: GOLD, borderWidth: 1, borderRadius: 4, yAxisID: 'y' },
+          { label: 'MRR (元)', data: REVENUE_MONTHLY, backgroundColor: 'rgba(200,169,110,0.7)', borderColor: GOLD, borderWidth: 1, borderRadius: 4, yAxisID: 'y' },
           { label: '付费用户数', data: USERS_MONTHLY, type: 'line', borderColor: BLUE, backgroundColor: 'rgba(52,152,219,0.08)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: BLUE, fill: true, tension: 0.4, yAxisID: 'y1' }
         ]
       },
@@ -752,8 +752,8 @@ function renderRevenueSection() {
         plugins: { legend: { labels: { color: WHITE } }, tooltip: makeTooltipOptions() },
         scales: {
           x:  { grid: { display: false }, ticks: { color: GRAY } },
-          y:  { position: 'left',  grid: { color: 'rgba(200,169,110,0.06)' }, ticks: { color: GRAY, callback: v => '¥'+v+'万' } },
-          y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: BLUE, callback: v => (v/1000).toFixed(0)+'K' } }
+          y:  { position: 'left',  grid: { color: 'rgba(200,169,110,0.06)' }, ticks: { color: GRAY, callback: v => '¥'+v } },
+          y1: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: BLUE, callback: v => v } }
         }
       }
     });
@@ -784,7 +784,7 @@ function renderRevenueSection() {
         plugins: { legend: { labels: { color: WHITE, font: { size: 11 } } }, tooltip: makeTooltipOptions() },
         scales: {
           x: { stacked: true, grid: { display: false }, ticks: { color: GRAY } },
-          y: { stacked: true, grid: { color: 'rgba(200,169,110,0.06)' }, ticks: { color: GRAY, callback: v => '¥'+v+'万' } }
+          y: { stacked: true, grid: { color: 'rgba(200,169,110,0.06)' }, ticks: { color: GRAY, callback: v => '¥'+v } }
         }
       }
     });
@@ -798,8 +798,8 @@ function renderRevenueSection() {
       data: {
         labels: CHANNEL_DATA.map(c => c.name),
         datasets: [{
-          label: '月度营收（万元）',
-          data: CHANNEL_DATA.map(c => Math.round(c.revenue / 10000)),
+          label: '月度营收（元）',
+          data: CHANNEL_DATA.map(c => c.revenue),
           backgroundColor: CHANNEL_COLORS.map(c => c + 'CC'),
           borderColor: CHANNEL_COLORS,
           borderWidth: 1,
@@ -808,10 +808,10 @@ function renderRevenueSection() {
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: makeTooltipOptions({ callbacks: { label: c => ` ¥${c.raw}万` } }) },
+        plugins: { legend: { display: false }, tooltip: makeTooltipOptions({ callbacks: { label: c => ` ¥${c.raw}` } }) },
         scales: {
           x: { grid: { display: false }, ticks: { color: GRAY } },
-          y: { grid: { color: 'rgba(200,169,110,0.06)' }, ticks: { color: GRAY, callback: v => '¥'+v+'万' } }
+          y: { grid: { color: 'rgba(200,169,110,0.06)' }, ticks: { color: GRAY, callback: v => '¥'+v } }
         }
       }
     });
@@ -840,18 +840,18 @@ function renderRevenueSection() {
 //  SECTION 5: 用户分层  (Segment)
 // ============================================================
 const SEG_TIERS = [
-  { name: '免费用户',  count: 229800, pct: 91.5, arpu: 0,    ltv: 0,    r7: '42%', r30: '18%', r90: '8%',  color: '#4A5568' },
-  { name: '基础会员',  count: 12400,  pct: 4.9,  arpu: 68,   ltv: 480,  r7: '72%', r30: '54%', r90: '38%', color: '#3182CE' },
-  { name: '专业会员',  count: 5200,   pct: 2.1,  arpu: 198,  ltv: 1420, r7: '86%', r30: '74%', r90: '62%', color: '#38A169' },
-  { name: 'VIP机构',   count: 3600,   pct: 1.4,  arpu: 1820, ltv: 18200,r7: '94%', r30: '88%', r90: '80%', color: '#C8A96E' },
+  { name: '免费用户', count: 880, pct: 69.4, arpu: 0, ltv: 0, r7: '38%', r30: '16%', r90: '7%', color: '#4A5568' },
+  { name: '验证版会员', count: 214, pct: 16.9, arpu: 68, ltv: 420, r7: '68%', r30: '48%', r90: '34%', color: '#3182CE' },
+  { name: '专业会员', count: 128, pct: 10.1, arpu: 198, ltv: 1260, r7: '82%', r30: '70%', r90: '56%', color: '#38A169' },
+  { name: '机构试点', count: 34, pct: 2.7, arpu: 1820, ltv: 12800, r7: '91%', r30: '84%', r90: '76%', color: '#C8A96E' },
 ];
 
 const LIFECYCLE_STAGES = [
-  { icon: '👀', name: '公域曝光',  desc: '微信/抖音等多渠道触达', num: '980万' },
-  { icon: '🏠', name: '私域沉淀',  desc: '关注公众号/加入社群',   num: '24.5万' },
-  { icon: '💡', name: '主动意向',  desc: '点击注册/浏览产品',     num: '9.8万' },
-  { icon: '💳', name: '首次付费',  desc: '购买基础或专业套餐',    num: '1.85万' },
-  { icon: '👑', name: 'VIP升级',   desc: '升级机构VIP订阅',      num: '4,200' },
+  { icon: '👀', name: '内容触达', desc: '种子内容与合作分发', num: '6.8万' },
+  { icon: '🏠', name: '私域留资', desc: '社群 / 注册 / 演示预约', num: '5,400' },
+  { icon: '💡', name: '激活试用', desc: '完成首次分析与复盘', num: '1,260' },
+  { icon: '💳', name: '首次付费', desc: '购买验证版或专业版', num: '128' },
+  { icon: '👑', name: '高频留存', desc: '复购 / 升级 / 持续使用', num: '36' },
 ];
 
 function renderSegmentSection() {
@@ -859,10 +859,10 @@ function renderSegmentSection() {
   const funnelContainer = document.getElementById('seg-funnel-container');
   if (funnelContainer) {
     const tiers = [
-      { label: '免费用户',   count: 251000, color: '#4A5568', convFrom: null,     convTo: '4.9%' },
-      { label: '基础会员',   count: 12400,  color: '#3182CE', convFrom: '4.9%',  convTo: '42%' },
-      { label: '专业会员',   count: 5200,   color: '#38A169', convFrom: '42%',   convTo: '69%' },
-      { label: 'VIP机构',    count: 3600,   color: '#C8A96E', convFrom: '69%',   convTo: null },
+      { label: '免费用户', count: 1268, color: '#4A5568', convFrom: null, convTo: '16.9%' },
+      { label: '验证版会员', count: 214, color: '#3182CE', convFrom: '16.9%', convTo: '59.8%' },
+      { label: '专业会员', count: 128, color: '#38A169', convFrom: '59.8%', convTo: '26.6%' },
+      { label: '机构试点', count: 34, color: '#C8A96E', convFrom: '26.6%', convTo: null },
     ];
     const maxCount = tiers[0].count;
     funnelContainer.innerHTML = tiers.map((t, i) => {

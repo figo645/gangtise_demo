@@ -396,7 +396,7 @@ body { background: var(--surface-2); color: var(--text-main); }
     <!-- Sub-tabs -->
     <div class="community-subtabs" id="community-subtabs">
       <div class="community-subtab active" onclick="switchCommunityTab('square')">广场</div>
-      <div class="community-subtab" onclick="switchCommunityTab('dav')">大V</div>
+      <div class="community-subtab" onclick="switchCommunityTab('dav')">试点作者</div>
       <div class="community-subtab" onclick="switchCommunityTab('events')">活动</div>
     </div>
 
@@ -414,10 +414,10 @@ body { background: var(--surface-2); color: var(--text-main); }
       </div>
     </div>
 
-    <!-- 大V sub-tab -->
+    <!-- 试点作者 sub-tab -->
     <div id="community-dav" style="padding:14px;display:none">
       <div style="font-size:12px;color:var(--gray-400);margin-bottom:14px;text-align:center;background:rgba(200,169,110,0.05);border:1px solid rgba(200,169,110,0.1);border-radius:8px;padding:8px">
-        认证大V · 专业投研意见领袖
+        试点作者 · 与平台共同验证内容协同与付费转化
       </div>
       <div id="kol-list">
         <!-- KOL cards rendered by JS -->
@@ -426,13 +426,13 @@ body { background: var(--surface-2); color: var(--text-main); }
             <div class="kol-avatar-lg" style="font-size:22px">👑<span class="kol-verified-badge">✅</span></div>
             <div class="kol-info">
               <div class="kol-name">财经老王</div>
-              <div class="kol-platform">抖音 · 财经大V</div>
-              <div class="kol-followers">280万粉丝</div>
+              <div class="kol-platform">微信社群 · 科技研究协同</div>
+              <div class="kol-followers">12.8万关注</div>
             </div>
             <button class="btn-outline" style="padding:5px 14px;font-size:12px">关注</button>
-            <button class="btn-gold" style="padding:5px 14px;font-size:12px" onclick="openDmChat(1,'财经老王','👑','S级')">私信</button>
+            <button class="btn-gold" style="padding:5px 14px;font-size:12px" onclick="openDmChat(1,'财经老王','👑','种子作者')">私信</button>
           </div>
-          <div class="kol-preview">"科技板块短期估值压力可控，AI算力需求持续超预期，建议关注中游设备端的投资机会..."</div>
+          <div class="kol-preview">"AI 算力这条线短期有波动，但订单兑现和国产替代证据还在累积，更适合做分批跟踪..."</div>
           <div class="kol-footer">
             <div class="kol-stats">
               <div class="kol-stat">本月观点 <span>18条</span></div>
@@ -445,13 +445,13 @@ body { background: var(--surface-2); color: var(--text-main); }
             <div class="kol-avatar-lg" style="font-size:22px">💎<span class="kol-verified-badge">✅</span></div>
             <div class="kol-info">
               <div class="kol-name">投资女神Lisa</div>
-              <div class="kol-platform">小红书 · 价值投资</div>
-              <div class="kol-followers">156万粉丝</div>
+              <div class="kol-platform">内容合作 · 港股框架研究</div>
+              <div class="kol-followers">8.6万关注</div>
             </div>
             <button class="btn-outline" style="padding:5px 14px;font-size:12px">关注</button>
-            <button class="btn-gold" style="padding:5px 14px;font-size:12px" onclick="openDmChat(2,'投资女神Lisa','💎','S级')">私信</button>
+            <button class="btn-gold" style="padding:5px 14px;font-size:12px" onclick="openDmChat(2,'投资女神Lisa','💎','种子作者')">私信</button>
           </div>
-          <div class="kol-preview">"港股互联网板块的估值修复还没走完，南向资金持续净流入是最好的佐证..."</div>
+          <div class="kol-preview">"港股互联网更像中期修复样本，适合继续跟踪资金和业绩验证，不建议只看单日情绪..."</div>
           <div class="kol-footer">
             <div class="kol-stats">
               <div class="kol-stat">本月观点 <span>24条</span></div>
@@ -464,13 +464,13 @@ body { background: var(--surface-2); color: var(--text-main); }
             <div class="kol-avatar-lg" style="font-size:22px">📊<span class="kol-verified-badge">✅</span></div>
             <div class="kol-info">
               <div class="kol-name">量化老师陈明</div>
-              <div class="kol-platform">微信公众号 · 量化策略</div>
-              <div class="kol-followers">89万粉丝</div>
+              <div class="kol-platform">小红书 · 因子研究样本</div>
+              <div class="kol-followers">5.4万关注</div>
             </div>
             <button class="btn-outline" style="padding:5px 14px;font-size:12px">关注</button>
-            <button class="btn-gold" style="padding:5px 14px;font-size:12px" onclick="openDmChat(3,'量化老师陈明','📊','A级')">私信</button>
+            <button class="btn-gold" style="padding:5px 14px;font-size:12px" onclick="openDmChat(3,'量化老师陈明','📊','成长作者')">私信</button>
           </div>
-          <div class="kol-preview">"本周多因子模型显示动量因子衰减明显，价值因子重新占优，建议切换配置思路..."</div>
+          <div class="kol-preview">"本周多因子样本里，价值因子重新占优，适合用 Hermes 再做一轮交叉验证..."</div>
           <div class="kol-footer">
             <div class="kol-stats">
               <div class="kol-stat">本月观点 <span>31条</span></div>
@@ -483,13 +483,13 @@ body { background: var(--surface-2); color: var(--text-main); }
             <div class="kol-avatar-lg" style="font-size:22px">🌐<span class="kol-verified-badge">✅</span></div>
             <div class="kol-info">
               <div class="kol-name">全球宏观James</div>
-              <div class="kol-platform">微博 · 宏观策略</div>
-              <div class="kol-followers">120万粉丝</div>
+              <div class="kol-platform">微信社群 · 海外宏观</div>
+              <div class="kol-followers">4.2万关注</div>
             </div>
             <button class="btn-outline" style="padding:5px 14px;font-size:12px">关注</button>
-            <button class="btn-gold" style="padding:5px 14px;font-size:12px" onclick="openDmChat(4,'全球宏观James','🌐','A级')">私信</button>
+            <button class="btn-gold" style="padding:5px 14px;font-size:12px" onclick="openDmChat(4,'全球宏观James','🌐','成长作者')">私信</button>
           </div>
-          <div class="kol-preview">"美联储点阵图暗示年内两次降息，美元指数承压，大宗商品和新兴市场将是主要受益方向..."</div>
+          <div class="kol-preview">"如果降息路径延续，风险资产会受益，但更关键的是国内资金是否同步改善..."</div>
           <div class="kol-footer">
             <div class="kol-stats">
               <div class="kol-stat">本月观点 <span>15条</span></div>
@@ -502,13 +502,13 @@ body { background: var(--surface-2); color: var(--text-main); }
             <div class="kol-avatar-lg" style="font-size:22px">⚡<span class="kol-verified-badge">✅</span></div>
             <div class="kol-info">
               <div class="kol-name">新能源猎手阿强</div>
-              <div class="kol-platform">B站 · 产业研究</div>
-              <div class="kol-followers">67万粉丝</div>
+              <div class="kol-platform">转介绍 · 产业调研</div>
+              <div class="kol-followers">3.1万关注</div>
             </div>
             <button class="btn-outline" style="padding:5px 14px;font-size:12px">关注</button>
-            <button class="btn-gold" style="padding:5px 14px;font-size:12px" onclick="openDmChat(5,'新能源猎手阿强','⚡','B级')">私信</button>
+            <button class="btn-gold" style="padding:5px 14px;font-size:12px" onclick="openDmChat(5,'新能源猎手阿强','⚡','观察作者')">私信</button>
           </div>
-          <div class="kol-preview">"固态电池产业化节奏超预期，2026年小批量装车可期，中游材料公司值得深入研究..."</div>
+          <div class="kol-preview">"固态电池仍是早期跟踪样本，优先关注产业节奏和验证节点，不做过度推演..."</div>
           <div class="kol-footer">
             <div class="kol-stats">
               <div class="kol-stat">本月观点 <span>22条</span></div>
@@ -576,7 +576,7 @@ body { background: var(--surface-2); color: var(--text-main); }
     <div class="hermes-shortcuts">
       <div class="hermes-shortcut" onclick="hermesShortcut('今日市场速览')">📊 今日市场速览</div>
       <div class="hermes-shortcut" onclick="hermesShortcut('热门研报摘要')">📋 热门研报</div>
-      <div class="hermes-shortcut" onclick="hermesShortcut('大V观点汇总')">👑 大V观点汇总</div>
+      <div class="hermes-shortcut" onclick="hermesShortcut('作者观点汇总')">👑 作者观点汇总</div>
       <div class="hermes-shortcut" onclick="hermesShortcut('风险预警扫描')">⚠️ 风险预警</div>
       <div class="hermes-shortcut" onclick="hermesShortcut('社区热帖解读')">🔥 社区热帖解读</div>
       <div class="hermes-shortcut" onclick="hermesShortcut('当前行情分析')">📈 当前行情分析</div>
@@ -609,19 +609,31 @@ body { background: var(--surface-2); color: var(--text-main); }
           <div style="font-size:14px;font-weight:700;color:var(--white)">我的关注列表</div>
           <button class="btn-outline" style="padding:5px 10px;font-size:11px" onclick="showToast('演示版暂不支持编辑')">+ 添加</button>
         </div>
-        <div style="font-size:12px;color:var(--gray-400);line-height:1.6">首发只保留自选股跟踪，不对外开放更复杂的社交和专业工作台功能。</div>
+        <div style="font-size:12px;color:var(--gray-400);line-height:1.6">围绕你的自选股票，优先打通 4 个动作：看价格、看作者观点、做基本面分析、做基本面判断。</div>
       </div>
       {% for item in market %}
-      <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.08);border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <div style="font-size:14px;font-weight:600;color:var(--white)">{{ item.name }}</div>
-          <div style="font-size:11px;color:var(--gray-400);margin-top:2px">实时行情</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-size:18px;font-weight:700;color:var(--white)">{{ "%.2f"|format(item.value) }}</div>
-          <div style="font-size:12px;{% if item.change >= 0 %}color:var(--red){% else %}color:var(--green){% endif %}">
-            {% if item.change >= 0 %}▲ +{{ "%.2f"|format(item.change) }} (+{{ "%.2f%%"|format(item.change_pct) }}){% else %}▼ {{ "%.2f"|format(item.change) }} ({{ "%.2f%%"|format(item.change_pct) }}){% endif %}
+      <div onclick="openWatchlistDetail('{{ item.code }}')" style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.08);border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:14px;font-weight:600;color:var(--white)">{{ item.name }}</div>
+            <div style="font-size:11px;color:var(--gray-400);margin-top:2px">{{ item.code }} · {{ item.market }} · {{ item.focus }}</div>
           </div>
+          <div style="text-align:right">
+            <div style="font-size:18px;font-weight:700;color:var(--white)">{{ "%.2f"|format(item.value) }}</div>
+            <div style="font-size:12px;{% if item.change >= 0 %}color:var(--red){% else %}color:var(--green){% endif %}">
+              {% if item.change >= 0 %}▲ +{{ "%.2f"|format(item.change) }} (+{{ "%.2f%%"|format(item.change_pct) }}){% else %}▼ {{ "%.2f"|format(item.change) }} ({{ "%.2f%%"|format(item.change_pct) }}){% endif %}
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+          {% for author in item.authors %}
+          <span style="font-size:10px;background:rgba(200,169,110,0.1);color:var(--gold);padding:3px 8px;border-radius:10px">{{ author }}</span>
+          {% endfor %}
+          <span style="font-size:10px;background:rgba(46,204,113,0.12);color:var(--green);padding:3px 8px;border-radius:10px">可连 Hermes</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+          <button class="btn-outline" style="padding:7px 10px;font-size:11px" onclick="event.stopPropagation();openWatchlistDetail('{{ item.code }}','authors')">作者互动</button>
+          <button class="btn-gold" style="padding:7px 10px;font-size:11px" onclick="event.stopPropagation();runWatchlistHermes('{{ item.code }}','basic')">基本面分析</button>
         </div>
       </div>
       {% endfor %}
@@ -629,9 +641,23 @@ body { background: var(--surface-2); color: var(--text-main); }
     <div class="h5-section">
       <div class="h5-section-title">跟踪提示</div>
       <div class="card" style="padding:14px">
-        <div style="font-size:13px;color:var(--gold);font-weight:600;margin-bottom:8px">观察维度</div>
-        <div style="font-size:13px;color:var(--white);line-height:1.6">围绕价格、涨跌幅、资金流向和板块热度做日常跟踪，减少首发阶段的复杂分析路径。</div>
-        <div style="font-size:11px;color:var(--gray-400);margin-top:6px">后续若后台开放高级功能，可再加入更多研究模块</div>
+        <div style="font-size:13px;color:var(--gold);font-weight:600;margin-bottom:8px">建议使用路径</div>
+        <div style="font-size:13px;color:var(--white);line-height:1.8">
+          1. 先看自选股价格与涨跌幅。<br>
+          2. 再看该股票对应作者的研究角度。<br>
+          3. 用 Hermes 做基本面分析。<br>
+          4. 最后做“基本面判断”，决定是继续跟踪、重点研究还是暂不处理。
+        </div>
+        <div style="font-size:11px;color:var(--gray-400);margin-top:6px">重点不是给买卖建议，而是缩短你从关注到判断的研究路径。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="watchlist-detail-modal" onclick="if(event.target===this)this.classList.remove('show')">
+    <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
+      <div class="modal-handle"></div>
+      <div id="watchlist-detail-content">
+        <div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">加载中...</div>
       </div>
     </div>
   </div>
@@ -729,43 +755,43 @@ body { background: var(--surface-2); color: var(--text-main); }
           <div class="tier-features">
             <div class="tier-feature">每日3条信息流</div>
             <div class="tier-feature">基础行情数据</div>
-            <div class="tier-feature">KOL公开观点</div>
+            <div class="tier-feature">研究样例体验</div>
           </div>
         </div>
         <div class="tier-card tier-basic">
-          <div class="tier-name">基础会员</div>
-          <div class="tier-price">¥99 <span>/ 月</span></div>
+          <div class="tier-name">验证版会员</div>
+          <div class="tier-price">¥68 <span>/ 月</span></div>
           <div class="tier-features">
-            <div class="tier-feature">无限信息流</div>
-            <div class="tier-feature">AI分析 (5次/日)</div>
+            <div class="tier-feature">核心信息流与复盘</div>
+            <div class="tier-feature">AI分析 (3次/日)</div>
             <div class="tier-feature">券商研报摘要</div>
             <div class="tier-feature">专家纪要摘要</div>
           </div>
-          <button class="btn-outline" style="margin-top:12px;width:100%">立即订阅</button>
+          <button class="btn-outline" style="margin-top:12px;width:100%">加入验证</button>
         </div>
         <div class="tier-card tier-pro">
-          <div class="tier-badge">热门</div>
+          <div class="tier-badge">主验证档</div>
           <div class="tier-name" style="color:var(--green)">专业会员</div>
-          <div class="tier-price" style="color:var(--green)">¥299 <span>/ 月</span></div>
+          <div class="tier-price" style="color:var(--green)">¥198 <span>/ 月</span></div>
           <div class="tier-features">
-            <div class="tier-feature">无限AI分析</div>
-            <div class="tier-feature">完整研报原文</div>
-            <div class="tier-feature">专家纪要全文</div>
-            <div class="tier-feature">另类数据信号</div>
-            <div class="tier-feature">KOL专属直播</div>
+            <div class="tier-feature">更高频 AI 分析</div>
+            <div class="tier-feature">完整研报精读输出</div>
+            <div class="tier-feature">专家纪要深度版</div>
+            <div class="tier-feature">高频研究模板</div>
+            <div class="tier-feature">优先参与共创反馈</div>
           </div>
           <button class="btn-gold" style="margin-top:12px;width:100%">升级专业版</button>
         </div>
         <div class="tier-card tier-vip">
-          <div class="tier-badge" style="background:var(--gold-dark)">顶级</div>
-          <div class="tier-name" style="color:var(--gold)">机构VIP</div>
-          <div class="tier-price">¥2999 <span>/ 月</span></div>
+          <div class="tier-badge" style="background:var(--gold-dark)">试点</div>
+          <div class="tier-name" style="color:var(--gold)">机构试点</div>
+          <div class="tier-price">定制 <span>/ 洽谈</span></div>
           <div class="tier-features">
-            <div class="tier-feature">专属投研顾问</div>
-            <div class="tier-feature">定制化数据报告</div>
-            <div class="tier-feature">专家一对一会议</div>
-            <div class="tier-feature">API数据接口</div>
-            <div class="tier-feature">优先新功能体验</div>
+            <div class="tier-feature">专属问题清单梳理</div>
+            <div class="tier-feature">定制研究辅助输出</div>
+            <div class="tier-feature">专家 / 团队深度交流</div>
+            <div class="tier-feature">接口与历史库需求访谈</div>
+            <div class="tier-feature">共同定义正式产品</div>
           </div>
           <button class="btn-gold" style="margin-top:12px;width:100%">联系顾问</button>
         </div>
@@ -774,27 +800,27 @@ body { background: var(--surface-2); color: var(--text-main); }
 
     <!-- KOL partner -->
     <div class="h5-section">
-      <div class="h5-section-title">成为KOL合伙人</div>
+      <div class="h5-section-title">成为试点作者</div>
       <div class="card">
-        <div style="font-size:14px;color:var(--gold);font-weight:600;margin-bottom:8px">🤝 收益分成模式</div>
+        <div style="font-size:14px;color:var(--gold);font-weight:600;margin-bottom:8px">🤝 研究协同试点</div>
         <div style="font-size:13px;color:var(--white);line-height:1.7;margin-bottom:12px">
-          洞见智研提供专业数据与证据链，您负责内容创作与粉丝运营。每带来一位付费用户，享受持续分成收益。
+          当前只开放少量研究型创作者试点。平台提供证据链与合规模板，重点验证内容协同是否能带来更低 CAC 和更高质量付费用户。
         </div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
           <div style="text-align:center;padding:10px;background:rgba(200,169,110,0.05);border-radius:8px">
-            <div style="font-size:18px;font-weight:700;color:var(--gold)">15%</div>
-            <div style="font-size:11px;color:var(--gray-400)">基础分成</div>
+            <div style="font-size:18px;font-weight:700;color:var(--gold)">试点</div>
+            <div style="font-size:11px;color:var(--gray-400)">先验证留资</div>
           </div>
           <div style="text-align:center;padding:10px;background:rgba(200,169,110,0.05);border-radius:8px">
-            <div style="font-size:18px;font-weight:700;color:var(--gold)">20%</div>
-            <div style="font-size:11px;color:var(--gray-400)">A级合伙人</div>
+            <div style="font-size:18px;font-weight:700;color:var(--gold)">协同</div>
+            <div style="font-size:11px;color:var(--gray-400)">再看 CAC / LTV</div>
           </div>
           <div style="text-align:center;padding:10px;background:rgba(200,169,110,0.05);border-radius:8px">
-            <div style="font-size:18px;font-weight:700;color:var(--gold)">25%</div>
-            <div style="font-size:11px;color:var(--gray-400)">S级合伙人</div>
+            <div style="font-size:18px;font-weight:700;color:var(--gold)">放量</div>
+            <div style="font-size:11px;color:var(--gray-400)">成立后再扩展</div>
           </div>
         </div>
-        <button class="btn-gold" style="width:100%">申请成为合伙人</button>
+        <button class="btn-gold" style="width:100%">申请试点合作</button>
       </div>
     </div>
   </div>
@@ -806,15 +832,15 @@ body { background: var(--surface-2); color: var(--text-main); }
     <div id="dm-list-view">
       <div style="padding:16px;display:flex;justify-content:space-between;align-items:center">
         <div style="font-size:16px;font-weight:700;color:var(--white)">专属对话</div>
-        <div style="font-size:11px;color:var(--gray-400);background:rgba(200,169,110,0.08);padding:4px 10px;border-radius:10px">与大V 1对1 交流</div>
+        <div style="font-size:11px;color:var(--gray-400);background:rgba(200,169,110,0.08);padding:4px 10px;border-radius:10px">与试点作者研究交流</div>
       </div>
       <div id="dm-conversations-list">
         <div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">加载中...</div>
       </div>
       <!-- Subscription upsell -->
       <div style="margin:16px;padding:14px;background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.15);border-radius:12px">
-        <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:6px">🔓 解锁更多大V专属对话</div>
-        <div style="font-size:12px;color:var(--gray-400);line-height:1.6;margin-bottom:10px">升级专业会员，可与所有认证大V进行1对1专属对话，获取独家投研观点。</div>
+        <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:6px">🔓 解锁更多作者深度交流</div>
+        <div style="font-size:12px;color:var(--gray-400);line-height:1.6;margin-bottom:10px">升级专业会员后，可与全部试点作者做 1 对 1 研究交流，查看更完整的证据链摘要。</div>
         <button class="btn-gold" style="width:100%;padding:10px;font-size:13px" onclick="switchTab('vip')">查看会员权益</button>
       </div>
     </div>
@@ -831,7 +857,7 @@ body { background: var(--surface-2); color: var(--text-main); }
       </div>
       <!-- 合规横幅 -->
       <div style="padding:8px 14px;background:rgba(231,76,60,0.06);border-bottom:1px solid rgba(231,76,60,0.15);font-size:11px;color:#E2C98A;line-height:1.5">
-        ⚠️ 大V分享为个人研究观点，仅供参考，不构成投资建议。投资有风险，决策需谨慎。
+        ⚠️ 试点作者分享为个人研究观点，仅供参考，不构成投资建议。投资有风险，决策需谨慎。
       </div>
       <div class="dm-messages" id="dm-messages-container"></div>
       <div style="padding:8px 14px 0;display:flex;gap:6px;flex-wrap:wrap;background:var(--navy)">
@@ -842,42 +868,42 @@ body { background: var(--surface-2); color: var(--text-main); }
         <span class="tag tag-gold" style="font-size:11px;cursor:pointer;padding:4px 10px" onclick="dmQuickAsk('美联储降息怎么布局?')">宏观</span>
       </div>
       <div class="dm-input-bar">
-        <input class="dm-input" id="dm-input" placeholder="多轮提问，大V会基于平台数据回复..." onkeydown="if(event.key==='Enter')sendDm()">
+        <input class="dm-input" id="dm-input" placeholder="多轮提问，作者会基于平台证据链回复..." onkeydown="if(event.key==='Enter')sendDm()">
         <button class="dm-send-btn" onclick="sendDm()">➤</button>
       </div>
     </div>
   </div>
 
-  <!-- ===== TAB: 大V工作台 ===== -->
+  <!-- ===== TAB: 作者工作台 ===== -->
   <div id="page-workbench" class="page" data-feature="workbench">
     <div style="padding:16px;display:flex;justify-content:space-between;align-items:center">
       <div>
-        <div style="font-size:16px;font-weight:700;color:var(--white)">大V工作台</div>
-        <div style="font-size:11px;color:var(--gray-400);margin-top:2px">管理粉丝 · 内容运营 · 收益查看</div>
+        <div style="font-size:16px;font-weight:700;color:var(--white)">作者试点工作台</div>
+        <div style="font-size:11px;color:var(--gray-400);margin-top:2px">管理试用用户 · 共创反馈 · 协同收入</div>
       </div>
-      <div style="font-size:11px;color:var(--navy);background:var(--gold);padding:4px 10px;border-radius:10px;font-weight:600">S级合伙人</div>
+      <div style="font-size:11px;color:var(--navy);background:var(--gold);padding:4px 10px;border-radius:10px;font-weight:600">种子合作作者</div>
     </div>
     <!-- Stats -->
     <div class="wb-stat-grid">
       <div class="wb-stat-card">
-        <div class="wb-stat-label">本月收益</div>
-        <div class="wb-stat-value">¥186,000</div>
-        <div class="wb-stat-change">↑ 12.5%</div>
+        <div class="wb-stat-label">本月协同收入</div>
+        <div class="wb-stat-value">¥18,600</div>
+        <div class="wb-stat-change">↑ 8.5%</div>
       </div>
       <div class="wb-stat-card">
-        <div class="wb-stat-label">VIP订阅者</div>
-        <div class="wb-stat-value">4,200</div>
-        <div class="wb-stat-change">↑ 8.3%</div>
+        <div class="wb-stat-label">高频付费样本</div>
+        <div class="wb-stat-value">36</div>
+        <div class="wb-stat-change">↑ 6 位新增</div>
       </div>
       <div class="wb-stat-card">
         <div class="wb-stat-label">待回复消息</div>
-        <div class="wb-stat-value" style="color:#E74C3C">8</div>
-        <div class="wb-stat-label">23条未读</div>
+        <div class="wb-stat-value" style="color:#E74C3C">3</div>
+        <div class="wb-stat-label">7 条未读</div>
       </div>
       <div class="wb-stat-card">
         <div class="wb-stat-label">今日浏览</div>
-        <div class="wb-stat-value">12,800</div>
-        <div class="wb-stat-change">互动率 4.2%</div>
+        <div class="wb-stat-value">680</div>
+        <div class="wb-stat-change">互动率 6.8%</div>
       </div>
     </div>
     <!-- Fan messages inbox -->
@@ -916,7 +942,7 @@ body { background: var(--surface-2); color: var(--text-main); }
         </div>
         <div class="wb-fan-meta">
           <div class="wb-fan-time">2小时前</div>
-          <div class="wb-fan-tier" style="background:rgba(200,169,110,0.2);color:var(--gold)">机构VIP</div>
+          <div class="wb-fan-tier" style="background:rgba(200,169,110,0.2);color:var(--gold)">机构试点</div>
         </div>
       </div>
     </div>
@@ -931,15 +957,15 @@ body { background: var(--surface-2); color: var(--text-main); }
     <!-- Broadcast -->
     <div style="padding:8px 16px;display:flex;justify-content:space-between;align-items:center">
       <div style="font-size:14px;font-weight:600;color:var(--white)">群发助手</div>
-      <div style="font-size:11px;color:var(--gray-400)">触达 4,200 订阅者</div>
+      <div style="font-size:11px;color:var(--gray-400)">触达 128 位留资用户</div>
     </div>
     <div style="padding:8px 16px">
       <textarea id="wb-broadcast-text" style="width:100%;background:var(--navy);border:1px solid rgba(200,169,110,0.2);border-radius:10px;padding:10px;color:var(--white);font-size:13px;min-height:60px;resize:none;outline:none;box-sizing:border-box" placeholder="输入群发内容..."></textarea>
       <div style="display:flex;gap:8px;margin-top:8px">
         <select id="wb-broadcast-target" style="flex:1;background:var(--navy-mid);border:1px solid rgba(200,169,110,0.2);border-radius:8px;padding:8px;color:var(--white);font-size:12px;outline:none">
-          <option value="all">全部订阅者 (4,200人)</option>
-          <option value="vip">仅VIP用户 (680人)</option>
-          <option value="active">活跃用户 (2,100人)</option>
+          <option value="all">全部留资用户 (128人)</option>
+          <option value="vip">仅专业会员 (36人)</option>
+          <option value="active">活跃样本 (72人)</option>
         </select>
         <button class="btn-gold" style="padding:8px 16px;font-size:12px" onclick="sendBroadcast()">群发</button>
       </div>
@@ -949,12 +975,12 @@ body { background: var(--surface-2); color: var(--text-main); }
       <div style="font-size:13px;font-weight:600;color:var(--gray-400);margin-bottom:8px">最近群发</div>
     </div>
     <div class="wb-broadcast-item">
-      <div class="wb-broadcast-content">本周策略更新：科技板块逢低布局，AI算力+国产替代双主线</div>
-      <div class="wb-broadcast-meta"><span>2026-05-20 08:00</span><span>触达 3,200人</span><span style="color:var(--gold)">打开率 68%</span></div>
+      <div class="wb-broadcast-content">本周策略更新：重点看 AI 算力订单兑现和估值承接，仍以跟踪为主。</div>
+      <div class="wb-broadcast-meta"><span>2026-05-20 08:00</span><span>触达 92人</span><span style="color:var(--gold)">打开率 68%</span></div>
     </div>
     <div class="wb-broadcast-item">
-      <div class="wb-broadcast-content">紧急提醒：美联储会议纪要偏鸽，短期利好风险资产</div>
-      <div class="wb-broadcast-meta"><span>2026-05-19 22:30</span><span>触达 4,100人</span><span style="color:var(--gold)">打开率 82%</span></div>
+      <div class="wb-broadcast-content">宏观提醒：美联储纪要偏鸽，但仍要等资金面和国内数据共振确认。</div>
+      <div class="wb-broadcast-meta"><span>2026-05-19 22:30</span><span>触达 108人</span><span style="color:var(--gold)">打开率 82%</span></div>
     </div>
     <!-- Switch back -->
     <div class="wb-mode-switch" onclick="switchTab('profile')">
@@ -1111,7 +1137,7 @@ body { background: var(--surface-2); color: var(--text-main); }
     <!-- KOL mode switch -->
     <div class="wb-mode-switch" onclick="switchTab('workbench')" style="margin-bottom:0;border:1px solid rgba(200,169,110,0.4);background:rgba(200,169,110,0.12)">
       <span>👑</span>
-      <span class="wb-mode-switch-label">切换到大V工作台</span>
+      <span class="wb-mode-switch-label">切换到作者工作台</span>
       <span style="margin-left:auto;font-size:11px;color:#E74C3C;font-weight:600">8条待回复</span>
     </div>
     <div class="settings-list">
@@ -1181,7 +1207,7 @@ body { background: var(--surface-2); color: var(--text-main); }
   <div class="modal-sheet">
     <div class="modal-handle"></div>
     <div class="modal-title">发布投研观点</div>
-    <textarea class="modal-textarea" id="compose-text" placeholder="分享你的投研观点，可以@大V或添加标签..."></textarea>
+    <textarea class="modal-textarea" id="compose-text" placeholder="分享你的投研观点，可以@试点作者或添加标签..."></textarea>
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
       <span class="tag tag-gold" style="cursor:pointer" onclick="appendTag('#A股')">+ #A股</span>
       <span class="tag tag-gold" style="cursor:pointer" onclick="appendTag('#港股')">+ #港股</span>
@@ -1219,7 +1245,7 @@ const TAB_LABELS = {
   dm: '消息',
   vip: '会员',
   profile: '我的',
-  workbench: '大V工作台',
+  workbench: '作者试点工作台',
 };
 const TAB_HINTS = {
   feed: '围绕估值、盈利预期和资金流进行基础分析',
@@ -1230,7 +1256,7 @@ const TAB_HINTS = {
   dm: '消息与对话入口集中放在底部导航',
   vip: '会员与积分权益在此查看',
   profile: '账号、偏好与个人中心设置',
-  workbench: '面向大V和运营角色的工作区',
+  workbench: '面向试点作者和运营角色的工作区',
 };
 
 function isFeatureEnabled(featureName) {
@@ -1306,6 +1332,144 @@ function switchTab(tab) {
   }
 }
 
+// ===== WATCHLIST =====
+let currentWatchlistDetail = null;
+
+async function openWatchlistDetail(stockCode, section) {
+  const modal = document.getElementById('watchlist-detail-modal');
+  const host = document.getElementById('watchlist-detail-content');
+  if (!modal || !host) return;
+  modal.classList.add('show');
+  host.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">加载中...</div>';
+  try {
+    const resp = await fetch('/api/watchlist/' + encodeURIComponent(stockCode));
+    const data = await resp.json();
+    currentWatchlistDetail = data;
+    renderWatchlistDetail(data, section);
+  } catch (e) {
+    host.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">加载失败，请稍后重试</div>';
+  }
+}
+
+function renderWatchlistDetail(data, section) {
+  const host = document.getElementById('watchlist-detail-content');
+  if (!host || !data) return;
+  const authorCards = (data.authors || []).map(author => `
+    <div style="background:var(--navy);border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--gold-dark),var(--gold));display:flex;align-items:center;justify-content:center;font-size:16px">${author.avatar}</div>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--white)">${author.name}</div>
+            <div style="font-size:10px;color:var(--gray-400)">${author.tier}</div>
+          </div>
+        </div>
+        <button class="btn-outline" style="padding:5px 10px;font-size:11px" onclick="openWatchlistAuthorDm('${author.name}')">提问</button>
+      </div>
+      <div style="font-size:12px;color:var(--gray-400);line-height:1.7">${author.angle}</div>
+    </div>
+  `).join('');
+  const metricCards = (data.fundamental?.metrics || []).map(metric => `
+    <div style="background:var(--navy);border:1px solid rgba(200,169,110,0.08);border-radius:10px;padding:10px">
+      <div style="font-size:10px;color:var(--gray-400)">${metric.label}</div>
+      <div style="font-size:16px;font-weight:700;color:var(--gold);margin-top:4px">${metric.value}</div>
+      <div style="font-size:10px;color:var(--gray-400);margin-top:4px;line-height:1.6">${metric.note}</div>
+    </div>
+  `).join('');
+  const thesis = (data.fundamental?.thesis || []).map(item => `<div style="font-size:12px;color:var(--white);line-height:1.7">• ${item}</div>`).join('');
+  const drivers = (data.forecast?.drivers || []).map(item => `
+    <div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid rgba(200,169,110,0.06)">
+      <div>
+        <div style="font-size:12px;color:var(--white)">${item.label}</div>
+        <div style="font-size:10px;color:var(--gray-400);margin-top:2px">${item.note}</div>
+      </div>
+      <div style="font-size:14px;font-weight:700;color:${String(item.score).startsWith('-') ? '#E74C3C' : 'var(--green)'}">${item.score}</div>
+    </div>
+  `).join('');
+  host.innerHTML = `
+    <div style="padding-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:var(--white)">${data.name}</div>
+          <div style="font-size:11px;color:var(--gray-400);margin-top:4px">${data.code} · ${data.market} · ${data.industry}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:20px;font-weight:700;color:var(--white)">${Number(data.price || 0).toFixed(2)}</div>
+          <div style="font-size:12px;color:${data.change >= 0 ? 'var(--red)' : 'var(--green)'}">${data.change >= 0 ? '▲' : '▼'} ${Math.abs(Number(data.change || 0)).toFixed(2)} (${Number(data.change_pct || 0).toFixed(2)}%)</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+        <button class="btn-gold" style="padding:10px;font-size:12px" onclick="runWatchlistHermes('${data.code}','basic')">Hermes 基本面分析</button>
+        <button class="btn-outline" style="padding:10px;font-size:12px" onclick="runWatchlistHermes('${data.code}','forecast')">Hermes 基本面判断</button>
+      </div>
+
+      <div style="background:rgba(200,169,110,0.05);border:1px solid rgba(200,169,110,0.12);border-radius:12px;padding:12px;margin-bottom:14px">
+        <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:8px">作者互动</div>
+        <div style="display:grid;gap:10px">${authorCards || '<div style="font-size:12px;color:var(--gray-400)">暂无作者观点</div>'}</div>
+      </div>
+
+      <div style="background:rgba(46,204,113,0.06);border:1px solid rgba(46,204,113,0.16);border-radius:12px;padding:12px;margin-bottom:14px">
+        <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:8px">基本面摘要</div>
+        <div style="font-size:12px;color:var(--white);line-height:1.7;margin-bottom:10px">${data.fundamental?.summary || ''}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">${metricCards}</div>
+        <div style="display:grid;gap:6px">${thesis}</div>
+      </div>
+
+      <div style="background:rgba(52,152,219,0.06);border:1px solid rgba(52,152,219,0.18);border-radius:12px;padding:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+          <div style="font-size:13px;font-weight:600;color:var(--gold)">${data.forecast?.label || '基本面判断'}</div>
+          <span style="font-size:10px;background:rgba(200,169,110,0.12);color:var(--gold);padding:3px 8px;border-radius:10px">${data.forecast?.confidence || '中'}</span>
+        </div>
+        <div style="font-size:18px;font-weight:700;color:var(--white);margin-bottom:6px">${data.forecast?.verdict || '待分析'}</div>
+        <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">${data.forecast?.band || ''}</div>
+        <div>${drivers}</div>
+      </div>
+    </div>
+  `;
+  if (section === 'authors') {
+    host.scrollTo({top: 140, behavior: 'smooth'});
+  }
+}
+
+function openWatchlistAuthorDm(name) {
+  const mapping = {
+    '财经老王': { id: 1, avatar: '👑', tier: '种子作者' },
+    '投资女神Lisa': { id: 2, avatar: '💎', tier: '种子作者' },
+    '量化老师陈明': { id: 3, avatar: '📊', tier: '成长作者' },
+    '全球宏观James': { id: 4, avatar: '🌐', tier: '成长作者' },
+    '新能源猎手阿强': { id: 5, avatar: '⚡', tier: '观察作者' },
+    '港股研究员': { id: 2, avatar: '🏙️', tier: '观察作者' },
+  };
+  const author = mapping[name];
+  document.getElementById('watchlist-detail-modal')?.classList.remove('show');
+  if (author) {
+    openDmChat(author.id, name, author.avatar, author.tier);
+  } else {
+    showToast('暂未配置该作者对话');
+  }
+}
+
+function runWatchlistHermes(stockCode, mode) {
+  const detail = currentWatchlistDetail;
+  if (!detail || detail.code !== stockCode) {
+    openWatchlistDetail(stockCode);
+    return;
+  }
+  document.getElementById('watchlist-detail-modal')?.classList.remove('show');
+  switchTab('hermes');
+  const quickText = mode === 'basic'
+    ? `请基于 ${detail.name}（${detail.code}）输出基本面分析，重点看 ${detail.industry} 的盈利、估值和行业位置。`
+    : `请基于 ${detail.name}（${detail.code}）输出基本面判断，给出继续跟踪、重点研究或暂缓处理的理由。`;
+  setTimeout(() => {
+    const input = document.getElementById('hermes-input');
+    if (input) {
+      input.value = quickText;
+      sendHermesChat();
+    }
+  }, 80);
+}
+
 // ===== COMMUNITY =====
 let communitySubTab = 'square';
 
@@ -1333,7 +1497,7 @@ async function loadCommunityPosts() {
     // Merge API posts with sample posts for richer feed
     const merged = [...posts.map(p => ({
       id: p.id, avatar: p.avatar, name: p.author,
-      tier: p.tier === '大V' ? 'dav' : (p.tier === '认证用户' ? 'verified' : 'normal'),
+      tier: p.tier === '试点作者' ? 'dav' : (p.tier === '认证用户' ? 'verified' : 'normal'),
       platform: p.platform, time: p.time, content: p.content,
       tags: p.tags, likes: p.likes, comments: p.comments, points: '+' + (p.points_reward||10) + '积分'
     })), ...getSamplePosts().slice(posts.length > 3 ? 3 : 0)];
@@ -1346,21 +1510,21 @@ async function loadCommunityPosts() {
 function getSamplePosts() {
   return [
     {
-      id: 1, avatar: '👑', name: '财经老王', tier: 'dav', platform: '抖音',
+      id: 1, avatar: '👑', name: '财经老王', tier: 'dav', platform: '微信社群',
       time: '10分钟前',
-      content: '今日A股开盘，科技板块继续强势。AI算力链上游出现分歧，建议关注具有自主可控优势的国内设备商。半导体设备板块短期或有调整，但中长期逻辑未变，逢低布局机会值得关注。\n$中微公司 $北方华创 #A股 #半导体',
+      content: '今天看下来，科技板块情绪还在，但更值得跟踪的是订单兑现和估值承接。AI 算力链上游已经出现分歧，现阶段更适合做分批观察和证据补全。\n$中微公司 $北方华创 #A股 #半导体',
       tags: ['A股', '半导体', 'AI'],
       likes: 234, comments: 56, points: '+10积分'
     },
     {
-      id: 2, avatar: '🌐', name: '全球宏观James', tier: 'dav', platform: '微博',
+      id: 2, avatar: '🌐', name: '全球宏观James', tier: 'dav', platform: '内容合作',
       time: '32分钟前',
       content: '美联储官员发表鸽派讲话，年内降息预期升温。美债收益率下行带动风险资产情绪改善，美股科技股普涨。关注国内货币政策是否会跟进宽松，若配合财政发力，A股有望迎来阶段性行情。',
       tags: ['宏观', '美联储', '美股'],
       likes: 189, comments: 43, points: '+10积分'
     },
     {
-      id: 3, avatar: '⚡', name: '新能源猎手阿强', tier: 'verified', platform: 'B站',
+      id: 3, avatar: '⚡', name: '新能源猎手阿强', tier: 'verified', platform: '转介绍',
       time: '1小时前',
       content: '固态电池最新进展：某头部企业已完成500次循环测试，能量密度突破400Wh/kg。量产时间表可能提前至2026年Q3。产业链中游材料端率先受益，氧化物固态电解质相关标的值得重点关注。',
       tags: ['新能源', '固态电池', '锂电池'],
@@ -1392,7 +1556,7 @@ function renderPosts(posts) {
   container.innerHTML = posts.map(p => {
     const avatarClass = p.tier === 'dav' ? 'dav' : (p.tier === 'verified' ? 'verified' : 'normal');
     const badge = p.tier === 'dav'
-      ? '<span class="post-badge-dav">大V</span>'
+      ? '<span class="post-badge-dav">作者</span>'
       : (p.tier === 'verified' ? '<span class="post-badge-verified">认证</span>' : '');
     const tags = (p.tags || []).map(t =>
       `<span class="tag tag-gold" style="font-size:11px">#${t}</span>`
@@ -1470,51 +1634,51 @@ function getSampleEvents() {
   return [
     {
       id: 1, type: '直播', typeClass: 'event-live',
-      title: '【大V直播】财经老王：美联储降息周期下的A股配置策略',
+      title: '【作者直播】财经老王：降息预期下的 A 股跟踪框架',
       date: '2026-05-22 20:00', host: '财经老王 · 全球宏观James',
-      participants: 2840, points: 100, statusText: '报名中', open: true,
-      desc: '两位S级大V联合直播，深度解析降息周期对A股各板块的影响，给出具体配置建议。',
+      participants: 128, points: 100, statusText: '报名中', open: true,
+      desc: '两位试点作者联合直播，围绕降息预期、资金风格与行业节奏做研究框架分享，重点验证用户留存与互动质量。',
       tags: ['宏观', 'A股', '配置策略'], reward: '参与+100积分，提问被采纳+50积分'
     },
     {
       id: 2, type: '活动', typeClass: 'event-activity',
       title: '【挑战赛】洞见智研投研大赛第三季 · 最佳分析师评选',
       date: '2026-05-25 ~ 2026-06-15', host: '洞见智研官方',
-      participants: 1260, points: 500, statusText: '进行中', open: true,
-      desc: '发布原创投研帖子，获赞最多的前10名获得丰厚奖励。一等奖：年度专业会员+1000算力。',
+      participants: 214, points: 500, statusText: '进行中', open: true,
+      desc: '发布原创投研帖子，平台重点观察内容质量、互动留存和转介绍效率。优质样本将进入共创反馈池。',
       tags: ['原创', '竞赛', '奖励'], reward: '一等奖¥2000+年度会员，参与即得+50积分'
     },
     {
       id: 3, type: '会议', typeClass: 'event-meeting',
       title: '【专家会议】新能源产业链Q2展望 · 固态电池专题',
       date: '2026-05-24 14:00', host: '新能源猎手阿强 + 行业专家',
-      participants: 680, points: 200, statusText: '名额有限', open: true,
-      desc: '邀请产业链核心专家，深度探讨固态电池商业化进程、碳酸锂价格走势及投资机会。',
+      participants: 68, points: 200, statusText: '名额有限', open: true,
+      desc: '邀请产业链专家做闭门分享，重点验证高价值纪要内容是否能带来更强付费和留存。',
       tags: ['新能源', '固态电池', '专家'], reward: '参与+200积分，仅限专业会员及以上'
     },
     {
       id: 4, type: '活动', typeClass: 'event-activity',
       title: '【积分翻倍】本周发帖积分×2 · 限时活动',
       date: '2026-05-20 ~ 2026-05-26', host: '洞见智研官方',
-      participants: 5600, points: 0, statusText: '进行中', open: true,
-      desc: '本周内发布投研帖子，积分翻倍奖励。优质帖子额外获得算力奖励，快来参与！',
+      participants: 186, points: 0, statusText: '进行中', open: true,
+      desc: '本周内发布投研帖子，积分翻倍奖励。平台同步观察哪些内容方向更能形成高频讨论与次日回访。',
       tags: ['积分', '限时', '福利'], reward: '发帖积分×2，优质帖额外+50算力'
     },
     {
       id: 5, type: '直播', typeClass: 'event-live',
       title: '【直播回放】量化老师陈明：多因子模型实战讲解',
       date: '2026-05-18 19:30', host: '量化老师陈明',
-      participants: 3200, points: 30, statusText: '可回放', open: true,
-      desc: '深度讲解价值、动量、质量三因子的构建方法和实战应用，附完整代码示例。',
+      participants: 96, points: 30, statusText: '可回放', open: true,
+      desc: '回放内容围绕价值、动量、质量三因子展开，主要验证专业会员对量化研究模板的接受度。',
       tags: ['量化', '因子', '回放'], reward: '观看回放+30积分'
     },
     {
       id: 6, type: '会议', typeClass: 'event-meeting',
-      title: '【闭门会】港股互联网板块深度研讨',
+      title: '【闭门会】港股互联网板块验证交流',
       date: '2026-05-28 15:00', host: '投资女神Lisa + 港股研究员',
-      participants: 120, points: 300, statusText: '即将开放', open: false,
-      desc: '仅限机构VIP用户参与，深度研讨港股互联网板块的估值修复逻辑和配置时机。',
-      tags: ['港股', '互联网', 'VIP专属'], reward: '参与+300积分，仅限机构VIP'
+      participants: 24, points: 300, statusText: '即将开放', open: false,
+      desc: '仅限机构试点与专业会员代表参与，重点讨论港股互联网的估值修复逻辑和产品需求访谈。',
+      tags: ['港股', '互联网', '闭门交流'], reward: '参与+300积分，仅限机构试点'
     },
   ];
 }
@@ -1689,7 +1853,7 @@ function showEventDetail(id) {
       <div style="margin-bottom:16px">
         <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:8px">🤖 Hermes 活动解读</div>
         <div style="font-size:12px;color:var(--gray-400);background:rgba(200,169,110,0.04);border:1px solid rgba(200,169,110,0.1);border-radius:8px;padding:10px;line-height:1.7">
-          本次活动由洞见智研平台认证大V主持，内容基于平台专业数据支撑。参与活动可获取一手投研信息，结合Hermes AI分析工具，帮助您更好地理解和应用活动中的投研观点。
+          本次活动由平台试点作者或研究协同方主持，内容基于洞见智研证据链样本。活动不仅提供研究信息，也用于验证内容转化、留存与共创反馈质量。
         </div>
       </div>
 
@@ -2099,7 +2263,7 @@ async function hermesShortcut(action) {
   const shortcutResults = {
     '今日市场速览': '【今日市场速览 · 2026-05-20】\n\n📈 A股：两市成交9800亿，科技板块领涨+2.3%，北向资金净流入28亿\n🌐 港股：恒指+1.1%，互联网板块+2.8%，南向资金净流入38亿\n🇺🇸 美股：纳指+0.8%，AI概念股普涨，英伟达+3.2%\n🥇 黄金：3342美元/盎司，+0.56%\n\n💡 今日关注：PMI数据发布、美联储官员讲话\n⚠️ 风险提示：地缘政治扰动、汇率波动',
     '热门研报摘要': '【今日热门研报 Top5】\n\n1. 📋 中金 - AI算力深度研究：需求拐点已现，上调目标价\n2. 📋 高盛 - A股策略：Q2配置建议，超配科技+消费\n3. 📋 中信证券 - 新能源2026年展望：固态电池加速\n4. 📋 国泰君安 - 消费复苏路径：下半年量价齐升\n5. 📋 摩根士丹利 - 港股互联网：估值重估空间测算\n\n点击上方 📋 研报精读 模式查看完整分析',
-    '大V观点汇总': '【今日大V观点汇总 · 5位大V】\n\n👑 财经老王（抖音280万）：科技板块逢低布局，AI算力+国产替代双主线\n💎 投资女神Lisa（小红书156万）：港股互联网配置价值凸显，南向资金是信号\n📊 量化老师陈明（公众号89万）：价值因子持续占优，建议切换配置思路\n🌐 全球宏观James（微博120万）：美元走弱，利好新兴市场和大宗商品\n⚡ 新能源猎手阿强（B站67万）：固态电池节奏超预期，中游材料先行\n\n综合观点：偏多，关注科技+港股+新能源机会',
+    '作者观点汇总': '【今日作者观点汇总 · 5位试点作者】\n\n👑 财经老王（微信社群12.8万）：科技板块可继续跟踪，重点看订单兑现和估值承接\n💎 投资女神Lisa（内容合作8.6万）：港股互联网仍在修复区间，先看业绩和南向资金延续\n📊 量化老师陈明（小红书5.4万）：价值因子阶段性占优，适合做再平衡验证\n🌐 全球宏观James（微信社群4.2万）：美元偏弱利好风险资产，但仍要看国内资金面配合\n⚡ 新能源猎手阿强（转介绍3.1万）：固态电池是值得继续跟踪的产业样本\n\n综合观点：偏谨慎乐观，优先关注可验证的科技、港股和新能源样本',
     '风险预警扫描': '【当前风险预警 · 实时扫描】\n\n🔴 高关注：美债收益率反弹风险（10Y突破4.5%需警惕）\n🟡 中关注：地缘政治紧张态势（中东局势）\n🟡 中关注：国内经济复苏节奏（Q2数据待验证）\n🟡 中关注：人民币汇率波动（7.25关键位）\n🟢 低关注：A股资金面充裕（融资余额稳定）\n\n建议：维持分散配置，控制单一行业集中度在20%以内，保留10-15%现金仓位',
     '社区热帖解读': '【社区热帖 Hermes 解读】\n\n🔥 热帖1：财经老王 - A股科技板块布局\n解读：观点偏多，逻辑清晰，基于AI算力需求超预期。可信度：★★★★☆\n\n🔥 热帖2：新能源猎手阿强 - 固态电池进展\n解读：产业链一手信息，时间节点具体，参考价值高。可信度：★★★★★\n\n🔥 热帖3：量化老师陈明 - 因子切换信号\n解读：数据驱动，方法论严谨，适合量化投资者参考。可信度：★★★★☆\n\n综合：社区今日讨论热度高，多头情绪占主导。',
     '当前行情分析': '【当前行情深度分析 · 2026-05-20 实时】\n\n市场结构：\n● 上证指数 3428.56 (+0.82%) — 温和上涨，量能适中\n● 科技板块领涨，防御板块滞涨，风险偏好回升\n● 北向资金净流入，外资态度积极\n\n技术面：\n● 上证站稳3400点，短期支撑有效\n● MACD金叉形成，动能向上\n● 成交量温和放大，趋势健康\n\nHermes判断：短期偏多，建议维持标配，关注3500点阻力位。'
@@ -2143,6 +2307,9 @@ async function sendHermesChat() {
 
 function getChatResponse(text) {
   const t = text.toLowerCase();
+  if (t.includes('基本面分析') || t.includes('基本面判断')) {
+    return '【个股基本面研究输出】\n\n我会优先按 4 个维度看这只自选股：\n1. 盈利能力是否稳定，利润率和现金流有没有被破坏；\n2. 估值是否已经提前反映乐观预期；\n3. 所处行业景气是否还在上行或至少没有明显恶化；\n4. 当前争议点是不是短期噪音，还是会影响中期价值判断。\n\n如果是“基本面分析”，我会展开财务、行业和竞争位置；如果是“基本面判断”，我会给出继续跟踪、重点研究或暂缓处理的研究结论。\n\n注意：这里仍然只提供研究框架，不提供买卖建议。';
+  }
   if (t.includes('新能源') || t.includes('电池') || t.includes('锂')) {
     return '【新能源板块分析】\n\n基于洞见智研平台数据：\n● 固态电池商业化节奏超预期，2026年Q3小批量装车可期\n● 碳酸锂价格底部已现，Q3有望反弹\n● 海外市场拓展加速，欧洲工厂投产在即\n\n投资建议：关注中游材料端（固态电解质、正极材料），技术壁垒强的企业优先。\n\n数据来源：专家会议纪要 + 卫星产能数据 + 券商研报综合';
   }
@@ -2280,7 +2447,7 @@ async function openDmChat(kolId, name, avatar, tier) {
     document.getElementById('dm-list-view').style.display = 'none';
     document.getElementById('dm-chat-view').style.display = 'block';
     document.getElementById('dm-chat-name').textContent = name;
-    document.getElementById('dm-chat-tier').textContent = tier + ' · 认证大V';
+    document.getElementById('dm-chat-tier').textContent = tier + ' · 试点作者';
     document.getElementById('dm-chat-avatar').textContent = avatar;
     loadDmMessages(kolId);
   }, 50);
