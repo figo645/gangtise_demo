@@ -74,6 +74,10 @@ def gen_market_data():
             "change": 12.80,
             "change_pct": 0.76,
             "focus": "高端白酒",
+            "board": "稳健配置",
+            "alert_level": "normal",
+            "alert_text": "估值回到中枢附近，当前无明显预警",
+            "signal_summary": "盈利稳定，重点看消费修复持续性",
             "authors": ["财经老王", "量化老师陈明"],
         },
         {
@@ -84,6 +88,10 @@ def gen_market_data():
             "change": -3.84,
             "change_pct": -1.78,
             "focus": "动力电池",
+            "board": "新能源",
+            "alert_level": "warning",
+            "alert_text": "价格竞争仍在，需继续跟踪利润率和海外出货",
+            "signal_summary": "情绪回落，等待技术路线与订单验证",
             "authors": ["新能源猎手阿强", "全球宏观James"],
         },
         {
@@ -94,6 +102,10 @@ def gen_market_data():
             "change": 5.60,
             "change_pct": 1.46,
             "focus": "港股互联网",
+            "board": "港股互联网",
+            "alert_level": "attention",
+            "alert_text": "财报前估值修复较快，关注南向资金是否继续放量",
+            "signal_summary": "回购和财报兑现是两条主验证线",
             "authors": ["投资女神Lisa", "港股研究员"],
         },
         {
@@ -104,6 +116,10 @@ def gen_market_data():
             "change": 1.18,
             "change_pct": 2.60,
             "focus": "半导体制造",
+            "board": "科技成长",
+            "alert_level": "attention",
+            "alert_text": "景气恢复尚未完全兑现，需继续跟踪产能利用率",
+            "signal_summary": "国产替代逻辑在，短期看盈利兑现",
             "authors": ["财经老王", "宏观策略师"],
         },
         {
@@ -114,13 +130,108 @@ def gen_market_data():
             "change": 0.22,
             "change_pct": 0.53,
             "focus": "银行",
+            "board": "稳健配置",
+            "alert_level": "normal",
+            "alert_text": "股息和资产质量稳定，当前无明显报警",
+            "signal_summary": "更适合作为组合稳定器跟踪",
             "authors": ["全球宏观James", "量化老师陈明"],
         },
     ]
     return indices
 
 
+def gen_macro_indicators():
+    return [
+        {
+            "name": "美联储年内降息预期",
+            "value": "2次",
+            "status": "good",
+            "assessment": "偏利好风险资产",
+            "alert": "当前无需报警",
+            "hint": "市场已部分提前定价，后续看非农和通胀数据是否继续支持。",
+        },
+        {
+            "name": "北向 / 南向资金",
+            "value": "+28亿 / +41亿",
+            "status": "attention",
+            "assessment": "流入延续但未到强共振",
+            "alert": "关注是否连续 3 日放量",
+            "hint": "若资金只集中在单一主线，说明市场广度仍不够。",
+        },
+        {
+            "name": "美元指数",
+            "value": "103.4",
+            "status": "good",
+            "assessment": "偏回落，对港股与大宗更友好",
+            "alert": "当前无需报警",
+            "hint": "若美元重新走强，港股互联网和黄金链条都要重新评估。",
+        },
+        {
+            "name": "国内信用脉冲",
+            "value": "温和修复",
+            "status": "warning",
+            "assessment": "恢复力度偏弱",
+            "alert": "需继续观察社融和中长期贷款",
+            "hint": "若信用扩张迟迟不起来，顺周期与高弹性资产要谨慎。",
+        },
+    ]
+
+
+def gen_feed_boards(market_items):
+    boards = []
+    board_map = {}
+    for item in market_items:
+        board_name = item.get("board") or "自选股"
+        if board_name not in board_map:
+            board_map[board_name] = {
+                "name": board_name,
+                "warning_count": 0,
+                "items": [],
+            }
+            boards.append(board_map[board_name])
+        if item.get("alert_level") in {"warning", "attention"}:
+            board_map[board_name]["warning_count"] += 1
+        board_map[board_name]["items"].append(
+            {
+                "code": item["code"],
+                "name": item["name"],
+                "market": item["market"],
+                "value": item["value"],
+                "change": item["change"],
+                "change_pct": item["change_pct"],
+                "focus": item["focus"],
+                "alert_level": item.get("alert_level", "normal"),
+                "alert_text": item.get("alert_text", "当前无明显预警"),
+                "signal_summary": item.get("signal_summary", ""),
+            }
+        )
+    return boards
+
+
 def gen_watchlist_details():
+    def build_kline_series(stock_code, base_price):
+        rng = random.Random(f"kline:{stock_code}")
+        close = float(base_price) * (0.9 + rng.random() * 0.2)
+        current_date = datetime.now() - timedelta(days=33)
+        series = []
+        while len(series) < 24:
+            current_date += timedelta(days=1)
+            if current_date.weekday() >= 5:
+                continue
+            open_price = close * (1 + rng.uniform(-0.018, 0.018))
+            close_price = open_price * (1 + rng.uniform(-0.035, 0.035))
+            high_price = max(open_price, close_price) * (1 + rng.uniform(0.004, 0.022))
+            low_price = min(open_price, close_price) * (1 - rng.uniform(0.004, 0.022))
+            series.append({
+                "date": current_date.strftime("%m-%d"),
+                "open": round(open_price, 2),
+                "high": round(high_price, 2),
+                "low": round(low_price, 2),
+                "close": round(close_price, 2),
+            })
+            close = close_price
+        return series
+
     return {
         "600519": {
             "code": "600519",
@@ -130,6 +241,7 @@ def gen_watchlist_details():
             "change": 12.80,
             "change_pct": 0.76,
             "industry": "高端白酒",
+            "kline": build_kline_series("600519", 1688.20),
             "authors": [
                 {"id": 1, "name": "财经老王", "avatar": "👑", "tier": "种子作者", "angle": "消费龙头的现金流韧性仍在，核心要看估值是否已经反映需求修复。"},
                 {"id": 3, "name": "量化老师陈明", "avatar": "📊", "tier": "成长作者", "angle": "从历史分位看，当前更适合做中期配置跟踪，不建议把短期波动当趋势。"},
@@ -168,6 +280,7 @@ def gen_watchlist_details():
             "change": -3.84,
             "change_pct": -1.78,
             "industry": "动力电池",
+            "kline": build_kline_series("300750", 212.36),
             "authors": [
                 {"id": 5, "name": "新能源猎手阿强", "avatar": "⚡", "tier": "观察作者", "angle": "更重要的是看新技术路线和海外出货，而不是单日股价波动。"},
                 {"id": 4, "name": "全球宏观James", "avatar": "🌐", "tier": "成长作者", "angle": "海外需求和原材料价格波动会持续影响预期。"},
@@ -206,6 +319,7 @@ def gen_watchlist_details():
             "change": 5.60,
             "change_pct": 1.46,
             "industry": "港股互联网",
+            "kline": build_kline_series("00700", 388.40),
             "authors": [
                 {"id": 2, "name": "投资女神Lisa", "avatar": "💎", "tier": "种子作者", "angle": "广告、游戏和回购共同支撑估值修复，关键还是财报兑现。"},
                 {"id": 2, "name": "港股研究员", "avatar": "🏙️", "tier": "观察作者", "angle": "这类资产更适合中期配置，而不是追逐情绪高点。"},
@@ -244,6 +358,7 @@ def gen_watchlist_details():
             "change": 1.18,
             "change_pct": 2.60,
             "industry": "半导体制造",
+            "kline": build_kline_series("688981", 46.52),
             "authors": [
                 {"id": 1, "name": "财经老王", "avatar": "👑", "tier": "种子作者", "angle": "要拆开看产能利用率、成熟制程景气和国产替代订单，不要只看情绪。"},
                 {"id": 4, "name": "宏观策略师", "avatar": "🎯", "tier": "成长作者", "angle": "产业政策和资本开支周期决定中期想象空间。"},
@@ -282,6 +397,7 @@ def gen_watchlist_details():
             "change": 0.22,
             "change_pct": 0.53,
             "industry": "银行",
+            "kline": build_kline_series("600036", 41.86),
             "authors": [
                 {"id": 4, "name": "全球宏观James", "avatar": "🌐", "tier": "成长作者", "angle": "利率环境和资产质量是银行股的核心框架。"},
                 {"id": 3, "name": "量化老师陈明", "avatar": "📊", "tier": "成长作者", "angle": "这类资产更适合放在组合稳定器角色里看。"},
@@ -316,12 +432,54 @@ def gen_watchlist_details():
 
 def gen_news_feed():
     news = [
-        {"title": "美联储6月议息会议前瞻：降息预期升温，市场如何定价？", "tag": "宏观", "time": "10分钟前", "hot": True},
-        {"title": "【深度】新能源车渗透率突破50%，产业链投资机会梳理", "tag": "行业", "time": "32分钟前", "hot": True},
-        {"title": "高盛最新报告：A股估值修复空间测算", "tag": "券商研报", "time": "1小时前", "hot": False},
-        {"title": "专家会议纪要：某头部消费品牌Q2经营数据点评", "tag": "专家纪要", "time": "2小时前", "hot": False},
-        {"title": "另类数据：卫星图像显示主要港口吞吐量环比回升8%", "tag": "另类数据", "time": "3小时前", "hot": False},
-        {"title": "DeepSeek最新研究：AI算力需求2026年增速预测上调至180%", "tag": "科技", "time": "4小时前", "hot": True},
+        {
+            "title": "美联储6月议息会议前瞻：降息预期升温，市场如何定价？",
+            "tag": "全球要闻",
+            "time": "10分钟前",
+            "hot": True,
+            "source_group": "全球要闻",
+            "why": "它会直接影响美元、港股互联网和大宗商品的估值锚，是当前最核心的宏观变量之一。",
+        },
+        {
+            "title": "【深度】新能源车渗透率突破50%，产业链投资机会梳理",
+            "tag": "自选股相关",
+            "time": "32分钟前",
+            "hot": True,
+            "source_group": "自选股",
+            "why": "你的自选股里有动力电池样本，且当前预警点正集中在价格竞争和技术路线验证。",
+        },
+        {
+            "title": "高盛最新报告：A股估值修复空间测算",
+            "tag": "全球要闻",
+            "time": "1小时前",
+            "hot": False,
+            "source_group": "全球要闻",
+            "why": "它决定科技成长板块当前估值是不是已经提前反映乐观预期，影响面广。",
+        },
+        {
+            "title": "专家会议纪要：某头部消费品牌Q2经营数据点评",
+            "tag": "大V关注趋势",
+            "time": "2小时前",
+            "hot": False,
+            "source_group": "大V趋势",
+            "why": "与大V近期关注的消费修复和高端白酒判断高度相关，适合作为租户知识延伸阅读。",
+        },
+        {
+            "title": "另类数据：卫星图像显示主要港口吞吐量环比回升8%",
+            "tag": "全球要闻",
+            "time": "3小时前",
+            "hot": False,
+            "source_group": "全球要闻",
+            "why": "它是宏观修复是否真正落地的交叉验证项，不是普通资讯，而是影响顺周期判断的旁证。",
+        },
+        {
+            "title": "DeepSeek最新研究：AI算力需求2026年增速预测上调至180%",
+            "tag": "大V关注趋势",
+            "time": "4小时前",
+            "hot": True,
+            "source_group": "大V趋势",
+            "why": "它和当前科技成长板块的核心主线一致，也会被大V方法模板优先引用为趋势依据。",
+        },
     ]
     return news
 
@@ -580,7 +738,15 @@ def index():
 def h5():
     market = gen_market_data()
     news = gen_news_feed()
-    return render_template("h5.html", market=market, news=news)
+    macro_indicators = gen_macro_indicators()
+    feed_boards = gen_feed_boards(market)
+    return render_template(
+        "h5.html",
+        market=market,
+        news=news,
+        macro_indicators=macro_indicators,
+        feed_boards=feed_boards,
+    )
 
 @app.route("/admin")
 def admin():
@@ -589,9 +755,14 @@ def admin():
     access_stats = get_access_summary()
     return render_template("admin.html", kols=kols, segments=segments, access_stats=access_stats)
 
+@app.route("/kol-workbench")
+def kol_workbench():
+    workbench = gen_kol_workbench()
+    return render_template("kol_workbench.html", workbench=workbench)
+
 @app.route("/dashboard")
 def dashboard():
-    return redirect(url_for("admin", section="funnel"))
+    return redirect(url_for("kol_workbench"))
 
 # API endpoints
 @app.route("/api/funnel")
@@ -635,6 +806,7 @@ def api_watchlist_detail(stock_code):
         "change": 0,
         "change_pct": 0,
         "industry": "待识别",
+        "kline": [],
         "authors": [],
         "fundamental": {
             "summary": "暂无样本数据，可通过 Hermes 继续补充。",
@@ -1018,6 +1190,35 @@ def gen_kol_workbench():
             {"id":2,"content":"宏观提醒：美联储纪要偏鸽，但还要等国内资金面确认","time":"2026-05-19 22:30","reach":108,"open_rate":82},
             {"id":3,"content":"周末复盘：本周操作回顾与下周观察重点","time":"2026-05-18 18:00","reach":76,"open_rate":55},
         ],
+        "review_studio": {
+            "sources": [
+                {"icon": "🎙️", "label": "语音口述", "desc": "收盘后直接口述行业主线、关键公司和操作复盘，智能体自动转写并抽取段落。"},
+                {"icon": "✍️", "label": "手动撰写", "desc": "大V自己决定文章段落、标题和表达顺序，再交给智能体补结构和证据链。"},
+                {"icon": "📎", "label": "文件上传", "desc": "上传研报、纪要、Excel 和 PDF，由智能体统一抽取要点并生成复盘草稿。"},
+                {"icon": "🧩", "label": "选股归纳", "desc": "先锁定几支股票，再按行业板块复盘和个股投资复盘两个层次统一归纳。"},
+            ],
+            "paragraph_modes": [
+                {"label": "大V自定段落", "desc": "适合自己写主框架，只让智能体补摘要、证据链和风险提示。"},
+                {"label": "智能体成稿", "desc": "适合先交信息给智能体，自动生成完整复盘文章后再人工微调。"},
+            ],
+            "default_flow": ["选择复盘周期", "补充语音/手输/文件", "锁定行业和个股", "生成复盘草稿", "确认后发布给粉丝"],
+        },
+        "published_reviews": [
+            {
+                "title": "收盘复盘：AI 算力强主线未变，港股互联网继续看回购与财报兑现",
+                "period": "日复盘",
+                "time": "2026-06-07 18:40",
+                "tags": ["行业板块", "个股跟踪", "可直接分发"],
+                "summary": "先从全天资料压出短版提纲，再对中芯国际、腾讯控股和贵州茅台三个样本做个股投资复盘，保留主线、验证节点和下一步观察。"
+            },
+            {
+                "title": "周度复盘：科技成长维持主线，消费与新能源需要继续等景气验证",
+                "period": "周复盘",
+                "time": "2026-06-06 20:10",
+                "tags": ["周度框架", "板块归纳"],
+                "summary": "以行业板块为骨架，把 AI 算力、半导体、港股互联网、消费和新能源统一放进同一篇复盘，方便普通投资者快速查看。"
+            },
+        ],
     }
 
 @app.route("/api/dm/conversations")
@@ -1207,6 +1408,9 @@ def api_ai_forecast():
         "compute_used": 8,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
     })
+
+@app.route("/api/kol/workbench")
+def api_kol_workbench():
     return jsonify(gen_kol_workbench())
 
 @app.route("/api/kol/broadcast", methods=["POST"])

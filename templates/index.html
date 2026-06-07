@@ -178,6 +178,70 @@ body { background: var(--surface); color: var(--text-main); }
   z-index: 1;
   flex-wrap: wrap;
 }
+.hero-split-entry-grid {
+  width: min(960px, 100%);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 24px;
+  position: relative;
+  z-index: 1;
+}
+.hero-split-entry {
+  text-align: left;
+  text-decoration: none;
+  background: rgba(12, 24, 38, 0.72);
+  border: 1px solid rgba(200,169,110,0.16);
+  border-radius: 18px;
+  padding: 22px 24px;
+  box-shadow: 0 18px 44px rgba(3, 10, 20, 0.22);
+  backdrop-filter: blur(10px);
+  transition: transform .24s ease, border-color .24s ease, box-shadow .24s ease;
+}
+.hero-split-entry:hover {
+  transform: translateY(-4px);
+  border-color: rgba(200,169,110,0.38);
+  box-shadow: 0 24px 56px rgba(3, 10, 20, 0.28);
+}
+.hero-split-entry-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.hero-split-entry-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  background: rgba(200,169,110,0.12);
+  color: var(--gold);
+}
+.hero-split-entry-tag {
+  font-size: 11px;
+  color: var(--gold);
+  letter-spacing: 1px;
+}
+.hero-split-entry-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--white);
+  margin-top: 14px;
+}
+.hero-split-entry-desc {
+  font-size: 13px;
+  color: var(--gray-400);
+  line-height: 1.8;
+  margin-top: 8px;
+}
+.hero-split-entry-arrow {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--gold);
+}
 .mountain-label {
   font-size: 11px;
   color: rgba(200,169,110,0.3);
@@ -192,7 +256,7 @@ body { background: var(--surface); color: var(--text-main); }
 ======================================================== */
 .nav-cards-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 24px;
 }
 .ix-nav-card {
@@ -689,6 +753,7 @@ body.theme-dark .tech-layer {
 @media (max-width: 900px) {
   .ix-section { padding: 60px 20px; }
   .ix-section-title { font-size: 24px; }
+  .hero-split-entry-grid { grid-template-columns: 1fr; }
   .nav-cards-grid { grid-template-columns: 1fr; }
   .biz-model-wrap { grid-template-columns: 1fr; }
   .biz-col-center { display: none; }
@@ -749,7 +814,7 @@ body.theme-dark .tech-layer {
   <div class="hero-tagline">聚焦复盘、基本面分析、自选股诊断与证据链输出的智能投研能力</div>
   <div class="hero-desc">
     当前定位不是泛金融 SaaS，而是 Gandis 生态外部的第三方研究工具与服务层<br>
-    面向普通投资者、大V投顾租户和平台 Admin 提供多租户隔离、按需基本面、租户知识板块与合规表达能力
+    面向普通投资者、大V投顾租户和平台 Admin 提供多角色隔离、按需基本面、工作台协同与合规表达能力
   </div>
 
   <div class="hero-kpi-row">
@@ -773,7 +838,28 @@ body.theme-dark .tech-layer {
 
   <div class="hero-cta-row">
     <a href="/h5" class="btn-gold" style="text-decoration:none;font-size:14px;padding:12px 32px">体验产品原型</a>
-    <a href="/admin?section=funnel" class="btn-outline" style="text-decoration:none;font-size:14px;padding:12px 32px">查看验证看板</a>
+    <a href="#modules" class="btn-outline" style="text-decoration:none;font-size:14px;padding:12px 32px">查看系统入口</a>
+  </div>
+
+  <div class="hero-split-entry-grid">
+    <a href="/kol-workbench" class="hero-split-entry">
+      <div class="hero-split-entry-top">
+        <span class="hero-split-entry-icon">👑</span>
+        <span class="hero-split-entry-tag">KOL WORKBENCH</span>
+      </div>
+      <div class="hero-split-entry-title">大V 工作台 Web</div>
+      <div class="hero-split-entry-desc">给大V投顾单独使用的 web 工作台，处理粉丝消息、群发助手、协同收入和租户内研究经营动作。</div>
+      <div class="hero-split-entry-arrow">直接进入工作台 →</div>
+    </a>
+    <a href="/admin" class="hero-split-entry">
+      <div class="hero-split-entry-top">
+        <span class="hero-split-entry-icon">⚙️</span>
+        <span class="hero-split-entry-tag">PLATFORM ADMIN</span>
+      </div>
+      <div class="hero-split-entry-title">纯 Admin 后台</div>
+      <div class="hero-split-entry-desc">给平台运营和管理方使用的后台，承接功能控开、租户管理、审计、结算、渠道和平台级分析。</div>
+      <div class="hero-split-entry-arrow">直接进入 Admin →</div>
+    </a>
   </div>
 
   <div class="mountain-label">▲ ▲ ▲ &nbsp; 洞见智研山脉 · 海拔6656米 &nbsp; ▲ ▲ ▲</div>
@@ -788,7 +874,7 @@ body.theme-dark .tech-layer {
     <div class="ix-section-label">System Modules</div>
     <div class="ix-section-title">系统模块导航</div>
     <div class="ix-divider"></div>
-    <div class="ix-section-desc">三大核心系统协同运作，重点放在研究工具层、多租户服务和角色隔离能力，而不是堆叠表层功能。</div>
+    <div class="ix-section-desc">现在拆成四个清晰入口，普通用户端、大V 工作台 Web、平台 Admin 后台和平台分析后台彼此分层，不再混用。</div>
 
     <div class="nav-cards-grid">
       <a href="/h5" class="ix-nav-card">
@@ -797,16 +883,22 @@ body.theme-dark .tech-layer {
         <div class="ix-nav-card-desc">前台围绕基本面分析、自选股、每日复盘与研究互动展开，提供清晰、低风险、可理解的投研体验。</div>
         <div class="ix-nav-card-arrow">进入体验 →</div>
       </a>
+      <a href="/kol-workbench" class="ix-nav-card">
+        <div class="ix-nav-card-icon">👑</div>
+        <div class="ix-nav-card-title">大V 工作台 Web</div>
+        <div class="ix-nav-card-desc">独立给大V投顾使用的 web 版后台，承接粉丝消息、群发助手、协同收入和租户内研究经营动作。</div>
+        <div class="ix-nav-card-arrow">进入工作台 →</div>
+      </a>
       <a href="/admin" class="ix-nav-card">
         <div class="ix-nav-card-icon">⚙️</div>
-        <div class="ix-nav-card-title">中后台管理</div>
-        <div class="ix-nav-card-desc">除了主题和功能控开，还要管理合作推进、分成结算、敏感词过滤、证据链模板、租户知识板块和合规表达。</div>
-        <div class="ix-nav-card-arrow">进入管理 →</div>
+        <div class="ix-nav-card-title">纯 Admin 后台</div>
+        <div class="ix-nav-card-desc">只保留平台级控制台职责，包括功能控开、租户管理、结算、审计、渠道和全局合规策略，不再承接大V日常工作流。</div>
+        <div class="ix-nav-card-arrow">进入 Admin →</div>
       </a>
       <a href="/admin?section=funnel" class="ix-nav-card">
         <div class="ix-nav-card-icon">📊</div>
-        <div class="ix-nav-card-title">后台数据分析</div>
-        <div class="ix-nav-card-desc">重点看线索推进、价格反馈、合作效率、合规状态和漏斗变化。首页保留入口，但数据分析已统一并入 admin 分组管理。</div>
+        <div class="ix-nav-card-title">平台分析后台</div>
+        <div class="ix-nav-card-desc">重点看线索推进、价格反馈、合作效率、合规状态和漏斗变化。这里仍归属于 Admin，但单独保留分析入口。</div>
         <div class="ix-nav-card-arrow">进入分析分组 →</div>
       </a>
     </div>
@@ -1688,8 +1780,9 @@ body.theme-dark .tech-layer {
       <div>
         <div class="footer-col-title">产品</div>
         <a href="/h5" class="footer-col-link">H5 用户端</a>
-        <a href="/admin" class="footer-col-link">中后台管理</a>
-        <a href="/admin?section=funnel" class="footer-col-link">后台数据分析</a>
+        <a href="/kol-workbench" class="footer-col-link">大V 工作台 Web</a>
+        <a href="/admin" class="footer-col-link">纯 Admin 后台</a>
+        <a href="/admin?section=funnel" class="footer-col-link">平台分析后台</a>
         <a href="/prd" class="footer-col-link">产品设计文档</a>
       </div>
       <div>
@@ -1701,9 +1794,9 @@ body.theme-dark .tech-layer {
       </div>
       <div>
         <div class="footer-col-title">后台控制</div>
-        <a href="/admin" class="footer-col-link">默认主题模式</a>
-        <a href="/admin" class="footer-col-link">主题色配置</a>
-        <a href="/admin" class="footer-col-link">功能开关</a>
+        <a href="/admin" class="footer-col-link">平台主题模式</a>
+        <a href="/admin" class="footer-col-link">平台功能控开</a>
+        <a href="/kol-workbench" class="footer-col-link">大V 工作流入口</a>
         <a href="/admin" class="footer-col-link">访问统计</a>
       </div>
     </div>

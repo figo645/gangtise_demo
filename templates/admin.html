@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>洞见智研 — 运营管理中心</title>
+<title>洞见智研 — 纯 Admin 后台</title>
 <link rel="stylesheet" href="/static/css/style.css">
 <script>
   window.SITE_CONFIG = {{ site_config | tojson }};
@@ -157,7 +157,7 @@
   <div class="admin-sidebar">
     <div class="admin-logo">
       <div class="admin-logo-text">洞见智研</div>
-      <div class="admin-logo-sub">平台管理中心</div>
+      <div class="admin-logo-sub">纯 Admin 平台后台</div>
     </div>
     <nav class="admin-nav">
       <div class="admin-nav-group">
@@ -1937,7 +1937,7 @@
               <label class="toggle"><input id="feature-dm" type="checkbox"><span class="toggle-slider"></span></label>
             </div>
             <div class="toggle-wrap">
-              <span class="toggle-label">大V工作台</span>
+              <span class="toggle-label">大V 工作台 Web</span>
               <label class="toggle"><input id="feature-workbench" type="checkbox"><span class="toggle-slider"></span></label>
             </div>
             <div class="feature-note">
@@ -1945,17 +1945,17 @@
             </div>
           </div>
           <div class="config-card">
-            <div class="config-card-title">对外策略说明</div>
+            <div class="config-card-title">平台发布策略</div>
             <div class="config-field">
               <label>当前首发范围</label>
-              <input type="text" value="基本面分析 / 自选股 / 复盘专区 / 知识专区（默认） + Hermes / 社区 / 大V工作台" readonly>
+              <input type="text" value="基本面分析 / 自选股 / 复盘专区 + Hermes / 社区 / 大V 工作台 Web" readonly>
             </div>
             <div class="config-field">
               <label>策略备注</label>
-              <input type="text" value="聚焦消息沉淀后的复盘整理、知识沉淀、基本面分析、Hermes 与证据链输出" readonly>
+              <input type="text" value="平台 Admin 负责能力控开与边界治理，大V 日常经营动作迁移到独立 web 工作台" readonly>
             </div>
             <div class="feature-note">
-              这套配置适合围绕核心研究能力做验证，同时并行推进 NDA、新数据接入、敏感词模板和备案事项。
+              这套配置只描述平台视角的发布与控开，不再把大V 的日常消息、群发和协同动作混在 Admin 后台里。
             </div>
           </div>
           <div class="config-card">
@@ -1973,17 +1973,17 @@
             </div>
           </div>
           <div class="config-card">
-            <div class="config-card-title">知识板块输入源</div>
+            <div class="config-card-title">租户研究资料输入源</div>
             <div class="config-field">
               <label>支持渠道</label>
               <input type="text" value="大V语音输入 / 文件上传 / 网页URL" readonly>
             </div>
             <div class="config-field">
-              <label>知识资产用途</label>
-              <input type="text" value="形成大V租户独有知识，并同步到前台知识专区、按需基本面与个性化自选股分析" readonly>
+              <label>资料用途</label>
+              <input type="text" value="形成租户研究资料底座，并同步到按需基本面、自选股分析与工作台研究记录" readonly>
             </div>
             <div class="feature-note">
-              知识板块支持 H5 前台和 admin 后台共用，主理投顾可通过语音输入、文件上传、网页URL沉淀专属框架与纪要资料，并按规则同步到知识专区。
+              Admin 在这里配置的是资料输入权限和同步规则，实际的大V 日常使用入口已经拆到独立的 web 工作台。
             </div>
           </div>
           <div class="config-card">

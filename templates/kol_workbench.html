@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>洞见智研 — 大V工作台</title>
+<link rel="stylesheet" href="/static/css/style.css">
+<script>
+  window.SITE_CONFIG = {{ site_config | tojson }};
+</script>
+<script src="/static/js/theme.js"></script>
+<style>
+body { background: var(--surface-2); color: var(--text-main); }
+.kw-shell { min-height: 100vh; background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%); }
+.kw-topbar {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:24px 32px;
+  border-bottom:1px solid rgba(200,169,110,0.10);
+  background:rgba(255,255,255,0.78);
+  backdrop-filter: blur(10px);
+  position:sticky;
+  top:0;
+  z-index:20;
+}
+.kw-brand-title { font-size:22px; font-weight:700; color:var(--text-main); }
+.kw-brand-sub { font-size:12px; color:var(--text-sub); margin-top:4px; }
+.kw-topbar-actions { display:flex; gap:10px; flex-wrap:wrap; }
+.kw-wrap { max-width:1280px; margin:0 auto; padding:28px 32px 40px; }
+.kw-hero {
+  background:linear-gradient(135deg, rgba(200,169,110,0.14), rgba(47,116,192,0.08));
+  border:1px solid rgba(200,169,110,0.18);
+  border-radius:18px;
+  padding:24px;
+  display:grid;
+  grid-template-columns:1.2fr 0.8fr;
+  gap:20px;
+  margin-bottom:20px;
+}
+.kw-hero-title { font-size:26px; font-weight:700; color:var(--text-main); }
+.kw-hero-desc { font-size:13px; color:var(--text-sub); line-height:1.8; margin-top:8px; max-width:720px; }
+.kw-chip-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; }
+.kw-chip {
+  font-size:11px;
+  color:var(--gold);
+  background:rgba(255,255,255,0.62);
+  border:1px solid rgba(200,169,110,0.16);
+  border-radius:999px;
+  padding:5px 10px;
+}
+.kw-side-card {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  padding:16px;
+  box-shadow:0 8px 24px rgba(31,73,125,0.06);
+}
+.kw-side-title { font-size:13px; font-weight:700; color:var(--gold); margin-bottom:10px; }
+.kw-side-item { display:flex; justify-content:space-between; gap:10px; font-size:12px; color:var(--text-sub); padding:8px 0; border-bottom:1px solid rgba(47,116,192,0.08); }
+.kw-side-item:last-child { border-bottom:none; padding-bottom:0; }
+.kw-side-item strong { color:var(--text-main); font-size:18px; }
+.kw-grid { display:grid; grid-template-columns:1.2fr 0.8fr; gap:20px; }
+.kw-col { display:grid; gap:20px; align-content:start; }
+.kw-card {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:16px;
+  padding:18px;
+  box-shadow:0 8px 24px rgba(31,73,125,0.06);
+}
+.kw-card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:14px; }
+.kw-card-title { font-size:16px; font-weight:700; color:var(--text-main); }
+.kw-card-desc { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:4px; }
+.kw-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+.kw-stat {
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  padding:14px;
+}
+.kw-stat-label { font-size:11px; color:var(--text-sub); }
+.kw-stat-value { font-size:24px; font-weight:700; color:var(--gold); margin-top:6px; }
+.kw-stat-note { font-size:11px; color:var(--text-sub); margin-top:6px; }
+.kw-fan-list,
+.kw-broadcast-list { display:grid; gap:10px; }
+.kw-fan-item,
+.kw-broadcast-item {
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  padding:14px;
+}
+.kw-fan-top,
+.kw-broadcast-top { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+.kw-fan-name,
+.kw-broadcast-content { font-size:13px; color:var(--text-main); font-weight:600; }
+.kw-fan-msg { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:8px; }
+.kw-fan-meta,
+.kw-broadcast-meta { font-size:11px; color:var(--text-sub); margin-top:8px; line-height:1.6; }
+.kw-tag {
+  flex-shrink:0;
+  font-size:10px;
+  color:var(--gold);
+  background:rgba(200,169,110,0.12);
+  border:1px solid rgba(200,169,110,0.20);
+  border-radius:999px;
+  padding:4px 8px;
+}
+.kw-action-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.kw-action {
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  padding:14px;
+}
+.kw-action-title { font-size:13px; font-weight:700; color:var(--text-main); }
+.kw-action-desc { font-size:11px; color:var(--text-sub); line-height:1.7; margin-top:6px; }
+.kw-toolbar { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+.kw-review-source-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.kw-review-source,
+.kw-review-mode-item {
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  padding:14px;
+}
+.kw-review-source-icon { font-size:20px; margin-bottom:10px; }
+.kw-review-source-title,
+.kw-review-mode-title { font-size:13px; font-weight:700; color:var(--text-main); }
+.kw-review-source-desc,
+.kw-review-mode-desc { font-size:11px; color:var(--text-sub); line-height:1.7; margin-top:6px; }
+.kw-review-flow { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+.kw-review-flow-step {
+  font-size:11px;
+  color:var(--gold);
+  background:rgba(200,169,110,0.10);
+  border:1px solid rgba(200,169,110,0.18);
+  border-radius:999px;
+  padding:5px 10px;
+}
+.kw-review-mode-list { display:grid; gap:8px; }
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%) translateY(12px);
+  background: rgba(13, 27, 42, 0.92);
+  color: #fff;
+  border: 1px solid rgba(200,169,110,0.24);
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 12px;
+  box-shadow: 0 12px 32px rgba(13, 27, 42, 0.22);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease;
+  z-index: 40;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+@media (max-width: 980px) {
+  .kw-hero,
+  .kw-grid { grid-template-columns:1fr; }
+  .kw-stats { grid-template-columns:1fr 1fr; }
+  .kw-review-source-grid { grid-template-columns:1fr; }
+}
+@media (max-width: 640px) {
+  .kw-topbar,
+  .kw-wrap { padding-left:16px; padding-right:16px; }
+  .kw-stats,
+  .kw-action-grid { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body onload="initGangtiseTheme()">
+<div class="kw-shell">
+  <div class="kw-topbar">
+    <div>
+      <div class="kw-brand-title">{{ workbench.kol_name }} · 大V工作台</div>
+      <div class="kw-brand-sub">独立的 web 工作台入口，专门服务大V投顾，不与平台 Admin 后台混用。</div>
+    </div>
+    <div class="kw-topbar-actions">
+      <a href="/h5" class="btn-outline" style="text-decoration:none;padding:9px 14px;font-size:12px">前往 H5</a>
+      <a href="/admin" class="btn-outline" style="text-decoration:none;padding:9px 14px;font-size:12px">纯 Admin 后台</a>
+      <a href="/" class="btn-gold" style="text-decoration:none;padding:9px 14px;font-size:12px">返回首页</a>
+    </div>
+  </div>
+
+  <div class="kw-wrap">
+    <div class="kw-hero">
+      <div>
+        <div class="kw-hero-title">面向大V的专属工作台 Web 应用</div>
+        <div class="kw-hero-desc">这里承接的是大V自己的日常动作：处理粉丝消息、查看协同收入、做群发、管理研究输出和跟踪高频用户，不再和平台级的功能控开、审计、结算后台混在一起。</div>
+        <div class="kw-chip-row">
+          <span class="kw-chip">粉丝消息</span>
+          <span class="kw-chip">群发助手</span>
+          <span class="kw-chip">研究协同</span>
+          <span class="kw-chip">租户内运营</span>
+        </div>
+      </div>
+      <div class="kw-side-card">
+        <div class="kw-side-title">当前租户摘要</div>
+        <div class="kw-side-item"><span>主理人</span><strong>{{ workbench.kol_name }}</strong></div>
+        <div class="kw-side-item"><span>合作阶段</span><span>{{ workbench.tier }}</span></div>
+        <div class="kw-side-item"><span>待回复消息</span><span>{{ workbench.stats.pending_replies }} 条</span></div>
+        <div class="kw-side-item"><span>未读粉丝会话</span><span>{{ workbench.stats.unread_messages }} 条</span></div>
+      </div>
+    </div>
+
+    <div class="kw-card" style="margin-bottom:20px">
+      <div class="kw-card-head">
+        <div>
+          <div class="kw-card-title">核心看板</div>
+          <div class="kw-card-desc">这里是大V最常打开的一层信息，不放平台级配置，只保留个人工作台的日常经营数据。</div>
+        </div>
+        <span class="kw-tag">Web 工作台</span>
+      </div>
+      <div class="kw-stats">
+        <div class="kw-stat">
+          <div class="kw-stat-label">总关注样本</div>
+          <div class="kw-stat-value">{{ "{:,}".format(workbench.stats.total_followers) }}</div>
+          <div class="kw-stat-note">当前租户累计</div>
+        </div>
+        <div class="kw-stat">
+          <div class="kw-stat-label">高频付费用户</div>
+          <div class="kw-stat-value">{{ workbench.stats.vip_subscribers }}</div>
+          <div class="kw-stat-note">重点服务对象</div>
+        </div>
+        <div class="kw-stat">
+          <div class="kw-stat-label">本月协同收入</div>
+          <div class="kw-stat-value">¥{{ "{:,}".format(workbench.stats.monthly_revenue) }}</div>
+          <div class="kw-stat-note">环比 +{{ workbench.stats.revenue_change }}%</div>
+        </div>
+        <div class="kw-stat">
+          <div class="kw-stat-label">今日浏览 / 互动率</div>
+          <div class="kw-stat-value">{{ workbench.stats.today_views }}</div>
+          <div class="kw-stat-note">互动率 {{ workbench.stats.engagement_rate }}%</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="kw-grid">
+      <div class="kw-col">
+        <div class="kw-card">
+          <div class="kw-card-head">
+            <div>
+              <div class="kw-card-title">粉丝消息</div>
+              <div class="kw-card-desc">作为 web 版工作台，这里优先展示最近需要处理的高频用户消息。</div>
+            </div>
+            <span class="kw-tag">{{ workbench.stats.pending_replies }} 条待处理</span>
+          </div>
+          <div class="kw-fan-list">
+            {% for fan in workbench.recent_fans %}
+            <div class="kw-fan-item">
+              <div class="kw-fan-top">
+                <div class="kw-fan-name">{{ fan.name }}</div>
+                <span class="kw-tag">{{ fan.tier }}</span>
+              </div>
+              <div class="kw-fan-msg">{{ fan.msg }}</div>
+              <div class="kw-fan-meta">{{ fan.time }}</div>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="kw-toolbar">
+            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="showToast('消息中心开发中')">进入消息中心</button>
+            <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="showToast('批量标记已读开发中')">批量标记已读</button>
+          </div>
+        </div>
+
+        <div class="kw-card">
+          <div class="kw-card-head">
+            <div>
+              <div class="kw-card-title">最近群发</div>
+              <div class="kw-card-desc">把大V高频使用的群发记录独立出来，和平台运营活动隔离。</div>
+            </div>
+            <span class="kw-tag">群发助手</span>
+          </div>
+          <div class="kw-broadcast-list">
+            {% for item in workbench.broadcast_history %}
+            <div class="kw-broadcast-item">
+              <div class="kw-broadcast-top">
+                <div class="kw-broadcast-content">{{ item.content }}</div>
+                <span class="kw-tag">触达 {{ item.reach }}</span>
+              </div>
+              <div class="kw-broadcast-meta">{{ item.time }} · 打开率 {{ item.open_rate }}%</div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="kw-card">
+          <div class="kw-card-head">
+            <div>
+              <div class="kw-card-title">复盘生产台</div>
+              <div class="kw-card-desc">复盘由大V发起和确认。材料既可以来自语音、手输和文件上传，也可以先从大量自选股里挑出本次要纳入的样本，再分别生成行业板块复盘和个股投资复盘。</div>
+            </div>
+            <span class="kw-tag">Review Studio</span>
+          </div>
+          <div class="kw-review-source-grid">
+            {% for item in workbench.review_studio.sources %}
+            <div class="kw-review-source">
+              <div class="kw-review-source-icon">{{ item.icon }}</div>
+              <div class="kw-review-source-title">{{ item.label }}</div>
+              <div class="kw-review-source-desc">{{ item.desc }}</div>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="kw-review-flow">
+            {% for step in workbench.review_studio.default_flow %}
+            <span class="kw-review-flow-step">{{ step }}</span>
+            {% endfor %}
+          </div>
+          <div class="kw-toolbar">
+            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="showToast('复盘草稿生成中')">发起新复盘</button>
+            <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="showToast('语音录入面板开发中')">语音导入</button>
+            <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="showToast('上传文件面板开发中')">上传文件</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="kw-col">
+        <div class="kw-card">
+          <div class="kw-card-head">
+            <div>
+              <div class="kw-card-title">文章成稿方式</div>
+              <div class="kw-card-desc">大V可以自己决定文章段落内容，也可以只提供信息交给智能体完成整篇复盘草稿。</div>
+            </div>
+            <span class="kw-tag">Paragraph Control</span>
+          </div>
+          <div class="kw-review-mode-list">
+            {% for item in workbench.review_studio.paragraph_modes %}
+            <div class="kw-review-mode-item">
+              <div class="kw-review-mode-title">{{ item.label }}</div>
+              <div class="kw-review-mode-desc">{{ item.desc }}</div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="kw-card">
+          <div class="kw-card-head">
+            <div>
+              <div class="kw-card-title">快捷动作</div>
+              <div class="kw-card-desc">web 工作台优先放大V每天真的会点的动作。</div>
+            </div>
+            <span class="kw-tag">Quick Actions</span>
+          </div>
+          <div class="kw-action-grid">
+            <div class="kw-action">
+              <div class="kw-action-title">发布今日解读</div>
+              <div class="kw-action-desc">继续承接基本面面板、复盘摘要和租户内研究输出。</div>
+            </div>
+            <div class="kw-action">
+              <div class="kw-action-title">发起群发</div>
+              <div class="kw-action-desc">面向留资用户或高频用户做分层触达。</div>
+            </div>
+            <div class="kw-action">
+              <div class="kw-action-title">处理 Hermes 记录</div>
+              <div class="kw-action-desc">查看粉丝近期分析偏好，沉淀到租户画像。</div>
+            </div>
+            <div class="kw-action">
+              <div class="kw-action-title">查看协同收入</div>
+              <div class="kw-action-desc">只看与自己相关的经营结果，不混平台总表。</div>
+            </div>
+          </div>
+          <div class="kw-toolbar">
+            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="showToast('工作台功能持续补充中')">进入工作流程</button>
+          </div>
+        </div>
+
+        <div class="kw-card">
+          <div class="kw-card-head">
+            <div>
+              <div class="kw-card-title">最近已发布复盘</div>
+              <div class="kw-card-desc">普通投资者在前台看到的，就是这里确认发布后的复盘内容。</div>
+            </div>
+            <span class="kw-tag">Published</span>
+          </div>
+          <div class="kw-broadcast-list">
+            {% for item in workbench.published_reviews %}
+            <div class="kw-broadcast-item">
+              <div class="kw-broadcast-top">
+                <div class="kw-broadcast-content">{{ item.title }}</div>
+                <span class="kw-tag">{{ item.period }}</span>
+              </div>
+              <div class="kw-broadcast-meta">{{ item.time }} · {{ item.summary }}</div>
+              <div class="kw-chip-row" style="margin-top:10px">
+                {% for tag in item.tags %}
+                <span class="kw-chip">{{ tag }}</span>
+                {% endfor %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="kw-card">
+          <div class="kw-card-head">
+            <div>
+              <div class="kw-card-title">边界说明</div>
+              <div class="kw-card-desc">这套页面只属于大V自己的后台 web 应用，不再混入平台 Admin 的功能。</div>
+            </div>
+            <span class="kw-tag">Role Split</span>
+          </div>
+          <div class="kw-fan-list">
+            <div class="kw-fan-item">
+              <div class="kw-fan-name">平台 Admin 保留</div>
+              <div class="kw-fan-msg">功能控开、访问审计、活动管理、平台级用户与渠道管理。</div>
+            </div>
+            <div class="kw-fan-item">
+              <div class="kw-fan-name">大V工作台保留</div>
+              <div class="kw-fan-msg">粉丝消息、群发、个人协同收入、租户内研究经营动作。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+function showToast(message) {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(window.__kwToastTimer);
+  window.__kwToastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+}
+</script>
+</body>
+</html>
