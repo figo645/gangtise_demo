@@ -111,6 +111,21 @@ body { background: var(--surface-2); color: var(--text-main); }
 .hermes-logo { font-size:20px; font-weight:700; color:var(--gold); letter-spacing:1px; }
 .hermes-subtitle { font-size:11px; color:var(--gray-400); margin-top:2px; line-height:1.5; }
 .hermes-credits { font-size:12px; color:var(--gold); background:rgba(200,169,110,0.1); padding:4px 10px; border-radius:12px; border:1px solid rgba(200,169,110,0.2); white-space:nowrap; }
+.hermes-demo-toggle { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+.hermes-demo-pill {
+  border:none;
+  background:rgba(47,116,192,0.08);
+  color:#1F497D;
+  border-radius:999px;
+  padding:6px 10px;
+  font-size:10px;
+  font-weight:700;
+  cursor:pointer;
+}
+.hermes-demo-pill.active {
+  background:linear-gradient(135deg,var(--gold-dark),var(--gold));
+  color:#FFFFFF;
+}
 .hermes-header,
 .hermes-workspace,
 .hermes-assistant-card {
@@ -118,39 +133,59 @@ body { background: var(--surface-2); color: var(--text-main); }
   box-sizing:border-box;
   max-width:100%;
 }
-.hermes-workspace { padding:14px 0 0; display:grid; gap:14px; }
+.hermes-workspace { padding:12px 0 0; display:grid; gap:12px; min-width:0; }
 .hermes-assistant-card {
   background:#FFFFFF;
   border:1px solid rgba(47,116,192,0.12);
   border-radius:18px;
-  padding:16px;
+  padding:12px;
   box-shadow:0 12px 28px rgba(31,73,125,0.08);
   overflow:hidden;
+  min-width:0;
 }
-.hermes-assistant-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:12px; }
+.hermes-version-panel { display:none; min-width:0; }
+.hermes-version-panel.active { display:block; }
+.hermes-assistant-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:8px; }
 .hermes-assistant-head > div:first-child { min-width:0; }
-.hermes-assistant-title { font-size:18px; font-weight:700; color:var(--text-main); }
-.hermes-assistant-desc { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:4px; }
+.hermes-assistant-title { font-size:16px; font-weight:700; color:var(--text-main); }
+.hermes-assistant-desc { font-size:10px; color:var(--text-sub); line-height:1.5; margin-top:3px; }
 .hermes-assistant-tag {
   flex-shrink:0;
-  font-size:10px;
+  font-size:9px;
   color:#1F497D;
   background:rgba(47,116,192,0.08);
   border:1px solid rgba(47,116,192,0.14);
   border-radius:999px;
-  padding:5px 10px;
+  padding:4px 8px;
 }
-.hermes-toolbar { display:grid; gap:12px; }
-.hermes-stock-input-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; }
+.hermes-toolbar { display:grid; gap:8px; min-width:0; overflow:hidden; }
+.hermes-control-row { display:flex; gap:8px; align-items:center; min-width:0; }
+.hermes-control-row.wrap { flex-wrap:wrap; }
+.hermes-stock-input-row { display:grid; grid-template-columns:minmax(0,92px) minmax(0,1fr) auto; gap:8px; align-items:center; min-width:0; width:100%; }
+.hermes-stock-mini {
+  min-width:0;
+  width:100%;
+  border:1px solid rgba(47,116,192,0.12);
+  background:#F3F8FE;
+  color:#1F497D;
+  border-radius:999px;
+  padding:8px 10px;
+  font-size:10px;
+  line-height:1;
+  text-align:center;
+  white-space:nowrap;
+}
 .hermes-stock-input {
   width:100%;
   border:1px solid rgba(47,116,192,0.18);
-  border-radius:12px;
-  padding:12px 14px;
-  font-size:14px;
+  border-radius:999px;
+  padding:9px 11px;
+  font-size:12px;
   color:var(--text-main);
   background:#F7FBFF;
   outline:none;
+  min-width:0;
+  box-sizing:border-box;
 }
 .hermes-stock-input:focus,
 .hermes-question-input:focus {
@@ -160,9 +195,9 @@ body { background: var(--surface-2); color: var(--text-main); }
 .hermes-stock-btn,
 .hermes-analyze-btn {
   border:none;
-  border-radius:12px;
-  padding:0 16px;
-  font-size:13px;
+  border-radius:999px;
+  padding:0 14px;
+  font-size:12px;
   font-weight:700;
   cursor:pointer;
 }
@@ -170,20 +205,21 @@ body { background: var(--surface-2); color: var(--text-main); }
   background:#EAF3FF;
   color:#1F497D;
   border:1px solid rgba(47,116,192,0.12);
+  min-height:34px;
 }
-.hermes-stock-picks { display:flex; gap:8px; overflow-x:auto; padding-top:2px; scrollbar-width:none; max-width:100%; }
+.hermes-stock-picks { display:flex; gap:6px; overflow-x:auto; padding-top:2px; scrollbar-width:none; max-width:100%; min-width:0; }
 .hermes-stock-picks::-webkit-scrollbar { display:none; }
 .hermes-stock-pick {
   flex-shrink:0;
-  background:#F7FBFF;
+  background:#FFFFFF;
   border:1px solid rgba(47,116,192,0.10);
-  border-radius:12px;
-  padding:9px 12px;
+  border-radius:999px;
+  padding:6px 9px;
   cursor:pointer;
-  min-width:112px;
+  min-width:0;
 }
-.hermes-stock-pick-name { font-size:13px; font-weight:700; color:var(--text-main); }
-.hermes-stock-pick-meta { font-size:10px; color:var(--text-sub); margin-top:4px; }
+.hermes-stock-pick-name { font-size:11px; font-weight:700; color:var(--text-main); }
+.hermes-stock-pick-meta { display:none; }
 .hermes-skills-head { display:flex; justify-content:space-between; align-items:center; gap:10px; }
 .hermes-skills-title { font-size:12px; font-weight:700; color:var(--text-main); }
 .hermes-skill-actions { display:flex; gap:8px; align-items:center; }
@@ -191,100 +227,105 @@ body { background: var(--surface-2); color: var(--text-main); }
   border:none;
   background:#F3F8FE;
   color:#1F497D;
-  border-radius:10px;
-  padding:8px 12px;
-  font-size:12px;
+  border-radius:999px;
+  padding:7px 11px;
+  font-size:11px;
   font-weight:700;
   cursor:pointer;
 }
-.hermes-skill-grid { display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; max-width:100%; }
+.hermes-skill-grid { display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; max-width:100%; min-width:0; }
 .hermes-skill-grid::-webkit-scrollbar { display:none; }
 .hermes-skill-chip {
   flex-shrink:0;
-  background:#F8FBFF;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  background:#FFFFFF;
   border:1px solid rgba(47,116,192,0.10);
-  border-radius:14px;
-  padding:12px;
+  border-radius:999px;
+  padding:6px 9px;
   cursor:pointer;
   transition:all 0.2s ease;
-  min-width:164px;
-  max-width:220px;
+  min-width:0;
+  max-width:none;
 }
 .hermes-skill-chip.active {
   border-color:#2F74C0;
   background:linear-gradient(150deg,rgba(47,116,192,0.12),rgba(47,116,192,0.04));
-  box-shadow:0 10px 20px rgba(47,116,192,0.10);
+  box-shadow:0 8px 16px rgba(47,116,192,0.08);
 }
-.hermes-skill-chip-top { display:flex; align-items:center; gap:8px; }
 .hermes-skill-icon {
-  width:32px;
-  height:32px;
-  border-radius:10px;
+  width:20px;
+  height:20px;
+  border-radius:999px;
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:16px;
+  font-size:11px;
   background:rgba(47,116,192,0.10);
 }
-.hermes-skill-name { font-size:13px; font-weight:700; color:var(--text-main); }
-.hermes-skill-desc { font-size:11px; color:var(--text-sub); line-height:1.6; margin-top:8px; }
-.hermes-skill-meta { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.hermes-skill-name { font-size:11px; font-weight:700; color:var(--text-main); white-space:nowrap; }
+.hermes-skill-desc { display:none; }
+.hermes-skill-meta { display:none; }
 .hermes-skill-meta-chip {
-  font-size:10px;
+  font-size:9px;
   color:#2F74C0;
   background:rgba(47,116,192,0.08);
   border-radius:999px;
-  padding:4px 8px;
+  padding:3px 6px;
 }
 .hermes-context-box {
   background:#F8FBFF;
   border:1px solid rgba(47,116,192,0.10);
   border-radius:14px;
-  padding:12px;
+  padding:8px 10px;
+  min-width:0;
 }
-.hermes-context-title { font-size:12px; font-weight:700; color:var(--text-main); }
-.hermes-context-desc { font-size:11px; color:var(--text-sub); line-height:1.7; margin-top:4px; }
+.hermes-context-title { font-size:11px; font-weight:700; color:var(--text-main); }
+.hermes-context-desc { display:none; }
 .hermes-context-chip-row { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
 .hermes-context-chip {
-  font-size:10px;
+  font-size:9px;
   color:#1F497D;
   background:#EAF3FF;
   border-radius:999px;
-  padding:4px 8px;
+  padding:3px 7px;
 }
-.hermes-suggestion-row { display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; scrollbar-width:none; max-width:100%; }
+.hermes-suggestion-row { display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; scrollbar-width:none; max-width:100%; min-width:0; flex:1; }
 .hermes-suggestion-row::-webkit-scrollbar { display:none; }
 .hermes-suggestion-chip {
   flex-shrink:0;
-  font-size:11px;
+  font-size:10px;
   color:#1F497D;
   background:#F3F8FE;
   border:1px solid rgba(47,116,192,0.12);
   border-radius:999px;
-  padding:7px 12px;
+  padding:5px 9px;
   cursor:pointer;
   white-space:nowrap;
 }
-.hermes-chat-thread { display:grid; gap:12px; margin-top:2px; }
+.hermes-chat-thread { display:grid; gap:12px; margin-top:2px; min-width:0; overflow:hidden; }
 .hermes-chat-empty {
   background:#F8FBFF;
   border:1px dashed rgba(47,116,192,0.18);
   border-radius:16px;
-  padding:20px 16px;
+  padding:18px 14px;
 }
 .hermes-chat-empty-title { font-size:14px; font-weight:700; color:var(--text-main); }
 .hermes-chat-empty-desc { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:6px; }
-.hermes-chat-msg.user { display:flex; justify-content:flex-end; }
-.hermes-chat-msg.ai { display:flex; justify-content:flex-start; }
+.hermes-chat-msg.user { display:flex; justify-content:flex-end; width:100%; }
+.hermes-chat-msg.ai { display:flex; justify-content:flex-start; width:100%; min-width:0; }
 .hermes-chat-bubble {
-  max-width:86%;
+  max-width:100%;
   border-radius:16px;
-  padding:12px 14px;
+  padding:10px 12px;
+  min-width:0;
 }
 .hermes-chat-bubble.user {
   background:linear-gradient(135deg,var(--gold-dark),var(--gold));
   color:#FFFFFF;
   border-bottom-right-radius:6px;
+  max-width:86%;
 }
 .hermes-chat-bubble.ai {
   background:#F8FBFF;
@@ -294,44 +335,158 @@ body { background: var(--surface-2); color: var(--text-main); }
 }
 .hermes-chat-role { font-size:10px; font-weight:700; color:#2F74C0; margin-bottom:6px; }
 .hermes-chat-main { font-size:12px; line-height:1.7; white-space:pre-line; }
+.hermes-chat-main { word-break:break-word; }
 .hermes-chat-meta { font-size:10px; line-height:1.6; opacity:0.86; margin-top:6px; }
 .hermes-question-input {
   width:100%;
-  min-height:92px;
+  min-height:78px;
   border:1px solid rgba(47,116,192,0.18);
-  border-radius:14px;
-  padding:12px 14px;
-  font-size:13px;
+  border-radius:16px;
+  padding:11px 12px;
+  font-size:12px;
   color:var(--text-main);
   background:#F7FBFF;
   resize:none;
   outline:none;
   font-family:var(--font-main);
-  line-height:1.7;
+  line-height:1.6;
+  box-sizing:border-box;
 }
 .hermes-action-row { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:12px; flex-wrap:wrap; }
 .hermes-analyze-btn {
   background:linear-gradient(135deg,var(--gold-dark),var(--gold));
   color:#FFFFFF;
-  min-height:42px;
+  min-height:38px;
 }
-.hermes-action-hint { font-size:11px; color:var(--text-sub); line-height:1.6; min-width:0; flex:1; }
+.hermes-action-hint { font-size:10px; color:var(--text-sub); line-height:1.6; min-width:0; flex:1; }
 .hermes-chat-analysis {
   display:grid;
-  gap:10px;
-  margin-top:10px;
+  gap:8px;
+  margin-top:8px;
+  min-width:0;
 }
 .hermes-result-card {
   background:#FFFFFF;
   border:1px solid rgba(47,116,192,0.10);
   border-radius:16px;
-  padding:14px;
+  padding:12px;
   box-shadow:0 10px 24px rgba(31,73,125,0.06);
+  min-width:0;
 }
-.hermes-result-top { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px; }
+.hermes-chatbi-inline {
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+  min-width:0;
+}
+.hermes-chatbi-inline-label {
+  font-size:10px;
+  color:var(--text-sub);
+  text-transform:uppercase;
+  letter-spacing:0.4px;
+  white-space:nowrap;
+}
+.hermes-lobster-card {
+  background:linear-gradient(180deg,#FFFFFF 0%,#F8FBFF 100%);
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:18px;
+  padding:12px;
+  box-shadow:0 12px 28px rgba(31,73,125,0.08);
+  min-width:0;
+  overflow:hidden;
+}
+.hermes-lobster-topbar {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  margin-bottom:8px;
+}
+.hermes-lobster-title { font-size:15px; font-weight:700; color:var(--text-main); }
+.hermes-lobster-note { font-size:10px; color:var(--text-sub); margin-top:3px; }
+.hermes-lobster-stage {
+  display:grid;
+  gap:8px;
+  min-width:0;
+}
+.hermes-lobster-skillbar,
+.hermes-lobster-promptbar {
+  display:flex;
+  gap:6px;
+  align-items:center;
+  min-width:0;
+}
+.hermes-lobster-label {
+  flex-shrink:0;
+  font-size:10px;
+  color:var(--text-sub);
+  text-transform:uppercase;
+  letter-spacing:0.4px;
+}
+.hermes-lobster-thread {
+  display:grid;
+  gap:10px;
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.08);
+  border-radius:16px;
+  padding:10px;
+  min-height:220px;
+  min-width:0;
+  overflow:hidden;
+}
+.hermes-lobster-composer {
+  display:grid;
+  grid-template-columns:minmax(0,88px) minmax(0,1fr) auto;
+  gap:8px;
+  align-items:end;
+  min-width:0;
+}
+.hermes-lobster-code {
+  width:100%;
+  border:1px solid rgba(47,116,192,0.14);
+  background:#F3F8FE;
+  color:#1F497D;
+  border-radius:14px;
+  padding:10px;
+  font-size:11px;
+  min-width:0;
+  box-sizing:border-box;
+}
+.hermes-lobster-question {
+  width:100%;
+  min-height:54px;
+  max-height:160px;
+  border:1px solid rgba(47,116,192,0.14);
+  background:#FFFFFF;
+  color:var(--text-main);
+  border-radius:16px;
+  padding:10px 12px;
+  font-size:12px;
+  line-height:1.6;
+  resize:none;
+  min-width:0;
+  outline:none;
+  font-family:var(--font-main);
+  box-sizing:border-box;
+}
+.hermes-lobster-send {
+  border:none;
+  background:linear-gradient(135deg,var(--gold-dark),var(--gold));
+  color:#FFFFFF;
+  border-radius:14px;
+  min-height:54px;
+  padding:0 14px;
+  font-size:12px;
+  font-weight:700;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.hermes-result-top { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px; min-width:0; }
+.hermes-result-top > div:first-child { min-width:0; }
 .hermes-result-kicker { font-size:11px; color:#2F74C0; font-weight:700; }
-.hermes-result-title { font-size:17px; font-weight:700; color:var(--text-main); margin-top:4px; }
-.hermes-result-subtitle { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:6px; }
+.hermes-result-title { font-size:17px; font-weight:700; color:var(--text-main); margin-top:4px; min-width:0; word-break:break-word; }
+.hermes-result-subtitle { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:6px; min-width:0; word-break:break-word; }
 .hermes-result-badge {
   flex-shrink:0;
   font-size:10px;
@@ -371,6 +526,14 @@ body { background: var(--surface-2); color: var(--text-main); }
 .hermes-loading { display:flex; align-items:center; gap:8px; }
 .hermes-loading-text { font-size:13px; color:var(--gold); }
 .dot-anim span { display:inline-block; animation:dotBounce 1.2s infinite; }
+@media (max-width: 420px) {
+  .hermes-lobster-composer {
+    grid-template-columns:minmax(0,72px) minmax(0,1fr) auto;
+  }
+  .hermes-stock-input-row {
+    grid-template-columns:minmax(0,76px) minmax(0,1fr) auto;
+  }
+}
 .dot-anim span:nth-child(2) { animation-delay:0.2s; }
 .dot-anim span:nth-child(3) { animation-delay:0.4s; }
 @keyframes dotBounce { 0%,80%,100%{opacity:0.3} 40%{opacity:1} }
@@ -1475,53 +1638,102 @@ body,
       <div class="hermes-header">
         <div>
           <div class="hermes-logo">🦞 Hermes</div>
-          <div class="hermes-subtitle">高级龙虾智能体 · 以对话为主，skills 可选、可自定义、可绑定知识库</div>
+          <div class="hermes-subtitle">高级龙虾智能体 · 支持两种演示版本切换</div>
+          <div class="hermes-demo-toggle">
+            <button class="hermes-demo-pill active" id="hermes-demo-workspace" onclick="setHermesDemoMode('workspace')">工作区版</button>
+            <button class="hermes-demo-pill" id="hermes-demo-lobster" onclick="setHermesDemoMode('lobster')">龙虾纯对话版</button>
+          </div>
         </div>
         <div class="hermes-credits" id="hermes-credits-display">⚡ 128次</div>
       </div>
 
       <div class="hermes-workspace">
-        <div class="hermes-assistant-card">
-          <div class="hermes-assistant-head">
-            <div>
-              <div class="hermes-assistant-title">Hermes 对话工作区</div>
-              <div class="hermes-assistant-desc">先选股票和 skill，再直接对话。Hermes 会把租户知识库一并带入回答，不再堆很多杂乱入口。</div>
+        <div class="hermes-version-panel active" id="hermes-version-workspace">
+          <div class="hermes-assistant-card">
+            <div class="hermes-assistant-head">
+              <div>
+                <div class="hermes-assistant-title">工作区版</div>
+                <div class="hermes-assistant-desc">保留股票、skills、提示词和结构化结果，更适合演示多能力协同。</div>
+              </div>
+              <div class="hermes-assistant-tag">Workspace</div>
             </div>
-            <div class="hermes-assistant-tag">对话式</div>
-          </div>
-          <div class="hermes-toolbar">
-            <div class="hermes-stock-input-row">
-              <input
-                id="hermes-stock-code-input"
-                class="hermes-stock-input"
-                type="text"
-                placeholder="输入股票代码，例如 600519 / 300750 / 00700"
-                onkeydown="if(event.key==='Enter'){event.preventDefault();runHermesAnalysis();}"
-              >
-              <button class="hermes-stock-btn" onclick="runHermesAnalysis()">发送</button>
-            </div>
-            <div class="hermes-stock-picks" id="hermes-quick-stocks"></div>
-            <div class="hermes-skills-head">
-              <div class="hermes-skills-title">Skills</div>
-              <div class="hermes-skill-actions">
-                <button class="hermes-skill-add-btn" onclick="openHermesSkillModal()">+ 新增 skill</button>
+            <div class="hermes-toolbar">
+              <div class="hermes-stock-input-row">
+                <div class="hermes-stock-mini">股票代码</div>
+                <input
+                  id="hermes-stock-code-input"
+                  class="hermes-stock-input"
+                  type="text"
+                  placeholder="例如 600519 / 00700"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();runHermesAnalysis();}"
+                >
+                <button class="hermes-stock-btn" onclick="runHermesAnalysis()">问</button>
+              </div>
+              <div class="hermes-stock-picks" id="hermes-quick-stocks"></div>
+              <div class="hermes-control-row wrap">
+                <div class="hermes-skills-title">Skills</div>
+                <div class="hermes-skill-actions">
+                  <button class="hermes-skill-add-btn" onclick="openHermesSkillModal()">+ 新增</button>
+                </div>
+              </div>
+              <div class="hermes-skill-grid" id="hermes-skill-grid"></div>
+              <div class="hermes-context-box" id="hermes-skill-context"></div>
+              <div class="hermes-chatbi-inline">
+                <div class="hermes-chatbi-inline-label">提示词</div>
+                <div class="hermes-suggestion-row" id="hermes-suggestion-row"></div>
+              </div>
+              <div class="hermes-chat-thread" id="hermes-chat-thread"></div>
+              <div>
+                <textarea
+                  id="hermes-question-input"
+                  class="hermes-question-input"
+                  placeholder="继续问 Hermes，例如：当前更适合继续跟踪还是重点研究？"
+                  oninput="this.style.height='auto';this.style.height=Math.max(92,Math.min(this.scrollHeight,180))+'px'"
+                ></textarea>
+                <div class="hermes-action-row">
+                  <div class="hermes-action-hint">当前 skill 会自动带上知识库上下文。</div>
+                  <button class="hermes-analyze-btn" onclick="runHermesAnalysis()">发送给 Hermes</button>
+                </div>
               </div>
             </div>
-            <div class="hermes-skill-grid" id="hermes-skill-grid"></div>
-            <div class="hermes-context-box" id="hermes-skill-context"></div>
-            <div class="hermes-suggestion-row" id="hermes-suggestion-row"></div>
-            <div class="hermes-chat-thread" id="hermes-chat-thread"></div>
-            <div>
-              <div class="hermes-skills-title" style="margin-bottom:8px">和 Hermes 继续对话</div>
-              <textarea
-                id="hermes-question-input"
-                class="hermes-question-input"
-                placeholder="例如：请判断这只股票当前更适合继续跟踪还是重点研究，并说明原因。"
-                oninput="this.style.height='auto';this.style.height=Math.max(92,Math.min(this.scrollHeight,180))+'px'"
-              ></textarea>
-              <div class="hermes-action-row">
-                <div class="hermes-action-hint">你选中的 skill 会自动携带知识库上下文，一次对话里给出图表和结构化内容。</div>
-                <button class="hermes-analyze-btn" onclick="runHermesAnalysis()">发送给 Hermes</button>
+          </div>
+        </div>
+
+        <div class="hermes-version-panel" id="hermes-version-lobster">
+          <div class="hermes-lobster-card">
+            <div class="hermes-lobster-topbar">
+              <div>
+                <div class="hermes-lobster-title">龙虾纯对话版</div>
+                <div class="hermes-lobster-note">更像飞书龙虾，主要就是对话和最少控制项。</div>
+              </div>
+              <button class="hermes-skill-add-btn" onclick="openHermesSkillModal()">+ Skill</button>
+            </div>
+            <div class="hermes-lobster-stage">
+              <div class="hermes-lobster-skillbar">
+                <div class="hermes-lobster-label">Skills</div>
+                <div class="hermes-skill-grid" id="hermes-chat-skill-grid"></div>
+              </div>
+              <div class="hermes-context-box" id="hermes-chat-skill-context"></div>
+              <div class="hermes-lobster-promptbar">
+                <div class="hermes-lobster-label">提示词</div>
+                <div class="hermes-suggestion-row" id="hermes-chat-suggestion-row"></div>
+              </div>
+              <div class="hermes-lobster-thread" id="hermes-chatpure-thread"></div>
+              <div class="hermes-lobster-composer">
+                <input
+                  id="hermes-chat-stock-code-input"
+                  class="hermes-lobster-code"
+                  type="text"
+                  placeholder="代码"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();runHermesAnalysis();}"
+                >
+                <textarea
+                  id="hermes-chat-question-input"
+                  class="hermes-lobster-question"
+                  placeholder="直接问 Hermes..."
+                  oninput="this.style.height='auto';this.style.height=Math.max(54,Math.min(this.scrollHeight,160))+'px'"
+                ></textarea>
+                <button class="hermes-lobster-send" onclick="runHermesAnalysis()">发送</button>
               </div>
             </div>
           </div>
@@ -3688,6 +3900,7 @@ function renderHermesWorkspace() {
   renderHermesSkillContext();
   renderHermesSuggestionChips();
   renderHermesThread();
+  setHermesDemoMode(hermesDemoMode);
   if (stockHost) {
     stockHost.innerHTML = marketCards.map(item => `
       <div class="hermes-stock-pick" onclick="fillHermesStockCode('${item.code}')">
@@ -4921,6 +5134,7 @@ function submitPost() {
 
 // ===== HERMES =====
 const HERMES_CUSTOM_SKILL_STORAGE_KEY = 'gangtise_demo_hermes_custom_skills';
+let hermesDemoMode = 'workspace';
 let hermesSelectedSkill = 'basic';
 let hermesConversation = [];
 let hermesCredits = 128;
@@ -4989,9 +5203,56 @@ async function selectHermesOption(option) {
 }
 
 function fillHermesStockCode(stockCode) {
-  const input = document.getElementById('hermes-stock-code-input');
-  if (!input) return;
-  input.value = findWatchlistCodeFromInput(stockCode);
+  const normalized = findWatchlistCodeFromInput(stockCode);
+  const inputA = document.getElementById('hermes-stock-code-input');
+  const inputB = document.getElementById('hermes-chat-stock-code-input');
+  if (inputA) inputA.value = normalized;
+  if (inputB) inputB.value = normalized;
+}
+
+function setHermesDemoMode(mode) {
+  hermesDemoMode = mode === 'lobster' ? 'lobster' : 'workspace';
+  const workspaceBtn = document.getElementById('hermes-demo-workspace');
+  const lobsterBtn = document.getElementById('hermes-demo-lobster');
+  const workspacePanel = document.getElementById('hermes-version-workspace');
+  const lobsterPanel = document.getElementById('hermes-version-lobster');
+  if (workspaceBtn) workspaceBtn.classList.toggle('active', hermesDemoMode === 'workspace');
+  if (lobsterBtn) lobsterBtn.classList.toggle('active', hermesDemoMode === 'lobster');
+  if (workspacePanel) workspacePanel.classList.toggle('active', hermesDemoMode === 'workspace');
+  if (lobsterPanel) lobsterPanel.classList.toggle('active', hermesDemoMode === 'lobster');
+}
+
+function getHermesActiveStockCode() {
+  const preferred = hermesDemoMode === 'lobster'
+    ? document.getElementById('hermes-chat-stock-code-input')
+    : document.getElementById('hermes-stock-code-input');
+  const fallback = hermesDemoMode === 'lobster'
+    ? document.getElementById('hermes-stock-code-input')
+    : document.getElementById('hermes-chat-stock-code-input');
+  return (preferred && preferred.value) || (fallback && fallback.value) || '';
+}
+
+function getHermesActiveQuestion() {
+  const preferred = hermesDemoMode === 'lobster'
+    ? document.getElementById('hermes-chat-question-input')
+    : document.getElementById('hermes-question-input');
+  const fallback = hermesDemoMode === 'lobster'
+    ? document.getElementById('hermes-question-input')
+    : document.getElementById('hermes-chat-question-input');
+  return (preferred && preferred.value) || (fallback && fallback.value) || '';
+}
+
+function clearHermesQuestionInputs() {
+  const inputA = document.getElementById('hermes-question-input');
+  const inputB = document.getElementById('hermes-chat-question-input');
+  if (inputA) {
+    inputA.value = '';
+    inputA.style.height = '92px';
+  }
+  if (inputB) {
+    inputB.value = '';
+    inputB.style.height = '54px';
+  }
 }
 
 function getHermesSkillStorageByTenant() {
@@ -5066,21 +5327,21 @@ function renderHermesCredits() {
 }
 
 function renderHermesSkillSelector() {
-  const host = document.getElementById('hermes-skill-grid');
-  if (!host) return;
+  const hosts = [
+    document.getElementById('hermes-skill-grid'),
+    document.getElementById('hermes-chat-skill-grid'),
+  ].filter(Boolean);
+  if (!hosts.length) return;
   const skills = getHermesSkillCatalog();
   if (!skills.some(skill => skill.id === hermesSelectedSkill) && skills.length) {
     hermesSelectedSkill = skills[0].id;
   }
-  host.innerHTML = skills.map(skill => {
+  const html = skills.map(skill => {
     const linkedKnowledge = inferHermesKnowledgeForSkill(skill);
     return `
     <div class="hermes-skill-chip ${skill.id === hermesSelectedSkill ? 'active' : ''}" onclick="selectHermesSkill('${skill.id}')">
-      <div class="hermes-skill-chip-top">
-        <div class="hermes-skill-icon">${skill.icon}</div>
-        <div class="hermes-skill-name">${skill.label}</div>
-      </div>
-      <div class="hermes-skill-desc">${skill.desc}</div>
+      <div class="hermes-skill-icon">${skill.icon}</div>
+      <div class="hermes-skill-name">${skill.label}</div>
       <div class="hermes-skill-meta">
         <span class="hermes-skill-meta-chip">${skill.source === 'custom' ? '自定义' : '系统'}</span>
         <span class="hermes-skill-meta-chip">知识 ${linkedKnowledge.length} 条</span>
@@ -5088,14 +5349,18 @@ function renderHermesSkillSelector() {
     </div>
   `;
   }).join('');
+  hosts.forEach(host => { host.innerHTML = html; });
 }
 
 function renderHermesSkillContext() {
-  const host = document.getElementById('hermes-skill-context');
   const skill = getHermesSkillById(hermesSelectedSkill);
-  if (!host || !skill) return;
+  const hosts = [
+    document.getElementById('hermes-skill-context'),
+    document.getElementById('hermes-chat-skill-context'),
+  ].filter(Boolean);
+  if (!hosts.length || !skill) return;
   const linkedKnowledge = inferHermesKnowledgeForSkill(skill);
-  host.innerHTML = `
+  const html = `
     <div class="hermes-context-title">${escapeHtml(skill.label)} · 知识库上下文</div>
     <div class="hermes-context-desc">${escapeHtml(skill.source === 'custom'
       ? `这是一个自定义 skill。Hermes 会优先按你的个性化提示词执行，并引入关联知识库条目。`
@@ -5106,15 +5371,20 @@ function renderHermesSkillContext() {
         : '<span class="hermes-context-chip">暂未关联知识条目</span>'}
     </div>
   `;
+  hosts.forEach(host => { host.innerHTML = html; });
 }
 
 function renderHermesSuggestionChips() {
-  const host = document.getElementById('hermes-suggestion-row');
-  if (!host) return;
+  const hosts = [
+    document.getElementById('hermes-suggestion-row'),
+    document.getElementById('hermes-chat-suggestion-row'),
+  ].filter(Boolean);
+  if (!hosts.length) return;
   const skill = getHermesSkillById(hermesSelectedSkill) || DEFAULT_HERMES_SKILLS.basic;
-  host.innerHTML = (skill.suggestions || []).map(text => `
+  const html = (skill.suggestions || []).map(text => `
     <div class="hermes-suggestion-chip" onclick="applyHermesSuggestion('${text.replace(/'/g, '&#39;')}')">${text}</div>
   `).join('');
+  hosts.forEach(host => { host.innerHTML = html; });
 }
 
 function selectHermesSkill(skillKey) {
@@ -5125,12 +5395,20 @@ function selectHermesSkill(skillKey) {
 }
 
 function applyHermesSuggestion(text) {
-  const input = document.getElementById('hermes-question-input');
-  if (!input) return;
-  input.value = text;
-  input.style.height = 'auto';
-  input.style.height = Math.max(92, Math.min(input.scrollHeight, 180)) + 'px';
-  input.focus();
+  const inputA = document.getElementById('hermes-question-input');
+  const inputB = document.getElementById('hermes-chat-question-input');
+  if (inputA) {
+    inputA.value = text;
+    inputA.style.height = 'auto';
+    inputA.style.height = Math.max(92, Math.min(inputA.scrollHeight, 180)) + 'px';
+  }
+  if (inputB) {
+    inputB.value = text;
+    inputB.style.height = 'auto';
+    inputB.style.height = Math.max(54, Math.min(inputB.scrollHeight, 160)) + 'px';
+  }
+  const focusTarget = hermesDemoMode === 'lobster' ? inputB : inputA;
+  if (focusTarget) focusTarget.focus();
 }
 
 function escapeHtml(value) {
@@ -5143,18 +5421,22 @@ function escapeHtml(value) {
 }
 
 function renderHermesThread() {
-  const host = document.getElementById('hermes-chat-thread');
-  if (!host) return;
+  const hosts = [
+    document.getElementById('hermes-chat-thread'),
+    document.getElementById('hermes-chatpure-thread'),
+  ].filter(Boolean);
+  if (!hosts.length) return;
   if (!hermesConversation.length) {
-    host.innerHTML = `
+    const emptyHtml = `
       <div class="hermes-chat-empty">
         <div class="hermes-chat-empty-title">先选一只股票，再和 Hermes 对话</div>
         <div class="hermes-chat-empty-desc">Skills 可以切换，也可以自己新增并绑定知识库。Hermes 会按当前 skill 和租户知识上下文给出图表加内容的回答。</div>
       </div>
     `;
+    hosts.forEach(host => { host.innerHTML = emptyHtml; });
     return;
   }
-  host.innerHTML = hermesConversation.map(entry => {
+  const html = hermesConversation.map(entry => {
     if (entry.type === 'user') {
       return `
         <div class="hermes-chat-msg user">
@@ -5187,6 +5469,7 @@ function renderHermesThread() {
       </div>
     `;
   }).join('');
+  hosts.forEach(host => { host.innerHTML = html; });
 }
 
 function renderHermesAnalysisCards(detail, result, question) {
@@ -5354,17 +5637,15 @@ function buildHermesAnalysis(detail, skillKey, question) {
 
 async function runHermesAnalysis(options) {
   options = options || {};
-  const stockInput = document.getElementById('hermes-stock-code-input');
-  const questionInput = document.getElementById('hermes-question-input');
-  const rawCode = stockInput ? stockInput.value : '';
+  const rawCode = getHermesActiveStockCode();
   const stockCode = findWatchlistCodeFromInput(rawCode);
-  const question = (questionInput ? questionInput.value : '').trim();
+  const question = getHermesActiveQuestion().trim();
   const skill = getHermesSkillById(hermesSelectedSkill) || DEFAULT_HERMES_SKILLS.basic;
   if (!stockCode) {
     showToast('请输入股票代码');
     return;
   }
-  if (stockInput) stockInput.value = stockCode;
+  fillHermesStockCode(stockCode);
   if (!question) {
     showToast('请先输入你想让 Hermes 回答的问题');
     return;
@@ -5391,10 +5672,7 @@ async function runHermesAnalysis(options) {
     hermesCredits = Math.max(0, hermesCredits - 1);
     renderHermesCredits();
     renderHermesWorkspace();
-    if (questionInput) {
-      questionInput.value = '';
-      questionInput.style.height = '92px';
-    }
+    clearHermesQuestionInputs();
     if (options.fromWatchlist && getActiveDemoUser().role === 'investor') {
       showToast(`已按 ${getActiveDemoUser().tenant.advisor} 视角生成个股分析`);
     }
