@@ -1168,6 +1168,18 @@ def gen_kol_workbench():
         "kol_name": "财经老王",
         "kol_avatar": "👑",
         "tier": "种子合作作者",
+        "entry_points": [
+            {
+                "label": "H5 前台演示",
+                "url": "/h5",
+                "desc": "查看普通投资者和大V在 H5 里实际看到的 Hermes、复盘、知识和自选股路径。"
+            },
+            {
+                "label": "纯 Admin 后台",
+                "url": "/admin?section=kols",
+                "desc": "查看平台侧的大V租户管理、能力开关、一致性巡检和审计入口。"
+            },
+        ],
         "stats": {
             "total_followers": 128000,
             "vip_subscribers": 36,
@@ -1190,6 +1202,88 @@ def gen_kol_workbench():
             {"id":2,"content":"宏观提醒：美联储纪要偏鸽，但还要等国内资金面确认","time":"2026-05-19 22:30","reach":108,"open_rate":82},
             {"id":3,"content":"周末复盘：本周操作回顾与下周观察重点","time":"2026-05-18 18:00","reach":76,"open_rate":55},
         ],
+        "message_center": {
+            "summary": "消息板块不仅包含粉丝给大V的提问，也包含大V回复粉丝后的追问，以及复盘发布后需要第一时间触达的粉丝提醒。",
+            "items": [
+                {
+                    "name": "投研达人_小陈",
+                    "type": "粉丝提问",
+                    "time": "5分钟前",
+                    "content": "AI 算力还能继续跟吗？想看你按 Hermes 基本面判断后的短版结论。",
+                    "status": "待回复",
+                },
+                {
+                    "name": "复盘发布提醒",
+                    "type": "系统消息",
+                    "time": "12分钟前",
+                    "content": "你刚发布的日复盘已经推送给 92 位高频粉丝，首批打开率 41%。",
+                    "status": "已送达",
+                },
+                {
+                    "name": "价值猎人小林",
+                    "type": "追问消息",
+                    "time": "23分钟前",
+                    "content": "港股互联网那篇复盘我看完了，想继续问腾讯回购节奏和估值带怎么看。",
+                    "status": "待跟进",
+                },
+            ],
+        },
+        "fan_management": {
+            "summary": "这里看的是大V自己的粉丝分层，不是平台总用户。重点管理高频互动、付费意向、机构试点和沉默粉丝的经营动作。",
+            "stats": {
+                "total_fans": 128000,
+                "new_fans_7d": 1860,
+                "active_fans_30d": 6840,
+                "paying_fans": 312,
+            },
+            "fans": [
+                {"name": "投研达人_小陈", "tier": "专业会员", "source": "H5 Hermes", "joined": "2026-05-20", "value": "高频提问", "status": "活跃"},
+                {"name": "价值猎人小林", "tier": "基础会员", "source": "复盘转化", "joined": "2026-04-16", "value": "高频复盘阅读", "status": "待升级"},
+                {"name": "机构用户_张总", "tier": "机构试点", "source": "闭门交流", "joined": "2026-03-08", "value": "高价值线索", "status": "重点跟进"},
+                {"name": "小白投资者", "tier": "基础会员", "source": "群发助手", "joined": "2026-05-28", "value": "新粉", "status": "观察中"},
+                {"name": "量化新手_阿明", "tier": "免费用户", "source": "社区帖子", "joined": "2026-05-03", "value": "低频互动", "status": "待激活"},
+            ],
+        },
+        "dashboard_metrics": {
+            "summary": "这里整合的是大V自己的经营 Dashboard，口径覆盖粉丝增长、粉丝注册费、总注册收入、其他收入、token 消耗、消息数量分布和趋势、发布数量及类型趋势。",
+            "kpis": [
+                {"label": "粉丝增长量", "value": "+1,860", "sub": "近7日新增", "trend": "up", "badge": "+12.4%"},
+                {"label": "粉丝注册费用", "value": "¥39", "sub": "单粉平均注册成本", "trend": "down", "badge": "-6.2%"},
+                {"label": "总注册收入", "value": "¥86,400", "sub": "近30日累计", "trend": "up", "badge": "+18.7%"},
+                {"label": "其他收入", "value": "¥12,800", "sub": "群发 / 定制 / 线下活动", "trend": "up", "badge": "+9.5%"},
+                {"label": "Token 消耗量", "value": "128,400", "sub": "近30日 Hermes 消耗", "trend": "up", "badge": "+14.1%"},
+            ],
+            "message_distribution": [
+                {"label": "粉丝提问", "value": 42},
+                {"label": "复盘提醒反馈", "value": 28},
+                {"label": "大V回复追问", "value": 19},
+                {"label": "系统触达回执", "value": 11},
+            ],
+            "message_trend": [
+                {"day": "06-01", "count": 26},
+                {"day": "06-02", "count": 31},
+                {"day": "06-03", "count": 34},
+                {"day": "06-04", "count": 29},
+                {"day": "06-05", "count": 40},
+                {"day": "06-06", "count": 44},
+                {"day": "06-07", "count": 52},
+            ],
+            "publish_distribution": [
+                {"label": "日复盘", "value": 18},
+                {"label": "周复盘", "value": 4},
+                {"label": "基本面解读", "value": 12},
+                {"label": "群发提醒", "value": 9},
+            ],
+            "publish_trend": [
+                {"day": "06-01", "count": 2},
+                {"day": "06-02", "count": 3},
+                {"day": "06-03", "count": 1},
+                {"day": "06-04", "count": 4},
+                {"day": "06-05", "count": 3},
+                {"day": "06-06", "count": 2},
+                {"day": "06-07", "count": 5},
+            ],
+        },
         "review_studio": {
             "sources": [
                 {"icon": "🎙️", "label": "语音口述", "desc": "收盘后直接口述行业主线、关键公司和操作复盘，智能体自动转写并抽取段落。"},
@@ -1202,6 +1296,94 @@ def gen_kol_workbench():
                 {"label": "智能体成稿", "desc": "适合先交信息给智能体，自动生成完整复盘文章后再人工微调。"},
             ],
             "default_flow": ["选择复盘周期", "补充语音/手输/文件", "锁定行业和个股", "生成复盘草稿", "确认后发布给粉丝"],
+            "watchlist_focus": ["中芯国际", "腾讯控股", "贵州茅台"],
+            "periods": ["日复盘", "周复盘", "月复盘"],
+        },
+        "knowledge_hub": {
+            "summary": "知识库支持语音、文件和 URL 三种入口；历史内容允许点开弹框继续微调，修改后会重新同步到知识专区和 Hermes 上下文。",
+            "items": [
+                {
+                    "title": "港股互联网估值框架",
+                    "source": "文件上传 · 12页 PDF",
+                    "status": "可微调",
+                    "summary": "拆出回购强度、估值带与催化条件，已关联腾讯 / 美团 / 阿里。",
+                    "tags": ["估值框架", "港股互联网"],
+                },
+                {
+                    "title": "5月产业电话会录音整理",
+                    "source": "语音转写 · 28分钟",
+                    "status": "已同步 Hermes",
+                    "summary": "提炼固态电池、订单验证和量产节点，当前可直接被 Hermes 调用。",
+                    "tags": ["电话会", "新能源"],
+                },
+                {
+                    "title": "半导体景气验证节点",
+                    "source": "网页 URL · 3篇行业资料",
+                    "status": "同步中",
+                    "summary": "整理产能利用率、成熟制程价格与资本开支节奏，适合继续补充验证节点。",
+                    "tags": ["半导体", "网页资料"],
+                },
+            ],
+        },
+        "hermes_hub": {
+            "summary": "Hermes 对大V保留两种演示版本：工作区版承接股票、skills、提示词和结构化结果；龙虾纯对话版只保留 skills + 对话，按知识库直接聊天。",
+            "versions": [
+                {
+                    "name": "工作区版",
+                    "desc": "适合带股票代码、skills、提示词建议和图表结果一起演示。",
+                    "points": ["股票代码输入", "结构化结果卡", "图表 + 指标 + 证据链"],
+                },
+                {
+                    "name": "龙虾纯对话版",
+                    "desc": "纯提示词聊天，不强制单独输入股票代码；若问题里自然带了股票对象，会自动进入个股分析。",
+                    "points": ["纯对话输入", "skills 保持一致", "知识库自动带入上下文"],
+                },
+            ],
+            "skills": [
+                {"label": "基本面分析", "type": "系统", "knowledge": 3},
+                {"label": "基本面判断", "type": "系统", "knowledge": 2},
+                {"label": "证据链归因", "type": "系统", "knowledge": 3},
+                {"label": "龙头股估值框架", "type": "自定义", "knowledge": 2},
+            ],
+        },
+        "watchlist_hub": {
+            "summary": "自选股在前台已经改成顶部直接输入股票代码，进入个股详情后再添加自选；详情页展示基础 K 线和 5 / 10 / 20 日线。",
+            "items": [
+                {
+                    "name": "中芯国际",
+                    "code": "688981",
+                    "market": "A股",
+                    "focus": "半导体景气",
+                    "change": "+2.8%",
+                    "thesis": "订单兑现和国产替代仍是核心验证点。",
+                },
+                {
+                    "name": "腾讯控股",
+                    "code": "00700",
+                    "market": "港股",
+                    "focus": "回购 + 财报",
+                    "change": "+1.4%",
+                    "thesis": "回购和现金流支撑估值修复，但仍需财报确认。",
+                },
+                {
+                    "name": "贵州茅台",
+                    "code": "600519",
+                    "market": "A股",
+                    "focus": "稳健配置",
+                    "change": "-0.6%",
+                    "thesis": "更适合作为长期稳健样本，不宜只按短期波动下结论。",
+                },
+            ],
+        },
+        "fund_dashboard": {
+            "summary": "基本面的核心指标面板默认展示总结态；没有指标时显示加号，点击单格后输入独立提示词，保存即生成该格指标摘要。",
+            "layout": "2x2",
+            "cells": [
+                {"title": "美联储路径", "value": "偏鸽", "prompt": "跟踪美联储降息路径与风险资产影响"},
+                {"title": "港股互联网", "value": "估值修复中", "prompt": "跟踪港股互联网回购、财报与估值带"},
+                {"title": "AI 订单兑现", "value": "继续验证", "prompt": "跟踪 AI 算力订单兑现和利润率"},
+                {"title": "增量资金", "value": "连续净流入", "prompt": "跟踪南向和北向资金的连续性"},
+            ],
         },
         "published_reviews": [
             {
@@ -1218,6 +1400,16 @@ def gen_kol_workbench():
                 "tags": ["周度框架", "板块归纳"],
                 "summary": "以行业板块为骨架，把 AI 算力、半导体、港股互联网、消费和新能源统一放进同一篇复盘，方便普通投资者快速查看。"
             },
+        ],
+        "consistency_notes": [
+            {"title": "前后台分离", "desc": "首页同时展示纯 Admin 后台和大V web 工作台两个入口，角色职责分开。"},
+            {"title": "消息口径一致", "desc": "H5、工作台和 Admin 都把“粉丝消息 + 大V回复 + 复盘提醒”视为同一消息链路。"},
+            {"title": "Hermes 口径一致", "desc": "前台支持工作区版和龙虾纯对话版，后台也按同样两种产品模式管理。"},
+            {"title": "知识库口径一致", "desc": "历史知识内容允许继续微调，修改后会重新同步到知识专区和 Hermes。"},
+        ],
+        "role_split": [
+            {"side": "平台 Admin 保留", "items": ["功能控开", "访问审计", "活动管理", "平台级用户与渠道管理"]},
+            {"side": "大V工作台保留", "items": ["粉丝消息", "群发助手", "复盘生产", "Hermes 研究与租户知识经营"]},
         ],
     }
 

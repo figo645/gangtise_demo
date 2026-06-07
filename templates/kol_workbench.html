@@ -7,62 +7,17 @@
 <link rel="stylesheet" href="/static/css/style.css">
 <script>
   window.SITE_CONFIG = {{ site_config | tojson }};
+  window.WORKBENCH_DATA = {{ workbench | tojson }};
 </script>
 <script src="/static/js/theme.js"></script>
 <style>
 body { background: var(--surface-2); color: var(--text-main); }
-.kw-shell { min-height: 100vh; background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%); }
-.kw-topbar {
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:16px;
-  padding:24px 32px;
-  border-bottom:1px solid rgba(200,169,110,0.10);
-  background:rgba(255,255,255,0.78);
-  backdrop-filter: blur(10px);
-  position:sticky;
-  top:0;
-  z-index:20;
-}
-.kw-brand-title { font-size:22px; font-weight:700; color:var(--text-main); }
-.kw-brand-sub { font-size:12px; color:var(--text-sub); margin-top:4px; }
-.kw-topbar-actions { display:flex; gap:10px; flex-wrap:wrap; }
-.kw-wrap { max-width:1280px; margin:0 auto; padding:28px 32px 40px; }
-.kw-hero {
-  background:linear-gradient(135deg, rgba(200,169,110,0.14), rgba(47,116,192,0.08));
-  border:1px solid rgba(200,169,110,0.18);
-  border-radius:18px;
-  padding:24px;
-  display:grid;
-  grid-template-columns:1.2fr 0.8fr;
-  gap:20px;
-  margin-bottom:20px;
-}
-.kw-hero-title { font-size:26px; font-weight:700; color:var(--text-main); }
-.kw-hero-desc { font-size:13px; color:var(--text-sub); line-height:1.8; margin-top:8px; max-width:720px; }
-.kw-chip-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:16px; }
-.kw-chip {
-  font-size:11px;
-  color:var(--gold);
-  background:rgba(255,255,255,0.62);
-  border:1px solid rgba(200,169,110,0.16);
-  border-radius:999px;
-  padding:5px 10px;
-}
-.kw-side-card {
-  background:#FFFFFF;
-  border:1px solid rgba(47,116,192,0.10);
-  border-radius:14px;
-  padding:16px;
-  box-shadow:0 8px 24px rgba(31,73,125,0.06);
-}
-.kw-side-title { font-size:13px; font-weight:700; color:var(--gold); margin-bottom:10px; }
-.kw-side-item { display:flex; justify-content:space-between; gap:10px; font-size:12px; color:var(--text-sub); padding:8px 0; border-bottom:1px solid rgba(47,116,192,0.08); }
-.kw-side-item:last-child { border-bottom:none; padding-bottom:0; }
-.kw-side-item strong { color:var(--text-main); font-size:18px; }
-.kw-grid { display:grid; grid-template-columns:1.2fr 0.8fr; gap:20px; }
-.kw-col { display:grid; gap:20px; align-content:start; }
+.kw-page-summary { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:4px; }
+.kw-admin-footer { padding:16px 20px; border-top:1px solid rgba(200,169,110,0.1); }
+.kw-admin-footer-title { font-size:11px; color:var(--text-sub); }
+.kw-admin-footer-text { font-size:13px; color:var(--text-main); margin-top:2px; }
+.kw-section-grid { display:grid; grid-template-columns:1.15fr 0.85fr; gap:20px; }
+.kw-section-stack { display:grid; gap:20px; align-content:start; }
 .kw-card {
   background:#FFFFFF;
   border:1px solid rgba(47,116,192,0.10);
@@ -73,32 +28,6 @@ body { background: var(--surface-2); color: var(--text-main); }
 .kw-card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:14px; }
 .kw-card-title { font-size:16px; font-weight:700; color:var(--text-main); }
 .kw-card-desc { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:4px; }
-.kw-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
-.kw-stat {
-  background:#F8FBFF;
-  border:1px solid rgba(47,116,192,0.10);
-  border-radius:14px;
-  padding:14px;
-}
-.kw-stat-label { font-size:11px; color:var(--text-sub); }
-.kw-stat-value { font-size:24px; font-weight:700; color:var(--gold); margin-top:6px; }
-.kw-stat-note { font-size:11px; color:var(--text-sub); margin-top:6px; }
-.kw-fan-list,
-.kw-broadcast-list { display:grid; gap:10px; }
-.kw-fan-item,
-.kw-broadcast-item {
-  background:#F8FBFF;
-  border:1px solid rgba(47,116,192,0.10);
-  border-radius:14px;
-  padding:14px;
-}
-.kw-fan-top,
-.kw-broadcast-top { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
-.kw-fan-name,
-.kw-broadcast-content { font-size:13px; color:var(--text-main); font-weight:600; }
-.kw-fan-msg { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:8px; }
-.kw-fan-meta,
-.kw-broadcast-meta { font-size:11px; color:var(--text-sub); margin-top:8px; line-height:1.6; }
 .kw-tag {
   flex-shrink:0;
   font-size:10px;
@@ -108,39 +37,122 @@ body { background: var(--surface-2); color: var(--text-main); }
   border-radius:999px;
   padding:4px 8px;
 }
-.kw-action-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-.kw-action {
-  background:#F8FBFF;
-  border:1px solid rgba(47,116,192,0.10);
-  border-radius:14px;
-  padding:14px;
-}
-.kw-action-title { font-size:13px; font-weight:700; color:var(--text-main); }
-.kw-action-desc { font-size:11px; color:var(--text-sub); line-height:1.7; margin-top:6px; }
-.kw-toolbar { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
-.kw-review-source-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.kw-link-grid,
+.kw-mini-grid,
+.kw-watch-grid,
+.kw-role-grid,
+.kw-version-grid,
+.kw-review-source-grid,
+.kw-cell-grid,
+.kw-knowledge-list,
+.kw-skill-list,
+.kw-fan-list,
+.kw-broadcast-list { display:grid; gap:10px; }
+.kw-link-grid,
+.kw-mini-grid,
+.kw-cell-grid,
+.kw-review-source-grid { grid-template-columns:1fr 1fr; }
+.kw-link-card,
+.kw-mini-card,
+.kw-watch-card,
+.kw-role-card,
+.kw-version-card,
 .kw-review-source,
-.kw-review-mode-item {
+.kw-knowledge-item,
+.kw-cell-card,
+.kw-fan-item,
+.kw-broadcast-item,
+.kw-side-card {
   background:#F8FBFF;
   border:1px solid rgba(47,116,192,0.10);
   border-radius:14px;
   padding:14px;
 }
-.kw-review-source-icon { font-size:20px; margin-bottom:10px; }
+.kw-link-card { text-decoration:none; }
+.kw-link-title,
+.kw-mini-title,
+.kw-watch-title,
+.kw-role-title,
+.kw-version-title,
 .kw-review-source-title,
-.kw-review-mode-title { font-size:13px; font-weight:700; color:var(--text-main); }
+.kw-cell-title,
+.kw-fan-name,
+.kw-broadcast-content,
+.kw-knowledge-title { font-size:13px; font-weight:700; color:var(--text-main); }
+.kw-link-desc,
+.kw-mini-desc,
+.kw-watch-desc,
+.kw-version-desc,
 .kw-review-source-desc,
-.kw-review-mode-desc { font-size:11px; color:var(--text-sub); line-height:1.7; margin-top:6px; }
-.kw-review-flow { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+.kw-cell-desc,
+.kw-fan-msg,
+.kw-broadcast-meta,
+.kw-knowledge-summary,
+.kw-side-item,
+.kw-side-note { font-size:11px; color:var(--text-sub); line-height:1.7; }
+.kw-link-url,
+.kw-message-type,
+.kw-watch-meta,
+.kw-knowledge-meta,
+.kw-skill-meta { font-size:11px; color:var(--text-sub); line-height:1.7; margin-top:6px; }
+.kw-chip-row,
+.kw-watch-chip-row,
+.kw-prompt-row,
+.kw-review-flow,
+.kw-toolbar { display:flex; gap:8px; flex-wrap:wrap; }
+.kw-chip,
+.kw-watch-chip,
+.kw-mode-chip,
+.kw-prompt-chip,
 .kw-review-flow-step {
-  font-size:11px;
+  display:inline-flex;
+  align-items:center;
+  font-size:10px;
+  border-radius:999px;
+  padding:4px 8px;
+}
+.kw-chip,
+.kw-review-flow-step {
   color:var(--gold);
   background:rgba(200,169,110,0.10);
   border:1px solid rgba(200,169,110,0.18);
-  border-radius:999px;
-  padding:5px 10px;
 }
-.kw-review-mode-list { display:grid; gap:8px; }
+.kw-watch-chip,
+.kw-mode-chip,
+.kw-prompt-chip {
+  color:#1F497D;
+  background:#EAF3FF;
+}
+.kw-side-title { font-size:13px; font-weight:700; color:var(--gold); margin-bottom:10px; }
+.kw-side-item {
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  padding:8px 0;
+  border-bottom:1px solid rgba(47,116,192,0.08);
+}
+.kw-side-item:last-child { border-bottom:none; padding-bottom:0; }
+.kw-side-item strong { color:var(--text-main); font-size:18px; }
+.kw-fan-top,
+.kw-broadcast-top,
+.kw-watch-top,
+.kw-version-top,
+.kw-knowledge-top { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+.kw-review-source-icon { font-size:20px; margin-bottom:10px; }
+.kw-cell-value { font-size:20px; font-weight:700; color:var(--gold); margin-top:6px; }
+.kw-empty-plus {
+  width:28px;
+  height:28px;
+  border-radius:50%;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(47,116,192,0.10);
+  color:#1F497D;
+  font-size:18px;
+  font-weight:700;
+  margin-top:6px;
+}
 .toast {
   position: fixed;
   left: 50%;
@@ -162,122 +174,324 @@ body { background: var(--surface-2); color: var(--text-main); }
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
-@media (max-width: 980px) {
-  .kw-hero,
-  .kw-grid { grid-template-columns:1fr; }
-  .kw-stats { grid-template-columns:1fr 1fr; }
-  .kw-review-source-grid { grid-template-columns:1fr; }
+.kw-kpi-row {
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:16px;
+  margin-bottom:20px;
 }
-@media (max-width: 640px) {
-  .kw-topbar,
-  .kw-wrap { padding-left:16px; padding-right:16px; }
-  .kw-stats,
-  .kw-action-grid { grid-template-columns:1fr; }
+.kw-kpi-card {
+  background:var(--navy-mid);
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:12px;
+  padding:18px;
+  position:relative;
+  overflow:hidden;
+}
+.kw-kpi-card::after {
+  content:'';
+  position:absolute;
+  top:0;
+  left:0;
+  right:0;
+  height:2px;
+  background:linear-gradient(90deg,var(--gold-dark),var(--gold-light));
+  opacity:0.6;
+}
+.kw-kpi-label { font-size:11px; color:var(--text-sub); margin-bottom:8px; letter-spacing:0.5px; }
+.kw-kpi-value { font-size:24px; font-weight:700; color:var(--text-main); margin-bottom:4px; }
+.kw-kpi-sub { font-size:12px; color:var(--text-sub); }
+.kw-kpi-badge {
+  display:inline-block;
+  padding:2px 6px;
+  border-radius:4px;
+  font-size:10px;
+  font-weight:600;
+  margin-top:6px;
+}
+.kw-kpi-badge.up { background:rgba(46,204,113,0.15); color:#2ECC71; }
+.kw-kpi-badge.down { background:rgba(231,76,60,0.15); color:#E74C3C; }
+.kw-chart-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.kw-chart-card {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:16px;
+  padding:18px;
+  box-shadow:0 8px 24px rgba(31,73,125,0.06);
+}
+.kw-chart-title { font-size:15px; font-weight:600; color:var(--text-main); margin-bottom:4px; }
+.kw-chart-subtitle { font-size:12px; color:var(--text-sub); margin-bottom:14px; }
+.kw-chart-host { width:100%; }
+.kw-chart-svg { width:100%; height:auto; display:block; }
+.kw-chart-axis { stroke:rgba(47,116,192,0.18); stroke-width:1; }
+.kw-chart-gridline { stroke:rgba(47,116,192,0.10); stroke-width:1; stroke-dasharray:3 3; }
+.kw-chart-bar { fill:url(#kwBarGradient); }
+.kw-chart-line { fill:none; stroke:url(#kwLineGradient); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; }
+.kw-chart-area { fill:url(#kwAreaGradient); opacity:0.24; }
+.kw-chart-point { fill:#2F74C0; stroke:#FFFFFF; stroke-width:2; }
+.kw-chart-label,
+.kw-chart-value,
+.kw-chart-tick { font-size:11px; fill:var(--text-sub); }
+.kw-chart-value { fill:var(--text-main); font-weight:600; }
+@media (max-width: 980px) {
+  .kw-section-grid,
+  .kw-link-grid,
+  .kw-mini-grid,
+  .kw-cell-grid,
+  .kw-review-source-grid,
+  .kw-chart-grid,
+  .kw-kpi-row { grid-template-columns:1fr; }
 }
 </style>
 </head>
 <body onload="initGangtiseTheme()">
-<div class="kw-shell">
-  <div class="kw-topbar">
-    <div>
-      <div class="kw-brand-title">{{ workbench.kol_name }} · 大V工作台</div>
-      <div class="kw-brand-sub">独立的 web 工作台入口，专门服务大V投顾，不与平台 Admin 后台混用。</div>
+<div class="admin-layout">
+  <div class="admin-sidebar">
+    <div class="admin-logo">
+      <div class="admin-logo-text">洞见智研</div>
+      <div class="admin-logo-sub">大V工作台 Web</div>
     </div>
-    <div class="kw-topbar-actions">
-      <a href="/h5" class="btn-outline" style="text-decoration:none;padding:9px 14px;font-size:12px">前往 H5</a>
-      <a href="/admin" class="btn-outline" style="text-decoration:none;padding:9px 14px;font-size:12px">纯 Admin 后台</a>
-      <a href="/" class="btn-gold" style="text-decoration:none;padding:9px 14px;font-size:12px">返回首页</a>
+    <nav class="admin-nav">
+      <div class="admin-nav-group">
+        <div class="admin-nav-group-title">概览</div>
+        <div class="admin-nav-item active" data-section="overview" onclick="showWorkbenchSection('overview', this)">
+          <span class="admin-nav-icon">&#9783;</span> 工作台概览
+        </div>
+      </div>
+      <div class="admin-nav-group">
+        <div class="admin-nav-group-title">粉丝运营</div>
+        <div class="admin-nav-item" data-section="fans" onclick="showWorkbenchSection('fans', this)">
+          <span class="admin-nav-icon">&#128101;</span> 粉丝管理
+        </div>
+        <div class="admin-nav-item" data-section="messages" onclick="showWorkbenchSection('messages', this)">
+          <span class="admin-nav-icon">&#9993;</span> 粉丝消息
+        </div>
+        <div class="admin-nav-item" data-section="broadcast" onclick="showWorkbenchSection('broadcast', this)">
+          <span class="admin-nav-icon">&#128227;</span> 群发助手
+        </div>
+      </div>
+      <div class="admin-nav-group">
+        <div class="admin-nav-group-title">研究生产</div>
+        <div class="admin-nav-item" data-section="biz-dashboard" onclick="showWorkbenchSection('biz-dashboard', this)">
+          <span class="admin-nav-icon">&#128202;</span> 经营 Dashboard
+        </div>
+        <div class="admin-nav-item" data-section="review" onclick="showWorkbenchSection('review', this)">
+          <span class="admin-nav-icon">&#9998;</span> 复盘生产台
+        </div>
+        <div class="admin-nav-item" data-section="knowledge" onclick="showWorkbenchSection('knowledge', this)">
+          <span class="admin-nav-icon">&#128214;</span> 知识库微调
+        </div>
+        <div class="admin-nav-item" data-section="hermes" onclick="showWorkbenchSection('hermes', this)">
+          <span class="admin-nav-icon">&#129438;</span> Hermes 工作台
+        </div>
+      </div>
+      <div class="admin-nav-group">
+        <div class="admin-nav-group-title">个股与面板</div>
+        <div class="admin-nav-item" data-section="watchlist" onclick="showWorkbenchSection('watchlist', this)">
+          <span class="admin-nav-icon">&#128200;</span> 自选股与详情
+        </div>
+        <div class="admin-nav-item" data-section="dashboard" onclick="showWorkbenchSection('dashboard', this)">
+          <span class="admin-nav-icon">&#9638;</span> 核心指标面板
+        </div>
+      </div>
+      <div class="admin-nav-group">
+        <div class="admin-nav-group-title">发布与一致性</div>
+        <div class="admin-nav-item" data-section="published" onclick="showWorkbenchSection('published', this)">
+          <span class="admin-nav-icon">&#10003;</span> 已发布复盘
+        </div>
+        <div class="admin-nav-item" data-section="consistency" onclick="showWorkbenchSection('consistency', this)">
+          <span class="admin-nav-icon">&#8646;</span> 前后台一致性
+        </div>
+      </div>
+    </nav>
+    <div class="kw-admin-footer">
+      <div class="kw-admin-footer-title">当前主理人</div>
+      <div class="kw-admin-footer-text">{{ workbench.kol_name }} · {{ workbench.tier }}</div>
     </div>
   </div>
 
-  <div class="kw-wrap">
-    <div class="kw-hero">
+  <div class="admin-main">
+    <div class="admin-topbar">
       <div>
-        <div class="kw-hero-title">面向大V的专属工作台 Web 应用</div>
-        <div class="kw-hero-desc">这里承接的是大V自己的日常动作：处理粉丝消息、查看协同收入、做群发、管理研究输出和跟踪高频用户，不再和平台级的功能控开、审计、结算后台混在一起。</div>
-        <div class="kw-chip-row">
-          <span class="kw-chip">粉丝消息</span>
-          <span class="kw-chip">群发助手</span>
-          <span class="kw-chip">研究协同</span>
-          <span class="kw-chip">租户内运营</span>
-        </div>
+        <div class="admin-page-title" id="workbench-page-title">工作台概览</div>
+        <div class="kw-page-summary" id="workbench-page-summary">和 H5 保持同一套产品口径，但以桌面 web 工作流方式组织大V日常动作。</div>
       </div>
-      <div class="kw-side-card">
-        <div class="kw-side-title">当前租户摘要</div>
-        <div class="kw-side-item"><span>主理人</span><strong>{{ workbench.kol_name }}</strong></div>
-        <div class="kw-side-item"><span>合作阶段</span><span>{{ workbench.tier }}</span></div>
-        <div class="kw-side-item"><span>待回复消息</span><span>{{ workbench.stats.pending_replies }} 条</span></div>
-        <div class="kw-side-item"><span>未读粉丝会话</span><span>{{ workbench.stats.unread_messages }} 条</span></div>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <a href="/h5" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">前往 H5</a>
+        <a href="/admin" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">纯 Admin 后台</a>
+        <a href="/" class="btn-gold" style="padding:8px 16px;font-size:12px;text-decoration:none">返回首页</a>
       </div>
     </div>
 
-    <div class="kw-card" style="margin-bottom:20px">
-      <div class="kw-card-head">
-        <div>
-          <div class="kw-card-title">核心看板</div>
-          <div class="kw-card-desc">这里是大V最常打开的一层信息，不放平台级配置，只保留个人工作台的日常经营数据。</div>
+    <div class="admin-content">
+      <div id="workbench-section-overview">
+        <div class="stats-grid" style="margin-bottom:20px">
+          <div class="stat-card"><div class="stat-label">总关注样本</div><div class="stat-value">{{ "{:,}".format(workbench.stats.total_followers) }}</div><div class="stat-change up">当前租户累计</div></div>
+          <div class="stat-card"><div class="stat-label">高频付费用户</div><div class="stat-value">{{ workbench.stats.vip_subscribers }}</div><div class="stat-change up">重点服务对象</div></div>
+          <div class="stat-card"><div class="stat-label">本月协同收入</div><div class="stat-value">¥{{ "{:,}".format(workbench.stats.monthly_revenue) }}</div><div class="stat-change up">环比 +{{ workbench.stats.revenue_change }}%</div></div>
+          <div class="stat-card"><div class="stat-label">今日浏览 / 互动率</div><div class="stat-value">{{ workbench.stats.today_views }}</div><div class="stat-change up">互动率 {{ workbench.stats.engagement_rate }}%</div></div>
         </div>
-        <span class="kw-tag">Web 工作台</span>
+        <div class="kw-section-grid">
+          <div class="kw-section-stack">
+            <div class="kw-card">
+              <div class="kw-card-head">
+                <div>
+                  <div class="kw-card-title">工作台定位</div>
+                  <div class="kw-card-desc">这里承接 H5 里已成型的大V动作，并统一成桌面 web 工作流：粉丝消息、复盘生产、Hermes 双版本、知识微调、自选股跟踪、核心指标面板和群发助手都在同一套后台里。</div>
+                </div>
+                <span class="kw-tag">Web Workbench</span>
+              </div>
+              <div class="kw-chip-row">
+                <span class="kw-chip">粉丝消息</span>
+                <span class="kw-chip">Hermes 双版本</span>
+                <span class="kw-chip">知识微调</span>
+                <span class="kw-chip">自选股/K线</span>
+                <span class="kw-chip">群发助手</span>
+                <span class="kw-chip">复盘生产</span>
+              </div>
+            </div>
+            <div class="kw-card">
+              <div class="kw-card-head">
+                <div>
+                  <div class="kw-card-title">前后台入口</div>
+                  <div class="kw-card-desc">和首页保持一致：一个是大V自己的 web 工作台，一个是平台侧纯 Admin 后台。</div>
+                </div>
+                <span class="kw-tag">Entry Split</span>
+              </div>
+              <div class="kw-link-grid">
+                {% for item in workbench.entry_points %}
+                <a href="{{ item.url }}" class="kw-link-card">
+                  <div class="kw-link-title">{{ item.label }}</div>
+                  <div class="kw-link-desc">{{ item.desc }}</div>
+                  <div class="kw-link-url">{{ item.url }}</div>
+                </a>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+          <div class="kw-section-stack">
+            <div class="kw-side-card">
+              <div class="kw-side-title">当前租户摘要</div>
+              <div class="kw-side-item"><span>主理人</span><strong>{{ workbench.kol_name }}</strong></div>
+              <div class="kw-side-item"><span>合作阶段</span><span>{{ workbench.tier }}</span></div>
+              <div class="kw-side-item"><span>待回复消息</span><span>{{ workbench.stats.pending_replies }} 条</span></div>
+              <div class="kw-side-item"><span>未读粉丝会话</span><span>{{ workbench.stats.unread_messages }} 条</span></div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="kw-stats">
-        <div class="kw-stat">
-          <div class="kw-stat-label">总关注样本</div>
-          <div class="kw-stat-value">{{ "{:,}".format(workbench.stats.total_followers) }}</div>
-          <div class="kw-stat-note">当前租户累计</div>
-        </div>
-        <div class="kw-stat">
-          <div class="kw-stat-label">高频付费用户</div>
-          <div class="kw-stat-value">{{ workbench.stats.vip_subscribers }}</div>
-          <div class="kw-stat-note">重点服务对象</div>
-        </div>
-        <div class="kw-stat">
-          <div class="kw-stat-label">本月协同收入</div>
-          <div class="kw-stat-value">¥{{ "{:,}".format(workbench.stats.monthly_revenue) }}</div>
-          <div class="kw-stat-note">环比 +{{ workbench.stats.revenue_change }}%</div>
-        </div>
-        <div class="kw-stat">
-          <div class="kw-stat-label">今日浏览 / 互动率</div>
-          <div class="kw-stat-value">{{ workbench.stats.today_views }}</div>
-          <div class="kw-stat-note">互动率 {{ workbench.stats.engagement_rate }}%</div>
-        </div>
-      </div>
-    </div>
 
-    <div class="kw-grid">
-      <div class="kw-col">
+      <div id="workbench-section-messages" style="display:none">
         <div class="kw-card">
           <div class="kw-card-head">
             <div>
               <div class="kw-card-title">粉丝消息</div>
-              <div class="kw-card-desc">作为 web 版工作台，这里优先展示最近需要处理的高频用户消息。</div>
+              <div class="kw-card-desc">{{ workbench.message_center.summary }}</div>
             </div>
             <span class="kw-tag">{{ workbench.stats.pending_replies }} 条待处理</span>
           </div>
           <div class="kw-fan-list">
-            {% for fan in workbench.recent_fans %}
+            {% for fan in workbench.message_center["items"] %}
             <div class="kw-fan-item">
               <div class="kw-fan-top">
                 <div class="kw-fan-name">{{ fan.name }}</div>
-                <span class="kw-tag">{{ fan.tier }}</span>
+                <span class="kw-tag">{{ fan.status }}</span>
               </div>
-              <div class="kw-fan-msg">{{ fan.msg }}</div>
-              <div class="kw-fan-meta">{{ fan.time }}</div>
+              <div class="kw-message-type">{{ fan.type }} · {{ fan.time }}</div>
+              <div class="kw-fan-msg">{{ fan.content }}</div>
             </div>
             {% endfor %}
           </div>
-          <div class="kw-toolbar">
-            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="showToast('消息中心开发中')">进入消息中心</button>
-            <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="showToast('批量标记已读开发中')">批量标记已读</button>
+          <div class="kw-toolbar" style="margin-top:12px">
+            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="showToast('将进入工作台消息中心')">进入消息中心</button>
+            <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="showToast('将同步复盘提醒到粉丝消息')">推送复盘提醒</button>
           </div>
         </div>
+      </div>
 
+      <div id="workbench-section-fans" style="display:none">
+        <div class="stats-grid" style="margin-bottom:20px">
+          <div class="stat-card"><div class="stat-label">总粉丝数</div><div class="stat-value">{{ "{:,}".format(workbench.fan_management.stats.total_fans) }}</div><div class="stat-change up">大V租户口径</div></div>
+          <div class="stat-card"><div class="stat-label">近7日新增</div><div class="stat-value">{{ "{:,}".format(workbench.fan_management.stats.new_fans_7d) }}</div><div class="stat-change up">持续增长</div></div>
+          <div class="stat-card"><div class="stat-label">近30日活跃</div><div class="stat-value">{{ "{:,}".format(workbench.fan_management.stats.active_fans_30d) }}</div><div class="stat-change up">高频互动池</div></div>
+          <div class="stat-card"><div class="stat-label">付费粉丝</div><div class="stat-value">{{ workbench.fan_management.stats.paying_fans }}</div><div class="stat-change up">重点经营对象</div></div>
+        </div>
+        <div class="table-wrap">
+          <div class="table-header">
+            <div class="table-title">粉丝管理</div>
+            <span class="tag tag-gold">仅当前大V租户</span>
+          </div>
+          <div class="kw-card-desc" style="margin-bottom:12px">{{ workbench.fan_management.summary }}</div>
+          <table>
+            <thead><tr><th>粉丝名称</th><th>等级</th><th>来源</th><th>加入时间</th><th>价值标签</th><th>状态</th></tr></thead>
+            <tbody>
+              {% for fan in workbench.fan_management.fans %}
+              <tr>
+                <td><span style="color:var(--text-main);font-weight:600">{{ fan.name }}</span></td>
+                <td>{{ fan.tier }}</td>
+                <td>{{ fan.source }}</td>
+                <td>{{ fan.joined }}</td>
+                <td>{{ fan.value }}</td>
+                <td><span class="tag tag-gold">{{ fan.status }}</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="workbench-section-biz-dashboard" style="display:none">
+        <div class="kw-kpi-row">
+          {% for item in workbench.dashboard_metrics.kpis %}
+          <div class="kw-kpi-card">
+            <div class="kw-kpi-label">{{ item.label }}</div>
+            <div class="kw-kpi-value">{{ item.value }}</div>
+            <div class="kw-kpi-sub">{{ item.sub }}</div>
+            <span class="kw-kpi-badge {{ item.trend }}">{{ item.badge }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="kw-card" style="margin-bottom:20px">
+          <div class="kw-card-head">
+            <div>
+              <div class="kw-card-title">经营 Dashboard</div>
+              <div class="kw-card-desc">{{ workbench.dashboard_metrics.summary }}</div>
+            </div>
+            <span class="kw-tag">Owner Metrics</span>
+          </div>
+        </div>
+        <div class="kw-chart-grid">
+          <div class="kw-chart-card">
+            <div class="kw-chart-title">粉丝消息数量分布</div>
+            <div class="kw-chart-subtitle">按消息类型看当前大V租户的消息构成</div>
+            <div class="kw-chart-host" id="kw-message-distribution-chart"></div>
+          </div>
+          <div class="kw-chart-card">
+            <div class="kw-chart-title">粉丝消息趋势</div>
+            <div class="kw-chart-subtitle">按天看消息量变化</div>
+            <div class="kw-chart-host" id="kw-message-trend-chart"></div>
+          </div>
+          <div class="kw-chart-card">
+            <div class="kw-chart-title">发布数量类型分布</div>
+            <div class="kw-chart-subtitle">看大V当前内容生产结构</div>
+            <div class="kw-chart-host" id="kw-publish-distribution-chart"></div>
+          </div>
+          <div class="kw-chart-card">
+            <div class="kw-chart-title">发布数量趋势</div>
+            <div class="kw-chart-subtitle">按天看内容产出节奏</div>
+            <div class="kw-chart-host" id="kw-publish-trend-chart"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="workbench-section-broadcast" style="display:none">
         <div class="kw-card">
           <div class="kw-card-head">
             <div>
-              <div class="kw-card-title">最近群发</div>
-              <div class="kw-card-desc">把大V高频使用的群发记录独立出来，和平台运营活动隔离。</div>
+              <div class="kw-card-title">群发助手</div>
+              <div class="kw-card-desc">和平台活动隔离，只保留大V自己的分层触达、复盘提醒和今日解读动作。</div>
             </div>
-            <span class="kw-tag">群发助手</span>
+            <span class="kw-tag">Broadcast</span>
           </div>
           <div class="kw-broadcast-list">
             {% for item in workbench.broadcast_history %}
@@ -290,8 +504,14 @@ body { background: var(--surface-2); color: var(--text-main); }
             </div>
             {% endfor %}
           </div>
+          <div class="kw-toolbar" style="margin-top:12px">
+            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="showToast('新建群发任务')">发起群发</button>
+            <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="showToast('发布今日基本面解读')">发布今日解读</button>
+          </div>
         </div>
+      </div>
 
+      <div id="workbench-section-review" style="display:none">
         <div class="kw-card">
           <div class="kw-card-head">
             <div>
@@ -309,74 +529,178 @@ body { background: var(--surface-2); color: var(--text-main); }
             </div>
             {% endfor %}
           </div>
-          <div class="kw-review-flow">
+          <div class="kw-review-flow" style="margin-top:12px">
             {% for step in workbench.review_studio.default_flow %}
             <span class="kw-review-flow-step">{{ step }}</span>
             {% endfor %}
           </div>
-          <div class="kw-toolbar">
-            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="showToast('复盘草稿生成中')">发起新复盘</button>
-            <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="showToast('语音录入面板开发中')">语音导入</button>
-            <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="showToast('上传文件面板开发中')">上传文件</button>
+          <div class="kw-watch-chip-row" style="margin-top:12px">
+            {% for item in workbench.review_studio.periods %}
+            <span class="kw-mode-chip">{{ item }}</span>
+            {% endfor %}
+          </div>
+          <div class="kw-mini-grid" style="margin-top:12px">
+            {% for item in workbench.review_studio.paragraph_modes %}
+            <div class="kw-mini-card">
+              <div class="kw-mini-title">{{ item.label }}</div>
+              <div class="kw-mini-desc">{{ item.desc }}</div>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="kw-watch-chip-row" style="margin-top:12px">
+            {% for item in workbench.review_studio.watchlist_focus %}
+            <span class="kw-watch-chip">{{ item }}</span>
+            {% endfor %}
+          </div>
+          <div class="kw-toolbar" style="margin-top:12px">
+            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="showToast('发起新复盘')">发起新复盘</button>
+            <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="showToast('进入选股归纳流程')">挑选本次复盘自选股</button>
           </div>
         </div>
       </div>
 
-      <div class="kw-col">
+      <div id="workbench-section-knowledge" style="display:none">
         <div class="kw-card">
           <div class="kw-card-head">
             <div>
-              <div class="kw-card-title">文章成稿方式</div>
-              <div class="kw-card-desc">大V可以自己决定文章段落内容，也可以只提供信息交给智能体完成整篇复盘草稿。</div>
+              <div class="kw-card-title">知识库与微调</div>
+              <div class="kw-card-desc">{{ workbench.knowledge_hub.summary }}</div>
             </div>
-            <span class="kw-tag">Paragraph Control</span>
+            <span class="kw-tag">Knowledge</span>
           </div>
-          <div class="kw-review-mode-list">
-            {% for item in workbench.review_studio.paragraph_modes %}
-            <div class="kw-review-mode-item">
-              <div class="kw-review-mode-title">{{ item.label }}</div>
-              <div class="kw-review-mode-desc">{{ item.desc }}</div>
+          <div class="kw-knowledge-list">
+            {% for item in workbench.knowledge_hub["items"] %}
+            <div class="kw-knowledge-item">
+              <div class="kw-knowledge-top">
+                <div>
+                  <div class="kw-knowledge-title">{{ item.title }}</div>
+                  <div class="kw-knowledge-meta">{{ item.source }}</div>
+                </div>
+                <span class="kw-tag">{{ item.status }}</span>
+              </div>
+              <div class="kw-knowledge-summary">{{ item.summary }}</div>
+              <div class="kw-watch-chip-row" style="margin-top:10px">
+                {% for tag in item.tags %}
+                <span class="kw-watch-chip">{{ tag }}</span>
+                {% endfor %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="kw-toolbar" style="margin-top:12px">
+            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="showToast('点击后将弹框微调历史知识')">微调历史知识</button>
+            <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="showToast('新增语音 / 文件 / URL 知识')">新增知识</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="workbench-section-hermes" style="display:none">
+        <div class="kw-card">
+          <div class="kw-card-head">
+            <div>
+              <div class="kw-card-title">Hermes 双版本</div>
+              <div class="kw-card-desc">{{ workbench.hermes_hub.summary }}</div>
+            </div>
+            <span class="kw-tag">Hermes</span>
+          </div>
+          <div class="kw-version-grid">
+            {% for item in workbench.hermes_hub.versions %}
+            <div class="kw-version-card">
+              <div class="kw-version-top">
+                <div>
+                  <div class="kw-version-title">{{ item.name }}</div>
+                  <div class="kw-version-desc">{{ item.desc }}</div>
+                </div>
+                <span class="kw-tag">演示版</span>
+              </div>
+              <div class="kw-watch-chip-row" style="margin-top:10px">
+                {% for point in item.points %}
+                <span class="kw-mode-chip">{{ point }}</span>
+                {% endfor %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="kw-skill-list" style="margin-top:12px">
+            {% for item in workbench.hermes_hub.skills %}
+            <div class="kw-mini-card">
+              <div class="kw-mini-title">{{ item.label }}</div>
+              <div class="kw-skill-meta">{{ item.type }} · 关联知识 {{ item.knowledge }} 条</div>
             </div>
             {% endfor %}
           </div>
         </div>
+      </div>
 
+      <div id="workbench-section-watchlist" style="display:none">
         <div class="kw-card">
           <div class="kw-card-head">
             <div>
-              <div class="kw-card-title">快捷动作</div>
-              <div class="kw-card-desc">web 工作台优先放大V每天真的会点的动作。</div>
+              <div class="kw-card-title">自选股与个股详情</div>
+              <div class="kw-card-desc">{{ workbench.watchlist_hub.summary }}</div>
             </div>
-            <span class="kw-tag">Quick Actions</span>
+            <span class="kw-tag">Watchlist</span>
           </div>
-          <div class="kw-action-grid">
-            <div class="kw-action">
-              <div class="kw-action-title">发布今日解读</div>
-              <div class="kw-action-desc">继续承接基本面面板、复盘摘要和租户内研究输出。</div>
+          <div class="kw-watch-grid">
+            {% for item in workbench.watchlist_hub["items"] %}
+            <div class="kw-watch-card">
+              <div class="kw-watch-top">
+                <div>
+                  <div class="kw-watch-title">{{ item.name }}</div>
+                  <div class="kw-watch-meta">{{ item.code }} · {{ item.market }} · {{ item.focus }}</div>
+                </div>
+                <span class="kw-tag">{{ item.change }}</span>
+              </div>
+              <div class="kw-watch-desc">{{ item.thesis }}</div>
+              <div class="kw-watch-chip-row" style="margin-top:10px">
+                <span class="kw-watch-chip">基础 K 线</span>
+                <span class="kw-watch-chip">MA5</span>
+                <span class="kw-watch-chip">MA10</span>
+                <span class="kw-watch-chip">MA20</span>
+              </div>
             </div>
-            <div class="kw-action">
-              <div class="kw-action-title">发起群发</div>
-              <div class="kw-action-desc">面向留资用户或高频用户做分层触达。</div>
-            </div>
-            <div class="kw-action">
-              <div class="kw-action-title">处理 Hermes 记录</div>
-              <div class="kw-action-desc">查看粉丝近期分析偏好，沉淀到租户画像。</div>
-            </div>
-            <div class="kw-action">
-              <div class="kw-action-title">查看协同收入</div>
-              <div class="kw-action-desc">只看与自己相关的经营结果，不混平台总表。</div>
-            </div>
-          </div>
-          <div class="kw-toolbar">
-            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="showToast('工作台功能持续补充中')">进入工作流程</button>
+            {% endfor %}
           </div>
         </div>
+      </div>
 
+      <div id="workbench-section-dashboard" style="display:none">
+        <div class="kw-card">
+          <div class="kw-card-head">
+            <div>
+              <div class="kw-card-title">基本面核心指标面板</div>
+              <div class="kw-card-desc">{{ workbench.fund_dashboard.summary }}</div>
+            </div>
+            <span class="kw-tag">{{ workbench.fund_dashboard.layout }}</span>
+          </div>
+          <div class="kw-cell-grid">
+            {% for cell in workbench.fund_dashboard.cells %}
+            <div class="kw-cell-card">
+              <div class="kw-cell-title">{{ cell.title }}</div>
+              {% if cell.value %}
+              <div class="kw-cell-value">{{ cell.value }}</div>
+              {% else %}
+              <div class="kw-empty-plus">+</div>
+              {% endif %}
+              <div class="kw-cell-desc">默认总结态展示；点击编辑后按独立提示词重新生成。</div>
+              <div class="kw-prompt-row" style="margin-top:10px">
+                <span class="kw-prompt-chip">{{ cell.prompt }}</span>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="kw-toolbar" style="margin-top:12px">
+            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="showToast('将弹框输入单格提示词')">编辑单格提示词</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="workbench-section-published" style="display:none">
         <div class="kw-card">
           <div class="kw-card-head">
             <div>
               <div class="kw-card-title">最近已发布复盘</div>
-              <div class="kw-card-desc">普通投资者在前台看到的，就是这里确认发布后的复盘内容。</div>
+              <div class="kw-card-desc">普通投资者在前台看到的，就是这里确认发布后的复盘内容。粉丝也会通过消息板块第一时间收到通知。</div>
             </div>
             <span class="kw-tag">Published</span>
           </div>
@@ -397,23 +721,50 @@ body { background: var(--surface-2); color: var(--text-main); }
             {% endfor %}
           </div>
         </div>
+      </div>
 
-        <div class="kw-card">
-          <div class="kw-card-head">
-            <div>
-              <div class="kw-card-title">边界说明</div>
-              <div class="kw-card-desc">这套页面只属于大V自己的后台 web 应用，不再混入平台 Admin 的功能。</div>
+      <div id="workbench-section-consistency" style="display:none">
+        <div class="kw-section-grid">
+          <div class="kw-section-stack">
+            <div class="kw-card">
+              <div class="kw-card-head">
+                <div>
+                  <div class="kw-card-title">前后台一致性</div>
+                  <div class="kw-card-desc">工作台、H5 和 Admin 当前围绕同一套产品结构协同，不再各说各话。</div>
+                </div>
+                <span class="kw-tag">Consistency</span>
+              </div>
+              <div class="kw-mini-grid">
+                {% for item in workbench.consistency_notes %}
+                <div class="kw-mini-card">
+                  <div class="kw-mini-title">{{ item.title }}</div>
+                  <div class="kw-mini-desc">{{ item.desc }}</div>
+                </div>
+                {% endfor %}
+              </div>
             </div>
-            <span class="kw-tag">Role Split</span>
           </div>
-          <div class="kw-fan-list">
-            <div class="kw-fan-item">
-              <div class="kw-fan-name">平台 Admin 保留</div>
-              <div class="kw-fan-msg">功能控开、访问审计、活动管理、平台级用户与渠道管理。</div>
-            </div>
-            <div class="kw-fan-item">
-              <div class="kw-fan-name">大V工作台保留</div>
-              <div class="kw-fan-msg">粉丝消息、群发、个人协同收入、租户内研究经营动作。</div>
+          <div class="kw-section-stack">
+            <div class="kw-card">
+              <div class="kw-card-head">
+                <div>
+                  <div class="kw-card-title">角色边界</div>
+                  <div class="kw-card-desc">这套页面只属于大V自己的后台 web 应用，不和平台 Admin 功能混用。</div>
+                </div>
+                <span class="kw-tag">Role Split</span>
+              </div>
+              <div class="kw-role-grid">
+                {% for item in workbench.role_split %}
+                <div class="kw-role-card">
+                  <div class="kw-role-title">{{ item.side }}</div>
+                  <div class="kw-watch-chip-row" style="margin-top:10px">
+                    {% for point in item["items"] %}
+                    <span class="kw-watch-chip">{{ point }}</span>
+                    {% endfor %}
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
             </div>
           </div>
         </div>
@@ -424,6 +775,137 @@ body { background: var(--surface-2); color: var(--text-main); }
 
 <div class="toast" id="toast"></div>
 <script>
+const workbenchSectionMeta = {
+  overview: { title: '工作台概览', summary: '和 H5 保持同一套产品口径，但以桌面 web 工作流方式组织大V日常动作。' },
+  fans: { title: '粉丝管理', summary: '查看大V自己的粉丝规模、来源、价值标签和分层状态。' },
+  messages: { title: '粉丝消息', summary: '查看粉丝提问、大V回复链路和复盘发布后的触达提醒。' },
+  broadcast: { title: '群发助手', summary: '只保留大V自己的分层触达、今日解读和复盘提醒动作。' },
+  'biz-dashboard': { title: '经营 Dashboard', summary: '整合粉丝增长、注册费、总注册收入、其他收入、token 消耗、消息数量分布与趋势、发布数量分布与趋势。' },
+  review: { title: '复盘生产台', summary: '按周期、供稿方式、选股归纳和段落方式组织复盘生产流程。' },
+  knowledge: { title: '知识库微调', summary: '历史知识内容可继续弹框微调，修改后重新同步 Hermes 和知识专区。' },
+  hermes: { title: 'Hermes 工作台', summary: '统一管理工作区版和龙虾纯对话版的产品口径、skills 和知识绑定。' },
+  watchlist: { title: '自选股与详情', summary: '承接 H5 的顶部输代码、自选股详情和 K 线 + MA5/10/20 展示逻辑。' },
+  dashboard: { title: '核心指标面板', summary: '单格提示词驱动的基本面面板，默认总结态展示，编辑后按格生成。' },
+  published: { title: '已发布复盘', summary: '这里确认发布后的复盘，就是普通投资者在前台实际看到的内容。' },
+  consistency: { title: '前后台一致性', summary: '明确 H5、工作台和 Admin 的一致性口径以及角色边界。' }
+};
+
+function renderWorkbenchBarChart(hostId, items) {
+  const host = document.getElementById(hostId);
+  const list = Array.isArray(items) ? items : [];
+  if (!host || !list.length) return;
+  const width = 420;
+  const height = 240;
+  const padding = { top: 20, right: 18, bottom: 56, left: 24 };
+  const maxValue = Math.max(...list.map(item => Number(item.value || 0)), 1);
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const slotWidth = plotWidth / list.length;
+  const barWidth = Math.min(44, slotWidth * 0.56);
+  const bars = list.map((item, index) => {
+    const value = Number(item.value || 0);
+    const barHeight = (value / maxValue) * plotHeight;
+    const x = padding.left + slotWidth * index + (slotWidth - barWidth) / 2;
+    const y = padding.top + plotHeight - barHeight;
+    const labelX = padding.left + slotWidth * index + slotWidth / 2;
+    return `
+      <rect class="kw-chart-bar" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barWidth.toFixed(2)}" height="${barHeight.toFixed(2)}" rx="8" />
+      <text class="kw-chart-value" x="${labelX.toFixed(2)}" y="${(y - 8).toFixed(2)}" text-anchor="middle">${value}</text>
+      <text class="kw-chart-label" x="${labelX.toFixed(2)}" y="${(height - 18).toFixed(2)}" text-anchor="middle">${item.label}</text>
+    `;
+  }).join('');
+  host.innerHTML = `
+    <svg class="kw-chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="柱状图">
+      <defs>
+        <linearGradient id="kwBarGradient" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#66A1DF" />
+          <stop offset="100%" stop-color="#2F74C0" />
+        </linearGradient>
+      </defs>
+      <line class="kw-chart-axis" x1="${padding.left}" y1="${padding.top + plotHeight}" x2="${width - padding.right}" y2="${padding.top + plotHeight}" />
+      ${bars}
+    </svg>
+  `;
+}
+
+function renderWorkbenchTrendChart(hostId, items) {
+  const host = document.getElementById(hostId);
+  const list = Array.isArray(items) ? items : [];
+  if (!host || !list.length) return;
+  const width = 420;
+  const height = 240;
+  const padding = { top: 20, right: 20, bottom: 36, left: 24 };
+  const values = list.map(item => Number(item.count || 0));
+  const maxValue = Math.max(...values, 1);
+  const minValue = Math.min(...values, 0);
+  const span = Math.max(maxValue - minValue, 1);
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const scaleX = index => padding.left + (plotWidth / Math.max(list.length - 1, 1)) * index;
+  const scaleY = value => padding.top + ((maxValue - value) / span) * plotHeight;
+  const linePath = list.map((item, index) => `${index === 0 ? 'M' : 'L'} ${scaleX(index).toFixed(2)} ${scaleY(Number(item.count || 0)).toFixed(2)}`).join(' ');
+  const areaPath = `${linePath} L ${scaleX(list.length - 1).toFixed(2)} ${(padding.top + plotHeight).toFixed(2)} L ${scaleX(0).toFixed(2)} ${(padding.top + plotHeight).toFixed(2)} Z`;
+  const points = list.map((item, index) => `
+    <circle class="kw-chart-point" cx="${scaleX(index).toFixed(2)}" cy="${scaleY(Number(item.count || 0)).toFixed(2)}" r="4.5"></circle>
+    <text class="kw-chart-value" x="${scaleX(index).toFixed(2)}" y="${(scaleY(Number(item.count || 0)) - 10).toFixed(2)}" text-anchor="middle">${item.count}</text>
+    <text class="kw-chart-tick" x="${scaleX(index).toFixed(2)}" y="${(height - 12).toFixed(2)}" text-anchor="middle">${item.day}</text>
+  `).join('');
+  const gridlines = [0, 0.5, 1].map(ratio => {
+    const y = padding.top + plotHeight * ratio;
+    return `<line class="kw-chart-gridline" x1="${padding.left}" y1="${y.toFixed(2)}" x2="${width - padding.right}" y2="${y.toFixed(2)}"></line>`;
+  }).join('');
+  host.innerHTML = `
+    <svg class="kw-chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="趋势线图">
+      <defs>
+        <linearGradient id="kwLineGradient" x1="0" x2="1" y1="0" y2="0">
+          <stop offset="0%" stop-color="#66A1DF" />
+          <stop offset="100%" stop-color="#2F74C0" />
+        </linearGradient>
+        <linearGradient id="kwAreaGradient" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#66A1DF" />
+          <stop offset="100%" stop-color="#FFFFFF" />
+        </linearGradient>
+      </defs>
+      ${gridlines}
+      <line class="kw-chart-axis" x1="${padding.left}" y1="${padding.top + plotHeight}" x2="${width - padding.right}" y2="${padding.top + plotHeight}" />
+      <path class="kw-chart-area" d="${areaPath}"></path>
+      <path class="kw-chart-line" d="${linePath}"></path>
+      ${points}
+    </svg>
+  `;
+}
+
+function renderWorkbenchBizCharts() {
+  const metrics = window.WORKBENCH_DATA && window.WORKBENCH_DATA.dashboard_metrics;
+  if (!metrics) return;
+  renderWorkbenchBarChart('kw-message-distribution-chart', metrics.message_distribution);
+  renderWorkbenchTrendChart('kw-message-trend-chart', metrics.message_trend);
+  renderWorkbenchBarChart('kw-publish-distribution-chart', metrics.publish_distribution);
+  renderWorkbenchTrendChart('kw-publish-trend-chart', metrics.publish_trend);
+}
+
+function showWorkbenchSection(name, navEl) {
+  document.querySelectorAll('[id^="workbench-section-"]').forEach(el => {
+    el.style.display = 'none';
+  });
+  const target = document.getElementById('workbench-section-' + name);
+  if (target) target.style.display = 'block';
+  document.querySelectorAll('.admin-nav-item').forEach(el => el.classList.remove('active'));
+  const activeNav = navEl || document.querySelector(`.admin-nav-item[data-section="${name}"]`);
+  if (activeNav) activeNav.classList.add('active');
+  const meta = workbenchSectionMeta[name] || workbenchSectionMeta.overview;
+  const title = document.getElementById('workbench-page-title');
+  const summary = document.getElementById('workbench-page-summary');
+  if (title) title.textContent = meta.title;
+  if (summary) summary.textContent = meta.summary;
+  if (name === 'biz-dashboard') {
+    renderWorkbenchBizCharts();
+  }
+  const url = new URL(window.location.href);
+  url.searchParams.set('section', name);
+  window.history.replaceState({}, '', url);
+}
+
 function showToast(message) {
   const toast = document.getElementById('toast');
   if (!toast) return;
@@ -432,6 +914,15 @@ function showToast(message) {
   clearTimeout(window.__kwToastTimer);
   window.__kwToastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  const section = new URLSearchParams(window.location.search).get('section');
+  if (section && workbenchSectionMeta[section]) {
+    showWorkbenchSection(section);
+    return;
+  }
+  renderWorkbenchBizCharts();
+});
 </script>
 </body>
 </html>

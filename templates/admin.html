@@ -79,6 +79,16 @@
   .audit-table th { color:var(--text-sub); background:rgba(200,169,110,0.06); text-align:left; }
   .audit-table td { color:var(--text-main); }
   .audit-chart-wrap { height:280px; }
+  .sync-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .sync-card { background:var(--surface-2); border:1px solid rgba(200,169,110,0.15); border-radius:12px; padding:18px; }
+  .sync-title { font-size:14px; color:var(--gold); font-weight:600; margin-bottom:8px; }
+  .sync-desc { font-size:12px; color:var(--text-sub); line-height:1.7; margin-bottom:12px; }
+  .sync-chip-row { display:flex; gap:8px; flex-wrap:wrap; }
+  .sync-chip { font-size:11px; color:var(--gold-dark); background:rgba(200,169,110,0.10); border:1px solid rgba(200,169,110,0.18); border-radius:999px; padding:4px 10px; }
+  .sync-note-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .sync-note-card { background:var(--surface-2); border:1px solid rgba(200,169,110,0.15); border-radius:12px; padding:16px; }
+  .sync-note-title { font-size:13px; color:var(--text-main); font-weight:600; margin-bottom:6px; }
+  .sync-note-desc { font-size:12px; color:var(--text-sub); line-height:1.7; }
   .theme-pill-group { display:flex; gap:8px; flex-wrap:wrap; }
   .theme-pill { padding:6px 10px; border-radius:999px; border:1px solid rgba(200,169,110,0.2); background:transparent; color:var(--text-main); cursor:pointer; font-size:12px; }
   .theme-pill.active { background:rgba(200,169,110,0.15); color:var(--gold); border-color:var(--gold); }
@@ -248,6 +258,8 @@
       <div class="admin-page-title" id="page-title">运营概览</div>
       <div style="display:flex;gap:12px;align-items:center">
         <span style="font-size:12px;color:#8899aa">2026-06-01 业务沟通会口径</span>
+        <a href="/kol-workbench" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">大V工作台 Web</a>
+        <a href="/h5" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">H5 前台</a>
         <button class="btn-gold" style="padding:8px 16px;font-size:12px" onclick="showToast('报告生成中，请稍候...')">导出报告</button>
       </div>
     </div>
@@ -280,6 +292,21 @@
             <span class="stat-icon">&#9733;</span>
             <div class="stat-value">4</div>
             <div class="stat-change up">NDA / 敏感词 / ICP / 软著</div>
+          </div>
+        </div>
+
+        <div class="sync-note-grid" style="margin-bottom:20px">
+          <div class="sync-note-card">
+            <div class="sync-note-title">双后台入口已拆开</div>
+            <div class="sync-note-desc">首页和 Admin 顶栏都保留两个入口：纯 Admin 后台负责平台管理，大V工作台 Web 负责租户经营动作。</div>
+          </div>
+          <div class="sync-note-card">
+            <div class="sync-note-title">H5 能力是后台单一事实源</div>
+            <div class="sync-note-desc">Hermes、复盘、知识、自选股、消息和核心指标面板，都按同一套产品口径映射到前后台。</div>
+          </div>
+          <div class="sync-note-card">
+            <div class="sync-note-title">平台只做平台职责</div>
+            <div class="sync-note-desc">Admin 负责审计、控开、租户管理和一致性巡检，不替代大V自己的消息、复盘和 Hermes 工作台。</div>
           </div>
         </div>
 
@@ -340,6 +367,26 @@
                 <td>{% if seg.segment == '免费用户' %}16%{% elif seg.segment == '基础会员' %}48%{% elif seg.segment == '专业会员' %}70%{% elif seg.segment == '机构试点' %}84%{% else %}75%{% endif %}</td>
               </tr>
               {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="table-wrap" style="margin-top:20px">
+          <div class="table-header">
+            <div class="table-title">前后台能力一致性矩阵</div>
+            <span class="tag tag-gold">以 H5 为产品事实源</span>
+          </div>
+          <table>
+            <thead>
+              <tr><th>能力</th><th>H5 前台</th><th>大V工作台 Web</th><th>纯 Admin 后台</th></tr>
+            </thead>
+            <tbody>
+              <tr><td style="color:#F8F6F0;font-weight:500">消息链路</td><td>粉丝消息 + 大V回复 + 复盘提醒</td><td>处理消息、回复、推送复盘提醒</td><td>管理 DM 开关与审计，不直接代替回复</td></tr>
+              <tr><td style="color:#F8F6F0;font-weight:500">复盘</td><td>展示大V复盘 + 智能复盘</td><td>发起复盘、选周期、挑自选股、决定段落方式</td><td>管理租户是否开通复盘工作流</td></tr>
+              <tr><td style="color:#F8F6F0;font-weight:500">知识库</td><td>知识专区展示沉淀结果</td><td>语音/文件/URL 入库，历史内容继续微调</td><td>管理知识功能开关和租户能力边界</td></tr>
+              <tr><td style="color:#F8F6F0;font-weight:500">Hermes</td><td>工作区版 + 龙虾纯对话版</td><td>维护 skill、知识绑定、查看使用动作</td><td>监控调用、算力、双版本使用与知识命中</td></tr>
+              <tr><td style="color:#F8F6F0;font-weight:500">自选股</td><td>顶部输代码，进详情后添加自选</td><td>按复盘和 Hermes 工作流挑选重点样本</td><td>不直接管理个股内容，只管理功能可用性</td></tr>
+              <tr><td style="color:#F8F6F0;font-weight:500">核心指标面板</td><td>默认总结态，单格提示词生成</td><td>配置单格提示词和发布面板</td><td>管理该能力的租户开关和一致性说明</td></tr>
             </tbody>
           </table>
         </div>
@@ -664,6 +711,32 @@
             <span class="stat-icon">&#9998;</span>
             <div class="stat-value">6</div>
             <div class="stat-change" style="color:#C8A96E">需处理</div>
+          </div>
+        </div>
+        <div class="sync-grid" style="margin-bottom:20px">
+          <div class="sync-card">
+            <div class="sync-title">大V工作台能力映射</div>
+            <div class="sync-desc">平台侧必须知道大V工作台现在承接的，不只是消息和群发，还包括复盘生产、知识微调、Hermes 双版本、自选股详情和核心指标面板。</div>
+            <div class="sync-chip-row">
+              <span class="sync-chip">粉丝消息 + 复盘提醒</span>
+              <span class="sync-chip">复盘周期 / 供稿方式 / 选股归纳</span>
+              <span class="sync-chip">知识库历史微调</span>
+              <span class="sync-chip">Hermes 工作区版</span>
+              <span class="sync-chip">Hermes 龙虾纯对话版</span>
+              <span class="sync-chip">自选股详情 + K线 + MA5/10/20</span>
+              <span class="sync-chip">基本面单格提示词面板</span>
+            </div>
+          </div>
+          <div class="sync-card">
+            <div class="sync-title">平台管理动作</div>
+            <div class="sync-desc">Admin 不直接替代大V工作台，而是管理租户是否开通这些能力、能力是否一致、消息与知识是否能在租户内闭环。</div>
+            <div class="sync-chip-row">
+              <span class="sync-chip">租户开通 Hermes</span>
+              <span class="sync-chip">租户开通知识库</span>
+              <span class="sync-chip">租户开通复盘工作流</span>
+              <span class="sync-chip">租户开通 DM 消息链路</span>
+              <span class="sync-chip">租户开通工作台入口</span>
+            </div>
           </div>
         </div>
         <div class="table-wrap" style="margin-bottom:20px">
@@ -1394,6 +1467,31 @@
             <span class="stat-icon">&#9733;</span>
             <div class="stat-value">284,000</div>
             <div class="stat-change" style="color:#C8A96E">积分</div>
+          </div>
+        </div>
+        <div class="sync-grid" style="margin-bottom:20px">
+          <div class="sync-card">
+            <div class="sync-title">Hermes 产品口径</div>
+            <div class="sync-desc">H5 现已分成两种版本：工作区版保留股票、skills、提示词和结构化结果；龙虾纯对话版只保留聊天和 skills，不强制单独输入股票代码。</div>
+            <div class="sync-chip-row">
+              <span class="sync-chip">工作区版</span>
+              <span class="sync-chip">龙虾纯对话版</span>
+              <span class="sync-chip">skills 可选</span>
+              <span class="sync-chip">skills 可自定义</span>
+              <span class="sync-chip">skills 绑定知识库</span>
+              <span class="sync-chip">问题里自然带股票对象时自动转个股分析</span>
+            </div>
+          </div>
+          <div class="sync-card">
+            <div class="sync-title">平台监控重点</div>
+            <div class="sync-desc">平台侧看的不是按钮多少，而是这两种模式的调用量、知识命中情况、个股分析触发率和响应质量是否一致。</div>
+            <div class="sync-chip-row">
+              <span class="sync-chip">双版本调用占比</span>
+              <span class="sync-chip">知识命中率</span>
+              <span class="sync-chip">自定义 skill 使用率</span>
+              <span class="sync-chip">纯对话转个股分析比率</span>
+              <span class="sync-chip">响应耗时</span>
+            </div>
           </div>
         </div>
         <div class="table-wrap" style="margin-bottom:20px">
