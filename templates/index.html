@@ -17,6 +17,30 @@
 
 html { scroll-behavior: smooth; }
 body { background: var(--surface); color: var(--text-main); }
+body.index-page,
+body.index-page.theme-light,
+body.index-page.theme-dark {
+  --navy: #F4F7FB;
+  --navy-mid: #FFFFFF;
+  --navy-light: #EEF4FA;
+  --gold: #2F74C0;
+  --gold-light: #66A1DF;
+  --gold-dark: #245B96;
+  --white: #182132;
+  --white-pure: #182132;
+  --gray-100: #F7FAFD;
+  --gray-200: #516174;
+  --gray-300: #445468;
+  --gray-400: #3B4A5C;
+  --gray-600: #243244;
+  --surface: #FFFFFF;
+  --surface-2: #F7F9FC;
+  --surface-3: #EEF4FA;
+  --text-main: #182132;
+  --text-sub: #445468;
+  --border-soft: #D7E0EA;
+  --shadow-soft: 0 10px 30px rgba(25,42,64,0.08);
+}
 
 /* ---- SECTION WRAPPERS ---- */
 .ix-section {
@@ -55,6 +79,26 @@ body { background: var(--surface); color: var(--text-main); }
   max-width: 600px;
   line-height: 1.8;
   margin-bottom: 48px;
+}
+body.index-page .ix-section-dark,
+body.index-page.theme-dark .ix-section-dark,
+body.index-page.theme-dark .ix-section-alt,
+body.index-page .ix-footer {
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
+}
+body.index-page .ix-top-nav,
+body.index-page.theme-dark .ix-top-nav {
+  background: rgba(255,255,255,0.94);
+}
+body.index-page .hero-section {
+  background: linear-gradient(160deg, var(--surface) 0%, var(--surface-2) 55%, var(--surface-3) 100%);
+}
+body.index-page .ix-nav-card,
+body.index-page .biz-node,
+body.index-page .funnel-channel-card,
+body.index-page .kol-col-card,
+body.index-page .tech-layer {
+  box-shadow: var(--shadow-soft);
 }
 
 /* ---- SECTION DIVIDER ---- */
@@ -190,18 +234,18 @@ body { background: var(--surface); color: var(--text-main); }
 .hero-split-entry {
   text-align: left;
   text-decoration: none;
-  background: rgba(12, 24, 38, 0.72);
-  border: 1px solid rgba(200,169,110,0.16);
+  background: rgba(255,255,255,0.94);
+  border: 1px solid rgba(47,116,192,0.14);
   border-radius: 18px;
   padding: 22px 24px;
-  box-shadow: 0 18px 44px rgba(3, 10, 20, 0.22);
+  box-shadow: 0 18px 44px rgba(25,42,64,0.1);
   backdrop-filter: blur(10px);
   transition: transform .24s ease, border-color .24s ease, box-shadow .24s ease;
 }
 .hero-split-entry:hover {
   transform: translateY(-4px);
-  border-color: rgba(200,169,110,0.38);
-  box-shadow: 0 24px 56px rgba(3, 10, 20, 0.28);
+  border-color: rgba(47,116,192,0.32);
+  box-shadow: 0 24px 56px rgba(25,42,64,0.14);
 }
 .hero-split-entry-top {
   display: flex;
@@ -217,7 +261,7 @@ body { background: var(--surface); color: var(--text-main); }
   align-items: center;
   justify-content: center;
   font-size: 22px;
-  background: rgba(200,169,110,0.12);
+  background: rgba(47,116,192,0.1);
   color: var(--gold);
 }
 .hero-split-entry-tag {
@@ -228,7 +272,7 @@ body { background: var(--surface); color: var(--text-main); }
 .hero-split-entry-title {
   font-size: 20px;
   font-weight: 700;
-  color: var(--white);
+  color: var(--text-main);
   margin-top: 14px;
 }
 .hero-split-entry-desc {
@@ -241,6 +285,131 @@ body { background: var(--surface); color: var(--text-main); }
   margin-top: 14px;
   font-size: 12px;
   color: var(--gold);
+}
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 24px;
+  align-items: stretch;
+}
+.summary-main-card,
+.summary-side-card,
+.summary-role-card {
+  background: #fff;
+  border: 1px solid rgba(47,116,192,0.12);
+  border-radius: 18px;
+  box-shadow: var(--shadow-soft);
+}
+.summary-main-card { padding: 28px; }
+.summary-side-stack {
+  display: grid;
+  gap: 16px;
+}
+.summary-side-card { padding: 20px; }
+.summary-main-title,
+.summary-side-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 10px;
+}
+.summary-main-desc,
+.summary-side-desc {
+  font-size: 13px;
+  color: var(--gray-400);
+  line-height: 1.8;
+}
+.summary-flow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 22px;
+}
+.summary-flow-item {
+  background: var(--surface-2);
+  border: 1px solid rgba(47,116,192,0.1);
+  border-radius: 14px;
+  padding: 16px;
+}
+.summary-flow-step {
+  font-size: 11px;
+  color: var(--gold);
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+.summary-flow-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 6px;
+}
+.summary-flow-desc {
+  font-size: 12px;
+  color: var(--gray-400);
+  line-height: 1.7;
+}
+.summary-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.summary-badge {
+  font-size: 11px;
+  color: var(--gold);
+  background: rgba(47,116,192,0.08);
+  border: 1px solid rgba(47,116,192,0.12);
+  border-radius: 999px;
+  padding: 5px 10px;
+}
+.summary-role-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+.summary-role-card { padding: 20px; }
+.summary-role-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.summary-role-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(47,116,192,0.08);
+  color: var(--gold);
+  font-size: 18px;
+}
+.summary-role-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.summary-role-desc {
+  font-size: 12px;
+  color: var(--gray-400);
+  line-height: 1.8;
+}
+.summary-link-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.summary-link {
+  text-decoration: none;
+  font-size: 12px;
+  color: var(--gold);
+  border: 1px solid rgba(47,116,192,0.16);
+  background: rgba(47,116,192,0.04);
+  border-radius: 999px;
+  padding: 8px 12px;
 }
 .mountain-label {
   font-size: 11px;
@@ -449,6 +618,37 @@ body { background: var(--surface); color: var(--text-main); }
 .funnel-layer-count { font-size: 22px; font-weight: 700; color: var(--gold); min-width: 80px; text-align: right; }
 .funnel-layer-desc { font-size: 12px; color: var(--text-sub); flex: 1; text-align: center; line-height: 1.4; }
 .funnel-layer-rate { font-size: 12px; color: var(--text-sub); min-width: 80px; text-align: right; }
+.funnel-layer-retain {
+  width: 54% !important;
+  display: grid;
+  grid-template-columns: 92px 1fr auto;
+  align-items: center;
+  gap: 8px 14px;
+}
+.funnel-layer-retain .funnel-layer-name {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  min-width: 0;
+}
+.funnel-layer-retain .funnel-layer-desc {
+  grid-column: 2 / 4;
+  grid-row: 1;
+  min-width: 0;
+  text-align: left;
+}
+.funnel-layer-retain .funnel-layer-count {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  text-align: left;
+}
+.funnel-layer-retain .funnel-layer-rate {
+  grid-column: 3;
+  grid-row: 2;
+  min-width: 0;
+  text-align: right;
+  white-space: nowrap;
+}
 
 /* ========================================================
    SECTION 5: KOL PARTNERSHIP
@@ -754,6 +954,9 @@ body.theme-dark .tech-layer {
   .ix-section { padding: 60px 20px; }
   .ix-section-title { font-size: 24px; }
   .hero-split-entry-grid { grid-template-columns: 1fr; }
+  .summary-grid,
+  .summary-role-grid,
+  .summary-flow { grid-template-columns: 1fr; }
   .nav-cards-grid { grid-template-columns: 1fr; }
   .biz-model-wrap { grid-template-columns: 1fr; }
   .biz-col-center { display: none; }
@@ -771,7 +974,7 @@ body.theme-dark .tech-layer {
 }
 </style>
 </head>
-<body onload="initGangtiseTheme()">
+<body class="index-page" onload="initGangtiseTheme()">
 
 <!-- ======================================================
      STICKY TOP NAV
@@ -783,6 +986,7 @@ body.theme-dark .tech-layer {
       <a href="#modules" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">系统模块</a>
       <a href="#business" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">项目定位</a>
       <a href="#c-core" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">核心能力</a>
+      <a href="#knowledge-system" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">知识能力</a>
       <a href="#validation" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">验证进展</a>
       <a href="#funnel-flow" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">增长验证</a>
       <a href="#fundraise" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">融资计划</a>
@@ -867,6 +1071,93 @@ body.theme-dark .tech-layer {
 
 
 <!-- ======================================================
+     SECTION 1.5: 前后台归案总结
+====================================================== -->
+<section class="ix-section ix-section-alt" id="summary">
+  <div class="ix-inner">
+    <div class="ix-section-label">Front / Back Summary</div>
+    <div class="ix-section-title">前后台归案总结</div>
+    <div class="ix-divider"></div>
+    <div class="ix-section-desc">首页现在直接说明前台、工作台和纯 Admin 后台怎么分工，确保演示时一眼能看懂产品结构，不再把角色和能力混在一起。</div>
+
+    <div class="summary-grid">
+      <div class="summary-main-card">
+        <div class="summary-main-title">统一口径：前台负责消费研究，工作台负责生产研究，Admin 负责控开与治理</div>
+        <div class="summary-main-desc">H5 承接普通投资者的基本面分析、自选股、复盘与 Hermes 互动。大V 工作台 Web 承接粉丝管理、消息、群发、复盘生产、知识库微调、Skills 绑定、Hermes 工作台和经营 Dashboard。纯 Admin 后台只做平台级租户管理、能力控开、审计、结算、一致性巡检与分析配置。知识库加 Skills 是整个平台最独有的能力，让每个租户把自己的研究方法、历史资料和表达方式真正沉淀进智能体。</div>
+
+        <div class="summary-flow">
+          <div class="summary-flow-item">
+            <div class="summary-flow-step">01 / H5 前台</div>
+            <div class="summary-flow-title">普通用户消费内容</div>
+            <div class="summary-flow-desc">查看大V复盘、进行基本面分析、维护自选股、和 Hermes 对话；对话会自动承接当前知识库与 Skills 上下文，但不暴露后台配置。</div>
+          </div>
+          <div class="summary-flow-item">
+            <div class="summary-flow-step">02 / 大V 工作台 Web</div>
+            <div class="summary-flow-title">大V生产与经营内容</div>
+            <div class="summary-flow-desc">从粉丝消息、自选股筛选、复盘生成、知识微调、Skill 新增绑定到发布分发，都在左侧菜单式工作台内完成。</div>
+          </div>
+          <div class="summary-flow-item">
+            <div class="summary-flow-step">03 / 纯 Admin 后台</div>
+            <div class="summary-flow-title">平台统一治理</div>
+            <div class="summary-flow-desc">只负责租户、权限、开关、审计、收入结算和一致性，不替代大V自己的日常工作流。</div>
+          </div>
+        </div>
+
+        <div class="summary-badges">
+          <span class="summary-badge">Hermes 双版本演示</span>
+          <span class="summary-badge">知识库内容支持微调</span>
+          <span class="summary-badge">Skills 可新增并绑定知识库</span>
+          <span class="summary-badge">核心指标支持单格提示词生成</span>
+          <span class="summary-badge">前后台能力一一映射</span>
+        </div>
+
+        <div class="summary-link-row">
+          <a href="/h5" class="summary-link">查看 H5 用户端</a>
+          <a href="/kol-workbench" class="summary-link">查看大V工作台 Web</a>
+          <a href="/admin" class="summary-link">查看纯 Admin 后台</a>
+        </div>
+      </div>
+
+      <div class="summary-side-stack">
+        <div class="summary-side-card">
+          <div class="summary-side-title">工作台 Web 新职责</div>
+          <div class="summary-side-desc">以左侧菜单方式整合工作台概览、粉丝管理、粉丝消息、群发助手、经营 Dashboard、复盘生产台、知识库微调、Skills 维护、Hermes 工作台、自选股详情、核心指标面板和已发布复盘。</div>
+        </div>
+        <div class="summary-side-card">
+          <div class="summary-side-title">纯 Admin 后台新职责</div>
+          <div class="summary-side-desc">聚焦平台管理和一致性巡检，保证首页、H5、大V 工作台 Web、Admin 三端表达一致，并通过 feature flag 管理能力开放节奏。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="summary-role-grid">
+      <div class="summary-role-card">
+        <div class="summary-role-top">
+          <div class="summary-role-icon">📱</div>
+          <div class="summary-role-title">H5 用户端</div>
+        </div>
+        <div class="summary-role-desc">浅色、低门槛、直接承接分析和阅读。普通用户看到的是研究框架、K线图表、复盘内容和 Hermes 对话结果。</div>
+      </div>
+      <div class="summary-role-card">
+        <div class="summary-role-top">
+          <div class="summary-role-icon">👑</div>
+          <div class="summary-role-title">大V 工作台 Web</div>
+        </div>
+        <div class="summary-role-desc">和 Admin 保持同一设计语言，但职责独立。左侧菜单，右侧内容，重点面向大V自己的粉丝经营和研究生产工作流。</div>
+      </div>
+      <div class="summary-role-card">
+        <div class="summary-role-top">
+          <div class="summary-role-icon">⚙️</div>
+          <div class="summary-role-title">纯 Admin 后台</div>
+        </div>
+        <div class="summary-role-desc">只处理平台级事情：租户治理、能力控开、审计、收入和一致性，不再承接大V的私域工作动作。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ======================================================
      SECTION 2: 系统模块导航
 ====================================================== -->
 <section class="ix-section ix-section-alt" id="modules">
@@ -914,9 +1205,9 @@ body.theme-dark .tech-layer {
     <div class="ix-section-label">C-Side Core Capabilities</div>
     <div class="ix-section-title">当前对外承接的 C 端能力</div>
     <div class="ix-divider"></div>
-    <div class="ix-section-desc">当前对外能力聚焦三类高频、低风险、易理解的场景：基本面分析、自选股和每日复盘。</div>
+    <div class="ix-section-desc">当前对外能力聚焦三类高频、低风险、易理解的场景：基本面分析、自选股和每日复盘；底层独有能力则是知识库与 Skills，把租户自己的研究方法沉淀到系统里。</div>
 
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:24px">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:24px">
       <!-- 1) 基本面分析 -->
       <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.15);border-radius:14px;padding:24px;position:relative">
         <div style="position:absolute;top:18px;right:18px;font-size:11px;color:var(--gold);background:rgba(200,169,110,0.1);padding:3px 10px;border-radius:10px">P0</div>
@@ -924,7 +1215,7 @@ body.theme-dark .tech-layer {
         <div style="font-size:18px;font-weight:700;color:var(--gold);margin-bottom:10px">基本面分析</div>
         <div style="font-size:13px;color:var(--gray-400);line-height:1.8;margin-bottom:14px">围绕估值、盈利预期、行业位置和争议点给出基础研究判断。普通投资者获得结构化输出，大V则可按需组合多源基本面模块与租户知识做综合分析。</div>
         <div style="border-top:1px solid rgba(200,169,110,0.1);padding-top:12px">
-          <div style="font-size:11px;color:#E2C98A;background:rgba(231,76,60,0.06);border-left:3px solid #E74C3C;padding:8px 10px;border-radius:4px;line-height:1.6">
+          <div style="font-size:11px;color:var(--text-main);background:rgba(231,76,60,0.06);border-left:3px solid #E74C3C;padding:8px 10px;border-radius:4px;line-height:1.6">
             🛡️ 合规：只做结构化研究表达，不给明确买卖动作，保留“仅供参考”边界
           </div>
         </div>
@@ -937,7 +1228,7 @@ body.theme-dark .tech-layer {
         <div style="font-size:18px;font-weight:700;color:var(--gold);margin-bottom:10px">自选股</div>
         <div style="font-size:13px;color:var(--gray-400);line-height:1.8;margin-bottom:14px">作为最直接的 C 端承接入口，围绕价格、所属投顾视角、基本面和处理结论四步走；普通投资者只与所属租户投顾互动，Hermes 记录会同步主理投顾。</div>
         <div style="border-top:1px solid rgba(200,169,110,0.1);padding-top:12px">
-          <div style="font-size:11px;color:#E2C98A;background:rgba(231,76,60,0.06);border-left:3px solid #E74C3C;padding:8px 10px;border-radius:4px;line-height:1.6">
+          <div style="font-size:11px;color:var(--text-main);background:rgba(231,76,60,0.06);border-left:3px solid #E74C3C;padding:8px 10px;border-radius:4px;line-height:1.6">
             🛡️ 运营策略：围绕看盘、跟踪和研究辅助表达，避免引入更重的社交与付费耦合
           </div>
         </div>
@@ -950,8 +1241,21 @@ body.theme-dark .tech-layer {
         <div style="font-size:18px;font-weight:700;color:var(--gold);margin-bottom:10px">每日复盘</div>
         <div style="font-size:13px;color:var(--gray-400);line-height:1.8;margin-bottom:14px">复盘是会议里最明确的高频刚需之一。固定模板可以同时服务大V投顾、机构助理和普通用户，直接解决“资料太散、整理太慢”的问题。</div>
         <div style="border-top:1px solid rgba(200,169,110,0.1);padding-top:12px">
-          <div style="font-size:11px;color:#E2C98A;background:rgba(231,76,60,0.06);border-left:3px solid #E74C3C;padding:8px 10px;border-radius:4px;line-height:1.6">
+          <div style="font-size:11px;color:var(--text-main);background:rgba(231,76,60,0.06);border-left:3px solid #E74C3C;padding:8px 10px;border-radius:4px;line-height:1.6">
             🛡️ 产品约束：优先沉淀日常研究习惯，扩展模块统一通过后台 feature flag 控制
+          </div>
+        </div>
+      </div>
+
+      <!-- 4) 知识库 + Skills -->
+      <div style="background:var(--navy-mid);border:1px solid rgba(47,116,192,0.16);border-radius:14px;padding:24px;position:relative">
+        <div style="position:absolute;top:18px;right:18px;font-size:11px;color:var(--gold);background:rgba(47,116,192,0.1);padding:3px 10px;border-radius:10px">UNIQUE</div>
+        <div style="font-size:32px;margin-bottom:14px">🧠</div>
+        <div style="font-size:18px;font-weight:700;color:var(--gold);margin-bottom:10px">知识库 + Skills</div>
+        <div style="font-size:13px;color:var(--gray-400);line-height:1.8;margin-bottom:14px">这是系统独有能力。大V可以把历史复盘、行业观点、研究模板、常用提示词沉淀进知识库，再把它们绑定到不同 Skills，让 Hermes 每次回答都带着租户自己的方法论。</div>
+        <div style="border-top:1px solid rgba(47,116,192,0.1);padding-top:12px">
+          <div style="font-size:11px;color:var(--text-main);background:rgba(47,116,192,0.06);border-left:3px solid var(--gold);padding:8px 10px;border-radius:4px;line-height:1.6">
+            ✨ 独有价值：不是只调用通用模型，而是把租户知识、提示词和 Skill 结构真正注入智能体工作流
           </div>
         </div>
       </div>
@@ -1193,7 +1497,7 @@ body.theme-dark .tech-layer {
         <div class="funnel-layer-rate">订阅意愿进入验证阶段</div>
       </div>
       <div style="text-align:center;font-size:11px;color:var(--gold);opacity:0.7">↓ 高频留存 28.1%</div>
-      <div class="funnel-layer" style="background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.25);width:40%;margin:0 auto">
+      <div class="funnel-layer funnel-layer-retain" style="background:rgba(255,215,0,0.08);border:1px solid rgba(255,215,0,0.25);margin:0 auto">
         <div class="funnel-layer-name">⑤ 高频留存</div>
         <div class="funnel-layer-desc">持续使用研究工具，并形成复购或升级意愿的高质量用户</div>
         <div class="funnel-layer-count">36</div>
@@ -1297,6 +1601,60 @@ body.theme-dark .tech-layer {
       <div>
         <strong style="color:var(--gold)">合规说明：</strong>
         洞见智研 AI 引擎为大V投顾提供有据可查的研究证据链，普通用户看到的是研究框架与来源依据，而不是直接投资建议。所有协同内容都须标注数据来源、风险提示和适用边界，平台 Admin 保留审核、下线与终止合作的权限。
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ======================================================
+     SECTION 5.2: 知识库与 Skills
+====================================================== -->
+<section class="ix-section ix-section-alt" id="knowledge-system">
+  <div class="ix-inner">
+    <div class="ix-section-label">Knowledge System</div>
+    <div class="ix-section-title">知识库 / Skills / 智能体上下文</div>
+    <div class="ix-divider"></div>
+    <div class="ix-section-desc">知识库不是附属功能，而是和“普通用户 / 大V投顾 / 平台 Admin”同级的一条产品主线。它决定 Hermes 不是通用问答，而是带着租户方法论、历史研究和提示词约束在工作。</div>
+
+    <div class="kol-three-col">
+      <div class="kol-col-card" style="border-color:rgba(47,116,192,0.22)">
+        <div class="kol-col-header">
+          <div class="kol-col-icon">📚</div>
+          <div class="kol-col-title">知识库</div>
+        </div>
+        <div class="kol-col-item">沉淀历史复盘、行业观点、会议纪要、研究模板和个股跟踪资料</div>
+        <div class="kol-col-item">已有内容支持选中后弹框微调和修改，持续更新租户知识资产</div>
+        <div class="kol-col-item">作为 Hermes 与复盘生产台的底层上下文，不只是静态内容展示</div>
+        <div class="kol-col-item">支持平台按租户做隔离，保证不同大V之间的方法论和素材不混用</div>
+      </div>
+      <div class="kol-col-card" style="border-color:rgba(200,169,110,0.24)">
+        <div class="kol-col-header">
+          <div class="kol-col-icon">🧩</div>
+          <div class="kol-col-title">Skills</div>
+        </div>
+        <div class="kol-col-item">Skills 可切换，也可由大V自己新增，做成更小颗粒度的研究能力入口</div>
+        <div class="kol-col-item">每个 Skill 都可以绑定对应知识库、提示词、研究框架和输出结构</div>
+        <div class="kol-col-item">用户表面看到的是简单入口，背后实际切换的是不同智能分析工作流</div>
+        <div class="kol-col-item">这是 Hermes 能做成类龙虾高级智能体，而不是普通聊天框的关键能力</div>
+      </div>
+      <div class="kol-col-card" style="border-color:rgba(46,204,113,0.22)">
+        <div class="kol-col-header">
+          <div class="kol-col-icon">🤖</div>
+          <div class="kol-col-title">智能体上下文</div>
+        </div>
+        <div class="kol-col-item">普通用户对话时会自动继承当前 Skill 和知识库上下文，不需要手动理解复杂配置</div>
+        <div class="kol-col-item">大V在工作台里负责维护这些上下文，决定 Hermes 回答的风格、依据和结构</div>
+        <div class="kol-col-item">Admin 负责能力控开、知识来源审计和一致性说明，确保前后台口径统一</div>
+        <div class="kol-col-item">最终形成“知识库 -> Skills -> Hermes -> 复盘/分析输出”的独有链路</div>
+      </div>
+    </div>
+
+    <div class="kol-compliance" style="margin-top:20px">
+      <div class="kol-compliance-icon">🔗</div>
+      <div>
+        <strong style="color:var(--gold)">独有能力总结：</strong>
+        知识库负责沉淀内容，Skills 负责组织调用方式，Hermes 负责把这套上下文转成图表加内容的回答。这一层是整个系统最核心的差异化能力，不属于普通内容平台或通用聊天产品。
       </div>
     </div>
   </div>
@@ -1634,7 +1992,7 @@ body.theme-dark .tech-layer {
     <div class="ix-section-label">Hermes · AI Engine</div>
     <div class="ix-section-title">🦞 Hermes 智能投研引擎</div>
     <div class="ix-divider"></div>
-    <div class="ix-section-desc">Hermes 不是泛聊天机器人，而是围绕复盘、研报、纪要、自选股和证据链输出设计的工具层。它的价值在于把高频研究动作标准化，而不是自由对话本身。</div>
+    <div class="ix-section-desc">Hermes 不是泛聊天机器人，而是围绕复盘、研报、纪要、自选股和证据链输出设计的工具层。它的价值在于把高频研究动作标准化，并把知识库与 Skills 一起带入回答，而不是只有自由对话本身。</div>
 
     <!-- Hermes vs chatbot comparison -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:48px">
@@ -1660,6 +2018,9 @@ body.theme-dark .tech-layer {
         <div style="display:flex;flex-direction:column;gap:10px">
           <div style="font-size:13px;color:var(--white);padding-left:16px;position:relative">
             <span style="position:absolute;left:0;color:var(--gold)">•</span>围绕复盘、自选股、纪要等高频动作预设模式
+          </div>
+          <div style="font-size:13px;color:var(--white);padding-left:16px;position:relative">
+            <span style="position:absolute;left:0;color:var(--gold)">•</span>每个 Skill 可绑定租户知识库、提示词和研究表达方式
           </div>
           <div style="font-size:13px;color:var(--white);padding-left:16px;position:relative">
             <span style="position:absolute;left:0;color:var(--gold)">•</span>点击式与对话式双交互并存，兼容原有习惯
