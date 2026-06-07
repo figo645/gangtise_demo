@@ -22,10 +22,12 @@ SITE_CONFIG_KEY = "site_config"
 DEFAULT_SITE_CONFIG = {
     "default_theme": "light",
     "default_accent": "blue",
+    "password_gate_enabled": True,
     "feature_flags": {
         "fundamental_analysis": True,
         "watchlist": True,
         "daily_review": True,
+        "knowledge": True,
         "community": False,
         "hermes": False,
         "vip": False,
@@ -465,6 +467,10 @@ def is_authenticated():
     return session.get(AUTH_SESSION_KEY) is True
 
 
+def is_password_gate_enabled():
+    return bool(get_site_config().get("password_gate_enabled", True))
+
+
 def safe_next_target(target):
     if not target:
         return "/"
@@ -518,6 +524,8 @@ def record_access(response):
 
 @app.before_request
 def require_password_gate():
+    if not is_password_gate_enabled():
+        return None
     public_paths = {"/login", "/unlock", "/logout"}
     if request.path.startswith("/static/") or request.path in public_paths:
         return None
@@ -536,12 +544,18 @@ def log_access(response):
 @app.route("/login", methods=["GET"])
 def login():
     next_target = safe_next_target(request.args.get("next", "/"))
+    if not is_password_gate_enabled():
+        return redirect(next_target)
     return render_template("login.html", next_target=next_target, error=None)
 
 
 @app.route("/unlock", methods=["POST"])
 def unlock():
     next_target = safe_next_target(request.form.get("next", "/"))
+    if not is_password_gate_enabled():
+        session[AUTH_SESSION_KEY] = True
+        session.permanent = True
+        return redirect(next_target)
     password = request.form.get("password", "")
     if not compare_digest(password, AUTH_PASSWORD):
         return render_template("login.html", next_target=next_target, error="密码错误")
@@ -553,6 +567,8 @@ def unlock():
 @app.route("/logout")
 def logout():
     session.pop(AUTH_SESSION_KEY, None)
+    if not is_password_gate_enabled():
+        return redirect("/")
     return redirect(url_for("login"))
 
 
@@ -735,6 +751,7 @@ def api_admin_site_config():
         {
             "default_theme": payload.get("default_theme", current.get("default_theme", "light")),
             "default_accent": payload.get("default_accent", current.get("default_accent", "blue")),
+            "password_gate_enabled": bool(payload.get("password_gate_enabled", current.get("password_gate_enabled", True))),
             "feature_flags": feature_flags,
         },
     )

@@ -157,7 +157,7 @@
   <div class="admin-sidebar">
     <div class="admin-logo">
       <div class="admin-logo-text">洞见智研</div>
-      <div class="admin-logo-sub">运营管理中心</div>
+      <div class="admin-logo-sub">平台管理中心</div>
     </div>
     <nav class="admin-nav">
       <div class="admin-nav-group">
@@ -179,9 +179,9 @@
         </div>
       </div>
       <div class="admin-nav-group">
-        <div class="admin-nav-group-title">KOL生态</div>
+        <div class="admin-nav-group-title">大V租户</div>
         <div class="admin-nav-item" data-section="kols" onclick="showSection('kols', this)">
-          <span class="admin-nav-icon">&#9775;</span> 合伙人管理
+          <span class="admin-nav-icon">&#9775;</span> 大V管理
         </div>
         <div class="admin-nav-item" data-section="commission" onclick="showSection('commission', this)">
           <span class="admin-nav-icon">&#9654;</span> 收益结算
@@ -217,7 +217,7 @@
           <span class="admin-nav-icon">&#128225;</span> 渠道分析
         </div>
         <div class="admin-nav-item" id="nav-kol" onclick="showAnalyticsSection('kol')">
-          <span class="admin-nav-icon">&#11088;</span> 作者协同
+          <span class="admin-nav-icon">&#11088;</span> 大V协同
         </div>
         <div class="admin-nav-item" id="nav-revenue" onclick="showAnalyticsSection('revenue')">
           <span class="admin-nav-icon">&#128176;</span> 营收趋势
@@ -238,7 +238,7 @@
     </nav>
     <div style="padding:16px 20px;border-top:1px solid rgba(200,169,110,0.1)">
       <div style="font-size:11px;color:#8899aa">当前登录</div>
-      <div style="font-size:13px;color:#F8F6F0;margin-top:2px">运营管理员</div>
+      <div style="font-size:13px;color:#F8F6F0;margin-top:2px">平台管理员</div>
     </div>
   </div>
 
@@ -247,7 +247,7 @@
     <div class="admin-topbar">
       <div class="admin-page-title" id="page-title">运营概览</div>
       <div style="display:flex;gap:12px;align-items:center">
-        <span style="font-size:12px;color:#8899aa">2026-06-01 验证期看板</span>
+        <span style="font-size:12px;color:#8899aa">2026-06-01 业务沟通会口径</span>
         <button class="btn-gold" style="padding:8px 16px;font-size:12px" onclick="showToast('报告生成中，请稍候...')">导出报告</button>
       </div>
     </div>
@@ -258,65 +258,65 @@
       <div id="section-overview">
         <div class="stats-grid">
           <div class="stat-card">
-            <div class="stat-label">累计留资用户</div>
+            <div class="stat-label">推进中合作线索</div>
             <span class="stat-icon">&#9786;</span>
-            <div class="stat-value">1,268</div>
-            <div class="stat-change up">&#9650; +146 本月</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">付费用户</div>
-            <span class="stat-icon">&#9830;</span>
-            <div class="stat-value">128</div>
-            <div class="stat-change up">&#9650; +18 本月</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">月度 MRR</div>
-            <span class="stat-icon">&#9775;</span>
-            <div class="stat-value">¥68,800</div>
-            <div class="stat-change up">&#9650; +8.5%</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">试点作者 / 机构线索</div>
-            <span class="stat-icon">&#9733;</span>
             <div class="stat-value">12</div>
-            <div class="stat-change up">&#9650; +3 本月</div>
+            <div class="stat-change up">&#9650; +3 本周</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">已确认工具场景</div>
+            <span class="stat-icon">&#9830;</span>
+            <div class="stat-value">4</div>
+            <div class="stat-change up">复盘 / 自选股 / 基本面 / Hermes</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">待确认价格方案</div>
+            <span class="stat-icon">&#9775;</span>
+            <div class="stat-value">3</div>
+            <div class="stat-change up">年费 / 服务费 / 分成</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">合规关键事项</div>
+            <span class="stat-icon">&#9733;</span>
+            <div class="stat-value">4</div>
+            <div class="stat-change up">NDA / 敏感词 / ICP / 软著</div>
           </div>
         </div>
 
         <div class="table-wrap" style="margin-bottom:20px">
           <div class="table-header">
-            <div class="table-title">验证渠道概览</div>
-            <span class="tag tag-gold">试点阶段</span>
+            <div class="table-title">试点合作推进表</div>
+            <span class="tag tag-gold">业务优先</span>
           </div>
           <table>
             <thead>
-              <tr><th>渠道</th><th>留资用户</th><th>首次付费率</th><th>月度营收</th><th>LTV/CAC</th><th>状态</th></tr>
+              <tr><th>来源</th><th>对接对象</th><th>核心诉求</th><th>当前进度</th><th>下一步</th><th>状态</th></tr>
             </thead>
             <tbody>
               <tr>
-                <td><span style="color:#F8F6F0;font-weight:500">微信社群</span></td>
-                <td>2,100</td><td><span class="up">6.4%</span></td><td>¥28,600</td><td><span class="up">14.8x</span></td>
-                <td><span class="tag tag-green">健康</span></td>
+                <td><span style="color:#F8F6F0;font-weight:500">微信社群大V</span></td>
+                <td>复盘工具</td><td>需要日更复盘提纲</td><td>已完成原型演示</td><td>确认年费与活跃用户量</td>
+                <td><span class="tag tag-green">深度沟通</span></td>
               </tr>
               <tr>
-                <td><span style="color:#F8F6F0;font-weight:500">内容合作</span></td>
-                <td>1,400</td><td><span class="up">4.8%</span></td><td>¥19,200</td><td><span class="up">9.6x</span></td>
-                <td><span class="tag tag-green">验证中</span></td>
+                <td><span style="color:#F8F6F0;font-weight:500">内容合作机构</span></td>
+                <td>证据链输出</td><td>需要可引用纪要摘要</td><td>待签 NDA</td><td>新数据接入</td>
+                <td><span class="tag tag-green">推进中</span></td>
               </tr>
               <tr>
-                <td><span style="color:#F8F6F0;font-weight:500">小红书</span></td>
-                <td>980</td><td><span class="up">3.6%</span></td><td>¥13,600</td><td><span class="up">8.8x</span></td>
+                <td><span style="color:#F8F6F0;font-weight:500">小红书投顾</span></td>
+                <td>自选股诊断</td><td>需要更短的 C 端路径</td><td>已收集反馈</td><td>验证转化率</td>
                 <td><span class="tag tag-blue">观察</span></td>
               </tr>
               <tr>
-                <td><span style="color:#F8F6F0;font-weight:500">转介绍</span></td>
-                <td>620</td><td><span class="up">12.1%</span></td><td>¥24,800</td><td><span class="up">47.8x</span></td>
-                <td><span class="tag tag-green">优质</span></td>
+                <td><span style="color:#F8F6F0;font-weight:500">转介绍顾问</span></td>
+                <td>基本面分析</td><td>希望辅助私域答疑</td><td>已试用 Demo</td><td>讨论服务费</td>
+                <td><span class="tag tag-green">试用中</span></td>
               </tr>
               <tr>
-                <td><span style="color:#F8F6F0;font-weight:500">直接流量</span></td>
-                <td>300</td><td><span class="up">15.0%</span></td><td>¥16,800</td><td><span class="up">78.3x</span></td>
-                <td><span class="tag tag-green">优质</span></td>
+                <td><span style="color:#F8F6F0;font-weight:500">直接线索</span></td>
+                <td>合规模板</td><td>关注敏感词与风险提示</td><td>已梳理清单</td><td>ICP / 软著排期</td>
+                <td><span class="tag tag-gold">待排期</span></td>
               </tr>
             </tbody>
           </table>
@@ -380,7 +380,7 @@
           </div>
           <div class="search-bar">
             <input type="text" placeholder="搜索用户名 / 手机号">
-            <select><option>会员等级 (全部)</option><option>免费用户</option><option>基础会员</option><option>专业会员</option><option>机构试点</option><option>试点作者</option></select>
+            <select><option>会员等级 (全部)</option><option>免费用户</option><option>基础会员</option><option>专业会员</option><option>机构试点</option><option>大V投顾</option></select>
             <select><option>用户状态 (全部)</option><option>正常</option><option>活跃</option><option>沉默</option><option>已禁用</option></select>
             <button class="btn-gold" style="padding:8px 16px;font-size:12px">搜索</button>
           </div>
@@ -484,7 +484,7 @@
             <button class="btn-outline" style="width:100%;margin-top:10px;padding:6px;font-size:12px" onclick="showToast('策略配置已打开')">配置运营策略</button>
           </div>
           <div class="segment-card">
-            <div class="segment-card-name">试点作者</div>
+            <div class="segment-card-name">大V投顾</div>
             <div class="segment-card-stat"><span>用户数</span><span>12</span></div>
             <div style="margin:8px 0"><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:0.9%"></div></div></div>
             <div class="segment-card-stat"><span>占比</span><span>0.9%</span></div>
@@ -527,7 +527,7 @@
               <div class="funnel-conv">共创筛选</div>
             </div>
             <div class="funnel-step">
-              <div class="funnel-box"><div class="funnel-name">试点作者</div><div class="funnel-count">12</div><div class="funnel-pct">1.4%</div></div>
+              <div class="funnel-box"><div class="funnel-name">大V投顾</div><div class="funnel-count">12</div><div class="funnel-pct">1.4%</div></div>
             </div>
           </div>
         </div>
@@ -575,7 +575,7 @@
               <tr><td style="color:#F8F6F0">参与活动</td><td style="color:#C8A96E">+50 分</td><td>100 分</td><td><span class="tag tag-green">启用</span></td><td><button class="btn-sm-red" onclick="showToast('规则已停用')">停用</button></td></tr>
               <tr><td style="color:#F8F6F0">邀请好友</td><td style="color:#C8A96E">+100 分</td><td>500 分</td><td><span class="tag tag-green">启用</span></td><td><button class="btn-sm-red" onclick="showToast('规则已停用')">停用</button></td></tr>
               <tr><td style="color:#F8F6F0">完成AI分析</td><td style="color:#C8A96E">+20 分</td><td>100 分</td><td><span class="tag tag-green">启用</span></td><td><button class="btn-sm-red" onclick="showToast('规则已停用')">停用</button></td></tr>
-              <tr><td style="color:#F8F6F0">作者互动</td><td style="color:#C8A96E">+5 分</td><td>30 分</td><td><span class="tag tag-green">启用</span></td><td><button class="btn-sm-red" onclick="showToast('规则已停用')">停用</button></td></tr>
+              <tr><td style="color:#F8F6F0">投顾互动</td><td style="color:#C8A96E">+5 分</td><td>30 分</td><td><span class="tag tag-green">启用</span></td><td><button class="btn-sm-red" onclick="showToast('规则已停用')">停用</button></td></tr>
               <tr><td style="color:#F8F6F0">分享内容</td><td style="color:#C8A96E">+15 分</td><td>60 分</td><td><span style="color:#8899aa;font-size:12px">停用</span></td><td><button class="btn-sm-blue" onclick="showToast('规则已启用')">启用</button></td></tr>
             </tbody>
           </table>
@@ -592,7 +592,7 @@
               <tr><td><span class="rank-badge rank-2">2</span></td><td style="color:#F8F6F0">周浩然</td><td><span class="tag tag-gold">机构试点</span></td><td style="color:#C8A96E">2,320</td><td>10,800</td><td>11</td></tr>
               <tr><td><span class="rank-badge rank-3">3</span></td><td style="color:#F8F6F0">李晓梅</td><td><span class="tag tag-blue">专业会员</span></td><td style="color:#C8A96E">8,940</td><td>48,600</td><td>31</td></tr>
               <tr><td><span class="rank-badge rank-n">4</span></td><td style="color:#F8F6F0">王建国</td><td><span class="tag tag-blue">专业会员</span></td><td style="color:#C8A96E">7,280</td><td>36,200</td><td>24</td></tr>
-              <tr><td><span class="rank-badge rank-n">5</span></td><td style="color:#F8F6F0">财经老王</td><td><span class="tier-s">种子作者</span></td><td style="color:#C8A96E">1,840</td><td>8,400</td><td>9</td></tr>
+              <tr><td><span class="rank-badge rank-n">5</span></td><td style="color:#F8F6F0">财经老王</td><td><span class="tier-s">种子投顾</span></td><td style="color:#C8A96E">1,840</td><td>8,400</td><td>9</td></tr>
               <tr><td><span class="rank-badge rank-n">6</span></td><td style="color:#F8F6F0">陈思远</td><td><span style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.2);color:#C8A96E;border-radius:4px;padding:2px 7px;font-size:11px">基础会员</span></td><td style="color:#C8A96E">4,120</td><td>18,400</td><td>12</td></tr>
               <tr><td><span class="rank-badge rank-n">7</span></td><td style="color:#F8F6F0">吴静怡</td><td><span class="tag tag-blue">专业会员</span></td><td style="color:#C8A96E">3,680</td><td>22,100</td><td>14</td></tr>
               <tr><td><span class="rank-badge rank-n">8</span></td><td style="color:#F8F6F0">郑凯</td><td><span style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.2);color:#C8A96E;border-radius:4px;padding:2px 7px;font-size:11px">基础会员</span></td><td style="color:#C8A96E">2,940</td><td>14,600</td><td>9</td></tr>
@@ -646,9 +646,9 @@
 
       <!-- ===== KOLS ===== -->
       <div id="section-kols" style="display:none">
-        <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
           <div class="stat-card">
-            <div class="stat-label">种子作者</div>
+            <div class="stat-label">种子投顾租户</div>
             <span class="stat-icon">&#9812;</span>
             <div class="stat-value">2</div>
             <div class="stat-change up">贡献协同收入 54%</div>
@@ -660,7 +660,7 @@
             <div class="stat-change up">&#9650; +6.2%</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">待审核作者申请</div>
+            <div class="stat-label">待审核投顾申请</div>
             <span class="stat-icon">&#9998;</span>
             <div class="stat-value">6</div>
             <div class="stat-change" style="color:#C8A96E">需处理</div>
@@ -668,11 +668,11 @@
         </div>
         <div class="table-wrap" style="margin-bottom:20px">
           <div class="table-header">
-            <div class="table-title">试点作者列表</div>
-            <button class="btn-gold" style="padding:6px 14px;font-size:12px" onclick="showToast('新增作者表单已打开')">+ 新增作者</button>
+            <div class="table-title">大V投顾列表</div>
+            <button class="btn-gold" style="padding:6px 14px;font-size:12px" onclick="showToast('新增投顾表单已打开')">+ 新增投顾</button>
           </div>
           <table>
-            <thead><tr><th>作者名称</th><th>协同渠道</th><th>关注样本</th><th>本月协同收入</th><th>分成</th><th>阶段</th><th>操作</th></tr></thead>
+            <thead><tr><th>投顾名称</th><th>协同渠道</th><th>关注样本</th><th>本月协同收入</th><th>分成</th><th>阶段</th><th>操作</th></tr></thead>
             <tbody>
               {% for kol in kols %}
               <tr>
@@ -690,17 +690,17 @@
         </div>
         <div class="table-wrap">
           <div class="table-header">
-            <div class="table-title">作者申请审核</div>
+            <div class="table-title">大V投顾申请审核</div>
             <span class="tag tag-gold">待审核 6 条</span>
           </div>
           <table>
             <thead><tr><th>申请人</th><th>来源</th><th>关注样本</th><th>内容方向</th><th>申请阶段</th><th>提交时间</th><th>操作</th></tr></thead>
             <tbody>
-              <tr><td style="color:#F8F6F0">林晓宇</td><td>微信社群</td><td>12,800</td><td>宏观经济分析</td><td><span class="tier-a">成长作者</span></td><td>今日 09:12</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
-              <tr><td style="color:#F8F6F0">陈雨桐</td><td>内容合作</td><td>8,420</td><td>A股技术分析</td><td><span class="tier-b">观察作者</span></td><td>今日 08:44</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
-              <tr><td style="color:#F8F6F0">黄志远</td><td>小红书</td><td>21,000</td><td>港股投资策略</td><td><span class="tier-s">种子作者</span></td><td>昨日 22:30</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
-              <tr><td style="color:#F8F6F0">苏梦琪</td><td>转介绍</td><td>5,680</td><td>基金定投科普</td><td><span class="tier-b">观察作者</span></td><td>昨日 18:15</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
-              <tr><td style="color:#F8F6F0">方浩天</td><td>内容合作</td><td>32,000</td><td>量化交易策略</td><td><span class="tier-a">成长作者</span></td><td>昨日 14:08</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
+              <tr><td style="color:#F8F6F0">林晓宇</td><td>微信社群</td><td>12,800</td><td>宏观经济分析</td><td><span class="tier-a">成长投顾</span></td><td>今日 09:12</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
+              <tr><td style="color:#F8F6F0">陈雨桐</td><td>内容合作</td><td>8,420</td><td>A股技术分析</td><td><span class="tier-b">观察投顾</span></td><td>今日 08:44</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
+              <tr><td style="color:#F8F6F0">黄志远</td><td>小红书</td><td>21,000</td><td>港股投资策略</td><td><span class="tier-s">种子投顾</span></td><td>昨日 22:30</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
+              <tr><td style="color:#F8F6F0">苏梦琪</td><td>转介绍</td><td>5,680</td><td>基金定投科普</td><td><span class="tier-b">观察投顾</span></td><td>昨日 18:15</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
+              <tr><td style="color:#F8F6F0">方浩天</td><td>内容合作</td><td>32,000</td><td>量化交易策略</td><td><span class="tier-a">成长投顾</span></td><td>昨日 14:08</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
             </tbody>
           </table>
         </div>
@@ -722,7 +722,7 @@
             <div class="stat-change up">&#9650; +4.4%</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">结算作者数</div>
+            <div class="stat-label">结算投顾数</div>
             <span class="stat-icon">&#9786;</span>
             <div class="stat-value">12</div>
             <div class="stat-change up">&#9650; +2</div>
@@ -744,15 +744,15 @@
             </div>
           </div>
           <table>
-            <thead><tr><th><input type="checkbox" style="accent-color:#C8A96E"></th><th>作者名称</th><th>阶段</th><th>来源</th><th>本月协同收入</th><th>分成比例</th><th>应付金额</th><th>状态</th><th>操作</th></tr></thead>
+            <thead><tr><th><input type="checkbox" style="accent-color:#C8A96E"></th><th>投顾名称</th><th>阶段</th><th>来源</th><th>本月协同收入</th><th>分成比例</th><th>应付金额</th><th>状态</th><th>操作</th></tr></thead>
             <tbody>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">财经老王</td><td><span class="tier-s">种子作者</span></td><td>微信社群</td><td>¥18,600</td><td>15%</td><td style="color:#C8A96E">¥2,790</td><td><span class="status-gold">待结算</span></td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px" onclick="showToast('结算已发起')">结算</button></td></tr>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">投资女神Lisa</td><td><span class="tier-s">种子作者</span></td><td>内容合作</td><td>¥14,200</td><td>18%</td><td style="color:#C8A96E">¥2,556</td><td><span class="status-blue">处理中</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">查看</button></td></tr>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">量化小白</td><td><span class="tier-a">成长作者</span></td><td>小红书</td><td>¥7,800</td><td>15%</td><td style="color:#C8A96E">¥1,170</td><td><span class="status-gold">待结算</span></td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px" onclick="showToast('结算已发起')">结算</button></td></tr>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">宏观策略师</td><td><span class="tier-a">成长作者</span></td><td>微信社群</td><td>¥9,600</td><td>16%</td><td style="color:#C8A96E">¥1,536</td><td><span class="status-green">已完成</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">凭证</button></td></tr>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">港股研究员</td><td><span class="tier-b">观察作者</span></td><td>转介绍</td><td>¥5,400</td><td>15%</td><td style="color:#C8A96E">¥810</td><td><span class="status-gold">待结算</span></td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px" onclick="showToast('结算已发起')">结算</button></td></tr>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">债券研究员</td><td><span class="tier-b">观察作者</span></td><td>内容合作</td><td>¥4,200</td><td>14%</td><td style="color:#C8A96E">¥588</td><td><span class="status-blue">处理中</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">查看</button></td></tr>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">科技股猎手</td><td><span class="tier-a">成长作者</span></td><td>内容合作</td><td>¥6,800</td><td>15%</td><td style="color:#C8A96E">¥1,020</td><td><span class="status-green">已完成</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">凭证</button></td></tr>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">财经老王</td><td><span class="tier-s">种子投顾</span></td><td>微信社群</td><td>¥18,600</td><td>15%</td><td style="color:#C8A96E">¥2,790</td><td><span class="status-gold">待结算</span></td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px" onclick="showToast('结算已发起')">结算</button></td></tr>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">投资女神Lisa</td><td><span class="tier-s">种子投顾</span></td><td>内容合作</td><td>¥14,200</td><td>18%</td><td style="color:#C8A96E">¥2,556</td><td><span class="status-blue">处理中</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">查看</button></td></tr>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">量化小白</td><td><span class="tier-a">成长投顾</span></td><td>小红书</td><td>¥7,800</td><td>15%</td><td style="color:#C8A96E">¥1,170</td><td><span class="status-gold">待结算</span></td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px" onclick="showToast('结算已发起')">结算</button></td></tr>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">宏观策略师</td><td><span class="tier-a">成长投顾</span></td><td>微信社群</td><td>¥9,600</td><td>16%</td><td style="color:#C8A96E">¥1,536</td><td><span class="status-green">已完成</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">凭证</button></td></tr>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">港股研究员</td><td><span class="tier-b">观察投顾</span></td><td>转介绍</td><td>¥5,400</td><td>15%</td><td style="color:#C8A96E">¥810</td><td><span class="status-gold">待结算</span></td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px" onclick="showToast('结算已发起')">结算</button></td></tr>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">债券研究员</td><td><span class="tier-b">观察投顾</span></td><td>内容合作</td><td>¥4,200</td><td>14%</td><td style="color:#C8A96E">¥588</td><td><span class="status-blue">处理中</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">查看</button></td></tr>
+              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">科技股猎手</td><td><span class="tier-a">成长投顾</span></td><td>内容合作</td><td>¥6,800</td><td>15%</td><td style="color:#C8A96E">¥1,020</td><td><span class="status-green">已完成</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">凭证</button></td></tr>
             </tbody>
           </table>
         </div>
@@ -792,7 +792,7 @@
             <span class="tag tag-gold">待审核 7 条</span>
           </div>
           <table>
-            <thead><tr><th>作者</th><th>内容摘要</th><th>标签</th><th>点赞</th><th>提交时间</th><th>AI合规检测</th><th>操作</th></tr></thead>
+            <thead><tr><th>发布者</th><th>内容摘要</th><th>标签</th><th>点赞</th><th>提交时间</th><th>AI合规检测</th><th>操作</th></tr></thead>
             <tbody>
               <tr>
                 <td style="color:#F8F6F0">财经老王</td>
@@ -1282,7 +1282,7 @@
                   style="min-height:160px;background:#0D1B2A;border:1px solid rgba(200,169,110,0.15);border-radius:6px;padding:12px;font-size:13px;color:#D8D4CC;line-height:1.8;outline:none"
                   oninput="evUpdatePreview()">
                   <p><b>活动背景</b></p>
-                  <p>2026年进入年中，全球宏观格局持续演变，A股估值修复逻辑渐趋清晰。洞见智研计划联合试点作者和研究协同方，举办一场中期策略分享会，用于验证高价值内容能否带来更强的留存和付费转化。</p>
+                  <p>2026年进入年中，全球宏观格局持续演变，A股估值修复逻辑渐趋清晰。洞见智研计划联合大V投顾和研究协同方，举办一场中期策略分享会，集中展示复盘、证据链与 Hermes 研究能力，并服务会后持续跟踪。</p>
                   <p><b>活动亮点</b></p>
                   <ul>
                     <li>4位顶级分析师同台，覆盖宏观、行业、量化、港股四大维度</li>
@@ -1398,39 +1398,39 @@
         </div>
         <div class="table-wrap" style="margin-bottom:20px">
           <div class="table-header">
-            <div class="table-title">Hermes 模式使用统计</div>
-            <span class="tag tag-gold">6 个模式</span>
+            <div class="table-title">Hermes 工具动作统计</div>
+            <span class="tag tag-gold">6 个优先模式</span>
           </div>
           <table>
             <thead><tr><th>模式名称</th><th>今日调用</th><th>本月调用</th><th>占比</th><th>平均响应时间</th><th>状态</th></tr></thead>
             <tbody>
               <tr>
-                <td style="color:#F8F6F0;font-weight:500">研报精读</td><td>494</td><td>19,400</td>
+                <td style="color:#F8F6F0;font-weight:500">复盘速写</td><td>494</td><td>19,400</td>
                 <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:35%"></div></div><span style="color:#C8A96E">35%</span></div></td>
                 <td>2.4s</td><td><span class="tag tag-green">正常</span></td>
               </tr>
               <tr>
-                <td style="color:#F8F6F0;font-weight:500">专家纪要速读</td><td>286</td><td>11,280</td>
+                <td style="color:#F8F6F0;font-weight:500">研报精读</td><td>286</td><td>11,280</td>
                 <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:22%"></div></div><span style="color:#C8A96E">22%</span></div></td>
                 <td>1.8s</td><td><span class="tag tag-green">正常</span></td>
               </tr>
               <tr>
-                <td style="color:#F8F6F0;font-weight:500">另类数据解读</td><td>231</td><td>8,120</td>
+                <td style="color:#F8F6F0;font-weight:500">专家纪要速读</td><td>231</td><td>8,120</td>
                 <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:18%"></div></div><span style="color:#C8A96E">18%</span></div></td>
                 <td>3.2s</td><td><span class="tag tag-green">正常</span></td>
               </tr>
               <tr>
-                <td style="color:#F8F6F0;font-weight:500">投资组合诊断</td><td>154</td><td>5,480</td>
+                <td style="color:#F8F6F0;font-weight:500">自选股诊断</td><td>154</td><td>5,480</td>
                 <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:12%"></div></div><span style="color:#C8A96E">12%</span></div></td>
                 <td>4.1s</td><td><span class="tag tag-green">正常</span></td>
               </tr>
               <tr>
-                <td style="color:#F8F6F0;font-weight:500">市场情绪扫描</td><td>108</td><td>4,120</td>
+                <td style="color:#F8F6F0;font-weight:500">证据链归因</td><td>108</td><td>4,120</td>
                 <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:8%"></div></div><span style="color:#C8A96E">8%</span></div></td>
                 <td>2.8s</td><td><span class="tag tag-green">正常</span></td>
               </tr>
               <tr>
-                <td style="color:#F8F6F0;font-weight:500">量化因子筛选</td><td>142</td><td>4,200</td>
+                <td style="color:#F8F6F0;font-weight:500">方法模板</td><td>142</td><td>4,200</td>
                 <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:5%"></div></div><span style="color:#C8A96E">5%</span></div></td>
                 <td>5.6s</td><td><span class="tag tag-gold">高负载</span></td>
               </tr>
@@ -1462,14 +1462,14 @@
           <table>
             <thead><tr><th>排名</th><th>用户</th><th>等级</th><th>本月调用</th><th>消耗算力</th><th>最常用模式</th></tr></thead>
             <tbody>
-              <tr><td><span class="rank-badge rank-1">1</span></td><td style="color:#F8F6F0">张伟</td><td><span class="tag tag-gold">机构试点</span></td><td>84</td><td style="color:#C8A96E">1,680</td><td>研报精读</td></tr>
-              <tr><td><span class="rank-badge rank-2">2</span></td><td style="color:#F8F6F0">周浩然</td><td><span class="tag tag-gold">机构试点</span></td><td>71</td><td style="color:#C8A96E">1,420</td><td>投资组合诊断</td></tr>
-              <tr><td><span class="rank-badge rank-3">3</span></td><td style="color:#F8F6F0">财经老王</td><td><span class="tier-s">种子作者</span></td><td>68</td><td style="color:#C8A96E">1,360</td><td>专家纪要速读</td></tr>
+              <tr><td><span class="rank-badge rank-1">1</span></td><td style="color:#F8F6F0">张伟</td><td><span class="tag tag-gold">机构试点</span></td><td>84</td><td style="color:#C8A96E">1,680</td><td>复盘速写</td></tr>
+              <tr><td><span class="rank-badge rank-2">2</span></td><td style="color:#F8F6F0">周浩然</td><td><span class="tag tag-gold">机构试点</span></td><td>71</td><td style="color:#C8A96E">1,420</td><td>自选股诊断</td></tr>
+              <tr><td><span class="rank-badge rank-3">3</span></td><td style="color:#F8F6F0">财经老王</td><td><span class="tier-s">种子投顾</span></td><td>68</td><td style="color:#C8A96E">1,360</td><td>专家纪要速读</td></tr>
               <tr><td><span class="rank-badge rank-n">4</span></td><td style="color:#F8F6F0">李晓梅</td><td><span class="tag tag-blue">专业会员</span></td><td>164</td><td style="color:#C8A96E">3,280</td><td>研报精读</td></tr>
-              <tr><td><span class="rank-badge rank-n">5</span></td><td style="color:#F8F6F0">方浩天</td><td><span class="tier-a">成长作者</span></td><td>42</td><td style="color:#C8A96E">840</td><td>量化因子筛选</td></tr>
-              <tr><td><span class="rank-badge rank-n">6</span></td><td style="color:#F8F6F0">王建国</td><td><span class="tag tag-blue">专业会员</span></td><td>128</td><td style="color:#C8A96E">2,560</td><td>另类数据解读</td></tr>
-              <tr><td><span class="rank-badge rank-n">7</span></td><td style="color:#F8F6F0">科技股猎手</td><td><span class="tier-a">成长作者</span></td><td>31</td><td style="color:#C8A96E">620</td><td>市场情绪扫描</td></tr>
-              <tr><td><span class="rank-badge rank-n">8</span></td><td style="color:#F8F6F0">吴静怡</td><td><span class="tag tag-blue">专业会员</span></td><td>96</td><td style="color:#C8A96E">1,920</td><td>研报精读</td></tr>
+              <tr><td><span class="rank-badge rank-n">5</span></td><td style="color:#F8F6F0">方浩天</td><td><span class="tier-a">成长投顾</span></td><td>42</td><td style="color:#C8A96E">840</td><td>方法模板</td></tr>
+              <tr><td><span class="rank-badge rank-n">6</span></td><td style="color:#F8F6F0">王建国</td><td><span class="tag tag-blue">专业会员</span></td><td>128</td><td style="color:#C8A96E">2,560</td><td>证据链归因</td></tr>
+              <tr><td><span class="rank-badge rank-n">7</span></td><td style="color:#F8F6F0">科技股猎手</td><td><span class="tier-a">成长投顾</span></td><td>31</td><td style="color:#C8A96E">620</td><td>基本面分析</td></tr>
+              <tr><td><span class="rank-badge rank-n">8</span></td><td style="color:#F8F6F0">吴静怡</td><td><span class="tag tag-blue">专业会员</span></td><td>96</td><td style="color:#C8A96E">1,920</td><td>复盘速写</td></tr>
             </tbody>
           </table>
         </div>
@@ -1611,8 +1611,8 @@
               </div>
             </div>
             <div class="chart-card">
-              <div class="chart-title">试点作者效能排行</div>
-              <div class="chart-subtitle">本月试点协同收入 Top 5</div>
+              <div class="chart-title">大V租户效能排行</div>
+              <div class="chart-subtitle">本月大V协同收入 Top 5</div>
               <div class="chart-container tall">
                 <canvas id="kolBar"></canvas>
               </div>
@@ -1708,8 +1708,8 @@
         <div id="ds-kol" class="dash-section">
           <div class="section-header">
             <div>
-              <div class="section-title">作者协同效能分析</div>
-              <div class="section-subtitle">试点作者协同收入、分成结算与成长阶段追踪</div>
+              <div class="section-title">大V协同效能分析</div>
+              <div class="section-subtitle">大V投顾协同收入、分成结算与成长阶段追踪</div>
             </div>
           </div>
 
@@ -1717,15 +1717,15 @@
 
           <div class="charts-grid" style="margin-bottom:20px">
             <div class="chart-card">
-              <div class="chart-title">Top 10 作者协同收入排行</div>
-              <div class="chart-subtitle">本月试点作者协同收入水平柱图</div>
+              <div class="chart-title">Top 10 大V协同收入排行</div>
+              <div class="chart-subtitle">本月大V投顾协同收入水平柱图</div>
               <div class="chart-container tall" style="height:380px">
                 <canvas id="kolTop10Bar"></canvas>
               </div>
             </div>
             <div class="chart-card">
-              <div class="chart-title">作者阶段成长趋势</div>
-              <div class="chart-subtitle">种子 / 成长 / 观察作者数量月度变化</div>
+              <div class="chart-title">投顾阶段成长趋势</div>
+              <div class="chart-subtitle">种子 / 成长 / 观察投顾数量月度变化</div>
               <div class="chart-container tall">
                 <canvas id="kolTierGrowth"></canvas>
               </div>
@@ -1734,20 +1734,20 @@
 
           <div class="charts-grid" style="margin-bottom:20px">
             <div class="chart-card">
-              <div class="chart-title">作者阶段分布</div>
-              <div class="chart-subtitle">当前种子 / 成长 / 观察作者占比</div>
+              <div class="chart-title">投顾阶段分布</div>
+              <div class="chart-subtitle">当前种子 / 成长 / 观察投顾占比</div>
               <div class="chart-container">
                 <canvas id="kolTierDonut"></canvas>
               </div>
             </div>
             <div class="chart-card" style="overflow:hidden">
-              <div class="chart-title">试点作者列表</div>
+              <div class="chart-title">大V投顾列表</div>
               <div class="chart-subtitle">Top 8 综合排行</div>
               <div style="overflow-x:auto;margin-top:8px">
                 <table class="quality-table">
                   <thead>
                     <tr>
-                      <th>作者名称</th>
+                      <th>投顾名称</th>
                       <th>来源</th>
                       <th>关注样本</th>
                       <th>本月协同收入</th>
@@ -1901,6 +1901,10 @@
           <div class="config-card">
             <div class="config-card-title">首发功能开关</div>
             <div class="toggle-wrap">
+              <span class="toggle-label">访问密码门禁</span>
+              <label class="toggle"><input id="password-gate-enabled" type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
               <span class="toggle-label">基本面分析</span>
               <label class="toggle"><input id="feature-fundamental_analysis" type="checkbox" checked><span class="toggle-slider"></span></label>
             </div>
@@ -1911,6 +1915,10 @@
             <div class="toggle-wrap">
               <span class="toggle-label">每日复盘</span>
               <label class="toggle"><input id="feature-daily_review" type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
+              <span class="toggle-label">知识专区</span>
+              <label class="toggle"><input id="feature-knowledge" type="checkbox" checked><span class="toggle-slider"></span></label>
             </div>
             <div class="toggle-wrap">
               <span class="toggle-label">社区</span>
@@ -1929,25 +1937,53 @@
               <label class="toggle"><input id="feature-dm" type="checkbox"><span class="toggle-slider"></span></label>
             </div>
             <div class="toggle-wrap">
-              <span class="toggle-label">作者工作台</span>
+              <span class="toggle-label">大V工作台</span>
               <label class="toggle"><input id="feature-workbench" type="checkbox"><span class="toggle-slider"></span></label>
             </div>
             <div class="feature-note">
-              根据 2026年5月18日访谈和 2026年5月24日产品定位会议，当前建议仅对外保留三项基础功能，其余先通过 admin 控制关闭。
+              访问密码门禁可由后台直接开关。启用时仍使用服务端配置的访问密码；关闭时首页、H5 和 admin 将直接开放访问。
             </div>
           </div>
           <div class="config-card">
             <div class="config-card-title">对外策略说明</div>
             <div class="config-field">
               <label>当前首发范围</label>
-              <input type="text" value="基本面分析 / 自选股 / 每日复盘" readonly>
+              <input type="text" value="基本面分析 / 自选股 / 复盘专区 / 知识专区（默认） + Hermes / 社区 / 大V工作台" readonly>
             </div>
             <div class="config-field">
               <label>策略备注</label>
-              <input type="text" value="减少对外功能暴露，优先验证高频低风险能力" readonly>
+              <input type="text" value="聚焦消息沉淀后的复盘整理、知识沉淀、基本面分析、Hermes 与证据链输出" readonly>
             </div>
             <div class="feature-note">
-              这套配置适合先服务试点作者合作导流和少量 C 端承接，避免在早期暴露过多复杂功能与运维负担。
+              这套配置适合围绕核心研究能力做验证，同时并行推进 NDA、新数据接入、敏感词模板和备案事项。
+            </div>
+          </div>
+          <div class="config-card">
+            <div class="config-card-title">租户隔离策略</div>
+            <div class="config-field">
+              <label>普通投资者互动边界</label>
+              <input type="text" value="仅可与所属大V投顾互动，跨租户投顾内容默认关闭" readonly>
+            </div>
+            <div class="config-field">
+              <label>自选股分析回流</label>
+              <input type="text" value="普通投资者通过 Hermes 发起的个股分析记录同步主理投顾" readonly>
+            </div>
+            <div class="feature-note">
+              Admin 负责统一租户隔离策略，保证前台自选股、私信、活动与工作台使用同一套权限边界。
+            </div>
+          </div>
+          <div class="config-card">
+            <div class="config-card-title">知识板块输入源</div>
+            <div class="config-field">
+              <label>支持渠道</label>
+              <input type="text" value="大V语音输入 / 文件上传 / 网页URL" readonly>
+            </div>
+            <div class="config-field">
+              <label>知识资产用途</label>
+              <input type="text" value="形成大V租户独有知识，并同步到前台知识专区、按需基本面与个性化自选股分析" readonly>
+            </div>
+            <div class="feature-note">
+              知识板块支持 H5 前台和 admin 后台共用，主理投顾可通过语音输入、文件上传、网页URL沉淀专属框架与纪要资料，并按规则同步到知识专区。
             </div>
           </div>
           <div class="config-card">
@@ -1994,13 +2030,13 @@
 <script>
 const sectionTitles = {
   overview:'运营概览', users:'用户列表', segments:'用户分层', points:'积分管理',
-  kols:'试点作者管理', commission:'收益结算', community:'帖子审核',
+  kols:'大V投顾管理', commission:'收益结算', community:'帖子审核',
   events:'活动管理', hermes:'Hermes使用统计', channels:'渠道管理', analytics:'数据分析', settings:'系统设置', access:'访问审计'
 };
 const analyticsTitles = {
   funnel: '数据分析 · 转化漏斗',
   channel: '数据分析 · 渠道分析',
-  kol: '数据分析 · 作者协同效能',
+  kol: '数据分析 · 大V协同效能',
   revenue: '数据分析 · 营收趋势',
   segment: '数据分析 · 用户分层分析',
 };
@@ -2057,7 +2093,9 @@ function renderSiteConfigForm() {
   const flags = cfg.feature_flags || {};
   markActivePill('theme-mode-group', 'mode', cfg.default_theme || 'light');
   markActivePill('theme-accent-group', 'accent', cfg.default_accent || 'blue');
-  ['fundamental_analysis', 'watchlist', 'daily_review', 'community', 'hermes', 'vip', 'dm', 'workbench'].forEach(key => {
+  const passwordGate = document.getElementById('password-gate-enabled');
+  if (passwordGate) passwordGate.checked = cfg.password_gate_enabled !== false;
+  ['fundamental_analysis', 'watchlist', 'daily_review', 'knowledge', 'community', 'hermes', 'vip', 'dm', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     if (checkbox) checkbox.checked = Boolean(flags[key]);
   });
@@ -2087,13 +2125,15 @@ async function loadSiteConfig() {
 
 async function saveSiteConfig() {
   const featureFlags = {};
-  ['fundamental_analysis', 'watchlist', 'daily_review', 'community', 'hermes', 'vip', 'dm', 'workbench'].forEach(key => {
+  const passwordGate = document.getElementById('password-gate-enabled');
+  ['fundamental_analysis', 'watchlist', 'daily_review', 'knowledge', 'community', 'hermes', 'vip', 'dm', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     featureFlags[key] = Boolean(checkbox && checkbox.checked);
   });
   const payload = {
     default_theme: adminSiteConfig.default_theme || 'light',
     default_accent: adminSiteConfig.default_accent || 'blue',
+    password_gate_enabled: Boolean(passwordGate && passwordGate.checked),
     feature_flags: featureFlags,
   };
   const status = document.getElementById('site-config-status');
@@ -2164,7 +2204,7 @@ async function renderAccessAudit() {
 
 // ── Events rich client ──
 const EV_DATA = {
-  1: { title:'2026年中期投资策略验证会', type:'会议', host:'洞见智研官方', date:'2026-06-15 14:00 ~ 16:00', cap:'180', pts:'100分', compute:'—', status:'报名中', joined:'128', checkin:'—', ptsGiven:'—', share:'42', desc:'本次会议聚焦原型阶段的核心验证项，联合试点作者和研究协同方，覆盖宏观、行业、量化、港股四大维度，并观察活动是否带来更强留资与付费。', agenda:'13:30 签到入场\n14:00 开场致辞 + 2026上半年市场复盘\n14:30 宏观策略演讲：美联储路径 + A股估值\n15:00 行业精选：新能源 + AI算力\n15:30 Hermes现场Demo + 互动问答\n15:50 反馈收集 + 结束' },
+  1: { title:'2026年中期投资策略验证会', type:'会议', host:'洞见智研官方', date:'2026-06-15 14:00 ~ 16:00', cap:'180', pts:'100分', compute:'—', status:'报名中', joined:'128', checkin:'—', ptsGiven:'—', share:'42', desc:'本次会议聚焦复盘、基本面分析、证据链与 Hermes 研究能力，联合大V投顾和研究协同方，覆盖宏观、行业、量化、港股四大维度，并服务会后持续跟踪。', agenda:'13:30 签到入场\n14:00 开场致辞 + 2026上半年市场复盘\n14:30 宏观策略演讲：美联储路径 + A股估值\n15:00 行业精选：新能源 + AI算力\n15:30 Hermes现场Demo + 互动问答\n15:50 反馈收集 + 结束' },
   2: { title:'财经老王直播：A股下半年布局', type:'直播', host:'财经老王', date:'2026-05-22 20:00 ~ 21:30', cap:'不限', pts:'50分', compute:'1次', status:'进行中', joined:'1,240', checkin:'1,240', ptsGiven:'62,000', share:'528', desc:'财经老王将深度解析A股下半年配置策略，重点覆盖科技成长与高股息双主线，结合Hermes实时数据展示。', agenda:'20:00 直播开始 + 实时行情解读\n20:20 下半年大势研判\n20:50 重点板块机会梳理\n21:10 用户问答 + Hermes连线' },
   3: { title:'新能源投资沙龙（上海）', type:'线下活动', host:'洞见智研官方', date:'2026-05-28 13:30 ~ 17:00', cap:'500', pts:'200分', compute:'2次', status:'报名中', joined:'480', checkin:'—', ptsGiven:'—', share:'198', desc:'洞见智研首场线下投研沙龙，落地上海，邀请新能源产业链核心专家，结合洞见智研卫星数据与Hermes分析工具，深度解读产业机会。', agenda:'13:30 签到\n14:00 产业链现状综述\n14:40 固态电池专项研讨\n15:30 圆桌讨论\n16:20 自由交流 + 洞见智研产品体验' },
   4: { title:'量化因子研讨会', type:'会议', host:'量化小白', date:'2026-06-05 10:00 ~ 12:00', cap:'80', pts:'150分', compute:'1次', status:'待发布', joined:'36', checkin:'—', ptsGiven:'—', share:'16', desc:'洞见智研Hermes量化因子筛选功能深度演示，量化小白分享多因子模型构建经验，适合专业会员及机构试点。', agenda:'10:00 开场\n10:15 多因子模型原理回顾\n10:50 Hermes量化因子筛选现场演示\n11:30 策略回测对比\n11:50 Q&A' },
