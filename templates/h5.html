@@ -100,124 +100,280 @@ body { background: var(--surface-2); color: var(--text-main); }
 .modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:12px; }
 
 /* ===== HERMES ===== */
-.hermes-header { background:linear-gradient(135deg,var(--navy-mid),#0F2035); padding:14px 16px; border-bottom:1px solid rgba(200,169,110,0.15); display:flex; justify-content:space-between; align-items:center; }
-.hermes-logo { font-size:20px; font-weight:700; color:var(--gold); letter-spacing:1px; }
-.hermes-subtitle { font-size:11px; color:var(--gray-400); margin-top:2px; }
-.hermes-credits { font-size:12px; color:var(--gold); background:rgba(200,169,110,0.1); padding:4px 10px; border-radius:12px; border:1px solid rgba(200,169,110,0.2); white-space:nowrap; }
-.hermes-workspace { padding:14px 16px 6px; display:grid; gap:14px; }
-.hermes-hero-card {
-  background:linear-gradient(160deg, #FFFFFF, #F6FAFF);
-  border:1px solid rgba(47,116,192,0.14);
-  border-radius:16px;
-  padding:16px;
-  box-shadow:0 12px 28px rgba(31,73,125,0.08);
+.hermes-shell {
+  width:100%;
+  box-sizing:border-box;
+  max-width:100%;
+  overflow-x:hidden;
 }
-.hermes-hero-title { font-size:16px; font-weight:700; color:var(--white); }
-.hermes-hero-desc { font-size:12px; color:var(--gray-400); line-height:1.7; margin-top:6px; }
-.hermes-hero-actions { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:12px; }
-.hermes-hero-pill {
+.hermes-header { background:linear-gradient(135deg,var(--navy-mid),#0F2035); padding:14px 16px; border:1px solid rgba(200,169,110,0.15); border-radius:16px; display:flex; justify-content:space-between; align-items:center; gap:10px; overflow:hidden; }
+.hermes-header > div:first-child { flex:1; min-width:0; }
+.hermes-logo { font-size:20px; font-weight:700; color:var(--gold); letter-spacing:1px; }
+.hermes-subtitle { font-size:11px; color:var(--gray-400); margin-top:2px; line-height:1.5; }
+.hermes-credits { font-size:12px; color:var(--gold); background:rgba(200,169,110,0.1); padding:4px 10px; border-radius:12px; border:1px solid rgba(200,169,110,0.2); white-space:nowrap; }
+.hermes-header,
+.hermes-workspace,
+.hermes-assistant-card {
+  width:100%;
+  box-sizing:border-box;
+  max-width:100%;
+}
+.hermes-workspace { padding:14px 0 0; display:grid; gap:14px; }
+.hermes-assistant-card {
   background:#FFFFFF;
   border:1px solid rgba(47,116,192,0.12);
-  border-radius:12px;
-  padding:10px 8px;
-  text-align:center;
-  font-size:11px;
-  color:var(--text-sub);
+  border-radius:18px;
+  padding:16px;
+  box-shadow:0 12px 28px rgba(31,73,125,0.08);
+  overflow:hidden;
 }
-.hermes-panel {
+.hermes-assistant-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:12px; }
+.hermes-assistant-head > div:first-child { min-width:0; }
+.hermes-assistant-title { font-size:18px; font-weight:700; color:var(--text-main); }
+.hermes-assistant-desc { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:4px; }
+.hermes-assistant-tag {
+  flex-shrink:0;
+  font-size:10px;
+  color:#1F497D;
+  background:rgba(47,116,192,0.08);
+  border:1px solid rgba(47,116,192,0.14);
+  border-radius:999px;
+  padding:5px 10px;
+}
+.hermes-toolbar { display:grid; gap:12px; }
+.hermes-stock-input-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; }
+.hermes-stock-input {
+  width:100%;
+  border:1px solid rgba(47,116,192,0.18);
+  border-radius:12px;
+  padding:12px 14px;
+  font-size:14px;
+  color:var(--text-main);
+  background:#F7FBFF;
+  outline:none;
+}
+.hermes-stock-input:focus,
+.hermes-question-input:focus {
+  border-color:#2F74C0;
+  box-shadow:0 0 0 3px rgba(47,116,192,0.10);
+}
+.hermes-stock-btn,
+.hermes-analyze-btn {
+  border:none;
+  border-radius:12px;
+  padding:0 16px;
+  font-size:13px;
+  font-weight:700;
+  cursor:pointer;
+}
+.hermes-stock-btn {
+  background:#EAF3FF;
+  color:#1F497D;
+  border:1px solid rgba(47,116,192,0.12);
+}
+.hermes-stock-picks { display:flex; gap:8px; overflow-x:auto; padding-top:2px; scrollbar-width:none; max-width:100%; }
+.hermes-stock-picks::-webkit-scrollbar { display:none; }
+.hermes-stock-pick {
+  flex-shrink:0;
+  background:#F7FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:12px;
+  padding:9px 12px;
+  cursor:pointer;
+  min-width:112px;
+}
+.hermes-stock-pick-name { font-size:13px; font-weight:700; color:var(--text-main); }
+.hermes-stock-pick-meta { font-size:10px; color:var(--text-sub); margin-top:4px; }
+.hermes-skills-head { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.hermes-skills-title { font-size:12px; font-weight:700; color:var(--text-main); }
+.hermes-skill-actions { display:flex; gap:8px; align-items:center; }
+.hermes-skill-add-btn {
+  border:none;
+  background:#F3F8FE;
+  color:#1F497D;
+  border-radius:10px;
+  padding:8px 12px;
+  font-size:12px;
+  font-weight:700;
+  cursor:pointer;
+}
+.hermes-skill-grid { display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; max-width:100%; }
+.hermes-skill-grid::-webkit-scrollbar { display:none; }
+.hermes-skill-chip {
+  flex-shrink:0;
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  padding:12px;
+  cursor:pointer;
+  transition:all 0.2s ease;
+  min-width:164px;
+  max-width:220px;
+}
+.hermes-skill-chip.active {
+  border-color:#2F74C0;
+  background:linear-gradient(150deg,rgba(47,116,192,0.12),rgba(47,116,192,0.04));
+  box-shadow:0 10px 20px rgba(47,116,192,0.10);
+}
+.hermes-skill-chip-top { display:flex; align-items:center; gap:8px; }
+.hermes-skill-icon {
+  width:32px;
+  height:32px;
+  border-radius:10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:16px;
+  background:rgba(47,116,192,0.10);
+}
+.hermes-skill-name { font-size:13px; font-weight:700; color:var(--text-main); }
+.hermes-skill-desc { font-size:11px; color:var(--text-sub); line-height:1.6; margin-top:8px; }
+.hermes-skill-meta { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.hermes-skill-meta-chip {
+  font-size:10px;
+  color:#2F74C0;
+  background:rgba(47,116,192,0.08);
+  border-radius:999px;
+  padding:4px 8px;
+}
+.hermes-context-box {
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  padding:12px;
+}
+.hermes-context-title { font-size:12px; font-weight:700; color:var(--text-main); }
+.hermes-context-desc { font-size:11px; color:var(--text-sub); line-height:1.7; margin-top:4px; }
+.hermes-context-chip-row { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.hermes-context-chip {
+  font-size:10px;
+  color:#1F497D;
+  background:#EAF3FF;
+  border-radius:999px;
+  padding:4px 8px;
+}
+.hermes-suggestion-row { display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; scrollbar-width:none; max-width:100%; }
+.hermes-suggestion-row::-webkit-scrollbar { display:none; }
+.hermes-suggestion-chip {
+  flex-shrink:0;
+  font-size:11px;
+  color:#1F497D;
+  background:#F3F8FE;
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:999px;
+  padding:7px 12px;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.hermes-chat-thread { display:grid; gap:12px; margin-top:2px; }
+.hermes-chat-empty {
+  background:#F8FBFF;
+  border:1px dashed rgba(47,116,192,0.18);
+  border-radius:16px;
+  padding:20px 16px;
+}
+.hermes-chat-empty-title { font-size:14px; font-weight:700; color:var(--text-main); }
+.hermes-chat-empty-desc { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:6px; }
+.hermes-chat-msg.user { display:flex; justify-content:flex-end; }
+.hermes-chat-msg.ai { display:flex; justify-content:flex-start; }
+.hermes-chat-bubble {
+  max-width:86%;
+  border-radius:16px;
+  padding:12px 14px;
+}
+.hermes-chat-bubble.user {
+  background:linear-gradient(135deg,var(--gold-dark),var(--gold));
+  color:#FFFFFF;
+  border-bottom-right-radius:6px;
+}
+.hermes-chat-bubble.ai {
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  color:var(--text-main);
+  border-bottom-left-radius:6px;
+}
+.hermes-chat-role { font-size:10px; font-weight:700; color:#2F74C0; margin-bottom:6px; }
+.hermes-chat-main { font-size:12px; line-height:1.7; white-space:pre-line; }
+.hermes-chat-meta { font-size:10px; line-height:1.6; opacity:0.86; margin-top:6px; }
+.hermes-question-input {
+  width:100%;
+  min-height:92px;
+  border:1px solid rgba(47,116,192,0.18);
+  border-radius:14px;
+  padding:12px 14px;
+  font-size:13px;
+  color:var(--text-main);
+  background:#F7FBFF;
+  resize:none;
+  outline:none;
+  font-family:var(--font-main);
+  line-height:1.7;
+}
+.hermes-action-row { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:12px; flex-wrap:wrap; }
+.hermes-analyze-btn {
+  background:linear-gradient(135deg,var(--gold-dark),var(--gold));
+  color:#FFFFFF;
+  min-height:42px;
+}
+.hermes-action-hint { font-size:11px; color:var(--text-sub); line-height:1.6; min-width:0; flex:1; }
+.hermes-chat-analysis {
+  display:grid;
+  gap:10px;
+  margin-top:10px;
+}
+.hermes-result-card {
   background:#FFFFFF;
   border:1px solid rgba(47,116,192,0.10);
   border-radius:16px;
   padding:14px;
   box-shadow:0 10px 24px rgba(31,73,125,0.06);
 }
-.hermes-panel-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px; }
-.hermes-panel-title { font-size:14px; font-weight:700; color:var(--white); }
-.hermes-panel-subtitle { font-size:11px; color:var(--gray-400); line-height:1.6; margin-top:4px; }
-.hermes-entry-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-.hermes-entry-card {
-  background:#F7FBFF;
-  border:1px solid rgba(47,116,192,0.10);
-  border-radius:14px;
-  padding:12px;
-  cursor:pointer;
-  transition:transform 0.18s ease, border-color 0.18s ease;
+.hermes-result-top { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px; }
+.hermes-result-kicker { font-size:11px; color:#2F74C0; font-weight:700; }
+.hermes-result-title { font-size:17px; font-weight:700; color:var(--text-main); margin-top:4px; }
+.hermes-result-subtitle { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:6px; }
+.hermes-result-badge {
+  flex-shrink:0;
+  font-size:10px;
+  color:var(--gold-dark);
+  background:rgba(200,169,110,0.12);
+  border-radius:999px;
+  padding:5px 10px;
 }
-.hermes-entry-card:hover,
-.hermes-entry-card:active {
-  transform:translateY(-1px);
-  border-color:rgba(47,116,192,0.24);
+.hermes-metric-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.hermes-metric-card {
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.08);
+  border-radius:12px;
+  padding:10px;
 }
-.hermes-entry-icon { width:36px; height:36px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:18px; background:rgba(47,116,192,0.10); margin-bottom:10px; }
-.hermes-entry-title { font-size:13px; font-weight:700; color:var(--white); }
-.hermes-entry-desc { font-size:11px; color:var(--gray-400); line-height:1.6; margin-top:6px; min-height:34px; }
-.hermes-entry-meta { font-size:10px; color:var(--gold); margin-top:8px; }
-.hermes-stock-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-.hermes-stock-chip {
-  background:#F7FBFF;
-  border:1px solid rgba(47,116,192,0.10);
-  border-radius:14px;
-  padding:12px;
-  cursor:pointer;
+.hermes-metric-label { font-size:10px; color:var(--text-sub); }
+.hermes-metric-value { font-size:16px; font-weight:700; color:#1F497D; margin-top:4px; }
+.hermes-metric-note { font-size:10px; color:var(--text-sub); line-height:1.6; margin-top:4px; }
+.hermes-bullet-list { display:grid; gap:8px; }
+.hermes-bullet-item {
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.08);
+  border-radius:12px;
+  padding:10px 12px;
+  font-size:12px;
+  color:var(--text-main);
+  line-height:1.7;
 }
-.hermes-stock-chip-name { font-size:13px; font-weight:700; color:var(--white); }
-.hermes-stock-chip-meta { font-size:10px; color:var(--gray-400); margin-top:4px; line-height:1.5; }
-.hermes-stock-chip-tag { display:inline-block; margin-top:8px; font-size:10px; color:var(--gold); background:rgba(47,116,192,0.08); border-radius:999px; padding:3px 8px; }
-.hermes-recent-list { display:grid; gap:8px; }
-.hermes-recent-card {
-  background:#F7FBFF;
-  border:1px solid rgba(47,116,192,0.10);
-  border-radius:14px;
-  padding:12px;
-  display:flex;
-  justify-content:space-between;
-  gap:10px;
-  align-items:flex-start;
+.hermes-evidence-row { display:flex; gap:8px; flex-wrap:wrap; }
+.hermes-evidence-chip {
+  font-size:10px;
+  color:#1F497D;
+  background:rgba(47,116,192,0.08);
+  border-radius:999px;
+  padding:5px 9px;
 }
-.hermes-recent-title { font-size:13px; font-weight:700; color:var(--white); }
-.hermes-recent-desc { font-size:11px; color:var(--gray-400); line-height:1.6; margin-top:4px; }
-.hermes-recent-tag { font-size:10px; color:var(--gold); background:rgba(47,116,192,0.08); border-radius:999px; padding:3px 8px; white-space:nowrap; }
-
-.hermes-modes { display:flex; gap:8px; overflow-x:auto; padding:12px 16px; scrollbar-width:none; }
-.hermes-modes::-webkit-scrollbar { display:none; }
-.hermes-mode-btn { flex-shrink:0; padding:8px 14px; border-radius:20px; border:1px solid rgba(200,169,110,0.2); background:var(--navy-mid); color:var(--gray-400); font-size:12px; cursor:pointer; white-space:nowrap; transition:all 0.2s; }
-.hermes-mode-btn.active { background:rgba(200,169,110,0.15); color:var(--gold); border-color:var(--gold); }
-
-.hermes-mode-desc { margin:0 16px 12px; background:rgba(200,169,110,0.05); border:1px solid rgba(200,169,110,0.15); border-radius:10px; padding:12px; }
-.hermes-mode-desc-text { font-size:12px; color:var(--gray-400); line-height:1.6; }
-
-.hermes-section-title { font-size:12px; color:var(--gray-400); padding:0 16px 8px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; }
-
-.hermes-options { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:0 16px 12px; }
-.hermes-option-btn { background:var(--navy-mid); border:1px solid rgba(200,169,110,0.15); border-radius:10px; padding:12px; cursor:pointer; text-align:left; transition:all 0.2s; }
-.hermes-option-btn:hover, .hermes-option-btn.selected { border-color:var(--gold); background:rgba(200,169,110,0.08); }
-.hermes-option-label { font-size:12px; color:var(--white); font-weight:500; }
-.hermes-option-tag { font-size:10px; color:var(--gold); margin-top:3px; }
-
-.hermes-chat { padding:0 16px; min-height:200px; }
-.chat-bubble-wrap { margin-bottom:12px; }
-.chat-bubble-wrap.user { display:flex; justify-content:flex-end; }
-.chat-bubble-wrap.ai { display:flex; justify-content:flex-start; }
-.chat-bubble { max-width:85%; border-radius:12px; padding:12px 14px; }
-.chat-bubble.user { background:linear-gradient(135deg,var(--gold-dark),var(--gold)); color:var(--navy); font-size:13px; font-weight:500; border-bottom-right-radius:4px; }
-.chat-bubble.ai { background:var(--navy-mid); border:1px solid rgba(200,169,110,0.15); border-bottom-left-radius:4px; }
-.chat-ai-header { font-size:11px; color:var(--gold); font-weight:600; margin-bottom:6px; }
-.chat-ai-text { font-size:13px; color:var(--white); line-height:1.7; white-space:pre-line; }
-.chat-ai-footer { font-size:10px; color:var(--gray-400); margin-top:8px; padding-top:6px; border-top:1px solid rgba(200,169,110,0.1); }
-
-.hermes-loading { display:flex; align-items:center; gap:8px; padding:12px 16px; }
+.hermes-loading { display:flex; align-items:center; gap:8px; }
 .hermes-loading-text { font-size:13px; color:var(--gold); }
 .dot-anim span { display:inline-block; animation:dotBounce 1.2s infinite; }
 .dot-anim span:nth-child(2) { animation-delay:0.2s; }
 .dot-anim span:nth-child(3) { animation-delay:0.4s; }
 @keyframes dotBounce { 0%,80%,100%{opacity:0.3} 40%{opacity:1} }
-
-.hermes-quick-actions { display:flex; gap:6px; flex-wrap:wrap; padding:8px 16px 12px; }
-.hermes-quick-btn { font-size:11px; color:var(--gold); background:rgba(200,169,110,0.08); border:1px solid rgba(200,169,110,0.2); border-radius:16px; padding:5px 12px; cursor:pointer; }
-
-.hermes-shortcuts { display:flex; gap:8px; overflow-x:auto; padding:10px 16px; border-top:1px solid rgba(200,169,110,0.08); scrollbar-width:none; }
-.hermes-shortcuts::-webkit-scrollbar { display:none; }
-.hermes-shortcut { flex-shrink:0; font-size:11px; color:var(--gray-400); background:var(--navy-mid); border:1px solid rgba(200,169,110,0.1); border-radius:16px; padding:6px 12px; cursor:pointer; white-space:nowrap; }
 
 /* ===== PROFILE ===== */
 .profile-header { background:linear-gradient(135deg,var(--navy-mid),#0F2035); padding:24px 16px 20px; text-align:center; }
@@ -759,6 +915,115 @@ body { background: var(--surface-2); color: var(--text-main); }
   border-color:var(--gold);
   background:rgba(200,169,110,0.1);
 }
+.review-period-row {
+  display:flex;
+  gap:8px;
+  overflow-x:auto;
+  padding-bottom:2px;
+  scrollbar-width:none;
+}
+.review-period-row::-webkit-scrollbar { display:none; }
+.review-period-pill {
+  flex-shrink:0;
+  border:1px solid rgba(47,116,192,0.16);
+  border-radius:999px;
+  padding:8px 12px;
+  font-size:12px;
+  color:var(--gray-400);
+  background:#FFFFFF;
+  cursor:pointer;
+}
+.review-period-pill.active {
+  color:var(--gold);
+  border-color:var(--gold);
+  background:rgba(200,169,110,0.10);
+}
+.review-role-toolbar {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  margin-bottom:12px;
+}
+.review-role-title { font-size:15px; font-weight:700; color:var(--white); }
+.review-role-desc { font-size:12px; color:var(--gray-400); line-height:1.8; margin-top:6px; }
+.review-source-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px; }
+.review-source-card,
+.review-summary-card,
+.review-paragraph-card,
+.review-meta-card {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:12px;
+  padding:12px;
+}
+.review-source-icon { font-size:18px; margin-bottom:8px; }
+.review-source-title,
+.review-summary-title,
+.review-meta-title { font-size:13px; color:var(--text-main); font-weight:700; }
+.review-source-desc,
+.review-summary-desc,
+.review-meta-desc { font-size:11px; color:var(--gray-400); line-height:1.7; margin-top:6px; }
+.review-flow-row { display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
+.review-flow-step {
+  font-size:10px;
+  color:var(--gold);
+  background:rgba(47,116,192,0.08);
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:999px;
+  padding:4px 8px;
+}
+.review-report-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+  margin-bottom:10px;
+}
+.review-author-row { display:flex; gap:10px; align-items:center; }
+.review-author-avatar {
+  width:42px;
+  height:42px;
+  border-radius:14px;
+  background:linear-gradient(135deg,var(--gold-dark),var(--gold));
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:20px;
+  flex-shrink:0;
+}
+.review-author-name { font-size:14px; color:var(--white); font-weight:700; }
+.review-author-meta { font-size:11px; color:var(--gray-400); margin-top:4px; line-height:1.6; }
+.review-report-title { font-size:15px; color:var(--white); font-weight:700; line-height:1.5; margin-top:10px; }
+.review-report-summary { font-size:12px; color:var(--gray-400); line-height:1.8; margin-top:8px; }
+.review-paragraph-list,
+.review-summary-grid,
+.review-meta-grid { display:grid; gap:8px; margin-top:12px; }
+.review-paragraph-title { font-size:12px; color:var(--gold); font-weight:700; margin-bottom:6px; }
+.review-paragraph-text { font-size:12px; color:var(--gray-400); line-height:1.8; }
+.review-meta-grid { grid-template-columns:1fr 1fr; }
+.review-watchlist-row { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.review-watchlist-chip {
+  font-size:10px;
+  color:var(--gold);
+  background:rgba(200,169,110,0.10);
+  border:1px solid rgba(200,169,110,0.18);
+  border-radius:999px;
+  padding:4px 8px;
+}
+.review-watchlist-chip.selectable {
+  cursor:pointer;
+  transition:all 0.18s ease;
+}
+.review-watchlist-chip.selectable.active {
+  color:var(--navy);
+  background:var(--gold);
+  border-color:var(--gold);
+}
+@media (max-width: 420px) {
+  .review-source-grid,
+  .review-meta-grid { grid-template-columns:1fr; }
+}
 .knowledge-wave {
   display:flex;
   align-items:flex-end;
@@ -1206,119 +1471,69 @@ body,
 
   <!-- ===== TAB 3: HERMES ===== -->
   <div id="page-hermes" class="page" data-feature="hermes">
-    <!-- Hermes branding bar -->
-    <div class="hermes-header">
-      <div>
-        <div class="hermes-logo">🦞 Hermes</div>
-        <div class="hermes-subtitle">研究工具层 · 复盘、诊断、证据链与方法模板</div>
-      </div>
-      <div class="hermes-credits" id="hermes-credits-display">⚡ 128次</div>
-    </div>
-
-    <div class="hermes-workspace">
-      <div class="hermes-hero-card">
-        <div class="hermes-hero-title">研究工作台</div>
-        <div class="hermes-hero-desc">Hermes 不只是聊天工具，而是前台统一的主动分析入口。你可以按任务启动 Skills，也可以直接按标的进入研究档案。</div>
-        <div class="hermes-hero-actions">
-          <div class="hermes-hero-pill">按任务启动</div>
-          <div class="hermes-hero-pill">按标的进入</div>
-          <div class="hermes-hero-pill">分析结果回写档案</div>
+    <div class="h5-section hermes-shell" style="padding-top:14px">
+      <div class="hermes-header">
+        <div>
+          <div class="hermes-logo">🦞 Hermes</div>
+          <div class="hermes-subtitle">高级龙虾智能体 · 以对话为主，skills 可选、可自定义、可绑定知识库</div>
         </div>
+        <div class="hermes-credits" id="hermes-credits-display">⚡ 128次</div>
       </div>
 
-      <div class="hermes-panel">
-        <div class="hermes-panel-head">
-          <div>
-            <div class="hermes-panel-title">按任务分析</div>
-            <div class="hermes-panel-subtitle">把常见研究动作做成 Skills，先启动任务，再进入具体分析。</div>
+      <div class="hermes-workspace">
+        <div class="hermes-assistant-card">
+          <div class="hermes-assistant-head">
+            <div>
+              <div class="hermes-assistant-title">Hermes 对话工作区</div>
+              <div class="hermes-assistant-desc">先选股票和 skill，再直接对话。Hermes 会把租户知识库一并带入回答，不再堆很多杂乱入口。</div>
+            </div>
+            <div class="hermes-assistant-tag">对话式</div>
           </div>
-          <span class="tag tag-gold">Skills</span>
-        </div>
-        <div class="hermes-entry-grid" id="hermes-entry-grid"></div>
-      </div>
-
-      <div class="hermes-panel">
-        <div class="hermes-panel-head">
-          <div>
-            <div class="hermes-panel-title">按标的进入</div>
-            <div class="hermes-panel-subtitle">从重点标的直接进入 Research Profile，再决定是否继续分析。</div>
+          <div class="hermes-toolbar">
+            <div class="hermes-stock-input-row">
+              <input
+                id="hermes-stock-code-input"
+                class="hermes-stock-input"
+                type="text"
+                placeholder="输入股票代码，例如 600519 / 300750 / 00700"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();runHermesAnalysis();}"
+              >
+              <button class="hermes-stock-btn" onclick="runHermesAnalysis()">发送</button>
+            </div>
+            <div class="hermes-stock-picks" id="hermes-quick-stocks"></div>
+            <div class="hermes-skills-head">
+              <div class="hermes-skills-title">Skills</div>
+              <div class="hermes-skill-actions">
+                <button class="hermes-skill-add-btn" onclick="openHermesSkillModal()">+ 新增 skill</button>
+              </div>
+            </div>
+            <div class="hermes-skill-grid" id="hermes-skill-grid"></div>
+            <div class="hermes-context-box" id="hermes-skill-context"></div>
+            <div class="hermes-suggestion-row" id="hermes-suggestion-row"></div>
+            <div class="hermes-chat-thread" id="hermes-chat-thread"></div>
+            <div>
+              <div class="hermes-skills-title" style="margin-bottom:8px">和 Hermes 继续对话</div>
+              <textarea
+                id="hermes-question-input"
+                class="hermes-question-input"
+                placeholder="例如：请判断这只股票当前更适合继续跟踪还是重点研究，并说明原因。"
+                oninput="this.style.height='auto';this.style.height=Math.max(92,Math.min(this.scrollHeight,180))+'px'"
+              ></textarea>
+              <div class="hermes-action-row">
+                <div class="hermes-action-hint">你选中的 skill 会自动携带知识库上下文，一次对话里给出图表和结构化内容。</div>
+                <button class="hermes-analyze-btn" onclick="runHermesAnalysis()">发送给 Hermes</button>
+              </div>
+            </div>
           </div>
-          <span class="tag tag-gold">Research Profile</span>
         </div>
-        <div class="hermes-stock-grid" id="hermes-stock-grid"></div>
-      </div>
-
-      <div class="hermes-panel">
-        <div class="hermes-panel-head">
-          <div>
-            <div class="hermes-panel-title">最近分析</div>
-            <div class="hermes-panel-subtitle">承接刚做过的任务、今日热门主题和大V方法模板。</div>
-          </div>
-          <span class="tag tag-gold">最近使用</span>
-        </div>
-        <div class="hermes-recent-list" id="hermes-recent-list"></div>
       </div>
     </div>
+  </div>
 
-    <!-- Mode selector -->
-    <div class="hermes-modes" id="hermes-modes">
-      <div class="hermes-mode-btn active" onclick="selectHermesMode('复盘速写')">📅 复盘速写</div>
-      <div class="hermes-mode-btn" onclick="selectHermesMode('自选股诊断')">⭐ 自选股诊断</div>
-      <div class="hermes-mode-btn" onclick="selectHermesMode('基本面分析')">🧭 基本面分析</div>
-      <div class="hermes-mode-btn" onclick="selectHermesMode('研报精读')">📋 研报精读</div>
-      <div class="hermes-mode-btn" onclick="selectHermesMode('专家纪要速读')">🎙️ 专家纪要</div>
-      <div class="hermes-mode-btn" onclick="selectHermesMode('证据链归因')">🔗 证据链</div>
-      <div class="hermes-mode-btn" onclick="selectHermesMode('线索追踪')">🛰️ 线索追踪</div>
-      <div class="hermes-mode-btn" onclick="selectHermesMode('方法模板')">🧠 方法模板</div>
-    </div>
-
-    <!-- Mode description card -->
-    <div class="hermes-mode-desc" id="hermes-mode-desc">
-      <div class="hermes-mode-desc-text" id="hermes-mode-desc-text">选择一个分析模式开始使用 Hermes 智能投研引擎。</div>
-    </div>
-
-    <!-- Analysis object selector -->
-    <div class="hermes-section-title" id="hermes-options-title" style="display:none">选择分析对象</div>
-    <div class="hermes-options" id="hermes-options"></div>
-
-    <!-- Chat / result area -->
-    <div class="hermes-chat" id="hermes-chat"></div>
-
-    <!-- Quick action buttons (shown after AI reply) -->
-    <div class="hermes-quick-actions" id="hermes-quick-actions" style="display:none">
-      <div class="hermes-quick-btn" onclick="hermesQuickAction('深入追问')">深入追问</div>
-      <div class="hermes-quick-btn" onclick="hermesQuickAction('对比分析')">对比分析</div>
-      <div class="hermes-quick-btn" onclick="hermesQuickAction('生成摘要')">生成摘要</div>
-      <div class="hermes-quick-btn" onclick="hermesQuickAction('加入收藏')">⭐ 收藏</div>
-      <div class="hermes-quick-btn" onclick="hermesQuickAction('分享到社区')">📤 分享</div>
-    </div>
-
-    <!-- Shortcut commands (always visible) -->
-    <div style="padding:8px 16px 4px;font-size:11px;color:var(--gray-400)">快捷指令 · 可直接生成复盘、摘要、证据链和方法提示</div>
-    <div class="hermes-shortcuts">
-      <div class="hermes-shortcut" onclick="hermesShortcut('今日复盘提纲')">📊 今日复盘提纲</div>
-      <div class="hermes-shortcut" onclick="hermesShortcut('热门研报摘要')">📋 热门研报</div>
-      <div class="hermes-shortcut" onclick="hermesShortcut('投顾方法汇总')">👑 投顾方法汇总</div>
-      <div class="hermes-shortcut" onclick="hermesShortcut('风险词扫描')">⚠️ 风险词扫描</div>
-      <div class="hermes-shortcut" onclick="hermesShortcut('社区热帖解读')">🔥 社区热帖解读</div>
-      <div class="hermes-shortcut" onclick="hermesShortcut('当前自选诊断')">📈 当前自选诊断</div>
-    </div>
-
-    <!-- Chat input box -->
-    <div style="padding:10px 16px 16px;border-top:1px solid rgba(200,169,110,0.08)">
-      <div style="display:flex;gap:8px;align-items:flex-end">
-        <div style="flex:1;background:var(--navy-mid);border:1px solid rgba(200,169,110,0.2);border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:8px">
-          <textarea id="hermes-input" placeholder="直接输入需求，例如“把今天的半导体资料做成复盘提纲”..." rows="1"
-            style="flex:1;background:transparent;border:none;outline:none;color:var(--white);font-size:13px;resize:none;font-family:inherit;line-height:1.5;max-height:80px;overflow-y:auto"
-            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,80)+'px'"
-            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendHermesChat()}"
-          ></textarea>
-        </div>
-        <button onclick="sendHermesChat()" style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--gold-dark),var(--gold));border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">
-          ↑
-        </button>
-      </div>
-      <div style="font-size:10px;color:var(--gray-400);margin-top:6px;text-align:center">Hermes 会优先输出证据链、来源条目和置信度 · 消耗1算力/次</div>
+  <div class="modal-overlay" id="hermes-skill-modal" onclick="if(event.target===this)closeHermesSkillModal()">
+    <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
+      <div class="modal-handle"></div>
+      <div id="hermes-skill-modal-content"></div>
     </div>
   </div>
 
@@ -1341,6 +1556,7 @@ body,
         <div style="font-size:12px;color:var(--gray-400);line-height:1.6">用户不需要先点“添加”。直接输入股票代码后进入个股详情页，再决定是否加入自选股。</div>
         <div style="font-size:11px;color:var(--gold);margin-top:8px;line-height:1.7">租户隔离规则：普通投资者只可与所属大V投顾互动；跨租户投顾内容不开放。通过 Hermes 发起的个股分析会同步为租户分析记录，供主理投顾查看。</div>
       </div>
+      <div id="market-review-selection-banner" style="display:none"></div>
       <div id="market-watchlist-list">
       {% for item in market %}
       <div
@@ -1374,6 +1590,7 @@ body,
           <button class="btn-outline" style="padding:7px 10px;font-size:11px" onclick="event.stopPropagation();openWatchlistDetail('{{ item.code }}','authors')">当前投顾互动</button>
           <button class="btn-gold" style="padding:7px 10px;font-size:11px" onclick="event.stopPropagation();runWatchlistHermes('{{ item.code }}','basic')">基本面分析</button>
         </div>
+        <div data-review-selection-slot="true" style="display:none"></div>
       </div>
       {% endfor %}
       </div>
@@ -1406,42 +1623,21 @@ body,
     <div class="h5-section">
       <div class="h5-section-title">复盘专区</div>
       <div class="card" style="padding:16px;margin-bottom:12px">
-        <div style="font-size:15px;font-weight:700;color:var(--white);margin-bottom:8px">消息里的复盘内容会被自动整理到这里</div>
-        <div style="font-size:12px;color:var(--gray-400);line-height:1.8">
-          复盘专区不是新的内容源，而是把大V消息、普通用户与 Hermes 对话生成的复盘、文本资料和图像摘要里的关键信息抽出来，整理成便于查看的独立专区。
+        <div class="review-role-toolbar">
+          <div>
+            <div class="review-role-title">大V复盘 + 智能复盘</div>
+            <div class="review-role-desc">普通投资者默认查看所属大V已发布的复盘，同时系统会结合你的自选股和当前阶段行情，补一版可随时发起的智能复盘。</div>
+          </div>
+          <span class="tag tag-gold" id="review-role-badge">租户复盘</span>
         </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
-          <span class="tag tag-gold">来源：大V消息</span>
-          <span class="tag tag-gold">来源：用户与 Hermes 对话</span>
-          <span class="tag tag-gold">来源：图片 / 数据图像</span>
-        </div>
-      </div>
-      <div class="card" style="padding:16px;margin-bottom:12px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <div style="font-size:15px;font-weight:700;color:var(--white)">2026-06-07 今日已整理复盘</div>
-          <span class="tag tag-gold">独立专区</span>
-        </div>
-        <div style="font-size:13px;color:var(--white);line-height:1.8">
-          1. 消息里最集中的主线仍是 AI 算力、半导体和港股互联网。<br>
-          2. 大V侧更强调“先复盘再深挖”，普通用户侧更需要短版提纲和下一步动作。<br>
-          3. 图像类资料主要贡献了量能、资金流与估值带的辅助判断，适合保留在复盘卡片里统一查看。
-        </div>
-        <div style="font-size:11px;color:var(--gray-400);margin-top:8px">整理规则：只保留消息中对“今天/本周判断”真正有价值的内容，不重复堆原始对话。</div>
-      </div>
-      <div class="card" style="padding:16px;margin-bottom:12px">
-        <div style="font-size:13px;color:var(--gold);font-weight:700;margin-bottom:8px">来自大V消息的复盘摘录</div>
-        <div style="font-size:13px;color:var(--white);line-height:1.8">
-          • 财经老王：先把全天资料压成短版复盘，再挑 1-2 个重点样本深挖。<br>
-          • 投资女神Lisa：所有复盘结论都要挂来源和置信度，不能只保留结论。<br>
-          • 全球宏观James：宏观类内容更适合保留框架和变量，不适合直接情绪化表达。
+        <div class="review-period-row" id="review-period-row"></div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn-gold" style="flex:1;padding:10px;font-size:12px" id="review-trigger-button" onclick="openReviewTriggerModal()">发起复盘</button>
+          <button class="btn-outline" style="flex:1;padding:10px;font-size:12px" onclick="openReviewWatchlistSelector()">查看自选股</button>
         </div>
       </div>
-      <div class="card" style="padding:16px">
-        <div style="font-size:13px;color:var(--gold);font-weight:700;margin-bottom:8px">来自普通用户与 Hermes 的智能复盘</div>
-        <div style="font-size:12px;color:var(--gray-400);line-height:1.8">
-          用户自己和 Hermes 产生的复盘也会通过消息发送；当系统判断这些内容具备连续跟踪价值时，会同步沉淀到复盘专区，便于后续回看与比较。
-        </div>
-      </div>
+      <div id="review-dav-studio" style="display:none"></div>
+      <div id="review-report-feed"></div>
     </div>
   </div>
 
@@ -1508,6 +1704,7 @@ body,
           <div style="font-size:12px;color:var(--gray-400);line-height:1.7" id="dm-role-card-desc">普通投资者只能和所属大V对话；大V进入消息页后可查看并回复自己的粉丝会话。</div>
         </div>
       </div>
+      <div id="dm-review-status-card" style="padding:0 16px 12px"></div>
       <div id="dm-conversations-list">
         <div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">加载中...</div>
       </div>
@@ -1949,6 +2146,13 @@ body,
   </div>
 </div>
 
+<div class="modal-overlay" id="review-trigger-modal" onclick="if(event.target===this)closeReviewTriggerModal()">
+  <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <div id="review-trigger-modal-content"></div>
+  </div>
+</div>
+
 <!-- ===== TOAST ===== -->
 <div class="toast" id="toast"></div>
 
@@ -1970,7 +2174,7 @@ const TAB_LABELS = {
 const TAB_HINTS = {
   feed: '优先承接复盘、知识、基本面和自选股诊断四类高频动作',
   market: '仅保留首发阶段的自选股跟踪能力',
-  review: '把消息流里的重要复盘信息整理成独立专区',
+  review: '大V发布复盘，系统再按自选股和阶段行情补充智能复盘',
   knowledge: '把可复用的方法、框架和资料沉淀为长期知识资产',
   community: '社区功能默认可由后台按需开放',
   hermes: '以证据链、来源条目和置信度输出研究结论',
@@ -2102,6 +2306,28 @@ let currentWorkbenchDashboardLayout = '2x2';
 let currentWorkbenchDashboardSlots = [];
 let currentWorkbenchDashboardSourceVersion = '';
 let dashboardCellEditingIndex = -1;
+const REVIEW_PERIOD_CONFIG = {
+  day: { label: '日复盘', shortLabel: '今日', prompt: '今天收盘后', marketFocus: '当天行情', aiLabel: '自选股 + 当日行情' },
+  week: { label: '周复盘', shortLabel: '本周', prompt: '本周结束后', marketFocus: '阶段行情', aiLabel: '自选股 + 周度主线' },
+  month: { label: '月复盘', shortLabel: '本月', prompt: '本月阶段内', marketFocus: '月度趋势', aiLabel: '自选股 + 月度行情' },
+};
+const REVIEW_SOURCE_OPTIONS = [
+  { value: 'voice', icon: '🎙️', label: '语音口述', desc: '收盘后直接口述盘面、行业和个股判断。' },
+  { value: 'manual', icon: '✍️', label: '手动撰写', desc: '自己决定段落内容，再让智能体补结构。' },
+  { value: 'file', icon: '📎', label: '文件上传', desc: '上传纪要、研报或 PDF 统一抽取重点。' },
+  { value: 'stocks', icon: '🧩', label: '选股归纳', desc: '先锁定几支股票，再归纳行业和个股复盘。' },
+];
+const REVIEW_PARAGRAPH_OPTIONS = [
+  { value: 'manual', label: '大V自定段落', desc: '保留自己的文章结构，只让智能体补摘要、证据链和风险提示。' },
+  { value: 'ai', label: '智能体成稿', desc: '只提供资料和判断，由智能体先生成整篇复盘草稿。' },
+];
+const REVIEW_WATCHLIST_MAP = {
+  tenant_lw: ['中芯国际', '腾讯控股', '贵州茅台', '宁德时代', '招商银行', '寒武纪', '比亚迪'],
+};
+let currentReviewPeriod = 'day';
+let reviewTriggerDraft = { period: 'day', sourceMode: 'voice', paragraphMode: 'manual', selectedWatchlist: [] };
+const reviewRuntimeStore = {};
+let reviewWatchlistSelectionMode = false;
 const KNOWLEDGE_INPUT_TYPES = {
   voice: {
     label: '语音输入',
@@ -2484,6 +2710,524 @@ function getDefaultDemoUser() {
 
 function getActiveDemoUser() {
   return currentDemoUser || getDefaultDemoUser();
+}
+
+function getReviewPeriodMeta(period) {
+  return REVIEW_PERIOD_CONFIG[period] || REVIEW_PERIOD_CONFIG.day;
+}
+
+function getTenantWatchlistFocus(tenantId) {
+  return REVIEW_WATCHLIST_MAP[tenantId] || ['中芯国际', '腾讯控股', '贵州茅台'];
+}
+
+function getDavReviewSelectedWatchlist(tenantId) {
+  const fullList = getTenantWatchlistFocus(tenantId);
+  const runtime = ensureTenantReviewRuntime(tenantId);
+  const selected = (runtime.kolSelectedWatchlist || []).filter(name => fullList.includes(name));
+  return selected.length ? selected : fullList.slice(0, 3);
+}
+
+function ensureTenantReviewRuntime(tenantId) {
+  if (!reviewRuntimeStore[tenantId]) {
+    reviewRuntimeStore[tenantId] = {
+      kolGeneratedAt: '2026-06-07 18:40',
+      aiGeneratedAt: '2026-06-07 19:00',
+      kolSourceMode: 'voice',
+      paragraphMode: 'manual',
+      kolSelectedWatchlist: getTenantWatchlistFocus(tenantId).slice(0, 3),
+      lastReviewPeriod: 'day',
+    };
+  }
+  return reviewRuntimeStore[tenantId];
+}
+
+function buildKolReviewData(user, period) {
+  const periodMeta = getReviewPeriodMeta(period);
+  const runtime = ensureTenantReviewRuntime(user.tenant.id);
+  const focusNames = getDavReviewSelectedWatchlist(user.tenant.id);
+  const firstFocus = focusNames[0] || '重点样本';
+  const secondFocus = focusNames[1] || firstFocus;
+  const thirdFocus = focusNames[2] || secondFocus;
+  const focusSummary = focusNames.join('、');
+  const sourceCfg = REVIEW_SOURCE_OPTIONS.find(item => item.value === runtime.kolSourceMode) || REVIEW_SOURCE_OPTIONS[0];
+  const paragraphCfg = REVIEW_PARAGRAPH_OPTIONS.find(item => item.value === runtime.paragraphMode) || REVIEW_PARAGRAPH_OPTIONS[0];
+  const titleMap = {
+    day: '收盘复盘：AI 算力主线未变，港股互联网继续看回购与财报兑现',
+    week: '周度复盘：科技成长维持主线，消费与新能源继续等景气验证',
+    month: '月度复盘：先保留主线框架，再按行业和重点个股做阶段归纳',
+  };
+  const summaryMap = {
+    day: `这版${periodMeta.label}先由 ${user.tenant.advisor} 压缩全天资料，再从 ${focusNames.slice(0, 2).join('、')} 等样本里挑重点公司深挖。`,
+    week: `这版${periodMeta.label}把一周内的大V语音、手写观点和会议资料统一归纳成行业主线 + 个股复盘，方便普通投资者直接查看。`,
+    month: `这版${periodMeta.label}强调阶段框架，先看主线是否延续，再筛出最值得继续跟踪的行业板块和个股。`,
+  };
+  const paragraphMap = {
+    day: [
+      { title: '市场主线', text: '今天讨论度最高的仍是 AI 算力、半导体和港股互联网。大V先保留真正影响判断的验证节点，不重复堆原始消息。' },
+      { title: '行业板块复盘', text: '行业层面更像结构性活跃，适合先压出短版提纲，再决定哪些板块值得继续投入时间。消费和新能源目前更适合放在观察队列。' },
+      { title: '个股投资复盘', text: `${firstFocus} 看订单和景气兑现，${secondFocus} 看回购和财报验证，${thirdFocus} 更偏稳健配置，不建议把短期波动直接当成结论。` },
+    ],
+    week: [
+      { title: '阶段行情复盘', text: '本周市场仍由少数高景气方向驱动，强主线集中但广度一般，说明更需要复盘结构而不是只看指数涨跌。' },
+      { title: '行业板块归纳', text: '科技成长仍是最值得保留的主线，消费和新能源还要继续回到景气、订单和利润率三个验证节点。' },
+      { title: '重点样本回顾', text: `${focusSummary} 仍留在重点跟踪池里，但对应结论要继续挂来源和置信度，避免情绪化表达。` },
+    ],
+    month: [
+      { title: '月度框架', text: '月度复盘更看阶段性框架是否成立，而不是单日波动。先保留主线，再决定哪些样本值得继续深挖。' },
+      { title: '行业与个股拆分', text: '行业板块用于解释大方向，个股复盘用于解释具体投资逻辑，两层内容拆开后更便于普通投资者阅读。' },
+      { title: '下阶段动作', text: '后续继续沿着科技成长、港股互联网和稳健配置三条线做复盘更新，必要时再补充新的重点个股。' },
+    ],
+  };
+  return {
+    author: user.tenant.advisor,
+    avatar: user.tenant.advisor === '财经老王' ? '👑' : '🧭',
+    periodLabel: periodMeta.label,
+    generatedAt: runtime.kolGeneratedAt,
+    title: titleMap[period] || titleMap.day,
+    summary: summaryMap[period] || summaryMap.day,
+    sourceLabel: sourceCfg.label,
+    paragraphLabel: paragraphCfg.label,
+    tags: [periodMeta.label, '行业板块', '个股投资复盘'],
+    watchlist: focusNames,
+    paragraphs: paragraphMap[period] || paragraphMap.day,
+  };
+}
+
+function buildAiReviewData(user, period) {
+  const periodMeta = getReviewPeriodMeta(period);
+  const runtime = ensureTenantReviewRuntime(user.tenant.id);
+  const focusNames = user.role === 'dav'
+    ? getDavReviewSelectedWatchlist(user.tenant.id)
+    : getTenantWatchlistFocus(user.tenant.id);
+  const summaryMap = {
+    day: '系统会把你的自选股、当前行情、所属大V最近发布的复盘和 Hermes 上下文一起压成短版智能复盘。',
+    week: '系统按一周内的自选股波动、阶段行情和大V复盘主线做聚合，给出一版更适合回看的周度短版。',
+    month: '系统会把月内主线延续性、自选股位置和阶段验证节点统一收口，形成一版月度智能复盘摘要。',
+  };
+  const focusMap = {
+    day: '今天最需要继续看的不是所有个股，而是自选股里与主线相关、且已经出现验证材料的样本。',
+    week: '本周最值得复盘的是哪些逻辑被重复验证，哪些只是短期热度，没有继续沉淀成可跟踪线索。',
+    month: '月度视角更关注哪些行业和个股持续进入复盘，而不是某一天的情绪波动。',
+  };
+  return {
+    title: `${periodMeta.aiLabel}智能复盘`,
+    generatedAt: runtime.aiGeneratedAt,
+    summary: summaryMap[period] || summaryMap.day,
+    focusText: focusMap[period] || focusMap.day,
+    watchlist: focusNames,
+    bullets: [
+      '先看所属大V当前主线，再判断你的自选股是否真正跟上验证节奏。',
+      '如果大V复盘强调行业框架，系统会同步把个股观察拆出来，避免只剩抽象观点。',
+      '任何结论都只保留为研究参考，不直接给买卖动作。',
+    ],
+  };
+}
+
+function renderReviewPeriodRow() {
+  const row = document.getElementById('review-period-row');
+  if (!row) return;
+  row.innerHTML = Object.entries(REVIEW_PERIOD_CONFIG).map(([value, meta]) => `
+    <button class="review-period-pill ${value === currentReviewPeriod ? 'active' : ''}" onclick="selectReviewPeriod('${value}')">${meta.label}</button>
+  `).join('');
+}
+
+function openReviewWatchlistSelector() {
+  const user = getActiveDemoUser();
+  if (user.role !== 'dav') {
+    switchTab('market');
+    return;
+  }
+  reviewWatchlistSelectionMode = true;
+  reviewTriggerDraft.period = currentReviewPeriod;
+  reviewTriggerDraft.selectedWatchlist = getDavReviewSelectedWatchlist(user.tenant.id).slice(0);
+  switchTab('market');
+  renderReviewWatchlistSelectionMode();
+  showToast('请选择本次复盘要纳入的自选股');
+}
+
+function closeReviewWatchlistSelector() {
+  reviewWatchlistSelectionMode = false;
+  renderReviewWatchlistSelectionMode();
+}
+
+function returnFromReviewWatchlistSelector() {
+  const user = getActiveDemoUser();
+  if (user.role !== 'dav') {
+    switchTab('review');
+    return;
+  }
+  if (!reviewTriggerDraft.selectedWatchlist.length) {
+    showToast('请先至少选择 1 只自选股');
+    return;
+  }
+  reviewWatchlistSelectionMode = false;
+  renderReviewWatchlistSelectionMode();
+  switchTab('review');
+  openReviewTriggerModal('stocks');
+}
+
+function isReviewWatchlistSelectedByCode(stockCode) {
+  const normalized = normalizeStockLookupValue(stockCode);
+  return (reviewTriggerDraft.selectedWatchlist || []).some(name => {
+    const card = document.querySelector(`[data-watchlist-card="true"][data-stock-code="${normalized}"]`);
+    if (!card) return false;
+    return normalizeStockLookupValue(card.dataset.stockName || '') === normalizeStockLookupValue(name);
+  });
+}
+
+function toggleReviewWatchlistByCode(stockCode) {
+  const normalized = normalizeStockLookupValue(stockCode);
+  const card = document.querySelector(`[data-watchlist-card="true"][data-stock-code="${normalized}"]`);
+  if (!card) return;
+  const stockName = String(card.dataset.stockName || '').trim();
+  if (!stockName) return;
+  const selected = new Set(reviewTriggerDraft.selectedWatchlist || []);
+  if (selected.has(stockName)) {
+    selected.delete(stockName);
+  } else {
+    selected.add(stockName);
+  }
+  reviewTriggerDraft.selectedWatchlist = getTenantWatchlistFocus(getActiveDemoUser().tenant.id).filter(name => selected.has(name));
+  renderReviewWatchlistSelectionMode();
+}
+
+function renderReviewWatchlistSelectionMode() {
+  const banner = document.getElementById('market-review-selection-banner');
+  const user = getActiveDemoUser();
+  const selectedCount = (reviewTriggerDraft.selectedWatchlist || []).length;
+  if (banner) {
+    if (reviewWatchlistSelectionMode && user.role === 'dav') {
+      banner.style.display = 'block';
+      banner.innerHTML = `
+        <div class="card" style="padding:14px;margin-bottom:12px;border:1px solid rgba(200,169,110,0.24);background:linear-gradient(135deg,rgba(200,169,110,0.10),rgba(47,116,192,0.08))">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+            <div>
+              <div style="font-size:14px;font-weight:700;color:var(--white)">本次复盘选股模式</div>
+              <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-top:6px">从你的自选股里挑出本次真正要进入复盘智能总结的样本。选完后返回复盘页继续生成草稿。</div>
+            </div>
+            <span class="tag tag-gold">${selectedCount} 只已选</span>
+          </div>
+          <div class="review-watchlist-row" style="margin-top:10px">
+            ${(reviewTriggerDraft.selectedWatchlist || []).map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('') || '<span style="font-size:11px;color:var(--gray-400)">当前还没选择股票</span>'}
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn-gold" style="flex:1;padding:10px;font-size:12px" onclick="returnFromReviewWatchlistSelector()">带着已选股票返回复盘</button>
+            <button class="btn-outline" style="padding:10px 14px;font-size:12px" onclick="closeReviewWatchlistSelector()">退出选股模式</button>
+          </div>
+        </div>
+      `;
+    } else {
+      banner.style.display = 'none';
+      banner.innerHTML = '';
+    }
+  }
+  document.querySelectorAll('[data-review-selection-slot="true"]').forEach(slot => {
+    const card = slot.closest('[data-watchlist-card="true"]');
+    const stockCode = card ? String(card.dataset.stockCode || '') : '';
+    if (!slot || !stockCode) return;
+    if (reviewWatchlistSelectionMode && user.role === 'dav') {
+      slot.style.display = 'block';
+      const selected = isReviewWatchlistSelectedByCode(stockCode);
+      slot.innerHTML = `
+        <button class="${selected ? 'btn-gold' : 'btn-outline'}" style="width:100%;padding:8px 10px;font-size:11px;margin-top:8px" onclick="event.stopPropagation();toggleReviewWatchlistByCode('${stockCode}')">
+          ${selected ? '移出本次复盘' : '纳入本次复盘'}
+        </button>
+      `;
+    } else {
+      slot.style.display = 'none';
+      slot.innerHTML = '';
+    }
+  });
+}
+
+function renderDavReviewStudio(user) {
+  const host = document.getElementById('review-dav-studio');
+  if (!host) return;
+  if (user.role !== 'dav') {
+    host.style.display = 'none';
+    host.innerHTML = '';
+    return;
+  }
+  host.style.display = 'block';
+  const selectedNames = getDavReviewSelectedWatchlist(user.tenant.id);
+  host.innerHTML = `
+    <div class="card" style="padding:16px;margin-bottom:12px">
+      <div class="review-role-toolbar">
+        <div>
+          <div class="review-role-title">大V复盘供稿台</div>
+          <div class="review-role-desc">你可以通过语音、手输、文件上传或选股归纳来生成复盘。文章段落可以自己决定，也可以交给智能体先成稿。本次智能总结会只基于你挑出来的自选股样本。</div>
+        </div>
+        <span class="tag tag-gold">仅大V可见</span>
+      </div>
+      <div class="review-source-grid">
+        <div class="review-source-card" onclick="openKnowledgeIntake('voice')">
+          <div class="review-source-icon">🎙️</div>
+          <div class="review-source-title">语音口述</div>
+          <div class="review-source-desc">收盘后直接口述行情、行业和个股判断。</div>
+        </div>
+        <div class="review-source-card" onclick="openReviewTriggerModal('manual')">
+          <div class="review-source-icon">✍️</div>
+          <div class="review-source-title">手动撰写</div>
+          <div class="review-source-desc">自己决定文章段落，再交给智能体补结构。</div>
+        </div>
+        <div class="review-source-card" onclick="openKnowledgeIntake('file')">
+          <div class="review-source-icon">📎</div>
+          <div class="review-source-title">上传文件</div>
+          <div class="review-source-desc">研报、纪要和 PDF 会统一抽取为复盘草稿。</div>
+        </div>
+        <div class="review-source-card" onclick="openReviewTriggerModal('stocks')">
+          <div class="review-source-icon">🧩</div>
+          <div class="review-source-title">选股归纳</div>
+          <div class="review-source-desc">先锁定几支股票，再拆成行业和个股两层复盘。</div>
+        </div>
+      </div>
+      <div class="review-flow-row">
+        <span class="review-flow-step">选择周期</span>
+        <span class="review-flow-step">挑选自选股</span>
+        <span class="review-flow-step">补充材料</span>
+        <span class="review-flow-step">确认段落方式</span>
+        <span class="review-flow-step">生成复盘草稿</span>
+        <span class="review-flow-step">发布给粉丝</span>
+      </div>
+      <div class="review-watchlist-row" style="margin-top:10px">
+        ${selectedNames.map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderReviewExperience() {
+  const user = getActiveDemoUser();
+  const badge = document.getElementById('review-role-badge');
+  const triggerBtn = document.getElementById('review-trigger-button');
+  const host = document.getElementById('review-report-feed');
+  if (!host) return;
+  if (badge) badge.textContent = user.role === 'dav' ? '复盘供稿中枢' : `${user.tenant.advisor} 租户复盘`;
+  if (triggerBtn) triggerBtn.textContent = user.role === 'dav' ? '发起新复盘' : '发起智能复盘';
+  renderReviewPeriodRow();
+  renderDavReviewStudio(user);
+  const kol = buildKolReviewData(user, currentReviewPeriod);
+  const ai = buildAiReviewData(user, currentReviewPeriod);
+  host.innerHTML = `
+    <div class="card" style="padding:16px;margin-bottom:12px">
+      <div class="review-report-head">
+        <div class="review-author-row">
+          <div class="review-author-avatar">${kol.avatar}</div>
+          <div>
+            <div class="review-author-name">${escapeHtml(kol.author)}</div>
+            <div class="review-author-meta">${escapeHtml(kol.generatedAt)} · ${escapeHtml(kol.periodLabel)} · 来源 ${escapeHtml(kol.sourceLabel)} · ${escapeHtml(kol.paragraphLabel)}</div>
+          </div>
+        </div>
+        <span class="tag tag-gold">已发布</span>
+      </div>
+      <div class="review-report-title">${escapeHtml(kol.title)}</div>
+      <div class="review-report-summary">${escapeHtml(kol.summary)}</div>
+      <div class="review-summary-desc">本次纳入复盘的自选股样本</div>
+      <div class="review-watchlist-row">
+        ${kol.watchlist.map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
+      </div>
+      <div class="review-watchlist-row">
+        ${kol.tags.map(tag => `<span class="review-watchlist-chip">${escapeHtml(tag)}</span>`).join('')}
+      </div>
+      <div class="review-paragraph-list">
+        ${kol.paragraphs.map(item => `
+          <div class="review-paragraph-card">
+            <div class="review-paragraph-title">${escapeHtml(item.title)}</div>
+            <div class="review-paragraph-text">${escapeHtml(item.text)}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    <div class="card" style="padding:16px;margin-bottom:12px">
+      <div class="review-report-head">
+        <div>
+          <div class="review-role-title">${escapeHtml(ai.title)}</div>
+          <div class="review-summary-desc">${escapeHtml(ai.generatedAt)} · 可随时重新发起 · 基于所属租户与当前自选股</div>
+        </div>
+        <span class="tag tag-gold">系统补充</span>
+      </div>
+      <div class="review-report-summary">${escapeHtml(ai.summary)}</div>
+      <div class="review-summary-grid">
+        <div class="review-summary-card">
+          <div class="review-summary-title">当前重点</div>
+          <div class="review-summary-desc">${escapeHtml(ai.focusText)}</div>
+        </div>
+        <div class="review-summary-card">
+          <div class="review-summary-title">自选股输入</div>
+          <div class="review-watchlist-row">
+            ${ai.watchlist.map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
+          </div>
+        </div>
+      </div>
+      <div class="review-paragraph-list">
+        ${ai.bullets.map((text, idx) => `
+          <div class="review-meta-card">
+            <div class="review-meta-title">智能复盘点 ${idx + 1}</div>
+            <div class="review-meta-desc">${escapeHtml(text)}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    <div class="card" style="padding:16px">
+      <div class="review-meta-grid">
+        <div class="review-meta-card">
+          <div class="review-meta-title">普通投资者看到什么</div>
+          <div class="review-meta-desc">默认看到所属大V已经确认发布的复盘文章，以及系统按你的自选股和阶段行情补出来的短版智能复盘。</div>
+        </div>
+        <div class="review-meta-card">
+          <div class="review-meta-title">大V控制什么</div>
+          <div class="review-meta-desc">大V可以决定复盘周期、材料来源、文章段落是否自己写，以及是否按行业板块和个股两层方式发布。</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function selectReviewPeriod(period) {
+  if (!REVIEW_PERIOD_CONFIG[period]) return;
+  currentReviewPeriod = period;
+  reviewTriggerDraft.period = period;
+  renderReviewExperience();
+}
+
+function openReviewTriggerModal(sourceMode) {
+  const user = getActiveDemoUser();
+  const runtime = ensureTenantReviewRuntime(user.tenant.id);
+  reviewTriggerDraft.period = currentReviewPeriod;
+  if (sourceMode && REVIEW_SOURCE_OPTIONS.some(item => item.value === sourceMode)) {
+    reviewTriggerDraft.sourceMode = sourceMode;
+  }
+  reviewTriggerDraft.paragraphMode = runtime.paragraphMode || reviewTriggerDraft.paragraphMode;
+  reviewTriggerDraft.selectedWatchlist = user.role === 'dav'
+    ? getDavReviewSelectedWatchlist(user.tenant.id).slice(0)
+    : getTenantWatchlistFocus(user.tenant.id).slice(0);
+  const modal = document.getElementById('review-trigger-modal');
+  if (!modal) return;
+  renderReviewTriggerModal(user);
+  modal.classList.add('show');
+}
+
+function closeReviewTriggerModal() {
+  const modal = document.getElementById('review-trigger-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function renderReviewTriggerModal(user) {
+  const host = document.getElementById('review-trigger-modal-content');
+  if (!host) return;
+  const focusNames = getTenantWatchlistFocus(user.tenant.id);
+  host.innerHTML = `
+    <div class="modal-title" style="margin-bottom:10px">${user.role === 'dav' ? '发起大V复盘' : '发起智能复盘'}</div>
+    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">
+      ${user.role === 'dav'
+        ? '生成复盘前必须先选择复盘周期。你可以继续补充语音、手输、文件上传，或按几支股票归纳行业和个股复盘。'
+        : '生成复盘前必须先选择复盘周期。系统会结合你的自选股、所属大V最近复盘和当前阶段行情生成一版短版智能复盘。'}
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">复盘周期</label>
+      <div class="review-period-row">
+        ${Object.entries(REVIEW_PERIOD_CONFIG).map(([value, meta]) => `
+          <button class="review-period-pill ${value === reviewTriggerDraft.period ? 'active' : ''}" onclick="setReviewTriggerPeriod('${value}')">${meta.label}</button>
+        `).join('')}
+      </div>
+    </div>
+    ${user.role === 'dav' ? `
+      <div class="knowledge-modal-block">
+        <label class="knowledge-modal-label">供稿方式</label>
+        <div class="knowledge-source-selector" style="grid-template-columns:repeat(2,1fr)">
+          ${REVIEW_SOURCE_OPTIONS.map(item => `
+            <div class="knowledge-source-pill ${item.value === reviewTriggerDraft.sourceMode ? 'active' : ''}" onclick="setReviewTriggerSourceMode('${item.value}')">${item.icon} ${item.label}</div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="knowledge-modal-block">
+        <label class="knowledge-modal-label">文章段落方式</label>
+        <div class="knowledge-source-selector" style="grid-template-columns:repeat(2,1fr)">
+          ${REVIEW_PARAGRAPH_OPTIONS.map(item => `
+            <div class="knowledge-source-pill ${item.value === reviewTriggerDraft.paragraphMode ? 'active' : ''}" onclick="setReviewTriggerParagraphMode('${item.value}')">${item.label}</div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="knowledge-modal-block">
+        <label class="knowledge-modal-label">本次纳入复盘的自选股</label>
+        <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">大V自选股可能很多，这里先挑出本次真正要进入智能总结的样本，再生成复盘草稿。</div>
+        <div class="review-watchlist-row">
+          ${focusNames.map(name => `
+            <button class="review-watchlist-chip selectable ${reviewTriggerDraft.selectedWatchlist.includes(name) ? 'active' : ''}" onclick="toggleReviewTriggerWatchlist('${name}')">${escapeHtml(name)}</button>
+          `).join('')}
+        </div>
+      </div>
+    ` : ''}
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">${user.role === 'dav' ? '本次复盘覆盖' : '本次智能复盘输入'}</label>
+      <div class="review-watchlist-row">
+        ${(user.role === 'dav' ? reviewTriggerDraft.selectedWatchlist : focusNames).map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeReviewTriggerModal()">取消</button>
+      <button class="btn-gold" onclick="submitReviewTrigger()">${user.role === 'dav' ? '生成复盘草稿' : '生成智能复盘'}</button>
+    </div>
+  `;
+}
+
+function setReviewTriggerPeriod(period) {
+  if (!REVIEW_PERIOD_CONFIG[period]) return;
+  reviewTriggerDraft.period = period;
+  const user = getActiveDemoUser();
+  renderReviewTriggerModal(user);
+}
+
+function setReviewTriggerSourceMode(mode) {
+  if (!REVIEW_SOURCE_OPTIONS.some(item => item.value === mode)) return;
+  reviewTriggerDraft.sourceMode = mode;
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+function toggleReviewTriggerWatchlist(name) {
+  const fullList = getTenantWatchlistFocus(getActiveDemoUser().tenant.id);
+  if (!fullList.includes(name)) return;
+  const current = new Set(reviewTriggerDraft.selectedWatchlist || []);
+  if (current.has(name)) {
+    current.delete(name);
+  } else {
+    current.add(name);
+  }
+  reviewTriggerDraft.selectedWatchlist = fullList.filter(item => current.has(item));
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+function setReviewTriggerParagraphMode(mode) {
+  if (!REVIEW_PARAGRAPH_OPTIONS.some(item => item.value === mode)) return;
+  reviewTriggerDraft.paragraphMode = mode;
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+function submitReviewTrigger() {
+  const user = getActiveDemoUser();
+  const runtime = ensureTenantReviewRuntime(user.tenant.id);
+  currentReviewPeriod = reviewTriggerDraft.period;
+  if (user.role === 'dav') {
+    if (!reviewTriggerDraft.selectedWatchlist.length) {
+      showToast('请先至少选择 1 只自选股');
+      return;
+    }
+    runtime.kolGeneratedAt = '刚刚生成';
+    runtime.kolSourceMode = reviewTriggerDraft.sourceMode;
+    runtime.paragraphMode = reviewTriggerDraft.paragraphMode;
+    runtime.kolSelectedWatchlist = reviewTriggerDraft.selectedWatchlist.slice(0);
+    runtime.lastReviewPeriod = currentReviewPeriod;
+    showToast(`${getReviewPeriodMeta(currentReviewPeriod).label}草稿已生成`);
+  } else {
+    runtime.aiGeneratedAt = '刚刚生成';
+    showToast(`${getReviewPeriodMeta(currentReviewPeriod).label}智能复盘已生成`);
+  }
+  closeReviewTriggerModal();
+  renderReviewExperience();
+  loadDmConversations();
+  if (currentDmKol) {
+    loadDmMessages(currentDmKol.id);
+  }
 }
 
 function getTenantVisibleAuthors(authors) {
@@ -2932,70 +3676,25 @@ function renderKnowledgeExperience() {
 }
 
 function renderHermesWorkspace() {
-  const entryHost = document.getElementById('hermes-entry-grid');
-  const stockHost = document.getElementById('hermes-stock-grid');
-  const recentHost = document.getElementById('hermes-recent-list');
-  const activeUser = getActiveDemoUser();
+  const stockHost = document.getElementById('hermes-quick-stocks');
   const marketCards = Array.from(document.querySelectorAll('[data-hermes-stock="true"]')).slice(0, 4).map(node => ({
     code: node.dataset.stockCode || '',
     name: node.dataset.stockName || '',
     market: node.dataset.stockMarket || '',
     focus: node.dataset.stockFocus || '',
   }));
-  if (entryHost) {
-    entryHost.innerHTML = HERMES_ENTRY_CARDS.map(item => `
-      <div class="hermes-entry-card" onclick="launchHermesMode('${item.mode}')">
-        <div class="hermes-entry-icon">${item.icon}</div>
-        <div class="hermes-entry-title">${item.title}</div>
-        <div class="hermes-entry-desc">${item.desc}</div>
-        <div class="hermes-entry-meta">${item.meta}</div>
-      </div>
-    `).join('');
-  }
+  renderHermesCredits();
+  renderHermesSkillSelector();
+  renderHermesSkillContext();
+  renderHermesSuggestionChips();
+  renderHermesThread();
   if (stockHost) {
     stockHost.innerHTML = marketCards.map(item => `
-      <div class="hermes-stock-chip" onclick="openWatchlistDetail('${item.code}','profile'); switchTab('market');">
-        <div class="hermes-stock-chip-name">${item.name}</div>
-        <div class="hermes-stock-chip-meta">${item.code} · ${item.market} · ${item.focus}</div>
-        <span class="hermes-stock-chip-tag">进入研究档案</span>
+      <div class="hermes-stock-pick" onclick="fillHermesStockCode('${item.code}')">
+        <div class="hermes-stock-pick-name">${item.name}</div>
+        <div class="hermes-stock-pick-meta">${item.code} · ${item.market} · ${item.focus}</div>
       </div>
-    `).join('');
-  }
-  if (recentHost) {
-    const recentCards = [
-      {
-        title: '今日基本面解读',
-        desc: `${activeUser.tenant.advisor} 的知识专栏已同步到基本面页，可继续追问或转入证据链归因。`,
-        tag: '今日更新'
-      },
-      {
-        title: '港股互联网估值框架',
-        desc: '已进入租户知识库，可直接作为 Hermes 的长期上下文使用。',
-        tag: '知识沉淀'
-      },
-      {
-        title: '半导体订单验证',
-        desc: '建议先看研究档案里的关键资料，再决定是否发起基本面判断。',
-        tag: '热门主题'
-      }
-    ];
-    recentHost.innerHTML = recentCards.map(card => `
-      <div class="hermes-recent-card">
-        <div>
-          <div class="hermes-recent-title">${card.title}</div>
-          <div class="hermes-recent-desc">${card.desc}</div>
-        </div>
-        <span class="hermes-recent-tag">${card.tag}</span>
-      </div>
-    `).join('');
-  }
-}
-
-function launchHermesMode(mode) {
-  selectHermesMode(mode);
-  const modeBar = document.getElementById('hermes-modes');
-  if (modeBar) {
-    modeBar.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    `).join('') || '<div style="font-size:12px;color:var(--text-sub)">暂无自选股快捷入口</div>';
   }
 }
 
@@ -3287,11 +3986,10 @@ function renderDemoProfile(user) {
   }
   renderDemoUserSwitchList();
   syncTenantScopedAdvisorViews();
+  renderReviewExperience();
   renderKnowledgeExperience();
   renderHermesWorkspace();
-  if (typeof dmConversationsCache !== 'undefined' && dmConversationsCache) {
-    renderDmConversations(dmConversationsCache);
-  }
+  loadDmConversations();
   if (typeof currentDmKol !== 'undefined' && currentDmKol && !canAccessAdvisor(currentDmKol.name)) {
     closeDmChat();
   }
@@ -3443,6 +4141,7 @@ function buildWatchlistCardHtml(detail) {
         <button class="btn-outline" style="padding:7px 10px;font-size:11px" onclick="event.stopPropagation();openWatchlistDetail('${detail.code}','authors')">当前投顾互动</button>
         <button class="btn-gold" style="padding:7px 10px;font-size:11px" onclick="event.stopPropagation();runWatchlistHermes('${detail.code}','basic')">基本面分析</button>
       </div>
+      <div data-review-selection-slot="true" style="display:none"></div>
     </div>
   `;
 }
@@ -3459,6 +4158,7 @@ function addCurrentStockToWatchlist() {
   const existingCard = document.querySelector(`[data-watchlist-card="true"][data-stock-code="${stockCode}"]`);
   if (!existingCard && listHost) {
     listHost.insertAdjacentHTML('afterbegin', buildWatchlistCardHtml(currentWatchlistDetail));
+    renderReviewWatchlistSelectionMode();
     renderHermesWorkspace();
   }
   renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
@@ -3774,29 +4474,24 @@ function openWatchlistAuthorDm(name) {
 }
 
 function runWatchlistHermes(stockCode, mode) {
-  const detail = currentWatchlistDetail;
-  if (!detail || detail.code !== stockCode) {
-    openWatchlistDetail(stockCode);
-    return;
-  }
-  const activeUser = getActiveDemoUser();
+  const detail = currentWatchlistDetail && normalizeStockLookupValue(currentWatchlistDetail.code) === normalizeStockLookupValue(stockCode)
+    ? currentWatchlistDetail
+    : null;
+  const skillKey = mode === 'forecast' ? 'judgement' : 'basic';
+  const stockLabel = detail ? `${detail.name}（${detail.code}）` : stockCode;
   document.getElementById('watchlist-detail-modal')?.classList.remove('show');
   switchTab('hermes');
-  const quickText = mode === 'basic'
-    ? (activeUser.role === 'dav'
-      ? `请基于 ${detail.name}（${detail.code}）输出按需基本面分析，重点综合盈利、估值、行业位置、资金面和租户知识库证据。`
-      : `请基于 ${detail.name}（${detail.code}）输出个性化基本面分析，结合所属投顾 ${activeUser.tenant.advisor} 的租户知识，并说明该记录会同步给主理投顾。`)
-    : (activeUser.role === 'dav'
-      ? `请基于 ${detail.name}（${detail.code}）输出按需基本面判断，综合多源信息后给出继续跟踪、重点研究或暂缓处理的理由。`
-      : `请基于 ${detail.name}（${detail.code}）输出个性化基本面判断，给出继续跟踪、重点研究或暂缓处理的理由，并同步分析偏好给 ${activeUser.tenant.advisor}。`);
-  if (activeUser.role === 'investor') {
-    showToast(`已同步分析记录给 ${activeUser.tenant.advisor}`);
-  }
+  fillHermesStockCode(stockCode);
+  selectHermesSkill(skillKey);
   setTimeout(() => {
-    const input = document.getElementById('hermes-input');
+    const input = document.getElementById('hermes-question-input');
     if (input) {
-      input.value = quickText;
-      sendHermesChat();
+      input.value = mode === 'forecast'
+        ? `请判断 ${stockLabel} 当前更适合继续跟踪、重点研究还是暂缓处理，并说明原因。`
+        : `请围绕 ${stockLabel} 的盈利、估值、行业位置和关键争议点，给我一个简洁但完整的基本面分析。`;
+      input.style.height = 'auto';
+      input.style.height = Math.max(92, Math.min(input.scrollHeight, 180)) + 'px';
+      runHermesAnalysis({ fromWatchlist: true });
     }
   }, 80);
 }
@@ -4225,504 +4920,609 @@ function submitPost() {
 }
 
 // ===== HERMES =====
-let hermesMode = '复盘速写';
-let hermesHistory = [];
+const HERMES_CUSTOM_SKILL_STORAGE_KEY = 'gangtise_demo_hermes_custom_skills';
+let hermesSelectedSkill = 'basic';
+let hermesConversation = [];
 let hermesCredits = 128;
+let hermesCustomSkillDraft = { title: '', prompt: '', knowledgeIds: [] };
 
-const HERMES_MODES = {
-  '复盘速写': {
-    desc: '把当天研报、纪要、行情异动压成结构化复盘提纲，服务研究协同、内容生产与个人跟踪场景。',
-    options: [
-      { label: 'A股收盘复盘', tag: '高频刚需' },
-      { label: '港股午间复盘', tag: '短版模板' },
-      { label: '行业新闻归并', tag: '按主题整理' },
-      { label: '投顾直播前提纲', tag: '输出前准备' }
-    ]
+const DEFAULT_HERMES_SKILLS = {
+  basic: {
+    id: 'basic',
+    icon: '🧭',
+    label: '基本面分析',
+    desc: '先看盈利、估值、行业位置和争议点，适合第一次快速判断。',
+    promptTemplate: '围绕盈利、估值、行业位置和争议点做一轮结构化基本面分析。',
+    suggestions: [
+      '请概括这只股票当前的基本面强弱。',
+      '请把盈利、估值、行业位置拆开讲清楚。',
+      '请说明最值得继续跟踪的两个变量。'
+    ],
+    knowledgeKeywords: ['基本面', '估值', '盈利', '框架']
   },
-  '自选股诊断': {
-    desc: '围绕价格、投顾角度、基本面和处理建议四个步骤，给出适合普通投资者理解的自选股诊断结果。',
-    options: [
-      { label: '继续跟踪型', tag: '轻观察' },
-      { label: '重点研究型', tag: '需要深挖' },
-      { label: '暂缓处理型', tag: '先不投入精力' },
-      { label: '投顾观点对照', tag: '方法参考' }
-    ]
+  judgement: {
+    id: 'judgement',
+    icon: '📌',
+    label: '基本面判断',
+    desc: '直接输出继续跟踪、重点研究或暂缓处理，并解释原因。',
+    promptTemplate: '直接给出继续跟踪、重点研究或暂缓处理的阶段性结论，并解释原因。',
+    suggestions: [
+      '请判断当前更适合继续跟踪还是重点研究。',
+      '请给出阶段性结论和置信度。',
+      '请说明短期和中期分别该看什么。'
+    ],
+    knowledgeKeywords: ['判断', '复盘', '跟踪', '结论']
   },
-  '基本面分析': {
-    desc: '重点看盈利、估值、行业位置和争议点，输出结构化的基础研究框架，并保留合规边界。',
-    options: [
-      { label: '科技硬件样本', tag: '订单与估值' },
-      { label: '港股互联网样本', tag: '估值与资金' },
-      { label: '新能源样本', tag: '节奏与验证' },
-      { label: '高股息样本', tag: '现金流与防御' }
-    ]
-  },
-  '研报精读': {
-    desc: '深度解读券商研报，优先提取核心判断、关键数据、风险提示和可供复用的研究表达。',
-    options: [
-      { label: '高盛A股策略报告', tag: '最新发布' },
-      { label: '中金新能源深度', tag: '本周热门' },
-      { label: '摩根大通港股展望', tag: '机构重磅' },
-      { label: '国泰君安AI专题', tag: '行业深度' }
-    ]
-  },
-  '专家纪要速读': {
-    desc: '快速提炼专家会议纪要，聚焦一手信息、验证节点和尚未确认的判断，避免只留下情绪性结论。',
-    options: [
-      { label: '半导体产业专家会', tag: '昨日更新' },
-      { label: '新能源产业链调研', tag: '最新纪要' },
-      { label: '消费行业专家访谈', tag: '独家内容' },
-      { label: '医药行业专家会议', tag: '本周热门' }
-    ]
-  },
-  '证据链归因': {
-    desc: '同一结论同时挂接研报、纪要与市场数据来源，并给出置信度，便于大V投顾和普通投资者理解依据。',
-    options: [
-      { label: '单条结论归因', tag: '来源回溯' },
-      { label: '多来源交叉验证', tag: '证据补全' },
-      { label: '风险词过滤检查', tag: '合规辅助' },
-      { label: '置信度说明卡片', tag: '可直接引用' }
-    ]
-  },
-  '线索追踪': {
-    desc: '把散落在线索、新闻和会议里的关键信号聚合到主题看板，适合持续跟踪某条产业或公司线索。',
-    options: [
-      { label: '半导体订单线索', tag: '主题跟踪' },
-      { label: '新能源验证节点', tag: '时间轴' },
-      { label: '港股平台公司动态', tag: '重点样本' },
-      { label: '宏观变量观察清单', tag: '持续更新' }
-    ]
-  },
-  '方法模板': {
-    desc: '把大V投顾或研究员高频使用的研究动作、提问方式和关注指标沉淀成可复用的方法模板。',
-    options: [
-      { label: '复盘模板提炼', tag: '高频使用' },
-      { label: '选股问题清单', tag: '投顾常问' },
-      { label: '证据链表达模板', tag: '引用友好' },
-      { label: '新手版简化输出', tag: '清晰表达' }
-    ]
+  evidence: {
+    id: 'evidence',
+    icon: '🔗',
+    label: '证据链归因',
+    desc: '把结论拆成来源、依据和未验证项，方便给粉丝或团队复用。',
+    promptTemplate: '把当前结论拆成来源、依据、未验证项和可复用的证据链表达。',
+    suggestions: [
+      '请把当前结论拆成证据链。',
+      '请区分已验证和未验证部分。',
+      '请输出适合复盘引用的依据卡片。'
+    ],
+    knowledgeKeywords: ['纪要', '证据', '来源', '方法']
   }
 };
-
-const HERMES_ENTRY_CARDS = [
-  { icon: '🧭', title: '基本面分析', desc: '从盈利、估值、行业位置和争议点输出结构化研究框架。', meta: '适合首轮判断', mode: '基本面分析' },
-  { icon: '⭐', title: '自选股诊断', desc: '围绕继续跟踪、重点研究、暂缓处理三类结论快速落地。', meta: '面向个股处理', mode: '自选股诊断' },
-  { icon: '🔗', title: '证据链归因', desc: '把结论同时挂接研报、纪要、市场数据和置信度。', meta: '适合合规表达', mode: '证据链归因' },
-  { icon: '🧠', title: '投资 Thesis', desc: '提炼买卖条件、验证节点和反证条件，适合沉淀研究档案。', meta: '适合长期跟踪', mode: '方法模板' },
-  { icon: '⚠️', title: '健康检查', desc: '快速扫描红旗、风险词和关键变量失真点。', meta: '适合复核', mode: '线索追踪' },
-  { icon: '📅', title: '复盘速写', desc: '把当天资料压成短版复盘，先形成提纲再决定深挖对象。', meta: '适合高频使用', mode: '复盘速写' },
-];
 
 let currentWatchlistSection = 'overview';
 
 async function selectHermesMode(mode) {
-  hermesMode = mode;
-  // Update mode buttons
-  document.querySelectorAll('.hermes-mode-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.textContent.includes(mode));
-  });
-  // Show mode description
-  const modeData = HERMES_MODES[mode] || {};
-  document.getElementById('hermes-mode-desc-text').textContent = modeData.desc || '';
-  // Show options
-  const optionsTitle = document.getElementById('hermes-options-title');
-  const optionsGrid = document.getElementById('hermes-options');
-  optionsTitle.style.display = 'block';
-  const opts = modeData.options || [];
-  optionsGrid.innerHTML = opts.map((opt, i) => `
-    <div class="hermes-option-btn" id="opt-${i}" onclick="selectHermesOption('${opt.label}')">
-      <div class="hermes-option-label">${opt.label}</div>
-      <div class="hermes-option-tag">${opt.tag}</div>
-    </div>
-  `).join('');
-  // Fetch mode detail from API (non-blocking)
+  const mapping = {
+    '基本面分析': 'basic',
+    '自选股诊断': 'judgement',
+    '证据链归因': 'evidence',
+    '线索追踪': 'evidence',
+    '复盘速写': 'basic',
+    '研报精读': 'evidence',
+    '专家纪要速读': 'evidence',
+    '方法模板': 'judgement'
+  };
+  selectHermesSkill(mapping[mode] || 'basic');
+}
+
+async function selectHermesOption(option) {
+  applyHermesSuggestion(option);
+}
+
+function fillHermesStockCode(stockCode) {
+  const input = document.getElementById('hermes-stock-code-input');
+  if (!input) return;
+  input.value = findWatchlistCodeFromInput(stockCode);
+}
+
+function getHermesSkillStorageByTenant() {
   try {
-    const resp = await fetch('/api/hermes/mode-detail?mode=' + encodeURIComponent(mode));
-    const data = await resp.json();
-    if (data.desc) {
-      document.getElementById('hermes-mode-desc-text').textContent = data.desc;
+    const raw = window.localStorage ? window.localStorage.getItem(HERMES_CUSTOM_SKILL_STORAGE_KEY) : '';
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveHermesSkillStorageByTenant(storage) {
+  try {
+    if (window.localStorage) {
+      window.localStorage.setItem(HERMES_CUSTOM_SKILL_STORAGE_KEY, JSON.stringify(storage));
     }
   } catch (e) {}
 }
 
-async function selectHermesOption(option) {
-  // Highlight selected option
-  document.querySelectorAll('.hermes-option-btn').forEach(btn => {
-    btn.classList.toggle('selected', btn.querySelector('.hermes-option-label').textContent === option);
+function getTenantHermesCustomSkills() {
+  const activeUser = getActiveDemoUser();
+  const storage = getHermesSkillStorageByTenant();
+  const list = storage[activeUser.tenant.id];
+  return Array.isArray(list) ? list : [];
+}
+
+function persistTenantHermesCustomSkills(skills) {
+  const activeUser = getActiveDemoUser();
+  const storage = getHermesSkillStorageByTenant();
+  storage[activeUser.tenant.id] = skills;
+  saveHermesSkillStorageByTenant(storage);
+}
+
+function inferHermesKnowledgeForSkill(skill) {
+  const entries = getTenantKnowledgeEntries().filter(entry => entry.status === 'ready');
+  if (!entries.length) return [];
+  if (Array.isArray(skill.linkedKnowledgeIds) && skill.linkedKnowledgeIds.length) {
+    const resolved = skill.linkedKnowledgeIds
+      .map(id => entries.find(entry => entry.id === id) || getTenantKnowledgeEntries().find(entry => entry.id === id))
+      .filter(Boolean);
+    return resolved;
+  }
+  const keywords = Array.isArray(skill.knowledgeKeywords) ? skill.knowledgeKeywords : [];
+  const matched = entries.filter(entry => {
+    const corpus = `${entry.title} ${entry.summary} ${(entry.tags || []).join(' ')}`.toLowerCase();
+    return keywords.some(keyword => corpus.includes(String(keyword).toLowerCase()));
   });
-  // Add user bubble
-  addHermesMessage('user', null, { mode: hermesMode, option: option });
-  // Show loading
-  showHermesLoading(true);
-  document.getElementById('hermes-quick-actions').style.display = 'none';
-  // Scroll to bottom
-  scrollHermesToBottom();
-  try {
-    const resp = await fetch('/api/hermes/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: hermesMode, option: option })
-    });
-    const data = await resp.json();
-    showHermesLoading(false);
-    addHermesMessage('ai', data.result || data.analysis || '分析完成，请查看结果。', { credits: 1, points: 20 });
-  } catch (e) {
-    showHermesLoading(false);
-    // Fallback mock response
-    const mockResult = generateMockHermesResult(hermesMode, option);
-    addHermesMessage('ai', mockResult, { credits: 1, points: 20 });
-  }
-  document.getElementById('hermes-quick-actions').style.display = 'flex';
-  scrollHermesToBottom();
-  // Update credits
-  hermesCredits = Math.max(0, hermesCredits - 1);
-  document.getElementById('hermes-credits-display').textContent = '⚡ ' + hermesCredits + '次';
+  return (matched.length ? matched : entries).slice(0, 3);
 }
 
-// ==== AI 资产配置 (合规：仅区间+免责) ====
-async function runAllocation(profile) {
-  addHermesMessage('user', null, { quickAction: '生成 ' + profile + ' 配置方案' });
-  showHermesLoading(true);
-  scrollHermesToBottom();
-  try {
-    const resp = await fetch('/api/ai/allocation', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({risk: profile, horizon:'中期(6-12月)'})
-    });
-    const data = await resp.json();
-    showHermesLoading(false);
-    renderAllocationCard(data);
-  } catch(e) {
-    showHermesLoading(false);
-    showToast('生成失败，请重试');
-  }
-  document.getElementById('hermes-quick-actions').style.display = 'flex';
-  hermesCredits = Math.max(0, hermesCredits - 5);
-  document.getElementById('hermes-credits-display').textContent = '⚡ ' + hermesCredits + '次';
-  scrollHermesToBottom();
+function getHermesSkillCatalog() {
+  const builtins = Object.values(DEFAULT_HERMES_SKILLS).map(skill => ({
+    ...skill,
+    source: 'system',
+  }));
+  const custom = getTenantHermesCustomSkills().map(skill => ({
+    ...skill,
+    source: 'custom',
+    icon: skill.icon || '🧠',
+  }));
+  return [...builtins, ...custom];
 }
 
-function renderAllocationCard(data) {
-  const chat = document.getElementById('hermes-chat');
-  const r = 56, cx = 70, cy = 70;
-  let acc = 0;
-  const pie = data.allocation.filter(a=>a.ratio>0).map(a => {
-    const startAngle = acc * 2 * Math.PI;
-    acc += a.ratio / 100;
-    const endAngle = acc * 2 * Math.PI;
-    const x1 = cx + r * Math.sin(startAngle), y1 = cy - r * Math.cos(startAngle);
-    const x2 = cx + r * Math.sin(endAngle), y2 = cy - r * Math.cos(endAngle);
-    const large = (a.ratio > 50) ? 1 : 0;
-    return `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z" fill="${a.color}" stroke="var(--navy)" stroke-width="1.5"/>`;
+function getHermesSkillById(skillId) {
+  return getHermesSkillCatalog().find(skill => skill.id === skillId) || getHermesSkillCatalog()[0];
+}
+
+function renderHermesCredits() {
+  const el = document.getElementById('hermes-credits-display');
+  if (el) el.textContent = '⚡ ' + hermesCredits + '次';
+}
+
+function renderHermesSkillSelector() {
+  const host = document.getElementById('hermes-skill-grid');
+  if (!host) return;
+  const skills = getHermesSkillCatalog();
+  if (!skills.some(skill => skill.id === hermesSelectedSkill) && skills.length) {
+    hermesSelectedSkill = skills[0].id;
+  }
+  host.innerHTML = skills.map(skill => {
+    const linkedKnowledge = inferHermesKnowledgeForSkill(skill);
+    return `
+    <div class="hermes-skill-chip ${skill.id === hermesSelectedSkill ? 'active' : ''}" onclick="selectHermesSkill('${skill.id}')">
+      <div class="hermes-skill-chip-top">
+        <div class="hermes-skill-icon">${skill.icon}</div>
+        <div class="hermes-skill-name">${skill.label}</div>
+      </div>
+      <div class="hermes-skill-desc">${skill.desc}</div>
+      <div class="hermes-skill-meta">
+        <span class="hermes-skill-meta-chip">${skill.source === 'custom' ? '自定义' : '系统'}</span>
+        <span class="hermes-skill-meta-chip">知识 ${linkedKnowledge.length} 条</span>
+      </div>
+    </div>
+  `;
   }).join('');
-  const legend = data.allocation.map(a => `
-    <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(200,169,110,0.06)">
-      <span style="width:10px;height:10px;border-radius:2px;background:${a.color};display:inline-block"></span>
-      <span style="font-size:12px;color:var(--white);flex:1">${a.name}</span>
-      <span style="font-size:13px;color:var(--gold);font-weight:600">${a.ratio}%</span>
-      <span style="font-size:10px;color:var(--gray-400);min-width:54px;text-align:right">${a.range}</span>
-    </div>`).join('');
-  const sectors = (data.sector_focus||[]).map(s => `<span class="tag tag-gold" style="font-size:11px">${s}</span>`).join('');
-  const html = `
-    <div class="chat-bubble-wrap ai">
-      <div class="chat-bubble ai" style="max-width:100%;width:100%">
-        <div class="chat-ai-header">🎯 AI 资产配置参考 · ${data.risk}型</div>
-        <div style="display:flex;gap:12px;align-items:center;margin:10px 0">
-          <svg viewBox="0 0 140 140" width="120" height="120" style="flex-shrink:0">${pie}<circle cx="${cx}" cy="${cy}" r="28" fill="var(--navy-mid)"/><text x="${cx}" y="${cy-2}" text-anchor="middle" fill="var(--gold)" font-size="10">${data.risk}</text><text x="${cx}" y="${cy+12}" text-anchor="middle" fill="var(--gray-400)" font-size="8">${data.horizon}</text></svg>
-          <div style="flex:1;min-width:0">${legend}</div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0">
-          <div style="background:rgba(46,204,113,0.08);border:1px solid rgba(46,204,113,0.2);border-radius:8px;padding:8px"><div style="font-size:10px;color:var(--gray-400)">回测年化收益区间</div><div style="font-size:13px;color:var(--green);font-weight:600;margin-top:3px">${data.expected_return}</div></div>
-          <div style="background:rgba(231,76,60,0.08);border:1px solid rgba(231,76,60,0.2);border-radius:8px;padding:8px"><div style="font-size:10px;color:var(--gray-400)">最大回撤区间</div><div style="font-size:13px;color:#E74C3C;font-weight:600;margin-top:3px">${data.max_drawdown}</div></div>
-        </div>
-        <div style="margin:8px 0">
-          <div style="font-size:11px;color:var(--gray-400);margin-bottom:6px">建议关注行业</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">${sectors}</div>
-        </div>
-        <div style="font-size:11px;color:var(--gray-400);margin-top:6px">再平衡频率：${data.rebalance}</div>
-        <div class="chat-ai-footer" style="border-color:rgba(231,76,60,0.2);color:#E2C98A;line-height:1.6">⚠️ ${data.disclaimer}</div>
-        <div style="font-size:10px;color:var(--gray-400);margin-top:6px">数据来源：${data.data_source}</div>
-      </div>
-    </div>`;
-  chat.insertAdjacentHTML('beforeend', html);
 }
 
-// ==== AI 行情预判 (合规：历史可解读，未来仅区间) ====
-async function runForecast(target, type) {
-  addHermesMessage('user', null, { quickAction: 'AI预判 · ' + target });
-  showHermesLoading(true);
-  scrollHermesToBottom();
-  try {
-    const resp = await fetch('/api/ai/forecast', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({target, type})
-    });
-    const data = await resp.json();
-    showHermesLoading(false);
-    renderForecastCard(data);
-  } catch(e) {
-    showHermesLoading(false);
-    showToast('生成失败，请重试');
-  }
-  document.getElementById('hermes-quick-actions').style.display = 'flex';
-  hermesCredits = Math.max(0, hermesCredits - 8);
-  document.getElementById('hermes-credits-display').textContent = '⚡ ' + hermesCredits + '次';
-  scrollHermesToBottom();
+function renderHermesSkillContext() {
+  const host = document.getElementById('hermes-skill-context');
+  const skill = getHermesSkillById(hermesSelectedSkill);
+  if (!host || !skill) return;
+  const linkedKnowledge = inferHermesKnowledgeForSkill(skill);
+  host.innerHTML = `
+    <div class="hermes-context-title">${escapeHtml(skill.label)} · 知识库上下文</div>
+    <div class="hermes-context-desc">${escapeHtml(skill.source === 'custom'
+      ? `这是一个自定义 skill。Hermes 会优先按你的个性化提示词执行，并引入关联知识库条目。`
+      : skill.desc)}</div>
+    <div class="hermes-context-chip-row">
+      ${linkedKnowledge.length
+        ? linkedKnowledge.map(entry => `<span class="hermes-context-chip">${escapeHtml(entry.title)}</span>`).join('')
+        : '<span class="hermes-context-chip">暂未关联知识条目</span>'}
+    </div>
+  `;
 }
 
-function renderForecastCard(data) {
-  const W = 320, H = 180, PAD_L = 42, PAD_R = 8, PAD_T = 18, PAD_B = 24;
-  const totalLen = data.history.length + data.forecast_base.length;
-  const all = [...data.history, ...data.forecast_bear, ...data.forecast_base, ...data.forecast_bull];
-  const yMin = Math.min(...all), yMax = Math.max(...all);
-  const yPad = (yMax - yMin) * 0.1 || 1;
-  const lo = yMin - yPad, hi = yMax + yPad;
-  const xScale = (i) => PAD_L + (i / (totalLen-1)) * (W - PAD_L - PAD_R);
-  const yScale = (v) => PAD_T + (1 - (v - lo) / (hi - lo)) * (H - PAD_T - PAD_B);
-  const histPath = data.history.map((v,i) => `${i===0?'M':'L'} ${xScale(i).toFixed(1)} ${yScale(v).toFixed(1)}`).join(' ');
-  const fLen = data.forecast_base.length;
-  const offset = data.history.length;
-  const topPath = data.forecast_bull.map((v,i) => `${i===0?'M':'L'} ${xScale(offset+i).toFixed(1)} ${yScale(v).toFixed(1)}`).join(' ');
-  const botPath = data.forecast_bear.map((v,i) => `L ${xScale(offset+fLen-1-i).toFixed(1)} ${yScale(data.forecast_bear[fLen-1-i]).toFixed(1)}`).join(' ');
-  const fanArea = `${topPath} ${botPath} Z`;
-  const midUpper = data.forecast_base.map((v,i) => v + (data.forecast_bull[i]-v)*0.5);
-  const midLower = data.forecast_base.map((v,i) => v + (data.forecast_bear[i]-v)*0.5);
-  const midUpPath = midUpper.map((v,i) => `${i===0?'M':'L'} ${xScale(offset+i).toFixed(1)} ${yScale(v).toFixed(1)}`).join(' ');
-  const midDownPath = midLower.map((v,i) => `L ${xScale(offset+fLen-1-i).toFixed(1)} ${yScale(midLower[fLen-1-i]).toFixed(1)}`).join(' ');
-  const midFanArea = `${midUpPath} ${midDownPath} Z`;
-  const basePath = data.forecast_base.map((v,i) => `${i===0?'M':'L'} ${xScale(offset+i).toFixed(1)} ${yScale(v).toFixed(1)}`).join(' ');
-  const splitX = xScale(offset - 0.5);
-  const yLabels = [hi, (hi+lo)/2, lo].map(v => v.toFixed(2));
-  const corrBars = data.correlations.map(c => {
-    const abs = Math.abs(c.corr) * 100;
-    const color = c.corr > 0 ? '#2ECC71' : '#E74C3C';
-    return `<div style="display:flex;align-items:center;gap:8px;font-size:11px;padding:4px 0">
-      <div style="flex:0 0 110px;color:var(--white)">${c.name}</div>
-      <div style="flex:1;background:rgba(154,149,144,0.15);border-radius:4px;height:10px;position:relative;overflow:hidden">
-        <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(200,169,110,0.4)"></div>
-        <div style="position:absolute;top:0;bottom:0;${c.corr>=0?'left:50%':'right:50%'};width:${abs/2}%;background:${color};border-radius:2px"></div>
-      </div>
-      <div style="flex:0 0 40px;text-align:right;color:${color};font-weight:600">${c.corr>=0?'+':''}${c.corr.toFixed(2)}</div>
-    </div>`;
-  }).join('');
-  const histCommentary = data.history_commentary.map(c => `<div style="font-size:12px;color:var(--white);padding:3px 0;display:flex;gap:6px"><span style="color:var(--gold)">•</span><span>${c}</span></div>`).join('');
-  const last = data.history[data.history.length-1];
-  const bullEnd = data.forecast_bull[data.forecast_bull.length-1];
-  const bearEnd = data.forecast_bear[data.forecast_bear.length-1];
-  const rangePct = ((bullEnd-bearEnd)/last*100).toFixed(1);
-  const html = `
-    <div class="chat-bubble-wrap ai">
-      <div class="chat-bubble ai" style="max-width:100%;width:100%">
-        <div class="chat-ai-header">📈 AI 行情预判 · ${data.target} <span style="font-size:10px;color:var(--gray-400);font-weight:400">(${data.type})</span></div>
-        <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;margin:8px 0;background:rgba(11,30,58,0.5);border-radius:8px">
-          <line x1="${PAD_L}" y1="${PAD_T}" x2="${PAD_L}" y2="${H-PAD_B}" stroke="rgba(200,169,110,0.2)"/>
-          <line x1="${PAD_L}" y1="${H-PAD_B}" x2="${W-PAD_R}" y2="${H-PAD_B}" stroke="rgba(200,169,110,0.2)"/>
-          <text x="${PAD_L-4}" y="${PAD_T+4}" text-anchor="end" fill="#9A9590" font-size="9">${yLabels[0]}</text>
-          <text x="${PAD_L-4}" y="${(PAD_T+H-PAD_B)/2+3}" text-anchor="end" fill="#9A9590" font-size="9">${yLabels[1]}</text>
-          <text x="${PAD_L-4}" y="${H-PAD_B+3}" text-anchor="end" fill="#9A9590" font-size="9">${yLabels[2]}</text>
-          <line x1="${splitX.toFixed(1)}" y1="${PAD_T}" x2="${splitX.toFixed(1)}" y2="${H-PAD_B}" stroke="rgba(200,169,110,0.35)" stroke-dasharray="3,3"/>
-          <text x="${(splitX-3).toFixed(1)}" y="${PAD_T-4}" text-anchor="end" fill="#C8A96E" font-size="9">历史(可解读)</text>
-          <text x="${(splitX+3).toFixed(1)}" y="${PAD_T-4}" text-anchor="start" fill="#E2C98A" font-size="9">未来(仅区间)</text>
-          <path d="${fanArea}" fill="rgba(200,169,110,0.12)" stroke="none"/>
-          <path d="${midFanArea}" fill="rgba(200,169,110,0.24)" stroke="none"/>
-          <path d="${basePath}" fill="none" stroke="rgba(200,169,110,0.6)" stroke-width="1" stroke-dasharray="2,3"/>
-          <path d="${histPath}" fill="none" stroke="#C8A96E" stroke-width="1.8"/>
-          <circle cx="${xScale(offset-1).toFixed(1)}" cy="${yScale(last).toFixed(1)}" r="3" fill="#C8A96E"/>
-          <text x="${W-PAD_R-2}" y="${(yScale(data.forecast_bull[fLen-1])-2).toFixed(1)}" text-anchor="end" fill="#2ECC71" font-size="9">看好上沿 ${data.forecast_bull[fLen-1]}</text>
-          <text x="${W-PAD_R-2}" y="${(yScale(data.forecast_bear[fLen-1])+10).toFixed(1)}" text-anchor="end" fill="#E74C3C" font-size="9">看空下沿 ${data.forecast_bear[fLen-1]}</text>
-        </svg>
-        <div style="display:flex;gap:10px;justify-content:center;font-size:10px;color:var(--gray-400);margin-bottom:10px;flex-wrap:wrap">
-          <span><span style="display:inline-block;width:12px;height:2px;background:#C8A96E;vertical-align:middle"></span> 历史走势</span>
-          <span><span style="display:inline-block;width:12px;height:8px;background:rgba(200,169,110,0.24);vertical-align:middle"></span> 中性区间</span>
-          <span><span style="display:inline-block;width:12px;height:8px;background:rgba(200,169,110,0.12);vertical-align:middle"></span> 看好/看空带</span>
-        </div>
-        <div style="background:rgba(46,204,113,0.05);border-left:3px solid var(--gold);padding:8px 10px;margin:10px 0;border-radius:4px">
-          <div style="font-size:12px;font-weight:600;color:var(--gold);margin-bottom:6px">📊 历史解读 (合规可读)</div>
-          ${histCommentary}
-        </div>
-        <div style="background:rgba(231,76,60,0.06);border:1px dashed rgba(231,76,60,0.3);padding:10px;margin:10px 0;border-radius:6px">
-          <div style="font-size:12px;font-weight:600;color:#E2C98A;margin-bottom:4px">🔮 未来区间 · 20个交易日</div>
-          <div style="font-size:12px;color:var(--white);line-height:1.7">区间宽度：±${rangePct}% · 看好上沿/中性中枢/看空下沿三条带<br><span style="font-size:11px;color:var(--gray-400)">⚠️ 仅展示模型概率分布，不做方向解读、不做时间点预测</span></div>
-        </div>
-        <div style="margin:10px 0">
-          <div style="font-size:12px;font-weight:600;color:var(--gold);margin-bottom:6px">🔗 多数据源相关性</div>
-          ${corrBars}
-        </div>
-        <div class="chat-ai-footer" style="border-color:rgba(231,76,60,0.2);color:#E2C98A;line-height:1.6">⚠️ ${data.forecast_disclaimer}</div>
-        <div style="font-size:10px;color:var(--gray-400);margin-top:6px">数据来源：${data.data_source}</div>
-      </div>
-    </div>`;
-  document.getElementById('hermes-chat').insertAdjacentHTML('beforeend', html);
+function renderHermesSuggestionChips() {
+  const host = document.getElementById('hermes-suggestion-row');
+  if (!host) return;
+  const skill = getHermesSkillById(hermesSelectedSkill) || DEFAULT_HERMES_SKILLS.basic;
+  host.innerHTML = (skill.suggestions || []).map(text => `
+    <div class="hermes-suggestion-chip" onclick="applyHermesSuggestion('${text.replace(/'/g, '&#39;')}')">${text}</div>
+  `).join('');
 }
 
-function generateMockHermesResult(mode, option) {
-  const results = {
-    '复盘速写': `【复盘提纲】\n场景：${option}\n\n1. 今日最值得保留的 3 条信息\n- 资料密度最高的主题是科技硬件与港股平台公司。\n- 市场层面更像结构性活跃，不适合只看单一涨跌。\n- 会议纪要中的产业判断需要回到订单、产能与验证节点继续跟踪。\n\n2. 明日继续观察\n- 资金是否延续\n- 关键公司是否有新增验证材料\n- 讨论热度是否脱离基本面\n\n3. 输出建议\n先发短版复盘，再补 1 条重点公司诊断。`,
-    '自选股诊断': `【自选股诊断】\n处理类型：${option}\n\n1. 价格与波动先决定是否值得继续看。\n2. 投顾观点只作为方法参考，不直接替代判断。\n3. 如果证据链仍不完整，结论优先落在“继续跟踪”。\n4. 只有当盈利、估值和行业位置三项都能解释时，才进入“重点研究”。\n\n当前建议：研究结论必须附来源条目与置信度。`,
-    '基本面分析': `【基本面分析】\n样本：${option}\n\n1. 盈利：先看利润率、现金流和订单兑现节奏。\n2. 估值：判断乐观预期是否已经提前反映。\n3. 行业位置：比较景气度、竞争结构与替代空间。\n4. 争议点：区分短期噪音与中期变化。\n\n输出方式：继续跟踪 / 重点研究 / 暂缓处理，不直接给买卖动作。`,
-    '研报精读': `【核心观点】\n目标价上调至 52.0元，维持买入评级。\n\n【盈利预测】\n2025E EPS: 2.35元 (+18% YoY)\n2026E EPS: 2.82元 (+20% YoY)\n\n【投资逻辑】\n1. AI算力需求持续超预期，订单能见度延伸至Q3\n2. 国产替代加速，市场份额持续提升\n3. 估值处于历史中枢偏下，性价比凸显\n\n【风险提示】\n宏观经济下行、竞争加剧、政策不确定性`,
-    '专家纪要速读': `【会议要点】\n日期：2026年6月1日\n\n【核心信息】\n1. 产品核心能力聚焦复盘、基本面分析、自选股诊断和 Hermes 双交互。\n2. 用户体系拆分为普通投资者、大V投顾租户和平台 Admin 三类角色。\n3. 任何结论都需要来源条目、置信度和合规边界。\n\n【当前重点】\n- 强化证据链表达\n- 保持多租户角色清晰\n- 让研究输出更容易复用`,
-    '证据链归因': `【证据链归因卡】\n结论：${option}\n\n来源1：券商研报摘要\n来源2：专家会议纪要条目\n来源3：市场与资金数据\n\n当前置信度：中高\n未验证部分：行业节奏是否持续、样本是否扩散\n\n输出原则：只给研究结论和依据，不给直接买卖建议。`,
-    '线索追踪': `【线索追踪看板】\n主题：${option}\n\n- 最新新增信号：2 条\n- 待验证节点：3 个\n- 可复用资料：研报 4 份，纪要 2 份\n- 推荐动作：继续收集证据，再决定是否升级为重点研究样本`,
-    '方法模板': `【方法模板】\n主题：${option}\n\n投顾高频动作已整理为 4 步：\n1. 收拢全天资料\n2. 生成复盘提纲\n3. 锁定少量重点样本\n4. 所有结论附来源与置信度\n\n输出价值：方便团队复用同一套研究框架与表达模板。`
-  };
-  return results[mode] || `【${mode}分析完成】\n\n分析对象：${option}\n\n基于洞见智研数据库综合分析，当前更适合先给出研究框架、证据链和下一步动作建议，而不是直接输出买卖结论。\n\n详细报告请查看完整版。`;
+function selectHermesSkill(skillKey) {
+  hermesSelectedSkill = getHermesSkillById(skillKey) ? skillKey : 'basic';
+  renderHermesSkillSelector();
+  renderHermesSkillContext();
+  renderHermesSuggestionChips();
 }
 
-async function hermesQuickAction(action) {
-  if (action === '加入收藏') { showToast('已加入收藏夹 ⭐'); return; }
-  if (action === '分享到社区') { showToast('已分享到社区广场 +15积分'); return; }
-  addHermesMessage('user', null, { quickAction: action });
-  showHermesLoading(true);
-  scrollHermesToBottom();
-  await new Promise(r => setTimeout(r, 1200));
-  showHermesLoading(false);
-  const actionResults = {
-    '深入追问': '好的，我来进一步深入分析。\n\n从估值角度看，当前PE处于历史25%分位，具备一定的安全边际。未来6个月，如果盈利预测上修兑现，股价有望带来15-25%的潜在回报空间。\n\n关键催化剂：\n① Q2财报季业绩超预期\n② 政策边际改善信号\n③ 外资持续流入确认',
-    '对比分析': '与同类标的横向对比：\n\n● 估值：折价10-15%，优势明显\n● 成长性：营收增速高于行业均值8ppt\n● 盈利质量：自由现金流转化率行业领先\n● 股东回报：分红率持续提升\n\n综合评分：★★★★☆\n\n建议：在同类标的中优先配置。',
-    '生成摘要': '【三句话摘要】\n① 基本面改善，盈利拐点明确；\n② 估值处于历史低位，安全边际充足；\n③ 催化剂明确，建议超配。\n\n适合分享给朋友或发布到社区。'
-  };
-  addHermesMessage('ai', actionResults[action] || '正在处理您的请求...', { credits: 1, points: 10 });
-  scrollHermesToBottom();
-  hermesCredits = Math.max(0, hermesCredits - 1);
-  document.getElementById('hermes-credits-display').textContent = '⚡ ' + hermesCredits + '次';
-}
-
-async function hermesShortcut(action) {
-  addHermesMessage('user', null, { quickAction: action });
-  showHermesLoading(true);
-  scrollHermesToBottom();
-  await new Promise(r => setTimeout(r, 1000));
-  showHermesLoading(false);
-  const shortcutResults = {
-    '今日复盘提纲': '【今日复盘提纲 · 2026-06-07】\n\n1. 今日需要保留的资料\n- 研报：科技硬件、港股平台、宏观利率三条主线\n- 纪要：半导体与新能源各 1 份高相关内容\n- 市场：资金延续性一般，结构性机会更明显\n\n2. 明日继续跟踪\n- 是否出现新的验证节点\n- 投顾内容是否能复用为标准模板\n- 结论的证据链是否补齐\n\n3. 输出建议\n先做短版复盘，再补 1 条自选股诊断。',
-    '热门研报摘要': '【今日热门研报 Top5】\n\n1. 📋 中金 - AI算力深度研究：需求拐点已现，上调目标价\n2. 📋 高盛 - A股策略：Q2配置建议，超配科技+消费\n3. 📋 中信证券 - 新能源2026年展望：固态电池加速\n4. 📋 国泰君安 - 消费复苏路径：下半年量价齐升\n5. 📋 摩根士丹利 - 港股互联网：估值重估空间测算\n\n点击上方 📋 研报精读 模式查看完整分析',
-    '投顾方法汇总': '【今日投顾方法汇总】\n\n👑 财经老王：先做收盘复盘，再深挖 1-2 个重点样本\n💎 投资女神Lisa：所有结论必须附来源和置信度\n📊 量化老师陈明：高频动作标准化后，才有蒸馏价值\n🌐 全球宏观James：宏观内容优先输出框架，不直接喊单\n⚡ 新能源猎手阿强：产业线索一定回到验证节点\n\n综合结论：平台当前最该沉淀的是研究动作，而不是更多表层功能。',
-    '风险词扫描': '【风险词扫描】\n\n高频敏感表达：\n- “建议买入”\n- “明确加仓”\n- “下周必涨”\n- “稳赚”\n\n建议替换为：\n- “继续跟踪”\n- “重点研究”\n- “当前证据支持度较高”\n- “仍需结合个人判断”\n\n目标：在不损失信息量的前提下，降低直接荐股风险。',
-    '社区热帖解读': '【社区热帖 Hermes 解读】\n\n🔥 热帖1：复盘助手怎么提升投顾产出效率\n解读：讨论聚焦真实痛点，适合继续打磨。\n\n🔥 热帖2：证据链卡片能不能直接引用到内容里\n解读：需求明确，和合规目标一致。\n\n🔥 热帖3：自选股诊断如何只保留 3 个动作\n解读：说明用户更接受短路径研究流程。\n\n综合：当前社区更适合验证工作流，而不是追逐情绪化内容。',
-    '当前自选诊断': '【当前自选诊断】\n\n1. 先看价格和波动，决定是否值得继续投入时间。\n2. 再看投顾常用的研究角度，避免无效重复阅读。\n3. 用基本面分析补齐盈利、估值和行业位置。\n4. 最终只输出三种处理结论：继续跟踪 / 重点研究 / 暂缓处理。\n\n目标不是给买卖建议，而是缩短从信息到判断的路径。'
-  };
-  addHermesMessage('ai', shortcutResults[action] || '正在查询...', { credits: 0, points: 5 });
-  document.getElementById('hermes-quick-actions').style.display = 'flex';
-  scrollHermesToBottom();
-}
-
-async function sendHermesChat() {
-  const input = document.getElementById('hermes-input');
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = '';
+function applyHermesSuggestion(text) {
+  const input = document.getElementById('hermes-question-input');
+  if (!input) return;
+  input.value = text;
   input.style.height = 'auto';
+  input.style.height = Math.max(92, Math.min(input.scrollHeight, 180)) + 'px';
+  input.focus();
+}
 
-  // Show user message
-  addHermesMessage('user', null, { quickAction: text, isChat: true });
-  showHermesLoading(true);
-  scrollHermesToBottom();
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
-  // Call API
+function renderHermesThread() {
+  const host = document.getElementById('hermes-chat-thread');
+  if (!host) return;
+  if (!hermesConversation.length) {
+    host.innerHTML = `
+      <div class="hermes-chat-empty">
+        <div class="hermes-chat-empty-title">先选一只股票，再和 Hermes 对话</div>
+        <div class="hermes-chat-empty-desc">Skills 可以切换，也可以自己新增并绑定知识库。Hermes 会按当前 skill 和租户知识上下文给出图表加内容的回答。</div>
+      </div>
+    `;
+    return;
+  }
+  host.innerHTML = hermesConversation.map(entry => {
+    if (entry.type === 'user') {
+      return `
+        <div class="hermes-chat-msg user">
+          <div class="hermes-chat-bubble user">
+            <div class="hermes-chat-main">${escapeHtml(entry.text)}</div>
+            <div class="hermes-chat-meta">${escapeHtml(entry.stockCode)} · ${escapeHtml(entry.skillLabel)}</div>
+          </div>
+        </div>
+      `;
+    }
+    if (entry.type === 'loading') {
+      return `
+        <div class="hermes-chat-msg ai">
+          <div class="hermes-chat-bubble ai">
+            <div class="hermes-chat-role">🦞 Hermes</div>
+            <div class="hermes-loading">
+              <div class="hermes-loading-text">正在分析<span class="dot-anim"><span>.</span><span>.</span><span>.</span></span></div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    return `
+      <div class="hermes-chat-msg ai">
+        <div class="hermes-chat-bubble ai" style="max-width:100%;width:100%">
+          <div class="hermes-chat-role">🦞 Hermes</div>
+          <div class="hermes-chat-main">${escapeHtml(entry.result.headline)}</div>
+          <div class="hermes-chat-analysis">${renderHermesAnalysisCards(entry.detail, entry.result, entry.question)}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderHermesAnalysisCards(detail, result, question) {
+  const metricsHtml = (result.metrics || []).map(metric => `
+    <div class="hermes-metric-card">
+      <div class="hermes-metric-label">${escapeHtml(metric.label)}</div>
+      <div class="hermes-metric-value">${escapeHtml(metric.value)}</div>
+      <div class="hermes-metric-note">${escapeHtml(metric.note)}</div>
+    </div>
+  `).join('');
+  const bulletsHtml = (result.bullets || []).map(item => `<div class="hermes-bullet-item">${escapeHtml(item)}</div>`).join('');
+  const actionsHtml = (result.actions || []).map(item => `<div class="hermes-bullet-item">${escapeHtml(item)}</div>`).join('');
+  const evidenceHtml = (result.evidence || []).map(item => `<span class="hermes-evidence-chip">${escapeHtml(item)}</span>`).join('');
+  const knowledgeHtml = (result.knowledgeEntries || []).length
+    ? result.knowledgeEntries.map(entry => `<span class="hermes-evidence-chip">${escapeHtml(entry.title)}</span>`).join('')
+    : '<span class="hermes-evidence-chip">暂未命中知识库条目</span>';
+  return `
+    <div class="hermes-result-card">
+      <div class="hermes-result-top">
+        <div>
+          <div class="hermes-result-kicker">${escapeHtml(result.title)}</div>
+          <div class="hermes-result-title">${escapeHtml(detail.name)} · ${escapeHtml(detail.code)}</div>
+          <div class="hermes-result-subtitle">${escapeHtml(result.summary)}</div>
+        </div>
+        <div class="hermes-result-badge">${escapeHtml(detail.forecast?.confidence || '中')} 置信度</div>
+      </div>
+      ${result.chartHtml}
+      ${question ? `<div class="hermes-bullet-item" style="margin-top:10px">本次问题：${escapeHtml(question)}</div>` : ''}
+    </div>
+    <div class="hermes-result-card">
+      <div class="hermes-assistant-title" style="font-size:14px;margin-bottom:10px">核心指标</div>
+      <div class="hermes-metric-grid">${metricsHtml}</div>
+    </div>
+    <div class="hermes-result-card">
+      <div class="hermes-assistant-title" style="font-size:14px;margin-bottom:10px">Hermes 判断</div>
+      <div class="hermes-bullet-list">${bulletsHtml}</div>
+    </div>
+    <div class="hermes-result-card">
+      <div class="hermes-assistant-title" style="font-size:14px;margin-bottom:10px">下一步建议</div>
+      <div class="hermes-bullet-list">${actionsHtml}</div>
+    </div>
+    <div class="hermes-result-card">
+      <div class="hermes-assistant-title" style="font-size:14px;margin-bottom:10px">关联知识与证据</div>
+      <div class="hermes-evidence-row">${knowledgeHtml}</div>
+      <div class="hermes-evidence-row" style="margin-top:8px">${evidenceHtml}</div>
+      <div class="hermes-result-subtitle" style="margin-top:10px">${escapeHtml(result.footer)}</div>
+    </div>
+  `;
+}
+
+function buildHermesAnalysis(detail, skillKey, question) {
+  const activeUser = getActiveDemoUser();
+  const skill = getHermesSkillById(skillKey) || DEFAULT_HERMES_SKILLS.basic;
+  const metrics = (detail.fundamental?.metrics || []).slice(0, 4);
+  const thesis = detail.fundamental?.thesis || [];
+  const drivers = detail.forecast?.drivers || [];
+  const visibleAuthors = getTenantVisibleAuthors(detail.authors || []);
+  const negativeDrivers = drivers.filter(item => String(item.score || '').startsWith('-'));
+  const knowledgeEntries = inferHermesKnowledgeForSkill(skill);
+  let summary = detail.fundamental?.summary || '当前暂无更多基本面摘要。';
+  let headline = `${detail.name} 的当前分析已生成`;
+  let bullets = [];
+  let actions = [];
+  let evidence = [
+    `${detail.market} ${detail.code}`,
+    detail.industry || '行业跟踪',
+    `${detail.forecast?.confidence || '中'}置信度`
+  ];
+
+  if (skill.source === 'custom') {
+    headline = `${detail.name} 已按自定义 skill「${skill.label}」执行。`;
+    summary = `自定义 skill 提示：${skill.promptTemplate || skill.desc || '按你的自定义研究方式生成。'}`;
+    bullets = [
+      skill.promptTemplate || '当前采用了自定义研究方式。',
+      knowledgeEntries[0] ? `知识库优先调用：${knowledgeEntries[0].title} · ${knowledgeEntries[0].summary}` : '当前未绑定额外知识条目。',
+      thesis[0] || '个股结论仍会回到基本面和行业位置。'
+    ];
+    actions = [
+      '继续沿着自定义 skill 的问题模板追问，这样 Hermes 会保持同一研究视角。',
+      knowledgeEntries[1] ? `可以继续调用 ${knowledgeEntries[1].title} 做第二轮补充。` : '可以给这个 skill 再补一条知识库条目，增强上下文。',
+      '如果这是高频动作，建议持续沉淀成你的长期 skill。'
+    ];
+    evidence = evidence.concat(['自定义 skill', `知识条目 ${knowledgeEntries.length} 条`]);
+  } else if (skillKey === 'basic') {
+    headline = `${detail.name} 更适合先从盈利质量、估值承受力和行业位置三条线看。`;
+    summary = `核心摘要：${detail.fundamental?.summary || '基本面结构稳定，但仍需结合估值和行业位置看。'}`;
+    bullets = [
+      metrics[0] ? `${metrics[0].label} ${metrics[0].value}，${metrics[0].note}` : '先确认收入和利润率的稳定性。',
+      metrics[3] ? `${metrics[3].label} ${metrics[3].value}，说明当前预期是否已经被估值提前反映。` : '估值要结合历史分位去判断承受力。',
+      knowledgeEntries[0] ? `知识库补充：${knowledgeEntries[0].summary}` : (thesis[0] || '行业位置和竞争结构是本轮分析的核心。')
+    ];
+    actions = [
+      drivers[0] ? `继续跟踪 ${drivers[0].label}：${drivers[0].note}` : '继续补充盈利与现金流验证。',
+      drivers[1] ? `重点复核 ${drivers[1].label} 对估值的影响。` : '把估值和行业景气一起看。',
+      '如果准备发复盘内容，建议把最强支撑项和最大争议点同时写出来。'
+    ];
+  } else if (skillKey === 'judgement') {
+    headline = `${detail.name} 当前阶段更适合给出“${detail.forecast?.verdict || '继续跟踪'}”的处理结论。`;
+    summary = `阶段性判断：${detail.forecast?.band || '更像结构化跟踪，而不是一次性定论。'}`;
+    bullets = drivers.length ? drivers.map(item => `${item.label} ${item.score}，${item.note}`).slice(0, 3) : [
+      '当前建议优先回到盈利、估值和行业景气三个变量。'
+    ];
+    actions = [
+      `${detail.forecast?.verdict || '继续跟踪'} 不等于看多或看空，而是决定投入多少研究精力。`,
+      '优先保留 1 到 2 个最有解释力的变量，避免把结论做得太散。',
+      knowledgeEntries[0] ? `关联知识条目 ${knowledgeEntries[0].title} 后，再做下一轮复盘会更稳。` : '如果下次复盘还想继续跟，建议同步记录验证节点。'
+    ];
+    evidence.push(`${detail.forecast?.verdict || '继续跟踪'}结论`);
+  } else if (skillKey === 'evidence') {
+    headline = `${detail.name} 当前结论可以拆成可复用的证据链。`;
+    summary = '适合把结果整理给粉丝、团队或复盘内容使用，重点不是观点本身，而是观点从哪里来。';
+    bullets = [
+      thesis[0] ? `结论依据 1：${thesis[0]}` : '结论依据 1：核心基本面摘要。',
+      thesis[1] ? `结论依据 2：${thesis[1]}` : '结论依据 2：行业位置与估值相互印证。',
+      knowledgeEntries[0]
+        ? `知识库依据：${knowledgeEntries[0].title} · ${knowledgeEntries[0].summary}`
+        : (visibleAuthors[0] ? `租户/投顾视角：${visibleAuthors[0].name} 提到“${visibleAuthors[0].angle}”` : '租户/投顾视角：当前暂无额外观点。')
+    ];
+    actions = [
+      '把已验证和未验证部分分开写，避免一段话里把判断和事实混在一起。',
+      '如果要对外发内容，优先保留有来源感的表述，不直接给动作指令。',
+      '下一轮可以继续补充纪要、研报或市场数据来源。'
+    ];
+    evidence = evidence.concat(['研报/纪要/市场数据', '租户知识可引用']);
+  } else {
+    headline = `${detail.name} 当前最需要防守的是容易推翻判断的脆弱变量。`;
+    summary = negativeDrivers.length
+      ? `当前最明显的风险来自 ${negativeDrivers.map(item => item.label).join('、')}。`
+      : '当前没有特别突出的单一红旗，但仍需持续扫描估值和行业节奏。';
+    bullets = [
+      negativeDrivers[0] ? `${negativeDrivers[0].label} ${negativeDrivers[0].score}，${negativeDrivers[0].note}` : (thesis[2] || '最大的风险通常来自景气度或竞争结构变化。'),
+      thesis[2] || '如果市场只交易情绪而不回到盈利兑现，当前判断容易失真。',
+      metrics[3] ? `${metrics[3].label} ${metrics[3].value}，估值并不自动等于安全边际。` : '估值是否已经过度透支，是风险扫描必须回答的问题。'
+    ];
+    actions = [
+      '先盯住一项最容易恶化的变量，而不是平均分散关注。',
+      '出现新证据时，先判断它是不是会推翻原结论，再决定是否继续研究。',
+      '如果你准备给粉丝结论，风险提示一定要和核心观点同时出现。'
+    ];
+    evidence.push('风险优先');
+  }
+
+  if (question) {
+    evidence.unshift(`问题：${question}`);
+  }
+  if (knowledgeEntries.length) {
+    evidence.push(`知识库 ${knowledgeEntries.length} 条`);
+  }
+
+  return {
+    title: `${skill.icon} ${skill.label}`,
+    headline,
+    summary,
+    metrics,
+    bullets,
+    actions,
+    evidence,
+    knowledgeEntries,
+    chartHtml: buildWatchlistKlineSvg(detail.kline || []),
+    footer: activeUser.role === 'dav'
+      ? '当前分析会承接大V自己的复盘、知识和个股跟踪视角。'
+      : `当前分析会优先结合所属投顾 ${activeUser.tenant.advisor} 的租户视角做解释。`
+  };
+}
+
+async function runHermesAnalysis(options) {
+  options = options || {};
+  const stockInput = document.getElementById('hermes-stock-code-input');
+  const questionInput = document.getElementById('hermes-question-input');
+  const rawCode = stockInput ? stockInput.value : '';
+  const stockCode = findWatchlistCodeFromInput(rawCode);
+  const question = (questionInput ? questionInput.value : '').trim();
+  const skill = getHermesSkillById(hermesSelectedSkill) || DEFAULT_HERMES_SKILLS.basic;
+  if (!stockCode) {
+    showToast('请输入股票代码');
+    return;
+  }
+  if (stockInput) stockInput.value = stockCode;
+  if (!question) {
+    showToast('请先输入你想让 Hermes 回答的问题');
+    return;
+  }
+  hermesConversation.push({
+    type: 'user',
+    text: question,
+    stockCode,
+    skillLabel: skill.label,
+  });
+  hermesConversation.push({ type: 'loading' });
+  renderHermesThread();
   try {
-    const resp = await fetch('/api/hermes/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: '自由对话', option: text })
+    const resp = await fetch('/api/watchlist/' + encodeURIComponent(stockCode));
+    const detail = await resp.json();
+    const result = buildHermesAnalysis(detail, hermesSelectedSkill, question);
+    hermesConversation.pop();
+    hermesConversation.push({
+      type: 'ai',
+      detail,
+      question,
+      result,
     });
-    const data = await resp.json();
-    showHermesLoading(false);
-    addHermesMessage('ai', data.result || getChatResponse(text), { credits: 1, points: data.points_earned || 20 });
-  } catch(e) {
-    showHermesLoading(false);
-    addHermesMessage('ai', getChatResponse(text), { credits: 1, points: 20 });
+    hermesCredits = Math.max(0, hermesCredits - 1);
+    renderHermesCredits();
+    renderHermesWorkspace();
+    if (questionInput) {
+      questionInput.value = '';
+      questionInput.style.height = '92px';
+    }
+    if (options.fromWatchlist && getActiveDemoUser().role === 'investor') {
+      showToast(`已按 ${getActiveDemoUser().tenant.advisor} 视角生成个股分析`);
+    }
+  } catch (e) {
+    hermesConversation.pop();
+    hermesConversation.push({
+      type: 'ai',
+      detail: { name: stockCode, code: stockCode, forecast: {} },
+      question,
+      result: {
+        title: `${skill.icon} ${skill.label}`,
+        headline: '未找到对应个股详情',
+        summary: '请检查股票代码，或者先从自选股快捷入口带入。',
+        metrics: [],
+        bullets: ['当前无法匹配到个股详情数据。'],
+        actions: ['确认股票代码后重新发送给 Hermes。'],
+        evidence: ['数据未命中'],
+        knowledgeEntries: inferHermesKnowledgeForSkill(skill),
+        chartHtml: '',
+        footer: 'Hermes 保留了当前对话上下文，你修正代码后可以继续追问。',
+      }
+    });
+    renderHermesThread();
+    showToast('未找到该股票详情，请检查代码');
   }
-  document.getElementById('hermes-quick-actions').style.display = 'flex';
-  scrollHermesToBottom();
-  hermesCredits = Math.max(0, hermesCredits - 1);
-  document.getElementById('hermes-credits-display').textContent = '⚡ ' + hermesCredits + '次';
 }
 
-function getChatResponse(text) {
-  const t = text.toLowerCase();
-  if (t.includes('基本面分析') || t.includes('基本面判断')) {
-    return '【个股基本面研究输出】\n\n我会优先按 4 个维度看这只自选股：\n1. 盈利能力是否稳定，利润率和现金流有没有被破坏；\n2. 估值是否已经提前反映乐观预期；\n3. 所处行业景气是否还在上行或至少没有明显恶化；\n4. 当前争议点是不是短期噪音，还是会影响中期价值判断。\n\n如果是“基本面分析”，我会展开财务、行业和竞争位置；如果是“基本面判断”，我会给出继续跟踪、重点研究或暂缓处理的研究结论。\n\n注意：这里仍然只提供研究框架，不提供买卖建议。';
-  }
-  if (t.includes('新能源') || t.includes('电池') || t.includes('锂')) {
-    return '【新能源主题研究】\n\n基于洞见智研平台数据：\n● 固态电池商业化节奏仍处于早期验证阶段\n● 原材料与设备端的兑现节奏比情绪更重要\n● 产业新闻需要回到订单、量产和成本节点继续核验\n\n研究结论：更适合列入持续跟踪样本，而不是直接下结论。\n\n数据来源：专家会议纪要 + 产业新闻 + 券商研报综合';
-  }
-  if (t.includes('港股') || t.includes('恒生') || t.includes('互联网')) {
-    return '【港股互联网研究】\n\n基于洞见智研平台数据：\n● 当前估值处于相对低位，但更重要的是业绩兑现节奏\n● 南向资金延续性仍是核心观察项\n● 政策边际改善可以作为辅助证据，不能单独构成结论\n\n研究结论：适合继续跟踪和做中期框架整理。\n\n数据来源：市场数据 + 资金流向 + 政策跟踪';
-  }
-  if (t.includes('a股') || t.includes('上证') || t.includes('科技')) {
-    return '【A股科技板块研究】\n\n基于洞见智研平台数据：\n● AI算力需求与国产替代仍是重要线索\n● 但现阶段更该看订单兑现、估值承接与资金持续性\n● 适合先做复盘提纲，再从中挑少量个股进入深挖\n\n研究结论：保留为重点观察主线，但不直接输出买卖建议。\n\n数据来源：另类数据 + 资金流向 + 券商研报';
-  }
-  if (t.includes('宏观') || t.includes('美联储') || t.includes('降息')) {
-    return '【宏观框架分析】\n\n基于洞见智研平台数据：\n● 美联储路径、国内货币政策和汇率波动仍是核心变量\n● 宏观内容更适合输出框架和风险提示，而不是直接落到单一结论\n● 对普通投资者，应优先说明变量之间的关系和未验证项\n\n数据来源：宏观数据库 + 利率期货 + 专家会议纪要';
-  }
-  return `【Hermes 智能分析】\n\n您的问题：「${text}」\n\n基于洞见智研平台整合的多维度数据（券商研报、专家会议纪要、市场数据），Hermes 已完成初步整理。\n\n当前输出会优先给出：\n1. 研究框架；\n2. 证据链来源；\n3. 置信度与未验证项；\n4. 下一步动作建议。\n\n如需更精准的分析，建议使用上方模式按钮选择对应的专业分析模式。`;
-}
-
-function addHermesMessage(type, content, meta) {
-  meta = meta || {};
-  const entry = { type, content, meta };
-  hermesHistory.push(entry);
-  renderHermesHistory();
+function sendHermesChat() {
+  runHermesAnalysis();
 }
 
 function renderHermesHistory() {
-  const chat = document.getElementById('hermes-chat');
-  chat.innerHTML = hermesHistory.map(entry => {
-    if (entry.type === 'user') {
-      const label = entry.meta.isChat
-        ? entry.meta.quickAction
-        : entry.meta.quickAction
-          ? `⚡ ${entry.meta.quickAction}`
-          : `📋 ${entry.meta.mode} · ${entry.meta.option}`;
-      return `
-        <div class="chat-bubble-wrap user">
-          <div class="chat-bubble user">${label}</div>
-        </div>`;
-    } else {
-      const footer = (entry.meta.credits != null)
-        ? `⚡ 消耗${entry.meta.credits}算力 · +${entry.meta.points}积分`
-        : '';
-      return `
-        <div class="chat-bubble-wrap ai">
-          <div class="chat-bubble ai">
-            <div class="chat-ai-header">🦞 Hermes</div>
-            <div class="chat-ai-text">${entry.content}</div>
-            ${footer ? `<div class="chat-ai-footer">${footer}</div>` : ''}
-          </div>
-        </div>`;
-    }
-  }).join('');
+  renderHermesWorkspace();
 }
 
-function showHermesLoading(show) {
-  let loader = document.getElementById('hermes-loading');
-  if (show) {
-    if (!loader) {
-      loader = document.createElement('div');
-      loader.id = 'hermes-loading';
-      loader.className = 'hermes-loading';
-      loader.innerHTML = `
-        <div class="chat-bubble-wrap ai" style="width:100%">
-          <div class="chat-bubble ai">
-            <div class="chat-ai-header">🦞 Hermes</div>
-            <div class="hermes-loading-text">正在分析<span class="dot-anim"><span>.</span><span>.</span><span>.</span></span></div>
-          </div>
-        </div>`;
-      document.getElementById('hermes-chat').appendChild(loader);
-    }
+function openHermesSkillModal() {
+  const entries = getTenantKnowledgeEntries();
+  hermesCustomSkillDraft = {
+    title: '',
+    prompt: '',
+    knowledgeIds: entries.slice(0, 2).map(entry => entry.id),
+  };
+  renderHermesSkillModal();
+  const modal = document.getElementById('hermes-skill-modal');
+  if (modal) modal.classList.add('show');
+}
+
+function closeHermesSkillModal() {
+  const modal = document.getElementById('hermes-skill-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function toggleHermesSkillKnowledge(entryId) {
+  const next = new Set(hermesCustomSkillDraft.knowledgeIds || []);
+  if (next.has(entryId)) {
+    next.delete(entryId);
   } else {
-    if (loader) loader.remove();
+    next.add(entryId);
   }
+  hermesCustomSkillDraft.knowledgeIds = Array.from(next);
+  renderHermesSkillModal();
 }
 
-function scrollHermesToBottom() {
-  const chat = document.getElementById('hermes-chat');
-  if (chat) {
-    requestAnimationFrame(() => {
-      chat.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    });
+function renderHermesSkillModal() {
+  const host = document.getElementById('hermes-skill-modal-content');
+  if (!host) return;
+  const entries = getTenantKnowledgeEntries();
+  host.innerHTML = `
+    <div class="modal-title" style="margin-bottom:10px">新增自定义 skill</div>
+    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">你可以把自己的研究动作沉淀成 skill，并且直接绑定租户知识库，让 Hermes 后续按这套方法持续对话。</div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">Skill 名称</label>
+      <input id="hermes-skill-title-input" class="knowledge-modal-input" placeholder="例如：龙头股估值框架" value="${escapeHtml(hermesCustomSkillDraft.title)}" />
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">个性化提示词</label>
+      <textarea id="hermes-skill-prompt-input" class="knowledge-modal-textarea" placeholder="例如：优先按照龙头公司估值带、盈利兑现和行业竞争格局做判断，再给出跟踪结论。">${escapeHtml(hermesCustomSkillDraft.prompt)}</textarea>
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">关联知识库</label>
+      <div class="knowledge-chip-row">
+        ${entries.length
+          ? entries.map(entry => `
+            <button class="${hermesCustomSkillDraft.knowledgeIds.includes(entry.id) ? 'btn-gold' : 'btn-outline'}" style="padding:7px 10px;font-size:11px" onclick="toggleHermesSkillKnowledge('${entry.id}')">${escapeHtml(entry.title)}</button>
+          `).join('')
+          : '<span class="knowledge-chip">当前租户还没有知识条目</span>'}
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeHermesSkillModal()">取消</button>
+      <button class="btn-gold" onclick="saveHermesCustomSkill()">保存 skill</button>
+    </div>
+  `;
+}
+
+function saveHermesCustomSkill() {
+  const titleInput = document.getElementById('hermes-skill-title-input');
+  const promptInput = document.getElementById('hermes-skill-prompt-input');
+  const title = titleInput ? titleInput.value.trim() : '';
+  const prompt = promptInput ? promptInput.value.trim() : '';
+  if (!title) {
+    showToast('请先输入 skill 名称');
+    return;
   }
+  if (!prompt) {
+    showToast('请先输入个性化提示词');
+    return;
+  }
+  const customSkills = getTenantHermesCustomSkills();
+  const skill = {
+    id: `custom_${Date.now()}`,
+    icon: '🧠',
+    label: title,
+    desc: prompt.length > 34 ? `${prompt.slice(0, 34)}...` : prompt,
+    promptTemplate: prompt,
+    suggestions: [
+      prompt,
+      `请按「${title}」这套方法继续展开。`,
+      '请把这个自定义 skill 的结论再拆细一点。'
+    ],
+    linkedKnowledgeIds: (hermesCustomSkillDraft.knowledgeIds || []).slice(0),
+  };
+  customSkills.unshift(skill);
+  persistTenantHermesCustomSkills(customSkills);
+  hermesSelectedSkill = skill.id;
+  closeHermesSkillModal();
+  renderHermesWorkspace();
+  showToast('已新增自定义 skill');
 }
 
 // ===== DM (私信) =====
@@ -4757,13 +5557,15 @@ function isDavDmMode() {
 
 function getInvestorDmConversation() {
   const activeUser = getActiveDemoUser();
+  const messages = getInvestorDmMessages();
+  const latest = messages[messages.length - 1] || {};
   return {
     id: 1,
     kol_name: activeUser.tenant.advisor,
     kol_avatar: '👑',
     tier: '所属大V',
-    last_msg: '好的，我周四直播会详细讲这个方向',
-    time: '5分钟前',
+    last_msg: latest.type === 'review' ? '最新复盘已发布，点击查看' : (latest.content || '欢迎交流'),
+    time: latest.time || '刚刚',
     unread: 1,
     vip_only: false,
   };
@@ -4783,6 +5585,66 @@ function getDmQuickAskOptions() {
     { label: '港股互联网', text: '港股互联网值得配置吗?' },
     { label: '新能源', text: '新能源板块还有机会吗?' },
     { label: '宏观', text: '美联储降息怎么布局?' },
+  ];
+}
+
+function buildReviewPushDmMeta(user) {
+  const runtime = ensureTenantReviewRuntime(user.tenant.id);
+  const reviewPeriod = runtime.lastReviewPeriod || 'day';
+  const review = buildKolReviewData(user, reviewPeriod);
+  const selectedNames = getDavReviewSelectedWatchlist(user.tenant.id);
+  return {
+    title: review.title,
+    time: runtime.kolGeneratedAt || '刚刚',
+    periodLabel: review.periodLabel,
+    watchlist: selectedNames,
+    content: `【最新复盘已发布】${review.title}\n已同步到复盘专区，当前纳入样本：${selectedNames.join('、')}。\n现在可以直接去“复盘”页查看完整内容。`,
+  };
+}
+
+function renderDmReviewStatusCard() {
+  const host = document.getElementById('dm-review-status-card');
+  if (!host) return;
+  const activeUser = getActiveDemoUser();
+  const reviewMeta = buildReviewPushDmMeta(activeUser);
+  if (isDavDmMode()) {
+    host.innerHTML = `
+      <div style="background:rgba(52,152,219,0.08);border:1px solid rgba(52,152,219,0.18);border-radius:12px;padding:12px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#63B3ED;margin-bottom:6px">复盘推送状态</div>
+            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">你的最新${reviewMeta.periodLabel}已推送到粉丝消息侧。粉丝会在消息里第一时间看到复盘更新，并可直接跳去复盘专区查看。</div>
+          </div>
+          <span class="tag tag-blue">${reviewMeta.time}</span>
+        </div>
+        <div class="review-watchlist-row" style="margin-top:10px">
+          ${reviewMeta.watchlist.map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
+        </div>
+      </div>
+    `;
+  } else {
+    host.innerHTML = `
+      <div style="background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.14);border-radius:12px;padding:12px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:6px">最新复盘提醒</div>
+            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">${escapeHtml(activeUser.tenant.advisor)} 刚发布了一版${reviewMeta.periodLabel}，你会在专属对话里第一时间收到提醒。</div>
+          </div>
+          <button class="btn-outline" style="padding:6px 10px;font-size:11px" onclick="switchTab('review')">去看复盘</button>
+        </div>
+      </div>
+    `;
+  }
+}
+
+function getInvestorDmMessages() {
+  const activeUser = getActiveDemoUser();
+  const reviewMeta = buildReviewPushDmMeta(activeUser);
+  return [
+    { id: 1, sender: 'kol', content: `欢迎来到 ${activeUser.tenant.advisor} 的专属消息区，有问题可以直接提问。`, time: '2026-06-07 09:00', type: 'text' },
+    { id: 2, sender: 'user', content: '最近想继续跟踪科技主线，也想看看你这边最新的复盘。', time: '2026-06-07 09:08', type: 'text' },
+    { id: 3, sender: 'kol', content: '可以，新的复盘和后续重点样本我会第一时间同步到消息里。', time: '2026-06-07 09:12', type: 'text' },
+    { id: 4, sender: 'kol', content: reviewMeta.content, time: reviewMeta.time, type: 'review' },
   ];
 }
 
@@ -4834,6 +5696,7 @@ function syncDmRoleView() {
     if (input) input.placeholder = '多轮提问，投顾会基于平台证据链回复...';
   }
   renderDmQuickAsks();
+  renderDmReviewStatusCard();
 }
 
 async function loadDmConversations() {
@@ -4844,8 +5707,6 @@ async function loadDmConversations() {
     return;
   }
   try {
-    const resp = await fetch('/api/dm/conversations');
-    const data = await resp.json();
     dmConversationsCache = [getInvestorDmConversation()];
     renderDmConversations(dmConversationsCache);
   } catch (e) {
@@ -4922,15 +5783,9 @@ async function loadDmMessages(kolId) {
     renderDmMessages(data);
     return;
   }
-  try {
-    const resp = await fetch('/api/dm/messages/' + kolId);
-    const data = await resp.json();
-    dmCurrentHistory = data.map(m => ({sender:m.sender, content:m.content}));
-    renderDmMessages(data);
-  } catch (e) {
-    dmCurrentHistory = [];
-    renderDmMessages([{id:1,sender:'kol',content:'欢迎关注！有投研问题随时交流。',time:'刚刚',type:'text'}]);
-  }
+  const data = getInvestorDmMessages();
+  dmCurrentHistory = data.map(m => ({sender:m.sender, content:m.content}));
+  renderDmMessages(data);
 }
 
 function renderDmMessages(messages) {
@@ -4947,6 +5802,15 @@ function renderDmMessages(messages) {
           <div style="font-size:11px;color:var(--gold);font-weight:600;margin-bottom:6px">🔒 付费内容 · ¥${m.price}</div>
           <div style="font-size:13px;color:var(--white);line-height:1.6">${m.preview||'解锁查看完整内容'}</div>
           <button class="btn-gold" style="width:100%;margin-top:10px;padding:6px;font-size:12px" onclick="unlockPaidMsg(${m.price})">解锁查看 ¥${m.price}</button>
+          <div class="dm-msg-time" style="color:${timeColor}">${m.time}</div>
+        </div>`;
+    }
+    if (m.type === 'review') {
+      return `
+        <div class="dm-msg from-${bubbleSide}" style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.18)">
+          <div style="font-size:11px;color:var(--gold);font-weight:700;margin-bottom:8px">📝 最新复盘已发布</div>
+          <div style="font-size:13px;color:var(--white);line-height:1.7">${m.content.replace(/\n/g, '<br>')}</div>
+          <button class="btn-outline" style="width:100%;margin-top:10px;padding:6px 10px;font-size:11px" onclick="switchTab('review')">去复盘专区查看</button>
           <div class="dm-msg-time" style="color:${timeColor}">${m.time}</div>
         </div>`;
     }
