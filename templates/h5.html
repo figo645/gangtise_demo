@@ -7,6 +7,8 @@
 <link rel="stylesheet" href="/static/css/style.css">
 <script>
   window.SITE_CONFIG = {{ site_config | tojson }};
+  window.SITE_CONFIG.default_theme = 'light';
+  try { localStorage.setItem('gangtise_theme_mode', 'light'); } catch (e) {}
 </script>
 <script src="/static/js/theme.js"></script>
 <style>
@@ -15,27 +17,6 @@ body { background: var(--surface-2); color: var(--text-main); }
 .page { display: none; }
 .page.active { display: block; }
 
-.h5-header-context {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-top: 12px;
-  padding: 10px 12px;
-  background: var(--navy-mid);
-  border: 1px solid var(--border-soft);
-  border-radius: 12px;
-}
-.h5-header-section {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-main);
-}
-.h5-header-hint {
-  font-size: 11px;
-  color: var(--text-sub);
-  text-align: right;
-}
 
 /* ===== BOTTOM NAV (6 items) ===== */
 .h5-bottom-nav {
@@ -123,6 +104,79 @@ body { background: var(--surface-2); color: var(--text-main); }
 .hermes-logo { font-size:20px; font-weight:700; color:var(--gold); letter-spacing:1px; }
 .hermes-subtitle { font-size:11px; color:var(--gray-400); margin-top:2px; }
 .hermes-credits { font-size:12px; color:var(--gold); background:rgba(200,169,110,0.1); padding:4px 10px; border-radius:12px; border:1px solid rgba(200,169,110,0.2); white-space:nowrap; }
+.hermes-workspace { padding:14px 16px 6px; display:grid; gap:14px; }
+.hermes-hero-card {
+  background:linear-gradient(160deg, #FFFFFF, #F6FAFF);
+  border:1px solid rgba(47,116,192,0.14);
+  border-radius:16px;
+  padding:16px;
+  box-shadow:0 12px 28px rgba(31,73,125,0.08);
+}
+.hermes-hero-title { font-size:16px; font-weight:700; color:var(--white); }
+.hermes-hero-desc { font-size:12px; color:var(--gray-400); line-height:1.7; margin-top:6px; }
+.hermes-hero-actions { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:12px; }
+.hermes-hero-pill {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:12px;
+  padding:10px 8px;
+  text-align:center;
+  font-size:11px;
+  color:var(--text-sub);
+}
+.hermes-panel {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:16px;
+  padding:14px;
+  box-shadow:0 10px 24px rgba(31,73,125,0.06);
+}
+.hermes-panel-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px; }
+.hermes-panel-title { font-size:14px; font-weight:700; color:var(--white); }
+.hermes-panel-subtitle { font-size:11px; color:var(--gray-400); line-height:1.6; margin-top:4px; }
+.hermes-entry-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.hermes-entry-card {
+  background:#F7FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  padding:12px;
+  cursor:pointer;
+  transition:transform 0.18s ease, border-color 0.18s ease;
+}
+.hermes-entry-card:hover,
+.hermes-entry-card:active {
+  transform:translateY(-1px);
+  border-color:rgba(47,116,192,0.24);
+}
+.hermes-entry-icon { width:36px; height:36px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:18px; background:rgba(47,116,192,0.10); margin-bottom:10px; }
+.hermes-entry-title { font-size:13px; font-weight:700; color:var(--white); }
+.hermes-entry-desc { font-size:11px; color:var(--gray-400); line-height:1.6; margin-top:6px; min-height:34px; }
+.hermes-entry-meta { font-size:10px; color:var(--gold); margin-top:8px; }
+.hermes-stock-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.hermes-stock-chip {
+  background:#F7FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  padding:12px;
+  cursor:pointer;
+}
+.hermes-stock-chip-name { font-size:13px; font-weight:700; color:var(--white); }
+.hermes-stock-chip-meta { font-size:10px; color:var(--gray-400); margin-top:4px; line-height:1.5; }
+.hermes-stock-chip-tag { display:inline-block; margin-top:8px; font-size:10px; color:var(--gold); background:rgba(47,116,192,0.08); border-radius:999px; padding:3px 8px; }
+.hermes-recent-list { display:grid; gap:8px; }
+.hermes-recent-card {
+  background:#F7FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  padding:12px;
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:flex-start;
+}
+.hermes-recent-title { font-size:13px; font-weight:700; color:var(--white); }
+.hermes-recent-desc { font-size:11px; color:var(--gray-400); line-height:1.6; margin-top:4px; }
+.hermes-recent-tag { font-size:10px; color:var(--gold); background:rgba(47,116,192,0.08); border-radius:999px; padding:3px 8px; white-space:nowrap; }
 
 .hermes-modes { display:flex; gap:8px; overflow-x:auto; padding:12px 16px; scrollbar-width:none; }
 .hermes-modes::-webkit-scrollbar { display:none; }
@@ -203,7 +257,7 @@ body { background: var(--surface-2); color: var(--text-main); }
 .toast { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:rgba(200,169,110,0.9); color:var(--navy); padding:8px 20px; border-radius:20px; font-size:13px; font-weight:600; z-index:9999; opacity:0; transition:opacity 0.3s; pointer-events:none; white-space:nowrap; }
 .toast.show { opacity:1; }
 
-/* ===== VIP POINTS BANNER ===== */
+/* ===== EXCHANGE BANNER ===== */
 .vip-points-banner { margin:16px 16px 0; background:linear-gradient(135deg,rgba(200,169,110,0.12),rgba(168,137,62,0.06)); border:1px solid rgba(200,169,110,0.25); border-radius:14px; padding:14px 16px; }
 .exchange-grid { display:flex; flex-direction:column; gap:8px; margin:0 16px 16px; }
 .exchange-item { background:var(--navy-mid); border:1px solid rgba(200,169,110,0.12); border-radius:10px; padding:12px 14px; display:flex; align-items:center; gap:12px; }
@@ -216,6 +270,285 @@ body { background: var(--surface-2); color: var(--text-main); }
 /* ===== BADGES ===== */
 .badges-wrap { display:flex; flex-wrap:wrap; gap:8px; padding:0 16px 16px; }
 .badge-chip { font-size:11px; background:rgba(200,169,110,0.1); color:var(--gold); border:1px solid rgba(200,169,110,0.2); border-radius:16px; padding:4px 12px; }
+.watch-detail-tabs { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-bottom:12px; scrollbar-width:none; }
+.watch-detail-tabs::-webkit-scrollbar { display:none; }
+.watch-detail-tab {
+  flex-shrink:0;
+  font-size:11px;
+  color:var(--gray-400);
+  background:#F7FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:999px;
+  padding:7px 12px;
+  cursor:pointer;
+}
+.watch-detail-tab.active { color:var(--gold); border-color:var(--gold); background:rgba(47,116,192,0.08); }
+.watch-section-card {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  padding:12px;
+  margin-bottom:12px;
+}
+.watch-section-title { font-size:13px; font-weight:700; color:var(--gold); margin-bottom:8px; }
+.watch-section-desc { font-size:12px; color:var(--gray-400); line-height:1.7; }
+.watch-thesis-badge {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-size:10px;
+  color:var(--gold);
+  background:rgba(47,116,192,0.08);
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:999px;
+  padding:4px 8px;
+}
+.watch-research-grid { display:grid; gap:8px; }
+.watch-research-item {
+  background:#F7FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:12px;
+  padding:10px;
+}
+.watch-research-meta { font-size:10px; color:var(--gray-400); margin-bottom:6px; }
+.watch-research-title { font-size:12px; font-weight:700; color:var(--white); }
+.watch-research-desc { font-size:11px; color:var(--gray-400); line-height:1.6; margin-top:6px; }
+.fund-overview-card {
+  background:linear-gradient(160deg, #FFFFFF, #F6FAFF);
+  border:1px solid rgba(47,116,192,0.14);
+  border-radius:16px;
+  padding:16px;
+  box-shadow:0 12px 28px rgba(31,73,125,0.08);
+}
+.fund-overview-title { font-size:16px; font-weight:700; color:var(--white); }
+.fund-overview-desc { font-size:12px; color:var(--gray-400); line-height:1.7; margin-top:6px; }
+.fund-macro-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.fund-macro-grid.cols-2 { grid-template-columns:1fr 1fr; }
+.fund-macro-grid.cols-3 { grid-template-columns:1fr 1fr 1fr; }
+.fund-macro-grid.cols-4 { grid-template-columns:1fr 1fr; }
+.fund-macro-card {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  padding:12px;
+  box-shadow:0 8px 22px rgba(31,73,125,0.06);
+}
+.fund-macro-card.good { border-color:rgba(46,204,113,0.18); }
+.fund-macro-card.attention { border-color:rgba(47,116,192,0.18); }
+.fund-macro-card.warning { border-color:rgba(231,76,60,0.18); }
+.fund-macro-name { font-size:12px; font-weight:700; color:var(--white); line-height:1.5; }
+.fund-macro-badge {
+  flex-shrink:0;
+  font-size:10px;
+  border-radius:999px;
+  padding:3px 8px;
+}
+.fund-macro-badge.good { color:var(--green); background:rgba(46,204,113,0.12); }
+.fund-macro-badge.attention { color:#3498DB; background:rgba(52,152,219,0.12); }
+.fund-macro-badge.warning { color:#E74C3C; background:rgba(231,76,60,0.12); }
+.fund-macro-value { font-size:20px; font-weight:700; color:var(--gold); margin-top:10px; }
+.fund-macro-assessment { font-size:12px; color:var(--white); margin-top:6px; line-height:1.6; }
+.fund-macro-alert { font-size:11px; color:var(--gold); margin-top:8px; line-height:1.6; }
+.fund-macro-hint { font-size:10px; color:var(--gray-400); margin-top:6px; line-height:1.6; }
+.fund-macro-toolbar {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  margin-bottom:10px;
+}
+.fund-macro-toolbar-note { font-size:11px; color:var(--gray-400); line-height:1.6; }
+.fund-macro-layout-tag {
+  flex-shrink:0;
+  font-size:10px;
+  color:var(--gold);
+  background:rgba(47,116,192,0.08);
+  border-radius:999px;
+  padding:4px 8px;
+}
+.fund-board-hint,
+.fund-news-hint { font-size:12px; color:var(--gray-400); line-height:1.7; margin-bottom:10px; }
+.fund-board-tabs {
+  display:flex;
+  gap:8px;
+  overflow-x:auto;
+  padding-bottom:4px;
+  margin-bottom:12px;
+  scrollbar-width:none;
+}
+.fund-board-tabs::-webkit-scrollbar { display:none; }
+.fund-board-tab {
+  flex-shrink:0;
+  border:1px solid rgba(47,116,192,0.10);
+  background:#FFFFFF;
+  color:var(--text-sub);
+  border-radius:999px;
+  padding:8px 12px;
+  font-size:11px;
+  cursor:pointer;
+}
+.fund-board-tab.active { border-color:var(--gold); color:var(--gold); background:rgba(47,116,192,0.08); }
+.fund-board-tab-count { margin-left:6px; font-size:10px; opacity:0.86; }
+.fund-board-panel { display:none; }
+.fund-board-panel.active { display:block; }
+.fund-board-summary {
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  font-size:11px;
+  color:var(--gray-400);
+  margin-bottom:10px;
+  line-height:1.6;
+}
+.fund-stock-list { display:grid; gap:10px; }
+.fund-stock-card {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  padding:12px;
+  box-shadow:0 8px 22px rgba(31,73,125,0.06);
+  cursor:pointer;
+}
+.fund-stock-name { font-size:13px; font-weight:700; color:var(--white); }
+.fund-stock-meta { font-size:10px; color:var(--gray-400); margin-top:4px; line-height:1.5; }
+.fund-stock-price-wrap { text-align:right; flex-shrink:0; }
+.fund-stock-price { font-size:18px; font-weight:700; color:var(--white); }
+.fund-stock-change { font-size:11px; margin-top:4px; }
+.fund-stock-signal { font-size:12px; color:var(--white); line-height:1.7; margin-top:10px; }
+.fund-stock-alert-row { display:flex; align-items:flex-start; gap:8px; margin-top:10px; }
+.fund-stock-alert-tag {
+  flex-shrink:0;
+  font-size:10px;
+  border-radius:999px;
+  padding:3px 8px;
+}
+.fund-stock-alert-tag.normal { color:var(--green); background:rgba(46,204,113,0.12); }
+.fund-stock-alert-tag.attention { color:#3498DB; background:rgba(52,152,219,0.12); }
+.fund-stock-alert-tag.warning { color:#E74C3C; background:rgba(231,76,60,0.12); }
+.fund-stock-alert-text { font-size:11px; color:var(--gray-400); line-height:1.6; }
+.fund-news-item { box-shadow:0 8px 22px rgba(31,73,125,0.06); }
+.fund-news-source {
+  flex-shrink:0;
+  font-size:10px;
+  color:var(--gold);
+  background:rgba(47,116,192,0.08);
+  border-radius:999px;
+  padding:4px 8px;
+}
+.fund-news-why { font-size:11px; color:var(--gray-400); line-height:1.7; margin-top:10px; }
+.wb-dashboard-card {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  padding:12px;
+  box-shadow:0 8px 22px rgba(31,73,125,0.06);
+}
+.wb-dashboard-label { font-size:12px; color:var(--gold); font-weight:600; margin-bottom:8px; display:block; }
+.wb-dashboard-textarea {
+  width:100%;
+  min-height:82px;
+  resize:none;
+  border:1px solid rgba(47,116,192,0.14);
+  border-radius:12px;
+  padding:10px 12px;
+  font-size:12px;
+  color:var(--text-main);
+  background:#F8FBFF;
+  outline:none;
+  font-family:var(--font-main);
+  line-height:1.7;
+}
+.wb-dashboard-summary-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.wb-dashboard-summary-grid.cols-3 { grid-template-columns:1fr 1fr 1fr; }
+.wb-dashboard-summary-grid.cols-4 { grid-template-columns:1fr 1fr; }
+.wb-dashboard-summary-card {
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:12px;
+  padding:10px;
+  min-height:132px;
+  cursor:pointer;
+  transition:transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.wb-dashboard-summary-card.filled:hover,
+.wb-dashboard-summary-card.filled:active {
+  border-color:rgba(200,169,110,0.34);
+  box-shadow:0 10px 24px rgba(31,73,125,0.10);
+}
+.wb-dashboard-summary-card.empty {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  border-style:dashed;
+  background:rgba(47,116,192,0.04);
+}
+.wb-dashboard-summary-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  margin-bottom:8px;
+}
+.wb-dashboard-summary-title {
+  font-size:12px;
+  font-weight:700;
+  color:var(--white);
+}
+.wb-dashboard-summary-tag {
+  flex-shrink:0;
+  font-size:10px;
+  color:var(--gold);
+  background:rgba(47,116,192,0.08);
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:999px;
+  padding:3px 8px;
+}
+.wb-dashboard-summary-value { font-size:20px; font-weight:700; color:var(--gold); margin-top:8px; }
+.wb-dashboard-summary-text { font-size:11px; color:var(--gray-400); line-height:1.6; margin-top:6px; }
+.wb-dashboard-summary-edit { font-size:10px; color:var(--gold); font-weight:600; margin-top:10px; }
+.wb-dashboard-summary-plus {
+  width:42px;
+  height:42px;
+  border-radius:14px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin:0 auto 10px;
+  background:rgba(200,169,110,0.12);
+  color:var(--gold);
+  font-size:28px;
+  line-height:1;
+}
+.wb-dashboard-summary-empty-title { font-size:13px; font-weight:700; color:var(--white); }
+.wb-dashboard-summary-empty-desc { font-size:11px; color:var(--gray-400); line-height:1.6; margin-top:6px; }
+.wb-dashboard-layout-btn.active {
+  color:var(--gold);
+  border-color:var(--gold);
+  background:rgba(47,116,192,0.08);
+}
+.wb-dashboard-toolbar {
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:8px;
+  margin-top:10px;
+}
+.wb-dashboard-actions {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:10px;
+}
+.wb-dashboard-meta {
+  font-size:11px;
+  color:var(--gray-400);
+  line-height:1.7;
+  margin-top:10px;
+}
 
 /* ===== POINTS RULES ===== */
 .points-rules { margin:0 16px 16px; background:var(--navy-mid); border-radius:12px; overflow:hidden; }
@@ -226,9 +559,78 @@ body { background: var(--surface-2); color: var(--text-main); }
 
 .tenant-card { margin:16px; background:linear-gradient(135deg,rgba(52,152,219,0.09),rgba(200,169,110,0.06)); border:1px solid rgba(200,169,110,0.16); border-radius:14px; padding:16px; }
 .tenant-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
-.tenant-cell { background:rgba(13,27,42,0.28); border:1px solid rgba(200,169,110,0.08); border-radius:10px; padding:10px 12px; }
+.tenant-cell { background:#FFFFFF; border:1px solid rgba(47,116,192,0.10); border-radius:10px; padding:10px 12px; }
 .tenant-label { font-size:10px; color:var(--gray-400); margin-bottom:4px; }
 .tenant-value { font-size:13px; color:var(--white); font-weight:600; line-height:1.5; }
+.profile-overview-card { margin:16px; background:#FFFFFF; border:1px solid rgba(47,116,192,0.12); border-radius:14px; padding:16px; box-shadow:0 8px 24px rgba(31,73,125,0.06); }
+.profile-overview-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:12px; }
+.profile-overview-title { font-size:15px; font-weight:700; color:var(--white); }
+.profile-overview-desc { font-size:12px; color:var(--gray-400); line-height:1.7; margin-top:6px; }
+.profile-overview-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.profile-overview-item { background:#F7FBFF; border:1px solid rgba(47,116,192,0.1); border-radius:12px; padding:12px; }
+.profile-overview-label { font-size:10px; color:var(--gray-400); margin-bottom:6px; }
+.profile-overview-value { font-size:14px; color:var(--white); font-weight:600; line-height:1.5; }
+.profile-workbench-entry {
+  margin:0 16px 16px;
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  padding:16px;
+  border-radius:16px;
+  border:1px solid rgba(200,169,110,0.28);
+  background:linear-gradient(135deg, rgba(200,169,110,0.16), rgba(47,116,192,0.12));
+  box-shadow:0 14px 32px rgba(31,73,125,0.10);
+  cursor:pointer;
+}
+.profile-workbench-entry-icon {
+  width:44px;
+  height:44px;
+  flex-shrink:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:14px;
+  background:rgba(255,255,255,0.72);
+  font-size:22px;
+}
+.profile-workbench-entry-main { flex:1; min-width:0; }
+.profile-workbench-entry-top {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.profile-workbench-entry-title {
+  font-size:16px;
+  font-weight:700;
+  color:var(--white);
+  line-height:1.35;
+}
+.profile-workbench-entry-desc { font-size:11px; color:var(--gray-400); line-height:1.6; margin-top:4px; }
+.profile-workbench-entry-meta {
+  font-size:11px;
+  color:#E74C3C;
+  font-weight:700;
+  background:rgba(255,255,255,0.76);
+  border-radius:999px;
+  padding:6px 10px;
+  margin-top:8px;
+  display:inline-flex;
+  align-items:center;
+}
+.profile-workbench-entry-arrow {
+  flex-shrink:0;
+  width:28px;
+  height:28px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:999px;
+  background:rgba(255,255,255,0.72);
+  color:var(--gold);
+  font-size:16px;
+  font-weight:700;
+}
 .demo-switch-list { display:flex; flex-direction:column; gap:10px; padding:0 16px 16px; }
 .demo-switch-item { background:var(--navy-mid); border:1px solid rgba(200,169,110,0.12); border-radius:12px; padding:12px 14px; display:flex; align-items:center; gap:12px; cursor:pointer; }
 .demo-switch-item.active { border-color:var(--gold); background:rgba(200,169,110,0.08); }
@@ -238,10 +640,264 @@ body { background: var(--surface-2); color: var(--text-main); }
 .demo-switch-meta { font-size:11px; color:var(--gray-400); margin-top:4px; line-height:1.5; }
 .demo-switch-tag { font-size:10px; color:var(--gold); background:rgba(200,169,110,0.12); border:1px solid rgba(200,169,110,0.2); border-radius:999px; padding:3px 8px; white-space:nowrap; }
 
+/* ===== KNOWLEDGE UX ===== */
+.knowledge-entry-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:12px; }
+.knowledge-entry-card {
+  background:linear-gradient(160deg, #FFFFFF, #F6FAFF);
+  border:1px solid rgba(47,116,192,0.14);
+  border-radius:14px;
+  padding:12px;
+  cursor:pointer;
+  transition:transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.knowledge-entry-card:hover,
+.knowledge-entry-card:active {
+  transform:translateY(-1px);
+  border-color:rgba(200,169,110,0.34);
+  box-shadow:0 10px 24px rgba(0,0,0,0.18);
+}
+.knowledge-entry-icon {
+  width:38px;
+  height:38px;
+  border-radius:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:18px;
+  margin-bottom:10px;
+  background:rgba(47,116,192,0.10);
+  border:1px solid rgba(47,116,192,0.14);
+}
+.knowledge-entry-title { font-size:13px; color:var(--white); font-weight:700; }
+.knowledge-entry-desc { font-size:11px; color:var(--gray-400); line-height:1.6; margin-top:6px; min-height:34px; }
+.knowledge-entry-cta { font-size:10px; color:var(--gold); margin-top:8px; font-weight:600; }
+.knowledge-pipeline {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  font-size:11px;
+  color:var(--gray-400);
+  margin-bottom:12px;
+}
+.knowledge-pipeline-step {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.08);
+  border-radius:999px;
+  padding:5px 10px;
+}
+.knowledge-pipeline-arrow { color:var(--gold); }
+.knowledge-queue { display:grid; gap:8px; }
+.knowledge-queue-item {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.08);
+  border-radius:12px;
+  padding:12px;
+}
+.knowledge-queue-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:8px; }
+.knowledge-queue-title { font-size:13px; color:var(--white); font-weight:600; }
+.knowledge-queue-meta { font-size:10px; color:var(--gray-400); margin-top:4px; }
+.knowledge-status {
+  flex-shrink:0;
+  font-size:10px;
+  border-radius:999px;
+  padding:4px 8px;
+  border:1px solid transparent;
+}
+.knowledge-status.ready { color:var(--green); background:rgba(46,204,113,0.12); border-color:rgba(46,204,113,0.2); }
+.knowledge-status.syncing { color:var(--gold); background:rgba(200,169,110,0.12); border-color:rgba(200,169,110,0.2); }
+.knowledge-queue-body { font-size:12px; color:var(--gray-400); line-height:1.7; }
+.knowledge-chip-row { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.knowledge-chip {
+  font-size:10px;
+  color:var(--gold);
+  background:rgba(47,116,192,0.07);
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:999px;
+  padding:3px 8px;
+}
+.knowledge-zone-list { display:grid; gap:10px; }
+.knowledge-zone-card {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.08);
+  border-radius:12px;
+  padding:12px;
+}
+.knowledge-zone-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+.knowledge-zone-title { font-size:13px; color:var(--white); font-weight:700; }
+.knowledge-zone-origin { font-size:10px; color:var(--gray-400); margin-top:4px; line-height:1.5; }
+.knowledge-zone-summary { font-size:12px; color:var(--gray-400); line-height:1.7; margin-top:8px; }
+.knowledge-modal-block { margin-bottom:16px; }
+.knowledge-modal-label { font-size:12px; color:var(--gold); font-weight:600; margin-bottom:8px; display:block; }
+.knowledge-modal-input,
+.knowledge-modal-textarea {
+  width:100%;
+  box-sizing:border-box;
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.18);
+  border-radius:12px;
+  color:var(--white);
+  font-size:13px;
+  padding:11px 12px;
+  outline:none;
+  font-family:var(--font-main);
+}
+.knowledge-modal-textarea { min-height:96px; resize:none; line-height:1.7; }
+.knowledge-source-selector { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px; }
+.knowledge-source-pill {
+  border:1px solid rgba(47,116,192,0.16);
+  border-radius:12px;
+  padding:10px 8px;
+  text-align:center;
+  font-size:12px;
+  color:var(--gray-400);
+  cursor:pointer;
+  background:#FFFFFF;
+}
+.knowledge-source-pill.active {
+  color:var(--gold);
+  border-color:var(--gold);
+  background:rgba(200,169,110,0.1);
+}
+.knowledge-wave {
+  display:flex;
+  align-items:flex-end;
+  gap:4px;
+  height:42px;
+  padding:0 4px;
+}
+.knowledge-wave span {
+  width:8px;
+  border-radius:999px;
+  background:linear-gradient(180deg, rgba(200,169,110,0.92), rgba(88,214,141,0.75));
+  animation:knowledgePulse 1s ease-in-out infinite;
+}
+.knowledge-wave span:nth-child(1) { height:16px; animation-delay:0s; }
+.knowledge-wave span:nth-child(2) { height:28px; animation-delay:0.12s; }
+.knowledge-wave span:nth-child(3) { height:36px; animation-delay:0.24s; }
+.knowledge-wave span:nth-child(4) { height:22px; animation-delay:0.36s; }
+.knowledge-wave span:nth-child(5) { height:30px; animation-delay:0.48s; }
+@keyframes knowledgePulse {
+  0%, 100% { opacity:0.45; transform:scaleY(0.84); }
+  50% { opacity:1; transform:scaleY(1); }
+}
+.knowledge-record-panel,
+.knowledge-upload-panel,
+.knowledge-url-panel {
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:14px;
+  padding:12px;
+}
+.knowledge-record-toolbar { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px; }
+.knowledge-live-dot {
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#E74C3C;
+  box-shadow:0 0 0 6px rgba(231,76,60,0.12);
+}
+.knowledge-record-status { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--gray-400); }
+.knowledge-action-row { display:flex; gap:8px; margin-top:10px; }
+.knowledge-upload-drop {
+  border:1px dashed rgba(47,116,192,0.24);
+  border-radius:14px;
+  padding:14px 12px;
+  text-align:center;
+  color:var(--gray-400);
+  font-size:12px;
+  line-height:1.7;
+}
+.knowledge-preview-box {
+  margin-top:10px;
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.08);
+  border-radius:12px;
+  padding:12px;
+}
+.knowledge-preview-title { font-size:12px; color:var(--white); font-weight:600; }
+.knowledge-preview-desc { font-size:11px; color:var(--gray-400); line-height:1.7; margin-top:6px; }
+.fund-column-card {
+  background:linear-gradient(160deg, #FFFFFF, #F7FBFF);
+  border:1px solid rgba(47,116,192,0.14);
+  border-radius:16px;
+  padding:16px;
+}
+.fund-column-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:12px; }
+.fund-column-title { font-size:15px; font-weight:700; color:var(--white); }
+.fund-column-subtitle { font-size:11px; color:var(--gray-400); margin-top:4px; line-height:1.6; }
+.fund-column-summary {
+  background:rgba(47,116,192,0.06);
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:12px;
+  padding:12px;
+  margin-bottom:12px;
+}
+.fund-column-summary-title { font-size:12px; color:var(--gold); font-weight:700; margin-bottom:8px; }
+.fund-column-summary-text { font-size:13px; color:var(--white); line-height:1.8; }
+.fund-column-grid { display:grid; gap:10px; }
+.fund-column-item {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.08);
+  border-radius:12px;
+  padding:12px;
+}
+.fund-column-item-title { font-size:12px; color:var(--white); font-weight:600; }
+.fund-column-item-meta { font-size:10px; color:var(--gray-400); margin-top:4px; }
+.fund-column-item-desc { font-size:12px; color:var(--gray-400); line-height:1.7; margin-top:8px; }
+.fund-column-actions { display:flex; gap:8px; margin-top:12px; }
+
+body,
+.h5-wrap {
+  background:linear-gradient(180deg, #FAFCFF 0%, #F4F8FC 100%);
+}
+.modal-overlay {
+  background:rgba(244,248,252,0.88);
+}
+.modal-sheet,
+.post-card,
+.kol-card,
+.event-card,
+.post-composer,
+.hermes-mode-btn,
+.hermes-option-btn,
+.chat-bubble.ai,
+.hermes-shortcut,
+.level-table,
+.settings-list,
+.exchange-item,
+.points-rules,
+.demo-switch-item,
+.dm-chat-header,
+.dm-msg.from-kol,
+.dm-input-bar,
+.wb-stat-card {
+  box-shadow:0 8px 24px rgba(31,73,125,0.06);
+}
+.hermes-header,
+.profile-header,
+.h5-header {
+  background:linear-gradient(180deg, #FFFFFF 0%, #F4F8FC 100%);
+}
+.modal-sheet,
+.dm-chat-header,
+.dm-input-bar {
+  background:#FFFFFF;
+}
+.modal-textarea,
+.dm-input {
+  background:#FFFFFF;
+  color:var(--text-main);
+  border-color:rgba(47,116,192,0.16);
+}
+.wb-fan-avatar {
+  background:#EAF2FB;
+}
+
 /* ===== LOADING OVERLAY ===== */
 .loading-overlay {
   position:fixed; inset:0;
-  background:rgba(13,27,42,0.85);
+  background:rgba(244,248,252,0.88);
   display:none; align-items:center; justify-content:center;
   z-index:999; backdrop-filter:blur(4px);
 }
@@ -305,10 +961,7 @@ body { background: var(--surface-2); color: var(--text-main); }
         <div class="h5-tagline">白底咨询风 · 专业投资研究界面</div>
       </div>
       <div style="display:flex;gap:10px;align-items:center">
-        <div style="display:flex;gap:6px;align-items:center">
-          <button class="btn-outline" style="padding:4px 8px;font-size:11px" onclick="chooseTheme('light')">浅色</button>
-          <button class="btn-outline" style="padding:4px 8px;font-size:11px" onclick="chooseTheme('dark')">黑色</button>
-        </div>
+        <div class="tag tag-gold">H5 固定浅色</div>
         <div id="global-profile-avatar" onclick="switchTab('profile')" style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--gold-dark),var(--gold));display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer">👤</div>
       </div>
     </div>
@@ -319,44 +972,87 @@ body { background: var(--surface-2); color: var(--text-main); }
       <button class="btn-outline" style="padding:3px 8px;font-size:11px" onclick="chooseAccent('slate')">石板灰</button>
       <button class="btn-outline" style="padding:3px 8px;font-size:11px" onclick="chooseAccent('amber')">琥珀</button>
     </div>
-    <div class="h5-header-context">
-      <div class="h5-header-section" id="header-section-name">基本面分析</div>
-      <div class="h5-header-hint" id="header-section-hint">底部导航负责页面切换</div>
-    </div>
   </div>
 
   <!-- ===== TAB 1: 信息流 ===== -->
   <div id="page-feed" class="page active" data-feature="fundamental_analysis">
     <div class="h5-section" style="padding-bottom:8px">
-      <div class="card" style="padding:16px;background:linear-gradient(145deg,var(--navy-mid),var(--navy-light))">
-        <div style="font-size:12px;color:var(--gold);font-weight:700;margin-bottom:6px">今日产品重点</div>
-        <div style="font-size:18px;font-weight:700;color:var(--white);line-height:1.5">聚焦复盘专区、知识专区、基本面分析与证据链输出的高频投研能力。</div>
-        <div style="font-size:12px;color:var(--gray-400);margin-top:10px">围绕普通投资者、大V投顾租户和平台 Admin 三类角色，统一强化证据链、租户隔离、消息沉淀后的复盘整理与知识沉淀能力。</div>
-      </div>
-    </div>
-    <!-- Market ticker -->
-    <div class="h5-section" style="padding-bottom:0">
-      <div class="market-scroll">
-        {% for item in market %}
-        <div class="market-item">
-          <div class="market-name">{{ item.name }}</div>
-          <div class="market-value">{{ "%.2f"|format(item.value) }}</div>
-          <div class="market-change {% if item.change >= 0 %}up{% else %}down{% endif %}">
-            {% if item.change >= 0 %}▲{% else %}▼{% endif %}
-            {{ "%.2f%%"|format(item.change_pct|abs) }}
+      <div class="fund-overview-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+          <div>
+            <div class="fund-overview-title">今日基本面首页</div>
+            <div class="fund-overview-desc">先看宏观核心指标有没有报警，再看自选股板块预警，接着看大V的今日基本面解读，最后只保留真正值得看的综合要闻。</div>
           </div>
+          <span class="tag tag-gold">决策首页</span>
         </div>
-        {% endfor %}
       </div>
     </div>
 
-    <!-- Today's news -->
+    <div class="h5-section" style="padding-top:6px">
+      <div class="h5-section-title">核心指标</div>
+      <div id="feed-macro-dashboard"></div>
+    </div>
+
     <div class="h5-section">
-      <div class="h5-section-title">今日要闻</div>
+      <div class="h5-section-title">板块</div>
+      <div class="fund-board-hint">这里展示的是当前租户下由大V和粉丝共同加入的自选股列表。按板块分组后，可以直接看到哪些标的正在预警。</div>
+      <div class="fund-board-tabs">
+        {% for board in feed_boards %}
+        <button class="fund-board-tab {% if loop.first %}active{% endif %}" id="fund-board-tab-{{ loop.index0 }}" onclick="switchFeedBoardTab({{ loop.index0 }})">
+          {{ board.name }}
+          <span class="fund-board-tab-count">{{ board.warning_count }}预警</span>
+        </button>
+        {% endfor %}
+      </div>
+      {% for board in feed_boards %}
+      <div class="fund-board-panel {% if loop.first %}active{% endif %}" id="fund-board-panel-{{ loop.index0 }}">
+        <div class="fund-board-summary">
+          <span>{{ board['name'] }} · 共 {{ board['items']|length }} 只自选股</span>
+          <span>{% if board['warning_count'] %}当前有 {{ board['warning_count'] }} 条需要关注{% else %}当前无明显预警{% endif %}</span>
+        </div>
+        <div class="fund-stock-list">
+          {% for item in board['items'] %}
+          <div class="fund-stock-card" onclick="openWatchlistDetail('{{ item.code }}','overview'); switchTab('market');">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+              <div>
+                <div class="fund-stock-name">{{ item.name }}</div>
+                <div class="fund-stock-meta">{{ item.code }} · {{ item.market }} · {{ item.focus }}</div>
+              </div>
+              <div class="fund-stock-price-wrap">
+                <div class="fund-stock-price">{{ "%.2f"|format(item.value) }}</div>
+                <div class="fund-stock-change {% if item.change >= 0 %}up{% else %}down{% endif %}">
+                  {% if item.change >= 0 %}▲{% else %}▼{% endif %}
+                  {{ "%.2f%%"|format(item.change_pct|abs) }}
+                </div>
+              </div>
+            </div>
+            <div class="fund-stock-signal">{{ item.signal_summary }}</div>
+            <div class="fund-stock-alert-row">
+              <span class="fund-stock-alert-tag {{ item.alert_level }}">
+                {% if item.alert_level == 'warning' %}预警{% elif item.alert_level == 'attention' %}关注{% else %}正常{% endif %}
+              </span>
+              <span class="fund-stock-alert-text">{{ item.alert_text }}</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="h5-section">
+      <div class="h5-section-title">今日基本面解读</div>
+      <div id="feed-fundamental-column"></div>
+    </div>
+
+    <div class="h5-section">
+      <div class="h5-section-title">综合归纳要闻</div>
+      <div class="fund-news-hint">这里不是普通新闻流，只保留三类值得看的内容：和自选股直接相关的、被大V趋势持续关注的、以及会影响当前判断框架的全球要闻。</div>
       {% for item in news %}
-      <div class="news-item">
+      <div class="news-item fund-news-item">
         <div class="news-item-header">
           <div class="news-title">{{ item.title }}</div>
+          <span class="fund-news-source">{{ item.source_group }}</span>
         </div>
         <div class="news-meta">
           <div style="display:flex;gap:8px;align-items:center">
@@ -365,44 +1061,11 @@ body { background: var(--surface-2); color: var(--text-main); }
           </div>
           {% if item.hot %}<span class="hot-badge">🔥 热门</span>{% endif %}
         </div>
+        <div class="fund-news-why">为什么是要闻：{{ item.why }}</div>
       </div>
       {% endfor %}
     </div>
 
-    <!-- Basic analysis -->
-    <div class="h5-section">
-      <div class="h5-section-title">今日工具样例</div>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <div class="card" style="padding:14px">
-          <div style="display:flex;gap:10px;align-items:flex-start">
-            <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#C8A96E,#A8893E);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">👑</div>
-            <div style="flex:1">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                <span style="font-size:13px;font-weight:600;color:var(--gold)">复盘助手</span>
-                <span class="tag tag-gold">高频刚需</span>
-              </div>
-              <div style="font-size:12px;color:var(--gray-400);margin-bottom:6px">输入：全天研报 + 会议纪要 + 行情异动</div>
-              <div style="font-size:13px;color:var(--white);line-height:1.6">把一天资料压成 3 分钟可读复盘，覆盖研究协同、内容生产与个人跟踪场景，核心是把“整理时间太长”的问题压缩掉。</div>
-              <div style="font-size:11px;color:var(--gray-400);margin-top:6px">目标是节省整理时间，不替代最终观点</div>
-            </div>
-          </div>
-        </div>
-        <div class="card" style="padding:14px">
-          <div style="display:flex;gap:10px;align-items:flex-start">
-            <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#E2C98A,#C8A96E);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">💎</div>
-            <div style="flex:1">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                <span style="font-size:13px;font-weight:600;color:var(--gold)">证据链输出</span>
-                <span class="tag tag-gold">合规表达</span>
-              </div>
-              <div style="font-size:12px;color:var(--gray-400);margin-bottom:6px">输出：结论 + 来源条目 + 置信度</div>
-              <div style="font-size:13px;color:var(--white);line-height:1.6">同一条判断必须能回溯到研报、纪要和市场数据。趋势推演只给区间和理由，不直接给买卖指令，确保表达可追溯。</div>
-              <div style="font-size:11px;color:var(--gray-400);margin-top:6px">研究结果默认附来源、置信度与风险边界，方便直接复用</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 
   <!-- ===== TAB 2: 社区 ===== -->
@@ -552,6 +1215,51 @@ body { background: var(--surface-2); color: var(--text-main); }
       <div class="hermes-credits" id="hermes-credits-display">⚡ 128次</div>
     </div>
 
+    <div class="hermes-workspace">
+      <div class="hermes-hero-card">
+        <div class="hermes-hero-title">研究工作台</div>
+        <div class="hermes-hero-desc">Hermes 不只是聊天工具，而是前台统一的主动分析入口。你可以按任务启动 Skills，也可以直接按标的进入研究档案。</div>
+        <div class="hermes-hero-actions">
+          <div class="hermes-hero-pill">按任务启动</div>
+          <div class="hermes-hero-pill">按标的进入</div>
+          <div class="hermes-hero-pill">分析结果回写档案</div>
+        </div>
+      </div>
+
+      <div class="hermes-panel">
+        <div class="hermes-panel-head">
+          <div>
+            <div class="hermes-panel-title">按任务分析</div>
+            <div class="hermes-panel-subtitle">把常见研究动作做成 Skills，先启动任务，再进入具体分析。</div>
+          </div>
+          <span class="tag tag-gold">Skills</span>
+        </div>
+        <div class="hermes-entry-grid" id="hermes-entry-grid"></div>
+      </div>
+
+      <div class="hermes-panel">
+        <div class="hermes-panel-head">
+          <div>
+            <div class="hermes-panel-title">按标的进入</div>
+            <div class="hermes-panel-subtitle">从重点标的直接进入 Research Profile，再决定是否继续分析。</div>
+          </div>
+          <span class="tag tag-gold">Research Profile</span>
+        </div>
+        <div class="hermes-stock-grid" id="hermes-stock-grid"></div>
+      </div>
+
+      <div class="hermes-panel">
+        <div class="hermes-panel-head">
+          <div>
+            <div class="hermes-panel-title">最近分析</div>
+            <div class="hermes-panel-subtitle">承接刚做过的任务、今日热门主题和大V方法模板。</div>
+          </div>
+          <span class="tag tag-gold">最近使用</span>
+        </div>
+        <div class="hermes-recent-list" id="hermes-recent-list"></div>
+      </div>
+    </div>
+
     <!-- Mode selector -->
     <div class="hermes-modes" id="hermes-modes">
       <div class="hermes-mode-btn active" onclick="selectHermesMode('复盘速写')">📅 复盘速写</div>
@@ -619,15 +1327,32 @@ body { background: var(--surface-2); color: var(--text-main); }
     <div class="h5-section">
       <div class="h5-section-title">自选股</div>
       <div class="card" style="padding:14px;margin-bottom:12px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <div style="font-size:14px;font-weight:700;color:var(--white)">我的关注列表</div>
-          <button class="btn-outline" style="padding:5px 10px;font-size:11px" onclick="showToast('演示版暂不支持编辑')">+ 添加</button>
+        <div style="font-size:14px;font-weight:700;color:var(--white);margin-bottom:8px">输入股票代码，直接进入个股详情</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+          <input
+            id="watchlist-stock-code-input"
+            class="dm-input"
+            placeholder="例如：600519 / 300750 / 00700"
+            style="flex:1"
+            onkeydown="if(event.key==='Enter')submitWatchlistStockCode()"
+          >
+          <button class="btn-gold" style="padding:9px 14px;font-size:12px;white-space:nowrap" onclick="submitWatchlistStockCode()">进入详情</button>
         </div>
-        <div style="font-size:12px;color:var(--gray-400);line-height:1.6">围绕你的自选股票，固定走 4 个动作：看价格、看所属投顾方法、做基本面分析、形成继续跟踪/重点研究/暂缓处理结论。</div>
+        <div style="font-size:12px;color:var(--gray-400);line-height:1.6">用户不需要先点“添加”。直接输入股票代码后进入个股详情页，再决定是否加入自选股。</div>
         <div style="font-size:11px;color:var(--gold);margin-top:8px;line-height:1.7">租户隔离规则：普通投资者只可与所属大V投顾互动；跨租户投顾内容不开放。通过 Hermes 发起的个股分析会同步为租户分析记录，供主理投顾查看。</div>
       </div>
+      <div id="market-watchlist-list">
       {% for item in market %}
-      <div onclick="openWatchlistDetail('{{ item.code }}')" style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.08);border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer">
+      <div
+        onclick="openWatchlistDetail('{{ item.code }}')"
+        data-hermes-stock="true"
+        data-watchlist-card="true"
+        data-stock-code="{{ item.code }}"
+        data-stock-name="{{ item.name }}"
+        data-stock-market="{{ item.market }}"
+        data-stock-focus="{{ item.focus }}"
+        style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.08);border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer"
+      >
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div>
             <div style="font-size:14px;font-weight:600;color:var(--white)">{{ item.name }}</div>
@@ -651,6 +1376,7 @@ body { background: var(--surface-2); color: var(--text-main); }
         </div>
       </div>
       {% endfor %}
+      </div>
     </div>
     <div class="h5-section">
       <div class="h5-section-title">跟踪提示</div>
@@ -722,6 +1448,22 @@ body { background: var(--surface-2); color: var(--text-main); }
   <div id="page-knowledge" class="page" data-feature="knowledge">
     <div class="h5-section">
       <div class="h5-section-title">知识专区</div>
+      <div class="card" id="knowledge-dav-intake-card" style="padding:16px;margin-bottom:12px;display:none">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+          <div>
+            <div style="font-size:15px;font-weight:700;color:var(--white);margin-bottom:8px">大V知识录入</div>
+            <div style="font-size:12px;color:var(--gray-400);line-height:1.8">
+              你当前是大V视角，可以直接从这里提交语音、文件或网页 URL，无需先跳到别的页面。
+            </div>
+          </div>
+          <span class="tag tag-gold">仅大V可见</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px">
+          <button class="btn-gold" style="padding:10px;font-size:12px" onclick="openKnowledgeIntake('voice')">语音录入</button>
+          <button class="btn-outline" style="padding:10px;font-size:12px" onclick="openKnowledgeIntake('file')">上传文件</button>
+          <button class="btn-outline" style="padding:10px;font-size:12px" onclick="openKnowledgeIntake('url')">添加 URL</button>
+        </div>
+      </div>
       <div class="card" style="padding:16px;margin-bottom:12px">
         <div style="font-size:15px;font-weight:700;color:var(--white);margin-bottom:8px">知识专区沉淀长期可复用的信息</div>
         <div style="font-size:12px;color:var(--gray-400);line-height:1.8">
@@ -731,22 +1473,9 @@ body { background: var(--surface-2); color: var(--text-main); }
       <div class="card" style="padding:16px;margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <div style="font-size:14px;font-weight:700;color:var(--white)">最新沉淀</div>
-          <span class="tag tag-gold">今日新增 3 条</span>
+          <span class="tag tag-gold" id="knowledge-zone-count">今日新增 0 条</span>
         </div>
-        <div style="display:grid;gap:10px">
-          <div style="background:var(--navy);border-radius:10px;padding:10px">
-            <div style="font-size:12px;color:var(--white);font-weight:600">港股互联网估值框架</div>
-            <div style="font-size:10px;color:var(--gray-400);margin-top:4px">来源：投资女神Lisa 消息 + PDF 批注 · 已转成长期知识卡</div>
-          </div>
-          <div style="background:var(--navy);border-radius:10px;padding:10px">
-            <div style="font-size:12px;color:var(--white);font-weight:600">复盘四步法</div>
-            <div style="font-size:10px;color:var(--gray-400);margin-top:4px">来源：财经老王高频消息 + Hermes 方法模板 · 适合普通用户直接复用</div>
-          </div>
-          <div style="background:var(--navy);border-radius:10px;padding:10px">
-            <div style="font-size:12px;color:var(--white);font-weight:600">半导体景气验证节点</div>
-            <div style="font-size:10px;color:var(--gray-400);margin-top:4px">来源：图像数据摘要 + 专家纪要速读 · 已关联到中芯国际观察页</div>
-          </div>
-        </div>
+        <div class="knowledge-zone-list" id="knowledge-zone-feed"></div>
       </div>
       <div class="card" style="padding:16px;margin-bottom:12px">
         <div style="font-size:13px;color:var(--gold);font-weight:700;margin-bottom:8px">方法与框架</div>
@@ -757,7 +1486,7 @@ body { background: var(--surface-2); color: var(--text-main); }
         </div>
       </div>
       <div class="card" style="padding:16px">
-        <div style="font-size:13px;color:var(--gold);font-weight:700;margin-bottom:8px">资料与图像</div>
+        <div style="font-size:13px;color:var(--gold);font-weight:700;margin-bottom:8px">入库方式</div>
         <div style="font-size:12px;color:var(--gray-400);line-height:1.8">
           大V通过语音输入、文件上传、网页 URL 提供的内容，会在清洗后进入知识专区，供 Hermes、复盘专区和大V工作台复用。
         </div>
@@ -765,157 +1494,27 @@ body { background: var(--surface-2); color: var(--text-main); }
     </div>
   </div>
 
-  <!-- ===== TAB 5: 会员 ===== -->
-  <div id="page-vip" class="page" data-feature="vip">
-    <!-- Points banner -->
-    <div class="vip-points-banner">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div>
-          <div style="font-size:11px;color:var(--gray-400);margin-bottom:4px">当前积分</div>
-          <div style="font-size:28px;font-weight:700;color:var(--gold)">3,840</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-size:12px;color:var(--navy);background:var(--gold);padding:3px 12px;border-radius:10px;font-weight:600;margin-bottom:4px">Lv.4 资深分析师</div>
-          <div style="font-size:11px;color:var(--gray-400)">⚡ 128次算力</div>
-        </div>
-      </div>
-      <div class="points-progress">
-        <div class="points-progress-bar" style="width:76.8%"></div>
-      </div>
-      <div class="points-progress-label">
-        <span>3840 积分</span>
-        <span>距 Lv.5 还差 1160 积分</span>
-      </div>
-    </div>
-
-    <!-- Exchange compute credits -->
-    <div class="h5-section" style="padding-bottom:8px">
-      <div class="h5-section-title">积分兑换算力</div>
-    </div>
-    <div class="exchange-grid" id="exchange-grid">
-      <div class="exchange-item">
-        <div class="exchange-credits">10次</div>
-        <div class="exchange-info">
-          <div class="exchange-name">初级算力包</div>
-          <div class="exchange-desc">消耗 200 积分</div>
-        </div>
-        <button class="btn-outline exchange-btn" onclick="showToast('兑换成功！获得10次算力')">兑换</button>
-      </div>
-      <div class="exchange-item">
-        <div class="exchange-credits">30次</div>
-        <div class="exchange-info">
-          <div class="exchange-name">标准算力包</div>
-          <div class="exchange-desc">消耗 500 积分</div>
-        </div>
-        <button class="btn-outline exchange-btn" onclick="showToast('兑换成功！获得30次算力')">兑换</button>
-      </div>
-      <div class="exchange-item">
-        <div class="exchange-credits">100次</div>
-        <div class="exchange-info">
-          <div class="exchange-name">高级算力包</div>
-          <div class="exchange-desc">消耗 1500 积分</div>
-        </div>
-        <button class="btn-gold exchange-btn" onclick="showToast('兑换成功！获得100次算力')">兑换</button>
-      </div>
-    </div>
-
-    <!-- Tier cards -->
-    <div class="h5-section">
-      <div class="h5-section-title">会员体系</div>
-      <div class="tier-cards">
-        <div class="tier-card tier-free">
-          <div class="tier-name">免费用户</div>
-          <div class="tier-price">¥0 <span>/ 月</span></div>
-          <div class="tier-features">
-            <div class="tier-feature">每日3条信息流</div>
-            <div class="tier-feature">基础行情数据</div>
-            <div class="tier-feature">研究样例体验</div>
-          </div>
-        </div>
-        <div class="tier-card tier-basic">
-          <div class="tier-name">验证版会员</div>
-          <div class="tier-price">¥68 <span>/ 月</span></div>
-          <div class="tier-features">
-            <div class="tier-feature">核心信息流与复盘</div>
-            <div class="tier-feature">AI分析 (3次/日)</div>
-            <div class="tier-feature">券商研报摘要</div>
-            <div class="tier-feature">专家纪要摘要</div>
-          </div>
-          <button class="btn-outline" style="margin-top:12px;width:100%">加入验证</button>
-        </div>
-        <div class="tier-card tier-pro">
-          <div class="tier-badge">主验证档</div>
-          <div class="tier-name" style="color:var(--green)">专业会员</div>
-          <div class="tier-price" style="color:var(--green)">¥198 <span>/ 月</span></div>
-          <div class="tier-features">
-            <div class="tier-feature">更高频 AI 分析</div>
-            <div class="tier-feature">完整研报精读输出</div>
-            <div class="tier-feature">专家纪要深度版</div>
-            <div class="tier-feature">高频研究模板</div>
-            <div class="tier-feature">优先参与共创反馈</div>
-          </div>
-          <button class="btn-gold" style="margin-top:12px;width:100%">升级专业版</button>
-        </div>
-        <div class="tier-card tier-vip">
-          <div class="tier-badge" style="background:var(--gold-dark)">试点</div>
-          <div class="tier-name" style="color:var(--gold)">机构试点</div>
-          <div class="tier-price">定制 <span>/ 洽谈</span></div>
-          <div class="tier-features">
-            <div class="tier-feature">专属问题清单梳理</div>
-            <div class="tier-feature">定制研究辅助输出</div>
-            <div class="tier-feature">专家 / 团队深度交流</div>
-            <div class="tier-feature">接口与历史库需求访谈</div>
-            <div class="tier-feature">共同定义正式产品</div>
-          </div>
-          <button class="btn-gold" style="margin-top:12px;width:100%">联系顾问</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- KOL partner -->
-    <div class="h5-section">
-      <div class="h5-section-title">申请成为大V投顾</div>
-      <div class="card">
-        <div style="font-size:14px;color:var(--gold);font-weight:600;margin-bottom:8px">🤝 研究协同试点</div>
-        <div style="font-size:13px;color:var(--white);line-height:1.7;margin-bottom:12px">
-          面向研究型大V投顾开放独立租户入驻。平台提供证据链模板、粉丝管理、活动协同和合规模板，帮助稳定输出研究内容与用户服务。
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
-          <div style="text-align:center;padding:10px;background:rgba(200,169,110,0.05);border-radius:8px">
-            <div style="font-size:18px;font-weight:700;color:var(--gold)">租户</div>
-            <div style="font-size:11px;color:var(--gray-400)">独立空间</div>
-          </div>
-          <div style="text-align:center;padding:10px;background:rgba(200,169,110,0.05);border-radius:8px">
-            <div style="font-size:18px;font-weight:700;color:var(--gold)">工具</div>
-            <div style="font-size:11px;color:var(--gray-400)">研究提效</div>
-          </div>
-          <div style="text-align:center;padding:10px;background:rgba(200,169,110,0.05);border-radius:8px">
-            <div style="font-size:18px;font-weight:700;color:var(--gold)">协同</div>
-            <div style="font-size:11px;color:var(--gray-400)">内容与服务</div>
-          </div>
-        </div>
-        <button class="btn-gold" style="width:100%">申请试点合作</button>
-      </div>
-    </div>
-  </div>
-
-
   <!-- ===== TAB: 消息 (DM) ===== -->
   <div id="page-dm" class="page" data-feature="dm">
     <!-- Conversation list view -->
     <div id="dm-list-view">
       <div style="padding:16px;display:flex;justify-content:space-between;align-items:center">
-      <div style="font-size:16px;font-weight:700;color:var(--white)">专属对话</div>
-        <div style="font-size:11px;color:var(--gray-400);background:rgba(200,169,110,0.08);padding:4px 10px;border-radius:10px">与大V投顾研究交流</div>
+      <div style="font-size:16px;font-weight:700;color:var(--white)" id="dm-list-title">专属对话</div>
+        <div style="font-size:11px;color:var(--gray-400);background:rgba(200,169,110,0.08);padding:4px 10px;border-radius:10px" id="dm-list-hint">与大V投顾研究交流</div>
+      </div>
+      <div style="padding:0 16px 12px">
+        <div style="background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.14);border-radius:12px;padding:12px">
+          <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:6px" id="dm-role-card-title">租户私信说明</div>
+          <div style="font-size:12px;color:var(--gray-400);line-height:1.7" id="dm-role-card-desc">普通投资者只能和所属大V对话；大V进入消息页后可查看并回复自己的粉丝会话。</div>
+        </div>
       </div>
       <div id="dm-conversations-list">
         <div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">加载中...</div>
       </div>
-      <!-- Subscription upsell -->
       <div style="margin:16px;padding:14px;background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.15);border-radius:12px">
-        <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:6px">🔓 解锁更多投顾深度交流</div>
-        <div style="font-size:12px;color:var(--gray-400);line-height:1.6;margin-bottom:10px">升级专业会员后，可与所属租户的大V投顾做 1 对 1 研究交流，查看更完整的证据链摘要。</div>
-        <button class="btn-gold" style="width:100%;padding:10px;font-size:13px" onclick="switchTab('vip')">查看会员权益</button>
+        <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:6px" id="dm-footer-title">当前消息规则</div>
+        <div style="font-size:12px;color:var(--gray-400);line-height:1.6;margin-bottom:10px" id="dm-footer-desc">投资者只能和所属大V对话，工作台入口统一从“我的”进入。</div>
+        <button class="btn-gold" style="width:100%;padding:10px;font-size:13px" id="dm-footer-btn" onclick="switchTab('profile')">去我的查看租户服务</button>
       </div>
     </div>
     <!-- Chat view (hidden by default) -->
@@ -927,20 +1526,14 @@ body { background: var(--surface-2); color: var(--text-main); }
           <div class="dm-chat-title" id="dm-chat-name"></div>
           <div class="dm-chat-subtitle" id="dm-chat-tier"></div>
         </div>
-        <div style="margin-left:auto;font-size:11px;color:var(--gray-400);background:rgba(200,169,110,0.08);padding:3px 8px;border-radius:8px">专属频道</div>
+        <div style="margin-left:auto;font-size:11px;color:var(--gray-400);background:rgba(200,169,110,0.08);padding:3px 8px;border-radius:8px" id="dm-chat-badge">专属频道</div>
       </div>
       <!-- 合规横幅 -->
-      <div style="padding:8px 14px;background:rgba(231,76,60,0.06);border-bottom:1px solid rgba(231,76,60,0.15);font-size:11px;color:#E2C98A;line-height:1.5">
+      <div style="padding:8px 14px;background:rgba(231,76,60,0.06);border-bottom:1px solid rgba(231,76,60,0.15);font-size:11px;color:#E2C98A;line-height:1.5" id="dm-compliance-banner">
         ⚠️ 大V投顾分享为个人研究观点，仅供参考，不构成投资建议。投资有风险，决策需谨慎。
       </div>
       <div class="dm-messages" id="dm-messages-container"></div>
-      <div style="padding:8px 14px 0;display:flex;gap:6px;flex-wrap:wrap;background:var(--navy)">
-        <span style="font-size:10px;color:var(--gray-400);padding:5px 8px">快捷提问:</span>
-        <span class="tag tag-gold" style="font-size:11px;cursor:pointer;padding:4px 10px" onclick="dmQuickAsk('A股科技板块现在能追吗?')">A股科技</span>
-        <span class="tag tag-gold" style="font-size:11px;cursor:pointer;padding:4px 10px" onclick="dmQuickAsk('港股互联网值得配置吗?')">港股互联网</span>
-        <span class="tag tag-gold" style="font-size:11px;cursor:pointer;padding:4px 10px" onclick="dmQuickAsk('新能源板块还有机会吗?')">新能源</span>
-        <span class="tag tag-gold" style="font-size:11px;cursor:pointer;padding:4px 10px" onclick="dmQuickAsk('美联储降息怎么布局?')">宏观</span>
-      </div>
+      <div style="padding:8px 14px 0;display:flex;gap:6px;flex-wrap:wrap;background:var(--navy)" id="dm-quick-asks"></div>
       <div class="dm-input-bar">
         <input class="dm-input" id="dm-input" placeholder="多轮提问，投顾会基于平台证据链回复..." onkeydown="if(event.key==='Enter')sendDm()">
         <button class="dm-send-btn" onclick="sendDm()">➤</button>
@@ -988,6 +1581,28 @@ body { background: var(--surface-2); color: var(--text-main); }
         </div>
       </div>
     </div>
+    <div style="padding:0 16px 12px">
+      <div class="wb-dashboard-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
+          <div>
+            <div style="font-size:14px;font-weight:700;color:var(--white)">今日核心指标面板</div>
+            <div style="font-size:11px;color:var(--gray-400);line-height:1.6;margin-top:4px">默认先展示指标摘要；空格子显示 +，点击任一格子后再输入提示词，保存即自动生成。</div>
+          </div>
+          <span class="tag tag-gold">工作台生成</span>
+        </div>
+        <div class="wb-dashboard-toolbar">
+          <button class="btn-outline wb-dashboard-layout-btn" data-dashboard-layout-button="2x2" style="padding:8px 10px;font-size:12px" onclick="selectFundDashboardLayout('2x2')">2x2 布局</button>
+          <button class="btn-outline wb-dashboard-layout-btn" data-dashboard-layout-button="3x3" style="padding:8px 10px;font-size:12px" onclick="selectFundDashboardLayout('3x3')">3x3 布局</button>
+          <button class="btn-outline wb-dashboard-layout-btn" data-dashboard-layout-button="4x4" style="padding:8px 10px;font-size:12px" onclick="selectFundDashboardLayout('4x4')">4x4 布局</button>
+        </div>
+        <div class="wb-dashboard-actions">
+          <button class="btn-gold" style="padding:9px 10px;font-size:12px" onclick="publishFundDashboard()">发布到基本面首页</button>
+          <button class="btn-outline" style="padding:9px 10px;font-size:12px" onclick="resetFundDashboardDraft()">恢复当前发布版</button>
+        </div>
+        <div class="wb-dashboard-meta" id="wb-dashboard-meta">当前未生成新的指标面板，发布后会同步到前台“基本面”页顶部。</div>
+        <div id="wb-dashboard-preview" style="margin-top:12px"></div>
+      </div>
+    </div>
     <!-- Fan messages inbox -->
     <div style="padding:0 16px 8px;display:flex;justify-content:space-between;align-items:center">
       <div style="font-size:14px;font-weight:600;color:var(--white)">粉丝消息</div>
@@ -1002,7 +1617,7 @@ body { background: var(--surface-2); color: var(--text-main); }
         </div>
         <div class="wb-fan-meta">
           <div class="wb-fan-time">5分钟前</div>
-          <div class="wb-fan-tier" style="background:rgba(46,204,113,0.15);color:var(--green)">专业会员</div>
+          <div class="wb-fan-tier" style="background:rgba(46,204,113,0.15);color:var(--green)">核心用户</div>
         </div>
       </div>
       <div class="wb-fan-item">
@@ -1013,7 +1628,7 @@ body { background: var(--surface-2); color: var(--text-main); }
         </div>
         <div class="wb-fan-meta">
           <div class="wb-fan-time">23分钟前</div>
-          <div class="wb-fan-tier" style="background:rgba(52,152,219,0.15);color:#3498DB">基础会员</div>
+          <div class="wb-fan-tier" style="background:rgba(52,152,219,0.15);color:#3498DB">观察用户</div>
         </div>
       </div>
       <div class="wb-fan-item">
@@ -1046,7 +1661,7 @@ body { background: var(--surface-2); color: var(--text-main); }
       <div style="display:flex;gap:8px;margin-top:8px">
         <select id="wb-broadcast-target" style="flex:1;background:var(--navy-mid);border:1px solid rgba(200,169,110,0.2);border-radius:8px;padding:8px;color:var(--white);font-size:12px;outline:none">
           <option value="all">全部留资用户 (128人)</option>
-          <option value="vip">仅专业会员 (36人)</option>
+          <option value="vip">仅深度交流用户 (36人)</option>
           <option value="active">活跃样本 (72人)</option>
         </select>
         <button class="btn-gold" style="padding:8px 16px;font-size:12px" onclick="sendBroadcast()">群发</button>
@@ -1095,37 +1710,13 @@ body { background: var(--surface-2); color: var(--text-main); }
           <span class="tag tag-gold">订单能见度</span>
           <span class="tag tag-gold">估值带</span>
           <span class="tag tag-gold">资金面</span>
-          <span class="tag tag-gold">租户知识库证据</span>
         </div>
         <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:10px">
-          大V可按需选择自己关心的基本面模块，Hermes 会把财务、研报、会议纪要、市场数据和租户知识库做综合分析，输出适配各自方法框架的结论卡片。
+          大V可按需选择自己关心的基本面模块，Hermes 会把财务、研报、会议纪要和市场数据做综合分析，输出适配各自方法框架的结论卡片。
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <button class="btn-outline" style="padding:9px 10px;font-size:12px" onclick="showToast('已加载按需基本面模块')">选择分析模块</button>
           <button class="btn-gold" style="padding:9px 10px;font-size:12px" onclick="showToast('已发起多源综合分析')">发起综合分析</button>
-        </div>
-      </div>
-    </div>
-    <div style="padding:8px 16px;display:flex;justify-content:space-between;align-items:center">
-      <div style="font-size:14px;font-weight:600;color:var(--white)">租户知识板块</div>
-      <div style="font-size:11px;color:var(--gold)">前后台共用 · 同步知识专区</div>
-    </div>
-    <div style="padding:0 16px 14px">
-      <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.12);border-radius:12px;padding:12px">
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
-          <button class="btn-outline" style="padding:8px 6px;font-size:11px" onclick="showToast('语音输入已加入租户知识库')">🎙️ 语音</button>
-          <button class="btn-outline" style="padding:8px 6px;font-size:11px" onclick="showToast('文件已上传到租户知识库')">📄 文件</button>
-          <button class="btn-outline" style="padding:8px 6px;font-size:11px" onclick="showToast('网页 URL 已加入租户知识库')">🔗 URL</button>
-        </div>
-        <div style="display:grid;gap:8px">
-          <div style="background:var(--navy);border-radius:10px;padding:10px">
-            <div style="font-size:12px;color:var(--white);font-weight:600">港股互联网估值框架</div>
-            <div style="font-size:10px;color:var(--gray-400);margin-top:4px">来源：上传 PDF · 主理人批注 6 条 · 已关联腾讯 / 美团 / 阿里 · 可同步前台知识专区</div>
-          </div>
-          <div style="background:var(--navy);border-radius:10px;padding:10px">
-            <div style="font-size:12px;color:var(--white);font-weight:600">5月产业电话会录音整理</div>
-            <div style="font-size:10px;color:var(--gray-400);margin-top:4px">来源：语音转写 · 风险词已过滤 · 可同步前台知识专区并参与 Hermes 综合分析</div>
-          </div>
         </div>
       </div>
     </div>
@@ -1142,7 +1733,6 @@ body { background: var(--surface-2); color: var(--text-main); }
     <div class="profile-header">
       <div class="profile-avatar-lg" id="profile-avatar-lg">👤</div>
       <div class="profile-name" id="profile-name">投研用户</div>
-      <div class="profile-level-badge" id="profile-level-badge">Lv.4 资深分析师</div>
       <div style="font-size:12px;color:var(--gray-400);margin-top:8px" id="profile-tenant-brief">投资者身份 · 当前归属：财经老王租户</div>
       <div class="profile-stats">
         <div class="profile-stat">
@@ -1171,7 +1761,7 @@ body { background: var(--surface-2); color: var(--text-main); }
           <div style="font-size:16px;font-weight:700;color:var(--white)" id="tenant-name">财经老王租户</div>
           <div style="font-size:12px;color:var(--gray-400);margin-top:6px;line-height:1.6" id="tenant-desc">面向 A 股科技、复盘专区与知识专区粉丝用户的独立租户空间。</div>
         </div>
-        <div class="demo-switch-tag" id="tenant-tier-tag">专业会员</div>
+        <div class="demo-switch-tag" id="tenant-tier-tag">投资者视角</div>
       </div>
       <div class="tenant-grid">
         <div class="tenant-cell">
@@ -1193,26 +1783,43 @@ body { background: var(--surface-2); color: var(--text-main); }
       </div>
     </div>
 
-    <!-- Points & level card -->
-    <div class="points-card">
-      <div class="points-main">
+    <div class="profile-workbench-entry" onclick="switchTab('workbench')">
+      <div class="profile-workbench-entry-icon">👑</div>
+      <div class="profile-workbench-entry-main">
+        <div class="profile-workbench-entry-top">
+          <div class="profile-workbench-entry-title" id="profile-workbench-label">查看当前租户大V工作台</div>
+          <div class="profile-workbench-entry-arrow">›</div>
+        </div>
+        <div class="profile-workbench-entry-desc">工作台入口已前置到首屏，可直接进入粉丝消息、群发助手和分析协同。</div>
+        <div class="profile-workbench-entry-meta" id="profile-workbench-meta">8条待回复</div>
+      </div>
+    </div>
+
+    <div class="profile-overview-card">
+      <div class="profile-overview-head">
         <div>
-          <div style="font-size:11px;color:var(--gray-400);margin-bottom:4px">当前积分</div>
-          <div class="points-num" id="profile-points">3,840</div>
-          <div class="points-label" id="profile-points-label">Lv.4 资深分析师</div>
+          <div class="profile-overview-title">当前账号概览</div>
+          <div class="profile-overview-desc">“我的”只保留租户关系、工作台入口和账号管理，不再展示旧版权益和积分信息。</div>
         </div>
-        <div style="text-align:right">
-          <div style="font-size:11px;color:var(--gray-400);margin-bottom:4px">算力余额</div>
-          <div style="font-size:22px;font-weight:700;color:var(--gold)" id="profile-compute">⚡ 128</div>
-          <div style="font-size:11px;color:var(--gray-400)">次可用</div>
+        <div class="demo-switch-tag" id="profile-identity-tag">投资者</div>
+      </div>
+      <div class="profile-overview-grid">
+        <div class="profile-overview-item">
+          <div class="profile-overview-label">当前身份</div>
+          <div class="profile-overview-value" id="profile-role-value">投资者用户</div>
         </div>
-      </div>
-      <div class="points-progress">
-        <div class="points-progress-bar" id="profile-progress-bar" style="width:76.8%"></div>
-      </div>
-      <div class="points-progress-label" id="profile-progress-label">
-        <span id="profile-progress-text">3840 / 5000</span>
-        <span id="profile-next-level">下一级：Lv.5 首席分析师</span>
+        <div class="profile-overview-item">
+          <div class="profile-overview-label">算力余额</div>
+          <div class="profile-overview-value" id="profile-compute">⚡ 128 次可用</div>
+        </div>
+        <div class="profile-overview-item">
+          <div class="profile-overview-label">租户服务</div>
+          <div class="profile-overview-value" id="profile-service-brief">复盘专区 · 知识专区 · Hermes 摘要</div>
+        </div>
+        <div class="profile-overview-item">
+          <div class="profile-overview-label">工作台入口</div>
+          <div class="profile-overview-value">统一从“我的”进入</div>
+        </div>
       </div>
     </div>
 
@@ -1224,99 +1831,15 @@ body { background: var(--surface-2); color: var(--text-main); }
     </div>
     <div class="demo-switch-list" id="demo-user-switch-list"></div>
 
-    <!-- Level system table -->
-    <div class="h5-section" style="padding-bottom:8px">
-      <div class="h5-section-title">等级体系</div>
-    </div>
-    <div class="level-table">
-      <div class="level-row">
-        <div class="level-num">Lv.1</div>
-        <div class="level-name">投研新手</div>
-        <div class="level-pts">0</div>
-        <div class="level-reward">10次/月</div>
-      </div>
-      <div class="level-row">
-        <div class="level-num">Lv.2</div>
-        <div class="level-name">初级分析师</div>
-        <div class="level-pts">500</div>
-        <div class="level-reward">30次/月</div>
-      </div>
-      <div class="level-row">
-        <div class="level-num">Lv.3</div>
-        <div class="level-name">中级分析师</div>
-        <div class="level-pts">1500</div>
-        <div class="level-reward">80次/月</div>
-      </div>
-      <div class="level-row current">
-        <div class="level-num" style="font-size:13px">Lv.4 ✓</div>
-        <div class="level-name" style="font-weight:600">资深分析师</div>
-        <div class="level-pts">3000</div>
-        <div class="level-reward">150次/月</div>
-      </div>
-      <div class="level-row">
-        <div class="level-num">Lv.5</div>
-        <div class="level-name">首席分析师</div>
-        <div class="level-pts">5000</div>
-        <div class="level-reward">300次/月</div>
-      </div>
-      <div class="level-row">
-        <div class="level-num">Lv.6</div>
-        <div class="level-name" style="color:var(--gold)">投研大师</div>
-        <div class="level-pts">10000</div>
-        <div class="level-reward" style="color:var(--gold)">无限次</div>
-      </div>
-    </div>
-
-    <!-- Points earning rules -->
-    <div class="h5-section" style="padding-bottom:8px">
-      <div class="h5-section-title">积分获取方式</div>
-    </div>
-    <div class="points-rules">
-      <div class="points-rule-item">
-        <div class="points-rule-name">📝 发布投研帖子</div>
-        <div class="points-rule-pts">+10 积分</div>
-      </div>
-      <div class="points-rule-item">
-        <div class="points-rule-name">👍 帖子获赞</div>
-        <div class="points-rule-pts">+2 积分/赞</div>
-      </div>
-      <div class="points-rule-item">
-        <div class="points-rule-name">💬 评论互动</div>
-        <div class="points-rule-pts">+3 积分</div>
-      </div>
-      <div class="points-rule-item">
-        <div class="points-rule-name">🦞 使用Hermes分析</div>
-        <div class="points-rule-pts">+20 积分</div>
-      </div>
-      <div class="points-rule-item">
-        <div class="points-rule-name">📅 每日签到</div>
-        <div class="points-rule-pts">+5 积分</div>
-      </div>
-      <div class="points-rule-item">
-        <div class="points-rule-name">🎯 参与活动</div>
-        <div class="points-rule-pts">+50 积分</div>
-      </div>
-      <div class="points-rule-item">
-        <div class="points-rule-name">👥 邀请新用户</div>
-        <div class="points-rule-pts">+100 积分</div>
-      </div>
-    </div>
-
     <!-- Badges -->
     <div class="h5-section" style="padding-bottom:8px">
-      <div class="h5-section-title">我的勋章</div>
+      <div class="h5-section-title">我的标签</div>
     </div>
     <div class="badges-wrap" id="profile-badges-wrap"></div>
 
     <!-- Settings -->
     <div class="h5-section" style="padding-bottom:8px">
       <div class="h5-section-title">账号管理</div>
-    </div>
-    <!-- KOL mode switch -->
-    <div class="wb-mode-switch" onclick="switchTab('workbench')" style="margin-bottom:0;border:1px solid rgba(200,169,110,0.4);background:rgba(200,169,110,0.12)">
-      <span>👑</span>
-      <span class="wb-mode-switch-label" id="profile-workbench-label">查看当前租户大V工作台</span>
-      <span style="margin-left:auto;font-size:11px;color:#E74C3C;font-weight:600" id="profile-workbench-meta">8条待回复</span>
     </div>
     <div class="settings-list">
       <div class="settings-item" onclick="showToast((currentDemoUser ? currentDemoUser.tenant.name : '当前租户') + ' · 由 ' + (currentDemoUser ? currentDemoUser.tenant.advisor : '投顾') + ' 主理')">
@@ -1378,10 +1901,6 @@ body { background: var(--surface-2); color: var(--text-main); }
       <div class="h5-nav-icon">🦞</div>
       <div class="h5-nav-label">Hermes</div>
     </div>
-    <div class="h5-nav-item" id="nav-vip" data-feature="vip" onclick="switchTab('vip')">
-      <div class="h5-nav-icon">💎</div>
-      <div class="h5-nav-label">会员</div>
-    </div>
     <div class="h5-nav-item" id="nav-profile" onclick="switchTab('profile')">
       <div class="h5-nav-icon">👤</div>
       <div class="h5-nav-label">我的</div>
@@ -1416,13 +1935,27 @@ body { background: var(--surface-2); color: var(--text-main); }
   </div>
 </div>
 
+<div class="modal-overlay" id="knowledge-intake-modal" onclick="if(event.target===this)closeKnowledgeIntake()">
+  <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <div id="knowledge-intake-content"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="dashboard-cell-modal" onclick="if(event.target===this)closeDashboardCellModal()">
+  <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <div id="dashboard-cell-modal-content"></div>
+  </div>
+</div>
+
 <!-- ===== TOAST ===== -->
 <div class="toast" id="toast"></div>
 
 <script>
 // ===== TAB SWITCHING =====
 const SITE_FEATURES = (window.SITE_CONFIG && window.SITE_CONFIG.feature_flags) || {};
-const ALL_TABS = ['feed', 'community', 'hermes', 'market', 'review', 'knowledge', 'vip', 'profile', 'dm', 'workbench'];
+const ALL_TABS = ['feed', 'community', 'hermes', 'market', 'review', 'knowledge', 'profile', 'dm', 'workbench'];
 const TAB_LABELS = {
   feed: '基本面分析',
   market: '自选股',
@@ -1431,7 +1964,6 @@ const TAB_LABELS = {
   community: '社区',
   hermes: 'Hermes',
   dm: '消息',
-  vip: '会员',
   profile: '我的',
   workbench: '大V投顾工作台',
 };
@@ -1443,13 +1975,16 @@ const TAB_HINTS = {
   community: '社区功能默认可由后台按需开放',
   hermes: '以证据链、来源条目和置信度输出研究结论',
   dm: '消息与对话入口集中放在底部导航',
-  vip: '会员与积分权益在此查看',
   profile: '账号、偏好与个人中心设置',
   workbench: '面向大V投顾与平台运营角色的协同工作区',
 };
 
 function isFeatureEnabled(featureName) {
   if (!featureName) return true;
+  if (featureName === 'workbench') {
+    const activeUser = getActiveDemoUser();
+    if (activeUser && activeUser.role === 'dav') return true;
+  }
   return SITE_FEATURES[featureName] !== false;
 }
 
@@ -1474,15 +2009,8 @@ function applySiteFeatureFlags() {
   });
 }
 
-function syncHeaderContext(tab) {
-  const title = document.getElementById('header-section-name');
-  const hint = document.getElementById('header-section-hint');
-  if (title) title.textContent = TAB_LABELS[tab] || '页面';
-  if (hint) hint.textContent = TAB_HINTS[tab] || '底部导航负责页面切换';
-}
-
 function chooseTheme(mode) {
-  setGangtiseTheme(mode);
+  setGangtiseTheme('light');
 }
 
 function chooseAccent(accent) {
@@ -1506,11 +2034,11 @@ const DEMO_PROFILE_USERS = [
     likes: 456,
     following: 12,
     followers: 89,
-    membership: '专业会员',
+    membership: '投资者视角',
     relationship: '核心订阅用户',
     statLabels: ['帖子', '获赞', '自选', '社群互动'],
     tenantCardTitle: '所属大V租户',
-    badges: ['🦞 Hermes达人', '📊 投研先锋', '💎 专业会员', '📅 连续签到30天'],
+    badges: ['🦞 Hermes达人', '📊 投研先锋', '🧭 长期跟踪', '📅 连续签到30天'],
     workbenchLabel: '查看财经老王工作台（demo）',
     workbenchHint: '投资者视角 · 查看租户服务与互动提醒',
     tenant: {
@@ -1538,7 +2066,7 @@ const DEMO_PROFILE_USERS = [
     likes: 3688,
     following: 128,
     followers: 1240,
-    membership: '种子投顾租户',
+    membership: '大V主理视角',
     relationship: '租户主理人',
     statLabels: ['内容', '获赞', '订阅用户', '私域线索'],
     tenantCardTitle: '当前管理租户',
@@ -1558,9 +2086,395 @@ const DEMO_PROFILE_USERS = [
 
 const DEMO_PROFILE_STORAGE_KEY = 'gangtise_demo_profile_user';
 let currentDemoUser = null;
+const DEFAULT_MACRO_INDICATORS = {{ macro_indicators | tojson }};
+const FUND_DASHBOARD_STORAGE_KEY = 'gangtise_fund_dashboard_state';
+const DEFAULT_DASHBOARD_CELL_PROMPTS = [
+  '聚焦美联储路径、通胀和降息预期，给普通投资者一个方向判断。',
+  '只看南向/北向资金与成交量变化，判断今天是否有增量资金验证。',
+  '跟踪 AI、算力、半导体订单兑现，提醒是叙事驱动还是业绩驱动。',
+  '关注港股互联网财报、回购和利润率，说明估值修复是否还能持续。',
+  '围绕消费复苏、可选消费和渠道反馈，判断需求是真回暖还是脉冲反弹。',
+  '聚焦地产链、政策托底和信用扩张，判断风险是否继续收敛。',
+  '跟踪新能源排产、价格和补库节奏，判断景气是否触底。',
+  '观察人民币汇率、美元强弱和海外风险偏好，提示对港股和成长板块的影响。',
+];
+let currentWorkbenchDashboardLayout = '2x2';
+let currentWorkbenchDashboardSlots = [];
+let currentWorkbenchDashboardSourceVersion = '';
+let dashboardCellEditingIndex = -1;
+const KNOWLEDGE_INPUT_TYPES = {
+  voice: {
+    label: '语音输入',
+    icon: '🎙️',
+    desc: '适合把直播口播、电话会录音或临场观点快速录入为可清洗的知识素材。',
+    placeholder: '例如：把这段语音里的 3 个核心判断、验证节点和风险点整理成长期知识卡。',
+    defaultTitle: '最新语音纪要整理',
+    defaultTags: ['语音纪要', '方法框架'],
+  },
+  file: {
+    label: '文件上传',
+    icon: '📄',
+    desc: '适合上传 PDF、纪要、研报和内部框架文档，进入租户知识队列统一整理。',
+    placeholder: '例如：这份 PDF 重点保留估值带、催化条件和不确定项，供后续 Hermes 调用。',
+    defaultTitle: '最新文件资料整理',
+    defaultTags: ['PDF', '框架资料'],
+  },
+  url: {
+    label: '网页 URL',
+    icon: '🔗',
+    desc: '适合把行业网页、公告页面和外部资料链接转成结构化知识卡。',
+    placeholder: '例如：抓取网页里的行业主线、关键数据和引用边界，沉淀为长期知识。',
+    defaultTitle: '最新网页资料整理',
+    defaultTags: ['网页资料', '外部来源'],
+  },
+};
+let knowledgeIntakeType = 'voice';
+let knowledgeRecording = false;
+let knowledgeUploadSamples = [];
+let knowledgeUrlPreview = null;
+let knowledgeDraft = { title: '', summary: '', url: '' };
+let knowledgeEntrySeq = 4;
+let knowledgeEntryStore = [
+  {
+    id: 'kb-1',
+    tenantId: 'tenant_lw',
+    type: 'file',
+    title: '港股互联网估值框架',
+    source: '文件上传',
+    sourceDetail: '来源：上传 PDF · 12页',
+    summary: '拆出回购强度、估值带与催化条件，已关联腾讯 / 美团 / 阿里。',
+    status: 'ready',
+    time: '12分钟前',
+    tags: ['估值框架', '港股互联网'],
+    destination: '已同步知识专区',
+  },
+  {
+    id: 'kb-2',
+    tenantId: 'tenant_lw',
+    type: 'voice',
+    title: '5月产业电话会录音整理',
+    source: '语音输入',
+    sourceDetail: '来源：语音转写 · 28分钟',
+    summary: '提炼固态电池、订单验证和量产节点，已可被 Hermes 直接调用。',
+    status: 'ready',
+    time: '26分钟前',
+    tags: ['电话会', '新能源'],
+    destination: '已进入 Hermes 上下文',
+  },
+  {
+    id: 'kb-3',
+    tenantId: 'tenant_lw',
+    type: 'url',
+    title: '半导体景气验证节点',
+    source: '网页 URL',
+    sourceDetail: '来源：网页解析 · 3篇行业资料',
+    summary: '整理产能利用率、成熟制程价格与资本开支节奏，当前正在同步到知识专区。',
+    status: 'syncing',
+    time: '刚刚',
+    tags: ['半导体', '网页资料'],
+    destination: '同步中',
+  },
+];
+let tenantFundDashboardState = loadTenantFundDashboardState();
+
+function loadTenantFundDashboardState() {
+  try {
+    const raw = window.localStorage ? window.localStorage.getItem(FUND_DASHBOARD_STORAGE_KEY) : '';
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function persistTenantFundDashboardState() {
+  try {
+    if (window.localStorage) {
+      window.localStorage.setItem(FUND_DASHBOARD_STORAGE_KEY, JSON.stringify(tenantFundDashboardState));
+    }
+  } catch (e) {}
+}
+
+function cloneDashboardConfig(config) {
+  return config ? JSON.parse(JSON.stringify(config)) : null;
+}
+
+function getFundStatusLabel(status) {
+  if (status === 'warning') return '需报警';
+  if (status === 'attention') return '需关注';
+  return '正常';
+}
+
+function normalizeDashboardLayout(layout) {
+  if (layout === '2x2' || layout === '3x3' || layout === '4x4') return layout;
+  return '2x2';
+}
+
+function getDashboardCardTarget(layout) {
+  if (layout === '3x3') return 6;
+  if (layout === '4x4') return 8;
+  return 4;
+}
+
+function getDashboardKeywordCards(promptText) {
+  const normalizedPrompt = String(promptText || '');
+  return [
+    {
+      hit: /美联储|降息|通胀|非农|就业|联储/i.test(normalizedPrompt),
+      card: {
+        name: '美联储路径',
+        value: '偏鸽',
+        assessment: '若通胀继续回落，全球风险资产承压会减轻。',
+        status: 'good',
+        alert: '重点盯非农与 CPI 是否反复',
+        hint: '适合作为港股科技和成长板块的方向锚。',
+      },
+    },
+    {
+      hit: /南向|北向|资金|流入|流出/i.test(normalizedPrompt),
+      card: {
+        name: '增量资金',
+        value: '连续净流入',
+        assessment: '说明风险偏好在恢复，但还没到全面扩散阶段。',
+        status: 'attention',
+        alert: '看是否形成连续 3 日放量',
+        hint: '若只集中在单一主线，行情持续性要打折。',
+      },
+    },
+    {
+      hit: /AI|算力|半导体|订单/i.test(normalizedPrompt),
+      card: {
+        name: 'AI 订单兑现',
+        value: '继续验证',
+        assessment: '主题逻辑仍强，但必须看到订单和利润兑现。',
+        status: 'attention',
+        alert: '若只见叙事不见业绩，需要收缩仓位',
+        hint: '更适合与自选股预警联动看，而不是单看新闻热度。',
+      },
+    },
+    {
+      hit: /港股|互联网|财报|回购/i.test(normalizedPrompt),
+      card: {
+        name: '港股互联网',
+        value: '估值修复中',
+        assessment: '回购和现金流是支撑，但财报验证仍是核心。',
+        status: 'good',
+        alert: '重点看广告、电商和利润率能否继续超预期',
+        hint: '若美元重新走强，修复节奏会被打断。',
+      },
+    },
+  ].filter(item => item.hit).map(item => item.card);
+}
+
+function getBaseDashboardCards() {
+  return DEFAULT_MACRO_INDICATORS.map(item => ({
+    name: item.name,
+    value: item.value,
+    assessment: item.assessment,
+    status: item.status,
+    alert: item.alert,
+    hint: item.hint,
+  }));
+}
+
+function getFallbackDashboardCard(index) {
+  const baseCards = getBaseDashboardCards();
+  const source = baseCards[index % baseCards.length] || {
+    name: `核心指标 ${index + 1}`,
+    value: '待跟踪',
+    assessment: '当前缺少可用模板，请补充指标来源。',
+    status: 'attention',
+    alert: '建议补充一条更具体的格子提示词',
+    hint: '发布前请确认该格子的研究重点。',
+  };
+  return { ...source };
+}
+
+function buildEmptyDashboardCard(promptText) {
+  return {
+    name: '',
+    value: '',
+    assessment: '',
+    status: 'normal',
+    alert: '',
+    hint: '',
+    prompt: String(promptText || '').trim(),
+    isEmpty: true,
+  };
+}
+
+function summarizeDashboardPrompt(promptText, maxLength) {
+  const compact = String(promptText || '').replace(/\s+/g, ' ').trim();
+  if (!compact) return '';
+  const limit = maxLength || 16;
+  return compact.length > limit ? `${compact.slice(0, limit)}...` : compact;
+}
+
+function getDashboardPromptSeed(index, card) {
+  if (card && typeof card.prompt === 'string' && card.prompt.trim()) return card.prompt.trim();
+  if (card && card.name) {
+    return `围绕 ${card.name} 生成适合普通投资者看的核心指标卡，说明当前状态、风险提醒和后续跟踪点。`;
+  }
+  return DEFAULT_DASHBOARD_CELL_PROMPTS[index % DEFAULT_DASHBOARD_CELL_PROMPTS.length];
+}
+
+function normalizeDashboardPromptList(layout, promptList, cards) {
+  const targetCount = getDashboardCardTarget(layout);
+  return Array.from({ length: targetCount }, (_, index) => {
+    const promptText = promptList && typeof promptList[index] === 'string' ? promptList[index].trim() : '';
+    if (promptText) return promptText;
+    return getDashboardPromptSeed(index, cards && cards[index]);
+  });
+}
+
+function buildDashboardCardFromPrompt(promptText, index) {
+  const normalizedPrompt = String(promptText || '').trim();
+  if (!normalizedPrompt) return buildEmptyDashboardCard('');
+  const matchedCards = getDashboardKeywordCards(promptText);
+  const fallbackCard = getFallbackDashboardCard(index);
+  let nextCard = matchedCards.length ? { ...matchedCards[index % matchedCards.length] } : { ...fallbackCard };
+  if (!matchedCards.length) {
+    nextCard.name = summarizeDashboardPrompt(promptText, 10) || nextCard.name;
+    nextCard.assessment = `按该格子的定制提示词跟踪：${summarizeDashboardPrompt(promptText, 28)}`;
+    nextCard.alert = '重点确认该主题是否已有最新数据或事件验证。';
+    nextCard.hint = '该格子由独立提示词生成，适合跟踪小众主题或临时变量。';
+  }
+  nextCard.prompt = normalizedPrompt;
+  nextCard.isEmpty = false;
+  return nextCard;
+}
+
+function pickDashboardCards(layout, promptSource) {
+  const targetCount = getDashboardCardTarget(layout);
+  const promptList = Array.isArray(promptSource)
+    ? Array.from({ length: targetCount }, (_, index) => String(promptSource[index] || '').trim())
+    : Array(targetCount).fill(String(promptSource || '').trim());
+  const cards = [];
+  while (cards.length < targetCount) {
+    cards.push(buildDashboardCardFromPrompt(promptList[cards.length], cards.length));
+  }
+  return cards;
+}
+
+function getDashboardPromptSummary(promptSource) {
+  if (Array.isArray(promptSource)) {
+    return promptSource.map(item => String(item || '').trim()).filter(Boolean).join('；');
+  }
+  return String(promptSource || '').trim();
+}
+
+function buildDashboardTitle(layout, promptSource) {
+  const promptText = getDashboardPromptSummary(promptSource);
+  if (/港股|互联网/i.test(promptText)) return '今日核心指标面板 · 港股与科技';
+  if (/AI|算力|半导体/i.test(promptText)) return '今日核心指标面板 · AI 主线';
+  if (/美联储|降息|通胀/i.test(promptText)) return '今日核心指标面板 · 宏观优先';
+  return `今日核心指标面板 · ${layout.toUpperCase()}`;
+}
+
+function buildDashboardNote(promptSource) {
+  if (Array.isArray(promptSource)) {
+    const prompts = promptSource.map(item => String(item || '').trim()).filter(Boolean);
+    if (prompts.length) {
+      return `本次由大V为 ${prompts.length} 个格子分别设置独立提示词，面板内容按单格定制生成。`;
+    }
+  }
+  const promptText = getDashboardPromptSummary(promptSource);
+  if (promptText) {
+    return `本次由大V根据提示词生成：${promptText.slice(0, 52)}${promptText.length > 52 ? '...' : ''}`;
+  }
+  return '当前面板聚焦宏观方向、资金验证和重点主线，帮助普通投资者先判断是否需要报警。';
+}
+
+function hydrateDashboardConfig(config) {
+  const fallbackConfig = buildDefaultFundDashboard();
+  const source = config && typeof config === 'object' ? config : fallbackConfig;
+  const layout = normalizeDashboardLayout(source.layout || fallbackConfig.layout);
+  const existingCards = Array.isArray(source.cards) ? source.cards : fallbackConfig.cards;
+  const cards = Array.from({ length: getDashboardCardTarget(layout) }, (_, index) => {
+    const currentCard = existingCards[index];
+    if (!currentCard) return buildEmptyDashboardCard('');
+    const fallbackCard = getFallbackDashboardCard(index);
+    const hasContent = !!(currentCard.name || currentCard.value || currentCard.assessment || currentCard.alert || currentCard.hint);
+    if (!hasContent && !String(currentCard.prompt || '').trim()) return buildEmptyDashboardCard('');
+    return {
+      name: currentCard.name || fallbackCard.name,
+      value: currentCard.value || fallbackCard.value,
+      assessment: currentCard.assessment || fallbackCard.assessment,
+      status: currentCard.status || fallbackCard.status,
+      alert: currentCard.alert || fallbackCard.alert,
+      hint: currentCard.hint || fallbackCard.hint,
+      prompt: getDashboardPromptSeed(index, currentCard),
+      isEmpty: false,
+    };
+  });
+  return {
+    layout,
+    title: source.title || fallbackConfig.title,
+    note: source.note || fallbackConfig.note,
+    cards,
+    updatedAt: source.updatedAt || fallbackConfig.updatedAt,
+    publisher: source.publisher || fallbackConfig.publisher,
+  };
+}
+
+function buildDefaultFundDashboard() {
+  const defaultPrompts = DEFAULT_DASHBOARD_CELL_PROMPTS.slice(0, getDashboardCardTarget('2x2'));
+  return {
+    layout: '2x2',
+    title: '今日核心指标面板',
+    note: '默认展示租户当前发布的宏观核心指标，用于判断今天先看方向还是先控风险。',
+    cards: pickDashboardCards('2x2', defaultPrompts),
+    updatedAt: '默认模板',
+    publisher: '系统初始化',
+  };
+}
+
+function ensureTenantFundDashboardState(tenantId) {
+  if (!tenantFundDashboardState[tenantId]) {
+    tenantFundDashboardState[tenantId] = {
+      published: buildDefaultFundDashboard(),
+      draft: null,
+    };
+    persistTenantFundDashboardState();
+  } else {
+    const tenantState = tenantFundDashboardState[tenantId];
+    tenantState.published = hydrateDashboardConfig(tenantState.published);
+    tenantState.draft = tenantState.draft ? hydrateDashboardConfig(tenantState.draft) : null;
+    if (!tenantState.published) {
+      tenantState.published = buildDefaultFundDashboard();
+    }
+    persistTenantFundDashboardState();
+  }
+  return tenantFundDashboardState[tenantId];
+}
+
+function getTenantFundDashboardState() {
+  const activeUser = getActiveDemoUser();
+  return ensureTenantFundDashboardState(activeUser.tenant.id);
+}
+
+function getPublishedFundDashboard() {
+  const tenantState = getTenantFundDashboardState();
+  return cloneDashboardConfig(tenantState.published);
+}
+
+function getDraftFundDashboard() {
+  const tenantState = getTenantFundDashboardState();
+  return cloneDashboardConfig(tenantState.draft);
+}
 
 function formatInt(value) {
   return Number(value || 0).toLocaleString('zh-CN');
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function getDefaultDemoUser() {
@@ -1612,18 +2526,730 @@ function renderDemoUserSwitchList() {
   `).join('');
 }
 
+function getTenantKnowledgeEntries() {
+  const activeUser = getActiveDemoUser();
+  return knowledgeEntryStore.filter(entry => entry.tenantId === activeUser.tenant.id);
+}
+
+function getKnowledgeStatusMeta(status) {
+  if (status === 'ready') {
+    return { className: 'ready', label: '已同步' };
+  }
+  return { className: 'syncing', label: '清洗中' };
+}
+
+function renderKnowledgeWorkbench() {
+  const entryGrid = document.getElementById('wb-knowledge-entry-grid');
+  const queueHost = document.getElementById('wb-knowledge-queue');
+  if (!entryGrid || !queueHost) return;
+  entryGrid.innerHTML = Object.entries(KNOWLEDGE_INPUT_TYPES).map(([type, cfg]) => `
+    <div class="knowledge-entry-card" onclick="openKnowledgeIntake('${type}')">
+      <div class="knowledge-entry-icon">${cfg.icon}</div>
+      <div class="knowledge-entry-title">${cfg.label}</div>
+      <div class="knowledge-entry-desc">${cfg.desc}</div>
+      <div class="knowledge-entry-cta">点击录入</div>
+    </div>
+  `).join('');
+  const entries = getTenantKnowledgeEntries();
+  queueHost.innerHTML = entries.map(entry => {
+    const status = getKnowledgeStatusMeta(entry.status);
+    return `
+      <div class="knowledge-queue-item">
+        <div class="knowledge-queue-head">
+          <div>
+            <div class="knowledge-queue-title">${escapeHtml(entry.title)}</div>
+            <div class="knowledge-queue-meta">${escapeHtml(entry.sourceDetail)} · ${escapeHtml(entry.time)}</div>
+          </div>
+          <span class="knowledge-status ${status.className}">${status.label}</span>
+        </div>
+        <div class="knowledge-queue-body">${escapeHtml(entry.summary)}</div>
+        <div class="knowledge-chip-row">
+          ${(entry.tags || []).map(tag => `<span class="knowledge-chip">${escapeHtml(tag)}</span>`).join('')}
+          <span class="knowledge-chip">${escapeHtml(entry.destination)}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderKnowledgeZone() {
+  const countEl = document.getElementById('knowledge-zone-count');
+  const feedHost = document.getElementById('knowledge-zone-feed');
+  if (!countEl || !feedHost) return;
+  const entries = getTenantKnowledgeEntries();
+  countEl.textContent = `今日新增 ${entries.length} 条`;
+  feedHost.innerHTML = entries.map(entry => {
+    const cfg = KNOWLEDGE_INPUT_TYPES[entry.type] || KNOWLEDGE_INPUT_TYPES.voice;
+    const status = getKnowledgeStatusMeta(entry.status);
+    return `
+      <div class="knowledge-zone-card">
+        <div class="knowledge-zone-top">
+          <div>
+            <div class="knowledge-zone-title">${escapeHtml(entry.title)}</div>
+            <div class="knowledge-zone-origin">${cfg.icon} ${escapeHtml(entry.source)} · ${escapeHtml(entry.sourceDetail)}</div>
+          </div>
+          <span class="knowledge-status ${status.className}">${status.label}</span>
+        </div>
+        <div class="knowledge-zone-summary">${escapeHtml(entry.summary)}</div>
+        <div class="knowledge-chip-row">
+          ${(entry.tags || []).map(tag => `<span class="knowledge-chip">${escapeHtml(tag)}</span>`).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderDashboardCards(config, options) {
+  if (!config || !config.cards || !config.cards.length) return '';
+  const opts = options || {};
+  const layout = normalizeDashboardLayout(config.layout);
+  const toolbarTag = opts.toolbarTag || layout.toUpperCase();
+  const toolbarNote = opts.toolbarNote || config.note || '';
+  return `
+    <div class="fund-macro-toolbar">
+      <div class="fund-macro-toolbar-note">${escapeHtml(toolbarNote)}</div>
+      <span class="fund-macro-layout-tag">${escapeHtml(toolbarTag)}</span>
+    </div>
+    <div class="fund-macro-grid cols-${layout.charAt(0)}">
+      ${config.cards.map(card => `
+        <div class="fund-macro-card ${escapeHtml(card.status || 'normal')}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+            <div class="fund-macro-name">${escapeHtml(card.name || '待补充指标')}</div>
+            <span class="fund-macro-badge ${escapeHtml(card.status || 'normal')}">${escapeHtml(getFundStatusLabel(card.status || 'normal'))}</span>
+          </div>
+          <div class="fund-macro-value">${escapeHtml(card.value || '--')}</div>
+          <div class="fund-macro-assessment">${escapeHtml(card.assessment || '当前格子尚未配置指标提示词。')}</div>
+          <div class="fund-macro-alert">${escapeHtml(card.alert || '点击工作台中的对应格子即可继续补充。')}</div>
+          <div class="fund-macro-hint">${escapeHtml(card.hint || '')}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function getDashboardConfigVersion(config) {
+  if (!config) return '';
+  return [
+    normalizeDashboardLayout(config.layout),
+    config.updatedAt || '',
+    config.publisher || '',
+    (config.cards || []).map(card => `${card.prompt || ''}|${card.name || ''}|${card.value || ''}`).join('^'),
+  ].join('::');
+}
+
+function normalizeWorkbenchDashboardSlots(layout, cards) {
+  const normalizedLayout = normalizeDashboardLayout(layout);
+  return Array.from({ length: getDashboardCardTarget(normalizedLayout) }, (_, index) => {
+    const card = cards && cards[index];
+    if (!card) return buildEmptyDashboardCard('');
+    const hasContent = !!(card.name || card.value || card.assessment || card.alert || card.hint);
+    const prompt = String(card.prompt || '').trim();
+    if (!hasContent && !prompt) return buildEmptyDashboardCard('');
+    return {
+      ...buildEmptyDashboardCard(''),
+      ...card,
+      prompt,
+      isEmpty: !hasContent && !prompt,
+    };
+  });
+}
+
+function ensureWorkbenchDashboardEditor(config) {
+  const version = getDashboardConfigVersion(config);
+  if (!currentWorkbenchDashboardSlots.length || currentWorkbenchDashboardSourceVersion !== version) {
+    currentWorkbenchDashboardLayout = normalizeDashboardLayout(config.layout || currentWorkbenchDashboardLayout);
+    currentWorkbenchDashboardSlots = normalizeWorkbenchDashboardSlots(currentWorkbenchDashboardLayout, config.cards || []);
+    currentWorkbenchDashboardSourceVersion = version;
+  }
+}
+
+function isWorkbenchDashboardCellFilled(card) {
+  return !!(card && !card.isEmpty && (card.name || card.value || card.assessment || String(card.prompt || '').trim()));
+}
+
+function renderWorkbenchDashboardBoard() {
+  const layout = normalizeDashboardLayout(currentWorkbenchDashboardLayout);
+  currentWorkbenchDashboardSlots = normalizeWorkbenchDashboardSlots(layout, currentWorkbenchDashboardSlots);
+  document.querySelectorAll('[data-dashboard-layout-button]').forEach(button => {
+    button.classList.toggle('active', button.getAttribute('data-dashboard-layout-button') === layout);
+  });
+  return `
+    <div class="wb-dashboard-summary-grid cols-${layout.charAt(0)}">
+      ${currentWorkbenchDashboardSlots.map((card, index) => isWorkbenchDashboardCellFilled(card) ? `
+        <div class="wb-dashboard-summary-card filled" onclick="openDashboardCellModal(${index})">
+          <div class="wb-dashboard-summary-head">
+            <div class="wb-dashboard-summary-title">${escapeHtml(card.name || `格子 ${index + 1}`)}</div>
+            <span class="wb-dashboard-summary-tag">格子 ${index + 1}</span>
+          </div>
+          <div class="wb-dashboard-summary-value">${escapeHtml(card.value || '--')}</div>
+          <div class="wb-dashboard-summary-text">${escapeHtml(card.assessment || '点击继续补充指标提示词。')}</div>
+          <div class="wb-dashboard-summary-edit">点击编辑提示词</div>
+        </div>
+      ` : `
+        <div class="wb-dashboard-summary-card empty" onclick="openDashboardCellModal(${index})">
+          <div>
+            <div class="wb-dashboard-summary-plus">+</div>
+            <div class="wb-dashboard-summary-empty-title">添加指标</div>
+            <div class="wb-dashboard-summary-empty-desc">点击输入提示词，保存后自动生成。</div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function selectFundDashboardLayout(layout) {
+  const normalizedLayout = normalizeDashboardLayout(layout);
+  currentWorkbenchDashboardLayout = normalizedLayout;
+  currentWorkbenchDashboardSlots = normalizeWorkbenchDashboardSlots(normalizedLayout, currentWorkbenchDashboardSlots);
+  renderWorkbenchFundDashboard();
+}
+
+function buildDashboardPromptListFromSlots() {
+  return normalizeWorkbenchDashboardSlots(currentWorkbenchDashboardLayout, currentWorkbenchDashboardSlots).map(card => String(card.prompt || '').trim());
+}
+
+function openDashboardCellModal(index) {
+  const activeUser = getActiveDemoUser();
+  if (activeUser.role !== 'dav') {
+    showToast('只有大V身份可以编辑核心指标面板');
+    return;
+  }
+  currentWorkbenchDashboardSlots = normalizeWorkbenchDashboardSlots(currentWorkbenchDashboardLayout, currentWorkbenchDashboardSlots);
+  dashboardCellEditingIndex = index;
+  const host = document.getElementById('dashboard-cell-modal-content');
+  const modal = document.getElementById('dashboard-cell-modal');
+  if (!host || !modal) return;
+  const card = currentWorkbenchDashboardSlots[index] || buildEmptyDashboardCard('');
+  host.innerHTML = `
+    <div class="modal-title" style="margin-bottom:10px">编辑格子 ${index + 1}</div>
+    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">${isWorkbenchDashboardCellFilled(card) ? `当前摘要：${escapeHtml(card.name || '未命名指标')} · ${escapeHtml(card.value || '--')}` : '当前格子为空，输入提示词后会自动生成指标摘要。'}</div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">提示词</label>
+      <textarea id="dashboard-cell-prompt-input" class="knowledge-modal-textarea" placeholder="${escapeHtml(DEFAULT_DASHBOARD_CELL_PROMPTS[index % DEFAULT_DASHBOARD_CELL_PROMPTS.length])}">${escapeHtml(card.prompt || '')}</textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeDashboardCellModal()">取消</button>
+      <button class="btn-gold" onclick="saveDashboardCellPrompt()">保存并生成</button>
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+function closeDashboardCellModal() {
+  const modal = document.getElementById('dashboard-cell-modal');
+  if (modal) modal.classList.remove('show');
+  dashboardCellEditingIndex = -1;
+}
+
+function saveDashboardCellPrompt() {
+  const activeUser = getActiveDemoUser();
+  if (activeUser.role !== 'dav') {
+    showToast('只有大V身份可以编辑核心指标面板');
+    return;
+  }
+  if (dashboardCellEditingIndex < 0) return;
+  const input = document.getElementById('dashboard-cell-prompt-input');
+  const promptText = input ? input.value.trim() : '';
+  currentWorkbenchDashboardSlots = normalizeWorkbenchDashboardSlots(currentWorkbenchDashboardLayout, currentWorkbenchDashboardSlots);
+  currentWorkbenchDashboardSlots[dashboardCellEditingIndex] = buildDashboardCardFromPrompt(promptText, dashboardCellEditingIndex);
+  closeDashboardCellModal();
+  generateFundDashboard();
+}
+
+function renderFundMacroDashboard() {
+  const host = document.getElementById('feed-macro-dashboard');
+  if (!host) return;
+  const published = getPublishedFundDashboard();
+  host.innerHTML = `
+    <div class="fund-column-card">
+      <div class="fund-column-head">
+        <div>
+          <div class="fund-column-title">${escapeHtml(published.title || '今日核心指标面板')}</div>
+          <div class="fund-column-subtitle">顶部核心指标由大V在工作台生成并发布，普通投资者只看到当前生效版本。</div>
+        </div>
+        <span class="tag tag-gold">${escapeHtml(normalizeDashboardLayout(published.layout).toUpperCase())}</span>
+      </div>
+      ${renderDashboardCards(published, {
+        toolbarTag: `${normalizeDashboardLayout(published.layout).toUpperCase()} 已发布`,
+        toolbarNote: published.note || '',
+      })}
+    </div>
+  `;
+}
+
+function renderWorkbenchFundDashboard() {
+  const previewHost = document.getElementById('wb-dashboard-preview');
+  const metaHost = document.getElementById('wb-dashboard-meta');
+  if (!previewHost || !metaHost) return;
+  const activeUser = getActiveDemoUser();
+  if (activeUser.role !== 'dav') {
+    previewHost.innerHTML = '';
+    metaHost.textContent = '当前为投资者身份，核心指标面板只展示已发布版本。';
+    return;
+  }
+  const tenantState = getTenantFundDashboardState();
+  const draft = tenantState.draft;
+  const published = tenantState.published;
+  ensureWorkbenchDashboardEditor(draft || published);
+  metaHost.textContent = draft
+    ? `草稿已生成 · ${normalizeDashboardLayout(draft.layout).toUpperCase()} · 点击任意格子可继续修改，发布后会同步到基本面首页顶部`
+    : `当前展示已发布版本 · ${published.updatedAt || '刚刚同步'} · 点击格子输入提示词，保存后自动生成新草稿`;
+  previewHost.innerHTML = renderWorkbenchDashboardBoard();
+}
+
+function generateFundDashboard(layout) {
+  const activeUser = getActiveDemoUser();
+  if (activeUser.role !== 'dav') {
+    showToast('只有大V身份可以生成核心指标面板');
+    return;
+  }
+  const normalizedLayout = normalizeDashboardLayout(layout || currentWorkbenchDashboardLayout);
+  currentWorkbenchDashboardLayout = normalizedLayout;
+  currentWorkbenchDashboardSlots = normalizeWorkbenchDashboardSlots(normalizedLayout, currentWorkbenchDashboardSlots);
+  const promptList = buildDashboardPromptListFromSlots();
+  const tenantState = getTenantFundDashboardState();
+  tenantState.draft = {
+    layout: normalizedLayout,
+    title: buildDashboardTitle(normalizedLayout, promptList),
+    note: buildDashboardNote(promptList),
+    cards: pickDashboardCards(normalizedLayout, promptList),
+    updatedAt: '刚刚生成',
+    publisher: activeUser.name,
+  };
+  persistTenantFundDashboardState();
+  currentWorkbenchDashboardSourceVersion = getDashboardConfigVersion(tenantState.draft);
+  renderWorkbenchFundDashboard();
+  showToast(`已生成 ${normalizedLayout.toUpperCase()} 指标面板草稿`);
+}
+
+function publishFundDashboard() {
+  const activeUser = getActiveDemoUser();
+  if (activeUser.role !== 'dav') {
+    showToast('只有大V身份可以发布核心指标面板');
+    return;
+  }
+  const tenantState = getTenantFundDashboardState();
+  if (!tenantState.draft) {
+    showToast('请先生成一个指标面板草稿');
+    return;
+  }
+  tenantState.published = cloneDashboardConfig(tenantState.draft);
+  tenantState.published.updatedAt = '刚刚发布';
+  tenantState.published.publisher = activeUser.name;
+  tenantState.draft = null;
+  persistTenantFundDashboardState();
+  renderWorkbenchFundDashboard();
+  renderFundMacroDashboard();
+  showToast('已发布到基本面首页顶部');
+}
+
+function resetFundDashboardDraft() {
+  const activeUser = getActiveDemoUser();
+  if (activeUser.role !== 'dav') {
+    showToast('当前身份没有草稿编辑权限');
+    return;
+  }
+  const tenantState = getTenantFundDashboardState();
+  tenantState.draft = null;
+  persistTenantFundDashboardState();
+  renderWorkbenchFundDashboard();
+  showToast('已恢复到当前发布版');
+}
+
+function renderFundamentalKolColumn() {
+  const host = document.getElementById('feed-fundamental-column');
+  if (!host) return;
+  const activeUser = getActiveDemoUser();
+  const entries = getTenantKnowledgeEntries();
+  const advisorName = activeUser.tenant.advisor;
+  const readyEntries = entries.filter(entry => entry.status === 'ready');
+  const displayEntries = (readyEntries.length ? readyEntries : entries).slice(0, 3);
+  const summaryText = readyEntries.length
+    ? `今日基本面解读优先引用 ${advisorName} 租户已经沉淀完成的知识卡，把估值、盈利质量、验证节点和争议点整理成可直接阅读的专栏。`
+    : `当前专栏会优先展示 ${advisorName} 最近录入但仍在清洗中的知识内容，等同步完成后会自动切换到正式知识卡。`;
+  const columnCards = displayEntries.map((entry, index) => {
+    const status = getKnowledgeStatusMeta(entry.status);
+    const angleLabel = ['估值视角', '盈利视角', '验证节点'][index] || '研究视角';
+    return `
+      <div class="fund-column-item">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div>
+            <div class="fund-column-item-title">${escapeHtml(entry.title)}</div>
+            <div class="fund-column-item-meta">${escapeHtml(angleLabel)} · ${escapeHtml(entry.source)} · ${escapeHtml(entry.sourceDetail)}</div>
+          </div>
+          <span class="knowledge-status ${status.className}">${status.label}</span>
+        </div>
+        <div class="fund-column-item-desc">${escapeHtml(entry.summary)}</div>
+      </div>
+    `;
+  }).join('');
+  const actionBlock = activeUser.role === 'dav'
+    ? `
+      <div class="fund-column-actions">
+        <button class="btn-gold" style="flex:1;padding:10px;font-size:12px" onclick="openKnowledgeIntake('voice')">更新今日解读</button>
+        <button class="btn-outline" style="flex:1;padding:10px;font-size:12px" onclick="switchTab('knowledge')">查看知识专区</button>
+      </div>
+    `
+    : `
+      <div class="fund-column-actions">
+        <button class="btn-outline" style="flex:1;padding:10px;font-size:12px" onclick="switchTab('knowledge')">查看知识专区</button>
+        <button class="btn-gold" style="flex:1;padding:10px;font-size:12px" onclick="openDmChat(1,'${advisorName}','👑','种子投顾')">追问投顾</button>
+      </div>
+    `;
+  host.innerHTML = `
+    <div class="fund-column-card">
+      <div class="fund-column-head">
+        <div>
+          <div class="fund-column-title">${escapeHtml(advisorName)} · 大V知识专栏</div>
+          <div class="fund-column-subtitle">作为今日基本面解读入口，优先展示租户内大V沉淀的长期知识和最新判断。</div>
+        </div>
+        <span class="tag tag-gold">${activeUser.role === 'dav' ? '当前主理人视角' : '所属租户专栏'}</span>
+      </div>
+      <div class="fund-column-summary">
+        <div class="fund-column-summary-title">今日解读摘要</div>
+        <div class="fund-column-summary-text">${escapeHtml(summaryText)}</div>
+      </div>
+      <div class="fund-column-grid">
+        ${columnCards || `
+          <div class="fund-column-item">
+            <div class="fund-column-item-title">暂无今日专栏内容</div>
+            <div class="fund-column-item-desc">${activeUser.role === 'dav' ? '你可以直接提交语音、文件或网页 URL，生成今日基本面解读。' : '当前租户大V还没有同步新的基本面专栏。'}</div>
+          </div>
+        `}
+      </div>
+      ${actionBlock}
+    </div>
+  `;
+}
+
+function renderKnowledgeExperience() {
+  renderFundMacroDashboard();
+  renderFundamentalKolColumn();
+  renderKnowledgeWorkbench();
+  renderKnowledgeZone();
+  renderWorkbenchFundDashboard();
+}
+
+function renderHermesWorkspace() {
+  const entryHost = document.getElementById('hermes-entry-grid');
+  const stockHost = document.getElementById('hermes-stock-grid');
+  const recentHost = document.getElementById('hermes-recent-list');
+  const activeUser = getActiveDemoUser();
+  const marketCards = Array.from(document.querySelectorAll('[data-hermes-stock="true"]')).slice(0, 4).map(node => ({
+    code: node.dataset.stockCode || '',
+    name: node.dataset.stockName || '',
+    market: node.dataset.stockMarket || '',
+    focus: node.dataset.stockFocus || '',
+  }));
+  if (entryHost) {
+    entryHost.innerHTML = HERMES_ENTRY_CARDS.map(item => `
+      <div class="hermes-entry-card" onclick="launchHermesMode('${item.mode}')">
+        <div class="hermes-entry-icon">${item.icon}</div>
+        <div class="hermes-entry-title">${item.title}</div>
+        <div class="hermes-entry-desc">${item.desc}</div>
+        <div class="hermes-entry-meta">${item.meta}</div>
+      </div>
+    `).join('');
+  }
+  if (stockHost) {
+    stockHost.innerHTML = marketCards.map(item => `
+      <div class="hermes-stock-chip" onclick="openWatchlistDetail('${item.code}','profile'); switchTab('market');">
+        <div class="hermes-stock-chip-name">${item.name}</div>
+        <div class="hermes-stock-chip-meta">${item.code} · ${item.market} · ${item.focus}</div>
+        <span class="hermes-stock-chip-tag">进入研究档案</span>
+      </div>
+    `).join('');
+  }
+  if (recentHost) {
+    const recentCards = [
+      {
+        title: '今日基本面解读',
+        desc: `${activeUser.tenant.advisor} 的知识专栏已同步到基本面页，可继续追问或转入证据链归因。`,
+        tag: '今日更新'
+      },
+      {
+        title: '港股互联网估值框架',
+        desc: '已进入租户知识库，可直接作为 Hermes 的长期上下文使用。',
+        tag: '知识沉淀'
+      },
+      {
+        title: '半导体订单验证',
+        desc: '建议先看研究档案里的关键资料，再决定是否发起基本面判断。',
+        tag: '热门主题'
+      }
+    ];
+    recentHost.innerHTML = recentCards.map(card => `
+      <div class="hermes-recent-card">
+        <div>
+          <div class="hermes-recent-title">${card.title}</div>
+          <div class="hermes-recent-desc">${card.desc}</div>
+        </div>
+        <span class="hermes-recent-tag">${card.tag}</span>
+      </div>
+    `).join('');
+  }
+}
+
+function launchHermesMode(mode) {
+  selectHermesMode(mode);
+  const modeBar = document.getElementById('hermes-modes');
+  if (modeBar) {
+    modeBar.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function switchFeedBoardTab(index) {
+  document.querySelectorAll('.fund-board-tab').forEach((tab, idx) => {
+    tab.classList.toggle('active', idx === index);
+  });
+  document.querySelectorAll('.fund-board-panel').forEach((panel, idx) => {
+    panel.classList.toggle('active', idx === index);
+  });
+}
+
+function openKnowledgeIntake(type) {
+  knowledgeIntakeType = KNOWLEDGE_INPUT_TYPES[type] ? type : 'voice';
+  knowledgeRecording = false;
+  knowledgeUploadSamples = [];
+  knowledgeUrlPreview = null;
+  knowledgeDraft = { title: '', summary: '', url: '' };
+  renderKnowledgeIntakeModal();
+  const modal = document.getElementById('knowledge-intake-modal');
+  if (modal) modal.classList.add('show');
+}
+
+function closeKnowledgeIntake() {
+  const modal = document.getElementById('knowledge-intake-modal');
+  if (modal) modal.classList.remove('show');
+  knowledgeRecording = false;
+}
+
+function renderKnowledgeIntakeModal() {
+  const cfg = KNOWLEDGE_INPUT_TYPES[knowledgeIntakeType];
+  const host = document.getElementById('knowledge-intake-content');
+  if (!cfg || !host) return;
+  host.innerHTML = `
+    <div class="modal-title" style="margin-bottom:10px">${cfg.icon} ${cfg.label}</div>
+    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">${cfg.desc}</div>
+    <div class="knowledge-source-selector">
+      ${Object.entries(KNOWLEDGE_INPUT_TYPES).map(([type, item]) => `
+        <div class="knowledge-source-pill ${type === knowledgeIntakeType ? 'active' : ''}" onclick="switchKnowledgeIntakeType('${type}')">
+          ${item.icon} ${item.label}
+        </div>
+      `).join('')}
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">知识标题</label>
+      <input id="knowledge-title-input" class="knowledge-modal-input" placeholder="例如：${cfg.defaultTitle}" value="${escapeHtml(knowledgeDraft.title)}" />
+    </div>
+    ${renderKnowledgeIntakeTypePanel()}
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">结构化备注</label>
+      <textarea id="knowledge-summary-input" class="knowledge-modal-textarea" placeholder="${cfg.placeholder}">${escapeHtml(knowledgeDraft.summary)}</textarea>
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">同步去向</label>
+      <div class="knowledge-chip-row">
+        <span class="knowledge-chip">租户知识队列</span>
+        <span class="knowledge-chip">知识专区</span>
+        <span class="knowledge-chip">Hermes 上下文</span>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeKnowledgeIntake()">取消</button>
+      <button class="btn-gold" onclick="submitKnowledgeIntake()">提交入库</button>
+    </div>
+  `;
+}
+
+function renderKnowledgeIntakeTypePanel() {
+  if (knowledgeIntakeType === 'voice') {
+    return `
+      <div class="knowledge-modal-block">
+        <label class="knowledge-modal-label">录音面板</label>
+        <div class="knowledge-record-panel">
+          <div class="knowledge-record-toolbar">
+            <div class="knowledge-record-status">
+              <span class="knowledge-live-dot" style="opacity:${knowledgeRecording ? '1' : '0.35'}"></span>
+              ${knowledgeRecording ? '正在录音，系统会自动转写' : '准备录音，可直接口述观点'}
+            </div>
+            <button class="${knowledgeRecording ? 'btn-gold' : 'btn-outline'}" style="padding:7px 12px;font-size:12px" onclick="toggleKnowledgeVoiceCapture()">${knowledgeRecording ? '结束录音' : '开始录音'}</button>
+          </div>
+          <div class="knowledge-wave"><span></span><span></span><span></span><span></span><span></span></div>
+        </div>
+      </div>
+    `;
+  }
+  if (knowledgeIntakeType === 'file') {
+    return `
+      <div class="knowledge-modal-block">
+        <label class="knowledge-modal-label">文件面板</label>
+        <div class="knowledge-upload-panel">
+          <div class="knowledge-upload-drop">
+            支持 PDF / DOCX / XLSX 演示文件<br>点击下方按钮模拟上传
+            <div class="knowledge-action-row">
+              <button class="btn-outline" style="flex:1;padding:8px 10px;font-size:12px" onclick="attachKnowledgeSampleFile()">选择示例文件</button>
+              <button class="btn-gold" style="flex:1;padding:8px 10px;font-size:12px" onclick="attachKnowledgeSampleFile(true)">批量导入</button>
+            </div>
+          </div>
+          <div class="knowledge-chip-row" id="knowledge-file-preview">
+            ${knowledgeUploadSamples.length ? knowledgeUploadSamples.map(file => `<span class="knowledge-chip">${escapeHtml(file)}</span>`).join('') : '<span class="knowledge-chip">尚未选择文件</span>'}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  return `
+      <div class="knowledge-modal-block">
+        <label class="knowledge-modal-label">网页 URL 面板</label>
+        <div class="knowledge-url-panel">
+        <input id="knowledge-url-input" class="knowledge-modal-input" placeholder="https://example.com/research-note" value="${escapeHtml(knowledgeDraft.url)}" />
+        <div class="knowledge-action-row">
+          <button class="btn-gold" style="flex:1;padding:8px 10px;font-size:12px" onclick="previewKnowledgeUrl()">抓取网页摘要</button>
+        </div>
+        <div id="knowledge-url-preview">
+          ${renderKnowledgeUrlPreview()}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function syncKnowledgeDraftFromModal() {
+  const titleInput = document.getElementById('knowledge-title-input');
+  const summaryInput = document.getElementById('knowledge-summary-input');
+  const urlInput = document.getElementById('knowledge-url-input');
+  knowledgeDraft = {
+    title: titleInput ? titleInput.value : knowledgeDraft.title,
+    summary: summaryInput ? summaryInput.value : knowledgeDraft.summary,
+    url: urlInput ? urlInput.value : knowledgeDraft.url,
+  };
+}
+
+function renderKnowledgeUrlPreview() {
+  if (!knowledgeUrlPreview) {
+    return '<div class="knowledge-preview-box"><div class="knowledge-preview-desc">输入网页 URL 后可预览将被沉淀的标题、来源域名和摘要。</div></div>';
+  }
+  return `
+    <div class="knowledge-preview-box">
+      <div class="knowledge-preview-title">${escapeHtml(knowledgeUrlPreview.title)}</div>
+      <div class="knowledge-preview-desc">${escapeHtml(knowledgeUrlPreview.domain)} · ${escapeHtml(knowledgeUrlPreview.summary)}</div>
+    </div>
+  `;
+}
+
+function switchKnowledgeIntakeType(type) {
+  if (!KNOWLEDGE_INPUT_TYPES[type]) return;
+  syncKnowledgeDraftFromModal();
+  knowledgeIntakeType = type;
+  knowledgeRecording = false;
+  if (type !== 'file') knowledgeUploadSamples = [];
+  if (type !== 'url') knowledgeUrlPreview = null;
+  renderKnowledgeIntakeModal();
+}
+
+function toggleKnowledgeVoiceCapture() {
+  syncKnowledgeDraftFromModal();
+  knowledgeRecording = !knowledgeRecording;
+  renderKnowledgeIntakeModal();
+  if (!knowledgeRecording) {
+    if (!knowledgeDraft.title.trim()) {
+      knowledgeDraft.title = '最新语音纪要整理';
+    }
+    if (!knowledgeDraft.summary.trim()) {
+      knowledgeDraft.summary = '系统已转写语音内容：重点保留 3 条核心判断、2 个验证节点和 1 个风险边界，建议同步到知识专区供 Hermes 和复盘专区复用。';
+    }
+    renderKnowledgeIntakeModal();
+    showToast('录音已结束，转写结果已回填');
+  }
+}
+
+function attachKnowledgeSampleFile(batch) {
+  syncKnowledgeDraftFromModal();
+  knowledgeUploadSamples = batch
+    ? ['港股互联网估值框架.pdf', '2026Q2_电话会纪要.docx']
+    : ['港股互联网估值框架.pdf'];
+  renderKnowledgeIntakeModal();
+}
+
+function previewKnowledgeUrl() {
+  syncKnowledgeDraftFromModal();
+  const url = (knowledgeDraft.url || '').trim() || 'https://example.com/research-note';
+  let domain = 'example.com';
+  try {
+    domain = new URL(url).host || domain;
+  } catch (e) {}
+  knowledgeUrlPreview = {
+    url,
+    domain,
+    title: '网页资料已抓取：行业主线与关键数据',
+    summary: '已识别行业主线、引用数据与验证节点，可作为长期知识卡继续清洗。',
+  };
+  renderKnowledgeIntakeModal();
+}
+
+function submitKnowledgeIntake() {
+  const activeUser = getActiveDemoUser();
+  const cfg = KNOWLEDGE_INPUT_TYPES[knowledgeIntakeType];
+  syncKnowledgeDraftFromModal();
+  const rawTitle = (knowledgeDraft.title || '').trim();
+  const rawSummary = (knowledgeDraft.summary || '').trim();
+  if (knowledgeIntakeType === 'file' && !knowledgeUploadSamples.length) {
+    showToast('请先选择至少一个文件');
+    return;
+  }
+  if (knowledgeIntakeType === 'url' && !knowledgeUrlPreview) {
+    showToast('请先抓取网页摘要');
+    return;
+  }
+  const title = rawTitle || cfg.defaultTitle;
+  const summary = rawSummary || cfg.placeholder.replace('例如：', '');
+  let sourceDetail = '';
+  if (knowledgeIntakeType === 'voice') {
+    sourceDetail = '来源：语音转写 · 6分钟';
+  } else if (knowledgeIntakeType === 'file') {
+    sourceDetail = `来源：文件上传 · ${knowledgeUploadSamples.join(' / ')}`;
+  } else {
+    sourceDetail = `来源：网页 URL · ${knowledgeUrlPreview.domain}`;
+  }
+  const entry = {
+    id: `kb-${knowledgeEntrySeq++}`,
+    tenantId: activeUser.tenant.id,
+    type: knowledgeIntakeType,
+    title,
+    source: cfg.label,
+    sourceDetail,
+    summary,
+    status: 'syncing',
+    time: '刚刚',
+    tags: cfg.defaultTags.slice(0),
+    destination: '同步中',
+  };
+  knowledgeEntryStore.unshift(entry);
+  renderKnowledgeExperience();
+  closeKnowledgeIntake();
+  knowledgeDraft = { title: '', summary: '', url: '' };
+  showToast('知识已进入租户清洗队列');
+  setTimeout(() => {
+    entry.status = 'ready';
+    entry.time = '1分钟前';
+    entry.destination = '已同步知识专区';
+    renderKnowledgeExperience();
+    showToast('已同步到知识专区并可供 Hermes 调用');
+  }, 1200);
+}
+
 function renderDemoProfile(user) {
   currentDemoUser = user;
+  applySiteFeatureFlags();
   if (window.localStorage) {
     window.localStorage.setItem(DEMO_PROFILE_STORAGE_KEY, user.id);
   }
-  const progressPct = Math.max(0, Math.min(100, (user.points / user.nextLevelPoints) * 100));
-  const pointsToNext = Math.max(0, user.nextLevelPoints - user.points);
   const el = (id) => document.getElementById(id);
   if (el('global-profile-avatar')) el('global-profile-avatar').textContent = user.avatar;
   if (el('profile-avatar-lg')) el('profile-avatar-lg').textContent = user.avatar;
   if (el('profile-name')) el('profile-name').textContent = user.name;
-  if (el('profile-level-badge')) el('profile-level-badge').textContent = `Lv.${user.level} ${user.levelName}`;
   if (el('profile-tenant-brief')) el('profile-tenant-brief').textContent = user.role === 'dav'
     ? `大V投顾身份 · 当前管理：${user.tenant.name}`
     : `投资者身份 · 当前归属：${user.tenant.name}`;
@@ -1643,14 +3269,15 @@ function renderDemoProfile(user) {
   if (el('tenant-focus')) el('tenant-focus').textContent = user.tenant.focus;
   if (el('tenant-rights')) el('tenant-rights').textContent = user.tenant.rights;
   if (el('tenant-relationship')) el('tenant-relationship').textContent = user.relationship;
-  if (el('profile-points')) el('profile-points').textContent = formatInt(user.points);
-  if (el('profile-points-label')) el('profile-points-label').textContent = `Lv.${user.level} ${user.levelName}`;
-  if (el('profile-compute')) el('profile-compute').textContent = `⚡ ${formatInt(user.computeCredits)}`;
-  if (el('profile-progress-bar')) el('profile-progress-bar').style.width = `${progressPct.toFixed(1)}%`;
-  if (el('profile-progress-text')) el('profile-progress-text').textContent = `${formatInt(user.points)} / ${formatInt(user.nextLevelPoints)}`;
-  if (el('profile-next-level')) el('profile-next-level').textContent = pointsToNext > 0 ? `下一级：${user.nextLevelName}` : '已达到当前阶段最高演示等级';
+  if (el('profile-identity-tag')) el('profile-identity-tag').textContent = user.role === 'dav' ? '大V投顾' : '投资者';
+  if (el('profile-role-value')) el('profile-role-value').textContent = user.role === 'dav' ? '大V投顾用户' : '投资者用户';
+  if (el('profile-compute')) el('profile-compute').textContent = `⚡ ${formatInt(user.computeCredits)} 次可用`;
+  if (el('profile-service-brief')) el('profile-service-brief').textContent = user.role === 'dav'
+    ? '工作台管理 · 知识供稿 · Hermes 模板'
+    : '复盘专区 · 知识专区 · Hermes 摘要';
   if (el('profile-workbench-label')) el('profile-workbench-label').textContent = user.workbenchLabel;
   if (el('profile-workbench-meta')) el('profile-workbench-meta').textContent = user.workbenchHint;
+  if (el('knowledge-dav-intake-card')) el('knowledge-dav-intake-card').style.display = user.role === 'dav' ? 'block' : 'none';
   if (el('settings-tenant-label')) el('settings-tenant-label').textContent = user.role === 'dav'
     ? `${user.tenant.name} · 当前管理租户`
     : `${user.tenant.name} · 当前归属租户`;
@@ -1660,6 +3287,8 @@ function renderDemoProfile(user) {
   }
   renderDemoUserSwitchList();
   syncTenantScopedAdvisorViews();
+  renderKnowledgeExperience();
+  renderHermesWorkspace();
   if (typeof dmConversationsCache !== 'undefined' && dmConversationsCache) {
     renderDmConversations(dmConversationsCache);
   }
@@ -1710,11 +3339,223 @@ function switchTab(tab) {
 
 // ===== WATCHLIST =====
 let currentWatchlistDetail = null;
+const WATCHLIST_ADDED_STORAGE_KEY = 'gangtise_demo_added_watchlist_codes';
+let addedWatchlistCodes = loadAddedWatchlistCodes();
+
+function loadAddedWatchlistCodes() {
+  try {
+    const raw = window.localStorage ? window.localStorage.getItem(WATCHLIST_ADDED_STORAGE_KEY) : '';
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function persistAddedWatchlistCodes() {
+  try {
+    if (window.localStorage) {
+      window.localStorage.setItem(WATCHLIST_ADDED_STORAGE_KEY, JSON.stringify(addedWatchlistCodes));
+    }
+  } catch (e) {}
+}
+
+function getRenderedWatchlistCodes() {
+  return Array.from(document.querySelectorAll('[data-watchlist-card="true"]')).map(node => String(node.dataset.stockCode || '').toUpperCase());
+}
+
+function normalizeStockLookupValue(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
+function normalizeComparableCode(value) {
+  const normalized = normalizeStockLookupValue(value);
+  return normalized.replace(/^0+/, '') || '0';
+}
+
+function findWatchlistCodeFromInput(value) {
+  const query = normalizeStockLookupValue(value);
+  if (!query) return '';
+  const cards = Array.from(document.querySelectorAll('[data-watchlist-card="true"]'));
+  const matchedCard = cards.find(node => {
+    const code = normalizeStockLookupValue(node.dataset.stockCode || '');
+    const name = normalizeStockLookupValue(node.dataset.stockName || '');
+    return code === query
+      || normalizeComparableCode(code) === normalizeComparableCode(query)
+      || name === query;
+  });
+  if (matchedCard) return normalizeStockLookupValue(matchedCard.dataset.stockCode || '');
+  return query;
+}
+
+function submitWatchlistStockCode() {
+  const input = document.getElementById('watchlist-stock-code-input');
+  const rawValue = input ? input.value : '';
+  const stockCode = findWatchlistCodeFromInput(rawValue);
+  if (!stockCode) {
+    showToast('请输入股票代码');
+    return;
+  }
+  if (input) input.value = stockCode;
+  openWatchlistDetail(stockCode);
+}
+
+function isStockInWatchlist(stockCode) {
+  const normalizedCode = normalizeStockLookupValue(stockCode);
+  return getRenderedWatchlistCodes().includes(normalizedCode) || addedWatchlistCodes.includes(normalizedCode);
+}
+
+function buildWatchlistCardHtml(detail) {
+  const change = Number(detail.change || 0);
+  const price = Number(detail.price || 0);
+  const market = detail.market || '';
+  const focus = detail.industry || detail.focus || '个股跟踪';
+  const statusTag = isStockInWatchlist(detail.code) ? '已加入我的自选' : '支持继续加入';
+  return `
+    <div
+      onclick="openWatchlistDetail('${detail.code}')"
+      data-hermes-stock="true"
+      data-watchlist-card="true"
+      data-stock-code="${detail.code}"
+      data-stock-name="${detail.name}"
+      data-stock-market="${market}"
+      data-stock-focus="${focus}"
+      style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.08);border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer"
+    >
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:14px;font-weight:600;color:var(--white)">${detail.name}</div>
+          <div style="font-size:11px;color:var(--gray-400);margin-top:2px">${detail.code} · ${market} · ${focus}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:18px;font-weight:700;color:var(--white)">${price.toFixed(2)}</div>
+          <div style="font-size:12px;color:${change >= 0 ? 'var(--red)' : 'var(--green)'}">
+            ${change >= 0 ? '▲' : '▼'} ${Math.abs(change).toFixed(2)} (${Number(detail.change_pct || 0).toFixed(2)}%)
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+        <span style="font-size:10px;background:rgba(200,169,110,0.1);color:var(--gold);padding:3px 8px;border-radius:10px">${statusTag}</span>
+        <span style="font-size:10px;background:rgba(52,152,219,0.12);color:#3498DB;padding:3px 8px;border-radius:10px">分析记录同步主理投顾</span>
+        <span style="font-size:10px;background:rgba(46,204,113,0.12);color:var(--green);padding:3px 8px;border-radius:10px">可连 Hermes</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+        <button class="btn-outline" style="padding:7px 10px;font-size:11px" onclick="event.stopPropagation();openWatchlistDetail('${detail.code}','authors')">当前投顾互动</button>
+        <button class="btn-gold" style="padding:7px 10px;font-size:11px" onclick="event.stopPropagation();runWatchlistHermes('${detail.code}','basic')">基本面分析</button>
+      </div>
+    </div>
+  `;
+}
+
+function addCurrentStockToWatchlist() {
+  if (!currentWatchlistDetail) return;
+  const stockCode = normalizeStockLookupValue(currentWatchlistDetail.code);
+  if (!stockCode) return;
+  if (!addedWatchlistCodes.includes(stockCode)) {
+    addedWatchlistCodes.unshift(stockCode);
+    persistAddedWatchlistCodes();
+  }
+  const listHost = document.getElementById('market-watchlist-list');
+  const existingCard = document.querySelector(`[data-watchlist-card="true"][data-stock-code="${stockCode}"]`);
+  if (!existingCard && listHost) {
+    listHost.insertAdjacentHTML('afterbegin', buildWatchlistCardHtml(currentWatchlistDetail));
+    renderHermesWorkspace();
+  }
+  renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
+  showToast('已加入自选股');
+}
+
+function calcMovingAverage(series, windowSize) {
+  return series.map((item, index) => {
+    if (index + 1 < windowSize) return null;
+    const slice = series.slice(index + 1 - windowSize, index + 1);
+    const sum = slice.reduce((total, row) => total + Number(row.close || 0), 0);
+    return Number((sum / windowSize).toFixed(2));
+  });
+}
+
+function buildWatchlistKlineSvg(series) {
+  const list = Array.isArray(series) ? series : [];
+  if (!list.length) {
+    return `
+      <div style="background:var(--navy);border:1px solid rgba(200,169,110,0.08);border-radius:12px;padding:18px;text-align:center;font-size:12px;color:var(--gray-400)">
+        暂无 K 线数据
+      </div>
+    `;
+  }
+  const width = 320;
+  const height = 200;
+  const padding = { top: 14, right: 10, bottom: 24, left: 10 };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const values = list.flatMap(item => [Number(item.high || 0), Number(item.low || 0)]);
+  const maxValue = Math.max(...values);
+  const minValue = Math.min(...values);
+  const valueSpan = Math.max(maxValue - minValue, 1);
+  const scaleY = value => padding.top + ((maxValue - value) / valueSpan) * plotHeight;
+  const slotWidth = plotWidth / list.length;
+  const candleWidth = Math.max(5, slotWidth * 0.52);
+  const ma5 = calcMovingAverage(list, 5);
+  const ma10 = calcMovingAverage(list, 10);
+  const ma20 = calcMovingAverage(list, 20);
+  const buildLinePath = points => points
+    .map((value, index) => value === null ? null : `${index === points.findIndex(item => item !== null) ? 'M' : 'L'} ${(padding.left + slotWidth * index + slotWidth / 2).toFixed(2)} ${scaleY(value).toFixed(2)}`)
+    .filter(Boolean)
+    .join(' ');
+  const yTicks = [0, 0.5, 1].map(ratio => {
+    const value = maxValue - valueSpan * ratio;
+    const y = padding.top + plotHeight * ratio;
+    return `
+      <line x1="${padding.left}" y1="${y.toFixed(2)}" x2="${width - padding.right}" y2="${y.toFixed(2)}" stroke="rgba(200,169,110,0.08)" stroke-width="1" />
+      <text x="${width - padding.right}" y="${(y - 4).toFixed(2)}" text-anchor="end" font-size="9" fill="var(--gray-400)">${value.toFixed(2)}</text>
+    `;
+  }).join('');
+  const candles = list.map((item, index) => {
+    const centerX = padding.left + slotWidth * index + slotWidth / 2;
+    const open = Number(item.open || 0);
+    const close = Number(item.close || 0);
+    const high = Number(item.high || 0);
+    const low = Number(item.low || 0);
+    const color = close >= open ? '#E74C3C' : '#2ECC71';
+    const bodyTop = scaleY(Math.max(open, close));
+    const bodyBottom = scaleY(Math.min(open, close));
+    const bodyHeight = Math.max(2, bodyBottom - bodyTop);
+    return `
+      <line x1="${centerX.toFixed(2)}" y1="${scaleY(high).toFixed(2)}" x2="${centerX.toFixed(2)}" y2="${scaleY(low).toFixed(2)}" stroke="${color}" stroke-width="1.2" />
+      <rect x="${(centerX - candleWidth / 2).toFixed(2)}" y="${bodyTop.toFixed(2)}" width="${candleWidth.toFixed(2)}" height="${bodyHeight.toFixed(2)}" rx="1.4" fill="${color}" />
+    `;
+  }).join('');
+  const labels = [0, Math.floor((list.length - 1) / 2), list.length - 1].map(index => {
+    const x = padding.left + slotWidth * index + slotWidth / 2;
+    return `<text x="${x.toFixed(2)}" y="${height - 6}" text-anchor="middle" font-size="9" fill="var(--gray-400)">${list[index].date || ''}</text>`;
+  }).join('');
+  return `
+    <div style="background:var(--navy);border:1px solid rgba(200,169,110,0.08);border-radius:12px;padding:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:700;color:var(--white)">K线走势</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--gray-400)">
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#F6C453;display:inline-block"></span>MA5</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#5DADE2;display:inline-block"></span>MA10</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#AF7AC5;display:inline-block"></span>MA20</span>
+        </div>
+      </div>
+      <svg viewBox="0 0 ${width} ${height}" width="100%" height="200" role="img" aria-label="个股K线与5日10日20日均线图">
+        ${yTicks}
+        ${candles}
+        <path d="${buildLinePath(ma5)}" fill="none" stroke="#F6C453" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="${buildLinePath(ma10)}" fill="none" stroke="#5DADE2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="${buildLinePath(ma20)}" fill="none" stroke="#AF7AC5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+        ${labels}
+      </svg>
+    </div>
+  `;
+}
 
 async function openWatchlistDetail(stockCode, section) {
   const modal = document.getElementById('watchlist-detail-modal');
   const host = document.getElementById('watchlist-detail-content');
   if (!modal || !host) return;
+  currentWatchlistSection = section || 'overview';
   modal.classList.add('show');
   host.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">加载中...</div>';
   try {
@@ -1730,9 +3571,11 @@ async function openWatchlistDetail(stockCode, section) {
 function renderWatchlistDetail(data, section) {
   const host = document.getElementById('watchlist-detail-content');
   if (!host || !data) return;
+  if (section) currentWatchlistSection = section;
   const activeUser = getActiveDemoUser();
   const visibleAuthors = getTenantVisibleAuthors(data.authors);
   const isInvestorView = activeUser.role === 'investor';
+  const activeSection = currentWatchlistSection || 'overview';
   const authorCards = visibleAuthors.map(author => `
     <div style="background:var(--navy);border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
@@ -1768,6 +3611,23 @@ function renderWatchlistDetail(data, section) {
   const interactionNotice = isInvestorView
     ? `当前仅开放与所属投顾 ${activeUser.tenant.advisor} 的租户内互动，跨租户投顾内容默认关闭。`
     : '当前为大V租户视角，可查看粉丝端看到的租户内互动内容。';
+  const researchTimeline = [
+    {
+      meta: '今日判断',
+      title: `${data.forecast?.verdict || '继续跟踪'} · ${data.forecast?.confidence || '中'}置信度`,
+      desc: data.forecast?.band || '结合当前盈利、估值和行业位置输出阶段性处理建议。'
+    },
+    {
+      meta: '历史观点',
+      title: `${activeUser.tenant.advisor} 最近研究角度`,
+      desc: visibleAuthors[0] ? visibleAuthors[0].angle : '当前暂无来自所属租户投顾的历史观点。'
+    },
+    {
+      meta: '后续跟踪',
+      title: '下一步验证节点',
+      desc: (data.forecast?.drivers || []).map(item => `${item.label}：${item.note}`).join('；')
+    }
+  ];
   const knowledgeCards = [
     {
       title: `${activeUser.tenant.advisor} 租户纪要框架`,
@@ -1780,12 +3640,86 @@ function renderWatchlistDetail(data, section) {
       desc: '围绕行业景气、估值带和关键验证节点建立公司级知识索引。'
     }
   ].map(item => `
-    <div style="background:var(--navy);border-radius:10px;padding:10px">
-      <div style="font-size:12px;color:var(--white);font-weight:600">${item.title}</div>
-      <div style="font-size:10px;color:var(--gray-400);margin-top:4px">${item.meta}</div>
-      <div style="font-size:11px;color:var(--gray-400);line-height:1.6;margin-top:6px">${item.desc}</div>
+    <div class="watch-research-item">
+      <div class="watch-research-meta">${item.meta}</div>
+      <div class="watch-research-title">${item.title}</div>
+      <div class="watch-research-desc">${item.desc}</div>
     </div>
   `).join('');
+  const evidenceCards = (data.fundamental?.thesis || []).map((item, index) => `
+    <div class="watch-research-item">
+      <div class="watch-research-meta">证据 ${index + 1} · 来源：研报 / 纪要 / 市场数据</div>
+      <div class="watch-research-title">${item}</div>
+      <div class="watch-research-desc">默认关联租户知识、基本面指标和当前市场表现，便于后续做证据链归因和结论复核。</div>
+    </div>
+  `).join('');
+  const profileCards = researchTimeline.map(item => `
+    <div class="watch-research-item">
+      <div class="watch-research-meta">${item.meta}</div>
+      <div class="watch-research-title">${item.title}</div>
+      <div class="watch-research-desc">${item.desc}</div>
+    </div>
+  `).join('');
+  const klineChart = buildWatchlistKlineSvg(data.kline || []);
+  const overviewSection = `
+    <div class="watch-section-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
+        <div>
+          <div class="watch-section-title">当前总览</div>
+          <div class="watch-section-desc">${data.fundamental?.summary || ''}</div>
+        </div>
+        <span class="watch-thesis-badge">Research Profile</span>
+      </div>
+      ${klineChart}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 10px">${metricCards}</div>
+      <div style="display:grid;gap:6px">${thesis}</div>
+    </div>
+    <div class="watch-section-card">
+      <div class="watch-section-title">${data.forecast?.label || '基本面判断'}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="font-size:18px;font-weight:700;color:var(--white)">${data.forecast?.verdict || '待分析'}</div>
+        <span class="watch-thesis-badge">${data.forecast?.confidence || '中'}</span>
+      </div>
+      <div class="watch-section-desc" style="margin-bottom:8px">${data.forecast?.band || ''}</div>
+      <div>${drivers}</div>
+    </div>
+  `;
+  const profileSection = `
+    <div class="watch-section-card">
+      <div class="watch-section-title">研究档案</div>
+      <div class="watch-section-desc">这里沉淀的是围绕 ${data.name} 的长期研究资产，不只是一次性分析结果。</div>
+      <div class="watch-research-grid" style="margin-top:10px">${profileCards}</div>
+    </div>
+    <div class="watch-section-card">
+      <div class="watch-section-title">关键资料</div>
+      <div class="watch-research-grid">${knowledgeCards}</div>
+    </div>
+  `;
+  const evidenceSection = `
+    <div class="watch-section-card">
+      <div class="watch-section-title">证据链</div>
+      <div class="watch-section-desc">把结论拆回来源、验证节点和租户知识引用，方便复核和继续深挖。</div>
+      <div class="watch-research-grid" style="margin-top:10px">${evidenceCards}</div>
+    </div>
+    <div class="watch-section-card">
+      <div class="watch-section-title">租户知识引用</div>
+      <div class="watch-section-desc">该部分会把大V通过语音输入、文件上传、网页 URL 提供的内容沉淀为租户独有知识，并参与当前个股分析。</div>
+      <div class="watch-research-grid" style="margin-top:10px">${knowledgeCards}</div>
+    </div>
+  `;
+  const authorsSection = `
+    <div class="watch-section-card">
+      <div class="watch-section-title">投顾互动</div>
+      <div class="watch-section-desc">${interactionNotice}</div>
+      <div style="display:grid;gap:10px;margin-top:10px">${authorCards || `<div style="font-size:12px;color:var(--gray-400)">${isInvestorView ? `该自选股当前暂无来自 ${activeUser.tenant.advisor} 的租户内互动内容。` : '暂无投顾观点'}</div>`}</div>
+    </div>
+  `;
+  const sectionMap = {
+    overview: overviewSection,
+    profile: profileSection,
+    evidence: evidenceSection,
+    authors: authorsSection,
+  };
   host.innerHTML = `
     <div style="padding-bottom:8px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px">
@@ -1799,47 +3733,22 @@ function renderWatchlistDetail(data, section) {
         </div>
       </div>
 
+      <div style="display:grid;gap:8px;margin-bottom:14px">
+        <button class="${isStockInWatchlist(data.code) ? 'btn-outline' : 'btn-gold'}" style="padding:10px;font-size:12px" onclick="addCurrentStockToWatchlist()">${isStockInWatchlist(data.code) ? '已加入自选股' : '添加自选股'}</button>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
         <button class="btn-gold" style="padding:10px;font-size:12px" onclick="runWatchlistHermes('${data.code}','basic')">Hermes 基本面分析</button>
         <button class="btn-outline" style="padding:10px;font-size:12px" onclick="runWatchlistHermes('${data.code}','forecast')">Hermes 基本面判断</button>
       </div>
-
-      <div style="background:rgba(200,169,110,0.05);border:1px solid rgba(200,169,110,0.12);border-radius:12px;padding:12px;margin-bottom:14px">
-        <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:8px">投顾互动</div>
-        <div style="font-size:11px;color:var(--gold);line-height:1.6;margin-bottom:10px">${interactionNotice}</div>
-        <div style="display:grid;gap:10px">${authorCards || `<div style="font-size:12px;color:var(--gray-400)">${isInvestorView ? `该自选股当前暂无来自 ${activeUser.tenant.advisor} 的租户内互动内容。` : '暂无投顾观点'}</div>`}</div>
+      <div class="watch-detail-tabs">
+        <div class="watch-detail-tab ${activeSection === 'overview' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'overview')">总览</div>
+        <div class="watch-detail-tab ${activeSection === 'profile' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'profile')">研究档案</div>
+        <div class="watch-detail-tab ${activeSection === 'evidence' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'evidence')">证据链</div>
+        <div class="watch-detail-tab ${activeSection === 'authors' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'authors')">投顾互动</div>
       </div>
-
-      <div style="background:rgba(46,204,113,0.06);border:1px solid rgba(46,204,113,0.16);border-radius:12px;padding:12px;margin-bottom:14px">
-        <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:8px">基本面摘要</div>
-        <div style="font-size:12px;color:var(--white);line-height:1.7;margin-bottom:10px">${data.fundamental?.summary || ''}</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">${metricCards}</div>
-        <div style="display:grid;gap:6px">${thesis}</div>
-      </div>
-
-      <div style="background:rgba(52,152,219,0.06);border:1px solid rgba(52,152,219,0.18);border-radius:12px;padding:12px;margin-bottom:14px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
-          <div style="font-size:13px;font-weight:600;color:var(--gold)">租户知识引用</div>
-          <span style="font-size:10px;background:rgba(52,152,219,0.15);color:#3498DB;padding:3px 8px;border-radius:10px">${activeUser.tenant.name}</span>
-        </div>
-        <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:10px">该板块会把大V通过语音输入、文件上传、网页 URL 提供的内容沉淀为租户独有知识，并参与当前个股的个性化分析。</div>
-        <div style="display:grid;gap:8px">${knowledgeCards}</div>
-      </div>
-
-      <div style="background:rgba(52,152,219,0.06);border:1px solid rgba(52,152,219,0.18);border-radius:12px;padding:12px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
-          <div style="font-size:13px;font-weight:600;color:var(--gold)">${data.forecast?.label || '基本面判断'}</div>
-          <span style="font-size:10px;background:rgba(200,169,110,0.12);color:var(--gold);padding:3px 8px;border-radius:10px">${data.forecast?.confidence || '中'}</span>
-        </div>
-        <div style="font-size:18px;font-weight:700;color:var(--white);margin-bottom:6px">${data.forecast?.verdict || '待分析'}</div>
-        <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">${data.forecast?.band || ''}</div>
-        <div>${drivers}</div>
-      </div>
+      ${sectionMap[activeSection] || overviewSection}
     </div>
   `;
-  if (section === 'authors') {
-    host.scrollTo({top: 140, behavior: 'smooth'});
-  }
 }
 
 function openWatchlistAuthorDm(name) {
@@ -2069,7 +3978,7 @@ function getSampleEvents() {
       date: '2026-05-25 ~ 2026-06-15', host: '洞见智研官方',
       participants: 214, points: 500, statusText: '进行中', open: true,
       desc: '发布原创投研帖子，平台重点观察内容质量、互动留存和转介绍效率。优质样本将进入共创反馈池。',
-      tags: ['原创', '竞赛', '奖励'], reward: '一等奖¥2000+年度会员，参与即得+50积分'
+      tags: ['原创', '竞赛', '奖励'], reward: '一等奖¥2000，参与即得+50积分'
     },
     {
       id: 3, type: '会议', typeClass: 'event-meeting',
@@ -2077,7 +3986,7 @@ function getSampleEvents() {
       date: '2026-05-24 14:00', host: '新能源猎手阿强 + 行业专家',
       participants: 68, points: 200, statusText: '名额有限', open: true,
       desc: '邀请产业链专家做闭门分享，重点验证高价值纪要内容是否能带来更强付费和留存。',
-      tags: ['新能源', '固态电池', '专家'], reward: '参与+200积分，仅限专业会员及以上'
+      tags: ['新能源', '固态电池', '专家'], reward: '参与+200积分，仅限深度交流用户'
     },
     {
       id: 4, type: '活动', typeClass: 'event-activity',
@@ -2092,7 +4001,7 @@ function getSampleEvents() {
       title: '【直播回放】量化老师陈明：多因子模型实战讲解',
       date: '2026-05-18 19:30', host: '量化老师陈明',
       participants: 96, points: 30, statusText: '可回放', open: true,
-      desc: '回放内容围绕价值、动量、质量三因子展开，主要验证专业会员对量化研究模板的接受度。',
+      desc: '回放内容围绕价值、动量、质量三因子展开，主要验证深度交流用户对量化研究模板的接受度。',
       tags: ['量化', '因子', '回放'], reward: '观看回放+30积分'
     },
     {
@@ -2100,7 +4009,7 @@ function getSampleEvents() {
       title: '【闭门会】港股互联网板块验证交流',
       date: '2026-05-28 15:00', host: '投资女神Lisa + 港股研究员',
       participants: 24, points: 300, statusText: '即将开放', open: false,
-      desc: '仅限机构试点与专业会员代表参与，重点讨论港股互联网的估值修复逻辑和产品需求访谈。',
+      desc: '仅限机构试点与深度交流代表参与，重点讨论港股互联网的估值修复逻辑和产品需求访谈。',
       tags: ['港股', '互联网', '闭门交流'], reward: '参与+300积分，仅限机构试点'
     },
   ];
@@ -2394,6 +4303,17 @@ const HERMES_MODES = {
     ]
   }
 };
+
+const HERMES_ENTRY_CARDS = [
+  { icon: '🧭', title: '基本面分析', desc: '从盈利、估值、行业位置和争议点输出结构化研究框架。', meta: '适合首轮判断', mode: '基本面分析' },
+  { icon: '⭐', title: '自选股诊断', desc: '围绕继续跟踪、重点研究、暂缓处理三类结论快速落地。', meta: '面向个股处理', mode: '自选股诊断' },
+  { icon: '🔗', title: '证据链归因', desc: '把结论同时挂接研报、纪要、市场数据和置信度。', meta: '适合合规表达', mode: '证据链归因' },
+  { icon: '🧠', title: '投资 Thesis', desc: '提炼买卖条件、验证节点和反证条件，适合沉淀研究档案。', meta: '适合长期跟踪', mode: '方法模板' },
+  { icon: '⚠️', title: '健康检查', desc: '快速扫描红旗、风险词和关键变量失真点。', meta: '适合复核', mode: '线索追踪' },
+  { icon: '📅', title: '复盘速写', desc: '把当天资料压成短版复盘，先形成提纲再决定深挖对象。', meta: '适合高频使用', mode: '复盘速写' },
+];
+
+let currentWatchlistSection = 'overview';
 
 async function selectHermesMode(mode) {
   hermesMode = mode;
@@ -2809,14 +4729,125 @@ function scrollHermesToBottom() {
 let currentDmKol = null;
 let dmConversationsCache = null;
 let dmCurrentHistory = []; // 当前对话上下文 (多轮)
+const DAV_DM_CONVERSATIONS = [
+  { id: 101, user_name: '投研达人_小陈', user_avatar: '👨', tier: '核心用户', last_msg: '老王好！AI算力还能追吗？', time: '5分钟前', unread: 2, vip_only: false },
+  { id: 102, user_name: '价值猎人小林', user_avatar: '🧑', tier: '观察用户', last_msg: '请问港股互联网怎么看？', time: '23分钟前', unread: 1, vip_only: false },
+  { id: 103, user_name: '量化新手_阿明', user_avatar: '😊', tier: '新用户', last_msg: '想学习多因子模型，有推荐吗？', time: '1小时前', unread: 0, vip_only: false },
+];
+const DAV_DM_MESSAGES = {
+  101: [
+    { id: 1, sender: 'user', content: '老王好！AI算力还能追吗？', time: '2026-06-07 09:10', type: 'text' },
+    { id: 2, sender: 'kol', content: '短期先别追高，更适合等回调后再看订单兑现和估值承接。', time: '2026-06-07 09:16', type: 'text' },
+    { id: 3, sender: 'user', content: '那我先继续跟踪，后面想结合 Hermes 再看一次。', time: '2026-06-07 09:18', type: 'text' },
+  ],
+  102: [
+    { id: 1, sender: 'user', content: '请问港股互联网怎么看？', time: '2026-06-07 08:42', type: 'text' },
+    { id: 2, sender: 'kol', content: '我更关注回购强度、南向资金和财报兑现，短期不建议只看情绪。', time: '2026-06-07 08:47', type: 'text' },
+  ],
+  103: [
+    { id: 1, sender: 'user', content: '想学习多因子模型，有推荐吗？', time: '2026-06-07 07:36', type: 'text' },
+    { id: 2, sender: 'kol', content: '可以先从价值、动量、质量三因子的基础框架入手，再结合 Hermes 看示例。', time: '2026-06-07 07:45', type: 'text' },
+  ],
+};
+
+function isDavDmMode() {
+  const activeUser = getActiveDemoUser();
+  return activeUser && activeUser.role === 'dav';
+}
+
+function getInvestorDmConversation() {
+  const activeUser = getActiveDemoUser();
+  return {
+    id: 1,
+    kol_name: activeUser.tenant.advisor,
+    kol_avatar: '👑',
+    tier: '所属大V',
+    last_msg: '好的，我周四直播会详细讲这个方向',
+    time: '5分钟前',
+    unread: 1,
+    vip_only: false,
+  };
+}
+
+function getDmQuickAskOptions() {
+  if (isDavDmMode()) {
+    return [
+      { label: '跟进粉丝', text: '先别急着下结论，我建议你先继续跟踪盈利、估值和验证节点。' },
+      { label: '引导 Hermes', text: '你可以先用 Hermes 跑一轮基本面分析，我再帮你看结论是否站得住。' },
+      { label: '补充风险', text: '这个方向先别只看情绪，最好把风险边界和反证条件一起列出来。' },
+      { label: '安排直播', text: '这个问题我会放到本周直播里展开讲，你也可以先把关注点发给我。' },
+    ];
+  }
+  return [
+    { label: 'A股科技', text: 'A股科技板块现在能追吗?' },
+    { label: '港股互联网', text: '港股互联网值得配置吗?' },
+    { label: '新能源', text: '新能源板块还有机会吗?' },
+    { label: '宏观', text: '美联储降息怎么布局?' },
+  ];
+}
+
+function renderDmQuickAsks() {
+  const host = document.getElementById('dm-quick-asks');
+  if (!host) return;
+  const prefix = isDavDmMode() ? '快捷回复:' : '快捷提问:';
+  host.innerHTML = `
+    <span style="font-size:10px;color:var(--gray-400);padding:5px 8px">${prefix}</span>
+    ${getDmQuickAskOptions().map(item => `
+      <span class="tag tag-gold" style="font-size:11px;cursor:pointer;padding:4px 10px" onclick="dmQuickAsk('${escapeHtml(item.text)}')">${item.label}</span>
+    `).join('')}
+  `;
+}
+
+function syncDmRoleView() {
+  const title = document.getElementById('dm-list-title');
+  const hint = document.getElementById('dm-list-hint');
+  const cardTitle = document.getElementById('dm-role-card-title');
+  const cardDesc = document.getElementById('dm-role-card-desc');
+  const footerTitle = document.getElementById('dm-footer-title');
+  const footerDesc = document.getElementById('dm-footer-desc');
+  const footerBtn = document.getElementById('dm-footer-btn');
+  const input = document.getElementById('dm-input');
+  if (isDavDmMode()) {
+    if (title) title.textContent = '粉丝对话';
+    if (hint) hint.textContent = '仅展示当前租户粉丝会话';
+    if (cardTitle) cardTitle.textContent = '粉丝私信说明';
+    if (cardDesc) cardDesc.textContent = '大V进入消息页后，可查看并回复自己租户内粉丝发来的会话。';
+    if (footerTitle) footerTitle.textContent = '当前消息规则';
+    if (footerDesc) footerDesc.textContent = '粉丝只能和所属大V对话；如需统一处理更多消息，可从“我的”进入工作台。';
+    if (footerBtn) {
+      footerBtn.textContent = '去我的进入工作台';
+      footerBtn.setAttribute('onclick', "switchTab('profile')");
+    }
+    if (input) input.placeholder = '回复粉丝问题，支持多轮沟通...';
+  } else {
+    const activeUser = getActiveDemoUser();
+    if (title) title.textContent = '专属对话';
+    if (hint) hint.textContent = `仅可与所属大V ${activeUser.tenant.advisor} 对话`;
+    if (cardTitle) cardTitle.textContent = '租户私信说明';
+    if (cardDesc) cardDesc.textContent = `普通投资者只能和所属大V ${activeUser.tenant.advisor} 对话，跨租户私信默认关闭。`;
+    if (footerTitle) footerTitle.textContent = '当前消息规则';
+    if (footerDesc) footerDesc.textContent = '投资者只能和所属大V对话，工作台入口统一从“我的”进入。';
+    if (footerBtn) {
+      footerBtn.textContent = '去我的查看租户服务';
+      footerBtn.setAttribute('onclick', "switchTab('profile')");
+    }
+    if (input) input.placeholder = '多轮提问，投顾会基于平台证据链回复...';
+  }
+  renderDmQuickAsks();
+}
 
 async function loadDmConversations() {
-  const container = document.getElementById('dm-conversations-list');
+  syncDmRoleView();
+  if (isDavDmMode()) {
+    dmConversationsCache = DAV_DM_CONVERSATIONS.slice();
+    renderDmConversations(dmConversationsCache);
+    return;
+  }
   try {
     const resp = await fetch('/api/dm/conversations');
     const data = await resp.json();
-    dmConversationsCache = data;
-    renderDmConversations(data);
+    dmConversationsCache = [getInvestorDmConversation()];
+    renderDmConversations(dmConversationsCache);
   } catch (e) {
     // fallback
     renderDmConversations(getMockDmConversations());
@@ -2824,28 +4855,26 @@ async function loadDmConversations() {
 }
 
 function getMockDmConversations() {
-  return [
-    {id:1,kol_name:'财经老王',kol_avatar:'👑',tier:'S级',last_msg:'好的，我周四直播会详细讲这个方向',time:'5分钟前',unread:1,vip_only:false},
-    {id:2,kol_name:'投资女神Lisa',kol_avatar:'💎',tier:'S级',last_msg:'港股互联网的配置建议已发送',time:'2小时前',unread:0,vip_only:false},
-    {id:3,kol_name:'量化老师陈明',kol_avatar:'📊',tier:'A级',last_msg:'[付费内容] 本周多因子模型调仓建议',time:'昨天',unread:0,vip_only:true},
-  ];
+  return isDavDmMode() ? DAV_DM_CONVERSATIONS.slice() : [getInvestorDmConversation()];
 }
 
 function renderDmConversations(list) {
   const container = document.getElementById('dm-conversations-list');
-  const visibleList = (list || []).filter(item => canAccessAdvisor(item.kol_name));
+  const visibleList = isDavDmMode()
+    ? (list || [])
+    : (list || []).filter(item => canAccessAdvisor(item.kol_name));
   if (!visibleList.length) {
     container.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">暂无对话</div>';
     return;
   }
   container.innerHTML = visibleList.map(c => `
-    <div class="dm-conv-item" onclick="openDmChat(${c.id},'${c.kol_name}','${c.kol_avatar}','${c.tier}')">
-      <div class="dm-avatar">${c.kol_avatar}${c.unread>0?'<div class="dm-unread-dot"></div>':''}</div>
+    <div class="dm-conv-item" onclick="openDmChat(${c.id},'${isDavDmMode() ? c.user_name : c.kol_name}','${isDavDmMode() ? c.user_avatar : c.kol_avatar}','${c.tier}')">
+      <div class="dm-avatar">${isDavDmMode() ? c.user_avatar : c.kol_avatar}${c.unread>0?'<div class="dm-unread-dot"></div>':''}</div>
       <div class="dm-conv-info">
         <div class="dm-conv-name">
-          ${c.kol_name}
+          ${isDavDmMode() ? c.user_name : c.kol_name}
           <span style="font-size:10px;background:rgba(200,169,110,0.15);color:var(--gold);padding:1px 5px;border-radius:4px">${c.tier}</span>
-          ${c.vip_only?'<span style="font-size:10px;background:rgba(231,76,60,0.15);color:#E74C3C;padding:1px 5px;border-radius:4px">VIP</span>':''}
+          ${c.vip_only?'<span style="font-size:10px;background:rgba(231,76,60,0.15);color:#E74C3C;padding:1px 5px;border-radius:4px">深度</span>':''}
         </div>
         <div class="dm-conv-last">${c.last_msg}</div>
       </div>
@@ -2855,19 +4884,25 @@ function renderDmConversations(list) {
 }
 
 async function openDmChat(kolId, name, avatar, tier) {
-  if (!canAccessAdvisor(name)) {
+  if (!isDavDmMode() && !canAccessAdvisor(name)) {
     showToast('当前身份仅可与所属租户投顾互动');
     return;
   }
   // Switch to DM tab if not already
   switchTab('dm');
   setTimeout(() => {
-    currentDmKol = { id: kolId, name, avatar, tier };
+    currentDmKol = { id: kolId, name, avatar, tier, role: isDavDmMode() ? 'fan' : 'advisor' };
     document.getElementById('dm-list-view').style.display = 'none';
     document.getElementById('dm-chat-view').style.display = 'block';
     document.getElementById('dm-chat-name').textContent = name;
-    document.getElementById('dm-chat-tier').textContent = tier + ' · 大V投顾';
+    document.getElementById('dm-chat-tier').textContent = isDavDmMode() ? `${tier} · 当前租户粉丝` : `${tier} · 大V投顾`;
     document.getElementById('dm-chat-avatar').textContent = avatar;
+    const badge = document.getElementById('dm-chat-badge');
+    const banner = document.getElementById('dm-compliance-banner');
+    if (badge) badge.textContent = isDavDmMode() ? '粉丝会话' : '专属频道';
+    if (banner) banner.textContent = isDavDmMode()
+      ? '⚠️ 回复粉丝时请保持研究表达克制，避免直接给出买卖建议，所有结论建议附上依据和风险边界。'
+      : '⚠️ 大V投顾分享为个人研究观点，仅供参考，不构成投资建议。投资有风险，决策需谨慎。';
     loadDmMessages(kolId);
   }, 50);
 }
@@ -2881,6 +4916,12 @@ function closeDmChat() {
 async function loadDmMessages(kolId) {
   const container = document.getElementById('dm-messages-container');
   container.innerHTML = '<div style="text-align:center;color:var(--gray-400);font-size:12px;padding:20px">加载中...</div>';
+  if (isDavDmMode()) {
+    const data = DAV_DM_MESSAGES[kolId] || [{id:1,sender:'user',content:'你好，想和你交流一下当前市场看法。',time:'刚刚',type:'text'}];
+    dmCurrentHistory = data.map(m => ({sender:m.sender, content:m.content}));
+    renderDmMessages(data);
+    return;
+  }
   try {
     const resp = await fetch('/api/dm/messages/' + kolId);
     const data = await resp.json();
@@ -2895,19 +4936,24 @@ async function loadDmMessages(kolId) {
 function renderDmMessages(messages) {
   const container = document.getElementById('dm-messages-container');
   container.innerHTML = messages.map(m => {
+    const isDavView = isDavDmMode();
+    const bubbleSide = isDavView
+      ? (m.sender === 'kol' ? 'user' : 'kol')
+      : m.sender;
+    const timeColor = bubbleSide === 'user' ? 'rgba(11,30,58,0.7)' : 'var(--gray-400)';
     if (m.type === 'paid') {
       return `
-        <div class="dm-msg from-kol paid-msg">
+        <div class="dm-msg from-${bubbleSide} paid-msg">
           <div style="font-size:11px;color:var(--gold);font-weight:600;margin-bottom:6px">🔒 付费内容 · ¥${m.price}</div>
           <div style="font-size:13px;color:var(--white);line-height:1.6">${m.preview||'解锁查看完整内容'}</div>
           <button class="btn-gold" style="width:100%;margin-top:10px;padding:6px;font-size:12px" onclick="unlockPaidMsg(${m.price})">解锁查看 ¥${m.price}</button>
-          <div class="dm-msg-time">${m.time}</div>
+          <div class="dm-msg-time" style="color:${timeColor}">${m.time}</div>
         </div>`;
     }
     return `
-      <div class="dm-msg from-${m.sender}">
+      <div class="dm-msg from-${bubbleSide}">
         ${m.content}
-        <div class="dm-msg-time" style="color:${m.sender==='user'?'rgba(11,30,58,0.7)':'var(--gray-400)'}">${m.time}</div>
+        <div class="dm-msg-time" style="color:${timeColor}">${m.time}</div>
       </div>`;
   }).join('');
   // Scroll to bottom
@@ -2922,17 +4968,23 @@ async function sendDm() {
   const container = document.getElementById('dm-messages-container');
   // Append user msg
   const userMsg = document.createElement('div');
-  userMsg.className = 'dm-msg from-user';
-  userMsg.innerHTML = `${text}<div class="dm-msg-time" style="color:rgba(11,30,58,0.7)">刚刚</div>`;
+  userMsg.className = `dm-msg from-${isDavDmMode() ? 'kol' : 'user'}`;
+  userMsg.innerHTML = `${text}<div class="dm-msg-time" style="color:${isDavDmMode() ? 'var(--gray-400)' : 'rgba(11,30,58,0.7)'}">刚刚</div>`;
   container.appendChild(userMsg);
-  dmCurrentHistory.push({sender:'user', content:text});
+  dmCurrentHistory.push({sender:isDavDmMode() ? 'kol' : 'user', content:text});
   container.scrollTop = container.scrollHeight;
   // Typing
   const typing = document.createElement('div');
-  typing.className = 'dm-msg from-kol';
+  typing.className = `dm-msg from-${isDavDmMode() ? 'user' : 'kol'}`;
   typing.innerHTML = '<span style="color:var(--gray-400);font-size:12px">对方正在输入<span class="dot-anim"><span>.</span><span>.</span><span>.</span></span></span>';
   container.appendChild(typing);
   container.scrollTop = container.scrollHeight;
+  if (isDavDmMode()) {
+    await new Promise(r=>setTimeout(r, 600));
+    typing.remove();
+    showToast('已回复粉丝');
+    return;
+  }
   try {
     const resp = await fetch('/api/dm/send', {
       method:'POST', headers:{'Content-Type':'application/json'},

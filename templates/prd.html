@@ -165,7 +165,7 @@ body.theme-light .lv1{color:var(--text-sub)}
   <div class="prd-section-num">SECTION 01</div>
   <h2 class="prd-section-title">产品概述</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">洞见智研是面向C端投资者的轻量化投研产品，当前以基本面分析、自选股、每日复盘三类高频能力切入，并通过后台控制主题和扩展模块的开放节奏。</p>
+  <p class="prd-section-desc">洞见智研是面向C端投资者的轻量化投研产品，当前以基本面分析、自选股、复盘专区、知识专区四类高频能力切入，并通过后台控制主题和扩展模块的开放节奏。</p>
 
   <div class="prd-sub">
     <div class="prd-sub-title">基本信息</div>
@@ -183,7 +183,7 @@ body.theme-light .lv1{color:var(--text-sub)}
     <div class="prd-sub-title">核心价值主张</div>
     <div class="info-card">
       <div class="info-card-title">① 研究辅助优先</div>
-      <div class="info-card-body">默认对外只保留基本面分析、自选股、每日复盘三类高频动作，强调研究辅助、低学习成本和稳定表达，不额外堆叠过多复杂能力。</div>
+      <div class="info-card-body">默认对外优先保留基本面分析、自选股、复盘专区、知识专区四类高频动作，强调研究辅助、低学习成本和稳定表达，不额外堆叠过多复杂能力。</div>
     </div>
     <div class="info-card">
       <div class="info-card-title">② 主题一致性与咨询风体验</div>
@@ -238,7 +238,7 @@ body.theme-light .lv1{color:var(--text-sub)}
   <div class="prd-section-num">SECTION 02</div>
   <h2 class="prd-section-title">用户角色与权限</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">当前版本以“普通用户默认使用三项核心能力 + 管理员后台控开扩展模块”为主。会员、KOL、机构等角色仍保留在规划内，但不作为当前默认开放范围。</p>
+  <p class="prd-section-desc">当前版本以“普通用户默认使用四项核心能力 + 管理员后台控开扩展模块”为主。会员、KOL、机构等角色仍保留在规划内，但不作为当前默认开放范围。</p>
 
   <div class="prd-sub">
     <div class="prd-sub-title">当前版本权限矩阵</div>
@@ -265,7 +265,14 @@ body.theme-light .lv1{color:var(--text-sub)}
         <td>默认开放</td>
       </tr>
       <tr>
-        <td>每日复盘</td>
+        <td>复盘专区</td>
+        <td><span class="check">✓</span></td>
+        <td><span class="check">✓</span></td>
+        <td>否</td>
+        <td>默认开放</td>
+      </tr>
+      <tr>
+        <td>知识专区</td>
         <td><span class="check">✓</span></td>
         <td><span class="check">✓</span></td>
         <td>否</td>
@@ -329,7 +336,7 @@ body.theme-light .lv1{color:var(--text-sub)}
     <div class="prd-sub-title">扩展商业化定价参考</div>
     <table class="prd-table">
       <tr><th>会员档位</th><th>月费</th><th>年费</th><th>核心权益</th></tr>
-      <tr><td>普通用户</td><td>¥0</td><td>¥0</td><td>默认开放基本面分析、自选股、每日复盘、我的</td></tr>
+      <tr><td>普通用户</td><td>¥0</td><td>¥0</td><td>默认开放基本面分析、自选股、复盘专区、知识专区、我的</td></tr>
       <tr><td>基础会员</td><td>¥39</td><td>¥299</td><td>扩展研究深度、更多专题内容、更多使用配额</td></tr>
       <tr><td>专业会员</td><td>¥99</td><td>¥799</td><td>高级研究模块、完整扩展能力、更多个性化服务</td></tr>
       <tr><td>机构VIP</td><td>¥999</td><td>¥8,999</td><td>接口服务、定制分析、专属支持</td></tr>
@@ -353,11 +360,12 @@ body.theme-light .lv1{color:var(--text-sub)}
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">H5用户端</span><span class="arch-route">/h5</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">中后台管理</span><span class="arch-route">/admin</span></div>
       <div class="arch-node"><span class="arch-indent">│  └─ </span><span class="arch-box sub">PRD文档</span><span class="arch-route">/prd</span></div>
-      <div class="arch-node" style="margin-top:8px"><span class="arch-indent">├─ </span><span class="arch-box page">H5用户端</span><span class="arch-route">/h5 · 默认4个底部导航</span></div>
+      <div class="arch-node" style="margin-top:8px"><span class="arch-indent">├─ </span><span class="arch-box page">H5用户端</span><span class="arch-route">/h5 · 默认5个核心入口</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">基本面分析</span><span class="arch-route">默认开放</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">自选股</span><span class="arch-route">默认开放</span></div>
-      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">每日复盘</span><span class="arch-route">默认开放</span></div>
-      <div class="arch-node"><span class="arch-indent">│  └─ </span><span class="arch-box sub">我的</span><span class="arch-route">默认开放</span></div>
+      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">复盘专区</span><span class="arch-route">默认开放</span></div>
+      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">知识专区</span><span class="arch-route">默认开放</span></div>
+      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">我的</span><span class="arch-route">默认开放</span></div>
       <div class="arch-node"><span class="arch-indent">│  └─ </span><span class="arch-box sub">社区 / Hermes / 会员 / 消息 / 工作台</span><span class="arch-route">后台按需开放</span></div>
       <div class="arch-node" style="margin-top:8px"><span class="arch-indent">├─ </span><span class="arch-box page">中后台管理</span><span class="arch-route">/admin · 运营配置 + 数据分析</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">运营概览</span></div>
@@ -389,13 +397,15 @@ body.theme-light .lv1{color:var(--text-sub)}
         <span class="flow-box action">首页 · 基本面分析</span>
       </div>
       <!-- Row 2: Tab bar -->
-      <div style="margin:4px 0 4px 0;color:var(--text-sub);font-size:12px;padding-left:2px">底部导航栏（默认 4 Tab）</div>
+      <div style="margin:4px 0 4px 0;color:var(--text-sub);font-size:12px;padding-left:2px">底部导航栏（默认 5 个核心入口）</div>
       <div class="flow-row" style="justify-content:flex-start;flex-wrap:wrap;gap:6px;margin-bottom:4px">
         <span class="flow-box action">自选股</span>
         <span class="flow-arrow" style="color:#9A9590">↔</span>
         <span class="flow-box action">首页 · 基本面分析</span>
         <span class="flow-arrow" style="color:#9A9590">↔</span>
-        <span class="flow-box action">每日复盘</span>
+        <span class="flow-box action">复盘专区</span>
+        <span class="flow-arrow" style="color:#9A9590">↔</span>
+        <span class="flow-box action">知识专区</span>
         <span class="flow-arrow" style="color:#9A9590">↔</span>
         <span class="flow-box">我的</span>
       </div>
@@ -475,7 +485,7 @@ body.theme-light .lv1{color:var(--text-sub)}
           <div class="hermes-num">3</div>
           <div class="hermes-box wide">
             配置功能开关<br>
-            <span style="font-size:11px;color:var(--text-sub)">默认开放：基本面分析 / 自选股 / 每日复盘</span>
+            <span style="font-size:11px;color:var(--text-sub)">默认开放：基本面分析 / 自选股 / 复盘专区 / 知识专区</span>
           </div>
         </div>
         <div class="hermes-arrow-down">↓</div>
@@ -555,7 +565,7 @@ body.theme-light .lv1{color:var(--text-sub)}
   <div class="prd-section-num">SECTION 04</div>
   <h2 class="prd-section-title">H5用户端功能规格</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">H5端当前按“少量核心能力先验证”的原则收敛为 4 个默认底部导航：基本面分析、自选股、每日复盘、我的。其余模块作为后台可配置能力存在，不默认对外开放。</p>
+  <p class="prd-section-desc">H5端当前按“少量核心能力先验证”的原则收敛为 5 个核心入口：基本面分析、自选股、复盘专区、知识专区、我的。其余模块作为后台可配置能力存在，不默认对外开放。</p>
 
   <div class="prd-sub">
     <div class="prd-sub-title">Tab 1 · 基本面分析</div>
@@ -580,18 +590,29 @@ body.theme-light .lv1{color:var(--text-sub)}
   </div>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">Tab 3 · 每日复盘</div>
+    <div class="prd-sub-title">Tab 3 · 复盘专区</div>
     <table class="prd-table">
       <tr><th>功能点</th><th>描述</th><th>优先级</th><th>状态</th></tr>
-      <tr><td>日终模板</td><td>按固定模板输出主线、情绪、风险点与次日观察项</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>消息聚合</td><td>把大V消息、普通用户与 Hermes 生成的复盘内容、文本和图像摘要整理到独立专区</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
       <tr><td>重点标的关联</td><td>支持结合自选股内容生成更贴近用户关注的复盘视图</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>复盘沉淀</td><td>强调连续记录和研究习惯养成，而非复杂互动链路</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>结构化整理</td><td>按主线、风险点、次日观察项统一整理消息里的重要复盘信息</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
       <tr><td>导出/分享</td><td>后续可开放导出、分享或关联社区分发能力</td><td><span class="p1">P1</span></td><td><span class="planned">后台控制</span></td></tr>
     </table>
   </div>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">Tab 4 · 我的</div>
+    <div class="prd-sub-title">Tab 4 · 知识专区</div>
+    <table class="prd-table">
+      <tr><th>功能点</th><th>描述</th><th>优先级</th><th>状态</th></tr>
+      <tr><td>长期知识沉淀</td><td>把大V通过语音输入、文件上传、网页URL提供的内容沉淀为知识卡，并抽取其中可复用的框架、方法和资料</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>前后台共用</td><td>租户知识板块和前台知识专区使用同一套知识资产，避免重复维护</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>可复用供给</td><td>知识资产可回流给 Hermes、复盘专区和大V工作台使用</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>分类运营</td><td>后续支持按方法、纪要、文件资料、网页资料等分类管理</td><td><span class="p1">P1</span></td><td><span class="planned">规划中</span></td></tr>
+    </table>
+  </div>
+
+  <div class="prd-sub">
+    <div class="prd-sub-title">Tab 5 · 我的</div>
     <table class="prd-table">
       <tr><th>功能点</th><th>描述</th><th>优先级</th><th>状态</th></tr>
       <tr><td>基础个人资料</td><td>展示个人信息、偏好设置与基础账户信息</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
@@ -614,12 +635,12 @@ body.theme-light .lv1{color:var(--text-sub)}
       <tr>
         <td><b>历史可解读 / 未来不解读</b></td>
         <td>对历史数据，AI 可输出涨跌幅、振幅、量能、高低点等结构化解读；对未来走势，仅渲染"看好上沿 / 中性中枢 / 看空下沿"三条数值区间带，不附带任何方向性叙述、不指定时间点、不给目标价。</td>
-        <td>基本面分析 / 每日复盘</td>
+        <td>基本面分析 / 复盘专区</td>
       </tr>
       <tr>
         <td><b>区间替代单点</b></td>
         <td>涉及收益、风险或区间判断时，统一以范围形式表达，强调研究辅助而非确定性结论。</td>
-        <td>基本面分析 / 每日复盘</td>
+        <td>基本面分析 / 复盘专区</td>
       </tr>
       <tr>
         <td><b>大V敏感词守护</b></td>
@@ -629,7 +650,7 @@ body.theme-light .lv1{color:var(--text-sub)}
       <tr>
         <td><b>数据来源透明</b></td>
         <td>分析卡片与复盘内容保留可追溯来源说明，避免只给结论不给依据。</td>
-        <td>基本面分析 / 每日复盘</td>
+        <td>基本面分析 / 复盘专区 / 知识专区</td>
       </tr>
       <tr>
         <td><b>免责声明硬约束</b></td>
@@ -819,7 +840,7 @@ body.theme-light .lv1{color:var(--text-sub)}
       <tr><td>默认主题模式</td><td>支持浅色与深色，浅色为默认</td><td>首页 / H5 / PRD / admin</td><td><span class="done">已实现</span></td></tr>
       <tr><td>默认主题色</td><td>支持蓝、绿、slate、amber 等主题色</td><td>首页 / H5 / PRD / admin</td><td><span class="done">已实现</span></td></tr>
       <tr><td>用户本地偏好</td><td>用户可自行覆盖默认主题选择，本地记忆优先</td><td>首页 / H5 / PRD / admin</td><td><span class="done">已实现</span></td></tr>
-      <tr><td>功能开关</td><td>控制基本面分析、自选股、每日复盘及扩展模块的可见性</td><td>H5 首页导航 / 实际页面</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>功能开关</td><td>控制基本面分析、自选股、复盘专区、知识专区及扩展模块的可见性</td><td>H5 首页导航 / 实际页面</td><td><span class="done">已实现</span></td></tr>
     </table>
   </div>
 
@@ -1128,7 +1149,7 @@ body.theme-light .lv1{color:var(--text-sub)}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="info-card">
         <div class="info-card-title">系统可用性</div>
-        <div class="info-card-body">SLA目标：99.9% uptime（月停机时间 ≤ 43分钟）。核心服务（登录、基本面分析、自选股、每日复盘）优先保障。</div>
+        <div class="info-card-body">SLA目标：99.9% uptime（月停机时间 ≤ 43分钟）。核心服务（登录、基本面分析、自选股、复盘专区、知识专区）优先保障。</div>
       </div>
       <div class="info-card">
         <div class="info-card-title">故障恢复</div>
@@ -1163,7 +1184,8 @@ body.theme-light .lv1{color:var(--text-sub)}
         <div class="roadmap-feature">白底咨询风 + 深色模式</div>
         <div class="roadmap-feature">基本面分析</div>
         <div class="roadmap-feature">自选股</div>
-        <div class="roadmap-feature">每日复盘</div>
+        <div class="roadmap-feature">复盘专区</div>
+        <div class="roadmap-feature">知识专区</div>
         <div class="roadmap-feature">中后台管理</div>
         <div class="roadmap-feature">admin 数据分析分组</div>
         <div class="roadmap-feature">主题色与功能开关</div>
