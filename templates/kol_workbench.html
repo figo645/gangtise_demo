@@ -233,6 +233,188 @@ body { background: var(--surface-2); color: var(--text-main); }
 .kw-chart-value,
 .kw-chart-tick { font-size:11px; fill:var(--text-sub); }
 .kw-chart-value { fill:var(--text-main); font-weight:600; }
+.kw-admin-status { font-size:13px; color:var(--text-sub); margin:12px 0 0; min-height:18px; }
+.kw-admin-build-tag {
+  display:inline-flex;
+  align-items:center;
+  padding:4px 10px;
+  border-radius:999px;
+  background:rgba(47,116,192,0.12);
+  color:var(--gold);
+  font-size:11px;
+  font-weight:600;
+  white-space:nowrap;
+}
+.kw-compact-row {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  padding:12px 14px;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  background:#F8FBFF;
+  font-size:12px;
+  color:var(--text-sub);
+}
+.kw-compact-row strong { color:var(--text-main); }
+.kw-workflow-shell { display:grid; grid-template-columns:250px minmax(0,1fr) 320px; gap:20px; margin-top:16px; }
+.kw-workflow-catalog { display:grid; gap:10px; }
+.kw-workflow-catalog-item {
+  text-align:left;
+  padding:12px 14px;
+  border-radius:14px;
+  border:1px solid rgba(47,116,192,0.10);
+  background:#F8FBFF;
+  color:var(--text-main);
+  cursor:pointer;
+  transition:all .18s ease;
+}
+.kw-workflow-catalog-item:hover {
+  border-color:rgba(47,116,192,0.28);
+  box-shadow:0 10px 24px rgba(31,73,125,0.08);
+  transform:translateY(-1px);
+}
+.kw-workflow-catalog-item strong { display:block; font-size:13px; margin-bottom:4px; }
+.kw-workflow-catalog-item span { display:block; font-size:11px; line-height:1.6; color:var(--text-sub); }
+.kw-workflow-toolbar {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-bottom:14px;
+}
+.kw-workflow-toolbar-left,
+.kw-workflow-toolbar-right { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.kw-workflow-stage {
+  position:relative;
+  overflow:auto;
+  border-radius:16px;
+  border:1px solid rgba(47,116,192,0.10);
+  min-height:760px;
+  background:
+    linear-gradient(90deg, rgba(47,116,192,0.06) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(rgba(47,116,192,0.06) 1px, transparent 1px) 0 0 / 24px 24px,
+    #F8FBFF;
+}
+.kw-workflow-stage-viewport {
+  position:relative;
+  min-width:100%;
+  min-height:760px;
+  transform-origin:0 0;
+  isolation:isolate;
+}
+.kw-workflow-edge-layer {
+  position:absolute;
+  top:0;
+  left:0;
+  pointer-events:none;
+  overflow:visible;
+  z-index:1;
+}
+.kw-workflow-edge {
+  fill:none;
+  stroke:rgba(47,116,192,0.96);
+  stroke-width:4;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  filter:drop-shadow(0 0 10px rgba(47,116,192,0.18));
+}
+.kw-workflow-edge-shadow {
+  fill:none;
+  stroke:rgba(255,255,255,0.98);
+  stroke-width:8;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.kw-workflow-edge-anchor {
+  fill:#FFFFFF;
+  stroke:rgba(47,116,192,0.98);
+  stroke-width:3;
+}
+.kw-workflow-board { position:relative; min-height:760px; z-index:2; }
+.kw-workflow-node {
+  position:absolute;
+  width:220px;
+  padding:12px;
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:14px;
+  box-shadow:0 10px 26px rgba(14,33,55,0.08);
+  cursor:grab;
+  user-select:none;
+  z-index:3;
+}
+.kw-workflow-node.is-selected {
+  border-color:var(--gold);
+  box-shadow:0 12px 28px rgba(47,116,192,0.15);
+}
+.kw-workflow-node-head { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.kw-workflow-node-head strong { font-size:13px; color:var(--text-main); }
+.kw-workflow-node-type {
+  font-size:10px;
+  color:var(--gold);
+  border:1px solid rgba(47,116,192,0.14);
+  border-radius:999px;
+  padding:3px 8px;
+}
+.kw-workflow-node-meta { margin-top:8px; font-size:11px; line-height:1.6; color:var(--text-sub); }
+.kw-workflow-node-ports { display:flex; justify-content:space-between; margin-top:12px; }
+.kw-workflow-port {
+  border:1px solid rgba(47,116,192,0.12);
+  background:#F8FBFF;
+  color:var(--text-main);
+  border-radius:999px;
+  padding:4px 10px;
+  font-size:11px;
+  cursor:pointer;
+  font-family:inherit;
+}
+.kw-workflow-port::before {
+  content:"";
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:var(--gold);
+  display:inline-block;
+  margin-right:6px;
+  box-shadow:0 0 0 3px rgba(47,116,192,0.14);
+}
+.kw-forecast-config-board { display:grid; gap:12px; }
+.kw-forecast-config-section-title { margin:2px 0 8px; font-size:12px; color:var(--text-main); font-weight:700; }
+.kw-forecast-config-field {
+  display:grid;
+  gap:6px;
+  padding:12px 14px;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  background:#F8FBFF;
+}
+.kw-forecast-config-field span { font-size:12px; color:var(--text-sub); }
+.kw-forecast-config-input { display:flex; align-items:center; gap:10px; }
+.kw-forecast-config-input input {
+  flex:1;
+  min-width:0;
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:10px;
+  background:#FFFFFF;
+  color:var(--text-main);
+  padding:10px 12px;
+  font-size:13px;
+}
+.kw-forecast-config-input em {
+  min-width:28px;
+  font-style:normal;
+  font-size:12px;
+  color:var(--gold);
+  text-align:right;
+}
+.kw-forecast-debug-value,
+.kw-forecast-debug-copy,
+.kw-forecast-debug-list,
+.kw-result-line { font-size:12px; color:var(--text-main); line-height:1.7; }
+.kw-result-line strong { color:var(--gold); }
 @media (max-width: 980px) {
   .kw-section-grid,
   .kw-link-grid,
@@ -240,7 +422,8 @@ body { background: var(--surface-2); color: var(--text-main); }
   .kw-cell-grid,
   .kw-review-source-grid,
   .kw-chart-grid,
-  .kw-kpi-row { grid-template-columns:1fr; }
+  .kw-kpi-row,
+  .kw-workflow-shell { grid-template-columns:1fr; }
 }
 </style>
 </head>
@@ -274,6 +457,9 @@ body { background: var(--surface-2); color: var(--text-main); }
         <div class="admin-nav-group-title">研究生产</div>
         <div class="admin-nav-item" data-section="biz-dashboard" onclick="showWorkbenchSection('biz-dashboard', this)">
           <span class="admin-nav-icon">&#128202;</span> 经营 Dashboard
+        </div>
+        <div class="admin-nav-item" data-section="forecast-model" onclick="showWorkbenchSection('forecast-model', this)">
+          <span class="admin-nav-icon">&#128200;</span> 预测模型
         </div>
         <div class="admin-nav-item" data-section="review" onclick="showWorkbenchSection('review', this)">
           <span class="admin-nav-icon">&#9998;</span> 复盘生产台
@@ -507,6 +693,73 @@ body { background: var(--surface-2); color: var(--text-main); }
           <div class="kw-toolbar" style="margin-top:12px">
             <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="showToast('新建群发任务')">发起群发</button>
             <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="showToast('发布今日基本面解读')">发布今日解读</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="workbench-section-forecast-model" style="display:none">
+        <div class="kw-card" style="margin-bottom:20px">
+          <div class="kw-card-head">
+            <div>
+              <div class="kw-card-title">预测算法工作流</div>
+              <div class="kw-card-desc">展示目标价是怎么计算出来的，并允许在后台调整自动收敛参数。</div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <span id="kw-forecast-graph-stats" class="kw-admin-build-tag">0 节点 · 0 连线 · 当前算法</span>
+              <button id="kw-save-forecast-configs" class="btn-gold" type="button" style="padding:9px 14px;font-size:12px">保存算法配置</button>
+            </div>
+          </div>
+          <div id="kw-forecast-save-status" class="kw-admin-status"></div>
+          <div class="kw-workflow-shell">
+            <aside class="kw-card">
+              <div class="kw-card-head" style="margin-bottom:10px">
+                <div>
+                  <div class="kw-card-title">节点库</div>
+                  <div class="kw-card-desc">点击添加节点，拖拽排布，再用“出 / 入”连线。</div>
+                </div>
+              </div>
+              <div id="kw-forecast-node-catalog" class="kw-workflow-catalog"></div>
+            </aside>
+            <section class="kw-card">
+              <div class="kw-card-head">
+                <div>
+                  <div class="kw-card-title">当前预测算法工作流</div>
+                  <div class="kw-card-desc" id="kw-forecast-workflow-summary">这里展示你当前使用的预测工作流。调整节点、连线和参数，会直接改变你后续复盘和解读使用的算法结构。</div>
+                </div>
+              </div>
+              <div class="kw-workflow-toolbar">
+                <div class="kw-workflow-toolbar-left">
+                  <button id="kw-forecast-reset-graph" class="btn-outline" type="button" style="padding:8px 12px;font-size:12px">恢复默认图</button>
+                  <button id="kw-forecast-center-view" class="btn-outline" type="button" style="padding:8px 12px;font-size:12px">居中视图</button>
+                </div>
+                <div class="kw-workflow-toolbar-right">
+                  <button id="kw-forecast-zoom-out" class="btn-outline" type="button" style="padding:8px 12px;font-size:12px">-</button>
+                  <button id="kw-forecast-zoom-in" class="btn-outline" type="button" style="padding:8px 12px;font-size:12px">+</button>
+                </div>
+              </div>
+              <div class="kw-workflow-stage">
+                <div id="kw-forecast-stage-viewport" class="kw-workflow-stage-viewport">
+                  <svg id="kw-forecast-edge-layer" class="kw-workflow-edge-layer"></svg>
+                  <div id="kw-forecast-workflow-board" class="kw-workflow-board"></div>
+                </div>
+              </div>
+            </section>
+            <aside class="kw-card">
+              <div class="kw-card-head" style="margin-bottom:10px">
+                <div>
+                  <div class="kw-card-title">节点检查器</div>
+                  <div class="kw-card-desc">选中节点后，编辑标签、参数和全局 tuning；右侧同时看到节点的预览输出。</div>
+                </div>
+              </div>
+              <div id="kw-forecast-config-board" class="kw-forecast-config-board"></div>
+              <div class="kw-card-head" style="margin-top:16px;margin-bottom:10px">
+                <div>
+                  <div class="kw-card-title">节点调试预览</div>
+                  <div class="kw-card-desc">查看当前节点的公式、示例输出和上下文摘要。</div>
+                </div>
+              </div>
+              <div id="kw-forecast-node-debug" class="kw-forecast-config-board"></div>
+            </aside>
           </div>
         </div>
       </div>
@@ -781,6 +1034,7 @@ const workbenchSectionMeta = {
   messages: { title: '粉丝消息', summary: '查看粉丝提问、大V回复链路和复盘发布后的触达提醒。' },
   broadcast: { title: '群发助手', summary: '只保留大V自己的分层触达、今日解读和复盘提醒动作。' },
   'biz-dashboard': { title: '经营 Dashboard', summary: '整合粉丝增长、注册费、总注册收入、其他收入、token 消耗、消息数量分布与趋势、发布数量分布与趋势。' },
+  'forecast-model': { title: '预测模型', summary: '展示目标价是怎么计算出来的，并允许在后台调整自动收敛参数。' },
   review: { title: '复盘生产台', summary: '按周期、供稿方式、选股归纳和段落方式组织复盘生产流程。' },
   knowledge: { title: '知识库微调', summary: '历史知识内容可继续弹框微调，修改后重新同步 Hermes 和知识专区。' },
   hermes: { title: 'Hermes 工作台', summary: '统一管理工作区版和龙虾纯对话版的产品口径、skills 和知识绑定。' },
@@ -884,6 +1138,465 @@ function renderWorkbenchBizCharts() {
   renderWorkbenchTrendChart('kw-publish-trend-chart', metrics.publish_trend);
 }
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value);
+}
+
+let kwForecastConfig = {};
+let kwForecastWorkflowMeta = {};
+let kwForecastGraph = {nodes: [], edges: [], tuning: {}};
+let kwSelectedForecastNodeId = '';
+let kwForecastDragState = null;
+let kwForecastLinkState = null;
+let kwForecastZoom = 1;
+let kwForecastEditorBootstrapped = false;
+let kwForecastLoaded = false;
+
+function renderWorkbenchForecastWorkflow() {
+  const board = document.getElementById('kw-forecast-workflow-board');
+  const summary = document.getElementById('kw-forecast-workflow-summary');
+  const stats = document.getElementById('kw-forecast-graph-stats');
+  const preview = kwForecastWorkflowMeta.preview || {};
+  if (summary) {
+    const result = preview.result || {};
+    summary.textContent = result.predicted_change_pct !== undefined
+      ? `当前示例预览输出 ${Number(result.predicted_change_pct || 0).toFixed(2)}%，波动上限 ${Number(result.volatility_cap || 0).toFixed(2)}%。这套 DAG 会直接决定目标价的自动收敛路径。`
+      : (kwForecastWorkflowMeta.summary || '展示目标价是怎么计算出来的，并允许在后台调整自动收敛参数。');
+  }
+  if (stats) {
+    stats.textContent = `${(kwForecastGraph.nodes || []).length} 节点 · ${(kwForecastGraph.edges || []).length} 连线 · 当前算法`;
+  }
+  if (!board) return;
+  const graph = kwForecastWorkflowMeta.graph || kwForecastGraph;
+  const nodes = Array.isArray(graph.nodes) ? graph.nodes : [];
+  applyWorkbenchForecastZoom();
+  if (!nodes.length) {
+    board.innerHTML = `<div class="kw-compact-row"><strong>暂无工作流节点</strong><span>0</span></div>`;
+    const edgeLayer = document.getElementById('kw-forecast-edge-layer');
+    if (edgeLayer) edgeLayer.innerHTML = '';
+    return;
+  }
+  board.innerHTML = nodes.map((item) => `
+    <article class="kw-workflow-node ${item.id === kwSelectedForecastNodeId ? 'is-selected' : ''}" data-node-id="${escapeAttr(item.id || '')}" style="left:${Number(item.x || 0)}px;top:${Number(item.y || 0)}px;">
+      <div class="kw-workflow-node-head">
+        <strong>${escapeHtml(item.label || item.id || '-')}</strong>
+        <span class="kw-workflow-node-type">${escapeHtml(item.processor || '')}</span>
+      </div>
+      <div class="kw-workflow-node-meta">${escapeHtml(describeWorkbenchForecastNode(item))}</div>
+      <div class="kw-workflow-node-ports">
+        <button type="button" class="kw-workflow-port" data-port-action="select" data-node-id="${escapeAttr(item.id || '')}">入</button>
+        <button type="button" class="kw-workflow-port" data-port-action="link" data-node-id="${escapeAttr(item.id || '')}">出</button>
+      </div>
+    </article>
+  `).join('');
+  bindWorkbenchForecastGraphEvents();
+  renderWorkbenchForecastEdges();
+  renderWorkbenchForecastCatalog();
+}
+
+function renderWorkbenchForecastConfigBoard() {
+  const board = document.getElementById('kw-forecast-config-board');
+  if (!board) return;
+  const selectedNode = (kwForecastGraph.nodes || []).find((item) => item.id === kwSelectedForecastNodeId) || null;
+  const catalog = Array.isArray(kwForecastWorkflowMeta.catalog) ? kwForecastWorkflowMeta.catalog : [];
+  const nodeSpec = selectedNode ? catalog.find((item) => item.processor === selectedNode.processor) : null;
+  const tuningEntries = Object.entries(kwForecastConfig || {});
+  const paramFields = Array.isArray(nodeSpec?.params) ? nodeSpec.params : [];
+  const selectedBlock = selectedNode ? `
+    <div class="kw-forecast-config-section-title">节点参数 · ${escapeHtml(selectedNode.label || selectedNode.id || '')}</div>
+    <label class="kw-forecast-config-field">
+      <span>节点名称</span>
+      <div class="kw-forecast-config-input">
+        <input data-kw-node-label value="${escapeAttr(String(selectedNode.label || ''))}">
+        <em>label</em>
+      </div>
+    </label>
+    ${paramFields.length ? paramFields.map((field) => `
+      <label class="kw-forecast-config-field">
+        <span>${escapeHtml(field.label || field.key || '-')}</span>
+        <div class="kw-forecast-config-input">
+          <input data-kw-node-param="${escapeAttr(field.key || '')}" value="${escapeAttr(String(selectedNode.params?.[field.key] ?? ''))}">
+          <em>${escapeHtml(field.kind || '')}</em>
+        </div>
+      </label>
+    `).join('') : `<div class="kw-compact-row"><strong>当前节点无独立参数</strong><span>${escapeHtml(selectedNode.processor || '')}</span></div>`}
+    <div style="display:flex;justify-content:flex-end;margin-top:10px">
+      <button type="button" class="btn-outline" id="kw-forecast-delete-node" style="padding:8px 12px;font-size:12px">删除节点</button>
+    </div>
+  ` : `<div class="kw-compact-row"><strong>未选中节点</strong><span>点击画布节点后编辑参数</span></div>`;
+  board.innerHTML = `
+    ${selectedBlock}
+    <div class="kw-forecast-config-section-title">全局 Tuning</div>
+    ${tuningEntries.map(([key, value]) => `
+      <label class="kw-forecast-config-field">
+        <span>${escapeHtml(key)}</span>
+        <div class="kw-forecast-config-input">
+          <input data-kw-forecast-field="${escapeAttr(key)}" inputmode="decimal" step="0.05" value="${escapeAttr(String(value ?? ''))}">
+          <em>tuning</em>
+        </div>
+      </label>
+    `).join('')}
+  `;
+  document.getElementById('kw-forecast-delete-node')?.addEventListener('click', deleteWorkbenchForecastNode);
+}
+
+function renderWorkbenchForecastNodeDebug() {
+  const board = document.getElementById('kw-forecast-node-debug');
+  if (!board) return;
+  const selectedNode = (kwForecastGraph.nodes || []).find((item) => item.id === kwSelectedForecastNodeId) || null;
+  const nodeResults = kwForecastWorkflowMeta.preview?.node_results || kwForecastWorkflowMeta.graph?.node_results || {};
+  if (!selectedNode) {
+    board.innerHTML = `<div class="kw-compact-row"><strong>未选中节点</strong><span>暂无调试信息</span></div>`;
+    return;
+  }
+  const debug = nodeResults[selectedNode.id];
+  if (!debug) {
+    board.innerHTML = `<div class="kw-compact-row"><strong>${escapeHtml(selectedNode.label || selectedNode.id || '-')}</strong><span>暂无运行结果</span></div>`;
+    return;
+  }
+  const preview = debug.context_preview && typeof debug.context_preview === 'object'
+    ? Object.entries(debug.context_preview).map(([key, value]) => `<div class="kw-result-line"><strong>${escapeHtml(key)}</strong> · ${escapeHtml(String(value))}</div>`).join('')
+    : `<div class="kw-result-line">暂无上下文预览</div>`;
+  board.innerHTML = `
+    <div class="kw-forecast-config-field">
+      <span>当前输出</span>
+      <div class="kw-forecast-debug-value">${escapeHtml(String(debug.value ?? '--'))}</div>
+    </div>
+    <div class="kw-forecast-config-field">
+      <span>计算公式</span>
+      <div class="kw-forecast-debug-copy">${escapeHtml(debug.formula || '暂无')}</div>
+    </div>
+    <div class="kw-forecast-config-field">
+      <span>说明</span>
+      <div class="kw-forecast-debug-copy">${escapeHtml(debug.note || '暂无')}</div>
+    </div>
+    <div class="kw-forecast-config-field">
+      <span>上下文预览</span>
+      <div class="kw-forecast-debug-list">${preview}</div>
+    </div>
+  `;
+}
+
+function describeWorkbenchForecastNode(node) {
+  const params = node?.params || {};
+  const keys = Object.keys(params);
+  return keys.length ? keys.map((key) => `${key}:${params[key]}`).join(' · ') : '无附加参数';
+}
+
+function renderWorkbenchForecastCatalog() {
+  const host = document.getElementById('kw-forecast-node-catalog');
+  if (!host) return;
+  const catalog = Array.isArray(kwForecastWorkflowMeta.catalog) ? kwForecastWorkflowMeta.catalog : [];
+  host.innerHTML = catalog.map((item) => `
+    <button type="button" class="kw-workflow-catalog-item" data-add-processor="${escapeAttr(item.processor || '')}">
+      <strong>${escapeHtml(item.label || item.processor || '-')}</strong>
+      <span>${escapeHtml(item.description || '')}</span>
+    </button>
+  `).join('');
+  host.querySelectorAll('[data-add-processor]').forEach((node) => {
+    node.addEventListener('click', () => addWorkbenchForecastNode(node.dataset.addProcessor || 'source'));
+  });
+}
+
+function renderWorkbenchForecastEdges() {
+  const layer = document.getElementById('kw-forecast-edge-layer');
+  const board = document.getElementById('kw-forecast-workflow-board');
+  const viewport = document.getElementById('kw-forecast-stage-viewport');
+  if (!layer || !board) return;
+  const nodes = Array.isArray(kwForecastGraph.nodes) ? kwForecastGraph.nodes : [];
+  const edges = Array.isArray(kwForecastGraph.edges) ? kwForecastGraph.edges : [];
+  const width = Math.max(1800, ...nodes.map((item) => Number(item.x || 0) + 280));
+  const height = Math.max(760, ...nodes.map((item) => Number(item.y || 0) + 180));
+  board.style.width = `${width}px`;
+  board.style.height = `${height}px`;
+  if (viewport) {
+    viewport.style.width = `${width}px`;
+    viewport.style.height = `${height}px`;
+  }
+  layer.setAttribute('width', String(width));
+  layer.setAttribute('height', String(height));
+  layer.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  layer.innerHTML = `
+    <defs>
+      <marker id="kw-workflow-arrowhead" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M 0 1 L 11 6 L 0 11 z" fill="rgba(47, 116, 192, 0.96)"></path>
+      </marker>
+    </defs>
+    ${edges.map((edge) => {
+      const fromNode = nodes.find((item) => item.id === edge.from);
+      const toNode = nodes.find((item) => item.id === edge.to);
+      if (!fromNode || !toNode) return '';
+      const startX = Number(fromNode.x || 0) + 220;
+      const startY = Number(fromNode.y || 0) + 52;
+      const endX = Number(toNode.x || 0);
+      const endY = Number(toNode.y || 0) + 52;
+      const deltaX = endX - startX;
+      const controlOffset = Math.max(80, Math.min(180, Math.abs(deltaX) * 0.45));
+      const controlA = startX + (deltaX >= 0 ? controlOffset : -controlOffset);
+      const controlB = endX - (deltaX >= 0 ? controlOffset : -controlOffset);
+      const path = `M ${startX} ${startY} C ${controlA} ${startY}, ${controlB} ${endY}, ${endX} ${endY}`;
+      return `
+        <g data-edge-id="${escapeAttr(edge.id || '')}">
+          <path class="kw-workflow-edge-shadow" d="${path}"></path>
+          <path class="kw-workflow-edge" d="${path}" marker-end="url(#kw-workflow-arrowhead)"></path>
+          <circle class="kw-workflow-edge-anchor" cx="${startX}" cy="${startY}" r="5"></circle>
+          <circle class="kw-workflow-edge-anchor" cx="${endX}" cy="${endY}" r="5"></circle>
+        </g>
+      `;
+    }).join('')}
+  `;
+}
+
+function applyWorkbenchForecastZoom() {
+  const viewport = document.getElementById('kw-forecast-stage-viewport');
+  if (!viewport) return;
+  viewport.style.transform = `scale(${kwForecastZoom})`;
+  viewport.dataset.zoom = String(kwForecastZoom);
+}
+
+function bindWorkbenchForecastGraphEvents() {
+  document.querySelectorAll('.kw-workflow-node').forEach((node) => {
+    node.addEventListener('click', (event) => {
+      if (event.target instanceof HTMLElement && event.target.dataset.portAction) return;
+      kwSelectedForecastNodeId = node.dataset.nodeId || '';
+      renderWorkbenchForecastWorkflow();
+      renderWorkbenchForecastConfigBoard();
+      renderWorkbenchForecastNodeDebug();
+    });
+    node.addEventListener('pointerdown', (event) => {
+      if (event.target instanceof HTMLElement && event.target.dataset.portAction) return;
+      const nodeId = node.dataset.nodeId || '';
+      const item = (kwForecastGraph.nodes || []).find((row) => row.id === nodeId);
+      if (!item) return;
+      kwSelectedForecastNodeId = nodeId;
+      kwForecastDragState = {
+        nodeId,
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: Number(item.x || 0),
+        originY: Number(item.y || 0),
+      };
+      node.setPointerCapture?.(event.pointerId);
+    });
+  });
+  document.querySelectorAll('[data-port-action="link"]').forEach((node) => {
+    node.addEventListener('click', (event) => {
+      const target = event.currentTarget;
+      if (!(target instanceof HTMLElement) || !target.closest('.kw-workflow-node')) return;
+      kwForecastLinkState = {from: target.dataset.nodeId || ''};
+    });
+  });
+  document.querySelectorAll('[data-port-action="select"]').forEach((node) => {
+    node.addEventListener('click', (event) => {
+      const target = event.currentTarget;
+      if (!(target instanceof HTMLElement) || !target.closest('.kw-workflow-node')) return;
+      const nodeId = target.dataset.nodeId || '';
+      if (kwForecastLinkState?.from && kwForecastLinkState.from !== nodeId) {
+        addWorkbenchForecastEdge(kwForecastLinkState.from, nodeId);
+        kwForecastLinkState = null;
+        renderWorkbenchForecastWorkflow();
+        renderWorkbenchForecastConfigBoard();
+        renderWorkbenchForecastNodeDebug();
+        return;
+      }
+      kwSelectedForecastNodeId = nodeId;
+      renderWorkbenchForecastWorkflow();
+      renderWorkbenchForecastConfigBoard();
+      renderWorkbenchForecastNodeDebug();
+    });
+  });
+}
+
+window.addEventListener('pointermove', (event) => {
+  if (!kwForecastDragState) return;
+  const item = (kwForecastGraph.nodes || []).find((row) => row.id === kwForecastDragState.nodeId);
+  if (!item) return;
+  const zoom = kwForecastZoom || 1;
+  item.x = Math.max(8, kwForecastDragState.originX + (event.clientX - kwForecastDragState.startX) / zoom);
+  item.y = Math.max(8, kwForecastDragState.originY + (event.clientY - kwForecastDragState.startY) / zoom);
+  renderWorkbenchForecastWorkflow();
+  renderWorkbenchForecastConfigBoard();
+  renderWorkbenchForecastNodeDebug();
+});
+
+window.addEventListener('pointerup', () => {
+  kwForecastDragState = null;
+});
+
+function addWorkbenchForecastNode(processor) {
+  const catalog = Array.isArray(kwForecastWorkflowMeta.catalog) ? kwForecastWorkflowMeta.catalog : [];
+  const spec = catalog.find((item) => item.processor === processor) || {label: processor, params: []};
+  const nextIndex = (kwForecastGraph.nodes || []).length + 1;
+  const nodeId = `${processor}_${Date.now()}_${nextIndex}`;
+  const params = {};
+  (spec.params || []).forEach((item) => {
+    params[item.key] = '';
+  });
+  kwForecastGraph.nodes.push({
+    id: nodeId,
+    label: spec.label || processor,
+    processor,
+    x: 120 + (nextIndex % 3) * 260,
+    y: 120 + Math.floor(nextIndex / 3) * 120,
+    params,
+  });
+  kwSelectedForecastNodeId = nodeId;
+  renderWorkbenchForecastWorkflow();
+  renderWorkbenchForecastConfigBoard();
+  renderWorkbenchForecastNodeDebug();
+}
+
+function addWorkbenchForecastEdge(fromId, toId) {
+  if (!fromId || !toId || fromId === toId) return;
+  if ((kwForecastGraph.edges || []).some((item) => item.from === fromId && item.to === toId)) return;
+  kwForecastGraph.edges.push({id: `edge_${Date.now()}_${kwForecastGraph.edges.length + 1}`, from: fromId, to: toId});
+}
+
+function deleteWorkbenchForecastNode() {
+  if (!kwSelectedForecastNodeId) return;
+  kwForecastGraph.nodes = (kwForecastGraph.nodes || []).filter((item) => item.id !== kwSelectedForecastNodeId);
+  kwForecastGraph.edges = (kwForecastGraph.edges || []).filter((item) => item.from !== kwSelectedForecastNodeId && item.to !== kwSelectedForecastNodeId);
+  kwSelectedForecastNodeId = (kwForecastGraph.nodes || [])[0]?.id || '';
+  renderWorkbenchForecastWorkflow();
+  renderWorkbenchForecastConfigBoard();
+  renderWorkbenchForecastNodeDebug();
+}
+
+function centerWorkbenchForecastView() {
+  const stage = document.querySelector('#workbench-section-forecast-model .kw-workflow-stage');
+  const viewport = document.getElementById('kw-forecast-stage-viewport');
+  if (!stage) return;
+  const targetWidth = viewport ? viewport.offsetWidth * kwForecastZoom : stage.scrollWidth;
+  const targetHeight = viewport ? viewport.offsetHeight * kwForecastZoom : stage.scrollHeight;
+  stage.scrollLeft = Math.max(0, (targetWidth - stage.clientWidth) / 2);
+  stage.scrollTop = Math.max(0, (targetHeight - stage.clientHeight) / 2);
+}
+
+function collectWorkbenchForecastConfig() {
+  document.querySelectorAll('[data-kw-forecast-field]').forEach((fieldNode) => {
+    const field = fieldNode.dataset.kwForecastField;
+    if (!field) return;
+    kwForecastConfig[field] = Number(fieldNode.value || 0);
+  });
+  const selectedNode = (kwForecastGraph.nodes || []).find((item) => item.id === kwSelectedForecastNodeId);
+  if (selectedNode) {
+    const labelNode = document.querySelector('[data-kw-node-label]');
+    if (labelNode instanceof HTMLInputElement) {
+      selectedNode.label = labelNode.value || selectedNode.label;
+    }
+    document.querySelectorAll('[data-kw-node-param]').forEach((fieldNode) => {
+      const field = fieldNode.dataset.kwNodeParam;
+      if (!field) return;
+      selectedNode.params = selectedNode.params || {};
+      selectedNode.params[field] = fieldNode.value;
+    });
+  }
+  kwForecastGraph.tuning = {...kwForecastConfig};
+}
+
+async function loadWorkbenchForecastModel(forceReload) {
+  if (kwForecastLoaded && !forceReload && kwForecastEditorBootstrapped) return;
+  const res = await fetch('/api/admin/forecast-config');
+  const data = await res.json();
+  if (!res.ok || data.ok === false) throw new Error(data.error || 'forecast_config_failed');
+  kwForecastConfig = data.config || {};
+  kwForecastWorkflowMeta = data.workflow_meta || {};
+  kwForecastGraph = kwForecastWorkflowMeta.graph || {nodes: [], edges: [], tuning: kwForecastConfig};
+  kwForecastGraph.tuning = {...kwForecastConfig};
+  kwSelectedForecastNodeId = (kwForecastGraph.nodes || [])[0]?.id || '';
+  kwForecastLoaded = true;
+  renderWorkbenchForecastWorkflow();
+  renderWorkbenchForecastConfigBoard();
+  renderWorkbenchForecastNodeDebug();
+  centerWorkbenchForecastView();
+}
+
+async function resetWorkbenchForecastGraph() {
+  const statusNode = document.getElementById('kw-forecast-save-status');
+  if (statusNode) statusNode.textContent = '恢复默认图中...';
+  const res = await fetch('/api/admin/forecast-config', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({reset_default: true}),
+  });
+  const data = await res.json();
+  if (!res.ok || data.ok === false) throw new Error(data.error || 'reset_failed');
+  kwForecastConfig = data.config || {};
+  kwForecastWorkflowMeta = data.workflow_meta || {};
+  kwForecastGraph = kwForecastWorkflowMeta.graph || {nodes: [], edges: [], tuning: kwForecastConfig};
+  kwForecastGraph.tuning = {...kwForecastConfig};
+  kwSelectedForecastNodeId = (kwForecastGraph.nodes || [])[0]?.id || '';
+  kwForecastLoaded = true;
+  renderWorkbenchForecastWorkflow();
+  renderWorkbenchForecastConfigBoard();
+  renderWorkbenchForecastNodeDebug();
+  centerWorkbenchForecastView();
+  if (statusNode) statusNode.textContent = '已恢复默认预测算法工作流';
+  showToast('已恢复默认预测算法工作流');
+}
+
+async function saveWorkbenchForecastConfigs() {
+  collectWorkbenchForecastConfig();
+  const statusNode = document.getElementById('kw-forecast-save-status');
+  if (statusNode) statusNode.textContent = '保存中...';
+  const res = await fetch('/api/admin/forecast-config', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({graph: {...kwForecastGraph, tuning: kwForecastConfig}, config: kwForecastConfig}),
+  });
+  const data = await res.json();
+  if (!res.ok || data.ok === false) throw new Error(data.error || 'save_failed');
+  kwForecastConfig = data.config || {};
+  kwForecastWorkflowMeta = data.workflow_meta || {};
+  kwForecastGraph = kwForecastWorkflowMeta.graph || kwForecastGraph;
+  kwForecastGraph.tuning = {...kwForecastConfig};
+  kwSelectedForecastNodeId = (kwForecastGraph.nodes || [])[0]?.id || '';
+  renderWorkbenchForecastWorkflow();
+  renderWorkbenchForecastConfigBoard();
+  renderWorkbenchForecastNodeDebug();
+  if (statusNode) statusNode.textContent = '预测算法配置已保存';
+  showToast('预测算法配置已保存');
+}
+
+function initWorkbenchForecastEditorEvents() {
+  if (kwForecastEditorBootstrapped) return;
+  kwForecastEditorBootstrapped = true;
+  document.getElementById('kw-save-forecast-configs')?.addEventListener('click', async () => {
+    try {
+      await saveWorkbenchForecastConfigs();
+    } catch (error) {
+      showToast(error.message || '保存失败');
+    }
+  });
+  document.getElementById('kw-forecast-reset-graph')?.addEventListener('click', async () => {
+    try {
+      await resetWorkbenchForecastGraph();
+    } catch (error) {
+      showToast(error.message || '恢复失败');
+    }
+  });
+  document.getElementById('kw-forecast-center-view')?.addEventListener('click', () => {
+    centerWorkbenchForecastView();
+  });
+  document.getElementById('kw-forecast-zoom-in')?.addEventListener('click', () => {
+    kwForecastZoom = Math.min(1.8, Number((kwForecastZoom + 0.1).toFixed(2)));
+    applyWorkbenchForecastZoom();
+  });
+  document.getElementById('kw-forecast-zoom-out')?.addEventListener('click', () => {
+    kwForecastZoom = Math.max(0.6, Number((kwForecastZoom - 0.1).toFixed(2)));
+    applyWorkbenchForecastZoom();
+  });
+}
+
 function showWorkbenchSection(name, navEl) {
   document.querySelectorAll('[id^="workbench-section-"]').forEach(el => {
     el.style.display = 'none';
@@ -900,6 +1613,10 @@ function showWorkbenchSection(name, navEl) {
   if (summary) summary.textContent = meta.summary;
   if (name === 'biz-dashboard') {
     renderWorkbenchBizCharts();
+  }
+  if (name === 'forecast-model') {
+    initWorkbenchForecastEditorEvents();
+    loadWorkbenchForecastModel().catch((error) => showToast(error.message || '加载失败'));
   }
   const url = new URL(window.location.href);
   url.searchParams.set('section', name);
@@ -921,6 +1638,7 @@ document.addEventListener('DOMContentLoaded', () => {
     showWorkbenchSection(section);
     return;
   }
+  initWorkbenchForecastEditorEvents();
   renderWorkbenchBizCharts();
 });
 </script>

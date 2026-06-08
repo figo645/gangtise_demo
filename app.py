@@ -1,6 +1,9 @@
 import os
 import json
 import sqlite3
+import copy
+import math
+import statistics
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for, g
 import random
 from datetime import datetime, timedelta
@@ -18,6 +21,7 @@ AUTH_PASSWORD = os.environ.get("GANGTISE_DEMO_PASSWORD", "gangtise")
 AUTH_SESSION_KEY = "gangtise_auth"
 DB_PATH = os.environ.get("GANGTISE_DEMO_DB", os.path.join(os.path.dirname(__file__), "gangtise_demo.db"))
 SITE_CONFIG_KEY = "site_config"
+FORECAST_WORKFLOW_KEY = "forecast_workflow_graph"
 
 DEFAULT_SITE_CONFIG = {
     "default_theme": "light",
@@ -35,6 +39,491 @@ DEFAULT_SITE_CONFIG = {
         "workbench": False,
     },
 }
+
+DEFAULT_FORECAST_TUNING = {
+    "factor_score_clip": 8.0,
+    "factor_signal_limit": 12.0,
+    "momentum_signal_limit": 18.0,
+    "predicted_change_limit": 35.0,
+    "fundamental_adjustment_limit": 3.0,
+    "volatility_cap_multiplier": 1.35,
+    "backtest_weight": 0.55,
+    "confidence_penalty_scale": 0.2,
+    "confidence_floor": 45.0,
+    "range_bound_multiplier": 0.85,
+}
+
+FORECAST_WORKFLOW_NODE_CATALOG = (
+    {
+        "processor": "source",
+        "label": "上下文输入",
+        "description": "从运行时上下文取值，作为后续节点输入。",
+        "params": ({"key": "source_key", "label": "来源键", "kind": "text"},),
+    },
+    {
+        "processor": "raw_signal",
+        "label": "原始信号合成",
+        "description": "将动量、因子和基本面修正合成为原始目标涨跌幅。",
+        "params": (),
+    },
+    {
+        "processor": "clip",
+        "label": "总涨幅限幅",
+        "description": "按绝对上限裁剪原始目标涨跌幅。",
+        "params": ({"key": "limit_key", "label": "限幅参数键", "kind": "text"},),
+    },
+    {
+        "processor": "volatility_cap",
+        "label": "波动率约束",
+        "description": "基于近 30 日波动率压缩目标空间。",
+        "params": ({"key": "multiplier_key", "label": "倍数参数键", "kind": "text"},),
+    },
+    {
+        "processor": "backtest_blend",
+        "label": "回测收缩",
+        "description": "结合历史相似样本平均回报对目标做收缩。",
+        "params": ({"key": "weight_key", "label": "权重参数键", "kind": "text"},),
+    },
+    {
+        "processor": "confidence_guard",
+        "label": "置信度惩罚",
+        "description": "低置信度场景下进一步压缩预测空间。",
+        "params": (
+            {"key": "floor_key", "label": "安全线参数键", "kind": "text"},
+            {"key": "scale_key", "label": "惩罚参数键", "kind": "text"},
+            {"key": "range_key", "label": "震荡系数参数键", "kind": "text"},
+        ),
+    },
+    {
+        "processor": "output",
+        "label": "输出结果",
+        "description": "输出最终高概率目标涨跌幅。",
+        "params": (),
+    },
+)
+
+
+def _coerce_float(value, fallback):
+    try:
+        return float(value)
+    except Exception:
+        return float(fallback)
+
+
+def normalize_forecast_tuning_values(source=None):
+    payload = source or {}
+    normalized = {}
+    for key, default_value in DEFAULT_FORECAST_TUNING.items():
+        raw = payload.get(key, default_value)
+        try:
+            normalized[key] = float(raw)
+        except Exception:
+            normalized[key] = float(default_value)
+    normalized["factor_score_clip"] = max(0.5, normalized["factor_score_clip"])
+    normalized["factor_signal_limit"] = max(1.0, normalized["factor_signal_limit"])
+    normalized["momentum_signal_limit"] = max(1.0, normalized["momentum_signal_limit"])
+    normalized["predicted_change_limit"] = max(3.0, normalized["predicted_change_limit"])
+    normalized["fundamental_adjustment_limit"] = max(0.0, normalized["fundamental_adjustment_limit"])
+    normalized["volatility_cap_multiplier"] = max(0.2, normalized["volatility_cap_multiplier"])
+    normalized["backtest_weight"] = max(0.0, min(1.0, normalized["backtest_weight"]))
+    normalized["confidence_penalty_scale"] = max(0.0, normalized["confidence_penalty_scale"])
+    normalized["confidence_floor"] = max(1.0, min(99.0, normalized["confidence_floor"]))
+    normalized["range_bound_multiplier"] = max(0.4, min(1.0, normalized["range_bound_multiplier"]))
+    return normalized
+
+
+def build_forecast_node_catalog():
+    return [copy.deepcopy(item) for item in FORECAST_WORKFLOW_NODE_CATALOG]
+
+
+def build_default_forecast_workflow_graph(tuning=None):
+    normalized = normalize_forecast_tuning_values(tuning)
+    return {
+        "version": 1,
+        "title": "预测算法工作流",
+        "summary": "展示目标价是怎么计算出来的，并允许在后台调整自动收敛参数。",
+        "nodes": [
+            {"id": "source_signals", "label": "市场信号输入", "processor": "source", "x": 32, "y": 48, "params": {"source_key": "signals_bundle"}},
+            {"id": "source_volatility", "label": "波动率输入", "processor": "source", "x": 32, "y": 188, "params": {"source_key": "volatility_context"}},
+            {"id": "source_backtest", "label": "回测输入", "processor": "source", "x": 32, "y": 328, "params": {"source_key": "backtest_context"}},
+            {"id": "source_confidence", "label": "置信度输入", "processor": "source", "x": 32, "y": 468, "params": {"source_key": "confidence_context"}},
+            {"id": "raw_signal", "label": "原始信号", "processor": "raw_signal", "x": 312, "y": 48, "params": {}},
+            {"id": "predicted_clip", "label": "总涨幅限幅", "processor": "clip", "x": 580, "y": 48, "params": {"limit_key": "predicted_change_limit"}},
+            {"id": "volatility_cap", "label": "波动率约束", "processor": "volatility_cap", "x": 848, "y": 118, "params": {"multiplier_key": "volatility_cap_multiplier"}},
+            {"id": "backtest_shrink", "label": "回测收缩", "processor": "backtest_blend", "x": 1116, "y": 258, "params": {"weight_key": "backtest_weight"}},
+            {"id": "confidence_penalty", "label": "置信度惩罚", "processor": "confidence_guard", "x": 1384, "y": 398, "params": {"floor_key": "confidence_floor", "scale_key": "confidence_penalty_scale", "range_key": "range_bound_multiplier"}},
+            {"id": "final_output", "label": "最终目标涨跌幅", "processor": "output", "x": 1652, "y": 398, "params": {}},
+        ],
+        "edges": [
+            {"id": "edge_signals_raw", "from": "source_signals", "to": "raw_signal"},
+            {"id": "edge_raw_clip", "from": "raw_signal", "to": "predicted_clip"},
+            {"id": "edge_clip_vol", "from": "predicted_clip", "to": "volatility_cap"},
+            {"id": "edge_vol_ctx", "from": "source_volatility", "to": "volatility_cap"},
+            {"id": "edge_vol_backtest", "from": "volatility_cap", "to": "backtest_shrink"},
+            {"id": "edge_backtest_ctx", "from": "source_backtest", "to": "backtest_shrink"},
+            {"id": "edge_backtest_conf", "from": "backtest_shrink", "to": "confidence_penalty"},
+            {"id": "edge_conf_ctx", "from": "source_confidence", "to": "confidence_penalty"},
+            {"id": "edge_conf_output", "from": "confidence_penalty", "to": "final_output"},
+        ],
+        "tuning": normalized,
+    }
+
+
+def normalize_forecast_workflow_graph(payload):
+    source = payload if isinstance(payload, dict) else {}
+    default_graph = build_default_forecast_workflow_graph(source.get("tuning") if isinstance(source.get("tuning"), dict) else None)
+    nodes = source.get("nodes", default_graph["nodes"])
+    edges = source.get("edges", default_graph["edges"])
+    title = str(source.get("title", default_graph["title"]) or default_graph["title"])
+    summary = str(source.get("summary", default_graph["summary"]) or default_graph["summary"])
+    tuning = normalize_forecast_tuning_values(source.get("tuning") if isinstance(source.get("tuning"), dict) else default_graph["tuning"])
+    catalog_map = {item["processor"]: item for item in FORECAST_WORKFLOW_NODE_CATALOG}
+    normalized_nodes = []
+    seen_ids = set()
+    if isinstance(nodes, list):
+        for index, item in enumerate(nodes):
+            if not isinstance(item, dict):
+                continue
+            node_id = str(item.get("id", "")).strip() or f"node_{index + 1}"
+            if node_id in seen_ids:
+                node_id = f"{node_id}_{index + 1}"
+            seen_ids.add(node_id)
+            processor = str(item.get("processor", "source")).strip() or "source"
+            if processor not in catalog_map:
+                processor = "source"
+            fallback_node = default_graph["nodes"][min(index, len(default_graph["nodes"]) - 1)]
+            normalized_nodes.append(
+                {
+                    "id": node_id,
+                    "label": str(item.get("label", catalog_map[processor]["label"]) or catalog_map[processor]["label"]),
+                    "processor": processor,
+                    "x": _coerce_float(item.get("x"), fallback_node["x"]),
+                    "y": _coerce_float(item.get("y"), fallback_node["y"]),
+                    "params": dict(item.get("params", {})) if isinstance(item.get("params"), dict) else {},
+                }
+            )
+    if not normalized_nodes:
+        normalized_nodes = copy.deepcopy(default_graph["nodes"])
+    node_ids = {item["id"] for item in normalized_nodes}
+    normalized_edges = []
+    seen_edge_ids = set()
+    if isinstance(edges, list):
+        for index, item in enumerate(edges):
+            if not isinstance(item, dict):
+                continue
+            from_id = str(item.get("from", "")).strip()
+            to_id = str(item.get("to", "")).strip()
+            if from_id not in node_ids or to_id not in node_ids or from_id == to_id:
+                continue
+            edge_id = str(item.get("id", "")).strip() or f"edge_{index + 1}"
+            if edge_id in seen_edge_ids:
+                edge_id = f"{edge_id}_{index + 1}"
+            if any(row["from"] == from_id and row["to"] == to_id for row in normalized_edges):
+                continue
+            seen_edge_ids.add(edge_id)
+            normalized_edges.append({"id": edge_id, "from": from_id, "to": to_id})
+    if not normalized_edges:
+        normalized_edges = copy.deepcopy(default_graph["edges"])
+    default_nodes = copy.deepcopy(default_graph["nodes"])
+    default_node_map = {item["id"]: item for item in default_nodes}
+    merged_nodes_map = {item["id"]: item for item in normalized_nodes}
+    for default_node in default_nodes:
+        if default_node["id"] not in merged_nodes_map:
+            merged_nodes_map[default_node["id"]] = default_node
+    ordered_nodes = [merged_nodes_map[node["id"]] for node in default_nodes if node["id"] in merged_nodes_map]
+    ordered_nodes.extend([item for item in normalized_nodes if item["id"] not in default_node_map])
+    default_edges = copy.deepcopy(default_graph["edges"])
+    merged_edges = list(normalized_edges)
+    existing_pairs = {(item["from"], item["to"]) for item in merged_edges}
+    for default_edge in default_edges:
+        pair = (default_edge["from"], default_edge["to"])
+        if pair not in existing_pairs:
+            merged_edges.append(default_edge)
+            existing_pairs.add(pair)
+    return {
+        "version": 1,
+        "title": title,
+        "summary": summary,
+        "nodes": ordered_nodes,
+        "edges": merged_edges,
+        "tuning": tuning,
+    }
+
+
+def workflow_graph_to_tuning(graph):
+    normalized_graph = normalize_forecast_workflow_graph(graph)
+    tuning = dict(normalized_graph.get("tuning", {}))
+    for node in normalized_graph["nodes"]:
+        params = node.get("params", {})
+        if not isinstance(params, dict):
+            continue
+        for key in ("limit_key", "multiplier_key", "weight_key", "floor_key", "scale_key", "range_key"):
+            tuning_key = str(params.get(key, "")).strip()
+            if tuning_key in DEFAULT_FORECAST_TUNING and tuning_key not in tuning:
+                tuning[tuning_key] = DEFAULT_FORECAST_TUNING[tuning_key]
+    return normalize_forecast_tuning_values(tuning)
+
+
+def _build_context_preview(context):
+    if not isinstance(context, dict):
+        return {}
+    preview = {}
+    for key, value in context.items():
+        if isinstance(value, float):
+            preview[key] = round(value, 3)
+        elif isinstance(value, (int, str)):
+            preview[key] = value
+    return preview
+
+
+def _topological_nodes(graph):
+    nodes = graph.get("nodes", [])
+    edges = graph.get("edges", [])
+    incoming = {item["id"]: 0 for item in nodes}
+    outgoing = {item["id"]: [] for item in nodes}
+    for edge in edges:
+        if edge["from"] in outgoing and edge["to"] in incoming:
+            outgoing[edge["from"]].append(edge["to"])
+            incoming[edge["to"]] += 1
+    queue = [item["id"] for item in nodes if incoming[item["id"]] == 0]
+    ordered = []
+    while queue:
+        node_id = queue.pop(0)
+        ordered.append(node_id)
+        for target in outgoing.get(node_id, []):
+            incoming[target] -= 1
+            if incoming[target] == 0:
+                queue.append(target)
+    if len(ordered) != len(nodes):
+        return [item["id"] for item in nodes]
+    return ordered
+
+
+def _build_runtime_contexts(tuning):
+    closes = [100 + idx * 0.28 + ((idx % 7) - 3) * 0.22 for idx in range(90)]
+    returns = []
+    for idx in range(1, len(closes)):
+        prev = closes[idx - 1]
+        returns.append((closes[idx] - prev) / prev)
+    recent_returns = returns[-30:]
+    realized_daily_vol = statistics.pstdev(recent_returns) if len(recent_returns) > 1 else 0.0
+    volatility_cap = max(4.0, realized_daily_vol * math.sqrt(20) * 100 * tuning["volatility_cap_multiplier"])
+    avg_return_pct = 6.8
+    up_probability = 61.5
+    sample_size = 18
+    sample_confidence = min(1.0, sample_size / 12.0)
+    backtest_anchor = avg_return_pct * (0.55 + 0.45 * sample_confidence)
+    raw_factor_signal = 11.3
+    factor_signal = max(-tuning["factor_signal_limit"], min(tuning["factor_signal_limit"], 9.2))
+    momentum_signal = max(-tuning["momentum_signal_limit"], min(tuning["momentum_signal_limit"], 8.4))
+    confidence = 68.0
+    bullish_confidence = 63.0
+    confidence_penalty = max(0.0, (tuning["confidence_floor"] - confidence) * tuning["confidence_penalty_scale"] / 10.0)
+    return {
+        "signals_bundle": {
+            "stance": "震荡偏上",
+            "raw_factor_signal": raw_factor_signal,
+            "factor_signal": factor_signal,
+            "momentum_signal": momentum_signal,
+            "fundamental_adjustment": 1.1,
+            "bullish_confidence": bullish_confidence,
+        },
+        "volatility_context": {
+            "realized_daily_vol": realized_daily_vol,
+            "volatility_cap": volatility_cap,
+        },
+        "backtest_context": {
+            "avg_return_pct": avg_return_pct,
+            "up_probability": up_probability,
+            "sample_size": sample_size,
+            "sample_confidence": sample_confidence,
+            "backtest_anchor": backtest_anchor,
+        },
+        "confidence_context": {
+            "confidence": confidence,
+            "confidence_floor": tuning["confidence_floor"],
+            "confidence_penalty": confidence_penalty,
+            "range_bound_multiplier": tuning["range_bound_multiplier"],
+        },
+    }
+
+
+def _execute_workflow_node(node, upstream_values, contexts, tuning):
+    processor = node.get("processor", "source")
+    params = node.get("params", {}) if isinstance(node.get("params"), dict) else {}
+    if processor == "source":
+        source_key = str(params.get("source_key", "")).strip()
+        context = contexts.get(source_key, {})
+        label = source_key or "unknown_context"
+        return {
+            "value": 0.0,
+            "formula": f"context[{label}]",
+            "note": "提供运行时上下文，不直接产生目标涨跌幅。",
+            "context": context,
+        }
+    if processor == "raw_signal":
+        signal_context = {}
+        for item in upstream_values:
+            if isinstance(item.get("context"), dict):
+                signal_context.update(item["context"])
+        value = float(signal_context.get("factor_signal", 0)) * 0.45 + float(signal_context.get("momentum_signal", 0)) * 0.35 + float(signal_context.get("fundamental_adjustment", 0)) * 0.2
+        value = max(-tuning["factor_score_clip"], min(tuning["factor_score_clip"], value))
+        return {
+            "value": value,
+            "formula": "0.45*因子信号 + 0.35*动量信号 + 0.20*基本面修正",
+            "note": "先把多来源强弱合成为单一原始预测信号。",
+            "context": signal_context,
+        }
+    if processor == "clip":
+        limit = tuning.get(str(params.get("limit_key", "predicted_change_limit")).strip(), tuning["predicted_change_limit"])
+        input_value = float(upstream_values[0].get("value", 0) if upstream_values else 0)
+        value = max(-limit, min(limit, input_value))
+        return {
+            "value": value,
+            "formula": f"clip(raw_signal, ±{round(limit, 2)})",
+            "note": "限制单轮预测不超过全局上限。",
+            "context": {"input_value": input_value, "limit": limit},
+        }
+    if processor == "volatility_cap":
+        input_value = float(upstream_values[0].get("value", 0) if upstream_values else 0)
+        volatility_context = {}
+        for item in upstream_values:
+            if isinstance(item.get("context"), dict):
+                volatility_context.update(item["context"])
+        cap = float(volatility_context.get("volatility_cap", 0))
+        limited = max(-cap, min(cap, input_value))
+        return {
+            "value": limited,
+            "formula": "clip(predicted_change, ±volatility_cap)",
+            "note": "按近 30 日波动率压缩目标涨跌幅。",
+            "context": dict(volatility_context, input_value=input_value),
+        }
+    if processor == "backtest_blend":
+        input_value = float(upstream_values[0].get("value", 0) if upstream_values else 0)
+        backtest_context = {}
+        for item in upstream_values:
+            if isinstance(item.get("context"), dict):
+                backtest_context.update(item["context"])
+        weight = tuning.get(str(params.get("weight_key", "backtest_weight")).strip(), tuning["backtest_weight"])
+        anchor = float(backtest_context.get("backtest_anchor", 0))
+        value = input_value * (1 - weight) + anchor * weight
+        return {
+            "value": value,
+            "formula": f"(1-{round(weight, 2)})*波动率约束后结果 + {round(weight, 2)}*回测锚",
+            "note": "把当前信号和历史相似样本均值做加权收缩。",
+            "context": dict(backtest_context, input_value=input_value, weight=weight),
+        }
+    if processor == "confidence_guard":
+        input_value = float(upstream_values[0].get("value", 0) if upstream_values else 0)
+        confidence_context = {}
+        for item in upstream_values:
+            if isinstance(item.get("context"), dict):
+                confidence_context.update(item["context"])
+        penalty = float(confidence_context.get("confidence_penalty", 0))
+        range_multiplier = tuning.get(str(params.get("range_key", "range_bound_multiplier")).strip(), tuning["range_bound_multiplier"])
+        adjusted = input_value - penalty if input_value >= 0 else input_value + penalty
+        adjusted *= range_multiplier
+        return {
+            "value": adjusted,
+            "formula": f"(回测收缩结果 {'-' if input_value >= 0 else '+'} 置信度惩罚) * {round(range_multiplier, 2)}",
+            "note": "置信度不够时继续收窄空间，避免目标价过度发散。",
+            "context": dict(confidence_context, input_value=input_value, range_multiplier=range_multiplier),
+        }
+    input_value = float(upstream_values[0].get("value", 0) if upstream_values else 0)
+    return {
+        "value": input_value,
+        "formula": "output(previous_step)",
+        "note": "输出当前工作流最终结果。",
+        "context": {"input_value": input_value},
+    }
+
+
+def run_forecast_workflow_graph(graph):
+    normalized_graph = normalize_forecast_workflow_graph(graph)
+    tuning = workflow_graph_to_tuning(normalized_graph)
+    contexts = _build_runtime_contexts(tuning)
+    ordered_nodes = _topological_nodes(normalized_graph)
+    node_lookup = {item["id"]: item for item in normalized_graph["nodes"]}
+    incoming_map = {item["id"]: [] for item in normalized_graph["nodes"]}
+    for edge in normalized_graph["edges"]:
+        incoming_map.setdefault(edge["to"], []).append(edge["from"])
+    runtime_values = {}
+    steps = []
+    node_results = {}
+    final_value = 0.0
+    for node_id in ordered_nodes:
+        node = node_lookup[node_id]
+        upstream_values = [runtime_values[source_id] for source_id in incoming_map.get(node_id, []) if source_id in runtime_values]
+        result = _execute_workflow_node(node, upstream_values, contexts, tuning)
+        runtime_values[node_id] = result
+        node_results[node_id] = {
+            "label": node["label"],
+            "processor": node["processor"],
+            "value": round(float(result.get("value", 0) or 0), 2),
+            "formula": str(result.get("formula", "")),
+            "note": str(result.get("note", "")),
+            "context_preview": _build_context_preview(result.get("context")),
+        }
+        if node["processor"] not in {"source", "output"}:
+            steps.append(
+                {
+                    "key": node_id,
+                    "label": node["label"],
+                    "formula": str(result.get("formula", "")),
+                    "value": round(float(result.get("value", 0) or 0), 2),
+                    "note": str(result.get("note", "")),
+                    "processor": node["processor"],
+                }
+            )
+        if node["processor"] == "output":
+            final_value = float(result.get("value", 0) or 0)
+    workflow = {
+        "inputs": {
+            "raw_factor_signal": 11.3,
+            "factor_signal_after_clip": 9.2,
+            "momentum_signal": 8.4,
+            "fundamental_adjustment": 1.1,
+            "bullish_confidence": 63.0,
+            "confidence": 68.0,
+            "backtest_up_probability": 61.5,
+            "backtest_avg_return_pct": 6.8,
+            "backtest_sample_size": 18,
+        },
+        "steps": steps,
+        "result": {
+            "predicted_change_pct": round(final_value, 2),
+            "volatility_cap": round(float(contexts["volatility_context"]["volatility_cap"]), 2),
+            "backtest_anchor": round(float(contexts["backtest_context"]["backtest_anchor"]), 2),
+            "confidence_penalty": round(float(contexts["confidence_context"]["confidence_penalty"]), 2),
+        },
+        "graph": normalized_graph,
+        "node_results": node_results,
+    }
+    return final_value, workflow
+
+
+def build_forecast_workflow_preview(graph):
+    _, workflow = run_forecast_workflow_graph(graph)
+    return {
+        "inputs": workflow.get("inputs", {}),
+        "result": workflow.get("result", {}),
+        "steps": workflow.get("steps", []),
+        "node_results": workflow.get("node_results", {}),
+    }
+
+
+def build_forecast_workflow_meta(graph):
+    normalized_graph = normalize_forecast_workflow_graph(graph)
+    preview = build_forecast_workflow_preview(normalized_graph)
+    graph_with_preview = copy.deepcopy(normalized_graph)
+    graph_with_preview["node_results"] = preview.get("node_results", {})
+    return {
+        "title": str(normalized_graph["title"]),
+        "summary": str(normalized_graph["summary"]),
+        "graph": graph_with_preview,
+        "catalog": build_forecast_node_catalog(),
+        "preview": preview,
+    }
 
 # Mock data
 CHANNELS = ["微信社群", "内容合作", "小红书", "转介绍", "直接流量"]
@@ -609,6 +1098,48 @@ def save_site_config(config):
     return merged
 
 
+def load_forecast_workflow_graph():
+    cached = g.get("forecast_workflow_graph")
+    if cached is not None:
+        return cached
+    db = get_db()
+    row = db.execute(
+        "SELECT setting_value FROM app_settings WHERE setting_key = ?",
+        (FORECAST_WORKFLOW_KEY,),
+    ).fetchone()
+    graph = build_default_forecast_workflow_graph()
+    if row and row["setting_value"]:
+        try:
+            stored = json.loads(row["setting_value"])
+            graph = normalize_forecast_workflow_graph(stored)
+        except Exception:
+            app.logger.exception("Failed to parse forecast workflow graph")
+    g.forecast_workflow_graph = graph
+    return graph
+
+
+def save_forecast_workflow_graph(graph):
+    normalized = normalize_forecast_workflow_graph(graph)
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO app_settings (setting_key, setting_value, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(setting_key) DO UPDATE SET
+            setting_value = excluded.setting_value,
+            updated_at = excluded.updated_at
+        """,
+        (
+            FORECAST_WORKFLOW_KEY,
+            json.dumps(normalized, ensure_ascii=False),
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        ),
+    )
+    db.commit()
+    g.forecast_workflow_graph = normalized
+    return normalized
+
+
 @app.context_processor
 def inject_site_config():
     return {"site_config": get_site_config()}
@@ -928,6 +1459,55 @@ def api_admin_site_config():
         },
     )
     return jsonify({"success": True, "site_config": save_site_config(next_config)})
+
+
+@app.route("/api/admin/forecast-config")
+def api_admin_forecast_config():
+    graph = load_forecast_workflow_graph()
+    return jsonify(
+        {
+            "ok": True,
+            "config": workflow_graph_to_tuning(graph),
+            "workflow_meta": build_forecast_workflow_meta(graph),
+        }
+    )
+
+
+@app.route("/api/admin/forecast-config", methods=["POST"])
+def api_save_admin_forecast_config():
+    body = request.get_json(silent=True) or {}
+    if body.get("reset_default"):
+        default_graph = save_forecast_workflow_graph(build_default_forecast_workflow_graph())
+        return jsonify(
+            {
+                "ok": True,
+                "config": workflow_graph_to_tuning(default_graph),
+                "workflow_meta": build_forecast_workflow_meta(default_graph),
+            }
+        )
+    raw_graph = body.get("graph")
+    raw_config = body.get("config", {})
+    if raw_graph is None and not isinstance(raw_config, dict):
+        return jsonify({"ok": False, "error": "graph or config must be provided"}), 400
+    base_graph = load_forecast_workflow_graph()
+    if raw_graph is None:
+        graph_payload = dict(base_graph)
+        graph_payload["tuning"] = dict(raw_config)
+    else:
+        graph_payload = raw_graph
+        if isinstance(raw_config, dict) and raw_config:
+            graph_payload = dict(raw_graph) if isinstance(raw_graph, dict) else {}
+            graph_payload["tuning"] = dict(raw_config)
+    normalized_graph = normalize_forecast_workflow_graph(graph_payload)
+    saved_graph = save_forecast_workflow_graph(normalized_graph)
+    normalized = workflow_graph_to_tuning(saved_graph)
+    return jsonify(
+        {
+            "ok": True,
+            "config": normalized,
+            "workflow_meta": build_forecast_workflow_meta(saved_graph),
+        }
+    )
 
 @app.route("/api/ai-analysis", methods=["POST"])
 def api_ai_analysis():
