@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="/static/css/style.css">
 <script>
   window.SITE_CONFIG = {{ site_config | tojson }};
+  window.ACTIVE_TENANT = {{ active_tenant | tojson if active_tenant else 'null' }};
   window.SITE_CONFIG.default_theme = 'light';
   try { localStorage.setItem('gangtise_theme_mode', 'light'); } catch (e) {}
 </script>
@@ -2916,6 +2917,20 @@ function escapeHtml(value) {
 }
 
 function getDefaultDemoUser() {
+  const activeTenant = window.ACTIVE_TENANT || null;
+  if (activeTenant && activeTenant.id) {
+    const matchedById = DEMO_PROFILE_USERS.find(user => user.tenant && user.tenant.id === activeTenant.id);
+    if (matchedById) return matchedById;
+  }
+  const tenantSlug = (activeTenant && activeTenant.slug) || new URLSearchParams(window.location.search).get('tenant');
+  if (tenantSlug) {
+    const matched = DEMO_PROFILE_USERS.find(user => {
+      const advisor = String(user.tenant && user.tenant.advisor || '').toLowerCase();
+      const tenantName = String(user.tenant && user.tenant.name || '').toLowerCase();
+      return advisor.includes(tenantSlug.toLowerCase()) || tenantName.includes(tenantSlug.toLowerCase());
+    });
+    if (matched) return matched;
+  }
   const savedId = window.localStorage ? window.localStorage.getItem(DEMO_PROFILE_STORAGE_KEY) : '';
   return DEMO_PROFILE_USERS.find(user => user.id === savedId) || DEMO_PROFILE_USERS[0];
 }

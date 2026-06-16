@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>洞见智研金融科技 — 智能投研平台</title>
+<title>{{ brand.name }}金融科技 — 智能投研平台</title>
 <link rel="stylesheet" href="/static/css/style.css">
 <script>
   window.SITE_CONFIG = {{ site_config | tojson }};
@@ -981,7 +981,7 @@ body.theme-dark .tech-layer {
 ====================================================== -->
 <nav class="ix-top-nav">
   <div style="max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:56px">
-    <div style="font-size:18px;font-weight:700;color:var(--gold);letter-spacing:2px">洞见智研</div>
+    <div style="font-size:18px;font-weight:700;color:var(--gold);letter-spacing:2px">{{ brand.short_name }}</div>
     <div style="display:flex;gap:28px;font-size:13px;color:var(--gray-400)">
       <a href="#modules" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">系统模块</a>
       <a href="#business" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">项目定位</a>
@@ -1013,13 +1013,10 @@ body.theme-dark .tech-layer {
     </svg>
   </div>
 
-  <div class="hero-logo-text">洞见智研</div>
-  <div class="hero-logo-sub">洞见智研</div>
-  <div class="hero-tagline">聚焦复盘、基本面分析、自选股诊断与证据链输出的智能投研能力</div>
-  <div class="hero-desc">
-    当前定位不是泛金融 SaaS，而是面向研究场景的第三方智能投研工具与服务层<br>
-    面向普通投资者、大V投顾租户和平台 Admin 提供多角色隔离、按需基本面、工作台协同与合规表达能力
-  </div>
+  <div class="hero-logo-text">{{ brand.name }}</div>
+  <div class="hero-logo-sub">{{ brand.tagline }}</div>
+  <div class="hero-tagline">{{ brand.hero_tagline }}</div>
+  <div class="hero-desc">{{ brand.hero_description | replace('。', '。<br>') | safe }}</div>
 
   <div class="hero-kpi-row">
     <div class="hero-kpi-item">
@@ -1046,7 +1043,16 @@ body.theme-dark .tech-layer {
   </div>
 
   <div class="hero-split-entry-grid">
-    <a href="/kol-workbench" class="hero-split-entry">
+    <a href="/tenant/{{ default_tenant.slug }}" class="hero-split-entry">
+      <div class="hero-split-entry-top">
+        <span class="hero-split-entry-icon">{{ default_tenant.logo_mark }}</span>
+        <span class="hero-split-entry-tag">TENANT PORTAL</span>
+      </div>
+      <div class="hero-split-entry-title">{{ default_tenant.name }} 门户</div>
+      <div class="hero-split-entry-desc">面向 {{ default_tenant.advisor }} 粉丝的专属租户门户，展示权益介绍、代表性研究内容和 Web 化 Dashboard。</div>
+      <div class="hero-split-entry-arrow">进入租户门户 →</div>
+    </a>
+    <a href="/kol-workbench?tenant={{ default_tenant.slug }}" class="hero-split-entry">
       <div class="hero-split-entry-top">
         <span class="hero-split-entry-icon">👑</span>
         <span class="hero-split-entry-tag">KOL WORKBENCH</span>
@@ -1066,7 +1072,7 @@ body.theme-dark .tech-layer {
     </a>
   </div>
 
-  <div class="mountain-label">▲ ▲ ▲ &nbsp; 洞见智研山脉 · 海拔6656米 &nbsp; ▲ ▲ ▲</div>
+  <div class="mountain-label">▲ ▲ ▲ &nbsp; {{ brand.short_name }} 山脉 · 海拔6656米 &nbsp; ▲ ▲ ▲</div>
 </section>
 
 
@@ -1113,7 +1119,8 @@ body.theme-dark .tech-layer {
 
         <div class="summary-link-row">
           <a href="/h5" class="summary-link">查看 H5 用户端</a>
-          <a href="/kol-workbench" class="summary-link">查看大V工作台 Web</a>
+          <a href="/tenant/{{ default_tenant.slug }}" class="summary-link">查看默认租户门户</a>
+          <a href="/kol-workbench?tenant={{ default_tenant.slug }}" class="summary-link">查看大V工作台 Web</a>
           <a href="/admin" class="summary-link">查看纯 Admin 后台</a>
         </div>
       </div>
@@ -1174,7 +1181,13 @@ body.theme-dark .tech-layer {
         <div class="ix-nav-card-desc">前台围绕基本面分析、自选股、每日复盘与研究互动展开，提供清晰、低风险、可理解的投研体验。</div>
         <div class="ix-nav-card-arrow">进入体验 →</div>
       </a>
-      <a href="/kol-workbench" class="ix-nav-card">
+      <a href="/tenant/{{ default_tenant.slug }}" class="ix-nav-card">
+        <div class="ix-nav-card-icon">{{ default_tenant.logo_mark }}</div>
+        <div class="ix-nav-card-title">租户门户</div>
+        <div class="ix-nav-card-desc">按大V租户单独配置门户名字、logo 和介绍，让每个主理人对外拥有独立品牌空间与 Web Dashboard。</div>
+        <div class="ix-nav-card-arrow">进入门户 →</div>
+      </a>
+      <a href="/kol-workbench?tenant={{ default_tenant.slug }}" class="ix-nav-card">
         <div class="ix-nav-card-icon">👑</div>
         <div class="ix-nav-card-title">大V 工作台 Web</div>
         <div class="ix-nav-card-desc">独立给大V投顾使用的 web 版后台，承接粉丝消息、群发助手、协同收入和租户内研究经营动作。</div>
@@ -2132,16 +2145,17 @@ body.theme-dark .tech-layer {
 
     <div class="ix-footer-inner">
       <div>
-        <div class="footer-brand-text">洞见智研</div>
-        <div class="footer-brand-sub">洞见智研</div>
+        <div class="footer-brand-text">{{ brand.name }}</div>
+        <div class="footer-brand-sub">{{ brand.tagline }}</div>
         <div class="footer-brand-desc">
-          整合券商研报、专家纪要与市场数据，以 AI 驱动的证据链和工作流工具服务研究型大V投顾、机构与普通投资者，持续沉淀可复用的方法论资产。
+          {{ brand.footer_description }}
         </div>
       </div>
       <div>
         <div class="footer-col-title">产品</div>
         <a href="/h5" class="footer-col-link">H5 用户端</a>
-        <a href="/kol-workbench" class="footer-col-link">大V 工作台 Web</a>
+        <a href="/tenant/{{ default_tenant.slug }}" class="footer-col-link">默认租户门户</a>
+        <a href="/kol-workbench?tenant={{ default_tenant.slug }}" class="footer-col-link">大V 工作台 Web</a>
         <a href="/admin" class="footer-col-link">纯 Admin 后台</a>
         <a href="/admin?section=funnel" class="footer-col-link">平台分析后台</a>
         <a href="/prd" class="footer-col-link">产品设计文档</a>
@@ -2157,13 +2171,13 @@ body.theme-dark .tech-layer {
         <div class="footer-col-title">后台控制</div>
         <a href="/admin" class="footer-col-link">平台主题模式</a>
         <a href="/admin" class="footer-col-link">平台功能控开</a>
-        <a href="/kol-workbench" class="footer-col-link">大V 工作流入口</a>
+        <a href="/kol-workbench?tenant={{ default_tenant.slug }}" class="footer-col-link">大V 工作流入口</a>
         <a href="/admin" class="footer-col-link">访问统计</a>
       </div>
     </div>
 
     <div class="footer-bottom">
-      © 2024 洞见智研金融科技 洞见智研 · 本平台提供金融数据参考服务，不构成投资建议 · 投资有风险，决策需谨慎
+      © 2024 {{ brand.name }}金融科技 {{ brand.short_name }} · 本平台提供金融数据参考服务，不构成投资建议 · 投资有风险，决策需谨慎
     </div>
   </div>
 </footer>

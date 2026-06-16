@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>洞见智研 — 大V工作台</title>
+<title>{{ active_tenant.name }} — 大V工作台</title>
 <link rel="stylesheet" href="/static/css/style.css">
 <script>
   window.SITE_CONFIG = {{ site_config | tojson }};
@@ -359,7 +359,6 @@ body { background: var(--surface-2); color: var(--text-main); }
   border-radius:999px;
   padding:3px 8px;
 }
-.kw-workflow-node-meta { margin-top:8px; font-size:11px; line-height:1.6; color:var(--text-sub); }
 .kw-workflow-node-ports { display:flex; justify-content:space-between; margin-top:12px; }
 .kw-workflow-port {
   border:1px solid rgba(47,116,192,0.12);
@@ -380,6 +379,18 @@ body { background: var(--surface-2); color: var(--text-main); }
   display:inline-block;
   margin-right:6px;
   box-shadow:0 0 0 3px rgba(47,116,192,0.14);
+}
+.kw-workflow-tool-button {
+  padding:6px 10px !important;
+  font-size:11px !important;
+  color:var(--text-sub);
+  border-color:rgba(47,116,192,0.12);
+  background:transparent;
+}
+.kw-workflow-tool-button:hover {
+  color:var(--text-main);
+  border-color:rgba(47,116,192,0.22);
+  background:#F8FBFF;
 }
 .kw-forecast-config-board { display:grid; gap:12px; }
 .kw-forecast-config-section-title { margin:2px 0 8px; font-size:12px; color:var(--text-main); font-weight:700; }
@@ -415,6 +426,29 @@ body { background: var(--surface-2); color: var(--text-main); }
 .kw-forecast-debug-list,
 .kw-result-line { font-size:12px; color:var(--text-main); line-height:1.7; }
 .kw-result-line strong { color:var(--gold); }
+.kw-forecast-inspector-section { display:grid; gap:12px; }
+.kw-workflow-guide {
+  margin:8px 0 0;
+  font-size:12px;
+  line-height:1.7;
+  color:var(--text-sub);
+}
+.kw-workflow-guide strong { color:var(--text-main); }
+.kw-forecast-advanced-toggle {
+  cursor:pointer;
+  list-style:none;
+  font-size:12px;
+  color:var(--text-main);
+  font-weight:700;
+}
+.kw-forecast-advanced-toggle::-webkit-details-marker { display:none; }
+.kw-forecast-advanced-toggle::before {
+  content:"+";
+  display:inline-block;
+  margin-right:6px;
+  color:var(--gold);
+}
+details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
 @media (max-width: 980px) {
   .kw-section-grid,
   .kw-link-grid,
@@ -431,8 +465,8 @@ body { background: var(--surface-2); color: var(--text-main); }
 <div class="admin-layout">
   <div class="admin-sidebar">
     <div class="admin-logo">
-      <div class="admin-logo-text">洞见智研</div>
-      <div class="admin-logo-sub">大V工作台 Web</div>
+      <div class="admin-logo-text">{{ active_tenant.short_name }}</div>
+      <div class="admin-logo-sub">{{ active_tenant.advisor }} · 大V工作台 Web</div>
     </div>
     <nav class="admin-nav">
       <div class="admin-nav-group">
@@ -491,19 +525,20 @@ body { background: var(--surface-2); color: var(--text-main); }
       </div>
     </nav>
     <div class="kw-admin-footer">
-      <div class="kw-admin-footer-title">当前主理人</div>
-      <div class="kw-admin-footer-text">{{ workbench.kol_name }} · {{ workbench.tier }}</div>
+      <div class="kw-admin-footer-title">当前租户</div>
+      <div class="kw-admin-footer-text">{{ active_tenant.name }} · {{ workbench.kol_name }}</div>
     </div>
   </div>
 
   <div class="admin-main">
     <div class="admin-topbar">
       <div>
-        <div class="admin-page-title" id="workbench-page-title">工作台概览</div>
-        <div class="kw-page-summary" id="workbench-page-summary">和 H5 保持同一套产品口径，但以桌面 web 工作流方式组织大V日常动作。</div>
+        <div class="admin-page-title" id="workbench-page-title">{{ active_tenant.advisor }} 工作台概览</div>
+        <div class="kw-page-summary" id="workbench-page-summary">和 H5 保持同一套产品口径，但以 {{ active_tenant.name }} 的桌面 Web 工作流组织大V日常动作。</div>
       </div>
       <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-        <a href="/h5" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">前往 H5</a>
+        <a href="/tenant/{{ active_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">租户门户</a>
+        <a href="/h5?tenant={{ active_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">前往 H5</a>
         <a href="/admin" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">纯 Admin 后台</a>
         <a href="/" class="btn-gold" style="padding:8px 16px;font-size:12px;text-decoration:none">返回首页</a>
       </div>
@@ -715,7 +750,6 @@ body { background: var(--surface-2); color: var(--text-main); }
               <div class="kw-card-head" style="margin-bottom:10px">
                 <div>
                   <div class="kw-card-title">节点库</div>
-                  <div class="kw-card-desc">点击添加节点，拖拽排布，再用“出 / 入”连线。</div>
                 </div>
               </div>
               <div id="kw-forecast-node-catalog" class="kw-workflow-catalog"></div>
@@ -724,17 +758,18 @@ body { background: var(--surface-2); color: var(--text-main); }
               <div class="kw-card-head">
                 <div>
                   <div class="kw-card-title">当前预测算法工作流</div>
-                  <div class="kw-card-desc" id="kw-forecast-workflow-summary">这里展示你当前使用的预测工作流。调整节点、连线和参数，会直接改变你后续复盘和解读使用的算法结构。</div>
+                  <div class="kw-card-desc" id="kw-forecast-workflow-summary">这里展示你当前使用的预测工作流。</div>
                 </div>
               </div>
+              <div class="kw-workflow-guide"><strong>新手提示：</strong>先从左侧添加节点，再点某个节点的“连出”，最后点目标节点的“接入”完成连线。拖动节点可以重新排布。</div>
               <div class="kw-workflow-toolbar">
                 <div class="kw-workflow-toolbar-left">
-                  <button id="kw-forecast-reset-graph" class="btn-outline" type="button" style="padding:8px 12px;font-size:12px">恢复默认图</button>
-                  <button id="kw-forecast-center-view" class="btn-outline" type="button" style="padding:8px 12px;font-size:12px">居中视图</button>
+                  <button id="kw-forecast-reset-graph" class="btn-outline kw-workflow-tool-button" type="button">恢复推荐模板</button>
+                  <button id="kw-forecast-center-view" class="btn-outline kw-workflow-tool-button" type="button">回到中间</button>
                 </div>
                 <div class="kw-workflow-toolbar-right">
-                  <button id="kw-forecast-zoom-out" class="btn-outline" type="button" style="padding:8px 12px;font-size:12px">-</button>
-                  <button id="kw-forecast-zoom-in" class="btn-outline" type="button" style="padding:8px 12px;font-size:12px">+</button>
+                  <button id="kw-forecast-zoom-out" class="btn-outline kw-workflow-tool-button" type="button">缩小</button>
+                  <button id="kw-forecast-zoom-in" class="btn-outline kw-workflow-tool-button" type="button">放大</button>
                 </div>
               </div>
               <div class="kw-workflow-stage">
@@ -748,17 +783,9 @@ body { background: var(--surface-2); color: var(--text-main); }
               <div class="kw-card-head" style="margin-bottom:10px">
                 <div>
                   <div class="kw-card-title">节点检查器</div>
-                  <div class="kw-card-desc">选中节点后，编辑标签、参数和全局 tuning；右侧同时看到节点的预览输出。</div>
                 </div>
               </div>
               <div id="kw-forecast-config-board" class="kw-forecast-config-board"></div>
-              <div class="kw-card-head" style="margin-top:16px;margin-bottom:10px">
-                <div>
-                  <div class="kw-card-title">节点调试预览</div>
-                  <div class="kw-card-desc">查看当前节点的公式、示例输出和上下文摘要。</div>
-                </div>
-              </div>
-              <div id="kw-forecast-node-debug" class="kw-forecast-config-board"></div>
             </aside>
           </div>
         </div>
@@ -1169,7 +1196,7 @@ function renderWorkbenchForecastWorkflow() {
   if (summary) {
     const result = preview.result || {};
     summary.textContent = result.predicted_change_pct !== undefined
-      ? `当前示例预览输出 ${Number(result.predicted_change_pct || 0).toFixed(2)}%，波动上限 ${Number(result.volatility_cap || 0).toFixed(2)}%。这套 DAG 会直接决定目标价的自动收敛路径。`
+      ? `当前示例预览目标 ${Number(result.predicted_change_pct || 0).toFixed(2)}%，波动上限 ${Number(result.volatility_cap || 0).toFixed(2)}%。`
       : (kwForecastWorkflowMeta.summary || '展示目标价是怎么计算出来的，并允许在后台调整自动收敛参数。');
   }
   if (stats) {
@@ -1186,15 +1213,14 @@ function renderWorkbenchForecastWorkflow() {
     return;
   }
   board.innerHTML = nodes.map((item) => `
-    <article class="kw-workflow-node ${item.id === kwSelectedForecastNodeId ? 'is-selected' : ''}" data-node-id="${escapeAttr(item.id || '')}" style="left:${Number(item.x || 0)}px;top:${Number(item.y || 0)}px;">
+    <article class="kw-workflow-node ${item.id === kwSelectedForecastNodeId ? 'is-selected' : ''} ${kwForecastLinkState?.from === item.id ? 'is-link-source' : ''}" data-node-id="${escapeAttr(item.id || '')}" style="left:${Number(item.x || 0)}px;top:${Number(item.y || 0)}px;">
       <div class="kw-workflow-node-head">
         <strong>${escapeHtml(item.label || item.id || '-')}</strong>
         <span class="kw-workflow-node-type">${escapeHtml(item.processor || '')}</span>
       </div>
-      <div class="kw-workflow-node-meta">${escapeHtml(describeWorkbenchForecastNode(item))}</div>
       <div class="kw-workflow-node-ports">
-        <button type="button" class="kw-workflow-port" data-port-action="select" data-node-id="${escapeAttr(item.id || '')}">入</button>
-        <button type="button" class="kw-workflow-port" data-port-action="link" data-node-id="${escapeAttr(item.id || '')}">出</button>
+        <button type="button" class="kw-workflow-port" data-port-action="select" data-node-id="${escapeAttr(item.id || '')}">接入</button>
+        <button type="button" class="kw-workflow-port" data-port-action="link" data-node-id="${escapeAttr(item.id || '')}">连出</button>
       </div>
     </article>
   `).join('');
@@ -1211,62 +1237,69 @@ function renderWorkbenchForecastConfigBoard() {
   const nodeSpec = selectedNode ? catalog.find((item) => item.processor === selectedNode.processor) : null;
   const tuningEntries = Object.entries(kwForecastConfig || {});
   const paramFields = Array.isArray(nodeSpec?.params) ? nodeSpec.params : [];
+  const debugBlock = renderWorkbenchForecastNodeDebug();
   const selectedBlock = selectedNode ? `
-    <div class="kw-forecast-config-section-title">节点参数 · ${escapeHtml(selectedNode.label || selectedNode.id || '')}</div>
-    <label class="kw-forecast-config-field">
-      <span>节点名称</span>
-      <div class="kw-forecast-config-input">
-        <input data-kw-node-label value="${escapeAttr(String(selectedNode.label || ''))}">
-        <em>label</em>
-      </div>
-    </label>
-    ${paramFields.length ? paramFields.map((field) => `
+    <div class="kw-forecast-inspector-section">
+      <div class="kw-forecast-config-section-title">节点参数</div>
       <label class="kw-forecast-config-field">
-        <span>${escapeHtml(field.label || field.key || '-')}</span>
+        <span>节点名称</span>
         <div class="kw-forecast-config-input">
-          <input data-kw-node-param="${escapeAttr(field.key || '')}" value="${escapeAttr(String(selectedNode.params?.[field.key] ?? ''))}">
-          <em>${escapeHtml(field.kind || '')}</em>
+          <input data-kw-node-label value="${escapeAttr(String(selectedNode.label || ''))}">
+          <em>label</em>
         </div>
       </label>
-    `).join('') : `<div class="kw-compact-row"><strong>当前节点无独立参数</strong><span>${escapeHtml(selectedNode.processor || '')}</span></div>`}
-    <div style="display:flex;justify-content:flex-end;margin-top:10px">
-      <button type="button" class="btn-outline" id="kw-forecast-delete-node" style="padding:8px 12px;font-size:12px">删除节点</button>
+      ${paramFields.length ? paramFields.map((field) => `
+        <label class="kw-forecast-config-field">
+          <span>${escapeHtml(field.label || field.key || '-')}</span>
+          <div class="kw-forecast-config-input">
+            <input data-kw-node-param="${escapeAttr(field.key || '')}" value="${escapeAttr(String(selectedNode.params?.[field.key] ?? ''))}">
+            <em>${escapeHtml(field.kind || '')}</em>
+          </div>
+        </label>
+      `).join('') : `<div class="kw-compact-row"><strong>当前节点无独立参数</strong><span>${escapeHtml(selectedNode.processor || '')}</span></div>`}
     </div>
   ` : `<div class="kw-compact-row"><strong>未选中节点</strong><span>点击画布节点后编辑参数</span></div>`;
   board.innerHTML = `
     ${selectedBlock}
-    <div class="kw-forecast-config-section-title">全局 Tuning</div>
-    ${tuningEntries.map(([key, value]) => `
-      <label class="kw-forecast-config-field">
-        <span>${escapeHtml(key)}</span>
-        <div class="kw-forecast-config-input">
-          <input data-kw-forecast-field="${escapeAttr(key)}" inputmode="decimal" step="0.05" value="${escapeAttr(String(value ?? ''))}">
-          <em>tuning</em>
-        </div>
-      </label>
-    `).join('')}
+    <div class="kw-forecast-inspector-section">
+      <div class="kw-forecast-config-section-title">节点预览</div>
+      ${debugBlock}
+    </div>
+    <details class="kw-forecast-inspector-section">
+      <summary class="kw-forecast-advanced-toggle">高级参数</summary>
+      ${tuningEntries.map(([key, value]) => `
+        <label class="kw-forecast-config-field">
+          <span>${escapeHtml(key)}</span>
+          <div class="kw-forecast-config-input">
+            <input data-kw-forecast-field="${escapeAttr(key)}" inputmode="decimal" step="0.05" value="${escapeAttr(String(value ?? ''))}">
+            <em>tuning</em>
+          </div>
+        </label>
+      `).join('')}
+    </details>
+    ${selectedNode ? `
+      <div style="display:flex;justify-content:flex-end;margin-top:4px">
+        <button type="button" class="btn-outline kw-workflow-tool-button" id="kw-forecast-delete-node">删除节点</button>
+      </div>
+    ` : ''}
   `;
   document.getElementById('kw-forecast-delete-node')?.addEventListener('click', deleteWorkbenchForecastNode);
 }
 
 function renderWorkbenchForecastNodeDebug() {
-  const board = document.getElementById('kw-forecast-node-debug');
-  if (!board) return;
   const selectedNode = (kwForecastGraph.nodes || []).find((item) => item.id === kwSelectedForecastNodeId) || null;
   const nodeResults = kwForecastWorkflowMeta.preview?.node_results || kwForecastWorkflowMeta.graph?.node_results || {};
   if (!selectedNode) {
-    board.innerHTML = `<div class="kw-compact-row"><strong>未选中节点</strong><span>暂无调试信息</span></div>`;
-    return;
+    return `<div class="kw-compact-row"><strong>未选中节点</strong><span>暂无调试信息</span></div>`;
   }
   const debug = nodeResults[selectedNode.id];
   if (!debug) {
-    board.innerHTML = `<div class="kw-compact-row"><strong>${escapeHtml(selectedNode.label || selectedNode.id || '-')}</strong><span>暂无运行结果</span></div>`;
-    return;
+    return `<div class="kw-compact-row"><strong>${escapeHtml(selectedNode.label || selectedNode.id || '-')}</strong><span>暂无运行结果</span></div>`;
   }
   const preview = debug.context_preview && typeof debug.context_preview === 'object'
     ? Object.entries(debug.context_preview).map(([key, value]) => `<div class="kw-result-line"><strong>${escapeHtml(key)}</strong> · ${escapeHtml(String(value))}</div>`).join('')
     : `<div class="kw-result-line">暂无上下文预览</div>`;
-  board.innerHTML = `
+  return `
     <div class="kw-forecast-config-field">
       <span>当前输出</span>
       <div class="kw-forecast-debug-value">${escapeHtml(String(debug.value ?? '--'))}</div>
@@ -1284,12 +1317,6 @@ function renderWorkbenchForecastNodeDebug() {
       <div class="kw-forecast-debug-list">${preview}</div>
     </div>
   `;
-}
-
-function describeWorkbenchForecastNode(node) {
-  const params = node?.params || {};
-  const keys = Object.keys(params);
-  return keys.length ? keys.map((key) => `${key}:${params[key]}`).join(' · ') : '无附加参数';
 }
 
 function renderWorkbenchForecastCatalog() {
@@ -1389,13 +1416,37 @@ function bindWorkbenchForecastGraphEvents() {
     });
   });
   document.querySelectorAll('[data-port-action="link"]').forEach((node) => {
+    node.addEventListener('pointerdown', (event) => {
+      const target = event.currentTarget;
+      if (!(target instanceof HTMLElement) || !target.closest('.kw-workflow-node')) return;
+      kwForecastLinkState = {from: target.dataset.nodeId || ''};
+      renderWorkbenchForecastWorkflow();
+      renderWorkbenchForecastConfigBoard();
+      event.preventDefault();
+    });
     node.addEventListener('click', (event) => {
       const target = event.currentTarget;
       if (!(target instanceof HTMLElement) || !target.closest('.kw-workflow-node')) return;
       kwForecastLinkState = {from: target.dataset.nodeId || ''};
+      renderWorkbenchForecastWorkflow();
+      renderWorkbenchForecastConfigBoard();
     });
   });
   document.querySelectorAll('[data-port-action="select"]').forEach((node) => {
+    node.addEventListener('pointerup', (event) => {
+      const target = event.currentTarget;
+      if (!(target instanceof HTMLElement) || !target.closest('.kw-workflow-node')) return;
+      const nodeId = target.dataset.nodeId || '';
+      if (kwForecastLinkState?.from && kwForecastLinkState.from !== nodeId) {
+        addWorkbenchForecastEdge(kwForecastLinkState.from, nodeId);
+        kwForecastLinkState = null;
+        renderWorkbenchForecastWorkflow();
+        renderWorkbenchForecastConfigBoard();
+        renderWorkbenchForecastNodeDebug();
+        showToast('连线已完成');
+        event.preventDefault();
+      }
+    });
     node.addEventListener('click', (event) => {
       const target = event.currentTarget;
       if (!(target instanceof HTMLElement) || !target.closest('.kw-workflow-node')) return;
@@ -1406,6 +1457,7 @@ function bindWorkbenchForecastGraphEvents() {
         renderWorkbenchForecastWorkflow();
         renderWorkbenchForecastConfigBoard();
         renderWorkbenchForecastNodeDebug();
+        showToast('连线已完成');
         return;
       }
       kwSelectedForecastNodeId = nodeId;
@@ -1522,7 +1574,7 @@ async function loadWorkbenchForecastModel(forceReload) {
 
 async function resetWorkbenchForecastGraph() {
   const statusNode = document.getElementById('kw-forecast-save-status');
-  if (statusNode) statusNode.textContent = '恢复默认图中...';
+  if (statusNode) statusNode.textContent = '正在恢复推荐模板...';
   const res = await fetch('/api/admin/forecast-config', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -1540,8 +1592,8 @@ async function resetWorkbenchForecastGraph() {
   renderWorkbenchForecastConfigBoard();
   renderWorkbenchForecastNodeDebug();
   centerWorkbenchForecastView();
-  if (statusNode) statusNode.textContent = '已恢复默认预测算法工作流';
-  showToast('已恢复默认预测算法工作流');
+  if (statusNode) statusNode.textContent = '已恢复推荐模板';
+  showToast('已恢复推荐模板');
 }
 
 async function saveWorkbenchForecastConfigs() {

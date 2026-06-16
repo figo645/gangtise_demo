@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>洞见智研 — 纯 Admin 后台</title>
+<title>{{ brand.name }} — 纯 Admin 后台</title>
 <link rel="stylesheet" href="/static/css/style.css">
 <script>
   window.SITE_CONFIG = {{ site_config | tojson }};
@@ -220,6 +220,10 @@
     border-color:var(--gold);
     box-shadow:0 12px 28px rgba(47,116,192,0.15);
   }
+  .workflow-node.is-link-source {
+    border-color:rgba(47,116,192,0.52);
+    box-shadow:0 12px 28px rgba(47,116,192,0.18);
+  }
   .workflow-node:hover { border-color:rgba(47,116,192,0.35); }
   .workflow-node-head { display:flex; justify-content:space-between; align-items:center; gap:8px; }
   .workflow-node-head strong { font-size:13px; color:var(--text-main); }
@@ -230,7 +234,6 @@
     border-radius:999px;
     padding:3px 8px;
   }
-  .workflow-node-meta { margin-top:8px; font-size:11px; line-height:1.6; color:var(--text-sub); }
   .workflow-node-ports { display:flex; justify-content:space-between; margin-top:12px; }
   .workflow-port {
     border:1px solid var(--border-soft);
@@ -252,6 +255,18 @@
     display:inline-block;
     margin-right:6px;
     box-shadow:0 0 0 3px rgba(47,116,192,0.14);
+  }
+  .workflow-tool-button {
+    padding:6px 10px !important;
+    font-size:11px !important;
+    color:var(--text-sub);
+    border-color:rgba(47,116,192,0.12);
+    background:transparent;
+  }
+  .workflow-tool-button:hover {
+    color:var(--text-main);
+    border-color:rgba(47,116,192,0.22);
+    background:var(--surface-2);
   }
   .forecast-config-section-title { margin:2px 0 8px; font-size:12px; color:var(--text-main); font-weight:700; }
   .workflow-inspector-actions { display:flex; justify-content:flex-end; margin-top:10px; }
@@ -289,6 +304,29 @@
   .forecast-debug-list,
   .result-line { font-size:12px; color:var(--text-main); line-height:1.7; }
   .result-line strong { color:var(--gold); }
+  .forecast-inspector-section { display:grid; gap:12px; }
+  .workflow-guide {
+    margin:8px 0 0;
+    font-size:12px;
+    color:var(--text-sub);
+    line-height:1.7;
+  }
+  .workflow-guide strong { color:var(--text-main); }
+  .forecast-advanced-toggle {
+    cursor:pointer;
+    font-size:12px;
+    color:var(--text-main);
+    font-weight:700;
+    list-style:none;
+  }
+  .forecast-advanced-toggle::-webkit-details-marker { display:none; }
+  .forecast-advanced-toggle::before {
+    content:"+";
+    display:inline-block;
+    margin-right:6px;
+    color:var(--gold);
+  }
+  details[open] > .forecast-advanced-toggle::before { content:"-"; }
 
   @media (max-width: 1280px) {
     .workflow-shell { grid-template-columns:1fr; }
@@ -366,7 +404,7 @@
   <!-- Sidebar -->
   <div class="admin-sidebar">
     <div class="admin-logo">
-      <div class="admin-logo-text">洞见智研</div>
+      <div class="admin-logo-text">{{ brand.short_name }}</div>
       <div class="admin-logo-sub">纯 Admin 平台后台</div>
     </div>
     <nav class="admin-nav">
@@ -461,8 +499,8 @@
       <div class="admin-page-title" id="page-title">运营概览</div>
       <div style="display:flex;gap:12px;align-items:center">
         <span style="font-size:12px;color:#8899aa">2026-06-01 业务沟通会口径</span>
-        <a href="/kol-workbench" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">大V工作台 Web</a>
-        <a href="/h5" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">H5 前台</a>
+        <a href="/kol-workbench?tenant={{ default_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">大V工作台 Web</a>
+        <a href="/h5?tenant={{ default_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">H5 前台</a>
         <button class="btn-gold" style="padding:8px 16px;font-size:12px" onclick="showToast('报告生成中，请稍候...')">导出报告</button>
       </div>
     </div>
@@ -1792,20 +1830,20 @@
         <div class="workflow-shell">
           <aside class="chart-card">
             <div class="chart-title">节点库</div>
-            <div class="chart-subtitle">点击添加节点，拖拽排布，再用“出 / 入”连线。</div>
             <div id="forecast-node-catalog" class="workflow-catalog"></div>
           </aside>
           <section class="chart-card">
             <div class="chart-title">当前预测算法工作流</div>
-            <div class="chart-subtitle" id="forecast-workflow-summary">这里展示的是当前线上预测算法本体。调整节点、连线和参数，等于直接调整算法结构。</div>
+            <div class="chart-subtitle" id="forecast-workflow-summary">这里展示的是当前线上预测算法本体。</div>
+            <div class="workflow-guide"><strong>新手提示：</strong>先从左侧添加节点，再点某个节点的“连出”，最后点目标节点的“接入”完成连线。拖动节点可重新排布。</div>
             <div class="workflow-toolbar">
               <div class="workflow-toolbar-left">
-                <button id="forecast-reset-graph" class="btn-outline" type="button" style="padding:7px 12px;font-size:12px">恢复默认图</button>
-                <button id="forecast-center-view" class="btn-outline" type="button" style="padding:7px 12px;font-size:12px">居中视图</button>
+                <button id="forecast-reset-graph" class="btn-outline workflow-tool-button" type="button">恢复推荐模板</button>
+                <button id="forecast-center-view" class="btn-outline workflow-tool-button" type="button">回到中间</button>
               </div>
               <div class="workflow-toolbar-right">
-                <button id="forecast-zoom-out" class="btn-outline" type="button" style="padding:7px 12px;font-size:12px">-</button>
-                <button id="forecast-zoom-in" class="btn-outline" type="button" style="padding:7px 12px;font-size:12px">+</button>
+                <button id="forecast-zoom-out" class="btn-outline workflow-tool-button" type="button">缩小</button>
+                <button id="forecast-zoom-in" class="btn-outline workflow-tool-button" type="button">放大</button>
               </div>
             </div>
             <div class="workflow-stage">
@@ -1817,11 +1855,7 @@
           </section>
           <aside class="chart-card">
             <div class="chart-title">节点检查器</div>
-            <div class="chart-subtitle">选中节点后编辑标签、参数与全局 tuning，并查看当前预览结果。</div>
             <div id="forecast-config-board" class="forecast-config-board"></div>
-            <div class="chart-title" style="margin-top:16px">节点调试预览</div>
-            <div class="chart-subtitle">展示当前算法里这个节点的公式、示例输出和值上下文。</div>
-            <div id="forecast-node-debug" class="forecast-config-board"></div>
           </aside>
         </div>
       </div><!-- end section-forecast-model -->
@@ -2250,6 +2284,39 @@
             </div>
           </div>
           <div class="config-card">
+            <div class="config-card-title">平台品牌与租户入口</div>
+            <div class="config-field">
+              <label>平台名称</label>
+              <input id="brand-name" type="text" placeholder="平台名称">
+            </div>
+            <div class="config-field">
+              <label>平台简称</label>
+              <input id="brand-short-name" type="text" placeholder="平台简称">
+            </div>
+            <div class="config-field">
+              <label>平台 Logo 文案 / Emoji</label>
+              <input id="brand-logo-mark" type="text" placeholder="例如 洞 / 👁️">
+            </div>
+            <div class="config-field">
+              <label>平台副标题</label>
+              <input id="brand-tagline" type="text" placeholder="智能投研平台">
+            </div>
+            <div class="config-field">
+              <label>默认租户门户</label>
+              <select id="default-tenant-slug"></select>
+            </div>
+            <div class="feature-note">
+              平台品牌用于首页、Admin、默认文案。大V 对外展示则以下方租户配置为准。
+            </div>
+          </div>
+          <div class="config-card" style="grid-column:1 / -1">
+            <div class="config-card-title">租户品牌配置</div>
+            <div id="tenant-config-list" style="display:grid;gap:16px"></div>
+            <div class="feature-note">
+              每个大V租户都可以配置独立门户名称、logo、主理人、介绍和 Dashboard 标题。保存后首页入口、租户门户和工作台会同步切换。
+            </div>
+          </div>
+          <div class="config-card">
             <div class="config-card-title">首发功能开关</div>
             <div class="toggle-wrap">
               <span class="toggle-label">访问密码门禁</span>
@@ -2466,7 +2533,7 @@ function renderForecastWorkflow() {
   if (summary) {
     const result = preview.result || {};
     summary.textContent = result.predicted_change_pct !== undefined
-      ? `当前示例预览输出 ${Number(result.predicted_change_pct || 0).toFixed(2)}%，波动上限 ${Number(result.volatility_cap || 0).toFixed(2)}%。这套 DAG 会直接决定目标价的自动收敛路径。`
+      ? `当前示例预览目标 ${Number(result.predicted_change_pct || 0).toFixed(2)}%，波动上限 ${Number(result.volatility_cap || 0).toFixed(2)}%。`
       : (forecastWorkflowMeta.summary || '展示目标价是怎么计算出来的，并允许在后台调整自动收敛参数。');
   }
   if (stats) {
@@ -2483,15 +2550,14 @@ function renderForecastWorkflow() {
     return;
   }
   board.innerHTML = nodes.map((item) => `
-    <article class="workflow-node ${item.id === selectedForecastNodeId ? 'is-selected' : ''}" data-node-id="${escapeAttr(item.id || '')}" style="left:${Number(item.x || 0)}px;top:${Number(item.y || 0)}px;">
+    <article class="workflow-node ${item.id === selectedForecastNodeId ? 'is-selected' : ''} ${forecastLinkState?.from === item.id ? 'is-link-source' : ''}" data-node-id="${escapeAttr(item.id || '')}" style="left:${Number(item.x || 0)}px;top:${Number(item.y || 0)}px;">
       <div class="workflow-node-head">
         <strong>${escapeHtml(item.label || item.id || '-')}</strong>
         <span class="workflow-node-type">${escapeHtml(item.processor || '')}</span>
       </div>
-      <div class="workflow-node-meta">${escapeHtml(describeForecastNode(item))}</div>
       <div class="workflow-node-ports">
-        <button type="button" class="workflow-port" data-port-action="select" data-node-id="${escapeAttr(item.id || '')}">入</button>
-        <button type="button" class="workflow-port" data-port-action="link" data-node-id="${escapeAttr(item.id || '')}">出</button>
+        <button type="button" class="workflow-port" data-port-action="select" data-node-id="${escapeAttr(item.id || '')}">接入</button>
+        <button type="button" class="workflow-port" data-port-action="link" data-node-id="${escapeAttr(item.id || '')}">连出</button>
       </div>
     </article>
   `).join('');
@@ -2508,62 +2574,69 @@ function renderForecastConfigBoard() {
   const nodeSpec = selectedNode ? catalog.find((item) => item.processor === selectedNode.processor) : null;
   const tuningEntries = Object.entries(forecastConfig || {});
   const paramFields = Array.isArray(nodeSpec?.params) ? nodeSpec.params : [];
+  const debugBlock = renderForecastNodeDebug();
   const selectedBlock = selectedNode ? `
-    <div class="forecast-config-section-title">节点参数 · ${escapeHtml(selectedNode.label || selectedNode.id || '')}</div>
-    <label class="forecast-config-field">
-      <span>节点名称</span>
-      <div class="forecast-config-input">
-        <input data-node-label value="${escapeAttr(String(selectedNode.label || ''))}">
-        <em>label</em>
-      </div>
-    </label>
-    ${paramFields.length ? paramFields.map((field) => `
+    <div class="forecast-inspector-section">
+      <div class="forecast-config-section-title">节点参数</div>
       <label class="forecast-config-field">
-        <span>${escapeHtml(field.label || field.key || '-')}</span>
+        <span>节点名称</span>
         <div class="forecast-config-input">
-          <input data-node-param="${escapeAttr(field.key || '')}" value="${escapeAttr(String(selectedNode.params?.[field.key] ?? ''))}">
-          <em>${escapeHtml(field.kind || '')}</em>
+          <input data-node-label value="${escapeAttr(String(selectedNode.label || ''))}">
+          <em>label</em>
         </div>
       </label>
-    `).join('') : `<div class="compact-row"><strong>当前节点无独立参数</strong><span>${escapeHtml(selectedNode.processor || '')}</span></div>`}
-    <div class="workflow-inspector-actions">
-      <button type="button" class="btn-outline" id="forecast-delete-node" style="padding:7px 12px;font-size:12px">删除节点</button>
+      ${paramFields.length ? paramFields.map((field) => `
+        <label class="forecast-config-field">
+          <span>${escapeHtml(field.label || field.key || '-')}</span>
+          <div class="forecast-config-input">
+            <input data-node-param="${escapeAttr(field.key || '')}" value="${escapeAttr(String(selectedNode.params?.[field.key] ?? ''))}">
+            <em>${escapeHtml(field.kind || '')}</em>
+          </div>
+        </label>
+      `).join('') : `<div class="compact-row"><strong>当前节点无独立参数</strong><span>${escapeHtml(selectedNode.processor || '')}</span></div>`}
     </div>
   ` : `<div class="compact-row"><strong>未选中节点</strong><span>点击画布节点后编辑参数</span></div>`;
   board.innerHTML = `
     ${selectedBlock}
-    <div class="forecast-config-section-title">全局 Tuning</div>
-    ${tuningEntries.map(([key, value]) => `
-      <label class="forecast-config-field">
-        <span>${escapeHtml(key)}</span>
-        <div class="forecast-config-input">
-          <input data-forecast-field="${escapeAttr(key)}" inputmode="decimal" step="0.05" value="${escapeAttr(String(value ?? ''))}">
-          <em>tuning</em>
-        </div>
-      </label>
-    `).join('')}
+    <div class="forecast-inspector-section">
+      <div class="forecast-config-section-title">节点预览</div>
+      ${debugBlock}
+    </div>
+    <details class="forecast-inspector-section">
+      <summary class="forecast-advanced-toggle">高级参数</summary>
+      ${tuningEntries.map(([key, value]) => `
+        <label class="forecast-config-field">
+          <span>${escapeHtml(key)}</span>
+          <div class="forecast-config-input">
+            <input data-forecast-field="${escapeAttr(key)}" inputmode="decimal" step="0.05" value="${escapeAttr(String(value ?? ''))}">
+            <em>tuning</em>
+          </div>
+        </label>
+      `).join('')}
+    </details>
+    ${selectedNode ? `
+      <div class="workflow-inspector-actions">
+        <button type="button" class="btn-outline workflow-tool-button" id="forecast-delete-node">删除节点</button>
+      </div>
+    ` : ''}
   `;
   document.getElementById('forecast-delete-node')?.addEventListener('click', deleteSelectedForecastNode);
 }
 
 function renderForecastNodeDebug() {
-  const board = document.getElementById('forecast-node-debug');
-  if (!board) return;
   const selectedNode = (forecastGraph.nodes || []).find((item) => item.id === selectedForecastNodeId) || null;
   const nodeResults = forecastWorkflowMeta.preview?.node_results || forecastWorkflowMeta.graph?.node_results || {};
   if (!selectedNode) {
-    board.innerHTML = `<div class="compact-row"><strong>未选中节点</strong><span>暂无调试信息</span></div>`;
-    return;
+    return `<div class="compact-row"><strong>未选中节点</strong><span>暂无调试信息</span></div>`;
   }
   const debug = nodeResults[selectedNode.id];
   if (!debug) {
-    board.innerHTML = `<div class="compact-row"><strong>${escapeHtml(selectedNode.label || selectedNode.id || '-')}</strong><span>暂无运行结果</span></div>`;
-    return;
+    return `<div class="compact-row"><strong>${escapeHtml(selectedNode.label || selectedNode.id || '-')}</strong><span>暂无运行结果</span></div>`;
   }
   const preview = debug.context_preview && typeof debug.context_preview === 'object'
     ? Object.entries(debug.context_preview).map(([key, value]) => `<div class="result-line"><strong>${escapeHtml(key)}</strong> · ${escapeHtml(String(value))}</div>`).join('')
     : `<div class="result-line">暂无上下文预览</div>`;
-  board.innerHTML = `
+  return `
     <div class="forecast-config-field">
       <span>当前输出</span>
       <div class="forecast-debug-value">${escapeHtml(String(debug.value ?? '--'))}</div>
@@ -2581,12 +2654,6 @@ function renderForecastNodeDebug() {
       <div class="forecast-debug-list">${preview}</div>
     </div>
   `;
-}
-
-function describeForecastNode(node) {
-  const params = node?.params || {};
-  const keys = Object.keys(params);
-  return keys.length ? keys.map((key) => `${key}:${params[key]}`).join(' · ') : '无附加参数';
 }
 
 function renderForecastCatalog() {
@@ -2686,13 +2753,37 @@ function bindForecastGraphEvents() {
     });
   });
   document.querySelectorAll('[data-port-action="link"]').forEach((node) => {
+    node.addEventListener('pointerdown', (event) => {
+      const target = event.currentTarget;
+      if (!(target instanceof HTMLElement)) return;
+      forecastLinkState = {from: target.dataset.nodeId || ''};
+      renderForecastWorkflow();
+      renderForecastConfigBoard();
+      event.preventDefault();
+    });
     node.addEventListener('click', (event) => {
       const target = event.currentTarget;
       if (!(target instanceof HTMLElement)) return;
       forecastLinkState = {from: target.dataset.nodeId || ''};
+      renderForecastWorkflow();
+      renderForecastConfigBoard();
     });
   });
   document.querySelectorAll('[data-port-action="select"]').forEach((node) => {
+    node.addEventListener('pointerup', (event) => {
+      const target = event.currentTarget;
+      if (!(target instanceof HTMLElement)) return;
+      const nodeId = target.dataset.nodeId || '';
+      if (forecastLinkState?.from && forecastLinkState.from !== nodeId) {
+        addForecastEdge(forecastLinkState.from, nodeId);
+        forecastLinkState = null;
+        renderForecastWorkflow();
+        renderForecastConfigBoard();
+        renderForecastNodeDebug();
+        showToast('连线已完成');
+        event.preventDefault();
+      }
+    });
     node.addEventListener('click', (event) => {
       const target = event.currentTarget;
       if (!(target instanceof HTMLElement)) return;
@@ -2703,6 +2794,7 @@ function bindForecastGraphEvents() {
         renderForecastWorkflow();
         renderForecastConfigBoard();
         renderForecastNodeDebug();
+        showToast('连线已完成');
         return;
       }
       selectedForecastNodeId = nodeId;
@@ -2819,7 +2911,7 @@ async function loadAdminForecastModel(forceReload) {
 
 async function resetAdminForecastGraph() {
   const statusNode = document.getElementById('forecast-save-status');
-  if (statusNode) statusNode.textContent = '恢复默认图中...';
+  if (statusNode) statusNode.textContent = '正在恢复推荐模板...';
   const res = await fetch('/api/admin/forecast-config', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -2837,8 +2929,8 @@ async function resetAdminForecastGraph() {
   renderForecastConfigBoard();
   renderForecastNodeDebug();
   centerForecastView();
-  if (statusNode) statusNode.textContent = '已恢复默认预测算法工作流';
-  showToast('已恢复默认预测算法工作流');
+  if (statusNode) statusNode.textContent = '已恢复推荐模板';
+  showToast('已恢复推荐模板');
 }
 
 async function saveForecastConfigs() {
@@ -2896,6 +2988,81 @@ function initForecastEditorEvents() {
 
 let adminSiteConfig = JSON.parse(JSON.stringify(window.SITE_CONFIG || {}));
 
+function ensureAdminTenants() {
+  if (!Array.isArray(adminSiteConfig.tenants) || !adminSiteConfig.tenants.length) {
+    adminSiteConfig.tenants = [];
+  }
+  return adminSiteConfig.tenants;
+}
+
+function renderTenantConfigList() {
+  const host = document.getElementById('tenant-config-list');
+  const defaultSelect = document.getElementById('default-tenant-slug');
+  if (!host || !defaultSelect) return;
+  const tenants = ensureAdminTenants();
+  host.innerHTML = tenants.map((tenant, index) => `
+    <div class="config-card" style="margin:0">
+      <div class="config-card-title">${escapeHtml(tenant.name || `租户 ${index + 1}`)}</div>
+      <div class="config-grid">
+        <div class="config-field">
+          <label>租户名称</label>
+          <input type="text" data-tenant-field="name" data-tenant-index="${index}" value="${escapeAttr(tenant.name || '')}">
+        </div>
+        <div class="config-field">
+          <label>租户简称</label>
+          <input type="text" data-tenant-field="short_name" data-tenant-index="${index}" value="${escapeAttr(tenant.short_name || '')}">
+        </div>
+        <div class="config-field">
+          <label>门户 slug</label>
+          <input type="text" data-tenant-field="slug" data-tenant-index="${index}" value="${escapeAttr(tenant.slug || '')}">
+        </div>
+        <div class="config-field">
+          <label>Logo 文案 / Emoji</label>
+          <input type="text" data-tenant-field="logo_mark" data-tenant-index="${index}" value="${escapeAttr(tenant.logo_mark || '')}">
+        </div>
+        <div class="config-field">
+          <label>主理人</label>
+          <input type="text" data-tenant-field="advisor" data-tenant-index="${index}" value="${escapeAttr(tenant.advisor || '')}">
+        </div>
+        <div class="config-field">
+          <label>租户等级</label>
+          <input type="text" data-tenant-field="tier" data-tenant-index="${index}" value="${escapeAttr(tenant.tier || '')}">
+        </div>
+        <div class="config-field">
+          <label>研究方向</label>
+          <input type="text" data-tenant-field="focus" data-tenant-index="${index}" value="${escapeAttr(tenant.focus || '')}">
+        </div>
+        <div class="config-field">
+          <label>租户权益</label>
+          <input type="text" data-tenant-field="rights" data-tenant-index="${index}" value="${escapeAttr(tenant.rights || '')}">
+        </div>
+        <div class="config-field">
+          <label>门户标题</label>
+          <input type="text" data-tenant-field="portal_headline" data-tenant-index="${index}" value="${escapeAttr(tenant.portal_headline || '')}">
+        </div>
+        <div class="config-field">
+          <label>Dashboard 标题</label>
+          <input type="text" data-tenant-field="dashboard_title" data-tenant-index="${index}" value="${escapeAttr(tenant.dashboard_title || '')}">
+        </div>
+      </div>
+      <div class="config-field">
+        <label>租户简介</label>
+        <input type="text" data-tenant-field="description" data-tenant-index="${index}" value="${escapeAttr(tenant.description || '')}">
+      </div>
+      <div class="config-field">
+        <label>门户描述</label>
+        <input type="text" data-tenant-field="portal_description" data-tenant-index="${index}" value="${escapeAttr(tenant.portal_description || '')}">
+      </div>
+      <div class="config-field">
+        <label>Dashboard 描述</label>
+        <input type="text" data-tenant-field="dashboard_description" data-tenant-index="${index}" value="${escapeAttr(tenant.dashboard_description || '')}">
+      </div>
+    </div>
+  `).join('');
+  defaultSelect.innerHTML = tenants.map(tenant => `<option value="${escapeAttr(tenant.slug || '')}">${escapeHtml(tenant.name || tenant.slug || '未命名租户')}</option>`).join('');
+  defaultSelect.value = adminSiteConfig.default_tenant_slug || (tenants[0] && tenants[0].slug) || '';
+}
+
 function markActivePill(groupId, attr, value) {
   document.querySelectorAll(`#${groupId} .theme-pill`).forEach(btn => {
     btn.classList.toggle('active', btn.dataset[attr] === value);
@@ -2905,14 +3072,20 @@ function markActivePill(groupId, attr, value) {
 function renderSiteConfigForm() {
   const cfg = adminSiteConfig || {};
   const flags = cfg.feature_flags || {};
+  const brand = cfg.brand || {};
   markActivePill('theme-mode-group', 'mode', cfg.default_theme || 'light');
   markActivePill('theme-accent-group', 'accent', cfg.default_accent || 'blue');
   const passwordGate = document.getElementById('password-gate-enabled');
   if (passwordGate) passwordGate.checked = cfg.password_gate_enabled !== false;
+  if (document.getElementById('brand-name')) document.getElementById('brand-name').value = brand.name || '';
+  if (document.getElementById('brand-short-name')) document.getElementById('brand-short-name').value = brand.short_name || '';
+  if (document.getElementById('brand-logo-mark')) document.getElementById('brand-logo-mark').value = brand.logo_mark || '';
+  if (document.getElementById('brand-tagline')) document.getElementById('brand-tagline').value = brand.tagline || '';
   ['fundamental_analysis', 'watchlist', 'daily_review', 'knowledge', 'community', 'hermes', 'vip', 'dm', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     if (checkbox) checkbox.checked = Boolean(flags[key]);
   });
+  renderTenantConfigList();
 }
 
 function pickAdminThemeMode(mode) {
@@ -2940,6 +3113,18 @@ async function loadSiteConfig() {
 async function saveSiteConfig() {
   const featureFlags = {};
   const passwordGate = document.getElementById('password-gate-enabled');
+  const tenantFields = document.querySelectorAll('[data-tenant-field]');
+  const tenantMap = new Map();
+  tenantFields.forEach((node) => {
+    const index = Number(node.dataset.tenantIndex || 0);
+    const field = node.dataset.tenantField;
+    if (!tenantMap.has(index)) tenantMap.set(index, {});
+    tenantMap.get(index)[field] = node.value || '';
+  });
+  const tenants = Array.from(tenantMap.entries()).sort((a, b) => a[0] - b[0]).map(([, value], index) => ({
+    ...ensureAdminTenants()[index],
+    ...value,
+  }));
   ['fundamental_analysis', 'watchlist', 'daily_review', 'knowledge', 'community', 'hermes', 'vip', 'dm', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     featureFlags[key] = Boolean(checkbox && checkbox.checked);
@@ -2948,6 +3133,15 @@ async function saveSiteConfig() {
     default_theme: adminSiteConfig.default_theme || 'light',
     default_accent: adminSiteConfig.default_accent || 'blue',
     password_gate_enabled: Boolean(passwordGate && passwordGate.checked),
+    brand: {
+      ...(adminSiteConfig.brand || {}),
+      name: document.getElementById('brand-name') ? document.getElementById('brand-name').value : '',
+      short_name: document.getElementById('brand-short-name') ? document.getElementById('brand-short-name').value : '',
+      logo_mark: document.getElementById('brand-logo-mark') ? document.getElementById('brand-logo-mark').value : '',
+      tagline: document.getElementById('brand-tagline') ? document.getElementById('brand-tagline').value : '',
+    },
+    default_tenant_slug: document.getElementById('default-tenant-slug') ? document.getElementById('default-tenant-slug').value : '',
+    tenants,
     feature_flags: featureFlags,
   };
   const status = document.getElementById('site-config-status');

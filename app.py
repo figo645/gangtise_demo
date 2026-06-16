@@ -4,7 +4,7 @@ import sqlite3
 import copy
 import math
 import statistics
-from flask import Flask, render_template, jsonify, request, session, redirect, url_for, g
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for, g, abort
 import random
 from datetime import datetime, timedelta
 from urllib.parse import urlsplit
@@ -23,10 +23,61 @@ DB_PATH = os.environ.get("GANGTISE_DEMO_DB", os.path.join(os.path.dirname(__file
 SITE_CONFIG_KEY = "site_config"
 FORECAST_WORKFLOW_KEY = "forecast_workflow_graph"
 
+DEFAULT_BRAND_CONFIG = {
+    "name": "洞见智研",
+    "short_name": "洞见智研",
+    "logo_mark": "洞",
+    "logo_url": "",
+    "tagline": "智能投研平台",
+    "hero_tagline": "聚焦复盘、基本面分析、自选股诊断与证据链输出的智能投研能力",
+    "hero_description": "当前定位不是泛金融 SaaS，而是面向研究场景的第三方智能投研工具与服务层。面向普通投资者、大V投顾租户和平台 Admin 提供多角色隔离、按需基本面、工作台协同与合规表达能力。",
+    "footer_description": "整合券商研报、专家纪要与市场数据，以 AI 驱动的证据链和工作流工具服务研究型大V投顾、机构与普通投资者，持续沉淀可复用的方法论资产。",
+}
+
+DEFAULT_TENANTS = [
+    {
+        "id": "tenant_lw",
+        "slug": "laowang",
+        "name": "财经老王研究院",
+        "short_name": "老王研究院",
+        "logo_mark": "👑",
+        "logo_url": "",
+        "advisor": "财经老王",
+        "tier": "旗舰租户",
+        "focus": "A股科技 · 港股互联网 · 复盘专区",
+        "rights": "复盘专区 · 知识专区 · Hermes 摘要 · 社群问答",
+        "description": "面向 A 股科技、港股互联网和高频复盘粉丝用户的独立租户空间。",
+        "portal_headline": "把大V研究能力、粉丝经营和证据链展示，统一到一个专属门户里。",
+        "portal_description": "门户前台承接功能介绍、最新复盘、核心指标和 Web 化经营 Dashboard；后台工作台承接粉丝消息、知识经营和内容生产。",
+        "dashboard_title": "老王租户经营 Dashboard",
+        "dashboard_description": "和 H5 核心指标面板同源，但在 Web 端用更完整的经营视角呈现。",
+    },
+    {
+        "id": "tenant_lisa",
+        "slug": "lisa",
+        "name": "Lisa 港股研究社",
+        "short_name": "Lisa 研究社",
+        "logo_mark": "💎",
+        "logo_url": "",
+        "advisor": "投资女神Lisa",
+        "tier": "专业租户",
+        "focus": "港股互联网 · 南向资金 · 价值框架",
+        "rights": "港股专栏 · 直播纪要 · Hermes 摘要 · 问答私域",
+        "description": "面向港股互联网与价值投资粉丝的独立租户空间。",
+        "portal_headline": "为每个大V提供独立品牌门户，让粉丝先进入专属空间，再承接服务和内容转化。",
+        "portal_description": "门户展示大V品牌、服务权益、代表性研究专题和租户专属 Dashboard，避免所有大V共用一个统一前台品牌。",
+        "dashboard_title": "Lisa 租户价值跟踪台",
+        "dashboard_description": "突出港股估值、南向资金、回购与财报验证等核心经营与研究指标。",
+    },
+]
+
 DEFAULT_SITE_CONFIG = {
     "default_theme": "light",
     "default_accent": "blue",
     "password_gate_enabled": True,
+    "brand": DEFAULT_BRAND_CONFIG,
+    "default_tenant_slug": DEFAULT_TENANTS[0]["slug"],
+    "tenants": DEFAULT_TENANTS,
     "feature_flags": {
         "fundamental_analysis": True,
         "watchlist": True,
@@ -108,6 +159,136 @@ def _coerce_float(value, fallback):
         return float(value)
     except Exception:
         return float(fallback)
+
+
+def normalize_brand_config(source=None):
+    raw = source if isinstance(source, dict) else {}
+    brand = copy.deepcopy(DEFAULT_BRAND_CONFIG)
+    for key in brand:
+        value = raw.get(key, brand[key])
+        brand[key] = str(value or brand[key]).strip() or brand[key]
+    return brand
+
+
+def normalize_tenant_config(source=None, index=0):
+    raw = source if isinstance(source, dict) else {}
+    fallback = DEFAULT_TENANTS[min(index, len(DEFAULT_TENANTS) - 1)]
+    tenant = {}
+    for key, default_value in fallback.items():
+        value = raw.get(key, default_value)
+        tenant[key] = str(value or default_value).strip() or default_value
+    slug = tenant.get("slug", "").strip().lower().replace(" ", "-").replace("_", "-")
+    tenant["slug"] = slug or fallback["slug"]
+    tenant["id"] = tenant.get("id") or f"tenant_{tenant['slug']}"
+    tenant["dashboard_title"] = tenant.get("dashboard_title") or f"{tenant['short_name']} Dashboard"
+    tenant["dashboard_description"] = tenant.get("dashboard_description") or fallback["dashboard_description"]
+    return tenant
+
+
+def normalize_tenant_configs(source=None):
+    items = source if isinstance(source, list) else []
+    normalized = []
+    seen_slugs = set()
+    if not items:
+        items = copy.deepcopy(DEFAULT_TENANTS)
+    for index, item in enumerate(items):
+        tenant = normalize_tenant_config(item, index)
+        base_slug = tenant["slug"]
+        dedup_slug = base_slug
+        suffix = 2
+        while dedup_slug in seen_slugs:
+            dedup_slug = f"{base_slug}-{suffix}"
+            suffix += 1
+        tenant["slug"] = dedup_slug
+        tenant["id"] = tenant.get("id") or f"tenant_{dedup_slug}"
+        seen_slugs.add(dedup_slug)
+        normalized.append(tenant)
+    return normalized
+
+
+def normalize_site_config(source=None):
+    merged = _merge_site_config(copy.deepcopy(DEFAULT_SITE_CONFIG), source or {})
+    merged["brand"] = normalize_brand_config(merged.get("brand"))
+    merged["tenants"] = normalize_tenant_configs(merged.get("tenants"))
+    tenant_slugs = [tenant["slug"] for tenant in merged["tenants"]]
+    default_tenant_slug = str(merged.get("default_tenant_slug", "") or "").strip()
+    merged["default_tenant_slug"] = default_tenant_slug if default_tenant_slug in tenant_slugs else tenant_slugs[0]
+    return merged
+
+
+def get_platform_brand(site_config=None):
+    config = site_config or get_site_config()
+    return normalize_brand_config(config.get("brand"))
+
+
+def get_tenant_configs(site_config=None):
+    config = site_config or get_site_config()
+    return normalize_tenant_configs(config.get("tenants"))
+
+
+def get_default_tenant_slug(site_config=None):
+    config = site_config or get_site_config()
+    return str(config.get("default_tenant_slug", "") or "").strip() or DEFAULT_TENANTS[0]["slug"]
+
+
+def get_tenant_by_slug(slug=None, site_config=None):
+    tenants = get_tenant_configs(site_config)
+    target = str(slug or "").strip().lower()
+    if not target:
+        target = get_default_tenant_slug(site_config)
+    for tenant in tenants:
+        if tenant["slug"] == target:
+            return tenant
+    return tenants[0] if tenants else normalize_tenant_config({}, 0)
+
+
+def get_active_tenant_from_request(site_config=None):
+    return get_tenant_by_slug(request.args.get("tenant"), site_config)
+
+
+def build_tenant_dashboard_payload(tenant=None):
+    tenant = tenant or get_tenant_by_slug()
+    workbench = gen_kol_workbench(tenant)
+    dashboard_metrics = workbench["dashboard_metrics"]
+    return {
+        "title": tenant["dashboard_title"],
+        "description": tenant["dashboard_description"],
+        "tenant": tenant,
+        "kpis": dashboard_metrics["kpis"],
+        "message_distribution": dashboard_metrics["message_distribution"],
+        "message_trend": dashboard_metrics["message_trend"],
+        "publish_distribution": dashboard_metrics["publish_distribution"],
+        "publish_trend": dashboard_metrics["publish_trend"],
+        "fund_dashboard": workbench["fund_dashboard"],
+        "reviews": workbench["published_reviews"],
+        "stats": workbench["stats"],
+    }
+
+
+def build_tenant_portal_payload(tenant=None):
+    tenant = tenant or get_tenant_by_slug()
+    workbench = gen_kol_workbench(tenant)
+    dashboard = build_tenant_dashboard_payload(tenant)
+    return {
+        "tenant": tenant,
+        "brand": get_platform_brand(),
+        "workbench": workbench,
+        "dashboard": dashboard,
+        "highlights": [
+            {
+                "title": "专属品牌门户",
+                "desc": f"{tenant['advisor']} 对外的名字、logo、定位和权益由平台 Admin 统一配置，前台不会再固定成平台总品牌。",
+            },
+            {
+                "title": "租户经营后台",
+                "desc": "大V 在自己的 Web 工作台里管理粉丝消息、群发、复盘生产、知识库和 Hermes 协同。",
+            },
+            {
+                "title": "Web 化 Dashboard",
+                "desc": "复用 H5 端核心指标与经营口径，但在 Web 上用更完整、更大气的仪表展示。",
+            },
+        ],
+    }
 
 
 def normalize_forecast_tuning_values(source=None):
@@ -544,14 +725,29 @@ def gen_channel_data():
     return data
 
 def gen_kol_data():
-    kols = [
-        {"name": "财经老王", "platform": "微信", "followers": 128000, "gmv": 18600, "commission": 2790, "tier": "种子A"},
-        {"name": "投资女神Lisa", "platform": "小红书", "followers": 86000, "gmv": 14200, "commission": 2556, "tier": "种子A"},
-        {"name": "宏观策略师", "platform": "内容合作", "followers": 54000, "gmv": 9600, "commission": 1536, "tier": "观察"},
-        {"name": "量化小白", "platform": "小红书", "followers": 32000, "gmv": 7800, "commission": 1170, "tier": "观察"},
-        {"name": "港股研究员", "platform": "转介绍", "followers": 18000, "gmv": 5400, "commission": 810, "tier": "观察"},
-    ]
-    return kols
+    tenants = get_tenant_configs()
+    tenant_rows = []
+    for index, tenant in enumerate(tenants):
+        tenant_rows.append(
+            {
+                "name": tenant["advisor"],
+                "platform": "租户门户",
+                "followers": 128000 - index * 18000,
+                "gmv": 18600 - index * 2400,
+                "commission": 2790 - index * 360,
+                "tier": tenant["tier"],
+                "tenant_name": tenant["name"],
+                "tenant_slug": tenant["slug"],
+            }
+        )
+    tenant_rows.extend(
+        [
+            {"name": "宏观策略师", "platform": "内容合作", "followers": 54000, "gmv": 9600, "commission": 1536, "tier": "观察"},
+            {"name": "量化小白", "platform": "小红书", "followers": 32000, "gmv": 7800, "commission": 1170, "tier": "观察"},
+            {"name": "港股研究员", "platform": "转介绍", "followers": 18000, "gmv": 5400, "commission": 810, "tier": "观察"},
+        ]
+    )
+    return tenant_rows
 
 def gen_market_data():
     indices = [
@@ -1064,7 +1260,7 @@ def get_site_config():
         "SELECT setting_value FROM app_settings WHERE setting_key = ?",
         (SITE_CONFIG_KEY,),
     ).fetchone()
-    config = dict(DEFAULT_SITE_CONFIG)
+    config = copy.deepcopy(DEFAULT_SITE_CONFIG)
     if row and row["setting_value"]:
         try:
             stored = json.loads(row["setting_value"])
@@ -1072,12 +1268,13 @@ def get_site_config():
                 config = _merge_site_config(config, stored)
         except Exception:
             app.logger.exception("Failed to parse site config")
+    config = normalize_site_config(config)
     g.site_config = config
     return config
 
 
 def save_site_config(config):
-    merged = _merge_site_config(DEFAULT_SITE_CONFIG, config or {})
+    merged = normalize_site_config(config)
     db = get_db()
     db.execute(
         """
@@ -1142,7 +1339,13 @@ def save_forecast_workflow_graph(graph):
 
 @app.context_processor
 def inject_site_config():
-    return {"site_config": get_site_config()}
+    config = get_site_config()
+    return {
+        "site_config": config,
+        "brand_config": get_platform_brand(config),
+        "tenant_configs": get_tenant_configs(config),
+        "default_tenant_slug": get_default_tenant_slug(config),
+    }
 
 
 @app.teardown_appcontext
@@ -1263,10 +1466,14 @@ def logout():
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    config = get_site_config()
+    tenants = get_tenant_configs(config)
+    default_tenant = get_tenant_by_slug(get_default_tenant_slug(config), config)
+    return render_template("index.html", brand=get_platform_brand(config), tenants=tenants, default_tenant=default_tenant)
 
 @app.route("/h5")
 def h5():
+    tenant = get_active_tenant_from_request()
     market = gen_market_data()
     news = gen_news_feed()
     macro_indicators = gen_macro_indicators()
@@ -1277,6 +1484,7 @@ def h5():
         news=news,
         macro_indicators=macro_indicators,
         feed_boards=feed_boards,
+        active_tenant=tenant,
     )
 
 @app.route("/admin")
@@ -1284,16 +1492,35 @@ def admin():
     kols = gen_kol_data()
     segments = gen_user_segments()
     access_stats = get_access_summary()
-    return render_template("admin.html", kols=kols, segments=segments, access_stats=access_stats)
+    return render_template(
+        "admin.html",
+        kols=kols,
+        segments=segments,
+        access_stats=access_stats,
+        brand=get_platform_brand(),
+        tenants=get_tenant_configs(),
+        default_tenant=get_tenant_by_slug(get_default_tenant_slug()),
+    )
 
 @app.route("/kol-workbench")
 def kol_workbench():
-    workbench = gen_kol_workbench()
-    return render_template("kol_workbench.html", workbench=workbench)
+    tenant = get_active_tenant_from_request()
+    workbench = gen_kol_workbench(tenant)
+    return render_template("kol_workbench.html", workbench=workbench, brand=get_platform_brand(), active_tenant=tenant)
+
+
+@app.route("/tenant/<tenant_slug>")
+def tenant_portal(tenant_slug):
+    tenant = get_tenant_by_slug(tenant_slug)
+    if not tenant or tenant["slug"] != tenant_slug:
+        abort(404)
+    portal = build_tenant_portal_payload(tenant)
+    return render_template("tenant_portal.html", portal=portal, brand=get_platform_brand(), active_tenant=tenant)
 
 @app.route("/dashboard")
 def dashboard():
-    return redirect(url_for("kol_workbench"))
+    tenant = get_active_tenant_from_request()
+    return redirect(url_for("tenant_portal", tenant_slug=tenant["slug"]))
 
 # API endpoints
 @app.route("/api/funnel")
@@ -1455,6 +1682,9 @@ def api_admin_site_config():
             "default_theme": payload.get("default_theme", current.get("default_theme", "light")),
             "default_accent": payload.get("default_accent", current.get("default_accent", "blue")),
             "password_gate_enabled": bool(payload.get("password_gate_enabled", current.get("password_gate_enabled", True))),
+            "brand": payload.get("brand", current.get("brand", {})),
+            "default_tenant_slug": payload.get("default_tenant_slug", current.get("default_tenant_slug")),
+            "tenants": payload.get("tenants", current.get("tenants", [])),
             "feature_flags": feature_flags,
         },
     )
@@ -1743,16 +1973,50 @@ def gen_dm_messages(kol_id):
         {"id":1,"sender":"kol","content":"欢迎关注！有投研问题随时交流。","time":"2026-05-18 09:00","type":"text"},
     ])
 
-def gen_kol_workbench():
+def gen_kol_workbench(tenant=None):
+    tenant = tenant or get_tenant_by_slug()
+    is_lisa = tenant["slug"] == "lisa"
+    kol_name = tenant["advisor"]
+    kol_avatar = tenant.get("logo_mark") or "👑"
+    base_followers = 86000 if is_lisa else 128000
+    base_vip = 29 if is_lisa else 36
+    base_revenue = 14200 if is_lisa else 18600
+    revenue_change = 6.4 if is_lisa else 8.5
+    unread_messages = 5 if is_lisa else 7
+    pending_replies = 2 if is_lisa else 3
+    today_views = 540 if is_lisa else 680
+    engagement_rate = 7.6 if is_lisa else 6.8
+    watchlist_focus = ["腾讯控股", "美团-W", "阿里巴巴-W"] if is_lisa else ["中芯国际", "腾讯控股", "贵州茅台"]
+    fund_cells = (
+        [
+            {"title": "南向资金", "value": "连续净流入", "prompt": "跟踪南向资金连续性与港股互联网情绪"},
+            {"title": "回购节奏", "value": "持续兑现", "prompt": "跟踪腾讯和头部互联网平台回购力度"},
+            {"title": "财报验证", "value": "等待披露", "prompt": "跟踪财报窗口的估值与盈利兑现"},
+            {"title": "平台政策", "value": "边际友好", "prompt": "跟踪平台经济监管边际变化"},
+        ]
+        if is_lisa
+        else [
+            {"title": "美联储路径", "value": "偏鸽", "prompt": "跟踪美联储降息路径与风险资产影响"},
+            {"title": "港股互联网", "value": "估值修复中", "prompt": "跟踪港股互联网回购、财报与估值带"},
+            {"title": "AI 订单兑现", "value": "继续验证", "prompt": "跟踪 AI 算力订单兑现和利润率"},
+            {"title": "增量资金", "value": "连续净流入", "prompt": "跟踪南向和北向资金的连续性"},
+        ]
+    )
     return {
-        "kol_name": "财经老王",
-        "kol_avatar": "👑",
-        "tier": "种子合作作者",
+        "tenant": tenant,
+        "kol_name": kol_name,
+        "kol_avatar": kol_avatar,
+        "tier": tenant["tier"],
         "entry_points": [
             {
                 "label": "H5 前台演示",
-                "url": "/h5",
-                "desc": "查看普通投资者和大V在 H5 里实际看到的 Hermes、复盘、知识和自选股路径。"
+                "url": f"/h5?tenant={tenant['slug']}",
+                "desc": f"查看普通投资者和大V在 H5 里实际看到的 {tenant['name']} Hermes、复盘、知识和自选股路径。"
+            },
+            {
+                "label": "租户门户",
+                "url": f"/tenant/{tenant['slug']}",
+                "desc": f"查看 {tenant['advisor']} 对外的专属租户门户，包括品牌介绍与 Web 化 Dashboard。"
             },
             {
                 "label": "纯 Admin 后台",
@@ -1761,25 +2025,25 @@ def gen_kol_workbench():
             },
         ],
         "stats": {
-            "total_followers": 128000,
-            "vip_subscribers": 36,
-            "monthly_revenue": 18600,
-            "revenue_change": 8.5,
-            "unread_messages": 7,
-            "pending_replies": 3,
-            "today_views": 680,
-            "engagement_rate": 6.8,
+            "total_followers": base_followers,
+            "vip_subscribers": base_vip,
+            "monthly_revenue": base_revenue,
+            "revenue_change": revenue_change,
+            "unread_messages": unread_messages,
+            "pending_replies": pending_replies,
+            "today_views": today_views,
+            "engagement_rate": engagement_rate,
         },
         "recent_fans": [
-            {"name":"投研达人_小陈","time":"5分钟前","msg":"老王好！AI算力还能追吗？","tier":"专业会员"},
-            {"name":"价值猎人小林","time":"23分钟前","msg":"请问港股互联网怎么看？","tier":"基础会员"},
+            {"name":"投研达人_小陈","time":"5分钟前","msg":f"{kol_name} 老师，想看最新核心指标版。","tier":"专业会员"},
+            {"name":"价值猎人小林","time":"23分钟前","msg":is_lisa and "请问港股互联网还能继续配吗？" or "请问港股互联网怎么看？","tier":"基础会员"},
             {"name":"量化新手_阿明","time":"1小时前","msg":"想学习多因子模型，有推荐吗？","tier":"免费用户"},
             {"name":"机构用户_张总","time":"2小时前","msg":"能否安排一次闭门交流？","tier":"机构试点"},
             {"name":"小白投资者","time":"3小时前","msg":"新能源板块现在能入吗？","tier":"基础会员"},
         ],
         "broadcast_history": [
-            {"id":1,"content":"本周策略更新：科技板块适合继续跟踪，重点看 AI 算力订单兑现","time":"2026-05-20 08:00","reach":92,"open_rate":68},
-            {"id":2,"content":"宏观提醒：美联储纪要偏鸽，但还要等国内资金面确认","time":"2026-05-19 22:30","reach":108,"open_rate":82},
+            {"id":1,"content":is_lisa and "本周港股互联网更新：继续看南向资金和回购兑现" or "本周策略更新：科技板块适合继续跟踪，重点看 AI 算力订单兑现","time":"2026-05-20 08:00","reach":92,"open_rate":68},
+            {"id":2,"content":is_lisa and "价值提醒：财报前估值修复较快，注意不要只盯单一平台" or "宏观提醒：美联储纪要偏鸽，但还要等国内资金面确认","time":"2026-05-19 22:30","reach":108,"open_rate":82},
             {"id":3,"content":"周末复盘：本周操作回顾与下周观察重点","time":"2026-05-18 18:00","reach":76,"open_rate":55},
         ],
         "message_center": {
@@ -1789,7 +2053,7 @@ def gen_kol_workbench():
                     "name": "投研达人_小陈",
                     "type": "粉丝提问",
                     "time": "5分钟前",
-                    "content": "AI 算力还能继续跟吗？想看你按 Hermes 基本面判断后的短版结论。",
+                    "content": is_lisa and "港股互联网还能继续配吗？想看你按 Hermes 价值框架压缩后的短版结论。" or "AI 算力还能继续跟吗？想看你按 Hermes 基本面判断后的短版结论。",
                     "status": "待回复",
                 },
                 {
@@ -1803,7 +2067,7 @@ def gen_kol_workbench():
                     "name": "价值猎人小林",
                     "type": "追问消息",
                     "time": "23分钟前",
-                    "content": "港股互联网那篇复盘我看完了，想继续问腾讯回购节奏和估值带怎么看。",
+                    "content": is_lisa and "最新那篇港股复盘我看完了，想继续问腾讯和美团的回购节奏怎么拆。" or "港股互联网那篇复盘我看完了，想继续问腾讯回购节奏和估值带怎么看。",
                     "status": "待跟进",
                 },
             ],
@@ -1811,10 +2075,10 @@ def gen_kol_workbench():
         "fan_management": {
             "summary": "这里看的是大V自己的粉丝分层，不是平台总用户。重点管理高频互动、付费意向、机构试点和沉默粉丝的经营动作。",
             "stats": {
-                "total_fans": 128000,
-                "new_fans_7d": 1860,
-                "active_fans_30d": 6840,
-                "paying_fans": 312,
+                "total_fans": base_followers,
+                "new_fans_7d": 1420 if is_lisa else 1860,
+                "active_fans_30d": 5120 if is_lisa else 6840,
+                "paying_fans": 248 if is_lisa else 312,
             },
             "fans": [
                 {"name": "投研达人_小陈", "tier": "专业会员", "source": "H5 Hermes", "joined": "2026-05-20", "value": "高频提问", "status": "活跃"},
@@ -1827,11 +2091,11 @@ def gen_kol_workbench():
         "dashboard_metrics": {
             "summary": "这里整合的是大V自己的经营 Dashboard，口径覆盖粉丝增长、粉丝注册费、总注册收入、其他收入、token 消耗、消息数量分布和趋势、发布数量及类型趋势。",
             "kpis": [
-                {"label": "粉丝增长量", "value": "+1,860", "sub": "近7日新增", "trend": "up", "badge": "+12.4%"},
-                {"label": "粉丝注册费用", "value": "¥39", "sub": "单粉平均注册成本", "trend": "down", "badge": "-6.2%"},
-                {"label": "总注册收入", "value": "¥86,400", "sub": "近30日累计", "trend": "up", "badge": "+18.7%"},
-                {"label": "其他收入", "value": "¥12,800", "sub": "群发 / 定制 / 线下活动", "trend": "up", "badge": "+9.5%"},
-                {"label": "Token 消耗量", "value": "128,400", "sub": "近30日 Hermes 消耗", "trend": "up", "badge": "+14.1%"},
+                {"label": "粉丝增长量", "value": is_lisa and "+1,420" or "+1,860", "sub": "近7日新增", "trend": "up", "badge": is_lisa and "+9.8%" or "+12.4%"},
+                {"label": "粉丝注册费用", "value": is_lisa and "¥42" or "¥39", "sub": "单粉平均注册成本", "trend": "down", "badge": is_lisa and "-4.1%" or "-6.2%"},
+                {"label": "总注册收入", "value": is_lisa and "¥69,800" or "¥86,400", "sub": "近30日累计", "trend": "up", "badge": is_lisa and "+15.2%" or "+18.7%"},
+                {"label": "其他收入", "value": is_lisa and "¥9,600" or "¥12,800", "sub": "群发 / 定制 / 线下活动", "trend": "up", "badge": is_lisa and "+7.4%" or "+9.5%"},
+                {"label": "Token 消耗量", "value": is_lisa and "102,300" or "128,400", "sub": "近30日 Hermes 消耗", "trend": "up", "badge": is_lisa and "+11.6%" or "+14.1%"},
             ],
             "message_distribution": [
                 {"label": "粉丝提问", "value": 42},
@@ -1876,7 +2140,7 @@ def gen_kol_workbench():
                 {"label": "智能体成稿", "desc": "适合先交信息给智能体，自动生成完整复盘文章后再人工微调。"},
             ],
             "default_flow": ["选择复盘周期", "补充语音/手输/文件", "锁定行业和个股", "生成复盘草稿", "确认后发布给粉丝"],
-            "watchlist_focus": ["中芯国际", "腾讯控股", "贵州茅台"],
+            "watchlist_focus": watchlist_focus,
             "periods": ["日复盘", "周复盘", "月复盘"],
         },
         "knowledge_hub": {
@@ -1928,7 +2192,32 @@ def gen_kol_workbench():
         },
         "watchlist_hub": {
             "summary": "自选股在前台已经改成顶部直接输入股票代码，进入个股详情后再添加自选；详情页展示基础 K 线和 5 / 10 / 20 日线。",
-            "items": [
+            "items": is_lisa and [
+                {
+                    "name": "腾讯控股",
+                    "code": "00700",
+                    "market": "港股",
+                    "focus": "回购 + 财报",
+                    "change": "+1.4%",
+                    "thesis": "回购和现金流支撑估值修复，但仍需财报确认。",
+                },
+                {
+                    "name": "美团-W",
+                    "code": "03690",
+                    "market": "港股",
+                    "focus": "外卖 + 到店",
+                    "change": "+0.9%",
+                    "thesis": "看履约效率和广告变现恢复斜率。",
+                },
+                {
+                    "name": "阿里巴巴-W",
+                    "code": "09988",
+                    "market": "港股",
+                    "focus": "云 + 电商",
+                    "change": "+1.1%",
+                    "thesis": "组织调整和云业务兑现是核心观察点。",
+                },
+            ] or [
                 {
                     "name": "中芯国际",
                     "code": "688981",
@@ -1956,14 +2245,9 @@ def gen_kol_workbench():
             ],
         },
         "fund_dashboard": {
-            "summary": "基本面的核心指标面板默认展示总结态；没有指标时显示加号，点击单格后输入独立提示词，保存即生成该格指标摘要。",
+            "summary": f"{tenant['advisor']} 租户的核心指标面板默认展示总结态；没有指标时显示加号，点击单格后输入独立提示词，保存即生成该格指标摘要。",
             "layout": "2x2",
-            "cells": [
-                {"title": "美联储路径", "value": "偏鸽", "prompt": "跟踪美联储降息路径与风险资产影响"},
-                {"title": "港股互联网", "value": "估值修复中", "prompt": "跟踪港股互联网回购、财报与估值带"},
-                {"title": "AI 订单兑现", "value": "继续验证", "prompt": "跟踪 AI 算力订单兑现和利润率"},
-                {"title": "增量资金", "value": "连续净流入", "prompt": "跟踪南向和北向资金的连续性"},
-            ],
+            "cells": fund_cells,
         },
         "published_reviews": [
             {
@@ -2183,7 +2467,16 @@ def api_ai_forecast():
 
 @app.route("/api/kol/workbench")
 def api_kol_workbench():
-    return jsonify(gen_kol_workbench())
+    tenant = get_tenant_by_slug(request.args.get("tenant"))
+    return jsonify(gen_kol_workbench(tenant))
+
+
+@app.route("/api/tenant/<tenant_slug>/dashboard")
+def api_tenant_dashboard(tenant_slug):
+    tenant = get_tenant_by_slug(tenant_slug)
+    if not tenant or tenant["slug"] != tenant_slug:
+        return jsonify({"success": False, "error": "tenant_not_found"}), 404
+    return jsonify({"success": True, "dashboard": build_tenant_dashboard_payload(tenant)})
 
 @app.route("/api/kol/broadcast", methods=["POST"])
 def api_kol_broadcast():
