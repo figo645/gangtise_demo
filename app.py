@@ -1478,12 +1478,14 @@ def h5():
     news = gen_news_feed()
     macro_indicators = gen_macro_indicators()
     feed_boards = gen_feed_boards(market)
+    watchlist_details = gen_watchlist_details()
     return render_template(
         "h5.html",
         market=market,
         news=news,
         macro_indicators=macro_indicators,
         feed_boards=feed_boards,
+        watchlist_details=watchlist_details,
         active_tenant=tenant,
     )
 
@@ -1976,6 +1978,7 @@ def gen_dm_messages(kol_id):
 def gen_kol_workbench(tenant=None):
     tenant = tenant or get_tenant_by_slug()
     is_lisa = tenant["slug"] == "lisa"
+    watchlist_details_map = gen_watchlist_details()
     kol_name = tenant["advisor"]
     kol_avatar = tenant.get("logo_mark") or "👑"
     base_followers = 86000 if is_lisa else 128000
@@ -2007,6 +2010,7 @@ def gen_kol_workbench(tenant=None):
         "kol_name": kol_name,
         "kol_avatar": kol_avatar,
         "tier": tenant["tier"],
+        "watchlist_details": watchlist_details_map,
         "entry_points": [
             {
                 "label": "H5 前台演示",
@@ -2255,6 +2259,7 @@ def gen_kol_workbench(tenant=None):
                 "period": "日复盘",
                 "time": "2026-06-07 18:40",
                 "tags": ["行业板块", "个股跟踪", "可直接分发"],
+                "watchlist": watchlist_focus[:3],
                 "summary": "先从全天资料压出短版提纲，再对中芯国际、腾讯控股和贵州茅台三个样本做个股投资复盘，保留主线、验证节点和下一步观察。"
             },
             {
@@ -2262,6 +2267,7 @@ def gen_kol_workbench(tenant=None):
                 "period": "周复盘",
                 "time": "2026-06-06 20:10",
                 "tags": ["周度框架", "板块归纳"],
+                "watchlist": watchlist_focus[:3],
                 "summary": "以行业板块为骨架，把 AI 算力、半导体、港股互联网、消费和新能源统一放进同一篇复盘，方便普通投资者快速查看。"
             },
         ],

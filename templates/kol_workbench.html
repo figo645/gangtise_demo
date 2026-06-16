@@ -6,8 +6,10 @@
 <title>{{ active_tenant.name }} — 大V工作台</title>
 <link rel="stylesheet" href="/static/css/style.css">
 <script>
+  window.ACTIVE_TENANT = {{ active_tenant | tojson }};
   window.SITE_CONFIG = {{ site_config | tojson }};
   window.WORKBENCH_DATA = {{ workbench | tojson }};
+  window.WATCHLIST_DETAILS_MAP = {{ workbench.watchlist_details | tojson }};
 </script>
 <script src="/static/js/theme.js"></script>
 <style>
@@ -796,7 +798,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <div class="kw-card-head">
             <div>
               <div class="kw-card-title">复盘生产台</div>
-              <div class="kw-card-desc">复盘由大V发起和确认。材料既可以来自语音、手输和文件上传，也可以先从大量自选股里挑出本次要纳入的样本，再分别生成行业板块复盘和个股投资复盘。</div>
+              <div class="kw-card-desc">复盘由大V发起和确认。材料既可以来自语音、手输和文件上传，也可以先从大量自选股里挑出本次要纳入的样本，再在 K 线上补标注和复盘话语，最后分别生成行业板块复盘和个股投资复盘。</div>
             </div>
             <span class="kw-tag">Review Studio</span>
           </div>
@@ -834,7 +836,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           </div>
           <div class="kw-toolbar" style="margin-top:12px">
             <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="showToast('发起新复盘')">发起新复盘</button>
-            <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="showToast('进入选股归纳流程')">挑选本次复盘自选股</button>
+            <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="showToast('进入选股归纳流程，并在 K 线上补充标注')">挑选本次复盘自选股</button>
           </div>
         </div>
       </div>
@@ -938,6 +940,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
                 <span class="kw-watch-chip">MA10</span>
                 <span class="kw-watch-chip">MA20</span>
               </div>
+              <div data-workbench-watch-annotation="{{ item.code }}" style="margin-top:10px"></div>
             </div>
             {% endfor %}
           </div>
@@ -992,6 +995,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
                 <span class="kw-tag">{{ item.period }}</span>
               </div>
               <div class="kw-broadcast-meta">{{ item.time }} · {{ item.summary }}</div>
+              <div data-workbench-review-annotation="{{ loop.index0 }}" style="margin-top:10px"></div>
               <div class="kw-chip-row" style="margin-top:10px">
                 {% for tag in item.tags %}
                 <span class="kw-chip">{{ tag }}</span>
@@ -1176,6 +1180,84 @@ function escapeHtml(value) {
 
 function escapeAttr(value) {
   return escapeHtml(value);
+}
+
+const KW_WATCHLIST_ANNOTATION_STORAGE_KEY = 'gangtise_demo_watchlist_annotations';
+
+function loadWorkbenchWatchlistAnnotations() {
+  try {
+    const raw = window.localStorage ? window.localStorage.getItem(KW_WATCHLIST_ANNOTATION_STORAGE_KEY) : '';
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function getWorkbenchStockAnnotations(stockCode) {
+  const tenantId = window.ACTIVE_TENANT && window.ACTIVE_TENANT.id;
+  const storage = loadWorkbenchWatchlistAnnotations();
+  const bucket = tenantId && storage[tenantId] && storage[tenantId][String(stockCode || '').toUpperCase()];
+  return Array.isArray(bucket) ? bucket.slice().sort((a, b) => Number(a.candleIndex || 0) - Number(b.candleIndex || 0)) : [];
+}
+
+function getWorkbenchReviewAnnotations(reviewItem) {
+  const detailsMap = window.WATCHLIST_DETAILS_MAP || {};
+  const watchlist = Array.isArray(reviewItem.watchlist) ? reviewItem.watchlist : [];
+  return watchlist.map((name) => {
+    const detail = Object.values(detailsMap).find(item => item && item.name === name);
+    if (!detail) return null;
+    const annotations = getWorkbenchStockAnnotations(detail.code);
+    if (!annotations.length) return null;
+    return {
+      name,
+      summary: annotations.slice(0, 2).map(item => `${item.dateLabel} ${item.note}`).join('；'),
+    };
+  }).filter(Boolean);
+}
+
+function renderWorkbenchAnnotationViews() {
+  document.querySelectorAll('[data-workbench-watch-annotation]').forEach((node) => {
+    const stockCode = node.getAttribute('data-workbench-watch-annotation') || '';
+    const annotations = getWorkbenchStockAnnotations(stockCode);
+    if (!annotations.length) {
+      node.innerHTML = '<div class="kw-side-note">当前还没有 K 线标注，H5 里的大V视角新增后会同步显示在这里。</div>';
+      return;
+    }
+    const latest = annotations[annotations.length - 1];
+    node.innerHTML = `
+      <div class="kw-watch-chip-row" style="margin-bottom:8px">
+        <span class="kw-watch-chip">K线标注 ${annotations.length} 条</span>
+      </div>
+      <div class="kw-side-card">
+        <div class="kw-knowledge-title">${escapeHtml(latest.title || '最新标注')}</div>
+        <div class="kw-knowledge-meta">${escapeHtml(latest.dateLabel || '--')} · 最新复盘话语</div>
+        <div class="kw-side-note" style="margin-top:6px">${escapeHtml(latest.note || '')}${latest.trigger ? `｜验证节点：${escapeHtml(latest.trigger)}` : ''}</div>
+      </div>
+    `;
+  });
+
+  const reviews = (window.WORKBENCH_DATA && window.WORKBENCH_DATA.published_reviews) || [];
+  document.querySelectorAll('[data-workbench-review-annotation]').forEach((node) => {
+    const index = Number(node.getAttribute('data-workbench-review-annotation') || 0);
+    const reviewItem = reviews[index];
+    const annotations = reviewItem ? getWorkbenchReviewAnnotations(reviewItem) : [];
+    if (!annotations.length) {
+      node.innerHTML = '';
+      return;
+    }
+    node.innerHTML = `
+      <div class="kw-side-card">
+        <div class="kw-side-title" style="margin-bottom:8px">本篇复盘引用的 K 线标注</div>
+        ${annotations.map(item => `
+          <div class="kw-side-item" style="display:block;border-bottom:none;padding:0 0 8px">
+            <div class="kw-knowledge-title">${escapeHtml(item.name)}</div>
+            <div class="kw-side-note" style="margin-top:4px">${escapeHtml(item.summary)}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  });
 }
 
 let kwForecastConfig = {};
@@ -1666,6 +1748,9 @@ function showWorkbenchSection(name, navEl) {
   if (name === 'biz-dashboard') {
     renderWorkbenchBizCharts();
   }
+  if (name === 'watchlist' || name === 'published' || name === 'review') {
+    renderWorkbenchAnnotationViews();
+  }
   if (name === 'forecast-model') {
     initWorkbenchForecastEditorEvents();
     loadWorkbenchForecastModel().catch((error) => showToast(error.message || '加载失败'));
@@ -1692,6 +1777,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   initWorkbenchForecastEditorEvents();
   renderWorkbenchBizCharts();
+  renderWorkbenchAnnotationViews();
 });
 </script>
 </body>

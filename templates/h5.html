@@ -2362,6 +2362,13 @@ body,
   </div>
 </div>
 
+<div class="modal-overlay" id="watchlist-annotation-modal" onclick="if(event.target===this)closeWatchlistAnnotationModal()">
+  <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <div id="watchlist-annotation-modal-content"></div>
+  </div>
+</div>
+
 <!-- ===== TOAST ===== -->
 <div class="toast" id="toast"></div>
 
@@ -2500,6 +2507,7 @@ const DEMO_PROFILE_USERS = [
 const DEMO_PROFILE_STORAGE_KEY = 'gangtise_demo_profile_user';
 let currentDemoUser = null;
 const DEFAULT_MACRO_INDICATORS = {{ macro_indicators | tojson }};
+const WATCHLIST_DETAILS_MAP = {{ watchlist_details | tojson }};
 const FUND_DASHBOARD_STORAGE_KEY = 'gangtise_fund_dashboard_state';
 const DEFAULT_DASHBOARD_CELL_PROMPTS = [
   '聚焦美联储路径、通胀和降息预期，给普通投资者一个方向判断。',
@@ -2972,6 +2980,8 @@ function buildKolReviewData(user, period) {
   const periodMeta = getReviewPeriodMeta(period);
   const runtime = ensureTenantReviewRuntime(user.tenant.id);
   const focusNames = getDavReviewSelectedWatchlist(user.tenant.id);
+  const annotationEntries = getReviewAnnotationEntries(user.tenant.id, focusNames);
+  const annotationSummary = annotationEntries.map(entry => `${entry.stockName}：${entry.summary}`).join('；');
   const firstFocus = focusNames[0] || '重点样本';
   const secondFocus = focusNames[1] || firstFocus;
   const thirdFocus = focusNames[2] || secondFocus;
@@ -2984,25 +2994,25 @@ function buildKolReviewData(user, period) {
     month: '月度复盘：先保留主线框架，再按行业和重点个股做阶段归纳',
   };
   const summaryMap = {
-    day: `这版${periodMeta.label}先由 ${user.tenant.advisor} 压缩全天资料，再从 ${focusNames.slice(0, 2).join('、')} 等样本里挑重点公司深挖。`,
-    week: `这版${periodMeta.label}把一周内的大V语音、手写观点和会议资料统一归纳成行业主线 + 个股复盘，方便普通投资者直接查看。`,
-    month: `这版${periodMeta.label}强调阶段框架，先看主线是否延续，再筛出最值得继续跟踪的行业板块和个股。`,
+    day: `这版${periodMeta.label}先由 ${user.tenant.advisor} 压缩全天资料，再从 ${focusNames.slice(0, 2).join('、')} 等样本里挑重点公司深挖。${annotationSummary ? `其中已直接引用 K 线标注：${annotationSummary}。` : ''}`,
+    week: `这版${periodMeta.label}把一周内的大V语音、手写观点和会议资料统一归纳成行业主线 + 个股复盘，方便普通投资者直接查看。${annotationSummary ? `本周重点样本的 K 线标注也已一并纳入。` : ''}`,
+    month: `这版${periodMeta.label}强调阶段框架，先看主线是否延续，再筛出最值得继续跟踪的行业板块和个股。${annotationSummary ? `月内关键 K 线节点也被带入复盘判断。` : ''}`,
   };
   const paragraphMap = {
     day: [
       { title: '市场主线', text: '今天讨论度最高的仍是 AI 算力、半导体和港股互联网。大V先保留真正影响判断的验证节点，不重复堆原始消息。' },
       { title: '行业板块复盘', text: '行业层面更像结构性活跃，适合先压出短版提纲，再决定哪些板块值得继续投入时间。消费和新能源目前更适合放在观察队列。' },
-      { title: '个股投资复盘', text: `${firstFocus} 看订单和景气兑现，${secondFocus} 看回购和财报验证，${thirdFocus} 更偏稳健配置，不建议把短期波动直接当成结论。` },
+      { title: '个股投资复盘', text: `${firstFocus} 看订单和景气兑现，${secondFocus} 看回购和财报验证，${thirdFocus} 更偏稳健配置，不建议把短期波动直接当成结论。${annotationSummary ? `本次补充的 K 线标注要点：${annotationSummary}` : ''}` },
     ],
     week: [
       { title: '阶段行情复盘', text: '本周市场仍由少数高景气方向驱动，强主线集中但广度一般，说明更需要复盘结构而不是只看指数涨跌。' },
       { title: '行业板块归纳', text: '科技成长仍是最值得保留的主线，消费和新能源还要继续回到景气、订单和利润率三个验证节点。' },
-      { title: '重点样本回顾', text: `${focusSummary} 仍留在重点跟踪池里，但对应结论要继续挂来源和置信度，避免情绪化表达。` },
+      { title: '重点样本回顾', text: `${focusSummary} 仍留在重点跟踪池里，但对应结论要继续挂来源和置信度，避免情绪化表达。${annotationSummary ? `本周样本的 K 线标注摘要：${annotationSummary}` : ''}` },
     ],
     month: [
       { title: '月度框架', text: '月度复盘更看阶段性框架是否成立，而不是单日波动。先保留主线，再决定哪些样本值得继续深挖。' },
       { title: '行业与个股拆分', text: '行业板块用于解释大方向，个股复盘用于解释具体投资逻辑，两层内容拆开后更便于普通投资者阅读。' },
-      { title: '下阶段动作', text: '后续继续沿着科技成长、港股互联网和稳健配置三条线做复盘更新，必要时再补充新的重点个股。' },
+      { title: '下阶段动作', text: `后续继续沿着科技成长、港股互联网和稳健配置三条线做复盘更新，必要时再补充新的重点个股。${annotationSummary ? `月内已沉淀的 K 线标注会继续作为后续判断的起点。` : ''}` },
     ],
   };
   return {
@@ -3016,6 +3026,7 @@ function buildKolReviewData(user, period) {
     paragraphLabel: paragraphCfg.label,
     tags: [periodMeta.label, '行业板块', '个股投资复盘'],
     watchlist: focusNames,
+    annotations: annotationEntries,
     paragraphs: paragraphMap[period] || paragraphMap.day,
   };
 }
@@ -3026,10 +3037,12 @@ function buildAiReviewData(user, period) {
   const focusNames = user.role === 'dav'
     ? getDavReviewSelectedWatchlist(user.tenant.id)
     : getTenantWatchlistFocus(user.tenant.id);
+  const annotationEntries = getReviewAnnotationEntries(user.tenant.id, focusNames);
+  const annotationSummary = annotationEntries.map(entry => `${entry.stockName}：${entry.summary}`).join('；');
   const summaryMap = {
-    day: '系统会把你的自选股、当前行情、所属大V最近发布的复盘和 Hermes 上下文一起压成短版智能复盘。',
-    week: '系统按一周内的自选股波动、阶段行情和大V复盘主线做聚合，给出一版更适合回看的周度短版。',
-    month: '系统会把月内主线延续性、自选股位置和阶段验证节点统一收口，形成一版月度智能复盘摘要。',
+    day: `系统会把你的自选股、当前行情、所属大V最近发布的复盘和 Hermes 上下文一起压成短版智能复盘。${annotationSummary ? `同时会优先引用这些个股已有的 K 线标注：${annotationSummary}。` : ''}`,
+    week: `系统按一周内的自选股波动、阶段行情和大V复盘主线做聚合，给出一版更适合回看的周度短版。${annotationSummary ? '已有 K 线标注会作为个股层证据优先进入摘要。' : ''}`,
+    month: `系统会把月内主线延续性、自选股位置和阶段验证节点统一收口，形成一版月度智能复盘摘要。${annotationSummary ? '系统也会把月内关键 K 线标注一并带入。' : ''}`,
   };
   const focusMap = {
     day: '今天最需要继续看的不是所有个股，而是自选股里与主线相关、且已经出现验证材料的样本。',
@@ -3044,7 +3057,7 @@ function buildAiReviewData(user, period) {
     watchlist: focusNames,
     bullets: [
       '先看所属大V当前主线，再判断你的自选股是否真正跟上验证节奏。',
-      '如果大V复盘强调行业框架，系统会同步把个股观察拆出来，避免只剩抽象观点。',
+      annotationSummary ? `这次会优先引用 K 线标注，把个股判断落到明确节点上：${annotationSummary}` : '如果大V复盘强调行业框架，系统会同步把个股观察拆出来，避免只剩抽象观点。',
       '任何结论都只保留为研究参考，不直接给买卖动作。',
     ],
   };
@@ -3253,6 +3266,17 @@ function renderReviewExperience() {
       <div class="review-watchlist-row">
         ${kol.watchlist.map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
       </div>
+      ${kol.annotations && kol.annotations.length ? `
+        <div class="review-summary-desc">本次引用的 K 线标注</div>
+        <div class="review-paragraph-list">
+          ${kol.annotations.map(item => `
+            <div class="review-meta-card">
+              <div class="review-meta-title">${escapeHtml(item.stockName)} · K线标注</div>
+              <div class="review-meta-desc">${escapeHtml(item.summary)}</div>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
       <div class="review-watchlist-row">
         ${kol.tags.map(tag => `<span class="review-watchlist-chip">${escapeHtml(tag)}</span>`).join('')}
       </div>
@@ -4290,6 +4314,7 @@ function renderDemoProfile(user) {
   }
   renderDemoUserSwitchList();
   syncTenantScopedAdvisorViews();
+  renderWatchlist();
   renderReviewExperience();
   renderKnowledgeExperience();
   renderHermesWorkspace();
@@ -4342,7 +4367,10 @@ function switchTab(tab) {
 // ===== WATCHLIST =====
 let currentWatchlistDetail = null;
 const WATCHLIST_ADDED_STORAGE_KEY = 'gangtise_demo_added_watchlist_codes';
+const WATCHLIST_ANNOTATION_STORAGE_KEY = 'gangtise_demo_watchlist_annotations';
 let addedWatchlistCodes = loadAddedWatchlistCodes();
+let currentWatchlistAnnotationTarget = null;
+let watchlistAnnotationStore = loadWatchlistAnnotationStore();
 
 function loadAddedWatchlistCodes() {
   try {
@@ -4360,6 +4388,64 @@ function persistAddedWatchlistCodes() {
       window.localStorage.setItem(WATCHLIST_ADDED_STORAGE_KEY, JSON.stringify(addedWatchlistCodes));
     }
   } catch (e) {}
+}
+
+function loadWatchlistAnnotationStore() {
+  try {
+    const raw = window.localStorage ? window.localStorage.getItem(WATCHLIST_ANNOTATION_STORAGE_KEY) : '';
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function persistWatchlistAnnotationStore() {
+  try {
+    if (window.localStorage) {
+      window.localStorage.setItem(WATCHLIST_ANNOTATION_STORAGE_KEY, JSON.stringify(watchlistAnnotationStore));
+    }
+  } catch (e) {}
+}
+
+function getWatchlistAnnotationBucket(tenantId, stockCode) {
+  const normalizedCode = normalizeStockLookupValue(stockCode);
+  if (!watchlistAnnotationStore[tenantId]) watchlistAnnotationStore[tenantId] = {};
+  if (!Array.isArray(watchlistAnnotationStore[tenantId][normalizedCode])) {
+    watchlistAnnotationStore[tenantId][normalizedCode] = [];
+  }
+  return watchlistAnnotationStore[tenantId][normalizedCode];
+}
+
+function getWatchlistAnnotations(tenantId, stockCode) {
+  const bucket = getWatchlistAnnotationBucket(tenantId, stockCode);
+  return bucket.slice().sort((a, b) => Number(a.candleIndex || 0) - Number(b.candleIndex || 0));
+}
+
+function buildAnnotationId(tenantId, stockCode, candleIndex) {
+  return `${tenantId}__${normalizeStockLookupValue(stockCode)}__${candleIndex}`;
+}
+
+function getWatchlistAnnotationSummary(tenantId, stockCode) {
+  const annotations = getWatchlistAnnotations(tenantId, stockCode);
+  if (!annotations.length) return '';
+  return annotations.slice(0, 3).map(item => `${item.dateLabel || '该K线'}：${item.note}`).join('；');
+}
+
+function getReviewAnnotationEntries(tenantId, stockNames) {
+  const detailsMap = WATCHLIST_DETAILS_MAP || {};
+  return (stockNames || []).map((name) => {
+    const detail = Object.values(detailsMap).find(item => item && item.name === name);
+    if (!detail) return null;
+    const annotations = getWatchlistAnnotations(tenantId, detail.code);
+    if (!annotations.length) return null;
+    return {
+      stockName: name,
+      stockCode: detail.code,
+      annotations,
+      summary: annotations.slice(0, 2).map(item => `${item.dateLabel} ${item.note}`).join('；'),
+    };
+  }).filter(Boolean);
 }
 
 function getRenderedWatchlistCodes() {
@@ -4413,6 +4499,9 @@ function buildWatchlistCardHtml(detail) {
   const market = detail.market || '';
   const focus = detail.industry || detail.focus || '个股跟踪';
   const statusTag = isStockInWatchlist(detail.code) ? '已加入我的自选' : '支持继续加入';
+  const activeUser = getActiveDemoUser();
+  const annotations = getWatchlistAnnotations(activeUser.tenant.id, detail.code);
+  const latestAnnotation = annotations[annotations.length - 1] || null;
   return `
     <div
       onclick="openWatchlistDetail('${detail.code}')"
@@ -4440,7 +4529,12 @@ function buildWatchlistCardHtml(detail) {
         <span style="font-size:10px;background:rgba(200,169,110,0.1);color:var(--gold);padding:3px 8px;border-radius:10px">${statusTag}</span>
         <span style="font-size:10px;background:rgba(52,152,219,0.12);color:#3498DB;padding:3px 8px;border-radius:10px">分析记录同步主理投顾</span>
         <span style="font-size:10px;background:rgba(46,204,113,0.12);color:var(--green);padding:3px 8px;border-radius:10px">可连 Hermes</span>
+        ${annotations.length ? `<span style="font-size:10px;background:rgba(99,179,237,0.12);color:#63B3ED;padding:3px 8px;border-radius:10px">K线标注 ${annotations.length} 条</span>` : ''}
       </div>
+      ${latestAnnotation ? `<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:rgba(47,116,192,0.08);border:1px solid rgba(47,116,192,0.12)">
+        <div style="font-size:10px;color:#63B3ED;font-weight:700">${escapeHtml(latestAnnotation.dateLabel || '--')} · 最新标注</div>
+        <div style="font-size:12px;color:var(--white);line-height:1.7;margin-top:4px">${escapeHtml(latestAnnotation.title || '')}：${escapeHtml(latestAnnotation.note || '')}</div>
+      </div>` : ''}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
         <button class="btn-outline" style="padding:7px 10px;font-size:11px" onclick="event.stopPropagation();openWatchlistDetail('${detail.code}','authors')">当前投顾互动</button>
         <button class="btn-gold" style="padding:7px 10px;font-size:11px" onclick="event.stopPropagation();runWatchlistHermes('${detail.code}','basic')">基本面分析</button>
@@ -4492,6 +4586,8 @@ function buildWatchlistKlineSvg(series) {
   const padding = { top: 14, right: 10, bottom: 24, left: 10 };
   const plotWidth = width - padding.left - padding.right;
   const plotHeight = height - padding.top - padding.bottom;
+  const activeUser = getActiveDemoUser();
+  const annotations = currentWatchlistDetail ? getWatchlistAnnotations(activeUser.tenant.id, currentWatchlistDetail.code) : [];
   const values = list.flatMap(item => [Number(item.high || 0), Number(item.low || 0)]);
   const maxValue = Math.max(...values);
   const minValue = Math.min(...values);
@@ -4533,6 +4629,32 @@ function buildWatchlistKlineSvg(series) {
     const x = padding.left + slotWidth * index + slotWidth / 2;
     return `<text x="${x.toFixed(2)}" y="${height - 6}" text-anchor="middle" font-size="9" fill="var(--gray-400)">${list[index].date || ''}</text>`;
   }).join('');
+  const annotationMarkers = annotations.map((item) => {
+    const candleIndex = Number(item.candleIndex || 0);
+    const candle = list[candleIndex];
+    if (!candle) return '';
+    const centerX = padding.left + slotWidth * candleIndex + slotWidth / 2;
+    const markerY = scaleY(Number(candle.high || candle.close || 0)) - 12;
+    return `
+      <g>
+        <circle cx="${centerX.toFixed(2)}" cy="${markerY.toFixed(2)}" r="6" fill="#2F74C0" stroke="#FFFFFF" stroke-width="2"></circle>
+        <text x="${centerX.toFixed(2)}" y="${(markerY + 3).toFixed(2)}" text-anchor="middle" font-size="8" fill="#FFFFFF">注</text>
+      </g>
+    `;
+  }).join('');
+  const clickableOverlays = list.map((item, index) => {
+    const x = padding.left + slotWidth * index;
+    return `
+      <rect
+        x="${x.toFixed(2)}"
+        y="${padding.top}"
+        width="${slotWidth.toFixed(2)}"
+        height="${plotHeight.toFixed(2)}"
+        fill="transparent"
+        ${activeUser.role === 'dav' ? `onclick="openWatchlistAnnotationModal(${index})"` : ''}
+      ></rect>
+    `;
+  }).join('');
   return `
     <div style="background:var(--navy);border:1px solid rgba(200,169,110,0.08);border-radius:12px;padding:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
@@ -4543,12 +4665,16 @@ function buildWatchlistKlineSvg(series) {
           <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#AF7AC5;display:inline-block"></span>MA20</span>
         </div>
       </div>
+      ${annotations.length ? `<div style="font-size:11px;color:#63B3ED;line-height:1.7;margin-bottom:8px">当前已标注 ${annotations.length} 处 K 线节点，复盘生成时会自动引用这些标注。</div>` : ''}
+      ${activeUser.role === 'dav' ? `<div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">点击 K 线任一蜡烛可添加标注，记录当时判断、验证节点和复盘话语。</div>` : ''}
       <svg viewBox="0 0 ${width} ${height}" width="100%" height="200" role="img" aria-label="个股K线与5日10日20日均线图">
         ${yTicks}
         ${candles}
         <path d="${buildLinePath(ma5)}" fill="none" stroke="#F6C453" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
         <path d="${buildLinePath(ma10)}" fill="none" stroke="#5DADE2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
         <path d="${buildLinePath(ma20)}" fill="none" stroke="#AF7AC5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+        ${annotationMarkers}
+        ${clickableOverlays}
         ${labels}
       </svg>
     </div>
@@ -4664,6 +4790,14 @@ function renderWatchlistDetail(data, section) {
       <div class="watch-research-desc">${item.desc}</div>
     </div>
   `).join('');
+  const stockAnnotations = getWatchlistAnnotations(activeUser.tenant.id, data.code);
+  const annotationCards = stockAnnotations.map(item => `
+    <div class="watch-research-item">
+      <div class="watch-research-meta">K线标注 · ${escapeHtml(item.dateLabel || '--')} · ${escapeHtml(item.updatedAt || '刚刚')}</div>
+      <div class="watch-research-title">${escapeHtml(item.title || '未命名标注')}</div>
+      <div class="watch-research-desc">${escapeHtml(item.note || '')}${item.trigger ? `｜验证节点：${escapeHtml(item.trigger)}` : ''}</div>
+    </div>
+  `).join('');
   const klineChart = buildWatchlistKlineSvg(data.kline || []);
   const overviewSection = `
     <div class="watch-section-card">
@@ -4675,6 +4809,7 @@ function renderWatchlistDetail(data, section) {
         <span class="watch-thesis-badge">Research Profile</span>
       </div>
       ${klineChart}
+      ${stockAnnotations.length ? `<div class="watch-research-grid" style="margin:10px 0 0">${annotationCards}</div>` : (activeUser.role === 'dav' ? `<div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-top:10px">当前还没有 K 线标注。你可以点击蜡烛节点，把当时的判断写下来，后续复盘会自动引用。</div>` : '')}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 10px">${metricCards}</div>
       <div style="display:grid;gap:6px">${thesis}</div>
     </div>
@@ -4775,6 +4910,111 @@ function openWatchlistAuthorDm(name) {
   } else {
     showToast('暂未配置该投顾对话');
   }
+}
+
+function openWatchlistAnnotationModal(candleIndex) {
+  const user = getActiveDemoUser();
+  if (user.role !== 'dav') {
+    showToast('只有大V身份可以在 K 线上做标注');
+    return;
+  }
+  if (!currentWatchlistDetail || !Array.isArray(currentWatchlistDetail.kline)) return;
+  const candle = currentWatchlistDetail.kline[candleIndex];
+  if (!candle) return;
+  const existing = getWatchlistAnnotations(user.tenant.id, currentWatchlistDetail.code).find(item => Number(item.candleIndex) === Number(candleIndex));
+  currentWatchlistAnnotationTarget = {
+    tenantId: user.tenant.id,
+    stockCode: currentWatchlistDetail.code,
+    stockName: currentWatchlistDetail.name,
+    candleIndex,
+    candle,
+    existing: existing || null,
+  };
+  const host = document.getElementById('watchlist-annotation-modal-content');
+  const modal = document.getElementById('watchlist-annotation-modal');
+  if (!host || !modal) return;
+  host.innerHTML = `
+    <div class="modal-title" style="margin-bottom:10px">K线标注 · ${escapeHtml(currentWatchlistDetail.name)}</div>
+    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">
+      你正在标注 ${escapeHtml(candle.date || '--')} 这根 K 线。保存后，这条标注会显示在图上，并自动参与后续复盘。
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">K线节点</label>
+      <div class="review-watchlist-row">
+        <span class="review-watchlist-chip">${escapeHtml(candle.date || '--')}</span>
+        <span class="review-watchlist-chip">开 ${Number(candle.open || 0).toFixed(2)}</span>
+        <span class="review-watchlist-chip">收 ${Number(candle.close || 0).toFixed(2)}</span>
+        <span class="review-watchlist-chip">高 ${Number(candle.high || 0).toFixed(2)}</span>
+        <span class="review-watchlist-chip">低 ${Number(candle.low || 0).toFixed(2)}</span>
+      </div>
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">标注标题</label>
+      <textarea id="watchlist-annotation-title" class="knowledge-modal-textarea" placeholder="例如：放量突破前高 / 回踩20日线">${escapeHtml(existing && existing.title || '')}</textarea>
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">复盘话语</label>
+      <textarea id="watchlist-annotation-note" class="knowledge-modal-textarea" placeholder="写下你当时的判断、观察点和复盘话语。">${escapeHtml(existing && existing.note || '')}</textarea>
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">验证节点</label>
+      <textarea id="watchlist-annotation-trigger" class="knowledge-modal-textarea" placeholder="例如：看次日量能、财报兑现、均线是否守住。">${escapeHtml(existing && existing.trigger || '')}</textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeWatchlistAnnotationModal()">取消</button>
+      ${existing ? '<button class="btn-outline" style="color:#E74C3C;border-color:rgba(231,76,60,0.22)" onclick="deleteWatchlistAnnotation()">删除标注</button>' : ''}
+      <button class="btn-gold" onclick="saveWatchlistAnnotation()">保存标注</button>
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+function closeWatchlistAnnotationModal() {
+  const modal = document.getElementById('watchlist-annotation-modal');
+  if (modal) modal.classList.remove('show');
+  currentWatchlistAnnotationTarget = null;
+}
+
+function saveWatchlistAnnotation() {
+  const target = currentWatchlistAnnotationTarget;
+  if (!target) return;
+  const title = (document.getElementById('watchlist-annotation-title') || {}).value?.trim() || '';
+  const note = (document.getElementById('watchlist-annotation-note') || {}).value?.trim() || '';
+  const trigger = (document.getElementById('watchlist-annotation-trigger') || {}).value?.trim() || '';
+  if (!title || !note) {
+    showToast('请至少填写标注标题和复盘话语');
+    return;
+  }
+  const bucket = getWatchlistAnnotationBucket(target.tenantId, target.stockCode);
+  const nextEntry = {
+    id: buildAnnotationId(target.tenantId, target.stockCode, target.candleIndex),
+    candleIndex: target.candleIndex,
+    dateLabel: target.candle.date || '',
+    title,
+    note,
+    trigger,
+    updatedAt: '刚刚',
+  };
+  const existingIndex = bucket.findIndex(item => Number(item.candleIndex) === Number(target.candleIndex));
+  if (existingIndex >= 0) bucket[existingIndex] = nextEntry;
+  else bucket.push(nextEntry);
+  persistWatchlistAnnotationStore();
+  closeWatchlistAnnotationModal();
+  renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
+  renderReviewExperience();
+  showToast('K线标注已保存，复盘会自动引用');
+}
+
+function deleteWatchlistAnnotation() {
+  const target = currentWatchlistAnnotationTarget;
+  if (!target) return;
+  watchlistAnnotationStore[target.tenantId][normalizeStockLookupValue(target.stockCode)] =
+    getWatchlistAnnotationBucket(target.tenantId, target.stockCode).filter(item => Number(item.candleIndex) !== Number(target.candleIndex));
+  persistWatchlistAnnotationStore();
+  closeWatchlistAnnotationModal();
+  renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
+  renderReviewExperience();
+  showToast('已删除该处 K 线标注');
 }
 
 function runWatchlistHermes(stockCode, mode) {
