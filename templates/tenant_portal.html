@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{{ portal.tenant.name }} — 租户门户</title>
+<title>{{ portal.tenant.name }} - 粉丝门户</title>
 <link rel="stylesheet" href="/static/css/style.css">
 <script>
   window.SITE_CONFIG = {{ site_config | tojson }};
@@ -11,60 +11,66 @@
 </script>
 <script src="/static/js/theme.js"></script>
 <style>
-body { background:linear-gradient(180deg,#F3F7FC 0%,#FFFFFF 45%,#EEF4FA 100%); color:var(--text-main); }
-.tp-shell { max-width:1200px; margin:0 auto; padding:32px 24px 56px; }
-.tp-topbar { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:28px; flex-wrap:wrap; }
+body { background:linear-gradient(180deg,#F7FAFD 0%,#EFF5FB 42%,#FFFFFF 100%); color:var(--text-main); }
+.tp-shell { max-width:1180px; margin:0 auto; padding:28px 20px 56px; }
+.tp-topbar { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:24px; flex-wrap:wrap; }
 .tp-brand { display:flex; align-items:center; gap:14px; }
-.tp-logo { width:54px; height:54px; border-radius:18px; background:linear-gradient(135deg,#2F74C0,#66A1DF); color:#fff; display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:700; box-shadow:0 14px 30px rgba(47,116,192,0.18); }
-.tp-brand-text strong { display:block; font-size:18px; }
+.tp-logo { width:56px; height:56px; border-radius:20px; background:linear-gradient(135deg,#2F74C0,#66A1DF); color:#fff; display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:700; box-shadow:0 16px 34px rgba(47,116,192,0.20); }
+.tp-brand-text strong { display:block; font-size:19px; color:#172132; }
 .tp-brand-text span { display:block; margin-top:4px; font-size:12px; color:var(--text-sub); }
-.tp-hero { display:grid; grid-template-columns:1.1fr 0.9fr; gap:24px; align-items:stretch; }
-.tp-card { background:rgba(255,255,255,0.92); border:1px solid rgba(47,116,192,0.10); border-radius:24px; box-shadow:0 18px 48px rgba(23,45,74,0.08); }
+.tp-link-row { display:flex; gap:10px; flex-wrap:wrap; }
+.tp-hero { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(320px,0.85fr); gap:20px; align-items:stretch; }
+.tp-card { background:rgba(255,255,255,0.94); border:1px solid rgba(47,116,192,0.10); border-radius:24px; box-shadow:0 20px 46px rgba(23,45,74,0.08); }
 .tp-hero-main { padding:34px; position:relative; overflow:hidden; }
-.tp-hero-main::before { content:''; position:absolute; inset:auto -10% -25% auto; width:260px; height:260px; background:radial-gradient(circle, rgba(47,116,192,0.16) 0%, rgba(47,116,192,0) 72%); pointer-events:none; }
+.tp-hero-main::after { content:''; position:absolute; right:-48px; top:-28px; width:220px; height:220px; border-radius:50%; background:radial-gradient(circle, rgba(47,116,192,0.16) 0%, rgba(47,116,192,0) 72%); pointer-events:none; }
 .tp-kicker { display:inline-flex; align-items:center; gap:8px; font-size:11px; color:#1F497D; background:#EAF3FF; border-radius:999px; padding:6px 12px; font-weight:700; }
-.tp-title { font-size:42px; line-height:1.15; margin:18px 0 14px; color:#182132; }
-.tp-desc { font-size:15px; line-height:1.9; color:var(--text-sub); max-width:640px; }
+.tp-title { font-size:40px; line-height:1.15; margin:18px 0 14px; color:#182132; max-width:700px; }
+.tp-desc { font-size:15px; line-height:1.9; color:var(--text-sub); max-width:660px; }
 .tp-chip-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:20px; }
-.tp-chip { font-size:11px; color:var(--gold); background:rgba(200,169,110,0.12); border:1px solid rgba(200,169,110,0.16); border-radius:999px; padding:6px 10px; }
-.tp-cta-row { display:flex; gap:12px; margin-top:28px; flex-wrap:wrap; }
-.tp-meta { padding:28px; display:grid; gap:14px; }
-.tp-meta-item { background:#F8FBFF; border:1px solid rgba(47,116,192,0.10); border-radius:18px; padding:16px; }
-.tp-meta-label { font-size:11px; color:var(--text-sub); margin-bottom:8px; }
-.tp-meta-value { font-size:16px; font-weight:700; color:var(--text-main); }
+.tp-chip { font-size:11px; color:#8E6A1E; background:rgba(200,169,110,0.12); border:1px solid rgba(200,169,110,0.16); border-radius:999px; padding:6px 10px; }
+.tp-cta-row { display:flex; gap:12px; margin-top:26px; flex-wrap:wrap; }
+.tp-side-panel { padding:24px; display:grid; gap:14px; }
+.tp-side-block { background:#F8FBFF; border:1px solid rgba(47,116,192,0.10); border-radius:18px; padding:16px; }
+.tp-side-label { font-size:11px; color:var(--text-sub); margin-bottom:8px; }
+.tp-side-value { font-size:15px; color:#172132; font-weight:700; line-height:1.6; }
+.tp-side-copy { font-size:12px; color:var(--text-sub); line-height:1.8; margin-top:8px; }
 .tp-section { margin-top:28px; }
 .tp-section-head { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-bottom:16px; flex-wrap:wrap; }
-.tp-section-head h2 { margin:0; font-size:24px; color:#182132; }
-.tp-section-head p { margin:6px 0 0; font-size:13px; color:var(--text-sub); max-width:640px; line-height:1.7; }
-.tp-highlight-grid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:16px; }
-.tp-highlight-card, .tp-kpi-card, .tp-chart-card, .tp-fund-card, .tp-review-card { background:#FFFFFF; border:1px solid rgba(47,116,192,0.10); border-radius:20px; padding:20px; box-shadow:0 10px 28px rgba(23,45,74,0.06); }
-.tp-highlight-card strong { display:block; font-size:15px; margin-bottom:8px; }
-.tp-highlight-card p { margin:0; font-size:13px; line-height:1.8; color:var(--text-sub); }
-.tp-kpi-grid { display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:14px; }
-.tp-kpi-card .label { font-size:11px; color:var(--text-sub); }
-.tp-kpi-card .value { font-size:28px; font-weight:700; margin:10px 0 6px; color:#182132; }
-.tp-kpi-card .sub { font-size:12px; color:var(--text-sub); }
-.tp-kpi-card .badge { display:inline-flex; margin-top:10px; font-size:11px; color:#1F497D; background:#EAF3FF; border-radius:999px; padding:4px 8px; }
-.tp-chart-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px; }
-.tp-chart-card h3, .tp-fund-card h3, .tp-review-card h3 { margin:0 0 12px; font-size:16px; color:#182132; }
-.tp-bar-list, .tp-trend-list, .tp-fund-grid, .tp-review-list { display:grid; gap:12px; }
-.tp-bar-row { display:grid; grid-template-columns:96px 1fr auto; gap:10px; align-items:center; font-size:12px; color:var(--text-sub); }
-.tp-bar-track { height:8px; border-radius:999px; background:#EEF4FA; overflow:hidden; }
-.tp-bar-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,#2F74C0,#66A1DF); }
-.tp-trend-row { display:grid; grid-template-columns:72px 1fr auto; gap:12px; align-items:center; font-size:12px; color:var(--text-sub); }
-.tp-trend-line { height:8px; border-radius:999px; background:linear-gradient(90deg, rgba(47,116,192,0.12), rgba(47,116,192,0.28)); position:relative; overflow:hidden; }
-.tp-trend-line span { position:absolute; top:0; left:0; height:100%; border-radius:999px; background:linear-gradient(90deg,#2F74C0,#66A1DF); }
-.tp-fund-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
-.tp-fund-item { background:#F8FBFF; border:1px solid rgba(47,116,192,0.08); border-radius:16px; padding:16px; }
-.tp-fund-item .name { font-size:13px; font-weight:700; }
-.tp-fund-item .value { font-size:22px; font-weight:700; color:#2F74C0; margin-top:8px; }
-.tp-fund-item .prompt { font-size:11px; color:var(--text-sub); line-height:1.7; margin-top:8px; }
-.tp-review-row { padding:16px 0; border-top:1px solid rgba(47,116,192,0.08); }
-.tp-review-row:first-child { border-top:none; padding-top:0; }
-.tp-review-row strong { display:block; font-size:14px; }
-.tp-review-row p { margin:8px 0 0; font-size:12px; line-height:1.8; color:var(--text-sub); }
+.tp-section-head h2 { margin:0; font-size:25px; color:#172132; }
+.tp-section-head p { margin:6px 0 0; font-size:13px; color:var(--text-sub); line-height:1.8; max-width:680px; }
+.tp-grid-3, .tp-grid-2 { display:grid; gap:16px; }
+.tp-grid-3 { grid-template-columns:repeat(3, minmax(0,1fr)); }
+.tp-grid-2 { grid-template-columns:repeat(2, minmax(0,1fr)); }
+.tp-info-card, .tp-review-card, .tp-service-card, .tp-framework-card, .tp-spotlight-card { background:#FFFFFF; border:1px solid rgba(47,116,192,0.10); border-radius:20px; padding:20px; box-shadow:0 10px 28px rgba(23,45,74,0.06); }
+.tp-info-card strong, .tp-review-title, .tp-service-card strong, .tp-framework-card strong, .tp-spotlight-card strong { display:block; font-size:15px; color:#172132; }
+.tp-info-card p, .tp-review-copy, .tp-service-card p, .tp-framework-card p, .tp-spotlight-card p { margin:8px 0 0; font-size:13px; line-height:1.8; color:var(--text-sub); }
+.tp-clickable { cursor:pointer; transition:transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
+.tp-clickable:hover { transform:translateY(-2px); border-color:rgba(47,116,192,0.18); box-shadow:0 16px 32px rgba(23,45,74,0.08); }
+.tp-detail-link { margin-top:12px; font-size:12px; color:#2F74C0; font-weight:700; }
+.tp-review-list, .tp-watch-list { display:grid; gap:12px; }
+.tp-review-row, .tp-watch-item { background:#FFFFFF; border:1px solid rgba(47,116,192,0.10); border-radius:20px; padding:18px; box-shadow:0 10px 28px rgba(23,45,74,0.06); }
+.tp-review-meta, .tp-watch-meta { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.tp-mini-chip { font-size:10px; color:#1F497D; background:#EAF3FF; border-radius:999px; padding:4px 8px; }
+.tp-watch-top { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+.tp-watch-name { font-size:15px; font-weight:700; color:#172132; }
+.tp-watch-code { font-size:11px; color:var(--text-sub); margin-top:4px; }
+.tp-watch-change { font-size:14px; font-weight:700; color:#2F74C0; }
+.tp-footer-note { margin-top:30px; font-size:12px; color:var(--text-sub); line-height:1.8; padding:18px 20px; background:rgba(47,116,192,0.05); border:1px solid rgba(47,116,192,0.08); border-radius:18px; }
+.tp-modal-overlay { position:fixed; inset:0; background:rgba(15,32,53,0.52); display:none; align-items:center; justify-content:center; padding:20px; z-index:1000; backdrop-filter:blur(4px); }
+.tp-modal-overlay.show { display:flex; }
+.tp-modal-card { width:min(760px,100%); max-height:86vh; overflow:auto; background:#FFFFFF; border:1px solid rgba(47,116,192,0.12); border-radius:24px; box-shadow:0 28px 70px rgba(23,45,74,0.18); padding:24px; }
+.tp-modal-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:16px; }
+.tp-modal-title { font-size:22px; color:#172132; font-weight:700; }
+.tp-modal-desc { font-size:13px; color:var(--text-sub); line-height:1.8; margin-top:8px; }
+.tp-modal-close { border:none; background:#EAF3FF; color:#1F497D; width:34px; height:34px; border-radius:50%; font-size:18px; cursor:pointer; }
+.tp-modal-section { margin-top:16px; padding-top:16px; border-top:1px solid rgba(47,116,192,0.08); }
+.tp-modal-section:first-child { margin-top:0; padding-top:0; border-top:none; }
+.tp-modal-section-title { font-size:14px; color:#172132; font-weight:700; }
+.tp-modal-section-copy { font-size:13px; color:var(--text-sub); line-height:1.9; margin-top:8px; white-space:pre-wrap; }
+.tp-modal-bullets { margin:10px 0 0; padding-left:18px; color:var(--text-sub); }
+.tp-modal-bullets li { margin:6px 0; line-height:1.7; }
 @media (max-width: 960px) {
-  .tp-hero, .tp-chart-grid, .tp-highlight-grid, .tp-kpi-grid, .tp-fund-grid { grid-template-columns:1fr; }
+  .tp-hero, .tp-grid-3, .tp-grid-2 { grid-template-columns:1fr; }
   .tp-title { font-size:30px; }
 }
 </style>
@@ -76,47 +82,41 @@ body { background:linear-gradient(180deg,#F3F7FC 0%,#FFFFFF 45%,#EEF4FA 100%); c
       <div class="tp-logo">{{ portal.tenant.logo_mark }}</div>
       <div class="tp-brand-text">
         <strong>{{ portal.tenant.name }}</strong>
-        <span>{{ portal.tenant.advisor }} · {{ portal.tenant.tier }} · {{ brand.name }} 租户门户</span>
+        <span>{{ portal.tenant.advisor }} · 面向粉丝的专属门户</span>
       </div>
     </div>
-    <div style="display:flex;gap:12px;flex-wrap:wrap">
-      <a href="/kol-workbench?tenant={{ portal.tenant.slug }}" class="btn-outline" style="text-decoration:none">进入大V后台</a>
-      <a href="/h5?tenant={{ portal.tenant.slug }}" class="btn-outline" style="text-decoration:none">查看 H5</a>
-      <a href="/admin" class="btn-gold" style="text-decoration:none">返回 Admin</a>
+    <div class="tp-link-row">
+      <a href="/" class="btn-outline" style="text-decoration:none">返回首页</a>
+      <a href="/h5?tenant={{ portal.tenant.slug }}" class="btn-gold" style="text-decoration:none">进入 H5</a>
     </div>
   </div>
 
   <section class="tp-hero">
     <div class="tp-card tp-hero-main">
-      <div class="tp-kicker">TENANT PORTAL · {{ portal.tenant.short_name }}</div>
+      <div class="tp-kicker">FAN PORTAL · {{ portal.tenant.short_name }}</div>
       <div class="tp-title">{{ portal.tenant.portal_headline }}</div>
       <div class="tp-desc">{{ portal.tenant.portal_description }}</div>
       <div class="tp-chip-row">
+        <span class="tp-chip">主理人：{{ portal.tenant.advisor }}</span>
         <span class="tp-chip">{{ portal.tenant.focus }}</span>
         <span class="tp-chip">{{ portal.tenant.rights }}</span>
-        <span class="tp-chip">主理人：{{ portal.tenant.advisor }}</span>
       </div>
       <div class="tp-cta-row">
-        <a href="/kol-workbench?tenant={{ portal.tenant.slug }}" class="btn-gold" style="text-decoration:none">进入租户后台</a>
-        <a href="#dashboard" class="btn-outline" style="text-decoration:none">查看 Web Dashboard</a>
+        <a href="{{ portal.cta.primary_href }}" class="btn-gold" style="text-decoration:none">{{ portal.cta.primary_label }}</a>
+        <a href="{{ portal.cta.secondary_href }}" class="btn-outline" style="text-decoration:none">{{ portal.cta.secondary_label }}</a>
       </div>
     </div>
-    <div class="tp-card tp-meta">
-      <div class="tp-meta-item">
-        <div class="tp-meta-label">租户简介</div>
-        <div class="tp-meta-value">{{ portal.tenant.description }}</div>
+    <div class="tp-card tp-side-panel">
+      {% for item in portal.hero_stats %}
+      <div class="tp-side-block">
+        <div class="tp-side-label">{{ item.label }}</div>
+        <div class="tp-side-value">{{ item.value }}</div>
       </div>
-      <div class="tp-meta-item">
-        <div class="tp-meta-label">研究方向</div>
-        <div class="tp-meta-value">{{ portal.tenant.focus }}</div>
-      </div>
-      <div class="tp-meta-item">
-        <div class="tp-meta-label">可开放权益</div>
-        <div class="tp-meta-value">{{ portal.tenant.rights }}</div>
-      </div>
-      <div class="tp-meta-item">
-        <div class="tp-meta-label">当前能力</div>
-        <div class="tp-meta-value">门户介绍 + 大V后台 + Web Dashboard</div>
+      {% endfor %}
+      <div class="tp-side-block">
+        <div class="tp-side-label">适合谁先看</div>
+        <div class="tp-side-value">已经在跟 {{ portal.tenant.advisor }} 研究口径，想先快速理解当前主线和重点样本的粉丝用户。</div>
+        <div class="tp-side-copy">先看内容，再去 H5 做自选股跟踪、Hermes 对话和专属提问，路径会更顺。</div>
       </div>
     </div>
   </section>
@@ -124,116 +124,198 @@ body { background:linear-gradient(180deg,#F3F7FC 0%,#FFFFFF 45%,#EEF4FA 100%); c
   <section class="tp-section">
     <div class="tp-section-head">
       <div>
-        <h2>门户能力说明</h2>
-        <p>租户门户不只是展示品牌和介绍，还要承接大V专属服务入口，并明确把后台工作台与前台消费场景分开。</p>
+        <h2>这个门户先解决什么</h2>
+        <p>不是把后台功能搬过来，而是先把粉丝最需要消费的内容和理解入口收拢起来。</p>
       </div>
     </div>
-    <div class="tp-highlight-grid">
-      {% for item in portal.highlights %}
-      <div class="tp-highlight-card">
-        <strong>{{ item.title }}</strong>
-        <p>{{ item.desc }}</p>
+    {% for group in portal.audience_sections %}
+    <div style="margin-bottom:18px">
+      <div class="tp-section-head" style="margin-bottom:12px">
+        <div>
+        <h2 style="font-size:20px">{{ group["title"] }}</h2>
+        <p>{{ group["desc"] }}</p>
       </div>
-      {% endfor %}
     </div>
+    <div class="tp-grid-3">
+        {% for item in group["items"] %}
+        <div class="tp-info-card">
+          <strong>{{ item["title"] }}</strong>
+          <p>{{ item["desc"] }}</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
   </section>
 
-  <section class="tp-section" id="dashboard">
+  <section class="tp-section" id="latest-review">
     <div class="tp-section-head">
       <div>
-        <h2>{{ portal.dashboard.title }}</h2>
-        <p>{{ portal.dashboard.description }}</p>
+        <h2>最近复盘</h2>
+        <p>这里展示的是已经确认发布、适合粉丝直接阅读的代表性复盘，不展示大V后台里的草稿和经营数据。</p>
       </div>
     </div>
-    <div class="tp-kpi-grid">
-      {% for item in portal.dashboard.kpis %}
-      <div class="tp-kpi-card">
-        <div class="label">{{ item.label }}</div>
-        <div class="value">{{ item.value }}</div>
-        <div class="sub">{{ item.sub }}</div>
-        <div class="badge">{{ item.badge }}</div>
+    <div class="tp-review-list">
+      {% for item in portal.featured_reviews %}
+      <div class="tp-review-row tp-clickable" onclick='openPortalDetail({{ item | tojson }}, "review")'>
+        <div class="tp-review-title">{{ item.title }}</div>
+        <div class="tp-review-meta">
+          <span class="tp-mini-chip">{{ item.period }}</span>
+          <span class="tp-mini-chip">{{ item.time }}</span>
+          {% for tag in item.tags %}
+          <span class="tp-mini-chip">{{ tag }}</span>
+          {% endfor %}
+        </div>
+        <div class="tp-review-copy">{{ item.summary }}</div>
+        <div class="tp-review-meta">
+          {% for stock in item.watchlist %}
+          <span class="tp-mini-chip">{{ stock }}</span>
+          {% endfor %}
+        </div>
+        <div class="tp-detail-link">查看详情</div>
       </div>
       {% endfor %}
     </div>
+  </section>
 
-    <div class="tp-chart-grid">
-      <div class="tp-chart-card">
-        <h3>消息分布</h3>
-        <div class="tp-bar-list">
-          {% for item in portal.dashboard.message_distribution %}
-          <div class="tp-bar-row">
-            <div>{{ item.label }}</div>
-            <div class="tp-bar-track"><div class="tp-bar-fill" style="width: {{ (item.value * 100 / 50)|round(0, 'floor') }}%"></div></div>
-            <strong>{{ item.value }}</strong>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-      <div class="tp-chart-card">
-        <h3>近 7 日消息趋势</h3>
-        <div class="tp-trend-list">
-          {% for item in portal.dashboard.message_trend %}
-          <div class="tp-trend-row">
-            <div>{{ item.day }}</div>
-            <div class="tp-trend-line"><span style="width: {{ (item.count * 100 / 60)|round(0, 'floor') }}%"></span></div>
-            <strong>{{ item.count }}</strong>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-      <div class="tp-chart-card">
-        <h3>发布类型分布</h3>
-        <div class="tp-bar-list">
-          {% for item in portal.dashboard.publish_distribution %}
-          <div class="tp-bar-row">
-            <div>{{ item.label }}</div>
-            <div class="tp-bar-track"><div class="tp-bar-fill" style="width: {{ (item.value * 100 / 20)|round(0, 'floor') }}%"></div></div>
-            <strong>{{ item.value }}</strong>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-      <div class="tp-chart-card">
-        <h3>近 7 日发布趋势</h3>
-        <div class="tp-trend-list">
-          {% for item in portal.dashboard.publish_trend %}
-          <div class="tp-trend-row">
-            <div>{{ item.day }}</div>
-            <div class="tp-trend-line"><span style="width: {{ (item.count * 100 / 6)|round(0, 'floor') }}%"></span></div>
-            <strong>{{ item.count }}</strong>
-          </div>
-          {% endfor %}
-        </div>
+  <section class="tp-section">
+    <div class="tp-section-head">
+      <div>
+        <h2>当前重点样本</h2>
+        <p>粉丝先看到这位主理人最近重点跟踪哪些样本，再决定后续是否加入自选或继续提问。</p>
       </div>
     </div>
-
-    <div class="tp-chart-grid">
-      <div class="tp-fund-card">
-        <h3>Web 核心指标面板</h3>
-        <div class="tp-fund-grid">
-          {% for item in portal.dashboard.fund_dashboard.cells %}
-          <div class="tp-fund-item">
-            <div class="name">{{ item.title }}</div>
-            <div class="value">{{ item.value }}</div>
-            <div class="prompt">{{ item.prompt }}</div>
+    <div class="tp-grid-3">
+      {% for item in portal.featured_watchlist %}
+      <div class="tp-watch-item tp-clickable" onclick='openPortalDetail({{ item | tojson }}, "watch")'>
+        <div class="tp-watch-top">
+          <div>
+            <div class="tp-watch-name">{{ item.name }}</div>
+            <div class="tp-watch-code">{{ item.code }} · {{ item.market }} · {{ item.focus }}</div>
           </div>
-          {% endfor %}
+          <div class="tp-watch-change">{{ item.change }}</div>
         </div>
+        <p style="margin:10px 0 0;font-size:13px;line-height:1.8;color:var(--text-sub)">{{ item.thesis }}</p>
+        <div class="tp-detail-link">查看详情</div>
       </div>
-      <div class="tp-review-card">
-        <h3>代表性复盘</h3>
-        <div class="tp-review-list">
-          {% for item in portal.dashboard.reviews %}
-          <div class="tp-review-row">
-            <strong>{{ item.title }}</strong>
-            <div style="font-size:11px;color:var(--text-sub);margin-top:6px">{{ item.period }} · {{ item.time }}</div>
-            <p>{{ item.summary }}</p>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
+      {% endfor %}
     </div>
   </section>
+
+  <section class="tp-section">
+    <div class="tp-section-head">
+      <div>
+        <h2>研究框架</h2>
+        <p>粉丝不只看结论，也能先理解这位大V平时怎么看估值、验证节点和风险边界。</p>
+      </div>
+    </div>
+    <div class="tp-grid-3">
+      {% for item in portal.research_framework %}
+      <div class="tp-framework-card tp-clickable" onclick='openPortalDetail({{ item | tojson }}, "framework")'>
+        <strong>{{ item.title }}</strong>
+        <p>{{ item.desc }}</p>
+        <div class="tp-detail-link">查看详情</div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="tp-section">
+    <div class="tp-section-head">
+      <div>
+        <h2>可继续使用的服务</h2>
+        <p>看完门户内容以后，粉丝再进入 H5 做更深一层的跟踪、问答和互动。</p>
+      </div>
+    </div>
+    <div class="tp-grid-2">
+      {% for item in portal.service_cards %}
+      <div class="tp-service-card tp-clickable" onclick='openPortalDetail({{ item | tojson }}, "service")'>
+        <strong>{{ item.title }}</strong>
+        <p>{{ item.desc }}</p>
+        <div class="tp-detail-link">查看详情</div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="tp-section">
+    <div class="tp-section-head">
+      <div>
+        <h2>代表性知识沉淀</h2>
+        <p>这里展示的是已经沉淀下来的框架和资料方向，帮助粉丝理解这位主理人的研究积累。</p>
+      </div>
+    </div>
+    <div class="tp-grid-2">
+      {% for item in portal.knowledge_spotlight %}
+      <div class="tp-spotlight-card tp-clickable" onclick='openPortalDetail({{ item | tojson }}, "knowledge")'>
+        <strong>{{ item.title }}</strong>
+        <p>{{ item.summary }}</p>
+        <div class="tp-review-meta">
+          {% for tag in item.tags %}
+          <span class="tp-mini-chip">{{ tag }}</span>
+          {% endfor %}
+        </div>
+        <div class="tp-detail-link">查看详情</div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <div class="tp-footer-note">
+    这里是面向粉丝的内容门户，不是大V自己的后台。大V自己的复盘生产、粉丝消息、知识经营和工作流协同，仍然只放在工作台里，不暴露给粉丝。所有研究内容仅供参考，不构成投资建议。
+  </div>
 </div>
+<div class="tp-modal-overlay" id="portal-detail-modal" onclick="if(event.target===this)closePortalDetail()">
+  <div class="tp-modal-card">
+    <div id="portal-detail-content"></div>
+  </div>
+</div>
+<script>
+function closePortalDetail() {
+  const modal = document.getElementById('portal-detail-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function renderPortalDetailSections(sections) {
+  return (sections || []).map(section => `
+    <div class="tp-modal-section">
+      <div class="tp-modal-section-title">${section.title || ''}</div>
+      ${section.body ? `<div class="tp-modal-section-copy">${section.body}</div>` : ''}
+      ${Array.isArray(section.bullets) && section.bullets.length ? `
+        <ul class="tp-modal-bullets">
+          ${section.bullets.map(item => `<li>${item}</li>`).join('')}
+        </ul>
+      ` : ''}
+    </div>
+  `).join('');
+}
+
+function openPortalDetail(item, type) {
+  const host = document.getElementById('portal-detail-content');
+  const modal = document.getElementById('portal-detail-modal');
+  if (!host || !modal || !item) return;
+  const desc = item.summary || item.desc || item.thesis || '';
+  const metaBits = [];
+  if (item.period) metaBits.push(item.period);
+  if (item.time) metaBits.push(item.time);
+  if (item.code) metaBits.push(item.code);
+  if (item.market) metaBits.push(item.market);
+  if (item.focus) metaBits.push(item.focus);
+  host.innerHTML = `
+    <div class="tp-modal-head">
+      <div>
+        <div class="tp-modal-title">${item.title || item.name || '详情'}</div>
+        <div class="tp-review-meta" style="margin-top:10px">
+          ${metaBits.map(text => `<span class="tp-mini-chip">${text}</span>`).join('')}
+        </div>
+        ${desc ? `<div class="tp-modal-desc">${desc}</div>` : ''}
+      </div>
+      <button class="tp-modal-close" onclick="closePortalDetail()">×</button>
+    </div>
+    ${renderPortalDetailSections(item.detail_sections || [])}
+  `;
+  modal.classList.add('show');
+}
+</script>
 </body>
 </html>

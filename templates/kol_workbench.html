@@ -10,8 +10,11 @@
   window.SITE_CONFIG = {{ site_config | tojson }};
   window.WORKBENCH_DATA = {{ workbench | tojson }};
   window.WATCHLIST_DETAILS_MAP = {{ workbench.watchlist_details | tojson }};
+  window.dashboardDefaultSection = 'funnel';
+  window.AUTO_INIT_DASHBOARD = false;
 </script>
 <script src="/static/js/theme.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 body { background: var(--surface-2); color: var(--text-main); }
 .kw-page-summary { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:4px; }
@@ -214,6 +217,22 @@ body { background: var(--surface-2); color: var(--text-main); }
 .kw-kpi-badge.up { background:rgba(46,204,113,0.15); color:#2ECC71; }
 .kw-kpi-badge.down { background:rgba(231,76,60,0.15); color:#E74C3C; }
 .kw-chart-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.kw-analytics-subnav { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 18px; }
+.kw-analytics-pill {
+  border:1px solid rgba(47,116,192,0.12);
+  background:#FFFFFF;
+  color:var(--text-sub);
+  border-radius:999px;
+  padding:7px 12px;
+  font-size:12px;
+  font-weight:600;
+  cursor:pointer;
+}
+.kw-analytics-pill.active {
+  color:var(--gold);
+  border-color:rgba(200,169,110,0.26);
+  background:rgba(200,169,110,0.10);
+}
 .kw-chart-card {
   background:#FFFFFF;
   border:1px solid rgba(47,116,192,0.10);
@@ -224,6 +243,40 @@ body { background: var(--surface-2); color: var(--text-main); }
 .kw-chart-title { font-size:15px; font-weight:600; color:var(--text-main); margin-bottom:4px; }
 .kw-chart-subtitle { font-size:12px; color:var(--text-sub); margin-bottom:14px; }
 .kw-chart-host { width:100%; }
+.kw-chart-stack { display:grid; gap:16px; }
+.kw-analytics-section { display:none; }
+.kw-analytics-section.active { display:block; }
+.kw-funnel-list { display:grid; gap:10px; }
+.kw-funnel-row { display:grid; grid-template-columns:88px 1fr 70px; gap:12px; align-items:center; }
+.kw-funnel-label, .kw-funnel-value,
+.kw-quality-table td, .kw-quality-table th,
+.kw-cohort-table td, .kw-cohort-table th,
+.kw-retention-table td, .kw-retention-table th,
+.kw-heatmap-table td, .kw-heatmap-table th { font-size:12px; }
+.kw-funnel-bar { height:12px; background:#EEF4FA; border-radius:999px; overflow:hidden; }
+.kw-funnel-bar span { display:block; height:100%; background:linear-gradient(90deg,#66A1DF,#2F74C0); border-radius:999px; }
+.kw-heatmap-table, .kw-quality-table, .kw-cohort-table, .kw-retention-table { width:100%; border-collapse:collapse; }
+.kw-heatmap-table th, .kw-heatmap-table td,
+.kw-quality-table th, .kw-quality-table td,
+.kw-cohort-table th, .kw-cohort-table td,
+.kw-retention-table th, .kw-retention-table td {
+  border-bottom:1px solid rgba(47,116,192,0.08);
+  padding:10px 8px;
+  text-align:left;
+}
+.kw-heatmap-table th, .kw-quality-table th, .kw-cohort-table th, .kw-retention-table th { color:var(--text-sub); font-size:11px; font-weight:600; }
+.kw-heat-cell { text-align:center !important; border-radius:10px; }
+.kw-score-bar { display:inline-block; height:8px; border-radius:999px; background:linear-gradient(90deg,#C8A96E,#2F74C0); margin-right:8px; vertical-align:middle; }
+.kw-lifecycle-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+.kw-lifecycle-card {
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  padding:14px;
+  text-align:center;
+}
+.kw-lifecycle-name { font-size:12px; color:var(--text-sub); }
+.kw-lifecycle-value { font-size:22px; font-weight:700; color:var(--text-main); margin-top:8px; }
 .kw-chart-svg { width:100%; height:auto; display:block; }
 .kw-chart-axis { stroke:rgba(47,116,192,0.18); stroke-width:1; }
 .kw-chart-gridline { stroke:rgba(47,116,192,0.10); stroke-width:1; stroke-dasharray:3 3; }
@@ -451,6 +504,284 @@ body { background: var(--surface-2); color: var(--text-main); }
   color:var(--gold);
 }
 details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
+.kw-review-source {
+  cursor:pointer;
+  transition:transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.kw-review-source:hover,
+.kw-review-source:active {
+  transform:translateY(-1px);
+  border-color:rgba(200,169,110,0.32);
+  box-shadow:0 10px 24px rgba(31,73,125,0.10);
+}
+.kw-review-runtime-grid {
+  display:grid;
+  grid-template-columns:1.15fr 0.85fr;
+  gap:16px;
+  margin-top:16px;
+}
+.kw-review-runtime-card,
+.kw-review-published-card {
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  padding:14px;
+}
+.kw-review-runtime-title,
+.kw-review-published-title {
+  font-size:13px;
+  font-weight:700;
+  color:var(--text-main);
+}
+.kw-review-runtime-desc,
+.kw-review-published-desc,
+.kw-review-runtime-meta {
+  font-size:11px;
+  color:var(--text-sub);
+  line-height:1.7;
+}
+.kw-review-runtime-list {
+  display:grid;
+  gap:10px;
+  margin-top:12px;
+}
+.kw-review-runtime-item {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.08);
+  border-radius:12px;
+  padding:12px;
+}
+.kw-review-runtime-item strong {
+  display:block;
+  font-size:12px;
+  color:var(--text-main);
+  margin-bottom:4px;
+}
+.kw-review-modal-overlay {
+  position:fixed;
+  inset:0;
+  background:rgba(13,27,42,0.52);
+  backdrop-filter:blur(6px);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  z-index:1200;
+}
+.kw-review-modal-overlay.show { display:flex; }
+.kw-review-modal-sheet {
+  width:min(840px, 100%);
+  max-height:min(88vh, 960px);
+  overflow-y:auto;
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:22px;
+  box-shadow:0 26px 60px rgba(13,27,42,0.22);
+  padding:24px;
+}
+.kw-review-modal-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:14px;
+  margin-bottom:18px;
+}
+.kw-review-modal-title {
+  font-size:20px;
+  font-weight:700;
+  color:var(--text-main);
+}
+.kw-review-modal-subtitle {
+  font-size:12px;
+  color:var(--text-sub);
+  line-height:1.8;
+  margin-top:6px;
+}
+.kw-review-modal-close {
+  border:none;
+  background:#F3F8FE;
+  color:#1F497D;
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  font-size:18px;
+  cursor:pointer;
+}
+.kw-knowledge-modal-block { margin-bottom:16px; }
+.kw-knowledge-modal-label {
+  display:block;
+  font-size:12px;
+  font-weight:700;
+  color:var(--gold);
+  margin-bottom:8px;
+}
+.kw-knowledge-modal-textarea {
+  width:100%;
+  min-height:96px;
+  resize:none;
+  border:1px solid rgba(47,116,192,0.14);
+  border-radius:14px;
+  padding:12px 14px;
+  font-size:12px;
+  color:var(--text-main);
+  background:#F8FBFF;
+  outline:none;
+  font-family:var(--font-main);
+  line-height:1.7;
+  box-sizing:border-box;
+}
+.kw-knowledge-source-selector {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+}
+.kw-knowledge-source-pill,
+.kw-review-period-pill,
+.kw-review-watchlist-chip,
+.kw-review-prompt-tag {
+  border:none;
+  cursor:pointer;
+}
+.kw-knowledge-source-pill {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  min-height:44px;
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:12px;
+  padding:0 12px;
+  font-size:12px;
+  font-weight:700;
+  color:#1F497D;
+}
+.kw-knowledge-source-pill.active {
+  color:var(--gold);
+  border-color:rgba(200,169,110,0.30);
+  background:rgba(200,169,110,0.10);
+}
+.kw-review-period-row,
+.kw-review-watchlist-row,
+.kw-review-prompt-tag-row,
+.kw-review-rich-toolbar {
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.kw-review-period-pill {
+  min-height:36px;
+  padding:0 14px;
+  border-radius:999px;
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.12);
+  font-size:12px;
+  font-weight:700;
+  color:#1F497D;
+}
+.kw-review-period-pill.active {
+  color:var(--gold);
+  border-color:rgba(200,169,110,0.30);
+  background:rgba(200,169,110,0.10);
+}
+.kw-review-watchlist-chip {
+  display:inline-flex;
+  align-items:center;
+  min-height:34px;
+  padding:0 12px;
+  border-radius:999px;
+  background:#F3F8FE;
+  border:1px solid rgba(47,116,192,0.10);
+  font-size:11px;
+  color:#1F497D;
+}
+.kw-review-watchlist-chip.selectable.active {
+  color:var(--gold);
+  border-color:rgba(200,169,110,0.30);
+  background:rgba(200,169,110,0.10);
+}
+.kw-review-draft-status {
+  display:inline-flex;
+  align-items:center;
+  height:28px;
+  border-radius:999px;
+  padding:0 10px;
+  font-size:11px;
+  color:var(--gold);
+  background:rgba(200,169,110,0.10);
+}
+.kw-review-intake-panel,
+.kw-review-preview-panel,
+.kw-review-rich-editor {
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+}
+.kw-review-intake-panel,
+.kw-review-preview-panel { padding:14px; }
+.kw-review-intake-toolbar,
+.kw-review-preview-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+}
+.kw-review-input-button,
+.kw-review-rich-tool,
+.kw-review-prompt-tag {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:999px;
+  padding:7px 12px;
+  font-size:11px;
+  color:#1F497D;
+}
+.kw-review-input-button { font-weight:700; }
+.kw-review-intake-result {
+  margin-top:10px;
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.08);
+  border-radius:12px;
+  padding:12px;
+}
+.kw-review-intake-result-title,
+.kw-review-preview-title {
+  font-size:12px;
+  font-weight:700;
+  color:var(--text-main);
+}
+.kw-review-intake-result-text,
+.kw-review-preview-copy {
+  margin-top:6px;
+  font-size:12px;
+  color:var(--text-main);
+  line-height:1.8;
+  white-space:pre-wrap;
+}
+.kw-review-rich-toolbar { margin-bottom:10px; }
+.kw-review-rich-editor {
+  min-height:180px;
+  padding:14px;
+  outline:none;
+  font-size:12px;
+  line-height:1.8;
+  color:var(--text-main);
+}
+.kw-review-rich-editor:empty:before {
+  content:attr(data-placeholder);
+  color:var(--text-sub);
+}
+.kw-review-prompt-tag.active {
+  color:var(--gold);
+  border-color:rgba(200,169,110,0.30);
+  background:rgba(200,169,110,0.10);
+}
+.kw-review-modal-actions {
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  margin-top:18px;
+}
 @media (max-width: 980px) {
   .kw-section-grid,
   .kw-link-grid,
@@ -458,8 +789,13 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
   .kw-cell-grid,
   .kw-review-source-grid,
   .kw-chart-grid,
+  .kw-lifecycle-row,
   .kw-kpi-row,
-  .kw-workflow-shell { grid-template-columns:1fr; }
+  .kw-workflow-shell,
+  .kw-review-runtime-grid,
+  .kw-knowledge-source-selector { grid-template-columns:1fr; }
+  .kw-review-modal-overlay { padding:12px; }
+  .kw-review-modal-sheet { padding:18px; border-radius:18px; }
 }
 </style>
 </head>
@@ -492,7 +828,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
       <div class="admin-nav-group">
         <div class="admin-nav-group-title">研究生产</div>
         <div class="admin-nav-item" data-section="biz-dashboard" onclick="showWorkbenchSection('biz-dashboard', this)">
-          <span class="admin-nav-icon">&#128202;</span> 经营 Dashboard
+          <span class="admin-nav-icon">&#128202;</span> 数据分析
         </div>
         <div class="admin-nav-item" data-section="forecast-model" onclick="showWorkbenchSection('forecast-model', this)">
           <span class="admin-nav-icon">&#128200;</span> 预测模型
@@ -677,32 +1013,291 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         <div class="kw-card" style="margin-bottom:20px">
           <div class="kw-card-head">
             <div>
-              <div class="kw-card-title">经营 Dashboard</div>
+              <div class="kw-card-title">数据分析</div>
               <div class="kw-card-desc">{{ workbench.dashboard_metrics.summary }}</div>
             </div>
-            <span class="kw-tag">Owner Metrics</span>
+            <span class="kw-tag">Tenant Analytics</span>
           </div>
         </div>
-        <div class="kw-chart-grid">
-          <div class="kw-chart-card">
-            <div class="kw-chart-title">粉丝消息数量分布</div>
-            <div class="kw-chart-subtitle">按消息类型看当前大V租户的消息构成</div>
-            <div class="kw-chart-host" id="kw-message-distribution-chart"></div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <div class="table-header">
+            <div>
+              <div class="table-title">后台数据分析</div>
+              <div class="chart-subtitle" id="topbar-title" style="margin:6px 0 0">多渠道多圈层转化分析</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <div class="date-filter">
+                <button class="date-btn" onclick="setDateRange(this,'7d')">7天</button>
+                <button class="date-btn active" onclick="setDateRange(this,'30d')">30天</button>
+                <button class="date-btn" onclick="setDateRange(this,'90d')">90天</button>
+                <button class="date-btn" onclick="setDateRange(this,'1y')">1年</button>
+              </div>
+              <button class="btn-gold" style="padding:7px 16px;font-size:12px" onclick="showToast('分析报告导出中，请稍候...')">导出分析</button>
+            </div>
           </div>
-          <div class="kw-chart-card">
-            <div class="kw-chart-title">粉丝消息趋势</div>
-            <div class="kw-chart-subtitle">按天看消息量变化</div>
-            <div class="kw-chart-host" id="kw-message-trend-chart"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+            <button class="date-btn active" id="nav-funnel" onclick="showWorkbenchAnalyticsSection('funnel')">转化漏斗</button>
+            <button class="date-btn" id="nav-channel" onclick="showWorkbenchAnalyticsSection('channel')">渠道分析</button>
+            <button class="date-btn" id="nav-revenue" onclick="showWorkbenchAnalyticsSection('revenue')">营收趋势</button>
+            <button class="date-btn" id="nav-segment" onclick="showWorkbenchAnalyticsSection('segment')">用户分层分析</button>
           </div>
-          <div class="kw-chart-card">
-            <div class="kw-chart-title">发布数量类型分布</div>
-            <div class="kw-chart-subtitle">看大V当前内容生产结构</div>
-            <div class="kw-chart-host" id="kw-publish-distribution-chart"></div>
+        </div>
+
+        <div id="ds-funnel" class="dash-section active">
+          <div class="section-header">
+            <div>
+              <div class="section-title">验证期增长分析</div>
+              <div class="section-subtitle">从内容触达到高频留存的早期转化追踪</div>
+            </div>
           </div>
-          <div class="kw-chart-card">
-            <div class="kw-chart-title">发布数量趋势</div>
-            <div class="kw-chart-subtitle">按天看内容产出节奏</div>
-            <div class="kw-chart-host" id="kw-publish-trend-chart"></div>
+
+          <div class="kpi-row" style="margin-bottom:20px">
+            <div class="kpi-card">
+              <div class="kpi-label">内容触达</div>
+              <div class="kpi-value">6.8万</div>
+              <div class="kpi-badge kpi-badge-up">▲ +12.4%</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">私域留资</div>
+              <div class="kpi-value">5,400</div>
+              <div class="kpi-badge kpi-badge-gold">留资率 7.9%</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">首次付费</div>
+              <div class="kpi-value">128</div>
+              <div class="kpi-badge kpi-badge-gold">首次付费率 10.2%</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label">高频留存</div>
+              <div class="kpi-value">36</div>
+              <div class="kpi-badge kpi-badge-gold">核心验证样本</div>
+            </div>
+          </div>
+
+          <div class="charts-grid">
+            <div class="chart-card">
+              <div class="chart-title">验证漏斗</div>
+              <div class="chart-subtitle">内容触达 → 私域留资 → 激活试用 → 首次付费 → 高频留存</div>
+              <div class="funnel-wrap" id="funnel-container"></div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-title">渠道用户来源分布</div>
+              <div class="chart-subtitle">各渠道贡献占比</div>
+              <div class="chart-container">
+                <canvas id="channelDonut"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="charts-grid">
+            <div class="chart-card">
+              <div class="chart-title">月度营收趋势</div>
+              <div class="chart-subtitle">近12个月 MRR 与激活用户增长</div>
+              <div class="chart-container tall">
+                <canvas id="revenueTrend"></canvas>
+              </div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-title">大V租户效能排行</div>
+              <div class="chart-subtitle">本月大V协同收入 Top 5</div>
+              <div class="chart-container tall">
+                <canvas id="kolBar"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-card full" style="margin-bottom:20px">
+            <div class="chart-title">多渠道 × 多圈层 转化矩阵</div>
+            <div class="chart-subtitle">各渠道在不同圈层的转化率热力图</div>
+            <div style="overflow-x:auto;margin-top:16px">
+              <table style="width:100%;min-width:600px">
+                <thead>
+                  <tr>
+                    <th style="width:120px">渠道 \ 圈层</th>
+                    <th>内容触达</th><th>私域留资</th><th>激活试用</th><th>首次付费</th><th>高频留存</th>
+                  </tr>
+                </thead>
+                <tbody id="heatmap-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="charts-grid">
+            <div class="chart-card">
+              <div class="chart-title">用户圈层分布</div>
+              <div class="chart-subtitle">付费用户结构</div>
+              <div style="display:flex;gap:16px;align-items:center;margin-top:8px">
+                <div style="flex:1;height:200px;position:relative">
+                  <canvas id="segmentDonut"></canvas>
+                </div>
+                <div class="segment-legend" id="segment-legend"></div>
+              </div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-title">渠道营收贡献</div>
+              <div class="chart-subtitle">各渠道月度营收对比</div>
+              <div class="chart-container">
+                <canvas id="channelRevenue"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="ds-channel" class="dash-section">
+          <div class="section-header">
+            <div>
+              <div class="section-title">渠道分析</div>
+              <div class="section-subtitle">各渠道获客质量、成本与收益全景对比</div>
+            </div>
+          </div>
+
+          <div class="kpi-row kpi-row-5" style="margin-bottom:20px" id="channel-kpi-cards"></div>
+
+          <div class="charts-grid" style="margin-bottom:20px">
+            <div class="chart-card">
+              <div class="chart-title">各渠道月度用户获取量</div>
+              <div class="chart-subtitle">近12个月堆叠柱图（万用户）</div>
+              <div class="chart-container tall">
+                <canvas id="channelStackedBar"></canvas>
+              </div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-title">CAC vs LTV 散点图</div>
+              <div class="chart-subtitle">气泡大小代表用户量，横轴CAC，纵轴LTV</div>
+              <div class="chart-container tall">
+                <canvas id="cacLtvScatter"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-card full" style="margin-bottom:20px">
+            <div class="chart-title">渠道质量评分</div>
+            <div class="chart-subtitle">综合CAC、转化率、LTV、活跃度的综合评分</div>
+            <div style="overflow-x:auto;margin-top:12px">
+              <table class="quality-table">
+                <thead>
+                  <tr>
+                    <th>渠道</th>
+                    <th>用户量</th>
+                    <th>CAC (¥)</th>
+                    <th>LTV (¥)</th>
+                    <th>转化率</th>
+                    <th>综合评分</th>
+                    <th>趋势</th>
+                  </tr>
+                </thead>
+                <tbody id="channel-quality-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="ds-revenue" class="dash-section">
+          <div class="section-header">
+            <div>
+              <div class="section-title">营收趋势</div>
+              <div class="section-subtitle">MRR/ARR、订阅分层、渠道营收全维度分析</div>
+            </div>
+          </div>
+
+          <div class="kpi-row" style="margin-bottom:20px" id="revenue-kpi-cards"></div>
+
+          <div class="charts-grid" style="margin-bottom:20px">
+            <div class="chart-card">
+              <div class="chart-title">月度 MRR + 付费用户增长</div>
+              <div class="chart-subtitle">双轴图：左轴 MRR（元），右轴付费用户数</div>
+              <div class="chart-container tall">
+                <canvas id="revGmvUsers"></canvas>
+              </div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-title">订阅层级收入结构</div>
+              <div class="chart-subtitle">免费/验证版/专业/机构试点各层月度收入堆叠</div>
+              <div class="chart-container tall">
+                <canvas id="revTierStack"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="charts-grid" style="margin-bottom:20px">
+            <div class="chart-card">
+              <div class="chart-title">渠道营收对比</div>
+              <div class="chart-subtitle">各渠道月度收入贡献（万元）</div>
+              <div class="chart-container">
+                <canvas id="revChannelBar"></canvas>
+              </div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-title">Cohort 留存矩阵</div>
+              <div class="chart-subtitle">6个月队列留存率（%）</div>
+              <div style="overflow-x:auto;margin-top:12px">
+                <table class="cohort-table">
+                  <thead>
+                    <tr id="cohort-thead"></tr>
+                  </thead>
+                  <tbody id="cohort-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="ds-segment" class="dash-section">
+          <div class="section-header">
+            <div>
+              <div class="section-title">用户分层分析</div>
+              <div class="section-subtitle">各订阅层级用户数、ARPU、留存与生命周期流转</div>
+            </div>
+          </div>
+
+          <div class="chart-card full" style="margin-bottom:20px">
+            <div class="chart-title">订阅层级转化漏斗</div>
+            <div class="chart-subtitle">免费 → 基础 → 专业 → VIP 转化路径</div>
+            <div id="seg-funnel-container" style="padding:16px 0"></div>
+          </div>
+
+          <div class="charts-grid" style="margin-bottom:20px">
+            <div class="chart-card">
+              <div class="chart-title">用户层级分布</div>
+              <div class="chart-subtitle">各层级用户占比</div>
+              <div class="chart-container">
+                <canvas id="segTierDonut"></canvas>
+              </div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-title">各层级 ARPU 对比</div>
+              <div class="chart-subtitle">月度ARPU（元）</div>
+              <div class="chart-container">
+                <canvas id="segArpuBar"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-card full" style="margin-bottom:20px">
+            <div class="chart-title">用户生命周期流转图</div>
+            <div class="chart-subtitle">各阶段用户数量与转化节点</div>
+            <div class="lifecycle-flow" id="lifecycle-flow"></div>
+          </div>
+
+          <div class="chart-card full" style="margin-bottom:20px">
+            <div class="chart-title">各层级留存率对比</div>
+            <div class="chart-subtitle">7日 / 30日 / 90日留存率</div>
+            <div style="overflow-x:auto;margin-top:12px">
+              <table class="retention-table">
+                <thead>
+                  <tr>
+                    <th>用户层级</th>
+                    <th>用户数</th>
+                    <th>7日留存</th>
+                    <th>30日留存</th>
+                    <th>90日留存</th>
+                    <th>ARPU (¥)</th>
+                    <th>LTV (¥)</th>
+                  </tr>
+                </thead>
+                <tbody id="retention-body"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -798,13 +1393,13 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <div class="kw-card-head">
             <div>
               <div class="kw-card-title">复盘生产台</div>
-              <div class="kw-card-desc">复盘由大V发起和确认。材料既可以来自语音、手输和文件上传，也可以先从大量自选股里挑出本次要纳入的样本，再在 K 线上补标注和复盘话语，最后分别生成行业板块复盘和个股投资复盘。</div>
+              <div class="kw-card-desc">复盘由大V发起和确认。材料来自语音口述、手动撰写和文件上传三类入口；语音和文件会先转成文案，手动撰写提供富文本手写区。用户确认本次纳入复盘的自选股后，可选择自定义文案或智能文案，先生成草稿预览，再确认发布。</div>
             </div>
             <span class="kw-tag">Review Studio</span>
           </div>
           <div class="kw-review-source-grid">
             {% for item in workbench.review_studio.sources %}
-            <div class="kw-review-source">
+            <div class="kw-review-source" onclick="kwOpenReviewTriggerModal('{{ item.mode if item.mode else ['voice','manual','file'][loop.index0] }}')">
               <div class="kw-review-source-icon">{{ item.icon }}</div>
               <div class="kw-review-source-title">{{ item.label }}</div>
               <div class="kw-review-source-desc">{{ item.desc }}</div>
@@ -834,9 +1429,21 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
             <span class="kw-watch-chip">{{ item }}</span>
             {% endfor %}
           </div>
+          <div class="kw-review-runtime-grid">
+            <div class="kw-review-runtime-card">
+              <div class="kw-review-runtime-title">当前运行态</div>
+              <div class="kw-review-runtime-desc">保持和前台 H5 同一套三类输入、智能文案规则、草稿预览和确认发布流程。</div>
+              <div id="kw-review-runtime-panel" class="kw-review-runtime-list"></div>
+            </div>
+            <div class="kw-review-published-card">
+              <div class="kw-review-published-title">最近一次发布</div>
+              <div class="kw-review-published-desc">这里展示刚刚确认发布后，前台粉丝实际会看到的复盘摘要。</div>
+              <div id="kw-review-latest-published" class="kw-review-runtime-list"></div>
+            </div>
+          </div>
           <div class="kw-toolbar" style="margin-top:12px">
-            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="showToast('发起新复盘')">发起新复盘</button>
-            <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="showToast('进入选股归纳流程，并在 K 线上补充标注')">挑选本次复盘自选股</button>
+            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="kwOpenReviewTriggerModal()">发起新复盘</button>
+            <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="kwOpenReviewTriggerModal('stocks')">确认本次复盘自选股</button>
           </div>
         </div>
       </div>
@@ -987,7 +1594,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
             </div>
             <span class="kw-tag">Published</span>
           </div>
-          <div class="kw-broadcast-list">
+          <div id="kw-published-review-list" class="kw-broadcast-list">
             {% for item in workbench.published_reviews %}
             <div class="kw-broadcast-item">
               <div class="kw-broadcast-top">
@@ -1058,15 +1665,20 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="kw-review-modal-overlay" id="kw-review-trigger-modal" onclick="if(event.target===this)kwCloseReviewTriggerModal()">
+  <div class="kw-review-modal-sheet">
+    <div id="kw-review-trigger-modal-content"></div>
+  </div>
+</div>
 <script>
 const workbenchSectionMeta = {
   overview: { title: '工作台概览', summary: '和 H5 保持同一套产品口径，但以桌面 web 工作流方式组织大V日常动作。' },
   fans: { title: '粉丝管理', summary: '查看大V自己的粉丝规模、来源、价值标签和分层状态。' },
   messages: { title: '粉丝消息', summary: '查看粉丝提问、大V回复链路和复盘发布后的触达提醒。' },
   broadcast: { title: '群发助手', summary: '只保留大V自己的分层触达、今日解读和复盘提醒动作。' },
-  'biz-dashboard': { title: '经营 Dashboard', summary: '整合粉丝增长、注册费、总注册收入、其他收入、token 消耗、消息数量分布与趋势、发布数量分布与趋势。' },
+  'biz-dashboard': { title: '数据分析', summary: '整体承接 Admin 的数据分析结构，但口径只保留当前大V租户自己的转化漏斗、渠道质量、协同效能、营收趋势和用户分层。' },
   'forecast-model': { title: '预测模型', summary: '展示目标价是怎么计算出来的，并允许在后台调整自动收敛参数。' },
-  review: { title: '复盘生产台', summary: '按周期、供稿方式、选股归纳和段落方式组织复盘生产流程。' },
+  review: { title: '复盘生产台', summary: '按周期、三类输入方式、智能文案规则和预览发布流程组织复盘生产。' },
   knowledge: { title: '知识库微调', summary: '历史知识内容可继续弹框微调，修改后重新同步 Hermes 和知识专区。' },
   hermes: { title: 'Hermes 工作台', summary: '统一管理工作区版和龙虾纯对话版的产品口径、skills 和知识绑定。' },
   watchlist: { title: '自选股与详情', summary: '承接 H5 的顶部输代码、自选股详情和 K 线 + MA5/10/20 展示逻辑。' },
@@ -1161,12 +1773,30 @@ function renderWorkbenchTrendChart(hostId, items) {
 }
 
 function renderWorkbenchBizCharts() {
-  const metrics = window.WORKBENCH_DATA && window.WORKBENCH_DATA.dashboard_metrics;
-  if (!metrics) return;
-  renderWorkbenchBarChart('kw-message-distribution-chart', metrics.message_distribution);
-  renderWorkbenchTrendChart('kw-message-trend-chart', metrics.message_trend);
-  renderWorkbenchBarChart('kw-publish-distribution-chart', metrics.publish_distribution);
-  renderWorkbenchTrendChart('kw-publish-trend-chart', metrics.publish_trend);
+  if (window.initDashboardCharts) {
+    window.initDashboardCharts(window.dashboardDefaultSection || 'funnel');
+  }
+}
+
+function showWorkbenchAnalyticsSection(section) {
+  document.querySelectorAll('.dash-section').forEach(node => node.classList.remove('active'));
+  const target = document.getElementById('ds-' + section);
+  if (target) target.classList.add('active');
+  document.querySelectorAll('#nav-funnel, #nav-channel, #nav-revenue, #nav-segment').forEach(node => node.classList.remove('active'));
+  const nav = document.getElementById('nav-' + section);
+  if (nav) nav.classList.add('active');
+  const topbar = document.getElementById('topbar-title');
+  const titleMap = {
+    funnel: '多渠道多圈层转化分析',
+    channel: '渠道分析',
+    revenue: '营收趋势',
+    segment: '用户分层分析',
+  };
+  if (topbar) topbar.textContent = titleMap[section] || '多渠道多圈层转化分析';
+  window.dashboardDefaultSection = section;
+  if (window.initDashboardCharts) {
+    window.initDashboardCharts(section);
+  }
 }
 
 function escapeHtml(value) {
@@ -1183,6 +1813,464 @@ function escapeAttr(value) {
 }
 
 const KW_WATCHLIST_ANNOTATION_STORAGE_KEY = 'gangtise_demo_watchlist_annotations';
+const KW_REVIEW_PERIOD_CONFIG = {
+  day: { label: '日复盘', shortLabel: '今日' },
+  week: { label: '周复盘', shortLabel: '本周' },
+  month: { label: '月复盘', shortLabel: '本月' },
+};
+const KW_REVIEW_SOURCE_OPTIONS = [
+  { value: 'voice', icon: '🎙️', label: '语音口述' },
+  { value: 'manual', icon: '✍️', label: '手动撰写' },
+  { value: 'file', icon: '📎', label: '文件上传' },
+];
+const KW_REVIEW_PARAGRAPH_OPTIONS = [
+  { value: 'manual', label: '大V自定段落' },
+  { value: 'ai', label: '智能文案' },
+];
+const KW_REVIEW_PROMPT_TAGS = ['更口语化', '保留原文不改写', '强调风险提示', '适合粉丝阅读', '分成短段落'];
+let kwReviewDraft = {
+  period: 'day',
+  sourceMode: 'voice',
+  paragraphMode: 'manual',
+  selectedWatchlist: [],
+  voiceTranscript: '',
+  manualHtml: '',
+  fileText: '',
+  aiPrompt: '',
+  promptTags: [],
+  previewReady: false,
+};
+const kwReviewRuntimeStore = {};
+
+function getKwReviewPeriodMeta(period) {
+  return KW_REVIEW_PERIOD_CONFIG[period] || KW_REVIEW_PERIOD_CONFIG.day;
+}
+
+function getKwTenantWatchlistFocus() {
+  const reviewStudio = window.WORKBENCH_DATA && window.WORKBENCH_DATA.review_studio;
+  const list = reviewStudio && Array.isArray(reviewStudio.watchlist_focus) ? reviewStudio.watchlist_focus : [];
+  return list.slice(0);
+}
+
+function ensureKwReviewRuntime() {
+  const tenantId = window.ACTIVE_TENANT && window.ACTIVE_TENANT.id ? window.ACTIVE_TENANT.id : 'tenant_default';
+  if (!kwReviewRuntimeStore[tenantId]) {
+    const latestReview = (window.WORKBENCH_DATA && window.WORKBENCH_DATA.published_reviews && window.WORKBENCH_DATA.published_reviews[0]) || null;
+    kwReviewRuntimeStore[tenantId] = {
+      kolGeneratedAt: latestReview && latestReview.time ? latestReview.time : '2026-06-07 18:40',
+      kolPublishedAt: latestReview && latestReview.time ? latestReview.time : '2026-06-07 18:40',
+      kolSourceMode: 'voice',
+      paragraphMode: 'manual',
+      kolSelectedWatchlist: getKwTenantWatchlistFocus().slice(0, 3),
+      lastReviewPeriod: 'day',
+      latestVoiceTranscript: '系统已转写语音口述：今天复盘只保留两条主线，AI 算力继续看订单和景气，港股互联网继续看回购与财报兑现；个股上优先跟中芯国际、腾讯控股和贵州茅台。',
+      latestManualHtml: '<p><strong>市场主线</strong></p><p>今天只保留真正影响判断的验证节点，不重复堆砌原始消息。</p><p><strong>重点个股</strong></p><p>中芯国际看订单兑现，腾讯看回购和财报，茅台继续偏稳健配置。</p>',
+      latestFileText: '系统已从上传文件提炼文案：行业层面保留 AI 算力、半导体和港股互联网三条线，个股层面补充估值带、催化条件和风险边界，已整理为复盘草稿输入。',
+      latestAiPrompt: '保持大V自己的判断口吻，适度精简，但不要改动原始观点。',
+      latestPromptTags: ['适合粉丝阅读'],
+      draftReady: false,
+    };
+  }
+  return kwReviewRuntimeStore[tenantId];
+}
+
+function kwGetSelectedWatchlist() {
+  const runtime = ensureKwReviewRuntime();
+  const fullList = getKwTenantWatchlistFocus();
+  const selected = (runtime.kolSelectedWatchlist || []).filter(name => fullList.includes(name));
+  return selected.length ? selected : fullList.slice(0, 3);
+}
+
+function kwGetReviewDraftContentText() {
+  if (kwReviewDraft.sourceMode === 'voice') return String(kwReviewDraft.voiceTranscript || '').trim();
+  if (kwReviewDraft.sourceMode === 'file') return String(kwReviewDraft.fileText || '').trim();
+  const temp = document.createElement('div');
+  temp.innerHTML = kwReviewDraft.manualHtml || '';
+  return String(temp.textContent || '').trim();
+}
+
+function kwGetReviewPreviewText() {
+  if (kwReviewDraft.paragraphMode === 'manual') {
+    return kwGetReviewDraftContentText();
+  }
+  const tagText = (kwReviewDraft.promptTags || []).join('、');
+  const promptText = String(kwReviewDraft.aiPrompt || '').trim();
+  const sourceText = kwGetReviewDraftContentText();
+  return [
+    '智能文案已根据输入材料生成草稿。',
+    sourceText || '当前尚未补充供稿内容。',
+    promptText ? `修改规则：${promptText}` : '',
+    tagText ? `常用标签：${tagText}` : '',
+  ].filter(Boolean).join('\n\n');
+}
+
+function kwSyncReviewDraftFromModal() {
+  const promptInput = document.getElementById('kw-review-ai-prompt-input');
+  const manualEditor = document.getElementById('kw-review-manual-editor');
+  if (promptInput) kwReviewDraft.aiPrompt = promptInput.value;
+  if (manualEditor) kwReviewDraft.manualHtml = manualEditor.innerHTML;
+}
+
+function kwRenderReviewInputPanel() {
+  if (kwReviewDraft.sourceMode === 'voice') {
+    return `
+      <div class="kw-review-intake-panel">
+        <div class="kw-review-intake-toolbar">
+          <div class="kw-review-runtime-meta">点击按钮模拟语音输入，系统会自动转成文案。</div>
+          <button class="kw-review-input-button" type="button" onclick="kwCaptureReviewVoiceInput()">语音输入</button>
+        </div>
+        <div class="kw-review-intake-result">
+          <div class="kw-review-intake-result-title">转写文案</div>
+          <div class="kw-review-intake-result-text">${escapeHtml(kwReviewDraft.voiceTranscript || '完成语音输入后，这里会展示转写后的复盘文案。')}</div>
+        </div>
+      </div>
+    `;
+  }
+  if (kwReviewDraft.sourceMode === 'file') {
+    return `
+      <div class="kw-review-intake-panel">
+        <div class="kw-review-intake-toolbar">
+          <div class="kw-review-runtime-meta">上传文件后，系统会自动提炼成可用文案。</div>
+          <button class="kw-review-input-button" type="button" onclick="kwCaptureReviewFileInput()">上传文件</button>
+        </div>
+        <div class="kw-review-intake-result">
+          <div class="kw-review-intake-result-title">抽取文案</div>
+          <div class="kw-review-intake-result-text">${escapeHtml(kwReviewDraft.fileText || '完成文件上传后，这里会展示抽取后的复盘文案。')}</div>
+        </div>
+      </div>
+    `;
+  }
+  return `
+    <div class="kw-review-intake-panel">
+      <div class="kw-review-rich-toolbar">
+        <button class="kw-review-rich-tool" type="button" onclick="kwFormatReviewRichText('bold')">加粗</button>
+        <button class="kw-review-rich-tool" type="button" onclick="kwFormatReviewRichText('insertUnorderedList')">列表</button>
+        <button class="kw-review-rich-tool" type="button" onclick="kwInsertReviewSectionTitle()">小标题</button>
+      </div>
+      <div id="kw-review-manual-editor" class="kw-review-rich-editor" contenteditable="true" data-placeholder="在这里直接手写复盘正文。手动撰写模式下，后续不会再改写这份文案。">${kwReviewDraft.manualHtml || ''}</div>
+    </div>
+  `;
+}
+
+function kwRenderReviewPromptPanel() {
+  if (kwReviewDraft.paragraphMode !== 'ai') return '';
+  return `
+    <div class="kw-knowledge-modal-block">
+      <label class="kw-knowledge-modal-label">智能文案修改规则</label>
+      <textarea id="kw-review-ai-prompt-input" class="kw-knowledge-modal-textarea" placeholder="例如：更口语化，但保留原始观点，不要写买卖建议。">${escapeHtml(kwReviewDraft.aiPrompt || '')}</textarea>
+      <div class="kw-review-prompt-tag-row" style="margin-top:10px">
+        ${KW_REVIEW_PROMPT_TAGS.map(tag => `
+          <button class="kw-review-prompt-tag ${kwReviewDraft.promptTags.includes(tag) ? 'active' : ''}" type="button" onclick="kwToggleReviewPromptTag('${tag}')">${escapeHtml(tag)}</button>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function kwRenderReviewPreviewPanel() {
+  if (!kwReviewDraft.previewReady) return '';
+  return `
+    <div class="kw-review-preview-panel">
+      <div class="kw-review-preview-head">
+        <div>
+          <div class="kw-review-preview-title">草稿预览</div>
+          <div class="kw-review-runtime-meta">预览没问题再发布</div>
+        </div>
+        <span class="kw-review-draft-status">待发布</span>
+      </div>
+      <div class="kw-review-preview-copy">${escapeHtml(kwGetReviewPreviewText())}</div>
+    </div>
+  `;
+}
+
+function kwRenderReviewTriggerModal() {
+  const host = document.getElementById('kw-review-trigger-modal-content');
+  if (!host) return;
+  const focusNames = getKwTenantWatchlistFocus();
+  host.innerHTML = `
+    <div class="kw-review-modal-head">
+      <div>
+        <div class="kw-review-modal-title">发起大V复盘</div>
+        <div class="kw-review-modal-subtitle">先选择复盘周期，再补充语音口述、手动撰写或文件上传内容。生成草稿后先预览，确认没问题再发布。</div>
+      </div>
+      <button class="kw-review-modal-close" type="button" onclick="kwCloseReviewTriggerModal()">×</button>
+    </div>
+    <div class="kw-knowledge-modal-block">
+      <label class="kw-knowledge-modal-label">复盘周期</label>
+      <div class="kw-review-period-row">
+        ${Object.entries(KW_REVIEW_PERIOD_CONFIG).map(([value, meta]) => `
+          <button class="kw-review-period-pill ${value === kwReviewDraft.period ? 'active' : ''}" type="button" onclick="kwSetReviewTriggerPeriod('${value}')">${meta.label}</button>
+        `).join('')}
+      </div>
+    </div>
+    <div class="kw-knowledge-modal-block">
+      <label class="kw-knowledge-modal-label">供稿方式</label>
+      <div class="kw-knowledge-source-selector">
+        ${KW_REVIEW_SOURCE_OPTIONS.map(item => `
+          <button class="kw-knowledge-source-pill ${item.value === kwReviewDraft.sourceMode ? 'active' : ''}" type="button" onclick="kwSetReviewTriggerSourceMode('${item.value}')">${item.icon} ${item.label}</button>
+        `).join('')}
+      </div>
+    </div>
+    <div class="kw-knowledge-modal-block">
+      <label class="kw-knowledge-modal-label">输入内容</label>
+      ${kwRenderReviewInputPanel()}
+    </div>
+    <div class="kw-knowledge-modal-block">
+      <label class="kw-knowledge-modal-label">文章段落方式</label>
+      <div class="kw-knowledge-source-selector" style="grid-template-columns:repeat(2,1fr)">
+        ${KW_REVIEW_PARAGRAPH_OPTIONS.map(item => `
+          <button class="kw-knowledge-source-pill ${item.value === kwReviewDraft.paragraphMode ? 'active' : ''}" type="button" onclick="kwSetReviewTriggerParagraphMode('${item.value}')">${item.label}</button>
+        `).join('')}
+      </div>
+      <div class="kw-review-runtime-meta" style="margin-top:8px">${kwReviewDraft.paragraphMode === 'manual' ? '如果是自定义文案，就直接使用你上面输入的内容，不再二次改写。' : '智能文案会基于输入材料和你的修改规则生成草稿。'}</div>
+    </div>
+    ${kwRenderReviewPromptPanel()}
+    <div class="kw-knowledge-modal-block">
+      <label class="kw-knowledge-modal-label">本次纳入复盘的自选股</label>
+      <div class="kw-review-runtime-meta" style="margin-bottom:8px">本次纳入复盘的自选股已经从自选列表里选择，这里只做确认，不再单独做选股归纳。</div>
+      <div class="kw-review-watchlist-row">
+        ${focusNames.map(name => `
+          <button class="kw-review-watchlist-chip selectable ${kwReviewDraft.selectedWatchlist.includes(name) ? 'active' : ''}" type="button" onclick="kwToggleReviewTriggerWatchlist('${name}')">${escapeHtml(name)}</button>
+        `).join('')}
+      </div>
+    </div>
+    <div class="kw-knowledge-modal-block">
+      <label class="kw-knowledge-modal-label">本次复盘覆盖</label>
+      <div class="kw-review-watchlist-row">
+        ${(kwReviewDraft.selectedWatchlist || []).map(name => `<span class="kw-review-watchlist-chip">${escapeHtml(name)}</span>`).join('') || '<span class="kw-review-runtime-meta">当前还没选择股票</span>'}
+      </div>
+    </div>
+    ${kwRenderReviewPreviewPanel()}
+    <div class="kw-review-modal-actions">
+      <button class="btn-outline" type="button" onclick="kwCloseReviewTriggerModal()">取消</button>
+      ${kwReviewDraft.previewReady
+        ? '<button class="btn-gold" type="button" onclick="kwPublishReviewDraft()">确认发布</button>'
+        : '<button class="btn-gold" type="button" onclick="kwSubmitReviewTrigger()">生成草稿</button>'}
+    </div>
+  `;
+}
+
+function kwOpenReviewTriggerModal(sourceMode) {
+  const runtime = ensureKwReviewRuntime();
+  const existingSelected = Array.isArray(kwReviewDraft.selectedWatchlist) ? kwReviewDraft.selectedWatchlist.slice(0) : [];
+  kwReviewDraft.period = runtime.lastReviewPeriod || kwReviewDraft.period;
+  if (sourceMode && KW_REVIEW_SOURCE_OPTIONS.some(item => item.value === sourceMode)) {
+    kwReviewDraft.sourceMode = sourceMode;
+  }
+  kwReviewDraft.paragraphMode = runtime.paragraphMode || kwReviewDraft.paragraphMode;
+  kwReviewDraft.selectedWatchlist = sourceMode === 'stocks' && existingSelected.length
+    ? existingSelected
+    : kwGetSelectedWatchlist().slice(0);
+  kwReviewDraft.voiceTranscript = runtime.latestVoiceTranscript || '';
+  kwReviewDraft.manualHtml = runtime.latestManualHtml || '';
+  kwReviewDraft.fileText = runtime.latestFileText || '';
+  kwReviewDraft.aiPrompt = runtime.latestAiPrompt || '';
+  kwReviewDraft.promptTags = Array.isArray(runtime.latestPromptTags) ? runtime.latestPromptTags.slice(0) : [];
+  kwReviewDraft.previewReady = false;
+  const modal = document.getElementById('kw-review-trigger-modal');
+  if (!modal) return;
+  kwRenderReviewTriggerModal();
+  modal.classList.add('show');
+}
+
+function kwCloseReviewTriggerModal() {
+  const modal = document.getElementById('kw-review-trigger-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function kwSetReviewTriggerPeriod(period) {
+  if (!KW_REVIEW_PERIOD_CONFIG[period]) return;
+  kwReviewDraft.period = period;
+  kwRenderReviewTriggerModal();
+}
+
+function kwSetReviewTriggerSourceMode(mode) {
+  if (!KW_REVIEW_SOURCE_OPTIONS.some(item => item.value === mode)) return;
+  kwSyncReviewDraftFromModal();
+  kwReviewDraft.sourceMode = mode;
+  kwReviewDraft.previewReady = false;
+  kwRenderReviewTriggerModal();
+}
+
+function kwSetReviewTriggerParagraphMode(mode) {
+  if (!KW_REVIEW_PARAGRAPH_OPTIONS.some(item => item.value === mode)) return;
+  kwSyncReviewDraftFromModal();
+  kwReviewDraft.paragraphMode = mode;
+  kwReviewDraft.previewReady = false;
+  kwRenderReviewTriggerModal();
+}
+
+function kwToggleReviewTriggerWatchlist(name) {
+  const fullList = getKwTenantWatchlistFocus();
+  if (!fullList.includes(name)) return;
+  const current = new Set(kwReviewDraft.selectedWatchlist || []);
+  if (current.has(name)) current.delete(name); else current.add(name);
+  kwReviewDraft.selectedWatchlist = fullList.filter(item => current.has(item));
+  kwReviewDraft.previewReady = false;
+  kwRenderReviewTriggerModal();
+}
+
+function kwCaptureReviewVoiceInput() {
+  kwReviewDraft.voiceTranscript = '系统已转写语音口述：今天复盘只保留两条主线，AI 算力继续看订单和景气，港股互联网继续看回购与财报兑现；个股上优先跟中芯国际、腾讯控股和贵州茅台。';
+  kwReviewDraft.previewReady = false;
+  kwRenderReviewTriggerModal();
+  showToast('语音已转成文案');
+}
+
+function kwCaptureReviewFileInput() {
+  kwReviewDraft.fileText = '系统已从上传文件提炼文案：行业层面保留 AI 算力、半导体和港股互联网三条线，个股层面补充估值带、催化条件和风险边界，已整理为复盘草稿输入。';
+  kwReviewDraft.previewReady = false;
+  kwRenderReviewTriggerModal();
+  showToast('文件已转成文案');
+}
+
+function kwFormatReviewRichText(command) {
+  const editor = document.getElementById('kw-review-manual-editor');
+  if (!editor) return;
+  editor.focus();
+  document.execCommand(command, false);
+  kwSyncReviewDraftFromModal();
+}
+
+function kwInsertReviewSectionTitle() {
+  const editor = document.getElementById('kw-review-manual-editor');
+  if (!editor) return;
+  editor.focus();
+  document.execCommand('insertHTML', false, '<p><strong>小标题</strong></p><p></p>');
+  kwSyncReviewDraftFromModal();
+}
+
+function kwToggleReviewPromptTag(tag) {
+  kwSyncReviewDraftFromModal();
+  const current = new Set(kwReviewDraft.promptTags || []);
+  if (current.has(tag)) current.delete(tag); else current.add(tag);
+  kwReviewDraft.promptTags = KW_REVIEW_PROMPT_TAGS.filter(item => current.has(item));
+  kwReviewDraft.previewReady = false;
+  kwRenderReviewTriggerModal();
+}
+
+function kwBuildPublishedReviewFromDraft() {
+  const periodMeta = getKwReviewPeriodMeta(kwReviewDraft.period);
+  const contentText = kwGetReviewDraftContentText();
+  const title = kwReviewDraft.paragraphMode === 'manual'
+    ? `${periodMeta.label}：${contentText.split(/[。！？\n]/).map(item => item.trim()).find(Boolean) || '自定义文案已完成'}`
+    : `${periodMeta.label}：智能文案草稿已按你的规则生成`;
+  const tags = kwReviewDraft.paragraphMode === 'manual'
+    ? ['自定义文案', '可直接分发']
+    : ['智能文案', '规则已生效'];
+  return {
+    title: title.slice(0, 40),
+    period: periodMeta.label,
+    time: new Date().toLocaleString('zh-CN', { hour12: false }),
+    tags,
+    watchlist: kwReviewDraft.selectedWatchlist.slice(0),
+    summary: kwGetReviewPreviewText().replace(/\n+/g, ' ').slice(0, 120),
+  };
+}
+
+function kwSubmitReviewTrigger() {
+  const runtime = ensureKwReviewRuntime();
+  kwSyncReviewDraftFromModal();
+  if (!kwReviewDraft.selectedWatchlist.length) {
+    showToast('请先至少选择 1 只自选股');
+    return;
+  }
+  if (!kwGetReviewDraftContentText()) {
+    showToast('请先补充输入内容');
+    return;
+  }
+  runtime.kolGeneratedAt = '刚刚生成';
+  runtime.kolSourceMode = kwReviewDraft.sourceMode;
+  runtime.paragraphMode = kwReviewDraft.paragraphMode;
+  runtime.kolSelectedWatchlist = kwReviewDraft.selectedWatchlist.slice(0);
+  runtime.lastReviewPeriod = kwReviewDraft.period;
+  runtime.latestVoiceTranscript = kwReviewDraft.voiceTranscript;
+  runtime.latestManualHtml = kwReviewDraft.manualHtml;
+  runtime.latestFileText = kwReviewDraft.fileText;
+  runtime.latestAiPrompt = kwReviewDraft.aiPrompt;
+  runtime.latestPromptTags = (kwReviewDraft.promptTags || []).slice(0);
+  runtime.draftReady = true;
+  kwReviewDraft.previewReady = true;
+  kwRenderReviewTriggerModal();
+  kwRenderReviewStudio();
+  showToast(`${getKwReviewPeriodMeta(kwReviewDraft.period).label}草稿已生成，请先预览`);
+}
+
+function kwPublishReviewDraft() {
+  const runtime = ensureKwReviewRuntime();
+  const item = kwBuildPublishedReviewFromDraft();
+  runtime.kolPublishedAt = '刚刚发布';
+  runtime.kolGeneratedAt = '刚刚发布';
+  runtime.draftReady = false;
+  const reviews = window.WORKBENCH_DATA && Array.isArray(window.WORKBENCH_DATA.published_reviews)
+    ? window.WORKBENCH_DATA.published_reviews
+    : [];
+  reviews.unshift(item);
+  if (window.WORKBENCH_DATA) {
+    window.WORKBENCH_DATA.published_reviews = reviews.slice(0, 6);
+  }
+  kwCloseReviewTriggerModal();
+  kwRenderReviewStudio();
+  kwRenderPublishedReviewList();
+  renderWorkbenchAnnotationViews();
+  showToast('复盘已发布');
+}
+
+function kwRenderPublishedReviewList() {
+  const host = document.getElementById('kw-published-review-list');
+  const reviews = (window.WORKBENCH_DATA && window.WORKBENCH_DATA.published_reviews) || [];
+  if (!host) return;
+  host.innerHTML = reviews.map((item, index) => `
+    <div class="kw-broadcast-item">
+      <div class="kw-broadcast-top">
+        <div class="kw-broadcast-content">${escapeHtml(item.title || '')}</div>
+        <span class="kw-tag">${escapeHtml(item.period || '')}</span>
+      </div>
+      <div class="kw-broadcast-meta">${escapeHtml(item.time || '')} · ${escapeHtml(item.summary || '')}</div>
+      <div data-workbench-review-annotation="${index}" style="margin-top:10px"></div>
+      <div class="kw-chip-row" style="margin-top:10px">
+        ${Array.isArray(item.tags) ? item.tags.map(tag => `<span class="kw-chip">${escapeHtml(tag)}</span>`).join('') : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function kwRenderReviewStudio() {
+  const runtime = ensureKwReviewRuntime();
+  const runtimeHost = document.getElementById('kw-review-runtime-panel');
+  const latestHost = document.getElementById('kw-review-latest-published');
+  const latestPublished = (window.WORKBENCH_DATA && window.WORKBENCH_DATA.published_reviews && window.WORKBENCH_DATA.published_reviews[0]) || null;
+  const sourceCfg = KW_REVIEW_SOURCE_OPTIONS.find(item => item.value === runtime.kolSourceMode) || KW_REVIEW_SOURCE_OPTIONS[0];
+  const paragraphCfg = KW_REVIEW_PARAGRAPH_OPTIONS.find(item => item.value === runtime.paragraphMode) || KW_REVIEW_PARAGRAPH_OPTIONS[0];
+  if (runtimeHost) {
+    runtimeHost.innerHTML = `
+      <div class="kw-review-runtime-item">
+        <strong>${escapeHtml(getKwReviewPeriodMeta(runtime.lastReviewPeriod).label)} · ${escapeHtml(sourceCfg.label)} · ${escapeHtml(paragraphCfg.label)}</strong>
+        <div class="kw-review-runtime-desc">最近一次生成：${escapeHtml(runtime.kolGeneratedAt || '--')}｜最近一次发布：${escapeHtml(runtime.kolPublishedAt || '--')}</div>
+      </div>
+      <div class="kw-review-runtime-item">
+        <strong>本次纳入复盘的自选股</strong>
+        <div class="kw-watch-chip-row" style="margin-top:8px">${kwGetSelectedWatchlist().map(name => `<span class="kw-watch-chip">${escapeHtml(name)}</span>`).join('')}</div>
+      </div>
+      <div class="kw-review-runtime-item">
+        <strong>当前修改规则</strong>
+        <div class="kw-review-runtime-desc">${escapeHtml(runtime.latestAiPrompt || '当前未填写修改规则')}</div>
+      </div>
+    `;
+  }
+  if (latestHost) {
+    latestHost.innerHTML = latestPublished ? `
+      <div class="kw-review-runtime-item">
+        <strong>${escapeHtml(latestPublished.title || '')}</strong>
+        <div class="kw-review-runtime-desc">${escapeHtml(latestPublished.time || '--')} · ${escapeHtml(latestPublished.period || '')}</div>
+        <div class="kw-review-runtime-desc" style="margin-top:6px">${escapeHtml(latestPublished.summary || '')}</div>
+        <div class="kw-watch-chip-row" style="margin-top:8px">
+          ${(latestPublished.watchlist || []).map(name => `<span class="kw-watch-chip">${escapeHtml(name)}</span>`).join('')}
+        </div>
+      </div>
+    ` : '<div class="kw-review-runtime-item"><strong>暂无已发布复盘</strong><div class="kw-review-runtime-desc">生成草稿并确认发布后，这里会同步显示最新结果。</div></div>';
+  }
+}
 
 function loadWorkbenchWatchlistAnnotations() {
   try {
@@ -1746,10 +2834,16 @@ function showWorkbenchSection(name, navEl) {
   if (title) title.textContent = meta.title;
   if (summary) summary.textContent = meta.summary;
   if (name === 'biz-dashboard') {
-    renderWorkbenchBizCharts();
+    showWorkbenchAnalyticsSection(window.dashboardDefaultSection || 'funnel');
   }
   if (name === 'watchlist' || name === 'published' || name === 'review') {
     renderWorkbenchAnnotationViews();
+  }
+  if (name === 'review') {
+    kwRenderReviewStudio();
+  }
+  if (name === 'published') {
+    kwRenderPublishedReviewList();
   }
   if (name === 'forecast-model') {
     initWorkbenchForecastEditorEvents();
@@ -1770,15 +2864,17 @@ function showToast(message) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  kwRenderReviewStudio();
+  kwRenderPublishedReviewList();
   const section = new URLSearchParams(window.location.search).get('section');
   if (section && workbenchSectionMeta[section]) {
     showWorkbenchSection(section);
     return;
   }
   initWorkbenchForecastEditorEvents();
-  renderWorkbenchBizCharts();
   renderWorkbenchAnnotationViews();
 });
 </script>
+<script src="/static/js/charts.js"></script>
 </body>
 </html>

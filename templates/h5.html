@@ -1187,6 +1187,103 @@ body { background: var(--surface-2); color: var(--text-main); }
   background:var(--gold);
   border-color:var(--gold);
 }
+.review-draft-status {
+  font-size:11px;
+  color:#1F497D;
+  background:rgba(47,116,192,0.08);
+  border:1px solid rgba(47,116,192,0.18);
+  border-radius:999px;
+  padding:4px 8px;
+}
+.review-intake-panel,
+.review-preview-panel,
+.review-rich-editor {
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:14px;
+  padding:12px;
+}
+.review-intake-toolbar,
+.review-preview-head,
+.review-prompt-tag-row,
+.review-rich-toolbar {
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+.review-intake-toolbar { justify-content:space-between; margin-bottom:10px; }
+.review-input-button {
+  border:1px solid rgba(47,116,192,0.16);
+  background:#FFFFFF;
+  color:#1F497D;
+  border-radius:10px;
+  padding:8px 10px;
+  font-size:12px;
+  cursor:pointer;
+}
+.review-intake-result {
+  margin-top:10px;
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:12px;
+  padding:12px;
+}
+.review-intake-result-title {
+  font-size:12px;
+  color:var(--text-main);
+  font-weight:700;
+}
+.review-intake-result-text,
+.review-preview-copy {
+  font-size:12px;
+  color:var(--gray-400);
+  line-height:1.8;
+  margin-top:8px;
+  white-space:pre-wrap;
+}
+.review-rich-toolbar { margin-bottom:10px; }
+.review-rich-tool {
+  border:1px solid rgba(47,116,192,0.16);
+  background:#FFFFFF;
+  color:#1F497D;
+  border-radius:8px;
+  padding:6px 10px;
+  font-size:11px;
+  cursor:pointer;
+}
+.review-rich-editor {
+  min-height:180px;
+  outline:none;
+  font-size:13px;
+  color:var(--text-main);
+  line-height:1.8;
+}
+.review-rich-editor:empty:before {
+  content:attr(data-placeholder);
+  color:var(--gray-400);
+}
+.review-prompt-tag {
+  font-size:11px;
+  color:#1F497D;
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.14);
+  border-radius:999px;
+  padding:6px 10px;
+  cursor:pointer;
+}
+.review-prompt-tag.active {
+  color:var(--gold);
+  border-color:var(--gold);
+  background:rgba(200,169,110,0.10);
+}
+.review-preview-panel { margin-top:12px; }
+.review-preview-head { justify-content:space-between; }
+.review-preview-title {
+  font-size:14px;
+  color:var(--text-main);
+  font-weight:700;
+}
 @media (max-width: 420px) {
   .review-source-grid,
   .review-meta-grid { grid-template-columns:1fr; }
@@ -2532,19 +2629,30 @@ const REVIEW_SOURCE_OPTIONS = [
   { value: 'voice', icon: '🎙️', label: '语音口述', desc: '收盘后直接口述盘面、行业和个股判断。' },
   { value: 'manual', icon: '✍️', label: '手动撰写', desc: '自己决定段落内容，再让智能体补结构。' },
   { value: 'file', icon: '📎', label: '文件上传', desc: '上传纪要、研报或 PDF 统一抽取重点。' },
-  { value: 'stocks', icon: '🧩', label: '选股归纳', desc: '先锁定几支股票，再归纳行业和个股复盘。' },
 ];
 const REVIEW_PARAGRAPH_OPTIONS = [
   { value: 'manual', label: '大V自定段落', desc: '保留自己的文章结构，只让智能体补摘要、证据链和风险提示。' },
-  { value: 'ai', label: '智能体成稿', desc: '只提供资料和判断，由智能体先生成整篇复盘草稿。' },
+  { value: 'ai', label: '智能文案', desc: '只提供资料和判断，再补一句修改规则，由智能体先生成整篇复盘草稿。' },
 ];
 const REVIEW_WATCHLIST_MAP = {
   tenant_lw: ['中芯国际', '腾讯控股', '贵州茅台', '宁德时代', '招商银行', '寒武纪', '比亚迪'],
 };
 let currentReviewPeriod = 'day';
-let reviewTriggerDraft = { period: 'day', sourceMode: 'voice', paragraphMode: 'manual', selectedWatchlist: [] };
+let reviewTriggerDraft = {
+  period: 'day',
+  sourceMode: 'voice',
+  paragraphMode: 'manual',
+  selectedWatchlist: [],
+  voiceTranscript: '',
+  manualHtml: '',
+  fileText: '',
+  aiPrompt: '',
+  promptTags: [],
+  previewReady: false,
+};
 const reviewRuntimeStore = {};
 let reviewWatchlistSelectionMode = false;
+const REVIEW_PROMPT_TAGS = ['更口语化', '保留原文不改写', '强调风险提示', '适合粉丝阅读', '分成短段落'];
 const KNOWLEDGE_INPUT_TYPES = {
   voice: {
     label: '语音输入',
@@ -2966,11 +3074,18 @@ function ensureTenantReviewRuntime(tenantId) {
   if (!reviewRuntimeStore[tenantId]) {
     reviewRuntimeStore[tenantId] = {
       kolGeneratedAt: '2026-06-07 18:40',
+      kolPublishedAt: '2026-06-07 18:40',
       aiGeneratedAt: '2026-06-07 19:00',
       kolSourceMode: 'voice',
       paragraphMode: 'manual',
       kolSelectedWatchlist: getTenantWatchlistFocus(tenantId).slice(0, 3),
       lastReviewPeriod: 'day',
+      latestVoiceTranscript: '系统已转写语音口述：今天先保留 AI 算力和港股互联网两条主线，个股上继续盯中芯国际订单兑现、腾讯回购节奏和贵州茅台稳健配置逻辑。',
+      latestManualHtml: '<p><strong>市场主线</strong></p><p>今天先讲主线，不把所有盘面噪音都写进去。</p><p><strong>重点个股</strong></p><p>中芯国际看订单兑现，腾讯看回购与财报，茅台继续偏稳健配置。</p>',
+      latestFileText: '系统已从上传文件中提炼文案：保留行业主线、估值带、催化条件和不确定项，整理为可直接进入复盘的结构化文本。',
+      latestAiPrompt: '保持大V自己的判断口吻，适度精简，但不要改动原始观点。',
+      latestPromptTags: ['适合粉丝阅读'],
+      draftReady: false,
     };
   }
   return reviewRuntimeStore[tenantId];
@@ -2998,6 +3113,17 @@ function buildKolReviewData(user, period) {
     week: `这版${periodMeta.label}把一周内的大V语音、手写观点和会议资料统一归纳成行业主线 + 个股复盘，方便普通投资者直接查看。${annotationSummary ? `本周重点样本的 K 线标注也已一并纳入。` : ''}`,
     month: `这版${periodMeta.label}强调阶段框架，先看主线是否延续，再筛出最值得继续跟踪的行业板块和个股。${annotationSummary ? `月内关键 K 线节点也被带入复盘判断。` : ''}`,
   };
+  const manualParagraphs = runtime.paragraphMode === 'manual'
+    ? (() => {
+        const temp = document.createElement('div');
+        temp.innerHTML = runtime.latestManualHtml || '';
+        const chunks = temp.textContent.split('\n').map(item => item.trim()).filter(Boolean);
+        return chunks.length ? chunks.map((text, idx) => ({
+          title: idx === 0 ? '自定义文案' : `补充段落 ${idx}`,
+          text,
+        })) : null;
+      })()
+    : null;
   const paragraphMap = {
     day: [
       { title: '市场主线', text: '今天讨论度最高的仍是 AI 算力、半导体和港股互联网。大V先保留真正影响判断的验证节点，不重复堆原始消息。' },
@@ -3027,7 +3153,7 @@ function buildKolReviewData(user, period) {
     tags: [periodMeta.label, '行业板块', '个股投资复盘'],
     watchlist: focusNames,
     annotations: annotationEntries,
-    paragraphs: paragraphMap[period] || paragraphMap.day,
+    paragraphs: manualParagraphs || paragraphMap[period] || paragraphMap.day,
   };
 }
 
@@ -3195,39 +3321,34 @@ function renderDavReviewStudio(user) {
       <div class="review-role-toolbar">
         <div>
           <div class="review-role-title">大V复盘供稿台</div>
-          <div class="review-role-desc">你可以通过语音、手输、文件上传或选股归纳来生成复盘。文章段落可以自己决定，也可以交给智能体先成稿。本次智能总结会只基于你挑出来的自选股样本。</div>
+          <div class="review-role-desc">你可以通过语音口述、手动撰写或文件上传来输入复盘内容。手动撰写支持直接手写富文本；语音和文件会先转成文案。文章段落方式支持自定义文案或智能文案，生成后先预览再发布。</div>
         </div>
         <span class="tag tag-gold">仅大V可见</span>
       </div>
       <div class="review-source-grid">
-        <div class="review-source-card" onclick="openKnowledgeIntake('voice')">
+        <div class="review-source-card" onclick="openReviewTriggerModal('voice')">
           <div class="review-source-icon">🎙️</div>
           <div class="review-source-title">语音口述</div>
-          <div class="review-source-desc">收盘后直接口述行情、行业和个股判断。</div>
+          <div class="review-source-desc">先点输入按钮口述，系统自动转成复盘文案。</div>
         </div>
         <div class="review-source-card" onclick="openReviewTriggerModal('manual')">
           <div class="review-source-icon">✍️</div>
           <div class="review-source-title">手动撰写</div>
-          <div class="review-source-desc">自己决定文章段落，再交给智能体补结构。</div>
+          <div class="review-source-desc">提供具体的富文本手写区域，自定义文案不再改写。</div>
         </div>
-        <div class="review-source-card" onclick="openKnowledgeIntake('file')">
+        <div class="review-source-card" onclick="openReviewTriggerModal('file')">
           <div class="review-source-icon">📎</div>
           <div class="review-source-title">上传文件</div>
-          <div class="review-source-desc">研报、纪要和 PDF 会统一抽取为复盘草稿。</div>
-        </div>
-        <div class="review-source-card" onclick="openReviewTriggerModal('stocks')">
-          <div class="review-source-icon">🧩</div>
-          <div class="review-source-title">选股归纳</div>
-          <div class="review-source-desc">先锁定几支股票，再拆成行业和个股两层复盘。</div>
+          <div class="review-source-desc">上传后自动抽取并转成复盘文案。</div>
         </div>
       </div>
       <div class="review-flow-row">
         <span class="review-flow-step">选择周期</span>
-        <span class="review-flow-step">挑选自选股</span>
-        <span class="review-flow-step">补充材料</span>
-        <span class="review-flow-step">确认段落方式</span>
+        <span class="review-flow-step">确认本次自选股</span>
+        <span class="review-flow-step">输入或转化文案</span>
+        <span class="review-flow-step">设置智能文案规则</span>
         <span class="review-flow-step">生成复盘草稿</span>
-        <span class="review-flow-step">发布给粉丝</span>
+        <span class="review-flow-step">预览确认后发布</span>
       </div>
       <div class="review-watchlist-row" style="margin-top:10px">
         ${selectedNames.map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
@@ -3344,14 +3465,23 @@ function selectReviewPeriod(period) {
 function openReviewTriggerModal(sourceMode) {
   const user = getActiveDemoUser();
   const runtime = ensureTenantReviewRuntime(user.tenant.id);
+  const existingSelected = Array.isArray(reviewTriggerDraft.selectedWatchlist) ? reviewTriggerDraft.selectedWatchlist.slice(0) : [];
   reviewTriggerDraft.period = currentReviewPeriod;
   if (sourceMode && REVIEW_SOURCE_OPTIONS.some(item => item.value === sourceMode)) {
     reviewTriggerDraft.sourceMode = sourceMode;
   }
   reviewTriggerDraft.paragraphMode = runtime.paragraphMode || reviewTriggerDraft.paragraphMode;
-  reviewTriggerDraft.selectedWatchlist = user.role === 'dav'
-    ? getDavReviewSelectedWatchlist(user.tenant.id).slice(0)
-    : getTenantWatchlistFocus(user.tenant.id).slice(0);
+  reviewTriggerDraft.selectedWatchlist = (sourceMode === 'stocks' && existingSelected.length)
+    ? existingSelected
+    : (user.role === 'dav'
+      ? getDavReviewSelectedWatchlist(user.tenant.id).slice(0)
+      : getTenantWatchlistFocus(user.tenant.id).slice(0));
+  reviewTriggerDraft.voiceTranscript = runtime.latestVoiceTranscript || '';
+  reviewTriggerDraft.manualHtml = runtime.latestManualHtml || '';
+  reviewTriggerDraft.fileText = runtime.latestFileText || '';
+  reviewTriggerDraft.aiPrompt = runtime.latestAiPrompt || '';
+  reviewTriggerDraft.promptTags = Array.isArray(runtime.latestPromptTags) ? runtime.latestPromptTags.slice(0) : [];
+  reviewTriggerDraft.previewReady = false;
   const modal = document.getElementById('review-trigger-modal');
   if (!modal) return;
   renderReviewTriggerModal(user);
@@ -3363,6 +3493,105 @@ function closeReviewTriggerModal() {
   if (modal) modal.classList.remove('show');
 }
 
+function getReviewDraftContentText() {
+  if (reviewTriggerDraft.sourceMode === 'voice') return String(reviewTriggerDraft.voiceTranscript || '').trim();
+  if (reviewTriggerDraft.sourceMode === 'file') return String(reviewTriggerDraft.fileText || '').trim();
+  const temp = document.createElement('div');
+  temp.innerHTML = reviewTriggerDraft.manualHtml || '';
+  return temp.textContent.trim();
+}
+
+function getReviewPreviewText() {
+  if (reviewTriggerDraft.paragraphMode === 'manual') {
+    return getReviewDraftContentText();
+  }
+  const tagText = (reviewTriggerDraft.promptTags || []).join('、');
+  const promptText = String(reviewTriggerDraft.aiPrompt || '').trim();
+  const sourceText = getReviewDraftContentText();
+  return [
+    '智能文案已根据输入材料生成草稿。',
+    sourceText || '当前尚未补充供稿内容。',
+    promptText ? `修改规则：${promptText}` : '',
+    tagText ? `常用标签：${tagText}` : '',
+  ].filter(Boolean).join('\n\n');
+}
+
+function renderReviewInputPanel() {
+  if (reviewTriggerDraft.sourceMode === 'voice') {
+    return `
+      <div class="review-intake-panel">
+        <div class="review-intake-toolbar">
+          <div class="knowledge-record-status">
+            <span class="knowledge-live-dot" style="opacity:1"></span>
+            点击按钮模拟语音输入，系统会自动转成文案
+          </div>
+          <button class="review-input-button" onclick="captureReviewVoiceInput()">语音输入</button>
+        </div>
+        <div class="review-intake-result">
+          <div class="review-intake-result-title">转写文案</div>
+          <div class="review-intake-result-text">${escapeHtml(reviewTriggerDraft.voiceTranscript || '完成语音输入后，这里会展示转写后的复盘文案。')}</div>
+        </div>
+      </div>
+    `;
+  }
+  if (reviewTriggerDraft.sourceMode === 'file') {
+    return `
+      <div class="review-intake-panel">
+        <div class="review-intake-toolbar">
+          <div class="knowledge-record-status">上传文件后，系统会自动提炼成可用文案</div>
+          <button class="review-input-button" onclick="captureReviewFileInput()">上传文件</button>
+        </div>
+        <div class="review-intake-result">
+          <div class="review-intake-result-title">抽取文案</div>
+          <div class="review-intake-result-text">${escapeHtml(reviewTriggerDraft.fileText || '完成文件上传后，这里会展示抽取后的复盘文案。')}</div>
+        </div>
+      </div>
+    `;
+  }
+  return `
+    <div class="review-intake-panel">
+      <div class="review-rich-toolbar">
+        <button class="review-rich-tool" onclick="formatReviewRichText('bold')">加粗</button>
+        <button class="review-rich-tool" onclick="formatReviewRichText('insertUnorderedList')">列表</button>
+        <button class="review-rich-tool" onclick="insertReviewSectionTitle()">小标题</button>
+      </div>
+      <div id="review-manual-editor" class="review-rich-editor" contenteditable="true" data-placeholder="在这里直接手写复盘正文。手动撰写模式下，后续不会再改写这份文案。">${reviewTriggerDraft.manualHtml || ''}</div>
+    </div>
+    `;
+}
+
+function renderReviewPromptPanel() {
+  if (reviewTriggerDraft.paragraphMode !== 'ai') return '';
+  return `
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">智能文案修改规则</label>
+      <textarea id="review-ai-prompt-input" class="knowledge-modal-textarea" placeholder="例如：更口语化，但保留原始观点，不要写买卖建议。">${escapeHtml(reviewTriggerDraft.aiPrompt || '')}</textarea>
+      <div class="review-prompt-tag-row" style="margin-top:10px">
+        ${REVIEW_PROMPT_TAGS.map(tag => `
+          <button class="review-prompt-tag ${reviewTriggerDraft.promptTags.includes(tag) ? 'active' : ''}" onclick="toggleReviewPromptTag('${tag}')">${escapeHtml(tag)}</button>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderReviewPreviewPanel() {
+  if (!reviewTriggerDraft.previewReady) return '';
+  const previewText = getReviewPreviewText();
+  return `
+    <div class="review-preview-panel">
+      <div class="review-preview-head">
+        <div>
+          <div class="review-preview-title">草稿预览</div>
+          <div class="review-summary-desc">确认没问题后再发布</div>
+        </div>
+        <span class="review-draft-status">待发布</span>
+      </div>
+      <div class="review-preview-copy">${escapeHtml(previewText)}</div>
+    </div>
+  `;
+}
+
 function renderReviewTriggerModal(user) {
   const host = document.getElementById('review-trigger-modal-content');
   if (!host) return;
@@ -3371,7 +3600,7 @@ function renderReviewTriggerModal(user) {
     <div class="modal-title" style="margin-bottom:10px">${user.role === 'dav' ? '发起大V复盘' : '发起智能复盘'}</div>
     <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">
       ${user.role === 'dav'
-        ? '生成复盘前必须先选择复盘周期。你可以继续补充语音、手输、文件上传，或按几支股票归纳行业和个股复盘。'
+        ? '先选择复盘周期，再补充语音口述、手动撰写或文件上传内容。生成草稿后先预览，确认没问题再发布。'
         : '生成复盘前必须先选择复盘周期。系统会结合你的自选股、所属大V最近复盘和当前阶段行情生成一版短版智能复盘。'}
     </div>
     <div class="knowledge-modal-block">
@@ -3385,11 +3614,15 @@ function renderReviewTriggerModal(user) {
     ${user.role === 'dav' ? `
       <div class="knowledge-modal-block">
         <label class="knowledge-modal-label">供稿方式</label>
-        <div class="knowledge-source-selector" style="grid-template-columns:repeat(2,1fr)">
+        <div class="knowledge-source-selector" style="grid-template-columns:repeat(3,1fr)">
           ${REVIEW_SOURCE_OPTIONS.map(item => `
             <div class="knowledge-source-pill ${item.value === reviewTriggerDraft.sourceMode ? 'active' : ''}" onclick="setReviewTriggerSourceMode('${item.value}')">${item.icon} ${item.label}</div>
           `).join('')}
         </div>
+      </div>
+      <div class="knowledge-modal-block">
+        <label class="knowledge-modal-label">输入内容</label>
+        ${renderReviewInputPanel()}
       </div>
       <div class="knowledge-modal-block">
         <label class="knowledge-modal-label">文章段落方式</label>
@@ -3398,10 +3631,14 @@ function renderReviewTriggerModal(user) {
             <div class="knowledge-source-pill ${item.value === reviewTriggerDraft.paragraphMode ? 'active' : ''}" onclick="setReviewTriggerParagraphMode('${item.value}')">${item.label}</div>
           `).join('')}
         </div>
+        <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-top:8px">
+          ${reviewTriggerDraft.paragraphMode === 'manual' ? '如果是自定义文案，就直接使用你上面输入的内容，不再二次改写。' : '智能文案会基于输入材料和你的修改规则生成草稿。'}
+        </div>
       </div>
+      ${renderReviewPromptPanel()}
       <div class="knowledge-modal-block">
         <label class="knowledge-modal-label">本次纳入复盘的自选股</label>
-        <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">大V自选股可能很多，这里先挑出本次真正要进入智能总结的样本，再生成复盘草稿。</div>
+        <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">本次纳入复盘的自选股已经从自选列表里选择，这里只做确认，不再单独做选股归纳。</div>
         <div class="review-watchlist-row">
           ${focusNames.map(name => `
             <button class="review-watchlist-chip selectable ${reviewTriggerDraft.selectedWatchlist.includes(name) ? 'active' : ''}" onclick="toggleReviewTriggerWatchlist('${name}')">${escapeHtml(name)}</button>
@@ -3415,9 +3652,14 @@ function renderReviewTriggerModal(user) {
         ${(user.role === 'dav' ? reviewTriggerDraft.selectedWatchlist : focusNames).map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
       </div>
     </div>
+    ${user.role === 'dav' ? renderReviewPreviewPanel() : ''}
     <div class="modal-actions">
       <button class="btn-outline" onclick="closeReviewTriggerModal()">取消</button>
-      <button class="btn-gold" onclick="submitReviewTrigger()">${user.role === 'dav' ? '生成复盘草稿' : '生成智能复盘'}</button>
+      ${user.role === 'dav'
+        ? `${reviewTriggerDraft.previewReady
+          ? '<button class="btn-gold" onclick="publishReviewDraft()">确认发布</button>'
+          : '<button class="btn-gold" onclick="submitReviewTrigger()">生成草稿</button>'}`
+        : '<button class="btn-gold" onclick="submitReviewTrigger()">生成智能复盘</button>'}
     </div>
   `;
 }
@@ -3431,7 +3673,9 @@ function setReviewTriggerPeriod(period) {
 
 function setReviewTriggerSourceMode(mode) {
   if (!REVIEW_SOURCE_OPTIONS.some(item => item.value === mode)) return;
+  syncReviewDraftFromModal();
   reviewTriggerDraft.sourceMode = mode;
+  reviewTriggerDraft.previewReady = false;
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
@@ -3445,12 +3689,65 @@ function toggleReviewTriggerWatchlist(name) {
     current.add(name);
   }
   reviewTriggerDraft.selectedWatchlist = fullList.filter(item => current.has(item));
+  reviewTriggerDraft.previewReady = false;
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
 function setReviewTriggerParagraphMode(mode) {
   if (!REVIEW_PARAGRAPH_OPTIONS.some(item => item.value === mode)) return;
+  syncReviewDraftFromModal();
   reviewTriggerDraft.paragraphMode = mode;
+  reviewTriggerDraft.previewReady = false;
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+function syncReviewDraftFromModal() {
+  const promptInput = document.getElementById('review-ai-prompt-input');
+  const manualEditor = document.getElementById('review-manual-editor');
+  if (promptInput) reviewTriggerDraft.aiPrompt = promptInput.value;
+  if (manualEditor) reviewTriggerDraft.manualHtml = manualEditor.innerHTML;
+}
+
+function captureReviewVoiceInput() {
+  reviewTriggerDraft.voiceTranscript = '系统已转写语音口述：今天复盘只保留两条主线，AI 算力继续看订单和景气，港股互联网继续看回购与财报兑现；个股上优先跟中芯国际、腾讯控股和贵州茅台。';
+  reviewTriggerDraft.previewReady = false;
+  renderReviewTriggerModal(getActiveDemoUser());
+  showToast('语音已转成文案');
+}
+
+function captureReviewFileInput() {
+  reviewTriggerDraft.fileText = '系统已从上传文件提炼文案：行业层面保留 AI 算力、半导体和港股互联网三条线，个股层面补充估值带、催化条件和风险边界，已整理为复盘草稿输入。';
+  reviewTriggerDraft.previewReady = false;
+  renderReviewTriggerModal(getActiveDemoUser());
+  showToast('文件已转成文案');
+}
+
+function formatReviewRichText(command) {
+  const editor = document.getElementById('review-manual-editor');
+  if (!editor) return;
+  editor.focus();
+  document.execCommand(command, false);
+  syncReviewDraftFromModal();
+}
+
+function insertReviewSectionTitle() {
+  const editor = document.getElementById('review-manual-editor');
+  if (!editor) return;
+  editor.focus();
+  document.execCommand('insertHTML', false, '<p><strong>小标题</strong></p><p></p>');
+  syncReviewDraftFromModal();
+}
+
+function toggleReviewPromptTag(tag) {
+  syncReviewDraftFromModal();
+  const current = new Set(reviewTriggerDraft.promptTags || []);
+  if (current.has(tag)) {
+    current.delete(tag);
+  } else {
+    current.add(tag);
+  }
+  reviewTriggerDraft.promptTags = REVIEW_PROMPT_TAGS.filter(item => current.has(item));
+  reviewTriggerDraft.previewReady = false;
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
@@ -3463,12 +3760,26 @@ function submitReviewTrigger() {
       showToast('请先至少选择 1 只自选股');
       return;
     }
+    syncReviewDraftFromModal();
+    if (!getReviewDraftContentText()) {
+      showToast('请先补充输入内容');
+      return;
+    }
     runtime.kolGeneratedAt = '刚刚生成';
     runtime.kolSourceMode = reviewTriggerDraft.sourceMode;
     runtime.paragraphMode = reviewTriggerDraft.paragraphMode;
     runtime.kolSelectedWatchlist = reviewTriggerDraft.selectedWatchlist.slice(0);
     runtime.lastReviewPeriod = currentReviewPeriod;
-    showToast(`${getReviewPeriodMeta(currentReviewPeriod).label}草稿已生成`);
+    runtime.latestVoiceTranscript = reviewTriggerDraft.voiceTranscript;
+    runtime.latestManualHtml = reviewTriggerDraft.manualHtml;
+    runtime.latestFileText = reviewTriggerDraft.fileText;
+    runtime.latestAiPrompt = reviewTriggerDraft.aiPrompt;
+    runtime.latestPromptTags = (reviewTriggerDraft.promptTags || []).slice(0);
+    runtime.draftReady = true;
+    reviewTriggerDraft.previewReady = true;
+    renderReviewTriggerModal(user);
+    showToast(`${getReviewPeriodMeta(currentReviewPeriod).label}草稿已生成，请先预览`);
+    return;
   } else {
     runtime.aiGeneratedAt = '刚刚生成';
     showToast(`${getReviewPeriodMeta(currentReviewPeriod).label}智能复盘已生成`);
@@ -3479,6 +3790,22 @@ function submitReviewTrigger() {
   if (currentDmKol) {
     loadDmMessages(currentDmKol.id);
   }
+}
+
+function publishReviewDraft() {
+  const user = getActiveDemoUser();
+  if (user.role !== 'dav') return;
+  const runtime = ensureTenantReviewRuntime(user.tenant.id);
+  runtime.kolPublishedAt = '刚刚发布';
+  runtime.kolGeneratedAt = '刚刚发布';
+  runtime.draftReady = false;
+  closeReviewTriggerModal();
+  renderReviewExperience();
+  loadDmConversations();
+  if (currentDmKol) {
+    loadDmMessages(currentDmKol.id);
+  }
+  showToast('复盘已发布');
 }
 
 function getTenantVisibleAuthors(authors) {

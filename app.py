@@ -47,8 +47,8 @@ DEFAULT_TENANTS = [
         "focus": "A股科技 · 港股互联网 · 复盘专区",
         "rights": "复盘专区 · 知识专区 · Hermes 摘要 · 社群问答",
         "description": "面向 A 股科技、港股互联网和高频复盘粉丝用户的独立租户空间。",
-        "portal_headline": "把大V研究能力、粉丝经营和证据链展示，统一到一个专属门户里。",
-        "portal_description": "门户前台承接功能介绍、最新复盘、核心指标和 Web 化经营 Dashboard；后台工作台承接粉丝消息、知识经营和内容生产。",
+        "portal_headline": "把每天该看的复盘、重点个股和研究框架，集中在一个粉丝能直接进入的专属门户里。",
+        "portal_description": "这个门户不是给大V自己看的，而是给粉丝看的。你可以先看最新复盘、重点样本和研究框架，再决定是否继续去 H5 做自选股跟踪、Hermes 对话和专属问答。",
         "dashboard_title": "老王租户经营 Dashboard",
         "dashboard_description": "和 H5 核心指标面板同源，但在 Web 端用更完整的经营视角呈现。",
     },
@@ -64,8 +64,8 @@ DEFAULT_TENANTS = [
         "focus": "港股互联网 · 南向资金 · 价值框架",
         "rights": "港股专栏 · 直播纪要 · Hermes 摘要 · 问答私域",
         "description": "面向港股互联网与价值投资粉丝的独立租户空间。",
-        "portal_headline": "为每个大V提供独立品牌门户，让粉丝先进入专属空间，再承接服务和内容转化。",
-        "portal_description": "门户展示大V品牌、服务权益、代表性研究专题和租户专属 Dashboard，避免所有大V共用一个统一前台品牌。",
+        "portal_headline": "先把港股核心主线、代表性复盘和价值框架讲清楚，再把粉丝带进后续互动。",
+        "portal_description": "这个门户面向粉丝展示 Lisa 的研究方向、最近复盘、代表性样本和互动权益，让用户先理解你在看什么、怎么判断，再进入 H5 跟踪和提问。",
         "dashboard_title": "Lisa 租户价值跟踪台",
         "dashboard_description": "突出港股估值、南向资金、回购与财报验证等核心经营与研究指标。",
     },
@@ -268,26 +268,186 @@ def build_tenant_dashboard_payload(tenant=None):
 def build_tenant_portal_payload(tenant=None):
     tenant = tenant or get_tenant_by_slug()
     workbench = gen_kol_workbench(tenant)
-    dashboard = build_tenant_dashboard_payload(tenant)
+    watchlist_items = copy.deepcopy(workbench["watchlist_hub"]["items"])
+    reviews = copy.deepcopy(workbench["published_reviews"])
+    knowledge_items = copy.deepcopy(workbench["knowledge_hub"]["items"])
+    is_lisa = tenant["slug"] == "lisa"
+    for review in reviews:
+        review["detail_sections"] = [
+            {
+                "title": "这篇复盘主要解决什么",
+                "body": review["summary"],
+            },
+            {
+                "title": "本篇重点样本",
+                "bullets": review.get("watchlist", []),
+            },
+            {
+                "title": "适合什么人先看",
+                "body": "适合已经在跟这位主理人研究口径、想先快速理解阶段主线和下一步观察点的粉丝用户。",
+            },
+        ]
+    for item in watchlist_items:
+        item["detail_sections"] = [
+            {
+                "title": "当前跟踪焦点",
+                "body": item["focus"],
+            },
+            {
+                "title": "当前判断",
+                "body": item["thesis"],
+            },
+            {
+                "title": "继续看什么",
+                "bullets": [
+                    "是否出现新的验证材料",
+                    "主线是否继续强化而不是只剩情绪波动",
+                    "后续复盘里是否仍被保留为重点样本",
+                ],
+            },
+        ]
+    research_framework = [
+        {
+            "title": is_lisa and "先看估值修复能否被业绩接住" or "先看主线有没有真实验证材料",
+            "desc": is_lisa and "港股互联网优先看回购、利润率和财报兑现，不把情绪当结论。" or "科技成长优先看订单、景气和资金是否连续验证，不把热度直接当逻辑。",
+            "detail_sections": [
+                {
+                    "title": "为什么先看这一层",
+                    "body": "先判断主线是否有真实材料承接，能避免只看短期波动或单日情绪。",
+                },
+                {
+                    "title": "常见验证点",
+                    "bullets": is_lisa and ["回购节奏", "利润率兑现", "财报后的估值承接"] or ["订单兑现", "行业景气持续性", "资金验证是否连续"],
+                },
+            ],
+        },
+        {
+            "title": "只保留真正值得跟踪的样本",
+            "desc": "不是把所有股票都讲一遍，而是把最值得继续跟踪的样本收进固定池子里。",
+            "detail_sections": [
+                {
+                    "title": "这样做的原因",
+                    "body": "粉丝真正需要的不是覆盖越多越好，而是知道哪些样本值得持续看，哪些已经可以暂时放掉。",
+                },
+                {
+                    "title": "粉丝能直接得到什么",
+                    "bullets": ["更少的噪音", "更清晰的样本池", "更容易跟上后续复盘"],
+                },
+            ],
+        },
+        {
+            "title": "结论必须带风险边界",
+            "desc": "每次复盘都要写清楚什么条件成立、什么条件失效，避免只讲单边观点。",
+            "detail_sections": [
+                {
+                    "title": "风险边界怎么用",
+                    "body": "不是只写结论，而是同步写明失效条件和反证条件，帮助粉丝理解什么时候该继续跟、什么时候该停下来重看。",
+                },
+                {
+                    "title": "通常会同步哪些内容",
+                    "bullets": ["成立条件", "失效条件", "下一步观察项"],
+                },
+            ],
+        },
+    ]
+    service_cards = [
+        {
+            "title": "复盘专区",
+            "desc": "查看已发布的日复盘、周复盘和阶段主线整理。",
+            "detail_sections": [
+                {"title": "你会看到什么", "bullets": ["已发布复盘", "阶段主线", "重点样本和下一步观察"]},
+                {"title": "适合什么时候用", "body": "适合先快速理解最近判断，再决定是否继续深挖。"},
+            ],
+        },
+        {
+            "title": "Hermes 对话",
+            "desc": "基于当前租户研究口径继续问个股、板块和证据链。",
+            "detail_sections": [
+                {"title": "它和普通问答的区别", "body": "会承接当前租户的大V研究口径，而不是通用聊天。"},
+                {"title": "常见适用问题", "bullets": ["这只股票为什么还在重点池里", "某条主线的验证点是什么", "当前判断的证据链来自哪里"]},
+            ],
+        },
+        {
+            "title": "自选股跟踪",
+            "desc": "把你自己关注的样本加入自选，后续复盘会更贴近你的持仓和兴趣。",
+            "detail_sections": [
+                {"title": "带来的变化", "body": "系统会更容易把你的关注样本带入后续复盘和智能整理。"},
+                {"title": "适合谁", "body": "适合已经有明确观察名单、希望门户内容更贴近自己的人。"},
+            ],
+        },
+        {
+            "title": "专属问答",
+            "desc": "看完内容后可继续在消息区向所属大V提问。",
+            "detail_sections": [
+                {"title": "适合提什么", "bullets": ["样本为什么继续保留", "某个风险边界怎么理解", "后续更应该看哪一个验证节点"]},
+                {"title": "提问前建议", "body": "先看完最新复盘和重点样本，再提问题，交流效率会更高。"},
+            ],
+        },
+    ]
+    for item in knowledge_items[:2]:
+        item["detail_sections"] = [
+            {
+                "title": "这条知识沉淀的用途",
+                "body": item["summary"],
+            },
+            {
+                "title": "会影响哪些后续内容",
+                "bullets": ["Hermes 对话", "后续复盘", "研究框架表达"],
+            },
+        ]
     return {
         "tenant": tenant,
         "brand": get_platform_brand(),
-        "workbench": workbench,
-        "dashboard": dashboard,
+        "hero_stats": [
+            {"label": "代表性方向", "value": tenant["focus"]},
+            {"label": "当前开放权益", "value": tenant["rights"]},
+            {"label": "最近更新", "value": reviews[0]["time"] if reviews else "持续更新中"},
+        ],
         "highlights": [
             {
-                "title": "专属品牌门户",
-                "desc": f"{tenant['advisor']} 对外的名字、logo、定位和权益由平台 Admin 统一配置，前台不会再固定成平台总品牌。",
+                "title": "先看主线",
+                "desc": "进入门户先知道当前重点研究哪些方向，而不是先掉进复杂功能里。",
             },
             {
-                "title": "租户经营后台",
-                "desc": "大V 在自己的 Web 工作台里管理粉丝消息、群发、复盘生产、知识库和 Hermes 协同。",
+                "title": "先看复盘",
+                "desc": "粉丝先消费已经确认发布的复盘，再决定是否继续深挖个股和框架。",
             },
             {
-                "title": "Web 化 Dashboard",
-                "desc": "复用 H5 端核心指标与经营口径，但在 Web 上用更完整、更大气的仪表展示。",
+                "title": "再去互动",
+                "desc": "理解研究口径以后，再进入 H5 做自选股跟踪、Hermes 对话和专属提问。",
             },
         ],
+        "audience_sections": [
+            {
+                "title": "你在这里先得到什么",
+                "desc": "不是把功能全摊开，而是先把粉丝最需要的内容入口收拢起来。",
+                "items": [
+                    {"title": "最新复盘", "desc": "先看已经发布的日复盘 / 周复盘，快速理解当前判断主线。"},
+                    {"title": "重点样本", "desc": "直接看到当前最值得继续跟踪的几只样本，不用自己先筛一遍。"},
+                    {"title": "研究框架", "desc": "知道这位大V平时怎么看估值、验证节点和风险边界。"},
+                ],
+            },
+            {
+                "title": "适合哪些粉丝",
+                "desc": "这个门户不是泛流量首页，而是面向已经认可这位主理人研究风格的人。",
+                "items": [
+                    {"title": "高频复盘用户", "desc": "每天想快速看阶段主线和重点样本的人。"},
+                    {"title": "框架型用户", "desc": "不只想看结论，也想知道判断依据和方法的人。"},
+                    {"title": "互动型用户", "desc": "看完内容后，希望继续问个股、板块和验证节点的人。"},
+                ],
+            },
+        ],
+        "featured_reviews": reviews,
+        "featured_watchlist": watchlist_items,
+        "research_framework": research_framework,
+        "service_cards": service_cards,
+        "knowledge_spotlight": knowledge_items[:2],
+        "cta": {
+            "primary_label": "进入 H5 继续查看",
+            "primary_href": f"/h5?tenant={tenant['slug']}",
+            "secondary_label": "直接看最新复盘",
+            "secondary_href": "#latest-review",
+        },
     }
 
 
@@ -2131,19 +2291,130 @@ def gen_kol_workbench(tenant=None):
                 {"day": "06-06", "count": 2},
                 {"day": "06-07", "count": 5},
             ],
+            "analytics_sections": {
+                "funnel": {
+                    "summary": "从内容触达到高频留存，观察当前租户粉丝在复盘、问答和 H5 内的转化路径。",
+                    "kpis": [
+                        {"label": "内容触达", "value": "12,800", "sub": "近30日门户/H5 内容触达"},
+                        {"label": "私域留资", "value": "1,460", "sub": "留资率 11.4%"},
+                        {"label": "激活试用", "value": "620", "sub": "激活率 42.5%"},
+                        {"label": "首次付费", "value": "128", "sub": "付费率 20.6%"},
+                        {"label": "高频留存", "value": "36", "sub": "稳定跟踪样本用户"},
+                    ],
+                    "funnel": [
+                        {"label": "内容触达", "count": 12800, "rate": 100.0},
+                        {"label": "私域留资", "count": 1460, "rate": 11.4},
+                        {"label": "激活试用", "count": 620, "rate": 4.8},
+                        {"label": "首次付费", "count": 128, "rate": 1.0},
+                        {"label": "高频留存", "count": 36, "rate": 0.3},
+                    ],
+                    "channel_mix": [
+                        {"label": "复盘阅读", "value": 42},
+                        {"label": "Hermes 问答", "value": 24},
+                        {"label": "消息追问", "value": 18},
+                        {"label": "自选股跟踪", "value": 16},
+                    ],
+                    "heatmap_columns": ["内容触达", "私域留资", "激活试用", "首次付费", "高频留存"],
+                    "heatmap_rows": [
+                        {"label": "复盘专区", "values": [100, 18.2, 8.4, 2.2, 0.8]},
+                        {"label": "Hermes", "values": [100, 14.8, 9.6, 3.4, 1.2]},
+                        {"label": "消息区", "values": [100, 22.1, 11.2, 3.8, 1.5]},
+                        {"label": "自选股", "values": [100, 12.4, 6.7, 2.1, 0.9]},
+                    ],
+                },
+                "channel": {
+                    "summary": "看当前租户各获客和互动来源的质量，而不是平台总渠道。",
+                    "cards": [
+                        {"label": "复盘转化", "users": "620", "conv": "8.4%", "revenue": "¥26,800", "score": 88},
+                        {"label": "Hermes 转化", "users": "410", "conv": "11.2%", "revenue": "¥24,300", "score": 92},
+                        {"label": "消息追问", "users": "260", "conv": "15.6%", "revenue": "¥18,600", "score": 95},
+                        {"label": "社群转介绍", "users": "170", "conv": "18.1%", "revenue": "¥16,200", "score": 97},
+                    ],
+                    "quality_rows": [
+                        {"label": "复盘转化", "users": 620, "cac": 32, "ltv": 620, "conv": "8.4%", "score": 88, "trend": "上升"},
+                        {"label": "Hermes 转化", "users": 410, "cac": 24, "ltv": 760, "conv": "11.2%", "score": 92, "trend": "上升"},
+                        {"label": "消息追问", "users": 260, "cac": 18, "ltv": 880, "conv": "15.6%", "score": 95, "trend": "稳定"},
+                        {"label": "社群转介绍", "users": 170, "cac": 12, "ltv": 960, "conv": "18.1%", "score": 97, "trend": "上升"},
+                    ],
+                },
+                "kol": {
+                    "summary": "这里不再比较全平台所有大V，而是拆解当前租户自己的协同效率与增长阶段。",
+                    "kpis": [
+                        {"label": "本月协同收入", "value": is_lisa and "¥69,800" or "¥86,400", "sub": "当前租户口径"},
+                        {"label": "高价值线索", "value": "18", "sub": "近30日重点粉丝"},
+                        {"label": "复盘带动付费", "value": "42%", "sub": "主要转化来源"},
+                        {"label": "私域追问率", "value": "31%", "sub": "复盘后继续追问"},
+                    ],
+                    "stage_cards": [
+                        {"label": "种子线索", "value": 42},
+                        {"label": "持续互动", "value": 28},
+                        {"label": "稳定付费", "value": 12},
+                        {"label": "高频留存", "value": 6},
+                    ],
+                    "table_rows": [
+                        {"label": "机构试点张总", "source": "闭门交流", "focus": "港股互联网 / 宏观", "revenue": "¥18,000", "share": "30%", "stage": "高价值", "change": "+12%"},
+                        {"label": "投研达人小陈", "source": "Hermes", "focus": "AI 算力 / 半导体", "revenue": "¥8,600", "share": "22%", "stage": "稳定付费", "change": "+8%"},
+                        {"label": "价值猎人小林", "source": "复盘", "focus": "港股互联网", "revenue": "¥4,200", "share": "18%", "stage": "成长中", "change": "+6%"},
+                    ],
+                },
+                "revenue": {
+                    "summary": "把当前租户的收入来源、订阅结构和月度变化拆开看。",
+                    "kpis": [
+                        {"label": "月度收入", "value": is_lisa and "¥79,400" or "¥99,200", "sub": "订阅 + 定制 + 活动"},
+                        {"label": "专业会员占比", "value": "46%", "sub": "当前主力收入层"},
+                        {"label": "高价值服务", "value": "¥12,800", "sub": "群发 / 定制 / 线下"},
+                        {"label": "30日留存收入", "value": "73%", "sub": "非一次性收入"},
+                    ],
+                    "monthly_revenue": [
+                        {"label": "1月", "value": 42},
+                        {"label": "2月", "value": 48},
+                        {"label": "3月", "value": 56},
+                        {"label": "4月", "value": 63},
+                        {"label": "5月", "value": 71},
+                        {"label": "6月", "value": 79 if is_lisa else 89},
+                    ],
+                    "tier_revenue": [
+                        {"label": "基础会员", "value": 18},
+                        {"label": "专业会员", "value": 36},
+                        {"label": "机构试点", "value": 22},
+                        {"label": "其他服务", "value": 12},
+                    ],
+                    "cohort_columns": ["M0", "M1", "M2", "M3", "M4", "M5"],
+                    "cohort_rows": [
+                        {"label": "2026-01", "values": [100, 64, 51, 42, 36, 29]},
+                        {"label": "2026-02", "values": [100, 66, 54, 45, 38, None]},
+                        {"label": "2026-03", "values": [100, 68, 56, 47, None, None]},
+                        {"label": "2026-04", "values": [100, 69, 58, None, None, None]},
+                    ],
+                },
+                "segment": {
+                    "summary": "看当前租户不同粉丝层级的规模、ARPU 和留存，而不是平台总用户。",
+                    "tiers": [
+                        {"label": "免费用户", "users": 3680, "ret7": "24%", "ret30": "9%", "ret90": "3%", "arpu": "¥0", "ltv": "¥0"},
+                        {"label": "基础会员", "users": 880, "ret7": "58%", "ret30": "41%", "ret90": "24%", "arpu": "¥49", "ltv": "¥186"},
+                        {"label": "专业会员", "users": 248, "ret7": "72%", "ret30": "63%", "ret90": "46%", "arpu": "¥138", "ltv": "¥620"},
+                        {"label": "机构试点", "users": 18, "ret7": "88%", "ret30": "82%", "ret90": "71%", "arpu": "¥860", "ltv": "¥4,800"},
+                    ],
+                    "lifecycle": [
+                        {"label": "免费", "value": 3680},
+                        {"label": "基础", "value": 880},
+                        {"label": "专业", "value": 248},
+                        {"label": "机构", "value": 18},
+                    ],
+                },
+            },
         },
         "review_studio": {
             "sources": [
                 {"icon": "🎙️", "label": "语音口述", "desc": "收盘后直接口述行业主线、关键公司和操作复盘，智能体自动转写并抽取段落。"},
-                {"icon": "✍️", "label": "手动撰写", "desc": "大V自己决定文章段落、标题和表达顺序，再交给智能体补结构和证据链。"},
-                {"icon": "📎", "label": "文件上传", "desc": "上传研报、纪要、Excel 和 PDF，由智能体统一抽取要点并生成复盘草稿。"},
-                {"icon": "🧩", "label": "选股归纳", "desc": "先锁定几支股票，再按行业板块复盘和个股投资复盘两个层次统一归纳。"},
+                {"icon": "✍️", "label": "手动撰写", "desc": "提供富文本手写区域，大V自己决定文章段落、标题和表达顺序。"},
+                {"icon": "📎", "label": "文件上传", "desc": "上传研报、纪要、Excel 和 PDF，由智能体统一抽取要点并转成复盘文案。"},
             ],
             "paragraph_modes": [
                 {"label": "大V自定段落", "desc": "适合自己写主框架，只让智能体补摘要、证据链和风险提示。"},
-                {"label": "智能体成稿", "desc": "适合先交信息给智能体，自动生成完整复盘文章后再人工微调。"},
+                {"label": "智能文案", "desc": "适合先交信息给智能体，并补充修改规则或常用提示词标签后生成草稿。"},
             ],
-            "default_flow": ["选择复盘周期", "补充语音/手输/文件", "锁定行业和个股", "生成复盘草稿", "确认后发布给粉丝"],
+            "default_flow": ["选择复盘周期", "确认本次自选股", "补充语音/手输/文件", "设置智能文案规则", "生成草稿预览", "确认后发布给粉丝"],
             "watchlist_focus": watchlist_focus,
             "periods": ["日复盘", "周复盘", "月复盘"],
         },
