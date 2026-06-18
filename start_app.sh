@@ -9,6 +9,15 @@ PYTHON_BIN=""
 
 cd "$SCRIPT_DIR"
 
+if [ -z "${PORT:-}" ]; then
+  if lsof -nP -iTCP:5000 -sTCP:LISTEN >/dev/null 2>&1; then
+    PORT=5001
+  else
+    PORT=5000
+  fi
+  export PORT
+fi
+
 for candidate in "$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/venv/bin/python" "$SCRIPT_DIR/env/bin/python"; do
   if [ -x "$candidate" ]; then
     PYTHON_BIN="$candidate"
@@ -56,6 +65,7 @@ if kill -0 "$APP_PID" 2>/dev/null; then
   echo "Started app.py successfully."
   echo "PID: $APP_PID"
   echo "Python: $PYTHON_BIN"
+  echo "Port: $PORT"
   echo "Log: $LOG_FILE"
 else
   echo "Failed to start app.py. Check log: $LOG_FILE"
