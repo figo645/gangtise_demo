@@ -656,7 +656,11 @@ body { background: var(--surface-2); color: var(--text-main); }
   border-radius:14px;
   padding:12px;
   box-shadow:0 8px 22px rgba(31,73,125,0.06);
+  cursor:pointer;
+  transition:transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
+.fund-macro-card:active { transform:scale(0.99); }
+.fund-macro-card:hover { box-shadow:0 10px 24px rgba(31,73,125,0.08); }
 .fund-macro-card.good { border-color:rgba(46,204,113,0.18); }
 .fund-macro-card.attention { border-color:rgba(47,116,192,0.18); }
 .fund-macro-card.warning { border-color:rgba(231,76,60,0.18); }
@@ -674,6 +678,206 @@ body { background: var(--surface-2); color: var(--text-main); }
 .fund-macro-assessment { font-size:12px; color:var(--white); margin-top:6px; line-height:1.6; }
 .fund-macro-alert { font-size:11px; color:var(--gold); margin-top:8px; line-height:1.6; }
 .fund-macro-hint { font-size:10px; color:var(--gray-400); margin-top:6px; line-height:1.6; }
+.fund-macro-entry-hint {
+  margin-top:8px;
+  font-size:10px;
+  color:#5B7DA6;
+}
+.fund-metric-detail-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+  margin-bottom:14px;
+}
+.fund-metric-detail-title {
+  font-size:16px;
+  font-weight:700;
+  color:var(--text-main);
+}
+.fund-metric-detail-subtitle {
+  margin-top:4px;
+  font-size:11px;
+  color:var(--text-sub);
+  line-height:1.6;
+}
+.fund-metric-detail-close {
+  border:none;
+  background:#F3F8FE;
+  color:#1F497D;
+  width:30px;
+  height:30px;
+  border-radius:999px;
+  font-size:18px;
+  cursor:pointer;
+}
+.fund-metric-detail-grid {
+  display:grid;
+  gap:12px;
+}
+.fund-metric-detail-card {
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  padding:12px;
+}
+.fund-metric-detail-card-title {
+  font-size:13px;
+  font-weight:700;
+  color:var(--text-main);
+  margin-bottom:10px;
+}
+.fund-metric-detail-summary {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-bottom:12px;
+}
+.fund-metric-detail-stat {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.08);
+  border-radius:12px;
+  padding:10px;
+  min-height:88px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+}
+.fund-metric-detail-stat-label {
+  font-size:10px;
+  color:var(--text-sub);
+}
+.fund-metric-detail-stat-value {
+  margin-top:6px;
+  font-size:15px;
+  font-weight:700;
+  color:#1F497D;
+  line-height:1.4;
+  word-break:break-word;
+}
+.fund-metric-detail-stat-value.compact { font-size:13px; letter-spacing:0.2px; }
+.fund-metric-detail-stat-badge { margin-top:8px; display:flex; align-items:flex-start; }
+.fund-metric-detail-list {
+  display:grid;
+  gap:8px;
+}
+.fund-metric-detail-item {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.08);
+  border-radius:12px;
+  padding:10px;
+}
+.fund-metric-detail-item-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+}
+.fund-metric-detail-copy {
+  margin-top:6px;
+  font-size:12px;
+  color:var(--text-main);
+  line-height:1.6;
+}
+.fund-metric-detail-section-note {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.08);
+  border-radius:12px;
+  padding:10px 12px;
+  margin-bottom:10px;
+}
+.fund-metric-detail-section-title {
+  font-size:12px;
+  font-weight:700;
+  color:var(--text-main);
+}
+.fund-metric-detail-section-copy {
+  margin-top:4px;
+  font-size:11px;
+  color:var(--text-sub);
+  line-height:1.6;
+}
+.fund-metric-detail-history-list { display:grid; gap:8px; }
+.fund-metric-detail-history-row {
+  display:grid;
+  grid-template-columns:56px minmax(0, 1fr) auto;
+  align-items:center;
+  gap:8px;
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.08);
+  border-radius:999px;
+  padding:8px 10px;
+}
+.fund-metric-detail-history-date { font-size:11px; font-weight:700; color:var(--text-main); }
+.fund-metric-detail-history-text {
+  min-width:0;
+  font-size:11px;
+  color:var(--text-sub);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.fund-metric-status {
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  border-radius:999px;
+  padding:2px 7px;
+  font-size:9px;
+  font-weight:700;
+}
+.fund-metric-status.good {
+  color:#1F7A43;
+  background:rgba(46,204,113,0.12);
+}
+.fund-metric-status.attention {
+  color:#1F497D;
+  background:rgba(47,116,192,0.12);
+}
+.fund-metric-status.warning {
+  color:#B33A2F;
+  background:rgba(231,76,60,0.12);
+}
+.fund-metric-status.normal {
+  color:#5B6B7B;
+  background:rgba(91,107,123,0.10);
+}
+.fund-metric-chart-shell {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.08);
+  border-radius:12px;
+  padding:12px;
+}
+.fund-metric-chart-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  margin-bottom:8px;
+}
+.fund-metric-chart-title {
+  font-size:12px;
+  font-weight:700;
+  color:var(--text-main);
+}
+.fund-metric-chart-legend {
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  font-size:10px;
+  color:var(--text-sub);
+}
+.fund-metric-chart-legend span {
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+}
+.fund-metric-chart-legend i {
+  width:10px;
+  height:2px;
+  display:inline-block;
+  border-radius:999px;
+}
 .fund-macro-toolbar {
   display:flex;
   justify-content:space-between;
@@ -2622,6 +2826,13 @@ body,
   </div>
 </div>
 
+<div class="modal-overlay" id="fund-metric-detail-modal" onclick="if(event.target===this)closeFundMetricDetailModal()">
+  <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <div id="fund-metric-detail-modal-content"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="review-trigger-modal" onclick="if(event.target===this)closeReviewTriggerModal()">
   <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
     <div class="modal-handle"></div>
@@ -2763,6 +2974,7 @@ let currentWorkbenchDashboardLayout = '2x2';
 let currentWorkbenchDashboardSlots = [];
 let currentWorkbenchDashboardSourceVersion = '';
 let dashboardCellEditingIndex = -1;
+let currentFundMetricDetail = null;
 const REVIEW_PERIOD_CONFIG = {
   day: { label: '日复盘', shortLabel: '今日', prompt: '今天收盘后', marketFocus: '当天行情', aiLabel: '自选股 + 当日行情' },
   week: { label: '周复盘', shortLabel: '本周', prompt: '本周结束后', marketFocus: '阶段行情', aiLabel: '自选股 + 周度主线' },
@@ -4185,8 +4397,8 @@ function renderDashboardCards(config, options) {
       <span class="fund-macro-layout-tag">${escapeHtml(toolbarTag)}</span>
     </div>
     <div class="fund-macro-grid cols-${layout.charAt(0)}">
-      ${config.cards.map(card => `
-        <div class="fund-macro-card ${escapeHtml(card.status || 'normal')}">
+      ${config.cards.map((card, index) => `
+        <div class="fund-macro-card ${escapeHtml(card.status || 'normal')}" onclick="openFundMetricDetail(${index})">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
             <div class="fund-macro-name">${escapeHtml(card.name || '待补充指标')}</div>
             <span class="fund-macro-badge ${escapeHtml(card.status || 'normal')}">${escapeHtml(getFundStatusLabel(card.status || 'normal'))}</span>
@@ -4195,10 +4407,312 @@ function renderDashboardCards(config, options) {
           <div class="fund-macro-assessment">${escapeHtml(card.assessment || '当前格子尚未配置指标提示词。')}</div>
           <div class="fund-macro-alert">${escapeHtml(card.alert || '点击工作台中的对应格子即可继续补充。')}</div>
           <div class="fund-macro-hint">${escapeHtml(card.hint || '')}</div>
+          <div class="fund-macro-entry-hint">点击查看历史趋势</div>
         </div>
       `).join('')}
     </div>
   `;
+}
+
+function hashMetricSeed(input) {
+  const text = String(input || '');
+  let hash = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    hash = ((hash << 5) - hash) + text.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash) || 1;
+}
+
+function createSeededRandom(seedText) {
+  let seed = hashMetricSeed(seedText) % 2147483647;
+  if (seed <= 0) seed += 2147483646;
+  return function seededRandom() {
+    seed = seed * 16807 % 2147483647;
+    return (seed - 1) / 2147483646;
+  };
+}
+
+function formatMetricDate(date) {
+  const d = date instanceof Date ? date : new Date(date);
+  const month = `${d.getMonth() + 1}`.padStart(2, '0');
+  const day = `${d.getDate()}`.padStart(2, '0');
+  return `${month}-${day}`;
+}
+
+function buildFundMetricHistory(card, index) {
+  const name = String(card && card.name || `核心指标${index + 1}`);
+  const status = String(card && card.status || 'normal');
+  const random = createSeededRandom(`h5-fund-metric:${name}:${status}:${index}`);
+  let current = 32 + random() * 30;
+  const candles = [];
+  const startDate = new Date('2026-05-18T00:00:00');
+  for (let i = 0; i < 24; i += 1) {
+    const open = Number((current + (random() - 0.5) * 3.4).toFixed(2));
+    let delta = (random() - 0.5) * 6.2;
+    if (status === 'good') delta += random() * 0.9;
+    if (status === 'warning') delta -= random() * 0.9;
+    const close = Number(Math.max(8, open + delta).toFixed(2));
+    const high = Number((Math.max(open, close) + 0.4 + random() * 1.8).toFixed(2));
+    const low = Number((Math.max(5, Math.min(open, close) - 0.4 - random() * 1.8)).toFixed(2));
+    const currentDate = new Date(startDate.getTime());
+    currentDate.setDate(startDate.getDate() + i);
+    candles.push({
+      date: formatMetricDate(currentDate),
+      open,
+      high,
+      low,
+      close,
+    });
+    current = close;
+  }
+  const movingAverage = (windowSize) => candles.map((_, candleIndex) => {
+    if (candleIndex + 1 < windowSize) return null;
+    const slice = candles.slice(candleIndex - windowSize + 1, candleIndex + 1);
+    const sum = slice.reduce((total, item) => total + Number(item.close || 0), 0);
+    return Number((sum / windowSize).toFixed(2));
+  });
+  const ma5 = movingAverage(5);
+  const ma10 = movingAverage(10);
+  const ma20 = movingAverage(20);
+  const trend = [];
+  for (let i = 0; i < 8; i += 1) {
+    const candle = candles[Math.min(candles.length - 1, i * 3)];
+    if (!candle) continue;
+    let pointStatus = 'good';
+    if (status === 'warning' && i >= 6) pointStatus = 'warning';
+    else if (status === 'attention' && i >= 5) pointStatus = 'attention';
+    trend.push({
+      date: candle.date,
+      value: candle.close,
+      status: pointStatus,
+    });
+  }
+  const rankedIndexes = candles
+    .map((item, candleIndex) => ({
+      candleIndex,
+      score: Math.abs(Number(item.close || 0) - Number(item.open || 0)) + Number(item.high || 0) - Number(item.low || 0),
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, status === 'warning' ? 2 : 1);
+  const anomalies = rankedIndexes.map((entry) => ({
+    date: candles[entry.candleIndex].date,
+    value: candles[entry.candleIndex].close,
+    status: status === 'normal' ? 'attention' : status,
+    label: status === 'warning' ? '异常放大' : '波动抬升',
+    candleIndex: entry.candleIndex,
+  }));
+  return {
+    name,
+    status,
+    value: card && card.value ? card.value : '--',
+    category: '核心指标',
+    owner: '前台基本面面板',
+    trend,
+    kline: { candles, ma5, ma10, ma20, anomalies },
+    anomalies,
+  };
+}
+
+function getFundMetricStatusLabel(status) {
+  if (status === 'good') return '正常';
+  if (status === 'attention') return '关注';
+  if (status === 'warning') return '预警';
+  return '待跟踪';
+}
+
+function renderFundMetricStatus(status) {
+  return `<span class="fund-metric-status ${escapeHtml(status || 'normal')}">${escapeHtml(getFundMetricStatusLabel(status || 'normal'))}</span>`;
+}
+
+function buildFundMetricTrendSummary(series) {
+  const list = Array.isArray(series) ? series : [];
+  return list.map((item, index) => {
+    const value = Number(item && item.value || 0);
+    const previous = index > 0 ? Number(list[index - 1] && list[index - 1].value || value) : value;
+    const delta = Number((value - previous).toFixed(2));
+    return {
+      date: item.date || '--',
+      value: value.toFixed(2),
+      status: item.status || 'normal',
+      delta,
+      direction: delta > 0 ? '上行' : delta < 0 ? '下行' : '持平',
+    };
+  });
+}
+
+function buildFundMetricKlineSvg(payload) {
+  const candles = Array.isArray(payload && payload.candles) ? payload.candles : [];
+  if (!candles.length) {
+    return '<div class="fund-metric-chart-shell" style="text-align:center;font-size:12px;color:var(--text-sub)">暂无历史数据</div>';
+  }
+  const width = 320;
+  const height = 200;
+  const padding = { top: 14, right: 10, bottom: 24, left: 10 };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const values = candles.flatMap((item) => [Number(item.high || 0), Number(item.low || 0)]);
+  const maxValue = Math.max(...values);
+  const minValue = Math.min(...values);
+  const span = Math.max(maxValue - minValue, 1);
+  const scaleY = (value) => padding.top + ((maxValue - value) / span) * plotHeight;
+  const slotWidth = plotWidth / candles.length;
+  const candleWidth = Math.max(5, slotWidth * 0.52);
+  const buildLinePath = (points) => {
+    let started = false;
+    return points.map((value, index) => {
+      if (value === null || value === undefined) return '';
+      const x = padding.left + slotWidth * index + slotWidth / 2;
+      const y = scaleY(Number(value || 0));
+      const command = started ? 'L' : 'M';
+      started = true;
+      return `${command} ${x.toFixed(2)} ${y.toFixed(2)}`;
+    }).filter(Boolean).join(' ');
+  };
+  const ticks = [0, 0.5, 1].map((ratio) => {
+    const value = maxValue - span * ratio;
+    const y = padding.top + plotHeight * ratio;
+    return `
+      <line x1="${padding.left}" y1="${y.toFixed(2)}" x2="${width - padding.right}" y2="${y.toFixed(2)}" stroke="rgba(47,116,192,0.10)" stroke-width="1"></line>
+      <text x="${width - padding.right}" y="${(y - 4).toFixed(2)}" text-anchor="end" font-size="9" fill="#7B92AA">${value.toFixed(2)}</text>
+    `;
+  }).join('');
+  const candleNodes = candles.map((item, index) => {
+    const centerX = padding.left + slotWidth * index + slotWidth / 2;
+    const open = Number(item.open || 0);
+    const close = Number(item.close || 0);
+    const high = Number(item.high || 0);
+    const low = Number(item.low || 0);
+    const color = close >= open ? '#E74C3C' : '#2ECC71';
+    const bodyTop = scaleY(Math.max(open, close));
+    const bodyBottom = scaleY(Math.min(open, close));
+    const bodyHeight = Math.max(2, bodyBottom - bodyTop);
+    return `
+      <line x1="${centerX.toFixed(2)}" y1="${scaleY(high).toFixed(2)}" x2="${centerX.toFixed(2)}" y2="${scaleY(low).toFixed(2)}" stroke="${color}" stroke-width="1.2"></line>
+      <rect x="${(centerX - candleWidth / 2).toFixed(2)}" y="${bodyTop.toFixed(2)}" width="${candleWidth.toFixed(2)}" height="${bodyHeight.toFixed(2)}" rx="1.4" fill="${color}"></rect>
+    `;
+  }).join('');
+  const anomalyNodes = (Array.isArray(payload && payload.anomalies) ? payload.anomalies : []).map((item) => {
+    const candleIndex = Number(item.candleIndex || 0);
+    const candle = candles[candleIndex];
+    if (!candle) return '';
+    const centerX = padding.left + slotWidth * candleIndex + slotWidth / 2;
+    const markerY = scaleY(Number(candle.high || candle.close || 0)) - 12;
+    return `
+      <g>
+        <circle cx="${centerX.toFixed(2)}" cy="${markerY.toFixed(2)}" r="5" fill="rgba(220,53,69,0.12)" stroke="#DC3545" stroke-width="1.6"></circle>
+        <text x="${centerX.toFixed(2)}" y="${(markerY - 8).toFixed(2)}" text-anchor="middle" font-size="7" fill="#DC3545">${escapeHtml(item.label || '异动')}</text>
+      </g>
+    `;
+  }).join('');
+  const labels = [0, Math.floor((candles.length - 1) / 2), candles.length - 1].map((index) => {
+    const x = padding.left + slotWidth * index + slotWidth / 2;
+    return `<text x="${x.toFixed(2)}" y="${height - 6}" text-anchor="middle" font-size="9" fill="#7B92AA">${escapeHtml(candles[index].date || '')}</text>`;
+  }).join('');
+  return `
+    <div class="fund-metric-chart-shell">
+      <div class="fund-metric-chart-head">
+        <div class="fund-metric-chart-title">历史趋势</div>
+        <div class="fund-metric-chart-legend">
+          <span><i style="background:#F6C453"></i>MA5</span>
+          <span><i style="background:#5DADE2"></i>MA10</span>
+          <span><i style="background:#AF7AC5"></i>MA20</span>
+        </div>
+      </div>
+      <svg viewBox="0 0 ${width} ${height}" width="100%" role="img" aria-label="核心指标历史趋势图" style="display:block;width:100%;height:auto;aspect-ratio:${width} / ${height}">
+        ${ticks}
+        ${candleNodes}
+        <path d="${buildLinePath(payload.ma5 || [])}" fill="none" stroke="#F6C453" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="${buildLinePath(payload.ma10 || [])}" fill="none" stroke="#5DADE2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="${buildLinePath(payload.ma20 || [])}" fill="none" stroke="#AF7AC5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+        ${anomalyNodes}
+        ${labels}
+      </svg>
+    </div>
+  `;
+}
+
+function closeFundMetricDetailModal() {
+  const modal = document.getElementById('fund-metric-detail-modal');
+  if (modal) modal.classList.remove('show');
+  currentFundMetricDetail = null;
+}
+
+function openFundMetricDetail(index) {
+  const published = getPublishedFundDashboard();
+  const card = published && published.cards ? published.cards[index] : null;
+  const host = document.getElementById('fund-metric-detail-modal-content');
+  const modal = document.getElementById('fund-metric-detail-modal');
+  if (!card || !host || !modal) return;
+  const detail = buildFundMetricHistory(card, index);
+  currentFundMetricDetail = detail;
+  const trendSummary = buildFundMetricTrendSummary(detail.trend);
+  const currentValue = String(detail.value || '--');
+  const valueClass = /[A-Za-z]/.test(currentValue) || currentValue.length >= 9 ? 'fund-metric-detail-stat-value compact' : 'fund-metric-detail-stat-value';
+  host.innerHTML = `
+    <div class="fund-metric-detail-head">
+      <div>
+        <div class="fund-metric-detail-title">${escapeHtml(detail.name)}</div>
+        <div class="fund-metric-detail-subtitle">${escapeHtml(detail.category)} · ${escapeHtml(detail.owner)} · 仅展示历史数据与异动标注</div>
+      </div>
+      <button class="fund-metric-detail-close" type="button" onclick="closeFundMetricDetailModal()">×</button>
+    </div>
+    <div class="fund-metric-detail-grid">
+      <div class="fund-metric-detail-card">
+        <div class="fund-metric-detail-card-title">1. 趋势线图</div>
+        ${buildFundMetricKlineSvg(detail.kline)}
+      </div>
+      <div class="fund-metric-detail-card">
+        <div class="fund-metric-detail-card-title">2. 异动情况（异动点标注）</div>
+        <div class="fund-metric-detail-list">
+          ${(detail.anomalies || []).map((entry) => `
+            <div class="fund-metric-detail-item">
+              <div class="fund-metric-detail-item-head">
+                <strong style="color:var(--text-main)">${escapeHtml(entry.date)}</strong>
+                ${renderFundMetricStatus(entry.status)}
+              </div>
+              <div class="fund-metric-detail-copy">异动点：${escapeHtml(entry.label || '异动')}</div>
+              <div class="fund-metric-detail-copy">指标值：${escapeHtml(Number(entry.value || 0).toFixed ? Number(entry.value || 0).toFixed(2) : entry.value || '--')}</div>
+            </div>
+          `).join('') || '<div class="fund-metric-detail-item">当前没有异动点。</div>'}
+        </div>
+      </div>
+      <div class="fund-metric-detail-card">
+        <div class="fund-metric-detail-card-title">3. 数据口径</div>
+        <div class="fund-metric-detail-copy" style="margin-top:0">当前详情页只展示纯数据分析视图，不做结果原因分析。可见范围包括趋势线、趋势状态和异动点标注。</div>
+        <div class="fund-metric-detail-copy">当前值代表最新观测结果；历史趋势展示最近 8 个时间点的方向变化，用于快速判断节奏是否延续。</div>
+      </div>
+      <div class="fund-metric-detail-card">
+        <div class="fund-metric-detail-card-title">4. 趋势情况与历史趋势</div>
+        <div class="fund-metric-detail-summary">
+          <div class="fund-metric-detail-stat">
+            <div>
+              <div class="fund-metric-detail-stat-label">当前值</div>
+              <div class="${valueClass}">${escapeHtml(currentValue)}</div>
+            </div>
+          </div>
+          <div class="fund-metric-detail-stat">
+            <div class="fund-metric-detail-stat-label">当前状态</div>
+            <div class="fund-metric-detail-stat-badge">${renderFundMetricStatus(detail.status)}</div>
+          </div>
+        </div>
+        <div class="fund-metric-detail-section-note">
+          <div class="fund-metric-detail-section-title">历史趋势</div>
+          <div class="fund-metric-detail-section-copy">按时间顺序展示最近 ${trendSummary.length} 个观察点，压缩为细条便于快速扫读变化方向。</div>
+        </div>
+        <div class="fund-metric-detail-history-list">
+          ${trendSummary.map((entry) => `
+            <div class="fund-metric-detail-history-row">
+              <div class="fund-metric-detail-history-date">${escapeHtml(entry.date)}</div>
+              <div class="fund-metric-detail-history-text">指标值 ${escapeHtml(entry.value)} · ${escapeHtml(entry.direction)} · 变动 ${entry.delta > 0 ? '+' : ''}${entry.delta}</div>
+              ${renderFundMetricStatus(entry.status)}
+            </div>
+          `).join('') || '<div class="fund-metric-detail-item">暂无趋势记录。</div>'}
+        </div>
+      </div>
+    </div>
+  `;
+  modal.classList.add('show');
 }
 
 function getDashboardConfigVersion(config) {

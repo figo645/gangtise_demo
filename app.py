@@ -4,6 +4,9 @@ import sqlite3
 import copy
 import math
 import statistics
+from pathlib import Path
+from html import escape as html_escape
+from html.parser import HTMLParser
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for, g, abort
 import random
 from datetime import datetime, timedelta
@@ -23,6 +26,12 @@ H5_USER_SESSION_KEY = "current_h5_username"
 DB_PATH = os.environ.get("GANGTISE_DEMO_DB", os.path.join(os.path.dirname(__file__), "gangtise_demo.db"))
 SITE_CONFIG_KEY = "site_config"
 FORECAST_WORKFLOW_KEY = "forecast_workflow_graph"
+MARKET_DASHBOARD_REGISTRY_PATH = Path(
+    os.environ.get(
+        "MARKET_DASHBOARD_REGISTRY_PATH",
+        "/Users/xuchenfei/PycharmProjects/market_dashboard/data_sources.json",
+    )
+)
 
 DEFAULT_BRAND_CONFIG = {
     "name": "洞见智研",
@@ -51,7 +60,7 @@ DEFAULT_TENANTS = [
         "portal_headline": "把每天该看的复盘、重点个股和研究框架，集中在一个粉丝能直接进入的专属门户里。",
         "portal_description": "这个门户不是给大V自己看的，而是给粉丝看的。你可以先看最新复盘、重点样本和研究框架，再决定是否继续去 H5 做自选股跟踪、Hermes 对话和专属问答。",
         "dashboard_title": "老王租户经营 Dashboard",
-        "dashboard_description": "和 H5 核心指标面板同源，但在 Web 端用更完整的经营视角呈现。",
+        "dashboard_description": "和 H5 的智能指标定义同源，但在 Web 端用更完整的经营视角呈现。",
     },
     {
         "id": "tenant_lisa",
@@ -102,6 +111,58 @@ DEFAULT_USERS = [
     },
 ]
 
+ALLOWED_PORTAL_HTML_TAGS = {"p", "br", "strong", "b", "em", "i", "ul", "ol", "li", "h2", "h3", "blockquote", "a", "img", "table", "thead", "tbody", "tr", "th", "td"}
+
+
+class PortalHtmlSanitizer(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.parts = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag not in ALLOWED_PORTAL_HTML_TAGS:
+            return
+        if tag == "br":
+            self.parts.append("<br>")
+            return
+        attr_map = dict(attrs or [])
+        if tag == "a":
+            href = str(attr_map.get("href") or "").strip()
+            parsed = urlsplit(href)
+            is_allowed_href = href.startswith(("/", "#")) or parsed.scheme in {"http", "https", "mailto", "tel"}
+            if is_allowed_href:
+                safe_href = html_escape(href, quote=True)
+                suffix = ' target="_blank" rel="noopener noreferrer"' if parsed.scheme in {"http", "https"} else ""
+                self.parts.append(f'<a href="{safe_href}"{suffix}>')
+                return
+        if tag == "img":
+            src = str(attr_map.get("src") or "").strip()
+            alt = html_escape(str(attr_map.get("alt") or "").strip(), quote=True)
+            parsed = urlsplit(src)
+            is_allowed_src = src.startswith("data:image/") or parsed.scheme in {"http", "https"}
+            if is_allowed_src:
+                safe_src = html_escape(src, quote=True)
+                self.parts.append(f'<img src="{safe_src}" alt="{alt}">')
+                return
+        self.parts.append(f"<{tag}>")
+
+    def handle_endtag(self, tag):
+        if tag in ALLOWED_PORTAL_HTML_TAGS and tag != "br":
+            self.parts.append(f"</{tag}>")
+
+    def handle_data(self, data):
+        if data:
+            self.parts.append(html_escape(data))
+
+    def handle_entityref(self, name):
+        self.parts.append(f"&{name};")
+
+    def handle_charref(self, name):
+        self.parts.append(f"&#{name};")
+
+    def get_html(self):
+        return "".join(self.parts)
+
 DEFAULT_SITE_CONFIG = {
     "default_theme": "light",
     "default_accent": "blue",
@@ -118,8 +179,8 @@ DEFAULT_SITE_CONFIG = {
         "community": False,
         "hermes": False,
         "vip": False,
-        "dm": False,
-        "workbench": False,
+        "dm": True,
+        "workbench": True,
     },
 }
 
@@ -214,7 +275,234 @@ def normalize_tenant_config(source=None, index=0):
     tenant["id"] = tenant.get("id") or f"tenant_{tenant['slug']}"
     tenant["dashboard_title"] = tenant.get("dashboard_title") or f"{tenant['short_name']} Dashboard"
     tenant["dashboard_description"] = tenant.get("dashboard_description") or fallback["dashboard_description"]
+    if isinstance(raw.get("portal_cms"), dict):
+        tenant["portal_cms"] = copy.deepcopy(raw["portal_cms"])
     return tenant
+
+
+def sanitize_portal_html(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    parser = PortalHtmlSanitizer()
+    parser.feed(raw)
+    parser.close()
+    return parser.get_html().strip()
+
+
+def default_portal_workspace(tenant):
+    is_lisa = tenant["slug"] == "lisa"
+    workspace = {
+        "summary": "租户门户是给粉丝看的父客户端主页。大V在这里像维护 WordPress 一样编辑门户结构：上半部做品牌介绍和价值主张，中间固定展示 Dashboard，下半部维护可自定义文案区，最后放扫码与联系方式。",
+        "draft_status": "草稿待发布",
+        "published_status": "线上已发布",
+        "last_published_at": "2026-06-17 21:10",
+        "theme_name": is_lisa and "港股价值蓝" or "科技主线金",
+        "hero": {
+            "headline": tenant["portal_headline"],
+            "description": tenant["portal_description"],
+            "audience": is_lisa and "适合先看港股互联网、估值修复与价值框架的粉丝" or "适合先看科技成长、复盘主线和重点样本的粉丝",
+            "value_props": [
+                is_lisa and "先看价值框架，再决定是否继续互动" or "先看阶段主线，再决定是否继续深挖个股",
+                is_lisa and "把港股互联网研究口径整理成粉丝能直接理解的主页" or "把科技成长和重点样本整理成粉丝能直接消费的入口",
+                "把复盘、Dashboard 和联系方式收拢成一个父客户端首页",
+            ],
+        },
+        "cta": {
+            "primary_label": "进入 H5 继续查看",
+            "secondary_label": "先看最新复盘",
+        },
+        "modules": [
+            {"id": "hero", "title": "门户介绍区", "type": "固定首屏", "desc": "介绍大V是谁、价值主张是什么、门户适合谁看。", "enabled": True},
+            {"id": "dashboard", "title": "固定 Dashboard", "type": "固定中段", "desc": "中段固定展示关键经营 / 研究 Dashboard，不由大V随意删除。", "enabled": True},
+            {"id": "custom-copy", "title": "自定义文案区", "type": "父客户端编辑", "desc": "大V自己写长文案、特色介绍、服务说明和专题说明。", "enabled": True},
+            {"id": "contact", "title": "扫码与联系方式", "type": "固定尾部", "desc": "放企微、公众号、客服方式和线下联系入口。", "enabled": True},
+        ],
+        "presets": [
+            {"label": "品牌主视觉", "desc": "突出主理人定位、价值主张和门户导语。"},
+            {"label": "固定 Dashboard", "desc": "中段固定承接关键指标与研究总结，不与门户装修混用。"},
+            {"label": "父客户端文案", "desc": "大V自己写特色介绍、服务说明和长期表达。"},
+            {"label": "联系方式尾部", "desc": "把扫码、企微、公众号和联系信息固定收在页尾。"},
+        ],
+        "custom_sections": [
+            {
+                "title": is_lisa and "为什么这个门户值得先看" or "为什么先看这个门户而不是直接进功能页",
+                "body": is_lisa and "我希望先把港股互联网的核心主线、估值框架和代表性样本讲清楚，再带你去看更具体的互动和跟踪。" or "我希望先把科技成长、重点样本和阶段判断讲清楚，再带你去看更具体的复盘、互动和工具。",
+            },
+            {
+                "title": "我会持续更新什么",
+                "body": "这里会持续更新复盘摘要、重点样本、价值主张和阶段判断。粉丝进入门户后，不需要先理解复杂功能，就能先看懂我当前在研究什么。",
+            },
+        ],
+        "contact": {
+            "qr_title": is_lisa and "扫码加入 Lisa 研究社" or "扫码加入老王研究群",
+            "qr_hint": "扫码后可进入所属租户粉丝群或添加助手，后续接收复盘分享和互动提醒。",
+            "wechat": is_lisa and "Lisa-Research-Assistant" or "Laowang-Research-Assistant",
+            "phone": "400-889-6608",
+            "email": is_lisa and "lisa@gangtise.demo" or "laowang@gangtise.demo",
+        },
+    }
+    workspace["page_blocks"] = [
+        {"id": "hero_block", "type": "hero", "title": "门户介绍", "html": "", "enabled": True},
+        {"id": "dashboard_block", "type": "dashboard", "title": "固定 Dashboard", "html": "", "enabled": True},
+        {
+            "id": "copy_block_1",
+            "type": "rich_text",
+            "title": workspace["custom_sections"][0]["title"],
+            "html": sanitize_portal_html(
+                f"<h3>{workspace['custom_sections'][0]['title']}</h3><p>{workspace['custom_sections'][0]['body']}</p>"
+            ),
+            "enabled": True,
+        },
+        {
+            "id": "copy_block_2",
+            "type": "rich_text",
+            "title": workspace["custom_sections"][1]["title"],
+            "html": sanitize_portal_html(
+                f"<h3>{workspace['custom_sections'][1]['title']}</h3><p>{workspace['custom_sections'][1]['body']}</p>"
+            ),
+            "enabled": True,
+        },
+        {"id": "contact_block", "type": "contact", "title": "联系方式", "html": "", "enabled": True},
+    ]
+    return workspace
+
+
+def resolve_tenant_portal_workspace(tenant, cms=None):
+    tenant = tenant or get_tenant_by_slug()
+    base = default_portal_workspace(tenant)
+    if isinstance(cms, dict):
+        merged = normalize_portal_cms_config(cms, tenant)
+        base.update({
+            "summary": merged.get("summary", base["summary"]),
+            "draft_status": merged.get("draft_status", base["draft_status"]),
+            "published_status": merged.get("published_status", base["published_status"]),
+            "last_published_at": merged.get("last_published_at", base["last_published_at"]),
+            "theme_name": merged.get("theme_name", base["theme_name"]),
+            "hero": merged.get("hero", base["hero"]),
+            "cta": merged.get("cta", base["cta"]),
+            "modules": merged.get("modules", base["modules"]),
+            "presets": merged.get("presets", base["presets"]),
+            "custom_sections": merged.get("custom_sections", base["custom_sections"]),
+            "contact": merged.get("contact", base["contact"]),
+            "page_blocks": merged.get("page_blocks", base["page_blocks"]),
+        })
+    return base
+
+
+def normalize_portal_cms_config(source, tenant):
+    defaults = default_portal_workspace(tenant)
+    raw = source if isinstance(source, dict) else {}
+    merged = _merge_site_config(copy.deepcopy(defaults), raw)
+    hero = merged.get("hero") if isinstance(merged.get("hero"), dict) else {}
+    cta = merged.get("cta") if isinstance(merged.get("cta"), dict) else {}
+    contact = merged.get("contact") if isinstance(merged.get("contact"), dict) else {}
+    custom_sections = merged.get("custom_sections") if isinstance(merged.get("custom_sections"), list) else []
+    merged["hero"] = {
+        "headline": str(hero.get("headline") or defaults["hero"]["headline"]).strip() or defaults["hero"]["headline"],
+        "description": str(hero.get("description") or defaults["hero"]["description"]).strip() or defaults["hero"]["description"],
+        "audience": str(hero.get("audience") or defaults["hero"]["audience"]).strip() or defaults["hero"]["audience"],
+        "value_props": [
+            str(item or "").strip()
+            for item in (hero.get("value_props") if isinstance(hero.get("value_props"), list) else defaults["hero"]["value_props"])
+        ][:3] or copy.deepcopy(defaults["hero"]["value_props"]),
+    }
+    while len(merged["hero"]["value_props"]) < 3:
+        merged["hero"]["value_props"].append(defaults["hero"]["value_props"][len(merged["hero"]["value_props"])])
+    merged["cta"] = {
+        "primary_label": str(cta.get("primary_label") or defaults["cta"]["primary_label"]).strip() or defaults["cta"]["primary_label"],
+        "secondary_label": str(cta.get("secondary_label") or defaults["cta"]["secondary_label"]).strip() or defaults["cta"]["secondary_label"],
+    }
+    normalized_sections = []
+    for index, item in enumerate(custom_sections[:4]):
+        if not isinstance(item, dict):
+            continue
+        fallback = defaults["custom_sections"][min(index, len(defaults["custom_sections"]) - 1)]
+        normalized_sections.append(
+            {
+                "title": str(item.get("title") or fallback["title"]).strip() or fallback["title"],
+                "body": str(item.get("body") or fallback["body"]).strip() or fallback["body"],
+            }
+        )
+    if not normalized_sections:
+        normalized_sections = copy.deepcopy(defaults["custom_sections"])
+    merged["custom_sections"] = normalized_sections
+    merged["contact"] = {
+        "qr_title": str(contact.get("qr_title") or defaults["contact"]["qr_title"]).strip() or defaults["contact"]["qr_title"],
+        "qr_hint": str(contact.get("qr_hint") or defaults["contact"]["qr_hint"]).strip() or defaults["contact"]["qr_hint"],
+        "wechat": str(contact.get("wechat") or defaults["contact"]["wechat"]).strip() or defaults["contact"]["wechat"],
+        "phone": str(contact.get("phone") or defaults["contact"]["phone"]).strip() or defaults["contact"]["phone"],
+        "email": str(contact.get("email") or defaults["contact"]["email"]).strip() or defaults["contact"]["email"],
+    }
+    blocks = raw.get("page_blocks") if isinstance(raw.get("page_blocks"), list) else []
+    normalized_blocks = []
+    allowed_types = {"hero", "dashboard", "rich_text", "contact"}
+    for index, block in enumerate(blocks[:8]):
+        if not isinstance(block, dict):
+            continue
+        block_type = str(block.get("type") or "").strip()
+        if block_type not in allowed_types:
+            continue
+        normalized_blocks.append(
+            {
+                "id": str(block.get("id") or f"block_{index + 1}").strip() or f"block_{index + 1}",
+                "type": block_type,
+                "title": str(block.get("title") or "").strip(),
+                "html": sanitize_portal_html(block.get("html") if block_type == "rich_text" else ""),
+                "enabled": block.get("enabled") is not False,
+            }
+        )
+    if not normalized_blocks:
+        normalized_blocks = [
+            {"id": "hero_block", "type": "hero", "title": "门户介绍", "html": "", "enabled": True},
+            {"id": "dashboard_block", "type": "dashboard", "title": "固定 Dashboard", "html": "", "enabled": True},
+            {
+                "id": "copy_block_1",
+                "type": "rich_text",
+                "title": merged["custom_sections"][0]["title"],
+                "html": sanitize_portal_html(
+                    f"<h3>{html_escape(merged['custom_sections'][0]['title'])}</h3><p>{html_escape(merged['custom_sections'][0]['body'])}</p>"
+                ),
+                "enabled": True,
+            },
+            {
+                "id": "copy_block_2",
+                "type": "rich_text",
+                "title": merged["custom_sections"][1]["title"],
+                "html": sanitize_portal_html(
+                    f"<h3>{html_escape(merged['custom_sections'][1]['title'])}</h3><p>{html_escape(merged['custom_sections'][1]['body'])}</p>"
+                ),
+                "enabled": True,
+            },
+            {"id": "contact_block", "type": "contact", "title": "联系方式", "html": "", "enabled": True},
+        ]
+    merged["page_blocks"] = normalized_blocks
+    merged["draft_status"] = str(merged.get("draft_status") or defaults["draft_status"]).strip() or defaults["draft_status"]
+    merged["published_status"] = str(merged.get("published_status") or defaults["published_status"]).strip() or defaults["published_status"]
+    merged["last_published_at"] = str(merged.get("last_published_at") or defaults["last_published_at"]).strip() or defaults["last_published_at"]
+    merged["theme_name"] = str(merged.get("theme_name") or defaults["theme_name"]).strip() or defaults["theme_name"]
+    merged["summary"] = str(merged.get("summary") or defaults["summary"]).strip() or defaults["summary"]
+    merged["modules"] = copy.deepcopy(defaults["modules"])
+    merged["presets"] = copy.deepcopy(defaults["presets"])
+    return merged
+
+
+def update_tenant_portal_cms(tenant_slug, portal_cms):
+    site_config = get_site_config()
+    tenants = get_tenant_configs(site_config)
+    updated = False
+    for index, tenant in enumerate(tenants):
+        if tenant.get("slug") != tenant_slug:
+            continue
+        tenants[index] = dict(tenant)
+        tenants[index]["portal_cms"] = normalize_portal_cms_config(portal_cms, tenant)
+        updated = True
+        break
+    if not updated:
+        return None
+    next_config = dict(site_config)
+    next_config["tenants"] = tenants
+    return save_site_config(next_config)
 
 
 def normalize_tenant_configs(source=None):
@@ -486,6 +774,9 @@ def build_tenant_dashboard_payload(tenant=None):
 def build_tenant_portal_payload(tenant=None):
     tenant = tenant or get_tenant_by_slug()
     workbench = gen_kol_workbench(tenant)
+    portal_workspace = copy.deepcopy(workbench.get("portal_workspace") or {})
+    dashboard_metrics = copy.deepcopy(workbench.get("dashboard_metrics") or {})
+    fund_dashboard = copy.deepcopy(workbench.get("fund_dashboard") or {})
     watchlist_items = copy.deepcopy(workbench["watchlist_hub"]["items"])
     reviews = copy.deepcopy(workbench["published_reviews"])
     knowledge_items = copy.deepcopy(workbench["knowledge_hub"]["items"])
@@ -616,6 +907,9 @@ def build_tenant_portal_payload(tenant=None):
     return {
         "tenant": tenant,
         "brand": get_platform_brand(),
+        "portal_workspace": portal_workspace,
+        "dashboard_metrics": dashboard_metrics,
+        "fund_dashboard": fund_dashboard,
         "hero_stats": [
             {"label": "代表性方向", "value": tenant["focus"]},
             {"label": "当前开放权益", "value": tenant["rights"]},
@@ -661,9 +955,9 @@ def build_tenant_portal_payload(tenant=None):
         "service_cards": service_cards,
         "knowledge_spotlight": knowledge_items[:2],
         "cta": {
-            "primary_label": "进入 H5 继续查看",
+            "primary_label": portal_workspace.get("cta", {}).get("primary_label") or "进入 H5 继续查看",
             "primary_href": f"/h5?tenant={tenant['slug']}",
-            "secondary_label": "直接看最新复盘",
+            "secondary_label": portal_workspace.get("cta", {}).get("secondary_label") or "直接看最新复盘",
             "secondary_href": "#latest-review",
         },
     }
@@ -1238,6 +1532,348 @@ def gen_macro_indicators():
             "hint": "若信用扩张迟迟不起来，顺周期与高弹性资产要谨慎。",
         },
     ]
+
+
+def load_market_dashboard_indicators():
+    if not MARKET_DASHBOARD_REGISTRY_PATH.exists():
+        return []
+    try:
+        payload = json.loads(MARKET_DASHBOARD_REGISTRY_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        app.logger.exception("Failed to load market dashboard source registry")
+        return []
+    if not isinstance(payload, list):
+        return []
+    return payload
+
+
+def build_simulated_indicator_series(indicator_id, status="good", points=8):
+    rng = random.Random(f"indicator-series:{indicator_id}:{status}")
+    base = round(rng.uniform(82, 128), 2)
+    values = []
+    current = base
+    for _ in range(points):
+        jump = rng.uniform(-5.8, 5.8)
+        if status == "good":
+            jump += rng.uniform(0.2, 1.8)
+        elif status == "warning":
+            jump -= rng.uniform(0.2, 1.8)
+        current = round(max(18, current + jump), 2)
+        values.append(current)
+    start_date = datetime(2026, 5, 28)
+    series = []
+    for index, value in enumerate(values):
+        point_status = "good"
+        if status == "warning" and (index >= points - 2 or value <= min(values) + 1.2):
+            point_status = "warning"
+        elif status == "attention" and (index >= points - 2 or abs(value - values[max(0, index - 1)]) >= 3.5):
+            point_status = "attention"
+        series.append(
+            {
+                "date": (start_date + timedelta(days=index * 3)).strftime("%Y-%m-%d"),
+                "value": value,
+                "status": point_status,
+            }
+        )
+    anomalies = []
+    ranked_indexes = sorted(range(len(values)), key=lambda idx: abs(values[idx] - (values[idx - 1] if idx > 0 else values[idx])), reverse=True)
+    anomaly_indexes = ranked_indexes[:1] if ranked_indexes else [0]
+    if status == "warning" and len(ranked_indexes) >= 2:
+        anomaly_indexes = ranked_indexes[:2]
+    for idx in anomaly_indexes:
+        point = series[idx]
+        anomalies.append(
+            {
+                "date": point["date"],
+                "value": point["value"],
+                "status": point["status"],
+                "label": "异常放大" if point["status"] == "warning" else "波动抬升",
+            }
+        )
+    return series, anomalies
+
+
+def build_simulated_indicator_kline(indicator_id, status="good", points=24):
+    rng = random.Random(f"indicator-kline:{indicator_id}:{status}")
+    current = round(rng.uniform(28, 68), 2)
+    start_date = datetime(2026, 5, 18)
+    candles = []
+    for _ in range(points):
+        open_price = round(current + rng.uniform(-1.6, 1.6), 2)
+        close_delta = rng.uniform(-2.8, 2.8)
+        if status == "good":
+            close_delta += rng.uniform(0.1, 0.7)
+        elif status == "warning":
+            close_delta -= rng.uniform(0.1, 0.7)
+        close_price = round(max(8, open_price + close_delta), 2)
+        wick_high = rng.uniform(0.35, 1.6)
+        wick_low = rng.uniform(0.35, 1.6)
+        high_price = round(max(open_price, close_price) + wick_high, 2)
+        low_price = round(max(5, min(open_price, close_price) - wick_low), 2)
+        candles.append(
+            {
+                "date": (start_date + timedelta(days=len(candles))).strftime("%Y-%m-%d"),
+                "open": open_price,
+                "high": high_price,
+                "low": low_price,
+                "close": close_price,
+            }
+        )
+        current = close_price
+
+    def moving_average(window):
+        line = []
+        for index, candle in enumerate(candles):
+            if index + 1 < window:
+                continue
+            subset = candles[index - window + 1:index + 1]
+            avg = round(sum(item["close"] for item in subset) / window, 2)
+            line.append({"date": candle["date"], "value": avg})
+        return line
+
+    ranked_indexes = sorted(
+        range(len(candles)),
+        key=lambda idx: abs(candles[idx]["close"] - candles[idx]["open"]) + (candles[idx]["high"] - candles[idx]["low"]),
+        reverse=True,
+    )
+    anomaly_indexes = ranked_indexes[:1] if ranked_indexes else [0]
+    if status == "warning" and len(ranked_indexes) >= 2:
+        anomaly_indexes = ranked_indexes[:2]
+    anomalies = [
+        {
+            "date": candles[idx]["date"],
+            "value": candles[idx]["close"],
+            "status": status,
+            "label": "波动抬升" if status != "warning" else "异常放大",
+        }
+        for idx in anomaly_indexes
+    ]
+    return {
+        "candles": candles,
+        "ma5": moving_average(5),
+        "ma10": moving_average(10),
+        "ma20": moving_average(20),
+        "anomalies": anomalies,
+    }
+
+
+def build_data_lake_indicator_items():
+    items = []
+    for raw in load_market_dashboard_indicators():
+        indicator_name = str(raw.get("indicator", "")).strip()
+        if not indicator_name:
+            continue
+        enabled = bool(raw.get("enabled", True))
+        source_status = str(raw.get("status", "")).strip().lower()
+        test_status = str(raw.get("last_test_status", "")).strip()
+        updated_at = str(raw.get("updated_at", "")).strip()
+        tested_at = str(raw.get("last_tested_at", "")).strip()
+        if not enabled:
+            status = "warning"
+        elif "200" in test_status or source_status == "configured":
+            status = "good"
+        elif test_status:
+            status = "attention"
+        else:
+            status = "attention"
+        current_value = test_status or ("已接入" if enabled else "未启用")
+        if not enabled:
+            assessment = "该数据湖指标当前被关闭，不会进入平台指标展示与异动监测。"
+            alert = "需确认是否重新启用该指标"
+        else:
+            assessment = str(raw.get("notes", "")).strip() or "该指标来自 market_dashboard 数据湖，可用于平台与工作台统一分析。"
+            alert = "已纳入数据湖指标监测" if status == "good" else "需关注数据源刷新与连通状态"
+        simulated_series, simulated_anomalies = build_simulated_indicator_series(raw.get("id") or indicator_name, status=status)
+        simulated_kline = build_simulated_indicator_kline(raw.get("id") or indicator_name, status=status)
+        history = []
+        if updated_at:
+            history.append(
+                {
+                    "date": updated_at[:10],
+                    "value": current_value,
+                    "status": status,
+                    "event": "数据湖源配置已同步到指标专区",
+                }
+            )
+        if tested_at:
+            history.append(
+                {
+                    "date": tested_at[:10],
+                    "value": test_status or current_value,
+                    "status": "good" if "200" in test_status else "attention",
+                    "event": str(raw.get("last_test_detail", "")).strip()[:120] or "最近一次连通性测试已完成",
+                }
+            )
+        items.append(
+            {
+                "id": f"lake_{raw.get('id') or indicator_name}",
+                "name": indicator_name,
+                "category": str(raw.get("category", "")).strip() or "数据湖指标",
+                "owner": "market_dashboard 数据湖",
+                "value": current_value,
+                "assessment": assessment,
+                "status": status,
+                "alert": alert,
+                "enabled": enabled,
+                "last_updated": updated_at or tested_at or "未记录",
+                "watchers": ["market_dashboard", "Admin 指标专区", "大V 工作台"],
+                "history": history or [
+                    {
+                        "date": datetime.now().strftime("%Y-%m-%d"),
+                        "value": current_value,
+                        "status": status,
+                        "event": "已从数据湖源注册表导入",
+                    }
+                ],
+                "simulated_series": simulated_series,
+                "simulated_anomalies": simulated_anomalies,
+                "simulated_kline": simulated_kline,
+                "source_type": "lake",
+                "source_type_label": "数据湖指标",
+                "provider": str(raw.get("provider", "")).strip() or "数据湖",
+            }
+        )
+    return items
+
+
+def build_indicator_hub(tenant=None, admin_view=False):
+    tenant = tenant or get_tenant_by_slug()
+    is_lisa = tenant["slug"] == "lisa"
+    smart_items = [
+        {
+            "id": "fed_rate_path",
+            "name": "美联储路径",
+            "category": "宏观流动性",
+            "owner": "平台宏观组" if admin_view else tenant["advisor"],
+            "value": "偏鸽",
+            "assessment": "若降息节奏继续兑现，成长和港股风险偏好会继续改善。",
+            "status": "good",
+            "alert": "当前无需报警",
+            "enabled": True,
+            "last_updated": "2026-06-18 09:20",
+            "watchers": ["H5 基本面首页", "Hermes", "复盘专区"],
+            "source_type": "smart",
+            "source_type_label": "智能指标",
+            "history": [
+                {"date": "2026-06-18", "value": "偏鸽", "status": "good", "event": "议息会议前瞻延续宽松预期"},
+                {"date": "2026-06-11", "value": "中性偏鸽", "status": "attention", "event": "非农偏强压低快速降息预期"},
+                {"date": "2026-06-04", "value": "偏鹰", "status": "warning", "event": "通胀反复导致市场重新定价"},
+            ],
+        },
+        {
+            "id": "southbound_flow",
+            "name": is_lisa and "南向资金连续性" or "南向 / 北向资金",
+            "category": "增量资金",
+            "owner": tenant["advisor"],
+            "value": is_lisa and "连续净流入" or "+28亿 / +41亿",
+            "assessment": is_lisa and "港股互联网继续获得资金确认，但尚未扩散到更宽板块。" or "流入延续但未到强共振，说明市场广度仍一般。",
+            "status": "attention",
+            "alert": "关注是否连续 3 日放量",
+            "enabled": True,
+            "last_updated": "2026-06-18 10:05",
+            "watchers": ["H5 智能指标区", "租户门户", "复盘报告"],
+            "source_type": "smart",
+            "source_type_label": "智能指标",
+            "history": [
+                {"date": "2026-06-18", "value": is_lisa and "连续净流入" or "+28亿 / +41亿", "status": "attention", "event": "增量资金延续但未形成全面共振"},
+                {"date": "2026-06-12", "value": is_lisa and "小幅净流入" or "+12亿 / +18亿", "status": "good", "event": "风险偏好回暖"},
+                {"date": "2026-06-05", "value": is_lisa and "转为净流出" or "-6亿 / +3亿", "status": "warning", "event": "资金分歧扩大"},
+            ],
+        },
+        {
+            "id": "ai_order_signal",
+            "name": is_lisa and "财报兑现节奏" or "AI 订单兑现",
+            "category": is_lisa and "财报验证" or "科技主线",
+            "owner": tenant["advisor"],
+            "value": is_lisa and "等待披露" or "继续验证",
+            "assessment": is_lisa and "回购与利润率之外，财报兑现是下阶段最关键验证项。" or "主题强度仍在，但必须继续验证订单、交付和利润率。",
+            "status": "warning" if not is_lisa else "attention",
+            "alert": is_lisa and "下个财报窗口是关键异动时点" or "若连续两周只见叙事不见订单，需要提高警惕",
+            "enabled": True,
+            "last_updated": "2026-06-18 11:10",
+            "watchers": ["大V工作台", "复盘生产台", "自选股详情"],
+            "source_type": "smart",
+            "source_type_label": "智能指标",
+            "history": [
+                {"date": "2026-06-18", "value": is_lisa and "等待披露" or "继续验证", "status": "warning" if not is_lisa else "attention", "event": "核心公司订单节奏仍未完全兑现"},
+                {"date": "2026-06-10", "value": is_lisa and "市场观望" or "边际改善", "status": "attention", "event": "市场先交易预期后等验证"},
+                {"date": "2026-06-03", "value": is_lisa and "预热阶段" or "高景气", "status": "good", "event": "情绪和成交同步抬升"},
+            ],
+        },
+        {
+            "id": "credit_pulse",
+            "name": is_lisa and "平台政策" or "国内信用脉冲",
+            "category": is_lisa and "政策环境" or "宏观信用",
+            "owner": "平台研究运营",
+            "value": is_lisa and "边际友好" or "温和修复",
+            "assessment": is_lisa and "平台经济环境边际友好，但仍需继续观察政策和行业执行。" or "恢复力度偏弱，顺周期与高弹性资产仍需保守。",
+            "status": "warning",
+            "alert": is_lisa and "继续观察政策节奏与执行口径" or "需继续观察社融和中长期贷款",
+            "enabled": True,
+            "last_updated": "2026-06-18 08:45",
+            "watchers": ["Admin 指标专区", "工作台数据分析", "H5 基本面首页"],
+            "source_type": "smart",
+            "source_type_label": "智能指标",
+            "history": [
+                {"date": "2026-06-18", "value": is_lisa and "边际友好" or "温和修复", "status": "warning", "event": "关键数据未形成强修复共振"},
+                {"date": "2026-06-09", "value": is_lisa and "政策平稳" or "弱修复", "status": "attention", "event": "市场在等更强信用数据"},
+                {"date": "2026-06-02", "value": is_lisa and "扰动反复" or "承压", "status": "warning", "event": "高弹性板块风险偏好下降"},
+            ],
+        },
+    ]
+    for item in smart_items:
+        series, anomaly_points = build_simulated_indicator_series(item["id"], status=item["status"])
+        item["simulated_series"] = series
+        item["simulated_anomalies"] = anomaly_points
+        item["simulated_kline"] = build_simulated_indicator_kline(item["id"], status=item["status"])
+    lake_items = build_data_lake_indicator_items()
+    all_items = smart_items + lake_items
+    anomalies = [
+        {
+            "id": "anomaly_credit",
+            "level": "高",
+            "title": f"{smart_items[3]['name']} 触发重点异动",
+            "summary": f"{smart_items[3]['alert']}。该指标已连续两期落在 {smart_items[3]['status']} 区间，需要优先同步到复盘和前台核心指标。",
+            "time": "2026-06-18 08:50",
+            "related_indicator_id": smart_items[3]["id"],
+        },
+        {
+            "id": "anomaly_flow",
+            "level": "中",
+            "title": f"{smart_items[1]['name']} 进入连续监测",
+            "summary": f"{smart_items[1]['assessment']}，建议关注后续 3 个交易日是否形成资金共振。",
+            "time": "2026-06-18 10:08",
+            "related_indicator_id": smart_items[1]["id"],
+        },
+    ]
+    for lake_item in lake_items:
+        if lake_item["status"] == "warning":
+            anomalies.append(
+                {
+                    "id": f"anomaly_{lake_item['id']}",
+                    "level": "中",
+                    "title": f"{lake_item['name']} 数据湖状态异常",
+                    "summary": lake_item["alert"],
+                    "time": lake_item["last_updated"],
+                    "related_indicator_id": lake_item["id"],
+                }
+            )
+    summary = {
+        "total": len(all_items),
+        "smart_total": len(smart_items),
+        "lake_total": len(lake_items),
+        "enabled": sum(1 for item in all_items if item["enabled"]),
+        "warnings": sum(1 for item in all_items if item["status"] == "warning"),
+        "attention": sum(1 for item in all_items if item["status"] == "attention"),
+        "anomalies": len(anomalies),
+    }
+    return {
+        "summary": summary,
+        "items": all_items,
+        "smart_items": smart_items,
+        "lake_items": lake_items,
+        "anomalies": anomalies,
+    }
 
 
 def gen_feed_boards(market_items):
@@ -1934,11 +2570,13 @@ def admin():
     kols = gen_kol_data()
     segments = gen_user_segments()
     access_stats = get_access_summary()
+    indicator_hub = build_indicator_hub(admin_view=True)
     return render_template(
         "admin.html",
         kols=kols,
         segments=segments,
         access_stats=access_stats,
+        indicator_hub=indicator_hub,
         brand=get_platform_brand(),
         tenants=get_tenant_configs(),
         default_tenant=get_tenant_by_slug(get_default_tenant_slug()),
@@ -2534,7 +3172,7 @@ def gen_kol_workbench(tenant=None):
             {
                 "label": "租户门户",
                 "url": f"/tenant/{tenant['slug']}",
-                "desc": f"查看 {tenant['advisor']} 对外的专属租户门户，包括品牌介绍与 Web 化 Dashboard。"
+                "desc": f"查看 {tenant['advisor']} 对外的专属租户门户，重点承接品牌表达、已发布内容和粉丝入口。"
             },
             {
                 "label": "纯 Admin 后台",
@@ -2568,6 +3206,7 @@ def gen_kol_workbench(tenant=None):
             {"id":2,"content":is_lisa and "价值提醒：财报前估值修复较快，注意不要只盯单一平台" or "宏观提醒：美联储纪要偏鸽，但还要等国内资金面确认","time":"2026-05-19 22:30","reach":108,"open_rate":82},
             {"id":3,"content":"周末复盘：本周操作回顾与下周观察重点","time":"2026-05-18 18:00","reach":76,"open_rate":55},
         ],
+        "portal_workspace": resolve_tenant_portal_workspace(tenant, tenant.get("portal_cms")),
         "message_center": {
             "summary": "消息板块不仅包含粉丝给大V的提问，也包含大V回复粉丝后的追问，以及复盘发布后需要第一时间触达的粉丝提醒。",
             "items": [
@@ -2914,10 +3553,11 @@ def gen_kol_workbench(tenant=None):
             ],
         },
         "fund_dashboard": {
-            "summary": f"{tenant['advisor']} 租户的核心指标面板默认展示总结态；没有指标时显示加号，点击单格后输入独立提示词，保存即生成该格指标摘要。",
+            "summary": f"{tenant['advisor']} 的智能 Dashboard 默认展示总结态；没有指标时显示加号，点击单格后输入独立提示词，保存即生成该格指标摘要。",
             "layout": "2x2",
             "cells": fund_cells,
         },
+        "indicator_hub": build_indicator_hub(tenant=tenant, admin_view=False),
         "published_reviews": [
             {
                 "title": "收盘复盘：AI 算力强主线未变，港股互联网继续看回购与财报兑现",
@@ -3145,6 +3785,23 @@ def api_ai_forecast():
 def api_kol_workbench():
     tenant = get_tenant_by_slug(request.args.get("tenant"))
     return jsonify(gen_kol_workbench(tenant))
+
+
+@app.route("/api/kol/portal-cms", methods=["POST"])
+def api_save_kol_portal_cms():
+    tenant = get_tenant_by_slug(request.args.get("tenant"))
+    if not tenant:
+        return jsonify({"ok": False, "error": "tenant_not_found"}), 404
+    body = request.get_json(silent=True) or {}
+    saved = update_tenant_portal_cms(tenant["slug"], body.get("portal_cms", {}))
+    if not saved:
+        return jsonify({"ok": False, "error": "tenant_not_found"}), 404
+    latest_tenant = get_tenant_by_slug(tenant["slug"], saved)
+    return jsonify({
+        "ok": True,
+        "portal_workspace": gen_kol_workbench(latest_tenant).get("portal_workspace"),
+        "portal": build_tenant_portal_payload(latest_tenant),
+    })
 
 
 @app.route("/api/tenant/<tenant_slug>/dashboard")

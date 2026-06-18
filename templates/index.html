@@ -1021,19 +1021,19 @@ body.theme-dark .tech-layer {
   <div class="hero-kpi-row">
     <div class="hero-kpi-item">
       <div class="hero-kpi-num">4</div>
-      <div class="hero-kpi-label">首批工具场景</div>
+      <div class="hero-kpi-label">系统主入口</div>
     </div>
     <div class="hero-kpi-item">
       <div class="hero-kpi-num">2</div>
-      <div class="hero-kpi-label">核心交互方式</div>
+      <div class="hero-kpi-label">前台层级</div>
     </div>
     <div class="hero-kpi-item">
       <div class="hero-kpi-num">3</div>
       <div class="hero-kpi-label">角色体系</div>
     </div>
     <div class="hero-kpi-item">
-      <div class="hero-kpi-num">12</div>
-      <div class="hero-kpi-label">租户样例线索</div>
+      <div class="hero-kpi-num">1:1</div>
+      <div class="hero-kpi-label">大V对应租户</div>
     </div>
   </div>
 
@@ -1048,8 +1048,8 @@ body.theme-dark .tech-layer {
         <span class="hero-split-entry-icon">{{ default_tenant.logo_mark }}</span>
         <span class="hero-split-entry-tag">TENANT PORTAL</span>
       </div>
-      <div class="hero-split-entry-title">{{ default_tenant.name }} 门户</div>
-      <div class="hero-split-entry-desc">面向 {{ default_tenant.advisor }} 粉丝的专属门户，先展示最新复盘、重点样本、研究框架和后续互动入口。</div>
+      <div class="hero-split-entry-title">{{ default_tenant.name }} 门户 CMS</div>
+      <div class="hero-split-entry-desc">这是一个给大V自定义的拖拽式租户门户。可以把指标卡、复盘内容、研究框架、CTA 和自写内容块按模块自由编排成自己的主页。</div>
       <div class="hero-split-entry-arrow">进入租户门户 →</div>
     </a>
     <a href="/kol-workbench?tenant={{ default_tenant.slug }}" class="hero-split-entry">
@@ -1058,7 +1058,7 @@ body.theme-dark .tech-layer {
         <span class="hero-split-entry-tag">KOL WORKBENCH</span>
       </div>
       <div class="hero-split-entry-title">大V 工作台 Web</div>
-      <div class="hero-split-entry-desc">给大V投顾单独使用的 web 工作台，处理粉丝消息、群发助手、协同收入和租户内研究经营动作。</div>
+      <div class="hero-split-entry-desc">给大V单独使用的工作台，负责粉丝消息、群发助手、复盘生产、知识库微调、Hermes 维护、智能 Dashboard 定义和门户 CMS 编排。</div>
       <div class="hero-split-entry-arrow">直接进入工作台 →</div>
     </a>
     <a href="/admin" class="hero-split-entry">
@@ -1084,36 +1084,38 @@ body.theme-dark .tech-layer {
     <div class="ix-section-label">Front / Back Summary</div>
     <div class="ix-section-title">前后台归案总结</div>
     <div class="ix-divider"></div>
-    <div class="ix-section-desc">首页现在直接说明前台、工作台和纯 Admin 后台怎么分工，确保演示时一眼能看懂产品结构，不再把角色和能力混在一起。</div>
+    <div class="ix-section-desc">首页现在直接说明“租户门户 CMS + H5 前台 + 大V工作台 + 平台 Admin”怎么分工，确保演示时一眼能看懂产品结构，不再把角色和能力混在一起。</div>
 
     <div class="summary-grid">
       <div class="summary-main-card">
-        <div class="summary-main-title">统一口径：前台负责消费研究，工作台负责生产研究，Admin 负责控开与治理</div>
-        <div class="summary-main-desc">H5 承接普通投资者的基本面分析、自选股、复盘与 Hermes 互动。大V 工作台 Web 承接粉丝管理、消息、群发、复盘生产、知识库微调、Skills 绑定、Hermes 工作台和经营 Dashboard。纯 Admin 后台只做平台级租户管理、能力控开、审计、结算、一致性巡检与分析配置。知识库加 Skills 是整个平台最独有的能力，让每个租户把自己的研究方法、历史资料和表达方式真正沉淀进智能体。</div>
+        <div class="summary-main-title">统一口径：门户负责对外编排，H5 负责互动工具，工作台负责生产经营，Admin 负责控开治理</div>
+        <div class="summary-main-desc">前台不再只有一个入口，而是分成两层。租户门户是大V自己装修的 CMS 首页，可以拖拽指标卡、复盘模块、研究框架、服务入口和自写内容；H5 承接普通投资者后续的基本面分析、自选股、复盘阅读与 Hermes 互动。大V 工作台 Web 承接粉丝管理、消息、群发、复盘生产、知识库微调、Hermes 维护、智能 Dashboard 定义和门户 CMS 编排。纯 Admin 后台只做平台级租户管理、能力控开、审计、结算、一致性巡检与分析配置。</div>
 
         <div class="summary-flow">
           <div class="summary-flow-item">
-            <div class="summary-flow-step">01 / H5 前台</div>
-            <div class="summary-flow-title">普通用户消费内容</div>
-            <div class="summary-flow-desc">查看大V复盘、进行基本面分析、维护自选股、和 Hermes 对话；对话会自动承接当前知识库与 Skills 上下文，但不暴露后台配置。</div>
+            <div class="summary-flow-step">01 / 租户门户 CMS</div>
+            <div class="summary-flow-title">大V定义对外首页</div>
+            <div class="summary-flow-desc">大V像维护内容站一样拖拽模块、插入指标卡、编排复盘与研究框架，也可以直接写自定义内容，形成自己的对外主页。</div>
           </div>
           <div class="summary-flow-item">
-            <div class="summary-flow-step">02 / 大V 工作台 Web</div>
-            <div class="summary-flow-title">大V生产与经营内容</div>
-            <div class="summary-flow-desc">从粉丝消息、自选股筛选、复盘生成、知识微调、Skill 新增绑定到发布分发，都在左侧菜单式工作台内完成。</div>
+            <div class="summary-flow-step">02 / H5 前台</div>
+            <div class="summary-flow-title">普通用户继续使用工具</div>
+            <div class="summary-flow-desc">用户先从租户门户理解内容，再进入 H5 做基本面分析、自选股跟踪、复盘阅读和 Hermes 对话；对话自动承接当前租户上下文。</div>
           </div>
           <div class="summary-flow-item">
-            <div class="summary-flow-step">03 / 纯 Admin 后台</div>
-            <div class="summary-flow-title">平台统一治理</div>
-            <div class="summary-flow-desc">只负责租户、权限、开关、审计、收入结算和一致性，不替代大V自己的日常工作流。</div>
+            <div class="summary-flow-step">03 / 工作台 + Admin</div>
+            <div class="summary-flow-title">生产经营与平台治理分层</div>
+            <div class="summary-flow-desc">工作台负责大V日常生产与经营动作；Admin 只负责租户、权限、开关、审计、收入结算和一致性，不替代大V工作流。</div>
           </div>
         </div>
 
         <div class="summary-badges">
+          <span class="summary-badge">租户门户 = 拖拽式 CMS</span>
+          <span class="summary-badge">支持指标卡 + 自写内容</span>
           <span class="summary-badge">Hermes 双版本演示</span>
           <span class="summary-badge">知识库内容支持微调</span>
           <span class="summary-badge">Skills 可新增并绑定知识库</span>
-          <span class="summary-badge">核心指标支持单格提示词生成</span>
+          <span class="summary-badge">智能 Dashboard 独立定义</span>
           <span class="summary-badge">前后台能力一一映射</span>
         </div>
 
@@ -1127,12 +1129,12 @@ body.theme-dark .tech-layer {
 
       <div class="summary-side-stack">
         <div class="summary-side-card">
-          <div class="summary-side-title">工作台 Web 新职责</div>
-          <div class="summary-side-desc">以左侧菜单方式整合工作台概览、粉丝管理、粉丝消息、群发助手、经营 Dashboard、复盘生产台、知识库微调、Skills 维护、Hermes 工作台、自选股详情、核心指标面板和已发布复盘。</div>
+          <div class="summary-side-title">租户门户 CMS 新职责</div>
+          <div class="summary-side-desc">门户不再是固定展示页，而是大V可以拖拽模块、配置指标卡、写自定义内容、编排 CTA 和发布顺序的粉丝首页。</div>
         </div>
         <div class="summary-side-card">
-          <div class="summary-side-title">纯 Admin 后台新职责</div>
-          <div class="summary-side-desc">聚焦平台管理和一致性巡检，保证首页、H5、大V 工作台 Web、Admin 三端表达一致，并通过 feature flag 管理能力开放节奏。</div>
+          <div class="summary-side-title">工作台与 Admin 的边界</div>
+          <div class="summary-side-desc">工作台负责门户编排、复盘生产、知识维护和智能 Dashboard 定义；Admin 聚焦平台管理和一致性巡检，通过 feature flag 管理能力开放节奏。</div>
         </div>
       </div>
     </div>
@@ -1140,24 +1142,24 @@ body.theme-dark .tech-layer {
     <div class="summary-role-grid">
       <div class="summary-role-card">
         <div class="summary-role-top">
+          <div class="summary-role-icon">{{ default_tenant.logo_mark }}</div>
+          <div class="summary-role-title">租户门户 CMS</div>
+        </div>
+        <div class="summary-role-desc">面向粉丝的第一层内容入口，但由大V自己定义。可拖拽指标卡、内容模块和服务入口，也支持直接写页面内容。</div>
+      </div>
+      <div class="summary-role-card">
+        <div class="summary-role-top">
           <div class="summary-role-icon">📱</div>
           <div class="summary-role-title">H5 用户端</div>
         </div>
-        <div class="summary-role-desc">浅色、低门槛、直接承接分析和阅读。普通用户看到的是研究框架、K线图表、复盘内容和 Hermes 对话结果。</div>
+        <div class="summary-role-desc">浅色、低门槛、直接承接分析和阅读。普通用户看到的是研究框架、K线图表、复盘内容、自选股和 Hermes 对话结果。</div>
       </div>
       <div class="summary-role-card">
         <div class="summary-role-top">
           <div class="summary-role-icon">👑</div>
-          <div class="summary-role-title">大V 工作台 Web</div>
+          <div class="summary-role-title">大V 工作台 + Admin</div>
         </div>
-        <div class="summary-role-desc">和 Admin 保持同一设计语言，但职责独立。左侧菜单，右侧内容，重点面向大V自己的粉丝经营和研究生产工作流。</div>
-      </div>
-      <div class="summary-role-card">
-        <div class="summary-role-top">
-          <div class="summary-role-icon">⚙️</div>
-          <div class="summary-role-title">纯 Admin 后台</div>
-        </div>
-        <div class="summary-role-desc">只处理平台级事情：租户治理、能力控开、审计、收入和一致性，不再承接大V的私域工作动作。</div>
+        <div class="summary-role-desc">工作台负责大V自己的生产与经营动作；Admin 只处理平台级事情：租户治理、能力控开、审计、收入和一致性。</div>
       </div>
     </div>
   </div>
@@ -1172,25 +1174,25 @@ body.theme-dark .tech-layer {
     <div class="ix-section-label">System Modules</div>
     <div class="ix-section-title">系统模块导航</div>
     <div class="ix-divider"></div>
-    <div class="ix-section-desc">现在拆成四个清晰入口，普通用户端、大V 工作台 Web、平台 Admin 后台和平台分析后台彼此分层，不再混用。</div>
+    <div class="ix-section-desc">现在拆成四个真实入口：租户门户 CMS、H5 用户端、大V 工作台 Web 和平台 Admin 后台。分析能力仍属于 Admin，不再单独包装成一个新产品入口。</div>
 
     <div class="nav-cards-grid">
+      <a href="/tenant/{{ default_tenant.slug }}" class="ix-nav-card">
+        <div class="ix-nav-card-icon">{{ default_tenant.logo_mark }}</div>
+        <div class="ix-nav-card-title">租户门户 CMS</div>
+        <div class="ix-nav-card-desc">每个大V对应一个租户门户。门户支持模块拖拽、指标卡编排、复盘内容露出、CTA 配置和自定义文案编辑。</div>
+        <div class="ix-nav-card-arrow">进入门户 →</div>
+      </a>
       <a href="/h5" class="ix-nav-card">
         <div class="ix-nav-card-icon">📱</div>
         <div class="ix-nav-card-title">H5 用户端</div>
-        <div class="ix-nav-card-desc">前台围绕基本面分析、自选股、每日复盘与研究互动展开，提供清晰、低风险、可理解的投研体验。</div>
+        <div class="ix-nav-card-desc">用户从门户进入后，继续在这里做基本面分析、自选股跟踪、复盘阅读和 Hermes 对话，形成完整的前台使用路径。</div>
         <div class="ix-nav-card-arrow">进入体验 →</div>
-      </a>
-      <a href="/tenant/{{ default_tenant.slug }}" class="ix-nav-card">
-        <div class="ix-nav-card-icon">{{ default_tenant.logo_mark }}</div>
-        <div class="ix-nav-card-title">租户门户</div>
-        <div class="ix-nav-card-desc">按大V租户单独配置门户名字、logo 和介绍，让每个主理人对外拥有独立品牌空间与 Web Dashboard。</div>
-        <div class="ix-nav-card-arrow">进入门户 →</div>
       </a>
       <a href="/kol-workbench?tenant={{ default_tenant.slug }}" class="ix-nav-card">
         <div class="ix-nav-card-icon">👑</div>
         <div class="ix-nav-card-title">大V 工作台 Web</div>
-        <div class="ix-nav-card-desc">独立给大V投顾使用的 web 版后台，承接粉丝消息、群发助手、协同收入和租户内研究经营动作。</div>
+        <div class="ix-nav-card-desc">独立给大V使用的后台，承接粉丝消息、群发助手、复盘生产、知识维护、租户门户 CMS 编排和智能 Dashboard 定义。</div>
         <div class="ix-nav-card-arrow">进入工作台 →</div>
       </a>
       <a href="/admin" class="ix-nav-card">
@@ -1198,12 +1200,6 @@ body.theme-dark .tech-layer {
         <div class="ix-nav-card-title">纯 Admin 后台</div>
         <div class="ix-nav-card-desc">只保留平台级控制台职责，包括功能控开、租户管理、结算、审计、渠道和全局合规策略，不再承接大V日常工作流。</div>
         <div class="ix-nav-card-arrow">进入 Admin →</div>
-      </a>
-      <a href="/admin?section=funnel" class="ix-nav-card">
-        <div class="ix-nav-card-icon">📊</div>
-        <div class="ix-nav-card-title">平台分析后台</div>
-        <div class="ix-nav-card-desc">重点看线索推进、价格反馈、合作效率、合规状态和漏斗变化。这里仍归属于 Admin，但单独保留分析入口。</div>
-        <div class="ix-nav-card-arrow">进入分析分组 →</div>
       </a>
     </div>
   </div>
@@ -1218,7 +1214,12 @@ body.theme-dark .tech-layer {
     <div class="ix-section-label">C-Side Core Capabilities</div>
     <div class="ix-section-title">当前对外承接的 C 端能力</div>
     <div class="ix-divider"></div>
-    <div class="ix-section-desc">当前对外能力聚焦三类高频、低风险、易理解的场景：基本面分析、自选股和每日复盘；底层独有能力则是知识库与 Skills，把租户自己的研究方法沉淀到系统里。</div>
+    <div class="ix-section-desc">当前对外承接分成两部分：租户门户 CMS 负责把指标卡、复盘、研究框架和自定义内容编排成主页；H5 负责后续的基本面分析、自选股、每日复盘和 Hermes 互动。</div>
+
+    <div style="margin-bottom:24px;background:rgba(47,116,192,0.05);border:1px solid rgba(47,116,192,0.16);border-radius:16px;padding:22px 24px">
+      <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:10px">租户门户 CMS 的定义</div>
+      <div style="font-size:13px;color:var(--gray-400);line-height:1.9">门户不是静态展示页。大V可以像搭内容站一样，把指标卡、复盘卡片、重点样本、研究框架、服务入口和自己写的长短内容块拖拽到首页，再按草稿、预览、发布的节奏对外生效。</div>
+    </div>
 
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:24px">
       <!-- 1) 基本面分析 -->
@@ -1548,11 +1549,12 @@ body.theme-dark .tech-layer {
           <div class="kol-col-icon">🎤</div>
           <div class="kol-col-title">大V投顾 / 投资顾问</div>
         </div>
+        <div class="kol-col-item">一个大V就是一个租户，拥有自己的门户 CMS、工作台和对外内容空间</div>
         <div class="kol-col-item">管理粉丝用户、私域答疑、群发与活动协同</div>
         <div class="kol-col-item">使用复盘、按需基本面、自选股、纪要速读和知识板块等研究工具</div>
+        <div class="kol-col-item">可拖拽指标卡和内容模块，自定义自己的租户门户首页</div>
         <div class="kol-col-item">用平台证据链增强内容可信度，不直接做喊单式表达</div>
-        <div class="kol-col-item">拥有部分 admin 能力，如粉丝管理、内容协同、结算查看</div>
-        <div class="kol-col-item">可查看粉丝 Hermes 个股记录、内容反馈、私域线索和租户运营概况</div>
+        <div class="kol-col-item">在工作台里维护智能 Dashboard 定义、知识库和粉丝经营动作</div>
       </div>
       <div class="kol-col-card" style="border-color:rgba(46,204,113,0.25)">
         <div class="kol-col-header">
@@ -1592,7 +1594,7 @@ body.theme-dark .tech-layer {
           <tr>
             <td><span class="tier-badge-pro">大V投顾</span></td>
             <td>管理粉丝客群、输出研究内容、协同转化</td>
-            <td style="color:var(--gold);font-weight:600">工作台 / 私信 / 群发 / 按需基本面 / 知识板块 / Hermes</td>
+            <td style="color:var(--gold);font-weight:600">门户 CMS / 工作台 / 私信 / 群发 / 知识板块 / Hermes / 智能 Dashboard</td>
             <td>部分 admin 能力</td>
             <td>CAC / LTV / 协同收入 / 定价带</td>
             <td>内容必须带证据链、置信度和风险提示</td>
@@ -1679,61 +1681,61 @@ body.theme-dark .tech-layer {
 ====================================================== -->
 <section class="ix-section ix-section-alt" id="fundraise">
   <div class="ix-inner">
-    <div class="ix-section-label">Fundraising Plan</div>
-    <div class="ix-section-title">本轮融资想解决什么</div>
+    <div class="ix-section-label">MVP Roadmap</div>
+    <div class="ix-section-title">MVP 路线与阶段规划</div>
     <div class="ix-divider"></div>
-    <div class="ix-section-desc">投资人不会因为“功能很多”而投钱，只会因为知道这轮钱投进去之后，6 到 12 个月能多大概率验证一组关键命题而投钱。</div>
+    <div class="ix-section-desc">当前路线不是一次性把所有能力都放开，而是先用一个月完成 MVP，先让粉丝和大V跑通消息互动、复盘分享、知识沉淀、租户门户和扫码导入，再逐步开放预测分析与收费能力。</div>
 
     <div style="display:grid;grid-template-columns:0.9fr 1.1fr;gap:24px">
       <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.14);border-radius:16px;padding:24px">
-        <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:14px">资金优先投向</div>
+        <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:14px">未来 1 个月先完成的 MVP</div>
         <div style="display:flex;flex-direction:column;gap:14px">
           <div>
-            <div style="font-size:13px;color:var(--white);font-weight:600">1. 数据接入与结构化处理</div>
-            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">把研报、纪要和内部标签体系真正沉淀成可检索、可引用、可追溯的研究底层。</div>
+            <div style="font-size:13px;color:var(--white);font-weight:600">1. 基本面 H5 + 自选股 + 复盘</div>
+            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">先把前台最基础的研究消费路径跑通，让粉丝能看、能跟、能读、能继续回来。</div>
           </div>
           <div>
-            <div style="font-size:13px;color:var(--white);font-weight:600">2. Hermes 输出质量打磨</div>
-            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">重点打磨 3 到 5 个高频模式，而不是继续堆更多模式。</div>
+            <div style="font-size:13px;color:var(--white);font-weight:600">2. 消息互动 + 复盘分享</div>
+            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">让粉丝和大V先能稳定互动，复盘内容可以被发布、分发和持续追问。</div>
           </div>
           <div>
-            <div style="font-size:13px;color:var(--white);font-weight:600">3. 种子用户与付费验证</div>
-            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">补齐留存、复购、升级和用户访谈，形成真实可复盘的数据样本。</div>
+            <div style="font-size:13px;color:var(--white);font-weight:600">3. 知识归档 + 大V门户 CMS</div>
+            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">先沉淀大V自己的知识资产，再通过可拖拽门户把内容、指标和服务入口编排成租户主页。</div>
           </div>
           <div>
-            <div style="font-size:13px;color:var(--white);font-weight:600">4. 合规与运营后台完善</div>
-            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">把审核、审计、渠道归因和风控表达从演示能力变成可运营能力。</div>
+            <div style="font-size:13px;color:var(--white);font-weight:600">4. 粉丝扫码导入</div>
+            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">先满足大V最现实的拉新与私域承接动作，让粉丝能被快速导入到所属租户体系里。</div>
           </div>
         </div>
       </div>
 
       <div style="background:rgba(200,169,110,0.04);border:1px solid rgba(200,169,110,0.16);border-radius:16px;padding:24px">
-        <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:14px">希望在 6-12 个月证明的 5 件事</div>
+        <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:14px">阶段二与后续开放顺序</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
           <div style="background:var(--navy-mid);border-radius:12px;padding:16px;border:1px solid rgba(200,169,110,0.08)">
             <div style="font-size:24px;color:var(--gold);font-weight:700;margin-bottom:4px">01</div>
-            <div style="font-size:13px;color:var(--white);font-weight:600;margin-bottom:6px">用户愿意持续付费</div>
-            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">不是一次性体验，而是连续复购或升级。</div>
+            <div style="font-size:13px;color:var(--white);font-weight:600;margin-bottom:6px">阶段二：预测分析</div>
+            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">预测分析能力放到约 1 个月以后，等 MVP 交互路径和基础内容能力先稳定下来。</div>
           </div>
           <div style="background:var(--navy-mid);border-radius:12px;padding:16px;border:1px solid rgba(200,169,110,0.08)">
             <div style="font-size:24px;color:var(--gold);font-weight:700;margin-bottom:4px">02</div>
-            <div style="font-size:13px;color:var(--white);font-weight:600;margin-bottom:6px">Hermes 足够可信</div>
-            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">输出稳定、可追溯、用户愿意反复调用。</div>
+            <div style="font-size:13px;color:var(--white);font-weight:600;margin-bottom:6px">逐步开放收费</div>
+            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">先跑通互动和内容，再按不同层级用户逐步开放订阅、会员和更多收费能力。</div>
           </div>
           <div style="background:var(--navy-mid);border-radius:12px;padding:16px;border:1px solid rgba(200,169,110,0.08)">
             <div style="font-size:24px;color:var(--gold);font-weight:700;margin-bottom:4px">03</div>
-            <div style="font-size:13px;color:var(--white);font-weight:600;margin-bottom:6px">增长链路可以复制</div>
-            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">私域、内容合作和转介绍不是偶然有效。</div>
+            <div style="font-size:13px;color:var(--white);font-weight:600;margin-bottom:6px">先强互动，后强模型</div>
+            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">当前优先级是粉丝和大V之间的内容与消息闭环，而不是先堆更重的预测模型。</div>
           </div>
           <div style="background:var(--navy-mid);border-radius:12px;padding:16px;border:1px solid rgba(200,169,110,0.08)">
             <div style="font-size:24px;color:var(--gold);font-weight:700;margin-bottom:4px">04</div>
-            <div style="font-size:13px;color:var(--white);font-weight:600;margin-bottom:6px">大V投顾协同优于纯投流</div>
-            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">至少能在部分圈层形成更低 CAC，并提高私域转化质量。</div>
+            <div style="font-size:13px;color:var(--white);font-weight:600;margin-bottom:6px">先分层，再收费</div>
+            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">先把粉丝用户、大V和平台侧边界清楚，再决定哪些能力面向哪个层级收费。</div>
           </div>
           <div style="background:var(--navy-mid);border-radius:12px;padding:16px;border:1px solid rgba(200,169,110,0.08);grid-column:1 / span 2">
             <div style="font-size:24px;color:var(--gold);font-weight:700;margin-bottom:4px">05</div>
-            <div style="font-size:13px;color:var(--white);font-weight:600;margin-bottom:6px">机构试点与多租户样本能拉高收入上限</div>
-            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">只要少量高质量机构和大V投顾租户样本成立，项目的估值逻辑就会比单纯内容订阅更有上限。</div>
+            <div style="font-size:13px;color:var(--white);font-weight:600;margin-bottom:6px">MVP 完成标准</div>
+            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">粉丝能被导入、能和大V消息互动、能接收复盘分享、能通过门户和 H5 消费内容；大V能沉淀知识、维护门户并持续经营自己的租户。</div>
           </div>
         </div>
       </div>
@@ -1750,19 +1752,25 @@ body.theme-dark .tech-layer {
     <div class="ix-section-label">Product Features</div>
     <div class="ix-section-title">功能开放矩阵</div>
     <div class="ix-divider"></div>
-    <div class="ix-section-desc">当前代码状态已经收敛为“默认开放、后台可开、后续规划”三层能力边界，首页与 PRD 统一按这个口径表达。</div>
+    <div class="ix-section-desc">当前按“MVP 先交付、一个月后进入第二阶段、收费能力逐步开放”的节奏组织。首页与后台都统一按这个口径表达。</div>
 
     <div class="feature-table-wrap">
       <table class="feature-table">
         <thead>
           <tr>
             <th style="text-align:left">能力项</th>
-            <th>当前默认开放</th>
-            <th class="highlight-col">Admin 可控开放</th>
-            <th>后续规划</th>
+            <th>当前 MVP</th>
+            <th class="highlight-col">Admin 控制节奏</th>
+            <th>阶段二 / 后续</th>
           </tr>
         </thead>
         <tbody>
+          <tr>
+            <td>租户门户 CMS</td>
+            <td><span class="feat-check">✓</span> 支持门户首页编排</td>
+            <td class="highlight-col"><span class="feat-check">✓</span> Admin 管理租户边界，工作台负责配置</td>
+            <td>补充更多拖拽模板、组件和发布能力</td>
+          </tr>
           <tr>
             <td>基本面分析</td>
             <td><span class="feat-check">✓</span> 核心主入口</td>
@@ -1782,22 +1790,34 @@ body.theme-dark .tech-layer {
             <td>加入个人复盘沉淀和导出</td>
           </tr>
           <tr>
-            <td>主题模式与主题色</td>
-            <td><span class="feat-check">✓</span> 浅色默认 + 黑色保留</td>
-            <td class="highlight-col"><span class="feat-check">✓</span> Admin 可设默认主题</td>
-            <td>继续补充更多主题色</td>
+            <td>消息互动 / 私信</td>
+            <td><span class="feat-check">✓</span> 粉丝与大V互动闭环</td>
+            <td class="highlight-col"><span class="feat-check">✓</span> Admin 统一控开</td>
+            <td>后续补充更细的分层触达与消息策略</td>
           </tr>
           <tr>
-            <td>社区 / Hermes / 消息 / 会员 / 工作台</td>
-            <td><span class="feat-cross">✗</span> 默认关闭</td>
-            <td class="highlight-col"><span class="feat-check">✓</span> 通过 feature flag 按阶段开放</td>
-            <td>逐步验证后再对外放量</td>
+            <td>知识归档</td>
+            <td><span class="feat-check">✓</span> 支持知识沉淀</td>
+            <td class="highlight-col"><span class="feat-check">✓</span> Admin 控制能力边界</td>
+            <td>继续增强知识结构化与复用</td>
           </tr>
           <tr>
-            <td>访问统计与运营设置</td>
-            <td><span class="feat-cross">✗</span> 用户端不感知</td>
-            <td class="highlight-col"><span class="feat-check">✓</span> Admin 中可查看和配置</td>
-            <td>后续接入更多运营指标</td>
+            <td>大V工作台 Web</td>
+            <td><span class="feat-check">✓</span> 支持门户、复盘、消息和粉丝经营</td>
+            <td class="highlight-col"><span class="feat-check">✓</span> Admin 可统一控开</td>
+            <td>继续增强经营分析与门户装修能力</td>
+          </tr>
+          <tr>
+            <td>预测分析</td>
+            <td><span class="feat-cross">✗</span> MVP 暂不开放</td>
+            <td class="highlight-col"><span class="feat-check">✓</span> 保持后台可配置</td>
+            <td>约 1 个月后进入第二阶段</td>
+          </tr>
+          <tr>
+            <td>会员 / 收费能力</td>
+            <td><span class="feat-cross">✗</span> MVP 暂不全面开放</td>
+            <td class="highlight-col"><span class="feat-check">✓</span> 按层级逐步开放</td>
+            <td>先从不同层级用户的收费策略开始验证</td>
           </tr>
         </tbody>
       </table>
@@ -2153,24 +2173,26 @@ body.theme-dark .tech-layer {
       </div>
       <div>
         <div class="footer-col-title">产品</div>
+        <a href="/tenant/{{ default_tenant.slug }}" class="footer-col-link">租户门户 CMS</a>
         <a href="/h5" class="footer-col-link">H5 用户端</a>
-        <a href="/tenant/{{ default_tenant.slug }}" class="footer-col-link">默认租户门户</a>
         <a href="/kol-workbench?tenant={{ default_tenant.slug }}" class="footer-col-link">大V 工作台 Web</a>
         <a href="/admin" class="footer-col-link">纯 Admin 后台</a>
-        <a href="/admin?section=funnel" class="footer-col-link">平台分析后台</a>
         <a href="/prd" class="footer-col-link">产品设计文档</a>
       </div>
       <div>
         <div class="footer-col-title">核心功能</div>
+        <a href="/tenant/{{ default_tenant.slug }}" class="footer-col-link">门户拖拽编排</a>
+        <a href="/tenant/{{ default_tenant.slug }}" class="footer-col-link">指标卡与自定义内容</a>
         <a href="/h5" class="footer-col-link">基本面分析</a>
         <a href="/h5" class="footer-col-link">自选股</a>
         <a href="/h5" class="footer-col-link">每日复盘</a>
-        <a href="/h5" class="footer-col-link">我的</a>
+        <a href="/h5" class="footer-col-link">Hermes 对话</a>
       </div>
       <div>
         <div class="footer-col-title">后台控制</div>
         <a href="/admin" class="footer-col-link">平台主题模式</a>
         <a href="/admin" class="footer-col-link">平台功能控开</a>
+        <a href="/admin?section=kols" class="footer-col-link">租户管理</a>
         <a href="/kol-workbench?tenant={{ default_tenant.slug }}" class="footer-col-link">大V 工作流入口</a>
         <a href="/admin" class="footer-col-link">访问统计</a>
       </div>

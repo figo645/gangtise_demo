@@ -313,6 +313,489 @@ body { background: var(--surface-2); color: var(--text-main); }
   color:var(--text-sub);
 }
 .kw-compact-row strong { color:var(--text-main); }
+.kw-portal-shell {
+  display:grid;
+  grid-template-columns:280px minmax(0,1fr) 300px;
+  gap:16px;
+}
+.kw-portal-column { display:grid; gap:16px; align-content:start; }
+.kw-portal-status-grid,
+.kw-portal-preset-grid,
+.kw-portal-preview-list,
+.kw-portal-module-list,
+.kw-portal-outline-list { display:grid; gap:10px; }
+.kw-portal-status-grid { grid-template-columns:1fr 1fr; }
+.kw-portal-status-card,
+.kw-portal-preview-card,
+.kw-portal-module-item,
+.kw-portal-preset-card,
+.kw-portal-note-card {
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  padding:14px;
+}
+.kw-portal-status-label,
+.kw-portal-preview-label,
+.kw-portal-note-label { font-size:11px; color:var(--text-sub); }
+.kw-portal-status-value {
+  margin-top:8px;
+  font-size:15px;
+  font-weight:700;
+  color:var(--text-main);
+}
+.kw-portal-status-sub,
+.kw-portal-preview-copy,
+.kw-portal-module-desc,
+.kw-portal-note-copy {
+  margin-top:6px;
+  font-size:11px;
+  line-height:1.7;
+  color:var(--text-sub);
+}
+.kw-portal-module-top,
+.kw-portal-preview-top {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+}
+.kw-portal-module-title,
+.kw-portal-preview-title,
+.kw-portal-note-title {
+  font-size:13px;
+  font-weight:700;
+  color:var(--text-main);
+}
+.kw-portal-module-meta {
+  margin-top:4px;
+  font-size:11px;
+  color:var(--text-sub);
+}
+.kw-portal-module-actions {
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  margin-top:10px;
+}
+.kw-portal-mini-btn {
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:999px;
+  background:#FFFFFF;
+  color:var(--text-sub);
+  padding:5px 9px;
+  font-size:11px;
+  cursor:pointer;
+}
+.kw-portal-mini-btn:hover {
+  color:var(--text-main);
+  border-color:rgba(47,116,192,0.22);
+}
+.kw-portal-preview-card.active,
+.kw-portal-module-item.active {
+  border-color:rgba(200,169,110,0.28);
+  box-shadow:0 10px 22px rgba(31,73,125,0.08);
+}
+.kw-portal-preview-route {
+  margin-top:10px;
+  font-size:11px;
+  color:#1F497D;
+}
+.kw-portal-preview-chip {
+  display:inline-flex;
+  align-items:center;
+  font-size:10px;
+  color:var(--gold);
+  background:rgba(200,169,110,0.10);
+  border:1px solid rgba(200,169,110,0.18);
+  border-radius:999px;
+  padding:4px 8px;
+  margin-top:10px;
+}
+.kw-portal-toolbar-split {
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+.kw-portal-outline-item {
+  display:grid;
+  gap:8px;
+  cursor:pointer;
+}
+.kw-portal-outline-item.active {
+  border-color:rgba(200,169,110,0.28);
+  box-shadow:0 10px 22px rgba(31,73,125,0.08);
+}
+.kw-portal-outline-title {
+  font-size:13px;
+  font-weight:700;
+  color:var(--text-main);
+}
+.kw-portal-outline-meta {
+  font-size:11px;
+  color:var(--text-sub);
+}
+.kw-portal-outline-actions {
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+}
+.kw-portal-stage-card,
+.kw-portal-inspector-card {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:16px;
+  box-shadow:0 10px 26px rgba(14,33,55,0.06);
+}
+.kw-portal-stage-card { overflow:hidden; }
+.kw-portal-stage-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  padding:16px 18px;
+  border-bottom:1px solid rgba(47,116,192,0.08);
+  background:linear-gradient(180deg,#FFFFFF 0%, #F8FBFF 100%);
+}
+.kw-portal-stage-title {
+  font-size:14px;
+  font-weight:700;
+  color:var(--text-main);
+}
+.kw-portal-stage-copy {
+  margin-top:6px;
+  font-size:12px;
+  line-height:1.7;
+  color:var(--text-sub);
+}
+.kw-portal-editor-toolbar {
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.kw-portal-editor-btn {
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:999px;
+  background:#FFFFFF;
+  color:var(--text-main);
+  padding:7px 10px;
+  font-size:11px;
+  cursor:pointer;
+}
+.kw-portal-editor-btn:hover {
+  border-color:rgba(47,116,192,0.24);
+  background:#F8FBFF;
+}
+.kw-portal-stage-body {
+  padding:18px;
+  background:
+    linear-gradient(90deg, rgba(47,116,192,0.05) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(rgba(47,116,192,0.05) 1px, transparent 1px) 0 0 / 24px 24px,
+    #F5F9FE;
+}
+.kw-portal-page {
+  max-width:900px;
+  margin:0 auto;
+  display:grid;
+  gap:18px;
+}
+.kw-portal-page-block {
+  position:relative;
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:22px;
+  box-shadow:0 16px 34px rgba(23,45,74,0.06);
+  padding:22px;
+}
+.kw-portal-page-block.active {
+  border-color:rgba(200,169,110,0.4);
+  box-shadow:0 18px 38px rgba(31,73,125,0.12);
+}
+.kw-portal-page-block.is-fixed {
+  background:linear-gradient(180deg,#FFFFFF 0%, #FBFDFF 100%);
+}
+.kw-portal-block-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+  margin-bottom:14px;
+}
+.kw-portal-block-title {
+  font-size:13px;
+  font-weight:700;
+  color:var(--text-main);
+}
+.kw-portal-block-type {
+  display:inline-flex;
+  align-items:center;
+  border-radius:999px;
+  padding:4px 8px;
+  font-size:10px;
+  color:#1F497D;
+  background:#EAF3FF;
+}
+.kw-portal-block-status {
+  font-size:11px;
+  color:var(--text-sub);
+}
+.kw-portal-hero-kicker {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  border-radius:999px;
+  background:#EAF3FF;
+  color:#1F497D;
+  padding:6px 12px;
+  font-size:11px;
+  font-weight:700;
+}
+.kw-portal-editable {
+  outline:none;
+  border-radius:12px;
+  transition:background .16s ease, box-shadow .16s ease;
+}
+.kw-portal-editable:hover,
+.kw-portal-editable:focus {
+  background:rgba(47,116,192,0.05);
+  box-shadow:inset 0 0 0 1px rgba(47,116,192,0.12);
+}
+.kw-portal-editable[contenteditable="true"]:empty::before {
+  content:attr(data-placeholder);
+  color:#97A6BA;
+}
+.kw-portal-hero-title {
+  margin-top:16px;
+  font-size:34px;
+  line-height:1.18;
+  font-weight:700;
+  color:#172132;
+  padding:6px 8px;
+}
+.kw-portal-hero-desc,
+.kw-portal-hero-audience {
+  margin-top:12px;
+  font-size:14px;
+  line-height:1.9;
+  color:var(--text-sub);
+  padding:8px 10px;
+}
+.kw-portal-hero-props {
+  display:grid;
+  gap:10px;
+  margin-top:16px;
+}
+.kw-portal-hero-prop {
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  background:#F8FBFF;
+  padding:12px 14px;
+  font-size:13px;
+  line-height:1.8;
+  color:var(--text-main);
+}
+.kw-portal-hero-cta-row {
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:18px;
+}
+.kw-portal-cta-chip {
+  min-width:140px;
+  border:1px solid rgba(200,169,110,0.18);
+  border-radius:999px;
+  background:rgba(200,169,110,0.10);
+  color:var(--gold);
+  padding:8px 12px;
+  font-size:12px;
+  font-weight:700;
+}
+.kw-portal-dashboard-kpis {
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0,1fr));
+  gap:12px;
+}
+.kw-portal-dashboard-kpi {
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:16px;
+  background:#F8FBFF;
+  padding:14px;
+}
+.kw-portal-dashboard-kpi strong,
+.kw-portal-dashboard-side strong {
+  display:block;
+  font-size:12px;
+  color:var(--text-main);
+}
+.kw-portal-dashboard-kpi span {
+  display:block;
+  margin-top:8px;
+  font-size:20px;
+  font-weight:700;
+  color:#1F497D;
+}
+.kw-portal-dashboard-shell {
+  display:grid;
+  grid-template-columns:1.15fr 0.85fr;
+  gap:14px;
+  margin-top:14px;
+}
+.kw-portal-dashboard-panel,
+.kw-portal-dashboard-side {
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:18px;
+  background:#F8FBFF;
+  padding:16px;
+}
+.kw-portal-dashboard-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:14px;
+}
+.kw-portal-dashboard-cell {
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  background:#FFFFFF;
+  padding:12px;
+}
+.kw-portal-dashboard-cell div {
+  margin-top:8px;
+  font-size:17px;
+  font-weight:700;
+  color:#2F74C0;
+}
+.kw-portal-dashboard-copy,
+.kw-portal-contact-tip {
+  margin-top:8px;
+  font-size:12px;
+  line-height:1.8;
+  color:var(--text-sub);
+}
+.kw-portal-rich-title {
+  font-size:22px;
+  font-weight:700;
+  color:#172132;
+  padding:6px 8px;
+}
+.kw-portal-rich-editor {
+  min-height:160px;
+  margin-top:10px;
+  padding:10px 12px;
+  font-size:14px;
+  line-height:1.9;
+  color:var(--text-main);
+}
+.kw-portal-rich-editor p { margin:0 0 12px; }
+.kw-portal-rich-editor h2,
+.kw-portal-rich-editor h3 { margin:0 0 12px; color:#172132; }
+.kw-portal-rich-editor ul,
+.kw-portal-rich-editor ol { margin:0 0 12px 20px; }
+.kw-portal-rich-editor img {
+  display:block;
+  max-width:100%;
+  height:auto;
+  margin:12px 0;
+  border-radius:14px;
+  border:1px solid rgba(47,116,192,0.10);
+}
+.kw-portal-rich-editor table {
+  width:100%;
+  border-collapse:collapse;
+  margin:12px 0;
+  font-size:13px;
+}
+.kw-portal-rich-editor th,
+.kw-portal-rich-editor td {
+  border:1px solid rgba(47,116,192,0.12);
+  padding:8px 10px;
+  text-align:left;
+}
+.kw-portal-rich-editor th {
+  background:#F8FBFF;
+  color:#172132;
+}
+.kw-portal-rich-editor blockquote {
+  margin:0 0 12px;
+  padding:12px 14px;
+  border-left:3px solid rgba(47,116,192,0.24);
+  background:#F8FBFF;
+  color:#425266;
+}
+.kw-portal-contact-editor-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:14px;
+}
+.kw-portal-contact-panel {
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:18px;
+  background:#F8FBFF;
+  padding:16px;
+}
+.kw-portal-contact-panel strong {
+  display:block;
+  font-size:14px;
+  color:#172132;
+}
+.kw-portal-contact-line {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  padding:10px 0;
+  border-bottom:1px solid rgba(47,116,192,0.08);
+  font-size:13px;
+}
+.kw-portal-contact-line:last-child { border-bottom:none; }
+.kw-portal-contact-label {
+  color:var(--text-sub);
+}
+.kw-portal-contact-value {
+  min-width:0;
+  text-align:right;
+  color:var(--text-main);
+  font-weight:700;
+  padding:4px 6px;
+}
+.kw-portal-inspector-card { padding:16px; }
+.kw-portal-inspector-grid { display:grid; gap:12px; }
+.kw-portal-inspector-label {
+  font-size:11px;
+  color:var(--text-sub);
+}
+.kw-portal-inspector-value {
+  margin-top:6px;
+  font-size:13px;
+  line-height:1.8;
+  color:var(--text-main);
+}
+.kw-portal-inspector-input,
+.kw-portal-inspector-textarea {
+  width:100%;
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:12px;
+  background:#FFFFFF;
+  color:var(--text-main);
+  padding:10px 12px;
+  font-size:13px;
+  font-family:inherit;
+}
+.kw-portal-inspector-textarea {
+  min-height:100px;
+  resize:vertical;
+}
+.kw-portal-empty-note {
+  padding:16px;
+  border:1px dashed rgba(47,116,192,0.18);
+  border-radius:14px;
+  background:#F8FBFF;
+  font-size:12px;
+  line-height:1.8;
+  color:var(--text-sub);
+}
 .kw-workflow-shell { display:grid; grid-template-columns:250px minmax(0,1fr) 320px; gap:20px; margin-top:16px; }
 .kw-workflow-catalog { display:grid; gap:10px; }
 .kw-workflow-catalog-item {
@@ -794,7 +1277,6 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
 }
 .kw-knowledge-detail-grid {
   display:grid;
-  grid-template-columns:1.1fr 0.9fr;
   gap:16px;
 }
 .kw-knowledge-detail-stack {
@@ -834,6 +1316,62 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
   font-size:12px;
   color:var(--text-main);
   line-height:1.7;
+}
+.kw-detail-summary {
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:12px;
+  margin-bottom:14px;
+}
+.kw-detail-stat {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.08);
+  border-radius:12px;
+  padding:12px;
+  min-height:92px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+}
+.kw-detail-stat-label { font-size:11px; color:var(--text-sub); }
+.kw-detail-stat-value {
+  margin-top:8px;
+  font-size:18px;
+  font-weight:700;
+  line-height:1.35;
+  color:var(--text-main);
+  word-break:break-word;
+}
+.kw-detail-stat-value.compact { font-size:14px; }
+.kw-detail-stat-badge { margin-top:8px; display:flex; align-items:flex-start; }
+.kw-detail-section-note {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.08);
+  border-radius:12px;
+  padding:10px 12px;
+  margin-bottom:10px;
+}
+.kw-detail-section-title { font-size:12px; font-weight:700; color:var(--text-main); }
+.kw-detail-section-copy { margin-top:4px; font-size:11px; color:var(--text-sub); line-height:1.6; }
+.kw-detail-history-list { display:grid; gap:8px; }
+.kw-detail-history-row {
+  display:grid;
+  grid-template-columns:78px minmax(0, 1fr) auto;
+  align-items:center;
+  gap:10px;
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.08);
+  border-radius:999px;
+  padding:8px 12px;
+}
+.kw-detail-history-date { font-size:11px; font-weight:700; color:var(--text-main); }
+.kw-detail-history-text {
+  min-width:0;
+  font-size:11px;
+  color:var(--text-sub);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
 .kw-knowledge-modal-input {
   width:100%;
@@ -916,10 +1454,12 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
   .kw-chart-grid,
   .kw-lifecycle-row,
   .kw-kpi-row,
+  .kw-portal-shell,
   .kw-workflow-shell,
   .kw-review-runtime-grid,
   .kw-knowledge-source-selector,
   .kw-knowledge-detail-grid { grid-template-columns:1fr; }
+  .kw-portal-status-grid { grid-template-columns:1fr; }
   .kw-review-modal-overlay { padding:12px; }
   .kw-review-modal-sheet { padding:18px; border-radius:18px; }
 }
@@ -953,6 +1493,9 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
       </div>
       <div class="admin-nav-group">
         <div class="admin-nav-group-title">研究生产</div>
+        <div class="admin-nav-item" data-section="portal" onclick="showWorkbenchSection('portal', this)">
+          <span class="admin-nav-icon">&#127968;</span> 租户门户
+        </div>
         <div class="admin-nav-item" data-section="biz-dashboard" onclick="showWorkbenchSection('biz-dashboard', this)">
           <span class="admin-nav-icon">&#128202;</span> 数据分析
         </div>
@@ -965,9 +1508,11 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         <div class="admin-nav-item" data-section="knowledge" onclick="showWorkbenchSection('knowledge', this)">
           <span class="admin-nav-icon">&#128214;</span> 知识库微调
         </div>
+        {% if site_config.feature_flags.hermes %}
         <div class="admin-nav-item" data-section="hermes" onclick="showWorkbenchSection('hermes', this)">
           <span class="admin-nav-icon">&#129438;</span> Hermes 工作台
         </div>
+        {% endif %}
       </div>
       <div class="admin-nav-group">
         <div class="admin-nav-group-title">个股与面板</div>
@@ -975,7 +1520,10 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <span class="admin-nav-icon">&#128200;</span> 自选股与详情
         </div>
         <div class="admin-nav-item" data-section="dashboard" onclick="showWorkbenchSection('dashboard', this)">
-          <span class="admin-nav-icon">&#9638;</span> 核心指标面板
+          <span class="admin-nav-icon">&#9638;</span> 智能 Dashboard
+        </div>
+        <div class="admin-nav-item" data-section="indicator-hub" onclick="showWorkbenchSection('indicator-hub', this)">
+          <span class="admin-nav-icon">&#128202;</span> 指标专区
         </div>
       </div>
       <div class="admin-nav-group">
@@ -1022,17 +1570,19 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
               <div class="kw-card-head">
                 <div>
                   <div class="kw-card-title">工作台定位</div>
-                  <div class="kw-card-desc">这里承接 H5 里已成型的大V动作，并统一成桌面 web 工作流：粉丝消息、复盘生产、Hermes 双版本、知识微调、自选股跟踪、核心指标面板和群发助手都在同一套后台里。</div>
+                  <div class="kw-card-desc">这里承接 H5 里已成型的大V动作，并统一成桌面 web 工作流：粉丝消息、租户门户自定义、复盘生产、Hermes 双版本、知识微调、自选股跟踪、智能 Dashboard 和群发助手都在同一套后台里。</div>
                 </div>
                 <span class="kw-tag">Web Workbench</span>
               </div>
               <div class="kw-chip-row">
                 <span class="kw-chip">粉丝消息</span>
+                <span class="kw-chip">门户自定义</span>
                 <span class="kw-chip">Hermes 双版本</span>
                 <span class="kw-chip">知识微调</span>
                 <span class="kw-chip">自选股/K线</span>
                 <span class="kw-chip">群发助手</span>
                 <span class="kw-chip">复盘生产</span>
+                <span class="kw-chip">智能 Dashboard</span>
               </div>
             </div>
             <div class="kw-card">
@@ -1574,6 +2124,99 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         </div>
       </div>
 
+      <div id="workbench-section-portal" style="display:none">
+        <div class="kw-card">
+          <div class="kw-card-head">
+            <div>
+              <div class="kw-card-title">租户门户</div>
+              <div class="kw-card-desc">{{ workbench.portal_workspace.summary }}</div>
+            </div>
+            <span class="kw-tag">Portal CMS</span>
+          </div>
+          <div class="kw-portal-shell">
+            <div class="kw-portal-column">
+              <div class="kw-portal-status-grid">
+                <div class="kw-portal-status-card">
+                  <div class="kw-portal-status-label">当前草稿</div>
+                  <div class="kw-portal-status-value" id="kw-portal-draft-status">{{ workbench.portal_workspace.draft_status }}</div>
+                  <div class="kw-portal-status-sub">先维护模块、文案和 CTA，确认后再发布，不直接影响线上门户。</div>
+                </div>
+                <div class="kw-portal-status-card">
+                  <div class="kw-portal-status-label">线上状态</div>
+                  <div class="kw-portal-status-value">{{ workbench.portal_workspace.published_status }}</div>
+                  <div class="kw-portal-status-sub">最近发布时间：{{ workbench.portal_workspace.last_published_at }}</div>
+                </div>
+              </div>
+              <div class="kw-portal-note-card">
+                <div class="kw-portal-note-label">当前主题</div>
+                <div class="kw-portal-note-title">{{ workbench.portal_workspace.theme_name }}</div>
+                <div class="kw-portal-note-copy">门户是父客户端首页，不是很多卡片堆出来的目录页。这里改成富客户端页面编辑器，编辑体验更接近 WordPress 页面装修。</div>
+              </div>
+              <div class="kw-portal-note-card">
+                <div class="kw-portal-note-label">页面结构</div>
+                <div id="kw-portal-module-list" class="kw-portal-outline-list"></div>
+              </div>
+              <div class="kw-portal-note-card">
+                <div class="kw-portal-note-label">推荐装修动作</div>
+                <div class="kw-portal-note-copy">先改首屏导语和价值主张，再补自定义文案块。Dashboard 仍是固定中段，底部联系方式是固定尾部。</div>
+                <div class="kw-watch-chip-row" style="margin-top:10px">
+                  {% for item in workbench.portal_workspace.presets %}
+                  <span class="kw-watch-chip">{{ item.label }}</span>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+
+            <div class="kw-portal-column">
+              <div class="kw-portal-stage-card">
+                <div class="kw-portal-stage-head">
+                  <div>
+                    <div class="kw-portal-stage-title">页面画布</div>
+                    <div class="kw-portal-stage-copy">直接在画布里编辑标题、导语、长文案和联系方式。固定 Dashboard 保留在中段，不参与自由拖拽。</div>
+                  </div>
+                  <div class="kw-portal-editor-toolbar">
+                    <button class="kw-portal-editor-btn" type="button" onclick="kwPortalExec('bold')">加粗</button>
+                    <button class="kw-portal-editor-btn" type="button" onclick="kwPortalExec('italic')">斜体</button>
+                    <button class="kw-portal-editor-btn" type="button" onclick="kwPortalExec('insertUnorderedList')">列表</button>
+                    <button class="kw-portal-editor-btn" type="button" onclick="kwPortalInsertTable()">表格</button>
+                    <button class="kw-portal-editor-btn" type="button" onclick="kwPortalInsertLink()">链接</button>
+                    <button class="kw-portal-editor-btn" type="button" onclick="kwPortalExec('formatBlock','<h3>')">小标题</button>
+                    <button class="kw-portal-editor-btn" type="button" onclick="kwPortalExec('formatBlock','<p>')">正文</button>
+                    <button class="kw-portal-editor-btn" type="button" onclick="kwPortalExec('removeFormat')">清除格式</button>
+                  </div>
+                </div>
+                <div class="kw-portal-stage-body">
+                  <div id="kw-portal-page-canvas" class="kw-portal-page"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="kw-portal-column">
+              <div class="kw-portal-inspector-card">
+                <div class="kw-portal-note-label">检查器</div>
+                <div id="kw-portal-inspector" class="kw-portal-inspector-grid"></div>
+              </div>
+              <div class="kw-portal-note-card">
+                <div class="kw-portal-note-label">粉丝端页面摘要</div>
+                <div id="kw-portal-preview-list" class="kw-portal-preview-list"></div>
+              </div>
+            </div>
+          </div>
+          <div class="kw-toolbar kw-portal-toolbar-split" style="margin-top:12px">
+            <div class="kw-watch-chip-row">
+              <span class="kw-watch-chip">草稿 / 预览 / 发布</span>
+              <span class="kw-watch-chip">介绍 + Dashboard + 文案 + 联系方式</span>
+              <span class="kw-watch-chip">门户与 Dashboard 分离</span>
+            </div>
+            <div class="kw-toolbar">
+              <button class="btn-outline" type="button" style="padding:9px 14px;font-size:12px" onclick="kwResetPortalDraft()">恢复当前线上版本</button>
+              <button class="btn-gold" type="button" style="padding:9px 14px;font-size:12px" onclick="kwPublishPortalDraft()">发布门户草稿</button>
+            </div>
+            <a href="/tenant/{{ active_tenant.slug }}" class="btn-outline" style="padding:9px 14px;font-size:12px;text-decoration:none">预览粉丝端门户</a>
+          </div>
+        </div>
+      </div>
+
       <div id="workbench-section-knowledge" style="display:none">
         <div class="kw-card">
           <div class="kw-card-head">
@@ -1610,6 +2253,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         </div>
       </div>
 
+      {% if site_config.feature_flags.hermes %}
       <div id="workbench-section-hermes" style="display:none">
         <div class="kw-card">
           <div class="kw-card-head">
@@ -1647,6 +2291,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           </div>
         </div>
       </div>
+      {% endif %}
 
       <div id="workbench-section-watchlist" style="display:none">
         <div class="kw-card">
@@ -1685,8 +2330,8 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         <div class="kw-card">
           <div class="kw-card-head">
             <div>
-              <div class="kw-card-title">基本面核心指标面板</div>
-              <div class="kw-card-desc">{{ workbench.fund_dashboard.summary }}</div>
+              <div class="kw-card-title">智能 Dashboard</div>
+              <div class="kw-card-desc">这里是智能化定义模式，不是门户装修。你用提示词、布局和指标逻辑去定义面板，系统再自动生成并发布到前台的基本面区域。</div>
             </div>
             <span class="kw-tag">{{ workbench.fund_dashboard.layout }}</span>
           </div>
@@ -1699,7 +2344,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
               {% else %}
               <div class="kw-empty-plus">+</div>
               {% endif %}
-              <div class="kw-cell-desc">默认总结态展示；点击编辑后按独立提示词重新生成。</div>
+              <div class="kw-cell-desc">每个格子是一个智能定义单元；点击编辑后按独立提示词重新生成，不是手工装修门户页面。</div>
               <div class="kw-prompt-row" style="margin-top:10px">
                 <span class="kw-prompt-chip">{{ cell.prompt }}</span>
               </div>
@@ -1707,8 +2352,141 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
             {% endfor %}
           </div>
           <div class="kw-toolbar" style="margin-top:12px">
-            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="showToast('将弹框输入单格提示词')">编辑单格提示词</button>
+            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="showToast('将弹框输入单格提示词')">编辑智能定义提示词</button>
           </div>
+        </div>
+      </div>
+
+      <div id="workbench-section-indicator-hub" style="display:none">
+        <div class="stats-grid" style="margin-bottom:20px">
+          <div class="stat-card">
+            <div class="stat-label">纳管指标</div>
+            <span class="stat-icon">&#9638;</span>
+            <div class="stat-value">{{ workbench.indicator_hub.summary.total }}</div>
+            <div class="stat-change up">智能 {{ workbench.indicator_hub.summary.smart_total }} · 数据湖 {{ workbench.indicator_hub.summary.lake_total }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">启用中</div>
+            <span class="stat-icon">&#10003;</span>
+            <div class="stat-value">{{ workbench.indicator_hub.summary.enabled }}</div>
+            <div class="stat-change up">平台统一控开</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">重点异动</div>
+            <span class="stat-icon">&#9888;</span>
+            <div class="stat-value">{{ workbench.indicator_hub.summary.anomalies }}</div>
+            <div class="stat-change" style="color:#C8A96E">需第一时间跟踪</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">预警 / 关注</div>
+            <span class="stat-icon">&#128202;</span>
+            <div class="stat-value">{{ workbench.indicator_hub.summary.warnings }} / {{ workbench.indicator_hub.summary.attention }}</div>
+            <div class="stat-change up">同步前台与工作台</div>
+          </div>
+        </div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <div class="table-header">
+            <div>
+              <div class="table-title">智能指标</div>
+              <div style="font-size:12px;color:#8899aa;margin-top:6px">这类指标来自大V输入与平台智能分析口径，可用于复盘、Hermes 和核心指标判断。大V后台可查看与分析，但不可关闭。</div>
+            </div>
+            <span class="tag tag-gold">大V输入</span>
+          </div>
+          <table>
+            <thead><tr><th>指标</th><th>分类</th><th>当前值</th><th>判断</th><th>状态</th><th>开关</th><th>最后更新</th><th>操作</th></tr></thead>
+            <tbody>
+              {% for item in workbench.indicator_hub["smart_items"] %}
+              <tr>
+                <td><span style="color:#F8F6F0;font-weight:600">{{ item.name }}</span><div style="font-size:11px;color:#8899aa;margin-top:4px">{{ item.owner }}</div></td>
+                <td>{{ item.category }}</td>
+                <td style="color:#C8A96E">{{ item.value }}</td>
+                <td style="max-width:260px;color:#8899aa">{{ item.assessment }}</td>
+                <td>
+                  {% if item.status == 'warning' %}
+                  <span class="tag tag-red">预警</span>
+                  {% elif item.status == 'attention' %}
+                  <span class="tag tag-gold">关注</span>
+                  {% else %}
+                  <span class="tag tag-green">正常</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <label class="toggle" style="opacity:0.72;cursor:not-allowed">
+                    <input type="checkbox" {% if item.enabled %}checked{% endif %} disabled>
+                    <span class="toggle-slider"></span>
+                  </label>
+                </td>
+                <td>{{ item.last_updated }}</td>
+                <td>
+                  <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="kwOpenIndicatorHistory('{{ item.id }}')">历史详情</button>
+                  <button class="btn-sm-blue" onclick="showToast('已加入异动监测队列')">监测异动</button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <div class="table-header">
+            <div>
+              <div class="table-title">数据湖指标</div>
+              <div style="font-size:12px;color:#8899aa;margin-top:6px">这类指标直接来自 `/Users/xuchenfei/PycharmProjects/market_dashboard/data_sources.json`，用于统一展示 market_dashboard 已接入的全部指标源。大V后台可查看与分析，但不可关闭。</div>
+            </div>
+            <span class="tag tag-blue">market_dashboard</span>
+          </div>
+          <table>
+            <thead><tr><th>指标</th><th>分类</th><th>当前状态</th><th>来源说明</th><th>状态</th><th>开关</th><th>最后更新</th><th>操作</th></tr></thead>
+            <tbody>
+              {% for item in workbench.indicator_hub["lake_items"] %}
+              <tr>
+                <td><span style="color:#F8F6F0;font-weight:600">{{ item.name }}</span><div style="font-size:11px;color:#8899aa;margin-top:4px">{{ item.owner }}</div></td>
+                <td>{{ item.category }}</td>
+                <td style="color:#C8A96E">{{ item.value }}</td>
+                <td style="max-width:320px;color:#8899aa">{{ item.assessment }}</td>
+                <td>
+                  {% if item.status == 'warning' %}
+                  <span class="tag tag-red">预警</span>
+                  {% elif item.status == 'attention' %}
+                  <span class="tag tag-gold">关注</span>
+                  {% else %}
+                  <span class="tag tag-green">正常</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <label class="toggle" style="opacity:0.72;cursor:not-allowed">
+                    <input type="checkbox" {% if item.enabled %}checked{% endif %} disabled>
+                    <span class="toggle-slider"></span>
+                  </label>
+                </td>
+                <td>{{ item.last_updated }}</td>
+                <td>
+                  <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="kwOpenIndicatorHistory('{{ item.id }}')">历史详情</button>
+                  <button class="btn-sm-blue" onclick="showToast('已加入数据湖异动监测队列')">监测异动</button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap">
+          <div class="table-header">
+            <div class="table-title">异动报告</div>
+            <span class="tag tag-gold">实时监测</span>
+          </div>
+          <table>
+            <thead><tr><th>级别</th><th>异动标题</th><th>摘要</th><th>时间</th><th>操作</th></tr></thead>
+            <tbody>
+              {% for item in workbench.indicator_hub["anomalies"] %}
+              <tr>
+                <td>{% if item.level == '高' %}<span class="tag tag-red">高</span>{% else %}<span class="tag tag-gold">中</span>{% endif %}</td>
+                <td><span style="color:#F8F6F0;font-weight:600">{{ item.title }}</span></td>
+                <td style="color:#8899aa">{{ item.summary }}</td>
+                <td>{{ item.time }}</td>
+                <td><button class="btn-outline" style="padding:3px 9px;font-size:11px" onclick="kwOpenIndicatorHistory('{{ item.related_indicator_id }}')">查看详情</button></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -1802,22 +2580,32 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
     <div id="kw-knowledge-modal-content"></div>
   </div>
 </div>
+<div class="kw-review-modal-overlay" id="kw-indicator-modal" onclick="if(event.target===this)kwCloseIndicatorModal()">
+  <div class="kw-review-modal-sheet">
+    <div id="kw-indicator-modal-content"></div>
+  </div>
+</div>
 <script>
 const workbenchSectionMeta = {
   overview: { title: '工作台概览', summary: '和 H5 保持同一套产品口径，但以桌面 web 工作流方式组织大V日常动作。' },
   fans: { title: '粉丝管理', summary: '查看大V自己的粉丝规模、来源、价值标签和分层状态。' },
   messages: { title: '粉丝消息', summary: '查看粉丝提问、大V回复链路和复盘发布后的触达提醒。' },
   broadcast: { title: '群发助手', summary: '只保留大V自己的分层触达、今日解读和复盘提醒动作。' },
+  portal: { title: '租户门户', summary: '租户门户是大V自定义的对外内容空间，按类似 WordPress 的装修和编排模式维护，不是智能生成区。' },
   'biz-dashboard': { title: '数据分析', summary: '整体承接 Admin 的数据分析结构，但口径只保留当前大V租户自己的转化漏斗、渠道质量、协同效能、营收趋势和用户分层。' },
   'forecast-model': { title: '预测模型', summary: '展示目标价是怎么计算出来的，并允许在后台调整自动收敛参数。' },
   review: { title: '复盘生产台', summary: '按周期、三类输入方式、智能文案规则和预览发布流程组织复盘生产。' },
   knowledge: { title: '知识库微调', summary: '历史知识内容可继续弹框微调，修改后重新同步 Hermes 和知识专区。' },
   hermes: { title: 'Hermes 工作台', summary: '统一管理工作区版和龙虾纯对话版的产品口径、skills 和知识绑定。' },
   watchlist: { title: '自选股与详情', summary: '承接 H5 的顶部输代码、自选股详情和 K 线 + MA5/10/20 展示逻辑。' },
-  dashboard: { title: '核心指标面板', summary: '单格提示词驱动的基本面面板，默认总结态展示，编辑后按格生成。' },
+  dashboard: { title: '智能 Dashboard', summary: 'Dashboard 是智能化定义模式：通过提示词、布局和指标规则生成面板，再发布到前台，不等同于门户装修。' },
+  'indicator-hub': { title: '指标专区', summary: '统一查看核心指标、异动报告和历史详情。大V只读分析，关闭动作由 Admin 控制。' },
   published: { title: '已发布复盘', summary: '这里确认发布后的复盘，就是普通投资者在前台实际看到的内容。' },
   consistency: { title: '前后台一致性', summary: '明确 H5、工作台和 Admin 的一致性口径以及角色边界。' }
 };
+
+let kwPortalWorkspaceBase = JSON.parse(JSON.stringify((window.WORKBENCH_DATA && window.WORKBENCH_DATA.portal_workspace) || {}));
+let kwPortalWorkspaceDraft = JSON.parse(JSON.stringify(kwPortalWorkspaceBase || {}));
 
 function isWorkbenchFeatureEnabled(featureName) {
   const flags = (window.SITE_CONFIG && window.SITE_CONFIG.feature_flags) || {};
@@ -1947,6 +2735,819 @@ function escapeHtml(value) {
 
 function escapeAttr(value) {
   return escapeHtml(value);
+}
+
+function kwGetPortalModuleLabel(moduleId) {
+  const map = {
+    hero: '门户介绍区',
+    dashboard: '固定 Dashboard',
+    'custom-copy': '自定义文案区',
+    contact: '扫码与联系方式',
+  };
+  return map[moduleId] || moduleId || '模块';
+}
+
+let kwPortalSelectedBlockId = null;
+let kwPortalFocusedEditor = null;
+
+function kwGetPortalBlocks() {
+  if (!Array.isArray(kwPortalWorkspaceDraft.page_blocks)) kwPortalWorkspaceDraft.page_blocks = [];
+  return kwPortalWorkspaceDraft.page_blocks;
+}
+
+function kwGetPortalBlockById(blockId) {
+  return kwGetPortalBlocks().find((item) => item.id === blockId) || null;
+}
+
+function kwEnsurePortalSelection() {
+  const blocks = kwGetPortalBlocks();
+  const enabledBlocks = blocks.filter((item) => item.enabled !== false);
+  if (!enabledBlocks.length) {
+    kwPortalSelectedBlockId = null;
+    return null;
+  }
+  if (!kwPortalSelectedBlockId || !enabledBlocks.some((item) => item.id === kwPortalSelectedBlockId)) {
+    kwPortalSelectedBlockId = enabledBlocks[0].id;
+  }
+  return kwPortalSelectedBlockId;
+}
+
+function kwSelectPortalBlock(blockId) {
+  kwPortalSelectedBlockId = blockId;
+  kwRenderPortalWorkspace();
+}
+
+function kwHandlePortalBlockClick(event, blockId) {
+  if (event && event.target && event.target.closest && event.target.closest('.kw-portal-editable')) return;
+  kwSelectPortalBlock(blockId);
+}
+
+function kwHandlePortalEditableFocus(event, el) {
+  if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+  kwPortalFocusedEditor = el || null;
+}
+
+function kwPortalMarkDraft(status) {
+  kwPortalWorkspaceDraft.draft_status = status || '草稿编辑中';
+}
+
+function kwPortalGetBlockSummary(block) {
+  if (!block) return '';
+  if (block.type === 'hero') {
+    const hero = kwPortalWorkspaceDraft.hero || {};
+    return hero.description || hero.audience || '请先维护门户导语。';
+  }
+  if (block.type === 'dashboard') return '固定展示核心指标、Dashboard 面板和代表性内容。';
+  if (block.type === 'contact') {
+    const contact = kwPortalWorkspaceDraft.contact || {};
+    return `${contact.wechat || '未设置微信'} / ${contact.phone || '未设置电话'} / ${contact.email || '未设置邮箱'}`;
+  }
+  const temp = document.createElement('div');
+  temp.innerHTML = block.html || '';
+  return (temp.textContent || temp.innerText || '').trim() || '请补充正文内容。';
+}
+
+function kwPortalRenderOutline(moduleHost) {
+  const blocks = kwGetPortalBlocks();
+  kwEnsurePortalSelection();
+  moduleHost.innerHTML = blocks.map((item, index) => `
+    <div class="kw-portal-note-card kw-portal-outline-item ${item.id === kwPortalSelectedBlockId ? 'active' : ''}" onclick="kwSelectPortalBlock('${escapeAttr(item.id)}')">
+      <div class="kw-portal-module-top">
+        <div>
+          <div class="kw-portal-outline-title">${escapeHtml(item.title || kwGetPortalModuleLabel(item.type))}</div>
+          <div class="kw-portal-outline-meta">${escapeHtml(item.type === 'rich_text' ? '富文本区块' : kwGetPortalModuleLabel(item.type))} · 第 ${index + 1} 屏</div>
+        </div>
+        <span class="kw-tag">${item.enabled === false ? '已隐藏' : '已展示'}</span>
+      </div>
+      <div class="kw-portal-module-desc">${escapeHtml(kwPortalGetBlockSummary(item).slice(0, 56))}</div>
+      <div class="kw-portal-outline-actions">
+        <button class="kw-portal-mini-btn" type="button" onclick="event.stopPropagation();kwMovePortalBlock(${index}, -1)">上移</button>
+        <button class="kw-portal-mini-btn" type="button" onclick="event.stopPropagation();kwMovePortalBlock(${index}, 1)">下移</button>
+        <button class="kw-portal-mini-btn" type="button" onclick="event.stopPropagation();kwTogglePortalBlock(${index})">${item.enabled === false ? '重新展示' : '暂时隐藏'}</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function kwPortalRenderHeroBlock(block) {
+  const hero = kwPortalWorkspaceDraft.hero || {};
+  const cta = kwPortalWorkspaceDraft.cta || {};
+  const props = Array.isArray(hero.value_props) ? hero.value_props : [];
+  return `
+    <div class="kw-portal-block-head">
+      <div>
+        <div class="kw-portal-block-title">${escapeHtml(block.title || '门户介绍')}</div>
+        <div class="kw-portal-block-status">首屏介绍区，可直接改标题、导语、受众和价值主张。</div>
+      </div>
+      <span class="kw-portal-block-type">固定首屏</span>
+    </div>
+    <div class="kw-portal-hero-kicker">FAN PORTAL · ${escapeHtml((window.ACTIVE_TENANT && window.ACTIVE_TENANT.short_name) || '')}</div>
+    <div class="kw-portal-hero-title kw-portal-editable" contenteditable="true" data-placeholder="输入门户标题" onfocus="kwHandlePortalEditableFocus(event, this)" oninput="kwUpdatePortalDraft('headline', this.textContent)" onblur="kwPortalSyncPanels()">${escapeHtml(hero.headline || '')}</div>
+    <div class="kw-portal-hero-desc kw-portal-editable" contenteditable="true" data-placeholder="输入门户导语" onfocus="kwHandlePortalEditableFocus(event, this)" oninput="kwUpdatePortalDraft('description', this.textContent)" onblur="kwPortalSyncPanels()">${escapeHtml(hero.description || '')}</div>
+    <div class="kw-portal-hero-audience kw-portal-editable" contenteditable="true" data-placeholder="输入适合谁先看" onfocus="kwHandlePortalEditableFocus(event, this)" oninput="kwUpdatePortalDraft('audience', this.textContent)" onblur="kwPortalSyncPanels()">${escapeHtml(hero.audience || '')}</div>
+    <div class="kw-portal-hero-props">
+      ${[0, 1, 2].map((index) => `
+        <div class="kw-portal-hero-prop kw-portal-editable" contenteditable="true" data-placeholder="输入价值主张" onfocus="kwHandlePortalEditableFocus(event, this)" oninput="kwUpdatePortalArrayField('value_props', ${index}, this.textContent)" onblur="kwPortalSyncPanels()">${escapeHtml(props[index] || '')}</div>
+      `).join('')}
+    </div>
+    <div class="kw-portal-hero-cta-row">
+      <div class="kw-portal-cta-chip kw-portal-editable" contenteditable="true" data-placeholder="主 CTA" onfocus="kwHandlePortalEditableFocus(event, this)" oninput="kwUpdatePortalDraft('primaryCta', this.textContent)" onblur="kwPortalSyncPanels()">${escapeHtml(cta.primary_label || '')}</div>
+      <div class="kw-portal-cta-chip kw-portal-editable" contenteditable="true" data-placeholder="次 CTA" onfocus="kwHandlePortalEditableFocus(event, this)" oninput="kwUpdatePortalDraft('secondaryCta', this.textContent)" onblur="kwPortalSyncPanels()">${escapeHtml(cta.secondary_label || '')}</div>
+    </div>
+  `;
+}
+
+function kwPortalRenderDashboardBlock(block) {
+  const metrics = ((window.WORKBENCH_DATA || {}).dashboard_metrics || {}).kpis || [];
+  const fundDashboard = (window.WORKBENCH_DATA || {}).fund_dashboard || {};
+  const cells = Array.isArray(fundDashboard.cells) ? fundDashboard.cells.slice(0, 4) : [];
+  const reviews = ((window.WORKBENCH_DATA || {}).published_reviews || []).slice(0, 2);
+  return `
+    <div class="kw-portal-block-head">
+      <div>
+        <div class="kw-portal-block-title">${escapeHtml(block.title || '固定 Dashboard')}</div>
+        <div class="kw-portal-block-status">固定中段，不走自由编辑，用来承接经营摘要和代表性内容。</div>
+      </div>
+      <span class="kw-portal-block-type">固定中段</span>
+    </div>
+    <div class="kw-portal-dashboard-kpis">
+      ${metrics.slice(0, 3).map((item) => `
+        <div class="kw-portal-dashboard-kpi">
+          <strong>${escapeHtml(item.label || '')}</strong>
+          <span>${escapeHtml(item.value || '')}</span>
+        </div>
+      `).join('')}
+    </div>
+    <div class="kw-portal-dashboard-shell">
+      <div class="kw-portal-dashboard-panel">
+        <strong>智能 Dashboard 面板</strong>
+        <div class="kw-portal-dashboard-copy">${escapeHtml(fundDashboard.summary || '')}</div>
+        <div class="kw-portal-dashboard-grid">
+          ${cells.map((cell) => `
+            <div class="kw-portal-dashboard-cell">
+              <strong>${escapeHtml(cell.title || '')}</strong>
+              <div>${escapeHtml(cell.value || '待定义')}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="kw-portal-dashboard-side">
+        <strong>代表性内容</strong>
+        <div class="kw-portal-dashboard-copy">这里保留固定摘要，帮助粉丝先看你当前研究主线，再决定要不要继续进入 H5。</div>
+        ${reviews.map((item) => `
+          <div class="kw-portal-dashboard-cell" style="margin-top:10px">
+            <strong>${escapeHtml(item.title || '')}</strong>
+            <div style="margin-top:8px;font-size:12px;font-weight:400;color:var(--text-sub)">${escapeHtml(item.summary || '')}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function kwPortalRenderRichTextBlock(block) {
+  return `
+    <div class="kw-portal-block-head">
+      <div>
+        <div class="kw-portal-block-title">${escapeHtml(block.title || '自定义文案区')}</div>
+        <div class="kw-portal-block-status">这是富文本正文区，可像公众号编辑器一样改标题、段落和列表。</div>
+      </div>
+      <span class="kw-portal-block-type">富文本区块</span>
+    </div>
+    <div class="kw-portal-rich-title kw-portal-editable" contenteditable="true" data-placeholder="输入区块标题" onfocus="kwHandlePortalEditableFocus(event, this)" oninput="kwUpdatePortalBlockTitle('${escapeAttr(block.id)}', this.textContent)" onblur="kwPortalSyncPanels()">${escapeHtml(block.title || '')}</div>
+    <div class="kw-portal-rich-editor kw-portal-editable" contenteditable="true" data-placeholder="输入正文内容，可插入段落、小标题、表格和截图" onfocus="kwHandlePortalEditableFocus(event, this)" oninput="kwUpdatePortalBlockHtml('${escapeAttr(block.id)}', this.innerHTML)" onpaste="kwPortalHandlePaste(event, '${escapeAttr(block.id)}')" onblur="kwPortalSyncPanels()">${block.html || ''}</div>
+  `;
+}
+
+function kwPortalRenderContactBlock(block) {
+  const contact = kwPortalWorkspaceDraft.contact || {};
+  return `
+    <div class="kw-portal-block-head">
+      <div>
+        <div class="kw-portal-block-title">${escapeHtml(block.title || '扫码与联系方式')}</div>
+        <div class="kw-portal-block-status">固定尾部区块，支持直接改扫码文案与联系信息。</div>
+      </div>
+      <span class="kw-portal-block-type">固定尾部</span>
+    </div>
+    <div class="kw-portal-contact-editor-grid">
+      <div class="kw-portal-contact-panel">
+        <strong class="kw-portal-editable" contenteditable="true" data-placeholder="扫码标题" onfocus="kwHandlePortalEditableFocus(event, this)" oninput="kwUpdatePortalContact('qr_title', this.textContent)" onblur="kwPortalSyncPanels()">${escapeHtml(contact.qr_title || '')}</strong>
+        <div class="kw-portal-contact-tip kw-portal-editable" contenteditable="true" data-placeholder="扫码说明" onfocus="kwHandlePortalEditableFocus(event, this)" oninput="kwUpdatePortalContact('qr_hint', this.textContent)" onblur="kwPortalSyncPanels()">${escapeHtml(contact.qr_hint || '')}</div>
+      </div>
+      <div class="kw-portal-contact-panel">
+        <strong>联系信息</strong>
+        <div class="kw-portal-contact-line">
+          <span class="kw-portal-contact-label">微信助手</span>
+          <span class="kw-portal-contact-value kw-portal-editable" contenteditable="true" data-placeholder="微信助手" onfocus="kwHandlePortalEditableFocus(event, this)" oninput="kwUpdatePortalContact('wechat', this.textContent)" onblur="kwPortalSyncPanels()">${escapeHtml(contact.wechat || '')}</span>
+        </div>
+        <div class="kw-portal-contact-line">
+          <span class="kw-portal-contact-label">联系电话</span>
+          <span class="kw-portal-contact-value kw-portal-editable" contenteditable="true" data-placeholder="联系电话" onfocus="kwHandlePortalEditableFocus(event, this)" oninput="kwUpdatePortalContact('phone', this.textContent)" onblur="kwPortalSyncPanels()">${escapeHtml(contact.phone || '')}</span>
+        </div>
+        <div class="kw-portal-contact-line">
+          <span class="kw-portal-contact-label">联系邮箱</span>
+          <span class="kw-portal-contact-value kw-portal-editable" contenteditable="true" data-placeholder="联系邮箱" onfocus="kwHandlePortalEditableFocus(event, this)" oninput="kwUpdatePortalContact('email', this.textContent)" onblur="kwPortalSyncPanels()">${escapeHtml(contact.email || '')}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function kwPortalRenderCanvas() {
+  const canvas = document.getElementById('kw-portal-page-canvas');
+  if (!canvas) return;
+  const blocks = kwGetPortalBlocks().filter((item) => item.enabled !== false);
+  kwEnsurePortalSelection();
+  canvas.innerHTML = blocks.map((block) => {
+    let content = '';
+    if (block.type === 'hero') content = kwPortalRenderHeroBlock(block);
+    if (block.type === 'dashboard') content = kwPortalRenderDashboardBlock(block);
+    if (block.type === 'rich_text') content = kwPortalRenderRichTextBlock(block);
+    if (block.type === 'contact') content = kwPortalRenderContactBlock(block);
+    return `
+      <div class="kw-portal-page-block ${block.id === kwPortalSelectedBlockId ? 'active' : ''} ${block.type !== 'rich_text' ? 'is-fixed' : ''}" onclick="kwHandlePortalBlockClick(event, '${escapeAttr(block.id)}')">
+        ${content}
+      </div>
+    `;
+  }).join('');
+}
+
+function kwPortalRenderInspector() {
+  const host = document.getElementById('kw-portal-inspector');
+  if (!host) return;
+  const block = kwGetPortalBlockById(kwEnsurePortalSelection());
+  if (!block) {
+    host.innerHTML = '<div class="kw-portal-empty-note">当前没有可编辑区块。</div>';
+    return;
+  }
+  const hero = kwPortalWorkspaceDraft.hero || {};
+  const contact = kwPortalWorkspaceDraft.contact || {};
+  if (block.type === 'rich_text') {
+    host.innerHTML = `
+      <div>
+        <div class="kw-portal-inspector-label">当前区块</div>
+        <div class="kw-portal-inspector-value">${escapeHtml(block.title || '未命名文案区')}</div>
+      </div>
+      <label>
+        <div class="kw-portal-inspector-label">区块标题</div>
+        <input class="kw-portal-inspector-input" type="text" value="${escapeAttr(block.title || '')}" oninput="kwUpdatePortalBlockTitle('${escapeAttr(block.id)}', this.value)">
+      </label>
+      <label>
+        <div class="kw-portal-inspector-label">HTML 结构</div>
+        <textarea class="kw-portal-inspector-textarea" oninput="kwUpdatePortalBlockHtml('${escapeAttr(block.id)}', this.value)">${escapeHtml(block.html || '')}</textarea>
+      </label>
+      <div class="kw-portal-empty-note">支持 p、h2、h3、ul、ol、li、strong、em、blockquote、a。</div>
+    `;
+    return;
+  }
+  if (block.type === 'hero') {
+    host.innerHTML = `
+      <div>
+        <div class="kw-portal-inspector-label">当前区块</div>
+        <div class="kw-portal-inspector-value">门户介绍区</div>
+      </div>
+      <div>
+        <div class="kw-portal-inspector-label">当前标题</div>
+        <div class="kw-portal-inspector-value">${escapeHtml(hero.headline || '')}</div>
+      </div>
+      <div class="kw-portal-empty-note">首屏建议先讲“你是谁、看什么、为什么值得关注”。标题和导语请直接在中间画布修改。</div>
+    `;
+    return;
+  }
+  if (block.type === 'dashboard') {
+    host.innerHTML = `
+      <div>
+        <div class="kw-portal-inspector-label">当前区块</div>
+        <div class="kw-portal-inspector-value">固定 Dashboard</div>
+      </div>
+      <div class="kw-portal-empty-note">这一段不开放自由编辑，固定承接研究和经营摘要，避免门户和 Dashboard 概念混淆。</div>
+    `;
+    return;
+  }
+  host.innerHTML = `
+    <div>
+      <div class="kw-portal-inspector-label">当前区块</div>
+      <div class="kw-portal-inspector-value">扫码与联系方式</div>
+    </div>
+    <div>
+      <div class="kw-portal-inspector-label">微信助手</div>
+      <div class="kw-portal-inspector-value">${escapeHtml(contact.wechat || '')}</div>
+    </div>
+    <div>
+      <div class="kw-portal-inspector-label">联系电话</div>
+      <div class="kw-portal-inspector-value">${escapeHtml(contact.phone || '')}</div>
+    </div>
+    <div>
+      <div class="kw-portal-inspector-label">联系邮箱</div>
+      <div class="kw-portal-inspector-value">${escapeHtml(contact.email || '')}</div>
+    </div>
+  `;
+}
+
+function kwRenderPortalWorkspace() {
+  const moduleHost = document.getElementById('kw-portal-module-list');
+  const previewHost = document.getElementById('kw-portal-preview-list');
+  const draftStatus = document.getElementById('kw-portal-draft-status');
+  if (!moduleHost || !previewHost) return;
+  if (draftStatus) draftStatus.textContent = kwPortalWorkspaceDraft.draft_status || '草稿待发布';
+  kwPortalRenderOutline(moduleHost);
+  kwPortalRenderCanvas();
+  kwPortalRenderInspector();
+  const hero = kwPortalWorkspaceDraft.hero || {};
+  const cta = kwPortalWorkspaceDraft.cta || {};
+  const blocks = kwGetPortalBlocks().filter((item) => item.enabled !== false);
+  previewHost.innerHTML = [
+    {
+      title: hero.headline || '未设置门户标题',
+      label: '粉丝打开后看到的首屏',
+      copy: hero.description || '请先补充门户说明。',
+      extra: hero.audience || '适合谁先看',
+      chip: `${cta.primary_label || '主 CTA'} / ${cta.secondary_label || '次 CTA'}`,
+    },
+    ...blocks.map(item => ({
+      title: item.title || kwGetPortalModuleLabel(item.type),
+      label: item.type === 'rich_text' ? '富文本内容区' : '固定门户结构',
+      copy: kwPortalGetBlockSummary(item),
+      extra: item.type === 'dashboard' ? '固定中段展示' : kwGetPortalModuleLabel(item.type),
+      chip: item.type === 'rich_text' ? '可编辑文案' : (item.type || '模块'),
+    })),
+  ].map((item, index) => `
+    <div class="kw-portal-preview-card ${index === 0 ? 'active' : ''}">
+      <div class="kw-portal-preview-top">
+        <div>
+          <div class="kw-portal-preview-title">${escapeHtml(item.title)}</div>
+          <div class="kw-portal-preview-label">${escapeHtml(item.label)}</div>
+        </div>
+        <span class="kw-tag">${escapeHtml(item.chip)}</span>
+      </div>
+      <div class="kw-portal-preview-copy">${escapeHtml(item.copy)}</div>
+      <div class="kw-portal-preview-chip">${escapeHtml(item.extra)}</div>
+      ${index === 0 ? `<div class="kw-portal-preview-route">当前路由：/tenant/${escapeHtml((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '')}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function kwUpdatePortalDraft(field, value) {
+  if (!kwPortalWorkspaceDraft.hero) kwPortalWorkspaceDraft.hero = {};
+  if (!kwPortalWorkspaceDraft.cta) kwPortalWorkspaceDraft.cta = {};
+  if (field === 'headline') kwPortalWorkspaceDraft.hero.headline = value;
+  if (field === 'description') kwPortalWorkspaceDraft.hero.description = value;
+  if (field === 'audience') kwPortalWorkspaceDraft.hero.audience = value;
+  if (field === 'primaryCta') kwPortalWorkspaceDraft.cta.primary_label = value;
+  if (field === 'secondaryCta') kwPortalWorkspaceDraft.cta.secondary_label = value;
+  kwPortalMarkDraft('草稿编辑中');
+}
+
+function kwUpdatePortalArrayField(field, index, value) {
+  if (!kwPortalWorkspaceDraft.hero) kwPortalWorkspaceDraft.hero = {};
+  if (!Array.isArray(kwPortalWorkspaceDraft.hero[field])) kwPortalWorkspaceDraft.hero[field] = [];
+  kwPortalWorkspaceDraft.hero[field][index] = value;
+  kwPortalMarkDraft('草稿编辑中');
+}
+
+function kwUpdatePortalBlockTitle(blockId, value) {
+  const block = kwGetPortalBlockById(blockId);
+  if (!block) return;
+  block.title = value;
+  kwPortalMarkDraft('草稿编辑中');
+}
+
+function kwNormalizePortalHtml(html) {
+  return String(html || '')
+    .replace(/<div>/gi, '<p>')
+    .replace(/<\/div>/gi, '</p>')
+    .replace(/<p><br><\/p>/gi, '<p></p>');
+}
+
+function kwPortalGetFocusedBlockId() {
+  if (!kwPortalFocusedEditor || !kwPortalFocusedEditor.closest) return '';
+  const card = kwPortalFocusedEditor.closest('.kw-portal-page-block');
+  if (!card) return '';
+  const raw = card.getAttribute('onclick') || '';
+  const match = /kwHandlePortalBlockClick\(event, '([^']+)'\)/.exec(raw);
+  return match && match[1] ? match[1] : '';
+}
+
+function kwPortalCommitFocusedEditor() {
+  const blockId = kwPortalGetFocusedBlockId();
+  if (!blockId || !kwPortalFocusedEditor) return;
+  if (kwPortalFocusedEditor.classList.contains('kw-portal-rich-title')) {
+    kwUpdatePortalBlockTitle(blockId, kwPortalFocusedEditor.textContent);
+  } else if (kwPortalFocusedEditor.classList.contains('kw-portal-rich-editor')) {
+    kwUpdatePortalBlockHtml(blockId, kwPortalFocusedEditor.innerHTML);
+  }
+}
+
+function kwPortalInsertHtml(html) {
+  if (!kwPortalFocusedEditor) return;
+  kwPortalFocusedEditor.focus();
+  document.execCommand('insertHTML', false, html);
+  kwPortalCommitFocusedEditor();
+  kwPortalSyncPanels();
+}
+
+function kwPortalInsertTable() {
+  kwPortalInsertHtml('<table><thead><tr><th>列 1</th><th>列 2</th></tr></thead><tbody><tr><td>内容</td><td>内容</td></tr><tr><td>内容</td><td>内容</td></tr></tbody></table>');
+}
+
+function kwPortalInsertLink() {
+  if (!kwPortalFocusedEditor) return;
+  const url = window.prompt('输入链接地址');
+  if (!url) return;
+  kwPortalFocusedEditor.focus();
+  document.execCommand('createLink', false, url);
+  kwPortalCommitFocusedEditor();
+  kwPortalSyncPanels();
+}
+
+function kwPortalHandlePaste(event, blockId) {
+  const clipboard = event.clipboardData;
+  if (!clipboard) return;
+  const items = Array.from(clipboard.items || []);
+  const imageItem = items.find((item) => item.type && item.type.startsWith('image/'));
+  if (imageItem) {
+    event.preventDefault();
+    const file = imageItem.getAsFile();
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      kwPortalInsertHtml(`<p><img src="${reader.result}" alt="pasted-image"></p>`);
+    };
+    reader.readAsDataURL(file);
+    return;
+  }
+  const html = clipboard.getData('text/html');
+  if (html) {
+    event.preventDefault();
+    kwPortalInsertHtml(html);
+    return;
+  }
+  const text = clipboard.getData('text/plain');
+  if (text) {
+    event.preventDefault();
+    kwPortalInsertHtml(`<p>${escapeHtml(text).replace(/\n/g, '<br>')}</p>`);
+  }
+}
+
+function kwUpdatePortalBlockHtml(blockId, html) {
+  const block = kwGetPortalBlockById(blockId);
+  if (!block) return;
+  block.html = kwNormalizePortalHtml(html);
+  kwPortalMarkDraft('草稿编辑中');
+}
+
+function kwUpdatePortalContact(field, value) {
+  if (!kwPortalWorkspaceDraft.contact) kwPortalWorkspaceDraft.contact = {};
+  kwPortalWorkspaceDraft.contact[field] = value;
+  kwPortalMarkDraft('草稿编辑中');
+}
+
+function kwPortalSyncPanels() {
+  const draftStatus = document.getElementById('kw-portal-draft-status');
+  if (draftStatus) draftStatus.textContent = kwPortalWorkspaceDraft.draft_status || '草稿待发布';
+  const previewHost = document.getElementById('kw-portal-preview-list');
+  const moduleHost = document.getElementById('kw-portal-module-list');
+  if (moduleHost) kwPortalRenderOutline(moduleHost);
+  if (!previewHost) return;
+  const hero = kwPortalWorkspaceDraft.hero || {};
+  const cta = kwPortalWorkspaceDraft.cta || {};
+  const blocks = kwGetPortalBlocks().filter((item) => item.enabled !== false);
+  previewHost.innerHTML = [
+    {
+      title: hero.headline || '未设置门户标题',
+      label: '粉丝打开后看到的首屏',
+      copy: hero.description || '请先补充门户说明。',
+      extra: hero.audience || '适合谁先看',
+      chip: `${cta.primary_label || '主 CTA'} / ${cta.secondary_label || '次 CTA'}`,
+    },
+    ...blocks.map(item => ({
+      title: item.title || kwGetPortalModuleLabel(item.type),
+      label: item.type === 'rich_text' ? '富文本内容区' : '固定门户结构',
+      copy: kwPortalGetBlockSummary(item),
+      extra: item.type === 'dashboard' ? '固定中段展示' : kwGetPortalModuleLabel(item.type),
+      chip: item.type === 'rich_text' ? '可编辑文案' : (item.type || '模块'),
+    })),
+  ].map((item, index) => `
+    <div class="kw-portal-preview-card ${index === 0 ? 'active' : ''}">
+      <div class="kw-portal-preview-top">
+        <div>
+          <div class="kw-portal-preview-title">${escapeHtml(item.title)}</div>
+          <div class="kw-portal-preview-label">${escapeHtml(item.label)}</div>
+        </div>
+        <span class="kw-tag">${escapeHtml(item.chip)}</span>
+      </div>
+      <div class="kw-portal-preview-copy">${escapeHtml(item.copy)}</div>
+      <div class="kw-portal-preview-chip">${escapeHtml(item.extra)}</div>
+      ${index === 0 ? `<div class="kw-portal-preview-route">当前路由：/tenant/${escapeHtml((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '')}</div>` : ''}
+    </div>
+  `).join('');
+  kwPortalRenderInspector();
+}
+
+function kwMovePortalBlock(index, offset) {
+  const blocks = kwGetPortalBlocks();
+  const target = index + offset;
+  if (index < 0 || index >= blocks.length || target < 0 || target >= blocks.length) return;
+  const current = blocks[index];
+  blocks[index] = blocks[target];
+  blocks[target] = current;
+  kwPortalMarkDraft('草稿已调整排序');
+  kwRenderPortalWorkspace();
+}
+
+function kwTogglePortalBlock(index) {
+  const blocks = kwGetPortalBlocks();
+  const item = blocks[index];
+  if (!item) return;
+  item.enabled = item.enabled === false;
+  kwPortalMarkDraft(item.enabled === false ? '草稿中有隐藏模块' : '草稿编辑中');
+  kwRenderPortalWorkspace();
+}
+
+function kwBuildPortalCustomSectionsFromBlocks() {
+  return kwGetPortalBlocks()
+    .filter((item) => item.type === 'rich_text')
+    .map((item) => {
+      const temp = document.createElement('div');
+      temp.innerHTML = item.html || '';
+      return {
+        title: item.title || '未命名文案区',
+        body: (temp.textContent || temp.innerText || '').trim(),
+      };
+    });
+}
+
+function kwResetPortalEditorState() {
+  kwPortalSelectedBlockId = null;
+  kwPortalFocusedEditor = null;
+}
+
+function kwResetPortalDraft() {
+  kwPortalWorkspaceDraft = JSON.parse(JSON.stringify(kwPortalWorkspaceBase || {}));
+  kwResetPortalEditorState();
+  kwRenderPortalWorkspace();
+  showToast('已恢复为当前线上门户版本');
+}
+
+function kwPortalExec(command, value) {
+  if (!kwPortalFocusedEditor) return;
+  kwPortalFocusedEditor.focus();
+  document.execCommand(command, false, value || null);
+  if (kwPortalFocusedEditor.classList.contains('kw-portal-rich-editor')) {
+    const blockId = kwPortalFocusedEditor.parentElement && kwPortalFocusedEditor.parentElement.parentElement
+      ? kwPortalFocusedEditor.parentElement.parentElement.getAttribute('onclick')
+      : '';
+    const card = kwPortalFocusedEditor.closest('.kw-portal-page-block');
+    if (card) {
+      const match = /kwSelectPortalBlock\('([^']+)'\)/.exec(card.getAttribute('onclick') || '');
+      if (match && match[1]) kwUpdatePortalBlockHtml(match[1], kwPortalFocusedEditor.innerHTML);
+    }
+  }
+}
+
+async function kwPublishPortalDraft() {
+  kwPortalWorkspaceDraft.custom_sections = kwBuildPortalCustomSectionsFromBlocks();
+  kwPortalWorkspaceDraft.published_status = '线上已发布';
+  kwPortalWorkspaceDraft.last_published_at = new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-');
+  kwPortalMarkDraft('发布中');
+  kwRenderPortalWorkspace();
+  const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
+  try {
+    const resp = await fetch(`/api/kol/portal-cms?tenant=${encodeURIComponent(tenantSlug)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ portal_cms: kwPortalWorkspaceDraft }),
+    });
+    const payload = await resp.json();
+    if (!resp.ok || !payload.ok) throw new Error(payload.error || 'save_failed');
+    kwPortalWorkspaceBase = JSON.parse(JSON.stringify(payload.portal_workspace || {}));
+    kwPortalWorkspaceDraft = JSON.parse(JSON.stringify(payload.portal_workspace || {}));
+    if (window.WORKBENCH_DATA) window.WORKBENCH_DATA.portal_workspace = JSON.parse(JSON.stringify(payload.portal_workspace || {}));
+    kwResetPortalEditorState();
+    kwRenderPortalWorkspace();
+    showToast('门户草稿已发布到粉丝端门户');
+  } catch (error) {
+    kwPortalMarkDraft('发布失败，请重试');
+    kwRenderPortalWorkspace();
+    showToast('门户发布失败，请稍后重试');
+  }
+}
+
+const kwIndicatorHub = JSON.parse(JSON.stringify((window.WORKBENCH_DATA && window.WORKBENCH_DATA.indicator_hub) || {summary: {}, items: [], anomalies: []}));
+
+function kwGetIndicatorItemById(indicatorId) {
+  return (kwIndicatorHub.items || []).find((item) => item.id === indicatorId) || null;
+}
+
+function kwIndicatorStatusBadge(status) {
+  if (status === 'warning') return '<span class="tag tag-red">预警</span>';
+  if (status === 'attention') return '<span class="tag tag-gold">关注</span>';
+  return '<span class="tag tag-green">正常</span>';
+}
+
+function kwIndicatorStatusLabel(status) {
+  if (status === 'warning') return '预警';
+  if (status === 'attention') return '关注';
+  return '正常';
+}
+
+function kwBuildIndicatorKlineSvg(klinePayload) {
+  const candles = Array.isArray(klinePayload?.candles) ? klinePayload.candles : [];
+  if (!candles.length) {
+    return '<div class="kw-knowledge-detail-copy">暂无趋势数据。</div>';
+  }
+  const ma5 = Array.isArray(klinePayload?.ma5) ? klinePayload.ma5 : [];
+  const ma10 = Array.isArray(klinePayload?.ma10) ? klinePayload.ma10 : [];
+  const ma20 = Array.isArray(klinePayload?.ma20) ? klinePayload.ma20 : [];
+  const anomalies = Array.isArray(klinePayload?.anomalies) ? klinePayload.anomalies : [];
+  const width = 320;
+  const height = 200;
+  const padding = { top: 14, right: 10, bottom: 24, left: 10 };
+  const candleAreaHeight = height - padding.top - padding.bottom;
+  const maxPrice = Math.max(...candles.map(item => Number(item.high || 0)), 1);
+  const minPrice = Math.min(...candles.map(item => Number(item.low || 0)), 0);
+  const span = Math.max(maxPrice - minPrice, 1);
+  const step = (width - padding.left - padding.right) / candles.length;
+  const candleWidth = Math.max(5.5, Math.min(7, step * 0.52));
+  const scaleY = (value) => padding.top + ((maxPrice - Number(value || 0)) / span) * candleAreaHeight;
+  const scaleX = (index) => padding.left + step * index + step / 2;
+  const buildMaPath = (items) => {
+    const points = items.map((entry) => {
+      const index = candles.findIndex((candle) => candle.date === entry.date);
+      if (index < 0) return null;
+      return `${scaleX(index).toFixed(2)} ${scaleY(entry.value).toFixed(2)}`;
+    }).filter(Boolean);
+    return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point}`).join(' ');
+  };
+  const gridValues = [maxPrice, minPrice + span / 2, minPrice];
+  const gridlines = gridValues.map((value) => {
+    const y = scaleY(value);
+    return `
+      <line x1="${padding.left}" y1="${y.toFixed(2)}" x2="${width - padding.right}" y2="${y.toFixed(2)}" stroke="rgba(200,169,110,0.08)" stroke-width="1"></line>
+      <text x="${width - padding.right}" y="${(y - 4).toFixed(2)}" text-anchor="end" font-size="9" fill="var(--gray-400)">${Number(value).toFixed(2)}</text>
+    `;
+  }).join('');
+  const candleSvg = candles.map((item, index) => {
+    const x = scaleX(index);
+    const openY = scaleY(item.open);
+    const closeY = scaleY(item.close);
+    const highY = scaleY(item.high);
+    const lowY = scaleY(item.low);
+    const rectY = Math.min(openY, closeY);
+    const rectHeight = Math.max(2, Math.abs(closeY - openY));
+    const color = Number(item.close) >= Number(item.open) ? '#2ECC71' : '#E74C3C';
+    return `
+      <line x1="${x.toFixed(2)}" y1="${highY.toFixed(2)}" x2="${x.toFixed(2)}" y2="${lowY.toFixed(2)}" stroke="${color}" stroke-width="1.2"></line>
+      <rect x="${(x - candleWidth / 2).toFixed(2)}" y="${rectY.toFixed(2)}" width="${candleWidth.toFixed(2)}" height="${rectHeight.toFixed(2)}" rx="1.4" fill="${color}"></rect>
+    `;
+  }).join('');
+  const anomalyMarks = anomalies.map((entry) => {
+    const index = candles.findIndex((candle) => candle.date === entry.date);
+    if (index < 0) return '';
+    const x = scaleX(index);
+    const y = scaleY(entry.value);
+    return `
+      <circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="4.5" fill="rgba(220,53,69,0.14)" stroke="#DC3545" stroke-width="1.4"></circle>
+      <text x="${x.toFixed(2)}" y="${(y - 8).toFixed(2)}" text-anchor="middle" font-size="7" fill="#DC3545">${escapeHtml(entry.label || '异动')}</text>
+    `;
+  }).join('');
+  const tickIndexes = [0, Math.floor((candles.length - 1) / 2), candles.length - 1].filter((value, index, arr) => arr.indexOf(value) === index);
+  const ticks = tickIndexes.map((index) => `
+    <text x="${scaleX(index).toFixed(2)}" y="${height - 6}" text-anchor="middle" font-size="9" fill="var(--gray-400)">${escapeHtml((candles[index].date || '--').slice(5))}</text>
+  `).join('');
+  return `
+    <div style="background:var(--navy);border:1px solid rgba(200,169,110,0.08);border-radius:12px;padding:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:700;color:var(--white)">K线走势</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--gray-400)">
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#F6C453;display:inline-block"></span>MA5</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#5DADE2;display:inline-block"></span>MA10</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#AF7AC5;display:inline-block"></span>MA20</span>
+        </div>
+      </div>
+      <svg viewBox="0 0 ${width} ${height}" width="100%" role="img" aria-label="指标K线与均线图" style="display:block;width:100%;height:auto;aspect-ratio:${width} / ${height}">
+        ${gridlines}
+        ${candleSvg}
+        <path d="${buildMaPath(ma5)}" fill="none" stroke="#F6C453" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="${buildMaPath(ma10)}" fill="none" stroke="#5DADE2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="${buildMaPath(ma20)}" fill="none" stroke="#AF7AC5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+        ${anomalyMarks}
+        ${ticks}
+      </svg>
+    </div>
+  `;
+}
+
+function kwBuildIndicatorTrendSummary(series) {
+  const list = Array.isArray(series) ? series : [];
+  if (!list.length) return [];
+  return list.map((entry, index) => {
+    const numeric = Number(entry.value || 0);
+    const previous = index > 0 ? Number(list[index - 1].value || 0) : numeric;
+    const delta = Number((numeric - previous).toFixed(2));
+    return {
+      date: entry.date || '--',
+      value: entry.value || '--',
+      status: entry.status || 'good',
+      delta,
+      direction: delta > 0 ? '上行' : delta < 0 ? '下行' : '持平',
+    };
+  });
+}
+
+function kwCloseIndicatorModal() {
+  const modal = document.getElementById('kw-indicator-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function kwOpenIndicatorHistory(indicatorId) {
+  const item = kwGetIndicatorItemById(indicatorId);
+  const host = document.getElementById('kw-indicator-modal-content');
+  const modal = document.getElementById('kw-indicator-modal');
+  if (!item || !host || !modal) {
+    showToast('未找到指标详情');
+    return;
+  }
+  const simulatedSeries = Array.isArray(item.simulated_series) ? item.simulated_series : [];
+  const klinePayload = item.simulated_kline || {};
+  const anomalyPoints = Array.isArray(klinePayload.anomalies) ? klinePayload.anomalies : [];
+  const trendSummary = kwBuildIndicatorTrendSummary(simulatedSeries);
+  const currentValue = String(item.value || '--');
+  const valueClass = /[A-Za-z]/.test(currentValue) || currentValue.length >= 9 ? 'kw-detail-stat-value compact' : 'kw-detail-stat-value';
+  host.innerHTML = `
+    <div class="kw-review-modal-head">
+      <div>
+        <div class="kw-review-modal-title">${escapeHtml(item.name || '')}</div>
+        <div class="kw-review-modal-subtitle">${escapeHtml(item.category || '')} · ${escapeHtml(item.owner || '')} · 最后更新 ${escapeHtml(item.last_updated || '--')}</div>
+      </div>
+      <button class="kw-review-modal-close" type="button" onclick="kwCloseIndicatorModal()">×</button>
+    </div>
+    <div class="kw-knowledge-detail-grid">
+      <div class="kw-knowledge-detail-card">
+        <div class="kw-knowledge-detail-title">1. 趋势线图</div>
+        ${kwBuildIndicatorKlineSvg(klinePayload)}
+      </div>
+      <div class="kw-knowledge-detail-card">
+        <div class="kw-knowledge-detail-title">2. 异动情况（异动点标注）</div>
+        <div class="kw-knowledge-bullet-list">
+          ${anomalyPoints.length ? anomalyPoints.map((entry) => `
+            <div class="kw-knowledge-bullet-item">
+              <strong>${escapeHtml(entry.date || '--')}</strong>
+              <div class="kw-knowledge-detail-copy">异动点：${escapeHtml(entry.label || '异动')}</div>
+              <div class="kw-knowledge-detail-copy">指标值：${escapeHtml(entry.value || '--')}</div>
+            </div>
+          `).join('') : '<div class="kw-knowledge-bullet-item">当前没有关联异动报告。</div>'}
+        </div>
+      </div>
+      <div class="kw-knowledge-detail-card">
+        <div class="kw-knowledge-detail-title">3. 数据口径</div>
+        <div class="kw-knowledge-detail-note">当前详情页只展示纯数据分析视图，不做结果原因分析。可见范围包括趋势线、趋势状态和异动点标注。</div>
+        <div class="kw-knowledge-detail-note">当前值代表最新观测结果；历史趋势压缩展示最近时间点，用于快速判断指标方向与波动节奏。</div>
+        <div class="kw-watch-chip-row" style="margin-top:12px">
+          <span class="kw-watch-chip">状态：${escapeHtml(kwIndicatorStatusLabel(item.status))}</span>
+          <span class="kw-watch-chip">监测源：${escapeHtml(item.owner || '--')}</span>
+          <span class="kw-watch-chip">记录数：${trendSummary.length}</span>
+        </div>
+      </div>
+      <div class="kw-knowledge-detail-card">
+        <div class="kw-knowledge-detail-title">4. 趋势情况与历史趋势</div>
+        <div class="kw-detail-summary">
+          <div class="kw-detail-stat">
+            <div>
+              <div class="kw-detail-stat-label">当前值</div>
+              <div class="${valueClass}">${escapeHtml(currentValue)}</div>
+            </div>
+          </div>
+          <div class="kw-detail-stat">
+            <div class="kw-detail-stat-label">当前状态</div>
+            <div class="kw-detail-stat-badge">${kwIndicatorStatusBadge(item.status)}</div>
+          </div>
+        </div>
+        <div class="kw-detail-section-note">
+          <div class="kw-detail-section-title">历史趋势</div>
+          <div class="kw-detail-section-copy">展示最近 ${trendSummary.length} 个观测点，改为细长条以减少空间占用并保留趋势判断。</div>
+        </div>
+        <div class="kw-detail-history-list">
+          ${trendSummary.map((entry) => `
+            <div class="kw-detail-history-row">
+              <div class="kw-detail-history-date">${escapeHtml(entry.date)}</div>
+              <div class="kw-detail-history-text">指标值 ${escapeHtml(entry.value)} · ${escapeHtml(entry.direction)} · 变动 ${entry.delta > 0 ? '+' : ''}${entry.delta}</div>
+              ${kwIndicatorStatusBadge(entry.status)}
+            </div>
+          `).join('') || '<div class="kw-knowledge-bullet-item">暂无趋势记录。</div>'}
+        </div>
+      </div>
+      <div class="kw-knowledge-detail-card">
+        <div class="kw-knowledge-detail-title">工作台动作</div>
+        <div class="kw-knowledge-detail-note">这里可以看、分析和追踪异动，但关闭指标仍由 Admin 统一控制，避免前后台口径不一致。</div>
+        <div class="kw-toolbar" style="margin-top:12px">
+          <button class="btn-gold" type="button" style="padding:8px 12px;font-size:12px" onclick="showToast('已加入租户异动盯盘')">加入盯盘</button>
+          <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="showToast('已同步到复盘关注事项')">同步到复盘</button>
+        </div>
+      </div>
+    </div>
+  `;
+  modal.classList.add('show');
 }
 
 const KW_WATCHLIST_ANNOTATION_STORAGE_KEY = 'gangtise_demo_watchlist_annotations';
@@ -3360,6 +4961,10 @@ function showWorkbenchSection(name, navEl) {
     showToast('预测功能当前未开放');
     return;
   }
+  if (name === 'hermes' && !isWorkbenchFeatureEnabled('hermes')) {
+    showToast('Hermes 专区当前未开放');
+    return;
+  }
   document.querySelectorAll('[id^="workbench-section-"]').forEach(el => {
     el.style.display = 'none';
   });
@@ -3408,12 +5013,19 @@ function showToast(message) {
 
 document.addEventListener('DOMContentLoaded', () => {
   const forecastNav = document.querySelector('.admin-nav-item[data-section="forecast-model"]');
+  const hermesNav = document.querySelector('.admin-nav-item[data-section="hermes"]');
   if (forecastNav) forecastNav.style.display = isWorkbenchFeatureEnabled('stock_forecast') ? '' : 'none';
+  if (hermesNav) hermesNav.style.display = isWorkbenchFeatureEnabled('hermes') ? '' : 'none';
+  kwRenderPortalWorkspace();
   kwRenderReviewStudio();
   kwRenderPublishedReviewList();
   kwRenderKnowledgeList();
   const section = new URLSearchParams(window.location.search).get('section');
   if (section === 'forecast-model' && !isWorkbenchFeatureEnabled('stock_forecast')) {
+    showWorkbenchSection('overview');
+    return;
+  }
+  if (section === 'hermes' && !isWorkbenchFeatureEnabled('hermes')) {
     showWorkbenchSection('overview');
     return;
   }

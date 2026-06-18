@@ -41,9 +41,82 @@ body { background:linear-gradient(180deg,#F7FAFD 0%,#EFF5FB 42%,#FFFFFF 100%); c
 .tp-grid-3, .tp-grid-2 { display:grid; gap:16px; }
 .tp-grid-3 { grid-template-columns:repeat(3, minmax(0,1fr)); }
 .tp-grid-2 { grid-template-columns:repeat(2, minmax(0,1fr)); }
+.tp-value-grid,
+.tp-dashboard-kpi-row,
+.tp-parent-copy-grid,
+.tp-contact-grid { display:grid; gap:16px; }
+.tp-value-grid { grid-template-columns:repeat(3, minmax(0,1fr)); }
+.tp-dashboard-kpi-row { grid-template-columns:repeat(5, minmax(0,1fr)); }
+.tp-parent-copy-grid { grid-template-columns:1.1fr 0.9fr; }
+.tp-contact-grid { grid-template-columns:0.8fr 1.2fr; align-items:stretch; }
+.tp-rich-html { font-size:14px; line-height:1.9; color:var(--text-main); }
+.tp-rich-html p { margin:0 0 14px; }
+.tp-rich-html h2, .tp-rich-html h3 { margin:0 0 14px; color:#172132; }
+.tp-rich-html ul, .tp-rich-html ol { margin:0 0 14px 22px; }
+.tp-rich-html blockquote {
+  margin:0 0 14px;
+  padding:12px 14px;
+  border-left:3px solid rgba(47,116,192,0.18);
+  background:#F8FBFF;
+  border-radius:12px;
+  color:#425266;
+}
+.tp-rich-stack { display:grid; gap:16px; }
 .tp-info-card, .tp-review-card, .tp-service-card, .tp-framework-card, .tp-spotlight-card { background:#FFFFFF; border:1px solid rgba(47,116,192,0.10); border-radius:20px; padding:20px; box-shadow:0 10px 28px rgba(23,45,74,0.06); }
 .tp-info-card strong, .tp-review-title, .tp-service-card strong, .tp-framework-card strong, .tp-spotlight-card strong { display:block; font-size:15px; color:#172132; }
 .tp-info-card p, .tp-review-copy, .tp-service-card p, .tp-framework-card p, .tp-spotlight-card p { margin:8px 0 0; font-size:13px; line-height:1.8; color:var(--text-sub); }
+.tp-kpi-card,
+.tp-parent-copy-card,
+.tp-contact-card,
+.tp-qr-card,
+.tp-dashboard-panel,
+.tp-dashboard-side {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:20px;
+  padding:20px;
+  box-shadow:0 10px 28px rgba(23,45,74,0.06);
+}
+.tp-kpi-label { font-size:11px; color:var(--text-sub); }
+.tp-kpi-value { margin-top:10px; font-size:22px; font-weight:700; color:#172132; }
+.tp-kpi-sub { margin-top:6px; font-size:12px; line-height:1.7; color:var(--text-sub); }
+.tp-dashboard-shell { display:grid; grid-template-columns:1.05fr 0.95fr; gap:16px; }
+.tp-dashboard-cell-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px; }
+.tp-dashboard-cell {
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:16px;
+  padding:16px;
+}
+.tp-dashboard-cell strong { display:block; font-size:13px; color:#172132; }
+.tp-dashboard-cell span { display:block; margin-top:10px; font-size:18px; font-weight:700; color:#2F74C0; }
+.tp-dashboard-summary,
+.tp-parent-copy-body,
+.tp-contact-copy { font-size:13px; line-height:1.9; color:var(--text-sub); }
+.tp-contact-list { display:grid; gap:10px; margin-top:16px; }
+.tp-contact-line {
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 0;
+  border-bottom:1px solid rgba(47,116,192,0.08);
+  font-size:13px;
+  color:var(--text-sub);
+}
+.tp-contact-line strong { color:#172132; }
+.tp-qr-box {
+  width:140px;
+  height:140px;
+  border-radius:24px;
+  background:linear-gradient(135deg, rgba(47,116,192,0.1), rgba(102,161,223,0.18)), #FFFFFF;
+  border:1px solid rgba(47,116,192,0.14);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:48px;
+  color:#2F74C0;
+  box-shadow:inset 0 0 0 8px rgba(255,255,255,0.7);
+}
 .tp-clickable { cursor:pointer; transition:transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
 .tp-clickable:hover { transform:translateY(-2px); border-color:rgba(47,116,192,0.18); box-shadow:0 16px 32px rgba(23,45,74,0.08); }
 .tp-detail-link { margin-top:12px; font-size:12px; color:#2F74C0; font-weight:700; }
@@ -70,8 +143,9 @@ body { background:linear-gradient(180deg,#F7FAFD 0%,#EFF5FB 42%,#FFFFFF 100%); c
 .tp-modal-bullets { margin:10px 0 0; padding-left:18px; color:var(--text-sub); }
 .tp-modal-bullets li { margin:6px 0; line-height:1.7; }
 @media (max-width: 960px) {
-  .tp-hero, .tp-grid-3, .tp-grid-2 { grid-template-columns:1fr; }
+  .tp-hero, .tp-grid-3, .tp-grid-2, .tp-value-grid, .tp-dashboard-kpi-row, .tp-parent-copy-grid, .tp-contact-grid, .tp-dashboard-shell { grid-template-columns:1fr; }
   .tp-title { font-size:30px; }
+  .tp-dashboard-cell-grid { grid-template-columns:1fr; }
 }
 </style>
 </head>
@@ -91,175 +165,145 @@ body { background:linear-gradient(180deg,#F7FAFD 0%,#EFF5FB 42%,#FFFFFF 100%); c
     </div>
   </div>
 
-  <section class="tp-hero">
-    <div class="tp-card tp-hero-main">
-      <div class="tp-kicker">FAN PORTAL · {{ portal.tenant.short_name }}</div>
-      <div class="tp-title">{{ portal.tenant.portal_headline }}</div>
-      <div class="tp-desc">{{ portal.tenant.portal_description }}</div>
-      <div class="tp-chip-row">
-        <span class="tp-chip">主理人：{{ portal.tenant.advisor }}</span>
-        <span class="tp-chip">{{ portal.tenant.focus }}</span>
-        <span class="tp-chip">{{ portal.tenant.rights }}</span>
+  {% set page_blocks = portal.portal_workspace.page_blocks or [] %}
+  {% for block in page_blocks if block.enabled != false %}
+    {% if block.type == 'hero' %}
+    <section class="tp-hero">
+      <div class="tp-card tp-hero-main">
+        <div class="tp-kicker">FAN PORTAL · {{ portal.tenant.short_name }}</div>
+        <div class="tp-title">{{ portal.portal_workspace.hero.headline }}</div>
+        <div class="tp-desc">{{ portal.portal_workspace.hero.description }}</div>
+        <div class="tp-chip-row">
+          <span class="tp-chip">主理人：{{ portal.tenant.advisor }}</span>
+          <span class="tp-chip">{{ portal.tenant.focus }}</span>
+          <span class="tp-chip">{{ portal.tenant.rights }}</span>
+        </div>
+        <div class="tp-cta-row">
+          <a href="{{ portal.cta.primary_href }}" class="btn-gold" style="text-decoration:none">{{ portal.cta.primary_label }}</a>
+          <a href="{{ portal.cta.secondary_href }}" class="btn-outline" style="text-decoration:none">{{ portal.cta.secondary_label }}</a>
+        </div>
       </div>
-      <div class="tp-cta-row">
-        <a href="{{ portal.cta.primary_href }}" class="btn-gold" style="text-decoration:none">{{ portal.cta.primary_label }}</a>
-        <a href="{{ portal.cta.secondary_href }}" class="btn-outline" style="text-decoration:none">{{ portal.cta.secondary_label }}</a>
+      <div class="tp-card tp-side-panel">
+        {% for item in portal.hero_stats %}
+        <div class="tp-side-block">
+          <div class="tp-side-label">{{ item.label }}</div>
+          <div class="tp-side-value">{{ item.value }}</div>
+        </div>
+        {% endfor %}
+        <div class="tp-side-block">
+          <div class="tp-side-label">适合谁先看</div>
+          <div class="tp-side-value">{{ portal.portal_workspace.hero.audience }}</div>
+          <div class="tp-side-copy">先看内容，再去 H5 做自选股跟踪、Hermes 对话和专属提问，路径会更顺。</div>
+        </div>
       </div>
-    </div>
-    <div class="tp-card tp-side-panel">
-      {% for item in portal.hero_stats %}
-      <div class="tp-side-block">
-        <div class="tp-side-label">{{ item.label }}</div>
-        <div class="tp-side-value">{{ item.value }}</div>
-      </div>
-      {% endfor %}
-      <div class="tp-side-block">
-        <div class="tp-side-label">适合谁先看</div>
-        <div class="tp-side-value">已经在跟 {{ portal.tenant.advisor }} 研究口径，想先快速理解当前主线和重点样本的粉丝用户。</div>
-        <div class="tp-side-copy">先看内容，再去 H5 做自选股跟踪、Hermes 对话和专属提问，路径会更顺。</div>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="tp-section">
-    <div class="tp-section-head">
-      <div>
-        <h2>这个门户先解决什么</h2>
-        <p>不是把后台功能搬过来，而是先把粉丝最需要消费的内容和理解入口收拢起来。</p>
-      </div>
-    </div>
-    {% for group in portal.audience_sections %}
-    <div style="margin-bottom:18px">
-      <div class="tp-section-head" style="margin-bottom:12px">
+    <section class="tp-section">
+      <div class="tp-section-head">
         <div>
-        <h2 style="font-size:20px">{{ group["title"] }}</h2>
-        <p>{{ group["desc"] }}</p>
+          <h2>{{ block.title or '门户介绍与价值主张' }}</h2>
+          <p>这一段是门户上半部，先讲清楚这位大V是谁、为什么值得关注、门户适合谁先看，而不是先把粉丝直接扔进功能页。</p>
+        </div>
       </div>
-    </div>
-    <div class="tp-grid-3">
-        {% for item in group["items"] %}
+      <div class="tp-value-grid">
+        {% for item in portal.portal_workspace.hero.value_props %}
         <div class="tp-info-card">
-          <strong>{{ item["title"] }}</strong>
-          <p>{{ item["desc"] }}</p>
+          <strong>价值主张 {{ loop.index }}</strong>
+          <p>{{ item }}</p>
         </div>
         {% endfor %}
       </div>
-    </div>
-    {% endfor %}
-  </section>
-
-  <section class="tp-section" id="latest-review">
-    <div class="tp-section-head">
-      <div>
-        <h2>最近复盘</h2>
-        <p>这里展示的是已经确认发布、适合粉丝直接阅读的代表性复盘，不展示大V后台里的草稿和经营数据。</p>
-      </div>
-    </div>
-    <div class="tp-review-list">
-      {% for item in portal.featured_reviews %}
-      <div class="tp-review-row tp-clickable" onclick='openPortalDetail({{ item | tojson }}, "review")'>
-        <div class="tp-review-title">{{ item.title }}</div>
-        <div class="tp-review-meta">
-          <span class="tp-mini-chip">{{ item.period }}</span>
-          <span class="tp-mini-chip">{{ item.time }}</span>
-          {% for tag in item.tags %}
-          <span class="tp-mini-chip">{{ tag }}</span>
-          {% endfor %}
+    </section>
+    {% elif block.type == 'dashboard' %}
+    <section class="tp-section" id="portal-dashboard">
+      <div class="tp-section-head">
+        <div>
+          <h2>{{ block.title or '固定 Dashboard' }}</h2>
+          <p>中间这一段固定承接 Dashboard，不作为父客户端的自由拖拽区。粉丝在这里先看研究与经营摘要，再决定是否继续深入。</p>
         </div>
-        <div class="tp-review-copy">{{ item.summary }}</div>
-        <div class="tp-review-meta">
-          {% for stock in item.watchlist %}
-          <span class="tp-mini-chip">{{ stock }}</span>
-          {% endfor %}
+      </div>
+      <div class="tp-dashboard-kpi-row">
+        {% for item in portal.dashboard_metrics.kpis %}
+        <div class="tp-kpi-card">
+          <div class="tp-kpi-label">{{ item.label }}</div>
+          <div class="tp-kpi-value">{{ item.value }}</div>
+          <div class="tp-kpi-sub">{{ item.sub }}</div>
         </div>
-        <div class="tp-detail-link">查看详情</div>
+        {% endfor %}
       </div>
-      {% endfor %}
-    </div>
-  </section>
-
-  <section class="tp-section">
-    <div class="tp-section-head">
-      <div>
-        <h2>当前重点样本</h2>
-        <p>粉丝先看到这位主理人最近重点跟踪哪些样本，再决定后续是否加入自选或继续提问。</p>
-      </div>
-    </div>
-    <div class="tp-grid-3">
-      {% for item in portal.featured_watchlist %}
-      <div class="tp-watch-item tp-clickable" onclick='openPortalDetail({{ item | tojson }}, "watch")'>
-        <div class="tp-watch-top">
-          <div>
-            <div class="tp-watch-name">{{ item.name }}</div>
-            <div class="tp-watch-code">{{ item.code }} · {{ item.market }} · {{ item.focus }}</div>
+      <div class="tp-dashboard-shell" style="margin-top:16px">
+        <div class="tp-dashboard-panel">
+          <strong style="display:block;font-size:16px;color:#172132">智能 Dashboard 面板</strong>
+          <div class="tp-dashboard-summary" style="margin-top:10px">{{ portal.fund_dashboard.summary }}</div>
+          <div class="tp-dashboard-cell-grid">
+            {% for cell in portal.fund_dashboard.cells %}
+            <div class="tp-dashboard-cell">
+              <strong>{{ cell.title }}</strong>
+              <span>{{ cell.value or '待定义' }}</span>
+            </div>
+            {% endfor %}
           </div>
-          <div class="tp-watch-change">{{ item.change }}</div>
         </div>
-        <p style="margin:10px 0 0;font-size:13px;line-height:1.8;color:var(--text-sub)">{{ item.thesis }}</p>
-        <div class="tp-detail-link">查看详情</div>
-      </div>
-      {% endfor %}
-    </div>
-  </section>
-
-  <section class="tp-section">
-    <div class="tp-section-head">
-      <div>
-        <h2>研究框架</h2>
-        <p>粉丝不只看结论，也能先理解这位大V平时怎么看估值、验证节点和风险边界。</p>
-      </div>
-    </div>
-    <div class="tp-grid-3">
-      {% for item in portal.research_framework %}
-      <div class="tp-framework-card tp-clickable" onclick='openPortalDetail({{ item | tojson }}, "framework")'>
-        <strong>{{ item.title }}</strong>
-        <p>{{ item.desc }}</p>
-        <div class="tp-detail-link">查看详情</div>
-      </div>
-      {% endfor %}
-    </div>
-  </section>
-
-  <section class="tp-section">
-    <div class="tp-section-head">
-      <div>
-        <h2>可继续使用的服务</h2>
-        <p>看完门户内容以后，粉丝再进入 H5 做更深一层的跟踪、问答和互动。</p>
-      </div>
-    </div>
-    <div class="tp-grid-2">
-      {% for item in portal.service_cards %}
-      <div class="tp-service-card tp-clickable" onclick='openPortalDetail({{ item | tojson }}, "service")'>
-        <strong>{{ item.title }}</strong>
-        <p>{{ item.desc }}</p>
-        <div class="tp-detail-link">查看详情</div>
-      </div>
-      {% endfor %}
-    </div>
-  </section>
-
-  <section class="tp-section">
-    <div class="tp-section-head">
-      <div>
-        <h2>代表性知识沉淀</h2>
-        <p>这里展示的是已经沉淀下来的框架和资料方向，帮助粉丝理解这位主理人的研究积累。</p>
-      </div>
-    </div>
-    <div class="tp-grid-2">
-      {% for item in portal.knowledge_spotlight %}
-      <div class="tp-spotlight-card tp-clickable" onclick='openPortalDetail({{ item | tojson }}, "knowledge")'>
-        <strong>{{ item.title }}</strong>
-        <p>{{ item.summary }}</p>
-        <div class="tp-review-meta">
-          {% for tag in item.tags %}
-          <span class="tp-mini-chip">{{ tag }}</span>
-          {% endfor %}
+        <div class="tp-dashboard-side">
+          <strong style="display:block;font-size:16px;color:#172132">当前代表性内容</strong>
+          <div class="tp-dashboard-summary" style="margin-top:10px">Dashboard 固定展示在门户中段，帮助粉丝先快速理解当前核心方向，再决定是否继续查看复盘、样本或进入 H5。</div>
+          <div class="tp-review-list" style="margin-top:16px">
+            {% for item in portal.featured_reviews[:2] %}
+            <div class="tp-review-row tp-clickable" onclick='openPortalDetail({{ item | tojson }}, "review")'>
+              <div class="tp-review-title">{{ item.title }}</div>
+              <div class="tp-review-meta">
+                <span class="tp-mini-chip">{{ item.period }}</span>
+                <span class="tp-mini-chip">{{ item.time }}</span>
+              </div>
+              <div class="tp-review-copy">{{ item.summary }}</div>
+            </div>
+            {% endfor %}
+          </div>
         </div>
-        <div class="tp-detail-link">查看详情</div>
       </div>
-      {% endfor %}
-    </div>
-  </section>
+    </section>
+    {% elif block.type == 'rich_text' %}
+    <section class="tp-section">
+      <div class="tp-section-head">
+        <div>
+          <h2>{{ block.title or '自定义文案区' }}</h2>
+          <p>这里是父客户端的内容编辑区。大V可以自己写特色介绍、长期主张、服务说明和专题文案，而不是只放很多零散卡片。</p>
+        </div>
+      </div>
+      <div class="tp-parent-copy-card">
+        <div class="tp-rich-html">{{ block.html | safe }}</div>
+      </div>
+    </section>
+    {% elif block.type == 'contact' %}
+    <section class="tp-section">
+      <div class="tp-section-head">
+        <div>
+          <h2>{{ block.title or '扫码与联系方式' }}</h2>
+          <p>门户最下方固定提供扫码、企微和联系方式，方便粉丝继续加入社群、添加助手或建立更稳定的联系。</p>
+        </div>
+      </div>
+      <div class="tp-contact-grid">
+        <div class="tp-qr-card">
+          <div style="font-size:16px;font-weight:700;color:#172132">{{ portal.portal_workspace.contact.qr_title }}</div>
+          <div class="tp-contact-copy" style="margin-top:8px">{{ portal.portal_workspace.contact.qr_hint }}</div>
+          <div style="margin-top:18px;display:flex;justify-content:center">
+            <div class="tp-qr-box">⌘</div>
+          </div>
+        </div>
+        <div class="tp-contact-card">
+          <div style="font-size:16px;font-weight:700;color:#172132">联系信息</div>
+          <div class="tp-contact-list">
+            <div class="tp-contact-line"><span>主理人</span><strong>{{ portal.tenant.advisor }}</strong></div>
+            <div class="tp-contact-line"><span>微信助手</span><strong>{{ portal.portal_workspace.contact.wechat }}</strong></div>
+            <div class="tp-contact-line"><span>联系电话</span><strong>{{ portal.portal_workspace.contact.phone }}</strong></div>
+            <div class="tp-contact-line"><span>联系邮箱</span><strong>{{ portal.portal_workspace.contact.email }}</strong></div>
+          </div>
+          <div class="tp-contact-copy" style="margin-top:16px">这里是粉丝和大V建立进一步联系的固定区块，适合放企微、公众号、客服入口、线下活动报名和长期留资信息。</div>
+        </div>
+      </div>
+    </section>
+    {% endif %}
+  {% endfor %}
 
   <div class="tp-footer-note">
     这里是面向粉丝的内容门户，不是大V自己的后台。大V自己的复盘生产、粉丝消息、知识经营和工作流协同，仍然只放在工作台里，不暴露给粉丝。所有研究内容仅供参考，不构成投资建议。

@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="/static/css/style.css">
 <script>
   window.SITE_CONFIG = {{ site_config | tojson }};
+  window.ADMIN_INDICATOR_HUB = {{ indicator_hub | tojson }};
   window.AUTO_INIT_DASHBOARD = false;
 </script>
 <script src="/static/js/theme.js"></script>
@@ -94,6 +95,118 @@
   .theme-pill.active { background:rgba(200,169,110,0.15); color:var(--gold); border-color:var(--gold); }
   .feature-note { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:10px; }
   .admin-status { font-size:13px; color:var(--text-sub); margin:12px 0 0; min-height:18px; }
+  .tenant-admin-shell {
+    display:grid;
+    grid-template-columns:300px minmax(0,1fr);
+    gap:20px;
+    align-items:start;
+  }
+  .tenant-admin-sidebar {
+    position:sticky;
+    top:20px;
+  }
+  .tenant-admin-toolbar {
+    display:flex;
+    gap:8px;
+    margin:14px 0 16px;
+    flex-wrap:wrap;
+  }
+  .tenant-admin-list {
+    display:grid;
+    gap:10px;
+  }
+  .tenant-admin-item {
+    border:1px solid rgba(200,169,110,0.12);
+    background:var(--surface);
+    border-radius:12px;
+    padding:12px;
+    cursor:pointer;
+    transition:border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  }
+  .tenant-admin-item:hover {
+    border-color:rgba(200,169,110,0.26);
+    box-shadow:0 10px 24px rgba(14,33,55,0.06);
+    transform:translateY(-1px);
+  }
+  .tenant-admin-item.active {
+    border-color:rgba(47,116,192,0.36);
+    box-shadow:0 12px 28px rgba(47,116,192,0.10);
+    background:linear-gradient(180deg, rgba(47,116,192,0.05), var(--surface));
+  }
+  .tenant-admin-item-top {
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:10px;
+  }
+  .tenant-admin-item-title {
+    font-size:13px;
+    font-weight:700;
+    color:var(--text-main);
+  }
+  .tenant-admin-item-sub {
+    margin-top:4px;
+    font-size:11px;
+    color:var(--text-sub);
+    line-height:1.6;
+  }
+  .tenant-admin-item-meta {
+    margin-top:10px;
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+  .tenant-admin-badge {
+    display:inline-flex;
+    align-items:center;
+    border-radius:999px;
+    padding:4px 8px;
+    font-size:10px;
+    color:#1F497D;
+    background:#EAF3FF;
+  }
+  .tenant-admin-default {
+    color:var(--gold);
+    background:rgba(200,169,110,0.12);
+    border:1px solid rgba(200,169,110,0.18);
+  }
+  .tenant-admin-detail-head {
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:16px;
+    margin-bottom:16px;
+  }
+  .tenant-admin-detail-title {
+    font-size:18px;
+    font-weight:700;
+    color:var(--text-main);
+  }
+  .tenant-admin-detail-desc {
+    margin-top:6px;
+    font-size:12px;
+    color:var(--text-sub);
+    line-height:1.7;
+  }
+  .tenant-admin-detail-grid {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+  }
+  .tenant-admin-empty {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    min-height:420px;
+    border:1px dashed rgba(200,169,110,0.18);
+    border-radius:14px;
+    background:var(--surface-2);
+    font-size:13px;
+    color:var(--text-sub);
+    text-align:center;
+    line-height:1.8;
+    padding:24px;
+  }
   .admin-build-tag {
     display:inline-flex;
     align-items:center;
@@ -396,6 +509,146 @@
     color: var(--text-main) !important;
     caret-color: var(--text-main);
   }
+  .admin-modal-overlay {
+    position:fixed;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    background:rgba(7,18,31,0.56);
+    z-index:10000;
+  }
+  .admin-modal-overlay.show { display:flex; }
+  .admin-modal-sheet {
+    width:min(900px, 100%);
+    max-height:min(88vh, 920px);
+    overflow:auto;
+    background:var(--surface);
+    border:1px solid rgba(200,169,110,0.16);
+    border-radius:18px;
+    box-shadow:0 24px 80px rgba(9,22,37,0.28);
+    padding:22px;
+  }
+  .admin-modal-head {
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:16px;
+    margin-bottom:18px;
+  }
+  .admin-modal-title { font-size:20px; color:var(--text-main); font-weight:700; }
+  .admin-modal-subtitle { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:4px; }
+  .admin-modal-close {
+    width:34px;
+    height:34px;
+    border-radius:50%;
+    border:1px solid rgba(200,169,110,0.2);
+    background:transparent;
+    color:var(--text-sub);
+    font-size:22px;
+    cursor:pointer;
+  }
+  .admin-modal-close:hover { color:var(--gold); border-color:rgba(200,169,110,0.42); }
+  .admin-modal-grid {
+    display:grid;
+    gap:16px;
+  }
+  .admin-modal-card {
+    background:var(--surface-2);
+    border:1px solid rgba(200,169,110,0.12);
+    border-radius:14px;
+    padding:16px;
+  }
+  .admin-modal-card-title { font-size:13px; color:var(--gold); font-weight:600; margin-bottom:10px; }
+  .admin-modal-list { display:grid; gap:10px; }
+  .admin-modal-item {
+    border:1px solid rgba(200,169,110,0.1);
+    border-radius:10px;
+    padding:12px;
+    background:var(--surface);
+  }
+  .admin-modal-item-top {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    margin-bottom:6px;
+  }
+  .admin-modal-copy { font-size:12px; color:var(--text-sub); line-height:1.7; white-space:pre-wrap; }
+  .admin-modal-summary {
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:12px;
+    margin-bottom:14px;
+  }
+  .admin-modal-stat {
+    background:var(--surface);
+    border:1px solid rgba(200,169,110,0.1);
+    border-radius:12px;
+    padding:12px;
+    min-height:92px;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+  }
+  .admin-modal-stat-label { font-size:11px; color:var(--text-sub); }
+  .admin-modal-stat-value {
+    margin-top:8px;
+    font-size:20px;
+    font-weight:700;
+    line-height:1.35;
+    color:var(--text-main);
+    word-break:break-word;
+  }
+  .admin-modal-stat-value.compact { font-size:14px; }
+  .admin-modal-stat-badge { margin-top:8px; display:flex; align-items:flex-start; }
+  .admin-modal-section-note {
+    background:var(--surface);
+    border:1px solid rgba(200,169,110,0.1);
+    border-radius:12px;
+    padding:10px 12px;
+    margin-bottom:10px;
+  }
+  .admin-modal-section-title { font-size:12px; font-weight:700; color:var(--text-main); }
+  .admin-modal-section-copy { margin-top:4px; font-size:11px; color:var(--text-sub); line-height:1.6; }
+  .admin-modal-history-list { display:grid; gap:8px; }
+  .admin-modal-history-row {
+    display:grid;
+    grid-template-columns:78px minmax(0, 1fr) auto;
+    align-items:center;
+    gap:10px;
+    background:var(--surface);
+    border:1px solid rgba(200,169,110,0.1);
+    border-radius:999px;
+    padding:8px 12px;
+  }
+  .admin-modal-history-date { font-size:11px; font-weight:700; color:var(--text-main); }
+  .admin-modal-history-text {
+    min-width:0;
+    font-size:11px;
+    color:var(--text-sub);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .admin-chip-row { display:flex; flex-wrap:wrap; gap:8px; }
+  .admin-chip {
+    font-size:11px;
+    color:var(--gold-dark);
+    background:rgba(200,169,110,0.1);
+    border:1px solid rgba(200,169,110,0.16);
+    border-radius:999px;
+    padding:4px 10px;
+  }
+  @media (max-width: 980px) {
+    .admin-modal-overlay { padding:12px; }
+    .admin-modal-sheet { padding:18px; border-radius:16px; }
+    .admin-modal-grid { grid-template-columns:1fr; }
+    .tenant-admin-shell,
+    .tenant-admin-detail-grid { grid-template-columns:1fr; }
+    .tenant-admin-sidebar { position:static; }
+  }
 </style>
 </head>
 <body onload="initGangtiseTheme()">
@@ -461,6 +714,9 @@
       </div>
       <div class="admin-nav-group">
         <div class="admin-nav-group-title">数据分析</div>
+        <div class="admin-nav-item" data-section="indicator-hub" onclick="showSection('indicator-hub', this)">
+          <span class="admin-nav-icon">&#128202;</span> 指标专区
+        </div>
         <div class="admin-nav-item" id="nav-funnel" onclick="showAnalyticsSection('funnel')">
           <span class="admin-nav-icon">&#128202;</span> 转化漏斗
         </div>
@@ -543,7 +799,7 @@
           </div>
           <div class="sync-note-card">
             <div class="sync-note-title">H5 能力是后台单一事实源</div>
-            <div class="sync-note-desc">Hermes、复盘、知识、自选股、消息和核心指标面板，都按同一套产品口径映射到前后台。</div>
+            <div class="sync-note-desc">Hermes、复盘、知识、自选股、消息和智能 Dashboard，都按同一套产品口径映射到前后台；租户门户则作为独立的粉丝内容入口维护。</div>
           </div>
           <div class="sync-note-card">
             <div class="sync-note-title">平台只做平台职责</div>
@@ -627,7 +883,7 @@
               <tr><td style="color:#F8F6F0;font-weight:500">知识库</td><td>知识专区展示沉淀结果</td><td>语音/文件/URL 入库，历史内容继续微调</td><td>管理知识功能开关和租户能力边界</td></tr>
               <tr><td style="color:#F8F6F0;font-weight:500">Hermes</td><td>工作区版 + 龙虾纯对话版</td><td>维护 skill、知识绑定、查看使用动作</td><td>监控调用、算力、双版本使用与知识命中</td></tr>
               <tr><td style="color:#F8F6F0;font-weight:500">自选股</td><td>顶部输代码，进详情后添加自选</td><td>按复盘和 Hermes 工作流挑选重点样本</td><td>不直接管理个股内容，只管理功能可用性</td></tr>
-              <tr><td style="color:#F8F6F0;font-weight:500">核心指标面板</td><td>默认总结态，单格提示词生成</td><td>配置单格提示词和发布面板</td><td>管理该能力的租户开关和一致性说明</td></tr>
+              <tr><td style="color:#F8F6F0;font-weight:500">智能 Dashboard</td><td>默认总结态，单格提示词生成</td><td>配置单格提示词和发布面板</td><td>管理该能力的租户开关和一致性说明</td></tr>
             </tbody>
           </table>
         </div>
@@ -917,89 +1173,49 @@
 
       <!-- ===== KOLS ===== -->
       <div id="section-kols" style="display:none">
-          <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">
           <div class="stat-card">
-            <div class="stat-label">种子投顾租户</div>
-            <span class="stat-icon">&#9812;</span>
-            <div class="stat-value">2</div>
-            <div class="stat-change up">贡献协同收入 54%</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">本月总分成</div>
+            <div class="stat-label">租户总数</div>
             <span class="stat-icon">&#9775;</span>
-            <div class="stat-value">¥8.9万</div>
-            <div class="stat-change up">&#9650; +6.2%</div>
+            <div class="stat-value" id="tenant-total-count">2</div>
+            <div class="stat-change up">一个大V对应一个租户</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">待审核投顾申请</div>
-            <span class="stat-icon">&#9998;</span>
-            <div class="stat-value">6</div>
-            <div class="stat-change" style="color:#C8A96E">需处理</div>
+            <div class="stat-label">默认门户</div>
+            <span class="stat-icon">&#127968;</span>
+            <div class="stat-value" id="tenant-default-name">老王研究院</div>
+            <div class="stat-change up">首页和默认入口使用</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">已开通工作台</div>
+            <span class="stat-icon">&#128187;</span>
+            <div class="stat-value">2</div>
+            <div class="stat-change up">租户经营入口统一管理</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">品牌配置状态</div>
+            <span class="stat-icon">&#128295;</span>
+            <div class="stat-value">已集中</div>
+            <div class="stat-change up">不再散落在系统设置</div>
           </div>
         </div>
-        <div class="sync-grid" style="margin-bottom:20px">
-          <div class="sync-card">
-            <div class="sync-title">大V工作台能力映射</div>
-            <div class="sync-desc">平台侧必须知道大V工作台现在承接的，不只是消息和群发，还包括复盘生产、知识微调、Hermes 双版本、自选股详情和核心指标面板。</div>
-            <div class="sync-chip-row">
-              <span class="sync-chip">粉丝消息 + 复盘提醒</span>
-              <span class="sync-chip">复盘周期 / 供稿方式 / 选股归纳</span>
-              <span class="sync-chip">知识库历史微调</span>
-              <span class="sync-chip">Hermes 工作区版</span>
-              <span class="sync-chip">Hermes 龙虾纯对话版</span>
-              <span class="sync-chip">自选股详情 + K线 + MA5/10/20</span>
-              <span class="sync-chip">基本面单格提示词面板</span>
+        <div class="tenant-admin-shell">
+          <div class="config-card tenant-admin-sidebar">
+            <div class="config-card-title">大V租户列表</div>
+            <div class="feature-note">
+              一个大V就是一个租户。这里负责新增租户、选择默认门户，并进入租户详情统一维护品牌、门户与智能 Dashboard 的定义边界。
             </div>
-          </div>
-          <div class="sync-card">
-            <div class="sync-title">平台管理动作</div>
-            <div class="sync-desc">Admin 不直接替代大V工作台，而是管理租户是否开通这些能力、能力是否一致、消息与知识是否能在租户内闭环。</div>
-            <div class="sync-chip-row">
-              <span class="sync-chip">租户开通 Hermes</span>
-              <span class="sync-chip">租户开通知识库</span>
-              <span class="sync-chip">租户开通复盘工作流</span>
-              <span class="sync-chip">租户开通 DM 消息链路</span>
-              <span class="sync-chip">租户开通工作台入口</span>
+            <div class="config-field" style="margin-top:14px">
+              <label>默认租户门户</label>
+              <select id="default-tenant-slug" onchange="updateDefaultTenantSlug(this.value)"></select>
             </div>
+            <div class="tenant-admin-toolbar">
+              <button class="btn-outline" style="padding:8px 14px;font-size:12px" onclick="addAdminTenant()">+ 新增租户</button>
+              <button class="btn-gold" style="padding:8px 14px;font-size:12px" onclick="saveSiteConfig()">保存租户配置</button>
+            </div>
+            <div id="tenant-config-list" class="tenant-admin-list"></div>
           </div>
-        </div>
-        <div class="table-wrap" style="margin-bottom:20px">
-          <div class="table-header">
-            <div class="table-title">大V投顾列表</div>
-            <button class="btn-gold" style="padding:6px 14px;font-size:12px" onclick="showToast('新增投顾表单已打开')">+ 新增投顾</button>
-          </div>
-          <table>
-            <thead><tr><th>投顾名称</th><th>协同渠道</th><th>关注样本</th><th>本月协同收入</th><th>分成</th><th>阶段</th><th>操作</th></tr></thead>
-            <tbody>
-              {% for kol in kols %}
-              <tr>
-                <td><span style="color:#F8F6F0;font-weight:500">{{ kol.name }}</span></td>
-                <td>{{ kol.platform }}</td>
-                <td>{{ "{:,}".format(kol.followers) }}</td>
-                <td>¥{{ "{:,}".format(kol.gmv) }}</td>
-                <td style="color:#C8A96E">¥{{ "{:,}".format(kol.commission) }}</td>
-                <td><span class="{% if '种子' in kol.tier %}tier-s{% elif 'A' in kol.tier or '成长' in kol.tier %}tier-a{% else %}tier-b{% endif %}">{{ kol.tier }}</span></td>
-                <td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-blue" onclick="showToast('结算已发起')">结算</button></td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        <div class="table-wrap">
-          <div class="table-header">
-            <div class="table-title">大V投顾申请审核</div>
-            <span class="tag tag-gold">待审核 6 条</span>
-          </div>
-          <table>
-            <thead><tr><th>申请人</th><th>来源</th><th>关注样本</th><th>内容方向</th><th>申请阶段</th><th>提交时间</th><th>操作</th></tr></thead>
-            <tbody>
-              <tr><td style="color:#F8F6F0">林晓宇</td><td>微信社群</td><td>12,800</td><td>宏观经济分析</td><td><span class="tier-a">成长投顾</span></td><td>今日 09:12</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
-              <tr><td style="color:#F8F6F0">陈雨桐</td><td>内容合作</td><td>8,420</td><td>A股技术分析</td><td><span class="tier-b">观察投顾</span></td><td>今日 08:44</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
-              <tr><td style="color:#F8F6F0">黄志远</td><td>小红书</td><td>21,000</td><td>港股投资策略</td><td><span class="tier-s">种子投顾</span></td><td>昨日 22:30</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
-              <tr><td style="color:#F8F6F0">苏梦琪</td><td>转介绍</td><td>5,680</td><td>基金定投科普</td><td><span class="tier-b">观察投顾</span></td><td>昨日 18:15</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
-              <tr><td style="color:#F8F6F0">方浩天</td><td>内容合作</td><td>32,000</td><td>量化交易策略</td><td><span class="tier-a">成长投顾</span></td><td>昨日 14:08</td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="showToast('申请已通过')">通过</button><button class="btn-sm-red" onclick="showToast('申请已拒绝')">拒绝</button></td></tr>
-            </tbody>
-          </table>
+          <div id="tenant-detail-panel"></div>
         </div>
       </div><!-- end section-kols -->
 
@@ -1171,6 +1387,139 @@
           </div>
         </div>
       </div><!-- end section-community -->
+
+      <div id="section-indicator-hub" style="display:none">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">纳管指标</div>
+            <span class="stat-icon">&#9638;</span>
+            <div class="stat-value">{{ indicator_hub.summary.total }}</div>
+            <div class="stat-change up">智能 {{ indicator_hub.summary.smart_total }} · 数据湖 {{ indicator_hub.summary.lake_total }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">启用中</div>
+            <span class="stat-icon">&#10003;</span>
+            <div class="stat-value" id="admin-indicator-enabled-count">{{ indicator_hub.summary.enabled }}</div>
+            <div class="stat-change up">Admin 可控开关</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">重点异动</div>
+            <span class="stat-icon">&#9888;</span>
+            <div class="stat-value">{{ indicator_hub.summary.anomalies }}</div>
+            <div class="stat-change" style="color:#C8A96E">需第一时间跟进</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">预警 / 关注</div>
+            <span class="stat-icon">&#128202;</span>
+            <div class="stat-value">{{ indicator_hub.summary.warnings }} / {{ indicator_hub.summary.attention }}</div>
+            <div class="stat-change up">同步前台与工作台</div>
+          </div>
+        </div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <div class="table-header">
+            <div>
+              <div class="table-title">智能指标</div>
+              <div style="font-size:12px;color:#8899aa;margin-top:6px">这类指标来自大V输入与平台智能分析口径，可用于复盘、Hermes 和核心指标判断。</div>
+            </div>
+            <span class="tag tag-gold">大V输入</span>
+          </div>
+          <table>
+            <thead><tr><th>指标</th><th>分类</th><th>当前值</th><th>判断</th><th>状态</th><th>开关</th><th>最后更新</th><th>操作</th></tr></thead>
+            <tbody>
+              {% for item in indicator_hub["smart_items"] %}
+              <tr>
+                <td><span style="color:#F8F6F0;font-weight:600">{{ item.name }}</span><div style="font-size:11px;color:#8899aa;margin-top:4px">{{ item.owner }}</div></td>
+                <td>{{ item.category }}</td>
+                <td style="color:#C8A96E">{{ item.value }}</td>
+                <td style="max-width:260px;color:#8899aa">{{ item.assessment }}</td>
+                <td>
+                  {% if item.status == 'warning' %}
+                  <span class="tag tag-red">预警</span>
+                  {% elif item.status == 'attention' %}
+                  <span class="tag tag-gold">关注</span>
+                  {% else %}
+                  <span class="tag tag-green">正常</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <label class="toggle">
+                    <input type="checkbox" {% if item.enabled %}checked{% endif %} onchange="toggleAdminIndicator('{{ item.id }}', this.checked)">
+                    <span class="toggle-slider"></span>
+                  </label>
+                </td>
+                <td>{{ item.last_updated }}</td>
+                <td>
+                  <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="openAdminIndicatorHistory('{{ item.id }}')">历史详情</button>
+                  <button class="btn-sm-blue" onclick="showToast('已加入异动监测队列')">监测异动</button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <div class="table-header">
+            <div>
+              <div class="table-title">数据湖指标</div>
+              <div style="font-size:12px;color:#8899aa;margin-top:6px">这类指标直接来自 `/Users/xuchenfei/PycharmProjects/market_dashboard/data_sources.json`，用于统一展示 market_dashboard 已接入的全部指标源。</div>
+            </div>
+            <span class="tag tag-blue">market_dashboard</span>
+          </div>
+          <table>
+            <thead><tr><th>指标</th><th>分类</th><th>当前状态</th><th>来源说明</th><th>状态</th><th>开关</th><th>最后更新</th><th>操作</th></tr></thead>
+            <tbody>
+              {% for item in indicator_hub["lake_items"] %}
+              <tr>
+                <td><span style="color:#F8F6F0;font-weight:600">{{ item.name }}</span><div style="font-size:11px;color:#8899aa;margin-top:4px">{{ item.owner }}</div></td>
+                <td>{{ item.category }}</td>
+                <td style="color:#C8A96E">{{ item.value }}</td>
+                <td style="max-width:320px;color:#8899aa">{{ item.assessment }}</td>
+                <td>
+                  {% if item.status == 'warning' %}
+                  <span class="tag tag-red">预警</span>
+                  {% elif item.status == 'attention' %}
+                  <span class="tag tag-gold">关注</span>
+                  {% else %}
+                  <span class="tag tag-green">正常</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <label class="toggle">
+                    <input type="checkbox" {% if item.enabled %}checked{% endif %} onchange="toggleAdminIndicator('{{ item.id }}', this.checked)">
+                    <span class="toggle-slider"></span>
+                  </label>
+                </td>
+                <td>{{ item.last_updated }}</td>
+                <td>
+                  <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="openAdminIndicatorHistory('{{ item.id }}')">历史详情</button>
+                  <button class="btn-sm-blue" onclick="showToast('已加入数据湖异动监测队列')">监测异动</button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap">
+          <div class="table-header">
+            <div class="table-title">异动报告</div>
+            <span class="tag tag-gold">实时监测</span>
+          </div>
+          <table>
+            <thead><tr><th>级别</th><th>异动标题</th><th>摘要</th><th>时间</th><th>操作</th></tr></thead>
+            <tbody>
+              {% for item in indicator_hub["anomalies"] %}
+              <tr>
+                <td>{% if item.level == '高' %}<span class="tag tag-red">高</span>{% else %}<span class="tag tag-gold">中</span>{% endif %}</td>
+                <td><span style="color:#F8F6F0;font-weight:600">{{ item.title }}</span></td>
+                <td style="color:#8899aa">{{ item.summary }}</td>
+                <td>{{ item.time }}</td>
+                <td><button class="btn-outline" style="padding:3px 9px;font-size:11px" onclick="openAdminIndicatorHistory('{{ item.related_indicator_id }}')">查看详情</button></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div><!-- end section-indicator-hub -->
 
       <!-- ===== EVENTS ===== -->
       <div id="section-events" style="display:none">
@@ -2267,7 +2616,7 @@
             </div>
           </div>
           <div class="config-card">
-            <div class="config-card-title">平台品牌与租户入口</div>
+            <div class="config-card-title">平台品牌配置</div>
             <div class="config-field">
               <label>平台名称</label>
               <input id="brand-name" type="text" placeholder="平台名称">
@@ -2296,19 +2645,8 @@
               <label>页脚简介</label>
               <input id="brand-footer-description" type="text" placeholder="页脚简介">
             </div>
-            <div class="config-field">
-              <label>默认租户门户</label>
-              <select id="default-tenant-slug"></select>
-            </div>
             <div class="feature-note">
-              平台品牌用于首页、Admin、默认文案。大V 对外展示则以下方租户配置为准。
-            </div>
-          </div>
-          <div class="config-card" style="grid-column:1 / -1">
-            <div class="config-card-title">租户品牌配置</div>
-            <div id="tenant-config-list" style="display:grid;gap:16px"></div>
-            <div class="feature-note">
-              每个大V租户都可以配置独立门户名称、logo、主理人、介绍和 Dashboard 标题。保存后首页入口、租户门户和工作台会同步切换。
+              平台品牌只用于首页、Admin 和平台默认文案。租户门户与大V对外展示统一放在“大V管理”专区维护。
             </div>
           </div>
           <div class="config-card">
@@ -2360,19 +2698,22 @@
             <div class="feature-note">
               访问密码门禁可由后台直接开关。启用时仍使用服务端配置的访问密码；关闭时首页、H5 和 admin 将直接开放访问。
             </div>
+            <div class="feature-note" style="margin-top:8px">
+              MVP 默认优先开放：基本面、自选股、复盘、消息互动、知识归档、大V工作台和租户门户；预测分析放到约 1 个月后的第二阶段，会员收费能力按层级逐步开放。
+            </div>
           </div>
           <div class="config-card">
             <div class="config-card-title">平台发布策略</div>
             <div class="config-field">
               <label>当前首发范围</label>
-              <input type="text" value="基本面分析 / 自选股 / 复盘专区 + Hermes / 社区 / 大V 工作台 Web" readonly>
+              <input type="text" value="MVP：基本面 H5 / 复盘 / 自选股 / 消息互动 / 知识归档 / 大V门户 CMS / 大V 工作台 Web" readonly>
             </div>
             <div class="config-field">
               <label>策略备注</label>
-              <input type="text" value="平台 Admin 负责能力控开与边界治理，大V 日常经营动作迁移到独立 web 工作台" readonly>
+              <input type="text" value="阶段二（约1个月后）再开放预测分析；收费能力按粉丝与大V层级逐步放开" readonly>
             </div>
             <div class="feature-note">
-              这套配置只描述平台视角的发布与控开，不再把大V 的日常消息、群发和协同动作混在 Admin 后台里。
+              当前一个月目标是满足 MVP：让粉丝和大V先完成消息互动、复盘分享、粉丝扫码导入与知识沉淀；预测分析和更复杂收费能力后移。
             </div>
           </div>
           <div class="config-card">
@@ -2442,13 +2783,18 @@
     </div><!-- end admin-content -->
   </div><!-- end admin-main -->
 </div><!-- end admin-layout -->
+<div class="admin-modal-overlay" id="admin-indicator-modal" onclick="if(event.target===this)closeAdminIndicatorHistory()">
+  <div class="admin-modal-sheet">
+    <div id="admin-indicator-modal-content"></div>
+  </div>
+</div>
 
 <script src="/static/js/charts.js"></script>
 <script>
 const sectionTitles = {
   overview:'运营概览', users:'用户列表', segments:'用户分层', points:'积分管理',
   kols:'大V投顾管理', commission:'收益结算', community:'帖子审核',
-  events:'活动管理', hermes:'Hermes使用统计', 'forecast-model':'预测模型', channels:'渠道管理', analytics:'数据分析', settings:'系统设置', access:'访问审计'
+  events:'活动管理', hermes:'Hermes使用统计', 'forecast-model':'预测模型', channels:'渠道管理', 'indicator-hub':'指标专区', analytics:'数据分析', settings:'系统设置', access:'访问审计'
 };
 const analyticsTitles = {
   funnel: '数据分析 · 转化漏斗',
@@ -2516,6 +2862,235 @@ function escapeHtml(value) {
 
 function escapeAttr(value) {
   return escapeHtml(value);
+}
+
+const adminIndicatorHub = JSON.parse(JSON.stringify(window.ADMIN_INDICATOR_HUB || {summary: {}, items: [], anomalies: []}));
+
+function getAdminIndicatorItemById(indicatorId) {
+  return (adminIndicatorHub.items || []).find((item) => item.id === indicatorId) || null;
+}
+
+function adminIndicatorStatusBadge(status) {
+  if (status === 'warning') return '<span class="tag tag-red">预警</span>';
+  if (status === 'attention') return '<span class="tag tag-gold">关注</span>';
+  return '<span class="tag tag-green">正常</span>';
+}
+
+function indicatorStatusLabel(status) {
+  if (status === 'warning') return '预警';
+  if (status === 'attention') return '关注';
+  return '正常';
+}
+
+function buildIndicatorKlineSvg(klinePayload) {
+  const candles = Array.isArray(klinePayload?.candles) ? klinePayload.candles : [];
+  if (!candles.length) {
+    return '<div class="admin-modal-copy">暂无趋势数据。</div>';
+  }
+  const ma5 = Array.isArray(klinePayload?.ma5) ? klinePayload.ma5 : [];
+  const ma10 = Array.isArray(klinePayload?.ma10) ? klinePayload.ma10 : [];
+  const ma20 = Array.isArray(klinePayload?.ma20) ? klinePayload.ma20 : [];
+  const anomalies = Array.isArray(klinePayload?.anomalies) ? klinePayload.anomalies : [];
+  const width = 320;
+  const height = 200;
+  const padding = { top: 14, right: 10, bottom: 24, left: 10 };
+  const candleAreaHeight = height - padding.top - padding.bottom;
+  const maxPrice = Math.max(...candles.map(item => Number(item.high || 0)), 1);
+  const minPrice = Math.min(...candles.map(item => Number(item.low || 0)), 0);
+  const span = Math.max(maxPrice - minPrice, 1);
+  const step = (width - padding.left - padding.right) / candles.length;
+  const candleWidth = Math.max(5.5, Math.min(7, step * 0.52));
+  const scaleY = (value) => padding.top + ((maxPrice - Number(value || 0)) / span) * candleAreaHeight;
+  const scaleX = (index) => padding.left + step * index + step / 2;
+  const buildMaPath = (items) => {
+    const points = items.map((entry) => {
+      const index = candles.findIndex((candle) => candle.date === entry.date);
+      if (index < 0) return null;
+      return `${scaleX(index).toFixed(2)} ${scaleY(entry.value).toFixed(2)}`;
+    }).filter(Boolean);
+    return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point}`).join(' ');
+  };
+  const gridValues = [maxPrice, minPrice + span / 2, minPrice];
+  const gridlines = gridValues.map((value) => {
+    const y = scaleY(value);
+    return `
+      <line x1="${padding.left}" y1="${y.toFixed(2)}" x2="${width - padding.right}" y2="${y.toFixed(2)}" stroke="rgba(200,169,110,0.08)" stroke-width="1"></line>
+      <text x="${width - padding.right}" y="${(y - 4).toFixed(2)}" text-anchor="end" font-size="9" fill="var(--gray-400)">${Number(value).toFixed(2)}</text>
+    `;
+  }).join('');
+  const candleSvg = candles.map((item, index) => {
+    const x = scaleX(index);
+    const openY = scaleY(item.open);
+    const closeY = scaleY(item.close);
+    const highY = scaleY(item.high);
+    const lowY = scaleY(item.low);
+    const rectY = Math.min(openY, closeY);
+    const rectHeight = Math.max(2, Math.abs(closeY - openY));
+    const color = Number(item.close) >= Number(item.open) ? '#2ECC71' : '#E74C3C';
+    return `
+      <line x1="${x.toFixed(2)}" y1="${highY.toFixed(2)}" x2="${x.toFixed(2)}" y2="${lowY.toFixed(2)}" stroke="${color}" stroke-width="1.2"></line>
+      <rect x="${(x - candleWidth / 2).toFixed(2)}" y="${rectY.toFixed(2)}" width="${candleWidth.toFixed(2)}" height="${rectHeight.toFixed(2)}" rx="1.4" fill="${color}"></rect>
+    `;
+  }).join('');
+  const anomalyMarks = anomalies.map((entry) => {
+    const index = candles.findIndex((candle) => candle.date === entry.date);
+    if (index < 0) return '';
+    const x = scaleX(index);
+    const y = scaleY(entry.value);
+    return `
+      <circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="4.5" fill="rgba(220,53,69,0.14)" stroke="#DC3545" stroke-width="1.4"></circle>
+      <text x="${x.toFixed(2)}" y="${(y - 8).toFixed(2)}" text-anchor="middle" font-size="7" fill="#DC3545">${escapeHtml(entry.label || '异动')}</text>
+    `;
+  }).join('');
+  const tickIndexes = [0, Math.floor((candles.length - 1) / 2), candles.length - 1].filter((value, index, arr) => arr.indexOf(value) === index);
+  const ticks = tickIndexes.map((index) => `
+    <text x="${scaleX(index).toFixed(2)}" y="${height - 6}" text-anchor="middle" font-size="9" fill="var(--gray-400)">${escapeHtml((candles[index].date || '--').slice(5))}</text>
+  `).join('');
+  return `
+    <div style="background:var(--navy);border:1px solid rgba(200,169,110,0.08);border-radius:12px;padding:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:700;color:var(--white)">K线走势</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--gray-400)">
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#F6C453;display:inline-block"></span>MA5</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#5DADE2;display:inline-block"></span>MA10</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#AF7AC5;display:inline-block"></span>MA20</span>
+        </div>
+      </div>
+      <svg viewBox="0 0 ${width} ${height}" width="100%" role="img" aria-label="指标K线与均线图" style="display:block;width:100%;height:auto;aspect-ratio:${width} / ${height}">
+        ${gridlines}
+        ${candleSvg}
+        <path d="${buildMaPath(ma5)}" fill="none" stroke="#F6C453" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="${buildMaPath(ma10)}" fill="none" stroke="#5DADE2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="${buildMaPath(ma20)}" fill="none" stroke="#AF7AC5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+        ${anomalyMarks}
+        ${ticks}
+      </svg>
+    </div>
+  `;
+}
+
+function buildIndicatorTrendSummary(series) {
+  const list = Array.isArray(series) ? series : [];
+  if (!list.length) return [];
+  return list.map((entry, index) => {
+    const numeric = Number(entry.value || 0);
+    const previous = index > 0 ? Number(list[index - 1].value || 0) : numeric;
+    const delta = Number((numeric - previous).toFixed(2));
+    return {
+      date: entry.date || '--',
+      value: entry.value || '--',
+      status: entry.status || 'good',
+      delta,
+      direction: delta > 0 ? '上行' : delta < 0 ? '下行' : '持平',
+    };
+  });
+}
+
+function renderAdminIndicatorSummary() {
+  const enabledCount = (adminIndicatorHub.items || []).filter((item) => item.enabled).length;
+  const node = document.getElementById('admin-indicator-enabled-count');
+  if (node) node.textContent = String(enabledCount);
+}
+
+function toggleAdminIndicator(indicatorId, enabled) {
+  const item = getAdminIndicatorItemById(indicatorId);
+  if (!item) {
+    showToast('未找到指标');
+    return;
+  }
+  item.enabled = Boolean(enabled);
+  renderAdminIndicatorSummary();
+  showToast(`${item.name} 已切换为${item.enabled ? '启用' : '关闭'}`);
+}
+
+function closeAdminIndicatorHistory() {
+  const modal = document.getElementById('admin-indicator-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function openAdminIndicatorHistory(indicatorId) {
+  const item = typeof indicatorId === 'string' ? getAdminIndicatorItemById(indicatorId) : indicatorId;
+  const host = document.getElementById('admin-indicator-modal-content');
+  const modal = document.getElementById('admin-indicator-modal');
+  if (!item || !host || !modal) {
+    showToast('未找到指标详情');
+    return;
+  }
+  const simulatedSeries = Array.isArray(item.simulated_series) ? item.simulated_series : [];
+  const klinePayload = item.simulated_kline || {};
+  const anomalyPoints = Array.isArray(klinePayload.anomalies) ? klinePayload.anomalies : [];
+  const trendSummary = buildIndicatorTrendSummary(simulatedSeries);
+  const currentValue = String(item.value || '--');
+  const valueClass = /[A-Za-z]/.test(currentValue) || currentValue.length >= 9 ? 'admin-modal-stat-value compact' : 'admin-modal-stat-value';
+  host.innerHTML = `
+    <div class="admin-modal-head">
+      <div>
+        <div class="admin-modal-title">${escapeHtml(item.name || '')}</div>
+        <div class="admin-modal-subtitle">${escapeHtml(item.category || '')} · ${escapeHtml(item.owner || '')} · 最后更新 ${escapeHtml(item.last_updated || '--')}</div>
+      </div>
+      <button class="admin-modal-close" type="button" onclick="closeAdminIndicatorHistory()">×</button>
+    </div>
+    <div class="admin-modal-grid">
+      <div class="admin-modal-card">
+        <div class="admin-modal-card-title">1. 趋势线图</div>
+        ${buildIndicatorKlineSvg(klinePayload)}
+      </div>
+      <div class="admin-modal-card">
+        <div class="admin-modal-card-title">2. 异动情况（异动点标注）</div>
+        <div class="admin-modal-list">
+          ${anomalyPoints.length ? anomalyPoints.map((entry) => `
+            <div class="admin-modal-item">
+              <div class="admin-modal-item-top">
+                <strong style="color:var(--text-main)">${escapeHtml(entry.date || '--')}</strong>
+                ${adminIndicatorStatusBadge(entry.status)}
+              </div>
+              <div class="admin-modal-copy">异动点：${escapeHtml(entry.label || '异动')}</div>
+              <div class="admin-modal-copy" style="margin-top:6px">指标值：${escapeHtml(entry.value || '--')}</div>
+            </div>
+          `).join('') : '<div class="admin-modal-copy">当前没有异动点标注。</div>'}
+        </div>
+      </div>
+      <div class="admin-modal-card">
+        <div class="admin-modal-card-title">3. 数据口径</div>
+        <div class="admin-modal-copy">当前详情页只展示纯数据分析视图，不做结果原因分析。可见范围包括趋势线、趋势状态和异动点标注。</div>
+        <div class="admin-modal-copy" style="margin-top:8px">当前值代表最新观测结果；历史趋势压缩展示最近时间点，用于快速判断指标方向与波动节奏。</div>
+        <div class="admin-chip-row" style="margin-top:12px">
+          <span class="admin-chip">状态：${escapeHtml(indicatorStatusLabel(item.status))}</span>
+          <span class="admin-chip">监测源：${escapeHtml(item.owner || '--')}</span>
+          <span class="admin-chip">记录数：${trendSummary.length}</span>
+        </div>
+      </div>
+      <div class="admin-modal-card">
+        <div class="admin-modal-card-title">4. 趋势情况与历史趋势</div>
+        <div class="admin-modal-summary">
+          <div class="admin-modal-stat">
+            <div>
+              <div class="admin-modal-stat-label">当前值</div>
+              <div class="${valueClass}">${escapeHtml(currentValue)}</div>
+            </div>
+          </div>
+          <div class="admin-modal-stat">
+            <div class="admin-modal-stat-label">当前状态</div>
+            <div class="admin-modal-stat-badge">${adminIndicatorStatusBadge(item.status)}</div>
+          </div>
+        </div>
+        <div class="admin-modal-section-note">
+          <div class="admin-modal-section-title">历史趋势</div>
+          <div class="admin-modal-section-copy">展示最近 ${trendSummary.length} 个观测点，改为细长条以减少占用空间并保留趋势判断。</div>
+        </div>
+        <div class="admin-modal-history-list">
+          ${trendSummary.map((entry) => `
+            <div class="admin-modal-history-row">
+              <div class="admin-modal-history-date">${escapeHtml(entry.date)}</div>
+              <div class="admin-modal-history-text">指标值 ${escapeHtml(entry.value)} · ${escapeHtml(entry.direction)} · 变动 ${entry.delta > 0 ? '+' : ''}${entry.delta}</div>
+              ${adminIndicatorStatusBadge(entry.status)}
+            </div>
+          `).join('') || '<div class="admin-modal-copy">暂无趋势记录</div>'}
+        </div>
+      </div>
+    </div>
+  `;
+  modal.classList.add('show');
 }
 
 let adminUsers = [];
@@ -3078,6 +3653,7 @@ function initForecastEditorEvents() {
 }
 
 let adminSiteConfig = JSON.parse(JSON.stringify(window.SITE_CONFIG || {}));
+let selectedAdminTenantIndex = 0;
 
 function isAdminFeatureEnabled(featureName) {
   const flags = (adminSiteConfig && adminSiteConfig.feature_flags) || {};
@@ -3091,72 +3667,201 @@ function ensureAdminTenants() {
   return adminSiteConfig.tenants;
 }
 
-function renderTenantConfigList() {
+function buildNewAdminTenant(index) {
+  const serial = index + 1;
+  return {
+    id: `tenant_custom_${serial}`,
+    slug: `tenant-${serial}`,
+    name: `新租户 ${serial}`,
+    short_name: `租户${serial}`,
+    logo_mark: '⭐',
+    advisor: `待命名大V ${serial}`,
+    tier: '观察租户',
+    focus: '',
+    rights: '',
+    description: '',
+    portal_headline: '',
+    portal_description: '',
+    dashboard_title: '',
+    dashboard_description: '',
+  };
+}
+
+function sanitizeTenantSlug(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]+/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function updateTenantSummaryCards() {
+  const tenants = ensureAdminTenants();
+  const totalNode = document.getElementById('tenant-total-count');
+  const defaultNode = document.getElementById('tenant-default-name');
+  if (totalNode) totalNode.textContent = String(tenants.length);
+  const defaultSlug = adminSiteConfig.default_tenant_slug || '';
+  const defaultTenant = tenants.find((tenant) => tenant.slug === defaultSlug) || tenants[0];
+  if (defaultNode) defaultNode.textContent = defaultTenant ? (defaultTenant.short_name || defaultTenant.name || '--') : '--';
+}
+
+function updateDefaultTenantSlug(value) {
+  adminSiteConfig.default_tenant_slug = value || '';
+  renderTenantConfigList();
+}
+
+function selectAdminTenant(index) {
+  const tenants = ensureAdminTenants();
+  if (!tenants.length) {
+    selectedAdminTenantIndex = 0;
+    renderTenantConfigList();
+    return;
+  }
+  selectedAdminTenantIndex = Math.max(0, Math.min(index, tenants.length - 1));
+  renderTenantConfigList();
+}
+
+function addAdminTenant() {
+  const tenants = ensureAdminTenants();
+  const nextTenant = buildNewAdminTenant(tenants.length);
+  tenants.push(nextTenant);
+  if (!adminSiteConfig.default_tenant_slug) {
+    adminSiteConfig.default_tenant_slug = nextTenant.slug;
+  }
+  selectedAdminTenantIndex = tenants.length - 1;
+  renderTenantConfigList();
+}
+
+function updateAdminTenantField(field, value) {
+  const tenants = ensureAdminTenants();
+  const tenant = tenants[selectedAdminTenantIndex];
+  if (!tenant) return;
+  const previousSlug = tenant.slug || '';
+  const nextValue = field === 'slug' ? sanitizeTenantSlug(value) : value;
+  tenant[field] = nextValue;
+  if (field === 'slug' && adminSiteConfig.default_tenant_slug === previousSlug) {
+    adminSiteConfig.default_tenant_slug = nextValue;
+  }
+  renderTenantSidebar();
+}
+
+function renderTenantSidebar() {
   const host = document.getElementById('tenant-config-list');
   const defaultSelect = document.getElementById('default-tenant-slug');
-  if (!host || !defaultSelect) return;
   const tenants = ensureAdminTenants();
+  if (!host || !defaultSelect) return;
+  if (!tenants.length) {
+    host.innerHTML = '<div class="tenant-admin-empty">当前还没有租户。<br>点击“新增租户”开始配置。</div>';
+    defaultSelect.innerHTML = '';
+    updateTenantSummaryCards();
+    return;
+  }
+  selectedAdminTenantIndex = Math.max(0, Math.min(selectedAdminTenantIndex, tenants.length - 1));
+  defaultSelect.innerHTML = tenants.map((tenant) => `
+    <option value="${escapeAttr(tenant.slug || '')}">${escapeHtml(tenant.name || tenant.slug || '未命名租户')}</option>
+  `).join('');
+  defaultSelect.value = adminSiteConfig.default_tenant_slug || (tenants[0] && tenants[0].slug) || '';
   host.innerHTML = tenants.map((tenant, index) => `
-    <div class="config-card" style="margin:0">
-      <div class="config-card-title">${escapeHtml(tenant.name || `租户 ${index + 1}`)}</div>
-      <div class="config-grid">
+    <div class="tenant-admin-item ${index === selectedAdminTenantIndex ? 'active' : ''}" onclick="selectAdminTenant(${index})">
+      <div class="tenant-admin-item-top">
+        <div>
+          <div class="tenant-admin-item-title">${escapeHtml(tenant.name || `租户 ${index + 1}`)}</div>
+          <div class="tenant-admin-item-sub">${escapeHtml(tenant.advisor || '未设置主理人')} · ${escapeHtml(tenant.slug || '未设置 slug')}</div>
+        </div>
+        <span class="tenant-admin-badge ${adminSiteConfig.default_tenant_slug === tenant.slug ? 'tenant-admin-default' : ''}">${adminSiteConfig.default_tenant_slug === tenant.slug ? '默认门户' : (tenant.tier || '租户')}</span>
+      </div>
+      <div class="tenant-admin-item-meta">
+        ${tenant.short_name ? `<span class="tenant-admin-badge">${escapeHtml(tenant.short_name)}</span>` : ''}
+        ${tenant.focus ? `<span class="tenant-admin-badge">${escapeHtml(tenant.focus)}</span>` : ''}
+      </div>
+    </div>
+  `).join('');
+  updateTenantSummaryCards();
+}
+
+function renderTenantDetail() {
+  const host = document.getElementById('tenant-detail-panel');
+  const tenants = ensureAdminTenants();
+  if (!host) return;
+  const tenant = tenants[selectedAdminTenantIndex];
+  if (!tenant) {
+    host.innerHTML = '<div class="tenant-admin-empty">请先新增一个租户，再开始维护品牌与门户配置。</div>';
+    return;
+  }
+  host.innerHTML = `
+    <div class="config-card">
+      <div class="tenant-admin-detail-head">
+        <div>
+          <div class="tenant-admin-detail-title">${escapeHtml(tenant.name || `租户 ${selectedAdminTenantIndex + 1}`)} 详情</div>
+          <div class="tenant-admin-detail-desc">这里就是这个大V租户的详情页。品牌、门户、主理人和对外文案在这里维护；智能 Dashboard 的展示标题和说明也在这里定义，但具体指标提示词仍在大V工作台里维护。</div>
+        </div>
+        <span class="tenant-admin-badge ${adminSiteConfig.default_tenant_slug === tenant.slug ? 'tenant-admin-default' : ''}">${adminSiteConfig.default_tenant_slug === tenant.slug ? '当前默认门户' : '租户详情'}</span>
+      </div>
+      <div class="tenant-admin-detail-grid">
         <div class="config-field">
           <label>租户名称</label>
-          <input type="text" data-tenant-field="name" data-tenant-index="${index}" value="${escapeAttr(tenant.name || '')}">
+          <input type="text" value="${escapeAttr(tenant.name || '')}" oninput="updateAdminTenantField('name', this.value)">
         </div>
         <div class="config-field">
           <label>租户简称</label>
-          <input type="text" data-tenant-field="short_name" data-tenant-index="${index}" value="${escapeAttr(tenant.short_name || '')}">
+          <input type="text" value="${escapeAttr(tenant.short_name || '')}" oninput="updateAdminTenantField('short_name', this.value)">
         </div>
         <div class="config-field">
           <label>门户 slug</label>
-          <input type="text" data-tenant-field="slug" data-tenant-index="${index}" value="${escapeAttr(tenant.slug || '')}">
+          <input type="text" value="${escapeAttr(tenant.slug || '')}" oninput="updateAdminTenantField('slug', this.value)">
         </div>
         <div class="config-field">
           <label>Logo 文案 / Emoji</label>
-          <input type="text" data-tenant-field="logo_mark" data-tenant-index="${index}" value="${escapeAttr(tenant.logo_mark || '')}">
+          <input type="text" value="${escapeAttr(tenant.logo_mark || '')}" oninput="updateAdminTenantField('logo_mark', this.value)">
         </div>
         <div class="config-field">
-          <label>主理人</label>
-          <input type="text" data-tenant-field="advisor" data-tenant-index="${index}" value="${escapeAttr(tenant.advisor || '')}">
+          <label>主理人 / 大V名称</label>
+          <input type="text" value="${escapeAttr(tenant.advisor || '')}" oninput="updateAdminTenantField('advisor', this.value)">
         </div>
         <div class="config-field">
           <label>租户等级</label>
-          <input type="text" data-tenant-field="tier" data-tenant-index="${index}" value="${escapeAttr(tenant.tier || '')}">
+          <input type="text" value="${escapeAttr(tenant.tier || '')}" oninput="updateAdminTenantField('tier', this.value)">
         </div>
         <div class="config-field">
           <label>研究方向</label>
-          <input type="text" data-tenant-field="focus" data-tenant-index="${index}" value="${escapeAttr(tenant.focus || '')}">
+          <input type="text" value="${escapeAttr(tenant.focus || '')}" oninput="updateAdminTenantField('focus', this.value)">
         </div>
         <div class="config-field">
           <label>租户权益</label>
-          <input type="text" data-tenant-field="rights" data-tenant-index="${index}" value="${escapeAttr(tenant.rights || '')}">
+          <input type="text" value="${escapeAttr(tenant.rights || '')}" oninput="updateAdminTenantField('rights', this.value)">
         </div>
         <div class="config-field">
           <label>门户标题</label>
-          <input type="text" data-tenant-field="portal_headline" data-tenant-index="${index}" value="${escapeAttr(tenant.portal_headline || '')}">
+          <input type="text" value="${escapeAttr(tenant.portal_headline || '')}" oninput="updateAdminTenantField('portal_headline', this.value)">
         </div>
         <div class="config-field">
           <label>Dashboard 标题</label>
-          <input type="text" data-tenant-field="dashboard_title" data-tenant-index="${index}" value="${escapeAttr(tenant.dashboard_title || '')}">
+          <input type="text" value="${escapeAttr(tenant.dashboard_title || '')}" oninput="updateAdminTenantField('dashboard_title', this.value)">
         </div>
       </div>
       <div class="config-field">
         <label>租户简介</label>
-        <input type="text" data-tenant-field="description" data-tenant-index="${index}" value="${escapeAttr(tenant.description || '')}">
+        <input type="text" value="${escapeAttr(tenant.description || '')}" oninput="updateAdminTenantField('description', this.value)">
       </div>
       <div class="config-field">
         <label>门户描述</label>
-        <input type="text" data-tenant-field="portal_description" data-tenant-index="${index}" value="${escapeAttr(tenant.portal_description || '')}">
+        <input type="text" value="${escapeAttr(tenant.portal_description || '')}" oninput="updateAdminTenantField('portal_description', this.value)">
       </div>
       <div class="config-field">
         <label>Dashboard 描述</label>
-        <input type="text" data-tenant-field="dashboard_description" data-tenant-index="${index}" value="${escapeAttr(tenant.dashboard_description || '')}">
+        <input type="text" value="${escapeAttr(tenant.dashboard_description || '')}" oninput="updateAdminTenantField('dashboard_description', this.value)">
+      </div>
+      <div class="feature-note">
+        这里维护的是租户级配置，不是平台级配置。保存后，该大V对应的门户、工作台和默认展示文案会同步更新。
       </div>
     </div>
-  `).join('');
-  defaultSelect.innerHTML = tenants.map(tenant => `<option value="${escapeAttr(tenant.slug || '')}">${escapeHtml(tenant.name || tenant.slug || '未命名租户')}</option>`).join('');
-  defaultSelect.value = adminSiteConfig.default_tenant_slug || (tenants[0] && tenants[0].slug) || '';
+  `;
+}
+
+function renderTenantConfigList() {
+  renderTenantSidebar();
+  renderTenantDetail();
 }
 
 function markActivePill(groupId, attr, value) {
@@ -3218,18 +3923,7 @@ async function loadSiteConfig() {
 async function saveSiteConfig() {
   const featureFlags = {};
   const passwordGate = document.getElementById('password-gate-enabled');
-  const tenantFields = document.querySelectorAll('[data-tenant-field]');
-  const tenantMap = new Map();
-  tenantFields.forEach((node) => {
-    const index = Number(node.dataset.tenantIndex || 0);
-    const field = node.dataset.tenantField;
-    if (!tenantMap.has(index)) tenantMap.set(index, {});
-    tenantMap.get(index)[field] = node.value || '';
-  });
-  const tenants = Array.from(tenantMap.entries()).sort((a, b) => a[0] - b[0]).map(([, value], index) => ({
-    ...ensureAdminTenants()[index],
-    ...value,
-  }));
+  const tenants = ensureAdminTenants().map((tenant) => ({ ...tenant }));
   ['fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'vip', 'dm', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     featureFlags[key] = Boolean(checkbox && checkbox.checked);
