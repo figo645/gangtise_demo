@@ -664,41 +664,24 @@
         <div class="table-wrap">
           <div class="table-header">
             <div class="table-title">用户列表</div>
-            <button class="btn-gold" style="padding:6px 14px;font-size:12px" onclick="showToast('导出任务已创建')">导出用户数据</button>
+            <div style="display:flex;gap:8px;align-items:center">
+              <button class="btn-outline" style="padding:6px 14px;font-size:12px" onclick="importAdminUsers()">导入用户</button>
+              <button class="btn-gold" style="padding:6px 14px;font-size:12px" onclick="openAdminUserCreator()">新增用户</button>
+            </div>
           </div>
           <div class="search-bar">
-            <input type="text" placeholder="搜索用户名 / 手机号">
-            <select><option>会员等级 (全部)</option><option>免费用户</option><option>基础会员</option><option>专业会员</option><option>机构试点</option><option>大V投顾</option></select>
-            <select><option>用户状态 (全部)</option><option>正常</option><option>活跃</option><option>沉默</option><option>已禁用</option></select>
-            <button class="btn-gold" style="padding:8px 16px;font-size:12px">搜索</button>
+            <input id="admin-user-search" type="text" placeholder="搜索用户名 / 手机号 / 所属大V" oninput="renderAdminUsersTable()">
+            <select id="admin-user-role-filter" onchange="renderAdminUsersTable()"><option value="">权限 (全部)</option><option value="admin">admin</option><option value="dav">大V</option><option value="investor">普通用户</option></select>
+            <select id="admin-user-status-filter" onchange="renderAdminUsersTable()"><option value="">用户状态 (全部)</option><option value="active">正常</option><option value="disabled">已禁用</option></select>
+            <button class="btn-gold" style="padding:8px 16px;font-size:12px" onclick="loadAdminUsers()">刷新</button>
           </div>
           <table>
             <thead>
-              <tr><th>用户</th><th>等级</th><th>积分</th><th>算力余额</th><th>注册时间</th><th>最近活跃</th><th>状态</th><th>操作</th></tr>
+              <tr><th>用户名</th><th>电话</th><th>权限</th><th>所属大V</th><th>所属租户</th><th>状态</th><th>创建时间</th><th>操作</th></tr>
             </thead>
-            <tbody>
-              <tr><td><span style="color:#F8F6F0;font-weight:500">张伟 <span style="font-size:10px;color:#8899aa">138****8821</span></span></td><td><span class="tag tag-gold">机构试点</span></td><td style="color:#C8A96E">1,240</td><td>180</td><td>2026-03-12</td><td>今日 09:42</td><td><span class="tag tag-green">活跃</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
-              <tr><td><span style="color:#F8F6F0;font-weight:500">李晓梅 <span style="font-size:10px;color:#8899aa">139****4402</span></span></td><td><span class="tag tag-blue">专业会员</span></td><td style="color:#C8A96E">3,580</td><td>480</td><td>2024-06-28</td><td>今日 11:15</td><td><span class="tag tag-green">活跃</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
-              <tr><td><span style="color:#F8F6F0;font-weight:500">王建国 <span style="font-size:10px;color:#8899aa">135****7730</span></span></td><td><span class="tag tag-blue">专业会员</span></td><td style="color:#C8A96E">2,100</td><td>320</td><td>2024-09-05</td><td>昨日 20:33</td><td><span class="tag tag-green">正常</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
-              <tr><td><span style="color:#F8F6F0;font-weight:500">陈思远 <span style="font-size:10px;color:#8899aa">186****2219</span></span></td><td><span style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.2);color:#C8A96E;border-radius:4px;padding:2px 7px;font-size:11px">基础会员</span></td><td style="color:#C8A96E">860</td><td>80</td><td>2025-01-18</td><td>3天前</td><td><span class="tag tag-green">正常</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
-              <tr><td><span style="color:#F8F6F0;font-weight:500">刘芳 <span style="font-size:10px;color:#8899aa">177****6614</span></span></td><td><span style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.2);color:#C8A96E;border-radius:4px;padding:2px 7px;font-size:11px">基础会员</span></td><td style="color:#C8A96E">420</td><td>40</td><td>2025-02-22</td><td>7天前</td><td><span style="color:#8899aa;font-size:12px">沉默</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
-              <tr><td><span style="color:#F8F6F0;font-weight:500">赵磊 <span style="font-size:10px;color:#8899aa">150****9983</span></span></td><td><span style="color:#8899aa;font-size:12px">免费用户</span></td><td style="color:#C8A96E">180</td><td>0</td><td>2025-04-10</td><td>2天前</td><td><span class="tag tag-green">正常</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
-              <tr><td><span style="color:#F8F6F0;font-weight:500">孙雪 <span style="font-size:10px;color:#8899aa">132****5571</span></span></td><td><span style="color:#8899aa;font-size:12px">免费用户</span></td><td style="color:#C8A96E">100</td><td>0</td><td>2025-05-01</td><td>今日 08:20</td><td><span class="tag tag-green">正常</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
-              <tr><td><span style="color:#F8F6F0;font-weight:500">周浩然 <span style="font-size:10px;color:#8899aa">188****3340</span></span></td><td><span class="tag tag-gold">机构试点</span></td><td style="color:#C8A96E">980</td><td>140</td><td>2026-01-08</td><td>今日 10:58</td><td><span class="tag tag-green">活跃</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
-              <tr><td><span style="color:#F8F6F0;font-weight:500">吴静怡 <span style="font-size:10px;color:#8899aa">136****8802</span></span></td><td><span class="tag tag-blue">专业会员</span></td><td style="color:#C8A96E">1,640</td><td>200</td><td>2024-11-30</td><td>5天前</td><td><span style="color:#8899aa;font-size:12px">沉默</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
-              <tr><td><span style="color:#F8F6F0;font-weight:500">郑凯 <span style="font-size:10px;color:#8899aa">159****1127</span></span></td><td><span style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.2);color:#C8A96E;border-radius:4px;padding:2px 7px;font-size:11px">基础会员</span></td><td style="color:#C8A96E">540</td><td>60</td><td>2025-03-14</td><td>昨日 16:44</td><td><span class="tag tag-green">正常</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px">详情</button><button class="btn-sm-red">禁用</button></td></tr>
-            </tbody>
+            <tbody id="admin-user-table-body"></tbody>
           </table>
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0 0;font-size:12px;color:#8899aa">
-            <span>共 1,268 条记录，当前显示第 1-10 条</span>
-            <div style="display:flex;gap:6px">
-              <button class="btn-outline" style="padding:4px 10px;font-size:11px">上一页</button>
-              <button class="btn-gold" style="padding:4px 10px;font-size:11px">1</button>
-              <button class="btn-outline" style="padding:4px 10px;font-size:11px">2</button>
-              <button class="btn-outline" style="padding:4px 10px;font-size:11px">3</button>
-              <button class="btn-outline" style="padding:4px 10px;font-size:11px">下一页</button>
-            </div>
-          </div>
+          <div id="admin-user-table-meta" style="display:flex;justify-content:space-between;align-items:center;padding:12px 0 0;font-size:12px;color:#8899aa"></div>
         </div>
       </div><!-- end section-users -->
 
@@ -2302,6 +2285,18 @@
               <input id="brand-tagline" type="text" placeholder="智能投研平台">
             </div>
             <div class="config-field">
+              <label>首页主标题说明</label>
+              <input id="brand-hero-tagline" type="text" placeholder="聚焦复盘、基本面分析、自选股诊断与证据链输出的智能投研能力">
+            </div>
+            <div class="config-field">
+              <label>平台简介</label>
+              <input id="brand-hero-description" type="text" placeholder="平台简介">
+            </div>
+            <div class="config-field">
+              <label>页脚简介</label>
+              <input id="brand-footer-description" type="text" placeholder="页脚简介">
+            </div>
+            <div class="config-field">
               <label>默认租户门户</label>
               <select id="default-tenant-slug"></select>
             </div>
@@ -2329,6 +2324,10 @@
             <div class="toggle-wrap">
               <span class="toggle-label">自选股</span>
               <label class="toggle"><input id="feature-watchlist" type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
+              <span class="toggle-label">股票 K 线预测</span>
+              <label class="toggle"><input id="feature-stock_forecast" type="checkbox"><span class="toggle-slider"></span></label>
             </div>
             <div class="toggle-wrap">
               <span class="toggle-label">每日复盘</span>
@@ -2471,6 +2470,10 @@ function setActiveAdminNav(target) {
 }
 
 function showSection(name, navEl) {
+  if (name === 'forecast-model' && !isAdminFeatureEnabled('stock_forecast')) {
+    showToast('预测功能当前未开放');
+    return;
+  }
   document.querySelectorAll('[id^="section-"]').forEach(s => s.style.display = 'none');
   document.getElementById('section-' + name).style.display = 'block';
   setActiveAdminNav(navEl || document.querySelector(`.admin-nav-item[data-section="${name}"]`));
@@ -2515,6 +2518,7 @@ function escapeAttr(value) {
   return escapeHtml(value);
 }
 
+let adminUsers = [];
 let forecastConfig = {};
 let forecastWorkflowMeta = {};
 let forecastGraph = {nodes: [], edges: [], tuning: {}};
@@ -2524,6 +2528,93 @@ let forecastLinkState = null;
 let forecastZoom = 1;
 let forecastEditorBootstrapped = false;
 let forecastLoaded = false;
+
+function renderAdminUsersTable() {
+  const body = document.getElementById('admin-user-table-body');
+  const meta = document.getElementById('admin-user-table-meta');
+  if (!body || !meta) return;
+  const search = String(document.getElementById('admin-user-search')?.value || '').trim().toLowerCase();
+  const role = String(document.getElementById('admin-user-role-filter')?.value || '').trim();
+  const status = String(document.getElementById('admin-user-status-filter')?.value || '').trim();
+  const filtered = adminUsers.filter((user) => {
+    if (role && user.role !== role) return false;
+    if (status && user.status !== status) return false;
+    if (!search) return true;
+    const corpus = `${user.username} ${user.phone} ${user.advisor_name || ''} ${user.tenant?.name || ''}`.toLowerCase();
+    return corpus.includes(search);
+  });
+  body.innerHTML = filtered.map((user) => `
+    <tr>
+      <td><span style="color:#F8F6F0;font-weight:500">${escapeHtml(user.username)}</span></td>
+      <td><span style="font-size:10px;color:#8899aa">${escapeHtml(user.phone_masked || user.phone || '')}</span></td>
+      <td><span class="tag ${user.role === 'admin' ? 'tag-red' : (user.role === 'dav' ? 'tag-gold' : 'tag-blue')}">${escapeHtml(user.role)}</span></td>
+      <td>${escapeHtml(user.advisor_name || '--')}</td>
+      <td>${escapeHtml(user.tenant?.name || '--')}</td>
+      <td><span class="tag ${user.status === 'active' ? 'tag-green' : 'tag-red'}">${escapeHtml(user.status === 'active' ? '正常' : '已禁用')}</span></td>
+      <td>${escapeHtml(user.created_at || '--')}</td>
+      <td><button class="btn-outline" style="padding:3px 9px;font-size:11px" onclick="showToast('当前版本先提供新增与导入，编辑/禁用可继续补充')">详情</button></td>
+    </tr>
+  `).join('') || '<tr><td colspan="8" style="text-align:center;color:#8899aa;padding:20px 0">暂无用户</td></tr>';
+  meta.innerHTML = `<span>共 ${filtered.length} 条记录</span><span>当前数据来自 SQLite 用户表</span>`;
+}
+
+async function loadAdminUsers() {
+  try {
+    const res = await fetch('/api/admin/users');
+    const data = await res.json();
+    adminUsers = Array.isArray(data.users) ? data.users : [];
+    renderAdminUsersTable();
+  } catch (error) {
+    showToast('加载用户列表失败');
+  }
+}
+
+async function openAdminUserCreator() {
+  const username = window.prompt('用户名');
+  if (!username) return;
+  const password = window.prompt('密码');
+  if (!password) return;
+  const role = window.prompt('权限：admin / dav / investor', 'investor');
+  if (!role) return;
+  const phone = window.prompt('电话');
+  if (!phone) return;
+  const advisor_name = window.prompt('所属大V（普通用户必填，admin 可留空）', '');
+  const tenant_slug = window.prompt('所属租户 slug，例如 laowang / lisa', adminSiteConfig.default_tenant_slug || 'laowang');
+  try {
+    const res = await fetch('/api/admin/users', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({username, password, role, phone, advisor_name, tenant_slug}),
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) throw new Error(data.error || 'create_user_failed');
+    adminUsers = Array.isArray(data.users) ? data.users : adminUsers;
+    renderAdminUsersTable();
+    showToast('用户已创建');
+  } catch (error) {
+    showToast('创建用户失败');
+  }
+}
+
+async function importAdminUsers() {
+  const raw = window.prompt('按 JSON 数组导入用户，例如：[{"username":"u1","password":"p1","role":"investor","advisor_name":"财经老王","tenant_slug":"laowang","phone":"13800000001"}]');
+  if (!raw) return;
+  try {
+    const payload = JSON.parse(raw);
+    const res = await fetch('/api/admin/users/import', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({users: payload}),
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) throw new Error(data.error || 'import_users_failed');
+    adminUsers = Array.isArray(data.users) ? data.users : adminUsers;
+    renderAdminUsersTable();
+    showToast(`已导入 ${Array.isArray(data.created) ? data.created.length : 0} 个用户`);
+  } catch (error) {
+    showToast('导入失败，请检查 JSON 格式');
+  }
+}
 
 function renderForecastWorkflow() {
   const board = document.getElementById('forecast-workflow-board');
@@ -2988,6 +3079,11 @@ function initForecastEditorEvents() {
 
 let adminSiteConfig = JSON.parse(JSON.stringify(window.SITE_CONFIG || {}));
 
+function isAdminFeatureEnabled(featureName) {
+  const flags = (adminSiteConfig && adminSiteConfig.feature_flags) || {};
+  return flags[featureName] !== false;
+}
+
 function ensureAdminTenants() {
   if (!Array.isArray(adminSiteConfig.tenants) || !adminSiteConfig.tenants.length) {
     adminSiteConfig.tenants = [];
@@ -3081,10 +3177,19 @@ function renderSiteConfigForm() {
   if (document.getElementById('brand-short-name')) document.getElementById('brand-short-name').value = brand.short_name || '';
   if (document.getElementById('brand-logo-mark')) document.getElementById('brand-logo-mark').value = brand.logo_mark || '';
   if (document.getElementById('brand-tagline')) document.getElementById('brand-tagline').value = brand.tagline || '';
-  ['fundamental_analysis', 'watchlist', 'daily_review', 'knowledge', 'community', 'hermes', 'vip', 'dm', 'workbench'].forEach(key => {
+  if (document.getElementById('brand-hero-tagline')) document.getElementById('brand-hero-tagline').value = brand.hero_tagline || '';
+  if (document.getElementById('brand-hero-description')) document.getElementById('brand-hero-description').value = brand.hero_description || '';
+  if (document.getElementById('brand-footer-description')) document.getElementById('brand-footer-description').value = brand.footer_description || '';
+  ['fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'vip', 'dm', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     if (checkbox) checkbox.checked = Boolean(flags[key]);
   });
+  const forecastNav = document.querySelector('.admin-nav-item[data-section="forecast-model"]');
+  if (forecastNav) forecastNav.style.display = isAdminFeatureEnabled('stock_forecast') ? '' : 'none';
+  const forecastSection = document.getElementById('section-forecast-model');
+  if (forecastSection && !isAdminFeatureEnabled('stock_forecast') && forecastSection.style.display !== 'none') {
+    showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
+  }
   renderTenantConfigList();
 }
 
@@ -3125,7 +3230,7 @@ async function saveSiteConfig() {
     ...ensureAdminTenants()[index],
     ...value,
   }));
-  ['fundamental_analysis', 'watchlist', 'daily_review', 'knowledge', 'community', 'hermes', 'vip', 'dm', 'workbench'].forEach(key => {
+  ['fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'vip', 'dm', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     featureFlags[key] = Boolean(checkbox && checkbox.checked);
   });
@@ -3139,6 +3244,9 @@ async function saveSiteConfig() {
       short_name: document.getElementById('brand-short-name') ? document.getElementById('brand-short-name').value : '',
       logo_mark: document.getElementById('brand-logo-mark') ? document.getElementById('brand-logo-mark').value : '',
       tagline: document.getElementById('brand-tagline') ? document.getElementById('brand-tagline').value : '',
+      hero_tagline: document.getElementById('brand-hero-tagline') ? document.getElementById('brand-hero-tagline').value : '',
+      hero_description: document.getElementById('brand-hero-description') ? document.getElementById('brand-hero-description').value : '',
+      footer_description: document.getElementById('brand-footer-description') ? document.getElementById('brand-footer-description').value : '',
     },
     default_tenant_slug: document.getElementById('default-tenant-slug') ? document.getElementById('default-tenant-slug').value : '',
     tenants,
@@ -3278,6 +3386,7 @@ function evUpdatePreview() {
 
 document.addEventListener('DOMContentLoaded', () => {
   loadSiteConfig();
+  loadAdminUsers();
   if (document.getElementById('section-access')) {
     renderAccessAudit();
   }

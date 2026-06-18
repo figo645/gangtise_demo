@@ -19,6 +19,7 @@ app.config.update(
 
 AUTH_PASSWORD = os.environ.get("GANGTISE_DEMO_PASSWORD", "gangtise")
 AUTH_SESSION_KEY = "gangtise_auth"
+H5_USER_SESSION_KEY = "current_h5_username"
 DB_PATH = os.environ.get("GANGTISE_DEMO_DB", os.path.join(os.path.dirname(__file__), "gangtise_demo.db"))
 SITE_CONFIG_KEY = "site_config"
 FORECAST_WORKFLOW_KEY = "forecast_workflow_graph"
@@ -71,6 +72,36 @@ DEFAULT_TENANTS = [
     },
 ]
 
+DEFAULT_USERS = [
+    {
+        "username": "投研达人_小陈",
+        "password": "demo123",
+        "role": "investor",
+        "tenant_slug": DEFAULT_TENANTS[0]["slug"],
+        "advisor_name": DEFAULT_TENANTS[0]["advisor"],
+        "phone": "13800008821",
+        "status": "active",
+    },
+    {
+        "username": "财经老王",
+        "password": "demo123",
+        "role": "dav",
+        "tenant_slug": DEFAULT_TENANTS[0]["slug"],
+        "advisor_name": DEFAULT_TENANTS[0]["advisor"],
+        "phone": "13900001111",
+        "status": "active",
+    },
+    {
+        "username": "平台管理员",
+        "password": "admin123",
+        "role": "admin",
+        "tenant_slug": DEFAULT_TENANTS[0]["slug"],
+        "advisor_name": "",
+        "phone": "13700009999",
+        "status": "active",
+    },
+]
+
 DEFAULT_SITE_CONFIG = {
     "default_theme": "light",
     "default_accent": "blue",
@@ -81,6 +112,7 @@ DEFAULT_SITE_CONFIG = {
     "feature_flags": {
         "fundamental_analysis": True,
         "watchlist": True,
+        "stock_forecast": False,
         "daily_review": True,
         "knowledge": True,
         "community": False,
@@ -229,6 +261,192 @@ def get_tenant_configs(site_config=None):
 def get_default_tenant_slug(site_config=None):
     config = site_config or get_site_config()
     return str(config.get("default_tenant_slug", "") or "").strip() or DEFAULT_TENANTS[0]["slug"]
+
+
+def is_feature_enabled(feature_name, site_config=None):
+    if not feature_name:
+        return True
+    config = site_config or get_site_config()
+    feature_flags = config.get("feature_flags", {}) if isinstance(config, dict) else {}
+    return feature_flags.get(feature_name) is not False
+
+
+def get_h5_login_users(site_config=None):
+    users = list_users()
+    return [
+        ensure_user_row_defaults(user, site_config)
+        for user in users
+        if user.get("role") in {"investor", "dav"} and user.get("status") == "active"
+    ]
+
+
+def get_current_demo_profile_id():
+    cached = g.get("current_demo_profile_id")
+    if cached is not None:
+        return cached
+    profile_id = str(session.get(H5_USER_SESSION_KEY) or "").strip()
+    g.current_demo_profile_id = profile_id
+    return profile_id
+
+
+def save_current_demo_profile_id(profile_id):
+    normalized = str(profile_id or "").strip()
+    if normalized:
+        session[H5_USER_SESSION_KEY] = normalized
+        session.permanent = True
+    else:
+        session.pop(H5_USER_SESSION_KEY, None)
+    g.current_demo_profile_id = normalized
+    return normalized
+
+
+def get_current_demo_profile(site_config=None):
+    current_username = get_current_demo_profile_id()
+    if not current_username:
+        return None
+    current_user = get_user_by_username(current_username)
+    if not current_user:
+        session.pop(H5_USER_SESSION_KEY, None)
+        g.current_demo_profile_id = ""
+        return None
+    if current_user.get("role") not in {"investor", "dav"} or current_user.get("status") != "active":
+        session.pop(H5_USER_SESSION_KEY, None)
+        g.current_demo_profile_id = ""
+        return None
+    return ensure_user_row_defaults(current_user, site_config)
+
+
+def mask_phone(phone):
+    value = str(phone or "").strip()
+    if len(value) >= 7:
+        return f"{value[:3]}****{value[-4:]}"
+    return value
+
+
+def list_users(role=None, tenant_slug=None):
+    db = get_db()
+    conditions = []
+    params = []
+    if role:
+        conditions.append("role = ?")
+        params.append(role)
+    if tenant_slug:
+        conditions.append("tenant_slug = ?")
+        params.append(tenant_slug)
+    where_sql = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    rows = db.execute(
+        f"""
+        SELECT id, username, password, role, tenant_slug, advisor_name, phone, status, created_at, updated_at
+        FROM users
+        {where_sql}
+        ORDER BY id ASC
+        """,
+        tuple(params),
+    ).fetchall()
+    return [ensure_user_row_defaults(dict(row)) for row in rows]
+
+
+def get_user_by_username(username):
+    db = get_db()
+    row = db.execute(
+        """
+        SELECT id, username, password, role, tenant_slug, advisor_name, phone, status, created_at, updated_at
+        FROM users
+        WHERE username = ?
+        """,
+        (str(username or "").strip(),),
+    ).fetchone()
+    return ensure_user_row_defaults(dict(row)) if row else None
+
+
+def create_user(payload):
+    source = payload if isinstance(payload, dict) else {}
+    username = str(source.get("username") or "").strip()
+    password = str(source.get("password") or "").strip()
+    role = str(source.get("role") or "investor").strip().lower()
+    tenant_slug = str(source.get("tenant_slug") or get_default_tenant_slug()).strip().lower()
+    advisor_name = str(source.get("advisor_name") or "").strip()
+    phone = str(source.get("phone") or "").strip()
+    status = str(source.get("status") or "active").strip().lower()
+    if not username or not password or role not in {"investor", "dav", "admin"} or not phone:
+        raise ValueError("invalid_user_payload")
+    if get_user_by_username(username):
+        raise ValueError("username_exists")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO users (username, password, role, tenant_slug, advisor_name, phone, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (username, password, role, tenant_slug, advisor_name, phone, status, now, now),
+    )
+    db.commit()
+    return get_user_by_username(username)
+
+
+def import_users(items):
+    created = []
+    for item in (items or []):
+        try:
+            user = create_user(item)
+            if user:
+                created.append(user)
+        except ValueError:
+            continue
+    return created
+
+
+def ensure_user_row_defaults(user, site_config=None):
+    config = site_config or get_site_config()
+    tenant = get_tenant_by_slug(user.get("tenant_slug"), config)
+    role = str(user.get("role", "investor") or "investor").strip().lower()
+    role_label_map = {"investor": "投资者", "dav": "大V投顾", "admin": "管理员"}
+    default_stats = {
+        "investor": {"posts": 23, "likes": 456, "following": 12, "followers": 89, "points": 3840, "compute_credits": 128, "level": 4, "level_name": "资深分析师", "membership": "投资者视角", "relationship": "核心订阅用户", "tenant_card_title": "所属大V租户", "workbench_label": "查看当前租户工作台（demo）", "workbench_hint": "投资者视角 · 查看租户服务与互动提醒", "stat_labels": ["帖子", "获赞", "自选", "社群互动"], "badges": ["🦞 Hermes达人", "📊 投研先锋", "🧭 长期跟踪", "📅 连续签到30天"], "avatar": "👨"},
+        "dav": {"posts": 86, "likes": 3688, "following": 128, "followers": 1240, "points": 9820, "compute_credits": 420, "level": 6, "level_name": "租户主理人", "membership": "大V主理视角", "relationship": "租户主理人", "tenant_card_title": "当前管理租户", "workbench_label": "进入我的大V工作台", "workbench_hint": "大V投顾视角 · 管理粉丝、内容与协同收入", "stat_labels": ["内容", "获赞", "订阅用户", "私域线索"], "badges": ["👑 种子投顾", "🦞 Hermes高频用户", "🏆 协同标杆", "💬 私域主理人"], "avatar": "👑"},
+        "admin": {"posts": 0, "likes": 0, "following": 0, "followers": 0, "points": 9999, "compute_credits": 999, "level": 9, "level_name": "平台管理员", "membership": "管理员视角", "relationship": "平台管理员", "tenant_card_title": "当前管理平台", "workbench_label": "进入平台后台", "workbench_hint": "管理员视角 · 管理平台用户与租户", "stat_labels": ["用户", "租户", "权限", "系统"], "badges": ["🛡️ 平台管理员"], "avatar": "🛡️"},
+    }
+    defaults = default_stats.get(role, default_stats["investor"])
+    advisor_name = str(user.get("advisor_name") or tenant.get("advisor") or "").strip()
+    return {
+        "id": user.get("id"),
+        "username": str(user.get("username") or "").strip(),
+        "password": str(user.get("password") or "").strip(),
+        "role": role,
+        "roleLabel": role_label_map.get(role, "投资者"),
+        "avatar": str(user.get("avatar") or defaults["avatar"]).strip() or defaults["avatar"],
+        "name": str(user.get("username") or "").strip(),
+        "phone": str(user.get("phone") or "").strip(),
+        "phone_masked": mask_phone(user.get("phone")),
+        "status": str(user.get("status") or "active").strip(),
+        "tenant_slug": tenant.get("slug"),
+        "advisor_name": advisor_name,
+        "tenant": {
+            "id": tenant.get("id"),
+            "slug": tenant.get("slug"),
+            "name": tenant.get("name"),
+            "advisor": tenant.get("advisor"),
+            "focus": tenant.get("focus"),
+            "rights": tenant.get("rights"),
+            "desc": tenant.get("description"),
+        },
+        "level": defaults["level"],
+        "levelName": defaults["level_name"],
+        "points": defaults["points"],
+        "computeCredits": defaults["compute_credits"],
+        "posts": defaults["posts"],
+        "likes": defaults["likes"],
+        "following": defaults["following"],
+        "followers": defaults["followers"],
+        "membership": defaults["membership"],
+        "relationship": defaults["relationship"],
+        "statLabels": defaults["stat_labels"],
+        "tenantCardTitle": defaults["tenant_card_title"],
+        "badges": defaults["badges"],
+        "workbenchLabel": defaults["workbench_label"],
+        "workbenchHint": defaults["workbench_hint"],
+    }
 
 
 def get_tenant_by_slug(slug=None, site_config=None):
@@ -1275,6 +1493,19 @@ def gen_watchlist_details():
         },
     }
 
+
+def strip_watchlist_forecast_payload(detail):
+    normalized = copy.deepcopy(detail or {})
+    normalized.pop("forecast", None)
+    return normalized
+
+
+def apply_watchlist_feature_flags(detail, site_config=None):
+    normalized = copy.deepcopy(detail or {})
+    if not is_feature_enabled("stock_forecast", site_config):
+        normalized = strip_watchlist_forecast_payload(normalized)
+    return normalized
+
 def gen_news_feed():
     news = [
         {
@@ -1352,6 +1583,7 @@ def gen_user_segments():
 
 def init_db():
     with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS access_logs (
@@ -1378,6 +1610,22 @@ def init_db():
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                password TEXT NOT NULL,
+                role TEXT NOT NULL,
+                tenant_slug TEXT NOT NULL,
+                advisor_name TEXT,
+                phone TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'active',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
         row = conn.execute(
             "SELECT setting_key FROM app_settings WHERE setting_key = ?",
             (SITE_CONFIG_KEY,),
@@ -1390,6 +1638,23 @@ def init_db():
                     json.dumps(DEFAULT_SITE_CONFIG, ensure_ascii=False),
                     datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 ),
+            )
+        user_count = conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"]
+        if user_count == 0:
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            conn.executemany(
+                """
+                INSERT INTO users (username, password, role, tenant_slug, advisor_name, phone, status, created_at, updated_at)
+                VALUES (:username, :password, :role, :tenant_slug, :advisor_name, :phone, :status, :created_at, :updated_at)
+                """,
+                [
+                    {
+                        **user,
+                        "created_at": now,
+                        "updated_at": now,
+                    }
+                    for user in DEFAULT_USERS
+                ],
             )
         conn.commit()
 
@@ -1506,6 +1771,14 @@ def inject_site_config():
         "tenant_configs": get_tenant_configs(config),
         "default_tenant_slug": get_default_tenant_slug(config),
     }
+
+
+def get_platform_name(site_config=None):
+    return get_platform_brand(site_config).get("name", DEFAULT_BRAND_CONFIG["name"])
+
+
+def get_platform_short_name(site_config=None):
+    return get_platform_brand(site_config).get("short_name", DEFAULT_BRAND_CONFIG["short_name"])
 
 
 @app.teardown_appcontext
@@ -1633,7 +1906,12 @@ def index():
 
 @app.route("/h5")
 def h5():
-    tenant = get_active_tenant_from_request()
+    site_config = get_site_config()
+    current_demo_profile = get_current_demo_profile(site_config)
+    tenant = get_tenant_by_slug(
+        current_demo_profile.get("tenant", {}).get("slug") if current_demo_profile else None,
+        site_config,
+    )
     market = gen_market_data()
     news = gen_news_feed()
     macro_indicators = gen_macro_indicators()
@@ -1647,6 +1925,8 @@ def h5():
         feed_boards=feed_boards,
         watchlist_details=watchlist_details,
         active_tenant=tenant,
+        demo_profiles=get_h5_login_users(site_config),
+        current_demo_profile=current_demo_profile,
     )
 
 @app.route("/admin")
@@ -1717,8 +1997,9 @@ def api_watchlist():
 
 @app.route("/api/watchlist/<stock_code>")
 def api_watchlist_detail(stock_code):
+    site_config = get_site_config()
     details = gen_watchlist_details()
-    return jsonify(details.get(stock_code, {
+    payload = details.get(stock_code, {
         "code": stock_code,
         "name": stock_code,
         "market": "CN",
@@ -1740,7 +2021,8 @@ def api_watchlist_detail(stock_code):
             "band": "等待更多财务、行业和作者样本。",
             "drivers": [],
         },
-    }))
+    })
+    return jsonify(apply_watchlist_feature_flags(payload, site_config))
 
 
 def get_access_summary():
@@ -1827,6 +2109,69 @@ def api_site_config():
     return jsonify(get_site_config())
 
 
+@app.route("/api/demo-profiles")
+def api_demo_profiles():
+    site_config = get_site_config()
+    profiles = get_h5_login_users(site_config)
+    current = get_current_demo_profile(site_config)
+    return jsonify({
+        "profiles": profiles,
+        "current_profile": current,
+    })
+
+
+@app.route("/api/demo-profile/switch", methods=["POST"])
+def api_switch_demo_profile():
+    site_config = get_site_config()
+    profiles = get_h5_login_users(site_config)
+    body = request.get_json(silent=True) or {}
+    profile_id = str(body.get("profile_id") or "").strip()
+    matched = next((profile for profile in profiles if profile["username"] == profile_id), None)
+    if not matched:
+        return jsonify({"ok": False, "error": "demo_profile_not_found"}), 404
+    save_current_demo_profile_id(matched["username"])
+    return jsonify({
+        "ok": True,
+        "current_profile": matched,
+        "profiles": profiles,
+    })
+
+
+@app.route("/api/h5/logout", methods=["POST"])
+def api_h5_logout():
+    save_current_demo_profile_id("")
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/users")
+def api_admin_users():
+    return jsonify({"users": list_users()})
+
+
+@app.route("/api/admin/users", methods=["POST"])
+def api_create_admin_user():
+    body = request.get_json(silent=True) or {}
+    try:
+        user = create_user(body)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "user": user, "users": list_users()})
+
+
+@app.route("/api/admin/users/import", methods=["POST"])
+def api_import_admin_users():
+    body = request.get_json(silent=True) or {}
+    users = body.get("users", [])
+    created = import_users(users if isinstance(users, list) else [])
+    return jsonify({"ok": True, "created": created, "users": list_users()})
+
+
+@app.route("/api/kol/users")
+def api_kol_users():
+    tenant = get_active_tenant_from_request()
+    return jsonify({"users": list_users(tenant_slug=tenant["slug"])})
+
+
 @app.route("/api/admin/site-config", methods=["GET", "POST"])
 def api_admin_site_config():
     if request.method == "GET":
@@ -1847,6 +2192,7 @@ def api_admin_site_config():
             "brand": payload.get("brand", current.get("brand", {})),
             "default_tenant_slug": payload.get("default_tenant_slug", current.get("default_tenant_slug")),
             "tenants": payload.get("tenants", current.get("tenants", [])),
+            "demo_profiles": payload.get("demo_profiles", current.get("demo_profiles", [])),
             "feature_flags": feature_flags,
         },
     )
@@ -1855,6 +2201,8 @@ def api_admin_site_config():
 
 @app.route("/api/admin/forecast-config")
 def api_admin_forecast_config():
+    if not is_feature_enabled("stock_forecast"):
+        return jsonify({"ok": False, "error": "stock_forecast_disabled"}), 403
     graph = load_forecast_workflow_graph()
     return jsonify(
         {
@@ -1867,6 +2215,8 @@ def api_admin_forecast_config():
 
 @app.route("/api/admin/forecast-config", methods=["POST"])
 def api_save_admin_forecast_config():
+    if not is_feature_enabled("stock_forecast"):
+        return jsonify({"ok": False, "error": "stock_forecast_disabled"}), 403
     body = request.get_json(silent=True) or {}
     if body.get("reset_default"):
         default_graph = save_forecast_workflow_graph(build_default_forecast_workflow_graph())
@@ -1912,8 +2262,9 @@ def api_ai_analysis():
         "新能源": "新能源车渗透率突破50%里程碑，产业链进入成熟期竞争。电池技术迭代加速，固态电池商业化时间表前移。关注具备技术壁垒的核心零部件企业。",
         "AI科技": "AI算力需求持续超预期，国产替代加速推进。DeepSeek等国内大模型商业化落地提速，应用层投资机会涌现。关注算力基础设施及AI应用双主线。",
     }
-    result = responses.get(topic, f"针对{topic}的深度分析：基于洞见智研平台整合的券商研报、专家会议纪要及另类数据，当前该领域呈现结构性机会。建议结合个人风险偏好，参考试点作者的研究框架后做出自己的判断。")
-    return jsonify({"topic": topic, "analysis": result, "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"), "source": "洞见智研AI分析引擎 (DeepSeek + Kimi 2.6)"})
+    platform_name = get_platform_name()
+    result = responses.get(topic, f"针对{topic}的深度分析：基于{platform_name}平台整合的券商研报、专家会议纪要及另类数据，当前该领域呈现结构性机会。建议结合个人风险偏好，参考试点作者的研究框架后做出自己的判断。")
+    return jsonify({"topic": topic, "analysis": result, "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"), "source": f"{platform_name}AI分析引擎 (DeepSeek + Kimi 2.6)"})
 
 def gen_community_posts():
     return [
@@ -2092,7 +2443,8 @@ def api_hermes_analyze():
     mode = request.json.get("mode", "研报精读")
     option = request.json.get("option", "")
     key = f"{mode}_{option}"
-    result = HERMES_RESPONSES.get(key, f"【{mode} · {option}】\n\n基于洞见智研平台整合的多维度数据，AI已完成深度分析。\n\n核心发现：该领域当前呈现结构性机会，关键指标向好。建议结合个人风险偏好，参考试点作者的研究框架后做出自己的判断。\n\n数据来源：券商研报库 + 专家纪要库 + 另类数据库\nAI引擎：DeepSeek R2 + Kimi 2.6 RAG架构\n分析时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    platform_name = get_platform_name()
+    result = HERMES_RESPONSES.get(key, f"【{mode} · {option}】\n\n基于{platform_name}平台整合的多维度数据，AI已完成深度分析。\n\n核心发现：该领域当前呈现结构性机会，关键指标向好。建议结合个人风险偏好，参考试点作者的研究框架后做出自己的判断。\n\n数据来源：券商研报库 + 专家纪要库 + 另类数据库\nAI引擎：DeepSeek R2 + Kimi 2.6 RAG架构\n分析时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
     return jsonify({
         "mode": mode,
         "option": option,
@@ -2138,6 +2490,8 @@ def gen_dm_messages(kol_id):
 def gen_kol_workbench(tenant=None):
     tenant = tenant or get_tenant_by_slug()
     is_lisa = tenant["slug"] == "lisa"
+    tenant_users = list_users(tenant_slug=tenant["slug"])
+    investor_users = [user for user in tenant_users if user["role"] == "investor"]
     watchlist_details_map = gen_watchlist_details()
     kol_name = tenant["advisor"]
     kol_avatar = tenant.get("logo_mark") or "👑"
@@ -2199,11 +2553,15 @@ def gen_kol_workbench(tenant=None):
             "engagement_rate": engagement_rate,
         },
         "recent_fans": [
-            {"name":"投研达人_小陈","time":"5分钟前","msg":f"{kol_name} 老师，想看最新核心指标版。","tier":"专业会员"},
-            {"name":"价值猎人小林","time":"23分钟前","msg":is_lisa and "请问港股互联网还能继续配吗？" or "请问港股互联网怎么看？","tier":"基础会员"},
-            {"name":"量化新手_阿明","time":"1小时前","msg":"想学习多因子模型，有推荐吗？","tier":"免费用户"},
-            {"name":"机构用户_张总","time":"2小时前","msg":"能否安排一次闭门交流？","tier":"机构试点"},
-            {"name":"小白投资者","time":"3小时前","msg":"新能源板块现在能入吗？","tier":"基础会员"},
+            {
+                "name": user["username"],
+                "time": "刚刚",
+                "msg": f"{kol_name} 老师，想看最新复盘和核心指标版。",
+                "tier": user["membership"],
+            }
+            for user in investor_users[:5]
+        ] or [
+            {"name": "暂无粉丝", "time": "--", "msg": "请先通过 Admin 或工作台导入用户。", "tier": "--"}
         ],
         "broadcast_history": [
             {"id":1,"content":is_lisa and "本周港股互联网更新：继续看南向资金和回购兑现" or "本周策略更新：科技板块适合继续跟踪，重点看 AI 算力订单兑现","time":"2026-05-20 08:00","reach":92,"open_rate":68},
@@ -2239,17 +2597,23 @@ def gen_kol_workbench(tenant=None):
         "fan_management": {
             "summary": "这里看的是大V自己的粉丝分层，不是平台总用户。重点管理高频互动、付费意向、机构试点和沉默粉丝的经营动作。",
             "stats": {
-                "total_fans": base_followers,
-                "new_fans_7d": 1420 if is_lisa else 1860,
-                "active_fans_30d": 5120 if is_lisa else 6840,
-                "paying_fans": 248 if is_lisa else 312,
+                "total_fans": len(investor_users),
+                "new_fans_7d": min(len(investor_users), 6 if is_lisa else 8),
+                "active_fans_30d": len(investor_users),
+                "paying_fans": max(0, len(investor_users) // 3),
             },
             "fans": [
-                {"name": "投研达人_小陈", "tier": "专业会员", "source": "H5 Hermes", "joined": "2026-05-20", "value": "高频提问", "status": "活跃"},
-                {"name": "价值猎人小林", "tier": "基础会员", "source": "复盘转化", "joined": "2026-04-16", "value": "高频复盘阅读", "status": "待升级"},
-                {"name": "机构用户_张总", "tier": "机构试点", "source": "闭门交流", "joined": "2026-03-08", "value": "高价值线索", "status": "重点跟进"},
-                {"name": "小白投资者", "tier": "基础会员", "source": "群发助手", "joined": "2026-05-28", "value": "新粉", "status": "观察中"},
-                {"name": "量化新手_阿明", "tier": "免费用户", "source": "社区帖子", "joined": "2026-05-03", "value": "低频互动", "status": "待激活"},
+                {
+                    "name": user["username"],
+                    "tier": user["membership"],
+                    "source": "用户导入",
+                    "joined": str(user.get("created_at") or "--")[:10],
+                    "value": f"手机号 {mask_phone(user.get('phone'))}",
+                    "status": user["status"] == "active" and "活跃" or "已禁用",
+                }
+                for user in investor_users
+            ] or [
+                {"name": "暂无粉丝", "tier": "--", "source": "--", "joined": "--", "value": "请先在用户管理中添加普通用户", "status": "待录入"}
             ],
         },
         "dashboard_metrics": {
@@ -2422,25 +2786,55 @@ def gen_kol_workbench(tenant=None):
             "summary": "知识库支持语音、文件和 URL 三种入口；历史内容允许点开弹框继续微调，修改后会重新同步到知识专区和 Hermes 上下文。",
             "items": [
                 {
+                    "id": "kb-hk-internet-valuation",
+                    "type": "file",
                     "title": "港股互联网估值框架",
                     "source": "文件上传 · 12页 PDF",
+                    "source_detail": "来源：文件上传 · 港股互联网估值框架.pdf · 12页",
                     "status": "可微调",
                     "summary": "拆出回购强度、估值带与催化条件，已关联腾讯 / 美团 / 阿里。",
                     "tags": ["估值框架", "港股互联网"],
+                    "raw_input": "原始材料重点包括：腾讯 / 美团 / 阿里的历史估值带、回购力度、自由现金流、财报兑现节奏，以及对行业竞争格局和监管预期的补充说明。",
+                    "key_points": ["回购强度直接影响估值修复斜率", "估值带必须结合利润兑现看，不单看 PS/PE", "催化条件要和财报、回购公告、南向资金一起验证"],
+                    "validation_nodes": ["财报后利润率是否兑现", "回购节奏是否持续", "南向资金是否继续净流入"],
+                    "sync_targets": ["租户知识队列", "知识专区", "Hermes 上下文", "港股互联网 Skill"],
+                    "tuning_focus": ["标题是否更贴近大V表达", "摘要是否保留关键判断", "关键要点是否足够结构化", "验证节点是否可直接复用到复盘"],
+                    "notes": "适合继续补公司层估值带、买回购和财报验证的先后顺序，以及哪些结论只适用于龙头公司。",
+                    "files": ["港股互联网估值框架.pdf"],
                 },
                 {
+                    "id": "kb-may-industry-call",
+                    "type": "voice",
                     "title": "5月产业电话会录音整理",
                     "source": "语音转写 · 28分钟",
+                    "source_detail": "来源：语音转写 · 产业电话会录音 · 28分钟",
                     "status": "已同步 Hermes",
                     "summary": "提炼固态电池、订单验证和量产节点，当前可直接被 Hermes 调用。",
                     "tags": ["电话会", "新能源"],
+                    "raw_input": "原始语音中重点讨论了固态电池量产路径、下游车厂验证节奏、订单兑现的不确定项，以及短期市场情绪和长期产业趋势的区别。",
+                    "key_points": ["先分清产业趋势和交易情绪", "订单验证比概念热度更重要", "量产节点要拆成时间、客户、成本三层"],
+                    "validation_nodes": ["样品送测是否进入下一阶段", "订单是否从试产切换到量产", "成本曲线是否出现拐点"],
+                    "sync_targets": ["租户知识队列", "知识专区", "Hermes 上下文", "新能源相关复盘"],
+                    "tuning_focus": ["转写口语是否要收敛成书面结论", "关键判断是否已经拆成可复用节点", "风险边界是否写清", "是否适合直接进入复盘或 Hermes"],
+                    "notes": "建议把口语化表达进一步压缩成“观点 - 证据 - 验证节点 - 风险”四段式，便于 Hermes 后续直接调用。",
+                    "voice_minutes": 28,
                 },
                 {
+                    "id": "kb-semiconductor-cycle",
+                    "type": "url",
                     "title": "半导体景气验证节点",
                     "source": "网页 URL · 3篇行业资料",
+                    "source_detail": "来源：网页 URL · 3篇行业资料抓取摘要",
                     "status": "同步中",
                     "summary": "整理产能利用率、成熟制程价格与资本开支节奏，适合继续补充验证节点。",
                     "tags": ["半导体", "网页资料"],
+                    "raw_input": "系统已抓取 3 篇行业网页资料，内容涉及成熟制程价格变化、产能利用率、资本开支收缩节奏，以及下游消费电子和服务器需求恢复情况。",
+                    "key_points": ["成熟制程价格是景气验证先行指标", "资本开支变化会领先反映景气预期", "不能只看单篇新闻，要归并成长期跟踪节点"],
+                    "validation_nodes": ["晶圆代工价格是否止跌", "主要厂商 capex 指引是否收缩", "下游需求恢复是否扩散到更多品类"],
+                    "sync_targets": ["租户知识队列", "知识专区", "Hermes 上下文"],
+                    "tuning_focus": ["网页摘要是否准确", "要点是否去噪", "验证节点是否可持续追踪", "是否需要补更多来源链接"],
+                    "notes": "当前更适合补充来源链接、删除噪音表述，并把验证节点改成可按月跟踪的版本。",
+                    "url": "https://example.com/semiconductor-cycle",
                 },
             ],
         },
@@ -2583,7 +2977,7 @@ def api_dm_send():
     def reply_for(kw_match):
         base = persona["name"]
         if "买" in content or "卖" in content or "推荐" in content or "代码" in content:
-            return f"我只能基于公开数据分享研究观点，无法给具体买卖建议哦。你可以参考洞见智研Hermes的「AI资产配置」做组合规划，或在「AI行情预判」看历史区间和模型推演的概率分布，结合自己的风险偏好判断。"
+            return f"我只能基于公开数据分享研究观点，无法给具体买卖建议哦。你可以参考{get_platform_short_name()}Hermes的「AI资产配置」做组合规划，或在「AI行情预判」看历史区间和模型推演的概率分布，结合自己的风险偏好判断。"
         if "新能源" in text or "电池" in text or "锂" in text:
             if kol_id == 5:
                 return f"我刚跑完一轮产业链调研：固态电池量产时间表略有提前迹象，中游材料端景气度在恢复。可以关注以下三个维度：①电解质技术路线分化 ②碳酸锂价格底部信号 ③海外工厂投产节奏。具体标的我不点名，避免合规风险，你可以用Hermes的量化因子筛选自己跑一下。"
@@ -2607,7 +3001,7 @@ def api_dm_send():
         if turn <= 2:
             return f"你这个问题挺好。我先简单回应：基于我最近跟踪的数据（{('、'.join(persona['focus'][:2]))}方向），目前的情况是结构性机会大于系统性机会。要不你具体说说你的关注点？是想看赛道、还是想做资产配置？"
         if turn <= 4:
-            return f"明白。我补充一下数据视角：洞见智研平台最近的研报数据库里，{persona['focus'][0]}相关研报量周环比+12%，机构关注度在抬升。但研报关注≠股价上涨，仅作信号参考。你的仓位结构是怎样的？我可以帮你从大方向上看一下平衡性。"
+            return f"明白。我补充一下数据视角：{get_platform_name()}平台最近的研报数据库里，{persona['focus'][0]}相关研报量周环比+12%，机构关注度在抬升。但研报关注≠股价上涨，仅作信号参考。你的仓位结构是怎样的？我可以帮你从大方向上看一下平衡性。"
         return f"咱们聊了几轮，我建议你这样做：①用Hermes的「AI资产配置」生成一份组合参考 ②用「AI行情预判」看一下你关注标的的历史走势区间 ③有具体观点了，再回来跟我对一对。最终决策一定是你自己做，我们这边只能给数据和研究框架。"
 
     reply = reply_for(content)
@@ -2667,7 +3061,7 @@ def api_ai_allocation():
         "max_drawdown": p["max_drawdown"],
         "rebalance": p["rebalance"],
         "sector_focus": p["sector"],
-        "data_source": "基于洞见智研回测引擎(2015-2026)+ 多因子模型 + Black-Litterman 框架",
+        "data_source": f"基于{get_platform_short_name()}回测引擎(2015-2026)+ 多因子模型 + Black-Litterman 框架",
         "disclaimer": "本配置方案为模型推演结果，基于历史数据回测，不构成投资建议。市场有风险，实际收益可能与回测区间显著偏离。",
         "compute_used": 5,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -2677,6 +3071,11 @@ def api_ai_allocation():
 def api_ai_forecast():
     """行情预判：历史可解读，未来仅区间不解读"""
     import math
+    if not is_feature_enabled("stock_forecast"):
+        return jsonify({
+            "error": "stock_forecast_disabled",
+            "message": "预测功能当前未开放。",
+        }), 403
     target = request.json.get("target", "上证指数")
     target_type = request.json.get("type", "大盘")
     # 30天历史 + 20天未来
@@ -2737,7 +3136,7 @@ def api_ai_forecast():
         "history_commentary": history_commentary,
         "forecast_disclaimer": "⚠️ 未来区间为模型基于历史波动率推演的概率分布，不构成方向判断和投资建议。实际走势受多重因素影响，可能显著偏离区间。",
         "correlations": correlations,
-        "data_source": "洞见智研多因子模型 + 历史波动率Monte Carlo推演 + RAG数据库",
+        "data_source": f"{get_platform_short_name()}多因子模型 + 历史波动率Monte Carlo推演 + RAG数据库",
         "compute_used": 8,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
     })
