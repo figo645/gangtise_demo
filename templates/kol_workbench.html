@@ -2314,11 +2314,20 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
               </div>
               <div class="kw-watch-desc">{{ item.thesis }}</div>
               <div class="kw-watch-chip-row" style="margin-top:10px">
+                <span class="kw-watch-chip">状态：{% if item.alert_level == 'warning' %}预警{% elif item.alert_level == 'attention' %}关注{% else %}正常{% endif %}</span>
                 <span class="kw-watch-chip">基础 K 线</span>
                 <span class="kw-watch-chip">MA5</span>
                 <span class="kw-watch-chip">MA10</span>
                 <span class="kw-watch-chip">MA20</span>
               </div>
+              {% if item.related_indicator_names %}
+              <div class="kw-watch-chip-row" style="margin-top:8px">
+                {% for signal_name in item.related_indicator_names[:3] %}
+                <span class="kw-watch-chip">{{ signal_name }}</span>
+                {% endfor %}
+              </div>
+              {% endif %}
+              <div class="kw-watch-desc" style="margin-top:10px;color:var(--gray-400)">{{ item.alert_text }}</div>
               <div data-workbench-watch-annotation="{{ item.code }}" style="margin-top:10px"></div>
             </div>
             {% endfor %}
@@ -2333,27 +2342,19 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
               <div class="kw-card-title">智能 Dashboard</div>
               <div class="kw-card-desc">这里是智能化定义模式，不是门户装修。你用提示词、布局和指标逻辑去定义面板，系统再自动生成并发布到前台的基本面区域。</div>
             </div>
-            <span class="kw-tag">{{ workbench.fund_dashboard.layout }}</span>
+            <span class="kw-tag" id="kw-dashboard-layout-tag">{{ workbench.fund_dashboard.layout }}</span>
           </div>
-          <div class="kw-cell-grid">
-            {% for cell in workbench.fund_dashboard.cells %}
-            <div class="kw-cell-card">
-              <div class="kw-cell-title">{{ cell.title }}</div>
-              {% if cell.value %}
-              <div class="kw-cell-value">{{ cell.value }}</div>
-              {% else %}
-              <div class="kw-empty-plus">+</div>
-              {% endif %}
-              <div class="kw-cell-desc">每个格子是一个智能定义单元；点击编辑后按独立提示词重新生成，不是手工装修门户页面。</div>
-              <div class="kw-prompt-row" style="margin-top:10px">
-                <span class="kw-prompt-chip">{{ cell.prompt }}</span>
-              </div>
+          <div class="kw-toolbar" style="margin-top:12px;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div id="kw-dashboard-meta" class="kw-side-note">当前展示已发布版本。</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn-outline" style="padding:9px 14px;font-size:12px" type="button" onclick="kwGenerateFundDashboard('2x2')">生成 2x2</button>
+              <button class="btn-outline" style="padding:9px 14px;font-size:12px" type="button" onclick="kwGenerateFundDashboard('3x3')">生成 3x3</button>
+              <button class="btn-outline" style="padding:9px 14px;font-size:12px" type="button" onclick="kwGenerateFundDashboard('4x4')">生成 4x4</button>
+              <button class="btn-gold" style="padding:9px 14px;font-size:12px" type="button" onclick="kwPublishFundDashboard()">发布到前台</button>
+              <button class="btn-outline" style="padding:9px 14px;font-size:12px" type="button" onclick="kwResetFundDashboardDraft()">恢复发布版</button>
             </div>
-            {% endfor %}
           </div>
-          <div class="kw-toolbar" style="margin-top:12px">
-            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="showToast('将弹框输入单格提示词')">编辑智能定义提示词</button>
-          </div>
+          <div id="kw-dashboard-preview" style="margin-top:12px"></div>
         </div>
       </div>
 
@@ -2397,7 +2398,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
             <tbody>
               {% for item in workbench.indicator_hub["smart_items"] %}
               <tr>
-                <td><span style="color:#F8F6F0;font-weight:600">{{ item.name }}</span><div style="font-size:11px;color:#8899aa;margin-top:4px">{{ item.owner }}</div></td>
+                <td><span style="color:#F8F6F0;font-weight:600">{{ item.name }}</span><div style="font-size:11px;color:#8899aa;margin-top:4px">{{ item.owner }} · {{ item.data_mode_label }}</div></td>
                 <td>{{ item.category }}</td>
                 <td style="color:#C8A96E">{{ item.value }}</td>
                 <td style="max-width:260px;color:#8899aa">{{ item.assessment }}</td>
@@ -2439,7 +2440,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
             <tbody>
               {% for item in workbench.indicator_hub["lake_items"] %}
               <tr>
-                <td><span style="color:#F8F6F0;font-weight:600">{{ item.name }}</span><div style="font-size:11px;color:#8899aa;margin-top:4px">{{ item.owner }}</div></td>
+                <td><span style="color:#F8F6F0;font-weight:600">{{ item.name }}</span><div style="font-size:11px;color:#8899aa;margin-top:4px">{{ item.owner }} · {{ item.data_mode_label }}</div></td>
                 <td>{{ item.category }}</td>
                 <td style="color:#C8A96E">{{ item.value }}</td>
                 <td style="max-width:320px;color:#8899aa">{{ item.assessment }}</td>
@@ -2585,6 +2586,11 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
     <div id="kw-indicator-modal-content"></div>
   </div>
 </div>
+<div class="kw-review-modal-overlay" id="kw-dashboard-cell-modal" onclick="if(event.target===this)kwCloseDashboardCellModal()">
+  <div class="kw-review-modal-sheet">
+    <div id="kw-dashboard-cell-modal-content"></div>
+  </div>
+</div>
 <script>
 const workbenchSectionMeta = {
   overview: { title: '工作台概览', summary: '和 H5 保持同一套产品口径，但以桌面 web 工作流方式组织大V日常动作。' },
@@ -2606,6 +2612,10 @@ const workbenchSectionMeta = {
 
 let kwPortalWorkspaceBase = JSON.parse(JSON.stringify((window.WORKBENCH_DATA && window.WORKBENCH_DATA.portal_workspace) || {}));
 let kwPortalWorkspaceDraft = JSON.parse(JSON.stringify(kwPortalWorkspaceBase || {}));
+let kwFundDashboardState = JSON.parse(JSON.stringify((window.WORKBENCH_DATA && window.WORKBENCH_DATA.fund_dashboard_state) || { published: (window.WORKBENCH_DATA && window.WORKBENCH_DATA.fund_dashboard) || {}, draft: null }));
+let kwDashboardCellEditingIndex = -1;
+let kwDashboardCurrentLayout = '2x2';
+let kwDashboardCurrentCards = [];
 
 function isWorkbenchFeatureEnabled(featureName) {
   const flags = (window.SITE_CONFIG && window.SITE_CONFIG.feature_flags) || {};
@@ -2695,6 +2705,243 @@ function renderWorkbenchTrendChart(hostId, items) {
       ${points}
     </svg>
   `;
+}
+
+function kwNormalizeDashboardLayout(layout) {
+  if (layout === '3x3' || layout === '4x4' || layout === '2x2') return layout;
+  return '2x2';
+}
+
+function kwGetDashboardCardTarget(layout) {
+  if (layout === '3x3') return 6;
+  if (layout === '4x4') return 8;
+  return 4;
+}
+
+function kwGetIndicatorDashboardSeedCards() {
+  const items = ((window.WORKBENCH_DATA && window.WORKBENCH_DATA.indicator_hub && window.WORKBENCH_DATA.indicator_hub.smart_items) || [])
+    .concat((window.WORKBENCH_DATA && window.WORKBENCH_DATA.indicator_hub && window.WORKBENCH_DATA.indicator_hub.lake_items) || []);
+  return items.map((item) => ({
+    name: item.name || '核心指标',
+    value: item.value || '--',
+    assessment: item.assessment || item.alert || '继续观察',
+    status: item.status || 'attention',
+    alert: item.alert || '',
+    hint: item.alert || item.assessment || '',
+    prompt: `直接引用指标湖信号：${item.name || '核心指标'}，用于工作台和前台基本面首页。`,
+  }));
+}
+
+function kwBuildFallbackDashboardCard(index) {
+  const seeds = kwGetIndicatorDashboardSeedCards();
+  const seed = seeds[index % Math.max(seeds.length, 1)] || {};
+  return {
+    name: seed.name || `核心指标 ${index + 1}`,
+    value: seed.value || '待跟踪',
+    assessment: seed.assessment || '继续观察',
+    status: seed.status || 'attention',
+    alert: seed.alert || '',
+    hint: seed.hint || '',
+    prompt: seed.prompt || `围绕核心指标 ${index + 1} 生成适合普通投资者看的核心指标卡。`,
+    isEmpty: false,
+  };
+}
+
+function kwHydrateDashboardConfig(config) {
+  const source = config && typeof config === 'object' ? config : {};
+  const layout = kwNormalizeDashboardLayout(source.layout || '2x2');
+  const cards = Array.from({ length: kwGetDashboardCardTarget(layout) }, (_, index) => {
+    const item = Array.isArray(source.cards) ? source.cards[index] : null;
+    const fallback = kwBuildFallbackDashboardCard(index);
+    if (!item) return { ...fallback };
+    return {
+      name: item.name || fallback.name,
+      value: item.value || fallback.value,
+      assessment: item.assessment || fallback.assessment,
+      status: item.status || fallback.status,
+      alert: item.alert || fallback.alert,
+      hint: item.hint || fallback.hint,
+      prompt: item.prompt || fallback.prompt,
+      isEmpty: !!item.isEmpty,
+    };
+  });
+  return {
+    layout,
+    title: source.title || '今日核心指标面板',
+    note: source.note || source.summary || '当前面板聚焦宏观方向、资金验证和重点主线。',
+    summary: source.summary || source.note || '当前面板聚焦宏观方向、资金验证和重点主线。',
+    updatedAt: source.updatedAt || '刚刚同步',
+    publisher: source.publisher || '系统',
+    cards,
+  };
+}
+
+function kwGetFundDashboardPublished() {
+  return kwHydrateDashboardConfig((kwFundDashboardState && kwFundDashboardState.published) || (window.WORKBENCH_DATA && window.WORKBENCH_DATA.fund_dashboard) || {});
+}
+
+function kwGetFundDashboardDraft() {
+  return kwFundDashboardState && kwFundDashboardState.draft ? kwHydrateDashboardConfig(kwFundDashboardState.draft) : null;
+}
+
+function kwBuildDashboardCardsFromPrompts(layout, prompts) {
+  const target = kwGetDashboardCardTarget(layout);
+  return Array.from({ length: target }, (_, index) => {
+    const prompt = String((prompts && prompts[index]) || '').trim();
+    const fallback = kwBuildFallbackDashboardCard(index);
+    if (!prompt) return { ...fallback };
+    return {
+      ...fallback,
+      name: prompt.length > 10 ? `${prompt.slice(0, 10)}...` : prompt,
+      assessment: `按该格子的定制提示词跟踪：${prompt.length > 28 ? `${prompt.slice(0, 28)}...` : prompt}`,
+      alert: '重点确认该主题是否已有最新数据或事件验证。',
+      hint: '该格子由独立提示词生成，适合跟踪小众主题或临时变量。',
+      prompt,
+      isEmpty: false,
+    };
+  });
+}
+
+function kwRenderDashboardPreview() {
+  const host = document.getElementById('kw-dashboard-preview');
+  const metaHost = document.getElementById('kw-dashboard-meta');
+  const tag = document.getElementById('kw-dashboard-layout-tag');
+  if (!host) return;
+  const draft = kwGetFundDashboardDraft();
+  const published = kwGetFundDashboardPublished();
+  const active = draft || published;
+  kwDashboardCurrentLayout = kwNormalizeDashboardLayout(active.layout || '2x2');
+  kwDashboardCurrentCards = Array.isArray(active.cards) ? active.cards.slice() : [];
+  if (tag) tag.textContent = kwDashboardCurrentLayout;
+  if (metaHost) {
+    metaHost.textContent = draft
+      ? `草稿已生成 · ${kwDashboardCurrentLayout.toUpperCase()} · 点击格子继续编辑，发布后同步到 H5 和租户门户`
+      : `当前展示已发布版本 · ${published.updatedAt || '刚刚同步'} · ${published.publisher || '系统发布'}`;
+  }
+  host.innerHTML = `
+    <div class="kw-cell-grid">
+      ${kwDashboardCurrentCards.map((cell, index) => `
+        <div class="kw-cell-card" onclick="kwOpenDashboardCellModal(${index})" style="cursor:pointer">
+          <div class="kw-cell-title">${escapeHtml(cell.name || `核心指标 ${index + 1}`)}</div>
+          ${cell.value ? `<div class="kw-cell-value">${escapeHtml(cell.value)}</div>` : '<div class="kw-empty-plus">+</div>'}
+          <div class="kw-cell-desc">${escapeHtml(cell.assessment || '每个格子是一个智能定义单元；点击后按独立提示词重新生成。')}</div>
+          <div class="kw-prompt-row" style="margin-top:10px">
+            <span class="kw-prompt-chip">${escapeHtml(cell.prompt || '点击补充单格提示词')}</span>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function kwOpenDashboardCellModal(index) {
+  kwDashboardCurrentCards = Array.isArray(kwDashboardCurrentCards) ? kwDashboardCurrentCards : [];
+  const card = kwDashboardCurrentCards[index];
+  if (!card) return;
+  kwDashboardCellEditingIndex = index;
+  const host = document.getElementById('kw-dashboard-cell-modal-content');
+  const modal = document.getElementById('kw-dashboard-cell-modal');
+  if (!host || !modal) return;
+  host.innerHTML = `
+    <div class="kw-review-modal-title">编辑单格提示词</div>
+    <div class="kw-review-runtime-desc" style="margin-top:6px">当前摘要：${escapeHtml(card.name || '未命名指标')} · ${escapeHtml(card.value || '--')}</div>
+    <div style="margin-top:14px">
+      <textarea id="kw-dashboard-cell-prompt-input" class="kw-knowledge-modal-textarea" placeholder="例如：聚焦 AI 订单兑现、利润率与订单验证节点，写成适合普通投资者理解的提示卡。">${escapeHtml(card.prompt || '')}</textarea>
+    </div>
+    <div class="kw-toolbar" style="margin-top:14px;justify-content:flex-end">
+      <button class="btn-outline" type="button" onclick="kwCloseDashboardCellModal()">取消</button>
+      <button class="btn-gold" type="button" onclick="kwSaveDashboardCellPrompt()">保存提示词</button>
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+function kwCloseDashboardCellModal() {
+  const modal = document.getElementById('kw-dashboard-cell-modal');
+  if (modal) modal.classList.remove('show');
+  kwDashboardCellEditingIndex = -1;
+}
+
+async function kwSaveDashboardCellPrompt() {
+  if (kwDashboardCellEditingIndex < 0) return;
+  const input = document.getElementById('kw-dashboard-cell-prompt-input');
+  const prompt = input ? input.value.trim() : '';
+  const prompts = kwDashboardCurrentCards.map((item) => item.prompt || '');
+  prompts[kwDashboardCellEditingIndex] = prompt;
+  const layout = kwDashboardCurrentLayout || '2x2';
+  const cards = kwBuildDashboardCardsFromPrompts(layout, prompts);
+  const nextDraft = {
+    layout,
+    title: `今日核心指标面板 · ${layout.toUpperCase()}`,
+    note: `本次由大V为 ${cards.length} 个格子分别设置独立提示词，面板内容按单格定制生成。`,
+    summary: `本次由大V为 ${cards.length} 个格子分别设置独立提示词，面板内容按单格定制生成。`,
+    cards,
+    updatedAt: '刚刚生成',
+    publisher: (window.WORKBENCH_DATA && window.WORKBENCH_DATA.kol_name) || '当前大V',
+  };
+  await kwSyncFundDashboard('save_draft', nextDraft, '草稿已保存');
+  kwCloseDashboardCellModal();
+}
+
+async function kwGenerateFundDashboard(layout) {
+  const normalizedLayout = kwNormalizeDashboardLayout(layout || kwDashboardCurrentLayout || '2x2');
+  const target = kwGetDashboardCardTarget(normalizedLayout);
+  const currentDraft = kwGetFundDashboardDraft() || kwGetFundDashboardPublished();
+  const prompts = Array.from({ length: target }, (_, index) => {
+    return (currentDraft.cards && currentDraft.cards[index] && currentDraft.cards[index].prompt) || kwBuildFallbackDashboardCard(index).prompt;
+  });
+  const nextDraft = {
+    layout: normalizedLayout,
+    title: `今日核心指标面板 · ${normalizedLayout.toUpperCase()}`,
+    note: `本次由大V为 ${target} 个格子分别设置独立提示词，面板内容按单格定制生成。`,
+    summary: `本次由大V为 ${target} 个格子分别设置独立提示词，面板内容按单格定制生成。`,
+    cards: kwBuildDashboardCardsFromPrompts(normalizedLayout, prompts),
+    updatedAt: '刚刚生成',
+    publisher: (window.WORKBENCH_DATA && window.WORKBENCH_DATA.kol_name) || '当前大V',
+  };
+  await kwSyncFundDashboard('save_draft', nextDraft, `已生成 ${normalizedLayout.toUpperCase()} 指标面板草稿`);
+}
+
+async function kwPublishFundDashboard() {
+  const draft = kwGetFundDashboardDraft();
+  if (!draft) {
+    showToast('请先生成一个指标面板草稿');
+    return;
+  }
+  await kwSyncFundDashboard('publish', draft, '已发布到前台 H5 和租户门户');
+}
+
+async function kwResetFundDashboardDraft() {
+  await kwSyncFundDashboard('reset_draft', null, '已恢复到当前发布版');
+}
+
+async function kwSyncFundDashboard(action, dashboard, successMessage) {
+  const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
+  try {
+    const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/dashboard`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action,
+        dashboard: dashboard || null,
+      }),
+    });
+    const payload = await resp.json();
+    if (!resp.ok || !payload.success) throw new Error(payload.error || 'dashboard_sync_failed');
+    kwFundDashboardState = JSON.parse(JSON.stringify(payload.fund_dashboard_state || ((payload.dashboard || {}).fund_dashboard_state) || {}));
+    if (window.WORKBENCH_DATA) {
+      window.WORKBENCH_DATA.fund_dashboard_state = JSON.parse(JSON.stringify(kwFundDashboardState || {}));
+      if (payload.dashboard && payload.dashboard.fund_dashboard) {
+        window.WORKBENCH_DATA.fund_dashboard = JSON.parse(JSON.stringify(payload.dashboard.fund_dashboard));
+      } else if (kwFundDashboardState.published) {
+        window.WORKBENCH_DATA.fund_dashboard = JSON.parse(JSON.stringify(kwFundDashboardState.published));
+      }
+    }
+    kwRenderDashboardPreview();
+    showToast(successMessage || '已同步');
+  } catch (error) {
+    showToast('Dashboard 同步失败，请稍后重试');
+  }
 }
 
 function renderWorkbenchBizCharts() {
@@ -3468,10 +3715,10 @@ function kwOpenIndicatorHistory(indicatorId) {
     showToast('未找到指标详情');
     return;
   }
-  const simulatedSeries = Array.isArray(item.simulated_series) ? item.simulated_series : [];
-  const klinePayload = item.simulated_kline || {};
+  const historySeries = Array.isArray(item.history_series) ? item.history_series : [];
+  const klinePayload = item.history_kline || {};
   const anomalyPoints = Array.isArray(klinePayload.anomalies) ? klinePayload.anomalies : [];
-  const trendSummary = kwBuildIndicatorTrendSummary(simulatedSeries);
+  const trendSummary = kwBuildIndicatorTrendSummary(historySeries);
   const currentValue = String(item.value || '--');
   const valueClass = /[A-Za-z]/.test(currentValue) || currentValue.length >= 9 ? 'kw-detail-stat-value compact' : 'kw-detail-stat-value';
   host.innerHTML = `
@@ -3506,6 +3753,7 @@ function kwOpenIndicatorHistory(indicatorId) {
         <div class="kw-watch-chip-row" style="margin-top:12px">
           <span class="kw-watch-chip">状态：${escapeHtml(kwIndicatorStatusLabel(item.status))}</span>
           <span class="kw-watch-chip">监测源：${escapeHtml(item.owner || '--')}</span>
+          <span class="kw-watch-chip">数据来源：${escapeHtml(item.data_mode_label || '--')}</span>
           <span class="kw-watch-chip">记录数：${trendSummary.length}</span>
         </div>
       </div>
@@ -4981,6 +5229,9 @@ function showWorkbenchSection(name, navEl) {
   if (name === 'biz-dashboard') {
     showWorkbenchAnalyticsSection(window.dashboardDefaultSection || 'funnel');
   }
+  if (name === 'dashboard') {
+    kwRenderDashboardPreview();
+  }
   if (name === 'watchlist' || name === 'published' || name === 'review') {
     renderWorkbenchAnnotationViews();
   }
@@ -5017,6 +5268,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (forecastNav) forecastNav.style.display = isWorkbenchFeatureEnabled('stock_forecast') ? '' : 'none';
   if (hermesNav) hermesNav.style.display = isWorkbenchFeatureEnabled('hermes') ? '' : 'none';
   kwRenderPortalWorkspace();
+  kwRenderDashboardPreview();
   kwRenderReviewStudio();
   kwRenderPublishedReviewList();
   kwRenderKnowledgeList();

@@ -2931,8 +2931,12 @@ let currentDemoUser = null;
 let h5LoginPendingUser = '';
 let h5ExperienceBooted = false;
 const DEFAULT_MACRO_INDICATORS = {{ macro_indicators | tojson }};
+const H5_INDICATOR_HUB = {{ indicator_hub | tojson }};
+const FUNDAMENTAL_COLUMN_DATA = {{ fundamental_column | tojson }};
+const DASHBOARD_SEED_CARDS = {{ dashboard_seed_cards | tojson }};
 const WATCHLIST_DETAILS_MAP = {{ watchlist_details | tojson }};
 const FUND_DASHBOARD_STORAGE_KEY = 'gangtise_fund_dashboard_state';
+const INITIAL_TENANT_DASHBOARD = {{ tenant_dashboard_payload | tojson }};
 const DEFAULT_DASHBOARD_CELL_PROMPTS = [
   '聚焦美联储路径、通胀和降息预期，给普通投资者一个方向判断。',
   '只看南向/北向资金与成交量变化，判断今天是否有增量资金验证。',
@@ -3086,6 +3090,7 @@ let knowledgeEntryStore = [
   },
 ];
 let tenantFundDashboardState = loadTenantFundDashboardState();
+let tenantFundDashboardRemoteState = normalizeInitialRemoteDashboardState(INITIAL_TENANT_DASHBOARD);
 
 function loadTenantFundDashboardState() {
   try {
@@ -3096,6 +3101,17 @@ function loadTenantFundDashboardState() {
   } catch (e) {
     return {};
   }
+}
+
+function normalizeInitialRemoteDashboardState(payload) {
+  const dashboard = payload && typeof payload === 'object' ? payload : {};
+  const state = dashboard.fund_dashboard_state && typeof dashboard.fund_dashboard_state === 'object'
+    ? dashboard.fund_dashboard_state
+    : { published: dashboard.fund_dashboard || null, draft: null };
+  return {
+    published: state.published ? hydrateDashboardConfig(state.published) : null,
+    draft: state.draft ? hydrateDashboardConfig(state.draft) : null,
+  };
 }
 
 function persistTenantFundDashboardState() {
@@ -3178,7 +3194,19 @@ function getDashboardKeywordCards(promptText) {
 }
 
 function getBaseDashboardCards() {
-  return DEFAULT_MACRO_INDICATORS.map(item => ({
+  const source = Array.isArray(DASHBOARD_SEED_CARDS) && DASHBOARD_SEED_CARDS.length
+    ? DASHBOARD_SEED_CARDS
+    : (Array.isArray(DEFAULT_MACRO_INDICATORS) && DEFAULT_MACRO_INDICATORS.length
+      ? DEFAULT_MACRO_INDICATORS
+      : (((H5_INDICATOR_HUB || {}).smart_items || []).slice(0, 4).map(item => ({
+          name: item.name,
+          value: item.value,
+          assessment: item.assessment,
+          status: item.status,
+          alert: item.alert,
+          hint: item.alert,
+        }))));
+  return source.map(item => ({
     name: item.name,
     value: item.value,
     assessment: item.assessment,
@@ -3341,22 +3369,50 @@ function buildDefaultFundDashboard() {
 }
 
 function ensureTenantFundDashboardState(tenantId) {
+  const remotePublished = tenantFundDashboardRemoteState && tenantFundDashboardRemoteState.published
+    ? hydrateDashboardConfig(tenantFundDashboardRemoteState.published)
+    : null;
+  const remoteDraft = tenantFundDashboardRemoteState && tenantFundDashboardRemoteState.draft
+    ? hydrateDashboardConfig(tenantFundDashboardRemoteState.draft)
+    : null;
   if (!tenantFundDashboardState[tenantId]) {
     tenantFundDashboardState[tenantId] = {
-      published: buildDefaultFundDashboard(),
-      draft: null,
+      published: remotePublished || buildDefaultFundDashboard(),
+      draft: remoteDraft,
     };
     persistTenantFundDashboardState();
   } else {
     const tenantState = tenantFundDashboardState[tenantId];
-    tenantState.published = hydrateDashboardConfig(tenantState.published);
-    tenantState.draft = tenantState.draft ? hydrateDashboardConfig(tenantState.draft) : null;
+    tenantState.published = remotePublished || hydrateDashboardConfig(tenantState.published);
+    tenantState.draft = remoteDraft !== null ? remoteDraft : (tenantState.draft ? hydrateDashboardConfig(tenantState.draft) : null);
     if (!tenantState.published) {
       tenantState.published = buildDefaultFundDashboard();
     }
     persistTenantFundDashboardState();
   }
   return tenantFundDashboardState[tenantId];
+}
+
+async function syncTenantDashboardState(action, dashboardConfig) {
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  if (!tenantSlug) throw new Error('tenant_missing');
+  const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/dashboard`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action,
+      dashboard: dashboardConfig || null,
+    }),
+  });
+  const payload = await resp.json();
+  if (!resp.ok || !payload.success) throw new Error(payload.error || 'dashboard_sync_failed');
+  tenantFundDashboardRemoteState = normalizeInitialRemoteDashboardState(payload.dashboard || {});
+  const tenantState = ensureTenantFundDashboardState(activeUser.tenant.id);
+  tenantState.published = tenantFundDashboardRemoteState.published || tenantState.published;
+  tenantState.draft = tenantFundDashboardRemoteState.draft;
+  persistTenantFundDashboardState();
+  return payload;
 }
 
 function getTenantFundDashboardState() {
@@ -4440,7 +4496,70 @@ function formatMetricDate(date) {
   return `${month}-${day}`;
 }
 
+function getIndicatorHubItems() {
+  return [
+    ...(((H5_INDICATOR_HUB || {}).smart_items) || []),
+    ...(((H5_INDICATOR_HUB || {}).lake_items) || []),
+  ];
+}
+
+function normalizeMetricLookupName(name) {
+  return String(name || '').replace(/\s+/g, '').trim().toLowerCase();
+}
+
+function findIndicatorHubItemForCard(card, index) {
+  const name = String(card && card.name || `核心指标${index + 1}`);
+  const normalized = normalizeMetricLookupName(name);
+  const items = getIndicatorHubItems();
+  const exact = items.find(item => normalizeMetricLookupName(item.name) === normalized);
+  if (exact) return exact;
+  const contains = items.find(item => normalized && normalizeMetricLookupName(item.name).includes(normalized));
+  if (contains) return contains;
+  const prompt = String(card && card.prompt || '').trim();
+  if (prompt) {
+    if (/美联储|降息|联储|非农|通胀/i.test(prompt)) return items.find(item => item.id === 'fed_rate_path') || null;
+    if (/南向|北向|资金|流入|流出/i.test(prompt)) return items.find(item => item.id === 'southbound_flow') || null;
+    if (/AI|算力|半导体|订单/i.test(prompt)) return items.find(item => item.id === 'ai_order_signal') || null;
+    if (/信用|社融|地产|顺周期|CPI/i.test(prompt)) return items.find(item => item.id === 'credit_pulse') || null;
+  }
+  return null;
+}
+
 function buildFundMetricHistory(card, index) {
+  const linkedItem = findIndicatorHubItemForCard(card, index);
+  if (linkedItem) {
+    const trend = Array.isArray(linkedItem.history_series) ? linkedItem.history_series.map(item => ({
+      date: String(item.date || '').slice(5) || item.date || '--',
+      value: Number(item.value || 0),
+      status: item.status || linkedItem.status || 'normal',
+    })) : [];
+    const rawKline = linkedItem.history_kline || {};
+    const rawCandles = Array.isArray(rawKline.candles) ? rawKline.candles : [];
+    const anomalies = Array.isArray(rawKline.anomalies) ? rawKline.anomalies.map(entry => ({
+      ...entry,
+      date: String(entry.date || '').slice(5) || entry.date || '--',
+    })) : [];
+    return {
+      name: linkedItem.name || String(card && card.name || `核心指标${index + 1}`),
+      status: linkedItem.status || String(card && card.status || 'normal'),
+      value: linkedItem.value || (card && card.value) || '--',
+      category: linkedItem.category || '核心指标',
+      owner: linkedItem.owner || '指标湖',
+      dataModeLabel: linkedItem.data_mode_label || '指标湖',
+      trend,
+      kline: {
+        candles: rawCandles.map(candle => ({
+          ...candle,
+          date: String(candle.date || '').slice(5) || candle.date || '--',
+        })),
+        ma5: Array.isArray(rawKline.ma5) ? rawKline.ma5.map(item => ({ ...item, date: String(item.date || '').slice(5) || item.date || '--' })) : [],
+        ma10: Array.isArray(rawKline.ma10) ? rawKline.ma10.map(item => ({ ...item, date: String(item.date || '').slice(5) || item.date || '--' })) : [],
+        ma20: Array.isArray(rawKline.ma20) ? rawKline.ma20.map(item => ({ ...item, date: String(item.date || '').slice(5) || item.date || '--' })) : [],
+        anomalies,
+      },
+      anomalies,
+    };
+  }
   const name = String(card && card.name || `核心指标${index + 1}`);
   const status = String(card && card.status || 'normal');
   const random = createSeededRandom(`h5-fund-metric:${name}:${status}:${index}`);
@@ -4508,6 +4627,7 @@ function buildFundMetricHistory(card, index) {
     value: card && card.value ? card.value : '--',
     category: '核心指标',
     owner: '前台基本面面板',
+    dataModeLabel: '本地模拟',
     trend,
     kline: { candles, ma5, ma10, ma20, anomalies },
     anomalies,
@@ -4681,6 +4801,7 @@ function openFundMetricDetail(index) {
         <div class="fund-metric-detail-card-title">3. 数据口径</div>
         <div class="fund-metric-detail-copy" style="margin-top:0">当前详情页只展示纯数据分析视图，不做结果原因分析。可见范围包括趋势线、趋势状态和异动点标注。</div>
         <div class="fund-metric-detail-copy">当前值代表最新观测结果；历史趋势展示最近 8 个时间点的方向变化，用于快速判断节奏是否延续。</div>
+        <div class="fund-metric-detail-copy">数据来源：${escapeHtml(detail.dataModeLabel || '--')}</div>
       </div>
       <div class="fund-metric-detail-card">
         <div class="fund-metric-detail-card-title">4. 趋势情况与历史趋势</div>
@@ -4809,9 +4930,16 @@ function openDashboardCellModal(index) {
   const modal = document.getElementById('dashboard-cell-modal');
   if (!host || !modal) return;
   const card = currentWorkbenchDashboardSlots[index] || buildEmptyDashboardCard('');
+  const seedOptions = (Array.isArray(DASHBOARD_SEED_CARDS) ? DASHBOARD_SEED_CARDS : []).slice(0, 8).map((seed, seedIndex) => `
+    <button class="btn-outline" style="padding:6px 8px;font-size:11px" onclick="fillDashboardCellFromSeed(${index}, ${seedIndex})">${escapeHtml(seed.name || `指标${seedIndex + 1}`)}</button>
+  `).join('');
   host.innerHTML = `
     <div class="modal-title" style="margin-bottom:10px">编辑格子 ${index + 1}</div>
     <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">${isWorkbenchDashboardCellFilled(card) ? `当前摘要：${escapeHtml(card.name || '未命名指标')} · ${escapeHtml(card.value || '--')}` : '当前格子为空，输入提示词后会自动生成指标摘要。'}</div>
+    ${seedOptions ? `<div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">快速引用指标湖</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${seedOptions}</div>
+    </div>` : ''}
     <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">提示词</label>
       <textarea id="dashboard-cell-prompt-input" class="knowledge-modal-textarea" placeholder="${escapeHtml(DEFAULT_DASHBOARD_CELL_PROMPTS[index % DEFAULT_DASHBOARD_CELL_PROMPTS.length])}">${escapeHtml(card.prompt || '')}</textarea>
@@ -4822,6 +4950,26 @@ function openDashboardCellModal(index) {
     </div>
   `;
   modal.classList.add('show');
+}
+
+function fillDashboardCellFromSeed(cellIndex, seedIndex) {
+  const seed = (Array.isArray(DASHBOARD_SEED_CARDS) ? DASHBOARD_SEED_CARDS : [])[seedIndex];
+  if (!seed) return;
+  currentWorkbenchDashboardSlots = normalizeWorkbenchDashboardSlots(currentWorkbenchDashboardLayout, currentWorkbenchDashboardSlots);
+  currentWorkbenchDashboardSlots[cellIndex] = {
+    ...buildEmptyDashboardCard(''),
+    ...seed,
+    prompt: seed.prompt || `直接引用指标湖信号：${seed.name || '指标'}`,
+    isEmpty: false,
+  };
+  const input = document.getElementById('dashboard-cell-prompt-input');
+  if (input) input.value = currentWorkbenchDashboardSlots[cellIndex].prompt || '';
+  const host = document.getElementById('dashboard-cell-modal-content');
+  if (host) {
+    const summary = currentWorkbenchDashboardSlots[cellIndex];
+    const note = host.querySelector('.modal-title + div');
+    if (note) note.textContent = `当前摘要：${summary.name || '未命名指标'} · ${summary.value || '--'}`;
+  }
 }
 
 function closeDashboardCellModal() {
@@ -4886,7 +5034,7 @@ function renderWorkbenchFundDashboard() {
   previewHost.innerHTML = renderWorkbenchDashboardBoard();
 }
 
-function generateFundDashboard(layout) {
+async function generateFundDashboard(layout) {
   const activeUser = getActiveDemoUser();
   if (activeUser.role !== 'dav') {
     showToast('只有大V身份可以生成核心指标面板');
@@ -4896,22 +5044,37 @@ function generateFundDashboard(layout) {
   currentWorkbenchDashboardLayout = normalizedLayout;
   currentWorkbenchDashboardSlots = normalizeWorkbenchDashboardSlots(normalizedLayout, currentWorkbenchDashboardSlots);
   const promptList = buildDashboardPromptListFromSlots();
+  const cards = currentWorkbenchDashboardSlots.map((card, index) => {
+    if (isWorkbenchDashboardCellFilled(card) && card.name && card.value) {
+      return {
+        ...card,
+        isEmpty: false,
+      };
+    }
+    return buildDashboardCardFromPrompt(promptList[index], index);
+  });
   const tenantState = getTenantFundDashboardState();
   tenantState.draft = {
     layout: normalizedLayout,
     title: buildDashboardTitle(normalizedLayout, promptList),
     note: buildDashboardNote(promptList),
-    cards: pickDashboardCards(normalizedLayout, promptList),
+    cards,
     updatedAt: '刚刚生成',
     publisher: activeUser.name,
   };
   persistTenantFundDashboardState();
   currentWorkbenchDashboardSourceVersion = getDashboardConfigVersion(tenantState.draft);
-  renderWorkbenchFundDashboard();
-  showToast(`已生成 ${normalizedLayout.toUpperCase()} 指标面板草稿`);
+  try {
+    await syncTenantDashboardState('save_draft', tenantState.draft);
+    renderWorkbenchFundDashboard();
+    showToast(`已生成 ${normalizedLayout.toUpperCase()} 指标面板草稿`);
+  } catch (error) {
+    renderWorkbenchFundDashboard();
+    showToast('草稿已生成，但同步后端失败');
+  }
 }
 
-function publishFundDashboard() {
+async function publishFundDashboard() {
   const activeUser = getActiveDemoUser();
   if (activeUser.role !== 'dav') {
     showToast('只有大V身份可以发布核心指标面板');
@@ -4922,53 +5085,67 @@ function publishFundDashboard() {
     showToast('请先生成一个指标面板草稿');
     return;
   }
-  tenantState.published = cloneDashboardConfig(tenantState.draft);
-  tenantState.published.updatedAt = '刚刚发布';
-  tenantState.published.publisher = activeUser.name;
-  tenantState.draft = null;
-  persistTenantFundDashboardState();
-  renderWorkbenchFundDashboard();
-  renderFundMacroDashboard();
-  showToast('已发布到基本面首页顶部');
+  try {
+    const payload = await syncTenantDashboardState('publish', tenantState.draft);
+    const state = normalizeInitialRemoteDashboardState(payload.dashboard || {});
+    tenantState.published = state.published || tenantState.published;
+    tenantState.draft = state.draft;
+    persistTenantFundDashboardState();
+    renderWorkbenchFundDashboard();
+    renderFundMacroDashboard();
+    showToast('已发布到基本面首页顶部');
+  } catch (error) {
+    showToast('发布失败，请稍后重试');
+  }
 }
 
-function resetFundDashboardDraft() {
+async function resetFundDashboardDraft() {
   const activeUser = getActiveDemoUser();
   if (activeUser.role !== 'dav') {
     showToast('当前身份没有草稿编辑权限');
     return;
   }
   const tenantState = getTenantFundDashboardState();
-  tenantState.draft = null;
-  persistTenantFundDashboardState();
-  renderWorkbenchFundDashboard();
-  showToast('已恢复到当前发布版');
+  try {
+    const payload = await syncTenantDashboardState('reset_draft');
+    const state = normalizeInitialRemoteDashboardState(payload.dashboard || {});
+    tenantState.published = state.published || tenantState.published;
+    tenantState.draft = state.draft;
+    persistTenantFundDashboardState();
+    renderWorkbenchFundDashboard();
+    showToast('已恢复到当前发布版');
+  } catch (error) {
+    showToast('恢复失败，请稍后重试');
+  }
 }
 
 function renderFundamentalKolColumn() {
   const host = document.getElementById('feed-fundamental-column');
   if (!host) return;
   const activeUser = getActiveDemoUser();
-  const entries = getTenantKnowledgeEntries();
   const advisorName = activeUser.tenant.advisor;
+  const backendEntries = Array.isArray((FUNDAMENTAL_COLUMN_DATA || {}).entries) ? FUNDAMENTAL_COLUMN_DATA.entries : [];
+  const entries = backendEntries.length ? backendEntries : getTenantKnowledgeEntries();
   const readyEntries = entries.filter(entry => entry.status === 'ready');
-  const displayEntries = (readyEntries.length ? readyEntries : entries).slice(0, 3);
-  const summaryText = readyEntries.length
-    ? `今日基本面解读优先引用 ${advisorName} 租户已经沉淀完成的知识卡，把估值、盈利质量、验证节点和争议点整理成可直接阅读的专栏。`
-    : `当前专栏会优先展示 ${advisorName} 最近录入但仍在清洗中的知识内容，等同步完成后会自动切换到正式知识卡。`;
+  const displayEntries = (readyEntries.length ? readyEntries : entries).slice(0, 4);
+  const summaryText = backendEntries.length
+    ? ((FUNDAMENTAL_COLUMN_DATA || {}).summary || `今日基本面解读优先引用 ${advisorName} 租户当前最重要的指标湖信号和异动。`)
+    : (readyEntries.length
+      ? `今日基本面解读优先引用 ${advisorName} 租户已经沉淀完成的知识卡，把估值、盈利质量、验证节点和争议点整理成可直接阅读的专栏。`
+      : `当前专栏会优先展示 ${advisorName} 最近录入但仍在清洗中的知识内容，等同步完成后会自动切换到正式知识卡。`);
   const columnCards = displayEntries.map((entry, index) => {
-    const status = getKnowledgeStatusMeta(entry.status);
+    const status = getKnowledgeStatusMeta(entry.status || 'ready');
     const angleLabel = ['估值视角', '盈利视角', '验证节点'][index] || '研究视角';
     return `
       <div class="fund-column-item">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
           <div>
-            <div class="fund-column-item-title">${escapeHtml(entry.title)}</div>
-            <div class="fund-column-item-meta">${escapeHtml(angleLabel)} · ${escapeHtml(entry.source)} · ${escapeHtml(entry.sourceDetail)}</div>
+            <div class="fund-column-item-title">${escapeHtml(entry.title || '')}</div>
+            <div class="fund-column-item-meta">${escapeHtml(entry.angle || angleLabel)} · ${escapeHtml(entry.source || '')} · ${escapeHtml(entry.sourceDetail || '')}</div>
           </div>
           <span class="knowledge-status ${status.className}">${status.label}</span>
         </div>
-        <div class="fund-column-item-desc">${escapeHtml(entry.summary)}</div>
+        <div class="fund-column-item-desc">${escapeHtml(entry.summary || '')}</div>
       </div>
     `;
   }).join('');

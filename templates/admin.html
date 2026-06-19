@@ -1388,13 +1388,13 @@
         </div>
       </div><!-- end section-community -->
 
-      <div id="section-indicator-hub" style="display:none">
+<div id="section-indicator-hub" style="display:none">
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-label">纳管指标</div>
             <span class="stat-icon">&#9638;</span>
-            <div class="stat-value">{{ indicator_hub.summary.total }}</div>
-            <div class="stat-change up">智能 {{ indicator_hub.summary.smart_total }} · 数据湖 {{ indicator_hub.summary.lake_total }}</div>
+            <div class="stat-value" id="admin-indicator-total-count">{{ indicator_hub.summary.total }}</div>
+            <div class="stat-change up" id="admin-indicator-total-desc">智能 {{ indicator_hub.summary.smart_total }} · 数据湖 {{ indicator_hub.summary.lake_total }}</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">启用中</div>
@@ -1405,14 +1405,63 @@
           <div class="stat-card">
             <div class="stat-label">重点异动</div>
             <span class="stat-icon">&#9888;</span>
-            <div class="stat-value">{{ indicator_hub.summary.anomalies }}</div>
+            <div class="stat-value" id="admin-indicator-anomaly-count">{{ indicator_hub.summary.anomalies }}</div>
             <div class="stat-change" style="color:#C8A96E">需第一时间跟进</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">预警 / 关注</div>
             <span class="stat-icon">&#128202;</span>
-            <div class="stat-value">{{ indicator_hub.summary.warnings }} / {{ indicator_hub.summary.attention }}</div>
+            <div class="stat-value" id="admin-indicator-status-count">{{ indicator_hub.summary.warnings }} / {{ indicator_hub.summary.attention }}</div>
             <div class="stat-change up">同步前台与工作台</div>
+          </div>
+        </div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <div class="table-header">
+            <div>
+              <div class="table-title">指标湖控制台</div>
+              <div style="font-size:12px;color:#8899aa;margin-top:6px">第一步先完成指标定义、API 定义、接口测试和模拟入湖。真实接入与清洗链路后续再接入这一套骨架。</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <button class="btn-outline" style="padding:6px 12px;font-size:12px" onclick="openIndicatorDefinitionModal()">+ 新增指标定义</button>
+              <button class="btn-outline" style="padding:6px 12px;font-size:12px" onclick="openIndicatorSourceModal()">+ 新增 API 定义</button>
+              <button class="btn-gold" style="padding:6px 12px;font-size:12px" onclick="seedAdminIndicatorMockData(false)">生成模拟入湖数据</button>
+              <button class="btn-sm-blue" style="padding:6px 12px;font-size:12px" onclick="refreshAdminIndicatorHub()">刷新数据</button>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:16px">
+            <div style="background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.15);border-radius:12px;padding:14px">
+              <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:10px">最近入湖批次</div>
+              <div id="admin-indicator-batch-list" style="display:grid;gap:10px">
+                {% for batch in indicator_hub.load_batches[:4] %}
+                <div style="padding:10px 12px;border-radius:10px;background:rgba(11,30,58,0.55);border:1px solid rgba(200,169,110,0.08)">
+                  <div style="font-size:12px;color:var(--white);font-weight:600">{{ batch.batch_code }}</div>
+                  <div style="font-size:11px;color:#8899aa;margin-top:4px">{{ batch.summary }}</div>
+                  <div style="font-size:11px;color:#C8A96E;margin-top:6px">{{ batch.created_at }} · {{ batch.total_indicators }} 指标 / {{ batch.total_points }} 点</div>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            <div style="background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.15);border-radius:12px;padding:14px">
+              <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:10px">最近接口测试</div>
+              <div id="admin-indicator-test-list" style="display:grid;gap:10px">
+                {% for item in indicator_hub.recent_tests[:4] %}
+                <div style="padding:10px 12px;border-radius:10px;background:rgba(11,30,58,0.55);border:1px solid rgba(200,169,110,0.08)">
+                  <div style="font-size:12px;color:var(--white);font-weight:600">{{ item.source_code }}</div>
+                  <div style="font-size:11px;color:#8899aa;margin-top:4px">{{ item.tested_at }}</div>
+                  <div style="font-size:11px;color:{% if item.success %}#63B3ED{% else %}#E74C3C{% endif %};margin-top:6px">{% if item.success %}成功{% else %}失败{% endif %} · HTTP {{ item.http_status or '--' }} · {{ item.latency_ms or '--' }} ms</div>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            <div style="background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.15);border-radius:12px;padding:14px">
+              <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:10px">接入设计原则</div>
+              <div style="font-size:12px;color:#8899aa;line-height:1.85">
+                1. 所有前台只读指标湖，不直连源接口。<br>
+                2. 当前先写入模拟数据，保证接口与展示协议固定。<br>
+                3. 下一阶段再补原始数据接入、清洗标准化和真实入湖任务。<br>
+                4. API 定义与测试结果必须落库，避免只停留在 JSON 配置。
+              </div>
+            </div>
           </div>
         </div>
         <div class="table-wrap" style="margin-bottom:20px">
@@ -1425,10 +1474,10 @@
           </div>
           <table>
             <thead><tr><th>指标</th><th>分类</th><th>当前值</th><th>判断</th><th>状态</th><th>开关</th><th>最后更新</th><th>操作</th></tr></thead>
-            <tbody>
+            <tbody id="admin-smart-indicator-tbody">
               {% for item in indicator_hub["smart_items"] %}
               <tr>
-                <td><span style="color:#F8F6F0;font-weight:600">{{ item.name }}</span><div style="font-size:11px;color:#8899aa;margin-top:4px">{{ item.owner }}</div></td>
+                <td><span style="color:#F8F6F0;font-weight:600">{{ item.name }}</span><div style="font-size:11px;color:#8899aa;margin-top:4px">{{ item.owner }} · {{ item.data_mode_label }}</div></td>
                 <td>{{ item.category }}</td>
                 <td style="color:#C8A96E">{{ item.value }}</td>
                 <td style="max-width:260px;color:#8899aa">{{ item.assessment }}</td>
@@ -1467,10 +1516,10 @@
           </div>
           <table>
             <thead><tr><th>指标</th><th>分类</th><th>当前状态</th><th>来源说明</th><th>状态</th><th>开关</th><th>最后更新</th><th>操作</th></tr></thead>
-            <tbody>
+            <tbody id="admin-lake-indicator-tbody">
               {% for item in indicator_hub["lake_items"] %}
               <tr>
-                <td><span style="color:#F8F6F0;font-weight:600">{{ item.name }}</span><div style="font-size:11px;color:#8899aa;margin-top:4px">{{ item.owner }}</div></td>
+                <td><span style="color:#F8F6F0;font-weight:600">{{ item.name }}</span><div style="font-size:11px;color:#8899aa;margin-top:4px">{{ item.owner }} · {{ item.data_mode_label }}</div></td>
                 <td>{{ item.category }}</td>
                 <td style="color:#C8A96E">{{ item.value }}</td>
                 <td style="max-width:320px;color:#8899aa">{{ item.assessment }}</td>
@@ -1506,7 +1555,7 @@
           </div>
           <table>
             <thead><tr><th>级别</th><th>异动标题</th><th>摘要</th><th>时间</th><th>操作</th></tr></thead>
-            <tbody>
+            <tbody id="admin-indicator-anomaly-tbody">
               {% for item in indicator_hub["anomalies"] %}
               <tr>
                 <td>{% if item.level == '高' %}<span class="tag tag-red">高</span>{% else %}<span class="tag tag-gold">中</span>{% endif %}</td>
@@ -1514,6 +1563,179 @@
                 <td style="color:#8899aa">{{ item.summary }}</td>
                 <td>{{ item.time }}</td>
                 <td><button class="btn-outline" style="padding:3px 9px;font-size:11px" onclick="openAdminIndicatorHistory('{{ item.related_indicator_id }}')">查看详情</button></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap" style="margin-top:20px">
+          <div class="table-header">
+            <div class="table-title">API 定义与测试</div>
+            <span class="tag tag-blue">控制面</span>
+          </div>
+          <table>
+            <thead><tr><th>Source Code</th><th>指标编码</th><th>提供方</th><th>Method</th><th>地址</th><th>最近测试</th><th>状态</th><th>操作</th></tr></thead>
+            <tbody id="admin-indicator-source-tbody">
+              {% for source in indicator_hub.source_defs[:12] %}
+              <tr>
+                <td style="color:#F8F6F0;font-weight:600">{{ source.source_code }}</td>
+                <td>{{ source.indicator_code }}</td>
+                <td>{{ source.provider }}</td>
+                <td style="color:#C8A96E">{{ source.method }}</td>
+                <td style="max-width:260px;color:#8899aa">{{ source.base_url }}{{ source.path }}</td>
+                <td style="color:#8899aa">{{ source.last_tested_at or '未测试' }}</td>
+                <td>{% if source.enabled %}<span class="tag tag-green">启用</span>{% else %}<span class="tag tag-red">关闭</span>{% endif %}</td>
+                <td>
+                  <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="testIndicatorSource('{{ source.source_code }}')">测试</button>
+                  <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="previewIndicatorSource('{{ source.source_code }}')">预览</button>
+                  <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="createRawRecord('{{ source.source_code }}', false)">蓝图落地</button>
+                  <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="createRawRecord('{{ source.source_code }}', true)">实时落地</button>
+                  <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="openMappingRuleModal('', '{{ source.source_code }}', '{{ source.indicator_code }}')">映射规则</button>
+                  <button class="btn-sm-blue" style="padding:3px 9px;font-size:11px" onclick="openIndicatorSourceModal('{{ source.source_code }}')">编辑</button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap" style="margin-top:20px">
+          <div class="table-header">
+            <div>
+              <div class="table-title">Source 接入预览</div>
+              <div style="font-size:12px;color:#8899aa;margin-top:6px">用于检查 market_dashboard 原始样例、字段路径发现、建议映射与接入蓝图。</div>
+            </div>
+            <span class="tag tag-gold">Blueprint</span>
+          </div>
+          <div id="admin-indicator-source-preview-empty" style="font-size:12px;color:#8899aa;line-height:1.8">
+            请选择上方某个 API Source 的“预览”，查看它的原始样例、解析路径和建议映射。
+          </div>
+          <div id="admin-indicator-source-preview" style="display:none">
+            <div style="display:grid;grid-template-columns:1.1fr 0.9fr;gap:16px">
+              <div style="background:rgba(11,30,58,0.55);border:1px solid rgba(200,169,110,0.12);border-radius:12px;padding:14px">
+                <div style="font-size:13px;color:#F8F6F0;font-weight:700" id="indicator-source-preview-title">--</div>
+                <div style="font-size:12px;color:#8899aa;margin-top:6px" id="indicator-source-preview-meta">--</div>
+                <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px">
+                  <div style="padding:10px;border-radius:10px;background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.08)">
+                    <div style="font-size:11px;color:#8899aa">Value Path</div>
+                    <div style="font-size:12px;color:#F8F6F0;margin-top:6px" id="indicator-source-preview-value-path">--</div>
+                  </div>
+                  <div style="padding:10px;border-radius:10px;background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.08)">
+                    <div style="font-size:11px;color:#8899aa">Time Path</div>
+                    <div style="font-size:12px;color:#F8F6F0;margin-top:6px" id="indicator-source-preview-time-path">--</div>
+                  </div>
+                  <div style="padding:10px;border-radius:10px;background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.08)">
+                    <div style="font-size:11px;color:#8899aa">Status Path</div>
+                    <div style="font-size:12px;color:#F8F6F0;margin-top:6px" id="indicator-source-preview-status-path">--</div>
+                  </div>
+                </div>
+                <div style="margin-top:14px">
+                  <div style="font-size:11px;color:#8899aa;margin-bottom:8px">字段路径发现</div>
+                  <div id="indicator-source-preview-paths" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+                </div>
+              </div>
+              <div style="background:rgba(11,30,58,0.55);border:1px solid rgba(200,169,110,0.12);border-radius:12px;padding:14px">
+                <div style="font-size:12px;color:#F8F6F0;font-weight:700">接入蓝图</div>
+                <div id="indicator-source-preview-blueprint" style="font-size:12px;color:#8899aa;line-height:1.8;margin-top:10px"></div>
+                <div style="font-size:11px;color:#8899aa;margin-top:12px">最近测试</div>
+                <div id="indicator-source-preview-test" style="font-size:12px;color:#C8A96E;line-height:1.8;margin-top:6px"></div>
+              </div>
+            </div>
+            <div style="margin-top:16px;background:rgba(11,30,58,0.55);border:1px solid rgba(200,169,110,0.12);border-radius:12px;padding:14px">
+              <div style="font-size:12px;color:#F8F6F0;font-weight:700;margin-bottom:8px">原始样例 Payload</div>
+              <pre id="indicator-source-preview-payload" style="margin:0;white-space:pre-wrap;word-break:break-word;font-size:11px;line-height:1.7;color:#8899aa;max-height:320px;overflow:auto"></pre>
+            </div>
+          </div>
+        </div>
+        <div class="table-wrap" style="margin-top:20px">
+          <div class="table-header">
+            <div class="table-title">指标定义</div>
+            <span class="tag tag-gold">Schema</span>
+          </div>
+          <table>
+            <thead><tr><th>指标编码</th><th>名称</th><th>分类</th><th>来源类型</th><th>Owner</th><th>启用</th><th>更新时间</th><th>操作</th></tr></thead>
+            <tbody id="admin-indicator-definition-tbody">
+              {% for item in indicator_hub.definitions[:12] %}
+              <tr>
+                <td style="color:#F8F6F0;font-weight:600">{{ item.indicator_code }}</td>
+                <td>{{ item.indicator_name }}</td>
+                <td>{{ item.category }}</td>
+                <td style="color:#C8A96E">{{ item.source_type_label }}</td>
+                <td>{{ item.owner }}</td>
+                <td>{% if item.enabled %}<span class="tag tag-green">启用</span>{% else %}<span class="tag tag-red">关闭</span>{% endif %}</td>
+                <td style="color:#8899aa">{{ item.updated_at }}</td>
+                <td>
+                  <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="openIndicatorDefinitionModal('{{ item.indicator_code }}')">编辑</button>
+                  <button class="btn-sm-blue" style="padding:3px 9px;font-size:11px" onclick="deleteIndicatorDefinition('{{ item.indicator_code }}')">删除</button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap" style="margin-top:20px">
+          <div class="table-header">
+            <div class="table-title">原始记录落地区</div>
+            <span class="tag tag-blue">Raw Landing</span>
+          </div>
+          <table>
+            <thead><tr><th>Source Code</th><th>指标编码</th><th>模式</th><th>状态</th><th>抓取时间</th><th>批次</th><th>操作</th></tr></thead>
+            <tbody id="admin-indicator-raw-tbody">
+              {% for item in indicator_hub.raw_records[:12] %}
+              <tr>
+                <td style="color:#F8F6F0;font-weight:600">{{ item.source_code }}</td>
+                <td>{{ item.indicator_code }}</td>
+                <td style="color:#C8A96E">{{ item.fetch_mode }}</td>
+                <td>{% if item.success %}<span class="tag tag-green">成功</span>{% else %}<span class="tag tag-red">失败</span>{% endif %}</td>
+                <td style="color:#8899aa">{{ item.fetched_at }}</td>
+                <td style="color:#8899aa">{{ item.batch_code }}</td>
+                <td><button class="btn-outline" style="padding:3px 9px;font-size:11px" onclick="runCleanJobForRecord('{{ item.source_code }}', {{ item.id }})">清洗入湖</button></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap" style="margin-top:20px">
+          <div class="table-header">
+            <div class="table-title">映射规则</div>
+            <span class="tag tag-gold">Normalize</span>
+          </div>
+          <table>
+            <thead><tr><th>规则编码</th><th>指标编码</th><th>Source Code</th><th>Value Path</th><th>Time Path</th><th>默认状态</th><th>操作</th></tr></thead>
+            <tbody id="admin-indicator-mapping-tbody">
+              {% for item in indicator_hub.mapping_rules[:12] %}
+              <tr>
+                <td style="color:#F8F6F0;font-weight:600">{{ item.rule_code }}</td>
+                <td>{{ item.indicator_code }}</td>
+                <td>{{ item.source_code }}</td>
+                <td style="color:#C8A96E">{{ item.value_path or 'value' }}</td>
+                <td style="color:#8899aa">{{ item.time_path or 'timestamp' }}</td>
+                <td>{{ item.default_status }}</td>
+                <td>
+                  <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="openMappingRuleModal('{{ item.rule_code }}')">编辑</button>
+                  <button class="btn-sm-blue" style="padding:3px 9px;font-size:11px" onclick="deleteMappingRule('{{ item.rule_code }}')">删除</button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap" style="margin-top:20px">
+          <div class="table-header">
+            <div class="table-title">清洗任务</div>
+            <span class="tag tag-blue">Clean Jobs</span>
+          </div>
+          <table>
+            <thead><tr><th>任务编码</th><th>Source Code</th><th>指标编码</th><th>规则</th><th>状态</th><th>结果</th><th>完成时间</th></tr></thead>
+            <tbody id="admin-indicator-clean-job-tbody">
+              {% for item in indicator_hub.clean_jobs[:12] %}
+              <tr>
+                <td style="color:#F8F6F0;font-weight:600">{{ item.job_code }}</td>
+                <td>{{ item.source_code }}</td>
+                <td>{{ item.indicator_code }}</td>
+                <td style="color:#C8A96E">{{ item.mapping_rule_code }}</td>
+                <td>{% if item.job_status == 'success' %}<span class="tag tag-green">成功</span>{% else %}<span class="tag tag-gold">{{ item.job_status }}</span>{% endif %}</td>
+                <td style="color:#8899aa">{{ item.result_summary }}</td>
+                <td style="color:#8899aa">{{ item.finished_at or '--' }}</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -2864,7 +3086,25 @@ function escapeAttr(value) {
   return escapeHtml(value);
 }
 
-const adminIndicatorHub = JSON.parse(JSON.stringify(window.ADMIN_INDICATOR_HUB || {summary: {}, items: [], anomalies: []}));
+const adminIndicatorHub = JSON.parse(JSON.stringify(window.ADMIN_INDICATOR_HUB || {
+  summary: {},
+  items: [],
+  anomalies: [],
+  smart_items: [],
+  lake_items: [],
+  definitions: [],
+  source_defs: [],
+  recent_tests: [],
+  load_batches: []
+}));
+
+function getAdminIndicatorDefinition(indicatorCode) {
+  return (adminIndicatorHub.definitions || []).find((item) => item.indicator_code === indicatorCode) || null;
+}
+
+function getAdminIndicatorSource(sourceCode) {
+  return (adminIndicatorHub.source_defs || []).find((item) => item.source_code === sourceCode) || null;
+}
 
 function getAdminIndicatorItemById(indicatorId) {
   return (adminIndicatorHub.items || []).find((item) => item.id === indicatorId) || null;
@@ -2987,20 +3227,552 @@ function buildIndicatorTrendSummary(series) {
 }
 
 function renderAdminIndicatorSummary() {
-  const enabledCount = (adminIndicatorHub.items || []).filter((item) => item.enabled).length;
-  const node = document.getElementById('admin-indicator-enabled-count');
-  if (node) node.textContent = String(enabledCount);
+  const summary = adminIndicatorHub.summary || {};
+  const enabledNode = document.getElementById('admin-indicator-enabled-count');
+  if (enabledNode) enabledNode.textContent = String(summary.enabled || 0);
+  const totalNode = document.getElementById('admin-indicator-total-count');
+  if (totalNode) totalNode.textContent = String(summary.total || 0);
+  const totalDesc = document.getElementById('admin-indicator-total-desc');
+  if (totalDesc) totalDesc.textContent = `智能 ${summary.smart_total || 0} · 数据湖 ${summary.lake_total || 0}`;
+  const anomalyNode = document.getElementById('admin-indicator-anomaly-count');
+  if (anomalyNode) anomalyNode.textContent = String(summary.anomalies || 0);
+  const statusNode = document.getElementById('admin-indicator-status-count');
+  if (statusNode) statusNode.textContent = `${summary.warnings || 0} / ${summary.attention || 0}`;
 }
 
-function toggleAdminIndicator(indicatorId, enabled) {
+function renderAdminIndicatorBatches() {
+  const host = document.getElementById('admin-indicator-batch-list');
+  if (!host) return;
+  const batches = Array.isArray(adminIndicatorHub.load_batches) ? adminIndicatorHub.load_batches.slice(0, 4) : [];
+  host.innerHTML = batches.length ? batches.map((batch) => `
+    <div style="padding:10px 12px;border-radius:10px;background:rgba(11,30,58,0.55);border:1px solid rgba(200,169,110,0.08)">
+      <div style="font-size:12px;color:var(--white);font-weight:600">${escapeHtml(batch.batch_code)}</div>
+      <div style="font-size:11px;color:#8899aa;margin-top:4px">${escapeHtml(batch.summary || '')}</div>
+      <div style="font-size:11px;color:#C8A96E;margin-top:6px">${escapeHtml(batch.created_at || '--')} · ${escapeHtml(String(batch.total_indicators || 0))} 指标 / ${escapeHtml(String(batch.total_points || 0))} 点</div>
+    </div>
+  `).join('') : '<div style="font-size:12px;color:#8899aa">暂无入湖批次。</div>';
+}
+
+function renderAdminIndicatorTests() {
+  const host = document.getElementById('admin-indicator-test-list');
+  if (!host) return;
+  const tests = Array.isArray(adminIndicatorHub.recent_tests) ? adminIndicatorHub.recent_tests.slice(0, 4) : [];
+  host.innerHTML = tests.length ? tests.map((item) => `
+    <div style="padding:10px 12px;border-radius:10px;background:rgba(11,30,58,0.55);border:1px solid rgba(200,169,110,0.08)">
+      <div style="font-size:12px;color:var(--white);font-weight:600">${escapeHtml(item.source_code || '')}</div>
+      <div style="font-size:11px;color:#8899aa;margin-top:4px">${escapeHtml(item.tested_at || '--')}</div>
+      <div style="font-size:11px;color:${item.success ? '#63B3ED' : '#E74C3C'};margin-top:6px">${item.success ? '成功' : '失败'} · HTTP ${escapeHtml(item.http_status || '--')} · ${escapeHtml(item.latency_ms || '--')} ms</div>
+    </div>
+  `).join('') : '<div style="font-size:12px;color:#8899aa">暂无测试记录。</div>';
+}
+
+function renderAdminIndicatorSecondStageTables() {
+  const rawHost = document.getElementById('admin-indicator-raw-tbody');
+  const mappingHost = document.getElementById('admin-indicator-mapping-tbody');
+  const cleanJobHost = document.getElementById('admin-indicator-clean-job-tbody');
+  if (rawHost) {
+    rawHost.innerHTML = (adminIndicatorHub.raw_records || []).slice(0, 20).map((item) => `
+      <tr>
+        <td style="color:#F8F6F0;font-weight:600">${escapeHtml(item.source_code || '')}</td>
+        <td>${escapeHtml(item.indicator_code || '')}</td>
+        <td style="color:#C8A96E">${escapeHtml(item.fetch_mode || '')}</td>
+        <td>${item.success ? '<span class="tag tag-green">成功</span>' : '<span class="tag tag-red">失败</span>'}</td>
+        <td style="color:#8899aa">${escapeHtml(item.fetched_at || '--')}</td>
+        <td style="color:#8899aa">${escapeHtml(item.batch_code || '--')}</td>
+        <td><button class="btn-outline" style="padding:3px 9px;font-size:11px" onclick="runCleanJobForRecord('${escapeHtml(item.source_code)}', ${Number(item.id || 0)})">清洗入湖</button></td>
+      </tr>
+    `).join('') || '<tr><td colspan="7" style="color:#8899aa">暂无原始记录。</td></tr>';
+  }
+  if (mappingHost) {
+    mappingHost.innerHTML = (adminIndicatorHub.mapping_rules || []).slice(0, 20).map((item) => `
+      <tr>
+        <td style="color:#F8F6F0;font-weight:600">${escapeHtml(item.rule_code || '')}</td>
+        <td>${escapeHtml(item.indicator_code || '')}</td>
+        <td>${escapeHtml(item.source_code || '')}</td>
+        <td style="color:#C8A96E">${escapeHtml(item.value_path || 'value')}</td>
+        <td style="color:#8899aa">${escapeHtml(item.time_path || 'timestamp')}</td>
+        <td>${escapeHtml(item.default_status || 'attention')}</td>
+        <td>
+          <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="openMappingRuleModal('${escapeHtml(item.rule_code)}')">编辑</button>
+          <button class="btn-sm-blue" style="padding:3px 9px;font-size:11px" onclick="deleteMappingRule('${escapeHtml(item.rule_code)}')">删除</button>
+        </td>
+      </tr>
+    `).join('') || '<tr><td colspan="7" style="color:#8899aa">暂无映射规则。</td></tr>';
+  }
+  if (cleanJobHost) {
+    cleanJobHost.innerHTML = (adminIndicatorHub.clean_jobs || []).slice(0, 20).map((item) => `
+      <tr>
+        <td style="color:#F8F6F0;font-weight:600">${escapeHtml(item.job_code || '')}</td>
+        <td>${escapeHtml(item.source_code || '')}</td>
+        <td>${escapeHtml(item.indicator_code || '')}</td>
+        <td style="color:#C8A96E">${escapeHtml(item.mapping_rule_code || '')}</td>
+        <td>${item.job_status === 'success' ? '<span class="tag tag-green">成功</span>' : `<span class="tag tag-gold">${escapeHtml(item.job_status || 'pending')}</span>`}</td>
+        <td style="color:#8899aa">${escapeHtml(item.result_summary || '')}</td>
+        <td style="color:#8899aa">${escapeHtml(item.finished_at || '--')}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="7" style="color:#8899aa">暂无清洗任务。</td></tr>';
+  }
+}
+
+function renderAdminIndicatorTableBodies() {
+  const smartHost = document.getElementById('admin-smart-indicator-tbody');
+  const lakeHost = document.getElementById('admin-lake-indicator-tbody');
+  const anomalyHost = document.getElementById('admin-indicator-anomaly-tbody');
+  const sourceHost = document.getElementById('admin-indicator-source-tbody');
+  const definitionHost = document.getElementById('admin-indicator-definition-tbody');
+  if (smartHost) {
+    smartHost.innerHTML = (adminIndicatorHub.smart_items || []).map((item) => `
+      <tr>
+        <td><span style="color:#F8F6F0;font-weight:600">${escapeHtml(item.name)}</span><div style="font-size:11px;color:#8899aa;margin-top:4px">${escapeHtml(item.owner || '')}</div></td>
+        <td>${escapeHtml(item.category || '')}</td>
+        <td style="color:#C8A96E">${escapeHtml(item.value || '--')}</td>
+        <td style="max-width:260px;color:#8899aa">${escapeHtml(item.assessment || '')}</td>
+        <td>${adminIndicatorStatusBadge(item.status)}</td>
+        <td>
+          <label class="toggle">
+            <input type="checkbox" ${item.enabled ? 'checked' : ''} onchange="toggleAdminIndicator('${escapeHtml(item.id)}', this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </td>
+        <td>${escapeHtml(item.last_updated || '--')}</td>
+        <td>
+          <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="openAdminIndicatorHistory('${escapeHtml(item.id)}')">历史详情</button>
+          <button class="btn-sm-blue" onclick="showToast('已加入异动监测队列')">监测异动</button>
+        </td>
+      </tr>
+    `).join('') || '<tr><td colspan="8" style="color:#8899aa">暂无智能指标。</td></tr>';
+  }
+  if (lakeHost) {
+    lakeHost.innerHTML = (adminIndicatorHub.lake_items || []).map((item) => `
+      <tr>
+        <td><span style="color:#F8F6F0;font-weight:600">${escapeHtml(item.name)}</span><div style="font-size:11px;color:#8899aa;margin-top:4px">${escapeHtml(item.owner || '')}</div></td>
+        <td>${escapeHtml(item.category || '')}</td>
+        <td style="color:#C8A96E">${escapeHtml(item.value || '--')}</td>
+        <td style="max-width:320px;color:#8899aa">${escapeHtml(item.assessment || '')}</td>
+        <td>${adminIndicatorStatusBadge(item.status)}</td>
+        <td>
+          <label class="toggle">
+            <input type="checkbox" ${item.enabled ? 'checked' : ''} onchange="toggleAdminIndicator('${escapeHtml(item.id)}', this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </td>
+        <td>${escapeHtml(item.last_updated || '--')}</td>
+        <td>
+          <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="openAdminIndicatorHistory('${escapeHtml(item.id)}')">历史详情</button>
+          <button class="btn-sm-blue" onclick="testPrimarySourceByIndicator('${escapeHtml(item.id)}')">测试接口</button>
+        </td>
+      </tr>
+    `).join('') || '<tr><td colspan="8" style="color:#8899aa">暂无数据湖指标。</td></tr>';
+  }
+  if (anomalyHost) {
+    anomalyHost.innerHTML = (adminIndicatorHub.anomalies || []).map((item) => `
+      <tr>
+        <td>${item.level === '高' ? '<span class="tag tag-red">高</span>' : '<span class="tag tag-gold">中</span>'}</td>
+        <td><span style="color:#F8F6F0;font-weight:600">${escapeHtml(item.title || '')}</span></td>
+        <td style="color:#8899aa">${escapeHtml(item.summary || '')}</td>
+        <td>${escapeHtml(item.time || '--')}</td>
+        <td><button class="btn-outline" style="padding:3px 9px;font-size:11px" onclick="openAdminIndicatorHistory('${escapeHtml(item.related_indicator_id || '')}')">查看详情</button></td>
+      </tr>
+    `).join('') || '<tr><td colspan="5" style="color:#8899aa">暂无异动。</td></tr>';
+  }
+  if (sourceHost) {
+    sourceHost.innerHTML = (adminIndicatorHub.source_defs || []).slice(0, 20).map((source) => `
+      <tr>
+        <td style="color:#F8F6F0;font-weight:600">${escapeHtml(source.source_code || '')}</td>
+        <td>${escapeHtml(source.indicator_code || '')}</td>
+        <td>${escapeHtml(source.provider || '')}</td>
+        <td style="color:#C8A96E">${escapeHtml(source.method || '')}</td>
+        <td style="max-width:260px;color:#8899aa">${escapeHtml((source.base_url || '') + (source.path || ''))}</td>
+        <td style="color:#8899aa">${escapeHtml(source.last_tested_at || '未测试')}</td>
+        <td>${source.enabled ? '<span class="tag tag-green">启用</span>' : '<span class="tag tag-red">关闭</span>'}</td>
+        <td>
+          <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="testIndicatorSource('${escapeHtml(source.source_code)}')">测试</button>
+          <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="previewIndicatorSource('${escapeHtml(source.source_code)}')">预览</button>
+          <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="createRawRecord('${escapeHtml(source.source_code)}', false)">蓝图落地</button>
+          <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="createRawRecord('${escapeHtml(source.source_code)}', true)">实时落地</button>
+          <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="openMappingRuleModal('', '${escapeHtml(source.source_code)}', '${escapeHtml(source.indicator_code)}')">映射规则</button>
+          <button class="btn-sm-blue" style="padding:3px 9px;font-size:11px" onclick="openIndicatorSourceModal('${escapeHtml(source.source_code)}')">编辑</button>
+        </td>
+      </tr>
+    `).join('') || '<tr><td colspan="8" style="color:#8899aa">暂无 API 定义。</td></tr>';
+  }
+  if (definitionHost) {
+    definitionHost.innerHTML = (adminIndicatorHub.definitions || []).slice(0, 20).map((item) => `
+      <tr>
+        <td style="color:#F8F6F0;font-weight:600">${escapeHtml(item.indicator_code || '')}</td>
+        <td>${escapeHtml(item.indicator_name || '')}</td>
+        <td>${escapeHtml(item.category || '')}</td>
+        <td style="color:#C8A96E">${escapeHtml(item.source_type_label || '')}</td>
+        <td>${escapeHtml(item.owner || '')}</td>
+        <td>${item.enabled ? '<span class="tag tag-green">启用</span>' : '<span class="tag tag-red">关闭</span>'}</td>
+        <td style="color:#8899aa">${escapeHtml(item.updated_at || '--')}</td>
+        <td>
+          <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="openIndicatorDefinitionModal('${escapeHtml(item.indicator_code)}')">编辑</button>
+          <button class="btn-sm-blue" style="padding:3px 9px;font-size:11px" onclick="deleteIndicatorDefinition('${escapeHtml(item.indicator_code)}')">删除</button>
+        </td>
+      </tr>
+    `).join('') || '<tr><td colspan="8" style="color:#8899aa">暂无指标定义。</td></tr>';
+  }
+}
+
+function renderAdminIndicatorHubAll() {
+  renderAdminIndicatorSummary();
+  renderAdminIndicatorBatches();
+  renderAdminIndicatorTests();
+  renderAdminIndicatorTableBodies();
+  renderAdminIndicatorSecondStageTables();
+}
+
+async function refreshAdminIndicatorHub(showMessage) {
+  const resp = await fetch('/api/admin/indicator-hub');
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    showToast('指标湖数据刷新失败');
+    return;
+  }
+  Object.keys(adminIndicatorHub).forEach((key) => delete adminIndicatorHub[key]);
+  Object.assign(adminIndicatorHub, data.hub || {});
+  renderAdminIndicatorHubAll();
+  if (showMessage !== false) showToast('指标湖数据已刷新');
+}
+
+async function toggleAdminIndicator(indicatorId, enabled) {
   const item = getAdminIndicatorItemById(indicatorId);
-  if (!item) {
+  const definition = getAdminIndicatorDefinition(indicatorId);
+  const payloadSource = definition ? {
+    indicator_code: definition.indicator_code,
+    indicator_name: definition.indicator_name,
+    category: definition.category,
+    description: definition.description,
+    unit: definition.unit,
+    owner: definition.owner,
+    source_type: definition.source_type,
+    source_type_label: definition.source_type_label,
+    provider: definition.provider,
+    status_hint: definition.status_hint,
+    assessment_template: definition.assessment_template,
+    alert_template: definition.alert_template,
+    watchers: definition.watchers || [],
+    display_config: definition.display_config || {},
+    enabled
+  } : (item ? {
+    indicator_code: item.id,
+    indicator_name: item.name,
+    category: item.category,
+    description: item.assessment || '',
+    unit: '',
+    owner: item.owner,
+    source_type: item.source_type,
+    source_type_label: item.source_type_label,
+    provider: item.provider,
+    status_hint: item.status,
+    assessment_template: item.assessment,
+    alert_template: item.alert,
+    watchers: item.watchers || [],
+    display_config: {},
+    enabled
+  } : null);
+  if (!payloadSource) {
     showToast('未找到指标');
     return;
   }
-  item.enabled = Boolean(enabled);
-  renderAdminIndicatorSummary();
-  showToast(`${item.name} 已切换为${item.enabled ? '启用' : '关闭'}`);
+  const resp = await fetch('/api/admin/indicator-definitions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payloadSource),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    showToast('指标开关保存失败');
+    return;
+  }
+  await refreshAdminIndicatorHub(false);
+  showToast(`${payloadSource.indicator_name} 已切换为${enabled ? '启用' : '关闭'}`);
+}
+
+async function seedAdminIndicatorMockData(force) {
+  const resp = await fetch('/api/admin/indicator-batches/mock-seed', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ force: !!force }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    showToast('模拟入湖失败');
+    return;
+  }
+  Object.keys(adminIndicatorHub).forEach((key) => delete adminIndicatorHub[key]);
+  Object.assign(adminIndicatorHub, data.hub || {});
+  renderAdminIndicatorHubAll();
+  showToast(data.result && data.result.seeded ? '模拟指标已写入指标湖' : '模拟指标湖已存在，未重复写入');
+}
+
+async function testIndicatorSource(sourceCode) {
+  const resp = await fetch('/api/admin/indicator-sources/test', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source_code: sourceCode }),
+  });
+  const data = await resp.json();
+  if (!resp.ok) {
+    showToast((data && data.error) || '接口测试失败');
+    return;
+  }
+  await refreshAdminIndicatorHub(false);
+  showToast(data.result && data.result.success ? '接口测试成功' : `接口测试失败：${data.result && data.result.detail ? data.result.detail : '未知错误'}`);
+}
+
+function renderIndicatorSourcePreview(preview) {
+  const emptyNode = document.getElementById('admin-indicator-source-preview-empty');
+  const panelNode = document.getElementById('admin-indicator-source-preview');
+  if (!preview) {
+    if (emptyNode) emptyNode.style.display = 'block';
+    if (panelNode) panelNode.style.display = 'none';
+    return;
+  }
+  if (emptyNode) emptyNode.style.display = 'none';
+  if (panelNode) panelNode.style.display = 'block';
+  const titleNode = document.getElementById('indicator-source-preview-title');
+  if (titleNode) titleNode.textContent = `${preview.source_code || '--'} -> ${preview.indicator_code || '--'}`;
+  const metaNode = document.getElementById('indicator-source-preview-meta');
+  if (metaNode) metaNode.textContent = `${preview.provider || '--'} · ${preview.method || '--'} · ${preview.endpoint || '--'}`;
+  const valueNode = document.getElementById('indicator-source-preview-value-path');
+  if (valueNode) valueNode.textContent = (preview.suggested_mapping && preview.suggested_mapping.value_path) || '--';
+  const timeNode = document.getElementById('indicator-source-preview-time-path');
+  if (timeNode) timeNode.textContent = (preview.suggested_mapping && preview.suggested_mapping.time_path) || '--';
+  const statusNode = document.getElementById('indicator-source-preview-status-path');
+  if (statusNode) statusNode.textContent = (preview.suggested_mapping && preview.suggested_mapping.status_path) || '--';
+  const pathsNode = document.getElementById('indicator-source-preview-paths');
+  if (pathsNode) {
+    const paths = Array.isArray(preview.discovered_paths) ? preview.discovered_paths : [];
+    pathsNode.innerHTML = paths.length
+      ? paths.map((item) => `<span class="tag tag-blue">${escapeHtml(item)}</span>`).join('')
+      : '<span style="font-size:12px;color:#8899aa">未发现字段路径</span>';
+  }
+  const blueprintNode = document.getElementById('indicator-source-preview-blueprint');
+  if (blueprintNode) {
+    const blueprint = preview.blueprint || {};
+    const requestBlueprint = blueprint.request_blueprint || {};
+    blueprintNode.innerHTML = [
+      `连接器：${escapeHtml(preview.connector_type || '--')}`,
+      `Extractor Type：${escapeHtml(blueprint.extractor_type || '--')}`,
+      `Extractor Path：${escapeHtml(blueprint.extractor_path || '--')}`,
+      `Expected Contains：${escapeHtml(blueprint.expected_contains || '--')}`,
+      `API URL：${escapeHtml(requestBlueprint.api_url || '--')}`,
+      `Notes：${escapeHtml(requestBlueprint.notes || '--')}`,
+    ].map((line) => `<div>${line}</div>`).join('');
+  }
+  const testNode = document.getElementById('indicator-source-preview-test');
+  if (testNode) {
+    testNode.innerHTML = [
+      `状态：${escapeHtml(preview.last_test_status || '--')}`,
+      `详情：${escapeHtml(preview.last_test_detail || '--')}`,
+    ].map((line) => `<div>${line}</div>`).join('');
+  }
+  const payloadNode = document.getElementById('indicator-source-preview-payload');
+  if (payloadNode) payloadNode.textContent = preview.sample_payload_text || '{}';
+}
+
+async function previewIndicatorSource(sourceCode) {
+  const resp = await fetch(`/api/admin/indicator-sources/${encodeURIComponent(sourceCode)}/preview`);
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    showToast((data && data.error) || 'Source 预览失败');
+    return;
+  }
+  renderIndicatorSourcePreview(data.preview || null);
+}
+
+function testPrimarySourceByIndicator(indicatorId) {
+  const item = getAdminIndicatorItemById(indicatorId);
+  const source = item && Array.isArray(item.source_defs) ? item.source_defs[0] : null;
+  if (!source) {
+    showToast('当前指标还没有 API 定义');
+    return;
+  }
+  testIndicatorSource(source.source_code);
+}
+
+async function deleteIndicatorDefinition(indicatorCode) {
+  if (!confirm(`确认删除指标定义 ${indicatorCode} 吗？`)) return;
+  const resp = await fetch(`/api/admin/indicator-definitions/${encodeURIComponent(indicatorCode)}`, { method: 'DELETE' });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    showToast((data && data.error) || '删除失败');
+    return;
+  }
+  await refreshAdminIndicatorHub(false);
+  showToast('指标定义已删除');
+}
+
+async function openIndicatorDefinitionModal(indicatorCode) {
+  const existing = indicatorCode ? getAdminIndicatorDefinition(indicatorCode) : null;
+  const name = prompt('指标名称', existing ? existing.indicator_name : '');
+  if (name === null) return;
+  const category = prompt('指标分类', existing ? existing.category : '数据湖指标');
+  if (category === null) return;
+  const sourceType = prompt('来源类型（smart / lake / mock / api）', existing ? existing.source_type : 'mock');
+  if (sourceType === null) return;
+  const owner = prompt('Owner', existing ? existing.owner : '平台研究运营');
+  if (owner === null) return;
+  const payload = {
+    indicator_code: existing ? existing.indicator_code : '',
+    indicator_name: name,
+    category,
+    description: existing ? existing.description : '',
+    unit: existing ? existing.unit : '',
+    owner,
+    source_type: sourceType,
+    source_type_label: sourceType === 'smart' ? '智能指标' : (sourceType === 'lake' ? '数据湖指标' : '模拟指标'),
+    provider: existing ? existing.provider : '平台数据层',
+    status_hint: existing ? existing.status_hint : 'attention',
+    assessment_template: existing ? existing.assessment_template : '',
+    alert_template: existing ? existing.alert_template : '',
+    watchers: existing ? existing.watchers : [],
+    display_config: existing ? existing.display_config : {},
+    enabled: existing ? existing.enabled : true
+  };
+  const resp = await fetch('/api/admin/indicator-definitions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    showToast((data && data.error) || '保存失败');
+    return;
+  }
+  await refreshAdminIndicatorHub(false);
+  showToast('指标定义已保存');
+}
+
+async function openIndicatorSourceModal(sourceCode) {
+  const existing = sourceCode ? getAdminIndicatorSource(sourceCode) : null;
+  const indicatorCode = prompt('绑定指标编码', existing ? existing.indicator_code : '');
+  if (indicatorCode === null || !indicatorCode.trim()) return;
+  const provider = prompt('提供方', existing ? existing.provider : 'market_dashboard');
+  if (provider === null) return;
+  const baseUrl = prompt('Base URL（留空则用样例响应测试）', existing ? existing.base_url : '');
+  if (baseUrl === null) return;
+  const path = prompt('Path', existing ? existing.path : '');
+  if (path === null) return;
+  const method = prompt('Method', existing ? existing.method : 'GET');
+  if (method === null) return;
+  const payload = {
+    source_code: existing ? existing.source_code : '',
+    indicator_code: indicatorCode,
+    provider,
+    base_url: baseUrl,
+    path,
+    method,
+    auth_type: existing ? existing.auth_type : 'none',
+    headers: existing ? existing.headers : {},
+    query: existing ? existing.query : {},
+    body: existing ? existing.body : {},
+    response_mapping: existing ? existing.response_mapping : {},
+    response_sample: existing ? existing.response_sample : {},
+    source_status: existing ? existing.source_status : 'draft',
+    enabled: existing ? existing.enabled : true,
+    last_test_status: existing ? existing.last_test_status : '',
+    last_http_status: existing ? existing.last_http_status : null,
+    last_tested_at: existing ? existing.last_tested_at : '',
+    last_test_detail: existing ? existing.last_test_detail : ''
+  };
+  const resp = await fetch('/api/admin/indicator-sources', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    showToast((data && data.error) || '保存失败');
+    return;
+  }
+  await refreshAdminIndicatorHub(false);
+  showToast('API 定义已保存');
+}
+
+async function createRawRecord(sourceCode, preferLive) {
+  const resp = await fetch('/api/admin/indicator-sources/landing', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source_code: sourceCode, prefer_live: !!preferLive }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    showToast((data && data.error) || '原始记录创建失败');
+    return;
+  }
+  Object.keys(adminIndicatorHub).forEach((key) => delete adminIndicatorHub[key]);
+  Object.assign(adminIndicatorHub, data.hub || {});
+  renderAdminIndicatorHubAll();
+  showToast((data.result && data.result.detail) || '原始记录已落地');
+}
+
+async function openMappingRuleModal(ruleCode, presetSourceCode, presetIndicatorCode) {
+  const existing = ruleCode ? (adminIndicatorHub.mapping_rules || []).find((item) => item.rule_code === ruleCode) : null;
+  const sourceCode = prompt('Source Code', existing ? existing.source_code : (presetSourceCode || ''));
+  if (sourceCode === null || !sourceCode.trim()) return;
+  const indicatorCode = prompt('指标编码', existing ? existing.indicator_code : (presetIndicatorCode || ''));
+  if (indicatorCode === null || !indicatorCode.trim()) return;
+  const valuePath = prompt('Value Path', existing ? existing.value_path : 'value');
+  if (valuePath === null) return;
+  const timePath = prompt('Time Path', existing ? existing.time_path : 'timestamp');
+  if (timePath === null) return;
+  const statusPath = prompt('Status Path', existing ? existing.status_path : 'status');
+  if (statusPath === null) return;
+  const resp = await fetch('/api/admin/indicator-mapping-rules', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      rule_code: existing ? existing.rule_code : '',
+      source_code: sourceCode,
+      indicator_code: indicatorCode,
+      value_path: valuePath,
+      time_path: timePath,
+      status_path: statusPath,
+      unit_override: existing ? existing.unit_override : '',
+      default_status: existing ? existing.default_status : 'attention',
+      transform_expr: existing ? existing.transform_expr : '',
+      enabled: existing ? existing.enabled : true,
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    showToast((data && data.error) || '映射规则保存失败');
+    return;
+  }
+  await refreshAdminIndicatorHub(false);
+  showToast('映射规则已保存');
+}
+
+async function deleteMappingRule(ruleCode) {
+  if (!confirm(`确认删除映射规则 ${ruleCode} 吗？`)) return;
+  const resp = await fetch(`/api/admin/indicator-mapping-rules/${encodeURIComponent(ruleCode)}`, { method: 'DELETE' });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    showToast((data && data.error) || '删除失败');
+    return;
+  }
+  await refreshAdminIndicatorHub(false);
+  showToast('映射规则已删除');
+}
+
+async function runCleanJobForRecord(sourceCode, rawRecordId) {
+  const resp = await fetch('/api/admin/indicator-clean-jobs/run', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source_code: sourceCode, raw_record_id: rawRecordId }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    showToast((data && data.error) || '清洗入湖失败');
+    return;
+  }
+  Object.keys(adminIndicatorHub).forEach((key) => delete adminIndicatorHub[key]);
+  Object.assign(adminIndicatorHub, data.hub || {});
+  renderAdminIndicatorHubAll();
+  showToast('原始记录已清洗并写入指标湖');
 }
 
 function closeAdminIndicatorHistory() {
@@ -3008,7 +3780,64 @@ function closeAdminIndicatorHistory() {
   if (modal) modal.classList.remove('show');
 }
 
-function openAdminIndicatorHistory(indicatorId) {
+function buildTraceTimelineHtml(trace) {
+  const timeline = Array.isArray(trace && trace.timeline) ? trace.timeline : [];
+  if (!timeline.length) return '<div class="admin-modal-copy">暂无湖内追溯记录。</div>';
+  return timeline.map((entry) => `
+    <div class="admin-modal-history-row">
+      <div class="admin-modal-history-date">${escapeHtml(entry.time || '--')}</div>
+      <div class="admin-modal-history-text">${escapeHtml(entry.type || '--')} · ${escapeHtml(entry.summary || '--')}</div>
+    </div>
+  `).join('');
+}
+
+function buildTraceOpsHtml(trace) {
+  const latest = trace && trace.latest ? trace.latest : null;
+  const rawRecords = Array.isArray(trace && trace.raw_records) ? trace.raw_records.slice(0, 4) : [];
+  const cleanJobs = Array.isArray(trace && trace.clean_jobs) ? trace.clean_jobs.slice(0, 4) : [];
+  const series = Array.isArray(trace && trace.series) ? trace.series.slice(0, 4) : [];
+  return `
+    <div class="admin-modal-section-note">
+      <div class="admin-modal-section-title">湖内追溯</div>
+      <div class="admin-modal-section-copy">同一个指标的最新值、原始落地、清洗任务和入湖序列统一展示，便于排查展示和数据链路是否一致。</div>
+    </div>
+    <div class="admin-modal-list" style="margin-top:12px">
+      <div class="admin-modal-item">
+        <div class="admin-modal-item-top">
+          <strong style="color:var(--text-main)">Latest</strong>
+          <span class="tag tag-blue">${latest ? escapeHtml(latest.latest_status || '--') : '--'}</span>
+        </div>
+        <div class="admin-modal-copy">${latest ? `最新值 ${escapeHtml(latest.latest_value || '--')} · 更新时间 ${escapeHtml(latest.updated_at || '--')} · Source ${escapeHtml(latest.source_code || '--')}` : '暂无 latest 记录'}</div>
+      </div>
+      <div class="admin-modal-item">
+        <div class="admin-modal-item-top">
+          <strong style="color:var(--text-main)">Raw Landing</strong>
+          <span class="tag tag-gold">${rawRecords.length} 条</span>
+        </div>
+        <div class="admin-modal-copy">${rawRecords.length ? rawRecords.map((item) => `${item.fetched_at || '--'} · ${item.fetch_mode || '--'} · ${item.success ? '成功' : '失败'}`).join(' | ') : '暂无原始落地记录'}</div>
+      </div>
+      <div class="admin-modal-item">
+        <div class="admin-modal-item-top">
+          <strong style="color:var(--text-main)">Clean Jobs</strong>
+          <span class="tag tag-blue">${cleanJobs.length} 条</span>
+        </div>
+        <div class="admin-modal-copy">${cleanJobs.length ? cleanJobs.map((item) => `${item.finished_at || item.created_at || '--'} · ${item.job_status || '--'} · ${item.mapping_rule_code || '--'}`).join(' | ') : '暂无清洗任务记录'}</div>
+      </div>
+      <div class="admin-modal-item">
+        <div class="admin-modal-item-top">
+          <strong style="color:var(--text-main)">Series</strong>
+          <span class="tag tag-gold">${series.length} 点</span>
+        </div>
+        <div class="admin-modal-copy">${series.length ? series.map((item) => `${item.point_time || '--'} · ${item.point_value || '--'} · ${item.point_status || '--'}`).join(' | ') : '暂无入湖序列点'}</div>
+      </div>
+    </div>
+    <div class="admin-modal-history-list" style="margin-top:12px">
+      ${buildTraceTimelineHtml(trace)}
+    </div>
+  `;
+}
+
+async function openAdminIndicatorHistory(indicatorId) {
   const item = typeof indicatorId === 'string' ? getAdminIndicatorItemById(indicatorId) : indicatorId;
   const host = document.getElementById('admin-indicator-modal-content');
   const modal = document.getElementById('admin-indicator-modal');
@@ -3016,12 +3845,19 @@ function openAdminIndicatorHistory(indicatorId) {
     showToast('未找到指标详情');
     return;
   }
-  const simulatedSeries = Array.isArray(item.simulated_series) ? item.simulated_series : [];
-  const klinePayload = item.simulated_kline || {};
+  const historySeries = Array.isArray(item.history_series) ? item.history_series : [];
+  const klinePayload = item.history_kline || {};
   const anomalyPoints = Array.isArray(klinePayload.anomalies) ? klinePayload.anomalies : [];
-  const trendSummary = buildIndicatorTrendSummary(simulatedSeries);
+  const trendSummary = buildIndicatorTrendSummary(historySeries);
   const currentValue = String(item.value || '--');
   const valueClass = /[A-Za-z]/.test(currentValue) || currentValue.length >= 9 ? 'admin-modal-stat-value compact' : 'admin-modal-stat-value';
+  let trace = null;
+  try {
+    const resp = await fetch(`/api/admin/indicator-trace/${encodeURIComponent(item.id)}?limit=10`);
+    const data = await resp.json();
+    if (resp.ok && data.ok) trace = data.trace || null;
+  } catch (error) {
+  }
   host.innerHTML = `
     <div class="admin-modal-head">
       <div>
@@ -3057,6 +3893,7 @@ function openAdminIndicatorHistory(indicatorId) {
         <div class="admin-chip-row" style="margin-top:12px">
           <span class="admin-chip">状态：${escapeHtml(indicatorStatusLabel(item.status))}</span>
           <span class="admin-chip">监测源：${escapeHtml(item.owner || '--')}</span>
+          <span class="admin-chip">数据来源：${escapeHtml(item.data_mode_label || '--')}</span>
           <span class="admin-chip">记录数：${trendSummary.length}</span>
         </div>
       </div>
@@ -3087,6 +3924,7 @@ function openAdminIndicatorHistory(indicatorId) {
             </div>
           `).join('') || '<div class="admin-modal-copy">暂无趋势记录</div>'}
         </div>
+        ${trace ? buildTraceOpsHtml(trace) : '<div class="admin-modal-copy" style="margin-top:12px">湖内追溯数据加载失败或暂无记录。</div>'}
       </div>
     </div>
   `;
@@ -4081,6 +4919,8 @@ function evUpdatePreview() {
 document.addEventListener('DOMContentLoaded', () => {
   loadSiteConfig();
   loadAdminUsers();
+  renderAdminIndicatorHubAll();
+  refreshAdminIndicatorHub(false);
   if (document.getElementById('section-access')) {
     renderAccessAudit();
   }

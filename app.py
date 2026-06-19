@@ -4,13 +4,17 @@ import sqlite3
 import copy
 import math
 import statistics
+import time
+import re
 from pathlib import Path
 from html import escape as html_escape
 from html.parser import HTMLParser
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for, g, abort
 import random
 from datetime import datetime, timedelta
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, parse_qsl
+from urllib.request import Request, urlopen
+from urllib.error import URLError, HTTPError
 from hmac import compare_digest
 
 app = Flask(__name__)
@@ -32,6 +36,120 @@ MARKET_DASHBOARD_REGISTRY_PATH = Path(
         "/Users/xuchenfei/PycharmProjects/market_dashboard/data_sources.json",
     )
 )
+MARKET_DASHBOARD_CACHE_DB_PATH = Path(
+    os.environ.get(
+        "MARKET_DASHBOARD_CACHE_DB_PATH",
+        "/Users/xuchenfei/PycharmProjects/market_dashboard/market_cache.db",
+    )
+)
+INDICATOR_DEFINITION_FIELDS = {
+    "indicator_code",
+    "indicator_name",
+    "category",
+    "description",
+    "unit",
+    "owner",
+    "source_type",
+    "source_type_label",
+    "provider",
+    "status_hint",
+    "assessment_template",
+    "alert_template",
+    "watchers_json",
+    "display_config_json",
+    "enabled",
+}
+INDICATOR_SOURCE_FIELDS = {
+    "source_code",
+    "indicator_code",
+    "provider",
+    "base_url",
+    "path",
+    "method",
+    "auth_type",
+    "headers_json",
+    "query_json",
+    "body_json",
+    "response_mapping_json",
+    "response_sample_json",
+    "source_status",
+    "enabled",
+    "last_test_status",
+    "last_http_status",
+    "last_tested_at",
+    "last_test_detail",
+}
+
+DEFAULT_SMART_INDICATOR_DEFINITIONS = [
+    {
+        "indicator_code": "fed_rate_path",
+        "indicator_name": "美联储路径",
+        "category": "宏观流动性",
+        "description": "用于跟踪全球流动性预期和成长风格风险偏好。",
+        "unit": "",
+        "owner": "平台宏观组",
+        "source_type": "smart",
+        "source_type_label": "智能指标",
+        "provider": "平台研究运营",
+        "status_hint": "good",
+        "assessment_template": "若降息节奏继续兑现，成长和港股风险偏好会继续改善。",
+        "alert_template": "当前无需报警",
+        "watchers_json": json.dumps(["H5 基本面首页", "Hermes", "复盘专区"], ensure_ascii=False),
+        "display_config_json": json.dumps({"show_in_admin": True, "show_in_h5": True}, ensure_ascii=False),
+        "enabled": 1,
+    },
+    {
+        "indicator_code": "southbound_flow",
+        "indicator_name": "南向 / 北向资金",
+        "category": "增量资金",
+        "description": "用于跟踪跨市场增量资金是否形成共振。",
+        "unit": "亿",
+        "owner": "平台研究运营",
+        "source_type": "smart",
+        "source_type_label": "智能指标",
+        "provider": "平台研究运营",
+        "status_hint": "attention",
+        "assessment_template": "流入延续但未到强共振，说明市场广度仍一般。",
+        "alert_template": "关注是否连续 3 日放量",
+        "watchers_json": json.dumps(["H5 智能指标区", "租户门户", "复盘报告"], ensure_ascii=False),
+        "display_config_json": json.dumps({"show_in_admin": True, "show_in_h5": True}, ensure_ascii=False),
+        "enabled": 1,
+    },
+    {
+        "indicator_code": "ai_order_signal",
+        "indicator_name": "AI 订单兑现",
+        "category": "科技主线",
+        "description": "用于判断 AI 主线是否从叙事走向订单和利润兑现。",
+        "unit": "分",
+        "owner": "平台研究运营",
+        "source_type": "smart",
+        "source_type_label": "智能指标",
+        "provider": "平台研究运营",
+        "status_hint": "warning",
+        "assessment_template": "主题强度仍在，但必须继续验证订单、交付和利润率。",
+        "alert_template": "若连续两周只见叙事不见订单，需要提高警惕",
+        "watchers_json": json.dumps(["大V工作台", "复盘生产台", "自选股详情"], ensure_ascii=False),
+        "display_config_json": json.dumps({"show_in_admin": True, "show_in_h5": True}, ensure_ascii=False),
+        "enabled": 1,
+    },
+    {
+        "indicator_code": "credit_pulse",
+        "indicator_name": "国内信用脉冲",
+        "category": "宏观信用",
+        "description": "用于跟踪信用扩张与顺周期风格的验证强度。",
+        "unit": "分",
+        "owner": "平台研究运营",
+        "source_type": "smart",
+        "source_type_label": "智能指标",
+        "provider": "平台研究运营",
+        "status_hint": "warning",
+        "assessment_template": "恢复力度偏弱，顺周期与高弹性资产仍需保守。",
+        "alert_template": "需继续观察社融和中长期贷款",
+        "watchers_json": json.dumps(["Admin 指标专区", "工作台数据分析", "H5 基本面首页"], ensure_ascii=False),
+        "display_config_json": json.dumps({"show_in_admin": True, "show_in_h5": True}, ensure_ascii=False),
+        "enabled": 1,
+    },
+]
 
 DEFAULT_BRAND_CONFIG = {
     "name": "洞见智研",
@@ -277,6 +395,8 @@ def normalize_tenant_config(source=None, index=0):
     tenant["dashboard_description"] = tenant.get("dashboard_description") or fallback["dashboard_description"]
     if isinstance(raw.get("portal_cms"), dict):
         tenant["portal_cms"] = copy.deepcopy(raw["portal_cms"])
+    if isinstance(raw.get("fund_dashboard_config"), dict):
+        tenant["fund_dashboard_config"] = copy.deepcopy(raw["fund_dashboard_config"])
     return tenant
 
 
@@ -496,6 +616,171 @@ def update_tenant_portal_cms(tenant_slug, portal_cms):
             continue
         tenants[index] = dict(tenant)
         tenants[index]["portal_cms"] = normalize_portal_cms_config(portal_cms, tenant)
+        updated = True
+        break
+    if not updated:
+        return None
+    next_config = dict(site_config)
+    next_config["tenants"] = tenants
+    return save_site_config(next_config)
+
+
+def get_dashboard_card_target(layout):
+    layout_key = str(layout or "").strip().lower()
+    if layout_key == "3x3":
+        return 6
+    if layout_key == "4x4":
+        return 8
+    return 4
+
+
+def normalize_dashboard_layout(layout):
+    layout_key = str(layout or "").strip().lower()
+    if layout_key in {"2x2", "3x3", "4x4"}:
+        return layout_key
+    return "2x2"
+
+
+def build_default_fund_dashboard_cards(tenant, layout="2x2"):
+    target_count = get_dashboard_card_target(layout)
+    seeds = build_indicator_dashboard_seed_cards(tenant, count=target_count)
+    cards = []
+    for index in range(target_count):
+        seed = seeds[index] if index < len(seeds) else {}
+        cards.append(
+            {
+                "name": str(seed.get("name") or f"核心指标 {index + 1}").strip() or f"核心指标 {index + 1}",
+                "value": str(seed.get("value") or "待跟踪").strip() or "待跟踪",
+                "assessment": str(seed.get("assessment") or "继续观察").strip() or "继续观察",
+                "status": str(seed.get("status") or "attention").strip() or "attention",
+                "alert": str(seed.get("alert") or "").strip(),
+                "hint": str(seed.get("hint") or seed.get("assessment") or "").strip(),
+                "prompt": str(
+                    seed.get("prompt")
+                    or f"围绕 {seed.get('name') or f'核心指标 {index + 1}'} 生成适合普通投资者看的核心指标卡，说明当前状态、风险提醒和后续跟踪点。"
+                ).strip(),
+                "isEmpty": False,
+            }
+        )
+    return cards
+
+
+def normalize_fund_dashboard_view(source, tenant):
+    defaults = {
+        "layout": "2x2",
+        "title": "今日核心指标面板",
+        "note": "默认展示租户当前发布的核心指标，用于判断今天先看方向还是先控风险。",
+        "updatedAt": "默认模板",
+        "publisher": "系统初始化",
+    }
+    raw = source if isinstance(source, dict) else {}
+    layout = normalize_dashboard_layout(raw.get("layout") or defaults["layout"])
+    fallback_cards = build_default_fund_dashboard_cards(tenant, layout)
+    raw_cards = raw.get("cards") if isinstance(raw.get("cards"), list) else []
+    cards = []
+    for index in range(get_dashboard_card_target(layout)):
+        fallback = fallback_cards[index]
+        item = raw_cards[index] if index < len(raw_cards) and isinstance(raw_cards[index], dict) else {}
+        prompt = str(item.get("prompt") or fallback["prompt"]).strip()
+        has_user_content = any(str(item.get(key) or "").strip() for key in ("name", "value", "assessment", "alert", "hint"))
+        cards.append(
+            {
+                "name": str(item.get("name") or fallback["name"]).strip() or fallback["name"],
+                "value": str(item.get("value") or fallback["value"]).strip() or fallback["value"],
+                "assessment": str(item.get("assessment") or fallback["assessment"]).strip() or fallback["assessment"],
+                "status": str(item.get("status") or fallback["status"]).strip() or fallback["status"],
+                "alert": str(item.get("alert") or fallback["alert"]).strip(),
+                "hint": str(item.get("hint") or fallback["hint"]).strip() or fallback["hint"],
+                "prompt": prompt,
+                "isEmpty": bool(item.get("isEmpty")) and not has_user_content and not prompt,
+            }
+        )
+    title = str(raw.get("title") or defaults["title"]).strip() or defaults["title"]
+    note = str(raw.get("note") or defaults["note"]).strip() or defaults["note"]
+    updated_at = str(raw.get("updatedAt") or defaults["updatedAt"]).strip() or defaults["updatedAt"]
+    publisher = str(raw.get("publisher") or defaults["publisher"]).strip() or defaults["publisher"]
+    summary = note
+    cells = [
+        {
+            "title": card["name"] or f"核心指标 {index + 1}",
+            "value": card["value"],
+            "prompt": card["prompt"],
+            "assessment": card["assessment"],
+            "status": card["status"],
+            "alert": card["alert"],
+            "hint": card["hint"],
+        }
+        for index, card in enumerate(cards)
+    ]
+    return {
+        "layout": layout,
+        "title": title,
+        "note": note,
+        "summary": summary,
+        "updatedAt": updated_at,
+        "publisher": publisher,
+        "cards": cards,
+        "cells": cells,
+    }
+
+
+def default_tenant_fund_dashboard_state(tenant):
+    published = normalize_fund_dashboard_view(
+        {
+            "layout": "2x2",
+            "title": "今日核心指标面板",
+            "note": "默认展示租户当前发布的核心指标，用于判断今天先看方向还是先控风险。",
+            "updatedAt": "默认模板",
+            "publisher": "系统初始化",
+        },
+        tenant,
+    )
+    return {
+        "published": published,
+        "draft": None,
+    }
+
+
+def resolve_tenant_fund_dashboard_state(tenant, config=None):
+    tenant = tenant or get_tenant_by_slug()
+    defaults = default_tenant_fund_dashboard_state(tenant)
+    raw = config if isinstance(config, dict) else {}
+    published = normalize_fund_dashboard_view(raw.get("published"), tenant) if isinstance(raw.get("published"), dict) else copy.deepcopy(defaults["published"])
+    draft = normalize_fund_dashboard_view(raw.get("draft"), tenant) if isinstance(raw.get("draft"), dict) else None
+    return {
+        "published": published,
+        "draft": draft,
+    }
+
+
+def build_tenant_fund_dashboard_payload(tenant=None, config=None):
+    tenant = tenant or get_tenant_by_slug()
+    state = resolve_tenant_fund_dashboard_state(tenant, config if config is not None else tenant.get("fund_dashboard_config"))
+    return copy.deepcopy(state["published"])
+
+
+def update_tenant_fund_dashboard_config(tenant_slug, action, dashboard=None):
+    action_key = str(action or "").strip().lower()
+    if action_key not in {"save_draft", "publish", "reset_draft"}:
+        return None
+    site_config = get_site_config()
+    tenants = get_tenant_configs(site_config)
+    updated = False
+    for index, tenant in enumerate(tenants):
+        if tenant.get("slug") != tenant_slug:
+            continue
+        current_state = resolve_tenant_fund_dashboard_state(tenant, tenant.get("fund_dashboard_config"))
+        next_state = copy.deepcopy(current_state)
+        if action_key == "save_draft":
+            next_state["draft"] = normalize_fund_dashboard_view(dashboard, tenant)
+        elif action_key == "publish":
+            candidate = dashboard if isinstance(dashboard, dict) else next_state.get("draft") or next_state.get("published")
+            next_state["published"] = normalize_fund_dashboard_view(candidate, tenant)
+            next_state["draft"] = None
+        elif action_key == "reset_draft":
+            next_state["draft"] = None
+        tenants[index] = dict(tenant)
+        tenants[index]["fund_dashboard_config"] = next_state
         updated = True
         break
     if not updated:
@@ -766,6 +1051,7 @@ def build_tenant_dashboard_payload(tenant=None):
         "publish_distribution": dashboard_metrics["publish_distribution"],
         "publish_trend": dashboard_metrics["publish_trend"],
         "fund_dashboard": workbench["fund_dashboard"],
+        "fund_dashboard_state": workbench["fund_dashboard_state"],
         "reviews": workbench["published_reviews"],
         "stats": workbench["stats"],
     }
@@ -1547,6 +1833,1361 @@ def load_market_dashboard_indicators():
     return payload
 
 
+def now_ts():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def safe_json_loads(value, default):
+    if value in (None, ""):
+        return copy.deepcopy(default)
+    try:
+        parsed = json.loads(value)
+    except Exception:
+        return copy.deepcopy(default)
+    return parsed if isinstance(parsed, type(default)) else copy.deepcopy(default)
+
+
+def slugify_code(value, fallback="item"):
+    text = re.sub(r"[^a-zA-Z0-9_]+", "_", str(value or "").strip()).strip("_").lower()
+    return text or fallback
+
+
+def coerce_float(value, default=None):
+    try:
+        text = str(value).replace("%", "").replace(",", "").strip()
+        if not text:
+            return default
+        return float(text)
+    except Exception:
+        return default
+
+
+def normalize_datetime_text(value):
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    for fmt in ("%Y%m%d%H%M%S", "%Y-%m-%d %H:%M:%S", "%Y/%m/%d %H:%M:%S", "%Y-%m-%d", "%Y/%m/%d"):
+        try:
+            parsed = datetime.strptime(text, fmt)
+            return parsed.strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            continue
+    return text[:19].replace("T", " ")
+
+
+def extract_timestamp_from_fields(fields, fallback=""):
+    values = [str(item or "").strip() for item in fields if str(item or "").strip()]
+    for item in values:
+        normalized = normalize_datetime_text(item)
+        if normalized:
+            return normalized
+    for index, item in enumerate(values[:-1]):
+        if re.fullmatch(r"\d{4}[-/]\d{2}[-/]\d{2}", item) and re.fullmatch(r"\d{2}:\d{2}:\d{2}", values[index + 1]):
+            return normalize_datetime_text(f"{item} {values[index + 1]}")
+        if re.fullmatch(r"\d{2}:\d{2}:\d{2}", item) and re.fullmatch(r"\d{4}[-/]\d{2}[-/]\d{2}", values[index + 1]):
+            return normalize_datetime_text(f"{values[index + 1]} {item}")
+    return normalize_datetime_text(fallback or now_ts())
+
+
+def extract_quoted_payload(detail):
+    text = str(detail or "").strip()
+    if not text:
+        return ""
+    match = re.search(r'="(.*)"', text)
+    if match:
+        return match.group(1)
+    return ""
+
+
+def split_endpoint_url(api_url):
+    text = str(api_url or "").strip()
+    if not text:
+        return "", "", {}
+    parsed = urlsplit(text)
+    if parsed.scheme not in {"http", "https"}:
+        return "", "", {}
+    base_url = f"{parsed.scheme}://{parsed.netloc}"
+    path = parsed.path or ""
+    if parsed.query:
+        path = f"{path}?{parsed.query}" if path else f"?{parsed.query}"
+    return base_url, path, {key: value for key, value in parse_qsl(parsed.query, keep_blank_values=True)}
+
+
+def discover_payload_paths(payload, prefix=""):
+    paths = []
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            next_prefix = f"{prefix}.{key}" if prefix else str(key)
+            if isinstance(value, (dict, list)):
+                paths.extend(discover_payload_paths(value, next_prefix))
+            else:
+                paths.append(next_prefix)
+    elif isinstance(payload, list):
+        for index, value in enumerate(payload[:6]):
+            next_prefix = f"{prefix}.{index}" if prefix else str(index)
+            if isinstance(value, (dict, list)):
+                paths.extend(discover_payload_paths(value, next_prefix))
+            else:
+                paths.append(next_prefix)
+    elif prefix:
+        paths.append(prefix)
+    return paths
+
+
+def build_source_sample_from_market_dashboard(raw):
+    detail = str(raw.get("last_test_detail") or "").strip()
+    extractor_type = str(raw.get("extractor_type") or "").strip().lower()
+    last_tested_at = str(raw.get("last_tested_at") or "").strip()
+    indicator_name = str(raw.get("indicator") or raw.get("id") or "指标").strip()
+    sample = {
+        "indicator": indicator_name,
+        "provider": str(raw.get("provider") or "").strip(),
+        "connector_type": "akshare" if str(raw.get("api_url") or "").startswith("akshare://") else ("http" if str(raw.get("api_url") or "").startswith(("http://", "https://")) else "manual"),
+        "extractor_type": extractor_type or "sample",
+        "status": "good" if "200" in str(raw.get("last_test_status") or "") else "attention",
+        "timestamp": normalize_datetime_text(last_tested_at or now_ts()),
+        "value": None,
+        "raw_preview": detail[:600],
+    }
+    quoted = extract_quoted_payload(detail)
+    if extractor_type == "text" and quoted:
+        delimiter = "~" if "~" in quoted else ","
+        fields = [part.strip() for part in quoted.split(delimiter)]
+        sample["raw_delimiter"] = delimiter
+        sample["raw_field_count"] = len(fields)
+        sample["raw_fields"] = fields[:40]
+        sample["timestamp"] = extract_timestamp_from_fields(fields, fallback=last_tested_at or now_ts())
+        if delimiter == "~":
+            sample["name"] = fields[1] if len(fields) > 1 else indicator_name
+            sample["symbol"] = fields[2] if len(fields) > 2 else str(raw.get("id") or "")
+            sample["value"] = coerce_float(fields[3], coerce_float(fields[0], 0.0))
+            sample["prev_close"] = coerce_float(fields[4])
+            sample["open"] = coerce_float(fields[5])
+            sample["change"] = coerce_float(fields[31]) if len(fields) > 31 else None
+            sample["change_pct"] = coerce_float(fields[32]) if len(fields) > 32 else None
+            sample["high"] = coerce_float(fields[33]) if len(fields) > 33 else None
+            sample["low"] = coerce_float(fields[34]) if len(fields) > 34 else None
+        else:
+            sample["name"] = fields[-1] if fields else indicator_name
+            sample["symbol"] = str(raw.get("id") or "")
+            sample["value"] = coerce_float(fields[0], 0.0)
+            sample["change_pct"] = coerce_float(fields[1])
+            sample["open"] = coerce_float(fields[2])
+            sample["high"] = coerce_float(fields[4]) if len(fields) > 4 else None
+            sample["low"] = coerce_float(fields[5]) if len(fields) > 5 else None
+    elif extractor_type == "akshare":
+        sample["record_summary"] = detail or f"{indicator_name} AKShare 样例"
+        sample["value"] = coerce_float(re.search(r"(-?\\d+(?:\\.\\d+)?)", detail).group(1), None) if re.search(r"(-?\\d+(?:\\.\\d+)?)", detail) else None
+    else:
+        sample["record_summary"] = detail or f"{indicator_name} 样例预览"
+    if sample["value"] is None:
+        seeded_rng = random.Random(f"source-sample:{raw.get('id') or indicator_name}")
+        sample["value"] = round(seeded_rng.uniform(80, 160), 2)
+    change_pct = sample.get("change_pct")
+    if isinstance(change_pct, (int, float)):
+        if change_pct <= -1.5:
+            sample["status"] = "warning"
+        elif change_pct < 0:
+            sample["status"] = "attention"
+        else:
+            sample["status"] = "good"
+    return sample
+
+
+def build_market_dashboard_response_mapping(raw, sample):
+    return {
+        "value_path": "value",
+        "time_path": "timestamp",
+        "status_path": "status",
+        "connector_type": sample.get("connector_type") or "",
+        "extractor_type": sample.get("extractor_type") or "",
+        "extractor_path": str(raw.get("extractor_path") or "").strip(),
+        "expected_contains": str(raw.get("expected_contains") or "").strip(),
+        "request_blueprint": {
+            "api_url": str(raw.get("api_url") or "").strip(),
+            "request_method": str(raw.get("request_method") or "GET").strip().upper(),
+            "notes": str(raw.get("notes") or "").strip(),
+        },
+        "discovered_paths": discover_payload_paths(sample),
+    }
+
+
+def build_indicator_source_seed_payload(raw, existing=None):
+    api_url = str(raw.get("api_url") or "").strip()
+    base_url, path, url_query = split_endpoint_url(api_url)
+    headers = safe_json_loads(raw.get("headers_json"), {})
+    body = safe_json_loads(raw.get("payload_json"), {})
+    sample = build_source_sample_from_market_dashboard(raw)
+    generated_mapping = build_market_dashboard_response_mapping(raw, sample)
+    existing = existing or {}
+    existing_mapping = existing.get("response_mapping") if isinstance(existing.get("response_mapping"), dict) else {}
+    mapping = dict(generated_mapping)
+    for key in ("value_path", "time_path", "status_path", "unit_override", "default_status", "transform_expr"):
+        if existing_mapping.get(key):
+            mapping[key] = existing_mapping[key]
+    if existing_mapping.get("request_blueprint"):
+        mapping["request_blueprint"] = existing_mapping["request_blueprint"]
+    response_sample = existing.get("response_sample") if isinstance(existing.get("response_sample"), dict) and existing.get("response_sample") else sample
+    source_code = slugify_code(raw.get("id") or f"{raw.get('indicator')}_source", "source")
+    indicator_code = slugify_code(raw.get("id") or raw.get("indicator"), "lake_indicator")
+    if api_url.startswith("akshare://"):
+        base_url = existing.get("base_url") or ""
+        path = existing.get("path") or ""
+    return {
+        "source_code": source_code,
+        "indicator_code": indicator_code,
+        "provider": str(raw.get("provider") or existing.get("provider") or "market_dashboard").strip(),
+        "base_url": existing.get("base_url") or base_url,
+        "path": existing.get("path") or path,
+        "method": str(existing.get("method") or raw.get("request_method") or "GET").strip().upper(),
+        "auth_type": str(existing.get("auth_type") or "none").strip(),
+        "headers": existing.get("headers") if isinstance(existing.get("headers"), dict) and existing.get("headers") else headers,
+        "query": existing.get("query") if isinstance(existing.get("query"), dict) and existing.get("query") else url_query,
+        "body": existing.get("body") if isinstance(existing.get("body"), dict) and existing.get("body") else body,
+        "response_mapping": mapping,
+        "response_sample": response_sample,
+        "source_status": str(existing.get("source_status") or raw.get("status") or "configured").strip(),
+        "enabled": bool(existing.get("enabled", raw.get("enabled", True))),
+        "last_test_status": str(existing.get("last_test_status") or raw.get("last_test_status") or "").strip(),
+        "last_http_status": existing.get("last_http_status") if existing and existing.get("last_http_status") is not None else (200 if "200" in str(raw.get("last_test_status") or "") else None),
+        "last_tested_at": str(existing.get("last_tested_at") or raw.get("last_tested_at") or "").strip(),
+        "last_test_detail": str(existing.get("last_test_detail") or raw.get("last_test_detail") or raw.get("notes") or "").strip(),
+    }
+
+
+def suggest_mapping_from_payload(payload):
+    paths = discover_payload_paths(payload)
+    def pick(candidate_keys, fallback):
+        for path in paths:
+            tail = path.split(".")[-1].lower()
+            if tail in candidate_keys:
+                return path
+        return fallback
+    return {
+        "value_path": pick({"value", "close", "price", "latest_value"}, "value"),
+        "time_path": pick({"timestamp", "time", "date", "point_time"}, "timestamp"),
+        "status_path": pick({"status", "state", "point_status"}, "status"),
+    }
+
+
+def build_indicator_source_preview(source_code):
+    source = get_indicator_source_def(source_code)
+    if not source:
+        raise ValueError("indicator_source_not_found")
+    sample_payload = source.get("response_sample") if isinstance(source.get("response_sample"), dict) else {}
+    response_mapping = source.get("response_mapping") if isinstance(source.get("response_mapping"), dict) else {}
+    suggested_mapping = suggest_mapping_from_payload(sample_payload)
+    rules = list_indicator_mapping_rules(source_code=source["source_code"])
+    current_rule = rules[0] if rules else None
+    endpoint = f"{source.get('base_url') or ''}{source.get('path') or ''}".strip() or "未配置真实地址"
+    return {
+        "source_code": source["source_code"],
+        "indicator_code": source["indicator_code"],
+        "provider": source.get("provider") or "",
+        "method": source.get("method") or "GET",
+        "endpoint": endpoint,
+        "connector_type": response_mapping.get("connector_type") or ("http" if str(source.get("base_url") or "").startswith(("http://", "https://")) else "sample"),
+        "blueprint": {
+            "extractor_type": response_mapping.get("extractor_type") or "",
+            "extractor_path": response_mapping.get("extractor_path") or "",
+            "expected_contains": response_mapping.get("expected_contains") or "",
+            "request_blueprint": response_mapping.get("request_blueprint") if isinstance(response_mapping.get("request_blueprint"), dict) else {},
+        },
+        "sample_payload": sample_payload,
+        "sample_payload_text": json.dumps(sample_payload, ensure_ascii=False, indent=2),
+        "discovered_paths": discover_payload_paths(sample_payload)[:40],
+        "suggested_mapping": {
+            "value_path": response_mapping.get("value_path") or suggested_mapping["value_path"],
+            "time_path": response_mapping.get("time_path") or suggested_mapping["time_path"],
+            "status_path": response_mapping.get("status_path") or suggested_mapping["status_path"],
+        },
+        "mapping_rule": current_rule,
+        "last_test_status": source.get("last_test_status") or "",
+        "last_test_detail": source.get("last_test_detail") or "",
+    }
+
+
+def infer_source_connector_type(source):
+    response_mapping = source.get("response_mapping") if isinstance(source.get("response_mapping"), dict) else {}
+    connector_type = str(response_mapping.get("connector_type") or "").strip().lower()
+    if connector_type:
+        return connector_type
+    request_blueprint = response_mapping.get("request_blueprint") if isinstance(response_mapping.get("request_blueprint"), dict) else {}
+    api_url = str(request_blueprint.get("api_url") or "").strip()
+    base_url = str(source.get("base_url") or "").strip()
+    if api_url.startswith("akshare://"):
+        return "akshare"
+    if api_url.startswith(("http://", "https://")) or base_url.startswith(("http://", "https://")):
+        return "http"
+    return "manual"
+
+
+def build_source_payload_from_text(source, raw_text):
+    response_mapping = source.get("response_mapping") if isinstance(source.get("response_mapping"), dict) else {}
+    base_sample = copy.deepcopy(source.get("response_sample")) if isinstance(source.get("response_sample"), dict) else {}
+    payload = base_sample if isinstance(base_sample, dict) else {}
+    payload.setdefault("indicator", source.get("indicator_code") or source.get("source_code") or "指标")
+    payload.setdefault("provider", source.get("provider") or "")
+    payload.setdefault("status", "attention")
+    payload.setdefault("timestamp", now_ts())
+    payload["raw_preview"] = str(raw_text or "")[:1200]
+    quoted = extract_quoted_payload(raw_text)
+    extractor_type = str(response_mapping.get("extractor_type") or payload.get("extractor_type") or "").strip().lower()
+    text = quoted or str(raw_text or "").strip()
+    delimiter = "~" if "~" in text else ("," if "," in text else "")
+    if extractor_type == "text" and delimiter:
+        fields = [part.strip() for part in text.split(delimiter)]
+        payload["raw_delimiter"] = delimiter
+        payload["raw_field_count"] = len(fields)
+        payload["raw_fields"] = fields[:40]
+        payload["timestamp"] = extract_timestamp_from_fields(fields, fallback=payload.get("timestamp") or now_ts())
+        if delimiter == "~":
+            payload["name"] = fields[1] if len(fields) > 1 else payload.get("indicator")
+            payload["symbol"] = fields[2] if len(fields) > 2 else source.get("source_code")
+            if coerce_float(fields[3] if len(fields) > 3 else None, None) is not None:
+                payload["value"] = coerce_float(fields[3], payload.get("value"))
+            payload["change"] = coerce_float(fields[31] if len(fields) > 31 else None, payload.get("change"))
+            payload["change_pct"] = coerce_float(fields[32] if len(fields) > 32 else None, payload.get("change_pct"))
+            payload["high"] = coerce_float(fields[33] if len(fields) > 33 else None, payload.get("high"))
+            payload["low"] = coerce_float(fields[34] if len(fields) > 34 else None, payload.get("low"))
+        else:
+            if coerce_float(fields[0] if len(fields) > 0 else None, None) is not None:
+                payload["value"] = coerce_float(fields[0], payload.get("value"))
+            payload["change_pct"] = coerce_float(fields[1] if len(fields) > 1 else None, payload.get("change_pct"))
+            payload["open"] = coerce_float(fields[2] if len(fields) > 2 else None, payload.get("open"))
+            payload["high"] = coerce_float(fields[4] if len(fields) > 4 else None, payload.get("high"))
+            payload["low"] = coerce_float(fields[5] if len(fields) > 5 else None, payload.get("low"))
+            payload["name"] = fields[-1] if fields else payload.get("indicator")
+    elif text:
+        payload["record_summary"] = text[:240]
+    if payload.get("value") is None:
+        payload["value"] = round(random.Random(f"landing:{source.get('source_code')}").uniform(80, 160), 2)
+    change_pct = coerce_float(payload.get("change_pct"), None)
+    if change_pct is not None:
+        payload["status"] = "warning" if change_pct <= -1.5 else ("attention" if change_pct < 0 else "good")
+    return payload
+
+
+def build_source_payload_from_live_response(source, raw_text):
+    text = str(raw_text or "").strip()
+    if text.startswith("{") or text.startswith("["):
+        parsed = safe_json_loads(text, {})
+        if isinstance(parsed, dict):
+            parsed.setdefault("timestamp", now_ts())
+            parsed.setdefault("status", "attention")
+            return parsed
+    return build_source_payload_from_text(source, text)
+
+
+def persist_indicator_raw_record(source, raw_payload, fetch_mode, http_status=None, success=True, summary=""):
+    timestamp = now_ts()
+    batch_code = f"raw_{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+    db = get_db()
+    payload_text = raw_payload if isinstance(raw_payload, str) else json.dumps(raw_payload, ensure_ascii=False)
+    db.execute(
+        """
+        INSERT INTO indicator_raw_records (
+            source_code, indicator_code, fetch_mode, raw_payload, http_status, success, fetched_at, batch_code, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            source["source_code"],
+            source["indicator_code"],
+            fetch_mode,
+            payload_text,
+            http_status,
+            1 if success else 0,
+            timestamp,
+            batch_code,
+            timestamp,
+        ),
+    )
+    db.execute(
+        """
+        INSERT INTO indicator_load_batches (
+            batch_code, load_type, source_code, summary, total_points, total_indicators, success, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            batch_code,
+            "raw_landing",
+            source["source_code"],
+            (summary or f"已执行 {fetch_mode} 接入，原始数据已落地区。")[:240],
+            1,
+            1,
+            1 if success else 0,
+            timestamp,
+        ),
+    )
+    db.commit()
+    row = db.execute("SELECT * FROM indicator_raw_records ORDER BY id DESC LIMIT 1").fetchone()
+    return dict(row) if row else None
+
+
+def execute_indicator_source_landing(source_code, prefer_live=False):
+    source = get_indicator_source_def(source_code)
+    if not source:
+        raise ValueError("indicator_source_not_found")
+    connector_type = infer_source_connector_type(source)
+    response_mapping = source.get("response_mapping") if isinstance(source.get("response_mapping"), dict) else {}
+    if connector_type == "http" and prefer_live and str(source.get("base_url") or "").strip():
+        url = source["base_url"].rstrip("/") + "/" + source["path"].lstrip("/")
+        query = source["query"] if isinstance(source["query"], dict) else {}
+        if query:
+            separator = "&" if "?" in url else "?"
+            url = f"{url}{separator}" + "&".join(f"{key}={value}" for key, value in query.items())
+        body_data = None
+        if source["method"] != "GET":
+            body_data = json.dumps(source["body"], ensure_ascii=False).encode("utf-8")
+        headers = source["headers"] if isinstance(source["headers"], dict) else {}
+        if body_data is not None:
+            headers = {**headers, "Content-Type": "application/json"}
+        try:
+            with urlopen(Request(url, data=body_data, method=source["method"], headers=headers), timeout=8) as resp:
+                raw_text = resp.read().decode("utf-8", errors="ignore")
+                payload = build_source_payload_from_live_response(source, raw_text)
+                status_code = getattr(resp, "status", 200)
+                record = persist_indicator_raw_record(
+                    source,
+                    payload,
+                    fetch_mode="http_live",
+                    http_status=status_code,
+                    success=True,
+                    summary=f"HTTP 实时接入成功，状态码 {status_code}。",
+                )
+                return {
+                    "record": record,
+                    "connector_type": connector_type,
+                    "fetch_mode": "http_live",
+                    "detail": "HTTP 实时接入成功。",
+                    "used_sample": False,
+                }
+        except Exception as exc:
+            fallback_payload = source.get("response_sample") if isinstance(source.get("response_sample"), dict) else {}
+            fallback_payload = fallback_payload or {
+                "value": round(random.uniform(80, 160), 2),
+                "timestamp": now_ts(),
+                "status": "attention",
+                "fallback_reason": str(exc),
+            }
+            record = persist_indicator_raw_record(
+                source,
+                fallback_payload,
+                fetch_mode="http_fallback_sample",
+                http_status=None,
+                success=False,
+                summary=f"HTTP 实时接入失败，已回退样例：{str(exc)[:120]}",
+            )
+            return {
+                "record": record,
+                "connector_type": connector_type,
+                "fetch_mode": "http_fallback_sample",
+                "detail": f"HTTP 实时接入失败，已回退样例：{exc}",
+                "used_sample": True,
+            }
+    sample_payload = source.get("response_sample") if isinstance(source.get("response_sample"), dict) else {}
+    sample_payload = copy.deepcopy(sample_payload) if sample_payload else {
+        "value": round(random.uniform(80, 160), 2),
+        "timestamp": now_ts(),
+        "status": "attention",
+    }
+    sample_payload.setdefault("timestamp", now_ts())
+    sample_payload.setdefault("status", "attention")
+    if connector_type == "http":
+        fetch_mode = "http_blueprint_sample"
+        summary = "HTTP Source 当前按蓝图样例入湖，可在下一步切换到真实实时接入。"
+    elif connector_type == "akshare":
+        sample_payload.setdefault("record_summary", str(source.get("last_test_detail") or "AKShare 蓝图样例"))
+        fetch_mode = "akshare_blueprint"
+        summary = "AKShare Source 当前按蓝图样例入湖，后续接真实执行器。"
+    else:
+        fetch_mode = "manual_blueprint"
+        summary = "Manual Source 已按样例原始数据落地区。"
+    record = persist_indicator_raw_record(source, sample_payload, fetch_mode=fetch_mode, http_status=200, success=True, summary=summary)
+    return {
+        "record": record,
+        "connector_type": connector_type,
+        "fetch_mode": fetch_mode,
+        "detail": summary,
+        "used_sample": True,
+    }
+
+
+def normalize_indicator_definition(payload, existing=None):
+    base = dict(existing or {})
+    base.update(payload or {})
+    code = slugify_code(base.get("indicator_code") or base.get("indicator_name"), "indicator")
+    return {
+        "indicator_code": code,
+        "indicator_name": str(base.get("indicator_name") or code).strip(),
+        "category": str(base.get("category") or "未分类指标").strip(),
+        "description": str(base.get("description") or "").strip(),
+        "unit": str(base.get("unit") or "").strip(),
+        "owner": str(base.get("owner") or "平台研究运营").strip(),
+        "source_type": str(base.get("source_type") or "mock").strip() or "mock",
+        "source_type_label": str(base.get("source_type_label") or "模拟指标").strip() or "模拟指标",
+        "provider": str(base.get("provider") or "平台数据层").strip(),
+        "status_hint": str(base.get("status_hint") or "attention").strip() or "attention",
+        "assessment_template": str(base.get("assessment_template") or "").strip(),
+        "alert_template": str(base.get("alert_template") or "").strip(),
+        "watchers_json": json.dumps(base.get("watchers") if isinstance(base.get("watchers"), list) else safe_json_loads(base.get("watchers_json"), []), ensure_ascii=False),
+        "display_config_json": json.dumps(base.get("display_config") if isinstance(base.get("display_config"), dict) else safe_json_loads(base.get("display_config_json"), {}), ensure_ascii=False),
+        "enabled": 1 if bool(base.get("enabled", True)) else 0,
+    }
+
+
+def normalize_indicator_source_def(payload, existing=None):
+    base = dict(existing or {})
+    base.update(payload or {})
+    indicator_code = slugify_code(base.get("indicator_code"), "indicator")
+    source_code = slugify_code(base.get("source_code") or f"{indicator_code}_source", "source")
+    method = str(base.get("method") or "GET").strip().upper()
+    if method not in {"GET", "POST", "PUT", "PATCH", "DELETE"}:
+        method = "GET"
+    return {
+        "source_code": source_code,
+        "indicator_code": indicator_code,
+        "provider": str(base.get("provider") or "待配置").strip(),
+        "base_url": str(base.get("base_url") or "").strip(),
+        "path": str(base.get("path") or "").strip(),
+        "method": method,
+        "auth_type": str(base.get("auth_type") or "none").strip(),
+        "headers_json": json.dumps(base.get("headers") if isinstance(base.get("headers"), dict) else safe_json_loads(base.get("headers_json"), {}), ensure_ascii=False),
+        "query_json": json.dumps(base.get("query") if isinstance(base.get("query"), dict) else safe_json_loads(base.get("query_json"), {}), ensure_ascii=False),
+        "body_json": json.dumps(base.get("body") if isinstance(base.get("body"), dict) else safe_json_loads(base.get("body_json"), {}), ensure_ascii=False),
+        "response_mapping_json": json.dumps(base.get("response_mapping") if isinstance(base.get("response_mapping"), dict) else safe_json_loads(base.get("response_mapping_json"), {}), ensure_ascii=False),
+        "response_sample_json": json.dumps(base.get("response_sample") if isinstance(base.get("response_sample"), dict) else safe_json_loads(base.get("response_sample_json"), {}), ensure_ascii=False),
+        "source_status": str(base.get("source_status") or "draft").strip() or "draft",
+        "enabled": 1 if bool(base.get("enabled", True)) else 0,
+        "last_test_status": str(base.get("last_test_status") or "").strip(),
+        "last_http_status": base.get("last_http_status"),
+        "last_tested_at": str(base.get("last_tested_at") or "").strip(),
+        "last_test_detail": str(base.get("last_test_detail") or "").strip(),
+    }
+
+
+def row_to_indicator_definition(row):
+    item = dict(row)
+    item["enabled"] = bool(item.get("enabled"))
+    item["watchers"] = safe_json_loads(item.get("watchers_json"), [])
+    item["display_config"] = safe_json_loads(item.get("display_config_json"), {})
+    return item
+
+
+def row_to_indicator_source_def(row):
+    item = dict(row)
+    item["enabled"] = bool(item.get("enabled"))
+    item["headers"] = safe_json_loads(item.get("headers_json"), {})
+    item["query"] = safe_json_loads(item.get("query_json"), {})
+    item["body"] = safe_json_loads(item.get("body_json"), {})
+    item["response_mapping"] = safe_json_loads(item.get("response_mapping_json"), {})
+    item["response_sample"] = safe_json_loads(item.get("response_sample_json"), {})
+    return item
+
+
+def list_indicator_definitions(source_type=None):
+    db = get_db()
+    query = "SELECT * FROM indicator_definitions"
+    params = []
+    if source_type:
+        query += " WHERE source_type = ?"
+        params.append(source_type)
+    query += " ORDER BY category ASC, indicator_name ASC"
+    return [row_to_indicator_definition(row) for row in db.execute(query, params).fetchall()]
+
+
+def get_indicator_definition(indicator_code):
+    if not indicator_code:
+        return None
+    db = get_db()
+    row = db.execute(
+        "SELECT * FROM indicator_definitions WHERE indicator_code = ?",
+        (slugify_code(indicator_code, "indicator"),),
+    ).fetchone()
+    return row_to_indicator_definition(row) if row else None
+
+
+def save_indicator_definition(payload):
+    normalized = normalize_indicator_definition(payload)
+    db = get_db()
+    existing = get_indicator_definition(normalized["indicator_code"])
+    timestamp = now_ts()
+    db.execute(
+        """
+        INSERT INTO indicator_definitions (
+            indicator_code, indicator_name, category, description, unit, owner, source_type,
+            source_type_label, provider, status_hint, assessment_template, alert_template,
+            watchers_json, display_config_json, enabled, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(indicator_code) DO UPDATE SET
+            indicator_name = excluded.indicator_name,
+            category = excluded.category,
+            description = excluded.description,
+            unit = excluded.unit,
+            owner = excluded.owner,
+            source_type = excluded.source_type,
+            source_type_label = excluded.source_type_label,
+            provider = excluded.provider,
+            status_hint = excluded.status_hint,
+            assessment_template = excluded.assessment_template,
+            alert_template = excluded.alert_template,
+            watchers_json = excluded.watchers_json,
+            display_config_json = excluded.display_config_json,
+            enabled = excluded.enabled,
+            updated_at = excluded.updated_at
+        """,
+        (
+            normalized["indicator_code"],
+            normalized["indicator_name"],
+            normalized["category"],
+            normalized["description"],
+            normalized["unit"],
+            normalized["owner"],
+            normalized["source_type"],
+            normalized["source_type_label"],
+            normalized["provider"],
+            normalized["status_hint"],
+            normalized["assessment_template"],
+            normalized["alert_template"],
+            normalized["watchers_json"],
+            normalized["display_config_json"],
+            normalized["enabled"],
+            existing["created_at"] if existing else timestamp,
+            timestamp,
+        ),
+    )
+    db.commit()
+    return get_indicator_definition(normalized["indicator_code"])
+
+
+def delete_indicator_definition(indicator_code):
+    db = get_db()
+    normalized_code = slugify_code(indicator_code, "indicator")
+    db.execute("DELETE FROM indicator_definitions WHERE indicator_code = ?", (normalized_code,))
+    db.execute("DELETE FROM indicator_source_defs WHERE indicator_code = ?", (normalized_code,))
+    db.execute("DELETE FROM indicator_latest_values WHERE indicator_code = ?", (normalized_code,))
+    db.execute("DELETE FROM indicator_series WHERE indicator_code = ?", (normalized_code,))
+    db.execute("DELETE FROM indicator_anomalies WHERE indicator_code = ?", (normalized_code,))
+    db.execute("DELETE FROM indicator_kline_points WHERE indicator_code = ?", (normalized_code,))
+    db.commit()
+
+
+def list_indicator_source_defs(indicator_code=None):
+    db = get_db()
+    query = "SELECT * FROM indicator_source_defs"
+    params = []
+    if indicator_code:
+        query += " WHERE indicator_code = ?"
+        params.append(slugify_code(indicator_code, "indicator"))
+    query += " ORDER BY updated_at DESC, source_code ASC"
+    return [row_to_indicator_source_def(row) for row in db.execute(query, params).fetchall()]
+
+
+def get_indicator_source_def(source_code):
+    if not source_code:
+        return None
+    db = get_db()
+    row = db.execute(
+        "SELECT * FROM indicator_source_defs WHERE source_code = ?",
+        (slugify_code(source_code, "source"),),
+    ).fetchone()
+    return row_to_indicator_source_def(row) if row else None
+
+
+def save_indicator_source_def(payload):
+    normalized = normalize_indicator_source_def(payload)
+    db = get_db()
+    existing = get_indicator_source_def(normalized["source_code"])
+    timestamp = now_ts()
+    db.execute(
+        """
+        INSERT INTO indicator_source_defs (
+            source_code, indicator_code, provider, base_url, path, method, auth_type,
+            headers_json, query_json, body_json, response_mapping_json, response_sample_json,
+            source_status, enabled, last_test_status, last_http_status, last_tested_at,
+            last_test_detail, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(source_code) DO UPDATE SET
+            indicator_code = excluded.indicator_code,
+            provider = excluded.provider,
+            base_url = excluded.base_url,
+            path = excluded.path,
+            method = excluded.method,
+            auth_type = excluded.auth_type,
+            headers_json = excluded.headers_json,
+            query_json = excluded.query_json,
+            body_json = excluded.body_json,
+            response_mapping_json = excluded.response_mapping_json,
+            response_sample_json = excluded.response_sample_json,
+            source_status = excluded.source_status,
+            enabled = excluded.enabled,
+            last_test_status = excluded.last_test_status,
+            last_http_status = excluded.last_http_status,
+            last_tested_at = excluded.last_tested_at,
+            last_test_detail = excluded.last_test_detail,
+            updated_at = excluded.updated_at
+        """,
+        (
+            normalized["source_code"],
+            normalized["indicator_code"],
+            normalized["provider"],
+            normalized["base_url"],
+            normalized["path"],
+            normalized["method"],
+            normalized["auth_type"],
+            normalized["headers_json"],
+            normalized["query_json"],
+            normalized["body_json"],
+            normalized["response_mapping_json"],
+            normalized["response_sample_json"],
+            normalized["source_status"],
+            normalized["enabled"],
+            normalized["last_test_status"],
+            normalized["last_http_status"],
+            normalized["last_tested_at"],
+            normalized["last_test_detail"],
+            existing["created_at"] if existing else timestamp,
+            timestamp,
+        ),
+    )
+    db.commit()
+    saved = get_indicator_source_def(normalized["source_code"])
+    ensure_indicator_mapping_rule_for_source(saved)
+    return saved
+
+
+def delete_indicator_source_def(source_code):
+    db = get_db()
+    normalized_code = slugify_code(source_code, "source")
+    db.execute("DELETE FROM indicator_source_defs WHERE source_code = ?", (normalized_code,))
+    db.execute("DELETE FROM indicator_source_tests WHERE source_code = ?", (normalized_code,))
+    db.commit()
+
+
+def record_indicator_source_test(source_code, success, http_status=None, latency_ms=None, response_sample="", error_message=""):
+    db = get_db()
+    timestamp = now_ts()
+    normalized_code = slugify_code(source_code, "source")
+    db.execute(
+        """
+        INSERT INTO indicator_source_tests (
+            source_code, tested_at, success, http_status, latency_ms, response_sample, error_message
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            normalized_code,
+            timestamp,
+            1 if success else 0,
+            http_status,
+            latency_ms,
+            response_sample[:4000],
+            error_message[:1000],
+        ),
+    )
+    db.execute(
+        """
+        UPDATE indicator_source_defs
+        SET last_test_status = ?, last_http_status = ?, last_tested_at = ?, last_test_detail = ?, updated_at = ?
+        WHERE source_code = ?
+        """,
+        (
+            f"HTTP {http_status}" if http_status else ("SUCCESS" if success else "FAILED"),
+            http_status,
+            timestamp,
+            (error_message or response_sample or "测试完成")[:240],
+            timestamp,
+            normalized_code,
+        ),
+    )
+    db.commit()
+
+
+def list_indicator_source_tests(source_code=None, limit=20):
+    db = get_db()
+    limit = max(1, min(int(limit or 20), 100))
+    if source_code:
+        rows = db.execute(
+            """
+            SELECT * FROM indicator_source_tests
+            WHERE source_code = ?
+            ORDER BY tested_at DESC, id DESC
+            LIMIT ?
+            """,
+            (slugify_code(source_code, "source"), limit),
+        ).fetchall()
+    else:
+        rows = db.execute(
+            """
+            SELECT * FROM indicator_source_tests
+            ORDER BY tested_at DESC, id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def test_indicator_source(source_code):
+    source = get_indicator_source_def(source_code)
+    if not source:
+        raise ValueError("indicator_source_not_found")
+    start = time.time()
+    if not source["base_url"]:
+        sample = source["response_sample"] or {"message": "未配置真实地址，使用样例响应作为测试结果。"}
+        latency_ms = int((time.time() - start) * 1000)
+        sample_text = json.dumps(sample, ensure_ascii=False)
+        record_indicator_source_test(source["source_code"], True, 200, latency_ms, sample_text, "")
+        return {
+            "success": True,
+            "http_status": 200,
+            "latency_ms": latency_ms,
+            "response_sample": sample,
+            "detail": "当前未配置真实接口地址，已使用样例响应完成测试。",
+        }
+    url = source["base_url"].rstrip("/") + "/" + source["path"].lstrip("/")
+    query = source["query"] if isinstance(source["query"], dict) else {}
+    if query:
+        separator = "&" if "?" in url else "?"
+        query_string = "&".join(f"{key}={value}" for key, value in query.items())
+        url = f"{url}{separator}{query_string}"
+    body_data = None
+    if source["method"] != "GET":
+        body_data = json.dumps(source["body"], ensure_ascii=False).encode("utf-8")
+    headers = source["headers"] if isinstance(source["headers"], dict) else {}
+    if body_data is not None:
+        headers = {**headers, "Content-Type": "application/json"}
+    request_obj = Request(url, data=body_data, method=source["method"], headers=headers)
+    try:
+        with urlopen(request_obj, timeout=8) as resp:
+            raw = resp.read().decode("utf-8", errors="ignore")
+            latency_ms = int((time.time() - start) * 1000)
+            status_code = getattr(resp, "status", 200)
+            record_indicator_source_test(source["source_code"], True, status_code, latency_ms, raw, "")
+            sample = safe_json_loads(raw, {}) if raw.strip().startswith(("{", "[")) else {"raw": raw[:1200]}
+            return {
+                "success": True,
+                "http_status": status_code,
+                "latency_ms": latency_ms,
+                "response_sample": sample,
+                "detail": "接口测试成功。",
+            }
+    except HTTPError as exc:
+        latency_ms = int((time.time() - start) * 1000)
+        error_text = f"HTTP {exc.code}: {exc.reason}"
+        record_indicator_source_test(source["source_code"], False, exc.code, latency_ms, "", error_text)
+        return {
+            "success": False,
+            "http_status": exc.code,
+            "latency_ms": latency_ms,
+            "response_sample": {},
+            "detail": error_text,
+        }
+    except URLError as exc:
+        latency_ms = int((time.time() - start) * 1000)
+        error_text = f"NETWORK ERROR: {exc.reason}"
+        record_indicator_source_test(source["source_code"], False, None, latency_ms, "", error_text)
+        return {
+            "success": False,
+            "http_status": None,
+            "latency_ms": latency_ms,
+            "response_sample": {},
+            "detail": error_text,
+        }
+    except Exception as exc:
+        latency_ms = int((time.time() - start) * 1000)
+        error_text = f"UNEXPECTED ERROR: {exc}"
+        record_indicator_source_test(source["source_code"], False, None, latency_ms, "", error_text)
+        return {
+            "success": False,
+            "http_status": None,
+            "latency_ms": latency_ms,
+            "response_sample": {},
+            "detail": error_text,
+        }
+
+
+def normalize_indicator_mapping_rule(payload, existing=None):
+    base = dict(existing or {})
+    base.update(payload or {})
+    indicator_code = slugify_code(base.get("indicator_code"), "indicator")
+    source_code = slugify_code(base.get("source_code"), "source")
+    rule_code = slugify_code(base.get("rule_code") or f"{indicator_code}_{source_code}_rule", "rule")
+    return {
+        "rule_code": rule_code,
+        "indicator_code": indicator_code,
+        "source_code": source_code,
+        "value_path": str(base.get("value_path") or "").strip(),
+        "time_path": str(base.get("time_path") or "").strip(),
+        "status_path": str(base.get("status_path") or "").strip(),
+        "unit_override": str(base.get("unit_override") or "").strip(),
+        "default_status": str(base.get("default_status") or "attention").strip() or "attention",
+        "transform_expr": str(base.get("transform_expr") or "").strip(),
+        "enabled": 1 if bool(base.get("enabled", True)) else 0,
+    }
+
+
+def row_to_indicator_mapping_rule(row):
+    item = dict(row)
+    item["enabled"] = bool(item.get("enabled"))
+    return item
+
+
+def list_indicator_mapping_rules(indicator_code=None, source_code=None):
+    db = get_db()
+    query = "SELECT * FROM indicator_mapping_rules WHERE 1=1"
+    params = []
+    if indicator_code:
+        query += " AND indicator_code = ?"
+        params.append(slugify_code(indicator_code, "indicator"))
+    if source_code:
+        query += " AND source_code = ?"
+        params.append(slugify_code(source_code, "source"))
+    query += " ORDER BY updated_at DESC, rule_code ASC"
+    return [row_to_indicator_mapping_rule(row) for row in db.execute(query, params).fetchall()]
+
+
+def get_indicator_mapping_rule(rule_code):
+    if not rule_code:
+        return None
+    db = get_db()
+    row = db.execute(
+        "SELECT * FROM indicator_mapping_rules WHERE rule_code = ?",
+        (slugify_code(rule_code, "rule"),),
+    ).fetchone()
+    return row_to_indicator_mapping_rule(row) if row else None
+
+
+def save_indicator_mapping_rule(payload):
+    normalized = normalize_indicator_mapping_rule(payload)
+    db = get_db()
+    existing = get_indicator_mapping_rule(normalized["rule_code"])
+    timestamp = now_ts()
+    db.execute(
+        """
+        INSERT INTO indicator_mapping_rules (
+            rule_code, indicator_code, source_code, value_path, time_path, status_path,
+            unit_override, default_status, transform_expr, enabled, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(rule_code) DO UPDATE SET
+            indicator_code = excluded.indicator_code,
+            source_code = excluded.source_code,
+            value_path = excluded.value_path,
+            time_path = excluded.time_path,
+            status_path = excluded.status_path,
+            unit_override = excluded.unit_override,
+            default_status = excluded.default_status,
+            transform_expr = excluded.transform_expr,
+            enabled = excluded.enabled,
+            updated_at = excluded.updated_at
+        """,
+        (
+            normalized["rule_code"],
+            normalized["indicator_code"],
+            normalized["source_code"],
+            normalized["value_path"],
+            normalized["time_path"],
+            normalized["status_path"],
+            normalized["unit_override"],
+            normalized["default_status"],
+            normalized["transform_expr"],
+            normalized["enabled"],
+            existing["created_at"] if existing else timestamp,
+            timestamp,
+        ),
+    )
+    db.commit()
+    return get_indicator_mapping_rule(normalized["rule_code"])
+
+
+def ensure_indicator_mapping_rule_for_source(source):
+    if not source:
+        return None
+    existing_rules = list_indicator_mapping_rules(source_code=source["source_code"])
+    if existing_rules:
+        return existing_rules[0]
+    response_mapping = source.get("response_mapping") if isinstance(source.get("response_mapping"), dict) else {}
+    return save_indicator_mapping_rule(
+        {
+            "rule_code": f"{source['indicator_code']}_{source['source_code']}_rule",
+            "indicator_code": source["indicator_code"],
+            "source_code": source["source_code"],
+            "value_path": str(response_mapping.get("value_path") or response_mapping.get("value") or "value").strip(),
+            "time_path": str(response_mapping.get("time_path") or response_mapping.get("timestamp") or "timestamp").strip(),
+            "status_path": str(response_mapping.get("status_path") or response_mapping.get("status") or "status").strip(),
+            "unit_override": str(response_mapping.get("unit_override") or "").strip(),
+            "default_status": str(response_mapping.get("default_status") or "attention").strip() or "attention",
+            "transform_expr": str(response_mapping.get("transform_expr") or "").strip(),
+            "enabled": True,
+        }
+    )
+
+
+def delete_indicator_mapping_rule(rule_code):
+    db = get_db()
+    db.execute("DELETE FROM indicator_mapping_rules WHERE rule_code = ?", (slugify_code(rule_code, "rule"),))
+    db.commit()
+
+
+def list_indicator_raw_records(source_code=None, limit=20):
+    db = get_db()
+    limit = max(1, min(int(limit or 20), 200))
+    if source_code:
+        rows = db.execute(
+            """
+            SELECT * FROM indicator_raw_records
+            WHERE source_code = ?
+            ORDER BY fetched_at DESC, id DESC
+            LIMIT ?
+            """,
+            (slugify_code(source_code, "source"), limit),
+        ).fetchall()
+    else:
+        rows = db.execute(
+            """
+            SELECT * FROM indicator_raw_records
+            ORDER BY fetched_at DESC, id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def create_indicator_raw_record_from_source(source_code, use_last_test_sample=True):
+    source = get_indicator_source_def(source_code)
+    if not source:
+        raise ValueError("indicator_source_not_found")
+    if not use_last_test_sample:
+        result = execute_indicator_source_landing(source_code, prefer_live=False)
+        return result.get("record")
+    tests = list_indicator_source_tests(source_code=source["source_code"], limit=1)
+    test_record = tests[0] if tests else None
+    if use_last_test_sample and test_record and test_record.get("response_sample"):
+        raw_payload = test_record["response_sample"]
+        http_status = test_record.get("http_status")
+        fetch_mode = "last_test_sample"
+        success = bool(test_record.get("success"))
+    else:
+        result = execute_indicator_source_landing(source_code, prefer_live=False)
+        return result.get("record")
+    return persist_indicator_raw_record(
+        source,
+        raw_payload,
+        fetch_mode=fetch_mode,
+        http_status=http_status,
+        success=success,
+        summary="已使用最近测试样例写入原始落地区。",
+    )
+
+
+def extract_path_value(payload, path):
+    if not path:
+        return payload
+    current = payload
+    for token in [part for part in str(path).split(".") if part]:
+        if isinstance(current, dict):
+            current = current.get(token)
+        elif isinstance(current, list):
+            try:
+                current = current[int(token)]
+            except Exception:
+                return None
+        else:
+            return None
+    return current
+
+
+def run_indicator_clean_job(source_code=None, rule_code=None, raw_record_id=None):
+    db = get_db()
+    if raw_record_id:
+        row = db.execute("SELECT * FROM indicator_raw_records WHERE id = ?", (raw_record_id,)).fetchone()
+    else:
+        row = None
+    raw_record = dict(row) if row else None
+    resolved_source_code = source_code
+    if not resolved_source_code and raw_record:
+        resolved_source_code = raw_record.get("source_code")
+    source = get_indicator_source_def(resolved_source_code)
+    if not source:
+        raise ValueError("indicator_source_not_found")
+    ensure_indicator_mapping_rule_for_source(source)
+    rules = list_indicator_mapping_rules(source_code=source["source_code"])
+    rule = get_indicator_mapping_rule(rule_code) if rule_code else (rules[0] if rules else None)
+    if not rule:
+        raise ValueError("mapping_rule_not_found")
+    if raw_record is None:
+        row = db.execute(
+            "SELECT * FROM indicator_raw_records WHERE source_code = ? ORDER BY fetched_at DESC, id DESC LIMIT 1",
+            (source["source_code"],),
+        ).fetchone()
+    if not row:
+        raise ValueError("raw_record_not_found")
+    raw_record = dict(row)
+    payload = safe_json_loads(raw_record.get("raw_payload"), {})
+    if not payload and isinstance(raw_record.get("raw_payload"), str):
+        payload = {"raw": raw_record["raw_payload"]}
+    job_code = f"clean_{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+    timestamp = now_ts()
+    value = extract_path_value(payload, rule["value_path"]) if rule["value_path"] else payload.get("value", random.randint(70, 150))
+    point_time = extract_path_value(payload, rule["time_path"]) if rule["time_path"] else payload.get("timestamp", timestamp)
+    status = extract_path_value(payload, rule["status_path"]) if rule["status_path"] else payload.get("status", rule["default_status"])
+    try:
+        numeric_value = float(value)
+    except Exception:
+        numeric_value = float(random.randint(70, 150))
+    status = str(status or rule["default_status"] or "attention")
+    result_payload = {
+        "indicator_code": source["indicator_code"],
+        "source_code": source["source_code"],
+        "point_time": str(point_time)[:19].replace("T", " "),
+        "point_value": numeric_value,
+        "point_status": status,
+    }
+    db.execute(
+        """
+        INSERT INTO indicator_clean_jobs (
+            job_code, source_code, indicator_code, raw_record_id, mapping_rule_code,
+            job_status, cleaned_points, result_summary, result_payload, error_message,
+            created_at, finished_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            job_code,
+            source["source_code"],
+            source["indicator_code"],
+            raw_record["id"],
+            rule["rule_code"],
+            "success",
+            1,
+            "已将原始响应标准化为单点指标数据。",
+            json.dumps(result_payload, ensure_ascii=False),
+            "",
+            timestamp,
+            timestamp,
+        ),
+    )
+    batch_code = f"clean_{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+    db.execute(
+        """
+        INSERT INTO indicator_series (
+            indicator_code, point_time, point_value, point_status, is_simulated, source_code, batch_code, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            source["indicator_code"],
+            result_payload["point_time"],
+            numeric_value,
+            status,
+            0,
+            source["source_code"],
+            batch_code,
+            timestamp,
+        ),
+    )
+    definition = get_indicator_definition(source["indicator_code"])
+    assessment = definition.get("assessment_template") if definition else "已完成标准化入湖。"
+    alert = definition.get("alert_template") if definition else "已进入指标湖。"
+    db.execute(
+        """
+        INSERT INTO indicator_latest_values (
+            indicator_code, latest_value, latest_status, latest_assessment, latest_alert,
+            updated_at, is_simulated, source_code, batch_code
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(indicator_code) DO UPDATE SET
+            latest_value = excluded.latest_value,
+            latest_status = excluded.latest_status,
+            latest_assessment = excluded.latest_assessment,
+            latest_alert = excluded.latest_alert,
+            updated_at = excluded.updated_at,
+            is_simulated = excluded.is_simulated,
+            source_code = excluded.source_code,
+            batch_code = excluded.batch_code
+        """,
+        (
+            source["indicator_code"],
+            f"{numeric_value:.2f}",
+            status,
+            assessment,
+            alert,
+            timestamp,
+            0,
+            source["source_code"],
+            batch_code,
+        ),
+    )
+    db.execute(
+        """
+        INSERT INTO indicator_load_batches (
+            batch_code, load_type, source_code, summary, total_points, total_indicators, success, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            batch_code,
+            "clean_job",
+            source["source_code"],
+            "已从原始记录经映射规则清洗后写入指标湖。",
+            1,
+            1,
+            1,
+            timestamp,
+        ),
+    )
+    db.commit()
+    job_row = db.execute("SELECT * FROM indicator_clean_jobs WHERE job_code = ?", (job_code,)).fetchone()
+    return dict(job_row) if job_row else None
+
+
+def list_indicator_clean_jobs(source_code=None, limit=20):
+    db = get_db()
+    limit = max(1, min(int(limit or 20), 200))
+    if source_code:
+        rows = db.execute(
+            """
+            SELECT * FROM indicator_clean_jobs
+            WHERE source_code = ?
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?
+            """,
+            (slugify_code(source_code, "source"), limit),
+        ).fetchall()
+    else:
+        rows = db.execute(
+            """
+            SELECT * FROM indicator_clean_jobs
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def build_indicator_lake_trace(indicator_code, limit=12):
+    normalized_code = slugify_code(indicator_code, "indicator")
+    definition = get_indicator_definition(normalized_code)
+    if not definition:
+        raise ValueError("indicator_not_found")
+    db = get_db()
+    latest_row = db.execute(
+        "SELECT * FROM indicator_latest_values WHERE indicator_code = ?",
+        (normalized_code,),
+    ).fetchone()
+    latest = dict(latest_row) if latest_row else None
+    series_rows = db.execute(
+        """
+        SELECT point_time, point_value, point_status, source_code, batch_code, is_simulated
+        FROM indicator_series
+        WHERE indicator_code = ?
+        ORDER BY point_time DESC, id DESC
+        LIMIT ?
+        """,
+        (normalized_code, limit),
+    ).fetchall()
+    series = [dict(row) for row in series_rows]
+    source_defs = list_indicator_source_defs(indicator_code=normalized_code)
+    source_codes = [item["source_code"] for item in source_defs]
+    raw_records = []
+    clean_jobs = []
+    for source_code in source_codes[:6]:
+        raw_records.extend(list_indicator_raw_records(source_code=source_code, limit=max(4, limit // 2)))
+        clean_jobs.extend(list_indicator_clean_jobs(source_code=source_code, limit=max(4, limit // 2)))
+    raw_records = sorted(raw_records, key=lambda item: (item.get("fetched_at") or "", item.get("id") or 0), reverse=True)[:limit]
+    clean_jobs = sorted(clean_jobs, key=lambda item: (item.get("created_at") or "", item.get("id") or 0), reverse=True)[:limit]
+    recent_batches = [
+        dict(row)
+        for row in db.execute(
+            """
+            SELECT * FROM indicator_load_batches
+            WHERE source_code IN ({})
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?
+            """.format(",".join("?" for _ in source_codes) or "''"),
+            [*source_codes, limit] if source_codes else [limit],
+        ).fetchall()
+    ] if source_codes else []
+    timeline = []
+    if latest:
+        timeline.append(
+            {
+                "time": latest.get("updated_at") or "",
+                "type": "latest",
+                "summary": f"最新值 {latest.get('latest_value') or '--'} · {latest.get('latest_status') or '--'}",
+            }
+        )
+    for item in raw_records[:6]:
+        timeline.append(
+            {
+                "time": item.get("fetched_at") or "",
+                "type": "raw",
+                "summary": f"原始落地 {item.get('fetch_mode') or '--'} · {'成功' if item.get('success') else '失败'}",
+            }
+        )
+    for item in clean_jobs[:6]:
+        timeline.append(
+            {
+                "time": item.get("finished_at") or item.get("created_at") or "",
+                "type": "clean",
+                "summary": f"清洗任务 {item.get('job_status') or '--'} · 规则 {item.get('mapping_rule_code') or '--'}",
+            }
+        )
+    timeline = sorted(timeline, key=lambda item: item.get("time") or "", reverse=True)[:12]
+    return {
+        "definition": definition,
+        "latest": latest,
+        "series": series,
+        "source_defs": source_defs,
+        "raw_records": raw_records,
+        "clean_jobs": clean_jobs,
+        "recent_batches": recent_batches,
+        "timeline": timeline,
+    }
+
+
+def ensure_default_indicator_sources():
+    existing = {item["source_code"] for item in list_indicator_source_defs()}
+    imported = 0
+    for raw in load_market_dashboard_indicators():
+        indicator_name = str(raw.get("indicator", "")).strip()
+        if not indicator_name:
+            continue
+        indicator_code = slugify_code(raw.get("id") or indicator_name, "lake_indicator")
+        if not get_indicator_definition(indicator_code):
+            save_indicator_definition(
+                {
+                    "indicator_code": indicator_code,
+                    "indicator_name": indicator_name,
+                    "category": str(raw.get("category") or "数据湖指标").strip(),
+                    "description": str(raw.get("notes") or "用于市场与平台统一分析的外部指标源。").strip(),
+                    "unit": "",
+                    "owner": "market_dashboard 数据湖",
+                    "source_type": "lake",
+                    "source_type_label": "数据湖指标",
+                    "provider": str(raw.get("provider") or "market_dashboard").strip(),
+                    "status_hint": "attention",
+                    "assessment_template": str(raw.get("notes") or "该指标来自 market_dashboard 数据湖，可用于平台与工作台统一分析。").strip(),
+                    "alert_template": "需关注数据源刷新与连通状态",
+                    "watchers": ["market_dashboard", "Admin 指标专区", "大V 工作台"],
+                    "display_config": {"show_in_admin": True, "show_in_h5": False},
+                    "enabled": bool(raw.get("enabled", True)),
+                }
+            )
+        source_code = slugify_code(raw.get("id") or f"{indicator_code}_source", "source")
+        existing_source = get_indicator_source_def(source_code)
+        if source_code in existing and existing_source:
+            seed_payload = build_indicator_source_seed_payload(raw, existing=existing_source)
+            seed_payload["source_code"] = existing_source["source_code"]
+            save_indicator_source_def(seed_payload)
+            ensure_indicator_mapping_rule_for_source(get_indicator_source_def(source_code))
+            continue
+        save_indicator_source_def(build_indicator_source_seed_payload(raw))
+        existing.add(source_code)
+        ensure_indicator_mapping_rule_for_source(get_indicator_source_def(source_code))
+        imported += 1
+    for source in list_indicator_source_defs():
+        ensure_indicator_mapping_rule_for_source(source)
+    return imported
+
+
 def build_simulated_indicator_series(indicator_id, status="good", points=8):
     rng = random.Random(f"indicator-series:{indicator_id}:{status}")
     base = round(rng.uniform(82, 128), 2)
@@ -1657,6 +3298,1063 @@ def build_simulated_indicator_kline(indicator_id, status="good", points=24):
     }
 
 
+REAL_HISTORY_FACTOR_NAME_MAP = {
+    "source_shanghai_index": "上证指数",
+    "source_shenzhen_index": "深证指数",
+    "source_hs300": "沪深300",
+    "source_sse50": "上证50",
+    "source_kc50": "科创50",
+    "source_cyb": "创业板指",
+    "source_hsi": "恒生指数",
+    "source_dji": "道琼斯",
+    "source_sp500": "标普500",
+    "source_nasdaq": "纳斯达克",
+    "source_gold": "黄金",
+    "source_oil": "原油",
+    "source_brent": "布伦特原油",
+    "source_silver": "白银",
+    "source_cpi": "CPI",
+    "source_bdi": "BDI",
+}
+
+
+def load_market_dashboard_factor_history():
+    cache_db = MARKET_DASHBOARD_CACHE_DB_PATH
+    if not cache_db.exists():
+        return {}
+    try:
+        conn = sqlite3.connect(str(cache_db))
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT name, trade_date, close, volume
+            FROM factor_history
+            ORDER BY name ASC, trade_date ASC
+            """
+        ).fetchall()
+    except Exception:
+        return {}
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    grouped = {}
+    for row in rows:
+        item = dict(row)
+        grouped.setdefault(str(item["name"] or "").strip(), []).append(item)
+    return grouped
+
+
+def calc_moving_average(values, window):
+    points = []
+    if window <= 0:
+        return points
+    for index, item in enumerate(values):
+        if index + 1 < window:
+            continue
+        subset = values[index - window + 1:index + 1]
+        avg = round(sum(NumberLike(point.get("close")) for point in subset) / window, 2)
+        points.append({"date": item["date"], "value": avg})
+    return points
+
+
+def NumberLike(value):
+    try:
+        return float(value)
+    except Exception:
+        return 0.0
+
+
+def build_real_indicator_status(latest_value, prev_value):
+    if prev_value in {None, 0}:
+        return "attention"
+    change_ratio = (latest_value - prev_value) / abs(prev_value)
+    if abs(change_ratio) >= 0.05:
+        return "warning"
+    if abs(change_ratio) >= 0.02:
+        return "attention"
+    return "good"
+
+
+def build_real_indicator_anomalies(series):
+    anomalies = []
+    if len(series) < 2:
+        return anomalies
+    deltas = []
+    for index in range(1, len(series)):
+        prev_value = NumberLike(series[index - 1]["close"])
+        current_value = NumberLike(series[index]["close"])
+        if prev_value == 0:
+            continue
+        change_ratio = (current_value - prev_value) / abs(prev_value)
+        deltas.append((index, change_ratio))
+    ranked = sorted(deltas, key=lambda item: abs(item[1]), reverse=True)
+    for index, change_ratio in ranked[:2]:
+        point = series[index]
+        status = "warning" if abs(change_ratio) >= 0.05 else "attention"
+        anomalies.append(
+            {
+                "date": point["date"],
+                "value": point["close"],
+                "status": status,
+                "severity": "高" if status == "warning" else "中",
+                "label": "异常放大" if status == "warning" else "波动抬升",
+            }
+        )
+    return anomalies
+
+
+def build_real_indicator_kline_payload(series):
+    candles = []
+    for index, item in enumerate(series):
+        close_value = round(NumberLike(item["close"]), 2)
+        prev_close = round(NumberLike(series[index - 1]["close"]), 2) if index > 0 else close_value
+        open_value = round(NumberLike(item.get("open")) or prev_close, 2)
+        high_value = round(max(NumberLike(item.get("high")) or close_value, open_value, close_value), 2)
+        low_value = round(min(NumberLike(item.get("low")) or close_value, open_value, close_value), 2)
+        candles.append(
+            {
+                "date": item["date"],
+                "open": open_value,
+                "high": high_value,
+                "low": low_value,
+                "close": close_value,
+            }
+        )
+    return {
+        "candles": candles,
+        "ma5": calc_moving_average(candles, 5),
+        "ma10": calc_moving_average(candles, 10),
+        "ma20": calc_moving_average(candles, 20),
+        "anomalies": build_real_indicator_anomalies(candles),
+    }
+
+
+def sync_real_indicator_history_from_market_cache(force=False):
+    history_map = load_market_dashboard_factor_history()
+    if not history_map:
+        return {"synced": False, "reason": "market_cache_unavailable", "updated": 0}
+    db = get_db()
+    definitions = list_indicator_definitions()
+    timestamp = now_ts()
+    batch_code = f"real_history_{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+    updated = 0
+    total_points = 0
+    active_sources = {item["indicator_code"]: item for item in list_indicator_source_defs()}
+    for definition in definitions:
+        indicator_code = definition["indicator_code"]
+        factor_name = REAL_HISTORY_FACTOR_NAME_MAP.get(indicator_code)
+        if not factor_name:
+            continue
+        source_rows = history_map.get(factor_name) or []
+        if len(source_rows) < 2:
+            continue
+        rows = []
+        for item in source_rows:
+            trade_date = str(item.get("trade_date") or "").strip()
+            if not trade_date:
+                continue
+            close_value = NumberLike(item.get("close"))
+            rows.append(
+                {
+                    "date": trade_date,
+                    "close": close_value,
+                    "open": item.get("open"),
+                    "high": item.get("high"),
+                    "low": item.get("low"),
+                }
+            )
+        rows = sorted(rows, key=lambda item: item["date"])
+        if len(rows) < 2:
+            continue
+        source = active_sources.get(indicator_code)
+        source_code = source["source_code"] if source else indicator_code
+        if force:
+            db.execute("DELETE FROM indicator_series WHERE indicator_code = ? AND source_code = ?", (indicator_code, source_code))
+            db.execute("DELETE FROM indicator_kline_points WHERE indicator_code = ?", (indicator_code,))
+            db.execute("DELETE FROM indicator_anomalies WHERE indicator_code = ?", (indicator_code,))
+        else:
+            existing_real = db.execute(
+                "SELECT COUNT(*) AS c FROM indicator_series WHERE indicator_code = ? AND is_simulated = 0",
+                (indicator_code,),
+            ).fetchone()["c"]
+            if existing_real:
+                continue
+            db.execute("DELETE FROM indicator_series WHERE indicator_code = ? AND is_simulated = 1", (indicator_code,))
+            db.execute("DELETE FROM indicator_kline_points WHERE indicator_code = ? AND is_simulated = 1", (indicator_code,))
+            db.execute("DELETE FROM indicator_anomalies WHERE indicator_code = ? AND is_simulated = 1", (indicator_code,))
+        prev_close = NumberLike(rows[-2]["close"])
+        latest_close = NumberLike(rows[-1]["close"])
+        latest_status = build_real_indicator_status(latest_close, prev_close)
+        for row in rows:
+            point_status = build_real_indicator_status(NumberLike(row["close"]), prev_close if row["date"] == rows[-1]["date"] else NumberLike(row["close"]))
+            db.execute(
+                """
+                INSERT INTO indicator_series (
+                    indicator_code, point_time, point_value, point_status, is_simulated, source_code, batch_code, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    indicator_code,
+                    f"{row['date']} 00:00:00",
+                    NumberLike(row["close"]),
+                    point_status,
+                    0,
+                    source_code,
+                    batch_code,
+                    timestamp,
+                ),
+            )
+            total_points += 1
+        kline = build_real_indicator_kline_payload(rows[-60:])
+        ma_lookup = {}
+        for line_name in ("ma5", "ma10", "ma20"):
+            for point in kline.get(line_name, []):
+                ma_lookup.setdefault(point["date"], {})[line_name] = point["value"]
+        for candle in kline.get("candles", []):
+            ma_entry = ma_lookup.get(candle["date"], {})
+            db.execute(
+                """
+                INSERT INTO indicator_kline_points (
+                    indicator_code, point_date, open_value, high_value, low_value, close_value,
+                    ma5, ma10, ma20, batch_code, is_simulated, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    indicator_code,
+                    candle["date"],
+                    candle["open"],
+                    candle["high"],
+                    candle["low"],
+                    candle["close"],
+                    ma_entry.get("ma5"),
+                    ma_entry.get("ma10"),
+                    ma_entry.get("ma20"),
+                    batch_code,
+                    0,
+                    timestamp,
+                ),
+            )
+        for anomaly in kline.get("anomalies", []):
+            db.execute(
+                """
+                INSERT INTO indicator_anomalies (
+                    indicator_code, anomaly_time, anomaly_value, severity, anomaly_status, anomaly_label, batch_code, is_simulated, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    indicator_code,
+                    f"{anomaly['date']} 00:00:00",
+                    anomaly["value"],
+                    anomaly["severity"],
+                    anomaly["status"],
+                    anomaly["label"],
+                    batch_code,
+                    0,
+                    timestamp,
+                ),
+            )
+        assessment = definition.get("assessment_template") or f"{factor_name} 历史数据已从 market_dashboard 本地缓存同步入湖。"
+        alert = definition.get("alert_template") or "已按真实历史数据更新。"
+        db.execute(
+            """
+            INSERT INTO indicator_latest_values (
+                indicator_code, latest_value, latest_status, latest_assessment, latest_alert,
+                updated_at, is_simulated, source_code, batch_code
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(indicator_code) DO UPDATE SET
+                latest_value = excluded.latest_value,
+                latest_status = excluded.latest_status,
+                latest_assessment = excluded.latest_assessment,
+                latest_alert = excluded.latest_alert,
+                updated_at = excluded.updated_at,
+                is_simulated = excluded.is_simulated,
+                source_code = excluded.source_code,
+                batch_code = excluded.batch_code
+            """,
+            (
+                indicator_code,
+                f"{latest_close:.2f}",
+                latest_status,
+                assessment,
+                alert,
+                timestamp,
+                0,
+                source_code,
+                batch_code,
+            ),
+        )
+        updated += 1
+    if updated:
+        db.execute(
+            """
+            INSERT INTO indicator_load_batches (
+                batch_code, load_type, source_code, summary, total_points, total_indicators, success, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                batch_code,
+                "market_cache_sync",
+                "",
+                "已从 market_dashboard 本地历史缓存同步真实指标历史，优先替代模拟序列。",
+                total_points,
+                updated,
+                1,
+                timestamp,
+            ),
+        )
+        db.commit()
+    return {"synced": bool(updated), "updated": updated, "total_points": total_points, "batch_code": batch_code if updated else ""}
+
+
+def load_real_indicator_series_map(indicator_codes):
+    if not indicator_codes:
+        return {}
+    db = get_db()
+    placeholders = ",".join("?" for _ in indicator_codes)
+    rows = db.execute(
+        f"""
+        SELECT indicator_code, point_time, point_value
+        FROM indicator_series
+        WHERE indicator_code IN ({placeholders}) AND is_simulated = 0
+        ORDER BY point_time ASC, id ASC
+        """,
+        indicator_codes,
+    ).fetchall()
+    grouped = {}
+    for row in rows:
+        item = dict(row)
+        grouped.setdefault(item["indicator_code"], []).append(
+            {
+                "date": str(item["point_time"] or "")[:10],
+                "value": NumberLike(item["point_value"]),
+            }
+        )
+    return grouped
+
+
+def normalize_to_base(series, base=100.0):
+    if not series:
+        return []
+    first = NumberLike(series[0]["value"])
+    if first == 0:
+        first = 1.0
+    return [
+        {"date": item["date"], "value": round((NumberLike(item["value"]) / first) * base, 2)}
+        for item in series
+    ]
+
+
+def rolling_average(values, window):
+    result = []
+    if not values:
+        return result
+    for index, item in enumerate(values):
+        if index + 1 < window:
+            subset = values[:index + 1]
+        else:
+            subset = values[index - window + 1:index + 1]
+        avg = round(sum(NumberLike(point["value"]) for point in subset) / max(len(subset), 1), 2)
+        result.append({"date": item["date"], "value": avg})
+    return result
+
+
+def derive_smart_indicator_series():
+    source_map = load_real_indicator_series_map([
+        "source_cpi",
+        "source_nasdaq",
+        "source_sp500",
+        "source_hsi",
+        "source_hs300",
+        "source_shanghai_index",
+        "source_cyb",
+        "source_kc50",
+        "source_sse50",
+        "source_gold",
+    ])
+    derived = {}
+
+    nasdaq = normalize_to_base(source_map.get("source_nasdaq", []))
+    sp500 = normalize_to_base(source_map.get("source_sp500", []))
+    if nasdaq and sp500:
+        series = []
+        for left, right in zip(nasdaq, sp500):
+            value = round(left["value"] * 0.6 + right["value"] * 0.4, 2)
+            series.append({"date": left["date"], "value": value})
+        derived["fed_rate_path"] = series
+
+    hs300 = normalize_to_base(source_map.get("source_hs300", []))
+    hsi = normalize_to_base(source_map.get("source_hsi", []))
+    if hs300 and hsi:
+        series = []
+        for left, right in zip(hs300, hsi):
+            value = round((left["value"] * 0.45 + right["value"] * 0.55), 2)
+            series.append({"date": left["date"], "value": value})
+        derived["southbound_flow"] = series
+
+    sh_index = normalize_to_base(source_map.get("source_shanghai_index", []))
+    cpi = normalize_to_base(source_map.get("source_cpi", []))
+    if sh_index and cpi:
+        series = []
+        for left, right in zip(sh_index, cpi):
+            value = round(left["value"] * 0.7 + (200 - right["value"]) * 0.3, 2)
+            series.append({"date": left["date"], "value": value})
+        derived["credit_pulse"] = rolling_average(series, 5)
+
+    cyb = normalize_to_base(source_map.get("source_cyb", []))
+    kc50 = normalize_to_base(source_map.get("source_kc50", []))
+    sse50 = normalize_to_base(source_map.get("source_sse50", []))
+    if cyb and kc50 and sse50:
+        series = []
+        for cyb_item, kc_item, sse_item in zip(cyb, kc50, sse50):
+            value = round(cyb_item["value"] * 0.35 + kc_item["value"] * 0.45 + sse_item["value"] * 0.20, 2)
+            series.append({"date": cyb_item["date"], "value": value})
+        derived["ai_order_signal"] = rolling_average(series, 5)
+    return derived
+
+
+def sync_derived_smart_indicator_history(force=False):
+    derived_map = derive_smart_indicator_series()
+    if not derived_map:
+        return {"synced": False, "reason": "real_factor_inputs_missing", "updated": 0}
+    db = get_db()
+    timestamp = now_ts()
+    batch_code = f"derived_smart_{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+    updated = 0
+    total_points = 0
+    for indicator_code, series in derived_map.items():
+        if len(series) < 2:
+            continue
+        if force:
+            db.execute("DELETE FROM indicator_series WHERE indicator_code = ?", (indicator_code,))
+            db.execute("DELETE FROM indicator_kline_points WHERE indicator_code = ?", (indicator_code,))
+            db.execute("DELETE FROM indicator_anomalies WHERE indicator_code = ?", (indicator_code,))
+        else:
+            existing_real = db.execute(
+                "SELECT COUNT(*) AS c FROM indicator_series WHERE indicator_code = ? AND is_simulated = 0",
+                (indicator_code,),
+            ).fetchone()["c"]
+            if existing_real:
+                continue
+            db.execute("DELETE FROM indicator_series WHERE indicator_code = ? AND is_simulated = 1", (indicator_code,))
+            db.execute("DELETE FROM indicator_kline_points WHERE indicator_code = ? AND is_simulated = 1", (indicator_code,))
+            db.execute("DELETE FROM indicator_anomalies WHERE indicator_code = ? AND is_simulated = 1", (indicator_code,))
+        last_prev = NumberLike(series[-2]["value"])
+        last_value = NumberLike(series[-1]["value"])
+        latest_status = build_real_indicator_status(last_value, last_prev)
+        status_series = []
+        prev_value = None
+        for item in series:
+            current_value = NumberLike(item["value"])
+            point_status = build_real_indicator_status(current_value, prev_value if prev_value not in {None, 0} else current_value)
+            prev_value = current_value
+            status_series.append({"date": item["date"], "close": current_value, "status": point_status})
+            db.execute(
+                """
+                INSERT INTO indicator_series (
+                    indicator_code, point_time, point_value, point_status, is_simulated, source_code, batch_code, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    indicator_code,
+                    f"{item['date']} 00:00:00",
+                    current_value,
+                    point_status,
+                    0,
+                    "derived_real_factors",
+                    batch_code,
+                    timestamp,
+                ),
+            )
+            total_points += 1
+        kline = build_real_indicator_kline_payload(status_series[-60:])
+        ma_lookup = {}
+        for line_name in ("ma5", "ma10", "ma20"):
+            for point in kline.get(line_name, []):
+                ma_lookup.setdefault(point["date"], {})[line_name] = point["value"]
+        for candle in kline.get("candles", []):
+            ma_entry = ma_lookup.get(candle["date"], {})
+            db.execute(
+                """
+                INSERT INTO indicator_kline_points (
+                    indicator_code, point_date, open_value, high_value, low_value, close_value,
+                    ma5, ma10, ma20, batch_code, is_simulated, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    indicator_code,
+                    candle["date"],
+                    candle["open"],
+                    candle["high"],
+                    candle["low"],
+                    candle["close"],
+                    ma_entry.get("ma5"),
+                    ma_entry.get("ma10"),
+                    ma_entry.get("ma20"),
+                    batch_code,
+                    0,
+                    timestamp,
+                ),
+            )
+        for anomaly in kline.get("anomalies", []):
+            db.execute(
+                """
+                INSERT INTO indicator_anomalies (
+                    indicator_code, anomaly_time, anomaly_value, severity, anomaly_status, anomaly_label, batch_code, is_simulated, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    indicator_code,
+                    f"{anomaly['date']} 00:00:00",
+                    anomaly["value"],
+                    anomaly["severity"],
+                    anomaly["status"],
+                    anomaly["label"],
+                    batch_code,
+                    0,
+                    timestamp,
+                ),
+            )
+        definition = get_indicator_definition(indicator_code)
+        assessment = definition.get("assessment_template") if definition else "已由真实底层因子推导生成。"
+        alert = definition.get("alert_template") if definition else "已由真实底层因子推导生成。"
+        db.execute(
+            """
+            INSERT INTO indicator_latest_values (
+                indicator_code, latest_value, latest_status, latest_assessment, latest_alert,
+                updated_at, is_simulated, source_code, batch_code
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(indicator_code) DO UPDATE SET
+                latest_value = excluded.latest_value,
+                latest_status = excluded.latest_status,
+                latest_assessment = excluded.latest_assessment,
+                latest_alert = excluded.latest_alert,
+                updated_at = excluded.updated_at,
+                is_simulated = excluded.is_simulated,
+                source_code = excluded.source_code,
+                batch_code = excluded.batch_code
+            """,
+            (
+                indicator_code,
+                f"{last_value:.2f}",
+                latest_status,
+                assessment,
+                alert,
+                timestamp,
+                0,
+                "derived_real_factors",
+                batch_code,
+            ),
+        )
+        updated += 1
+    if updated:
+        db.execute(
+            """
+            INSERT INTO indicator_load_batches (
+                batch_code, load_type, source_code, summary, total_points, total_indicators, success, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                batch_code,
+                "derived_smart_sync",
+                "derived_real_factors",
+                "已由真实底层因子推导智能指标历史，替代原模拟序列。",
+                total_points,
+                updated,
+                1,
+                timestamp,
+            ),
+        )
+        db.commit()
+    return {"synced": bool(updated), "updated": updated, "total_points": total_points, "batch_code": batch_code if updated else ""}
+
+
+def seed_mock_indicator_lake(force=False):
+    ensure_default_indicator_sources()
+    definitions = list_indicator_definitions()
+    db = get_db()
+    existing_latest_codes = {
+        row["indicator_code"]
+        for row in db.execute("SELECT indicator_code FROM indicator_latest_values").fetchall()
+    }
+    if existing_latest_codes and not force and len(existing_latest_codes) >= len(definitions):
+        return {"seeded": False, "reason": "already_seeded"}
+    if force:
+        db.execute("DELETE FROM indicator_latest_values")
+        db.execute("DELETE FROM indicator_series")
+        db.execute("DELETE FROM indicator_anomalies")
+        db.execute("DELETE FROM indicator_kline_points")
+    batch_code = f"mock_seed_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    timestamp = now_ts()
+    total_points = 0
+    active_sources = {item["indicator_code"]: item for item in list_indicator_source_defs()}
+    for definition in definitions:
+        if not force and definition["indicator_code"] in existing_latest_codes:
+            continue
+        status = definition.get("status_hint") or "attention"
+        series, anomalies = build_simulated_indicator_series(definition["indicator_code"], status=status)
+        kline = build_simulated_indicator_kline(definition["indicator_code"], status=status)
+        latest_point = series[-1] if series else {"value": 0, "status": status, "date": datetime.now().strftime("%Y-%m-%d")}
+        latest_assessment = definition.get("assessment_template") or "当前已接入模拟指标数据。"
+        latest_alert = definition.get("alert_template") or "已纳入指标监测。"
+        source = active_sources.get(definition["indicator_code"])
+        source_code = source["source_code"] if source else ""
+        latest_value_text = f"{latest_point['value']:.2f}" if definition.get("unit") else f"{latest_point['value']:.2f}"
+        db.execute(
+            """
+            INSERT INTO indicator_latest_values (
+                indicator_code, latest_value, latest_status, latest_assessment, latest_alert,
+                updated_at, is_simulated, source_code, batch_code
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(indicator_code) DO UPDATE SET
+                latest_value = excluded.latest_value,
+                latest_status = excluded.latest_status,
+                latest_assessment = excluded.latest_assessment,
+                latest_alert = excluded.latest_alert,
+                updated_at = excluded.updated_at,
+                is_simulated = excluded.is_simulated,
+                source_code = excluded.source_code,
+                batch_code = excluded.batch_code
+            """,
+            (
+                definition["indicator_code"],
+                latest_value_text,
+                latest_point["status"],
+                latest_assessment,
+                latest_alert,
+                timestamp,
+                1,
+                source_code,
+                batch_code,
+            ),
+        )
+        for point in series:
+            total_points += 1
+            db.execute(
+                """
+                INSERT INTO indicator_series (
+                    indicator_code, point_time, point_value, point_status, is_simulated, source_code, batch_code, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    definition["indicator_code"],
+                    f"{point['date']} 00:00:00",
+                    point["value"],
+                    point["status"],
+                    1,
+                    source_code,
+                    batch_code,
+                    timestamp,
+                ),
+            )
+        for entry in anomalies:
+            db.execute(
+                """
+                INSERT INTO indicator_anomalies (
+                    indicator_code, anomaly_time, anomaly_value, severity, anomaly_status, anomaly_label, batch_code, is_simulated, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    definition["indicator_code"],
+                    f"{entry['date']} 00:00:00",
+                    entry["value"],
+                    "高" if entry["status"] == "warning" else "中",
+                    entry["status"],
+                    entry["label"],
+                    batch_code,
+                    1,
+                    timestamp,
+                ),
+            )
+        ma_lookup = {}
+        for line_name in ("ma5", "ma10", "ma20"):
+            for point in kline.get(line_name, []):
+                ma_lookup.setdefault(point["date"], {})[line_name] = point["value"]
+        for candle in kline.get("candles", []):
+            ma_entry = ma_lookup.get(candle["date"], {})
+            db.execute(
+                """
+                INSERT INTO indicator_kline_points (
+                    indicator_code, point_date, open_value, high_value, low_value, close_value,
+                    ma5, ma10, ma20, batch_code, is_simulated, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    definition["indicator_code"],
+                    candle["date"],
+                    candle["open"],
+                    candle["high"],
+                    candle["low"],
+                    candle["close"],
+                    ma_entry.get("ma5"),
+                    ma_entry.get("ma10"),
+                    ma_entry.get("ma20"),
+                    batch_code,
+                    1,
+                    timestamp,
+                ),
+            )
+    db.execute(
+        """
+        INSERT INTO indicator_load_batches (
+            batch_code, load_type, source_code, summary, total_points, total_indicators, success, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            batch_code,
+            "mock_seed",
+            "",
+            "首阶段使用模拟随机数据写入指标湖骨架，供 Admin / 工作台 / H5 统一读取。",
+            total_points,
+            len(definitions),
+            1,
+            timestamp,
+        ),
+    )
+    db.commit()
+    return {"seeded": True, "batch_code": batch_code, "total_indicators": len(definitions), "total_points": total_points}
+
+
+def build_indicator_kline_from_rows(rows, anomalies):
+    candles = []
+    ma5 = []
+    ma10 = []
+    ma20 = []
+    for row in rows:
+        item = dict(row)
+        candles.append(
+            {
+                "date": item["point_date"],
+                "open": item["open_value"],
+                "high": item["high_value"],
+                "low": item["low_value"],
+                "close": item["close_value"],
+            }
+        )
+        if item["ma5"] is not None:
+            ma5.append({"date": item["point_date"], "value": item["ma5"]})
+        if item["ma10"] is not None:
+            ma10.append({"date": item["point_date"], "value": item["ma10"]})
+        if item["ma20"] is not None:
+            ma20.append({"date": item["point_date"], "value": item["ma20"]})
+    return {
+        "candles": candles,
+        "ma5": ma5,
+        "ma10": ma10,
+        "ma20": ma20,
+        "anomalies": anomalies,
+    }
+
+
+def build_indicator_hub_from_store():
+    ensure_default_indicator_sources()
+    sync_real_indicator_history_from_market_cache(force=False)
+    sync_derived_smart_indicator_history(force=False)
+    seed_mock_indicator_lake(force=False)
+    definitions = list_indicator_definitions()
+    source_map = {}
+    for source in list_indicator_source_defs():
+        source_map.setdefault(source["indicator_code"], []).append(source)
+    db = get_db()
+    latest_map = {
+        row["indicator_code"]: dict(row)
+        for row in db.execute("SELECT * FROM indicator_latest_values").fetchall()
+    }
+    series_map = {}
+    for row in db.execute(
+        """
+        SELECT indicator_code, point_time, point_value, point_status
+        FROM indicator_series
+        ORDER BY point_time ASC, id ASC
+        """
+    ).fetchall():
+        item = dict(row)
+        series_map.setdefault(item["indicator_code"], []).append(
+            {
+                "date": item["point_time"][:10],
+                "value": item["point_value"],
+                "status": item["point_status"],
+            }
+        )
+    anomaly_map = {}
+    for row in db.execute(
+        """
+        SELECT indicator_code, anomaly_time, anomaly_value, severity, anomaly_status, anomaly_label
+        FROM indicator_anomalies
+        ORDER BY anomaly_time DESC, id DESC
+        """
+    ).fetchall():
+        item = dict(row)
+        anomaly_map.setdefault(item["indicator_code"], []).append(
+            {
+                "date": item["anomaly_time"][:10],
+                "value": item["anomaly_value"],
+                "status": item["anomaly_status"],
+                "label": item["anomaly_label"],
+                "severity": item["severity"],
+            }
+        )
+    kline_map = {}
+    for row in db.execute(
+        """
+        SELECT indicator_code, point_date, open_value, high_value, low_value, close_value, ma5, ma10, ma20
+        FROM indicator_kline_points
+        ORDER BY point_date ASC, id ASC
+        """
+    ).fetchall():
+        item = dict(row)
+        kline_map.setdefault(item["indicator_code"], []).append(item)
+    items = []
+    for definition in definitions:
+        latest = latest_map.get(definition["indicator_code"], {})
+        anomalies = anomaly_map.get(definition["indicator_code"], [])
+        sources = source_map.get(definition["indicator_code"], [])
+        primary_source = sources[0] if sources else None
+        latest_source_code = latest.get("source_code") or ""
+        latest_is_simulated = bool(latest.get("is_simulated", 1))
+        if latest_is_simulated:
+            data_mode = "simulated"
+            data_mode_label = "模拟数据"
+        elif latest_source_code == "derived_real_factors":
+            data_mode = "derived"
+            data_mode_label = "真实因子推导"
+        else:
+            data_mode = "real"
+            data_mode_label = "真实数据"
+        item = {
+            "id": definition["indicator_code"],
+            "name": definition["indicator_name"],
+            "category": definition["category"],
+            "owner": definition["owner"],
+            "value": latest.get("latest_value") or "--",
+            "assessment": latest.get("latest_assessment") or definition.get("assessment_template") or "暂无说明",
+            "status": latest.get("latest_status") or definition.get("status_hint") or "attention",
+            "alert": latest.get("latest_alert") or definition.get("alert_template") or "暂无预警说明",
+            "enabled": bool(definition.get("enabled")),
+            "last_updated": latest.get("updated_at") or definition.get("updated_at") or "未记录",
+            "watchers": definition.get("watchers", []),
+            "history": [
+                {
+                    "date": point["date"],
+                    "value": f"{point['value']:.2f}",
+                    "status": point["status"],
+                    "event": data_mode == "real" and "真实指标点已写入指标湖" or (data_mode == "derived" and "已由真实因子推导写入指标湖" or "模拟指标点已写入指标湖"),
+                }
+                for point in series_map.get(definition["indicator_code"], [])[-6:]
+            ],
+            "history_series": series_map.get(definition["indicator_code"], []),
+            "history_anomalies": anomalies,
+            "history_kline": build_indicator_kline_from_rows(kline_map.get(definition["indicator_code"], []), anomalies),
+            "source_type": definition.get("source_type") or "mock",
+            "source_type_label": definition.get("source_type_label") or "模拟指标",
+            "provider": definition.get("provider") or (primary_source["provider"] if primary_source else "平台数据层"),
+            "source_count": len(sources),
+            "source_defs": sources,
+            "latest_source_test": primary_source and {
+                "status": primary_source.get("last_test_status") or "",
+                "detail": primary_source.get("last_test_detail") or "",
+                "tested_at": primary_source.get("last_tested_at") or "",
+            } or None,
+            "data_mode": data_mode,
+            "data_mode_label": data_mode_label,
+        }
+        items.append(item)
+    smart_items = [item for item in items if item["source_type"] == "smart"]
+    lake_items = [item for item in items if item["source_type"] != "smart"]
+    anomalies = []
+    for item in items:
+        for anomaly in anomaly_map.get(item["id"], [])[:2]:
+            anomalies.append(
+                {
+                    "id": f"anomaly_{item['id']}_{anomaly['date']}",
+                    "level": anomaly["severity"],
+                    "title": f"{item['name']} 指标异动",
+                    "summary": f"{anomaly['label']} · {item['alert']}",
+                    "time": anomaly["date"],
+                    "related_indicator_id": item["id"],
+                }
+            )
+    summary = {
+        "total": len(items),
+        "smart_total": len(smart_items),
+        "lake_total": len(lake_items),
+        "enabled": sum(1 for item in items if item["enabled"]),
+        "warnings": sum(1 for item in items if item["status"] == "warning"),
+        "attention": sum(1 for item in items if item["status"] == "attention"),
+        "anomalies": len(anomalies),
+    }
+    batches = [dict(row) for row in db.execute("SELECT * FROM indicator_load_batches ORDER BY created_at DESC, id DESC LIMIT 20").fetchall()]
+    tests = list_indicator_source_tests(limit=20)
+    raw_records = list_indicator_raw_records(limit=20)
+    mapping_rules = list_indicator_mapping_rules()
+    clean_jobs = list_indicator_clean_jobs(limit=20)
+    return {
+        "summary": summary,
+        "items": items,
+        "smart_items": smart_items,
+        "lake_items": lake_items,
+        "anomalies": anomalies,
+        "definitions": definitions,
+        "source_defs": list_indicator_source_defs(),
+        "recent_tests": tests,
+        "load_batches": batches,
+        "raw_records": raw_records,
+        "mapping_rules": mapping_rules,
+        "clean_jobs": clean_jobs,
+    }
+
+
+def get_indicator_hub_snapshot():
+    return build_indicator_hub_from_store()
+
+
+def build_watchlist_indicator_context(indicator_hub=None):
+    hub = indicator_hub or get_indicator_hub_snapshot()
+    items = list(hub.get("smart_items") or []) + list(hub.get("lake_items") or [])
+    by_id = {item.get("id"): item for item in items if item.get("id")}
+    item_names = {str(item.get("name") or ""): item for item in items if item.get("name")}
+    return {
+        "hub": hub,
+        "items": items,
+        "by_id": by_id,
+        "by_name": item_names,
+        "warnings": [item for item in items if item.get("status") == "warning"],
+        "attentions": [item for item in items if item.get("status") == "attention"],
+        "anomalies": hub.get("anomalies") or [],
+    }
+
+
+def build_watchlist_signal_bundle(stock_code, stock_name, industry, context):
+    normalized_code = str(stock_code or "").strip().upper()
+    normalized_name = str(stock_name or "").strip()
+    industry_text = str(industry or "").strip()
+    items = context.get("items") or []
+    warnings = context.get("warnings") or []
+    attentions = context.get("attentions") or []
+    anomalies = context.get("anomalies") or []
+
+    board_signal_map = {
+        "半导体制造": ["ai_order_signal", "credit_pulse", "source_hs300"],
+        "动力电池": ["credit_pulse", "source_oil", "source_brent"],
+        "港股互联网": ["southbound_flow", "fed_rate_path", "source_hsi"],
+        "高端白酒": ["credit_pulse", "source_cpi", "source_shanghai_index"],
+        "银行": ["credit_pulse", "fed_rate_path", "source_shanghai_index"],
+    }
+    related_ids = board_signal_map.get(industry_text, ["credit_pulse", "fed_rate_path", "southbound_flow"])
+    related_items = [context["by_id"].get(item_id) for item_id in related_ids if context["by_id"].get(item_id)]
+    if not related_items:
+        related_items = warnings[:2] + attentions[:1]
+    warning_count = sum(1 for item in related_items if item and item.get("status") == "warning")
+    attention_count = sum(1 for item in related_items if item and item.get("status") == "attention")
+    dominant_item = related_items[0] if related_items else (warnings[0] if warnings else (attentions[0] if attentions else None))
+    board_alert_level = "warning" if warning_count else ("attention" if attention_count else "normal")
+    if dominant_item:
+        board_summary = f"{dominant_item.get('name') or '核心指标'}：{dominant_item.get('assessment') or dominant_item.get('alert') or '需继续观察'}"
+        board_alert_text = dominant_item.get("alert") or dominant_item.get("assessment") or "当前无明显预警"
+    else:
+        board_summary = "当前未匹配到高优先级指标，继续观察价格、行业位置和验证节点。"
+        board_alert_text = "当前无明显预警"
+    relevant_anomalies = [
+        item for item in anomalies
+        if any(signal and item.get("related_indicator_id") == signal.get("id") for signal in related_items)
+    ][:2]
+    anomaly_text = "；".join(item.get("summary") or item.get("title") or "" for item in relevant_anomalies if (item.get("summary") or item.get("title")))
+    thesis = []
+    for item in related_items[:3]:
+        if not item:
+            continue
+        thesis.append(f"{item.get('name')}: {item.get('assessment') or item.get('alert') or '继续观察'}")
+    while len(thesis) < 3:
+        thesis.append("当前需结合个股盈利、估值和行业位置继续判断。")
+    metrics = []
+    for item in related_items[:4]:
+        if not item:
+            continue
+        metrics.append(
+            {
+                "label": item.get("name") or "指标",
+                "value": item.get("value") or "--",
+                "note": item.get("assessment") or item.get("alert") or "当前无说明",
+            }
+        )
+    return {
+        "stock_code": normalized_code,
+        "stock_name": normalized_name,
+        "industry": industry_text,
+        "board_alert_level": board_alert_level,
+        "board_alert_text": board_alert_text,
+        "board_summary": board_summary,
+        "anomaly_text": anomaly_text,
+        "related_indicator_ids": [item.get("id") for item in related_items if item],
+        "related_indicator_names": [item.get("name") for item in related_items if item],
+        "thesis": thesis[:3],
+        "metrics": metrics[:4],
+        "warning_count": warning_count,
+        "attention_count": attention_count,
+    }
+
+
+def build_fundamental_column_payload(tenant=None):
+    tenant = tenant or get_tenant_by_slug()
+    indicator_hub = build_indicator_hub(tenant=tenant, admin_view=False)
+    smart_items = list(indicator_hub.get("smart_items") or [])
+    anomalies = list(indicator_hub.get("anomalies") or [])
+    top_signals = sorted(
+        smart_items,
+        key=lambda item: (0 if item.get("status") == "warning" else (1 if item.get("status") == "attention" else 2), item.get("last_updated") or ""),
+    )[:3]
+    summary_bits = [f"{item.get('name')}: {item.get('assessment') or item.get('alert') or '继续观察'}" for item in top_signals]
+    summary = "；".join(summary_bits) if summary_bits else f"{tenant.get('advisor') or '主理投顾'} 当前暂无新的重点指标解读。"
+    entries = []
+    for index, item in enumerate(top_signals):
+        entries.append(
+            {
+                "title": item.get("name") or f"重点信号 {index + 1}",
+                "source": "指标湖",
+                "sourceDetail": item.get("category") or "核心指标",
+                "summary": item.get("assessment") or item.get("alert") or "继续观察",
+                "status": "ready",
+                "angle": ["宏观视角", "行业视角", "验证节点"][index] if index < 3 else "研究视角",
+            }
+        )
+    for anomaly in anomalies[:2]:
+        entries.append(
+            {
+                "title": anomaly.get("title") or "异动提醒",
+                "source": "异动监测",
+                "sourceDetail": anomaly.get("time") or "最新",
+                "summary": anomaly.get("summary") or "",
+                "status": "ready",
+                "angle": "异动跟踪",
+            }
+        )
+    return {
+        "summary": summary,
+        "entries": entries[:4],
+    }
+
+
+def build_indicator_dashboard_seed_cards(tenant=None, count=8):
+    tenant = tenant or get_tenant_by_slug()
+    indicator_hub = build_indicator_hub(tenant=tenant, admin_view=False)
+    cards = []
+    for item in list(indicator_hub.get("smart_items") or []) + list(indicator_hub.get("lake_items") or []):
+        cards.append(
+            {
+                "name": item.get("name") or "指标",
+                "value": item.get("value") or "--",
+                "assessment": item.get("assessment") or item.get("alert") or "继续观察",
+                "status": item.get("status") or "attention",
+                "alert": item.get("alert") or "",
+                "hint": item.get("alert") or item.get("assessment") or "",
+                "prompt": f"直接引用指标湖信号：{item.get('name') or '指标'}，用于工作台和前台基本面首页。",
+                "sourceType": item.get("source_type") or "",
+            }
+        )
+    return cards[:count]
+
+
 def build_data_lake_indicator_items():
     items = []
     for raw in load_market_dashboard_indicators():
@@ -1725,9 +4423,9 @@ def build_data_lake_indicator_items():
                         "event": "已从数据湖源注册表导入",
                     }
                 ],
-                "simulated_series": simulated_series,
-                "simulated_anomalies": simulated_anomalies,
-                "simulated_kline": simulated_kline,
+                "history_series": simulated_series,
+                "history_anomalies": simulated_anomalies,
+                "history_kline": simulated_kline,
                 "source_type": "lake",
                 "source_type_label": "数据湖指标",
                 "provider": str(raw.get("provider", "")).strip() or "数据湖",
@@ -1738,142 +4436,12 @@ def build_data_lake_indicator_items():
 
 def build_indicator_hub(tenant=None, admin_view=False):
     tenant = tenant or get_tenant_by_slug()
-    is_lisa = tenant["slug"] == "lisa"
-    smart_items = [
-        {
-            "id": "fed_rate_path",
-            "name": "美联储路径",
-            "category": "宏观流动性",
-            "owner": "平台宏观组" if admin_view else tenant["advisor"],
-            "value": "偏鸽",
-            "assessment": "若降息节奏继续兑现，成长和港股风险偏好会继续改善。",
-            "status": "good",
-            "alert": "当前无需报警",
-            "enabled": True,
-            "last_updated": "2026-06-18 09:20",
-            "watchers": ["H5 基本面首页", "Hermes", "复盘专区"],
-            "source_type": "smart",
-            "source_type_label": "智能指标",
-            "history": [
-                {"date": "2026-06-18", "value": "偏鸽", "status": "good", "event": "议息会议前瞻延续宽松预期"},
-                {"date": "2026-06-11", "value": "中性偏鸽", "status": "attention", "event": "非农偏强压低快速降息预期"},
-                {"date": "2026-06-04", "value": "偏鹰", "status": "warning", "event": "通胀反复导致市场重新定价"},
-            ],
-        },
-        {
-            "id": "southbound_flow",
-            "name": is_lisa and "南向资金连续性" or "南向 / 北向资金",
-            "category": "增量资金",
-            "owner": tenant["advisor"],
-            "value": is_lisa and "连续净流入" or "+28亿 / +41亿",
-            "assessment": is_lisa and "港股互联网继续获得资金确认，但尚未扩散到更宽板块。" or "流入延续但未到强共振，说明市场广度仍一般。",
-            "status": "attention",
-            "alert": "关注是否连续 3 日放量",
-            "enabled": True,
-            "last_updated": "2026-06-18 10:05",
-            "watchers": ["H5 智能指标区", "租户门户", "复盘报告"],
-            "source_type": "smart",
-            "source_type_label": "智能指标",
-            "history": [
-                {"date": "2026-06-18", "value": is_lisa and "连续净流入" or "+28亿 / +41亿", "status": "attention", "event": "增量资金延续但未形成全面共振"},
-                {"date": "2026-06-12", "value": is_lisa and "小幅净流入" or "+12亿 / +18亿", "status": "good", "event": "风险偏好回暖"},
-                {"date": "2026-06-05", "value": is_lisa and "转为净流出" or "-6亿 / +3亿", "status": "warning", "event": "资金分歧扩大"},
-            ],
-        },
-        {
-            "id": "ai_order_signal",
-            "name": is_lisa and "财报兑现节奏" or "AI 订单兑现",
-            "category": is_lisa and "财报验证" or "科技主线",
-            "owner": tenant["advisor"],
-            "value": is_lisa and "等待披露" or "继续验证",
-            "assessment": is_lisa and "回购与利润率之外，财报兑现是下阶段最关键验证项。" or "主题强度仍在，但必须继续验证订单、交付和利润率。",
-            "status": "warning" if not is_lisa else "attention",
-            "alert": is_lisa and "下个财报窗口是关键异动时点" or "若连续两周只见叙事不见订单，需要提高警惕",
-            "enabled": True,
-            "last_updated": "2026-06-18 11:10",
-            "watchers": ["大V工作台", "复盘生产台", "自选股详情"],
-            "source_type": "smart",
-            "source_type_label": "智能指标",
-            "history": [
-                {"date": "2026-06-18", "value": is_lisa and "等待披露" or "继续验证", "status": "warning" if not is_lisa else "attention", "event": "核心公司订单节奏仍未完全兑现"},
-                {"date": "2026-06-10", "value": is_lisa and "市场观望" or "边际改善", "status": "attention", "event": "市场先交易预期后等验证"},
-                {"date": "2026-06-03", "value": is_lisa and "预热阶段" or "高景气", "status": "good", "event": "情绪和成交同步抬升"},
-            ],
-        },
-        {
-            "id": "credit_pulse",
-            "name": is_lisa and "平台政策" or "国内信用脉冲",
-            "category": is_lisa and "政策环境" or "宏观信用",
-            "owner": "平台研究运营",
-            "value": is_lisa and "边际友好" or "温和修复",
-            "assessment": is_lisa and "平台经济环境边际友好，但仍需继续观察政策和行业执行。" or "恢复力度偏弱，顺周期与高弹性资产仍需保守。",
-            "status": "warning",
-            "alert": is_lisa and "继续观察政策节奏与执行口径" or "需继续观察社融和中长期贷款",
-            "enabled": True,
-            "last_updated": "2026-06-18 08:45",
-            "watchers": ["Admin 指标专区", "工作台数据分析", "H5 基本面首页"],
-            "source_type": "smart",
-            "source_type_label": "智能指标",
-            "history": [
-                {"date": "2026-06-18", "value": is_lisa and "边际友好" or "温和修复", "status": "warning", "event": "关键数据未形成强修复共振"},
-                {"date": "2026-06-09", "value": is_lisa and "政策平稳" or "弱修复", "status": "attention", "event": "市场在等更强信用数据"},
-                {"date": "2026-06-02", "value": is_lisa and "扰动反复" or "承压", "status": "warning", "event": "高弹性板块风险偏好下降"},
-            ],
-        },
-    ]
-    for item in smart_items:
-        series, anomaly_points = build_simulated_indicator_series(item["id"], status=item["status"])
-        item["simulated_series"] = series
-        item["simulated_anomalies"] = anomaly_points
-        item["simulated_kline"] = build_simulated_indicator_kline(item["id"], status=item["status"])
-    lake_items = build_data_lake_indicator_items()
-    all_items = smart_items + lake_items
-    anomalies = [
-        {
-            "id": "anomaly_credit",
-            "level": "高",
-            "title": f"{smart_items[3]['name']} 触发重点异动",
-            "summary": f"{smart_items[3]['alert']}。该指标已连续两期落在 {smart_items[3]['status']} 区间，需要优先同步到复盘和前台核心指标。",
-            "time": "2026-06-18 08:50",
-            "related_indicator_id": smart_items[3]["id"],
-        },
-        {
-            "id": "anomaly_flow",
-            "level": "中",
-            "title": f"{smart_items[1]['name']} 进入连续监测",
-            "summary": f"{smart_items[1]['assessment']}，建议关注后续 3 个交易日是否形成资金共振。",
-            "time": "2026-06-18 10:08",
-            "related_indicator_id": smart_items[1]["id"],
-        },
-    ]
-    for lake_item in lake_items:
-        if lake_item["status"] == "warning":
-            anomalies.append(
-                {
-                    "id": f"anomaly_{lake_item['id']}",
-                    "level": "中",
-                    "title": f"{lake_item['name']} 数据湖状态异常",
-                    "summary": lake_item["alert"],
-                    "time": lake_item["last_updated"],
-                    "related_indicator_id": lake_item["id"],
-                }
-            )
-    summary = {
-        "total": len(all_items),
-        "smart_total": len(smart_items),
-        "lake_total": len(lake_items),
-        "enabled": sum(1 for item in all_items if item["enabled"]),
-        "warnings": sum(1 for item in all_items if item["status"] == "warning"),
-        "attention": sum(1 for item in all_items if item["status"] == "attention"),
-        "anomalies": len(anomalies),
-    }
-    return {
-        "summary": summary,
-        "items": all_items,
-        "smart_items": smart_items,
-        "lake_items": lake_items,
-        "anomalies": anomalies,
-    }
+    hub = copy.deepcopy(build_indicator_hub_from_store())
+    advisor_name = tenant.get("advisor") if isinstance(tenant, dict) else ""
+    for item in hub.get("smart_items", []):
+        if advisor_name and item.get("owner") in {"平台研究运营", "平台宏观组", ""}:
+            item["owner"] = advisor_name
+    return hub
 
 
 def gen_feed_boards(market_items):
@@ -1907,6 +4475,37 @@ def gen_feed_boards(market_items):
     return boards
 
 
+def gen_feed_boards_from_watchlist_details(watchlist_details):
+    board_map = {}
+    boards = []
+    for item in (watchlist_details or {}).values():
+        board_name = item.get("industry") or item.get("focus") or "自选股"
+        if board_name not in board_map:
+            board_map[board_name] = {
+                "name": board_name,
+                "warning_count": 0,
+                "items": [],
+            }
+            boards.append(board_map[board_name])
+        if item.get("alert_level") in {"warning", "attention"}:
+            board_map[board_name]["warning_count"] += 1
+        board_map[board_name]["items"].append(
+            {
+                "code": item.get("code"),
+                "name": item.get("name"),
+                "market": item.get("market"),
+                "value": item.get("price", 0),
+                "change": item.get("change", 0),
+                "change_pct": item.get("change_pct", 0),
+                "focus": item.get("focus") or item.get("industry") or "个股跟踪",
+                "alert_level": item.get("alert_level", "normal"),
+                "alert_text": item.get("alert_text", "当前无明显预警"),
+                "signal_summary": item.get("signal_summary", ""),
+            }
+        )
+    return boards
+
+
 def gen_watchlist_details():
     def build_kline_series(stock_code, base_price):
         rng = random.Random(f"kline:{stock_code}")
@@ -1931,7 +4530,7 @@ def gen_watchlist_details():
             close = close_price
         return series
 
-    return {
+    details = {
         "600519": {
             "code": "600519",
             "name": "贵州茅台",
@@ -2128,6 +4727,48 @@ def gen_watchlist_details():
             },
         },
     }
+    indicator_context = build_watchlist_indicator_context()
+    for detail in details.values():
+        signal_bundle = build_watchlist_signal_bundle(detail["code"], detail["name"], detail.get("industry"), indicator_context)
+        detail["indicator_context"] = signal_bundle
+        detail["focus"] = detail.get("industry") or detail.get("focus") or "个股跟踪"
+        detail["alert_level"] = signal_bundle["board_alert_level"]
+        detail["alert_text"] = signal_bundle["board_alert_text"]
+        detail["signal_summary"] = signal_bundle["board_summary"]
+        detail["anomaly_text"] = signal_bundle["anomaly_text"]
+        detail["related_indicator_ids"] = signal_bundle["related_indicator_ids"]
+        detail["related_indicator_names"] = signal_bundle["related_indicator_names"]
+        fundamental = detail.get("fundamental") if isinstance(detail.get("fundamental"), dict) else {}
+        base_summary = str(fundamental.get("summary") or "").strip()
+        fundamental["summary"] = f"{base_summary} 当前关联指标信号：{signal_bundle['board_summary']}" if base_summary else signal_bundle["board_summary"]
+        base_metrics = fundamental.get("metrics") if isinstance(fundamental.get("metrics"), list) else []
+        metric_labels = {str(item.get('label') or '') for item in base_metrics if isinstance(item, dict)}
+        for metric in signal_bundle["metrics"]:
+            if metric["label"] not in metric_labels:
+                base_metrics.append(metric)
+        fundamental["metrics"] = base_metrics[:6]
+        base_thesis = fundamental.get("thesis") if isinstance(fundamental.get("thesis"), list) else []
+        fundamental["thesis"] = (base_thesis + [item for item in signal_bundle["thesis"] if item not in base_thesis])[:5]
+        detail["fundamental"] = fundamental
+        forecast = detail.get("forecast") if isinstance(detail.get("forecast"), dict) else {}
+        if signal_bundle["board_alert_level"] == "warning":
+            forecast["verdict"] = "重点观察"
+            forecast["confidence"] = "中"
+            forecast["band"] = f"{forecast.get('band') or ''} 当前行业关联指标存在预警，优先核查 {signal_bundle['related_indicator_names'][0] if signal_bundle['related_indicator_names'] else '核心信号'}。".strip()
+        elif signal_bundle["board_alert_level"] == "attention":
+            forecast["band"] = f"{forecast.get('band') or ''} 当前行业关联指标进入关注区间，建议跟踪 {signal_bundle['related_indicator_names'][0] if signal_bundle['related_indicator_names'] else '核心信号'}。".strip()
+        drivers = forecast.get("drivers") if isinstance(forecast.get("drivers"), list) else []
+        if signal_bundle["related_indicator_names"]:
+            drivers = [
+                {
+                    "label": "指标湖联动",
+                    "score": "+0.6" if signal_bundle["board_alert_level"] == "normal" else ("-0.9" if signal_bundle["board_alert_level"] == "warning" else "-0.3"),
+                    "note": f"当前主要受 {signal_bundle['related_indicator_names'][0]} 影响",
+                }
+            ] + drivers
+        forecast["drivers"] = drivers[:4]
+        detail["forecast"] = forecast
+    return details
 
 
 def strip_watchlist_forecast_payload(detail):
@@ -2262,6 +4903,232 @@ def init_db():
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS indicator_definitions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                indicator_code TEXT NOT NULL UNIQUE,
+                indicator_name TEXT NOT NULL,
+                category TEXT NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                unit TEXT NOT NULL DEFAULT '',
+                owner TEXT NOT NULL DEFAULT '',
+                source_type TEXT NOT NULL DEFAULT 'mock',
+                source_type_label TEXT NOT NULL DEFAULT '模拟指标',
+                provider TEXT NOT NULL DEFAULT '',
+                status_hint TEXT NOT NULL DEFAULT 'attention',
+                assessment_template TEXT NOT NULL DEFAULT '',
+                alert_template TEXT NOT NULL DEFAULT '',
+                watchers_json TEXT NOT NULL DEFAULT '[]',
+                display_config_json TEXT NOT NULL DEFAULT '{}',
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_indicator_definitions_source_type ON indicator_definitions(source_type)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS indicator_source_defs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_code TEXT NOT NULL UNIQUE,
+                indicator_code TEXT NOT NULL,
+                provider TEXT NOT NULL DEFAULT '',
+                base_url TEXT NOT NULL DEFAULT '',
+                path TEXT NOT NULL DEFAULT '',
+                method TEXT NOT NULL DEFAULT 'GET',
+                auth_type TEXT NOT NULL DEFAULT 'none',
+                headers_json TEXT NOT NULL DEFAULT '{}',
+                query_json TEXT NOT NULL DEFAULT '{}',
+                body_json TEXT NOT NULL DEFAULT '{}',
+                response_mapping_json TEXT NOT NULL DEFAULT '{}',
+                response_sample_json TEXT NOT NULL DEFAULT '{}',
+                source_status TEXT NOT NULL DEFAULT 'draft',
+                enabled INTEGER NOT NULL DEFAULT 1,
+                last_test_status TEXT NOT NULL DEFAULT '',
+                last_http_status INTEGER,
+                last_tested_at TEXT NOT NULL DEFAULT '',
+                last_test_detail TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_indicator_source_defs_indicator_code ON indicator_source_defs(indicator_code)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS indicator_source_tests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_code TEXT NOT NULL,
+                tested_at TEXT NOT NULL,
+                success INTEGER NOT NULL,
+                http_status INTEGER,
+                latency_ms INTEGER,
+                response_sample TEXT NOT NULL DEFAULT '',
+                error_message TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_indicator_source_tests_source_code ON indicator_source_tests(source_code, tested_at DESC)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS indicator_load_batches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                batch_code TEXT NOT NULL UNIQUE,
+                load_type TEXT NOT NULL DEFAULT 'mock_seed',
+                source_code TEXT NOT NULL DEFAULT '',
+                summary TEXT NOT NULL DEFAULT '',
+                total_points INTEGER NOT NULL DEFAULT 0,
+                total_indicators INTEGER NOT NULL DEFAULT 0,
+                success INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS indicator_latest_values (
+                indicator_code TEXT PRIMARY KEY,
+                latest_value TEXT NOT NULL DEFAULT '',
+                latest_status TEXT NOT NULL DEFAULT 'attention',
+                latest_assessment TEXT NOT NULL DEFAULT '',
+                latest_alert TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL,
+                is_simulated INTEGER NOT NULL DEFAULT 1,
+                source_code TEXT NOT NULL DEFAULT '',
+                batch_code TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS indicator_series (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                indicator_code TEXT NOT NULL,
+                point_time TEXT NOT NULL,
+                point_value REAL NOT NULL,
+                point_status TEXT NOT NULL DEFAULT 'attention',
+                is_simulated INTEGER NOT NULL DEFAULT 1,
+                source_code TEXT NOT NULL DEFAULT '',
+                batch_code TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_indicator_series_indicator_code ON indicator_series(indicator_code, point_time DESC)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS indicator_anomalies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                indicator_code TEXT NOT NULL,
+                anomaly_time TEXT NOT NULL,
+                anomaly_value REAL NOT NULL DEFAULT 0,
+                severity TEXT NOT NULL DEFAULT '中',
+                anomaly_status TEXT NOT NULL DEFAULT 'attention',
+                anomaly_label TEXT NOT NULL DEFAULT '',
+                batch_code TEXT NOT NULL DEFAULT '',
+                is_simulated INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_indicator_anomalies_indicator_code ON indicator_anomalies(indicator_code, anomaly_time DESC)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS indicator_kline_points (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                indicator_code TEXT NOT NULL,
+                point_date TEXT NOT NULL,
+                open_value REAL NOT NULL,
+                high_value REAL NOT NULL,
+                low_value REAL NOT NULL,
+                close_value REAL NOT NULL,
+                ma5 REAL,
+                ma10 REAL,
+                ma20 REAL,
+                batch_code TEXT NOT NULL DEFAULT '',
+                is_simulated INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_indicator_kline_points_indicator_code ON indicator_kline_points(indicator_code, point_date DESC)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS indicator_raw_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_code TEXT NOT NULL,
+                indicator_code TEXT NOT NULL,
+                fetch_mode TEXT NOT NULL DEFAULT 'sample',
+                raw_payload TEXT NOT NULL,
+                http_status INTEGER,
+                success INTEGER NOT NULL DEFAULT 1,
+                fetched_at TEXT NOT NULL,
+                batch_code TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_indicator_raw_records_source_code ON indicator_raw_records(source_code, fetched_at DESC)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS indicator_mapping_rules (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                rule_code TEXT NOT NULL UNIQUE,
+                indicator_code TEXT NOT NULL,
+                source_code TEXT NOT NULL,
+                value_path TEXT NOT NULL DEFAULT '',
+                time_path TEXT NOT NULL DEFAULT '',
+                status_path TEXT NOT NULL DEFAULT '',
+                unit_override TEXT NOT NULL DEFAULT '',
+                default_status TEXT NOT NULL DEFAULT 'attention',
+                transform_expr TEXT NOT NULL DEFAULT '',
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_indicator_mapping_rules_indicator_code ON indicator_mapping_rules(indicator_code, source_code)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS indicator_clean_jobs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_code TEXT NOT NULL UNIQUE,
+                source_code TEXT NOT NULL,
+                indicator_code TEXT NOT NULL,
+                raw_record_id INTEGER,
+                mapping_rule_code TEXT NOT NULL DEFAULT '',
+                job_status TEXT NOT NULL DEFAULT 'pending',
+                cleaned_points INTEGER NOT NULL DEFAULT 0,
+                result_summary TEXT NOT NULL DEFAULT '',
+                result_payload TEXT NOT NULL DEFAULT '',
+                error_message TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                finished_at TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_indicator_clean_jobs_source_code ON indicator_clean_jobs(source_code, created_at DESC)"
+        )
         row = conn.execute(
             "SELECT setting_key FROM app_settings WHERE setting_key = ?",
             (SITE_CONFIG_KEY,),
@@ -2291,6 +5158,23 @@ def init_db():
                     }
                     for user in DEFAULT_USERS
                 ],
+            )
+        indicator_count = conn.execute("SELECT COUNT(*) AS c FROM indicator_definitions").fetchone()["c"]
+        if indicator_count == 0:
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            conn.executemany(
+                """
+                INSERT INTO indicator_definitions (
+                    indicator_code, indicator_name, category, description, unit, owner,
+                    source_type, source_type_label, provider, status_hint, assessment_template,
+                    alert_template, watchers_json, display_config_json, enabled, created_at, updated_at
+                ) VALUES (
+                    :indicator_code, :indicator_name, :category, :description, :unit, :owner,
+                    :source_type, :source_type_label, :provider, :status_hint, :assessment_template,
+                    :alert_template, :watchers_json, :display_config_json, :enabled, :created_at, :updated_at
+                )
+                """,
+                [{**item, "created_at": now, "updated_at": now} for item in DEFAULT_SMART_INDICATOR_DEFINITIONS],
             )
         conn.commit()
 
@@ -2550,9 +5434,23 @@ def h5():
     )
     market = gen_market_data()
     news = gen_news_feed()
-    macro_indicators = gen_macro_indicators()
-    feed_boards = gen_feed_boards(market)
     watchlist_details = gen_watchlist_details()
+    indicator_hub = build_indicator_hub(tenant=tenant, admin_view=False)
+    fundamental_column = build_fundamental_column_payload(tenant)
+    dashboard_seed_cards = build_indicator_dashboard_seed_cards(tenant, count=8)
+    tenant_dashboard_payload = build_tenant_dashboard_payload(tenant)
+    macro_indicators = [
+        {
+            "name": item.get("name") or "",
+            "value": item.get("value") or "--",
+            "status": item.get("status") or "attention",
+            "assessment": item.get("assessment") or "",
+            "alert": item.get("alert") or "",
+            "hint": item.get("alert") or "",
+        }
+        for item in (indicator_hub.get("smart_items") or [])[:4]
+    ]
+    feed_boards = gen_feed_boards_from_watchlist_details(watchlist_details)
     return render_template(
         "h5.html",
         market=market,
@@ -2560,6 +5458,10 @@ def h5():
         macro_indicators=macro_indicators,
         feed_boards=feed_boards,
         watchlist_details=watchlist_details,
+        indicator_hub=indicator_hub,
+        fundamental_column=fundamental_column,
+        dashboard_seed_cards=dashboard_seed_cards,
+        tenant_dashboard_payload=tenant_dashboard_payload,
         active_tenant=tenant,
         demo_profiles=get_h5_login_users(site_config),
         current_demo_profile=current_demo_profile,
@@ -2740,6 +5642,205 @@ def api_admin_access_logs():
         (limit,),
     ).fetchall()
     return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/admin/indicator-hub")
+def api_admin_indicator_hub():
+    return jsonify({"ok": True, "hub": build_indicator_hub_from_store()})
+
+
+@app.route("/api/admin/indicator-definitions")
+def api_admin_indicator_definitions():
+    source_type = str(request.args.get("source_type") or "").strip() or None
+    return jsonify({"ok": True, "definitions": list_indicator_definitions(source_type=source_type)})
+
+
+@app.route("/api/admin/indicator-definitions", methods=["POST"])
+def api_save_admin_indicator_definition():
+    body = request.get_json(silent=True) or {}
+    try:
+        definition = save_indicator_definition(body)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "definition": definition, "definitions": list_indicator_definitions()})
+
+
+@app.route("/api/admin/indicator-definitions/<indicator_code>", methods=["DELETE"])
+def api_delete_admin_indicator_definition(indicator_code):
+    if not get_indicator_definition(indicator_code):
+        return jsonify({"ok": False, "error": "indicator_not_found"}), 404
+    delete_indicator_definition(indicator_code)
+    return jsonify({"ok": True, "definitions": list_indicator_definitions()})
+
+
+@app.route("/api/admin/indicator-sources")
+def api_admin_indicator_sources():
+    indicator_code = str(request.args.get("indicator_code") or "").strip() or None
+    return jsonify({"ok": True, "sources": list_indicator_source_defs(indicator_code=indicator_code)})
+
+
+@app.route("/api/admin/indicator-sources", methods=["POST"])
+def api_save_admin_indicator_source():
+    body = request.get_json(silent=True) or {}
+    try:
+        source = save_indicator_source_def(body)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "source": source, "sources": list_indicator_source_defs()})
+
+
+@app.route("/api/admin/indicator-sources/<source_code>", methods=["DELETE"])
+def api_delete_admin_indicator_source(source_code):
+    if not get_indicator_source_def(source_code):
+        return jsonify({"ok": False, "error": "source_not_found"}), 404
+    delete_indicator_source_def(source_code)
+    return jsonify({"ok": True, "sources": list_indicator_source_defs()})
+
+
+@app.route("/api/admin/indicator-sources/test", methods=["POST"])
+def api_test_admin_indicator_source():
+    body = request.get_json(silent=True) or {}
+    source_code = str(body.get("source_code") or "").strip()
+    if not source_code:
+        return jsonify({"ok": False, "error": "source_code_required"}), 400
+    try:
+        result = test_indicator_source(source_code)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    return jsonify(
+        {
+            "ok": result["success"],
+            "result": result,
+            "tests": list_indicator_source_tests(source_code=source_code),
+            "source": get_indicator_source_def(source_code),
+        }
+    )
+
+
+@app.route("/api/admin/indicator-sources/<source_code>/preview")
+def api_admin_indicator_source_preview(source_code):
+    try:
+        preview = build_indicator_source_preview(source_code)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    return jsonify({"ok": True, "preview": preview})
+
+
+@app.route("/api/admin/indicator-batches/mock-seed", methods=["POST"])
+def api_admin_indicator_mock_seed():
+    body = request.get_json(silent=True) or {}
+    force = bool(body.get("force"))
+    result = seed_mock_indicator_lake(force=force)
+    return jsonify({"ok": True, "result": result, "hub": build_indicator_hub_from_store()})
+
+
+@app.route("/api/admin/indicator-batches/market-cache-sync", methods=["POST"])
+def api_admin_indicator_market_cache_sync():
+    body = request.get_json(silent=True) or {}
+    force = bool(body.get("force"))
+    result = sync_real_indicator_history_from_market_cache(force=force)
+    return jsonify({"ok": True, "result": result, "hub": build_indicator_hub_from_store()})
+
+
+@app.route("/api/admin/indicator-raw-records")
+def api_admin_indicator_raw_records():
+    source_code = str(request.args.get("source_code") or "").strip() or None
+    limit = min(int(request.args.get("limit", 20)), 100)
+    return jsonify({"ok": True, "records": list_indicator_raw_records(source_code=source_code, limit=limit)})
+
+
+@app.route("/api/admin/indicator-raw-records/create", methods=["POST"])
+def api_admin_create_indicator_raw_record():
+    body = request.get_json(silent=True) or {}
+    source_code = str(body.get("source_code") or "").strip()
+    if not source_code:
+        return jsonify({"ok": False, "error": "source_code_required"}), 400
+    try:
+        record = create_indicator_raw_record_from_source(source_code, use_last_test_sample=bool(body.get("use_last_test_sample", True)))
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    return jsonify({"ok": True, "record": record, "records": list_indicator_raw_records(source_code=source_code)})
+
+
+@app.route("/api/admin/indicator-sources/landing", methods=["POST"])
+def api_admin_execute_indicator_source_landing():
+    body = request.get_json(silent=True) or {}
+    source_code = str(body.get("source_code") or "").strip()
+    if not source_code:
+        return jsonify({"ok": False, "error": "source_code_required"}), 400
+    try:
+        result = execute_indicator_source_landing(source_code, prefer_live=bool(body.get("prefer_live")))
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    return jsonify(
+        {
+            "ok": True,
+            "result": result,
+            "records": list_indicator_raw_records(source_code=source_code),
+            "hub": build_indicator_hub_from_store(),
+        }
+    )
+
+
+@app.route("/api/admin/indicator-mapping-rules")
+def api_admin_indicator_mapping_rules():
+    indicator_code = str(request.args.get("indicator_code") or "").strip() or None
+    source_code = str(request.args.get("source_code") or "").strip() or None
+    return jsonify({"ok": True, "rules": list_indicator_mapping_rules(indicator_code=indicator_code, source_code=source_code)})
+
+
+@app.route("/api/admin/indicator-mapping-rules", methods=["POST"])
+def api_save_admin_indicator_mapping_rule():
+    body = request.get_json(silent=True) or {}
+    try:
+        rule = save_indicator_mapping_rule(body)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "rule": rule, "rules": list_indicator_mapping_rules()})
+
+
+@app.route("/api/admin/indicator-mapping-rules/<rule_code>", methods=["DELETE"])
+def api_delete_admin_indicator_mapping_rule(rule_code):
+    if not get_indicator_mapping_rule(rule_code):
+        return jsonify({"ok": False, "error": "mapping_rule_not_found"}), 404
+    delete_indicator_mapping_rule(rule_code)
+    return jsonify({"ok": True, "rules": list_indicator_mapping_rules()})
+
+
+@app.route("/api/admin/indicator-clean-jobs")
+def api_admin_indicator_clean_jobs():
+    source_code = str(request.args.get("source_code") or "").strip() or None
+    limit = min(int(request.args.get("limit", 20)), 100)
+    return jsonify({"ok": True, "jobs": list_indicator_clean_jobs(source_code=source_code, limit=limit)})
+
+
+@app.route("/api/admin/indicator-clean-jobs/run", methods=["POST"])
+def api_admin_run_indicator_clean_job():
+    body = request.get_json(silent=True) or {}
+    source_code = str(body.get("source_code") or "").strip()
+    raw_record_id = body.get("raw_record_id")
+    if not source_code and not raw_record_id:
+        return jsonify({"ok": False, "error": "source_code_required"}), 400
+    try:
+        job = run_indicator_clean_job(
+            source_code=source_code,
+            rule_code=body.get("rule_code"),
+            raw_record_id=raw_record_id,
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    effective_source_code = source_code or (job.get("source_code") if isinstance(job, dict) else "")
+    return jsonify({"ok": True, "job": job, "jobs": list_indicator_clean_jobs(source_code=effective_source_code), "hub": build_indicator_hub_from_store()})
+
+
+@app.route("/api/admin/indicator-trace/<indicator_code>")
+def api_admin_indicator_trace(indicator_code):
+    limit = min(int(request.args.get("limit", 12)), 50)
+    try:
+        trace = build_indicator_lake_trace(indicator_code, limit=limit)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    return jsonify({"ok": True, "trace": trace})
 
 
 @app.route("/api/site-config")
@@ -3142,21 +6243,8 @@ def gen_kol_workbench(tenant=None):
     today_views = 540 if is_lisa else 680
     engagement_rate = 7.6 if is_lisa else 6.8
     watchlist_focus = ["腾讯控股", "美团-W", "阿里巴巴-W"] if is_lisa else ["中芯国际", "腾讯控股", "贵州茅台"]
-    fund_cells = (
-        [
-            {"title": "南向资金", "value": "连续净流入", "prompt": "跟踪南向资金连续性与港股互联网情绪"},
-            {"title": "回购节奏", "value": "持续兑现", "prompt": "跟踪腾讯和头部互联网平台回购力度"},
-            {"title": "财报验证", "value": "等待披露", "prompt": "跟踪财报窗口的估值与盈利兑现"},
-            {"title": "平台政策", "value": "边际友好", "prompt": "跟踪平台经济监管边际变化"},
-        ]
-        if is_lisa
-        else [
-            {"title": "美联储路径", "value": "偏鸽", "prompt": "跟踪美联储降息路径与风险资产影响"},
-            {"title": "港股互联网", "value": "估值修复中", "prompt": "跟踪港股互联网回购、财报与估值带"},
-            {"title": "AI 订单兑现", "value": "继续验证", "prompt": "跟踪 AI 算力订单兑现和利润率"},
-            {"title": "增量资金", "value": "连续净流入", "prompt": "跟踪南向和北向资金的连续性"},
-        ]
-    )
+    fund_dashboard_state = resolve_tenant_fund_dashboard_state(tenant, tenant.get("fund_dashboard_config"))
+    fund_dashboard = copy.deepcopy(fund_dashboard_state["published"])
     return {
         "tenant": tenant,
         "kol_name": kol_name,
@@ -3499,64 +6587,28 @@ def gen_kol_workbench(tenant=None):
             ],
         },
         "watchlist_hub": {
-            "summary": "自选股在前台已经改成顶部直接输入股票代码，进入个股详情后再添加自选；详情页展示基础 K 线和 5 / 10 / 20 日线。",
-            "items": is_lisa and [
+            "summary": "自选股在前台已经改成顶部直接输入股票代码，进入个股详情后再添加自选；现在工作台与 H5 共用同一套指标湖增强信号，能同步看到行业预警、核心指标和异常摘要。",
+            "items": [
                 {
-                    "name": "腾讯控股",
-                    "code": "00700",
-                    "market": "港股",
-                    "focus": "回购 + 财报",
-                    "change": "+1.4%",
-                    "thesis": "回购和现金流支撑估值修复，但仍需财报确认。",
-                },
-                {
-                    "name": "美团-W",
-                    "code": "03690",
-                    "market": "港股",
-                    "focus": "外卖 + 到店",
-                    "change": "+0.9%",
-                    "thesis": "看履约效率和广告变现恢复斜率。",
-                },
-                {
-                    "name": "阿里巴巴-W",
-                    "code": "09988",
-                    "market": "港股",
-                    "focus": "云 + 电商",
-                    "change": "+1.1%",
-                    "thesis": "组织调整和云业务兑现是核心观察点。",
-                },
-            ] or [
-                {
-                    "name": "中芯国际",
-                    "code": "688981",
-                    "market": "A股",
-                    "focus": "半导体景气",
-                    "change": "+2.8%",
-                    "thesis": "订单兑现和国产替代仍是核心验证点。",
-                },
-                {
-                    "name": "腾讯控股",
-                    "code": "00700",
-                    "market": "港股",
-                    "focus": "回购 + 财报",
-                    "change": "+1.4%",
-                    "thesis": "回购和现金流支撑估值修复，但仍需财报确认。",
-                },
-                {
-                    "name": "贵州茅台",
-                    "code": "600519",
-                    "market": "A股",
-                    "focus": "稳健配置",
-                    "change": "-0.6%",
-                    "thesis": "更适合作为长期稳健样本，不宜只按短期波动下结论。",
-                },
+                    "name": detail["name"],
+                    "code": detail["code"],
+                    "market": "港股" if detail.get("market") == "HK" else "A股",
+                    "focus": detail.get("focus") or detail.get("industry") or "个股跟踪",
+                    "change": f"{detail.get('change_pct', 0):+.1f}%",
+                    "thesis": detail.get("signal_summary") or detail.get("fundamental", {}).get("summary") or "继续跟踪",
+                    "alert_level": detail.get("alert_level") or "normal",
+                    "alert_text": detail.get("alert_text") or "当前无明显预警",
+                    "related_indicator_names": detail.get("related_indicator_names") or [],
+                }
+                for detail in (
+                    [watchlist_details_map.get(code) for code in ["00700", "03690", "09988"]] if is_lisa
+                    else [watchlist_details_map.get(code) for code in ["688981", "00700", "600519"]]
+                )
+                if detail
             ],
         },
-        "fund_dashboard": {
-            "summary": f"{tenant['advisor']} 的智能 Dashboard 默认展示总结态；没有指标时显示加号，点击单格后输入独立提示词，保存即生成该格指标摘要。",
-            "layout": "2x2",
-            "cells": fund_cells,
-        },
+        "fund_dashboard": fund_dashboard,
+        "fund_dashboard_state": fund_dashboard_state,
         "indicator_hub": build_indicator_hub(tenant=tenant, admin_view=False),
         "published_reviews": [
             {
@@ -3809,7 +6861,24 @@ def api_tenant_dashboard(tenant_slug):
     tenant = get_tenant_by_slug(tenant_slug)
     if not tenant or tenant["slug"] != tenant_slug:
         return jsonify({"success": False, "error": "tenant_not_found"}), 404
-    return jsonify({"success": True, "dashboard": build_tenant_dashboard_payload(tenant)})
+    payload = build_tenant_dashboard_payload(tenant)
+    return jsonify({"success": True, "dashboard": payload, "fund_dashboard_state": payload.get("fund_dashboard_state")})
+
+
+@app.route("/api/tenant/<tenant_slug>/dashboard", methods=["POST"])
+def api_save_tenant_dashboard(tenant_slug):
+    tenant = get_tenant_by_slug(tenant_slug)
+    if not tenant or tenant["slug"] != tenant_slug:
+        return jsonify({"success": False, "error": "tenant_not_found"}), 404
+    body = request.get_json(silent=True) or {}
+    action = str(body.get("action") or "").strip().lower()
+    dashboard = body.get("dashboard") if isinstance(body.get("dashboard"), dict) else None
+    saved = update_tenant_fund_dashboard_config(tenant_slug, action, dashboard)
+    if not saved:
+        return jsonify({"success": False, "error": "invalid_action"}), 400
+    latest_tenant = get_tenant_by_slug(tenant_slug, saved)
+    payload = build_tenant_dashboard_payload(latest_tenant)
+    return jsonify({"success": True, "dashboard": payload, "fund_dashboard_state": payload.get("fund_dashboard_state")})
 
 @app.route("/api/kol/broadcast", methods=["POST"])
 def api_kol_broadcast():
