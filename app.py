@@ -20,6 +20,7 @@ from hmac import compare_digest
 import requests
 import psycopg2
 from psycopg2.extras import Json, RealDictCursor
+from psycopg2 import OperationalError
 try:
     from faster_whisper import WhisperModel
 except Exception:
@@ -4572,61 +4573,13 @@ def build_watchlist_signal_bundle(stock_code, stock_name, industry, context):
 def build_fundamental_column_payload(tenant=None):
     tenant = tenant or get_tenant_by_slug()
     indicator_hub = build_indicator_hub(tenant=tenant, admin_view=False)
-    smart_items = list(indicator_hub.get("smart_items") or [])
-    anomalies = list(indicator_hub.get("anomalies") or [])
-    top_signals = sorted(
-        smart_items,
-        key=lambda item: (0 if item.get("status") == "warning" else (1 if item.get("status") == "attention" else 2), item.get("last_updated") or ""),
-    )[:3]
-    summary_bits = [f"{item.get('name')}: {item.get('assessment') or item.get('alert') or '继续观察'}" for item in top_signals]
-    summary = "；".join(summary_bits) if summary_bits else f"{tenant.get('advisor') or '主理投顾'} 当前暂无新的重点指标解读。"
-    entries = []
-    for index, item in enumerate(top_signals):
-        entries.append(
-            {
-                "title": item.get("name") or f"重点信号 {index + 1}",
-                "source": "指标湖",
-                "sourceDetail": item.get("category") or "核心指标",
-                "summary": item.get("assessment") or item.get("alert") or "继续观察",
-                "status": "ready",
-                "angle": ["宏观视角", "行业视角", "验证节点"][index] if index < 3 else "研究视角",
-            }
-        )
-    for anomaly in anomalies[:2]:
-        entries.append(
-            {
-                "title": anomaly.get("title") or "异动提醒",
-                "source": "异动监测",
-                "sourceDetail": anomaly.get("time") or "最新",
-                "summary": anomaly.get("summary") or "",
-                "status": "ready",
-                "angle": "异动跟踪",
-            }
-        )
-    return {
-        "summary": summary,
-        "entries": entries[:4],
-    }
+    return build_fundamental_column_payload_from_hub(tenant, indicator_hub)
 
 
 def build_indicator_dashboard_seed_cards(tenant=None, count=8):
     tenant = tenant or get_tenant_by_slug()
     indicator_hub = build_indicator_hub(tenant=tenant, admin_view=False)
-    cards = []
-    for item in list(indicator_hub.get("smart_items") or []) + list(indicator_hub.get("lake_items") or []):
-        cards.append(
-            {
-                "name": item.get("name") or "指标",
-                "value": item.get("value") or "--",
-                "assessment": item.get("assessment") or item.get("alert") or "继续观察",
-                "status": item.get("status") or "attention",
-                "alert": item.get("alert") or "",
-                "hint": item.get("alert") or item.get("assessment") or "",
-                "prompt": f"直接引用指标湖信号：{item.get('name') or '指标'}，用于工作台和前台基本面首页。",
-                "sourceType": item.get("source_type") or "",
-            }
-        )
-    return cards[:count]
+    return build_indicator_dashboard_seed_cards_from_hub(indicator_hub, count=count)
 
 
 def build_data_lake_indicator_items():
@@ -5143,6 +5096,258 @@ def get_app_db_connection():
     )
 
 
+def is_db_unavailable_error(error):
+    return isinstance(error, OperationalError)
+
+
+def build_default_demo_profiles(site_config=None):
+    config = site_config or normalize_site_config(DEFAULT_SITE_CONFIG)
+    profiles = []
+    for item in DEFAULT_USERS:
+        try:
+          profiles.append(ensure_user_row_defaults(dict(item), config))
+        except Exception:
+          continue
+    return [profile for profile in profiles if profile.get("role") in {"investor", "dav"} and profile.get("status") == "active"]
+
+
+def resolve_demo_profile_fallback(site_config=None):
+    profiles = build_default_demo_profiles(site_config)
+    current_username = get_current_demo_profile_id()
+    current = next((profile for profile in profiles if profile.get("username") == current_username), None)
+    if current is None and profiles:
+        current = profiles[0]
+    return profiles, current
+
+
+def build_tenant_dashboard_payload_fallback(tenant=None):
+    tenant = tenant or normalize_tenant_config({}, 0)
+    return {
+        "title": tenant.get("dashboard_title") or f"{tenant.get('short_name') or tenant.get('name') or '租户'} Dashboard",
+        "description": tenant.get("dashboard_description") or "当前展示为数据库不可达时的降级数据视图。",
+        "tenant": tenant,
+        "kpis": [
+            {"label": "今日互动", "value": "128", "delta": "+12%"},
+            {"label": "重点复盘", "value": "3", "delta": "待发布"},
+            {"label": "关注信号", "value": "2", "delta": "优先跟踪"},
+            {"label": "粉丝提问", "value": "19", "delta": "待回应"},
+        ],
+        "message_distribution": [],
+        "message_trend": [],
+        "publish_distribution": [],
+        "publish_trend": [],
+        "fund_dashboard": {
+            "layout": "2x2",
+            "cards": [],
+        },
+        "fund_dashboard_state": {
+            "published": {"layout": "2x2", "cards": []},
+            "draft": None,
+        },
+        "reviews": [],
+        "stats": {},
+    }
+
+
+def build_indicator_hub_fallback(tenant=None, admin_view=False):
+    tenant = tenant or normalize_tenant_config({}, 0)
+    advisor_name = tenant.get("advisor") or ""
+    smart_items = [
+        {
+            "id": "smart_market_heat",
+            "name": "市场情绪温度",
+            "category": "情绪信号",
+            "owner": advisor_name or "平台研究运营",
+            "value": "72",
+            "assessment": "情绪处于偏活跃区间，适合输出结构化复盘而不是极端结论。",
+            "status": "attention",
+            "alert": "成交集中在主线方向，注意高位分化。",
+            "enabled": True,
+            "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "watchers": [],
+            "history": [],
+            "history_series": [],
+            "history_anomalies": [],
+            "history_kline": [],
+            "source_type": "smart",
+            "source_type_label": "智能指标",
+            "provider": "fallback",
+            "source_count": 0,
+            "source_defs": [],
+            "latest_source_test": None,
+            "data_mode": "fallback",
+            "data_mode_label": "降级数据",
+        },
+        {
+            "id": "smart_review_signal",
+            "name": "复盘重点信号",
+            "category": "内容生产",
+            "owner": advisor_name or "平台研究运营",
+            "value": "3 条",
+            "assessment": "建议优先围绕强势主线、回撤风险和次日观察点组织内容。",
+            "status": "normal",
+            "alert": "当前无高危异常。",
+            "enabled": True,
+            "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "watchers": [],
+            "history": [],
+            "history_series": [],
+            "history_anomalies": [],
+            "history_kline": [],
+            "source_type": "smart",
+            "source_type_label": "智能指标",
+            "provider": "fallback",
+            "source_count": 0,
+            "source_defs": [],
+            "latest_source_test": None,
+            "data_mode": "fallback",
+            "data_mode_label": "降级数据",
+        },
+    ]
+    lake_items = [
+        {
+            "id": "lake_turnover",
+            "name": "市场成交额",
+            "category": "市场宽度",
+            "owner": advisor_name or "平台宏观组",
+            "value": "1.12 万亿",
+            "assessment": "成交维持在相对活跃区间，说明主题轮动仍有承接。",
+            "status": "normal",
+            "alert": "量能暂未出现断崖式收缩。",
+            "enabled": True,
+            "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "watchers": [],
+            "history": [],
+            "history_series": [],
+            "history_anomalies": [],
+            "history_kline": [],
+            "source_type": "lake",
+            "source_type_label": "数据湖指标",
+            "provider": "fallback",
+            "source_count": 0,
+            "source_defs": [],
+            "latest_source_test": None,
+            "data_mode": "fallback",
+            "data_mode_label": "降级数据",
+        },
+        {
+            "id": "lake_northbound",
+            "name": "北向资金净流向",
+            "category": "资金流向",
+            "owner": advisor_name or "平台宏观组",
+            "value": "+18.6 亿",
+            "assessment": "外资风险偏好温和修复，但还不足以支撑全面进攻判断。",
+            "status": "attention",
+            "alert": "若连续转负，需要同步调整复盘语气。",
+            "enabled": True,
+            "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "watchers": [],
+            "history": [],
+            "history_series": [],
+            "history_anomalies": [],
+            "history_kline": [],
+            "source_type": "lake",
+            "source_type_label": "数据湖指标",
+            "provider": "fallback",
+            "source_count": 0,
+            "source_defs": [],
+            "latest_source_test": None,
+            "data_mode": "fallback",
+            "data_mode_label": "降级数据",
+        },
+    ]
+    anomalies = [
+        {
+            "id": "fallback_anomaly_1",
+            "level": "中",
+            "title": "主线分化加剧",
+            "summary": "高位题材出现分歧，复盘里应提示追高风险。",
+            "time": datetime.now().strftime("%Y-%m-%d"),
+            "related_indicator_id": "smart_market_heat",
+        }
+    ]
+    items = smart_items + lake_items
+    return {
+        "summary": {
+            "total": len(items),
+            "smart_total": len(smart_items),
+            "lake_total": len(lake_items),
+            "enabled": len(items),
+            "warnings": 0,
+            "attention": 2,
+            "anomalies": len(anomalies),
+        },
+        "items": items,
+        "smart_items": smart_items,
+        "lake_items": lake_items,
+        "anomalies": anomalies,
+        "definitions": [],
+        "source_defs": [],
+        "recent_tests": [],
+        "load_batches": [],
+        "raw_records": [],
+        "mapping_rules": [],
+        "clean_jobs": [],
+    }
+
+
+def build_fundamental_column_payload_from_hub(tenant, indicator_hub):
+    tenant = tenant or get_tenant_by_slug()
+    smart_items = list((indicator_hub or {}).get("smart_items") or [])
+    anomalies = list((indicator_hub or {}).get("anomalies") or [])
+    top_signals = sorted(
+        smart_items,
+        key=lambda item: (0 if item.get("status") == "warning" else (1 if item.get("status") == "attention" else 2), item.get("last_updated") or ""),
+    )[:3]
+    summary_bits = [f"{item.get('name')}: {item.get('assessment') or item.get('alert') or '继续观察'}" for item in top_signals]
+    summary = "；".join(summary_bits) if summary_bits else f"{tenant.get('advisor') or '主理投顾'} 当前暂无新的重点指标解读。"
+    entries = []
+    for index, item in enumerate(top_signals):
+        entries.append(
+            {
+                "title": item.get("name") or f"重点信号 {index + 1}",
+                "source": "指标湖",
+                "sourceDetail": item.get("category") or "核心指标",
+                "summary": item.get("assessment") or item.get("alert") or "继续观察",
+                "status": "ready",
+                "angle": ["宏观视角", "行业视角", "验证节点"][index] if index < 3 else "研究视角",
+            }
+        )
+    for anomaly in anomalies[:2]:
+        entries.append(
+            {
+                "title": anomaly.get("title") or "异动提醒",
+                "source": "异动监测",
+                "sourceDetail": anomaly.get("time") or "最新",
+                "summary": anomaly.get("summary") or "",
+                "status": "ready",
+                "angle": "异动跟踪",
+            }
+        )
+    return {
+        "summary": summary,
+        "entries": entries[:4],
+    }
+
+
+def build_indicator_dashboard_seed_cards_from_hub(indicator_hub, count=8):
+    cards = []
+    for item in list((indicator_hub or {}).get("smart_items") or []) + list((indicator_hub or {}).get("lake_items") or []):
+        cards.append(
+            {
+                "name": item.get("name") or "指标",
+                "value": item.get("value") or "--",
+                "assessment": item.get("assessment") or item.get("alert") or "继续观察",
+                "status": item.get("status") or "attention",
+                "alert": item.get("alert") or "",
+                "hint": item.get("alert") or item.get("assessment") or "",
+                "prompt": f"直接引用指标湖信号：{item.get('name') or '指标'}，用于工作台和前台基本面首页。",
+                "sourceType": item.get("source_type") or "",
+            }
+        )
+    return cards[:count]
+
+
 def execute_sql_file(conn, sql_path):
     sql_text = Path(sql_path).read_text(encoding="utf-8")
     with conn.cursor() as cur:
@@ -5188,19 +5393,25 @@ def get_site_config():
     cached = g.get("site_config")
     if cached is not None:
         return cached
-    db = get_db()
-    row = db.execute(
-        "SELECT setting_value FROM app_settings WHERE setting_key = ?",
-        (SITE_CONFIG_KEY,),
-    ).fetchone()
     config = copy.deepcopy(DEFAULT_SITE_CONFIG)
-    if row and row["setting_value"]:
-        try:
-            stored = json.loads(row["setting_value"])
-            if isinstance(stored, dict):
-                config = _merge_site_config(config, stored)
-        except Exception:
-            app.logger.exception("Failed to parse site config")
+    try:
+        db = get_db()
+        row = db.execute(
+            "SELECT setting_value FROM app_settings WHERE setting_key = ?",
+            (SITE_CONFIG_KEY,),
+        ).fetchone()
+        if row and row["setting_value"]:
+            try:
+                stored = json.loads(row["setting_value"])
+                if isinstance(stored, dict):
+                    config = _merge_site_config(config, stored)
+            except Exception:
+                app.logger.exception("Failed to parse site config")
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            app.logger.warning("Database unavailable while loading site config, using defaults")
+        else:
+            raise
     config = normalize_site_config(config)
     g.site_config = config
     return config
@@ -6373,7 +6584,13 @@ def is_authenticated():
 
 
 def is_password_gate_enabled():
-    return bool(get_site_config().get("password_gate_enabled", True))
+    try:
+        return bool(get_site_config().get("password_gate_enabled", True))
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            app.logger.warning("Database unavailable while checking password gate, using default gate config")
+            return bool(DEFAULT_SITE_CONFIG.get("password_gate_enabled", True))
+        raise
 
 
 def safe_next_target(target):
@@ -6487,18 +6704,43 @@ def index():
 @app.route("/h5")
 def h5():
     site_config = get_site_config()
-    current_demo_profile = get_current_demo_profile(site_config)
-    tenant = get_tenant_by_slug(
-        current_demo_profile.get("tenant", {}).get("slug") if current_demo_profile else None,
-        site_config,
-    )
+    h5_fallback_mode = False
+    demo_profiles = []
+    current_demo_profile = None
+    tenant = None
+    indicator_hub = {}
+    fundamental_column = {}
+    dashboard_seed_cards = []
+    tenant_dashboard_payload = {}
+    try:
+        current_demo_profile = get_current_demo_profile(site_config)
+        tenant = get_tenant_by_slug(
+            current_demo_profile.get("tenant", {}).get("slug") if current_demo_profile else None,
+            site_config,
+        )
+        indicator_hub = build_indicator_hub(tenant=tenant, admin_view=False)
+        fundamental_column = build_fundamental_column_payload(tenant)
+        dashboard_seed_cards = build_indicator_dashboard_seed_cards(tenant, count=8)
+        tenant_dashboard_payload = build_tenant_dashboard_payload(tenant)
+        demo_profiles = get_h5_login_users(site_config)
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        app.logger.warning("Database unavailable while building H5 page, using fallback data")
+        h5_fallback_mode = True
+        fallback_config = normalize_site_config(site_config)
+        demo_profiles, current_demo_profile = resolve_demo_profile_fallback(fallback_config)
+        tenant = get_tenant_by_slug(
+            current_demo_profile.get("tenant", {}).get("slug") if current_demo_profile else None,
+            fallback_config,
+        )
+        indicator_hub = build_indicator_hub_fallback(tenant=tenant, admin_view=False)
+        fundamental_column = build_fundamental_column_payload_from_hub(tenant, indicator_hub)
+        dashboard_seed_cards = build_indicator_dashboard_seed_cards_from_hub(indicator_hub, count=8)
+        tenant_dashboard_payload = build_tenant_dashboard_payload_fallback(tenant)
     market = gen_market_data()
     news = gen_news_feed()
     watchlist_details = gen_watchlist_details()
-    indicator_hub = build_indicator_hub(tenant=tenant, admin_view=False)
-    fundamental_column = build_fundamental_column_payload(tenant)
-    dashboard_seed_cards = build_indicator_dashboard_seed_cards(tenant, count=8)
-    tenant_dashboard_payload = build_tenant_dashboard_payload(tenant)
     macro_indicators = [
         {
             "name": item.get("name") or "",
@@ -6523,8 +6765,9 @@ def h5():
         dashboard_seed_cards=dashboard_seed_cards,
         tenant_dashboard_payload=tenant_dashboard_payload,
         active_tenant=tenant,
-        demo_profiles=get_h5_login_users(site_config),
+        demo_profiles=demo_profiles,
         current_demo_profile=current_demo_profile,
+        h5_fallback_mode=h5_fallback_mode,
     )
 
 @app.route("/admin")
@@ -6997,14 +7240,27 @@ def api_admin_indicator_trace(indicator_code):
 
 @app.route("/api/site-config")
 def api_site_config():
-    return jsonify(get_site_config())
+    try:
+        return jsonify(get_site_config())
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        app.logger.warning("Database unavailable while serving site config API, using defaults")
+        return jsonify(normalize_site_config(DEFAULT_SITE_CONFIG))
 
 
 @app.route("/api/demo-profiles")
 def api_demo_profiles():
-    site_config = get_site_config()
-    profiles = get_h5_login_users(site_config)
-    current = get_current_demo_profile(site_config)
+    try:
+        site_config = get_site_config()
+        profiles = get_h5_login_users(site_config)
+        current = get_current_demo_profile(site_config)
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        app.logger.warning("Database unavailable while serving demo profiles, using defaults")
+        fallback_config = normalize_site_config(DEFAULT_SITE_CONFIG)
+        profiles, current = resolve_demo_profile_fallback(fallback_config)
     return jsonify({
         "profiles": profiles,
         "current_profile": current,
@@ -7013,8 +7269,15 @@ def api_demo_profiles():
 
 @app.route("/api/demo-profile/switch", methods=["POST"])
 def api_switch_demo_profile():
-    site_config = get_site_config()
-    profiles = get_h5_login_users(site_config)
+    try:
+        site_config = get_site_config()
+        profiles = get_h5_login_users(site_config)
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        app.logger.warning("Database unavailable while switching demo profile, using defaults")
+        fallback_config = normalize_site_config(DEFAULT_SITE_CONFIG)
+        profiles, _ = resolve_demo_profile_fallback(fallback_config)
     body = request.get_json(silent=True) or {}
     profile_id = str(body.get("profile_id") or "").strip()
     matched = next((profile for profile in profiles if profile["username"] == profile_id), None)
