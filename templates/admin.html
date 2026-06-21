@@ -36,8 +36,21 @@
   .config-card-title { font-size:14px; color:var(--gold); font-weight:600; margin-bottom:16px; padding-bottom:10px; border-bottom:1px solid rgba(200,169,110,0.1); }
   .config-field { margin-bottom:12px; }
   .config-field label { display:block; font-size:11px; color:var(--text-sub); margin-bottom:4px; }
-  .config-field input { width:100%; background:var(--surface); border:1px solid rgba(200,169,110,0.2); border-radius:6px; padding:7px 10px; color:var(--text-main); font-size:13px; box-sizing:border-box; }
-  .config-field input:focus { outline:none; border-color:rgba(200,169,110,0.5); }
+  .config-field input,
+  .config-field select,
+  .config-field textarea {
+    width:100%;
+    background:var(--surface);
+    border:1px solid rgba(200,169,110,0.2);
+    border-radius:8px;
+    padding:8px 10px;
+    color:var(--text-main);
+    font-size:13px;
+    box-sizing:border-box;
+  }
+  .config-field input:focus,
+  .config-field select:focus,
+  .config-field textarea:focus { outline:none; border-color:rgba(200,169,110,0.5); }
   .keyword-cloud { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
   .keyword-tag { background:rgba(220,50,50,0.12); border:1px solid rgba(220,50,50,0.3); color:#ff7070; border-radius:20px; padding:4px 12px; font-size:12px; cursor:pointer; }
   .keyword-tag:hover { background:rgba(220,50,50,0.2); }
@@ -95,6 +108,244 @@
   .theme-pill.active { background:rgba(200,169,110,0.15); color:var(--gold); border-color:var(--gold); }
   .feature-note { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:10px; }
   .admin-status { font-size:13px; color:var(--text-sub); margin:12px 0 0; min-height:18px; }
+  .config-grid.single-column { grid-template-columns:1fr; }
+  .admin-nav-subgroup {
+    margin-top:8px;
+    padding-top:8px;
+    border-top:1px dashed rgba(200,169,110,0.10);
+  }
+  .admin-nav-subtitle {
+    margin:0 0 8px 12px;
+    font-size:10px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--text-sub);
+  }
+  .llm-admin-shell { display:grid; gap:16px; }
+  .llm-admin-hero {
+    display:grid;
+    grid-template-columns:minmax(0, 1.3fr) minmax(280px, 0.7fr);
+    gap:16px;
+  }
+  .llm-admin-panel {
+    border:1px solid rgba(200,169,110,0.12);
+    border-radius:16px;
+    background:linear-gradient(180deg, rgba(47,116,192,0.03), var(--surface));
+    padding:18px;
+  }
+  .llm-admin-hero-top {
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:14px;
+  }
+  .llm-admin-title {
+    font-size:18px;
+    line-height:1.2;
+    font-weight:700;
+    color:var(--text-main);
+  }
+  .llm-admin-desc {
+    margin-top:8px;
+    font-size:12px;
+    color:var(--text-sub);
+    line-height:1.8;
+    max-width:680px;
+  }
+  .llm-admin-chip-row,
+  .llm-admin-default-switch,
+  .llm-admin-inline-actions {
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .llm-admin-chip {
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:6px 10px;
+    border-radius:999px;
+    background:rgba(47,116,192,0.08);
+    color:#1F497D;
+    border:1px solid rgba(47,116,192,0.16);
+    font-size:11px;
+    line-height:1;
+  }
+  .llm-admin-chip.is-gold {
+    color:var(--gold);
+    background:rgba(200,169,110,0.12);
+    border-color:rgba(200,169,110,0.20);
+  }
+  .llm-admin-chip.is-muted {
+    color:var(--text-sub);
+    background:rgba(18,31,49,0.04);
+    border-color:rgba(18,31,49,0.08);
+  }
+  .llm-admin-default-switch {
+    margin-top:12px;
+  }
+  .llm-admin-default-pill {
+    border:1px solid rgba(200,169,110,0.16);
+    background:var(--surface);
+    color:var(--text-main);
+    border-radius:999px;
+    padding:8px 12px;
+    font-size:12px;
+    cursor:pointer;
+    transition:all 0.18s ease;
+  }
+  .llm-admin-default-pill:hover {
+    border-color:rgba(47,116,192,0.28);
+    transform:translateY(-1px);
+  }
+  .llm-admin-default-pill.active {
+    background:rgba(47,116,192,0.12);
+    border-color:rgba(47,116,192,0.30);
+    color:#1F497D;
+    box-shadow:0 10px 18px rgba(47,116,192,0.08);
+  }
+  .llm-admin-tag-picker {
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-top:8px;
+  }
+  .llm-admin-tag-option {
+    border:1px solid rgba(200,169,110,0.16);
+    background:var(--surface);
+    color:var(--text-main);
+    border-radius:999px;
+    padding:6px 10px;
+    font-size:11px;
+    cursor:pointer;
+    transition:all 0.18s ease;
+  }
+  .llm-admin-tag-option.active {
+    background:rgba(200,169,110,0.12);
+    border-color:rgba(200,169,110,0.24);
+    color:var(--gold);
+  }
+  .llm-admin-tag-input-shell {
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+    min-height:44px;
+    padding:8px 10px;
+    border:1px solid rgba(200,169,110,0.2);
+    border-radius:10px;
+    background:var(--surface);
+  }
+  .llm-admin-tag-token {
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:6px 10px;
+    border-radius:999px;
+    background:rgba(47,116,192,0.10);
+    border:1px solid rgba(47,116,192,0.16);
+    color:#1F497D;
+    font-size:11px;
+    line-height:1;
+  }
+  .llm-admin-tag-remove {
+    border:0;
+    background:transparent;
+    color:inherit;
+    cursor:pointer;
+    padding:0;
+    line-height:1;
+    font-size:12px;
+  }
+  .llm-admin-tag-input {
+    flex:1;
+    min-width:180px;
+    border:0 !important;
+    background:transparent !important;
+    padding:0 !important;
+    border-radius:0 !important;
+    box-shadow:none !important;
+  }
+  .llm-admin-tag-input:focus {
+    border:0 !important;
+    outline:none !important;
+  }
+  .llm-admin-section-label {
+    margin-top:18px;
+    font-size:11px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    color:var(--text-sub);
+  }
+  .llm-admin-panel-title {
+    font-size:14px;
+    font-weight:700;
+    color:var(--text-main);
+    margin-bottom:8px;
+  }
+  .llm-admin-panel-note {
+    font-size:12px;
+    color:var(--text-sub);
+    line-height:1.7;
+    margin-top:10px;
+  }
+  .llm-admin-model-stack {
+    display:grid;
+    gap:14px;
+  }
+  .llm-admin-model-card {
+    border:1px solid rgba(200,169,110,0.12);
+    border-radius:16px;
+    background:var(--surface);
+    padding:18px;
+    box-shadow:0 10px 24px rgba(14,33,55,0.04);
+  }
+  .llm-admin-model-card.is-default {
+    border-color:rgba(47,116,192,0.26);
+    box-shadow:0 14px 30px rgba(47,116,192,0.10);
+    background:linear-gradient(180deg, rgba(47,116,192,0.04), var(--surface));
+  }
+  .llm-admin-model-top {
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:16px;
+    margin-bottom:14px;
+  }
+  .llm-admin-model-title {
+    font-size:16px;
+    font-weight:700;
+    color:var(--text-main);
+  }
+  .llm-admin-model-sub {
+    margin-top:6px;
+    font-size:12px;
+    color:var(--text-sub);
+    line-height:1.7;
+  }
+  .llm-admin-model-grid {
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:14px 16px;
+  }
+  .llm-admin-model-footer {
+    margin-top:14px;
+    padding-top:12px;
+    border-top:1px dashed rgba(200,169,110,0.14);
+    font-size:12px;
+    color:var(--text-sub);
+    line-height:1.7;
+  }
+  .llm-admin-empty {
+    border:1px dashed rgba(200,169,110,0.18);
+    border-radius:16px;
+    background:var(--surface-2);
+    padding:28px;
+    text-align:center;
+    color:var(--text-sub);
+    font-size:13px;
+    line-height:1.8;
+  }
   .tenant-admin-shell {
     display:grid;
     grid-template-columns:300px minmax(0,1fr);
@@ -645,6 +896,8 @@
     .admin-modal-overlay { padding:12px; }
     .admin-modal-sheet { padding:18px; border-radius:16px; }
     .admin-modal-grid { grid-template-columns:1fr; }
+    .llm-admin-hero,
+    .llm-admin-model-grid,
     .tenant-admin-shell,
     .tenant-admin-detail-grid { grid-template-columns:1fr; }
     .tenant-admin-sidebar { position:static; }
@@ -735,8 +988,26 @@
       </div>
       <div class="admin-nav-group">
         <div class="admin-nav-group-title">系统</div>
-        <div class="admin-nav-item" data-section="settings" onclick="showSection('settings', this)">
-          <span class="admin-nav-icon">&#9965;</span> 系统设置
+        <div class="admin-nav-subgroup">
+          <div class="admin-nav-subtitle">系统专区</div>
+          <div class="admin-nav-item" data-section="settings-appearance" onclick="showSection('settings-appearance', this)">
+            <span class="admin-nav-icon">&#9965;</span> 站点外观
+          </div>
+          <div class="admin-nav-item" data-section="settings-brand" onclick="showSection('settings-brand', this)">
+            <span class="admin-nav-icon">&#9734;</span> 平台品牌
+          </div>
+          <div class="admin-nav-item" data-section="settings-features" onclick="showSection('settings-features', this)">
+            <span class="admin-nav-icon">&#9881;</span> 功能开关
+          </div>
+          <div class="admin-nav-item" data-section="settings-policy" onclick="showSection('settings-policy', this)">
+            <span class="admin-nav-icon">&#128203;</span> 发布与隔离
+          </div>
+          <div class="admin-nav-item" data-section="settings-knowledge" onclick="showSection('settings-knowledge', this)">
+            <span class="admin-nav-icon">&#128214;</span> 知识与向量
+          </div>
+          <div class="admin-nav-item" data-section="settings-llm" onclick="showSection('settings-llm', this)">
+            <span class="admin-nav-icon">&#129302;</span> 大模型专区
+          </div>
         </div>
         <div class="admin-nav-item" data-section="access" onclick="showSection('access', this)">
           <span class="admin-nav-icon">&#128737;</span> 访问审计
@@ -2813,8 +3084,8 @@
       </div><!-- end section-analytics -->
 
       <!-- ===== SETTINGS ===== -->
-      <div id="section-settings" style="display:none">
-        <div class="config-grid">
+      <div id="section-settings-appearance" style="display:none">
+        <div class="config-grid single-column">
           <div class="config-card">
             <div class="config-card-title">主题策略</div>
             <div class="config-field">
@@ -2837,6 +3108,11 @@
               默认对外建议使用白底咨询风，保留黑色模式供用户自行切换。用户端仍可通过前台主题功能覆盖默认设置。
             </div>
           </div>
+        </div>
+      </div><!-- end section-settings-appearance -->
+
+      <div id="section-settings-brand" style="display:none">
+        <div class="config-grid single-column">
           <div class="config-card">
             <div class="config-card-title">平台品牌配置</div>
             <div class="config-field">
@@ -2871,6 +3147,11 @@
               平台品牌只用于首页、Admin 和平台默认文案。租户门户与大V对外展示统一放在“大V管理”专区维护。
             </div>
           </div>
+        </div>
+      </div><!-- end section-settings-brand -->
+
+      <div id="section-settings-features" style="display:none">
+        <div class="config-grid">
           <div class="config-card">
             <div class="config-card-title">首发功能开关</div>
             <div class="toggle-wrap">
@@ -2924,6 +3205,11 @@
               MVP 默认优先开放：基本面、自选股、复盘、消息互动、知识归档、大V工作台和租户门户；预测分析放到约 1 个月后的第二阶段，会员收费能力按层级逐步开放。
             </div>
           </div>
+        </div>
+      </div><!-- end section-settings-features -->
+
+      <div id="section-settings-policy" style="display:none">
+        <div class="config-grid">
           <div class="config-card">
             <div class="config-card-title">平台发布策略</div>
             <div class="config-field">
@@ -2952,6 +3238,11 @@
               Admin 负责统一租户隔离策略，保证前台自选股、私信、活动与工作台使用同一套权限边界。
             </div>
           </div>
+        </div>
+      </div><!-- end section-settings-policy -->
+
+      <div id="section-settings-knowledge" style="display:none">
+        <div class="config-grid">
           <div class="config-card">
             <div class="config-card-title">租户研究资料输入源</div>
             <div class="config-field">
@@ -2962,19 +3253,78 @@
               <label>资料用途</label>
               <input type="text" value="形成租户研究资料底座，并同步到按需基本面、自选股分析与工作台研究记录" readonly>
             </div>
+            <div class="config-field">
+              <label>语音转写引擎</label>
+              <select id="voice-transcription-engine">
+                <option value="local">本地 Python 转写（默认）</option>
+                <option value="api">大模型 API 转写</option>
+              </select>
+            </div>
+            <div class="config-field">
+              <label>向量生成引擎</label>
+              <select id="voice-embedding-engine">
+                <option value="local">本地 Embedding</option>
+                <option value="api">大模型 API Embedding</option>
+              </select>
+            </div>
             <div class="feature-note">
-              Admin 在这里配置的是资料输入权限和同步规则，实际的大V 日常使用入口已经拆到独立的 web 工作台。
+              转写引擎和向量引擎独立配置，可自由组合。系统会按 embedding 引擎自动隔离 vector namespace，避免不同模型生成的向量混搜。
             </div>
           </div>
           <div class="config-card">
             <div class="config-card-title">保存发布</div>
-            <button class="btn-gold" style="padding:10px 20px;font-size:13px;margin-top:4px;width:100%" onclick="saveSiteConfig()">保存主题与功能配置</button>
+            <button class="btn-gold" style="padding:10px 20px;font-size:13px;margin-top:4px;width:100%" onclick="saveSiteConfig()">保存系统配置</button>
             <div class="feature-note" id="site-config-status">
               保存后，H5 用户端会按默认主题和功能开关展示；用户自己的主题选择仍然会被本地记住。
             </div>
           </div>
         </div>
-      </div><!-- end section-settings -->
+      </div><!-- end section-settings-knowledge -->
+
+      <div id="section-settings-llm" style="display:none">
+        <div class="llm-admin-shell">
+          <div class="llm-admin-hero">
+            <div class="llm-admin-panel">
+              <div class="llm-admin-hero-top">
+                <div>
+                  <div class="llm-admin-title">大模型配置工作台</div>
+                  <div class="llm-admin-desc">
+                    这里统一维护平台可调用的大模型配置。用途标签支持手写输入，同时保留预设标签快捷点选；目前默认只提供 `general` 这个预设，用于知识库对话和平台通用 AI 能力，后续可以继续扩展 summary、translation、review 等用途。
+                  </div>
+                </div>
+                <button class="btn-outline" style="padding:8px 14px;font-size:12px" type="button" onclick="addAdminLlmModel()">新增模型配置</button>
+              </div>
+              <div class="llm-admin-section-label">当前通用模型</div>
+              <div class="config-field" style="margin-top:8px;max-width:360px">
+                <label>下拉选择</label>
+                <select id="llm-default-model-key"></select>
+              </div>
+              <div id="llm-default-switcher" class="llm-admin-default-switch"></div>
+            </div>
+            <div class="llm-admin-panel">
+              <div class="llm-admin-panel-title">配置总览</div>
+              <div id="llm-admin-summary"></div>
+              <div class="llm-admin-panel-note">
+                推荐做法是把“正在试验”的模型先保留为未启用，等接口地址、模型名和 API Key 验证通过后，再切成默认模型。这样知识库对话和后续生成链路不会误用到半成品配置。
+              </div>
+            </div>
+          </div>
+          <div class="config-card">
+            <div class="config-card-title">模型配置列表</div>
+            <div class="feature-note">
+              每条模型都按 OpenAI Compatible 接口方式维护。用途标签支持手写输入，输入后按回车、空格或失焦都会生成标签，同时也保留 `general` 的预设点选；后续扩展新用途时，不需要重做配置结构。
+            </div>
+            <div id="llm-model-list" style="margin-top:14px"></div>
+          </div>
+          <div class="config-card">
+            <div class="config-card-title">保存发布</div>
+            <button class="btn-gold" style="padding:10px 20px;font-size:13px;margin-top:4px;width:100%" onclick="saveSiteConfig()">保存系统配置</button>
+            <div class="feature-note">
+              大模型配置和知识引擎配置共用同一套站点配置保存逻辑。保存后，工作台知识库对话和后续 AI 能力都会读取这里的通用模型。
+            </div>
+          </div>
+        </div>
+      </div><!-- end section-settings-llm -->
 
       <!-- ===== ACCESS AUDIT ===== -->
       <div id="section-access" style="display:none">
@@ -3016,7 +3366,14 @@
 const sectionTitles = {
   overview:'运营概览', users:'用户列表', segments:'用户分层', points:'积分管理',
   kols:'大V投顾管理', commission:'收益结算', community:'帖子审核',
-  events:'活动管理', hermes:'Hermes使用统计', 'forecast-model':'预测模型', channels:'渠道管理', 'indicator-hub':'指标专区', analytics:'数据分析', settings:'系统设置', access:'访问审计'
+  events:'活动管理', hermes:'Hermes使用统计', 'forecast-model':'预测模型', channels:'渠道管理', 'indicator-hub':'指标专区', analytics:'数据分析',
+  'settings-appearance':'系统专区 · 站点外观',
+  'settings-brand':'系统专区 · 平台品牌',
+  'settings-features':'系统专区 · 功能开关',
+  'settings-policy':'系统专区 · 发布与隔离',
+  'settings-knowledge':'系统专区 · 知识与向量',
+  'settings-llm':'系统专区 · 大模型专区',
+  access:'访问审计'
 };
 const analyticsTitles = {
   funnel: '数据分析 · 转化漏斗',
@@ -3038,6 +3395,9 @@ function setActiveAdminNav(target) {
 }
 
 function showSection(name, navEl) {
+  if (name === 'settings') {
+    name = 'settings-appearance';
+  }
   if (name === 'forecast-model' && !isAdminFeatureEnabled('stock_forecast')) {
     showToast('预测功能当前未开放');
     return;
@@ -4491,6 +4851,229 @@ function initForecastEditorEvents() {
 }
 
 let adminSiteConfig = JSON.parse(JSON.stringify(window.SITE_CONFIG || {}));
+
+function ensureAdminLlmRegistry() {
+  if (!adminSiteConfig.llm_registry || typeof adminSiteConfig.llm_registry !== 'object') {
+    adminSiteConfig.llm_registry = { default_model_key: '', models: [] };
+  }
+  if (!Array.isArray(adminSiteConfig.llm_registry.models)) {
+    adminSiteConfig.llm_registry.models = [];
+  }
+  return adminSiteConfig.llm_registry;
+}
+
+function addAdminLlmModel() {
+  const registry = ensureAdminLlmRegistry();
+  const nextIndex = registry.models.length + 1;
+  registry.models.push({
+    key: `model_${nextIndex}`,
+    label: `模型 ${nextIndex}`,
+    provider: 'openai',
+    model_name: '',
+    base_url: '',
+    api_key: '',
+    purpose: 'general',
+    enabled: true,
+  });
+  if (!registry.default_model_key) {
+    registry.default_model_key = registry.models[registry.models.length - 1].key;
+  }
+  renderSiteConfigForm();
+}
+
+function updateAdminLlmModel(index, field, value) {
+  const registry = ensureAdminLlmRegistry();
+  if (!registry.models[index]) return;
+  const previousKey = registry.models[index].key || '';
+  registry.models[index][field] = field === 'enabled' ? Boolean(value) : value;
+  if (field === 'key' && registry.default_model_key === previousKey) {
+    registry.default_model_key = value;
+  }
+  renderSiteConfigForm();
+}
+
+function removeAdminLlmModel(index) {
+  const registry = ensureAdminLlmRegistry();
+  const current = registry.models[index];
+  if (!current) return;
+  const removedKey = current.key;
+  registry.models.splice(index, 1);
+  if (registry.default_model_key === removedKey) {
+    registry.default_model_key = registry.models[0] ? registry.models[0].key : '';
+  }
+  renderSiteConfigForm();
+}
+
+function renderAdminLlmRegistry() {
+  const registry = ensureAdminLlmRegistry();
+  if (!registry.default_model_key && registry.models.length) {
+    const generalModels = registry.models.filter(model => model.purpose === 'general' && model.enabled !== false);
+    registry.default_model_key = ((generalModels[0] || registry.models[0] || {}).key || '');
+  }
+  const defaultSelect = document.getElementById('llm-default-model-key');
+  if (defaultSelect) {
+    const options = registry.models.map(model => `<option value="${escapeAttr(model.key || '')}">${escapeHtml(model.label || model.key || '未命名模型')} · ${escapeHtml(model.purpose || 'general')}</option>`).join('');
+    defaultSelect.innerHTML = options || '<option value="">暂无模型配置</option>';
+    if (registry.default_model_key && !registry.models.some(model => model.key === registry.default_model_key)) {
+      registry.default_model_key = registry.models[0] ? (registry.models[0].key || '') : '';
+    }
+    defaultSelect.value = registry.default_model_key || '';
+    defaultSelect.onchange = function () {
+      registry.default_model_key = this.value || '';
+      renderSiteConfigForm();
+    };
+  }
+  const quickSwitch = document.getElementById('llm-default-switcher');
+  if (quickSwitch) {
+    const enabledModels = registry.models.filter(model => model.enabled !== false);
+    quickSwitch.innerHTML = enabledModels.length ? enabledModels.map((model) => `
+      <button
+        type="button"
+        class="llm-admin-default-pill ${registry.default_model_key === model.key ? 'active' : ''}"
+        onclick="updateAdminLlmDefaultModel('${escapeAttr(model.key || '')}')"
+      >
+        ${escapeHtml(model.label || model.key || '未命名模型')}
+      </button>
+    `).join('') : '<span class="llm-admin-chip is-muted">当前没有可切换的已启用模型</span>';
+  }
+  const statsHost = document.getElementById('llm-admin-summary');
+  if (statsHost) {
+    const total = registry.models.length;
+    const enabledCount = registry.models.filter(model => model.enabled !== false).length;
+    const defaultModel = registry.models.find(model => model.key === registry.default_model_key) || null;
+    statsHost.innerHTML = `
+      <div class="llm-admin-chip-row">
+        <span class="llm-admin-chip is-gold">模型总数 ${total}</span>
+        <span class="llm-admin-chip">已启用 ${enabledCount}</span>
+        <span class="llm-admin-chip is-muted">用途标签 ${Array.from(new Set(registry.models.map(model => model.purpose || 'general'))).join(' / ') || 'general'}</span>
+      </div>
+      <div class="llm-admin-panel-note">
+        当前通用模型：${escapeHtml(defaultModel ? (defaultModel.label || defaultModel.model_name || defaultModel.key || '未命名模型') : '尚未指定')}。
+        推荐只把真正可用的模型设为启用，避免工作台误选到未完成配置的模型。
+      </div>
+    `;
+  }
+  const host = document.getElementById('llm-model-list');
+  if (!host) return;
+  host.innerHTML = registry.models.length ? `<div class="llm-admin-model-stack">${registry.models.map((model, index) => {
+    const isDefault = registry.default_model_key === model.key;
+    const enabled = model.enabled !== false;
+    const title = model.label || `模型 ${index + 1}`;
+    const provider = model.provider || 'openai';
+    const purpose = model.purpose || 'general';
+    const modelName = model.model_name || '待填写模型名';
+    const baseUrlHint = model.base_url || '将沿用平台默认 OpenAI Compatible 地址';
+    return `
+      <div class="llm-admin-model-card ${isDefault ? 'is-default' : ''}">
+        <div class="llm-admin-model-top">
+          <div>
+            <div class="llm-admin-model-title">${escapeHtml(title)}</div>
+            <div class="llm-admin-model-sub">${escapeHtml(modelName)} · ${escapeHtml(provider)} · ${escapeHtml(baseUrlHint)}</div>
+            <div class="llm-admin-chip-row" style="margin-top:10px">
+              ${isDefault ? '<span class="llm-admin-chip is-gold">当前默认</span>' : `<button type="button" class="llm-admin-default-pill" onclick="updateAdminLlmDefaultModel('${escapeAttr(model.key || '')}')">设为默认</button>`}
+              <span class="llm-admin-chip">${enabled ? '已启用' : '未启用'}</span>
+              <span class="llm-admin-chip is-muted">用途 ${escapeHtml(purpose)}</span>
+              <span class="llm-admin-chip is-muted">接口 OpenAI Compatible</span>
+            </div>
+          </div>
+          <div class="llm-admin-inline-actions">
+            <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="removeAdminLlmModel(${index})">删除配置</button>
+          </div>
+        </div>
+        <div class="llm-admin-model-grid">
+          <div class="config-field">
+            <label>模型 key</label>
+            <input type="text" value="${escapeAttr(model.key || '')}" oninput="updateAdminLlmModel(${index}, 'key', this.value)">
+          </div>
+          <div class="config-field">
+            <label>显示名称</label>
+            <input type="text" value="${escapeAttr(model.label || '')}" oninput="updateAdminLlmModel(${index}, 'label', this.value)">
+          </div>
+          <div class="config-field">
+            <label>Provider</label>
+            <input type="text" value="${escapeAttr(provider)}" oninput="updateAdminLlmModel(${index}, 'provider', this.value)">
+          </div>
+          <div class="config-field">
+            <label>用途标签</label>
+            <div class="llm-admin-tag-input-shell">
+              ${purpose ? `
+                <span class="llm-admin-tag-token">
+                  ${escapeHtml(purpose)}
+                  <button type="button" class="llm-admin-tag-remove" onclick="clearAdminLlmPurpose(${index})">×</button>
+                </span>
+              ` : ''}
+              <input
+                type="text"
+                class="llm-admin-tag-input"
+                value=""
+                placeholder="${purpose ? '输入新标签后回车 / 空格 / 失焦提交' : '输入用途标签，回车 / 空格 / 失焦生成标签'}"
+                onkeydown="handleAdminLlmPurposeKeydown(${index}, event)"
+                onblur="commitAdminLlmPurposeInput(${index}, this)"
+              >
+            </div>
+            <div class="llm-admin-tag-picker">
+              <button type="button" class="llm-admin-tag-option ${purpose === 'general' ? 'active' : ''}" onclick="applyAdminLlmPurposePreset(${index}, 'general')">general</button>
+            </div>
+          </div>
+          <div class="config-field">
+            <label>模型名</label>
+            <input type="text" value="${escapeAttr(model.model_name || '')}" placeholder="例如 gpt-4o / deepseek-chat" oninput="updateAdminLlmModel(${index}, 'model_name', this.value)">
+          </div>
+          <div class="config-field">
+            <label>Base URL</label>
+            <input type="text" value="${escapeAttr(model.base_url || '')}" placeholder="例如 https://api.openai.com/v1" oninput="updateAdminLlmModel(${index}, 'base_url', this.value)">
+          </div>
+          <div class="config-field">
+            <label>API Key</label>
+            <input type="text" value="${escapeAttr(model.api_key || '')}" placeholder="留空则走平台环境变量 OPENAI_API_KEY" oninput="updateAdminLlmModel(${index}, 'api_key', this.value)">
+          </div>
+          <div class="config-field">
+            <label>启用状态</label>
+            <select onchange="updateAdminLlmModel(${index}, 'enabled', this.value === 'true')">
+              <option value="true" ${enabled ? 'selected' : ''}>启用</option>
+              <option value="false" ${!enabled ? 'selected' : ''}>停用</option>
+            </select>
+          </div>
+        </div>
+        <div class="llm-admin-model-footer">
+          建议只把已经验证过连接、模型名和 key 的配置设为“启用”。默认模型会被知识库对话、后续 AI 生成和平台通用能力优先读取。
+        </div>
+      </div>
+    `;
+  }).join('')}</div>` : '<div class="llm-admin-empty">当前还没有模型配置。先新增一个通用模型，把 Provider、模型名、Base URL 和 API Key 配完整，再设成默认。</div>';
+}
+
+function updateAdminLlmDefaultModel(key) {
+  const registry = ensureAdminLlmRegistry();
+  registry.default_model_key = key || '';
+  renderSiteConfigForm();
+}
+
+function applyAdminLlmPurposePreset(index, purpose) {
+  updateAdminLlmModel(index, 'purpose', purpose || 'general');
+}
+
+function commitAdminLlmPurposeInput(index, inputEl) {
+  if (!inputEl) return;
+  const nextValue = String(inputEl.value || '').trim().toLowerCase();
+  if (!nextValue) {
+    inputEl.value = '';
+    return;
+  }
+  updateAdminLlmModel(index, 'purpose', nextValue);
+}
+
+function handleAdminLlmPurposeKeydown(index, event) {
+  if (!event) return;
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    commitAdminLlmPurposeInput(index, event.target);
+  }
+}
+
+function clearAdminLlmPurpose(index) {
+  updateAdminLlmModel(index, 'purpose', '');
+}
 let selectedAdminTenantIndex = 0;
 
 function isAdminFeatureEnabled(featureName) {
@@ -4712,10 +5295,17 @@ function renderSiteConfigForm() {
   const cfg = adminSiteConfig || {};
   const flags = cfg.feature_flags || {};
   const brand = cfg.brand || {};
+  const voiceTranscription = cfg.voice_transcription || {};
+  const voiceEmbedding = cfg.voice_embedding || {};
+  ensureAdminLlmRegistry();
   markActivePill('theme-mode-group', 'mode', cfg.default_theme || 'light');
   markActivePill('theme-accent-group', 'accent', cfg.default_accent || 'blue');
   const passwordGate = document.getElementById('password-gate-enabled');
   if (passwordGate) passwordGate.checked = cfg.password_gate_enabled !== false;
+  const voiceEngine = document.getElementById('voice-transcription-engine');
+  if (voiceEngine) voiceEngine.value = voiceTranscription.engine || 'local';
+  const embeddingEngine = document.getElementById('voice-embedding-engine');
+  if (embeddingEngine) embeddingEngine.value = voiceEmbedding.engine || 'api';
   if (document.getElementById('brand-name')) document.getElementById('brand-name').value = brand.name || '';
   if (document.getElementById('brand-short-name')) document.getElementById('brand-short-name').value = brand.short_name || '';
   if (document.getElementById('brand-logo-mark')) document.getElementById('brand-logo-mark').value = brand.logo_mark || '';
@@ -4733,6 +5323,7 @@ function renderSiteConfigForm() {
   if (forecastSection && !isAdminFeatureEnabled('stock_forecast') && forecastSection.style.display !== 'none') {
     showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
   }
+  renderAdminLlmRegistry();
   renderTenantConfigList();
 }
 
@@ -4762,6 +5353,7 @@ async function saveSiteConfig() {
   const featureFlags = {};
   const passwordGate = document.getElementById('password-gate-enabled');
   const tenants = ensureAdminTenants().map((tenant) => ({ ...tenant }));
+  const llmRegistry = ensureAdminLlmRegistry();
   ['fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'vip', 'dm', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     featureFlags[key] = Boolean(checkbox && checkbox.checked);
@@ -4770,6 +5362,29 @@ async function saveSiteConfig() {
     default_theme: adminSiteConfig.default_theme || 'light',
     default_accent: adminSiteConfig.default_accent || 'blue',
     password_gate_enabled: Boolean(passwordGate && passwordGate.checked),
+    voice_transcription: {
+      engine: document.getElementById('voice-transcription-engine')
+        ? document.getElementById('voice-transcription-engine').value
+        : ((adminSiteConfig.voice_transcription || {}).engine || 'local'),
+    },
+    voice_embedding: {
+      engine: document.getElementById('voice-embedding-engine')
+        ? document.getElementById('voice-embedding-engine').value
+        : ((adminSiteConfig.voice_embedding || {}).engine || 'local'),
+    },
+    llm_registry: {
+      default_model_key: llmRegistry.default_model_key || '',
+      models: (Array.isArray(llmRegistry.models) ? llmRegistry.models : []).map((model, index) => ({
+        key: String(model.key || `model_${index + 1}`),
+        label: String(model.label || model.key || `模型 ${index + 1}`),
+        provider: String(model.provider || 'openai'),
+        model_name: String(model.model_name || ''),
+        base_url: String(model.base_url || ''),
+        api_key: String(model.api_key || ''),
+        purpose: String(model.purpose || 'general'),
+        enabled: model.enabled !== false,
+      })),
+    },
     brand: {
       ...(adminSiteConfig.brand || {}),
       name: document.getElementById('brand-name') ? document.getElementById('brand-name').value : '',
@@ -4927,6 +5542,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const section = new URLSearchParams(window.location.search).get('section');
   if (section && analyticsTitles[section]) {
     showAnalyticsSection(section);
+    return;
+  }
+  if (section === 'settings') {
+    showSection('settings-appearance');
     return;
   }
   if (section && sectionTitles[section]) {

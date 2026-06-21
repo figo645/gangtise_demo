@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>{{ brand_config.name }} — {{ brand_config.tagline }}</title>
 <link rel="stylesheet" href="/static/css/style.css">
+<link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
 <script>
   window.SITE_CONFIG = {{ site_config | tojson }};
   window.ACTIVE_TENANT = {{ active_tenant | tojson if active_tenant else 'null' }};
@@ -14,6 +15,7 @@
   try { localStorage.setItem('gangtise_theme_mode', 'light'); } catch (e) {}
 </script>
 <script src="/static/js/theme.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
 <style>
 /* ===== BASE ===== */
 body { background: var(--surface-2); color: var(--text-main); }
@@ -1619,14 +1621,7 @@ body { background: var(--surface-2); color: var(--text-main); }
 }
 .review-rich-editor {
   min-height:180px;
-  outline:none;
-  font-size:13px;
-  color:var(--text-main);
-  line-height:1.8;
-}
-.review-rich-editor:empty:before {
-  content:attr(data-placeholder);
-  color:var(--gray-400);
+  overflow:hidden;
 }
 .review-prompt-tag {
   font-size:11px;
@@ -1648,6 +1643,63 @@ body { background: var(--surface-2); color: var(--text-main); }
   font-size:14px;
   color:var(--text-main);
   font-weight:700;
+}
+.knowledge-rich-shell {
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:14px;
+  overflow:hidden;
+}
+.knowledge-editor-loading,
+.knowledge-rich-help {
+  padding:10px 12px;
+  font-size:11px;
+  color:var(--gray-400);
+  line-height:1.7;
+}
+.knowledge-rich-help {
+  border-top:1px solid rgba(47,116,192,0.08);
+  background:#FFFFFF;
+}
+.knowledge-rich-editor .ql-toolbar.ql-snow,
+.review-rich-editor .ql-toolbar.ql-snow {
+  border:none;
+  border-bottom:1px solid rgba(47,116,192,0.10);
+  background:#FFFFFF;
+}
+.knowledge-rich-editor .ql-container.ql-snow,
+.review-rich-editor .ql-container.ql-snow {
+  border:none;
+  background:#F8FBFF;
+}
+.knowledge-rich-editor .ql-editor,
+.review-rich-editor .ql-editor {
+  min-height:180px;
+  font-size:13px;
+  line-height:1.8;
+  color:var(--text-main);
+}
+.knowledge-rich-editor .ql-editor.ql-blank::before,
+.review-rich-editor .ql-editor.ql-blank::before {
+  color:var(--gray-400);
+  font-style:normal;
+}
+.knowledge-rich-editor .ql-editor img,
+.review-rich-editor .ql-editor img {
+  max-width:100%;
+  border-radius:10px;
+  display:block;
+  margin:10px 0;
+}
+.knowledge-rich-editor .ql-editor blockquote,
+.review-rich-editor .ql-editor blockquote {
+  border-left:3px solid rgba(47,116,192,0.18);
+  margin:10px 0;
+  padding-left:12px;
+  color:var(--text-sub);
+}
+.review-rich-toolbar .review-rich-tool {
+  border-radius:999px;
 }
 @media (max-width: 420px) {
   .review-source-grid,
@@ -2329,21 +2381,22 @@ body,
           <div>
             <div style="font-size:15px;font-weight:700;color:var(--white);margin-bottom:8px">大V知识录入</div>
             <div style="font-size:12px;color:var(--gray-400);line-height:1.8">
-              你当前是大V视角，可以直接从这里提交语音、文件或网页 URL，无需先跳到别的页面。
+              你当前是大V视角，可以直接从这里提交语音、文件、网页 URL 或纯文本，无需先跳到别的页面。
             </div>
           </div>
           <span class="tag tag-gold">仅大V可见</span>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px">
           <button class="btn-gold" style="padding:10px;font-size:12px" onclick="openKnowledgeIntake('voice')">语音录入</button>
           <button class="btn-outline" style="padding:10px;font-size:12px" onclick="openKnowledgeIntake('file')">上传文件</button>
           <button class="btn-outline" style="padding:10px;font-size:12px" onclick="openKnowledgeIntake('url')">添加 URL</button>
+          <button class="btn-outline" style="padding:10px;font-size:12px" onclick="openKnowledgeIntake('manual')">纯文本</button>
         </div>
       </div>
       <div class="card" style="padding:16px;margin-bottom:12px">
         <div style="font-size:15px;font-weight:700;color:var(--white);margin-bottom:8px">知识专区沉淀长期可复用的信息</div>
         <div style="font-size:12px;color:var(--gray-400);line-height:1.8">
-          它和复盘专区一样都来自消息流，但复盘专区偏“阶段性整理”，知识专区偏“长期沉淀”。对大V来说，知识通过语音输入、文件上传、网页 URL 进入系统，再沉淀成可复用的方法、框架和资料。
+          它和复盘专区一样都来自消息流，但复盘专区偏“阶段性整理”，知识专区偏“长期沉淀”。对大V来说，知识通过语音输入、文件上传、网页 URL 或纯文本编写进入系统，再沉淀成可复用的方法、框架和资料。
         </div>
       </div>
       <div class="card" style="padding:16px;margin-bottom:12px">
@@ -2840,6 +2893,13 @@ body,
   </div>
 </div>
 
+<div class="modal-overlay" id="review-ingest-result-modal" onclick="if(event.target===this)closeReviewIngestResultModal()">
+  <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <div id="review-ingest-result-modal-content"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="review-article-modal" onclick="if(event.target===this)closeReviewArticleModal()">
   <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
     <div class="modal-handle"></div>
@@ -3001,6 +3061,7 @@ let reviewTriggerDraft = {
   period: 'day',
   sourceMode: 'voice',
   paragraphMode: 'manual',
+  skipAiProcessing: true,
   selectedWatchlist: [],
   voiceTranscript: '',
   manualHtml: '',
@@ -3037,12 +3098,20 @@ const KNOWLEDGE_INPUT_TYPES = {
     defaultTitle: '最新网页资料整理',
     defaultTags: ['网页资料', '外部来源'],
   },
+  manual: {
+    label: '纯文本编写',
+    icon: '✍️',
+    desc: '适合直接输入观点、框架和验证节点，不依赖语音、文件或外部链接。',
+    placeholder: '例如：先写观点，再写证据、验证节点和风险边界，作为长期知识卡沉淀。',
+    defaultTitle: '最新文本知识整理',
+    defaultTags: ['手动编写', '观点沉淀'],
+  },
 };
 let knowledgeIntakeType = 'voice';
 let knowledgeRecording = false;
 let knowledgeUploadSamples = [];
 let knowledgeUrlPreview = null;
-let knowledgeDraft = { title: '', summary: '', url: '' };
+let knowledgeDraft = { title: '', summary: '', body: '', url: '' };
 let knowledgeEditingId = '';
 let knowledgeEntrySeq = 4;
 let knowledgeEntryStore = [
@@ -4022,20 +4091,238 @@ function getReviewPreviewText() {
   ].filter(Boolean).join('\n\n');
 }
 
+let reviewVoiceRecorder = null;
+let reviewVoiceChunks = [];
+let reviewVoiceRecording = false;
+let reviewVoiceUploading = false;
+let reviewIngestResult = null;
+let knowledgeEditors = { body: null };
+let reviewEditors = { manual: null };
+
+function openReviewIngestResultModal(title, lines) {
+  const host = document.getElementById('review-ingest-result-modal-content');
+  const modal = document.getElementById('review-ingest-result-modal');
+  if (!host || !modal) return;
+  host.innerHTML = `
+    <div class="modal-title" style="margin-bottom:10px">${escapeHtml(title || '入库结果')}</div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">测试结果</label>
+      <div class="review-preview-panel">
+        <div class="review-preview-copy">${escapeHtml((lines || []).join('\n\n'))}</div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-gold" onclick="closeReviewIngestResultModal()">我看到了，关闭</button>
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+function closeReviewIngestResultModal() {
+  const modal = document.getElementById('review-ingest-result-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function normalizeRichHtml(html) {
+  return String(html || '').replace(/<p><br><\/p>/gi, '<p></p>').trim();
+}
+
+function richHtmlToPlainText(html) {
+  const temp = document.createElement('div');
+  temp.innerHTML = String(html || '');
+  return (temp.textContent || temp.innerText || '').replace(/\u00a0/g, ' ').trim();
+}
+
+function installSharedQuillImagePaste(quill, onChange) {
+  if (!quill || !quill.root) return;
+  quill.root.addEventListener('paste', (event) => {
+    const clipboard = event.clipboardData;
+    if (!clipboard) return;
+    const items = Array.from(clipboard.items || []);
+    const imageItem = items.find((item) => item.type && item.type.startsWith('image/'));
+    if (!imageItem) return;
+    event.preventDefault();
+    const file = imageItem.getAsFile();
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const range = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
+      quill.insertEmbed(range.index, 'image', reader.result, 'user');
+      quill.setSelection(range.index + 1, 0, 'silent');
+      if (onChange) onChange();
+      showToast('截图已插入正文');
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function createSharedQuill(containerId, placeholder, html, onChange) {
+  const host = document.getElementById(containerId);
+  if (!host || typeof window.Quill === 'undefined') return null;
+  host.innerHTML = '';
+  const quill = new window.Quill(host, {
+    theme: 'snow',
+    placeholder,
+    modules: {
+      toolbar: [
+        [{ header: [1, 2, false] }],
+        ['bold', 'italic', 'underline', 'blockquote'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        ['link', 'image'],
+        ['clean'],
+      ],
+    },
+  });
+  const normalizedHtml = normalizeRichHtml(html);
+  if (normalizedHtml) quill.clipboard.dangerouslyPasteHTML(normalizedHtml);
+  quill.on('text-change', () => {
+    if (onChange) onChange();
+  });
+  installSharedQuillImagePaste(quill, onChange);
+  return quill;
+}
+
+function destroyKnowledgeEditors() {
+  knowledgeEditors = { body: null };
+}
+
+function syncKnowledgeDraftFromEditors() {
+  if (knowledgeEditors.body) {
+    knowledgeDraft.bodyHtml = normalizeRichHtml(knowledgeEditors.body.root.innerHTML);
+    knowledgeDraft.body = richHtmlToPlainText(knowledgeDraft.bodyHtml);
+  }
+}
+
+function ensureKnowledgeEditors() {
+  destroyKnowledgeEditors();
+  if (knowledgeIntakeType !== 'manual') return;
+  if (typeof window.Quill === 'undefined') {
+    const host = document.getElementById('knowledge-body-editor');
+    if (host) host.innerHTML = '<div class="knowledge-editor-loading">编辑器加载失败，请刷新后重试。</div>';
+    return;
+  }
+  knowledgeEditors.body = createSharedQuill(
+    'knowledge-body-editor',
+    '直接输入正文，可写观点、证据、验证节点和风险边界。',
+    knowledgeDraft.bodyHtml || (knowledgeDraft.body ? `<p>${escapeHtml(knowledgeDraft.body).replace(/\n/g, '<br>')}</p>` : ''),
+    () => syncKnowledgeDraftFromEditors(),
+  );
+}
+
+function destroyReviewEditors() {
+  reviewEditors = { manual: null };
+}
+
+function syncReviewDraftFromEditors() {
+  if (reviewEditors.manual) {
+    reviewTriggerDraft.manualHtml = normalizeRichHtml(reviewEditors.manual.root.innerHTML);
+  }
+}
+
+function ensureReviewEditors() {
+  destroyReviewEditors();
+  if (reviewTriggerDraft.sourceMode !== 'manual') return;
+  if (typeof window.Quill === 'undefined') {
+    const host = document.getElementById('review-manual-editor');
+    if (host) host.innerHTML = '<div class="knowledge-editor-loading">编辑器加载失败，请刷新后重试。</div>';
+    return;
+  }
+  reviewEditors.manual = createSharedQuill(
+    'review-manual-editor',
+    '在这里直接完善完整复盘正文，发布后会按文章形式展示给前台用户。',
+    reviewTriggerDraft.manualHtml || '',
+    () => syncReviewDraftFromEditors(),
+  );
+}
+
+function getReviewVoiceButtonLabel() {
+  if (reviewVoiceUploading) return '转写中...';
+  if (reviewVoiceRecording) return '结束录音';
+  return '开始录音';
+}
+
+function getReviewVoiceStatusText() {
+  if (reviewVoiceUploading) return '正在转写刚才的语音，请稍候';
+  if (reviewVoiceRecording) return '正在录音，结束后会自动转成文案';
+  return '点击按钮开始录音，系统会自动转成文案';
+}
+
+async function uploadReviewVoiceBlob(audioBlob) {
+  const user = getActiveDemoUser();
+  const formData = new FormData();
+  const fileName = `review-${Date.now()}.webm`;
+  formData.append('audio', audioBlob, fileName);
+  formData.append('tenant_slug', ((user || {}).tenant || {}).slug || '');
+  formData.append('period', reviewTriggerDraft.period || currentReviewPeriod || 'day');
+  formData.append('entry_point', 'h5');
+  formData.append('speaker_name', (user && (user.advisor_name || user.username)) || '');
+  const resp = await fetch('/api/review/voice-transcribe', {
+    method: 'POST',
+    body: formData,
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.success) {
+    throw new Error((data && data.error) || 'voice_transcribe_failed');
+  }
+  return data;
+}
+
+async function embedManualReviewText(text) {
+  const user = getActiveDemoUser();
+  const resp = await fetch('/api/review/manual-embed', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      text,
+      tenant_slug: ((user || {}).tenant || {}).slug || '',
+      period: reviewTriggerDraft.period || currentReviewPeriod || 'day',
+      entry_point: 'h5',
+      speaker_name: (user && (user.advisor_name || user.username)) || '',
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.success) {
+    throw new Error((data && data.error) || 'manual_embed_failed');
+  }
+  return data;
+}
+
+async function publishReviewContentEmbedding(text, transcriptionEngine, transcriptModel) {
+  const user = getActiveDemoUser();
+  const resp = await fetch('/api/review/publish-embed', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      text,
+      tenant_slug: ((user || {}).tenant || {}).slug || '',
+      period: reviewTriggerDraft.period || currentReviewPeriod || 'day',
+      entry_point: 'h5_publish',
+      speaker_name: (user && (user.advisor_name || user.username)) || '',
+      transcription_engine: transcriptionEngine || 'manual',
+      transcript_model: transcriptModel || 'manual_input',
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.success) {
+    throw new Error((data && data.error) || 'publish_embed_failed');
+  }
+  return data;
+}
+
 function renderReviewInputPanel() {
   if (reviewTriggerDraft.sourceMode === 'voice') {
     return `
       <div class="review-intake-panel">
         <div class="review-intake-toolbar">
           <div class="knowledge-record-status">
-            <span class="knowledge-live-dot" style="opacity:1"></span>
-            点击按钮模拟语音输入，系统会自动转成文案
+            <span class="knowledge-live-dot" style="opacity:${reviewVoiceRecording ? '1' : '0.35'}"></span>
+            ${getReviewVoiceStatusText()}
           </div>
-          <button class="review-input-button" onclick="captureReviewVoiceInput()">语音输入</button>
+          <button class="review-input-button" ${reviewVoiceUploading ? 'disabled' : ''} onclick="captureReviewVoiceInput()">${getReviewVoiceButtonLabel()}</button>
         </div>
         <div class="review-intake-result">
           <div class="review-intake-result-title">转写文案</div>
-          <div class="review-intake-result-text">${escapeHtml(reviewTriggerDraft.voiceTranscript || '完成语音输入后，这里会展示转写后的复盘文案。')}</div>
+          <div class="review-intake-result-text">${escapeHtml(reviewTriggerDraft.voiceTranscript || '录音结束后，这里会立即展示转写后的复盘文案。')}</div>
         </div>
       </div>
     `;
@@ -4056,18 +4343,17 @@ function renderReviewInputPanel() {
   }
   return `
     <div class="review-intake-panel">
-      <div class="review-rich-toolbar">
-        <button class="review-rich-tool" onclick="formatReviewRichText('bold')">加粗</button>
-        <button class="review-rich-tool" onclick="formatReviewRichText('insertUnorderedList')">列表</button>
-        <button class="review-rich-tool" onclick="insertReviewSectionTitle()">小标题</button>
+      <div class="knowledge-rich-shell">
+        <div class="knowledge-editor-loading">支持加粗、列表、引用、链接、贴图，适合作为大V复盘正文编辑。</div>
+        <div id="review-manual-editor" class="review-rich-editor"></div>
+        <div class="knowledge-rich-help">这里和 web 后台使用同一套富文本编辑器 Quill。</div>
       </div>
-      <div id="review-manual-editor" class="review-rich-editor" contenteditable="true" data-placeholder="在这里直接完善完整复盘正文，发布后会按文章形式展示给前台用户。">${reviewTriggerDraft.manualHtml || ''}</div>
     </div>
     `;
 }
 
 function renderReviewPromptPanel() {
-  if (reviewTriggerDraft.paragraphMode !== 'ai') return '';
+  if (reviewTriggerDraft.paragraphMode !== 'ai' || reviewTriggerDraft.skipAiProcessing) return '';
   return `
     <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">智能整理规则</label>
@@ -4138,8 +4424,17 @@ function renderReviewTriggerModal(user) {
           `).join('')}
         </div>
         <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-top:8px">
-          ${reviewTriggerDraft.paragraphMode === 'manual' ? '会直接沿用你上面写好的完整正文，不再做二次整理。' : '系统会基于输入材料和你的修改规则整理出完整复盘草稿。'}
+          ${reviewTriggerDraft.skipAiProcessing
+            ? '当前已关闭大模型处理，系统只保留原文和本地转化结果。'
+            : (reviewTriggerDraft.paragraphMode === 'manual' ? '会直接沿用你上面写好的完整正文，不再做二次整理。' : '系统会基于输入材料和你的修改规则整理出完整复盘草稿。')}
         </div>
+      </div>
+      <div class="knowledge-modal-block">
+        <label class="knowledge-modal-label">处理选项</label>
+        <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--text-main);line-height:1.7">
+          <input type="checkbox" id="review-skip-ai-processing" ${reviewTriggerDraft.skipAiProcessing ? 'checked' : ''} onchange="toggleReviewSkipAiProcessing(this.checked)" />
+          <span>不使用大模型处理。勾选后，只走原文 / 本地转化路径，不做 AI 整理。</span>
+        </label>
       </div>
       ${renderReviewPromptPanel()}
       <div class="knowledge-modal-block">
@@ -4168,6 +4463,7 @@ function renderReviewTriggerModal(user) {
         : '<button class="btn-gold" onclick="submitReviewTrigger()">生成智能复盘</button>'}
     </div>
   `;
+  ensureReviewEditors();
 }
 
 function setReviewTriggerPeriod(period) {
@@ -4207,18 +4503,86 @@ function setReviewTriggerParagraphMode(mode) {
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
+function toggleReviewSkipAiProcessing(checked) {
+  syncReviewDraftFromModal();
+  reviewTriggerDraft.skipAiProcessing = !!checked;
+  if (reviewTriggerDraft.skipAiProcessing) {
+    reviewTriggerDraft.paragraphMode = 'manual';
+    reviewTriggerDraft.aiPrompt = '';
+    reviewTriggerDraft.promptTags = [];
+  }
+  reviewTriggerDraft.previewReady = false;
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
 function syncReviewDraftFromModal() {
   const promptInput = document.getElementById('review-ai-prompt-input');
-  const manualEditor = document.getElementById('review-manual-editor');
+  const skipAiInput = document.getElementById('review-skip-ai-processing');
+  syncReviewDraftFromEditors();
   if (promptInput) reviewTriggerDraft.aiPrompt = promptInput.value;
-  if (manualEditor) reviewTriggerDraft.manualHtml = manualEditor.innerHTML;
+  if (skipAiInput) reviewTriggerDraft.skipAiProcessing = !!skipAiInput.checked;
 }
 
 function captureReviewVoiceInput() {
-  reviewTriggerDraft.voiceTranscript = '系统已转写语音口述：今天复盘只保留两条主线，AI 算力继续看订单和景气，港股互联网继续看回购与财报兑现；个股上优先跟中芯国际、腾讯控股和贵州茅台。';
-  reviewTriggerDraft.previewReady = false;
-  renderReviewTriggerModal(getActiveDemoUser());
-  showToast('语音已转成文案');
+  if (reviewVoiceUploading) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
+    showToast('当前浏览器不支持录音');
+    return;
+  }
+  if (reviewVoiceRecording && reviewVoiceRecorder) {
+    reviewVoiceRecorder.stop();
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+    reviewVoiceChunks = [];
+    reviewVoiceRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    reviewVoiceRecording = true;
+    reviewTriggerDraft.previewReady = false;
+    reviewVoiceRecorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) {
+        reviewVoiceChunks.push(event.data);
+      }
+    };
+    reviewVoiceRecorder.onerror = () => {
+      reviewVoiceRecording = false;
+      reviewVoiceUploading = false;
+      stream.getTracks().forEach((track) => track.stop());
+      renderReviewTriggerModal(getActiveDemoUser());
+      showToast('录音失败，请重试');
+    };
+    reviewVoiceRecorder.onstop = async () => {
+      reviewVoiceRecording = false;
+      reviewVoiceUploading = true;
+      renderReviewTriggerModal(getActiveDemoUser());
+      const blob = new Blob(reviewVoiceChunks, { type: reviewVoiceRecorder.mimeType || 'audio/webm' });
+      stream.getTracks().forEach((track) => track.stop());
+      try {
+        const data = await uploadReviewVoiceBlob(blob);
+        reviewTriggerDraft.voiceTranscript = data.transcript || '';
+        reviewTriggerDraft.previewReady = false;
+        reviewIngestResult = data;
+        openReviewIngestResultModal('语音转写成功（尚未入库）', [
+          `转写引擎：${data.transcript_engine || '-'}`,
+          `转写模型：${data.transcript_model || '-'}`,
+          `当前状态：仅完成转写，确认发布后才会写入向量库`,
+          `转写内容：${data.transcript || ''}`,
+        ]);
+        showToast('语音已转成文案，待确认发布');
+      } catch (error) {
+        showToast(error.message || '语音转写失败');
+      } finally {
+        reviewVoiceUploading = false;
+        reviewVoiceRecorder = null;
+        reviewVoiceChunks = [];
+        renderReviewTriggerModal(getActiveDemoUser());
+      }
+    };
+    reviewVoiceRecorder.start();
+    renderReviewTriggerModal(getActiveDemoUser());
+  }).catch(() => {
+    showToast('未获得麦克风权限');
+  });
 }
 
 function captureReviewFileInput() {
@@ -4226,22 +4590,6 @@ function captureReviewFileInput() {
   reviewTriggerDraft.previewReady = false;
   renderReviewTriggerModal(getActiveDemoUser());
   showToast('文件已转成文案');
-}
-
-function formatReviewRichText(command) {
-  const editor = document.getElementById('review-manual-editor');
-  if (!editor) return;
-  editor.focus();
-  document.execCommand(command, false);
-  syncReviewDraftFromModal();
-}
-
-function insertReviewSectionTitle() {
-  const editor = document.getElementById('review-manual-editor');
-  if (!editor) return;
-  editor.focus();
-  document.execCommand('insertHTML', false, '<p><strong>小标题</strong></p><p></p>');
-  syncReviewDraftFromModal();
 }
 
 function toggleReviewPromptTag(tag) {
@@ -4257,7 +4605,7 @@ function toggleReviewPromptTag(tag) {
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
-function submitReviewTrigger() {
+async function submitReviewTrigger() {
   const user = getActiveDemoUser();
   const runtime = ensureTenantReviewRuntime(user.tenant.id);
   currentReviewPeriod = reviewTriggerDraft.period;
@@ -4270,6 +4618,21 @@ function submitReviewTrigger() {
     if (!getReviewDraftContentText()) {
       showToast('请先补充输入内容');
       return;
+    }
+    if (reviewTriggerDraft.sourceMode === 'manual') {
+      try {
+        const manualResult = await embedManualReviewText(getReviewDraftContentText());
+        reviewIngestResult = manualResult;
+        openReviewIngestResultModal('手写正文已就绪（尚未入库）', [
+          `转写引擎：${manualResult.transcript_engine || '-'}`,
+          `转写模型：${manualResult.transcript_model || '-'}`,
+          `当前状态：仅完成正文确认，确认发布后才会写入向量库`,
+          `正文内容：${manualResult.text || ''}`,
+        ]);
+      } catch (error) {
+        showToast(error.message || '手写正文入库失败');
+        return;
+      }
     }
     runtime.kolGeneratedAt = '刚刚生成';
     runtime.kolSourceMode = reviewTriggerDraft.sourceMode;
@@ -4302,16 +4665,35 @@ function publishReviewDraft() {
   const user = getActiveDemoUser();
   if (user.role !== 'dav') return;
   const runtime = ensureTenantReviewRuntime(user.tenant.id);
-  runtime.kolPublishedAt = '刚刚发布';
-  runtime.kolGeneratedAt = '刚刚发布';
-  runtime.draftReady = false;
-  closeReviewTriggerModal();
-  renderReviewExperience();
-  loadDmConversations();
-  if (currentDmKol) {
-    loadDmMessages(currentDmKol.id);
-  }
-  showToast('复盘已发布');
+  const finalText = getReviewPreviewText();
+  const transcriptionEngine = reviewTriggerDraft.sourceMode === 'voice'
+    ? ((reviewIngestResult && reviewIngestResult.transcript_engine) || 'local')
+    : 'manual';
+  const transcriptModel = reviewTriggerDraft.sourceMode === 'voice'
+    ? ((reviewIngestResult && reviewIngestResult.transcript_model) || '')
+    : 'manual_input';
+  publishReviewContentEmbedding(finalText, transcriptionEngine, transcriptModel).then((publishResult) => {
+    reviewIngestResult = publishResult;
+    openReviewIngestResultModal('确认发布成功，已写入向量库', [
+      `转写引擎：${publishResult.transcript_engine || '-'}`,
+      `向量引擎：${publishResult.embedding_engine || '-'}`,
+      `向量模型：${publishResult.embedding_model || '-'}`,
+      `namespace：${(publishResult.vector_record && publishResult.vector_record.vector_namespace) || '-'}`,
+      `发布正文：${publishResult.text || ''}`,
+    ]);
+    runtime.kolPublishedAt = '刚刚发布';
+    runtime.kolGeneratedAt = '刚刚发布';
+    runtime.draftReady = false;
+    closeReviewTriggerModal();
+    renderReviewExperience();
+    loadDmConversations();
+    if (currentDmKol) {
+      loadDmMessages(currentDmKol.id);
+    }
+    showToast('复盘已发布并入向量库');
+  }).catch((error) => {
+    showToast(error.message || '发布入库失败');
+  });
 }
 
 function getTenantVisibleAuthors(authors) {
@@ -4367,15 +4749,25 @@ function buildKnowledgeDraft(entry) {
   return {
     title: entry && entry.title ? entry.title : '',
     summary: entry && entry.summary ? entry.summary : '',
+    body: entry && (entry.body || entry.raw_input) ? (entry.body || entry.raw_input) : '',
+    bodyHtml: entry && entry.raw_html ? entry.raw_html : (entry && (entry.body || entry.raw_input) ? `<p>${escapeHtml(entry.body || entry.raw_input).replace(/\n/g, '<br>')}</p>` : ''),
+    skipAiProcessing: entry && Object.prototype.hasOwnProperty.call(entry, 'skip_ai_processing') ? !!entry.skip_ai_processing : true,
     url: entry && entry.url ? entry.url : '',
   };
 }
 
 function getKnowledgeStatusMeta(status) {
-  if (status === 'ready') {
+  const text = String(status || '').trim();
+  if (!text) {
+    return { className: 'syncing', label: '清洗中' };
+  }
+  if (text === 'ready') {
     return { className: 'ready', label: '已同步' };
   }
-  return { className: 'syncing', label: '清洗中' };
+  if (/(同步|已|可微调|ready|Hermes)/i.test(text) && !/中/.test(text)) {
+    return { className: 'ready', label: text };
+  }
+  return { className: 'syncing', label: text };
 }
 
 function renderKnowledgeWorkbench() {
@@ -5152,7 +5544,8 @@ function renderFundamentalKolColumn() {
   const actionBlock = activeUser.role === 'dav'
     ? `
       <div class="fund-column-actions">
-        <button class="btn-gold" style="flex:1;padding:10px;font-size:12px" onclick="openKnowledgeIntake('voice')">更新今日解读</button>
+        <button class="btn-gold" style="flex:1;padding:10px;font-size:12px" onclick="openKnowledgeIntake('voice')">语音录入</button>
+        <button class="btn-outline" style="flex:1;padding:10px;font-size:12px" onclick="openKnowledgeIntake('manual')">纯文本编写</button>
         <button class="btn-outline" style="flex:1;padding:10px;font-size:12px" onclick="switchTab('knowledge')">查看知识专区</button>
       </div>
     `
@@ -5299,6 +5692,13 @@ function renderKnowledgeIntakeModal() {
       <textarea id="knowledge-summary-input" class="knowledge-modal-textarea" placeholder="${cfg.placeholder}">${escapeHtml(knowledgeDraft.summary)}</textarea>
     </div>
     <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">处理选项</label>
+      <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--text-main);line-height:1.7">
+        <input type="checkbox" id="knowledge-skip-ai-processing" ${knowledgeDraft.skipAiProcessing !== false ? 'checked' : ''} />
+        <span>不使用大模型处理。勾选后，这条知识只保留用户原文和本地 embedding，不做 AI 清洗。</span>
+      </label>
+    </div>
+    <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">同步去向</label>
       <div class="knowledge-chip-row">
         <span class="knowledge-chip">租户知识队列</span>
@@ -5311,6 +5711,7 @@ function renderKnowledgeIntakeModal() {
       <button class="btn-gold" onclick="submitKnowledgeIntake()">${isEditing ? '保存微调' : '提交入库'}</button>
     </div>
   `;
+  ensureKnowledgeEditors();
 }
 
 function renderKnowledgeIntakeTypePanel() {
@@ -5350,6 +5751,18 @@ function renderKnowledgeIntakeTypePanel() {
       </div>
     `;
   }
+  if (knowledgeIntakeType === 'manual') {
+    return `
+      <div class="knowledge-modal-block">
+        <label class="knowledge-modal-label">纯文本面板</label>
+        <div class="knowledge-rich-shell">
+          <div class="knowledge-editor-loading">支持加粗、列表、引用、链接、贴图，和 web 后台使用同一套 Quill 编辑器。</div>
+          <div id="knowledge-body-editor" class="knowledge-rich-editor"></div>
+          <div class="knowledge-rich-help">正文会同时保留纯文本内容，用于 embedding 入库。</div>
+        </div>
+      </div>
+    `;
+  }
   return `
       <div class="knowledge-modal-block">
         <label class="knowledge-modal-label">网页 URL 面板</label>
@@ -5370,9 +5783,14 @@ function syncKnowledgeDraftFromModal() {
   const titleInput = document.getElementById('knowledge-title-input');
   const summaryInput = document.getElementById('knowledge-summary-input');
   const urlInput = document.getElementById('knowledge-url-input');
+  const skipAiInput = document.getElementById('knowledge-skip-ai-processing');
+  syncKnowledgeDraftFromEditors();
   knowledgeDraft = {
     title: titleInput ? titleInput.value : knowledgeDraft.title,
     summary: summaryInput ? summaryInput.value : knowledgeDraft.summary,
+    body: knowledgeDraft.body,
+    bodyHtml: knowledgeDraft.bodyHtml,
+    skipAiProcessing: skipAiInput ? !!skipAiInput.checked : knowledgeDraft.skipAiProcessing !== false,
     url: urlInput ? urlInput.value : knowledgeDraft.url,
   };
 }
@@ -5410,6 +5828,9 @@ function toggleKnowledgeVoiceCapture() {
     if (!knowledgeDraft.summary.trim()) {
       knowledgeDraft.summary = '系统已转写语音内容：重点保留 3 条核心判断、2 个验证节点和 1 个风险边界，建议同步到知识专区供 Hermes 和复盘专区复用。';
     }
+    if (!knowledgeDraft.body.trim()) {
+      knowledgeDraft.body = '观点：\n1. 这里补充本次口述里的核心判断。\n\n验证节点：\n1. 写清楚后续要继续跟踪的节点。';
+    }
     renderKnowledgeIntakeModal();
     showToast('录音已结束，转写结果已回填');
   }
@@ -5439,12 +5860,30 @@ function previewKnowledgeUrl() {
   renderKnowledgeIntakeModal();
 }
 
-function submitKnowledgeIntake() {
+async function saveManualKnowledgeEntry(payload) {
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  if (!tenantSlug) throw new Error('tenant_missing');
+  const resp = await fetch('/api/kol/knowledge/manual', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      tenant_slug: tenantSlug,
+      ...payload,
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) throw new Error(data.error || 'knowledge_manual_save_failed');
+  return data;
+}
+
+async function submitKnowledgeIntake() {
   const activeUser = getActiveDemoUser();
   const cfg = KNOWLEDGE_INPUT_TYPES[knowledgeIntakeType];
   syncKnowledgeDraftFromModal();
   const rawTitle = (knowledgeDraft.title || '').trim();
   const rawSummary = (knowledgeDraft.summary || '').trim();
+  const rawBody = (knowledgeDraft.body || '').trim();
   const editingEntry = knowledgeEditingId ? getKnowledgeEntryById(knowledgeEditingId) : null;
   if (knowledgeIntakeType === 'file' && !knowledgeUploadSamples.length) {
     showToast('请先选择至少一个文件');
@@ -5454,8 +5893,50 @@ function submitKnowledgeIntake() {
     showToast('请先抓取网页摘要');
     return;
   }
+  if (knowledgeIntakeType === 'manual' && !rawBody && !rawSummary) {
+    showToast('请先输入正文或摘要');
+    return;
+  }
   const title = rawTitle || cfg.defaultTitle;
   const summary = rawSummary || cfg.placeholder.replace('例如：', '');
+  if (knowledgeIntakeType === 'manual') {
+    try {
+      const payload = await saveManualKnowledgeEntry({
+        id: editingEntry ? editingEntry.id : '',
+        title,
+        summary,
+        body: rawBody || summary,
+        raw_html: knowledgeDraft.bodyHtml || '',
+        skip_ai_processing: knowledgeDraft.skipAiProcessing !== false,
+      });
+      knowledgeEntryStore = (payload.knowledge_hub && Array.isArray(payload.knowledge_hub.items) ? payload.knowledge_hub.items : knowledgeEntryStore).map((item, index) => ({
+        tenantId: activeUser.tenant.id,
+        sourceDetail: item.source_detail || item.sourceDetail || '',
+        voiceMinutes: item.voice_minutes,
+        destination: Array.isArray(item.sync_targets) && item.sync_targets.length ? item.sync_targets[0] : '已同步知识专区',
+        time: index === 0 ? '刚刚' : (item.time || '1分钟前'),
+        body: item.body || item.raw_input || '',
+        ...item,
+      }));
+      renderKnowledgeExperience();
+      closeKnowledgeIntake();
+      knowledgeEditingId = '';
+      knowledgeDraft = buildKnowledgeDraft();
+      openReviewIngestResultModal(editingEntry ? '知识微调成功，已写入向量库' : '知识入库成功，已写入向量库', [
+        `embedding 引擎：${payload.embedding_engine || '-'}`,
+        `embedding 模型：${payload.embedding_model || '-'}`,
+        `存储方式：${(payload.vector_record && payload.vector_record.storage_mode) || '-'}`,
+        `namespace：${(payload.vector_record && payload.vector_record.vector_namespace) || '-'}`,
+        `知识标题：${title}`,
+        `知识摘要：${summary}`,
+        `正文预览：${(rawBody || summary || '').slice(0, 180)}`,
+      ]);
+      return;
+    } catch (error) {
+      showToast(error.message || '知识入库失败');
+      return;
+    }
+  }
   let sourceDetail = '';
   if (knowledgeIntakeType === 'voice') {
     const minutes = editingEntry && editingEntry.voiceMinutes ? editingEntry.voiceMinutes : 6;
@@ -5475,6 +5956,7 @@ function submitKnowledgeIntake() {
     editingEntry.time = '刚刚修改';
     editingEntry.tags = cfg.defaultTags.slice(0);
     editingEntry.destination = '重新同步中';
+    editingEntry.body = rawBody;
     editingEntry.files = knowledgeIntakeType === 'file' ? knowledgeUploadSamples.slice(0) : [];
     editingEntry.url = knowledgeIntakeType === 'url' && knowledgeUrlPreview ? knowledgeUrlPreview.url : '';
     editingEntry.voiceMinutes = knowledgeIntakeType === 'voice' ? (editingEntry.voiceMinutes || 6) : undefined;
@@ -5504,6 +5986,7 @@ function submitKnowledgeIntake() {
     time: '刚刚',
     tags: cfg.defaultTags.slice(0),
     destination: '同步中',
+    body: rawBody,
     files: knowledgeIntakeType === 'file' ? knowledgeUploadSamples.slice(0) : [],
     url: knowledgeIntakeType === 'url' && knowledgeUrlPreview ? knowledgeUrlPreview.url : '',
     voiceMinutes: knowledgeIntakeType === 'voice' ? 6 : undefined,

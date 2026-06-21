@@ -6,6 +6,7 @@ import math
 import statistics
 import time
 import re
+import hashlib
 from pathlib import Path
 from html import escape as html_escape
 from html.parser import HTMLParser
@@ -16,6 +17,17 @@ from urllib.parse import urlsplit, parse_qsl
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 from hmac import compare_digest
+import requests
+import psycopg2
+from psycopg2.extras import Json
+try:
+    from faster_whisper import WhisperModel
+except Exception:
+    WhisperModel = None
+try:
+    from sentence_transformers import SentenceTransformer
+except Exception:
+    SentenceTransformer = None
 
 app = Flask(__name__)
 app.config.update(
@@ -28,6 +40,23 @@ AUTH_PASSWORD = os.environ.get("GANGTISE_DEMO_PASSWORD", "gangtise")
 AUTH_SESSION_KEY = "gangtise_auth"
 H5_USER_SESSION_KEY = "current_h5_username"
 DB_PATH = os.environ.get("GANGTISE_DEMO_DB", os.path.join(os.path.dirname(__file__), "gangtise_demo.db"))
+VECTOR_DB_HOST = os.environ.get("VECTOR_DB_HOST") or os.environ.get("IP") or "129.211.65.53"
+VECTOR_DB_PORT = int(os.environ.get("VECTOR_DB_PORT", "5432"))
+VECTOR_DB_NAME = os.environ.get("POSTGRES_DB", "sprint_dashboard")
+VECTOR_DB_USER = os.environ.get("POSTGRES_USER", "postgres")
+VECTOR_DB_PASSWORD = os.environ.get("POSTGRES_PASSWORD", "your_password")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
+OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
+OPENAI_AUDIO_MODEL = os.environ.get("OPENAI_AUDIO_MODEL", "whisper-1").strip() or "whisper-1"
+OPENAI_AUDIO_LANGUAGE = os.environ.get("OPENAI_AUDIO_LANGUAGE", "zh").strip() or "zh"
+OPENAI_EMBEDDING_MODEL = os.environ.get("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small").strip() or "text-embedding-3-small"
+LOCAL_WHISPER_MODEL_SIZE = os.environ.get("LOCAL_WHISPER_MODEL_SIZE", "small").strip() or "small"
+LOCAL_WHISPER_DEVICE = os.environ.get("LOCAL_WHISPER_DEVICE", "cpu").strip() or "cpu"
+LOCAL_WHISPER_COMPUTE_TYPE = os.environ.get("LOCAL_WHISPER_COMPUTE_TYPE", "int8").strip() or "int8"
+LOCAL_EMBEDDING_MODEL_NAME = os.environ.get("LOCAL_EMBEDDING_MODEL_NAME", "BAAI/bge-small-zh-v1.5").strip() or "BAAI/bge-small-zh-v1.5"
+PGVECTOR_TARGET_DIM = int(os.environ.get("PGVECTOR_TARGET_DIM", "1536"))
+VOICE_UPLOAD_MAX_BYTES = int(os.environ.get("VOICE_UPLOAD_MAX_BYTES", str(25 * 1024 * 1024)))
+ALLOWED_AUDIO_EXTENSIONS = {".mp3", ".mp4", ".m4a", ".wav", ".webm", ".ogg", ".mpeg", ".mpga"}
 SITE_CONFIG_KEY = "site_config"
 FORECAST_WORKFLOW_KEY = "forecast_workflow_graph"
 MARKET_DASHBOARD_REGISTRY_PATH = Path(
@@ -285,6 +314,16 @@ DEFAULT_SITE_CONFIG = {
     "default_theme": "light",
     "default_accent": "blue",
     "password_gate_enabled": True,
+    "voice_transcription": {
+        "engine": "local",
+    },
+    "voice_embedding": {
+        "engine": "local",
+    },
+    "llm_registry": {
+        "default_model_key": "",
+        "models": [],
+    },
     "brand": DEFAULT_BRAND_CONFIG,
     "default_tenant_slug": DEFAULT_TENANTS[0]["slug"],
     "tenants": DEFAULT_TENANTS,
@@ -301,6 +340,41 @@ DEFAULT_SITE_CONFIG = {
         "workbench": True,
     },
 }
+
+def normalize_llm_model_config(source, index=0):
+    raw = source if isinstance(source, dict) else {}
+    key = str(raw.get("key") or f"model_{index + 1}").strip() or f"model_{index + 1}"
+    purpose = str(raw.get("purpose") or "general").strip().lower() or "general"
+    return {
+        "key": key,
+        "label": str(raw.get("label") or key).strip() or key,
+        "provider": str(raw.get("provider") or "openai").strip() or "openai",
+        "model_name": str(raw.get("model_name") or "").strip(),
+        "base_url": str(raw.get("base_url") or "").strip(),
+        "api_key": str(raw.get("api_key") or "").strip(),
+        "purpose": purpose,
+        "enabled": bool(raw.get("enabled", True)),
+    }
+
+
+def normalize_llm_registry_config(source=None):
+    raw = source if isinstance(source, dict) else {}
+    items = raw.get("models") if isinstance(raw.get("models"), list) else []
+    models = []
+    for index, item in enumerate(items[:40]):
+        if not isinstance(item, dict):
+            continue
+        models.append(normalize_llm_model_config(item, index=index))
+    default_model_key = str(raw.get("default_model_key") or "").strip()
+    if default_model_key and not any(model["key"] == default_model_key for model in models):
+        default_model_key = ""
+    if not default_model_key and models:
+        general_models = [model for model in models if model.get("purpose") == "general" and model.get("enabled")]
+        default_model_key = (general_models[0] if general_models else models[0]).get("key") or ""
+    return {
+        "default_model_key": default_model_key,
+        "models": models,
+    }
 
 DEFAULT_FORECAST_TUNING = {
     "factor_score_clip": 8.0,
@@ -397,6 +471,8 @@ def normalize_tenant_config(source=None, index=0):
         tenant["portal_cms"] = copy.deepcopy(raw["portal_cms"])
     if isinstance(raw.get("fund_dashboard_config"), dict):
         tenant["fund_dashboard_config"] = copy.deepcopy(raw["fund_dashboard_config"])
+    if isinstance(raw.get("knowledge_hub_config"), dict):
+        tenant["knowledge_hub_config"] = copy.deepcopy(raw["knowledge_hub_config"])
     return tenant
 
 
@@ -625,6 +701,150 @@ def update_tenant_portal_cms(tenant_slug, portal_cms):
     return save_site_config(next_config)
 
 
+def default_tenant_knowledge_items(tenant):
+    is_lisa = tenant["slug"] == "lisa"
+    return [
+        {
+            "id": "kb-hk-internet-valuation",
+            "type": "file",
+            "title": "港股互联网估值框架",
+            "source": "文件上传 · 12页 PDF",
+            "source_detail": "来源：文件上传 · 港股互联网估值框架.pdf · 12页",
+            "status": "可微调",
+            "summary": "拆出回购强度、估值带与催化条件，已关联腾讯 / 美团 / 阿里。",
+            "tags": ["估值框架", "港股互联网"],
+            "raw_input": "原始材料重点包括：腾讯 / 美团 / 阿里的历史估值带、回购力度、自由现金流、财报兑现节奏，以及对行业竞争格局和监管预期的补充说明。",
+            "key_points": ["回购强度直接影响估值修复斜率", "估值带必须结合利润兑现看，不单看 PS/PE", "催化条件要和财报、回购公告、南向资金一起验证"],
+            "validation_nodes": ["财报后利润率是否兑现", "回购节奏是否持续", "南向资金是否继续净流入"],
+            "sync_targets": ["租户知识队列", "知识专区", "Hermes 上下文", "港股互联网 Skill"],
+            "tuning_focus": ["标题是否更贴近大V表达", "摘要是否保留关键判断", "关键要点是否足够结构化", "验证节点是否可直接复用到复盘"],
+            "notes": "适合继续补公司层估值带、买回购和财报验证的先后顺序，以及哪些结论只适用于龙头公司。",
+            "files": ["港股互联网估值框架.pdf"],
+        },
+        {
+            "id": "kb-may-industry-call",
+            "type": "voice",
+            "title": "5月产业电话会录音整理",
+            "source": "语音转写 · 28分钟",
+            "source_detail": "来源：语音转写 · 产业电话会录音 · 28分钟",
+            "status": "已同步 Hermes",
+            "summary": "提炼固态电池、订单验证和量产节点，当前可直接被 Hermes 调用。",
+            "tags": ["电话会", "新能源"],
+            "raw_input": "原始语音中重点讨论了固态电池量产路径、下游车厂验证节奏、订单兑现的不确定项，以及短期市场情绪和长期产业趋势的区别。",
+            "key_points": ["先分清产业趋势和交易情绪", "订单验证比概念热度更重要", "量产节点要拆成时间、客户、成本三层"],
+            "validation_nodes": ["样品送测是否进入下一阶段", "订单是否从试产切换到量产", "成本曲线是否出现拐点"],
+            "sync_targets": ["租户知识队列", "知识专区", "Hermes 上下文", "新能源相关复盘"],
+            "tuning_focus": ["转写口语是否要收敛成书面结论", "关键判断是否已经拆成可复用节点", "风险边界是否写清", "是否适合直接进入复盘或 Hermes"],
+            "notes": "建议把口语化表达进一步压缩成“观点 - 证据 - 验证节点 - 风险”四段式，便于 Hermes 后续直接调用。",
+            "voice_minutes": 28,
+        },
+        {
+            "id": "kb-semiconductor-cycle",
+            "type": "url",
+            "title": "半导体景气验证节点",
+            "source": "网页 URL · 3篇行业资料",
+            "source_detail": "来源：网页 URL · 3篇行业资料抓取摘要",
+            "status": "同步中",
+            "summary": "整理产能利用率、成熟制程价格与资本开支节奏，适合继续补充验证节点。",
+            "tags": ["半导体", "网页资料"],
+            "raw_input": "系统已抓取 3 篇行业网页资料，内容涉及成熟制程价格变化、产能利用率、资本开支收缩节奏，以及下游消费电子和服务器需求恢复情况。",
+            "key_points": ["成熟制程价格是景气验证先行指标", "资本开支变化会领先反映景气预期", "不能只看单篇新闻，要归并成长期跟踪节点"],
+            "validation_nodes": ["晶圆代工价格是否止跌", "主要厂商 capex 指引是否收缩", "下游需求恢复是否扩散到更多品类"],
+            "sync_targets": ["租户知识队列", "知识专区", "Hermes 上下文"],
+            "tuning_focus": ["网页摘要是否准确", "要点是否去噪", "验证节点是否可持续追踪", "是否需要补更多来源链接"],
+            "notes": "当前更适合补充来源链接、删除噪音表述，并把验证节点改成可按月跟踪的版本。",
+            "url": "https://example.com/semiconductor-cycle",
+        },
+        {
+            "id": "kb-manual-thesis-note",
+            "type": "manual",
+            "title": is_lisa and "港股互联网判断口径手记" or "科技主线判断手记",
+            "source": "纯文本编写",
+            "source_detail": "来源：纯文本编写 · 186字",
+            "status": "可微调",
+            "summary": is_lisa and "手工整理港股互联网判断口径，保留估值、回购与财报验证顺序。" or "手工整理科技主线判断框架，保留景气、订单和验证节点顺序。",
+            "tags": ["手动编写", "观点沉淀"],
+            "raw_input": is_lisa and "观点：港股互联网先看回购与现金流，再看财报兑现，最后才看估值修复弹性。\n\n验证节点：回购节奏、利润率、南向资金。"
+                or "观点：科技主线先看产业趋势和订单兑现，再看估值扩张是否有利润支撑。\n\n验证节点：订单、毛利率、资本开支。",
+            "key_points": ["先写观点，再写证据", "验证节点要能持续跟踪", "风险边界要单独写清楚"],
+            "validation_nodes": ["继续跟踪验证节点是否兑现"],
+            "sync_targets": ["租户知识队列", "知识专区", "Hermes 上下文"],
+            "tuning_focus": ["收敛表达", "补证据链", "补风险边界"],
+            "notes": "适合直接从后台或 H5 手工录入，再继续细化成长期知识卡。",
+            "body": is_lisa and "观点：港股互联网先看回购与现金流，再看财报兑现，最后才看估值修复弹性。\n\n验证节点：回购节奏、利润率、南向资金。"
+                or "观点：科技主线先看产业趋势和订单兑现，再看估值扩张是否有利润支撑。\n\n验证节点：订单、毛利率、资本开支。",
+        },
+    ]
+
+
+def normalize_knowledge_hub_config(source, tenant):
+    defaults = {
+        "summary": "知识库支持语音、文件、URL 和纯文本四种入口；历史内容允许点开弹框继续微调，修改后会重新同步到知识专区和 Hermes 上下文。",
+        "items": default_tenant_knowledge_items(tenant),
+    }
+    raw = source if isinstance(source, dict) else {}
+    summary = str(raw.get("summary") or defaults["summary"]).strip() or defaults["summary"]
+    items = raw.get("items") if isinstance(raw.get("items"), list) else defaults["items"]
+    normalized_items = []
+    for index, item in enumerate(items[:80]):
+        if not isinstance(item, dict):
+            continue
+        item_type = str(item.get("type") or "manual").strip().lower()
+        if item_type not in {"voice", "file", "url", "manual"}:
+            item_type = "manual"
+        title = str(item.get("title") or f"知识条目 {index + 1}").strip() or f"知识条目 {index + 1}"
+        summary_text = str(item.get("summary") or "").strip()
+        raw_input = str(item.get("raw_input") or item.get("body") or "").strip()
+        notes = str(item.get("notes") or "").strip()
+        normalized_items.append({
+            "id": str(item.get("id") or f"kb-{slugify_code(title, 'item')}-{index + 1}").strip() or f"kb-item-{index + 1}",
+            "type": item_type,
+            "title": title,
+            "source": str(item.get("source") or "").strip() or ("纯文本编写" if item_type == "manual" else title),
+            "source_detail": str(item.get("source_detail") or "").strip(),
+            "status": str(item.get("status") or "可微调").strip() or "可微调",
+            "summary": summary_text,
+            "tags": [str(tag).strip() for tag in (item.get("tags") if isinstance(item.get("tags"), list) else []) if str(tag).strip()][:8],
+            "raw_input": raw_input,
+            "raw_html": str(item.get("raw_html") or "").strip(),
+            "key_points": [str(point).strip() for point in (item.get("key_points") if isinstance(item.get("key_points"), list) else []) if str(point).strip()][:8],
+            "validation_nodes": [str(point).strip() for point in (item.get("validation_nodes") if isinstance(item.get("validation_nodes"), list) else []) if str(point).strip()][:8],
+            "sync_targets": [str(point).strip() for point in (item.get("sync_targets") if isinstance(item.get("sync_targets"), list) else []) if str(point).strip()][:8],
+            "tuning_focus": [str(point).strip() for point in (item.get("tuning_focus") if isinstance(item.get("tuning_focus"), list) else []) if str(point).strip()][:8],
+            "notes": notes,
+            "notes_html": str(item.get("notes_html") or "").strip(),
+            "files": [str(name).strip() for name in (item.get("files") if isinstance(item.get("files"), list) else []) if str(name).strip()][:12],
+            "url": str(item.get("url") or "").strip(),
+            "voice_minutes": item.get("voice_minutes") if isinstance(item.get("voice_minutes"), int) else None,
+            "body": str(item.get("body") or raw_input).strip(),
+        })
+    if not normalized_items:
+        normalized_items = copy.deepcopy(defaults["items"])
+    return {"summary": summary, "items": normalized_items}
+
+
+def resolve_tenant_knowledge_hub(tenant, config=None):
+    return normalize_knowledge_hub_config(config if isinstance(config, dict) else tenant.get("knowledge_hub_config"), tenant)
+
+
+def update_tenant_knowledge_hub_config(tenant_slug, knowledge_hub_config):
+    site_config = get_site_config()
+    tenants = get_tenant_configs(site_config)
+    updated = False
+    for index, tenant in enumerate(tenants):
+        if tenant.get("slug") != tenant_slug:
+            continue
+        tenants[index] = dict(tenant)
+        tenants[index]["knowledge_hub_config"] = normalize_knowledge_hub_config(knowledge_hub_config, tenant)
+        updated = True
+        break
+    if not updated:
+        return None
+    next_config = dict(site_config)
+    next_config["tenants"] = tenants
+    return save_site_config(next_config)
+
+
 def get_dashboard_card_target(layout):
     layout_key = str(layout or "").strip().lower()
     if layout_key == "3x3":
@@ -814,6 +1034,7 @@ def normalize_tenant_configs(source=None):
 def normalize_site_config(source=None):
     merged = _merge_site_config(copy.deepcopy(DEFAULT_SITE_CONFIG), source or {})
     merged["brand"] = normalize_brand_config(merged.get("brand"))
+    merged["llm_registry"] = normalize_llm_registry_config(merged.get("llm_registry"))
     merged["tenants"] = normalize_tenant_configs(merged.get("tenants"))
     tenant_slugs = [tenant["slug"] for tenant in merged["tenants"]]
     default_tenant_slug = str(merged.get("default_tenant_slug", "") or "").strip()
@@ -5301,6 +5522,1078 @@ def get_platform_short_name(site_config=None):
     return get_platform_brand(site_config).get("short_name", DEFAULT_BRAND_CONFIG["short_name"])
 
 
+def get_voice_transcription_config(site_config=None):
+    config = site_config or get_site_config()
+    section = config.get("voice_transcription") if isinstance(config, dict) else {}
+    engine = str((section or {}).get("engine") or "local").strip().lower()
+    if engine not in {"local", "api"}:
+        engine = "local"
+    return {"engine": engine}
+
+
+def get_voice_embedding_config(site_config=None):
+    config = site_config or get_site_config()
+    section = config.get("voice_embedding") if isinstance(config, dict) else {}
+    engine = str((section or {}).get("engine") or "local").strip().lower()
+    if engine not in {"local", "api"}:
+        engine = "local"
+    return {"engine": engine}
+
+
+def get_default_llm_config(site_config=None, purpose="general"):
+    config = site_config or get_site_config()
+    registry = normalize_llm_registry_config((config or {}).get("llm_registry"))
+    purpose_key = str(purpose or "general").strip().lower() or "general"
+    default_key = str(registry.get("default_model_key") or "").strip()
+    models = registry.get("models") if isinstance(registry.get("models"), list) else []
+    selected = None
+    if default_key:
+        for item in models:
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("key") or "").strip() == default_key:
+                selected = item
+                break
+    if not selected:
+        for item in models:
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("purpose") or "").strip().lower() != purpose_key:
+                continue
+            if item.get("enabled", True) is False:
+                continue
+            selected = item
+            break
+    if not selected or selected.get("enabled", True) is False:
+        return None
+    return normalize_llm_model_config(selected)
+
+
+def _normalize_openai_compatible_base_url(base_url):
+    normalized = str(base_url or "").strip().rstrip("/")
+    if not normalized:
+        normalized = OPENAI_BASE_URL
+    return normalized.rstrip("/")
+
+
+def _extract_llm_text_content(content):
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+                continue
+            if not isinstance(item, dict):
+                continue
+            text_value = item.get("text")
+            if isinstance(text_value, str) and text_value.strip():
+                parts.append(text_value.strip())
+                continue
+            if item.get("type") == "output_text" and isinstance(item.get("text"), str):
+                parts.append(item.get("text").strip())
+        return "\n".join(part for part in parts if part).strip()
+    return ""
+
+
+def call_openai_compatible_llm(model_config, system_prompt, user_prompt):
+    config = normalize_llm_model_config(model_config)
+    model_name = str(config.get("model_name") or "").strip()
+    if not model_name:
+        raise RuntimeError("llm_model_name_missing")
+    api_key = str(config.get("api_key") or "").strip() or OPENAI_API_KEY
+    if not api_key:
+        raise RuntimeError("llm_api_key_missing")
+    endpoint_base = _normalize_openai_compatible_base_url(config.get("base_url"))
+    response = requests.post(
+        f"{endpoint_base}/chat/completions",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": model_name,
+            "temperature": 0.25,
+            "messages": [
+                {"role": "system", "content": str(system_prompt or "").strip()},
+                {"role": "user", "content": str(user_prompt or "").strip()},
+            ],
+        },
+        timeout=120,
+    )
+    if response.status_code >= 400:
+        raise RuntimeError(f"llm_request_failed:{response.status_code}:{response.text[:240]}")
+    payload = response.json()
+    choices = payload.get("choices") if isinstance(payload, dict) else None
+    if not choices or not isinstance(choices, list):
+        raise RuntimeError("invalid_llm_payload")
+    first_choice = choices[0] if isinstance(choices[0], dict) else {}
+    message = first_choice.get("message") if isinstance(first_choice.get("message"), dict) else {}
+    content = _extract_llm_text_content(message.get("content"))
+    if not content:
+        raise RuntimeError("empty_llm_response")
+    return content
+
+
+def get_review_vector_db_connection():
+    return psycopg2.connect(
+        host=VECTOR_DB_HOST,
+        port=VECTOR_DB_PORT,
+        dbname=VECTOR_DB_NAME,
+        user=VECTOR_DB_USER,
+        password=VECTOR_DB_PASSWORD,
+        connect_timeout=8,
+    )
+
+
+def _safe_audio_filename(filename):
+    raw = os.path.basename(str(filename or "").strip())
+    sanitized = re.sub(r"[^A-Za-z0-9._-]+", "_", raw)
+    return sanitized[:120] or f"review_voice_{int(time.time())}.webm"
+
+
+def _guess_audio_content_type(filename, provided_type):
+    content_type = str(provided_type or "").strip().lower()
+    if content_type.startswith("audio/") or content_type in {"video/webm", "video/mp4"}:
+        return content_type
+    suffix = Path(str(filename or "")).suffix.lower()
+    mapping = {
+        ".mp3": "audio/mpeg",
+        ".mp4": "audio/mp4",
+        ".m4a": "audio/mp4",
+        ".wav": "audio/wav",
+        ".webm": "audio/webm",
+        ".ogg": "audio/ogg",
+        ".mpeg": "audio/mpeg",
+        ".mpga": "audio/mpeg",
+    }
+    return mapping.get(suffix, "application/octet-stream")
+
+
+def _is_allowed_audio_upload(filename, content_type):
+    suffix = Path(str(filename or "")).suffix.lower()
+    normalized_type = str(content_type or "").strip().lower()
+    if suffix in ALLOWED_AUDIO_EXTENSIONS:
+        return True
+    return normalized_type.startswith("audio/") or normalized_type in {"video/webm", "video/mp4"}
+
+
+def _write_temp_audio_file(audio_bytes, filename):
+    safe_suffix = Path(filename).suffix.lower() or ".webm"
+    temp_dir = Path("/private/tmp") if Path("/private/tmp").exists() else Path("/tmp")
+    temp_path = temp_dir / f"gangtise_review_{int(time.time() * 1000)}_{os.getpid()}{safe_suffix}"
+    temp_path.write_bytes(audio_bytes)
+    return temp_path
+
+
+def _load_local_whisper_model():
+    cached = g.get("local_whisper_model")
+    if cached is not None:
+        return cached
+    if WhisperModel is None:
+        raise RuntimeError("local_transcriber_dependency_missing")
+    try:
+        model = WhisperModel(
+            LOCAL_WHISPER_MODEL_SIZE,
+            device=LOCAL_WHISPER_DEVICE,
+            compute_type=LOCAL_WHISPER_COMPUTE_TYPE,
+        )
+    except Exception as exc:
+        raise RuntimeError(f"local_transcriber_init_failed:{exc}") from exc
+    g.local_whisper_model = model
+    return model
+
+
+def _load_local_embedding_model():
+    cached = g.get("local_embedding_model")
+    if cached is not None:
+        return cached
+    if SentenceTransformer is None:
+        raise RuntimeError("local_embedding_dependency_missing")
+    try:
+        model = SentenceTransformer(LOCAL_EMBEDDING_MODEL_NAME)
+    except Exception as exc:
+        raise RuntimeError(f"local_embedding_init_failed:{exc}") from exc
+    g.local_embedding_model = model
+    return model
+
+
+def _ensure_review_voice_vector_table(conn):
+    has_pgvector = False
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS review_voice_embeddings (
+                id BIGSERIAL PRIMARY KEY,
+                tenant_slug TEXT NOT NULL DEFAULT '',
+                review_period TEXT NOT NULL DEFAULT '',
+                entry_point TEXT NOT NULL DEFAULT '',
+                vector_namespace TEXT NOT NULL DEFAULT '',
+                speaker_name TEXT NOT NULL DEFAULT '',
+                original_filename TEXT NOT NULL DEFAULT '',
+                mime_type TEXT NOT NULL DEFAULT '',
+                audio_size_bytes INTEGER NOT NULL DEFAULT 0,
+                transcript_text TEXT NOT NULL,
+                transcript_hash TEXT NOT NULL,
+                transcription_engine TEXT NOT NULL DEFAULT '',
+                transcript_model TEXT NOT NULL DEFAULT '',
+                embedding_engine TEXT NOT NULL DEFAULT '',
+                embedding_model TEXT NOT NULL DEFAULT '',
+                embedding_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+                metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_review_voice_embeddings_tenant_created ON review_voice_embeddings(tenant_slug, created_at DESC)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_review_voice_embeddings_hash ON review_voice_embeddings(transcript_hash)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_review_voice_embeddings_namespace ON review_voice_embeddings(vector_namespace, created_at DESC)")
+        try:
+            cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
+        except Exception:
+            conn.rollback()
+            with conn.cursor() as retry_cur:
+                retry_cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS review_voice_embeddings (
+                        id BIGSERIAL PRIMARY KEY,
+                        tenant_slug TEXT NOT NULL DEFAULT '',
+                        review_period TEXT NOT NULL DEFAULT '',
+                        entry_point TEXT NOT NULL DEFAULT '',
+                        vector_namespace TEXT NOT NULL DEFAULT '',
+                        speaker_name TEXT NOT NULL DEFAULT '',
+                        original_filename TEXT NOT NULL DEFAULT '',
+                        mime_type TEXT NOT NULL DEFAULT '',
+                        audio_size_bytes INTEGER NOT NULL DEFAULT 0,
+                        transcript_text TEXT NOT NULL,
+                        transcript_hash TEXT NOT NULL,
+                        transcription_engine TEXT NOT NULL DEFAULT '',
+                        transcript_model TEXT NOT NULL DEFAULT '',
+                        embedding_engine TEXT NOT NULL DEFAULT '',
+                        embedding_model TEXT NOT NULL DEFAULT '',
+                        embedding_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+                        metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+                retry_cur.execute("CREATE INDEX IF NOT EXISTS idx_review_voice_embeddings_tenant_created ON review_voice_embeddings(tenant_slug, created_at DESC)")
+                retry_cur.execute("CREATE INDEX IF NOT EXISTS idx_review_voice_embeddings_hash ON review_voice_embeddings(transcript_hash)")
+                retry_cur.execute("CREATE INDEX IF NOT EXISTS idx_review_voice_embeddings_namespace ON review_voice_embeddings(vector_namespace, created_at DESC)")
+            conn.commit()
+        with conn.cursor() as check_cur:
+            check_cur.execute("ALTER TABLE review_voice_embeddings ADD COLUMN IF NOT EXISTS vector_namespace TEXT NOT NULL DEFAULT ''")
+            check_cur.execute("ALTER TABLE review_voice_embeddings ADD COLUMN IF NOT EXISTS transcription_engine TEXT NOT NULL DEFAULT ''")
+            check_cur.execute("ALTER TABLE review_voice_embeddings ADD COLUMN IF NOT EXISTS embedding_engine TEXT NOT NULL DEFAULT ''")
+            check_cur.execute("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')")
+            has_pgvector = bool(check_cur.fetchone()[0])
+            if has_pgvector:
+                check_cur.execute(
+                    f"ALTER TABLE review_voice_embeddings ADD COLUMN IF NOT EXISTS embedding_vector vector({PGVECTOR_TARGET_DIM})"
+                )
+                try:
+                    check_cur.execute(
+                        """
+                        CREATE INDEX IF NOT EXISTS idx_review_voice_embeddings_vector
+                        ON review_voice_embeddings
+                        USING ivfflat (embedding_vector vector_cosine_ops)
+                        """
+                    )
+                except Exception:
+                    conn.rollback()
+                    with conn.cursor() as recovery_cur:
+                        recovery_cur.execute(
+                            """
+                            CREATE TABLE IF NOT EXISTS review_voice_embeddings (
+                                id BIGSERIAL PRIMARY KEY,
+                                tenant_slug TEXT NOT NULL DEFAULT '',
+                                review_period TEXT NOT NULL DEFAULT '',
+                                entry_point TEXT NOT NULL DEFAULT '',
+                                speaker_name TEXT NOT NULL DEFAULT '',
+                                original_filename TEXT NOT NULL DEFAULT '',
+                                mime_type TEXT NOT NULL DEFAULT '',
+                                audio_size_bytes INTEGER NOT NULL DEFAULT 0,
+                                transcript_text TEXT NOT NULL,
+                                transcript_hash TEXT NOT NULL,
+                                transcript_model TEXT NOT NULL DEFAULT '',
+                                embedding_model TEXT NOT NULL DEFAULT '',
+                                embedding_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+                                metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+                                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                            )
+                            """
+                        )
+                        recovery_cur.execute(
+                            f"ALTER TABLE review_voice_embeddings ADD COLUMN IF NOT EXISTS embedding_vector vector({PGVECTOR_TARGET_DIM})"
+                        )
+    conn.commit()
+    return has_pgvector
+
+
+def _transcribe_audio_with_python(audio_bytes, filename, content_type):
+    if not OPENAI_API_KEY:
+        raise RuntimeError("openai_api_key_missing")
+    response = requests.post(
+        f"{OPENAI_BASE_URL}/audio/transcriptions",
+        headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+        data={
+            "model": OPENAI_AUDIO_MODEL,
+            "language": OPENAI_AUDIO_LANGUAGE,
+            "response_format": "json",
+            "prompt": "请尽量按原意转写中文金融复盘口述，保留主线、个股、风险提示和验证节点。",
+        },
+        files={"file": (filename, audio_bytes, content_type)},
+        timeout=180,
+    )
+    if response.status_code >= 400:
+        raise RuntimeError(f"transcription_request_failed:{response.status_code}:{response.text[:240]}")
+    payload = response.json()
+    transcript = str(payload.get("text") or "").strip()
+    if not transcript:
+        raise RuntimeError("empty_transcript")
+    return transcript
+
+
+def _transcribe_audio_locally(audio_bytes, filename):
+    temp_path = _write_temp_audio_file(audio_bytes, filename)
+    try:
+        model = _load_local_whisper_model()
+        segments, _info = model.transcribe(
+            str(temp_path),
+            language=OPENAI_AUDIO_LANGUAGE or "zh",
+            vad_filter=True,
+            beam_size=5,
+        )
+        transcript = " ".join((segment.text or "").strip() for segment in segments).strip()
+    except RuntimeError:
+        raise
+    except Exception as exc:
+        raise RuntimeError(f"local_transcription_failed:{exc}") from exc
+    finally:
+        try:
+            temp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+    if not transcript:
+        raise RuntimeError("empty_transcript")
+    return transcript
+
+
+def transcribe_review_audio(audio_bytes, filename, content_type, engine="local"):
+    normalized_engine = str(engine or "local").strip().lower()
+    if normalized_engine == "local":
+        return _transcribe_audio_locally(audio_bytes, filename), "local"
+    if normalized_engine == "api":
+        return _transcribe_audio_with_python(audio_bytes, filename, content_type), "api"
+    raise RuntimeError("unsupported_transcription_engine")
+
+
+def _build_text_embedding_with_api(text):
+    if not OPENAI_API_KEY:
+        raise RuntimeError("openai_api_key_missing")
+    response = requests.post(
+        f"{OPENAI_BASE_URL}/embeddings",
+        headers={
+            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": OPENAI_EMBEDDING_MODEL,
+            "input": text,
+        },
+        timeout=120,
+    )
+    if response.status_code >= 400:
+        raise RuntimeError(f"embedding_request_failed:{response.status_code}:{response.text[:240]}")
+    payload = response.json()
+    items = payload.get("data") if isinstance(payload, dict) else None
+    if not items or not isinstance(items, list):
+        raise RuntimeError("invalid_embedding_payload")
+    vector = items[0].get("embedding") if isinstance(items[0], dict) else None
+    if not isinstance(vector, list) or not vector:
+        raise RuntimeError("invalid_embedding_vector")
+    return [float(value) for value in vector]
+
+
+def _build_text_embedding_locally(text):
+    model = _load_local_embedding_model()
+    try:
+        vector = model.encode(text, normalize_embeddings=True)
+    except Exception as exc:
+        raise RuntimeError(f"local_embedding_failed:{exc}") from exc
+    try:
+        values = vector.tolist()
+    except Exception:
+        values = list(vector)
+    return [float(value) for value in values]
+
+
+def build_text_embedding(text, engine="api"):
+    normalized_engine = str(engine or "api").strip().lower()
+    if normalized_engine == "local":
+        return _build_text_embedding_locally(text), "local", LOCAL_EMBEDDING_MODEL_NAME
+    if normalized_engine == "api":
+        return _build_text_embedding_with_api(text), "api", OPENAI_EMBEDDING_MODEL
+    raise RuntimeError("unsupported_embedding_engine")
+
+
+def build_vector_namespace(embedding_engine, embedding_model):
+    engine_key = str(embedding_engine or "").strip().lower() or "unknown"
+    model_key = re.sub(r"[^a-z0-9]+", "_", str(embedding_model or "").strip().lower()).strip("_")
+    return f"review_voice__{engine_key}__{model_key or 'default'}"
+
+
+def _store_review_voice_embedding_record(
+    tenant_slug,
+    review_period,
+    entry_point,
+    vector_namespace,
+    speaker_name,
+    filename,
+    content_type,
+    audio_size_bytes,
+    transcript,
+    transcription_engine,
+    transcript_model,
+    embedding,
+    embedding_engine,
+    embedding_model,
+):
+    transcript_hash = hashlib.sha256(transcript.encode("utf-8")).hexdigest()
+    metadata = {
+        "client_ip": get_client_ip(),
+        "user_agent": request.headers.get("User-Agent", ""),
+        "uploaded_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "embedding_dimensions": len(embedding),
+        "vector_namespace": vector_namespace,
+    }
+    with get_review_vector_db_connection() as conn:
+        has_pgvector = _ensure_review_voice_vector_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO review_voice_embeddings (
+                    tenant_slug, review_period, entry_point, vector_namespace, speaker_name,
+                    original_filename, mime_type, audio_size_bytes,
+                    transcript_text, transcript_hash, transcription_engine, transcript_model,
+                    embedding_engine, embedding_model, embedding_json, metadata_json
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id, created_at
+                """,
+                (
+                    str(tenant_slug or "").strip(),
+                    str(review_period or "").strip(),
+                    str(entry_point or "").strip(),
+                    str(vector_namespace or "").strip(),
+                    str(speaker_name or "").strip(),
+                    filename,
+                    content_type,
+                    int(audio_size_bytes),
+                    transcript,
+                    transcript_hash,
+                    str(transcription_engine or "").strip(),
+                    str(transcript_model or "").strip(),
+                    str(embedding_engine or "").strip(),
+                    str(embedding_model or "").strip(),
+                    Json(embedding),
+                    Json(metadata),
+                ),
+            )
+            row = cur.fetchone()
+            storage_mode = "jsonb"
+            if has_pgvector and len(embedding) == PGVECTOR_TARGET_DIM:
+                vector_literal = "[" + ",".join(f"{float(value):.10f}" for value in embedding) + "]"
+                cur.execute(
+                    "UPDATE review_voice_embeddings SET embedding_vector = %s::vector WHERE id = %s",
+                    (vector_literal, row[0]),
+                )
+                storage_mode = "pgvector"
+        conn.commit()
+    return {
+        "id": int(row[0]),
+        "created_at": row[1].isoformat() if hasattr(row[1], "isoformat") else str(row[1]),
+        "storage_mode": storage_mode,
+        "embedding_dimensions": len(embedding),
+        "transcript_hash": transcript_hash,
+        "vector_namespace": vector_namespace,
+    }
+
+
+def _ensure_knowledge_embedding_table(conn):
+    has_pgvector = False
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS knowledge_embeddings (
+                id BIGSERIAL PRIMARY KEY,
+                tenant_slug TEXT NOT NULL DEFAULT '',
+                knowledge_id TEXT NOT NULL DEFAULT '',
+                knowledge_type TEXT NOT NULL DEFAULT '',
+                title TEXT NOT NULL DEFAULT '',
+                summary TEXT NOT NULL DEFAULT '',
+                body_text TEXT NOT NULL DEFAULT '',
+                source_detail TEXT NOT NULL DEFAULT '',
+                vector_namespace TEXT NOT NULL DEFAULT '',
+                embedding_engine TEXT NOT NULL DEFAULT '',
+                embedding_model TEXT NOT NULL DEFAULT '',
+                embedding_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+                metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_embeddings_tenant_created ON knowledge_embeddings(tenant_slug, created_at DESC)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_embeddings_knowledge_id ON knowledge_embeddings(knowledge_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_embeddings_namespace ON knowledge_embeddings(vector_namespace, created_at DESC)")
+        try:
+            cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
+        except Exception:
+            conn.rollback()
+            with conn.cursor() as retry_cur:
+                retry_cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS knowledge_embeddings (
+                        id BIGSERIAL PRIMARY KEY,
+                        tenant_slug TEXT NOT NULL DEFAULT '',
+                        knowledge_id TEXT NOT NULL DEFAULT '',
+                        knowledge_type TEXT NOT NULL DEFAULT '',
+                        title TEXT NOT NULL DEFAULT '',
+                        summary TEXT NOT NULL DEFAULT '',
+                        body_text TEXT NOT NULL DEFAULT '',
+                        source_detail TEXT NOT NULL DEFAULT '',
+                        vector_namespace TEXT NOT NULL DEFAULT '',
+                        embedding_engine TEXT NOT NULL DEFAULT '',
+                        embedding_model TEXT NOT NULL DEFAULT '',
+                        embedding_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+                        metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+                retry_cur.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_embeddings_tenant_created ON knowledge_embeddings(tenant_slug, created_at DESC)")
+                retry_cur.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_embeddings_knowledge_id ON knowledge_embeddings(knowledge_id)")
+                retry_cur.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_embeddings_namespace ON knowledge_embeddings(vector_namespace, created_at DESC)")
+            conn.commit()
+        with conn.cursor() as check_cur:
+            check_cur.execute("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')")
+            has_pgvector = bool(check_cur.fetchone()[0])
+            if has_pgvector:
+                check_cur.execute(
+                    f"ALTER TABLE knowledge_embeddings ADD COLUMN IF NOT EXISTS embedding_vector vector({PGVECTOR_TARGET_DIM})"
+                )
+    conn.commit()
+    return has_pgvector
+
+
+def _store_knowledge_embedding_record(
+    tenant_slug,
+    knowledge_id,
+    knowledge_type,
+    title,
+    summary,
+    body_text,
+    source_detail,
+    vector_namespace,
+    embedding,
+    embedding_engine,
+    embedding_model,
+    metadata,
+):
+    with get_review_vector_db_connection() as conn:
+        has_pgvector = _ensure_knowledge_embedding_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO knowledge_embeddings (
+                    tenant_slug, knowledge_id, knowledge_type, title, summary, body_text, source_detail,
+                    vector_namespace, embedding_engine, embedding_model, embedding_json, metadata_json
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id, created_at
+                """,
+                (
+                    str(tenant_slug or "").strip(),
+                    str(knowledge_id or "").strip(),
+                    str(knowledge_type or "").strip(),
+                    str(title or "").strip(),
+                    str(summary or "").strip(),
+                    str(body_text or "").strip(),
+                    str(source_detail or "").strip(),
+                    str(vector_namespace or "").strip(),
+                    str(embedding_engine or "").strip(),
+                    str(embedding_model or "").strip(),
+                    Json(embedding),
+                    Json(metadata or {}),
+                ),
+            )
+            row = cur.fetchone()
+            storage_mode = "jsonb"
+            if has_pgvector and len(embedding) == PGVECTOR_TARGET_DIM:
+                vector_literal = "[" + ",".join(f"{float(value):.10f}" for value in embedding) + "]"
+                cur.execute(
+                    "UPDATE knowledge_embeddings SET embedding_vector = %s::vector WHERE id = %s",
+                    (vector_literal, row[0]),
+                )
+                storage_mode = "pgvector"
+        conn.commit()
+    return {
+        "id": int(row[0]),
+        "created_at": row[1].isoformat() if hasattr(row[1], "isoformat") else str(row[1]),
+        "storage_mode": storage_mode,
+        "embedding_dimensions": len(embedding),
+        "vector_namespace": vector_namespace,
+    }
+
+
+def save_manual_knowledge_entry(tenant_slug, title="", summary="", body="", raw_html="", notes="", notes_html="", knowledge_id="", skip_ai_processing=True):
+    tenant = get_tenant_by_slug(tenant_slug)
+    if not tenant or tenant.get("slug") != tenant_slug:
+        raise ValueError("tenant_not_found")
+    normalized_title = str(title or "").strip() or "最新文本知识整理"
+    normalized_summary = str(summary or "").strip() or "已通过纯文本方式沉淀知识内容。"
+    normalized_body = str(body or "").strip() or normalized_summary
+    embedding_cfg = get_voice_embedding_config()
+    embedding, embedding_engine, embedding_model = build_text_embedding(
+        f"{normalized_title}\n\n{normalized_summary}\n\n{normalized_body}",
+        engine=embedding_cfg.get("engine", "api"),
+    )
+    vector_namespace = build_vector_namespace(embedding_engine, embedding_model)
+    source_detail = f"来源：纯文本编写 · {max(1, len(normalized_body))}字"
+    next_id = str(knowledge_id or f"kb-manual-{int(time.time() * 1000)}").strip()
+    vector_record = _store_knowledge_embedding_record(
+        tenant_slug=tenant_slug,
+        knowledge_id=next_id,
+        knowledge_type="manual",
+        title=normalized_title,
+        summary=normalized_summary,
+        body_text=normalized_body,
+        source_detail=source_detail,
+        vector_namespace=vector_namespace,
+        embedding=embedding,
+        embedding_engine=embedding_engine,
+        embedding_model=embedding_model,
+        metadata={
+            "notes": str(notes or "").strip(),
+            "source": "纯文本编写",
+            "skip_ai_processing": bool(skip_ai_processing),
+        },
+    )
+    current_hub = resolve_tenant_knowledge_hub(tenant, tenant.get("knowledge_hub_config"))
+    items = copy.deepcopy(current_hub.get("items") or [])
+    entry = {
+        "id": next_id,
+        "type": "manual",
+        "title": normalized_title,
+        "source": "纯文本编写",
+        "source_detail": source_detail,
+        "status": "已同步 Hermes",
+        "summary": normalized_summary,
+        "tags": ["手动编写", "观点沉淀"],
+        "raw_input": normalized_body,
+        "raw_html": str(raw_html or "").strip(),
+        "key_points": [segment.strip() for segment in re.split(r"[。；;\\n]+", normalized_summary) if segment.strip()][:3] or ["待补充关键要点"],
+        "validation_nodes": ["待补充验证节点"],
+        "sync_targets": ["租户知识队列", "知识专区", "Hermes 上下文", "向量知识库"],
+        "tuning_focus": ["补充摘要", "补充验证节点", "继续细化表达"],
+        "notes": str(notes or "纯文本知识已入库，可继续补充结构化要点。").strip(),
+        "notes_html": str(notes_html or "").strip(),
+        "files": [],
+        "url": "",
+        "skip_ai_processing": bool(skip_ai_processing),
+        "body": normalized_body,
+        "vector_record": vector_record,
+    }
+    replaced = False
+    for index, item in enumerate(items):
+        if str(item.get("id") or "") == next_id:
+            items[index] = entry
+            replaced = True
+            break
+    if not replaced:
+        items.insert(0, entry)
+    saved = update_tenant_knowledge_hub_config(tenant_slug, {
+        "summary": current_hub.get("summary") or "",
+        "items": items,
+    })
+    latest_tenant = get_tenant_by_slug(tenant_slug, saved) if saved else tenant
+    latest_hub = resolve_tenant_knowledge_hub(latest_tenant, latest_tenant.get("knowledge_hub_config"))
+    return {
+        "entry": entry,
+        "knowledge_hub": latest_hub,
+        "vector_record": vector_record,
+        "embedding_engine": embedding_engine,
+        "embedding_model": embedding_model,
+    }
+
+
+def _build_live_knowledge_entry_from_record(record, config_item=None):
+    config_item = config_item if isinstance(config_item, dict) else {}
+    item_type = str(record.get("knowledge_type") or config_item.get("type") or "manual").strip().lower()
+    if item_type not in {"voice", "file", "url", "manual"}:
+        item_type = "manual"
+    metadata = record.get("metadata_json") if isinstance(record.get("metadata_json"), dict) else {}
+    summary_text = str(record.get("summary") or config_item.get("summary") or "").strip()
+    body_text = str(record.get("body_text") or config_item.get("body") or config_item.get("raw_input") or summary_text).strip()
+    source_text = str(
+        config_item.get("source")
+        or metadata.get("source")
+        or ("纯文本编写" if item_type == "manual" else record.get("title") or "知识内容")
+    ).strip()
+    notes_text = str(config_item.get("notes") or metadata.get("notes") or "知识已进入向量库，可继续补充结构化信息。").strip()
+    title_text = str(record.get("title") or config_item.get("title") or "知识内容").strip() or "知识内容"
+    created_at = record.get("created_at")
+    return {
+        "id": str(record.get("knowledge_id") or config_item.get("id") or "").strip() or f"kb-live-{record.get('id')}",
+        "type": item_type,
+        "title": title_text,
+        "source": source_text,
+        "source_detail": str(record.get("source_detail") or config_item.get("source_detail") or "").strip(),
+        "status": str(config_item.get("status") or "已同步 Hermes").strip() or "已同步 Hermes",
+        "summary": summary_text,
+        "tags": [str(tag).strip() for tag in (config_item.get("tags") if isinstance(config_item.get("tags"), list) else []) if str(tag).strip()][:8] or (
+            ["手动编写", "观点沉淀"] if item_type == "manual" else [item_type.upper(), "已入向量库"]
+        ),
+        "raw_input": str(config_item.get("raw_input") or body_text).strip(),
+        "raw_html": str(config_item.get("raw_html") or "").strip(),
+        "key_points": [str(point).strip() for point in (config_item.get("key_points") if isinstance(config_item.get("key_points"), list) else []) if str(point).strip()][:8]
+            or [segment.strip() for segment in re.split(r"[。；;\n]+", summary_text) if segment.strip()][:3]
+            or ["待补充关键要点"],
+        "validation_nodes": [str(point).strip() for point in (config_item.get("validation_nodes") if isinstance(config_item.get("validation_nodes"), list) else []) if str(point).strip()][:8]
+            or ["待补充验证节点"],
+        "sync_targets": [str(point).strip() for point in (config_item.get("sync_targets") if isinstance(config_item.get("sync_targets"), list) else []) if str(point).strip()][:8]
+            or ["租户知识队列", "知识专区", "Hermes 上下文", "向量知识库"],
+        "tuning_focus": [str(point).strip() for point in (config_item.get("tuning_focus") if isinstance(config_item.get("tuning_focus"), list) else []) if str(point).strip()][:8]
+            or ["补充摘要", "补充验证节点", "继续细化表达"],
+        "notes": notes_text,
+        "notes_html": str(config_item.get("notes_html") or "").strip(),
+        "files": [str(name).strip() for name in (config_item.get("files") if isinstance(config_item.get("files"), list) else []) if str(name).strip()][:12],
+        "url": str(config_item.get("url") or "").strip(),
+        "skip_ai_processing": bool(metadata.get("skip_ai_processing", config_item.get("skip_ai_processing", True))),
+        "voice_minutes": config_item.get("voice_minutes") if isinstance(config_item.get("voice_minutes"), int) else None,
+        "body": body_text,
+        "time": created_at.strftime("%Y-%m-%d %H:%M") if hasattr(created_at, "strftime") else str(created_at or ""),
+        "vector_record": {
+            "id": int(record.get("id") or 0),
+            "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else str(created_at or ""),
+            "vector_namespace": str(record.get("vector_namespace") or "").strip(),
+            "embedding_engine": str(record.get("embedding_engine") or "").strip(),
+            "embedding_model": str(record.get("embedding_model") or "").strip(),
+            "storage_mode": "pgvector" if str(record.get("vector_namespace") or "").strip() else "jsonb",
+        },
+    }
+
+
+def fetch_live_knowledge_hub(tenant, limit=80):
+    config_hub = resolve_tenant_knowledge_hub(tenant, tenant.get("knowledge_hub_config"))
+    config_items = {
+        str(item.get("id") or "").strip(): item
+        for item in (config_hub.get("items") or [])
+        if isinstance(item, dict) and str(item.get("id") or "").strip()
+    }
+    try:
+        with get_review_vector_db_connection() as conn:
+            _ensure_knowledge_embedding_table(conn)
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, knowledge_id, knowledge_type, title, summary, body_text, source_detail,
+                           vector_namespace, embedding_engine, embedding_model, metadata_json, created_at
+                    FROM (
+                        SELECT DISTINCT ON (knowledge_id)
+                            id, knowledge_id, knowledge_type, title, summary, body_text, source_detail,
+                            vector_namespace, embedding_engine, embedding_model, metadata_json, created_at
+                        FROM knowledge_embeddings
+                        WHERE tenant_slug = %s
+                        ORDER BY knowledge_id, created_at DESC, id DESC
+                    ) latest
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT %s
+                    """,
+                    (tenant.get("slug"), max(1, int(limit or 80))),
+                )
+                rows = cur.fetchall()
+    except Exception:
+        app.logger.exception("Failed to load live knowledge hub from vector database")
+        return config_hub
+    if not rows:
+        return config_hub
+    items = []
+    for row in rows:
+        record = {
+            "id": row[0],
+            "knowledge_id": row[1],
+            "knowledge_type": row[2],
+            "title": row[3],
+            "summary": row[4],
+            "body_text": row[5],
+            "source_detail": row[6],
+            "vector_namespace": row[7],
+            "embedding_engine": row[8],
+            "embedding_model": row[9],
+            "metadata_json": row[10],
+            "created_at": row[11],
+        }
+        items.append(_build_live_knowledge_entry_from_record(record, config_items.get(str(row[1] or "").strip())))
+    return {
+        "summary": config_hub.get("summary") or "知识库支持语音、文件、URL 和纯文本四种入口。",
+        "items": items,
+    }
+
+
+def _cosine_similarity(vec_a, vec_b):
+    if not isinstance(vec_a, list) or not isinstance(vec_b, list) or not vec_a or not vec_b:
+        return 0.0
+    size = min(len(vec_a), len(vec_b))
+    if size <= 0:
+        return 0.0
+    dot = sum(float(vec_a[i]) * float(vec_b[i]) for i in range(size))
+    norm_a = math.sqrt(sum(float(vec_a[i]) * float(vec_a[i]) for i in range(size)))
+    norm_b = math.sqrt(sum(float(vec_b[i]) * float(vec_b[i]) for i in range(size)))
+    if norm_a <= 0 or norm_b <= 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
+def search_knowledge_embeddings(tenant_slug, query_text, limit=5):
+    normalized_query = str(query_text or "").strip()
+    if not normalized_query:
+        raise ValueError("knowledge_query_required")
+    embedding_cfg = get_voice_embedding_config()
+    query_embedding, embedding_engine, embedding_model = build_text_embedding(
+        normalized_query,
+        engine=embedding_cfg.get("engine", "local"),
+    )
+    with get_review_vector_db_connection() as conn:
+        _ensure_knowledge_embedding_table(conn)
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, knowledge_id, knowledge_type, title, summary, body_text, source_detail,
+                       vector_namespace, embedding_engine, embedding_model, embedding_json, metadata_json, created_at
+                FROM (
+                    SELECT DISTINCT ON (knowledge_id)
+                        id, knowledge_id, knowledge_type, title, summary, body_text, source_detail,
+                        vector_namespace, embedding_engine, embedding_model, embedding_json, metadata_json, created_at
+                    FROM knowledge_embeddings
+                    WHERE tenant_slug = %s
+                    ORDER BY knowledge_id, created_at DESC, id DESC
+                ) latest
+                ORDER BY created_at DESC, id DESC
+                LIMIT 120
+                """,
+                (str(tenant_slug or "").strip(),),
+            )
+            rows = cur.fetchall()
+    if not rows:
+        return {
+            "query": normalized_query,
+            "answer": "当前知识库里还没有可检索的真实知识，请先完成至少一条知识入库。",
+            "matches": [],
+            "embedding_engine": embedding_engine,
+            "embedding_model": embedding_model,
+        }
+    tenant = get_tenant_by_slug(tenant_slug)
+    config_hub = resolve_tenant_knowledge_hub(tenant, tenant.get("knowledge_hub_config")) if tenant else {"items": []}
+    config_items = {
+        str(item.get("id") or "").strip(): item
+        for item in (config_hub.get("items") or [])
+        if isinstance(item, dict) and str(item.get("id") or "").strip()
+    }
+    scored = []
+    for row in rows:
+        stored_embedding = row[10] if isinstance(row[10], list) else []
+        score = _cosine_similarity(query_embedding, stored_embedding)
+        record = {
+            "id": row[0],
+            "knowledge_id": row[1],
+            "knowledge_type": row[2],
+            "title": row[3],
+            "summary": row[4],
+            "body_text": row[5],
+            "source_detail": row[6],
+            "vector_namespace": row[7],
+            "embedding_engine": row[8],
+            "embedding_model": row[9],
+            "metadata_json": row[11],
+            "created_at": row[12],
+        }
+        entry = _build_live_knowledge_entry_from_record(record, config_items.get(str(row[1] or "").strip()))
+        entry["score"] = round(float(score), 4)
+        scored.append(entry)
+    scored.sort(key=lambda item: item.get("score", 0.0), reverse=True)
+    matches = scored[: max(1, int(limit or 5))]
+    if matches:
+        answer_lines = [
+            f"已命中 {len(matches)} 条知识，最相关的是《{matches[0].get('title') or '未命名知识'}》。",
+            f"核心摘要：{matches[0].get('summary') or matches[0].get('body') or '暂无摘要'}",
+        ]
+        for index, item in enumerate(matches[1:3], start=2):
+            answer_lines.append(f"补充命中 {index}：{item.get('title') or '未命名知识'}，相关度 {item.get('score', 0)}。")
+        answer = "\n".join(answer_lines)
+    else:
+        answer = "当前没有找到足够相关的知识条目。"
+    return {
+        "query": normalized_query,
+        "answer": answer,
+        "matches": matches,
+        "embedding_engine": embedding_engine,
+        "embedding_model": embedding_model,
+    }
+
+
+def build_knowledge_chat_prompts(query_text, matches, tenant_slug=""):
+    query = str(query_text or "").strip()
+    tenant = get_tenant_by_slug(tenant_slug)
+    tenant_name = (tenant or {}).get("name") or (tenant or {}).get("short_name") or str(tenant_slug or "").strip() or "当前租户"
+    context_blocks = []
+    for index, item in enumerate(matches[:5], start=1):
+        if not isinstance(item, dict):
+            continue
+        context_blocks.append(
+            "\n".join([
+                f"[知识 {index}] 标题：{str(item.get('title') or '未命名知识').strip()}",
+                f"[知识 {index}] 摘要：{str(item.get('summary') or item.get('body') or item.get('raw_input') or '暂无摘要').strip()}",
+                f"[知识 {index}] 原文：{str(item.get('body') or item.get('raw_input') or item.get('summary') or '').strip()}",
+                f"[知识 {index}] 来源：{str(item.get('source_detail') or item.get('source') or '').strip()}",
+                f"[知识 {index}] 相关度：{item.get('score', 0)}",
+            ])
+        )
+    context_text = "\n\n".join(block for block in context_blocks if block.strip())
+    system_prompt = (
+        f"你是{tenant_name}的大V知识库助手。"
+        "你的任务是基于召回到的知识条目回答问题。"
+        "必须优先依据给定知识，不要编造未提供的事实。"
+        "如果知识不足以完整回答，要明确指出边界。"
+        "回答请使用中文，风格简洁、专业、适合大V内容生产和研究复盘。"
+    )
+    user_prompt = (
+        f"用户问题：{query}\n\n"
+        f"知识库召回结果：\n{context_text or '当前没有召回到有效知识。'}\n\n"
+        "请输出：\n"
+        "1. 直接回答用户问题\n"
+        "2. 提炼2到4条关键依据\n"
+        "3. 如果存在知识空白，补一句“知识边界”"
+    )
+    return system_prompt, user_prompt
+
+
+def build_knowledge_query_response(tenant_slug, query_text, limit=5, submit_to_model=False):
+    result = search_knowledge_embeddings(tenant_slug=tenant_slug, query_text=query_text, limit=limit)
+    llm_requested = bool(submit_to_model)
+    llm_enabled = False
+    llm_mode = "retrieval_only"
+    llm_model = None
+    llm_notice = "当前为纯知识检索模式，未提交给大模型。"
+    if llm_requested:
+        llm_model = get_default_llm_config(purpose="general")
+        if llm_model:
+            system_prompt, user_prompt = build_knowledge_chat_prompts(
+                query_text=result.get("query"),
+                matches=result.get("matches") or [],
+                tenant_slug=tenant_slug,
+            )
+            llm_enabled = True
+            try:
+                llm_answer = call_openai_compatible_llm(llm_model, system_prompt, user_prompt)
+                result["answer"] = llm_answer
+                llm_mode = "model_answered"
+                llm_notice = f"当前回答已由通用模型生成：{llm_model.get('label') or llm_model.get('model_name') or llm_model.get('key')}。下方仍保留原始知识命中结果供校验。"
+            except RuntimeError as exc:
+                llm_enabled = False
+                llm_mode = "fallback_retrieval"
+                llm_notice = f"已尝试调用通用模型，但失败并回退到纯知识检索：{str(exc)}"
+        else:
+            llm_mode = "fallback_retrieval"
+            llm_notice = "已勾选提交给大模型，但当前没有可用的通用模型配置，已自动回退到纯知识检索模式。"
+    return {
+        **result,
+        "submit_to_model": llm_requested,
+        "llm_enabled": llm_enabled,
+        "llm_mode": llm_mode,
+        "llm_notice": llm_notice,
+        "llm_model": {
+            "key": llm_model.get("key"),
+            "label": llm_model.get("label"),
+            "provider": llm_model.get("provider"),
+            "model_name": llm_model.get("model_name"),
+            "purpose": llm_model.get("purpose"),
+        } if llm_model else None,
+    }
+
+
+def process_review_voice_upload(file_storage, tenant_slug="", review_period="", entry_point="", speaker_name=""):
+    if file_storage is None:
+        raise ValueError("audio_file_required")
+    safe_name = _safe_audio_filename(getattr(file_storage, "filename", ""))
+    content_type = _guess_audio_content_type(safe_name, getattr(file_storage, "mimetype", ""))
+    if not _is_allowed_audio_upload(safe_name, content_type):
+        raise ValueError("unsupported_audio_type")
+    audio_bytes = file_storage.read() or b""
+    if not audio_bytes:
+        raise ValueError("empty_audio_file")
+    if len(audio_bytes) > VOICE_UPLOAD_MAX_BYTES:
+        raise ValueError("audio_file_too_large")
+    transcription_cfg = get_voice_transcription_config()
+    transcript, transcript_engine = transcribe_review_audio(
+        audio_bytes=audio_bytes,
+        filename=safe_name,
+        content_type=content_type,
+        engine=transcription_cfg.get("engine", "local"),
+    )
+    transcript_model = LOCAL_WHISPER_MODEL_SIZE if transcript_engine == "local" else OPENAI_AUDIO_MODEL
+    return {
+        "transcript": transcript,
+        "transcript_engine": transcript_engine,
+        "transcript_model": transcript_model,
+    }
+
+
+def process_review_publish_text(text, tenant_slug="", review_period="", entry_point="", speaker_name="", transcription_engine="manual", transcript_model="manual_input"):
+    normalized_text = str(text or "").strip()
+    if not normalized_text:
+        raise ValueError("publish_text_required")
+    embedding_cfg = get_voice_embedding_config()
+    embedding, embedding_engine, embedding_model = build_text_embedding(
+        normalized_text,
+        engine=embedding_cfg.get("engine", "api"),
+    )
+    vector_namespace = build_vector_namespace(embedding_engine, embedding_model)
+    record = _store_review_voice_embedding_record(
+        tenant_slug=tenant_slug,
+        review_period=review_period,
+        entry_point=entry_point,
+        vector_namespace=vector_namespace,
+        speaker_name=speaker_name,
+        filename="review_publish_text.txt",
+        content_type="text/plain",
+        audio_size_bytes=0,
+        transcript=normalized_text,
+        transcription_engine=transcript_engine,
+        transcript_model=transcript_model,
+        embedding=embedding,
+        embedding_engine=embedding_engine,
+        embedding_model=embedding_model,
+    )
+    return {
+        "text": normalized_text,
+        "record": record,
+        "transcription_engine": transcription_engine,
+        "embedding_engine": embedding_engine,
+        "embedding_model": embedding_model,
+    }
+
+
+def process_review_manual_text(text, tenant_slug="", review_period="", entry_point="", speaker_name=""):
+    normalized_text = str(text or "").strip()
+    if not normalized_text:
+        raise ValueError("manual_text_required")
+    return {
+        "text": normalized_text,
+        "transcription_engine": "manual",
+        "transcript_model": "manual_input",
+    }
+
+
 @app.teardown_appcontext
 def close_db(exc):
     db = g.pop("db", None)
@@ -5524,6 +6817,98 @@ def api_revenue():
 @app.route("/api/segments")
 def api_segments():
     return jsonify(gen_user_segments())
+
+
+@app.route("/api/review/voice-transcribe", methods=["POST"])
+def api_review_voice_transcribe():
+    audio_file = request.files.get("audio") or request.files.get("file")
+    tenant_slug = str(request.form.get("tenant_slug") or "").strip().lower()
+    review_period = str(request.form.get("period") or "").strip().lower()
+    entry_point = str(request.form.get("entry_point") or "").strip().lower() or "unknown"
+    speaker_name = str(request.form.get("speaker_name") or "").strip()
+    try:
+        result = process_review_voice_upload(
+            file_storage=audio_file,
+            tenant_slug=tenant_slug,
+            review_period=review_period,
+            entry_point=entry_point,
+            speaker_name=speaker_name,
+        )
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 503
+    except Exception:
+        app.logger.exception("Failed to process review voice upload")
+        return jsonify({"success": False, "error": "review_voice_transcribe_failed"}), 500
+    return jsonify(
+        {
+            "success": True,
+            "transcript": result["transcript"],
+            "transcript_engine": result["transcript_engine"],
+            "transcript_model": result["transcript_model"],
+        }
+    )
+
+
+@app.route("/api/review/manual-embed", methods=["POST"])
+def api_review_manual_embed():
+    body = request.get_json(silent=True) or {}
+    try:
+        result = process_review_manual_text(
+            text=body.get("text"),
+            tenant_slug=str(body.get("tenant_slug") or "").strip().lower(),
+            review_period=str(body.get("period") or "").strip().lower(),
+            entry_point=str(body.get("entry_point") or "").strip().lower() or "unknown",
+            speaker_name=str(body.get("speaker_name") or "").strip(),
+        )
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 503
+    except Exception:
+        app.logger.exception("Failed to process review manual text")
+        return jsonify({"success": False, "error": "review_manual_embed_failed"}), 500
+    return jsonify(
+        {
+            "success": True,
+            "text": result["text"],
+            "transcript_engine": result["transcription_engine"],
+            "transcript_model": result["transcript_model"],
+        }
+    )
+
+
+@app.route("/api/review/publish-embed", methods=["POST"])
+def api_review_publish_embed():
+    body = request.get_json(silent=True) or {}
+    try:
+        result = process_review_publish_text(
+            text=body.get("text"),
+            tenant_slug=str(body.get("tenant_slug") or "").strip().lower(),
+            review_period=str(body.get("period") or "").strip().lower(),
+            entry_point=str(body.get("entry_point") or "").strip().lower() or "unknown",
+            speaker_name=str(body.get("speaker_name") or "").strip(),
+            transcription_engine=str(body.get("transcription_engine") or "manual").strip().lower() or "manual",
+            transcript_model=str(body.get("transcript_model") or "manual_input").strip() or "manual_input",
+        )
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 503
+    except Exception:
+        app.logger.exception("Failed to process review publish text")
+        return jsonify({"success": False, "error": "review_publish_embed_failed"}), 500
+    return jsonify(
+        {
+            "success": True,
+            "text": result["text"],
+            "vector_record": result["record"],
+            "transcript_engine": result["transcription_engine"],
+            "embedding_engine": result["embedding_engine"],
+            "embedding_model": result["embedding_model"],
+        }
+    )
 
 @app.route("/api/market")
 def api_market():
@@ -5928,6 +7313,29 @@ def api_admin_site_config():
             "default_theme": payload.get("default_theme", current.get("default_theme", "light")),
             "default_accent": payload.get("default_accent", current.get("default_accent", "blue")),
             "password_gate_enabled": bool(payload.get("password_gate_enabled", current.get("password_gate_enabled", True))),
+            "voice_transcription": {
+                "engine": str(
+                    (
+                        (payload.get("voice_transcription") or {}).get("engine")
+                        or (current.get("voice_transcription") or {}).get("engine")
+                        or "local"
+                    )
+                ).strip().lower() or "local"
+            },
+            "voice_embedding": {
+                "engine": str(
+                    (
+                        (payload.get("voice_embedding") or {}).get("engine")
+                        or (current.get("voice_embedding") or {}).get("engine")
+                        or "local"
+                    )
+                ).strip().lower() or "local"
+            },
+            "llm_registry": normalize_llm_registry_config(
+                payload.get("llm_registry")
+                if isinstance(payload.get("llm_registry"), dict)
+                else current.get("llm_registry")
+            ),
             "brand": payload.get("brand", current.get("brand", {})),
             "default_tenant_slug": payload.get("default_tenant_slug", current.get("default_tenant_slug")),
             "tenants": payload.get("tenants", current.get("tenants", [])),
@@ -6245,6 +7653,7 @@ def gen_kol_workbench(tenant=None):
     watchlist_focus = ["腾讯控股", "美团-W", "阿里巴巴-W"] if is_lisa else ["中芯国际", "腾讯控股", "贵州茅台"]
     fund_dashboard_state = resolve_tenant_fund_dashboard_state(tenant, tenant.get("fund_dashboard_config"))
     fund_dashboard = copy.deepcopy(fund_dashboard_state["published"])
+    knowledge_hub = fetch_live_knowledge_hub(tenant)
     return {
         "tenant": tenant,
         "kol_name": kol_name,
@@ -6509,62 +7918,7 @@ def gen_kol_workbench(tenant=None):
             "watchlist_focus": watchlist_focus,
             "periods": ["日复盘", "周复盘", "月复盘"],
         },
-        "knowledge_hub": {
-            "summary": "知识库支持语音、文件和 URL 三种入口；历史内容允许点开弹框继续微调，修改后会重新同步到知识专区和 Hermes 上下文。",
-            "items": [
-                {
-                    "id": "kb-hk-internet-valuation",
-                    "type": "file",
-                    "title": "港股互联网估值框架",
-                    "source": "文件上传 · 12页 PDF",
-                    "source_detail": "来源：文件上传 · 港股互联网估值框架.pdf · 12页",
-                    "status": "可微调",
-                    "summary": "拆出回购强度、估值带与催化条件，已关联腾讯 / 美团 / 阿里。",
-                    "tags": ["估值框架", "港股互联网"],
-                    "raw_input": "原始材料重点包括：腾讯 / 美团 / 阿里的历史估值带、回购力度、自由现金流、财报兑现节奏，以及对行业竞争格局和监管预期的补充说明。",
-                    "key_points": ["回购强度直接影响估值修复斜率", "估值带必须结合利润兑现看，不单看 PS/PE", "催化条件要和财报、回购公告、南向资金一起验证"],
-                    "validation_nodes": ["财报后利润率是否兑现", "回购节奏是否持续", "南向资金是否继续净流入"],
-                    "sync_targets": ["租户知识队列", "知识专区", "Hermes 上下文", "港股互联网 Skill"],
-                    "tuning_focus": ["标题是否更贴近大V表达", "摘要是否保留关键判断", "关键要点是否足够结构化", "验证节点是否可直接复用到复盘"],
-                    "notes": "适合继续补公司层估值带、买回购和财报验证的先后顺序，以及哪些结论只适用于龙头公司。",
-                    "files": ["港股互联网估值框架.pdf"],
-                },
-                {
-                    "id": "kb-may-industry-call",
-                    "type": "voice",
-                    "title": "5月产业电话会录音整理",
-                    "source": "语音转写 · 28分钟",
-                    "source_detail": "来源：语音转写 · 产业电话会录音 · 28分钟",
-                    "status": "已同步 Hermes",
-                    "summary": "提炼固态电池、订单验证和量产节点，当前可直接被 Hermes 调用。",
-                    "tags": ["电话会", "新能源"],
-                    "raw_input": "原始语音中重点讨论了固态电池量产路径、下游车厂验证节奏、订单兑现的不确定项，以及短期市场情绪和长期产业趋势的区别。",
-                    "key_points": ["先分清产业趋势和交易情绪", "订单验证比概念热度更重要", "量产节点要拆成时间、客户、成本三层"],
-                    "validation_nodes": ["样品送测是否进入下一阶段", "订单是否从试产切换到量产", "成本曲线是否出现拐点"],
-                    "sync_targets": ["租户知识队列", "知识专区", "Hermes 上下文", "新能源相关复盘"],
-                    "tuning_focus": ["转写口语是否要收敛成书面结论", "关键判断是否已经拆成可复用节点", "风险边界是否写清", "是否适合直接进入复盘或 Hermes"],
-                    "notes": "建议把口语化表达进一步压缩成“观点 - 证据 - 验证节点 - 风险”四段式，便于 Hermes 后续直接调用。",
-                    "voice_minutes": 28,
-                },
-                {
-                    "id": "kb-semiconductor-cycle",
-                    "type": "url",
-                    "title": "半导体景气验证节点",
-                    "source": "网页 URL · 3篇行业资料",
-                    "source_detail": "来源：网页 URL · 3篇行业资料抓取摘要",
-                    "status": "同步中",
-                    "summary": "整理产能利用率、成熟制程价格与资本开支节奏，适合继续补充验证节点。",
-                    "tags": ["半导体", "网页资料"],
-                    "raw_input": "系统已抓取 3 篇行业网页资料，内容涉及成熟制程价格变化、产能利用率、资本开支收缩节奏，以及下游消费电子和服务器需求恢复情况。",
-                    "key_points": ["成熟制程价格是景气验证先行指标", "资本开支变化会领先反映景气预期", "不能只看单篇新闻，要归并成长期跟踪节点"],
-                    "validation_nodes": ["晶圆代工价格是否止跌", "主要厂商 capex 指引是否收缩", "下游需求恢复是否扩散到更多品类"],
-                    "sync_targets": ["租户知识队列", "知识专区", "Hermes 上下文"],
-                    "tuning_focus": ["网页摘要是否准确", "要点是否去噪", "验证节点是否可持续追踪", "是否需要补更多来源链接"],
-                    "notes": "当前更适合补充来源链接、删除噪音表述，并把验证节点改成可按月跟踪的版本。",
-                    "url": "https://example.com/semiconductor-cycle",
-                },
-            ],
-        },
+        "knowledge_hub": knowledge_hub,
         "hermes_hub": {
             "summary": "Hermes 对大V保留两种演示版本：工作区版承接股票、skills、提示词和结构化结果；龙虾纯对话版只保留 skills + 对话，按知识库直接聊天。",
             "versions": [
@@ -6854,6 +8208,61 @@ def api_save_kol_portal_cms():
         "portal_workspace": gen_kol_workbench(latest_tenant).get("portal_workspace"),
         "portal": build_tenant_portal_payload(latest_tenant),
     })
+
+
+@app.route("/api/kol/knowledge/manual", methods=["POST"])
+def api_save_kol_manual_knowledge():
+    body = request.get_json(silent=True) or {}
+    tenant_slug = str(body.get("tenant_slug") or request.args.get("tenant") or "").strip().lower()
+    try:
+        result = save_manual_knowledge_entry(
+            tenant_slug=tenant_slug,
+            title=body.get("title"),
+            summary=body.get("summary"),
+            body=body.get("body"),
+            raw_html=body.get("raw_html"),
+            notes=body.get("notes"),
+            notes_html=body.get("notes_html"),
+            knowledge_id=body.get("id"),
+            skip_ai_processing=bool(body.get("skip_ai_processing", True)),
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    except Exception:
+        app.logger.exception("Failed to save manual knowledge entry")
+        return jsonify({"ok": False, "error": "knowledge_manual_save_failed"}), 500
+    return jsonify({
+        "ok": True,
+        "entry": result["entry"],
+        "knowledge_hub": result["knowledge_hub"],
+        "vector_record": result["vector_record"],
+        "embedding_engine": result["embedding_engine"],
+        "embedding_model": result["embedding_model"],
+    })
+
+
+@app.route("/api/kol/knowledge/query", methods=["POST"])
+def api_query_kol_knowledge():
+    body = request.get_json(silent=True) or {}
+    tenant_slug = str(body.get("tenant_slug") or request.args.get("tenant") or "").strip().lower()
+    submit_to_model = bool(body.get("submit_to_model", False))
+    try:
+        result = build_knowledge_query_response(
+            tenant_slug=tenant_slug,
+            query_text=body.get("query"),
+            limit=body.get("limit") or 5,
+            submit_to_model=submit_to_model,
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    except Exception:
+        app.logger.exception("Failed to query knowledge embeddings")
+        return jsonify({"ok": False, "error": "knowledge_query_failed"}), 500
+    return jsonify({"ok": True, **result})
 
 
 @app.route("/api/tenant/<tenant_slug>/dashboard")

@@ -15,6 +15,8 @@
 </script>
 <script src="/static/js/theme.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
 <style>
 body { background: var(--surface-2); color: var(--text-main); }
 .kw-page-summary { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:4px; }
@@ -143,6 +145,214 @@ body { background: var(--surface-2); color: var(--text-main); }
 .kw-watch-top,
 .kw-version-top,
 .kw-knowledge-top { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+.kw-knowledge-layout,
+.kw-knowledge-entry-grid,
+.kw-knowledge-detail-grid { display:grid; gap:14px; }
+.kw-knowledge-entry-grid { grid-template-columns:repeat(4, minmax(0, 1fr)); margin-bottom:14px; }
+.kw-knowledge-layout { grid-template-columns:1.02fr 0.98fr; }
+.kw-knowledge-detail-grid { grid-template-columns:minmax(240px, 0.56fr) minmax(0, 1.44fr); }
+.kw-knowledge-entry-card {
+  background:linear-gradient(180deg,#FFFFFF 0%, #F4F9FF 100%);
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:16px;
+  padding:14px;
+  cursor:pointer;
+  transition:transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.kw-knowledge-entry-card:hover,
+.kw-knowledge-entry-card:active {
+  transform:translateY(-1px);
+  border-color:rgba(200,169,110,0.26);
+  box-shadow:0 12px 26px rgba(31,73,125,0.10);
+}
+.kw-knowledge-entry-icon {
+  width:42px;
+  height:42px;
+  border-radius:14px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:20px;
+  background:#EAF3FF;
+  margin-bottom:10px;
+}
+.kw-knowledge-entry-desc {
+  min-height:40px;
+  margin-top:6px;
+  font-size:11px;
+  color:var(--text-sub);
+  line-height:1.7;
+}
+.kw-knowledge-entry-cta {
+  margin-top:10px;
+  font-size:11px;
+  font-weight:700;
+  color:var(--gold);
+}
+.kw-knowledge-pipeline {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-bottom:16px;
+}
+.kw-knowledge-pipeline-step {
+  min-height:30px;
+  display:inline-flex;
+  align-items:center;
+  padding:0 12px;
+  border-radius:999px;
+  font-size:11px;
+  color:#1F497D;
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+}
+.kw-knowledge-pipeline-arrow {
+  color:var(--gold);
+  font-size:12px;
+  font-weight:700;
+}
+.kw-knowledge-panel {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:16px;
+  padding:14px;
+}
+.kw-knowledge-panel-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+  margin-bottom:12px;
+}
+.kw-knowledge-panel-title {
+  font-size:13px;
+  font-weight:700;
+  color:var(--text-main);
+}
+.kw-knowledge-panel-desc {
+  margin-top:4px;
+  font-size:11px;
+  color:var(--text-sub);
+  line-height:1.7;
+}
+.kw-knowledge-queue,
+.kw-knowledge-zone-list,
+.kw-knowledge-detail-stack { display:grid; gap:10px; }
+.kw-knowledge-queue-item,
+.kw-knowledge-zone-card {
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  padding:14px;
+  cursor:pointer;
+  transition:transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.kw-knowledge-queue-item:hover,
+.kw-knowledge-zone-card:hover,
+.kw-knowledge-queue-item:active,
+.kw-knowledge-zone-card:active {
+  transform:translateY(-1px);
+  border-color:rgba(200,169,110,0.24);
+  box-shadow:0 10px 24px rgba(31,73,125,0.08);
+}
+.kw-knowledge-queue-head,
+.kw-knowledge-zone-top {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+}
+.kw-knowledge-queue-title,
+.kw-knowledge-zone-title {
+  font-size:13px;
+  font-weight:700;
+  color:var(--text-main);
+}
+.kw-knowledge-queue-meta,
+.kw-knowledge-zone-origin {
+  margin-top:6px;
+  font-size:11px;
+  color:var(--text-sub);
+  line-height:1.6;
+}
+.kw-knowledge-zone-summary,
+.kw-knowledge-queue-body {
+  margin-top:10px;
+  font-size:12px;
+  color:var(--text-main);
+  line-height:1.8;
+}
+.kw-knowledge-entry-hint {
+  margin-top:10px;
+  font-size:11px;
+  color:var(--gold);
+}
+.kw-knowledge-status {
+  display:inline-flex;
+  align-items:center;
+  min-height:26px;
+  padding:0 10px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:700;
+  border:1px solid transparent;
+  white-space:nowrap;
+}
+.kw-knowledge-status.ready {
+  color:#12805C;
+  background:rgba(18,128,92,0.10);
+  border-color:rgba(18,128,92,0.14);
+}
+.kw-knowledge-status.syncing {
+  color:var(--gold);
+  background:rgba(200,169,110,0.10);
+  border-color:rgba(200,169,110,0.18);
+}
+.kw-knowledge-chat-shell { display:grid; grid-template-columns:minmax(280px, 0.82fr) minmax(0, 1.18fr); gap:14px; margin-top:14px; }
+.kw-knowledge-chat-card {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:16px;
+  padding:14px;
+}
+.kw-knowledge-chat-title { font-size:13px; font-weight:700; color:var(--text-main); }
+.kw-knowledge-chat-desc { margin-top:4px; font-size:11px; color:var(--text-sub); line-height:1.7; }
+.kw-knowledge-chat-input {
+  width:100%;
+  min-height:110px;
+  margin-top:12px;
+  padding:12px;
+  box-sizing:border-box;
+  border:1px solid rgba(47,116,192,0.14);
+  border-radius:12px;
+  background:#F8FBFF;
+  color:var(--text-main);
+  font-size:12px;
+  line-height:1.8;
+  resize:vertical;
+}
+.kw-knowledge-chat-answer {
+  margin-top:12px;
+  padding:12px;
+  border-radius:12px;
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  font-size:12px;
+  color:var(--text-main);
+  line-height:1.8;
+  white-space:pre-wrap;
+}
+.kw-knowledge-chat-match-list { display:grid; gap:10px; margin-top:12px; }
+.kw-knowledge-chat-match {
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  padding:12px;
+}
+.kw-knowledge-chat-match-title { font-size:12px; font-weight:700; color:var(--text-main); }
+.kw-knowledge-chat-match-meta { margin-top:4px; font-size:11px; color:var(--text-sub); line-height:1.6; }
+.kw-knowledge-chat-match-body { margin-top:8px; font-size:12px; color:var(--text-main); line-height:1.8; }
 .kw-review-source-icon { font-size:20px; margin-bottom:10px; }
 .kw-cell-value { font-size:20px; font-weight:700; color:var(--gold); margin-top:6px; }
 .kw-empty-plus {
@@ -1062,6 +1272,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
   box-shadow:0 26px 60px rgba(13,27,42,0.22);
   padding:24px;
 }
+.kw-knowledge-modal-sheet { width:min(1180px, 100%); }
 .kw-review-modal-head {
   display:flex;
   justify-content:space-between;
@@ -1115,7 +1326,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
 }
 .kw-knowledge-source-selector {
   display:grid;
-  grid-template-columns:repeat(3,1fr);
+  grid-template-columns:repeat(4,1fr);
   gap:10px;
 }
 .kw-knowledge-source-pill,
@@ -1390,6 +1601,116 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
   border-radius:14px;
   padding:14px;
 }
+.kw-knowledge-rich-shell {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  overflow:hidden;
+}
+.kw-knowledge-editor-loading {
+  padding:14px;
+  font-size:11px;
+  color:var(--text-sub);
+  border-bottom:1px dashed rgba(47,116,192,0.10);
+  background:#FCFEFF;
+}
+.kw-knowledge-rich-editor {
+  min-height:320px;
+  background:#FFFFFF;
+}
+.kw-knowledge-rich-editor .ql-toolbar.ql-snow {
+  border:none;
+  border-bottom:1px solid rgba(47,116,192,0.10);
+  background:#F8FBFF;
+  padding:10px 12px;
+}
+.kw-knowledge-rich-editor .ql-container.ql-snow {
+  border:none;
+  font-family:var(--font-main);
+}
+.kw-knowledge-rich-editor .ql-editor {
+  min-height:260px;
+  padding:16px 18px;
+  font-size:13px;
+  line-height:1.9;
+  color:var(--text-main);
+}
+.kw-knowledge-rich-editor .ql-editor.ql-blank::before {
+  color:var(--text-sub);
+  font-style:normal;
+  left:18px;
+  right:18px;
+}
+.kw-knowledge-rich-editor .ql-editor img,
+.kw-knowledge-rendered img {
+  max-width:100%;
+  height:auto;
+  display:block;
+  border-radius:12px;
+  margin:12px 0;
+}
+.kw-knowledge-rich-editor .ql-editor table,
+.kw-knowledge-rendered table {
+  width:100%;
+  border-collapse:collapse;
+  margin:14px 0;
+}
+.kw-knowledge-rich-editor .ql-editor th,
+.kw-knowledge-rich-editor .ql-editor td,
+.kw-knowledge-rendered th,
+.kw-knowledge-rendered td {
+  border:1px solid rgba(47,116,192,0.16);
+  padding:8px 10px;
+  vertical-align:top;
+}
+.kw-knowledge-rich-editor .ql-editor blockquote,
+.kw-knowledge-rendered blockquote {
+  margin:12px 0;
+  padding:10px 14px;
+  border-left:3px solid var(--gold);
+  background:rgba(200,169,110,0.08);
+  color:var(--text-main);
+}
+.kw-knowledge-rich-editor .ql-editor pre,
+.kw-knowledge-rendered pre {
+  overflow:auto;
+  padding:12px 14px;
+  border-radius:12px;
+  background:#0F2542;
+  color:#EAF3FF;
+}
+.kw-knowledge-rich-editor .ql-editor ul,
+.kw-knowledge-rich-editor .ql-editor ol,
+.kw-knowledge-rendered ul,
+.kw-knowledge-rendered ol {
+  padding-left:22px;
+}
+.kw-knowledge-rich-editor .ql-editor h1,
+.kw-knowledge-rendered h2 {
+  margin:14px 0 8px;
+  font-size:20px;
+  line-height:1.4;
+}
+.kw-knowledge-rich-editor .ql-editor h2,
+.kw-knowledge-rendered h3 {
+  margin:12px 0 8px;
+  font-size:17px;
+  line-height:1.45;
+}
+.kw-knowledge-rendered {
+  font-size:12px;
+  color:var(--text-main);
+  line-height:1.85;
+}
+.kw-knowledge-rendered.is-empty {
+  color:var(--text-sub);
+}
+.kw-knowledge-rich-help {
+  padding:10px 14px 14px;
+  font-size:11px;
+  color:var(--text-sub);
+  background:#FFFFFF;
+}
 .kw-knowledge-type-toolbar {
   display:flex;
   justify-content:space-between;
@@ -1457,6 +1778,8 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
   .kw-portal-shell,
   .kw-workflow-shell,
   .kw-review-runtime-grid,
+  .kw-knowledge-entry-grid,
+  .kw-knowledge-layout,
   .kw-knowledge-source-selector,
   .kw-knowledge-detail-grid { grid-template-columns:1fr; }
   .kw-portal-status-grid { grid-template-columns:1fr; }
@@ -2226,29 +2549,62 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
             </div>
             <span class="kw-tag">Knowledge</span>
           </div>
-          <div class="kw-knowledge-list">
-            {% for item in workbench.knowledge_hub["items"] %}
-            <div class="kw-knowledge-item" onclick="kwOpenKnowledgeEntryEditor('{{ item.id }}')">
-              <div class="kw-knowledge-top">
+          <div id="kw-knowledge-entry-grid" class="kw-knowledge-entry-grid"></div>
+          <div class="kw-knowledge-pipeline">
+            <span class="kw-knowledge-pipeline-step">新增素材</span>
+            <span class="kw-knowledge-pipeline-arrow">→</span>
+            <span class="kw-knowledge-pipeline-step">结构化提炼</span>
+            <span class="kw-knowledge-pipeline-arrow">→</span>
+            <span class="kw-knowledge-pipeline-step">继续微调</span>
+            <span class="kw-knowledge-pipeline-arrow">→</span>
+            <span class="kw-knowledge-pipeline-step">同步知识专区 / Hermes</span>
+          </div>
+          <div class="kw-knowledge-layout">
+            <div class="kw-knowledge-panel">
+              <div class="kw-knowledge-panel-head">
                 <div>
-                  <div class="kw-knowledge-title">{{ item.title }}</div>
-                  <div class="kw-knowledge-meta">{{ item.source }}</div>
+                  <div class="kw-knowledge-panel-title">知识清洗队列</div>
+                  <div class="kw-knowledge-panel-desc">这里保留和 H5 一样的三类录入入口与知识队列语义，点击条目可继续微调。</div>
                 </div>
-                <span class="kw-tag">{{ item.status }}</span>
+                <span class="kw-tag">Queue</span>
               </div>
-              <div class="kw-knowledge-summary">{{ item.summary }}</div>
-              <div class="kw-watch-chip-row" style="margin-top:10px">
-                {% for tag in item.tags %}
-                <span class="kw-watch-chip">{{ tag }}</span>
-                {% endfor %}
-              </div>
-              <div class="kw-link-url" style="margin-top:8px">点击查看详情并微调</div>
+              <div id="kw-knowledge-list" class="kw-knowledge-queue"></div>
             </div>
-            {% endfor %}
+            <div class="kw-knowledge-panel">
+              <div class="kw-knowledge-panel-head">
+                <div>
+                  <div class="kw-knowledge-panel-title">知识专区同步视图</div>
+                  <div class="kw-knowledge-panel-desc">展示最终会同步到知识专区与 Hermes 的知识卡结构，便于后台继续校准内容质量。</div>
+                </div>
+                <span class="kw-tag">Zone</span>
+              </div>
+              <div id="kw-knowledge-zone-feed" class="kw-knowledge-zone-list"></div>
+            </div>
           </div>
           <div class="kw-toolbar" style="margin-top:12px">
             <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="kwOpenKnowledgeEntryEditor('{{ workbench.knowledge_hub['items'][0].id }}')">微调历史知识</button>
-            <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="kwOpenKnowledgeIntake('voice')">新增知识</button>
+            <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="kwOpenKnowledgeIntake('manual')">新增知识</button>
+          </div>
+          <div class="kw-knowledge-chat-shell">
+            <div class="kw-knowledge-chat-card">
+              <div class="kw-knowledge-chat-title">知识库对话专区</div>
+              <div class="kw-knowledge-chat-desc">大V可以直接对当前租户知识库发问，测试向量检索结果和召回质量，不需要跳转到其他页面。</div>
+              <textarea id="kw-knowledge-chat-input" class="kw-knowledge-chat-input" placeholder="例如：当前港股互联网这条主线，知识库里沉淀过哪些验证节点？"></textarea>
+              <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--text-main);line-height:1.7;margin-top:12px">
+                <input type="checkbox" id="kw-knowledge-chat-submit-model" />
+                <span>提交给大模型。未勾选时只做知识库检索；勾选后会先召回知识，再交给 admin 配置的通用模型生成回答。若模型不可用，会自动回退到纯检索模式。</span>
+              </label>
+              <div class="kw-toolbar" style="margin-top:12px">
+                <button class="btn-gold" type="button" style="padding:9px 14px;font-size:12px" onclick="kwSubmitKnowledgeChat()">开始查询</button>
+                <button class="btn-outline" type="button" style="padding:9px 14px;font-size:12px" onclick="kwFillKnowledgeChatSample()">填入示例问题</button>
+              </div>
+            </div>
+            <div class="kw-knowledge-chat-card">
+              <div class="kw-knowledge-chat-title">查询结果</div>
+              <div class="kw-knowledge-chat-desc">先展示回答摘要，再展示命中的知识条目和相关度，方便你判断知识库是否可用。</div>
+              <div id="kw-knowledge-chat-answer" class="kw-knowledge-chat-answer">还没有发起查询。</div>
+              <div id="kw-knowledge-chat-matches" class="kw-knowledge-chat-match-list"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -3818,6 +4174,7 @@ let kwReviewDraft = {
   period: 'day',
   sourceMode: 'voice',
   paragraphMode: 'manual',
+  skipAiProcessing: true,
   selectedWatchlist: [],
   voiceTranscript: '',
   manualHtml: '',
@@ -3852,14 +4209,25 @@ const KW_KNOWLEDGE_INPUT_TYPES = {
     defaultTitle: '网页资料提炼',
     defaultTags: ['网页资料', '行业跟踪'],
   },
+  manual: {
+    label: '纯文本编写',
+    icon: '✍️',
+    desc: '适合直接输入观点、框架和验证节点，不依赖语音、文件或网页链接。',
+    placeholder: '例如：先写观点，再写证据、验证节点和风险边界，作为长期知识卡沉淀。',
+    defaultTitle: '最新文本知识整理',
+    defaultTags: ['手动编写', '观点沉淀'],
+  },
 };
 let kwKnowledgeStore = [];
-let kwKnowledgeDraft = { title: '', summary: '', rawInput: '', notes: '', url: '' };
+let kwKnowledgeDraft = { title: '', summary: '', rawInput: '', rawHtml: '', notes: '', notesHtml: '', url: '', skipAiProcessing: true };
 let kwKnowledgeEditingId = '';
 let kwKnowledgeIntakeType = 'voice';
 let kwKnowledgeRecording = false;
 let kwKnowledgeUploadSamples = [];
 let kwKnowledgeUrlPreview = null;
+let kwKnowledgeEditors = { raw: null, notes: null };
+let kwReviewEditors = { manual: null };
+let kwKnowledgeChatState = { answer: '还没有发起查询。', matches: [], submitToModel: false, llmMode: 'retrieval_only', llmNotice: '', llmModel: null };
 
 function getKwReviewPeriodMeta(period) {
   return KW_REVIEW_PERIOD_CONFIG[period] || KW_REVIEW_PERIOD_CONFIG.day;
@@ -3878,36 +4246,318 @@ function getKwKnowledgeEntryById(entryId) {
   return kwKnowledgeStore.find(item => item.id === entryId) || null;
 }
 
+function kwNormalizeKnowledgeHtml(html) {
+  return String(html || '')
+    .replace(/<p><br><\/p>/gi, '<p></p>')
+    .trim();
+}
+
+function kwKnowledgeHtmlToPlainText(html) {
+  const temp = document.createElement('div');
+  temp.innerHTML = String(html || '');
+  return (temp.textContent || temp.innerText || '').replace(/\u00a0/g, ' ').trim();
+}
+
+function kwBuildKnowledgeRenderedHtml(value, fallback) {
+  const html = kwNormalizeKnowledgeHtml(value);
+  if (!html) return `<div class="kw-knowledge-rendered is-empty">${escapeHtml(fallback || '暂无内容')}</div>`;
+  return `<div class="kw-knowledge-rendered">${html}</div>`;
+}
+
+function kwBuildKnowledgeStatusMeta(status) {
+  const text = String(status || '').trim();
+  if (!text) return { label: '待同步', className: 'syncing' };
+  if (/(同步|已|可微调|ready|Hermes)/i.test(text) && !/中/.test(text)) {
+    return { label: text, className: 'ready' };
+  }
+  return { label: text, className: 'syncing' };
+}
+
+function kwDestroyKnowledgeEditors() {
+  kwKnowledgeEditors = { raw: null, notes: null };
+}
+
+function kwSyncKnowledgeDraftFromEditors() {
+  if (kwKnowledgeEditors.raw) {
+    kwKnowledgeDraft.rawHtml = kwNormalizeKnowledgeHtml(kwKnowledgeEditors.raw.root.innerHTML);
+    kwKnowledgeDraft.rawInput = kwKnowledgeHtmlToPlainText(kwKnowledgeDraft.rawHtml);
+  }
+  if (kwKnowledgeEditors.notes) {
+    kwKnowledgeDraft.notesHtml = kwNormalizeKnowledgeHtml(kwKnowledgeEditors.notes.root.innerHTML);
+    kwKnowledgeDraft.notes = kwKnowledgeHtmlToPlainText(kwKnowledgeDraft.notesHtml);
+  }
+}
+
+function kwSyncKnowledgeDraftFromModal() {
+  kwSyncKnowledgeDraftFromEditors();
+  const titleInput = document.getElementById('kw-knowledge-title-input');
+  const summaryInput = document.getElementById('kw-knowledge-summary-input');
+  const urlInput = document.getElementById('kw-knowledge-url-input');
+  const skipAiInput = document.getElementById('kw-knowledge-skip-ai-processing');
+  kwKnowledgeDraft = {
+    ...kwKnowledgeDraft,
+    title: titleInput ? titleInput.value : kwKnowledgeDraft.title,
+    summary: summaryInput ? summaryInput.value : kwKnowledgeDraft.summary,
+    skipAiProcessing: skipAiInput ? !!skipAiInput.checked : kwKnowledgeDraft.skipAiProcessing !== false,
+    url: urlInput ? urlInput.value : kwKnowledgeDraft.url,
+  };
+}
+
+function kwInstallKnowledgeImagePaste(quill) {
+  if (!quill || !quill.root) return;
+  quill.root.addEventListener('paste', (event) => {
+    const clipboard = event.clipboardData;
+    if (!clipboard) return;
+    const items = Array.from(clipboard.items || []);
+    const imageItem = items.find((item) => item.type && item.type.startsWith('image/'));
+    if (!imageItem) return;
+    event.preventDefault();
+    const file = imageItem.getAsFile();
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const range = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
+      quill.insertEmbed(range.index, 'image', reader.result, 'user');
+      quill.setSelection(range.index + 1, 0, 'silent');
+      kwSyncKnowledgeDraftFromEditors();
+      showToast('截图已插入正文');
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function kwCreateKnowledgeQuill(containerId, placeholder, html) {
+  const host = document.getElementById(containerId);
+  if (!host || typeof window.Quill === 'undefined') return null;
+  host.innerHTML = '';
+  const quill = new window.Quill(host, {
+    theme: 'snow',
+    placeholder,
+    modules: {
+      toolbar: [
+        [{ header: [1, 2, false] }],
+        ['bold', 'italic', 'underline', 'blockquote'],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        ['link', 'image'],
+        ['clean'],
+      ],
+    },
+  });
+  const normalizedHtml = kwNormalizeKnowledgeHtml(html);
+  if (normalizedHtml) {
+    quill.clipboard.dangerouslyPasteHTML(normalizedHtml);
+  }
+  quill.on('text-change', () => {
+    kwSyncKnowledgeDraftFromEditors();
+  });
+  kwInstallKnowledgeImagePaste(quill);
+  return quill;
+}
+
+function kwSyncReviewDraftFromEditors() {
+  if (kwReviewEditors.manual) {
+    kwReviewDraft.manualHtml = kwNormalizeKnowledgeHtml(kwReviewEditors.manual.root.innerHTML);
+  }
+}
+
+function kwEnsureReviewEditors() {
+  kwReviewEditors = { manual: null };
+  if (kwReviewDraft.sourceMode !== 'manual') return;
+  if (typeof window.Quill === 'undefined') {
+    const manualHost = document.getElementById('kw-review-manual-editor');
+    if (manualHost) manualHost.innerHTML = '<div class="kw-knowledge-editor-loading">编辑器加载失败，请刷新后重试。</div>';
+    return;
+  }
+  kwReviewEditors.manual = kwCreateKnowledgeQuill(
+    'kw-review-manual-editor',
+    '在这里直接手写复盘正文。手动撰写模式下，后续不会再改写这份文案。',
+    kwReviewDraft.manualHtml || '',
+  );
+  if (kwReviewEditors.manual) {
+    kwReviewEditors.manual.on('text-change', () => {
+      kwSyncReviewDraftFromEditors();
+    });
+  }
+}
+
+function kwEnsureKnowledgeEditors() {
+  kwDestroyKnowledgeEditors();
+  if (typeof window.Quill === 'undefined') {
+    const rawHost = document.getElementById('kw-knowledge-raw-editor');
+    const notesHost = document.getElementById('kw-knowledge-notes-editor');
+    if (rawHost) rawHost.innerHTML = '<div class="kw-knowledge-editor-loading">编辑器加载失败，请刷新后重试。</div>';
+    if (notesHost) notesHost.innerHTML = '<div class="kw-knowledge-editor-loading">编辑器加载失败，请刷新后重试。</div>';
+    return;
+  }
+  kwKnowledgeEditors.raw = kwCreateKnowledgeQuill(
+    'kw-knowledge-raw-editor',
+    '补充原始材料中的关键上下文、贴入截图、表格或段落，让知识条目更接近 CMS 正文。',
+    kwKnowledgeDraft.rawHtml || kwKnowledgeDraft.rawInput,
+  );
+  kwKnowledgeEditors.notes = kwCreateKnowledgeQuill(
+    'kw-knowledge-notes-editor',
+    '记录本次微调原则，例如保留大V语气、强调验证节点、删掉口语噪音。',
+    kwKnowledgeDraft.notesHtml || kwKnowledgeDraft.notes,
+  );
+}
+
 function buildKwKnowledgeDraft(entry) {
   return {
     title: entry && entry.title ? entry.title : '',
     summary: entry && entry.summary ? entry.summary : '',
-    rawInput: entry && entry.raw_input ? entry.raw_input : '',
+    rawInput: entry && (entry.raw_input || entry.body) ? (entry.raw_input || entry.body) : '',
+    rawHtml: entry && entry.raw_html ? entry.raw_html : (entry && (entry.raw_input || entry.body) ? `<p>${escapeHtml(entry.raw_input || entry.body).replace(/\n/g, '<br>')}</p>` : ''),
     notes: entry && entry.notes ? entry.notes : '',
+    notesHtml: entry && entry.notes_html ? entry.notes_html : (entry && entry.notes ? `<p>${escapeHtml(entry.notes).replace(/\n/g, '<br>')}</p>` : ''),
+    skipAiProcessing: entry && Object.prototype.hasOwnProperty.call(entry, 'skip_ai_processing') ? !!entry.skip_ai_processing : true,
     url: entry && entry.url ? entry.url : '',
   };
 }
 
 function kwRenderKnowledgeList() {
   initializeKwKnowledgeStore();
-  const host = document.querySelector('#workbench-section-knowledge .kw-knowledge-list');
-  if (!host) return;
-  host.innerHTML = kwKnowledgeStore.map(item => `
-    <div class="kw-knowledge-item" onclick="kwOpenKnowledgeEntryEditor('${escapeAttr(item.id || '')}')">
-      <div class="kw-knowledge-top">
-        <div>
-          <div class="kw-knowledge-title">${escapeHtml(item.title || '')}</div>
-          <div class="kw-knowledge-meta">${escapeHtml(item.source || '')}</div>
+  const entryGrid = document.getElementById('kw-knowledge-entry-grid');
+  const listHost = document.getElementById('kw-knowledge-list');
+  const zoneHost = document.getElementById('kw-knowledge-zone-feed');
+  if (entryGrid) {
+    entryGrid.innerHTML = Object.entries(KW_KNOWLEDGE_INPUT_TYPES).map(([type, cfg]) => `
+      <div class="kw-knowledge-entry-card" onclick="kwOpenKnowledgeIntake('${type}')">
+        <div class="kw-knowledge-entry-icon">${cfg.icon}</div>
+        <div class="kw-knowledge-title">${escapeHtml(cfg.label)}</div>
+        <div class="kw-knowledge-entry-desc">${escapeHtml(cfg.desc)}</div>
+        <div class="kw-knowledge-entry-cta">点击录入</div>
+      </div>
+    `).join('');
+  }
+  if (listHost) {
+    listHost.innerHTML = kwKnowledgeStore.map(item => {
+      const status = kwBuildKnowledgeStatusMeta(item.status);
+      return `
+      <div class="kw-knowledge-queue-item" onclick="kwOpenKnowledgeEntryEditor('${escapeAttr(item.id || '')}')">
+        <div class="kw-knowledge-queue-head">
+          <div>
+            <div class="kw-knowledge-queue-title">${escapeHtml(item.title || '')}</div>
+            <div class="kw-knowledge-queue-meta">${escapeHtml(item.source_detail || item.source || '')}</div>
+          </div>
+          <span class="kw-knowledge-status ${status.className}">${escapeHtml(status.label)}</span>
         </div>
-        <span class="kw-tag">${escapeHtml(item.status || '')}</span>
+        <div class="kw-knowledge-queue-body">${escapeHtml(item.summary || '')}</div>
+        <div class="kw-watch-chip-row" style="margin-top:10px">
+          ${(item.tags || []).map(tag => `<span class="kw-watch-chip">${escapeHtml(tag)}</span>`).join('')}
+        </div>
+        <div class="kw-knowledge-entry-hint">点击弹框微调</div>
       </div>
-      <div class="kw-knowledge-summary">${escapeHtml(item.summary || '')}</div>
-      <div class="kw-watch-chip-row" style="margin-top:10px">
-        ${(item.tags || []).map(tag => `<span class="kw-watch-chip">${escapeHtml(tag)}</span>`).join('')}
+    `;
+    }).join('');
+  }
+  if (zoneHost) {
+    zoneHost.innerHTML = kwKnowledgeStore.map(item => {
+      const cfg = KW_KNOWLEDGE_INPUT_TYPES[item.type] || KW_KNOWLEDGE_INPUT_TYPES.voice;
+      const status = kwBuildKnowledgeStatusMeta(item.status);
+      return `
+      <div class="kw-knowledge-zone-card" onclick="kwOpenKnowledgeEntryEditor('${escapeAttr(item.id || '')}')">
+        <div class="kw-knowledge-zone-top">
+          <div>
+            <div class="kw-knowledge-zone-title">${escapeHtml(item.title || '')}</div>
+            <div class="kw-knowledge-zone-origin">${escapeHtml(cfg.icon)} ${escapeHtml(item.source || '')} · ${escapeHtml(item.source_detail || '')}</div>
+          </div>
+          <span class="kw-knowledge-status ${status.className}">${escapeHtml(status.label)}</span>
+        </div>
+        <div class="kw-knowledge-zone-summary">${escapeHtml(item.summary || '')}</div>
+        <div class="kw-watch-chip-row" style="margin-top:10px">
+          ${(item.tags || []).map(tag => `<span class="kw-watch-chip">${escapeHtml(tag)}</span>`).join('')}
+        </div>
+        <div class="kw-knowledge-entry-hint">点击弹框微调</div>
       </div>
-      <div class="kw-link-url" style="margin-top:8px">点击查看详情并微调</div>
-    </div>
-  `).join('');
+    `;
+    }).join('');
+  }
+  kwRenderKnowledgeChatResult();
+}
+
+function kwRenderKnowledgeChatResult() {
+  const answerHost = document.getElementById('kw-knowledge-chat-answer');
+  const matchesHost = document.getElementById('kw-knowledge-chat-matches');
+  if (answerHost) {
+    const prefix = kwKnowledgeChatState.llmNotice ? `${kwKnowledgeChatState.llmNotice}\n\n` : '';
+    answerHost.textContent = `${prefix}${kwKnowledgeChatState.answer || '还没有发起查询。'}`;
+  }
+  if (matchesHost) {
+    const matches = Array.isArray(kwKnowledgeChatState.matches) ? kwKnowledgeChatState.matches : [];
+    matchesHost.innerHTML = matches.length ? matches.map((item) => `
+      <div class="kw-knowledge-chat-match" onclick="kwOpenKnowledgeEntryEditor('${escapeAttr(item.id || '')}')">
+        <div class="kw-knowledge-chat-match-title">${escapeHtml(item.title || '未命名知识')}</div>
+        <div class="kw-knowledge-chat-match-meta">相关度 ${escapeHtml(String(item.score || 0))} · ${escapeHtml(item.source_detail || item.source || '')}</div>
+        <div class="kw-knowledge-chat-match-body">${escapeHtml(item.summary || item.body || item.raw_input || '')}</div>
+      </div>
+    `).join('') : '<div class="kw-knowledge-chat-match"><div class="kw-knowledge-chat-match-meta">当前还没有命中结果。</div></div>';
+  }
+}
+
+function kwFillKnowledgeChatSample() {
+  const input = document.getElementById('kw-knowledge-chat-input');
+  if (!input) return;
+  input.value = '当前知识库里，关于港股互联网或科技主线，沉淀过哪些验证节点和风险边界？';
+}
+
+async function kwSubmitKnowledgeChat() {
+  const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
+  const input = document.getElementById('kw-knowledge-chat-input');
+  const submitModelInput = document.getElementById('kw-knowledge-chat-submit-model');
+  const query = input ? String(input.value || '').trim() : '';
+  const submitToModel = submitModelInput ? !!submitModelInput.checked : false;
+  if (!tenantSlug) {
+    showToast('tenant_missing');
+    return;
+  }
+  if (!query) {
+    showToast('请先输入问题');
+    return;
+  }
+  kwKnowledgeChatState = {
+    answer: '正在查询知识库，请稍候...',
+    matches: [],
+    submitToModel,
+    llmMode: submitToModel ? 'requesting_model' : 'retrieval_only',
+    llmNotice: submitToModel ? '已请求带上通用模型配置，正在查询知识库...' : '当前为纯知识检索模式，未提交给大模型。',
+    llmModel: null,
+  };
+  kwRenderKnowledgeChatResult();
+  try {
+    const resp = await fetch('/api/kol/knowledge/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tenant_slug: tenantSlug,
+        query,
+        submit_to_model: submitToModel,
+        limit: 5,
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error(data.error || 'knowledge_query_failed');
+    kwKnowledgeChatState = {
+      answer: data.answer || '未返回结果。',
+      matches: Array.isArray(data.matches) ? data.matches : [],
+      submitToModel: !!data.submit_to_model,
+      llmMode: data.llm_mode || 'retrieval_only',
+      llmNotice: data.llm_notice || '',
+      llmModel: data.llm_model || null,
+    };
+    kwRenderKnowledgeChatResult();
+    showToast('知识库查询完成');
+  } catch (error) {
+    kwKnowledgeChatState = {
+      answer: error.message || '知识库查询失败',
+      matches: [],
+      submitToModel,
+      llmMode: 'error',
+      llmNotice: '',
+      llmModel: null,
+    };
+    kwRenderKnowledgeChatResult();
+    showToast(error.message || '知识库查询失败');
+  }
 }
 
 function kwOpenKnowledgeIntake(type) {
@@ -3953,21 +4603,7 @@ function kwCloseKnowledgeModal() {
   const modal = document.getElementById('kw-knowledge-modal');
   if (modal) modal.classList.remove('show');
   kwKnowledgeRecording = false;
-}
-
-function kwSyncKnowledgeDraftFromModal() {
-  const titleInput = document.getElementById('kw-knowledge-title-input');
-  const summaryInput = document.getElementById('kw-knowledge-summary-input');
-  const rawInput = document.getElementById('kw-knowledge-raw-input');
-  const notesInput = document.getElementById('kw-knowledge-notes-input');
-  const urlInput = document.getElementById('kw-knowledge-url-input');
-  kwKnowledgeDraft = {
-    title: titleInput ? titleInput.value : kwKnowledgeDraft.title,
-    summary: summaryInput ? summaryInput.value : kwKnowledgeDraft.summary,
-    rawInput: rawInput ? rawInput.value : kwKnowledgeDraft.rawInput,
-    notes: notesInput ? notesInput.value : kwKnowledgeDraft.notes,
-    url: urlInput ? urlInput.value : kwKnowledgeDraft.url,
-  };
+  kwDestroyKnowledgeEditors();
 }
 
 function kwRenderKnowledgeTypePanel() {
@@ -3998,6 +4634,16 @@ function kwRenderKnowledgeTypePanel() {
           <div class="kw-knowledge-chip-row" style="margin-top:10px">
             ${kwKnowledgeUploadSamples.length ? kwKnowledgeUploadSamples.map(file => `<span class="kw-knowledge-chip">${escapeHtml(file)}</span>`).join('') : '<span class="kw-knowledge-chip">尚未选择文件</span>'}
           </div>
+        </div>
+      </div>
+    `;
+  }
+  if (kwKnowledgeIntakeType === 'manual') {
+    return `
+      <div class="kw-knowledge-modal-block">
+        <label class="kw-knowledge-modal-label">纯文本面板</label>
+        <div class="kw-knowledge-type-panel">
+          <div class="kw-review-runtime-meta">这里适合直接编写结构化知识，不依赖语音、文件或网页抓取。</div>
         </div>
       </div>
     `;
@@ -4054,7 +4700,7 @@ function kwRenderKnowledgeModal() {
           <div class="kw-knowledge-detail-note">${entry ? `${escapeHtml(entry.source_detail || entry.source || '')} · ${escapeHtml(entry.status || '')}` : '新建知识条目时，左侧会逐步形成“原始输入 - 提炼摘要 - 备注”的完整内容。'}</div>
           ${entry ? `
             <div class="kw-knowledge-bullet-list">
-              <div class="kw-knowledge-bullet-item"><strong>原始材料</strong><div class="kw-knowledge-detail-copy">${escapeHtml(entry.raw_input || '')}</div></div>
+              <div class="kw-knowledge-bullet-item"><strong>原始材料</strong>${kwBuildKnowledgeRenderedHtml(entry.raw_html || entry.raw_input || '', '暂无原始材料')}</div>
               <div class="kw-knowledge-bullet-item"><strong>系统提炼的关键要点</strong><div class="kw-knowledge-detail-copy">${(entry.key_points || []).map((point, index) => `${index + 1}. ${point}`).join('\n')}</div></div>
               <div class="kw-knowledge-bullet-item"><strong>当前验证节点</strong><div class="kw-knowledge-detail-copy">${(entry.validation_nodes || []).map((point, index) => `${index + 1}. ${point}`).join('\n')}</div></div>
             </div>
@@ -4076,7 +4722,7 @@ function kwRenderKnowledgeModal() {
       <div class="kw-knowledge-detail-stack">
         <div class="kw-knowledge-detail-card">
           <div class="kw-knowledge-detail-title">怎么调</div>
-          <div class="kw-knowledge-detail-note">按入口类型补充新材料，再修改标题、结构化摘要和补充备注。若是 URL 条目，可以重新抓摘要；若是文件条目，可以追加文件；若是语音条目，可以继续补口述。</div>
+          <div class="kw-knowledge-detail-note">按入口类型补充新材料，再修改标题、结构化摘要和补充备注。web 端这里是 CMS 富客户端，可以直接贴图、贴表格和多段文本。</div>
         </div>
         <div class="kw-knowledge-modal-block">
           <label class="kw-knowledge-modal-label">知识标题</label>
@@ -4088,12 +4734,25 @@ function kwRenderKnowledgeModal() {
           <textarea id="kw-knowledge-summary-input" class="kw-knowledge-modal-textarea" placeholder="${escapeHtml(cfg.placeholder)}">${escapeHtml(kwKnowledgeDraft.summary || '')}</textarea>
         </div>
         <div class="kw-knowledge-modal-block">
-          <label class="kw-knowledge-modal-label">原始材料补充 / 去噪备注</label>
-          <textarea id="kw-knowledge-raw-input" class="kw-knowledge-modal-textarea" placeholder="补充原始材料中的关键上下文，或者删除你认为不该保留的噪音。">${escapeHtml(kwKnowledgeDraft.rawInput || '')}</textarea>
+          <label class="kw-knowledge-modal-label">处理选项</label>
+          <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--text-main);line-height:1.7">
+            <input type="checkbox" id="kw-knowledge-skip-ai-processing" ${kwKnowledgeDraft.skipAiProcessing !== false ? 'checked' : ''} />
+            <span>不使用大模型处理。勾选后，这条知识只保留用户原文和本地 embedding，不做 AI 清洗。</span>
+          </label>
+        </div>
+        <div class="kw-knowledge-modal-block">
+          <label class="kw-knowledge-modal-label">原始材料补充 / 富文本正文</label>
+          <div class="kw-knowledge-rich-shell">
+            <div class="kw-knowledge-editor-loading">支持贴图、富文本段落、引用、列表与链接，适合作为 CMS 知识正文继续编辑。</div>
+            <div id="kw-knowledge-raw-editor" class="kw-knowledge-rich-editor"></div>
+            <div class="kw-knowledge-rich-help">可直接粘贴截图，图片会以内嵌方式插入当前知识正文。</div>
+          </div>
         </div>
         <div class="kw-knowledge-modal-block">
           <label class="kw-knowledge-modal-label">微调说明</label>
-          <textarea id="kw-knowledge-notes-input" class="kw-knowledge-modal-textarea" placeholder="例如：把验证节点写得更清楚，保留大V判断口吻，避免空泛行业表述。">${escapeHtml(kwKnowledgeDraft.notes || '')}</textarea>
+          <div class="kw-knowledge-rich-shell">
+            <div id="kw-knowledge-notes-editor" class="kw-knowledge-rich-editor"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -4102,6 +4761,12 @@ function kwRenderKnowledgeModal() {
       <button class="btn-gold" type="button" onclick="kwSubmitKnowledgeTuning()">${entry ? '保存微调' : '提交入库'}</button>
     </div>
   `;
+  const modal = document.getElementById('kw-knowledge-modal');
+  if (modal) {
+    const sheet = modal.querySelector('.kw-review-modal-sheet');
+    if (sheet) sheet.classList.add('kw-knowledge-modal-sheet');
+  }
+  kwEnsureKnowledgeEditors();
 }
 
 function kwSwitchKnowledgeIntakeType(type) {
@@ -4126,6 +4791,7 @@ function kwToggleKnowledgeVoiceCapture() {
     }
     if (!String(kwKnowledgeDraft.rawInput || '').trim()) {
       kwKnowledgeDraft.rawInput = '新增口述材料已经转写完成，可继续删掉口语噪音，并把判断改成“观点 - 证据 - 验证节点”的结构。';
+      kwKnowledgeDraft.rawHtml = `<p>${escapeHtml(kwKnowledgeDraft.rawInput).replace(/\n/g, '<br>')}</p>`;
     }
     showToast('录音已结束，转写结果已回填');
   }
@@ -4156,7 +4822,23 @@ function kwPreviewKnowledgeUrl() {
   kwRenderKnowledgeModal();
 }
 
-function kwSubmitKnowledgeTuning() {
+async function kwSaveManualKnowledgeEntry(payload) {
+  const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
+  if (!tenantSlug) throw new Error('tenant_missing');
+  const resp = await fetch('/api/kol/knowledge/manual', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      tenant_slug: tenantSlug,
+      ...payload,
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) throw new Error(data.error || 'knowledge_manual_save_failed');
+  return data;
+}
+
+async function kwSubmitKnowledgeTuning() {
   initializeKwKnowledgeStore();
   kwSyncKnowledgeDraftFromModal();
   const cfg = KW_KNOWLEDGE_INPUT_TYPES[kwKnowledgeIntakeType] || KW_KNOWLEDGE_INPUT_TYPES.voice;
@@ -4168,11 +4850,52 @@ function kwSubmitKnowledgeTuning() {
     showToast('请先抓取网页摘要');
     return;
   }
+  if (kwKnowledgeIntakeType === 'manual' && !String(kwKnowledgeDraft.rawInput || '').trim() && !String(kwKnowledgeDraft.summary || '').trim()) {
+    showToast('请先输入正文或摘要');
+    return;
+  }
   const title = String(kwKnowledgeDraft.title || '').trim() || cfg.defaultTitle;
   const summary = String(kwKnowledgeDraft.summary || '').trim() || cfg.placeholder.replace('例如：', '');
   const rawInput = String(kwKnowledgeDraft.rawInput || '').trim();
+  const rawHtml = kwNormalizeKnowledgeHtml(kwKnowledgeDraft.rawHtml || '');
   const notes = String(kwKnowledgeDraft.notes || '').trim();
+  const notesHtml = kwNormalizeKnowledgeHtml(kwKnowledgeDraft.notesHtml || '');
   const editingEntry = kwKnowledgeEditingId ? getKwKnowledgeEntryById(kwKnowledgeEditingId) : null;
+  if (kwKnowledgeIntakeType === 'manual') {
+    try {
+      const payload = await kwSaveManualKnowledgeEntry({
+        id: editingEntry ? editingEntry.id : '',
+        title,
+        summary,
+        body: rawInput || summary,
+        raw_html: rawHtml,
+        notes,
+        notes_html: notesHtml,
+        skip_ai_processing: kwKnowledgeDraft.skipAiProcessing !== false,
+      });
+      kwKnowledgeStore = payload.knowledge_hub && Array.isArray(payload.knowledge_hub.items)
+        ? payload.knowledge_hub.items.map(item => ({ ...item }))
+        : kwKnowledgeStore;
+      if (window.WORKBENCH_DATA && window.WORKBENCH_DATA.knowledge_hub) {
+        window.WORKBENCH_DATA.knowledge_hub = payload.knowledge_hub || window.WORKBENCH_DATA.knowledge_hub;
+      }
+      kwRenderKnowledgeList();
+      kwCloseKnowledgeModal();
+      kwOpenReviewIngestResultModal(editingEntry ? '知识微调成功，已写入向量库' : '知识入库成功，已写入向量库', [
+        `embedding 引擎：${payload.embedding_engine || '-'}`,
+        `embedding 模型：${payload.embedding_model || '-'}`,
+        `存储方式：${(payload.vector_record && payload.vector_record.storage_mode) || '-'}`,
+        `namespace：${(payload.vector_record && payload.vector_record.vector_namespace) || '-'}`,
+        `知识标题：${title}`,
+        `知识摘要：${summary}`,
+        `正文预览：${(rawInput || summary || '').slice(0, 240)}`,
+      ]);
+      return;
+    } catch (error) {
+      showToast(error.message || '知识入库失败');
+      return;
+    }
+  }
   const nextSourceDetail = kwKnowledgeIntakeType === 'voice'
     ? `来源：语音转写 · ${editingEntry && editingEntry.voice_minutes ? editingEntry.voice_minutes : 6}分钟`
     : kwKnowledgeIntakeType === 'file'
@@ -4185,7 +4908,9 @@ function kwSubmitKnowledgeTuning() {
     editingEntry.source_detail = nextSourceDetail;
     editingEntry.summary = summary;
     editingEntry.raw_input = rawInput || editingEntry.raw_input || '';
+    editingEntry.raw_html = rawHtml || editingEntry.raw_html || '';
     editingEntry.notes = notes || '已根据后台微调要求更新结构、验证节点与同步说明。';
+    editingEntry.notes_html = notesHtml || editingEntry.notes_html || '';
     editingEntry.status = '重新同步中';
     editingEntry.tags = cfg.defaultTags.slice(0);
     editingEntry.files = kwKnowledgeIntakeType === 'file' ? kwKnowledgeUploadSamples.slice(0) : (editingEntry.files || []);
@@ -4214,11 +4939,13 @@ function kwSubmitKnowledgeTuning() {
     summary,
     tags: cfg.defaultTags.slice(0),
     raw_input: rawInput || '新知识条目已进入清洗队列，等待继续补全原始材料和验证节点。',
+    raw_html: rawHtml || '',
     key_points: ['待补充关键要点 1', '待补充关键要点 2'],
     validation_nodes: ['待补充验证节点'],
     sync_targets: ['租户知识队列', '知识专区', 'Hermes 上下文'],
     tuning_focus: ['补全摘要', '补全验证节点', '确认同步去向'],
     notes: notes || '新知识条目已创建，建议继续补具体判断和验证节点。',
+    notes_html: notesHtml || '',
     files: kwKnowledgeIntakeType === 'file' ? kwKnowledgeUploadSamples.slice(0) : [],
     url: kwKnowledgeIntakeType === 'url' ? (kwKnowledgeUrlPreview ? kwKnowledgeUrlPreview.url : kwKnowledgeDraft.url) : '',
     voice_minutes: kwKnowledgeIntakeType === 'voice' ? 6 : undefined,
@@ -4289,11 +5016,108 @@ function kwGetReviewPreviewText() {
   ].filter(Boolean).join('\n\n');
 }
 
+let kwReviewVoiceRecorder = null;
+let kwReviewVoiceChunks = [];
+let kwReviewVoiceRecording = false;
+let kwReviewVoiceUploading = false;
+let kwReviewIngestResult = null;
+
+function kwOpenReviewIngestResultModal(title, lines) {
+  const host = document.getElementById('kw-dashboard-cell-modal-content');
+  const modal = document.getElementById('kw-dashboard-cell-modal');
+  if (!host || !modal) return;
+  host.innerHTML = `
+    <div class="kw-review-modal-title">${escapeHtml(title || '入库结果')}</div>
+    <div class="kw-review-runtime-desc" style="margin-top:6px">这里用于测试确认语音 / 手写正文是否已成功进入向量库。</div>
+    <div class="kw-knowledge-modal-block" style="margin-top:14px">
+      <textarea class="kw-knowledge-modal-textarea" readonly>${escapeHtml((lines || []).join('\n\n'))}</textarea>
+    </div>
+    <div class="kw-review-modal-actions">
+      <button class="btn-gold" type="button" onclick="kwCloseDashboardCellModal()">我看到了，关闭</button>
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+function kwGetReviewVoiceButtonLabel() {
+  if (kwReviewVoiceUploading) return '转写中...';
+  if (kwReviewVoiceRecording) return '结束录音';
+  return '开始录音';
+}
+
+function kwGetReviewVoiceStatusText() {
+  if (kwReviewVoiceUploading) return '正在转写刚才的语音，请稍候。';
+  if (kwReviewVoiceRecording) return '正在录音，结束后会自动转成文案。';
+  return '点击按钮开始录音，系统会自动转成文案。';
+}
+
+async function kwUploadReviewVoiceBlob(audioBlob) {
+  const tenant = window.ACTIVE_TENANT || {};
+  const formData = new FormData();
+  formData.append('audio', audioBlob, `review-${Date.now()}.webm`);
+  formData.append('tenant_slug', tenant.slug || '');
+  formData.append('period', kwReviewDraft.period || 'day');
+  formData.append('entry_point', 'web');
+  formData.append('speaker_name', tenant.advisor || '');
+  const resp = await fetch('/api/review/voice-transcribe', {
+    method: 'POST',
+    body: formData,
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.success) {
+    throw new Error((data && data.error) || 'voice_transcribe_failed');
+  }
+  return data;
+}
+
+async function kwEmbedManualReviewText(text) {
+  const tenant = window.ACTIVE_TENANT || {};
+  const resp = await fetch('/api/review/manual-embed', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      text,
+      tenant_slug: tenant.slug || '',
+      period: kwReviewDraft.period || 'day',
+      entry_point: 'web',
+      speaker_name: tenant.advisor || '',
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.success) {
+    throw new Error((data && data.error) || 'manual_embed_failed');
+  }
+  return data;
+}
+
+async function kwPublishReviewContentEmbedding(text, transcriptionEngine, transcriptModel) {
+  const tenant = window.ACTIVE_TENANT || {};
+  const resp = await fetch('/api/review/publish-embed', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      text,
+      tenant_slug: tenant.slug || '',
+      period: kwReviewDraft.period || 'day',
+      entry_point: 'web_publish',
+      speaker_name: tenant.advisor || '',
+      transcription_engine: transcriptionEngine || 'manual',
+      transcript_model: transcriptModel || 'manual_input',
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.success) {
+    throw new Error((data && data.error) || 'publish_embed_failed');
+  }
+  return data;
+}
+
 function kwSyncReviewDraftFromModal() {
   const promptInput = document.getElementById('kw-review-ai-prompt-input');
-  const manualEditor = document.getElementById('kw-review-manual-editor');
+  const skipAiInput = document.getElementById('kw-review-skip-ai-processing');
+  kwSyncReviewDraftFromEditors();
   if (promptInput) kwReviewDraft.aiPrompt = promptInput.value;
-  if (manualEditor) kwReviewDraft.manualHtml = manualEditor.innerHTML;
+  if (skipAiInput) kwReviewDraft.skipAiProcessing = !!skipAiInput.checked;
 }
 
 function kwRenderReviewInputPanel() {
@@ -4301,12 +5125,12 @@ function kwRenderReviewInputPanel() {
     return `
       <div class="kw-review-intake-panel">
         <div class="kw-review-intake-toolbar">
-          <div class="kw-review-runtime-meta">点击按钮模拟语音输入，系统会自动转成文案。</div>
-          <button class="kw-review-input-button" type="button" onclick="kwCaptureReviewVoiceInput()">语音输入</button>
+          <div class="kw-review-runtime-meta">${kwGetReviewVoiceStatusText()}</div>
+          <button class="kw-review-input-button" type="button" ${kwReviewVoiceUploading ? 'disabled' : ''} onclick="kwCaptureReviewVoiceInput()">${kwGetReviewVoiceButtonLabel()}</button>
         </div>
         <div class="kw-review-intake-result">
           <div class="kw-review-intake-result-title">转写文案</div>
-          <div class="kw-review-intake-result-text">${escapeHtml(kwReviewDraft.voiceTranscript || '完成语音输入后，这里会展示转写后的复盘文案。')}</div>
+          <div class="kw-review-intake-result-text">${escapeHtml(kwReviewDraft.voiceTranscript || '录音结束后，这里会立即展示转写后的复盘文案。')}</div>
         </div>
       </div>
     `;
@@ -4327,18 +5151,17 @@ function kwRenderReviewInputPanel() {
   }
   return `
     <div class="kw-review-intake-panel">
-      <div class="kw-review-rich-toolbar">
-        <button class="kw-review-rich-tool" type="button" onclick="kwFormatReviewRichText('bold')">加粗</button>
-        <button class="kw-review-rich-tool" type="button" onclick="kwFormatReviewRichText('insertUnorderedList')">列表</button>
-        <button class="kw-review-rich-tool" type="button" onclick="kwInsertReviewSectionTitle()">小标题</button>
+      <div class="kw-knowledge-rich-shell">
+        <div class="kw-knowledge-editor-loading">支持加粗、列表、引用、链接、贴图，和知识正文使用同一套 Quill 编辑器。</div>
+        <div id="kw-review-manual-editor" class="kw-review-rich-editor"></div>
+        <div class="kw-knowledge-rich-help">这里和 H5 端使用同一套富文本编辑器 Quill。</div>
       </div>
-      <div id="kw-review-manual-editor" class="kw-review-rich-editor" contenteditable="true" data-placeholder="在这里直接手写复盘正文。手动撰写模式下，后续不会再改写这份文案。">${kwReviewDraft.manualHtml || ''}</div>
     </div>
   `;
 }
 
 function kwRenderReviewPromptPanel() {
-  if (kwReviewDraft.paragraphMode !== 'ai') return '';
+  if (kwReviewDraft.paragraphMode !== 'ai' || kwReviewDraft.skipAiProcessing) return '';
   return `
     <div class="kw-knowledge-modal-block">
       <label class="kw-knowledge-modal-label">智能文案修改规则</label>
@@ -4407,7 +5230,14 @@ function kwRenderReviewTriggerModal() {
           <button class="kw-knowledge-source-pill ${item.value === kwReviewDraft.paragraphMode ? 'active' : ''}" type="button" onclick="kwSetReviewTriggerParagraphMode('${item.value}')">${item.label}</button>
         `).join('')}
       </div>
-      <div class="kw-review-runtime-meta" style="margin-top:8px">${kwReviewDraft.paragraphMode === 'manual' ? '如果是自定义文案，就直接使用你上面输入的内容，不再二次改写。' : '智能文案会基于输入材料和你的修改规则生成草稿。'}</div>
+      <div class="kw-review-runtime-meta" style="margin-top:8px">${kwReviewDraft.skipAiProcessing ? '当前已关闭大模型处理，系统只保留原文和本地转化结果。' : (kwReviewDraft.paragraphMode === 'manual' ? '如果是自定义文案，就直接使用你上面输入的内容，不再二次改写。' : '智能文案会基于输入材料和你的修改规则生成草稿。')}</div>
+    </div>
+    <div class="kw-knowledge-modal-block">
+      <label class="kw-knowledge-modal-label">处理选项</label>
+      <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--text-main);line-height:1.7">
+        <input type="checkbox" id="kw-review-skip-ai-processing" ${kwReviewDraft.skipAiProcessing ? 'checked' : ''} onchange="kwToggleReviewSkipAiProcessing(this.checked)" />
+        <span>不使用大模型处理。勾选后，只走原文 / 本地转化路径，不做 AI 整理。</span>
+      </label>
     </div>
     ${kwRenderReviewPromptPanel()}
     <div class="kw-knowledge-modal-block">
@@ -4433,6 +5263,7 @@ function kwRenderReviewTriggerModal() {
         : '<button class="btn-gold" type="button" onclick="kwSubmitReviewTrigger()">生成草稿</button>'}
     </div>
   `;
+  kwEnsureReviewEditors();
 }
 
 function kwOpenReviewTriggerModal(sourceMode) {
@@ -4485,6 +5316,18 @@ function kwSetReviewTriggerParagraphMode(mode) {
   kwRenderReviewTriggerModal();
 }
 
+function kwToggleReviewSkipAiProcessing(checked) {
+  kwSyncReviewDraftFromModal();
+  kwReviewDraft.skipAiProcessing = !!checked;
+  if (kwReviewDraft.skipAiProcessing) {
+    kwReviewDraft.paragraphMode = 'manual';
+    kwReviewDraft.aiPrompt = '';
+    kwReviewDraft.promptTags = [];
+  }
+  kwReviewDraft.previewReady = false;
+  kwRenderReviewTriggerModal();
+}
+
 function kwToggleReviewTriggerWatchlist(name) {
   const fullList = getKwTenantWatchlistFocus();
   if (!fullList.includes(name)) return;
@@ -4496,10 +5339,65 @@ function kwToggleReviewTriggerWatchlist(name) {
 }
 
 function kwCaptureReviewVoiceInput() {
-  kwReviewDraft.voiceTranscript = '系统已转写语音口述：今天复盘只保留两条主线，AI 算力继续看订单和景气，港股互联网继续看回购与财报兑现；个股上优先跟中芯国际、腾讯控股和贵州茅台。';
-  kwReviewDraft.previewReady = false;
-  kwRenderReviewTriggerModal();
-  showToast('语音已转成文案');
+  if (kwReviewVoiceUploading) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
+    showToast('当前浏览器不支持录音');
+    return;
+  }
+  if (kwReviewVoiceRecording && kwReviewVoiceRecorder) {
+    kwReviewVoiceRecorder.stop();
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+    kwReviewVoiceChunks = [];
+    kwReviewVoiceRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    kwReviewVoiceRecording = true;
+    kwReviewDraft.previewReady = false;
+    kwReviewVoiceRecorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) {
+        kwReviewVoiceChunks.push(event.data);
+      }
+    };
+    kwReviewVoiceRecorder.onerror = () => {
+      kwReviewVoiceRecording = false;
+      kwReviewVoiceUploading = false;
+      stream.getTracks().forEach((track) => track.stop());
+      kwRenderReviewTriggerModal();
+      showToast('录音失败，请重试');
+    };
+    kwReviewVoiceRecorder.onstop = async () => {
+      kwReviewVoiceRecording = false;
+      kwReviewVoiceUploading = true;
+      kwRenderReviewTriggerModal();
+      const blob = new Blob(kwReviewVoiceChunks, { type: kwReviewVoiceRecorder.mimeType || 'audio/webm' });
+      stream.getTracks().forEach((track) => track.stop());
+      try {
+        const data = await kwUploadReviewVoiceBlob(blob);
+        kwReviewDraft.voiceTranscript = data.transcript || '';
+        kwReviewDraft.previewReady = false;
+        kwReviewIngestResult = data;
+        kwOpenReviewIngestResultModal('语音转写成功（尚未入库）', [
+          `转写引擎：${data.transcript_engine || '-'}`,
+          `转写模型：${data.transcript_model || '-'}`,
+          `当前状态：仅完成转写，确认发布后才会写入向量库`,
+          `转写内容：${data.transcript || ''}`,
+        ]);
+        showToast('语音已转成文案，待确认发布');
+      } catch (error) {
+        showToast(error.message || '语音转写失败');
+      } finally {
+        kwReviewVoiceUploading = false;
+        kwReviewVoiceRecorder = null;
+        kwReviewVoiceChunks = [];
+        kwRenderReviewTriggerModal();
+      }
+    };
+    kwReviewVoiceRecorder.start();
+    kwRenderReviewTriggerModal();
+  }).catch(() => {
+    showToast('未获得麦克风权限');
+  });
 }
 
 function kwCaptureReviewFileInput() {
@@ -4507,22 +5405,6 @@ function kwCaptureReviewFileInput() {
   kwReviewDraft.previewReady = false;
   kwRenderReviewTriggerModal();
   showToast('文件已转成文案');
-}
-
-function kwFormatReviewRichText(command) {
-  const editor = document.getElementById('kw-review-manual-editor');
-  if (!editor) return;
-  editor.focus();
-  document.execCommand(command, false);
-  kwSyncReviewDraftFromModal();
-}
-
-function kwInsertReviewSectionTitle() {
-  const editor = document.getElementById('kw-review-manual-editor');
-  if (!editor) return;
-  editor.focus();
-  document.execCommand('insertHTML', false, '<p><strong>小标题</strong></p><p></p>');
-  kwSyncReviewDraftFromModal();
 }
 
 function kwToggleReviewPromptTag(tag) {
@@ -4564,6 +5446,35 @@ function kwSubmitReviewTrigger() {
     showToast('请先补充输入内容');
     return;
   }
+  if (kwReviewDraft.sourceMode === 'manual') {
+    kwEmbedManualReviewText(kwGetReviewDraftContentText()).then((manualResult) => {
+      kwReviewIngestResult = manualResult;
+      kwOpenReviewIngestResultModal('手写正文已就绪（尚未入库）', [
+        `转写引擎：${manualResult.transcript_engine || '-'}`,
+        `转写模型：${manualResult.transcript_model || '-'}`,
+        `当前状态：仅完成正文确认，确认发布后才会写入向量库`,
+        `正文内容：${manualResult.text || ''}`,
+      ]);
+      runtime.kolGeneratedAt = '刚刚生成';
+      runtime.kolSourceMode = kwReviewDraft.sourceMode;
+      runtime.paragraphMode = kwReviewDraft.paragraphMode;
+      runtime.kolSelectedWatchlist = kwReviewDraft.selectedWatchlist.slice(0);
+      runtime.lastReviewPeriod = kwReviewDraft.period;
+      runtime.latestVoiceTranscript = kwReviewDraft.voiceTranscript;
+      runtime.latestManualHtml = kwReviewDraft.manualHtml;
+      runtime.latestFileText = kwReviewDraft.fileText;
+      runtime.latestAiPrompt = kwReviewDraft.aiPrompt;
+      runtime.latestPromptTags = (kwReviewDraft.promptTags || []).slice(0);
+      runtime.draftReady = true;
+      kwReviewDraft.previewReady = true;
+      kwRenderReviewTriggerModal();
+      kwRenderReviewStudio();
+      showToast(`${getKwReviewPeriodMeta(kwReviewDraft.period).label}草稿已生成，请先预览`);
+    }).catch((error) => {
+      showToast(error.message || '手写正文入库失败');
+    });
+    return;
+  }
   runtime.kolGeneratedAt = '刚刚生成';
   runtime.kolSourceMode = kwReviewDraft.sourceMode;
   runtime.paragraphMode = kwReviewDraft.paragraphMode;
@@ -4584,21 +5495,40 @@ function kwSubmitReviewTrigger() {
 function kwPublishReviewDraft() {
   const runtime = ensureKwReviewRuntime();
   const item = kwBuildPublishedReviewFromDraft();
-  runtime.kolPublishedAt = '刚刚发布';
-  runtime.kolGeneratedAt = '刚刚发布';
-  runtime.draftReady = false;
-  const reviews = window.WORKBENCH_DATA && Array.isArray(window.WORKBENCH_DATA.published_reviews)
-    ? window.WORKBENCH_DATA.published_reviews
-    : [];
-  reviews.unshift(item);
-  if (window.WORKBENCH_DATA) {
-    window.WORKBENCH_DATA.published_reviews = reviews.slice(0, 6);
-  }
-  kwCloseReviewTriggerModal();
-  kwRenderReviewStudio();
-  kwRenderPublishedReviewList();
-  renderWorkbenchAnnotationViews();
-  showToast('复盘已发布');
+  const finalText = kwGetReviewPreviewText();
+  const transcriptionEngine = kwReviewDraft.sourceMode === 'voice'
+    ? ((kwReviewIngestResult && kwReviewIngestResult.transcript_engine) || 'local')
+    : 'manual';
+  const transcriptModel = kwReviewDraft.sourceMode === 'voice'
+    ? ((kwReviewIngestResult && kwReviewIngestResult.transcript_model) || '')
+    : 'manual_input';
+  kwPublishReviewContentEmbedding(finalText, transcriptionEngine, transcriptModel).then((publishResult) => {
+    kwReviewIngestResult = publishResult;
+    kwOpenReviewIngestResultModal('确认发布成功，已写入向量库', [
+      `转写引擎：${publishResult.transcript_engine || '-'}`,
+      `向量引擎：${publishResult.embedding_engine || '-'}`,
+      `向量模型：${publishResult.embedding_model || '-'}`,
+      `namespace：${(publishResult.vector_record && publishResult.vector_record.vector_namespace) || '-'}`,
+      `发布正文：${publishResult.text || ''}`,
+    ]);
+    runtime.kolPublishedAt = '刚刚发布';
+    runtime.kolGeneratedAt = '刚刚发布';
+    runtime.draftReady = false;
+    const reviews = window.WORKBENCH_DATA && Array.isArray(window.WORKBENCH_DATA.published_reviews)
+      ? window.WORKBENCH_DATA.published_reviews
+      : [];
+    reviews.unshift(item);
+    if (window.WORKBENCH_DATA) {
+      window.WORKBENCH_DATA.published_reviews = reviews.slice(0, 6);
+    }
+    kwCloseReviewTriggerModal();
+    kwRenderReviewStudio();
+    kwRenderPublishedReviewList();
+    renderWorkbenchAnnotationViews();
+    showToast('复盘已发布并入向量库');
+  }).catch((error) => {
+    showToast(error.message || '发布入库失败');
+  });
 }
 
 function kwRenderPublishedReviewList() {
