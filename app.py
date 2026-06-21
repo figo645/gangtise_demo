@@ -1332,9 +1332,9 @@ def build_tenant_dashboard_payload(tenant=None):
     }
 
 
-def build_tenant_portal_payload(tenant=None):
+def build_tenant_portal_payload(tenant=None, fallback_mode=False):
     tenant = tenant or get_tenant_by_slug()
-    workbench = gen_kol_workbench(tenant)
+    workbench = gen_kol_workbench(tenant, fallback_mode=fallback_mode)
     portal_workspace = copy.deepcopy(workbench.get("portal_workspace") or {})
     dashboard_metrics = copy.deepcopy(workbench.get("dashboard_metrics") or {})
     fund_dashboard = copy.deepcopy(workbench.get("fund_dashboard") or {})
@@ -1468,6 +1468,7 @@ def build_tenant_portal_payload(tenant=None):
     return {
         "tenant": tenant,
         "brand": get_platform_brand(),
+        "fallback_mode": fallback_mode,
         "portal_workspace": portal_workspace,
         "dashboard_metrics": dashboard_metrics,
         "fund_dashboard": fund_dashboard,
@@ -4481,7 +4482,13 @@ def build_indicator_hub_from_store():
 
 
 def get_indicator_hub_snapshot():
-    return build_indicator_hub_from_store()
+    try:
+        return build_indicator_hub_from_store()
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        app.logger.warning("Database unavailable while loading indicator hub snapshot, using fallback data")
+        return build_indicator_hub_fallback()
 
 
 def build_watchlist_indicator_context(indicator_hub=None):
@@ -4663,7 +4670,13 @@ def build_data_lake_indicator_items():
 
 def build_indicator_hub(tenant=None, admin_view=False):
     tenant = tenant or get_tenant_by_slug()
-    hub = copy.deepcopy(build_indicator_hub_from_store())
+    try:
+        hub = copy.deepcopy(build_indicator_hub_from_store())
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        app.logger.warning("Database unavailable while building indicator hub, using fallback data")
+        return build_indicator_hub_fallback(tenant=tenant, admin_view=admin_view)
     advisor_name = tenant.get("advisor") if isinstance(tenant, dict) else ""
     for item in hub.get("smart_items", []):
         if advisor_name and item.get("owner") in {"平台研究运营", "平台宏观组", ""}:
@@ -5120,6 +5133,22 @@ def resolve_demo_profile_fallback(site_config=None):
     return profiles, current
 
 
+def build_access_summary_fallback():
+    return {
+        "summary": {
+            "total": 0,
+            "unique_ips": 0,
+            "today": 0,
+            "paths": 0,
+        },
+        "top_paths": [],
+        "top_ips": [],
+        "daily_counts": [],
+        "recent_logs": [],
+        "fallback_mode": True,
+    }
+
+
 def build_tenant_dashboard_payload_fallback(tenant=None):
     tenant = tenant or normalize_tenant_config({}, 0)
     return {
@@ -5373,6 +5402,15 @@ def init_db():
         execute_sql_file(conn, sql_dir / "100_seed_master_data.sql")
 
 
+def init_db_safe():
+    try:
+        init_db()
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        app.logger.warning("Database unavailable during startup init, skipping init_db")
+
+
 def get_db():
     if "db" not in g:
         g.db = PgCompatConnection(get_app_db_connection())
@@ -5393,6 +5431,7 @@ def get_site_config():
     cached = g.get("site_config")
     if cached is not None:
         return cached
+    g.site_config_db_unavailable = False
     config = copy.deepcopy(DEFAULT_SITE_CONFIG)
     try:
         db = get_db()
@@ -5409,6 +5448,7 @@ def get_site_config():
                 app.logger.exception("Failed to parse site config")
     except Exception as exc:
         if is_db_unavailable_error(exc):
+            g.site_config_db_unavailable = True
             app.logger.warning("Database unavailable while loading site config, using defaults")
         else:
             raise
@@ -6291,7 +6331,15 @@ def fetch_live_knowledge_hub(tenant, limit=80):
                 )
                 rows = cur.fetchall()
     except Exception:
-        app.logger.exception("Failed to load live knowledge hub from vector database")
+        exc = None
+        try:
+            raise
+        except Exception as error:
+            exc = error
+        if exc is not None and is_db_unavailable_error(exc):
+            app.logger.warning("Vector database unavailable while loading live knowledge hub, using config fallback")
+        else:
+            app.logger.exception("Failed to load live knowledge hub from vector database")
         return config_hub
     if not rows:
         return config_hub
@@ -6584,13 +6632,11 @@ def is_authenticated():
 
 
 def is_password_gate_enabled():
-    try:
-        return bool(get_site_config().get("password_gate_enabled", True))
-    except Exception as exc:
-        if is_db_unavailable_error(exc):
-            app.logger.warning("Database unavailable while checking password gate, using default gate config")
-            return bool(DEFAULT_SITE_CONFIG.get("password_gate_enabled", True))
-        raise
+    config = get_site_config()
+    if g.get("site_config_db_unavailable"):
+        app.logger.warning("Database unavailable while checking password gate, temporarily disabling gate")
+        return False
+    return bool(config.get("password_gate_enabled", True))
 
 
 def safe_next_target(target):
@@ -6639,7 +6685,9 @@ def record_access(response):
             ),
         )
         db.commit()
-    except Exception:
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return response
         app.logger.exception("Failed to write access log")
     return response
 
@@ -6719,12 +6767,11 @@ def h5():
     fundamental_column = {}
     dashboard_seed_cards = []
     tenant_dashboard_payload = {}
+    requested_tenant_slug = str(request.args.get("tenant") or "").strip().lower()
     try:
         current_demo_profile = get_current_demo_profile(site_config)
-        tenant = get_tenant_by_slug(
-            current_demo_profile.get("tenant", {}).get("slug") if current_demo_profile else None,
-            site_config,
-        )
+        effective_tenant_slug = requested_tenant_slug or (current_demo_profile.get("tenant", {}).get("slug") if current_demo_profile else None)
+        tenant = get_tenant_by_slug(effective_tenant_slug, site_config)
         indicator_hub = build_indicator_hub(tenant=tenant, admin_view=False)
         fundamental_column = build_fundamental_column_payload(tenant)
         dashboard_seed_cards = build_indicator_dashboard_seed_cards(tenant, count=8)
@@ -6737,10 +6784,8 @@ def h5():
         h5_fallback_mode = True
         fallback_config = normalize_site_config(site_config)
         demo_profiles, current_demo_profile = resolve_demo_profile_fallback(fallback_config)
-        tenant = get_tenant_by_slug(
-            current_demo_profile.get("tenant", {}).get("slug") if current_demo_profile else None,
-            fallback_config,
-        )
+        effective_tenant_slug = requested_tenant_slug or (current_demo_profile.get("tenant", {}).get("slug") if current_demo_profile else None)
+        tenant = get_tenant_by_slug(effective_tenant_slug, fallback_config)
         indicator_hub = build_indicator_hub_fallback(tenant=tenant, admin_view=False)
         fundamental_column = build_fundamental_column_payload_from_hub(tenant, indicator_hub)
         dashboard_seed_cards = build_indicator_dashboard_seed_cards_from_hub(indicator_hub, count=8)
@@ -6779,35 +6824,61 @@ def h5():
 
 @app.route("/admin")
 def admin():
+    site_config = get_site_config()
     kols = gen_kol_data()
     segments = gen_user_segments()
-    access_stats = get_access_summary()
-    indicator_hub = build_indicator_hub(admin_view=True)
+    try:
+        access_stats = get_access_summary()
+        indicator_hub = build_indicator_hub(admin_view=True)
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        app.logger.warning("Database unavailable while building admin page, using fallback data")
+        access_stats = build_access_summary_fallback()
+        indicator_hub = build_indicator_hub_fallback(
+            tenant=get_tenant_by_slug(get_default_tenant_slug(site_config), site_config),
+            admin_view=True,
+        )
     return render_template(
         "admin.html",
         kols=kols,
         segments=segments,
         access_stats=access_stats,
         indicator_hub=indicator_hub,
-        brand=get_platform_brand(),
-        tenants=get_tenant_configs(),
-        default_tenant=get_tenant_by_slug(get_default_tenant_slug()),
+        brand=get_platform_brand(site_config),
+        tenants=get_tenant_configs(site_config),
+        default_tenant=get_tenant_by_slug(get_default_tenant_slug(site_config), site_config),
     )
 
 @app.route("/kol-workbench")
 def kol_workbench():
-    tenant = get_active_tenant_from_request()
-    workbench = gen_kol_workbench(tenant)
-    return render_template("kol_workbench.html", workbench=workbench, brand=get_platform_brand(), active_tenant=tenant)
+    site_config = get_site_config()
+    tenant = get_active_tenant_from_request(site_config)
+    try:
+        workbench = gen_kol_workbench(tenant)
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        app.logger.warning("Database unavailable while building workbench page, using fallback data")
+        tenant = get_tenant_by_slug(tenant.get("slug"), site_config) if isinstance(tenant, dict) else get_tenant_by_slug(site_config=site_config)
+        workbench = gen_kol_workbench(tenant, fallback_mode=True)
+    return render_template("kol_workbench.html", workbench=workbench, brand=get_platform_brand(site_config), active_tenant=tenant)
 
 
 @app.route("/tenant/<tenant_slug>")
 def tenant_portal(tenant_slug):
-    tenant = get_tenant_by_slug(tenant_slug)
+    site_config = get_site_config()
+    tenant = get_tenant_by_slug(tenant_slug, site_config)
     if not tenant or tenant["slug"] != tenant_slug:
         abort(404)
-    portal = build_tenant_portal_payload(tenant)
-    return render_template("tenant_portal.html", portal=portal, brand=get_platform_brand(), active_tenant=tenant)
+    try:
+        portal = build_tenant_portal_payload(tenant)
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        app.logger.warning("Database unavailable while building tenant portal, using fallback data")
+        portal = build_tenant_portal_payload(tenant, fallback_mode=True)
+    return render_template("tenant_portal.html", portal=portal, brand=get_platform_brand(site_config), active_tenant=tenant)
 
 @app.route("/dashboard")
 def dashboard():
@@ -7671,10 +7742,18 @@ def gen_dm_messages(kol_id):
         {"id":1,"sender":"kol","content":"欢迎关注！有投研问题随时交流。","time":"2026-05-18 09:00","type":"text"},
     ])
 
-def gen_kol_workbench(tenant=None):
+def gen_kol_workbench(tenant=None, fallback_mode=False):
     tenant = tenant or get_tenant_by_slug()
     is_lisa = tenant["slug"] == "lisa"
-    tenant_users = list_users(tenant_slug=tenant["slug"])
+    if fallback_mode:
+        fallback_config = normalize_site_config(DEFAULT_SITE_CONFIG)
+        tenant_users = [
+            ensure_user_row_defaults(dict(item), fallback_config)
+            for item in DEFAULT_USERS
+            if str(item.get("tenant_slug") or "").strip().lower() == tenant["slug"]
+        ]
+    else:
+        tenant_users = list_users(tenant_slug=tenant["slug"])
     investor_users = [user for user in tenant_users if user["role"] == "investor"]
     watchlist_details_map = gen_watchlist_details()
     kol_name = tenant["advisor"]
@@ -7691,8 +7770,10 @@ def gen_kol_workbench(tenant=None):
     fund_dashboard_state = resolve_tenant_fund_dashboard_state(tenant, tenant.get("fund_dashboard_config"))
     fund_dashboard = copy.deepcopy(fund_dashboard_state["published"])
     knowledge_hub = fetch_live_knowledge_hub(tenant)
+    indicator_hub = build_indicator_hub_fallback(tenant=tenant, admin_view=False) if fallback_mode else build_indicator_hub(tenant=tenant, admin_view=False)
     return {
         "tenant": tenant,
+        "fallback_mode": fallback_mode,
         "kol_name": kol_name,
         "kol_avatar": kol_avatar,
         "tier": tenant["tier"],
@@ -8000,7 +8081,7 @@ def gen_kol_workbench(tenant=None):
         },
         "fund_dashboard": fund_dashboard,
         "fund_dashboard_state": fund_dashboard_state,
-        "indicator_hub": build_indicator_hub(tenant=tenant, admin_view=False),
+        "indicator_hub": indicator_hub,
         "published_reviews": [
             {
                 "title": "收盘复盘：AI 算力强主线未变，港股互联网继续看回购与财报兑现",
@@ -8343,10 +8424,8 @@ def api_kol_reply():
 def prd():
     return render_template("prd.html")
 
-init_db()
-
 if __name__ == "__main__":
     host = os.environ.get("HOST", "0.0.0.0")
-    port = int(os.environ.get("PORT", "5000"))
+    port = int(os.environ.get("PORT", "5001"))
     debug = os.environ.get("DEBUG", "1").lower() in {"1", "true", "yes", "y"}
     app.run(host=host, port=port, debug=debug)

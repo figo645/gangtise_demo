@@ -1195,8 +1195,8 @@
       <div class="admin-page-title" id="page-title">运营概览</div>
       <div style="display:flex;gap:12px;align-items:center">
         <span style="font-size:12px;color:#8899aa">2026-06-01 业务沟通会口径</span>
-        <a href="/kol-workbench?tenant={{ default_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">大V工作台 Web</a>
-        <a href="/h5?tenant={{ default_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">H5 前台</a>
+        <a id="admin-top-workbench-link" href="/kol-workbench?tenant={{ default_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">大V工作台 Web</a>
+        <a id="admin-top-h5-link" href="/h5?tenant={{ default_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">H5 前台</a>
         <button class="btn-gold" style="padding:8px 16px;font-size:12px" onclick="showToast('报告生成中，请稍候...')">导出报告</button>
       </div>
     </div>
@@ -5494,6 +5494,17 @@ function updateTenantSummaryCards() {
   if (defaultNode) defaultNode.textContent = defaultTenant ? (defaultTenant.short_name || defaultTenant.name || '--') : '--';
 }
 
+function updateAdminTopEntryLinks() {
+  const tenants = ensureAdminTenants();
+  const defaultSlug = adminSiteConfig.default_tenant_slug || '';
+  const defaultTenant = tenants.find((tenant) => tenant.slug === defaultSlug) || tenants[0];
+  const slug = defaultTenant && defaultTenant.slug ? defaultTenant.slug : 'laowang';
+  const workbenchLink = document.getElementById('admin-top-workbench-link');
+  const h5Link = document.getElementById('admin-top-h5-link');
+  if (workbenchLink) workbenchLink.href = `/kol-workbench?tenant=${encodeURIComponent(slug)}`;
+  if (h5Link) h5Link.href = `/h5?tenant=${encodeURIComponent(slug)}`;
+}
+
 function updateDefaultTenantSlug(value) {
   adminSiteConfig.default_tenant_slug = value || '';
   renderTenantConfigList();
@@ -5543,6 +5554,7 @@ function renderTenantSidebar() {
     host.innerHTML = '<div class="tenant-admin-empty">当前还没有租户。<br>点击“新增租户”开始配置。</div>';
     defaultSelect.innerHTML = '';
     updateTenantSummaryCards();
+    updateAdminTopEntryLinks();
     return;
   }
   selectedAdminTenantIndex = Math.max(0, Math.min(selectedAdminTenantIndex, tenants.length - 1));
@@ -5566,6 +5578,7 @@ function renderTenantSidebar() {
     </div>
   `).join('');
   updateTenantSummaryCards();
+  updateAdminTopEntryLinks();
 }
 
 function renderTenantDetail() {
