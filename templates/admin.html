@@ -110,16 +110,123 @@
   .admin-status { font-size:13px; color:var(--text-sub); margin:12px 0 0; min-height:18px; }
   .config-grid.single-column { grid-template-columns:1fr; }
   .admin-nav-subgroup {
-    margin-top:8px;
-    padding-top:8px;
+    margin:8px 6px 0;
+    padding:8px 0 0;
     border-top:1px dashed rgba(200,169,110,0.10);
   }
   .admin-nav-subtitle {
-    margin:0 0 8px 12px;
+    margin:0 0 8px 14px;
     font-size:10px;
     letter-spacing:0.08em;
     text-transform:uppercase;
     color:var(--text-sub);
+  }
+  .indicator-hero {
+    display:grid;
+    grid-template-columns:minmax(0, 1.25fr) minmax(280px, 0.75fr);
+    gap:16px;
+    margin-bottom:20px;
+  }
+  .indicator-hero-card,
+  .indicator-side-card {
+    border:1px solid rgba(200,169,110,0.12);
+    border-radius:18px;
+    background:linear-gradient(180deg, rgba(47,116,192,0.04), var(--surface));
+    padding:18px;
+  }
+  .indicator-hero-title {
+    font-size:20px;
+    line-height:1.2;
+    font-weight:700;
+    color:var(--text-main);
+  }
+  .indicator-hero-desc {
+    margin-top:8px;
+    max-width:680px;
+    font-size:12px;
+    color:var(--text-sub);
+    line-height:1.8;
+  }
+  .indicator-chip-row,
+  .indicator-action-row,
+  .indicator-side-list { display:flex; gap:8px; flex-wrap:wrap; }
+  .indicator-chip {
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:6px 10px;
+    border-radius:999px;
+    background:rgba(47,116,192,0.08);
+    color:#1F497D;
+    border:1px solid rgba(47,116,192,0.16);
+    font-size:11px;
+    line-height:1;
+  }
+  .indicator-chip.is-gold {
+    color:var(--gold);
+    background:rgba(200,169,110,0.12);
+    border-color:rgba(200,169,110,0.20);
+  }
+  .indicator-action-row { margin-top:14px; }
+  .indicator-side-title {
+    font-size:13px;
+    font-weight:700;
+    color:var(--gold);
+  }
+  .indicator-side-copy {
+    margin-top:6px;
+    font-size:11px;
+    color:var(--text-sub);
+    line-height:1.8;
+  }
+  .indicator-side-list {
+    margin-top:14px;
+    display:grid;
+    gap:10px;
+  }
+  .indicator-side-item {
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    padding:10px 12px;
+    border-radius:12px;
+    background:rgba(11,30,58,0.42);
+    border:1px solid rgba(200,169,110,0.08);
+  }
+  .indicator-side-label {
+    font-size:11px;
+    color:var(--text-sub);
+  }
+  .indicator-side-value {
+    font-size:12px;
+    color:var(--text-main);
+    font-weight:700;
+    text-align:right;
+  }
+  .indicator-page-meta {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:16px;
+    flex-wrap:wrap;
+  }
+  .indicator-page-copy {
+    font-size:12px;
+    color:var(--text-sub);
+    line-height:1.8;
+    max-width:760px;
+  }
+  .indicator-page-tags { display:flex; gap:8px; flex-wrap:wrap; }
+  .indicator-page-tag {
+    display:inline-flex;
+    align-items:center;
+    padding:5px 10px;
+    border-radius:999px;
+    font-size:11px;
+    color:var(--gold);
+    background:rgba(200,169,110,0.10);
+    border:1px solid rgba(200,169,110,0.18);
   }
   .llm-admin-shell { display:grid; gap:16px; }
   .llm-admin-hero {
@@ -896,6 +1003,7 @@
     .admin-modal-overlay { padding:12px; }
     .admin-modal-sheet { padding:18px; border-radius:16px; }
     .admin-modal-grid { grid-template-columns:1fr; }
+    .indicator-hero,
     .llm-admin-hero,
     .llm-admin-model-grid,
     .tenant-admin-shell,
@@ -914,14 +1022,23 @@
       <div class="admin-logo-sub">纯 Admin 平台后台</div>
     </div>
     <nav class="admin-nav">
-      <div class="admin-nav-group">
-        <div class="admin-nav-group-title">概览</div>
+      <div class="admin-nav-group" data-nav-group="overview">
+        <button type="button" class="admin-nav-group-toggle" onclick="toggleAdminNavGroup(this)">
+          <span class="admin-nav-group-title">概览</span>
+          <span class="admin-nav-group-caret">&#9662;</span>
+        </button>
+        <div class="admin-nav-group-body">
         <div class="admin-nav-item active" data-section="overview" onclick="showSection('overview', this)">
           <span class="admin-nav-icon">&#9783;</span> 运营概览
         </div>
+        </div>
       </div>
-      <div class="admin-nav-group">
-        <div class="admin-nav-group-title">用户管理</div>
+      <div class="admin-nav-group" data-nav-group="users">
+        <button type="button" class="admin-nav-group-toggle" onclick="toggleAdminNavGroup(this)">
+          <span class="admin-nav-group-title">用户管理</span>
+          <span class="admin-nav-group-caret">&#9662;</span>
+        </button>
+        <div class="admin-nav-group-body">
         <div class="admin-nav-item" data-section="users" onclick="showSection('users', this)">
           <span class="admin-nav-icon">&#9786;</span> 用户列表
         </div>
@@ -931,44 +1048,90 @@
         <div class="admin-nav-item" data-section="points" onclick="showSection('points', this)">
           <span class="admin-nav-icon">&#9733;</span> 积分管理
         </div>
+        </div>
       </div>
-      <div class="admin-nav-group">
-        <div class="admin-nav-group-title">大V租户</div>
+      <div class="admin-nav-group" data-nav-group="kols">
+        <button type="button" class="admin-nav-group-toggle" onclick="toggleAdminNavGroup(this)">
+          <span class="admin-nav-group-title">大V租户</span>
+          <span class="admin-nav-group-caret">&#9662;</span>
+        </button>
+        <div class="admin-nav-group-body">
         <div class="admin-nav-item" data-section="kols" onclick="showSection('kols', this)">
           <span class="admin-nav-icon">&#9775;</span> 大V管理
         </div>
         <div class="admin-nav-item" data-section="commission" onclick="showSection('commission', this)">
           <span class="admin-nav-icon">&#9654;</span> 收益结算
         </div>
+        </div>
       </div>
-      <div class="admin-nav-group">
-        <div class="admin-nav-group-title">社区运营</div>
+      <div class="admin-nav-group" data-nav-group="community">
+        <button type="button" class="admin-nav-group-toggle" onclick="toggleAdminNavGroup(this)">
+          <span class="admin-nav-group-title">社区运营</span>
+          <span class="admin-nav-group-caret">&#9662;</span>
+        </button>
+        <div class="admin-nav-group-body">
         <div class="admin-nav-item" data-section="community" onclick="showSection('community', this)">
           <span class="admin-nav-icon">&#9998;</span> 帖子审核
         </div>
         <div class="admin-nav-item" data-section="events" onclick="showSection('events', this)">
           <span class="admin-nav-icon">&#9728;</span> 活动管理
         </div>
+        </div>
       </div>
-      <div class="admin-nav-group">
-        <div class="admin-nav-group-title">Hermes管理</div>
+      <div class="admin-nav-group" data-nav-group="hermes">
+        <button type="button" class="admin-nav-group-toggle" onclick="toggleAdminNavGroup(this)">
+          <span class="admin-nav-group-title">Hermes管理</span>
+          <span class="admin-nav-group-caret">&#9662;</span>
+        </button>
+        <div class="admin-nav-group-body">
         <div class="admin-nav-item" data-section="hermes" onclick="showSection('hermes', this)">
           <span class="admin-nav-icon">&#9881;</span> 使用统计
         </div>
         <div class="admin-nav-item" data-section="forecast-model" onclick="showSection('forecast-model', this)">
           <span class="admin-nav-icon">&#128200;</span> 预测模型
         </div>
+        </div>
       </div>
-      <div class="admin-nav-group">
-        <div class="admin-nav-group-title">渠道管理</div>
+      <div class="admin-nav-group" data-nav-group="channels">
+        <button type="button" class="admin-nav-group-toggle" onclick="toggleAdminNavGroup(this)">
+          <span class="admin-nav-group-title">渠道管理</span>
+          <span class="admin-nav-group-caret">&#9662;</span>
+        </button>
+        <div class="admin-nav-group-body">
         <div class="admin-nav-item" data-section="channels" onclick="showSection('channels', this)">
           <span class="admin-nav-icon">&#9741;</span> 渠道配置
         </div>
+        </div>
       </div>
-      <div class="admin-nav-group">
-        <div class="admin-nav-group-title">数据分析</div>
-        <div class="admin-nav-item" data-section="indicator-hub" onclick="showSection('indicator-hub', this)">
-          <span class="admin-nav-icon">&#128202;</span> 指标专区
+      <div class="admin-nav-group" data-nav-group="analytics">
+        <button type="button" class="admin-nav-group-toggle" onclick="toggleAdminNavGroup(this)">
+          <span class="admin-nav-group-title">数据分析</span>
+          <span class="admin-nav-group-caret">&#9662;</span>
+        </button>
+        <div class="admin-nav-group-body">
+        <div class="admin-nav-subgroup">
+          <div class="admin-nav-subtitle">指标专区</div>
+          <div class="admin-nav-item" data-section="indicator-overview" onclick="showSection('indicator-overview', this)">
+            <span class="admin-nav-icon">&#128202;</span> 总览控制台
+          </div>
+          <div class="admin-nav-item" data-section="indicator-smart" onclick="showSection('indicator-smart', this)">
+            <span class="admin-nav-icon">&#129504;</span> 智能指标
+          </div>
+          <div class="admin-nav-item" data-section="indicator-lake" onclick="showSection('indicator-lake', this)">
+            <span class="admin-nav-icon">&#127754;</span> 数据湖指标
+          </div>
+          <div class="admin-nav-item" data-section="indicator-anomalies" onclick="showSection('indicator-anomalies', this)">
+            <span class="admin-nav-icon">&#9888;</span> 异动报告
+          </div>
+          <div class="admin-nav-item" data-section="indicator-sources" onclick="showSection('indicator-sources', this)">
+            <span class="admin-nav-icon">&#128279;</span> API 源接入
+          </div>
+          <div class="admin-nav-item" data-section="indicator-definitions" onclick="showSection('indicator-definitions', this)">
+            <span class="admin-nav-icon">&#128451;</span> 指标定义
+          </div>
+          <div class="admin-nav-item" data-section="indicator-pipeline" onclick="showSection('indicator-pipeline', this)">
+            <span class="admin-nav-icon">&#128295;</span> 清洗流水线
+          </div>
         </div>
         <div class="admin-nav-item" id="nav-funnel" onclick="showAnalyticsSection('funnel')">
           <span class="admin-nav-icon">&#128202;</span> 转化漏斗
@@ -985,9 +1148,14 @@
         <div class="admin-nav-item" id="nav-segment" onclick="showAnalyticsSection('segment')">
           <span class="admin-nav-icon">&#127919;</span> 用户分层分析
         </div>
+        </div>
       </div>
-      <div class="admin-nav-group">
-        <div class="admin-nav-group-title">系统</div>
+      <div class="admin-nav-group" data-nav-group="system">
+        <button type="button" class="admin-nav-group-toggle" onclick="toggleAdminNavGroup(this)">
+          <span class="admin-nav-group-title">系统</span>
+          <span class="admin-nav-group-caret">&#9662;</span>
+        </button>
+        <div class="admin-nav-group-body">
         <div class="admin-nav-subgroup">
           <div class="admin-nav-subtitle">系统专区</div>
           <div class="admin-nav-item" data-section="settings-appearance" onclick="showSection('settings-appearance', this)">
@@ -1011,6 +1179,7 @@
         </div>
         <div class="admin-nav-item" data-section="access" onclick="showSection('access', this)">
           <span class="admin-nav-icon">&#128737;</span> 访问审计
+        </div>
         </div>
       </div>
     </nav>
@@ -1659,7 +1828,42 @@
         </div>
       </div><!-- end section-community -->
 
-<div id="section-indicator-hub" style="display:none">
+<div id="section-indicator-overview" style="display:none">
+        <div class="indicator-hero">
+          <div class="indicator-hero-card">
+            <div class="indicator-hero-title">指标专区总览</div>
+            <div class="indicator-hero-desc">把控制台、接入节奏和最近运行状态拆开查看。这里保留最关键的入口、近况与风险，让后台不再被单个超长页面拖慢操作效率。</div>
+            <div class="indicator-chip-row" style="margin-top:14px">
+              <span class="indicator-chip is-gold">真实库驱动</span>
+              <span class="indicator-chip">配置与数据分层</span>
+              <span class="indicator-chip">适配前后台一致消费</span>
+            </div>
+            <div class="indicator-action-row">
+              <button class="btn-outline" style="padding:6px 12px;font-size:12px" onclick="openIndicatorDefinitionModal()">+ 新增指标定义</button>
+              <button class="btn-outline" style="padding:6px 12px;font-size:12px" onclick="openIndicatorSourceModal()">+ 新增 API 定义</button>
+              <button class="btn-gold" style="padding:6px 12px;font-size:12px" onclick="seedAdminIndicatorMockData(false)">生成模拟入湖数据</button>
+              <button class="btn-sm-blue" style="padding:6px 12px;font-size:12px" onclick="refreshAdminIndicatorHub()">刷新数据</button>
+            </div>
+          </div>
+          <div class="indicator-side-card">
+            <div class="indicator-side-title">本页聚焦</div>
+            <div class="indicator-side-copy">保留总览和最近动态，详细配置分流到下方各指标子模块，避免同屏堆叠过多表格。</div>
+            <div class="indicator-side-list">
+              <div class="indicator-side-item">
+                <div class="indicator-side-label">推荐入口</div>
+                <div class="indicator-side-value">先看总览，再进入源接入或清洗流水线</div>
+              </div>
+              <div class="indicator-side-item">
+                <div class="indicator-side-label">当前结构</div>
+                <div class="indicator-side-value">总览 / 指标 / 异动 / Source / Schema / Pipeline</div>
+              </div>
+              <div class="indicator-side-item">
+                <div class="indicator-side-label">设计目标</div>
+                <div class="indicator-side-value">减少首屏密度，提高定位速度</div>
+              </div>
+            </div>
+          </div>
+        </div>
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-label">纳管指标</div>
@@ -1692,12 +1896,7 @@
               <div class="table-title">指标湖控制台</div>
               <div style="font-size:12px;color:#8899aa;margin-top:6px">第一步先完成指标定义、API 定义、接口测试和模拟入湖。真实接入与清洗链路后续再接入这一套骨架。</div>
             </div>
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-              <button class="btn-outline" style="padding:6px 12px;font-size:12px" onclick="openIndicatorDefinitionModal()">+ 新增指标定义</button>
-              <button class="btn-outline" style="padding:6px 12px;font-size:12px" onclick="openIndicatorSourceModal()">+ 新增 API 定义</button>
-              <button class="btn-gold" style="padding:6px 12px;font-size:12px" onclick="seedAdminIndicatorMockData(false)">生成模拟入湖数据</button>
-              <button class="btn-sm-blue" style="padding:6px 12px;font-size:12px" onclick="refreshAdminIndicatorHub()">刷新数据</button>
-            </div>
+            <span class="indicator-page-tag">控制台入口</span>
           </div>
           <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:16px">
             <div style="background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.15);border-radius:12px;padding:14px">
@@ -1735,10 +1934,27 @@
             </div>
           </div>
         </div>
+      </div><!-- end section-indicator-overview -->
+
+      <div id="section-indicator-smart" style="display:none">
+        <div class="section-header">
+          <div>
+            <div class="section-title">智能指标</div>
+            <div class="section-subtitle">聚焦大V输入与智能分析产出的指标，便于单独运营和排查。</div>
+          </div>
+        </div>
+        <div class="indicator-page-meta">
+          <div class="indicator-page-copy">这一页只处理智能指标，不再和数据湖、Source、清洗链路混排。适合运营同学直接查看判断、状态和人工干预入口。</div>
+          <div class="indicator-page-tags">
+            <span class="indicator-page-tag">大V输入</span>
+            <span class="indicator-page-tag">智能分析</span>
+            <span class="indicator-page-tag">人工复核</span>
+          </div>
+        </div>
         <div class="table-wrap" style="margin-bottom:20px">
           <div class="table-header">
             <div>
-              <div class="table-title">智能指标</div>
+              <div class="table-title">智能指标列表</div>
               <div style="font-size:12px;color:#8899aa;margin-top:6px">这类指标来自大V输入与平台智能分析口径，可用于复盘、Hermes 和核心指标判断。</div>
             </div>
             <span class="tag tag-gold">大V输入</span>
@@ -1777,10 +1993,27 @@
             </tbody>
           </table>
         </div>
+      </div><!-- end section-indicator-smart -->
+
+      <div id="section-indicator-lake" style="display:none">
+        <div class="section-header">
+          <div>
+            <div class="section-title">数据湖指标</div>
+            <div class="section-subtitle">统一查看从数据源接入到展示层消费的湖内指标。</div>
+          </div>
+        </div>
+        <div class="indicator-page-meta">
+          <div class="indicator-page-copy">面向已经进入统一指标湖的数据，重点看当前值、状态、来源说明以及是否继续启用，不混入原始配置操作。</div>
+          <div class="indicator-page-tags">
+            <span class="indicator-page-tag">湖内消费</span>
+            <span class="indicator-page-tag">统一展示协议</span>
+            <span class="indicator-page-tag">前后台共用</span>
+          </div>
+        </div>
         <div class="table-wrap" style="margin-bottom:20px">
           <div class="table-header">
             <div>
-              <div class="table-title">数据湖指标</div>
+              <div class="table-title">数据湖指标列表</div>
               <div style="font-size:12px;color:#8899aa;margin-top:6px">这类指标直接来自 `/Users/xuchenfei/PycharmProjects/market_dashboard/data_sources.json`，用于统一展示 market_dashboard 已接入的全部指标源。</div>
             </div>
             <span class="tag tag-blue">market_dashboard</span>
@@ -1819,6 +2052,22 @@
             </tbody>
           </table>
         </div>
+      </div><!-- end section-indicator-lake -->
+
+      <div id="section-indicator-anomalies" style="display:none">
+        <div class="section-header">
+          <div>
+            <div class="section-title">异动报告</div>
+            <div class="section-subtitle">将需要优先跟进的指标波动独立收口，避免淹没在全量配置中。</div>
+          </div>
+        </div>
+        <div class="indicator-page-meta">
+          <div class="indicator-page-copy">把异常从全量指标中剥离出来，方便运营、研究和产品先看风险，再决定是否回到指标详情或 Source 链路继续排查。</div>
+          <div class="indicator-page-tags">
+            <span class="indicator-page-tag">风险优先</span>
+            <span class="indicator-page-tag">异常跟踪</span>
+          </div>
+        </div>
         <div class="table-wrap">
           <div class="table-header">
             <div class="table-title">异动报告</div>
@@ -1839,7 +2088,24 @@
             </tbody>
           </table>
         </div>
-        <div class="table-wrap" style="margin-top:20px">
+      </div><!-- end section-indicator-anomalies -->
+
+      <div id="section-indicator-sources" style="display:none">
+        <div class="section-header">
+          <div>
+            <div class="section-title">API 源接入</div>
+            <div class="section-subtitle">集中管理 source 定义、测试结果和接入蓝图，便于联调外部数据源。</div>
+          </div>
+        </div>
+        <div class="indicator-page-meta">
+          <div class="indicator-page-copy">这里负责外部 source 的接入控制面，包括定义、联调、样例预览和蓝图落地。相比指标列表，更偏工程接入视角。</div>
+          <div class="indicator-page-tags">
+            <span class="indicator-page-tag">API 定义</span>
+            <span class="indicator-page-tag">Source 测试</span>
+            <span class="indicator-page-tag">蓝图接入</span>
+          </div>
+        </div>
+        <div class="table-wrap">
           <div class="table-header">
             <div class="table-title">API 定义与测试</div>
             <span class="tag tag-blue">控制面</span>
@@ -1917,7 +2183,24 @@
             </div>
           </div>
         </div>
-        <div class="table-wrap" style="margin-top:20px">
+      </div><!-- end section-indicator-sources -->
+
+      <div id="section-indicator-definitions" style="display:none">
+        <div class="section-header">
+          <div>
+            <div class="section-title">指标定义</div>
+            <div class="section-subtitle">维护指标 schema、分类和 owner，作为 source 与展示层之间的统一字典。</div>
+          </div>
+        </div>
+        <div class="indicator-page-meta">
+          <div class="indicator-page-copy">所有指标都先经过这层 schema 定义，再向下关联 source 和清洗规则。这样页面职责更清楚，维护成本也更低。</div>
+          <div class="indicator-page-tags">
+            <span class="indicator-page-tag">Schema</span>
+            <span class="indicator-page-tag">Owner</span>
+            <span class="indicator-page-tag">分类字典</span>
+          </div>
+        </div>
+        <div class="table-wrap">
           <div class="table-header">
             <div class="table-title">指标定义</div>
             <span class="tag tag-gold">Schema</span>
@@ -1943,7 +2226,24 @@
             </tbody>
           </table>
         </div>
-        <div class="table-wrap" style="margin-top:20px">
+      </div><!-- end section-indicator-definitions -->
+
+      <div id="section-indicator-pipeline" style="display:none">
+        <div class="section-header">
+          <div>
+            <div class="section-title">清洗流水线</div>
+            <div class="section-subtitle">查看原始落地、映射规则和清洗任务，聚焦数据标准化过程。</div>
+          </div>
+        </div>
+        <div class="indicator-page-meta">
+          <div class="indicator-page-copy">这页承接工程流水线视角，把落地记录、字段映射和清洗任务统一归到一处，方便排查数据为什么没有成功入湖。</div>
+          <div class="indicator-page-tags">
+            <span class="indicator-page-tag">Raw Landing</span>
+            <span class="indicator-page-tag">Normalize</span>
+            <span class="indicator-page-tag">Clean Jobs</span>
+          </div>
+        </div>
+        <div class="table-wrap">
           <div class="table-header">
             <div class="table-title">原始记录落地区</div>
             <span class="tag tag-blue">Raw Landing</span>
@@ -2012,7 +2312,7 @@
             </tbody>
           </table>
         </div>
-      </div><!-- end section-indicator-hub -->
+      </div><!-- end section-indicator-pipeline -->
 
       <!-- ===== EVENTS ===== -->
       <div id="section-events" style="display:none">
@@ -3366,7 +3666,15 @@
 const sectionTitles = {
   overview:'运营概览', users:'用户列表', segments:'用户分层', points:'积分管理',
   kols:'大V投顾管理', commission:'收益结算', community:'帖子审核',
-  events:'活动管理', hermes:'Hermes使用统计', 'forecast-model':'预测模型', channels:'渠道管理', 'indicator-hub':'指标专区', analytics:'数据分析',
+  events:'活动管理', hermes:'Hermes使用统计', 'forecast-model':'预测模型', channels:'渠道管理',
+  'indicator-overview':'指标专区 · 总览控制台',
+  'indicator-smart':'指标专区 · 智能指标',
+  'indicator-lake':'指标专区 · 数据湖指标',
+  'indicator-anomalies':'指标专区 · 异动报告',
+  'indicator-sources':'指标专区 · API 源接入',
+  'indicator-definitions':'指标专区 · 指标定义',
+  'indicator-pipeline':'指标专区 · 清洗流水线',
+  analytics:'数据分析',
   'settings-appearance':'系统专区 · 站点外观',
   'settings-brand':'系统专区 · 平台品牌',
   'settings-features':'系统专区 · 功能开关',
@@ -3382,6 +3690,7 @@ const analyticsTitles = {
   revenue: '数据分析 · 营收趋势',
   segment: '数据分析 · 用户分层分析',
 };
+const ADMIN_NAV_STORAGE_KEY = 'gangtise-admin-nav-groups-v1';
 
 function updateAdminQuery(name) {
   const url = new URL(window.location.href);
@@ -3389,14 +3698,72 @@ function updateAdminQuery(name) {
   window.history.replaceState({}, '', url);
 }
 
+function readAdminNavState() {
+  try {
+    return JSON.parse(localStorage.getItem(ADMIN_NAV_STORAGE_KEY) || '{}');
+  } catch (error) {
+    return {};
+  }
+}
+
+function writeAdminNavState(state) {
+  try {
+    localStorage.setItem(ADMIN_NAV_STORAGE_KEY, JSON.stringify(state || {}));
+  } catch (error) {
+    // ignore storage write failures
+  }
+}
+
+function setAdminNavGroupCollapsed(groupEl, collapsed) {
+  if (!groupEl) return;
+  groupEl.classList.toggle('is-collapsed', !!collapsed);
+  const toggle = groupEl.querySelector('.admin-nav-group-toggle');
+  if (toggle) toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+}
+
+function toggleAdminNavGroup(toggleEl) {
+  const groupEl = toggleEl ? toggleEl.closest('.admin-nav-group') : null;
+  if (!groupEl) return;
+  const collapsed = !groupEl.classList.contains('is-collapsed');
+  setAdminNavGroupCollapsed(groupEl, collapsed);
+  const state = readAdminNavState();
+  const key = groupEl.dataset.navGroup;
+  if (key) {
+    state[key] = collapsed;
+    writeAdminNavState(state);
+  }
+}
+
+function initAdminNavGroups() {
+  const state = readAdminNavState();
+  document.querySelectorAll('.admin-nav-group[data-nav-group]').forEach((groupEl) => {
+    const key = groupEl.dataset.navGroup;
+    const collapsed = !!state[key];
+    setAdminNavGroupCollapsed(groupEl, collapsed);
+  });
+}
+
 function setActiveAdminNav(target) {
   document.querySelectorAll('.admin-nav-item').forEach(i => i.classList.remove('active'));
-  if (target) target.classList.add('active');
+  if (!target) return;
+  target.classList.add('active');
+  const groupEl = target.closest('.admin-nav-group');
+  if (!groupEl) return;
+  setAdminNavGroupCollapsed(groupEl, false);
+  const state = readAdminNavState();
+  const key = groupEl.dataset.navGroup;
+  if (key) {
+    state[key] = false;
+    writeAdminNavState(state);
+  }
 }
 
 function showSection(name, navEl) {
   if (name === 'settings') {
     name = 'settings-appearance';
+  }
+  if (name === 'indicator-hub') {
+    name = 'indicator-overview';
   }
   if (name === 'forecast-model' && !isAdminFeatureEnabled('stock_forecast')) {
     showToast('预测功能当前未开放');
@@ -5532,6 +5899,7 @@ function evUpdatePreview() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  initAdminNavGroups();
   loadSiteConfig();
   loadAdminUsers();
   renderAdminIndicatorHubAll();
@@ -5546,6 +5914,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   if (section === 'settings') {
     showSection('settings-appearance');
+    return;
+  }
+  if (section === 'indicator-hub') {
+    showSection('indicator-overview');
     return;
   }
   if (section && sectionTitles[section]) {

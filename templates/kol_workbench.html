@@ -124,6 +124,28 @@ body { background: var(--surface-2); color: var(--text-main); }
   background:rgba(200,169,110,0.10);
   border:1px solid rgba(200,169,110,0.18);
 }
+.kw-sidebar-group {
+  margin-top:8px;
+  padding-top:8px;
+  border-top:1px dashed rgba(200,169,110,0.10);
+}
+.kw-sidebar-group:first-child {
+  margin-top:0;
+  padding-top:0;
+  border-top:none;
+}
+.kw-nav-subgroup {
+  margin-top:8px;
+  padding-top:8px;
+  border-top:1px dashed rgba(200,169,110,0.10);
+}
+.kw-nav-subtitle {
+  margin:0 0 8px 14px;
+  font-size:10px;
+  letter-spacing:0.08em;
+  text-transform:uppercase;
+  color:var(--text-sub);
+}
 .kw-watch-chip,
 .kw-mode-chip,
 .kw-prompt-chip {
@@ -235,6 +257,95 @@ body { background: var(--surface-2); color: var(--text-main); }
   font-size:11px;
   color:var(--text-sub);
   line-height:1.7;
+}
+.kw-indicator-hero {
+  display:grid;
+  grid-template-columns:minmax(0, 1.18fr) minmax(260px, 0.82fr);
+  gap:16px;
+  margin-bottom:20px;
+}
+.kw-indicator-hero-card,
+.kw-indicator-side-card {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:16px;
+  padding:18px;
+  box-shadow:0 8px 24px rgba(31,73,125,0.06);
+}
+.kw-indicator-hero-title {
+  font-size:18px;
+  line-height:1.2;
+  font-weight:700;
+  color:var(--text-main);
+}
+.kw-indicator-hero-desc,
+.kw-indicator-page-copy,
+.kw-indicator-side-copy {
+  margin-top:8px;
+  font-size:12px;
+  color:var(--text-sub);
+  line-height:1.8;
+}
+.kw-indicator-chip-row,
+.kw-indicator-page-tags,
+.kw-indicator-side-list {
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.kw-indicator-chip,
+.kw-indicator-page-tag {
+  display:inline-flex;
+  align-items:center;
+  padding:5px 10px;
+  border-radius:999px;
+  font-size:11px;
+  color:#1F497D;
+  background:#EAF3FF;
+  border:1px solid rgba(47,116,192,0.12);
+}
+.kw-indicator-chip.is-gold,
+.kw-indicator-page-tag.is-gold {
+  color:var(--gold);
+  background:rgba(200,169,110,0.10);
+  border-color:rgba(200,169,110,0.18);
+}
+.kw-indicator-side-title {
+  font-size:13px;
+  font-weight:700;
+  color:var(--gold);
+}
+.kw-indicator-side-list {
+  margin-top:14px;
+  display:grid;
+  gap:10px;
+}
+.kw-indicator-side-item {
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px 12px;
+  border-radius:12px;
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+}
+.kw-indicator-side-label {
+  font-size:11px;
+  color:var(--text-sub);
+}
+.kw-indicator-side-value {
+  font-size:12px;
+  color:var(--text-main);
+  font-weight:700;
+  text-align:right;
+}
+.kw-indicator-page-meta {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+  margin-bottom:16px;
 }
 .kw-knowledge-queue,
 .kw-knowledge-zone-list,
@@ -1767,6 +1878,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
   50% { opacity:1; transform:scaleY(1); }
 }
 @media (max-width: 980px) {
+  .kw-indicator-hero,
   .kw-section-grid,
   .kw-link-grid,
   .kw-mini-grid,
@@ -1796,14 +1908,23 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
       <div class="admin-logo-sub">{{ active_tenant.advisor }} · 大V工作台 Web</div>
     </div>
     <nav class="admin-nav">
-      <div class="admin-nav-group">
-        <div class="admin-nav-group-title">概览</div>
+      <div class="admin-nav-group" data-nav-group="overview">
+        <button type="button" class="admin-nav-group-toggle" onclick="toggleWorkbenchNavGroup(this)">
+          <span class="admin-nav-group-title">概览</span>
+          <span class="admin-nav-group-caret">&#9662;</span>
+        </button>
+        <div class="admin-nav-group-body">
         <div class="admin-nav-item active" data-section="overview" onclick="showWorkbenchSection('overview', this)">
           <span class="admin-nav-icon">&#9783;</span> 工作台概览
         </div>
+        </div>
       </div>
-      <div class="admin-nav-group">
-        <div class="admin-nav-group-title">粉丝运营</div>
+      <div class="admin-nav-group" data-nav-group="fans">
+        <button type="button" class="admin-nav-group-toggle" onclick="toggleWorkbenchNavGroup(this)">
+          <span class="admin-nav-group-title">粉丝运营</span>
+          <span class="admin-nav-group-caret">&#9662;</span>
+        </button>
+        <div class="admin-nav-group-body">
         <div class="admin-nav-item" data-section="fans" onclick="showWorkbenchSection('fans', this)">
           <span class="admin-nav-icon">&#128101;</span> 粉丝管理
         </div>
@@ -1813,9 +1934,14 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         <div class="admin-nav-item" data-section="broadcast" onclick="showWorkbenchSection('broadcast', this)">
           <span class="admin-nav-icon">&#128227;</span> 群发助手
         </div>
+        </div>
       </div>
-      <div class="admin-nav-group">
-        <div class="admin-nav-group-title">研究生产</div>
+      <div class="admin-nav-group" data-nav-group="production">
+        <button type="button" class="admin-nav-group-toggle" onclick="toggleWorkbenchNavGroup(this)">
+          <span class="admin-nav-group-title">研究生产</span>
+          <span class="admin-nav-group-caret">&#9662;</span>
+        </button>
+        <div class="admin-nav-group-body">
         <div class="admin-nav-item" data-section="portal" onclick="showWorkbenchSection('portal', this)">
           <span class="admin-nav-icon">&#127968;</span> 租户门户
         </div>
@@ -1836,26 +1962,49 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <span class="admin-nav-icon">&#129438;</span> Hermes 工作台
         </div>
         {% endif %}
+        </div>
       </div>
-      <div class="admin-nav-group">
-        <div class="admin-nav-group-title">个股与面板</div>
+      <div class="admin-nav-group" data-nav-group="market">
+        <button type="button" class="admin-nav-group-toggle" onclick="toggleWorkbenchNavGroup(this)">
+          <span class="admin-nav-group-title">个股与面板</span>
+          <span class="admin-nav-group-caret">&#9662;</span>
+        </button>
+        <div class="admin-nav-group-body">
         <div class="admin-nav-item" data-section="watchlist" onclick="showWorkbenchSection('watchlist', this)">
           <span class="admin-nav-icon">&#128200;</span> 自选股与详情
         </div>
         <div class="admin-nav-item" data-section="dashboard" onclick="showWorkbenchSection('dashboard', this)">
           <span class="admin-nav-icon">&#9638;</span> 智能 Dashboard
         </div>
-        <div class="admin-nav-item" data-section="indicator-hub" onclick="showWorkbenchSection('indicator-hub', this)">
-          <span class="admin-nav-icon">&#128202;</span> 指标专区
+        <div class="kw-nav-subgroup">
+          <div class="kw-nav-subtitle">指标专区</div>
+          <div class="admin-nav-item" data-section="indicator-overview" onclick="showWorkbenchSection('indicator-overview', this)">
+            <span class="admin-nav-icon">&#128202;</span> 总览控制台
+          </div>
+          <div class="admin-nav-item" data-section="indicator-smart" onclick="showWorkbenchSection('indicator-smart', this)">
+            <span class="admin-nav-icon">&#129504;</span> 智能指标
+          </div>
+          <div class="admin-nav-item" data-section="indicator-lake" onclick="showWorkbenchSection('indicator-lake', this)">
+            <span class="admin-nav-icon">&#127754;</span> 数据湖指标
+          </div>
+          <div class="admin-nav-item" data-section="indicator-anomalies" onclick="showWorkbenchSection('indicator-anomalies', this)">
+            <span class="admin-nav-icon">&#9888;</span> 异动报告
+          </div>
+        </div>
         </div>
       </div>
-      <div class="admin-nav-group">
-        <div class="admin-nav-group-title">发布与一致性</div>
+      <div class="admin-nav-group" data-nav-group="publishing">
+        <button type="button" class="admin-nav-group-toggle" onclick="toggleWorkbenchNavGroup(this)">
+          <span class="admin-nav-group-title">发布与一致性</span>
+          <span class="admin-nav-group-caret">&#9662;</span>
+        </button>
+        <div class="admin-nav-group-body">
         <div class="admin-nav-item" data-section="published" onclick="showWorkbenchSection('published', this)">
           <span class="admin-nav-icon">&#10003;</span> 已发布复盘
         </div>
         <div class="admin-nav-item" data-section="consistency" onclick="showWorkbenchSection('consistency', this)">
           <span class="admin-nav-icon">&#8646;</span> 前后台一致性
+        </div>
         </div>
       </div>
     </nav>
@@ -2714,7 +2863,36 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         </div>
       </div>
 
-      <div id="workbench-section-indicator-hub" style="display:none">
+      <div id="workbench-section-indicator-overview" style="display:none">
+        <div class="kw-indicator-hero">
+          <div class="kw-indicator-hero-card">
+            <div class="kw-indicator-hero-title">指标专区总览</div>
+            <div class="kw-indicator-hero-desc">把大V最常看的指标状况和异动优先信息放在首屏。详细列表拆到独立模块里，减少研究工作台被长表格打断的情况。</div>
+            <div class="kw-indicator-chip-row" style="margin-top:14px">
+              <span class="kw-indicator-chip is-gold">大V只读分析</span>
+              <span class="kw-indicator-chip">前后台同口径</span>
+              <span class="kw-indicator-chip">重点先看异动</span>
+            </div>
+          </div>
+          <div class="kw-indicator-side-card">
+            <div class="kw-indicator-side-title">本页聚焦</div>
+            <div class="kw-indicator-side-copy">这里不承载控制面配置，只负责帮助大V快速判断当前内容生产、判断和跟踪优先级。</div>
+            <div class="kw-indicator-side-list">
+              <div class="kw-indicator-side-item">
+                <div class="kw-indicator-side-label">推荐顺序</div>
+                <div class="kw-indicator-side-value">总览 → 异动 → 历史详情</div>
+              </div>
+              <div class="kw-indicator-side-item">
+                <div class="kw-indicator-side-label">当前边界</div>
+                <div class="kw-indicator-side-value">可查看分析，不可关闭指标</div>
+              </div>
+              <div class="kw-indicator-side-item">
+                <div class="kw-indicator-side-label">数据来源</div>
+                <div class="kw-indicator-side-value">统一来自平台指标湖和智能分析结果</div>
+              </div>
+            </div>
+          </div>
+        </div>
         <div class="stats-grid" style="margin-bottom:20px">
           <div class="stat-card">
             <div class="stat-label">纳管指标</div>
@@ -2739,6 +2917,23 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
             <span class="stat-icon">&#128202;</span>
             <div class="stat-value">{{ workbench.indicator_hub.summary.warnings }} / {{ workbench.indicator_hub.summary.attention }}</div>
             <div class="stat-change up">同步前台与工作台</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="workbench-section-indicator-smart" style="display:none">
+        <div class="section-header">
+          <div>
+            <div class="section-title">智能指标</div>
+            <div class="section-subtitle">聚焦来自大V输入与平台智能分析口径的指标，适合直接辅助复盘判断。</div>
+          </div>
+        </div>
+        <div class="kw-indicator-page-meta">
+          <div class="kw-indicator-page-copy">这一页只保留智能指标，避免和数据湖指标混在一起。更适合大V在内容生产时快速判断哪些信号值得写入复盘。</div>
+          <div class="kw-indicator-page-tags">
+            <span class="kw-indicator-page-tag is-gold">大V输入</span>
+            <span class="kw-indicator-page-tag">智能分析</span>
+            <span class="kw-indicator-page-tag">只读判断</span>
           </div>
         </div>
         <div class="table-wrap" style="margin-bottom:20px">
@@ -2783,6 +2978,23 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div id="workbench-section-indicator-lake" style="display:none">
+        <div class="section-header">
+          <div>
+            <div class="section-title">数据湖指标</div>
+            <div class="section-subtitle">统一查看已进入指标湖的数据，便于验证市场信号和内容判断是否一致。</div>
+          </div>
+        </div>
+        <div class="kw-indicator-page-meta">
+          <div class="kw-indicator-page-copy">面向已经纳入统一数据湖的指标。这里更适合查看当前值、来源说明和状态，不承载管理员控制动作。</div>
+          <div class="kw-indicator-page-tags">
+            <span class="kw-indicator-page-tag">数据湖</span>
+            <span class="kw-indicator-page-tag">前后台共用</span>
+            <span class="kw-indicator-page-tag">市场信号</span>
+          </div>
+        </div>
         <div class="table-wrap" style="margin-bottom:20px">
           <div class="table-header">
             <div>
@@ -2824,6 +3036,22 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
               {% endfor %}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div id="workbench-section-indicator-anomalies" style="display:none">
+        <div class="section-header">
+          <div>
+            <div class="section-title">异动报告</div>
+            <div class="section-subtitle">优先收口需要跟踪的指标波动，帮助大V决定今天重点要写什么。</div>
+          </div>
+        </div>
+        <div class="kw-indicator-page-meta">
+          <div class="kw-indicator-page-copy">把高优先级波动单独放出来，比在全量表格里翻找更适合大V内容生产节奏。看完可直接进入历史详情做进一步判断。</div>
+          <div class="kw-indicator-page-tags">
+            <span class="kw-indicator-page-tag is-gold">风险优先</span>
+            <span class="kw-indicator-page-tag">异动跟踪</span>
+          </div>
         </div>
         <div class="table-wrap">
           <div class="table-header">
@@ -2961,7 +3189,10 @@ const workbenchSectionMeta = {
   hermes: { title: 'Hermes 工作台', summary: '统一管理工作区版和龙虾纯对话版的产品口径、skills 和知识绑定。' },
   watchlist: { title: '自选股与详情', summary: '承接 H5 的顶部输代码、自选股详情和 K 线 + MA5/10/20 展示逻辑。' },
   dashboard: { title: '智能 Dashboard', summary: 'Dashboard 是智能化定义模式：通过提示词、布局和指标规则生成面板，再发布到前台，不等同于门户装修。' },
-  'indicator-hub': { title: '指标专区', summary: '统一查看核心指标、异动报告和历史详情。大V只读分析，关闭动作由 Admin 控制。' },
+  'indicator-overview': { title: '指标专区 · 总览控制台', summary: '先看总体状态、风险分布和跟踪优先级，再进入更细的指标分组。' },
+  'indicator-smart': { title: '指标专区 · 智能指标', summary: '聚焦大V输入与智能分析相关的指标，辅助复盘内容判断。' },
+  'indicator-lake': { title: '指标专区 · 数据湖指标', summary: '查看来自统一指标湖的市场与业务信号，和前台消费保持一致。' },
+  'indicator-anomalies': { title: '指标专区 · 异动报告', summary: '优先查看需要跟踪的波动与异常，帮助确定当天内容重点。' },
   published: { title: '已发布复盘', summary: '这里确认发布后的复盘，就是普通投资者在前台实际看到的内容。' },
   consistency: { title: '前后台一致性', summary: '明确 H5、工作台和 Admin 的一致性口径以及角色边界。' }
 };
@@ -6135,6 +6366,9 @@ function initWorkbenchForecastEditorEvents() {
 }
 
 function showWorkbenchSection(name, navEl) {
+  if (name === 'indicator-hub') {
+    name = 'indicator-overview';
+  }
   if (name === 'forecast-model' && !isWorkbenchFeatureEnabled('stock_forecast')) {
     showToast('预测功能当前未开放');
     return;
@@ -6150,7 +6384,19 @@ function showWorkbenchSection(name, navEl) {
   if (target) target.style.display = 'block';
   document.querySelectorAll('.admin-nav-item').forEach(el => el.classList.remove('active'));
   const activeNav = navEl || document.querySelector(`.admin-nav-item[data-section="${name}"]`);
-  if (activeNav) activeNav.classList.add('active');
+  if (activeNav) {
+    activeNav.classList.add('active');
+    const groupEl = activeNav.closest('.admin-nav-group');
+    if (groupEl) {
+      setWorkbenchNavGroupCollapsed(groupEl, false);
+      const state = readWorkbenchNavState();
+      const key = groupEl.dataset.navGroup;
+      if (key) {
+        state[key] = false;
+        writeWorkbenchNavState(state);
+      }
+    }
+  }
   const meta = workbenchSectionMeta[name] || workbenchSectionMeta.overview;
   const title = document.getElementById('workbench-page-title');
   const summary = document.getElementById('workbench-page-summary');
@@ -6183,6 +6429,53 @@ function showWorkbenchSection(name, navEl) {
   window.history.replaceState({}, '', url);
 }
 
+const WORKBENCH_NAV_STORAGE_KEY = 'gangtise-workbench-nav-groups-v1';
+
+function readWorkbenchNavState() {
+  try {
+    return JSON.parse(localStorage.getItem(WORKBENCH_NAV_STORAGE_KEY) || '{}');
+  } catch (error) {
+    return {};
+  }
+}
+
+function writeWorkbenchNavState(state) {
+  try {
+    localStorage.setItem(WORKBENCH_NAV_STORAGE_KEY, JSON.stringify(state || {}));
+  } catch (error) {
+    // ignore storage write failures
+  }
+}
+
+function setWorkbenchNavGroupCollapsed(groupEl, collapsed) {
+  if (!groupEl) return;
+  groupEl.classList.toggle('is-collapsed', !!collapsed);
+  const toggle = groupEl.querySelector('.admin-nav-group-toggle');
+  if (toggle) toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+}
+
+function toggleWorkbenchNavGroup(toggleEl) {
+  const groupEl = toggleEl ? toggleEl.closest('.admin-nav-group') : null;
+  if (!groupEl) return;
+  const collapsed = !groupEl.classList.contains('is-collapsed');
+  setWorkbenchNavGroupCollapsed(groupEl, collapsed);
+  const state = readWorkbenchNavState();
+  const key = groupEl.dataset.navGroup;
+  if (key) {
+    state[key] = collapsed;
+    writeWorkbenchNavState(state);
+  }
+}
+
+function initWorkbenchNavGroups() {
+  const state = readWorkbenchNavState();
+  document.querySelectorAll('.admin-nav-group[data-nav-group]').forEach((groupEl) => {
+    const key = groupEl.dataset.navGroup;
+    const collapsed = !!state[key];
+    setWorkbenchNavGroupCollapsed(groupEl, collapsed);
+  });
+}
+
 function showToast(message) {
   const toast = document.getElementById('toast');
   if (!toast) return;
@@ -6193,6 +6486,7 @@ function showToast(message) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  initWorkbenchNavGroups();
   const forecastNav = document.querySelector('.admin-nav-item[data-section="forecast-model"]');
   const hermesNav = document.querySelector('.admin-nav-item[data-section="hermes"]');
   if (forecastNav) forecastNav.style.display = isWorkbenchFeatureEnabled('stock_forecast') ? '' : 'none';
@@ -6209,6 +6503,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   if (section === 'hermes' && !isWorkbenchFeatureEnabled('hermes')) {
     showWorkbenchSection('overview');
+    return;
+  }
+  if (section === 'indicator-hub') {
+    showWorkbenchSection('indicator-overview');
     return;
   }
   if (section && workbenchSectionMeta[section]) {

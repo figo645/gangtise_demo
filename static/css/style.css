@@ -425,21 +425,73 @@ body[data-accent="amber"] { --gold: #C7902E; --gold-light: #E5B65B; --gold-dark:
 .admin-logo-text { font-size: 18px; font-weight: 700; color: var(--gold); letter-spacing: 2px; }
 .admin-logo-sub { font-size: 11px; color: var(--gray-400); margin-top: 2px; }
 .admin-nav { padding: 16px 0; flex: 1; }
-.admin-nav-group { margin-bottom: 8px; }
-.admin-nav-group-title { font-size: 10px; color: var(--gray-400); padding: 8px 20px 4px; letter-spacing: 1px; text-transform: uppercase; }
+.admin-nav-group {
+  margin: 0 10px 10px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+  background: rgba(255,255,255,0.01);
+}
+.admin-nav-group-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  color: var(--gray-300);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.admin-nav-group-toggle:hover {
+  background: rgba(200,169,110,0.05);
+  color: var(--white);
+}
+.admin-nav-group-title {
+  font-size: 10px;
+  color: inherit;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 0;
+  text-align: left;
+}
+.admin-nav-group-caret {
+  font-size: 11px;
+  color: var(--gray-400);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+.admin-nav-group-toggle:hover .admin-nav-group-caret,
+.admin-nav-group-toggle[aria-expanded="true"] .admin-nav-group-caret {
+  color: var(--gold);
+}
+.admin-nav-group.is-collapsed .admin-nav-group-caret { transform: rotate(-90deg); }
+.admin-nav-group-body {
+  display: grid;
+  gap: 2px;
+  padding: 0 0 6px;
+}
+.admin-nav-group.is-collapsed .admin-nav-group-body { display: none; }
 .admin-nav-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 20px;
+  margin: 0 6px;
+  padding: 10px 14px;
   cursor: pointer;
   font-size: 13px;
   color: var(--gray-200);
   transition: all 0.2s;
   border-left: 3px solid transparent;
+  border-radius: 10px;
 }
 .admin-nav-item:hover { background: rgba(200,169,110,0.05); color: var(--white); }
-.admin-nav-item.active { background: rgba(200,169,110,0.1); color: var(--gold); border-left-color: var(--gold); }
+.admin-nav-item.active {
+  background: linear-gradient(90deg, rgba(200,169,110,0.14), rgba(200,169,110,0.04));
+  color: var(--gold);
+  border-left-color: var(--gold);
+}
 .admin-nav-icon { font-size: 16px; width: 20px; text-align: center; }
 
 .admin-main { flex: 1; overflow: auto; }
