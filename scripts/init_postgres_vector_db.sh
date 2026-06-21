@@ -37,12 +37,25 @@ echo "==> Target database: $TARGET_DB"
 echo "==> Login user: $PGUSER"
 
 run_sql "$PGDATABASE" "${SQL_DIR}/000_create_database.sql"
+run_sql "$TARGET_DB" "${SQL_DIR}/002_app_core_tables.sql"
 run_sql "$TARGET_DB" "${SQL_DIR}/001_enable_pgvector.sql"
 run_sql "$TARGET_DB" "${SQL_DIR}/010_review_voice_embeddings.sql"
 run_sql "$TARGET_DB" "${SQL_DIR}/011_review_voice_embeddings_alter_legacy_columns.sql"
 run_sql "$TARGET_DB" "${SQL_DIR}/012_review_voice_embeddings_pgvector.sql"
 run_sql "$TARGET_DB" "${SQL_DIR}/020_knowledge_embeddings.sql"
 run_sql "$TARGET_DB" "${SQL_DIR}/021_knowledge_embeddings_pgvector.sql"
+run_sql "$TARGET_DB" "${SQL_DIR}/101_seed_app_core.sql"
 run_sql "$TARGET_DB" "${SQL_DIR}/100_seed_master_data.sql"
 
-echo "==> Postgres / pgvector initialization completed successfully."
+if [ -f "${ROOT_DIR}/gangtise_demo.db" ]; then
+  echo "==> Migrating existing SQLite data into Postgres"
+  APP_DB_HOST="$PGHOST" \
+  APP_DB_PORT="$PGPORT" \
+  APP_DB_NAME="$TARGET_DB" \
+  APP_DB_USER="$PGUSER" \
+  APP_DB_PASSWORD="$PGPASSWORD" \
+  GANGTISE_DEMO_DB="${ROOT_DIR}/gangtise_demo.db" \
+  python3 "${ROOT_DIR}/scripts/migrate_sqlite_to_postgres.py"
+fi
+
+echo "==> Postgres application database initialization completed successfully."

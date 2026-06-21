@@ -19,7 +19,7 @@ from urllib.error import URLError, HTTPError
 from hmac import compare_digest
 import requests
 import psycopg2
-from psycopg2.extras import Json
+from psycopg2.extras import Json, RealDictCursor
 try:
     from faster_whisper import WhisperModel
 except Exception:
@@ -45,6 +45,11 @@ VECTOR_DB_PORT = int(os.environ.get("VECTOR_DB_PORT", "5432"))
 VECTOR_DB_NAME = os.environ.get("POSTGRES_DB", "sprint_dashboard")
 VECTOR_DB_USER = os.environ.get("POSTGRES_USER", "postgres")
 VECTOR_DB_PASSWORD = os.environ.get("POSTGRES_PASSWORD", "your_password")
+APP_DB_HOST = os.environ.get("APP_DB_HOST") or VECTOR_DB_HOST
+APP_DB_PORT = int(os.environ.get("APP_DB_PORT", str(VECTOR_DB_PORT)))
+APP_DB_NAME = os.environ.get("APP_DB_NAME") or VECTOR_DB_NAME
+APP_DB_USER = os.environ.get("APP_DB_USER") or VECTOR_DB_USER
+APP_DB_PASSWORD = os.environ.get("APP_DB_PASSWORD") or VECTOR_DB_PASSWORD
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 OPENAI_AUDIO_MODEL = os.environ.get("OPENAI_AUDIO_MODEL", "whisper-1").strip() or "whisper-1"
@@ -108,6 +113,54 @@ INDICATOR_SOURCE_FIELDS = {
     "last_tested_at",
     "last_test_detail",
 }
+
+
+class PgCompatCursor:
+    def __init__(self, cursor):
+        self._cursor = cursor
+        self._result = None
+
+    def fetchone(self):
+        row = self._cursor.fetchone()
+        return dict(row) if isinstance(row, dict) else row
+
+    def fetchall(self):
+        rows = self._cursor.fetchall()
+        return [dict(row) if isinstance(row, dict) else row for row in rows]
+
+
+class PgCompatConnection:
+    def __init__(self, connection):
+        self._connection = connection
+
+    @staticmethod
+    def _normalize_sql(sql):
+        if not isinstance(sql, str):
+            return sql
+        normalized = sql.replace("?", "%s")
+        normalized = normalized.replace("INSERT OR IGNORE INTO", "INSERT INTO")
+        normalized = normalized.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "BIGSERIAL PRIMARY KEY")
+        normalized = normalized.replace("SELECT substr(created_at, 1, 10) AS day, COUNT(*) AS c", "SELECT LEFT(created_at, 10) AS day, COUNT(*) AS c")
+        return normalized
+
+    def execute(self, sql, params=None):
+        cursor = self._connection.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(self._normalize_sql(sql), tuple(params or ()))
+        return PgCompatCursor(cursor)
+
+    def executemany(self, sql, seq_of_params):
+        cursor = self._connection.cursor(cursor_factory=RealDictCursor)
+        cursor.executemany(self._normalize_sql(sql), list(seq_of_params or []))
+        return PgCompatCursor(cursor)
+
+    def commit(self):
+        self._connection.commit()
+
+    def rollback(self):
+        self._connection.rollback()
+
+    def close(self):
+        self._connection.close()
 
 DEFAULT_SMART_INDICATOR_DEFINITIONS = [
     {
@@ -5079,331 +5132,45 @@ def gen_user_segments():
     ]
 
 
+def get_app_db_connection():
+    return psycopg2.connect(
+        host=APP_DB_HOST,
+        port=APP_DB_PORT,
+        dbname=APP_DB_NAME,
+        user=APP_DB_USER,
+        password=APP_DB_PASSWORD,
+        connect_timeout=8,
+    )
+
+
+def execute_sql_file(conn, sql_path):
+    sql_text = Path(sql_path).read_text(encoding="utf-8")
+    with conn.cursor() as cur:
+        cur.execute(sql_text)
+    conn.commit()
+
+
 def init_db():
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS access_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ip TEXT NOT NULL,
-                path TEXT NOT NULL,
-                method TEXT NOT NULL,
-                status_code INTEGER NOT NULL,
-                created_at TEXT NOT NULL,
-                user_agent TEXT,
-                referrer TEXT
-            )
-            """
-        )
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_access_logs_created_at ON access_logs(created_at)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_access_logs_ip ON access_logs(ip)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_access_logs_path ON access_logs(path)")
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS app_settings (
-                setting_key TEXT PRIMARY KEY,
-                setting_value TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL UNIQUE,
-                password TEXT NOT NULL,
-                role TEXT NOT NULL,
-                tenant_slug TEXT NOT NULL,
-                advisor_name TEXT,
-                phone TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'active',
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS indicator_definitions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                indicator_code TEXT NOT NULL UNIQUE,
-                indicator_name TEXT NOT NULL,
-                category TEXT NOT NULL,
-                description TEXT NOT NULL DEFAULT '',
-                unit TEXT NOT NULL DEFAULT '',
-                owner TEXT NOT NULL DEFAULT '',
-                source_type TEXT NOT NULL DEFAULT 'mock',
-                source_type_label TEXT NOT NULL DEFAULT '模拟指标',
-                provider TEXT NOT NULL DEFAULT '',
-                status_hint TEXT NOT NULL DEFAULT 'attention',
-                assessment_template TEXT NOT NULL DEFAULT '',
-                alert_template TEXT NOT NULL DEFAULT '',
-                watchers_json TEXT NOT NULL DEFAULT '[]',
-                display_config_json TEXT NOT NULL DEFAULT '{}',
-                enabled INTEGER NOT NULL DEFAULT 1,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_indicator_definitions_source_type ON indicator_definitions(source_type)"
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS indicator_source_defs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                source_code TEXT NOT NULL UNIQUE,
-                indicator_code TEXT NOT NULL,
-                provider TEXT NOT NULL DEFAULT '',
-                base_url TEXT NOT NULL DEFAULT '',
-                path TEXT NOT NULL DEFAULT '',
-                method TEXT NOT NULL DEFAULT 'GET',
-                auth_type TEXT NOT NULL DEFAULT 'none',
-                headers_json TEXT NOT NULL DEFAULT '{}',
-                query_json TEXT NOT NULL DEFAULT '{}',
-                body_json TEXT NOT NULL DEFAULT '{}',
-                response_mapping_json TEXT NOT NULL DEFAULT '{}',
-                response_sample_json TEXT NOT NULL DEFAULT '{}',
-                source_status TEXT NOT NULL DEFAULT 'draft',
-                enabled INTEGER NOT NULL DEFAULT 1,
-                last_test_status TEXT NOT NULL DEFAULT '',
-                last_http_status INTEGER,
-                last_tested_at TEXT NOT NULL DEFAULT '',
-                last_test_detail TEXT NOT NULL DEFAULT '',
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_indicator_source_defs_indicator_code ON indicator_source_defs(indicator_code)"
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS indicator_source_tests (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                source_code TEXT NOT NULL,
-                tested_at TEXT NOT NULL,
-                success INTEGER NOT NULL,
-                http_status INTEGER,
-                latency_ms INTEGER,
-                response_sample TEXT NOT NULL DEFAULT '',
-                error_message TEXT NOT NULL DEFAULT ''
-            )
-            """
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_indicator_source_tests_source_code ON indicator_source_tests(source_code, tested_at DESC)"
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS indicator_load_batches (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                batch_code TEXT NOT NULL UNIQUE,
-                load_type TEXT NOT NULL DEFAULT 'mock_seed',
-                source_code TEXT NOT NULL DEFAULT '',
-                summary TEXT NOT NULL DEFAULT '',
-                total_points INTEGER NOT NULL DEFAULT 0,
-                total_indicators INTEGER NOT NULL DEFAULT 0,
-                success INTEGER NOT NULL DEFAULT 1,
-                created_at TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS indicator_latest_values (
-                indicator_code TEXT PRIMARY KEY,
-                latest_value TEXT NOT NULL DEFAULT '',
-                latest_status TEXT NOT NULL DEFAULT 'attention',
-                latest_assessment TEXT NOT NULL DEFAULT '',
-                latest_alert TEXT NOT NULL DEFAULT '',
-                updated_at TEXT NOT NULL,
-                is_simulated INTEGER NOT NULL DEFAULT 1,
-                source_code TEXT NOT NULL DEFAULT '',
-                batch_code TEXT NOT NULL DEFAULT ''
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS indicator_series (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                indicator_code TEXT NOT NULL,
-                point_time TEXT NOT NULL,
-                point_value REAL NOT NULL,
-                point_status TEXT NOT NULL DEFAULT 'attention',
-                is_simulated INTEGER NOT NULL DEFAULT 1,
-                source_code TEXT NOT NULL DEFAULT '',
-                batch_code TEXT NOT NULL DEFAULT '',
-                created_at TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_indicator_series_indicator_code ON indicator_series(indicator_code, point_time DESC)"
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS indicator_anomalies (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                indicator_code TEXT NOT NULL,
-                anomaly_time TEXT NOT NULL,
-                anomaly_value REAL NOT NULL DEFAULT 0,
-                severity TEXT NOT NULL DEFAULT '中',
-                anomaly_status TEXT NOT NULL DEFAULT 'attention',
-                anomaly_label TEXT NOT NULL DEFAULT '',
-                batch_code TEXT NOT NULL DEFAULT '',
-                is_simulated INTEGER NOT NULL DEFAULT 1,
-                created_at TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_indicator_anomalies_indicator_code ON indicator_anomalies(indicator_code, anomaly_time DESC)"
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS indicator_kline_points (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                indicator_code TEXT NOT NULL,
-                point_date TEXT NOT NULL,
-                open_value REAL NOT NULL,
-                high_value REAL NOT NULL,
-                low_value REAL NOT NULL,
-                close_value REAL NOT NULL,
-                ma5 REAL,
-                ma10 REAL,
-                ma20 REAL,
-                batch_code TEXT NOT NULL DEFAULT '',
-                is_simulated INTEGER NOT NULL DEFAULT 1,
-                created_at TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_indicator_kline_points_indicator_code ON indicator_kline_points(indicator_code, point_date DESC)"
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS indicator_raw_records (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                source_code TEXT NOT NULL,
-                indicator_code TEXT NOT NULL,
-                fetch_mode TEXT NOT NULL DEFAULT 'sample',
-                raw_payload TEXT NOT NULL,
-                http_status INTEGER,
-                success INTEGER NOT NULL DEFAULT 1,
-                fetched_at TEXT NOT NULL,
-                batch_code TEXT NOT NULL DEFAULT '',
-                created_at TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_indicator_raw_records_source_code ON indicator_raw_records(source_code, fetched_at DESC)"
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS indicator_mapping_rules (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                rule_code TEXT NOT NULL UNIQUE,
-                indicator_code TEXT NOT NULL,
-                source_code TEXT NOT NULL,
-                value_path TEXT NOT NULL DEFAULT '',
-                time_path TEXT NOT NULL DEFAULT '',
-                status_path TEXT NOT NULL DEFAULT '',
-                unit_override TEXT NOT NULL DEFAULT '',
-                default_status TEXT NOT NULL DEFAULT 'attention',
-                transform_expr TEXT NOT NULL DEFAULT '',
-                enabled INTEGER NOT NULL DEFAULT 1,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_indicator_mapping_rules_indicator_code ON indicator_mapping_rules(indicator_code, source_code)"
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS indicator_clean_jobs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                job_code TEXT NOT NULL UNIQUE,
-                source_code TEXT NOT NULL,
-                indicator_code TEXT NOT NULL,
-                raw_record_id INTEGER,
-                mapping_rule_code TEXT NOT NULL DEFAULT '',
-                job_status TEXT NOT NULL DEFAULT 'pending',
-                cleaned_points INTEGER NOT NULL DEFAULT 0,
-                result_summary TEXT NOT NULL DEFAULT '',
-                result_payload TEXT NOT NULL DEFAULT '',
-                error_message TEXT NOT NULL DEFAULT '',
-                created_at TEXT NOT NULL,
-                finished_at TEXT NOT NULL DEFAULT ''
-            )
-            """
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_indicator_clean_jobs_source_code ON indicator_clean_jobs(source_code, created_at DESC)"
-        )
-        row = conn.execute(
-            "SELECT setting_key FROM app_settings WHERE setting_key = ?",
-            (SITE_CONFIG_KEY,),
-        ).fetchone()
-        if row is None:
-            conn.execute(
-                "INSERT INTO app_settings (setting_key, setting_value, updated_at) VALUES (?, ?, ?)",
-                (
-                    SITE_CONFIG_KEY,
-                    json.dumps(DEFAULT_SITE_CONFIG, ensure_ascii=False),
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                ),
-            )
-        user_count = conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"]
-        if user_count == 0:
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            conn.executemany(
-                """
-                INSERT INTO users (username, password, role, tenant_slug, advisor_name, phone, status, created_at, updated_at)
-                VALUES (:username, :password, :role, :tenant_slug, :advisor_name, :phone, :status, :created_at, :updated_at)
-                """,
-                [
-                    {
-                        **user,
-                        "created_at": now,
-                        "updated_at": now,
-                    }
-                    for user in DEFAULT_USERS
-                ],
-            )
-        indicator_count = conn.execute("SELECT COUNT(*) AS c FROM indicator_definitions").fetchone()["c"]
-        if indicator_count == 0:
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            conn.executemany(
-                """
-                INSERT INTO indicator_definitions (
-                    indicator_code, indicator_name, category, description, unit, owner,
-                    source_type, source_type_label, provider, status_hint, assessment_template,
-                    alert_template, watchers_json, display_config_json, enabled, created_at, updated_at
-                ) VALUES (
-                    :indicator_code, :indicator_name, :category, :description, :unit, :owner,
-                    :source_type, :source_type_label, :provider, :status_hint, :assessment_template,
-                    :alert_template, :watchers_json, :display_config_json, :enabled, :created_at, :updated_at
-                )
-                """,
-                [{**item, "created_at": now, "updated_at": now} for item in DEFAULT_SMART_INDICATOR_DEFINITIONS],
-            )
-        conn.commit()
+    sql_dir = Path(__file__).resolve().parent / "sql" / "postgres"
+    with get_app_db_connection() as conn:
+        execute_sql_file(conn, sql_dir / "002_app_core_tables.sql")
+        execute_sql_file(conn, sql_dir / "010_review_voice_embeddings.sql")
+        execute_sql_file(conn, sql_dir / "011_review_voice_embeddings_alter_legacy_columns.sql")
+        try:
+            execute_sql_file(conn, sql_dir / "001_enable_pgvector.sql")
+            execute_sql_file(conn, sql_dir / "012_review_voice_embeddings_pgvector.sql")
+            execute_sql_file(conn, sql_dir / "020_knowledge_embeddings.sql")
+            execute_sql_file(conn, sql_dir / "021_knowledge_embeddings_pgvector.sql")
+        except Exception:
+            conn.rollback()
+            execute_sql_file(conn, sql_dir / "020_knowledge_embeddings.sql")
+        execute_sql_file(conn, sql_dir / "101_seed_app_core.sql")
+        execute_sql_file(conn, sql_dir / "100_seed_master_data.sql")
 
 
 def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(DB_PATH)
-        g.db.row_factory = sqlite3.Row
+        g.db = PgCompatConnection(get_app_db_connection())
     return g.db
 
 
