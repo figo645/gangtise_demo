@@ -6648,7 +6648,14 @@ def record_access(response):
 def require_password_gate():
     if not is_password_gate_enabled():
         return None
-    public_paths = {"/login", "/unlock", "/logout"}
+    public_paths = {
+        "/login",
+        "/unlock",
+        "/logout",
+        "/api/demo-profiles",
+        "/api/demo-profile/switch",
+        "/api/h5/logout",
+    }
     if request.path.startswith("/static/") or request.path in public_paths:
         return None
     if is_authenticated():
