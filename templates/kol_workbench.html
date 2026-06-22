@@ -1988,13 +1988,13 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <span class="admin-nav-group-caret">&#9662;</span>
         </button>
         <div class="admin-nav-group-body">
-        <div class="admin-nav-item" data-section="fans" onclick="showWorkbenchSection('fans', this)">
+        <div class="admin-nav-item" data-section="fans" data-feature="user_module" onclick="showWorkbenchSection('fans', this)">
           <span class="admin-nav-icon">&#128101;</span> 粉丝管理
         </div>
-        <div class="admin-nav-item" data-section="messages" onclick="showWorkbenchSection('messages', this)">
+        <div class="admin-nav-item" data-section="messages" data-feature="dm" onclick="showWorkbenchSection('messages', this)">
           <span class="admin-nav-icon">&#9993;</span> 粉丝消息
         </div>
-        <div class="admin-nav-item" data-section="broadcast" onclick="showWorkbenchSection('broadcast', this)">
+        <div class="admin-nav-item" data-section="broadcast" data-feature="dm" onclick="showWorkbenchSection('broadcast', this)">
           <span class="admin-nav-icon">&#128227;</span> 群发助手
         </div>
         </div>
@@ -2005,23 +2005,23 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <span class="admin-nav-group-caret">&#9662;</span>
         </button>
         <div class="admin-nav-group-body">
-        <div class="admin-nav-item" data-section="portal" onclick="showWorkbenchSection('portal', this)">
+        <div class="admin-nav-item" data-section="portal" data-feature="workbench" onclick="showWorkbenchSection('portal', this)">
           <span class="admin-nav-icon">&#127968;</span> 租户门户
         </div>
-        <div class="admin-nav-item" data-section="biz-dashboard" onclick="showWorkbenchSection('biz-dashboard', this)">
+        <div class="admin-nav-item" data-section="biz-dashboard" data-feature="workbench" onclick="showWorkbenchSection('biz-dashboard', this)">
           <span class="admin-nav-icon">&#128202;</span> 数据分析
         </div>
-        <div class="admin-nav-item" data-section="forecast-model" onclick="showWorkbenchSection('forecast-model', this)">
+        <div class="admin-nav-item" data-section="forecast-model" data-feature="stock_forecast" onclick="showWorkbenchSection('forecast-model', this)">
           <span class="admin-nav-icon">&#128200;</span> 预测模型
         </div>
-        <div class="admin-nav-item" data-section="review" onclick="showWorkbenchSection('review', this)">
+        <div class="admin-nav-item" data-section="review" data-feature="daily_review" onclick="showWorkbenchSection('review', this)">
           <span class="admin-nav-icon">&#9998;</span> 复盘生产台
         </div>
-        <div class="admin-nav-item" data-section="knowledge" onclick="showWorkbenchSection('knowledge', this)">
+        <div class="admin-nav-item" data-section="knowledge" data-feature="knowledge" onclick="showWorkbenchSection('knowledge', this)">
           <span class="admin-nav-icon">&#128214;</span> 知识库微调
         </div>
         {% if site_config.feature_flags.hermes %}
-        <div class="admin-nav-item" data-section="hermes" onclick="showWorkbenchSection('hermes', this)">
+        <div class="admin-nav-item" data-section="hermes" data-feature="hermes" onclick="showWorkbenchSection('hermes', this)">
           <span class="admin-nav-icon">&#129438;</span> Hermes 工作台
         </div>
         {% endif %}
@@ -2033,24 +2033,24 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <span class="admin-nav-group-caret">&#9662;</span>
         </button>
         <div class="admin-nav-group-body">
-        <div class="admin-nav-item" data-section="watchlist" onclick="showWorkbenchSection('watchlist', this)">
+        <div class="admin-nav-item" data-section="watchlist" data-feature="watchlist" onclick="showWorkbenchSection('watchlist', this)">
           <span class="admin-nav-icon">&#128200;</span> 自选股与详情
         </div>
-        <div class="admin-nav-item" data-section="dashboard" onclick="showWorkbenchSection('dashboard', this)">
+        <div class="admin-nav-item" data-section="dashboard" data-feature="fundamental_analysis" onclick="showWorkbenchSection('dashboard', this)">
           <span class="admin-nav-icon">&#9638;</span> 智能 Dashboard
         </div>
         <div class="kw-nav-subgroup">
           <div class="kw-nav-subtitle">指标专区</div>
-          <div class="admin-nav-item" data-section="indicator-overview" onclick="showWorkbenchSection('indicator-overview', this)">
+          <div class="admin-nav-item" data-section="indicator-overview" data-feature="analytics_module" onclick="showWorkbenchSection('indicator-overview', this)">
             <span class="admin-nav-icon">&#128202;</span> 总览控制台
           </div>
-          <div class="admin-nav-item" data-section="indicator-smart" onclick="showWorkbenchSection('indicator-smart', this)">
+          <div class="admin-nav-item" data-section="indicator-smart" data-feature="analytics_module" onclick="showWorkbenchSection('indicator-smart', this)">
             <span class="admin-nav-icon">&#129504;</span> 智能指标
           </div>
-          <div class="admin-nav-item" data-section="indicator-lake" onclick="showWorkbenchSection('indicator-lake', this)">
+          <div class="admin-nav-item" data-section="indicator-lake" data-feature="analytics_module" onclick="showWorkbenchSection('indicator-lake', this)">
             <span class="admin-nav-icon">&#127754;</span> 数据湖指标
           </div>
-          <div class="admin-nav-item" data-section="indicator-anomalies" onclick="showWorkbenchSection('indicator-anomalies', this)">
+          <div class="admin-nav-item" data-section="indicator-anomalies" data-feature="analytics_module" onclick="showWorkbenchSection('indicator-anomalies', this)">
             <span class="admin-nav-icon">&#9888;</span> 异动报告
           </div>
         </div>
@@ -2062,10 +2062,10 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <span class="admin-nav-group-caret">&#9662;</span>
         </button>
         <div class="admin-nav-group-body">
-        <div class="admin-nav-item" data-section="published" onclick="showWorkbenchSection('published', this)">
+        <div class="admin-nav-item" data-section="published" data-feature="daily_review" onclick="showWorkbenchSection('published', this)">
           <span class="admin-nav-icon">&#10003;</span> 已发布复盘
         </div>
-        <div class="admin-nav-item" data-section="consistency" onclick="showWorkbenchSection('consistency', this)">
+        <div class="admin-nav-item" data-section="consistency" data-feature="workbench" onclick="showWorkbenchSection('consistency', this)">
           <span class="admin-nav-icon">&#8646;</span> 前后台一致性
         </div>
         </div>
@@ -2186,15 +2186,34 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <div class="stat-card"><div class="stat-label">近30日活跃</div><div class="stat-value">{{ "{:,}".format(workbench.fan_management.stats.active_fans_30d) }}</div><div class="stat-change up">高频互动池</div></div>
           <div class="stat-card"><div class="stat-label">付费粉丝</div><div class="stat-value">{{ workbench.fan_management.stats.paying_fans }}</div><div class="stat-change up">重点经营对象</div></div>
         </div>
+        <div class="kw-card" style="margin-bottom:20px">
+          <div class="kw-card-head">
+            <div>
+              <div class="kw-card-title">粉丝导入</div>
+              <div class="kw-card-desc">这里和 admin 共用同一套用户导入服务，但当前大V只能导入自己租户下的粉丝用户，不能创建 admin 或其他大V。</div>
+            </div>
+            <span class="kw-tag">仅粉丝用户</span>
+          </div>
+          <div class="kw-toolbar">
+            <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="downloadKwFanTemplate()">下载 CSV 模板</button>
+            <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="triggerKwFanCsvImport()">上传 CSV 导入</button>
+            <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="openKwFanBulkEditor()">批量手工录入</button>
+            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="openKwFanCreator()">新增单个粉丝</button>
+          </div>
+          <input id="kw-fan-csv-input" type="file" accept=".csv,text/csv" style="display:none">
+        </div>
         <div class="table-wrap">
           <div class="table-header">
             <div class="table-title">粉丝管理</div>
-            <span class="tag tag-gold">仅当前大V租户</span>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <span class="tag tag-gold">仅当前大V租户</span>
+              <button class="btn-outline" style="padding:6px 12px;font-size:12px" onclick="loadKwFans()">刷新</button>
+            </div>
           </div>
-          <div class="kw-card-desc" style="margin-bottom:12px">{{ workbench.fan_management.summary }}</div>
+          <div class="kw-card-desc" id="kw-fans-summary" style="margin-bottom:12px">{{ workbench.fan_management.summary }}</div>
           <table>
             <thead><tr><th>粉丝名称</th><th>等级</th><th>来源</th><th>加入时间</th><th>价值标签</th><th>状态</th></tr></thead>
-            <tbody>
+            <tbody id="kw-fans-table-body">
               {% for fan in workbench.fan_management.fans %}
               <tr>
                 <td><span style="color:var(--text-main);font-weight:600">{{ fan.name }}</span></td>
@@ -2207,6 +2226,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
               {% endfor %}
             </tbody>
           </table>
+          <div id="kw-fans-table-meta" style="display:flex;justify-content:space-between;align-items:center;padding:12px 0 0;font-size:12px;color:#8899aa"></div>
         </div>
       </div>
 
@@ -3238,6 +3258,11 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
     <div id="kw-dashboard-cell-modal-content"></div>
   </div>
 </div>
+<div class="kw-review-modal-overlay" id="kw-fan-import-modal" onclick="if(event.target===this)closeKwFanImportModal()">
+  <div class="kw-review-modal-sheet kw-knowledge-modal-sheet">
+    <div id="kw-fan-import-modal-content"></div>
+  </div>
+</div>
 <script>
 const workbenchSectionMeta = {
   overview: { title: '工作台概览', summary: '和 H5 保持同一套产品口径，但以桌面 web 工作流方式组织大V日常动作。' },
@@ -3270,6 +3295,22 @@ let kwDashboardCurrentCards = [];
 function isWorkbenchFeatureEnabled(featureName) {
   const flags = (window.SITE_CONFIG && window.SITE_CONFIG.feature_flags) || {};
   return flags[featureName] !== false;
+}
+
+function refreshWorkbenchNavVisibility() {
+  document.querySelectorAll('.admin-nav-item[data-feature]').forEach((node) => {
+    const featureName = node.dataset.feature;
+    node.style.display = isWorkbenchFeatureEnabled(featureName) ? '' : 'none';
+  });
+  document.querySelectorAll('.admin-nav-group').forEach((group) => {
+    const items = Array.from(group.querySelectorAll('.admin-nav-item'));
+    const visibleItems = items.filter((item) => item.style.display !== 'none');
+    group.style.display = visibleItems.length ? '' : 'none';
+  });
+  const activeSection = document.querySelector('.admin-nav-item.active[data-section]');
+  if (activeSection && activeSection.style.display === 'none') {
+    showWorkbenchSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
+  }
 }
 
 function renderWorkbenchBarChart(hostId, items) {
@@ -3646,6 +3687,17 @@ function kwGetPortalModuleLabel(moduleId) {
 
 let kwPortalSelectedBlockId = null;
 let kwPortalFocusedEditor = null;
+let kwFans = Array.isArray((window.WORKBENCH_DATA && window.WORKBENCH_DATA.fan_management && window.WORKBENCH_DATA.fan_management.fans))
+  ? window.WORKBENCH_DATA.fan_management.fans.map((fan) => ({
+      username: fan.name || '',
+      membership: fan.tier || '--',
+      source: fan.source || '用户导入',
+      created_at: fan.joined || '--',
+      phone_masked: fan.value || '--',
+      status: fan.status === '已禁用' ? 'disabled' : 'active',
+    }))
+  : [];
+const KW_FAN_IMPORT_COLUMNS = ['username', 'password', 'phone', 'status'];
 
 function kwGetPortalBlocks() {
   if (!Array.isArray(kwPortalWorkspaceDraft.page_blocks)) kwPortalWorkspaceDraft.page_blocks = [];
@@ -7142,23 +7194,250 @@ function showToast(message) {
   window.__kwToastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
 }
 
+function renderKwFans() {
+  const body = document.getElementById('kw-fans-table-body');
+  const meta = document.getElementById('kw-fans-table-meta');
+  const summary = document.getElementById('kw-fans-summary');
+  if (!body) return;
+  body.innerHTML = kwFans.length ? kwFans.map((fan) => `
+    <tr>
+      <td><span style="color:var(--text-main);font-weight:600">${escapeHtml(fan.username || '--')}</span></td>
+      <td>${escapeHtml(fan.membership || '投资者视角')}</td>
+      <td>${escapeHtml(fan.source || '用户导入')}</td>
+      <td>${escapeHtml(String(fan.created_at || '--').slice(0, 10))}</td>
+      <td>${escapeHtml(fan.phone_masked || '--')}</td>
+      <td><span class="tag tag-gold">${escapeHtml(fan.status === 'disabled' ? '已禁用' : '活跃')}</span></td>
+    </tr>
+  `).join('') : '<tr><td colspan="6" style="text-align:center;color:#8899aa;padding:20px 0">暂无粉丝用户</td></tr>';
+  if (meta) meta.innerHTML = `<span>共 ${kwFans.length} 位粉丝</span><span>当前仅展示本大V租户下的粉丝用户</span>`;
+  if (summary) summary.textContent = `当前共 ${kwFans.length} 位粉丝用户，支持 CSV 批量导入、单个新增和批量表格式录入。`;
+}
+
+async function loadKwFans() {
+  const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
+  if (!tenantSlug) {
+    showToast('tenant_missing');
+    return;
+  }
+  try {
+    const res = await fetch(`/api/kol/users?tenant=${encodeURIComponent(tenantSlug)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error((data && data.error) || 'load_kol_users_failed');
+    kwFans = Array.isArray(data.users) ? data.users : [];
+    renderKwFans();
+  } catch (error) {
+    showToast(error.message || '粉丝列表加载失败');
+  }
+}
+
+function closeKwFanImportModal() {
+  const modal = document.getElementById('kw-fan-import-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function buildKwFanImportRow(row = {}) {
+  return `
+    <tr>
+      <td><input data-field="username" type="text" value="${escapeAttr(row.username || '')}" placeholder="用户名"></td>
+      <td><input data-field="password" type="text" value="${escapeAttr(row.password || '')}" placeholder="密码"></td>
+      <td><input data-field="phone" type="text" value="${escapeAttr(row.phone || '')}" placeholder="手机号"></td>
+      <td>
+        <select data-field="status">
+          <option value="active" ${String(row.status || 'active') === 'active' ? 'selected' : ''}>正常</option>
+          <option value="disabled" ${String(row.status || '') === 'disabled' ? 'selected' : ''}>禁用</option>
+        </select>
+      </td>
+      <td><button class="btn-outline" type="button" style="padding:4px 10px;font-size:11px" onclick="removeKwFanImportRow(this)">删除</button></td>
+    </tr>
+  `;
+}
+
+function addKwFanImportRow(row) {
+  const body = document.getElementById('kw-fan-import-tbody');
+  if (!body) return;
+  body.insertAdjacentHTML('beforeend', buildKwFanImportRow(row || {}));
+}
+
+function removeKwFanImportRow(button) {
+  const row = button ? button.closest('tr') : null;
+  if (row) row.remove();
+}
+
+function collectKwFanImportRows() {
+  return Array.from(document.querySelectorAll('#kw-fan-import-tbody tr')).map((row) => {
+    const item = {};
+    KW_FAN_IMPORT_COLUMNS.forEach((field) => {
+      const node = row.querySelector(`[data-field="${field}"]`);
+      item[field] = node ? String(node.value || '').trim() : '';
+    });
+    return item;
+  }).filter((item) => item.username || item.phone);
+}
+
+function openKwFanImportModal(mode = 'bulk') {
+  const modal = document.getElementById('kw-fan-import-modal');
+  const content = document.getElementById('kw-fan-import-modal-content');
+  if (!modal || !content) return;
+  const isSingle = mode === 'single';
+  content.innerHTML = `
+    <div class="kw-review-modal-head">
+      <div>
+        <div class="kw-review-modal-title">${isSingle ? '新增单个粉丝' : '批量手工录入粉丝'}</div>
+        <div class="kw-review-modal-subtitle">当前大V只能导入自己租户下的粉丝用户。无需选择租户，也不能选择 admin / 大V 角色。</div>
+      </div>
+      <button class="kw-review-modal-close" type="button" onclick="closeKwFanImportModal()">×</button>
+    </div>
+    <div class="kw-card">
+      <div class="kw-card-desc" style="margin-bottom:10px">字段固定为：用户名、密码、手机号、状态。导入后自动归属当前大V租户。</div>
+      <div style="overflow:auto">
+        <table>
+          <thead><tr><th>用户名</th><th>密码</th><th>手机号</th><th>状态</th><th>操作</th></tr></thead>
+          <tbody id="kw-fan-import-tbody"></tbody>
+        </table>
+      </div>
+      <div class="kw-toolbar" style="margin-top:12px">
+        <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="addKwFanImportRow()">新增一行</button>
+        <button class="btn-gold" type="button" style="padding:8px 14px;font-size:12px" onclick="submitKwFanImportRows()">${isSingle ? '保存粉丝' : '批量创建粉丝'}</button>
+      </div>
+    </div>
+  `;
+  modal.classList.add('show');
+  addKwFanImportRow({status: 'active'});
+  if (!isSingle) addKwFanImportRow({status: 'active'});
+}
+
+function openKwFanBulkEditor() {
+  openKwFanImportModal('bulk');
+}
+
+function openKwFanCreator() {
+  openKwFanImportModal('single');
+}
+
+async function submitKwFanImportRows() {
+  const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
+  const users = collectKwFanImportRows();
+  if (!tenantSlug) {
+    showToast('tenant_missing');
+    return;
+  }
+  if (!users.length) {
+    showToast('请至少填写一位粉丝');
+    return;
+  }
+  try {
+    const res = await fetch(`/api/kol/users/import?tenant=${encodeURIComponent(tenantSlug)}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({users}),
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) throw new Error(data.error || 'import_kol_users_failed');
+    kwFans = Array.isArray(data.users) ? data.users : kwFans;
+    renderKwFans();
+    closeKwFanImportModal();
+    const skipped = Array.isArray(data.skipped) ? data.skipped.length : 0;
+    showToast(`已导入 ${Array.isArray(data.created) ? data.created.length : 0} 位粉丝${skipped ? `，跳过 ${skipped} 条` : ''}`);
+  } catch (error) {
+    showToast(error.message || '粉丝导入失败');
+  }
+}
+
+function downloadKwFanTemplate() {
+  const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
+  if (!tenantSlug) {
+    showToast('tenant_missing');
+    return;
+  }
+  window.location.href = `/api/kol/users/template.csv?tenant=${encodeURIComponent(tenantSlug)}`;
+}
+
+function triggerKwFanCsvImport() {
+  const input = document.getElementById('kw-fan-csv-input');
+  if (input) input.click();
+}
+
+async function handleKwFanCsvImport(file) {
+  const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
+  if (!file) return;
+  if (!tenantSlug) {
+    showToast('tenant_missing');
+    return;
+  }
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const res = await fetch(`/api/kol/users/import-csv?tenant=${encodeURIComponent(tenantSlug)}`, {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) throw new Error(data.error || 'import_kol_users_csv_failed');
+    kwFans = Array.isArray(data.users) ? data.users : kwFans;
+    renderKwFans();
+    const skipped = Array.isArray(data.skipped) ? data.skipped.length : 0;
+    showToast(`CSV 已导入 ${Array.isArray(data.created) ? data.created.length : 0} 位粉丝${skipped ? `，跳过 ${skipped} 条` : ''}`);
+  } catch (error) {
+    showToast(error.message || '粉丝 CSV 导入失败');
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initWorkbenchNavGroups();
-  const forecastNav = document.querySelector('.admin-nav-item[data-section="forecast-model"]');
-  const hermesNav = document.querySelector('.admin-nav-item[data-section="hermes"]');
-  if (forecastNav) forecastNav.style.display = isWorkbenchFeatureEnabled('stock_forecast') ? '' : 'none';
-  if (hermesNav) hermesNav.style.display = isWorkbenchFeatureEnabled('hermes') ? '' : 'none';
+  refreshWorkbenchNavVisibility();
   kwRenderPortalWorkspace();
   kwRenderDashboardPreview();
   kwRenderReviewStudio();
   kwRenderPublishedReviewList();
   kwRenderKnowledgeList();
+  renderKwFans();
+  const kwFanCsvInput = document.getElementById('kw-fan-csv-input');
+  if (kwFanCsvInput && !kwFanCsvInput.dataset.bound) {
+    kwFanCsvInput.addEventListener('change', async (event) => {
+      const file = event.target.files && event.target.files[0];
+      await handleKwFanCsvImport(file);
+      event.target.value = '';
+    });
+    kwFanCsvInput.dataset.bound = '1';
+  }
   const section = new URLSearchParams(window.location.search).get('section');
+  if (section === 'fans' && !isWorkbenchFeatureEnabled('user_module')) {
+    showWorkbenchSection('overview');
+    return;
+  }
+  if ((section === 'messages' || section === 'broadcast') && !isWorkbenchFeatureEnabled('dm')) {
+    showWorkbenchSection('overview');
+    return;
+  }
+  if ((section === 'portal' || section === 'biz-dashboard' || section === 'consistency') && !isWorkbenchFeatureEnabled('workbench')) {
+    showWorkbenchSection('overview');
+    return;
+  }
   if (section === 'forecast-model' && !isWorkbenchFeatureEnabled('stock_forecast')) {
     showWorkbenchSection('overview');
     return;
   }
+  if ((section === 'review' || section === 'published') && !isWorkbenchFeatureEnabled('daily_review')) {
+    showWorkbenchSection('overview');
+    return;
+  }
+  if (section === 'knowledge' && !isWorkbenchFeatureEnabled('knowledge')) {
+    showWorkbenchSection('overview');
+    return;
+  }
   if (section === 'hermes' && !isWorkbenchFeatureEnabled('hermes')) {
+    showWorkbenchSection('overview');
+    return;
+  }
+  if (section === 'watchlist' && !isWorkbenchFeatureEnabled('watchlist')) {
+    showWorkbenchSection('overview');
+    return;
+  }
+  if (section === 'dashboard' && !isWorkbenchFeatureEnabled('fundamental_analysis')) {
+    showWorkbenchSection('overview');
+    return;
+  }
+  if (['indicator-overview', 'indicator-smart', 'indicator-lake', 'indicator-anomalies'].includes(section) && !isWorkbenchFeatureEnabled('analytics_module')) {
     showWorkbenchSection('overview');
     return;
   }

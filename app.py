@@ -9,6 +9,8 @@ import threading
 import re
 import hashlib
 import base64
+import csv
+import io
 from pathlib import Path
 from html import escape as html_escape
 from html.parser import HTMLParser
@@ -447,6 +449,8 @@ DEFAULT_SITE_CONFIG = {
     "default_tenant_slug": DEFAULT_TENANTS[0]["slug"],
     "tenants": DEFAULT_TENANTS,
     "feature_flags": {
+        "user_module": True,
+        "kol_module": True,
         "fundamental_analysis": True,
         "watchlist": True,
         "stock_forecast": False,
@@ -454,6 +458,9 @@ DEFAULT_SITE_CONFIG = {
         "knowledge": True,
         "community": False,
         "hermes": False,
+        "channel_module": True,
+        "analytics_module": True,
+        "system_module": True,
         "vip": False,
         "dm": True,
         "workbench": True,
@@ -1532,6 +1539,185 @@ def import_users(items):
         except ValueError:
             continue
     return created
+
+
+USER_IMPORT_TEMPLATE_FIELDS = ["username", "password", "phone", "role", "tenant_slug", "advisor_name", "status"]
+
+
+def build_user_import_template_csv(scope="admin", tenant_slug=""):
+    normalized_scope = str(scope or "admin").strip().lower()
+    rows = []
+    if normalized_scope == "kol":
+        active_tenant = get_tenant_by_slug(tenant_slug)
+        rows.append({
+            "username": "fan_demo_001",
+            "password": "demo123456",
+            "phone": "13800000001",
+            "role": "investor",
+            "tenant_slug": active_tenant.get("slug") or "",
+            "advisor_name": active_tenant.get("advisor") or "",
+            "status": "active",
+        })
+    else:
+        default_tenant = get_tenant_by_slug(get_default_tenant_slug())
+        rows.extend([
+            {
+                "username": "fan_demo_001",
+                "password": "demo123456",
+                "phone": "13800000001",
+                "role": "investor",
+                "tenant_slug": default_tenant.get("slug") or "",
+                "advisor_name": default_tenant.get("advisor") or "",
+                "status": "active",
+            },
+            {
+                "username": "kol_demo_001",
+                "password": "demo123456",
+                "phone": "13800000002",
+                "role": "dav",
+                "tenant_slug": default_tenant.get("slug") or "",
+                "advisor_name": default_tenant.get("advisor") or "",
+                "status": "active",
+            },
+            {
+                "username": "admin_demo_001",
+                "password": "demo123456",
+                "phone": "13800000003",
+                "role": "admin",
+                "tenant_slug": default_tenant.get("slug") or "",
+                "advisor_name": "",
+                "status": "active",
+            },
+        ])
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=USER_IMPORT_TEMPLATE_FIELDS)
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({key: row.get(key, "") for key in USER_IMPORT_TEMPLATE_FIELDS})
+    return output.getvalue()
+
+
+def _normalize_user_role_for_scope(role, scope):
+    normalized_scope = str(scope or "admin").strip().lower()
+    value = str(role or "investor").strip().lower() or "investor"
+    if normalized_scope == "kol":
+        return "investor"
+    return value if value in {"investor", "dav", "admin"} else "investor"
+
+
+def _normalize_user_status(value):
+    normalized = str(value or "active").strip().lower()
+    return normalized if normalized in {"active", "disabled"} else "active"
+
+
+def build_user_import_context(scope="admin", tenant_slug=""):
+    normalized_scope = str(scope or "admin").strip().lower()
+    if normalized_scope == "kol":
+        tenant = get_tenant_by_slug(tenant_slug)
+        return {
+            "scope": "kol",
+            "tenant_slug": tenant.get("slug") or "",
+            "advisor_name": tenant.get("advisor") or "",
+            "allowed_roles": ["investor"],
+        }
+    return {
+        "scope": "admin",
+        "tenant_slug": "",
+        "advisor_name": "",
+        "allowed_roles": ["investor", "dav", "admin"],
+    }
+
+
+def normalize_user_payload(source, context=None):
+    raw = source if isinstance(source, dict) else {}
+    ctx = context or build_user_import_context()
+    scope = ctx.get("scope") or "admin"
+    target_tenant_slug = str(ctx.get("tenant_slug") or "").strip().lower()
+    username = str(raw.get("username") or "").strip()
+    password = str(raw.get("password") or "").strip()
+    phone = str(raw.get("phone") or "").strip()
+    role = _normalize_user_role_for_scope(raw.get("role"), scope)
+    status = _normalize_user_status(raw.get("status"))
+    tenant_slug = str(raw.get("tenant_slug") or target_tenant_slug or get_default_tenant_slug()).strip().lower()
+    if scope == "kol":
+        tenant_slug = target_tenant_slug
+    tenant = get_tenant_by_slug(tenant_slug)
+    advisor_name = str(raw.get("advisor_name") or "").strip()
+    if scope == "kol":
+        advisor_name = tenant.get("advisor") or ctx.get("advisor_name") or ""
+    elif role == "investor" and not advisor_name:
+        advisor_name = tenant.get("advisor") or ""
+    elif role == "admin":
+        advisor_name = ""
+    return {
+        "username": username,
+        "password": password,
+        "phone": phone,
+        "role": role,
+        "tenant_slug": tenant_slug,
+        "advisor_name": advisor_name,
+        "status": status,
+    }
+
+
+def parse_user_csv_import(file_storage, context=None):
+    if file_storage is None:
+        raise ValueError("csv_file_required")
+    raw_bytes = file_storage.read() or b""
+    if not raw_bytes:
+        raise ValueError("csv_file_required")
+    try:
+        content = raw_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        content = raw_bytes.decode("gb18030")
+    reader = csv.DictReader(io.StringIO(content))
+    if not reader.fieldnames:
+        raise ValueError("csv_header_required")
+    rows = []
+    for row in reader:
+        if not isinstance(row, dict):
+            continue
+        if not any(str(value or "").strip() for value in row.values()):
+            continue
+        rows.append(normalize_user_payload(row, context=context))
+    return rows
+
+
+def bulk_create_users(items, context=None):
+    ctx = context or build_user_import_context()
+    created = []
+    skipped = []
+    for index, item in enumerate(items or [], start=1):
+        try:
+            payload = normalize_user_payload(item, context=ctx)
+            user = create_user(payload)
+            if user:
+                created.append(user)
+        except Exception as exc:
+            skipped.append({
+                "row_index": index,
+                "username": str((item or {}).get("username") or "").strip() if isinstance(item, dict) else "",
+                "reason": str(exc),
+            })
+    return created, skipped
+
+
+def build_user_import_summary(scope="admin", tenant_slug=""):
+    ctx = build_user_import_context(scope=scope, tenant_slug=tenant_slug)
+    users = list_users(tenant_slug=ctx["tenant_slug"] or None)
+    if ctx["scope"] == "kol":
+        users = [user for user in users if user.get("role") == "investor"]
+    return {
+        "scope": ctx["scope"],
+        "tenant_slug": ctx["tenant_slug"],
+        "total_users": len(users),
+        "role_split": {
+            "investor": len([user for user in users if user.get("role") == "investor"]),
+            "dav": len([user for user in users if user.get("role") == "dav"]),
+            "admin": len([user for user in users if user.get("role") == "admin"]),
+        },
+        "users": users,
+    }
 
 
 def ensure_user_row_defaults(user, site_config=None):
@@ -10215,7 +10401,8 @@ def api_admin_users():
 def api_create_admin_user():
     body = request.get_json(silent=True) or {}
     try:
-        user = create_user(body)
+        payload = normalize_user_payload(body, context=build_user_import_context(scope="admin"))
+        user = create_user(payload)
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     return jsonify({"ok": True, "user": user, "users": list_users()})
@@ -10225,14 +10412,90 @@ def api_create_admin_user():
 def api_import_admin_users():
     body = request.get_json(silent=True) or {}
     users = body.get("users", [])
-    created = import_users(users if isinstance(users, list) else [])
-    return jsonify({"ok": True, "created": created, "users": list_users()})
+    created, skipped = bulk_create_users(users if isinstance(users, list) else [], context=build_user_import_context(scope="admin"))
+    return jsonify({"ok": True, "created": created, "skipped": skipped, "users": list_users()})
+
+
+@app.route("/api/admin/users/import-csv", methods=["POST"])
+def api_import_admin_users_csv():
+    try:
+        rows = parse_user_csv_import(request.files.get("file"), context=build_user_import_context(scope="admin"))
+        created, skipped = bulk_create_users(rows, context=build_user_import_context(scope="admin"))
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "created": created, "skipped": skipped, "users": list_users()})
+
+
+@app.route("/api/admin/users/template.csv")
+def api_admin_users_template():
+    content = build_user_import_template_csv(scope="admin")
+    return app.response_class(
+        content,
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="admin_user_import_template.csv"'},
+    )
 
 
 @app.route("/api/kol/users")
 def api_kol_users():
     tenant = get_active_tenant_from_request()
-    return jsonify({"users": list_users(tenant_slug=tenant["slug"])})
+    summary = build_user_import_summary(scope="kol", tenant_slug=tenant["slug"])
+    return jsonify({"users": summary["users"], "summary": summary})
+
+
+@app.route("/api/kol/users", methods=["POST"])
+def api_create_kol_user():
+    tenant = get_active_tenant_from_request()
+    body = request.get_json(silent=True) or {}
+    try:
+        payload = normalize_user_payload(body, context=build_user_import_context(scope="kol", tenant_slug=tenant["slug"]))
+        user = create_user(payload)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    summary = build_user_import_summary(scope="kol", tenant_slug=tenant["slug"])
+    return jsonify({"ok": True, "user": user, "users": summary["users"], "summary": summary})
+
+
+@app.route("/api/kol/users/import", methods=["POST"])
+def api_import_kol_users():
+    tenant = get_active_tenant_from_request()
+    body = request.get_json(silent=True) or {}
+    users = body.get("users", [])
+    created, skipped = bulk_create_users(
+        users if isinstance(users, list) else [],
+        context=build_user_import_context(scope="kol", tenant_slug=tenant["slug"]),
+    )
+    summary = build_user_import_summary(scope="kol", tenant_slug=tenant["slug"])
+    return jsonify({"ok": True, "created": created, "skipped": skipped, "users": summary["users"], "summary": summary})
+
+
+@app.route("/api/kol/users/import-csv", methods=["POST"])
+def api_import_kol_users_csv():
+    tenant = get_active_tenant_from_request()
+    try:
+        rows = parse_user_csv_import(
+            request.files.get("file"),
+            context=build_user_import_context(scope="kol", tenant_slug=tenant["slug"]),
+        )
+        created, skipped = bulk_create_users(
+            rows,
+            context=build_user_import_context(scope="kol", tenant_slug=tenant["slug"]),
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    summary = build_user_import_summary(scope="kol", tenant_slug=tenant["slug"])
+    return jsonify({"ok": True, "created": created, "skipped": skipped, "users": summary["users"], "summary": summary})
+
+
+@app.route("/api/kol/users/template.csv")
+def api_kol_users_template():
+    tenant = get_active_tenant_from_request()
+    content = build_user_import_template_csv(scope="kol", tenant_slug=tenant["slug"])
+    return app.response_class(
+        content,
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{tenant["slug"]}_fan_import_template.csv"'},
+    )
 
 
 @app.route("/api/admin/site-config", methods=["GET", "POST"])

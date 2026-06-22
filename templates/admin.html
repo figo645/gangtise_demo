@@ -1041,13 +1041,13 @@
           <span class="admin-nav-group-caret">&#9662;</span>
         </button>
         <div class="admin-nav-group-body">
-        <div class="admin-nav-item" data-section="users" onclick="showSection('users', this)">
+        <div class="admin-nav-item" data-section="users" data-feature="user_module" onclick="showSection('users', this)">
           <span class="admin-nav-icon">&#9786;</span> 用户列表
         </div>
-        <div class="admin-nav-item" data-section="segments" onclick="showSection('segments', this)">
+        <div class="admin-nav-item" data-section="segments" data-feature="vip" onclick="showSection('segments', this)">
           <span class="admin-nav-icon">&#9670;</span> 用户分层
         </div>
-        <div class="admin-nav-item" data-section="points" onclick="showSection('points', this)">
+        <div class="admin-nav-item" data-section="points" data-feature="vip" onclick="showSection('points', this)">
           <span class="admin-nav-icon">&#9733;</span> 积分管理
         </div>
         </div>
@@ -1058,10 +1058,10 @@
           <span class="admin-nav-group-caret">&#9662;</span>
         </button>
         <div class="admin-nav-group-body">
-        <div class="admin-nav-item" data-section="kols" onclick="showSection('kols', this)">
+        <div class="admin-nav-item" data-section="kols" data-feature="kol_module" onclick="showSection('kols', this)">
           <span class="admin-nav-icon">&#9775;</span> 大V管理
         </div>
-        <div class="admin-nav-item" data-section="commission" onclick="showSection('commission', this)">
+        <div class="admin-nav-item" data-section="commission" data-feature="kol_module" onclick="showSection('commission', this)">
           <span class="admin-nav-icon">&#9654;</span> 收益结算
         </div>
         </div>
@@ -1072,10 +1072,10 @@
           <span class="admin-nav-group-caret">&#9662;</span>
         </button>
         <div class="admin-nav-group-body">
-        <div class="admin-nav-item" data-section="community" onclick="showSection('community', this)">
+        <div class="admin-nav-item" data-section="community" data-feature="community" onclick="showSection('community', this)">
           <span class="admin-nav-icon">&#9998;</span> 帖子审核
         </div>
-        <div class="admin-nav-item" data-section="events" onclick="showSection('events', this)">
+        <div class="admin-nav-item" data-section="events" data-feature="community" onclick="showSection('events', this)">
           <span class="admin-nav-icon">&#9728;</span> 活动管理
         </div>
         </div>
@@ -1086,10 +1086,10 @@
           <span class="admin-nav-group-caret">&#9662;</span>
         </button>
         <div class="admin-nav-group-body">
-        <div class="admin-nav-item" data-section="hermes" onclick="showSection('hermes', this)">
+        <div class="admin-nav-item" data-section="hermes" data-feature="hermes" onclick="showSection('hermes', this)">
           <span class="admin-nav-icon">&#9881;</span> 使用统计
         </div>
-        <div class="admin-nav-item" data-section="forecast-model" onclick="showSection('forecast-model', this)">
+        <div class="admin-nav-item" data-section="forecast-model" data-feature="stock_forecast" onclick="showSection('forecast-model', this)">
           <span class="admin-nav-icon">&#128200;</span> 预测模型
         </div>
         </div>
@@ -1100,7 +1100,7 @@
           <span class="admin-nav-group-caret">&#9662;</span>
         </button>
         <div class="admin-nav-group-body">
-        <div class="admin-nav-item" data-section="channels" onclick="showSection('channels', this)">
+        <div class="admin-nav-item" data-section="channels" data-feature="channel_module" onclick="showSection('channels', this)">
           <span class="admin-nav-icon">&#9741;</span> 渠道配置
         </div>
         </div>
@@ -1113,41 +1113,41 @@
         <div class="admin-nav-group-body">
         <div class="admin-nav-subgroup">
           <div class="admin-nav-subtitle">指标专区</div>
-          <div class="admin-nav-item" data-section="indicator-overview" onclick="showSection('indicator-overview', this)">
+          <div class="admin-nav-item" data-section="indicator-overview" data-feature="analytics_module" onclick="showSection('indicator-overview', this)">
             <span class="admin-nav-icon">&#128202;</span> 总览控制台
           </div>
-          <div class="admin-nav-item" data-section="indicator-smart" onclick="showSection('indicator-smart', this)">
+          <div class="admin-nav-item" data-section="indicator-smart" data-feature="analytics_module" onclick="showSection('indicator-smart', this)">
             <span class="admin-nav-icon">&#129504;</span> 智能指标
           </div>
-          <div class="admin-nav-item" data-section="indicator-lake" onclick="showSection('indicator-lake', this)">
+          <div class="admin-nav-item" data-section="indicator-lake" data-feature="analytics_module" onclick="showSection('indicator-lake', this)">
             <span class="admin-nav-icon">&#127754;</span> 数据湖指标
           </div>
-          <div class="admin-nav-item" data-section="indicator-anomalies" onclick="showSection('indicator-anomalies', this)">
+          <div class="admin-nav-item" data-section="indicator-anomalies" data-feature="analytics_module" onclick="showSection('indicator-anomalies', this)">
             <span class="admin-nav-icon">&#9888;</span> 异动报告
           </div>
-          <div class="admin-nav-item" data-section="indicator-sources" onclick="showSection('indicator-sources', this)">
+          <div class="admin-nav-item" data-section="indicator-sources" data-feature="analytics_module" onclick="showSection('indicator-sources', this)">
             <span class="admin-nav-icon">&#128279;</span> API 源接入
           </div>
-          <div class="admin-nav-item" data-section="indicator-definitions" onclick="showSection('indicator-definitions', this)">
+          <div class="admin-nav-item" data-section="indicator-definitions" data-feature="analytics_module" onclick="showSection('indicator-definitions', this)">
             <span class="admin-nav-icon">&#128451;</span> 指标定义
           </div>
-          <div class="admin-nav-item" data-section="indicator-pipeline" onclick="showSection('indicator-pipeline', this)">
+          <div class="admin-nav-item" data-section="indicator-pipeline" data-feature="analytics_module" onclick="showSection('indicator-pipeline', this)">
             <span class="admin-nav-icon">&#128295;</span> 清洗流水线
           </div>
         </div>
-        <div class="admin-nav-item" id="nav-funnel" onclick="showAnalyticsSection('funnel')">
+        <div class="admin-nav-item" id="nav-funnel" data-feature="analytics_module" onclick="showAnalyticsSection('funnel')">
           <span class="admin-nav-icon">&#128202;</span> 转化漏斗
         </div>
-        <div class="admin-nav-item" id="nav-channel" onclick="showAnalyticsSection('channel')">
+        <div class="admin-nav-item" id="nav-channel" data-feature="analytics_module" onclick="showAnalyticsSection('channel')">
           <span class="admin-nav-icon">&#128225;</span> 渠道分析
         </div>
-        <div class="admin-nav-item" id="nav-kol" onclick="showAnalyticsSection('kol')">
+        <div class="admin-nav-item" id="nav-kol" data-feature="analytics_module" onclick="showAnalyticsSection('kol')">
           <span class="admin-nav-icon">&#11088;</span> 大V协同
         </div>
-        <div class="admin-nav-item" id="nav-revenue" onclick="showAnalyticsSection('revenue')">
+        <div class="admin-nav-item" id="nav-revenue" data-feature="analytics_module" onclick="showAnalyticsSection('revenue')">
           <span class="admin-nav-icon">&#128176;</span> 营收趋势
         </div>
-        <div class="admin-nav-item" id="nav-segment" onclick="showAnalyticsSection('segment')">
+        <div class="admin-nav-item" id="nav-segment" data-feature="vip" onclick="showAnalyticsSection('segment')">
           <span class="admin-nav-icon">&#127919;</span> 用户分层分析
         </div>
         </div>
@@ -1160,35 +1160,35 @@
         <div class="admin-nav-group-body">
         <div class="admin-nav-subgroup">
           <div class="admin-nav-subtitle">系统专区</div>
-          <div class="admin-nav-item" data-section="settings-appearance" onclick="showSection('settings-appearance', this)">
+          <div class="admin-nav-item" data-section="settings-appearance" data-feature="system_module" onclick="showSection('settings-appearance', this)">
             <span class="admin-nav-icon">&#9965;</span> 站点外观
           </div>
-          <div class="admin-nav-item" data-section="settings-brand" onclick="showSection('settings-brand', this)">
+          <div class="admin-nav-item" data-section="settings-brand" data-feature="system_module" onclick="showSection('settings-brand', this)">
             <span class="admin-nav-icon">&#9734;</span> 平台品牌
           </div>
-          <div class="admin-nav-item" data-section="settings-features" onclick="showSection('settings-features', this)">
+          <div class="admin-nav-item" data-section="settings-features" data-feature="system_module" onclick="showSection('settings-features', this)">
             <span class="admin-nav-icon">&#9881;</span> 功能开关
           </div>
-          <div class="admin-nav-item" data-section="settings-policy" onclick="showSection('settings-policy', this)">
+          <div class="admin-nav-item" data-section="settings-policy" data-feature="system_module" onclick="showSection('settings-policy', this)">
             <span class="admin-nav-icon">&#128203;</span> 发布与隔离
           </div>
-          <div class="admin-nav-item" data-section="settings-knowledge" onclick="showSection('settings-knowledge', this)">
+          <div class="admin-nav-item" data-section="settings-knowledge" data-feature="system_module" onclick="showSection('settings-knowledge', this)">
             <span class="admin-nav-icon">&#128214;</span> 知识与向量
           </div>
-          <div class="admin-nav-item" data-section="knowledge-items" onclick="showSection('knowledge-items', this)">
+          <div class="admin-nav-item" data-section="knowledge-items" data-feature="system_module" onclick="showSection('knowledge-items', this)">
             <span class="admin-nav-icon">&#128196;</span> 知识内容管理
           </div>
-          <div class="admin-nav-item" data-section="settings-llm" onclick="showSection('settings-llm', this)">
+          <div class="admin-nav-item" data-section="settings-llm" data-feature="system_module" onclick="showSection('settings-llm', this)">
             <span class="admin-nav-icon">&#129302;</span> 大模型专区
           </div>
-          <div class="admin-nav-item" data-section="token-usage" onclick="showSection('token-usage', this)">
+          <div class="admin-nav-item" data-section="token-usage" data-feature="system_module" onclick="showSection('token-usage', this)">
             <span class="admin-nav-icon">&#128202;</span> Token 监控
           </div>
-          <div class="admin-nav-item" data-section="task-center" onclick="showSection('task-center', this)">
+          <div class="admin-nav-item" data-section="task-center" data-feature="system_module" onclick="showSection('task-center', this)">
             <span class="admin-nav-icon">&#9201;</span> 定时任务专区
           </div>
         </div>
-        <div class="admin-nav-item" data-section="access" onclick="showSection('access', this)">
+        <div class="admin-nav-item" data-section="access" data-feature="system_module" onclick="showSection('access', this)">
           <span class="admin-nav-icon">&#128737;</span> 访问审计
         </div>
         </div>
@@ -1368,11 +1368,24 @@
             <div class="stat-change up">&#9650; +0.7pp</div>
           </div>
         </div>
+        <div class="config-card" style="margin-bottom:16px">
+          <div class="config-card-title">用户导入工作台</div>
+          <div class="feature-note" style="margin-bottom:12px">
+            Admin 可统一导入粉丝用户、大V 和管理员。支持下载 CSV 模板、上传 CSV、单个新增，以及像在线表格一样批量手工填写。
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn-outline" style="padding:8px 14px;font-size:12px" onclick="downloadAdminUserTemplate()">下载 CSV 模板</button>
+            <button class="btn-outline" style="padding:8px 14px;font-size:12px" onclick="triggerAdminUserCsvImport()">上传 CSV 导入</button>
+            <button class="btn-outline" style="padding:8px 14px;font-size:12px" onclick="openAdminUserBulkEditor()">批量手工录入</button>
+            <button class="btn-gold" style="padding:8px 14px;font-size:12px" onclick="openAdminUserCreator()">单个新增用户</button>
+          </div>
+          <input id="admin-user-csv-input" type="file" accept=".csv,text/csv" style="display:none">
+        </div>
         <div class="table-wrap">
           <div class="table-header">
             <div class="table-title">用户列表</div>
             <div style="display:flex;gap:8px;align-items:center">
-              <button class="btn-outline" style="padding:6px 14px;font-size:12px" onclick="importAdminUsers()">导入用户</button>
+              <button class="btn-outline" style="padding:6px 14px;font-size:12px" onclick="openAdminUserBulkEditor()">批量录入</button>
               <button class="btn-gold" style="padding:6px 14px;font-size:12px" onclick="openAdminUserCreator()">新增用户</button>
             </div>
           </div>
@@ -3470,6 +3483,14 @@
               <label class="toggle"><input id="password-gate-enabled" type="checkbox" checked><span class="toggle-slider"></span></label>
             </div>
             <div class="toggle-wrap">
+              <span class="toggle-label">用户模块</span>
+              <label class="toggle"><input id="feature-user_module" type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
+              <span class="toggle-label">大V租户模块</span>
+              <label class="toggle"><input id="feature-kol_module" type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
               <span class="toggle-label">基本面分析</span>
               <label class="toggle"><input id="feature-fundamental_analysis" type="checkbox" checked><span class="toggle-slider"></span></label>
             </div>
@@ -3496,6 +3517,18 @@
             <div class="toggle-wrap">
               <span class="toggle-label">Hermes</span>
               <label class="toggle"><input id="feature-hermes" type="checkbox"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
+              <span class="toggle-label">渠道模块</span>
+              <label class="toggle"><input id="feature-channel_module" type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
+              <span class="toggle-label">数据分析模块</span>
+              <label class="toggle"><input id="feature-analytics_module" type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
+              <span class="toggle-label">系统模块</span>
+              <label class="toggle"><input id="feature-system_module" type="checkbox" checked><span class="toggle-slider"></span></label>
             </div>
             <div class="toggle-wrap">
               <span class="toggle-label">会员页</span>
@@ -4014,6 +4047,16 @@
     <div id="admin-task-modal-content"></div>
   </div>
 </div>
+<div class="admin-modal-overlay" id="admin-user-import-modal" onclick="if(event.target===this)closeAdminUserImportModal()">
+  <div class="admin-modal-sheet">
+    <div id="admin-user-import-modal-content"></div>
+  </div>
+</div>
+<div class="admin-modal-overlay" id="admin-user-detail-modal" onclick="if(event.target===this)closeAdminUserDetailModal()">
+  <div class="admin-modal-sheet">
+    <div id="admin-user-detail-modal-content"></div>
+  </div>
+</div>
 
 <script src="/static/js/charts.js"></script>
 <script>
@@ -4147,6 +4190,14 @@ function showSection(name, navEl) {
 }
 
 function showAnalyticsSection(section) {
+  if (section === 'segment' && !isAdminFeatureEnabled('vip')) {
+    showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
+    return;
+  }
+  if (!isAdminFeatureEnabled('analytics_module')) {
+    showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
+    return;
+  }
   document.querySelectorAll('[id^="section-"]').forEach(s => s.style.display = 'none');
   document.getElementById('section-analytics').style.display = 'block';
   const navEl = document.getElementById('nav-' + section);
@@ -5795,6 +5846,7 @@ async function openAdminIndicatorHistory(indicatorId) {
 }
 
 let adminUsers = [];
+const ADMIN_USER_IMPORT_COLUMNS = ['username', 'password', 'phone', 'role', 'tenant_slug', 'advisor_name', 'status'];
 let forecastConfig = {};
 let forecastWorkflowMeta = {};
 let forecastGraph = {nodes: [], edges: [], tuning: {}};
@@ -5828,10 +5880,122 @@ function renderAdminUsersTable() {
       <td>${escapeHtml(user.tenant?.name || '--')}</td>
       <td><span class="tag ${user.status === 'active' ? 'tag-green' : 'tag-red'}">${escapeHtml(user.status === 'active' ? '正常' : '已禁用')}</span></td>
       <td>${escapeHtml(user.created_at || '--')}</td>
-      <td><button class="btn-outline" style="padding:3px 9px;font-size:11px" onclick="showToast('当前版本先提供新增与导入，编辑/禁用可继续补充')">详情</button></td>
+      <td><button class="btn-outline" style="padding:3px 9px;font-size:11px" onclick="openAdminUserDetail(${Number(user.id || 0)})">详情</button></td>
     </tr>
   `).join('') || '<tr><td colspan="8" style="text-align:center;color:#8899aa;padding:20px 0">暂无用户</td></tr>';
   meta.innerHTML = `<span>共 ${filtered.length} 条记录</span><span>当前数据来自 SQLite 用户表</span>`;
+}
+
+function closeAdminUserDetailModal() {
+  const modal = document.getElementById('admin-user-detail-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function getAdminRoleTagClass(role) {
+  if (role === 'admin') return 'tag-red';
+  if (role === 'dav') return 'tag-gold';
+  return 'tag-blue';
+}
+
+function openAdminUserDetail(userId) {
+  const user = adminUsers.find((item) => Number(item.id || 0) === Number(userId || 0));
+  if (!user) {
+    showToast('未找到用户详情');
+    return;
+  }
+  const modal = document.getElementById('admin-user-detail-modal');
+  const content = document.getElementById('admin-user-detail-modal-content');
+  if (!modal || !content) return;
+  const roleLabel = user.roleLabel || (user.role === 'admin' ? '管理员' : (user.role === 'dav' ? '大V投顾' : '粉丝用户'));
+  const statusLabel = user.status === 'active' ? '正常' : '已禁用';
+  content.innerHTML = `
+    <div class="admin-modal-head">
+      <div>
+        <div class="admin-modal-title">${escapeHtml(user.username || '未命名用户')}</div>
+        <div class="admin-modal-subtitle">${escapeHtml(roleLabel)} · ${escapeHtml(user.tenant?.name || user.tenant_slug || '--')} · 创建于 ${escapeHtml(user.created_at || '--')}</div>
+      </div>
+      <button class="admin-modal-close" type="button" onclick="closeAdminUserDetailModal()">×</button>
+    </div>
+    <div class="admin-modal-grid">
+      <div class="admin-modal-card">
+        <div class="admin-modal-card-title">基础信息</div>
+        <div class="admin-modal-list">
+          <div class="admin-modal-item">
+            <div class="admin-modal-item-top">
+              <strong>权限角色</strong>
+              <span class="tag ${getAdminRoleTagClass(user.role)}">${escapeHtml(user.role || '--')}</span>
+            </div>
+            <div class="admin-modal-copy">${escapeHtml(roleLabel)}</div>
+          </div>
+          <div class="admin-modal-item">
+            <div class="admin-modal-item-top">
+              <strong>用户状态</strong>
+              <span class="tag ${user.status === 'active' ? 'tag-green' : 'tag-red'}">${escapeHtml(statusLabel)}</span>
+            </div>
+            <div class="admin-modal-copy">更新时间：${escapeHtml(user.updated_at || '--')}</div>
+          </div>
+          <div class="admin-modal-item">
+            <div class="admin-modal-item-top">
+              <strong>手机号</strong>
+              <span class="tag tag-blue">${escapeHtml(user.phone_masked || '--')}</span>
+            </div>
+            <div class="admin-modal-copy">原始号码：${escapeHtml(user.phone || '--')}</div>
+          </div>
+          <div class="admin-modal-item">
+            <div class="admin-modal-item-top">
+              <strong>所属租户</strong>
+              <span class="tag tag-gold">${escapeHtml(user.tenant_slug || '--')}</span>
+            </div>
+            <div class="admin-modal-copy">${escapeHtml(user.tenant?.name || '--')} · 大V：${escapeHtml(user.advisor_name || user.tenant?.advisor || '--')}</div>
+          </div>
+        </div>
+      </div>
+      <div class="admin-modal-card">
+        <div class="admin-modal-card-title">用户画像</div>
+        <div class="admin-modal-summary">
+          <div class="admin-modal-stat">
+            <div class="admin-modal-stat-label">等级</div>
+            <div class="admin-modal-stat-value compact">${escapeHtml(user.level_name || '--')}</div>
+          </div>
+          <div class="admin-modal-stat">
+            <div class="admin-modal-stat-label">会员视角</div>
+            <div class="admin-modal-stat-value compact">${escapeHtml(user.membership || '--')}</div>
+          </div>
+          <div class="admin-modal-stat">
+            <div class="admin-modal-stat-label">积分</div>
+            <div class="admin-modal-stat-value compact">${escapeHtml(String(user.points || 0))}</div>
+          </div>
+          <div class="admin-modal-stat">
+            <div class="admin-modal-stat-label">算力余额</div>
+            <div class="admin-modal-stat-value compact">${escapeHtml(String(user.compute_credits || 0))}</div>
+          </div>
+        </div>
+        <div class="admin-modal-section-note" style="margin-top:12px">
+          <div class="admin-modal-section-title">关系标签</div>
+          <div class="admin-modal-section-copy">${escapeHtml(user.relationship || '--')}</div>
+        </div>
+      </div>
+      <div class="admin-modal-card">
+        <div class="admin-modal-card-title">行为概况</div>
+        <div class="admin-modal-list">
+          <div class="admin-modal-item"><div class="admin-modal-item-top"><strong>帖子 / 获赞</strong><span class="tag tag-blue">${escapeHtml(String(user.posts || 0))} / ${escapeHtml(String(user.likes || 0))}</span></div><div class="admin-modal-copy">关注 ${escapeHtml(String(user.following || 0))} · 粉丝 ${escapeHtml(String(user.followers || 0))}</div></div>
+          <div class="admin-modal-item"><div class="admin-modal-item-top"><strong>工作台入口</strong><span class="tag tag-gold">${escapeHtml(user.workbenchLabel || '--')}</span></div><div class="admin-modal-copy">${escapeHtml(user.workbenchHint || '--')}</div></div>
+        </div>
+      </div>
+      <div class="admin-modal-card">
+        <div class="admin-modal-card-title">身份标记</div>
+        <div class="admin-modal-history-list">
+          ${(Array.isArray(user.badges) ? user.badges : []).map((badge) => `
+            <div class="admin-modal-history-row">
+              <div class="admin-modal-history-date">标签</div>
+              <div class="admin-modal-history-text">${escapeHtml(badge || '--')}</div>
+            </div>
+          `).join('') || '<div class="admin-modal-copy">暂无身份标记</div>'}
+        </div>
+      </div>
+    </div>
+  `;
+  modal.classList.add('show');
 }
 
 async function loadAdminUsers() {
@@ -5846,49 +6010,149 @@ async function loadAdminUsers() {
 }
 
 async function openAdminUserCreator() {
-  const username = window.prompt('用户名');
-  if (!username) return;
-  const password = window.prompt('密码');
-  if (!password) return;
-  const role = window.prompt('权限：admin / dav / investor', 'investor');
-  if (!role) return;
-  const phone = window.prompt('电话');
-  if (!phone) return;
-  const advisor_name = window.prompt('所属大V（普通用户必填，admin 可留空）', '');
-  const tenant_slug = window.prompt('所属租户 slug，例如 laowang / lisa', adminSiteConfig.default_tenant_slug || 'laowang');
-  try {
-    const res = await fetch('/api/admin/users', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({username, password, role, phone, advisor_name, tenant_slug}),
-    });
-    const data = await res.json();
-    if (!res.ok || data.ok === false) throw new Error(data.error || 'create_user_failed');
-    adminUsers = Array.isArray(data.users) ? data.users : adminUsers;
-    renderAdminUsersTable();
-    showToast('用户已创建');
-  } catch (error) {
-    showToast('创建用户失败');
-  }
+  openAdminUserImportModal('single');
 }
 
-async function importAdminUsers() {
-  const raw = window.prompt('按 JSON 数组导入用户，例如：[{"username":"u1","password":"p1","role":"investor","advisor_name":"财经老王","tenant_slug":"laowang","phone":"13800000001"}]');
-  if (!raw) return;
+function closeAdminUserImportModal() {
+  const modal = document.getElementById('admin-user-import-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function buildAdminUserImportRow(row = {}) {
+  return `
+    <tr>
+      <td><input data-field="username" type="text" value="${escapeAttr(row.username || '')}" placeholder="用户名"></td>
+      <td><input data-field="password" type="text" value="${escapeAttr(row.password || '')}" placeholder="密码"></td>
+      <td><input data-field="phone" type="text" value="${escapeAttr(row.phone || '')}" placeholder="手机号"></td>
+      <td>
+        <select data-field="role">
+          <option value="investor" ${String(row.role || 'investor') === 'investor' ? 'selected' : ''}>粉丝用户</option>
+          <option value="dav" ${String(row.role || '') === 'dav' ? 'selected' : ''}>大V</option>
+          <option value="admin" ${String(row.role || '') === 'admin' ? 'selected' : ''}>admin</option>
+        </select>
+      </td>
+      <td><input data-field="tenant_slug" type="text" value="${escapeAttr(row.tenant_slug || adminSiteConfig.default_tenant_slug || '')}" placeholder="租户 slug"></td>
+      <td><input data-field="advisor_name" type="text" value="${escapeAttr(row.advisor_name || '')}" placeholder="所属大V"></td>
+      <td>
+        <select data-field="status">
+          <option value="active" ${String(row.status || 'active') === 'active' ? 'selected' : ''}>正常</option>
+          <option value="disabled" ${String(row.status || '') === 'disabled' ? 'selected' : ''}>禁用</option>
+        </select>
+      </td>
+      <td><button class="btn-outline" type="button" style="padding:4px 10px;font-size:11px" onclick="removeAdminUserImportRow(this)">删除</button></td>
+    </tr>
+  `;
+}
+
+function removeAdminUserImportRow(button) {
+  const row = button ? button.closest('tr') : null;
+  if (row) row.remove();
+}
+
+function addAdminUserImportRow(row) {
+  const body = document.getElementById('admin-user-import-tbody');
+  if (!body) return;
+  body.insertAdjacentHTML('beforeend', buildAdminUserImportRow(row || {}));
+}
+
+function collectAdminUserImportRows() {
+  return Array.from(document.querySelectorAll('#admin-user-import-tbody tr')).map((row) => {
+    const payload = {};
+    ADMIN_USER_IMPORT_COLUMNS.forEach((field) => {
+      const node = row.querySelector(`[data-field="${field}"]`);
+      payload[field] = node ? String(node.value || '').trim() : '';
+    });
+    return payload;
+  }).filter((item) => item.username || item.phone);
+}
+
+function openAdminUserBulkEditor() {
+  openAdminUserImportModal('bulk');
+}
+
+function openAdminUserImportModal(mode = 'bulk') {
+  const modal = document.getElementById('admin-user-import-modal');
+  const content = document.getElementById('admin-user-import-modal-content');
+  if (!modal || !content) return;
+  const isSingle = mode === 'single';
+  content.innerHTML = `
+    <div class="admin-modal-head">
+      <div>
+        <div class="admin-modal-title">${isSingle ? '新增用户' : '批量手工录入用户'}</div>
+        <div class="admin-modal-subtitle">Admin 可创建粉丝用户、大V 和 admin。批量录入风格参考在线表格。</div>
+      </div>
+      <button class="admin-modal-close" type="button" onclick="closeAdminUserImportModal()">×</button>
+    </div>
+    <div class="admin-modal-card">
+      <div class="admin-modal-card-title">录入表格</div>
+      <div class="feature-note" style="margin-bottom:10px">角色含义：investor = 粉丝用户，dav = 大V，admin = 管理员。</div>
+      <div style="overflow:auto">
+        <table>
+          <thead><tr><th>用户名</th><th>密码</th><th>手机号</th><th>角色</th><th>租户 slug</th><th>所属大V</th><th>状态</th><th>操作</th></tr></thead>
+          <tbody id="admin-user-import-tbody"></tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="addAdminUserImportRow()">新增一行</button>
+        <button class="btn-gold" type="button" style="padding:8px 14px;font-size:12px" onclick="submitAdminUserImportRows()">${isSingle ? '保存用户' : '批量创建用户'}</button>
+      </div>
+    </div>
+  `;
+  modal.classList.add('show');
+  addAdminUserImportRow(isSingle ? {role: 'investor', status: 'active'} : {role: 'investor', status: 'active'});
+  if (!isSingle) addAdminUserImportRow({role: 'investor', status: 'active'});
+}
+
+async function submitAdminUserImportRows() {
+  const users = collectAdminUserImportRows();
+  if (!users.length) {
+    showToast('请至少填写一行用户');
+    return;
+  }
   try {
-    const payload = JSON.parse(raw);
     const res = await fetch('/api/admin/users/import', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({users: payload}),
+      body: JSON.stringify({users}),
     });
     const data = await res.json();
     if (!res.ok || data.ok === false) throw new Error(data.error || 'import_users_failed');
     adminUsers = Array.isArray(data.users) ? data.users : adminUsers;
     renderAdminUsersTable();
-    showToast(`已导入 ${Array.isArray(data.created) ? data.created.length : 0} 个用户`);
+    closeAdminUserImportModal();
+    const skipped = Array.isArray(data.skipped) ? data.skipped.length : 0;
+    showToast(`已创建 ${Array.isArray(data.created) ? data.created.length : 0} 个用户${skipped ? `，跳过 ${skipped} 条` : ''}`);
   } catch (error) {
-    showToast('导入失败，请检查 JSON 格式');
+    showToast(error.message || '用户导入失败');
+  }
+}
+
+function downloadAdminUserTemplate() {
+  window.location.href = '/api/admin/users/template.csv';
+}
+
+function triggerAdminUserCsvImport() {
+  const input = document.getElementById('admin-user-csv-input');
+  if (input) input.click();
+}
+
+async function handleAdminUserCsvImport(file) {
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const res = await fetch('/api/admin/users/import-csv', {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok || data.ok === false) throw new Error(data.error || 'import_csv_failed');
+    adminUsers = Array.isArray(data.users) ? data.users : adminUsers;
+    renderAdminUsersTable();
+    const skipped = Array.isArray(data.skipped) ? data.skipped.length : 0;
+    showToast(`CSV 已导入 ${Array.isArray(data.created) ? data.created.length : 0} 个用户${skipped ? `，跳过 ${skipped} 条` : ''}`);
+  } catch (error) {
+    showToast(error.message || 'CSV 导入失败');
   }
 }
 
@@ -6584,6 +6848,22 @@ function isAdminFeatureEnabled(featureName) {
   return flags[featureName] !== false;
 }
 
+function refreshAdminNavVisibility() {
+  document.querySelectorAll('.admin-nav-item[data-feature]').forEach((node) => {
+    const featureName = node.dataset.feature;
+    node.style.display = isAdminFeatureEnabled(featureName) ? '' : 'none';
+  });
+  document.querySelectorAll('.admin-nav-group').forEach((group) => {
+    const items = Array.from(group.querySelectorAll('.admin-nav-item'));
+    const visibleItems = items.filter((item) => item.style.display !== 'none');
+    group.style.display = visibleItems.length ? '' : 'none';
+  });
+  const activeSection = document.querySelector('.admin-nav-item.active[data-section]');
+  if (activeSection && activeSection.style.display === 'none') {
+    showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
+  }
+}
+
 function ensureAdminTenants() {
   if (!Array.isArray(adminSiteConfig.tenants) || !adminSiteConfig.tenants.length) {
     adminSiteConfig.tenants = [];
@@ -6837,16 +7117,63 @@ function renderSiteConfigForm() {
   if (document.getElementById('brand-hero-tagline')) document.getElementById('brand-hero-tagline').value = brand.hero_tagline || '';
   if (document.getElementById('brand-hero-description')) document.getElementById('brand-hero-description').value = brand.hero_description || '';
   if (document.getElementById('brand-footer-description')) document.getElementById('brand-footer-description').value = brand.footer_description || '';
-  ['fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'vip', 'dm', 'workbench'].forEach(key => {
+  ['user_module', 'kol_module', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'vip', 'dm', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     if (checkbox) checkbox.checked = Boolean(flags[key]);
   });
-  const forecastNav = document.querySelector('.admin-nav-item[data-section="forecast-model"]');
-  if (forecastNav) forecastNav.style.display = isAdminFeatureEnabled('stock_forecast') ? '' : 'none';
+  refreshAdminNavVisibility();
   const forecastSection = document.getElementById('section-forecast-model');
   if (forecastSection && !isAdminFeatureEnabled('stock_forecast') && forecastSection.style.display !== 'none') {
     showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
   }
+  const usersSection = document.getElementById('section-users');
+  if (usersSection && !isAdminFeatureEnabled('user_module') && usersSection.style.display !== 'none') {
+    showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
+  }
+  const segmentsSection = document.getElementById('section-segments');
+  if (segmentsSection && !isAdminFeatureEnabled('vip') && segmentsSection.style.display !== 'none') {
+    showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
+  }
+  const pointsSection = document.getElementById('section-points');
+  if (pointsSection && !isAdminFeatureEnabled('vip') && pointsSection.style.display !== 'none') {
+    showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
+  }
+  const kolsSection = document.getElementById('section-kols');
+  if (kolsSection && !isAdminFeatureEnabled('kol_module') && kolsSection.style.display !== 'none') {
+    showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
+  }
+  const commissionSection = document.getElementById('section-commission');
+  if (commissionSection && !isAdminFeatureEnabled('kol_module') && commissionSection.style.display !== 'none') {
+    showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
+  }
+  const communitySection = document.getElementById('section-community');
+  if (communitySection && !isAdminFeatureEnabled('community') && communitySection.style.display !== 'none') {
+    showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
+  }
+  const eventsSection = document.getElementById('section-events');
+  if (eventsSection && !isAdminFeatureEnabled('community') && eventsSection.style.display !== 'none') {
+    showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
+  }
+  const hermesSection = document.getElementById('section-hermes');
+  if (hermesSection && !isAdminFeatureEnabled('hermes') && hermesSection.style.display !== 'none') {
+    showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
+  }
+  const channelsSection = document.getElementById('section-channels');
+  if (channelsSection && !isAdminFeatureEnabled('channel_module') && channelsSection.style.display !== 'none') {
+    showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
+  }
+  ['section-indicator-overview', 'section-indicator-smart', 'section-indicator-lake', 'section-indicator-anomalies', 'section-indicator-sources', 'section-indicator-definitions', 'section-indicator-pipeline'].forEach((id) => {
+    const section = document.getElementById(id);
+    if (section && !isAdminFeatureEnabled('analytics_module') && section.style.display !== 'none') {
+      showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
+    }
+  });
+  ['section-settings-appearance', 'section-settings-brand', 'section-settings-features', 'section-settings-policy', 'section-settings-knowledge', 'section-knowledge-items', 'section-settings-llm', 'section-token-usage', 'section-task-center', 'section-access'].forEach((id) => {
+    const section = document.getElementById(id);
+    if (section && !isAdminFeatureEnabled('system_module') && section.style.display !== 'none') {
+      showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
+    }
+  });
   renderAdminLlmRegistry();
   renderTenantConfigList();
 }
@@ -6880,7 +7207,7 @@ async function saveSiteConfig() {
   const knowledgePreviewToggle = document.getElementById('knowledge-user-preview-enabled');
   const tenants = ensureAdminTenants().map((tenant) => ({ ...tenant }));
   const llmRegistry = ensureAdminLlmRegistry();
-  ['fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'vip', 'dm', 'workbench'].forEach(key => {
+  ['user_module', 'kol_module', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'vip', 'dm', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     featureFlags[key] = Boolean(checkbox && checkbox.checked);
   });
@@ -7080,6 +7407,15 @@ document.addEventListener('DOMContentLoaded', () => {
   renderAdminTokenUsage();
   loadSiteConfig();
   loadAdminUsers();
+  const adminUserCsvInput = document.getElementById('admin-user-csv-input');
+  if (adminUserCsvInput && !adminUserCsvInput.dataset.bound) {
+    adminUserCsvInput.addEventListener('change', async (event) => {
+      const file = event.target.files && event.target.files[0];
+      await handleAdminUserCsvImport(file);
+      event.target.value = '';
+    });
+    adminUserCsvInput.dataset.bound = '1';
+  }
   renderAdminIndicatorHubAll();
   refreshAdminIndicatorHub(false);
   if (document.getElementById('section-access')) {
@@ -7087,6 +7423,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   const section = new URLSearchParams(window.location.search).get('section');
   if (section && analyticsTitles[section]) {
+    if (section === 'segment' && !isAdminFeatureEnabled('vip')) {
+      showSection('overview');
+      return;
+    }
+    if (!isAdminFeatureEnabled('analytics_module')) {
+      showSection('overview');
+      return;
+    }
     showAnalyticsSection(section);
     return;
   }
