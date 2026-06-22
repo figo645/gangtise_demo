@@ -5,8 +5,10 @@ import copy
 import math
 import statistics
 import time
+import threading
 import re
 import hashlib
+import base64
 from pathlib import Path
 from html import escape as html_escape
 from html.parser import HTMLParser
@@ -29,6 +31,30 @@ try:
     from sentence_transformers import SentenceTransformer
 except Exception:
     SentenceTransformer = None
+try:
+    from bs4 import BeautifulSoup
+except Exception:
+    BeautifulSoup = None
+try:
+    import pytesseract
+except Exception:
+    pytesseract = None
+try:
+    import fitz
+except Exception:
+    fitz = None
+try:
+    from PIL import Image
+except Exception:
+    Image = None
+try:
+    import docx
+except Exception:
+    docx = None
+try:
+    import openpyxl
+except Exception:
+    openpyxl = None
 
 app = Flask(__name__)
 app.config.update(
@@ -65,6 +91,12 @@ VOICE_UPLOAD_MAX_BYTES = int(os.environ.get("VOICE_UPLOAD_MAX_BYTES", str(25 * 1
 ALLOWED_AUDIO_EXTENSIONS = {".mp3", ".mp4", ".m4a", ".wav", ".webm", ".ogg", ".mpeg", ".mpga"}
 SITE_CONFIG_KEY = "site_config"
 FORECAST_WORKFLOW_KEY = "forecast_workflow_graph"
+INDICATOR_HUB_CACHE_TTL_SECONDS = max(0, int(os.environ.get("INDICATOR_HUB_CACHE_TTL_SECONDS", "30")))
+TASK_CENTER_POLL_INTERVAL_SECONDS = max(5, int(os.environ.get("TASK_CENTER_POLL_INTERVAL_SECONDS", "15")))
+TASK_CENTER_LOG_LIMIT = 80
+USER_ASYNC_JOB_POLL_INTERVAL_SECONDS = max(1, int(os.environ.get("USER_ASYNC_JOB_POLL_INTERVAL_SECONDS", "2")))
+USER_ASYNC_JOB_LOG_LIMIT = 80
+AUTO_INIT_DB_MODE = str(os.environ.get("AUTO_INIT_DB", "dev")).strip().lower()
 MARKET_DASHBOARD_REGISTRY_PATH = Path(
     os.environ.get(
         "MARKET_DASHBOARD_REGISTRY_PATH",
@@ -114,6 +146,15 @@ INDICATOR_SOURCE_FIELDS = {
     "last_tested_at",
     "last_test_detail",
 }
+_indicator_hub_cache = {"expires_at": 0.0, "value": None}
+_task_center_lock = threading.Lock()
+_task_center_thread = None
+_task_center_started = False
+_task_center_runtime = {}
+_user_async_job_lock = threading.Lock()
+_user_async_job_thread = None
+_user_async_job_started = False
+_user_async_job_runtime = {}
 
 
 class PgCompatCursor:
@@ -374,6 +415,9 @@ DEFAULT_SITE_CONFIG = {
     "voice_embedding": {
         "engine": "local",
     },
+    "knowledge_ingestion": {
+        "user_preview_enabled": False,
+    },
     "llm_registry": {
         "default_model_key": "",
         "models": [],
@@ -428,6 +472,182 @@ def normalize_llm_registry_config(source=None):
     return {
         "default_model_key": default_model_key,
         "models": models,
+    }
+
+
+def normalize_knowledge_ingestion_config(source=None):
+    raw = source if isinstance(source, dict) else {}
+    return {
+        "user_preview_enabled": bool(raw.get("user_preview_enabled", False)),
+    }
+
+
+def normalize_knowledge_processing_mode(value, skip_ai_processing=None):
+    mode = str(value or "").strip().lower()
+    if mode in {"none", "algorithm", "llm"}:
+        return mode
+    if skip_ai_processing is not None:
+        return "none" if bool(skip_ai_processing) else "llm"
+    return "algorithm"
+
+
+def _split_semantic_sentences(text):
+    raw = str(text or "").replace("\r", "\n")
+    parts = re.split(r"[\n。！？；;]+", raw)
+    return [part.strip(" \t-•*") for part in parts if str(part or "").strip(" \t-•*")]
+
+
+def build_algorithmic_knowledge_processing(raw_text, source_type="", title="", source_detail=""):
+    text = str(raw_text or "").strip()
+    sentences = _split_semantic_sentences(text)
+    if not sentences and text:
+        sentences = [text]
+    summary = "；".join(sentences[:3])[:220] if sentences else "暂无可提炼摘要。"
+    key_points = sentences[:3] or ["待补充关键要点"]
+    evidence = [item for item in sentences[3:6] if item] or key_points[:1]
+    validation_nodes = []
+    risk_points = []
+    for item in sentences:
+      if any(token in item for token in ("验证", "跟踪", "关注", "观察", "确认")) and len(validation_nodes) < 3:
+        validation_nodes.append(item)
+      if any(token in item for token in ("风险", "不确定", "波动", "警惕", "边界")) and len(risk_points) < 3:
+        risk_points.append(item)
+    if not validation_nodes:
+        validation_nodes = ["继续跟踪数据兑现、时间节点和市场反馈。"]
+    if not risk_points:
+        risk_points = ["需结合后续事实验证，避免把单次素材直接当成结论。"]
+    structured_sections = [
+        f"标题：{str(title or '未命名知识').strip() or '未命名知识'}",
+        f"来源：{str(source_detail or source_type or '原始输入').strip() or '原始输入'}",
+        f"核心结论：{summary}",
+        "关键要点：\n" + "\n".join(f"{index + 1}. {item}" for index, item in enumerate(key_points)),
+        "证据与上下文：\n" + "\n".join(f"{index + 1}. {item}" for index, item in enumerate(evidence)),
+        "验证节点：\n" + "\n".join(f"{index + 1}. {item}" for index, item in enumerate(validation_nodes[:3])),
+        "风险边界：\n" + "\n".join(f"{index + 1}. {item}" for index, item in enumerate(risk_points[:3])),
+    ]
+    rendered_text = "\n\n".join(structured_sections).strip()
+    return {
+        "mode": "algorithm",
+        "label": "算法加工",
+        "summary": summary,
+        "key_points": key_points,
+        "validation_nodes": validation_nodes[:3],
+        "risk_points": risk_points[:3],
+        "template_name": "semantic_outline_v1",
+        "rendered_text": rendered_text,
+    }
+
+
+def build_llm_knowledge_processing(raw_text, source_type="", title="", source_detail=""):
+    llm_model = get_default_llm_config(purpose="general")
+    if not llm_model:
+        raise RuntimeError("knowledge_processing_llm_not_configured")
+    safe_title = str(title or "未命名知识").strip() or "未命名知识"
+    safe_source = str(source_detail or source_type or "原始输入").strip() or "原始输入"
+    safe_text = str(raw_text or "").strip()
+    system_prompt = (
+        "你是知识加工助手。"
+        "请把原始材料加工成适合大V知识库沉淀的结构化内容。"
+        "输出必须使用中文，简洁、专业、避免编造。"
+    )
+    user_prompt = (
+        f"知识标题：{safe_title}\n"
+        f"来源：{safe_source}\n"
+        f"原始材料：\n{safe_text or '暂无原始材料'}\n\n"
+        "请严格按下面模板输出：\n"
+        "一、核心结论\n"
+        "二、关键要点（3条以内）\n"
+        "三、验证节点（3条以内）\n"
+        "四、风险边界（3条以内）\n"
+        "五、可直接入库正文"
+    )
+    rendered_text = call_openai_compatible_llm(llm_model, system_prompt, user_prompt)
+    sections = _split_semantic_sentences(rendered_text)
+    summary = "；".join(sections[:3])[:220] if sections else (rendered_text[:220] if rendered_text else "暂无摘要")
+    return {
+        "mode": "llm",
+        "label": "大模型加工",
+        "summary": summary,
+        "key_points": sections[:3] or ["待补充关键要点"],
+        "validation_nodes": [item for item in sections if any(token in item for token in ("验证", "跟踪", "观察", "确认"))][:3] or ["待补充验证节点"],
+        "risk_points": [item for item in sections if any(token in item for token in ("风险", "边界", "不确定", "警惕"))][:3] or ["待补充风险边界"],
+        "template_name": "llm_outline_v1",
+        "rendered_text": rendered_text,
+        "llm_model": {
+            "key": llm_model.get("key"),
+            "label": llm_model.get("label"),
+            "model_name": llm_model.get("model_name"),
+            "provider": llm_model.get("provider"),
+        },
+    }
+
+
+def build_knowledge_processing_result(raw_text, processing_mode="algorithm", source_type="", title="", source_detail=""):
+    normalized_mode = normalize_knowledge_processing_mode(processing_mode)
+    if normalized_mode == "none":
+        plain_text = str(raw_text or "").strip()
+        return {
+            "mode": "none",
+            "label": "不加工",
+            "summary": plain_text[:220] if plain_text else "保留原始输入，不做额外加工。",
+            "key_points": ["保留原始输入"],
+            "validation_nodes": [],
+            "risk_points": [],
+            "template_name": "raw_passthrough_v1",
+            "rendered_text": plain_text,
+        }
+    if normalized_mode == "llm":
+        return build_llm_knowledge_processing(raw_text, source_type=source_type, title=title, source_detail=source_detail)
+    return build_algorithmic_knowledge_processing(raw_text, source_type=source_type, title=title, source_detail=source_detail)
+
+
+def build_knowledge_sync_status(status_text="", sync_targets=None, queued_at="", synced_at="", failed_at=""):
+    raw = str(status_text or "").strip()
+    normalized = raw.lower()
+    targets = [str(item).strip() for item in (sync_targets if isinstance(sync_targets, list) else []) if str(item).strip()]
+    primary_target = targets[1] if len(targets) > 1 else (targets[0] if targets else "知识专区")
+    if "失败" in raw or "error" in normalized:
+        return {
+            "code": "failed",
+            "label": "同步失败",
+            "class_name": "syncing",
+            "detail": "原始内容已保留，等待重试同步",
+            "target": primary_target,
+            "queued_at": str(queued_at or "").strip(),
+            "synced_at": str(synced_at or "").strip(),
+            "failed_at": str(failed_at or "").strip(),
+        }
+    if "中" in raw or "pending" in normalized or "running" in normalized:
+        return {
+            "code": "syncing",
+            "label": "同步中",
+            "class_name": "syncing",
+            "detail": f"正在同步到 {primary_target} 与 Hermes",
+            "target": primary_target,
+            "queued_at": str(queued_at or "").strip(),
+            "synced_at": str(synced_at or "").strip(),
+            "failed_at": str(failed_at or "").strip(),
+        }
+    if raw:
+        return {
+            "code": "ready",
+            "label": "已同步",
+            "class_name": "ready",
+            "detail": f"已同步到 {primary_target} 与 Hermes",
+            "target": primary_target,
+            "queued_at": str(queued_at or "").strip(),
+            "synced_at": str(synced_at or queued_at or "").strip(),
+            "failed_at": str(failed_at or "").strip(),
+        }
+    return {
+        "code": "syncing",
+        "label": "待同步",
+        "class_name": "syncing",
+        "detail": f"等待同步到 {primary_target}",
+        "target": primary_target,
+        "queued_at": str(queued_at or "").strip(),
+        "synced_at": str(synced_at or "").strip(),
+        "failed_at": str(failed_at or "").strip(),
     }
 
 DEFAULT_FORECAST_TUNING = {
@@ -850,6 +1070,14 @@ def normalize_knowledge_hub_config(source, tenant):
         summary_text = str(item.get("summary") or "").strip()
         raw_input = str(item.get("raw_input") or item.get("body") or "").strip()
         notes = str(item.get("notes") or "").strip()
+        processing_mode = normalize_knowledge_processing_mode(
+            item.get("processing_mode"),
+            item.get("skip_ai_processing") if "skip_ai_processing" in item else None,
+        )
+        processed = item.get("processed_content") if isinstance(item.get("processed_content"), dict) else {}
+        queued_at = str(item.get("queued_at") or item.get("time") or "").strip()
+        synced_at = str(item.get("synced_at") or "").strip()
+        failed_at = str(item.get("failed_at") or "").strip()
         normalized_items.append({
             "id": str(item.get("id") or f"kb-{slugify_code(title, 'item')}-{index + 1}").strip() or f"kb-item-{index + 1}",
             "type": item_type,
@@ -870,6 +1098,25 @@ def normalize_knowledge_hub_config(source, tenant):
             "files": [str(name).strip() for name in (item.get("files") if isinstance(item.get("files"), list) else []) if str(name).strip()][:12],
             "url": str(item.get("url") or "").strip(),
             "voice_minutes": item.get("voice_minutes") if isinstance(item.get("voice_minutes"), int) else None,
+            "parse_meta": copy.deepcopy(item.get("parse_meta")) if isinstance(item.get("parse_meta"), (dict, list)) else None,
+            "processing_mode": processing_mode,
+            "processed_content": copy.deepcopy(processed) if processed else build_knowledge_processing_result(
+                raw_input,
+                processing_mode=processing_mode,
+                source_type=item_type,
+                title=title,
+                source_detail=str(item.get("source_detail") or "").strip(),
+            ),
+            "sync_status": build_knowledge_sync_status(
+                item.get("status"),
+                item.get("sync_targets") if isinstance(item.get("sync_targets"), list) else None,
+                queued_at=queued_at,
+                synced_at=synced_at,
+                failed_at=failed_at,
+            ),
+            "queued_at": queued_at,
+            "synced_at": synced_at,
+            "failed_at": failed_at,
             "body": str(item.get("body") or raw_input).strip(),
         })
     if not normalized_items:
@@ -1088,6 +1335,7 @@ def normalize_tenant_configs(source=None):
 def normalize_site_config(source=None):
     merged = _merge_site_config(copy.deepcopy(DEFAULT_SITE_CONFIG), source or {})
     merged["brand"] = normalize_brand_config(merged.get("brand"))
+    merged["knowledge_ingestion"] = normalize_knowledge_ingestion_config(merged.get("knowledge_ingestion"))
     merged["llm_registry"] = normalize_llm_registry_config(merged.get("llm_registry"))
     merged["tenants"] = normalize_tenant_configs(merged.get("tenants"))
     tenant_slugs = [tenant["slug"] for tenant in merged["tenants"]]
@@ -2733,6 +2981,7 @@ def save_indicator_definition(payload):
         ),
     )
     db.commit()
+    invalidate_indicator_hub_cache()
     return get_indicator_definition(normalized["indicator_code"])
 
 
@@ -2746,6 +2995,7 @@ def delete_indicator_definition(indicator_code):
     db.execute("DELETE FROM indicator_anomalies WHERE indicator_code = ?", (normalized_code,))
     db.execute("DELETE FROM indicator_kline_points WHERE indicator_code = ?", (normalized_code,))
     db.commit()
+    invalidate_indicator_hub_cache()
 
 
 def list_indicator_source_defs(indicator_code=None):
@@ -2827,6 +3077,7 @@ def save_indicator_source_def(payload):
         ),
     )
     db.commit()
+    invalidate_indicator_hub_cache()
     saved = get_indicator_source_def(normalized["source_code"])
     ensure_indicator_mapping_rule_for_source(saved)
     return saved
@@ -2838,6 +3089,7 @@ def delete_indicator_source_def(source_code):
     db.execute("DELETE FROM indicator_source_defs WHERE source_code = ?", (normalized_code,))
     db.execute("DELETE FROM indicator_source_tests WHERE source_code = ?", (normalized_code,))
     db.commit()
+    invalidate_indicator_hub_cache()
 
 
 def record_indicator_source_test(source_code, success, http_status=None, latency_ms=None, response_sample="", error_message=""):
@@ -2876,6 +3128,7 @@ def record_indicator_source_test(source_code, success, http_status=None, latency
         ),
     )
     db.commit()
+    invalidate_indicator_hub_cache()
 
 
 def list_indicator_source_tests(source_code=None, limit=20):
@@ -3072,6 +3325,7 @@ def save_indicator_mapping_rule(payload):
         ),
     )
     db.commit()
+    invalidate_indicator_hub_cache()
     return get_indicator_mapping_rule(normalized["rule_code"])
 
 
@@ -3102,6 +3356,7 @@ def delete_indicator_mapping_rule(rule_code):
     db = get_db()
     db.execute("DELETE FROM indicator_mapping_rules WHERE rule_code = ?", (slugify_code(rule_code, "rule"),))
     db.commit()
+    invalidate_indicator_hub_cache()
 
 
 def list_indicator_raw_records(source_code=None, limit=20):
@@ -3309,6 +3564,7 @@ def run_indicator_clean_job(source_code=None, rule_code=None, raw_record_id=None
         ),
     )
     db.commit()
+    invalidate_indicator_hub_cache()
     job_row = db.execute("SELECT * FROM indicator_clean_jobs WHERE job_code = ?", (job_code,)).fetchone()
     return dict(job_row) if job_row else None
 
@@ -3462,6 +3718,156 @@ def ensure_default_indicator_sources():
     for source in list_indicator_source_defs():
         ensure_indicator_mapping_rule_for_source(source)
     return imported
+
+
+def invalidate_indicator_hub_cache():
+    _indicator_hub_cache["expires_at"] = 0.0
+    _indicator_hub_cache["value"] = None
+
+
+def prepare_indicator_hub_store(force=False):
+    imported = ensure_default_indicator_sources()
+    real_sync = sync_real_indicator_history_from_market_cache(force=force)
+    derived_sync = sync_derived_smart_indicator_history(force=force)
+    mock_seed = seed_mock_indicator_lake(force=force)
+    invalidate_indicator_hub_cache()
+    return {
+        "imported_sources": imported,
+        "real_sync": real_sync,
+        "derived_sync": derived_sync,
+        "mock_seed": mock_seed,
+    }
+
+
+DEFAULT_ADMIN_TASKS = [
+    {
+        "task_code": "indicator_prepare",
+        "task_name": "指标中心预处理",
+        "task_group": "indicator",
+        "task_type": "prepare_indicator_hub",
+        "description": "补齐指标源定义，并同步真实历史、推导智能指标和模拟底仓。",
+        "schedule_type": "interval",
+        "schedule_value": "1800",
+        "enabled": 1,
+        "timeout_seconds": 900,
+    },
+    {
+        "task_code": "indicator_market_cache_sync",
+        "task_name": "市场缓存同步",
+        "task_group": "indicator",
+        "task_type": "sync_real_indicator_history",
+        "description": "从 market_dashboard 本地缓存同步真实因子历史到指标湖。",
+        "schedule_type": "interval",
+        "schedule_value": "3600",
+        "enabled": 1,
+        "timeout_seconds": 600,
+    },
+    {
+        "task_code": "indicator_mock_seed",
+        "task_name": "模拟指标补种",
+        "task_group": "indicator",
+        "task_type": "seed_mock_indicator_lake",
+        "description": "当真实数据缺失时补齐模拟指标底仓，避免前台空白。",
+        "schedule_type": "manual",
+        "schedule_value": "",
+        "enabled": 0,
+        "timeout_seconds": 600,
+    },
+    {
+        "task_code": "indicator_raw_landing",
+        "task_name": "指标原始数据落地",
+        "task_group": "indicator",
+        "task_type": "indicator_source_landing",
+        "description": "按 source 配置把样例或实时响应落到原始记录区。",
+        "schedule_type": "manual",
+        "schedule_value": "",
+        "enabled": 0,
+        "timeout_seconds": 600,
+    },
+    {
+        "task_code": "indicator_clean_pipeline",
+        "task_name": "指标清洗入湖",
+        "task_group": "indicator",
+        "task_type": "indicator_clean_pipeline",
+        "description": "把原始记录按映射规则标准化并写入指标湖。",
+        "schedule_type": "manual",
+        "schedule_value": "",
+        "enabled": 0,
+        "timeout_seconds": 600,
+    },
+    {
+        "task_code": "knowledge_sync_manual",
+        "task_name": "知识库同步入向量",
+        "task_group": "knowledge",
+        "task_type": "knowledge_manual_sync",
+        "description": "把文本知识同步到租户知识库和向量库，支持批量补录。",
+        "schedule_type": "manual",
+        "schedule_value": "",
+        "enabled": 0,
+        "timeout_seconds": 1200,
+    },
+    {
+        "task_code": "review_publish_embed",
+        "task_name": "纪要文本向量补录",
+        "task_group": "knowledge",
+        "task_type": "review_publish_embed",
+        "description": "把已有文本纪要补录到向量库，用于搜索和知识召回。",
+        "schedule_type": "manual",
+        "schedule_value": "",
+        "enabled": 0,
+        "timeout_seconds": 1200,
+    },
+    {
+        "task_code": "knowledge_query_batch",
+        "task_name": "知识检索批处理",
+        "task_group": "knowledge",
+        "task_type": "knowledge_query_batch",
+        "description": "按任务参数批量执行知识检索与可选的大模型回答，用于验证召回效果。",
+        "schedule_type": "manual",
+        "schedule_value": "",
+        "enabled": 0,
+        "timeout_seconds": 1200,
+    },
+]
+
+
+def normalize_admin_task_config(payload, existing=None):
+    base = dict(existing or {})
+    base.update(payload or {})
+    task_code = slugify_code(base.get("task_code"), "task")
+    schedule_type = str(base.get("schedule_type") or "manual").strip().lower()
+    if schedule_type not in {"manual", "interval"}:
+        schedule_type = "manual"
+    schedule_value = str(base.get("schedule_value") or "").strip()
+    try:
+        timeout_seconds = int(base.get("timeout_seconds") or 600)
+    except Exception:
+        timeout_seconds = 600
+    timeout_seconds = max(30, timeout_seconds)
+    return {
+        "task_code": task_code,
+        "task_name": str(base.get("task_name") or task_code).strip() or task_code,
+        "task_group": str(base.get("task_group") or "system").strip() or "system",
+        "task_type": str(base.get("task_type") or "manual").strip() or "manual",
+        "description": str(base.get("description") or "").strip(),
+        "task_params_json": json.dumps(base.get("task_params") if isinstance(base.get("task_params"), dict) else (safe_json_loads(base.get("task_params_json"), {}) if base.get("task_params_json") else {}), ensure_ascii=False),
+        "schedule_type": schedule_type,
+        "schedule_value": schedule_value,
+        "enabled": 1 if bool(base.get("enabled", True)) else 0,
+        "timeout_seconds": timeout_seconds,
+    }
+
+
+def parse_task_interval_seconds(task):
+    if not isinstance(task, dict):
+        return None
+    if str(task.get("schedule_type") or "").strip().lower() != "interval":
+        return None
+    try:
+        seconds = int(str(task.get("schedule_value") or "0").strip() or "0")
+    except Exception:
+        return None
+    return seconds if seconds > 0 else None
 
 
 def build_simulated_indicator_series(indicator_id, status="good", points=8):
@@ -4324,10 +4730,6 @@ def build_indicator_kline_from_rows(rows, anomalies):
 
 
 def build_indicator_hub_from_store():
-    ensure_default_indicator_sources()
-    sync_real_indicator_history_from_market_cache(force=False)
-    sync_derived_smart_indicator_history(force=False)
-    seed_mock_indicator_lake(force=False)
     definitions = list_indicator_definitions()
     source_map = {}
     for source in list_indicator_source_defs():
@@ -4481,9 +4883,21 @@ def build_indicator_hub_from_store():
     }
 
 
+def get_indicator_hub_from_store_cached(force_refresh=False):
+    now = time.time()
+    cached_value = _indicator_hub_cache.get("value")
+    expires_at = float(_indicator_hub_cache.get("expires_at") or 0.0)
+    if not force_refresh and cached_value is not None and now < expires_at:
+        return copy.deepcopy(cached_value)
+    hub = build_indicator_hub_from_store()
+    _indicator_hub_cache["value"] = copy.deepcopy(hub)
+    _indicator_hub_cache["expires_at"] = now + INDICATOR_HUB_CACHE_TTL_SECONDS
+    return copy.deepcopy(hub)
+
+
 def get_indicator_hub_snapshot():
     try:
-        return build_indicator_hub_from_store()
+        return get_indicator_hub_from_store_cached()
     except Exception as exc:
         if not is_db_unavailable_error(exc):
             raise
@@ -4671,7 +5085,7 @@ def build_data_lake_indicator_items():
 def build_indicator_hub(tenant=None, admin_view=False):
     tenant = tenant or get_tenant_by_slug()
     try:
-        hub = copy.deepcopy(build_indicator_hub_from_store())
+        hub = get_indicator_hub_from_store_cached()
     except Exception as exc:
         if not is_db_unavailable_error(exc):
             raise
@@ -5388,6 +5802,7 @@ def init_db():
     sql_dir = Path(__file__).resolve().parent / "sql" / "postgres"
     with get_app_db_connection() as conn:
         execute_sql_file(conn, sql_dir / "002_app_core_tables.sql")
+        execute_sql_file(conn, sql_dir / "003_admin_task_configs_task_params.sql")
         execute_sql_file(conn, sql_dir / "010_review_voice_embeddings.sql")
         execute_sql_file(conn, sql_dir / "011_review_voice_embeddings_alter_legacy_columns.sql")
         try:
@@ -5411,10 +5826,837 @@ def init_db_safe():
         app.logger.warning("Database unavailable during startup init, skipping init_db")
 
 
+def should_auto_init_db():
+    if AUTO_INIT_DB_MODE in {"1", "true", "yes", "on", "always"}:
+        return True
+    if AUTO_INIT_DB_MODE in {"0", "false", "no", "off", "never"}:
+        return False
+    if AUTO_INIT_DB_MODE == "dev":
+        return os.environ.get("DEBUG", "1").lower() in {"1", "true", "yes", "y"}
+    return False
+
+
+def startup_bootstrap():
+    if should_auto_init_db():
+        init_db_safe()
+    try:
+        with app.app_context():
+            ensure_default_admin_tasks()
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        app.logger.warning("Database unavailable during task-center init, skipping default tasks")
+    ensure_task_center_started()
+    ensure_user_async_job_worker_started()
+
+
 def get_db():
     if "db" not in g:
         g.db = PgCompatConnection(get_app_db_connection())
     return g.db
+
+
+def ensure_default_admin_tasks():
+    db = get_db()
+    timestamp = now_ts()
+    for raw in DEFAULT_ADMIN_TASKS:
+        item = normalize_admin_task_config(raw)
+        existing = db.execute(
+            "SELECT task_code FROM admin_task_configs WHERE task_code = ?",
+            (item["task_code"],),
+        ).fetchone()
+        if existing:
+            continue
+        db.execute(
+            """
+            INSERT INTO admin_task_configs (
+                task_code, task_name, task_group, task_type, description, task_params_json, schedule_type,
+                schedule_value, enabled, timeout_seconds, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                item["task_code"],
+                item["task_name"],
+                item["task_group"],
+                item["task_type"],
+                item["description"],
+                item["task_params_json"],
+                item["schedule_type"],
+                item["schedule_value"],
+                item["enabled"],
+                item["timeout_seconds"],
+                timestamp,
+                timestamp,
+            ),
+        )
+    db.commit()
+
+
+def row_to_admin_task_config(row):
+    item = dict(row)
+    item["enabled"] = bool(item.get("enabled"))
+    item["timeout_seconds"] = int(item.get("timeout_seconds") or 600)
+    item["task_params"] = safe_json_loads(item.get("task_params_json"), {})
+    return item
+
+
+def row_to_user_async_job(row):
+    item = dict(row)
+    item["payload"] = safe_json_loads(item.get("payload_json"), {})
+    item["result"] = safe_json_loads(item.get("result_json"), {})
+    item["progress_percent"] = int(item.get("progress_percent") or 0)
+    item["retry_count"] = int(item.get("retry_count") or 0)
+    return item
+
+
+def create_user_async_job(job_type, payload=None, tenant_slug="", entry_point="", owner_label="", trigger_source="user"):
+    payload = payload if isinstance(payload, dict) else {}
+    timestamp = now_ts()
+    job_code = f"{slugify_code(job_type, 'job')}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO user_async_jobs (
+            job_code, job_type, tenant_slug, entry_point, trigger_source, owner_label,
+            payload_json, status, progress_stage, progress_percent, summary,
+            error_message, result_json, retry_count, created_at, started_at, finished_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            job_code,
+            slugify_code(job_type, "job"),
+            str(tenant_slug or "").strip().lower(),
+            str(entry_point or "").strip(),
+            str(trigger_source or "user").strip(),
+            str(owner_label or "").strip(),
+            json.dumps(payload, ensure_ascii=False),
+            "pending",
+            "queued",
+            0,
+            "任务已进入队列",
+            "",
+            "{}",
+            0,
+            timestamp,
+            "",
+            "",
+            timestamp,
+        ),
+    )
+    db.commit()
+    return get_user_async_job(job_code)
+
+
+def get_user_async_job(job_code):
+    if not job_code:
+        return None
+    db = get_db()
+    row = db.execute(
+        "SELECT * FROM user_async_jobs WHERE job_code = ?",
+        (str(job_code).strip(),),
+    ).fetchone()
+    return row_to_user_async_job(row) if row else None
+
+
+def list_user_async_jobs(tenant_slug=None, status=None, job_type=None, limit=50):
+    db = get_db()
+    limit = max(1, min(int(limit or 50), USER_ASYNC_JOB_LOG_LIMIT))
+    filters = []
+    params = []
+    if tenant_slug:
+        filters.append("tenant_slug = ?")
+        params.append(str(tenant_slug).strip().lower())
+    if status:
+        filters.append("status = ?")
+        params.append(str(status).strip().lower())
+    if job_type:
+        filters.append("job_type = ?")
+        params.append(slugify_code(job_type, "job"))
+    where = f"WHERE {' AND '.join(filters)}" if filters else ""
+    rows = db.execute(
+        f"""
+        SELECT * FROM user_async_jobs
+        {where}
+        ORDER BY created_at DESC, id DESC
+        LIMIT ?
+        """,
+        params + [limit],
+    ).fetchall()
+    return [row_to_user_async_job(row) for row in rows]
+
+
+def update_user_async_job(job_code, **fields):
+    if not job_code or not fields:
+        return None
+    allowed = {
+        "status",
+        "progress_stage",
+        "progress_percent",
+        "summary",
+        "error_message",
+        "result_json",
+        "started_at",
+        "finished_at",
+        "retry_count",
+        "payload_json",
+    }
+    updates = []
+    params = []
+    for key, value in fields.items():
+        if key not in allowed:
+            continue
+        updates.append(f"{key} = ?")
+        params.append(value)
+    if not updates:
+        return get_user_async_job(job_code)
+    updates.append("updated_at = ?")
+    params.append(now_ts())
+    params.append(str(job_code).strip())
+    db = get_db()
+    db.execute(f"UPDATE user_async_jobs SET {', '.join(updates)} WHERE job_code = ?", params)
+    db.commit()
+    return get_user_async_job(job_code)
+
+
+def retry_user_async_job(job_code):
+    job = get_user_async_job(job_code)
+    if not job:
+        raise ValueError("job_not_found")
+    update_user_async_job(
+        job_code,
+        status="pending",
+        progress_stage="queued",
+        progress_percent=0,
+        summary="任务已重新排队",
+        error_message="",
+        result_json="{}",
+        started_at="",
+        finished_at="",
+        retry_count=int(job.get("retry_count") or 0) + 1,
+    )
+    return get_user_async_job(job_code)
+
+
+def _build_voice_file_storage_from_job_payload(payload):
+    raw_base64 = str(payload.get("audio_base64") or "").strip()
+    if not raw_base64:
+        raise ValueError("audio_payload_required")
+    try:
+        audio_bytes = base64.b64decode(raw_base64)
+    except Exception as exc:
+        raise ValueError("audio_payload_invalid") from exc
+    filename = str(payload.get("filename") or "review-audio.webm").strip() or "review-audio.webm"
+    content_type = str(payload.get("content_type") or "").strip()
+
+    class _MemoryUpload:
+        def __init__(self, data, upload_name, mimetype):
+            self._data = data
+            self.filename = upload_name
+            self.mimetype = mimetype
+
+        def read(self):
+            return self._data
+
+    return _MemoryUpload(audio_bytes, filename, content_type)
+
+
+def execute_user_async_job(job):
+    job_type = str(job.get("job_type") or "").strip()
+    payload = job.get("payload") if isinstance(job.get("payload"), dict) else {}
+    if job_type == "review_voice_transcribe":
+        file_storage = _build_voice_file_storage_from_job_payload(payload)
+        return process_review_voice_upload(
+            file_storage=file_storage,
+            tenant_slug=str(payload.get("tenant_slug") or "").strip().lower(),
+            review_period=str(payload.get("period") or "").strip().lower(),
+            entry_point=str(payload.get("entry_point") or "").strip().lower(),
+            speaker_name=str(payload.get("speaker_name") or "").strip(),
+            use_llm_enhancement=bool(payload.get("use_llm_enhancement")),
+        )
+    if job_type == "review_publish_embed":
+        return process_review_publish_text(
+            text=payload.get("text"),
+            tenant_slug=str(payload.get("tenant_slug") or "").strip().lower(),
+            review_period=str(payload.get("period") or "").strip().lower(),
+            entry_point=str(payload.get("entry_point") or "").strip().lower(),
+            speaker_name=str(payload.get("speaker_name") or "").strip(),
+            transcription_engine=str(payload.get("transcription_engine") or "manual").strip().lower() or "manual",
+            transcript_model=str(payload.get("transcript_model") or "manual_input").strip() or "manual_input",
+        )
+    if job_type == "knowledge_manual_sync":
+        return save_manual_knowledge_entry(
+            tenant_slug=str(payload.get("tenant_slug") or "").strip().lower(),
+            title=payload.get("title"),
+            summary=payload.get("summary"),
+            body=payload.get("body"),
+            raw_html=payload.get("raw_html"),
+            notes=payload.get("notes"),
+            notes_html=payload.get("notes_html"),
+            knowledge_id=payload.get("id"),
+            skip_ai_processing=bool(payload.get("skip_ai_processing", True)),
+            processing_mode=payload.get("processing_mode"),
+            knowledge_type=str(payload.get("knowledge_type") or "manual").strip().lower(),
+            source_label=payload.get("source_label"),
+            source_detail=payload.get("source_detail"),
+            tags=payload.get("tags"),
+            files=payload.get("files"),
+            source_url=payload.get("url"),
+            voice_minutes=payload.get("voice_minutes"),
+            parse_meta=payload.get("parse_meta"),
+        )
+    raise ValueError(f"unsupported_user_async_job_type:{job_type}")
+
+
+def _summarize_user_async_job_result(job_type, result):
+    if job_type == "review_voice_transcribe":
+        return "语音转写完成"
+    if job_type == "review_publish_embed":
+        return "复盘发布入向量完成"
+    if job_type == "knowledge_manual_sync":
+        return "知识入库同步完成"
+    return "任务执行完成"
+
+
+def build_user_async_jobs_payload(tenant_slug=None, status=None, job_type=None, limit=50):
+    jobs = list_user_async_jobs(tenant_slug=tenant_slug, status=status, job_type=job_type, limit=limit)
+    summary = {
+        "total": len(jobs),
+        "pending": sum(1 for item in jobs if item.get("status") == "pending"),
+        "running": sum(1 for item in jobs if item.get("status") == "running"),
+        "failed": sum(1 for item in jobs if item.get("status") == "failed"),
+        "success": sum(1 for item in jobs if item.get("status") == "success"),
+    }
+    return {"summary": summary, "jobs": jobs}
+
+
+def list_admin_task_configs():
+    ensure_default_admin_tasks()
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT * FROM admin_task_configs
+        ORDER BY task_group ASC, task_code ASC
+        """
+    ).fetchall()
+    return [row_to_admin_task_config(row) for row in rows]
+
+
+def get_admin_task_config(task_code):
+    if not task_code:
+        return None
+    ensure_default_admin_tasks()
+    db = get_db()
+    row = db.execute(
+        "SELECT * FROM admin_task_configs WHERE task_code = ?",
+        (slugify_code(task_code, "task"),),
+    ).fetchone()
+    return row_to_admin_task_config(row) if row else None
+
+
+def save_admin_task_config(payload):
+    normalized = normalize_admin_task_config(payload, existing=get_admin_task_config(payload.get("task_code")))
+    existing = get_admin_task_config(normalized["task_code"])
+    db = get_db()
+    timestamp = now_ts()
+    db.execute(
+        """
+        INSERT INTO admin_task_configs (
+            task_code, task_name, task_group, task_type, description, task_params_json, schedule_type,
+            schedule_value, enabled, timeout_seconds, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(task_code) DO UPDATE SET
+            task_name = excluded.task_name,
+            task_group = excluded.task_group,
+            task_type = excluded.task_type,
+            description = excluded.description,
+            task_params_json = excluded.task_params_json,
+            schedule_type = excluded.schedule_type,
+            schedule_value = excluded.schedule_value,
+            enabled = excluded.enabled,
+            timeout_seconds = excluded.timeout_seconds,
+            updated_at = excluded.updated_at
+        """,
+        (
+            normalized["task_code"],
+            normalized["task_name"],
+            normalized["task_group"],
+            normalized["task_type"],
+            normalized["description"],
+            normalized["task_params_json"],
+            normalized["schedule_type"],
+            normalized["schedule_value"],
+            normalized["enabled"],
+            normalized["timeout_seconds"],
+            existing["created_at"] if existing else timestamp,
+            timestamp,
+        ),
+    )
+    db.commit()
+    return get_admin_task_config(normalized["task_code"])
+
+
+def list_admin_task_runs(task_code=None, limit=50):
+    ensure_default_admin_tasks()
+    db = get_db()
+    limit = max(1, min(int(limit or 50), TASK_CENTER_LOG_LIMIT))
+    if task_code:
+        rows = db.execute(
+            """
+            SELECT * FROM admin_task_runs
+            WHERE task_code = ?
+            ORDER BY started_at DESC, id DESC
+            LIMIT ?
+            """,
+            (slugify_code(task_code, "task"), limit),
+        ).fetchall()
+    else:
+        rows = db.execute(
+            """
+            SELECT * FROM admin_task_runs
+            ORDER BY started_at DESC, id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def update_admin_task_status(task_code, **fields):
+    if not task_code or not fields:
+        return
+    db = get_db()
+    timestamp = now_ts()
+    allowed = {
+        "last_run_started_at",
+        "last_run_finished_at",
+        "last_run_status",
+        "last_run_message",
+        "last_run_duration_ms",
+        "last_next_run_at",
+        "last_error_at",
+        "last_error_message",
+    }
+    updates = []
+    params = []
+    for key, value in fields.items():
+        if key not in allowed:
+            continue
+        updates.append(f"{key} = ?")
+        params.append(value)
+    if not updates:
+        return
+    updates.append("updated_at = ?")
+    params.append(timestamp)
+    params.append(slugify_code(task_code, "task"))
+    db.execute(
+        f"UPDATE admin_task_configs SET {', '.join(updates)} WHERE task_code = ?",
+        params,
+    )
+    db.commit()
+
+
+def create_admin_task_run(task, trigger_mode="scheduler"):
+    db = get_db()
+    run_code = f"{task['task_code']}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+    timestamp = now_ts()
+    db.execute(
+        """
+        INSERT INTO admin_task_runs (
+            run_code, task_code, trigger_mode, run_status, started_at, finished_at,
+            duration_ms, summary, error_message, result_json, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            run_code,
+            task["task_code"],
+            trigger_mode,
+            "running",
+            timestamp,
+            "",
+            0,
+            "",
+            "",
+            "{}",
+            timestamp,
+        ),
+    )
+    db.commit()
+    update_admin_task_status(
+        task["task_code"],
+        last_run_started_at=timestamp,
+        last_run_status="running",
+        last_run_message=f"任务已开始（{trigger_mode}）",
+    )
+    return run_code
+
+
+def finish_admin_task_run(run_code, task_code, success, started_at_perf, summary="", error_message="", result=None):
+    db = get_db()
+    finished_at = now_ts()
+    duration_ms = int((time.perf_counter() - started_at_perf) * 1000)
+    run_status = "success" if success else "failed"
+    db.execute(
+        """
+        UPDATE admin_task_runs
+        SET run_status = ?, finished_at = ?, duration_ms = ?, summary = ?, error_message = ?, result_json = ?
+        WHERE run_code = ?
+        """,
+        (
+            run_status,
+            finished_at,
+            duration_ms,
+            (summary or "")[:500],
+            (error_message or "")[:2000],
+            json.dumps(result or {}, ensure_ascii=False)[:12000],
+            run_code,
+        ),
+    )
+    db.commit()
+    updates = {
+        "last_run_finished_at": finished_at,
+        "last_run_status": run_status,
+        "last_run_message": (summary or error_message or run_status)[:240],
+        "last_run_duration_ms": duration_ms,
+    }
+    if success:
+        updates["last_error_message"] = ""
+    else:
+        updates["last_error_at"] = finished_at
+        updates["last_error_message"] = (error_message or summary or "任务执行失败")[:500]
+    update_admin_task_status(task_code, **updates)
+
+
+def execute_admin_task_by_type(task_type, force=False):
+    if task_type == "prepare_indicator_hub":
+        return prepare_indicator_hub_store(force=force)
+    if task_type == "sync_real_indicator_history":
+        result = sync_real_indicator_history_from_market_cache(force=force)
+        invalidate_indicator_hub_cache()
+        return result
+    if task_type == "seed_mock_indicator_lake":
+        result = seed_mock_indicator_lake(force=force)
+        invalidate_indicator_hub_cache()
+        return result
+    raise ValueError(f"unsupported_task_type:{task_type}")
+
+
+def execute_admin_task(task, force=False):
+    task_type = task["task_type"]
+    params = task.get("task_params") if isinstance(task.get("task_params"), dict) else {}
+    if task_type in {"prepare_indicator_hub", "sync_real_indicator_history", "seed_mock_indicator_lake"}:
+        return execute_admin_task_by_type(task_type, force=force)
+    if task_type == "indicator_source_landing":
+        source_code = str(params.get("source_code") or "").strip()
+        if not source_code:
+            raise ValueError("task_source_code_required")
+        prefer_live = bool(params.get("prefer_live"))
+        return execute_indicator_source_landing(source_code=source_code, prefer_live=prefer_live or force)
+    if task_type == "indicator_clean_pipeline":
+        source_code = str(params.get("source_code") or "").strip() or None
+        rule_code = str(params.get("rule_code") or "").strip() or None
+        raw_record_id = params.get("raw_record_id")
+        if not source_code and not raw_record_id:
+            raise ValueError("task_source_code_or_raw_record_required")
+        return run_indicator_clean_job(source_code=source_code, rule_code=rule_code, raw_record_id=raw_record_id)
+    if task_type == "knowledge_manual_sync":
+        tenant_slug = str(params.get("tenant_slug") or "").strip().lower()
+        body = str(params.get("body") or "").strip()
+        if not tenant_slug:
+            raise ValueError("task_tenant_slug_required")
+        if not body:
+            raise ValueError("task_body_required")
+        return save_manual_knowledge_entry(
+            tenant_slug=tenant_slug,
+            title=params.get("title"),
+            summary=params.get("summary"),
+            body=body,
+            raw_html=params.get("raw_html"),
+            notes=params.get("notes"),
+            notes_html=params.get("notes_html"),
+            knowledge_id=params.get("knowledge_id"),
+            skip_ai_processing=bool(params.get("skip_ai_processing", True)),
+            processing_mode=params.get("processing_mode"),
+        )
+    if task_type == "review_publish_embed":
+        tenant_slug = str(params.get("tenant_slug") or "").strip().lower()
+        text = str(params.get("text") or "").strip()
+        if not tenant_slug:
+            raise ValueError("task_tenant_slug_required")
+        if not text:
+            raise ValueError("task_text_required")
+        return process_review_publish_text(
+            text=text,
+            tenant_slug=tenant_slug,
+            review_period=str(params.get("review_period") or "").strip(),
+            entry_point=str(params.get("entry_point") or "task_center").strip(),
+            speaker_name=str(params.get("speaker_name") or "").strip(),
+            transcription_engine=str(params.get("transcription_engine") or "manual").strip(),
+            transcript_model=str(params.get("transcript_model") or "manual_input").strip(),
+        )
+    if task_type == "knowledge_query_batch":
+        tenant_slug = str(params.get("tenant_slug") or "").strip().lower()
+        queries = params.get("queries")
+        if isinstance(queries, str):
+            queries = [item.strip() for item in re.split(r"[\n]+", queries) if item.strip()]
+        if not tenant_slug:
+            raise ValueError("task_tenant_slug_required")
+        if not isinstance(queries, list) or not queries:
+            raise ValueError("task_queries_required")
+        results = []
+        for query in queries[:20]:
+            results.append(
+                build_knowledge_query_response(
+                    tenant_slug=tenant_slug,
+                    query_text=str(query),
+                    limit=int(params.get("limit") or 5),
+                    submit_to_model=bool(params.get("submit_to_model")),
+                )
+            )
+        return {
+            "tenant_slug": tenant_slug,
+            "count": len(results),
+            "results": results,
+        }
+    raise ValueError(f"unsupported_task_type:{task_type}")
+
+
+def run_admin_task(task_code, trigger_mode="manual", force=False):
+    task = get_admin_task_config(task_code)
+    if not task:
+        raise ValueError("task_not_found")
+    start_perf = time.perf_counter()
+    run_code = create_admin_task_run(task, trigger_mode=trigger_mode)
+    try:
+        result = execute_admin_task(task, force=force)
+        summary = "任务执行完成"
+        if task["task_type"] == "prepare_indicator_hub":
+            summary = "指标中心预处理完成"
+        elif task["task_type"] == "sync_real_indicator_history":
+            summary = "真实历史同步完成"
+        elif task["task_type"] == "seed_mock_indicator_lake":
+            summary = "模拟指标补种完成"
+        elif task["task_type"] == "indicator_source_landing":
+            summary = "指标原始数据落地完成"
+        elif task["task_type"] == "indicator_clean_pipeline":
+            summary = "指标清洗入湖完成"
+        elif task["task_type"] == "knowledge_manual_sync":
+            summary = "知识库同步入向量完成"
+        elif task["task_type"] == "review_publish_embed":
+            summary = "纪要文本向量补录完成"
+        elif task["task_type"] == "knowledge_query_batch":
+            summary = "知识检索批处理完成"
+        finish_admin_task_run(run_code, task["task_code"], True, start_perf, summary=summary, result=result)
+        return {"run_code": run_code, "task": task, "summary": summary, "result": result}
+    except Exception as exc:
+        finish_admin_task_run(
+            run_code,
+            task["task_code"],
+            False,
+            start_perf,
+            summary="任务执行失败",
+            error_message=str(exc),
+            result={"error_type": type(exc).__name__},
+        )
+        raise
+
+
+def build_admin_task_center_payload():
+    tasks = list_admin_task_configs()
+    runs = list_admin_task_runs(limit=60)
+    user_jobs = list_user_async_jobs(limit=60)
+    now_ts_text = now_ts()
+    with _task_center_lock:
+        runtime = copy.deepcopy(_task_center_runtime)
+    with _user_async_job_lock:
+        user_job_runtime = copy.deepcopy(_user_async_job_runtime)
+    summary = {
+        "total": len(tasks),
+        "enabled": sum(1 for task in tasks if task.get("enabled")),
+        "running": sum(1 for task in tasks if str(task.get("last_run_status") or "") == "running"),
+        "failed": sum(1 for task in tasks if str(task.get("last_run_status") or "") == "failed"),
+        "now": now_ts_text,
+    }
+    return {
+        "summary": summary,
+        "tasks": tasks,
+        "runs": runs,
+        "runtime": runtime,
+        "user_jobs": user_jobs,
+        "user_job_runtime": user_job_runtime,
+    }
+
+
+def _task_should_run(task, now_epoch):
+    if not task.get("enabled"):
+        return False, None
+    interval_seconds = parse_task_interval_seconds(task)
+    if not interval_seconds:
+        return False, None
+    last_started = str(task.get("last_run_started_at") or "").strip()
+    if not last_started:
+        return True, interval_seconds
+    try:
+        last_dt = datetime.strptime(last_started, "%Y-%m-%d %H:%M:%S")
+        due = last_dt.timestamp() + interval_seconds
+    except Exception:
+        return True, interval_seconds
+    return now_epoch >= due, interval_seconds
+
+
+def _task_center_loop():
+    while True:
+        try:
+            with app.app_context():
+                tasks = list_admin_task_configs()
+                now_epoch = time.time()
+                next_run_map = {}
+                for task in tasks:
+                    should_run, interval_seconds = _task_should_run(task, now_epoch)
+                    if interval_seconds:
+                        if task.get("last_run_started_at"):
+                            try:
+                                last_dt = datetime.strptime(task["last_run_started_at"], "%Y-%m-%d %H:%M:%S")
+                                next_run_map[task["task_code"]] = datetime.fromtimestamp(last_dt.timestamp() + interval_seconds).strftime("%Y-%m-%d %H:%M:%S")
+                            except Exception:
+                                next_run_map[task["task_code"]] = ""
+                        else:
+                            next_run_map[task["task_code"]] = now_ts()
+                        update_admin_task_status(task["task_code"], last_next_run_at=next_run_map[task["task_code"]])
+                    if not should_run:
+                        continue
+                    run_admin_task(task["task_code"], trigger_mode="scheduler", force=False)
+                with _task_center_lock:
+                    _task_center_runtime["last_poll_at"] = now_ts()
+                    _task_center_runtime["tasks_seen"] = len(tasks)
+        except Exception as exc:
+            with _task_center_lock:
+                _task_center_runtime["last_poll_error"] = str(exc)
+                _task_center_runtime["last_poll_at"] = now_ts()
+        time.sleep(TASK_CENTER_POLL_INTERVAL_SECONDS)
+
+
+def ensure_task_center_started():
+    global _task_center_thread, _task_center_started
+    if _task_center_started:
+        return
+    with _task_center_lock:
+        if _task_center_started:
+            return
+        _task_center_thread = threading.Thread(target=_task_center_loop, name="admin-task-center", daemon=True)
+        _task_center_thread.start()
+        _task_center_started = True
+        _task_center_runtime["started_at"] = now_ts()
+
+
+def _claim_next_user_async_job():
+    conn = get_app_db_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT id, job_code
+                FROM user_async_jobs
+                WHERE status = 'pending'
+                ORDER BY created_at ASC, id ASC
+                FOR UPDATE SKIP LOCKED
+                LIMIT 1
+                """
+            )
+            row = cur.fetchone()
+            if not row:
+                conn.rollback()
+                return None
+            started_at = now_ts()
+            cur.execute(
+                """
+                UPDATE user_async_jobs
+                SET status = %s,
+                    progress_stage = %s,
+                    progress_percent = %s,
+                    summary = %s,
+                    started_at = %s,
+                    updated_at = %s
+                WHERE id = %s
+                """,
+                ("running", "processing", 15, "任务开始执行", started_at, started_at, row["id"]),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    with app.app_context():
+        return get_user_async_job(row["job_code"])
+
+
+def _complete_user_async_job(job_code, success, summary="", result=None, error_message=""):
+    with app.app_context():
+        update_user_async_job(
+            job_code,
+            status="success" if success else "failed",
+            progress_stage="completed" if success else "failed",
+            progress_percent=100 if success else 100,
+            summary=(summary or ("任务执行完成" if success else "任务执行失败"))[:240],
+            error_message=(error_message or "")[:2000],
+            result_json=json.dumps(result or {}, ensure_ascii=False)[:20000],
+            finished_at=now_ts(),
+        )
+
+
+def _user_async_job_loop():
+    while True:
+        try:
+            job = _claim_next_user_async_job()
+            if not job:
+                with _user_async_job_lock:
+                    _user_async_job_runtime["last_poll_at"] = now_ts()
+                    _user_async_job_runtime["queue_state"] = "idle"
+                time.sleep(USER_ASYNC_JOB_POLL_INTERVAL_SECONDS)
+                continue
+            with _user_async_job_lock:
+                _user_async_job_runtime["last_poll_at"] = now_ts()
+                _user_async_job_runtime["queue_state"] = "running"
+                _user_async_job_runtime["current_job_code"] = job.get("job_code")
+                _user_async_job_runtime["current_job_type"] = job.get("job_type")
+            with app.app_context():
+                update_user_async_job(job["job_code"], progress_stage="processing", progress_percent=45, summary="任务处理中")
+                result = execute_user_async_job(job)
+                summary = _summarize_user_async_job_result(job.get("job_type"), result)
+                _complete_user_async_job(job["job_code"], True, summary=summary, result=result)
+        except Exception as exc:
+            current_job_code = ""
+            with _user_async_job_lock:
+                current_job_code = str(_user_async_job_runtime.get("current_job_code") or "")
+                _user_async_job_runtime["last_error_at"] = now_ts()
+                _user_async_job_runtime["last_error_message"] = str(exc)
+            if current_job_code:
+                _complete_user_async_job(
+                    current_job_code,
+                    False,
+                    summary="任务执行失败",
+                    result={"error_type": type(exc).__name__},
+                    error_message=str(exc),
+                )
+            else:
+                app.logger.exception("User async job loop failed without claimed job")
+                time.sleep(USER_ASYNC_JOB_POLL_INTERVAL_SECONDS)
+        finally:
+            with _user_async_job_lock:
+                _user_async_job_runtime["last_poll_at"] = now_ts()
+                _user_async_job_runtime["current_job_code"] = ""
+                _user_async_job_runtime["current_job_type"] = ""
+
+
+def ensure_user_async_job_worker_started():
+    global _user_async_job_thread, _user_async_job_started
+    if _user_async_job_started:
+        return
+    with _user_async_job_lock:
+        if _user_async_job_started:
+            return
+        _user_async_job_thread = threading.Thread(target=_user_async_job_loop, name="user-async-jobs", daemon=True)
+        _user_async_job_thread.start()
+        _user_async_job_started = True
+        _user_async_job_runtime["started_at"] = now_ts()
+        _user_async_job_runtime["queue_state"] = "booting"
 
 
 def _merge_site_config(base, override):
@@ -5652,6 +6894,116 @@ def call_openai_compatible_llm(model_config, system_prompt, user_prompt):
     if not content:
         raise RuntimeError("empty_llm_response")
     return content
+
+
+def _is_truthy_flag(value):
+    return str(value or "").strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def enhance_review_voice_transcript_with_llm(transcript, entry_point="", speaker_name=""):
+    normalized_transcript = str(transcript or "").strip()
+    if not normalized_transcript:
+        raise ValueError("empty_transcript")
+    llm_model = get_default_llm_config(purpose="general")
+    if not llm_model:
+        raise RuntimeError("llm_model_unavailable")
+    context_label = "语音转写增强"
+    if entry_point:
+        context_label = f"{context_label} · {entry_point}"
+    speaker_label = str(speaker_name or "").strip() or "未命名用户"
+    system_prompt = (
+        "你是一个中文语音纪要整理助手。"
+        "请基于原始转写内容做轻量增强整理，去掉明显口语噪音和重复，修复少量语病，"
+        "保留原始事实、观点、风险提示与不确定性，不要补充原文没有提到的信息，不要编造数字。"
+        "输出纯文本，优先按自然段组织；如果原文明显包含多个观点，可以拆成短段。"
+    )
+    user_prompt = (
+        f"场景：{context_label}\n"
+        f"说话人：{speaker_label}\n"
+        "请输出更适合后续知识入库或文案编辑的整理稿。"
+        "如果原始转写已经足够清晰，只做最少改动。\n\n"
+        f"原始转写：\n{normalized_transcript}"
+    )
+    enhanced_text = call_openai_compatible_llm(llm_model, system_prompt, user_prompt)
+    normalized_enhanced = str(enhanced_text or "").strip()
+    if not normalized_enhanced:
+        raise RuntimeError("empty_llm_response")
+    return {
+        "text": normalized_enhanced,
+        "model": {
+            "key": llm_model.get("key"),
+            "label": llm_model.get("label"),
+            "provider": llm_model.get("provider"),
+            "model_name": llm_model.get("model_name"),
+            "purpose": llm_model.get("purpose"),
+        },
+    }
+
+
+def generate_review_draft_with_llm(
+    source_text,
+    review_period="",
+    source_mode="",
+    prompt_text="",
+    prompt_tags=None,
+    selected_watchlist=None,
+    speaker_name="",
+    entry_point="",
+):
+    normalized_source = str(source_text or "").strip()
+    if not normalized_source:
+        raise ValueError("review_source_text_required")
+    llm_model = get_default_llm_config(purpose="general")
+    if not llm_model:
+        raise RuntimeError("review_draft_llm_not_configured")
+    period_label_map = {
+        "day": "日复盘",
+        "week": "周复盘",
+        "month": "月复盘",
+        "quarter": "季复盘",
+        "knowledge": "知识整理",
+    }
+    review_period_key = str(review_period or "").strip().lower()
+    source_mode_key = str(source_mode or "").strip().lower()
+    speaker_label = str(speaker_name or "").strip() or "未命名大V"
+    watchlist_items = [str(item).strip() for item in (selected_watchlist or []) if str(item).strip()]
+    tag_items = [str(item).strip() for item in (prompt_tags or []) if str(item).strip()]
+    prompt_value = str(prompt_text or "").strip()
+    system_prompt = (
+        "你是一个中文投研复盘编辑助手。"
+        "请把输入材料整理成适合直接发布前预览的完整复盘草稿。"
+        "必须保留原始观点、风险提示和不确定性，不要编造事实、数字或结论。"
+        "输出纯文本，用自然段组织；优先按市场主线、行业判断、重点个股、验证节点和风险提示展开。"
+        "语言要专业、清晰、克制，避免空话和宣传语。"
+    )
+    user_prompt = "\n".join([
+        f"复盘周期：{period_label_map.get(review_period_key, review_period_key or '未指定')}",
+        f"输入来源：{source_mode_key or 'unknown'}",
+        f"作者身份：{speaker_label}",
+        f"触发入口：{entry_point or 'unknown'}",
+        f"关注股票：{'、'.join(watchlist_items) if watchlist_items else '未指定'}",
+        f"附加标签：{'、'.join(tag_items) if tag_items else '无'}",
+        f"改写规则：{prompt_value or '无，请按专业复盘风格整理'}",
+        "",
+        "请直接输出最终复盘草稿，不要解释你的处理过程，不要输出标题前缀如“以下是整理结果”。",
+        "",
+        "原始材料：",
+        normalized_source,
+    ])
+    rendered_text = call_openai_compatible_llm(llm_model, system_prompt, user_prompt)
+    normalized_text = str(rendered_text or "").strip()
+    if not normalized_text:
+        raise RuntimeError("empty_llm_response")
+    return {
+        "text": normalized_text,
+        "llm_model": {
+            "key": llm_model.get("key"),
+            "label": llm_model.get("label"),
+            "provider": llm_model.get("provider"),
+            "model_name": llm_model.get("model_name"),
+            "purpose": llm_model.get("purpose"),
+        },
+    }
 
 
 def get_review_vector_db_connection():
@@ -6163,64 +7515,144 @@ def _store_knowledge_embedding_record(
     }
 
 
-def save_manual_knowledge_entry(tenant_slug, title="", summary="", body="", raw_html="", notes="", notes_html="", knowledge_id="", skip_ai_processing=True):
+def save_manual_knowledge_entry(
+    tenant_slug,
+    title="",
+    summary="",
+    body="",
+    raw_html="",
+    notes="",
+    notes_html="",
+    knowledge_id="",
+    skip_ai_processing=True,
+    knowledge_type="manual",
+    source_label="",
+    source_detail="",
+    tags=None,
+    files=None,
+    source_url="",
+    voice_minutes=None,
+    parse_meta=None,
+    processing_mode="algorithm",
+):
     tenant = get_tenant_by_slug(tenant_slug)
     if not tenant or tenant.get("slug") != tenant_slug:
         raise ValueError("tenant_not_found")
-    normalized_title = str(title or "").strip() or "最新文本知识整理"
-    normalized_summary = str(summary or "").strip() or "已通过纯文本方式沉淀知识内容。"
+    normalized_type = str(knowledge_type or "manual").strip().lower()
+    if normalized_type not in {"voice", "file", "url", "manual"}:
+        normalized_type = "manual"
+    normalized_title = str(title or "").strip() or (
+        "最新语音纪要整理" if normalized_type == "voice"
+        else "最新文件资料整理" if normalized_type == "file"
+        else "网页资料提炼" if normalized_type == "url"
+        else "最新文本知识整理"
+    )
+    normalized_summary = str(summary or "").strip() or (
+        "已通过语音方式沉淀知识内容。" if normalized_type == "voice"
+        else "已通过文件方式沉淀知识内容。" if normalized_type == "file"
+        else "已通过网页资料沉淀知识内容。" if normalized_type == "url"
+        else "已通过纯文本方式沉淀知识内容。"
+    )
     normalized_body = str(body or "").strip() or normalized_summary
+    normalized_source_label = str(source_label or "").strip() or (
+        "语音输入" if normalized_type == "voice"
+        else "文件上传" if normalized_type == "file"
+        else "网页 URL" if normalized_type == "url"
+        else "纯文本编写"
+    )
+    normalized_source_detail = str(source_detail or "").strip() or (
+        f"来源：语音转写 · {int(voice_minutes or 6)}分钟" if normalized_type == "voice"
+        else f"来源：文件上传 · {' / '.join([str(item).strip() for item in (files or []) if str(item).strip()][:4]) or '未命名文件'}" if normalized_type == "file"
+        else f"来源：网页 URL · {source_url or 'example.com'}" if normalized_type == "url"
+        else f"来源：纯文本编写 · {max(1, len(normalized_body))}字"
+    )
+    normalized_processing_mode = normalize_knowledge_processing_mode(processing_mode, skip_ai_processing)
+    processed_content = build_knowledge_processing_result(
+        normalized_body,
+        processing_mode=normalized_processing_mode,
+        source_type=normalized_type,
+        title=normalized_title,
+        source_detail=normalized_source_detail,
+    )
+    processed_summary = str(processed_content.get("summary") or normalized_summary).strip() or normalized_summary
+    processed_body = str(processed_content.get("rendered_text") or normalized_body).strip() or normalized_body
     embedding_cfg = get_voice_embedding_config()
     embedding, embedding_engine, embedding_model = build_text_embedding(
-        f"{normalized_title}\n\n{normalized_summary}\n\n{normalized_body}",
+        f"{normalized_title}\n\n{processed_summary}\n\n{processed_body}",
         engine=embedding_cfg.get("engine", "api"),
     )
     vector_namespace = build_vector_namespace(embedding_engine, embedding_model)
-    source_detail = f"来源：纯文本编写 · {max(1, len(normalized_body))}字"
-    next_id = str(knowledge_id or f"kb-manual-{int(time.time() * 1000)}").strip()
+    next_id = str(knowledge_id or f"kb-{normalized_type}-{int(time.time() * 1000)}").strip()
+    normalized_tags = [str(tag).strip() for tag in (tags if isinstance(tags, list) else []) if str(tag).strip()][:8]
+    if not normalized_tags:
+        normalized_tags = (
+            ["语音纪要", "方法框架"] if normalized_type == "voice"
+            else ["PDF", "框架资料"] if normalized_type == "file"
+            else ["网页资料", "外部来源"] if normalized_type == "url"
+            else ["手动编写", "观点沉淀"]
+        )
+    normalized_files = [str(name).strip() for name in (files if isinstance(files, list) else []) if str(name).strip()][:12]
     vector_record = _store_knowledge_embedding_record(
         tenant_slug=tenant_slug,
         knowledge_id=next_id,
-        knowledge_type="manual",
+        knowledge_type=normalized_type,
         title=normalized_title,
-        summary=normalized_summary,
-        body_text=normalized_body,
-        source_detail=source_detail,
+        summary=processed_summary,
+        body_text=processed_body,
+        source_detail=normalized_source_detail,
         vector_namespace=vector_namespace,
         embedding=embedding,
         embedding_engine=embedding_engine,
         embedding_model=embedding_model,
         metadata={
             "notes": str(notes or "").strip(),
-            "source": "纯文本编写",
-            "skip_ai_processing": bool(skip_ai_processing),
+            "source": normalized_source_label,
+            "skip_ai_processing": normalized_processing_mode == "none",
+            "processing_mode": normalized_processing_mode,
+            "files": normalized_files,
+            "url": str(source_url or "").strip(),
+            "voice_minutes": int(voice_minutes or 0) if normalized_type == "voice" else None,
         },
     )
     current_hub = resolve_tenant_knowledge_hub(tenant, tenant.get("knowledge_hub_config"))
     items = copy.deepcopy(current_hub.get("items") or [])
     entry = {
         "id": next_id,
-        "type": "manual",
+        "type": normalized_type,
         "title": normalized_title,
-        "source": "纯文本编写",
-        "source_detail": source_detail,
+        "source": normalized_source_label,
+        "source_detail": normalized_source_detail,
         "status": "已同步 Hermes",
-        "summary": normalized_summary,
-        "tags": ["手动编写", "观点沉淀"],
+        "summary": processed_summary,
+        "tags": normalized_tags,
         "raw_input": normalized_body,
         "raw_html": str(raw_html or "").strip(),
-        "key_points": [segment.strip() for segment in re.split(r"[。；;\\n]+", normalized_summary) if segment.strip()][:3] or ["待补充关键要点"],
-        "validation_nodes": ["待补充验证节点"],
+        "key_points": [str(point).strip() for point in (processed_content.get("key_points") if isinstance(processed_content.get("key_points"), list) else []) if str(point).strip()][:8] or ["待补充关键要点"],
+        "validation_nodes": [str(point).strip() for point in (processed_content.get("validation_nodes") if isinstance(processed_content.get("validation_nodes"), list) else []) if str(point).strip()][:8] or ["待补充验证节点"],
         "sync_targets": ["租户知识队列", "知识专区", "Hermes 上下文", "向量知识库"],
         "tuning_focus": ["补充摘要", "补充验证节点", "继续细化表达"],
-        "notes": str(notes or "纯文本知识已入库，可继续补充结构化要点。").strip(),
+        "notes": str(notes or "知识已入库，可继续补充结构化要点。").strip(),
         "notes_html": str(notes_html or "").strip(),
-        "files": [],
-        "url": "",
-        "skip_ai_processing": bool(skip_ai_processing),
-        "body": normalized_body,
+        "files": normalized_files,
+        "url": str(source_url or "").strip(),
+        "skip_ai_processing": normalized_processing_mode == "none",
+        "processing_mode": normalized_processing_mode,
+        "voice_minutes": int(voice_minutes or 0) if normalized_type == "voice" else None,
+        "parse_meta": copy.deepcopy(parse_meta) if isinstance(parse_meta, (dict, list)) else None,
+        "processed_content": processed_content,
+        "body": processed_body,
         "vector_record": vector_record,
+        "queued_at": str(vector_record.get("created_at") or now_ts()).strip(),
+        "synced_at": str(vector_record.get("created_at") or now_ts()).strip(),
+        "failed_at": "",
     }
+    entry["sync_status"] = build_knowledge_sync_status(
+        entry.get("status"),
+        entry.get("sync_targets"),
+        queued_at=entry.get("queued_at"),
+        synced_at=entry.get("synced_at"),
+        failed_at=entry.get("failed_at"),
+    )
     replaced = False
     for index, item in enumerate(items):
         if str(item.get("id") or "") == next_id:
@@ -6252,6 +7684,19 @@ def _build_live_knowledge_entry_from_record(record, config_item=None):
     metadata = record.get("metadata_json") if isinstance(record.get("metadata_json"), dict) else {}
     summary_text = str(record.get("summary") or config_item.get("summary") or "").strip()
     body_text = str(record.get("body_text") or config_item.get("body") or config_item.get("raw_input") or summary_text).strip()
+    processing_mode = normalize_knowledge_processing_mode(
+        config_item.get("processing_mode"),
+        metadata.get("skip_ai_processing", config_item.get("skip_ai_processing", True)),
+    )
+    processed_content = config_item.get("processed_content") if isinstance(config_item.get("processed_content"), dict) else None
+    if not processed_content:
+        processed_content = build_knowledge_processing_result(
+            body_text or str(config_item.get("raw_input") or "").strip(),
+            processing_mode=processing_mode,
+            source_type=item_type,
+            title=str(record.get("title") or config_item.get("title") or "知识内容").strip(),
+            source_detail=str(record.get("source_detail") or config_item.get("source_detail") or "").strip(),
+        )
     source_text = str(
         config_item.get("source")
         or metadata.get("source")
@@ -6260,6 +7705,9 @@ def _build_live_knowledge_entry_from_record(record, config_item=None):
     notes_text = str(config_item.get("notes") or metadata.get("notes") or "知识已进入向量库，可继续补充结构化信息。").strip()
     title_text = str(record.get("title") or config_item.get("title") or "知识内容").strip() or "知识内容"
     created_at = record.get("created_at")
+    queued_at = str(config_item.get("queued_at") or (created_at.strftime("%Y-%m-%d %H:%M:%S") if hasattr(created_at, "strftime") else str(created_at or ""))).strip()
+    synced_at = str(config_item.get("synced_at") or (created_at.strftime("%Y-%m-%d %H:%M:%S") if hasattr(created_at, "strftime") else str(created_at or ""))).strip()
+    failed_at = str(config_item.get("failed_at") or "").strip()
     return {
         "id": str(record.get("knowledge_id") or config_item.get("id") or "").strip() or f"kb-live-{record.get('id')}",
         "type": item_type,
@@ -6286,8 +7734,21 @@ def _build_live_knowledge_entry_from_record(record, config_item=None):
         "notes_html": str(config_item.get("notes_html") or "").strip(),
         "files": [str(name).strip() for name in (config_item.get("files") if isinstance(config_item.get("files"), list) else []) if str(name).strip()][:12],
         "url": str(config_item.get("url") or "").strip(),
-        "skip_ai_processing": bool(metadata.get("skip_ai_processing", config_item.get("skip_ai_processing", True))),
+        "skip_ai_processing": processing_mode == "none",
+        "processing_mode": processing_mode,
         "voice_minutes": config_item.get("voice_minutes") if isinstance(config_item.get("voice_minutes"), int) else None,
+        "parse_meta": copy.deepcopy(config_item.get("parse_meta")) if isinstance(config_item.get("parse_meta"), (dict, list)) else None,
+        "processed_content": copy.deepcopy(processed_content) if isinstance(processed_content, dict) else None,
+        "sync_status": build_knowledge_sync_status(
+            config_item.get("status") or "已同步 Hermes",
+            config_item.get("sync_targets") if isinstance(config_item.get("sync_targets"), list) else None,
+            queued_at=queued_at,
+            synced_at=synced_at,
+            failed_at=failed_at,
+        ),
+        "queued_at": queued_at,
+        "synced_at": synced_at,
+        "failed_at": failed_at,
         "body": body_text,
         "time": created_at.strftime("%Y-%m-%d %H:%M") if hasattr(created_at, "strftime") else str(created_at or ""),
         "vector_record": {
@@ -6364,6 +7825,25 @@ def fetch_live_knowledge_hub(tenant, limit=80):
         "summary": config_hub.get("summary") or "知识库支持语音、文件、URL 和纯文本四种入口。",
         "items": items,
     }
+
+
+def list_admin_knowledge_items(tenant_slug="", limit=120):
+    site_config = get_site_config()
+    tenants = get_tenant_configs(site_config)
+    target_slug = str(tenant_slug or "").strip().lower()
+    selected_tenants = [tenant for tenant in tenants if not target_slug or tenant.get("slug") == target_slug]
+    results = []
+    for tenant in selected_tenants:
+        hub = fetch_live_knowledge_hub(tenant, limit=limit)
+        for item in hub.get("items") or []:
+            if not isinstance(item, dict):
+                continue
+            row = copy.deepcopy(item)
+            row["tenant_slug"] = tenant.get("slug") or ""
+            row["tenant_name"] = tenant.get("name") or tenant.get("slug") or ""
+            results.append(row)
+    results.sort(key=lambda item: str(item.get("time") or item.get("vector_record", {}).get("created_at") or ""), reverse=True)
+    return results[:max(1, int(limit or 120))]
 
 
 def _cosine_similarity(vec_a, vec_b):
@@ -6547,7 +8027,7 @@ def build_knowledge_query_response(tenant_slug, query_text, limit=5, submit_to_m
     }
 
 
-def process_review_voice_upload(file_storage, tenant_slug="", review_period="", entry_point="", speaker_name=""):
+def process_review_voice_upload(file_storage, tenant_slug="", review_period="", entry_point="", speaker_name="", use_llm_enhancement=False):
     if file_storage is None:
         raise ValueError("audio_file_required")
     safe_name = _safe_audio_filename(getattr(file_storage, "filename", ""))
@@ -6567,10 +8047,36 @@ def process_review_voice_upload(file_storage, tenant_slug="", review_period="", 
         engine=transcription_cfg.get("engine", "local"),
     )
     transcript_model = LOCAL_WHISPER_MODEL_SIZE if transcript_engine == "local" else OPENAI_AUDIO_MODEL
+    raw_transcript = str(transcript or "").strip()
+    enhanced_transcript = ""
+    llm_enhanced = False
+    llm_notice = ""
+    llm_model_info = None
+    if use_llm_enhancement and raw_transcript:
+        try:
+            llm_result = enhance_review_voice_transcript_with_llm(
+                raw_transcript,
+                entry_point=entry_point,
+                speaker_name=speaker_name,
+            )
+            enhanced_transcript = str(llm_result.get("text") or "").strip()
+            llm_model_info = llm_result.get("model")
+            llm_enhanced = bool(enhanced_transcript)
+            if llm_enhanced:
+                llm_notice = "已完成基础转写，并由大模型整理为更适合编辑和入库的文本。"
+        except Exception as exc:
+            llm_notice = f"已完成基础转写，但大模型增强失败，已回退原始转写：{str(exc)}"
     return {
-        "transcript": transcript,
+        "transcript": raw_transcript,
+        "display_transcript": enhanced_transcript or raw_transcript,
+        "raw_transcript": raw_transcript,
+        "enhanced_transcript": enhanced_transcript,
         "transcript_engine": transcript_engine,
         "transcript_model": transcript_model,
+        "llm_enhancement_requested": bool(use_llm_enhancement),
+        "llm_enhanced": llm_enhanced,
+        "llm_notice": llm_notice,
+        "llm_model": llm_model_info,
     }
 
 
@@ -6617,6 +8123,288 @@ def process_review_manual_text(text, tenant_slug="", review_period="", entry_poi
         "text": normalized_text,
         "transcription_engine": "manual",
         "transcript_model": "manual_input",
+    }
+
+
+def _extract_text_from_html(html_text):
+    if not str(html_text or "").strip():
+        return ""
+    if BeautifulSoup is not None:
+        soup = BeautifulSoup(html_text, "html.parser")
+        for tag in soup(["script", "style", "noscript"]):
+            tag.extract()
+        return re.sub(r"\n{3,}", "\n\n", soup.get_text("\n", strip=True)).strip()
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", str(html_text))).strip()
+
+
+def _extract_title_from_html(html_text, fallback="网页资料提炼"):
+    if BeautifulSoup is not None and str(html_text or "").strip():
+        soup = BeautifulSoup(html_text, "html.parser")
+        title = ""
+        if soup.title and soup.title.string:
+            title = str(soup.title.string).strip()
+        if not title:
+            og = soup.find("meta", attrs={"property": "og:title"}) or soup.find("meta", attrs={"name": "title"})
+            if og and og.get("content"):
+                title = str(og.get("content")).strip()
+        if title:
+            return title[:120]
+    return str(fallback or "网页资料提炼").strip() or "网页资料提炼"
+
+
+def fetch_url_preview(url):
+    normalized_url = str(url or "").strip()
+    if not normalized_url:
+        raise ValueError("url_required")
+    parsed = urlsplit(normalized_url)
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError("url_scheme_invalid")
+    request_obj = Request(
+        normalized_url,
+        headers={
+            "User-Agent": "Mozilla/5.0 GangtiseDemoBot/1.0",
+            "Accept": "text/html,application/xhtml+xml",
+        },
+    )
+    with urlopen(request_obj, timeout=10) as resp:
+        raw_bytes = resp.read()
+        content_type = str(resp.headers.get("Content-Type") or "")
+    html_text = raw_bytes.decode("utf-8", errors="ignore")
+    title = _extract_title_from_html(html_text, fallback=parsed.netloc or "网页资料提炼")
+    plain_text = _extract_text_from_html(html_text)
+    summary = plain_text[:280] if plain_text else f"已抓取 {parsed.netloc or normalized_url}，可继续提炼行业主线、关键数据与验证节点。"
+    return {
+        "url": normalized_url,
+        "domain": parsed.netloc or "",
+        "title": title,
+        "summary": summary,
+        "body": plain_text[:12000],
+        "content_type": content_type,
+        "extraction_modes": ["html_text"],
+        "ocr_used": False,
+    }
+
+
+def _extract_text_from_docx_bytes(file_bytes):
+    if docx is None:
+        return {"text": "", "stats": {"tables_found": 0, "ocr_pages": 0, "images_found": 0, "pages_processed": 0}}
+    from io import BytesIO
+    document = docx.Document(BytesIO(file_bytes))
+    lines = [str(paragraph.text or "").strip() for paragraph in document.paragraphs if str(paragraph.text or "").strip()]
+    table_count = 0
+    for table in document.tables:
+        table_rows = []
+        for row in table.rows:
+            cells = [str(cell.text or "").strip() for cell in row.cells if str(cell.text or "").strip()]
+            if cells:
+                table_rows.append(" | ".join(cells))
+        if table_rows:
+            table_count += 1
+            lines.append("[table]")
+            lines.extend(table_rows)
+    image_ocr_parts = []
+    image_count = 0
+    rels = getattr(document.part, "rels", {})
+    for rel in rels.values():
+        target_ref = str(getattr(rel, "target_ref", "") or "")
+        if "image" not in target_ref:
+            continue
+        image_count += 1
+        try:
+            image_bytes = rel.target_part.blob
+        except Exception:
+            continue
+        ocr_text = _extract_ocr_text_from_image_bytes(image_bytes)
+        if ocr_text:
+            image_ocr_parts.append(ocr_text)
+    if image_ocr_parts:
+        lines.append("[ocr_images]")
+        lines.extend(image_ocr_parts)
+    return {
+        "text": "\n".join(lines).strip(),
+        "stats": {
+            "tables_found": table_count,
+            "ocr_pages": len(image_ocr_parts),
+            "images_found": image_count,
+            "pages_processed": 0,
+        },
+    }
+
+
+def _extract_text_from_xlsx_bytes(file_bytes):
+    if openpyxl is None:
+        return {"text": "", "stats": {"tables_found": 0, "ocr_pages": 0, "images_found": 0, "pages_processed": 0}}
+    from io import BytesIO
+    workbook = openpyxl.load_workbook(BytesIO(file_bytes), data_only=True)
+    lines = []
+    rows_read = 0
+    for sheet in workbook.worksheets[:3]:
+        lines.append(f"[sheet] {sheet.title}")
+        for row in sheet.iter_rows(min_row=1, max_row=min(sheet.max_row, 20), values_only=True):
+            values = [str(cell).strip() for cell in row if cell is not None and str(cell).strip()]
+            if values:
+                lines.append(" | ".join(values))
+                rows_read += 1
+    return {
+        "text": "\n".join(lines).strip(),
+        "stats": {
+            "tables_found": 1 if rows_read else 0,
+            "ocr_pages": 0,
+            "images_found": 0,
+            "pages_processed": min(len(workbook.worksheets), 3),
+        },
+    }
+
+
+def _extract_text_from_pdf_bytes(file_bytes):
+    if fitz is None:
+        return {"text": "", "stats": {"tables_found": 0, "ocr_pages": 0, "images_found": 0, "pages_processed": 0}, "page_summaries": []}
+    text_parts = []
+    table_parts = []
+    ocr_parts = []
+    tables_found = 0
+    page_summaries = []
+    pages_processed = 0
+    document = fitz.open(stream=file_bytes, filetype="pdf")
+    try:
+        for page in document[: min(document.page_count, 8)]:
+            pages_processed += 1
+            page_text = str(page.get_text("text") or "").strip()
+            if page_text:
+                text_parts.append(page_text)
+            if hasattr(page, "find_tables"):
+                try:
+                    tables = page.find_tables()
+                    for table in getattr(tables, "tables", [])[:3]:
+                        extracted = table.extract()
+                        if not extracted:
+                            continue
+                        tables_found += 1
+                        table_parts.append("[table]")
+                        for row in extracted[:20]:
+                            cells = [str(cell).strip() for cell in (row or []) if str(cell or "").strip()]
+                            if cells:
+                                table_parts.append(" | ".join(cells))
+                except Exception:
+                    continue
+            if not page_text:
+                ocr_text = _extract_ocr_text_from_pdf_page(page)
+                if ocr_text:
+                    ocr_parts.append(ocr_text)
+                    page_text = ocr_text
+            page_summaries.append({
+                "page": pages_processed,
+                "summary": str(page_text or "").replace("\n", " ")[:200],
+                "used_ocr": bool(not str(page.get_text("text") or "").strip() and str(page_text or "").strip()),
+            })
+    finally:
+        document.close()
+    merged = [part.strip() for part in text_parts if str(part).strip()]
+    if table_parts:
+        merged.extend(table_parts)
+    if ocr_parts:
+        merged.append("[ocr]")
+        merged.extend([part.strip() for part in ocr_parts if str(part).strip()])
+    return {
+        "text": "\n".join(merged).strip(),
+        "stats": {
+            "tables_found": tables_found,
+            "ocr_pages": len(ocr_parts),
+            "images_found": 0,
+            "pages_processed": pages_processed,
+        },
+        "page_summaries": page_summaries,
+    }
+
+
+def _run_tesseract_on_image(image):
+    if pytesseract is None or Image is None or image is None:
+        return ""
+    try:
+        return str(pytesseract.image_to_string(image, lang="chi_sim+eng") or "").strip()
+    except Exception:
+        try:
+            return str(pytesseract.image_to_string(image, lang="eng") or "").strip()
+        except Exception:
+            return ""
+
+
+def _extract_ocr_text_from_pdf_page(page):
+    if fitz is None or Image is None:
+        return ""
+    try:
+        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
+        mode = "RGB" if pix.n < 4 else "RGBA"
+        image = Image.frombytes(mode, [pix.width, pix.height], pix.samples)
+        return _run_tesseract_on_image(image)
+    except Exception:
+        return ""
+
+
+def _extract_ocr_text_from_image_bytes(file_bytes):
+    if Image is None:
+        return ""
+    from io import BytesIO
+    try:
+        image = Image.open(BytesIO(file_bytes))
+    except Exception:
+        return ""
+    return _run_tesseract_on_image(image)
+
+
+def extract_text_from_uploaded_file(file_storage):
+    if file_storage is None:
+        raise ValueError("file_required")
+    filename = str(getattr(file_storage, "filename", "") or "").strip() or "upload.bin"
+    suffix = Path(filename).suffix.lower()
+    file_bytes = file_storage.read() or b""
+    if not file_bytes:
+        raise ValueError("empty_file")
+    text = ""
+    extraction_modes = []
+    stats = {"tables_found": 0, "ocr_pages": 0, "images_found": 0, "pages_processed": 0}
+    page_summaries = []
+    if suffix in {".txt", ".md", ".csv"}:
+        text = file_bytes.decode("utf-8", errors="ignore")
+        extraction_modes.append("plain_text")
+    elif suffix in {".html", ".htm"}:
+        text = _extract_text_from_html(file_bytes.decode("utf-8", errors="ignore"))
+        extraction_modes.append("html_text")
+    elif suffix == ".docx":
+        payload = _extract_text_from_docx_bytes(file_bytes)
+        text = payload.get("text") or ""
+        stats = payload.get("stats") or stats
+        extraction_modes.append("docx_paragraphs_tables")
+    elif suffix in {".xlsx", ".xlsm"}:
+        payload = _extract_text_from_xlsx_bytes(file_bytes)
+        text = payload.get("text") or ""
+        stats = payload.get("stats") or stats
+        extraction_modes.append("xlsx_cells")
+    elif suffix == ".pdf":
+        payload = _extract_text_from_pdf_bytes(file_bytes)
+        text = payload.get("text") or ""
+        stats = payload.get("stats") or stats
+        page_summaries = payload.get("page_summaries") or []
+        extraction_modes.append("pdf_text_tables_ocr")
+    elif suffix in {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".webp"}:
+        text = _extract_ocr_text_from_image_bytes(file_bytes)
+        extraction_modes.append("image_ocr")
+        stats["ocr_pages"] = 1 if text else 0
+        stats["images_found"] = 1
+    else:
+        text = file_bytes.decode("utf-8", errors="ignore")
+        extraction_modes.append("fallback_decode")
+    text = str(text or "").strip()
+    summary = text[:280] if text else f"已接收文件 {filename}，可继续补充摘要与验证节点。"
+    return {
+        "filename": filename,
+        "suffix": suffix,
+        "body": text[:12000],
+        "summary": summary,
+        "extraction_modes": extraction_modes,
+        "ocr_used": any("ocr" in mode for mode in extraction_modes),
+        "parse_stats": stats,
+        "page_summaries": page_summaries[:8],
     }
 
 
@@ -6830,6 +8618,7 @@ def admin():
     try:
         access_stats = get_access_summary()
         indicator_hub = build_indicator_hub(admin_view=True)
+        task_center = build_admin_task_center_payload()
     except Exception as exc:
         if not is_db_unavailable_error(exc):
             raise
@@ -6839,15 +8628,18 @@ def admin():
             tenant=get_tenant_by_slug(get_default_tenant_slug(site_config), site_config),
             admin_view=True,
         )
+        task_center = {"summary": {"total": 0, "enabled": 0, "running": 0, "failed": 0, "now": now_ts()}, "tasks": [], "runs": [], "runtime": {}}
     return render_template(
         "admin.html",
         kols=kols,
         segments=segments,
         access_stats=access_stats,
         indicator_hub=indicator_hub,
+        task_center=task_center,
         brand=get_platform_brand(site_config),
         tenants=get_tenant_configs(site_config),
         default_tenant=get_tenant_by_slug(get_default_tenant_slug(site_config), site_config),
+        site_config=site_config,
     )
 
 @app.route("/kol-workbench")
@@ -6914,27 +8706,46 @@ def api_review_voice_transcribe():
     review_period = str(request.form.get("period") or "").strip().lower()
     entry_point = str(request.form.get("entry_point") or "").strip().lower() or "unknown"
     speaker_name = str(request.form.get("speaker_name") or "").strip()
+    use_llm_enhancement = _is_truthy_flag(request.form.get("use_llm_enhancement"))
     try:
-        result = process_review_voice_upload(
-            file_storage=audio_file,
+        if audio_file is None:
+            raise ValueError("audio_file_required")
+        raw_bytes = audio_file.read() or b""
+        if not raw_bytes:
+            raise ValueError("empty_audio_file")
+        if len(raw_bytes) > VOICE_UPLOAD_MAX_BYTES:
+            raise ValueError("audio_file_too_large")
+        payload = {
+            "tenant_slug": tenant_slug,
+            "period": review_period,
+            "entry_point": entry_point,
+            "speaker_name": speaker_name,
+            "use_llm_enhancement": use_llm_enhancement,
+            "filename": getattr(audio_file, "filename", "") or f"review-{int(time.time())}.webm",
+            "content_type": getattr(audio_file, "mimetype", "") or "",
+            "audio_base64": base64.b64encode(raw_bytes).decode("ascii"),
+        }
+        job = create_user_async_job(
+            "review_voice_transcribe",
+            payload=payload,
             tenant_slug=tenant_slug,
-            review_period=review_period,
             entry_point=entry_point,
-            speaker_name=speaker_name,
+            owner_label=speaker_name,
         )
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     except RuntimeError as exc:
         return jsonify({"success": False, "error": str(exc)}), 503
     except Exception:
-        app.logger.exception("Failed to process review voice upload")
+        app.logger.exception("Failed to queue review voice upload")
         return jsonify({"success": False, "error": "review_voice_transcribe_failed"}), 500
     return jsonify(
         {
             "success": True,
-            "transcript": result["transcript"],
-            "transcript_engine": result["transcript_engine"],
-            "transcript_model": result["transcript_model"],
+            "async": True,
+            "job_code": job["job_code"],
+            "job_status": job["status"],
+            "message": "语音已提交处理，正在后台转写" + (" 并准备做大模型增强" if use_llm_enhancement else ""),
         }
     )
 
@@ -6971,30 +8782,41 @@ def api_review_manual_embed():
 def api_review_publish_embed():
     body = request.get_json(silent=True) or {}
     try:
-        result = process_review_publish_text(
-            text=body.get("text"),
-            tenant_slug=str(body.get("tenant_slug") or "").strip().lower(),
-            review_period=str(body.get("period") or "").strip().lower(),
-            entry_point=str(body.get("entry_point") or "").strip().lower() or "unknown",
-            speaker_name=str(body.get("speaker_name") or "").strip(),
-            transcription_engine=str(body.get("transcription_engine") or "manual").strip().lower() or "manual",
-            transcript_model=str(body.get("transcript_model") or "manual_input").strip() or "manual_input",
+        tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
+        entry_point = str(body.get("entry_point") or "").strip().lower() or "unknown"
+        speaker_name = str(body.get("speaker_name") or "").strip()
+        payload = {
+            "text": body.get("text"),
+            "tenant_slug": tenant_slug,
+            "period": str(body.get("period") or "").strip().lower(),
+            "entry_point": entry_point,
+            "speaker_name": speaker_name,
+            "transcription_engine": str(body.get("transcription_engine") or "manual").strip().lower() or "manual",
+            "transcript_model": str(body.get("transcript_model") or "manual_input").strip() or "manual_input",
+        }
+        if not str(payload.get("text") or "").strip():
+            raise ValueError("publish_text_required")
+        job = create_user_async_job(
+            "review_publish_embed",
+            payload=payload,
+            tenant_slug=tenant_slug,
+            entry_point=entry_point,
+            owner_label=speaker_name,
         )
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     except RuntimeError as exc:
         return jsonify({"success": False, "error": str(exc)}), 503
     except Exception:
-        app.logger.exception("Failed to process review publish text")
+        app.logger.exception("Failed to queue review publish text")
         return jsonify({"success": False, "error": "review_publish_embed_failed"}), 500
     return jsonify(
         {
             "success": True,
-            "text": result["text"],
-            "vector_record": result["record"],
-            "transcript_engine": result["transcription_engine"],
-            "embedding_engine": result["embedding_engine"],
-            "embedding_model": result["embedding_model"],
+            "async": True,
+            "job_code": job["job_code"],
+            "job_status": job["status"],
+            "message": "复盘已提交发布，正在后台入向量库",
         }
     )
 
@@ -7117,9 +8939,72 @@ def api_admin_access_logs():
     return jsonify([dict(r) for r in rows])
 
 
+@app.route("/api/admin/tasks")
+def api_admin_tasks():
+    return jsonify({"ok": True, **build_admin_task_center_payload()})
+
+
+@app.route("/api/admin/tasks", methods=["POST"])
+def api_save_admin_task():
+    body = request.get_json(silent=True) or {}
+    try:
+        task = save_admin_task_config(body)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "task": task, **build_admin_task_center_payload()})
+
+
+@app.route("/api/admin/tasks/<task_code>/run", methods=["POST"])
+def api_run_admin_task(task_code):
+    body = request.get_json(silent=True) or {}
+    force = bool(body.get("force"))
+    try:
+        result = run_admin_task(task_code, trigger_mode="manual", force=force)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+    return jsonify({"ok": True, "result": result, **build_admin_task_center_payload()})
+
+
+@app.route("/api/admin/task-runs")
+def api_admin_task_runs():
+    task_code = str(request.args.get("task_code") or "").strip() or None
+    limit = min(int(request.args.get("limit", 50)), TASK_CENTER_LOG_LIMIT)
+    return jsonify({"ok": True, "runs": list_admin_task_runs(task_code=task_code, limit=limit)})
+
+
+@app.route("/api/admin/user-jobs")
+def api_admin_user_jobs():
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower() or None
+    status = str(request.args.get("status") or "").strip().lower() or None
+    job_type = str(request.args.get("job_type") or "").strip().lower() or None
+    limit = min(int(request.args.get("limit", 60)), USER_ASYNC_JOB_LOG_LIMIT)
+    return jsonify({"ok": True, **build_user_async_jobs_payload(tenant_slug=tenant_slug, status=status, job_type=job_type, limit=limit)})
+
+
+@app.route("/api/jobs/<job_code>")
+def api_get_user_async_job(job_code):
+    job = get_user_async_job(job_code)
+    if not job:
+        return jsonify({"ok": False, "error": "job_not_found"}), 404
+    return jsonify({"ok": True, "job": job})
+
+
+@app.route("/api/jobs/<job_code>/retry", methods=["POST"])
+def api_retry_user_async_job(job_code):
+    try:
+        job = retry_user_async_job(job_code)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+    return jsonify({"ok": True, "job": job})
+
+
 @app.route("/api/admin/indicator-hub")
 def api_admin_indicator_hub():
-    return jsonify({"ok": True, "hub": build_indicator_hub_from_store()})
+    return jsonify({"ok": True, "hub": get_indicator_hub_from_store_cached()})
 
 
 @app.route("/api/admin/indicator-definitions")
@@ -7439,6 +9324,11 @@ def api_admin_site_config():
                     )
                 ).strip().lower() or "local"
             },
+            "knowledge_ingestion": normalize_knowledge_ingestion_config(
+                payload.get("knowledge_ingestion")
+                if isinstance(payload.get("knowledge_ingestion"), dict)
+                else current.get("knowledge_ingestion")
+            ),
             "llm_registry": normalize_llm_registry_config(
                 payload.get("llm_registry")
                 if isinstance(payload.get("llm_registry"), dict)
@@ -8333,32 +10223,130 @@ def api_save_kol_manual_knowledge():
     body = request.get_json(silent=True) or {}
     tenant_slug = str(body.get("tenant_slug") or request.args.get("tenant") or "").strip().lower()
     try:
-        result = save_manual_knowledge_entry(
+        payload = {
+            "tenant_slug": tenant_slug,
+            "title": body.get("title"),
+            "summary": body.get("summary"),
+            "body": body.get("body"),
+            "raw_html": body.get("raw_html"),
+            "notes": body.get("notes"),
+            "notes_html": body.get("notes_html"),
+            "id": body.get("id"),
+            "skip_ai_processing": bool(body.get("skip_ai_processing", True)),
+            "processing_mode": body.get("processing_mode"),
+        }
+        if not tenant_slug:
+            raise ValueError("tenant_not_found")
+        if not str(payload.get("body") or payload.get("summary") or "").strip():
+            raise ValueError("knowledge_body_required")
+        job = create_user_async_job(
+            "knowledge_manual_sync",
+            payload=payload,
             tenant_slug=tenant_slug,
-            title=body.get("title"),
-            summary=body.get("summary"),
-            body=body.get("body"),
-            raw_html=body.get("raw_html"),
-            notes=body.get("notes"),
-            notes_html=body.get("notes_html"),
-            knowledge_id=body.get("id"),
-            skip_ai_processing=bool(body.get("skip_ai_processing", True)),
+            entry_point="knowledge_manual",
+            owner_label="knowledge_manual",
         )
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except RuntimeError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 503
     except Exception:
-        app.logger.exception("Failed to save manual knowledge entry")
+        app.logger.exception("Failed to queue manual knowledge entry")
         return jsonify({"ok": False, "error": "knowledge_manual_save_failed"}), 500
     return jsonify({
         "ok": True,
-        "entry": result["entry"],
-        "knowledge_hub": result["knowledge_hub"],
-        "vector_record": result["vector_record"],
-        "embedding_engine": result["embedding_engine"],
-        "embedding_model": result["embedding_model"],
+        "async": True,
+        "job_code": job["job_code"],
+        "job_status": job["status"],
+        "message": "知识已提交处理，正在后台同步",
     })
+
+
+@app.route("/api/kol/knowledge/ingest", methods=["POST"])
+def api_ingest_kol_knowledge():
+    body = request.get_json(silent=True) or {}
+    tenant_slug = str(body.get("tenant_slug") or request.args.get("tenant") or "").strip().lower()
+    knowledge_type = str(body.get("knowledge_type") or "manual").strip().lower()
+    if knowledge_type not in {"voice", "file", "url", "manual"}:
+        return jsonify({"ok": False, "error": "knowledge_type_invalid"}), 400
+    payload = {
+        "tenant_slug": tenant_slug,
+        "knowledge_type": knowledge_type,
+        "title": body.get("title"),
+        "summary": body.get("summary"),
+        "body": body.get("body"),
+        "raw_html": body.get("raw_html"),
+        "notes": body.get("notes"),
+        "notes_html": body.get("notes_html"),
+        "id": body.get("id"),
+        "skip_ai_processing": bool(body.get("skip_ai_processing", True)),
+        "processing_mode": body.get("processing_mode"),
+        "source_label": body.get("source_label"),
+        "source_detail": body.get("source_detail"),
+        "tags": body.get("tags"),
+        "files": body.get("files"),
+        "url": body.get("url"),
+        "voice_minutes": body.get("voice_minutes"),
+        "parse_meta": body.get("parse_meta"),
+    }
+    if not tenant_slug:
+        return jsonify({"ok": False, "error": "tenant_not_found"}), 400
+    if not str(payload.get("body") or payload.get("summary") or "").strip():
+        return jsonify({"ok": False, "error": "knowledge_body_required"}), 400
+    try:
+        job = create_user_async_job(
+            "knowledge_manual_sync",
+            payload=payload,
+            tenant_slug=tenant_slug,
+            entry_point=f"knowledge_{knowledge_type}",
+            owner_label=f"knowledge_{knowledge_type}",
+        )
+    except Exception:
+        app.logger.exception("Failed to queue knowledge ingest")
+        return jsonify({"ok": False, "error": "knowledge_ingest_failed"}), 500
+    return jsonify({
+        "ok": True,
+        "async": True,
+        "job_code": job["job_code"],
+        "job_status": job["status"],
+        "message": "知识已提交处理，正在后台同步",
+    })
+
+
+@app.route("/api/admin/knowledge-items")
+def api_admin_knowledge_items():
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    limit = min(max(int(request.args.get("limit", 120)), 1), 300)
+    return jsonify({
+        "ok": True,
+        "items": list_admin_knowledge_items(tenant_slug=tenant_slug, limit=limit),
+    })
+
+
+@app.route("/api/kol/knowledge/file-preview", methods=["POST"])
+def api_preview_kol_knowledge_file():
+    file_storage = request.files.get("file")
+    try:
+        preview = extract_text_from_uploaded_file(file_storage)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception:
+        app.logger.exception("Failed to preview knowledge file")
+        return jsonify({"ok": False, "error": "knowledge_file_preview_failed"}), 500
+    return jsonify({"ok": True, "preview": preview})
+
+
+@app.route("/api/kol/knowledge/url-preview", methods=["POST"])
+def api_preview_kol_knowledge_url():
+    body = request.get_json(silent=True) or {}
+    try:
+        preview = fetch_url_preview(body.get("url"))
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception:
+        app.logger.exception("Failed to preview knowledge url")
+        return jsonify({"ok": False, "error": "knowledge_url_preview_failed"}), 500
+    return jsonify({"ok": True, "preview": preview})
 
 
 @app.route("/api/kol/knowledge/query", methods=["POST"])
@@ -8380,6 +10368,31 @@ def api_query_kol_knowledge():
     except Exception:
         app.logger.exception("Failed to query knowledge embeddings")
         return jsonify({"ok": False, "error": "knowledge_query_failed"}), 500
+    return jsonify({"ok": True, **result})
+
+
+@app.route("/api/review/generate-draft", methods=["POST"])
+def api_generate_review_draft():
+    body = request.get_json(silent=True) or {}
+    try:
+        source_text = body.get("source_text")
+        result = generate_review_draft_with_llm(
+            source_text=source_text,
+            review_period=body.get("period"),
+            source_mode=body.get("source_mode"),
+            prompt_text=body.get("prompt_text"),
+            prompt_tags=body.get("prompt_tags") if isinstance(body.get("prompt_tags"), list) else [],
+            selected_watchlist=body.get("selected_watchlist") if isinstance(body.get("selected_watchlist"), list) else [],
+            speaker_name=body.get("speaker_name"),
+            entry_point=body.get("entry_point"),
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    except Exception:
+        app.logger.exception("Failed to generate review draft with LLM")
+        return jsonify({"ok": False, "error": "review_draft_generation_failed"}), 500
     return jsonify({"ok": True, **result})
 
 
@@ -8428,4 +10441,5 @@ if __name__ == "__main__":
     host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", "5001"))
     debug = os.environ.get("DEBUG", "1").lower() in {"1", "true", "yes", "y"}
+    startup_bootstrap()
     app.run(host=host, port=port, debug=debug)

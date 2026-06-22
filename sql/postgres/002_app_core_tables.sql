@@ -224,3 +224,76 @@ CREATE TABLE IF NOT EXISTS indicator_clean_jobs (
 
 CREATE INDEX IF NOT EXISTS idx_indicator_clean_jobs_source_code
 ON indicator_clean_jobs(source_code, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS admin_task_configs (
+    id BIGSERIAL PRIMARY KEY,
+    task_code TEXT NOT NULL UNIQUE,
+    task_name TEXT NOT NULL,
+    task_group TEXT NOT NULL DEFAULT 'system',
+    task_type TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    task_params_json TEXT NOT NULL DEFAULT '{}',
+    schedule_type TEXT NOT NULL DEFAULT 'manual',
+    schedule_value TEXT NOT NULL DEFAULT '',
+    enabled INTEGER NOT NULL DEFAULT 1,
+    timeout_seconds INTEGER NOT NULL DEFAULT 600,
+    last_run_started_at TEXT NOT NULL DEFAULT '',
+    last_run_finished_at TEXT NOT NULL DEFAULT '',
+    last_run_status TEXT NOT NULL DEFAULT '',
+    last_run_message TEXT NOT NULL DEFAULT '',
+    last_run_duration_ms INTEGER NOT NULL DEFAULT 0,
+    last_next_run_at TEXT NOT NULL DEFAULT '',
+    last_error_at TEXT NOT NULL DEFAULT '',
+    last_error_message TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_task_configs_group
+ON admin_task_configs(task_group, enabled);
+
+CREATE TABLE IF NOT EXISTS admin_task_runs (
+    id BIGSERIAL PRIMARY KEY,
+    run_code TEXT NOT NULL UNIQUE,
+    task_code TEXT NOT NULL,
+    trigger_mode TEXT NOT NULL DEFAULT 'manual',
+    run_status TEXT NOT NULL DEFAULT 'running',
+    started_at TEXT NOT NULL,
+    finished_at TEXT NOT NULL DEFAULT '',
+    duration_ms INTEGER NOT NULL DEFAULT 0,
+    summary TEXT NOT NULL DEFAULT '',
+    error_message TEXT NOT NULL DEFAULT '',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_task_runs_task_code
+ON admin_task_runs(task_code, started_at DESC);
+
+CREATE TABLE IF NOT EXISTS user_async_jobs (
+    id BIGSERIAL PRIMARY KEY,
+    job_code TEXT NOT NULL UNIQUE,
+    job_type TEXT NOT NULL,
+    tenant_slug TEXT NOT NULL DEFAULT '',
+    entry_point TEXT NOT NULL DEFAULT '',
+    trigger_source TEXT NOT NULL DEFAULT 'user',
+    owner_label TEXT NOT NULL DEFAULT '',
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    status TEXT NOT NULL DEFAULT 'pending',
+    progress_stage TEXT NOT NULL DEFAULT 'queued',
+    progress_percent INTEGER NOT NULL DEFAULT 0,
+    summary TEXT NOT NULL DEFAULT '',
+    error_message TEXT NOT NULL DEFAULT '',
+    result_json TEXT NOT NULL DEFAULT '{}',
+    retry_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    started_at TEXT NOT NULL DEFAULT '',
+    finished_at TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_async_jobs_status
+ON user_async_jobs(status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_user_async_jobs_tenant
+ON user_async_jobs(tenant_slug, created_at DESC);

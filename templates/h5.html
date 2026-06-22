@@ -2920,6 +2920,8 @@ body,
 <script>
 // ===== TAB SWITCHING =====
 const SITE_FEATURES = (window.SITE_CONFIG && window.SITE_CONFIG.feature_flags) || {};
+const KNOWLEDGE_INGESTION_CONFIG = (window.SITE_CONFIG && window.SITE_CONFIG.knowledge_ingestion) || {};
+const KNOWLEDGE_USER_PREVIEW_ENABLED = KNOWLEDGE_INGESTION_CONFIG.user_preview_enabled === true;
 const ALL_TABS = ['feed', 'community', 'hermes', 'market', 'review', 'knowledge', 'profile', 'dm', 'workbench'];
 const TAB_LABELS = {
   feed: '基本面分析',
@@ -3062,12 +3064,14 @@ let reviewTriggerDraft = {
   sourceMode: 'voice',
   paragraphMode: 'manual',
   skipAiProcessing: true,
+  useVoiceLlmEnhancement: true,
   selectedWatchlist: [],
   voiceTranscript: '',
   manualHtml: '',
   fileText: '',
   aiPrompt: '',
   promptTags: [],
+  generatedPreviewText: '',
   previewReady: false,
 };
 const reviewRuntimeStore = {};
@@ -3110,8 +3114,10 @@ const KNOWLEDGE_INPUT_TYPES = {
 let knowledgeIntakeType = 'voice';
 let knowledgeRecording = false;
 let knowledgeUploadSamples = [];
+let knowledgeUploadBodies = [];
+let knowledgeUploadMeta = [];
 let knowledgeUrlPreview = null;
-let knowledgeDraft = { title: '', summary: '', body: '', url: '' };
+let knowledgeDraft = { title: '', summary: '', body: '', url: '', processingMode: 'algorithm', useVoiceLlmEnhancement: true };
 let knowledgeEditingId = '';
 let knowledgeEntrySeq = 4;
 let knowledgeEntryStore = [
@@ -4056,6 +4062,7 @@ function openReviewTriggerModal(sourceMode) {
   reviewTriggerDraft.fileText = runtime.latestFileText || '';
   reviewTriggerDraft.aiPrompt = runtime.latestAiPrompt || '';
   reviewTriggerDraft.promptTags = Array.isArray(runtime.latestPromptTags) ? runtime.latestPromptTags.slice(0) : [];
+  reviewTriggerDraft.generatedPreviewText = runtime.latestGeneratedPreviewText || '';
   reviewTriggerDraft.previewReady = false;
   const modal = document.getElementById('review-trigger-modal');
   if (!modal) return;
@@ -4080,15 +4087,7 @@ function getReviewPreviewText() {
   if (reviewTriggerDraft.paragraphMode === 'manual') {
     return getReviewDraftContentText();
   }
-  const tagText = (reviewTriggerDraft.promptTags || []).join('、');
-  const promptText = String(reviewTriggerDraft.aiPrompt || '').trim();
-  const sourceText = getReviewDraftContentText();
-  return [
-    '系统已根据输入材料整理出完整复盘草稿。',
-    sourceText || '当前尚未补充供稿内容。',
-    promptText ? `修改规则：${promptText}` : '',
-    tagText ? `常用标签：${tagText}` : '',
-  ].filter(Boolean).join('\n\n');
+  return String(reviewTriggerDraft.generatedPreviewText || '').trim() || getReviewDraftContentText();
 }
 
 let reviewVoiceRecorder = null;
@@ -4096,8 +4095,37 @@ let reviewVoiceChunks = [];
 let reviewVoiceRecording = false;
 let reviewVoiceUploading = false;
 let reviewIngestResult = null;
+let reviewDraftGenerating = false;
+let knowledgeVoiceRecorder = null;
+let knowledgeVoiceChunks = [];
+let knowledgeVoiceUploading = false;
+const pendingAsyncJobs = {};
 let knowledgeEditors = { body: null };
 let reviewEditors = { manual: null };
+
+async function generateReviewDraftWithLlm() {
+  const user = getActiveDemoUser();
+  const resp = await fetch('/api/review/generate-draft', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      tenant_slug: ((user || {}).tenant || {}).slug || '',
+      period: reviewTriggerDraft.period || currentReviewPeriod || 'day',
+      source_mode: reviewTriggerDraft.sourceMode || 'voice',
+      source_text: getReviewDraftContentText(),
+      prompt_text: reviewTriggerDraft.aiPrompt || '',
+      prompt_tags: reviewTriggerDraft.promptTags || [],
+      selected_watchlist: reviewTriggerDraft.selectedWatchlist || [],
+      speaker_name: (user && (user.advisor_name || user.username)) || '',
+      entry_point: 'h5_review_draft',
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    throw new Error((data && data.error) || 'review_draft_generation_failed');
+  }
+  return data;
+}
 
 function openReviewIngestResultModal(title, lines) {
   const host = document.getElementById('review-ingest-result-modal-content');
@@ -4121,6 +4149,42 @@ function openReviewIngestResultModal(title, lines) {
 function closeReviewIngestResultModal() {
   const modal = document.getElementById('review-ingest-result-modal');
   if (modal) modal.classList.remove('show');
+}
+
+async function fetchAsyncJob(jobCode) {
+  const resp = await fetch(`/api/jobs/${encodeURIComponent(jobCode)}`);
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'job_status_failed');
+  return data.job;
+}
+
+function startAsyncJobPolling(jobCode, handlers) {
+  if (!jobCode) return;
+  if (pendingAsyncJobs[jobCode]) {
+    clearTimeout(pendingAsyncJobs[jobCode]);
+    delete pendingAsyncJobs[jobCode];
+  }
+  const tick = async () => {
+    try {
+      const job = await fetchAsyncJob(jobCode);
+      if (handlers && typeof handlers.onProgress === 'function') handlers.onProgress(job);
+      if (job.status === 'success') {
+        if (handlers && typeof handlers.onSuccess === 'function') handlers.onSuccess(job);
+        delete pendingAsyncJobs[jobCode];
+        return;
+      }
+      if (job.status === 'failed') {
+        if (handlers && typeof handlers.onFailed === 'function') handlers.onFailed(job);
+        delete pendingAsyncJobs[jobCode];
+        return;
+      }
+      pendingAsyncJobs[jobCode] = setTimeout(tick, 1500);
+    } catch (error) {
+      if (handlers && typeof handlers.onError === 'function') handlers.onError(error);
+      delete pendingAsyncJobs[jobCode];
+    }
+  };
+  pendingAsyncJobs[jobCode] = setTimeout(tick, 1200);
 }
 
 function normalizeRichHtml(html) {
@@ -4256,6 +4320,28 @@ async function uploadReviewVoiceBlob(audioBlob) {
   formData.append('period', reviewTriggerDraft.period || currentReviewPeriod || 'day');
   formData.append('entry_point', 'h5');
   formData.append('speaker_name', (user && (user.advisor_name || user.username)) || '');
+  formData.append('use_llm_enhancement', reviewTriggerDraft.useVoiceLlmEnhancement ? 'true' : 'false');
+  const resp = await fetch('/api/review/voice-transcribe', {
+    method: 'POST',
+    body: formData,
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.success) {
+    throw new Error((data && data.error) || 'voice_transcribe_failed');
+  }
+  return data;
+}
+
+async function uploadKnowledgeVoiceBlob(audioBlob) {
+  const user = getActiveDemoUser();
+  const formData = new FormData();
+  const fileName = `knowledge-${Date.now()}.webm`;
+  formData.append('audio', audioBlob, fileName);
+  formData.append('tenant_slug', ((user || {}).tenant || {}).slug || '');
+  formData.append('period', 'knowledge');
+  formData.append('entry_point', 'h5_knowledge');
+  formData.append('speaker_name', (user && (user.advisor_name || user.username)) || '');
+  formData.append('use_llm_enhancement', knowledgeDraft.useVoiceLlmEnhancement ? 'true' : 'false');
   const resp = await fetch('/api/review/voice-transcribe', {
     method: 'POST',
     body: formData,
@@ -4309,6 +4395,25 @@ async function publishReviewContentEmbedding(text, transcriptionEngine, transcri
   return data;
 }
 
+function mapKnowledgeEntryForTenant(item, tenantId, index = 0) {
+  return {
+    tenantId,
+    sourceDetail: item.source_detail || item.sourceDetail || '',
+    voiceMinutes: item.voice_minutes,
+    destination: Array.isArray(item.sync_targets) && item.sync_targets.length ? item.sync_targets[0] : '已同步知识专区',
+    time: index === 0 ? '刚刚' : (item.time || '1分钟前'),
+    body: item.body || item.raw_input || '',
+    ...item,
+  };
+}
+
+function addOrReplaceKnowledgeEntry(entry) {
+  const next = {...entry};
+  const index = knowledgeEntryStore.findIndex(item => item.id === next.id);
+  if (index >= 0) knowledgeEntryStore.splice(index, 1, next);
+  else knowledgeEntryStore.unshift(next);
+}
+
 function renderReviewInputPanel() {
   if (reviewTriggerDraft.sourceMode === 'voice') {
     return `
@@ -4320,6 +4425,10 @@ function renderReviewInputPanel() {
           </div>
           <button class="review-input-button" ${reviewVoiceUploading ? 'disabled' : ''} onclick="captureReviewVoiceInput()">${getReviewVoiceButtonLabel()}</button>
         </div>
+        <label class="knowledge-check-row" style="margin-top:10px;display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#6b7280">
+          <input type="checkbox" id="review-voice-llm-enhancement" ${reviewTriggerDraft.useVoiceLlmEnhancement ? 'checked' : ''} onchange="toggleReviewVoiceLlmEnhancement(this.checked)" ${reviewVoiceRecording || reviewVoiceUploading ? 'disabled' : ''} />
+          <span>使用大模型增强语音解析，基础转写后自动整理口语噪音、重复句和语义结构。</span>
+        </label>
         <div class="review-intake-result">
           <div class="review-intake-result-title">转写文案</div>
           <div class="review-intake-result-text">${escapeHtml(reviewTriggerDraft.voiceTranscript || '录音结束后，这里会立即展示转写后的复盘文案。')}</div>
@@ -4453,13 +4562,14 @@ function renderReviewTriggerModal(user) {
         ${(user.role === 'dav' ? reviewTriggerDraft.selectedWatchlist : focusNames).map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
       </div>
     </div>
+    ${user.role === 'dav' && reviewDraftGenerating ? '<div class="review-preview-panel"><div class="review-preview-copy">正在调用大模型生成复盘草稿，请稍候...</div></div>' : ''}
     ${user.role === 'dav' ? renderReviewPreviewPanel() : ''}
     <div class="modal-actions">
       <button class="btn-outline" onclick="closeReviewTriggerModal()">取消</button>
       ${user.role === 'dav'
         ? `${reviewTriggerDraft.previewReady
           ? '<button class="btn-gold" onclick="publishReviewDraft()">确认发布</button>'
-          : '<button class="btn-gold" onclick="submitReviewTrigger()">生成草稿</button>'}`
+          : `<button class="btn-gold" ${reviewDraftGenerating ? 'disabled' : ''} onclick="submitReviewTrigger()">${reviewDraftGenerating ? '生成中...' : '生成草稿'}</button>`}`
         : '<button class="btn-gold" onclick="submitReviewTrigger()">生成智能复盘</button>'}
     </div>
   `;
@@ -4478,6 +4588,7 @@ function setReviewTriggerSourceMode(mode) {
   syncReviewDraftFromModal();
   reviewTriggerDraft.sourceMode = mode;
   reviewTriggerDraft.previewReady = false;
+  reviewTriggerDraft.generatedPreviewText = '';
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
@@ -4510,9 +4621,14 @@ function toggleReviewSkipAiProcessing(checked) {
     reviewTriggerDraft.paragraphMode = 'manual';
     reviewTriggerDraft.aiPrompt = '';
     reviewTriggerDraft.promptTags = [];
+    reviewTriggerDraft.generatedPreviewText = '';
   }
   reviewTriggerDraft.previewReady = false;
   renderReviewTriggerModal(getActiveDemoUser());
+}
+
+function toggleReviewVoiceLlmEnhancement(checked) {
+  reviewTriggerDraft.useVoiceLlmEnhancement = !!checked;
 }
 
 function syncReviewDraftFromModal() {
@@ -4559,16 +4675,34 @@ function captureReviewVoiceInput() {
       stream.getTracks().forEach((track) => track.stop());
       try {
         const data = await uploadReviewVoiceBlob(blob);
-        reviewTriggerDraft.voiceTranscript = data.transcript || '';
-        reviewTriggerDraft.previewReady = false;
-        reviewIngestResult = data;
-        openReviewIngestResultModal('语音转写成功（尚未入库）', [
-          `转写引擎：${data.transcript_engine || '-'}`,
-          `转写模型：${data.transcript_model || '-'}`,
-          `当前状态：仅完成转写，确认发布后才会写入向量库`,
-          `转写内容：${data.transcript || ''}`,
-        ]);
-        showToast('语音已转成文案，待确认发布');
+        if (!data.async || !data.job_code) throw new Error('voice_transcribe_job_missing');
+        showToast('语音已提交，正在后台转写');
+        startAsyncJobPolling(data.job_code, {
+          onSuccess(job) {
+            const result = job.result || {};
+            reviewTriggerDraft.voiceTranscript = result.display_transcript || result.enhanced_transcript || result.transcript || '';
+            reviewTriggerDraft.previewReady = false;
+            reviewIngestResult = result;
+            openReviewIngestResultModal('语音转写成功（尚未入库）', [
+              `转写引擎：${result.transcript_engine || '-'}`,
+              `转写模型：${result.transcript_model || '-'}`,
+              `大模型增强：${result.llm_enhanced ? '已启用' : (result.llm_enhancement_requested ? '已请求但回退原始转写' : '未启用')}`,
+              `当前状态：仅完成转写，确认发布后才会写入向量库`,
+              result.llm_notice ? `增强说明：${result.llm_notice}` : '',
+              `转写内容：${result.display_transcript || result.transcript || ''}`,
+              result.enhanced_transcript ? `原始转写：${result.raw_transcript || result.transcript || ''}` : '',
+            ]);
+            renderReviewTriggerModal(getActiveDemoUser());
+            showToast('语音已转成文案，待确认发布');
+          },
+          onFailed(job) {
+            openReviewIngestResultModal('语音转写失败', [
+              `任务编号：${job.job_code || '-'}`,
+              `异常详情：${job.error_message || job.summary || '转写失败'}`,
+            ]);
+            showToast(job.error_message || '语音转写失败');
+          },
+        });
       } catch (error) {
         showToast(error.message || '语音转写失败');
       } finally {
@@ -4634,6 +4768,28 @@ async function submitReviewTrigger() {
         return;
       }
     }
+    if (reviewTriggerDraft.paragraphMode === 'ai' && !reviewTriggerDraft.skipAiProcessing) {
+      reviewDraftGenerating = true;
+      reviewTriggerDraft.previewReady = false;
+      renderReviewTriggerModal(user);
+      try {
+        const draftResult = await generateReviewDraftWithLlm();
+        reviewTriggerDraft.generatedPreviewText = draftResult.text || '';
+        reviewIngestResult = {
+          ...(reviewIngestResult || {}),
+          review_draft_llm: draftResult.llm_model || null,
+        };
+      } catch (error) {
+        reviewDraftGenerating = false;
+        renderReviewTriggerModal(user);
+        showToast(error.message || '大模型复盘草稿生成失败');
+        return;
+      } finally {
+        reviewDraftGenerating = false;
+      }
+    } else {
+      reviewTriggerDraft.generatedPreviewText = '';
+    }
     runtime.kolGeneratedAt = '刚刚生成';
     runtime.kolSourceMode = reviewTriggerDraft.sourceMode;
     runtime.paragraphMode = reviewTriggerDraft.paragraphMode;
@@ -4644,6 +4800,7 @@ async function submitReviewTrigger() {
     runtime.latestFileText = reviewTriggerDraft.fileText;
     runtime.latestAiPrompt = reviewTriggerDraft.aiPrompt;
     runtime.latestPromptTags = (reviewTriggerDraft.promptTags || []).slice(0);
+    runtime.latestGeneratedPreviewText = reviewTriggerDraft.generatedPreviewText || '';
     runtime.draftReady = true;
     reviewTriggerDraft.previewReady = true;
     renderReviewTriggerModal(user);
@@ -4673,24 +4830,39 @@ function publishReviewDraft() {
     ? ((reviewIngestResult && reviewIngestResult.transcript_model) || '')
     : 'manual_input';
   publishReviewContentEmbedding(finalText, transcriptionEngine, transcriptModel).then((publishResult) => {
-    reviewIngestResult = publishResult;
-    openReviewIngestResultModal('确认发布成功，已写入向量库', [
-      `转写引擎：${publishResult.transcript_engine || '-'}`,
-      `向量引擎：${publishResult.embedding_engine || '-'}`,
-      `向量模型：${publishResult.embedding_model || '-'}`,
-      `namespace：${(publishResult.vector_record && publishResult.vector_record.vector_namespace) || '-'}`,
-      `发布正文：${publishResult.text || ''}`,
-    ]);
-    runtime.kolPublishedAt = '刚刚发布';
-    runtime.kolGeneratedAt = '刚刚发布';
+    if (!publishResult.async || !publishResult.job_code) throw new Error('publish_job_missing');
+    runtime.kolPublishedAt = '发布处理中';
+    runtime.kolGeneratedAt = '发布处理中';
     runtime.draftReady = false;
     closeReviewTriggerModal();
     renderReviewExperience();
-    loadDmConversations();
-    if (currentDmKol) {
-      loadDmMessages(currentDmKol.id);
-    }
-    showToast('复盘已发布并入向量库');
+    showToast('复盘已提交发布，正在后台入向量库');
+    startAsyncJobPolling(publishResult.job_code, {
+      onSuccess(job) {
+        const result = job.result || {};
+        reviewIngestResult = result;
+        openReviewIngestResultModal('确认发布成功，已写入向量库', [
+          `转写引擎：${result.transcription_engine || '-'}`,
+          `向量引擎：${result.embedding_engine || '-'}`,
+          `向量模型：${result.embedding_model || '-'}`,
+          `namespace：${(result.record && result.record.vector_namespace) || '-'}`,
+          `发布正文：${result.text || ''}`,
+        ]);
+        runtime.kolPublishedAt = '刚刚发布';
+        runtime.kolGeneratedAt = '刚刚发布';
+        loadDmConversations();
+        if (currentDmKol) loadDmMessages(currentDmKol.id);
+        showToast('复盘已发布并入向量库');
+      },
+      onFailed(job) {
+        runtime.kolPublishedAt = '发布失败';
+        openReviewIngestResultModal('复盘发布失败', [
+          `任务编号：${job.job_code || '-'}`,
+          `异常详情：${job.error_message || job.summary || '发布失败'}`,
+        ]);
+        showToast(job.error_message || '发布入库失败');
+      },
+    });
   }).catch((error) => {
     showToast(error.message || '发布入库失败');
   });
@@ -4751,8 +4923,9 @@ function buildKnowledgeDraft(entry) {
     summary: entry && entry.summary ? entry.summary : '',
     body: entry && (entry.body || entry.raw_input) ? (entry.body || entry.raw_input) : '',
     bodyHtml: entry && entry.raw_html ? entry.raw_html : (entry && (entry.body || entry.raw_input) ? `<p>${escapeHtml(entry.body || entry.raw_input).replace(/\n/g, '<br>')}</p>` : ''),
-    skipAiProcessing: entry && Object.prototype.hasOwnProperty.call(entry, 'skip_ai_processing') ? !!entry.skip_ai_processing : true,
+    processingMode: entry && entry.processing_mode ? entry.processing_mode : ((entry && Object.prototype.hasOwnProperty.call(entry, 'skip_ai_processing') && entry.skip_ai_processing) ? 'none' : 'algorithm'),
     url: entry && entry.url ? entry.url : '',
+    useVoiceLlmEnhancement: entry && Object.prototype.hasOwnProperty.call(entry, 'use_voice_llm_enhancement') ? !!entry.use_voice_llm_enhancement : true,
   };
 }
 
@@ -4770,6 +4943,31 @@ function getKnowledgeStatusMeta(status) {
   return { className: 'syncing', label: text };
 }
 
+function getKnowledgeSyncMeta(entry) {
+  const syncStatus = entry && entry.sync_status && typeof entry.sync_status === 'object' ? entry.sync_status : null;
+  if (syncStatus) {
+    return {
+      className: syncStatus.class_name || 'syncing',
+      label: syncStatus.label || '待同步',
+      detail: syncStatus.detail || '',
+      target: syncStatus.target || '知识专区',
+      queuedAt: syncStatus.queued_at || '',
+      syncedAt: syncStatus.synced_at || '',
+      failedAt: syncStatus.failed_at || '',
+    };
+  }
+  const fallback = getKnowledgeStatusMeta(entry && entry.status);
+  return {
+    className: fallback.className,
+    label: fallback.label,
+    detail: entry && entry.destination ? `同步去向：${entry.destination}` : '',
+    target: entry && entry.destination ? entry.destination : '知识专区',
+    queuedAt: entry && entry.queued_at ? entry.queued_at : '',
+    syncedAt: entry && entry.synced_at ? entry.synced_at : '',
+    failedAt: entry && entry.failed_at ? entry.failed_at : '',
+  };
+}
+
 function renderKnowledgeWorkbench() {
   const entryGrid = document.getElementById('wb-knowledge-entry-grid');
   const queueHost = document.getElementById('wb-knowledge-queue');
@@ -4784,20 +4982,20 @@ function renderKnowledgeWorkbench() {
   `).join('');
   const entries = getTenantKnowledgeEntries();
   queueHost.innerHTML = entries.map(entry => {
-    const status = getKnowledgeStatusMeta(entry.status);
+    const status = getKnowledgeSyncMeta(entry);
     return `
       <div class="knowledge-queue-item" onclick="openKnowledgeEntryEditor('${entry.id}')">
         <div class="knowledge-queue-head">
           <div>
             <div class="knowledge-queue-title">${escapeHtml(entry.title)}</div>
-            <div class="knowledge-queue-meta">${escapeHtml(entry.sourceDetail)} · ${escapeHtml(entry.time)}</div>
+            <div class="knowledge-queue-meta">${escapeHtml(entry.sourceDetail)} · ${escapeHtml(entry.time)} · ${escapeHtml(status.detail || `同步去向：${status.target}`)}${status.queuedAt ? ` · 入队 ${escapeHtml(status.queuedAt)}` : ''}${status.syncedAt && status.label === '已同步' ? ` · 完成 ${escapeHtml(status.syncedAt)}` : ''}${status.failedAt ? ` · 失败 ${escapeHtml(status.failedAt)}` : ''}</div>
           </div>
           <span class="knowledge-status ${status.className}">${status.label}</span>
         </div>
         <div class="knowledge-queue-body">${escapeHtml(entry.summary)}</div>
         <div class="knowledge-chip-row">
           ${(entry.tags || []).map(tag => `<span class="knowledge-chip">${escapeHtml(tag)}</span>`).join('')}
-          <span class="knowledge-chip">${escapeHtml(entry.destination)}</span>
+          <span class="knowledge-chip">${escapeHtml(status.target)}</span>
         </div>
         <div class="knowledge-entry-hint">点击弹框微调</div>
       </div>
@@ -4813,13 +5011,13 @@ function renderKnowledgeZone() {
   countEl.textContent = `今日新增 ${entries.length} 条`;
   feedHost.innerHTML = entries.map(entry => {
     const cfg = KNOWLEDGE_INPUT_TYPES[entry.type] || KNOWLEDGE_INPUT_TYPES.voice;
-    const status = getKnowledgeStatusMeta(entry.status);
+    const status = getKnowledgeSyncMeta(entry);
     return `
       <div class="knowledge-zone-card" onclick="openKnowledgeEntryEditor('${entry.id}')">
         <div class="knowledge-zone-top">
           <div>
             <div class="knowledge-zone-title">${escapeHtml(entry.title)}</div>
-            <div class="knowledge-zone-origin">${cfg.icon} ${escapeHtml(entry.source)} · ${escapeHtml(entry.sourceDetail)}</div>
+            <div class="knowledge-zone-origin">${cfg.icon} ${escapeHtml(entry.source)} · ${escapeHtml(entry.sourceDetail)} · ${escapeHtml(status.detail || `同步去向：${status.target}`)}${status.queuedAt ? ` · 入队 ${escapeHtml(status.queuedAt)}` : ''}${status.syncedAt && status.label === '已同步' ? ` · 完成 ${escapeHtml(status.syncedAt)}` : ''}${status.failedAt ? ` · 失败 ${escapeHtml(status.failedAt)}` : ''}</div>
           </div>
           <span class="knowledge-status ${status.className}">${status.label}</span>
         </div>
@@ -5693,10 +5891,12 @@ function renderKnowledgeIntakeModal() {
     </div>
     <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">处理选项</label>
-      <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--text-main);line-height:1.7">
-        <input type="checkbox" id="knowledge-skip-ai-processing" ${knowledgeDraft.skipAiProcessing !== false ? 'checked' : ''} />
-        <span>不使用大模型处理。勾选后，这条知识只保留用户原文和本地 embedding，不做 AI 清洗。</span>
-      </label>
+      <select id="knowledge-processing-mode" class="knowledge-modal-input">
+        <option value="none" ${knowledgeDraft.processingMode === 'none' ? 'selected' : ''}>1. 不加工，直接保留原文</option>
+        <option value="algorithm" ${knowledgeDraft.processingMode !== 'none' && knowledgeDraft.processingMode !== 'llm' ? 'selected' : ''}>2. 算法加工，做语义分析并套模板</option>
+        <option value="llm" ${knowledgeDraft.processingMode === 'llm' ? 'selected' : ''}>3. 大模型加工，生成结构化知识</option>
+      </select>
+      <div class="knowledge-rich-help" style="margin-top:8px">算法加工会做纯文本语义分析并生成模板化结构；大模型加工会调用 admin 配置的通用模型。</div>
     </div>
     <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">同步去向</label>
@@ -5723,10 +5923,14 @@ function renderKnowledgeIntakeTypePanel() {
           <div class="knowledge-record-toolbar">
             <div class="knowledge-record-status">
               <span class="knowledge-live-dot" style="opacity:${knowledgeRecording ? '1' : '0.35'}"></span>
-              ${knowledgeRecording ? '正在录音，系统会自动转写' : '准备录音，可直接口述观点'}
+              ${knowledgeVoiceUploading ? '正在转写刚才的语音，请稍候' : (knowledgeRecording ? '正在录音，系统会自动转写' : '准备录音，可直接口述观点')}
             </div>
-            <button class="${knowledgeRecording ? 'btn-gold' : 'btn-outline'}" style="padding:7px 12px;font-size:12px" onclick="toggleKnowledgeVoiceCapture()">${knowledgeRecording ? '结束录音' : '开始录音'}</button>
+            <button class="${knowledgeRecording ? 'btn-gold' : 'btn-outline'}" ${knowledgeVoiceUploading ? 'disabled' : ''} style="padding:7px 12px;font-size:12px" onclick="toggleKnowledgeVoiceCapture()">${knowledgeVoiceUploading ? '转写中...' : (knowledgeRecording ? '结束录音' : '开始录音')}</button>
           </div>
+          <label class="knowledge-check-row" style="margin-top:10px;display:flex;align-items:flex-start;gap:8px;font-size:12px;color:#6b7280">
+            <input type="checkbox" id="knowledge-voice-llm-enhancement" ${knowledgeDraft.useVoiceLlmEnhancement ? 'checked' : ''} onchange="toggleKnowledgeVoiceLlmEnhancement(this.checked)" ${knowledgeRecording || knowledgeVoiceUploading ? 'disabled' : ''} />
+            <span>使用大模型增强语音解析，转写后进一步整理原始口述，便于知识清洗与入库。</span>
+          </label>
           <div class="knowledge-wave"><span></span><span></span><span></span><span></span><span></span></div>
         </div>
       </div>
@@ -5738,15 +5942,16 @@ function renderKnowledgeIntakeTypePanel() {
         <label class="knowledge-modal-label">文件面板</label>
         <div class="knowledge-upload-panel">
           <div class="knowledge-upload-drop">
-            支持 PDF / DOCX / XLSX 演示文件<br>点击下方按钮模拟上传
+            支持 PDF / DOCX / XLSX / TXT / MD / HTML<br>点击下方按钮选择真实文件
             <div class="knowledge-action-row">
-              <button class="btn-outline" style="flex:1;padding:8px 10px;font-size:12px" onclick="attachKnowledgeSampleFile()">选择示例文件</button>
-              <button class="btn-gold" style="flex:1;padding:8px 10px;font-size:12px" onclick="attachKnowledgeSampleFile(true)">批量导入</button>
+              <button class="btn-outline" style="flex:1;padding:8px 10px;font-size:12px" onclick="openKnowledgeFilePicker(false)">选择文件</button>
+              <button class="btn-gold" style="flex:1;padding:8px 10px;font-size:12px" onclick="openKnowledgeFilePicker(true)">批量导入</button>
             </div>
           </div>
           <div class="knowledge-chip-row" id="knowledge-file-preview">
             ${knowledgeUploadSamples.length ? knowledgeUploadSamples.map(file => `<span class="knowledge-chip">${escapeHtml(file)}</span>`).join('') : '<span class="knowledge-chip">尚未选择文件</span>'}
           </div>
+          ${KNOWLEDGE_USER_PREVIEW_ENABLED ? '' : '<div class="knowledge-rich-help" style="margin-top:10px">解析预览已关闭。文件会继续上传并进入后台清洗，但用户侧不展示抽取内容。</div>'}
         </div>
       </div>
     `;
@@ -5783,26 +5988,37 @@ function syncKnowledgeDraftFromModal() {
   const titleInput = document.getElementById('knowledge-title-input');
   const summaryInput = document.getElementById('knowledge-summary-input');
   const urlInput = document.getElementById('knowledge-url-input');
-  const skipAiInput = document.getElementById('knowledge-skip-ai-processing');
+  const processingModeInput = document.getElementById('knowledge-processing-mode');
   syncKnowledgeDraftFromEditors();
   knowledgeDraft = {
     title: titleInput ? titleInput.value : knowledgeDraft.title,
     summary: summaryInput ? summaryInput.value : knowledgeDraft.summary,
     body: knowledgeDraft.body,
     bodyHtml: knowledgeDraft.bodyHtml,
-    skipAiProcessing: skipAiInput ? !!skipAiInput.checked : knowledgeDraft.skipAiProcessing !== false,
+    processingMode: processingModeInput ? (processingModeInput.value || 'algorithm') : (knowledgeDraft.processingMode || 'algorithm'),
     url: urlInput ? urlInput.value : knowledgeDraft.url,
+    useVoiceLlmEnhancement: Object.prototype.hasOwnProperty.call(knowledgeDraft, 'useVoiceLlmEnhancement') ? !!knowledgeDraft.useVoiceLlmEnhancement : true,
   };
 }
 
+function toggleKnowledgeVoiceLlmEnhancement(checked) {
+  knowledgeDraft.useVoiceLlmEnhancement = !!checked;
+}
+
 function renderKnowledgeUrlPreview() {
+  if (!KNOWLEDGE_USER_PREVIEW_ENABLED) {
+    return '<div class="knowledge-preview-box"><div class="knowledge-preview-desc">解析预览已关闭。提交后系统仍会抓取网页并进入后台处理。</div></div>';
+  }
   if (!knowledgeUrlPreview) {
     return '<div class="knowledge-preview-box"><div class="knowledge-preview-desc">输入网页 URL 后可预览将被沉淀的标题、来源域名和摘要。</div></div>';
   }
+  const modeText = Array.isArray(knowledgeUrlPreview.extraction_modes) && knowledgeUrlPreview.extraction_modes.length
+    ? ` · 解析方式：${knowledgeUrlPreview.extraction_modes.join(', ')}`
+    : '';
   return `
     <div class="knowledge-preview-box">
       <div class="knowledge-preview-title">${escapeHtml(knowledgeUrlPreview.title)}</div>
-      <div class="knowledge-preview-desc">${escapeHtml(knowledgeUrlPreview.domain)} · ${escapeHtml(knowledgeUrlPreview.summary)}</div>
+      <div class="knowledge-preview-desc">${escapeHtml(knowledgeUrlPreview.domain)}${escapeHtml(modeText)} · ${escapeHtml(knowledgeUrlPreview.summary)}</div>
     </div>
   `;
 }
@@ -5812,51 +6028,165 @@ function switchKnowledgeIntakeType(type) {
   syncKnowledgeDraftFromModal();
   knowledgeIntakeType = type;
   knowledgeRecording = false;
-  if (type !== 'file') knowledgeUploadSamples = [];
+  if (type !== 'file') {
+    knowledgeUploadSamples = [];
+    knowledgeUploadBodies = [];
+    knowledgeUploadMeta = [];
+  }
   if (type !== 'url') knowledgeUrlPreview = null;
   renderKnowledgeIntakeModal();
 }
 
 function toggleKnowledgeVoiceCapture() {
+  if (knowledgeVoiceUploading) return;
   syncKnowledgeDraftFromModal();
-  knowledgeRecording = !knowledgeRecording;
-  renderKnowledgeIntakeModal();
-  if (!knowledgeRecording) {
-    if (!knowledgeDraft.title.trim()) {
-      knowledgeDraft.title = '最新语音纪要整理';
-    }
-    if (!knowledgeDraft.summary.trim()) {
-      knowledgeDraft.summary = '系统已转写语音内容：重点保留 3 条核心判断、2 个验证节点和 1 个风险边界，建议同步到知识专区供 Hermes 和复盘专区复用。';
-    }
-    if (!knowledgeDraft.body.trim()) {
-      knowledgeDraft.body = '观点：\n1. 这里补充本次口述里的核心判断。\n\n验证节点：\n1. 写清楚后续要继续跟踪的节点。';
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
+    showToast('当前浏览器不支持录音');
+    return;
+  }
+  if (knowledgeRecording && knowledgeVoiceRecorder) {
+    knowledgeVoiceRecorder.stop();
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+    knowledgeVoiceChunks = [];
+    knowledgeVoiceRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    knowledgeRecording = true;
+    knowledgeVoiceRecorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) {
+        knowledgeVoiceChunks.push(event.data);
+      }
+    };
+    knowledgeVoiceRecorder.onerror = () => {
+      knowledgeRecording = false;
+      knowledgeVoiceUploading = false;
+      stream.getTracks().forEach((track) => track.stop());
+      renderKnowledgeIntakeModal();
+      showToast('录音失败，请重试');
+    };
+    knowledgeVoiceRecorder.onstop = async () => {
+      knowledgeRecording = false;
+      knowledgeVoiceUploading = true;
+      renderKnowledgeIntakeModal();
+      const blob = new Blob(knowledgeVoiceChunks, { type: knowledgeVoiceRecorder.mimeType || 'audio/webm' });
+      stream.getTracks().forEach((track) => track.stop());
+      try {
+        const data = await uploadKnowledgeVoiceBlob(blob);
+        if (!data.async || !data.job_code) throw new Error('voice_transcribe_job_missing');
+        showToast('语音已提交，正在后台转写');
+        startAsyncJobPolling(data.job_code, {
+          onSuccess(job) {
+            const result = job.result || {};
+            const transcript = String(result.display_transcript || result.enhanced_transcript || result.transcript || '').trim();
+            if (!knowledgeDraft.title.trim()) {
+              knowledgeDraft.title = '最新语音纪要整理';
+            }
+            if (!knowledgeDraft.summary.trim()) {
+              knowledgeDraft.summary = transcript ? transcript.slice(0, 120) : '系统已完成语音转写，待进一步整理摘要。';
+            }
+            if (!knowledgeDraft.body.trim()) {
+              knowledgeDraft.body = transcript || '语音转写已完成，请继续补充观点和验证节点。';
+            }
+            renderKnowledgeIntakeModal();
+            openReviewIngestResultModal('知识语音转写成功（尚未入库）', [
+              `转写引擎：${result.transcript_engine || '-'}`,
+              `转写模型：${result.transcript_model || '-'}`,
+              `大模型增强：${result.llm_enhanced ? '已启用' : (result.llm_enhancement_requested ? '已请求但回退原始转写' : '未启用')}`,
+              `当前状态：仅完成转写，确认提交知识后才会写入向量库`,
+              result.llm_notice ? `增强说明：${result.llm_notice}` : '',
+              `转写内容：${transcript || ''}`,
+              result.enhanced_transcript ? `原始转写：${result.raw_transcript || result.transcript || ''}` : '',
+            ]);
+            showToast('录音已结束，转写结果已回填');
+          },
+          onFailed(job) {
+            openReviewIngestResultModal('知识语音转写失败', [
+              `任务编号：${job.job_code || '-'}`,
+              `异常详情：${job.error_message || job.summary || '转写失败'}`,
+            ]);
+            showToast(job.error_message || '语音转写失败');
+          },
+        });
+      } catch (error) {
+        showToast(error.message || '语音转写失败');
+      } finally {
+        knowledgeVoiceUploading = false;
+        knowledgeVoiceRecorder = null;
+        knowledgeVoiceChunks = [];
+        renderKnowledgeIntakeModal();
+      }
+    };
+    knowledgeVoiceRecorder.start();
+    renderKnowledgeIntakeModal();
+  }).catch(() => {
+    showToast('未获得麦克风权限');
+  });
+}
+
+function openKnowledgeFilePicker(multiple) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.docx,.xlsx,.xlsm,.txt,.md,.csv,.html,.htm';
+  input.multiple = !!multiple;
+  input.onchange = async () => {
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
+    syncKnowledgeDraftFromModal();
+    knowledgeUploadSamples = [];
+    knowledgeUploadBodies = [];
+    knowledgeUploadMeta = [];
+    for (const file of files) {
+      const formData = new FormData();
+      formData.append('file', file, file.name);
+      const resp = await fetch('/api/kol/knowledge/file-preview', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        showToast((data && data.error) || `文件解析失败：${file.name}`);
+        continue;
+      }
+      const preview = data.preview || {};
+      knowledgeUploadSamples.push(preview.filename || file.name);
+      knowledgeUploadBodies.push(preview.body || '');
+      knowledgeUploadMeta.push(preview);
+      if (KNOWLEDGE_USER_PREVIEW_ENABLED) {
+        if (!knowledgeDraft.title) knowledgeDraft.title = preview.filename || file.name;
+        if (!knowledgeDraft.summary) knowledgeDraft.summary = preview.summary || '';
+        if (!knowledgeDraft.body) knowledgeDraft.body = preview.body || preview.summary || '';
+      }
     }
     renderKnowledgeIntakeModal();
-    showToast('录音已结束，转写结果已回填');
-  }
-}
-
-function attachKnowledgeSampleFile(batch) {
-  syncKnowledgeDraftFromModal();
-  knowledgeUploadSamples = batch
-    ? ['港股互联网估值框架.pdf', '2026Q2_电话会纪要.docx']
-    : ['港股互联网估值框架.pdf'];
-  renderKnowledgeIntakeModal();
-}
-
-function previewKnowledgeUrl() {
-  syncKnowledgeDraftFromModal();
-  const url = (knowledgeDraft.url || '').trim() || 'https://example.com/research-note';
-  let domain = 'example.com';
-  try {
-    domain = new URL(url).host || domain;
-  } catch (e) {}
-  knowledgeUrlPreview = {
-    url,
-    domain,
-    title: '网页资料已抓取：行业主线与关键数据',
-    summary: '已识别行业主线、引用数据与验证节点，可作为长期知识卡继续清洗。',
+    if (knowledgeUploadSamples.length) showToast(`已解析 ${knowledgeUploadSamples.length} 个文件`);
   };
+  input.click();
+}
+
+async function previewKnowledgeUrl() {
+  syncKnowledgeDraftFromModal();
+  const url = (knowledgeDraft.url || '').trim();
+  if (!url) {
+    showToast('请先输入 URL');
+    return;
+  }
+  const resp = await fetch('/api/kol/knowledge/url-preview', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    showToast((data && data.error) || '网页抓取失败');
+    return;
+  }
+  knowledgeUrlPreview = data.preview || null;
+  if (knowledgeUrlPreview && KNOWLEDGE_USER_PREVIEW_ENABLED) {
+    if (!knowledgeDraft.title) knowledgeDraft.title = knowledgeUrlPreview.title || '';
+    if (!knowledgeDraft.summary) knowledgeDraft.summary = knowledgeUrlPreview.summary || '';
+    if (!knowledgeDraft.body) knowledgeDraft.body = knowledgeUrlPreview.body || knowledgeUrlPreview.summary || '';
+  }
   renderKnowledgeIntakeModal();
 }
 
@@ -5874,6 +6204,23 @@ async function saveManualKnowledgeEntry(payload) {
   });
   const data = await resp.json();
   if (!resp.ok || !data.ok) throw new Error(data.error || 'knowledge_manual_save_failed');
+  return data;
+}
+
+async function ingestKnowledgeEntry(payload) {
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  if (!tenantSlug) throw new Error('tenant_missing');
+  const resp = await fetch('/api/kol/knowledge/ingest', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      tenant_slug: tenantSlug,
+      ...payload,
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) throw new Error(data.error || 'knowledge_ingest_failed');
   return data;
 }
 
@@ -5899,6 +6246,11 @@ async function submitKnowledgeIntake() {
   }
   const title = rawTitle || cfg.defaultTitle;
   const summary = rawSummary || cfg.placeholder.replace('例如：', '');
+  const effectiveKnowledgeBody = rawBody || (knowledgeIntakeType === 'file'
+    ? knowledgeUploadBodies.join('\n\n')
+    : knowledgeIntakeType === 'url'
+      ? ((knowledgeUrlPreview && knowledgeUrlPreview.body) || summary)
+      : summary);
   if (knowledgeIntakeType === 'manual') {
     try {
       const payload = await saveManualKnowledgeEntry({
@@ -5907,30 +6259,66 @@ async function submitKnowledgeIntake() {
         summary,
         body: rawBody || summary,
         raw_html: knowledgeDraft.bodyHtml || '',
-        skip_ai_processing: knowledgeDraft.skipAiProcessing !== false,
+        skip_ai_processing: (knowledgeDraft.processingMode || 'algorithm') === 'none',
+        processing_mode: knowledgeDraft.processingMode || 'algorithm',
       });
-      knowledgeEntryStore = (payload.knowledge_hub && Array.isArray(payload.knowledge_hub.items) ? payload.knowledge_hub.items : knowledgeEntryStore).map((item, index) => ({
+      if (!payload.async || !payload.job_code) throw new Error('knowledge_job_missing');
+      const optimisticId = editingEntry ? editingEntry.id : `kb-pending-${Date.now()}`;
+      addOrReplaceKnowledgeEntry({
+        ...(editingEntry || {}),
+        id: optimisticId,
         tenantId: activeUser.tenant.id,
-        sourceDetail: item.source_detail || item.sourceDetail || '',
-        voiceMinutes: item.voice_minutes,
-        destination: Array.isArray(item.sync_targets) && item.sync_targets.length ? item.sync_targets[0] : '已同步知识专区',
-        time: index === 0 ? '刚刚' : (item.time || '1分钟前'),
-        body: item.body || item.raw_input || '',
-        ...item,
-      }));
+        type: 'manual',
+        title,
+        summary,
+      body: rawBody || summary,
+      raw_input: rawBody || summary,
+      raw_html: knowledgeDraft.bodyHtml || '',
+      status: '同步中',
+        destination: '同步中',
+        time: '刚刚',
+      source: '纯文本编写',
+      sourceDetail: '来源：纯文本编写',
+      skip_ai_processing: (knowledgeDraft.processingMode || 'algorithm') === 'none',
+      processing_mode: knowledgeDraft.processingMode || 'algorithm',
+      });
       renderKnowledgeExperience();
       closeKnowledgeIntake();
       knowledgeEditingId = '';
       knowledgeDraft = buildKnowledgeDraft();
-      openReviewIngestResultModal(editingEntry ? '知识微调成功，已写入向量库' : '知识入库成功，已写入向量库', [
-        `embedding 引擎：${payload.embedding_engine || '-'}`,
-        `embedding 模型：${payload.embedding_model || '-'}`,
-        `存储方式：${(payload.vector_record && payload.vector_record.storage_mode) || '-'}`,
-        `namespace：${(payload.vector_record && payload.vector_record.vector_namespace) || '-'}`,
-        `知识标题：${title}`,
-        `知识摘要：${summary}`,
-        `正文预览：${(rawBody || summary || '').slice(0, 180)}`,
-      ]);
+      showToast(editingEntry ? '知识微调已提交，后台处理中' : '知识已提交入库，后台处理中');
+      startAsyncJobPolling(payload.job_code, {
+        onSuccess(job) {
+          const result = job.result || {};
+          const hubItems = result.knowledge_hub && Array.isArray(result.knowledge_hub.items) ? result.knowledge_hub.items : [];
+          if (hubItems.length) {
+            knowledgeEntryStore = hubItems.map((item, index) => mapKnowledgeEntryForTenant(item, activeUser.tenant.id, index));
+          }
+          renderKnowledgeExperience();
+          openReviewIngestResultModal(editingEntry ? '知识微调成功，已写入向量库' : '知识入库成功，已写入向量库', [
+            `embedding 引擎：${result.embedding_engine || '-'}`,
+            `embedding 模型：${result.embedding_model || '-'}`,
+            `存储方式：${(result.vector_record && result.vector_record.storage_mode) || '-'}`,
+            `namespace：${(result.vector_record && result.vector_record.vector_namespace) || '-'}`,
+            `知识标题：${title}`,
+            `知识摘要：${summary}`,
+            `正文预览：${(rawBody || summary || '').slice(0, 180)}`,
+          ]);
+        },
+        onFailed(job) {
+          const failedEntry = getKnowledgeEntryById(optimisticId);
+          if (failedEntry) {
+            failedEntry.status = '失败';
+            failedEntry.destination = '同步失败';
+            renderKnowledgeExperience();
+          }
+          openReviewIngestResultModal('知识入库失败', [
+            `任务编号：${job.job_code || '-'}`,
+            `异常详情：${job.error_message || job.summary || '知识入库失败'}`,
+          ]);
+          showToast(job.error_message || '知识入库失败');
+        },
+      });
       return;
     } catch (error) {
       showToast(error.message || '知识入库失败');
@@ -5946,64 +6334,87 @@ async function submitKnowledgeIntake() {
   } else {
     sourceDetail = `来源：网页 URL · ${knowledgeUrlPreview.domain}`;
   }
-  if (editingEntry) {
-    editingEntry.type = knowledgeIntakeType;
-    editingEntry.title = title;
-    editingEntry.source = cfg.label;
-    editingEntry.sourceDetail = sourceDetail;
-    editingEntry.summary = summary;
-    editingEntry.status = 'syncing';
-    editingEntry.time = '刚刚修改';
-    editingEntry.tags = cfg.defaultTags.slice(0);
-    editingEntry.destination = '重新同步中';
-    editingEntry.body = rawBody;
-    editingEntry.files = knowledgeIntakeType === 'file' ? knowledgeUploadSamples.slice(0) : [];
-    editingEntry.url = knowledgeIntakeType === 'url' && knowledgeUrlPreview ? knowledgeUrlPreview.url : '';
-    editingEntry.voiceMinutes = knowledgeIntakeType === 'voice' ? (editingEntry.voiceMinutes || 6) : undefined;
+  try {
+    const payload = await ingestKnowledgeEntry({
+      id: editingEntry ? editingEntry.id : '',
+      knowledge_type: knowledgeIntakeType,
+      title,
+      summary,
+      body: effectiveKnowledgeBody,
+      raw_html: knowledgeDraft.bodyHtml || '',
+      source_label: cfg.label,
+      source_detail: sourceDetail,
+      tags: cfg.defaultTags.slice(0),
+      files: knowledgeIntakeType === 'file' ? knowledgeUploadSamples.slice(0) : [],
+      url: knowledgeIntakeType === 'url' && knowledgeUrlPreview ? knowledgeUrlPreview.url : '',
+      voice_minutes: knowledgeIntakeType === 'voice' ? (editingEntry && editingEntry.voiceMinutes ? editingEntry.voiceMinutes : 6) : undefined,
+      parse_meta: knowledgeIntakeType === 'file' ? knowledgeUploadMeta.slice(0, 5) : (knowledgeIntakeType === 'url' ? knowledgeUrlPreview : null),
+      skip_ai_processing: (knowledgeDraft.processingMode || 'algorithm') === 'none',
+      processing_mode: knowledgeDraft.processingMode || 'algorithm',
+    });
+    if (!payload.async || !payload.job_code) throw new Error('knowledge_job_missing');
+    const optimisticId = editingEntry ? editingEntry.id : `kb-pending-${Date.now()}`;
+    addOrReplaceKnowledgeEntry({
+      ...(editingEntry || {}),
+      id: optimisticId,
+      tenantId: activeUser.tenant.id,
+      type: knowledgeIntakeType,
+      title,
+      source: cfg.label,
+      sourceDetail,
+      summary,
+      status: '同步中',
+      time: '刚刚',
+      tags: cfg.defaultTags.slice(0),
+      destination: editingEntry ? '重新同步中' : '同步中',
+      body: effectiveKnowledgeBody,
+      raw_input: effectiveKnowledgeBody,
+      raw_html: knowledgeDraft.bodyHtml || '',
+      files: knowledgeIntakeType === 'file' ? knowledgeUploadSamples.slice(0) : [],
+      url: knowledgeIntakeType === 'url' && knowledgeUrlPreview ? knowledgeUrlPreview.url : '',
+      voiceMinutes: knowledgeIntakeType === 'voice' ? (editingEntry && editingEntry.voiceMinutes ? editingEntry.voiceMinutes : 6) : undefined,
+      processing_mode: knowledgeDraft.processingMode || 'algorithm',
+    });
     renderKnowledgeExperience();
     closeKnowledgeIntake();
-    knowledgeEditingId = '';
     knowledgeDraft = buildKnowledgeDraft();
-    showToast('知识微调已提交');
-    setTimeout(() => {
-      editingEntry.status = 'ready';
-      editingEntry.time = '1分钟前';
-      editingEntry.destination = '已重新同步知识专区';
-      renderKnowledgeExperience();
-      showToast('修改后的知识已同步给 Hermes');
-    }, 1200);
-    return;
+    knowledgeEditingId = '';
+    showToast(editingEntry ? '知识微调已提交，后台处理中' : '知识已进入租户清洗队列');
+    startAsyncJobPolling(payload.job_code, {
+      onSuccess(job) {
+        const result = job.result || {};
+        const hubItems = result.knowledge_hub && Array.isArray(result.knowledge_hub.items) ? result.knowledge_hub.items : [];
+        if (hubItems.length) {
+          knowledgeEntryStore = hubItems.map((item, index) => mapKnowledgeEntryForTenant(item, activeUser.tenant.id, index));
+        }
+        renderKnowledgeExperience();
+        openReviewIngestResultModal(editingEntry ? '知识微调成功，已写入向量库' : '知识入库成功，已写入向量库', [
+          `embedding 引擎：${result.embedding_engine || '-'}`,
+          `embedding 模型：${result.embedding_model || '-'}`,
+          `存储方式：${(result.vector_record && result.vector_record.storage_mode) || '-'}`,
+          `namespace：${(result.vector_record && result.vector_record.vector_namespace) || '-'}`,
+          `知识标题：${title}`,
+          `知识摘要：${summary}`,
+          `正文预览：${(effectiveKnowledgeBody || '').slice(0, 180)}`,
+        ]);
+      },
+      onFailed(job) {
+        const failedEntry = getKnowledgeEntryById(optimisticId);
+        if (failedEntry) {
+          failedEntry.status = '失败';
+          failedEntry.destination = '同步失败';
+          renderKnowledgeExperience();
+        }
+        openReviewIngestResultModal('知识入库失败', [
+          `任务编号：${job.job_code || '-'}`,
+          `异常详情：${job.error_message || job.summary || '知识入库失败'}`,
+        ]);
+        showToast(job.error_message || '知识入库失败');
+      },
+    });
+  } catch (error) {
+    showToast(error.message || '知识入库失败');
   }
-  const entry = {
-    id: `kb-${knowledgeEntrySeq++}`,
-    tenantId: activeUser.tenant.id,
-    type: knowledgeIntakeType,
-    title,
-    source: cfg.label,
-    sourceDetail,
-    summary,
-    status: 'syncing',
-    time: '刚刚',
-    tags: cfg.defaultTags.slice(0),
-    destination: '同步中',
-    body: rawBody,
-    files: knowledgeIntakeType === 'file' ? knowledgeUploadSamples.slice(0) : [],
-    url: knowledgeIntakeType === 'url' && knowledgeUrlPreview ? knowledgeUrlPreview.url : '',
-    voiceMinutes: knowledgeIntakeType === 'voice' ? 6 : undefined,
-  };
-  knowledgeEntryStore.unshift(entry);
-  renderKnowledgeExperience();
-  closeKnowledgeIntake();
-  knowledgeDraft = buildKnowledgeDraft();
-  knowledgeEditingId = '';
-  showToast('知识已进入租户清洗队列');
-  setTimeout(() => {
-    entry.status = 'ready';
-    entry.time = '1分钟前';
-    entry.destination = '已同步知识专区';
-    renderKnowledgeExperience();
-    showToast('已同步到知识专区并可供 Hermes 调用');
-  }, 1200);
 }
 
 function renderDemoProfile(user) {
