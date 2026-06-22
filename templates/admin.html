@@ -3600,6 +3600,30 @@
               保存后，H5 用户端会按默认主题和功能开关展示；用户自己的主题选择仍然会被本地记住。
             </div>
           </div>
+          <div class="config-card">
+            <div class="config-card-title">证据链过滤配置</div>
+            <div class="config-field">
+              <label>过滤系统提示词</label>
+              <textarea id="evidence-filter-system-prompt" rows="8" placeholder="系统提示词"></textarea>
+            </div>
+            <div class="config-field">
+              <label>过滤用户提示词模板</label>
+              <textarea id="evidence-filter-user-template" rows="10" placeholder="可使用 {query} 和 {candidate_blocks} 占位符"></textarea>
+            </div>
+            <div class="config-grid two-column" style="margin-top:12px">
+              <div class="config-field">
+                <label>过滤超时（秒）</label>
+                <input id="evidence-filter-timeout-seconds" type="number" min="5" max="120" step="1" placeholder="25">
+              </div>
+              <div class="config-field">
+                <label>回答超时（秒）</label>
+                <input id="evidence-answer-timeout-seconds" type="number" min="5" max="180" step="1" placeholder="45">
+              </div>
+            </div>
+            <div class="feature-note">
+              这里是证据链相关性过滤的白盒配置。保存后，知识库问答、证据链 API，以及后续 H5 dashboard / 复盘等复用这套能力的入口都会使用这里的提示词和超时设置。
+            </div>
+          </div>
         </div>
       </div><!-- end section-settings-knowledge -->
 
@@ -3719,6 +3743,30 @@
             <div class="stat-value" id="token-summary-30d-requests">{{ token_usage.summary_30d.request_count }}</div>
             <div class="stat-change up">模型 / 向量总请求</div>
           </div>
+          <div class="stat-card">
+            <div class="stat-label">24h 平均耗时</div>
+            <span class="stat-icon">&#9201;</span>
+            <div class="stat-value" id="token-summary-24h-avg-latency">{{ token_usage.summary_24h.avg_latency_ms }}</div>
+            <div class="stat-change up">平均每次请求 ms</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">24h P95 / 最大</div>
+            <span class="stat-icon">&#9889;</span>
+            <div class="stat-value" id="token-summary-24h-p95">{{ token_usage.summary_24h.p95_latency_ms }}</div>
+            <div class="stat-change up" id="token-summary-24h-max-latency">峰值 {{ token_usage.summary_24h.max_latency_ms }} ms</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">24h 平均速度</div>
+            <span class="stat-icon">&#128640;</span>
+            <div class="stat-value" id="token-summary-24h-avg-throughput">{{ token_usage.summary_24h.avg_total_tokens_per_second }}</div>
+            <div class="stat-change up" id="token-summary-24h-output-throughput">输出 {{ token_usage.summary_24h.avg_output_tokens_per_second }} token/s</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">30d 总耗时</div>
+            <span class="stat-icon">&#9203;</span>
+            <div class="stat-value" id="token-summary-30d-total-latency">{{ token_usage.summary_30d.total_latency_seconds }}</div>
+            <div class="stat-change up" id="token-summary-30d-avg-throughput">均速 {{ token_usage.summary_30d.avg_total_tokens_per_second }} token/s</div>
+          </div>
         </div>
         <div class="charts-grid" style="margin-bottom:20px">
           <div class="chart-card">
@@ -3760,14 +3808,14 @@
           <div class="table-header">
             <div>
               <div class="table-title">模型消耗明细</div>
-              <div style="font-size:12px;color:#8899aa;margin-top:6px">这里可以直接看到 `provider + model` 的上行、下行、总量和平均延迟。</div>
+              <div style="font-size:12px;color:#8899aa;margin-top:6px">这里可以直接看到 `provider + model` 的上行、下行、总量、平均延迟和平均速度。</div>
             </div>
             <span class="tag tag-gold">按模型分析</span>
           </div>
           <table>
-            <thead><tr><th>模型</th><th>类型</th><th>请求数</th><th>上行</th><th>下行</th><th>总量</th><th>平均延迟</th></tr></thead>
+            <thead><tr><th>模型</th><th>类型</th><th>请求数</th><th>上行</th><th>下行</th><th>总量</th><th>平均延迟</th><th>平均速度</th><th>总耗时</th></tr></thead>
             <tbody id="admin-token-model-body">
-              <tr><td colspan="7" style="text-align:center;color:#8899aa;padding:20px 0">正在加载模型消耗…</td></tr>
+              <tr><td colspan="9" style="text-align:center;color:#8899aa;padding:20px 0">正在加载模型消耗…</td></tr>
             </tbody>
           </table>
         </div>
@@ -3775,14 +3823,14 @@
           <div class="table-header">
             <div>
               <div class="table-title">最近 Token 请求日志</div>
-              <div style="font-size:12px;color:#8899aa;margin-top:6px">按时间看最近调用了什么功能、用了哪个模型、消耗多少 token。</div>
+              <div style="font-size:12px;color:#8899aa;margin-top:6px">按时间看最近调用了什么功能、用了哪个模型、消耗多少 token，以及单次速度表现。</div>
             </div>
             <span class="tag tag-blue">明细日志</span>
           </div>
           <table>
-            <thead><tr><th>时间</th><th>功能</th><th>模型</th><th>入口</th><th>上行</th><th>下行</th><th>总量</th></tr></thead>
+            <thead><tr><th>时间</th><th>功能</th><th>模型</th><th>入口</th><th>耗时</th><th>上行</th><th>下行</th><th>总量</th><th>速度</th></tr></thead>
             <tbody id="admin-token-log-body">
-              <tr><td colspan="7" style="text-align:center;color:#8899aa;padding:20px 0">正在加载日志…</td></tr>
+              <tr><td colspan="9" style="text-align:center;color:#8899aa;padding:20px 0">正在加载日志…</td></tr>
             </tbody>
           </table>
         </div>
@@ -4163,6 +4211,13 @@ function formatAdminNumber(value) {
   return new Intl.NumberFormat('zh-CN').format(Number(value || 0));
 }
 
+function formatAdminMetric(value, digits = 2) {
+  return new Intl.NumberFormat('zh-CN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: digits,
+  }).format(Number(value || 0));
+}
+
 function formatAdminModelLabel(item) {
   const provider = String(item && item.model_provider || '').trim();
   const name = String(item && item.model_name || '').trim();
@@ -4189,8 +4244,8 @@ const adminTaskCenter = JSON.parse(JSON.stringify(window.ADMIN_TASK_CENTER || {
   user_job_runtime: {},
 }));
 const adminTokenUsage = JSON.parse(JSON.stringify(window.ADMIN_TOKEN_USAGE || {
-  summary_24h: {request_count: 0, input_tokens: 0, output_tokens: 0, total_tokens: 0, avg_tokens_per_request: 0, avg_latency_ms: 0},
-  summary_30d: {request_count: 0, input_tokens: 0, output_tokens: 0, total_tokens: 0, avg_tokens_per_request: 0, avg_latency_ms: 0},
+  summary_24h: {request_count: 0, input_tokens: 0, output_tokens: 0, total_tokens: 0, avg_tokens_per_request: 0, avg_latency_ms: 0, total_latency_ms: 0, total_latency_seconds: 0, avg_total_tokens_per_second: 0, avg_input_tokens_per_second: 0, avg_output_tokens_per_second: 0, p95_latency_ms: 0, max_latency_ms: 0},
+  summary_30d: {request_count: 0, input_tokens: 0, output_tokens: 0, total_tokens: 0, avg_tokens_per_request: 0, avg_latency_ms: 0, total_latency_ms: 0, total_latency_seconds: 0, avg_total_tokens_per_second: 0, avg_input_tokens_per_second: 0, avg_output_tokens_per_second: 0, p95_latency_ms: 0, max_latency_ms: 0},
   hourly: [],
   daily: [],
   monthly: [],
@@ -4678,8 +4733,8 @@ async function loadAdminKnowledgeItems(showMessage = false) {
 function applyAdminTokenUsagePayload(data) {
   Object.keys(adminTokenUsage).forEach((key) => delete adminTokenUsage[key]);
   Object.assign(adminTokenUsage, {
-    summary_24h: data.summary_24h || {request_count: 0, input_tokens: 0, output_tokens: 0, total_tokens: 0, avg_tokens_per_request: 0, avg_latency_ms: 0},
-    summary_30d: data.summary_30d || {request_count: 0, input_tokens: 0, output_tokens: 0, total_tokens: 0, avg_tokens_per_request: 0, avg_latency_ms: 0},
+    summary_24h: data.summary_24h || {request_count: 0, input_tokens: 0, output_tokens: 0, total_tokens: 0, avg_tokens_per_request: 0, avg_latency_ms: 0, total_latency_ms: 0, total_latency_seconds: 0, avg_total_tokens_per_second: 0, avg_input_tokens_per_second: 0, avg_output_tokens_per_second: 0, p95_latency_ms: 0, max_latency_ms: 0},
+    summary_30d: data.summary_30d || {request_count: 0, input_tokens: 0, output_tokens: 0, total_tokens: 0, avg_tokens_per_request: 0, avg_latency_ms: 0, total_latency_ms: 0, total_latency_seconds: 0, avg_total_tokens_per_second: 0, avg_input_tokens_per_second: 0, avg_output_tokens_per_second: 0, p95_latency_ms: 0, max_latency_ms: 0},
     hourly: Array.isArray(data.hourly) ? data.hourly : [],
     daily: Array.isArray(data.daily) ? data.daily : [],
     monthly: Array.isArray(data.monthly) ? data.monthly : [],
@@ -4698,10 +4753,24 @@ function renderAdminTokenSummary() {
   const inputNode = document.getElementById('token-summary-24h-input');
   const outputNode = document.getElementById('token-summary-24h-output');
   const requestNode = document.getElementById('token-summary-30d-requests');
+  const avgLatencyNode = document.getElementById('token-summary-24h-avg-latency');
+  const p95LatencyNode = document.getElementById('token-summary-24h-p95');
+  const maxLatencyNode = document.getElementById('token-summary-24h-max-latency');
+  const avgThroughputNode = document.getElementById('token-summary-24h-avg-throughput');
+  const outputThroughputNode = document.getElementById('token-summary-24h-output-throughput');
+  const totalLatencyNode = document.getElementById('token-summary-30d-total-latency');
+  const monthThroughputNode = document.getElementById('token-summary-30d-avg-throughput');
   if (totalNode) totalNode.textContent = formatAdminNumber(s24.total_tokens || 0);
   if (inputNode) inputNode.textContent = formatAdminNumber(s24.input_tokens || 0);
   if (outputNode) outputNode.textContent = formatAdminNumber(s24.output_tokens || 0);
   if (requestNode) requestNode.textContent = formatAdminNumber(s30.request_count || 0);
+  if (avgLatencyNode) avgLatencyNode.textContent = `${formatAdminNumber(s24.avg_latency_ms || 0)} ms`;
+  if (p95LatencyNode) p95LatencyNode.textContent = `${formatAdminNumber(s24.p95_latency_ms || 0)} ms`;
+  if (maxLatencyNode) maxLatencyNode.textContent = `峰值 ${formatAdminNumber(s24.max_latency_ms || 0)} ms`;
+  if (avgThroughputNode) avgThroughputNode.textContent = `${formatAdminMetric(s24.avg_total_tokens_per_second || 0)} token/s`;
+  if (outputThroughputNode) outputThroughputNode.textContent = `输出 ${formatAdminMetric(s24.avg_output_tokens_per_second || 0)} token/s`;
+  if (totalLatencyNode) totalLatencyNode.textContent = `${formatAdminNumber(s30.total_latency_seconds || 0)} s`;
+  if (monthThroughputNode) monthThroughputNode.textContent = `均速 ${formatAdminMetric(s30.avg_total_tokens_per_second || 0)} token/s`;
 }
 
 function renderAdminTokenTables() {
@@ -4717,8 +4786,10 @@ function renderAdminTokenTables() {
         <td>${formatAdminNumber(item.output_tokens || 0)}</td>
         <td style="color:#C8A96E">${formatAdminNumber(item.total_tokens || 0)}</td>
         <td>${formatAdminNumber(item.avg_latency_ms || 0)} ms</td>
+        <td>${formatAdminMetric(item.avg_total_tokens_per_second || 0)} token/s</td>
+        <td>${formatAdminMetric(item.total_latency_seconds || ((item.total_latency_ms || 0) / 1000), 1)} s</td>
       </tr>
-    `).join('') : '<tr><td colspan="7" style="text-align:center;color:#8899aa;padding:20px 0">暂无模型消耗数据</td></tr>';
+    `).join('') : '<tr><td colspan="9" style="text-align:center;color:#8899aa;padding:20px 0">暂无模型消耗数据</td></tr>';
   }
   if (logBody) {
     logBody.innerHTML = (adminTokenUsage.recent_logs || []).length ? (adminTokenUsage.recent_logs || []).map((item) => `
@@ -4727,11 +4798,13 @@ function renderAdminTokenTables() {
         <td><span style="color:#F8F6F0;font-weight:600">${escapeHtml(item.feature_label || item.feature_code || '--')}</span><div style="font-size:11px;color:#8899aa;margin-top:4px">${escapeHtml(item.usage_type || 'llm')}</div></td>
         <td>${escapeHtml([item.model_provider, item.model_name].filter(Boolean).join(' / ') || '--')}</td>
         <td>${escapeHtml(item.entry_point || '--')}</td>
+        <td>${formatAdminNumber(item.latency_ms || 0)} ms</td>
         <td>${formatAdminNumber(item.input_tokens || 0)}</td>
         <td>${formatAdminNumber(item.output_tokens || 0)}</td>
         <td style="color:#C8A96E">${formatAdminNumber(item.total_tokens || 0)}</td>
+        <td>${formatAdminMetric(item.avg_total_tokens_per_second || 0)} token/s</td>
       </tr>
-    `).join('') : '<tr><td colspan="7" style="text-align:center;color:#8899aa;padding:20px 0">暂无 token 日志</td></tr>';
+    `).join('') : '<tr><td colspan="9" style="text-align:center;color:#8899aa;padding:20px 0">暂无 token 日志</td></tr>';
   }
 }
 
@@ -6741,6 +6814,7 @@ function renderSiteConfigForm() {
   const voiceTranscription = cfg.voice_transcription || {};
   const voiceEmbedding = cfg.voice_embedding || {};
   const knowledgeIngestion = cfg.knowledge_ingestion || {};
+  const evidenceChain = cfg.evidence_chain || {};
   ensureAdminLlmRegistry();
   markActivePill('theme-mode-group', 'mode', cfg.default_theme || 'light');
   markActivePill('theme-accent-group', 'accent', cfg.default_accent || 'blue');
@@ -6752,6 +6826,10 @@ function renderSiteConfigForm() {
   if (embeddingEngine) embeddingEngine.value = voiceEmbedding.engine || 'api';
   const knowledgePreviewToggle = document.getElementById('knowledge-user-preview-enabled');
   if (knowledgePreviewToggle) knowledgePreviewToggle.checked = knowledgeIngestion.user_preview_enabled === true;
+  if (document.getElementById('evidence-filter-system-prompt')) document.getElementById('evidence-filter-system-prompt').value = evidenceChain.filter_prompt_system || '';
+  if (document.getElementById('evidence-filter-user-template')) document.getElementById('evidence-filter-user-template').value = evidenceChain.filter_prompt_user_template || '';
+  if (document.getElementById('evidence-filter-timeout-seconds')) document.getElementById('evidence-filter-timeout-seconds').value = String(evidenceChain.filter_timeout_seconds || 25);
+  if (document.getElementById('evidence-answer-timeout-seconds')) document.getElementById('evidence-answer-timeout-seconds').value = String(evidenceChain.answer_timeout_seconds || 45);
   if (document.getElementById('brand-name')) document.getElementById('brand-name').value = brand.name || '';
   if (document.getElementById('brand-short-name')) document.getElementById('brand-short-name').value = brand.short_name || '';
   if (document.getElementById('brand-logo-mark')) document.getElementById('brand-logo-mark').value = brand.logo_mark || '';
@@ -6822,6 +6900,20 @@ async function saveSiteConfig() {
     },
     knowledge_ingestion: {
       user_preview_enabled: Boolean(knowledgePreviewToggle && knowledgePreviewToggle.checked),
+    },
+    evidence_chain: {
+      filter_prompt_system: document.getElementById('evidence-filter-system-prompt')
+        ? document.getElementById('evidence-filter-system-prompt').value
+        : ((adminSiteConfig.evidence_chain || {}).filter_prompt_system || ''),
+      filter_prompt_user_template: document.getElementById('evidence-filter-user-template')
+        ? document.getElementById('evidence-filter-user-template').value
+        : ((adminSiteConfig.evidence_chain || {}).filter_prompt_user_template || ''),
+      filter_timeout_seconds: document.getElementById('evidence-filter-timeout-seconds')
+        ? Number(document.getElementById('evidence-filter-timeout-seconds').value || 25)
+        : Number((adminSiteConfig.evidence_chain || {}).filter_timeout_seconds || 25),
+      answer_timeout_seconds: document.getElementById('evidence-answer-timeout-seconds')
+        ? Number(document.getElementById('evidence-answer-timeout-seconds').value || 45)
+        : Number((adminSiteConfig.evidence_chain || {}).answer_timeout_seconds || 45),
     },
     llm_registry: {
       default_model_key: llmRegistry.default_model_key || '',

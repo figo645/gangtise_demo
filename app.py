@@ -418,6 +418,27 @@ DEFAULT_SITE_CONFIG = {
     "knowledge_ingestion": {
         "user_preview_enabled": False,
     },
+    "evidence_chain": {
+        "filter_prompt_system": (
+            "你是知识检索相关性过滤助手。"
+            "你的任务是根据用户问题，从召回候选里剔除明显无关、仅语义相近但业务主题不一致的内容。"
+            "判断标准必须严格，只有真正能回答问题、或能提供直接支撑信息的知识才能保留。"
+            "如果问题是具体领域问题，例如 MES、制造、设备、工艺，就不要保留股票、行情、复盘、泛化观点等无关内容。"
+            "输出必须是 JSON，不要输出任何额外解释。"
+        ),
+        "filter_prompt_user_template": (
+            "用户问题：{query}\n\n"
+            "候选知识：\n{candidate_blocks}\n\n"
+            "请返回 JSON，格式如下：\n"
+            "{\n"
+            '  "relevant_ids": ["保留的候选ID"],\n'
+            '  "reason": "一句话说明筛选结论"\n'
+            "}\n"
+            "如果没有任何相关知识，relevant_ids 返回空数组。"
+        ),
+        "filter_timeout_seconds": 25,
+        "answer_timeout_seconds": 45,
+    },
     "llm_registry": {
         "default_model_key": "",
         "models": [],
@@ -479,6 +500,17 @@ def normalize_knowledge_ingestion_config(source=None):
     raw = source if isinstance(source, dict) else {}
     return {
         "user_preview_enabled": bool(raw.get("user_preview_enabled", False)),
+    }
+
+
+def normalize_evidence_chain_config(source=None):
+    raw = source if isinstance(source, dict) else {}
+    defaults = copy.deepcopy(DEFAULT_SITE_CONFIG["evidence_chain"])
+    return {
+        "filter_prompt_system": str(raw.get("filter_prompt_system") or defaults["filter_prompt_system"]).strip()[:8000] or defaults["filter_prompt_system"],
+        "filter_prompt_user_template": str(raw.get("filter_prompt_user_template") or defaults["filter_prompt_user_template"]).strip()[:12000] or defaults["filter_prompt_user_template"],
+        "filter_timeout_seconds": max(5, min(int(raw.get("filter_timeout_seconds") or defaults["filter_timeout_seconds"]), 120)),
+        "answer_timeout_seconds": max(5, min(int(raw.get("answer_timeout_seconds") or defaults["answer_timeout_seconds"]), 180)),
     }
 
 
@@ -1344,6 +1376,7 @@ def normalize_site_config(source=None):
     merged = _merge_site_config(copy.deepcopy(DEFAULT_SITE_CONFIG), source or {})
     merged["brand"] = normalize_brand_config(merged.get("brand"))
     merged["knowledge_ingestion"] = normalize_knowledge_ingestion_config(merged.get("knowledge_ingestion"))
+    merged["evidence_chain"] = normalize_evidence_chain_config(merged.get("evidence_chain"))
     merged["llm_registry"] = normalize_llm_registry_config(merged.get("llm_registry"))
     merged["tenants"] = normalize_tenant_configs(merged.get("tenants"))
     tenant_slugs = [tenant["slug"] for tenant in merged["tenants"]]
@@ -2490,13 +2523,41 @@ def build_token_usage_summary(hours=24 * 30):
     payload = dict(row or {})
     total_requests = int(payload.get("request_count") or 0)
     total_tokens = int(payload.get("total_tokens") or 0)
+    latency_rows = db.execute(
+        """
+        SELECT latency_ms
+        FROM token_usage_logs
+        WHERE created_at >= ?
+          AND latency_ms > 0
+        ORDER BY latency_ms ASC
+        """,
+        (since,),
+    ).fetchall()
+    latencies = [int(row.get("latency_ms") or 0) for row in latency_rows if int(row.get("latency_ms") or 0) > 0]
+    p95_latency_ms = 0
+    max_latency_ms = 0
+    total_latency_ms = int(payload.get("latency_ms") or 0)
+    total_latency_seconds = round(total_latency_ms / 1000, 2)
+    if latencies:
+        p95_index = max(0, math.ceil(len(latencies) * 0.95) - 1)
+        p95_latency_ms = int(latencies[min(p95_index, len(latencies) - 1)])
+        max_latency_ms = max(latencies)
+    input_tokens = int(payload.get("input_tokens") or 0)
+    output_tokens = int(payload.get("output_tokens") or 0)
     return {
         "request_count": total_requests,
-        "input_tokens": int(payload.get("input_tokens") or 0),
-        "output_tokens": int(payload.get("output_tokens") or 0),
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
         "total_tokens": total_tokens,
         "avg_tokens_per_request": round(total_tokens / total_requests, 2) if total_requests else 0,
-        "avg_latency_ms": round(int(payload.get("latency_ms") or 0) / total_requests, 2) if total_requests else 0,
+        "avg_latency_ms": round(total_latency_ms / total_requests, 2) if total_requests else 0,
+        "total_latency_ms": total_latency_ms,
+        "total_latency_seconds": total_latency_seconds,
+        "avg_total_tokens_per_second": round(total_tokens / (total_latency_ms / 1000), 2) if total_latency_ms > 0 else 0,
+        "avg_input_tokens_per_second": round(input_tokens / (total_latency_ms / 1000), 2) if total_latency_ms > 0 else 0,
+        "avg_output_tokens_per_second": round(output_tokens / (total_latency_ms / 1000), 2) if total_latency_ms > 0 else 0,
+        "p95_latency_ms": p95_latency_ms,
+        "max_latency_ms": max_latency_ms,
         "window_hours": hours,
     }
 
@@ -2514,7 +2575,8 @@ def _build_token_usage_timeseries_sql(granularity):
             COUNT(*) AS request_count,
             COALESCE(SUM(input_tokens), 0) AS input_tokens,
             COALESCE(SUM(output_tokens), 0) AS output_tokens,
-            COALESCE(SUM(total_tokens), 0) AS total_tokens
+            COALESCE(SUM(total_tokens), 0) AS total_tokens,
+            COALESCE(SUM(latency_ms), 0) AS total_latency_ms
         FROM token_usage_logs
         WHERE created_at >= ?
         GROUP BY 1
@@ -2534,6 +2596,13 @@ def get_token_usage_timeseries(granularity="day", hours=24 * 30):
             "input_tokens": int(row.get("input_tokens") or 0),
             "output_tokens": int(row.get("output_tokens") or 0),
             "total_tokens": int(row.get("total_tokens") or 0),
+            "total_latency_ms": int(row.get("total_latency_ms") or 0),
+            "avg_total_tokens_per_second": round(
+                int(row.get("total_tokens") or 0) / (int(row.get("total_latency_ms") or 0) / 1000), 2
+            ) if int(row.get("total_latency_ms") or 0) > 0 else 0,
+            "avg_output_tokens_per_second": round(
+                int(row.get("output_tokens") or 0) / (int(row.get("total_latency_ms") or 0) / 1000), 2
+            ) if int(row.get("total_latency_ms") or 0) > 0 else 0,
         }
         for row in rows
     ]
@@ -2602,6 +2671,8 @@ def get_token_usage_model_breakdown(hours=24 * 30, limit=16):
     ).fetchall()
     return [
         {
+            "total_latency_ms": int(row.get("latency_ms") or 0),
+            "total_latency_seconds": round(int(row.get("latency_ms") or 0) / 1000, 2),
             "model_provider": row.get("model_provider") or "",
             "model_name": row.get("model_name") or "",
             "usage_type": row.get("usage_type") or "llm",
@@ -2610,6 +2681,15 @@ def get_token_usage_model_breakdown(hours=24 * 30, limit=16):
             "output_tokens": int(row.get("output_tokens") or 0),
             "total_tokens": int(row.get("total_tokens") or 0),
             "avg_latency_ms": round(int(row.get("latency_ms") or 0) / max(1, int(row.get("request_count") or 1)), 2),
+            "avg_total_tokens_per_second": round(
+                int(row.get("total_tokens") or 0) / (int(row.get("latency_ms") or 0) / 1000), 2
+            ) if int(row.get("latency_ms") or 0) > 0 else 0,
+            "avg_input_tokens_per_second": round(
+                int(row.get("input_tokens") or 0) / (int(row.get("latency_ms") or 0) / 1000), 2
+            ) if int(row.get("latency_ms") or 0) > 0 else 0,
+            "avg_output_tokens_per_second": round(
+                int(row.get("output_tokens") or 0) / (int(row.get("latency_ms") or 0) / 1000), 2
+            ) if int(row.get("latency_ms") or 0) > 0 else 0,
         }
         for row in rows
     ]
@@ -2675,7 +2755,18 @@ def get_token_usage_recent_logs(limit=80):
         """,
         (max(1, min(int(limit or 80), 200)),),
     ).fetchall()
-    return [dict(row) for row in rows]
+    items = []
+    for row in rows:
+        item = dict(row)
+        total_latency_ms = int(item.get("latency_ms") or 0)
+        input_tokens = int(item.get("input_tokens") or 0)
+        output_tokens = int(item.get("output_tokens") or 0)
+        total_tokens = int(item.get("total_tokens") or 0)
+        item["avg_total_tokens_per_second"] = round(total_tokens / (total_latency_ms / 1000), 2) if total_latency_ms > 0 else 0
+        item["avg_input_tokens_per_second"] = round(input_tokens / (total_latency_ms / 1000), 2) if total_latency_ms > 0 else 0
+        item["avg_output_tokens_per_second"] = round(output_tokens / (total_latency_ms / 1000), 2) if total_latency_ms > 0 else 0
+        items.append(item)
+    return items
 
 
 def build_admin_token_usage_payload():
@@ -7179,6 +7270,12 @@ def get_voice_embedding_config(site_config=None):
     return {"engine": engine}
 
 
+def get_evidence_chain_config(site_config=None):
+    config = site_config or get_site_config()
+    section = config.get("evidence_chain") if isinstance(config, dict) else {}
+    return normalize_evidence_chain_config(section)
+
+
 def get_default_llm_config(site_config=None, purpose="general"):
     config = site_config or get_site_config()
     registry = normalize_llm_registry_config((config or {}).get("llm_registry"))
@@ -8644,22 +8741,13 @@ def filter_knowledge_matches_with_llm(query_text, matches, tenant_slug=""):
                 f"向量相关度：{item.get('score', 0)}",
             ])
         )
-    system_prompt = (
-        "你是知识检索相关性过滤助手。"
-        "你的任务是根据用户问题，从召回候选里剔除明显无关、仅语义相近但业务主题不一致的内容。"
-        "判断标准必须严格，只有真正能回答问题、或能提供直接支撑信息的知识才能保留。"
-        "如果问题是具体领域问题，例如 MES、制造、设备、工艺，就不要保留股票、行情、复盘、泛化观点等无关内容。"
-        "输出必须是 JSON，不要输出任何额外解释。"
-    )
+    evidence_chain_cfg = get_evidence_chain_config()
+    system_prompt = evidence_chain_cfg.get("filter_prompt_system") or DEFAULT_SITE_CONFIG["evidence_chain"]["filter_prompt_system"]
+    user_prompt_template = evidence_chain_cfg.get("filter_prompt_user_template") or DEFAULT_SITE_CONFIG["evidence_chain"]["filter_prompt_user_template"]
     user_prompt = (
-        f"用户问题：{normalized_query}\n\n"
-        f"候选知识：\n{chr(10).join(candidate_blocks)}\n\n"
-        "请返回 JSON，格式如下：\n"
-        "{\n"
-        '  "relevant_ids": ["保留的候选ID"],\n'
-        '  "reason": "一句话说明筛选结论"\n'
-        "}\n"
-        "如果没有任何相关知识，relevant_ids 返回空数组。"
+        str(user_prompt_template)
+        .replace("{query}", normalized_query)
+        .replace("{candidate_blocks}", chr(10).join(candidate_blocks))
     )
     raw = call_openai_compatible_llm(
         llm_model,
@@ -8670,7 +8758,7 @@ def filter_knowledge_matches_with_llm(query_text, matches, tenant_slug=""):
         tenant_slug=tenant_slug,
         entry_point="knowledge_query",
         metadata={"candidate_count": len(normalized_matches), "query_length": len(normalized_query)},
-        request_timeout_seconds=25,
+        request_timeout_seconds=evidence_chain_cfg.get("filter_timeout_seconds", 25),
     )
     parsed = _extract_json_payload_from_llm_text(raw, {"relevant_ids": [], "reason": ""})
     relevant_ids = {
@@ -8770,7 +8858,7 @@ def build_evidence_chain_response(
                     tenant_slug=tenant_slug,
                     entry_point=entry_point,
                     metadata={"match_count": len(filtered_matches), "submit_to_model": True},
-                    request_timeout_seconds=45,
+                    request_timeout_seconds=get_evidence_chain_config().get("answer_timeout_seconds", 45),
                 )
                 result["answer"] = llm_answer
                 llm_mode = "model_answered"
@@ -9441,7 +9529,46 @@ def admin():
             admin_view=True,
         )
         task_center = {"summary": {"total": 0, "enabled": 0, "running": 0, "failed": 0, "now": now_ts()}, "tasks": [], "runs": [], "runtime": {}}
-        token_usage = {"summary_24h": {"request_count": 0, "input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "avg_tokens_per_request": 0, "avg_latency_ms": 0}, "summary_30d": {"request_count": 0, "input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "avg_tokens_per_request": 0, "avg_latency_ms": 0}, "hourly": [], "daily": [], "monthly": [], "features": [], "models": [], "model_daily": [], "recent_logs": [], "generated_at": now_ts()}
+        token_usage = {
+            "summary_24h": {
+                "request_count": 0,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+                "avg_tokens_per_request": 0,
+                "avg_latency_ms": 0,
+                "total_latency_ms": 0,
+                "total_latency_seconds": 0,
+                "avg_total_tokens_per_second": 0,
+                "avg_input_tokens_per_second": 0,
+                "avg_output_tokens_per_second": 0,
+                "p95_latency_ms": 0,
+                "max_latency_ms": 0,
+            },
+            "summary_30d": {
+                "request_count": 0,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+                "avg_tokens_per_request": 0,
+                "avg_latency_ms": 0,
+                "total_latency_ms": 0,
+                "total_latency_seconds": 0,
+                "avg_total_tokens_per_second": 0,
+                "avg_input_tokens_per_second": 0,
+                "avg_output_tokens_per_second": 0,
+                "p95_latency_ms": 0,
+                "max_latency_ms": 0,
+            },
+            "hourly": [],
+            "daily": [],
+            "monthly": [],
+            "features": [],
+            "models": [],
+            "model_daily": [],
+            "recent_logs": [],
+            "generated_at": now_ts(),
+        }
     return render_template(
         "admin.html",
         kols=kols,
@@ -10147,6 +10274,11 @@ def api_admin_site_config():
                 payload.get("knowledge_ingestion")
                 if isinstance(payload.get("knowledge_ingestion"), dict)
                 else current.get("knowledge_ingestion")
+            ),
+            "evidence_chain": normalize_evidence_chain_config(
+                payload.get("evidence_chain")
+                if isinstance(payload.get("evidence_chain"), dict)
+                else current.get("evidence_chain")
             ),
             "llm_registry": normalize_llm_registry_config(
                 payload.get("llm_registry")
