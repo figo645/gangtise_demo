@@ -1644,6 +1644,69 @@ body { background: var(--surface-2); color: var(--text-main); }
   color:var(--text-main);
   font-weight:700;
 }
+.review-progress-panel {
+  margin-top:12px;
+  background:#FFFDF7;
+  border:1px solid rgba(200,169,110,0.22);
+  border-radius:14px;
+  padding:12px;
+}
+.review-progress-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+}
+.review-progress-title {
+  font-size:13px;
+  color:var(--text-main);
+  font-weight:800;
+}
+.review-progress-subtitle {
+  margin-top:4px;
+  font-size:11px;
+  color:var(--gray-400);
+  line-height:1.7;
+}
+.review-progress-percent {
+  font-size:12px;
+  font-weight:800;
+  color:var(--gold-dark);
+}
+.review-progress-track {
+  margin-top:10px;
+  height:8px;
+  border-radius:999px;
+  background:rgba(200,169,110,0.12);
+  overflow:hidden;
+}
+.review-progress-fill {
+  height:100%;
+  border-radius:999px;
+  background:linear-gradient(90deg,#E2B85A,#C8A96E);
+}
+.review-progress-log {
+  margin-top:10px;
+  display:grid;
+  gap:8px;
+}
+.review-progress-log-item {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:10px;
+  padding:10px;
+}
+.review-progress-log-meta {
+  font-size:10px;
+  color:#1F497D;
+  font-weight:700;
+}
+.review-progress-log-text {
+  margin-top:4px;
+  font-size:11px;
+  color:var(--gray-400);
+  line-height:1.7;
+}
 .knowledge-rich-shell {
   background:#F8FBFF;
   border:1px solid rgba(47,116,192,0.12);
@@ -4096,6 +4159,7 @@ let reviewVoiceRecording = false;
 let reviewVoiceUploading = false;
 let reviewIngestResult = null;
 let reviewDraftGenerating = false;
+let reviewDraftJobState = null;
 let knowledgeVoiceRecorder = null;
 let knowledgeVoiceChunks = [];
 let knowledgeVoiceUploading = false;
@@ -4125,6 +4189,51 @@ async function generateReviewDraftWithLlm() {
     throw new Error((data && data.error) || 'review_draft_generation_failed');
   }
   return data;
+}
+
+function formatReviewJobStage(stage) {
+  const map = {
+    queued: '已进入队列',
+    processing: '后台处理中',
+    llm_preparing: '整理原始材料',
+    llm_postprocessing: '整理返回结果',
+    completed: '已完成',
+    failed: '已失败',
+  };
+  return map[String(stage || '').trim()] || (stage || '处理中');
+}
+
+function renderReviewDraftProgressPanel() {
+  if (!reviewDraftGenerating && !reviewDraftJobState) return '';
+  const job = reviewDraftJobState || {};
+  const percent = Math.max(5, Number(job.progress_percent || 0) || 0);
+  const logs = Array.isArray(job.result && job.result.live_log) ? job.result.live_log.slice(-4).reverse() : [];
+  return `
+    <div class="review-progress-panel">
+      <div class="review-progress-head">
+        <div>
+          <div class="review-progress-title">大模型正在生成复盘草稿</div>
+          <div class="review-progress-subtitle">${escapeHtml(job.summary || '后台仍在工作中，当前会持续展示处理阶段与最新进展。')}</div>
+        </div>
+        <div class="review-progress-percent">${escapeHtml(String(percent))}%</div>
+      </div>
+      <div class="review-progress-track">
+        <div class="review-progress-fill" style="width:${Math.min(100, percent)}%"></div>
+      </div>
+      <div class="review-progress-log">
+        <div class="review-progress-log-item">
+          <div class="review-progress-log-meta">${escapeHtml(formatReviewJobStage(job.progress_stage || 'processing'))}${job.job_code ? ` · ${escapeHtml(job.job_code)}` : ''}</div>
+          <div class="review-progress-log-text">${escapeHtml(job.summary || '系统正在准备模型请求')}</div>
+        </div>
+        ${logs.map((item) => `
+          <div class="review-progress-log-item">
+            <div class="review-progress-log-meta">${escapeHtml(formatReviewJobStage(item.stage || 'processing'))} · ${escapeHtml(item.at || '--')}</div>
+            <div class="review-progress-log-text">${escapeHtml(item.text || '')}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
 }
 
 function openReviewIngestResultModal(title, lines) {
@@ -4562,7 +4671,7 @@ function renderReviewTriggerModal(user) {
         ${(user.role === 'dav' ? reviewTriggerDraft.selectedWatchlist : focusNames).map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
       </div>
     </div>
-    ${user.role === 'dav' && reviewDraftGenerating ? '<div class="review-preview-panel"><div class="review-preview-copy">正在调用大模型生成复盘草稿，请稍候...</div></div>' : ''}
+    ${user.role === 'dav' ? renderReviewDraftProgressPanel() : ''}
     ${user.role === 'dav' ? renderReviewPreviewPanel() : ''}
     <div class="modal-actions">
       <button class="btn-outline" onclick="closeReviewTriggerModal()">取消</button>
@@ -4771,24 +4880,57 @@ async function submitReviewTrigger() {
     if (reviewTriggerDraft.paragraphMode === 'ai' && !reviewTriggerDraft.skipAiProcessing) {
       reviewDraftGenerating = true;
       reviewTriggerDraft.previewReady = false;
+      reviewDraftJobState = {
+        status: 'running',
+        progress_stage: 'queued',
+        progress_percent: 6,
+        summary: '已提交任务，正在进入大模型处理队列',
+        result: { live_log: [] },
+      };
       renderReviewTriggerModal(user);
       try {
         const draftResult = await generateReviewDraftWithLlm();
-        reviewTriggerDraft.generatedPreviewText = draftResult.text || '';
-        reviewIngestResult = {
-          ...(reviewIngestResult || {}),
-          review_draft_llm: draftResult.llm_model || null,
-        };
+        if (!draftResult.async || !draftResult.job_code) throw new Error('review_draft_job_missing');
+        await new Promise((resolve, reject) => {
+          startAsyncJobPolling(draftResult.job_code, {
+            onProgress(job) {
+              reviewDraftJobState = job || reviewDraftJobState;
+              renderReviewTriggerModal(user);
+            },
+            onSuccess(job) {
+              const result = job.result || {};
+              reviewTriggerDraft.generatedPreviewText = result.text || '';
+              reviewIngestResult = {
+                ...(reviewIngestResult || {}),
+                review_draft_llm: result.llm_model || null,
+              };
+              reviewDraftGenerating = false;
+              reviewDraftJobState = job;
+              resolve();
+            },
+            onFailed(job) {
+              reject(new Error(job.error_message || job.summary || '大模型复盘草稿生成失败'));
+            },
+            onError(error) {
+              reject(error);
+            },
+          });
+        });
       } catch (error) {
         reviewDraftGenerating = false;
+        reviewDraftJobState = null;
         renderReviewTriggerModal(user);
         showToast(error.message || '大模型复盘草稿生成失败');
         return;
       } finally {
         reviewDraftGenerating = false;
+        if (reviewDraftJobState && reviewDraftJobState.status === 'success') {
+          reviewDraftJobState = null;
+        }
       }
     } else {
       reviewTriggerDraft.generatedPreviewText = '';
+      reviewDraftJobState = null;
     }
     runtime.kolGeneratedAt = '刚刚生成';
     runtime.kolSourceMode = reviewTriggerDraft.sourceMode;

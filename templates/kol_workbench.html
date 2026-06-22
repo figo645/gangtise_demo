@@ -1563,6 +1563,69 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
   line-height:1.8;
   white-space:pre-wrap;
 }
+.kw-review-progress-panel {
+  margin-top:12px;
+  background:#FFFDF7;
+  border:1px solid rgba(200,169,110,0.22);
+  border-radius:14px;
+  padding:14px;
+}
+.kw-review-progress-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+}
+.kw-review-progress-title {
+  font-size:12px;
+  font-weight:800;
+  color:var(--text-main);
+}
+.kw-review-progress-subtitle {
+  margin-top:4px;
+  font-size:11px;
+  color:#6B7A90;
+  line-height:1.7;
+}
+.kw-review-progress-percent {
+  font-size:12px;
+  font-weight:800;
+  color:var(--gold);
+}
+.kw-review-progress-track {
+  margin-top:10px;
+  height:8px;
+  border-radius:999px;
+  background:rgba(200,169,110,0.12);
+  overflow:hidden;
+}
+.kw-review-progress-fill {
+  height:100%;
+  border-radius:999px;
+  background:linear-gradient(90deg,#E2B85A,#C8A96E);
+}
+.kw-review-progress-log {
+  margin-top:10px;
+  display:grid;
+  gap:8px;
+}
+.kw-review-progress-log-item {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:10px;
+  padding:10px;
+}
+.kw-review-progress-log-meta {
+  font-size:10px;
+  color:#1F497D;
+  font-weight:700;
+}
+.kw-review-progress-log-text {
+  margin-top:4px;
+  font-size:11px;
+  color:#6B7A90;
+  line-height:1.7;
+}
 .kw-review-rich-toolbar { margin-bottom:10px; }
 .kw-review-rich-editor {
   min-height:180px;
@@ -4953,7 +5016,7 @@ function kwRenderKnowledgeModal() {
     <div class="kw-review-modal-head">
       <div>
         <div class="kw-review-modal-title">${entry ? '微调知识内容' : '新增知识内容'}</div>
-        <div class="kw-review-modal-subtitle">${entry ? '这里不是只看摘要，而是可以直接查看原始材料、系统提炼结果、验证节点和同步去向，再决定具体怎么改。保存后会重新同步到知识专区和 Hermes 上下文。' : cfg.desc}</div>
+        <div class="kw-review-modal-subtitle">${entry ? '左侧用于说明这条知识建议如何微调，右侧直接修改标题、正文、摘要和补充备注。保存后会重新同步到知识专区和 Hermes 上下文。' : cfg.desc}</div>
       </div>
       <button class="kw-review-modal-close" type="button" onclick="kwCloseKnowledgeModal()">×</button>
     </div>
@@ -4965,17 +5028,13 @@ function kwRenderKnowledgeModal() {
     <div class="kw-knowledge-detail-grid">
       <div class="kw-knowledge-detail-stack">
         <div class="kw-knowledge-detail-card">
-          <div class="kw-knowledge-detail-title">当前知识详情</div>
-          <div class="kw-knowledge-detail-note">${entry ? `${escapeHtml(entry.source_detail || entry.source || '')} · ${escapeHtml(entry.status || '')}` : '新建知识条目时，左侧会逐步形成“原始输入 - 提炼摘要 - 备注”的完整内容。'}</div>
-          ${entry ? `
-            <div class="kw-knowledge-bullet-list">
-              <div class="kw-knowledge-bullet-item"><strong>原始材料</strong>${kwBuildKnowledgeRenderedHtml(entry.raw_html || entry.raw_input || '', '暂无原始材料')}</div>
-              <div class="kw-knowledge-bullet-item"><strong>加工方式</strong><div class="kw-knowledge-detail-copy">${escapeHtml((entry.processed_content && entry.processed_content.label) || (entry.processing_mode || 'algorithm'))}</div></div>
-              <div class="kw-knowledge-bullet-item"><strong>加工后正文</strong><div class="kw-knowledge-detail-copy">${escapeHtml((entry.processed_content && entry.processed_content.rendered_text) || entry.body || '暂无加工后正文')}</div></div>
-              <div class="kw-knowledge-bullet-item"><strong>系统提炼的关键要点</strong><div class="kw-knowledge-detail-copy">${(entry.key_points || []).map((point, index) => `${index + 1}. ${point}`).join('\n')}</div></div>
-              <div class="kw-knowledge-bullet-item"><strong>当前验证节点</strong><div class="kw-knowledge-detail-copy">${(entry.validation_nodes || []).map((point, index) => `${index + 1}. ${point}`).join('\n')}</div></div>
-            </div>
-          ` : ''}
+          <div class="kw-knowledge-detail-title">微调说明</div>
+          <div class="kw-knowledge-detail-note">${entry ? '左侧只保留操作说明，不再重复展示当前知识详情。请直接在右侧修改标题、内容、摘要和补充备注。' : '新建知识时，左侧显示操作说明，右侧负责录入实际内容。'}</div>
+          <div class="kw-knowledge-bullet-list">
+            <div class="kw-knowledge-bullet-item">右侧标题用于确定这条知识的最终命名。</div>
+            <div class="kw-knowledge-bullet-item">正文和原始输入建议保留核心证据，避免只写结论。</div>
+            <div class="kw-knowledge-bullet-item">结构化摘要更适合沉淀成可复用的判断、节点和风险边界。</div>
+          </div>
         </div>
         <div class="kw-knowledge-detail-card">
           <div class="kw-knowledge-detail-title">这条知识具体微调什么</div>
@@ -5556,6 +5615,7 @@ let kwReviewVoiceRecording = false;
 let kwReviewVoiceUploading = false;
 let kwReviewIngestResult = null;
 let kwReviewDraftGenerating = false;
+let kwReviewDraftJobState = null;
 let kwKnowledgeVoiceRecorder = null;
 let kwKnowledgeVoiceChunks = [];
 let kwKnowledgeVoiceUploading = false;
@@ -5583,6 +5643,51 @@ async function kwGenerateReviewDraftWithLlm() {
     throw new Error((data && data.error) || 'review_draft_generation_failed');
   }
   return data;
+}
+
+function kwFormatReviewJobStage(stage) {
+  const map = {
+    queued: '已进入队列',
+    processing: '后台处理中',
+    llm_preparing: '整理原始材料',
+    llm_postprocessing: '整理返回结果',
+    completed: '已完成',
+    failed: '已失败',
+  };
+  return map[String(stage || '').trim()] || (stage || '处理中');
+}
+
+function kwRenderReviewDraftProgressPanel() {
+  if (!kwReviewDraftGenerating && !kwReviewDraftJobState) return '';
+  const job = kwReviewDraftJobState || {};
+  const percent = Math.max(5, Number(job.progress_percent || 0) || 0);
+  const logs = Array.isArray(job.result && job.result.live_log) ? job.result.live_log.slice(-4).reverse() : [];
+  return `
+    <div class="kw-review-progress-panel">
+      <div class="kw-review-progress-head">
+        <div>
+          <div class="kw-review-progress-title">大模型正在生成复盘草稿</div>
+          <div class="kw-review-progress-subtitle">${escapeHtml(job.summary || '后台仍在工作中，当前会持续展示处理阶段与最新进展。')}</div>
+        </div>
+        <div class="kw-review-progress-percent">${escapeHtml(String(percent))}%</div>
+      </div>
+      <div class="kw-review-progress-track">
+        <div class="kw-review-progress-fill" style="width:${Math.min(100, percent)}%"></div>
+      </div>
+      <div class="kw-review-progress-log">
+        <div class="kw-review-progress-log-item">
+          <div class="kw-review-progress-log-meta">${escapeHtml(kwFormatReviewJobStage(job.progress_stage || 'processing'))}${job.job_code ? ` · ${escapeHtml(job.job_code)}` : ''}</div>
+          <div class="kw-review-progress-log-text">${escapeHtml(job.summary || '系统正在准备模型请求')}</div>
+        </div>
+        ${logs.map((item) => `
+          <div class="kw-review-progress-log-item">
+            <div class="kw-review-progress-log-meta">${escapeHtml(kwFormatReviewJobStage(item.stage || 'processing'))} · ${escapeHtml(item.at || '--')}</div>
+            <div class="kw-review-progress-log-text">${escapeHtml(item.text || '')}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
 }
 
 function kwOpenReviewIngestResultModal(title, lines) {
@@ -5879,7 +5984,7 @@ function kwRenderReviewTriggerModal() {
         ${(kwReviewDraft.selectedWatchlist || []).map(name => `<span class="kw-review-watchlist-chip">${escapeHtml(name)}</span>`).join('') || '<span class="kw-review-runtime-meta">当前还没选择股票</span>'}
       </div>
     </div>
-    ${kwReviewDraftGenerating ? '<div class="kw-review-preview-panel"><div class="kw-review-preview-copy">正在调用大模型生成复盘草稿，请稍候...</div></div>' : ''}
+    ${kwRenderReviewDraftProgressPanel()}
     ${kwRenderReviewPreviewPanel()}
     <div class="kw-review-modal-actions">
       <button class="btn-outline" type="button" onclick="kwCloseReviewTriggerModal()">取消</button>
@@ -6123,23 +6228,58 @@ function kwSubmitReviewTrigger() {
       if (kwReviewDraft.paragraphMode === 'ai' && !kwReviewDraft.skipAiProcessing) {
         kwReviewDraftGenerating = true;
         kwReviewDraft.previewReady = false;
+        kwReviewDraftJobState = {
+          status: 'running',
+          progress_stage: 'queued',
+          progress_percent: 6,
+          summary: '已提交任务，正在进入大模型处理队列',
+          result: { live_log: [] },
+        };
         kwRenderReviewTriggerModal();
         kwGenerateReviewDraftWithLlm().then((draftResult) => {
-          kwReviewDraft.generatedPreviewText = draftResult.text || '';
-          kwReviewIngestResult = {
-            ...(kwReviewIngestResult || {}),
-            review_draft_llm: draftResult.llm_model || null,
-          };
-          finalizeDraft();
+          if (!draftResult.async || !draftResult.job_code) throw new Error('review_draft_job_missing');
+          kwStartAsyncJobPolling(draftResult.job_code, {
+            onProgress(job) {
+              kwReviewDraftJobState = job || kwReviewDraftJobState;
+              kwRenderReviewTriggerModal();
+            },
+            onSuccess(job) {
+              const result = job.result || {};
+              kwReviewDraft.generatedPreviewText = result.text || '';
+              kwReviewIngestResult = {
+                ...(kwReviewIngestResult || {}),
+                review_draft_llm: result.llm_model || null,
+              };
+              kwReviewDraftGenerating = false;
+              kwReviewDraftJobState = null;
+              finalizeDraft();
+            },
+            onFailed(job) {
+              kwReviewDraftGenerating = false;
+              kwReviewDraftJobState = null;
+              kwRenderReviewTriggerModal();
+              showToast(job.error_message || job.summary || '大模型复盘草稿生成失败');
+            },
+            onError(error) {
+              kwReviewDraftGenerating = false;
+              kwReviewDraftJobState = null;
+              kwRenderReviewTriggerModal();
+              showToast(error.message || '大模型复盘草稿生成失败');
+            },
+          });
         }).catch((error) => {
+          kwReviewDraftJobState = null;
           showToast(error.message || '大模型复盘草稿生成失败');
         }).finally(() => {
-          kwReviewDraftGenerating = false;
-          kwRenderReviewTriggerModal();
+          if (!kwReviewDraftJobState) {
+            kwReviewDraftGenerating = false;
+            kwRenderReviewTriggerModal();
+          }
         });
         return;
       }
       kwReviewDraft.generatedPreviewText = '';
+      kwReviewDraftJobState = null;
       finalizeDraft();
     }).catch((error) => {
       showToast(error.message || '手写正文入库失败');
@@ -6167,23 +6307,58 @@ function kwSubmitReviewTrigger() {
   if (kwReviewDraft.paragraphMode === 'ai' && !kwReviewDraft.skipAiProcessing) {
     kwReviewDraftGenerating = true;
     kwReviewDraft.previewReady = false;
+    kwReviewDraftJobState = {
+      status: 'running',
+      progress_stage: 'queued',
+      progress_percent: 6,
+      summary: '已提交任务，正在进入大模型处理队列',
+      result: { live_log: [] },
+    };
     kwRenderReviewTriggerModal();
     kwGenerateReviewDraftWithLlm().then((draftResult) => {
-      kwReviewDraft.generatedPreviewText = draftResult.text || '';
-      kwReviewIngestResult = {
-        ...(kwReviewIngestResult || {}),
-        review_draft_llm: draftResult.llm_model || null,
-      };
-      finalizeDraft();
+      if (!draftResult.async || !draftResult.job_code) throw new Error('review_draft_job_missing');
+      kwStartAsyncJobPolling(draftResult.job_code, {
+        onProgress(job) {
+          kwReviewDraftJobState = job || kwReviewDraftJobState;
+          kwRenderReviewTriggerModal();
+        },
+        onSuccess(job) {
+          const result = job.result || {};
+          kwReviewDraft.generatedPreviewText = result.text || '';
+          kwReviewIngestResult = {
+            ...(kwReviewIngestResult || {}),
+            review_draft_llm: result.llm_model || null,
+          };
+          kwReviewDraftGenerating = false;
+          kwReviewDraftJobState = null;
+          finalizeDraft();
+        },
+        onFailed(job) {
+          kwReviewDraftGenerating = false;
+          kwReviewDraftJobState = null;
+          kwRenderReviewTriggerModal();
+          showToast(job.error_message || job.summary || '大模型复盘草稿生成失败');
+        },
+        onError(error) {
+          kwReviewDraftGenerating = false;
+          kwReviewDraftJobState = null;
+          kwRenderReviewTriggerModal();
+          showToast(error.message || '大模型复盘草稿生成失败');
+        },
+      });
     }).catch((error) => {
+      kwReviewDraftJobState = null;
       showToast(error.message || '大模型复盘草稿生成失败');
     }).finally(() => {
-      kwReviewDraftGenerating = false;
-      kwRenderReviewTriggerModal();
+      if (!kwReviewDraftJobState) {
+        kwReviewDraftGenerating = false;
+        kwRenderReviewTriggerModal();
+      }
     });
     return;
   }
   kwReviewDraft.generatedPreviewText = '';
+  kwReviewDraftJobState = null;
   finalizeDraft();
 }
 

@@ -297,3 +297,34 @@ ON user_async_jobs(status, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_user_async_jobs_tenant
 ON user_async_jobs(tenant_slug, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS token_usage_logs (
+    id BIGSERIAL PRIMARY KEY,
+    usage_code TEXT NOT NULL UNIQUE,
+    usage_type TEXT NOT NULL DEFAULT 'llm',
+    feature_code TEXT NOT NULL DEFAULT '',
+    feature_label TEXT NOT NULL DEFAULT '',
+    tenant_slug TEXT NOT NULL DEFAULT '',
+    entry_point TEXT NOT NULL DEFAULT '',
+    model_provider TEXT NOT NULL DEFAULT '',
+    model_name TEXT NOT NULL DEFAULT '',
+    request_direction TEXT NOT NULL DEFAULT 'bidirectional',
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0,
+    total_tokens INTEGER NOT NULL DEFAULT 0,
+    request_count INTEGER NOT NULL DEFAULT 1,
+    latency_ms INTEGER NOT NULL DEFAULT 0,
+    request_chars INTEGER NOT NULL DEFAULT 0,
+    response_chars INTEGER NOT NULL DEFAULT 0,
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_token_usage_logs_created
+ON token_usage_logs(created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_token_usage_logs_feature
+ON token_usage_logs(feature_code, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_token_usage_logs_tenant
+ON token_usage_logs(tenant_slug, created_at DESC);

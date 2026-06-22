@@ -9,6 +9,7 @@
   window.SITE_CONFIG = {{ site_config | tojson }};
   window.ADMIN_INDICATOR_HUB = {{ indicator_hub | tojson }};
   window.ADMIN_TASK_CENTER = {{ task_center | tojson }};
+  window.ADMIN_TOKEN_USAGE = {{ token_usage | tojson }};
   window.AUTO_INIT_DASHBOARD = false;
 </script>
 <script src="/static/js/theme.js"></script>
@@ -1179,6 +1180,9 @@
           </div>
           <div class="admin-nav-item" data-section="settings-llm" onclick="showSection('settings-llm', this)">
             <span class="admin-nav-icon">&#129302;</span> 大模型专区
+          </div>
+          <div class="admin-nav-item" data-section="token-usage" onclick="showSection('token-usage', this)">
+            <span class="admin-nav-icon">&#128202;</span> Token 监控
           </div>
           <div class="admin-nav-item" data-section="task-center" onclick="showSection('task-center', this)">
             <span class="admin-nav-icon">&#9201;</span> 定时任务专区
@@ -3680,6 +3684,110 @@
         </div>
       </div><!-- end section-settings-llm -->
 
+      <div id="section-token-usage" style="display:none">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Token 监控</div>
+            <div class="section-subtitle">统一查看大模型与 embedding 的上行、下行、总 token 消耗，并按功能、模型、小时 / 天 / 月追踪。</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="btn-outline" style="padding:8px 14px;font-size:12px" onclick="refreshAdminTokenUsage(true)">刷新统计</button>
+          </div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">24h 总 Token</div>
+            <span class="stat-icon">&#128293;</span>
+            <div class="stat-value" id="token-summary-24h-total">{{ token_usage.summary_24h.total_tokens }}</div>
+            <div class="stat-change up">最近 24 小时</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">24h 上行</div>
+            <span class="stat-icon">&#8593;</span>
+            <div class="stat-value" id="token-summary-24h-input">{{ token_usage.summary_24h.input_tokens }}</div>
+            <div class="stat-change up">Prompt / Input</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">24h 下行</div>
+            <span class="stat-icon">&#8595;</span>
+            <div class="stat-value" id="token-summary-24h-output">{{ token_usage.summary_24h.output_tokens }}</div>
+            <div class="stat-change up">Completion / Output</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">30d 请求数</div>
+            <span class="stat-icon">&#128269;</span>
+            <div class="stat-value" id="token-summary-30d-requests">{{ token_usage.summary_30d.request_count }}</div>
+            <div class="stat-change up">模型 / 向量总请求</div>
+          </div>
+        </div>
+        <div class="charts-grid" style="margin-bottom:20px">
+          <div class="chart-card">
+            <div class="chart-title">24 小时每小时 Token</div>
+            <div class="chart-subtitle">同时看上行、下行和总量，方便定位尖峰时段。</div>
+            <div class="audit-chart-wrap"><canvas id="tokenHourlyChart"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">30 天每日 Token</div>
+            <div class="chart-subtitle">看日度消耗趋势，判断是不是某个功能或模型最近明显放量。</div>
+            <div class="audit-chart-wrap"><canvas id="tokenDailyChart"></canvas></div>
+          </div>
+        </div>
+        <div class="charts-grid" style="margin-bottom:20px">
+          <div class="chart-card">
+            <div class="chart-title">月度 Token 趋势</div>
+            <div class="chart-subtitle">长期看总量和阶段波动。</div>
+            <div class="audit-chart-wrap"><canvas id="tokenMonthlyChart"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">功能消耗排行</div>
+            <div class="chart-subtitle">看哪个功能最耗 token，便于做优化优先级。</div>
+            <div class="audit-chart-wrap"><canvas id="tokenFeatureChart"></canvas></div>
+          </div>
+        </div>
+        <div class="charts-grid" style="margin-bottom:20px">
+          <div class="chart-card">
+            <div class="chart-title">模型消耗排行</div>
+            <div class="chart-subtitle">直接比较哪个模型总消耗最大、请求最多、平均延迟更高。</div>
+            <div class="audit-chart-wrap"><canvas id="tokenModelChart"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">模型 30 天对比</div>
+            <div class="chart-subtitle">Top 模型按天对比总 token，适合做模型预算和替换分析。</div>
+            <div class="audit-chart-wrap"><canvas id="tokenModelDailyChart"></canvas></div>
+          </div>
+        </div>
+        <div class="table-wrap" style="margin-bottom:20px">
+          <div class="table-header">
+            <div>
+              <div class="table-title">模型消耗明细</div>
+              <div style="font-size:12px;color:#8899aa;margin-top:6px">这里可以直接看到 `provider + model` 的上行、下行、总量和平均延迟。</div>
+            </div>
+            <span class="tag tag-gold">按模型分析</span>
+          </div>
+          <table>
+            <thead><tr><th>模型</th><th>类型</th><th>请求数</th><th>上行</th><th>下行</th><th>总量</th><th>平均延迟</th></tr></thead>
+            <tbody id="admin-token-model-body">
+              <tr><td colspan="7" style="text-align:center;color:#8899aa;padding:20px 0">正在加载模型消耗…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap">
+          <div class="table-header">
+            <div>
+              <div class="table-title">最近 Token 请求日志</div>
+              <div style="font-size:12px;color:#8899aa;margin-top:6px">按时间看最近调用了什么功能、用了哪个模型、消耗多少 token。</div>
+            </div>
+            <span class="tag tag-blue">明细日志</span>
+          </div>
+          <table>
+            <thead><tr><th>时间</th><th>功能</th><th>模型</th><th>入口</th><th>上行</th><th>下行</th><th>总量</th></tr></thead>
+            <tbody id="admin-token-log-body">
+              <tr><td colspan="7" style="text-align:center;color:#8899aa;padding:20px 0">正在加载日志…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div><!-- end section-token-usage -->
+
       <div id="section-task-center" style="display:none">
         <div class="section-header">
           <div>
@@ -3880,6 +3988,7 @@ const sectionTitles = {
   'settings-knowledge':'系统专区 · 知识与向量',
   'knowledge-items':'系统专区 · 知识内容管理',
   'settings-llm':'系统专区 · 大模型专区',
+  'token-usage':'系统专区 · Token 监控',
   'task-center':'系统专区 · 定时任务专区',
   access:'访问审计'
 };
@@ -3983,6 +4092,9 @@ function showSection(name, navEl) {
   if (name === 'knowledge-items') {
     loadAdminKnowledgeItems(false).catch((error) => showToast(error.message || '加载失败'));
   }
+  if (name === 'token-usage') {
+    refreshAdminTokenUsage(false).catch((error) => showToast(error.message || '加载失败'));
+  }
   updateAdminQuery(name);
 }
 
@@ -4047,6 +4159,16 @@ function escapeAttr(value) {
   return escapeHtml(value);
 }
 
+function formatAdminNumber(value) {
+  return new Intl.NumberFormat('zh-CN').format(Number(value || 0));
+}
+
+function formatAdminModelLabel(item) {
+  const provider = String(item && item.model_provider || '').trim();
+  const name = String(item && item.model_name || '').trim();
+  return [provider, name].filter(Boolean).join(' / ') || '未标记模型';
+}
+
 const adminIndicatorHub = JSON.parse(JSON.stringify(window.ADMIN_INDICATOR_HUB || {
   summary: {},
   items: [],
@@ -4065,6 +4187,18 @@ const adminTaskCenter = JSON.parse(JSON.stringify(window.ADMIN_TASK_CENTER || {
   runtime: {},
   user_jobs: [],
   user_job_runtime: {},
+}));
+const adminTokenUsage = JSON.parse(JSON.stringify(window.ADMIN_TOKEN_USAGE || {
+  summary_24h: {request_count: 0, input_tokens: 0, output_tokens: 0, total_tokens: 0, avg_tokens_per_request: 0, avg_latency_ms: 0},
+  summary_30d: {request_count: 0, input_tokens: 0, output_tokens: 0, total_tokens: 0, avg_tokens_per_request: 0, avg_latency_ms: 0},
+  hourly: [],
+  daily: [],
+  monthly: [],
+  features: [],
+  models: [],
+  model_daily: [],
+  recent_logs: [],
+  generated_at: '',
 }));
 const adminKnowledgeState = {
   items: [],
@@ -4539,6 +4673,176 @@ async function loadAdminKnowledgeItems(showMessage = false) {
   adminKnowledgeState.items = Array.isArray(data.items) ? data.items : [];
   renderAdminKnowledgeItems();
   if (showMessage) showToast('知识内容已刷新');
+}
+
+function applyAdminTokenUsagePayload(data) {
+  Object.keys(adminTokenUsage).forEach((key) => delete adminTokenUsage[key]);
+  Object.assign(adminTokenUsage, {
+    summary_24h: data.summary_24h || {request_count: 0, input_tokens: 0, output_tokens: 0, total_tokens: 0, avg_tokens_per_request: 0, avg_latency_ms: 0},
+    summary_30d: data.summary_30d || {request_count: 0, input_tokens: 0, output_tokens: 0, total_tokens: 0, avg_tokens_per_request: 0, avg_latency_ms: 0},
+    hourly: Array.isArray(data.hourly) ? data.hourly : [],
+    daily: Array.isArray(data.daily) ? data.daily : [],
+    monthly: Array.isArray(data.monthly) ? data.monthly : [],
+    features: Array.isArray(data.features) ? data.features : [],
+    models: Array.isArray(data.models) ? data.models : [],
+    model_daily: Array.isArray(data.model_daily) ? data.model_daily : [],
+    recent_logs: Array.isArray(data.recent_logs) ? data.recent_logs : [],
+    generated_at: data.generated_at || '',
+  });
+}
+
+function renderAdminTokenSummary() {
+  const s24 = adminTokenUsage.summary_24h || {};
+  const s30 = adminTokenUsage.summary_30d || {};
+  const totalNode = document.getElementById('token-summary-24h-total');
+  const inputNode = document.getElementById('token-summary-24h-input');
+  const outputNode = document.getElementById('token-summary-24h-output');
+  const requestNode = document.getElementById('token-summary-30d-requests');
+  if (totalNode) totalNode.textContent = formatAdminNumber(s24.total_tokens || 0);
+  if (inputNode) inputNode.textContent = formatAdminNumber(s24.input_tokens || 0);
+  if (outputNode) outputNode.textContent = formatAdminNumber(s24.output_tokens || 0);
+  if (requestNode) requestNode.textContent = formatAdminNumber(s30.request_count || 0);
+}
+
+function renderAdminTokenTables() {
+  const modelBody = document.getElementById('admin-token-model-body');
+  const logBody = document.getElementById('admin-token-log-body');
+  if (modelBody) {
+    modelBody.innerHTML = (adminTokenUsage.models || []).length ? (adminTokenUsage.models || []).map((item) => `
+      <tr>
+        <td style="color:#F8F6F0;font-weight:600">${escapeHtml(formatAdminModelLabel(item))}</td>
+        <td>${escapeHtml(item.usage_type || 'llm')}</td>
+        <td>${formatAdminNumber(item.request_count || 0)}</td>
+        <td>${formatAdminNumber(item.input_tokens || 0)}</td>
+        <td>${formatAdminNumber(item.output_tokens || 0)}</td>
+        <td style="color:#C8A96E">${formatAdminNumber(item.total_tokens || 0)}</td>
+        <td>${formatAdminNumber(item.avg_latency_ms || 0)} ms</td>
+      </tr>
+    `).join('') : '<tr><td colspan="7" style="text-align:center;color:#8899aa;padding:20px 0">暂无模型消耗数据</td></tr>';
+  }
+  if (logBody) {
+    logBody.innerHTML = (adminTokenUsage.recent_logs || []).length ? (adminTokenUsage.recent_logs || []).map((item) => `
+      <tr>
+        <td>${escapeHtml(item.created_at || '--')}</td>
+        <td><span style="color:#F8F6F0;font-weight:600">${escapeHtml(item.feature_label || item.feature_code || '--')}</span><div style="font-size:11px;color:#8899aa;margin-top:4px">${escapeHtml(item.usage_type || 'llm')}</div></td>
+        <td>${escapeHtml([item.model_provider, item.model_name].filter(Boolean).join(' / ') || '--')}</td>
+        <td>${escapeHtml(item.entry_point || '--')}</td>
+        <td>${formatAdminNumber(item.input_tokens || 0)}</td>
+        <td>${formatAdminNumber(item.output_tokens || 0)}</td>
+        <td style="color:#C8A96E">${formatAdminNumber(item.total_tokens || 0)}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="7" style="text-align:center;color:#8899aa;padding:20px 0">暂无 token 日志</td></tr>';
+  }
+}
+
+function renderAdminTokenCharts() {
+  const ui = getComputedStyle(document.body);
+  const mainText = (ui.getPropertyValue('--text-main') || '#182132').trim();
+  const subText = (ui.getPropertyValue('--text-sub') || '#445468').trim();
+  window.adminTokenCharts = window.adminTokenCharts || [];
+  while (window.adminTokenCharts.length) {
+    const chart = window.adminTokenCharts.pop();
+    if (chart && typeof chart.destroy === 'function') chart.destroy();
+  }
+  const hourlyCtx = document.getElementById('tokenHourlyChart');
+  const dailyCtx = document.getElementById('tokenDailyChart');
+  const monthlyCtx = document.getElementById('tokenMonthlyChart');
+  const featureCtx = document.getElementById('tokenFeatureChart');
+  const modelCtx = document.getElementById('tokenModelChart');
+  const modelDailyCtx = document.getElementById('tokenModelDailyChart');
+  if (hourlyCtx) {
+    window.adminTokenCharts.push(new Chart(hourlyCtx, {
+      type: 'line',
+      data: {
+        labels: (adminTokenUsage.hourly || []).map((item) => String(item.bucket || '').slice(11)),
+        datasets: [
+          { label: '上行', data: (adminTokenUsage.hourly || []).map((item) => item.input_tokens || 0), borderColor: '#3498DB', backgroundColor: 'rgba(52,152,219,0.10)', fill: false, tension: 0.3 },
+          { label: '下行', data: (adminTokenUsage.hourly || []).map((item) => item.output_tokens || 0), borderColor: '#2ECC71', backgroundColor: 'rgba(46,204,113,0.10)', fill: false, tension: 0.3 },
+          { label: '总量', data: (adminTokenUsage.hourly || []).map((item) => item.total_tokens || 0), borderColor: '#C8A96E', backgroundColor: 'rgba(200,169,110,0.16)', fill: true, tension: 0.3 },
+        ],
+      },
+      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color: mainText } } }, scales:{ x:{ ticks:{ color: subText } }, y:{ ticks:{ color: subText } } } }
+    }));
+  }
+  if (dailyCtx) {
+    window.adminTokenCharts.push(new Chart(dailyCtx, {
+      type: 'line',
+      data: {
+        labels: (adminTokenUsage.daily || []).map((item) => String(item.bucket || '').slice(5)),
+        datasets: [
+          { label: '总量', data: (adminTokenUsage.daily || []).map((item) => item.total_tokens || 0), borderColor: '#C8A96E', backgroundColor: 'rgba(200,169,110,0.16)', fill: true, tension: 0.3 },
+          { label: '请求数', data: (adminTokenUsage.daily || []).map((item) => item.request_count || 0), borderColor: '#1F497D', backgroundColor: 'rgba(31,73,125,0.08)', fill: false, tension: 0.3, yAxisID: 'y1' },
+        ],
+      },
+      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color: mainText } } }, scales:{ x:{ ticks:{ color: subText } }, y:{ ticks:{ color: subText } }, y1:{ position:'right', grid:{ drawOnChartArea:false }, ticks:{ color: subText } } } }
+    }));
+  }
+  if (monthlyCtx) {
+    window.adminTokenCharts.push(new Chart(monthlyCtx, {
+      type: 'bar',
+      data: {
+        labels: (adminTokenUsage.monthly || []).map((item) => item.bucket || ''),
+        datasets: [{ label: '月度总 Token', data: (adminTokenUsage.monthly || []).map((item) => item.total_tokens || 0), backgroundColor: 'rgba(200,169,110,0.55)', borderColor: '#C8A96E', borderWidth: 1 }],
+      },
+      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color: mainText } } }, scales:{ x:{ ticks:{ color: subText } }, y:{ ticks:{ color: subText } } } }
+    }));
+  }
+  if (featureCtx) {
+    window.adminTokenCharts.push(new Chart(featureCtx, {
+      type: 'bar',
+      data: {
+        labels: (adminTokenUsage.features || []).map((item) => item.feature_label || item.feature_code || '--'),
+        datasets: [{ label: '总 Token', data: (adminTokenUsage.features || []).map((item) => item.total_tokens || 0), backgroundColor: 'rgba(52,152,219,0.55)', borderColor: '#3498DB', borderWidth: 1 }],
+      },
+      options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color: subText } }, y:{ ticks:{ color: mainText } } } }
+    }));
+  }
+  if (modelCtx) {
+    window.adminTokenCharts.push(new Chart(modelCtx, {
+      type: 'bar',
+      data: {
+        labels: (adminTokenUsage.models || []).map((item) => formatAdminModelLabel(item)),
+        datasets: [{ label: '总 Token', data: (adminTokenUsage.models || []).map((item) => item.total_tokens || 0), backgroundColor: 'rgba(46,204,113,0.55)', borderColor: '#2ECC71', borderWidth: 1 }],
+      },
+      options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color: subText } }, y:{ ticks:{ color: mainText } } } }
+    }));
+  }
+  if (modelDailyCtx) {
+    const rows = Array.isArray(adminTokenUsage.model_daily) ? adminTokenUsage.model_daily : [];
+    const labels = [...new Set(rows.map((item) => item.bucket || ''))];
+    const modelKeys = [...new Set(rows.map((item) => formatAdminModelLabel(item)))];
+    const palette = ['#C8A96E', '#3498DB', '#2ECC71', '#E67E22', '#9B59B6', '#1F497D', '#E74C3C', '#16A085'];
+    const datasets = modelKeys.map((key, index) => ({
+      label: key,
+      data: labels.map((bucket) => {
+        const found = rows.find((item) => (item.bucket || '') === bucket && formatAdminModelLabel(item) === key);
+        return found ? Number(found.total_tokens || 0) : 0;
+      }),
+      borderColor: palette[index % palette.length],
+      backgroundColor: 'transparent',
+      tension: 0.3,
+    }));
+    window.adminTokenCharts.push(new Chart(modelDailyCtx, {
+      type: 'line',
+      data: { labels: labels.map((item) => String(item || '').slice(5)), datasets },
+      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color: mainText } } }, scales:{ x:{ ticks:{ color: subText } }, y:{ ticks:{ color: subText } } } }
+    }));
+  }
+}
+
+function renderAdminTokenUsage() {
+  renderAdminTokenSummary();
+  renderAdminTokenTables();
+  renderAdminTokenCharts();
+}
+
+async function refreshAdminTokenUsage(showMessage = true) {
+  const resp = await fetch('/api/admin/token-usage');
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'token_usage_failed');
+  applyAdminTokenUsagePayload(data);
+  renderAdminTokenUsage();
+  if (showMessage !== false) showToast('Token 监控已刷新');
 }
 
 function openAdminKnowledgeItemDetail(itemId, tenantSlug) {
@@ -6681,6 +6985,7 @@ function evUpdatePreview() {
 document.addEventListener('DOMContentLoaded', () => {
   initAdminNavGroups();
   renderAdminTaskCenter();
+  renderAdminTokenUsage();
   loadSiteConfig();
   loadAdminUsers();
   renderAdminIndicatorHubAll();

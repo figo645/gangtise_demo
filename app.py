@@ -561,7 +561,15 @@ def build_llm_knowledge_processing(raw_text, source_type="", title="", source_de
         "四、风险边界（3条以内）\n"
         "五、可直接入库正文"
     )
-    rendered_text = call_openai_compatible_llm(llm_model, system_prompt, user_prompt)
+    rendered_text = call_openai_compatible_llm(
+        llm_model,
+        system_prompt,
+        user_prompt,
+        feature_code="knowledge_processing_llm",
+        feature_label="知识加工生成",
+        entry_point="knowledge_processing",
+        metadata={"source_type": source_type, "title": safe_title[:80]},
+    )
     sections = _split_semantic_sentences(rendered_text)
     summary = "；".join(sections[:3])[:220] if sections else (rendered_text[:220] if rendered_text else "暂无摘要")
     return {
@@ -2361,6 +2369,10 @@ def now_ts():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def now_ts_ms():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+
+
 def safe_json_loads(value, default):
     if value in (None, ""):
         return copy.deepcopy(default)
@@ -2374,6 +2386,311 @@ def safe_json_loads(value, default):
 def slugify_code(value, fallback="item"):
     text = re.sub(r"[^a-zA-Z0-9_]+", "_", str(value or "").strip()).strip("_").lower()
     return text or fallback
+
+
+def _estimate_token_count(text):
+    normalized = str(text or "")
+    if not normalized:
+        return 0
+    return max(1, math.ceil(len(normalized) / 4))
+
+
+def _extract_usage_tokens(payload):
+    usage = payload.get("usage") if isinstance(payload, dict) else None
+    if not isinstance(usage, dict):
+        return 0, 0, 0
+    input_tokens = int(
+        usage.get("prompt_tokens")
+        or usage.get("input_tokens")
+        or usage.get("prompt_token_count")
+        or 0
+    )
+    output_tokens = int(
+        usage.get("completion_tokens")
+        or usage.get("output_tokens")
+        or usage.get("candidates_token_count")
+        or 0
+    )
+    total_tokens = int(usage.get("total_tokens") or 0)
+    if total_tokens <= 0:
+        total_tokens = input_tokens + output_tokens
+    return max(0, input_tokens), max(0, output_tokens), max(0, total_tokens)
+
+
+def log_token_usage(
+    usage_type="llm",
+    feature_code="",
+    feature_label="",
+    tenant_slug="",
+    entry_point="",
+    model_provider="",
+    model_name="",
+    input_tokens=0,
+    output_tokens=0,
+    total_tokens=0,
+    request_count=1,
+    latency_ms=0,
+    request_chars=0,
+    response_chars=0,
+    metadata=None,
+):
+    usage_code = f"usage_{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO token_usage_logs (
+            usage_code, usage_type, feature_code, feature_label, tenant_slug, entry_point,
+            model_provider, model_name, request_direction, input_tokens, output_tokens, total_tokens,
+            request_count, latency_ms, request_chars, response_chars, metadata_json, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            usage_code,
+            str(usage_type or "llm").strip(),
+            slugify_code(feature_code, "unknown"),
+            str(feature_label or feature_code or "未命名功能").strip()[:120],
+            str(tenant_slug or "").strip().lower(),
+            str(entry_point or "").strip()[:120],
+            str(model_provider or "").strip()[:80],
+            str(model_name or "").strip()[:160],
+            "bidirectional",
+            max(0, int(input_tokens or 0)),
+            max(0, int(output_tokens or 0)),
+            max(0, int(total_tokens or 0)),
+            max(1, int(request_count or 1)),
+            max(0, int(latency_ms or 0)),
+            max(0, int(request_chars or 0)),
+            max(0, int(response_chars or 0)),
+            json.dumps(metadata or {}, ensure_ascii=False)[:4000],
+            now_ts(),
+        ),
+    )
+    db.commit()
+    return usage_code
+
+
+def build_token_usage_summary(hours=24 * 30):
+    db = get_db()
+    hours = max(1, min(int(hours or 24 * 30), 24 * 180))
+    since_dt = datetime.now() - timedelta(hours=hours)
+    since = since_dt.strftime("%Y-%m-%d %H:%M:%S")
+    row = db.execute(
+        """
+        SELECT
+            COUNT(*) AS request_count,
+            COALESCE(SUM(input_tokens), 0) AS input_tokens,
+            COALESCE(SUM(output_tokens), 0) AS output_tokens,
+            COALESCE(SUM(total_tokens), 0) AS total_tokens,
+            COALESCE(SUM(latency_ms), 0) AS latency_ms
+        FROM token_usage_logs
+        WHERE created_at >= ?
+        """,
+        (since,),
+    ).fetchone()
+    payload = dict(row or {})
+    total_requests = int(payload.get("request_count") or 0)
+    total_tokens = int(payload.get("total_tokens") or 0)
+    return {
+        "request_count": total_requests,
+        "input_tokens": int(payload.get("input_tokens") or 0),
+        "output_tokens": int(payload.get("output_tokens") or 0),
+        "total_tokens": total_tokens,
+        "avg_tokens_per_request": round(total_tokens / total_requests, 2) if total_requests else 0,
+        "avg_latency_ms": round(int(payload.get("latency_ms") or 0) / total_requests, 2) if total_requests else 0,
+        "window_hours": hours,
+    }
+
+
+def _build_token_usage_timeseries_sql(granularity):
+    if granularity == "hour":
+        bucket_expr = "TO_CHAR(DATE_TRUNC('hour', created_at::timestamp), 'YYYY-MM-DD HH24:00')"
+    elif granularity == "month":
+        bucket_expr = "TO_CHAR(DATE_TRUNC('month', created_at::timestamp), 'YYYY-MM')"
+    else:
+        bucket_expr = "TO_CHAR(DATE_TRUNC('day', created_at::timestamp), 'YYYY-MM-DD')"
+    return f"""
+        SELECT
+            {bucket_expr} AS bucket,
+            COUNT(*) AS request_count,
+            COALESCE(SUM(input_tokens), 0) AS input_tokens,
+            COALESCE(SUM(output_tokens), 0) AS output_tokens,
+            COALESCE(SUM(total_tokens), 0) AS total_tokens
+        FROM token_usage_logs
+        WHERE created_at >= ?
+        GROUP BY 1
+        ORDER BY 1 ASC
+    """
+
+
+def get_token_usage_timeseries(granularity="day", hours=24 * 30):
+    db = get_db()
+    hours = max(1, min(int(hours or 24 * 30), 24 * 365))
+    since = (datetime.now() - timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
+    rows = db.execute(_build_token_usage_timeseries_sql(granularity), (since,)).fetchall()
+    return [
+        {
+            "bucket": row.get("bucket"),
+            "request_count": int(row.get("request_count") or 0),
+            "input_tokens": int(row.get("input_tokens") or 0),
+            "output_tokens": int(row.get("output_tokens") or 0),
+            "total_tokens": int(row.get("total_tokens") or 0),
+        }
+        for row in rows
+    ]
+
+
+def get_token_usage_feature_breakdown(hours=24 * 30, limit=12):
+    db = get_db()
+    hours = max(1, min(int(hours or 24 * 30), 24 * 365))
+    limit = max(1, min(int(limit or 12), 40))
+    since = (datetime.now() - timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
+    rows = db.execute(
+        """
+        SELECT
+            feature_code,
+            MAX(feature_label) AS feature_label,
+            usage_type,
+            COUNT(*) AS request_count,
+            COALESCE(SUM(input_tokens), 0) AS input_tokens,
+            COALESCE(SUM(output_tokens), 0) AS output_tokens,
+            COALESCE(SUM(total_tokens), 0) AS total_tokens
+        FROM token_usage_logs
+        WHERE created_at >= ?
+        GROUP BY feature_code, usage_type
+        ORDER BY total_tokens DESC, request_count DESC
+        LIMIT ?
+        """,
+        (since, limit),
+    ).fetchall()
+    return [
+        {
+            "feature_code": row.get("feature_code") or "",
+            "feature_label": row.get("feature_label") or row.get("feature_code") or "",
+            "usage_type": row.get("usage_type") or "llm",
+            "request_count": int(row.get("request_count") or 0),
+            "input_tokens": int(row.get("input_tokens") or 0),
+            "output_tokens": int(row.get("output_tokens") or 0),
+            "total_tokens": int(row.get("total_tokens") or 0),
+        }
+        for row in rows
+    ]
+
+
+def get_token_usage_model_breakdown(hours=24 * 30, limit=16):
+    db = get_db()
+    hours = max(1, min(int(hours or 24 * 30), 24 * 365))
+    limit = max(1, min(int(limit or 16), 40))
+    since = (datetime.now() - timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
+    rows = db.execute(
+        """
+        SELECT
+            model_provider,
+            model_name,
+            usage_type,
+            COUNT(*) AS request_count,
+            COALESCE(SUM(input_tokens), 0) AS input_tokens,
+            COALESCE(SUM(output_tokens), 0) AS output_tokens,
+            COALESCE(SUM(total_tokens), 0) AS total_tokens,
+            COALESCE(SUM(latency_ms), 0) AS latency_ms
+        FROM token_usage_logs
+        WHERE created_at >= ?
+        GROUP BY model_provider, model_name, usage_type
+        ORDER BY total_tokens DESC, request_count DESC
+        LIMIT ?
+        """,
+        (since, limit),
+    ).fetchall()
+    return [
+        {
+            "model_provider": row.get("model_provider") or "",
+            "model_name": row.get("model_name") or "",
+            "usage_type": row.get("usage_type") or "llm",
+            "request_count": int(row.get("request_count") or 0),
+            "input_tokens": int(row.get("input_tokens") or 0),
+            "output_tokens": int(row.get("output_tokens") or 0),
+            "total_tokens": int(row.get("total_tokens") or 0),
+            "avg_latency_ms": round(int(row.get("latency_ms") or 0) / max(1, int(row.get("request_count") or 1)), 2),
+        }
+        for row in rows
+    ]
+
+
+def get_token_usage_model_daily_breakdown(days=30, limit=8):
+    db = get_db()
+    days = max(1, min(int(days or 30), 180))
+    limit = max(1, min(int(limit or 8), 20))
+    since = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    top_models = db.execute(
+        """
+        SELECT model_provider, model_name
+        FROM token_usage_logs
+        WHERE created_at >= ?
+        GROUP BY model_provider, model_name
+        ORDER BY COALESCE(SUM(total_tokens), 0) DESC
+        LIMIT ?
+        """,
+        (since, limit),
+    ).fetchall()
+    pairs = [(row.get("model_provider") or "", row.get("model_name") or "") for row in top_models]
+    if not pairs:
+        return []
+    conditions = " OR ".join(["(model_provider = ? AND model_name = ?)"] * len(pairs))
+    params = [since]
+    for provider, name in pairs:
+        params.extend([provider, name])
+    rows = db.execute(
+        f"""
+        SELECT
+            TO_CHAR(DATE_TRUNC('day', created_at::timestamp), 'YYYY-MM-DD') AS bucket,
+            model_provider,
+            model_name,
+            COALESCE(SUM(total_tokens), 0) AS total_tokens
+        FROM token_usage_logs
+        WHERE created_at >= ?
+          AND ({conditions})
+        GROUP BY 1, model_provider, model_name
+        ORDER BY bucket ASC, total_tokens DESC
+        """,
+        tuple(params),
+    ).fetchall()
+    return [
+        {
+            "bucket": row.get("bucket") or "",
+            "model_provider": row.get("model_provider") or "",
+            "model_name": row.get("model_name") or "",
+            "total_tokens": int(row.get("total_tokens") or 0),
+        }
+        for row in rows
+    ]
+
+
+def get_token_usage_recent_logs(limit=80):
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT *
+        FROM token_usage_logs
+        ORDER BY created_at DESC, id DESC
+        LIMIT ?
+        """,
+        (max(1, min(int(limit or 80), 200)),),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def build_admin_token_usage_payload():
+    return {
+        "summary_24h": build_token_usage_summary(hours=24),
+        "summary_30d": build_token_usage_summary(hours=24 * 30),
+        "hourly": get_token_usage_timeseries(granularity="hour", hours=24),
+        "daily": get_token_usage_timeseries(granularity="day", hours=24 * 30),
+        "monthly": get_token_usage_timeseries(granularity="month", hours=24 * 180),
+        "features": get_token_usage_feature_breakdown(hours=24 * 30, limit=16),
+        "models": get_token_usage_model_breakdown(hours=24 * 30, limit=16),
+        "model_daily": get_token_usage_model_daily_breakdown(days=30, limit=8),
+        "recent_logs": get_token_usage_recent_logs(limit=80),
+        "generated_at": now_ts(),
+    }
 
 
 def coerce_float(value, default=None):
@@ -5836,7 +6153,18 @@ def should_auto_init_db():
     return False
 
 
+def is_debug_mode_enabled():
+    return os.environ.get("DEBUG", "1").lower() in {"1", "true", "yes", "y"}
+
+
+def is_werkzeug_reloader_parent():
+    return is_debug_mode_enabled() and os.environ.get("WERKZEUG_RUN_MAIN") != "true"
+
+
 def startup_bootstrap():
+    if is_werkzeug_reloader_parent():
+        app.logger.info("Skipping startup bootstrap in Werkzeug reloader parent process")
+        return
     if should_auto_init_db():
         init_db_safe()
     try:
@@ -6018,6 +6346,33 @@ def update_user_async_job(job_code, **fields):
     return get_user_async_job(job_code)
 
 
+def report_user_async_job_progress(job_code, stage="", percent=None, summary="", log_text="", extra_result=None):
+    job = get_user_async_job(job_code)
+    if not job:
+        return None
+    result_payload = copy.deepcopy(job.get("result")) if isinstance(job.get("result"), dict) else {}
+    live_log = result_payload.get("live_log") if isinstance(result_payload.get("live_log"), list) else []
+    if log_text:
+        live_log.append({
+            "at": now_ts(),
+            "stage": str(stage or job.get("progress_stage") or "").strip(),
+            "text": str(log_text).strip()[:240],
+        })
+        result_payload["live_log"] = live_log[-12:]
+    if isinstance(extra_result, dict):
+        result_payload.update(copy.deepcopy(extra_result))
+    fields = {
+        "result_json": json.dumps(result_payload, ensure_ascii=False)[:20000],
+    }
+    if stage:
+        fields["progress_stage"] = str(stage).strip()
+    if percent is not None:
+        fields["progress_percent"] = max(0, min(100, int(percent)))
+    if summary:
+        fields["summary"] = str(summary).strip()[:240]
+    return update_user_async_job(job_code, **fields)
+
+
 def retry_user_async_job(job_code):
     job = get_user_async_job(job_code)
     if not job:
@@ -6063,6 +6418,7 @@ def _build_voice_file_storage_from_job_payload(payload):
 def execute_user_async_job(job):
     job_type = str(job.get("job_type") or "").strip()
     payload = job.get("payload") if isinstance(job.get("payload"), dict) else {}
+    job_code = str(job.get("job_code") or "").strip()
     if job_type == "review_voice_transcribe":
         file_storage = _build_voice_file_storage_from_job_payload(payload)
         return process_review_voice_upload(
@@ -6072,6 +6428,20 @@ def execute_user_async_job(job):
             entry_point=str(payload.get("entry_point") or "").strip().lower(),
             speaker_name=str(payload.get("speaker_name") or "").strip(),
             use_llm_enhancement=bool(payload.get("use_llm_enhancement")),
+            job_code=job_code,
+        )
+    if job_type == "review_generate_draft":
+        return generate_review_draft_with_llm(
+            source_text=payload.get("source_text"),
+            review_period=str(payload.get("period") or "").strip().lower(),
+            source_mode=str(payload.get("source_mode") or "").strip().lower(),
+            prompt_text=payload.get("prompt_text"),
+            prompt_tags=payload.get("prompt_tags") if isinstance(payload.get("prompt_tags"), list) else [],
+            selected_watchlist=payload.get("selected_watchlist") if isinstance(payload.get("selected_watchlist"), list) else [],
+            speaker_name=str(payload.get("speaker_name") or "").strip(),
+            entry_point=str(payload.get("entry_point") or "").strip(),
+            tenant_slug=str(payload.get("tenant_slug") or "").strip().lower(),
+            job_code=job_code,
         )
     if job_type == "review_publish_embed":
         return process_review_publish_text(
@@ -6082,6 +6452,7 @@ def execute_user_async_job(job):
             speaker_name=str(payload.get("speaker_name") or "").strip(),
             transcription_engine=str(payload.get("transcription_engine") or "manual").strip().lower() or "manual",
             transcript_model=str(payload.get("transcript_model") or "manual_input").strip() or "manual_input",
+            job_code=job_code,
         )
     if job_type == "knowledge_manual_sync":
         return save_manual_knowledge_entry(
@@ -6103,6 +6474,7 @@ def execute_user_async_job(job):
             source_url=payload.get("url"),
             voice_minutes=payload.get("voice_minutes"),
             parse_meta=payload.get("parse_meta"),
+            job_code=job_code,
         )
     raise ValueError(f"unsupported_user_async_job_type:{job_type}")
 
@@ -6110,6 +6482,8 @@ def execute_user_async_job(job):
 def _summarize_user_async_job_result(job_type, result):
     if job_type == "review_voice_transcribe":
         return "语音转写完成"
+    if job_type == "review_generate_draft":
+        return "复盘草稿生成完成"
     if job_type == "review_publish_embed":
         return "复盘发布入向量完成"
     if job_type == "knowledge_manual_sync":
@@ -6635,6 +7009,9 @@ def _user_async_job_loop():
                     result={"error_type": type(exc).__name__},
                     error_message=str(exc),
                 )
+            elif is_db_unavailable_error(exc):
+                app.logger.warning("User async job loop database unavailable, retrying: %s", exc)
+                time.sleep(USER_ASYNC_JOB_POLL_INTERVAL_SECONDS)
             else:
                 app.logger.exception("User async job loop failed without claimed job")
                 time.sleep(USER_ASYNC_JOB_POLL_INTERVAL_SECONDS)
@@ -6647,6 +7024,8 @@ def _user_async_job_loop():
 
 def ensure_user_async_job_worker_started():
     global _user_async_job_thread, _user_async_job_started
+    if is_werkzeug_reloader_parent():
+        return
     if _user_async_job_started:
         return
     with _user_async_job_lock:
@@ -6857,7 +7236,17 @@ def _extract_llm_text_content(content):
     return ""
 
 
-def call_openai_compatible_llm(model_config, system_prompt, user_prompt):
+def call_openai_compatible_llm(
+    model_config,
+    system_prompt,
+    user_prompt,
+    feature_code="",
+    feature_label="",
+    tenant_slug="",
+    entry_point="",
+    metadata=None,
+    request_timeout_seconds=120,
+):
     config = normalize_llm_model_config(model_config)
     model_name = str(config.get("model_name") or "").strip()
     if not model_name:
@@ -6866,6 +7255,9 @@ def call_openai_compatible_llm(model_config, system_prompt, user_prompt):
     if not api_key:
         raise RuntimeError("llm_api_key_missing")
     endpoint_base = _normalize_openai_compatible_base_url(config.get("base_url"))
+    request_started = time.perf_counter()
+    system_text = str(system_prompt or "").strip()
+    user_text = str(user_prompt or "").strip()
     response = requests.post(
         f"{endpoint_base}/chat/completions",
         headers={
@@ -6876,11 +7268,11 @@ def call_openai_compatible_llm(model_config, system_prompt, user_prompt):
             "model": model_name,
             "temperature": 0.25,
             "messages": [
-                {"role": "system", "content": str(system_prompt or "").strip()},
-                {"role": "user", "content": str(user_prompt or "").strip()},
+                {"role": "system", "content": system_text},
+                {"role": "user", "content": user_text},
             ],
         },
-        timeout=120,
+        timeout=max(5, int(request_timeout_seconds or 120)),
     )
     if response.status_code >= 400:
         raise RuntimeError(f"llm_request_failed:{response.status_code}:{response.text[:240]}")
@@ -6893,6 +7285,27 @@ def call_openai_compatible_llm(model_config, system_prompt, user_prompt):
     content = _extract_llm_text_content(message.get("content"))
     if not content:
         raise RuntimeError("empty_llm_response")
+    input_tokens, output_tokens, total_tokens = _extract_usage_tokens(payload)
+    if total_tokens <= 0:
+        input_tokens = _estimate_token_count(system_text) + _estimate_token_count(user_text)
+        output_tokens = _estimate_token_count(content)
+        total_tokens = input_tokens + output_tokens
+    log_token_usage(
+        usage_type="llm",
+        feature_code=feature_code or "general_llm",
+        feature_label=feature_label or "通用大模型调用",
+        tenant_slug=tenant_slug,
+        entry_point=entry_point,
+        model_provider=str(config.get("provider") or "").strip(),
+        model_name=model_name,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        total_tokens=total_tokens,
+        latency_ms=int((time.perf_counter() - request_started) * 1000),
+        request_chars=len(system_text) + len(user_text),
+        response_chars=len(content),
+        metadata=metadata or {},
+    )
     return content
 
 
@@ -6900,7 +7313,7 @@ def _is_truthy_flag(value):
     return str(value or "").strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
-def enhance_review_voice_transcript_with_llm(transcript, entry_point="", speaker_name=""):
+def enhance_review_voice_transcript_with_llm(transcript, entry_point="", speaker_name="", tenant_slug=""):
     normalized_transcript = str(transcript or "").strip()
     if not normalized_transcript:
         raise ValueError("empty_transcript")
@@ -6924,7 +7337,16 @@ def enhance_review_voice_transcript_with_llm(transcript, entry_point="", speaker
         "如果原始转写已经足够清晰，只做最少改动。\n\n"
         f"原始转写：\n{normalized_transcript}"
     )
-    enhanced_text = call_openai_compatible_llm(llm_model, system_prompt, user_prompt)
+    enhanced_text = call_openai_compatible_llm(
+        llm_model,
+        system_prompt,
+        user_prompt,
+        feature_code="review_voice_enhancement",
+        feature_label="语音转写增强",
+        tenant_slug=tenant_slug,
+        entry_point=entry_point,
+        metadata={"speaker_name": speaker_label},
+    )
     normalized_enhanced = str(enhanced_text or "").strip()
     if not normalized_enhanced:
         raise RuntimeError("empty_llm_response")
@@ -6949,6 +7371,8 @@ def generate_review_draft_with_llm(
     selected_watchlist=None,
     speaker_name="",
     entry_point="",
+    tenant_slug="",
+    job_code="",
 ):
     normalized_source = str(source_text or "").strip()
     if not normalized_source:
@@ -6990,10 +7414,40 @@ def generate_review_draft_with_llm(
         "原始材料：",
         normalized_source,
     ])
-    rendered_text = call_openai_compatible_llm(llm_model, system_prompt, user_prompt)
+    if job_code:
+        report_user_async_job_progress(
+            job_code,
+            stage="llm_preparing",
+            percent=55,
+            summary="正在整理原始材料并构建复盘提示词",
+            log_text="已完成素材归并，正在调用大模型生成复盘草稿。",
+        )
+    rendered_text = call_openai_compatible_llm(
+        llm_model,
+        system_prompt,
+        user_prompt,
+        feature_code="review_draft_generation",
+        feature_label="复盘草稿生成",
+        tenant_slug=tenant_slug,
+        entry_point=entry_point,
+        metadata={
+            "review_period": review_period_key,
+            "source_mode": source_mode_key,
+            "watchlist_count": len(watchlist_items),
+            "job_code": job_code,
+        },
+    )
     normalized_text = str(rendered_text or "").strip()
     if not normalized_text:
         raise RuntimeError("empty_llm_response")
+    if job_code:
+        report_user_async_job_progress(
+            job_code,
+            stage="llm_postprocessing",
+            percent=85,
+            summary="大模型已返回草稿，正在整理预览结果",
+            log_text="复盘草稿已生成，正在整理模型信息和预览内容。",
+        )
     return {
         "text": normalized_text,
         "llm_model": {
@@ -7259,9 +7713,10 @@ def transcribe_review_audio(audio_bytes, filename, content_type, engine="local")
     raise RuntimeError("unsupported_transcription_engine")
 
 
-def _build_text_embedding_with_api(text):
+def _build_text_embedding_with_api(text, feature_code="", feature_label="", tenant_slug="", entry_point="", metadata=None):
     if not OPENAI_API_KEY:
         raise RuntimeError("openai_api_key_missing")
+    request_started = time.perf_counter()
     response = requests.post(
         f"{OPENAI_BASE_URL}/embeddings",
         headers={
@@ -7283,6 +7738,27 @@ def _build_text_embedding_with_api(text):
     vector = items[0].get("embedding") if isinstance(items[0], dict) else None
     if not isinstance(vector, list) or not vector:
         raise RuntimeError("invalid_embedding_vector")
+    input_tokens, output_tokens, total_tokens = _extract_usage_tokens(payload)
+    if total_tokens <= 0:
+        input_tokens = _estimate_token_count(text)
+        output_tokens = 0
+        total_tokens = input_tokens
+    log_token_usage(
+        usage_type="embedding",
+        feature_code=feature_code or "general_embedding",
+        feature_label=feature_label or "文本向量化",
+        tenant_slug=tenant_slug,
+        entry_point=entry_point,
+        model_provider="openai_compatible",
+        model_name=OPENAI_EMBEDDING_MODEL,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        total_tokens=total_tokens,
+        latency_ms=int((time.perf_counter() - request_started) * 1000),
+        request_chars=len(str(text or "")),
+        response_chars=0,
+        metadata=metadata or {},
+    )
     return [float(value) for value in vector]
 
 
@@ -7299,12 +7775,19 @@ def _build_text_embedding_locally(text):
     return [float(value) for value in values]
 
 
-def build_text_embedding(text, engine="api"):
+def build_text_embedding(text, engine="api", feature_code="", feature_label="", tenant_slug="", entry_point="", metadata=None):
     normalized_engine = str(engine or "api").strip().lower()
     if normalized_engine == "local":
         return _build_text_embedding_locally(text), "local", LOCAL_EMBEDDING_MODEL_NAME
     if normalized_engine == "api":
-        return _build_text_embedding_with_api(text), "api", OPENAI_EMBEDDING_MODEL
+        return _build_text_embedding_with_api(
+            text,
+            feature_code=feature_code,
+            feature_label=feature_label,
+            tenant_slug=tenant_slug,
+            entry_point=entry_point,
+            metadata=metadata,
+        ), "api", OPENAI_EMBEDDING_MODEL
     raise RuntimeError("unsupported_embedding_engine")
 
 
@@ -7534,6 +8017,7 @@ def save_manual_knowledge_entry(
     voice_minutes=None,
     parse_meta=None,
     processing_mode="algorithm",
+    job_code="",
 ):
     tenant = get_tenant_by_slug(tenant_slug)
     if not tenant or tenant.get("slug") != tenant_slug:
@@ -7577,9 +8061,25 @@ def save_manual_knowledge_entry(
     processed_summary = str(processed_content.get("summary") or normalized_summary).strip() or normalized_summary
     processed_body = str(processed_content.get("rendered_text") or normalized_body).strip() or normalized_body
     embedding_cfg = get_voice_embedding_config()
+    if job_code:
+        report_user_async_job_progress(
+            job_code,
+            stage="knowledge_processing",
+            percent=60,
+            summary="知识内容已整理，正在生成向量",
+            log_text="知识加工已完成，开始写入向量表示和知识库记录。",
+        )
     embedding, embedding_engine, embedding_model = build_text_embedding(
         f"{normalized_title}\n\n{processed_summary}\n\n{processed_body}",
         engine=embedding_cfg.get("engine", "api"),
+        feature_code="knowledge_embedding",
+        feature_label="知识向量入库",
+        tenant_slug=tenant_slug,
+        entry_point=normalized_type,
+        metadata={
+            "knowledge_type": normalized_type,
+            "processing_mode": normalized_processing_mode,
+        },
     )
     vector_namespace = build_vector_namespace(embedding_engine, embedding_model)
     next_id = str(knowledge_id or f"kb-{normalized_type}-{int(time.time() * 1000)}").strip()
@@ -7868,6 +8368,11 @@ def search_knowledge_embeddings(tenant_slug, query_text, limit=5):
     query_embedding, embedding_engine, embedding_model = build_text_embedding(
         normalized_query,
         engine=embedding_cfg.get("engine", "local"),
+        feature_code="knowledge_query_embedding",
+        feature_label="知识检索向量查询",
+        tenant_slug=tenant_slug,
+        entry_point="knowledge_query",
+        metadata={"query_length": len(normalized_query)},
     )
     with get_review_vector_db_connection() as conn:
         _ensure_knowledge_embedding_table(conn)
@@ -7983,8 +8488,221 @@ def build_knowledge_chat_prompts(query_text, matches, tenant_slug=""):
     return system_prompt, user_prompt
 
 
-def build_knowledge_query_response(tenant_slug, query_text, limit=5, submit_to_model=False):
-    result = search_knowledge_embeddings(tenant_slug=tenant_slug, query_text=query_text, limit=limit)
+def normalize_evidence_source_types(source_types=None):
+    allowed = {"knowledge"}
+    raw_items = []
+    if isinstance(source_types, (list, tuple, set)):
+        raw_items = list(source_types)
+    elif source_types not in (None, ""):
+        raw_items = re.split(r"[,\s]+", str(source_types))
+    normalized = []
+    for item in raw_items:
+        value = slugify_code(item, "")
+        if value in allowed and value not in normalized:
+            normalized.append(value)
+    return normalized or ["knowledge"]
+
+
+def _build_evidence_retrieval_answer(evidence_items):
+    items = [item for item in (evidence_items if isinstance(evidence_items, list) else []) if isinstance(item, dict)]
+    if not items:
+        return "当前没有找到足够相关的证据条目。"
+    answer_lines = [
+        f"已命中 {len(items)} 条证据，最相关的是《{items[0].get('title') or '未命名条目'}》。",
+        f"核心摘要：{items[0].get('summary') or items[0].get('body') or items[0].get('raw_input') or '暂无摘要'}",
+    ]
+    for index, item in enumerate(items[1:3], start=2):
+        answer_lines.append(
+            f"补充命中 {index}：{item.get('title') or '未命名条目'}，相关度 {item.get('score', 0)}。"
+        )
+    return "\n".join(answer_lines)
+
+
+def build_evidence_chain_chat_prompts(query_text, evidence_items, tenant_slug=""):
+    query = str(query_text or "").strip()
+    tenant = get_tenant_by_slug(tenant_slug)
+    tenant_name = (tenant or {}).get("name") or (tenant or {}).get("short_name") or str(tenant_slug or "").strip() or "当前租户"
+    context_blocks = []
+    for index, item in enumerate((evidence_items if isinstance(evidence_items, list) else [])[:6], start=1):
+        if not isinstance(item, dict):
+            continue
+        context_blocks.append(
+            "\n".join([
+                f"[证据 {index}] 类型：{str(item.get('source_label') or item.get('source_type') or '未知来源').strip()}",
+                f"[证据 {index}] 标题：{str(item.get('title') or '未命名证据').strip()}",
+                f"[证据 {index}] 摘要：{str(item.get('summary') or item.get('body') or item.get('raw_input') or '暂无摘要').strip()}",
+                f"[证据 {index}] 原文：{str(item.get('body') or item.get('raw_input') or item.get('summary') or '').strip()}",
+                f"[证据 {index}] 来源：{str(item.get('source_detail') or item.get('source') or '').strip()}",
+                f"[证据 {index}] 相关度：{item.get('score', 0)}",
+            ])
+        )
+    context_text = "\n\n".join(block for block in context_blocks if block.strip())
+    system_prompt = (
+        f"你是{tenant_name}的证据链助手。"
+        "你的任务是基于召回到的证据条目回答问题。"
+        "必须优先依据给定证据，不要编造未提供的事实。"
+        "如果证据不足以完整回答，要明确指出边界。"
+        "回答请使用中文，风格简洁、专业，适合研究、复盘、Dashboard 和证据链归因场景。"
+    )
+    user_prompt = (
+        f"用户问题：{query}\n\n"
+        f"证据链召回结果：\n{context_text or '当前没有召回到有效证据。'}\n\n"
+        "请输出：\n"
+        "1. 直接回答用户问题\n"
+        "2. 提炼2到4条关键依据\n"
+        "3. 如果存在证据空白，补一句“证据边界”"
+    )
+    return system_prompt, user_prompt
+
+
+def search_evidence_chain(tenant_slug, query_text, limit=5, source_types=None):
+    normalized_query = str(query_text or "").strip()
+    if not normalized_query:
+        raise ValueError("evidence_query_required")
+    normalized_sources = normalize_evidence_source_types(source_types)
+    evidence_items = []
+    source_summaries = []
+    unsupported_sources = []
+    for source_type in normalized_sources:
+        if source_type == "knowledge":
+            result = search_knowledge_embeddings(tenant_slug=tenant_slug, query_text=normalized_query, limit=limit)
+            items = []
+            for item in (result.get("matches") or []):
+                if not isinstance(item, dict):
+                    continue
+                evidence_item = copy.deepcopy(item)
+                evidence_item["source_type"] = "knowledge"
+                evidence_item["source_label"] = "知识库"
+                evidence_item["evidence_id"] = str(item.get("id") or item.get("knowledge_id") or "").strip()
+                items.append(evidence_item)
+            evidence_items.extend(items)
+            source_summaries.append({
+                "source_type": "knowledge",
+                "source_label": "知识库",
+                "request_count": len(items),
+            })
+        else:
+            unsupported_sources.append(source_type)
+    evidence_items.sort(key=lambda item: item.get("score", 0.0), reverse=True)
+    evidence_items = evidence_items[: max(1, int(limit or 5))]
+    return {
+        "query": normalized_query,
+        "answer": _build_evidence_retrieval_answer(evidence_items),
+        "evidence_items": evidence_items,
+        "matches": copy.deepcopy(evidence_items),
+        "source_types": normalized_sources,
+        "source_summaries": source_summaries,
+        "unsupported_source_types": unsupported_sources,
+    }
+
+
+def _extract_json_payload_from_llm_text(text, default):
+    normalized = str(text or "").strip()
+    if not normalized:
+        return copy.deepcopy(default)
+    candidates = [normalized]
+    fence_match = re.search(r"```(?:json)?\s*(\{.*?\}|\[.*?\])\s*```", normalized, flags=re.S)
+    if fence_match:
+        candidates.insert(0, fence_match.group(1).strip())
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+        except Exception:
+            continue
+        if isinstance(parsed, type(default)):
+            return parsed
+    return copy.deepcopy(default)
+
+
+def filter_knowledge_matches_with_llm(query_text, matches, tenant_slug=""):
+    normalized_query = str(query_text or "").strip()
+    normalized_matches = [copy.deepcopy(item) for item in (matches if isinstance(matches, list) else []) if isinstance(item, dict)]
+    if not normalized_query or not normalized_matches:
+        return normalized_matches, {
+            "filtered": False,
+            "kept_count": len(normalized_matches),
+            "dropped_count": 0,
+            "reason": "no_matches_or_query",
+        }, None
+    llm_model = get_default_llm_config(purpose="general")
+    if not llm_model:
+        return normalized_matches, {
+            "filtered": False,
+            "kept_count": len(normalized_matches),
+            "dropped_count": 0,
+            "reason": "llm_unavailable",
+        }, None
+    candidate_blocks = []
+    for index, item in enumerate(normalized_matches, start=1):
+        candidate_blocks.append(
+            "\n".join([
+                f"候选ID：{str(item.get('id') or '').strip() or f'match_{index}'}",
+                f"标题：{str(item.get('title') or '未命名知识').strip()}",
+                f"摘要：{str(item.get('summary') or item.get('body') or item.get('raw_input') or '暂无摘要').strip()[:500]}",
+                f"原文片段：{str(item.get('body') or item.get('raw_input') or item.get('summary') or '').strip()[:700]}",
+                f"来源：{str(item.get('source_detail') or item.get('source') or '').strip()}",
+                f"向量相关度：{item.get('score', 0)}",
+            ])
+        )
+    system_prompt = (
+        "你是知识检索相关性过滤助手。"
+        "你的任务是根据用户问题，从召回候选里剔除明显无关、仅语义相近但业务主题不一致的内容。"
+        "判断标准必须严格，只有真正能回答问题、或能提供直接支撑信息的知识才能保留。"
+        "如果问题是具体领域问题，例如 MES、制造、设备、工艺，就不要保留股票、行情、复盘、泛化观点等无关内容。"
+        "输出必须是 JSON，不要输出任何额外解释。"
+    )
+    user_prompt = (
+        f"用户问题：{normalized_query}\n\n"
+        f"候选知识：\n{chr(10).join(candidate_blocks)}\n\n"
+        "请返回 JSON，格式如下：\n"
+        "{\n"
+        '  "relevant_ids": ["保留的候选ID"],\n'
+        '  "reason": "一句话说明筛选结论"\n'
+        "}\n"
+        "如果没有任何相关知识，relevant_ids 返回空数组。"
+    )
+    raw = call_openai_compatible_llm(
+        llm_model,
+        system_prompt,
+        user_prompt,
+        feature_code="knowledge_query_filter",
+        feature_label="知识检索相关性过滤",
+        tenant_slug=tenant_slug,
+        entry_point="knowledge_query",
+        metadata={"candidate_count": len(normalized_matches), "query_length": len(normalized_query)},
+        request_timeout_seconds=25,
+    )
+    parsed = _extract_json_payload_from_llm_text(raw, {"relevant_ids": [], "reason": ""})
+    relevant_ids = {
+        str(item).strip()
+        for item in (parsed.get("relevant_ids") if isinstance(parsed.get("relevant_ids"), list) else [])
+        if str(item).strip()
+    }
+    filtered_matches = [item for item in normalized_matches if str(item.get("id") or "").strip() in relevant_ids]
+    filter_meta = {
+        "filtered": True,
+        "kept_count": len(filtered_matches),
+        "dropped_count": max(0, len(normalized_matches) - len(filtered_matches)),
+        "reason": str(parsed.get("reason") or "").strip()[:240],
+    }
+    return filtered_matches, filter_meta, llm_model
+
+
+def build_evidence_chain_response(
+    tenant_slug,
+    query_text,
+    limit=5,
+    submit_to_model=False,
+    source_types=None,
+    entry_point="evidence_chain",
+    feature_namespace="evidence_chain",
+):
+    result = search_evidence_chain(
+        tenant_slug=tenant_slug,
+        query_text=query_text,
+        limit=limit,
+        source_types=source_types,
+    )
     llm_requested = bool(submit_to_model)
     llm_enabled = False
     llm_mode = "retrieval_only"
@@ -7993,21 +8711,78 @@ def build_knowledge_query_response(tenant_slug, query_text, limit=5, submit_to_m
     if llm_requested:
         llm_model = get_default_llm_config(purpose="general")
         if llm_model:
-            system_prompt, user_prompt = build_knowledge_chat_prompts(
+            original_matches = result.get("evidence_items") or []
+            try:
+                filtered_matches, filter_meta, filter_model = filter_knowledge_matches_with_llm(
+                    query_text=result.get("query"),
+                    matches=original_matches,
+                    tenant_slug=tenant_slug,
+                )
+                if filter_model:
+                    llm_model = filter_model
+                result["evidence_items"] = filtered_matches
+                result["matches"] = copy.deepcopy(filtered_matches)
+                if filter_meta.get("filtered"):
+                    llm_notice = (
+                        f"已先用通用模型过滤知识召回结果，保留 {filter_meta.get('kept_count', 0)} 条，"
+                        f"过滤掉 {filter_meta.get('dropped_count', 0)} 条无关内容。"
+                    )
+                    if filter_meta.get("reason"):
+                        llm_notice = f"{llm_notice} {filter_meta.get('reason')}"
+                else:
+                    llm_notice = "已勾选提交给大模型，当前未启用额外过滤，直接基于召回结果生成回答。"
+            except Exception as exc:
+                result["evidence_items"] = original_matches
+                result["matches"] = copy.deepcopy(original_matches)
+                llm_notice = f"相关性过滤调用失败，已回退到原始召回结果：{str(exc)}"
+            filtered_matches = result.get("evidence_items") or []
+            if not filtered_matches:
+                llm_enabled = True
+                llm_mode = "model_filtered_empty"
+                result["answer"] = "当前召回结果经过大模型过滤后，没有发现与问题直接相关的知识条目。"
+                return {
+                    **result,
+                    "submit_to_model": llm_requested,
+                    "llm_enabled": llm_enabled,
+                    "llm_mode": llm_mode,
+                    "llm_notice": llm_notice,
+                    "llm_model": {
+                        "key": llm_model.get("key"),
+                        "label": llm_model.get("label"),
+                        "provider": llm_model.get("provider"),
+                        "model_name": llm_model.get("model_name"),
+                        "purpose": llm_model.get("purpose"),
+                    } if llm_model else None,
+                }
+            system_prompt, user_prompt = build_evidence_chain_chat_prompts(
                 query_text=result.get("query"),
-                matches=result.get("matches") or [],
+                evidence_items=filtered_matches,
                 tenant_slug=tenant_slug,
             )
             llm_enabled = True
             try:
-                llm_answer = call_openai_compatible_llm(llm_model, system_prompt, user_prompt)
+                llm_answer = call_openai_compatible_llm(
+                    llm_model,
+                    system_prompt,
+                    user_prompt,
+                    feature_code=f"{feature_namespace}_answer",
+                    feature_label="证据链问答生成",
+                    tenant_slug=tenant_slug,
+                    entry_point=entry_point,
+                    metadata={"match_count": len(filtered_matches), "submit_to_model": True},
+                    request_timeout_seconds=45,
+                )
                 result["answer"] = llm_answer
                 llm_mode = "model_answered"
-                llm_notice = f"当前回答已由通用模型生成：{llm_model.get('label') or llm_model.get('model_name') or llm_model.get('key')}。下方仍保留原始知识命中结果供校验。"
-            except RuntimeError as exc:
+                llm_notice = (
+                    f"{llm_notice}\n\n"
+                    f"当前回答已由通用模型生成：{llm_model.get('label') or llm_model.get('model_name') or llm_model.get('key')}。"
+                    "下方保留的是过滤后的相关知识命中结果。"
+                ).strip()
+            except Exception as exc:
                 llm_enabled = False
                 llm_mode = "fallback_retrieval"
-                llm_notice = f"已尝试调用通用模型，但失败并回退到纯知识检索：{str(exc)}"
+                llm_notice = f"{llm_notice}\n\n已尝试调用通用模型生成回答，但失败并回退到纯知识检索：{str(exc)}".strip()
         else:
             llm_mode = "fallback_retrieval"
             llm_notice = "已勾选提交给大模型，但当前没有可用的通用模型配置，已自动回退到纯知识检索模式。"
@@ -8027,7 +8802,21 @@ def build_knowledge_query_response(tenant_slug, query_text, limit=5, submit_to_m
     }
 
 
-def process_review_voice_upload(file_storage, tenant_slug="", review_period="", entry_point="", speaker_name="", use_llm_enhancement=False):
+def build_knowledge_query_response(tenant_slug, query_text, limit=5, submit_to_model=False):
+    result = build_evidence_chain_response(
+        tenant_slug=tenant_slug,
+        query_text=query_text,
+        limit=limit,
+        submit_to_model=submit_to_model,
+        source_types=["knowledge"],
+        entry_point="knowledge_query",
+        feature_namespace="knowledge_query",
+    )
+    result["matches"] = copy.deepcopy(result.get("evidence_items") or [])
+    return result
+
+
+def process_review_voice_upload(file_storage, tenant_slug="", review_period="", entry_point="", speaker_name="", use_llm_enhancement=False, job_code=""):
     if file_storage is None:
         raise ValueError("audio_file_required")
     safe_name = _safe_audio_filename(getattr(file_storage, "filename", ""))
@@ -8048,6 +8837,14 @@ def process_review_voice_upload(file_storage, tenant_slug="", review_period="", 
     )
     transcript_model = LOCAL_WHISPER_MODEL_SIZE if transcript_engine == "local" else OPENAI_AUDIO_MODEL
     raw_transcript = str(transcript or "").strip()
+    if job_code:
+        report_user_async_job_progress(
+            job_code,
+            stage="transcribed",
+            percent=50,
+            summary="基础转写已完成，正在整理文本",
+            log_text=f"已完成{transcript_engine}转写，准备输出可编辑文案。",
+        )
     enhanced_transcript = ""
     llm_enhanced = False
     llm_notice = ""
@@ -8058,6 +8855,7 @@ def process_review_voice_upload(file_storage, tenant_slug="", review_period="", 
                 raw_transcript,
                 entry_point=entry_point,
                 speaker_name=speaker_name,
+                tenant_slug=tenant_slug,
             )
             enhanced_transcript = str(llm_result.get("text") or "").strip()
             llm_model_info = llm_result.get("model")
@@ -8080,14 +8878,27 @@ def process_review_voice_upload(file_storage, tenant_slug="", review_period="", 
     }
 
 
-def process_review_publish_text(text, tenant_slug="", review_period="", entry_point="", speaker_name="", transcription_engine="manual", transcript_model="manual_input"):
+def process_review_publish_text(text, tenant_slug="", review_period="", entry_point="", speaker_name="", transcription_engine="manual", transcript_model="manual_input", job_code=""):
     normalized_text = str(text or "").strip()
     if not normalized_text:
         raise ValueError("publish_text_required")
     embedding_cfg = get_voice_embedding_config()
+    if job_code:
+        report_user_async_job_progress(
+            job_code,
+            stage="embedding",
+            percent=60,
+            summary="正在计算复盘向量并准备入库",
+            log_text="复盘正文已确认，正在生成向量表示。",
+        )
     embedding, embedding_engine, embedding_model = build_text_embedding(
         normalized_text,
         engine=embedding_cfg.get("engine", "api"),
+        feature_code="review_publish_embedding",
+        feature_label="复盘发布向量入库",
+        tenant_slug=tenant_slug,
+        entry_point=entry_point,
+        metadata={"review_period": review_period, "transcription_engine": transcription_engine},
     )
     vector_namespace = build_vector_namespace(embedding_engine, embedding_model)
     record = _store_review_voice_embedding_record(
@@ -8619,6 +9430,7 @@ def admin():
         access_stats = get_access_summary()
         indicator_hub = build_indicator_hub(admin_view=True)
         task_center = build_admin_task_center_payload()
+        token_usage = build_admin_token_usage_payload()
     except Exception as exc:
         if not is_db_unavailable_error(exc):
             raise
@@ -8629,6 +9441,7 @@ def admin():
             admin_view=True,
         )
         task_center = {"summary": {"total": 0, "enabled": 0, "running": 0, "failed": 0, "now": now_ts()}, "tasks": [], "runs": [], "runtime": {}}
+        token_usage = {"summary_24h": {"request_count": 0, "input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "avg_tokens_per_request": 0, "avg_latency_ms": 0}, "summary_30d": {"request_count": 0, "input_tokens": 0, "output_tokens": 0, "total_tokens": 0, "avg_tokens_per_request": 0, "avg_latency_ms": 0}, "hourly": [], "daily": [], "monthly": [], "features": [], "models": [], "model_daily": [], "recent_logs": [], "generated_at": now_ts()}
     return render_template(
         "admin.html",
         kols=kols,
@@ -8636,6 +9449,7 @@ def admin():
         access_stats=access_stats,
         indicator_hub=indicator_hub,
         task_center=task_center,
+        token_usage=token_usage,
         brand=get_platform_brand(site_config),
         tenants=get_tenant_configs(site_config),
         default_tenant=get_tenant_by_slug(get_default_tenant_slug(site_config), site_config),
@@ -8981,6 +9795,11 @@ def api_admin_user_jobs():
     job_type = str(request.args.get("job_type") or "").strip().lower() or None
     limit = min(int(request.args.get("limit", 60)), USER_ASYNC_JOB_LOG_LIMIT)
     return jsonify({"ok": True, **build_user_async_jobs_payload(tenant_slug=tenant_slug, status=status, job_type=job_type, limit=limit)})
+
+
+@app.route("/api/admin/token-usage")
+def api_admin_token_usage():
+    return jsonify({"ok": True, **build_admin_token_usage_payload()})
 
 
 @app.route("/api/jobs/<job_code>")
@@ -10371,20 +11190,57 @@ def api_query_kol_knowledge():
     return jsonify({"ok": True, **result})
 
 
+@app.route("/api/evidence-chain/query", methods=["POST"])
+def api_query_evidence_chain():
+    body = request.get_json(silent=True) or {}
+    tenant_slug = str(body.get("tenant_slug") or request.args.get("tenant") or "").strip().lower()
+    submit_to_model = bool(body.get("submit_to_model", False))
+    try:
+        result = build_evidence_chain_response(
+            tenant_slug=tenant_slug,
+            query_text=body.get("query"),
+            limit=body.get("limit") or 5,
+            submit_to_model=submit_to_model,
+            source_types=body.get("source_types"),
+            entry_point=str(body.get("entry_point") or "evidence_chain").strip() or "evidence_chain",
+            feature_namespace="evidence_chain",
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    except Exception:
+        app.logger.exception("Failed to query evidence chain")
+        return jsonify({"ok": False, "error": "evidence_chain_query_failed"}), 500
+    return jsonify({"ok": True, **result})
+
+
 @app.route("/api/review/generate-draft", methods=["POST"])
 def api_generate_review_draft():
     body = request.get_json(silent=True) or {}
     try:
-        source_text = body.get("source_text")
-        result = generate_review_draft_with_llm(
-            source_text=source_text,
-            review_period=body.get("period"),
-            source_mode=body.get("source_mode"),
-            prompt_text=body.get("prompt_text"),
-            prompt_tags=body.get("prompt_tags") if isinstance(body.get("prompt_tags"), list) else [],
-            selected_watchlist=body.get("selected_watchlist") if isinstance(body.get("selected_watchlist"), list) else [],
-            speaker_name=body.get("speaker_name"),
-            entry_point=body.get("entry_point"),
+        tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
+        entry_point = str(body.get("entry_point") or "").strip() or "review_draft"
+        speaker_name = str(body.get("speaker_name") or "").strip()
+        payload = {
+            "tenant_slug": tenant_slug,
+            "period": str(body.get("period") or "").strip().lower(),
+            "source_mode": str(body.get("source_mode") or "").strip().lower(),
+            "source_text": body.get("source_text"),
+            "prompt_text": body.get("prompt_text"),
+            "prompt_tags": body.get("prompt_tags") if isinstance(body.get("prompt_tags"), list) else [],
+            "selected_watchlist": body.get("selected_watchlist") if isinstance(body.get("selected_watchlist"), list) else [],
+            "speaker_name": speaker_name,
+            "entry_point": entry_point,
+        }
+        if not str(payload.get("source_text") or "").strip():
+            raise ValueError("review_source_text_required")
+        job = create_user_async_job(
+            "review_generate_draft",
+            payload=payload,
+            tenant_slug=tenant_slug,
+            entry_point=entry_point,
+            owner_label=speaker_name,
         )
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
@@ -10393,7 +11249,13 @@ def api_generate_review_draft():
     except Exception:
         app.logger.exception("Failed to generate review draft with LLM")
         return jsonify({"ok": False, "error": "review_draft_generation_failed"}), 500
-    return jsonify({"ok": True, **result})
+    return jsonify({
+        "ok": True,
+        "async": True,
+        "job_code": job["job_code"],
+        "job_status": job["status"],
+        "message": "复盘草稿已提交生成，正在后台调用大模型",
+    })
 
 
 @app.route("/api/tenant/<tenant_slug>/dashboard")
