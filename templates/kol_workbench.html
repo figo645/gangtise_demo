@@ -2590,7 +2590,11 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
             {% endfor %}
           </div>
           <div class="kw-toolbar" style="margin-top:12px">
-            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="showToast('将进入工作台消息中心')">进入消息中心</button>
+            <input id="kw-message-reply-input" class="dm-input" placeholder="先在上面选择一条粉丝会话，再输入回复..." style="flex:1">
+            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="submitWorkbenchMessageReply()">回复粉丝</button>
+          </div>
+          <div class="kw-toolbar" style="margin-top:12px">
+            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="openWorkbenchMessageCenter()">进入消息中心</button>
             <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="showToast('将同步复盘提醒到粉丝消息')">推送复盘提醒</button>
           </div>
         </div>
@@ -8312,15 +8316,64 @@ function kwRenderPublishedReviewList() {
   `).join('');
 }
 
+let kwSelectedMessageThreadId = '';
+
+function selectWorkbenchMessageThread(threadId) {
+  kwSelectedMessageThreadId = String(threadId || '').trim();
+  document.querySelectorAll('#workbench-section-messages .kw-fan-item[data-thread-id]').forEach((node) => {
+    const active = node.dataset.threadId === kwSelectedMessageThreadId;
+    node.style.borderColor = active ? 'rgba(200,169,110,0.32)' : '';
+    node.style.background = active ? '#FFFDF7' : '';
+  });
+}
+
+function openWorkbenchMessageCenter() {
+  const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
+  window.location.href = `/h5?tenant=${encodeURIComponent(tenantSlug)}`;
+}
+
+async function submitWorkbenchMessageReply() {
+  const input = document.getElementById('kw-message-reply-input');
+  const content = input ? String(input.value || '').trim() : '';
+  const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
+  if (!kwSelectedMessageThreadId) {
+    showToast('请先选择一条粉丝会话');
+    return;
+  }
+  if (!content) {
+    showToast('请输入回复内容');
+    return;
+  }
+  try {
+    const res = await fetch('/api/kol/reply', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        thread_id: kwSelectedMessageThreadId,
+        tenant_slug: tenantSlug,
+        content,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.success === false) throw new Error(data.error || 'kol_reply_failed');
+    if (input) input.value = '';
+    await refreshWorkbenchSiteConfig({silent: true});
+    showToast('已回复粉丝');
+  } catch (error) {
+    showToast(error.message || '回复失败');
+  }
+}
+
 function kwRenderMessageCenter() {
   const host = document.querySelector('#workbench-section-messages .kw-fan-list');
   const summaryHost = document.querySelector('#workbench-section-messages .kw-card-desc');
   const messageCenter = (window.WORKBENCH_DATA && window.WORKBENCH_DATA.message_center) || {};
   const items = Array.isArray(messageCenter.items) ? messageCenter.items : [];
+  const threads = Array.isArray(messageCenter.threads) ? messageCenter.threads : [];
   if (summaryHost && messageCenter.summary) summaryHost.textContent = messageCenter.summary;
   if (!host) return;
-  host.innerHTML = items.map((fan) => `
-    <div class="kw-fan-item">
+  host.innerHTML = items.map((fan, index) => `
+    <div class="kw-fan-item" data-thread-id="${escapeAttr(String((threads[index] || {}).id || ''))}" onclick="selectWorkbenchMessageThread('${escapeAttr(String((threads[index] || {}).id || ''))}')">
       <div class="kw-fan-top">
         <div class="kw-fan-name">${escapeHtml(fan.name || '')}</div>
         <span class="kw-tag">${escapeHtml(fan.status || '')}</span>
@@ -8329,6 +8382,12 @@ function kwRenderMessageCenter() {
       <div class="kw-fan-msg">${escapeHtml(fan.content || '')}</div>
     </div>
   `).join('') || '<div class="kw-side-note">当前暂无消息</div>';
+  if (!kwSelectedMessageThreadId && threads.length) {
+    kwSelectedMessageThreadId = String((threads[0] || {}).id || '');
+  }
+  if (kwSelectedMessageThreadId) {
+    selectWorkbenchMessageThread(kwSelectedMessageThreadId);
+  }
 }
 
 function kwRenderBroadcastHistory() {

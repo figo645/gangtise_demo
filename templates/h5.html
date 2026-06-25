@@ -4116,6 +4116,24 @@ function getActiveDemoUser() {
   return currentDemoUser || getDefaultDemoUser();
 }
 
+function getSafeActiveDemoUser() {
+  const fallbackTenant = getActiveTenantProfile();
+  const activeUser = getActiveDemoUser() || {};
+  const tenant = {
+    ...fallbackTenant,
+    ...((activeUser && activeUser.tenant) || {}),
+  };
+  return {
+    ...activeUser,
+    role: activeUser.role || 'investor',
+    username: activeUser.username || 'demo_user',
+    name: activeUser.name || activeUser.username || 'Demo User',
+    avatar: activeUser.avatar || '👤',
+    membership: activeUser.membership || '普通用户',
+    tenant,
+  };
+}
+
 function getReviewPeriodMeta(period) {
   return REVIEW_PERIOD_CONFIG[period] || REVIEW_PERIOD_CONFIG.day;
 }
@@ -5583,7 +5601,7 @@ function getTenantVisibleAuthors(authors) {
 }
 
 function canAccessAdvisor(advisorName) {
-  const activeUser = getActiveDemoUser();
+  const activeUser = getSafeActiveDemoUser();
   return activeUser.role === 'dav' || advisorName === activeUser.tenant.advisor;
 }
 
@@ -7332,7 +7350,11 @@ function renderDemoProfile(user) {
   syncTenantScopedAdvisorViews();
   renderFundMacroDashboard();
   refreshTenantDashboardRemoteState({ rerenderFeed: true, rerenderWorkbench: true });
-  renderWatchlist();
+  try {
+    renderWatchlist();
+  } catch (error) {
+    console.error('renderWatchlist failed', error);
+  }
   renderReviewExperience();
   renderKnowledgeExperience();
   renderHermesWorkspace();
@@ -7633,6 +7655,11 @@ function addCurrentStockToWatchlist() {
   }
   renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
   showToast('已加入自选股');
+}
+
+function renderWatchlist() {
+  renderReviewWatchlistSelectionMode();
+  renderHermesWorkspace();
 }
 
 function calcMovingAverage(series, windowSize) {
@@ -9374,24 +9401,28 @@ const DAV_DM_MESSAGES = {
 };
 
 function isDavDmMode() {
-  const activeUser = getActiveDemoUser();
+  const activeUser = getSafeActiveDemoUser();
   return activeUser && activeUser.role === 'dav';
 }
 
 function getInvestorDmConversation() {
-  const activeUser = getActiveDemoUser();
-  const messages = getInvestorDmMessages();
-  const latest = messages[messages.length - 1] || {};
+  const activeUser = getSafeActiveDemoUser();
   return {
-    id: 1,
+    id: buildInvestorFallbackThreadId(activeUser),
     kol_name: activeUser.tenant.advisor,
-    kol_avatar: '👑',
+    kol_avatar: activeUser.avatar || '👑',
     tier: '所属大V',
-    last_msg: latest.type === 'review' ? '最新复盘已发布，点击查看' : (latest.content || '欢迎交流'),
-    time: latest.time || '刚刚',
-    unread: 1,
+    last_msg: '欢迎交流',
+    time: '刚刚',
+    unread: 0,
     vip_only: false,
   };
+}
+
+function buildInvestorFallbackThreadId(user) {
+  const tenantSlug = user && user.tenant ? user.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || 'tenant');
+  const username = user && user.username ? user.username : 'investor';
+  return `${tenantSlug}-thread-fallback-${username}`;
 }
 
 function getDmQuickAskOptions() {
@@ -9412,10 +9443,11 @@ function getDmQuickAskOptions() {
 }
 
 function buildReviewPushDmMeta(user) {
-  const runtime = ensureTenantReviewRuntime(user.tenant.id);
+  const safeUser = user && user.tenant ? user : getSafeActiveDemoUser();
+  const runtime = ensureTenantReviewRuntime(safeUser.tenant.id);
   const reviewPeriod = runtime.lastReviewPeriod || 'day';
-  const review = buildKolReviewData(user, reviewPeriod);
-  const selectedNames = getDavReviewSelectedWatchlist(user.tenant.id);
+  const review = buildKolReviewData(safeUser, reviewPeriod);
+  const selectedNames = getDavReviewSelectedWatchlist(safeUser.tenant.id);
   return {
     title: review.title,
     time: runtime.kolGeneratedAt || '刚刚',
@@ -9428,7 +9460,7 @@ function buildReviewPushDmMeta(user) {
 function renderDmReviewStatusCard() {
   const host = document.getElementById('dm-review-status-card');
   if (!host) return;
-  const activeUser = getActiveDemoUser();
+  const activeUser = getSafeActiveDemoUser();
   const reviewMeta = buildReviewPushDmMeta(activeUser);
   if (isDavDmMode()) {
     host.innerHTML = `
@@ -9461,7 +9493,7 @@ function renderDmReviewStatusCard() {
 }
 
 function getInvestorDmMessages() {
-  const activeUser = getActiveDemoUser();
+  const activeUser = getSafeActiveDemoUser();
   const reviewMeta = buildReviewPushDmMeta(activeUser);
   return [
     { id: 1, sender: 'kol', content: `欢迎来到 ${activeUser.tenant.advisor} 的专属消息区，有问题可以直接提问。`, time: '2026-06-07 09:00', type: 'text' },
@@ -9505,7 +9537,7 @@ function syncDmRoleView() {
     }
     if (input) input.placeholder = '回复粉丝问题，支持多轮沟通...';
   } else {
-    const activeUser = getActiveDemoUser();
+    const activeUser = getSafeActiveDemoUser();
     if (title) title.textContent = '专属对话';
     if (hint) hint.textContent = `仅可与所属大V ${activeUser.tenant.advisor} 对话`;
     if (cardTitle) cardTitle.textContent = '租户私信说明';
@@ -9523,29 +9555,51 @@ function syncDmRoleView() {
 }
 
 async function loadDmConversations() {
-  syncDmRoleView();
-  const activeUser = getActiveDemoUser();
+  const container = document.getElementById('dm-conversations-list');
+  if (!container) return;
+  try {
+    syncDmRoleView();
+  } catch (e) {}
+  const activeUser = getSafeActiveDemoUser();
   const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  dmConversationsCache = getMockDmConversations();
+  try {
+    renderDmConversations(dmConversationsCache);
+  } catch (error) {
+    container.innerHTML = buildDmConversationFallbackHtml(dmConversationsCache);
+  }
   if (isDavDmMode()) {
     try {
-      const resp = await fetch(`/api/dm/conversations?tenant=${encodeURIComponent(tenantSlug)}`);
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timer = controller ? setTimeout(() => controller.abort(), 2500) : null;
+      const resp = await fetch(`/api/dm/conversations?tenant=${encodeURIComponent(tenantSlug)}`, controller ? { signal: controller.signal } : undefined);
+      if (timer) clearTimeout(timer);
       const data = await resp.json();
       dmConversationsCache = Array.isArray(data) ? data : DAV_DM_CONVERSATIONS.slice();
-      renderDmConversations(dmConversationsCache);
+      try {
+        renderDmConversations(dmConversationsCache);
+      } catch (error) {
+        container.innerHTML = buildDmConversationFallbackHtml(dmConversationsCache);
+      }
       return;
     } catch (e) {
-      dmConversationsCache = DAV_DM_CONVERSATIONS.slice();
-      renderDmConversations(dmConversationsCache);
       return;
     }
   }
   try {
-    const resp = await fetch(`/api/dm/conversations?tenant=${encodeURIComponent(tenantSlug)}`);
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 2500) : null;
+    const resp = await fetch(`/api/dm/conversations?tenant=${encodeURIComponent(tenantSlug)}`, controller ? { signal: controller.signal } : undefined);
+    if (timer) clearTimeout(timer);
     const data = await resp.json();
     dmConversationsCache = Array.isArray(data) && data.length ? data : [getInvestorDmConversation()];
-    renderDmConversations(dmConversationsCache);
+    try {
+      renderDmConversations(dmConversationsCache);
+    } catch (error) {
+      container.innerHTML = buildDmConversationFallbackHtml(dmConversationsCache);
+    }
   } catch (e) {
-    renderDmConversations(getMockDmConversations());
+    return;
   }
 }
 
@@ -9553,17 +9607,46 @@ function getMockDmConversations() {
   return isDavDmMode() ? DAV_DM_CONVERSATIONS.slice() : [getInvestorDmConversation()];
 }
 
+function buildDmConversationFallbackHtml(list) {
+  const items = Array.isArray(list) ? list : [];
+  if (!items.length) {
+    return '<div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">暂无对话</div>';
+  }
+  return items.map((item) => {
+    const name = isDavDmMode() ? (item.user_name || '粉丝') : (item.kol_name || '所属大V');
+    const avatar = isDavDmMode() ? (item.user_avatar || '👤') : (item.kol_avatar || '👑');
+    const tier = item.tier || (isDavDmMode() ? '粉丝' : '所属大V');
+    const lastMsg = item.last_msg || '欢迎交流';
+    const time = item.time || '刚刚';
+    return `
+      <div class="dm-conv-item" onclick="openDmChat('${escapeAttr(String(item.id || ''))}','${escapeAttr(name)}','${escapeAttr(avatar)}','${escapeAttr(tier)}')">
+        <div class="dm-avatar">${escapeHtml(avatar)}</div>
+        <div class="dm-conv-info">
+          <div class="dm-conv-name">
+            ${escapeHtml(name)}
+            <span style="font-size:10px;background:rgba(200,169,110,0.15);color:var(--gold);padding:1px 5px;border-radius:4px">${escapeHtml(tier)}</span>
+          </div>
+          <div class="dm-conv-last">${escapeHtml(lastMsg)}</div>
+        </div>
+        <div class="dm-conv-time">${escapeHtml(time)}</div>
+      </div>
+    `;
+  }).join('');
+}
+
 function renderDmConversations(list) {
   const container = document.getElementById('dm-conversations-list');
+  if (!container) return;
+  const safeList = Array.isArray(list) ? list : [];
   const visibleList = isDavDmMode()
-    ? (list || [])
-    : (list || []).filter(item => canAccessAdvisor(item.kol_name));
+    ? safeList
+    : safeList.filter(item => canAccessAdvisor(item && item.kol_name));
   if (!visibleList.length) {
     container.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">暂无对话</div>';
     return;
   }
   container.innerHTML = visibleList.map(c => `
-    <div class="dm-conv-item" onclick="openDmChat(${c.id},'${isDavDmMode() ? c.user_name : c.kol_name}','${isDavDmMode() ? c.user_avatar : c.kol_avatar}','${c.tier}')">
+    <div class="dm-conv-item" onclick="openDmChat('${escapeAttr(String(c.id || ''))}','${escapeAttr(isDavDmMode() ? c.user_name : c.kol_name)}','${escapeAttr(isDavDmMode() ? c.user_avatar : c.kol_avatar)}','${escapeAttr(c.tier || '')}')">
       <div class="dm-avatar">${isDavDmMode() ? c.user_avatar : c.kol_avatar}${c.unread>0?'<div class="dm-unread-dot"></div>':''}</div>
       <div class="dm-conv-info">
         <div class="dm-conv-name">
@@ -9576,6 +9659,38 @@ function renderDmConversations(list) {
       <div class="dm-conv-time">${c.time}</div>
     </div>
   `).join('');
+  renderWorkbenchFanInbox(visibleList);
+}
+
+function workbenchTierStyle(tier) {
+  const text = String(tier || '');
+  if (text.includes('核心')) return 'background:rgba(46,204,113,0.15);color:var(--green)';
+  if (text.includes('观察')) return 'background:rgba(52,152,219,0.15);color:#3498DB';
+  if (text.includes('机构') || text.includes('专业')) return 'background:rgba(200,169,110,0.2);color:var(--gold)';
+  return 'background:rgba(200,169,110,0.12);color:var(--gold)';
+}
+
+function renderWorkbenchFanInbox(list) {
+  const host = document.getElementById('wb-fan-inbox');
+  if (!host || !isDavDmMode()) return;
+  const items = Array.isArray(list) ? list : [];
+  if (!items.length) {
+    host.innerHTML = '<div style="padding:16px;color:var(--gray-400);font-size:12px">当前暂无粉丝消息</div>';
+    return;
+  }
+  host.innerHTML = items.slice(0, 6).map((item) => `
+    <div class="wb-fan-item" onclick="openDmChat('${escapeAttr(String(item.id || ''))}','${escapeAttr(item.user_name || '')}','${escapeAttr(item.user_avatar || '👤')}','${escapeAttr(item.tier || '粉丝')}')" style="cursor:pointer">
+      <div class="wb-fan-avatar">${escapeHtml(item.user_avatar || '👤')}</div>
+      <div class="wb-fan-info">
+        <div class="wb-fan-name">${escapeHtml(item.user_name || '')}</div>
+        <div class="wb-fan-msg">${escapeHtml(item.last_msg || '')}</div>
+      </div>
+      <div class="wb-fan-meta">
+        <div class="wb-fan-time">${escapeHtml(item.time || '--')}</div>
+        <div class="wb-fan-tier" style="${workbenchTierStyle(item.tier)}">${escapeHtml(item.tier || '粉丝')}</div>
+      </div>
+    </div>
+  `).join('');
 }
 
 async function openDmChat(kolId, name, avatar, tier) {
@@ -9586,7 +9701,7 @@ async function openDmChat(kolId, name, avatar, tier) {
   // Switch to DM tab if not already
   switchTab('dm');
   setTimeout(() => {
-    currentDmKol = { id: kolId, name, avatar, tier, role: isDavDmMode() ? 'fan' : 'advisor' };
+    currentDmKol = { id: String(kolId || ''), name, avatar, tier, role: isDavDmMode() ? 'fan' : 'advisor' };
     document.getElementById('dm-list-view').style.display = 'none';
     document.getElementById('dm-chat-view').style.display = 'block';
     document.getElementById('dm-chat-name').textContent = name;
@@ -9609,27 +9724,32 @@ function closeDmChat() {
 }
 
 async function loadDmMessages(kolId) {
-  const container = document.getElementById('dm-messages-container');
-  container.innerHTML = '<div style="text-align:center;color:var(--gray-400);font-size:12px;padding:20px">加载中...</div>';
   const activeUser = getActiveDemoUser();
   const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
   if (isDavDmMode()) {
+    const fallback = DAV_DM_MESSAGES[kolId] || [{id:1,sender:'user',content:'你好，想和你交流一下当前市场看法。',time:'刚刚',type:'text'}];
+    dmCurrentHistory = fallback.map(m => ({sender:m.sender, content:m.content}));
+    renderDmMessages(fallback);
     try {
-      const resp = await fetch(`/api/dm/messages/${encodeURIComponent(kolId)}?tenant=${encodeURIComponent(tenantSlug)}`);
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timer = controller ? setTimeout(() => controller.abort(), 2500) : null;
+      const resp = await fetch(`/api/dm/messages/${encodeURIComponent(kolId)}?tenant=${encodeURIComponent(tenantSlug)}`, controller ? { signal: controller.signal } : undefined);
+      if (timer) clearTimeout(timer);
       const data = await resp.json();
-      const list = Array.isArray(data) && data.length ? data : (DAV_DM_MESSAGES[kolId] || [{id:1,sender:'user',content:'你好，想和你交流一下当前市场看法。',time:'刚刚',type:'text'}]);
+      const list = Array.isArray(data) && data.length ? data : fallback;
       dmCurrentHistory = list.map(m => ({sender:m.sender, content:m.content}));
       renderDmMessages(list);
       return;
     } catch (e) {}
-    const data = DAV_DM_MESSAGES[kolId] || [{id:1,sender:'user',content:'你好，想和你交流一下当前市场看法。',time:'刚刚',type:'text'}];
-    dmCurrentHistory = data.map(m => ({sender:m.sender, content:m.content}));
-    renderDmMessages(data);
     return;
   }
   let data = getInvestorDmMessages();
+  renderDmMessages(data);
   try {
-    const resp = await fetch(`/api/dm/messages/${encodeURIComponent(kolId)}?tenant=${encodeURIComponent(tenantSlug)}`);
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 2500) : null;
+    const resp = await fetch(`/api/dm/messages/${encodeURIComponent(kolId)}?tenant=${encodeURIComponent(tenantSlug)}`, controller ? { signal: controller.signal } : undefined);
+    if (timer) clearTimeout(timer);
     const payload = await resp.json();
     if (Array.isArray(payload) && payload.length) data = payload;
   } catch (e) {}
@@ -9684,46 +9804,33 @@ async function sendDm() {
   }
   input.value = '';
   const container = document.getElementById('dm-messages-container');
-  // Append user msg
-  const userMsg = document.createElement('div');
-  userMsg.className = `dm-msg from-${isDavDmMode() ? 'kol' : 'user'}`;
-  userMsg.innerHTML = `${text}<div class="dm-msg-time" style="color:${isDavDmMode() ? 'var(--gray-400)' : 'rgba(11,30,58,0.7)'}">刚刚</div>`;
-  container.appendChild(userMsg);
-  dmCurrentHistory.push({sender:isDavDmMode() ? 'kol' : 'user', content:text});
-  container.scrollTop = container.scrollHeight;
-  // Typing
-  const typing = document.createElement('div');
-  typing.className = `dm-msg from-${isDavDmMode() ? 'user' : 'kol'}`;
-  typing.innerHTML = '<span style="color:var(--gray-400);font-size:12px">对方正在输入<span class="dot-anim"><span>.</span><span>.</span><span>.</span></span></span>';
-  container.appendChild(typing);
-  container.scrollTop = container.scrollHeight;
-  if (isDavDmMode()) {
-    await new Promise(r=>setTimeout(r, 600));
-    typing.remove();
-    showToast('已回复粉丝');
-    return;
-  }
   try {
     const activeUser = getActiveDemoUser();
     const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+    const payload = {
+      thread_id: currentDmKol.id,
+      tenant_slug: tenantSlug,
+      content: text,
+      sender_role: isDavDmMode() ? 'dav' : 'investor',
+      sender_profile_id: activeUser && activeUser.username ? activeUser.username : '',
+      sender_name: activeUser && activeUser.name ? activeUser.name : '',
+      sender_avatar: activeUser && activeUser.avatar ? activeUser.avatar : '',
+      sender_membership: activeUser && activeUser.membership ? activeUser.membership : '',
+    };
     const resp = await fetch('/api/dm/send', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({thread_id: currentDmKol.id, kol_id: currentDmKol.id, tenant_slug: tenantSlug, content: text, history: dmCurrentHistory})
+      body: JSON.stringify(payload)
     });
     const data = await resp.json();
     if (!resp.ok || !data.success) throw new Error((data && data.error) || 'dm_send_failed');
-    await new Promise(r=>setTimeout(r, 900));
-    typing.remove();
-    const reply = document.createElement('div');
-    reply.className = 'dm-msg from-kol';
-    reply.innerHTML = `${data.auto_reply}
-      <div style="font-size:10px;color:var(--gray-400);margin-top:6px;padding-top:6px;border-top:1px solid rgba(200,169,110,0.1);font-style:italic">${data.disclaimer || '仅供参考，不构成投资建议'}</div>
-      <div class="dm-msg-time">刚刚</div>`;
-    container.appendChild(reply);
-    dmCurrentHistory.push({sender:'kol', content:data.auto_reply});
-    container.scrollTop = container.scrollHeight;
+    if (data.thread_id) {
+      currentDmKol.id = String(data.thread_id);
+    }
+    await loadDmMessages(currentDmKol.id);
+    await loadDmConversations();
+    showToast(isDavDmMode() ? '已回复粉丝' : '消息已发送，等待大V回复');
   } catch (e) {
-    typing.remove();
+    showToast(e.message || '发送失败');
   }
 }
 
@@ -9740,12 +9847,31 @@ function dmQuickAsk(text) {
 function wbQuickReply(isPaid) {
   const text = document.getElementById('wb-quick-reply').value.trim();
   if (!text) { showToast('请输入回复内容'); return; }
-  if (isPaid) {
-    showToast('付费回复已发送！收益 +¥50');
-  } else {
-    showToast('回复已发送');
+  const selected = dmConversationsCache && dmConversationsCache.length ? dmConversationsCache[0] : null;
+  if (!selected || !selected.id) {
+    showToast('请先进入一条粉丝会话');
+    return;
   }
-  document.getElementById('wb-quick-reply').value = '';
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  fetch('/api/kol/reply', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      thread_id: selected.id,
+      tenant_slug: tenantSlug,
+      content: text,
+      is_paid: !!isPaid,
+    })
+  }).then(async (resp) => {
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw new Error((data && data.error) || 'kol_reply_failed');
+    document.getElementById('wb-quick-reply').value = '';
+    await loadDmConversations();
+    showToast(isPaid ? '付费回复已发送' : '回复已发送');
+  }).catch((error) => {
+    showToast(error.message || '回复发送失败');
+  });
 }
 
 async function sendBroadcast() {

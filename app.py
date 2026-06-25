@@ -1260,6 +1260,7 @@ def normalize_message_thread_item(item, tenant, index=0):
         "time": str(raw.get("time") or fallback.get("time") or "").strip() or now_ts(),
         "content": str(raw.get("content") or fallback.get("content") or "").strip(),
         "status": str(raw.get("status") or fallback.get("status") or "").strip() or "待处理",
+        "user_profile_id": str(raw.get("user_profile_id") or "").strip(),
         "user_name": str(raw.get("user_name") or fallback.get("user_name") or raw.get("name") or "").strip(),
         "user_avatar": str(raw.get("user_avatar") or fallback.get("user_avatar") or "👤").strip() or "👤",
         "tier": str(raw.get("tier") or fallback.get("tier") or "粉丝").strip() or "粉丝",
@@ -1368,6 +1369,104 @@ def append_broadcast_history(tenant_slug, broadcast_item):
     })
     latest_tenant = get_tenant_by_slug(tenant_slug, saved) if saved else tenant
     return resolve_tenant_message_center_state(latest_tenant, state=latest_tenant.get("message_center_state"))
+
+
+def build_fan_thread_id(tenant_slug, username):
+    normalized_tenant = str(tenant_slug or "").strip().lower() or "tenant"
+    normalized_username = str(username or "").strip().lower() or "user"
+    digest = hashlib.md5(f"{normalized_tenant}:{normalized_username}".encode("utf-8")).hexdigest()[:10]
+    return f"{normalized_tenant}-thread-fan-{digest}"
+
+
+def build_message_thread_for_user(user_profile, tenant, first_message=""):
+    username = str((user_profile or {}).get("username") or "").strip()
+    avatar = str((user_profile or {}).get("avatar") or "👤").strip() or "👤"
+    membership = str((user_profile or {}).get("membership") or "粉丝").strip() or "粉丝"
+    thread = {
+        "id": build_fan_thread_id(tenant.get("slug"), username),
+        "type": "fan_interaction",
+        "name": username,
+        "time": "刚刚" if first_message else "--",
+        "content": str(first_message or "").strip(),
+        "status": "待回复" if first_message else "待处理",
+        "user_profile_id": username,
+        "user_name": username,
+        "user_avatar": avatar,
+        "tier": membership,
+        "last_msg": str(first_message or "").strip() or "欢迎交流",
+        "unread": 1 if first_message else 0,
+        "vip_only": False,
+        "messages": [],
+    }
+    return normalize_message_thread_item(thread, tenant, index=0)
+
+
+def find_message_thread_index(threads, thread_id=None, user_profile_id=None):
+    normalized_thread_id = str(thread_id or "").strip()
+    normalized_profile_id = str(user_profile_id or "").strip()
+    for index, thread in enumerate(threads or []):
+        if normalized_thread_id and str(thread.get("id") or "").strip() == normalized_thread_id:
+            return index
+        if normalized_profile_id and str(thread.get("user_profile_id") or "").strip() == normalized_profile_id:
+            return index
+    return -1
+
+
+def save_tenant_message_threads(tenant_slug, state, threads):
+    normalized_slug = str(tenant_slug or "").strip().lower() or get_default_tenant_slug()
+    saved = update_tenant_message_center_state(normalized_slug, {
+        "summary": state["summary"],
+        "threads": threads[:60],
+        "broadcasts": state["broadcasts"],
+    })
+    latest_tenant = get_tenant_by_slug(normalized_slug, saved) if saved else get_tenant_by_slug(normalized_slug)
+    latest_state = resolve_tenant_message_center_state(latest_tenant, latest_tenant.get("message_center_state"))
+    return latest_tenant, latest_state
+
+
+def resolve_dm_actor(body=None, tenant_slug=""):
+    raw = body if isinstance(body, dict) else {}
+    sender_role = str(raw.get("sender_role") or request.args.get("sender_role") or "").strip().lower()
+    sender_profile_id = str(raw.get("sender_profile_id") or request.args.get("sender_profile_id") or "").strip()
+    sender_name = str(raw.get("sender_name") or request.args.get("sender_name") or sender_profile_id).strip()
+    sender_avatar = str(raw.get("sender_avatar") or request.args.get("sender_avatar") or "👤").strip() or "👤"
+    sender_membership = str(raw.get("sender_membership") or request.args.get("sender_membership") or "粉丝").strip() or "粉丝"
+    resolved_tenant_slug = str(raw.get("tenant_slug") or tenant_slug or request.args.get("tenant") or get_default_tenant_slug()).strip().lower()
+    if sender_role == "investor" and sender_profile_id:
+        return {
+            "role": "investor",
+            "profile": {
+                "username": sender_profile_id,
+                "name": sender_name,
+                "avatar": sender_avatar,
+                "membership": sender_membership,
+                "tenant": {"slug": resolved_tenant_slug},
+            },
+            "tenant_slug": resolved_tenant_slug,
+        }
+    if sender_role == "dav":
+        return {
+            "role": "dav",
+            "profile": None,
+            "tenant_slug": resolved_tenant_slug,
+        }
+    try:
+        current_profile = get_current_demo_profile()
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        current_profile = None
+    if current_profile:
+        return {
+            "role": str(current_profile.get("role") or "").strip(),
+            "profile": current_profile,
+            "tenant_slug": str((current_profile.get("tenant") or {}).get("slug") or resolved_tenant_slug).strip().lower(),
+        }
+    return {
+        "role": "",
+        "profile": None,
+        "tenant_slug": resolved_tenant_slug,
+    }
 
 
 def normalize_portal_cms_config(source, tenant):
@@ -11848,11 +11947,17 @@ def api_hermes_analyze():
 def gen_dm_conversations(tenant_slug=None, include_fan_threads=True):
     tenant = get_tenant_by_slug(tenant_slug)
     state = resolve_tenant_message_center_state(tenant, tenant.get("message_center_state"))
+    current_profile = get_current_demo_profile()
+    current_role = str((current_profile or {}).get("role") or "").strip().lower()
+    current_profile_id = str((current_profile or {}).get("username") or "").strip()
     items = []
     for thread in state["threads"]:
         thread_type = str(thread.get("type") or "").strip()
         if thread_type == "fan_interaction" and not include_fan_threads:
             continue
+        if thread_type == "fan_interaction" and current_role == "investor":
+            if str(thread.get("user_profile_id") or "").strip() != current_profile_id:
+                continue
         items.append({
             "id": thread.get("id"),
             "kol_name": tenant.get("advisor") or "",
@@ -12253,92 +12358,88 @@ def api_dm_send():
     if not is_feature_enabled("fan_interaction"):
         return jsonify({"success": False, "error": "fan_interaction_disabled"}), 403
     body = request.get_json(silent=True) or {}
-    thread_id = body.get("thread_id") or body.get("kol_id")
+    thread_id = str(body.get("thread_id") or body.get("kol_id") or "").strip()
     tenant_slug = str(body.get("tenant_slug") or request.args.get("tenant") or "").strip().lower()
-    content = body.get("content", "")
-    history = body.get("history", [])
+    content = str(body.get("content") or "").strip()
+    if not content:
+        return jsonify({"success": False, "error": "content_required"}), 400
+    actor = resolve_dm_actor(body, tenant_slug=tenant_slug)
+    actor_role = actor.get("role") or ""
+    actor_profile = actor.get("profile") or {}
+    tenant_slug = actor.get("tenant_slug") or tenant_slug or get_default_tenant_slug()
     tenant = get_tenant_by_slug(tenant_slug)
     state = resolve_tenant_message_center_state(tenant, tenant.get("message_center_state"))
-    # 作者角色画像 + 上下文感知（合规：用"关注/参考/可考虑"措辞，不出现"买/卖/必涨/必跌"）
-    KOL_PERSONA = {
-        1: {"name":"财经老王","style":"宏观+科技，偏稳健","focus":["AI算力","半导体","美联储","降息"]},
-        2: {"name":"投资女神Lisa","style":"港股+互联网，价值派","focus":["港股","互联网","南向资金","平台经济"]},
-        3: {"name":"量化老师陈明","style":"量化+因子，数据驱动","focus":["因子","量化","回测","动量","价值"]},
-        4: {"name":"全球宏观James","style":"宏观+大宗，海外视角","focus":["美联储","美元","黄金","大宗"]},
-        5: {"name":"新能源猎手阿强","style":"产业链调研，新能源","focus":["新能源","固态电池","锂电","光伏"]},
-    }
-    persona = KOL_PERSONA[1]
-    text = content.lower()
-    turn = len(history) + 1
+    threads = copy.deepcopy(state["threads"] or [])
+    now_text = now_ts()
 
-    # 关键词触发的多轮回复（每个作者不同风格）
-    def reply_for(kw_match):
-        base = persona["name"]
-        if "买" in content or "卖" in content or "推荐" in content or "代码" in content:
-            return f"我只能基于公开数据分享研究观点，无法给具体买卖建议哦。你可以参考{get_platform_short_name()}Hermes的「AI资产配置」做组合规划，或在「AI行情预判」看历史区间和模型推演的概率分布，结合自己的风险偏好判断。"
-        if "新能源" in text or "电池" in text or "锂" in text:
-            if kol_id == 5:
-                return f"我刚跑完一轮产业链调研：固态电池量产时间表略有提前迹象，中游材料端景气度在恢复。可以关注以下三个维度：①电解质技术路线分化 ②碳酸锂价格底部信号 ③海外工厂投产节奏。具体标的我不点名，避免合规风险，你可以用Hermes的量化因子筛选自己跑一下。"
-            return f"新能源这条线我不是最强的，建议直接看新能源猎手阿强的频道，他的产业链调研做得很扎实。从宏观角度，当下新能源板块处于估值修复阶段，可以适度关注。"
-        if "港股" in text or "互联网" in text or "恒生" in text:
-            if kol_id == 2:
-                return f"港股互联网这波我跟得比较紧。当前估值大约在历史20-25%分位，南向资金已经连续14个交易日净买入。但要注意两点：①Q2财报季验证基本面 ②美联储路径不确定性。我个人会把仓位控制在标配+5%以内，分批操作。"
-            return f"港股不是我的主战场，建议看Lisa的频道。从大方向看，估值确实有修复空间，但短期波动会比较大，注意控制仓位。"
-        if "ai" in text or "算力" in text or "科技" in text or "芯片" in text:
-            if kol_id == 1:
-                return f"AI算力短期确实热，但要拆开看：①云厂商资本开支节奏 ②国产替代订单兑现度 ③估值消化空间。我现在是逢回调关注，不追高。具体节奏，可以参考Hermes里高盛和中金最新的研报精读，我也是基于这些证据做判断的。"
-            return f"科技板块我会更多看宏观资金面和外资流向，不做个股推荐。可以参考一下老王的频道，他对这条线跟得更细。"
-        if "宏观" in text or "美联储" in text or "降息" in text or "美元" in text:
-            if kol_id == 4:
-                return f"美联储这边我跟最紧：CME利率期货显示年内降息2次概率68%，鲍威尔最近讲话偏鸽。美元指数承压，对应：①新兴市场股票偏好上升 ②黄金中长期支撑 ③大宗商品反弹。这些只是大类资产框架，不是具体建议哈。"
-            return f"宏观层面，降息预期升温对风险资产是利好，但要警惕预期透支后的回吐。建议看James的频道，他对海外宏观跟得更深。"
-        if "量化" in text or "因子" in text:
-            if kol_id == 3:
-                return f"我跑了最新一轮多因子回测：价值因子最近4周相对动量因子超额+3.2%，建议把组合往价值方向调一调。这只是因子层面的判断，不构成个股推荐。你可以在Hermes里用「量化因子筛选」自己跑一遍。"
-            return f"量化的事建议找陈明老师，他这块比我专业。"
-        if turn <= 2:
-            return f"你这个问题挺好。我先简单回应：基于我最近跟踪的数据（{('、'.join(persona['focus'][:2]))}方向），目前的情况是结构性机会大于系统性机会。要不你具体说说你的关注点？是想看赛道、还是想做资产配置？"
-        if turn <= 4:
-            return f"明白。我补充一下数据视角：{get_platform_name()}平台最近的研报数据库里，{persona['focus'][0]}相关研报量周环比+12%，机构关注度在抬升。但研报关注≠股价上涨，仅作信号参考。你的仓位结构是怎样的？我可以帮你从大方向上看一下平衡性。"
-        return f"咱们聊了几轮，我建议你这样做：①用Hermes的「AI资产配置」生成一份组合参考 ②用「AI行情预判」看一下你关注标的的历史走势区间 ③有具体观点了，再回来跟我对一对。最终决策一定是你自己做，我们这边只能给数据和研究框架。"
-
-    reply = reply_for(content)
-    updated = False
-    next_threads = []
-    for index, thread in enumerate(state["threads"]):
-        if str(thread.get("id")) != str(thread_id):
-            next_threads.append(thread)
-            continue
+    if actor_role == "investor":
+        if not actor_profile:
+            return jsonify({"success": False, "error": "investor_profile_required"}), 403
+        profile_id = str(actor_profile.get("username") or "").strip()
+        thread_index = find_message_thread_index(
+            threads,
+            thread_id=thread_id,
+            user_profile_id=profile_id,
+        )
+        if thread_index < 0:
+            base_thread = build_message_thread_for_user(actor_profile, tenant, first_message=content)
+            threads.insert(0, base_thread)
+            thread_index = 0
+        thread = dict(threads[thread_index])
         messages = copy.deepcopy(thread.get("messages") or [])
         next_message_id = len(messages) + 1
-        messages.append({"id": next_message_id, "sender": "user", "content": content, "time": now_ts(), "type": "text"})
-        messages.append({"id": next_message_id + 1, "sender": "kol", "content": reply, "time": now_ts(), "type": "text"})
-        next_thread = dict(thread)
-        next_thread["messages"] = messages[-120:]
-        next_thread["content"] = content
-        next_thread["last_msg"] = reply
-        next_thread["time"] = "刚刚"
-        next_thread["status"] = "已回复"
-        next_thread["unread"] = 0
-        next_threads.append(normalize_message_thread_item(next_thread, tenant, index=index))
-        updated = True
-    if updated:
-        saved = update_tenant_message_center_state(tenant_slug, {
-            "summary": state["summary"],
-            "threads": next_threads,
-            "broadcasts": state["broadcasts"],
+        messages.append({"id": next_message_id, "sender": "user", "content": content, "time": now_text, "type": "text"})
+        thread["messages"] = messages[-120:]
+        thread["content"] = content
+        thread["last_msg"] = content
+        thread["time"] = "刚刚"
+        thread["status"] = "待回复"
+        thread["unread"] = max(1, int(thread.get("unread") or 0) + 1)
+        thread["user_profile_id"] = profile_id
+        thread["user_name"] = actor_profile.get("username") or thread.get("user_name")
+        thread["user_avatar"] = actor_profile.get("avatar") or thread.get("user_avatar")
+        thread["tier"] = actor_profile.get("membership") or thread.get("tier")
+        normalized_thread = normalize_message_thread_item(thread, tenant, index=thread_index)
+        threads.pop(thread_index)
+        threads.insert(0, normalized_thread)
+        _, latest_state = save_tenant_message_threads(tenant_slug, state, threads)
+        return jsonify({
+            "success": True,
+            "thread_id": normalized_thread["id"],
+            "message": messages[-1],
+            "status": normalized_thread["status"],
+            "threads": gen_dm_conversations(tenant_slug=tenant_slug, include_fan_threads=True),
         })
-        latest_tenant = get_tenant_by_slug(tenant_slug, saved) if saved else tenant
-        state = resolve_tenant_message_center_state(latest_tenant, latest_tenant.get("message_center_state"))
-    return jsonify({
-        "success": True,
-        "kol_id": thread_id,
-        "msg_id": random.randint(100,999),
-        "auto_reply": reply,
-        "disclaimer": "以上为试点作者个人研究观点，仅供参考，不构成投资建议",
-        "turn": turn,
-        "threads": state["threads"],
-    })
+
+    if actor_role == "dav":
+        if not thread_id:
+            return jsonify({"success": False, "error": "thread_id_required"}), 400
+        thread_index = find_message_thread_index(threads, thread_id=thread_id)
+        if thread_index < 0:
+            return jsonify({"success": False, "error": "thread_not_found"}), 404
+        thread = dict(threads[thread_index])
+        messages = copy.deepcopy(thread.get("messages") or [])
+        next_message_id = len(messages) + 1
+        messages.append({"id": next_message_id, "sender": "kol", "content": content, "time": now_text, "type": "text"})
+        thread["messages"] = messages[-120:]
+        thread["content"] = content
+        thread["last_msg"] = content
+        thread["time"] = "刚刚"
+        thread["status"] = "已回复"
+        thread["unread"] = 0
+        normalized_thread = normalize_message_thread_item(thread, tenant, index=thread_index)
+        threads.pop(thread_index)
+        threads.insert(0, normalized_thread)
+        _, latest_state = save_tenant_message_threads(tenant_slug, state, threads)
+        return jsonify({
+            "success": True,
+            "thread_id": normalized_thread["id"],
+            "message": messages[-1],
+            "status": normalized_thread["status"],
+            "threads": gen_dm_conversations(tenant_slug=tenant_slug, include_fan_threads=True),
+        })
+
+    return jsonify({"success": False, "error": "sender_role_invalid"}), 403
 
 @app.route("/api/ai/allocation", methods=["POST"])
 def api_ai_allocation():
@@ -12842,10 +12943,45 @@ def api_kol_broadcast():
 @app.route("/api/kol/reply", methods=["POST"])
 def api_kol_reply():
     body = request.get_json(silent=True) or {}
-    fan_name = body.get("fan_name", "")
-    content = body.get("content", "")
-    is_paid = body.get("is_paid", False)
-    return jsonify({"success": True, "fan_name": fan_name, "is_paid": is_paid, "revenue": 50 if is_paid else 0})
+    tenant_slug = str(body.get("tenant_slug") or request.args.get("tenant") or "").strip().lower()
+    thread_id = str(body.get("thread_id") or "").strip()
+    content = str(body.get("content") or "").strip()
+    is_paid = bool(body.get("is_paid", False))
+    if not content:
+        return jsonify({"success": False, "error": "reply_content_required"}), 400
+    if not thread_id:
+        return jsonify({"success": False, "error": "thread_id_required"}), 400
+    resolved_slug = tenant_slug or get_default_tenant_slug()
+    tenant = get_tenant_by_slug(resolved_slug)
+    state = resolve_tenant_message_center_state(tenant, tenant.get("message_center_state"))
+    threads = copy.deepcopy(state["threads"] or [])
+    thread_index = find_message_thread_index(threads, thread_id=thread_id)
+    if thread_index < 0:
+        return jsonify({"success": False, "error": "thread_not_found"}), 404
+    thread = dict(threads[thread_index])
+    messages = copy.deepcopy(thread.get("messages") or [])
+    next_message_id = len(messages) + 1
+    message = {"id": next_message_id, "sender": "kol", "content": content, "time": now_ts(), "type": "text"}
+    messages.append(message)
+    thread["messages"] = messages[-120:]
+    thread["content"] = content
+    thread["last_msg"] = content
+    thread["time"] = "刚刚"
+    thread["status"] = "已回复"
+    thread["unread"] = 0
+    normalized_thread = normalize_message_thread_item(thread, tenant, index=thread_index)
+    threads.pop(thread_index)
+    threads.insert(0, normalized_thread)
+    _, latest_state = save_tenant_message_threads(resolved_slug, state, threads)
+    return jsonify({
+        "success": True,
+        "thread_id": normalized_thread["id"],
+        "message": message,
+        "status": normalized_thread["status"],
+        "is_paid": is_paid,
+        "revenue": 50 if is_paid else 0,
+        "threads": gen_dm_conversations(tenant_slug=resolved_slug, include_fan_threads=True),
+    })
 
 @app.route("/prd")
 def prd():
