@@ -650,8 +650,9 @@ body { background: var(--surface-2); color: var(--text-main); }
 .fund-overview-desc { font-size:12px; color:var(--gray-400); line-height:1.7; margin-top:6px; }
 .fund-macro-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .fund-macro-grid.cols-2 { grid-template-columns:1fr 1fr; }
-.fund-macro-grid.cols-3 { grid-template-columns:1fr 1fr 1fr; }
+.fund-macro-grid.cols-3 { grid-template-columns:1fr 1fr; }
 .fund-macro-grid.cols-4 { grid-template-columns:1fr 1fr; }
+.fund-macro-grid.cols-5 { grid-template-columns:1fr 1fr; }
 .fund-macro-card {
   background:#FFFFFF;
   border:1px solid rgba(47,116,192,0.10);
@@ -680,6 +681,23 @@ body { background: var(--surface-2); color: var(--text-main); }
 .fund-macro-assessment { font-size:12px; color:var(--white); margin-top:6px; line-height:1.6; }
 .fund-macro-alert { font-size:11px; color:var(--gold); margin-top:8px; line-height:1.6; }
 .fund-macro-hint { font-size:10px; color:var(--gray-400); margin-top:6px; line-height:1.6; }
+.fund-macro-compact {
+  margin-top:8px;
+  font-size:10px;
+  line-height:1.55;
+  color:#5F7084;
+}
+.fund-macro-source-list { margin-top:8px; display:grid; gap:6px; }
+.fund-macro-source-chip {
+  display:block;
+  padding:6px 8px;
+  border-radius:10px;
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  font-size:10px;
+  line-height:1.55;
+  color:#5F7084;
+}
 .fund-macro-entry-hint {
   margin-top:8px;
   font-size:10px;
@@ -762,6 +780,29 @@ body { background: var(--surface-2); color: var(--text-main); }
 .fund-metric-detail-list {
   display:grid;
   gap:8px;
+}
+.fund-metric-detail-group {
+  display:grid;
+  gap:8px;
+}
+.fund-metric-detail-group + .fund-metric-detail-group {
+  margin-top:12px;
+}
+.fund-metric-detail-group-head {
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:8px;
+}
+.fund-metric-detail-group-title {
+  font-size:12px;
+  font-weight:700;
+  color:var(--text-main);
+}
+.fund-metric-detail-group-note {
+  font-size:11px;
+  color:var(--text-sub);
+  line-height:1.6;
 }
 .fund-metric-detail-item {
   background:#FFFFFF;
@@ -993,8 +1034,9 @@ body { background: var(--surface-2); color: var(--text-main); }
   grid-template-columns:1fr 1fr;
   gap:10px;
 }
-.wb-dashboard-summary-grid.cols-3 { grid-template-columns:1fr 1fr 1fr; }
+.wb-dashboard-summary-grid.cols-3 { grid-template-columns:1fr 1fr; }
 .wb-dashboard-summary-grid.cols-4 { grid-template-columns:1fr 1fr; }
+.wb-dashboard-summary-grid.cols-5 { grid-template-columns:1fr 1fr; }
 .wb-dashboard-summary-card {
   background:#F8FBFF;
   border:1px solid rgba(47,116,192,0.10);
@@ -1063,9 +1105,49 @@ body { background: var(--surface-2); color: var(--text-main); }
 }
 .wb-dashboard-toolbar {
   display:grid;
-  grid-template-columns:1fr 1fr 1fr;
+  grid-template-columns:1fr 1fr;
   gap:8px;
   margin-top:10px;
+}
+.wb-dashboard-mode-row {
+  display:grid;
+  grid-template-columns:1fr;
+  gap:8px;
+  margin-top:10px;
+}
+.wb-dashboard-mode-card {
+  width:100%;
+  text-align:left;
+  border:1px solid rgba(47,116,192,0.12);
+  background:#F8FBFF;
+  border-radius:12px;
+  padding:10px 12px;
+  cursor:pointer;
+  transition:border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+.wb-dashboard-mode-card.active {
+  border-color:rgba(200,169,110,0.34);
+  box-shadow:0 10px 24px rgba(31,73,125,0.10);
+  transform:translateY(-1px);
+}
+.wb-dashboard-mode-kicker {
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:0.06em;
+  text-transform:uppercase;
+  color:var(--gold);
+}
+.wb-dashboard-mode-title {
+  margin-top:4px;
+  font-size:13px;
+  font-weight:700;
+  color:var(--white);
+}
+.wb-dashboard-mode-desc {
+  margin-top:6px;
+  font-size:11px;
+  line-height:1.7;
+  color:var(--gray-400);
 }
 .wb-dashboard-actions {
   display:grid;
@@ -2578,15 +2660,17 @@ body,
       <div class="wb-dashboard-card">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
           <div>
-            <div style="font-size:14px;font-weight:700;color:var(--white)">今日核心指标面板</div>
-            <div style="font-size:11px;color:var(--gray-400);line-height:1.6;margin-top:4px">默认先展示指标摘要；空格子显示 +，点击任一格子后再输入提示词，保存即自动生成。</div>
+            <div id="wb-dashboard-section-title" style="font-size:14px;font-weight:700;color:var(--white)">今日核心指标面板</div>
+            <div id="wb-dashboard-section-desc" style="font-size:11px;color:var(--gray-400);line-height:1.6;margin-top:4px">默认先展示指标摘要；空格子显示 +，点击任一格子后再输入提示词，保存即自动生成。</div>
           </div>
           <span class="tag tag-gold">工作台生成</span>
         </div>
+        <div id="wb-dashboard-mode-row" class="wb-dashboard-mode-row"></div>
         <div class="wb-dashboard-toolbar">
-          <button class="btn-outline wb-dashboard-layout-btn" data-dashboard-layout-button="2x2" style="padding:8px 10px;font-size:12px" onclick="selectFundDashboardLayout('2x2')">2x2 布局</button>
-          <button class="btn-outline wb-dashboard-layout-btn" data-dashboard-layout-button="3x3" style="padding:8px 10px;font-size:12px" onclick="selectFundDashboardLayout('3x3')">3x3 布局</button>
-          <button class="btn-outline wb-dashboard-layout-btn" data-dashboard-layout-button="4x4" style="padding:8px 10px;font-size:12px" onclick="selectFundDashboardLayout('4x4')">4x4 布局</button>
+          <button class="btn-outline wb-dashboard-layout-btn" data-dashboard-layout-button="2x2" style="padding:8px 10px;font-size:12px" onclick="selectFundDashboardLayout('2x2')">2列2行</button>
+          <button class="btn-outline wb-dashboard-layout-btn" data-dashboard-layout-button="2x3" style="padding:8px 10px;font-size:12px" onclick="selectFundDashboardLayout('2x3')">2列3行</button>
+          <button class="btn-outline wb-dashboard-layout-btn" data-dashboard-layout-button="2x4" style="padding:8px 10px;font-size:12px" onclick="selectFundDashboardLayout('2x4')">2列4行</button>
+          <button class="btn-outline wb-dashboard-layout-btn" data-dashboard-layout-button="2x5" style="padding:8px 10px;font-size:12px" onclick="selectFundDashboardLayout('2x5')">2列5行</button>
         </div>
         <div class="wb-dashboard-actions">
           <button class="btn-gold" style="padding:9px 10px;font-size:12px" onclick="publishFundDashboard()">发布到基本面首页</button>
@@ -2982,7 +3066,7 @@ body,
 
 <script>
 // ===== TAB SWITCHING =====
-const SITE_FEATURES = (window.SITE_CONFIG && window.SITE_CONFIG.feature_flags) || {};
+const SITE_CONFIG_BROADCAST_KEY = 'gangtise-site-config-updated-at';
 const KNOWLEDGE_INGESTION_CONFIG = (window.SITE_CONFIG && window.SITE_CONFIG.knowledge_ingestion) || {};
 const KNOWLEDGE_USER_PREVIEW_ENABLED = KNOWLEDGE_INGESTION_CONFIG.user_preview_enabled === true;
 const ALL_TABS = ['feed', 'community', 'hermes', 'market', 'review', 'knowledge', 'profile', 'dm', 'workbench'];
@@ -3010,12 +3094,16 @@ const TAB_HINTS = {
 };
 
 function isFeatureEnabled(featureName) {
+  const siteFeatures = (window.SITE_CONFIG && window.SITE_CONFIG.feature_flags) || {};
   if (!featureName) return true;
   if (featureName === 'workbench') {
     const activeUser = getActiveDemoUser();
     if (activeUser && activeUser.role === 'dav') return true;
   }
-  return SITE_FEATURES[featureName] !== false;
+  if (featureName === 'dm') {
+    return siteFeatures.dm !== false || siteFeatures.fan_interaction !== false;
+  }
+  return siteFeatures[featureName] !== false;
 }
 
 function isStockForecastEnabled() {
@@ -3041,6 +3129,28 @@ function applySiteFeatureFlags() {
     const featureName = el.dataset.feature;
     el.style.display = isFeatureEnabled(featureName) ? '' : 'none';
   });
+  if (currentWatchlistDetail) {
+    renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection || 'overview');
+  }
+  const activePage = document.querySelector('.page.active');
+  if (activePage && activePage.dataset.feature && !isFeatureEnabled(activePage.dataset.feature)) {
+    switchTab(getFirstEnabledTab());
+  }
+}
+
+async function refreshH5SiteConfig(options = {}) {
+  try {
+    const res = await fetch('/api/site-config', { cache: 'no-store' });
+    if (!res.ok) throw new Error('load_site_config_failed');
+    const data = await res.json();
+    if (!data || typeof data !== 'object') throw new Error('invalid_site_config');
+    window.SITE_CONFIG = data;
+    applySiteFeatureFlags();
+  } catch (error) {
+    if (!options.silent) {
+      showToast('前台功能配置刷新失败');
+    }
+  }
 }
 
 function chooseTheme(mode) {
@@ -3072,6 +3182,92 @@ const DEFAULT_DASHBOARD_CELL_PROMPTS = [
   '跟踪新能源排产、价格和补库节奏，判断景气是否触底。',
   '观察人民币汇率、美元强弱和海外风险偏好，提示对港股和成长板块的影响。',
 ];
+const H5_DASHBOARD_SEGMENTS = {
+  market: {
+    title: '市场进攻意愿卡',
+    shortTitle: '进攻意愿',
+    subtitle: '回答今天资金是在追高弹性方向，还是转向防守资产。',
+    editorTitle: '编辑市场进攻意愿格子',
+    detailTitle: '市场进攻意愿详情',
+    note: '这一层优先回答今天市场整体更偏进攻还是防守。',
+    detailNote: 'A股全市场口径。先把各因子映射为 0-100 分，再按权重合成总分，防御因子作为扣分项。',
+    question: '今天市场是在追逐高弹性方向，还是更偏向防守？',
+    scope: '适用范围：A股全市场',
+    sources: ['上涨/下跌家数、站上MA20占比、新高/新低差', '北向/南向净流入强度与连续性', '主线行业成交占比、5日变化、拥挤度', '银行/红利相对成长超额收益、低波ETF净流入'],
+    formula: '总分 = 35%广度改善分 + 25%资金回流分 + 25%主线参与分 - 15%防御压力分',
+    scoreMethod: '先标准化为 0-100 分，再按权重合成；防御因子作为扣分项，不直接把原始金额和家数相加。',
+    factorRules: ['广度改善分 = 40%上涨/下跌家数 + 35%站上MA20占比 + 25%新高-新低差', '资金回流分 = 50%净流入占成交比 + 30%3日累计净流入 + 20%连续净流入天数', '主线参与分 = 45%主线成交占比 + 35%5日变化 + 20%拥挤度惩罚', '防御压力分 = 50%银行/红利相对成长超额 + 30%高股息超额 + 20%低波ETF净流入'],
+    thresholds: ['>=70 偏进攻', '55-69 中性偏进攻', '45-54 中性', '30-44 中性偏防守', '<30 偏防守'],
+    outputExplain: '输出的是偏进攻 / 中性 / 偏防守，不直接给买卖指令。',
+    promptPlaceholder: '例如：回答今天市场是在追逐高弹性方向，还是更偏向防守，并说明使用哪些真实指标来给出总分。',
+    cards: [
+      { name: '市场进攻意愿', value: '偏进攻', assessment: '高弹性方向承接更顺，说明今天资金更愿意做进攻而不是回避风险。', status: 'good', alert: '继续盯增量资金是否延续', hint: '核心问题不是“风险偏好是否扩张”，而是“今天资金是否更愿意做进攻”。'},
+      { name: '资金回流强度', value: '回暖', assessment: '北向与南向的回流强度都在修复，但还没到全面扩散。', status: 'good', alert: '留意是否只是单一主线放量', hint: '净流入额要结合占成交比和连续性一起看。'},
+      { name: '主线参与度', value: '提升', assessment: '主线行业成交占比提升，说明市场正在围绕少数方向形成共识。', status: 'attention', alert: '若拥挤度过高要防止抱团末期', hint: '成交集中本身不是利好，要同时看是否过度拥挤。'},
+      { name: '防御压力', value: '下降', assessment: '银行、红利和低波方向相对走弱，说明防守需求正在回落。', status: 'good', alert: '若防御重新走强需降乐观程度', hint: '防御风格走强在这张卡里是扣分项。'},
+      { name: '广度扩散', value: '扩散', assessment: '上涨不再只集中在抱团龙头，市场广度在改善。', status: 'good', alert: '如果广度再度收缩，需降预期', hint: '广度改善比单一龙头走强更能说明市场环境。'},
+      { name: '风格切换', value: '成长占优', assessment: '成长方向相对红利和防御更强，说明短线愿意承担更多波动。', status: 'attention', alert: '风格切换速度仍偏快', hint: '成长跑赢防御是进攻意愿抬升的重要证据。'},
+      { name: '波动承受度', value: '可控', assessment: '市场能接受一定波动，说明今天不是纯粹的避险交易。', status: 'attention', alert: '若波动继续放大需降仓位', hint: '波动可控才适合把结论写得更积极。'},
+      { name: '主线拥挤度', value: '中性', assessment: '主线聚焦但还没拥挤到极端，说明进攻意愿并未失真。', status: 'good', alert: '若拥挤度快速抬升需警惕回撤', hint: '主线拥挤度过高时会吞噬进攻意愿的质量。'},
+    ],
+  },
+  industry: {
+    title: '行业景气验证卡',
+    shortTitle: '行业',
+    subtitle: '回答这条主线是不是基本面在继续验证，而不只是消息热度高。',
+    editorTitle: '编辑行业景气验证格子',
+    detailTitle: '行业景气验证详情',
+    note: '这一层优先回答一条主线到底是真景气，还是只是短期情绪。',
+    detailNote: '先把订单、价格、库存、政策和资本开支分别打成 0-100 分，再按权重合成景气总分。',
+    question: '这条主线是基本面继续验证，还是只有情绪热度？',
+    scope: '适用范围：单一行业 / 单一主题链条',
+    sources: ['新增订单同比、在手订单覆盖、开工率', '产品价格指数、价差、提价持续性', '库存天数、主动/被动补库、去库斜率', '政策热度、落地级别、持续性', 'Capex指引、扩产计划、设备招标'],
+    formula: '总分 = 30%订单景气分 + 25%价格景气分 + 20%库存去化分 + 15%政策催化分 + 10%资本开支确认分',
+    scoreMethod: '行业各因子先转为 0-100 分，订单和价格权重更高，因为它们更接近真实需求。',
+    factorRules: ['订单景气分 = 新增订单同比 + 在手订单覆盖 + 开工率', '价格景气分 = 产品价格指数 + 价差 + 提价持续性', '库存去化分 = 库存天数 + 去库斜率 + 主动/被动补库状态', '政策催化分 = 政策热度 + 落地级别 + 持续性', '资本开支确认分 = Capex指引 + 扩产计划 + 设备招标进展'],
+    thresholds: ['>=70 景气上行', '55-69 景气验证中', '45-54 中性观察', '30-44 景气转弱', '<30 仅剩情绪热度'],
+    outputExplain: '输出的是景气上行 / 景气验证中 / 仅剩情绪热度，不直接替代行业研究报告。',
+    promptPlaceholder: '例如：回答这条主线是基本面继续验证，还是只有情绪热度，并列出订单、价格、库存、政策和资本开支的证据。',
+    cards: [
+      { name: '行业景气验证', value: '成立', assessment: '订单、价格和库存三项已经形成同向验证，不只是消息面在推动。', status: 'good', alert: '继续盯高频月度数据是否延续', hint: '核心问题是“景气有没有被验证”，不是“情绪热不热”。'},
+      { name: '订单景气分', value: '改善', assessment: '新增订单和在手覆盖都有修复，说明需求不是纯预期。', status: 'good', alert: '继续盯高频订单是否延续', hint: '订单是行业景气最先看的验证指标。'},
+      { name: '价格景气分', value: '温和上行', assessment: '价格信号不算爆发，但已经脱离最弱区间。', status: 'attention', alert: '若价格回落则景气需要降级', hint: '价格比消息更能说明供需关系。'},
+      { name: '库存去化分', value: '去化中', assessment: '库存压力开始释放，对利润率形成正向支撑。', status: 'good', alert: '看是否重新进入被动累库', hint: '库存变化决定景气持续性。'},
+      { name: '政策催化分', value: '持续', assessment: '政策与新闻催化仍在，为行业预期提供外部支撑。', status: 'attention', alert: '催化若中断要警惕回撤', hint: '催化只能放大，不能替代基本面。'},
+      { name: '资本开支确认分', value: '恢复', assessment: '扩产和招标计划在恢复，说明企业端判断更积极。', status: 'good', alert: '若开支恢复不及预期，景气要打折', hint: '资本开支是偏中期的确认项。'},
+      { name: '竞争格局', value: '稳定', assessment: '价格竞争暂未恶化，行业利润修复更容易兑现。', status: 'attention', alert: '若竞争恶化，景气修复难以兑现', hint: '格局稳定时利润率更有弹性。'},
+      { name: '上下游传导', value: '顺畅', assessment: '上游到下游传导关系改善，说明景气不只停留在局部。', status: 'good', alert: '若传导断裂，景气只会停留在局部', hint: '景气能否传导决定主线厚度。'},
+    ],
+  },
+  'signal-stock': {
+    title: '主线信号个股卡',
+    shortTitle: '信号个股',
+    subtitle: '不是给粉丝推票，而是用关键个股去验证更大的行业或主题判断。',
+    editorTitle: '编辑主线信号个股格子',
+    detailTitle: '主线信号个股详情',
+    note: '这一层优先回答哪些个股正在验证主线，而不是直接给出买卖动作。',
+    detailNote: '先看这些个股能不能继续验证主线，不讨论买卖点。个股维度同样先转 0-100 分，再做权重合成。',
+    question: '哪些个股还在验证主线，哪些已经开始掉队？',
+    scope: '适用范围：单个行业龙头 / 主线代表个股',
+    sources: ['相对行业超额收益、回撤控制、成交额排名', '营收/利润兑现率、指引上修、订单兑现', '回调缩量、尾盘净流入、换手承接', 'PE/PS分位、PEG、相对历史分位'],
+    formula: '总分 = 35%龙头强度分 + 30%业绩兑现分 + 20%资金承接分 + 15%估值安全分',
+    scoreMethod: '龙头强度和业绩兑现权重更高，因为它们决定这只个股是否还有资格当主线信号。',
+    factorRules: ['龙头强度分 = 相对行业超额收益 + 回撤控制 + 成交额排名', '业绩兑现分 = 营收/利润兑现率 + 指引上修 + 订单兑现', '资金承接分 = 回调缩量 + 尾盘净流入 + 换手承接', '估值安全分 = PE/PS分位 + PEG + 相对历史分位'],
+    thresholds: ['>=70 强验证个股', '55-69 可继续跟踪', '45-54 中性观察', '30-44 信号转弱', '<30 已掉队'],
+    outputExplain: '输出的是“是否还适合作为主线信号个股”，不是荐股结论。',
+    promptPlaceholder: '例如：回答哪些个股还在验证主线，哪些开始掉队，并说明强度、业绩、承接和估值证据。',
+    cards: [
+      { name: '主线信号个股', value: '强验证', assessment: '这类个股仍在验证主线，没有从高频强势转成纯情绪脉冲。', status: 'good', alert: '若龙头走弱，主线判断要降级', hint: '这里看的是“还能不能当主线信号”，不是直接荐股。'},
+      { name: '龙头强度分', value: '突出', assessment: '龙头股仍有相对强度，说明主线没有完全瓦解。', status: 'good', alert: '若龙头走弱，主线判断要降级', hint: '先看龙头，再看板块整体。'},
+      { name: '业绩兑现分', value: '待验证', assessment: '业绩兑现仍是关键变量，适合继续跟踪而非重仓叙事。', status: 'warning', alert: '财报若不及预期，回撤会更快', hint: '兑现弱时只能把它当信号，不当结论。'},
+      { name: '资金承接分', value: '稳定', assessment: '回调时资金承接尚可，说明并非纯情绪脉冲。', status: 'good', alert: '若承接消失，则需降热度判断', hint: '承接比上涨更重要。'},
+      { name: '估值安全分', value: '可接受', assessment: '估值不算便宜，但仍未透支全部中期预期。', status: 'attention', alert: '若估值透支过快，需要降风险偏好', hint: '估值决定容错率。'},
+      { name: '催化窗口', value: '存在', assessment: '近期存在可验证催化，适合做信号跟踪。', status: 'attention', alert: '催化落空时容易快速回吐', hint: '催化是节奏，不是基本面本身。'},
+      { name: '相对行业', value: '领先', assessment: '个股相对行业更强，说明它更适合作为前瞻信号。', status: 'good', alert: '若开始落后行业，信号价值下降', hint: '领先个股更适合拿来验证主线。'},
+      { name: '风险边界', value: '需盯住', assessment: '若高频催化落空，这类个股回撤速度也会更快。', status: 'warning', alert: '风险项需要在文案里明确写出', hint: '这类个股必须附带风险边界。'},
+    ],
+  },
+};
 function getActiveTenantProfile() {
   const tenant = window.ACTIVE_TENANT || {};
   return {
@@ -3102,7 +3298,9 @@ function syncDemoUsersWithActiveTenant() {
 let currentWorkbenchDashboardLayout = '2x2';
 let currentWorkbenchDashboardSlots = [];
 let currentWorkbenchDashboardSourceVersion = '';
+let currentWorkbenchDashboardMode = 'market';
 let dashboardCellEditingIndex = -1;
+let dashboardCellDraftMode = 'market';
 let currentFundMetricDetail = null;
 const REVIEW_PERIOD_CONFIG = {
   day: { label: '日复盘', shortLabel: '今日', prompt: '今天收盘后', marketFocus: '当天行情', aiLabel: '自选股 + 当日行情' },
@@ -3252,6 +3450,28 @@ function normalizeInitialRemoteDashboardState(payload) {
   };
 }
 
+async function refreshTenantDashboardRemoteState(options) {
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  if (!tenantSlug) return null;
+  const opts = options || {};
+  try {
+    const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/dashboard`);
+    const payload = await resp.json();
+    if (!resp.ok || !payload.success) throw new Error(payload.error || 'dashboard_fetch_failed');
+    tenantFundDashboardRemoteState = normalizeInitialRemoteDashboardState(payload.dashboard || {});
+    const tenantState = ensureTenantFundDashboardState(activeUser.tenant.id);
+    tenantState.published = tenantFundDashboardRemoteState.published || tenantState.published;
+    tenantState.draft = tenantFundDashboardRemoteState.draft !== null ? tenantFundDashboardRemoteState.draft : tenantState.draft;
+    persistTenantFundDashboardState();
+    if (opts.rerenderFeed) renderFundMacroDashboard();
+    if (opts.rerenderWorkbench) renderWorkbenchFundDashboard();
+    return payload;
+  } catch (error) {
+    return null;
+  }
+}
+
 function persistTenantFundDashboardState() {
   try {
     if (window.localStorage) {
@@ -3271,13 +3491,222 @@ function getFundStatusLabel(status) {
 }
 
 function normalizeDashboardLayout(layout) {
-  if (layout === '2x2' || layout === '3x3' || layout === '4x4') return layout;
+  if (layout === '3x3') return '2x3';
+  if (layout === '4x4') return '2x4';
+  if (layout === '2x2' || layout === '2x3' || layout === '2x4' || layout === '2x5') return layout;
   return '2x2';
 }
 
+function normalizeDashboardMode(mode) {
+  if (mode === 'market' || mode === 'industry' || mode === 'signal-stock') return mode;
+  return 'market';
+}
+
+function getDashboardSegmentConfig(mode) {
+  return H5_DASHBOARD_SEGMENTS[normalizeDashboardMode(mode)] || H5_DASHBOARD_SEGMENTS.market;
+}
+
+function getDashboardComponentLibrary(mode) {
+  const resolvedMode = normalizeDashboardMode(mode);
+  const libraries = {
+    market: [
+      { id: 'market_breadth', label: '广度改善分', source: '全市场行情库', metric: '上涨/下跌家数、站上MA20占比、新高-新低差', window: '1D', aggregation: '0-100评分', defaultWeight: 0.35, defaultOperator: 'base', defaultSelected: true },
+      { id: 'northbound_flow', label: '资金回流分', source: '北向/南向资金库', metric: '净流入占成交比、3日累计、连续净流入天数', window: '1D / 3D', aggregation: '0-100评分', defaultWeight: 0.25, defaultOperator: '+', defaultSelected: true },
+      { id: 'turnover_structure', label: '主线参与分', source: '成交结构库', metric: '主线成交占比、5日变化、拥挤度惩罚', window: '1D / 5D', aggregation: '0-100评分', defaultWeight: 0.25, defaultOperator: '+', defaultSelected: true },
+      { id: 'style_rotation', label: '防御压力分', source: '风格因子库', metric: '银行/红利相对成长超额、低波ETF净流入', window: '1D / 5D', aggregation: '0-100评分', defaultWeight: 0.15, defaultOperator: '-', defaultSelected: true },
+      { id: 'policy_heat', label: '政策温度参考分', source: '政策新闻流', metric: '宏观政策热度与边际变化', window: '3D', aggregation: '辅助评分', defaultWeight: 0.1, defaultOperator: '+', defaultSelected: false },
+    ],
+    industry: [
+      { id: 'industry_orders', label: '订单景气分', source: '行业指标库', metric: '新增订单同比、在手订单覆盖、开工率', window: '1W / 1M', aggregation: '0-100评分', defaultWeight: 0.3, defaultOperator: 'base', defaultSelected: true },
+      { id: 'industry_price', label: '价格景气分', source: '产业链价格库', metric: '产品价格指数、价差、提价持续性', window: '1W / 1M', aggregation: '0-100评分', defaultWeight: 0.25, defaultOperator: '+', defaultSelected: true },
+      { id: 'industry_inventory', label: '库存去化分', source: '行业库存库', metric: '库存天数、主动/被动补库、去库斜率', window: '1M', aggregation: '0-100评分', defaultWeight: 0.2, defaultOperator: '+', defaultSelected: true },
+      { id: 'industry_policy', label: '政策催化分', source: '行业新闻流', metric: '政策热度、落地级别、持续性', window: '5D / 20D', aggregation: '0-100评分', defaultWeight: 0.15, defaultOperator: '+', defaultSelected: true },
+      { id: 'industry_capex', label: '资本开支确认分', source: '财报与经营数据', metric: 'Capex指引、扩产计划、设备招标', window: '1Q', aggregation: '0-100评分', defaultWeight: 0.1, defaultOperator: '+', defaultSelected: true },
+    ],
+    'signal-stock': [
+      { id: 'leader_strength', label: '龙头强度分', source: '个股行情库', metric: '相对行业超额收益、回撤控制、成交额排名', window: '5D / 20D', aggregation: '0-100评分', defaultWeight: 0.35, defaultOperator: 'base', defaultSelected: true },
+      { id: 'earnings_delivery', label: '业绩兑现分', source: '财报与预期库', metric: '营收/利润兑现率、指引上修、订单兑现', window: '1Q', aggregation: '0-100评分', defaultWeight: 0.3, defaultOperator: '+', defaultSelected: true },
+      { id: 'support_flow', label: '资金承接分', source: '盘口与成交数据', metric: '回调缩量、尾盘净流入、换手承接', window: '3D / 5D', aggregation: '0-100评分', defaultWeight: 0.2, defaultOperator: '+', defaultSelected: true },
+      { id: 'valuation_band', label: '估值安全分', source: '估值与财报库', metric: 'PE/PS分位、PEG、相对历史分位', window: '1Q / 3Y', aggregation: '0-100评分', defaultWeight: 0.15, defaultOperator: '+', defaultSelected: true },
+      { id: 'catalyst_window', label: '催化窗口参考分', source: '公司新闻流', metric: '新品、财报、订单公告、政策催化时点', window: '10D / 30D', aggregation: '辅助评分', defaultWeight: 0.1, defaultOperator: '+', defaultSelected: false },
+    ],
+  };
+  return JSON.parse(JSON.stringify(libraries[resolvedMode] || libraries.market));
+}
+
+function buildDefaultDashboardComponents(mode) {
+  return getDashboardComponentLibrary(mode).filter(item => item.defaultSelected !== false).slice(0, 5).map((item, index) => ({
+    id: item.id,
+    label: item.label,
+    source: item.source,
+    metric: item.metric,
+    window: item.window,
+    aggregation: item.aggregation,
+    weight: item.defaultWeight,
+    operator: item.defaultOperator || (index === 0 ? 'base' : '+'),
+  }));
+}
+
+function normalizeDashboardComponents(components, mode) {
+  const library = getDashboardComponentLibrary(mode);
+  const libraryMap = Object.fromEntries(library.map(item => [item.id, item]));
+  const rawList = Array.isArray(components) && components.length ? components : buildDefaultDashboardComponents(mode);
+  return rawList.slice(0, 6).map((item, index) => {
+    const raw = item && typeof item === 'object' ? item : {};
+    const template = libraryMap[raw.id || raw.componentId] || library[Math.min(index, library.length - 1)];
+    const nextWeight = Number(raw.weight);
+    return {
+      id: template.id,
+      label: String(raw.label || template.label || '').trim() || template.label,
+      source: String(raw.source || template.source || '').trim() || template.source,
+      metric: String(raw.metric || template.metric || '').trim() || template.metric,
+      window: String(raw.window || template.window || '').trim() || template.window,
+      aggregation: String(raw.aggregation || template.aggregation || '').trim() || template.aggregation,
+      weight: Number.isFinite(nextWeight) ? Number(nextWeight.toFixed(2)) : template.defaultWeight,
+      operator: String(raw.operator || template.defaultOperator || (index === 0 ? 'base' : '+')).trim() || (index === 0 ? 'base' : '+'),
+    };
+  });
+}
+
+function buildDashboardFormulaText(mode, components) {
+  const list = Array.isArray(components) ? components : [];
+  const fallback = getDashboardSegmentConfig(mode).formula || '';
+  if (!list.length) return fallback;
+  return list.map((item, index) => {
+    const weightText = Math.abs(Number(item.weight || 1) - 1) < 0.01 ? '' : ` x ${Number(item.weight || 1)}`;
+    const prefix = index > 0 && item.operator && item.operator !== 'base' ? ` ${item.operator} ` : '';
+    return `${prefix}${item.label || `组件 ${index + 1}`}${weightText}`;
+  }).join('').trim() || fallback;
+}
+
+function buildDashboardSourceList(mode, components, explicitSources) {
+  const deduped = [];
+  const pushSource = (source) => {
+    const text = String(source || '').trim();
+    if (text && !deduped.includes(text)) deduped.push(text);
+  };
+  (Array.isArray(explicitSources) ? explicitSources : []).forEach(pushSource);
+  (Array.isArray(components) ? components : []).forEach(item => pushSource(item.source));
+  if (!deduped.length) {
+    getDashboardComponentLibrary(mode).slice(0, 3).forEach(item => pushSource(item.source));
+  }
+  return deduped;
+}
+
+function buildDashboardMetricSummaryList(components, limit) {
+  const list = Array.isArray(components) ? components : [];
+  const maxItems = Number(limit || 2);
+  return list.slice(0, maxItems).map((item) => ({
+    label: item.label || '组件',
+    metric: item.metric || '--',
+  }));
+}
+
+function buildDashboardMetricCompactText(components, limit) {
+  const list = Array.isArray(components) ? components : [];
+  if (!list.length) return '点击查看详细指标构成';
+  const maxItems = Number(limit || 2);
+  const names = list.slice(0, maxItems).map((item) => item.label || '组件');
+  const suffix = list.length > maxItems ? `等${list.length}项` : '';
+  return `指标：${names.join('、')}${suffix}`;
+}
+
+function getDefaultDashboardCardMode(index) {
+  const sequence = ['market', 'industry', 'signal-stock', 'signal-stock', 'market', 'industry', 'signal-stock', 'market'];
+  return sequence[index % sequence.length];
+}
+
+function inferDashboardCardMode(card, fallbackMode) {
+  const raw = card && typeof card === 'object' ? card : {};
+  const explicit = raw.mode || raw.segmentId;
+  if (explicit) return normalizeDashboardMode(explicit);
+  const combined = [
+    raw.name,
+    raw.title,
+    raw.prompt,
+    raw.assessment,
+    raw.hint,
+    raw.alert,
+  ].map(item => String(item || '').trim()).join(' ');
+  if (/行业景气|行业订单|价格景气|库存节奏|景气验证|资本开支|竞争格局/.test(combined)) return 'industry';
+  if (/信号个股|龙头强度|业绩兑现|相对行业|催化临近|资金承接|估值位置/.test(combined)) return 'signal-stock';
+  if (/风险偏好|流动性|政策温度|市场广度|风格轮动|波动压力|主线热度/.test(combined)) return 'market';
+  return normalizeDashboardMode(fallbackMode || 'market');
+}
+
+function buildDashboardModeBreakdown(cards) {
+  const list = Array.isArray(cards) ? cards : [];
+  const counts = { market: 0, industry: 0, 'signal-stock': 0 };
+  list.forEach((card, index) => {
+    const mode = inferDashboardCardMode(card, getDefaultDashboardCardMode(index));
+    counts[mode] += 1;
+  });
+  return counts;
+}
+
+function getDashboardPrimaryMode(cards) {
+  const counts = buildDashboardModeBreakdown(cards);
+  const ordered = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  return ordered[0] && ordered[0][1] ? ordered[0][0] : 'market';
+}
+
+function isMixedDashboardModes(cards) {
+  return Object.values(buildDashboardModeBreakdown(cards)).filter(Boolean).length > 1;
+}
+
+function buildDashboardCompositionSummary(cards) {
+  const counts = buildDashboardModeBreakdown(cards);
+  return Object.entries(counts)
+    .filter(([, count]) => count > 0)
+    .map(([mode, count]) => `${getDashboardSegmentConfig(mode).shortTitle} ${count}`)
+    .join(' · ') || '市场 0';
+}
+
+function inferDashboardMode(source) {
+  const raw = source && typeof source === 'object' ? source : {};
+  const explicit = normalizeDashboardMode(raw.mode || raw.segmentId || '');
+  if (raw.mode || raw.segmentId) return explicit;
+  if (Array.isArray(raw.cards) && raw.cards.length) return getDashboardPrimaryMode(raw.cards);
+  const title = String(raw.title || '').trim();
+  const note = String(raw.note || '').trim();
+  const cardNames = Array.isArray(raw.cards) ? raw.cards.map(item => String(item && item.name || '').trim()).join(' ') : '';
+  const combined = `${title} ${note} ${cardNames}`;
+  if (/行业景气|行业订单|价格景气|库存节奏|景气验证|资本开支|竞争格局/.test(combined)) return 'industry';
+  if (/信号个股|龙头强度|业绩兑现|相对行业|催化临近|资金承接|估值位置/.test(combined)) return 'signal-stock';
+  return 'market';
+}
+
+function syncDashboardWorkbenchHeader(config) {
+  const titleEl = document.getElementById('wb-dashboard-section-title');
+  const descEl = document.getElementById('wb-dashboard-section-desc');
+  if (titleEl) titleEl.textContent = '智能仪表盘格子编排';
+  if (descEl) descEl.textContent = '每个格子都可以单独选择市场状态卡、行业景气卡或信号个股卡，自由混搭后再发布到基本面首页。';
+}
+
+function renderDashboardModeRow() {
+  const host = document.getElementById('wb-dashboard-mode-row');
+  if (!host) return;
+  const cards = [
+    { id: 'market', kicker: 'Macro' },
+    { id: 'industry', kicker: 'Industry' },
+    { id: 'signal-stock', kicker: 'Signal Stock' },
+  ];
+  host.innerHTML = cards.map((item) => {
+    const segment = getDashboardSegmentConfig(item.id);
+    return `
+      <button class="wb-dashboard-mode-card ${currentWorkbenchDashboardMode === item.id ? 'active' : ''}" type="button" onclick="selectFundDashboardMode('${item.id}')">
+        <div class="wb-dashboard-mode-kicker">${escapeHtml(item.kicker)}</div>
+        <div class="wb-dashboard-mode-title">${escapeHtml(segment.title)}</div>
+        <div class="wb-dashboard-mode-desc">${escapeHtml(segment.subtitle)} 当前作为新格子的默认类型。</div>
+      </button>
+    `;
+  }).join('');
+}
+
 function getDashboardCardTarget(layout) {
-  if (layout === '3x3') return 6;
-  if (layout === '4x4') return 8;
+  if (layout === '2x3') return 6;
+  if (layout === '2x4') return 8;
+  if (layout === '2x5') return 10;
   return 4;
 }
 
@@ -3354,9 +3783,10 @@ function getBaseDashboardCards() {
   }));
 }
 
-function getFallbackDashboardCard(index) {
-  const baseCards = getBaseDashboardCards();
-  const source = baseCards[index % baseCards.length] || {
+function getFallbackDashboardCard(index, mode) {
+  const resolvedMode = normalizeDashboardMode(mode || currentWorkbenchDashboardMode || getDefaultDashboardCardMode(index));
+  const segment = getDashboardSegmentConfig(resolvedMode);
+  const source = segment.cards[index % segment.cards.length] || {
     name: `核心指标 ${index + 1}`,
     value: '待跟踪',
     assessment: '当前缺少可用模板，请补充指标来源。',
@@ -3364,11 +3794,15 @@ function getFallbackDashboardCard(index) {
     alert: '建议补充一条更具体的格子提示词',
     hint: '发布前请确认该格子的研究重点。',
   };
-  return { ...source };
+  return { ...source, mode: resolvedMode, segmentId: resolvedMode };
 }
 
-function buildEmptyDashboardCard(promptText) {
+function buildEmptyDashboardCard(promptText, mode) {
+  const resolvedMode = normalizeDashboardMode(mode || currentWorkbenchDashboardMode || 'market');
+  const components = buildDefaultDashboardComponents(resolvedMode);
   return {
+    mode: resolvedMode,
+    segmentId: resolvedMode,
     name: '',
     value: '',
     assessment: '',
@@ -3376,6 +3810,9 @@ function buildEmptyDashboardCard(promptText) {
     alert: '',
     hint: '',
     prompt: String(promptText || '').trim(),
+    components,
+    formula: buildDashboardFormulaText(resolvedMode, components),
+    sources: buildDashboardSourceList(resolvedMode, components),
     isEmpty: true,
   };
 }
@@ -3387,12 +3824,14 @@ function summarizeDashboardPrompt(promptText, maxLength) {
   return compact.length > limit ? `${compact.slice(0, limit)}...` : compact;
 }
 
-function getDashboardPromptSeed(index, card) {
+function getDashboardPromptSeed(index, card, mode) {
+  const cardMode = inferDashboardCardMode(card, mode || getDefaultDashboardCardMode(index));
   if (card && typeof card.prompt === 'string' && card.prompt.trim()) return card.prompt.trim();
   if (card && card.name) {
     return `围绕 ${card.name} 生成适合普通投资者看的核心指标卡，说明当前状态、风险提醒和后续跟踪点。`;
   }
-  return DEFAULT_DASHBOARD_CELL_PROMPTS[index % DEFAULT_DASHBOARD_CELL_PROMPTS.length];
+  const segment = getDashboardSegmentConfig(cardMode);
+  return segment.promptPlaceholder || DEFAULT_DASHBOARD_CELL_PROMPTS[index % DEFAULT_DASHBOARD_CELL_PROMPTS.length];
 }
 
 function normalizeDashboardPromptList(layout, promptList, cards) {
@@ -3400,35 +3839,46 @@ function normalizeDashboardPromptList(layout, promptList, cards) {
   return Array.from({ length: targetCount }, (_, index) => {
     const promptText = promptList && typeof promptList[index] === 'string' ? promptList[index].trim() : '';
     if (promptText) return promptText;
-    return getDashboardPromptSeed(index, cards && cards[index]);
+    return getDashboardPromptSeed(index, cards && cards[index], inferDashboardCardMode(cards && cards[index], getDefaultDashboardCardMode(index)));
   });
 }
 
-function buildDashboardCardFromPrompt(promptText, index) {
+function buildDashboardCardFromPrompt(promptText, index, mode) {
   const normalizedPrompt = String(promptText || '').trim();
-  if (!normalizedPrompt) return buildEmptyDashboardCard('');
+  const resolvedMode = normalizeDashboardMode(mode || currentWorkbenchDashboardMode || getDefaultDashboardCardMode(index));
+  if (!normalizedPrompt) return buildEmptyDashboardCard('', resolvedMode);
+  const segment = getDashboardSegmentConfig(resolvedMode);
+  const segmentCard = segment.cards[index % segment.cards.length] || getFallbackDashboardCard(index, resolvedMode);
   const matchedCards = getDashboardKeywordCards(promptText);
-  const fallbackCard = getFallbackDashboardCard(index);
-  let nextCard = matchedCards.length ? { ...matchedCards[index % matchedCards.length] } : { ...fallbackCard };
+  const fallbackCard = getFallbackDashboardCard(index, resolvedMode);
+  let nextCard = matchedCards.length ? { ...matchedCards[index % matchedCards.length] } : { ...segmentCard, ...fallbackCard };
   if (!matchedCards.length) {
-    nextCard.name = summarizeDashboardPrompt(promptText, 10) || nextCard.name;
-    nextCard.assessment = `按该格子的定制提示词跟踪：${summarizeDashboardPrompt(promptText, 28)}`;
-    nextCard.alert = '重点确认该主题是否已有最新数据或事件验证。';
-    nextCard.hint = '该格子由独立提示词生成，适合跟踪小众主题或临时变量。';
+    nextCard.name = segmentCard.name || summarizeDashboardPrompt(promptText, 10) || nextCard.name;
+    nextCard.assessment = segmentCard.assessment || `按该格子的定制提示词跟踪：${summarizeDashboardPrompt(promptText, 28)}`;
+    nextCard.alert = segmentCard.alert || '重点确认该主题是否已有最新数据或事件验证。';
+    nextCard.hint = segmentCard.hint || '该格子由独立提示词生成，适合跟踪小众主题或临时变量。';
   }
+  nextCard.mode = resolvedMode;
+  nextCard.segmentId = resolvedMode;
   nextCard.prompt = normalizedPrompt;
+  nextCard.components = normalizeDashboardComponents(nextCard.components, resolvedMode);
+  nextCard.formula = buildDashboardFormulaText(resolvedMode, nextCard.components);
+  nextCard.sources = buildDashboardSourceList(resolvedMode, nextCard.components, nextCard.sources);
   nextCard.isEmpty = false;
   return nextCard;
 }
 
-function pickDashboardCards(layout, promptSource) {
+function pickDashboardCards(layout, promptSource, modeSource) {
   const targetCount = getDashboardCardTarget(layout);
   const promptList = Array.isArray(promptSource)
     ? Array.from({ length: targetCount }, (_, index) => String(promptSource[index] || '').trim())
     : Array(targetCount).fill(String(promptSource || '').trim());
+  const modeList = Array.isArray(modeSource)
+    ? Array.from({ length: targetCount }, (_, index) => normalizeDashboardMode(modeSource[index] || getDefaultDashboardCardMode(index)))
+    : Array.from({ length: targetCount }, (_, index) => normalizeDashboardMode(modeSource || getDefaultDashboardCardMode(index)));
   const cards = [];
   while (cards.length < targetCount) {
-    cards.push(buildDashboardCardFromPrompt(promptList[cards.length], cards.length));
+    cards.push(buildDashboardCardFromPrompt(promptList[cards.length], cards.length, modeList[cards.length]));
   }
   return cards;
 }
@@ -3440,54 +3890,73 @@ function getDashboardPromptSummary(promptSource) {
   return String(promptSource || '').trim();
 }
 
-function buildDashboardTitle(layout, promptSource) {
+function buildDashboardTitle(layout, promptSource, cards) {
+  const targetCards = Array.isArray(cards) ? cards : [];
+  const mixed = isMixedDashboardModes(targetCards);
+  const primaryMode = getDashboardPrimaryMode(targetCards);
+  const segment = getDashboardSegmentConfig(primaryMode);
   const promptText = getDashboardPromptSummary(promptSource);
+  if (targetCards.length) return mixed ? `今日核心指标面板 · 混合策略 · ${layout.toUpperCase()}` : `${segment.title} · ${layout.toUpperCase()}`;
   if (/港股|互联网/i.test(promptText)) return '今日核心指标面板 · 港股与科技';
   if (/AI|算力|半导体/i.test(promptText)) return '今日核心指标面板 · AI 主线';
   if (/美联储|降息|通胀/i.test(promptText)) return '今日核心指标面板 · 宏观优先';
   return `今日核心指标面板 · ${layout.toUpperCase()}`;
 }
 
-function buildDashboardNote(promptSource) {
+function buildDashboardNote(promptSource, cards) {
+  const targetCards = Array.isArray(cards) ? cards : [];
+  const segment = getDashboardSegmentConfig(getDashboardPrimaryMode(targetCards));
+  const composition = buildDashboardCompositionSummary(targetCards);
   if (Array.isArray(promptSource)) {
     const prompts = promptSource.map(item => String(item || '').trim()).filter(Boolean);
     if (prompts.length) {
-      return `本次由大V为 ${prompts.length} 个格子分别设置独立提示词，面板内容按单格定制生成。`;
+      return `当前面板支持按格子混搭。组合结构：${composition}。当前共配置 ${prompts.length} 个格子。`;
     }
   }
   const promptText = getDashboardPromptSummary(promptSource);
   if (promptText) {
-    return `本次由大V根据提示词生成：${promptText.slice(0, 52)}${promptText.length > 52 ? '...' : ''}`;
+    return `当前面板支持按格子混搭。组合结构：${composition}。当前提示词：${promptText.slice(0, 52)}${promptText.length > 52 ? '...' : ''}`;
   }
-  return '当前面板聚焦宏观方向、资金验证和重点主线，帮助普通投资者先判断是否需要报警。';
+  return targetCards.length ? `当前面板支持按格子混搭。组合结构：${composition}。` : segment.note;
 }
 
 function hydrateDashboardConfig(config) {
   const fallbackConfig = buildDefaultFundDashboard();
   const source = config && typeof config === 'object' ? config : fallbackConfig;
+  const mode = normalizeDashboardMode(source.mode || source.segmentId || fallbackConfig.mode || 'market');
   const layout = normalizeDashboardLayout(source.layout || fallbackConfig.layout);
   const existingCards = Array.isArray(source.cards) ? source.cards : fallbackConfig.cards;
   const cards = Array.from({ length: getDashboardCardTarget(layout) }, (_, index) => {
     const currentCard = existingCards[index];
-    if (!currentCard) return buildEmptyDashboardCard('');
-    const fallbackCard = getFallbackDashboardCard(index);
+    const cardMode = inferDashboardCardMode(currentCard, getDefaultDashboardCardMode(index));
+    if (!currentCard) return buildEmptyDashboardCard('', cardMode);
+    const fallbackCard = getFallbackDashboardCard(index, cardMode);
     const hasContent = !!(currentCard.name || currentCard.value || currentCard.assessment || currentCard.alert || currentCard.hint);
-    if (!hasContent && !String(currentCard.prompt || '').trim()) return buildEmptyDashboardCard('');
+    if (!hasContent && !String(currentCard.prompt || '').trim()) return buildEmptyDashboardCard('', cardMode);
     return {
+      mode: cardMode,
+      segmentId: cardMode,
       name: currentCard.name || fallbackCard.name,
       value: currentCard.value || fallbackCard.value,
       assessment: currentCard.assessment || fallbackCard.assessment,
       status: currentCard.status || fallbackCard.status,
       alert: currentCard.alert || fallbackCard.alert,
       hint: currentCard.hint || fallbackCard.hint,
-      prompt: getDashboardPromptSeed(index, currentCard),
+      prompt: getDashboardPromptSeed(index, currentCard, cardMode),
+      components: normalizeDashboardComponents(currentCard.components, cardMode),
+      formula: String(currentCard.formula || '').trim() || buildDashboardFormulaText(cardMode, normalizeDashboardComponents(currentCard.components, cardMode)),
+      sources: buildDashboardSourceList(cardMode, normalizeDashboardComponents(currentCard.components, cardMode), currentCard.sources),
       isEmpty: false,
     };
   });
+  const primaryMode = getDashboardPrimaryMode(cards);
+  const composition = buildDashboardCompositionSummary(cards);
   return {
+    mode: primaryMode || mode,
+    segmentId: primaryMode || mode,
     layout,
-    title: source.title || fallbackConfig.title,
-    note: source.note || fallbackConfig.note,
+    title: source.title || buildDashboardTitle(layout, cards.map(card => card.prompt || ''), cards),
+    note: source.note || `当前面板支持按格子混搭。组合结构：${composition}。`,
     cards,
     updatedAt: source.updatedAt || fallbackConfig.updatedAt,
     publisher: source.publisher || fallbackConfig.publisher,
@@ -3495,12 +3964,19 @@ function hydrateDashboardConfig(config) {
 }
 
 function buildDefaultFundDashboard() {
-  const defaultPrompts = DEFAULT_DASHBOARD_CELL_PROMPTS.slice(0, getDashboardCardTarget('2x2'));
+  const modeList = Array.from({ length: getDashboardCardTarget('2x2') }, (_, index) => getDefaultDashboardCardMode(index));
+  const defaultPrompts = modeList.map((mode, index) => {
+    const segment = getDashboardSegmentConfig(mode);
+    return segment.cards[index % segment.cards.length].prompt || segment.promptPlaceholder;
+  });
+  const cards = pickDashboardCards('2x2', defaultPrompts, modeList);
   return {
+    mode: getDashboardPrimaryMode(cards),
+    segmentId: getDashboardPrimaryMode(cards),
     layout: '2x2',
-    title: '今日核心指标面板',
-    note: '默认展示租户当前发布的宏观核心指标，用于判断今天先看方向还是先控风险。',
-    cards: pickDashboardCards('2x2', defaultPrompts),
+    title: buildDashboardTitle('2x2', defaultPrompts, cards),
+    note: buildDashboardNote(defaultPrompts, cards),
+    cards,
     updatedAt: '默认模板',
     publisher: '系统初始化',
   };
@@ -3559,8 +4035,10 @@ function getTenantFundDashboardState() {
 }
 
 function getPublishedFundDashboard() {
-  const tenantState = getTenantFundDashboardState();
-  return cloneDashboardConfig(tenantState.published);
+  if (tenantFundDashboardRemoteState && tenantFundDashboardRemoteState.published) {
+    return cloneDashboardConfig(tenantFundDashboardRemoteState.published);
+  }
+  return null;
 }
 
 function getDraftFundDashboard() {
@@ -3621,6 +4099,7 @@ function bootH5Experience() {
   loadCommunityPosts();
   loadCommunityEvents();
   selectHermesMode('复盘速写');
+  refreshTenantDashboardRemoteState({ rerenderFeed: true, rerenderWorkbench: true });
 }
 
 function getDefaultDemoUser() {
@@ -3746,6 +4225,11 @@ function buildReviewArticleData(review) {
     title: `${item.stockName} · K线标注`,
     text: item.summary,
   }));
+  const selectedCards = Array.isArray(review.selectedCards) ? review.selectedCards : [];
+  const knowledgeAttachments = Array.isArray(review.knowledgeAttachments) ? review.knowledgeAttachments : [];
+  const dataSources = Array.isArray(review.dataSources) ? review.dataSources : [];
+  const newsSources = Array.isArray(review.newsSources) ? review.newsSources : [];
+  const llmModels = Array.isArray(review.llmModels) ? review.llmModels : [];
   const bodySections = [
     {
       title: '复盘核心摘要',
@@ -3771,6 +4255,11 @@ function buildReviewArticleData(review) {
     coverDesc: '这是一份已经面向前台发布的复盘分析报告，普通用户和大V看到的是同一份正文内容。',
     bodySections,
     evidenceItems,
+    selectedCards,
+    knowledgeAttachments,
+    dataSources,
+    newsSources,
+    llmModels,
     quote: evidenceItems.length
       ? `本次复盘明确引用了 ${evidenceItems.length} 处 K 线标注，这些标注就是复盘智能化总结的依据之一。`
       : '本次复盘重点承接行业主线、关键个股和已验证资料，不做交易指令，只保留研究判断。',
@@ -3778,8 +4267,31 @@ function buildReviewArticleData(review) {
 }
 
 function buildPublishedReviewArticles(period) {
+  const periodMap = { day: '日复盘', week: '周复盘', month: '月复盘' };
+  const targetPeriod = periodMap[period] || '';
   return getAllDavUsersForReviews().map(davUser => {
-    const review = buildKolReviewData(davUser, period);
+    const snapshots = Array.isArray(davUser.tenant.review_snapshots) ? davUser.tenant.review_snapshots : [];
+    const matched = snapshots.find(item => !targetPeriod || item.period === targetPeriod || item.period_key === period);
+    const review = matched ? {
+      id: matched.id,
+      author: davUser.tenant.advisor,
+      avatar: davUser.tenant.advisor === '财经老王' ? '👑' : '🧭',
+      periodLabel: matched.period || targetPeriod || getReviewPeriodMeta(period).label,
+      generatedAt: matched.time || matched.published_at || nowTs(),
+      title: matched.title,
+      summary: matched.summary,
+      tags: matched.tags || [],
+      watchlist: matched.watchlist || [],
+      annotations: [],
+      selectedCards: matched.selected_cards || [],
+      knowledgeAttachments: matched.knowledge_attachments || [],
+      dataSources: matched.data_sources || [],
+      newsSources: matched.news_sources || [],
+      llmModels: matched.llm_models || [],
+      paragraphs: [
+        { title: '完整复盘正文', text: matched.content_text || matched.summary || '' },
+      ],
+    } : buildKolReviewData(davUser, period);
     return buildReviewArticleData(review);
   });
 }
@@ -3878,6 +4390,52 @@ function openReviewArticleModal(articleId) {
           <div class="review-article-section-text">${escapeHtml(section.text).replace(/\n/g, '<br>')}</div>
         </div>
       `).join('')}
+      ${article.knowledgeAttachments.length ? `
+        <div class="review-article-section">
+          <div class="review-article-section-title">附加材料</div>
+          <div class="review-article-evidence-list">
+            ${article.knowledgeAttachments.map(item => `
+              <div class="review-article-evidence-item">
+                <div class="review-article-evidence-title">${escapeHtml(item.title || '知识材料')}</div>
+                <div class="review-article-evidence-text">${escapeHtml(item.summary || item.body || '暂无摘要')}</div>
+                ${item.source_detail ? `<div class="review-article-evidence-text">来源：${escapeHtml(item.source_detail)}</div>` : ''}
+                ${item.url ? `<div class="review-article-evidence-text">链接：${escapeHtml(item.url)}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+      ${(article.selectedCards.length || article.dataSources.length || article.newsSources.length || article.llmModels.length) ? `
+        <div class="review-article-section">
+          <div class="review-article-section-title">归纳来源</div>
+          <div class="review-article-evidence-list">
+            ${article.selectedCards.map(item => `
+              <div class="review-article-evidence-item">
+                <div class="review-article-evidence-title">${escapeHtml(item.title || '智能卡片')}</div>
+                <div class="review-article-evidence-text">${escapeHtml(item.summary || item.value || '已纳入本次复盘')}</div>
+              </div>
+            `).join('')}
+            ${article.dataSources.length ? `
+              <div class="review-article-evidence-item">
+                <div class="review-article-evidence-title">数据来源</div>
+                <div class="review-article-evidence-text">${escapeHtml(article.dataSources.join(' / '))}</div>
+              </div>
+            ` : ''}
+            ${article.newsSources.length ? `
+              <div class="review-article-evidence-item">
+                <div class="review-article-evidence-title">新闻来源</div>
+                <div class="review-article-evidence-text">${escapeHtml(article.newsSources.join(' / '))}</div>
+              </div>
+            ` : ''}
+            ${article.llmModels.length ? `
+              <div class="review-article-evidence-item">
+                <div class="review-article-evidence-title">模型记录</div>
+                <div class="review-article-evidence-text">${escapeHtml(article.llmModels.map((item) => `${item.stage || 'stage'}：${item.label || item.model_name || item.key || '未命名模型'}`).join(' / '))}</div>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      ` : ''}
       ${article.evidenceItems.length ? `
         <div class="review-article-section">
           <div class="review-article-section-title">复盘依据 · K线标注</div>
@@ -4495,6 +5053,10 @@ async function publishReviewContentEmbedding(text, transcriptionEngine, transcri
       speaker_name: (user && (user.advisor_name || user.username)) || '',
       transcription_engine: transcriptionEngine || 'manual',
       transcript_model: transcriptModel || 'manual_input',
+      source_mode: reviewTriggerDraft.sourceMode || 'manual',
+      paragraph_mode: reviewTriggerDraft.paragraphMode || 'manual',
+      selected_watchlist: reviewTriggerDraft.selectedWatchlist || [],
+      prompt_tags: reviewTriggerDraft.promptTags || [],
     }),
   });
   const data = await resp.json();
@@ -4992,8 +5554,12 @@ function publishReviewDraft() {
         ]);
         runtime.kolPublishedAt = '刚刚发布';
         runtime.kolGeneratedAt = '刚刚发布';
+        if (result.snapshots && user && user.tenant) {
+          user.tenant.review_snapshots = result.snapshots;
+        }
         loadDmConversations();
         if (currentDmKol) loadDmMessages(currentDmKol.id);
+        renderReviewExperience();
         showToast('复盘已发布并入向量库');
       },
       onFailed(job) {
@@ -5176,8 +5742,9 @@ function renderKnowledgeZone() {
 function renderDashboardCards(config, options) {
   if (!config || !config.cards || !config.cards.length) return '';
   const opts = options || {};
+  const segment = getDashboardSegmentConfig(inferDashboardMode(config));
   const layout = normalizeDashboardLayout(config.layout);
-  const toolbarTag = opts.toolbarTag || layout.toUpperCase();
+  const toolbarTag = opts.toolbarTag || `${segment.shortTitle} · ${layout.toUpperCase()}`;
   const toolbarNote = opts.toolbarNote || config.note || '';
   return `
     <div class="fund-macro-toolbar">
@@ -5186,6 +5753,11 @@ function renderDashboardCards(config, options) {
     </div>
     <div class="fund-macro-grid cols-${layout.charAt(0)}">
       ${config.cards.map((card, index) => `
+        ${(() => {
+          const cardMode = inferDashboardCardMode(card, getDefaultDashboardCardMode(index));
+          const cardSegment = getDashboardSegmentConfig(cardMode);
+          const metricCompactText = buildDashboardMetricCompactText(card.components || [], 2);
+          return `
         <div class="fund-macro-card ${escapeHtml(card.status || 'normal')}" onclick="openFundMetricDetail(${index})">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
             <div class="fund-macro-name">${escapeHtml(card.name || '待补充指标')}</div>
@@ -5193,10 +5765,11 @@ function renderDashboardCards(config, options) {
           </div>
           <div class="fund-macro-value">${escapeHtml(card.value || '--')}</div>
           <div class="fund-macro-assessment">${escapeHtml(card.assessment || '当前格子尚未配置指标提示词。')}</div>
-          <div class="fund-macro-alert">${escapeHtml(card.alert || '点击工作台中的对应格子即可继续补充。')}</div>
-          <div class="fund-macro-hint">${escapeHtml(card.hint || '')}</div>
-          <div class="fund-macro-entry-hint">点击查看历史趋势</div>
+          <div class="fund-macro-compact">${escapeHtml(metricCompactText)}</div>
+          <div class="fund-macro-entry-hint">点击查看${escapeHtml(cardSegment.shortTitle)}指标说明</div>
         </div>
+          `;
+        })()}
       `).join('')}
     </div>
   `;
@@ -5496,47 +6069,90 @@ function openFundMetricDetail(index) {
   const host = document.getElementById('fund-metric-detail-modal-content');
   const modal = document.getElementById('fund-metric-detail-modal');
   if (!card || !host || !modal) return;
+  const cardMode = inferDashboardCardMode(card, getDefaultDashboardCardMode(index));
+  const segment = getDashboardSegmentConfig(cardMode);
+  const linkedItem = findIndicatorHubItemForCard(card, index);
   const detail = buildFundMetricHistory(card, index);
   currentFundMetricDetail = detail;
-  const trendSummary = buildFundMetricTrendSummary(detail.trend);
-  const currentValue = String(detail.value || '--');
+  const currentValue = String(detail.value || card.value || '--');
   const valueClass = /[A-Za-z]/.test(currentValue) || currentValue.length >= 9 ? 'fund-metric-detail-stat-value compact' : 'fund-metric-detail-stat-value';
+  const components = normalizeDashboardComponents(card.components, cardMode);
+  const sourceLines = linkedItem ? [
+    linkedItem.owner ? `来源归属：${linkedItem.owner}` : '',
+    linkedItem.category ? `指标分类：${linkedItem.category}` : '',
+    linkedItem.data_mode_label ? `数据模式：${linkedItem.data_mode_label}` : '',
+    linkedItem.id ? `命中指标：${linkedItem.id}` : '',
+  ].filter(Boolean) : buildDashboardSourceList(cardMode, components, card.sources).map(item => `来源：${item}`);
+  const explanationLines = [
+    card.assessment ? `当前判断：${card.assessment}` : '',
+    card.alert ? `提醒项：${card.alert}` : '',
+    card.hint ? `补充说明：${card.hint}` : '',
+    card.prompt ? `提示词：${card.prompt}` : '',
+  ].filter(Boolean);
+  const buildDetailItemHtml = (title, copy) => `
+    <div class="fund-metric-detail-item">
+      <div class="fund-metric-detail-item-head">
+        <strong style="color:var(--text-main)">${escapeHtml(title || '--')}</strong>
+      </div>
+      <div class="fund-metric-detail-copy">${escapeHtml(copy || '--')}</div>
+    </div>
+  `;
+  const buildDetailGroupHtml = (title, note, body) => {
+    if (!String(body || '').trim()) return '';
+    return `
+      <div class="fund-metric-detail-group">
+        <div class="fund-metric-detail-group-head">
+          <div>
+            <div class="fund-metric-detail-group-title">${escapeHtml(title || '--')}</div>
+            ${note ? `<div class="fund-metric-detail-group-note">${escapeHtml(note)}</div>` : ''}
+          </div>
+        </div>
+        <div class="fund-metric-detail-list">${body}</div>
+      </div>
+    `;
+  };
+  const factorRuleRows = (segment.factorRules || []).map((entry) => {
+    const raw = String(entry || '').trim();
+    if (!raw) return '';
+    const parts = raw.split(/\s*=\s*/);
+    if (parts.length >= 2) {
+      return buildDetailItemHtml(parts.shift(), parts.join(' = '));
+    }
+    return buildDetailItemHtml('因子规则', raw);
+  }).join('');
+  const thresholdRows = (segment.thresholds || []).map((entry) => {
+    const raw = String(entry || '').trim();
+    if (!raw) return '';
+    const match = raw.match(/^(\S+)\s+(.+)$/);
+    if (match) {
+      return buildDetailItemHtml(match[1], match[2]);
+    }
+    return buildDetailItemHtml('分数映射', raw);
+  }).join('');
+  const componentRows = components.map((item, componentIndex) => {
+    const weightText = Math.abs(Number(item.weight || 1) - 1) < 0.01 ? '默认权重' : `权重 ${Number(item.weight || 1)}`;
+    const operatorText = componentIndex === 0 || item.operator === 'base' ? '起始组件' : `组合符 ${item.operator}`;
+    return `
+      <div class="fund-metric-detail-item">
+        <div class="fund-metric-detail-item-head">
+          <strong style="color:var(--text-main)">${escapeHtml(item.label || `组件 ${componentIndex + 1}`)}</strong>
+        </div>
+        <div class="fund-metric-detail-copy">指标：${escapeHtml(item.metric || '--')} · 窗口：${escapeHtml(item.window || '--')} · 聚合：${escapeHtml(item.aggregation || '--')}</div>
+        <div class="fund-metric-detail-copy">数据源：${escapeHtml(item.source || '--')} · ${escapeHtml(weightText)} · ${escapeHtml(operatorText)}</div>
+      </div>
+    `;
+  }).join('');
   host.innerHTML = `
     <div class="fund-metric-detail-head">
       <div>
         <div class="fund-metric-detail-title">${escapeHtml(detail.name)}</div>
-        <div class="fund-metric-detail-subtitle">${escapeHtml(detail.category)} · ${escapeHtml(detail.owner)} · 仅展示历史数据与异动标注</div>
+        <div class="fund-metric-detail-subtitle">${escapeHtml(segment.detailTitle)} · 算法说明 · 数据源 · 详细解读</div>
       </div>
       <button class="fund-metric-detail-close" type="button" onclick="closeFundMetricDetailModal()">×</button>
     </div>
     <div class="fund-metric-detail-grid">
       <div class="fund-metric-detail-card">
-        <div class="fund-metric-detail-card-title">1. 趋势线图</div>
-        ${buildFundMetricKlineSvg(detail.kline)}
-      </div>
-      <div class="fund-metric-detail-card">
-        <div class="fund-metric-detail-card-title">2. 异动情况（异动点标注）</div>
-        <div class="fund-metric-detail-list">
-          ${(detail.anomalies || []).map((entry) => `
-            <div class="fund-metric-detail-item">
-              <div class="fund-metric-detail-item-head">
-                <strong style="color:var(--text-main)">${escapeHtml(entry.date)}</strong>
-                ${renderFundMetricStatus(entry.status)}
-              </div>
-              <div class="fund-metric-detail-copy">异动点：${escapeHtml(entry.label || '异动')}</div>
-              <div class="fund-metric-detail-copy">指标值：${escapeHtml(Number(entry.value || 0).toFixed ? Number(entry.value || 0).toFixed(2) : entry.value || '--')}</div>
-            </div>
-          `).join('') || '<div class="fund-metric-detail-item">当前没有异动点。</div>'}
-        </div>
-      </div>
-      <div class="fund-metric-detail-card">
-        <div class="fund-metric-detail-card-title">3. 数据口径</div>
-        <div class="fund-metric-detail-copy" style="margin-top:0">当前详情页只展示纯数据分析视图，不做结果原因分析。可见范围包括趋势线、趋势状态和异动点标注。</div>
-        <div class="fund-metric-detail-copy">当前值代表最新观测结果；历史趋势展示最近 8 个时间点的方向变化，用于快速判断节奏是否延续。</div>
-        <div class="fund-metric-detail-copy">数据来源：${escapeHtml(detail.dataModeLabel || '--')}</div>
-      </div>
-      <div class="fund-metric-detail-card">
-        <div class="fund-metric-detail-card-title">4. 趋势情况与历史趋势</div>
+        <div class="fund-metric-detail-card-title">1. 卡片定位</div>
         <div class="fund-metric-detail-summary">
           <div class="fund-metric-detail-stat">
             <div>
@@ -5546,21 +6162,57 @@ function openFundMetricDetail(index) {
           </div>
           <div class="fund-metric-detail-stat">
             <div class="fund-metric-detail-stat-label">当前状态</div>
-            <div class="fund-metric-detail-stat-badge">${renderFundMetricStatus(detail.status)}</div>
+            <div class="fund-metric-detail-stat-badge">${renderFundMetricStatus(detail.status || card.status)}</div>
           </div>
         </div>
-        <div class="fund-metric-detail-section-note">
-          <div class="fund-metric-detail-section-title">历史趋势</div>
-          <div class="fund-metric-detail-section-copy">按时间顺序展示最近 ${trendSummary.length} 个观察点，压缩为细条便于快速扫读变化方向。</div>
-        </div>
-        <div class="fund-metric-detail-history-list">
-          ${trendSummary.map((entry) => `
-            <div class="fund-metric-detail-history-row">
-              <div class="fund-metric-detail-history-date">${escapeHtml(entry.date)}</div>
-              <div class="fund-metric-detail-history-text">指标值 ${escapeHtml(entry.value)} · ${escapeHtml(entry.direction)} · 变动 ${entry.delta > 0 ? '+' : ''}${entry.delta}</div>
-              ${renderFundMetricStatus(entry.status)}
+        <div class="fund-metric-detail-copy">所属层级：${escapeHtml(segment.title)}</div>
+        <div class="fund-metric-detail-copy">核心问题：${escapeHtml(segment.question || segment.note)}</div>
+        <div class="fund-metric-detail-copy">${escapeHtml(segment.scope || '')}</div>
+        <div class="fund-metric-detail-copy">输出口径：${escapeHtml(segment.outputExplain || '输出的是一个面向粉丝的结构化判断结果。')}</div>
+      </div>
+      <div class="fund-metric-detail-card">
+        <div class="fund-metric-detail-card-title">2. 算法说明</div>
+        ${buildDetailGroupHtml(
+          '计算框架',
+          '先看总分怎么合成，再看解释文案按什么口径输出。',
+          buildDetailItemHtml('组合方式', String(card.formula || '').trim() || buildDashboardFormulaText(cardMode, components) || '当前卡片按预设指标组合规则生成。')
+          + buildDetailItemHtml('评分口径', segment.scoreMethod || segment.detailNote)
+          + buildDetailItemHtml('格子提示词', card.prompt || segment.promptPlaceholder || '暂无提示词')
+        )}
+        ${buildDetailGroupHtml(
+          '因子拆解',
+          '把总分拆成几个核心因子，便于看每部分在回答什么问题。',
+          factorRuleRows
+        )}
+        ${buildDetailGroupHtml(
+          '结果映射',
+          '分数不是直接展示给用户，而是映射成可读结论。',
+          thresholdRows
+        )}
+        ${buildDetailGroupHtml(
+          '组件构成',
+          '如果当前卡片绑定了白盒组件，这里展示具体指标、窗口和聚合方式。',
+          componentRows
+        )}
+      </div>
+      <div class="fund-metric-detail-card">
+        <div class="fund-metric-detail-card-title">3. 数据源</div>
+        <div class="fund-metric-detail-list">
+          ${sourceLines.map((entry) => `
+            <div class="fund-metric-detail-item">
+              <div class="fund-metric-detail-copy" style="margin-top:0">${escapeHtml(entry)}</div>
             </div>
-          `).join('') || '<div class="fund-metric-detail-item">暂无趋势记录。</div>'}
+          `).join('') || '<div class="fund-metric-detail-item">当前没有可展示的数据源说明。</div>'}
+        </div>
+      </div>
+      <div class="fund-metric-detail-card">
+        <div class="fund-metric-detail-card-title">4. 详细解读</div>
+        <div class="fund-metric-detail-history-list">
+          ${explanationLines.map((entry) => `
+            <div class="fund-metric-detail-history-row">
+              <div class="fund-metric-detail-history-text">${escapeHtml(entry)}</div>
+            </div>
+          `).join('') || '<div class="fund-metric-detail-item">暂无详细解读。</div>'}
         </div>
       </div>
     </div>
@@ -5571,6 +6223,7 @@ function openFundMetricDetail(index) {
 function getDashboardConfigVersion(config) {
   if (!config) return '';
   return [
+    inferDashboardMode(config),
     normalizeDashboardLayout(config.layout),
     config.updatedAt || '',
     config.publisher || '',
@@ -5582,13 +6235,16 @@ function normalizeWorkbenchDashboardSlots(layout, cards) {
   const normalizedLayout = normalizeDashboardLayout(layout);
   return Array.from({ length: getDashboardCardTarget(normalizedLayout) }, (_, index) => {
     const card = cards && cards[index];
-    if (!card) return buildEmptyDashboardCard('');
+    const mode = inferDashboardCardMode(card, getDefaultDashboardCardMode(index));
+    if (!card) return buildEmptyDashboardCard('', mode);
     const hasContent = !!(card.name || card.value || card.assessment || card.alert || card.hint);
     const prompt = String(card.prompt || '').trim();
-    if (!hasContent && !prompt) return buildEmptyDashboardCard('');
+    if (!hasContent && !prompt) return buildEmptyDashboardCard('', mode);
     return {
-      ...buildEmptyDashboardCard(''),
+      ...buildEmptyDashboardCard('', mode),
       ...card,
+      mode,
+      segmentId: mode,
       prompt,
       isEmpty: !hasContent && !prompt,
     };
@@ -5596,6 +6252,10 @@ function normalizeWorkbenchDashboardSlots(layout, cards) {
 }
 
 function ensureWorkbenchDashboardEditor(config) {
+  const sourceMode = inferDashboardMode(config || { mode: currentWorkbenchDashboardMode });
+  currentWorkbenchDashboardMode = sourceMode;
+  syncDashboardWorkbenchHeader(config);
+  renderDashboardModeRow();
   const version = getDashboardConfigVersion(config);
   if (!currentWorkbenchDashboardSlots.length || currentWorkbenchDashboardSourceVersion !== version) {
     currentWorkbenchDashboardLayout = normalizeDashboardLayout(config.layout || currentWorkbenchDashboardLayout);
@@ -5616,25 +6276,29 @@ function renderWorkbenchDashboardBoard() {
   });
   return `
     <div class="wb-dashboard-summary-grid cols-${layout.charAt(0)}">
-      ${currentWorkbenchDashboardSlots.map((card, index) => isWorkbenchDashboardCellFilled(card) ? `
+      ${currentWorkbenchDashboardSlots.map((card, index) => {
+        const cardMode = inferDashboardCardMode(card, getDefaultDashboardCardMode(index));
+        const segment = getDashboardSegmentConfig(cardMode);
+        return isWorkbenchDashboardCellFilled(card) ? `
         <div class="wb-dashboard-summary-card filled" onclick="openDashboardCellModal(${index})">
           <div class="wb-dashboard-summary-head">
-            <div class="wb-dashboard-summary-title">${escapeHtml(card.name || `格子 ${index + 1}`)}</div>
-            <span class="wb-dashboard-summary-tag">格子 ${index + 1}</span>
+            <div class="wb-dashboard-summary-title">${escapeHtml(card.name || `${segment.shortTitle} ${index + 1}`)}</div>
+            <span class="wb-dashboard-summary-tag">${escapeHtml(segment.shortTitle)} ${index + 1}</span>
           </div>
           <div class="wb-dashboard-summary-value">${escapeHtml(card.value || '--')}</div>
-          <div class="wb-dashboard-summary-text">${escapeHtml(card.assessment || '点击继续补充指标提示词。')}</div>
+          <div class="wb-dashboard-summary-text">${escapeHtml(card.assessment || `点击继续补充${segment.shortTitle}提示词。`)}</div>
           <div class="wb-dashboard-summary-edit">点击编辑提示词</div>
         </div>
       ` : `
         <div class="wb-dashboard-summary-card empty" onclick="openDashboardCellModal(${index})">
           <div>
             <div class="wb-dashboard-summary-plus">+</div>
-            <div class="wb-dashboard-summary-empty-title">添加指标</div>
-            <div class="wb-dashboard-summary-empty-desc">点击输入提示词，保存后自动生成。</div>
+            <div class="wb-dashboard-summary-empty-title">添加${escapeHtml(segment.shortTitle)}信号</div>
+            <div class="wb-dashboard-summary-empty-desc">点击输入提示词，保存后自动生成${escapeHtml(segment.shortTitle)}摘要。</div>
           </div>
         </div>
-      `).join('')}
+      `;
+      }).join('')}
     </div>
   `;
 }
@@ -5643,6 +6307,13 @@ function selectFundDashboardLayout(layout) {
   const normalizedLayout = normalizeDashboardLayout(layout);
   currentWorkbenchDashboardLayout = normalizedLayout;
   currentWorkbenchDashboardSlots = normalizeWorkbenchDashboardSlots(normalizedLayout, currentWorkbenchDashboardSlots);
+  renderWorkbenchFundDashboard();
+}
+
+function selectFundDashboardMode(mode) {
+  const nextMode = normalizeDashboardMode(mode);
+  currentWorkbenchDashboardMode = nextMode;
+  renderDashboardModeRow();
   renderWorkbenchFundDashboard();
 }
 
@@ -5661,20 +6332,31 @@ function openDashboardCellModal(index) {
   const host = document.getElementById('dashboard-cell-modal-content');
   const modal = document.getElementById('dashboard-cell-modal');
   if (!host || !modal) return;
+  const cardMode = inferDashboardCardMode(currentWorkbenchDashboardSlots[index], currentWorkbenchDashboardMode || getDefaultDashboardCardMode(index));
+  dashboardCellDraftMode = cardMode;
+  const segment = getDashboardSegmentConfig(cardMode);
   const card = currentWorkbenchDashboardSlots[index] || buildEmptyDashboardCard('');
+  const modeOptions = ['market', 'industry', 'signal-stock'].map((mode) => {
+    const item = getDashboardSegmentConfig(mode);
+    return `<button class="btn-outline ${dashboardCellDraftMode === mode ? 'wb-dashboard-layout-btn active' : ''}" style="padding:6px 8px;font-size:11px" type="button" onclick="setDashboardCellMode('${mode}')">${escapeHtml(item.title)}</button>`;
+  }).join('');
   const seedOptions = (Array.isArray(DASHBOARD_SEED_CARDS) ? DASHBOARD_SEED_CARDS : []).slice(0, 8).map((seed, seedIndex) => `
     <button class="btn-outline" style="padding:6px 8px;font-size:11px" onclick="fillDashboardCellFromSeed(${index}, ${seedIndex})">${escapeHtml(seed.name || `指标${seedIndex + 1}`)}</button>
   `).join('');
   host.innerHTML = `
-    <div class="modal-title" style="margin-bottom:10px">编辑格子 ${index + 1}</div>
-    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">${isWorkbenchDashboardCellFilled(card) ? `当前摘要：${escapeHtml(card.name || '未命名指标')} · ${escapeHtml(card.value || '--')}` : '当前格子为空，输入提示词后会自动生成指标摘要。'}</div>
+    <div class="modal-title" style="margin-bottom:10px">${escapeHtml(segment.editorTitle)} ${index + 1}</div>
+    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">${isWorkbenchDashboardCellFilled(card) ? `当前摘要：${escapeHtml(card.name || '未命名指标')} · ${escapeHtml(card.value || '--')}` : `当前${escapeHtml(segment.shortTitle)}格子为空，输入提示词后会自动生成对应摘要。`}</div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">格子类型</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${modeOptions}</div>
+    </div>
     ${seedOptions ? `<div class="knowledge-modal-block">
       <label class="knowledge-modal-label">快速引用指标湖</label>
       <div style="display:flex;gap:8px;flex-wrap:wrap">${seedOptions}</div>
     </div>` : ''}
     <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">提示词</label>
-      <textarea id="dashboard-cell-prompt-input" class="knowledge-modal-textarea" placeholder="${escapeHtml(DEFAULT_DASHBOARD_CELL_PROMPTS[index % DEFAULT_DASHBOARD_CELL_PROMPTS.length])}">${escapeHtml(card.prompt || '')}</textarea>
+      <textarea id="dashboard-cell-prompt-input" class="knowledge-modal-textarea" placeholder="${escapeHtml(segment.promptPlaceholder || DEFAULT_DASHBOARD_CELL_PROMPTS[index % DEFAULT_DASHBOARD_CELL_PROMPTS.length])}">${escapeHtml(card.prompt || '')}</textarea>
     </div>
     <div class="modal-actions">
       <button class="btn-outline" onclick="closeDashboardCellModal()">取消</button>
@@ -5684,13 +6366,21 @@ function openDashboardCellModal(index) {
   modal.classList.add('show');
 }
 
+function setDashboardCellMode(mode) {
+  dashboardCellDraftMode = normalizeDashboardMode(mode);
+  if (dashboardCellEditingIndex < 0) return;
+  openDashboardCellModal(dashboardCellEditingIndex);
+}
+
 function fillDashboardCellFromSeed(cellIndex, seedIndex) {
   const seed = (Array.isArray(DASHBOARD_SEED_CARDS) ? DASHBOARD_SEED_CARDS : [])[seedIndex];
   if (!seed) return;
   currentWorkbenchDashboardSlots = normalizeWorkbenchDashboardSlots(currentWorkbenchDashboardLayout, currentWorkbenchDashboardSlots);
   currentWorkbenchDashboardSlots[cellIndex] = {
-    ...buildEmptyDashboardCard(''),
+    ...buildEmptyDashboardCard('', dashboardCellDraftMode || currentWorkbenchDashboardMode),
     ...seed,
+    mode: dashboardCellDraftMode || currentWorkbenchDashboardMode,
+    segmentId: dashboardCellDraftMode || currentWorkbenchDashboardMode,
     prompt: seed.prompt || `直接引用指标湖信号：${seed.name || '指标'}`,
     isEmpty: false,
   };
@@ -5720,7 +6410,7 @@ function saveDashboardCellPrompt() {
   const input = document.getElementById('dashboard-cell-prompt-input');
   const promptText = input ? input.value.trim() : '';
   currentWorkbenchDashboardSlots = normalizeWorkbenchDashboardSlots(currentWorkbenchDashboardLayout, currentWorkbenchDashboardSlots);
-  currentWorkbenchDashboardSlots[dashboardCellEditingIndex] = buildDashboardCardFromPrompt(promptText, dashboardCellEditingIndex);
+  currentWorkbenchDashboardSlots[dashboardCellEditingIndex] = buildDashboardCardFromPrompt(promptText, dashboardCellEditingIndex, dashboardCellDraftMode || currentWorkbenchDashboardMode);
   closeDashboardCellModal();
   generateFundDashboard();
 }
@@ -5729,17 +6419,34 @@ function renderFundMacroDashboard() {
   const host = document.getElementById('feed-macro-dashboard');
   if (!host) return;
   const published = getPublishedFundDashboard();
+  if (!published || !Array.isArray(published.cards) || !published.cards.length) {
+    host.innerHTML = `
+      <div class="fund-column-card">
+        <div class="fund-column-head">
+          <div>
+            <div class="fund-column-title">今日核心指标面板</div>
+            <div class="fund-column-subtitle">这里严格只展示后台已发布的格子。当前还没有可展示的已发布版本。</div>
+          </div>
+          <span class="tag tag-gold">未发布</span>
+        </div>
+      </div>
+    `;
+    return;
+  }
+  const primaryMode = inferDashboardMode(published);
+  const segment = getDashboardSegmentConfig(primaryMode);
+  const composition = buildDashboardCompositionSummary(published.cards || []);
   host.innerHTML = `
     <div class="fund-column-card">
       <div class="fund-column-head">
         <div>
           <div class="fund-column-title">${escapeHtml(published.title || '今日核心指标面板')}</div>
-          <div class="fund-column-subtitle">顶部核心指标由大V在工作台生成并发布，普通投资者只看到当前生效版本。</div>
+          <div class="fund-column-subtitle">当前仪表盘支持市场状态、行业景气、信号个股混搭展示。组合结构：${escapeHtml(composition)}。普通投资者只看到当前生效版本。</div>
         </div>
-        <span class="tag tag-gold">${escapeHtml(normalizeDashboardLayout(published.layout).toUpperCase())}</span>
+        <span class="tag tag-gold">${escapeHtml(`${isMixedDashboardModes(published.cards || []) ? '混合策略' : segment.shortTitle} · ${normalizeDashboardLayout(published.layout).toUpperCase()}`)}</span>
       </div>
       ${renderDashboardCards(published, {
-        toolbarTag: `${normalizeDashboardLayout(published.layout).toUpperCase()} 已发布`,
+        toolbarTag: `${buildDashboardCompositionSummary(published.cards || [])} · ${normalizeDashboardLayout(published.layout).toUpperCase()} 已发布`,
         toolbarNote: published.note || '',
       })}
     </div>
@@ -5759,10 +6466,14 @@ function renderWorkbenchFundDashboard() {
   const tenantState = getTenantFundDashboardState();
   const draft = tenantState.draft;
   const published = tenantState.published;
-  ensureWorkbenchDashboardEditor(draft || published);
+  ensureWorkbenchDashboardEditor(draft || published || { mode: currentWorkbenchDashboardMode, layout: currentWorkbenchDashboardLayout, cards: currentWorkbenchDashboardSlots });
+  const activeConfig = draft || published || { cards: currentWorkbenchDashboardSlots };
+  const composition = buildDashboardCompositionSummary(activeConfig.cards || []);
   metaHost.textContent = draft
-    ? `草稿已生成 · ${normalizeDashboardLayout(draft.layout).toUpperCase()} · 点击任意格子可继续修改，发布后会同步到基本面首页顶部`
-    : `当前展示已发布版本 · ${published.updatedAt || '刚刚同步'} · 点击格子输入提示词，保存后自动生成新草稿`;
+    ? `草稿已生成 · ${composition} · ${normalizeDashboardLayout(draft.layout).toUpperCase()} · 点击任意格子可继续修改，发布后会同步到基本面首页顶部`
+    : published
+      ? `当前展示已发布版本 · ${composition} · ${published.updatedAt || '刚刚同步'}`
+      : `当前为混合格子 demo · 点击格子输入提示词，并为每个格子单独选择类型`;
   previewHost.innerHTML = renderWorkbenchDashboardBoard();
 }
 
@@ -5780,16 +6491,20 @@ async function generateFundDashboard(layout) {
     if (isWorkbenchDashboardCellFilled(card) && card.name && card.value) {
       return {
         ...card,
+        mode: inferDashboardCardMode(card, getDefaultDashboardCardMode(index)),
+        segmentId: inferDashboardCardMode(card, getDefaultDashboardCardMode(index)),
         isEmpty: false,
       };
     }
-    return buildDashboardCardFromPrompt(promptList[index], index);
+    return buildDashboardCardFromPrompt(promptList[index], index, inferDashboardCardMode(card, getDefaultDashboardCardMode(index)));
   });
   const tenantState = getTenantFundDashboardState();
   tenantState.draft = {
+    mode: getDashboardPrimaryMode(cards),
+    segmentId: getDashboardPrimaryMode(cards),
     layout: normalizedLayout,
-    title: buildDashboardTitle(normalizedLayout, promptList),
-    note: buildDashboardNote(promptList),
+    title: buildDashboardTitle(normalizedLayout, promptList, cards),
+    note: buildDashboardNote(promptList, cards),
     cards,
     updatedAt: '刚刚生成',
     publisher: activeUser.name,
@@ -5799,7 +6514,7 @@ async function generateFundDashboard(layout) {
   try {
     await syncTenantDashboardState('save_draft', tenantState.draft);
     renderWorkbenchFundDashboard();
-    showToast(`已生成 ${normalizedLayout.toUpperCase()} 指标面板草稿`);
+    showToast(`已生成混合仪表盘 ${normalizedLayout.toUpperCase()} 草稿`);
   } catch (error) {
     renderWorkbenchFundDashboard();
     showToast('草稿已生成，但同步后端失败');
@@ -6616,6 +7331,7 @@ function renderDemoProfile(user) {
   renderDemoUserSwitchList();
   syncTenantScopedAdvisorViews();
   renderFundMacroDashboard();
+  refreshTenantDashboardRemoteState({ rerenderFeed: true, rerenderWorkbench: true });
   renderWatchlist();
   renderReviewExperience();
   renderKnowledgeExperience();
@@ -8808,16 +9524,27 @@ function syncDmRoleView() {
 
 async function loadDmConversations() {
   syncDmRoleView();
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
   if (isDavDmMode()) {
-    dmConversationsCache = DAV_DM_CONVERSATIONS.slice();
-    renderDmConversations(dmConversationsCache);
-    return;
+    try {
+      const resp = await fetch(`/api/dm/conversations?tenant=${encodeURIComponent(tenantSlug)}`);
+      const data = await resp.json();
+      dmConversationsCache = Array.isArray(data) ? data : DAV_DM_CONVERSATIONS.slice();
+      renderDmConversations(dmConversationsCache);
+      return;
+    } catch (e) {
+      dmConversationsCache = DAV_DM_CONVERSATIONS.slice();
+      renderDmConversations(dmConversationsCache);
+      return;
+    }
   }
   try {
-    dmConversationsCache = [getInvestorDmConversation()];
+    const resp = await fetch(`/api/dm/conversations?tenant=${encodeURIComponent(tenantSlug)}`);
+    const data = await resp.json();
+    dmConversationsCache = Array.isArray(data) && data.length ? data : [getInvestorDmConversation()];
     renderDmConversations(dmConversationsCache);
   } catch (e) {
-    // fallback
     renderDmConversations(getMockDmConversations());
   }
 }
@@ -8884,13 +9611,28 @@ function closeDmChat() {
 async function loadDmMessages(kolId) {
   const container = document.getElementById('dm-messages-container');
   container.innerHTML = '<div style="text-align:center;color:var(--gray-400);font-size:12px;padding:20px">加载中...</div>';
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
   if (isDavDmMode()) {
+    try {
+      const resp = await fetch(`/api/dm/messages/${encodeURIComponent(kolId)}?tenant=${encodeURIComponent(tenantSlug)}`);
+      const data = await resp.json();
+      const list = Array.isArray(data) && data.length ? data : (DAV_DM_MESSAGES[kolId] || [{id:1,sender:'user',content:'你好，想和你交流一下当前市场看法。',time:'刚刚',type:'text'}]);
+      dmCurrentHistory = list.map(m => ({sender:m.sender, content:m.content}));
+      renderDmMessages(list);
+      return;
+    } catch (e) {}
     const data = DAV_DM_MESSAGES[kolId] || [{id:1,sender:'user',content:'你好，想和你交流一下当前市场看法。',time:'刚刚',type:'text'}];
     dmCurrentHistory = data.map(m => ({sender:m.sender, content:m.content}));
     renderDmMessages(data);
     return;
   }
-  const data = getInvestorDmMessages();
+  let data = getInvestorDmMessages();
+  try {
+    const resp = await fetch(`/api/dm/messages/${encodeURIComponent(kolId)}?tenant=${encodeURIComponent(tenantSlug)}`);
+    const payload = await resp.json();
+    if (Array.isArray(payload) && payload.length) data = payload;
+  } catch (e) {}
   dmCurrentHistory = data.map(m => ({sender:m.sender, content:m.content}));
   renderDmMessages(data);
 }
@@ -8935,6 +9677,11 @@ async function sendDm() {
   const input = document.getElementById('dm-input');
   const text = input.value.trim();
   if (!text || !currentDmKol) return;
+  const siteFeatures = (window.SITE_CONFIG && window.SITE_CONFIG.feature_flags) || {};
+  if (!isDavDmMode() && siteFeatures.fan_interaction === false) {
+    showToast('当前租户暂未开放粉丝互动');
+    return;
+  }
   input.value = '';
   const container = document.getElementById('dm-messages-container');
   // Append user msg
@@ -8957,11 +9704,14 @@ async function sendDm() {
     return;
   }
   try {
+    const activeUser = getActiveDemoUser();
+    const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
     const resp = await fetch('/api/dm/send', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({kol_id: currentDmKol.id, content: text, history: dmCurrentHistory})
+      body: JSON.stringify({thread_id: currentDmKol.id, kol_id: currentDmKol.id, tenant_slug: tenantSlug, content: text, history: dmCurrentHistory})
     });
     const data = await resp.json();
+    if (!resp.ok || !data.success) throw new Error((data && data.error) || 'dm_send_failed');
     await new Promise(r=>setTimeout(r, 900));
     typing.remove();
     const reply = document.createElement('div');
@@ -9037,6 +9787,22 @@ document.addEventListener('DOMContentLoaded', () => {
     switchTab(getFirstEnabledTab());
   } else {
     setH5ShellLoggedOut(true);
+  }
+});
+
+window.addEventListener('focus', () => {
+  refreshH5SiteConfig({silent: true});
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    refreshH5SiteConfig({silent: true});
+  }
+});
+
+window.addEventListener('storage', (event) => {
+  if (event.key === SITE_CONFIG_BROADCAST_KEY) {
+    refreshH5SiteConfig({silent: true});
   }
 });
 </script>

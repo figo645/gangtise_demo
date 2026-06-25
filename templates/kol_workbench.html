@@ -479,6 +479,425 @@ body { background: var(--surface-2); color: var(--text-main); }
   font-weight:700;
   margin-top:6px;
 }
+.kw-dashboard-studio {
+  display:grid;
+  grid-template-columns:minmax(0, 1.3fr) minmax(320px, 0.7fr);
+  gap:16px;
+  margin-top:14px;
+}
+.kw-dashboard-main,
+.kw-dashboard-side { display:grid; gap:16px; align-content:start; }
+.kw-dashboard-hero,
+.kw-dashboard-workbench-card {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:18px;
+  box-shadow:0 10px 24px rgba(31,73,125,0.06);
+}
+.kw-dashboard-hero {
+  overflow:hidden;
+  padding:18px;
+  background:
+    radial-gradient(circle at top right, rgba(200,169,110,0.20), transparent 30%),
+    linear-gradient(135deg, #F8FBFF 0%, #FFFFFF 100%);
+}
+.kw-dashboard-hero-title {
+  font-size:22px;
+  line-height:1.4;
+  font-weight:800;
+  color:var(--text-main);
+}
+.kw-dashboard-hero-desc,
+.kw-dashboard-workbench-desc,
+.kw-dashboard-hero-stat-label,
+.kw-dashboard-panel-note,
+.kw-dashboard-public-note {
+  font-size:12px;
+  color:var(--text-sub);
+  line-height:1.8;
+}
+.kw-dashboard-hero-stats {
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:10px;
+  margin-top:16px;
+}
+.kw-dashboard-hero-stat {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  padding:12px;
+}
+.kw-dashboard-hero-stat-value {
+  margin-top:6px;
+  font-size:14px;
+  font-weight:800;
+  color:#1F497D;
+}
+.kw-dashboard-mode-row {
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:10px;
+}
+.kw-dashboard-mode-card,
+.kw-dashboard-template-card,
+.kw-dashboard-strategy-card,
+.kw-dashboard-public-card {
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:16px;
+  padding:14px;
+}
+.kw-dashboard-mode-card {
+  cursor:pointer;
+  transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
+}
+.kw-dashboard-mode-card:hover,
+.kw-dashboard-mode-card.active {
+  transform:translateY(-1px);
+  border-color:rgba(200,169,110,0.24);
+  box-shadow:0 10px 22px rgba(31,73,125,0.08);
+}
+.kw-dashboard-mode-kicker {
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:0.06em;
+  text-transform:uppercase;
+  color:var(--gold);
+}
+.kw-dashboard-mode-title,
+.kw-dashboard-workbench-title,
+.kw-dashboard-template-title,
+.kw-dashboard-strategy-title,
+.kw-dashboard-public-title {
+  font-size:14px;
+  font-weight:800;
+  color:var(--text-main);
+}
+.kw-dashboard-mode-desc,
+.kw-dashboard-template-desc,
+.kw-dashboard-strategy-desc,
+.kw-dashboard-public-copy {
+  margin-top:6px;
+  font-size:12px;
+  color:var(--text-sub);
+  line-height:1.8;
+}
+.kw-dashboard-workbench-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  padding:16px 18px;
+  border-bottom:1px solid rgba(47,116,192,0.08);
+}
+.kw-dashboard-layout-row { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+.kw-dashboard-workbench-card > #kw-dashboard-preview,
+.kw-dashboard-workbench-card > #kw-dashboard-strategy-list,
+.kw-dashboard-workbench-card > #kw-dashboard-config-panel,
+.kw-dashboard-workbench-card > #kw-dashboard-public-preview {
+  padding:16px 18px 18px;
+}
+.kw-dashboard-section-title {
+  font-size:12px;
+  font-weight:800;
+  color:var(--gold);
+  margin-bottom:10px;
+}
+.kw-dashboard-template-grid,
+.kw-dashboard-strategy-list,
+.kw-dashboard-public-list { display:grid; gap:10px; }
+.kw-dashboard-template-card.active {
+  border-color:rgba(200,169,110,0.26);
+  background:rgba(200,169,110,0.08);
+}
+.kw-dashboard-template-meta,
+.kw-dashboard-strategy-meta,
+.kw-dashboard-public-meta {
+  margin-top:8px;
+  font-size:11px;
+  color:#1F497D;
+  line-height:1.7;
+}
+.kw-dashboard-config-grid { display:grid; gap:14px; }
+.kw-dashboard-chip-row { display:flex; gap:8px; flex-wrap:wrap; }
+.kw-dashboard-chip {
+  display:inline-flex;
+  align-items:center;
+  min-height:34px;
+  padding:0 12px;
+  border-radius:999px;
+  border:1px solid rgba(47,116,192,0.12);
+  background:#F8FBFF;
+  color:#1F497D;
+  font-size:11px;
+  font-weight:700;
+  cursor:pointer;
+}
+.kw-dashboard-chip.active {
+  color:var(--gold);
+  border-color:rgba(200,169,110,0.30);
+  background:rgba(200,169,110,0.10);
+}
+.kw-dashboard-input,
+.kw-dashboard-textarea {
+  width:100%;
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:14px;
+  background:#F8FBFF;
+  color:var(--text-main);
+  padding:10px 12px;
+  font-size:12px;
+  font-family:var(--font-main);
+  box-sizing:border-box;
+}
+.kw-dashboard-textarea {
+  min-height:110px;
+  resize:vertical;
+  line-height:1.8;
+}
+.kw-dashboard-public-card {
+  background:linear-gradient(180deg,#FFFFFF 0%, #F8FBFF 100%);
+}
+.kw-dashboard-public-value {
+  margin-top:10px;
+  font-size:24px;
+  font-weight:800;
+  color:var(--gold);
+}
+.kw-dashboard-public-tag {
+  display:inline-flex;
+  align-items:center;
+  margin-top:10px;
+  border-radius:999px;
+  padding:4px 10px;
+  font-size:11px;
+  font-weight:800;
+  color:#1F497D;
+  background:#EAF3FF;
+}
+.kw-dashboard-public-reasons {
+  margin-top:10px;
+  display:grid;
+  gap:6px;
+}
+.kw-dashboard-public-reason {
+  font-size:11px;
+  color:var(--text-sub);
+  line-height:1.7;
+}
+.kw-dashboard-canvas-note {
+  margin-bottom:12px;
+  padding:10px 12px;
+  border-radius:12px;
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  font-size:11px;
+  color:#6B7A90;
+  line-height:1.8;
+}
+.kw-dashboard-logic-note {
+  margin-top:10px;
+  padding:10px 12px;
+  border-radius:12px;
+  background:#FFFDF7;
+  border:1px solid rgba(200,169,110,0.18);
+  font-size:11px;
+  color:#6B7A90;
+  line-height:1.8;
+}
+.kw-dashboard-metric-list {
+  margin-top:8px;
+  display:grid;
+  gap:6px;
+}
+.kw-dashboard-metric-compact {
+  margin-top:8px;
+  font-size:10px;
+  line-height:1.55;
+  color:#5F7084;
+}
+.kw-dashboard-metric-chip {
+  display:block;
+  padding:6px 8px;
+  border-radius:10px;
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  font-size:10px;
+  line-height:1.55;
+  color:#5F7084;
+}
+.kw-dashboard-cell-modal-grid { display:grid; gap:14px; margin-top:14px; }
+.kw-dashboard-cell-summary {
+  padding:12px 14px;
+  border-radius:14px;
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+}
+.kw-dashboard-cell-summary-title {
+  font-size:13px;
+  font-weight:800;
+  color:var(--text-main);
+}
+.kw-dashboard-cell-summary-desc {
+  margin-top:6px;
+  font-size:11px;
+  color:var(--text-sub);
+  line-height:1.8;
+}
+.kw-dashboard-cell-block {
+  padding:14px;
+  border-radius:16px;
+  border:1px solid rgba(47,116,192,0.10);
+  background:#FFFFFF;
+}
+.kw-dashboard-component-library,
+.kw-dashboard-component-list {
+  display:grid;
+  gap:10px;
+}
+.kw-dashboard-component-option,
+.kw-dashboard-component-item {
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  background:#F8FBFF;
+  padding:12px;
+}
+.kw-dashboard-component-option {
+  cursor:pointer;
+  transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
+}
+.kw-dashboard-component-option:hover {
+  transform:translateY(-1px);
+  border-color:rgba(200,169,110,0.24);
+  box-shadow:0 8px 18px rgba(31,73,125,0.08);
+}
+.kw-dashboard-component-option.disabled {
+  opacity:0.45;
+  cursor:not-allowed;
+  box-shadow:none;
+}
+.kw-dashboard-component-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+}
+.kw-dashboard-component-title {
+  font-size:12px;
+  font-weight:800;
+  color:var(--text-main);
+}
+.kw-dashboard-component-meta {
+  margin-top:6px;
+  font-size:11px;
+  color:var(--text-sub);
+  line-height:1.7;
+}
+.kw-dashboard-component-badge {
+  display:inline-flex;
+  align-items:center;
+  padding:4px 8px;
+  border-radius:999px;
+  background:rgba(200,169,110,0.12);
+  color:var(--gold);
+  font-size:10px;
+  font-weight:800;
+}
+.kw-dashboard-component-item.dragging {
+  opacity:0.55;
+  border-style:dashed;
+}
+.kw-dashboard-component-controls {
+  display:grid;
+  grid-template-columns:repeat(4, minmax(0, 1fr));
+  gap:10px;
+  margin-top:10px;
+}
+.kw-dashboard-component-field label {
+  display:block;
+  margin-bottom:6px;
+  font-size:10px;
+  letter-spacing:0.03em;
+  text-transform:uppercase;
+  color:var(--text-sub);
+}
+.kw-dashboard-component-field select,
+.kw-dashboard-component-field input {
+  width:100%;
+  box-sizing:border-box;
+  border:1px solid rgba(47,116,192,0.12);
+  border-radius:10px;
+  background:#FFFFFF;
+  color:var(--text-main);
+  padding:8px 10px;
+  font-size:12px;
+}
+.kw-dashboard-component-actions {
+  display:flex;
+  gap:8px;
+  align-items:flex-end;
+  justify-content:flex-end;
+}
+.kw-dashboard-component-actions button,
+.kw-dashboard-component-option button {
+  white-space:nowrap;
+}
+.kw-dashboard-formula-shell {
+  margin-top:10px;
+  padding:10px 12px;
+  border-radius:12px;
+  background:#FFFDF7;
+  border:1px solid rgba(200,169,110,0.18);
+}
+.kw-dashboard-formula-title {
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:0.04em;
+  text-transform:uppercase;
+  color:var(--gold);
+}
+.kw-dashboard-formula-text {
+  margin-top:6px;
+  font-size:12px;
+  color:var(--text-main);
+  line-height:1.8;
+}
+.kw-dashboard-source-row {
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:10px;
+}
+.kw-dashboard-source-chip {
+  display:inline-flex;
+  align-items:center;
+  min-height:28px;
+  padding:0 10px;
+  border-radius:999px;
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+  color:#1F497D;
+  font-size:11px;
+  font-weight:700;
+}
+.kw-dashboard-cell-inline-meta {
+  margin-top:10px;
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.kw-dashboard-cell-inline-meta .kw-prompt-chip {
+  max-width:100%;
+}
+@media (max-width: 1180px) {
+  .kw-dashboard-studio { grid-template-columns:1fr; }
+}
+@media (max-width: 860px) {
+  .kw-dashboard-hero-stats,
+  .kw-dashboard-mode-row { grid-template-columns:1fr; }
+  .kw-dashboard-component-controls { grid-template-columns:1fr 1fr; }
+}
 .toast {
   position: fixed;
   left: 50%;
@@ -1991,7 +2410,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         <div class="admin-nav-item" data-section="fans" data-feature="user_module" onclick="showWorkbenchSection('fans', this)">
           <span class="admin-nav-icon">&#128101;</span> 粉丝管理
         </div>
-        <div class="admin-nav-item" data-section="messages" data-feature="dm" onclick="showWorkbenchSection('messages', this)">
+        <div class="admin-nav-item" data-section="messages" data-feature="fan_interaction" onclick="showWorkbenchSection('messages', this)">
           <span class="admin-nav-icon">&#9993;</span> 粉丝消息
         </div>
         <div class="admin-nav-item" data-section="broadcast" data-feature="dm" onclick="showWorkbenchSection('broadcast', this)">
@@ -2020,11 +2439,9 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         <div class="admin-nav-item" data-section="knowledge" data-feature="knowledge" onclick="showWorkbenchSection('knowledge', this)">
           <span class="admin-nav-icon">&#128214;</span> 知识库微调
         </div>
-        {% if site_config.feature_flags.hermes %}
         <div class="admin-nav-item" data-section="hermes" data-feature="hermes" onclick="showWorkbenchSection('hermes', this)">
           <span class="admin-nav-icon">&#129438;</span> Hermes 工作台
         </div>
-        {% endif %}
         </div>
       </div>
       <div class="admin-nav-group" data-nav-group="market">
@@ -2624,57 +3041,72 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <div class="kw-card-head">
             <div>
               <div class="kw-card-title">复盘生产台</div>
-              <div class="kw-card-desc">复盘由大V发起和确认。材料来自语音口述、手动撰写和文件上传三类入口；语音和文件会先转成文案，手动撰写提供富文本手写区。用户确认本次纳入复盘的自选股后，可选择自定义文案或智能文案，先生成草稿预览，再确认发布。</div>
+              <div class="kw-card-desc">复盘流程改成同页完成：先挑选智能仪表盘卡片，再录入大V自己的语音 / 文件 / URL / 手写内容，之后按“输入润色”与“完整成稿”两阶段调用大模型，最后人工修改确认后发布成快照给粉丝。</div>
             </div>
             <span class="kw-tag">Review Studio</span>
           </div>
-          <div class="kw-review-source-grid">
-            {% for item in workbench.review_studio.sources %}
-            <div class="kw-review-source" onclick="kwOpenReviewTriggerModal('{{ item.mode if item.mode else ['voice','manual','file'][loop.index0] }}')">
-              <div class="kw-review-source-icon">{{ item.icon }}</div>
-              <div class="kw-review-source-title">{{ item.label }}</div>
-              <div class="kw-review-source-desc">{{ item.desc }}</div>
+          <div id="kw-review-flow-nav" class="kw-review-flow-nav"></div>
+          <div class="kw-review-studio-layout">
+            <div class="kw-review-studio-main">
+              <div class="kw-review-studio-panel">
+                <div class="kw-review-studio-panel-head">
+                  <div>
+                    <div class="kw-review-studio-panel-title">智能仪表盘卡片</div>
+                    <div class="kw-review-studio-panel-desc">所有基础信息都从这里选。卡片支持像手机组件一样用 `+` 添加，每张卡片都能展开查看数据来源、新闻来源和可调整提示词。</div>
+                  </div>
+                  <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="kwOpenReviewCardPicker(0)">添加卡片</button>
+                </div>
+                <div id="kw-review-card-slot-grid" class="kw-review-card-slot-grid"></div>
+                <div id="kw-review-card-detail-list" class="kw-review-card-detail-list"></div>
+              </div>
+              <div class="kw-review-studio-panel">
+                <div class="kw-review-studio-panel-head">
+                  <div>
+                    <div class="kw-review-studio-panel-title">个人内容录入</div>
+                    <div class="kw-review-studio-panel-desc">支持语音口述、文件抽取、网页 URL 抓取和手动撰写四类入口。这里录入的是大V自己的原始内容。</div>
+                  </div>
+                </div>
+                <div id="kw-review-input-mode-row" class="kw-review-input-mode-row"></div>
+                <div id="kw-review-intake-workspace"></div>
+              </div>
+              <div class="kw-review-studio-panel">
+                <div class="kw-review-studio-panel-head">
+                  <div>
+                    <div class="kw-review-studio-panel-title">两阶段生成</div>
+                    <div class="kw-review-studio-panel-desc">阶段 1 可选做“输入润色”；阶段 2 基于用户输入 + 智能仪表盘卡片生成完整复盘草稿。整个过程中会实时展示模型进度和日志。</div>
+                  </div>
+                </div>
+                <div id="kw-review-stage-actions" class="kw-review-stage-actions"></div>
+                <div id="kw-review-progress-host"></div>
+                <div id="kw-review-stage-results" class="kw-review-stage-results"></div>
+              </div>
             </div>
-            {% endfor %}
-          </div>
-          <div class="kw-review-flow" style="margin-top:12px">
-            {% for step in workbench.review_studio.default_flow %}
-            <span class="kw-review-flow-step">{{ step }}</span>
-            {% endfor %}
-          </div>
-          <div class="kw-watch-chip-row" style="margin-top:12px">
-            {% for item in workbench.review_studio.periods %}
-            <span class="kw-mode-chip">{{ item }}</span>
-            {% endfor %}
-          </div>
-          <div class="kw-mini-grid" style="margin-top:12px">
-            {% for item in workbench.review_studio.paragraph_modes %}
-            <div class="kw-mini-card">
-              <div class="kw-mini-title">{{ item.label }}</div>
-              <div class="kw-mini-desc">{{ item.desc }}</div>
+            <div class="kw-review-studio-side">
+              <div class="kw-review-studio-panel">
+                <div class="kw-review-studio-panel-title">当前运行态</div>
+                <div class="kw-review-studio-panel-desc">这里会同步显示当前周期、输入来源、卡片选择和最近一次生成状态。</div>
+                <div id="kw-review-runtime-panel" class="kw-review-runtime-list"></div>
+              </div>
+              <div class="kw-review-studio-panel">
+                <div class="kw-review-studio-panel-title">发布前编辑</div>
+                <div class="kw-review-studio-panel-desc">最终文案会在这里生成可编辑快照。大V可以继续人工修改，再决定是否发布。</div>
+                <textarea id="kw-review-final-editor" class="kw-review-final-editor" placeholder="完成“完整成稿”后，这里会出现可编辑的最终复盘正文。"></textarea>
+                <div class="kw-review-stage-actions" style="margin-top:12px">
+                  <button class="btn-outline" type="button" onclick="kwUseCurrentReviewDraftAsFinal()">使用当前结果</button>
+                  <button class="btn-gold" type="button" onclick="kwPublishReviewDraft()">发布给粉丝</button>
+                </div>
+              </div>
+              <div class="kw-review-studio-panel">
+                <div class="kw-review-studio-panel-title">白盒提示词查看</div>
+                <div class="kw-review-studio-panel-desc">复盘阶段提示词由 Admin 统一配置。这里默认只读展示，便于监督当前系统到底按什么逻辑生成。</div>
+                <div id="kw-review-whitebox-panel" class="kw-review-whitebox-panel"></div>
+              </div>
+              <div class="kw-review-studio-panel">
+                <div class="kw-review-published-title">最近一次发布</div>
+                <div class="kw-review-published-desc">这里展示刚刚确认发布后，前台粉丝实际会看到的复盘摘要。</div>
+                <div id="kw-review-latest-published" class="kw-review-runtime-list"></div>
+              </div>
             </div>
-            {% endfor %}
-          </div>
-          <div class="kw-watch-chip-row" style="margin-top:12px">
-            {% for item in workbench.review_studio.watchlist_focus %}
-            <span class="kw-watch-chip">{{ item }}</span>
-            {% endfor %}
-          </div>
-          <div class="kw-review-runtime-grid">
-            <div class="kw-review-runtime-card">
-              <div class="kw-review-runtime-title">当前运行态</div>
-              <div class="kw-review-runtime-desc">保持和前台 H5 同一套三类输入、智能文案规则、草稿预览和确认发布流程。</div>
-              <div id="kw-review-runtime-panel" class="kw-review-runtime-list"></div>
-            </div>
-            <div class="kw-review-published-card">
-              <div class="kw-review-published-title">最近一次发布</div>
-              <div class="kw-review-published-desc">这里展示刚刚确认发布后，前台粉丝实际会看到的复盘摘要。</div>
-              <div id="kw-review-latest-published" class="kw-review-runtime-list"></div>
-            </div>
-          </div>
-          <div class="kw-toolbar" style="margin-top:12px">
-            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="kwOpenReviewTriggerModal()">发起新复盘</button>
-            <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="kwOpenReviewTriggerModal('stocks')">确认本次复盘自选股</button>
           </div>
         </div>
       </div>
@@ -2841,7 +3273,6 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         </div>
       </div>
 
-      {% if site_config.feature_flags.hermes %}
       <div id="workbench-section-hermes" style="display:none">
         <div class="kw-card">
           <div class="kw-card-head">
@@ -2879,7 +3310,6 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           </div>
         </div>
       </div>
-      {% endif %}
 
       <div id="workbench-section-watchlist" style="display:none">
         <div class="kw-card">
@@ -2928,21 +3358,81 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <div class="kw-card-head">
             <div>
               <div class="kw-card-title">智能 Dashboard</div>
-              <div class="kw-card-desc">这里是智能化定义模式，不是门户装修。你用提示词、布局和指标逻辑去定义面板，系统再自动生成并发布到前台的基本面区域。</div>
+              <div class="kw-card-desc">MVP 先收口成三段信号视图：市场状态卡、行业景气卡、信号个股卡。下面统一改成 2 列多行的极简格子风格，先验证大V在手机端的内容生产体验。</div>
             </div>
             <span class="kw-tag" id="kw-dashboard-layout-tag">{{ workbench.fund_dashboard.layout }}</span>
           </div>
-          <div class="kw-toolbar" style="margin-top:12px;justify-content:space-between;gap:12px;flex-wrap:wrap">
-            <div id="kw-dashboard-meta" class="kw-side-note">当前展示已发布版本。</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button class="btn-outline" style="padding:9px 14px;font-size:12px" type="button" onclick="kwGenerateFundDashboard('2x2')">生成 2x2</button>
-              <button class="btn-outline" style="padding:9px 14px;font-size:12px" type="button" onclick="kwGenerateFundDashboard('3x3')">生成 3x3</button>
-              <button class="btn-outline" style="padding:9px 14px;font-size:12px" type="button" onclick="kwGenerateFundDashboard('4x4')">生成 4x4</button>
-              <button class="btn-gold" style="padding:9px 14px;font-size:12px" type="button" onclick="kwPublishFundDashboard()">发布到前台</button>
-              <button class="btn-outline" style="padding:9px 14px;font-size:12px" type="button" onclick="kwResetFundDashboardDraft()">恢复发布版</button>
+          <div class="kw-dashboard-studio">
+            <div class="kw-dashboard-main">
+              <div class="kw-dashboard-hero">
+                <div class="kw-dashboard-hero-copy">
+                  <div class="kw-dashboard-hero-title">先选三段信号，再决定今天用多少格子表达</div>
+                  <div class="kw-dashboard-hero-desc">先把基本面判断拆成市场、行业、信号个股三层。上面决定你今天看哪一层，下面继续用极简格子展示结果，避免页面太重、信息结构太散。</div>
+                </div>
+                <div class="kw-dashboard-hero-stats">
+                  <div class="kw-dashboard-hero-stat">
+                    <div class="kw-dashboard-hero-stat-label">信号层级</div>
+                    <div class="kw-dashboard-hero-stat-value">市场 / 行业 / 个股</div>
+                  </div>
+                  <div class="kw-dashboard-hero-stat">
+                    <div class="kw-dashboard-hero-stat-label">展示风格</div>
+                    <div class="kw-dashboard-hero-stat-value">2列2行 / 2列3行 / 2列4行 / 2列5行</div>
+                  </div>
+                  <div class="kw-dashboard-hero-stat">
+                    <div class="kw-dashboard-hero-stat-label">粉丝端口径</div>
+                    <div class="kw-dashboard-hero-stat-value">只展示算法结果</div>
+                  </div>
+                </div>
+              </div>
+              <div id="kw-dashboard-mode-row" class="kw-dashboard-mode-row"></div>
+              <div class="kw-dashboard-workbench-card">
+                <div class="kw-dashboard-workbench-head">
+                  <div>
+                    <div class="kw-dashboard-workbench-title">结果画布</div>
+                    <div id="kw-dashboard-meta" class="kw-dashboard-workbench-desc">当前展示已发布版本。</div>
+                  </div>
+                  <div class="kw-dashboard-layout-row">
+                    <button class="btn-outline" style="padding:9px 14px;font-size:12px" type="button" onclick="kwGenerateFundDashboard('2x2')">生成 2列2行</button>
+                    <button class="btn-outline" style="padding:9px 14px;font-size:12px" type="button" onclick="kwGenerateFundDashboard('2x3')">生成 2列3行</button>
+                    <button class="btn-outline" style="padding:9px 14px;font-size:12px" type="button" onclick="kwGenerateFundDashboard('2x4')">生成 2列4行</button>
+                    <button class="btn-outline" style="padding:9px 14px;font-size:12px" type="button" onclick="kwGenerateFundDashboard('2x5')">生成 2列5行</button>
+                    <button class="btn-gold" style="padding:9px 14px;font-size:12px" type="button" onclick="kwPublishFundDashboard()">发布到前台</button>
+                    <button class="btn-outline" style="padding:9px 14px;font-size:12px" type="button" onclick="kwResetFundDashboardDraft()">恢复发布版</button>
+                  </div>
+                </div>
+                <div id="kw-dashboard-preview" style="margin-top:14px"></div>
+              </div>
+              <div class="kw-dashboard-workbench-card">
+                <div class="kw-dashboard-workbench-head">
+                  <div>
+                    <div class="kw-dashboard-workbench-title">组合逻辑预览</div>
+                    <div class="kw-dashboard-workbench-desc">这里先用 demo 方式展示这层信号会调用哪些数据源、会怎么组合，以及最后向粉丝解释什么。</div>
+                  </div>
+                </div>
+                <div id="kw-dashboard-strategy-list" class="kw-dashboard-strategy-list"></div>
+              </div>
+            </div>
+            <div class="kw-dashboard-side">
+              <div class="kw-dashboard-workbench-card">
+                <div class="kw-dashboard-workbench-head">
+                  <div>
+                    <div class="kw-dashboard-workbench-title">配置面板</div>
+                    <div class="kw-dashboard-workbench-desc">右侧先看当前层的重点信号和推荐组合；真正的单格微调放到格子弹框里完成，可以直接看到组件、公式、数据源并拖拽排序。</div>
+                  </div>
+                </div>
+                <div id="kw-dashboard-config-panel"></div>
+              </div>
+              <div class="kw-dashboard-workbench-card">
+                <div class="kw-dashboard-workbench-head">
+                  <div>
+                    <div class="kw-dashboard-workbench-title">粉丝端看到的结果</div>
+                    <div class="kw-dashboard-workbench-desc">对粉丝仍然只展示判断结果，不展示后台是怎样切市场、行业和个股信号的。</div>
+                  </div>
+                </div>
+                <div id="kw-dashboard-public-preview"></div>
+              </div>
             </div>
           </div>
-          <div id="kw-dashboard-preview" style="margin-top:12px"></div>
         </div>
       </div>
 
@@ -3291,10 +3781,127 @@ let kwFundDashboardState = JSON.parse(JSON.stringify((window.WORKBENCH_DATA && w
 let kwDashboardCellEditingIndex = -1;
 let kwDashboardCurrentLayout = '2x2';
 let kwDashboardCurrentCards = [];
+let kwDashboardCellDraftMode = 'market';
+let kwDashboardCellDraftComponents = [];
+let kwDashboardCellDraftPrompt = '';
+let kwDashboardCellDragIndex = -1;
+const KW_DASHBOARD_MODES = [
+  {
+    id: 'market',
+    kicker: 'Macro',
+    title: '市场进攻意愿卡',
+    desc: '回答今天资金是在追高弹性方向，还是转向防守资产。',
+    focus: '先回答今天市场整体更偏进攻还是防守，再拆证据。',
+    question: '今天市场是在追逐高弹性方向，还是更偏向防守？',
+    scope: '适用范围：A股全市场',
+    tags: ['上涨/下跌家数', '北向/南向资金', '主线成交占比', '防御风格超额', '站上MA20占比'],
+    outputs: ['偏进攻 / 中性 / 偏防守', '总分', '一句解释'],
+    prompt: '请回答今天市场是在追逐高弹性方向，还是更偏向防守，并说明广度、资金回流、主线参与和防御压力各自的证据。',
+    sources: ['上涨/下跌家数、站上MA20占比、新高/新低差', '北向/南向净流入强度与连续性', '主线行业成交占比、5日变化、拥挤度', '银行/红利相对成长超额收益、低波ETF净流入'],
+    formula: '总分 = 35%广度改善分 + 25%资金回流分 + 25%主线参与分 - 15%防御压力分',
+    scoreMethod: '先把各因子标准化为 0-100 分，再按权重合成；防御因子作为扣分项。',
+    factorRules: ['广度改善分 = 40%上涨/下跌家数 + 35%站上MA20占比 + 25%新高-新低差', '资金回流分 = 50%净流入占成交比 + 30%3日累计净流入 + 20%连续净流入天数', '主线参与分 = 45%主线成交占比 + 35%5日变化 + 20%拥挤度惩罚', '防御压力分 = 50%银行/红利相对成长超额 + 30%高股息超额 + 20%低波ETF净流入'],
+    thresholds: ['>=70 偏进攻', '55-69 中性偏进攻', '45-54 中性', '30-44 中性偏防守', '<30 偏防守'],
+    fanNote: '粉丝看到的是今天的大盘环境判断，不是后台的算法步骤。',
+    cards: [
+      { name: '市场进攻意愿', value: '偏进攻', assessment: '高弹性方向承接更顺，说明今天资金更愿意做进攻而不是回避风险。', status: 'normal', prompt: '回答今天市场是在追逐高弹性方向，还是更偏向防守。' },
+      { name: '资金回流强度', value: '回暖', assessment: '北向与南向的回流强度都在修复，但还没到全面扩散。', status: 'normal', prompt: '回答北向和南向资金是否真的在回流，而不只看单日净流入。' },
+      { name: '主线参与度', value: '提升', assessment: '主线行业成交占比提升，说明市场正在围绕少数方向形成共识。', status: 'attention', prompt: '回答主线成交占比是在改善，还是只是局部抱团。' },
+      { name: '防御压力', value: '下降', assessment: '银行、红利和低波方向相对走弱，说明防守需求正在回落。', status: 'normal', prompt: '回答防御风格是否在走强，并把它作为扣分项处理。' },
+      { name: '广度扩散', value: '扩散', assessment: '上涨不再只集中在抱团龙头，市场广度在改善。', status: 'normal', prompt: '回答上涨扩散是在改善还是收缩。' },
+      { name: '风格切换', value: '成长占优', assessment: '成长方向相对红利和防御更强，说明短线愿意承担更多波动。', status: 'attention', prompt: '回答成长相对防御是不是更强。' },
+      { name: '波动承受度', value: '可控', assessment: '市场能接受一定波动，说明今天不是纯粹的避险交易。', status: 'attention', prompt: '回答市场是否还能承受波动，而不是完全回避风险。' },
+      { name: '主线拥挤度', value: '中性', assessment: '主线聚焦但还没拥挤到极端，说明进攻意愿并未失真。', status: 'normal', prompt: '回答主线是否已经过度拥挤。' },
+    ],
+  },
+  {
+    id: 'industry',
+    kicker: 'Industry',
+    title: '行业景气验证卡',
+    desc: '回答这条主线是不是基本面在继续验证，而不只是消息热度高。',
+    focus: '先回答这条主线是不是基本面继续验证，再展开行业判断。',
+    question: '这条主线是基本面继续验证，还是只有情绪热度？',
+    scope: '适用范围：单一行业 / 单一主题链条',
+    tags: ['新增订单同比', '产品价格指数', '库存天数', '政策落地级别', 'Capex指引'],
+    outputs: ['景气上行 / 中性 / 转弱', '总分', '一句解释'],
+    prompt: '请回答这条主线是基本面继续验证，还是只有情绪热度，并说明订单、价格、库存、政策和资本开支的证据。',
+    sources: ['新增订单同比、在手订单覆盖、开工率', '产品价格指数、价差、提价持续性', '库存天数、主动/被动补库、去库斜率', '政策热度、落地级别、持续性', 'Capex指引、扩产计划、设备招标'],
+    formula: '总分 = 30%订单景气分 + 25%价格景气分 + 20%库存去化分 + 15%政策催化分 + 10%资本开支确认分',
+    scoreMethod: '订单和价格权重更高，因为它们更接近真实需求；所有因子先统一成 0-100 分。',
+    factorRules: ['订单景气分 = 新增订单同比 + 在手订单覆盖 + 开工率', '价格景气分 = 产品价格指数 + 价差 + 提价持续性', '库存去化分 = 库存天数 + 去库斜率 + 主动/被动补库状态', '政策催化分 = 政策热度 + 落地级别 + 持续性', '资本开支确认分 = Capex指引 + 扩产计划 + 设备招标进展'],
+    thresholds: ['>=70 景气上行', '55-69 景气验证中', '45-54 中性观察', '30-44 景气转弱', '<30 仅剩情绪热度'],
+    fanNote: '粉丝看到的是这条主线当前景气程度，而不是后台拆解的维度列表。',
+    cards: [
+      { name: '行业景气验证', value: '成立', assessment: '订单、价格和库存三项已经形成同向验证，不只是消息面在推动。', status: 'normal', prompt: '回答这条主线是不是基本面继续验证，而不是只有情绪热度。' },
+      { name: '订单景气分', value: '改善', assessment: '新增订单和在手覆盖都有修复，说明需求不是纯预期。', status: 'normal', prompt: '回答订单景气是否开始改善。' },
+      { name: '价格景气分', value: '温和上行', assessment: '价格信号不算爆发，但已经脱离最弱区间。', status: 'attention', prompt: '回答价格端是否真的在验证景气。' },
+      { name: '库存去化分', value: '去化中', assessment: '库存压力开始释放，对利润率形成正向支撑。', status: 'normal', prompt: '回答库存是否进入健康区间。' },
+      { name: '政策催化分', value: '持续', assessment: '政策与新闻催化仍在，为行业预期提供外部支撑。', status: 'attention', prompt: '回答政策催化是否还具备延续性。' },
+      { name: '资本开支确认分', value: '恢复', assessment: '扩产和招标计划在恢复，说明企业端判断更积极。', status: 'normal', prompt: '回答资本开支是否同步恢复。' },
+      { name: '竞争格局', value: '稳定', assessment: '价格竞争暂未恶化，行业利润修复更容易兑现。', status: 'attention', prompt: '回答竞争格局是否在扰动景气。' },
+      { name: '上下游传导', value: '顺畅', assessment: '上游到下游传导关系改善，说明景气不只停留在局部。', status: 'normal', prompt: '回答景气是否在产业链中传导。' },
+    ],
+  },
+  {
+    id: 'signal-stock',
+    kicker: 'Signal Stock',
+    title: '主线信号个股卡',
+    desc: '不是给粉丝推票，而是用关键个股去验证更大的行业或主题判断。',
+    focus: '先回答这只个股还能不能继续当主线信号，再谈个股层表达。',
+    question: '哪些个股还在验证主线，哪些已经开始掉队？',
+    scope: '适用范围：单个行业龙头 / 主线代表个股',
+    tags: ['相对行业超额收益', '业绩兑现率', '回调承接', 'PE/PS分位', '尾盘净流入'],
+    outputs: ['强验证 / 可跟踪 / 已掉队', '总分', '一句解释'],
+    prompt: '请回答哪些个股还在验证主线，哪些开始掉队，并说明强度、业绩、承接和估值证据。',
+    sources: ['相对行业超额收益、回撤控制、成交额排名', '营收/利润兑现率、指引上修、订单兑现', '回调缩量、尾盘净流入、换手承接', 'PE/PS分位、PEG、相对历史分位'],
+    formula: '总分 = 35%龙头强度分 + 30%业绩兑现分 + 20%资金承接分 + 15%估值安全分',
+    scoreMethod: '龙头强度和业绩兑现权重更高，因为它们决定这只个股是否还有资格当主线信号。',
+    factorRules: ['龙头强度分 = 相对行业超额收益 + 回撤控制 + 成交额排名', '业绩兑现分 = 营收/利润兑现率 + 指引上修 + 订单兑现', '资金承接分 = 回调缩量 + 尾盘净流入 + 换手承接', '估值安全分 = PE/PS分位 + PEG + 相对历史分位'],
+    thresholds: ['>=70 强验证个股', '55-69 可继续跟踪', '45-54 中性观察', '30-44 信号转弱', '<30 已掉队'],
+    fanNote: '粉丝看到的是“哪些个股在验证主线”，不是后台如何计算验证分数。',
+    cards: [
+      { name: '主线信号个股', value: '强验证', assessment: '这类个股仍在验证主线，没有从高频强势转成纯情绪脉冲。', status: 'normal', prompt: '回答这只个股还能不能继续当主线信号。' },
+      { name: '龙头强度分', value: '突出', assessment: '龙头股仍有相对强度，说明主线没有完全瓦解。', status: 'normal', prompt: '回答龙头个股是否仍在带动板块。' },
+      { name: '业绩兑现分', value: '待验证', assessment: '业绩兑现仍是关键变量，适合继续跟踪而非重仓叙事。', status: 'warning', prompt: '回答业绩兑现是否跟得上预期。' },
+      { name: '资金承接分', value: '稳定', assessment: '回调时资金承接尚可，说明并非纯情绪脉冲。', status: 'normal', prompt: '回答回调时是否有资金承接。' },
+      { name: '估值安全分', value: '可接受', assessment: '估值不算便宜，但仍未透支全部中期预期。', status: 'attention', prompt: '回答当前估值是否还能支持作为主线信号。' },
+      { name: '催化窗口', value: '存在', assessment: '近期存在可验证催化，适合做信号跟踪。', status: 'attention', prompt: '回答近期是否存在明确催化。' },
+      { name: '相对行业', value: '领先', assessment: '个股相对行业更强，说明它更适合作为前瞻信号。', status: 'normal', prompt: '回答个股相对行业是否领先。' },
+      { name: '风险边界', value: '需盯住', assessment: '若高频催化落空，这类个股回撤速度也会更快。', status: 'warning', prompt: '回答当前最需要盯住的个股风险。' },
+    ],
+  },
+];
+let kwDashboardStudioState = {
+  mode: 'market',
+  tags: ['上涨/下跌家数', '北向/南向资金', '主线成交占比'],
+  outputs: ['偏进攻 / 中性 / 偏防守', '总分', '一句解释'],
+  promptText: '请回答今天市场是在追逐高弹性方向，还是更偏向防守，并说明广度、资金回流、主线参与和防御压力各自的证据。',
+};
 
 function isWorkbenchFeatureEnabled(featureName) {
   const flags = (window.SITE_CONFIG && window.SITE_CONFIG.feature_flags) || {};
   return flags[featureName] !== false;
+}
+
+const SITE_CONFIG_BROADCAST_KEY = 'gangtise-site-config-updated-at';
+
+async function refreshWorkbenchSiteConfig(options = {}) {
+  try {
+    const res = await fetch('/api/site-config', {cache: 'no-store'});
+    if (!res.ok) throw new Error('load_site_config_failed');
+    const data = await res.json();
+    if (!data || typeof data !== 'object') throw new Error('invalid_site_config');
+    window.SITE_CONFIG = data;
+    refreshWorkbenchNavVisibility();
+    const activeSection = new URLSearchParams(window.location.search).get('section') || 'overview';
+    if (activeSection && !document.querySelector(`.admin-nav-item[data-section="${activeSection}"]`) && activeSection !== 'overview') {
+      showWorkbenchSection('overview');
+    }
+  } catch (error) {
+    if (!options.silent) {
+      showToast('工作台功能配置刷新失败');
+    }
+  }
 }
 
 function refreshWorkbenchNavVisibility() {
@@ -3399,14 +4006,128 @@ function renderWorkbenchTrendChart(hostId, items) {
 }
 
 function kwNormalizeDashboardLayout(layout) {
-  if (layout === '3x3' || layout === '4x4' || layout === '2x2') return layout;
+  if (layout === '3x3') return '2x3';
+  if (layout === '4x4') return '2x4';
+  if (layout === '2x2' || layout === '2x3' || layout === '2x4' || layout === '2x5') return layout;
   return '2x2';
 }
 
 function kwGetDashboardCardTarget(layout) {
-  if (layout === '3x3') return 6;
-  if (layout === '4x4') return 8;
+  if (layout === '2x3') return 6;
+  if (layout === '2x4') return 8;
+  if (layout === '2x5') return 10;
   return 4;
+}
+
+function kwGetDashboardComponentLibrary(mode) {
+  const resolvedMode = String(mode || '').trim() || 'market';
+  const libraries = {
+    market: [
+      { id: 'market_breadth', label: '广度改善分', source: '全市场行情库', metric: '上涨/下跌家数、站上MA20占比、新高-新低差', window: '1D', aggregation: '0-100评分', defaultWeight: 0.35, defaultOperator: 'base', defaultSelected: true },
+      { id: 'northbound_flow', label: '资金回流分', source: '北向/南向资金库', metric: '净流入占成交比、3日累计、连续净流入天数', window: '1D / 3D', aggregation: '0-100评分', defaultWeight: 0.25, defaultOperator: '+', defaultSelected: true },
+      { id: 'turnover_structure', label: '主线参与分', source: '成交结构库', metric: '主线成交占比、5日变化、拥挤度惩罚', window: '1D / 5D', aggregation: '0-100评分', defaultWeight: 0.25, defaultOperator: '+', defaultSelected: true },
+      { id: 'style_rotation', label: '防御压力分', source: '风格因子库', metric: '银行/红利相对成长超额、低波ETF净流入', window: '1D / 5D', aggregation: '0-100评分', defaultWeight: 0.15, defaultOperator: '-', defaultSelected: true },
+      { id: 'policy_heat', label: '政策温度参考分', source: '政策新闻流', metric: '宏观政策热度与边际变化', window: '3D', aggregation: '辅助评分', defaultWeight: 0.1, defaultOperator: '+', defaultSelected: false },
+    ],
+    industry: [
+      { id: 'industry_orders', label: '订单景气分', source: '行业指标库', metric: '新增订单同比、在手订单覆盖、开工率', window: '1W / 1M', aggregation: '0-100评分', defaultWeight: 0.3, defaultOperator: 'base', defaultSelected: true },
+      { id: 'industry_price', label: '价格景气分', source: '产业链价格库', metric: '产品价格指数、价差、提价持续性', window: '1W / 1M', aggregation: '0-100评分', defaultWeight: 0.25, defaultOperator: '+', defaultSelected: true },
+      { id: 'industry_inventory', label: '库存去化分', source: '行业库存库', metric: '库存天数、主动/被动补库、去库斜率', window: '1M', aggregation: '0-100评分', defaultWeight: 0.2, defaultOperator: '+', defaultSelected: true },
+      { id: 'industry_policy', label: '政策催化分', source: '行业新闻流', metric: '政策热度、落地级别、持续性', window: '5D / 20D', aggregation: '0-100评分', defaultWeight: 0.15, defaultOperator: '+', defaultSelected: true },
+      { id: 'industry_capex', label: '资本开支确认分', source: '财报与经营数据', metric: 'Capex指引、扩产计划、设备招标', window: '1Q', aggregation: '0-100评分', defaultWeight: 0.1, defaultOperator: '+', defaultSelected: true },
+    ],
+    'signal-stock': [
+      { id: 'leader_strength', label: '龙头强度分', source: '个股行情库', metric: '相对行业超额收益、回撤控制、成交额排名', window: '5D / 20D', aggregation: '0-100评分', defaultWeight: 0.35, defaultOperator: 'base', defaultSelected: true },
+      { id: 'earnings_delivery', label: '业绩兑现分', source: '财报与预期库', metric: '营收/利润兑现率、指引上修、订单兑现', window: '1Q', aggregation: '0-100评分', defaultWeight: 0.3, defaultOperator: '+', defaultSelected: true },
+      { id: 'support_flow', label: '资金承接分', source: '盘口与成交数据', metric: '回调缩量、尾盘净流入、换手承接', window: '3D / 5D', aggregation: '0-100评分', defaultWeight: 0.2, defaultOperator: '+', defaultSelected: true },
+      { id: 'valuation_band', label: '估值安全分', source: '估值与财报库', metric: 'PE/PS分位、PEG、相对历史分位', window: '1Q / 3Y', aggregation: '0-100评分', defaultWeight: 0.15, defaultOperator: '+', defaultSelected: true },
+      { id: 'catalyst_window', label: '催化窗口参考分', source: '公司新闻流', metric: '新品、财报、订单公告、政策催化时点', window: '10D / 30D', aggregation: '辅助评分', defaultWeight: 0.1, defaultOperator: '+', defaultSelected: false },
+    ],
+  };
+  return JSON.parse(JSON.stringify(libraries[resolvedMode] || libraries.market));
+}
+
+function kwBuildDefaultDashboardComponents(mode) {
+  return kwGetDashboardComponentLibrary(mode).filter(item => item.defaultSelected !== false).slice(0, 5).map((item, index) => ({
+    id: item.id,
+    label: item.label,
+    source: item.source,
+    metric: item.metric,
+    window: item.window,
+    aggregation: item.aggregation,
+    weight: item.defaultWeight,
+    operator: item.defaultOperator || (index === 0 ? 'base' : '+'),
+  }));
+}
+
+function kwNormalizeDashboardComponents(components, mode) {
+  const library = kwGetDashboardComponentLibrary(mode);
+  const libraryMap = Object.fromEntries(library.map(item => [item.id, item]));
+  const rawList = Array.isArray(components) && components.length ? components : kwBuildDefaultDashboardComponents(mode);
+  return rawList.slice(0, 6).map((item, index) => {
+    const raw = item && typeof item === 'object' ? item : {};
+    const template = libraryMap[raw.id || raw.componentId] || library[Math.min(index, library.length - 1)];
+    const nextWeight = Number(raw.weight);
+    return {
+      id: template.id,
+      label: String(raw.label || template.label || '').trim() || template.label,
+      source: String(raw.source || template.source || '').trim() || template.source,
+      metric: String(raw.metric || template.metric || '').trim() || template.metric,
+      window: String(raw.window || template.window || '').trim() || template.window,
+      aggregation: String(raw.aggregation || template.aggregation || '').trim() || template.aggregation,
+      weight: Number.isFinite(nextWeight) ? Number(nextWeight.toFixed(2)) : template.defaultWeight,
+      operator: index === 0 ? 'base' : (String(raw.operator || template.defaultOperator || '+').trim() || '+'),
+    };
+  });
+}
+
+function kwBuildDashboardFormulaText(mode, components) {
+  const list = Array.isArray(components) ? components : [];
+  const fallback = kwGetDashboardSegmentConfig(mode).formula || '';
+  if (!list.length) return fallback;
+  return list.map((item, index) => {
+    const weightText = Math.abs(Number(item.weight || 1) - 1) < 0.01 ? '' : ` x ${Number(item.weight || 1)}`;
+    const prefix = index > 0 && item.operator && item.operator !== 'base' ? ` ${item.operator} ` : '';
+    return `${prefix}${item.label || `组件 ${index + 1}`}${weightText}`;
+  }).join('').trim() || fallback;
+}
+
+function kwBuildDashboardSourceList(mode, components, explicitSources) {
+  const deduped = [];
+  const pushSource = (source) => {
+    const text = String(source || '').trim();
+    if (text && !deduped.includes(text)) deduped.push(text);
+  };
+  (Array.isArray(explicitSources) ? explicitSources : []).forEach(pushSource);
+  (Array.isArray(components) ? components : []).forEach(item => pushSource(item.source));
+  if (!deduped.length) {
+    kwGetDashboardComponentLibrary(mode).slice(0, 3).forEach(item => pushSource(item.source));
+  }
+  return deduped;
+}
+
+function kwSummarizeDashboardComponents(components) {
+  return (Array.isArray(components) ? components : [])
+    .map((item) => `${item.label || '组件'}${Math.abs(Number(item.weight || 1) - 1) < 0.01 ? '' : ` x${Number(item.weight || 1)}`}`)
+    .join(' · ');
+}
+
+function kwBuildDashboardMetricSummaryList(components, limit) {
+  const list = Array.isArray(components) ? components : [];
+  const maxItems = Number(limit || 2);
+  return list.slice(0, maxItems).map((item) => ({
+    label: item.label || '组件',
+    metric: item.metric || '--',
+  }));
+}
+
+function kwBuildDashboardMetricCompactText(components, limit) {
+  const list = Array.isArray(components) ? components : [];
+  if (!list.length) return '点击查看详细指标构成';
+  const maxItems = Number(limit || 2);
+  const names = list.slice(0, maxItems).map((item) => item.label || '组件');
+  const suffix = list.length > maxItems ? `等${list.length}项` : '';
+  return `指标：${names.join('、')}${suffix}`;
 }
 
 function kwGetIndicatorDashboardSeedCards() {
@@ -3424,18 +4145,269 @@ function kwGetIndicatorDashboardSeedCards() {
 }
 
 function kwBuildFallbackDashboardCard(index) {
-  const seeds = kwGetIndicatorDashboardSeedCards();
-  const seed = seeds[index % Math.max(seeds.length, 1)] || {};
+  const segment = kwGetDashboardSegmentConfig(kwDashboardStudioState.mode);
+  const template = segment.cards[index % segment.cards.length];
+  const components = kwBuildDefaultDashboardComponents(segment.id);
   return {
-    name: seed.name || `核心指标 ${index + 1}`,
-    value: seed.value || '待跟踪',
-    assessment: seed.assessment || '继续观察',
-    status: seed.status || 'attention',
-    alert: seed.alert || '',
-    hint: seed.hint || '',
-    prompt: seed.prompt || `围绕核心指标 ${index + 1} 生成适合普通投资者看的核心指标卡。`,
+    mode: segment.id,
+    segmentId: segment.id,
+    name: template.name || `核心指标 ${index + 1}`,
+    value: template.value || '待跟踪',
+    assessment: template.assessment || '继续观察',
+    status: template.status || 'attention',
+    alert: '',
+    hint: template.assessment || '',
+    prompt: template.prompt || `围绕核心指标 ${index + 1} 生成适合普通投资者看的核心指标卡。`,
+    components,
+    formula: kwBuildDashboardFormulaText(segment.id, components),
+    sources: kwBuildDashboardSourceList(segment.id, components),
     isEmpty: false,
   };
+}
+
+function kwGetDefaultDashboardCardMode(index) {
+  const sequence = ['market', 'industry', 'signal-stock', 'signal-stock', 'market', 'industry', 'signal-stock', 'market'];
+  return sequence[index % sequence.length];
+}
+
+function kwInferDashboardCardMode(card, fallbackMode) {
+  const raw = card && typeof card === 'object' ? card : {};
+  const explicit = raw.mode || raw.segmentId;
+  if (explicit) {
+    const normalized = String(explicit || '').trim().toLowerCase();
+    return ['market', 'industry', 'signal-stock'].includes(normalized) ? normalized : 'market';
+  }
+  const text = [
+    raw.name,
+    raw.title,
+    raw.prompt,
+    raw.assessment,
+    raw.hint,
+    raw.alert,
+  ].map(item => String(item || '').trim()).join(' ');
+  if (/行业景气|行业订单|价格景气|库存节奏|景气验证|资本开支|竞争格局/.test(text)) return 'industry';
+  if (/信号个股|龙头强度|业绩兑现|相对行业|催化临近|资金承接|估值位置/.test(text)) return 'signal-stock';
+  if (/风险偏好|流动性|政策温度|市场广度|风格轮动|波动压力|主线热度/.test(text)) return 'market';
+  return fallbackMode || 'market';
+}
+
+function kwBuildDashboardModeBreakdown(cards) {
+  const counts = { market: 0, industry: 0, 'signal-stock': 0 };
+  (Array.isArray(cards) ? cards : []).forEach((card, index) => {
+    const mode = kwInferDashboardCardMode(card, kwGetDefaultDashboardCardMode(index));
+    counts[mode] += 1;
+  });
+  return counts;
+}
+
+function kwBuildDashboardCompositionSummary(cards) {
+  return Object.entries(kwBuildDashboardModeBreakdown(cards))
+    .filter(([, count]) => count > 0)
+    .map(([mode, count]) => `${kwGetDashboardSegmentConfig(mode).title} ${count}`)
+    .join(' · ') || '市场状态卡 0';
+}
+
+function kwIsMixedDashboard(cards) {
+  return Object.values(kwBuildDashboardModeBreakdown(cards)).filter(Boolean).length > 1;
+}
+
+function kwGetPrimaryDashboardMode(cards) {
+  const ordered = Object.entries(kwBuildDashboardModeBreakdown(cards)).sort((a, b) => b[1] - a[1]);
+  return ordered[0] && ordered[0][1] ? ordered[0][0] : 'market';
+}
+
+function kwBuildDashboardCardFromPrompt(promptText, index, mode) {
+  const resolvedMode = mode || kwGetDefaultDashboardCardMode(index);
+  const segment = kwGetDashboardSegmentConfig(resolvedMode);
+  const base = segment.cards[index % segment.cards.length] || kwBuildFallbackDashboardCard(index);
+  const components = kwNormalizeDashboardComponents(base.components, resolvedMode);
+  return {
+    mode: resolvedMode,
+    segmentId: resolvedMode,
+    name: base.name,
+    value: base.value,
+    assessment: base.assessment,
+    status: base.status || 'attention',
+    alert: '',
+    hint: base.assessment || '',
+    prompt: String(promptText || base.prompt || '').trim(),
+    components,
+    formula: kwBuildDashboardFormulaText(resolvedMode, components),
+    sources: kwBuildDashboardSourceList(resolvedMode, components, base.sources),
+    isEmpty: false,
+  };
+}
+
+function kwEnsureDashboardStudioState() {
+  const segment = kwGetDashboardSegmentConfig(kwDashboardStudioState.mode);
+  if (!Array.isArray(kwDashboardStudioState.tags) || !kwDashboardStudioState.tags.length) {
+    kwDashboardStudioState.tags = segment.tags.slice(0, 3);
+  }
+  kwDashboardStudioState.tags = kwDashboardStudioState.tags.filter((item) => segment.tags.includes(item));
+  if (!kwDashboardStudioState.tags.length) kwDashboardStudioState.tags = segment.tags.slice(0, 3);
+  if (!Array.isArray(kwDashboardStudioState.outputs) || !kwDashboardStudioState.outputs.length) {
+    kwDashboardStudioState.outputs = segment.outputs.slice(0);
+  }
+  kwDashboardStudioState.outputs = segment.outputs.slice(0);
+  kwDashboardStudioState.promptText = kwDashboardStudioState.promptText || segment.prompt;
+}
+
+function kwSelectDashboardMode(mode) {
+  if (!KW_DASHBOARD_MODES.some((item) => item.id === mode)) return;
+  kwDashboardStudioState.mode = mode;
+  const segment = kwGetDashboardSegmentConfig(mode);
+  kwDashboardStudioState.tags = segment.tags.slice(0, 3);
+  kwDashboardStudioState.outputs = segment.outputs.slice(0);
+  kwDashboardStudioState.promptText = segment.prompt;
+  kwRenderDashboardPreview();
+}
+
+function kwGetDashboardSegmentConfig(mode) {
+  return KW_DASHBOARD_MODES.find((item) => item.id === mode) || KW_DASHBOARD_MODES[0];
+}
+
+function kwToggleDashboardTag(tag) {
+  const segment = kwGetDashboardSegmentConfig(kwDashboardStudioState.mode);
+  if (!segment.tags.includes(tag)) return;
+  const current = new Set(kwDashboardStudioState.tags || []);
+  if (current.has(tag)) current.delete(tag); else current.add(tag);
+  kwDashboardStudioState.tags = segment.tags.filter((item) => current.has(item));
+  if (!kwDashboardStudioState.tags.length) kwDashboardStudioState.tags = segment.tags.slice(0, 1);
+  kwRenderDashboardPreview();
+}
+
+function kwSetDashboardPromptText(value) {
+  kwDashboardStudioState.promptText = String(value || '').trim();
+}
+
+function kwBuildDashboardCardsFromPrompts(layout, prompts, mode) {
+  const target = kwGetDashboardCardTarget(layout);
+  return Array.from({ length: target }, (_, index) => {
+    const resolvedMode = mode || kwDashboardStudioState.mode;
+    const segment = kwGetDashboardSegmentConfig(resolvedMode);
+    const base = segment.cards[index % segment.cards.length];
+    const prompt = String((prompts && prompts[index]) || base.prompt || '').trim();
+    return kwBuildDashboardCardFromPrompt(prompt, index, resolvedMode);
+  });
+}
+
+function kwBuildDashboardPromptPlan(layout) {
+  kwEnsureDashboardStudioState();
+  const segment = kwGetDashboardSegmentConfig(kwDashboardStudioState.mode);
+  const target = kwGetDashboardCardTarget(layout);
+  const tags = (kwDashboardStudioState.tags || []).join('、') || segment.tags.slice(0, 3).join('、');
+  const outputs = (kwDashboardStudioState.outputs || []).join('、') || segment.outputs.join('、');
+  return Array.from({ length: target }, (_, index) => {
+    const card = segment.cards[index % segment.cards.length];
+    return `${segment.title} · ${card.name} · 组合信号：${tags} · 输出：${outputs}`;
+  });
+}
+
+function kwRenderDashboardModeRow() {
+  const host = document.getElementById('kw-dashboard-mode-row');
+  if (!host) return;
+  host.innerHTML = KW_DASHBOARD_MODES.map((item) => `
+    <button class="kw-dashboard-mode-card ${kwDashboardStudioState.mode === item.id ? 'active' : ''}" type="button" onclick="kwSelectDashboardMode('${item.id}')">
+      <div class="kw-dashboard-mode-kicker">${escapeHtml(item.kicker || '')}</div>
+      <div class="kw-dashboard-mode-title">${escapeHtml(item.title)}</div>
+      <div class="kw-dashboard-mode-desc">${escapeHtml(item.desc)}</div>
+    </button>
+  `).join('');
+}
+
+function kwRenderDashboardConfigPanel() {
+  const host = document.getElementById('kw-dashboard-config-panel');
+  if (!host) return;
+  const segment = kwGetDashboardSegmentConfig(kwDashboardStudioState.mode);
+  host.innerHTML = `
+    <div class="kw-dashboard-config-grid">
+      <div>
+        <div class="kw-dashboard-section-title">当前层问题</div>
+        <div class="kw-dashboard-panel-note">${escapeHtml(segment.question || segment.focus)}</div>
+        <div class="kw-dashboard-panel-note" style="margin-top:8px">${escapeHtml(segment.scope || '')}</div>
+        <div class="kw-dashboard-chip-row" style="margin-top:10px">
+          <span class="kw-dashboard-chip active">${escapeHtml(segment.title)}</span>
+          <span class="kw-dashboard-chip">${escapeHtml(segment.formula)}</span>
+        </div>
+      </div>
+      <div>
+        <div class="kw-dashboard-section-title">重点信号</div>
+        <div class="kw-dashboard-chip-row">
+          ${segment.tags.map((item) => `
+            <button class="kw-dashboard-chip ${(kwDashboardStudioState.tags || []).includes(item) ? 'active' : ''}" type="button" onclick="kwToggleDashboardTag('${item}')">${escapeHtml(item)}</button>
+          `).join('')}
+        </div>
+      </div>
+      <div>
+        <div class="kw-dashboard-section-title">白盒提示词</div>
+        <div class="kw-dashboard-panel-note">这里决定大模型如何把你的自然语言偏好映射成组合模式；单格里的组件、公式和数据源仍然可以继续微调。</div>
+        <textarea class="kw-dashboard-textarea" placeholder="${escapeAttr(segment.prompt)}" oninput="kwSetDashboardPromptText(this.value)">${escapeHtml(kwDashboardStudioState.promptText || '')}</textarea>
+      </div>
+      <div>
+        <div class="kw-dashboard-section-title">当前结构化结果</div>
+        <div class="kw-dashboard-logic-note">
+          问题定义：${escapeHtml(segment.question || segment.title)}<br>
+          评分口径：${escapeHtml(segment.scoreMethod || segment.formula)}<br>
+          数据源：${escapeHtml(segment.sources.join(' / '))}<br>
+          组合方式：${escapeHtml(segment.formula)}<br>
+          输出口径：${escapeHtml(segment.outputs.join(' / '))}<br>
+          分数映射：${escapeHtml((segment.thresholds || []).join(' / ') || '未设置')}
+        </div>
+        <div class="kw-dashboard-logic-note" style="margin-top:10px">
+          ${escapeHtml((segment.factorRules || []).join('；') || '当前没有因子拆解说明。')}
+        </div>
+        <div class="kw-toolbar" style="margin-top:12px">
+          <button class="btn-outline" type="button" onclick="kwGenerateFundDashboard(kwDashboardCurrentLayout || '2x2')">按当前配置生成草案</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function kwRenderDashboardStrategyList() {
+  const host = document.getElementById('kw-dashboard-strategy-list');
+  if (!host) return;
+  host.innerHTML = kwDashboardCurrentCards.map((card, index) => {
+    const mode = kwInferDashboardCardMode(card, kwGetDefaultDashboardCardMode(index));
+    const segment = kwGetDashboardSegmentConfig(mode);
+    const formula = String(card.formula || '').trim() || kwBuildDashboardFormulaText(mode, card.components || []);
+    const sources = kwBuildDashboardSourceList(mode, card.components || [], card.sources || []);
+    return `
+      <div class="kw-dashboard-strategy-card">
+        <div class="kw-dashboard-strategy-title">${escapeHtml(segment.title)} · 组合单元 ${index + 1}</div>
+        <div class="kw-dashboard-strategy-desc">${escapeHtml(card.prompt || `${segment.title} 提示词待补充`)}</div>
+        <div class="kw-dashboard-strategy-meta">组件：${escapeHtml(kwSummarizeDashboardComponents(card.components || []) || '未配置')} · 数据源：${escapeHtml(sources.join(' / '))} · 算法块：${escapeHtml(formula)} · 输出：${escapeHtml(segment.outputs.join(' / '))}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function kwRenderDashboardPublicPreview() {
+  const host = document.getElementById('kw-dashboard-public-preview');
+  if (!host) return;
+  const cards = Array.isArray(kwDashboardCurrentCards) ? kwDashboardCurrentCards.slice(0, 3) : [];
+  host.innerHTML = `
+    <div class="kw-dashboard-public-list">
+      ${cards.map((item, index) => `
+        ${(() => {
+          const mode = kwInferDashboardCardMode(item, kwGetDefaultDashboardCardMode(index));
+          const segment = kwGetDashboardSegmentConfig(mode);
+          return `
+        <div class="kw-dashboard-public-card">
+          <div class="kw-dashboard-public-title">${escapeHtml(item.name || `结果卡 ${index + 1}`)}</div>
+          <div class="kw-dashboard-public-copy">${escapeHtml(item.assessment || '这是给粉丝直接看的算法结果卡。')}</div>
+          <div class="kw-dashboard-public-value">${escapeHtml(item.value || '--')}</div>
+          <div class="kw-dashboard-public-tag">${escapeHtml(segment.title)}${item.status === 'warning' ? ' · 警惕' : (item.status === 'normal' ? ' · 稳定' : ' · 关注')}</div>
+          <div class="kw-dashboard-public-reasons">
+            <div class="kw-dashboard-public-reason">• 当前卡片已按 ${escapeHtml(segment.title)} 口径生成结果</div>
+          </div>
+          <div class="kw-dashboard-public-meta">更新时间：刚刚 · ${escapeHtml(segment.fanNote)}</div>
+        </div>
+          `;
+        })()}
+      `).join('')}
+    </div>
+  `;
 }
 
 function kwHydrateDashboardConfig(config) {
@@ -3443,9 +4415,24 @@ function kwHydrateDashboardConfig(config) {
   const layout = kwNormalizeDashboardLayout(source.layout || '2x2');
   const cards = Array.from({ length: kwGetDashboardCardTarget(layout) }, (_, index) => {
     const item = Array.isArray(source.cards) ? source.cards[index] : null;
-    const fallback = kwBuildFallbackDashboardCard(index);
+    const mode = kwInferDashboardCardMode(item, kwGetDefaultDashboardCardMode(index));
+    const segment = kwGetDashboardSegmentConfig(mode);
+    const fallback = {
+      ...segment.cards[index % segment.cards.length],
+      mode,
+      segmentId: mode,
+      alert: '',
+      hint: segment.cards[index % segment.cards.length].assessment || '',
+      components: kwBuildDefaultDashboardComponents(mode),
+      formula: kwBuildDashboardFormulaText(mode, kwBuildDefaultDashboardComponents(mode)),
+      sources: kwBuildDashboardSourceList(mode, kwBuildDefaultDashboardComponents(mode)),
+      isEmpty: false,
+    };
     if (!item) return { ...fallback };
+    const components = kwNormalizeDashboardComponents(item.components, mode);
     return {
+      mode,
+      segmentId: mode,
       name: item.name || fallback.name,
       value: item.value || fallback.value,
       assessment: item.assessment || fallback.assessment,
@@ -3453,14 +4440,20 @@ function kwHydrateDashboardConfig(config) {
       alert: item.alert || fallback.alert,
       hint: item.hint || fallback.hint,
       prompt: item.prompt || fallback.prompt,
+      components,
+      formula: item.formula || kwBuildDashboardFormulaText(mode, components),
+      sources: kwBuildDashboardSourceList(mode, components, item.sources || fallback.sources),
       isEmpty: !!item.isEmpty,
     };
   });
+  const primaryMode = kwGetPrimaryDashboardMode(cards);
+  const primarySegment = kwGetDashboardSegmentConfig(primaryMode);
   return {
     layout,
-    title: source.title || '今日核心指标面板',
-    note: source.note || source.summary || '当前面板聚焦宏观方向、资金验证和重点主线。',
-    summary: source.summary || source.note || '当前面板聚焦宏观方向、资金验证和重点主线。',
+    mode: primaryMode,
+    title: source.title || (kwIsMixedDashboard(cards) ? `今日核心指标面板 · 混合策略 · ${layout.toUpperCase()}` : `${primarySegment.title} · 今日核心指标面板`),
+    note: source.note || source.summary || `当前面板支持按格子混搭。组合结构：${kwBuildDashboardCompositionSummary(cards)}。`,
+    summary: source.summary || source.note || `当前面板支持按格子混搭。组合结构：${kwBuildDashboardCompositionSummary(cards)}。`,
     updatedAt: source.updatedAt || '刚刚同步',
     publisher: source.publisher || '系统',
     cards,
@@ -3475,54 +4468,51 @@ function kwGetFundDashboardDraft() {
   return kwFundDashboardState && kwFundDashboardState.draft ? kwHydrateDashboardConfig(kwFundDashboardState.draft) : null;
 }
 
-function kwBuildDashboardCardsFromPrompts(layout, prompts) {
-  const target = kwGetDashboardCardTarget(layout);
-  return Array.from({ length: target }, (_, index) => {
-    const prompt = String((prompts && prompts[index]) || '').trim();
-    const fallback = kwBuildFallbackDashboardCard(index);
-    if (!prompt) return { ...fallback };
-    return {
-      ...fallback,
-      name: prompt.length > 10 ? `${prompt.slice(0, 10)}...` : prompt,
-      assessment: `按该格子的定制提示词跟踪：${prompt.length > 28 ? `${prompt.slice(0, 28)}...` : prompt}`,
-      alert: '重点确认该主题是否已有最新数据或事件验证。',
-      hint: '该格子由独立提示词生成，适合跟踪小众主题或临时变量。',
-      prompt,
-      isEmpty: false,
-    };
-  });
-}
-
 function kwRenderDashboardPreview() {
   const host = document.getElementById('kw-dashboard-preview');
   const metaHost = document.getElementById('kw-dashboard-meta');
   const tag = document.getElementById('kw-dashboard-layout-tag');
   if (!host) return;
+  kwEnsureDashboardStudioState();
   const draft = kwGetFundDashboardDraft();
   const published = kwGetFundDashboardPublished();
   const active = draft || published;
   kwDashboardCurrentLayout = kwNormalizeDashboardLayout(active.layout || '2x2');
-  kwDashboardCurrentCards = Array.isArray(active.cards) ? active.cards.slice() : [];
-  if (tag) tag.textContent = kwDashboardCurrentLayout;
+  kwDashboardCurrentCards = active && Array.isArray(active.cards) && active.cards.length
+    ? active.cards.slice()
+    : kwBuildDashboardCardsFromPrompts(kwDashboardCurrentLayout, [], kwDashboardStudioState.mode);
+  const composition = kwBuildDashboardCompositionSummary(kwDashboardCurrentCards);
+  if (tag) tag.textContent = `${kwDashboardCurrentLayout} · ${kwIsMixedDashboard(kwDashboardCurrentCards) ? '混合策略' : kwGetDashboardSegmentConfig(kwGetPrimaryDashboardMode(kwDashboardCurrentCards)).title}`;
   if (metaHost) {
     metaHost.textContent = draft
-      ? `草稿已生成 · ${kwDashboardCurrentLayout.toUpperCase()} · 点击格子继续编辑，发布后同步到 H5 和租户门户`
-      : `当前展示已发布版本 · ${published.updatedAt || '刚刚同步'} · ${published.publisher || '系统发布'}`;
+      ? `当前预览的是草稿版本 · ${composition} · ${kwDashboardCurrentLayout.toUpperCase()} · 前台 H5 基本面仍只展示已发布版本`
+      : `当前展示已发布版本 · ${composition} · ${(published && published.updatedAt) || '刚刚同步'} · ${(published && published.publisher) || '系统发布'}`;
   }
   host.innerHTML = `
+    <div class="kw-dashboard-canvas-note">当前仪表盘支持市场状态卡、行业景气卡、信号个股卡按格子混搭。组合结构：${escapeHtml(composition)}。</div>
     <div class="kw-cell-grid">
-      ${kwDashboardCurrentCards.map((cell, index) => `
+      ${kwDashboardCurrentCards.map((cell, index) => {
+        const mode = kwInferDashboardCardMode(cell, kwGetDefaultDashboardCardMode(index));
+        const segment = kwGetDashboardSegmentConfig(mode);
+        const metricCompactText = kwBuildDashboardMetricCompactText(cell.components || [], 2);
+        return `
         <div class="kw-cell-card" onclick="kwOpenDashboardCellModal(${index})" style="cursor:pointer">
           <div class="kw-cell-title">${escapeHtml(cell.name || `核心指标 ${index + 1}`)}</div>
           ${cell.value ? `<div class="kw-cell-value">${escapeHtml(cell.value)}</div>` : '<div class="kw-empty-plus">+</div>'}
           <div class="kw-cell-desc">${escapeHtml(cell.assessment || '每个格子是一个智能定义单元；点击后按独立提示词重新生成。')}</div>
-          <div class="kw-prompt-row" style="margin-top:10px">
-            <span class="kw-prompt-chip">${escapeHtml(cell.prompt || '点击补充单格提示词')}</span>
+          <div class="kw-dashboard-cell-inline-meta">
+            <span class="kw-prompt-chip">${escapeHtml(segment.title)}</span>
+            <span class="kw-prompt-chip">${escapeHtml(metricCompactText)}</span>
           </div>
         </div>
-      `).join('')}
+      `;
+      }).join('')}
     </div>
   `;
+  kwRenderDashboardModeRow();
+  kwRenderDashboardConfigPanel();
+  kwRenderDashboardStrategyList();
+  kwRenderDashboardPublicPreview();
 }
 
 function kwOpenDashboardCellModal(index) {
@@ -3530,42 +4520,251 @@ function kwOpenDashboardCellModal(index) {
   const card = kwDashboardCurrentCards[index];
   if (!card) return;
   kwDashboardCellEditingIndex = index;
-  const host = document.getElementById('kw-dashboard-cell-modal-content');
-  const modal = document.getElementById('kw-dashboard-cell-modal');
-  if (!host || !modal) return;
-  host.innerHTML = `
-    <div class="kw-review-modal-title">编辑单格提示词</div>
-    <div class="kw-review-runtime-desc" style="margin-top:6px">当前摘要：${escapeHtml(card.name || '未命名指标')} · ${escapeHtml(card.value || '--')}</div>
-    <div style="margin-top:14px">
-      <textarea id="kw-dashboard-cell-prompt-input" class="kw-knowledge-modal-textarea" placeholder="例如：聚焦 AI 订单兑现、利润率与订单验证节点，写成适合普通投资者理解的提示卡。">${escapeHtml(card.prompt || '')}</textarea>
-    </div>
-    <div class="kw-toolbar" style="margin-top:14px;justify-content:flex-end">
-      <button class="btn-outline" type="button" onclick="kwCloseDashboardCellModal()">取消</button>
-      <button class="btn-gold" type="button" onclick="kwSaveDashboardCellPrompt()">保存提示词</button>
-    </div>
-  `;
-  modal.classList.add('show');
+  kwDashboardCellDraftMode = kwInferDashboardCardMode(card, kwGetDefaultDashboardCardMode(index));
+  kwDashboardCellDraftPrompt = String(card.prompt || '').trim();
+  kwDashboardCellDraftComponents = kwNormalizeDashboardComponents(card.components, kwDashboardCellDraftMode);
+  kwRenderDashboardCellModal();
+}
+
+function kwSetDashboardCellMode(mode) {
+  kwCaptureDashboardCellPromptDraft();
+  if (kwDashboardCellDraftMode !== mode) {
+    kwDashboardCellDraftMode = mode;
+    kwDashboardCellDraftComponents = kwBuildDefaultDashboardComponents(mode);
+  }
+  kwRenderDashboardCellModal();
 }
 
 function kwCloseDashboardCellModal() {
   const modal = document.getElementById('kw-dashboard-cell-modal');
   if (modal) modal.classList.remove('show');
   kwDashboardCellEditingIndex = -1;
+  kwDashboardCellDragIndex = -1;
+}
+
+function kwCaptureDashboardCellPromptDraft() {
+  const input = document.getElementById('kw-dashboard-cell-prompt-input');
+  if (input) kwDashboardCellDraftPrompt = input.value.trim();
+}
+
+function kwRenderDashboardCellModal() {
+  const host = document.getElementById('kw-dashboard-cell-modal-content');
+  const modal = document.getElementById('kw-dashboard-cell-modal');
+  if (!host || !modal || kwDashboardCellEditingIndex < 0) return;
+  const card = kwDashboardCurrentCards[kwDashboardCellEditingIndex] || {};
+  const currentSegment = kwGetDashboardSegmentConfig(kwDashboardCellDraftMode);
+  const modeOptions = KW_DASHBOARD_MODES.map((item) => `
+    <button class="btn-outline ${kwDashboardCellDraftMode === item.id ? 'active' : ''}" type="button" style="padding:6px 8px;font-size:11px" onclick="kwSetDashboardCellMode('${item.id}')">${escapeHtml(item.title)}</button>
+  `).join('');
+  const componentLibrary = kwGetDashboardComponentLibrary(kwDashboardCellDraftMode);
+  const selectedIds = kwDashboardCellDraftComponents.map(item => item.id);
+  const formula = kwBuildDashboardFormulaText(kwDashboardCellDraftMode, kwDashboardCellDraftComponents);
+  const sources = kwBuildDashboardSourceList(kwDashboardCellDraftMode, kwDashboardCellDraftComponents);
+  host.innerHTML = `
+    <div class="kw-review-modal-title">编辑智能格子</div>
+    <div class="kw-review-runtime-desc" style="margin-top:6px">当前摘要：${escapeHtml(card.name || '未命名指标')} · ${escapeHtml(card.value || '--')}</div>
+    <div class="kw-dashboard-cell-modal-grid">
+      <div class="kw-dashboard-cell-summary">
+        <div class="kw-dashboard-cell-summary-title">${escapeHtml(currentSegment.title)} · 白盒配置</div>
+        <div class="kw-dashboard-cell-summary-desc">先选格子类型，再看组件库。提示词负责帮助系统判断该用哪一类组合模式；当前真正发布到 H5 的，是下面这套组件组合、公式和数据源。</div>
+      </div>
+      <div class="kw-dashboard-cell-block">
+        <div class="kw-dashboard-section-title">格子类型</div>
+        <div class="kw-dashboard-chip-row">${modeOptions}</div>
+      </div>
+      <div class="kw-dashboard-cell-block">
+        <div class="kw-dashboard-section-title">白盒提示词</div>
+        <div class="kw-dashboard-panel-note">提示词仍然保留，但不再是唯一配置。下面的组件组合可以直接点选、排序和微调。</div>
+        <textarea id="kw-dashboard-cell-prompt-input" class="kw-knowledge-modal-textarea" placeholder="${escapeHtml(currentSegment.prompt)}">${escapeHtml(kwDashboardCellDraftPrompt || '')}</textarea>
+      </div>
+      <div class="kw-dashboard-cell-block">
+        <div class="kw-dashboard-section-title">组件库</div>
+        <div class="kw-dashboard-component-library">
+          ${componentLibrary.map((item) => {
+            const disabled = selectedIds.includes(item.id);
+            return `
+              <div class="kw-dashboard-component-option ${disabled ? 'disabled' : ''}">
+                <div class="kw-dashboard-component-head">
+                  <div>
+                    <div class="kw-dashboard-component-title">${escapeHtml(item.label)}</div>
+                    <div class="kw-dashboard-component-meta">指标：${escapeHtml(item.metric)} · 窗口：${escapeHtml(item.window)} · 聚合：${escapeHtml(item.aggregation)}</div>
+                  </div>
+                  <span class="kw-dashboard-component-badge">${escapeHtml(item.source)}</span>
+                </div>
+                <div class="kw-dashboard-component-actions" style="margin-top:10px">
+                  <button class="btn-outline" type="button" ${disabled ? 'disabled' : ''} onclick="kwAddDashboardComponent('${escapeAttr(item.id)}')">${disabled ? '已加入' : '加入组合'}</button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+      <div class="kw-dashboard-cell-block">
+        <div class="kw-dashboard-section-title">当前组合</div>
+        <div class="kw-dashboard-panel-note">支持拖拽排序，也可以直接改组合符和权重。第一个组件固定为起始项。</div>
+        <div class="kw-dashboard-component-list">
+          ${kwDashboardCellDraftComponents.map((item, index) => `
+            <div class="kw-dashboard-component-item" draggable="true" ondragstart="kwHandleDashboardComponentDragStart(${index})" ondragover="kwHandleDashboardComponentDragOver(event)" ondrop="kwHandleDashboardComponentDrop(${index})" ondragend="kwHandleDashboardComponentDragEnd()">
+              <div class="kw-dashboard-component-head">
+                <div>
+                  <div class="kw-dashboard-component-title">${escapeHtml(item.label || `组件 ${index + 1}`)}</div>
+                  <div class="kw-dashboard-component-meta">数据源：${escapeHtml(item.source || '--')} · 指标：${escapeHtml(item.metric || '--')} · 窗口：${escapeHtml(item.window || '--')}</div>
+                </div>
+                <span class="kw-dashboard-component-badge">${index === 0 ? '起始组件' : `第 ${index + 1} 项`}</span>
+              </div>
+              <div class="kw-dashboard-component-controls">
+                <div class="kw-dashboard-component-field">
+                  <label>组合符</label>
+                  <select onchange="kwUpdateDashboardComponentField(${index}, 'operator', this.value)" ${index === 0 ? 'disabled' : ''}>
+                    <option value="+" ${item.operator === '+' ? 'selected' : ''}>+</option>
+                    <option value="-" ${item.operator === '-' ? 'selected' : ''}>-</option>
+                    <option value="*" ${item.operator === '*' ? 'selected' : ''}>*</option>
+                    <option value="/" ${item.operator === '/' ? 'selected' : ''}>/</option>
+                  </select>
+                </div>
+                <div class="kw-dashboard-component-field">
+                  <label>权重</label>
+                  <input type="number" min="0.1" max="3" step="0.1" value="${escapeAttr(item.weight)}" onchange="kwUpdateDashboardComponentField(${index}, 'weight', this.value)">
+                </div>
+                <div class="kw-dashboard-component-field">
+                  <label>窗口</label>
+                  <input type="text" value="${escapeAttr(item.window || '')}" onchange="kwUpdateDashboardComponentField(${index}, 'window', this.value)">
+                </div>
+                <div class="kw-dashboard-component-actions">
+                  <button class="btn-outline" type="button" onclick="kwMoveDashboardComponent(${index}, -1)" ${index === 0 ? 'disabled' : ''}>上移</button>
+                  <button class="btn-outline" type="button" onclick="kwMoveDashboardComponent(${index}, 1)" ${index === kwDashboardCellDraftComponents.length - 1 ? 'disabled' : ''}>下移</button>
+                  <button class="btn-outline" type="button" onclick="kwRemoveDashboardComponent(${index})" ${kwDashboardCellDraftComponents.length <= 1 ? 'disabled' : ''}>移除</button>
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="kw-dashboard-formula-shell">
+          <div class="kw-dashboard-formula-title">当前组合公式</div>
+          <div class="kw-dashboard-formula-text">${escapeHtml(formula)}</div>
+          <div class="kw-dashboard-source-row">
+            ${sources.map((item) => `<span class="kw-dashboard-source-chip">${escapeHtml(item)}</span>`).join('')}
+          </div>
+        </div>
+      </div>
+      <div class="kw-toolbar" style="justify-content:flex-end">
+        <button class="btn-outline" type="button" onclick="kwCloseDashboardCellModal()">取消</button>
+        <button class="btn-gold" type="button" onclick="kwSaveDashboardCellPrompt()">保存并生成</button>
+      </div>
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+function kwAddDashboardComponent(componentId) {
+  kwCaptureDashboardCellPromptDraft();
+  const library = kwGetDashboardComponentLibrary(kwDashboardCellDraftMode);
+  const template = library.find(item => item.id === componentId);
+  if (!template || kwDashboardCellDraftComponents.some(item => item.id === componentId)) return;
+  kwDashboardCellDraftComponents = kwNormalizeDashboardComponents([
+    ...kwDashboardCellDraftComponents,
+    {
+      id: template.id,
+      label: template.label,
+      source: template.source,
+      metric: template.metric,
+      window: template.window,
+      aggregation: template.aggregation,
+      weight: template.defaultWeight,
+      operator: kwDashboardCellDraftComponents.length ? '+' : 'base',
+    },
+  ], kwDashboardCellDraftMode);
+  kwRenderDashboardCellModal();
+}
+
+function kwRemoveDashboardComponent(index) {
+  if (kwDashboardCellDraftComponents.length <= 1) return;
+  kwCaptureDashboardCellPromptDraft();
+  kwDashboardCellDraftComponents = kwNormalizeDashboardComponents(
+    kwDashboardCellDraftComponents.filter((_, componentIndex) => componentIndex !== index),
+    kwDashboardCellDraftMode,
+  );
+  kwRenderDashboardCellModal();
+}
+
+function kwMoveDashboardComponent(index, direction) {
+  const nextIndex = index + direction;
+  if (nextIndex < 0 || nextIndex >= kwDashboardCellDraftComponents.length) return;
+  kwCaptureDashboardCellPromptDraft();
+  const nextList = kwDashboardCellDraftComponents.slice();
+  const [moved] = nextList.splice(index, 1);
+  nextList.splice(nextIndex, 0, moved);
+  kwDashboardCellDraftComponents = kwNormalizeDashboardComponents(nextList, kwDashboardCellDraftMode);
+  kwRenderDashboardCellModal();
+}
+
+function kwUpdateDashboardComponentField(index, field, value) {
+  kwCaptureDashboardCellPromptDraft();
+  kwDashboardCellDraftComponents = kwNormalizeDashboardComponents(
+    kwDashboardCellDraftComponents.map((item, componentIndex) => {
+      if (componentIndex !== index) return item;
+      if (field === 'weight') return { ...item, weight: Number(value || item.weight || 1) };
+      return { ...item, [field]: value };
+    }),
+    kwDashboardCellDraftMode,
+  );
+  kwRenderDashboardCellModal();
+}
+
+function kwHandleDashboardComponentDragStart(index) {
+  kwDashboardCellDragIndex = index;
+}
+
+function kwHandleDashboardComponentDragOver(event) {
+  if (event) event.preventDefault();
+}
+
+function kwHandleDashboardComponentDrop(index) {
+  if (kwDashboardCellDragIndex < 0 || kwDashboardCellDragIndex === index) return;
+  kwCaptureDashboardCellPromptDraft();
+  const nextList = kwDashboardCellDraftComponents.slice();
+  const [moved] = nextList.splice(kwDashboardCellDragIndex, 1);
+  nextList.splice(index, 0, moved);
+  kwDashboardCellDraftComponents = kwNormalizeDashboardComponents(nextList, kwDashboardCellDraftMode);
+  kwDashboardCellDragIndex = -1;
+  kwRenderDashboardCellModal();
+}
+
+function kwHandleDashboardComponentDragEnd() {
+  kwDashboardCellDragIndex = -1;
 }
 
 async function kwSaveDashboardCellPrompt() {
   if (kwDashboardCellEditingIndex < 0) return;
-  const input = document.getElementById('kw-dashboard-cell-prompt-input');
-  const prompt = input ? input.value.trim() : '';
-  const prompts = kwDashboardCurrentCards.map((item) => item.prompt || '');
-  prompts[kwDashboardCellEditingIndex] = prompt;
+  kwCaptureDashboardCellPromptDraft();
+  const prompt = kwDashboardCellDraftPrompt;
   const layout = kwDashboardCurrentLayout || '2x2';
-  const cards = kwBuildDashboardCardsFromPrompts(layout, prompts);
+  const cards = kwDashboardCurrentCards.map((item, index) => {
+    if (index === kwDashboardCellEditingIndex) {
+      const nextCard = kwBuildDashboardCardFromPrompt(prompt, index, kwDashboardCellDraftMode);
+      const components = kwNormalizeDashboardComponents(kwDashboardCellDraftComponents, kwDashboardCellDraftMode);
+      return {
+        ...nextCard,
+        components,
+        formula: kwBuildDashboardFormulaText(kwDashboardCellDraftMode, components),
+        sources: kwBuildDashboardSourceList(kwDashboardCellDraftMode, components),
+      };
+    }
+    return {
+      ...item,
+      mode: kwInferDashboardCardMode(item, kwGetDefaultDashboardCardMode(index)),
+      segmentId: kwInferDashboardCardMode(item, kwGetDefaultDashboardCardMode(index)),
+    };
+  });
+  const composition = kwBuildDashboardCompositionSummary(cards);
+  const primaryMode = kwGetPrimaryDashboardMode(cards);
+  const primarySegment = kwGetDashboardSegmentConfig(primaryMode);
   const nextDraft = {
+    mode: primaryMode,
     layout,
-    title: `今日核心指标面板 · ${layout.toUpperCase()}`,
-    note: `本次由大V为 ${cards.length} 个格子分别设置独立提示词，面板内容按单格定制生成。`,
-    summary: `本次由大V为 ${cards.length} 个格子分别设置独立提示词，面板内容按单格定制生成。`,
+    title: kwIsMixedDashboard(cards) ? `今日核心指标面板 · 混合策略 · ${layout.toUpperCase()}` : `${primarySegment.title} · 今日核心指标面板 · ${layout.toUpperCase()}`,
+    note: `当前面板支持按格子混搭。组合结构：${composition}。`,
+    summary: `当前面板支持按格子混搭。组合结构：${composition}。`,
     cards,
     updatedAt: '刚刚生成',
     publisher: (window.WORKBENCH_DATA && window.WORKBENCH_DATA.kol_name) || '当前大V',
@@ -3578,19 +4777,34 @@ async function kwGenerateFundDashboard(layout) {
   const normalizedLayout = kwNormalizeDashboardLayout(layout || kwDashboardCurrentLayout || '2x2');
   const target = kwGetDashboardCardTarget(normalizedLayout);
   const currentDraft = kwGetFundDashboardDraft() || kwGetFundDashboardPublished();
-  const prompts = Array.from({ length: target }, (_, index) => {
-    return (currentDraft.cards && currentDraft.cards[index] && currentDraft.cards[index].prompt) || kwBuildFallbackDashboardCard(index).prompt;
+  const cards = Array.from({ length: target }, (_, index) => {
+    const existing = currentDraft.cards && currentDraft.cards[index] ? currentDraft.cards[index] : null;
+    const mode = kwInferDashboardCardMode(existing, (existing && existing.mode) || kwDashboardStudioState.mode || kwGetDefaultDashboardCardMode(index));
+    const segment = kwGetDashboardSegmentConfig(mode);
+    const prompt = (existing && existing.prompt) || (segment.cards[index % segment.cards.length] && segment.cards[index % segment.cards.length].prompt) || kwBuildFallbackDashboardCard(index).prompt;
+    const nextCard = kwBuildDashboardCardFromPrompt(prompt, index, mode);
+    const components = kwNormalizeDashboardComponents(existing && existing.components, mode);
+    return {
+      ...nextCard,
+      components,
+      formula: String((existing && existing.formula) || '').trim() || kwBuildDashboardFormulaText(mode, components),
+      sources: kwBuildDashboardSourceList(mode, components, existing && existing.sources),
+    };
   });
+  const composition = kwBuildDashboardCompositionSummary(cards);
+  const primaryMode = kwGetPrimaryDashboardMode(cards);
+  const primarySegment = kwGetDashboardSegmentConfig(primaryMode);
   const nextDraft = {
+    mode: primaryMode,
     layout: normalizedLayout,
-    title: `今日核心指标面板 · ${normalizedLayout.toUpperCase()}`,
-    note: `本次由大V为 ${target} 个格子分别设置独立提示词，面板内容按单格定制生成。`,
-    summary: `本次由大V为 ${target} 个格子分别设置独立提示词，面板内容按单格定制生成。`,
-    cards: kwBuildDashboardCardsFromPrompts(normalizedLayout, prompts),
+    title: kwIsMixedDashboard(cards) ? `今日核心指标面板 · 混合策略 · ${normalizedLayout.toUpperCase()}` : `${primarySegment.title} · 今日核心指标面板 · ${normalizedLayout.toUpperCase()}`,
+    note: `当前面板支持按格子混搭。组合结构：${composition}。`,
+    summary: `当前面板支持按格子混搭。组合结构：${composition}。`,
+    cards,
     updatedAt: '刚刚生成',
     publisher: (window.WORKBENCH_DATA && window.WORKBENCH_DATA.kol_name) || '当前大V',
   };
-  await kwSyncFundDashboard('save_draft', nextDraft, `已生成 ${normalizedLayout.toUpperCase()} 指标面板草稿`);
+  await kwSyncFundDashboard('save_draft', nextDraft, `已生成混合仪表盘 ${normalizedLayout.toUpperCase()} 草稿`);
 }
 
 async function kwPublishFundDashboard() {
@@ -4510,6 +5724,7 @@ const KW_REVIEW_SOURCE_OPTIONS = [
   { value: 'voice', icon: '🎙️', label: '语音口述' },
   { value: 'manual', icon: '✍️', label: '手动撰写' },
   { value: 'file', icon: '📎', label: '文件上传' },
+  { value: 'url', icon: '🔗', label: '网页 URL' },
 ];
 const KW_REVIEW_PARAGRAPH_OPTIONS = [
   { value: 'manual', label: '大V自定段落' },
@@ -4519,15 +5734,26 @@ const KW_REVIEW_PROMPT_TAGS = ['更口语化', '保留原文不改写', '强调�
 let kwReviewDraft = {
   period: 'day',
   sourceMode: 'voice',
-  paragraphMode: 'manual',
-  skipAiProcessing: true,
+  paragraphMode: 'ai',
+  skipAiProcessing: false,
   useVoiceLlmEnhancement: true,
+  useInputPolish: true,
   selectedWatchlist: [],
+  selectedCardIds: [],
+  selectedKnowledgeIds: [],
+  cardPromptOverrides: {},
   voiceTranscript: '',
+  manualText: '',
   manualHtml: '',
   fileText: '',
+  fileName: '',
+  urlValue: '',
+  urlTitle: '',
+  urlText: '',
   aiPrompt: '',
   promptTags: [],
+  polishedInputText: '',
+  finalDraftText: '',
   generatedPreviewText: '',
   previewReady: false,
 };
@@ -5641,6 +6867,7 @@ function kwGetSelectedWatchlist() {
 function kwGetReviewDraftContentText() {
   if (kwReviewDraft.sourceMode === 'voice') return String(kwReviewDraft.voiceTranscript || '').trim();
   if (kwReviewDraft.sourceMode === 'file') return String(kwReviewDraft.fileText || '').trim();
+  if (kwReviewDraft.sourceMode === 'url') return String(kwReviewDraft.urlText || '').trim();
   const temp = document.createElement('div');
   temp.innerHTML = kwReviewDraft.manualHtml || '';
   return String(temp.textContent || '').trim();
@@ -5648,6 +6875,7 @@ function kwGetReviewDraftContentText() {
 
 function kwToggleReviewVoiceLlmEnhancement(checked) {
   kwReviewDraft.useVoiceLlmEnhancement = !!checked;
+  kwRenderReviewStudio();
 }
 
 function kwToggleKnowledgeVoiceLlmEnhancement(checked) {
@@ -5655,6 +6883,9 @@ function kwToggleKnowledgeVoiceLlmEnhancement(checked) {
 }
 
 function kwGetReviewPreviewText() {
+  if (String(kwReviewDraft.finalDraftText || '').trim()) {
+    return String(kwReviewDraft.finalDraftText || '').trim();
+  }
   if (kwReviewDraft.paragraphMode === 'manual') {
     return kwGetReviewDraftContentText();
   }
@@ -5668,6 +6899,7 @@ let kwReviewVoiceUploading = false;
 let kwReviewIngestResult = null;
 let kwReviewDraftGenerating = false;
 let kwReviewDraftJobState = null;
+let kwReviewJobMode = '';
 let kwKnowledgeVoiceRecorder = null;
 let kwKnowledgeVoiceChunks = [];
 let kwKnowledgeVoiceUploading = false;
@@ -5880,6 +7112,27 @@ async function kwPublishReviewContentEmbedding(text, transcriptionEngine, transc
       speaker_name: tenant.advisor || '',
       transcription_engine: transcriptionEngine || 'manual',
       transcript_model: transcriptModel || 'manual_input',
+      source_mode: kwReviewDraft.sourceMode || 'manual',
+      paragraph_mode: kwReviewDraft.paragraphMode || 'manual',
+      selected_watchlist: kwReviewDraft.selectedWatchlist || [],
+      prompt_tags: kwReviewDraft.promptTags || [],
+      knowledge_attachments: kwGetReviewSelectedKnowledge().map(item => ({
+        id: item.id || '',
+        title: item.title || '',
+        summary: item.summary || '',
+        body: item.body || item.raw_input || '',
+        source_detail: item.source_detail || item.source || '',
+        url: item.url || '',
+        tags: item.tags || [],
+      })),
+      selected_cards: kwGetReviewSelectedCards(),
+      data_sources: kwGetReviewSelectedCards().flatMap(item => Array.isArray(item.data_sources) ? item.data_sources : []),
+      news_sources: kwGetReviewSelectedCards().flatMap(item => Array.isArray(item.news_sources) ? item.news_sources : []),
+      llm_models: [
+        kwReviewIngestResult && kwReviewIngestResult.review_polish_llm ? { stage: 'polish', ...kwReviewIngestResult.review_polish_llm } : null,
+        kwReviewIngestResult && kwReviewIngestResult.review_draft_llm ? { stage: 'compose', ...kwReviewIngestResult.review_draft_llm } : null,
+      ].filter(Boolean),
+      polished_input_text: kwReviewDraft.polishedInputText || '',
     }),
   });
   const data = await resp.json();
@@ -5887,6 +7140,316 @@ async function kwPublishReviewContentEmbedding(text, transcriptionEngine, transc
     throw new Error((data && data.error) || 'publish_embed_failed');
   }
   return data;
+}
+
+function kwGetReviewStudioConfig() {
+  return (window.WORKBENCH_DATA && window.WORKBENCH_DATA.review_studio) || {};
+}
+
+function kwGetReviewSmartCards() {
+  const reviewStudio = kwGetReviewStudioConfig();
+  return Array.isArray(reviewStudio.smart_cards) ? reviewStudio.smart_cards.slice(0) : [];
+}
+
+function kwGetReviewSelectedCards() {
+  const selected = new Set(kwReviewDraft.selectedCardIds || []);
+  return kwGetReviewSmartCards().filter((item) => selected.has(item.id)).map((item) => ({
+    ...item,
+    prompt: kwReviewDraft.cardPromptOverrides[item.id] || item.prompt || '',
+  }));
+}
+
+function kwGetReviewSelectedKnowledge() {
+  initializeKwKnowledgeStore();
+  const selected = new Set(kwReviewDraft.selectedKnowledgeIds || []);
+  return kwKnowledgeStore.filter((item) => selected.has(item.id));
+}
+
+function kwSyncReviewTextInputs() {
+  const urlInput = document.getElementById('kw-review-url-input');
+  const urlTitleInput = document.getElementById('kw-review-url-title');
+  const finalEditor = document.getElementById('kw-review-final-editor');
+  if (urlInput) kwReviewDraft.urlValue = String(urlInput.value || '').trim();
+  if (urlTitleInput) kwReviewDraft.urlTitle = String(urlTitleInput.value || '').trim();
+  if (finalEditor) kwReviewDraft.finalDraftText = String(finalEditor.value || '').trim();
+}
+
+function kwOpenReviewCardPicker() {
+  const cards = kwGetReviewSmartCards();
+  const selectedIds = new Set(kwReviewDraft.selectedCardIds || []);
+  const knowledgeSelectedIds = new Set(kwReviewDraft.selectedKnowledgeIds || []);
+  initializeKwKnowledgeStore();
+  const host = document.getElementById('kw-dashboard-cell-modal-content');
+  const modal = document.getElementById('kw-dashboard-cell-modal');
+  if (!host || !modal) return;
+  host.innerHTML = `
+    <div class="kw-review-modal-title">选择复盘素材</div>
+    <div class="kw-review-runtime-desc" style="margin-top:6px">这里统一选择智能仪表盘卡片和你之前上传过的知识内容。知识内容会同时作为本次归纳素材与粉丝可见的附加材料。</div>
+    <div class="kw-review-studio-panel" style="margin-top:14px">
+      <div class="kw-review-studio-panel-title">智能仪表盘卡片</div>
+      <div class="kw-review-runtime-list" style="margin-top:10px">
+        ${cards.map((card) => `
+          <label class="kw-review-runtime-item" style="display:block;cursor:pointer">
+            <div style="display:flex;gap:10px;align-items:flex-start">
+              <input type="checkbox" data-review-card-option="${escapeAttr(card.id || '')}" ${selectedIds.has(card.id) ? 'checked' : ''}>
+              <div>
+                <strong>${escapeHtml(card.title || '智能卡片')}</strong>
+                <div class="kw-review-runtime-desc">${escapeHtml(card.summary || '')}</div>
+              </div>
+            </div>
+          </label>
+        `).join('') || '<div class="kw-review-runtime-desc">当前没有可选卡片。</div>'}
+      </div>
+    </div>
+    <div class="kw-review-studio-panel" style="margin-top:14px">
+      <div class="kw-review-studio-panel-title">已上传知识内容</div>
+      <div class="kw-review-runtime-list" style="margin-top:10px;max-height:320px;overflow:auto">
+        ${kwKnowledgeStore.map((item) => `
+          <label class="kw-review-runtime-item" style="display:block;cursor:pointer">
+            <div style="display:flex;gap:10px;align-items:flex-start">
+              <input type="checkbox" data-review-knowledge-option="${escapeAttr(item.id || '')}" ${knowledgeSelectedIds.has(item.id) ? 'checked' : ''}>
+              <div>
+                <strong>${escapeHtml(item.title || '知识材料')}</strong>
+                <div class="kw-review-runtime-desc">${escapeHtml(item.summary || item.body || item.raw_input || '')}</div>
+              </div>
+            </div>
+          </label>
+        `).join('') || '<div class="kw-review-runtime-desc">当前还没有知识内容。</div>'}
+      </div>
+    </div>
+    <div class="kw-toolbar" style="margin-top:14px;justify-content:flex-end">
+      <button class="btn-outline" type="button" onclick="kwCloseDashboardCellModal()">取消</button>
+      <button class="btn-gold" type="button" onclick="kwApplyReviewCardPicker()">确认选择</button>
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+function kwApplyReviewCardPicker() {
+  kwReviewDraft.selectedCardIds = Array.from(document.querySelectorAll('[data-review-card-option]:checked')).map((node) => node.getAttribute('data-review-card-option') || '').filter(Boolean);
+  kwReviewDraft.selectedKnowledgeIds = Array.from(document.querySelectorAll('[data-review-knowledge-option]:checked')).map((node) => node.getAttribute('data-review-knowledge-option') || '').filter(Boolean);
+  kwCloseDashboardCellModal();
+  kwRenderReviewStudio();
+}
+
+function kwUseCurrentReviewDraftAsFinal() {
+  kwSyncReviewTextInputs();
+  kwReviewDraft.finalDraftText = String(kwReviewDraft.generatedPreviewText || kwReviewDraft.polishedInputText || kwGetReviewDraftContentText() || '').trim();
+  const editor = document.getElementById('kw-review-final-editor');
+  if (editor) editor.value = kwReviewDraft.finalDraftText;
+}
+
+async function kwPreviewReviewUrl() {
+  kwSyncReviewTextInputs();
+  if (!kwReviewDraft.urlValue) {
+    showToast('请先输入 URL');
+    return;
+  }
+  const resp = await fetch('/api/kol/knowledge/url-preview', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ url: kwReviewDraft.urlValue }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    showToast((data && data.error) || '网页抓取失败');
+    return;
+  }
+  const preview = data.preview || {};
+  kwReviewDraft.urlTitle = kwReviewDraft.urlTitle || preview.title || '';
+  kwReviewDraft.urlText = preview.body || preview.summary || '';
+  kwRenderReviewStudio();
+}
+
+function kwCaptureReviewFileInput() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.doc,.docx,.txt,.md,.csv,.xlsx,.xls';
+  input.onchange = async () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+    const resp = await fetch('/api/kol/knowledge/file-preview', {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) {
+      showToast((data && data.error) || '文件解析失败');
+      return;
+    }
+    const preview = data.preview || {};
+    kwReviewDraft.fileName = preview.filename || file.name;
+    kwReviewDraft.fileText = preview.body || preview.summary || '';
+    kwReviewDraft.previewReady = false;
+    kwRenderReviewStudio();
+    showToast('文件已转成文案');
+  };
+  input.click();
+}
+
+async function kwPolishReviewInput() {
+  kwSyncReviewDraftFromModal();
+  kwSyncReviewTextInputs();
+  const sourceText = kwGetReviewDraftContentText();
+  if (!sourceText) {
+    showToast('请先补充输入内容');
+    return;
+  }
+  const tenant = window.ACTIVE_TENANT || {};
+  kwReviewJobMode = 'polish';
+  kwReviewDraftGenerating = true;
+  kwReviewDraftJobState = {
+    status: 'running',
+    progress_stage: 'queued',
+    progress_percent: 4,
+    summary: '已提交输入润色任务，正在进入大模型队列',
+    result: { live_log: [] },
+  };
+  kwRenderReviewStudio();
+  try {
+    const resp = await fetch('/api/review/polish-input', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        tenant_slug: tenant.slug || '',
+        period: kwReviewDraft.period || 'day',
+        source_mode: kwReviewDraft.sourceMode || 'manual',
+        source_text: sourceText,
+        speaker_name: tenant.advisor || '',
+        entry_point: 'workbench_review_polish',
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.ok || !data.job_code) throw new Error((data && data.error) || 'review_input_polish_failed');
+    kwStartAsyncJobPolling(data.job_code, {
+      onProgress(job) {
+        kwReviewDraftJobState = job || kwReviewDraftJobState;
+        kwRenderReviewStudio();
+      },
+      onSuccess(job) {
+        const result = job.result || {};
+        kwReviewDraft.polishedInputText = result.text || '';
+        kwReviewIngestResult = { ...(kwReviewIngestResult || {}), review_polish_llm: result.llm_model || null };
+        kwReviewDraftGenerating = false;
+        kwReviewDraftJobState = null;
+        kwReviewJobMode = '';
+        kwRenderReviewStudio();
+      },
+      onFailed(job) {
+        kwReviewDraftGenerating = false;
+        kwReviewDraftJobState = null;
+        kwReviewJobMode = '';
+        kwRenderReviewStudio();
+        showToast(job.error_message || job.summary || '输入润色失败');
+      },
+      onError(error) {
+        kwReviewDraftGenerating = false;
+        kwReviewDraftJobState = null;
+        kwReviewJobMode = '';
+        kwRenderReviewStudio();
+        showToast(error.message || '输入润色失败');
+      },
+    });
+  } catch (error) {
+    kwReviewDraftGenerating = false;
+    kwReviewDraftJobState = null;
+    kwReviewJobMode = '';
+    kwRenderReviewStudio();
+    showToast(error.message || '输入润色失败');
+  }
+}
+
+async function kwComposeReviewDraft() {
+  kwSyncReviewDraftFromModal();
+  kwSyncReviewTextInputs();
+  const tenant = window.ACTIVE_TENANT || {};
+  const sourceText = String(kwReviewDraft.polishedInputText || kwGetReviewDraftContentText() || '').trim();
+  if (!sourceText) {
+    showToast('请先补充输入内容');
+    return;
+  }
+  if (!(kwReviewDraft.selectedCardIds || []).length && !(kwReviewDraft.selectedKnowledgeIds || []).length) {
+    showToast('请先至少选择一张智能卡片或一份知识材料');
+    return;
+  }
+  kwReviewJobMode = 'compose';
+  kwReviewDraftGenerating = true;
+  kwReviewDraftJobState = {
+    status: 'running',
+    progress_stage: 'queued',
+    progress_percent: 4,
+    summary: '已提交完整成稿任务，正在进入大模型队列',
+    result: { live_log: [] },
+  };
+  kwRenderReviewStudio();
+  try {
+    const resp = await fetch('/api/review/compose-draft', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        tenant_slug: tenant.slug || '',
+        period: kwReviewDraft.period || 'day',
+        source_text: sourceText,
+        prompt_text: kwReviewDraft.aiPrompt || '',
+        prompt_tags: kwReviewDraft.promptTags || [],
+        selected_watchlist: kwReviewDraft.selectedWatchlist || [],
+        dashboard_cards: kwGetReviewSelectedCards(),
+        knowledge_items: kwGetReviewSelectedKnowledge().map((item) => ({
+          id: item.id || '',
+          title: item.title || '',
+          summary: item.summary || '',
+          body: item.body || item.raw_input || '',
+          raw_input: item.raw_input || item.body || '',
+          source_detail: item.source_detail || item.source || '',
+          url: item.url || '',
+          tags: item.tags || [],
+        })),
+        speaker_name: tenant.advisor || '',
+        entry_point: 'workbench_review_compose',
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.ok || !data.job_code) throw new Error((data && data.error) || 'review_compose_draft_failed');
+    kwStartAsyncJobPolling(data.job_code, {
+      onProgress(job) {
+        kwReviewDraftJobState = job || kwReviewDraftJobState;
+        kwRenderReviewStudio();
+      },
+      onSuccess(job) {
+        const result = job.result || {};
+        kwReviewDraft.generatedPreviewText = result.text || '';
+        kwReviewDraft.finalDraftText = result.text || '';
+        kwReviewDraft.previewReady = true;
+        kwReviewIngestResult = { ...(kwReviewIngestResult || {}), review_draft_llm: result.llm_model || null };
+        kwReviewDraftGenerating = false;
+        kwReviewDraftJobState = null;
+        kwReviewJobMode = '';
+        kwRenderReviewStudio();
+      },
+      onFailed(job) {
+        kwReviewDraftGenerating = false;
+        kwReviewDraftJobState = null;
+        kwReviewJobMode = '';
+        kwRenderReviewStudio();
+        showToast(job.error_message || job.summary || '完整成稿失败');
+      },
+      onError(error) {
+        kwReviewDraftGenerating = false;
+        kwReviewDraftJobState = null;
+        kwReviewJobMode = '';
+        kwRenderReviewStudio();
+        showToast(error.message || '完整成稿失败');
+      },
+    });
+  } catch (error) {
+    kwReviewDraftGenerating = false;
+    kwReviewDraftJobState = null;
+    kwReviewJobMode = '';
+    kwRenderReviewStudio();
+    showToast(error.message || '完整成稿失败');
+  }
 }
 
 function kwSyncReviewDraftFromModal() {
@@ -5924,8 +7487,25 @@ function kwRenderReviewInputPanel() {
           <button class="kw-review-input-button" type="button" onclick="kwCaptureReviewFileInput()">上传文件</button>
         </div>
         <div class="kw-review-intake-result">
-          <div class="kw-review-intake-result-title">抽取文案</div>
+          <div class="kw-review-intake-result-title">抽取文案${kwReviewDraft.fileName ? ` · ${escapeHtml(kwReviewDraft.fileName)}` : ''}</div>
           <div class="kw-review-intake-result-text">${escapeHtml(kwReviewDraft.fileText || '完成文件上传后，这里会展示抽取后的复盘文案。')}</div>
+        </div>
+      </div>
+    `;
+  }
+  if (kwReviewDraft.sourceMode === 'url') {
+    return `
+      <div class="kw-review-intake-panel">
+        <div class="kw-review-intake-toolbar" style="align-items:flex-end">
+          <div style="flex:1;display:grid;gap:10px">
+            <input id="kw-review-url-input" type="text" value="${escapeAttr(kwReviewDraft.urlValue || '')}" placeholder="输入网页 URL 作为本次复盘补充素材" class="kw-review-final-editor" style="min-height:auto;height:40px">
+            <input id="kw-review-url-title" type="text" value="${escapeAttr(kwReviewDraft.urlTitle || '')}" placeholder="可选：自定义这份 URL 材料标题" class="kw-review-final-editor" style="min-height:auto;height:40px">
+          </div>
+          <button class="kw-review-input-button" type="button" onclick="kwPreviewReviewUrl()">抓取网页</button>
+        </div>
+        <div class="kw-review-intake-result">
+          <div class="kw-review-intake-result-title">网页提炼结果</div>
+          <div class="kw-review-intake-result-text">${escapeHtml(kwReviewDraft.urlText || '抓取网页后，这里会展示正文摘要，可作为复盘素材。')}</div>
         </div>
       </div>
     `;
@@ -5968,6 +7548,195 @@ function kwRenderReviewPreviewPanel() {
         <span class="kw-review-draft-status">待发布</span>
       </div>
       <div class="kw-review-preview-copy">${escapeHtml(kwGetReviewPreviewText())}</div>
+    </div>
+  `;
+}
+
+function kwSetReviewCardPrompt(cardId, value) {
+  const normalizedId = String(cardId || '').trim();
+  if (!normalizedId) return;
+  kwReviewDraft.cardPromptOverrides = {
+    ...(kwReviewDraft.cardPromptOverrides || {}),
+    [normalizedId]: String(value || '').trim(),
+  };
+}
+
+function kwRenderReviewFlowNav() {
+  const host = document.getElementById('kw-review-flow-nav');
+  const flowNodes = kwGetReviewStudioConfig().flow_nodes || [];
+  if (!host) return;
+  const sourceReady = !!kwGetReviewDraftContentText();
+  const cardsReady = !!(kwReviewDraft.selectedCardIds || []).length || !!(kwReviewDraft.selectedKnowledgeIds || []).length;
+  const polishedReady = !!String(kwReviewDraft.polishedInputText || '').trim();
+  const composedReady = !!String(kwReviewDraft.generatedPreviewText || '').trim();
+  const finalReady = !!String(kwGetReviewPreviewText() || '').trim();
+  host.innerHTML = flowNodes.map((node) => {
+    const nodeId = String(node.id || '').trim();
+    const active = (kwReviewJobMode === 'polish' && nodeId === 'polish')
+      || (kwReviewJobMode === 'compose' && nodeId === 'compose');
+    const done = (nodeId === 'cards' && cardsReady)
+      || (nodeId === 'input' && sourceReady)
+      || (nodeId === 'polish' && polishedReady)
+      || (nodeId === 'compose' && composedReady)
+      || (nodeId === 'preview' && finalReady);
+    const style = active
+      ? 'background:#1F497D;color:#fff;border-color:#1F497D;'
+      : (done ? 'background:rgba(47,116,192,0.10);color:#1F497D;border-color:rgba(47,116,192,0.20);' : '');
+    return `<span class="kw-review-flow-step" style="${style}">${escapeHtml(node.label || '')}</span>`;
+  }).join('');
+}
+
+function kwRenderReviewCardSlotGrid() {
+  const host = document.getElementById('kw-review-card-slot-grid');
+  const selectedCards = kwGetReviewSelectedCards();
+  const selectedKnowledge = kwGetReviewSelectedKnowledge();
+  if (!host) return;
+  if (!selectedCards.length && !selectedKnowledge.length) {
+    host.innerHTML = `
+      <button class="kw-knowledge-entry-card" type="button" style="text-align:left;background:#F8FBFF" onclick="kwOpenReviewCardPicker()">
+        <div class="kw-knowledge-entry-icon">+</div>
+        <div class="kw-knowledge-title">添加复盘素材</div>
+        <div class="kw-knowledge-entry-desc">选择智能仪表盘卡片或已上传知识内容，作为本次复盘的基础素材与附加材料。</div>
+      </button>
+    `;
+    return;
+  }
+  host.innerHTML = `
+    <div class="kw-knowledge-entry-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:0">
+      ${selectedCards.map((card) => `
+        <div class="kw-knowledge-entry-card" style="cursor:default">
+          <div class="kw-knowledge-entry-icon">📊</div>
+          <div class="kw-knowledge-title">${escapeHtml(card.title || '智能卡片')}</div>
+          <div class="kw-knowledge-entry-desc">${escapeHtml(card.summary || '已加入本次复盘')}</div>
+        </div>
+      `).join('')}
+      ${selectedKnowledge.map((item) => `
+        <div class="kw-knowledge-entry-card" style="cursor:default">
+          <div class="kw-knowledge-entry-icon">📚</div>
+          <div class="kw-knowledge-title">${escapeHtml(item.title || '知识材料')}</div>
+          <div class="kw-knowledge-entry-desc">${escapeHtml(item.summary || item.body || item.raw_input || '已加入本次复盘')}</div>
+        </div>
+      `).join('')}
+      <button class="kw-knowledge-entry-card" type="button" style="text-align:left;background:#F8FBFF" onclick="kwOpenReviewCardPicker()">
+        <div class="kw-knowledge-entry-icon">+</div>
+        <div class="kw-knowledge-title">继续添加</div>
+        <div class="kw-knowledge-entry-desc">可以继续补充卡片或知识材料。</div>
+      </button>
+    </div>
+  `;
+}
+
+function kwRenderReviewCardDetailList() {
+  const host = document.getElementById('kw-review-card-detail-list');
+  const selectedCards = kwGetReviewSelectedCards();
+  const selectedKnowledge = kwGetReviewSelectedKnowledge();
+  if (!host) return;
+  host.innerHTML = `
+    ${selectedCards.map((card) => `
+      <div class="kw-review-runtime-item" style="margin-top:12px">
+        <strong>${escapeHtml(card.title || '智能卡片')}</strong>
+        <div class="kw-review-runtime-desc" style="margin-top:6px">${escapeHtml(card.summary || '暂无摘要')}</div>
+        <div class="kw-review-runtime-desc" style="margin-top:6px">数据来源：${escapeHtml((card.data_sources || []).join(' / ') || '未提供')}</div>
+        <div class="kw-review-runtime-desc" style="margin-top:4px">新闻来源：${escapeHtml((card.news_sources || []).join(' / ') || '未提供')}</div>
+        <textarea class="kw-knowledge-modal-textarea" style="margin-top:10px;min-height:88px" placeholder="这里可以对白盒提示词做细调" onchange="kwSetReviewCardPrompt('${escapeAttr(card.id || '')}', this.value)">${escapeHtml(kwReviewDraft.cardPromptOverrides[card.id] || card.prompt || '')}</textarea>
+      </div>
+    `).join('')}
+    ${selectedKnowledge.length ? `
+      <div class="kw-review-runtime-item" style="margin-top:12px">
+        <strong>本次附加知识材料</strong>
+        <div class="kw-review-runtime-desc" style="margin-top:6px">这些知识会参与本次归纳，同时在粉丝侧作为附加材料可查看。</div>
+        <div class="kw-chip-row" style="margin-top:10px">
+          ${selectedKnowledge.map((item) => `<span class="kw-chip">${escapeHtml(item.title || '知识材料')}</span>`).join('')}
+        </div>
+      </div>
+    ` : ''}
+  `;
+}
+
+function kwRenderReviewInputModeRow() {
+  const host = document.getElementById('kw-review-input-mode-row');
+  if (!host) return;
+  host.innerHTML = KW_REVIEW_SOURCE_OPTIONS.map((item) => `
+    <button class="kw-knowledge-source-pill ${item.value === kwReviewDraft.sourceMode ? 'active' : ''}" type="button" onclick="kwSetReviewTriggerSourceMode('${item.value}')">
+      ${item.icon} ${escapeHtml(item.label)}
+    </button>
+  `).join('');
+}
+
+function kwRenderReviewStageActions() {
+  const host = document.getElementById('kw-review-stage-actions');
+  if (!host) return;
+  host.innerHTML = `
+    <div class="kw-knowledge-modal-block" style="margin:0;padding:0;background:none;border:none">
+      <div class="kw-review-runtime-desc">周期：${escapeHtml(getKwReviewPeriodMeta(kwReviewDraft.period).label)}；段落方式：${escapeHtml((KW_REVIEW_PARAGRAPH_OPTIONS.find((item) => item.value === kwReviewDraft.paragraphMode) || {}).label || '智能文案')}</div>
+      <div class="kw-toolbar" style="margin-top:10px">
+        ${Object.entries(KW_REVIEW_PERIOD_CONFIG).map(([value, meta]) => `
+          <button class="kw-review-period-pill ${value === kwReviewDraft.period ? 'active' : ''}" type="button" onclick="kwSetReviewTriggerPeriod('${value}')">${escapeHtml(meta.label)}</button>
+        `).join('')}
+      </div>
+      <div class="kw-toolbar" style="margin-top:10px">
+        ${KW_REVIEW_PARAGRAPH_OPTIONS.map((item) => `
+          <button class="kw-knowledge-source-pill ${item.value === kwReviewDraft.paragraphMode ? 'active' : ''}" type="button" onclick="kwSetReviewTriggerParagraphMode('${item.value}')">${escapeHtml(item.label)}</button>
+        `).join('')}
+      </div>
+      <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--text-main);line-height:1.7;margin-top:12px">
+        <input type="checkbox" id="kw-review-skip-ai-processing" ${kwReviewDraft.skipAiProcessing ? 'checked' : ''} onchange="kwToggleReviewSkipAiProcessing(this.checked)" />
+        <span>关闭大模型处理，只保留原始输入和人工编辑结果。</span>
+      </label>
+      ${kwRenderReviewPromptPanel()}
+      <div class="kw-toolbar" style="margin-top:12px">
+        <button class="btn-outline" type="button" ${kwReviewDraftGenerating ? 'disabled' : ''} onclick="kwPolishReviewInput()">输入润色</button>
+        <button class="btn-gold" type="button" ${kwReviewDraftGenerating ? 'disabled' : ''} onclick="kwComposeReviewDraft()">完整成稿</button>
+      </div>
+    </div>
+  `;
+}
+
+function kwRenderReviewStageResults() {
+  const host = document.getElementById('kw-review-stage-results');
+  if (!host) return;
+  const selectedKnowledge = kwGetReviewSelectedKnowledge();
+  const selectedCards = kwGetReviewSelectedCards();
+  host.innerHTML = `
+    ${kwReviewDraft.polishedInputText ? `
+      <div class="kw-review-runtime-item">
+        <strong>阶段 1：输入润色结果</strong>
+        <div class="kw-review-runtime-desc" style="margin-top:6px">${escapeHtml(kwReviewDraft.polishedInputText).replace(/\n/g, '<br>')}</div>
+      </div>
+    ` : ''}
+    ${kwReviewDraft.generatedPreviewText ? `
+      <div class="kw-review-runtime-item" style="margin-top:12px">
+        <strong>阶段 2：完整成稿</strong>
+        <div class="kw-review-runtime-desc" style="margin-top:6px">${escapeHtml(kwReviewDraft.generatedPreviewText).replace(/\n/g, '<br>')}</div>
+      </div>
+    ` : ''}
+    <div class="kw-review-runtime-item" style="margin-top:12px">
+      <strong>本次归纳素材</strong>
+      <div class="kw-review-runtime-desc" style="margin-top:6px">智能卡片 ${selectedCards.length} 张，知识材料 ${selectedKnowledge.length} 份。</div>
+    </div>
+  `;
+}
+
+function kwRenderReviewWhiteboxPanel() {
+  const host = document.getElementById('kw-review-whitebox-panel');
+  const promptConfig = kwGetReviewStudioConfig().prompt_config || {};
+  if (!host) return;
+  host.innerHTML = `
+    <div class="kw-review-runtime-item">
+      <strong>输入润色 System Prompt</strong>
+      <div class="kw-review-runtime-desc" style="margin-top:6px;white-space:pre-wrap">${escapeHtml(promptConfig.polish_system_prompt || '未配置')}</div>
+    </div>
+    <div class="kw-review-runtime-item" style="margin-top:12px">
+      <strong>输入润色 User Template</strong>
+      <div class="kw-review-runtime-desc" style="margin-top:6px;white-space:pre-wrap">${escapeHtml(promptConfig.polish_user_template || '未配置')}</div>
+    </div>
+    <div class="kw-review-runtime-item" style="margin-top:12px">
+      <strong>完整成稿 System Prompt</strong>
+      <div class="kw-review-runtime-desc" style="margin-top:6px;white-space:pre-wrap">${escapeHtml(promptConfig.compose_system_prompt || '未配置')}</div>
+    </div>
+    <div class="kw-review-runtime-item" style="margin-top:12px">
+      <strong>完整成稿 User Template</strong>
+      <div class="kw-review-runtime-desc" style="margin-top:6px;white-space:pre-wrap">${escapeHtml(promptConfig.compose_user_template || '未配置')}</div>
     </div>
   `;
 }
@@ -6046,6 +7815,7 @@ function kwRenderReviewTriggerModal() {
     </div>
   `;
   kwEnsureReviewEditors();
+  kwRenderReviewStudio();
 }
 
 function kwOpenReviewTriggerModal(sourceMode) {
@@ -6081,6 +7851,8 @@ function kwSetReviewTriggerPeriod(period) {
   if (!KW_REVIEW_PERIOD_CONFIG[period]) return;
   kwReviewDraft.period = period;
   kwReviewDraft.generatedPreviewText = '';
+  kwReviewDraft.previewReady = false;
+  kwRenderReviewStudio();
   kwRenderReviewTriggerModal();
 }
 
@@ -6090,6 +7862,7 @@ function kwSetReviewTriggerSourceMode(mode) {
   kwReviewDraft.sourceMode = mode;
   kwReviewDraft.generatedPreviewText = '';
   kwReviewDraft.previewReady = false;
+  kwRenderReviewStudio();
   kwRenderReviewTriggerModal();
 }
 
@@ -6098,6 +7871,7 @@ function kwSetReviewTriggerParagraphMode(mode) {
   kwSyncReviewDraftFromModal();
   kwReviewDraft.paragraphMode = mode;
   kwReviewDraft.previewReady = false;
+  kwRenderReviewStudio();
   kwRenderReviewTriggerModal();
 }
 
@@ -6111,6 +7885,7 @@ function kwToggleReviewSkipAiProcessing(checked) {
     kwReviewDraft.generatedPreviewText = '';
   }
   kwReviewDraft.previewReady = false;
+  kwRenderReviewStudio();
   kwRenderReviewTriggerModal();
 }
 
@@ -6121,6 +7896,7 @@ function kwToggleReviewTriggerWatchlist(name) {
   if (current.has(name)) current.delete(name); else current.add(name);
   kwReviewDraft.selectedWatchlist = fullList.filter(item => current.has(item));
   kwReviewDraft.previewReady = false;
+  kwRenderReviewStudio();
   kwRenderReviewTriggerModal();
 }
 
@@ -6149,12 +7925,14 @@ function kwCaptureReviewVoiceInput() {
       kwReviewVoiceRecording = false;
       kwReviewVoiceUploading = false;
       stream.getTracks().forEach((track) => track.stop());
+      kwRenderReviewStudio();
       kwRenderReviewTriggerModal();
       showToast('录音失败，请重试');
     };
     kwReviewVoiceRecorder.onstop = async () => {
       kwReviewVoiceRecording = false;
       kwReviewVoiceUploading = true;
+      kwRenderReviewStudio();
       kwRenderReviewTriggerModal();
       const blob = new Blob(kwReviewVoiceChunks, { type: kwReviewVoiceRecorder.mimeType || 'audio/webm' });
       stream.getTracks().forEach((track) => track.stop());
@@ -6177,6 +7955,7 @@ function kwCaptureReviewVoiceInput() {
               `转写内容：${result.display_transcript || result.transcript || ''}`,
               result.enhanced_transcript ? `原始转写：${result.raw_transcript || result.transcript || ''}` : '',
             ]);
+            kwRenderReviewStudio();
             kwRenderReviewTriggerModal();
             showToast('语音已转成文案，待确认发布');
           },
@@ -6194,21 +7973,45 @@ function kwCaptureReviewVoiceInput() {
         kwReviewVoiceUploading = false;
         kwReviewVoiceRecorder = null;
         kwReviewVoiceChunks = [];
+        kwRenderReviewStudio();
         kwRenderReviewTriggerModal();
       }
     };
     kwReviewVoiceRecorder.start();
+    kwRenderReviewStudio();
     kwRenderReviewTriggerModal();
   }).catch(() => {
     showToast('未获得麦克风权限');
   });
 }
 
-function kwCaptureReviewFileInput() {
-  kwReviewDraft.fileText = '系统已从上传文件提炼文案：行业层面保留 AI 算力、半导体和港股互联网三条线，个股层面补充估值带、催化条件和风险边界，已整理为复盘草稿输入。';
-  kwReviewDraft.previewReady = false;
-  kwRenderReviewTriggerModal();
-  showToast('文件已转成文案');
+function kwCaptureReviewFileInputLegacy() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.doc,.docx,.txt,.md,.csv,.xlsx,.xls';
+  input.onchange = async () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file, file.name);
+    const resp = await fetch('/api/kol/knowledge/file-preview', {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) {
+      showToast((data && data.error) || '文件解析失败');
+      return;
+    }
+    const preview = data.preview || {};
+    kwReviewDraft.fileName = preview.filename || file.name;
+    kwReviewDraft.fileText = preview.body || preview.summary || '';
+    kwReviewDraft.previewReady = false;
+    kwRenderReviewStudio();
+    kwRenderReviewTriggerModal();
+    showToast('文件已转成文案');
+  };
+  input.click();
 }
 
 function kwToggleReviewPromptTag(tag) {
@@ -6217,6 +8020,7 @@ function kwToggleReviewPromptTag(tag) {
   if (current.has(tag)) current.delete(tag); else current.add(tag);
   kwReviewDraft.promptTags = KW_REVIEW_PROMPT_TAGS.filter(item => current.has(item));
   kwReviewDraft.previewReady = false;
+  kwRenderReviewStudio();
   kwRenderReviewTriggerModal();
 }
 
@@ -6416,6 +8220,7 @@ function kwSubmitReviewTrigger() {
 
 function kwPublishReviewDraft() {
   const runtime = ensureKwReviewRuntime();
+  kwSyncReviewTextInputs();
   const item = kwBuildPublishedReviewFromDraft();
   const finalText = kwGetReviewPreviewText();
   const transcriptionEngine = kwReviewDraft.sourceMode === 'voice'
@@ -6445,15 +8250,32 @@ function kwPublishReviewDraft() {
         ]);
         runtime.kolPublishedAt = '刚刚发布';
         runtime.kolGeneratedAt = '刚刚发布';
-        const reviews = window.WORKBENCH_DATA && Array.isArray(window.WORKBENCH_DATA.published_reviews)
-          ? window.WORKBENCH_DATA.published_reviews
-          : [];
-        reviews.unshift(item);
         if (window.WORKBENCH_DATA) {
-          window.WORKBENCH_DATA.published_reviews = reviews.slice(0, 6);
+          if (Array.isArray(result.snapshots) && result.snapshots.length) {
+            window.WORKBENCH_DATA.published_reviews = result.snapshots.slice(0, 20);
+          } else {
+            const reviews = Array.isArray(window.WORKBENCH_DATA.published_reviews) ? window.WORKBENCH_DATA.published_reviews : [];
+            reviews.unshift(result.snapshot || item);
+            window.WORKBENCH_DATA.published_reviews = reviews.slice(0, 20);
+          }
+          if (result.message_center_state) {
+            const threadItems = Array.isArray(result.message_center_state.threads) ? result.message_center_state.threads : [];
+            window.WORKBENCH_DATA.message_center = {
+              summary: result.message_center_state.summary || ((window.WORKBENCH_DATA.message_center || {}).summary) || '',
+              items: threadItems.slice(0, 6).map((thread) => ({
+                name: thread.name || thread.user_name || '',
+                type: thread.type === 'review_notification' ? '系统消息' : (thread.status === '待回复' ? '粉丝提问' : '追问消息'),
+                time: thread.time || '--',
+                content: thread.content || '',
+                status: thread.status || '待处理',
+              })),
+              threads: threadItems,
+            };
+          }
         }
         kwRenderReviewStudio();
         kwRenderPublishedReviewList();
+        kwRenderMessageCenter();
         renderWorkbenchAnnotationViews();
         showToast('复盘已发布并入向量库');
       },
@@ -6490,13 +8312,67 @@ function kwRenderPublishedReviewList() {
   `).join('');
 }
 
+function kwRenderMessageCenter() {
+  const host = document.querySelector('#workbench-section-messages .kw-fan-list');
+  const summaryHost = document.querySelector('#workbench-section-messages .kw-card-desc');
+  const messageCenter = (window.WORKBENCH_DATA && window.WORKBENCH_DATA.message_center) || {};
+  const items = Array.isArray(messageCenter.items) ? messageCenter.items : [];
+  if (summaryHost && messageCenter.summary) summaryHost.textContent = messageCenter.summary;
+  if (!host) return;
+  host.innerHTML = items.map((fan) => `
+    <div class="kw-fan-item">
+      <div class="kw-fan-top">
+        <div class="kw-fan-name">${escapeHtml(fan.name || '')}</div>
+        <span class="kw-tag">${escapeHtml(fan.status || '')}</span>
+      </div>
+      <div class="kw-message-type">${escapeHtml(fan.type || '')} · ${escapeHtml(fan.time || '')}</div>
+      <div class="kw-fan-msg">${escapeHtml(fan.content || '')}</div>
+    </div>
+  `).join('') || '<div class="kw-side-note">当前暂无消息</div>';
+}
+
+function kwRenderBroadcastHistory() {
+  const host = document.querySelector('#workbench-section-broadcast .kw-broadcast-list');
+  const items = (window.WORKBENCH_DATA && Array.isArray(window.WORKBENCH_DATA.broadcast_history)) ? window.WORKBENCH_DATA.broadcast_history : [];
+  if (!host) return;
+  host.innerHTML = items.map((item) => `
+    <div class="kw-broadcast-item">
+      <div class="kw-broadcast-top">
+        <div class="kw-broadcast-content">${escapeHtml(item.content || '')}</div>
+        <span class="kw-tag">触达 ${escapeHtml(String(item.reach || 0))}</span>
+      </div>
+      <div class="kw-broadcast-meta">${escapeHtml(item.time || '')} · 打开率 ${escapeHtml(String(item.open_rate || 0))}%</div>
+    </div>
+  `).join('') || '<div class="kw-side-note">当前暂无群发记录</div>';
+}
+
 function kwRenderReviewStudio() {
   const runtime = ensureKwReviewRuntime();
+  const flowHost = document.getElementById('kw-review-flow-nav');
+  const cardSlotHost = document.getElementById('kw-review-card-slot-grid');
+  const cardDetailHost = document.getElementById('kw-review-card-detail-list');
+  const inputModeHost = document.getElementById('kw-review-input-mode-row');
+  const intakeHost = document.getElementById('kw-review-intake-workspace');
+  const stageActionsHost = document.getElementById('kw-review-stage-actions');
+  const progressHost = document.getElementById('kw-review-progress-host');
+  const stageResultsHost = document.getElementById('kw-review-stage-results');
   const runtimeHost = document.getElementById('kw-review-runtime-panel');
+  const whiteboxHost = document.getElementById('kw-review-whitebox-panel');
   const latestHost = document.getElementById('kw-review-latest-published');
   const latestPublished = (window.WORKBENCH_DATA && window.WORKBENCH_DATA.published_reviews && window.WORKBENCH_DATA.published_reviews[0]) || null;
   const sourceCfg = KW_REVIEW_SOURCE_OPTIONS.find(item => item.value === runtime.kolSourceMode) || KW_REVIEW_SOURCE_OPTIONS[0];
   const paragraphCfg = KW_REVIEW_PARAGRAPH_OPTIONS.find(item => item.value === runtime.paragraphMode) || KW_REVIEW_PARAGRAPH_OPTIONS[0];
+  const selectedKnowledge = kwGetReviewSelectedKnowledge();
+  const selectedCards = kwGetReviewSelectedCards();
+  if (flowHost) kwRenderReviewFlowNav();
+  if (cardSlotHost) kwRenderReviewCardSlotGrid();
+  if (cardDetailHost) kwRenderReviewCardDetailList();
+  if (inputModeHost) kwRenderReviewInputModeRow();
+  if (intakeHost) intakeHost.innerHTML = kwRenderReviewInputPanel();
+  if (stageActionsHost) kwRenderReviewStageActions();
+  if (progressHost) progressHost.innerHTML = kwRenderReviewDraftProgressPanel();
+  if (stageResultsHost) kwRenderReviewStageResults();
+  if (whiteboxHost) kwRenderReviewWhiteboxPanel();
   if (runtimeHost) {
     runtimeHost.innerHTML = `
       <div class="kw-review-runtime-item">
@@ -6510,6 +8386,10 @@ function kwRenderReviewStudio() {
       <div class="kw-review-runtime-item">
         <strong>当前修改规则</strong>
         <div class="kw-review-runtime-desc">${escapeHtml(runtime.latestAiPrompt || '当前未填写修改规则')}</div>
+      </div>
+      <div class="kw-review-runtime-item">
+        <strong>本次已选素材</strong>
+        <div class="kw-review-runtime-desc">智能卡片 ${selectedCards.length} 张，知识材料 ${selectedKnowledge.length} 份。</div>
       </div>
     `;
   }
@@ -6525,6 +8405,12 @@ function kwRenderReviewStudio() {
       </div>
     ` : '<div class="kw-review-runtime-item"><strong>暂无已发布复盘</strong><div class="kw-review-runtime-desc">生成草稿并确认发布后，这里会同步显示最新结果。</div></div>';
   }
+  const finalEditor = document.getElementById('kw-review-final-editor');
+  if (finalEditor) {
+    const nextValue = String(kwReviewDraft.finalDraftText || kwReviewDraft.generatedPreviewText || kwReviewDraft.polishedInputText || kwGetReviewDraftContentText() || '').trim();
+    if (finalEditor.value !== nextValue) finalEditor.value = nextValue;
+  }
+  kwEnsureReviewEditors();
 }
 
 function loadWorkbenchWatchlistAnnotations() {
@@ -7385,10 +9271,13 @@ async function handleKwFanCsvImport(file) {
 document.addEventListener('DOMContentLoaded', () => {
   initWorkbenchNavGroups();
   refreshWorkbenchNavVisibility();
+  refreshWorkbenchSiteConfig({silent: true});
   kwRenderPortalWorkspace();
   kwRenderDashboardPreview();
   kwRenderReviewStudio();
   kwRenderPublishedReviewList();
+  kwRenderMessageCenter();
+  kwRenderBroadcastHistory();
   kwRenderKnowledgeList();
   renderKwFans();
   const kwFanCsvInput = document.getElementById('kw-fan-csv-input');
@@ -7405,7 +9294,11 @@ document.addEventListener('DOMContentLoaded', () => {
     showWorkbenchSection('overview');
     return;
   }
-  if ((section === 'messages' || section === 'broadcast') && !isWorkbenchFeatureEnabled('dm')) {
+  if (section === 'messages' && !isWorkbenchFeatureEnabled('fan_interaction')) {
+    showWorkbenchSection('overview');
+    return;
+  }
+  if (section === 'broadcast' && !isWorkbenchFeatureEnabled('dm')) {
     showWorkbenchSection('overview');
     return;
   }
@@ -7451,6 +9344,22 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   initWorkbenchForecastEditorEvents();
   renderWorkbenchAnnotationViews();
+});
+
+window.addEventListener('focus', () => {
+  refreshWorkbenchSiteConfig({silent: true});
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    refreshWorkbenchSiteConfig({silent: true});
+  }
+});
+
+window.addEventListener('storage', (event) => {
+  if (event.key === SITE_CONFIG_BROADCAST_KEY) {
+    refreshWorkbenchSiteConfig({silent: true});
+  }
 });
 </script>
 <script src="/static/js/charts.js"></script>

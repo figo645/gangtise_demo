@@ -567,6 +567,122 @@
     line-height:1.8;
     padding:24px;
   }
+  .tenant-dashboard-preview {
+    margin-top:18px;
+    padding:16px;
+    border-radius:14px;
+    border:1px solid rgba(200,169,110,0.12);
+    background:var(--surface-2);
+  }
+  .tenant-dashboard-preview-head {
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+    margin-bottom:12px;
+  }
+  .tenant-dashboard-preview-title {
+    font-size:14px;
+    font-weight:700;
+    color:var(--text-main);
+  }
+  .tenant-dashboard-preview-desc {
+    margin-top:4px;
+    font-size:11px;
+    color:var(--text-sub);
+    line-height:1.7;
+  }
+  .tenant-dashboard-layout-tag {
+    display:inline-flex;
+    align-items:center;
+    padding:4px 10px;
+    border-radius:999px;
+    background:rgba(47,116,192,0.10);
+    color:#1F497D;
+    font-size:11px;
+    font-weight:700;
+    white-space:nowrap;
+  }
+  .tenant-dashboard-grid {
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:12px;
+  }
+  .tenant-dashboard-card {
+    border:1px solid rgba(47,116,192,0.10);
+    border-radius:14px;
+    background:linear-gradient(180deg, rgba(47,116,192,0.04), rgba(255,255,255,0.9));
+    padding:14px;
+    cursor:pointer;
+    transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
+  }
+  .tenant-dashboard-card:hover {
+    transform:translateY(-1px);
+    border-color:rgba(200,169,110,0.24);
+    box-shadow:0 10px 22px rgba(13,27,42,0.08);
+  }
+  .tenant-dashboard-card-head {
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:10px;
+  }
+  .tenant-dashboard-card-title {
+    font-size:13px;
+    font-weight:700;
+    color:var(--text-main);
+  }
+  .tenant-dashboard-card-value {
+    margin-top:8px;
+    font-size:22px;
+    font-weight:800;
+    color:var(--gold);
+  }
+  .tenant-dashboard-card-desc {
+    margin-top:8px;
+    font-size:11px;
+    color:var(--text-sub);
+    line-height:1.7;
+  }
+  .tenant-dashboard-card-meta {
+    margin-top:10px;
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .tenant-dashboard-metric-list {
+    margin-top:8px;
+    display:grid;
+    gap:6px;
+  }
+  .tenant-dashboard-metric-compact {
+    margin-top:8px;
+    font-size:10px;
+    line-height:1.55;
+    color:#5F7084;
+  }
+  .tenant-dashboard-metric-chip {
+    display:block;
+    padding:6px 8px;
+    border-radius:10px;
+    background:#F8FBFF;
+    border:1px solid rgba(47,116,192,0.10);
+    font-size:10px;
+    line-height:1.55;
+    color:#5F7084;
+  }
+  .tenant-dashboard-chip {
+    display:inline-flex;
+    align-items:center;
+    min-height:28px;
+    padding:0 10px;
+    border-radius:999px;
+    border:1px solid rgba(47,116,192,0.10);
+    background:#F8FBFF;
+    color:#1F497D;
+    font-size:10px;
+    font-weight:700;
+  }
   .admin-build-tag {
     display:inline-flex;
     align-items:center;
@@ -1009,7 +1125,8 @@
     .llm-admin-hero,
     .llm-admin-model-grid,
     .tenant-admin-shell,
-    .tenant-admin-detail-grid { grid-template-columns:1fr; }
+    .tenant-admin-detail-grid,
+    .tenant-dashboard-grid { grid-template-columns:1fr; }
     .tenant-admin-sidebar { position:static; }
   }
 </style>
@@ -3539,6 +3656,10 @@
               <label class="toggle"><input id="feature-dm" type="checkbox"><span class="toggle-slider"></span></label>
             </div>
             <div class="toggle-wrap">
+              <span class="toggle-label">粉丝与大V互动</span>
+              <label class="toggle"><input id="feature-fan_interaction" type="checkbox"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
               <span class="toggle-label">大V 工作台 Web</span>
               <label class="toggle"><input id="feature-workbench" type="checkbox"><span class="toggle-slider"></span></label>
             </div>
@@ -3547,6 +3668,12 @@
             </div>
             <div class="feature-note" style="margin-top:8px">
               MVP 默认优先开放：基本面、自选股、复盘、消息互动、知识归档、大V工作台和租户门户；预测分析放到约 1 个月后的第二阶段，会员收费能力按层级逐步开放。
+            </div>
+            <div style="display:grid;gap:10px;margin-top:16px">
+              <button class="btn-gold" type="button" style="padding:10px 20px;font-size:13px;width:100%" onclick="saveSiteConfig()">保存功能开关</button>
+              <div class="feature-note" id="feature-config-status">
+                修改开关后需要点击保存才会生效。保存后，Admin、大V工作台和 H5 会按最新配置同步显示或隐藏对应功能。
+              </div>
             </div>
           </div>
         </div>
@@ -3655,6 +3782,38 @@
             </div>
             <div class="feature-note">
               这里是证据链相关性过滤的白盒配置。保存后，知识库问答、证据链 API，以及后续 H5 dashboard / 复盘等复用这套能力的入口都会使用这里的提示词和超时设置。
+            </div>
+          </div>
+          <div class="config-card">
+            <div class="config-card-title">复盘生成白盒配置</div>
+            <div class="config-field">
+              <label>阶段1：输入润色系统提示词</label>
+              <textarea id="review-polish-system-prompt" rows="8" placeholder="输入润色系统提示词"></textarea>
+            </div>
+            <div class="config-field">
+              <label>阶段1：输入润色用户模板</label>
+              <textarea id="review-polish-user-template" rows="9" placeholder="可使用 {period_label} / {source_mode} / {speaker_label} / {entry_point} / {source_text}"></textarea>
+            </div>
+            <div class="config-field">
+              <label>阶段2：完整成稿系统提示词</label>
+              <textarea id="review-compose-system-prompt" rows="8" placeholder="完整成稿系统提示词"></textarea>
+            </div>
+            <div class="config-field">
+              <label>阶段2：完整成稿用户模板</label>
+              <textarea id="review-compose-user-template" rows="10" placeholder="可使用 {period_label} / {speaker_label} / {entry_point} / {watchlist_text} / {tag_text} / {prompt_text} / {source_text} / {dashboard_blocks}"></textarea>
+            </div>
+            <div class="config-grid two-column" style="margin-top:12px">
+              <div class="config-field">
+                <label>输入润色超时（秒）</label>
+                <input id="review-polish-timeout-seconds" type="number" min="5" max="180" step="1" placeholder="45">
+              </div>
+              <div class="config-field">
+                <label>完整成稿超时（秒）</label>
+                <input id="review-compose-timeout-seconds" type="number" min="5" max="240" step="1" placeholder="60">
+              </div>
+            </div>
+            <div class="feature-note">
+              这里是复盘两阶段生成的白盒配置。工作台中的“输入润色”和“完整成稿”都会读取这里的提示词与超时设置，便于运营监督和技术排查。
             </div>
           </div>
         </div>
@@ -4055,6 +4214,11 @@
 <div class="admin-modal-overlay" id="admin-user-detail-modal" onclick="if(event.target===this)closeAdminUserDetailModal()">
   <div class="admin-modal-sheet">
     <div id="admin-user-detail-modal-content"></div>
+  </div>
+</div>
+<div class="admin-modal-overlay" id="admin-tenant-dashboard-modal" onclick="if(event.target===this)closeAdminTenantDashboardModal()">
+  <div class="admin-modal-sheet">
+    <div id="admin-tenant-dashboard-modal-content"></div>
   </div>
 </div>
 
@@ -6842,10 +7006,60 @@ function clearAdminLlmPurpose(index) {
   updateAdminLlmModel(index, 'purpose', '');
 }
 let selectedAdminTenantIndex = 0;
+let adminSiteConfigDirty = false;
+const SITE_CONFIG_BROADCAST_KEY = 'gangtise-site-config-updated-at';
 
 function isAdminFeatureEnabled(featureName) {
   const flags = (adminSiteConfig && adminSiteConfig.feature_flags) || {};
   return flags[featureName] !== false;
+}
+
+function markAdminSiteConfigDirty(message) {
+  adminSiteConfigDirty = true;
+  const status = document.getElementById('site-config-status');
+  const featureStatus = document.getElementById('feature-config-status');
+  const nextMessage = message || '有未保存的修改。点击保存后才会同步到 Admin、大V工作台和 H5。';
+  if (status) status.textContent = nextMessage;
+  if (featureStatus) featureStatus.textContent = nextMessage;
+}
+
+function markAdminSiteConfigSaved(message) {
+  adminSiteConfigDirty = false;
+  const status = document.getElementById('site-config-status');
+  const featureStatus = document.getElementById('feature-config-status');
+  const nextMessage = message || '已保存。功能开关会同步影响 Admin、大V工作台和 H5。';
+  if (status) status.textContent = nextMessage;
+  if (featureStatus) featureStatus.textContent = nextMessage;
+}
+
+function broadcastSiteConfigUpdate() {
+  try {
+    window.localStorage.setItem(SITE_CONFIG_BROADCAST_KEY, String(Date.now()));
+  } catch (error) {
+    // ignore storage write failures
+  }
+}
+
+function isAdminSiteConfigField(target) {
+  if (!target || !target.closest) return false;
+  return Boolean(target.closest('#section-settings-appearance, #section-settings-brand, #section-settings-features, #section-settings-knowledge, #section-settings-llm'));
+}
+
+function updateAdminFeatureFlagPreview(target) {
+  if (!target || !target.id || !target.id.startsWith('feature-')) return;
+  if (!adminSiteConfig || typeof adminSiteConfig !== 'object') return;
+  adminSiteConfig.feature_flags = adminSiteConfig.feature_flags || {};
+  const key = target.id.replace(/^feature-/, '');
+  adminSiteConfig.feature_flags[key] = Boolean(target.checked);
+  refreshAdminNavVisibility();
+  const forecastSection = document.getElementById('section-forecast-model');
+  if (forecastSection && key === 'stock_forecast' && !target.checked && forecastSection.style.display !== 'none') {
+    showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
+  }
+  const hermesSection = document.getElementById('section-hermes');
+  if (hermesSection && key === 'hermes' && !target.checked && hermesSection.style.display !== 'none') {
+    showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
+  }
 }
 
 function refreshAdminNavVisibility() {
@@ -6961,6 +7175,272 @@ function updateAdminTenantField(field, value) {
   renderTenantSidebar();
 }
 
+function adminNormalizeDashboardMode(mode) {
+  return ['market', 'industry', 'signal-stock'].includes(mode) ? mode : 'market';
+}
+
+function adminNormalizeDashboardLayout(layout) {
+  if (layout === '3x3') return '2x3';
+  if (layout === '4x4') return '2x4';
+  return ['2x2', '2x3', '2x4', '2x5'].includes(layout) ? layout : '2x2';
+}
+
+function adminGetDashboardCardTarget(layout) {
+  if (layout === '2x3') return 6;
+  if (layout === '2x4') return 8;
+  if (layout === '2x5') return 10;
+  return 4;
+}
+
+function adminGetDashboardSegmentConfig(mode) {
+  const configs = {
+    market: { title: '市场进攻意愿卡', note: '先回答今天市场是在追逐高弹性方向，还是更偏向防守。', formula: '总分 = 35%广度改善分 + 25%资金回流分 + 25%主线参与分 - 15%防御压力分' },
+    industry: { title: '行业景气验证卡', note: '先判断这条主线是基本面继续验证，还是只有情绪热度。', formula: '总分 = 30%订单景气分 + 25%价格景气分 + 20%库存去化分 + 15%政策催化分 + 10%资本开支确认分' },
+    'signal-stock': { title: '主线信号个股卡', note: '先判断哪些个股还在验证主线，哪些已经开始掉队。', formula: '总分 = 35%龙头强度分 + 30%业绩兑现分 + 20%资金承接分 + 15%估值安全分' },
+  };
+  return configs[adminNormalizeDashboardMode(mode)] || configs.market;
+}
+
+function adminGetDashboardComponentLibrary(mode) {
+  const libraries = {
+    market: [
+      { id: 'market_breadth', label: '广度改善分', source: '全市场行情库', metric: '上涨/下跌家数、站上MA20占比、新高-新低差', window: '1D', aggregation: '0-100评分', defaultWeight: 0.35 },
+      { id: 'northbound_flow', label: '资金回流分', source: '北向/南向资金库', metric: '净流入占成交比、3日累计、连续净流入天数', window: '1D / 3D', aggregation: '0-100评分', defaultWeight: 0.25 },
+      { id: 'policy_heat', label: '防御压力分', source: '风格因子库', metric: '银行/红利相对成长超额、低波ETF净流入', window: '1D / 5D', aggregation: '0-100评分', defaultWeight: 0.15 },
+    ],
+    industry: [
+      { id: 'industry_orders', label: '订单景气分', source: '行业指标库', metric: '新增订单同比、在手订单覆盖、开工率', window: '1W / 1M', aggregation: '0-100评分', defaultWeight: 0.3 },
+      { id: 'industry_price', label: '价格景气分', source: '产业链价格库', metric: '产品价格指数、价差、提价持续性', window: '1W / 1M', aggregation: '0-100评分', defaultWeight: 0.25 },
+      { id: 'industry_inventory', label: '库存去化分', source: '行业库存库', metric: '库存天数、主动/被动补库、去库斜率', window: '1M', aggregation: '0-100评分', defaultWeight: 0.2 },
+    ],
+    'signal-stock': [
+      { id: 'leader_strength', label: '龙头强度分', source: '个股行情库', metric: '相对行业超额收益、回撤控制、成交额排名', window: '5D / 20D', aggregation: '0-100评分', defaultWeight: 0.35 },
+      { id: 'valuation_band', label: '估值安全分', source: '估值与财报库', metric: 'PE/PS分位、PEG、相对历史分位', window: '1Q / 3Y', aggregation: '0-100评分', defaultWeight: 0.15 },
+      { id: 'earnings_delivery', label: '业绩兑现分', source: '财报与预期库', metric: '营收/利润兑现率、指引上修、订单兑现', window: '1Q', aggregation: '0-100评分', defaultWeight: 0.3 },
+    ],
+  };
+  return JSON.parse(JSON.stringify(libraries[adminNormalizeDashboardMode(mode)] || libraries.market));
+}
+
+function adminBuildDefaultDashboardComponents(mode) {
+  return adminGetDashboardComponentLibrary(mode).map((item, index) => ({
+    id: item.id,
+    label: item.label,
+    source: item.source,
+    metric: item.metric,
+    window: item.window,
+    aggregation: item.aggregation,
+    weight: item.defaultWeight,
+    operator: index === 0 ? 'base' : '+',
+  }));
+}
+
+function adminNormalizeDashboardComponents(components, mode) {
+  const library = adminGetDashboardComponentLibrary(mode);
+  const libraryMap = Object.fromEntries(library.map(item => [item.id, item]));
+  const list = Array.isArray(components) && components.length ? components : adminBuildDefaultDashboardComponents(mode);
+  return list.map((item, index) => {
+    const raw = item && typeof item === 'object' ? item : {};
+    const template = libraryMap[raw.id || raw.componentId] || library[Math.min(index, library.length - 1)];
+    return {
+      id: template.id,
+      label: String(raw.label || template.label || '').trim() || template.label,
+      source: String(raw.source || template.source || '').trim() || template.source,
+      metric: String(raw.metric || template.metric || '').trim() || template.metric,
+      window: String(raw.window || template.window || '').trim() || template.window,
+      aggregation: String(raw.aggregation || template.aggregation || '').trim() || template.aggregation,
+      weight: Number.isFinite(Number(raw.weight)) ? Number(Number(raw.weight).toFixed(2)) : template.defaultWeight,
+      operator: index === 0 ? 'base' : (String(raw.operator || '+').trim() || '+'),
+    };
+  });
+}
+
+function adminBuildDashboardFormula(mode, components, explicitFormula) {
+  const formula = String(explicitFormula || '').trim();
+  if (formula) return formula;
+  const list = Array.isArray(components) ? components : [];
+  if (!list.length) return adminGetDashboardSegmentConfig(mode).formula;
+  return list.map((item, index) => {
+    const prefix = index > 0 && item.operator && item.operator !== 'base' ? ` ${item.operator} ` : '';
+    const weightText = Math.abs(Number(item.weight || 1) - 1) < 0.01 ? '' : ` x ${Number(item.weight || 1)}`;
+    return `${prefix}${item.label}${weightText}`;
+  }).join('');
+}
+
+function adminBuildDashboardSources(mode, components, explicitSources) {
+  const deduped = [];
+  const pushSource = (source) => {
+    const text = String(source || '').trim();
+    if (text && !deduped.includes(text)) deduped.push(text);
+  };
+  (Array.isArray(explicitSources) ? explicitSources : []).forEach(pushSource);
+  (Array.isArray(components) ? components : []).forEach(item => pushSource(item.source));
+  if (!deduped.length) adminGetDashboardComponentLibrary(mode).forEach(item => pushSource(item.source));
+  return deduped;
+}
+
+function adminBuildDashboardMetricSummaryList(components, limit) {
+  const list = Array.isArray(components) ? components : [];
+  const maxItems = Number(limit || 2);
+  return list.slice(0, maxItems).map((item) => ({
+    label: item.label || '组件',
+    metric: item.metric || '--',
+  }));
+}
+
+function adminBuildDashboardMetricCompactText(components, limit) {
+  const list = Array.isArray(components) ? components : [];
+  if (!list.length) return '点击查看详细指标构成';
+  const maxItems = Number(limit || 2);
+  const names = list.slice(0, maxItems).map((item) => item.label || '组件');
+  const suffix = list.length > maxItems ? `等${list.length}项` : '';
+  return `指标：${names.join('、')}${suffix}`;
+}
+
+function adminResolveTenantDashboardState(tenant) {
+  const state = (tenant && tenant.fund_dashboard_config) || {};
+  const published = state.published || {};
+  const layout = adminNormalizeDashboardLayout(published.layout || '2x2');
+  const cards = Array.from({ length: adminGetDashboardCardTarget(layout) }, (_, index) => {
+    const raw = Array.isArray(published.cards) ? published.cards[index] : null;
+    const mode = adminNormalizeDashboardMode((raw && (raw.mode || raw.segmentId)) || 'market');
+    const components = adminNormalizeDashboardComponents(raw && raw.components, mode);
+    return raw ? {
+      ...raw,
+      mode,
+      segmentId: mode,
+      components,
+      formula: adminBuildDashboardFormula(mode, components, raw.formula),
+      sources: adminBuildDashboardSources(mode, components, raw.sources),
+    } : {
+      mode,
+      segmentId: mode,
+      name: `${adminGetDashboardSegmentConfig(mode).title} ${index + 1}`,
+      value: '--',
+      assessment: '当前还没有发布这个格子的具体内容。',
+      status: 'attention',
+      prompt: '',
+      components,
+      formula: adminBuildDashboardFormula(mode, components),
+      sources: adminBuildDashboardSources(mode, components),
+    };
+  });
+  return {
+    layout,
+    title: published.title || tenant.dashboard_title || '今日核心指标面板',
+    note: published.note || tenant.dashboard_description || '这里只展示当前租户已发布到 H5 基本面的格子。',
+    cards,
+  };
+}
+
+function renderAdminTenantDashboardPreview(tenant) {
+  const dashboard = adminResolveTenantDashboardState(tenant);
+  return `
+    <div class="tenant-dashboard-preview">
+      <div class="tenant-dashboard-preview-head">
+        <div>
+          <div class="tenant-dashboard-preview-title">智能 Dashboard 白盒预览</div>
+          <div class="tenant-dashboard-preview-desc">这里看的是租户当前发布态，不是草稿。点击任一格子可以检查提示词、组件组合、公式和数据源。</div>
+        </div>
+        <span class="tenant-dashboard-layout-tag">${escapeHtml(dashboard.layout)} · 已发布</span>
+      </div>
+      <div class="tenant-dashboard-grid">
+        ${dashboard.cards.map((card, index) => {
+          const segment = adminGetDashboardSegmentConfig(card.mode);
+          const metricCompactText = adminBuildDashboardMetricCompactText(card.components || [], 2);
+          return `
+            <div class="tenant-dashboard-card" onclick="openAdminTenantDashboardCard(${index})">
+              <div class="tenant-dashboard-card-head">
+                <div class="tenant-dashboard-card-title">${escapeHtml(card.name || `格子 ${index + 1}`)}</div>
+                <span class="tenant-dashboard-chip">${escapeHtml(segment.title)}</span>
+              </div>
+              <div class="tenant-dashboard-card-value">${escapeHtml(card.value || '--')}</div>
+              <div class="tenant-dashboard-card-desc">${escapeHtml(card.assessment || segment.note)}</div>
+              <div class="tenant-dashboard-metric-compact">${escapeHtml(metricCompactText)}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function closeAdminTenantDashboardModal() {
+  const modal = document.getElementById('admin-tenant-dashboard-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function openAdminTenantDashboardCard(index) {
+  const tenants = ensureAdminTenants();
+  const tenant = tenants[selectedAdminTenantIndex];
+  if (!tenant) return;
+  const dashboard = adminResolveTenantDashboardState(tenant);
+  const card = dashboard.cards[index];
+  const host = document.getElementById('admin-tenant-dashboard-modal-content');
+  const modal = document.getElementById('admin-tenant-dashboard-modal');
+  if (!card || !host || !modal) return;
+  const segment = adminGetDashboardSegmentConfig(card.mode);
+  host.innerHTML = `
+    <div class="admin-modal-head">
+      <div>
+        <div class="admin-modal-title">${escapeHtml(card.name || `格子 ${index + 1}`)}</div>
+        <div class="admin-modal-subtitle">${escapeHtml(segment.title)} · 这里展示后台监督口径：提示词、组件、公式和数据源。</div>
+      </div>
+      <button class="admin-modal-close" type="button" onclick="closeAdminTenantDashboardModal()">×</button>
+    </div>
+    <div class="admin-modal-grid">
+      <div class="admin-modal-card">
+        <div class="admin-modal-card-title">1. 当前结果</div>
+        <div class="admin-modal-summary">
+          <div class="admin-modal-stat">
+            <div class="admin-modal-stat-label">当前值</div>
+            <div class="admin-modal-stat-value">${escapeHtml(card.value || '--')}</div>
+          </div>
+        </div>
+        <div class="admin-modal-copy">${escapeHtml(card.assessment || segment.note)}</div>
+        <div class="admin-modal-section-note" style="margin-top:12px">
+          <div class="admin-modal-section-title">提示词</div>
+          <div class="admin-modal-section-copy">${escapeHtml(card.prompt || '当前没有额外提示词')}</div>
+        </div>
+      </div>
+      <div class="admin-modal-card">
+        <div class="admin-modal-card-title">2. 组合公式</div>
+        <div class="admin-modal-copy">${escapeHtml(card.formula || segment.formula)}</div>
+        <div class="admin-modal-list" style="margin-top:12px">
+          ${(card.components || []).map((item, componentIndex) => `
+            <div class="admin-modal-item">
+              <div class="admin-modal-item-top">
+                <strong style="color:var(--text-main)">${escapeHtml(item.label || `组件 ${componentIndex + 1}`)}</strong>
+                <span class="tenant-dashboard-chip">${componentIndex === 0 ? '起始项' : `组合符 ${escapeHtml(item.operator || '+')}`}</span>
+              </div>
+              <div class="admin-modal-copy">指标：${escapeHtml(item.metric || '--')} · 窗口：${escapeHtml(item.window || '--')} · 聚合：${escapeHtml(item.aggregation || '--')} · 权重：${escapeHtml(item.weight || 1)}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="admin-modal-card">
+        <div class="admin-modal-card-title">3. 数据源</div>
+        <div class="admin-modal-list">
+          ${(card.sources || []).map((item) => `
+            <div class="admin-modal-item">
+              <div class="admin-modal-copy">${escapeHtml(item)}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="admin-modal-card">
+        <div class="admin-modal-card-title">4. 解释口径</div>
+        <div class="admin-modal-list">
+          <div class="admin-modal-item">
+            <div class="admin-modal-copy">${escapeHtml(segment.note)}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
 function renderTenantSidebar() {
   const host = document.getElementById('tenant-config-list');
   const defaultSelect = document.getElementById('default-tenant-slug');
@@ -7011,7 +7491,7 @@ function renderTenantDetail() {
       <div class="tenant-admin-detail-head">
         <div>
           <div class="tenant-admin-detail-title">${escapeHtml(tenant.name || `租户 ${selectedAdminTenantIndex + 1}`)} 详情</div>
-          <div class="tenant-admin-detail-desc">这里就是这个大V租户的详情页。品牌、门户、主理人和对外文案在这里维护；智能 Dashboard 的展示标题和说明也在这里定义，但具体指标提示词仍在大V工作台里维护。</div>
+          <div class="tenant-admin-detail-desc">这里就是这个大V租户的详情页。品牌、门户、主理人和对外文案在这里维护；智能 Dashboard 的展示标题和说明在这里定义，下面也可以直接检查当前发布格子的白盒构成。</div>
         </div>
         <span class="tenant-admin-badge ${adminSiteConfig.default_tenant_slug === tenant.slug ? 'tenant-admin-default' : ''}">${adminSiteConfig.default_tenant_slug === tenant.slug ? '当前默认门户' : '租户详情'}</span>
       </div>
@@ -7072,6 +7552,7 @@ function renderTenantDetail() {
       <div class="feature-note">
         这里维护的是租户级配置，不是平台级配置。保存后，该大V对应的门户、工作台和默认展示文案会同步更新。
       </div>
+      ${renderAdminTenantDashboardPreview(tenant)}
     </div>
   `;
 }
@@ -7095,6 +7576,7 @@ function renderSiteConfigForm() {
   const voiceEmbedding = cfg.voice_embedding || {};
   const knowledgeIngestion = cfg.knowledge_ingestion || {};
   const evidenceChain = cfg.evidence_chain || {};
+  const reviewGeneration = cfg.review_generation || {};
   ensureAdminLlmRegistry();
   markActivePill('theme-mode-group', 'mode', cfg.default_theme || 'light');
   markActivePill('theme-accent-group', 'accent', cfg.default_accent || 'blue');
@@ -7110,6 +7592,12 @@ function renderSiteConfigForm() {
   if (document.getElementById('evidence-filter-user-template')) document.getElementById('evidence-filter-user-template').value = evidenceChain.filter_prompt_user_template || '';
   if (document.getElementById('evidence-filter-timeout-seconds')) document.getElementById('evidence-filter-timeout-seconds').value = String(evidenceChain.filter_timeout_seconds || 25);
   if (document.getElementById('evidence-answer-timeout-seconds')) document.getElementById('evidence-answer-timeout-seconds').value = String(evidenceChain.answer_timeout_seconds || 45);
+  if (document.getElementById('review-polish-system-prompt')) document.getElementById('review-polish-system-prompt').value = reviewGeneration.polish_system_prompt || '';
+  if (document.getElementById('review-polish-user-template')) document.getElementById('review-polish-user-template').value = reviewGeneration.polish_user_template || '';
+  if (document.getElementById('review-compose-system-prompt')) document.getElementById('review-compose-system-prompt').value = reviewGeneration.compose_system_prompt || '';
+  if (document.getElementById('review-compose-user-template')) document.getElementById('review-compose-user-template').value = reviewGeneration.compose_user_template || '';
+  if (document.getElementById('review-polish-timeout-seconds')) document.getElementById('review-polish-timeout-seconds').value = String(reviewGeneration.polish_timeout_seconds || 45);
+  if (document.getElementById('review-compose-timeout-seconds')) document.getElementById('review-compose-timeout-seconds').value = String(reviewGeneration.compose_timeout_seconds || 60);
   if (document.getElementById('brand-name')) document.getElementById('brand-name').value = brand.name || '';
   if (document.getElementById('brand-short-name')) document.getElementById('brand-short-name').value = brand.short_name || '';
   if (document.getElementById('brand-logo-mark')) document.getElementById('brand-logo-mark').value = brand.logo_mark || '';
@@ -7117,11 +7605,12 @@ function renderSiteConfigForm() {
   if (document.getElementById('brand-hero-tagline')) document.getElementById('brand-hero-tagline').value = brand.hero_tagline || '';
   if (document.getElementById('brand-hero-description')) document.getElementById('brand-hero-description').value = brand.hero_description || '';
   if (document.getElementById('brand-footer-description')) document.getElementById('brand-footer-description').value = brand.footer_description || '';
-  ['user_module', 'kol_module', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'vip', 'dm', 'workbench'].forEach(key => {
+  ['user_module', 'kol_module', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'vip', 'dm', 'fan_interaction', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     if (checkbox) checkbox.checked = Boolean(flags[key]);
   });
   refreshAdminNavVisibility();
+  markAdminSiteConfigSaved('修改开关后需要点击保存才会生效。保存后，Admin、大V工作台和 H5 会按最新配置同步显示或隐藏对应功能。');
   const forecastSection = document.getElementById('section-forecast-model');
   if (forecastSection && !isAdminFeatureEnabled('stock_forecast') && forecastSection.style.display !== 'none') {
     showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
@@ -7207,7 +7696,7 @@ async function saveSiteConfig() {
   const knowledgePreviewToggle = document.getElementById('knowledge-user-preview-enabled');
   const tenants = ensureAdminTenants().map((tenant) => ({ ...tenant }));
   const llmRegistry = ensureAdminLlmRegistry();
-  ['user_module', 'kol_module', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'vip', 'dm', 'workbench'].forEach(key => {
+  ['user_module', 'kol_module', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'vip', 'dm', 'fan_interaction', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     featureFlags[key] = Boolean(checkbox && checkbox.checked);
   });
@@ -7241,6 +7730,26 @@ async function saveSiteConfig() {
       answer_timeout_seconds: document.getElementById('evidence-answer-timeout-seconds')
         ? Number(document.getElementById('evidence-answer-timeout-seconds').value || 45)
         : Number((adminSiteConfig.evidence_chain || {}).answer_timeout_seconds || 45),
+    },
+    review_generation: {
+      polish_system_prompt: document.getElementById('review-polish-system-prompt')
+        ? document.getElementById('review-polish-system-prompt').value
+        : ((adminSiteConfig.review_generation || {}).polish_system_prompt || ''),
+      polish_user_template: document.getElementById('review-polish-user-template')
+        ? document.getElementById('review-polish-user-template').value
+        : ((adminSiteConfig.review_generation || {}).polish_user_template || ''),
+      compose_system_prompt: document.getElementById('review-compose-system-prompt')
+        ? document.getElementById('review-compose-system-prompt').value
+        : ((adminSiteConfig.review_generation || {}).compose_system_prompt || ''),
+      compose_user_template: document.getElementById('review-compose-user-template')
+        ? document.getElementById('review-compose-user-template').value
+        : ((adminSiteConfig.review_generation || {}).compose_user_template || ''),
+      polish_timeout_seconds: document.getElementById('review-polish-timeout-seconds')
+        ? Number(document.getElementById('review-polish-timeout-seconds').value || 45)
+        : Number((adminSiteConfig.review_generation || {}).polish_timeout_seconds || 45),
+      compose_timeout_seconds: document.getElementById('review-compose-timeout-seconds')
+        ? Number(document.getElementById('review-compose-timeout-seconds').value || 60)
+        : Number((adminSiteConfig.review_generation || {}).compose_timeout_seconds || 60),
     },
     llm_registry: {
       default_model_key: llmRegistry.default_model_key || '',
@@ -7281,13 +7790,16 @@ async function saveSiteConfig() {
     adminSiteConfig = data.site_config;
     window.SITE_CONFIG = data.site_config;
     renderSiteConfigForm();
-    if (status) {
-      status.textContent = '已保存。用户端会按当前默认主题和功能开关展示。';
-    }
+    broadcastSiteConfigUpdate();
+    markAdminSiteConfigSaved('已保存。Admin、大V工作台和 H5 会按当前功能开关展示。');
     showToast('站点配置已保存');
   } catch (e) {
     if (status) {
       status.textContent = '保存失败，请重试。';
+    }
+    const featureStatus = document.getElementById('feature-config-status');
+    if (featureStatus) {
+      featureStatus.textContent = '保存失败，请重试。';
     }
     showToast('保存失败');
   }
@@ -7406,6 +7918,17 @@ document.addEventListener('DOMContentLoaded', () => {
   renderAdminTaskCenter();
   renderAdminTokenUsage();
   loadSiteConfig();
+  document.addEventListener('input', (event) => {
+    if (isAdminSiteConfigField(event.target)) {
+      markAdminSiteConfigDirty();
+    }
+  });
+  document.addEventListener('change', (event) => {
+    if (isAdminSiteConfigField(event.target)) {
+      updateAdminFeatureFlagPreview(event.target);
+      markAdminSiteConfigDirty();
+    }
+  });
   loadAdminUsers();
   const adminUserCsvInput = document.getElementById('admin-user-csv-input');
   if (adminUserCsvInput && !adminUserCsvInput.dataset.bound) {

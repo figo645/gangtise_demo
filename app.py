@@ -441,6 +441,50 @@ DEFAULT_SITE_CONFIG = {
         "filter_timeout_seconds": 25,
         "answer_timeout_seconds": 45,
     },
+    "review_generation": {
+        "polish_system_prompt": (
+            "你是中文投研复盘助手。"
+            "你的任务是先对大V输入的原始材料做轻量整理和润色，删除明显重复、口语噪音和无效赘述，"
+            "但必须保留原有事实、判断、风险提示和不确定性。"
+            "不要新增原文没有出现的观点、数据和投资建议。"
+            "输出纯文本，按自然段组织，保持便于后续继续组合成完整复盘。"
+        ),
+        "polish_user_template": (
+            "复盘周期：{period_label}\n"
+            "输入来源：{source_mode}\n"
+            "作者：{speaker_label}\n"
+            "触发入口：{entry_point}\n\n"
+            "请先把下面的原始输入整理成更干净、更适合后续继续生成复盘正文的中间稿。"
+            "重点保留：市场主线、行业判断、重点个股、验证节点、风险边界。\n\n"
+            "原始输入：\n{source_text}"
+        ),
+        "compose_system_prompt": (
+            "你是中文投研复盘编辑助手。"
+            "你要基于大V自己的输入，以及已选中的智能仪表盘卡片，生成一版完整复盘草稿。"
+            "必须优先保留大V自己的核心判断和风险表达，智能仪表盘只用于补充证据、结构和验证节点。"
+            "不要编造事实、数字、新闻或结论。"
+            "输出纯文本，语言专业、克制、可直接给大V继续人工修改。"
+            "尽量压缩表达，草稿长度默认应少于原始输入长度。"
+        ),
+        "compose_user_template": (
+            "复盘周期：{period_label}\n"
+            "作者：{speaker_label}\n"
+            "触发入口：{entry_point}\n"
+            "纳入样本：{watchlist_text}\n"
+            "附加标签：{tag_text}\n"
+            "额外要求：{prompt_text}\n\n"
+            "这是大V最终确认前的复盘草稿，请基于以下两部分内容生成：\n"
+            "1. 大V输入/润色稿\n"
+            "2. 智能仪表盘卡片摘要（每张卡片都附有数据来源和新闻来源）\n"
+            "3. 大V已选择的知识材料\n\n"
+            "大V输入：\n{source_text}\n\n"
+            "智能仪表盘卡片：\n{dashboard_blocks}\n\n"
+            "知识材料：\n{knowledge_blocks}\n\n"
+            "请直接输出最终复盘草稿，不要解释处理过程，不要输出“以下是结果”等前缀。"
+        ),
+        "polish_timeout_seconds": 45,
+        "compose_timeout_seconds": 60,
+    },
     "llm_registry": {
         "default_model_key": "",
         "models": [],
@@ -463,6 +507,7 @@ DEFAULT_SITE_CONFIG = {
         "system_module": True,
         "vip": False,
         "dm": True,
+        "fan_interaction": False,
         "workbench": True,
     },
 }
@@ -518,6 +563,19 @@ def normalize_evidence_chain_config(source=None):
         "filter_prompt_user_template": str(raw.get("filter_prompt_user_template") or defaults["filter_prompt_user_template"]).strip()[:12000] or defaults["filter_prompt_user_template"],
         "filter_timeout_seconds": max(5, min(int(raw.get("filter_timeout_seconds") or defaults["filter_timeout_seconds"]), 120)),
         "answer_timeout_seconds": max(5, min(int(raw.get("answer_timeout_seconds") or defaults["answer_timeout_seconds"]), 180)),
+    }
+
+
+def normalize_review_generation_config(source=None):
+    raw = source if isinstance(source, dict) else {}
+    defaults = copy.deepcopy(DEFAULT_SITE_CONFIG["review_generation"])
+    return {
+        "polish_system_prompt": str(raw.get("polish_system_prompt") or defaults["polish_system_prompt"]).strip()[:8000] or defaults["polish_system_prompt"],
+        "polish_user_template": str(raw.get("polish_user_template") or defaults["polish_user_template"]).strip()[:12000] or defaults["polish_user_template"],
+        "compose_system_prompt": str(raw.get("compose_system_prompt") or defaults["compose_system_prompt"]).strip()[:8000] or defaults["compose_system_prompt"],
+        "compose_user_template": str(raw.get("compose_user_template") or defaults["compose_user_template"]).strip()[:16000] or defaults["compose_user_template"],
+        "polish_timeout_seconds": max(5, min(int(raw.get("polish_timeout_seconds") or defaults["polish_timeout_seconds"]), 180)),
+        "compose_timeout_seconds": max(5, min(int(raw.get("compose_timeout_seconds") or defaults["compose_timeout_seconds"]), 240)),
     }
 
 
@@ -794,7 +852,94 @@ def normalize_tenant_config(source=None, index=0):
         tenant["fund_dashboard_config"] = copy.deepcopy(raw["fund_dashboard_config"])
     if isinstance(raw.get("knowledge_hub_config"), dict):
         tenant["knowledge_hub_config"] = copy.deepcopy(raw["knowledge_hub_config"])
+    if isinstance(raw.get("review_snapshots"), list):
+        tenant["review_snapshots"] = copy.deepcopy(raw["review_snapshots"])
+    if isinstance(raw.get("message_center_state"), dict):
+        tenant["message_center_state"] = copy.deepcopy(raw["message_center_state"])
     return tenant
+
+
+def _safe_card_id(value, fallback):
+    return slugify_code(value, fallback or "card")
+
+
+def build_review_smart_cards(tenant, fund_dashboard, watchlist_details_map=None, news_items=None):
+    tenant = tenant or get_tenant_by_slug()
+    watchlist_details_map = watchlist_details_map if isinstance(watchlist_details_map, dict) else {}
+    news_items = news_items if isinstance(news_items, list) else []
+    cards = []
+    dashboard_cards = fund_dashboard.get("cards") if isinstance(fund_dashboard, dict) else []
+    for index, item in enumerate((dashboard_cards or [])[:4], start=1):
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("name") or f"核心指标 {index}").strip() or f"核心指标 {index}"
+        assessment = str(item.get("assessment") or item.get("hint") or "").strip()
+        alert = str(item.get("alert") or "").strip()
+        cards.append(
+            {
+                "id": _safe_card_id(f"indicator_{title}", f"indicator_{index}"),
+                "kind": "indicator",
+                "title": title,
+                "category": "指标卡",
+                "summary": assessment or str(item.get("value") or "继续跟踪").strip() or "继续跟踪",
+                "value": str(item.get("value") or "").strip(),
+                "status": str(item.get("status") or "attention").strip() or "attention",
+                "prompt": str(item.get("prompt") or f"请围绕 {title} 生成复盘中的指标说明。").strip(),
+                "data_sources": [
+                    f"租户智能指标面板：{title}",
+                    "指标湖 / Dashboard 同源卡片",
+                ],
+                "news_sources": [alert] if alert else [],
+                "evidence_note": "用于补充当前阶段判断、风险提醒和后续跟踪点。",
+            }
+        )
+    focus_names = ["腾讯控股", "美团-W", "阿里巴巴-W"] if tenant.get("slug") == "lisa" else ["中芯国际", "腾讯控股", "贵州茅台"]
+    details_by_name = {
+        str(detail.get("name") or "").strip(): detail
+        for detail in watchlist_details_map.values()
+        if isinstance(detail, dict) and str(detail.get("name") or "").strip()
+    }
+    for name in focus_names:
+        detail = details_by_name.get(name)
+        if not detail:
+            continue
+        fundamental = detail.get("fundamental") if isinstance(detail.get("fundamental"), dict) else {}
+        thesis = fundamental.get("thesis") if isinstance(fundamental.get("thesis"), list) else []
+        related_indicator_names = detail.get("related_indicator_names") if isinstance(detail.get("related_indicator_names"), list) else []
+        cards.append(
+            {
+                "id": _safe_card_id(f"watch_{detail.get('code') or name}", "watchlist"),
+                "kind": "watchlist",
+                "title": name,
+                "category": "重点个股",
+                "summary": str(detail.get("signal_summary") or fundamental.get("summary") or "继续跟踪").strip() or "继续跟踪",
+                "value": f"{detail.get('change_pct', 0):+.1f}%",
+                "status": str(detail.get("alert_level") or "normal").strip() or "normal",
+                "prompt": f"围绕 {name} 生成重点个股复盘卡，包含当前判断、验证节点、风险边界和下一步观察。",
+                "data_sources": [f"自选股详情：{name}"] + [f"关联指标：{item}" for item in related_indicator_names[:2]],
+                "news_sources": [str(item).strip() for item in thesis[:2] if str(item).strip()],
+                "evidence_note": str(detail.get("alert_text") or "用于补充重点样本的验证节点与风险边界。").strip(),
+            }
+        )
+    if news_items:
+        top_news = [item for item in news_items[:3] if isinstance(item, dict)]
+        if top_news:
+            cards.append(
+                {
+                    "id": "market_news_digest",
+                    "kind": "news",
+                    "title": "相关新闻归纳",
+                    "category": "新闻卡",
+                    "summary": "从当前最相关的宏观、行业和自选股新闻中提炼复盘证据。",
+                    "value": f"{len(top_news)} 条",
+                    "status": "attention",
+                    "prompt": "归纳相关新闻，只保留真正能支撑本次复盘判断的背景材料、催化和验证信息。",
+                    "data_sources": ["平台新闻流 / 指标库关联资讯"],
+                    "news_sources": [str(item.get("title") or "").strip() for item in top_news if str(item.get("title") or "").strip()],
+                    "evidence_note": "用于给复盘补充事件背景和催化说明，不能替代大V自己的判断。",
+                }
+            )
+    return cards[:8]
 
 
 def sanitize_portal_html(value):
@@ -905,6 +1050,324 @@ def resolve_tenant_portal_workspace(tenant, cms=None):
             "page_blocks": merged.get("page_blocks", base["page_blocks"]),
         })
     return base
+
+
+def default_tenant_review_snapshots(tenant):
+    is_lisa = tenant["slug"] == "lisa"
+    watchlist_focus = ["腾讯控股", "美团-W", "阿里巴巴-W"] if is_lisa else ["中芯国际", "腾讯控股", "贵州茅台"]
+    return [
+        {
+            "id": f"{tenant['slug']}-review-day-default",
+            "title": "收盘复盘：AI 算力强主线未变，港股互联网继续看回购与财报兑现",
+            "period": "日复盘",
+            "period_key": "day",
+            "time": "2026-06-07 18:40",
+            "tags": ["行业板块", "个股跟踪", "可直接分发"],
+            "watchlist": watchlist_focus[:3],
+            "summary": "先从全天资料压出短版提纲，再对中芯国际、腾讯控股和贵州茅台三个样本做个股投资复盘，保留主线、验证节点和下一步观察。",
+            "content_text": "先从全天资料压出短版提纲，再对重点样本做个股投资复盘，保留主线、验证节点和下一步观察。",
+            "source_mode": "voice",
+            "paragraph_mode": "manual",
+            "publisher": tenant["advisor"],
+            "published_at": "2026-06-07 18:40",
+            "snapshot_type": "published_review",
+        },
+        {
+            "id": f"{tenant['slug']}-review-week-default",
+            "title": "周度复盘：科技成长维持主线，消费与新能源需要继续等景气验证",
+            "period": "周复盘",
+            "period_key": "week",
+            "time": "2026-06-06 20:10",
+            "tags": ["周度框架", "板块归纳"],
+            "watchlist": watchlist_focus[:3],
+            "summary": "以行业板块为骨架，把 AI 算力、半导体、港股互联网、消费和新能源统一放进同一篇复盘，方便普通投资者快速查看。",
+            "content_text": "以行业板块为骨架，把 AI 算力、半导体、港股互联网、消费和新能源统一放进同一篇复盘。",
+            "source_mode": "file",
+            "paragraph_mode": "ai",
+            "publisher": tenant["advisor"],
+            "published_at": "2026-06-06 20:10",
+            "snapshot_type": "published_review",
+        },
+    ]
+
+
+def normalize_review_snapshot_item(item, tenant, index=0):
+    raw = item if isinstance(item, dict) else {}
+    fallback = default_tenant_review_snapshots(tenant)[min(index, len(default_tenant_review_snapshots(tenant)) - 1)]
+    watchlist = [str(name).strip() for name in (raw.get("watchlist") if isinstance(raw.get("watchlist"), list) else fallback.get("watchlist", [])) if str(name).strip()][:8]
+    tags = [str(name).strip() for name in (raw.get("tags") if isinstance(raw.get("tags"), list) else fallback.get("tags", [])) if str(name).strip()][:8]
+    title = str(raw.get("title") or fallback.get("title") or "").strip() or fallback["title"]
+    content_text = str(raw.get("content_text") or raw.get("content") or raw.get("body_text") or fallback.get("content_text") or "").strip()
+    summary = str(raw.get("summary") or fallback.get("summary") or content_text[:180]).strip() or fallback["summary"]
+    published_at = normalize_datetime_text(raw.get("published_at") or raw.get("time") or fallback.get("published_at") or fallback.get("time"))
+    attachments = []
+    for offset, attachment in enumerate(raw.get("knowledge_attachments") if isinstance(raw.get("knowledge_attachments"), list) else []):
+        if not isinstance(attachment, dict):
+            continue
+        attachments.append({
+            "id": str(attachment.get("id") or attachment.get("knowledge_id") or f"{tenant['slug']}-knowledge-{index + offset + 1}").strip() or f"{tenant['slug']}-knowledge-{index + offset + 1}",
+            "title": str(attachment.get("title") or "知识材料").strip()[:120] or "知识材料",
+            "summary": str(attachment.get("summary") or attachment.get("body") or attachment.get("raw_input") or "").strip()[:360],
+            "body": str(attachment.get("body") or attachment.get("raw_input") or attachment.get("summary") or "").strip()[:4000],
+            "source_detail": str(attachment.get("source_detail") or attachment.get("source") or "").strip()[:240],
+            "url": str(attachment.get("url") or "").strip()[:500],
+            "tags": [str(tag).strip() for tag in (attachment.get("tags") if isinstance(attachment.get("tags"), list) else []) if str(tag).strip()][:8],
+        })
+    selected_cards = []
+    for card in raw.get("selected_cards") if isinstance(raw.get("selected_cards"), list) else []:
+        if not isinstance(card, dict):
+            continue
+        selected_cards.append({
+            "id": str(card.get("id") or "").strip()[:120],
+            "title": str(card.get("title") or card.get("name") or "智能卡片").strip()[:120] or "智能卡片",
+            "category": str(card.get("category") or card.get("kind") or "").strip()[:80],
+            "summary": str(card.get("summary") or card.get("assessment") or card.get("hint") or "").strip()[:360],
+            "value": str(card.get("value") or "").strip()[:120],
+            "prompt": str(card.get("prompt") or "").strip()[:2000],
+            "data_sources": [str(source).strip() for source in (card.get("data_sources") if isinstance(card.get("data_sources"), list) else []) if str(source).strip()][:8],
+            "news_sources": [str(source).strip() for source in (card.get("news_sources") if isinstance(card.get("news_sources"), list) else []) if str(source).strip()][:8],
+        })
+    llm_models = []
+    for model in raw.get("llm_models") if isinstance(raw.get("llm_models"), list) else []:
+        if not isinstance(model, dict):
+            continue
+        llm_models.append({
+            "stage": str(model.get("stage") or "").strip()[:80],
+            "key": str(model.get("key") or "").strip()[:120],
+            "label": str(model.get("label") or "").strip()[:120],
+            "provider": str(model.get("provider") or "").strip()[:120],
+            "model_name": str(model.get("model_name") or "").strip()[:240],
+            "purpose": str(model.get("purpose") or "").strip()[:120],
+        })
+    return {
+        "id": str(raw.get("id") or f"{tenant['slug']}-review-{index + 1}").strip() or f"{tenant['slug']}-review-{index + 1}",
+        "title": title,
+        "period": str(raw.get("period") or fallback.get("period") or "日复盘").strip() or "日复盘",
+        "period_key": str(raw.get("period_key") or fallback.get("period_key") or "day").strip().lower() or "day",
+        "time": published_at or fallback.get("time") or now_ts(),
+        "published_at": published_at or fallback.get("published_at") or now_ts(),
+        "tags": tags or copy.deepcopy(fallback.get("tags") or []),
+        "watchlist": watchlist or copy.deepcopy(fallback.get("watchlist") or []),
+        "summary": summary,
+        "content_text": content_text or summary,
+        "source_mode": str(raw.get("source_mode") or fallback.get("source_mode") or "manual").strip().lower() or "manual",
+        "paragraph_mode": str(raw.get("paragraph_mode") or fallback.get("paragraph_mode") or "manual").strip().lower() or "manual",
+        "publisher": str(raw.get("publisher") or tenant.get("advisor") or "").strip() or tenant.get("advisor") or "",
+        "snapshot_type": str(raw.get("snapshot_type") or "published_review").strip() or "published_review",
+        "knowledge_attachments": attachments,
+        "selected_cards": selected_cards,
+        "data_sources": [str(source).strip() for source in (raw.get("data_sources") if isinstance(raw.get("data_sources"), list) else []) if str(source).strip()][:12],
+        "news_sources": [str(source).strip() for source in (raw.get("news_sources") if isinstance(raw.get("news_sources"), list) else []) if str(source).strip()][:12],
+        "llm_models": llm_models,
+        "polished_input_text": str(raw.get("polished_input_text") or "").strip()[:12000],
+    }
+
+
+def resolve_tenant_review_snapshots(tenant, snapshots=None):
+    tenant = tenant or get_tenant_by_slug()
+    items = snapshots if isinstance(snapshots, list) else tenant.get("review_snapshots")
+    source_items = items if isinstance(items, list) and items else default_tenant_review_snapshots(tenant)
+    normalized = []
+    for index, item in enumerate(source_items[:20]):
+        normalized.append(normalize_review_snapshot_item(item, tenant, index=index))
+    return normalized
+
+
+def default_tenant_message_center_state(tenant):
+    is_lisa = tenant["slug"] == "lisa"
+    return {
+        "summary": "消息板块不仅包含粉丝给大V的提问，也包含大V回复粉丝后的追问，以及复盘发布后需要第一时间触达的粉丝提醒。",
+        "threads": [
+            {
+                "id": f"{tenant['slug']}-thread-fan-1",
+                "type": "fan_interaction",
+                "name": "投研达人_小陈",
+                "time": "5分钟前",
+                "content": is_lisa and "港股互联网还能继续配吗？想看你按 Hermes 价值框架压缩后的短版结论。" or "AI 算力还能继续跟吗？想看你按 Hermes 基本面判断后的短版结论。",
+                "status": "待回复",
+                "user_name": "投研达人_小陈",
+                "user_avatar": "👨",
+                "tier": "核心用户",
+                "last_msg": is_lisa and "港股互联网还能继续配吗？" or "AI 算力还能继续跟吗？",
+                "unread": 1,
+                "vip_only": False,
+                "messages": [
+                    {"id": 1, "sender": "user", "content": is_lisa and "港股互联网还能继续配吗？想看你按 Hermes 价值框架压缩后的短版结论。" or "AI 算力还能继续跟吗？想看你按 Hermes 基本面判断后的短版结论。", "time": "2026-06-07 17:35", "type": "text"},
+                ],
+            },
+            {
+                "id": f"{tenant['slug']}-thread-review-1",
+                "type": "review_notification",
+                "name": "复盘发布提醒",
+                "time": "12分钟前",
+                "content": "你刚发布的日复盘已经推送给 92 位高频粉丝，首批打开率 41%。",
+                "status": "已送达",
+                "user_name": "复盘发布提醒",
+                "user_avatar": "📝",
+                "tier": "系统消息",
+                "last_msg": "你刚发布的日复盘已经推送给 92 位高频粉丝",
+                "unread": 0,
+                "vip_only": False,
+                "messages": [
+                    {"id": 1, "sender": "kol", "content": "【最新复盘已发布】你刚发布的日复盘已经推送给高频粉丝，点击可查看送达情况。", "time": "2026-06-07 18:28", "type": "review"},
+                ],
+            },
+            {
+                "id": f"{tenant['slug']}-thread-fan-2",
+                "type": "fan_interaction",
+                "name": "价值猎人小林",
+                "time": "23分钟前",
+                "content": is_lisa and "最新那篇港股复盘我看完了，想继续问腾讯和美团的回购节奏怎么拆。" or "港股互联网那篇复盘我看完了，想继续问腾讯回购节奏和估值带怎么看。",
+                "status": "待跟进",
+                "user_name": "价值猎人小林",
+                "user_avatar": "🧑",
+                "tier": "观察用户",
+                "last_msg": is_lisa and "最新那篇港股复盘我看完了" or "港股互联网那篇复盘我看完了",
+                "unread": 1,
+                "vip_only": False,
+                "messages": [
+                    {"id": 1, "sender": "user", "content": is_lisa and "最新那篇港股复盘我看完了，想继续问腾讯和美团的回购节奏怎么拆。" or "港股互联网那篇复盘我看完了，想继续问腾讯回购节奏和估值带怎么看。", "time": "2026-06-07 18:17", "type": "text"},
+                ],
+            },
+        ],
+        "broadcasts": [
+            {"id": 1, "content": is_lisa and "本周港股互联网更新：继续看南向资金和回购兑现" or "本周策略更新：科技板块适合继续跟踪，重点看 AI 算力订单兑现", "time": "2026-05-20 08:00", "reach": 92, "open_rate": 68, "target": "all", "type": "broadcast"},
+            {"id": 2, "content": is_lisa and "价值提醒：财报前估值修复较快，注意不要只盯单一平台" or "宏观提醒：美联储纪要偏鸽，但还要等国内资金面确认", "time": "2026-05-19 22:30", "reach": 108, "open_rate": 82, "target": "active", "type": "broadcast"},
+            {"id": 3, "content": "周末复盘：本周操作回顾与下周观察重点", "time": "2026-05-18 18:00", "reach": 76, "open_rate": 55, "target": "review", "type": "broadcast"},
+        ],
+    }
+
+
+def normalize_message_thread_item(item, tenant, index=0):
+    raw = item if isinstance(item, dict) else {}
+    defaults = default_tenant_message_center_state(tenant)["threads"]
+    fallback = defaults[min(index, len(defaults) - 1)]
+    messages = []
+    for msg_index, msg in enumerate(raw.get("messages") if isinstance(raw.get("messages"), list) else fallback.get("messages", [])):
+        if not isinstance(msg, dict):
+            continue
+        messages.append({
+            "id": int(msg.get("id") or (msg_index + 1)),
+            "sender": str(msg.get("sender") or "user").strip() or "user",
+            "content": str(msg.get("content") or "").strip(),
+            "time": normalize_datetime_text(msg.get("time") or now_ts()) or now_ts(),
+            "type": str(msg.get("type") or "text").strip() or "text",
+        })
+    return {
+        "id": str(raw.get("id") or fallback.get("id") or f"{tenant['slug']}-thread-{index + 1}").strip(),
+        "type": str(raw.get("type") or fallback.get("type") or "fan_interaction").strip(),
+        "name": str(raw.get("name") or fallback.get("name") or "").strip(),
+        "time": str(raw.get("time") or fallback.get("time") or "").strip() or now_ts(),
+        "content": str(raw.get("content") or fallback.get("content") or "").strip(),
+        "status": str(raw.get("status") or fallback.get("status") or "").strip() or "待处理",
+        "user_name": str(raw.get("user_name") or fallback.get("user_name") or raw.get("name") or "").strip(),
+        "user_avatar": str(raw.get("user_avatar") or fallback.get("user_avatar") or "👤").strip() or "👤",
+        "tier": str(raw.get("tier") or fallback.get("tier") or "粉丝").strip() or "粉丝",
+        "last_msg": str(raw.get("last_msg") or fallback.get("last_msg") or raw.get("content") or "").strip(),
+        "unread": max(0, int(raw.get("unread") or fallback.get("unread") or 0)),
+        "vip_only": bool(raw.get("vip_only", fallback.get("vip_only", False))),
+        "messages": messages,
+    }
+
+
+def normalize_message_broadcast_item(item, tenant, index=0):
+    raw = item if isinstance(item, dict) else {}
+    defaults = default_tenant_message_center_state(tenant)["broadcasts"]
+    fallback = defaults[min(index, len(defaults) - 1)]
+    return {
+        "id": int(raw.get("id") or fallback.get("id") or (index + 1)),
+        "content": str(raw.get("content") or fallback.get("content") or "").strip(),
+        "time": str(raw.get("time") or fallback.get("time") or "").strip() or now_ts(),
+        "reach": max(0, int(raw.get("reach") or fallback.get("reach") or 0)),
+        "open_rate": max(0, int(raw.get("open_rate") or fallback.get("open_rate") or 0)),
+        "target": str(raw.get("target") or fallback.get("target") or "all").strip() or "all",
+        "type": str(raw.get("type") or fallback.get("type") or "broadcast").strip() or "broadcast",
+    }
+
+
+def resolve_tenant_message_center_state(tenant, state=None):
+    tenant = tenant or get_tenant_by_slug()
+    defaults = default_tenant_message_center_state(tenant)
+    raw = state if isinstance(state, dict) else tenant.get("message_center_state")
+    source = raw if isinstance(raw, dict) else {}
+    threads_source = source.get("threads") if isinstance(source.get("threads"), list) else defaults["threads"]
+    broadcasts_source = source.get("broadcasts") if isinstance(source.get("broadcasts"), list) else defaults["broadcasts"]
+    threads = [normalize_message_thread_item(item, tenant, index=index) for index, item in enumerate(threads_source[:60])]
+    broadcasts = [normalize_message_broadcast_item(item, tenant, index=index) for index, item in enumerate(broadcasts_source[:60])]
+    summary = str(source.get("summary") or defaults["summary"]).strip() or defaults["summary"]
+    return {
+        "summary": summary,
+        "threads": threads,
+        "broadcasts": broadcasts,
+    }
+
+
+def _save_tenant_state_field(tenant_slug, field_name, value):
+    site_config = get_site_config()
+    tenants = get_tenant_configs(site_config)
+    for index, tenant in enumerate(tenants):
+        if tenant["slug"] != tenant_slug:
+            continue
+        tenants[index][field_name] = copy.deepcopy(value)
+        next_config = dict(site_config)
+        next_config["tenants"] = tenants
+        return save_site_config(next_config)
+    return None
+
+
+def update_tenant_review_snapshots(tenant_slug, snapshots):
+    tenant = get_tenant_by_slug(tenant_slug)
+    normalized = resolve_tenant_review_snapshots(tenant, snapshots=snapshots)
+    return _save_tenant_state_field(tenant_slug, "review_snapshots", normalized)
+
+
+def update_tenant_message_center_state(tenant_slug, state):
+    tenant = get_tenant_by_slug(tenant_slug)
+    normalized = resolve_tenant_message_center_state(tenant, state=state)
+    return _save_tenant_state_field(tenant_slug, "message_center_state", normalized)
+
+
+def append_review_snapshot(tenant_slug, snapshot):
+    tenant = get_tenant_by_slug(tenant_slug)
+    current = resolve_tenant_review_snapshots(tenant, snapshots=tenant.get("review_snapshots"))
+    next_items = [normalize_review_snapshot_item(snapshot, tenant, index=0)] + current
+    deduped = []
+    seen_ids = set()
+    for index, item in enumerate(next_items):
+        item_id = str(item.get("id") or f"{tenant_slug}-review-{index + 1}").strip()
+        if item_id in seen_ids:
+            continue
+        seen_ids.add(item_id)
+        deduped.append(normalize_review_snapshot_item(item, tenant, index=index))
+    saved = update_tenant_review_snapshots(tenant_slug, deduped[:20])
+    latest_tenant = get_tenant_by_slug(tenant_slug, saved) if saved else tenant
+    return resolve_tenant_review_snapshots(latest_tenant, snapshots=latest_tenant.get("review_snapshots"))
+
+
+def append_message_thread(tenant_slug, thread_item):
+    tenant = get_tenant_by_slug(tenant_slug)
+    state = resolve_tenant_message_center_state(tenant, state=tenant.get("message_center_state"))
+    next_threads = [normalize_message_thread_item(thread_item, tenant, index=0)] + state["threads"]
+    saved = update_tenant_message_center_state(tenant_slug, {
+        "summary": state["summary"],
+        "threads": next_threads[:60],
+        "broadcasts": state["broadcasts"],
+    })
+    latest_tenant = get_tenant_by_slug(tenant_slug, saved) if saved else tenant
+    return resolve_tenant_message_center_state(latest_tenant, state=latest_tenant.get("message_center_state"))
+
+
+def append_broadcast_history(tenant_slug, broadcast_item):
+    tenant = get_tenant_by_slug(tenant_slug)
+    state = resolve_tenant_message_center_state(tenant, state=tenant.get("message_center_state"))
+    next_broadcasts = [normalize_message_broadcast_item(broadcast_item, tenant, index=0)] + state["broadcasts"]
+    saved = update_tenant_message_center_state(tenant_slug, {
+        "summary": state["summary"],
+        "threads": state["threads"],
+        "broadcasts": next_broadcasts[:60],
+    })
+    latest_tenant = get_tenant_by_slug(tenant_slug, saved) if saved else tenant
+    return resolve_tenant_message_center_state(latest_tenant, state=latest_tenant.get("message_center_state"))
 
 
 def normalize_portal_cms_config(source, tenant):
@@ -1195,18 +1658,171 @@ def update_tenant_knowledge_hub_config(tenant_slug, knowledge_hub_config):
 
 def get_dashboard_card_target(layout):
     layout_key = str(layout or "").strip().lower()
-    if layout_key == "3x3":
+    if layout_key in {"3x3", "2x3"}:
         return 6
-    if layout_key == "4x4":
+    if layout_key in {"4x4", "2x4"}:
         return 8
+    if layout_key == "2x5":
+        return 10
     return 4
 
 
 def normalize_dashboard_layout(layout):
     layout_key = str(layout or "").strip().lower()
-    if layout_key in {"2x2", "3x3", "4x4"}:
+    if layout_key == "3x3":
+        return "2x3"
+    if layout_key == "4x4":
+        return "2x4"
+    if layout_key in {"2x2", "2x3", "2x4", "2x5"}:
         return layout_key
     return "2x2"
+
+
+def normalize_dashboard_mode(mode):
+    mode_key = str(mode or "").strip().lower()
+    if mode_key in {"market", "industry", "signal-stock"}:
+        return mode_key
+    return "market"
+
+
+def get_dashboard_component_library(mode):
+    mode_key = normalize_dashboard_mode(mode)
+    library = {
+        "market": [
+            {"id": "market_breadth", "label": "广度改善分", "source": "全市场行情库", "metric": "上涨/下跌家数、站上MA20占比、新高-新低差", "window": "1D", "aggregation": "0-100评分", "default_weight": 0.35, "default_operator": "base", "default_selected": True},
+            {"id": "northbound_flow", "label": "资金回流分", "source": "北向/南向资金库", "metric": "净流入占成交比、3日累计、连续净流入天数", "window": "1D / 3D", "aggregation": "0-100评分", "default_weight": 0.25, "default_operator": "+", "default_selected": True},
+            {"id": "turnover_structure", "label": "主线参与分", "source": "成交结构库", "metric": "主线成交占比、5日变化、拥挤度惩罚", "window": "1D / 5D", "aggregation": "0-100评分", "default_weight": 0.25, "default_operator": "+", "default_selected": True},
+            {"id": "style_rotation", "label": "防御压力分", "source": "风格因子库", "metric": "银行/红利相对成长超额、低波ETF净流入", "window": "1D / 5D", "aggregation": "0-100评分", "default_weight": 0.15, "default_operator": "-", "default_selected": True},
+            {"id": "policy_heat", "label": "政策温度参考分", "source": "政策新闻流", "metric": "宏观政策热度与边际变化", "window": "3D", "aggregation": "辅助评分", "default_weight": 0.1, "default_operator": "+", "default_selected": False},
+        ],
+        "industry": [
+            {"id": "industry_orders", "label": "订单景气分", "source": "行业指标库", "metric": "新增订单同比、在手订单覆盖、开工率", "window": "1W / 1M", "aggregation": "0-100评分", "default_weight": 0.30, "default_operator": "base", "default_selected": True},
+            {"id": "industry_price", "label": "价格景气分", "source": "产业链价格库", "metric": "产品价格指数、价差、提价持续性", "window": "1W / 1M", "aggregation": "0-100评分", "default_weight": 0.25, "default_operator": "+", "default_selected": True},
+            {"id": "industry_inventory", "label": "库存去化分", "source": "行业库存库", "metric": "库存天数、主动/被动补库、去库斜率", "window": "1M", "aggregation": "0-100评分", "default_weight": 0.20, "default_operator": "+", "default_selected": True},
+            {"id": "industry_policy", "label": "政策催化分", "source": "行业新闻流", "metric": "政策热度、落地级别、持续性", "window": "5D / 20D", "aggregation": "0-100评分", "default_weight": 0.15, "default_operator": "+", "default_selected": True},
+            {"id": "industry_capex", "label": "资本开支确认分", "source": "财报与经营数据", "metric": "Capex指引、扩产计划、设备招标", "window": "1Q", "aggregation": "0-100评分", "default_weight": 0.10, "default_operator": "+", "default_selected": True},
+        ],
+        "signal-stock": [
+            {"id": "leader_strength", "label": "龙头强度分", "source": "个股行情库", "metric": "相对行业超额收益、回撤控制、成交额排名", "window": "5D / 20D", "aggregation": "0-100评分", "default_weight": 0.35, "default_operator": "base", "default_selected": True},
+            {"id": "earnings_delivery", "label": "业绩兑现分", "source": "财报与预期库", "metric": "营收/利润兑现率、指引上修、订单兑现", "window": "1Q", "aggregation": "0-100评分", "default_weight": 0.30, "default_operator": "+", "default_selected": True},
+            {"id": "support_flow", "label": "资金承接分", "source": "盘口与成交数据", "metric": "回调缩量、尾盘净流入、换手承接", "window": "3D / 5D", "aggregation": "0-100评分", "default_weight": 0.20, "default_operator": "+", "default_selected": True},
+            {"id": "valuation_band", "label": "估值安全分", "source": "估值与财报库", "metric": "PE/PS分位、PEG、相对历史分位", "window": "1Q / 3Y", "aggregation": "0-100评分", "default_weight": 0.15, "default_operator": "+", "default_selected": True},
+            {"id": "catalyst_window", "label": "催化窗口参考分", "source": "公司新闻流", "metric": "新品、财报、订单公告、政策催化时点", "window": "10D / 30D", "aggregation": "辅助评分", "default_weight": 0.10, "default_operator": "+", "default_selected": False},
+        ],
+    }
+    return copy.deepcopy(library.get(mode_key) or library["market"])
+
+
+def build_default_dashboard_components(mode):
+    components = []
+    defaults = [item for item in get_dashboard_component_library(mode) if item.get("default_selected", True)]
+    for index, item in enumerate(defaults[:5]):
+        components.append(
+            {
+                "id": item["id"],
+                "label": item["label"],
+                "source": item["source"],
+                "metric": item["metric"],
+                "window": item["window"],
+                "aggregation": item["aggregation"],
+                "weight": item["default_weight"],
+                "operator": item.get("default_operator") or ("base" if index == 0 else "+"),
+            }
+        )
+    return components
+
+
+def normalize_dashboard_components(raw_components, mode):
+    library = get_dashboard_component_library(mode)
+    library_map = {item["id"]: item for item in library}
+    source_list = raw_components if isinstance(raw_components, list) else []
+    if not source_list:
+        source_list = build_default_dashboard_components(mode)
+    components = []
+    for index, raw in enumerate(source_list[:6]):
+        item = raw if isinstance(raw, dict) else {}
+        component_id = str(item.get("id") or item.get("componentId") or "").strip()
+        template = library_map.get(component_id) or library[min(index, len(library) - 1)]
+        try:
+            weight = round(float(item.get("weight") if item.get("weight") is not None else template.get("default_weight", 1.0)), 2)
+        except (TypeError, ValueError):
+            weight = float(template.get("default_weight", 1.0))
+        components.append(
+            {
+                "id": template["id"],
+                "label": str(item.get("label") or template["label"]).strip() or template["label"],
+                "source": str(item.get("source") or template["source"]).strip() or template["source"],
+                "metric": str(item.get("metric") or template["metric"]).strip() or template["metric"],
+                "window": str(item.get("window") or template["window"]).strip() or template["window"],
+                "aggregation": str(item.get("aggregation") or template["aggregation"]).strip() or template["aggregation"],
+                "weight": weight,
+                "operator": str(item.get("operator") or template.get("default_operator") or ("base" if index == 0 else "+")).strip() or ("base" if index == 0 else "+"),
+            }
+        )
+    return components
+
+
+def build_dashboard_formula_text(mode, components):
+    items = components if isinstance(components, list) else []
+    chunks = []
+    for index, item in enumerate(items):
+        label = str(item.get("label") or "").strip() or f"组件 {index + 1}"
+        operator = str(item.get("operator") or "").strip()
+        weight = item.get("weight")
+        try:
+            weight_value = float(weight)
+        except (TypeError, ValueError):
+            weight_value = 1.0
+        weight_text = "" if abs(weight_value - 1.0) < 0.01 else f" x {weight_value:g}"
+        prefix = ""
+        if index > 0 and operator and operator != "base":
+            prefix = f" {operator} "
+        chunks.append(f"{prefix}{label}{weight_text}")
+    formula_text = "".join(chunks).strip()
+    if formula_text:
+        return formula_text
+    defaults = {
+        "market": "总分 = 35%广度改善分 + 25%资金回流分 + 25%主线参与分 - 15%防御压力分",
+        "industry": "总分 = 30%订单景气分 + 25%价格景气分 + 20%库存去化分 + 15%政策催化分 + 10%资本开支确认分",
+        "signal-stock": "总分 = 35%龙头强度分 + 30%业绩兑现分 + 20%资金承接分 + 15%估值安全分",
+    }
+    return defaults.get(normalize_dashboard_mode(mode), defaults["market"])
+
+
+def build_dashboard_sources_summary(mode, components):
+    seen = set()
+    sources = []
+    for item in (components if isinstance(components, list) else []):
+        source = str(item.get("source") or "").strip()
+        if source and source not in seen:
+            seen.add(source)
+            sources.append(source)
+    if sources:
+        return sources
+    return [item["source"] for item in get_dashboard_component_library(mode)[:3]]
+
+
+def infer_dashboard_card_mode(source, fallback="market"):
+    raw = source if isinstance(source, dict) else {}
+    explicit = raw.get("mode") or raw.get("segmentId")
+    if explicit:
+        return normalize_dashboard_mode(explicit)
+    text = " ".join(
+        [
+            str(raw.get("name") or "").strip(),
+            str(raw.get("title") or "").strip(),
+            str(raw.get("prompt") or "").strip(),
+            str(raw.get("assessment") or "").strip(),
+            str(raw.get("hint") or "").strip(),
+        ]
+    )
+    if re.search(r"行业景气|行业订单|价格景气|库存节奏|景气验证|资本开支|竞争格局", text):
+        return "industry"
+    if re.search(r"信号个股|龙头强度|业绩兑现|相对行业|催化临近|资金承接|估值位置", text):
+        return "signal-stock"
+    if re.search(r"风险偏好|流动性|政策温度|市场广度|风格轮动|波动压力|主线热度", text):
+        return "market"
+    return normalize_dashboard_mode(fallback)
 
 
 def build_default_fund_dashboard_cards(tenant, layout="2x2"):
@@ -1227,6 +1843,9 @@ def build_default_fund_dashboard_cards(tenant, layout="2x2"):
                     seed.get("prompt")
                     or f"围绕 {seed.get('name') or f'核心指标 {index + 1}'} 生成适合普通投资者看的核心指标卡，说明当前状态、风险提醒和后续跟踪点。"
                 ).strip(),
+                "components": build_default_dashboard_components(infer_dashboard_card_mode(seed, fallback="market")),
+                "formula": build_dashboard_formula_text(infer_dashboard_card_mode(seed, fallback="market"), build_default_dashboard_components(infer_dashboard_card_mode(seed, fallback="market"))),
+                "sources": build_dashboard_sources_summary(infer_dashboard_card_mode(seed, fallback="market"), build_default_dashboard_components(infer_dashboard_card_mode(seed, fallback="market"))),
                 "isEmpty": False,
             }
         )
@@ -1235,13 +1854,15 @@ def build_default_fund_dashboard_cards(tenant, layout="2x2"):
 
 def normalize_fund_dashboard_view(source, tenant):
     defaults = {
+        "mode": "market",
         "layout": "2x2",
         "title": "今日核心指标面板",
-        "note": "默认展示租户当前发布的核心指标，用于判断今天先看方向还是先控风险。",
+        "note": "默认展示租户当前发布的核心指标组合，用于先看环境、再看行业、最后看信号个股。",
         "updatedAt": "默认模板",
         "publisher": "系统初始化",
     }
     raw = source if isinstance(source, dict) else {}
+    mode = normalize_dashboard_mode(raw.get("mode") or raw.get("segmentId") or defaults["mode"])
     layout = normalize_dashboard_layout(raw.get("layout") or defaults["layout"])
     fallback_cards = build_default_fund_dashboard_cards(tenant, layout)
     raw_cards = raw.get("cards") if isinstance(raw.get("cards"), list) else []
@@ -1249,10 +1870,23 @@ def normalize_fund_dashboard_view(source, tenant):
     for index in range(get_dashboard_card_target(layout)):
         fallback = fallback_cards[index]
         item = raw_cards[index] if index < len(raw_cards) and isinstance(raw_cards[index], dict) else {}
+        card_mode = infer_dashboard_card_mode(item, fallback=mode)
         prompt = str(item.get("prompt") or fallback["prompt"]).strip()
+        components = normalize_dashboard_components(item.get("components"), card_mode)
+        formula = str(item.get("formula") or build_dashboard_formula_text(card_mode, components)).strip() or build_dashboard_formula_text(card_mode, components)
+        sources = item.get("sources") if isinstance(item.get("sources"), list) else fallback.get("sources")
+        normalized_sources = []
+        for source_name in (sources if isinstance(sources, list) else build_dashboard_sources_summary(card_mode, components)):
+            source_text = str(source_name or "").strip()
+            if source_text and source_text not in normalized_sources:
+                normalized_sources.append(source_text)
+        if not normalized_sources:
+            normalized_sources = build_dashboard_sources_summary(card_mode, components)
         has_user_content = any(str(item.get(key) or "").strip() for key in ("name", "value", "assessment", "alert", "hint"))
         cards.append(
             {
+                "mode": card_mode,
+                "segmentId": card_mode,
                 "name": str(item.get("name") or fallback["name"]).strip() or fallback["name"],
                 "value": str(item.get("value") or fallback["value"]).strip() or fallback["value"],
                 "assessment": str(item.get("assessment") or fallback["assessment"]).strip() or fallback["assessment"],
@@ -1260,6 +1894,9 @@ def normalize_fund_dashboard_view(source, tenant):
                 "alert": str(item.get("alert") or fallback["alert"]).strip(),
                 "hint": str(item.get("hint") or fallback["hint"]).strip() or fallback["hint"],
                 "prompt": prompt,
+                "components": components,
+                "formula": formula,
+                "sources": normalized_sources,
                 "isEmpty": bool(item.get("isEmpty")) and not has_user_content and not prompt,
             }
         )
@@ -1270,6 +1907,8 @@ def normalize_fund_dashboard_view(source, tenant):
     summary = note
     cells = [
         {
+            "mode": card.get("mode") or mode,
+            "segmentId": card.get("segmentId") or card.get("mode") or mode,
             "title": card["name"] or f"核心指标 {index + 1}",
             "value": card["value"],
             "prompt": card["prompt"],
@@ -1277,10 +1916,15 @@ def normalize_fund_dashboard_view(source, tenant):
             "status": card["status"],
             "alert": card["alert"],
             "hint": card["hint"],
+            "components": copy.deepcopy(card.get("components") or []),
+            "formula": str(card.get("formula") or "").strip(),
+            "sources": copy.deepcopy(card.get("sources") or []),
         }
         for index, card in enumerate(cards)
     ]
     return {
+        "mode": mode,
+        "segmentId": mode,
         "layout": layout,
         "title": title,
         "note": note,
@@ -1295,9 +1939,10 @@ def normalize_fund_dashboard_view(source, tenant):
 def default_tenant_fund_dashboard_state(tenant):
     published = normalize_fund_dashboard_view(
         {
+            "mode": "market",
             "layout": "2x2",
             "title": "今日核心指标面板",
-            "note": "默认展示租户当前发布的核心指标，用于判断今天先看方向还是先控风险。",
+            "note": "默认展示租户当前发布的核心指标组合，用于先看环境、再看行业、最后看信号个股。",
             "updatedAt": "默认模板",
             "publisher": "系统初始化",
         },
@@ -1384,6 +2029,7 @@ def normalize_site_config(source=None):
     merged["brand"] = normalize_brand_config(merged.get("brand"))
     merged["knowledge_ingestion"] = normalize_knowledge_ingestion_config(merged.get("knowledge_ingestion"))
     merged["evidence_chain"] = normalize_evidence_chain_config(merged.get("evidence_chain"))
+    merged["review_generation"] = normalize_review_generation_config(merged.get("review_generation"))
     merged["llm_registry"] = normalize_llm_registry_config(merged.get("llm_registry"))
     merged["tenants"] = normalize_tenant_configs(merged.get("tenants"))
     tenant_slugs = [tenant["slug"] for tenant in merged["tenants"]]
@@ -6720,8 +7366,32 @@ def execute_user_async_job(job):
             tenant_slug=str(payload.get("tenant_slug") or "").strip().lower(),
             job_code=job_code,
         )
+    if job_type == "review_polish_input":
+        return polish_review_input_with_llm(
+            source_text=payload.get("source_text"),
+            review_period=str(payload.get("period") or "").strip().lower(),
+            source_mode=str(payload.get("source_mode") or "").strip().lower(),
+            speaker_name=str(payload.get("speaker_name") or "").strip(),
+            entry_point=str(payload.get("entry_point") or "").strip(),
+            tenant_slug=str(payload.get("tenant_slug") or "").strip().lower(),
+            job_code=job_code,
+        )
+    if job_type == "review_compose_draft":
+        return compose_review_draft_with_llm(
+            source_text=payload.get("source_text"),
+            review_period=str(payload.get("period") or "").strip().lower(),
+            prompt_text=payload.get("prompt_text"),
+            prompt_tags=payload.get("prompt_tags") if isinstance(payload.get("prompt_tags"), list) else [],
+            selected_watchlist=payload.get("selected_watchlist") if isinstance(payload.get("selected_watchlist"), list) else [],
+            speaker_name=str(payload.get("speaker_name") or "").strip(),
+            entry_point=str(payload.get("entry_point") or "").strip(),
+            tenant_slug=str(payload.get("tenant_slug") or "").strip().lower(),
+            dashboard_cards=payload.get("dashboard_cards") if isinstance(payload.get("dashboard_cards"), list) else [],
+            knowledge_items=payload.get("knowledge_items") if isinstance(payload.get("knowledge_items"), list) else [],
+            job_code=job_code,
+        )
     if job_type == "review_publish_embed":
-        return process_review_publish_text(
+        publish_result = process_review_publish_text(
             text=payload.get("text"),
             tenant_slug=str(payload.get("tenant_slug") or "").strip().lower(),
             review_period=str(payload.get("period") or "").strip().lower(),
@@ -6731,6 +7401,26 @@ def execute_user_async_job(job):
             transcript_model=str(payload.get("transcript_model") or "manual_input").strip() or "manual_input",
             job_code=job_code,
         )
+        snapshot_result = persist_review_publish_snapshot(
+            tenant_slug=str(payload.get("tenant_slug") or "").strip().lower(),
+            text=payload.get("text"),
+            review_period=str(payload.get("period") or "").strip().lower(),
+            speaker_name=str(payload.get("speaker_name") or "").strip(),
+            source_mode=str(payload.get("source_mode") or "manual").strip().lower() or "manual",
+            paragraph_mode=str(payload.get("paragraph_mode") or "manual").strip().lower() or "manual",
+            selected_watchlist=payload.get("selected_watchlist") if isinstance(payload.get("selected_watchlist"), list) else [],
+            prompt_tags=payload.get("prompt_tags") if isinstance(payload.get("prompt_tags"), list) else [],
+            knowledge_attachments=payload.get("knowledge_attachments") if isinstance(payload.get("knowledge_attachments"), list) else [],
+            selected_cards=payload.get("selected_cards") if isinstance(payload.get("selected_cards"), list) else [],
+            data_sources=payload.get("data_sources") if isinstance(payload.get("data_sources"), list) else [],
+            news_sources=payload.get("news_sources") if isinstance(payload.get("news_sources"), list) else [],
+            llm_models=payload.get("llm_models") if isinstance(payload.get("llm_models"), list) else [],
+            polished_input_text=payload.get("polished_input_text"),
+        )
+        return {
+            **publish_result,
+            **snapshot_result,
+        }
     if job_type == "knowledge_manual_sync":
         return save_manual_knowledge_entry(
             tenant_slug=str(payload.get("tenant_slug") or "").strip().lower(),
@@ -6759,6 +7449,10 @@ def execute_user_async_job(job):
 def _summarize_user_async_job_result(job_type, result):
     if job_type == "review_voice_transcribe":
         return "语音转写完成"
+    if job_type == "review_polish_input":
+        return "复盘输入润色完成"
+    if job_type == "review_compose_draft":
+        return "复盘完整成稿完成"
     if job_type == "review_generate_draft":
         return "复盘草稿生成完成"
     if job_type == "review_publish_embed":
@@ -7462,6 +8156,12 @@ def get_evidence_chain_config(site_config=None):
     return normalize_evidence_chain_config(section)
 
 
+def get_review_generation_config(site_config=None):
+    config = site_config or get_site_config()
+    section = config.get("review_generation") if isinstance(config, dict) else {}
+    return normalize_review_generation_config(section)
+
+
 def get_default_llm_config(site_config=None, purpose="general"):
     config = site_config or get_site_config()
     registry = normalize_llm_registry_config((config or {}).get("llm_registry"))
@@ -7730,6 +8430,243 @@ def generate_review_draft_with_llm(
             percent=85,
             summary="大模型已返回草稿，正在整理预览结果",
             log_text="复盘草稿已生成，正在整理模型信息和预览内容。",
+        )
+    return {
+        "text": normalized_text,
+        "llm_model": {
+            "key": llm_model.get("key"),
+            "label": llm_model.get("label"),
+            "provider": llm_model.get("provider"),
+            "model_name": llm_model.get("model_name"),
+            "purpose": llm_model.get("purpose"),
+        },
+    }
+
+
+def _get_review_period_label(review_period):
+    period_label_map = {
+        "day": "日复盘",
+        "week": "周复盘",
+        "month": "月复盘",
+        "quarter": "季复盘",
+        "knowledge": "知识整理",
+    }
+    key = str(review_period or "").strip().lower()
+    return period_label_map.get(key, key or "未指定")
+
+
+def _format_review_dashboard_blocks(cards):
+    blocks = []
+    for index, item in enumerate(cards or [], start=1):
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title") or item.get("name") or f"卡片 {index}").strip() or f"卡片 {index}"
+        summary = str(item.get("summary") or item.get("assessment") or item.get("hint") or "").strip()
+        value = str(item.get("value") or "").strip()
+        prompt = str(item.get("prompt") or "").strip()
+        data_sources = [str(source).strip() for source in (item.get("data_sources") or []) if str(source).strip()]
+        news_sources = [str(source).strip() for source in (item.get("news_sources") or []) if str(source).strip()]
+        evidence_note = str(item.get("evidence_note") or "").strip()
+        parts = [
+            f"卡片ID：{str(item.get('id') or '').strip() or f'card_{index}'}",
+            f"卡片标题：{title}",
+            f"卡片类型：{str(item.get('category') or item.get('kind') or '智能卡片').strip() or '智能卡片'}",
+        ]
+        if value:
+            parts.append(f"关键值：{value}")
+        if summary:
+            parts.append(f"摘要：{summary}")
+        if evidence_note:
+            parts.append(f"补充说明：{evidence_note}")
+        if prompt:
+            parts.append(f"卡片提示词：{prompt}")
+        parts.append(f"数据来源：{'；'.join(data_sources) if data_sources else '未提供'}")
+        parts.append(f"新闻来源：{'；'.join(news_sources) if news_sources else '未提供'}")
+        blocks.append("\n".join(parts))
+    return "\n\n".join(blocks)
+
+
+def _format_review_knowledge_blocks(items):
+    blocks = []
+    for index, item in enumerate(items or [], start=1):
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title") or f"知识材料 {index}").strip() or f"知识材料 {index}"
+        summary = str(item.get("summary") or item.get("body") or item.get("raw_input") or "").strip()
+        body = str(item.get("body") or item.get("raw_input") or summary).strip()
+        source_detail = str(item.get("source_detail") or item.get("source") or "").strip()
+        tags = [str(tag).strip() for tag in (item.get("tags") or []) if str(tag).strip()]
+        blocks.append(
+            "\n".join(
+                [
+                    f"知识ID：{str(item.get('id') or item.get('knowledge_id') or f'knowledge_{index}').strip()}",
+                    f"知识标题：{title}",
+                    f"来源说明：{source_detail or '未提供'}",
+                    f"标签：{'、'.join(tags) if tags else '无'}",
+                    f"摘要：{summary or '暂无摘要'}",
+                    f"正文材料：{body or '暂无正文'}",
+                ]
+            )
+        )
+    return "\n\n".join(blocks)
+
+
+def polish_review_input_with_llm(
+    source_text,
+    review_period="",
+    source_mode="",
+    speaker_name="",
+    entry_point="",
+    tenant_slug="",
+    job_code="",
+):
+    normalized_source = str(source_text or "").strip()
+    if not normalized_source:
+        raise ValueError("review_source_text_required")
+    llm_model = get_default_llm_config(purpose="general")
+    if not llm_model:
+        raise RuntimeError("review_polish_llm_not_configured")
+    review_cfg = get_review_generation_config()
+    speaker_label = str(speaker_name or "").strip() or "未命名大V"
+    if job_code:
+        report_user_async_job_progress(
+            job_code,
+            stage="llm_preparing",
+            percent=38,
+            summary="正在整理原始输入并准备润色",
+            log_text="已进入输入润色阶段，正在构建提示词。",
+        )
+    system_prompt = review_cfg.get("polish_system_prompt") or DEFAULT_SITE_CONFIG["review_generation"]["polish_system_prompt"]
+    user_prompt = (
+        str(review_cfg.get("polish_user_template") or DEFAULT_SITE_CONFIG["review_generation"]["polish_user_template"])
+        .replace("{period_label}", _get_review_period_label(review_period))
+        .replace("{source_mode}", str(source_mode or "unknown").strip() or "unknown")
+        .replace("{speaker_label}", speaker_label)
+        .replace("{entry_point}", str(entry_point or "unknown").strip() or "unknown")
+        .replace("{source_text}", normalized_source)
+    )
+    polished_text = call_openai_compatible_llm(
+        llm_model,
+        system_prompt,
+        user_prompt,
+        feature_code="review_input_polish",
+        feature_label="复盘输入润色",
+        tenant_slug=tenant_slug,
+        entry_point=entry_point,
+        metadata={
+            "review_period": str(review_period or "").strip().lower(),
+            "source_mode": str(source_mode or "").strip().lower(),
+            "job_code": job_code,
+            "stage": "polish",
+        },
+        request_timeout_seconds=review_cfg.get("polish_timeout_seconds", 45),
+    )
+    normalized_text = str(polished_text or "").strip()
+    if not normalized_text:
+        raise RuntimeError("empty_llm_response")
+    if job_code:
+        report_user_async_job_progress(
+            job_code,
+            stage="llm_postprocessing",
+            percent=82,
+            summary="输入润色完成，正在整理预览内容",
+            log_text="大模型已返回润色结果，正在回填复盘输入。",
+        )
+    return {
+        "text": normalized_text,
+        "llm_model": {
+            "key": llm_model.get("key"),
+            "label": llm_model.get("label"),
+            "provider": llm_model.get("provider"),
+            "model_name": llm_model.get("model_name"),
+            "purpose": llm_model.get("purpose"),
+        },
+    }
+
+
+def compose_review_draft_with_llm(
+    source_text,
+    review_period="",
+    prompt_text="",
+    prompt_tags=None,
+    selected_watchlist=None,
+    speaker_name="",
+    entry_point="",
+    tenant_slug="",
+    dashboard_cards=None,
+    knowledge_items=None,
+    job_code="",
+):
+    normalized_source = str(source_text or "").strip()
+    if not normalized_source:
+        raise ValueError("review_source_text_required")
+    llm_model = get_default_llm_config(purpose="general")
+    if not llm_model:
+        raise RuntimeError("review_compose_llm_not_configured")
+    review_cfg = get_review_generation_config()
+    speaker_label = str(speaker_name or "").strip() or "未命名大V"
+    watchlist_items = [str(item).strip() for item in (selected_watchlist or []) if str(item).strip()]
+    tag_items = [str(item).strip() for item in (prompt_tags or []) if str(item).strip()]
+    prompt_value = str(prompt_text or "").strip() or "无，请按专业复盘风格整理"
+    dashboard_blocks = _format_review_dashboard_blocks(dashboard_cards or [])
+    knowledge_blocks = _format_review_knowledge_blocks(knowledge_items or [])
+    if job_code:
+        report_user_async_job_progress(
+            job_code,
+            stage="llm_preparing",
+            percent=46,
+            summary="正在聚合智能仪表盘卡片并准备成稿",
+            log_text="已完成卡片与输入拼接，准备调用大模型生成完整复盘。",
+            extra_result={
+                "selected_card_count": len(dashboard_cards or []),
+                "knowledge_item_count": len(knowledge_items or []),
+            },
+        )
+    system_prompt = review_cfg.get("compose_system_prompt") or DEFAULT_SITE_CONFIG["review_generation"]["compose_system_prompt"]
+    user_prompt = (
+        str(review_cfg.get("compose_user_template") or DEFAULT_SITE_CONFIG["review_generation"]["compose_user_template"])
+        .replace("{period_label}", _get_review_period_label(review_period))
+        .replace("{speaker_label}", speaker_label)
+        .replace("{entry_point}", str(entry_point or "unknown").strip() or "unknown")
+        .replace("{watchlist_text}", "、".join(watchlist_items) if watchlist_items else "未指定")
+        .replace("{tag_text}", "、".join(tag_items) if tag_items else "无")
+        .replace("{prompt_text}", prompt_value)
+        .replace("{source_text}", normalized_source)
+        .replace("{dashboard_blocks}", dashboard_blocks or "未选择智能仪表盘卡片")
+        .replace("{knowledge_blocks}", knowledge_blocks or "未选择知识材料")
+    )
+    rendered_text = call_openai_compatible_llm(
+        llm_model,
+        system_prompt,
+        user_prompt,
+        feature_code="review_compose_generation",
+        feature_label="复盘完整成稿",
+        tenant_slug=tenant_slug,
+        entry_point=entry_point,
+        metadata={
+            "review_period": str(review_period or "").strip().lower(),
+            "watchlist_count": len(watchlist_items),
+            "card_count": len(dashboard_cards or []),
+            "knowledge_item_count": len(knowledge_items or []),
+            "job_code": job_code,
+            "stage": "compose",
+        },
+        request_timeout_seconds=review_cfg.get("compose_timeout_seconds", 60),
+    )
+    normalized_text = str(rendered_text or "").strip()
+    if not normalized_text:
+        raise RuntimeError("empty_llm_response")
+    if job_code:
+        report_user_async_job_progress(
+            job_code,
+            stage="llm_postprocessing",
+            percent=88,
+            summary="完整复盘草稿已返回，正在整理预览结果",
+            log_text="复盘成稿已生成，正在回填卡片与模型信息。",
+            extra_result={
+                "selected_card_count": len(dashboard_cards or []),
+                "knowledge_item_count": len(knowledge_items or []),
+            },
         )
     return {
         "text": normalized_text,
@@ -9200,6 +10137,86 @@ def process_review_publish_text(text, tenant_slug="", review_period="", entry_po
     }
 
 
+def persist_review_publish_snapshot(
+    tenant_slug,
+    text,
+    review_period="",
+    speaker_name="",
+    source_mode="manual",
+    paragraph_mode="manual",
+    selected_watchlist=None,
+    prompt_tags=None,
+    knowledge_attachments=None,
+    selected_cards=None,
+    data_sources=None,
+    news_sources=None,
+    llm_models=None,
+    polished_input_text="",
+):
+    tenant = get_tenant_by_slug(tenant_slug)
+    if not tenant or tenant.get("slug") != tenant_slug:
+        raise ValueError("tenant_not_found")
+    period_key = str(review_period or "day").strip().lower() or "day"
+    period_map = {"day": "日复盘", "week": "周复盘", "month": "月复盘"}
+    period_label = period_map.get(period_key, "日复盘")
+    cleaned_text = str(text or "").strip()
+    title_seed = re.split(r"[。！？\n]", cleaned_text, 1)[0].strip() if cleaned_text else ""
+    title = f"{period_label}：{title_seed or '最新复盘已发布'}"
+    summary = re.sub(r"\s+", " ", cleaned_text).strip()[:160] if cleaned_text else f"{period_label}已发布。"
+    snapshot = {
+        "id": f"{tenant_slug}-review-{int(time.time() * 1000)}",
+        "title": title[:80],
+        "period": period_label,
+        "period_key": period_key,
+        "time": now_ts(),
+        "published_at": now_ts(),
+        "tags": [str(tag).strip() for tag in (prompt_tags if isinstance(prompt_tags, list) else []) if str(tag).strip()][:6] or (["自定义文案"] if paragraph_mode == "manual" else ["智能文案"]),
+        "watchlist": [str(name).strip() for name in (selected_watchlist if isinstance(selected_watchlist, list) else []) if str(name).strip()][:8],
+        "summary": summary or title[:80],
+        "content_text": cleaned_text,
+        "source_mode": str(source_mode or "manual").strip().lower() or "manual",
+        "paragraph_mode": str(paragraph_mode or "manual").strip().lower() or "manual",
+        "publisher": str(speaker_name or tenant.get("advisor") or "").strip() or tenant.get("advisor") or "",
+        "snapshot_type": "published_review",
+        "knowledge_attachments": copy.deepcopy(knowledge_attachments if isinstance(knowledge_attachments, list) else []),
+        "selected_cards": copy.deepcopy(selected_cards if isinstance(selected_cards, list) else []),
+        "data_sources": [str(source).strip() for source in (data_sources if isinstance(data_sources, list) else []) if str(source).strip()][:12],
+        "news_sources": [str(source).strip() for source in (news_sources if isinstance(news_sources, list) else []) if str(source).strip()][:12],
+        "llm_models": copy.deepcopy(llm_models if isinstance(llm_models, list) else []),
+        "polished_input_text": str(polished_input_text or "").strip()[:12000],
+    }
+    snapshots = append_review_snapshot(tenant_slug, snapshot)
+    review_message = {
+        "id": f"{tenant_slug}-review-message-{int(time.time() * 1000)}",
+        "type": "review_notification",
+        "name": "复盘发布提醒",
+        "time": "刚刚",
+        "content": f"你刚发布的{period_label}已经同步到前台复盘专区，并准备推送给粉丝。",
+        "status": "已送达",
+        "user_name": "复盘发布提醒",
+        "user_avatar": "📝",
+        "tier": "系统消息",
+        "last_msg": f"【最新复盘已发布】{title[:40]}",
+        "unread": 0,
+        "vip_only": False,
+        "messages": [
+            {
+                "id": 1,
+                "sender": "kol",
+                "content": f"【最新复盘已发布】{title}\n已同步到复盘专区，当前纳入样本：{'、'.join(snapshot['watchlist']) if snapshot['watchlist'] else '未指定'}。\n现在可以直接去“复盘”页查看完整内容。",
+                "time": now_ts(),
+                "type": "review",
+            }
+        ],
+    }
+    message_state = append_message_thread(tenant_slug, review_message)
+    return {
+        "snapshot": snapshot,
+        "snapshots": snapshots,
+        "message_center_state": message_state,
+    }
+
+
 def process_review_manual_text(text, tenant_slug="", review_period="", entry_point="", speaker_name=""):
     normalized_text = str(text or "").strip()
     if not normalized_text:
@@ -9920,6 +10937,16 @@ def api_review_publish_embed():
             "speaker_name": speaker_name,
             "transcription_engine": str(body.get("transcription_engine") or "manual").strip().lower() or "manual",
             "transcript_model": str(body.get("transcript_model") or "manual_input").strip() or "manual_input",
+            "source_mode": str(body.get("source_mode") or "manual").strip().lower() or "manual",
+            "paragraph_mode": str(body.get("paragraph_mode") or "manual").strip().lower() or "manual",
+            "selected_watchlist": body.get("selected_watchlist") if isinstance(body.get("selected_watchlist"), list) else [],
+            "prompt_tags": body.get("prompt_tags") if isinstance(body.get("prompt_tags"), list) else [],
+            "knowledge_attachments": body.get("knowledge_attachments") if isinstance(body.get("knowledge_attachments"), list) else [],
+            "selected_cards": body.get("selected_cards") if isinstance(body.get("selected_cards"), list) else [],
+            "data_sources": body.get("data_sources") if isinstance(body.get("data_sources"), list) else [],
+            "news_sources": body.get("news_sources") if isinstance(body.get("news_sources"), list) else [],
+            "llm_models": body.get("llm_models") if isinstance(body.get("llm_models"), list) else [],
+            "polished_input_text": body.get("polished_input_text"),
         }
         if not str(payload.get("text") or "").strip():
             raise ValueError("publish_text_required")
@@ -10543,6 +11570,11 @@ def api_admin_site_config():
                 if isinstance(payload.get("evidence_chain"), dict)
                 else current.get("evidence_chain")
             ),
+            "review_generation": normalize_review_generation_config(
+                payload.get("review_generation")
+                if isinstance(payload.get("review_generation"), dict)
+                else current.get("review_generation")
+            ),
             "llm_registry": normalize_llm_registry_config(
                 payload.get("llm_registry")
                 if isinstance(payload.get("llm_registry"), dict)
@@ -10813,38 +11845,37 @@ def api_hermes_analyze():
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
     })
 
-def gen_dm_conversations():
-    return [
-        {"id":1,"kol_name":"财经老王","kol_avatar":"👑","tier":"种子作者","last_msg":"好的，我周四直播会详细讲这个方向，记得来看","time":"5分钟前","unread":1,"vip_only":False},
-        {"id":2,"kol_name":"投资女神Lisa","kol_avatar":"💎","tier":"种子作者","last_msg":"港股互联网的配置建议我已经发到专属频道了","time":"2小时前","unread":0,"vip_only":False},
-        {"id":3,"kol_name":"量化老师陈明","kol_avatar":"📊","tier":"成长作者","last_msg":"[付费内容] 本周多因子模型调仓建议","time":"昨天","unread":0,"vip_only":True},
-        {"id":4,"kol_name":"全球宏观James","kol_avatar":"🌐","tier":"成长作者","last_msg":"美联储会议纪要解读已更新，查看详情","time":"昨天","unread":0,"vip_only":False},
-        {"id":5,"kol_name":"新能源猎手阿强","kol_avatar":"⚡","tier":"观察作者","last_msg":"固态电池调研纪要整理好了，分享给你","time":"3天前","unread":0,"vip_only":False},
-    ]
+def gen_dm_conversations(tenant_slug=None, include_fan_threads=True):
+    tenant = get_tenant_by_slug(tenant_slug)
+    state = resolve_tenant_message_center_state(tenant, tenant.get("message_center_state"))
+    items = []
+    for thread in state["threads"]:
+        thread_type = str(thread.get("type") or "").strip()
+        if thread_type == "fan_interaction" and not include_fan_threads:
+            continue
+        items.append({
+            "id": thread.get("id"),
+            "kol_name": tenant.get("advisor") or "",
+            "kol_avatar": tenant.get("logo_mark") or "👑",
+            "user_name": thread.get("user_name") or thread.get("name") or "",
+            "user_avatar": thread.get("user_avatar") or "👤",
+            "tier": thread.get("tier") or "粉丝",
+            "last_msg": thread.get("last_msg") or thread.get("content") or "",
+            "time": thread.get("time") or "",
+            "unread": int(thread.get("unread") or 0),
+            "vip_only": bool(thread.get("vip_only", False)),
+            "type": thread_type,
+        })
+    return items
 
-def gen_dm_messages(kol_id):
-    conversations = {
-        1: [
-            {"id":1,"sender":"kol","content":"欢迎关注我的专属频道！我会在这里分享一些不方便公开发的深度观点。","time":"2026-05-18 09:00","type":"text"},
-            {"id":2,"sender":"user","content":"老王好！想请教一下，AI算力板块现在还能追吗？感觉涨了不少了","time":"2026-05-18 10:30","type":"text"},
-            {"id":3,"sender":"kol","content":"好问题。短期确实有些过热，但中长期逻辑没变。我的建议是分批建仓，不要一把梭。具体标的我周四直播会讲。","time":"2026-05-18 11:00","type":"text"},
-            {"id":4,"sender":"user","content":"明白，那我先建1/3仓位，等回调再加","time":"2026-05-20 08:15","type":"text"},
-            {"id":5,"sender":"kol","content":"好的，我周四直播会详细讲这个方向，记得来看","time":"2026-05-20 08:20","type":"text"},
-        ],
-        2: [
-            {"id":1,"sender":"kol","content":"Hi～欢迎加入我的专属圈子！港股互联网是我的核心研究方向，有问题随时问。","time":"2026-05-17 14:00","type":"text"},
-            {"id":2,"sender":"user","content":"Lisa姐，南向资金最近流入很多，是不是该加仓港股了？","time":"2026-05-19 09:00","type":"text"},
-            {"id":3,"sender":"kol","content":"港股互联网的配置建议我已经发到专属频道了","time":"2026-05-20 10:00","type":"text"},
-            {"id":4,"sender":"kol","content":"简单说：当前估值20%分位，南向连续14天净买入，我觉得可以加到标配+5%。但注意分散，别只买一只。","time":"2026-05-20 10:02","type":"text"},
-        ],
-        3: [
-            {"id":1,"sender":"kol","content":"欢迎！我的频道主要分享量化策略和因子研究，每周更新调仓建议。","time":"2026-05-15 09:00","type":"text"},
-            {"id":2,"sender":"kol","content":"[付费内容] 本周多因子模型调仓建议","time":"2026-05-19 20:00","type":"paid","price":50,"preview":"本周价值因子持续占优，动量因子衰减...（解锁查看完整内容）"},
-        ],
-    }
-    return conversations.get(kol_id, [
-        {"id":1,"sender":"kol","content":"欢迎关注！有投研问题随时交流。","time":"2026-05-18 09:00","type":"text"},
-    ])
+
+def gen_dm_messages(thread_id, tenant_slug=None):
+    tenant = get_tenant_by_slug(tenant_slug)
+    state = resolve_tenant_message_center_state(tenant, tenant.get("message_center_state"))
+    for thread in state["threads"]:
+        if str(thread.get("id")) == str(thread_id):
+            return copy.deepcopy(thread.get("messages") or [])
+    return [{"id": 1, "sender": "kol", "content": "欢迎关注！有投研问题随时交流。", "time": "2026-05-18 09:00", "type": "text"}]
 
 def gen_kol_workbench(tenant=None, fallback_mode=False):
     tenant = tenant or get_tenant_by_slug()
@@ -10875,6 +11906,14 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
     fund_dashboard = copy.deepcopy(fund_dashboard_state["published"])
     knowledge_hub = fetch_live_knowledge_hub(tenant)
     indicator_hub = build_indicator_hub_fallback(tenant=tenant, admin_view=False) if fallback_mode else build_indicator_hub(tenant=tenant, admin_view=False)
+    news_items = gen_news_feed()
+    message_center_state = resolve_tenant_message_center_state(tenant, tenant.get("message_center_state"))
+    published_reviews = resolve_tenant_review_snapshots(tenant, tenant.get("review_snapshots"))
+    fan_threads = [item for item in message_center_state["threads"] if item.get("type") == "fan_interaction"]
+    review_notice_threads = [item for item in message_center_state["threads"] if item.get("type") == "review_notification"]
+    broadcast_history = message_center_state["broadcasts"]
+    review_smart_cards = build_review_smart_cards(tenant, fund_dashboard, watchlist_details_map, news_items)
+    review_generation_cfg = get_review_generation_config()
     return {
         "tenant": tenant,
         "fallback_mode": fallback_mode,
@@ -10920,37 +11959,21 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
         ] or [
             {"name": "暂无粉丝", "time": "--", "msg": "请先通过 Admin 或工作台导入用户。", "tier": "--"}
         ],
-        "broadcast_history": [
-            {"id":1,"content":is_lisa and "本周港股互联网更新：继续看南向资金和回购兑现" or "本周策略更新：科技板块适合继续跟踪，重点看 AI 算力订单兑现","time":"2026-05-20 08:00","reach":92,"open_rate":68},
-            {"id":2,"content":is_lisa and "价值提醒：财报前估值修复较快，注意不要只盯单一平台" or "宏观提醒：美联储纪要偏鸽，但还要等国内资金面确认","time":"2026-05-19 22:30","reach":108,"open_rate":82},
-            {"id":3,"content":"周末复盘：本周操作回顾与下周观察重点","time":"2026-05-18 18:00","reach":76,"open_rate":55},
-        ],
+        "broadcast_history": broadcast_history,
         "portal_workspace": resolve_tenant_portal_workspace(tenant, tenant.get("portal_cms")),
         "message_center": {
-            "summary": "消息板块不仅包含粉丝给大V的提问，也包含大V回复粉丝后的追问，以及复盘发布后需要第一时间触达的粉丝提醒。",
+            "summary": message_center_state["summary"],
             "items": [
                 {
-                    "name": "投研达人_小陈",
-                    "type": "粉丝提问",
-                    "time": "5分钟前",
-                    "content": is_lisa and "港股互联网还能继续配吗？想看你按 Hermes 价值框架压缩后的短版结论。" or "AI 算力还能继续跟吗？想看你按 Hermes 基本面判断后的短版结论。",
-                    "status": "待回复",
-                },
-                {
-                    "name": "复盘发布提醒",
-                    "type": "系统消息",
-                    "time": "12分钟前",
-                    "content": "你刚发布的日复盘已经推送给 92 位高频粉丝，首批打开率 41%。",
-                    "status": "已送达",
-                },
-                {
-                    "name": "价值猎人小林",
-                    "type": "追问消息",
-                    "time": "23分钟前",
-                    "content": is_lisa and "最新那篇港股复盘我看完了，想继续问腾讯和美团的回购节奏怎么拆。" or "港股互联网那篇复盘我看完了，想继续问腾讯回购节奏和估值带怎么看。",
-                    "status": "待跟进",
-                },
+                    "name": item.get("name") or item.get("user_name") or "",
+                    "type": "系统消息" if item.get("type") == "review_notification" else ("粉丝提问" if item.get("status") == "待回复" else "追问消息"),
+                    "time": item.get("time") or "--",
+                    "content": item.get("content") or "",
+                    "status": item.get("status") or "待处理",
+                }
+                for item in (fan_threads + review_notice_threads)[:6]
             ],
+            "threads": copy.deepcopy(message_center_state["threads"]),
         },
         "fan_management": {
             "summary": "这里看的是大V自己的粉丝分层，不是平台总用户。重点管理高频互动、付费意向、机构试点和沉默粉丝的经营动作。",
@@ -11131,6 +12154,7 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
                 {"icon": "🎙️", "label": "语音口述", "desc": "收盘后直接口述行业主线、关键公司和操作复盘，智能体自动转写并抽取段落。"},
                 {"icon": "✍️", "label": "手动撰写", "desc": "提供富文本手写区域，大V自己决定文章段落、标题和表达顺序。"},
                 {"icon": "📎", "label": "文件上传", "desc": "上传研报、纪要、Excel 和 PDF，由智能体统一抽取要点并转成复盘文案。"},
+                {"icon": "🔗", "label": "URL 资料", "desc": "抓取网页资料并抽取正文，适合作为复盘证据链和背景补充。"},
             ],
             "paragraph_modes": [
                 {"label": "大V自定段落", "desc": "适合自己写主框架，只让智能体补摘要、证据链和风险提示。"},
@@ -11139,6 +12163,20 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
             "default_flow": ["选择复盘周期", "确认本次自选股", "补充语音/手输/文件", "设置智能文案规则", "生成草稿预览", "确认后发布给粉丝"],
             "watchlist_focus": watchlist_focus,
             "periods": ["日复盘", "周复盘", "月复盘"],
+            "smart_cards": review_smart_cards,
+            "flow_nodes": [
+                {"id": "cards", "label": "选择智能仪表盘卡片"},
+                {"id": "input", "label": "录入个人内容"},
+                {"id": "polish", "label": "输入润色"},
+                {"id": "compose", "label": "完整成稿"},
+                {"id": "preview", "label": "人工确认并发布"},
+            ],
+            "prompt_config": {
+                "polish_system_prompt": review_generation_cfg.get("polish_system_prompt"),
+                "polish_user_template": review_generation_cfg.get("polish_user_template"),
+                "compose_system_prompt": review_generation_cfg.get("compose_system_prompt"),
+                "compose_user_template": review_generation_cfg.get("compose_user_template"),
+            },
         },
         "knowledge_hub": knowledge_hub,
         "hermes_hub": {
@@ -11186,24 +12224,7 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
         "fund_dashboard": fund_dashboard,
         "fund_dashboard_state": fund_dashboard_state,
         "indicator_hub": indicator_hub,
-        "published_reviews": [
-            {
-                "title": "收盘复盘：AI 算力强主线未变，港股互联网继续看回购与财报兑现",
-                "period": "日复盘",
-                "time": "2026-06-07 18:40",
-                "tags": ["行业板块", "个股跟踪", "可直接分发"],
-                "watchlist": watchlist_focus[:3],
-                "summary": "先从全天资料压出短版提纲，再对中芯国际、腾讯控股和贵州茅台三个样本做个股投资复盘，保留主线、验证节点和下一步观察。"
-            },
-            {
-                "title": "周度复盘：科技成长维持主线，消费与新能源需要继续等景气验证",
-                "period": "周复盘",
-                "time": "2026-06-06 20:10",
-                "tags": ["周度框架", "板块归纳"],
-                "watchlist": watchlist_focus[:3],
-                "summary": "以行业板块为骨架，把 AI 算力、半导体、港股互联网、消费和新能源统一放进同一篇复盘，方便普通投资者快速查看。"
-            },
-        ],
+        "published_reviews": published_reviews,
         "consistency_notes": [
             {"title": "前后台分离", "desc": "首页同时展示纯 Admin 后台和大V web 工作台两个入口，角色职责分开。"},
             {"title": "消息口径一致", "desc": "H5、工作台和 Admin 都把“粉丝消息 + 大V回复 + 复盘提醒”视为同一消息链路。"},
@@ -11218,17 +12239,26 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
 
 @app.route("/api/dm/conversations")
 def api_dm_conversations():
-    return jsonify(gen_dm_conversations())
+    tenant_slug = str(request.args.get("tenant") or "").strip().lower()
+    include_fan_threads = is_feature_enabled("fan_interaction")
+    return jsonify(gen_dm_conversations(tenant_slug=tenant_slug, include_fan_threads=include_fan_threads))
 
-@app.route("/api/dm/messages/<int:kol_id>")
-def api_dm_messages(kol_id):
-    return jsonify(gen_dm_messages(kol_id))
+@app.route("/api/dm/messages/<thread_id>")
+def api_dm_messages(thread_id):
+    tenant_slug = str(request.args.get("tenant") or "").strip().lower()
+    return jsonify(gen_dm_messages(thread_id, tenant_slug=tenant_slug))
 
 @app.route("/api/dm/send", methods=["POST"])
 def api_dm_send():
-    kol_id = request.json.get("kol_id")
-    content = request.json.get("content", "")
-    history = request.json.get("history", [])
+    if not is_feature_enabled("fan_interaction"):
+        return jsonify({"success": False, "error": "fan_interaction_disabled"}), 403
+    body = request.get_json(silent=True) or {}
+    thread_id = body.get("thread_id") or body.get("kol_id")
+    tenant_slug = str(body.get("tenant_slug") or request.args.get("tenant") or "").strip().lower()
+    content = body.get("content", "")
+    history = body.get("history", [])
+    tenant = get_tenant_by_slug(tenant_slug)
+    state = resolve_tenant_message_center_state(tenant, tenant.get("message_center_state"))
     # 作者角色画像 + 上下文感知（合规：用"关注/参考/可考虑"措辞，不出现"买/卖/必涨/必跌"）
     KOL_PERSONA = {
         1: {"name":"财经老王","style":"宏观+科技，偏稳健","focus":["AI算力","半导体","美联储","降息"]},
@@ -11237,7 +12267,7 @@ def api_dm_send():
         4: {"name":"全球宏观James","style":"宏观+大宗，海外视角","focus":["美联储","美元","黄金","大宗"]},
         5: {"name":"新能源猎手阿强","style":"产业链调研，新能源","focus":["新能源","固态电池","锂电","光伏"]},
     }
-    persona = KOL_PERSONA.get(kol_id, KOL_PERSONA[1])
+    persona = KOL_PERSONA[1]
     text = content.lower()
     turn = len(history) + 1
 
@@ -11273,13 +12303,41 @@ def api_dm_send():
         return f"咱们聊了几轮，我建议你这样做：①用Hermes的「AI资产配置」生成一份组合参考 ②用「AI行情预判」看一下你关注标的的历史走势区间 ③有具体观点了，再回来跟我对一对。最终决策一定是你自己做，我们这边只能给数据和研究框架。"
 
     reply = reply_for(content)
+    updated = False
+    next_threads = []
+    for index, thread in enumerate(state["threads"]):
+        if str(thread.get("id")) != str(thread_id):
+            next_threads.append(thread)
+            continue
+        messages = copy.deepcopy(thread.get("messages") or [])
+        next_message_id = len(messages) + 1
+        messages.append({"id": next_message_id, "sender": "user", "content": content, "time": now_ts(), "type": "text"})
+        messages.append({"id": next_message_id + 1, "sender": "kol", "content": reply, "time": now_ts(), "type": "text"})
+        next_thread = dict(thread)
+        next_thread["messages"] = messages[-120:]
+        next_thread["content"] = content
+        next_thread["last_msg"] = reply
+        next_thread["time"] = "刚刚"
+        next_thread["status"] = "已回复"
+        next_thread["unread"] = 0
+        next_threads.append(normalize_message_thread_item(next_thread, tenant, index=index))
+        updated = True
+    if updated:
+        saved = update_tenant_message_center_state(tenant_slug, {
+            "summary": state["summary"],
+            "threads": next_threads,
+            "broadcasts": state["broadcasts"],
+        })
+        latest_tenant = get_tenant_by_slug(tenant_slug, saved) if saved else tenant
+        state = resolve_tenant_message_center_state(latest_tenant, latest_tenant.get("message_center_state"))
     return jsonify({
         "success": True,
-        "kol_id": kol_id,
+        "kol_id": thread_id,
         "msg_id": random.randint(100,999),
         "auto_reply": reply,
         "disclaimer": "以上为试点作者个人研究观点，仅供参考，不构成投资建议",
         "turn": turn,
+        "threads": state["threads"],
     })
 
 @app.route("/api/ai/allocation", methods=["POST"])
@@ -11653,6 +12711,90 @@ def api_generate_review_draft():
     })
 
 
+@app.route("/api/review/polish-input", methods=["POST"])
+def api_polish_review_input():
+    body = request.get_json(silent=True) or {}
+    try:
+        tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
+        entry_point = str(body.get("entry_point") or "").strip() or "review_polish"
+        speaker_name = str(body.get("speaker_name") or "").strip()
+        payload = {
+            "tenant_slug": tenant_slug,
+            "period": str(body.get("period") or "").strip().lower(),
+            "source_mode": str(body.get("source_mode") or "").strip().lower(),
+            "source_text": body.get("source_text"),
+            "speaker_name": speaker_name,
+            "entry_point": entry_point,
+        }
+        if not str(payload.get("source_text") or "").strip():
+            raise ValueError("review_source_text_required")
+        job = create_user_async_job(
+            "review_polish_input",
+            payload=payload,
+            tenant_slug=tenant_slug,
+            entry_point=entry_point,
+            owner_label=speaker_name,
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    except Exception:
+        app.logger.exception("Failed to polish review input with LLM")
+        return jsonify({"ok": False, "error": "review_input_polish_failed"}), 500
+    return jsonify({
+        "ok": True,
+        "async": True,
+        "job_code": job["job_code"],
+        "job_status": job["status"],
+        "message": "复盘输入已提交润色，正在后台调用大模型",
+    })
+
+
+@app.route("/api/review/compose-draft", methods=["POST"])
+def api_compose_review_draft():
+    body = request.get_json(silent=True) or {}
+    try:
+        tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
+        entry_point = str(body.get("entry_point") or "").strip() or "review_compose"
+        speaker_name = str(body.get("speaker_name") or "").strip()
+        payload = {
+            "tenant_slug": tenant_slug,
+            "period": str(body.get("period") or "").strip().lower(),
+            "source_text": body.get("source_text"),
+            "prompt_text": body.get("prompt_text"),
+            "prompt_tags": body.get("prompt_tags") if isinstance(body.get("prompt_tags"), list) else [],
+            "selected_watchlist": body.get("selected_watchlist") if isinstance(body.get("selected_watchlist"), list) else [],
+            "dashboard_cards": body.get("dashboard_cards") if isinstance(body.get("dashboard_cards"), list) else [],
+            "knowledge_items": body.get("knowledge_items") if isinstance(body.get("knowledge_items"), list) else [],
+            "speaker_name": speaker_name,
+            "entry_point": entry_point,
+        }
+        if not str(payload.get("source_text") or "").strip():
+            raise ValueError("review_source_text_required")
+        job = create_user_async_job(
+            "review_compose_draft",
+            payload=payload,
+            tenant_slug=tenant_slug,
+            entry_point=entry_point,
+            owner_label=speaker_name,
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    except Exception:
+        app.logger.exception("Failed to compose review draft with LLM")
+        return jsonify({"ok": False, "error": "review_compose_draft_failed"}), 500
+    return jsonify({
+        "ok": True,
+        "async": True,
+        "job_code": job["job_code"],
+        "job_status": job["status"],
+        "message": "复盘完整草稿已提交生成，正在后台调用大模型",
+    })
+
+
 @app.route("/api/tenant/<tenant_slug>/dashboard")
 def api_tenant_dashboard(tenant_slug):
     tenant = get_tenant_by_slug(tenant_slug)
@@ -11679,15 +12821,30 @@ def api_save_tenant_dashboard(tenant_slug):
 
 @app.route("/api/kol/broadcast", methods=["POST"])
 def api_kol_broadcast():
-    content = request.json.get("content", "")
-    target = request.json.get("target", "all")
-    return jsonify({"success": True, "reach": random.randint(2000, 5000), "content": content, "target": target})
+    body = request.get_json(silent=True) or {}
+    tenant_slug = str(body.get("tenant_slug") or request.args.get("tenant") or "").strip().lower()
+    content = str(body.get("content") or "").strip()
+    target = str(body.get("target") or "all").strip() or "all"
+    if not content:
+        return jsonify({"success": False, "error": "broadcast_content_required"}), 400
+    broadcast_item = {
+        "id": int(time.time() * 1000),
+        "content": content,
+        "time": now_ts(),
+        "reach": random.randint(2000, 5000),
+        "open_rate": random.randint(45, 86),
+        "target": target,
+        "type": "broadcast",
+    }
+    state = append_broadcast_history(tenant_slug or get_default_tenant_slug(), broadcast_item)
+    return jsonify({"success": True, **broadcast_item, "broadcasts": state["broadcasts"]})
 
 @app.route("/api/kol/reply", methods=["POST"])
 def api_kol_reply():
-    fan_name = request.json.get("fan_name", "")
-    content = request.json.get("content", "")
-    is_paid = request.json.get("is_paid", False)
+    body = request.get_json(silent=True) or {}
+    fan_name = body.get("fan_name", "")
+    content = body.get("content", "")
+    is_paid = body.get("is_paid", False)
     return jsonify({"success": True, "fan_name": fan_name, "is_paid": is_paid, "revenue": 50 if is_paid else 0})
 
 @app.route("/prd")
