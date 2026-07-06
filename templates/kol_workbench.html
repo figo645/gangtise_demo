@@ -3897,6 +3897,26 @@ async function refreshWorkbenchSiteConfig(options = {}) {
     if (!data || typeof data !== 'object') throw new Error('invalid_site_config');
     window.SITE_CONFIG = data;
     refreshWorkbenchNavVisibility();
+    try {
+      const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
+      const workbenchRes = await fetch(`/api/kol/workbench?tenant=${encodeURIComponent(tenantSlug)}`, {cache: 'no-store'});
+      if (workbenchRes.ok) {
+        const workbenchData = await workbenchRes.json();
+        if (workbenchData && typeof workbenchData === 'object') {
+          window.WORKBENCH_DATA = workbenchData;
+          kwFans = Array.isArray((window.WORKBENCH_DATA && window.WORKBENCH_DATA.fan_management && window.WORKBENCH_DATA.fan_management.fans))
+            ? window.WORKBENCH_DATA.fan_management.fans.map((fan) => ({
+                ...fan,
+                name: fan.name || '',
+              }))
+            : [];
+          kwRenderMessageCenter();
+          kwRenderBroadcastHistory();
+          kwRenderPublishedReviewList();
+          renderWorkbenchAnnotationViews();
+        }
+      }
+    } catch (e) {}
     const activeSection = new URLSearchParams(window.location.search).get('section') || 'overview';
     if (activeSection && !document.querySelector(`.admin-nav-item[data-section="${activeSection}"]`) && activeSection !== 'overview') {
       showWorkbenchSection('overview');

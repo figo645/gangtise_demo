@@ -508,6 +508,7 @@ DEFAULT_SITE_CONFIG = {
         "vip": False,
         "dm": True,
         "fan_interaction": False,
+        "paid_reply": False,
         "workbench": True,
     },
 }
@@ -1238,24 +1239,83 @@ def default_tenant_message_center_state(tenant):
     }
 
 
+def summarize_message_preview(content, limit=72):
+    text = re.sub(r"\s+", " ", str(content or "").replace("\n", " ").strip())
+    if len(text) <= limit:
+        return text
+    return f"{text[:max(0, limit - 1)]}…"
+
+
+def normalize_message_thread_message_item(msg, msg_index=0):
+    raw = msg if isinstance(msg, dict) else {}
+    message_type = str(raw.get("type") or "text").strip() or "text"
+    content = str(raw.get("content") or "").strip()
+    preview = str(raw.get("preview") or "").strip()
+    price = max(0, int(raw.get("price") or 0))
+    if message_type == "paid" and not preview:
+        preview = summarize_message_preview(content, limit=48) or "解锁查看完整内容"
+    return {
+        "id": int(raw.get("id") or (msg_index + 1)),
+        "sender": str(raw.get("sender") or "user").strip() or "user",
+        "content": content,
+        "time": normalize_datetime_text(raw.get("time") or now_ts()) or now_ts(),
+        "type": message_type,
+        "price": price,
+        "preview": preview,
+    }
+
+
+def build_thread_last_message(thread, messages):
+    latest = messages[-1] if messages else {}
+    latest_type = str((latest or {}).get("type") or "").strip()
+    if latest_type == "review":
+        return summarize_message_preview((latest or {}).get("content") or thread.get("last_msg") or "【最新复盘已发布】", limit=72)
+    if latest_type == "broadcast":
+        content = (latest or {}).get("content") or thread.get("last_msg") or "群发消息已发送"
+        return f"【群发】{summarize_message_preview(content, limit=60)}"
+    if latest_type == "paid":
+        preview = (latest or {}).get("preview") or (latest or {}).get("content") or thread.get("last_msg") or "付费回复"
+        return f"【付费回复】{summarize_message_preview(preview, limit=56)}"
+    return summarize_message_preview((latest or {}).get("content") or thread.get("last_msg") or thread.get("content") or "", limit=72)
+
+
 def normalize_message_thread_item(item, tenant, index=0):
     raw = item if isinstance(item, dict) else {}
     defaults = default_tenant_message_center_state(tenant)["threads"]
     fallback = defaults[min(index, len(defaults) - 1)]
-    messages = []
-    for msg_index, msg in enumerate(raw.get("messages") if isinstance(raw.get("messages"), list) else fallback.get("messages", [])):
-        if not isinstance(msg, dict):
-            continue
-        messages.append({
-            "id": int(msg.get("id") or (msg_index + 1)),
-            "sender": str(msg.get("sender") or "user").strip() or "user",
-            "content": str(msg.get("content") or "").strip(),
-            "time": normalize_datetime_text(msg.get("time") or now_ts()) or now_ts(),
-            "type": str(msg.get("type") or "text").strip() or "text",
-        })
+    raw_messages = raw.get("messages") if isinstance(raw.get("messages"), list) else fallback.get("messages", [])
+    messages = [normalize_message_thread_message_item(msg, msg_index=msg_index) for msg_index, msg in enumerate(raw_messages) if isinstance(msg, dict)]
+    last_sender = str(
+        raw.get("last_sender")
+        or ((messages[-1] or {}).get("sender") if messages else "")
+        or fallback.get("last_sender")
+        or "user"
+    ).strip() or "user"
+    legacy_unread = max(0, int(raw.get("unread") or fallback.get("unread") or 0))
+    kol_unread = max(
+        0,
+        int(
+            raw.get("kol_unread")
+            if raw.get("kol_unread") is not None
+            else (legacy_unread if last_sender == "user" and str(raw.get("type") or fallback.get("type") or "").strip() == "fan_interaction" else 0)
+        ),
+    )
+    user_unread = max(
+        0,
+        int(
+            raw.get("user_unread")
+            if raw.get("user_unread") is not None
+            else (legacy_unread if last_sender == "kol" and str(raw.get("type") or fallback.get("type") or "").strip() == "fan_interaction" else 0)
+        ),
+    )
+    thread_type = str(raw.get("type") or fallback.get("type") or "fan_interaction").strip() or "fan_interaction"
+    last_message = messages[-1] if messages else {}
+    last_msg = str(raw.get("last_msg") or "").strip() or build_thread_last_message(raw, messages)
+    if not last_msg:
+        last_msg = str(raw.get("content") or fallback.get("content") or "").strip()
     return {
         "id": str(raw.get("id") or fallback.get("id") or f"{tenant['slug']}-thread-{index + 1}").strip(),
-        "type": str(raw.get("type") or fallback.get("type") or "fan_interaction").strip(),
+        "type": thread_type,
         "name": str(raw.get("name") or fallback.get("name") or "").strip(),
         "time": str(raw.get("time") or fallback.get("time") or "").strip() or now_ts(),
         "content": str(raw.get("content") or fallback.get("content") or "").strip(),
@@ -1264,8 +1324,13 @@ def normalize_message_thread_item(item, tenant, index=0):
         "user_name": str(raw.get("user_name") or fallback.get("user_name") or raw.get("name") or "").strip(),
         "user_avatar": str(raw.get("user_avatar") or fallback.get("user_avatar") or "👤").strip() or "👤",
         "tier": str(raw.get("tier") or fallback.get("tier") or "粉丝").strip() or "粉丝",
-        "last_msg": str(raw.get("last_msg") or fallback.get("last_msg") or raw.get("content") or "").strip(),
-        "unread": max(0, int(raw.get("unread") or fallback.get("unread") or 0)),
+        "last_msg": last_msg,
+        "unread": max(kol_unread, user_unread),
+        "kol_unread": kol_unread,
+        "user_unread": user_unread,
+        "last_sender": last_sender,
+        "updated_at": normalize_datetime_text(raw.get("updated_at") or (last_message or {}).get("time") or raw.get("time") or now_ts()) or now_ts(),
+        "last_message_type": str((last_message or {}).get("type") or raw.get("last_message_type") or "text").strip() or "text",
         "vip_only": bool(raw.get("vip_only", fallback.get("vip_only", False))),
         "messages": messages,
     }
@@ -1369,6 +1434,210 @@ def append_broadcast_history(tenant_slug, broadcast_item):
     })
     latest_tenant = get_tenant_by_slug(tenant_slug, saved) if saved else tenant
     return resolve_tenant_message_center_state(latest_tenant, state=latest_tenant.get("message_center_state"))
+
+
+def build_message_center_items(threads, limit=6):
+    items = []
+    for thread in (threads or [])[: max(1, int(limit or 6))]:
+        thread_type = str(thread.get("type") or "").strip()
+        status = str(thread.get("status") or "").strip() or "待处理"
+        if thread_type == "review_notification":
+            item_type = "系统消息"
+        elif thread_type == "broadcast_notification":
+            item_type = "群发通知"
+        else:
+            item_type = "粉丝提问" if status == "待回复" else "追问消息"
+        items.append({
+            "id": str(thread.get("id") or "").strip(),
+            "name": thread.get("name") or thread.get("user_name") or "",
+            "type": item_type,
+            "time": thread.get("time") or "--",
+            "content": thread.get("content") or thread.get("last_msg") or "",
+            "status": status,
+            "tier": thread.get("tier") or "",
+            "kol_unread": max(0, int(thread.get("kol_unread") or 0)),
+            "user_unread": max(0, int(thread.get("user_unread") or 0)),
+        })
+    return items
+
+
+def build_message_center_stats(state):
+    threads = state.get("threads") if isinstance(state, dict) else []
+    fan_threads = [item for item in (threads or []) if str(item.get("type") or "").strip() == "fan_interaction"]
+    unread_messages = sum(1 for item in fan_threads if int(item.get("kol_unread") or 0) > 0)
+    pending_replies = sum(1 for item in fan_threads if str(item.get("status") or "").strip() == "待回复")
+    investor_unread = sum(1 for item in fan_threads if int(item.get("user_unread") or 0) > 0)
+    return {
+        "unread_messages": unread_messages,
+        "pending_replies": pending_replies,
+        "investor_unread_threads": investor_unread,
+    }
+
+
+def build_dm_conversation_records(tenant, threads):
+    tenant = tenant or get_tenant_by_slug()
+    records = []
+    for thread in threads or []:
+        records.append({
+            "id": thread.get("id"),
+            "kol_name": tenant.get("advisor") or "",
+            "kol_avatar": tenant.get("logo_mark") or "👑",
+            "user_name": thread.get("user_name") or thread.get("name") or "",
+            "user_avatar": thread.get("user_avatar") or "👤",
+            "tier": thread.get("tier") or "粉丝",
+            "last_msg": thread.get("last_msg") or thread.get("content") or "",
+            "time": thread.get("time") or "",
+            "unread": int(thread.get("unread") or 0),
+            "kol_unread": int(thread.get("kol_unread") or 0),
+            "user_unread": int(thread.get("user_unread") or 0),
+            "last_sender": thread.get("last_sender") or "",
+            "status": thread.get("status") or "",
+            "vip_only": bool(thread.get("vip_only", False)),
+            "type": str(thread.get("type") or "").strip(),
+        })
+    return records
+
+
+def build_dm_center_payload(tenant_slug="", actor_role="", actor_profile_id="", include_fan_threads=True):
+    resolved_slug = str(tenant_slug or "").strip().lower() or get_default_tenant_slug()
+    tenant = get_tenant_by_slug(resolved_slug)
+    state = resolve_tenant_message_center_state(tenant, tenant.get("message_center_state"))
+    threads = []
+    normalized_role = str(actor_role or "").strip().lower()
+    normalized_profile_id = str(actor_profile_id or "").strip()
+    for thread in state["threads"]:
+        thread_type = str(thread.get("type") or "").strip()
+        if thread_type == "fan_interaction" and not include_fan_threads:
+            continue
+        if normalized_role == "investor":
+            if thread_type != "fan_interaction":
+                continue
+            if str(thread.get("user_profile_id") or "").strip() != normalized_profile_id:
+                continue
+        threads.append(copy.deepcopy(thread))
+    filtered_state = {
+        "summary": state["summary"],
+        "threads": threads,
+        "broadcasts": copy.deepcopy(state["broadcasts"]),
+    }
+    stats = build_message_center_stats(filtered_state)
+    return {
+        "tenant_slug": resolved_slug,
+        "summary": filtered_state["summary"],
+        "stats": stats,
+        "threads": build_dm_conversation_records(tenant, threads),
+        "thread_state": threads,
+        "items": build_message_center_items(threads, limit=6),
+        "broadcasts": copy.deepcopy(state["broadcasts"]),
+    }
+
+
+def mark_message_thread_read(tenant_slug, thread_id, actor_role):
+    resolved_slug = str(tenant_slug or "").strip().lower() or get_default_tenant_slug()
+    tenant = get_tenant_by_slug(resolved_slug)
+    state = resolve_tenant_message_center_state(tenant, tenant.get("message_center_state"))
+    threads = copy.deepcopy(state["threads"] or [])
+    thread_index = find_message_thread_index(threads, thread_id=thread_id)
+    if thread_index < 0:
+        return None, state
+    thread = dict(threads[thread_index])
+    normalized_role = str(actor_role or "").strip().lower()
+    if normalized_role == "dav":
+        thread["kol_unread"] = 0
+    elif normalized_role == "investor":
+        thread["user_unread"] = 0
+    normalized_thread = normalize_message_thread_item(thread, tenant, index=thread_index)
+    threads[thread_index] = normalized_thread
+    _, latest_state = save_tenant_message_threads(resolved_slug, state, threads)
+    return normalized_thread, latest_state
+
+
+def build_broadcast_thread_for_user(tenant, user_profile, broadcast_item):
+    username = str((user_profile or {}).get("username") or "").strip()
+    if not username:
+        return None
+    avatar = str((user_profile or {}).get("avatar") or "👤").strip() or "👤"
+    membership = str((user_profile or {}).get("membership") or "粉丝").strip() or "粉丝"
+    content = str((broadcast_item or {}).get("content") or "").strip()
+    message = {
+        "id": 1,
+        "sender": "kol",
+        "content": content,
+        "time": now_ts(),
+        "type": "broadcast",
+    }
+    return normalize_message_thread_item({
+        "id": build_fan_thread_id(tenant.get("slug"), username),
+        "type": "fan_interaction",
+        "name": username,
+        "time": "刚刚",
+        "content": content,
+        "status": "已触达",
+        "user_profile_id": username,
+        "user_name": username,
+        "user_avatar": avatar,
+        "tier": membership,
+        "last_msg": f"【群发】{summarize_message_preview(content, limit=56)}",
+        "kol_unread": 0,
+        "user_unread": 1,
+        "last_sender": "kol",
+        "last_message_type": "broadcast",
+        "vip_only": False,
+        "messages": [message],
+    }, tenant, index=0)
+
+
+def push_broadcast_to_fan_threads(tenant_slug, broadcast_item):
+    resolved_slug = str(tenant_slug or "").strip().lower() or get_default_tenant_slug()
+    tenant = get_tenant_by_slug(resolved_slug)
+    state = resolve_tenant_message_center_state(tenant, tenant.get("message_center_state"))
+    threads = copy.deepcopy(state["threads"] or [])
+    investor_users = list_users(role="investor", tenant_slug=resolved_slug)
+    user_map = {
+        str(item.get("username") or "").strip(): item
+        for item in investor_users
+        if str(item.get("username") or "").strip()
+    }
+    now_text = now_ts()
+    message_content = str((broadcast_item or {}).get("content") or "").strip()
+    thread_by_profile = {
+        str(item.get("user_profile_id") or "").strip(): idx
+        for idx, item in enumerate(threads)
+        if str(item.get("type") or "").strip() == "fan_interaction" and str(item.get("user_profile_id") or "").strip()
+    }
+    touched_ids = set()
+    for profile_id, user in user_map.items():
+        if profile_id in thread_by_profile:
+            idx = thread_by_profile[profile_id]
+            thread = dict(threads[idx])
+            messages = copy.deepcopy(thread.get("messages") or [])
+            next_message_id = len(messages) + 1
+            messages.append({
+                "id": next_message_id,
+                "sender": "kol",
+                "content": message_content,
+                "time": now_text,
+                "type": "broadcast",
+            })
+            thread["messages"] = messages[-120:]
+            thread["content"] = message_content
+            thread["last_msg"] = f"【群发】{summarize_message_preview(message_content, limit=56)}"
+            thread["time"] = "刚刚"
+            thread["status"] = "已触达"
+            thread["kol_unread"] = 0
+            thread["user_unread"] = max(1, int(thread.get("user_unread") or 0) + 1)
+            thread["last_sender"] = "kol"
+            thread["last_message_type"] = "broadcast"
+            threads[idx] = normalize_message_thread_item(thread, tenant, index=idx)
+            touched_ids.add(profile_id)
+    for profile_id, user in user_map.items():
+        if profile_id in touched_ids:
+            continue
+        thread = build_broadcast_thread_for_user(tenant, user, broadcast_item)
+        if thread:
+            threads.insert(0, thread)
+    _, latest_state = save_tenant_message_threads(resolved_slug, state, threads)
+    return latest_state
 
 
 def build_fan_thread_id(tenant_slug, username):
@@ -10126,6 +10395,773 @@ def build_knowledge_query_response(tenant_slug, query_text, limit=5, submit_to_m
     return result
 
 
+HERMES_QUERY_INTENT_PROMPT = (
+    "你是 Hermes 的任务路由器。"
+    "你的职责不是直接回答用户，而是把用户问题路由成最合适的任务类型，并决定需要调用哪些工具。"
+    "只能从给定枚举里选择 intent 和 tools。"
+    "禁止编造工具名。"
+    "输出必须是 JSON。"
+)
+
+HERMES_ALLOWED_INTENTS = {
+    "general_chat",
+    "knowledge_lookup",
+    "evidence_chain_analysis",
+    "watchlist_fundamental",
+    "multi_tool_research",
+}
+
+HERMES_ALLOWED_TOOLS = {
+    "knowledge.search",
+    "evidence.search",
+    "watchlist.detail",
+    "attachment.context",
+}
+
+
+def normalize_hermes_messages(messages):
+    normalized = []
+    for item in messages if isinstance(messages, list) else []:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role") or "").strip().lower()
+        content = str(item.get("content") or "").strip()
+        if role not in {"user", "assistant"} or not content:
+            continue
+        normalized.append({
+            "role": role,
+            "content": content[:4000],
+        })
+    return normalized
+
+
+def extract_hermes_question_text(messages, question_text=""):
+    for message in reversed(normalize_hermes_messages(messages)):
+        if message["role"] == "user" and message["content"]:
+            return message["content"]
+    return str(question_text or "").strip()
+
+
+def format_hermes_message_context(messages, limit=8):
+    lines = []
+    for item in normalize_hermes_messages(messages)[-max(1, int(limit or 8)):]:
+        role_label = "用户" if item["role"] == "user" else "Hermes"
+        lines.append(f"{role_label}：{item['content']}")
+    return "\n".join(lines)
+
+
+def build_hermes_intent_router_prompt(question_text, has_attachments=False, selected_knowledge_ids=None, messages=None):
+    conversation_block = format_hermes_message_context(messages, limit=6)
+    conversation_section = f"最近多轮对话：\n{conversation_block}\n\n" if conversation_block else ""
+    return (
+        "请根据用户问题判断 Hermes 应该如何拆解任务。\n"
+        "可选 intent：general_chat, knowledge_lookup, evidence_chain_analysis, watchlist_fundamental, multi_tool_research\n"
+        "可选 tools：knowledge.search, evidence.search, watchlist.detail, attachment.context\n"
+        "规则：\n"
+        "1. 如果用户明确问复盘、证据链、依据、来源，优先考虑 evidence_chain_analysis。\n"
+        "2. 如果用户明确问基本面、估值、盈利、行业位置、个股研究，且存在股票名/代码，优先考虑 watchlist_fundamental。\n"
+        "3. 如果用户主要想问某条知识、某个框架、方法、纪要内容，优先考虑 knowledge_lookup。\n"
+        "4. 如果问题同时涉及个股 + 证据/知识，多工具组合时用 multi_tool_research。\n"
+        "5. 如果只是泛化闲聊或方向性提问，用 general_chat。\n"
+        "6. 如果有附件，工具里可以包含 attachment.context。\n"
+        "7. stock_code 只在能明显识别时输出，否则为空字符串。\n"
+        "8. display_mode 只能是 text 或 structured。\n\n"
+        f"{conversation_section}"
+        f"用户问题：{str(question_text or '').strip()}\n"
+        f"是否有附件：{'是' if has_attachments else '否'}\n"
+        f"是否指定知识条目：{'是' if selected_knowledge_ids else '否'}\n\n"
+        "输出 JSON 结构：\n"
+        '{'
+        '"intent":"...",'
+        '"tools":["..."],'
+        '"stock_code":"",'
+        '"display_mode":"text",'
+        '"reason":"简短中文说明"'
+        '}'
+    )
+
+
+def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attachments=None, preferred_mode=""):
+    question = str(question_text or "").strip()
+    lowered = question.lower()
+    attachments = attachments if isinstance(attachments, list) else []
+    selected_knowledge_ids = selected_knowledge_ids if isinstance(selected_knowledge_ids, list) else []
+    preferred_mode = str(preferred_mode or "").strip().lower()
+    has_attachments = bool(attachments)
+    stock_code = ""
+    code_match = re.search(r"\b\d{5,6}\b", question)
+    if code_match:
+        stock_code = code_match.group(0)
+    stock_keywords = ["基本面", "估值", "盈利", "财报", "行业位置", "个股", "自选股"]
+    evidence_keywords = ["证据链", "证据", "依据", "来源", "纪要", "复盘"]
+    knowledge_keywords = ["框架", "方法", "知识", "纪要", "研报"]
+    if preferred_mode == "evidence":
+        return {
+            "intent": "evidence_chain_analysis" if not stock_code else "multi_tool_research",
+            "tools": ["evidence.search"] + (["watchlist.detail"] if stock_code else []) + (["attachment.context"] if has_attachments else []),
+            "stock_code": stock_code,
+            "display_mode": "structured" if stock_code else "text",
+            "reason": "分析方式偏向证据链归因",
+        }
+    if preferred_mode == "judgement" and stock_code:
+        return {
+            "intent": "watchlist_fundamental",
+            "tools": ["watchlist.detail"] + (["attachment.context"] if has_attachments else []),
+            "stock_code": stock_code,
+            "display_mode": "structured",
+            "reason": "分析方式偏向基本面判断",
+        }
+    if any(keyword in lowered for keyword in [item.lower() for item in evidence_keywords]):
+        return {
+            "intent": "evidence_chain_analysis" if not stock_code else "multi_tool_research",
+            "tools": ["evidence.search"] + (["watchlist.detail"] if stock_code else []) + (["attachment.context"] if has_attachments else []),
+            "stock_code": stock_code,
+            "display_mode": "structured" if stock_code else "text",
+            "reason": "命中复盘或证据链问题",
+        }
+    if stock_code or any(keyword in lowered for keyword in [item.lower() for item in stock_keywords]):
+        return {
+            "intent": "watchlist_fundamental" if not selected_knowledge_ids and not has_attachments else "multi_tool_research",
+            "tools": ["watchlist.detail"] + (["knowledge.search"] if selected_knowledge_ids else []) + (["attachment.context"] if has_attachments else []),
+            "stock_code": stock_code,
+            "display_mode": "structured" if stock_code else "text",
+            "reason": "命中个股基本面问题",
+        }
+    if selected_knowledge_ids or any(keyword in lowered for keyword in [item.lower() for item in knowledge_keywords]):
+        return {
+            "intent": "knowledge_lookup",
+            "tools": ["knowledge.search"] + (["attachment.context"] if has_attachments else []),
+            "stock_code": stock_code,
+            "display_mode": "text",
+            "reason": "命中知识或方法问题",
+        }
+    return {
+        "intent": "general_chat",
+        "tools": ["attachment.context"] if has_attachments else [],
+        "stock_code": stock_code,
+        "display_mode": "text",
+        "reason": "默认通用对话",
+    }
+
+
+def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_ids=None, attachments=None, preferred_mode="", messages=None):
+    selected_knowledge_ids = selected_knowledge_ids if isinstance(selected_knowledge_ids, list) else []
+    attachments = attachments if isinstance(attachments, list) else []
+    messages = normalize_hermes_messages(messages)
+    fallback = default_hermes_intent_plan(
+        question_text=question_text,
+        selected_knowledge_ids=selected_knowledge_ids,
+        attachments=attachments,
+        preferred_mode=preferred_mode,
+    )
+    llm_model = get_default_llm_config(purpose="general")
+    if not llm_model:
+        return fallback, None, "fallback_rule_router"
+    try:
+        raw = call_openai_compatible_llm(
+            llm_model,
+            HERMES_QUERY_INTENT_PROMPT,
+            build_hermes_intent_router_prompt(
+                question_text=question_text,
+                has_attachments=bool(attachments),
+                selected_knowledge_ids=selected_knowledge_ids,
+                messages=messages,
+            ),
+            feature_code="hermes_intent_router",
+            feature_label="Hermes 意图路由",
+            tenant_slug=tenant_slug,
+            entry_point="hermes_query",
+            metadata={"attachment_count": len(attachments), "selected_knowledge_count": len(selected_knowledge_ids)},
+            request_timeout_seconds=20,
+        )
+        parsed = _extract_json_payload_from_llm_text(raw, fallback)
+        intent = str(parsed.get("intent") or fallback["intent"]).strip()
+        if intent not in HERMES_ALLOWED_INTENTS:
+            intent = fallback["intent"]
+        raw_tools = parsed.get("tools") if isinstance(parsed.get("tools"), list) else fallback["tools"]
+        tools = []
+        for tool in raw_tools:
+            value = str(tool or "").strip()
+            if value in HERMES_ALLOWED_TOOLS and value not in tools:
+                tools.append(value)
+        if not tools:
+            tools = fallback["tools"]
+        stock_code = find_watchlist_code_from_text(str(parsed.get("stock_code") or "").strip()) or fallback["stock_code"]
+        display_mode = str(parsed.get("display_mode") or fallback["display_mode"]).strip()
+        if display_mode not in {"text", "structured"}:
+            display_mode = fallback["display_mode"]
+        return {
+            "intent": intent,
+            "tools": tools[:4],
+            "stock_code": stock_code,
+            "display_mode": display_mode,
+            "reason": str(parsed.get("reason") or fallback["reason"]).strip()[:200] or fallback["reason"],
+        }, llm_model, "llm_router"
+    except Exception:
+        app.logger.exception("Failed to route Hermes query intent")
+        return fallback, llm_model, "fallback_rule_router"
+
+
+def trim_hermes_text(value, limit=180):
+    text = re.sub(r"\s+", " ", str(value or "").strip())
+    if len(text) <= limit:
+        return text
+    return f"{text[:max(0, limit - 1)]}…"
+
+
+def find_watchlist_code_from_text(text):
+    normalized = str(text or "").strip()
+    if not normalized:
+        return ""
+    details = gen_watchlist_details()
+    code_match = re.search(r"\b\d{5,6}\b", normalized)
+    if code_match:
+        code = code_match.group(0)
+        return code if code in details else code
+    for code, detail in details.items():
+        name = str((detail or {}).get("name") or "").strip()
+        if name and name in normalized:
+            return code
+    return ""
+
+
+def hermes_tool_attachment_context(attachments):
+    items = []
+    for index, item in enumerate(attachments if isinstance(attachments, list) else [], start=1):
+        if not isinstance(item, dict):
+            continue
+        items.append({
+            "id": index,
+            "filename": str(item.get("filename") or "").strip(),
+            "summary": str(item.get("summary") or "").strip(),
+            "body": str(item.get("body") or "").strip()[:4000],
+        })
+    return {
+        "count": len(items),
+        "items": items,
+    }
+
+
+def hermes_tool_knowledge_search(tenant_slug, question_text, selected_knowledge_ids=None, limit=4):
+    selected_knowledge_ids = selected_knowledge_ids if isinstance(selected_knowledge_ids, list) else []
+    if selected_knowledge_ids:
+        entries = []
+        for entry_id in selected_knowledge_ids[:5]:
+            entry = get_knowledge_entry_for_tenant(tenant_slug, entry_id)
+            if entry:
+                entries.append(entry)
+        return {
+            "mode": "selected_entries",
+            "matches": entries,
+            "answer": f"当前限定到 {len(entries)} 条指定知识。",
+        }
+    result = build_knowledge_query_response(
+        tenant_slug=tenant_slug,
+        query_text=question_text,
+        limit=limit,
+        submit_to_model=False,
+    )
+    return {
+        "mode": "retrieval",
+        "matches": copy.deepcopy(result.get("matches") or []),
+        "answer": result.get("answer") or "",
+        "llm_notice": result.get("llm_notice") or "",
+    }
+
+
+def get_knowledge_entry_for_tenant(tenant_slug, entry_id):
+    tenant = get_tenant_by_slug(tenant_slug)
+    tenant_id = str((tenant or {}).get("id") or "").strip()
+    hub_items = list_admin_knowledge_items(tenant_slug=tenant_slug, limit=300)
+    for item in hub_items:
+        normalized_id = str(item.get("id") or item.get("knowledge_id") or "").strip()
+        if normalized_id == str(entry_id or "").strip():
+            return {
+                "id": normalized_id,
+                "title": str(item.get("title") or "").strip(),
+                "summary": str(item.get("summary") or "").strip(),
+                "body": str(item.get("body") or item.get("raw_input") or "").strip(),
+                "source": str(item.get("source_detail") or item.get("source") or "").strip(),
+                "tenant_id": tenant_id,
+            }
+    return None
+
+
+def hermes_tool_evidence_search(tenant_slug, question_text, limit=4):
+    result = build_evidence_chain_response(
+        tenant_slug=tenant_slug,
+        query_text=question_text,
+        limit=limit,
+        submit_to_model=False,
+        source_types=["knowledge"],
+        entry_point="hermes_query",
+        feature_namespace="hermes_evidence",
+    )
+    return {
+        "matches": copy.deepcopy(result.get("evidence_items") or []),
+        "answer": result.get("answer") or "",
+        "llm_notice": result.get("llm_notice") or "",
+    }
+
+
+def hermes_tool_watchlist_detail(stock_code):
+    if not str(stock_code or "").strip():
+        return {"found": False, "detail": None}
+    site_config = get_site_config()
+    details = gen_watchlist_details()
+    payload = details.get(stock_code)
+    if not payload:
+        return {"found": False, "detail": None}
+    return {
+        "found": True,
+        "detail": apply_watchlist_feature_flags(copy.deepcopy(payload), site_config),
+    }
+
+
+def get_hermes_tool_registry():
+    return {
+        "attachment.context": {
+            "output_key": "attachment_context",
+            "executor": lambda runtime: hermes_tool_attachment_context(runtime.get("attachments")),
+        },
+        "knowledge.search": {
+            "output_key": "knowledge",
+            "executor": lambda runtime: hermes_tool_knowledge_search(
+                tenant_slug=runtime.get("tenant_slug") or "",
+                question_text=runtime.get("question_text") or "",
+                selected_knowledge_ids=runtime.get("selected_knowledge_ids") or [],
+            ),
+        },
+        "evidence.search": {
+            "output_key": "evidence",
+            "executor": lambda runtime: hermes_tool_evidence_search(
+                tenant_slug=runtime.get("tenant_slug") or "",
+                question_text=runtime.get("question_text") or "",
+            ),
+        },
+        "watchlist.detail": {
+            "output_key": "watchlist",
+            "executor": lambda runtime: hermes_tool_watchlist_detail(runtime.get("stock_code")),
+        },
+    }
+
+
+def execute_hermes_tool_plan(plan, tenant_slug, question_text, selected_knowledge_ids=None, attachments=None):
+    selected_knowledge_ids = selected_knowledge_ids if isinstance(selected_knowledge_ids, list) else []
+    attachments = attachments if isinstance(attachments, list) else []
+    outputs = {}
+    trace = []
+    registry = get_hermes_tool_registry()
+    runtime = {
+        "tenant_slug": tenant_slug,
+        "question_text": question_text,
+        "selected_knowledge_ids": selected_knowledge_ids,
+        "attachments": attachments,
+        "stock_code": str(plan.get("stock_code") or "").strip(),
+    }
+    for tool_name in plan.get("tools") or []:
+        started_at = time.time()
+        tool_spec = registry.get(tool_name)
+        if not tool_spec:
+            trace.append({
+                "tool": tool_name,
+                "status": "skipped",
+                "elapsed_ms": int((time.time() - started_at) * 1000),
+                "error": "tool_not_registered",
+            })
+            continue
+        try:
+            output_key = str(tool_spec.get("output_key") or tool_name.replace(".", "_")).strip()
+            outputs[output_key] = tool_spec["executor"](runtime)
+            trace.append({
+                "tool": tool_name,
+                "status": "ok",
+                "elapsed_ms": int((time.time() - started_at) * 1000),
+            })
+        except Exception as exc:
+            trace.append({
+                "tool": tool_name,
+                "status": "error",
+                "elapsed_ms": int((time.time() - started_at) * 1000),
+                "error": str(exc)[:200],
+            })
+            app.logger.exception("Hermes tool execution failed: %s", tool_name)
+    return outputs, trace
+
+
+def build_hermes_citations(tool_outputs):
+    citations = []
+    watchlist_detail = ((tool_outputs.get("watchlist") or {}).get("detail") or {}) if isinstance(tool_outputs, dict) else {}
+    if watchlist_detail:
+        name = str(watchlist_detail.get("name") or "").strip()
+        code = str(watchlist_detail.get("code") or "").strip()
+        market = str(watchlist_detail.get("market") or "").strip()
+        label = " ".join(item for item in [name, code, market] if item).strip()
+        if label:
+            citations.append(label)
+    knowledge_matches = ((tool_outputs.get("knowledge") or {}).get("matches") or []) if isinstance(tool_outputs, dict) else []
+    for item in knowledge_matches[:4]:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title") or "").strip()
+        if title and title not in citations:
+            citations.append(title)
+    evidence_matches = ((tool_outputs.get("evidence") or {}).get("matches") or []) if isinstance(tool_outputs, dict) else []
+    for item in evidence_matches[:4]:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title") or "").strip()
+        if title and title not in citations:
+            citations.append(title)
+    attachment_items = ((tool_outputs.get("attachment_context") or {}).get("items") or []) if isinstance(tool_outputs, dict) else []
+    for item in attachment_items[:3]:
+        if not isinstance(item, dict):
+            continue
+        filename = str(item.get("filename") or "").strip()
+        if filename and filename not in citations:
+            citations.append(filename)
+    return citations[:8]
+
+
+def build_hermes_followups(plan, tool_outputs):
+    intent = str((plan or {}).get("intent") or "").strip()
+    watchlist_detail = (((tool_outputs or {}).get("watchlist") or {}).get("detail") or {}) if isinstance(tool_outputs, dict) else {}
+    stock_name = str(watchlist_detail.get("name") or watchlist_detail.get("code") or "这个对象").strip()
+    suggestions = []
+    if intent in {"watchlist_fundamental", "multi_tool_research"} and stock_name:
+        suggestions = [
+            f"继续追问 {stock_name} 的盈利、估值和行业位置如何互相印证。",
+            f"如果你要做复盘，可以让我把 {stock_name} 的证据链拆开重写。",
+            f"也可以继续补充一个新变量，我再判断 {stock_name} 是否需要更新结论。",
+        ]
+    elif intent == "knowledge_lookup":
+        suggestions = [
+            "如果你要把这条知识落到场景，我可以继续拆成判断步骤。",
+            "也可以指定某一条知识库内容，让我只围绕它继续展开。",
+            "如果你有附件，接上文件后我可以把知识和文件一起比对。",
+        ]
+    elif intent == "evidence_chain_analysis":
+        suggestions = [
+            "如果要复盘，我可以继续区分事实、推断和待验证部分。",
+            "如果你关心来源，我可以把本轮命中的知识和证据再按时间线整理。",
+            "如果要落到个股层面，下一轮直接补股票名称或代码即可。",
+        ]
+    else:
+        suggestions = [
+            "可以继续补一个更具体的对象、变量或时间范围，我会明显答得更准。",
+            "如果你需要结构化页面，直接问复盘、自选股、基本面或给出股票对象即可。",
+            "如果有文件，也可以通过加号上传后继续问同一个问题。",
+        ]
+    return suggestions[:3]
+
+
+def build_hermes_text_artifact(question_text, plan, synthesis, tool_outputs, citations):
+    answer_text = str((synthesis or {}).get("answer") or "").strip()
+    summary_text = str((synthesis or {}).get("summary") or "").strip()
+    bullets = [
+        str(item).strip()
+        for item in ((synthesis or {}).get("bullets") if isinstance((synthesis or {}).get("bullets"), list) else [])
+        if str(item).strip()
+    ][:6]
+    knowledge_matches = ((tool_outputs.get("knowledge") or {}).get("matches") or []) if isinstance(tool_outputs, dict) else []
+    knowledge_entries = []
+    for item in knowledge_matches[:3]:
+        if not isinstance(item, dict):
+            continue
+        knowledge_entries.append({
+            "title": str(item.get("title") or "未命名知识").strip(),
+            "summary": str(item.get("summary") or item.get("body") or "").strip()[:160],
+        })
+    return {
+        "type": "text_response",
+        "question": str(question_text or "").strip(),
+        "headline": trim_hermes_text(summary_text or answer_text or "已完成本轮查询", limit=90),
+        "summary": trim_hermes_text(summary_text or str((plan or {}).get("reason") or "").strip(), limit=220),
+        "body": answer_text,
+        "bullets": bullets,
+        "citations": citations[:6],
+        "knowledge": knowledge_entries,
+        "followups": build_hermes_followups(plan, tool_outputs),
+        "footer": f"当前为文字回答。路由判断：{str((plan or {}).get('reason') or '').strip()}",
+    }
+
+
+def build_hermes_watchlist_artifact(detail, question_text, synthesis, tool_outputs, citations, tenant_slug="", user_role=""):
+    detail = copy.deepcopy(detail if isinstance(detail, dict) else {})
+    fundamental = detail.get("fundamental") if isinstance(detail.get("fundamental"), dict) else {}
+    forecast = detail.get("forecast") if isinstance(detail.get("forecast"), dict) else {}
+    metrics = [
+        {
+            "label": str(item.get("label") or "").strip(),
+            "value": str(item.get("value") or "").strip(),
+            "note": str(item.get("note") or "").strip(),
+        }
+        for item in (fundamental.get("metrics") if isinstance(fundamental.get("metrics"), list) else [])[:4]
+        if isinstance(item, dict)
+    ]
+    knowledge_matches = ((tool_outputs.get("knowledge") or {}).get("matches") or []) if isinstance(tool_outputs, dict) else []
+    evidence_matches = ((tool_outputs.get("evidence") or {}).get("matches") or []) if isinstance(tool_outputs, dict) else []
+    bullets = [str(item).strip() for item in (synthesis.get("bullets") if isinstance(synthesis.get("bullets"), list) else []) if str(item).strip()][:3]
+    if not bullets:
+        bullets = [
+            str(item).strip()
+            for item in (fundamental.get("thesis") if isinstance(fundamental.get("thesis"), list) else [])
+            if str(item).strip()
+        ][:3]
+    actions = []
+    drivers = forecast.get("drivers") if isinstance(forecast.get("drivers"), list) else []
+    for item in drivers[:2]:
+        if not isinstance(item, dict):
+            continue
+        label = str(item.get("label") or "").strip()
+        note = str(item.get("note") or "").strip()
+        if label or note:
+            actions.append("：".join(part for part in [label, note] if part))
+    if not actions:
+        actions = [
+            "继续跟踪盈利、估值和行业位置三个变量。",
+            "补充下一轮验证节点，再决定是否继续深挖。",
+        ]
+    knowledge_entries = []
+    for item in knowledge_matches[:3]:
+        if not isinstance(item, dict):
+            continue
+        knowledge_entries.append({
+            "title": str(item.get("title") or "未命名知识").strip(),
+            "summary": str(item.get("summary") or item.get("body") or "").strip()[:160],
+        })
+    evidence = build_hermes_citations(tool_outputs)
+    tenant = get_tenant_by_slug(tenant_slug)
+    tenant_advisor = str((tenant or {}).get("advisor") or "").strip()
+    title_prefix = "📌" if str(forecast.get("verdict") or "").strip() else "🧭"
+    answer_text = str(synthesis.get("answer") or "").strip()
+    headline = trim_hermes_text(synthesis.get("summary") or answer_text or f"{detail.get('name') or detail.get('code') or '该标的'} 已完成结构化分析", limit=90)
+    summary = trim_hermes_text(synthesis.get("summary") or fundamental.get("summary") or answer_text, limit=220)
+    return {
+        "type": "watchlist_analysis",
+        "question": str(question_text or "").strip(),
+        "title": f"{title_prefix} 结构化分析",
+        "headline": headline,
+        "summary": summary,
+        "body": answer_text,
+        "symbol": {
+            "name": str(detail.get("name") or "").strip(),
+            "code": str(detail.get("code") or "").strip(),
+            "market": str(detail.get("market") or "").strip(),
+            "industry": str(detail.get("industry") or "").strip(),
+        },
+        "confidence": str(forecast.get("confidence") or "中").strip() or "中",
+        "metrics": metrics,
+        "judgement": bullets,
+        "next_steps": actions,
+        "citations": citations[:8],
+        "knowledge": knowledge_entries,
+        "chart": {
+            "kind": "kline",
+            "points": copy.deepcopy(detail.get("kline") or []),
+        },
+        "footer": (
+            f"本轮问题：{str(question_text or '').strip()}"
+            if not tenant_advisor else
+            f"当前优先结合 {tenant_advisor} 租户知识、自选股和证据条目做解释。"
+        ),
+    }
+
+
+def build_hermes_artifacts(plan, tool_outputs, synthesis, citations, tenant_slug="", user_role="", question_text=""):
+    display_mode = str(plan.get("display_mode") or "text").strip() or "text"
+    artifacts = []
+    watchlist_result = tool_outputs.get("watchlist") if isinstance(tool_outputs, dict) else {}
+    watchlist_detail = (watchlist_result or {}).get("detail") if isinstance(watchlist_result, dict) else None
+    if display_mode == "structured" and isinstance(watchlist_detail, dict) and watchlist_detail:
+        artifacts.append(
+            build_hermes_watchlist_artifact(
+                detail=watchlist_detail,
+                question_text=question_text,
+                synthesis=synthesis,
+                tool_outputs=tool_outputs,
+                citations=citations,
+                tenant_slug=tenant_slug,
+                user_role=user_role,
+            )
+        )
+    if not artifacts:
+        artifacts.append(
+            build_hermes_text_artifact(
+                question_text=question_text,
+                plan=plan,
+                synthesis=synthesis,
+                tool_outputs=tool_outputs,
+                citations=citations,
+            )
+        )
+    return artifacts
+
+
+def build_hermes_synthesis_prompt(question_text, plan, tool_outputs, tenant_slug="", user_role="", preferred_mode="", messages=None):
+    tenant = get_tenant_by_slug(tenant_slug)
+    tenant_name = (tenant or {}).get("name") or (tenant or {}).get("short_name") or str(tenant_slug or "").strip() or "当前租户"
+    conversation_block = format_hermes_message_context(messages, limit=8)
+    blocks = [
+        f"租户：{tenant_name}",
+        f"角色：{str(user_role or '').strip() or 'unknown'}",
+        f"问题：{str(question_text or '').strip()}",
+        f"意图：{str(plan.get('intent') or '').strip()}",
+        f"偏好分析方式：{str(preferred_mode or '').strip() or 'auto'}",
+        f"展示模式：{str(plan.get('display_mode') or 'text').strip()}",
+        f"路由原因：{str(plan.get('reason') or '').strip()}",
+        f"最近多轮对话：\n{conversation_block}" if conversation_block else "",
+        f"工具结果：{json.dumps(tool_outputs, ensure_ascii=False)[:12000]}",
+    ]
+    blocks = [block for block in blocks if block]
+    system_prompt = (
+        "你是 Hermes 的答案合成器。"
+        "你的职责是根据已执行的工具结果生成最终回答。"
+        "优先依据工具结果，不要编造不存在的数据。"
+        "如果证据不足，要明确说边界。"
+        "输出必须是 JSON。"
+    )
+    user_prompt = (
+        "\n\n".join(blocks) +
+        "\n\n请输出 JSON："
+        '{"answer":"中文最终回答","summary":"一句摘要","bullets":["..."],"citations":["..."]}'
+    )
+    return system_prompt, user_prompt
+
+
+def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", user_role="", preferred_mode="", messages=None):
+    fallback_answer = "我先按当前可用的知识和工具结果给你一个文字回答。"
+    fallback = {
+        "answer": fallback_answer,
+        "summary": str(plan.get("reason") or "已完成工具组合查询").strip(),
+        "bullets": [],
+        "citations": [],
+    }
+    llm_model = get_default_llm_config(purpose="general")
+    if not llm_model:
+        return fallback, None, "fallback_plain_answer"
+    try:
+        system_prompt, user_prompt = build_hermes_synthesis_prompt(
+            question_text=question_text,
+            plan=plan,
+            tool_outputs=tool_outputs,
+            tenant_slug=tenant_slug,
+            user_role=user_role,
+            preferred_mode=preferred_mode,
+            messages=messages,
+        )
+        raw = call_openai_compatible_llm(
+            llm_model,
+            system_prompt,
+            user_prompt,
+            feature_code="hermes_answer_synthesis",
+            feature_label="Hermes 回答合成",
+            tenant_slug=tenant_slug,
+            entry_point="hermes_query",
+            metadata={"intent": plan.get("intent"), "tool_count": len(plan.get("tools") or [])},
+            request_timeout_seconds=40,
+        )
+        parsed = _extract_json_payload_from_llm_text(raw, fallback)
+        answer = str(parsed.get("answer") or fallback_answer).strip() or fallback_answer
+        summary = str(parsed.get("summary") or plan.get("reason") or "").strip()[:240]
+        bullets = [str(item).strip() for item in (parsed.get("bullets") if isinstance(parsed.get("bullets"), list) else []) if str(item).strip()][:6]
+        citations = [str(item).strip() for item in (parsed.get("citations") if isinstance(parsed.get("citations"), list) else []) if str(item).strip()][:8]
+        return {
+            "answer": answer,
+            "summary": summary,
+            "bullets": bullets,
+            "citations": citations,
+        }, llm_model, "llm_synthesized"
+    except Exception:
+        app.logger.exception("Failed to synthesize Hermes answer")
+        return fallback, llm_model, "fallback_plain_answer"
+
+
+def build_hermes_query_response(body):
+    payload = body if isinstance(body, dict) else {}
+    tenant_slug = str(payload.get("tenant_slug") or request.args.get("tenant") or get_default_tenant_slug()).strip().lower()
+    user_role = str(payload.get("user_role") or "").strip().lower() or str((get_current_demo_profile() or {}).get("role") or "").strip().lower()
+    selected_knowledge_ids = payload.get("selected_knowledge_ids") if isinstance(payload.get("selected_knowledge_ids"), list) else []
+    attachments = payload.get("attachments") if isinstance(payload.get("attachments"), list) else []
+    preferred_mode = str(payload.get("preferred_mode") or "").strip().lower()
+    messages = normalize_hermes_messages(payload.get("messages"))
+    question_text = extract_hermes_question_text(messages, payload.get("question"))
+    if not question_text:
+        raise ValueError("hermes_question_required")
+    intent_plan, router_model, route_mode = route_hermes_query_intent(
+        question_text=question_text,
+        tenant_slug=tenant_slug,
+        selected_knowledge_ids=selected_knowledge_ids,
+        attachments=attachments,
+        preferred_mode=preferred_mode,
+        messages=messages,
+    )
+    tool_outputs, tool_trace = execute_hermes_tool_plan(
+        plan=intent_plan,
+        tenant_slug=tenant_slug,
+        question_text=question_text,
+        selected_knowledge_ids=selected_knowledge_ids,
+        attachments=attachments,
+    )
+    synthesis, answer_model, answer_mode = synthesize_hermes_answer(
+        question_text=question_text,
+        plan=intent_plan,
+        tool_outputs=tool_outputs,
+        tenant_slug=tenant_slug,
+        user_role=user_role,
+        preferred_mode=preferred_mode,
+        messages=messages,
+    )
+    citations = build_hermes_citations(tool_outputs)
+    artifacts = build_hermes_artifacts(
+        plan=intent_plan,
+        tool_outputs=tool_outputs,
+        synthesis=synthesis,
+        citations=citations,
+        tenant_slug=tenant_slug,
+        user_role=user_role,
+        question_text=question_text,
+    )
+    response_display_mode = "structured" if any(str((item or {}).get("type") or "").strip() == "watchlist_analysis" for item in artifacts) else "text"
+    return {
+        "ok": True,
+        "question": question_text,
+        "tenant_slug": tenant_slug,
+        "intent": intent_plan.get("intent"),
+        "display_mode": response_display_mode,
+        "answer": synthesis.get("answer") or "",
+        "summary": synthesis.get("summary") or "",
+        "bullets": synthesis.get("bullets") or [],
+        "citations": (synthesis.get("citations") or []) + [item for item in citations if item not in (synthesis.get("citations") or [])],
+        "artifacts": artifacts,
+        "tool_trace": tool_trace,
+        "tool_outputs": tool_outputs,
+        "preferred_mode": preferred_mode or "auto",
+        "router": {
+            "mode": route_mode,
+            "reason": intent_plan.get("reason") or "",
+            "model": {
+                "key": router_model.get("key"),
+                "label": router_model.get("label"),
+                "provider": router_model.get("provider"),
+                "model_name": router_model.get("model_name"),
+            } if router_model else None,
+        },
+        "answer_engine": {
+            "mode": answer_mode,
+            "model": {
+                "key": answer_model.get("key"),
+                "label": answer_model.get("label"),
+                "provider": answer_model.get("provider"),
+                "model_name": answer_model.get("model_name"),
+            } if answer_model else None,
+        },
+        "usage": {
+            "compute_used": 1,
+        },
+    }
+
+
 def process_review_voice_upload(file_storage, tenant_slug="", review_period="", entry_point="", speaker_name="", use_llm_enhancement=False, job_code=""):
     if file_storage is None:
         raise ValueError("audio_file_required")
@@ -10309,6 +11345,17 @@ def persist_review_publish_snapshot(
         ],
     }
     message_state = append_message_thread(tenant_slug, review_message)
+    review_broadcast = {
+        "id": int(time.time() * 1000),
+        "content": f"【最新复盘已发布】{title}\n已同步到复盘专区，当前纳入样本：{'、'.join(snapshot['watchlist']) if snapshot['watchlist'] else '未指定'}。\n现在可以直接去“复盘”页查看完整内容。",
+        "time": now_ts(),
+        "reach": max(1, len(list_users(role='investor', tenant_slug=tenant_slug))),
+        "open_rate": random.randint(35, 78),
+        "target": "review",
+        "type": "broadcast",
+    }
+    message_state = append_broadcast_history(tenant_slug, review_broadcast)
+    message_state = push_broadcast_to_fan_threads(tenant_slug, review_broadcast)
     return {
         "snapshot": snapshot,
         "snapshots": snapshots,
@@ -11944,6 +12991,21 @@ def api_hermes_analyze():
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
     })
 
+
+@app.route("/api/hermes/query", methods=["POST"])
+def api_hermes_query():
+    body = request.get_json(silent=True) or {}
+    try:
+        result = build_hermes_query_response(body)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    except Exception:
+        app.logger.exception("Failed to execute Hermes query")
+        return jsonify({"ok": False, "error": "hermes_query_failed"}), 500
+    return jsonify(result)
+
 def gen_dm_conversations(tenant_slug=None, include_fan_threads=True):
     tenant = get_tenant_by_slug(tenant_slug)
     state = resolve_tenant_message_center_state(tenant, tenant.get("message_center_state"))
@@ -11968,6 +13030,10 @@ def gen_dm_conversations(tenant_slug=None, include_fan_threads=True):
             "last_msg": thread.get("last_msg") or thread.get("content") or "",
             "time": thread.get("time") or "",
             "unread": int(thread.get("unread") or 0),
+            "kol_unread": int(thread.get("kol_unread") or 0),
+            "user_unread": int(thread.get("user_unread") or 0),
+            "last_sender": thread.get("last_sender") or "",
+            "status": thread.get("status") or "",
             "vip_only": bool(thread.get("vip_only", False)),
             "type": thread_type,
         })
@@ -12002,8 +13068,6 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
     base_vip = 29 if is_lisa else 36
     base_revenue = 14200 if is_lisa else 18600
     revenue_change = 6.4 if is_lisa else 8.5
-    unread_messages = 5 if is_lisa else 7
-    pending_replies = 2 if is_lisa else 3
     today_views = 540 if is_lisa else 680
     engagement_rate = 7.6 if is_lisa else 6.8
     watchlist_focus = ["腾讯控股", "美团-W", "阿里巴巴-W"] if is_lisa else ["中芯国际", "腾讯控股", "贵州茅台"]
@@ -12013,6 +13077,7 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
     indicator_hub = build_indicator_hub_fallback(tenant=tenant, admin_view=False) if fallback_mode else build_indicator_hub(tenant=tenant, admin_view=False)
     news_items = gen_news_feed()
     message_center_state = resolve_tenant_message_center_state(tenant, tenant.get("message_center_state"))
+    message_center_stats = build_message_center_stats(message_center_state)
     published_reviews = resolve_tenant_review_snapshots(tenant, tenant.get("review_snapshots"))
     fan_threads = [item for item in message_center_state["threads"] if item.get("type") == "fan_interaction"]
     review_notice_threads = [item for item in message_center_state["threads"] if item.get("type") == "review_notification"]
@@ -12048,8 +13113,8 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
             "vip_subscribers": base_vip,
             "monthly_revenue": base_revenue,
             "revenue_change": revenue_change,
-            "unread_messages": unread_messages,
-            "pending_replies": pending_replies,
+            "unread_messages": message_center_stats["unread_messages"],
+            "pending_replies": message_center_stats["pending_replies"],
             "today_views": today_views,
             "engagement_rate": engagement_rate,
         },
@@ -12068,16 +13133,7 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
         "portal_workspace": resolve_tenant_portal_workspace(tenant, tenant.get("portal_cms")),
         "message_center": {
             "summary": message_center_state["summary"],
-            "items": [
-                {
-                    "name": item.get("name") or item.get("user_name") or "",
-                    "type": "系统消息" if item.get("type") == "review_notification" else ("粉丝提问" if item.get("status") == "待回复" else "追问消息"),
-                    "time": item.get("time") or "--",
-                    "content": item.get("content") or "",
-                    "status": item.get("status") or "待处理",
-                }
-                for item in (fan_threads + review_notice_threads)[:6]
-            ],
+            "items": build_message_center_items((fan_threads + review_notice_threads)[:6], limit=6),
             "threads": copy.deepcopy(message_center_state["threads"]),
         },
         "fan_management": {
@@ -12348,10 +13404,53 @@ def api_dm_conversations():
     include_fan_threads = is_feature_enabled("fan_interaction")
     return jsonify(gen_dm_conversations(tenant_slug=tenant_slug, include_fan_threads=include_fan_threads))
 
+
+@app.route("/api/dm/center")
+def api_dm_center():
+    tenant_slug = str(request.args.get("tenant") or "").strip().lower()
+    body = request.get_json(silent=True) or {}
+    actor = resolve_dm_actor(body, tenant_slug=tenant_slug)
+    payload = build_dm_center_payload(
+        tenant_slug=actor.get("tenant_slug") or tenant_slug,
+        actor_role=actor.get("role") or "",
+        actor_profile_id=str((actor.get("profile") or {}).get("username") or "").strip(),
+        include_fan_threads=is_feature_enabled("fan_interaction"),
+    )
+    return jsonify({"success": True, **payload})
+
 @app.route("/api/dm/messages/<thread_id>")
 def api_dm_messages(thread_id):
     tenant_slug = str(request.args.get("tenant") or "").strip().lower()
-    return jsonify(gen_dm_messages(thread_id, tenant_slug=tenant_slug))
+    actor = resolve_dm_actor({}, tenant_slug=tenant_slug)
+    tenant = get_tenant_by_slug(actor.get("tenant_slug") or tenant_slug)
+    state = resolve_tenant_message_center_state(tenant, tenant.get("message_center_state"))
+    thread_index = find_message_thread_index(state["threads"], thread_id=thread_id)
+    if thread_index < 0:
+        return jsonify([])
+    thread = state["threads"][thread_index]
+    if str(actor.get("role") or "").strip().lower() == "investor":
+      if str(thread.get("type") or "").strip() != "fan_interaction":
+          return jsonify([])
+      if str(thread.get("user_profile_id") or "").strip() != str((actor.get("profile") or {}).get("username") or "").strip():
+          return jsonify([])
+    return jsonify(copy.deepcopy(thread.get("messages") or []))
+
+
+@app.route("/api/dm/threads/<thread_id>/read", methods=["POST"])
+def api_dm_mark_read(thread_id):
+    body = request.get_json(silent=True) or {}
+    tenant_slug = str(body.get("tenant_slug") or request.args.get("tenant") or "").strip().lower()
+    actor = resolve_dm_actor(body, tenant_slug=tenant_slug)
+    normalized_thread, latest_state = mark_message_thread_read(actor.get("tenant_slug") or tenant_slug, thread_id, actor.get("role") or "")
+    if not normalized_thread:
+        return jsonify({"success": False, "error": "thread_not_found"}), 404
+    payload = build_dm_center_payload(
+        tenant_slug=actor.get("tenant_slug") or tenant_slug,
+        actor_role=actor.get("role") or "",
+        actor_profile_id=str((actor.get("profile") or {}).get("username") or "").strip(),
+        include_fan_threads=is_feature_enabled("fan_interaction"),
+    )
+    return jsonify({"success": True, "thread": normalized_thread, "message_center_state": latest_state, **payload})
 
 @app.route("/api/dm/send", methods=["POST"])
 def api_dm_send():
@@ -12385,16 +13484,21 @@ def api_dm_send():
             base_thread = build_message_thread_for_user(actor_profile, tenant, first_message=content)
             threads.insert(0, base_thread)
             thread_index = 0
+        elif str(threads[thread_index].get("type") or "").strip() != "fan_interaction":
+            return jsonify({"success": False, "error": "thread_type_invalid"}), 400
         thread = dict(threads[thread_index])
         messages = copy.deepcopy(thread.get("messages") or [])
         next_message_id = len(messages) + 1
         messages.append({"id": next_message_id, "sender": "user", "content": content, "time": now_text, "type": "text"})
         thread["messages"] = messages[-120:]
         thread["content"] = content
-        thread["last_msg"] = content
+        thread["last_msg"] = summarize_message_preview(content, limit=72)
         thread["time"] = "刚刚"
         thread["status"] = "待回复"
-        thread["unread"] = max(1, int(thread.get("unread") or 0) + 1)
+        thread["kol_unread"] = max(1, int(thread.get("kol_unread") or 0) + 1)
+        thread["user_unread"] = 0
+        thread["last_sender"] = "user"
+        thread["last_message_type"] = "text"
         thread["user_profile_id"] = profile_id
         thread["user_name"] = actor_profile.get("username") or thread.get("user_name")
         thread["user_avatar"] = actor_profile.get("avatar") or thread.get("user_avatar")
@@ -12403,11 +13507,19 @@ def api_dm_send():
         threads.pop(thread_index)
         threads.insert(0, normalized_thread)
         _, latest_state = save_tenant_message_threads(tenant_slug, state, threads)
+        payload = build_dm_center_payload(
+            tenant_slug=tenant_slug,
+            actor_role=actor_role,
+            actor_profile_id=profile_id,
+            include_fan_threads=True,
+        )
         return jsonify({
             "success": True,
             "thread_id": normalized_thread["id"],
             "message": messages[-1],
             "status": normalized_thread["status"],
+            "message_center_state": latest_state,
+            **payload,
             "threads": gen_dm_conversations(tenant_slug=tenant_slug, include_fan_threads=True),
         })
 
@@ -12418,24 +13530,37 @@ def api_dm_send():
         if thread_index < 0:
             return jsonify({"success": False, "error": "thread_not_found"}), 404
         thread = dict(threads[thread_index])
+        if str(thread.get("type") or "").strip() != "fan_interaction":
+            return jsonify({"success": False, "error": "thread_type_invalid"}), 400
         messages = copy.deepcopy(thread.get("messages") or [])
         next_message_id = len(messages) + 1
         messages.append({"id": next_message_id, "sender": "kol", "content": content, "time": now_text, "type": "text"})
         thread["messages"] = messages[-120:]
         thread["content"] = content
-        thread["last_msg"] = content
+        thread["last_msg"] = summarize_message_preview(content, limit=72)
         thread["time"] = "刚刚"
         thread["status"] = "已回复"
-        thread["unread"] = 0
+        thread["kol_unread"] = 0
+        thread["user_unread"] = max(1, int(thread.get("user_unread") or 0) + 1)
+        thread["last_sender"] = "kol"
+        thread["last_message_type"] = "text"
         normalized_thread = normalize_message_thread_item(thread, tenant, index=thread_index)
         threads.pop(thread_index)
         threads.insert(0, normalized_thread)
         _, latest_state = save_tenant_message_threads(tenant_slug, state, threads)
+        payload = build_dm_center_payload(
+            tenant_slug=tenant_slug,
+            actor_role=actor_role,
+            actor_profile_id="",
+            include_fan_threads=True,
+        )
         return jsonify({
             "success": True,
             "thread_id": normalized_thread["id"],
             "message": messages[-1],
             "status": normalized_thread["status"],
+            "message_center_state": latest_state,
+            **payload,
             "threads": gen_dm_conversations(tenant_slug=tenant_slug, include_fan_threads=True),
         })
 
@@ -12937,8 +14062,16 @@ def api_kol_broadcast():
         "target": target,
         "type": "broadcast",
     }
-    state = append_broadcast_history(tenant_slug or get_default_tenant_slug(), broadcast_item)
-    return jsonify({"success": True, **broadcast_item, "broadcasts": state["broadcasts"]})
+    resolved_slug = tenant_slug or get_default_tenant_slug()
+    state = append_broadcast_history(resolved_slug, broadcast_item)
+    state = push_broadcast_to_fan_threads(resolved_slug, broadcast_item)
+    payload = build_dm_center_payload(
+        tenant_slug=resolved_slug,
+        actor_role="dav",
+        actor_profile_id="",
+        include_fan_threads=True,
+    )
+    return jsonify({"success": True, **broadcast_item, "broadcasts": state["broadcasts"], "message_center_state": state, **payload})
 
 @app.route("/api/kol/reply", methods=["POST"])
 def api_kol_reply():
@@ -12959,20 +14092,41 @@ def api_kol_reply():
     if thread_index < 0:
         return jsonify({"success": False, "error": "thread_not_found"}), 404
     thread = dict(threads[thread_index])
+    if str(thread.get("type") or "").strip() != "fan_interaction":
+        return jsonify({"success": False, "error": "thread_type_invalid"}), 400
     messages = copy.deepcopy(thread.get("messages") or [])
     next_message_id = len(messages) + 1
-    message = {"id": next_message_id, "sender": "kol", "content": content, "time": now_ts(), "type": "text"}
+    message_type = "paid" if is_paid else "text"
+    message = {
+        "id": next_message_id,
+        "sender": "kol",
+        "content": content,
+        "time": now_ts(),
+        "type": message_type,
+    }
+    if is_paid:
+        message["price"] = 50
+        message["preview"] = summarize_message_preview(content, limit=48) or "解锁查看完整内容"
     messages.append(message)
     thread["messages"] = messages[-120:]
     thread["content"] = content
-    thread["last_msg"] = content
+    thread["last_msg"] = build_thread_last_message(thread, messages)
     thread["time"] = "刚刚"
     thread["status"] = "已回复"
-    thread["unread"] = 0
+    thread["kol_unread"] = 0
+    thread["user_unread"] = max(1, int(thread.get("user_unread") or 0) + 1)
+    thread["last_sender"] = "kol"
+    thread["last_message_type"] = message_type
     normalized_thread = normalize_message_thread_item(thread, tenant, index=thread_index)
     threads.pop(thread_index)
     threads.insert(0, normalized_thread)
     _, latest_state = save_tenant_message_threads(resolved_slug, state, threads)
+    payload = build_dm_center_payload(
+        tenant_slug=resolved_slug,
+        actor_role="dav",
+        actor_profile_id="",
+        include_fan_threads=True,
+    )
     return jsonify({
         "success": True,
         "thread_id": normalized_thread["id"],
@@ -12980,6 +14134,8 @@ def api_kol_reply():
         "status": normalized_thread["status"],
         "is_paid": is_paid,
         "revenue": 50 if is_paid else 0,
+        "message_center_state": latest_state,
+        **payload,
         "threads": gen_dm_conversations(tenant_slug=resolved_slug, include_fan_threads=True),
     })
 
