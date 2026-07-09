@@ -10576,11 +10576,13 @@ function openWorkbenchSmartIndicatorDetailModal(card) {
       <label class="knowledge-modal-label">解读</label>
       <div style="font-size:12px;color:var(--gray-300);line-height:1.8">${escapeHtml(card.interpretation || '暂无解读')}</div>
     </div>
+    ${isDav ? `
     <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">提示词</label>
-      <textarea id="wb-smart-indicator-detail-prompt" class="knowledge-modal-textarea" ${isDav && card.indicatorCode ? '' : 'disabled'}>${escapeHtml(card.prompt || '')}</textarea>
-      ${isDav ? '<div style="font-size:11px;color:var(--gray-400);margin-top:8px">保存后系统会自动重算该智能指标，不直接展示内部公式。</div>' : ''}
+      <textarea id="wb-smart-indicator-detail-prompt" class="knowledge-modal-textarea" ${card.indicatorCode ? '' : 'disabled'}>${escapeHtml(card.prompt || '')}</textarea>
+      <div style="font-size:11px;color:var(--gray-400);margin-top:8px">保存后系统会自动重算该智能指标，不直接展示内部公式。</div>
     </div>
+    ` : ''}
     <div class="modal-actions">
       <button class="btn-outline" onclick="closeWorkbenchSmartIndicatorDetailModal()">关闭</button>
       ${isDav && card.indicatorCode ? `<button class="btn-gold" onclick="saveWorkbenchSmartIndicatorPrompt('${card.indicatorCode}')">保存并更新指标</button>` : ''}
@@ -10641,9 +10643,11 @@ function renderFundMacroDashboard() {
   const host = document.getElementById('feed-macro-dashboard');
   if (!host) return;
   const published = getPublishedFundDashboard();
-  const cards = published && Array.isArray(published.cards) ? published.cards.filter((item) => item && !item.isEmpty) : [];
+  const cards = published && Array.isArray(published.cards)
+    ? published.cards.filter((item) => item && !isWorkbenchSmartPlaceholderCard(item))
+    : [];
   if (!cards.length) {
-    host.innerHTML = '<div class="fund-column-card"><div class="fund-column-head"><div><div class="fund-column-title">智能指标 Dashboard</div><div class="fund-column-subtitle">当前还没有已发布的智能指标。</div></div><span class="tag tag-gold">未发布</span></div></div>';
+    host.innerHTML = '<div class="fund-column-card"><div class="fund-column-head"><div><div class="fund-column-title">智能指标 Dashboard</div><div class="fund-column-subtitle">暂无看板内容</div></div><span class="tag tag-gold">暂无内容</span></div></div>';
     return;
   }
   host.innerHTML = `
@@ -10675,6 +10679,57 @@ function renderWorkbenchFundDashboard() {
   const previewHost = document.getElementById('wb-dashboard-preview');
   const metaHost = document.getElementById('wb-dashboard-meta');
   if (!previewHost || !metaHost) return;
+  const activeUser = getActiveDemoUser();
+  const layoutHost = document.getElementById('wb-smart-layout-row');
+  const libraryHost = document.getElementById('wb-smart-indicator-library');
+  const sectionTitleHost = document.getElementById('wb-dashboard-section-title');
+  const sectionDescHost = document.getElementById('wb-dashboard-section-desc');
+  const actionHost = document.querySelector('.wb-dashboard-actions');
+  if (activeUser.role !== 'dav') {
+    const published = getPublishedFundDashboard() || { cards: [] };
+    const cards = Array.isArray(published.cards) ? published.cards.filter((item) => item && !isWorkbenchSmartPlaceholderCard(item)) : [];
+    if (layoutHost) {
+      layoutHost.innerHTML = '';
+      layoutHost.style.display = 'none';
+    }
+    if (libraryHost) {
+      libraryHost.innerHTML = '';
+      libraryHost.style.display = 'none';
+    }
+    if (actionHost) actionHost.style.display = 'none';
+    if (sectionTitleHost) sectionTitleHost.textContent = '智能指标 Dashboard';
+    if (sectionDescHost) sectionDescHost.textContent = '这里仅展示当前已发布的智能指标内容。';
+    metaHost.textContent = cards.length ? `当前已发布 ${cards.length} 个智能指标` : '暂无看板内容';
+    previewHost.innerHTML = cards.length ? `
+      <div class="wb-dashboard-summary-grid cols-3">
+        ${cards.map((item, index) => `
+        <div class="wb-dashboard-summary-card filled" onclick="openWorkbenchDashboardIndicatorDetail(${index}, 'published')">
+          <div class="wb-dashboard-summary-head">
+            <div class="wb-dashboard-summary-title">${escapeHtml(item.name || '智能指标')}</div>
+            <span class="wb-dashboard-summary-tag">${escapeHtml(item.updatedAt || '已发布')}</span>
+          </div>
+          <div class="wb-dashboard-summary-value">${escapeHtml(`${item.value || '--'}${item.unit || ''}`)}</div>
+          <div class="wb-dashboard-summary-text">${escapeHtml(item.interpretation || item.assessment || '')}</div>
+        </div>
+        `).join('')}
+      </div>
+    ` : `
+      <div class="wb-dashboard-summary-grid cols-3">
+        <div class="wb-dashboard-summary-card empty" style="cursor:default">
+          <div>
+            <div class="wb-dashboard-summary-empty-title">暂无看板内容</div>
+            <div class="wb-dashboard-summary-empty-desc">当前还没有已发布的智能指标。</div>
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+  if (layoutHost) layoutHost.style.display = 'flex';
+  if (libraryHost) libraryHost.style.display = 'block';
+  if (actionHost) actionHost.style.display = 'flex';
+  if (sectionTitleHost) sectionTitleHost.textContent = '智能指标 Dashboard';
+  if (sectionDescHost) sectionDescHost.textContent = '先选布局，再点击加号弹框。你可以用标签和提示词组合描述计算逻辑，系统先生成一版临时结果给你确认，确认后才会正式保存成智能指标。';
   renderWorkbenchSmartLayoutRow();
   renderWorkbenchSmartIndicatorLibrary();
   const active = getDraftFundDashboard() || getPublishedFundDashboard() || { cards: [], layout: '2x2' };

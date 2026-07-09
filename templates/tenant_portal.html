@@ -237,7 +237,9 @@ body { background:linear-gradient(180deg,#F7FAFD 0%,#EFF5FB 42%,#FFFFFF 100%); c
           <strong style="display:block;font-size:16px;color:#172132">智能 Dashboard 面板</strong>
           <div class="tp-dashboard-summary" style="margin-top:10px">{{ portal.fund_dashboard.summary }}</div>
           <div class="tp-dashboard-cell-grid">
-            {% for cell in portal.fund_dashboard.cells if not cell.isEmpty %}
+            {% set visible_cells = portal.fund_dashboard.cells | rejectattr('isEmpty') | list %}
+            {% if visible_cells %}
+            {% for cell in visible_cells %}
             <div class="tp-dashboard-cell tp-clickable" onclick='openPortalDetail({{ {
               "title": cell.title,
               "summary": cell.interpretation or cell.assessment or "暂无解读",
@@ -263,6 +265,12 @@ body { background:linear-gradient(180deg,#F7FAFD 0%,#EFF5FB 42%,#FFFFFF 100%); c
               <div class="tp-detail-link">点击查看算法详情与解读</div>
             </div>
             {% endfor %}
+            {% else %}
+            <div class="tp-dashboard-cell" style="cursor:default">
+              <strong>暂无看板内容</strong>
+              <div class="tp-dashboard-summary" style="margin-top:10px">当前还没有已发布的智能指标。</div>
+            </div>
+            {% endif %}
           </div>
         </div>
         <div class="tp-dashboard-side">
