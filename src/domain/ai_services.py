@@ -1,6 +1,7 @@
 from src.runtime import *
 from src.domain.core_services import *
 from src.domain.market_services import *
+from src.web.request_helpers import get_client_ip
 
 def get_platform_name(site_config=None):
     return get_platform_brand(site_config).get("name", DEFAULT_BRAND_CONFIG["name"])
@@ -559,12 +560,13 @@ def compose_review_draft_with_llm(
 
 
 def get_review_vector_db_connection():
+    target = get_runtime_db_target().get("vector", {})
     return psycopg2.connect(
-        host=VECTOR_DB_HOST,
-        port=VECTOR_DB_PORT,
-        dbname=VECTOR_DB_NAME,
-        user=VECTOR_DB_USER,
-        password=VECTOR_DB_PASSWORD,
+        host=target.get("host") or VECTOR_DB_HOST,
+        port=target.get("port") or VECTOR_DB_PORT,
+        dbname=target.get("dbname") or VECTOR_DB_NAME,
+        user=target.get("user") or VECTOR_DB_USER,
+        password=target.get("password") or VECTOR_DB_PASSWORD,
         connect_timeout=8,
     )
 
@@ -3164,5 +3166,3 @@ def extract_text_from_uploaded_file(file_storage):
         "parse_stats": stats,
         "page_summaries": page_summaries[:8],
     }
-
-

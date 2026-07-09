@@ -1,5 +1,124 @@
 from src.runtime import *
 
+
+def _market_services_module():
+    from src.domain import market_services
+
+    return market_services
+
+
+def _ai_services_module():
+    from src.domain import ai_services
+
+    return ai_services
+
+
+# Split app.py into domain modules after the fact means some legacy helpers still
+# cross-call market/AI functions by bare name. Keep these as lazy shims so we do
+# not reintroduce top-level circular imports.
+def build_indicator_hub(*args, **kwargs):
+    return _market_services_module().build_indicator_hub(*args, **kwargs)
+
+
+def normalize_selected_indicator_refs(*args, **kwargs):
+    return _market_services_module().normalize_selected_indicator_refs(*args, **kwargs)
+
+
+def generate_smart_indicator_js(*args, **kwargs):
+    return _market_services_module().generate_smart_indicator_js(*args, **kwargs)
+
+
+def validate_smart_indicator_js(*args, **kwargs):
+    return _market_services_module().validate_smart_indicator_js(*args, **kwargs)
+
+
+def evaluate_smart_indicator_formula_js(*args, **kwargs):
+    return _market_services_module().evaluate_smart_indicator_formula_js(*args, **kwargs)
+
+
+def save_indicator_definition(*args, **kwargs):
+    return _market_services_module().save_indicator_definition(*args, **kwargs)
+
+
+def get_indicator_definition(*args, **kwargs):
+    return _market_services_module().get_indicator_definition(*args, **kwargs)
+
+
+def invalidate_indicator_hub_cache(*args, **kwargs):
+    return _market_services_module().invalidate_indicator_hub_cache(*args, **kwargs)
+
+
+def execute_indicator_source_landing(*args, **kwargs):
+    return _market_services_module().execute_indicator_source_landing(*args, **kwargs)
+
+
+def prepare_indicator_hub_store(*args, **kwargs):
+    return _market_services_module().prepare_indicator_hub_store(*args, **kwargs)
+
+
+def parse_task_interval_seconds(*args, **kwargs):
+    return _market_services_module().parse_task_interval_seconds(*args, **kwargs)
+
+
+def normalize_admin_task_config(*args, **kwargs):
+    return _market_services_module().normalize_admin_task_config(*args, **kwargs)
+
+
+def run_indicator_clean_job(*args, **kwargs):
+    return _market_services_module().run_indicator_clean_job(*args, **kwargs)
+
+
+def seed_mock_indicator_lake(*args, **kwargs):
+    return _market_services_module().seed_mock_indicator_lake(*args, **kwargs)
+
+
+def sync_real_indicator_history_from_market_cache(*args, **kwargs):
+    return _market_services_module().sync_real_indicator_history_from_market_cache(*args, **kwargs)
+
+
+def gen_watchlist_details(*args, **kwargs):
+    return _market_services_module().gen_watchlist_details(*args, **kwargs)
+
+
+def get_default_llm_config(*args, **kwargs):
+    return _ai_services_module().get_default_llm_config(*args, **kwargs)
+
+
+def call_openai_compatible_llm(*args, **kwargs):
+    return _ai_services_module().call_openai_compatible_llm(*args, **kwargs)
+
+
+def build_knowledge_query_response(*args, **kwargs):
+    return _ai_services_module().build_knowledge_query_response(*args, **kwargs)
+
+
+def generate_review_draft_with_llm(*args, **kwargs):
+    return _ai_services_module().generate_review_draft_with_llm(*args, **kwargs)
+
+
+def polish_review_input_with_llm(*args, **kwargs):
+    return _ai_services_module().polish_review_input_with_llm(*args, **kwargs)
+
+
+def compose_review_draft_with_llm(*args, **kwargs):
+    return _ai_services_module().compose_review_draft_with_llm(*args, **kwargs)
+
+
+def process_review_publish_text(*args, **kwargs):
+    return _ai_services_module().process_review_publish_text(*args, **kwargs)
+
+
+def persist_review_publish_snapshot(*args, **kwargs):
+    return _ai_services_module().persist_review_publish_snapshot(*args, **kwargs)
+
+
+def save_manual_knowledge_entry(*args, **kwargs):
+    return _ai_services_module().save_manual_knowledge_entry(*args, **kwargs)
+
+
+def process_review_voice_upload(*args, **kwargs):
+    return _ai_services_module().process_review_voice_upload(*args, **kwargs)
+
 def normalize_llm_model_config(source, index=0):
     raw = source if isinstance(source, dict) else {}
     key = str(raw.get("key") or f"model_{index + 1}").strip() or f"model_{index + 1}"
@@ -2519,6 +2638,30 @@ def import_users(items):
     return created
 
 
+def ensure_default_users():
+    try:
+        existing_users = list_users()
+    except Exception:
+        raise
+    if existing_users:
+        return {"created": [], "skipped": []}
+    created = []
+    skipped = []
+    for item in DEFAULT_USERS:
+        try:
+            user = create_user(item)
+            if user:
+                created.append(user)
+        except Exception as exc:
+            skipped.append(
+                {
+                    "username": str((item or {}).get("username") or "").strip(),
+                    "reason": str(exc),
+                }
+            )
+    return {"created": created, "skipped": skipped}
+
+
 USER_IMPORT_TEMPLATE_FIELDS = ["username", "password", "phone", "role", "tenant_slug", "advisor_name", "status"]
 
 
@@ -3622,14 +3765,114 @@ def extract_timestamp_from_fields(fields, fallback=""):
     return normalize_datetime_text(fallback or now_ts())
 
 
+def load_db_runtime_config():
+    defaults = {"use_staging": False}
+    try:
+        if not DB_RUNTIME_CONFIG_PATH.exists():
+            return dict(defaults)
+        payload = json.loads(DB_RUNTIME_CONFIG_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return dict(defaults)
+    if not isinstance(payload, dict):
+        return dict(defaults)
+    return {
+        "use_staging": bool(payload.get("use_staging", False)),
+        "updated_at": str(payload.get("updated_at") or "").strip(),
+    }
+
+
+def save_db_runtime_config(use_staging):
+    payload = {
+        "use_staging": bool(use_staging),
+        "updated_at": now_ts(),
+    }
+    DB_RUNTIME_CONFIG_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return payload
+
+
+def get_runtime_db_target():
+    runtime = load_db_runtime_config()
+    use_staging = bool(runtime.get("use_staging"))
+    if use_staging:
+        app_db = {
+            "host": APP_DB_HOST,
+            "port": APP_DB_PORT,
+            "dbname": APP_DB_NAME,
+            "user": APP_DB_USER,
+            "password": APP_DB_PASSWORD,
+            "label": "staging",
+        }
+        vector_db = {
+            "host": VECTOR_DB_HOST,
+            "port": VECTOR_DB_PORT,
+            "dbname": VECTOR_DB_NAME,
+            "user": VECTOR_DB_USER,
+            "password": VECTOR_DB_PASSWORD,
+            "label": "staging",
+        }
+    else:
+        app_db = {
+            "host": LOCAL_POSTGRES_HOST,
+            "port": LOCAL_POSTGRES_PORT,
+            "dbname": LOCAL_POSTGRES_DB,
+            "user": LOCAL_POSTGRES_USER,
+            "password": LOCAL_POSTGRES_PASSWORD,
+            "label": "local",
+        }
+        vector_db = {
+            "host": LOCAL_VECTOR_DB_HOST,
+            "port": LOCAL_VECTOR_DB_PORT,
+            "dbname": LOCAL_VECTOR_DB_NAME,
+            "user": LOCAL_VECTOR_DB_USER,
+            "password": LOCAL_VECTOR_DB_PASSWORD,
+            "label": "local",
+        }
+    return {
+        "use_staging": use_staging,
+        "mode": "staging" if use_staging else "local",
+        "updated_at": runtime.get("updated_at") or "",
+        "app": app_db,
+        "vector": vector_db,
+    }
+
+
+def reset_request_runtime_state():
+    db = g.pop("db", None)
+    if db is not None:
+        try:
+            db.close()
+        except Exception:
+            pass
+    g.pop("site_config", None)
+    g.pop("forecast_workflow_graph", None)
+
+
+def build_admin_site_config_payload(site_config=None):
+    payload = copy.deepcopy(site_config or get_site_config())
+    runtime_target = get_runtime_db_target()
+    payload["db_runtime"] = {
+        "use_staging": runtime_target.get("use_staging", False),
+        "mode": runtime_target.get("mode", "local"),
+        "updated_at": runtime_target.get("updated_at", ""),
+        "app_host": runtime_target.get("app", {}).get("host", ""),
+        "app_port": runtime_target.get("app", {}).get("port", ""),
+        "app_db_name": runtime_target.get("app", {}).get("dbname", ""),
+        "vector_host": runtime_target.get("vector", {}).get("host", ""),
+        "vector_port": runtime_target.get("vector", {}).get("port", ""),
+        "vector_db_name": runtime_target.get("vector", {}).get("dbname", ""),
+    }
+    return payload
+
+
 
 def get_app_db_connection():
+    target = get_runtime_db_target().get("app", {})
     return psycopg2.connect(
-        host=APP_DB_HOST,
-        port=APP_DB_PORT,
-        dbname=APP_DB_NAME,
-        user=APP_DB_USER,
-        password=APP_DB_PASSWORD,
+        host=target.get("host") or APP_DB_HOST,
+        port=target.get("port") or APP_DB_PORT,
+        dbname=target.get("dbname") or APP_DB_NAME,
+        user=target.get("user") or APP_DB_USER,
+        password=target.get("password") or APP_DB_PASSWORD,
         connect_timeout=8,
     )
 
@@ -3978,6 +4221,15 @@ def startup_bootstrap():
         return
     if should_auto_init_db():
         init_db_safe()
+    try:
+        with app.app_context():
+            seed_result = ensure_default_users()
+            if seed_result["created"]:
+                app.logger.info("Seeded %s default users into app database", len(seed_result["created"]))
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        app.logger.warning("Database unavailable during default user init, skipping default user seed")
     try:
         with app.app_context():
             ensure_default_admin_tasks()

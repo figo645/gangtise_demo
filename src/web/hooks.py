@@ -1,5 +1,6 @@
 from src.runtime import *
 from src.services import *
+from src.web.request_helpers import get_client_ip, safe_next_target
 
 def close_db(exc):
     db = g.pop("db", None)
@@ -17,27 +18,6 @@ def is_password_gate_enabled():
         app.logger.warning("Database unavailable while checking password gate, temporarily disabling gate")
         return False
     return bool(config.get("password_gate_enabled", True))
-
-
-def safe_next_target(target):
-    if not target:
-        return "/"
-    parsed = urlsplit(target)
-    if parsed.scheme or parsed.netloc:
-        return "/"
-    if not target.startswith("/") or target.startswith("//"):
-        return "/"
-    return target
-
-
-def get_client_ip():
-    forwarded = request.headers.get("X-Forwarded-For", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    real_ip = request.headers.get("X-Real-IP", "")
-    if real_ip:
-        return real_ip.strip()
-    return request.remote_addr or "unknown"
 
 
 def should_log_request():

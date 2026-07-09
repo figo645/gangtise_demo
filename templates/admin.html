@@ -3600,6 +3600,15 @@
               <label class="toggle"><input id="password-gate-enabled" type="checkbox" checked><span class="toggle-slider"></span></label>
             </div>
             <div class="toggle-wrap">
+              <div class="toggle-label">
+                <div style="font-size:12px;color:var(--text-main);font-weight:600;margin-bottom:4px">Staging 数据库</div>
+                <div id="db-runtime-summary" class="feature-note" style="margin-top:0">
+                  关闭时默认连接本地 Postgres（开发环境），打开后连接 staging Postgres。
+                </div>
+              </div>
+              <label class="toggle"><input id="db-runtime-use-staging" type="checkbox"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
               <span class="toggle-label">用户模块</span>
               <label class="toggle"><input id="feature-user_module" type="checkbox" checked><span class="toggle-slider"></span></label>
             </div>
@@ -3761,7 +3770,7 @@
             <div class="config-card-title">保存发布</div>
             <button class="btn-gold" style="padding:10px 20px;font-size:13px;margin-top:4px;width:100%" onclick="saveSiteConfig()">保存系统配置</button>
             <div class="feature-note" id="site-config-status">
-              保存后，H5 用户端会按默认主题和功能开关展示；用户自己的主题选择仍然会被本地记住。
+              保存后，新的请求会按当前数据库目标和站点配置生效；用户自己的主题选择仍然会被本地记住。
             </div>
           </div>
           <div class="config-card">
@@ -7574,6 +7583,7 @@ function markActivePill(groupId, attr, value) {
 
 function renderSiteConfigForm() {
   const cfg = adminSiteConfig || {};
+  const dbRuntime = cfg.db_runtime || {};
   const flags = cfg.feature_flags || {};
   const brand = cfg.brand || {};
   const voiceTranscription = cfg.voice_transcription || {};
@@ -7592,6 +7602,16 @@ function renderSiteConfigForm() {
   if (embeddingEngine) embeddingEngine.value = voiceEmbedding.engine || 'api';
   const knowledgePreviewToggle = document.getElementById('knowledge-user-preview-enabled');
   if (knowledgePreviewToggle) knowledgePreviewToggle.checked = knowledgeIngestion.user_preview_enabled === true;
+  const dbRuntimeToggle = document.getElementById('db-runtime-use-staging');
+  if (dbRuntimeToggle) dbRuntimeToggle.checked = dbRuntime.use_staging === true;
+  const dbRuntimeSummary = document.getElementById('db-runtime-summary');
+  if (dbRuntimeSummary) {
+    const modeLabel = dbRuntime.use_staging ? 'staging' : '本地开发';
+    const appTarget = dbRuntime.app_host
+      ? `${dbRuntime.app_host}:${dbRuntime.app_port || 5432}/${dbRuntime.app_db_name || ''}`
+      : '未配置';
+    dbRuntimeSummary.textContent = `当前模式：${modeLabel}。应用库目标：${appTarget}。关闭时默认连接本地 Postgres，打开后连接 staging。`;
+  }
   if (document.getElementById('evidence-filter-system-prompt')) document.getElementById('evidence-filter-system-prompt').value = evidenceChain.filter_prompt_system || '';
   if (document.getElementById('evidence-filter-user-template')) document.getElementById('evidence-filter-user-template').value = evidenceChain.filter_prompt_user_template || '';
   if (document.getElementById('evidence-filter-timeout-seconds')) document.getElementById('evidence-filter-timeout-seconds').value = String(evidenceChain.filter_timeout_seconds || 25);
@@ -7698,6 +7718,7 @@ async function saveSiteConfig() {
   const featureFlags = {};
   const passwordGate = document.getElementById('password-gate-enabled');
   const knowledgePreviewToggle = document.getElementById('knowledge-user-preview-enabled');
+  const dbRuntimeToggle = document.getElementById('db-runtime-use-staging');
   const tenants = ensureAdminTenants().map((tenant) => ({ ...tenant }));
   const llmRegistry = ensureAdminLlmRegistry();
   ['user_module', 'kol_module', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'vip', 'dm', 'fan_interaction', 'workbench'].forEach(key => {
@@ -7705,6 +7726,9 @@ async function saveSiteConfig() {
     featureFlags[key] = Boolean(checkbox && checkbox.checked);
   });
   const payload = {
+    db_runtime: {
+      use_staging: Boolean(dbRuntimeToggle && dbRuntimeToggle.checked),
+    },
     default_theme: adminSiteConfig.default_theme || 'light',
     default_accent: adminSiteConfig.default_accent || 'blue',
     password_gate_enabled: Boolean(passwordGate && passwordGate.checked),
@@ -7795,7 +7819,8 @@ async function saveSiteConfig() {
     window.SITE_CONFIG = data.site_config;
     renderSiteConfigForm();
     broadcastSiteConfigUpdate();
-    markAdminSiteConfigSaved('已保存。Admin、大V工作台和 H5 会按当前功能开关展示。');
+    const dbModeText = (adminSiteConfig.db_runtime || {}).use_staging ? 'staging' : '本地开发';
+    markAdminSiteConfigSaved(`已保存。当前数据库目标：${dbModeText}。新的请求会按最新配置生效。`);
     showToast('站点配置已保存');
   } catch (e) {
     if (status) {

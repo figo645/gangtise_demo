@@ -1,5 +1,7 @@
 from src.runtime import *
 from src.services import *
+from src.domain.ai_services import _is_truthy_flag
+from src.domain.core_services import _merge_site_config
 
 @app.route("/api/funnel")
 def api_funnel():
@@ -707,9 +709,23 @@ def api_kol_users_template():
 @app.route("/api/admin/site-config", methods=["GET", "POST"])
 def api_admin_site_config():
     if request.method == "GET":
-        return jsonify(get_site_config())
+        return jsonify(build_admin_site_config_payload())
     payload = request.get_json(silent=True) or {}
-    current = get_site_config()
+    runtime_payload = payload.get("db_runtime") if isinstance(payload.get("db_runtime"), dict) else {}
+    current_runtime = get_runtime_db_target()
+    original_use_staging = bool(current_runtime.get("use_staging"))
+    requested_use_staging = bool(runtime_payload.get("use_staging", original_use_staging))
+    runtime_switched = requested_use_staging != original_use_staging
+    try:
+        if runtime_switched:
+            save_db_runtime_config(requested_use_staging)
+            reset_request_runtime_state()
+        current = get_site_config()
+    except Exception:
+        if runtime_switched:
+            save_db_runtime_config(original_use_staging)
+            reset_request_runtime_state()
+        raise
     feature_flags = dict(current.get("feature_flags", {}))
     incoming_flags = payload.get("feature_flags", {})
     for key in feature_flags:
@@ -766,7 +782,20 @@ def api_admin_site_config():
             "feature_flags": feature_flags,
         },
     )
-    return jsonify({"success": True, "site_config": save_site_config(next_config)})
+    try:
+        saved = save_site_config(next_config)
+    except Exception:
+        if runtime_switched:
+            save_db_runtime_config(original_use_staging)
+            reset_request_runtime_state()
+        raise
+    return jsonify(
+        {
+            "success": True,
+            "site_config": build_admin_site_config_payload(saved),
+            "db_runtime_switched": runtime_switched,
+        }
+    )
 
 
 @app.route("/api/admin/forecast-config")
@@ -972,4 +1001,3 @@ HERMES_RESPONSES = {
     "另类数据解读_卫星工业活动指数": "【卫星工业活动指数解读】\n\n数据时间：2026年5月第3周\n覆盖范围：长三角、珠三角、京津冀三大工业区\n\n核心信号：\n• 夜间灯光指数：+6.2%（环比）\n• 工厂烟囱热成像活跃度：+4.8%\n• 停车场占用率（工业园区）：+9.1%\n\n综合判断：工业活动明显回暖，领先PMI约2-3周。预计5月PMI数据将超预期。\n\n交叉验证：与货运数据、用电量数据形成三重共振，信号可靠性高。\n\n洞见智研信号强度：🟢🟢🟢🟢⚪ 强烈看多",
     "市场情绪扫描_A股全市场": "【A股市场情绪扫描报告】\n\n扫描时间：2026-05-20 实时\n\n情绪指标：\n• 恐贪指数：62（偏贪婪区间）\n• 融资余额：+3.2%（周环比）\n• 北向资金：今日净流入+28亿\n• 涨停板数量：47只（近期高位）\n\n情绪解读：市场处于温和乐观状态，未到极度贪婪。短期动能较强，但需警惕情绪过热后的回调风险。\n\n历史对比：当前情绪水平对应历史上未来1个月正收益概率约68%。\n\n操作建议：可适度参与，但控制仓位，避免追高。",
 }
-

@@ -85,6 +85,16 @@ APP_DB_PORT = int(os.environ.get("APP_DB_PORT", str(VECTOR_DB_PORT)))
 APP_DB_NAME = os.environ.get("APP_DB_NAME") or VECTOR_DB_NAME
 APP_DB_USER = os.environ.get("APP_DB_USER") or VECTOR_DB_USER
 APP_DB_PASSWORD = os.environ.get("APP_DB_PASSWORD") or VECTOR_DB_PASSWORD
+LOCAL_POSTGRES_HOST = os.environ.get("LOCAL_POSTGRES_HOST", "127.0.0.1").strip() or "127.0.0.1"
+LOCAL_POSTGRES_PORT = int(os.environ.get("LOCAL_POSTGRES_PORT", str(APP_DB_PORT or 5432)))
+LOCAL_POSTGRES_DB = os.environ.get("LOCAL_POSTGRES_DB") or APP_DB_NAME
+LOCAL_POSTGRES_USER = os.environ.get("LOCAL_POSTGRES_USER") or APP_DB_USER
+LOCAL_POSTGRES_PASSWORD = os.environ.get("LOCAL_POSTGRES_PASSWORD") or APP_DB_PASSWORD
+LOCAL_VECTOR_DB_HOST = os.environ.get("LOCAL_VECTOR_DB_HOST") or LOCAL_POSTGRES_HOST
+LOCAL_VECTOR_DB_PORT = int(os.environ.get("LOCAL_VECTOR_DB_PORT", str(VECTOR_DB_PORT or LOCAL_POSTGRES_PORT)))
+LOCAL_VECTOR_DB_NAME = os.environ.get("LOCAL_VECTOR_DB_NAME") or VECTOR_DB_NAME
+LOCAL_VECTOR_DB_USER = os.environ.get("LOCAL_VECTOR_DB_USER") or VECTOR_DB_USER
+LOCAL_VECTOR_DB_PASSWORD = os.environ.get("LOCAL_VECTOR_DB_PASSWORD") or VECTOR_DB_PASSWORD
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 OPENAI_AUDIO_MODEL = os.environ.get("OPENAI_AUDIO_MODEL", "whisper-1").strip() or "whisper-1"
@@ -117,6 +127,7 @@ MARKET_DASHBOARD_CACHE_DB_PATH = Path(
         "/Users/xuchenfei/PycharmProjects/market_dashboard/market_cache.db",
     )
 )
+DB_RUNTIME_CONFIG_PATH = PROJECT_ROOT / ".db_runtime.json"
 INDICATOR_DEFINITION_FIELDS = {
     "indicator_code",
     "indicator_name",

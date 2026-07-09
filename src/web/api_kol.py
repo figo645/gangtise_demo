@@ -4,7 +4,14 @@ from src.services import *
 @app.route("/api/kol/workbench")
 def api_kol_workbench():
     tenant = get_tenant_by_slug(request.args.get("tenant"))
-    return jsonify(gen_kol_workbench(tenant))
+    try:
+        payload = gen_kol_workbench(tenant)
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        app.logger.warning("Database unavailable while building workbench API, using fallback data")
+        payload = gen_kol_workbench(tenant, fallback_mode=True)
+    return jsonify(payload)
 
 
 @app.route("/api/kol/portal-cms", methods=["POST"])
@@ -334,7 +341,13 @@ def api_tenant_dashboard(tenant_slug):
     tenant = get_tenant_by_slug(tenant_slug)
     if not tenant or tenant["slug"] != tenant_slug:
         return jsonify({"success": False, "error": "tenant_not_found"}), 404
-    payload = build_tenant_dashboard_payload(tenant)
+    try:
+        payload = build_tenant_dashboard_payload(tenant)
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        app.logger.warning("Database unavailable while building tenant dashboard API, using fallback data")
+        payload = build_tenant_dashboard_payload_fallback(tenant)
     return jsonify({"success": True, "dashboard": payload, "fund_dashboard_state": payload.get("fund_dashboard_state")})
 
 
@@ -360,7 +373,13 @@ def api_tenant_smart_indicators(tenant_slug):
     if not tenant or tenant["slug"] != tenant_slug:
         return jsonify({"success": False, "error": "tenant_not_found"}), 404
     if request.method == "GET":
-        payload = build_tenant_dashboard_payload(tenant)
+        try:
+            payload = build_tenant_dashboard_payload(tenant)
+        except Exception as exc:
+            if not is_db_unavailable_error(exc):
+                raise
+            app.logger.warning("Database unavailable while building tenant smart indicators API, using fallback data")
+            payload = build_tenant_dashboard_payload_fallback(tenant)
         return jsonify(
             {
                 "success": True,

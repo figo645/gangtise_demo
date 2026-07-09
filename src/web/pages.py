@@ -1,5 +1,8 @@
 from src.runtime import *
 from src.services import *
+from src.web.api_core import get_access_summary
+from src.web.hooks import is_password_gate_enabled
+from src.web.request_helpers import safe_next_target
 
 @app.route("/login", methods=["GET"])
 def login():
@@ -108,6 +111,7 @@ def h5():
 @app.route("/admin")
 def admin():
     site_config = get_site_config()
+    site_config_payload = build_admin_site_config_payload(site_config)
     kols = gen_kol_data()
     segments = gen_user_segments()
     try:
@@ -176,7 +180,7 @@ def admin():
         brand=get_platform_brand(site_config),
         tenants=get_tenant_configs(site_config),
         default_tenant=get_tenant_by_slug(get_default_tenant_slug(site_config), site_config),
-        site_config=site_config,
+        site_config=site_config_payload,
     )
 
 @app.route("/kol-workbench")
@@ -213,4 +217,3 @@ def tenant_portal(tenant_slug):
 def dashboard():
     tenant = get_active_tenant_from_request()
     return redirect(url_for("tenant_portal", tenant_slug=tenant["slug"]))
-
