@@ -10222,6 +10222,81 @@ function openWorkbenchSmartIndicatorEditor(slotIndex) {
   renderWorkbenchSmartIndicatorEditorModal();
 }
 
+function normalizeWorkbenchSmartTagLabel(label) {
+  return String(label || '').replace(/[【】]/g, '').trim();
+}
+
+function escapeWorkbenchRegExp(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function collectWorkbenchPromptMatchedTagCodes(promptText, tagCatalog) {
+  const prompt = String(promptText || '').trim();
+  if (!prompt) return [];
+  return (Array.isArray(tagCatalog) ? tagCatalog.slice() : [])
+    .sort((left, right) => normalizeWorkbenchSmartTagLabel(right.label).length - normalizeWorkbenchSmartTagLabel(left.label).length)
+    .filter((tag) => {
+      const rawLabel = String(tag && tag.label || '').trim();
+      const normalizedLabel = normalizeWorkbenchSmartTagLabel(rawLabel);
+      if (!normalizedLabel) return false;
+      const bracketPattern = new RegExp(`【\\s*${escapeWorkbenchRegExp(normalizedLabel)}\\s*】`);
+      if (bracketPattern.test(prompt)) return true;
+      return prompt.includes(normalizedLabel);
+    })
+    .map((tag) => tag.tag_code)
+    .filter(Boolean);
+}
+
+function getWorkbenchSmartIndicatorEffectiveTagCodes() {
+  const manualCodes = Array.isArray(wbSmartIndicatorDraft.selectedTagCodes) ? wbSmartIndicatorDraft.selectedTagCodes : [];
+  const matchedCodes = collectWorkbenchPromptMatchedTagCodes(wbSmartIndicatorDraft.promptText, getTenantSmartTagCatalog());
+  return Array.from(new Set(manualCodes.concat(matchedCodes)));
+}
+
+function renderWorkbenchSmartTagSelection() {
+  const tagCatalog = getTenantSmartTagCatalog();
+  const effectiveTagCodes = getWorkbenchSmartIndicatorEffectiveTagCodes();
+  const selectedTagSet = new Set(effectiveTagCodes);
+  const selectedTags = tagCatalog.filter((tag) => selectedTagSet.has(tag.tag_code));
+  const selectedHost = document.getElementById('wb-smart-indicator-selected-tags');
+  const poolHost = document.getElementById('wb-smart-indicator-tag-pool');
+  const toggleHost = document.getElementById('wb-smart-indicator-tag-toggle');
+  const matchedCodes = new Set(collectWorkbenchPromptMatchedTagCodes(wbSmartIndicatorDraft.promptText, tagCatalog));
+  const previewList = wbSmartIndicatorDraft.tagPoolExpanded ? tagCatalog : tagCatalog.slice(0, 5);
+  if (selectedHost) {
+    selectedHost.innerHTML = selectedTags.length
+      ? selectedTags.map((tag) => {
+          const autoMatched = matchedCodes.has(tag.tag_code);
+          return `<button class="review-watchlist-chip selectable active" onclick="toggleWorkbenchSmartTag('${escapeHtml(tag.tag_code)}')" title="${autoMatched ? '已从提示词自动识别' : '点击取消选择'}">${escapeHtml(tag.label)}${autoMatched ? ' · 已识别' : ''}</button>`;
+        }).join('')
+      : '<span style="font-size:12px;color:var(--gray-400)">在上方选择指标，或直接在下方输入与指标名完全一致的词。</span>';
+  }
+  if (poolHost) {
+    poolHost.innerHTML = previewList.map((tag) => `<button class="review-watchlist-chip selectable ${selectedTagSet.has(tag.tag_code) ? 'active' : ''}" onclick="toggleWorkbenchSmartTag('${escapeHtml(tag.tag_code)}')">${escapeHtml(tag.label)}</button>`).join('');
+  }
+  if (toggleHost) {
+    toggleHost.innerHTML = tagCatalog.length > 5
+      ? `<button class="review-watchlist-chip selectable" onclick="toggleWorkbenchSmartTagPool()">${wbSmartIndicatorDraft.tagPoolExpanded ? '收起' : '...'}</button>`
+      : '';
+  }
+}
+
+function toggleWorkbenchSmartTagPool() {
+  wbSmartIndicatorDraft.tagPoolExpanded = !wbSmartIndicatorDraft.tagPoolExpanded;
+  renderWorkbenchSmartTagSelection();
+}
+
+function handleWorkbenchSmartIndicatorPromptInput(value) {
+  wbSmartIndicatorDraft.promptText = String(value || '');
+  wbSmartIndicatorDraft.preview = null;
+  renderWorkbenchSmartTagSelection();
+}
+
+function focusWorkbenchSmartPrompt() {
+  const input = document.getElementById('wb-smart-indicator-draft-prompt');
+  if (input) input.focus();
+}
+
 function toggleWorkbenchSmartTag(tagCode) {
   wbSmartIndicatorDraft.selectedTagCodes = wbSmartIndicatorDraft.selectedTagCodes.includes(tagCode)
     ? wbSmartIndicatorDraft.selectedTagCodes.filter((code) => code !== tagCode)
@@ -10239,32 +10314,29 @@ function renderWorkbenchSmartIndicatorEditorModal() {
   const host = document.getElementById('dashboard-cell-modal-content');
   const modal = document.getElementById('dashboard-cell-modal');
   if (!host || !modal) return;
-  const tagCatalog = getTenantSmartTagCatalog();
-  const selectedTagSet = new Set(wbSmartIndicatorDraft.selectedTagCodes);
-  const selectedTags = tagCatalog.filter((tag) => selectedTagSet.has(tag.tag_code));
   const preview = wbSmartIndicatorDraft.preview;
+  if (typeof wbSmartIndicatorDraft.tagPoolExpanded !== 'boolean') wbSmartIndicatorDraft.tagPoolExpanded = false;
   host.innerHTML = `
     <div class="modal-title" style="margin-bottom:10px">新增智能指标</div>
-    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">先选标签，再写提示词。系统先生成临时结果预览，确认后才正式保存入库。</div>
+    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">先选热门指标或点击“...”展开全部，再在提示词里组合描述计算逻辑。系统会自动识别与指标名称完全一致的词并转成标签。</div>
     <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">指标名称</label>
       <input id="wb-smart-indicator-draft-name" class="knowledge-modal-textarea" style="min-height:auto;height:42px" placeholder="可选，不填则系统自动命名" value="${escapeHtml(wbSmartIndicatorDraft.indicatorName || '')}">
     </div>
     <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">计算对象</label>
+      <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-top:6px">先展示热门指标 5 个；点击“...”后可展开全部指标。</div>
+      <div id="wb-smart-indicator-tag-pool" class="review-watchlist-row" style="margin-top:10px"></div>
+      <div id="wb-smart-indicator-tag-toggle" class="review-watchlist-row" style="margin-top:8px"></div>
+    </div>
+    <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">提示词</label>
-      <textarea id="wb-smart-indicator-draft-prompt" class="knowledge-modal-textarea" placeholder="例如：【上证50指数】*80/100，或者【上证50】/ 纳斯达克指数">${escapeHtml(wbSmartIndicatorDraft.promptText || '')}</textarea>
-    </div>
-    <div class="knowledge-modal-block">
-      <label class="knowledge-modal-label">已选标签</label>
-      <div class="review-watchlist-row" style="margin-top:10px">
-        ${selectedTags.map((tag) => `<button class="review-watchlist-chip selectable active" onclick="toggleWorkbenchSmartTag('${escapeHtml(tag.tag_code)}')">${escapeHtml(tag.label)}</button>`).join('') || '<span class="review-watchlist-chip">请至少选择一个标签</span>'}
+      <div onclick="focusWorkbenchSmartPrompt()" style="margin-top:10px;border:1px solid rgba(200,169,110,0.2);border-radius:14px;background:rgba(13,27,42,0.55);padding:12px 12px 10px;cursor:text">
+        <div style="font-size:11px;color:var(--gray-400);margin-bottom:8px">公式引用 / 指标标签</div>
+        <div id="wb-smart-indicator-selected-tags" class="review-watchlist-row" style="margin-top:0;min-height:30px"></div>
+        <textarea id="wb-smart-indicator-draft-prompt" class="knowledge-modal-textarea" placeholder="例如：【上证50指数】*80/100，或者【上证50】/ 纳斯达克指数" oninput="handleWorkbenchSmartIndicatorPromptInput(this.value)" style="margin-top:10px;border:none;background:transparent;padding:0;min-height:108px;box-shadow:none;resize:none">${escapeHtml(wbSmartIndicatorDraft.promptText || '')}</textarea>
       </div>
-    </div>
-    <div class="knowledge-modal-block">
-      <label class="knowledge-modal-label">标签池</label>
-      <div class="review-watchlist-row" style="margin-top:10px">
-        ${tagCatalog.map((tag) => `<button class="review-watchlist-chip selectable ${selectedTagSet.has(tag.tag_code) ? 'active' : ''}" onclick="toggleWorkbenchSmartTag('${escapeHtml(tag.tag_code)}')">${escapeHtml(tag.label)}</button>`).join('')}
-      </div>
+      <div style="font-size:11px;color:var(--gray-400);margin-top:8px">当你输入的词与指标名称完全一致时，系统会自动识别成标签。</div>
     </div>
     ${preview ? `
       <div class="knowledge-modal-block">
@@ -10282,6 +10354,7 @@ function renderWorkbenchSmartIndicatorEditorModal() {
     </div>
   `;
   modal.classList.add('show');
+  renderWorkbenchSmartTagSelection();
 }
 
 async function previewWorkbenchSmartIndicator() {
@@ -10295,7 +10368,8 @@ async function previewWorkbenchSmartIndicator() {
     showToast('请先填写提示词');
     return;
   }
-  if (!wbSmartIndicatorDraft.selectedTagCodes.length) {
+  const selectedTagCodes = getWorkbenchSmartIndicatorEffectiveTagCodes();
+  if (!selectedTagCodes.length) {
     showToast('请先至少选择一个标签');
     return;
   }
@@ -10307,12 +10381,13 @@ async function previewWorkbenchSmartIndicator() {
         action: 'preview',
         indicator_name: wbSmartIndicatorDraft.indicatorName,
         prompt_text: wbSmartIndicatorDraft.promptText,
-        selected_tag_codes: wbSmartIndicatorDraft.selectedTagCodes,
+        selected_tag_codes: selectedTagCodes,
       }),
     });
     const payload = await resp.json();
     if (!resp.ok || !payload.success) throw new Error(payload.error || 'smart_indicator_preview_failed');
     setTenantSmartCatalog(payload.smart_indicator_catalog);
+    wbSmartIndicatorDraft.selectedTagCodes = selectedTagCodes;
     wbSmartIndicatorDraft.preview = payload.preview || null;
     if (wbSmartIndicatorDraft.preview && wbSmartIndicatorDraft.preview.indicator_name) {
       wbSmartIndicatorDraft.indicatorName = wbSmartIndicatorDraft.preview.indicator_name;
@@ -10424,6 +10499,17 @@ function findWorkbenchSmartIndicator(indicatorCode) {
   return (getTenantSmartCatalog().tenant_smart_indicators || []).find((entry) => entry.indicator_code === indicatorCode);
 }
 
+function isWorkbenchSmartPlaceholderCard(card) {
+  const item = card && typeof card === 'object' ? card : {};
+  const indicatorCode = String(item.indicatorCode || item.indicator_code || '').trim();
+  const name = String(item.name || '').trim();
+  return !!(
+    item.isEmpty
+    || (!indicatorCode && /^待添加智能指标\s*\d*$/u.test(name))
+    || (!indicatorCode && !String(item.prompt || '').trim() && !Array.isArray(item.selectedIndicators))
+  );
+}
+
 function openWorkbenchSmartIndicatorLibraryDetail(indicatorCode) {
   const item = findWorkbenchSmartIndicator(indicatorCode);
   if (!item) return;
@@ -10445,6 +10531,10 @@ function openWorkbenchDashboardIndicatorDetail(index, sourceType) {
   const cards = source && Array.isArray(source.cards) ? source.cards : [];
   const item = cards[index];
   if (!item) return;
+  if (isWorkbenchSmartPlaceholderCard(item)) {
+    openWorkbenchSmartIndicatorEditor(index);
+    return;
+  }
   const catalogItem = findWorkbenchSmartIndicator(item.indicatorCode || item.indicator_code || '');
   openWorkbenchSmartIndicatorDetailModal({
     indicatorCode: item.indicatorCode || item.indicator_code || '',
@@ -10456,10 +10546,15 @@ function openWorkbenchDashboardIndicatorDetail(index, sourceType) {
     algorithmDetail: item.algorithmDetail || (catalogItem && catalogItem.algorithm_detail) || '',
     interpretation: item.interpretation || item.assessment || (catalogItem && (catalogItem.interpretation || catalogItem.assessment)) || '',
     selectedIndicators: item.selectedIndicators || (catalogItem && catalogItem.selected_indicators) || [],
+    slotIndex: index,
   });
 }
 
 function openWorkbenchSmartIndicatorDetailModal(card) {
+  if (isWorkbenchSmartPlaceholderCard(card)) {
+    openWorkbenchSmartIndicatorEditor(Number.isInteger(card.slotIndex) ? card.slotIndex : 0);
+    return;
+  }
   const host = document.getElementById('dashboard-cell-modal-content');
   const modal = document.getElementById('dashboard-cell-modal');
   if (!host || !modal || !card) return;

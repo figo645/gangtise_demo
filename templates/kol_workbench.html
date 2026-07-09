@@ -9543,6 +9543,81 @@ function kwOpenSmartIndicatorEditor(slotIndex) {
   kwRenderSmartIndicatorEditorModal();
 }
 
+function kwNormalizeSmartTagLabel(label) {
+  return String(label || '').replace(/[【】]/g, '').trim();
+}
+
+function kwEscapeRegExp(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function kwCollectPromptMatchedTagCodes(promptText, tagCatalog) {
+  const prompt = String(promptText || '').trim();
+  if (!prompt) return [];
+  return (Array.isArray(tagCatalog) ? tagCatalog.slice() : [])
+    .sort((left, right) => kwNormalizeSmartTagLabel(right.label).length - kwNormalizeSmartTagLabel(left.label).length)
+    .filter((tag) => {
+      const rawLabel = String(tag && tag.label || '').trim();
+      const normalizedLabel = kwNormalizeSmartTagLabel(rawLabel);
+      if (!normalizedLabel) return false;
+      const bracketPattern = new RegExp(`【\\s*${kwEscapeRegExp(normalizedLabel)}\\s*】`);
+      if (bracketPattern.test(prompt)) return true;
+      return prompt.includes(normalizedLabel);
+    })
+    .map((tag) => tag.tag_code)
+    .filter(Boolean);
+}
+
+function kwGetSmartIndicatorEffectiveTagCodes() {
+  const manualCodes = Array.isArray(kwSmartIndicatorDraft.selectedTagCodes) ? kwSmartIndicatorDraft.selectedTagCodes : [];
+  const matchedCodes = kwCollectPromptMatchedTagCodes(kwSmartIndicatorDraft.promptText, kwGetSmartTagCatalog());
+  return Array.from(new Set(manualCodes.concat(matchedCodes)));
+}
+
+function kwRenderSmartIndicatorTagSelection() {
+  const tagCatalog = kwGetSmartTagCatalog();
+  const effectiveTagCodes = kwGetSmartIndicatorEffectiveTagCodes();
+  const selectedTagSet = new Set(effectiveTagCodes);
+  const selectedTags = tagCatalog.filter((tag) => selectedTagSet.has(tag.tag_code));
+  const selectedHost = document.getElementById('kw-smart-indicator-selected-tags');
+  const poolHost = document.getElementById('kw-smart-indicator-tag-pool');
+  const toggleHost = document.getElementById('kw-smart-indicator-tag-toggle');
+  const matchedCodes = new Set(kwCollectPromptMatchedTagCodes(kwSmartIndicatorDraft.promptText, tagCatalog));
+  const previewList = kwSmartIndicatorDraft.tagPoolExpanded ? tagCatalog : tagCatalog.slice(0, 5);
+  if (selectedHost) {
+    selectedHost.innerHTML = selectedTags.length
+      ? selectedTags.map((tag) => {
+          const autoMatched = matchedCodes.has(tag.tag_code);
+          return `<button class="kw-dashboard-chip active" type="button" onclick="kwToggleSmartTag('${escapeHtml(tag.tag_code)}')" title="${autoMatched ? '已从提示词自动识别' : '点击取消选择'}">${escapeHtml(tag.label)}${autoMatched ? ' · 已识别' : ''}</button>`;
+        }).join('')
+      : '<span style="font-size:12px;color:#8899aa">在上方选择指标，或直接在下方输入与指标名完全一致的词。</span>';
+  }
+  if (poolHost) {
+    poolHost.innerHTML = previewList.map((tag) => `<button class="kw-dashboard-chip ${selectedTagSet.has(tag.tag_code) ? 'active' : ''}" type="button" onclick="kwToggleSmartTag('${escapeHtml(tag.tag_code)}')">${escapeHtml(tag.label)}</button>`).join('');
+  }
+  if (toggleHost) {
+    toggleHost.innerHTML = tagCatalog.length > 5
+      ? `<button class="kw-dashboard-chip" type="button" onclick="kwToggleSmartTagPool()">${kwSmartIndicatorDraft.tagPoolExpanded ? '收起' : '...'}</button>`
+      : '';
+  }
+}
+
+function kwToggleSmartTagPool() {
+  kwSmartIndicatorDraft.tagPoolExpanded = !kwSmartIndicatorDraft.tagPoolExpanded;
+  kwRenderSmartIndicatorTagSelection();
+}
+
+function kwHandleSmartIndicatorPromptInput(value) {
+  kwSmartIndicatorDraft.promptText = String(value || '');
+  kwSmartIndicatorDraft.preview = null;
+  kwRenderSmartIndicatorTagSelection();
+}
+
+function kwFocusSmartIndicatorPrompt() {
+  const input = document.getElementById('kw-smart-indicator-draft-prompt');
+  if (input) input.focus();
+}
+
 function kwToggleSmartTag(tagCode) {
   kwSmartIndicatorDraft.selectedTagCodes = kwSmartIndicatorDraft.selectedTagCodes.includes(tagCode)
     ? kwSmartIndicatorDraft.selectedTagCodes.filter((code) => code !== tagCode)
@@ -9560,33 +9635,34 @@ function kwRenderSmartIndicatorEditorModal() {
   const host = document.getElementById('kw-dashboard-cell-modal-content');
   const modal = document.getElementById('kw-dashboard-cell-modal');
   if (!host || !modal) return;
-  const tagCatalog = kwGetSmartTagCatalog();
-  const selectedTagSet = new Set(kwSmartIndicatorDraft.selectedTagCodes);
-  const selectedTags = tagCatalog.filter((tag) => selectedTagSet.has(tag.tag_code));
   const preview = kwSmartIndicatorDraft.preview;
+  if (typeof kwSmartIndicatorDraft.tagPoolExpanded !== 'boolean') kwSmartIndicatorDraft.tagPoolExpanded = false;
   host.innerHTML = `
     <div class="kw-review-modal-title">新增智能指标</div>
-    <div class="kw-dashboard-panel-note" style="margin-top:8px">先选标签，再写提示词。系统先生成临时结果预览，确认后才正式保存入库。</div>
+    <div class="kw-dashboard-panel-note" style="margin-top:8px">先选热门指标或点击“...”展开全部，再在提示词里组合描述计算逻辑。系统会自动识别与指标名称完全一致的词并转成标签。</div>
     <div class="kw-dashboard-cell-modal-grid">
       <div class="kw-dashboard-cell-block">
         <div class="kw-dashboard-section-title">指标名称</div>
         <input id="kw-smart-indicator-draft-name" class="kw-dashboard-input" placeholder="可选，不填则系统自动命名" value="${escapeHtml(kwSmartIndicatorDraft.indicatorName || '')}">
       </div>
       <div class="kw-dashboard-cell-block">
+        <div class="kw-dashboard-section-title">计算对象</div>
+        <div class="kw-dashboard-panel-note" style="margin-top:8px">先展示热门指标 5 个；点击“...”后可展开全部指标。</div>
+        <div id="kw-smart-indicator-tag-pool" class="kw-dashboard-chip-row" style="margin-top:10px"></div>
+        <div id="kw-smart-indicator-tag-toggle" class="kw-dashboard-chip-row" style="margin-top:8px"></div>
+      </div>
+      <div class="kw-dashboard-cell-block">
         <div class="kw-dashboard-section-title">提示词</div>
-        <textarea id="kw-smart-indicator-draft-prompt" class="kw-knowledge-modal-textarea" placeholder="例如：【上证50指数】*80/100，或者【上证50】/ 纳斯达克指数">${escapeHtml(kwSmartIndicatorDraft.promptText || '')}</textarea>
+        <div onclick="kwFocusSmartIndicatorPrompt()" style="margin-top:10px;border:1px solid rgba(200,169,110,0.16);border-radius:14px;background:rgba(8,18,30,0.72);padding:12px 12px 10px;cursor:text">
+          <div style="font-size:11px;color:#8899aa;margin-bottom:8px">公式引用 / 指标标签</div>
+          <div id="kw-smart-indicator-selected-tags" class="kw-dashboard-chip-row" style="margin-top:0;min-height:30px"></div>
+          <textarea id="kw-smart-indicator-draft-prompt" class="kw-knowledge-modal-textarea" placeholder="例如：【上证50指数】*80/100，或者【上证50】/ 纳斯达克指数" oninput="kwHandleSmartIndicatorPromptInput(this.value)" style="margin-top:10px;border:none;background:transparent;padding:0;min-height:108px;box-shadow:none;resize:none">${escapeHtml(kwSmartIndicatorDraft.promptText || '')}</textarea>
+        </div>
+        <div class="kw-dashboard-panel-note" style="margin-top:8px">当你输入的词与指标名称完全一致时，系统会自动识别成标签。</div>
       </div>
       <div class="kw-dashboard-cell-block">
-        <div class="kw-dashboard-section-title">已选标签</div>
-        <div class="kw-dashboard-chip-row" style="margin-top:10px">
-          ${selectedTags.map((tag) => `<button class="kw-dashboard-chip active" type="button" onclick="kwToggleSmartTag('${escapeHtml(tag.tag_code)}')">${escapeHtml(tag.label)}</button>`).join('') || '<span class="kw-dashboard-chip">请至少选择一个标签</span>'}
-        </div>
-      </div>
-      <div class="kw-dashboard-cell-block">
-        <div class="kw-dashboard-section-title">标签池</div>
-        <div class="kw-dashboard-chip-row" style="margin-top:10px">
-          ${tagCatalog.map((tag) => `<button class="kw-dashboard-chip ${selectedTagSet.has(tag.tag_code) ? 'active' : ''}" type="button" onclick="kwToggleSmartTag('${escapeHtml(tag.tag_code)}')">${escapeHtml(tag.label)}</button>`).join('')}
-        </div>
+        <div class="kw-dashboard-section-title">已识别逻辑</div>
+        <div class="kw-dashboard-panel-note" style="margin-top:8px">已选指标会和提示词一起提交给系统生成临时 JS，确认展示后才正式保存。</div>
       </div>
       ${preview ? `
       <div class="kw-dashboard-cell-block">
@@ -9605,6 +9681,7 @@ function kwRenderSmartIndicatorEditorModal() {
     </div>
   `;
   modal.classList.add('show');
+  kwRenderSmartIndicatorTagSelection();
 }
 
 async function kwPreviewSmartIndicator() {
@@ -9617,7 +9694,8 @@ async function kwPreviewSmartIndicator() {
     showToast('请先填写提示词');
     return;
   }
-  if (!kwSmartIndicatorDraft.selectedTagCodes.length) {
+  const selectedTagCodes = kwGetSmartIndicatorEffectiveTagCodes();
+  if (!selectedTagCodes.length) {
     showToast('请先至少选择一个标签');
     return;
   }
@@ -9629,12 +9707,13 @@ async function kwPreviewSmartIndicator() {
         action: 'preview',
         indicator_name: kwSmartIndicatorDraft.indicatorName,
         prompt_text: kwSmartIndicatorDraft.promptText,
-        selected_tag_codes: kwSmartIndicatorDraft.selectedTagCodes,
+        selected_tag_codes: selectedTagCodes,
       }),
     });
     const payload = await resp.json();
     if (!resp.ok || !payload.success) throw new Error(payload.error || 'smart_indicator_preview_failed');
     kwSetSmartIndicatorCatalog(payload.smart_indicator_catalog);
+    kwSmartIndicatorDraft.selectedTagCodes = selectedTagCodes;
     kwSmartIndicatorDraft.preview = payload.preview || null;
     if (kwSmartIndicatorDraft.preview && kwSmartIndicatorDraft.preview.indicator_name) {
       kwSmartIndicatorDraft.indicatorName = kwSmartIndicatorDraft.preview.indicator_name;
@@ -9697,6 +9776,17 @@ function kwFindSmartIndicatorCatalogItem(indicatorCode) {
   return (kwGetSmartIndicatorCatalog().tenant_smart_indicators || []).find((entry) => entry.indicator_code === indicatorCode);
 }
 
+function kwIsSmartPlaceholderCard(card) {
+  const item = card && typeof card === 'object' ? card : {};
+  const indicatorCode = String(item.indicatorCode || item.indicator_code || '').trim();
+  const name = String(item.name || '').trim();
+  return !!(
+    item.isEmpty
+    || (!indicatorCode && /^待添加智能指标\s*\d*$/u.test(name))
+    || (!indicatorCode && !String(item.prompt || '').trim() && !Array.isArray(item.selectedIndicators))
+  );
+}
+
 function kwOpenSmartIndicatorLibraryDetail(indicatorCode) {
   const item = kwFindSmartIndicatorCatalogItem(indicatorCode);
   if (!item) return;
@@ -9719,6 +9809,10 @@ function kwOpenSmartIndicatorDetail(index) {
   const cards = Array.isArray(active.cards) ? active.cards : [];
   const item = cards[index];
   if (!item) return;
+  if (kwIsSmartPlaceholderCard(item)) {
+    kwOpenSmartIndicatorEditor(index);
+    return;
+  }
   const catalogItem = kwFindSmartIndicatorCatalogItem(item.indicatorCode || item.indicator_code || '');
   kwOpenSmartIndicatorDetailModal({
     indicatorCode: item.indicatorCode || item.indicator_code || '',
@@ -9731,10 +9825,15 @@ function kwOpenSmartIndicatorDetail(index) {
     interpretation: item.interpretation || item.assessment || (catalogItem && (catalogItem.interpretation || catalogItem.assessment)) || '',
     selectedIndicators: item.selectedIndicators || (catalogItem && catalogItem.selected_indicators) || [],
     category: (catalogItem && catalogItem.category) || '',
+    slotIndex: index,
   });
 }
 
 function kwOpenSmartIndicatorDetailModal(card) {
+  if (kwIsSmartPlaceholderCard(card)) {
+    kwOpenSmartIndicatorEditor(Number.isInteger(card.slotIndex) ? card.slotIndex : 0);
+    return;
+  }
   const host = document.getElementById('kw-dashboard-cell-modal-content');
   const modal = document.getElementById('kw-dashboard-cell-modal');
   if (!host || !modal || !card) return;
