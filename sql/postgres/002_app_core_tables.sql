@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS indicator_definitions (
     id BIGSERIAL PRIMARY KEY,
     indicator_code TEXT NOT NULL UNIQUE,
     indicator_name TEXT NOT NULL,
+    tenant_slug TEXT NOT NULL DEFAULT '',
     category TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     unit TEXT NOT NULL DEFAULT '',
@@ -48,6 +49,10 @@ CREATE TABLE IF NOT EXISTS indicator_definitions (
     status_hint TEXT NOT NULL DEFAULT 'attention',
     assessment_template TEXT NOT NULL DEFAULT '',
     alert_template TEXT NOT NULL DEFAULT '',
+    prompt_text TEXT NOT NULL DEFAULT '',
+    formula_js TEXT NOT NULL DEFAULT '',
+    selected_indicators_json TEXT NOT NULL DEFAULT '[]',
+    display_order INTEGER NOT NULL DEFAULT 0,
     watchers_json TEXT NOT NULL DEFAULT '[]',
     display_config_json TEXT NOT NULL DEFAULT '{}',
     enabled INTEGER NOT NULL DEFAULT 1,
@@ -55,7 +60,14 @@ CREATE TABLE IF NOT EXISTS indicator_definitions (
     updated_at TEXT NOT NULL
 );
 
+ALTER TABLE indicator_definitions ADD COLUMN IF NOT EXISTS tenant_slug TEXT NOT NULL DEFAULT '';
+ALTER TABLE indicator_definitions ADD COLUMN IF NOT EXISTS prompt_text TEXT NOT NULL DEFAULT '';
+ALTER TABLE indicator_definitions ADD COLUMN IF NOT EXISTS formula_js TEXT NOT NULL DEFAULT '';
+ALTER TABLE indicator_definitions ADD COLUMN IF NOT EXISTS selected_indicators_json TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE indicator_definitions ADD COLUMN IF NOT EXISTS display_order INTEGER NOT NULL DEFAULT 0;
+
 CREATE INDEX IF NOT EXISTS idx_indicator_definitions_source_type ON indicator_definitions(source_type);
+CREATE INDEX IF NOT EXISTS idx_indicator_definitions_tenant_slug ON indicator_definitions(tenant_slug);
 
 CREATE TABLE IF NOT EXISTS indicator_source_defs (
     id BIGSERIAL PRIMARY KEY,

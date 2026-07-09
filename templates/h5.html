@@ -2649,24 +2649,21 @@ body,
       <div class="wb-dashboard-card">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
           <div>
-            <div id="wb-dashboard-section-title" style="font-size:14px;font-weight:700;color:var(--white)">今日核心指标面板</div>
-            <div id="wb-dashboard-section-desc" style="font-size:11px;color:var(--gray-400);line-height:1.6;margin-top:4px">默认先展示指标摘要；空格子显示 +，点击任一格子后再输入提示词，保存即自动生成。</div>
+            <div id="wb-dashboard-section-title" style="font-size:14px;font-weight:700;color:var(--white)">智能指标 Dashboard</div>
+            <div id="wb-dashboard-section-desc" style="font-size:11px;color:var(--gray-400);line-height:1.6;margin-top:4px">先选布局，再点击加号弹框。你可以用标签和提示词组合描述计算逻辑，系统先生成一版临时结果给你确认，确认后才会正式保存成智能指标。</div>
           </div>
           <span class="tag tag-gold">工作台生成</span>
         </div>
-        <div id="wb-dashboard-mode-row" class="wb-dashboard-mode-row"></div>
-        <div class="wb-dashboard-toolbar">
-          <button class="btn-outline wb-dashboard-layout-btn" data-dashboard-layout-button="2x2" style="padding:8px 10px;font-size:12px" onclick="selectFundDashboardLayout('2x2')">2列2行</button>
-          <button class="btn-outline wb-dashboard-layout-btn" data-dashboard-layout-button="2x3" style="padding:8px 10px;font-size:12px" onclick="selectFundDashboardLayout('2x3')">2列3行</button>
-          <button class="btn-outline wb-dashboard-layout-btn" data-dashboard-layout-button="2x4" style="padding:8px 10px;font-size:12px" onclick="selectFundDashboardLayout('2x4')">2列4行</button>
-          <button class="btn-outline wb-dashboard-layout-btn" data-dashboard-layout-button="2x5" style="padding:8px 10px;font-size:12px" onclick="selectFundDashboardLayout('2x5')">2列5行</button>
-        </div>
+        <div class="wb-dashboard-meta" style="margin-top:10px">标签来源于自选股和平台指标库，不再单独维护“可选底层指标”面板。</div>
+        <div id="wb-smart-layout-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"></div>
         <div class="wb-dashboard-actions">
-          <button class="btn-gold" style="padding:9px 10px;font-size:12px" onclick="publishFundDashboard()">发布到基本面首页</button>
+          <button class="btn-outline" style="padding:9px 10px;font-size:12px" onclick="publishFundDashboard()">发布到基本面首页</button>
           <button class="btn-outline" style="padding:9px 10px;font-size:12px" onclick="resetFundDashboardDraft()">恢复当前发布版</button>
         </div>
         <div class="wb-dashboard-meta" id="wb-dashboard-meta">当前未生成新的指标面板，发布后会同步到前台“基本面”页顶部。</div>
+        <div class="wb-dashboard-meta" style="margin-top:10px">系统会根据提示词自动更新内部计算逻辑，不向用户直接展示实现细节。</div>
         <div id="wb-dashboard-preview" style="margin-top:12px"></div>
+        <div id="wb-smart-indicator-library" style="margin-top:12px"></div>
       </div>
     </div>
     <!-- Fan messages inbox -->
@@ -3483,8 +3480,9 @@ function getFundStatusLabel(status) {
 
 function normalizeDashboardLayout(layout) {
   if (layout === '3x3') return '2x3';
-  if (layout === '4x4') return '2x4';
-  if (layout === '2x2' || layout === '2x3' || layout === '2x4' || layout === '2x5') return layout;
+  if (layout === '4x4' || layout === '2x4') return '4x2';
+  if (layout === '2x5') return '5x2';
+  if (layout === '2x2' || layout === '2x3' || layout === '4x2' || layout === '5x2') return layout;
   return '2x2';
 }
 
@@ -3696,8 +3694,8 @@ function renderDashboardModeRow() {
 
 function getDashboardCardTarget(layout) {
   if (layout === '2x3') return 6;
-  if (layout === '2x4') return 8;
-  if (layout === '2x5') return 10;
+  if (layout === '4x2') return 8;
+  if (layout === '5x2') return 10;
   return 4;
 }
 
@@ -10024,6 +10022,636 @@ function showToast(msg, duration) {
   toast.classList.add('show');
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.classList.remove('show'), duration);
+}
+
+let wbSmartIndicatorEditingCode = '';
+let wbSmartIndicatorSelectedCodes = [];
+let tenantSmartIndicatorCatalogState = null;
+let wbSmartIndicatorDraft = {
+  slotIndex: -1,
+  indicatorName: '',
+  promptText: '',
+  category: '',
+  unit: '',
+  selectedTagCodes: [],
+  preview: null,
+};
+
+function cloneSimpleDashboardConfig(config) {
+  return config ? JSON.parse(JSON.stringify(config)) : null;
+}
+
+function normalizeInitialRemoteDashboardState(payload) {
+  const dashboard = payload && typeof payload === 'object' ? payload : {};
+  const state = dashboard.fund_dashboard_state && typeof dashboard.fund_dashboard_state === 'object'
+    ? dashboard.fund_dashboard_state
+    : { published: dashboard.fund_dashboard || null, draft: null };
+  return {
+    published: cloneSimpleDashboardConfig(state.published),
+    draft: cloneSimpleDashboardConfig(state.draft),
+  };
+}
+
+function ensureTenantFundDashboardState(tenantId) {
+  if (!tenantFundDashboardState[tenantId]) {
+    tenantFundDashboardState[tenantId] = {
+      published: cloneSimpleDashboardConfig(tenantFundDashboardRemoteState.published) || { layout: '2x2', cards: [] },
+      draft: cloneSimpleDashboardConfig(tenantFundDashboardRemoteState.draft),
+    };
+    persistTenantFundDashboardState();
+  }
+  return tenantFundDashboardState[tenantId];
+}
+
+function getTenantFundDashboardState() {
+  const activeUser = getActiveDemoUser();
+  return ensureTenantFundDashboardState(activeUser.tenant.id);
+}
+
+function getPublishedFundDashboard() {
+  const state = getTenantFundDashboardState();
+  return cloneSimpleDashboardConfig((tenantFundDashboardRemoteState && tenantFundDashboardRemoteState.published) || state.published);
+}
+
+function getDraftFundDashboard() {
+  const state = getTenantFundDashboardState();
+  return cloneSimpleDashboardConfig((tenantFundDashboardRemoteState && tenantFundDashboardRemoteState.draft) || state.draft);
+}
+
+tenantFundDashboardRemoteState = normalizeInitialRemoteDashboardState(INITIAL_TENANT_DASHBOARD);
+
+function buildInitialTenantSmartCatalog() {
+  const payloadCatalog = (INITIAL_TENANT_DASHBOARD && INITIAL_TENANT_DASHBOARD.smart_indicator_catalog) || {};
+  if (payloadCatalog.tenant_smart_indicators || payloadCatalog.base_indicators || payloadCatalog.available_tags) {
+    return JSON.parse(JSON.stringify(payloadCatalog));
+  }
+  const hub = H5_INDICATOR_HUB || {};
+  return {
+    tenant_smart_indicators: Array.isArray(hub.smart_items) ? hub.smart_items.map((item) => ({
+      indicator_code: item.id,
+      indicator_name: item.name,
+      category: item.category || '智能指标',
+      unit: item.unit || '',
+      value: item.value || '--',
+      assessment: item.assessment || '',
+      prompt_text: item.prompt_text || '',
+      formula_js: item.formula_js || '',
+      algorithm_detail: item.algorithm_detail || item.description || '',
+      interpretation: item.interpretation || item.assessment || '',
+      selected_indicators: Array.isArray(item.selected_indicators) ? item.selected_indicators : [],
+    })) : [],
+    base_indicators: Array.isArray(hub.items) ? hub.items.filter((item) => item && item.id && item.numeric_value !== null && item.numeric_value !== undefined).map((item) => ({
+      indicator_code: item.id,
+      indicator_name: item.name,
+      category: item.category || '未分类指标',
+      value: item.value || '--',
+      numeric_value: item.numeric_value,
+      source_type_label: item.source_type_label || item.source_type || '',
+    })) : [],
+    available_tags: [],
+  };
+}
+
+function getTenantSmartCatalog() {
+  if (!tenantSmartIndicatorCatalogState) tenantSmartIndicatorCatalogState = buildInitialTenantSmartCatalog();
+  return tenantSmartIndicatorCatalogState;
+}
+
+function setTenantSmartCatalog(payload) {
+  const catalog = payload && payload.smart_indicator_catalog ? payload.smart_indicator_catalog : payload;
+  if (!catalog || typeof catalog !== 'object') return;
+  tenantSmartIndicatorCatalogState = JSON.parse(JSON.stringify(catalog));
+}
+
+function buildFallbackTenantSmartTags(catalog) {
+  const tags = [];
+  const seen = new Set();
+  Object.values(WATCHLIST_DETAILS_MAP || {}).forEach((detail) => {
+    const stockCode = String(detail.code || '').toUpperCase();
+    const relatedIds = Array.isArray(detail.related_indicator_ids) ? detail.related_indicator_ids : [];
+    const relatedNames = Array.isArray(detail.related_indicator_names) ? detail.related_indicator_names : [];
+    if (!stockCode || !relatedIds.length) return;
+    const tagCode = `watchlist:${stockCode}`;
+    if (seen.has(tagCode)) return;
+    seen.add(tagCode);
+    tags.push({
+      tag_code: tagCode,
+      label: detail.name || stockCode,
+      tag_type: 'watchlist',
+      category: detail.industry || '自选股',
+      subtitle: '自选股标签',
+      selected_indicators: relatedIds.map((indicatorCode, index) => ({
+        indicator_code: indicatorCode,
+        indicator_name: relatedNames[index] || indicatorCode,
+      })),
+    });
+  });
+  (catalog.base_indicators || []).forEach((item) => {
+    const indicatorCode = String(item.indicator_code || '').trim();
+    if (!indicatorCode) return;
+    const tagCode = `indicator:${indicatorCode}`;
+    if (seen.has(tagCode)) return;
+    seen.add(tagCode);
+    tags.push({
+      tag_code: tagCode,
+      label: item.indicator_name || indicatorCode,
+      tag_type: 'indicator',
+      category: item.category || '指标',
+      subtitle: item.source_type_label || '基础指标',
+      selected_indicators: [{ indicator_code: indicatorCode, indicator_name: item.indicator_name || indicatorCode }],
+    });
+  });
+  return tags;
+}
+
+function getTenantSmartTagCatalog() {
+  const catalog = getTenantSmartCatalog();
+  if (Array.isArray(catalog.available_tags) && catalog.available_tags.length) return catalog.available_tags;
+  return buildFallbackTenantSmartTags(catalog);
+}
+
+function renderWorkbenchSmartLayoutRow() {
+  const host = document.getElementById('wb-smart-layout-row');
+  if (!host) return;
+  const active = getDraftFundDashboard() || getPublishedFundDashboard() || { layout: '2x2' };
+  const currentLayout = normalizeDashboardLayout(active.layout || '2x2');
+  host.innerHTML = ['2x2', '2x3', '4x2', '5x2'].map((layout) => `
+    <button class="btn-outline ${currentLayout === layout ? 'active' : ''}" style="padding:8px 12px;font-size:12px" type="button" onclick="selectFundDashboardLayout('${layout}')">${layout.toUpperCase()}</button>
+  `).join('');
+}
+
+function renderWorkbenchSmartIndicatorLibrary() {
+  const host = document.getElementById('wb-smart-indicator-library');
+  if (!host) return;
+  const items = getTenantSmartCatalog().tenant_smart_indicators || [];
+  if (!items.length) {
+    host.innerHTML = '';
+    return;
+  }
+  host.innerHTML = items.map((item) => `
+    <div class="wb-dashboard-summary-card filled" style="margin-top:10px" onclick="openWorkbenchSmartIndicatorLibraryDetail('${item.indicator_code}')">
+      <div class="wb-dashboard-summary-head">
+        <div class="wb-dashboard-summary-title">${escapeHtml(item.indicator_name || '未命名指标')}</div>
+        <span class="wb-dashboard-summary-tag">${escapeHtml(item.category || '智能指标')}</span>
+      </div>
+      <div class="wb-dashboard-summary-value">${escapeHtml(`${item.value || '--'}${item.unit || ''}`)}</div>
+      <div class="wb-dashboard-summary-text">${escapeHtml(item.interpretation || item.assessment || '')}</div>
+    </div>
+  `).join('');
+}
+
+function buildWorkbenchSmartSlotCards(layout, cards) {
+  const target = getDashboardCardTarget(normalizeDashboardLayout(layout || '2x2'));
+  const list = Array.isArray(cards) ? cards : [];
+  return Array.from({ length: target }, (_, index) => {
+    const raw = typeof list[index] === 'object' ? list[index] : {};
+    return raw && !raw.isEmpty && (raw.indicatorCode || raw.indicator_code || raw.name || raw.prompt) ? raw : { isEmpty: true };
+  });
+}
+
+function openWorkbenchSmartIndicatorEditor(slotIndex) {
+  wbSmartIndicatorDraft = {
+    slotIndex,
+    indicatorName: '',
+    promptText: '',
+    category: '',
+    unit: '',
+    selectedTagCodes: [],
+    preview: null,
+  };
+  renderWorkbenchSmartIndicatorEditorModal();
+}
+
+function toggleWorkbenchSmartTag(tagCode) {
+  wbSmartIndicatorDraft.selectedTagCodes = wbSmartIndicatorDraft.selectedTagCodes.includes(tagCode)
+    ? wbSmartIndicatorDraft.selectedTagCodes.filter((code) => code !== tagCode)
+    : wbSmartIndicatorDraft.selectedTagCodes.concat(tagCode);
+  wbSmartIndicatorDraft.preview = null;
+  renderWorkbenchSmartIndicatorEditorModal();
+}
+
+function closeWorkbenchSmartIndicatorEditor() {
+  const modal = document.getElementById('dashboard-cell-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function renderWorkbenchSmartIndicatorEditorModal() {
+  const host = document.getElementById('dashboard-cell-modal-content');
+  const modal = document.getElementById('dashboard-cell-modal');
+  if (!host || !modal) return;
+  const tagCatalog = getTenantSmartTagCatalog();
+  const selectedTagSet = new Set(wbSmartIndicatorDraft.selectedTagCodes);
+  const selectedTags = tagCatalog.filter((tag) => selectedTagSet.has(tag.tag_code));
+  const preview = wbSmartIndicatorDraft.preview;
+  host.innerHTML = `
+    <div class="modal-title" style="margin-bottom:10px">新增智能指标</div>
+    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">先选标签，再写提示词。系统先生成临时结果预览，确认后才正式保存入库。</div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">指标名称</label>
+      <input id="wb-smart-indicator-draft-name" class="knowledge-modal-textarea" style="min-height:auto;height:42px" placeholder="可选，不填则系统自动命名" value="${escapeHtml(wbSmartIndicatorDraft.indicatorName || '')}">
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">提示词</label>
+      <textarea id="wb-smart-indicator-draft-prompt" class="knowledge-modal-textarea" placeholder="例如：【上证50指数】*80/100，或者【上证50】/ 纳斯达克指数">${escapeHtml(wbSmartIndicatorDraft.promptText || '')}</textarea>
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">已选标签</label>
+      <div class="review-watchlist-row" style="margin-top:10px">
+        ${selectedTags.map((tag) => `<button class="review-watchlist-chip selectable active" onclick="toggleWorkbenchSmartTag('${escapeHtml(tag.tag_code)}')">${escapeHtml(tag.label)}</button>`).join('') || '<span class="review-watchlist-chip">请至少选择一个标签</span>'}
+      </div>
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">标签池</label>
+      <div class="review-watchlist-row" style="margin-top:10px">
+        ${tagCatalog.map((tag) => `<button class="review-watchlist-chip selectable ${selectedTagSet.has(tag.tag_code) ? 'active' : ''}" onclick="toggleWorkbenchSmartTag('${escapeHtml(tag.tag_code)}')">${escapeHtml(tag.label)}</button>`).join('')}
+      </div>
+    </div>
+    ${preview ? `
+      <div class="knowledge-modal-block">
+        <label class="knowledge-modal-label">生成结果预览</label>
+        <div style="font-size:12px;color:var(--gray-300);line-height:1.8">名称：${escapeHtml(preview.indicator_name || '智能指标')}</div>
+        <div style="font-size:12px;color:var(--gray-300);line-height:1.8;margin-top:6px">当前值：${escapeHtml(`${preview.value || '--'}${preview.unit || ''}`)}</div>
+        <div style="font-size:12px;color:var(--gray-300);line-height:1.8;margin-top:10px">算法详情：${escapeHtml(preview.algorithm_detail || '暂无算法详情')}</div>
+        <div style="font-size:12px;color:var(--gray-300);line-height:1.8;margin-top:10px">解读：${escapeHtml(preview.interpretation || preview.assessment || '暂无解读')}</div>
+      </div>
+    ` : ''}
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeWorkbenchSmartIndicatorEditor()">取消</button>
+      <button class="btn-outline" onclick="previewWorkbenchSmartIndicator()">生成预览</button>
+      ${preview ? '<button class="btn-gold" onclick="confirmWorkbenchSmartIndicator()">确认展示</button>' : ''}
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+async function previewWorkbenchSmartIndicator() {
+  const nameInput = document.getElementById('wb-smart-indicator-draft-name');
+  const promptInput = document.getElementById('wb-smart-indicator-draft-prompt');
+  wbSmartIndicatorDraft.indicatorName = nameInput ? nameInput.value.trim() : '';
+  wbSmartIndicatorDraft.promptText = promptInput ? promptInput.value.trim() : '';
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  if (!wbSmartIndicatorDraft.promptText) {
+    showToast('请先填写提示词');
+    return;
+  }
+  if (!wbSmartIndicatorDraft.selectedTagCodes.length) {
+    showToast('请先至少选择一个标签');
+    return;
+  }
+  try {
+    const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'preview',
+        indicator_name: wbSmartIndicatorDraft.indicatorName,
+        prompt_text: wbSmartIndicatorDraft.promptText,
+        selected_tag_codes: wbSmartIndicatorDraft.selectedTagCodes,
+      }),
+    });
+    const payload = await resp.json();
+    if (!resp.ok || !payload.success) throw new Error(payload.error || 'smart_indicator_preview_failed');
+    setTenantSmartCatalog(payload.smart_indicator_catalog);
+    wbSmartIndicatorDraft.preview = payload.preview || null;
+    if (wbSmartIndicatorDraft.preview && wbSmartIndicatorDraft.preview.indicator_name) {
+      wbSmartIndicatorDraft.indicatorName = wbSmartIndicatorDraft.preview.indicator_name;
+    }
+    renderWorkbenchSmartIndicatorEditorModal();
+  } catch (error) {
+    showToast(error.message || '预览生成失败');
+  }
+}
+
+async function confirmWorkbenchSmartIndicator() {
+  const preview = wbSmartIndicatorDraft.preview;
+  if (!preview) {
+    showToast('请先生成预览');
+    return;
+  }
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  const active = getDraftFundDashboard() || getPublishedFundDashboard() || { layout: '2x2', cards: [] };
+  const layout = normalizeDashboardLayout(active.layout || '2x2');
+  const target = getDashboardCardTarget(layout);
+  try {
+    const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'save',
+        indicator_name: preview.indicator_name || wbSmartIndicatorDraft.indicatorName,
+        prompt_text: preview.prompt_text || wbSmartIndicatorDraft.promptText,
+        category: preview.category || '',
+        unit: preview.unit || '',
+        selected_indicators: preview.selected_indicators || [],
+        formula_js: preview.formula_js || '',
+        add_to_dashboard: false,
+      }),
+    });
+    const payload = await resp.json();
+    if (!resp.ok || !payload.success) throw new Error(payload.error || 'smart_indicator_save_failed');
+    setTenantSmartCatalog(payload.smart_indicator_catalog);
+    const nextCards = Array.from({ length: target }, (_, index) => {
+      const raw = Array.isArray(active.cards) && typeof active.cards[index] === 'object' ? active.cards[index] : {};
+      const indicatorCode = raw && (raw.indicatorCode || raw.indicator_code) ? (raw.indicatorCode || raw.indicator_code) : '';
+      return indicatorCode ? { indicatorCode } : {};
+    });
+    nextCards[wbSmartIndicatorDraft.slotIndex] = { indicatorCode: ((payload.definition || {}).indicator_code) || '' };
+    await syncTenantDashboardState('save_draft', {
+      ...active,
+      layout,
+      cards: nextCards,
+    });
+    wbSmartIndicatorEditingCode = ((payload.definition || {}).indicator_code) || '';
+    wbSmartIndicatorSelectedCodes = ((preview.selected_indicators || []).map((item) => item.indicator_code)).filter(Boolean);
+    closeWorkbenchSmartIndicatorEditor();
+    renderWorkbenchFundDashboard();
+    renderFundMacroDashboard();
+    showToast('智能指标已加入 Dashboard 草稿');
+  } catch (error) {
+    showToast(error.message || '智能指标保存失败');
+  }
+}
+
+async function removeWorkbenchDashboardIndicator(index) {
+  const active = getDraftFundDashboard() || getPublishedFundDashboard() || { layout: '2x2', cards: [] };
+  const layout = normalizeDashboardLayout(active.layout || '2x2');
+  const target = getDashboardCardTarget(layout);
+  const nextCards = Array.from({ length: target }, (_, slotIndex) => {
+    const raw = Array.isArray(active.cards) && typeof active.cards[slotIndex] === 'object' ? active.cards[slotIndex] : {};
+    if (slotIndex === index) return {};
+    const indicatorCode = raw && (raw.indicatorCode || raw.indicator_code) ? (raw.indicatorCode || raw.indicator_code) : '';
+    return indicatorCode ? { indicatorCode } : {};
+  });
+  try {
+    await syncTenantDashboardState('save_draft', {
+      ...active,
+      layout,
+      cards: nextCards,
+    });
+    renderWorkbenchFundDashboard();
+    showToast('已从草稿移除');
+  } catch (error) {
+    showToast('移除失败，请稍后重试');
+  }
+}
+
+async function selectFundDashboardLayout(layout) {
+  const active = getDraftFundDashboard() || getPublishedFundDashboard() || { layout: '2x2', cards: [] };
+  const nextLayout = normalizeDashboardLayout(layout || '2x2');
+  const currentCards = Array.isArray(active.cards) ? active.cards : [];
+  const target = getDashboardCardTarget(nextLayout);
+  const nextCards = Array.from({ length: target }, (_, index) => {
+    const raw = typeof currentCards[index] === 'object' ? currentCards[index] : {};
+    const indicatorCode = raw && (raw.indicatorCode || raw.indicator_code) ? (raw.indicatorCode || raw.indicator_code) : '';
+    return indicatorCode ? { indicatorCode } : {};
+  });
+  try {
+    await syncTenantDashboardState('save_draft', {
+      ...active,
+      layout: nextLayout,
+      cards: nextCards,
+    });
+    renderWorkbenchFundDashboard();
+    showToast(`已切换为 ${nextLayout.toUpperCase()} 布局草稿`);
+  } catch (error) {
+    showToast('布局切换失败，请稍后重试');
+  }
+}
+
+function findWorkbenchSmartIndicator(indicatorCode) {
+  return (getTenantSmartCatalog().tenant_smart_indicators || []).find((entry) => entry.indicator_code === indicatorCode);
+}
+
+function openWorkbenchSmartIndicatorLibraryDetail(indicatorCode) {
+  const item = findWorkbenchSmartIndicator(indicatorCode);
+  if (!item) return;
+  openWorkbenchSmartIndicatorDetailModal({
+    indicatorCode: item.indicator_code,
+    name: item.indicator_name,
+    value: item.value || '--',
+    unit: item.unit || '',
+    prompt: item.prompt_text || '',
+    updatedAt: item.last_updated || '',
+    algorithmDetail: item.algorithm_detail || '',
+    interpretation: item.interpretation || item.assessment || '',
+    selectedIndicators: item.selected_indicators || [],
+  });
+}
+
+function openWorkbenchDashboardIndicatorDetail(index, sourceType) {
+  const source = sourceType === 'published' ? getPublishedFundDashboard() : (getDraftFundDashboard() || getPublishedFundDashboard());
+  const cards = source && Array.isArray(source.cards) ? source.cards : [];
+  const item = cards[index];
+  if (!item) return;
+  const catalogItem = findWorkbenchSmartIndicator(item.indicatorCode || item.indicator_code || '');
+  openWorkbenchSmartIndicatorDetailModal({
+    indicatorCode: item.indicatorCode || item.indicator_code || '',
+    name: item.name || '',
+    value: item.value || '--',
+    unit: item.unit || '',
+    prompt: item.prompt || '',
+    updatedAt: item.updatedAt || (source && source.updatedAt) || '',
+    algorithmDetail: item.algorithmDetail || (catalogItem && catalogItem.algorithm_detail) || '',
+    interpretation: item.interpretation || item.assessment || (catalogItem && (catalogItem.interpretation || catalogItem.assessment)) || '',
+    selectedIndicators: item.selectedIndicators || (catalogItem && catalogItem.selected_indicators) || [],
+  });
+}
+
+function openWorkbenchSmartIndicatorDetailModal(card) {
+  const host = document.getElementById('dashboard-cell-modal-content');
+  const modal = document.getElementById('dashboard-cell-modal');
+  if (!host || !modal || !card) return;
+  const isDav = (getActiveDemoUser() || {}).role === 'dav';
+  const selectedIndicators = Array.isArray(card.selectedIndicators) ? card.selectedIndicators : [];
+  host.innerHTML = `
+    <div class="modal-title" style="margin-bottom:10px">${escapeHtml(card.name || '智能指标详情')}</div>
+    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">
+      当前值：${escapeHtml(`${card.value || '--'}${card.unit || ''}`)} · 更新时间：${escapeHtml(card.updatedAt || '未记录')}
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">算法详情</label>
+      <div style="font-size:12px;color:var(--gray-300);line-height:1.8">${escapeHtml(card.algorithmDetail || '暂无算法详情')}</div>
+      <div class="review-watchlist-row" style="margin-top:10px">
+        ${selectedIndicators.map((item) => `<span class="review-watchlist-chip">${escapeHtml(item.indicator_name || item.indicator_code || '')}</span>`).join('') || '<span class="review-watchlist-chip">未选择计算对象</span>'}
+      </div>
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">解读</label>
+      <div style="font-size:12px;color:var(--gray-300);line-height:1.8">${escapeHtml(card.interpretation || '暂无解读')}</div>
+    </div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">提示词</label>
+      <textarea id="wb-smart-indicator-detail-prompt" class="knowledge-modal-textarea" ${isDav && card.indicatorCode ? '' : 'disabled'}>${escapeHtml(card.prompt || '')}</textarea>
+      ${isDav ? '<div style="font-size:11px;color:var(--gray-400);margin-top:8px">保存后系统会自动重算该智能指标，不直接展示内部公式。</div>' : ''}
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeWorkbenchSmartIndicatorDetailModal()">关闭</button>
+      ${isDav && card.indicatorCode ? `<button class="btn-gold" onclick="saveWorkbenchSmartIndicatorPrompt('${card.indicatorCode}')">保存并更新指标</button>` : ''}
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+function closeWorkbenchSmartIndicatorDetailModal() {
+  const modal = document.getElementById('dashboard-cell-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+async function saveWorkbenchSmartIndicatorPrompt(indicatorCode) {
+  const item = findWorkbenchSmartIndicator(indicatorCode);
+  const promptInput = document.getElementById('wb-smart-indicator-detail-prompt');
+  const promptText = promptInput ? promptInput.value.trim() : '';
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  const layout = (getDraftFundDashboard() || getPublishedFundDashboard() || { layout: '2x2' }).layout || '2x2';
+  if (!item || !promptText) {
+    showToast('请先填写提示词');
+    return;
+  }
+  try {
+    const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'save',
+        indicator_code: item.indicator_code,
+        indicator_name: item.indicator_name,
+        category: item.category || '',
+        unit: item.unit || '',
+        prompt_text: promptText,
+        selected_indicator_codes: (item.selected_indicators || []).map((entry) => entry.indicator_code).filter(Boolean),
+        add_to_dashboard: false,
+      }),
+    });
+    const payload = await resp.json();
+    if (!resp.ok || !payload.success) throw new Error(payload.error || 'smart_indicator_update_failed');
+    setTenantSmartCatalog(payload.smart_indicator_catalog);
+    tenantFundDashboardRemoteState = normalizeInitialRemoteDashboardState(payload.dashboard || {});
+    const tenantState = getTenantFundDashboardState();
+    tenantState.published = tenantFundDashboardRemoteState.published || tenantState.published;
+    tenantState.draft = tenantFundDashboardRemoteState.draft;
+    persistTenantFundDashboardState();
+    closeWorkbenchSmartIndicatorDetailModal();
+    renderWorkbenchFundDashboard();
+    renderFundMacroDashboard();
+    showToast('提示词已更新，指标结果已重算');
+  } catch (error) {
+    showToast(error.message || '指标更新失败');
+  }
+}
+
+function renderFundMacroDashboard() {
+  const host = document.getElementById('feed-macro-dashboard');
+  if (!host) return;
+  const published = getPublishedFundDashboard();
+  const cards = published && Array.isArray(published.cards) ? published.cards.filter((item) => item && !item.isEmpty) : [];
+  if (!cards.length) {
+    host.innerHTML = '<div class="fund-column-card"><div class="fund-column-head"><div><div class="fund-column-title">智能指标 Dashboard</div><div class="fund-column-subtitle">当前还没有已发布的智能指标。</div></div><span class="tag tag-gold">未发布</span></div></div>';
+    return;
+  }
+  host.innerHTML = `
+    <div class="fund-column-card">
+      <div class="fund-column-head">
+        <div>
+          <div class="fund-column-title">${escapeHtml(published.title || '智能指标 Dashboard')}</div>
+          <div class="fund-column-subtitle">${escapeHtml(published.note || '展示当前已发布的智能指标结果。')}</div>
+        </div>
+        <span class="tag tag-gold">${escapeHtml((published.layout || '2x2').toUpperCase())}</span>
+      </div>
+      <div class="wb-dashboard-summary-grid cols-3">
+        ${cards.map((item, index) => `
+          <div class="wb-dashboard-summary-card filled" onclick="openWorkbenchDashboardIndicatorDetail(${index}, 'published')">
+            <div class="wb-dashboard-summary-head">
+              <div class="wb-dashboard-summary-title">${escapeHtml(item.name || '智能指标')}</div>
+              <span class="wb-dashboard-summary-tag">${escapeHtml(item.updatedAt || '已发布')}</span>
+            </div>
+            <div class="wb-dashboard-summary-value">${escapeHtml(`${item.value || '--'}${item.unit || ''}`)}</div>
+            <div class="wb-dashboard-summary-text">${escapeHtml(item.interpretation || item.assessment || '')}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderWorkbenchFundDashboard() {
+  const previewHost = document.getElementById('wb-dashboard-preview');
+  const metaHost = document.getElementById('wb-dashboard-meta');
+  if (!previewHost || !metaHost) return;
+  renderWorkbenchSmartLayoutRow();
+  renderWorkbenchSmartIndicatorLibrary();
+  const active = getDraftFundDashboard() || getPublishedFundDashboard() || { cards: [], layout: '2x2' };
+  const cards = buildWorkbenchSmartSlotCards(active.layout || '2x2', active.cards || []);
+  const filledCount = cards.filter((item) => item && !item.isEmpty).length;
+  metaHost.textContent = getDraftFundDashboard()
+    ? `当前是草稿版 · ${filledCount} 个智能指标 · ${active.layout || '2x2'}`
+    : `当前展示已发布版本 · ${filledCount} 个智能指标`;
+  previewHost.innerHTML = `
+    <div class="wb-dashboard-summary-grid cols-3">
+      ${cards.map((item, index) => `
+        ${item && !item.isEmpty ? `
+        <div class="wb-dashboard-summary-card filled" onclick="openWorkbenchDashboardIndicatorDetail(${index}, '${getDraftFundDashboard() ? 'draft' : 'published'}')">
+          <div class="wb-dashboard-summary-head">
+            <div class="wb-dashboard-summary-title">${escapeHtml(item.name || '智能指标')}</div>
+            <span class="wb-dashboard-summary-tag">${escapeHtml(item.updatedAt || '未记录')}</span>
+          </div>
+          <div class="wb-dashboard-summary-value">${escapeHtml(`${item.value || '--'}${item.unit || ''}`)}</div>
+          <div class="wb-dashboard-summary-text">${escapeHtml(item.interpretation || item.assessment || '')}</div>
+          ${getDraftFundDashboard() ? `<div style="margin-top:10px"><button class="btn-outline" style="padding:6px 8px;font-size:11px" onclick="event.stopPropagation();removeWorkbenchDashboardIndicator(${index})">移出草稿</button></div>` : ''}
+        </div>
+        ` : `
+        <div class="wb-dashboard-summary-card empty" onclick="openWorkbenchSmartIndicatorEditor(${index})">
+          <div>
+            <div class="wb-dashboard-summary-plus">+</div>
+            <div class="wb-dashboard-summary-empty-title">新增智能指标</div>
+            <div class="wb-dashboard-summary-empty-desc">点击后用标签和提示词生成预览。</div>
+          </div>
+        </div>
+        `}
+      `).join('')}
+    </div>
+  `;
+}
+
+async function saveWorkbenchSmartIndicator() {
+  showToast('请点击 Dashboard 空位上的加号创建智能指标');
+}
+
+async function publishFundDashboard() {
+  const tenantState = getTenantFundDashboardState();
+  if (!tenantState.draft) {
+    showToast('请先至少生成一个智能指标草稿');
+    return;
+  }
+  try {
+    const payload = await syncTenantDashboardState('publish', tenantState.draft);
+    const state = normalizeInitialRemoteDashboardState(payload.dashboard || {});
+    tenantState.published = state.published || tenantState.published;
+    tenantState.draft = state.draft;
+    persistTenantFundDashboardState();
+    renderWorkbenchFundDashboard();
+    renderFundMacroDashboard();
+    showToast('已发布到基本面首页顶部');
+  } catch (error) {
+    showToast('发布失败，请稍后重试');
+  }
+}
+
+async function resetFundDashboardDraft() {
+  const tenantState = getTenantFundDashboardState();
+  try {
+    const payload = await syncTenantDashboardState('reset_draft');
+    const state = normalizeInitialRemoteDashboardState(payload.dashboard || {});
+    tenantState.published = state.published || tenantState.published;
+    tenantState.draft = state.draft;
+    persistTenantFundDashboardState();
+    renderWorkbenchFundDashboard();
+    showToast('已恢复到当前发布版');
+  } catch (error) {
+    showToast('恢复失败，请稍后重试');
+  }
 }
 
 // ===== INIT =====

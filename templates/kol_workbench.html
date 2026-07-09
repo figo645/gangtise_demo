@@ -3362,7 +3362,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <div class="kw-card-head">
             <div>
               <div class="kw-card-title">智能 Dashboard</div>
-              <div class="kw-card-desc">MVP 先收口成三段信号视图：市场状态卡、行业景气卡、信号个股卡。下面统一改成 2 列多行的极简格子风格，先验证大V在手机端的内容生产体验。</div>
+              <div class="kw-card-desc">旧的三段信号白盒配置已下线。现在改成通过标签和自然语言描述计算规则，由系统生成内部计算逻辑并存成大V自己的智能指标。</div>
             </div>
             <span class="kw-tag" id="kw-dashboard-layout-tag">{{ workbench.fund_dashboard.layout }}</span>
           </div>
@@ -3370,70 +3370,66 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
             <div class="kw-dashboard-main">
               <div class="kw-dashboard-hero">
                 <div class="kw-dashboard-hero-copy">
-                  <div class="kw-dashboard-hero-title">先选三段信号，再决定今天用多少格子表达</div>
-                  <div class="kw-dashboard-hero-desc">先把基本面判断拆成市场、行业、信号个股三层。上面决定你今天看哪一层，下面继续用极简格子展示结果，避免页面太重、信息结构太散。</div>
+                  <div class="kw-dashboard-hero-title">先选标签，再用自然语言定义你的智能指标</div>
+                  <div class="kw-dashboard-hero-desc">例如输入 `【上证50指数】*80/100`，或者 `【上证50】/ 纳斯达克指数`。系统会按这段描述自动更新内部计算逻辑，后续 H5 / Web / 门户都按这条自定义指标复用。</div>
                 </div>
                 <div class="kw-dashboard-hero-stats">
                   <div class="kw-dashboard-hero-stat">
-                    <div class="kw-dashboard-hero-stat-label">信号层级</div>
-                    <div class="kw-dashboard-hero-stat-value">市场 / 行业 / 个股</div>
+                    <div class="kw-dashboard-hero-stat-label">指标来源</div>
+                    <div class="kw-dashboard-hero-stat-value">指标湖 / 智能指标</div>
                   </div>
                   <div class="kw-dashboard-hero-stat">
-                    <div class="kw-dashboard-hero-stat-label">展示风格</div>
-                    <div class="kw-dashboard-hero-stat-value">2列2行 / 2列3行 / 2列4行 / 2列5行</div>
+                    <div class="kw-dashboard-hero-stat-label">生成结果</div>
+                    <div class="kw-dashboard-hero-stat-value">智能指标入库</div>
                   </div>
                   <div class="kw-dashboard-hero-stat">
                     <div class="kw-dashboard-hero-stat-label">粉丝端口径</div>
-                    <div class="kw-dashboard-hero-stat-value">只展示算法结果</div>
+                    <div class="kw-dashboard-hero-stat-value">只展示已发布指标</div>
                   </div>
                 </div>
               </div>
-              <div id="kw-dashboard-mode-row" class="kw-dashboard-mode-row"></div>
               <div class="kw-dashboard-workbench-card">
                 <div class="kw-dashboard-workbench-head">
                   <div>
-                    <div class="kw-dashboard-workbench-title">结果画布</div>
+                    <div class="kw-dashboard-workbench-title">智能指标生成器</div>
+                    <div class="kw-dashboard-workbench-desc">先选布局，再点击加号弹框。你可以用标签和提示词组合描述计算逻辑，系统先生成一版临时结果给你确认，确认后才正式保存成智能指标。</div>
+                  </div>
+                </div>
+                <div class="kw-dashboard-panel-note" style="margin-top:14px">标签来源于自选股和平台指标库，不再单独维护“可选底层指标”面板。</div>
+              </div>
+              <div class="kw-dashboard-workbench-card">
+                <div class="kw-dashboard-workbench-head">
+                  <div>
+                    <div class="kw-dashboard-workbench-title">Dashboard 草稿 / 已发布</div>
                     <div id="kw-dashboard-meta" class="kw-dashboard-workbench-desc">当前展示已发布版本。</div>
                   </div>
-                  <div class="kw-dashboard-layout-row">
-                    <button class="btn-outline" style="padding:9px 14px;font-size:12px" type="button" onclick="kwGenerateFundDashboard('2x2')">生成 2列2行</button>
-                    <button class="btn-outline" style="padding:9px 14px;font-size:12px" type="button" onclick="kwGenerateFundDashboard('2x3')">生成 2列3行</button>
-                    <button class="btn-outline" style="padding:9px 14px;font-size:12px" type="button" onclick="kwGenerateFundDashboard('2x4')">生成 2列4行</button>
-                    <button class="btn-outline" style="padding:9px 14px;font-size:12px" type="button" onclick="kwGenerateFundDashboard('2x5')">生成 2列5行</button>
-                    <button class="btn-gold" style="padding:9px 14px;font-size:12px" type="button" onclick="kwPublishFundDashboard()">发布到前台</button>
-                    <button class="btn-outline" style="padding:9px 14px;font-size:12px" type="button" onclick="kwResetFundDashboardDraft()">恢复发布版</button>
-                  </div>
+                  <div class="kw-dashboard-layout-row" id="kw-smart-dashboard-layout-row"></div>
                 </div>
                 <div id="kw-dashboard-preview" style="margin-top:14px"></div>
-              </div>
-              <div class="kw-dashboard-workbench-card">
-                <div class="kw-dashboard-workbench-head">
-                  <div>
-                    <div class="kw-dashboard-workbench-title">组合逻辑预览</div>
-                    <div class="kw-dashboard-workbench-desc">这里先用 demo 方式展示这层信号会调用哪些数据源、会怎么组合，以及最后向粉丝解释什么。</div>
-                  </div>
-                </div>
-                <div id="kw-dashboard-strategy-list" class="kw-dashboard-strategy-list"></div>
               </div>
             </div>
             <div class="kw-dashboard-side">
               <div class="kw-dashboard-workbench-card">
                 <div class="kw-dashboard-workbench-head">
                   <div>
-                    <div class="kw-dashboard-workbench-title">配置面板</div>
-                    <div class="kw-dashboard-workbench-desc">右侧先看当前层的重点信号和推荐组合；真正的单格微调放到格子弹框里完成，可以直接看到组件、公式、数据源并拖拽排序。</div>
+                    <div class="kw-dashboard-workbench-title">我定义的智能指标</div>
+                    <div class="kw-dashboard-workbench-desc">这里列的是当前租户已经生成并落库的智能指标。点击可查看算法详情和解读；也可加入 Dashboard 或删除。</div>
                   </div>
                 </div>
-                <div id="kw-dashboard-config-panel"></div>
+                <div id="kw-smart-indicator-library" class="kw-dashboard-strategy-list"></div>
               </div>
               <div class="kw-dashboard-workbench-card">
                 <div class="kw-dashboard-workbench-head">
                   <div>
-                    <div class="kw-dashboard-workbench-title">粉丝端看到的结果</div>
-                    <div class="kw-dashboard-workbench-desc">对粉丝仍然只展示判断结果，不展示后台是怎样切市场、行业和个股信号的。</div>
+                    <div class="kw-dashboard-workbench-title">发布动作</div>
+                    <div class="kw-dashboard-workbench-desc">草稿确认后发布到 H5 顶部和门户固定 Dashboard 区；恢复发布版只会回滚当前草稿，不删除已定义指标。</div>
                   </div>
                 </div>
-                <div id="kw-dashboard-public-preview"></div>
+                <div style="display:grid;gap:10px">
+                  <button class="btn-gold" style="padding:10px 14px;font-size:12px" type="button" onclick="kwPublishFundDashboard()">发布到前台</button>
+                  <button class="btn-outline" style="padding:10px 14px;font-size:12px" type="button" onclick="kwResetFundDashboardDraft()">恢复发布版</button>
+                  <div id="kw-smart-dashboard-publish-note" class="kw-dashboard-panel-note">前台只展示已发布版本。</div>
+                </div>
               </div>
             </div>
           </div>
@@ -4031,15 +4027,16 @@ function renderWorkbenchTrendChart(hostId, items) {
 
 function kwNormalizeDashboardLayout(layout) {
   if (layout === '3x3') return '2x3';
-  if (layout === '4x4') return '2x4';
-  if (layout === '2x2' || layout === '2x3' || layout === '2x4' || layout === '2x5') return layout;
+  if (layout === '4x4' || layout === '2x4') return '4x2';
+  if (layout === '2x5') return '5x2';
+  if (layout === '2x2' || layout === '2x3' || layout === '4x2' || layout === '5x2') return layout;
   return '2x2';
 }
 
 function kwGetDashboardCardTarget(layout) {
   if (layout === '2x3') return 6;
-  if (layout === '2x4') return 8;
-  if (layout === '2x5') return 10;
+  if (layout === '4x2') return 8;
+  if (layout === '5x2') return 10;
   return 4;
 }
 
@@ -9345,6 +9342,557 @@ async function handleKwFanCsvImport(file) {
   } catch (error) {
     showToast(error.message || '粉丝 CSV 导入失败');
   }
+}
+
+let kwSmartIndicatorEditingCode = '';
+let kwSmartIndicatorSelectedCodes = [];
+let kwSmartIndicatorCatalogState = null;
+let kwSmartIndicatorDraft = {
+  slotIndex: -1,
+  indicatorName: '',
+  promptText: '',
+  category: '',
+  unit: '',
+  selectedTagCodes: [],
+  preview: null,
+};
+
+function kwBuildInitialSmartIndicatorCatalog() {
+  const payloadCatalog = (window.WORKBENCH_DATA && window.WORKBENCH_DATA.smart_indicator_catalog) || {};
+  if (payloadCatalog.tenant_smart_indicators || payloadCatalog.base_indicators || payloadCatalog.available_tags) {
+    return JSON.parse(JSON.stringify(payloadCatalog));
+  }
+  const hub = (window.WORKBENCH_DATA && window.WORKBENCH_DATA.indicator_hub) || {};
+  const smartItems = Array.isArray(hub.smart_items) ? hub.smart_items : [];
+  const baseItems = Array.isArray(hub.items) ? hub.items : [];
+  return {
+    tenant_smart_indicators: smartItems.map((item) => ({
+      indicator_code: item.id,
+      indicator_name: item.name,
+      tenant_slug: item.tenant_slug || '',
+      category: item.category || '智能指标',
+      value: item.value || '--',
+      numeric_value: item.numeric_value,
+      unit: item.unit || '',
+      assessment: item.assessment || '',
+      status: item.status || 'attention',
+      alert: item.alert || '',
+      prompt_text: item.prompt_text || '',
+      formula_js: item.formula_js || '',
+      algorithm_detail: item.algorithm_detail || item.description || '',
+      interpretation: item.interpretation || item.assessment || '',
+      selected_indicators: Array.isArray(item.selected_indicators) ? item.selected_indicators : [],
+      display_order: Number(item.display_order || 0),
+      last_updated: item.last_updated || '',
+    })),
+    base_indicators: baseItems
+      .filter((item) => item && item.id && item.numeric_value !== null && item.numeric_value !== undefined)
+      .map((item) => ({
+        indicator_code: item.id,
+        indicator_name: item.name,
+        category: item.category || '未分类指标',
+        value: item.value || '--',
+        numeric_value: item.numeric_value,
+        unit: item.unit || '',
+        source_type: item.source_type || '',
+        source_type_label: item.source_type_label || '',
+      })),
+    available_tags: [],
+  };
+}
+
+function kwGetSmartIndicatorCatalog() {
+  if (!kwSmartIndicatorCatalogState) kwSmartIndicatorCatalogState = kwBuildInitialSmartIndicatorCatalog();
+  return kwSmartIndicatorCatalogState;
+}
+
+function kwSetSmartIndicatorCatalog(payload) {
+  const catalog = payload && payload.smart_indicator_catalog ? payload.smart_indicator_catalog : payload;
+  if (!catalog || typeof catalog !== 'object') return;
+  kwSmartIndicatorCatalogState = JSON.parse(JSON.stringify(catalog));
+}
+
+function kwGetActiveDashboardConfig() {
+  return JSON.parse(JSON.stringify((kwFundDashboardState && (kwFundDashboardState.draft || kwFundDashboardState.published)) || { layout: '2x2', cards: [] }));
+}
+
+function kwRenderSmartDashboardLayoutRow() {
+  const host = document.getElementById('kw-smart-dashboard-layout-row');
+  if (!host) return;
+  const active = kwGetActiveDashboardConfig();
+  const currentLayout = active.layout || '2x2';
+  host.innerHTML = ['2x2', '2x3', '4x2', '5x2'].map((layout) => `
+    <button class="btn-outline ${currentLayout === layout ? 'active' : ''}" style="padding:8px 12px;font-size:12px" type="button" onclick="kwSelectSmartDashboardLayout('${layout}')">${layout.toUpperCase()}</button>
+  `).join('');
+}
+
+function kwBuildFallbackSmartTags(catalog) {
+  const tags = [];
+  const seen = new Set();
+  Object.values(WATCHLIST_DETAILS_MAP || {}).forEach((detail) => {
+    const stockCode = String(detail.code || '').toUpperCase();
+    const relatedIds = Array.isArray(detail.related_indicator_ids) ? detail.related_indicator_ids : [];
+    const relatedNames = Array.isArray(detail.related_indicator_names) ? detail.related_indicator_names : [];
+    if (!stockCode || !relatedIds.length) return;
+    const tagCode = `watchlist:${stockCode}`;
+    if (seen.has(tagCode)) return;
+    seen.add(tagCode);
+    tags.push({
+      tag_code: tagCode,
+      label: detail.name || stockCode,
+      tag_type: 'watchlist',
+      category: detail.industry || '自选股',
+      subtitle: '自选股标签',
+      selected_indicators: relatedIds.map((indicatorCode, index) => ({
+        indicator_code: indicatorCode,
+        indicator_name: relatedNames[index] || indicatorCode,
+      })),
+    });
+  });
+  (catalog.base_indicators || []).forEach((item) => {
+    const indicatorCode = String(item.indicator_code || '').trim();
+    if (!indicatorCode) return;
+    const tagCode = `indicator:${indicatorCode}`;
+    if (seen.has(tagCode)) return;
+    seen.add(tagCode);
+    tags.push({
+      tag_code: tagCode,
+      label: item.indicator_name || indicatorCode,
+      tag_type: 'indicator',
+      category: item.category || '指标',
+      subtitle: item.source_type_label || '基础指标',
+      selected_indicators: [{ indicator_code: indicatorCode, indicator_name: item.indicator_name || indicatorCode }],
+    });
+  });
+  return tags;
+}
+
+function kwGetSmartTagCatalog() {
+  const catalog = kwGetSmartIndicatorCatalog();
+  if (Array.isArray(catalog.available_tags) && catalog.available_tags.length) return catalog.available_tags;
+  return kwBuildFallbackSmartTags(catalog);
+}
+
+function kwRenderSmartIndicatorLibrary() {
+  const host = document.getElementById('kw-smart-indicator-library');
+  if (!host) return;
+  const items = (kwGetSmartIndicatorCatalog().tenant_smart_indicators || []);
+  if (!items.length) {
+    host.innerHTML = '<div class="kw-dashboard-panel-note">当前租户还没有已保存的智能指标。</div>';
+    return;
+  }
+  host.innerHTML = items.map((item) => `
+    <div class="kw-dashboard-strategy-card">
+      <div class="kw-dashboard-strategy-title">${escapeHtml(item.indicator_name || '未命名指标')}</div>
+      <div class="kw-dashboard-strategy-desc">${escapeHtml(item.interpretation || item.assessment || '暂无说明')}</div>
+      <div class="kw-dashboard-strategy-meta">分类：${escapeHtml(item.category || '--')} · 当前值：${escapeHtml(`${item.value || '--'}${item.unit || ''}`)} · 关联计算对象：${escapeHtml((item.selected_indicators || []).map((source) => source.indicator_name || source.indicator_code).join(' / ') || '未选择')}</div>
+      <div class="kw-dashboard-component-actions" style="margin-top:12px">
+        <button type="button" onclick="kwOpenSmartIndicatorLibraryDetail('${item.indicator_code}')">查看详情</button>
+        <button type="button" onclick="kwAddExistingIndicatorToDraft('${item.indicator_code}')">加入草稿</button>
+        <button type="button" onclick="kwDeleteSmartIndicator('${item.indicator_code}')">删除</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function kwRenderSmartDashboardPreviewCards(cards) {
+  const active = kwGetActiveDashboardConfig();
+  const layout = active.layout || '2x2';
+  const target = kwGetDashboardCardTarget(layout);
+  const list = Array.isArray(cards) ? cards : [];
+  const slots = Array.from({ length: target }, (_, index) => {
+    const raw = typeof list[index] === 'object' ? list[index] : {};
+    return raw && !raw.isEmpty && (raw.indicatorCode || raw.indicator_code || raw.name || raw.prompt) ? raw : { isEmpty: true };
+  });
+  return `<div class="kw-dashboard-public-list" style="grid-template-columns:repeat(${Math.max(2, Number(String(layout).split('x')[0] || 2))}, minmax(0, 1fr))">${slots.map((item, index) => item && !item.isEmpty ? `
+    <div class="kw-dashboard-public-card" onclick="kwOpenSmartIndicatorDetail(${index})" style="cursor:pointer">
+      <div class="kw-dashboard-public-title">${escapeHtml(item.name || `智能指标 ${index + 1}`)}</div>
+      <div class="kw-dashboard-public-copy">${escapeHtml(item.interpretation || item.assessment || '当前按自定义公式计算。')}</div>
+      <div class="kw-dashboard-public-value">${escapeHtml(`${item.value || '--'}${item.unit || ''}`)}</div>
+      <div class="kw-dashboard-public-meta">更新时间：${escapeHtml(item.updatedAt || '未记录')}</div>
+      <div class="kw-dashboard-component-actions" style="margin-top:10px">
+        <button type="button" onclick="event.stopPropagation();kwRemoveSmartDashboardCard(${index})">移出草稿</button>
+      </div>
+    </div>
+  ` : `
+    <div class="kw-dashboard-public-card" onclick="kwOpenSmartIndicatorEditor(${index})" style="cursor:pointer;display:flex;align-items:center;justify-content:center;border-style:dashed">
+      <div style="text-align:center">
+        <div class="kw-dashboard-public-value" style="margin-top:0">+</div>
+        <div class="kw-dashboard-public-copy">点击新增智能指标</div>
+      </div>
+    </div>
+  `).join('')}</div>`;
+}
+
+async function kwSelectSmartDashboardLayout(layout) {
+  const draft = kwGetActiveDashboardConfig();
+  draft.layout = layout;
+  await kwSyncFundDashboard('save_draft', draft, `已切换为 ${layout.toUpperCase()} 布局草稿`);
+}
+
+function kwOpenSmartIndicatorEditor(slotIndex) {
+  kwSmartIndicatorDraft = {
+    slotIndex,
+    indicatorName: '',
+    promptText: '',
+    category: '',
+    unit: '',
+    selectedTagCodes: [],
+    preview: null,
+  };
+  kwRenderSmartIndicatorEditorModal();
+}
+
+function kwToggleSmartTag(tagCode) {
+  kwSmartIndicatorDraft.selectedTagCodes = kwSmartIndicatorDraft.selectedTagCodes.includes(tagCode)
+    ? kwSmartIndicatorDraft.selectedTagCodes.filter((code) => code !== tagCode)
+    : kwSmartIndicatorDraft.selectedTagCodes.concat(tagCode);
+  kwSmartIndicatorDraft.preview = null;
+  kwRenderSmartIndicatorEditorModal();
+}
+
+function kwCloseSmartIndicatorEditor() {
+  const modal = document.getElementById('kw-dashboard-cell-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function kwRenderSmartIndicatorEditorModal() {
+  const host = document.getElementById('kw-dashboard-cell-modal-content');
+  const modal = document.getElementById('kw-dashboard-cell-modal');
+  if (!host || !modal) return;
+  const tagCatalog = kwGetSmartTagCatalog();
+  const selectedTagSet = new Set(kwSmartIndicatorDraft.selectedTagCodes);
+  const selectedTags = tagCatalog.filter((tag) => selectedTagSet.has(tag.tag_code));
+  const preview = kwSmartIndicatorDraft.preview;
+  host.innerHTML = `
+    <div class="kw-review-modal-title">新增智能指标</div>
+    <div class="kw-dashboard-panel-note" style="margin-top:8px">先选标签，再写提示词。系统先生成临时结果预览，确认后才正式保存入库。</div>
+    <div class="kw-dashboard-cell-modal-grid">
+      <div class="kw-dashboard-cell-block">
+        <div class="kw-dashboard-section-title">指标名称</div>
+        <input id="kw-smart-indicator-draft-name" class="kw-dashboard-input" placeholder="可选，不填则系统自动命名" value="${escapeHtml(kwSmartIndicatorDraft.indicatorName || '')}">
+      </div>
+      <div class="kw-dashboard-cell-block">
+        <div class="kw-dashboard-section-title">提示词</div>
+        <textarea id="kw-smart-indicator-draft-prompt" class="kw-knowledge-modal-textarea" placeholder="例如：【上证50指数】*80/100，或者【上证50】/ 纳斯达克指数">${escapeHtml(kwSmartIndicatorDraft.promptText || '')}</textarea>
+      </div>
+      <div class="kw-dashboard-cell-block">
+        <div class="kw-dashboard-section-title">已选标签</div>
+        <div class="kw-dashboard-chip-row" style="margin-top:10px">
+          ${selectedTags.map((tag) => `<button class="kw-dashboard-chip active" type="button" onclick="kwToggleSmartTag('${escapeHtml(tag.tag_code)}')">${escapeHtml(tag.label)}</button>`).join('') || '<span class="kw-dashboard-chip">请至少选择一个标签</span>'}
+        </div>
+      </div>
+      <div class="kw-dashboard-cell-block">
+        <div class="kw-dashboard-section-title">标签池</div>
+        <div class="kw-dashboard-chip-row" style="margin-top:10px">
+          ${tagCatalog.map((tag) => `<button class="kw-dashboard-chip ${selectedTagSet.has(tag.tag_code) ? 'active' : ''}" type="button" onclick="kwToggleSmartTag('${escapeHtml(tag.tag_code)}')">${escapeHtml(tag.label)}</button>`).join('')}
+        </div>
+      </div>
+      ${preview ? `
+      <div class="kw-dashboard-cell-block">
+        <div class="kw-dashboard-section-title">生成结果预览</div>
+        <div class="kw-dashboard-panel-note">名称：${escapeHtml(preview.indicator_name || '智能指标')}</div>
+        <div class="kw-dashboard-public-value" style="margin-top:8px">${escapeHtml(`${preview.value || '--'}${preview.unit || ''}`)}</div>
+        <div class="kw-dashboard-panel-note" style="margin-top:8px">算法详情：${escapeHtml(preview.algorithm_detail || '暂无算法详情')}</div>
+        <div class="kw-dashboard-panel-note" style="margin-top:8px">解读：${escapeHtml(preview.interpretation || preview.assessment || '暂无解读')}</div>
+      </div>
+      ` : ''}
+      <div class="modal-actions">
+        <button class="btn-outline" type="button" onclick="kwCloseSmartIndicatorEditor()">取消</button>
+        <button class="btn-outline" type="button" onclick="kwPreviewSmartIndicator()">生成预览</button>
+        ${preview ? '<button class="btn-gold" type="button" onclick="kwConfirmSmartIndicator()">确认展示</button>' : ''}
+      </div>
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+async function kwPreviewSmartIndicator() {
+  const nameInput = document.getElementById('kw-smart-indicator-draft-name');
+  const promptInput = document.getElementById('kw-smart-indicator-draft-prompt');
+  kwSmartIndicatorDraft.indicatorName = nameInput ? nameInput.value.trim() : '';
+  kwSmartIndicatorDraft.promptText = promptInput ? promptInput.value.trim() : '';
+  const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
+  if (!kwSmartIndicatorDraft.promptText) {
+    showToast('请先填写提示词');
+    return;
+  }
+  if (!kwSmartIndicatorDraft.selectedTagCodes.length) {
+    showToast('请先至少选择一个标签');
+    return;
+  }
+  try {
+    const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'preview',
+        indicator_name: kwSmartIndicatorDraft.indicatorName,
+        prompt_text: kwSmartIndicatorDraft.promptText,
+        selected_tag_codes: kwSmartIndicatorDraft.selectedTagCodes,
+      }),
+    });
+    const payload = await resp.json();
+    if (!resp.ok || !payload.success) throw new Error(payload.error || 'smart_indicator_preview_failed');
+    kwSetSmartIndicatorCatalog(payload.smart_indicator_catalog);
+    kwSmartIndicatorDraft.preview = payload.preview || null;
+    if (kwSmartIndicatorDraft.preview && kwSmartIndicatorDraft.preview.indicator_name) {
+      kwSmartIndicatorDraft.indicatorName = kwSmartIndicatorDraft.preview.indicator_name;
+    }
+    kwRenderSmartIndicatorEditorModal();
+  } catch (error) {
+    showToast(error.message || '预览生成失败');
+  }
+}
+
+async function kwConfirmSmartIndicator() {
+  const preview = kwSmartIndicatorDraft.preview;
+  if (!preview) {
+    showToast('请先生成预览');
+    return;
+  }
+  const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
+  const active = kwGetActiveDashboardConfig();
+  const layout = active.layout || '2x2';
+  const target = kwGetDashboardCardTarget(layout);
+  try {
+    const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'save',
+        indicator_name: preview.indicator_name || kwSmartIndicatorDraft.indicatorName,
+        prompt_text: preview.prompt_text || kwSmartIndicatorDraft.promptText,
+        category: preview.category || '',
+        unit: preview.unit || '',
+        selected_indicators: preview.selected_indicators || [],
+        formula_js: preview.formula_js || '',
+        add_to_dashboard: false,
+      }),
+    });
+    const payload = await resp.json();
+    if (!resp.ok || !payload.success) throw new Error(payload.error || 'smart_indicator_save_failed');
+    kwSetSmartIndicatorCatalog(payload.smart_indicator_catalog);
+    const nextCards = Array.from({ length: target }, (_, index) => {
+      const raw = Array.isArray(active.cards) && typeof active.cards[index] === 'object' ? active.cards[index] : {};
+      const indicatorCode = raw && (raw.indicatorCode || raw.indicator_code) ? (raw.indicatorCode || raw.indicator_code) : '';
+      return indicatorCode ? { indicatorCode } : {};
+    });
+    nextCards[kwSmartIndicatorDraft.slotIndex] = { indicatorCode: ((payload.definition || {}).indicator_code) || '' };
+    const nextDashboard = {
+      ...active,
+      layout,
+      cards: nextCards,
+    };
+    await kwSyncFundDashboard('save_draft', nextDashboard, '智能指标已加入 Dashboard 草稿');
+    kwSmartIndicatorEditingCode = ((payload.definition || {}).indicator_code) || '';
+    kwSmartIndicatorSelectedCodes = ((preview.selected_indicators || []).map((item) => item.indicator_code)).filter(Boolean);
+    kwCloseSmartIndicatorEditor();
+  } catch (error) {
+    showToast(error.message || '智能指标保存失败');
+  }
+}
+
+function kwFindSmartIndicatorCatalogItem(indicatorCode) {
+  return (kwGetSmartIndicatorCatalog().tenant_smart_indicators || []).find((entry) => entry.indicator_code === indicatorCode);
+}
+
+function kwOpenSmartIndicatorLibraryDetail(indicatorCode) {
+  const item = kwFindSmartIndicatorCatalogItem(indicatorCode);
+  if (!item) return;
+  kwOpenSmartIndicatorDetailModal({
+    indicatorCode: item.indicator_code,
+    name: item.indicator_name,
+    value: item.value || '--',
+    unit: item.unit || '',
+    prompt: item.prompt_text || '',
+    updatedAt: item.last_updated || '',
+    algorithmDetail: item.algorithm_detail || '',
+    interpretation: item.interpretation || item.assessment || '',
+    selectedIndicators: item.selected_indicators || [],
+    category: item.category || '',
+  });
+}
+
+function kwOpenSmartIndicatorDetail(index) {
+  const active = kwGetActiveDashboardConfig();
+  const cards = Array.isArray(active.cards) ? active.cards : [];
+  const item = cards[index];
+  if (!item) return;
+  const catalogItem = kwFindSmartIndicatorCatalogItem(item.indicatorCode || item.indicator_code || '');
+  kwOpenSmartIndicatorDetailModal({
+    indicatorCode: item.indicatorCode || item.indicator_code || '',
+    name: item.name,
+    value: item.value || '--',
+    unit: item.unit || '',
+    prompt: item.prompt || '',
+    updatedAt: item.updatedAt || active.updatedAt || '',
+    algorithmDetail: item.algorithmDetail || (catalogItem && catalogItem.algorithm_detail) || '',
+    interpretation: item.interpretation || item.assessment || (catalogItem && (catalogItem.interpretation || catalogItem.assessment)) || '',
+    selectedIndicators: item.selectedIndicators || (catalogItem && catalogItem.selected_indicators) || [],
+    category: (catalogItem && catalogItem.category) || '',
+  });
+}
+
+function kwOpenSmartIndicatorDetailModal(card) {
+  const host = document.getElementById('kw-dashboard-cell-modal-content');
+  const modal = document.getElementById('kw-dashboard-cell-modal');
+  if (!host || !modal || !card) return;
+  const selectedIndicators = Array.isArray(card.selectedIndicators) ? card.selectedIndicators : [];
+  host.innerHTML = `
+    <div class="kw-review-modal-title">${escapeHtml(card.name || '智能指标详情')}</div>
+    <div class="kw-dashboard-cell-modal-grid">
+      <div class="kw-dashboard-cell-summary">
+        <div class="kw-dashboard-cell-summary-title">当前结果</div>
+        <div class="kw-dashboard-public-value" style="margin-top:8px">${escapeHtml(`${card.value || '--'}${card.unit || ''}`)}</div>
+        <div class="kw-dashboard-panel-note" style="margin-top:8px">更新时间：${escapeHtml(card.updatedAt || '未记录')}</div>
+      </div>
+      <div class="kw-dashboard-cell-block">
+        <div class="kw-dashboard-section-title">算法详情</div>
+        <div class="kw-dashboard-panel-note">${escapeHtml(card.algorithmDetail || '暂无算法详情')}</div>
+        <div class="kw-dashboard-chip-row" style="margin-top:10px">
+          ${selectedIndicators.map((item) => `<span class="kw-dashboard-chip">${escapeHtml(item.indicator_name || item.indicator_code || '')}</span>`).join('') || '<span class="kw-dashboard-chip">未选择计算对象</span>'}
+        </div>
+      </div>
+      <div class="kw-dashboard-cell-block">
+        <div class="kw-dashboard-section-title">解读</div>
+        <div class="kw-dashboard-panel-note">${escapeHtml(card.interpretation || '暂无解读')}</div>
+      </div>
+      <div class="kw-dashboard-cell-block">
+        <div class="kw-dashboard-section-title">提示词</div>
+        <textarea id="kw-smart-indicator-detail-prompt" class="kw-knowledge-modal-textarea" ${card.indicatorCode ? '' : 'disabled'}>${escapeHtml(card.prompt || '')}</textarea>
+        <div class="kw-dashboard-panel-note" style="margin-top:8px">系统会根据提示词自动更新内部计算逻辑，不向用户展示实现细节。</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-outline" type="button" onclick="kwCloseSmartIndicatorDetailModal()">关闭</button>
+        ${card.indicatorCode ? `<button class="btn-gold" type="button" onclick="kwSaveSmartIndicatorPromptFromDetail('${escapeHtml(card.indicatorCode)}')">保存并更新指标</button>` : ''}
+      </div>
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+function kwCloseSmartIndicatorDetailModal() {
+  const modal = document.getElementById('kw-dashboard-cell-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+async function kwSaveSmartIndicatorPromptFromDetail(indicatorCode) {
+  const item = kwFindSmartIndicatorCatalogItem(indicatorCode);
+  const promptInput = document.getElementById('kw-smart-indicator-detail-prompt');
+  const promptText = promptInput ? promptInput.value.trim() : '';
+  const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
+  const active = kwGetActiveDashboardConfig();
+  if (!item || !promptText) {
+    showToast('请先填写提示词');
+    return;
+  }
+  try {
+    const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'save',
+        indicator_code: item.indicator_code,
+        indicator_name: item.indicator_name,
+        category: item.category || '',
+        unit: item.unit || '',
+        prompt_text: promptText,
+        selected_indicator_codes: (item.selected_indicators || []).map((source) => source.indicator_code).filter(Boolean),
+        add_to_dashboard: false,
+      }),
+    });
+    const payload = await resp.json();
+    if (!resp.ok || !payload.success) throw new Error(payload.error || 'smart_indicator_update_failed');
+    kwSetSmartIndicatorCatalog(payload.smart_indicator_catalog);
+    kwFundDashboardState = JSON.parse(JSON.stringify(payload.fund_dashboard_state || kwFundDashboardState || {}));
+    if (window.WORKBENCH_DATA) {
+      window.WORKBENCH_DATA.fund_dashboard_state = JSON.parse(JSON.stringify(kwFundDashboardState || {}));
+      window.WORKBENCH_DATA.fund_dashboard = JSON.parse(JSON.stringify((payload.dashboard || {}).fund_dashboard || {}));
+    }
+    kwCloseSmartIndicatorDetailModal();
+    kwRenderDashboardPreview();
+    showToast('提示词已更新，指标结果已重算');
+  } catch (error) {
+    showToast(error.message || '指标更新失败');
+  }
+}
+
+async function kwSaveSmartIndicator() {
+  showToast('请点击 Dashboard 空位上的加号创建智能指标');
+}
+
+async function kwAddExistingIndicatorToDraft(indicatorCode) {
+  const active = kwGetActiveDashboardConfig();
+  const nextCards = (Array.isArray(active.cards) ? active.cards : [])
+    .map((item) => ({ indicatorCode: item.indicatorCode || item.indicator_code || '' }))
+    .filter((item) => item.indicatorCode);
+  if (!nextCards.some((item) => item.indicatorCode === indicatorCode)) nextCards.push({ indicatorCode });
+  active.cards = nextCards;
+  await kwSyncFundDashboard('save_draft', active, '已加入 Dashboard 草稿');
+}
+
+async function kwRemoveSmartDashboardCard(index) {
+  const active = kwGetActiveDashboardConfig();
+  const target = kwGetDashboardCardTarget(active.layout || '2x2');
+  const nextCards = Array.from({ length: target }, (_, slotIndex) => {
+    const raw = Array.isArray(active.cards) && typeof active.cards[slotIndex] === 'object' ? active.cards[slotIndex] : {};
+    if (slotIndex === index) return {};
+    const indicatorCode = raw && (raw.indicatorCode || raw.indicator_code) ? (raw.indicatorCode || raw.indicator_code) : '';
+    return indicatorCode ? { indicatorCode } : {};
+  });
+  active.cards = nextCards;
+  await kwSyncFundDashboard('save_draft', active, '已从草稿移除');
+}
+
+async function kwDeleteSmartIndicator(indicatorCode) {
+  const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
+  if (!window.confirm('确认删除这个智能指标吗？这会同时把它从当前 Dashboard 草稿中移除。')) return;
+  try {
+    const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', indicator_code: indicatorCode }),
+    });
+    const payload = await resp.json();
+    if (!resp.ok || !payload.success) throw new Error(payload.error || 'smart_indicator_delete_failed');
+    kwSetSmartIndicatorCatalog(payload.smart_indicator_catalog);
+    kwFundDashboardState = JSON.parse(JSON.stringify((payload.dashboard || {}).fund_dashboard_state || kwFundDashboardState || {}));
+    kwRenderDashboardPreview();
+    showToast('智能指标已删除');
+  } catch (error) {
+    showToast(error.message || '智能指标删除失败');
+  }
+}
+
+function kwRenderDashboardPreview() {
+  const previewHost = document.getElementById('kw-dashboard-preview');
+  const metaHost = document.getElementById('kw-dashboard-meta');
+  const tag = document.getElementById('kw-dashboard-layout-tag');
+  if (!previewHost || !metaHost) return;
+  kwRenderSmartDashboardLayoutRow();
+  kwRenderSmartIndicatorLibrary();
+  const active = kwGetActiveDashboardConfig();
+  const cards = Array.isArray(active.cards) ? active.cards : [];
+  const filledCount = cards.filter((item) => item && !item.isEmpty && (item.indicatorCode || item.indicator_code || item.name || item.prompt)).length;
+  metaHost.textContent = kwFundDashboardState && kwFundDashboardState.draft
+    ? `当前是草稿版 · ${filledCount} 个智能指标 · ${active.layout || '2x2'}`
+    : `当前展示已发布版本 · ${filledCount} 个智能指标`;
+  if (tag) tag.textContent = (active.layout || '2x2').toUpperCase();
+  previewHost.innerHTML = kwRenderSmartDashboardPreviewCards(cards);
+}
+
+async function kwPublishFundDashboard() {
+  const draft = kwFundDashboardState && kwFundDashboardState.draft;
+  if (!draft) {
+    showToast('请先至少生成一个智能指标草稿');
+    return;
+  }
+  await kwSyncFundDashboard('publish', draft, '已发布到前台 H5 和租户门户');
+}
+
+async function kwResetFundDashboardDraft() {
+  await kwSyncFundDashboard('reset_draft', null, '已恢复到当前发布版');
 }
 
 document.addEventListener('DOMContentLoaded', () => {

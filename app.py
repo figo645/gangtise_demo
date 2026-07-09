@@ -114,6 +114,7 @@ MARKET_DASHBOARD_CACHE_DB_PATH = Path(
 INDICATOR_DEFINITION_FIELDS = {
     "indicator_code",
     "indicator_name",
+    "tenant_slug",
     "category",
     "description",
     "unit",
@@ -124,6 +125,10 @@ INDICATOR_DEFINITION_FIELDS = {
     "status_hint",
     "assessment_template",
     "alert_template",
+    "prompt_text",
+    "formula_js",
+    "selected_indicators_json",
+    "display_order",
     "watchers_json",
     "display_config_json",
     "enabled",
@@ -2028,9 +2033,9 @@ def get_dashboard_card_target(layout):
     layout_key = str(layout or "").strip().lower()
     if layout_key in {"3x3", "2x3"}:
         return 6
-    if layout_key in {"4x4", "2x4"}:
+    if layout_key in {"4x4", "2x4", "4x2"}:
         return 8
-    if layout_key == "2x5":
+    if layout_key in {"2x5", "5x2"}:
         return 10
     return 4
 
@@ -2040,8 +2045,12 @@ def normalize_dashboard_layout(layout):
     if layout_key == "3x3":
         return "2x3"
     if layout_key == "4x4":
-        return "2x4"
-    if layout_key in {"2x2", "2x3", "2x4", "2x5"}:
+        return "4x2"
+    if layout_key == "2x4":
+        return "4x2"
+    if layout_key == "2x5":
+        return "5x2"
+    if layout_key in {"2x2", "2x3", "4x2", "5x2"}:
         return layout_key
     return "2x2"
 
@@ -2193,106 +2202,377 @@ def infer_dashboard_card_mode(source, fallback="market"):
     return normalize_dashboard_mode(fallback)
 
 
-def build_default_fund_dashboard_cards(tenant, layout="2x2"):
-    target_count = get_dashboard_card_target(layout)
-    seeds = build_indicator_dashboard_seed_cards(tenant, count=target_count)
-    cards = []
-    for index in range(target_count):
-        seed = seeds[index] if index < len(seeds) else {}
-        cards.append(
+def ensure_dashboard_layout_for_card_count(card_count):
+    count = max(0, int(card_count or 0))
+    if count > 8:
+        return "5x2"
+    if count > 6:
+        return "4x2"
+    if count > 4:
+        return "2x3"
+    return "2x2"
+
+
+def build_smart_indicator_algorithm_detail(prompt_text, selected_indicators):
+    selected_items = normalize_selected_indicator_refs(selected_indicators)
+    source_names = [item.get("indicator_name") or item.get("indicator_code") for item in selected_items]
+    source_text = " / ".join(source_names) if source_names else "未选择底层指标"
+    prompt_value = str(prompt_text or "").strip() or "未填写提示词"
+    return f"引用指标：{source_text}。计算口径：{prompt_value}。系统会根据这段提示词自动生成内部公式，并按最新底层指标值实时计算结果。"
+
+
+def build_smart_indicator_interpretation(indicator_name, prompt_text, selected_indicators, current_value, unit=""):
+    name = str(indicator_name or "该智能指标").strip() or "该智能指标"
+    prompt_value = str(prompt_text or "").strip() or "当前提示词"
+    value_text = str(current_value or "--").strip() or "--"
+    unit_text = str(unit or "").strip()
+    display_value = f"{value_text}{unit_text}" if unit_text else value_text
+    selected_items = normalize_selected_indicator_refs(selected_indicators)
+    source_names = [item.get("indicator_name") or item.get("indicator_code") for item in selected_items]
+    if source_names:
+        return f"{name} 当前值为 {display_value}，由 {' / '.join(source_names)} 按“{prompt_value}”口径计算，适合用来看相对强弱和阶段变化。"
+    return f"{name} 当前值为 {display_value}，系统会按“{prompt_value}”这条口径持续更新结果。"
+
+
+def build_dashboard_base_indicator_options(tenant=None):
+    hub = build_indicator_hub(tenant=tenant, admin_view=False)
+    options = []
+    for item in (hub.get("items") or []):
+        numeric_value = item.get("numeric_value")
+        if numeric_value is None:
+            continue
+        options.append(
             {
-                "name": str(seed.get("name") or f"核心指标 {index + 1}").strip() or f"核心指标 {index + 1}",
-                "value": str(seed.get("value") or "待跟踪").strip() or "待跟踪",
-                "assessment": str(seed.get("assessment") or "继续观察").strip() or "继续观察",
-                "status": str(seed.get("status") or "attention").strip() or "attention",
-                "alert": str(seed.get("alert") or "").strip(),
-                "hint": str(seed.get("hint") or seed.get("assessment") or "").strip(),
-                "prompt": str(
-                    seed.get("prompt")
-                    or f"围绕 {seed.get('name') or f'核心指标 {index + 1}'} 生成适合普通投资者看的核心指标卡，说明当前状态、风险提醒和后续跟踪点。"
-                ).strip(),
-                "components": build_default_dashboard_components(infer_dashboard_card_mode(seed, fallback="market")),
-                "formula": build_dashboard_formula_text(infer_dashboard_card_mode(seed, fallback="market"), build_default_dashboard_components(infer_dashboard_card_mode(seed, fallback="market"))),
-                "sources": build_dashboard_sources_summary(infer_dashboard_card_mode(seed, fallback="market"), build_default_dashboard_components(infer_dashboard_card_mode(seed, fallback="market"))),
-                "isEmpty": False,
+                "indicator_code": item.get("id"),
+                "indicator_name": item.get("name"),
+                "category": item.get("category") or "未分类指标",
+                "value": item.get("value") or "--",
+                "numeric_value": numeric_value,
+                "unit": item.get("unit") or "",
+                "source_type": item.get("source_type") or "",
+                "source_type_label": item.get("source_type_label") or "",
             }
         )
+    return options
+
+
+def build_tenant_smart_indicator_tag_catalog(tenant=None):
+    base_indicators = build_dashboard_base_indicator_options(tenant)
+    watchlist_details = gen_watchlist_details()
+    tags = []
+    seen = set()
+    for item in base_indicators:
+        indicator_code = str(item.get("indicator_code") or "").strip()
+        if not indicator_code:
+            continue
+        tag_code = f"indicator:{indicator_code}"
+        seen.add(tag_code)
+        tags.append(
+            {
+                "tag_code": tag_code,
+                "label": item.get("indicator_name") or indicator_code,
+                "tag_type": "indicator",
+                "category": item.get("category") or "指标",
+                "subtitle": item.get("source_type_label") or item.get("source_type") or "基础指标",
+                "value": item.get("value") or "--",
+                "unit": item.get("unit") or "",
+                "selected_indicators": [
+                    {
+                        "indicator_code": indicator_code,
+                        "indicator_name": item.get("indicator_name") or indicator_code,
+                    }
+                ],
+            }
+        )
+    for detail in watchlist_details.values():
+        stock_code = str(detail.get("code") or "").strip().upper()
+        stock_name = str(detail.get("name") or stock_code).strip() or stock_code
+        related_ids = detail.get("related_indicator_ids") if isinstance(detail.get("related_indicator_ids"), list) else []
+        related_names = detail.get("related_indicator_names") if isinstance(detail.get("related_indicator_names"), list) else []
+        selected_indicators = normalize_selected_indicator_refs(
+            [
+                {
+                    "indicator_code": indicator_code,
+                    "indicator_name": related_names[index] if index < len(related_names) else indicator_code,
+                }
+                for index, indicator_code in enumerate(related_ids)
+                if indicator_code
+            ]
+        )
+        if not selected_indicators:
+            continue
+        tag_code = f"watchlist:{stock_code}"
+        if tag_code in seen:
+            continue
+        seen.add(tag_code)
+        tags.append(
+            {
+                "tag_code": tag_code,
+                "label": stock_name,
+                "tag_type": "watchlist",
+                "category": detail.get("industry") or "自选股",
+                "subtitle": "自选股标签",
+                "value": f"{detail.get('price', '--')}",
+                "unit": "",
+                "stock_code": stock_code,
+                "selected_indicators": selected_indicators,
+            }
+        )
+    return tags
+
+
+def normalize_selected_tag_refs(raw_selected_tags):
+    items = raw_selected_tags if isinstance(raw_selected_tags, list) else []
+    normalized = []
+    seen = set()
+    for raw in items:
+        if isinstance(raw, dict):
+            tag_code = str(raw.get("tag_code") or raw.get("code") or "").strip()
+            label = str(raw.get("label") or raw.get("name") or tag_code).strip() or tag_code
+        else:
+            tag_code = str(raw or "").strip()
+            label = tag_code
+        if not tag_code or tag_code in seen:
+            continue
+        seen.add(tag_code)
+        normalized.append({"tag_code": tag_code, "label": label})
+    return normalized
+
+
+def resolve_smart_indicator_selected_refs(tenant, payload):
+    body = payload if isinstance(payload, dict) else {}
+    selected = normalize_selected_indicator_refs(body.get("selected_indicators") or body.get("selected_indicator_codes") or [])
+    tag_catalog = {
+        item.get("tag_code"): item
+        for item in build_tenant_smart_indicator_tag_catalog(tenant)
+        if item.get("tag_code")
+    }
+    for tag in normalize_selected_tag_refs(body.get("selected_tags") or body.get("selected_tag_codes") or []):
+        tag_item = tag_catalog.get(tag["tag_code"])
+        if tag_item:
+            selected.extend(tag_item.get("selected_indicators") or [])
+    selected = normalize_selected_indicator_refs(selected)
+    indicator_name_map = {
+        item.get("id"): item.get("name")
+        for item in (build_indicator_hub(tenant=tenant, admin_view=False).get("items") or [])
+        if item.get("id") and item.get("name")
+    }
+    return [
+        {
+            "indicator_code": item["indicator_code"],
+            "indicator_name": indicator_name_map.get(item["indicator_code"]) or item.get("indicator_name") or item["indicator_code"],
+        }
+        for item in selected
+    ]
+
+
+def derive_smart_indicator_name(prompt_text, selected_indicators):
+    prompt_value = re.sub(r"\s+", " ", str(prompt_text or "").strip())
+    selected_items = normalize_selected_indicator_refs(selected_indicators)
+    source_names = [item.get("indicator_name") or item.get("indicator_code") for item in selected_items]
+    if source_names:
+        if len(source_names) == 1:
+            return f"{source_names[0]}智能指标"
+        return f"{source_names[0]}组合指标"
+    if prompt_value:
+        compact = prompt_value.replace("【", "").replace("】", "").replace(" ", "")
+        compact = compact[:14]
+        return f"{compact}指标" if compact else "智能指标"
+    return "智能指标"
+
+
+def build_tenant_smart_indicator_catalog(tenant=None):
+    hub = build_indicator_hub(tenant=tenant, admin_view=False)
+    items = []
+    for item in (hub.get("smart_items") or []):
+        items.append(
+            {
+                "indicator_code": item.get("id"),
+                "indicator_name": item.get("name"),
+                "tenant_slug": item.get("tenant_slug") or "",
+                "category": item.get("category") or "智能指标",
+                "value": item.get("value") or "--",
+                "numeric_value": item.get("numeric_value"),
+                "unit": item.get("unit") or "",
+                "assessment": item.get("assessment") or "",
+                "status": item.get("status") or "attention",
+                "alert": item.get("alert") or "",
+                "prompt_text": item.get("prompt_text") or "",
+                "formula_js": item.get("formula_js") or "",
+                "algorithm_detail": item.get("description") or build_smart_indicator_algorithm_detail(item.get("prompt_text"), item.get("selected_indicators")),
+                "interpretation": item.get("assessment") or build_smart_indicator_interpretation(item.get("name"), item.get("prompt_text"), item.get("selected_indicators"), item.get("value"), item.get("unit")),
+                "selected_indicators": copy.deepcopy(item.get("selected_indicators") or []),
+                "display_order": int(item.get("display_order") or 0),
+                "last_updated": item.get("last_updated") or "",
+            }
+        )
+    return sorted(items, key=lambda current: (current.get("display_order", 0), current.get("indicator_name") or ""))
+
+
+def build_fund_dashboard_card_from_indicator(indicator_item, index=0):
+    item = indicator_item if isinstance(indicator_item, dict) else {}
+    selected_indicators = normalize_selected_indicator_refs(item.get("selected_indicators"))
+    source_names = [source.get("indicator_name") for source in selected_indicators if source.get("indicator_name")]
+    title = str(item.get("indicator_name") or item.get("name") or f"智能指标 {index + 1}").strip() or f"智能指标 {index + 1}"
+    assessment = str(item.get("assessment") or item.get("alert") or "当前按自定义公式计算。").strip() or "当前按自定义公式计算。"
+    return {
+        "indicatorCode": str(item.get("indicator_code") or item.get("id") or "").strip(),
+        "name": title,
+        "value": str(item.get("value") or "--").strip() or "--",
+        "unit": str(item.get("unit") or "").strip(),
+        "assessment": assessment,
+        "interpretation": str(item.get("interpretation") or assessment).strip() or assessment,
+        "algorithmDetail": str(item.get("algorithm_detail") or item.get("description") or build_smart_indicator_algorithm_detail(item.get("prompt_text"), selected_indicators)).strip(),
+        "status": str(item.get("status") or "attention").strip() or "attention",
+        "alert": str(item.get("alert") or "").strip(),
+        "prompt": str(item.get("prompt_text") or "").strip(),
+        "sources": source_names,
+        "selectedIndicators": selected_indicators,
+        "updatedAt": str(item.get("last_updated") or item.get("updatedAt") or "").strip(),
+        "isEmpty": False,
+    }
+
+
+def build_empty_fund_dashboard_card(index=0):
+    return {
+        "indicatorCode": "",
+        "name": f"待添加智能指标 {index + 1}",
+        "value": "--",
+        "unit": "",
+        "assessment": "点击加号创建新的智能指标。",
+        "interpretation": "",
+        "algorithmDetail": "",
+        "status": "attention",
+        "alert": "",
+        "prompt": "",
+        "sources": [],
+        "selectedIndicators": [],
+        "updatedAt": "",
+        "isEmpty": True,
+    }
+
+
+def build_smart_indicator_preview(tenant_slug, payload):
+    tenant = get_tenant_by_slug(tenant_slug)
+    body = payload if isinstance(payload, dict) else {}
+    selected_indicators = resolve_smart_indicator_selected_refs(tenant, body)
+    if not selected_indicators:
+        raise ValueError("selected_indicators_required")
+    prompt_text = str(body.get("prompt_text") or body.get("prompt") or "").strip()
+    if not prompt_text:
+        raise ValueError("prompt_text_required")
+    indicator_name = str(body.get("indicator_name") or body.get("name") or "").strip() or derive_smart_indicator_name(prompt_text, selected_indicators)
+    category = str(body.get("category") or "大V自定义指标").strip() or "大V自定义指标"
+    unit = str(body.get("unit") or "").strip()
+    generated = generate_smart_indicator_js(indicator_name, prompt_text, selected_indicators, tenant_slug=tenant_slug)
+    latest_map = {
+        row["indicator_code"]: dict(row)
+        for row in get_db().execute("SELECT * FROM indicator_latest_values").fetchall()
+    }
+    try:
+        numeric_value = evaluate_smart_indicator_formula_js(generated["formula_js"], selected_indicators, latest_map)
+        value = f"{numeric_value:.4f}".rstrip("0").rstrip(".")
+    except Exception:
+        numeric_value = None
+        value = "--"
+    algorithm_detail = str(body.get("description") or "").strip() or build_smart_indicator_algorithm_detail(prompt_text, selected_indicators)
+    interpretation = build_smart_indicator_interpretation(indicator_name, prompt_text, selected_indicators, value, unit)
+    return {
+        "indicator_code": "",
+        "indicator_name": indicator_name,
+        "category": category,
+        "value": value,
+        "numeric_value": numeric_value,
+        "unit": unit,
+        "assessment": interpretation,
+        "interpretation": interpretation,
+        "algorithm_detail": algorithm_detail,
+        "prompt_text": prompt_text,
+        "selected_indicators": selected_indicators,
+        "updated_at": now_ts(),
+        "formula_js": generated["formula_js"],
+        "formula_meta": generated,
+    }
+
+
+def build_default_fund_dashboard_cards(tenant, layout="2x2"):
+    target_count = get_dashboard_card_target(layout)
+    smart_items = build_tenant_smart_indicator_catalog(tenant)[:target_count]
+    cards = [build_fund_dashboard_card_from_indicator(item, index=index) for index, item in enumerate(smart_items)]
+    while len(cards) < target_count:
+        cards.append(build_empty_fund_dashboard_card(len(cards)))
     return cards
 
 
 def normalize_fund_dashboard_view(source, tenant):
     defaults = {
-        "mode": "market",
         "layout": "2x2",
-        "title": "今日核心指标面板",
-        "note": "默认展示租户当前发布的核心指标组合，用于先看环境、再看行业、最后看信号个股。",
+        "title": "智能指标 Dashboard",
+        "note": "大V 通过选择底层指标并输入自然语言计算规则生成用户自定义智能指标，再发布到 H5 和 Web Dashboard。",
         "updatedAt": "默认模板",
         "publisher": "系统初始化",
     }
     raw = source if isinstance(source, dict) else {}
-    mode = normalize_dashboard_mode(raw.get("mode") or raw.get("segmentId") or defaults["mode"])
     layout = normalize_dashboard_layout(raw.get("layout") or defaults["layout"])
-    fallback_cards = build_default_fund_dashboard_cards(tenant, layout)
+    hub = build_indicator_hub(tenant=tenant, admin_view=False)
+    indicator_map = {item.get("id"): item for item in (hub.get("smart_items") or []) + (hub.get("lake_items") or []) if item.get("id")}
     raw_cards = raw.get("cards") if isinstance(raw.get("cards"), list) else []
     cards = []
     for index in range(get_dashboard_card_target(layout)):
-        fallback = fallback_cards[index]
         item = raw_cards[index] if index < len(raw_cards) and isinstance(raw_cards[index], dict) else {}
-        card_mode = infer_dashboard_card_mode(item, fallback=mode)
-        prompt = str(item.get("prompt") or fallback["prompt"]).strip()
-        components = normalize_dashboard_components(item.get("components"), card_mode)
-        formula = str(item.get("formula") or build_dashboard_formula_text(card_mode, components)).strip() or build_dashboard_formula_text(card_mode, components)
-        sources = item.get("sources") if isinstance(item.get("sources"), list) else fallback.get("sources")
-        normalized_sources = []
-        for source_name in (sources if isinstance(sources, list) else build_dashboard_sources_summary(card_mode, components)):
-            source_text = str(source_name or "").strip()
-            if source_text and source_text not in normalized_sources:
-                normalized_sources.append(source_text)
-        if not normalized_sources:
-            normalized_sources = build_dashboard_sources_summary(card_mode, components)
-        has_user_content = any(str(item.get(key) or "").strip() for key in ("name", "value", "assessment", "alert", "hint"))
-        cards.append(
-            {
-                "mode": card_mode,
-                "segmentId": card_mode,
-                "name": str(item.get("name") or fallback["name"]).strip() or fallback["name"],
-                "value": str(item.get("value") or fallback["value"]).strip() or fallback["value"],
-                "assessment": str(item.get("assessment") or fallback["assessment"]).strip() or fallback["assessment"],
-                "status": str(item.get("status") or fallback["status"]).strip() or fallback["status"],
-                "alert": str(item.get("alert") or fallback["alert"]).strip(),
-                "hint": str(item.get("hint") or fallback["hint"]).strip() or fallback["hint"],
-                "prompt": prompt,
-                "components": components,
-                "formula": formula,
-                "sources": normalized_sources,
-                "isEmpty": bool(item.get("isEmpty")) and not has_user_content and not prompt,
-            }
-        )
+        indicator_code = slugify_code(item.get("indicatorCode") or item.get("indicator_code"), "")
+        resolved = indicator_map.get(indicator_code) if indicator_code else None
+        if resolved:
+            cards.append(build_fund_dashboard_card_from_indicator(resolved, index=index))
+            continue
+        legacy_name = str(item.get("name") or "").strip()
+        if legacy_name:
+            cards.append(
+                {
+                    "indicatorCode": "",
+                    "name": legacy_name,
+                    "value": str(item.get("value") or "--").strip() or "--",
+                    "unit": str(item.get("unit") or "").strip(),
+                    "assessment": str(item.get("assessment") or item.get("hint") or "当前为历史配置，请改用智能指标方式重新生成。").strip(),
+                    "interpretation": str(item.get("interpretation") or item.get("assessment") or item.get("hint") or "").strip(),
+                    "status": str(item.get("status") or "attention").strip() or "attention",
+                    "alert": str(item.get("alert") or "").strip(),
+                    "prompt": str(item.get("prompt") or "").strip(),
+                    "algorithmDetail": str(item.get("algorithmDetail") or "当前为历史配置，请改用智能指标方式重新生成。").strip(),
+                    "sources": [str(source_name).strip() for source_name in (item.get("sources") or []) if str(source_name).strip()],
+                    "selectedIndicators": normalize_selected_indicator_refs(item.get("selectedIndicators") or []),
+                    "updatedAt": str(item.get("updatedAt") or raw.get("updatedAt") or "").strip(),
+                    "isEmpty": False,
+                }
+            )
+            continue
+        cards.append(build_empty_fund_dashboard_card(index))
     title = str(raw.get("title") or defaults["title"]).strip() or defaults["title"]
     note = str(raw.get("note") or defaults["note"]).strip() or defaults["note"]
     updated_at = str(raw.get("updatedAt") or defaults["updatedAt"]).strip() or defaults["updatedAt"]
     publisher = str(raw.get("publisher") or defaults["publisher"]).strip() or defaults["publisher"]
-    summary = note
+    active_cards = [card for card in cards if not card.get("isEmpty")]
+    summary = note if active_cards else "当前还没有已发布的智能指标，请先在大V工作台创建并发布。"
     cells = [
         {
-            "mode": card.get("mode") or mode,
-            "segmentId": card.get("segmentId") or card.get("mode") or mode,
+            "indicatorCode": card.get("indicatorCode") or "",
             "title": card["name"] or f"核心指标 {index + 1}",
             "value": card["value"],
+            "unit": card.get("unit") or "",
             "prompt": card["prompt"],
             "assessment": card["assessment"],
+            "interpretation": card.get("interpretation") or card["assessment"],
+            "algorithmDetail": card.get("algorithmDetail") or "",
             "status": card["status"],
             "alert": card["alert"],
-            "hint": card["hint"],
-            "components": copy.deepcopy(card.get("components") or []),
-            "formula": str(card.get("formula") or "").strip(),
             "sources": copy.deepcopy(card.get("sources") or []),
+            "selectedIndicators": copy.deepcopy(card.get("selectedIndicators") or []),
+            "updatedAt": str(card.get("updatedAt") or updated_at).strip(),
+            "isEmpty": bool(card.get("isEmpty")),
         }
         for index, card in enumerate(cards)
     ]
     return {
-        "mode": mode,
-        "segmentId": mode,
         "layout": layout,
         "title": title,
         "note": note,
@@ -2307,10 +2587,9 @@ def normalize_fund_dashboard_view(source, tenant):
 def default_tenant_fund_dashboard_state(tenant):
     published = normalize_fund_dashboard_view(
         {
-            "mode": "market",
             "layout": "2x2",
-            "title": "今日核心指标面板",
-            "note": "默认展示租户当前发布的核心指标组合，用于先看环境、再看行业、最后看信号个股。",
+            "title": "智能指标 Dashboard",
+            "note": "大V 通过选择底层指标并输入自然语言计算规则生成智能指标，并发布到 H5 / Web Dashboard。",
             "updatedAt": "默认模板",
             "publisher": "系统初始化",
         },
@@ -2369,6 +2648,209 @@ def update_tenant_fund_dashboard_config(tenant_slug, action, dashboard=None):
     next_config = dict(site_config)
     next_config["tenants"] = tenants
     return save_site_config(next_config)
+
+
+def save_smart_indicator_latest_snapshot(definition):
+    normalized = definition if isinstance(definition, dict) else {}
+    selected_indicators = normalize_selected_indicator_refs(normalized.get("selected_indicators"))
+    if not selected_indicators:
+        return None
+    db = get_db()
+    latest_map = {
+        row["indicator_code"]: dict(row)
+        for row in db.execute("SELECT * FROM indicator_latest_values").fetchall()
+    }
+    value = evaluate_smart_indicator_formula_js(normalized.get("formula_js"), selected_indicators, latest_map)
+    timestamp = now_ts()
+    assessment = build_smart_indicator_interpretation(
+        normalized.get("indicator_name"),
+        normalized.get("prompt_text"),
+        selected_indicators,
+        f"{value:.4f}".rstrip("0").rstrip("."),
+        normalized.get("unit"),
+    )
+    alert = normalized.get("alert_template") or "如需修改计算口径，请在大V工作台重新编辑智能指标。"
+    latest_status = normalized.get("status_hint") or "good"
+    db.execute(
+        """
+        INSERT INTO indicator_latest_values (
+            indicator_code, latest_value, latest_status, latest_assessment, latest_alert,
+            updated_at, is_simulated, source_code, batch_code
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(indicator_code) DO UPDATE SET
+            latest_value = excluded.latest_value,
+            latest_status = excluded.latest_status,
+            latest_assessment = excluded.latest_assessment,
+            latest_alert = excluded.latest_alert,
+            updated_at = excluded.updated_at,
+            is_simulated = excluded.is_simulated,
+            source_code = excluded.source_code,
+            batch_code = excluded.batch_code
+        """,
+        (
+            normalized.get("indicator_code"),
+            f"{value:.4f}".rstrip("0").rstrip("."),
+            latest_status,
+            assessment,
+            alert,
+            timestamp,
+            0,
+            "tenant_smart_formula",
+            f"smart_formula_{datetime.now().strftime('%Y%m%d%H%M%S')}",
+        ),
+    )
+    db.execute(
+        """
+        INSERT INTO indicator_series (
+            indicator_code, point_time, point_value, point_status, is_simulated, source_code, batch_code, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            normalized.get("indicator_code"),
+            timestamp,
+            value,
+            latest_status,
+            0,
+            "tenant_smart_formula",
+            f"smart_formula_{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            timestamp,
+        ),
+    )
+    db.commit()
+    invalidate_indicator_hub_cache()
+    return {
+        "value": value,
+        "assessment": assessment,
+        "alert": alert,
+        "status": latest_status,
+        "updated_at": timestamp,
+        "unit": normalized.get("unit") or "",
+    }
+
+
+def append_smart_indicator_to_dashboard(tenant_slug, indicator_code, title="", layout=None, publisher=""):
+    tenant = get_tenant_by_slug(tenant_slug)
+    current_state = resolve_tenant_fund_dashboard_state(tenant, tenant.get("fund_dashboard_config"))
+    base = copy.deepcopy(current_state.get("draft") or current_state.get("published") or {})
+    existing_cards = base.get("cards") if isinstance(base.get("cards"), list) else []
+    next_cards = []
+    seen_codes = set()
+    for raw in existing_cards:
+        if not isinstance(raw, dict):
+            continue
+        current_code = slugify_code(raw.get("indicatorCode") or raw.get("indicator_code"), "")
+        if current_code and current_code not in seen_codes:
+            seen_codes.add(current_code)
+            next_cards.append({"indicatorCode": current_code})
+    normalized_code = slugify_code(indicator_code, "indicator")
+    if normalized_code and normalized_code not in seen_codes:
+        next_cards.append({"indicatorCode": normalized_code})
+    next_layout = normalize_dashboard_layout(layout or ensure_dashboard_layout_for_card_count(len(next_cards)))
+    dashboard = {
+        "layout": next_layout,
+        "title": title or "智能指标 Dashboard",
+        "note": "大V 通过选择底层指标和自然语言规则生成智能指标，再发布到前台 Dashboard。",
+        "updatedAt": now_ts(),
+        "publisher": publisher or "系统同步",
+        "cards": next_cards[: get_dashboard_card_target(next_layout)],
+    }
+    return update_tenant_fund_dashboard_config(tenant_slug, "save_draft", dashboard)
+
+
+def remove_smart_indicator_from_dashboard(tenant_slug, indicator_code):
+    tenant = get_tenant_by_slug(tenant_slug)
+    current_state = resolve_tenant_fund_dashboard_state(tenant, tenant.get("fund_dashboard_config"))
+    published = copy.deepcopy(current_state.get("published") or {})
+    draft = copy.deepcopy(current_state.get("draft") or published or {})
+    normalized_code = slugify_code(indicator_code, "indicator")
+    def _strip_cards(source):
+        next_cards = [
+            raw for raw in (source.get("cards") or [])
+            if slugify_code((raw or {}).get("indicatorCode") or (raw or {}).get("indicator_code"), "") != normalized_code
+        ]
+        source["cards"] = next_cards
+        source["layout"] = ensure_dashboard_layout_for_card_count(len(next_cards))
+        source["updatedAt"] = now_ts()
+        source["publisher"] = tenant.get("advisor") or "大V"
+        return source
+    site_config = get_site_config()
+    tenants = get_tenant_configs(site_config)
+    for index, current_tenant in enumerate(tenants):
+        if current_tenant.get("slug") != tenant_slug:
+            continue
+        tenants[index] = dict(current_tenant)
+        tenants[index]["fund_dashboard_config"] = {
+            "published": normalize_fund_dashboard_view(_strip_cards(published), tenant),
+            "draft": normalize_fund_dashboard_view(_strip_cards(draft), tenant),
+        }
+        next_config = dict(site_config)
+        next_config["tenants"] = tenants
+        return save_site_config(next_config)
+    return None
+
+
+def create_or_update_tenant_smart_indicator(tenant_slug, payload):
+    tenant = get_tenant_by_slug(tenant_slug)
+    body = payload if isinstance(payload, dict) else {}
+    existing = get_indicator_definition(body.get("indicator_code")) if body.get("indicator_code") else None
+    selected_indicators = resolve_smart_indicator_selected_refs(tenant, body)
+    if not selected_indicators:
+        raise ValueError("selected_indicators_required")
+    prompt_text = str(body.get("prompt_text") or body.get("prompt") or "").strip()
+    if not prompt_text:
+        raise ValueError("prompt_text_required")
+    indicator_name = str(body.get("indicator_name") or body.get("name") or "").strip() or derive_smart_indicator_name(prompt_text, selected_indicators)
+    algorithm_detail = str(body.get("description") or "").strip() or build_smart_indicator_algorithm_detail(prompt_text, selected_indicators)
+    provided_formula_js = str(body.get("formula_js") or "").strip()
+    if provided_formula_js:
+        generated = {
+            "formula_js": validate_smart_indicator_js(provided_formula_js, selected_indicators),
+            "generator": "preview_confirmed",
+            "llm_used": False,
+        }
+    else:
+        generated = generate_smart_indicator_js(indicator_name, prompt_text, selected_indicators, tenant_slug=tenant_slug)
+    definition = save_indicator_definition(
+        {
+            **(existing or {}),
+            **body,
+            "tenant_slug": tenant_slug,
+            "indicator_name": indicator_name,
+            "category": str(body.get("category") or "大V自定义指标").strip() or "大V自定义指标",
+            "description": algorithm_detail,
+            "owner": tenant.get("advisor") or "大V",
+            "source_type": "smart",
+            "source_type_label": "智能指标",
+            "provider": "LLM / Prompt Formula",
+            "status_hint": str(body.get("status_hint") or "good").strip() or "good",
+            "assessment_template": str(body.get("assessment_template") or build_smart_indicator_interpretation(indicator_name, prompt_text, selected_indicators, "实时值", body.get("unit") or "")).strip(),
+            "alert_template": str(body.get("alert_template") or "").strip(),
+            "prompt_text": prompt_text,
+            "formula_js": generated["formula_js"],
+            "selected_indicators": selected_indicators,
+            "display_order": int(body.get("display_order") or 0),
+            "watchers": ["大V工作台", "H5 Dashboard", "租户门户"],
+            "display_config": {"show_in_h5": True, "show_in_workbench": True},
+            "enabled": body.get("enabled", True),
+        }
+    )
+    latest_snapshot = save_smart_indicator_latest_snapshot(definition)
+    saved_site_config = None
+    if body.get("add_to_dashboard", True):
+        saved_site_config = append_smart_indicator_to_dashboard(
+            tenant_slug,
+            definition["indicator_code"],
+            title=str(body.get("dashboard_title") or "智能指标 Dashboard").strip() or "智能指标 Dashboard",
+            layout=body.get("layout"),
+            publisher=tenant.get("advisor") or "大V",
+        )
+    latest_tenant = get_tenant_by_slug(tenant_slug, saved_site_config) if saved_site_config else tenant
+    return {
+        "definition": get_indicator_definition(definition["indicator_code"]),
+        "latest_snapshot": latest_snapshot,
+        "tenant": latest_tenant,
+        "formula_meta": generated,
+    }
 
 
 def normalize_tenant_configs(source=None):
@@ -2816,6 +3298,11 @@ def build_tenant_dashboard_payload(tenant=None):
         "publish_trend": dashboard_metrics["publish_trend"],
         "fund_dashboard": workbench["fund_dashboard"],
         "fund_dashboard_state": workbench["fund_dashboard_state"],
+        "smart_indicator_catalog": {
+            "tenant_smart_indicators": build_tenant_smart_indicator_catalog(tenant),
+            "base_indicators": build_dashboard_base_indicator_options(tenant),
+            "available_tags": build_tenant_smart_indicator_tag_catalog(tenant),
+        },
         "reviews": workbench["published_reviews"],
         "stats": workbench["stats"],
     }
@@ -4445,23 +4932,216 @@ def execute_indicator_source_landing(source_code, prefer_live=False):
     }
 
 
+def parse_numeric_indicator_value(raw_value):
+    if raw_value is None:
+        return None
+    if isinstance(raw_value, (int, float)) and not isinstance(raw_value, bool):
+        value = float(raw_value)
+        return value if math.isfinite(value) else None
+    text = str(raw_value or "").strip().replace(",", "")
+    if not text:
+        return None
+    match = re.search(r"[-+]?\d+(?:\.\d+)?", text)
+    if not match:
+        return None
+    try:
+        value = float(match.group(0))
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) else None
+
+
+def normalize_selected_indicator_refs(raw_selected):
+    items = raw_selected if isinstance(raw_selected, list) else []
+    normalized = []
+    seen = set()
+    for raw in items:
+        if isinstance(raw, dict):
+            indicator_code = slugify_code(raw.get("indicator_code") or raw.get("code"), "indicator")
+            indicator_name = str(raw.get("indicator_name") or raw.get("name") or indicator_code).strip() or indicator_code
+        else:
+            indicator_code = slugify_code(raw, "indicator")
+            indicator_name = indicator_code
+        if not indicator_code or indicator_code in seen:
+            continue
+        seen.add(indicator_code)
+        normalized.append({"indicator_code": indicator_code, "indicator_name": indicator_name})
+    return normalized
+
+
+def extract_json_payload_from_text(raw_text):
+    text = str(raw_text or "").strip()
+    if not text:
+        return {}
+    fenced_match = re.search(r"```(?:json)?\s*(\{.*\})\s*```", text, re.S)
+    if fenced_match:
+        text = fenced_match.group(1).strip()
+    start = text.find("{")
+    end = text.rfind("}")
+    if start >= 0 and end > start:
+        text = text[start : end + 1]
+    try:
+        payload = json.loads(text)
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def build_smart_indicator_expression_fallback(prompt_text, selected_indicators):
+    prompt = str(prompt_text or "").strip()
+    items = normalize_selected_indicator_refs(selected_indicators)
+    if not items:
+        raise ValueError("selected_indicators_required")
+    expression = prompt.replace("（", "(").replace("）", ")").replace("【", "[[").replace("】", "]]")
+    expression = expression.replace("×", "*").replace("÷", "/")
+    replaced = False
+    for item in sorted(items, key=lambda current: len(current["indicator_name"]), reverse=True):
+        code = item["indicator_code"]
+        name = item["indicator_name"]
+        token = f'Number(inputs["{code}"] || 0)'
+        bracket_token = f"[[{name}]]"
+        if bracket_token in expression:
+            expression = expression.replace(bracket_token, token)
+            replaced = True
+        plain_pattern = re.compile(re.escape(name))
+        if plain_pattern.search(expression):
+            expression = plain_pattern.sub(token, expression)
+            replaced = True
+    if not replaced:
+        first_token = f'Number(inputs["{items[0]["indicator_code"]}"] || 0)'
+        if re.match(r"^[\+\-\*\/]", expression):
+            expression = f"{first_token}{expression}"
+        elif len(items) == 1:
+            expression = first_token
+        elif "/" in expression:
+            second_token = f'Number(inputs["{items[1]["indicator_code"]}"] || 0)'
+            expression = f"{first_token} / ({second_token} + 0.000001)"
+        else:
+            second_token = f'Number(inputs["{items[1]["indicator_code"]}"] || 0)'
+            expression = f"{first_token} + {second_token}"
+    expression = expression.strip()
+    if not expression:
+        raise ValueError("smart_indicator_expression_empty")
+    if re.search(r"[^0-9A-Za-z_\.\+\-\*\/\(\)\[\]\"'\s|]", expression):
+        raise ValueError("smart_indicator_expression_unsafe")
+    return expression
+
+
+def build_smart_indicator_js_fallback(prompt_text, selected_indicators):
+    return f"return {build_smart_indicator_expression_fallback(prompt_text, selected_indicators)};"
+
+
+def validate_smart_indicator_js(js_code, selected_indicators):
+    code = str(js_code or "").strip()
+    if not code:
+        return ""
+    if not code.startswith("return "):
+        code = f"return {code.lstrip(';')}"
+    if not code.endswith(";"):
+        code = f"{code};"
+    normalized = code.replace("\n", " ").strip()
+    allowed_codes = {item["indicator_code"] for item in normalize_selected_indicator_refs(selected_indicators)}
+    for token in re.findall(r'inputs\[(?:"|\')([^"\']+)(?:"|\')\]', normalized):
+        if slugify_code(token, "indicator") not in allowed_codes:
+            raise ValueError("smart_indicator_js_contains_unknown_indicator")
+    if re.search(r"[^0-9A-Za-z_\.\+\-\*\/\(\)\[\]\"'\s|;]", normalized):
+        raise ValueError("smart_indicator_js_unsafe")
+    return normalized
+
+
+def generate_smart_indicator_js(indicator_name, prompt_text, selected_indicators, tenant_slug=""):
+    normalized_selected = normalize_selected_indicator_refs(selected_indicators)
+    fallback_js = build_smart_indicator_js_fallback(prompt_text, normalized_selected)
+    model = get_default_llm_config(purpose="general")
+    if not model:
+        return {"formula_js": fallback_js, "generator": "fallback", "llm_used": False}
+    try:
+        raw = call_openai_compatible_llm(
+            model,
+            (
+                "你是金融指标公式编译器。"
+                "只返回 JSON。字段必须包含 formula_js。"
+                "formula_js 必须是单行 JavaScript return 语句，只能使用 Number(inputs[\"indicator_code\"] || 0) 和 + - * / ()。"
+            ),
+            json.dumps(
+                {
+                    "indicator_name": indicator_name,
+                    "tenant_slug": tenant_slug,
+                    "prompt_text": str(prompt_text or "").strip(),
+                    "selected_indicators": normalized_selected,
+                    "fallback_formula_js": fallback_js,
+                },
+                ensure_ascii=False,
+            ),
+            feature_code="smart_indicator_formula_generation",
+            feature_label="智能指标公式生成",
+            tenant_slug=tenant_slug,
+            entry_point="dashboard_smart_indicator",
+            metadata={"indicator_name": indicator_name, "selected_indicator_count": len(normalized_selected)},
+            request_timeout_seconds=45,
+        )
+        parsed = extract_json_payload_from_text(raw)
+        formula_js = validate_smart_indicator_js(parsed.get("formula_js"), normalized_selected)
+        if not formula_js:
+            raise ValueError("llm_formula_js_missing")
+        return {"formula_js": formula_js, "generator": "llm", "llm_used": True}
+    except Exception:
+        return {"formula_js": fallback_js, "generator": "fallback", "llm_used": False}
+
+
+def evaluate_smart_indicator_formula_js(formula_js, selected_indicators, latest_value_map):
+    code = validate_smart_indicator_js(formula_js, selected_indicators)
+    expression = re.sub(r"^\s*return\s+", "", code).rstrip(" ;")
+    for item in normalize_selected_indicator_refs(selected_indicators):
+        indicator_code = item["indicator_code"]
+        latest = latest_value_map.get(indicator_code) or {}
+        numeric_value = parse_numeric_indicator_value(latest.get("latest_value"))
+        numeric_text = str(0.0 if numeric_value is None else numeric_value)
+        expression = expression.replace(f'Number(inputs["{indicator_code}"] || 0)', numeric_text)
+        expression = expression.replace(f"inputs[\"{indicator_code}\"]", numeric_text)
+        expression = expression.replace(f"inputs['{indicator_code}']", numeric_text)
+    expression = expression.replace("|| 0", "").replace("||0", "")
+    if re.search(r"[^0-9\.\+\-\*\/\(\)\s]", expression):
+        raise ValueError("smart_indicator_expression_eval_unsafe")
+    result = eval(expression, {"__builtins__": {}}, {})
+    value = float(result)
+    if not math.isfinite(value):
+        raise ValueError("smart_indicator_expression_not_finite")
+    return round(value, 4)
+
+
 def normalize_indicator_definition(payload, existing=None):
     base = dict(existing or {})
     base.update(payload or {})
-    code = slugify_code(base.get("indicator_code") or base.get("indicator_name"), "indicator")
+    tenant_slug = str(base.get("tenant_slug") or "").strip().lower()
+    source_type = str(base.get("source_type") or "mock").strip() or "mock"
+    code_seed = base.get("indicator_code") or base.get("indicator_name")
+    if tenant_slug and source_type == "smart" and not base.get("indicator_code"):
+        code_seed = f"{tenant_slug}_{code_seed or 'smart_indicator'}"
+    code = slugify_code(code_seed, "indicator")
+    selected_indicators = normalize_selected_indicator_refs(
+        base.get("selected_indicators")
+        if isinstance(base.get("selected_indicators"), list)
+        else safe_json_loads(base.get("selected_indicators_json"), [])
+    )
     return {
         "indicator_code": code,
+        "tenant_slug": tenant_slug,
         "indicator_name": str(base.get("indicator_name") or code).strip(),
         "category": str(base.get("category") or "未分类指标").strip(),
         "description": str(base.get("description") or "").strip(),
         "unit": str(base.get("unit") or "").strip(),
         "owner": str(base.get("owner") or "平台研究运营").strip(),
-        "source_type": str(base.get("source_type") or "mock").strip() or "mock",
+        "source_type": source_type,
         "source_type_label": str(base.get("source_type_label") or "模拟指标").strip() or "模拟指标",
         "provider": str(base.get("provider") or "平台数据层").strip(),
         "status_hint": str(base.get("status_hint") or "attention").strip() or "attention",
         "assessment_template": str(base.get("assessment_template") or "").strip(),
         "alert_template": str(base.get("alert_template") or "").strip(),
+        "prompt_text": str(base.get("prompt_text") or "").strip(),
+        "formula_js": str(base.get("formula_js") or "").strip(),
+        "selected_indicators_json": json.dumps(selected_indicators, ensure_ascii=False),
+        "display_order": int(base.get("display_order") or 0),
         "watchers_json": json.dumps(base.get("watchers") if isinstance(base.get("watchers"), list) else safe_json_loads(base.get("watchers_json"), []), ensure_ascii=False),
         "display_config_json": json.dumps(base.get("display_config") if isinstance(base.get("display_config"), dict) else safe_json_loads(base.get("display_config_json"), {}), ensure_ascii=False),
         "enabled": 1 if bool(base.get("enabled", True)) else 0,
@@ -4503,6 +5183,7 @@ def row_to_indicator_definition(row):
     item["enabled"] = bool(item.get("enabled"))
     item["watchers"] = safe_json_loads(item.get("watchers_json"), [])
     item["display_config"] = safe_json_loads(item.get("display_config_json"), {})
+    item["selected_indicators"] = normalize_selected_indicator_refs(safe_json_loads(item.get("selected_indicators_json"), []))
     return item
 
 
@@ -4517,13 +5198,23 @@ def row_to_indicator_source_def(row):
     return item
 
 
-def list_indicator_definitions(source_type=None):
+def list_indicator_definitions(source_type=None, tenant_slug=None, include_shared=True):
     db = get_db()
     query = "SELECT * FROM indicator_definitions"
     params = []
+    filters = []
     if source_type:
-        query += " WHERE source_type = ?"
+        filters.append("source_type = ?")
         params.append(source_type)
+    normalized_tenant_slug = str(tenant_slug or "").strip().lower()
+    if normalized_tenant_slug:
+        if include_shared:
+            filters.append("(tenant_slug = ? OR tenant_slug = '')")
+        else:
+            filters.append("tenant_slug = ?")
+        params.append(normalized_tenant_slug)
+    if filters:
+        query += " WHERE " + " AND ".join(filters)
     query += " ORDER BY category ASC, indicator_name ASC"
     return [row_to_indicator_definition(row) for row in db.execute(query, params).fetchall()]
 
@@ -4547,12 +5238,14 @@ def save_indicator_definition(payload):
     db.execute(
         """
         INSERT INTO indicator_definitions (
-            indicator_code, indicator_name, category, description, unit, owner, source_type,
-            source_type_label, provider, status_hint, assessment_template, alert_template,
-            watchers_json, display_config_json, enabled, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            indicator_code, indicator_name, tenant_slug, category, description, unit, owner, source_type,
+            source_type_label, provider, status_hint, assessment_template, alert_template, prompt_text,
+            formula_js, selected_indicators_json, display_order, watchers_json, display_config_json,
+            enabled, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(indicator_code) DO UPDATE SET
             indicator_name = excluded.indicator_name,
+            tenant_slug = excluded.tenant_slug,
             category = excluded.category,
             description = excluded.description,
             unit = excluded.unit,
@@ -4563,6 +5256,10 @@ def save_indicator_definition(payload):
             status_hint = excluded.status_hint,
             assessment_template = excluded.assessment_template,
             alert_template = excluded.alert_template,
+            prompt_text = excluded.prompt_text,
+            formula_js = excluded.formula_js,
+            selected_indicators_json = excluded.selected_indicators_json,
+            display_order = excluded.display_order,
             watchers_json = excluded.watchers_json,
             display_config_json = excluded.display_config_json,
             enabled = excluded.enabled,
@@ -4571,6 +5268,7 @@ def save_indicator_definition(payload):
         (
             normalized["indicator_code"],
             normalized["indicator_name"],
+            normalized["tenant_slug"],
             normalized["category"],
             normalized["description"],
             normalized["unit"],
@@ -4581,6 +5279,10 @@ def save_indicator_definition(payload):
             normalized["status_hint"],
             normalized["assessment_template"],
             normalized["alert_template"],
+            normalized["prompt_text"],
+            normalized["formula_js"],
+            normalized["selected_indicators_json"],
+            normalized["display_order"],
             normalized["watchers_json"],
             normalized["display_config_json"],
             normalized["enabled"],
@@ -6411,15 +7113,23 @@ def build_indicator_hub_from_store():
         item = {
             "id": definition["indicator_code"],
             "name": definition["indicator_name"],
+            "tenant_slug": str(definition.get("tenant_slug") or "").strip().lower(),
             "category": definition["category"],
+            "unit": definition.get("unit") or "",
+            "description": definition.get("description") or "",
             "owner": definition["owner"],
             "value": latest.get("latest_value") or "--",
+            "numeric_value": parse_numeric_indicator_value(latest.get("latest_value")),
             "assessment": latest.get("latest_assessment") or definition.get("assessment_template") or "暂无说明",
             "status": latest.get("latest_status") or definition.get("status_hint") or "attention",
             "alert": latest.get("latest_alert") or definition.get("alert_template") or "暂无预警说明",
             "enabled": bool(definition.get("enabled")),
             "last_updated": latest.get("updated_at") or definition.get("updated_at") or "未记录",
             "watchers": definition.get("watchers", []),
+            "prompt_text": str(definition.get("prompt_text") or "").strip(),
+            "formula_js": str(definition.get("formula_js") or "").strip(),
+            "selected_indicators": normalize_selected_indicator_refs(definition.get("selected_indicators")),
+            "display_order": int(definition.get("display_order") or 0),
             "history": [
                 {
                     "date": point["date"],
@@ -6699,6 +7409,31 @@ def build_indicator_hub(tenant=None, admin_view=False):
             raise
         app.logger.warning("Database unavailable while building indicator hub, using fallback data")
         return build_indicator_hub_fallback(tenant=tenant, admin_view=admin_view)
+    hub = copy.deepcopy(hub)
+    tenant_slug = str((tenant or {}).get("slug") or "").strip().lower()
+    if not admin_view and tenant_slug:
+        smart_items = [
+            item for item in (hub.get("smart_items") or [])
+            if str(item.get("tenant_slug") or "").strip().lower() in {"", tenant_slug}
+        ]
+        lake_items = list(hub.get("lake_items") or [])
+        items = smart_items + lake_items
+        smart_ids = {item.get("id") for item in smart_items if item.get("id")}
+        hub["smart_items"] = smart_items
+        hub["items"] = items
+        hub["anomalies"] = [
+            item for item in (hub.get("anomalies") or [])
+            if item.get("related_indicator_id") in smart_ids or item.get("related_indicator_id") in {lake.get("id") for lake in lake_items}
+        ]
+        hub["summary"] = {
+            "total": len(items),
+            "smart_total": len(smart_items),
+            "lake_total": len(lake_items),
+            "enabled": sum(1 for item in items if item.get("enabled")),
+            "warnings": sum(1 for item in items if item.get("status") == "warning"),
+            "attention": sum(1 for item in items if item.get("status") == "attention"),
+            "anomalies": len(hub["anomalies"]),
+        }
     advisor_name = tenant.get("advisor") if isinstance(tenant, dict) else ""
     for item in hub.get("smart_items", []):
         if advisor_name and item.get("owner") in {"平台研究运营", "平台宏观组", ""}:
@@ -7195,6 +7930,11 @@ def build_tenant_dashboard_payload_fallback(tenant=None):
             "published": {"layout": "2x2", "cards": []},
             "draft": None,
         },
+        "smart_indicator_catalog": {
+            "tenant_smart_indicators": [],
+            "base_indicators": [],
+            "available_tags": [],
+        },
         "reviews": [],
         "stats": {},
     }
@@ -7207,15 +7947,21 @@ def build_indicator_hub_fallback(tenant=None, admin_view=False):
         {
             "id": "smart_market_heat",
             "name": "市场情绪温度",
+            "tenant_slug": "",
             "category": "情绪信号",
             "owner": advisor_name or "平台研究运营",
             "value": "72",
+            "numeric_value": 72.0,
             "assessment": "情绪处于偏活跃区间，适合输出结构化复盘而不是极端结论。",
             "status": "attention",
             "alert": "成交集中在主线方向，注意高位分化。",
             "enabled": True,
             "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "watchers": [],
+            "prompt_text": "围绕市场情绪温度生成复盘信号。",
+            "formula_js": 'return Number(inputs["smart_market_heat"] || 0);',
+            "selected_indicators": [{"indicator_code": "smart_market_heat", "indicator_name": "市场情绪温度"}],
+            "display_order": 0,
             "history": [],
             "history_series": [],
             "history_anomalies": [],
@@ -7232,15 +7978,21 @@ def build_indicator_hub_fallback(tenant=None, admin_view=False):
         {
             "id": "smart_review_signal",
             "name": "复盘重点信号",
+            "tenant_slug": "",
             "category": "内容生产",
             "owner": advisor_name or "平台研究运营",
             "value": "3 条",
+            "numeric_value": 3.0,
             "assessment": "建议优先围绕强势主线、回撤风险和次日观察点组织内容。",
             "status": "normal",
             "alert": "当前无高危异常。",
             "enabled": True,
             "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "watchers": [],
+            "prompt_text": "围绕复盘重点信号生成内容优先级。",
+            "formula_js": 'return Number(inputs["smart_review_signal"] || 0);',
+            "selected_indicators": [{"indicator_code": "smart_review_signal", "indicator_name": "复盘重点信号"}],
+            "display_order": 1,
             "history": [],
             "history_series": [],
             "history_anomalies": [],
@@ -14044,6 +14796,78 @@ def api_save_tenant_dashboard(tenant_slug):
     latest_tenant = get_tenant_by_slug(tenant_slug, saved)
     payload = build_tenant_dashboard_payload(latest_tenant)
     return jsonify({"success": True, "dashboard": payload, "fund_dashboard_state": payload.get("fund_dashboard_state")})
+
+
+@app.route("/api/tenant/<tenant_slug>/smart-indicators", methods=["GET", "POST"])
+def api_tenant_smart_indicators(tenant_slug):
+    tenant = get_tenant_by_slug(tenant_slug)
+    if not tenant or tenant["slug"] != tenant_slug:
+        return jsonify({"success": False, "error": "tenant_not_found"}), 404
+    if request.method == "GET":
+        payload = build_tenant_dashboard_payload(tenant)
+        return jsonify(
+            {
+                "success": True,
+                "smart_indicator_catalog": payload.get("smart_indicator_catalog") or {
+                    "tenant_smart_indicators": [],
+                    "base_indicators": [],
+                },
+                "dashboard": payload,
+            }
+        )
+    body = request.get_json(silent=True) or {}
+    action = str(body.get("action") or "save").strip().lower()
+    if action == "preview":
+        try:
+            preview = build_smart_indicator_preview(tenant_slug, body)
+        except ValueError as exc:
+            return jsonify({"success": False, "error": str(exc)}), 400
+        except Exception as exc:
+            app.logger.exception("Failed to preview tenant smart indicator")
+            return jsonify({"success": False, "error": str(exc)}), 500
+        return jsonify(
+            {
+                "success": True,
+                "preview": preview,
+                "formula_meta": preview.get("formula_meta") or {},
+                "smart_indicator_catalog": {
+                    "tenant_smart_indicators": build_tenant_smart_indicator_catalog(tenant),
+                    "base_indicators": build_dashboard_base_indicator_options(tenant),
+                    "available_tags": build_tenant_smart_indicator_tag_catalog(tenant),
+                },
+            }
+        )
+    if action == "delete":
+        indicator_code = str(body.get("indicator_code") or "").strip()
+        definition = get_indicator_definition(indicator_code)
+        if not definition:
+            return jsonify({"success": False, "error": "indicator_not_found"}), 404
+        if str(definition.get("tenant_slug") or "").strip().lower() not in {"", tenant_slug}:
+            return jsonify({"success": False, "error": "indicator_forbidden"}), 403
+        saved = remove_smart_indicator_from_dashboard(tenant_slug, indicator_code)
+        delete_indicator_definition(indicator_code)
+        latest_tenant = get_tenant_by_slug(tenant_slug, saved) if saved else tenant
+        payload = build_tenant_dashboard_payload(latest_tenant)
+        return jsonify({"success": True, "dashboard": payload, "smart_indicator_catalog": payload.get("smart_indicator_catalog")})
+    try:
+        result = create_or_update_tenant_smart_indicator(tenant_slug, body)
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except Exception as exc:
+        app.logger.exception("Failed to save tenant smart indicator")
+        return jsonify({"success": False, "error": str(exc)}), 500
+    payload = build_tenant_dashboard_payload(result["tenant"])
+    return jsonify(
+        {
+            "success": True,
+            "definition": result["definition"],
+            "latest_snapshot": result["latest_snapshot"],
+            "formula_meta": result["formula_meta"],
+            "dashboard": payload,
+            "smart_indicator_catalog": payload.get("smart_indicator_catalog"),
+            "fund_dashboard_state": payload.get("fund_dashboard_state"),
+        }
+    )
 
 @app.route("/api/kol/broadcast", methods=["POST"])
 def api_kol_broadcast():
