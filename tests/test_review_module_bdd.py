@@ -5,11 +5,13 @@ from unittest.mock import patch
 import app as app_entry
 import src.web.hooks as web_hooks
 from src.domain import ai_services
+from src.domain import market_services
 from src.domain.core_services import (
     get_tenant_by_slug,
     normalize_fund_dashboard_card_refs,
     normalize_fund_dashboard_view,
     resolve_tenant_review_snapshots,
+    sanitize_user_facing_source_text,
 )
 from src.services import get_tenant_configs
 
@@ -305,6 +307,85 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
         self.assertNotIn("macro_china_cpi_monthly()", html)
+
+    def test_given_internal_source_text_when_sanitized_then_api_and_function_names_are_hidden(self):
+        source_text = "上证指数: 实时接口: qt.gtimg.cn/q=sh000001; 历史回退: AKShare stock_zh_index_daily(symbol='sh000001')"
+
+        normalized = sanitize_user_facing_source_text(source_text)
+
+        self.assertEqual(normalized, "上证指数：实时行情数据；历史行情数据：历史数据服务")
+        self.assertNotIn("qt.gtimg.cn", normalized)
+        self.assertNotIn("stock_zh_index_daily", normalized)
+        self.assertNotIn("AKShare", normalized)
+
+    def test_given_watchlist_detail_when_indicator_assessment_contains_internal_sources_then_api_response_is_sanitized(self):
+        mock_context = {
+            "items": [
+                {
+                    "id": "credit_pulse",
+                    "name": "信贷脉冲",
+                    "status": "attention",
+                    "assessment": "宏观环境继续观察",
+                    "alert": "保持关注",
+                    "value": "中性",
+                },
+                {
+                    "id": "source_cpi",
+                    "name": "CPI",
+                    "status": "attention",
+                    "assessment": "月度宏观接口: macro_china_cpi_monthly()",
+                    "alert": "保持关注",
+                    "value": "2.1%",
+                },
+                {
+                    "id": "source_shanghai_index",
+                    "name": "上证指数",
+                    "status": "normal",
+                    "assessment": "实时接口: qt.gtimg.cn/q=sh000001; 历史回退: AKShare stock_zh_index_daily(symbol='sh000001')",
+                    "alert": "保持观察",
+                    "value": "3288.4",
+                },
+            ],
+            "by_id": {},
+            "warnings": [],
+            "attentions": [],
+            "anomalies": [],
+        }
+        mock_context["by_id"] = {item["id"]: item for item in mock_context["items"]}
+        mock_context["attentions"] = mock_context["items"][:2]
+
+        with patch("src.domain.market_services.build_watchlist_indicator_context", return_value=mock_context):
+            response = self.client.get("/api/watchlist/600519")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        thesis_text = " ".join(payload["fundamental"]["thesis"])
+        metrics_text = " ".join(str(item.get("note") or "") for item in payload["fundamental"]["metrics"])
+
+        self.assertNotIn("macro_china_cpi_monthly()", thesis_text)
+        self.assertNotIn("qt.gtimg.cn", thesis_text)
+        self.assertNotIn("stock_zh_index_daily", thesis_text)
+        self.assertNotIn("macro_china_cpi_monthly()", metrics_text)
+        self.assertNotIn("qt.gtimg.cn", metrics_text)
+        self.assertNotIn("stock_zh_index_daily", metrics_text)
+        payload_text = str(payload)
+        self.assertNotIn("macro_china_cpi_monthly()", payload_text)
+        self.assertNotIn("qt.gtimg.cn", payload_text)
+        self.assertNotIn("stock_zh_index_daily", payload_text)
+        self.assertNotIn("AKShare", payload_text)
+        self.assertIn("CPI：月度宏观数据", thesis_text)
+
+        signal_bundle = market_services.build_watchlist_signal_bundle(
+            "600519",
+            "贵州茅台",
+            "高端白酒",
+            mock_context,
+        )
+        signal_text = str(signal_bundle)
+        self.assertIn("上证指数：实时行情数据", signal_text)
+        self.assertNotIn("qt.gtimg.cn", signal_text)
+        self.assertNotIn("stock_zh_index_daily", signal_text)
+        self.assertNotIn("AKShare", signal_text)
 
     def test_given_empty_source_text_when_generating_review_draft_then_reject(self):
         response = self.client.post(

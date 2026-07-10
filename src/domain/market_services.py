@@ -2965,7 +2965,12 @@ def build_watchlist_signal_bundle(stock_code, stock_name, industry, context):
     for item in related_items[:3]:
         if not item:
             continue
-        thesis.append(f"{item.get('name')}: {item.get('assessment') or item.get('alert') or '继续观察'}")
+        thesis.append(
+            sanitize_user_facing_source_text(
+                f"{item.get('name')}: {item.get('assessment') or item.get('alert') or '继续观察'}",
+                fallback=f"{item.get('name')}: 继续观察",
+            )
+        )
     while len(thesis) < 3:
         thesis.append("当前需结合个股盈利、估值和行业位置继续判断。")
     metrics = []
@@ -2976,7 +2981,10 @@ def build_watchlist_signal_bundle(stock_code, stock_name, industry, context):
             {
                 "label": item.get("name") or "指标",
                 "value": item.get("value") or "--",
-                "note": item.get("assessment") or item.get("alert") or "当前无说明",
+                "note": sanitize_user_facing_source_text(
+                    item.get("assessment") or item.get("alert") or "当前无说明",
+                    fallback="当前无说明",
+                ),
             }
         )
     return {
@@ -3417,7 +3425,7 @@ def gen_watchlist_details():
         detail["indicator_context"] = signal_bundle
         detail["focus"] = detail.get("industry") or detail.get("focus") or "个股跟踪"
         detail["alert_level"] = signal_bundle["board_alert_level"]
-        detail["alert_text"] = signal_bundle["board_alert_text"]
+        detail["alert_text"] = sanitize_user_facing_source_text(signal_bundle["board_alert_text"], fallback="当前无明显预警")
         detail["signal_summary"] = signal_bundle["board_summary"]
         detail["anomaly_text"] = signal_bundle["anomaly_text"]
         detail["related_indicator_ids"] = signal_bundle["related_indicator_ids"]
@@ -3430,9 +3438,21 @@ def gen_watchlist_details():
         for metric in signal_bundle["metrics"]:
             if metric["label"] not in metric_labels:
                 base_metrics.append(metric)
+        for metric in base_metrics:
+            if not isinstance(metric, dict):
+                continue
+            metric["note"] = sanitize_user_facing_source_text(metric.get("note") or "", fallback=str(metric.get("note") or "").strip())
         fundamental["metrics"] = base_metrics[:6]
         base_thesis = fundamental.get("thesis") if isinstance(fundamental.get("thesis"), list) else []
-        fundamental["thesis"] = (base_thesis + [item for item in signal_bundle["thesis"] if item not in base_thesis])[:5]
+        normalized_thesis = []
+        seen_thesis = set()
+        for item in base_thesis + [item for item in signal_bundle["thesis"] if item not in base_thesis]:
+            text = sanitize_user_facing_source_text(item, fallback=str(item or "").strip())
+            if not text or text in seen_thesis:
+                continue
+            seen_thesis.add(text)
+            normalized_thesis.append(text)
+        fundamental["thesis"] = normalized_thesis[:5]
         detail["fundamental"] = fundamental
         forecast = detail.get("forecast") if isinstance(detail.get("forecast"), dict) else {}
         if signal_bundle["board_alert_level"] == "warning":

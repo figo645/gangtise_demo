@@ -470,6 +470,59 @@ def _safe_card_id(value, fallback):
     return slugify_code(value, fallback or "card")
 
 
+def sanitize_user_facing_source_text(value, fallback=""):
+    raw = str(value or "").strip()
+    if not raw:
+        return str(fallback or "").strip()
+    normalized = raw.replace("：", ":").replace("；", ";")
+    normalized = re.sub(r"https?://\S+", "", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"\b(?:www\.)?[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:/[^\s;；，,]*)?", "", normalized)
+    normalized = re.sub(r"\b[A-Za-z_][A-Za-z0-9_]*\([^)]*\)", "", normalized)
+    replacements = [
+        ("月度宏观接口", "月度宏观数据"),
+        ("宏观接口", "宏观数据"),
+        ("实时接口", "实时行情数据"),
+        ("历史回退", "历史行情数据"),
+        ("历史接口", "历史行情数据"),
+        ("AKShare", "历史数据服务"),
+        ("TuShare", "历史数据服务"),
+        ("Wind", "数据服务"),
+    ]
+    for old, new in replacements:
+        normalized = normalized.replace(old, new)
+    parts = re.split(r"[;；]", normalized)
+    cleaned_parts = []
+    seen = set()
+    for part in parts:
+        text = re.sub(r"\s+", " ", str(part or "")).strip(" :：,，/·-")
+        if not text:
+            continue
+        text = re.sub(r":\s*:", ":", text)
+        text = re.sub(r"\s*:\s*", "：", text)
+        text = re.sub(r"：{2,}", "：", text)
+        text = re.sub(r"(实时行情数据|历史行情数据|月度宏观数据|宏观数据|历史数据服务|数据服务)(：\1)+", r"\1", text)
+        if text in seen:
+            continue
+        seen.add(text)
+        cleaned_parts.append(text)
+    if cleaned_parts:
+        return "；".join(cleaned_parts)
+    fallback_text = str(fallback or "").strip()
+    return fallback_text or "平台指标数据"
+
+
+def sanitize_user_facing_source_list(values, fallback=""):
+    normalized = []
+    seen = set()
+    for item in values if isinstance(values, list) else []:
+        text = sanitize_user_facing_source_text(item, fallback=fallback)
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        normalized.append(text)
+    return normalized
+
+
 def build_review_smart_cards(tenant, fund_dashboard, watchlist_details_map=None, news_items=None):
     tenant = tenant or get_tenant_by_slug()
     watchlist_details_map = watchlist_details_map if isinstance(watchlist_details_map, dict) else {}
@@ -492,10 +545,12 @@ def build_review_smart_cards(tenant, fund_dashboard, watchlist_details_map=None,
                 "value": str(item.get("value") or "").strip(),
                 "status": str(item.get("status") or "attention").strip() or "attention",
                 "prompt": str(item.get("prompt") or f"请围绕 {title} 生成复盘中的指标说明。").strip(),
-                "data_sources": [
-                    f"租户智能指标面板：{title}",
-                    "指标湖 / Dashboard 同源卡片",
-                ],
+                "data_sources": sanitize_user_facing_source_list(
+                    [
+                        f"租户智能指标面板：{title}",
+                        "指标湖 / Dashboard 同源卡片",
+                    ]
+                ),
                 "news_sources": [alert] if alert else [],
                 "evidence_note": "用于补充当前阶段判断、风险提醒和后续跟踪点。",
             }
@@ -523,7 +578,9 @@ def build_review_smart_cards(tenant, fund_dashboard, watchlist_details_map=None,
                 "value": f"{detail.get('change_pct', 0):+.1f}%",
                 "status": str(detail.get("alert_level") or "normal").strip() or "normal",
                 "prompt": f"围绕 {name} 生成重点个股复盘卡，包含当前判断、验证节点、风险边界和下一步观察。",
-                "data_sources": [f"自选股详情：{name}"] + [f"关联指标：{item}" for item in related_indicator_names[:2]],
+                "data_sources": sanitize_user_facing_source_list(
+                    [f"自选股详情：{name}"] + [f"关联指标：{item}" for item in related_indicator_names[:2]]
+                ),
                 "news_sources": [str(item).strip() for item in thesis[:2] if str(item).strip()],
                 "evidence_note": str(detail.get("alert_text") or "用于补充重点样本的验证节点与风险边界。").strip(),
             }
@@ -541,7 +598,7 @@ def build_review_smart_cards(tenant, fund_dashboard, watchlist_details_map=None,
                     "value": f"{len(top_news)} 条",
                     "status": "attention",
                     "prompt": "归纳相关新闻，只保留真正能支撑本次复盘判断的背景材料、催化和验证信息。",
-                    "data_sources": ["平台新闻流 / 指标库关联资讯"],
+                    "data_sources": sanitize_user_facing_source_list(["平台新闻流 / 指标库关联资讯"]),
                     "news_sources": [str(item.get("title") or "").strip() for item in top_news if str(item.get("title") or "").strip()],
                     "evidence_note": "用于给复盘补充事件背景和催化说明，不能替代大V自己的判断。",
                 }
@@ -716,7 +773,7 @@ def normalize_review_snapshot_item(item, tenant, index=0):
             "title": str(attachment.get("title") or "知识材料").strip()[:120] or "知识材料",
             "summary": str(attachment.get("summary") or attachment.get("body") or attachment.get("raw_input") or "").strip()[:360],
             "body": str(attachment.get("body") or attachment.get("raw_input") or attachment.get("summary") or "").strip()[:4000],
-            "source_detail": str(attachment.get("source_detail") or attachment.get("source") or "").strip()[:240],
+            "source_detail": sanitize_user_facing_source_text(attachment.get("source_detail") or attachment.get("source") or "")[:240],
             "url": str(attachment.get("url") or "").strip()[:500],
             "tags": [str(tag).strip() for tag in (attachment.get("tags") if isinstance(attachment.get("tags"), list) else []) if str(tag).strip()][:8],
         })
@@ -731,7 +788,7 @@ def normalize_review_snapshot_item(item, tenant, index=0):
             "summary": str(card.get("summary") or card.get("assessment") or card.get("hint") or "").strip()[:360],
             "value": str(card.get("value") or "").strip()[:120],
             "prompt": str(card.get("prompt") or "").strip()[:2000],
-            "data_sources": [str(source).strip() for source in (card.get("data_sources") if isinstance(card.get("data_sources"), list) else []) if str(source).strip()][:8],
+            "data_sources": sanitize_user_facing_source_list(card.get("data_sources") if isinstance(card.get("data_sources"), list) else [])[:8],
             "news_sources": [str(source).strip() for source in (card.get("news_sources") if isinstance(card.get("news_sources"), list) else []) if str(source).strip()][:8],
         })
     llm_models = []
@@ -763,7 +820,7 @@ def normalize_review_snapshot_item(item, tenant, index=0):
         "snapshot_type": str(raw.get("snapshot_type") or "published_review").strip() or "published_review",
         "knowledge_attachments": attachments,
         "selected_cards": selected_cards,
-        "data_sources": [str(source).strip() for source in (raw.get("data_sources") if isinstance(raw.get("data_sources"), list) else []) if str(source).strip()][:12],
+        "data_sources": sanitize_user_facing_source_list(raw.get("data_sources") if isinstance(raw.get("data_sources"), list) else [])[:12],
         "news_sources": [str(source).strip() for source in (raw.get("news_sources") if isinstance(raw.get("news_sources"), list) else []) if str(source).strip()][:12],
         "llm_models": llm_models,
         "polished_input_text": str(raw.get("polished_input_text") or "").strip()[:12000],
