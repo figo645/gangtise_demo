@@ -299,6 +299,13 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertNotIn("触达 128 位留资用户", html)
         self.assertNotIn(">最近群发<", html)
 
+    def test_given_h5_feed_when_page_renders_then_stock_signal_does_not_expose_internal_function_name(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertNotIn("macro_china_cpi_monthly()", html)
+
     def test_given_empty_source_text_when_generating_review_draft_then_reject(self):
         response = self.client.post(
             "/api/review/generate-draft",

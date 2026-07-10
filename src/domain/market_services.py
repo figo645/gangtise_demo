@@ -2909,8 +2909,49 @@ def build_watchlist_signal_bundle(stock_code, stock_name, industry, context):
     attention_count = sum(1 for item in related_items if item and item.get("status") == "attention")
     dominant_item = related_items[0] if related_items else (warnings[0] if warnings else (attentions[0] if attentions else None))
     board_alert_level = "warning" if warning_count else ("attention" if attention_count else "normal")
+
+    def _sanitize_summary_text(text):
+        cleaned = re.sub(r"[A-Za-z_][A-Za-z0-9_]*\(\)", "", str(text or "")).strip()
+        cleaned = re.sub(r"\s+", " ", cleaned)
+        cleaned = re.sub(r"^[：:;\-，,\s]+", "", cleaned)
+        cleaned = cleaned.replace("宏观接口", "宏观信号")
+        return cleaned.strip("：:;，, ")
+
+    board_summary_templates = {
+        "半导体制造": {
+            "warning": "景气验证仍有压力，优先盯产能利用率和盈利兑现。",
+            "attention": "国产替代逻辑仍在，短期继续跟踪盈利兑现。",
+            "normal": "产业趋势还在，当前按盈利兑现节奏继续观察。",
+        },
+        "动力电池": {
+            "warning": "价格竞争仍在，先看利润率和海外出货是否稳住。",
+            "attention": "情绪回落后更适合继续看技术路线和订单验证。",
+            "normal": "行业主线未破坏，重点跟踪新技术和出货节奏。",
+        },
+        "港股互联网": {
+            "warning": "估值修复放缓，先看财报兑现和资金延续。",
+            "attention": "回购和财报兑现仍是两条主验证线。",
+            "normal": "当前更适合围绕回购、利润率和南向资金继续跟踪。",
+        },
+        "高端白酒": {
+            "warning": "消费修复仍需验证，先看需求和估值承接。",
+            "attention": "盈利稳定但弹性有限，继续看消费修复持续性。",
+            "normal": "品牌力和现金流仍稳，当前按消费修复节奏跟踪。",
+        },
+        "银行": {
+            "warning": "防守价值还在，但要继续跟踪息差压力。",
+            "attention": "适合作为组合稳定器，继续看股息和资产质量。",
+            "normal": "股息和资产质量稳定，更适合稳健跟踪。",
+        },
+    }
+
     if dominant_item:
-        board_summary = f"{dominant_item.get('name') or '核心指标'}：{dominant_item.get('assessment') or dominant_item.get('alert') or '需继续观察'}"
+        default_summary = _sanitize_summary_text(dominant_item.get("assessment") or dominant_item.get("alert") or "需继续观察")
+        board_summary = (
+            board_summary_templates.get(industry_text, {}).get(board_alert_level)
+            or default_summary
+            or "当前需继续观察价格、行业位置和验证节点。"
+        )
         board_alert_text = dominant_item.get("alert") or dominant_item.get("assessment") or "当前无明显预警"
     else:
         board_summary = "当前未匹配到高优先级指标，继续观察价格、行业位置和验证节点。"
@@ -3499,4 +3540,3 @@ def gen_user_segments():
         {"segment": "机构试点", "count": 34, "pct": 2.7},
         {"segment": "种子KOL", "count": 12, "pct": 0.9},
     ]
-
