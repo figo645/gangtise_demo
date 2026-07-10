@@ -2105,6 +2105,30 @@ def build_default_fund_dashboard_cards(tenant, layout="2x2"):
     return cards
 
 
+def normalize_fund_dashboard_card_refs(raw_cards, layout):
+    target_count = get_dashboard_card_target(layout)
+    items = raw_cards if isinstance(raw_cards, list) else []
+    normalized = []
+    seen_codes = set()
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        indicator_code = slugify_code(item.get("indicatorCode") or item.get("indicator_code"), "")
+        if indicator_code:
+            if indicator_code in seen_codes:
+                continue
+            seen_codes.add(indicator_code)
+            normalized.append({"indicatorCode": indicator_code})
+            if len(normalized) >= target_count:
+                break
+            continue
+        if str(item.get("name") or "").strip():
+            normalized.append(item)
+            if len(normalized) >= target_count:
+                break
+    return normalized[:target_count]
+
+
 def normalize_fund_dashboard_view(source, tenant):
     defaults = {
         "layout": "2x2",
@@ -2117,7 +2141,7 @@ def normalize_fund_dashboard_view(source, tenant):
     layout = normalize_dashboard_layout(raw.get("layout") or defaults["layout"])
     hub = build_indicator_hub(tenant=tenant, admin_view=False)
     indicator_map = {item.get("id"): item for item in (hub.get("smart_items") or []) + (hub.get("lake_items") or []) if item.get("id")}
-    raw_cards = raw.get("cards") if isinstance(raw.get("cards"), list) else []
+    raw_cards = normalize_fund_dashboard_card_refs(raw.get("cards"), layout)
     cards = []
     for index in range(get_dashboard_card_target(layout)):
         item = raw_cards[index] if index < len(raw_cards) and isinstance(raw_cards[index], dict) else {}

@@ -5,7 +5,12 @@ from unittest.mock import patch
 import app as app_entry
 import src.web.hooks as web_hooks
 from src.domain import ai_services
-from src.domain.core_services import get_tenant_by_slug, resolve_tenant_review_snapshots
+from src.domain.core_services import (
+    get_tenant_by_slug,
+    normalize_fund_dashboard_card_refs,
+    normalize_fund_dashboard_view,
+    resolve_tenant_review_snapshots,
+)
 from src.services import get_tenant_configs
 
 
@@ -201,6 +206,98 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("published_reviews", html)
         self.assertIn("/api/review/generate-draft", html)
         self.assertIn("/api/review/compose-draft", html)
+
+    def test_given_workbench_when_page_renders_then_fan_message_block_is_removed(self):
+        response = self.client.get(f"/kol-workbench?tenant={self.tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertNotIn('data-section="messages"', html)
+        self.assertNotIn('id="workbench-section-messages"', html)
+        self.assertNotIn("kwRenderMessageCenter()", html)
+        self.assertNotIn("待回复消息", html)
+        self.assertNotIn("未读粉丝会话", html)
+
+    def test_given_workbench_when_page_renders_then_broadcast_block_is_removed(self):
+        response = self.client.get(f"/kol-workbench?tenant={self.tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertNotIn('data-section="broadcast"', html)
+        self.assertNotIn('id="workbench-section-broadcast"', html)
+        self.assertNotIn("kwRenderBroadcastHistory()", html)
+
+    def test_given_h5_when_smart_indicator_editor_renders_then_formula_builder_assets_exist(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("公式编辑器", html)
+        self.assertIn("function insertWorkbenchSmartTagReference(tagCode)", html)
+        self.assertIn("function insertWorkbenchSmartOperator(operator)", html)
+        self.assertIn("id=\"wb-smart-indicator-formula-tools\"", html)
+        self.assertIn("id=\"wb-smart-indicator-formula-hint\"", html)
+        self.assertIn("点击指标会直接插入下方公式编辑器", html)
+        self.assertIn("正在生成智能指标预览", html)
+        self.assertIn("wbSmartIndicatorDraft.isGenerating", html)
+        self.assertIn("生成中...", html)
+        self.assertIn("function getWorkbenchDirectPreviewCandidate(selectedTagCodes)", html)
+        self.assertIn("direct_reference", html)
+        self.assertIn("已直接引用指标，无需等待生成", html)
+        self.assertIn("这是已有指标的直接引用，不需要等待 LLM 生成", html)
+        self.assertIn("function buildWorkbenchSmartDashboardCardRefs(active, layout, slotIndex, nextIndicatorCode)", html)
+        self.assertNotIn("当前值为 151.275", html)
+        self.assertNotIn('wb-dashboard-summary-card filled" style="margin-top:10px"', html)
+
+    def test_given_h5_when_page_renders_then_on_demand_fundamental_panel_is_removed(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertNotIn("按需基本面面板", html)
+        self.assertNotIn("面向大V的通用分析设计", html)
+        self.assertNotIn("选择分析模块", html)
+        self.assertNotIn("发起综合分析", html)
+
+    def test_given_duplicate_dashboard_cards_when_normalized_then_indicator_codes_are_unique(self):
+        normalized = normalize_fund_dashboard_card_refs(
+            [
+                {"indicatorCode": "laowang_cpi"},
+                {"indicatorCode": "laowang_cpi"},
+                {"indicatorCode": "gold_silver_ratio"},
+            ],
+            "2x2",
+        )
+
+        indicator_codes = [item.get("indicatorCode") for item in normalized if item.get("indicatorCode")]
+        self.assertEqual(indicator_codes, list(dict.fromkeys(indicator_codes)))
+        self.assertEqual(len(indicator_codes), 2)
+
+    def test_given_h5_when_page_renders_then_fan_stock_observation_uses_sector_chart(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('id="wb-fan-stock-sector-chart"', html)
+        self.assertIn("function renderFanStockSectorChart()", html)
+        self.assertIn("function openFanStockInsightStock(stockCode)", html)
+        self.assertIn("按板块看访问热度", html)
+        self.assertNotIn("投研达人_小陈 · 中际旭创", html)
+        self.assertNotIn("价值猎人小林 · 腾讯控股", html)
+
+    def test_given_h5_workbench_when_page_renders_then_message_and_broadcast_blocks_are_removed(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertNotIn('id="wb-fan-inbox"', html)
+        self.assertNotIn('id="wb-quick-reply"', html)
+        self.assertNotIn('id="wb-broadcast-text"', html)
+        self.assertNotIn('id="wb-broadcast-history"', html)
+        self.assertNotIn("查看全部 ›", html)
+        self.assertNotIn("快速回复选中粉丝", html)
+        self.assertNotIn("触达 128 位留资用户", html)
+        self.assertNotIn(">最近群发<", html)
 
     def test_given_empty_source_text_when_generating_review_draft_then_reject(self):
         response = self.client.post(
