@@ -3836,6 +3836,28 @@ def get_runtime_db_target():
     }
 
 
+def get_staging_app_db_target():
+    return {
+        "host": APP_DB_HOST,
+        "port": APP_DB_PORT,
+        "dbname": APP_DB_NAME,
+        "user": APP_DB_USER,
+        "password": APP_DB_PASSWORD,
+        "label": "staging",
+    }
+
+
+def get_local_app_db_target():
+    return {
+        "host": LOCAL_POSTGRES_HOST,
+        "port": LOCAL_POSTGRES_PORT,
+        "dbname": LOCAL_POSTGRES_DB,
+        "user": LOCAL_POSTGRES_USER,
+        "password": LOCAL_POSTGRES_PASSWORD,
+        "label": "local",
+    }
+
+
 def reset_request_runtime_state():
     db = g.pop("db", None)
     if db is not None:
@@ -3875,6 +3897,117 @@ def get_app_db_connection():
         password=target.get("password") or APP_DB_PASSWORD,
         connect_timeout=8,
     )
+
+
+def get_db_connection_for_target(target):
+    db_target = target if isinstance(target, dict) else {}
+    return psycopg2.connect(
+        host=db_target.get("host") or APP_DB_HOST,
+        port=db_target.get("port") or APP_DB_PORT,
+        dbname=db_target.get("dbname") or APP_DB_NAME,
+        user=db_target.get("user") or APP_DB_USER,
+        password=db_target.get("password") or APP_DB_PASSWORD,
+        connect_timeout=8,
+    )
+
+
+def _extract_site_config_payload(row):
+    raw_value = None
+    if isinstance(row, dict):
+        raw_value = row.get("setting_value")
+    elif row is not None:
+        try:
+            raw_value = row["setting_value"]
+        except Exception:
+            raw_value = None
+    if isinstance(raw_value, dict):
+        return raw_value
+    if isinstance(raw_value, str) and raw_value.strip():
+        try:
+            decoded = json.loads(raw_value)
+        except Exception:
+            app.logger.exception("Failed to decode site config payload from direct db read")
+            return {}
+        if isinstance(decoded, dict):
+            return decoded
+    return {}
+
+
+def load_site_config_from_db_target(target):
+    config = copy.deepcopy(DEFAULT_SITE_CONFIG)
+    connection = get_db_connection_for_target(target)
+    try:
+        cursor = connection.cursor(cursor_factory=RealDictCursor)
+        cursor.execute(
+            "SELECT setting_value FROM app_settings WHERE setting_key = %s",
+            (SITE_CONFIG_KEY,),
+        )
+        stored = _extract_site_config_payload(cursor.fetchone())
+        if stored:
+            config = _merge_site_config(config, stored)
+    finally:
+        connection.close()
+    return normalize_site_config(config)
+
+
+def save_site_config_to_db_target(config, target):
+    merged = normalize_site_config(config)
+    connection = get_db_connection_for_target(target)
+    try:
+        cursor = connection.cursor()
+        cursor.execute(
+            """
+            INSERT INTO app_settings (setting_key, setting_value, updated_at)
+            VALUES (%s, %s, %s)
+            ON CONFLICT(setting_key) DO UPDATE SET
+                setting_value = excluded.setting_value,
+                updated_at = excluded.updated_at
+            """,
+            (
+                SITE_CONFIG_KEY,
+                json.dumps(merged, ensure_ascii=False),
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            ),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+    return merged
+
+
+def sync_local_llm_registry_from_staging():
+    local_target = get_local_app_db_target()
+    staging_target = get_staging_app_db_target()
+    local_site_config = load_site_config_from_db_target(local_target)
+    staging_site_config = load_site_config_from_db_target(staging_target)
+    next_local_site_config = copy.deepcopy(local_site_config)
+    next_local_site_config["llm_registry"] = normalize_llm_registry_config(
+        staging_site_config.get("llm_registry")
+    )
+    saved_local_site_config = save_site_config_to_db_target(next_local_site_config, local_target)
+    runtime_target = get_runtime_db_target()
+    if not bool(runtime_target.get("use_staging")):
+        g.site_config = saved_local_site_config
+    registry = normalize_llm_registry_config(saved_local_site_config.get("llm_registry"))
+    return {
+        "local_site_config": saved_local_site_config,
+        "local_llm_registry": registry,
+        "synced_model_count": len(registry.get("models") or []),
+        "default_model_key": registry.get("default_model_key") or "",
+        "current_runtime_uses_staging": bool(runtime_target.get("use_staging")),
+        "local_db_target": {
+            "label": local_target.get("label") or "local",
+            "host": local_target.get("host") or "",
+            "port": local_target.get("port") or "",
+            "dbname": local_target.get("dbname") or "",
+        },
+        "staging_db_target": {
+            "label": staging_target.get("label") or "staging",
+            "host": staging_target.get("host") or "",
+            "port": staging_target.get("port") or "",
+            "dbname": staging_target.get("dbname") or "",
+        },
+    }
 
 
 def is_db_unavailable_error(error):

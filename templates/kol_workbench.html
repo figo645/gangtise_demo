@@ -6995,6 +6995,29 @@ function kwRenderReviewDraftProgressPanel() {
   `;
 }
 
+function kwGetModalSheetByContentId(contentId) {
+  const host = document.getElementById(contentId);
+  if (!host) return null;
+  return host.closest('.kw-review-modal-sheet');
+}
+
+function kwCaptureModalSheetScroll(contentId) {
+  const sheet = kwGetModalSheetByContentId(contentId);
+  if (!sheet) return null;
+  return {
+    top: sheet.scrollTop,
+    left: sheet.scrollLeft,
+  };
+}
+
+function kwRestoreModalSheetScroll(contentId, snapshot) {
+  if (!snapshot) return;
+  const sheet = kwGetModalSheetByContentId(contentId);
+  if (!sheet) return;
+  sheet.scrollTop = Number(snapshot.top || 0);
+  sheet.scrollLeft = Number(snapshot.left || 0);
+}
+
 function kwOpenReviewIngestResultModal(title, lines) {
   const host = document.getElementById('kw-dashboard-cell-modal-content');
   const modal = document.getElementById('kw-dashboard-cell-modal');
@@ -7765,6 +7788,7 @@ function kwRenderReviewWhiteboxPanel() {
 function kwRenderReviewTriggerModal() {
   const host = document.getElementById('kw-review-trigger-modal-content');
   if (!host) return;
+  const scrollSnapshot = kwCaptureModalSheetScroll('kw-review-trigger-modal-content');
   const focusNames = getKwTenantWatchlistFocus();
   host.innerHTML = `
     <div class="kw-review-modal-head">
@@ -7837,6 +7861,7 @@ function kwRenderReviewTriggerModal() {
   `;
   kwEnsureReviewEditors();
   kwRenderReviewStudio();
+  kwRestoreModalSheetScroll('kw-review-trigger-modal-content', scrollSnapshot);
 }
 
 function kwOpenReviewTriggerModal(sourceMode) {

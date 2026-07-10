@@ -1088,6 +1088,7 @@ body { background: var(--surface-2); color: var(--text-main); }
   grid-template-columns:1fr 1fr;
   gap:10px;
 }
+.wb-dashboard-summary-grid.single-card { grid-template-columns:1fr; }
 .wb-dashboard-summary-grid.cols-3 { grid-template-columns:1fr 1fr; }
 .wb-dashboard-summary-grid.cols-4 { grid-template-columns:1fr 1fr; }
 .wb-dashboard-summary-grid.cols-5 { grid-template-columns:1fr 1fr; }
@@ -1114,9 +1115,7 @@ body { background: var(--surface-2); color: var(--text-main); }
   background:rgba(47,116,192,0.04);
 }
 .wb-dashboard-summary-head {
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
+  display:grid;
   gap:8px;
   margin-bottom:8px;
 }
@@ -1124,9 +1123,12 @@ body { background: var(--surface-2); color: var(--text-main); }
   font-size:12px;
   font-weight:700;
   color:var(--white);
+  line-height:1.5;
+  word-break:break-word;
 }
 .wb-dashboard-summary-tag {
-  flex-shrink:0;
+  display:inline-flex;
+  width:max-content;
   font-size:10px;
   color:var(--gold);
   background:rgba(47,116,192,0.08);
@@ -2135,7 +2137,7 @@ body,
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
           <div>
             <div class="fund-overview-title">今日基本面首页</div>
-            <div class="fund-overview-desc">先看宏观核心指标有没有报警，再看自选股板块预警，接着看大V的今日基本面解读，最后只保留真正值得看的综合要闻。</div>
+            <div class="fund-overview-desc">先看宏观核心指标有没有报警，再看自选股板块预警，最后只保留真正值得看的综合要闻。</div>
           </div>
           <span class="tag tag-gold">决策首页</span>
         </div>
@@ -2195,15 +2197,10 @@ body,
     </div>
 
     <div class="h5-section">
-      <div class="h5-section-title">今日基本面解读</div>
-      <div id="feed-fundamental-column"></div>
-    </div>
-
-    <div class="h5-section">
       <div class="h5-section-title">综合归纳要闻</div>
       <div class="fund-news-hint">这里不是普通新闻流，只保留三类值得看的内容：和自选股直接相关的、被大V趋势持续关注的、以及会影响当前判断框架的全球要闻。</div>
       {% for item in news %}
-      <div class="news-item fund-news-item">
+      <div class="news-item fund-news-item" style="cursor:pointer" onclick='showFundNewsDetail({{ item | tojson }})'>
         <div class="news-item-header">
           <div class="news-title">{{ item.title }}</div>
           <span class="fund-news-source">{{ item.source_group }}</span>
@@ -3313,6 +3310,8 @@ let reviewTriggerDraft = {
   sourceMode: 'voice',
   paragraphMode: 'manual',
   skipAiProcessing: true,
+  flowStage: 'intake',
+  optimizeRuleMode: 'default',
   useVoiceLlmEnhancement: true,
   selectedWatchlist: [],
   voiceTranscript: '',
@@ -3321,6 +3320,7 @@ let reviewTriggerDraft = {
   aiPrompt: '',
   promptTags: [],
   generatedPreviewText: '',
+  draftReviewText: '',
   previewReady: false,
 };
 const reviewRuntimeStore = {};
@@ -4369,16 +4369,17 @@ function buildReviewArticleHeroVisual(article) {
   `;
 }
 
-function openReviewArticleModal(articleId) {
-  const article = getReviewArticleById(articleId);
-  const modal = document.getElementById('review-article-modal');
-  const host = document.getElementById('review-article-modal-content');
-  if (!article || !modal || !host) return;
-  host.innerHTML = `
+function renderReviewArticleDetailContent(article, options = {}) {
+  const previewMode = !!options.previewMode;
+  const heroDesc = previewMode
+    ? '这是发布前的最终预览。当前阅读态会尽量贴近普通用户和大V最终看到的详情展示。'
+    : article.coverDesc;
+  const metaSuffix = previewMode ? ' · 预览态' : ` · 作者 ${escapeHtml(article.author)}`;
+  return `
     <div class="review-article-modal-head">
       <div class="review-article-modal-kicker">${escapeHtml(article.kicker)}</div>
       <div class="review-article-modal-title">${escapeHtml(article.title)}</div>
-      <div class="review-article-modal-meta">${escapeHtml(article.meta)} · 作者 ${escapeHtml(article.author)}</div>
+      <div class="review-article-modal-meta">${escapeHtml(article.meta)}${metaSuffix}</div>
       <div class="review-watchlist-row">
         ${(article.watchlist || []).map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
       </div>
@@ -4387,7 +4388,7 @@ function openReviewArticleModal(articleId) {
       <div class="review-article-hero">
         <div class="review-article-hero-copy">
           <div class="review-article-hero-title">${escapeHtml(article.coverTitle)}</div>
-          <div class="review-article-hero-desc">${escapeHtml(article.coverDesc)}</div>
+          <div class="review-article-hero-desc">${escapeHtml(heroDesc)}</div>
         </div>
         <div style="padding:12px 14px 14px">${buildReviewArticleHeroVisual(article)}</div>
       </div>
@@ -4462,6 +4463,51 @@ function openReviewArticleModal(articleId) {
       </div>
     </div>
   `;
+}
+
+function buildReviewPreviewArticle() {
+  const user = getActiveDemoUser();
+  const runtime = ensureTenantReviewRuntime(user.tenant.id);
+  const previewBody = getReviewPreviewText();
+  const periodMeta = getReviewPeriodMeta(reviewTriggerDraft.period || currentReviewPeriod || 'day');
+  const focusNames = (reviewTriggerDraft.selectedWatchlist || []).length
+    ? reviewTriggerDraft.selectedWatchlist.slice(0)
+    : getDavReviewSelectedWatchlist(user.tenant.id);
+  const sourceCfg = REVIEW_SOURCE_OPTIONS.find(item => item.value === reviewTriggerDraft.sourceMode) || REVIEW_SOURCE_OPTIONS[0];
+  const paragraphLabel = reviewTriggerDraft.paragraphMode === 'ai' ? '智能优化后草稿' : '用户原稿直出';
+  return buildReviewArticleData({
+    id: `preview-${user.tenant.id}-${reviewTriggerDraft.period || currentReviewPeriod || 'day'}`,
+    author: user.tenant.advisor,
+    avatar: user.tenant.advisor === '财经老王' ? '👑' : '🧭',
+    periodLabel: periodMeta.label,
+    generatedAt: runtime.kolGeneratedAt || '刚刚生成',
+    title: `${periodMeta.label}预览：${focusNames[0] || '重点样本'}等重点样本复盘`,
+    summary: previewBody.slice(0, 140) || '当前预览还没有生成正文。',
+    tags: [periodMeta.label, sourceCfg.label, paragraphLabel],
+    watchlist: focusNames,
+    annotations: [],
+    selectedCards: [],
+    knowledgeAttachments: [],
+    dataSources: reviewTriggerDraft.sourceMode === 'file' ? ['用户上传文件'] : (reviewTriggerDraft.sourceMode === 'voice' ? ['用户语音转写文稿'] : ['用户手写正文']),
+    newsSources: [],
+    llmModels: reviewIngestResult && reviewIngestResult.review_draft_llm ? [{
+      stage: 'draft',
+      label: reviewIngestResult.review_draft_llm.label || reviewIngestResult.review_draft_llm.model_name || '已调用模型',
+      model_name: reviewIngestResult.review_draft_llm.model_name || '',
+      key: reviewIngestResult.review_draft_llm.key || '',
+    }] : [],
+    paragraphs: [
+      { title: '完整复盘正文', text: previewBody || '暂无正文' },
+    ],
+  });
+}
+
+function openReviewArticleModal(articleId) {
+  const article = getReviewArticleById(articleId);
+  const modal = document.getElementById('review-article-modal');
+  const host = document.getElementById('review-article-modal-content');
+  if (!article || !modal || !host) return;
+  host.innerHTML = renderReviewArticleDetailContent(article);
   modal.classList.add('show');
 }
 
@@ -4590,52 +4636,8 @@ function renderReviewWatchlistSelectionMode() {
 function renderDavReviewStudio(user) {
   const host = document.getElementById('review-dav-studio');
   if (!host) return;
-  if (user.role !== 'dav') {
-    host.style.display = 'none';
-    host.innerHTML = '';
-    return;
-  }
-  host.style.display = 'block';
-  const selectedNames = getDavReviewSelectedWatchlist(user.tenant.id);
-  host.innerHTML = `
-    <div class="card" style="padding:16px;margin-bottom:12px">
-      <div class="review-role-toolbar">
-        <div>
-          <div class="review-role-title">大V复盘供稿台</div>
-          <div class="review-role-desc">你可以通过语音口述、手写正文或文件上传来生成完整复盘。最终前台展示给普通用户和大V看到的是同一篇已发布复盘分析报告。</div>
-        </div>
-        <span class="tag tag-gold">仅大V可见</span>
-      </div>
-      <div class="review-source-grid">
-        <div class="review-source-card" onclick="openReviewTriggerModal('voice')">
-          <div class="review-source-icon">🎙️</div>
-          <div class="review-source-title">语音口述</div>
-          <div class="review-source-desc">先点输入按钮口述，系统自动转成复盘文案。</div>
-        </div>
-        <div class="review-source-card" onclick="openReviewTriggerModal('manual')">
-          <div class="review-source-icon">✍️</div>
-          <div class="review-source-title">手写正文</div>
-          <div class="review-source-desc">直接完善完整复盘正文，发布后以前台文章形式展示。</div>
-        </div>
-        <div class="review-source-card" onclick="openReviewTriggerModal('file')">
-          <div class="review-source-icon">📎</div>
-          <div class="review-source-title">上传文件</div>
-          <div class="review-source-desc">上传后自动抽取并转成复盘文案。</div>
-        </div>
-      </div>
-      <div class="review-flow-row">
-        <span class="review-flow-step">选择周期</span>
-        <span class="review-flow-step">确认本次自选股</span>
-        <span class="review-flow-step">输入或转化文案</span>
-        <span class="review-flow-step">补充正文表达</span>
-        <span class="review-flow-step">生成复盘草稿</span>
-        <span class="review-flow-step">预览确认后发布</span>
-      </div>
-      <div class="review-watchlist-row" style="margin-top:10px">
-        ${selectedNames.map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
-      </div>
-    </div>
-  `;
+  host.style.display = 'none';
+  host.innerHTML = '';
 }
 
 function renderReviewExperience() {
@@ -4691,6 +4693,10 @@ function openReviewTriggerModal(sourceMode) {
   reviewTriggerDraft.aiPrompt = runtime.latestAiPrompt || '';
   reviewTriggerDraft.promptTags = Array.isArray(runtime.latestPromptTags) ? runtime.latestPromptTags.slice(0) : [];
   reviewTriggerDraft.generatedPreviewText = runtime.latestGeneratedPreviewText || '';
+  reviewTriggerDraft.draftReviewText = runtime.latestDraftReviewText || runtime.latestGeneratedPreviewText || '';
+  reviewTriggerDraft.flowStage = 'intake';
+  reviewTriggerDraft.optimizeRuleMode = 'default';
+  reviewTriggerDraft.skipAiProcessing = true;
   reviewTriggerDraft.previewReady = false;
   const modal = document.getElementById('review-trigger-modal');
   if (!modal) return;
@@ -4712,10 +4718,9 @@ function getReviewDraftContentText() {
 }
 
 function getReviewPreviewText() {
-  if (reviewTriggerDraft.paragraphMode === 'manual') {
-    return getReviewDraftContentText();
-  }
-  return String(reviewTriggerDraft.generatedPreviewText || '').trim() || getReviewDraftContentText();
+  return String(reviewTriggerDraft.draftReviewText || '').trim()
+    || String(reviewTriggerDraft.generatedPreviewText || '').trim()
+    || getReviewDraftContentText();
 }
 
 let reviewVoiceRecorder = null;
@@ -4754,6 +4759,32 @@ async function generateReviewDraftWithLlm() {
     throw new Error((data && data.error) || 'review_draft_generation_failed');
   }
   return data;
+}
+
+function hasConfiguredGeneralLlm() {
+  const registry = (window.SITE_CONFIG && window.SITE_CONFIG.llm_registry) || {};
+  const models = Array.isArray(registry.models) ? registry.models : [];
+  const defaultKey = String(registry.default_model_key || '').trim();
+  if (!models.length) return false;
+  if (defaultKey) {
+    return models.some((item) => item && item.enabled !== false && String(item.key || '').trim() === defaultKey);
+  }
+  return models.some((item) => item && item.enabled !== false && String(item.purpose || 'general').trim().toLowerCase() === 'general');
+}
+
+function getReviewDraftGenerationErrorMessage(error) {
+  const raw = String((error && error.message) || '').trim();
+  if (!raw) return '智能优化失败，请稍后重试';
+  if (raw.includes('review_draft_llm_not_configured')) {
+    return '当前还没有配置可用的大模型。请先到 Admin 的系统专区 · 大模型专区配置一个通用模型。';
+  }
+  if (raw.includes('llm_api_key_missing')) {
+    return '大模型 API Key 未配置，请先到 Admin 的系统专区 · 大模型专区补全。';
+  }
+  if (raw.includes('llm_request_failed')) {
+    return '大模型调用失败，请检查模型配置、Base URL 或网络连通性。';
+  }
+  return raw;
 }
 
 function formatReviewJobStage(stage) {
@@ -5140,48 +5171,101 @@ function renderReviewInputPanel() {
 }
 
 function renderReviewPromptPanel() {
-  if (reviewTriggerDraft.paragraphMode !== 'ai' || reviewTriggerDraft.skipAiProcessing) return '';
+  if (reviewTriggerDraft.flowStage !== 'optimize_rule') return '';
+  const useCustomRule = reviewTriggerDraft.optimizeRuleMode === 'custom';
   return `
     <div class="knowledge-modal-block">
-      <label class="knowledge-modal-label">智能整理规则</label>
-      <textarea id="review-ai-prompt-input" class="knowledge-modal-textarea" placeholder="例如：更口语化，但保留原始观点，不要写买卖建议。">${escapeHtml(reviewTriggerDraft.aiPrompt || '')}</textarea>
-      <div class="review-prompt-tag-row" style="margin-top:10px">
-        ${REVIEW_PROMPT_TAGS.map(tag => `
-          <button class="review-prompt-tag ${reviewTriggerDraft.promptTags.includes(tag) ? 'active' : ''}" onclick="toggleReviewPromptTag('${tag}')">${escapeHtml(tag)}</button>
-        `).join('')}
+      <label class="knowledge-modal-label">智能优化规则</label>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:10px">点击智能优化后，你可以让大模型按默认方式整理，也可以补充具体规则。这里不会直接发布，优化结果会先进入 draft 审核。</div>
+      <div class="knowledge-source-selector" style="grid-template-columns:repeat(2,1fr)">
+        <div class="knowledge-source-pill ${reviewTriggerDraft.optimizeRuleMode === 'default' ? 'active' : ''}" onclick="setReviewOptimizeRuleMode('default')">忽略规则，默认优化</div>
+        <div class="knowledge-source-pill ${useCustomRule ? 'active' : ''}" onclick="setReviewOptimizeRuleMode('custom')">输入规则后优化</div>
       </div>
+      ${useCustomRule ? `
+        <textarea id="review-ai-prompt-input" class="knowledge-modal-textarea" style="margin-top:10px" placeholder="例如：更口语化，但保留原始观点，不要写买卖建议。">${escapeHtml(reviewTriggerDraft.aiPrompt || '')}</textarea>
+        <div class="review-prompt-tag-row" style="margin-top:10px">
+          ${REVIEW_PROMPT_TAGS.map(tag => `
+            <button class="review-prompt-tag ${reviewTriggerDraft.promptTags.includes(tag) ? 'active' : ''}" onclick="toggleReviewPromptTag('${tag}')">${escapeHtml(tag)}</button>
+          `).join('')}
+        </div>
+      ` : ''}
     </div>
   `;
 }
 
-function renderReviewPreviewPanel() {
-  if (!reviewTriggerDraft.previewReady) return '';
-  const previewText = getReviewPreviewText();
+function renderReviewDraftReviewPanel() {
+  if (reviewTriggerDraft.flowStage !== 'draft_review') return '';
   return `
-    <div class="review-preview-panel">
-      <div class="review-preview-head">
-        <div>
-          <div class="review-preview-title">草稿预览</div>
-          <div class="review-summary-desc">确认没问题后再发布</div>
-        </div>
-        <span class="review-draft-status">待发布</span>
-      </div>
-      <div class="review-preview-copy">${escapeHtml(previewText)}</div>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">Draft 审核与详细修改</label>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">这是智能优化后的草稿。你可以继续详细修改，确认无误后再进入最终预览。</div>
+      <textarea id="review-draft-review-input" class="knowledge-modal-textarea" style="min-height:220px" placeholder="在这里继续修改优化后的复盘草稿。">${escapeHtml(reviewTriggerDraft.draftReviewText || reviewTriggerDraft.generatedPreviewText || getReviewDraftContentText())}</textarea>
     </div>
   `;
+}
+
+function isReviewInputStage() {
+  return reviewTriggerDraft.flowStage === 'intake' || reviewTriggerDraft.flowStage === 'optimize_rule';
+}
+
+function isReviewDraftProcessingStage() {
+  return reviewTriggerDraft.flowStage === 'draft_generating';
+}
+
+function renderReviewPreviewPanel() {
+  if (!reviewTriggerDraft.previewReady || reviewTriggerDraft.flowStage !== 'preview') return '';
+  const article = buildReviewPreviewArticle();
+  return `
+    <div class="review-preview-panel" style="padding:0;background:#FFFFFF;border-color:rgba(47,116,192,0.12)">
+      ${renderReviewArticleDetailContent(article, { previewMode: true })}
+    </div>
+  `;
+}
+
+function getModalSheetByContentId(contentId) {
+  const host = document.getElementById(contentId);
+  if (!host) return null;
+  return host.closest('.modal-sheet');
+}
+
+function captureModalSheetScroll(contentId) {
+  const sheet = getModalSheetByContentId(contentId);
+  if (!sheet) return null;
+  return {
+    top: sheet.scrollTop,
+    left: sheet.scrollLeft,
+  };
+}
+
+function restoreModalSheetScroll(contentId, snapshot) {
+  if (!snapshot) return;
+  const sheet = getModalSheetByContentId(contentId);
+  if (!sheet) return;
+  sheet.scrollTop = Number(snapshot.top || 0);
+  sheet.scrollLeft = Number(snapshot.left || 0);
 }
 
 function renderReviewTriggerModal(user) {
   const host = document.getElementById('review-trigger-modal-content');
   if (!host) return;
+  const scrollSnapshot = captureModalSheetScroll('review-trigger-modal-content');
   const focusNames = getTenantWatchlistFocus(user.tenant.id);
+  const stageLabelMap = {
+    intake: '1/3 输入稿件',
+    optimize_rule: '1/3 选择优化规则',
+    draft_generating: '2/3 Draft 生成中',
+    draft_review: '2/3 Draft 审核',
+    preview: '3/3 最终预览',
+  };
+  const stageLabel = stageLabelMap[reviewTriggerDraft.flowStage] || stageLabelMap.intake;
   host.innerHTML = `
     <div class="modal-title" style="margin-bottom:10px">${user.role === 'dav' ? '发起大V复盘' : '发起智能复盘'}</div>
     <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">
       ${user.role === 'dav'
-        ? '先选择复盘周期，再补充语音口述、手写正文或文件上传内容。生成草稿后先预览，确认没问题再发布。'
+        ? '先提交手写、录音或文件内容；可以智能优化后进入 draft 审核，也可以不经大模型直接预览。预览确认后再发布。'
         : '生成复盘前必须先选择复盘周期。系统会结合你的自选股、所属大V最近复盘和当前阶段行情生成一版短版智能复盘。'}
     </div>
+    ${user.role === 'dav' ? `<div class="review-flow-row" style="margin-bottom:12px"><span class="review-flow-step">${escapeHtml(stageLabel)}</span><span class="review-flow-step">智能优化可选</span><span class="review-flow-step">人工确认发布</span></div>` : ''}
     <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">复盘周期</label>
       <div class="review-period-row">
@@ -5199,59 +5283,65 @@ function renderReviewTriggerModal(user) {
           `).join('')}
         </div>
       </div>
-      <div class="knowledge-modal-block">
-        <label class="knowledge-modal-label">输入内容</label>
-        ${renderReviewInputPanel()}
-      </div>
-      <div class="knowledge-modal-block">
-        <label class="knowledge-modal-label">正文生成方式</label>
-        <div class="knowledge-source-selector" style="grid-template-columns:repeat(2,1fr)">
-          ${REVIEW_PARAGRAPH_OPTIONS.map(item => `
-            <div class="knowledge-source-pill ${item.value === reviewTriggerDraft.paragraphMode ? 'active' : ''}" onclick="setReviewTriggerParagraphMode('${item.value}')">${item.label}</div>
-          `).join('')}
+      ${isReviewInputStage() ? `
+        <div class="knowledge-modal-block">
+          <label class="knowledge-modal-label">输入内容</label>
+          ${renderReviewInputPanel()}
         </div>
-        <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-top:8px">
-          ${reviewTriggerDraft.skipAiProcessing
-            ? '当前已关闭大模型处理，系统只保留原文和本地转化结果。'
-            : (reviewTriggerDraft.paragraphMode === 'manual' ? '会直接沿用你上面写好的完整正文，不再做二次整理。' : '系统会基于输入材料和你的修改规则整理出完整复盘草稿。')}
+        ${renderReviewPromptPanel()}
+        <div class="knowledge-modal-block">
+          <label class="knowledge-modal-label">本次纳入复盘的自选股</label>
+          <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">本次纳入复盘的自选股已经从自选列表里选择，这里只做确认，不再单独做选股归纳。</div>
+          <div class="review-watchlist-row">
+            ${focusNames.map(name => `
+              <button class="review-watchlist-chip selectable ${reviewTriggerDraft.selectedWatchlist.includes(name) ? 'active' : ''}" onclick="toggleReviewTriggerWatchlist('${name}')">${escapeHtml(name)}</button>
+            `).join('')}
+          </div>
         </div>
-      </div>
+      ` : ''}
+      ${isReviewDraftProcessingStage() ? `
+        <div class="knowledge-modal-block">
+          <label class="knowledge-modal-label">正在生成 Draft</label>
+          <div style="font-size:11px;color:var(--gray-400);line-height:1.7">原始输入已经提交给大模型处理。当前先进入 Draft 审核流程，待草稿生成完成后，会自动切换到可审核、可详细修改的页面。</div>
+        </div>
+      ` : ''}
+      ${renderReviewDraftReviewPanel()}
+    ` : ''}
+    ${reviewTriggerDraft.flowStage !== 'preview' ? `
       <div class="knowledge-modal-block">
-        <label class="knowledge-modal-label">处理选项</label>
-        <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--text-main);line-height:1.7">
-          <input type="checkbox" id="review-skip-ai-processing" ${reviewTriggerDraft.skipAiProcessing ? 'checked' : ''} onchange="toggleReviewSkipAiProcessing(this.checked)" />
-          <span>不使用大模型处理。勾选后，只走原文 / 本地转化路径，不做 AI 整理。</span>
-        </label>
-      </div>
-      ${renderReviewPromptPanel()}
-      <div class="knowledge-modal-block">
-        <label class="knowledge-modal-label">本次纳入复盘的自选股</label>
-        <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">本次纳入复盘的自选股已经从自选列表里选择，这里只做确认，不再单独做选股归纳。</div>
+        <label class="knowledge-modal-label">${user.role === 'dav' ? '本次复盘覆盖' : '本次智能复盘输入'}</label>
         <div class="review-watchlist-row">
-          ${focusNames.map(name => `
-            <button class="review-watchlist-chip selectable ${reviewTriggerDraft.selectedWatchlist.includes(name) ? 'active' : ''}" onclick="toggleReviewTriggerWatchlist('${name}')">${escapeHtml(name)}</button>
-          `).join('')}
+          ${(user.role === 'dav' ? reviewTriggerDraft.selectedWatchlist : focusNames).map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
         </div>
       </div>
     ` : ''}
-    <div class="knowledge-modal-block">
-      <label class="knowledge-modal-label">${user.role === 'dav' ? '本次复盘覆盖' : '本次智能复盘输入'}</label>
-      <div class="review-watchlist-row">
-        ${(user.role === 'dav' ? reviewTriggerDraft.selectedWatchlist : focusNames).map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
-      </div>
-    </div>
     ${user.role === 'dav' ? renderReviewDraftProgressPanel() : ''}
     ${user.role === 'dav' ? renderReviewPreviewPanel() : ''}
     <div class="modal-actions">
       <button class="btn-outline" onclick="closeReviewTriggerModal()">取消</button>
       ${user.role === 'dav'
-        ? `${reviewTriggerDraft.previewReady
-          ? '<button class="btn-gold" onclick="publishReviewDraft()">确认发布</button>'
-          : `<button class="btn-gold" ${reviewDraftGenerating ? 'disabled' : ''} onclick="submitReviewTrigger()">${reviewDraftGenerating ? '生成中...' : '生成草稿'}</button>`}`
+        ? renderReviewFlowActions()
         : '<button class="btn-gold" onclick="submitReviewTrigger()">生成智能复盘</button>'}
     </div>
   `;
   ensureReviewEditors();
+  restoreModalSheetScroll('review-trigger-modal-content', scrollSnapshot);
+}
+
+function renderReviewFlowActions() {
+  if (reviewDraftGenerating) {
+    return '<button class="btn-gold" disabled>优化中...</button>';
+  }
+  if (reviewTriggerDraft.flowStage === 'optimize_rule') {
+    return '<button class="btn-outline" onclick="backToReviewIntake()">返回输入</button><button class="btn-gold" onclick="submitReviewSmartOptimize()">开始智能优化</button>';
+  }
+  if (reviewTriggerDraft.flowStage === 'draft_review') {
+    return '<button class="btn-outline" onclick="backToReviewIntake()">回退修改</button><button class="btn-gold" onclick="confirmReviewDraftToPreview()">直接预览</button>';
+  }
+  if (reviewTriggerDraft.flowStage === 'preview' || reviewTriggerDraft.previewReady) {
+    return '<button class="btn-outline" onclick="backToReviewDraftEdit()">回退修改</button><button class="btn-gold" onclick="publishReviewDraft()">确认发布</button>';
+  }
+  return '<button class="btn-outline" onclick="prepareReviewDirectPreview()">直接预览</button><button class="btn-gold" onclick="openReviewOptimizeRuleStep()">智能优化</button>';
 }
 
 function setReviewTriggerPeriod(period) {
@@ -5267,6 +5357,8 @@ function setReviewTriggerSourceMode(mode) {
   reviewTriggerDraft.sourceMode = mode;
   reviewTriggerDraft.previewReady = false;
   reviewTriggerDraft.generatedPreviewText = '';
+  reviewTriggerDraft.draftReviewText = '';
+  reviewTriggerDraft.flowStage = 'intake';
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
@@ -5284,24 +5376,13 @@ function toggleReviewTriggerWatchlist(name) {
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
-function setReviewTriggerParagraphMode(mode) {
-  if (!REVIEW_PARAGRAPH_OPTIONS.some(item => item.value === mode)) return;
+function setReviewOptimizeRuleMode(mode) {
   syncReviewDraftFromModal();
-  reviewTriggerDraft.paragraphMode = mode;
-  reviewTriggerDraft.previewReady = false;
-  renderReviewTriggerModal(getActiveDemoUser());
-}
-
-function toggleReviewSkipAiProcessing(checked) {
-  syncReviewDraftFromModal();
-  reviewTriggerDraft.skipAiProcessing = !!checked;
-  if (reviewTriggerDraft.skipAiProcessing) {
-    reviewTriggerDraft.paragraphMode = 'manual';
+  reviewTriggerDraft.optimizeRuleMode = mode === 'custom' ? 'custom' : 'default';
+  if (reviewTriggerDraft.optimizeRuleMode === 'default') {
     reviewTriggerDraft.aiPrompt = '';
     reviewTriggerDraft.promptTags = [];
-    reviewTriggerDraft.generatedPreviewText = '';
   }
-  reviewTriggerDraft.previewReady = false;
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
@@ -5311,10 +5392,92 @@ function toggleReviewVoiceLlmEnhancement(checked) {
 
 function syncReviewDraftFromModal() {
   const promptInput = document.getElementById('review-ai-prompt-input');
-  const skipAiInput = document.getElementById('review-skip-ai-processing');
+  const draftReviewInput = document.getElementById('review-draft-review-input');
   syncReviewDraftFromEditors();
   if (promptInput) reviewTriggerDraft.aiPrompt = promptInput.value;
-  if (skipAiInput) reviewTriggerDraft.skipAiProcessing = !!skipAiInput.checked;
+  if (draftReviewInput) reviewTriggerDraft.draftReviewText = draftReviewInput.value;
+}
+
+function validateReviewIntakeReady() {
+  if (!reviewTriggerDraft.selectedWatchlist.length) {
+    showToast('请先至少选择 1 只自选股');
+    return false;
+  }
+  syncReviewDraftFromModal();
+  if (!getReviewDraftContentText()) {
+    showToast('请先补充输入内容');
+    return false;
+  }
+  return true;
+}
+
+function openReviewOptimizeRuleStep() {
+  if (!validateReviewIntakeReady()) return;
+  reviewTriggerDraft.flowStage = 'optimize_rule';
+  reviewTriggerDraft.paragraphMode = 'ai';
+  reviewTriggerDraft.skipAiProcessing = false;
+  reviewTriggerDraft.previewReady = false;
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+function prepareReviewDirectPreview() {
+  const user = getActiveDemoUser();
+  const runtime = ensureTenantReviewRuntime(user.tenant.id);
+  if (!validateReviewIntakeReady()) return;
+  reviewTriggerDraft.paragraphMode = 'manual';
+  reviewTriggerDraft.skipAiProcessing = true;
+  reviewTriggerDraft.generatedPreviewText = '';
+  reviewTriggerDraft.draftReviewText = getReviewDraftContentText();
+  reviewTriggerDraft.flowStage = 'preview';
+  reviewTriggerDraft.previewReady = true;
+  persistReviewDraftRuntime(runtime);
+  renderReviewTriggerModal(user);
+  showToast('已进入最终预览');
+}
+
+function backToReviewIntake() {
+  syncReviewDraftFromModal();
+  reviewTriggerDraft.flowStage = 'intake';
+  reviewTriggerDraft.previewReady = false;
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+function backToReviewDraftEdit() {
+  syncReviewDraftFromModal();
+  reviewTriggerDraft.previewReady = false;
+  reviewTriggerDraft.flowStage = reviewTriggerDraft.generatedPreviewText ? 'draft_review' : 'intake';
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+function confirmReviewDraftToPreview() {
+  const user = getActiveDemoUser();
+  const runtime = ensureTenantReviewRuntime(user.tenant.id);
+  syncReviewDraftFromModal();
+  if (!String(reviewTriggerDraft.draftReviewText || '').trim()) {
+    showToast('请先确认或填写 draft 正文');
+    return;
+  }
+  reviewTriggerDraft.flowStage = 'preview';
+  reviewTriggerDraft.previewReady = true;
+  persistReviewDraftRuntime(runtime);
+  renderReviewTriggerModal(user);
+  showToast('已进入最终预览');
+}
+
+function persistReviewDraftRuntime(runtime) {
+  runtime.kolGeneratedAt = '刚刚生成';
+  runtime.kolSourceMode = reviewTriggerDraft.sourceMode;
+  runtime.paragraphMode = reviewTriggerDraft.paragraphMode;
+  runtime.kolSelectedWatchlist = reviewTriggerDraft.selectedWatchlist.slice(0);
+  runtime.lastReviewPeriod = currentReviewPeriod;
+  runtime.latestVoiceTranscript = reviewTriggerDraft.voiceTranscript;
+  runtime.latestManualHtml = reviewTriggerDraft.manualHtml;
+  runtime.latestFileText = reviewTriggerDraft.fileText;
+  runtime.latestAiPrompt = reviewTriggerDraft.aiPrompt;
+  runtime.latestPromptTags = (reviewTriggerDraft.promptTags || []).slice(0);
+  runtime.latestGeneratedPreviewText = reviewTriggerDraft.generatedPreviewText || '';
+  runtime.latestDraftReviewText = reviewTriggerDraft.draftReviewText || '';
+  runtime.draftReady = true;
 }
 
 function captureReviewVoiceInput() {
@@ -5360,6 +5523,9 @@ function captureReviewVoiceInput() {
             const result = job.result || {};
             reviewTriggerDraft.voiceTranscript = result.display_transcript || result.enhanced_transcript || result.transcript || '';
             reviewTriggerDraft.previewReady = false;
+            reviewTriggerDraft.generatedPreviewText = '';
+            reviewTriggerDraft.draftReviewText = '';
+            reviewTriggerDraft.flowStage = 'intake';
             reviewIngestResult = result;
             openReviewIngestResultModal('语音转写成功（尚未入库）', [
               `转写引擎：${result.transcript_engine || '-'}`,
@@ -5400,6 +5566,9 @@ function captureReviewVoiceInput() {
 function captureReviewFileInput() {
   reviewTriggerDraft.fileText = '系统已从上传文件提炼文案：行业层面保留 AI 算力、半导体和港股互联网三条线，个股层面补充估值带、催化条件和风险边界，已整理为复盘草稿输入。';
   reviewTriggerDraft.previewReady = false;
+  reviewTriggerDraft.generatedPreviewText = '';
+  reviewTriggerDraft.draftReviewText = '';
+  reviewTriggerDraft.flowStage = 'intake';
   renderReviewTriggerModal(getActiveDemoUser());
   showToast('文件已转成文案');
 }
@@ -5417,105 +5586,88 @@ function toggleReviewPromptTag(tag) {
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
+async function submitReviewSmartOptimize() {
+  const user = getActiveDemoUser();
+  const runtime = ensureTenantReviewRuntime(user.tenant.id);
+  currentReviewPeriod = reviewTriggerDraft.period;
+  if (!validateReviewIntakeReady()) return;
+  if (!hasConfiguredGeneralLlm()) {
+    showToast('当前还没有配置可用的大模型。请先到 Admin 的系统专区 · 大模型专区配置一个通用模型。');
+    return;
+  }
+  syncReviewDraftFromModal();
+  reviewTriggerDraft.paragraphMode = 'ai';
+  reviewTriggerDraft.skipAiProcessing = false;
+  if (reviewTriggerDraft.optimizeRuleMode !== 'custom') {
+    reviewTriggerDraft.aiPrompt = '';
+    reviewTriggerDraft.promptTags = [];
+  }
+  reviewDraftGenerating = true;
+  reviewTriggerDraft.flowStage = 'draft_generating';
+  reviewTriggerDraft.previewReady = false;
+  reviewDraftJobState = {
+    status: 'running',
+    progress_stage: 'queued',
+    progress_percent: 6,
+    summary: '已提交任务，正在进入大模型处理队列',
+    result: { live_log: [] },
+  };
+  renderReviewTriggerModal(user);
+  try {
+    const draftResult = await generateReviewDraftWithLlm();
+    if (!draftResult.async || !draftResult.job_code) throw new Error('review_draft_job_missing');
+    await new Promise((resolve, reject) => {
+      startAsyncJobPolling(draftResult.job_code, {
+        onProgress(job) {
+          reviewDraftJobState = job || reviewDraftJobState;
+          renderReviewTriggerModal(user);
+        },
+        onSuccess(job) {
+          const result = job.result || {};
+          reviewTriggerDraft.generatedPreviewText = result.text || '';
+          reviewTriggerDraft.draftReviewText = result.text || getReviewDraftContentText();
+          reviewIngestResult = {
+            ...(reviewIngestResult || {}),
+            review_draft_llm: result.llm_model || null,
+          };
+          reviewDraftGenerating = false;
+          reviewDraftJobState = job;
+          resolve();
+        },
+        onFailed(job) {
+          reject(new Error(job.error_message || job.summary || '大模型复盘草稿生成失败'));
+        },
+        onError(error) {
+          reject(error);
+        },
+      });
+    });
+  } catch (error) {
+    reviewDraftGenerating = false;
+    reviewDraftJobState = null;
+    reviewTriggerDraft.flowStage = 'optimize_rule';
+    renderReviewTriggerModal(user);
+    showToast(getReviewDraftGenerationErrorMessage(error));
+    return;
+  } finally {
+    reviewDraftGenerating = false;
+    if (reviewDraftJobState && reviewDraftJobState.status === 'success') {
+      reviewDraftJobState = null;
+    }
+  }
+  reviewTriggerDraft.flowStage = 'draft_review';
+  reviewTriggerDraft.previewReady = false;
+  persistReviewDraftRuntime(runtime);
+  renderReviewTriggerModal(user);
+  showToast('智能优化已完成，请审核 draft');
+}
+
 async function submitReviewTrigger() {
   const user = getActiveDemoUser();
   const runtime = ensureTenantReviewRuntime(user.tenant.id);
   currentReviewPeriod = reviewTriggerDraft.period;
   if (user.role === 'dav') {
-    if (!reviewTriggerDraft.selectedWatchlist.length) {
-      showToast('请先至少选择 1 只自选股');
-      return;
-    }
-    syncReviewDraftFromModal();
-    if (!getReviewDraftContentText()) {
-      showToast('请先补充输入内容');
-      return;
-    }
-    if (reviewTriggerDraft.sourceMode === 'manual') {
-      try {
-        const manualResult = await embedManualReviewText(getReviewDraftContentText());
-        reviewIngestResult = manualResult;
-        openReviewIngestResultModal('手写正文已就绪（尚未入库）', [
-          `转写引擎：${manualResult.transcript_engine || '-'}`,
-          `转写模型：${manualResult.transcript_model || '-'}`,
-          `当前状态：仅完成正文确认，确认发布后才会写入向量库`,
-          `正文内容：${manualResult.text || ''}`,
-        ]);
-      } catch (error) {
-        showToast(error.message || '手写正文入库失败');
-        return;
-      }
-    }
-    if (reviewTriggerDraft.paragraphMode === 'ai' && !reviewTriggerDraft.skipAiProcessing) {
-      reviewDraftGenerating = true;
-      reviewTriggerDraft.previewReady = false;
-      reviewDraftJobState = {
-        status: 'running',
-        progress_stage: 'queued',
-        progress_percent: 6,
-        summary: '已提交任务，正在进入大模型处理队列',
-        result: { live_log: [] },
-      };
-      renderReviewTriggerModal(user);
-      try {
-        const draftResult = await generateReviewDraftWithLlm();
-        if (!draftResult.async || !draftResult.job_code) throw new Error('review_draft_job_missing');
-        await new Promise((resolve, reject) => {
-          startAsyncJobPolling(draftResult.job_code, {
-            onProgress(job) {
-              reviewDraftJobState = job || reviewDraftJobState;
-              renderReviewTriggerModal(user);
-            },
-            onSuccess(job) {
-              const result = job.result || {};
-              reviewTriggerDraft.generatedPreviewText = result.text || '';
-              reviewIngestResult = {
-                ...(reviewIngestResult || {}),
-                review_draft_llm: result.llm_model || null,
-              };
-              reviewDraftGenerating = false;
-              reviewDraftJobState = job;
-              resolve();
-            },
-            onFailed(job) {
-              reject(new Error(job.error_message || job.summary || '大模型复盘草稿生成失败'));
-            },
-            onError(error) {
-              reject(error);
-            },
-          });
-        });
-      } catch (error) {
-        reviewDraftGenerating = false;
-        reviewDraftJobState = null;
-        renderReviewTriggerModal(user);
-        showToast(error.message || '大模型复盘草稿生成失败');
-        return;
-      } finally {
-        reviewDraftGenerating = false;
-        if (reviewDraftJobState && reviewDraftJobState.status === 'success') {
-          reviewDraftJobState = null;
-        }
-      }
-    } else {
-      reviewTriggerDraft.generatedPreviewText = '';
-      reviewDraftJobState = null;
-    }
-    runtime.kolGeneratedAt = '刚刚生成';
-    runtime.kolSourceMode = reviewTriggerDraft.sourceMode;
-    runtime.paragraphMode = reviewTriggerDraft.paragraphMode;
-    runtime.kolSelectedWatchlist = reviewTriggerDraft.selectedWatchlist.slice(0);
-    runtime.lastReviewPeriod = currentReviewPeriod;
-    runtime.latestVoiceTranscript = reviewTriggerDraft.voiceTranscript;
-    runtime.latestManualHtml = reviewTriggerDraft.manualHtml;
-    runtime.latestFileText = reviewTriggerDraft.fileText;
-    runtime.latestAiPrompt = reviewTriggerDraft.aiPrompt;
-    runtime.latestPromptTags = (reviewTriggerDraft.promptTags || []).slice(0);
-    runtime.latestGeneratedPreviewText = reviewTriggerDraft.generatedPreviewText || '';
-    runtime.draftReady = true;
-    reviewTriggerDraft.previewReady = true;
-    renderReviewTriggerModal(user);
-    showToast(`${getReviewPeriodMeta(currentReviewPeriod).label}草稿已生成，请先预览`);
+    prepareReviewDirectPreview();
     return;
   } else {
     runtime.aiGeneratedAt = '刚刚生成';
@@ -6645,7 +6797,6 @@ function renderFundamentalKolColumn() {
 
 function renderKnowledgeExperience() {
   renderFundMacroDashboard();
-  renderFundamentalKolColumn();
   renderKnowledgeWorkbench();
   renderKnowledgeZone();
   renderWorkbenchFundDashboard();
@@ -8512,6 +8663,49 @@ function showEventDetail(id) {
   document.getElementById('event-detail-modal').classList.add('show');
 }
 
+function showFundNewsDetail(item) {
+  const news = item && typeof item === 'object' ? item : {};
+  const title = String(news.title || '综合归纳要闻').trim() || '综合归纳要闻';
+  const sourceGroup = String(news.source_group || news.tag || '综合要闻').trim() || '综合要闻';
+  const tag = String(news.tag || sourceGroup).trim() || sourceGroup;
+  const time = String(news.time || '刚刚').trim() || '刚刚';
+  const why = String(news.why || '当前没有补充说明。').trim() || '当前没有补充说明。';
+  const detailSummary = sourceGroup === '自选股'
+    ? '这条内容与当前自选股样本直接相关，适合结合预警和个股判断一起看。'
+    : sourceGroup === '大V趋势'
+      ? '这条内容会被当前租户大V的研究框架优先引用，适合放到近期判断里联动理解。'
+      : '这条内容会影响当前市场框架、估值锚或主线判断，属于需要优先看的背景变量。';
+  document.getElementById('event-detail-content').innerHTML = `
+    <div style="padding:0 4px 16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <span class="event-type-badge event-activity">${escapeHtml(sourceGroup)}</span>
+        <span class="tag tag-gold">${escapeHtml(tag)}</span>
+        <span style="font-size:11px;color:var(--gray-400)">${escapeHtml(time)}</span>
+      </div>
+      <div style="font-size:17px;font-weight:700;color:var(--white);line-height:1.5;margin-bottom:14px">${escapeHtml(title)}</div>
+      <div style="background:rgba(200,169,110,0.05);border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:12px;margin-bottom:14px">
+        <div style="font-size:12px;color:var(--gray-400);margin-bottom:6px">为什么是要闻</div>
+        <div style="font-size:13px;color:var(--white);line-height:1.8">${escapeHtml(why)}</div>
+      </div>
+      <div style="display:grid;gap:10px;margin-bottom:16px">
+        <div style="background:var(--navy-mid);border-radius:8px;padding:10px">
+          <div style="font-size:11px;color:var(--gray-400)">内容归类</div>
+          <div style="font-size:12px;color:var(--white);margin-top:4px">${escapeHtml(sourceGroup)} · ${escapeHtml(tag)}</div>
+        </div>
+        <div style="background:var(--navy-mid);border-radius:8px;padding:10px">
+          <div style="font-size:11px;color:var(--gray-400)">阅读建议</div>
+          <div style="font-size:12px;color:var(--white);margin-top:4px;line-height:1.8">${escapeHtml(detailSummary)}</div>
+        </div>
+      </div>
+      <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:8px">继续动作</div>
+      <div style="display:grid;gap:8px">
+        <button class="btn-outline" style="width:100%;padding:12px" onclick="switchTab('market');document.getElementById('event-detail-modal').classList.remove('show')">去自选股继续看</button>
+        <button class="btn-gold" style="width:100%;padding:12px" onclick="switchTab('hermes');document.getElementById('event-detail-modal').classList.remove('show')">去 Hermes 继续追问</button>
+      </div>
+    </div>`;
+  document.getElementById('event-detail-modal').classList.add('show');
+}
+
 function likePost(postId, btn) {
   fetch('/api/community/like', {
     method: 'POST',
@@ -10314,6 +10508,7 @@ function renderWorkbenchSmartIndicatorEditorModal() {
   const host = document.getElementById('dashboard-cell-modal-content');
   const modal = document.getElementById('dashboard-cell-modal');
   if (!host || !modal) return;
+  const scrollSnapshot = captureModalSheetScroll('dashboard-cell-modal-content');
   const preview = wbSmartIndicatorDraft.preview;
   if (typeof wbSmartIndicatorDraft.tagPoolExpanded !== 'boolean') wbSmartIndicatorDraft.tagPoolExpanded = false;
   host.innerHTML = `
@@ -10331,10 +10526,10 @@ function renderWorkbenchSmartIndicatorEditorModal() {
     </div>
     <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">提示词</label>
-      <div onclick="focusWorkbenchSmartPrompt()" style="margin-top:10px;border:1px solid rgba(200,169,110,0.2);border-radius:14px;background:rgba(13,27,42,0.55);padding:12px 12px 10px;cursor:text">
+      <div onclick="focusWorkbenchSmartPrompt()" style="margin-top:10px;border:1px solid rgba(47,116,192,0.16);border-radius:14px;background:#ffffff;padding:12px 12px 10px;cursor:text;box-shadow:inset 0 1px 0 rgba(255,255,255,0.7)">
         <div style="font-size:11px;color:var(--gray-400);margin-bottom:8px">公式引用 / 指标标签</div>
         <div id="wb-smart-indicator-selected-tags" class="review-watchlist-row" style="margin-top:0;min-height:30px"></div>
-        <textarea id="wb-smart-indicator-draft-prompt" class="knowledge-modal-textarea" placeholder="例如：【上证50指数】*80/100，或者【上证50】/ 纳斯达克指数" oninput="handleWorkbenchSmartIndicatorPromptInput(this.value)" style="margin-top:10px;border:none;background:transparent;padding:0;min-height:108px;box-shadow:none;resize:none">${escapeHtml(wbSmartIndicatorDraft.promptText || '')}</textarea>
+        <textarea id="wb-smart-indicator-draft-prompt" class="knowledge-modal-textarea" placeholder="例如：【上证50指数】*80/100，或者【上证50】/ 纳斯达克指数" oninput="handleWorkbenchSmartIndicatorPromptInput(this.value)" style="margin-top:10px;border:none;background:transparent;padding:0;min-height:108px;box-shadow:none;resize:none;color:var(--text-main)">${escapeHtml(wbSmartIndicatorDraft.promptText || '')}</textarea>
       </div>
       <div style="font-size:11px;color:var(--gray-400);margin-top:8px">当你输入的词与指标名称完全一致时，系统会自动识别成标签。</div>
     </div>
@@ -10355,6 +10550,7 @@ function renderWorkbenchSmartIndicatorEditorModal() {
   `;
   modal.classList.add('show');
   renderWorkbenchSmartTagSelection();
+  restoreModalSheetScroll('dashboard-cell-modal-content', scrollSnapshot);
 }
 
 async function previewWorkbenchSmartIndicator() {
@@ -10646,6 +10842,7 @@ function renderFundMacroDashboard() {
   const cards = published && Array.isArray(published.cards)
     ? published.cards.filter((item) => item && !isWorkbenchSmartPlaceholderCard(item))
     : [];
+  const gridClass = cards.length === 1 ? 'single-card' : 'cols-3';
   if (!cards.length) {
     host.innerHTML = '<div class="fund-column-card"><div class="fund-column-head"><div><div class="fund-column-title">智能指标 Dashboard</div><div class="fund-column-subtitle">暂无看板内容</div></div><span class="tag tag-gold">暂无内容</span></div></div>';
     return;
@@ -10659,12 +10856,12 @@ function renderFundMacroDashboard() {
         </div>
         <span class="tag tag-gold">${escapeHtml((published.layout || '2x2').toUpperCase())}</span>
       </div>
-      <div class="wb-dashboard-summary-grid cols-3">
+      <div class="wb-dashboard-summary-grid ${gridClass}">
         ${cards.map((item, index) => `
           <div class="wb-dashboard-summary-card filled" onclick="openWorkbenchDashboardIndicatorDetail(${index}, 'published')">
             <div class="wb-dashboard-summary-head">
               <div class="wb-dashboard-summary-title">${escapeHtml(item.name || '智能指标')}</div>
-              <span class="wb-dashboard-summary-tag">${escapeHtml(item.updatedAt || '已发布')}</span>
+              <div class="wb-dashboard-summary-tag">${escapeHtml(item.updatedAt || '已发布')}</div>
             </div>
             <div class="wb-dashboard-summary-value">${escapeHtml(`${item.value || '--'}${item.unit || ''}`)}</div>
             <div class="wb-dashboard-summary-text">${escapeHtml(item.interpretation || item.assessment || '')}</div>

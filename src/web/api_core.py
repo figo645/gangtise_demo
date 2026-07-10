@@ -798,6 +798,27 @@ def api_admin_site_config():
     )
 
 
+@app.route("/api/admin/site-config/sync-llm-registry", methods=["POST"])
+def api_admin_sync_llm_registry():
+    try:
+        result = sync_local_llm_registry_from_staging()
+    except Exception:
+        app.logger.exception("Failed to sync staging llm registry into local site config")
+        return jsonify({"success": False, "error": "sync_llm_registry_failed"}), 500
+    return jsonify(
+        {
+            "success": True,
+            "site_config": build_admin_site_config_payload(result["local_site_config"]),
+            "llm_registry": result["local_llm_registry"],
+            "synced_model_count": result["synced_model_count"],
+            "default_model_key": result["default_model_key"],
+            "current_runtime_uses_staging": result["current_runtime_uses_staging"],
+            "local_db_target": result["local_db_target"],
+            "staging_db_target": result["staging_db_target"],
+        }
+    )
+
+
 @app.route("/api/admin/forecast-config")
 def api_admin_forecast_config():
     if not is_feature_enabled("stock_forecast"):

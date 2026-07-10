@@ -1,7 +1,9 @@
 from src.runtime import *
 from src.domain.core_services import *
+from src.domain.core_services import _estimate_token_count, _extract_usage_tokens
 from src.domain.market_services import *
 from src.web.request_helpers import get_client_ip
+from flask import has_request_context
 
 def get_platform_name(site_config=None):
     return get_platform_brand(site_config).get("name", DEFAULT_BRAND_CONFIG["name"])
@@ -912,11 +914,22 @@ def _store_review_voice_embedding_record(
     embedding,
     embedding_engine,
     embedding_model,
-):
+): 
     transcript_hash = hashlib.sha256(transcript.encode("utf-8")).hexdigest()
+    client_ip = "unknown"
+    user_agent = ""
+    if has_request_context():
+        try:
+            client_ip = get_client_ip()
+        except Exception:
+            client_ip = "unknown"
+        try:
+            user_agent = str(request.headers.get("User-Agent", "") or "")
+        except Exception:
+            user_agent = ""
     metadata = {
-        "client_ip": get_client_ip(),
-        "user_agent": request.headers.get("User-Agent", ""),
+        "client_ip": client_ip,
+        "user_agent": user_agent,
         "uploaded_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "embedding_dimensions": len(embedding),
         "vector_namespace": vector_namespace,
@@ -2769,7 +2782,7 @@ def process_review_publish_text(text, tenant_slug="", review_period="", entry_po
         content_type="text/plain",
         audio_size_bytes=0,
         transcript=normalized_text,
-        transcription_engine=transcript_engine,
+        transcription_engine=transcription_engine,
         transcript_model=transcript_model,
         embedding=embedding,
         embedding_engine=embedding_engine,

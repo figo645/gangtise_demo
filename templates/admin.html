@@ -3887,6 +3887,12 @@
                 <select id="llm-default-model-key"></select>
               </div>
               <div id="llm-default-switcher" class="llm-admin-default-switch"></div>
+              <div class="llm-admin-inline-actions" style="margin-top:14px">
+                <button class="btn-outline" style="padding:8px 14px;font-size:12px" type="button" onclick="syncLocalLlmRegistryFromStaging()">从 staging 同步 LLM 配置到本地</button>
+              </div>
+              <div class="feature-note" style="margin-top:8px">
+                这个动作只会把 staging 的 `llm_registry` 同步到本地开发库，不会切换当前数据库模式，也不会覆盖品牌、租户和功能开关等其他站点配置。
+              </div>
             </div>
             <div class="llm-admin-panel">
               <div class="llm-admin-panel-title">配置总览</div>
@@ -7712,6 +7718,38 @@ async function loadSiteConfig() {
   } catch (e) {}
   renderSiteConfigForm();
   renderAdminKnowledgeTenantFilter();
+}
+
+async function syncLocalLlmRegistryFromStaging() {
+  const status = document.getElementById('site-config-status');
+  if (status) {
+    status.textContent = '正在把 staging 的 LLM 配置同步到本地开发库...';
+  }
+  try {
+    const res = await fetch('/api/admin/site-config/sync-llm-registry', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({}),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error((data && data.error) || 'sync_failed');
+    adminSiteConfig = data.site_config;
+    window.SITE_CONFIG = data.site_config;
+    renderSiteConfigForm();
+    broadcastSiteConfigUpdate();
+    const localTarget = data.local_db_target || {};
+    const localLabel = localTarget.host
+      ? `${localTarget.host}:${localTarget.port || 5432}/${localTarget.dbname || ''}`
+      : '本地开发库';
+    const modelCount = Number(data.synced_model_count || 0);
+    markAdminSiteConfigSaved(`已把 staging 的 LLM 配置同步到本地。目标库：${localLabel}。同步模型数：${modelCount}。`);
+    showToast('LLM 配置已同步到本地');
+  } catch (e) {
+    if (status) {
+      status.textContent = '同步失败，请检查 staging 连接和本地数据库配置后重试。';
+    }
+    showToast('同步失败');
+  }
 }
 
 async function saveSiteConfig() {

@@ -1,5 +1,6 @@
 from src.runtime import *
 from src.services import *
+from src.web.api_core import gen_community_posts, gen_community_events
 
 @app.route("/api/community/posts")
 def api_community_posts():
@@ -752,4 +753,3 @@ def api_ai_forecast():
         "compute_used": 8,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
     })
-
