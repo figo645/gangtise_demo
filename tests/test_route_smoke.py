@@ -42,6 +42,8 @@ class RouteSmokeTest(unittest.TestCase):
         html = response.get_data(as_text=True)
         self.assertIn('placeholder="问 Hermes..."', html)
         self.assertIn("hermes-prompt-chip", html)
+        self.assertIn("hermes-thinking-stream", html)
+        self.assertIn("buildHermesLoadingThoughtTemplates", html)
         self.assertIn("上传文件解析", html)
         self.assertIn("互联网问答", html)
         self.assertNotIn("默认按全部知识库做文字回答，也可以点 + 指定知识或上传文件。", html)
@@ -58,6 +60,8 @@ class RouteSmokeTest(unittest.TestCase):
         payload = response.get_json()
         self.assertTrue(payload["ok"])
         self.assertTrue(payload["web_answer"])
+        self.assertIn("agent_trace", payload)
+        self.assertTrue(payload["agent_trace"]["steps"])
 
     def test_workbench_pages_render(self):
         for tenant_slug in self.tenant_slugs:

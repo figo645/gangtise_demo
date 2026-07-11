@@ -2314,6 +2314,95 @@ def execute_hermes_tool_plan(plan, tenant_slug, question_text, selected_knowledg
     return outputs, trace
 
 
+HERMES_INTENT_LABELS = {
+    "watchlist_fundamental": "个股基本面分析",
+    "knowledge_lookup": "知识检索问答",
+    "evidence_chain": "证据链归因",
+    "multi_tool_research": "多工具研究",
+    "general_chat": "通用研究问答",
+}
+
+HERMES_TOOL_LABELS = {
+    "attachment.context": "附件解析",
+    "knowledge.search": "知识检索",
+    "evidence.search": "证据链检索",
+    "watchlist.detail": "个股详情分析",
+}
+
+
+def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode="", preferred_mode="", web_answer=False, attachments=None, selected_knowledge_ids=None):
+    attachments = attachments if isinstance(attachments, list) else []
+    selected_knowledge_ids = selected_knowledge_ids if isinstance(selected_knowledge_ids, list) else []
+    intent = str((intent_plan or {}).get("intent") or "").strip()
+    tools = [str(item).strip() for item in ((intent_plan or {}).get("tools") or []) if str(item).strip()]
+    planned_tool_labels = [HERMES_TOOL_LABELS.get(item, item) for item in tools]
+    ok_count = sum(1 for item in (tool_trace or []) if str((item or {}).get("status") or "").strip() == "ok")
+    error_count = sum(1 for item in (tool_trace or []) if str((item or {}).get("status") or "").strip() == "error")
+    route_label = "LLM 路由" if route_mode == "llm_router" else "规则路由"
+    answer_label = "模型整合回答" if answer_mode == "llm_synthesized" else "规则降级回答"
+    planning_bits = []
+    if preferred_mode and preferred_mode != "auto":
+        planning_bits.append(f"偏好模式：{preferred_mode}")
+    if web_answer:
+        planning_bits.append("已启用互联网问答口径")
+    if attachments:
+        planning_bits.append(f"附件 {len(attachments)} 份")
+    if selected_knowledge_ids:
+        planning_bits.append(f"知识范围 {len(selected_knowledge_ids)} 条")
+    if planned_tool_labels:
+        planning_bits.append("工具：" + " / ".join(planned_tool_labels))
+    gather_items = []
+    for item in tool_trace or []:
+        if not isinstance(item, dict):
+            continue
+        tool_name = HERMES_TOOL_LABELS.get(str(item.get("tool") or "").strip(), str(item.get("tool") or "").strip() or "未知工具")
+        status = str(item.get("status") or "").strip() or "skipped"
+        elapsed_ms = int(item.get("elapsed_ms") or 0)
+        detail = f"{tool_name} · {elapsed_ms}ms"
+        if status == "error" and item.get("error"):
+            detail = f"{detail} · {str(item.get('error') or '').strip()[:80]}"
+        gather_items.append({
+            "title": tool_name,
+            "status": status,
+            "detail": detail,
+        })
+    steps = [
+        {
+            "key": "intent",
+            "title": "问题拆解",
+            "status": "ok",
+            "detail": f"{route_label}识别为“{HERMES_INTENT_LABELS.get(intent, intent or '通用研究问答')}”。",
+        },
+        {
+            "key": "plan",
+            "title": "执行规划",
+            "status": "ok",
+            "detail": "；".join(planning_bits) if planning_bits else "未指定额外约束，按默认 Agent 流程执行。",
+        },
+        {
+            "key": "tools",
+            "title": "资料调取",
+            "status": "error" if error_count and not ok_count else ("ok" if ok_count else "skipped"),
+            "detail": (
+                f"已执行 {len(tool_trace or [])} 个工具，成功 {ok_count} 个"
+                + (f"，失败 {error_count} 个。" if error_count else "。")
+            ) if tool_trace else "本轮未触发外部资料工具。",
+            "items": gather_items,
+        },
+        {
+            "key": "answer",
+            "title": "结论整合",
+            "status": "ok" if answer_mode != "fallback_plain_answer" else "skipped",
+            "detail": answer_label + "，输出面向用户的结论、依据和下一步建议。",
+        },
+    ]
+    return {
+        "headline": "Hermes Agent 已完成本轮编排",
+        "summary": "先拆解问题，再调度知识、个股、附件等工具，最后整合成可读回答。",
+        "steps": steps,
+    }
+
+
 def build_hermes_citations(tool_outputs):
     citations = []
     watchlist_detail = ((tool_outputs.get("watchlist") or {}).get("detail") or {}) if isinstance(tool_outputs, dict) else {}
@@ -2642,6 +2731,16 @@ def build_hermes_query_response(body):
         messages=messages,
         web_answer=web_answer,
     )
+    agent_trace = build_hermes_agent_trace(
+        intent_plan=intent_plan,
+        tool_trace=tool_trace,
+        route_mode=route_mode,
+        answer_mode=answer_mode,
+        preferred_mode=preferred_mode,
+        web_answer=web_answer,
+        attachments=attachments,
+        selected_knowledge_ids=selected_knowledge_ids,
+    )
     citations = build_hermes_citations(tool_outputs)
     artifacts = build_hermes_artifacts(
         plan=intent_plan,
@@ -2666,6 +2765,7 @@ def build_hermes_query_response(body):
         "artifacts": artifacts,
         "tool_trace": tool_trace,
         "tool_outputs": tool_outputs,
+        "agent_trace": agent_trace,
         "preferred_mode": preferred_mode or "auto",
         "web_answer": web_answer,
         "router": {

@@ -588,15 +588,18 @@ body { background: var(--surface-2); color: var(--text-main); }
 .hermes-metric-label { font-size:10px; color:var(--text-sub); }
 .hermes-metric-value { font-size:16px; font-weight:700; color:#1F497D; margin-top:4px; }
 .hermes-metric-note { font-size:10px; color:var(--text-sub); line-height:1.6; margin-top:4px; }
-.hermes-bullet-list { display:grid; gap:8px; }
+.hermes-bullet-list { display:flex; flex-direction:column; gap:6px; align-items:flex-start; }
 .hermes-bullet-item {
+  display:inline-flex;
+  width:fit-content;
+  max-width:84%;
   background:#F8FBFF;
   border:1px solid rgba(47,116,192,0.08);
-  border-radius:12px;
-  padding:10px 12px;
-  font-size:12px;
+  border-radius:10px;
+  padding:7px 10px;
+  font-size:11px;
   color:var(--text-main);
-  line-height:1.7;
+  line-height:1.65;
 }
 .hermes-evidence-row { display:flex; gap:8px; flex-wrap:wrap; }
 .hermes-evidence-chip {
@@ -608,6 +611,46 @@ body { background: var(--surface-2); color: var(--text-main); }
 }
 .hermes-loading { display:flex; align-items:center; gap:8px; }
 .hermes-loading-text { font-size:13px; color:var(--gold); }
+.hermes-thinking-stream { display:flex; flex-direction:column; gap:6px; align-items:flex-start; margin-top:10px; }
+.hermes-thinking-row {
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  width:fit-content;
+  max-width:88%;
+  padding:7px 10px;
+  border-radius:12px;
+  background:linear-gradient(180deg,#FBFDFF 0%, #F4F8FE 100%);
+  border:1px solid rgba(47,116,192,0.10);
+  color:#35506E;
+  font-size:11px;
+  line-height:1.6;
+}
+.hermes-thinking-row.active {
+  border-color:rgba(200,169,110,0.28);
+  background:linear-gradient(180deg,#FFF9EF 0%, #FFFDF8 100%);
+}
+.hermes-thinking-dot {
+  width:6px;
+  height:6px;
+  flex-shrink:0;
+  border-radius:50%;
+  background:rgba(47,116,192,0.38);
+}
+.hermes-thinking-row.active .hermes-thinking-dot {
+  background:var(--gold);
+  box-shadow:0 0 0 4px rgba(200,169,110,0.10);
+}
+.hermes-thinking-text { min-width:0; word-break:break-word; }
+.hermes-thinking-inline {
+  font-size:11px;
+  color:#2F74C0;
+  background:rgba(47,116,192,0.06);
+  border:1px solid rgba(47,116,192,0.08);
+  border-radius:999px;
+  padding:4px 9px;
+  width:fit-content;
+}
 .dot-anim span { display:inline-block; animation:dotBounce 1.2s infinite; }
 @media (max-width: 420px) {
   .hermes-stock-input-row {
@@ -8764,6 +8807,7 @@ let hermesCustomSkillDraft = { title: '', prompt: '', knowledgeIds: [] };
 let hermesScopedKnowledgeId = '';
 let hermesUploadedFiles = [];
 let hermesUseInternetAnswer = false;
+let hermesLoadingTicker = null;
 
 const DEFAULT_HERMES_SKILLS = {
   basic: {
@@ -9260,7 +9304,82 @@ function normalizeHermesArtifact(artifact, fallbackQuestion) {
   };
 }
 
-function renderHermesTextArtifact(artifact) {
+function buildHermesTraceThoughts(agentTrace) {
+  const trace = agentTrace && typeof agentTrace === 'object' ? agentTrace : {};
+  const steps = Array.isArray(trace.steps) ? trace.steps : [];
+  const thoughts = [];
+  steps.forEach((step) => {
+    const detail = String(step && step.detail || '').trim();
+    if (detail) thoughts.push(detail);
+    if (Array.isArray(step && step.items)) {
+      step.items.forEach((item) => {
+        const line = String(item && item.detail || item && item.title || '').trim();
+        if (line) thoughts.push(line);
+      });
+    }
+  });
+  return thoughts.slice(0, 6);
+}
+
+function renderHermesThinkingStream(lines, options = {}) {
+  const items = Array.isArray(lines) ? lines.filter(Boolean) : [];
+  if (!items.length) return '';
+  const activeIndex = Number.isInteger(options.activeIndex) ? options.activeIndex : -1;
+  const visible = activeIndex >= 0 ? items.slice(0, activeIndex + 1) : items;
+  return `
+    <div class="hermes-thinking-stream" aria-label="Hermes 深度思考">
+      ${visible.map((line, index) => `
+        <div class="hermes-thinking-row ${index === activeIndex ? 'active' : ''}">
+          <span class="hermes-thinking-dot"></span>
+          <span class="hermes-thinking-text">${escapeHtml(line)}</span>
+          ${index === activeIndex ? `<span class="dot-anim" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>` : ''}
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function buildHermesLoadingThoughts(entry) {
+  const payload = entry && typeof entry === 'object' ? entry : {};
+  const elapsedMs = Math.max(0, Date.now() - Number(payload.startedAt || Date.now()));
+  const lines = Array.isArray(payload.thoughts) ? payload.thoughts : [];
+  const activeIndex = lines.length ? Math.min(Math.floor(elapsedMs / 1200), lines.length - 1) : 0;
+  return {
+    lines,
+    activeIndex,
+  };
+}
+
+function buildHermesLoadingThoughtTemplates(question, skill, stockCode) {
+  const hasStock = !!String(stockCode || '').trim();
+  const hasAttachments = Array.isArray(hermesUploadedFiles) && hermesUploadedFiles.length > 0;
+  const suffix = String(question || '').trim().slice(0, 22);
+  return [
+    suffix ? `先理解你问的重点：${suffix}${String(question || '').trim().length > 22 ? '…' : ''}` : '先判断你到底在追问哪一层信息',
+    `按 ${String((skill || {}).label || '默认对话')} 的方式组织这次回答${hermesUseInternetAnswer ? '，并补上公开信息口径' : ''}`,
+    hasAttachments
+      ? `正在读你刚上传的文件${hasStock ? '，顺便对照个股资料' : ''}`
+      : (hasStock ? '正在对照个股资料、知识和证据' : '正在翻找能直接支撑结论的知识和证据'),
+    hasStock ? '把个股信息压缩成可直接判断的要点' : '先把结论压短，再把依据补齐',
+    '最后再整理成一版更适合直接阅读的回答',
+  ];
+}
+
+function syncHermesLoadingTicker() {
+  const hasLoading = hermesConversation.some((entry) => entry && entry.type === 'loading');
+  if (hasLoading && !hermesLoadingTicker) {
+    hermesLoadingTicker = setInterval(() => {
+      renderHermesThread();
+    }, 900);
+    return;
+  }
+  if (!hasLoading && hermesLoadingTicker) {
+    clearInterval(hermesLoadingTicker);
+    hermesLoadingTicker = null;
+  }
+}
+
+function renderHermesTextArtifact(artifact, agentTrace) {
   const evidenceHtml = artifact.citations.length
     ? `<div class="hermes-evidence-row" style="margin-top:8px">${artifact.citations.map(item => `<span class="hermes-evidence-chip">${escapeHtml(item)}</span>`).join('')}</div>`
     : '';
@@ -9274,12 +9393,14 @@ function renderHermesTextArtifact(artifact) {
   const followupHtml = artifact.followups.length
     ? `<div class="hermes-bullet-list" style="margin-top:8px">${artifact.followups.map(item => `<div class="hermes-bullet-item">${escapeHtml(item)}</div>`).join('')}</div>`
     : '';
+  const thoughtLines = buildHermesTraceThoughts(agentTrace);
   return `
     <div class="hermes-chat-msg ai">
       <div class="hermes-chat-bubble ai" style="max-width:100%;width:100%">
-        <div class="hermes-chat-role">🦞 Hermes</div>
+        <div class="hermes-chat-role">🦞 Hermes Agent</div>
         <div class="hermes-chat-main">${escapeHtml(artifact.headline || '')}</div>
         ${artifact.summary ? `<div class="hermes-chat-meta" style="margin-top:8px;opacity:1">${escapeHtml(artifact.summary)}</div>` : ''}
+        ${thoughtLines.length ? `<div class="hermes-thinking-inline" style="margin-top:8px">深度思考已完成</div>${renderHermesThinkingStream(thoughtLines)}` : ''}
         ${bodyHtml}
         ${bulletHtml}
         ${followupHtml}
@@ -9307,7 +9428,7 @@ function renderHermesThread() {
       <div class="hermes-chat-msg ai">
         <div class="hermes-chat-bubble ai" style="max-width:100%;width:100%">
           <div class="hermes-chat-role">🦞 Hermes</div>
-          <div class="hermes-chat-main">直接问我就可以。默认基于当前租户知识库回答。</div>
+          <div class="hermes-chat-main">直接问我就可以。我会先拆解问题，再调度知识、附件和个股工具回答。</div>
           <div class="hermes-prompt-chip-row" aria-label="Hermes 建议问题">
             ${suggestions.map(item => `<button class="hermes-prompt-chip" type="button" onclick="applyHermesSuggestion('${item.replace(/'/g, '&#39;')}')">${escapeHtml(item)}</button>`).join('')}
           </div>
@@ -9318,6 +9439,7 @@ function renderHermesThread() {
       host.innerHTML = emptyHtml;
       host.classList.add('is-empty');
     });
+    syncHermesLoadingTicker();
     return;
   }
   const html = hermesConversation.map(entry => {
@@ -9337,27 +9459,29 @@ function renderHermesThread() {
       `;
     }
     if (entry.type === 'loading') {
+      const loadingThoughts = buildHermesLoadingThoughts(entry);
       return `
         <div class="hermes-chat-msg ai">
           <div class="hermes-chat-bubble ai">
-            <div class="hermes-chat-role">🦞 Hermes</div>
+            <div class="hermes-chat-role">🦞 Hermes Agent</div>
             <div class="hermes-loading">
-              <div class="hermes-loading-text">正在分析<span class="dot-anim"><span>.</span><span>.</span><span>.</span></span></div>
+              <div class="hermes-loading-text">深度思考中<span class="dot-anim"><span>.</span><span>.</span><span>.</span></span></div>
             </div>
+            ${renderHermesThinkingStream(loadingThoughts.lines, { activeIndex: loadingThoughts.activeIndex })}
           </div>
         </div>
       `;
     }
     const artifact = normalizeHermesArtifact(entry.artifact || entry.result, entry.question);
     if ((entry.displayMode || 'text') !== 'structured' || artifact.type !== 'watchlist_analysis') {
-      return renderHermesTextArtifact(artifact);
+      return renderHermesTextArtifact(artifact, entry.agentTrace);
     }
     return `
       <div class="hermes-chat-msg ai">
         <div class="hermes-chat-bubble ai" style="max-width:100%;width:100%">
-          <div class="hermes-chat-role">🦞 Hermes</div>
+          <div class="hermes-chat-role">🦞 Hermes Agent</div>
           <div class="hermes-chat-main">${escapeHtml(artifact.headline)}</div>
-          <div class="hermes-chat-analysis">${renderHermesAnalysisCards(artifact)}</div>
+          <div class="hermes-chat-analysis">${renderHermesAnalysisCards(artifact, entry.agentTrace)}</div>
         </div>
       </div>
     `;
@@ -9366,9 +9490,10 @@ function renderHermesThread() {
     host.innerHTML = html;
     host.classList.remove('is-empty');
   });
+  syncHermesLoadingTicker();
 }
 
-function renderHermesAnalysisCards(artifact) {
+function renderHermesAnalysisCards(artifact, agentTrace) {
   const symbol = artifact.symbol || {};
   const metricsHtml = (artifact.metrics || []).map(metric => `
     <div class="hermes-metric-card">
@@ -9383,6 +9508,7 @@ function renderHermesAnalysisCards(artifact) {
   const knowledgeHtml = (artifact.knowledge || []).length
     ? artifact.knowledge.map(entry => `<span class="hermes-evidence-chip">${escapeHtml(entry.title)}</span>`).join('')
     : '<span class="hermes-evidence-chip">暂未命中知识库条目</span>';
+  const thoughtLines = buildHermesTraceThoughts(agentTrace);
   return `
     <div class="hermes-result-card">
       <div class="hermes-result-top">
@@ -9415,6 +9541,7 @@ function renderHermesAnalysisCards(artifact) {
       <div class="hermes-evidence-row" style="margin-top:8px">${evidenceHtml}</div>
       <div class="hermes-result-subtitle" style="margin-top:10px">${escapeHtml(artifact.footer || '')}</div>
     </div>
+    ${thoughtLines.length ? `<div class="hermes-thinking-inline">深度思考已完成</div>${renderHermesThinkingStream(thoughtLines)}` : ''}
   `;
 }
 
@@ -9439,7 +9566,11 @@ async function runHermesAnalysis(options) {
     skillLabel: skill.label,
     displayMode: 'text',
   });
-  hermesConversation.push({ type: 'loading' });
+  hermesConversation.push({
+    type: 'loading',
+    startedAt: Date.now(),
+    thoughts: buildHermesLoadingThoughtTemplates(question, skill, stockCode),
+  });
   renderHermesThread();
   try {
     const activeUser = getActiveDemoUser();
@@ -9491,6 +9622,7 @@ async function runHermesAnalysis(options) {
       result: normalizedArtifact,
       artifact: normalizedArtifact,
       displayMode,
+      agentTrace: data.agent_trace || null,
     });
     hermesCredits = Math.max(0, hermesCredits - 1);
     renderHermesCredits();
@@ -9517,6 +9649,14 @@ async function runHermesAnalysis(options) {
         footer: 'Hermes 保留了当前对话上下文，你可以继续追问。',
       }, question),
       displayMode: 'text',
+      agentTrace: {
+        headline: 'Hermes Agent 本轮未完成',
+        summary: '已完成问题接收，但在编排或工具执行阶段中断。你可以直接重试，或把问题收窄后再问。',
+        steps: [
+          { title: '问题拆解', detail: '问题已进入 Agent 流程。', status: 'ok' },
+          { title: '执行规划', detail: '本轮在编排阶段或结果汇总阶段中断。', status: 'error' },
+        ],
+      },
     });
     renderHermesThread();
     showToast(e.message || 'Hermes 查询失败');
