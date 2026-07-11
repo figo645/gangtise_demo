@@ -881,6 +881,141 @@
     margin-right:6px;
     box-shadow:0 0 0 3px rgba(47,116,192,0.14);
   }
+  #section-agent-workflows .workflow-stage {
+    min-height:0;
+    background:
+      linear-gradient(180deg, rgba(47,116,192,0.03), rgba(47,116,192,0.01)),
+      var(--surface-2);
+  }
+  #section-agent-workflows .workflow-stage-viewport {
+    min-height:0;
+    width:100% !important;
+    height:auto !important;
+    padding:22px 20px 26px;
+    box-sizing:border-box;
+  }
+  #section-agent-workflows .workflow-edge-layer {
+    display:none;
+  }
+  #section-agent-workflows .workflow-board {
+    position:static;
+    min-height:0;
+    width:100% !important;
+    height:auto !important;
+  }
+  .agent-workflow-flow {
+    width:min(720px, 100%);
+    margin:0 auto;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .agent-workflow-flow-step {
+    display:grid;
+    grid-template-columns:42px minmax(0, 1fr);
+    gap:10px;
+    align-items:start;
+  }
+  .agent-workflow-flow-rail {
+    position:relative;
+    display:flex;
+    justify-content:center;
+    min-height:100%;
+  }
+  .agent-workflow-flow-rail::after {
+    content:"";
+    position:absolute;
+    top:34px;
+    bottom:-10px;
+    left:50%;
+    width:2px;
+    transform:translateX(-50%);
+    background:linear-gradient(180deg, rgba(47,116,192,0.28), rgba(200,169,110,0.22));
+  }
+  .agent-workflow-flow-step.is-last .agent-workflow-flow-rail::after {
+    display:none;
+  }
+  .agent-workflow-flow-index {
+    width:24px;
+    height:24px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:10px;
+    font-weight:700;
+    color:#1F497D;
+    background:linear-gradient(180deg, rgba(255,255,255,0.96), rgba(240,246,252,0.96));
+    border:1px solid rgba(47,116,192,0.18);
+    box-shadow:0 6px 14px rgba(14,33,55,0.08);
+    position:relative;
+    z-index:1;
+  }
+  body.theme-dark .agent-workflow-flow-index {
+    color:#DDE9F7;
+    background:linear-gradient(180deg, rgba(19,35,58,0.96), rgba(14,28,48,0.96));
+  }
+  .agent-workflow-flow-card {
+    border:1px solid rgba(200,169,110,0.12);
+    border-radius:14px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.92), rgba(249,251,254,0.96));
+    box-shadow:0 10px 24px rgba(14,33,55,0.05);
+    padding:10px 12px;
+    cursor:pointer;
+    transition:border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  }
+  body.theme-dark .agent-workflow-flow-card {
+    background:linear-gradient(180deg, rgba(17,31,49,0.96), rgba(13,25,42,0.98));
+  }
+  .agent-workflow-flow-card:hover {
+    border-color:rgba(47,116,192,0.28);
+    transform:translateY(-1px);
+  }
+  .agent-workflow-flow-card.is-selected {
+    border-color:rgba(200,169,110,0.32);
+    box-shadow:0 14px 28px rgba(47,116,192,0.10);
+  }
+  .agent-workflow-flow-head {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+  }
+  .agent-workflow-flow-step-label {
+    font-size:10px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    color:var(--text-sub);
+  }
+  .agent-workflow-flow-title {
+    margin-top:2px;
+    font-size:13px;
+    line-height:1.25;
+    font-weight:700;
+    color:var(--text-main);
+  }
+  .agent-workflow-flow-pill {
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:4px 8px;
+    border-radius:999px;
+    font-size:10px;
+    color:var(--text-main);
+    background:rgba(47,116,192,0.08);
+    border:1px solid rgba(47,116,192,0.12);
+  }
+  .agent-workflow-flow-pill.is-gold {
+    color:var(--gold);
+    background:rgba(200,169,110,0.10);
+    border-color:rgba(200,169,110,0.18);
+  }
+  .agent-workflow-flow-mini {
+    margin-top:6px;
+    font-size:10px;
+    line-height:1.5;
+    color:var(--text-sub);
+  }
   .workflow-tool-button {
     padding:6px 10px !important;
     font-size:11px !important;
@@ -3040,6 +3175,46 @@
             </div>
           </div>
         </div>
+        <div class="chart-card" style="margin-bottom:20px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
+            <div>
+              <div class="chart-title">Hermes 记忆治理</div>
+              <div class="chart-subtitle">按租户查看 Hermes 记忆落库情况，支持范围预览、ZIP 备份和时间段清理。范围清理后，会自动重建剩余会话记忆和用户画像。</div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <select id="admin-hermes-memory-tenant" onchange="loadAdminHermesMemorySummary(true)" style="min-width:180px;background:#0F2745;border:1px solid rgba(200,169,110,0.18);border-radius:10px;padding:10px 12px;color:#F8F6F0;font-size:12px"></select>
+              <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="loadAdminHermesMemorySummary(true)">刷新</button>
+            </div>
+          </div>
+          <div id="admin-hermes-memory-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:16px"></div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-top:16px">
+            <div style="padding:14px;border-radius:14px;background:rgba(11,30,58,0.55);border:1px solid rgba(200,169,110,0.12)">
+              <div style="font-size:13px;color:#F8F6F0;font-weight:600">备份 Hermes 记忆</div>
+              <div style="font-size:12px;color:#8899aa;line-height:1.7;margin-top:6px">导出当前租户的 Hermes 记忆快照。范围备份会只打包命中时间窗口的对话及对应的聚合记忆。</div>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px">
+                <select id="admin-hermes-memory-backup-range" style="flex:1;min-width:160px;background:#0F2745;border:1px solid rgba(200,169,110,0.18);border-radius:10px;padding:10px 12px;color:#F8F6F0;font-size:12px"></select>
+                <button class="btn-gold" type="button" style="padding:8px 14px;font-size:12px" onclick="backupAdminHermesMemory()">下载 ZIP 备份</button>
+              </div>
+            </div>
+            <div style="padding:14px;border-radius:14px;background:rgba(11,30,58,0.55);border:1px solid rgba(200,169,110,0.12)">
+              <div style="font-size:13px;color:#F8F6F0;font-weight:600">清理 Hermes 记忆</div>
+              <div style="font-size:12px;color:#8899aa;line-height:1.7;margin-top:6px">支持最近 1 个月、3 个月、6 个月、1 年，或整租户全量清理。全量清理需要输入 <code>CONFIRM</code>。</div>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px">
+                <select id="admin-hermes-memory-clear-range" onchange="previewAdminHermesMemoryClear()" style="flex:1;min-width:160px;background:#0F2745;border:1px solid rgba(200,169,110,0.18);border-radius:10px;padding:10px 12px;color:#F8F6F0;font-size:12px"></select>
+                <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="previewAdminHermesMemoryClear()">预览影响</button>
+              </div>
+              <div id="admin-hermes-memory-clear-confirm-wrap" style="display:none;margin-top:10px">
+                <input id="admin-hermes-memory-clear-confirm" placeholder="全量清理请输入 CONFIRM" style="width:100%;background:#0F2745;border:1px solid rgba(231,76,60,0.24);border-radius:10px;padding:10px 12px;color:#F8F6F0;font-size:12px;box-sizing:border-box">
+              </div>
+              <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+                <button class="btn-sm-blue" type="button" style="padding:8px 14px;font-size:12px" onclick="clearAdminHermesMemory(true)">先备份再清理</button>
+                <button type="button" style="padding:8px 14px;font-size:12px;background:rgba(231,76,60,0.12);border:1px solid rgba(231,76,60,0.32);color:#F1948A;border-radius:10px;cursor:pointer" onclick="clearAdminHermesMemory(false)">直接清理</button>
+              </div>
+            </div>
+          </div>
+          <div id="admin-hermes-memory-preview" style="margin-top:16px;padding:14px;border-radius:14px;background:rgba(11,30,58,0.45);border:1px dashed rgba(200,169,110,0.18);font-size:12px;color:#8899aa;line-height:1.8">请选择租户和清理范围后查看影响预览。</div>
+          <div id="admin-hermes-memory-status" style="margin-top:10px;font-size:12px;color:#C8A96E">尚未加载 Hermes 记忆治理数据。</div>
+        </div>
         <div class="table-wrap" style="margin-bottom:20px">
           <div class="table-header">
             <div class="table-title">Hermes 工具动作统计</div>
@@ -4431,6 +4606,9 @@ function showSection(name, navEl) {
   if (name === 'agent-workflows') {
     loadAdminAgentWorkflows().catch((error) => showToast(error.message || '加载失败'));
   }
+  if (name === 'hermes') {
+    loadAdminHermesMemorySummary(false).catch((error) => showToast(error.message || '加载失败'));
+  }
   if (name === 'forecast-model') {
     initForecastEditorEvents();
     loadAdminForecastModel().catch((error) => showToast(error.message || '加载失败'));
@@ -4566,6 +4744,12 @@ const adminTokenUsage = JSON.parse(JSON.stringify(window.ADMIN_TOKEN_USAGE || {
 }));
 const adminKnowledgeState = {
   items: [],
+};
+const adminHermesMemoryState = {
+  loaded: false,
+  loading: false,
+  summary: null,
+  preview: null,
 };
 
 function getAdminIndicatorDefinition(indicatorCode) {
@@ -6454,6 +6638,40 @@ function renderAgentWorkflowDirectory() {
   if (stats) stats.textContent = `${workflows.length} 个智能体工作流`;
 }
 
+function buildAgentWorkflowVerticalOrder(nodes, edges) {
+  const nodeList = Array.isArray(nodes) ? nodes : [];
+  const edgeList = Array.isArray(edges) ? edges : [];
+  const nodeMap = new Map(nodeList.map((item) => [item.id, item]));
+  const inboundCount = new Map();
+  const adjacency = new Map();
+  nodeList.forEach((item) => {
+    inboundCount.set(item.id, 0);
+    adjacency.set(item.id, []);
+  });
+  edgeList.forEach((edge) => {
+    if (!nodeMap.has(edge.from) || !nodeMap.has(edge.to)) return;
+    inboundCount.set(edge.to, Number(inboundCount.get(edge.to) || 0) + 1);
+    adjacency.get(edge.from).push(edge.to);
+  });
+  const queue = nodeList.filter((item) => Number(inboundCount.get(item.id) || 0) === 0).map((item) => item.id);
+  const orderedIds = [];
+  while (queue.length) {
+    const nextId = queue.shift();
+    if (!nextId || orderedIds.includes(nextId)) continue;
+    orderedIds.push(nextId);
+    (adjacency.get(nextId) || []).forEach((targetId) => {
+      inboundCount.set(targetId, Number(inboundCount.get(targetId) || 0) - 1);
+      if (Number(inboundCount.get(targetId) || 0) <= 0) {
+        queue.push(targetId);
+      }
+    });
+  }
+  nodeList.forEach((item) => {
+    if (!orderedIds.includes(item.id)) orderedIds.push(item.id);
+  });
+  return orderedIds.map((id) => nodeMap.get(id)).filter(Boolean);
+}
+
 function renderAgentWorkflowGraph() {
   const titleNode = document.getElementById('agent-workflow-title');
   const summaryNode = document.getElementById('agent-workflow-summary');
@@ -6465,6 +6683,7 @@ function renderAgentWorkflowGraph() {
   const graph = workflow.graph || {};
   const nodes = Array.isArray(graph.nodes) ? graph.nodes : [];
   const edges = Array.isArray(graph.edges) ? graph.edges : [];
+  const orderedNodes = buildAgentWorkflowVerticalOrder(nodes, edges);
   if (titleNode) titleNode.textContent = workflow.title || '工作流详情';
   if (summaryNode) {
     const preview = workflow.preview && typeof workflow.preview === 'object' ? workflow.preview.result || {} : {};
@@ -6472,61 +6691,59 @@ function renderAgentWorkflowGraph() {
       ? `${workflow.summary || ''} 当前预览目标 ${Number(preview.predicted_change_pct || 0).toFixed(2)}%，波动上限 ${Number(preview.volatility_cap || 0).toFixed(2)}。`
       : (workflow.summary || '这里展示智能体的设计流转和关键节点职责。');
   }
-  if (!selectedAgentWorkflowNodeId && nodes.length) {
-    selectedAgentWorkflowNodeId = (nodes[0] || {}).id || '';
+  if (!selectedAgentWorkflowNodeId && orderedNodes.length) {
+    selectedAgentWorkflowNodeId = (orderedNodes[0] || {}).id || '';
   }
   if (!nodes.length) {
     board.innerHTML = '<div class="compact-row"><strong>暂无节点</strong><span>0</span></div>';
     layer.innerHTML = '';
     return;
   }
-  const width = Math.max(1480, ...nodes.map((item) => Number(item.x || 0) + 280));
-  const height = Math.max(680, ...nodes.map((item) => Number(item.y || 0) + 180));
-  board.style.width = `${width}px`;
-  board.style.height = `${height}px`;
-  viewport.style.width = `${width}px`;
-  viewport.style.height = `${height}px`;
-  layer.setAttribute('width', String(width));
-  layer.setAttribute('height', String(height));
-  layer.setAttribute('viewBox', `0 0 ${width} ${height}`);
-  layer.innerHTML = `
-    <defs>
-      <marker id="agent-workflow-arrowhead" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
-        <path d="M 0 1 L 11 6 L 0 11 z" fill="rgba(47, 116, 192, 0.96)"></path>
-      </marker>
-    </defs>
-    ${edges.map((edge) => {
-      const fromNode = nodes.find((item) => item.id === edge.from);
-      const toNode = nodes.find((item) => item.id === edge.to);
-      if (!fromNode || !toNode) return '';
-      const startX = Number(fromNode.x || 0) + 220;
-      const startY = Number(fromNode.y || 0) + 52;
-      const endX = Number(toNode.x || 0);
-      const endY = Number(toNode.y || 0) + 52;
-      const deltaX = endX - startX;
-      const controlOffset = Math.max(80, Math.min(180, Math.abs(deltaX) * 0.45));
-      const controlA = startX + (deltaX >= 0 ? controlOffset : -controlOffset);
-      const controlB = endX - (deltaX >= 0 ? controlOffset : -controlOffset);
-      const path = `M ${startX} ${startY} C ${controlA} ${startY}, ${controlB} ${endY}, ${endX} ${endY}`;
-      return `
-        <g data-edge-id="${escapeAttr(edge.id || '')}">
-          <path class="workflow-edge-shadow" d="${path}"></path>
-          <path class="workflow-edge" d="${path}" marker-end="url(#agent-workflow-arrowhead)"></path>
-          <circle class="workflow-edge-anchor" cx="${startX}" cy="${startY}" r="5"></circle>
-          <circle class="workflow-edge-anchor" cx="${endX}" cy="${endY}" r="5"></circle>
-        </g>
-      `;
-    }).join('')}
+  board.style.width = '100%';
+  board.style.height = 'auto';
+  viewport.style.width = '100%';
+  viewport.style.height = 'auto';
+  layer.innerHTML = '';
+  const incomingMap = new Map();
+  const outgoingMap = new Map();
+  nodes.forEach((item) => {
+    incomingMap.set(item.id, []);
+    outgoingMap.set(item.id, []);
+  });
+  edges.forEach((edge) => {
+    if (incomingMap.has(edge.to)) incomingMap.get(edge.to).push(edge.from);
+    if (outgoingMap.has(edge.from)) outgoingMap.get(edge.from).push(edge.to);
+  });
+  const nodeNameMap = new Map(nodes.map((item) => [item.id, item.label || item.id || '-']));
+  board.innerHTML = `
+    <div class="agent-workflow-flow">
+      ${orderedNodes.map((item, index) => {
+        const upstreamNames = (incomingMap.get(item.id) || []).map((id) => nodeNameMap.get(id) || id);
+        const downstreamNames = (outgoingMap.get(item.id) || []).map((id) => nodeNameMap.get(id) || id);
+        return `
+          <div class="agent-workflow-flow-step ${index === orderedNodes.length - 1 ? 'is-last' : ''}">
+            <div class="agent-workflow-flow-rail">
+              <div class="agent-workflow-flow-index">${index + 1}</div>
+            </div>
+            <article class="agent-workflow-flow-card ${item.id === selectedAgentWorkflowNodeId ? 'is-selected' : ''}" data-agent-node-id="${escapeAttr(item.id || '')}" title="${escapeAttr(item.description || item.label || item.id || '')}">
+              <div class="agent-workflow-flow-head">
+                <div>
+                  <div class="agent-workflow-flow-step-label">Step ${index + 1}</div>
+                  <div class="agent-workflow-flow-title">${escapeHtml(item.label || item.id || '-')}</div>
+                </div>
+                <span class="agent-workflow-flow-pill is-gold">${escapeHtml(item.processor || item.kind || '')}</span>
+              </div>
+              <div class="agent-workflow-flow-mini">
+                ${upstreamNames.length ? `来自 ${escapeHtml(upstreamNames[0])}` : '起始'}
+                ${downstreamNames.length ? ` → ${escapeHtml(downstreamNames[0])}` : ' → 输出'}
+                ${(upstreamNames.length > 1 || downstreamNames.length > 1) ? ` · ${escapeHtml(`分支 ${Math.max(upstreamNames.length, downstreamNames.length)}`)}` : ''}
+              </div>
+            </article>
+          </div>
+        `;
+      }).join('')}
+    </div>
   `;
-  board.innerHTML = nodes.map((item) => `
-    <article class="workflow-node ${item.id === selectedAgentWorkflowNodeId ? 'is-selected' : ''}" data-agent-node-id="${escapeAttr(item.id || '')}" style="left:${Number(item.x || 0)}px;top:${Number(item.y || 0)}px;cursor:default">
-      <div class="workflow-node-head">
-        <strong>${escapeHtml(item.label || item.id || '-')}</strong>
-        <span class="workflow-node-type">${escapeHtml(item.processor || item.kind || '')}</span>
-      </div>
-      <div class="workflow-node-copy">${escapeHtml(item.description || '暂无节点说明')}</div>
-    </article>
-  `).join('');
   board.querySelectorAll('[data-agent-node-id]').forEach((node) => {
     node.addEventListener('click', () => {
       selectedAgentWorkflowNodeId = node.dataset.agentNodeId || '';
@@ -6620,6 +6837,254 @@ async function loadAdminAgentWorkflows(forceReload) {
   selectedAgentWorkflowNodeId = '';
   agentWorkflowLoaded = true;
   renderAgentWorkflowCenter();
+}
+
+function getAdminHermesMemoryTenantOptions() {
+  const tenants = ensureAdminTenants();
+  return Array.isArray(tenants) ? tenants.filter((item) => item && item.slug) : [];
+}
+
+function getAdminHermesMemorySelectedTenant() {
+  const select = document.getElementById('admin-hermes-memory-tenant');
+  const fallback = adminSiteConfig.default_tenant_slug || (((getAdminHermesMemoryTenantOptions()[0] || {}).slug) || '');
+  return String((select && select.value) || fallback || '').trim();
+}
+
+function getAdminHermesMemoryRangeOptions() {
+  const summary = adminHermesMemoryState.summary || {};
+  return Array.isArray(summary.range_options) && summary.range_options.length
+    ? summary.range_options
+    : [
+        {key: '1m', label: '最近 1 个月'},
+        {key: '3m', label: '最近 3 个月'},
+        {key: '6m', label: '最近 6 个月'},
+        {key: '1y', label: '最近 1 年'},
+        {key: 'all', label: '全部清除'},
+      ];
+}
+
+function setAdminHermesMemoryStatus(message, isError = false) {
+  const node = document.getElementById('admin-hermes-memory-status');
+  if (!node) return;
+  node.textContent = message || '';
+  node.style.color = isError ? '#F1948A' : '#C8A96E';
+}
+
+function renderAdminHermesMemoryPanel() {
+  const tenantSelect = document.getElementById('admin-hermes-memory-tenant');
+  const summaryNode = document.getElementById('admin-hermes-memory-summary');
+  const previewNode = document.getElementById('admin-hermes-memory-preview');
+  const backupRange = document.getElementById('admin-hermes-memory-backup-range');
+  const clearRange = document.getElementById('admin-hermes-memory-clear-range');
+  const confirmWrap = document.getElementById('admin-hermes-memory-clear-confirm-wrap');
+  if (!tenantSelect || !summaryNode || !previewNode || !backupRange || !clearRange) return;
+
+  const tenants = getAdminHermesMemoryTenantOptions();
+  const currentTenant = getAdminHermesMemorySelectedTenant();
+  tenantSelect.innerHTML = tenants.map((tenant) => `
+    <option value="${escapeAttr(tenant.slug || '')}" ${(tenant.slug || '') === currentTenant ? 'selected' : ''}>${escapeHtml(tenant.name || tenant.slug || '')}</option>
+  `).join('') || '<option value="">暂无租户</option>';
+  if (!tenantSelect.value && tenants.length) {
+    tenantSelect.value = tenants[0].slug || '';
+  }
+
+  const options = getAdminHermesMemoryRangeOptions();
+  const currentBackupRange = backupRange.value || '3m';
+  const currentClearRange = clearRange.value || '3m';
+  backupRange.innerHTML = options.map((item) => `
+    <option value="${escapeAttr(item.key || '')}" ${(item.key || '') === currentBackupRange ? 'selected' : ''}>${escapeHtml(item.label || item.key || '')}</option>
+  `).join('');
+  clearRange.innerHTML = options.map((item) => `
+    <option value="${escapeAttr(item.key || '')}" ${(item.key || '') === currentClearRange ? 'selected' : ''}>${escapeHtml(item.label || item.key || '')}</option>
+  `).join('');
+
+  const summary = adminHermesMemoryState.summary || {};
+  const cards = [
+    {label: '对话总轮次', value: Number(summary.turn_count || 0), desc: summary.first_turn_at ? `首轮：${summary.first_turn_at}` : '暂无对话'},
+    {label: '会话数', value: Number(summary.session_count || 0), desc: `会话记忆行 ${Number(summary.session_memory_count || 0)}`},
+    {label: '用户数', value: Number(summary.user_count || 0), desc: `用户记忆行 ${Number(summary.user_memory_count || 0)}`},
+    {label: '画像数', value: Number(summary.profile_count || 0), desc: summary.last_turn_at ? `最近：${summary.last_turn_at}` : '暂无最近时间'},
+    {label: '近 30 天轮次', value: Number(summary.recent_30d_turn_count || 0), desc: `活跃用户 ${Number(summary.recent_30d_active_user_count || 0)}`},
+  ];
+  summaryNode.innerHTML = cards.map((item) => `
+    <div style="padding:14px;border-radius:14px;background:rgba(11,30,58,0.55);border:1px solid rgba(200,169,110,0.1)">
+      <div style="font-size:12px;color:#8899aa">${escapeHtml(item.label)}</div>
+      <div style="font-size:24px;font-weight:700;color:#F8F6F0;margin-top:8px">${escapeHtml(String(item.value))}</div>
+      <div style="font-size:11px;color:#C8A96E;margin-top:6px;line-height:1.6">${escapeHtml(item.desc)}</div>
+    </div>
+  `).join('');
+
+  const preview = adminHermesMemoryState.preview || null;
+  if (!preview) {
+    previewNode.innerHTML = '请选择租户和清理范围后查看影响预览。';
+  } else {
+    previewNode.innerHTML = `
+      <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:13px;color:#F8F6F0;font-weight:600">清理预览 · ${escapeHtml(preview.range_label || preview.range_key || '')}</div>
+          <div style="font-size:12px;color:#8899aa;line-height:1.8;margin-top:6px">
+            ${preview.cutoff ? `将删除 ${escapeHtml(preview.cutoff)} 之后的 Hermes 记忆。` : '将清空该租户全部 Hermes 记忆。'}
+          </div>
+        </div>
+        <div style="font-size:12px;color:#C8A96E">生成时间：${escapeHtml(preview.generated_at || '--')}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:12px">
+        <div style="padding:10px 12px;border-radius:10px;background:rgba(15,39,69,0.7)"><div style="font-size:11px;color:#8899aa">待删轮次</div><div style="font-size:18px;color:#F8F6F0;font-weight:700;margin-top:6px">${escapeHtml(String(preview.turns_to_clear || 0))}</div></div>
+        <div style="padding:10px 12px;border-radius:10px;background:rgba(15,39,69,0.7)"><div style="font-size:11px;color:#8899aa">受影响会话</div><div style="font-size:18px;color:#F8F6F0;font-weight:700;margin-top:6px">${escapeHtml(String(preview.sessions_affected || 0))}</div></div>
+        <div style="padding:10px 12px;border-radius:10px;background:rgba(15,39,69,0.7)"><div style="font-size:11px;color:#8899aa">受影响用户</div><div style="font-size:18px;color:#F8F6F0;font-weight:700;margin-top:6px">${escapeHtml(String(preview.users_affected || 0))}</div></div>
+        <div style="padding:10px 12px;border-radius:10px;background:rgba(15,39,69,0.7)"><div style="font-size:11px;color:#8899aa">受影响画像</div><div style="font-size:18px;color:#F8F6F0;font-weight:700;margin-top:6px">${escapeHtml(String(preview.profiles_affected || 0))}</div></div>
+      </div>
+      <div style="font-size:11px;color:#8899aa;margin-top:10px;line-height:1.8">
+        时间覆盖：${escapeHtml(preview.first_turn_at || '--')} 至 ${escapeHtml(preview.last_turn_at || '--')}
+        ${preview.requires_strong_confirm ? ' · 全量清理需要手动输入 CONFIRM。' : ''}
+      </div>
+    `;
+  }
+
+  const showConfirm = clearRange.value === 'all';
+  if (confirmWrap) confirmWrap.style.display = showConfirm ? 'block' : 'none';
+}
+
+async function loadAdminHermesMemorySummary(forceReload = false) {
+  if (adminHermesMemoryState.loading) return;
+  renderAdminHermesMemoryPanel();
+  const tenantSlug = getAdminHermesMemorySelectedTenant();
+  if (!tenantSlug) {
+    setAdminHermesMemoryStatus('当前没有可管理的租户。', true);
+    return;
+  }
+  adminHermesMemoryState.loading = true;
+  setAdminHermesMemoryStatus('正在加载 Hermes 记忆汇总...');
+  try {
+    const resp = await fetch(`/api/admin/hermes/memory-summary?tenant_slug=${encodeURIComponent(tenantSlug)}`);
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'hermes_memory_summary_failed');
+    adminHermesMemoryState.summary = data.summary || null;
+    adminHermesMemoryState.loaded = true;
+    if (forceReload || !adminHermesMemoryState.preview || adminHermesMemoryState.preview.tenant_slug !== tenantSlug) {
+      adminHermesMemoryState.preview = null;
+    }
+    renderAdminHermesMemoryPanel();
+    await previewAdminHermesMemoryClear(false);
+    setAdminHermesMemoryStatus(`Hermes 记忆汇总已加载 · 租户 ${tenantSlug}`);
+  } catch (error) {
+    setAdminHermesMemoryStatus(error.message || 'Hermes 记忆汇总加载失败', true);
+    throw error;
+  } finally {
+    adminHermesMemoryState.loading = false;
+  }
+}
+
+async function previewAdminHermesMemoryClear(showToastOnSuccess = true) {
+  const tenantSlug = getAdminHermesMemorySelectedTenant();
+  const rangeKey = document.getElementById('admin-hermes-memory-clear-range')?.value || '3m';
+  const confirmWrap = document.getElementById('admin-hermes-memory-clear-confirm-wrap');
+  if (confirmWrap) confirmWrap.style.display = rangeKey === 'all' ? 'block' : 'none';
+  if (!tenantSlug) return;
+  setAdminHermesMemoryStatus('正在预览 Hermes 记忆清理影响...');
+  const resp = await fetch('/api/admin/hermes/memory-clear-preview', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({tenant_slug: tenantSlug, range_key: rangeKey}),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    setAdminHermesMemoryStatus((data && data.error) || 'hermes_memory_preview_failed', true);
+    throw new Error((data && data.error) || 'hermes_memory_preview_failed');
+  }
+  adminHermesMemoryState.preview = data.preview || null;
+  renderAdminHermesMemoryPanel();
+  setAdminHermesMemoryStatus(`已生成清理预览 · ${tenantSlug} · ${rangeKey}`);
+  if (showToastOnSuccess !== false) showToast('已更新 Hermes 记忆清理预览');
+}
+
+async function backupAdminHermesMemory() {
+  const tenantSlug = getAdminHermesMemorySelectedTenant();
+  const rangeKey = document.getElementById('admin-hermes-memory-backup-range')?.value || '3m';
+  if (!tenantSlug) {
+    showToast('请先选择租户');
+    return false;
+  }
+  setAdminHermesMemoryStatus('正在生成 Hermes 记忆 ZIP 备份...');
+  const resp = await fetch('/api/admin/hermes/memory-backup', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({tenant_slug: tenantSlug, range_key: rangeKey}),
+  });
+  if (!resp.ok) {
+    let errorMessage = 'hermes_memory_backup_failed';
+    try {
+      const data = await resp.json();
+      errorMessage = (data && data.error) || errorMessage;
+    } catch (error) {}
+    setAdminHermesMemoryStatus(errorMessage, true);
+    showToast(errorMessage);
+    return false;
+  }
+  const blob = await resp.blob();
+  const downloadUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  link.download = (() => {
+    const contentDisposition = resp.headers.get('Content-Disposition') || '';
+    const matched = contentDisposition.match(/filename=\"([^\"]+)\"/);
+    return matched ? matched[1] : `hermes_memory_${tenantSlug}_${rangeKey}.zip`;
+  })();
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(downloadUrl);
+  setAdminHermesMemoryStatus(`Hermes 记忆备份已生成 · ${tenantSlug} · ${rangeKey}`);
+  showToast('Hermes 记忆 ZIP 备份已下载');
+  return true;
+}
+
+async function clearAdminHermesMemory(backupFirst) {
+  const tenantSlug = getAdminHermesMemorySelectedTenant();
+  const rangeKey = document.getElementById('admin-hermes-memory-clear-range')?.value || '3m';
+  const confirmText = document.getElementById('admin-hermes-memory-clear-confirm')?.value || '';
+  if (!tenantSlug) {
+    showToast('请先选择租户');
+    return;
+  }
+  if (rangeKey === 'all' && String(confirmText).trim() !== 'CONFIRM') {
+    showToast('全量清理前请输入 CONFIRM');
+    return;
+  }
+  if (backupFirst) {
+    const backupOk = await backupAdminHermesMemory();
+    if (!backupOk) return;
+  }
+  const preview = adminHermesMemoryState.preview || {};
+  const turnCount = Number(preview.turns_to_clear || 0);
+  const confirmed = window.confirm(
+    rangeKey === 'all'
+      ? `确认清空租户 ${tenantSlug} 的全部 Hermes 记忆吗？当前预估删除 ${turnCount} 轮对话。`
+      : `确认清理租户 ${tenantSlug} 的 Hermes 记忆吗？当前预估删除 ${turnCount} 轮对话。`
+  );
+  if (!confirmed) return;
+  setAdminHermesMemoryStatus('正在执行 Hermes 记忆清理...');
+  const resp = await fetch('/api/admin/hermes/memory-clear', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({tenant_slug: tenantSlug, range_key: rangeKey, confirm_text: confirmText}),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    const errorMessage = (data && data.error) || 'hermes_memory_clear_failed';
+    setAdminHermesMemoryStatus(errorMessage, true);
+    showToast(errorMessage);
+    return;
+  }
+  adminHermesMemoryState.summary = data.result && data.result.post_summary ? data.result.post_summary : adminHermesMemoryState.summary;
+  adminHermesMemoryState.preview = null;
+  if (document.getElementById('admin-hermes-memory-clear-confirm')) {
+    document.getElementById('admin-hermes-memory-clear-confirm').value = '';
+  }
+  renderAdminHermesMemoryPanel();
+  await previewAdminHermesMemoryClear(false);
+  setAdminHermesMemoryStatus(`Hermes 记忆清理完成 · ${tenantSlug} · ${rangeKey}`);
+  showToast('Hermes 记忆已清理并完成重建');
 }
 
 function renderForecastWorkflow() {

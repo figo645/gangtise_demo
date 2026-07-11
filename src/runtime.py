@@ -11,6 +11,7 @@ import hashlib
 import base64
 import csv
 import io
+import zipfile
 from pathlib import Path
 from html import escape as html_escape
 from html.parser import HTMLParser

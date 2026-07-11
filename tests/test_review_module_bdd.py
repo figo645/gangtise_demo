@@ -98,6 +98,150 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("function getReviewDraftGenerationErrorMessage(error)", html)
         self.assertIn("当前还没有配置可用的大模型。请先到 Admin 的系统专区 · 大模型专区配置一个通用模型。", html)
 
+    def test_given_h5_knowledge_page_when_rendered_then_framework_and_ingestion_cards_are_removed(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertNotIn("方法与框架", html)
+        self.assertNotIn("复盘四步法：收拢资料", html)
+        self.assertNotIn("入库方式", html)
+        self.assertNotIn("大V通过语音输入、文件上传、网页 URL 提供的内容，会在清洗后进入知识专区", html)
+
+    def test_given_hermes_tool_plan_when_web_answer_enabled_then_knowledge_runs_before_web(self):
+        ordered = ai_services.build_hermes_tool_execution_plan(
+            {
+                "tools": ["watchlist.detail", "evidence.search", "attachment.context"],
+            },
+            web_answer=True,
+        )
+
+        self.assertEqual(ordered[0], "knowledge.search")
+        self.assertEqual(ordered[-1], "web.search")
+        self.assertIn("watchlist.detail", ordered)
+        self.assertIn("evidence.search", ordered)
+        self.assertIn("attachment.context", ordered)
+
+    def test_given_hermes_tool_plan_when_web_answer_disabled_then_only_platform_tools_run(self):
+        ordered = ai_services.build_hermes_tool_execution_plan(
+            {
+                "tools": ["watchlist.detail"],
+            },
+            web_answer=False,
+        )
+
+        self.assertEqual(ordered, ["knowledge.search", "watchlist.detail"])
+
+    def test_given_out_of_scope_question_when_scope_guard_runs_then_redirected(self):
+        result = ai_services.hermes_scope_guard("今天天气怎么样，顺便推荐晚饭吃什么？")
+
+        self.assertEqual(result["status"], "redirected")
+        self.assertEqual(result["intent_hint"], "out_of_scope_redirect")
+        self.assertIn("Hermes 主要回答", result["message"])
+
+    def test_given_direct_trading_instruction_when_scope_guard_runs_then_blocked(self):
+        result = ai_services.hermes_scope_guard("明天这只股票该不该满仓买入？")
+
+        self.assertEqual(result["status"], "blocked")
+        self.assertIn("不直接提供买卖", result["message"])
+
+    def test_given_product_help_question_when_router_falls_back_then_product_help_is_selected(self):
+        with patch("src.domain.ai_services.get_default_llm_config", return_value=None):
+            plan, _, route_mode = ai_services.route_hermes_query_intent(
+                "H5 里的智能指标怎么创建和发布？",
+                tenant_slug=self.tenant_slug,
+            )
+
+        self.assertEqual(route_mode, "fallback_rule_router")
+        self.assertEqual(plan["intent"], "product_help")
+        self.assertIn("dashboard.context", plan["tools"])
+
+    def test_given_smart_indicator_question_when_router_falls_back_then_dashboard_context_is_used(self):
+        with patch("src.domain.ai_services.get_default_llm_config", return_value=None):
+            plan, _, route_mode = ai_services.route_hermes_query_intent(
+                "这个智能指标是按什么公式和提示词计算出来的？",
+                tenant_slug=self.tenant_slug,
+            )
+
+        self.assertEqual(route_mode, "fallback_rule_router")
+        self.assertEqual(plan["intent"], "smart_indicator_explain")
+        self.assertIn("dashboard.context", plan["tools"])
+
+    def test_given_watchlist_question_when_extracting_hermes_memory_then_focus_symbols_and_persona_are_updated(self):
+        payload = ai_services.extract_hermes_memory_payload(
+            question_text="请判断腾讯控股当前更适合继续跟踪还是重点研究？",
+            plan={
+                "intent": "watchlist_fundamental",
+                "display_mode": "structured",
+                "scope_status": "allowed",
+                "preferred_mode": "judgement",
+                "web_answer": False,
+            },
+            synthesis={
+                "answer": "腾讯控股当前更适合继续跟踪，重点看回购与利润率兑现。",
+                "summary": "继续跟踪腾讯控股，先看利润率与回购兑现。",
+                "citations": ["腾讯控股 00700 HK"],
+            },
+            tool_outputs={
+                "watchlist": {
+                    "detail": {
+                        "name": "腾讯控股",
+                        "code": "00700",
+                    }
+                }
+            },
+            actor_context={
+                "tenant_slug": self.tenant_slug,
+                "user_role": "investor",
+                "profile_id": "价值猎人小林",
+                "display_name": "价值猎人小林",
+                "membership": "专业会员",
+            },
+            memory_state={
+                "session_id": "session_demo",
+                "session": {"turn_count": 1, "recent_topics": ["港股互联网"], "recent_symbols": ["腾讯控股"]},
+                "user_memory": {"total_turns": 2, "preferred_response_style": "结构化偏好", "recent_topics": ["港股互联网"], "focus_symbols": ["腾讯控股"]},
+                "user_profile": {"total_queries": 2, "research_depth_score": 60, "interest_topics": ["港股互联网"], "focus_symbols": ["腾讯控股"], "style_tags": ["结构化偏好"]},
+                "recent_turns": [],
+            },
+        )
+
+        profile_snapshot = payload["profile_snapshot"]
+        turn_tags = payload["turn_record"]["tags"]
+        self.assertEqual(profile_snapshot["persona_primary"], "个股研究型用户")
+        self.assertIn("腾讯控股", profile_snapshot["focus_symbols"])
+        self.assertIn("个股", turn_tags["function_tags"])
+        self.assertIn("结构化偏好", profile_snapshot["style_tags"])
+        self.assertGreaterEqual(profile_snapshot["total_queries"], 3)
+
+    def test_given_hermes_query_when_db_unavailable_then_memory_meta_falls_back_without_failing(self):
+        response = self.client.post(
+            "/api/hermes/query",
+            json={"tenant_slug": self.tenant_slug, "question": "请解释这个智能指标的计算口径"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertIn("memory_meta", payload)
+        self.assertIn("user_profile_snapshot", payload)
+        self.assertEqual(payload["memory_meta"]["storage_mode"], "memoryless_fallback")
+        self.assertTrue(payload["session_id"])
+
+    def test_given_out_of_scope_question_when_calling_hermes_api_then_response_is_redirected(self):
+        response = self.client.post(
+            "/api/hermes/query",
+            json={"tenant_slug": self.tenant_slug, "question": "帮我推荐一个上海周末亲子旅游行程"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["intent"], "out_of_scope_redirect")
+        self.assertEqual(payload["router"]["mode"], "scope_guard")
+        self.assertFalse(payload["tool_trace"])
+        self.assertTrue(payload["bullets"])
+
     def test_given_admin_llm_page_when_rendered_then_sync_button_exists(self):
         response = self.client.get("/admin")
 
@@ -116,6 +260,75 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("loadAdminAgentWorkflows", html)
         self.assertIn("/api/admin/agent-workflows", html)
         self.assertIn("section-agent-workflows", html)
+
+    def test_given_admin_page_when_rendered_then_hermes_memory_governance_exists(self):
+        response = self.client.get("/admin")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("Hermes 记忆治理", html)
+        self.assertIn("admin-hermes-memory-summary", html)
+        self.assertIn("admin-hermes-memory-preview", html)
+        self.assertIn("async function loadAdminHermesMemorySummary", html)
+        self.assertIn("async function backupAdminHermesMemory", html)
+        self.assertIn("async function clearAdminHermesMemory", html)
+        self.assertIn("/api/admin/hermes/memory-summary", html)
+        self.assertIn("/api/admin/hermes/memory-clear-preview", html)
+        self.assertIn("/api/admin/hermes/memory-backup", html)
+        self.assertIn("/api/admin/hermes/memory-clear", html)
+
+    def test_given_admin_hermes_memory_summary_when_api_called_then_payload_returns(self):
+        summary = {
+            "tenant_slug": self.tenant_slug,
+            "turn_count": 12,
+            "session_count": 3,
+            "user_count": 2,
+            "profile_count": 2,
+            "range_options": [{"key": "3m", "label": "最近 3 个月"}],
+        }
+        with patch("src.web.api_core.build_admin_hermes_memory_summary", return_value=summary):
+            response = self.client.get(f"/api/admin/hermes/memory-summary?tenant_slug={self.tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["summary"]["tenant_slug"], self.tenant_slug)
+        self.assertEqual(payload["summary"]["turn_count"], 12)
+
+    def test_given_admin_hermes_memory_full_clear_without_confirm_when_api_called_then_bad_request(self):
+        with patch("src.web.api_core.clear_admin_hermes_memory", side_effect=ValueError("confirm_text_required")):
+            response = self.client.post(
+                "/api/admin/hermes/memory-clear",
+                json={"tenant_slug": self.tenant_slug, "range_key": "all", "confirm_text": ""},
+            )
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.get_json()
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["error"], "confirm_text_required")
+
+    def test_given_admin_hermes_memory_backup_when_api_called_then_attachment_returns(self):
+        backup_result = {
+            "filename": "hermes_memory_demo.zip",
+            "content_bytes": b"zip-bytes",
+            "manifest": {
+                "tenant_slug": self.tenant_slug,
+                "range_key": "3m",
+                "counts": {"conversation_turns": 5},
+            },
+        }
+        with patch("src.web.api_core.build_admin_hermes_memory_backup_zip", return_value=backup_result):
+            response = self.client.post(
+                "/api/admin/hermes/memory-backup",
+                json={"tenant_slug": self.tenant_slug, "range_key": "3m"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "application/zip")
+        self.assertIn("attachment; filename=\"hermes_memory_demo.zip\"", response.headers.get("Content-Disposition", ""))
+        self.assertEqual(response.headers.get("X-Hermes-Backup-Tenant"), self.tenant_slug)
+        self.assertEqual(response.headers.get("X-Hermes-Backup-Range"), "3m")
+        self.assertEqual(response.get_data(), b"zip-bytes")
 
     def test_given_sync_request_when_api_called_then_only_llm_registry_is_synced(self):
         local_site_config = {

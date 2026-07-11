@@ -4567,6 +4567,7 @@ def init_db():
         except Exception:
             conn.rollback()
             execute_sql_file(conn, sql_dir / "020_knowledge_embeddings.sql")
+        execute_sql_file(conn, sql_dir / "022_hermes_memory_profile.sql")
         execute_sql_file(conn, sql_dir / "101_seed_app_core.sql")
         execute_sql_file(conn, sql_dir / "100_seed_master_data.sql")
 

@@ -2383,18 +2383,24 @@ HERMES_QUERY_INTENT_PROMPT = (
 )
 
 HERMES_ALLOWED_INTENTS = {
-    "general_chat",
+    "small_talk",
+    "product_help",
     "knowledge_lookup",
     "evidence_chain_analysis",
     "watchlist_fundamental",
+    "smart_indicator_explain",
+    "dashboard_interpretation",
     "multi_tool_research",
+    "out_of_scope_redirect",
 }
 
 HERMES_ALLOWED_TOOLS = {
     "knowledge.search",
     "evidence.search",
     "watchlist.detail",
+    "dashboard.context",
     "attachment.context",
+    "web.search",
 }
 
 
@@ -2429,22 +2435,1818 @@ def format_hermes_message_context(messages, limit=8):
     return "\n".join(lines)
 
 
-def build_hermes_intent_router_prompt(question_text, has_attachments=False, selected_knowledge_ids=None, messages=None):
+HERMES_SCOPE_KEYWORDS = {
+    "watchlist": ["股票", "个股", "自选股", "基本面", "估值", "盈利", "财报", "行业位置", "港股", "a股", "美股"],
+    "evidence": ["复盘", "证据链", "证据", "依据", "来源", "纪要", "逻辑链"],
+    "knowledge": ["知识库", "知识", "框架", "方法", "研报", "材料", "纪要速读", "方法论"],
+    "indicator": ["智能指标", "指标", "公式", "提示词", "算法", "js", "计算", "引用指标"],
+    "dashboard": ["dashboard", "看板", "面板", "卡片", "2x2", "2x3", "4x2", "布局"],
+    "product": ["功能", "页面", "按钮", "工作台", "专区", "上传", "发布", "预览", "后台", "admin", "h5", "web", "怎么用", "如何用"],
+}
+
+HERMES_SMALL_TALK_KEYWORDS = [
+    "你好", "您好", "hi", "hello", "在吗", "谢谢", "感谢", "辛苦了", "早上好", "晚上好", "午安",
+]
+
+HERMES_BLOCKED_TRADING_KEYWORDS = [
+    "买入", "卖出", "梭哈", "满仓", "半仓", "仓位", "止盈", "止损", "带单", "喊单", "荐股", "财富密码",
+    "明天买", "今天买", "直接买", "直接卖", "短线暴富",
+]
+
+HERMES_OUT_OF_SCOPE_KEYWORDS = [
+    "天气", "菜谱", "做饭", "旅游", "酒店", "机票", "情书", "简历", "面试题", "数学作业", "翻译论文", "法律诉状",
+    "看病", "减肥", "星座", "宠物", "装修", "游戏攻略", "八卦新闻",
+]
+
+HERMES_PRODUCT_ACTION_KEYWORDS = ["怎么", "如何", "创建", "新增", "发布", "预览", "修改", "配置", "上传", "切换", "打开", "进入", "使用"]
+
+
+def _contains_any_keyword(text, keywords):
+    normalized = str(text or "").strip().lower()
+    for item in keywords:
+        keyword = str(item or "").strip().lower()
+        if keyword and keyword in normalized:
+            return True
+    return False
+
+
+def _hermes_scope_feature_flags(question_text, selected_knowledge_ids=None, attachments=None):
+    selected_knowledge_ids = selected_knowledge_ids if isinstance(selected_knowledge_ids, list) else []
+    attachments = attachments if isinstance(attachments, list) else []
+    text = str(question_text or "").strip()
+    flags = {
+        "watchlist": bool(find_watchlist_code_from_text(text)) or _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["watchlist"]),
+        "evidence": _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["evidence"]),
+        "knowledge": bool(selected_knowledge_ids) or _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["knowledge"]),
+        "indicator": _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["indicator"]),
+        "dashboard": _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["dashboard"]),
+        "product": _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["product"]),
+        "attachments": bool(attachments),
+        "small_talk": _contains_any_keyword(text, HERMES_SMALL_TALK_KEYWORDS),
+        "blocked_trading": _contains_any_keyword(text, HERMES_BLOCKED_TRADING_KEYWORDS),
+        "out_of_scope": _contains_any_keyword(text, HERMES_OUT_OF_SCOPE_KEYWORDS),
+    }
+    flags["platform_related"] = any(
+        flags[key]
+        for key in ["watchlist", "evidence", "knowledge", "indicator", "dashboard", "product", "attachments"]
+    )
+    return flags
+
+
+def hermes_scope_guard(question_text, selected_knowledge_ids=None, attachments=None):
+    text = str(question_text or "").strip()
+    flags = _hermes_scope_feature_flags(
+        question_text=text,
+        selected_knowledge_ids=selected_knowledge_ids,
+        attachments=attachments,
+    )
+    suggestions = [
+        "可以改问个股 / 自选股基本面。",
+        "也可以改问复盘依据、知识框架或智能指标。",
+        "如果想问功能使用，直接说页面或操作目标即可。",
+    ]
+    if flags["blocked_trading"] and (flags["watchlist"] or "股票" in text or "大盘" in text or "指数" in text):
+        return {
+            "status": "blocked",
+            "reason": "当前问题更像直接交易指令或仓位建议，超出 Hermes 的服务边界。",
+            "message": "Hermes 不直接提供买卖、仓位或喊单式指令。你可以改问标的的基本面、证据链、风险边界或跟踪变量。",
+            "suggestions": suggestions,
+            "intent_hint": "out_of_scope_redirect",
+            "flags": flags,
+        }
+    if flags["platform_related"]:
+        intent_hint = "knowledge_lookup"
+        if flags["product"] and _contains_any_keyword(text, HERMES_PRODUCT_ACTION_KEYWORDS):
+            intent_hint = "product_help"
+        elif flags["indicator"] and not flags["dashboard"]:
+            intent_hint = "smart_indicator_explain"
+        elif flags["dashboard"]:
+            intent_hint = "dashboard_interpretation"
+        elif flags["product"]:
+            intent_hint = "product_help"
+        elif flags["watchlist"]:
+            intent_hint = "watchlist_fundamental"
+        elif flags["evidence"]:
+            intent_hint = "evidence_chain_analysis"
+        return {
+            "status": "allowed",
+            "reason": "问题落在 Hermes 的研究或产品能力范围内。",
+            "message": "",
+            "suggestions": suggestions,
+            "intent_hint": intent_hint,
+            "flags": flags,
+        }
+    if flags["small_talk"]:
+        return {
+            "status": "soft_allowed",
+            "reason": "识别为轻度闲聊或寒暄，可保留简短对话。",
+            "message": "",
+            "suggestions": [
+                "如果继续聊研究内容，可以直接补股票、复盘或指标对象。",
+                "也可以问某个功能怎么用。",
+            ],
+            "intent_hint": "small_talk",
+            "flags": flags,
+        }
+    redirect_reason = "当前问题没有落在平台研究、复盘、知识、智能指标或产品使用范围内。"
+    if flags["out_of_scope"]:
+        redirect_reason = "当前问题更偏生活化或通用百科，不属于 Hermes 的主要服务范围。"
+    return {
+        "status": "redirected",
+        "reason": redirect_reason,
+        "message": "Hermes 主要回答个股/自选股、复盘证据链、知识框架、智能指标和平台功能使用相关问题。你可以换成这些方向继续问。",
+        "suggestions": suggestions,
+        "intent_hint": "out_of_scope_redirect",
+        "flags": flags,
+    }
+
+
+HERMES_FUNCTION_TAG_MAP = {
+    "small_talk": ["闲聊"],
+    "product_help": ["产品帮助"],
+    "knowledge_lookup": ["知识"],
+    "evidence_chain_analysis": ["证据链", "复盘"],
+    "watchlist_fundamental": ["个股"],
+    "smart_indicator_explain": ["指标"],
+    "dashboard_interpretation": ["Dashboard", "指标"],
+    "multi_tool_research": ["个股", "知识", "证据链"],
+    "out_of_scope_redirect": ["超范围收口"],
+}
+
+HERMES_STYLE_KEYWORDS = {
+    "结构化偏好": ["结构化", "分点", "拆开", "按步骤", "按模块"],
+    "摘要偏好": ["摘要", "概括", "一句话", "简短", "直接结论", "先给结论"],
+    "短线": ["短线", "日内", "明天", "今天", "本周"],
+    "中线": ["中线", "波段", "一两个月", "季度"],
+    "长期": ["长期", "一年", "长线", "长期跟踪"],
+    "保守": ["稳健", "保守", "防守", "低风险"],
+    "激进": ["激进", "进攻", "高弹性", "高波动"],
+}
+
+HERMES_TOPIC_KEYWORDS = {
+    "港股互联网": ["港股", "互联网", "腾讯", "阿里", "美团"],
+    "AI算力": ["ai", "算力", "gpu", "服务器", "光模块"],
+    "半导体": ["半导体", "芯片", "中芯国际"],
+    "消费": ["消费", "白酒", "贵州茅台"],
+    "宏观流动性": ["宏观", "流动性", "降息", "美联储", "cpi"],
+    "复盘方法": ["复盘", "证据链", "依据", "纪要"],
+    "智能指标": ["智能指标", "提示词", "公式", "dashboard", "看板"],
+}
+
+HERMES_MARKET_KEYWORDS = {
+    "A股": ["a股", "上证", "深证", "创业板"],
+    "港股": ["港股", "恒生", "腾讯", "美团", "阿里"],
+    "美股": ["美股", "纳斯达克", "标普", "道琼斯", "apple", "tesla", "nvda"],
+}
+
+HERMES_RESPONSE_STYLE_PRIORITY = ["结构化偏好", "摘要偏好", "长期", "中线", "短线", "保守", "激进"]
+
+
+def _hermes_unique_texts(items, limit=12):
+    result = []
+    seen = set()
+    for item in items if isinstance(items, list) else []:
+        value = re.sub(r"\s+", " ", str(item or "").strip())
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+        if len(result) >= max(1, int(limit or 12)):
+            break
+    return result
+
+
+def _hermes_json_text(value, fallback):
+    return json.dumps(value if value is not None else fallback, ensure_ascii=False)
+
+
+def _hermes_trim_text(value, limit=240):
+    text = re.sub(r"\s+", " ", str(value or "").strip())
+    if len(text) <= max(1, int(limit or 240)):
+        return text
+    return f"{text[:max(0, int(limit or 240) - 1)]}…"
+
+
+def _clamp_score(value, minimum=0, maximum=100):
+    try:
+        numeric = int(value)
+    except Exception:
+        numeric = minimum
+    return max(minimum, min(maximum, numeric))
+
+
+def resolve_hermes_actor_context(payload, tenant_slug="", user_role=""):
+    source = payload if isinstance(payload, dict) else {}
+    current_profile = None
+    if has_request_context():
+        try:
+            current_profile = get_current_demo_profile()
+        except Exception:
+            current_profile = None
+    normalized_role = str(source.get("user_role") or user_role or (current_profile or {}).get("role") or "investor").strip().lower() or "investor"
+    profile_id = str(source.get("user_profile_id") or (current_profile or {}).get("username") or "").strip()
+    if not profile_id:
+        profile_id = f"{normalized_role or 'guest'}_guest"
+    display_name = str(source.get("user_name") or (current_profile or {}).get("name") or (current_profile or {}).get("username") or profile_id).strip() or profile_id
+    membership = str(source.get("user_membership") or (current_profile or {}).get("membership") or "").strip()
+    tenant = (current_profile or {}).get("tenant") if isinstance((current_profile or {}).get("tenant"), dict) else {}
+    return {
+        "tenant_slug": str(tenant_slug or tenant.get("slug") or "").strip().lower(),
+        "user_role": normalized_role,
+        "profile_id": profile_id,
+        "display_name": display_name,
+        "membership": membership,
+        "is_anonymous": profile_id.endswith("_guest"),
+    }
+
+
+def resolve_hermes_session_id(payload, actor_context=None):
+    source = payload if isinstance(payload, dict) else {}
+    provided = slugify_code(source.get("session_id"), "")
+    if provided:
+        return provided
+    actor = actor_context if isinstance(actor_context, dict) else {}
+    base = "|".join([
+        str(actor.get("tenant_slug") or "").strip().lower(),
+        str(actor.get("profile_id") or "").strip().lower(),
+        str(actor.get("user_role") or "").strip().lower(),
+    ])
+    digest = hashlib.md5(base.encode("utf-8")).hexdigest()[:16] if base else hashlib.md5(now_ts_ms().encode("utf-8")).hexdigest()[:16]
+    return f"hermes_session_{digest}"
+
+
+def _extract_json_text_field(row, key, default):
+    if not isinstance(row, dict):
+        return copy.deepcopy(default)
+    value = row.get(key)
+    if isinstance(default, dict):
+        return safe_json_loads(value, {})
+    if isinstance(default, list):
+        return safe_json_loads(value, [])
+    return str(value or "").strip()
+
+
+def _load_hermes_db_rows(actor_context, session_id, limit=6):
+    actor = actor_context if isinstance(actor_context, dict) else {}
+    tenant_slug = str(actor.get("tenant_slug") or "").strip().lower()
+    profile_id = str(actor.get("profile_id") or "").strip()
+    result = {
+        "session": None,
+        "user_memory": None,
+        "user_profile": None,
+        "recent_turns": [],
+    }
+    if not tenant_slug or not session_id:
+        return result
+    db = get_db()
+    result["session"] = db.execute(
+        """
+        SELECT session_id, tenant_slug, user_profile_id, user_role, user_display_name, turn_count,
+               recent_topics_json, recent_symbols_json, recent_intents_json, working_memory_json,
+               summary_text, last_intent, last_tags_json, first_seen_at, last_seen_at
+        FROM hermes_session_memory
+        WHERE tenant_slug = ? AND session_id = ?
+        """,
+        (tenant_slug, session_id),
+    ).fetchone()
+    if profile_id:
+        result["user_memory"] = db.execute(
+            """
+            SELECT tenant_slug, user_profile_id, user_role, user_display_name, total_turns, last_session_id,
+                   fact_memory_json, working_memory_json, recent_topics_json, focus_symbols_json,
+                   last_tags_json, preferred_response_style, preferred_intents_json, created_at, updated_at
+            FROM hermes_user_memory
+            WHERE tenant_slug = ? AND user_profile_id = ?
+            """,
+            (tenant_slug, profile_id),
+        ).fetchone()
+        result["user_profile"] = db.execute(
+            """
+            SELECT tenant_slug, user_profile_id, user_role, user_display_name, persona_primary, persona_secondary,
+                   interest_topics_json, focus_symbols_json, function_tags_json, behavior_tags_json,
+                   style_tags_json, commercial_tags_json, intent_distribution_json, research_depth_score,
+                   engagement_score, conversion_signal_score, total_queries, last_intent, last_scope_status,
+                   last_activity_at, metadata_json, created_at, updated_at
+            FROM hermes_user_profiles
+            WHERE tenant_slug = ? AND user_profile_id = ?
+            """,
+            (tenant_slug, profile_id),
+        ).fetchone()
+    result["recent_turns"] = db.execute(
+        """
+        SELECT turn_id, question_text, answer_summary, intent, scope_status, tags_json, created_at
+        FROM hermes_conversation_turns
+        WHERE tenant_slug = ? AND session_id = ?
+        ORDER BY created_at DESC
+        LIMIT ?
+        """,
+        (tenant_slug, session_id, max(1, int(limit or 6))),
+    ).fetchall()
+    return result
+
+
+def build_hermes_memory_context_text(memory_state):
+    snapshot = memory_state if isinstance(memory_state, dict) else {}
+    session = snapshot.get("session") if isinstance(snapshot.get("session"), dict) else {}
+    user_memory = snapshot.get("user_memory") if isinstance(snapshot.get("user_memory"), dict) else {}
+    user_profile = snapshot.get("user_profile") if isinstance(snapshot.get("user_profile"), dict) else {}
+    recent_turns = snapshot.get("recent_turns") if isinstance(snapshot.get("recent_turns"), list) else []
+    parts = []
+    persona_primary = str(user_profile.get("persona_primary") or "").strip()
+    if persona_primary:
+        parts.append(f"用户主定位：{persona_primary}")
+    interest_topics = _hermes_unique_texts((user_profile.get("interest_topics") or user_memory.get("recent_topics") or []), limit=4)
+    if interest_topics:
+        parts.append("长期关注主题：" + " / ".join(interest_topics))
+    focus_symbols = _hermes_unique_texts((user_profile.get("focus_symbols") or user_memory.get("focus_symbols") or []), limit=4)
+    if focus_symbols:
+        parts.append("重点关注对象：" + " / ".join(focus_symbols))
+    preferred_style = str(user_memory.get("preferred_response_style") or "").strip()
+    if preferred_style:
+        parts.append(f"回答偏好：{preferred_style}")
+    recent_topics = _hermes_unique_texts(session.get("recent_topics") or [], limit=3)
+    if recent_topics:
+        parts.append("当前会话最近主题：" + " / ".join(recent_topics))
+    turn_summaries = []
+    for item in recent_turns[:3]:
+        if not isinstance(item, dict):
+            continue
+        question = _hermes_trim_text(item.get("question_text"), limit=48)
+        answer_summary = _hermes_trim_text(item.get("answer_summary"), limit=60)
+        if question:
+            turn_summaries.append(f"Q:{question} | A:{answer_summary}")
+    if turn_summaries:
+        parts.append("最近追问：" + " || ".join(turn_summaries))
+    return "\n".join(parts)
+
+
+def load_hermes_memory_state(actor_context, session_id, limit=6):
+    actor = actor_context if isinstance(actor_context, dict) else {}
+    fallback = {
+        "available": False,
+        "storage_mode": "memoryless_fallback",
+        "session_id": session_id,
+        "session": {
+            "turn_count": 0,
+            "recent_topics": [],
+            "recent_symbols": [],
+            "recent_intents": [],
+            "working_memory": {},
+            "summary_text": "",
+            "last_intent": "",
+            "last_tags": {},
+        },
+        "user_memory": {
+            "total_turns": 0,
+            "fact_memory": {},
+            "working_memory": {},
+            "recent_topics": [],
+            "focus_symbols": [],
+            "last_tags": {},
+            "preferred_response_style": "",
+            "preferred_intents": [],
+        },
+        "user_profile": {
+            "persona_primary": "",
+            "persona_secondary": "",
+            "interest_topics": [],
+            "focus_symbols": [],
+            "function_tags": [],
+            "behavior_tags": [],
+            "style_tags": [],
+            "commercial_tags": [],
+            "intent_distribution": {},
+            "research_depth_score": 0,
+            "engagement_score": 0,
+            "conversion_signal_score": 0,
+            "total_queries": 0,
+            "last_intent": "",
+            "last_scope_status": "",
+            "last_activity_at": "",
+            "metadata": {},
+        },
+        "recent_turns": [],
+        "context_text": "",
+        "actor": copy.deepcopy(actor),
+    }
+    if not str(actor.get("tenant_slug") or "").strip() or not str(session_id or "").strip():
+        return fallback
+    try:
+        rows = _load_hermes_db_rows(actor_context=actor, session_id=session_id, limit=limit)
+        session_row = rows.get("session") if isinstance(rows.get("session"), dict) else {}
+        user_memory_row = rows.get("user_memory") if isinstance(rows.get("user_memory"), dict) else {}
+        user_profile_row = rows.get("user_profile") if isinstance(rows.get("user_profile"), dict) else {}
+        recent_turns = []
+        for item in rows.get("recent_turns") or []:
+            if not isinstance(item, dict):
+                continue
+            recent_turns.append({
+                "turn_id": str(item.get("turn_id") or "").strip(),
+                "question_text": str(item.get("question_text") or "").strip(),
+                "answer_summary": str(item.get("answer_summary") or "").strip(),
+                "intent": str(item.get("intent") or "").strip(),
+                "scope_status": str(item.get("scope_status") or "").strip(),
+                "tags": _extract_json_text_field(item, "tags_json", {}),
+                "created_at": str(item.get("created_at") or "").strip(),
+            })
+        state = {
+            "available": True,
+            "storage_mode": "db",
+            "session_id": session_id,
+            "session": {
+                "turn_count": int(session_row.get("turn_count") or 0),
+                "recent_topics": _extract_json_text_field(session_row, "recent_topics_json", []),
+                "recent_symbols": _extract_json_text_field(session_row, "recent_symbols_json", []),
+                "recent_intents": _extract_json_text_field(session_row, "recent_intents_json", []),
+                "working_memory": _extract_json_text_field(session_row, "working_memory_json", {}),
+                "summary_text": str(session_row.get("summary_text") or "").strip(),
+                "last_intent": str(session_row.get("last_intent") or "").strip(),
+                "last_tags": _extract_json_text_field(session_row, "last_tags_json", {}),
+                "first_seen_at": str(session_row.get("first_seen_at") or "").strip(),
+                "last_seen_at": str(session_row.get("last_seen_at") or "").strip(),
+            },
+            "user_memory": {
+                "total_turns": int(user_memory_row.get("total_turns") or 0),
+                "fact_memory": _extract_json_text_field(user_memory_row, "fact_memory_json", {}),
+                "working_memory": _extract_json_text_field(user_memory_row, "working_memory_json", {}),
+                "recent_topics": _extract_json_text_field(user_memory_row, "recent_topics_json", []),
+                "focus_symbols": _extract_json_text_field(user_memory_row, "focus_symbols_json", []),
+                "last_tags": _extract_json_text_field(user_memory_row, "last_tags_json", {}),
+                "preferred_response_style": str(user_memory_row.get("preferred_response_style") or "").strip(),
+                "preferred_intents": _extract_json_text_field(user_memory_row, "preferred_intents_json", []),
+                "last_session_id": str(user_memory_row.get("last_session_id") or "").strip(),
+            },
+            "user_profile": {
+                "persona_primary": str(user_profile_row.get("persona_primary") or "").strip(),
+                "persona_secondary": str(user_profile_row.get("persona_secondary") or "").strip(),
+                "interest_topics": _extract_json_text_field(user_profile_row, "interest_topics_json", []),
+                "focus_symbols": _extract_json_text_field(user_profile_row, "focus_symbols_json", []),
+                "function_tags": _extract_json_text_field(user_profile_row, "function_tags_json", []),
+                "behavior_tags": _extract_json_text_field(user_profile_row, "behavior_tags_json", []),
+                "style_tags": _extract_json_text_field(user_profile_row, "style_tags_json", []),
+                "commercial_tags": _extract_json_text_field(user_profile_row, "commercial_tags_json", []),
+                "intent_distribution": _extract_json_text_field(user_profile_row, "intent_distribution_json", {}),
+                "research_depth_score": int(user_profile_row.get("research_depth_score") or 0),
+                "engagement_score": int(user_profile_row.get("engagement_score") or 0),
+                "conversion_signal_score": int(user_profile_row.get("conversion_signal_score") or 0),
+                "total_queries": int(user_profile_row.get("total_queries") or 0),
+                "last_intent": str(user_profile_row.get("last_intent") or "").strip(),
+                "last_scope_status": str(user_profile_row.get("last_scope_status") or "").strip(),
+                "last_activity_at": str(user_profile_row.get("last_activity_at") or "").strip(),
+                "metadata": _extract_json_text_field(user_profile_row, "metadata_json", {}),
+            },
+            "recent_turns": recent_turns,
+            "actor": copy.deepcopy(actor),
+        }
+        state["context_text"] = build_hermes_memory_context_text(state)
+        return state
+    except Exception as exc:
+        if has_request_context():
+            app.logger.warning("Hermes memory state unavailable, fallback only: %s", str(exc)[:180])
+        return fallback
+
+
+def _detect_hermes_focus_symbols(text, tool_outputs=None):
+    normalized = str(text or "").strip()
+    symbols = []
+    watchlist_detail = (((tool_outputs or {}).get("watchlist") or {}).get("detail") or {}) if isinstance(tool_outputs, dict) else {}
+    if isinstance(watchlist_detail, dict) and watchlist_detail:
+        name = str(watchlist_detail.get("name") or "").strip()
+        code = str(watchlist_detail.get("code") or "").strip()
+        if name:
+            symbols.append(name)
+        if code:
+            symbols.append(code)
+    try:
+        details = gen_watchlist_details()
+    except Exception:
+        details = {}
+    for code, detail in details.items():
+        name = str((detail or {}).get("name") or "").strip()
+        if name and name in normalized:
+            symbols.append(name)
+            symbols.append(str(code or "").strip())
+    code_match = re.findall(r"\b\d{5,6}\b", normalized)
+    symbols.extend(code_match)
+    return _hermes_unique_texts(symbols, limit=6)
+
+
+def _detect_hermes_topics(text, plan=None, tool_outputs=None):
+    normalized = str(text or "").strip().lower()
+    topics = []
+    for topic, keywords in HERMES_TOPIC_KEYWORDS.items():
+        if any(str(keyword or "").strip().lower() in normalized for keyword in keywords):
+            topics.append(topic)
+    dashboard_context = (tool_outputs.get("dashboard_context") or {}) if isinstance(tool_outputs, dict) else {}
+    for item in (dashboard_context.get("smart_indicators") or [])[:6]:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("indicator_name") or "").strip()
+        if name and name.lower() in normalized:
+            topics.append(name)
+    if str((plan or {}).get("intent") or "").strip() == "dashboard_interpretation":
+        topics.append("Dashboard")
+    if str((plan or {}).get("intent") or "").strip() == "smart_indicator_explain":
+        topics.append("智能指标")
+    return _hermes_unique_texts(topics, limit=6)
+
+
+def _detect_hermes_markets(text):
+    normalized = str(text or "").strip().lower()
+    markets = []
+    for market, keywords in HERMES_MARKET_KEYWORDS.items():
+        if any(str(keyword or "").strip().lower() in normalized for keyword in keywords):
+            markets.append(market)
+    return _hermes_unique_texts(markets, limit=4)
+
+
+def _detect_hermes_style_tags(question_text, plan=None):
+    normalized = str(question_text or "").strip().lower()
+    tags = []
+    for tag, keywords in HERMES_STYLE_KEYWORDS.items():
+        if any(str(keyword or "").strip().lower() in normalized for keyword in keywords):
+            tags.append(tag)
+    if str((plan or {}).get("display_mode") or "").strip() == "structured" and "结构化偏好" not in tags:
+        tags.append("结构化偏好")
+    return _hermes_unique_texts(tags, limit=6)
+
+
+def _resolve_hermes_preferred_response_style(style_tags, existing_value=""):
+    values = _hermes_unique_texts(style_tags, limit=6)
+    for item in HERMES_RESPONSE_STYLE_PRIORITY:
+        if item in values:
+            return item
+    return str(existing_value or "").strip()
+
+
+def _compute_hermes_behavior_tags(question_text, plan=None, memory_state=None):
+    plan = plan if isinstance(plan, dict) else {}
+    memory_state = memory_state if isinstance(memory_state, dict) else {}
+    normalized = str(question_text or "").strip().lower()
+    previous_session_turns = int(((memory_state.get("session") or {}).get("turn_count") or 0))
+    historical_turns = int(((memory_state.get("user_profile") or {}).get("total_queries") or (memory_state.get("user_memory") or {}).get("total_turns") or 0))
+    tags = []
+    if previous_session_turns == 0 and historical_turns == 0:
+        tags.append("首次提问")
+    if previous_session_turns > 0:
+        tags.append("连续追问")
+    if historical_turns >= 5:
+        tags.append("高频用户")
+    intent = str(plan.get("intent") or "").strip()
+    if intent in {"watchlist_fundamental", "knowledge_lookup", "evidence_chain_analysis", "smart_indicator_explain", "dashboard_interpretation", "multi_tool_research"}:
+        tags.append("深度研究型")
+    if any(keyword in normalized for keyword in ["结论", "一句话", "简短", "先说重点", "摘要"]):
+        tags.append("只看结论型")
+    return _hermes_unique_texts(tags, limit=6)
+
+
+def _compute_hermes_commercial_tags(actor_context, behavior_tags, research_depth_score, existing_tags=None):
+    actor = actor_context if isinstance(actor_context, dict) else {}
+    tags = list(existing_tags if isinstance(existing_tags, list) else [])
+    role = str(actor.get("user_role") or "").strip().lower()
+    membership = str(actor.get("membership") or "").strip()
+    if role == "dav":
+        tags.append("大V高频生产用户")
+    elif research_depth_score >= 65 or "深度研究型" in behavior_tags:
+        tags.append("活跃研究用户")
+    else:
+        tags.append("普通观察用户")
+    if role == "investor" and (research_depth_score >= 75 or membership and any(keyword in membership for keyword in ["专业", "机构", "核心"])):
+        tags.append("高价值潜客")
+    return _hermes_unique_texts(tags, limit=6)
+
+
+def _compute_hermes_personas(function_tags, style_tags, actor_context):
+    actor = actor_context if isinstance(actor_context, dict) else {}
+    role = str(actor.get("user_role") or "").strip().lower()
+    if role == "dav":
+        primary = "大V研究生产者"
+    elif "个股" in function_tags:
+        primary = "个股研究型用户"
+    elif "证据链" in function_tags or "复盘" in function_tags:
+        primary = "证据链复盘用户"
+    elif "知识" in function_tags:
+        primary = "方法框架型用户"
+    elif "产品帮助" in function_tags:
+        primary = "功能学习型用户"
+    elif "闲聊" in function_tags:
+        primary = "轻互动用户"
+    else:
+        primary = "研究观察用户"
+    secondary = ""
+    if "结构化偏好" in style_tags:
+        secondary = "结构化表达偏好"
+    elif "摘要偏好" in style_tags:
+        secondary = "摘要结论偏好"
+    elif "长期" in style_tags:
+        secondary = "长期跟踪偏好"
+    elif "中线" in style_tags:
+        secondary = "中线研究偏好"
+    elif "短线" in style_tags:
+        secondary = "短线关注偏好"
+    return primary, secondary
+
+
+def extract_hermes_memory_payload(question_text, plan, synthesis, tool_outputs=None, actor_context=None, memory_state=None):
+    plan = plan if isinstance(plan, dict) else {}
+    synthesis = synthesis if isinstance(synthesis, dict) else {}
+    tool_outputs = tool_outputs if isinstance(tool_outputs, dict) else {}
+    actor = actor_context if isinstance(actor_context, dict) else {}
+    memory_state = memory_state if isinstance(memory_state, dict) else {}
+    question = str(question_text or "").strip()
+    answer = str(synthesis.get("answer") or "").strip()
+    summary = str(synthesis.get("summary") or "").strip() or _hermes_trim_text(answer, limit=120)
+    intent = str(plan.get("intent") or "").strip()
+    scope_status = str(plan.get("scope_status") or "allowed").strip() or "allowed"
+    function_tags = _hermes_unique_texts(HERMES_FUNCTION_TAG_MAP.get(intent, []), limit=6)
+    style_tags = _detect_hermes_style_tags(question, plan=plan)
+    behavior_tags = _compute_hermes_behavior_tags(question, plan=plan, memory_state=memory_state)
+    topic_tags = _detect_hermes_topics(question, plan=plan, tool_outputs=tool_outputs)
+    market_tags = _detect_hermes_markets(question)
+    focus_symbols = _detect_hermes_focus_symbols(question, tool_outputs=tool_outputs)
+    previous_total = int(((memory_state.get("user_profile") or {}).get("total_queries") or (memory_state.get("user_memory") or {}).get("total_turns") or 0))
+    depth_base = {
+        "small_talk": 10,
+        "product_help": 28,
+        "knowledge_lookup": 60,
+        "evidence_chain_analysis": 72,
+        "watchlist_fundamental": 70,
+        "smart_indicator_explain": 64,
+        "dashboard_interpretation": 56,
+        "multi_tool_research": 82,
+        "out_of_scope_redirect": 8,
+    }.get(intent, 40)
+    research_depth_score = _clamp_score(
+        round((((memory_state.get("user_profile") or {}).get("research_depth_score") or 0) * min(previous_total, 6) + depth_base) / max(1, min(previous_total, 6) + 1))
+    )
+    engagement_score = _clamp_score(20 + min(previous_total + 1, 8) * 8 + (12 if "连续追问" in behavior_tags else 0))
+    commercial_tags = _compute_hermes_commercial_tags(
+        actor_context=actor,
+        behavior_tags=behavior_tags,
+        research_depth_score=research_depth_score,
+        existing_tags=((memory_state.get("user_profile") or {}).get("commercial_tags") or []),
+    )
+    conversion_signal_score = _clamp_score(
+        18
+        + (30 if "高价值潜客" in commercial_tags else 0)
+        + (18 if "活跃研究用户" in commercial_tags else 0)
+        + (10 if str(actor.get("user_role") or "").strip().lower() == "dav" else 0)
+    )
+    persona_primary, persona_secondary = _compute_hermes_personas(function_tags, style_tags, actor)
+    preferred_response_style = _resolve_hermes_preferred_response_style(
+        style_tags,
+        existing_value=str((memory_state.get("user_memory") or {}).get("preferred_response_style") or "").strip(),
+    )
+    intent_distribution = copy.deepcopy((memory_state.get("user_profile") or {}).get("intent_distribution") or {})
+    intent_distribution[intent] = int(intent_distribution.get(intent) or 0) + 1
+    existing_topics = list((memory_state.get("user_profile") or {}).get("interest_topics") or (memory_state.get("user_memory") or {}).get("recent_topics") or [])
+    existing_symbols = list((memory_state.get("user_profile") or {}).get("focus_symbols") or (memory_state.get("user_memory") or {}).get("focus_symbols") or [])
+    interest_topics = _hermes_unique_texts(existing_topics + topic_tags + market_tags, limit=12)
+    merged_symbols = _hermes_unique_texts(existing_symbols + focus_symbols, limit=12)
+    previous_style_tags = list((memory_state.get("user_profile") or {}).get("style_tags") or [])
+    previous_behavior_tags = list((memory_state.get("user_profile") or {}).get("behavior_tags") or [])
+    previous_function_tags = list((memory_state.get("user_profile") or {}).get("function_tags") or [])
+    profile_snapshot = {
+        "tenant_slug": str(actor.get("tenant_slug") or "").strip().lower(),
+        "user_profile_id": str(actor.get("profile_id") or "").strip(),
+        "user_role": str(actor.get("user_role") or "").strip().lower(),
+        "user_display_name": str(actor.get("display_name") or "").strip(),
+        "persona_primary": persona_primary,
+        "persona_secondary": persona_secondary,
+        "interest_topics": interest_topics,
+        "focus_symbols": merged_symbols,
+        "function_tags": _hermes_unique_texts(previous_function_tags + function_tags, limit=12),
+        "behavior_tags": _hermes_unique_texts(previous_behavior_tags + behavior_tags, limit=12),
+        "style_tags": _hermes_unique_texts(previous_style_tags + style_tags, limit=12),
+        "commercial_tags": commercial_tags,
+        "intent_distribution": intent_distribution,
+        "research_depth_score": research_depth_score,
+        "engagement_score": engagement_score,
+        "conversion_signal_score": conversion_signal_score,
+        "total_queries": previous_total + 1,
+        "last_intent": intent,
+        "last_scope_status": scope_status,
+        "last_activity_at": now_ts(),
+        "metadata": {
+            "topic_tags": topic_tags,
+            "market_tags": market_tags,
+            "preferred_response_style": preferred_response_style,
+        },
+    }
+    existing_fact_memory = copy.deepcopy((memory_state.get("user_memory") or {}).get("fact_memory") or {})
+    existing_working_memory = copy.deepcopy((memory_state.get("user_memory") or {}).get("working_memory") or {})
+    preferred_intents = _hermes_unique_texts(
+        list((memory_state.get("user_memory") or {}).get("preferred_intents") or []) + [intent],
+        limit=8,
+    )
+    user_memory_snapshot = {
+        "total_turns": int((memory_state.get("user_memory") or {}).get("total_turns") or 0) + 1,
+        "last_session_id": str(memory_state.get("session_id") or "").strip(),
+        "fact_memory": {
+            "interest_topics": interest_topics,
+            "focus_symbols": merged_symbols,
+            "preferred_response_style": preferred_response_style,
+            "preferred_intents": preferred_intents,
+            "persona_primary": persona_primary,
+        },
+        "working_memory": {
+            "last_question": _hermes_trim_text(question, limit=180),
+            "last_answer_summary": _hermes_trim_text(summary, limit=220),
+            "recent_questions": _hermes_unique_texts(
+                list(existing_working_memory.get("recent_questions") or []) + [_hermes_trim_text(question, limit=120)],
+                limit=4,
+            ),
+            "recent_topics": _hermes_unique_texts(
+                list(existing_working_memory.get("recent_topics") or []) + topic_tags + market_tags,
+                limit=6,
+            ),
+            "recent_symbols": _hermes_unique_texts(
+                list(existing_working_memory.get("recent_symbols") or []) + focus_symbols,
+                limit=6,
+            ),
+        },
+        "recent_topics": _hermes_unique_texts(list((memory_state.get("user_memory") or {}).get("recent_topics") or []) + topic_tags + market_tags, limit=8),
+        "focus_symbols": merged_symbols,
+        "last_tags": {
+            "function_tags": function_tags,
+            "behavior_tags": behavior_tags,
+            "style_tags": style_tags,
+            "commercial_tags": commercial_tags,
+            "topic_tags": topic_tags,
+            "market_tags": market_tags,
+            "focus_symbols": focus_symbols,
+        },
+        "preferred_response_style": preferred_response_style,
+        "preferred_intents": preferred_intents,
+    }
+    session_summary = copy.deepcopy((memory_state.get("session") or {}).get("summary_text") or "")
+    session_recent_questions = list((((memory_state.get("session") or {}).get("working_memory") or {}).get("recent_questions") or []))
+    session_snapshot = {
+        "turn_count": int((memory_state.get("session") or {}).get("turn_count") or 0) + 1,
+        "recent_topics": _hermes_unique_texts(list((memory_state.get("session") or {}).get("recent_topics") or []) + topic_tags + market_tags, limit=6),
+        "recent_symbols": _hermes_unique_texts(list((memory_state.get("session") or {}).get("recent_symbols") or []) + focus_symbols, limit=6),
+        "recent_intents": _hermes_unique_texts(list((memory_state.get("session") or {}).get("recent_intents") or []) + [intent], limit=6),
+        "working_memory": {
+            "recent_questions": _hermes_unique_texts(session_recent_questions + [_hermes_trim_text(question, limit=120)], limit=4),
+            "recent_answers": _hermes_unique_texts(list((((memory_state.get("session") or {}).get("working_memory") or {}).get("recent_answers") or [])) + [_hermes_trim_text(summary, limit=140)], limit=4),
+            "recent_topics": _hermes_unique_texts(topic_tags + market_tags, limit=6),
+            "recent_symbols": _hermes_unique_texts(focus_symbols, limit=6),
+        },
+        "summary_text": _hermes_trim_text(summary or session_summary or question, limit=220),
+        "last_intent": intent,
+        "last_tags": {
+            "function_tags": function_tags,
+            "behavior_tags": behavior_tags,
+            "style_tags": style_tags,
+            "commercial_tags": commercial_tags,
+            "topic_tags": topic_tags,
+            "market_tags": market_tags,
+            "focus_symbols": focus_symbols,
+        },
+    }
+    turn_tags = {
+        "function_tags": function_tags,
+        "behavior_tags": behavior_tags,
+        "style_tags": style_tags,
+        "commercial_tags": commercial_tags,
+        "topic_tags": topic_tags,
+        "market_tags": market_tags,
+        "focus_symbols": focus_symbols,
+    }
+    return {
+        "turn_record": {
+            "question_text": question,
+            "answer_text": answer,
+            "answer_summary": summary,
+            "intent": intent,
+            "scope_status": scope_status,
+            "display_mode": str(plan.get("display_mode") or "text").strip() or "text",
+            "preferred_mode": str(plan.get("preferred_mode") or "").strip(),
+            "web_answer": bool(plan.get("web_answer")),
+            "citations": [str(item).strip() for item in (synthesis.get("citations") if isinstance(synthesis.get("citations"), list) else []) if str(item).strip()][:8],
+            "tags": turn_tags,
+            "memory_summary": {
+                "persona_primary": persona_primary,
+                "persona_secondary": persona_secondary,
+                "research_depth_score": research_depth_score,
+                "engagement_score": engagement_score,
+                "conversion_signal_score": conversion_signal_score,
+                "interest_topics": interest_topics[:6],
+                "focus_symbols": merged_symbols[:6],
+            },
+        },
+        "session_snapshot": session_snapshot,
+        "user_memory_snapshot": user_memory_snapshot,
+        "profile_snapshot": profile_snapshot,
+        "memory_context_text": build_hermes_memory_context_text(
+            {
+                "session_id": str(memory_state.get("session_id") or "").strip(),
+                "session": session_snapshot,
+                "user_memory": user_memory_snapshot,
+                "user_profile": profile_snapshot,
+                "recent_turns": (memory_state.get("recent_turns") or [])[:2],
+            }
+        ),
+        "existing_fact_memory": existing_fact_memory,
+    }
+
+
+def persist_hermes_turn_and_memory(actor_context, session_id, entry_point, memory_payload, tool_trace=None):
+    actor = actor_context if isinstance(actor_context, dict) else {}
+    payload = memory_payload if isinstance(memory_payload, dict) else {}
+    turn_record = payload.get("turn_record") if isinstance(payload.get("turn_record"), dict) else {}
+    session_snapshot = payload.get("session_snapshot") if isinstance(payload.get("session_snapshot"), dict) else {}
+    user_memory_snapshot = payload.get("user_memory_snapshot") if isinstance(payload.get("user_memory_snapshot"), dict) else {}
+    created_at = now_ts()
+    turn_id = f"{slugify_code(str(actor.get('profile_id') or 'guest'), 'guest')}_{now_ts_ms().replace(' ', '_').replace(':', '').replace('-', '').replace('.', '')}"
+    fallback = {
+        "storage_mode": "memoryless_fallback",
+        "turn_id": turn_id,
+        "session_id": session_id,
+        "created_at": created_at,
+    }
+    try:
+        db = get_db()
+        db.execute(
+            """
+            INSERT INTO hermes_conversation_turns (
+                turn_id, session_id, tenant_slug, user_profile_id, user_role, user_display_name, entry_point,
+                question_text, answer_text, answer_summary, intent, scope_status, display_mode, preferred_mode,
+                web_answer, citations_json, tool_trace_json, tags_json, memory_summary_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                turn_id,
+                session_id,
+                actor.get("tenant_slug") or "",
+                actor.get("profile_id") or "",
+                actor.get("user_role") or "",
+                actor.get("display_name") or "",
+                str(entry_point or "").strip(),
+                _hermes_trim_text(turn_record.get("question_text"), limit=4000),
+                _hermes_trim_text(turn_record.get("answer_text"), limit=8000),
+                _hermes_trim_text(turn_record.get("answer_summary"), limit=1200),
+                turn_record.get("intent") or "",
+                turn_record.get("scope_status") or "",
+                turn_record.get("display_mode") or "text",
+                turn_record.get("preferred_mode") or "",
+                1 if turn_record.get("web_answer") else 0,
+                _hermes_json_text(turn_record.get("citations") or [], []),
+                _hermes_json_text(tool_trace if isinstance(tool_trace, list) else [], []),
+                _hermes_json_text(turn_record.get("tags") or {}, {}),
+                _hermes_json_text(turn_record.get("memory_summary") or {}, {}),
+                created_at,
+            ),
+        )
+        db.execute(
+            """
+            INSERT INTO hermes_session_memory (
+                session_id, tenant_slug, user_profile_id, user_role, user_display_name, turn_count,
+                recent_topics_json, recent_symbols_json, recent_intents_json, working_memory_json, summary_text,
+                last_intent, last_tags_json, first_seen_at, last_seen_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(session_id) DO UPDATE SET
+                tenant_slug = excluded.tenant_slug,
+                user_profile_id = excluded.user_profile_id,
+                user_role = excluded.user_role,
+                user_display_name = excluded.user_display_name,
+                turn_count = excluded.turn_count,
+                recent_topics_json = excluded.recent_topics_json,
+                recent_symbols_json = excluded.recent_symbols_json,
+                recent_intents_json = excluded.recent_intents_json,
+                working_memory_json = excluded.working_memory_json,
+                summary_text = excluded.summary_text,
+                last_intent = excluded.last_intent,
+                last_tags_json = excluded.last_tags_json,
+                last_seen_at = excluded.last_seen_at
+            """,
+            (
+                session_id,
+                actor.get("tenant_slug") or "",
+                actor.get("profile_id") or "",
+                actor.get("user_role") or "",
+                actor.get("display_name") or "",
+                int(session_snapshot.get("turn_count") or 0),
+                _hermes_json_text(session_snapshot.get("recent_topics") or [], []),
+                _hermes_json_text(session_snapshot.get("recent_symbols") or [], []),
+                _hermes_json_text(session_snapshot.get("recent_intents") or [], []),
+                _hermes_json_text(session_snapshot.get("working_memory") or {}, {}),
+                str(session_snapshot.get("summary_text") or "").strip(),
+                str(session_snapshot.get("last_intent") or "").strip(),
+                _hermes_json_text(session_snapshot.get("last_tags") or {}, {}),
+                created_at,
+                created_at,
+            ),
+        )
+        db.execute(
+            """
+            INSERT INTO hermes_user_memory (
+                tenant_slug, user_profile_id, user_role, user_display_name, total_turns, last_session_id,
+                fact_memory_json, working_memory_json, recent_topics_json, focus_symbols_json, last_tags_json,
+                preferred_response_style, preferred_intents_json, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(tenant_slug, user_profile_id) DO UPDATE SET
+                user_role = excluded.user_role,
+                user_display_name = excluded.user_display_name,
+                total_turns = excluded.total_turns,
+                last_session_id = excluded.last_session_id,
+                fact_memory_json = excluded.fact_memory_json,
+                working_memory_json = excluded.working_memory_json,
+                recent_topics_json = excluded.recent_topics_json,
+                focus_symbols_json = excluded.focus_symbols_json,
+                last_tags_json = excluded.last_tags_json,
+                preferred_response_style = excluded.preferred_response_style,
+                preferred_intents_json = excluded.preferred_intents_json,
+                updated_at = excluded.updated_at
+            """,
+            (
+                actor.get("tenant_slug") or "",
+                actor.get("profile_id") or "",
+                actor.get("user_role") or "",
+                actor.get("display_name") or "",
+                int(user_memory_snapshot.get("total_turns") or 0),
+                session_id,
+                _hermes_json_text(user_memory_snapshot.get("fact_memory") or {}, {}),
+                _hermes_json_text(user_memory_snapshot.get("working_memory") or {}, {}),
+                _hermes_json_text(user_memory_snapshot.get("recent_topics") or [], []),
+                _hermes_json_text(user_memory_snapshot.get("focus_symbols") or [], []),
+                _hermes_json_text(user_memory_snapshot.get("last_tags") or {}, {}),
+                str(user_memory_snapshot.get("preferred_response_style") or "").strip(),
+                _hermes_json_text(user_memory_snapshot.get("preferred_intents") or [], []),
+                created_at,
+                created_at,
+            ),
+        )
+        db.commit()
+        return {
+            "storage_mode": "db",
+            "turn_id": turn_id,
+            "session_id": session_id,
+            "created_at": created_at,
+        }
+    except Exception as exc:
+        try:
+            get_db().rollback()
+        except Exception:
+            pass
+        if has_request_context():
+            app.logger.warning("Hermes turn memory persistence skipped: %s", str(exc)[:180])
+        return fallback
+
+
+def persist_hermes_user_profile(actor_context, profile_snapshot):
+    actor = actor_context if isinstance(actor_context, dict) else {}
+    snapshot = profile_snapshot if isinstance(profile_snapshot, dict) else {}
+    updated_at = now_ts()
+    fallback = {
+        "storage_mode": "memoryless_fallback",
+        "profile_snapshot": copy.deepcopy(snapshot),
+    }
+    try:
+        db = get_db()
+        db.execute(
+            """
+            INSERT INTO hermes_user_profiles (
+                tenant_slug, user_profile_id, user_role, user_display_name, persona_primary, persona_secondary,
+                interest_topics_json, focus_symbols_json, function_tags_json, behavior_tags_json, style_tags_json,
+                commercial_tags_json, intent_distribution_json, research_depth_score, engagement_score,
+                conversion_signal_score, total_queries, last_intent, last_scope_status, last_activity_at,
+                metadata_json, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(tenant_slug, user_profile_id) DO UPDATE SET
+                user_role = excluded.user_role,
+                user_display_name = excluded.user_display_name,
+                persona_primary = excluded.persona_primary,
+                persona_secondary = excluded.persona_secondary,
+                interest_topics_json = excluded.interest_topics_json,
+                focus_symbols_json = excluded.focus_symbols_json,
+                function_tags_json = excluded.function_tags_json,
+                behavior_tags_json = excluded.behavior_tags_json,
+                style_tags_json = excluded.style_tags_json,
+                commercial_tags_json = excluded.commercial_tags_json,
+                intent_distribution_json = excluded.intent_distribution_json,
+                research_depth_score = excluded.research_depth_score,
+                engagement_score = excluded.engagement_score,
+                conversion_signal_score = excluded.conversion_signal_score,
+                total_queries = excluded.total_queries,
+                last_intent = excluded.last_intent,
+                last_scope_status = excluded.last_scope_status,
+                last_activity_at = excluded.last_activity_at,
+                metadata_json = excluded.metadata_json,
+                updated_at = excluded.updated_at
+            """,
+            (
+                actor.get("tenant_slug") or "",
+                actor.get("profile_id") or "",
+                actor.get("user_role") or "",
+                actor.get("display_name") or "",
+                snapshot.get("persona_primary") or "",
+                snapshot.get("persona_secondary") or "",
+                _hermes_json_text(snapshot.get("interest_topics") or [], []),
+                _hermes_json_text(snapshot.get("focus_symbols") or [], []),
+                _hermes_json_text(snapshot.get("function_tags") or [], []),
+                _hermes_json_text(snapshot.get("behavior_tags") or [], []),
+                _hermes_json_text(snapshot.get("style_tags") or [], []),
+                _hermes_json_text(snapshot.get("commercial_tags") or [], []),
+                _hermes_json_text(snapshot.get("intent_distribution") or {}, {}),
+                int(snapshot.get("research_depth_score") or 0),
+                int(snapshot.get("engagement_score") or 0),
+                int(snapshot.get("conversion_signal_score") or 0),
+                int(snapshot.get("total_queries") or 0),
+                snapshot.get("last_intent") or "",
+                snapshot.get("last_scope_status") or "",
+                snapshot.get("last_activity_at") or updated_at,
+                _hermes_json_text(snapshot.get("metadata") or {}, {}),
+                updated_at,
+                updated_at,
+            ),
+        )
+        db.commit()
+        return {
+            "storage_mode": "db",
+            "profile_snapshot": copy.deepcopy(snapshot),
+        }
+    except Exception as exc:
+        try:
+            get_db().rollback()
+        except Exception:
+            pass
+        if has_request_context():
+            app.logger.warning("Hermes user profile persistence skipped: %s", str(exc)[:180])
+        return fallback
+
+
+HERMES_ADMIN_MEMORY_RANGE_OPTIONS = [
+    {"key": "1m", "label": "最近 1 个月", "days": 30},
+    {"key": "3m", "label": "最近 3 个月", "days": 90},
+    {"key": "6m", "label": "最近 6 个月", "days": 180},
+    {"key": "1y", "label": "最近 1 年", "days": 365},
+    {"key": "all", "label": "全部清除", "days": None},
+]
+
+HERMES_ADMIN_MEMORY_RANGE_MAP = {
+    item["key"]: item for item in HERMES_ADMIN_MEMORY_RANGE_OPTIONS
+}
+
+
+def normalize_hermes_memory_range_key(range_key):
+    key = str(range_key or "").strip().lower()
+    if key in HERMES_ADMIN_MEMORY_RANGE_MAP:
+        return key
+    aliases = {
+        "month": "1m",
+        "month_1": "1m",
+        "1month": "1m",
+        "quarter": "3m",
+        "3month": "3m",
+        "month_3": "3m",
+        "half_year": "6m",
+        "6month": "6m",
+        "month_6": "6m",
+        "year": "1y",
+        "1year": "1y",
+        "year_1": "1y",
+        "full": "all",
+        "clear_all": "all",
+    }
+    return aliases.get(key, "3m")
+
+
+def resolve_hermes_memory_cutoff(range_key):
+    normalized = normalize_hermes_memory_range_key(range_key)
+    config = HERMES_ADMIN_MEMORY_RANGE_MAP.get(normalized) or {}
+    if normalized == "all" or config.get("days") is None:
+        return ""
+    return (datetime.now() - timedelta(days=int(config.get("days") or 0))).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _build_hermes_admin_turn_where(tenant_slug, range_key="all", alias=""):
+    tenant = str(tenant_slug or "").strip().lower()
+    if not tenant:
+        raise ValueError("tenant_slug_required")
+    prefix = f"{alias}." if alias else ""
+    clauses = [f"{prefix}tenant_slug = ?"]
+    params = [tenant]
+    cutoff = resolve_hermes_memory_cutoff(range_key)
+    if cutoff:
+        clauses.append(f"{prefix}created_at >= ?")
+        params.append(cutoff)
+    return " AND ".join(clauses), params
+
+
+def _serialize_hermes_backup_row(row):
+    data = dict(row) if isinstance(row, dict) else {}
+    for key, default in [
+        ("citations_json", []),
+        ("tool_trace_json", []),
+        ("tags_json", {}),
+        ("memory_summary_json", {}),
+        ("recent_topics_json", []),
+        ("recent_symbols_json", []),
+        ("recent_intents_json", []),
+        ("working_memory_json", {}),
+        ("last_tags_json", {}),
+        ("fact_memory_json", {}),
+        ("focus_symbols_json", []),
+        ("preferred_intents_json", []),
+        ("interest_topics_json", []),
+        ("function_tags_json", []),
+        ("behavior_tags_json", []),
+        ("style_tags_json", []),
+        ("commercial_tags_json", []),
+        ("intent_distribution_json", {}),
+        ("metadata_json", {}),
+    ]:
+        if key in data:
+            data[key] = _extract_json_text_field(data, key, default)
+    return data
+
+
+def _build_sql_in_clause(values):
+    items = list(values or [])
+    if not items:
+        return "(NULL)"
+    return "(" + ",".join(["?"] * len(items)) + ")"
+
+
+def _load_hermes_turn_rows_for_rebuild(db, tenant_slug, session_id="", user_profile_id=""):
+    clauses = ["tenant_slug = ?"]
+    params = [str(tenant_slug or "").strip().lower()]
+    if str(session_id or "").strip():
+        clauses.append("session_id = ?")
+        params.append(str(session_id or "").strip())
+    if str(user_profile_id or "").strip():
+        clauses.append("user_profile_id = ?")
+        params.append(str(user_profile_id or "").strip())
+    rows = db.execute(
+        f"""
+        SELECT turn_id, session_id, tenant_slug, user_profile_id, user_role, user_display_name, entry_point,
+               question_text, answer_text, answer_summary, intent, scope_status, display_mode, preferred_mode,
+               web_answer, citations_json, tool_trace_json, tags_json, memory_summary_json, created_at
+        FROM hermes_conversation_turns
+        WHERE {" AND ".join(clauses)}
+        ORDER BY created_at ASC, id ASC
+        """,
+        tuple(params),
+    ).fetchall()
+    normalized = []
+    for row in rows:
+        item = dict(row) if isinstance(row, dict) else {}
+        item["tags"] = _extract_json_text_field(item, "tags_json", {})
+        item["memory_summary"] = _extract_json_text_field(item, "memory_summary_json", {})
+        normalized.append(item)
+    return normalized
+
+
+def _collect_recent_hermes_tag_values(rows, tag_key, limit=6):
+    collected = []
+    for row in reversed(rows if isinstance(rows, list) else []):
+        tags = row.get("tags") if isinstance(row.get("tags"), dict) else {}
+        values = tags.get(tag_key) if isinstance(tags.get(tag_key), list) else []
+        collected.extend(values)
+    return _hermes_unique_texts(collected, limit=limit)
+
+
+def _build_rebuilt_hermes_session_row(rows):
+    if not rows:
+        return None
+    last_row = rows[-1]
+    recent_questions = _hermes_unique_texts(
+        [_hermes_trim_text(row.get("question_text"), limit=120) for row in reversed(rows)],
+        limit=4,
+    )
+    recent_answers = _hermes_unique_texts(
+        [_hermes_trim_text(row.get("answer_summary"), limit=140) for row in reversed(rows)],
+        limit=4,
+    )
+    return {
+        "session_id": str(last_row.get("session_id") or "").strip(),
+        "tenant_slug": str(last_row.get("tenant_slug") or "").strip().lower(),
+        "user_profile_id": str(last_row.get("user_profile_id") or "").strip(),
+        "user_role": str(last_row.get("user_role") or "").strip(),
+        "user_display_name": str(last_row.get("user_display_name") or "").strip(),
+        "turn_count": len(rows),
+        "recent_topics": _hermes_unique_texts(
+            _collect_recent_hermes_tag_values(rows, "topic_tags", limit=6)
+            + _collect_recent_hermes_tag_values(rows, "market_tags", limit=6),
+            limit=6,
+        ),
+        "recent_symbols": _collect_recent_hermes_tag_values(rows, "focus_symbols", limit=6),
+        "recent_intents": _hermes_unique_texts(
+            [str(row.get("intent") or "").strip() for row in reversed(rows)],
+            limit=6,
+        ),
+        "working_memory": {
+            "recent_questions": recent_questions,
+            "recent_answers": recent_answers,
+            "recent_topics": _hermes_unique_texts(
+                _collect_recent_hermes_tag_values(rows, "topic_tags", limit=6)
+                + _collect_recent_hermes_tag_values(rows, "market_tags", limit=6),
+                limit=6,
+            ),
+            "recent_symbols": _collect_recent_hermes_tag_values(rows, "focus_symbols", limit=6),
+        },
+        "summary_text": _hermes_trim_text(
+            last_row.get("answer_summary") or last_row.get("question_text") or "",
+            limit=220,
+        ),
+        "last_intent": str(last_row.get("intent") or "").strip(),
+        "last_tags": copy.deepcopy(last_row.get("tags") or {}),
+        "first_seen_at": str(rows[0].get("created_at") or "").strip(),
+        "last_seen_at": str(last_row.get("created_at") or "").strip(),
+    }
+
+
+def _build_rebuilt_hermes_user_memory_row(rows):
+    if not rows:
+        return None
+    last_row = rows[-1]
+    last_summary = last_row.get("memory_summary") if isinstance(last_row.get("memory_summary"), dict) else {}
+    style_tags = _collect_recent_hermes_tag_values(rows, "style_tags", limit=8)
+    preferred_response_style = _resolve_hermes_preferred_response_style(style_tags, existing_value="")
+    recent_topics = _hermes_unique_texts(
+        _collect_recent_hermes_tag_values(rows, "topic_tags", limit=8)
+        + _collect_recent_hermes_tag_values(rows, "market_tags", limit=8),
+        limit=8,
+    )
+    focus_symbols = _hermes_unique_texts(
+        list(last_summary.get("focus_symbols") or []) + _collect_recent_hermes_tag_values(rows, "focus_symbols", limit=8),
+        limit=8,
+    )
+    preferred_intents = _hermes_unique_texts(
+        [str(row.get("intent") or "").strip() for row in reversed(rows)],
+        limit=8,
+    )
+    return {
+        "tenant_slug": str(last_row.get("tenant_slug") or "").strip().lower(),
+        "user_profile_id": str(last_row.get("user_profile_id") or "").strip(),
+        "user_role": str(last_row.get("user_role") or "").strip(),
+        "user_display_name": str(last_row.get("user_display_name") or "").strip(),
+        "total_turns": len(rows),
+        "last_session_id": str(last_row.get("session_id") or "").strip(),
+        "fact_memory": {
+            "interest_topics": list(last_summary.get("interest_topics") or recent_topics[:6]),
+            "focus_symbols": focus_symbols[:6],
+            "preferred_response_style": preferred_response_style,
+            "preferred_intents": preferred_intents,
+            "persona_primary": str(last_summary.get("persona_primary") or "").strip(),
+        },
+        "working_memory": {
+            "last_question": _hermes_trim_text(last_row.get("question_text"), limit=180),
+            "last_answer_summary": _hermes_trim_text(last_row.get("answer_summary"), limit=220),
+            "recent_questions": _hermes_unique_texts(
+                [_hermes_trim_text(row.get("question_text"), limit=120) for row in reversed(rows)],
+                limit=4,
+            ),
+            "recent_topics": recent_topics[:6],
+            "recent_symbols": focus_symbols[:6],
+        },
+        "recent_topics": recent_topics,
+        "focus_symbols": focus_symbols,
+        "last_tags": copy.deepcopy(last_row.get("tags") or {}),
+        "preferred_response_style": preferred_response_style,
+        "preferred_intents": preferred_intents,
+        "created_at": str(rows[0].get("created_at") or "").strip(),
+        "updated_at": str(last_row.get("created_at") or "").strip(),
+    }
+
+
+def _build_rebuilt_hermes_user_profile_row(rows):
+    if not rows:
+        return None
+    last_row = rows[-1]
+    last_summary = last_row.get("memory_summary") if isinstance(last_row.get("memory_summary"), dict) else {}
+    function_tags = _collect_recent_hermes_tag_values(rows, "function_tags", limit=8)
+    behavior_tags = _collect_recent_hermes_tag_values(rows, "behavior_tags", limit=8)
+    style_tags = _collect_recent_hermes_tag_values(rows, "style_tags", limit=8)
+    commercial_tags = _collect_recent_hermes_tag_values(rows, "commercial_tags", limit=8)
+    topic_tags = _collect_recent_hermes_tag_values(rows, "topic_tags", limit=8)
+    market_tags = _collect_recent_hermes_tag_values(rows, "market_tags", limit=6)
+    focus_symbols = _hermes_unique_texts(
+        list(last_summary.get("focus_symbols") or []) + _collect_recent_hermes_tag_values(rows, "focus_symbols", limit=8),
+        limit=8,
+    )
+    intent_distribution = {}
+    for row in rows:
+        intent = str(row.get("intent") or "").strip()
+        if not intent:
+            continue
+        intent_distribution[intent] = int(intent_distribution.get(intent) or 0) + 1
+    persona_primary = str(last_summary.get("persona_primary") or "").strip()
+    persona_secondary = str(last_summary.get("persona_secondary") or "").strip()
+    if not persona_primary:
+        persona_primary, derived_secondary = _compute_hermes_personas(
+            function_tags=function_tags,
+            style_tags=style_tags,
+            actor_context={"user_role": str(last_row.get("user_role") or "").strip()},
+        )
+        if not persona_secondary:
+            persona_secondary = derived_secondary
+    return {
+        "tenant_slug": str(last_row.get("tenant_slug") or "").strip().lower(),
+        "user_profile_id": str(last_row.get("user_profile_id") or "").strip(),
+        "user_role": str(last_row.get("user_role") or "").strip(),
+        "user_display_name": str(last_row.get("user_display_name") or "").strip(),
+        "persona_primary": persona_primary,
+        "persona_secondary": persona_secondary,
+        "interest_topics": list(last_summary.get("interest_topics") or _hermes_unique_texts(topic_tags + market_tags, limit=8)),
+        "focus_symbols": focus_symbols,
+        "function_tags": function_tags,
+        "behavior_tags": behavior_tags,
+        "style_tags": style_tags,
+        "commercial_tags": commercial_tags,
+        "intent_distribution": intent_distribution,
+        "research_depth_score": _clamp_score(int(last_summary.get("research_depth_score") or 0)),
+        "engagement_score": _clamp_score(int(last_summary.get("engagement_score") or 0)),
+        "conversion_signal_score": _clamp_score(int(last_summary.get("conversion_signal_score") or 0)),
+        "total_queries": len(rows),
+        "last_intent": str(last_row.get("intent") or "").strip(),
+        "last_scope_status": str(last_row.get("scope_status") or "").strip(),
+        "last_activity_at": str(last_row.get("created_at") or "").strip(),
+        "metadata": {
+            "topic_tags": topic_tags,
+            "market_tags": market_tags,
+            "recent_session_id": str(last_row.get("session_id") or "").strip(),
+            "preferred_response_style": _resolve_hermes_preferred_response_style(style_tags, existing_value=""),
+        },
+        "created_at": str(rows[0].get("created_at") or "").strip(),
+        "updated_at": str(last_row.get("created_at") or "").strip(),
+    }
+
+
+def _upsert_rebuilt_hermes_session_rows(db, rows):
+    for item in rows if isinstance(rows, list) else []:
+        if not isinstance(item, dict) or not str(item.get("session_id") or "").strip():
+            continue
+        db.execute(
+            """
+            INSERT INTO hermes_session_memory (
+                session_id, tenant_slug, user_profile_id, user_role, user_display_name, turn_count,
+                recent_topics_json, recent_symbols_json, recent_intents_json, working_memory_json, summary_text,
+                last_intent, last_tags_json, first_seen_at, last_seen_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(session_id) DO UPDATE SET
+                tenant_slug = excluded.tenant_slug,
+                user_profile_id = excluded.user_profile_id,
+                user_role = excluded.user_role,
+                user_display_name = excluded.user_display_name,
+                turn_count = excluded.turn_count,
+                recent_topics_json = excluded.recent_topics_json,
+                recent_symbols_json = excluded.recent_symbols_json,
+                recent_intents_json = excluded.recent_intents_json,
+                working_memory_json = excluded.working_memory_json,
+                summary_text = excluded.summary_text,
+                last_intent = excluded.last_intent,
+                last_tags_json = excluded.last_tags_json,
+                first_seen_at = excluded.first_seen_at,
+                last_seen_at = excluded.last_seen_at
+            """,
+            (
+                item.get("session_id") or "",
+                item.get("tenant_slug") or "",
+                item.get("user_profile_id") or "",
+                item.get("user_role") or "",
+                item.get("user_display_name") or "",
+                int(item.get("turn_count") or 0),
+                _hermes_json_text(item.get("recent_topics") or [], []),
+                _hermes_json_text(item.get("recent_symbols") or [], []),
+                _hermes_json_text(item.get("recent_intents") or [], []),
+                _hermes_json_text(item.get("working_memory") or {}, {}),
+                str(item.get("summary_text") or "").strip(),
+                str(item.get("last_intent") or "").strip(),
+                _hermes_json_text(item.get("last_tags") or {}, {}),
+                item.get("first_seen_at") or now_ts(),
+                item.get("last_seen_at") or now_ts(),
+            ),
+        )
+
+
+def _upsert_rebuilt_hermes_user_memory_rows(db, rows):
+    for item in rows if isinstance(rows, list) else []:
+        if not isinstance(item, dict) or not str(item.get("tenant_slug") or "").strip() or not str(item.get("user_profile_id") or "").strip():
+            continue
+        db.execute(
+            """
+            INSERT INTO hermes_user_memory (
+                tenant_slug, user_profile_id, user_role, user_display_name, total_turns, last_session_id,
+                fact_memory_json, working_memory_json, recent_topics_json, focus_symbols_json, last_tags_json,
+                preferred_response_style, preferred_intents_json, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(tenant_slug, user_profile_id) DO UPDATE SET
+                user_role = excluded.user_role,
+                user_display_name = excluded.user_display_name,
+                total_turns = excluded.total_turns,
+                last_session_id = excluded.last_session_id,
+                fact_memory_json = excluded.fact_memory_json,
+                working_memory_json = excluded.working_memory_json,
+                recent_topics_json = excluded.recent_topics_json,
+                focus_symbols_json = excluded.focus_symbols_json,
+                last_tags_json = excluded.last_tags_json,
+                preferred_response_style = excluded.preferred_response_style,
+                preferred_intents_json = excluded.preferred_intents_json,
+                created_at = excluded.created_at,
+                updated_at = excluded.updated_at
+            """,
+            (
+                item.get("tenant_slug") or "",
+                item.get("user_profile_id") or "",
+                item.get("user_role") or "",
+                item.get("user_display_name") or "",
+                int(item.get("total_turns") or 0),
+                item.get("last_session_id") or "",
+                _hermes_json_text(item.get("fact_memory") or {}, {}),
+                _hermes_json_text(item.get("working_memory") or {}, {}),
+                _hermes_json_text(item.get("recent_topics") or [], []),
+                _hermes_json_text(item.get("focus_symbols") or [], []),
+                _hermes_json_text(item.get("last_tags") or {}, {}),
+                str(item.get("preferred_response_style") or "").strip(),
+                _hermes_json_text(item.get("preferred_intents") or [], []),
+                item.get("created_at") or now_ts(),
+                item.get("updated_at") or now_ts(),
+            ),
+        )
+
+
+def _upsert_rebuilt_hermes_user_profile_rows(db, rows):
+    for item in rows if isinstance(rows, list) else []:
+        if not isinstance(item, dict) or not str(item.get("tenant_slug") or "").strip() or not str(item.get("user_profile_id") or "").strip():
+            continue
+        db.execute(
+            """
+            INSERT INTO hermes_user_profiles (
+                tenant_slug, user_profile_id, user_role, user_display_name, persona_primary, persona_secondary,
+                interest_topics_json, focus_symbols_json, function_tags_json, behavior_tags_json, style_tags_json,
+                commercial_tags_json, intent_distribution_json, research_depth_score, engagement_score,
+                conversion_signal_score, total_queries, last_intent, last_scope_status, last_activity_at,
+                metadata_json, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(tenant_slug, user_profile_id) DO UPDATE SET
+                user_role = excluded.user_role,
+                user_display_name = excluded.user_display_name,
+                persona_primary = excluded.persona_primary,
+                persona_secondary = excluded.persona_secondary,
+                interest_topics_json = excluded.interest_topics_json,
+                focus_symbols_json = excluded.focus_symbols_json,
+                function_tags_json = excluded.function_tags_json,
+                behavior_tags_json = excluded.behavior_tags_json,
+                style_tags_json = excluded.style_tags_json,
+                commercial_tags_json = excluded.commercial_tags_json,
+                intent_distribution_json = excluded.intent_distribution_json,
+                research_depth_score = excluded.research_depth_score,
+                engagement_score = excluded.engagement_score,
+                conversion_signal_score = excluded.conversion_signal_score,
+                total_queries = excluded.total_queries,
+                last_intent = excluded.last_intent,
+                last_scope_status = excluded.last_scope_status,
+                last_activity_at = excluded.last_activity_at,
+                metadata_json = excluded.metadata_json,
+                created_at = excluded.created_at,
+                updated_at = excluded.updated_at
+            """,
+            (
+                item.get("tenant_slug") or "",
+                item.get("user_profile_id") or "",
+                item.get("user_role") or "",
+                item.get("user_display_name") or "",
+                item.get("persona_primary") or "",
+                item.get("persona_secondary") or "",
+                _hermes_json_text(item.get("interest_topics") or [], []),
+                _hermes_json_text(item.get("focus_symbols") or [], []),
+                _hermes_json_text(item.get("function_tags") or [], []),
+                _hermes_json_text(item.get("behavior_tags") or [], []),
+                _hermes_json_text(item.get("style_tags") or [], []),
+                _hermes_json_text(item.get("commercial_tags") or [], []),
+                _hermes_json_text(item.get("intent_distribution") or {}, {}),
+                int(item.get("research_depth_score") or 0),
+                int(item.get("engagement_score") or 0),
+                int(item.get("conversion_signal_score") or 0),
+                int(item.get("total_queries") or 0),
+                item.get("last_intent") or "",
+                item.get("last_scope_status") or "",
+                item.get("last_activity_at") or "",
+                _hermes_json_text(item.get("metadata") or {}, {}),
+                item.get("created_at") or now_ts(),
+                item.get("updated_at") or now_ts(),
+            ),
+        )
+
+
+def _rebuild_hermes_admin_aggregates(db, tenant_slug, session_ids=None, user_profile_ids=None):
+    session_values = [str(item or "").strip() for item in (session_ids or []) if str(item or "").strip()]
+    user_values = [str(item or "").strip() for item in (user_profile_ids or []) if str(item or "").strip()]
+    if session_values:
+        session_rows = []
+        for session_id in session_values:
+            rows = _load_hermes_turn_rows_for_rebuild(db, tenant_slug, session_id=session_id)
+            rebuilt = _build_rebuilt_hermes_session_row(rows)
+            if rebuilt:
+                session_rows.append(rebuilt)
+            else:
+                db.execute(
+                    "DELETE FROM hermes_session_memory WHERE tenant_slug = ? AND session_id = ?",
+                    (str(tenant_slug or "").strip().lower(), session_id),
+                )
+        _upsert_rebuilt_hermes_session_rows(db, session_rows)
+    if user_values:
+        user_memory_rows = []
+        user_profile_rows = []
+        for user_profile_id in user_values:
+            rows = _load_hermes_turn_rows_for_rebuild(db, tenant_slug, user_profile_id=user_profile_id)
+            rebuilt_memory = _build_rebuilt_hermes_user_memory_row(rows)
+            rebuilt_profile = _build_rebuilt_hermes_user_profile_row(rows)
+            if rebuilt_memory:
+                user_memory_rows.append(rebuilt_memory)
+            else:
+                db.execute(
+                    "DELETE FROM hermes_user_memory WHERE tenant_slug = ? AND user_profile_id = ?",
+                    (str(tenant_slug or "").strip().lower(), user_profile_id),
+                )
+            if rebuilt_profile:
+                user_profile_rows.append(rebuilt_profile)
+            else:
+                db.execute(
+                    "DELETE FROM hermes_user_profiles WHERE tenant_slug = ? AND user_profile_id = ?",
+                    (str(tenant_slug or "").strip().lower(), user_profile_id),
+                )
+        _upsert_rebuilt_hermes_user_memory_rows(db, user_memory_rows)
+        _upsert_rebuilt_hermes_user_profile_rows(db, user_profile_rows)
+
+
+def build_admin_hermes_memory_summary(tenant_slug):
+    tenant = str(tenant_slug or "").strip().lower()
+    if not tenant:
+        raise ValueError("tenant_slug_required")
+    db = get_db()
+    turns = db.execute(
+        """
+        SELECT COUNT(*) AS turn_count,
+               COUNT(DISTINCT session_id) AS session_count,
+               COUNT(DISTINCT user_profile_id) AS user_count,
+               MIN(created_at) AS first_turn_at,
+               MAX(created_at) AS last_turn_at
+        FROM hermes_conversation_turns
+        WHERE tenant_slug = ?
+        """,
+        (tenant,),
+    ).fetchone() or {}
+    session_rows = db.execute(
+        "SELECT COUNT(*) AS total FROM hermes_session_memory WHERE tenant_slug = ?",
+        (tenant,),
+    ).fetchone() or {}
+    user_memory_rows = db.execute(
+        "SELECT COUNT(*) AS total FROM hermes_user_memory WHERE tenant_slug = ?",
+        (tenant,),
+    ).fetchone() or {}
+    profile_rows = db.execute(
+        "SELECT COUNT(*) AS total FROM hermes_user_profiles WHERE tenant_slug = ?",
+        (tenant,),
+    ).fetchone() or {}
+    recent_30d_cutoff = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+    recent_30d = db.execute(
+        """
+        SELECT COUNT(*) AS turn_count, COUNT(DISTINCT user_profile_id) AS active_user_count
+        FROM hermes_conversation_turns
+        WHERE tenant_slug = ? AND created_at >= ?
+        """,
+        (tenant, recent_30d_cutoff),
+    ).fetchone() or {}
+    return {
+        "tenant_slug": tenant,
+        "range_options": copy.deepcopy(HERMES_ADMIN_MEMORY_RANGE_OPTIONS),
+        "turn_count": int(turns.get("turn_count") or 0),
+        "session_count": int(turns.get("session_count") or 0),
+        "user_count": int(turns.get("user_count") or 0),
+        "session_memory_count": int(session_rows.get("total") or 0),
+        "user_memory_count": int(user_memory_rows.get("total") or 0),
+        "profile_count": int(profile_rows.get("total") or 0),
+        "recent_30d_turn_count": int(recent_30d.get("turn_count") or 0),
+        "recent_30d_active_user_count": int(recent_30d.get("active_user_count") or 0),
+        "first_turn_at": str(turns.get("first_turn_at") or "").strip(),
+        "last_turn_at": str(turns.get("last_turn_at") or "").strip(),
+        "generated_at": now_ts(),
+    }
+
+
+def build_admin_hermes_memory_clear_preview(tenant_slug, range_key):
+    tenant = str(tenant_slug or "").strip().lower()
+    normalized_range = normalize_hermes_memory_range_key(range_key)
+    where_sql, params = _build_hermes_admin_turn_where(tenant, normalized_range)
+    db = get_db()
+    summary = db.execute(
+        f"""
+        SELECT COUNT(*) AS turns_to_clear,
+               COUNT(DISTINCT session_id) AS sessions_affected,
+               COUNT(DISTINCT user_profile_id) AS users_affected,
+               MIN(created_at) AS first_turn_at,
+               MAX(created_at) AS last_turn_at
+        FROM hermes_conversation_turns
+        WHERE {where_sql}
+        """,
+        tuple(params),
+    ).fetchone() or {}
+    return {
+        "tenant_slug": tenant,
+        "range_key": normalized_range,
+        "range_label": (HERMES_ADMIN_MEMORY_RANGE_MAP.get(normalized_range) or {}).get("label") or normalized_range,
+        "cutoff": resolve_hermes_memory_cutoff(normalized_range),
+        "turns_to_clear": int(summary.get("turns_to_clear") or 0),
+        "sessions_affected": int(summary.get("sessions_affected") or 0),
+        "users_affected": int(summary.get("users_affected") or 0),
+        "profiles_affected": int(summary.get("users_affected") or 0),
+        "first_turn_at": str(summary.get("first_turn_at") or "").strip(),
+        "last_turn_at": str(summary.get("last_turn_at") or "").strip(),
+        "requires_strong_confirm": normalized_range == "all",
+        "generated_at": now_ts(),
+    }
+
+
+def _load_admin_hermes_backup_rows(db, tenant_slug, range_key):
+    tenant = str(tenant_slug or "").strip().lower()
+    normalized_range = normalize_hermes_memory_range_key(range_key)
+    where_sql, params = _build_hermes_admin_turn_where(tenant, normalized_range)
+    turns = db.execute(
+        f"""
+        SELECT *
+        FROM hermes_conversation_turns
+        WHERE {where_sql}
+        ORDER BY created_at DESC, id DESC
+        """,
+        tuple(params),
+    ).fetchall()
+    if normalized_range == "all":
+        sessions = db.execute(
+            "SELECT * FROM hermes_session_memory WHERE tenant_slug = ? ORDER BY last_seen_at DESC",
+            (tenant,),
+        ).fetchall()
+        user_memory = db.execute(
+            "SELECT * FROM hermes_user_memory WHERE tenant_slug = ? ORDER BY updated_at DESC",
+            (tenant,),
+        ).fetchall()
+        profiles = db.execute(
+            "SELECT * FROM hermes_user_profiles WHERE tenant_slug = ? ORDER BY updated_at DESC",
+            (tenant,),
+        ).fetchall()
+        return turns, sessions, user_memory, profiles
+    session_ids = _hermes_unique_texts([str((row or {}).get("session_id") or "").strip() for row in turns], limit=5000)
+    user_ids = _hermes_unique_texts([str((row or {}).get("user_profile_id") or "").strip() for row in turns], limit=5000)
+    sessions = []
+    user_memory = []
+    profiles = []
+    if session_ids:
+        session_rows = db.execute(
+            f"""
+            SELECT *
+            FROM hermes_session_memory
+            WHERE tenant_slug = ? AND session_id IN {_build_sql_in_clause(session_ids)}
+            ORDER BY last_seen_at DESC
+            """,
+            tuple([tenant] + session_ids),
+        ).fetchall()
+        sessions = session_rows
+    if user_ids:
+        user_memory_rows = db.execute(
+            f"""
+            SELECT *
+            FROM hermes_user_memory
+            WHERE tenant_slug = ? AND user_profile_id IN {_build_sql_in_clause(user_ids)}
+            ORDER BY updated_at DESC
+            """,
+            tuple([tenant] + user_ids),
+        ).fetchall()
+        profile_rows = db.execute(
+            f"""
+            SELECT *
+            FROM hermes_user_profiles
+            WHERE tenant_slug = ? AND user_profile_id IN {_build_sql_in_clause(user_ids)}
+            ORDER BY updated_at DESC
+            """,
+            tuple([tenant] + user_ids),
+        ).fetchall()
+        user_memory = user_memory_rows
+        profiles = profile_rows
+    return turns, sessions, user_memory, profiles
+
+
+def build_admin_hermes_memory_backup_zip(tenant_slug, range_key):
+    tenant = str(tenant_slug or "").strip().lower()
+    normalized_range = normalize_hermes_memory_range_key(range_key)
+    db = get_db()
+    preview = build_admin_hermes_memory_clear_preview(tenant, normalized_range)
+    turns, sessions, user_memory, profiles = _load_admin_hermes_backup_rows(db, tenant, normalized_range)
+    manifest = {
+        "tenant_slug": tenant,
+        "range_key": normalized_range,
+        "range_label": (HERMES_ADMIN_MEMORY_RANGE_MAP.get(normalized_range) or {}).get("label") or normalized_range,
+        "generated_at": now_ts(),
+        "preview": preview,
+        "counts": {
+            "conversation_turns": len(turns),
+            "session_memory": len(sessions),
+            "user_memory": len(user_memory),
+            "user_profiles": len(profiles),
+        },
+    }
+    buffer = io.BytesIO()
+    filename = f"hermes_memory_{tenant}_{normalized_range}_{datetime.now().strftime('%Y%m%d%H%M%S')}.zip"
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "manifest.json",
+            json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8"),
+        )
+        archive.writestr(
+            "hermes_conversation_turns.json",
+            json.dumps([_serialize_hermes_backup_row(row) for row in turns], ensure_ascii=False, indent=2).encode("utf-8"),
+        )
+        archive.writestr(
+            "hermes_session_memory.json",
+            json.dumps([_serialize_hermes_backup_row(row) for row in sessions], ensure_ascii=False, indent=2).encode("utf-8"),
+        )
+        archive.writestr(
+            "hermes_user_memory.json",
+            json.dumps([_serialize_hermes_backup_row(row) for row in user_memory], ensure_ascii=False, indent=2).encode("utf-8"),
+        )
+        archive.writestr(
+            "hermes_user_profiles.json",
+            json.dumps([_serialize_hermes_backup_row(row) for row in profiles], ensure_ascii=False, indent=2).encode("utf-8"),
+        )
+    return {
+        "filename": filename,
+        "content_bytes": buffer.getvalue(),
+        "manifest": manifest,
+    }
+
+
+def clear_admin_hermes_memory(tenant_slug, range_key, confirm_text=""):
+    tenant = str(tenant_slug or "").strip().lower()
+    normalized_range = normalize_hermes_memory_range_key(range_key)
+    confirm_value = str(confirm_text or "").strip()
+    if normalized_range == "all" and confirm_value != "CONFIRM":
+        raise ValueError("confirm_text_required")
+    preview = build_admin_hermes_memory_clear_preview(tenant, normalized_range)
+    db = get_db()
+    if normalized_range == "all":
+        try:
+            db.execute("DELETE FROM hermes_conversation_turns WHERE tenant_slug = ?", (tenant,))
+            db.execute("DELETE FROM hermes_session_memory WHERE tenant_slug = ?", (tenant,))
+            db.execute("DELETE FROM hermes_user_memory WHERE tenant_slug = ?", (tenant,))
+            db.execute("DELETE FROM hermes_user_profiles WHERE tenant_slug = ?", (tenant,))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+    else:
+        target_rows = db.execute(
+            """
+            SELECT session_id, user_profile_id
+            FROM hermes_conversation_turns
+            WHERE tenant_slug = ? AND created_at >= ?
+            ORDER BY created_at DESC, id DESC
+            """,
+            (tenant, resolve_hermes_memory_cutoff(normalized_range)),
+        ).fetchall()
+        session_ids = _hermes_unique_texts([str((row or {}).get("session_id") or "").strip() for row in target_rows], limit=5000)
+        user_ids = _hermes_unique_texts([str((row or {}).get("user_profile_id") or "").strip() for row in target_rows], limit=5000)
+        try:
+            db.execute(
+                "DELETE FROM hermes_conversation_turns WHERE tenant_slug = ? AND created_at >= ?",
+                (tenant, resolve_hermes_memory_cutoff(normalized_range)),
+            )
+            _rebuild_hermes_admin_aggregates(db, tenant, session_ids=session_ids, user_profile_ids=user_ids)
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+    return {
+        "tenant_slug": tenant,
+        "range_key": normalized_range,
+        "preview": preview,
+        "post_summary": build_admin_hermes_memory_summary(tenant),
+        "cleared_at": now_ts(),
+    }
+
+
+def build_hermes_intent_router_prompt(question_text, has_attachments=False, selected_knowledge_ids=None, messages=None, memory_context_text=""):
     conversation_block = format_hermes_message_context(messages, limit=6)
     conversation_section = f"最近多轮对话：\n{conversation_block}\n\n" if conversation_block else ""
+    memory_section = f"历史记忆摘要：\n{str(memory_context_text or '').strip()}\n\n" if str(memory_context_text or "").strip() else ""
     return (
         "请根据用户问题判断 Hermes 应该如何拆解任务。\n"
-        "可选 intent：general_chat, knowledge_lookup, evidence_chain_analysis, watchlist_fundamental, multi_tool_research\n"
-        "可选 tools：knowledge.search, evidence.search, watchlist.detail, attachment.context\n"
+        "可选 intent：small_talk, product_help, knowledge_lookup, evidence_chain_analysis, watchlist_fundamental, smart_indicator_explain, dashboard_interpretation, multi_tool_research, out_of_scope_redirect\n"
+        "可选 tools：knowledge.search, evidence.search, watchlist.detail, dashboard.context, attachment.context\n"
         "规则：\n"
         "1. 如果用户明确问复盘、证据链、依据、来源，优先考虑 evidence_chain_analysis。\n"
         "2. 如果用户明确问基本面、估值、盈利、行业位置、个股研究，且存在股票名/代码，优先考虑 watchlist_fundamental。\n"
         "3. 如果用户主要想问某条知识、某个框架、方法、纪要内容，优先考虑 knowledge_lookup。\n"
-        "4. 如果问题同时涉及个股 + 证据/知识，多工具组合时用 multi_tool_research。\n"
-        "5. 如果只是泛化闲聊或方向性提问，用 general_chat。\n"
-        "6. 如果有附件，工具里可以包含 attachment.context。\n"
-        "7. stock_code 只在能明显识别时输出，否则为空字符串。\n"
-        "8. display_mode 只能是 text 或 structured。\n\n"
+        "4. 如果用户在问智能指标怎么计算、提示词/公式怎么理解，优先考虑 smart_indicator_explain，并使用 dashboard.context。\n"
+        "5. 如果用户在问 Dashboard 面板、看板卡片、布局、发布后的展示逻辑，优先考虑 dashboard_interpretation，并使用 dashboard.context。\n"
+        "6. 如果用户主要在问 H5 / Web / Admin / 工作台里的功能如何使用，优先考虑 product_help。\n"
+        "7. 如果问题同时涉及个股 + 证据/知识，多工具组合时用 multi_tool_research。\n"
+        "8. 如果只是寒暄或轻度闲聊，用 small_talk。\n"
+        "9. 如果问题明显超范围，但能温和收口，用 out_of_scope_redirect，且不要安排任何工具。\n"
+        "10. 如果有附件，工具里可以包含 attachment.context。\n"
+        "11. stock_code 只在能明显识别时输出，否则为空字符串。\n"
+        "12. display_mode 只能是 text 或 structured。\n\n"
+        f"{memory_section}"
         f"{conversation_section}"
         f"用户问题：{str(question_text or '').strip()}\n"
         f"是否有附件：{'是' if has_attachments else '否'}\n"
@@ -2467,13 +4269,15 @@ def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attac
     selected_knowledge_ids = selected_knowledge_ids if isinstance(selected_knowledge_ids, list) else []
     preferred_mode = str(preferred_mode or "").strip().lower()
     has_attachments = bool(attachments)
-    stock_code = ""
-    code_match = re.search(r"\b\d{5,6}\b", question)
-    if code_match:
-        stock_code = code_match.group(0)
-    stock_keywords = ["基本面", "估值", "盈利", "财报", "行业位置", "个股", "自选股"]
-    evidence_keywords = ["证据链", "证据", "依据", "来源", "纪要", "复盘"]
-    knowledge_keywords = ["框架", "方法", "知识", "纪要", "研报"]
+    stock_code = find_watchlist_code_from_text(question)
+    scope_flags = _hermes_scope_feature_flags(question, selected_knowledge_ids=selected_knowledge_ids, attachments=attachments)
+    stock_keywords = HERMES_SCOPE_KEYWORDS["watchlist"]
+    evidence_keywords = HERMES_SCOPE_KEYWORDS["evidence"]
+    knowledge_keywords = HERMES_SCOPE_KEYWORDS["knowledge"]
+    indicator_keywords = HERMES_SCOPE_KEYWORDS["indicator"]
+    dashboard_keywords = HERMES_SCOPE_KEYWORDS["dashboard"]
+    product_keywords = HERMES_SCOPE_KEYWORDS["product"]
+    product_action_keywords = HERMES_PRODUCT_ACTION_KEYWORDS
     if preferred_mode == "evidence":
         return {
             "intent": "evidence_chain_analysis" if not stock_code else "multi_tool_research",
@@ -2489,6 +4293,54 @@ def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attac
             "stock_code": stock_code,
             "display_mode": "structured",
             "reason": "分析方式偏向基本面判断",
+        }
+    if any(keyword in lowered for keyword in [item.lower() for item in product_keywords]) and any(
+        keyword in lowered for keyword in [item.lower() for item in product_action_keywords]
+    ):
+        product_tools = []
+        if scope_flags["dashboard"] or scope_flags["indicator"]:
+            product_tools.append("dashboard.context")
+        if selected_knowledge_ids:
+            product_tools.append("knowledge.search")
+        if has_attachments:
+            product_tools.append("attachment.context")
+        return {
+            "intent": "product_help",
+            "tools": product_tools,
+            "stock_code": stock_code,
+            "display_mode": "text",
+            "reason": "命中平台功能操作问题",
+        }
+    if any(keyword in lowered for keyword in [item.lower() for item in indicator_keywords]):
+        return {
+            "intent": "smart_indicator_explain",
+            "tools": ["dashboard.context"] + (["knowledge.search"] if selected_knowledge_ids else []) + (["attachment.context"] if has_attachments else []),
+            "stock_code": stock_code,
+            "display_mode": "text",
+            "reason": "命中智能指标或公式说明问题",
+        }
+    if any(keyword in lowered for keyword in [item.lower() for item in dashboard_keywords]):
+        return {
+            "intent": "dashboard_interpretation",
+            "tools": ["dashboard.context"] + (["attachment.context"] if has_attachments else []),
+            "stock_code": stock_code,
+            "display_mode": "text",
+            "reason": "命中 Dashboard 面板理解问题",
+        }
+    if any(keyword in lowered for keyword in [item.lower() for item in product_keywords]):
+        product_tools = []
+        if scope_flags["dashboard"] or scope_flags["indicator"]:
+            product_tools.append("dashboard.context")
+        if selected_knowledge_ids:
+            product_tools.append("knowledge.search")
+        if has_attachments:
+            product_tools.append("attachment.context")
+        return {
+            "intent": "product_help",
+            "tools": product_tools,
+            "stock_code": stock_code,
+            "display_mode": "text",
+            "reason": "命中平台功能使用问题",
         }
     if any(keyword in lowered for keyword in [item.lower() for item in evidence_keywords]):
         return {
@@ -2514,19 +4366,82 @@ def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attac
             "display_mode": "text",
             "reason": "命中知识或方法问题",
         }
+    if scope_flags["small_talk"]:
+        return {
+            "intent": "small_talk",
+            "tools": ["attachment.context"] if has_attachments else [],
+            "stock_code": stock_code,
+            "display_mode": "text",
+            "reason": "轻度闲聊或寒暄",
+        }
     return {
-        "intent": "general_chat",
-        "tools": ["attachment.context"] if has_attachments else [],
+        "intent": "out_of_scope_redirect",
+        "tools": [],
         "stock_code": stock_code,
         "display_mode": "text",
-        "reason": "默认通用对话",
+        "reason": "当前问题超出 Hermes 的主要服务范围，建议收口到平台相关问题。",
     }
 
 
-def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_ids=None, attachments=None, preferred_mode="", messages=None):
+def build_hermes_scope_plan(scope_result, question_text, selected_knowledge_ids=None, attachments=None, preferred_mode=""):
+    scope = scope_result if isinstance(scope_result, dict) else {}
+    if str(scope.get("status") or "").strip() in {"redirected", "blocked"}:
+        return {
+            "intent": "out_of_scope_redirect",
+            "tools": [],
+            "stock_code": "",
+            "display_mode": "text",
+            "reason": str(scope.get("reason") or "").strip() or "问题超出 Hermes 的主要服务范围。",
+            "scope_status": str(scope.get("status") or "").strip() or "redirected",
+            "guard_message": str(scope.get("message") or "").strip(),
+            "guard_suggestions": [
+                str(item).strip()
+                for item in (scope.get("suggestions") if isinstance(scope.get("suggestions"), list) else [])
+                if str(item).strip()
+            ][:4],
+        }
+    plan = default_hermes_intent_plan(
+        question_text=question_text,
+        selected_knowledge_ids=selected_knowledge_ids,
+        attachments=attachments,
+        preferred_mode=preferred_mode,
+    )
+    if scope.get("status") == "soft_allowed":
+        plan["intent"] = "small_talk"
+        plan["reason"] = str(scope.get("reason") or plan.get("reason") or "").strip() or plan.get("reason") or ""
+    plan["scope_status"] = str(scope.get("status") or "allowed").strip() or "allowed"
+    return plan
+
+
+def build_hermes_scope_synthesis(plan):
+    intent_plan = plan if isinstance(plan, dict) else {}
+    message = str(intent_plan.get("guard_message") or "").strip()
+    suggestions = [
+        str(item).strip()
+        for item in (intent_plan.get("guard_suggestions") if isinstance(intent_plan.get("guard_suggestions"), list) else [])
+        if str(item).strip()
+    ][:4]
+    answer = message or "Hermes 这轮先不直接展开，因为当前问题没有落在平台的核心服务范围内。"
+    return {
+        "answer": answer,
+        "summary": str(intent_plan.get("reason") or "问题已被范围守卫收口。").strip(),
+        "bullets": suggestions,
+        "citations": [],
+    }
+
+
+def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_ids=None, attachments=None, preferred_mode="", messages=None, scope_result=None, memory_state=None):
     selected_knowledge_ids = selected_knowledge_ids if isinstance(selected_knowledge_ids, list) else []
     attachments = attachments if isinstance(attachments, list) else []
     messages = normalize_hermes_messages(messages)
+    if isinstance(scope_result, dict) and str(scope_result.get("status") or "").strip() in {"redirected", "blocked"}:
+        return build_hermes_scope_plan(
+            scope_result=scope_result,
+            question_text=question_text,
+            selected_knowledge_ids=selected_knowledge_ids,
+            attachments=attachments,
+            preferred_mode=preferred_mode,
+        ), None, "scope_guard"
     fallback = default_hermes_intent_plan(
         question_text=question_text,
         selected_knowledge_ids=selected_knowledge_ids,
@@ -2545,6 +4460,7 @@ def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_
                 has_attachments=bool(attachments),
                 selected_knowledge_ids=selected_knowledge_ids,
                 messages=messages,
+                memory_context_text=str((memory_state or {}).get("context_text") or "").strip(),
             ),
             feature_code="hermes_intent_router",
             feature_label="Hermes 意图路由",
@@ -2592,11 +4508,13 @@ def find_watchlist_code_from_text(text):
     normalized = str(text or "").strip()
     if not normalized:
         return ""
-    details = gen_watchlist_details()
     code_match = re.search(r"\b\d{5,6}\b", normalized)
     if code_match:
-        code = code_match.group(0)
-        return code if code in details else code
+        return code_match.group(0)
+    try:
+        details = gen_watchlist_details()
+    except Exception:
+        details = {}
     for code, detail in details.items():
         name = str((detail or {}).get("name") or "").strip()
         if name and name in normalized:
@@ -2683,6 +4601,146 @@ def hermes_tool_evidence_search(tenant_slug, question_text, limit=4):
     }
 
 
+def hermes_tool_dashboard_context(tenant_slug):
+    tenant = get_tenant_by_slug(tenant_slug)
+    state = resolve_tenant_fund_dashboard_state(tenant, tenant.get("fund_dashboard_config"))
+    published = copy.deepcopy((state or {}).get("published") or {})
+    smart_indicator_catalog = build_tenant_smart_indicator_catalog(tenant)
+    hub = build_indicator_hub(tenant=tenant, admin_view=False)
+    cards = []
+    for item in (published.get("cells") or [])[:8]:
+        if not isinstance(item, dict) or item.get("isEmpty"):
+            continue
+        cards.append(
+            {
+                "indicator_code": str(item.get("indicatorCode") or "").strip(),
+                "title": str(item.get("title") or "").strip(),
+                "value": str(item.get("value") or "").strip(),
+                "unit": str(item.get("unit") or "").strip(),
+                "interpretation": str(item.get("interpretation") or item.get("assessment") or "").strip()[:220],
+                "algorithm_detail": str(item.get("algorithmDetail") or "").strip()[:240],
+                "updated_at": str(item.get("updatedAt") or "").strip(),
+            }
+        )
+    smart_items = []
+    for item in smart_indicator_catalog[:8]:
+        if not isinstance(item, dict):
+            continue
+        smart_items.append(
+            {
+                "indicator_code": str(item.get("indicator_code") or "").strip(),
+                "indicator_name": str(item.get("indicator_name") or "").strip(),
+                "value": str(item.get("value") or "").strip(),
+                "unit": str(item.get("unit") or "").strip(),
+                "prompt_text": str(item.get("prompt_text") or "").strip()[:220],
+                "algorithm_detail": str(item.get("algorithm_detail") or "").strip()[:240],
+                "interpretation": str(item.get("interpretation") or "").strip()[:220],
+                "last_updated": str(item.get("last_updated") or "").strip(),
+            }
+        )
+    base_items = []
+    for item in (hub.get("items") or [])[:10]:
+        if not isinstance(item, dict):
+            continue
+        base_items.append(
+            {
+                "indicator_code": str(item.get("id") or "").strip(),
+                "indicator_name": str(item.get("name") or "").strip(),
+                "category": str(item.get("category") or "").strip(),
+                "value": str(item.get("value") or "").strip(),
+                "unit": str(item.get("unit") or "").strip(),
+            }
+        )
+    return {
+        "layout": str(published.get("layout") or "").strip(),
+        "title": str(published.get("title") or "").strip(),
+        "summary": str(published.get("summary") or published.get("note") or "").strip()[:220],
+        "published_cards": cards,
+        "smart_indicators": smart_items,
+        "base_indicators": base_items,
+    }
+
+
+def hermes_tool_web_search(question_text, limit=4):
+    query = str(question_text or "").strip()
+    if not query:
+        return {
+            "mode": "web_search_skipped",
+            "matches": [],
+            "answer": "当前没有可用于互联网补充的问题文本。",
+        }
+    try:
+        response = requests.get(
+            "https://news.google.com/rss/search",
+            params={
+                "q": query,
+                "hl": "zh-CN",
+                "gl": "CN",
+                "ceid": "CN:zh-Hans",
+            },
+            headers={
+                "User-Agent": "Mozilla/5.0 HermesResearchAgent/1.0",
+            },
+            timeout=12,
+        )
+        response.raise_for_status()
+        xml_text = str(response.text or "").strip()
+        matches = []
+        if BeautifulSoup is not None:
+            soup = BeautifulSoup(xml_text, "xml")
+            for item in soup.find_all("item")[: max(1, int(limit or 4))]:
+                title = re.sub(r"\s+", " ", str(item.title.text if item.title else "").strip())
+                link = str(item.link.text if item.link else "").strip()
+                pub_date = re.sub(r"\s+", " ", str(item.pubDate.text if item.pubDate else "").strip())
+                description = re.sub(r"\s+", " ", str(item.description.text if item.description else "").strip())
+                if title:
+                    matches.append({
+                        "title": title[:180],
+                        "link": link[:500],
+                        "published_at": pub_date[:120],
+                        "summary": description[:240],
+                        "source": "Google News RSS",
+                    })
+        if not matches:
+            item_blocks = re.findall(r"<item>(.*?)</item>", xml_text, flags=re.S | re.I)
+            for block in item_blocks[: max(1, int(limit or 4))]:
+                title_match = re.search(r"<title><!\[CDATA\[(.*?)\]\]></title>|<title>(.*?)</title>", block, flags=re.S | re.I)
+                link_match = re.search(r"<link>(.*?)</link>", block, flags=re.S | re.I)
+                date_match = re.search(r"<pubDate>(.*?)</pubDate>", block, flags=re.S | re.I)
+                desc_match = re.search(r"<description><!\[CDATA\[(.*?)\]\]></description>|<description>(.*?)</description>", block, flags=re.S | re.I)
+                title = re.sub(r"\s+", " ", str((title_match.group(1) or title_match.group(2) or "") if title_match else "").strip())
+                link = re.sub(r"\s+", " ", str(link_match.group(1) if link_match else "").strip())
+                pub_date = re.sub(r"\s+", " ", str(date_match.group(1) if date_match else "").strip())
+                description = re.sub(r"\s+", " ", str((desc_match.group(1) or desc_match.group(2) or "") if desc_match else "").strip())
+                if title:
+                    matches.append({
+                        "title": title[:180],
+                        "link": link[:500],
+                        "published_at": pub_date[:120],
+                        "summary": description[:240],
+                        "source": "Google News RSS",
+                    })
+        answer = (
+            f"已补充 {len(matches)} 条公开信息结果，最相关的是《{matches[0].get('title') or '未命名结果'}》。"
+            if matches else
+            "当前没有补充到足够相关的互联网公开信息。"
+        )
+        return {
+            "mode": "web_search",
+            "matches": matches,
+            "answer": answer,
+            "provider": "google_news_rss",
+        }
+    except Exception as exc:
+        return {
+            "mode": "web_search_unavailable",
+            "matches": [],
+            "answer": "互联网公开信息暂不可用，当前已回退为只基于租户知识和平台内工具回答。",
+            "error": str(exc)[:200],
+            "provider": "google_news_rss",
+        }
+
+
 def hermes_tool_watchlist_detail(stock_code):
     if not str(stock_code or "").strip():
         return {"found": False, "detail": None}
@@ -2718,14 +4776,49 @@ def get_hermes_tool_registry():
                 question_text=runtime.get("question_text") or "",
             ),
         },
+        "dashboard.context": {
+            "output_key": "dashboard_context",
+            "executor": lambda runtime: hermes_tool_dashboard_context(
+                tenant_slug=runtime.get("tenant_slug") or "",
+            ),
+        },
         "watchlist.detail": {
             "output_key": "watchlist",
             "executor": lambda runtime: hermes_tool_watchlist_detail(runtime.get("stock_code")),
         },
+        "web.search": {
+            "output_key": "web_search",
+            "executor": lambda runtime: hermes_tool_web_search(
+                question_text=runtime.get("question_text") or "",
+            ),
+        },
     }
 
 
-def execute_hermes_tool_plan(plan, tenant_slug, question_text, selected_knowledge_ids=None, attachments=None):
+def build_hermes_tool_execution_plan(plan, web_answer=False):
+    plan = plan if isinstance(plan, dict) else {}
+    requested = [
+        str(item).strip()
+        for item in (plan.get("tools") if isinstance(plan.get("tools"), list) else [])
+        if str(item).strip()
+    ]
+    ordered = []
+
+    def _push(tool_name):
+        if tool_name in HERMES_ALLOWED_TOOLS and tool_name not in ordered:
+            ordered.append(tool_name)
+
+    # Hermes 固定先查租户知识，再走其它平台内工具，最后才补互联网公开信息。
+    _push("knowledge.search")
+    for tool_name in requested:
+        if tool_name != "knowledge.search":
+            _push(tool_name)
+    if web_answer:
+        _push("web.search")
+    return ordered
+
+
+def execute_hermes_tool_plan(plan, tenant_slug, question_text, selected_knowledge_ids=None, attachments=None, web_answer=False):
     selected_knowledge_ids = selected_knowledge_ids if isinstance(selected_knowledge_ids, list) else []
     attachments = attachments if isinstance(attachments, list) else []
     outputs = {}
@@ -2737,8 +4830,9 @@ def execute_hermes_tool_plan(plan, tenant_slug, question_text, selected_knowledg
         "selected_knowledge_ids": selected_knowledge_ids,
         "attachments": attachments,
         "stock_code": str(plan.get("stock_code") or "").strip(),
+        "web_answer": bool(web_answer),
     }
-    for tool_name in plan.get("tools") or []:
+    for tool_name in build_hermes_tool_execution_plan(plan, web_answer=web_answer):
         started_at = time.time()
         tool_spec = registry.get(tool_name)
         if not tool_spec:
@@ -2770,23 +4864,30 @@ def execute_hermes_tool_plan(plan, tenant_slug, question_text, selected_knowledg
 
 HERMES_INTENT_LABELS = {
     "watchlist_fundamental": "个股基本面分析",
+    "smart_indicator_explain": "智能指标解读",
+    "dashboard_interpretation": "Dashboard 解读",
+    "product_help": "产品功能帮助",
     "knowledge_lookup": "知识检索问答",
-    "evidence_chain": "证据链归因",
+    "evidence_chain_analysis": "证据链归因",
     "multi_tool_research": "多工具研究",
-    "general_chat": "通用研究问答",
+    "small_talk": "轻度闲聊",
+    "out_of_scope_redirect": "超范围收口",
 }
 
 HERMES_TOOL_LABELS = {
     "attachment.context": "附件解析",
     "knowledge.search": "知识检索",
     "evidence.search": "证据链检索",
+    "dashboard.context": "Dashboard 上下文",
     "watchlist.detail": "个股详情分析",
+    "web.search": "互联网补充",
 }
 
 
-def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode="", preferred_mode="", web_answer=False, attachments=None, selected_knowledge_ids=None):
+def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode="", preferred_mode="", web_answer=False, attachments=None, selected_knowledge_ids=None, scope_result=None):
     attachments = attachments if isinstance(attachments, list) else []
     selected_knowledge_ids = selected_knowledge_ids if isinstance(selected_knowledge_ids, list) else []
+    scope = scope_result if isinstance(scope_result, dict) else {}
     intent = str((intent_plan or {}).get("intent") or "").strip()
     tools = [str(item).strip() for item in ((intent_plan or {}).get("tools") or []) if str(item).strip()]
     planned_tool_labels = [HERMES_TOOL_LABELS.get(item, item) for item in tools]
@@ -2797,8 +4898,9 @@ def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode
     planning_bits = []
     if preferred_mode and preferred_mode != "auto":
         planning_bits.append(f"偏好模式：{preferred_mode}")
+    planning_bits.append("先查当前租户知识库")
     if web_answer:
-        planning_bits.append("已启用互联网问答口径")
+        planning_bits.append("已启用互联网补充")
     if attachments:
         planning_bits.append(f"附件 {len(attachments)} 份")
     if selected_knowledge_ids:
@@ -2820,12 +4922,30 @@ def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode
             "status": status,
             "detail": detail,
         })
+    scope_status = str(scope.get("status") or "allowed").strip() or "allowed"
+    scope_status_map = {
+        "allowed": ("ok", "问题落在平台研究或产品能力范围内。"),
+        "soft_allowed": ("ok", "当前属于轻度闲聊，允许简短承接。"),
+        "redirected": ("skipped", str(scope.get("reason") or "已收口到平台相关问题。").strip()),
+        "blocked": ("error", str(scope.get("reason") or "已识别为高风险或超边界问题。").strip()),
+    }
+    scope_trace_status, scope_detail = scope_status_map.get(scope_status, ("ok", "已完成范围识别。"))
     steps = [
+        {
+            "key": "scope",
+            "title": "范围识别",
+            "status": scope_trace_status,
+            "detail": scope_detail,
+        },
         {
             "key": "intent",
             "title": "问题拆解",
             "status": "ok",
-            "detail": f"{route_label}识别为“{HERMES_INTENT_LABELS.get(intent, intent or '通用研究问答')}”。",
+            "detail": (
+                "范围守卫已直接收口，无需继续做常规路由。"
+                if route_mode == "scope_guard" else
+                f"{route_label}识别为“{HERMES_INTENT_LABELS.get(intent, intent or '通用研究问答')}”。"
+            ),
         },
         {
             "key": "plan",
@@ -2881,6 +5001,20 @@ def build_hermes_citations(tool_outputs):
         title = str(item.get("title") or "").strip()
         if title and title not in citations:
             citations.append(title)
+    dashboard_cards = ((tool_outputs.get("dashboard_context") or {}).get("published_cards") or []) if isinstance(tool_outputs, dict) else []
+    for item in dashboard_cards[:4]:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title") or "").strip()
+        if title and title not in citations:
+            citations.append(title)
+    smart_items = ((tool_outputs.get("dashboard_context") or {}).get("smart_indicators") or []) if isinstance(tool_outputs, dict) else []
+    for item in smart_items[:4]:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("indicator_name") or "").strip()
+        if title and title not in citations:
+            citations.append(title)
     attachment_items = ((tool_outputs.get("attachment_context") or {}).get("items") or []) if isinstance(tool_outputs, dict) else []
     for item in attachment_items[:3]:
         if not isinstance(item, dict):
@@ -2888,6 +5022,13 @@ def build_hermes_citations(tool_outputs):
         filename = str(item.get("filename") or "").strip()
         if filename and filename not in citations:
             citations.append(filename)
+    web_matches = ((tool_outputs.get("web_search") or {}).get("matches") or []) if isinstance(tool_outputs, dict) else []
+    for item in web_matches[:4]:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title") or "").strip()
+        if title and title not in citations:
+            citations.append(title)
     return citations[:8]
 
 
@@ -2913,6 +5054,30 @@ def build_hermes_followups(plan, tool_outputs):
             "如果要复盘，我可以继续区分事实、推断和待验证部分。",
             "如果你关心来源，我可以把本轮命中的知识和证据再按时间线整理。",
             "如果要落到个股层面，下一轮直接补股票名称或代码即可。",
+        ]
+    elif intent == "smart_indicator_explain":
+        suggestions = [
+            "可以继续问这个智能指标引用了哪些底层指标。",
+            "也可以继续问这条提示词适不适合改成别的计算口径。",
+            "如果要落到看板展示，我可以继续解释它适合放在哪个格子。",
+        ]
+    elif intent == "dashboard_interpretation":
+        suggestions = [
+            "可以继续问当前看板里哪张卡片最值得先看。",
+            "也可以继续问某个格子为什么适合放这个指标。",
+            "如果要改布局，我可以继续按 2x2 / 2x3 方式解释取舍。",
+        ]
+    elif intent == "product_help":
+        suggestions = [
+            "可以直接说你在哪个页面、点到了哪个按钮。",
+            "也可以问某个操作的前后顺序，我会按步骤拆给你。",
+            "如果卡在报错或空白状态，可以把现象直接描述给我。",
+        ]
+    elif intent == "out_of_scope_redirect":
+        suggestions = [
+            "可以改问个股或自选股基本面。",
+            "也可以改问复盘依据、知识框架或智能指标。",
+            "如果是页面操作问题，直接说 H5 / Web / Admin 里的目标动作。",
         ]
     else:
         suggestions = [
@@ -2940,6 +5105,19 @@ def build_hermes_text_artifact(question_text, plan, synthesis, tool_outputs, cit
             "title": str(item.get("title") or "未命名知识").strip(),
             "summary": str(item.get("summary") or item.get("body") or "").strip()[:160],
         })
+    dashboard_context = (tool_outputs.get("dashboard_context") or {}) if isinstance(tool_outputs, dict) else {}
+    for item in (dashboard_context.get("smart_indicators") or [])[:2]:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("indicator_name") or "").strip()
+        if not title:
+            continue
+        knowledge_entries.append({
+            "title": title,
+            "summary": str(item.get("algorithm_detail") or item.get("interpretation") or "").strip()[:160],
+        })
+    web_matches = ((tool_outputs.get("web_search") or {}).get("matches") or []) if isinstance(tool_outputs, dict) else []
+    footer_suffix = "已先查租户知识，再补充互联网公开信息。" if web_matches else "已优先基于当前租户知识库和平台内工具回答。"
     return {
         "type": "text_response",
         "question": str(question_text or "").strip(),
@@ -2950,7 +5128,7 @@ def build_hermes_text_artifact(question_text, plan, synthesis, tool_outputs, cit
         "citations": citations[:6],
         "knowledge": knowledge_entries,
         "followups": build_hermes_followups(plan, tool_outputs),
-        "footer": f"当前为文字回答。路由判断：{str((plan or {}).get('reason') or '').strip()}",
+        "footer": f"当前为文字回答。路由判断：{str((plan or {}).get('reason') or '').strip()}。{footer_suffix}",
     }
 
 
@@ -2999,6 +5177,7 @@ def build_hermes_watchlist_artifact(detail, question_text, synthesis, tool_outpu
             "summary": str(item.get("summary") or item.get("body") or "").strip()[:160],
         })
     evidence = build_hermes_citations(tool_outputs)
+    web_matches = ((tool_outputs.get("web_search") or {}).get("matches") or []) if isinstance(tool_outputs, dict) else []
     tenant = get_tenant_by_slug(tenant_slug)
     tenant_advisor = str((tenant or {}).get("advisor") or "").strip()
     title_prefix = "📌" if str(forecast.get("verdict") or "").strip() else "🧭"
@@ -3029,9 +5208,9 @@ def build_hermes_watchlist_artifact(detail, question_text, synthesis, tool_outpu
             "points": copy.deepcopy(detail.get("kline") or []),
         },
         "footer": (
-            f"本轮问题：{str(question_text or '').strip()}"
+            f"本轮问题：{str(question_text or '').strip()}。{'已补充互联网公开信息。' if web_matches else '当前优先基于租户知识与平台内工具。'}"
             if not tenant_advisor else
-            f"当前优先结合 {tenant_advisor} 租户知识、自选股和证据条目做解释。"
+            f"当前优先结合 {tenant_advisor} 租户知识、自选股和证据条目做解释。{' 已补充互联网公开信息。' if web_matches else ''}"
         ),
     }
 
@@ -3066,19 +5245,21 @@ def build_hermes_artifacts(plan, tool_outputs, synthesis, citations, tenant_slug
     return artifacts
 
 
-def build_hermes_synthesis_prompt(question_text, plan, tool_outputs, tenant_slug="", user_role="", preferred_mode="", messages=None, web_answer=False):
+def build_hermes_synthesis_prompt(question_text, plan, tool_outputs, tenant_slug="", user_role="", preferred_mode="", messages=None, web_answer=False, memory_state=None):
     tenant = get_tenant_by_slug(tenant_slug)
     tenant_name = (tenant or {}).get("name") or (tenant or {}).get("short_name") or str(tenant_slug or "").strip() or "当前租户"
     conversation_block = format_hermes_message_context(messages, limit=8)
+    memory_context_text = str((memory_state or {}).get("context_text") or "").strip()
     blocks = [
         f"租户：{tenant_name}",
         f"角色：{str(user_role or '').strip() or 'unknown'}",
         f"问题：{str(question_text or '').strip()}",
         f"意图：{str(plan.get('intent') or '').strip()}",
         f"偏好分析方式：{str(preferred_mode or '').strip() or 'auto'}",
-        f"互联网问答模式：{'是' if web_answer else '否'}",
+        f"互联网补充模式：{'是' if web_answer else '否'}",
         f"展示模式：{str(plan.get('display_mode') or 'text').strip()}",
         f"路由原因：{str(plan.get('reason') or '').strip()}",
+        f"历史记忆摘要：\n{memory_context_text}" if memory_context_text else "",
         f"最近多轮对话：\n{conversation_block}" if conversation_block else "",
         f"工具结果：{json.dumps(tool_outputs, ensure_ascii=False)[:12000]}",
     ]
@@ -3087,7 +5268,8 @@ def build_hermes_synthesis_prompt(question_text, plan, tool_outputs, tenant_slug
         "你是 Hermes 的答案合成器。"
         "你的职责是根据已执行的工具结果生成最终回答。"
         "优先依据工具结果，不要编造不存在的数据。"
-        "如果互联网问答模式为是，可以按公开信息口径组织回答，但不能声称已经实时联网检索。"
+        "必须先依据租户知识结果，再参考平台内工具，最后才参考互联网补充结果。"
+        "如果存在互联网补充结果，可以按公开信息口径组织回答，但不能把互联网信息盖过租户知识。"
         "如果证据不足，要明确说边界。"
         "输出必须是 JSON。"
     )
@@ -3099,7 +5281,7 @@ def build_hermes_synthesis_prompt(question_text, plan, tool_outputs, tenant_slug
     return system_prompt, user_prompt
 
 
-def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", user_role="", preferred_mode="", messages=None, web_answer=False):
+def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", user_role="", preferred_mode="", messages=None, web_answer=False, memory_state=None):
     fallback_answer = "我先按当前可用的知识和工具结果给你一个文字回答。"
     fallback = {
         "answer": fallback_answer,
@@ -3120,6 +5302,7 @@ def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", 
             preferred_mode=preferred_mode,
             messages=messages,
             web_answer=web_answer,
+            memory_state=memory_state,
         )
         raw = call_openai_compatible_llm(
             llm_model,
@@ -3156,10 +5339,13 @@ def build_hermes_query_response(body):
     attachments = payload.get("attachments") if isinstance(payload.get("attachments"), list) else []
     preferred_mode = str(payload.get("preferred_mode") or "").strip().lower()
     web_answer = bool(payload.get("web_answer"))
+    entry_point = str(payload.get("entry_point") or "hermes_chat").strip() or "hermes_chat"
     messages = normalize_hermes_messages(payload.get("messages"))
     question_text = extract_hermes_question_text(messages, payload.get("question"))
     if not question_text:
         raise ValueError("hermes_question_required")
+    actor_context = resolve_hermes_actor_context(payload, tenant_slug=tenant_slug, user_role=user_role)
+    session_id = resolve_hermes_session_id(payload, actor_context=actor_context)
     workflow_definition = build_default_hermes_agent_workflow_definition()
 
     def _hermes_input_executor(state, runtime, node, upstream):
@@ -3170,6 +5356,67 @@ def build_hermes_query_response(body):
                 "attachment_count": len(runtime.get("attachments") or []),
                 "knowledge_count": len(runtime.get("selected_knowledge_ids") or []),
                 "message_count": len(runtime.get("messages") or []),
+                "session_id": runtime.get("session_id") or "",
+            },
+        }
+
+    def _hermes_session_load_executor(state, runtime, node, upstream):
+        memory_state = load_hermes_memory_state(
+            actor_context=runtime.get("actor_context") or {},
+            session_id=runtime.get("session_id") or "",
+            limit=6,
+        )
+        session_state = memory_state.get("session") if isinstance(memory_state.get("session"), dict) else {}
+        return {
+            "status": "ok" if memory_state.get("available") else "skipped",
+            "detail": "已装载当前会话记忆。" if memory_state.get("available") else "当前没有可读的历史会话记忆，按新会话继续。",
+            "state_updates": {
+                "memory_state": memory_state,
+            },
+            "context_preview": {
+                "session_turn_count": int(session_state.get("turn_count") or 0),
+                "storage_mode": memory_state.get("storage_mode") or "",
+            },
+        }
+
+    def _hermes_memory_read_executor(state, runtime, node, upstream):
+        memory_state = state.get("memory_state") if isinstance(state.get("memory_state"), dict) else {}
+        user_profile_state = memory_state.get("user_profile") if isinstance(memory_state.get("user_profile"), dict) else {}
+        user_memory_state = memory_state.get("user_memory") if isinstance(memory_state.get("user_memory"), dict) else {}
+        return {
+            "status": "ok" if memory_state.get("available") else "skipped",
+            "detail": "已读取用户事实记忆、工作记忆和画像。" if memory_state.get("available") else "当前未命中历史记忆，按首轮问答继续。",
+            "state_updates": {
+                "memory_context_text": memory_state.get("context_text") or "",
+            },
+            "context_preview": {
+                "total_turns": int(user_profile_state.get("total_queries") or user_memory_state.get("total_turns") or 0),
+                "persona_primary": user_profile_state.get("persona_primary") or "",
+            },
+        }
+
+    def _hermes_scope_executor(state, runtime, node, upstream):
+        scope_result = hermes_scope_guard(
+            question_text=runtime.get("question_text") or "",
+            selected_knowledge_ids=runtime.get("selected_knowledge_ids") or [],
+            attachments=runtime.get("attachments") or [],
+        )
+        scope_status = str(scope_result.get("status") or "allowed").strip() or "allowed"
+        detail_map = {
+            "allowed": "问题已通过范围识别。",
+            "soft_allowed": "问题属于轻度闲聊，允许简短承接。",
+            "redirected": "问题超出主要范围，已改为平台能力收口。",
+            "blocked": "问题涉及高风险或超边界诉求，已阻断直接回答。",
+        }
+        return {
+            "status": "error" if scope_status == "blocked" else ("skipped" if scope_status == "redirected" else "ok"),
+            "detail": detail_map.get(scope_status, "已完成范围识别。"),
+            "state_updates": {
+                "scope_result": scope_result,
+            },
+            "context_preview": {
+                "scope_status": scope_status,
+                "intent_hint": scope_result.get("intent_hint") or "",
             },
         }
 
@@ -3181,6 +5428,8 @@ def build_hermes_query_response(body):
             attachments=runtime.get("attachments") or [],
             preferred_mode=runtime.get("preferred_mode") or "",
             messages=runtime.get("messages") or [],
+            scope_result=state.get("scope_result") or {},
+            memory_state=state.get("memory_state") or {},
         )
         return {
             "detail": f"已完成意图路由：{str(intent_plan.get('reason') or '').strip() or '默认通用对话'}",
@@ -3197,12 +5446,27 @@ def build_hermes_query_response(body):
         }
 
     def _hermes_tool_executor(state, runtime, node, upstream):
+        intent_plan = state.get("intent_plan") or {}
+        if str(intent_plan.get("intent") or "").strip() == "out_of_scope_redirect":
+            return {
+                "status": "skipped",
+                "detail": "当前问题已被范围守卫收口，本轮不再调度平台工具。",
+                "state_updates": {
+                    "tool_outputs": {},
+                    "tool_trace": [],
+                },
+                "context_preview": {
+                    "tool_count": 0,
+                    "ok_count": 0,
+                },
+            }
         tool_outputs, tool_trace = execute_hermes_tool_plan(
-            plan=state.get("intent_plan") or {},
+            plan=intent_plan,
             tenant_slug=runtime.get("tenant_slug") or "",
             question_text=runtime.get("question_text") or "",
             selected_knowledge_ids=runtime.get("selected_knowledge_ids") or [],
             attachments=runtime.get("attachments") or [],
+            web_answer=bool(runtime.get("web_answer")),
         )
         return {
             "detail": f"已执行 {len(tool_trace or [])} 个工具。",
@@ -3217,6 +5481,21 @@ def build_hermes_query_response(body):
         }
 
     def _hermes_synthesis_executor(state, runtime, node, upstream):
+        if str((state.get("intent_plan") or {}).get("intent") or "").strip() == "out_of_scope_redirect":
+            synthesis = build_hermes_scope_synthesis(state.get("intent_plan") or {})
+            return {
+                "status": "skipped",
+                "detail": "已生成范围守卫的收口回复。",
+                "state_updates": {
+                    "synthesis": synthesis,
+                    "answer_model": None,
+                    "answer_mode": "scope_guard_reply",
+                },
+                "context_preview": {
+                    "answer_chars": len(str((synthesis or {}).get("answer") or "")),
+                    "bullet_count": len((synthesis or {}).get("bullets") or []),
+                },
+            }
         synthesis, answer_model, answer_mode = synthesize_hermes_answer(
             question_text=runtime.get("question_text") or "",
             plan=state.get("intent_plan") or {},
@@ -3226,6 +5505,7 @@ def build_hermes_query_response(body):
             preferred_mode=runtime.get("preferred_mode") or "",
             messages=runtime.get("messages") or [],
             web_answer=bool(runtime.get("web_answer")),
+            memory_state=state.get("memory_state") or {},
         )
         return {
             "detail": "已完成答案合成。",
@@ -3240,6 +5520,66 @@ def build_hermes_query_response(body):
             },
         }
 
+    def _hermes_memory_extract_executor(state, runtime, node, upstream):
+        intent_plan = copy.deepcopy(state.get("intent_plan") or {})
+        intent_plan["preferred_mode"] = runtime.get("preferred_mode") or ""
+        intent_plan["web_answer"] = bool(runtime.get("web_answer"))
+        memory_payload = extract_hermes_memory_payload(
+            question_text=runtime.get("question_text") or "",
+            plan=intent_plan,
+            synthesis=state.get("synthesis") or {},
+            tool_outputs=state.get("tool_outputs") or {},
+            actor_context=runtime.get("actor_context") or {},
+            memory_state=state.get("memory_state") or {},
+        )
+        return {
+            "detail": "已提炼本轮记忆、标签和用户画像更新内容。",
+            "state_updates": {
+                "memory_payload": memory_payload,
+            },
+            "context_preview": {
+                "interest_topics": len(((memory_payload.get("profile_snapshot") or {}).get("interest_topics") or [])),
+                "focus_symbols": len(((memory_payload.get("profile_snapshot") or {}).get("focus_symbols") or [])),
+            },
+        }
+
+    def _hermes_memory_write_executor(state, runtime, node, upstream):
+        persist_result = persist_hermes_turn_and_memory(
+            actor_context=runtime.get("actor_context") or {},
+            session_id=runtime.get("session_id") or "",
+            entry_point=runtime.get("entry_point") or "",
+            memory_payload=state.get("memory_payload") or {},
+            tool_trace=state.get("tool_trace") or [],
+        )
+        return {
+            "status": "ok" if persist_result.get("storage_mode") == "db" else "skipped",
+            "detail": "已写入问答原文、会话记忆和用户记忆。" if persist_result.get("storage_mode") == "db" else "当前未写入数据库，保留内存态结果。",
+            "state_updates": {
+                "memory_persist_result": persist_result,
+            },
+            "context_preview": {
+                "storage_mode": persist_result.get("storage_mode") or "",
+                "turn_id": persist_result.get("turn_id") or "",
+            },
+        }
+
+    def _hermes_user_profile_update_executor(state, runtime, node, upstream):
+        profile_result = persist_hermes_user_profile(
+            actor_context=runtime.get("actor_context") or {},
+            profile_snapshot=((state.get("memory_payload") or {}).get("profile_snapshot") or {}),
+        )
+        return {
+            "status": "ok" if profile_result.get("storage_mode") == "db" else "skipped",
+            "detail": "已更新 Hermes 用户画像。" if profile_result.get("storage_mode") == "db" else "当前未写入画像表，保留内存态画像结果。",
+            "state_updates": {
+                "profile_persist_result": profile_result,
+            },
+            "context_preview": {
+                "storage_mode": profile_result.get("storage_mode") or "",
+                "persona_primary": ((profile_result.get("profile_snapshot") or {}).get("persona_primary") or ""),
+            },
+        }
+
     def _hermes_artifact_executor(state, runtime, node, upstream):
         intent_plan = state.get("intent_plan") or {}
         tool_outputs = state.get("tool_outputs") or {}
@@ -3247,6 +5587,11 @@ def build_hermes_query_response(body):
         synthesis = state.get("synthesis") or {}
         route_mode = state.get("route_mode") or ""
         answer_mode = state.get("answer_mode") or ""
+        memory_payload = state.get("memory_payload") if isinstance(state.get("memory_payload"), dict) else {}
+        profile_snapshot = (memory_payload.get("profile_snapshot") or {}) if isinstance(memory_payload, dict) else {}
+        user_memory_snapshot = (memory_payload.get("user_memory_snapshot") or {}) if isinstance(memory_payload, dict) else {}
+        session_snapshot = (memory_payload.get("session_snapshot") or {}) if isinstance(memory_payload, dict) else {}
+        memory_state = state.get("memory_state") if isinstance(state.get("memory_state"), dict) else {}
         citations = build_hermes_citations(tool_outputs)
         agent_trace = build_hermes_agent_trace(
             intent_plan=intent_plan,
@@ -3257,6 +5602,7 @@ def build_hermes_query_response(body):
             web_answer=bool(runtime.get("web_answer")),
             attachments=runtime.get("attachments") or [],
             selected_knowledge_ids=runtime.get("selected_knowledge_ids") or [],
+            scope_result=state.get("scope_result") or {},
         )
         artifacts = build_hermes_artifacts(
             plan=intent_plan,
@@ -3272,7 +5618,9 @@ def build_hermes_query_response(body):
             "ok": True,
             "question": runtime.get("question_text") or "",
             "tenant_slug": runtime.get("tenant_slug") or "",
+            "session_id": runtime.get("session_id") or "",
             "intent": intent_plan.get("intent"),
+            "scope_status": intent_plan.get("scope_status") or str(((state.get("scope_result") or {}).get("status") or "allowed")).strip(),
             "display_mode": response_display_mode,
             "answer": synthesis.get("answer") or "",
             "summary": synthesis.get("summary") or "",
@@ -3284,6 +5632,25 @@ def build_hermes_query_response(body):
             "agent_trace": agent_trace,
             "preferred_mode": runtime.get("preferred_mode") or "auto",
             "web_answer": bool(runtime.get("web_answer")),
+            "source_policy": {
+                "knowledge_first": True,
+                "web_supplement_enabled": bool(runtime.get("web_answer")),
+            },
+            "memory_meta": {
+                "session_id": runtime.get("session_id") or "",
+                "storage_mode": (
+                    (state.get("profile_persist_result") or {}).get("storage_mode")
+                    or (state.get("memory_persist_result") or {}).get("storage_mode")
+                    or (memory_state.get("storage_mode") or "memoryless_fallback")
+                ),
+                "previous_session_turn_count": int(((memory_state.get("session") or {}).get("turn_count") or 0)),
+                "session_turn_count": int(session_snapshot.get("turn_count") or 0),
+                "total_turns": int(profile_snapshot.get("total_queries") or user_memory_snapshot.get("total_turns") or 0),
+                "preferred_response_style": user_memory_snapshot.get("preferred_response_style") or "",
+                "interest_topics": copy.deepcopy((profile_snapshot.get("interest_topics") or [])[:6]),
+                "focus_symbols": copy.deepcopy((profile_snapshot.get("focus_symbols") or [])[:6]),
+            },
+            "user_profile_snapshot": copy.deepcopy(profile_snapshot),
             "router": {
                 "mode": route_mode,
                 "reason": intent_plan.get("reason") or "",
@@ -3329,12 +5696,21 @@ def build_hermes_query_response(body):
             "web_answer": web_answer,
             "messages": messages,
             "question_text": question_text,
+            "entry_point": entry_point,
+            "session_id": session_id,
+            "actor_context": actor_context,
         },
         executor_registry={
             "question_input": _hermes_input_executor,
+            "session_load": _hermes_session_load_executor,
+            "memory_read": _hermes_memory_read_executor,
+            "scope_guard": _hermes_scope_executor,
             "intent_router": _hermes_router_executor,
             "tool_dispatch": _hermes_tool_executor,
             "answer_synthesis": _hermes_synthesis_executor,
+            "memory_extract": _hermes_memory_extract_executor,
+            "memory_write": _hermes_memory_write_executor,
+            "user_profile_update": _hermes_user_profile_update_executor,
             "artifact_render": _hermes_artifact_executor,
         },
     )

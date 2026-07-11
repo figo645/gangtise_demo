@@ -819,6 +819,84 @@ def api_admin_sync_llm_registry():
     )
 
 
+@app.route("/api/admin/hermes/memory-summary")
+def api_admin_hermes_memory_summary():
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    try:
+        summary = build_admin_hermes_memory_summary(tenant_slug)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "hermes_memory_db_unavailable"}), 503
+        app.logger.exception("Failed to build Hermes memory summary")
+        return jsonify({"ok": False, "error": "hermes_memory_summary_failed"}), 500
+    return jsonify({"ok": True, "summary": summary})
+
+
+@app.route("/api/admin/hermes/memory-clear-preview", methods=["POST"])
+def api_admin_hermes_memory_clear_preview():
+    body = request.get_json(silent=True) or {}
+    tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
+    range_key = str(body.get("range_key") or "").strip().lower()
+    try:
+        preview = build_admin_hermes_memory_clear_preview(tenant_slug, range_key)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "hermes_memory_db_unavailable"}), 503
+        app.logger.exception("Failed to build Hermes memory clear preview")
+        return jsonify({"ok": False, "error": "hermes_memory_preview_failed"}), 500
+    return jsonify({"ok": True, "preview": preview})
+
+
+@app.route("/api/admin/hermes/memory-backup", methods=["POST"])
+def api_admin_hermes_memory_backup():
+    body = request.get_json(silent=True) or {}
+    tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
+    range_key = str(body.get("range_key") or "").strip().lower()
+    try:
+        result = build_admin_hermes_memory_backup_zip(tenant_slug, range_key)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "hermes_memory_db_unavailable"}), 503
+        app.logger.exception("Failed to build Hermes memory backup zip")
+        return jsonify({"ok": False, "error": "hermes_memory_backup_failed"}), 500
+    manifest = result.get("manifest") if isinstance(result.get("manifest"), dict) else {}
+    counts = manifest.get("counts") if isinstance(manifest.get("counts"), dict) else {}
+    return app.response_class(
+        result.get("content_bytes") or b"",
+        mimetype="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{result.get("filename") or "hermes_memory_backup.zip"}"',
+            "X-Hermes-Backup-Tenant": str(manifest.get("tenant_slug") or ""),
+            "X-Hermes-Backup-Range": str(manifest.get("range_key") or ""),
+            "X-Hermes-Backup-Turns": str(counts.get("conversation_turns") or 0),
+        },
+    )
+
+
+@app.route("/api/admin/hermes/memory-clear", methods=["POST"])
+def api_admin_hermes_memory_clear():
+    body = request.get_json(silent=True) or {}
+    tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
+    range_key = str(body.get("range_key") or "").strip().lower()
+    confirm_text = str(body.get("confirm_text") or "").strip()
+    try:
+        result = clear_admin_hermes_memory(tenant_slug, range_key, confirm_text=confirm_text)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "hermes_memory_db_unavailable"}), 503
+        app.logger.exception("Failed to clear Hermes memory")
+        return jsonify({"ok": False, "error": "hermes_memory_clear_failed"}), 500
+    return jsonify({"ok": True, "result": result})
+
+
 @app.route("/api/admin/forecast-config")
 def api_admin_forecast_config():
     if not is_feature_enabled("stock_forecast"):

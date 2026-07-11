@@ -47,11 +47,23 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("hermes-thinking-stream", html)
         self.assertIn("buildHermesLoadingThoughtTemplates", html)
         self.assertIn("上传文件解析", html)
-        self.assertIn("互联网问答", html)
+        self.assertIn("id=\"hermes-internet-toggle\"", html)
+        self.assertIn("toggleHermesInternetAnswer()", html)
+        self.assertIn("互联网补充开关已移到输入框外侧", html)
+        self.assertIn("这个智能指标是按什么口径算出来的？", html)
+        self.assertIn("ensureHermesSessionId()", html)
         self.assertNotIn("hermes-chat-bubble", html)
         self.assertNotIn("默认按全部知识库做文字回答，也可以点 + 指定知识或上传文件。", html)
         self.assertNotIn("指定知识条目", html)
         self.assertNotIn("Hermes 扩展能力", html)
+        self.assertIn("function dedupeHermesTextItems(items)", html)
+        self.assertIn("overflow-wrap:anywhere;", html)
+        self.assertIn(".hermes-transcript-entry.assistant .hermes-transcript-text,", html)
+        self.assertIn("justify-items:stretch;", html)
+        self.assertIn("function saveHermesAnswerAsKnowledge(entryId)", html)
+        self.assertIn("function buildHermesKnowledgePayload(entry, artifact)", html)
+        self.assertIn("加入知识源", html)
+        self.assertNotIn("加入上下文", html)
 
     def test_hermes_query_accepts_web_answer_flag(self):
         response = self.client.post(
@@ -67,6 +79,14 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertTrue(payload["agent_trace"]["steps"])
         self.assertIn("workflow_meta", payload)
         self.assertEqual(payload["workflow_meta"]["id"], "hermes_agent")
+        self.assertIn("memory_meta", payload)
+        self.assertIn("user_profile_snapshot", payload)
+        workflow_node_ids = [item["id"] for item in payload["workflow_meta"]["graph"]["nodes"]]
+        self.assertIn("scope_guard", workflow_node_ids)
+        self.assertIn("session_load", workflow_node_ids)
+        self.assertIn("memory_read", workflow_node_ids)
+        self.assertIn("memory_extract", workflow_node_ids)
+        self.assertIn("user_profile_update", workflow_node_ids)
 
     def test_workbench_pages_render(self):
         for tenant_slug in self.tenant_slugs:
@@ -153,6 +173,23 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertIn("workflow_meta", payload)
         self.assertEqual(payload["workflow_meta"]["id"], "evidence_chain_agent")
+
+    def test_admin_page_contains_hermes_memory_governance_controls(self):
+        response = self.client.get("/admin")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("Hermes 记忆治理", html)
+        self.assertIn("id=\"admin-hermes-memory-tenant\"", html)
+        self.assertIn("id=\"admin-hermes-memory-backup-range\"", html)
+        self.assertIn("id=\"admin-hermes-memory-clear-range\"", html)
+        self.assertIn("loadAdminHermesMemorySummary", html)
+        self.assertIn("previewAdminHermesMemoryClear", html)
+        self.assertIn("backupAdminHermesMemory", html)
+        self.assertIn("clearAdminHermesMemory", html)
+        self.assertIn("/api/admin/hermes/memory-summary", html)
+        self.assertIn("/api/admin/hermes/memory-backup", html)
+        self.assertIn("/api/admin/hermes/memory-clear", html)
 
 
 if __name__ == "__main__":

@@ -331,14 +331,32 @@ body { background: var(--surface-2); color: var(--text-main); }
   gap:4px;
   width:100%;
   min-width:0;
+  max-width:100%;
+  overflow:hidden;
 }
 .hermes-transcript-entry.user {
   justify-items:end;
   text-align:right;
 }
 .hermes-transcript-entry.assistant {
-  justify-items:start;
+  justify-items:stretch;
   text-align:left;
+  align-items:start;
+}
+.hermes-transcript-entry.assistant .hermes-transcript-kicker {
+  justify-self:start;
+}
+.hermes-transcript-entry.assistant .hermes-transcript-text,
+.hermes-transcript-entry.assistant .hermes-transcript-body,
+.hermes-transcript-entry.assistant .hermes-transcript-meta,
+.hermes-transcript-entry.assistant .hermes-thinking-inline,
+.hermes-transcript-entry.assistant .hermes-thinking-stream,
+.hermes-transcript-entry.assistant .hermes-bullet-list,
+.hermes-transcript-entry.assistant .hermes-evidence-row {
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  box-sizing:border-box;
 }
 .hermes-transcript-kicker {
   font-size:9px;
@@ -353,6 +371,8 @@ body { background: var(--surface-2); color: var(--text-main); }
   color:var(--text-main);
   white-space:pre-line;
   word-break:break-word;
+  overflow-wrap:anywhere;
+  max-width:100%;
 }
 .hermes-transcript-entry.user .hermes-transcript-text {
   max-width:84%;
@@ -364,11 +384,39 @@ body { background: var(--surface-2); color: var(--text-main); }
   color:#66717F;
   white-space:pre-line;
   word-break:break-word;
+  overflow-wrap:anywhere;
+  max-width:100%;
 }
 .hermes-transcript-meta {
   font-size:9px;
   line-height:1.6;
   color:#98A2AE;
+  white-space:normal;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+  max-width:100%;
+}
+.hermes-transcript-actions {
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+  margin-top:4px;
+}
+.hermes-transcript-action {
+  border:none;
+  background:#F3F8FE;
+  color:#1F497D;
+  border-radius:999px;
+  padding:5px 9px;
+  font-size:10px;
+  font-weight:700;
+  line-height:1;
+  cursor:pointer;
+}
+.hermes-transcript-action.is-active {
+  background:rgba(200,169,110,0.16);
+  color:#8A5B00;
 }
 .hermes-question-input {
   width:100%;
@@ -403,6 +451,8 @@ body { background: var(--surface-2); color: var(--text-main); }
   font-size:11px;
   color:#1F497D;
   line-height:1.4;
+  max-width:100%;
+  min-width:0;
 }
 .hermes-composer-chip button {
   border:none;
@@ -412,6 +462,13 @@ body { background: var(--surface-2); color: var(--text-main); }
   cursor:pointer;
   padding:0;
   line-height:1;
+  flex-shrink:0;
+}
+.hermes-composer-chip span {
+  min-width:0;
+  max-width:100%;
+  word-break:break-word;
+  overflow-wrap:anywhere;
 }
 .hermes-composer-row {
   display:flex;
@@ -431,6 +488,26 @@ body { background: var(--surface-2); color: var(--text-main); }
   line-height:1;
   cursor:pointer;
   flex-shrink:0;
+}
+.hermes-composer-toggle {
+  min-width:68px;
+  height:36px;
+  border:none;
+  border-radius:999px;
+  background:#F5F7FA;
+  border:1px solid rgba(17,24,39,0.08);
+  color:#4E5968;
+  font-size:11px;
+  font-weight:700;
+  line-height:1;
+  cursor:pointer;
+  flex-shrink:0;
+  padding:0 12px;
+}
+.hermes-composer-toggle.is-active {
+  color:#8A5B00;
+  background:rgba(200,169,110,0.14);
+  border-color:rgba(200,169,110,0.32);
 }
 .hermes-composer-send {
   border:none;
@@ -627,9 +704,9 @@ body { background: var(--surface-2); color: var(--text-main); }
 .hermes-metric-note { font-size:10px; color:var(--text-sub); line-height:1.55; margin-top:3px; }
 .hermes-bullet-list { display:flex; flex-direction:column; gap:6px; align-items:flex-start; }
 .hermes-bullet-item {
-  display:inline-flex;
+  display:block;
   width:fit-content;
-  max-width:88%;
+  max-width:min(100%, 88%);
   background:#F5F7FA;
   border:none;
   border-radius:999px;
@@ -637,6 +714,10 @@ body { background: var(--surface-2); color: var(--text-main); }
   font-size:10px;
   color:#4E5968;
   line-height:1.55;
+  white-space:normal;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+  box-sizing:border-box;
 }
 .hermes-evidence-row { display:flex; gap:8px; flex-wrap:wrap; }
 .hermes-evidence-chip {
@@ -672,6 +753,7 @@ body { background: var(--surface-2); color: var(--text-main); }
   gap:7px;
   width:100%;
   max-width:100%;
+  min-width:0;
   padding:0;
   background:none;
   border:none;
@@ -694,7 +776,7 @@ body { background: var(--surface-2); color: var(--text-main); }
   background:var(--gold);
   box-shadow:none;
 }
-.hermes-thinking-text { min-width:0; word-break:break-word; }
+.hermes-thinking-text { min-width:0; max-width:100%; word-break:break-word; overflow-wrap:anywhere; }
 .hermes-thinking-inline {
   font-size:10px;
   color:#8A939F;
@@ -2517,6 +2599,7 @@ body,
                   placeholder="问 Hermes..."
                   oninput="this.style.height='auto';this.style.height=Math.max(54,Math.min(this.scrollHeight,160))+'px'"
                 ></textarea>
+                <button id="hermes-internet-toggle" class="hermes-composer-toggle" type="button" onclick="toggleHermesInternetAnswer()">互联网</button>
                 <button class="hermes-composer-send hermes-lobster-send" onclick="runHermesAnalysis()">发送</button>
               </div>
             </div>
@@ -2677,20 +2760,6 @@ body,
         </div>
         <div class="knowledge-zone-list" id="knowledge-zone-feed"></div>
       </div>
-      <div class="card" style="padding:16px;margin-bottom:12px">
-        <div style="font-size:13px;color:var(--gold);font-weight:700;margin-bottom:8px">方法与框架</div>
-        <div style="font-size:13px;color:var(--white);line-height:1.8">
-          • 复盘四步法：收拢资料 → 生成提纲 → 锁定样本 → 回填证据链<br>
-          • 个股观察法：价格位置 → 投顾视角 → 基本面判断 → 跟踪结论<br>
-          • 宏观表达法：先讲框架、变量和边界，不直接给结论性建议
-        </div>
-      </div>
-      <div class="card" style="padding:16px">
-        <div style="font-size:13px;color:var(--gold);font-weight:700;margin-bottom:8px">入库方式</div>
-        <div style="font-size:12px;color:var(--gray-400);line-height:1.8">
-          大V通过语音输入、文件上传、网页 URL 提供的内容，会在清洗后进入知识专区，供 Hermes、复盘专区和大V工作台复用。
-        </div>
-      </div>
     </div>
   </div>
 
@@ -2702,13 +2771,6 @@ body,
       <div style="font-size:16px;font-weight:700;color:var(--white)" id="dm-list-title">专属对话</div>
         <div style="font-size:11px;color:var(--gray-400);background:rgba(200,169,110,0.08);padding:4px 10px;border-radius:10px" id="dm-list-hint">与大V投顾研究交流</div>
       </div>
-      <div style="padding:0 16px 12px">
-        <div style="background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.14);border-radius:12px;padding:12px">
-          <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:6px" id="dm-role-card-title">租户私信说明</div>
-          <div style="font-size:12px;color:var(--gray-400);line-height:1.7" id="dm-role-card-desc">普通投资者只能和所属大V对话；大V进入消息页后可查看并回复自己的粉丝会话。</div>
-        </div>
-      </div>
-      <div id="dm-review-status-card" style="padding:0 16px 12px"></div>
       <div id="dm-conversations-list">
         <div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">加载中...</div>
       </div>
@@ -6843,6 +6905,7 @@ function renderKnowledgeExperience() {
 function renderHermesWorkspace() {
   renderHermesCredits();
   renderHermesComposerContext();
+  renderHermesInternetToggle();
   renderHermesThread();
 }
 
@@ -8871,8 +8934,29 @@ let hermesCredits = 128;
 let hermesCustomSkillDraft = { title: '', prompt: '', knowledgeIds: [] };
 let hermesScopedKnowledgeId = '';
 let hermesUploadedFiles = [];
+let hermesSavedKnowledgeEntries = {};
 let hermesUseInternetAnswer = false;
 let hermesLoadingTicker = null;
+
+function getHermesSessionStorageKey() {
+  const activeUser = getActiveDemoUser() || {};
+  const tenantSlug = (((activeUser || {}).tenant || {}).slug || 'default').toLowerCase();
+  const profileId = String(activeUser.username || activeUser.name || activeUser.role || 'guest').trim().toLowerCase() || 'guest';
+  return `gangtise_demo_hermes_session:${tenantSlug}:${profileId}`;
+}
+
+function ensureHermesSessionId() {
+  const storageKey = getHermesSessionStorageKey();
+  try {
+    const current = localStorage.getItem(storageKey);
+    if (current) return current;
+    const next = `hermes_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(storageKey, next);
+    return next;
+  } catch (e) {
+    return `hermes_${Date.now()}_fallback`;
+  }
+}
 
 const DEFAULT_HERMES_SKILLS = {
   basic: {
@@ -8981,6 +9065,62 @@ function getHermesUploadedFileNames() {
   return hermesUploadedFiles.map(item => item.filename || item.name || '文件');
 }
 
+function createHermesEntryId(prefix = 'entry') {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function getHermesCanSaveKnowledge() {
+  const activeUser = getActiveDemoUser() || {};
+  return String(activeUser.role || '').trim().toLowerCase() === 'dav';
+}
+
+function getHermesKnowledgeSaveState(entryId) {
+  return hermesSavedKnowledgeEntries[String(entryId || '').trim()] || 'idle';
+}
+
+function buildHermesKnowledgePayload(entry, artifact) {
+  const normalizedEntry = entry && typeof entry === 'object' ? entry : {};
+  const normalizedArtifact = artifact && typeof artifact === 'object' ? artifact : {};
+  const primaryBullets = dedupeHermesTextItems(
+    (normalizedArtifact.bullets || []).concat(normalizedArtifact.judgement || [])
+  );
+  const nextStepBullets = dedupeHermesTextItems(
+    (normalizedArtifact.followups || []).concat(normalizedArtifact.nextSteps || [])
+  );
+  const evidenceBullets = dedupeHermesTextItems(
+    (normalizedArtifact.knowledge || []).map(item => item && item.title ? item.title : '').concat(normalizedArtifact.citations || [])
+  );
+  const symbolTags = normalizedArtifact.symbol && normalizedArtifact.symbol.name
+    ? [normalizedArtifact.symbol.name]
+    : [];
+  const bodySections = [
+    normalizedEntry.question ? `用户问题\n${normalizedEntry.question}` : '',
+    normalizedArtifact.headline ? `核心结论\n${normalizedArtifact.headline}` : '',
+    normalizedArtifact.summary ? `摘要\n${normalizedArtifact.summary}` : '',
+    normalizedArtifact.body ? `正文\n${normalizedArtifact.body}` : '',
+    primaryBullets.length ? `要点\n${primaryBullets.map((item, index) => `${index + 1}. ${item}`).join('\n')}` : '',
+    nextStepBullets.length ? `后续建议\n${nextStepBullets.map((item, index) => `${index + 1}. ${item}`).join('\n')}` : '',
+    evidenceBullets.length ? `参考线索\n${evidenceBullets.map((item, index) => `${index + 1}. ${item}`).join('\n')}` : '',
+  ].filter(Boolean);
+  const title = String(
+    normalizedArtifact.headline || normalizedArtifact.title || normalizedEntry.question || 'Hermes问答沉淀'
+  ).trim() || 'Hermes问答沉淀';
+  const summary = String(
+    normalizedArtifact.summary || normalizedArtifact.headline || normalizedArtifact.body || normalizedEntry.question || ''
+  ).trim();
+  return {
+    knowledge_type: 'manual',
+    title: title.slice(0, 80),
+    summary: summary.slice(0, 240),
+    body: bodySections.join('\n\n').slice(0, 12000),
+    source_label: 'Hermes问答',
+    source_detail: `来源：Hermes 对话沉淀${normalizedEntry.skillLabel ? ` · ${normalizedEntry.skillLabel}` : ''}`,
+    tags: dedupeHermesTextItems(['Hermes问答', normalizedEntry.skillLabel || '', ...symbolTags]).slice(0, 6),
+    skip_ai_processing: true,
+    processing_mode: 'none',
+  };
+}
+
 function renderHermesComposerContext() {
   const hosts = [
     document.getElementById('hermes-composer-context'),
@@ -9006,14 +9146,6 @@ function renderHermesComposerContext() {
       </div>
     `);
   }
-  if (hermesUseInternetAnswer) {
-    chips.push(`
-      <div class="hermes-composer-chip">
-        <span>互联网问答</span>
-        <button onclick="clearHermesInternetAnswer()" aria-label="关闭互联网问答">×</button>
-      </div>
-    `);
-  }
   getHermesUploadedFileNames().forEach((name, index) => {
     chips.push(`
       <div class="hermes-composer-chip">
@@ -9022,8 +9154,19 @@ function renderHermesComposerContext() {
       </div>
     `);
   });
-  const html = chips.join('') || '<div class="hermes-action-hint">默认按当前租户知识库回答。</div>';
+  const html = chips.join('') || `<div class="hermes-action-hint">${hermesUseInternetAnswer ? '默认先查当前租户知识库，再补充互联网公开信息。' : '默认先查当前租户知识库。'}</div>`;
   hosts.forEach(host => { host.innerHTML = html; });
+}
+
+function renderHermesInternetToggle() {
+  const button = document.getElementById('hermes-internet-toggle');
+  if (!button) return;
+  button.classList.toggle('is-active', !!hermesUseInternetAnswer);
+  button.textContent = hermesUseInternetAnswer ? '互联网中' : '互联网';
+  button.setAttribute('aria-pressed', hermesUseInternetAnswer ? 'true' : 'false');
+  button.title = hermesUseInternetAnswer
+    ? '已开启互联网补充，Hermes 会先查租户知识库，再补公开信息'
+    : '开启后，Hermes 会在租户知识库之后补充互联网公开信息';
 }
 
 function clearHermesInternetAnswer() {
@@ -9031,11 +9174,10 @@ function clearHermesInternetAnswer() {
   renderHermesWorkspace();
 }
 
-function enableHermesInternetAnswer() {
-  hermesUseInternetAnswer = true;
-  closeHermesPlusMenu();
+function toggleHermesInternetAnswer(forceValue) {
+  hermesUseInternetAnswer = typeof forceValue === 'boolean' ? forceValue : !hermesUseInternetAnswer;
   renderHermesWorkspace();
-  showToast('已切换为互联网问答');
+  showToast(hermesUseInternetAnswer ? '已开启互联网补充' : '已关闭互联网补充');
 }
 
 function clearHermesKnowledgeScope() {
@@ -9046,6 +9188,105 @@ function clearHermesKnowledgeScope() {
 function removeHermesUploadedFile(index) {
   hermesUploadedFiles.splice(index, 1);
   renderHermesWorkspace();
+}
+
+function renderHermesKnowledgeAction(entryId) {
+  if (!entryId || !getHermesCanSaveKnowledge()) return '';
+  const state = getHermesKnowledgeSaveState(entryId);
+  const label = state === 'saved' ? '已加入知识源' : state === 'saving' ? '加入中...' : '加入知识源';
+  const disabled = state === 'saved' || state === 'saving' ? 'disabled' : '';
+  return `<div class="hermes-transcript-actions"><button class="hermes-transcript-action ${state !== 'idle' ? 'is-active' : ''}" ${disabled} onclick="saveHermesAnswerAsKnowledge('${escapeAttr(entryId)}')">${label}</button></div>`;
+}
+
+async function saveHermesAnswerAsKnowledge(entryId) {
+  const normalizedId = String(entryId || '').trim();
+  if (!normalizedId) return;
+  if (!getHermesCanSaveKnowledge()) {
+    showToast('只有大V可以沉淀知识源');
+    return;
+  }
+  const state = getHermesKnowledgeSaveState(normalizedId);
+  if (state === 'saving' || state === 'saved') return;
+  const entry = hermesConversation.find(item => item && item.id === normalizedId && item.type === 'ai');
+  if (!entry) {
+    showToast('当前问答结果不存在');
+    return;
+  }
+  const activeUser = getActiveDemoUser() || {};
+  const tenantId = activeUser && activeUser.tenant ? activeUser.tenant.id : 0;
+  const artifact = normalizeHermesArtifact(entry.artifact || entry.result, entry.question);
+  const payload = buildHermesKnowledgePayload(entry, artifact);
+  const optimisticId = `kb-hermes-${normalizedId}`;
+  hermesSavedKnowledgeEntries[normalizedId] = 'saving';
+  addOrReplaceKnowledgeEntry({
+    id: optimisticId,
+    tenantId,
+    type: 'manual',
+    title: payload.title,
+    source: 'Hermes问答',
+    sourceDetail: payload.source_detail,
+    summary: payload.summary,
+    body: payload.body,
+    raw_input: payload.body,
+    status: '同步中',
+    destination: '同步中',
+    time: '刚刚',
+    tags: payload.tags.slice(0),
+    skip_ai_processing: true,
+    processing_mode: 'none',
+  });
+  renderHermesWorkspace();
+  renderKnowledgeExperience();
+  try {
+    const result = await ingestKnowledgeEntry(payload);
+    if (!result.async || !result.job_code) throw new Error('knowledge_job_missing');
+    showToast('已提交到知识库，正在同步');
+    startAsyncJobPolling(result.job_code, {
+      onSuccess(job) {
+        const output = job.result || {};
+        const hubItems = output.knowledge_hub && Array.isArray(output.knowledge_hub.items) ? output.knowledge_hub.items : [];
+        if (hubItems.length) {
+          knowledgeEntryStore = hubItems.map((item, index) => mapKnowledgeEntryForTenant(item, tenantId, index));
+        } else {
+          const savedEntry = getKnowledgeEntryById(optimisticId);
+          if (savedEntry) {
+            savedEntry.status = 'ready';
+            savedEntry.destination = '已同步知识专区';
+          }
+        }
+        hermesSavedKnowledgeEntries[normalizedId] = 'saved';
+        renderKnowledgeExperience();
+        renderHermesWorkspace();
+        showToast('已加入知识源');
+      },
+      onFailed(job) {
+        const failedEntry = getKnowledgeEntryById(optimisticId);
+        if (failedEntry) {
+          failedEntry.status = '失败';
+          failedEntry.destination = '同步失败';
+        }
+        hermesSavedKnowledgeEntries[normalizedId] = 'idle';
+        renderKnowledgeExperience();
+        renderHermesWorkspace();
+        showToast(job.error_message || '加入知识源失败');
+      },
+      onError(error) {
+        hermesSavedKnowledgeEntries[normalizedId] = 'idle';
+        renderHermesWorkspace();
+        showToast(error.message || '知识同步状态查询失败');
+      },
+    });
+  } catch (error) {
+    const failedEntry = getKnowledgeEntryById(optimisticId);
+    if (failedEntry) {
+      failedEntry.status = '失败';
+      failedEntry.destination = '同步失败';
+    }
+    hermesSavedKnowledgeEntries[normalizedId] = 'idle';
+    renderKnowledgeExperience();
+    renderHermesWorkspace();
+    showToast(error.message || '加入知识源失败');
+  }
 }
 
 function closeHermesPlusMenu() {
@@ -9104,11 +9345,7 @@ function openHermesPlusMenu() {
     <div class="modal-title" style="margin-bottom:10px">添加上下文</div>
     <button class="hermes-plus-action" onclick="openHermesFilePicker()">
       <div class="hermes-plus-action-title">上传文件解析</div>
-      <div class="hermes-plus-action-desc">上传 PDF、DOCX、TXT、CSV、HTML，解析后随本次问题一起给 Hermes。</div>
-    </button>
-    <button class="hermes-plus-action" onclick="enableHermesInternetAnswer()">
-      <div class="hermes-plus-action-title">互联网问答</div>
-      <div class="hermes-plus-action-desc">让 Hermes 按公开信息口径回答；默认仍会结合当前租户知识库。</div>
+      <div class="hermes-plus-action-desc">上传 PDF、DOCX、TXT、CSV、HTML，解析后随本次问题一起给 Hermes。互联网补充开关已移到输入框外侧。</div>
     </button>
   `;
   const modal = document.getElementById('hermes-plus-modal');
@@ -9404,6 +9641,15 @@ function renderHermesThinkingStream(lines, options = {}) {
   `;
 }
 
+function dedupeHermesTextItems(items) {
+  const seen = new Set();
+  return (Array.isArray(items) ? items : []).map(item => String(item || '').trim()).filter(item => {
+    if (!item || seen.has(item)) return false;
+    seen.add(item);
+    return true;
+  });
+}
+
 function buildHermesLoadingThoughts(entry) {
   const payload = entry && typeof entry === 'object' ? entry : {};
   const elapsedMs = Math.max(0, Date.now() - Number(payload.startedAt || Date.now()));
@@ -9421,10 +9667,10 @@ function buildHermesLoadingThoughtTemplates(question, skill, stockCode) {
   const suffix = String(question || '').trim().slice(0, 22);
   return [
     suffix ? `先理解你问的重点：${suffix}${String(question || '').trim().length > 22 ? '…' : ''}` : '先判断你到底在追问哪一层信息',
-    `按 ${String((skill || {}).label || '默认对话')} 的方式组织这次回答${hermesUseInternetAnswer ? '，并补上公开信息口径' : ''}`,
+    `先查当前租户知识库，再按 ${String((skill || {}).label || '默认对话')} 的方式组织回答${hermesUseInternetAnswer ? '，最后补上互联网公开信息' : ''}`,
     hasAttachments
-      ? `正在读你刚上传的文件${hasStock ? '，顺便对照个股资料' : ''}`
-      : (hasStock ? '正在对照个股资料、知识和证据' : '正在翻找能直接支撑结论的知识和证据'),
+      ? `正在读你刚上传的文件${hasStock ? '，并对照租户知识与个股资料' : '，并对照租户知识'}`
+      : (hasStock ? '正在对照租户知识、个股资料和证据' : '正在翻找租户知识里能直接支撑结论的内容'),
     hasStock ? '把个股信息压缩成可直接判断的要点' : '先把结论压短，再把依据补齐',
     '最后再整理成一版更适合直接阅读的回答',
   ];
@@ -9445,6 +9691,11 @@ function syncHermesLoadingTicker() {
 }
 
 function renderHermesTextArtifact(artifact, agentTrace) {
+  const entryId = String(arguments[2] || '').trim();
+  const uniqueBullets = dedupeHermesTextItems(artifact.bullets);
+  const uniqueFollowups = dedupeHermesTextItems(
+    (artifact.followups || []).filter(item => !uniqueBullets.includes(String(item || '').trim()))
+  );
   const evidenceHtml = artifact.citations.length
     ? `<div class="hermes-evidence-row" style="margin-top:8px">${artifact.citations.map(item => `<span class="hermes-evidence-chip">${escapeHtml(item)}</span>`).join('')}</div>`
     : '';
@@ -9452,13 +9703,14 @@ function renderHermesTextArtifact(artifact, agentTrace) {
     ? `<div class="hermes-evidence-row" style="margin-top:8px">${artifact.knowledge.map(item => `<span class="hermes-evidence-chip">${escapeHtml(item.title)}</span>`).join('')}</div>`
     : '';
   const bodyHtml = artifact.body ? `<div class="hermes-transcript-body" style="margin-top:8px">${escapeHtml(artifact.body)}</div>` : '';
-  const bulletHtml = artifact.bullets.length
-    ? `<div class="hermes-bullet-list" style="margin-top:8px">${artifact.bullets.map(item => `<div class="hermes-bullet-item">${escapeHtml(item)}</div>`).join('')}</div>`
+  const bulletHtml = uniqueBullets.length
+    ? `<div class="hermes-bullet-list" style="margin-top:8px">${uniqueBullets.map(item => `<div class="hermes-bullet-item">${escapeHtml(item)}</div>`).join('')}</div>`
     : '';
-  const followupHtml = artifact.followups.length
-    ? `<div class="hermes-bullet-list" style="margin-top:8px">${artifact.followups.map(item => `<div class="hermes-bullet-item">${escapeHtml(item)}</div>`).join('')}</div>`
+  const followupHtml = uniqueFollowups.length
+    ? `<div class="hermes-bullet-list" style="margin-top:8px">${uniqueFollowups.map(item => `<div class="hermes-bullet-item">${escapeHtml(item)}</div>`).join('')}</div>`
     : '';
   const thoughtLines = buildHermesTraceThoughts(agentTrace);
+  const actionHtml = renderHermesKnowledgeAction(entryId);
   return `
     <div class="hermes-transcript-entry assistant">
       <div class="hermes-transcript-kicker">Hermes</div>
@@ -9470,6 +9722,7 @@ function renderHermesTextArtifact(artifact, agentTrace) {
       ${followupHtml}
       ${knowledgeHtml}
       ${evidenceHtml}
+      ${actionHtml}
       ${artifact.footer ? `<div class="hermes-transcript-meta">${escapeHtml(artifact.footer)}</div>` : ''}
     </div>
   `;
@@ -9482,14 +9735,14 @@ function renderHermesThread() {
   if (!hosts.length) return;
   if (!hermesConversation.length) {
     const suggestions = [
-      '最近这个方向怎么看？',
-      '帮我梳理一下这条信息值得怎么跟踪。',
-      '请先给我一个文字版结论。',
-      '如果要看基本面，我应该先补什么问题？'
+      '这只股票当前的基本面强弱怎么看？',
+      '这篇复盘的依据来源够不够扎实？',
+      '这个智能指标是按什么口径算出来的？',
+      'H5 里智能指标怎么创建和发布？'
     ];
     const emptyHtml = `
       <div class="hermes-chat-empty">
-        <div class="hermes-prompt-guide">聊聊新话题</div>
+        <div class="hermes-prompt-guide">从个股、复盘、指标或功能开始</div>
         <div class="hermes-prompt-chip-row" aria-label="Hermes 建议问题">
           ${suggestions.map(item => `<button class="hermes-prompt-chip" type="button" onclick="applyHermesSuggestion('${item.replace(/'/g, '&#39;')}')">${escapeHtml(item)}</button>`).join('')}
         </div>
@@ -9529,13 +9782,14 @@ function renderHermesThread() {
     }
     const artifact = normalizeHermesArtifact(entry.artifact || entry.result, entry.question);
     if ((entry.displayMode || 'text') !== 'structured' || artifact.type !== 'watchlist_analysis') {
-      return renderHermesTextArtifact(artifact, entry.agentTrace);
+      return renderHermesTextArtifact(artifact, entry.agentTrace, entry.id);
     }
     return `
       <div class="hermes-transcript-entry assistant">
         <div class="hermes-transcript-kicker">Hermes</div>
         <div class="hermes-transcript-text">${escapeHtml(artifact.headline)}</div>
         <div class="hermes-chat-analysis">${renderHermesAnalysisCards(artifact, entry.agentTrace)}</div>
+        ${renderHermesKnowledgeAction(entry.id)}
       </div>
     `;
   }).join('');
@@ -9625,6 +9879,7 @@ async function runHermesAnalysis(options) {
   }
   if (stockCode) fillHermesStockCode(stockCode);
   hermesConversation.push({
+    id: createHermesEntryId('user'),
     type: 'user',
     text: question,
     stockCode,
@@ -9645,7 +9900,11 @@ async function runHermesAnalysis(options) {
       body: JSON.stringify({
         tenant_slug: ((activeUser || {}).tenant || {}).slug || '',
         user_role: (activeUser || {}).role || '',
+        user_profile_id: activeUser && activeUser.username ? activeUser.username : '',
+        user_name: activeUser && (activeUser.name || activeUser.username) ? (activeUser.name || activeUser.username) : '',
+        user_membership: activeUser && activeUser.membership ? activeUser.membership : '',
         entry_point: options.fromWatchlist ? 'watchlist_detail' : 'hermes_chat',
+        session_id: ensureHermesSessionId(),
         question,
         messages: hermesConversation
           .filter(item => item.type === 'user')
@@ -9682,6 +9941,7 @@ async function runHermesAnalysis(options) {
       : 'text';
     hermesConversation.pop();
     hermesConversation.push({
+      id: createHermesEntryId('ai'),
       type: 'ai',
       question,
       result: normalizedArtifact,
@@ -9699,6 +9959,7 @@ async function runHermesAnalysis(options) {
   } catch (e) {
     hermesConversation.pop();
     hermesConversation.push({
+      id: createHermesEntryId('ai'),
       type: 'ai',
       question,
       result: normalizeHermesArtifact({
@@ -9940,64 +10201,12 @@ function getDmQuickAskOptions() {
   ];
 }
 
-function buildReviewPushDmMeta(user) {
-  const safeUser = user && user.tenant ? user : getSafeActiveDemoUser();
-  const runtime = ensureTenantReviewRuntime(safeUser.tenant.id);
-  const reviewPeriod = runtime.lastReviewPeriod || 'day';
-  const review = buildKolReviewData(safeUser, reviewPeriod);
-  const selectedNames = getDavReviewSelectedWatchlist(safeUser.tenant.id);
-  return {
-    title: review.title,
-    time: runtime.kolGeneratedAt || '刚刚',
-    periodLabel: review.periodLabel,
-    watchlist: selectedNames,
-    content: `【最新复盘已发布】${review.title}\n已同步到复盘专区，当前纳入样本：${selectedNames.join('、')}。\n现在可以直接去“复盘”页查看完整内容。`,
-  };
-}
-
-function renderDmReviewStatusCard() {
-  const host = document.getElementById('dm-review-status-card');
-  if (!host) return;
-  const activeUser = getSafeActiveDemoUser();
-  const reviewMeta = buildReviewPushDmMeta(activeUser);
-  if (isDavDmMode()) {
-    host.innerHTML = `
-      <div style="background:rgba(52,152,219,0.08);border:1px solid rgba(52,152,219,0.18);border-radius:12px;padding:12px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-          <div>
-            <div style="font-size:13px;font-weight:600;color:#63B3ED;margin-bottom:6px">复盘推送状态</div>
-            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">你的最新${reviewMeta.periodLabel}已推送到粉丝消息侧。粉丝会在消息里第一时间看到复盘更新，并可直接跳去复盘专区查看。</div>
-          </div>
-          <span class="tag tag-blue">${reviewMeta.time}</span>
-        </div>
-        <div class="review-watchlist-row" style="margin-top:10px">
-          ${reviewMeta.watchlist.map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
-        </div>
-      </div>
-    `;
-  } else {
-    host.innerHTML = `
-      <div style="background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.14);border-radius:12px;padding:12px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-          <div>
-            <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:6px">最新复盘提醒</div>
-            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">${escapeHtml(activeUser.tenant.advisor)} 刚发布了一版${reviewMeta.periodLabel}，你会在专属对话里第一时间收到提醒。</div>
-          </div>
-          <button class="btn-outline" style="padding:6px 10px;font-size:11px" onclick="switchTab('review')">去看复盘</button>
-        </div>
-      </div>
-    `;
-  }
-}
-
 function getInvestorDmMessages() {
   const activeUser = getSafeActiveDemoUser();
-  const reviewMeta = buildReviewPushDmMeta(activeUser);
   return [
     { id: 1, sender: 'kol', content: `欢迎来到 ${activeUser.tenant.advisor} 的专属消息区，有问题可以直接提问。`, time: '2026-06-07 09:00', type: 'text' },
     { id: 2, sender: 'user', content: '最近想继续跟踪科技主线，也想看看你这边最新的复盘。', time: '2026-06-07 09:08', type: 'text' },
     { id: 3, sender: 'kol', content: '可以，新的复盘和后续重点样本我会第一时间同步到消息里。', time: '2026-06-07 09:12', type: 'text' },
-    { id: 4, sender: 'kol', content: reviewMeta.content, time: reviewMeta.time, type: 'review' },
   ];
 }
 
@@ -10016,8 +10225,6 @@ function renderDmQuickAsks() {
 function syncDmRoleView() {
   const title = document.getElementById('dm-list-title');
   const hint = document.getElementById('dm-list-hint');
-  const cardTitle = document.getElementById('dm-role-card-title');
-  const cardDesc = document.getElementById('dm-role-card-desc');
   const footerTitle = document.getElementById('dm-footer-title');
   const footerDesc = document.getElementById('dm-footer-desc');
   const footerBtn = document.getElementById('dm-footer-btn');
@@ -10025,8 +10232,6 @@ function syncDmRoleView() {
   if (isDavDmMode()) {
     if (title) title.textContent = '粉丝对话';
     if (hint) hint.textContent = '仅展示当前租户粉丝会话';
-    if (cardTitle) cardTitle.textContent = '粉丝私信说明';
-    if (cardDesc) cardDesc.textContent = '大V进入消息页后，可查看并回复自己租户内粉丝发来的会话。';
     if (footerTitle) footerTitle.textContent = '当前消息规则';
     if (footerDesc) footerDesc.textContent = '粉丝只能和所属大V对话；如需统一处理更多消息，可从“我的”进入工作台。';
     if (footerBtn) {
@@ -10038,8 +10243,6 @@ function syncDmRoleView() {
     const activeUser = getSafeActiveDemoUser();
     if (title) title.textContent = '专属对话';
     if (hint) hint.textContent = `仅可与所属大V ${activeUser.tenant.advisor} 对话`;
-    if (cardTitle) cardTitle.textContent = '租户私信说明';
-    if (cardDesc) cardDesc.textContent = `普通投资者只能和所属大V ${activeUser.tenant.advisor} 对话，跨租户私信默认关闭。`;
     if (footerTitle) footerTitle.textContent = '当前消息规则';
     if (footerDesc) footerDesc.textContent = '投资者只能和所属大V对话，工作台入口统一从“我的”进入。';
     if (footerBtn) {
@@ -10049,7 +10252,6 @@ function syncDmRoleView() {
     if (input) input.placeholder = '多轮提问，投顾会基于平台证据链回复...';
   }
   renderDmQuickAsks();
-  renderDmReviewStatusCard();
 }
 
 async function loadDmConversations() {
@@ -10284,15 +10486,6 @@ function renderDmMessages(messages) {
           <div style="font-size:11px;color:var(--gold);font-weight:600;margin-bottom:6px">🔒 付费内容 · ¥${m.price}</div>
           <div style="font-size:13px;color:var(--white);line-height:1.6">${escapeHtml(m.preview||'解锁查看完整内容')}</div>
           <button class="btn-gold" style="width:100%;margin-top:10px;padding:6px;font-size:12px" onclick="unlockPaidMsg(${m.price})">解锁查看 ¥${m.price}</button>
-          <div class="dm-msg-time" style="color:${timeColor}">${m.time}</div>
-        </div>`;
-    }
-    if (m.type === 'review') {
-      return `
-        <div class="dm-msg from-${bubbleSide}" style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.18)">
-          <div style="font-size:11px;color:var(--gold);font-weight:700;margin-bottom:8px">📝 最新复盘已发布</div>
-          <div style="font-size:13px;color:var(--white);line-height:1.7">${escapeHtml(m.content || '').replace(/\n/g, '<br>')}</div>
-          <button class="btn-outline" style="width:100%;margin-top:10px;padding:6px 10px;font-size:11px" onclick="switchTab('review')">去复盘专区查看</button>
           <div class="dm-msg-time" style="color:${timeColor}">${m.time}</div>
         </div>`;
     }
