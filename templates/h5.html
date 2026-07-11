@@ -125,10 +125,10 @@ body { background: var(--surface-2); color: var(--text-main); }
 .hermes-workspace { padding:12px 0 0; display:grid; gap:12px; min-width:0; }
 .hermes-assistant-card {
   background:#FFFFFF;
-  border:1px solid rgba(47,116,192,0.12);
-  border-radius:18px;
-  padding:12px;
-  box-shadow:0 12px 28px rgba(31,73,125,0.08);
+  border:1px solid rgba(17,24,39,0.06);
+  border-radius:14px;
+  padding:8px 10px 10px;
+  box-shadow:none;
   overflow:hidden;
   min-width:0;
 }
@@ -282,66 +282,103 @@ body { background: var(--surface-2); color: var(--text-main); }
 }
 .hermes-prompt-chip-row {
   display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  margin-top:10px;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:10px;
+  margin-top:0;
 }
 .hermes-prompt-chip {
-  border:1px solid rgba(47,116,192,0.14);
-  background:#F8FBFF;
-  color:#1F497D;
-  border-radius:999px;
-  padding:7px 10px;
-  font-size:11px;
-  line-height:1;
+  border:none;
+  background:#F2F3F5;
+  color:#171A1F;
+  border-radius:16px;
+  padding:10px 14px;
+  font-size:12px;
+  line-height:1.38;
+  text-align:left;
+  width:fit-content;
+  max-width:82%;
   cursor:pointer;
   touch-action:manipulation;
-  transition:background .18s ease,border-color .18s ease,transform .18s ease;
+  box-shadow:none;
+  transition:background .18s ease,color .18s ease,transform .18s ease;
 }
+.hermes-prompt-chip:hover { background:#ECEEF2; }
 .hermes-prompt-chip:active { transform:scale(.97); }
-.hermes-chat-thread { display:grid; gap:12px; margin-top:2px; min-width:0; overflow:hidden; }
+.hermes-chat-thread { display:grid; gap:14px; margin-top:2px; min-width:0; overflow:hidden; }
 .hermes-chat-thread.is-empty { gap:0; }
 .hermes-chat-empty {
-  background:#F8FBFF;
-  border:1px dashed rgba(47,116,192,0.18);
-  border-radius:16px;
-  padding:12px 12px;
+  padding:2px 0 0;
 }
-.hermes-chat-empty-title { font-size:12px; font-weight:700; color:var(--text-main); }
-.hermes-chat-empty-desc { font-size:11px; color:var(--text-sub); line-height:1.6; margin-top:4px; }
-.hermes-chat-msg.user { display:flex; justify-content:flex-end; width:100%; }
-.hermes-chat-msg.ai { display:flex; justify-content:flex-start; width:100%; min-width:0; }
-.hermes-chat-bubble {
-  max-width:100%;
-  border-radius:16px;
-  padding:10px 12px;
+.hermes-prompt-guide {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  color:#ADB2BB;
+  font-size:11px;
+  line-height:1;
+  margin-bottom:12px;
+}
+.hermes-prompt-guide::before,
+.hermes-prompt-guide::after {
+  content:'';
+  flex:1;
+  height:1px;
+  background:rgba(17,24,39,0.08);
+}
+.hermes-transcript-entry {
+  display:grid;
+  gap:4px;
+  width:100%;
   min-width:0;
 }
-.hermes-chat-bubble.user {
-  background:linear-gradient(135deg,var(--gold-dark),var(--gold));
-  color:#FFFFFF;
-  border-bottom-right-radius:6px;
-  max-width:86%;
+.hermes-transcript-entry.user {
+  justify-items:end;
+  text-align:right;
 }
-.hermes-chat-bubble.ai {
-  background:#F8FBFF;
-  border:1px solid rgba(47,116,192,0.10);
+.hermes-transcript-entry.assistant {
+  justify-items:start;
+  text-align:left;
+}
+.hermes-transcript-kicker {
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:0.3px;
+  color:#A0A9B5;
+}
+.hermes-transcript-entry.user .hermes-transcript-kicker { color:#B88A30; }
+.hermes-transcript-text {
+  font-size:14px;
+  line-height:1.72;
   color:var(--text-main);
-  border-bottom-left-radius:6px;
+  white-space:pre-line;
+  word-break:break-word;
 }
-.hermes-chat-role { font-size:10px; font-weight:700; color:#2F74C0; margin-bottom:6px; }
-.hermes-chat-main { font-size:12px; line-height:1.7; white-space:pre-line; }
-.hermes-chat-main { word-break:break-word; }
-.hermes-chat-meta { font-size:10px; line-height:1.6; opacity:0.86; margin-top:6px; }
+.hermes-transcript-entry.user .hermes-transcript-text {
+  max-width:84%;
+  color:#1A1E25;
+}
+.hermes-transcript-body {
+  font-size:12px;
+  line-height:1.78;
+  color:#66717F;
+  white-space:pre-line;
+  word-break:break-word;
+}
+.hermes-transcript-meta {
+  font-size:9px;
+  line-height:1.6;
+  color:#98A2AE;
+}
 .hermes-question-input {
   width:100%;
-  min-height:78px;
-  border:1px solid rgba(47,116,192,0.18);
-  border-radius:16px;
-  padding:11px 12px;
+  min-height:64px;
+  border:1px solid rgba(17,24,39,0.08);
+  border-radius:14px;
+  padding:10px 12px;
   font-size:12px;
   color:var(--text-main);
-  background:#F7FBFF;
+  background:#FAFBFC;
   resize:none;
   outline:none;
   font-family:var(--font-main);
@@ -383,14 +420,14 @@ body { background: var(--surface-2); color: var(--text-main); }
   min-width:0;
 }
 .hermes-composer-plus {
-  width:40px;
-  height:40px;
+  width:36px;
+  height:36px;
   border:none;
   border-radius:999px;
-  background:#F3F8FE;
-  border:1px solid rgba(47,116,192,0.14);
-  color:#1F497D;
-  font-size:22px;
+  background:#F5F7FA;
+  border:1px solid rgba(17,24,39,0.08);
+  color:#4E5968;
+  font-size:20px;
   line-height:1;
   cursor:pointer;
   flex-shrink:0;
@@ -399,9 +436,9 @@ body { background: var(--surface-2); color: var(--text-main); }
   border:none;
   background:linear-gradient(135deg,var(--gold-dark),var(--gold));
   color:#FFFFFF;
-  border-radius:14px;
-  min-height:54px;
-  padding:0 16px;
+  border-radius:12px;
+  min-height:48px;
+  padding:0 14px;
   font-size:12px;
   font-weight:700;
   cursor:pointer;
@@ -417,16 +454,16 @@ body { background: var(--surface-2); color: var(--text-main); }
 .hermes-action-hint { font-size:10px; color:var(--text-sub); line-height:1.6; min-width:0; flex:1; }
 .hermes-chat-analysis {
   display:grid;
-  gap:8px;
-  margin-top:8px;
+  gap:6px;
+  margin-top:6px;
   min-width:0;
 }
 .hermes-result-card {
-  background:#FFFFFF;
-  border:1px solid rgba(47,116,192,0.10);
-  border-radius:16px;
-  padding:12px;
-  box-shadow:0 10px 24px rgba(31,73,125,0.06);
+  background:#FBFCFD;
+  border:1px solid rgba(17,24,39,0.06);
+  border-radius:12px;
+  padding:10px;
+  box-shadow:none;
   min-width:0;
 }
 .hermes-chatbi-inline {
@@ -464,18 +501,18 @@ body { background: var(--surface-2); color: var(--text-main); }
 }
 .hermes-lobster-thread {
   display:grid;
-  gap:12px;
-  background:#FCFDFF;
-  border:1px solid rgba(47,116,192,0.08);
-  border-radius:16px;
-  padding:14px;
-  min-height:420px;
+  gap:10px;
+  background:#FFFFFF;
+  border:none;
+  border-radius:0;
+  padding:8px 2px 6px;
+  min-height:360px;
   min-width:0;
   overflow:hidden;
 }
 .hermes-lobster-thread.is-empty {
-  min-height:420px;
-  padding:14px;
+  min-height:360px;
+  padding:8px 2px 6px;
 }
 .hermes-lobster-composer {
   display:flex;
@@ -485,12 +522,12 @@ body { background: var(--surface-2); color: var(--text-main); }
 }
 .hermes-lobster-question {
   flex:1;
-  min-height:54px;
+  min-height:48px;
   max-height:160px;
-  border:1px solid rgba(47,116,192,0.14);
-  background:#FFFFFF;
+  border:1px solid rgba(17,24,39,0.08);
+  background:#FAFBFC;
   color:var(--text-main);
-  border-radius:16px;
+  border-radius:14px;
   padding:10px 12px;
   font-size:12px;
   line-height:1.6;
@@ -567,39 +604,39 @@ body { background: var(--surface-2); color: var(--text-main); }
 }
 .hermes-result-top { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px; min-width:0; }
 .hermes-result-top > div:first-child { min-width:0; }
-.hermes-result-kicker { font-size:11px; color:#2F74C0; font-weight:700; }
-.hermes-result-title { font-size:17px; font-weight:700; color:var(--text-main); margin-top:4px; min-width:0; word-break:break-word; }
-.hermes-result-subtitle { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:6px; min-width:0; word-break:break-word; }
+.hermes-result-kicker { font-size:10px; color:#6E7884; font-weight:700; }
+.hermes-result-title { font-size:15px; font-weight:700; color:var(--text-main); margin-top:3px; min-width:0; word-break:break-word; }
+.hermes-result-subtitle { font-size:11px; color:var(--text-sub); line-height:1.7; margin-top:5px; min-width:0; word-break:break-word; }
 .hermes-result-badge {
   flex-shrink:0;
-  font-size:10px;
-  color:var(--gold-dark);
-  background:rgba(200,169,110,0.12);
+  font-size:9px;
+  color:#7E8691;
+  background:#F3F4F6;
   border-radius:999px;
-  padding:5px 10px;
+  padding:4px 8px;
 }
 .hermes-metric-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 .hermes-metric-card {
-  background:#F8FBFF;
-  border:1px solid rgba(47,116,192,0.08);
-  border-radius:12px;
-  padding:10px;
+  background:#FFFFFF;
+  border:1px solid rgba(17,24,39,0.06);
+  border-radius:10px;
+  padding:8px 9px;
 }
 .hermes-metric-label { font-size:10px; color:var(--text-sub); }
-.hermes-metric-value { font-size:16px; font-weight:700; color:#1F497D; margin-top:4px; }
-.hermes-metric-note { font-size:10px; color:var(--text-sub); line-height:1.6; margin-top:4px; }
+.hermes-metric-value { font-size:14px; font-weight:700; color:#1F497D; margin-top:3px; }
+.hermes-metric-note { font-size:10px; color:var(--text-sub); line-height:1.55; margin-top:3px; }
 .hermes-bullet-list { display:flex; flex-direction:column; gap:6px; align-items:flex-start; }
 .hermes-bullet-item {
   display:inline-flex;
   width:fit-content;
-  max-width:84%;
-  background:#F8FBFF;
-  border:1px solid rgba(47,116,192,0.08);
-  border-radius:10px;
-  padding:7px 10px;
-  font-size:11px;
-  color:var(--text-main);
-  line-height:1.65;
+  max-width:88%;
+  background:#F5F7FA;
+  border:none;
+  border-radius:999px;
+  padding:6px 10px;
+  font-size:10px;
+  color:#4E5968;
+  line-height:1.55;
 }
 .hermes-evidence-row { display:flex; gap:8px; flex-wrap:wrap; }
 .hermes-evidence-chip {
@@ -611,50 +648,78 @@ body { background: var(--surface-2); color: var(--text-main); }
 }
 .hermes-loading { display:flex; align-items:center; gap:8px; }
 .hermes-loading-text { font-size:13px; color:var(--gold); }
-.hermes-thinking-stream { display:flex; flex-direction:column; gap:6px; align-items:flex-start; margin-top:10px; }
+.hermes-thinking-stream {
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  align-items:flex-start;
+  margin-top:8px;
+  padding-left:12px;
+}
+.hermes-thinking-stream::before {
+  content:'';
+  position:absolute;
+  left:2px;
+  top:4px;
+  bottom:4px;
+  width:1px;
+  background:linear-gradient(180deg,rgba(17,24,39,0.10),rgba(17,24,39,0.04));
+}
 .hermes-thinking-row {
   display:inline-flex;
-  align-items:center;
-  gap:8px;
-  width:fit-content;
-  max-width:88%;
-  padding:7px 10px;
-  border-radius:12px;
-  background:linear-gradient(180deg,#FBFDFF 0%, #F4F8FE 100%);
-  border:1px solid rgba(47,116,192,0.10);
-  color:#35506E;
+  align-items:flex-start;
+  gap:7px;
+  width:100%;
+  max-width:100%;
+  padding:0;
+  background:none;
+  border:none;
+  color:#7D8793;
   font-size:11px;
-  line-height:1.6;
+  line-height:1.7;
 }
 .hermes-thinking-row.active {
-  border-color:rgba(200,169,110,0.28);
-  background:linear-gradient(180deg,#FFF9EF 0%, #FFFDF8 100%);
+  color:#555E69;
 }
 .hermes-thinking-dot {
-  width:6px;
-  height:6px;
+  width:4px;
+  height:4px;
   flex-shrink:0;
   border-radius:50%;
-  background:rgba(47,116,192,0.38);
+  background:rgba(31,41,55,0.22);
+  margin-top:7px;
 }
 .hermes-thinking-row.active .hermes-thinking-dot {
   background:var(--gold);
-  box-shadow:0 0 0 4px rgba(200,169,110,0.10);
+  box-shadow:none;
 }
 .hermes-thinking-text { min-width:0; word-break:break-word; }
 .hermes-thinking-inline {
-  font-size:11px;
-  color:#2F74C0;
-  background:rgba(47,116,192,0.06);
-  border:1px solid rgba(47,116,192,0.08);
-  border-radius:999px;
-  padding:4px 9px;
+  font-size:10px;
+  color:#8A939F;
+  background:none;
+  border:none;
+  border-radius:0;
+  padding:0;
   width:fit-content;
+}
+.hermes-section-label {
+  font-size:10px;
+  font-weight:700;
+  color:#6E7884;
+  margin-bottom:8px;
 }
 .dot-anim span { display:inline-block; animation:dotBounce 1.2s infinite; }
 @media (max-width: 420px) {
   .hermes-stock-input-row {
     grid-template-columns:minmax(0,76px) minmax(0,1fr) auto;
+  }
+  .hermes-metric-grid {
+    grid-template-columns:1fr;
+  }
+  .hermes-prompt-chip {
+    max-width:88%;
   }
 }
 .dot-anim span:nth-child(2) { animation-delay:0.2s; }
@@ -9386,7 +9451,7 @@ function renderHermesTextArtifact(artifact, agentTrace) {
   const knowledgeHtml = artifact.knowledge.length
     ? `<div class="hermes-evidence-row" style="margin-top:8px">${artifact.knowledge.map(item => `<span class="hermes-evidence-chip">${escapeHtml(item.title)}</span>`).join('')}</div>`
     : '';
-  const bodyHtml = artifact.body ? `<div class="hermes-chat-meta" style="margin-top:10px;opacity:1;line-height:1.8">${escapeHtml(artifact.body)}</div>` : '';
+  const bodyHtml = artifact.body ? `<div class="hermes-transcript-body" style="margin-top:8px">${escapeHtml(artifact.body)}</div>` : '';
   const bulletHtml = artifact.bullets.length
     ? `<div class="hermes-bullet-list" style="margin-top:8px">${artifact.bullets.map(item => `<div class="hermes-bullet-item">${escapeHtml(item)}</div>`).join('')}</div>`
     : '';
@@ -9395,19 +9460,17 @@ function renderHermesTextArtifact(artifact, agentTrace) {
     : '';
   const thoughtLines = buildHermesTraceThoughts(agentTrace);
   return `
-    <div class="hermes-chat-msg ai">
-      <div class="hermes-chat-bubble ai" style="max-width:100%;width:100%">
-        <div class="hermes-chat-role">🦞 Hermes Agent</div>
-        <div class="hermes-chat-main">${escapeHtml(artifact.headline || '')}</div>
-        ${artifact.summary ? `<div class="hermes-chat-meta" style="margin-top:8px;opacity:1">${escapeHtml(artifact.summary)}</div>` : ''}
-        ${thoughtLines.length ? `<div class="hermes-thinking-inline" style="margin-top:8px">深度思考已完成</div>${renderHermesThinkingStream(thoughtLines)}` : ''}
-        ${bodyHtml}
-        ${bulletHtml}
-        ${followupHtml}
-        ${knowledgeHtml}
-        ${evidenceHtml}
-        ${artifact.footer ? `<div class="hermes-chat-meta">${escapeHtml(artifact.footer)}</div>` : ''}
-      </div>
+    <div class="hermes-transcript-entry assistant">
+      <div class="hermes-transcript-kicker">Hermes</div>
+      <div class="hermes-transcript-text">${escapeHtml(artifact.headline || '')}</div>
+      ${artifact.summary ? `<div class="hermes-transcript-body">${escapeHtml(artifact.summary)}</div>` : ''}
+      ${thoughtLines.length ? `<div class="hermes-thinking-inline" style="margin-top:2px">思考过程</div>${renderHermesThinkingStream(thoughtLines)}` : ''}
+      ${bodyHtml}
+      ${bulletHtml}
+      ${followupHtml}
+      ${knowledgeHtml}
+      ${evidenceHtml}
+      ${artifact.footer ? `<div class="hermes-transcript-meta">${escapeHtml(artifact.footer)}</div>` : ''}
     </div>
   `;
 }
@@ -9425,13 +9488,10 @@ function renderHermesThread() {
       '如果要看基本面，我应该先补什么问题？'
     ];
     const emptyHtml = `
-      <div class="hermes-chat-msg ai">
-        <div class="hermes-chat-bubble ai" style="max-width:100%;width:100%">
-          <div class="hermes-chat-role">🦞 Hermes</div>
-          <div class="hermes-chat-main">直接问我就可以。我会先拆解问题，再调度知识、附件和个股工具回答。</div>
-          <div class="hermes-prompt-chip-row" aria-label="Hermes 建议问题">
-            ${suggestions.map(item => `<button class="hermes-prompt-chip" type="button" onclick="applyHermesSuggestion('${item.replace(/'/g, '&#39;')}')">${escapeHtml(item)}</button>`).join('')}
-          </div>
+      <div class="hermes-chat-empty">
+        <div class="hermes-prompt-guide">聊聊新话题</div>
+        <div class="hermes-prompt-chip-row" aria-label="Hermes 建议问题">
+          ${suggestions.map(item => `<button class="hermes-prompt-chip" type="button" onclick="applyHermesSuggestion('${item.replace(/'/g, '&#39;')}')">${escapeHtml(item)}</button>`).join('')}
         </div>
       </div>
     `;
@@ -9450,25 +9510,20 @@ function renderHermesThread() {
         entry.displayMode === 'structured' ? '结构化问题' : '纯聊天'
       ]);
       return `
-        <div class="hermes-chat-msg user">
-          <div class="hermes-chat-bubble user">
-            <div class="hermes-chat-main">${escapeHtml(entry.text)}</div>
-            <div class="hermes-chat-meta">${escapeHtml(meta)}</div>
-          </div>
+        <div class="hermes-transcript-entry user">
+          <div class="hermes-transcript-kicker">你</div>
+          <div class="hermes-transcript-text">${escapeHtml(entry.text)}</div>
+          <div class="hermes-transcript-meta">${escapeHtml(meta)}</div>
         </div>
       `;
     }
     if (entry.type === 'loading') {
       const loadingThoughts = buildHermesLoadingThoughts(entry);
       return `
-        <div class="hermes-chat-msg ai">
-          <div class="hermes-chat-bubble ai">
-            <div class="hermes-chat-role">🦞 Hermes Agent</div>
-            <div class="hermes-loading">
-              <div class="hermes-loading-text">深度思考中<span class="dot-anim"><span>.</span><span>.</span><span>.</span></span></div>
-            </div>
-            ${renderHermesThinkingStream(loadingThoughts.lines, { activeIndex: loadingThoughts.activeIndex })}
-          </div>
+        <div class="hermes-transcript-entry assistant">
+          <div class="hermes-transcript-kicker">Hermes</div>
+          <div class="hermes-thinking-inline">深度思考中<span class="dot-anim"><span>.</span><span>.</span><span>.</span></span></div>
+          ${renderHermesThinkingStream(loadingThoughts.lines, { activeIndex: loadingThoughts.activeIndex })}
         </div>
       `;
     }
@@ -9477,12 +9532,10 @@ function renderHermesThread() {
       return renderHermesTextArtifact(artifact, entry.agentTrace);
     }
     return `
-      <div class="hermes-chat-msg ai">
-        <div class="hermes-chat-bubble ai" style="max-width:100%;width:100%">
-          <div class="hermes-chat-role">🦞 Hermes Agent</div>
-          <div class="hermes-chat-main">${escapeHtml(artifact.headline)}</div>
-          <div class="hermes-chat-analysis">${renderHermesAnalysisCards(artifact, entry.agentTrace)}</div>
-        </div>
+      <div class="hermes-transcript-entry assistant">
+        <div class="hermes-transcript-kicker">Hermes</div>
+        <div class="hermes-transcript-text">${escapeHtml(artifact.headline)}</div>
+        <div class="hermes-chat-analysis">${renderHermesAnalysisCards(artifact, entry.agentTrace)}</div>
       </div>
     `;
   }).join('');
@@ -9509,6 +9562,22 @@ function renderHermesAnalysisCards(artifact, agentTrace) {
     ? artifact.knowledge.map(entry => `<span class="hermes-evidence-chip">${escapeHtml(entry.title)}</span>`).join('')
     : '<span class="hermes-evidence-chip">暂未命中知识库条目</span>';
   const thoughtLines = buildHermesTraceThoughts(agentTrace);
+  const insightBlock = bulletsHtml
+    ? `
+      <div style="margin-top:10px">
+        <div class="hermes-section-label">结论</div>
+        <div class="hermes-bullet-list">${bulletsHtml}</div>
+      </div>
+    `
+    : '';
+  const actionBlock = actionsHtml
+    ? `
+      <div style="margin-top:10px">
+        <div class="hermes-section-label">下一步</div>
+        <div class="hermes-bullet-list">${actionsHtml}</div>
+      </div>
+    `
+    : '';
   return `
     <div class="hermes-result-card">
       <div class="hermes-result-top">
@@ -9521,27 +9590,23 @@ function renderHermesAnalysisCards(artifact, agentTrace) {
       </div>
       ${artifact.chartHtml || ''}
       ${artifact.body ? `<div class="hermes-result-subtitle" style="margin-top:10px;line-height:1.8">${escapeHtml(artifact.body)}</div>` : ''}
-      ${artifact.question ? `<div class="hermes-bullet-item" style="margin-top:10px">本次问题：${escapeHtml(artifact.question)}</div>` : ''}
+      ${artifact.question ? `<div class="hermes-transcript-meta" style="margin-top:10px">本次问题：${escapeHtml(artifact.question)}</div>` : ''}
     </div>
     <div class="hermes-result-card">
-      <div class="hermes-assistant-title" style="font-size:14px;margin-bottom:10px">核心指标</div>
+      <div class="hermes-section-label">核心指标</div>
       <div class="hermes-metric-grid">${metricsHtml}</div>
     </div>
     <div class="hermes-result-card">
-      <div class="hermes-assistant-title" style="font-size:14px;margin-bottom:10px">Hermes 判断</div>
-      <div class="hermes-bullet-list">${bulletsHtml}</div>
-    </div>
-    <div class="hermes-result-card">
-      <div class="hermes-assistant-title" style="font-size:14px;margin-bottom:10px">下一步建议</div>
-      <div class="hermes-bullet-list">${actionsHtml}</div>
-    </div>
-    <div class="hermes-result-card">
-      <div class="hermes-assistant-title" style="font-size:14px;margin-bottom:10px">关联知识与证据</div>
+      ${insightBlock}
+      ${actionBlock}
+      <div style="${(insightBlock || actionBlock) ? 'margin-top:10px' : ''}">
+        <div class="hermes-section-label">参考</div>
+      </div>
       <div class="hermes-evidence-row">${knowledgeHtml}</div>
       <div class="hermes-evidence-row" style="margin-top:8px">${evidenceHtml}</div>
       <div class="hermes-result-subtitle" style="margin-top:10px">${escapeHtml(artifact.footer || '')}</div>
     </div>
-    ${thoughtLines.length ? `<div class="hermes-thinking-inline">深度思考已完成</div>${renderHermesThinkingStream(thoughtLines)}` : ''}
+    ${thoughtLines.length ? `<div class="hermes-thinking-inline">思考过程</div>${renderHermesThinkingStream(thoughtLines)}` : ''}
   `;
 }
 
