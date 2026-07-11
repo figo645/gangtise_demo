@@ -66,9 +66,9 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertNotIn("加入上下文", html)
         self.assertIn("function requestReviewStructuredPreview()", html)
         self.assertIn("function confirmStructuredReviewToPreview()", html)
-        self.assertIn("双段内容审核与详细修改", html)
-        self.assertIn("用户输入转化内容", html)
-        self.assertIn("自选股归纳分析", html)
+        self.assertIn("摘要和自选股归纳总结审核与详细修改", html)
+        self.assertIn("用户复盘", html)
+        self.assertIn("自选股归纳总结", html)
 
     def test_hermes_query_accepts_web_answer_flag(self):
         response = self.client.post(

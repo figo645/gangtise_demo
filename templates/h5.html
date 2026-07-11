@@ -103,6 +103,22 @@ body { background: var(--surface-2); color: var(--text-main); }
 .modal-textarea { width:100%; background:rgba(13,27,42,0.6); border:1px solid rgba(200,169,110,0.2); border-radius:10px; color:var(--white); font-size:13px; padding:12px; resize:none; height:100px; font-family:var(--font-main); }
 .modal-textarea::placeholder { color:var(--gray-400); }
 .modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:12px; }
+.review-flow-actions {
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.review-flow-actions .btn-outline:first-child {
+  margin-right:auto;
+}
+.review-flow-actions .btn-gold,
+.review-flow-actions .btn-outline {
+  padding:8px 14px;
+  font-size:12px;
+  line-height:1.2;
+  border-radius:999px;
+  white-space:nowrap;
+}
 
 /* ===== HERMES ===== */
 .hermes-shell {
@@ -3072,7 +3088,7 @@ body,
       <span class="tag tag-gold" style="cursor:pointer" onclick="appendTag('#新能源')">+ #新能源</span>
       <span class="tag tag-gold" style="cursor:pointer" onclick="appendTag('#AI科技')">+ #AI科技</span>
     </div>
-    <div class="modal-actions">
+    <div class="modal-actions review-flow-actions">
       <button class="btn-outline" onclick="document.getElementById('compose-modal').classList.remove('show')">取消</button>
       <button class="btn-gold" onclick="submitPost()">发布 +10积分</button>
     </div>
@@ -3509,9 +3525,9 @@ function buildReviewWatchlistAnalysisText(section) {
 function buildReviewStructuredFinalText(payload) {
   const normalized = normalizeReviewStructuredPreview(payload);
   return [
-    normalized.review_summary ? `【复盘摘要】\n${normalized.review_summary}` : '',
-    normalized.user_input_section.display_text ? `【用户输入转化内容】\n${normalized.user_input_section.display_text}` : '',
-    buildReviewWatchlistAnalysisText(normalized.watchlist_analysis_section) ? `【自选股归纳分析】\n${buildReviewWatchlistAnalysisText(normalized.watchlist_analysis_section)}` : '',
+    normalized.review_summary ? `【摘要】\n${normalized.review_summary}` : '',
+    normalized.user_input_section.display_text ? `【用户复盘】\n${normalized.user_input_section.display_text}` : '',
+    buildReviewWatchlistAnalysisText(normalized.watchlist_analysis_section) ? `【自选股归纳总结】\n${buildReviewWatchlistAnalysisText(normalized.watchlist_analysis_section)}` : '',
   ].filter(Boolean).join('\n\n').trim();
 }
 const KNOWLEDGE_INPUT_TYPES = {
@@ -4486,7 +4502,7 @@ function renderReviewWatchlistAnalysisSection(article) {
   if (!String(section.sector_summary || '').trim() && !sectorProfiles.length && !items.length) return '';
   return `
     <div class="review-article-section">
-      <div class="review-article-section-title">自选股归纳分析</div>
+      <div class="review-article-section-title">自选股归纳总结</div>
       ${section.sector_summary ? `<div class="review-article-section-text">${escapeHtml(section.sector_summary)}</div>` : ''}
       ${sectorProfiles.length ? `
         <div class="review-article-evidence-list" style="margin-top:12px">
@@ -4632,7 +4648,7 @@ function renderReviewArticleDetailContent(article, options = {}) {
       `).join('')}
       ${article.userInputSection && article.userInputSection.display_text ? `
         <div class="review-article-section">
-          <div class="review-article-section-title">用户输入转化内容</div>
+          <div class="review-article-section-title">用户复盘</div>
           <div class="review-article-section-text">${escapeHtml(article.userInputSection.display_text).replace(/\n/g, '<br>')}</div>
         </div>
       ` : ''}
@@ -5504,16 +5520,16 @@ function renderReviewStructuredReviewPanel() {
   const items = Array.isArray(watchlistSection.items) ? watchlistSection.items : [];
   return `
     <div class="knowledge-modal-block">
-      <label class="knowledge-modal-label">双段内容审核与详细修改</label>
-      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">这里会把用户自主内容和自选股归纳内容一起展示。你可以修改后再进入最终预览。</div>
+      <label class="knowledge-modal-label">摘要和自选股归纳总结审核与详细修改</label>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">这里会把用户复盘、摘要和自选股归纳总结一起展示。你可以修改后再进入最终预览。</div>
       <div style="display:grid;gap:12px">
         <div>
-          <div style="font-size:12px;font-weight:700;color:var(--white);margin-bottom:6px">复盘摘要</div>
+          <div style="font-size:12px;font-weight:700;color:var(--white);margin-bottom:6px">摘要</div>
           <textarea id="review-structured-summary-input" class="knowledge-modal-textarea" style="min-height:88px" placeholder="这里展示基于用户自主输入生成的摘要，可继续微调。">${escapeHtml(structured.review_summary || '')}</textarea>
         </div>
         <div>
-          <div style="font-size:12px;font-weight:700;color:var(--white);margin-bottom:6px">用户输入转化内容</div>
-          <textarea id="review-structured-user-input" class="knowledge-modal-textarea" style="min-height:220px" placeholder="在这里继续修改用户自主输入部分。">${escapeHtml(((structured.user_input_section || {}).display_text) || '')}</textarea>
+          <div style="font-size:12px;font-weight:700;color:var(--white);margin-bottom:6px">用户复盘</div>
+          <textarea id="review-structured-user-input" class="knowledge-modal-textarea" style="min-height:220px" placeholder="在这里继续修改用户复盘内容。">${escapeHtml(((structured.user_input_section || {}).display_text) || '')}</textarea>
         </div>
         <div>
           <div style="font-size:12px;font-weight:700;color:var(--white);margin-bottom:6px">板块归纳</div>
@@ -5586,8 +5602,8 @@ function renderReviewTriggerModal(user) {
     optimize_rule: '1/4 选择优化规则',
     draft_generating: '2/4 Draft 生成中',
     draft_review: '2/4 Draft 审核',
-    preview_generating: '3/4 双段内容生成中',
-    structured_review: '3/4 双段内容审核',
+    preview_generating: '3/4 摘要和自选股归纳总结生成中',
+    structured_review: '3/4 摘要和自选股归纳总结审核',
     preview: '4/4 最终预览',
   };
   const stageLabel = stageLabelMap[reviewTriggerDraft.flowStage] || stageLabelMap.intake;
@@ -5634,8 +5650,8 @@ function renderReviewTriggerModal(user) {
       ` : ''}
       ${isReviewDraftProcessingStage() ? `
         <div class="knowledge-modal-block">
-          <label class="knowledge-modal-label">${reviewTriggerDraft.flowStage === 'preview_generating' ? '正在生成双段复盘内容' : '正在生成 Draft'}</label>
-          <div style="font-size:11px;color:var(--gray-400);line-height:1.7">${reviewTriggerDraft.flowStage === 'preview_generating' ? '系统正在根据已确认的用户内容和自选股，生成可审核的板块归纳与逐股分析。' : '原始输入已经提交给大模型处理。当前先进入 Draft 审核流程，待草稿生成完成后，会自动切换到可审核、可详细修改的页面。'}</div>
+          <label class="knowledge-modal-label">${reviewTriggerDraft.flowStage === 'preview_generating' ? '正在生成摘要和自选股归纳总结' : '正在生成 Draft'}</label>
+          <div style="font-size:11px;color:var(--gray-400);line-height:1.7">${reviewTriggerDraft.flowStage === 'preview_generating' ? '系统正在根据已确认的用户复盘和自选股，生成可审核的摘要、板块归纳与逐股总结。' : '原始输入已经提交给大模型处理。当前先进入 Draft 审核流程，待草稿生成完成后，会自动切换到可审核、可详细修改的页面。'}</div>
         </div>
       ` : ''}
       ${renderReviewDraftReviewPanel()}
@@ -5667,10 +5683,10 @@ function renderReviewFlowActions() {
     return '<button class="btn-gold" disabled>处理中...</button>';
   }
   if (reviewTriggerDraft.flowStage === 'optimize_rule') {
-    return '<button class="btn-outline" onclick="backToReviewIntake()">返回输入</button><button class="btn-gold" onclick="submitReviewSmartOptimize()">开始智能优化</button>';
+    return '<button class="btn-outline" onclick="backToReviewIntake()">返回输入</button><button class="btn-gold" onclick="submitReviewSmartOptimize()">开始优化</button>';
   }
   if (reviewTriggerDraft.flowStage === 'draft_review') {
-    return '<button class="btn-outline" onclick="backToReviewIntake()">回退修改</button><button class="btn-gold" onclick="confirmReviewDraftToPreview()">生成双段内容</button>';
+    return '<button class="btn-outline" onclick="backToReviewIntake()">回退修改</button><button class="btn-gold" onclick="confirmReviewDraftToPreview()">生成摘要与归纳</button>';
   }
   if (reviewTriggerDraft.flowStage === 'structured_review') {
     return '<button class="btn-outline" onclick="backToReviewDraftEdit()">回退修改</button><button class="btn-gold" onclick="confirmStructuredReviewToPreview()">直接预览</button>';
@@ -5678,7 +5694,7 @@ function renderReviewFlowActions() {
   if (reviewTriggerDraft.flowStage === 'preview' || reviewTriggerDraft.previewReady) {
     return '<button class="btn-outline" onclick="backToReviewDraftEdit()">回退修改</button><button class="btn-gold" onclick="publishReviewDraft()">确认发布</button>';
   }
-  return '<button class="btn-outline" onclick="prepareReviewDirectPreview()">生成双段内容</button><button class="btn-gold" onclick="openReviewOptimizeRuleStep()">智能优化</button>';
+  return '<button class="btn-outline" onclick="prepareReviewDirectPreview()">生成摘要与归纳</button><button class="btn-gold" onclick="openReviewOptimizeRuleStep()">优化成稿</button>';
 }
 
 function setReviewTriggerPeriod(period) {
@@ -5847,7 +5863,7 @@ async function prepareReviewStructuredPreview() {
     }
   }
   renderReviewTriggerModal(user);
-  showToast('双段内容已生成，请审核后预览');
+  showToast('摘要和自选股归纳总结已生成，请审核后预览');
 }
 
 function prepareReviewDirectPreview() {
@@ -5893,11 +5909,11 @@ function confirmStructuredReviewToPreview() {
   syncReviewDraftFromModal();
   reviewStructuredPreview = normalizeReviewStructuredPreview(reviewStructuredPreview || {});
   if (!String(reviewStructuredPreview.review_summary || '').trim()) {
-    showToast('请先确认或填写复盘摘要');
+    showToast('请先确认或填写摘要');
     return;
   }
   if (!String((((reviewStructuredPreview.user_input_section || {}).display_text) || '')).trim()) {
-    showToast('请先确认或填写用户输入转化内容');
+    showToast('请先确认或填写用户复盘');
     return;
   }
   reviewTriggerDraft.previewReady = true;
