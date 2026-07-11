@@ -35,6 +35,30 @@ class RouteSmokeTest(unittest.TestCase):
                 self.assertIn("text/html", response.content_type)
                 self.assertIn("Hermes", response.get_data(as_text=True))
 
+    def test_h5_hermes_composer_is_compact(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('placeholder="问 Hermes..."', html)
+        self.assertIn("hermes-prompt-chip", html)
+        self.assertIn("上传文件解析", html)
+        self.assertIn("互联网问答", html)
+        self.assertNotIn("默认按全部知识库做文字回答，也可以点 + 指定知识或上传文件。", html)
+        self.assertNotIn("指定知识条目", html)
+        self.assertNotIn("Hermes 扩展能力", html)
+
+    def test_hermes_query_accepts_web_answer_flag(self):
+        response = self.client.post(
+            "/api/hermes/query",
+            json={"question": "最近这个方向怎么看？", "web_answer": True},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertTrue(payload["web_answer"])
+
     def test_workbench_pages_render(self):
         for tenant_slug in self.tenant_slugs:
             with self.subTest(route="/kol-workbench", tenant=tenant_slug):

@@ -2523,7 +2523,7 @@ def build_hermes_artifacts(plan, tool_outputs, synthesis, citations, tenant_slug
     return artifacts
 
 
-def build_hermes_synthesis_prompt(question_text, plan, tool_outputs, tenant_slug="", user_role="", preferred_mode="", messages=None):
+def build_hermes_synthesis_prompt(question_text, plan, tool_outputs, tenant_slug="", user_role="", preferred_mode="", messages=None, web_answer=False):
     tenant = get_tenant_by_slug(tenant_slug)
     tenant_name = (tenant or {}).get("name") or (tenant or {}).get("short_name") or str(tenant_slug or "").strip() or "当前租户"
     conversation_block = format_hermes_message_context(messages, limit=8)
@@ -2533,6 +2533,7 @@ def build_hermes_synthesis_prompt(question_text, plan, tool_outputs, tenant_slug
         f"问题：{str(question_text or '').strip()}",
         f"意图：{str(plan.get('intent') or '').strip()}",
         f"偏好分析方式：{str(preferred_mode or '').strip() or 'auto'}",
+        f"互联网问答模式：{'是' if web_answer else '否'}",
         f"展示模式：{str(plan.get('display_mode') or 'text').strip()}",
         f"路由原因：{str(plan.get('reason') or '').strip()}",
         f"最近多轮对话：\n{conversation_block}" if conversation_block else "",
@@ -2543,6 +2544,7 @@ def build_hermes_synthesis_prompt(question_text, plan, tool_outputs, tenant_slug
         "你是 Hermes 的答案合成器。"
         "你的职责是根据已执行的工具结果生成最终回答。"
         "优先依据工具结果，不要编造不存在的数据。"
+        "如果互联网问答模式为是，可以按公开信息口径组织回答，但不能声称已经实时联网检索。"
         "如果证据不足，要明确说边界。"
         "输出必须是 JSON。"
     )
@@ -2554,7 +2556,7 @@ def build_hermes_synthesis_prompt(question_text, plan, tool_outputs, tenant_slug
     return system_prompt, user_prompt
 
 
-def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", user_role="", preferred_mode="", messages=None):
+def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", user_role="", preferred_mode="", messages=None, web_answer=False):
     fallback_answer = "我先按当前可用的知识和工具结果给你一个文字回答。"
     fallback = {
         "answer": fallback_answer,
@@ -2574,6 +2576,7 @@ def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", 
             user_role=user_role,
             preferred_mode=preferred_mode,
             messages=messages,
+            web_answer=web_answer,
         )
         raw = call_openai_compatible_llm(
             llm_model,
@@ -2609,6 +2612,7 @@ def build_hermes_query_response(body):
     selected_knowledge_ids = payload.get("selected_knowledge_ids") if isinstance(payload.get("selected_knowledge_ids"), list) else []
     attachments = payload.get("attachments") if isinstance(payload.get("attachments"), list) else []
     preferred_mode = str(payload.get("preferred_mode") or "").strip().lower()
+    web_answer = bool(payload.get("web_answer"))
     messages = normalize_hermes_messages(payload.get("messages"))
     question_text = extract_hermes_question_text(messages, payload.get("question"))
     if not question_text:
@@ -2636,6 +2640,7 @@ def build_hermes_query_response(body):
         user_role=user_role,
         preferred_mode=preferred_mode,
         messages=messages,
+        web_answer=web_answer,
     )
     citations = build_hermes_citations(tool_outputs)
     artifacts = build_hermes_artifacts(
@@ -2662,6 +2667,7 @@ def build_hermes_query_response(body):
         "tool_trace": tool_trace,
         "tool_outputs": tool_outputs,
         "preferred_mode": preferred_mode or "auto",
+        "web_answer": web_answer,
         "router": {
             "mode": route_mode,
             "reason": intent_plan.get("reason") or "",

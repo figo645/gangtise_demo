@@ -280,6 +280,25 @@ body { background: var(--surface-2); color: var(--text-main); }
   cursor:pointer;
   white-space:nowrap;
 }
+.hermes-prompt-chip-row {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:10px;
+}
+.hermes-prompt-chip {
+  border:1px solid rgba(47,116,192,0.14);
+  background:#F8FBFF;
+  color:#1F497D;
+  border-radius:999px;
+  padding:7px 10px;
+  font-size:11px;
+  line-height:1;
+  cursor:pointer;
+  touch-action:manipulation;
+  transition:background .18s ease,border-color .18s ease,transform .18s ease;
+}
+.hermes-prompt-chip:active { transform:scale(.97); }
 .hermes-chat-thread { display:grid; gap:12px; margin-top:2px; min-width:0; overflow:hidden; }
 .hermes-chat-thread.is-empty { gap:0; }
 .hermes-chat-empty {
@@ -2387,7 +2406,7 @@ body,
                 <textarea
                   id="hermes-question-input"
                   class="hermes-lobster-question"
-                  placeholder="问 Hermes。默认按全部知识库做文字回答，也可以点 + 指定知识或上传文件。"
+                  placeholder="问 Hermes..."
                   oninput="this.style.height='auto';this.style.height=Math.max(54,Math.min(this.scrollHeight,160))+'px'"
                 ></textarea>
                 <button class="hermes-composer-send hermes-lobster-send" onclick="runHermesAnalysis()">发送</button>
@@ -8744,6 +8763,7 @@ let hermesCredits = 128;
 let hermesCustomSkillDraft = { title: '', prompt: '', knowledgeIds: [] };
 let hermesScopedKnowledgeId = '';
 let hermesUploadedFiles = [];
+let hermesUseInternetAnswer = false;
 
 const DEFAULT_HERMES_SKILLS = {
   basic: {
@@ -8843,9 +8863,9 @@ function focusHermesQuestionComposer() {
 }
 
 function getHermesActiveKnowledgeScopeText() {
-  if (!hermesScopedKnowledgeId) return '全部知识库';
+  if (!hermesScopedKnowledgeId) return '默认知识';
   const entry = getKnowledgeEntryById(hermesScopedKnowledgeId);
-  return entry ? `知识：${entry.title}` : '指定知识';
+  return entry ? `知识：${entry.title}` : '知识范围';
 }
 
 function getHermesUploadedFileNames() {
@@ -8877,6 +8897,14 @@ function renderHermesComposerContext() {
       </div>
     `);
   }
+  if (hermesUseInternetAnswer) {
+    chips.push(`
+      <div class="hermes-composer-chip">
+        <span>互联网问答</span>
+        <button onclick="clearHermesInternetAnswer()" aria-label="关闭互联网问答">×</button>
+      </div>
+    `);
+  }
   getHermesUploadedFileNames().forEach((name, index) => {
     chips.push(`
       <div class="hermes-composer-chip">
@@ -8885,8 +8913,20 @@ function renderHermesComposerContext() {
       </div>
     `);
   });
-  const html = chips.join('') || '<div class="hermes-action-hint">默认按当前租户全部已就绪知识库回答。点 + 选择分析方式、指定知识或上传文件。</div>';
+  const html = chips.join('') || '<div class="hermes-action-hint">默认按当前租户知识库回答。</div>';
   hosts.forEach(host => { host.innerHTML = html; });
+}
+
+function clearHermesInternetAnswer() {
+  hermesUseInternetAnswer = false;
+  renderHermesWorkspace();
+}
+
+function enableHermesInternetAnswer() {
+  hermesUseInternetAnswer = true;
+  closeHermesPlusMenu();
+  renderHermesWorkspace();
+  showToast('已切换为互联网问答');
 }
 
 function clearHermesKnowledgeScope() {
@@ -8908,7 +8948,7 @@ function selectHermesKnowledgeScope(entryId) {
   hermesScopedKnowledgeId = entryId || '';
   closeHermesPlusMenu();
   renderHermesWorkspace();
-  showToast(entryId ? '已切换到指定知识条目' : '已恢复为全部知识库');
+  showToast(entryId ? '已切换知识范围' : '已恢复默认知识范围');
 }
 
 async function openHermesFilePicker() {
@@ -8951,44 +8991,16 @@ async function openHermesFilePicker() {
 function openHermesPlusMenu() {
   const host = document.getElementById('hermes-plus-modal-content');
   if (!host) return;
-  const entries = getTenantKnowledgeEntries().filter(entry => entry.status === 'ready');
-  const skills = getHermesSkillCatalog();
   host.innerHTML = `
-    <div class="modal-title" style="margin-bottom:10px">Hermes 扩展能力</div>
-    <div class="hermes-plus-section-title">分析方式</div>
-    <button class="hermes-plus-action" onclick="selectHermesSkill('basic');closeHermesPlusMenu();renderHermesWorkspace();">
-      <div class="hermes-plus-action-title">默认对话</div>
-      <div class="hermes-plus-action-desc">不强制指定分析方式，Hermes 会先按普通聊天理解你的问题。</div>
-    </button>
-    <div class="hermes-knowledge-picker-list">
-      ${skills.map(skill => `
-        <button class="hermes-knowledge-picker-item ${hermesSelectedSkill === skill.id ? 'active' : ''}" onclick="selectHermesSkill('${skill.id}');closeHermesPlusMenu();renderHermesWorkspace();">
-          <div class="hermes-knowledge-picker-title">${escapeHtml(skill.label)}</div>
-          <div class="hermes-knowledge-picker-desc">${escapeHtml(skill.desc || '当前分析方式暂无说明')}</div>
-        </button>
-      `).join('')}
-    </div>
-    <div class="hermes-plus-section-title">知识范围</div>
-    <button class="hermes-plus-action" onclick="selectHermesKnowledgeScope('')">
-      <div class="hermes-plus-action-title">全部知识库</div>
-      <div class="hermes-plus-action-desc">不指定条目，默认基于当前租户全部已就绪知识一起回答。</div>
-    </button>
-    <div class="hermes-plus-section-title">文件解析</div>
+    <div class="modal-title" style="margin-bottom:10px">添加上下文</div>
     <button class="hermes-plus-action" onclick="openHermesFilePicker()">
       <div class="hermes-plus-action-title">上传文件解析</div>
-      <div class="hermes-plus-action-desc">支持 PDF、DOCX、TXT、CSV、HTML 等文本文件。不支持贴图。</div>
+      <div class="hermes-plus-action-desc">上传 PDF、DOCX、TXT、CSV、HTML，解析后随本次问题一起给 Hermes。</div>
     </button>
-    <div class="hermes-plus-section-title">指定知识条目</div>
-    <div class="hermes-knowledge-picker-list">
-      ${entries.length
-        ? entries.map(entry => `
-          <button class="hermes-knowledge-picker-item ${hermesScopedKnowledgeId === entry.id ? 'active' : ''}" onclick="selectHermesKnowledgeScope('${entry.id}')">
-            <div class="hermes-knowledge-picker-title">${escapeHtml(entry.title)}</div>
-            <div class="hermes-knowledge-picker-desc">${escapeHtml(entry.summary || '当前条目暂无摘要')}</div>
-          </button>
-        `).join('')
-        : '<div class="hermes-plus-sheet-note">当前租户暂无已就绪知识条目。</div>'}
-    </div>
+    <button class="hermes-plus-action" onclick="enableHermesInternetAnswer()">
+      <div class="hermes-plus-action-title">互联网问答</div>
+      <div class="hermes-plus-action-desc">让 Hermes 按公开信息口径回答；默认仍会结合当前租户知识库。</div>
+    </button>
   `;
   const modal = document.getElementById('hermes-plus-modal');
   if (modal) modal.classList.add('show');
@@ -9295,10 +9307,9 @@ function renderHermesThread() {
       <div class="hermes-chat-msg ai">
         <div class="hermes-chat-bubble ai" style="max-width:100%;width:100%">
           <div class="hermes-chat-role">🦞 Hermes</div>
-          <div class="hermes-chat-main">先直接告诉我你想聊什么。我默认先用文字回答；如果你明确问到复盘、自选股、基本面，再帮你展开结构化内容。</div>
-          <div class="hermes-chat-meta" style="margin-top:8px;opacity:1">如果你现在还不确定怎么问，可以直接点下面这些提示：</div>
-          <div class="hermes-bullet-list" style="margin-top:8px">
-            ${suggestions.map(item => `<div class="hermes-bullet-item" style="cursor:pointer" onclick="applyHermesSuggestion('${item.replace(/'/g, '&#39;')}')">${escapeHtml(item)}</div>`).join('')}
+          <div class="hermes-chat-main">直接问我就可以。默认基于当前租户知识库回答。</div>
+          <div class="hermes-prompt-chip-row" aria-label="Hermes 建议问题">
+            ${suggestions.map(item => `<button class="hermes-prompt-chip" type="button" onclick="applyHermesSuggestion('${item.replace(/'/g, '&#39;')}')">${escapeHtml(item)}</button>`).join('')}
           </div>
         </div>
       </div>
@@ -9447,6 +9458,7 @@ async function runHermesAnalysis(options) {
         selected_knowledge_ids: hermesScopedKnowledgeId ? [hermesScopedKnowledgeId] : [],
         attachments: hermesUploadedFiles.slice(0),
         preferred_mode: hermesSelectedSkill || 'basic',
+        web_answer: !!hermesUseInternetAnswer,
       }),
     });
     const data = await resp.json();
