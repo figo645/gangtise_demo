@@ -105,6 +105,14 @@ def compose_review_draft_with_llm(*args, **kwargs):
     return _ai_services_module().compose_review_draft_with_llm(*args, **kwargs)
 
 
+def analyze_review_watchlist_with_llm(*args, **kwargs):
+    return _ai_services_module().analyze_review_watchlist_with_llm(*args, **kwargs)
+
+
+def compose_review_structured_preview(*args, **kwargs):
+    return _ai_services_module().compose_review_structured_preview(*args, **kwargs)
+
+
 def process_review_publish_text(*args, **kwargs):
     return _ai_services_module().process_review_publish_text(*args, **kwargs)
 
@@ -874,6 +882,46 @@ def normalize_review_snapshot_item(item, tenant, index=0):
             "model_name": str(model.get("model_name") or "").strip()[:240],
             "purpose": str(model.get("purpose") or "").strip()[:120],
         })
+    user_input_raw = raw.get("user_input_section") if isinstance(raw.get("user_input_section"), dict) else {}
+    watchlist_analysis_raw = raw.get("watchlist_analysis_section") if isinstance(raw.get("watchlist_analysis_section"), dict) else {}
+    user_input_section = {
+        "source_mode": str(user_input_raw.get("source_mode") or raw.get("source_mode") or fallback.get("source_mode") or "manual").strip().lower() or "manual",
+        "source_mode_label": str(user_input_raw.get("source_mode_label") or "").strip()[:80],
+        "display_text": str(
+            user_input_raw.get("display_text")
+            or user_input_raw.get("polished_text")
+            or raw.get("polished_input_text")
+            or content_text
+            or summary
+        ).strip()[:12000],
+        "summary_source": str(user_input_raw.get("summary_source") or "").strip()[:120],
+    }
+    sector_profiles = []
+    for profile in watchlist_analysis_raw.get("sector_profiles") if isinstance(watchlist_analysis_raw.get("sector_profiles"), list) else []:
+        if not isinstance(profile, dict):
+            continue
+        sector_profiles.append({
+            "sector": str(profile.get("sector") or "").strip()[:120],
+            "stock_names": [str(name).strip() for name in (profile.get("stock_names") if isinstance(profile.get("stock_names"), list) else []) if str(name).strip()][:8],
+            "representative_description": str(profile.get("representative_description") or "").strip()[:400],
+        })
+    watchlist_items = []
+    for item in watchlist_analysis_raw.get("items") if isinstance(watchlist_analysis_raw.get("items"), list) else []:
+        if not isinstance(item, dict):
+            continue
+        watchlist_items.append({
+            "stock_name": str(item.get("stock_name") or "").strip()[:120],
+            "stock_code": str(item.get("stock_code") or "").strip()[:60],
+            "sector": str(item.get("sector") or "").strip()[:120],
+            "board_role": str(item.get("board_role") or "").strip()[:180],
+            "analysis_text": str(item.get("analysis_text") or "").strip()[:1200],
+            "evidence": [str(value).strip() for value in (item.get("evidence") if isinstance(item.get("evidence"), list) else []) if str(value).strip()][:6],
+        })
+    watchlist_analysis_section = {
+        "sector_summary": str(watchlist_analysis_raw.get("sector_summary") or "").strip()[:200],
+        "sector_profiles": sector_profiles,
+        "items": watchlist_items,
+    }
     return {
         "id": str(raw.get("id") or f"{tenant['slug']}-review-{index + 1}").strip() or f"{tenant['slug']}-review-{index + 1}",
         "title": title,
@@ -895,6 +943,8 @@ def normalize_review_snapshot_item(item, tenant, index=0):
         "news_sources": [str(source).strip() for source in (raw.get("news_sources") if isinstance(raw.get("news_sources"), list) else []) if str(source).strip()][:12],
         "llm_models": llm_models,
         "polished_input_text": str(raw.get("polished_input_text") or "").strip()[:12000],
+        "user_input_section": user_input_section,
+        "watchlist_analysis_section": watchlist_analysis_section,
     }
 
 
@@ -4916,6 +4966,17 @@ def execute_user_async_job(job):
             knowledge_items=payload.get("knowledge_items") if isinstance(payload.get("knowledge_items"), list) else [],
             job_code=job_code,
         )
+    if job_type == "review_prepare_preview":
+        return compose_review_structured_preview(
+            source_text=payload.get("source_text"),
+            review_period=str(payload.get("period") or "").strip().lower(),
+            source_mode=str(payload.get("source_mode") or "").strip().lower(),
+            selected_watchlist=payload.get("selected_watchlist") if isinstance(payload.get("selected_watchlist"), list) else [],
+            speaker_name=str(payload.get("speaker_name") or "").strip(),
+            entry_point=str(payload.get("entry_point") or "").strip(),
+            tenant_slug=str(payload.get("tenant_slug") or "").strip().lower(),
+            job_code=job_code,
+        )
     if job_type == "review_publish_embed":
         publish_result = process_review_publish_text(
             text=payload.get("text"),
@@ -4942,6 +5003,9 @@ def execute_user_async_job(job):
             news_sources=payload.get("news_sources") if isinstance(payload.get("news_sources"), list) else [],
             llm_models=payload.get("llm_models") if isinstance(payload.get("llm_models"), list) else [],
             polished_input_text=payload.get("polished_input_text"),
+            review_summary=payload.get("review_summary"),
+            user_input_section=payload.get("user_input_section") if isinstance(payload.get("user_input_section"), dict) else {},
+            watchlist_analysis_section=payload.get("watchlist_analysis_section") if isinstance(payload.get("watchlist_analysis_section"), dict) else {},
         )
         return {
             **publish_result,
@@ -4981,6 +5045,8 @@ def _summarize_user_async_job_result(job_type, result):
         return "复盘完整成稿完成"
     if job_type == "review_generate_draft":
         return "复盘草稿生成完成"
+    if job_type == "review_prepare_preview":
+        return "复盘结构化预览完成"
     if job_type == "review_publish_embed":
         return "复盘发布入向量完成"
     if job_type == "knowledge_manual_sync":

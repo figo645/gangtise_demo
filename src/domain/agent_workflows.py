@@ -97,6 +97,28 @@ DECLARED_AGENT_WORKFLOW_CATALOG = {
             {"id": "edge_review_compose_3", "from": "review_compose_llm", "to": "review_compose_output"},
         ],
     },
+    "review_watchlist_analysis": {
+        "id": "review_watchlist_analysis",
+        "title": "复盘自选股归纳",
+        "summary": "围绕本次选中的自选股，先归并板块代表性，再输出逐股归纳分析。",
+        "category": "复盘智能体",
+        "feature_key": "daily_review",
+        "execution_mode": "declared_agent_workflow",
+        "tags": ["大V", "自选股", "板块代表性", "LLM"],
+        "nodes": [
+            {"id": "review_watchlist_input", "label": "自选股输入", "processor": "input", "kind": "source", "x": 36, "y": 88, "description": "接收本次复盘已选中的股票列表、用户输入正文和复盘周期。"},
+            {"id": "review_watchlist_context", "label": "股票上下文装载", "processor": "context_load", "kind": "context", "x": 324, "y": 88, "description": "加载个股基础信息、行业归属、信号摘要和基本面判断。"},
+            {"id": "review_watchlist_sector_merge", "label": "板块代表性归并", "processor": "sector_merge", "kind": "planner", "x": 632, "y": 88, "description": "按行业或板块归并自选股，生成本次复盘的主线代表性描述。"},
+            {"id": "review_watchlist_llm", "label": "归纳分析生成", "processor": "llm_generation", "kind": "llm", "x": 946, "y": 88, "description": "调用模型生成板块综述和逐股归纳分析。"},
+            {"id": "review_watchlist_output", "label": "分析结果封装", "processor": "output", "kind": "output", "x": 1260, "y": 88, "description": "输出结构化的复盘第二部分，供预览和发布复用。"},
+        ],
+        "edges": [
+            {"id": "edge_review_watchlist_1", "from": "review_watchlist_input", "to": "review_watchlist_context"},
+            {"id": "edge_review_watchlist_2", "from": "review_watchlist_context", "to": "review_watchlist_sector_merge"},
+            {"id": "edge_review_watchlist_3", "from": "review_watchlist_sector_merge", "to": "review_watchlist_llm"},
+            {"id": "edge_review_watchlist_4", "from": "review_watchlist_llm", "to": "review_watchlist_output"},
+        ],
+    },
     "review_voice_enhancement": {
         "id": "review_voice_enhancement",
         "title": "复盘语音增强",
@@ -397,6 +419,10 @@ def build_default_review_polish_workflow_definition():
 
 def build_default_review_compose_workflow_definition():
     return copy.deepcopy(DECLARED_AGENT_WORKFLOW_CATALOG["review_compose_draft"])
+
+
+def build_default_review_watchlist_analysis_workflow_definition():
+    return copy.deepcopy(DECLARED_AGENT_WORKFLOW_CATALOG["review_watchlist_analysis"])
 
 
 def build_default_review_voice_enhancement_workflow_definition():

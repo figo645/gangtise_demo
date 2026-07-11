@@ -848,6 +848,527 @@ def compose_review_draft_with_llm(
     return execution["state"]["final_result"]
 
 
+def _normalize_review_source_mode_label(source_mode):
+    mapping = {
+        "voice": "语音口述",
+        "manual": "手写正文",
+        "file": "文件上传",
+        "url": "网页链接",
+    }
+    key = str(source_mode or "").strip().lower()
+    return mapping.get(key, key or "用户输入")
+
+
+def _find_review_watchlist_detail(selected_item, details_map):
+    normalized = str(selected_item or "").strip()
+    if not normalized:
+        return None
+    for detail in (details_map or {}).values():
+        if not isinstance(detail, dict):
+            continue
+        if normalized in {
+            str(detail.get("name") or "").strip(),
+            str(detail.get("code") or "").strip(),
+        }:
+            return copy.deepcopy(detail)
+    return None
+
+
+def _build_review_watchlist_sector_profiles(details):
+    sector_map = {}
+    ordered_sectors = []
+    for detail in details or []:
+        if not isinstance(detail, dict):
+            continue
+        sector_name = str(detail.get("industry") or detail.get("focus") or "其他板块").strip() or "其他板块"
+        if sector_name not in sector_map:
+            sector_map[sector_name] = {
+                "sector": sector_name,
+                "stock_names": [],
+                "stock_codes": [],
+                "signal_points": [],
+                "summary_points": [],
+            }
+            ordered_sectors.append(sector_name)
+        bucket = sector_map[sector_name]
+        stock_name = str(detail.get("name") or detail.get("code") or "").strip()
+        stock_code = str(detail.get("code") or "").strip()
+        if stock_name and stock_name not in bucket["stock_names"]:
+            bucket["stock_names"].append(stock_name)
+        if stock_code and stock_code not in bucket["stock_codes"]:
+            bucket["stock_codes"].append(stock_code)
+        signal_summary = str(detail.get("signal_summary") or detail.get("alert_text") or "").strip()
+        base_summary = str((((detail.get("fundamental") or {}) if isinstance(detail.get("fundamental"), dict) else {}).get("summary")) or "").strip()
+        if signal_summary and signal_summary not in bucket["signal_points"]:
+            bucket["signal_points"].append(signal_summary)
+        if base_summary and base_summary not in bucket["summary_points"]:
+            bucket["summary_points"].append(base_summary)
+    profiles = []
+    for sector_name in ordered_sectors:
+        bucket = sector_map[sector_name]
+        stock_names = bucket["stock_names"][:4]
+        representative_stock = stock_names[0] if stock_names else sector_name
+        supporting = "；".join((bucket["signal_points"] or bucket["summary_points"])[:2]).strip()
+        representative_description = (
+            f"{sector_name}以{representative_stock}为代表，本次复盘更适合从板块景气、龙头验证和后续催化三个角度归纳。"
+            if not supporting else
+            f"{sector_name}以{representative_stock}为代表，当前代表性描述可概括为：{supporting}"
+        )
+        profiles.append({
+            "sector": sector_name,
+            "stock_names": stock_names,
+            "representative_description": representative_description[:220],
+        })
+    if not profiles:
+        return [], "当前未匹配到可归纳的板块样本。"
+    if len(profiles) == 1:
+        only = profiles[0]
+        summary = f"本次自选股主要集中在{only['sector']}，代表性标的包括{'、'.join(only['stock_names'])}。"
+    else:
+        lead = profiles[0]
+        others = "、".join(item["sector"] for item in profiles[1:3])
+        summary = f"本次自选股横跨{lead['sector']}{f'、{others}' if others else ''}等板块，其中{lead['sector']}是最主要的代表性主线。"
+    return profiles, summary[:150]
+
+
+def _build_review_watchlist_llm_prompt(details, sector_profiles, source_text, review_period):
+    stock_blocks = []
+    for index, detail in enumerate(details or [], start=1):
+        if not isinstance(detail, dict):
+            continue
+        fundamental = detail.get("fundamental") if isinstance(detail.get("fundamental"), dict) else {}
+        forecast = detail.get("forecast") if isinstance(detail.get("forecast"), dict) else {}
+        metrics = [
+            f"{str(item.get('label') or '').strip()}：{str(item.get('value') or '').strip()}（{str(item.get('note') or '').strip()}）"
+            for item in (fundamental.get("metrics") or [])
+            if isinstance(item, dict) and str(item.get("label") or "").strip()
+        ]
+        theses = [str(item).strip() for item in (fundamental.get("thesis") or []) if str(item).strip()]
+        drivers = [
+            f"{str(item.get('label') or '').strip()}：{str(item.get('note') or '').strip()}（{str(item.get('score') or '').strip()}）"
+            for item in (forecast.get("drivers") or [])
+            if isinstance(item, dict) and str(item.get("label") or "").strip()
+        ]
+        stock_blocks.append(
+            "\n".join(
+                [
+                    f"[股票 {index}] 名称：{str(detail.get('name') or '').strip()}",
+                    f"代码：{str(detail.get('code') or '').strip()}",
+                    f"所属板块：{str(detail.get('industry') or detail.get('focus') or '其他板块').strip()}",
+                    f"信号摘要：{str(detail.get('signal_summary') or detail.get('alert_text') or '').strip() or '暂无'}",
+                    f"基本面摘要：{str(fundamental.get('summary') or '').strip() or '暂无'}",
+                    f"当前判断：{str(forecast.get('verdict') or '').strip() or '待观察'} / 置信度 {str(forecast.get('confidence') or '中').strip() or '中'}",
+                    f"指标要点：{'；'.join(metrics[:4]) if metrics else '暂无'}",
+                    f"核心论点：{'；'.join(theses[:3]) if theses else '暂无'}",
+                    f"驱动因素：{'；'.join(drivers[:3]) if drivers else '暂无'}",
+                ]
+            )
+        )
+    sector_blocks = [
+        f"{item['sector']}：代表股票 {'、'.join(item['stock_names'])}；代表性描述：{item['representative_description']}"
+        for item in (sector_profiles or [])
+        if isinstance(item, dict)
+    ]
+    period_label = _get_review_period_label(review_period)
+    return "\n".join(
+        [
+            f"复盘周期：{period_label}",
+            f"用户自主输入摘要参考：{trim_hermes_text(source_text, limit=300) if str(source_text or '').strip() else '未提供'}",
+            "",
+            "板块归并基础：",
+            "\n".join(sector_blocks) if sector_blocks else "暂无板块归并",
+            "",
+            "股票上下文：",
+            "\n\n".join(stock_blocks) if stock_blocks else "暂无股票上下文",
+            "",
+            "请输出 JSON，格式如下：",
+            '{"sector_summary":"150字内的板块与主线归纳","items":[{"stock_name":"股票名","stock_code":"代码","sector":"板块","board_role":"该股在本次复盘中的代表角色","analysis_text":"80到160字的归纳分析","evidence":["证据1","证据2"]}]}',
+            "要求：",
+            "1. 先从已选自选股归纳板块代表性，不要脱离这些股票泛化发挥。",
+            "2. 每只股票的 analysis_text 要强调它为什么被纳入本次复盘，以及当前更该跟踪什么。",
+            "3. 语言要适合直接展示在复盘详情页，不输出过程说明，不要使用 Markdown。",
+        ]
+    )
+
+
+def analyze_review_watchlist_with_llm(
+    selected_watchlist=None,
+    review_period="",
+    source_text="",
+    speaker_name="",
+    entry_point="",
+    tenant_slug="",
+    job_code="",
+):
+    workflow_definition = build_default_review_watchlist_analysis_workflow_definition()
+
+    def _watchlist_input_executor(state, runtime, node, upstream):
+        watchlist_items = [str(item).strip() for item in (runtime.get("selected_watchlist") or []) if str(item).strip()]
+        if not watchlist_items:
+            raise ValueError("review_selected_watchlist_required")
+        return {
+            "detail": "已接收本次复盘的自选股列表和用户输入正文。",
+            "state_updates": {
+                "watchlist_items": watchlist_items,
+                "normalized_source_text": str(runtime.get("source_text") or "").strip(),
+                "speaker_label": str(runtime.get("speaker_name") or "").strip() or "未命名大V",
+            },
+            "context_preview": {"watchlist_count": len(watchlist_items)},
+        }
+
+    def _watchlist_context_executor(state, runtime, node, upstream):
+        details_map = gen_watchlist_details()
+        matched = []
+        for item in state.get("watchlist_items") or []:
+            detail = _find_review_watchlist_detail(item, details_map)
+            if detail:
+                matched.append(detail)
+        if not matched:
+            raise ValueError("review_watchlist_detail_not_found")
+        if runtime.get("job_code"):
+            report_user_async_job_progress(
+                runtime["job_code"],
+                stage="watchlist_context_loading",
+                percent=54,
+                summary="正在装载自选股上下文",
+                log_text="已匹配股票基础信息、板块归属和信号摘要。",
+                extra_result={"selected_watchlist": [str(item.get("name") or "").strip() for item in matched]},
+            )
+        return {
+            "detail": "已加载个股基础信息、基本面摘要和板块信号。",
+            "state_updates": {"matched_watchlist_details": matched},
+            "context_preview": {"matched_count": len(matched)},
+        }
+
+    def _watchlist_sector_executor(state, runtime, node, upstream):
+        matched = state.get("matched_watchlist_details") if isinstance(state.get("matched_watchlist_details"), list) else []
+        sector_profiles, sector_summary = _build_review_watchlist_sector_profiles(matched)
+        if runtime.get("job_code"):
+            report_user_async_job_progress(
+                runtime["job_code"],
+                stage="watchlist_sector_merging",
+                percent=68,
+                summary="正在归并板块代表性",
+                log_text="已按行业板块归并自选股，准备生成复盘第二部分。",
+                extra_result={"sector_profiles": sector_profiles},
+            )
+        return {
+            "detail": "已完成板块代表性归并。",
+            "state_updates": {
+                "sector_profiles": sector_profiles,
+                "sector_summary_rule": sector_summary,
+                "system_prompt": (
+                    "你是中文投研复盘助手。"
+                    "你负责根据本次已选自选股，生成可直接展示在复盘详情页里的“自选股归纳分析”部分。"
+                    "必须聚焦给定股票和对应板块，不要扩写成泛市场评论。"
+                    "输出必须是 JSON。"
+                ),
+                "user_prompt": _build_review_watchlist_llm_prompt(
+                    matched,
+                    sector_profiles,
+                    state.get("normalized_source_text") or "",
+                    runtime.get("review_period") or "",
+                ),
+            },
+            "context_preview": {"sector_count": len(sector_profiles)},
+        }
+
+    def _watchlist_llm_executor(state, runtime, node, upstream):
+        llm_model = get_default_llm_config(purpose="general")
+        if not llm_model:
+            raise RuntimeError("review_watchlist_analysis_llm_not_configured")
+        raw = call_openai_compatible_llm(
+            llm_model,
+            state.get("system_prompt") or "",
+            state.get("user_prompt") or "",
+            feature_code="review_watchlist_analysis",
+            feature_label="复盘自选股归纳",
+            tenant_slug=str(runtime.get("tenant_slug") or "").strip(),
+            entry_point=str(runtime.get("entry_point") or "").strip(),
+            metadata={
+                "review_period": str(runtime.get("review_period") or "").strip().lower(),
+                "watchlist_count": len(state.get("watchlist_items") or []),
+                "job_code": runtime.get("job_code") or "",
+                "workflow_id": workflow_definition["id"],
+            },
+            request_timeout_seconds=60,
+        )
+        fallback = {
+            "sector_summary": state.get("sector_summary_rule") or "",
+            "items": [],
+        }
+        parsed = _extract_json_payload_from_llm_text(raw, fallback)
+        llm_items = parsed.get("items") if isinstance(parsed.get("items"), list) else []
+        matched = state.get("matched_watchlist_details") if isinstance(state.get("matched_watchlist_details"), list) else []
+        normalized_items = []
+        for detail in matched:
+            stock_name = str(detail.get("name") or "").strip()
+            stock_code = str(detail.get("code") or "").strip()
+            sector_name = str(detail.get("industry") or detail.get("focus") or "其他板块").strip() or "其他板块"
+            hit = next(
+                (
+                    item for item in llm_items
+                    if isinstance(item, dict) and str(item.get("stock_name") or item.get("stock_code") or "").strip() in {stock_name, stock_code}
+                ),
+                None,
+            )
+            fundamental = detail.get("fundamental") if isinstance(detail.get("fundamental"), dict) else {}
+            forecast = detail.get("forecast") if isinstance(detail.get("forecast"), dict) else {}
+            default_analysis = "；".join(
+                part for part in [
+                    str(fundamental.get("summary") or "").strip(),
+                    str(forecast.get("band") or "").strip(),
+                ] if part
+            ).strip() or f"{stock_name}当前更适合继续跟踪{sector_name}主线下的业绩兑现、估值位置和下一轮催化。"
+            evidence = hit.get("evidence") if isinstance(hit, dict) and isinstance(hit.get("evidence"), list) else []
+            normalized_items.append({
+                "stock_name": stock_name,
+                "stock_code": stock_code,
+                "sector": str((hit or {}).get("sector") or sector_name).strip() or sector_name,
+                "board_role": str((hit or {}).get("board_role") or f"{sector_name}代表样本").strip()[:80] or f"{sector_name}代表样本",
+                "analysis_text": trim_hermes_text(str((hit or {}).get("analysis_text") or default_analysis).strip(), limit=220),
+                "evidence": [trim_hermes_text(str(item).strip(), limit=60) for item in evidence if str(item).strip()][:4],
+            })
+        sector_summary = trim_hermes_text(
+            str(parsed.get("sector_summary") or state.get("sector_summary_rule") or "").strip() or (state.get("sector_summary_rule") or ""),
+            limit=150,
+        )
+        if runtime.get("job_code"):
+            report_user_async_job_progress(
+                runtime["job_code"],
+                stage="watchlist_analysis_done",
+                percent=82,
+                summary="自选股归纳分析已生成",
+                log_text="板块主线和逐股归纳已完成，正在整理发布结构。",
+            )
+        return {
+            "detail": "已生成板块代表性和逐股归纳分析。",
+            "state_updates": {
+                "analysis_result": {
+                    "sector_summary": sector_summary,
+                    "sector_profiles": copy.deepcopy(state.get("sector_profiles") or []),
+                    "items": normalized_items,
+                    "llm_model": {
+                        "key": llm_model.get("key"),
+                        "label": llm_model.get("label"),
+                        "provider": llm_model.get("provider"),
+                        "model_name": llm_model.get("model_name"),
+                        "purpose": llm_model.get("purpose"),
+                        "stage": "watchlist_analysis",
+                    },
+                }
+            },
+            "context_preview": {"item_count": len(normalized_items)},
+        }
+
+    def _watchlist_output_executor(state, runtime, node, upstream):
+        result = copy.deepcopy(state.get("analysis_result") or {})
+        result["workflow_meta"] = build_declared_agent_workflow_meta(
+            workflow_definition,
+            extras={"last_execution_steps": copy.deepcopy(upstream)},
+        )
+        return {
+            "detail": "已封装自选股归纳分析结果。",
+            "output": result,
+            "state_key": "final_result",
+            "context_preview": {"has_items": bool((result.get("items") or []))},
+        }
+
+    execution = run_declared_agent_workflow(
+        workflow_definition,
+        runtime={
+            "selected_watchlist": selected_watchlist or [],
+            "review_period": review_period,
+            "source_text": source_text,
+            "speaker_name": speaker_name,
+            "entry_point": entry_point,
+            "tenant_slug": tenant_slug,
+            "job_code": job_code,
+        },
+        executor_registry={
+            "review_watchlist_input": _watchlist_input_executor,
+            "review_watchlist_context": _watchlist_context_executor,
+            "review_watchlist_sector_merge": _watchlist_sector_executor,
+            "review_watchlist_llm": _watchlist_llm_executor,
+            "review_watchlist_output": _watchlist_output_executor,
+        },
+    )
+    return execution["state"]["final_result"]
+
+
+def summarize_review_user_input_with_llm(
+    source_text,
+    review_period="",
+    source_mode="",
+    speaker_name="",
+    entry_point="",
+    tenant_slug="",
+):
+    normalized_source = str(source_text or "").strip()
+    if not normalized_source:
+        raise ValueError("review_source_text_required")
+    llm_model = get_default_llm_config(purpose="general")
+    if not llm_model:
+        raise RuntimeError("review_summary_llm_not_configured")
+    raw = call_openai_compatible_llm(
+        llm_model,
+        (
+            "你是中文投研复盘摘要助手。"
+            "你只能根据用户自主输入内容做摘要，不得引用自选股分析、外部扩展解释或额外推断。"
+            "输出纯文本，一句话或两句话均可，控制在150个中文字符以内。"
+        ),
+        "\n".join(
+            [
+                f"复盘周期：{_get_review_period_label(review_period)}",
+                f"输入来源：{_normalize_review_source_mode_label(source_mode)}",
+                f"作者：{str(speaker_name or '').strip() or '未命名大V'}",
+                f"入口：{str(entry_point or '').strip() or 'unknown'}",
+                "",
+                "请仅基于以下用户自主输入内容生成摘要：",
+                normalized_source,
+            ]
+        ),
+        feature_code="review_user_input_summary",
+        feature_label="复盘用户输入摘要",
+        tenant_slug=str(tenant_slug or "").strip(),
+        entry_point=str(entry_point or "").strip(),
+        metadata={
+            "review_period": str(review_period or "").strip().lower(),
+            "source_mode": str(source_mode or "").strip().lower(),
+        },
+        request_timeout_seconds=45,
+    )
+    summary = re.sub(r"\s+", " ", str(raw or "").strip())
+    summary = summary.replace("摘要：", "").replace("总结：", "").strip()
+    summary = summary[:150].strip() or re.sub(r"\s+", " ", normalized_source)[:150].strip()
+    return {
+        "summary": summary,
+        "llm_model": {
+            "key": llm_model.get("key"),
+            "label": llm_model.get("label"),
+            "provider": llm_model.get("provider"),
+            "model_name": llm_model.get("model_name"),
+            "purpose": llm_model.get("purpose"),
+            "stage": "user_input_summary",
+        },
+    }
+
+
+def _compose_review_watchlist_analysis_text(section):
+    payload = section if isinstance(section, dict) else {}
+    sector_summary = str(payload.get("sector_summary") or "").strip()
+    sector_profiles = payload.get("sector_profiles") if isinstance(payload.get("sector_profiles"), list) else []
+    items = payload.get("items") if isinstance(payload.get("items"), list) else []
+    lines = []
+    if sector_summary:
+        lines.append(f"板块归纳：{sector_summary}")
+    if sector_profiles:
+        lines.append("板块代表性：")
+        for profile in sector_profiles:
+            if not isinstance(profile, dict):
+                continue
+            lines.append(
+                f"- {str(profile.get('sector') or '').strip()}：{str(profile.get('representative_description') or '').strip()}"
+            )
+    if items:
+        lines.append("逐股归纳：")
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            label = f"{str(item.get('stock_name') or '').strip()}（{str(item.get('sector') or '').strip() or '自选股'}）"
+            body = str(item.get("analysis_text") or "").strip()
+            if label or body:
+                lines.append(f"- {label}：{body}")
+    return "\n".join(line for line in lines if line).strip()
+
+
+def compose_review_structured_preview(
+    source_text,
+    review_period="",
+    source_mode="",
+    selected_watchlist=None,
+    speaker_name="",
+    entry_point="",
+    tenant_slug="",
+    job_code="",
+):
+    normalized_source = str(source_text or "").strip()
+    if not normalized_source:
+        raise ValueError("review_source_text_required")
+    watchlist_items = [str(item).strip() for item in (selected_watchlist or []) if str(item).strip()]
+    if not watchlist_items:
+        raise ValueError("review_selected_watchlist_required")
+    if job_code:
+        report_user_async_job_progress(
+            job_code,
+            stage="review_summary_generating",
+            percent=24,
+            summary="正在生成复盘摘要",
+            log_text="摘要仅基于用户自主输入内容生成，不引用自选股归纳。",
+        )
+    summary_result = summarize_review_user_input_with_llm(
+        source_text=normalized_source,
+        review_period=review_period,
+        source_mode=source_mode,
+        speaker_name=speaker_name,
+        entry_point=entry_point,
+        tenant_slug=tenant_slug,
+    )
+    if job_code:
+        report_user_async_job_progress(
+            job_code,
+            stage="review_watchlist_analyzing",
+            percent=46,
+            summary="正在归纳自选股与板块代表性",
+            log_text="将按已选自选股归并板块，并生成逐股归纳分析。",
+        )
+    watchlist_result = analyze_review_watchlist_with_llm(
+        selected_watchlist=watchlist_items,
+        review_period=review_period,
+        source_text=normalized_source,
+        speaker_name=speaker_name,
+        entry_point=entry_point,
+        tenant_slug=tenant_slug,
+        job_code=job_code,
+    )
+    user_input_section = {
+        "source_mode": str(source_mode or "").strip().lower() or "manual",
+        "source_mode_label": _normalize_review_source_mode_label(source_mode),
+        "display_text": normalized_source,
+        "summary_source": "llm_user_input_only",
+    }
+    watchlist_text = _compose_review_watchlist_analysis_text(watchlist_result)
+    final_text = "\n\n".join(
+        part for part in [
+            f"【复盘摘要】\n{summary_result['summary']}",
+            f"【用户输入转化内容】\n{user_input_section['display_text']}",
+            f"【自选股归纳分析】\n{watchlist_text}" if watchlist_text else "",
+        ] if part
+    ).strip()
+    llm_models = [summary_result.get("llm_model"), watchlist_result.get("llm_model")]
+    result = {
+        "review_summary": summary_result["summary"],
+        "user_input_section": user_input_section,
+        "watchlist_analysis_section": {
+            "sector_summary": str(watchlist_result.get("sector_summary") or "").strip(),
+            "sector_profiles": copy.deepcopy(watchlist_result.get("sector_profiles") or []),
+            "items": copy.deepcopy(watchlist_result.get("items") or []),
+        },
+        "final_text": final_text,
+        "llm_models": [item for item in llm_models if isinstance(item, dict)],
+        "watchlist_workflow_meta": copy.deepcopy(watchlist_result.get("workflow_meta") or {}),
+    }
+    if job_code:
+        report_user_async_job_progress(
+            job_code,
+            stage="review_preview_ready",
+            percent=92,
+            summary="双段式复盘预览已准备完成",
+            log_text="用户输入部分和自选股归纳部分已合成，正在返回预览结果。",
+        )
+    return result
+
+
 def get_review_vector_db_connection():
     target = get_runtime_db_target().get("vector", {})
     return psycopg2.connect(
@@ -5845,6 +6366,9 @@ def persist_review_publish_snapshot(
     news_sources=None,
     llm_models=None,
     polished_input_text="",
+    review_summary="",
+    user_input_section=None,
+    watchlist_analysis_section=None,
 ):
     tenant = get_tenant_by_slug(tenant_slug)
     if not tenant or tenant.get("slug") != tenant_slug:
@@ -5853,9 +6377,29 @@ def persist_review_publish_snapshot(
     period_map = {"day": "日复盘", "week": "周复盘", "month": "月复盘"}
     period_label = period_map.get(period_key, "日复盘")
     cleaned_text = str(text or "").strip()
-    title_seed = re.split(r"[。！？\n]", cleaned_text, 1)[0].strip() if cleaned_text else ""
+    normalized_user_input_section = copy.deepcopy(user_input_section if isinstance(user_input_section, dict) else {})
+    normalized_watchlist_analysis = copy.deepcopy(watchlist_analysis_section if isinstance(watchlist_analysis_section, dict) else {})
+    title_source_text = str(
+        normalized_user_input_section.get("display_text")
+        or normalized_user_input_section.get("polished_text")
+        or polished_input_text
+        or cleaned_text
+        or ""
+    ).strip()
+    title_seed = re.split(r"[。！？\n]", title_source_text, 1)[0].strip() if title_source_text else ""
     title = f"{period_label}：{title_seed or '最新复盘已发布'}"
-    summary = re.sub(r"\s+", " ", cleaned_text).strip()[:160] if cleaned_text else f"{period_label}已发布。"
+    summary = str(review_summary or "").strip()
+    if not summary:
+        summary_source_text = str(
+            normalized_user_input_section.get("display_text")
+            or normalized_user_input_section.get("polished_text")
+            or polished_input_text
+            or cleaned_text
+            or ""
+        ).strip()
+        summary = re.sub(r"\s+", " ", summary_source_text).strip()[:150] if summary_source_text else f"{period_label}已发布。"
+    else:
+        summary = re.sub(r"\s+", " ", summary).strip()[:150]
     snapshot = {
         "id": f"{tenant_slug}-review-{int(time.time() * 1000)}",
         "title": title[:80],
@@ -5877,6 +6421,8 @@ def persist_review_publish_snapshot(
         "news_sources": [str(source).strip() for source in (news_sources if isinstance(news_sources, list) else []) if str(source).strip()][:12],
         "llm_models": copy.deepcopy(llm_models if isinstance(llm_models, list) else []),
         "polished_input_text": str(polished_input_text or "").strip()[:12000],
+        "user_input_section": normalized_user_input_section,
+        "watchlist_analysis_section": normalized_watchlist_analysis,
     }
     snapshots = append_review_snapshot(tenant_slug, snapshot)
     review_message = {

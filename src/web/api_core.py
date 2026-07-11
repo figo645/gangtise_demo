@@ -128,6 +128,9 @@ def api_review_publish_embed():
             "news_sources": body.get("news_sources") if isinstance(body.get("news_sources"), list) else [],
             "llm_models": body.get("llm_models") if isinstance(body.get("llm_models"), list) else [],
             "polished_input_text": body.get("polished_input_text"),
+            "review_summary": body.get("review_summary"),
+            "user_input_section": body.get("user_input_section") if isinstance(body.get("user_input_section"), dict) else {},
+            "watchlist_analysis_section": body.get("watchlist_analysis_section") if isinstance(body.get("watchlist_analysis_section"), dict) else {},
         }
         if not str(payload.get("text") or "").strip():
             raise ValueError("publish_text_required")
@@ -154,6 +157,54 @@ def api_review_publish_embed():
             "message": "复盘已提交发布，正在后台入向量库",
         }
     )
+
+
+@app.route("/api/review/prepare-preview", methods=["POST"])
+def api_review_prepare_preview():
+    body = request.get_json(silent=True) or {}
+    try:
+        tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
+        entry_point = str(body.get("entry_point") or "").strip().lower() or "review_preview"
+        speaker_name = str(body.get("speaker_name") or "").strip()
+        payload = {
+            "tenant_slug": tenant_slug,
+            "period": str(body.get("period") or "").strip().lower(),
+            "source_mode": str(body.get("source_mode") or "").strip().lower(),
+            "source_text": body.get("source_text"),
+            "selected_watchlist": body.get("selected_watchlist") if isinstance(body.get("selected_watchlist"), list) else [],
+            "speaker_name": speaker_name,
+            "entry_point": entry_point,
+        }
+        if not str(payload.get("source_text") or "").strip():
+            raise ValueError("review_source_text_required")
+        if not payload["selected_watchlist"]:
+            raise ValueError("review_selected_watchlist_required")
+        job = create_user_async_job(
+            "review_prepare_preview",
+            payload=payload,
+            tenant_slug=tenant_slug,
+            entry_point=entry_point,
+            owner_label=speaker_name,
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to prepare review preview")
+        return jsonify({"ok": False, "error": "review_prepare_preview_failed"}), 500
+    return jsonify(
+        {
+            "ok": True,
+            "async": True,
+            "job_code": job["job_code"],
+            "job_status": job["status"],
+            "message": "复盘结构化预览已提交生成，正在后台归纳摘要与自选股分析",
+        }
+    )
+
 
 @app.route("/api/market")
 def api_market():

@@ -64,6 +64,11 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("function buildHermesKnowledgePayload(entry, artifact)", html)
         self.assertIn("加入知识源", html)
         self.assertNotIn("加入上下文", html)
+        self.assertIn("function requestReviewStructuredPreview()", html)
+        self.assertIn("function confirmStructuredReviewToPreview()", html)
+        self.assertIn("双段内容审核与详细修改", html)
+        self.assertIn("用户输入转化内容", html)
+        self.assertIn("自选股归纳分析", html)
 
     def test_hermes_query_accepts_web_answer_flag(self):
         response = self.client.post(
@@ -146,9 +151,35 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("hermes_agent", workflow_ids)
         self.assertIn("smart_indicator_agent", workflow_ids)
         self.assertIn("review_voice_enhancement", workflow_ids)
+        self.assertIn("review_watchlist_analysis", workflow_ids)
         self.assertIn("knowledge_query_agent", workflow_ids)
         self.assertIn("evidence_chain_agent", workflow_ids)
         self.assertIn("knowledge_processing_agent", workflow_ids)
+
+    def test_review_prepare_preview_endpoint_queues_job(self):
+        response = self.client.post(
+            "/api/review/prepare-preview",
+            json={
+                "tenant_slug": self.tenant_slugs[0],
+                "period": "day",
+                "source_mode": "manual",
+                "source_text": "今天用户自己输入的复盘内容，重点聚焦科技主线和风险边界。",
+                "selected_watchlist": ["中芯国际", "腾讯控股"],
+                "speaker_name": "测试大V",
+                "entry_point": "test_review_preview",
+            },
+        )
+
+        self.assertIn(response.status_code, {200, 503})
+        payload = response.get_json()
+        self.assertIsInstance(payload, dict)
+        if response.status_code == 200:
+            self.assertTrue(payload["ok"])
+            self.assertTrue(payload["async"])
+            self.assertIn("job_code", payload)
+        else:
+            self.assertFalse(payload["ok"])
+            self.assertIn("error", payload)
 
     def test_knowledge_query_api_returns_workflow_meta(self):
         response = self.client.post(
