@@ -88,6 +88,7 @@ body { background:linear-gradient(180deg,#F7FAFD 0%,#EFF5FB 42%,#FFFFFF 100%); c
   border-radius:16px;
   padding:16px;
 }
+.tp-dashboard-cell.tp-clickable { cursor:pointer; }
 .tp-dashboard-cell strong { display:block; font-size:13px; color:#172132; }
 .tp-dashboard-cell span { display:block; margin-top:10px; font-size:18px; font-weight:700; color:#2F74C0; }
 .tp-dashboard-summary,
@@ -236,12 +237,40 @@ body { background:linear-gradient(180deg,#F7FAFD 0%,#EFF5FB 42%,#FFFFFF 100%); c
           <strong style="display:block;font-size:16px;color:#172132">智能 Dashboard 面板</strong>
           <div class="tp-dashboard-summary" style="margin-top:10px">{{ portal.fund_dashboard.summary }}</div>
           <div class="tp-dashboard-cell-grid">
-            {% for cell in portal.fund_dashboard.cells %}
-            <div class="tp-dashboard-cell">
+            {% set visible_cells = portal.fund_dashboard.cells | rejectattr('isEmpty') | list %}
+            {% if visible_cells %}
+            {% for cell in visible_cells %}
+            <div class="tp-dashboard-cell tp-clickable" onclick='openPortalDetail({{ {
+              "title": cell.title,
+              "summary": cell.interpretation or cell.assessment or "暂无解读",
+              "detail_sections": [
+                {
+                  "title": "当前结果",
+                  "body": ((cell.value or "待定义") ~ (cell.unit or "")) ~ " · 更新时间：" ~ (cell.updatedAt or "未记录")
+                },
+                {
+                  "title": "算法详情",
+                  "body": cell.algorithmDetail or "当前没有可展示的算法详情。"
+                },
+                {
+                  "title": "解读",
+                  "body": cell.interpretation or cell.assessment or "暂无解读"
+                }
+              ],
+              "focus": "智能指标",
+              "time": cell.updatedAt or "未记录"
+            } | tojson }}, "dashboard")'>
               <strong>{{ cell.title }}</strong>
-              <span>{{ cell.value or '待定义' }}</span>
+              <span>{{ cell.value or '待定义' }}{{ cell.unit or '' }}</span>
+              <div class="tp-detail-link">点击查看算法详情与解读</div>
             </div>
             {% endfor %}
+            {% else %}
+            <div class="tp-dashboard-cell" style="cursor:default">
+              <strong>暂无看板内容</strong>
+              <div class="tp-dashboard-summary" style="margin-top:10px">当前还没有已发布的智能指标。</div>
+            </div>
+            {% endif %}
           </div>
         </div>
         <div class="tp-dashboard-side">
