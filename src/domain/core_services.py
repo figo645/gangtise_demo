@@ -1,4 +1,5 @@
 from src.runtime import *
+from src.domain.agent_workflows import *
 
 
 def _market_services_module():
@@ -243,55 +244,125 @@ def build_algorithmic_knowledge_processing(raw_text, source_type="", title="", s
 
 
 def build_llm_knowledge_processing(raw_text, source_type="", title="", source_detail=""):
-    llm_model = get_default_llm_config(purpose="general")
-    if not llm_model:
-        raise RuntimeError("knowledge_processing_llm_not_configured")
-    safe_title = str(title or "未命名知识").strip() or "未命名知识"
-    safe_source = str(source_detail or source_type or "原始输入").strip() or "原始输入"
-    safe_text = str(raw_text or "").strip()
-    system_prompt = (
-        "你是知识加工助手。"
-        "请把原始材料加工成适合大V知识库沉淀的结构化内容。"
-        "输出必须使用中文，简洁、专业、避免编造。"
-    )
-    user_prompt = (
-        f"知识标题：{safe_title}\n"
-        f"来源：{safe_source}\n"
-        f"原始材料：\n{safe_text or '暂无原始材料'}\n\n"
-        "请严格按下面模板输出：\n"
-        "一、核心结论\n"
-        "二、关键要点（3条以内）\n"
-        "三、验证节点（3条以内）\n"
-        "四、风险边界（3条以内）\n"
-        "五、可直接入库正文"
-    )
-    rendered_text = call_openai_compatible_llm(
-        llm_model,
-        system_prompt,
-        user_prompt,
-        feature_code="knowledge_processing_llm",
-        feature_label="知识加工生成",
-        entry_point="knowledge_processing",
-        metadata={"source_type": source_type, "title": safe_title[:80]},
-    )
-    sections = _split_semantic_sentences(rendered_text)
-    summary = "；".join(sections[:3])[:220] if sections else (rendered_text[:220] if rendered_text else "暂无摘要")
-    return {
-        "mode": "llm",
-        "label": "大模型加工",
-        "summary": summary,
-        "key_points": sections[:3] or ["待补充关键要点"],
-        "validation_nodes": [item for item in sections if any(token in item for token in ("验证", "跟踪", "观察", "确认"))][:3] or ["待补充验证节点"],
-        "risk_points": [item for item in sections if any(token in item for token in ("风险", "边界", "不确定", "警惕"))][:3] or ["待补充风险边界"],
-        "template_name": "llm_outline_v1",
-        "rendered_text": rendered_text,
-        "llm_model": {
-            "key": llm_model.get("key"),
-            "label": llm_model.get("label"),
-            "model_name": llm_model.get("model_name"),
-            "provider": llm_model.get("provider"),
+    workflow_definition = build_default_knowledge_processing_workflow_definition()
+
+    def _knowledge_processing_input_executor(state, runtime, node, upstream):
+        safe_text = str(runtime.get("raw_text") or "").strip()
+        if not safe_text:
+            raise ValueError("knowledge_body_required")
+        return {
+            "detail": "已接收原始知识材料。",
+            "state_updates": {
+                "safe_text": safe_text,
+                "safe_title": str(runtime.get("title") or "未命名知识").strip() or "未命名知识",
+                "safe_source": str(runtime.get("source_detail") or runtime.get("source_type") or "原始输入").strip() or "原始输入",
+            },
+            "context_preview": {
+                "source_type": str(runtime.get("source_type") or "").strip() or "manual",
+                "input_chars": len(safe_text),
+            },
+        }
+
+    def _knowledge_processing_prepare_executor(state, runtime, node, upstream):
+        system_prompt = (
+            "你是知识加工助手。"
+            "请把原始材料加工成适合大V知识库沉淀的结构化内容。"
+            "输出必须使用中文，简洁、专业、避免编造。"
+        )
+        user_prompt = (
+            f"知识标题：{state.get('safe_title') or '未命名知识'}\n"
+            f"来源：{state.get('safe_source') or '原始输入'}\n"
+            f"原始材料：\n{state.get('safe_text') or '暂无原始材料'}\n\n"
+            "请严格按下面模板输出：\n"
+            "一、核心结论\n"
+            "二、关键要点（3条以内）\n"
+            "三、验证节点（3条以内）\n"
+            "四、风险边界（3条以内）\n"
+            "五、可直接入库正文"
+        )
+        return {
+            "detail": "已生成知识加工提示词。",
+            "state_updates": {
+                "system_prompt": system_prompt,
+                "user_prompt": user_prompt,
+            },
+            "context_preview": {"prompt_chars": len(user_prompt)},
+        }
+
+    def _knowledge_processing_llm_executor(state, runtime, node, upstream):
+        llm_model = get_default_llm_config(purpose="general")
+        if not llm_model:
+            raise RuntimeError("knowledge_processing_llm_not_configured")
+        rendered_text = call_openai_compatible_llm(
+            llm_model,
+            state.get("system_prompt") or "",
+            state.get("user_prompt") or "",
+            feature_code="knowledge_processing_llm",
+            feature_label="知识加工生成",
+            entry_point="knowledge_processing",
+            metadata={
+                "source_type": str(runtime.get("source_type") or "").strip(),
+                "title": str(state.get("safe_title") or "").strip()[:80],
+                "workflow_id": workflow_definition["id"],
+            },
+        )
+        return {
+            "detail": "大模型已完成知识加工。",
+            "state_updates": {
+                "rendered_text": rendered_text,
+                "llm_model": {
+                    "key": llm_model.get("key"),
+                    "label": llm_model.get("label"),
+                    "model_name": llm_model.get("model_name"),
+                    "provider": llm_model.get("provider"),
+                },
+            },
+            "context_preview": {"output_chars": len(str(rendered_text or ""))},
+        }
+
+    def _knowledge_processing_output_executor(state, runtime, node, upstream):
+        rendered_text = str(state.get("rendered_text") or "").strip()
+        sections = _split_semantic_sentences(rendered_text)
+        summary = "；".join(sections[:3])[:220] if sections else (rendered_text[:220] if rendered_text else "暂无摘要")
+        return {
+            "detail": "已封装知识加工结果。",
+            "state_updates": {
+                "final_result": {
+                    "mode": "llm",
+                    "label": "大模型加工",
+                    "summary": summary,
+                    "key_points": sections[:3] or ["待补充关键要点"],
+                    "validation_nodes": [item for item in sections if any(token in item for token in ("验证", "跟踪", "观察", "确认"))][:3] or ["待补充验证节点"],
+                    "risk_points": [item for item in sections if any(token in item for token in ("风险", "边界", "不确定", "警惕"))][:3] or ["待补充风险边界"],
+                    "template_name": "llm_outline_v1",
+                    "rendered_text": rendered_text,
+                    "llm_model": copy.deepcopy(state.get("llm_model") or {}),
+                }
+            },
+            "context_preview": {"has_text": bool(rendered_text)},
+        }
+
+    execution = run_declared_agent_workflow(
+        workflow_definition,
+        runtime={
+            "raw_text": raw_text,
+            "source_type": source_type,
+            "title": title,
+            "source_detail": source_detail,
         },
-    }
+        executor_registry={
+            "knowledge_processing_input": _knowledge_processing_input_executor,
+            "knowledge_processing_prepare": _knowledge_processing_prepare_executor,
+            "knowledge_processing_llm": _knowledge_processing_llm_executor,
+            "knowledge_processing_output": _knowledge_processing_output_executor,
+        },
+    )
+    final_result = copy.deepcopy(execution["state"].get("final_result") or {})
+    final_result["workflow_meta"] = build_declared_agent_workflow_meta(
+        workflow_definition,
+        extras={"last_execution_steps": copy.deepcopy(execution.get("node_results") or {})},
+    )
+    return final_result
 
 
 def build_knowledge_processing_result(raw_text, processing_mode="algorithm", source_type="", title="", source_detail=""):
@@ -2110,47 +2181,205 @@ def build_empty_fund_dashboard_card(index=0):
     }
 
 
-def build_smart_indicator_preview(tenant_slug, payload):
+def _run_smart_indicator_agent_workflow(tenant_slug, payload, persist=False):
+    workflow_definition = build_default_smart_indicator_workflow_definition()
     tenant = get_tenant_by_slug(tenant_slug)
     body = payload if isinstance(payload, dict) else {}
-    selected_indicators = resolve_smart_indicator_selected_refs(tenant, body)
-    if not selected_indicators:
-        raise ValueError("selected_indicators_required")
-    prompt_text = str(body.get("prompt_text") or body.get("prompt") or "").strip()
-    if not prompt_text:
-        raise ValueError("prompt_text_required")
-    indicator_name = str(body.get("indicator_name") or body.get("name") or "").strip() or derive_smart_indicator_name(prompt_text, selected_indicators)
-    category = str(body.get("category") or "大V自定义指标").strip() or "大V自定义指标"
-    unit = str(body.get("unit") or "").strip()
-    generated = generate_smart_indicator_js(indicator_name, prompt_text, selected_indicators, tenant_slug=tenant_slug)
-    latest_map = {
-        row["indicator_code"]: dict(row)
-        for row in get_db().execute("SELECT * FROM indicator_latest_values").fetchall()
-    }
-    try:
-        numeric_value = evaluate_smart_indicator_formula_js(generated["formula_js"], selected_indicators, latest_map)
-        value = f"{numeric_value:.4f}".rstrip("0").rstrip(".")
-    except Exception:
-        numeric_value = None
-        value = "--"
-    algorithm_detail = str(body.get("description") or "").strip() or build_smart_indicator_algorithm_detail(prompt_text, selected_indicators)
-    interpretation = build_smart_indicator_interpretation(indicator_name, prompt_text, selected_indicators, value, unit)
-    return {
-        "indicator_code": "",
-        "indicator_name": indicator_name,
-        "category": category,
-        "value": value,
-        "numeric_value": numeric_value,
-        "unit": unit,
-        "assessment": interpretation,
-        "interpretation": interpretation,
-        "algorithm_detail": algorithm_detail,
-        "prompt_text": prompt_text,
-        "selected_indicators": selected_indicators,
-        "updated_at": now_ts(),
-        "formula_js": generated["formula_js"],
-        "formula_meta": generated,
-    }
+    existing = get_indicator_definition(body.get("indicator_code")) if body.get("indicator_code") else None
+
+    def _smart_input_executor(state, runtime, node, upstream):
+        return {
+            "detail": "已接收指标引用、提示词和展示配置。",
+            "context_preview": {
+                "persist_mode": bool(runtime.get("persist")),
+                "has_existing": bool(runtime.get("existing")),
+            },
+        }
+
+    def _smart_resolve_executor(state, runtime, node, upstream):
+        selected_indicators = resolve_smart_indicator_selected_refs(runtime.get("tenant"), runtime.get("body"))
+        if not selected_indicators:
+            raise ValueError("selected_indicators_required")
+        prompt_text = str((runtime.get("body") or {}).get("prompt_text") or (runtime.get("body") or {}).get("prompt") or "").strip()
+        if not prompt_text:
+            raise ValueError("prompt_text_required")
+        indicator_name = str((runtime.get("body") or {}).get("indicator_name") or (runtime.get("body") or {}).get("name") or "").strip() or derive_smart_indicator_name(prompt_text, selected_indicators)
+        algorithm_detail = str((runtime.get("body") or {}).get("description") or "").strip() or build_smart_indicator_algorithm_detail(prompt_text, selected_indicators)
+        return {
+            "detail": "已完成指标引用解析和提示词校验。",
+            "state_updates": {
+                "selected_indicators": selected_indicators,
+                "prompt_text": prompt_text,
+                "indicator_name": indicator_name,
+                "algorithm_detail": algorithm_detail,
+                "category": str((runtime.get("body") or {}).get("category") or "大V自定义指标").strip() or "大V自定义指标",
+                "unit": str((runtime.get("body") or {}).get("unit") or "").strip(),
+            },
+            "context_preview": {
+                "indicator_count": len(selected_indicators),
+                "indicator_name": indicator_name,
+            },
+        }
+
+    def _smart_compile_executor(state, runtime, node, upstream):
+        provided_formula_js = str((runtime.get("body") or {}).get("formula_js") or "").strip()
+        if provided_formula_js:
+            generated = {
+                "formula_js": validate_smart_indicator_js(provided_formula_js, state.get("selected_indicators") or []),
+                "generator": "preview_confirmed",
+                "llm_used": False,
+            }
+        else:
+            generated = generate_smart_indicator_js(
+                state.get("indicator_name") or "",
+                state.get("prompt_text") or "",
+                state.get("selected_indicators") or [],
+                tenant_slug=runtime.get("tenant_slug") or "",
+            )
+        return {
+            "detail": f"已完成公式编译：{generated.get('generator') or 'unknown'}。",
+            "state_updates": {"generated_formula_meta": generated},
+            "context_preview": {
+                "llm_used": bool(generated.get("llm_used")),
+                "generator": generated.get("generator") or "",
+            },
+        }
+
+    def _smart_preview_executor(state, runtime, node, upstream):
+        latest_map = {
+            row["indicator_code"]: dict(row)
+            for row in get_db().execute("SELECT * FROM indicator_latest_values").fetchall()
+        }
+        try:
+            numeric_value = evaluate_smart_indicator_formula_js(
+                (state.get("generated_formula_meta") or {}).get("formula_js"),
+                state.get("selected_indicators") or [],
+                latest_map,
+            )
+            value = f"{numeric_value:.4f}".rstrip("0").rstrip(".")
+        except Exception:
+            numeric_value = None
+            value = "--"
+        interpretation = build_smart_indicator_interpretation(
+            state.get("indicator_name") or "",
+            state.get("prompt_text") or "",
+            state.get("selected_indicators") or [],
+            value,
+            state.get("unit") or "",
+        )
+        preview = {
+            "indicator_code": "",
+            "indicator_name": state.get("indicator_name") or "",
+            "category": state.get("category") or "大V自定义指标",
+            "value": value,
+            "numeric_value": numeric_value,
+            "unit": state.get("unit") or "",
+            "assessment": interpretation,
+            "interpretation": interpretation,
+            "algorithm_detail": state.get("algorithm_detail") or "",
+            "prompt_text": state.get("prompt_text") or "",
+            "selected_indicators": copy.deepcopy(state.get("selected_indicators") or []),
+            "updated_at": now_ts(),
+            "formula_js": (state.get("generated_formula_meta") or {}).get("formula_js") or "",
+            "formula_meta": copy.deepcopy(state.get("generated_formula_meta") or {}),
+        }
+        return {
+            "detail": "已完成智能指标预览求值。",
+            "state_updates": {"preview_result": preview},
+            "context_preview": {"value": value, "has_numeric_value": numeric_value is not None},
+        }
+
+    def _smart_persist_executor(state, runtime, node, upstream):
+        if not runtime.get("persist"):
+            return {
+                "status": "skipped",
+                "detail": "当前为预览模式，未执行持久化。",
+                "output": copy.deepcopy(state.get("preview_result") or {}),
+                "state_key": "final_result",
+            }
+        definition = save_indicator_definition(
+            {
+                **(runtime.get("existing") or {}),
+                **(runtime.get("body") or {}),
+                "tenant_slug": runtime.get("tenant_slug") or "",
+                "indicator_name": state.get("indicator_name") or "",
+                "category": state.get("category") or "大V自定义指标",
+                "description": state.get("algorithm_detail") or "",
+                "owner": ((runtime.get("tenant") or {}).get("advisor") or "大V"),
+                "source_type": "smart",
+                "source_type_label": "智能指标",
+                "provider": "LLM / Prompt Formula",
+                "status_hint": str((runtime.get("body") or {}).get("status_hint") or "good").strip() or "good",
+                "assessment_template": str((runtime.get("body") or {}).get("assessment_template") or build_smart_indicator_interpretation(state.get("indicator_name"), state.get("prompt_text"), state.get("selected_indicators"), "实时值", (runtime.get("body") or {}).get("unit") or "")).strip(),
+                "alert_template": str((runtime.get("body") or {}).get("alert_template") or "").strip(),
+                "prompt_text": state.get("prompt_text") or "",
+                "formula_js": (state.get("generated_formula_meta") or {}).get("formula_js") or "",
+                "selected_indicators": copy.deepcopy(state.get("selected_indicators") or []),
+                "display_order": int((runtime.get("body") or {}).get("display_order") or 0),
+                "watchers": ["大V工作台", "H5 Dashboard", "租户门户"],
+                "display_config": {"show_in_h5": True, "show_in_workbench": True},
+                "enabled": (runtime.get("body") or {}).get("enabled", True),
+            }
+        )
+        latest_snapshot = save_smart_indicator_latest_snapshot(definition)
+        saved_site_config = None
+        if (runtime.get("body") or {}).get("add_to_dashboard", True):
+            saved_site_config = append_smart_indicator_to_dashboard(
+                runtime.get("tenant_slug") or "",
+                definition["indicator_code"],
+                title=str((runtime.get("body") or {}).get("dashboard_title") or "智能指标 Dashboard").strip() or "智能指标 Dashboard",
+                layout=(runtime.get("body") or {}).get("layout"),
+                publisher=((runtime.get("tenant") or {}).get("advisor") or "大V"),
+            )
+        latest_tenant = get_tenant_by_slug(runtime.get("tenant_slug") or "", saved_site_config) if saved_site_config else runtime.get("tenant")
+        result = {
+            "definition": get_indicator_definition(definition["indicator_code"]),
+            "latest_snapshot": latest_snapshot,
+            "tenant": latest_tenant,
+            "formula_meta": copy.deepcopy(state.get("generated_formula_meta") or {}),
+        }
+        return {
+            "detail": "已保存智能指标定义并同步 Dashboard。",
+            "output": result,
+            "state_key": "final_result",
+            "context_preview": {"indicator_code": definition.get("indicator_code") or "", "dashboard_sync": bool((runtime.get("body") or {}).get("add_to_dashboard", True))},
+        }
+
+    execution = run_declared_agent_workflow(
+        workflow_definition,
+        runtime={
+            "tenant_slug": tenant_slug,
+            "tenant": tenant,
+            "body": body,
+            "existing": existing,
+            "persist": bool(persist),
+        },
+        executor_registry={
+            "smart_indicator_input": _smart_input_executor,
+            "smart_indicator_resolve": _smart_resolve_executor,
+            "smart_indicator_compile": _smart_compile_executor,
+            "smart_indicator_preview": _smart_preview_executor,
+            "smart_indicator_publish": _smart_persist_executor,
+        },
+    )
+    final_result = execution["state"].get("final_result") or {}
+    if not persist:
+        final_result = dict(final_result)
+        final_result["workflow_meta"] = build_declared_agent_workflow_meta(
+            workflow_definition,
+            extras={"last_execution_steps": copy.deepcopy(execution.get("node_results") or {})},
+        )
+    else:
+        final_result = dict(final_result)
+        final_result["workflow_meta"] = build_declared_agent_workflow_meta(
+            workflow_definition,
+            extras={"last_execution_steps": copy.deepcopy(execution.get("node_results") or {})},
+        )
+    return final_result
+
+
+def build_smart_indicator_preview(tenant_slug, payload):
+    return _run_smart_indicator_agent_workflow(tenant_slug, payload, persist=False)
 
 
 def build_default_fund_dashboard_cards(tenant, layout="2x2"):
@@ -2472,67 +2701,7 @@ def remove_smart_indicator_from_dashboard(tenant_slug, indicator_code):
 
 
 def create_or_update_tenant_smart_indicator(tenant_slug, payload):
-    tenant = get_tenant_by_slug(tenant_slug)
-    body = payload if isinstance(payload, dict) else {}
-    existing = get_indicator_definition(body.get("indicator_code")) if body.get("indicator_code") else None
-    selected_indicators = resolve_smart_indicator_selected_refs(tenant, body)
-    if not selected_indicators:
-        raise ValueError("selected_indicators_required")
-    prompt_text = str(body.get("prompt_text") or body.get("prompt") or "").strip()
-    if not prompt_text:
-        raise ValueError("prompt_text_required")
-    indicator_name = str(body.get("indicator_name") or body.get("name") or "").strip() or derive_smart_indicator_name(prompt_text, selected_indicators)
-    algorithm_detail = str(body.get("description") or "").strip() or build_smart_indicator_algorithm_detail(prompt_text, selected_indicators)
-    provided_formula_js = str(body.get("formula_js") or "").strip()
-    if provided_formula_js:
-        generated = {
-            "formula_js": validate_smart_indicator_js(provided_formula_js, selected_indicators),
-            "generator": "preview_confirmed",
-            "llm_used": False,
-        }
-    else:
-        generated = generate_smart_indicator_js(indicator_name, prompt_text, selected_indicators, tenant_slug=tenant_slug)
-    definition = save_indicator_definition(
-        {
-            **(existing or {}),
-            **body,
-            "tenant_slug": tenant_slug,
-            "indicator_name": indicator_name,
-            "category": str(body.get("category") or "大V自定义指标").strip() or "大V自定义指标",
-            "description": algorithm_detail,
-            "owner": tenant.get("advisor") or "大V",
-            "source_type": "smart",
-            "source_type_label": "智能指标",
-            "provider": "LLM / Prompt Formula",
-            "status_hint": str(body.get("status_hint") or "good").strip() or "good",
-            "assessment_template": str(body.get("assessment_template") or build_smart_indicator_interpretation(indicator_name, prompt_text, selected_indicators, "实时值", body.get("unit") or "")).strip(),
-            "alert_template": str(body.get("alert_template") or "").strip(),
-            "prompt_text": prompt_text,
-            "formula_js": generated["formula_js"],
-            "selected_indicators": selected_indicators,
-            "display_order": int(body.get("display_order") or 0),
-            "watchers": ["大V工作台", "H5 Dashboard", "租户门户"],
-            "display_config": {"show_in_h5": True, "show_in_workbench": True},
-            "enabled": body.get("enabled", True),
-        }
-    )
-    latest_snapshot = save_smart_indicator_latest_snapshot(definition)
-    saved_site_config = None
-    if body.get("add_to_dashboard", True):
-        saved_site_config = append_smart_indicator_to_dashboard(
-            tenant_slug,
-            definition["indicator_code"],
-            title=str(body.get("dashboard_title") or "智能指标 Dashboard").strip() or "智能指标 Dashboard",
-            layout=body.get("layout"),
-            publisher=tenant.get("advisor") or "大V",
-        )
-    latest_tenant = get_tenant_by_slug(tenant_slug, saved_site_config) if saved_site_config else tenant
-    return {
-        "definition": get_indicator_definition(definition["indicator_code"]),
-        "latest_snapshot": latest_snapshot,
-        "tenant": latest_tenant,
-        "formula_meta": generated,
-    }
+    return _run_smart_indicator_agent_workflow(tenant_slug, payload, persist=True)
 
 
 def normalize_tenant_configs(source=None):

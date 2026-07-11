@@ -65,6 +65,8 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertTrue(payload["web_answer"])
         self.assertIn("agent_trace", payload)
         self.assertTrue(payload["agent_trace"]["steps"])
+        self.assertIn("workflow_meta", payload)
+        self.assertEqual(payload["workflow_meta"]["id"], "hermes_agent")
 
     def test_workbench_pages_render(self):
         for tenant_slug in self.tenant_slugs:
@@ -111,6 +113,46 @@ class RouteSmokeTest(unittest.TestCase):
                 self.assertTrue(payload["success"])
                 self.assertIn("smart_indicator_catalog", payload)
                 self.assertIn("dashboard", payload)
+
+    def test_admin_agent_workflows_api_payloads(self):
+        response = self.client.get("/api/admin/agent-workflows")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertIn("center", payload)
+        workflows = payload["center"]["workflows"]
+        workflow_ids = {item["id"] for item in workflows}
+        self.assertIn("hermes_agent", workflow_ids)
+        self.assertIn("smart_indicator_agent", workflow_ids)
+        self.assertIn("review_voice_enhancement", workflow_ids)
+        self.assertIn("knowledge_query_agent", workflow_ids)
+        self.assertIn("evidence_chain_agent", workflow_ids)
+        self.assertIn("knowledge_processing_agent", workflow_ids)
+
+    def test_knowledge_query_api_returns_workflow_meta(self):
+        response = self.client.post(
+            "/api/kol/knowledge/query",
+            json={"tenant_slug": self.tenant_slugs[0], "query": "测试知识问题", "submit_to_model": False},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertIn("workflow_meta", payload)
+        self.assertEqual(payload["workflow_meta"]["id"], "knowledge_query_agent")
+
+    def test_evidence_chain_api_returns_workflow_meta(self):
+        response = self.client.post(
+            "/api/evidence-chain/query",
+            json={"tenant_slug": self.tenant_slugs[0], "query": "测试证据问题", "submit_to_model": False},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertIn("workflow_meta", payload)
+        self.assertEqual(payload["workflow_meta"]["id"], "evidence_chain_agent")
 
 
 if __name__ == "__main__":

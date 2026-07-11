@@ -726,6 +726,42 @@
   }
   .workflow-catalog-item strong { display:block; font-size:13px; margin-bottom:4px; color:var(--text-main); }
   .workflow-catalog-item span { display:block; font-size:11px; line-height:1.6; color:var(--text-sub); }
+  .agent-workflow-list { display:grid; gap:10px; }
+  .agent-workflow-item {
+    text-align:left;
+    padding:12px 14px;
+    border-radius:12px;
+    border:1px solid rgba(200,169,110,0.12);
+    background:var(--surface);
+    color:var(--text-main);
+    cursor:pointer;
+    transition:all 0.18s ease;
+  }
+  .agent-workflow-item.is-active {
+    border-color:rgba(47,116,192,0.35);
+    box-shadow:0 10px 24px rgba(47,116,192,0.08);
+  }
+  .agent-workflow-item-title { font-size:13px; font-weight:700; color:var(--text-main); }
+  .agent-workflow-item-desc { font-size:11px; line-height:1.6; color:var(--text-sub); margin-top:5px; }
+  .agent-workflow-chip-row { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .agent-workflow-chip {
+    font-size:10px;
+    color:var(--gold);
+    border:1px solid rgba(200,169,110,0.14);
+    border-radius:999px;
+    padding:3px 8px;
+    background:var(--surface-2);
+  }
+  .workflow-node-copy { margin-top:8px; font-size:11px; line-height:1.65; color:var(--text-sub); }
+  .agent-workflow-metric-grid { display:grid; gap:10px; }
+  .agent-workflow-metric {
+    padding:12px 14px;
+    border:1px solid var(--border-soft);
+    border-radius:10px;
+    background:var(--surface-2);
+  }
+  .agent-workflow-metric-label { font-size:11px; color:var(--text-sub); }
+  .agent-workflow-metric-value { font-size:18px; font-weight:700; color:var(--text-main); margin-top:6px; }
   .workflow-toolbar {
     display:flex;
     justify-content:space-between;
@@ -1205,6 +1241,9 @@
         <div class="admin-nav-group-body">
         <div class="admin-nav-item" data-section="hermes" data-feature="hermes" onclick="showSection('hermes', this)">
           <span class="admin-nav-icon">&#9881;</span> 使用统计
+        </div>
+        <div class="admin-nav-item" data-section="agent-workflows" data-feature="system_module" onclick="showSection('agent-workflows', this)">
+          <span class="admin-nav-icon">&#129504;</span> 智能体工作流
         </div>
         <div class="admin-nav-item" data-section="forecast-model" data-feature="stock_forecast" onclick="showSection('forecast-model', this)">
           <span class="admin-nav-icon">&#128200;</span> 预测模型
@@ -3080,6 +3119,39 @@
         </div>
       </div><!-- end section-hermes -->
 
+      <div id="section-agent-workflows" style="display:none">
+        <div class="section-header">
+          <div>
+            <div class="section-title">智能体工作流中心</div>
+            <div class="section-subtitle">统一查看 Hermes、复盘、智能指标、知识问答、证据链、知识加工与预测算法的设计链路。除预测算法外，其余智能体已统一纳入声明式工作流执行框架。</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <span id="agent-workflow-stats" class="admin-build-tag">0 个智能体工作流</span>
+          </div>
+        </div>
+        <div class="workflow-shell">
+          <aside class="chart-card">
+            <div class="chart-title">智能体列表</div>
+            <div class="chart-subtitle">平台内所有智能体程序都应该纳入这里统一审视。</div>
+            <div id="agent-workflow-list" class="agent-workflow-list" style="margin-top:12px"></div>
+          </aside>
+          <section class="chart-card">
+            <div class="chart-title" id="agent-workflow-title">工作流详情</div>
+            <div class="chart-subtitle" id="agent-workflow-summary">这里展示智能体的设计流转和关键节点职责。</div>
+            <div class="workflow-stage" style="margin-top:16px;min-height:680px">
+              <div id="agent-workflow-stage-viewport" class="workflow-stage-viewport" style="min-height:680px">
+                <svg id="agent-workflow-edge-layer" class="workflow-edge-layer"></svg>
+                <div id="agent-workflow-board" class="workflow-board workflow-board-canvas" style="min-height:680px"></div>
+              </div>
+            </div>
+          </section>
+          <aside class="chart-card">
+            <div class="chart-title">节点检查器</div>
+            <div id="agent-workflow-inspector" class="forecast-config-board"></div>
+          </aside>
+        </div>
+      </div><!-- end section-agent-workflows -->
+
       <!-- ===== FORECAST MODEL ===== -->
       <div id="section-forecast-model" style="display:none">
         <div class="section-header">
@@ -4246,7 +4318,7 @@
 const sectionTitles = {
   overview:'运营概览', users:'用户列表', segments:'用户分层', points:'积分管理',
   kols:'大V投顾管理', commission:'收益结算', community:'帖子审核',
-  events:'活动管理', hermes:'Hermes使用统计', 'forecast-model':'预测模型', channels:'渠道管理',
+  events:'活动管理', hermes:'Hermes使用统计', 'agent-workflows':'智能体工作流中心', 'forecast-model':'预测模型', channels:'渠道管理',
   'indicator-overview':'指标专区 · 总览控制台',
   'indicator-smart':'指标专区 · 智能指标',
   'indicator-lake':'指标专区 · 数据湖指标',
@@ -4356,6 +4428,9 @@ function showSection(name, navEl) {
   document.getElementById('section-' + name).style.display = 'block';
   setActiveAdminNav(navEl || document.querySelector(`.admin-nav-item[data-section="${name}"]`));
   document.getElementById('page-title').textContent = sectionTitles[name];
+  if (name === 'agent-workflows') {
+    loadAdminAgentWorkflows().catch((error) => showToast(error.message || '加载失败'));
+  }
   if (name === 'forecast-model') {
     initForecastEditorEvents();
     loadAdminForecastModel().catch((error) => showToast(error.message || '加载失败'));
@@ -6030,6 +6105,10 @@ async function openAdminIndicatorHistory(indicatorId) {
 
 let adminUsers = [];
 const ADMIN_USER_IMPORT_COLUMNS = ['username', 'password', 'phone', 'role', 'tenant_slug', 'advisor_name', 'status'];
+let agentWorkflowCenter = {summary: {}, workflows: []};
+let selectedAgentWorkflowId = '';
+let selectedAgentWorkflowNodeId = '';
+let agentWorkflowLoaded = false;
 let forecastConfig = {};
 let forecastWorkflowMeta = {};
 let forecastGraph = {nodes: [], edges: [], tuning: {}};
@@ -6337,6 +6416,210 @@ async function handleAdminUserCsvImport(file) {
   } catch (error) {
     showToast(error.message || 'CSV 导入失败');
   }
+}
+
+function getSelectedAgentWorkflow() {
+  return (agentWorkflowCenter.workflows || []).find((item) => item.id === selectedAgentWorkflowId) || null;
+}
+
+function renderAgentWorkflowDirectory() {
+  const host = document.getElementById('agent-workflow-list');
+  const stats = document.getElementById('agent-workflow-stats');
+  if (!host) return;
+  const workflows = Array.isArray(agentWorkflowCenter.workflows) ? agentWorkflowCenter.workflows : [];
+  if (!selectedAgentWorkflowId && workflows.length) {
+    selectedAgentWorkflowId = workflows[0].id || '';
+  }
+  const selected = getSelectedAgentWorkflow();
+  if (selected && !selectedAgentWorkflowNodeId) {
+    selectedAgentWorkflowNodeId = (((selected.graph || {}).nodes || [])[0] || {}).id || '';
+  }
+  host.innerHTML = workflows.map((item) => `
+    <button type="button" class="agent-workflow-item ${item.id === selectedAgentWorkflowId ? 'is-active' : ''}" data-agent-workflow-id="${escapeAttr(item.id || '')}">
+      <div class="agent-workflow-item-title">${escapeHtml(item.title || item.id || '-')}</div>
+      <div class="agent-workflow-item-desc">${escapeHtml(item.summary || '')}</div>
+      <div class="agent-workflow-chip-row">
+        <span class="agent-workflow-chip">${escapeHtml(item.execution_mode || 'workflow')}</span>
+        <span class="agent-workflow-chip">${escapeHtml(item.category || '未分类')}</span>
+      </div>
+    </button>
+  `).join('') || '<div class="compact-row"><strong>暂无工作流</strong><span>0</span></div>';
+  host.querySelectorAll('[data-agent-workflow-id]').forEach((node) => {
+    node.addEventListener('click', () => {
+      selectedAgentWorkflowId = node.dataset.agentWorkflowId || '';
+      selectedAgentWorkflowNodeId = '';
+      renderAgentWorkflowCenter();
+    });
+  });
+  if (stats) stats.textContent = `${workflows.length} 个智能体工作流`;
+}
+
+function renderAgentWorkflowGraph() {
+  const titleNode = document.getElementById('agent-workflow-title');
+  const summaryNode = document.getElementById('agent-workflow-summary');
+  const board = document.getElementById('agent-workflow-board');
+  const layer = document.getElementById('agent-workflow-edge-layer');
+  const viewport = document.getElementById('agent-workflow-stage-viewport');
+  const workflow = getSelectedAgentWorkflow();
+  if (!workflow || !board || !layer || !viewport) return;
+  const graph = workflow.graph || {};
+  const nodes = Array.isArray(graph.nodes) ? graph.nodes : [];
+  const edges = Array.isArray(graph.edges) ? graph.edges : [];
+  if (titleNode) titleNode.textContent = workflow.title || '工作流详情';
+  if (summaryNode) {
+    const preview = workflow.preview && typeof workflow.preview === 'object' ? workflow.preview.result || {} : {};
+    summaryNode.textContent = preview.predicted_change_pct !== undefined
+      ? `${workflow.summary || ''} 当前预览目标 ${Number(preview.predicted_change_pct || 0).toFixed(2)}%，波动上限 ${Number(preview.volatility_cap || 0).toFixed(2)}。`
+      : (workflow.summary || '这里展示智能体的设计流转和关键节点职责。');
+  }
+  if (!selectedAgentWorkflowNodeId && nodes.length) {
+    selectedAgentWorkflowNodeId = (nodes[0] || {}).id || '';
+  }
+  if (!nodes.length) {
+    board.innerHTML = '<div class="compact-row"><strong>暂无节点</strong><span>0</span></div>';
+    layer.innerHTML = '';
+    return;
+  }
+  const width = Math.max(1480, ...nodes.map((item) => Number(item.x || 0) + 280));
+  const height = Math.max(680, ...nodes.map((item) => Number(item.y || 0) + 180));
+  board.style.width = `${width}px`;
+  board.style.height = `${height}px`;
+  viewport.style.width = `${width}px`;
+  viewport.style.height = `${height}px`;
+  layer.setAttribute('width', String(width));
+  layer.setAttribute('height', String(height));
+  layer.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  layer.innerHTML = `
+    <defs>
+      <marker id="agent-workflow-arrowhead" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M 0 1 L 11 6 L 0 11 z" fill="rgba(47, 116, 192, 0.96)"></path>
+      </marker>
+    </defs>
+    ${edges.map((edge) => {
+      const fromNode = nodes.find((item) => item.id === edge.from);
+      const toNode = nodes.find((item) => item.id === edge.to);
+      if (!fromNode || !toNode) return '';
+      const startX = Number(fromNode.x || 0) + 220;
+      const startY = Number(fromNode.y || 0) + 52;
+      const endX = Number(toNode.x || 0);
+      const endY = Number(toNode.y || 0) + 52;
+      const deltaX = endX - startX;
+      const controlOffset = Math.max(80, Math.min(180, Math.abs(deltaX) * 0.45));
+      const controlA = startX + (deltaX >= 0 ? controlOffset : -controlOffset);
+      const controlB = endX - (deltaX >= 0 ? controlOffset : -controlOffset);
+      const path = `M ${startX} ${startY} C ${controlA} ${startY}, ${controlB} ${endY}, ${endX} ${endY}`;
+      return `
+        <g data-edge-id="${escapeAttr(edge.id || '')}">
+          <path class="workflow-edge-shadow" d="${path}"></path>
+          <path class="workflow-edge" d="${path}" marker-end="url(#agent-workflow-arrowhead)"></path>
+          <circle class="workflow-edge-anchor" cx="${startX}" cy="${startY}" r="5"></circle>
+          <circle class="workflow-edge-anchor" cx="${endX}" cy="${endY}" r="5"></circle>
+        </g>
+      `;
+    }).join('')}
+  `;
+  board.innerHTML = nodes.map((item) => `
+    <article class="workflow-node ${item.id === selectedAgentWorkflowNodeId ? 'is-selected' : ''}" data-agent-node-id="${escapeAttr(item.id || '')}" style="left:${Number(item.x || 0)}px;top:${Number(item.y || 0)}px;cursor:default">
+      <div class="workflow-node-head">
+        <strong>${escapeHtml(item.label || item.id || '-')}</strong>
+        <span class="workflow-node-type">${escapeHtml(item.processor || item.kind || '')}</span>
+      </div>
+      <div class="workflow-node-copy">${escapeHtml(item.description || '暂无节点说明')}</div>
+    </article>
+  `).join('');
+  board.querySelectorAll('[data-agent-node-id]').forEach((node) => {
+    node.addEventListener('click', () => {
+      selectedAgentWorkflowNodeId = node.dataset.agentNodeId || '';
+      renderAgentWorkflowGraph();
+      renderAgentWorkflowInspector();
+    });
+  });
+}
+
+function renderAgentWorkflowInspector() {
+  const host = document.getElementById('agent-workflow-inspector');
+  if (!host) return;
+  const workflow = getSelectedAgentWorkflow();
+  if (!workflow) {
+    host.innerHTML = '<div class="compact-row"><strong>未选中工作流</strong><span>请选择左侧智能体</span></div>';
+    return;
+  }
+  const graph = workflow.graph || {};
+  const nodes = Array.isArray(graph.nodes) ? graph.nodes : [];
+  const selectedNode = nodes.find((item) => item.id === selectedAgentWorkflowNodeId) || nodes[0] || null;
+  const nodeResults = workflow.execution?.node_results || workflow.preview?.node_results || graph.node_results || {};
+  const nodeDebug = selectedNode ? nodeResults[selectedNode.id] : null;
+  const preview = workflow.preview && typeof workflow.preview === 'object' ? workflow.preview : {};
+  const previewLines = preview.result && typeof preview.result === 'object'
+    ? Object.entries(preview.result).map(([key, value]) => `<div class="result-line"><strong>${escapeHtml(key)}</strong> · ${escapeHtml(String(value))}</div>`).join('')
+    : '<div class="result-line">当前工作流暂无运行预览。</div>';
+  host.innerHTML = `
+    <div class="agent-workflow-metric-grid">
+      <div class="agent-workflow-metric">
+        <div class="agent-workflow-metric-label">执行框架</div>
+        <div class="agent-workflow-metric-value">${escapeHtml(workflow.execution_mode || 'workflow')}</div>
+      </div>
+      <div class="agent-workflow-metric">
+        <div class="agent-workflow-metric-label">节点数量</div>
+        <div class="agent-workflow-metric-value">${nodes.length}</div>
+      </div>
+    </div>
+    <div class="forecast-inspector-section" style="margin-top:12px">
+      <div class="forecast-config-section-title">工作流说明</div>
+      <div class="forecast-debug-copy">${escapeHtml(workflow.summary || '暂无说明')}</div>
+      <div class="agent-workflow-chip-row">
+        ${(Array.isArray(workflow.tags) ? workflow.tags : []).map((item) => `<span class="agent-workflow-chip">${escapeHtml(item)}</span>`).join('') || '<span class="agent-workflow-chip">暂无标签</span>'}
+      </div>
+    </div>
+    <div class="forecast-inspector-section" style="margin-top:12px">
+      <div class="forecast-config-section-title">当前节点</div>
+      ${selectedNode ? `
+        <div class="forecast-config-field">
+          <span>节点名称</span>
+          <div class="forecast-debug-copy">${escapeHtml(selectedNode.label || selectedNode.id || '-')}</div>
+        </div>
+        <div class="forecast-config-field">
+          <span>节点职责</span>
+          <div class="forecast-debug-copy">${escapeHtml(selectedNode.description || '暂无')}</div>
+        </div>
+        <div class="forecast-config-field">
+          <span>节点类型</span>
+          <div class="forecast-debug-copy">${escapeHtml(selectedNode.processor || selectedNode.kind || '-')}</div>
+        </div>
+      ` : '<div class="compact-row"><strong>暂无节点</strong><span>0</span></div>'}
+      ${nodeDebug ? `
+        <div class="forecast-config-field">
+          <span>最近执行说明</span>
+          <div class="forecast-debug-copy">${escapeHtml(nodeDebug.detail || '暂无')}</div>
+        </div>
+      ` : ''}
+    </div>
+    <div class="forecast-inspector-section" style="margin-top:12px">
+      <div class="forecast-config-section-title">运行预览</div>
+      <div class="forecast-debug-list">${previewLines}</div>
+    </div>
+  `;
+}
+
+function renderAgentWorkflowCenter() {
+  renderAgentWorkflowDirectory();
+  renderAgentWorkflowGraph();
+  renderAgentWorkflowInspector();
+}
+
+async function loadAdminAgentWorkflows(forceReload) {
+  if (agentWorkflowLoaded && !forceReload) {
+    renderAgentWorkflowCenter();
+    return;
+  }
+  const response = await fetch('/api/admin/agent-workflows');
+  const data = await response.json();
+  if (!response.ok || data.ok === false) throw new Error(data.error || 'agent_workflows_failed');
+  agentWorkflowCenter = data.center || {summary: {}, workflows: []};
+  selectedAgentWorkflowId = selectedAgentWorkflowId || (((agentWorkflowCenter.workflows || [])[0] || {}).id || '');
+  selectedAgentWorkflowNodeId = '';
+  agentWorkflowLoaded = true;
+  renderAgentWorkflowCenter();
 }
 
 function renderForecastWorkflow() {

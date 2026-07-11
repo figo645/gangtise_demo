@@ -405,6 +405,7 @@ def api_tenant_smart_indicators(tenant_slug):
                 "success": True,
                 "preview": preview,
                 "formula_meta": preview.get("formula_meta") or {},
+                "workflow_meta": preview.get("workflow_meta") or {},
                 "smart_indicator_catalog": {
                     "tenant_smart_indicators": build_tenant_smart_indicator_catalog(tenant),
                     "base_indicators": build_dashboard_base_indicator_options(tenant),
@@ -438,6 +439,7 @@ def api_tenant_smart_indicators(tenant_slug):
             "definition": result["definition"],
             "latest_snapshot": result["latest_snapshot"],
             "formula_meta": result["formula_meta"],
+            "workflow_meta": result.get("workflow_meta") or {},
             "dashboard": payload,
             "smart_indicator_catalog": payload.get("smart_indicator_catalog"),
             "fund_dashboard_state": payload.get("fund_dashboard_state"),

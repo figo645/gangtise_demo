@@ -1,6 +1,7 @@
 from src.runtime import *
 from src.domain.core_services import *
 from src.domain.core_services import _estimate_token_count, _extract_usage_tokens
+from src.domain.agent_workflows import *
 from src.domain.market_services import *
 from src.web.request_helpers import get_client_ip
 from flask import has_request_context
@@ -178,52 +179,120 @@ def _is_truthy_flag(value):
 
 
 def enhance_review_voice_transcript_with_llm(transcript, entry_point="", speaker_name="", tenant_slug=""):
-    normalized_transcript = str(transcript or "").strip()
-    if not normalized_transcript:
-        raise ValueError("empty_transcript")
-    llm_model = get_default_llm_config(purpose="general")
-    if not llm_model:
-        raise RuntimeError("llm_model_unavailable")
-    context_label = "语音转写增强"
-    if entry_point:
-        context_label = f"{context_label} · {entry_point}"
-    speaker_label = str(speaker_name or "").strip() or "未命名用户"
-    system_prompt = (
-        "你是一个中文语音纪要整理助手。"
-        "请基于原始转写内容做轻量增强整理，去掉明显口语噪音和重复，修复少量语病，"
-        "保留原始事实、观点、风险提示与不确定性，不要补充原文没有提到的信息，不要编造数字。"
-        "输出纯文本，优先按自然段组织；如果原文明显包含多个观点，可以拆成短段。"
-    )
-    user_prompt = (
-        f"场景：{context_label}\n"
-        f"说话人：{speaker_label}\n"
-        "请输出更适合后续知识入库或文案编辑的整理稿。"
-        "如果原始转写已经足够清晰，只做最少改动。\n\n"
-        f"原始转写：\n{normalized_transcript}"
-    )
-    enhanced_text = call_openai_compatible_llm(
-        llm_model,
-        system_prompt,
-        user_prompt,
-        feature_code="review_voice_enhancement",
-        feature_label="语音转写增强",
-        tenant_slug=tenant_slug,
-        entry_point=entry_point,
-        metadata={"speaker_name": speaker_label},
-    )
-    normalized_enhanced = str(enhanced_text or "").strip()
-    if not normalized_enhanced:
-        raise RuntimeError("empty_llm_response")
-    return {
-        "text": normalized_enhanced,
-        "model": {
-            "key": llm_model.get("key"),
-            "label": llm_model.get("label"),
-            "provider": llm_model.get("provider"),
-            "model_name": llm_model.get("model_name"),
-            "purpose": llm_model.get("purpose"),
+    workflow_definition = build_default_review_voice_enhancement_workflow_definition()
+
+    def _voice_input_executor(state, runtime, node, upstream):
+        normalized_transcript = str(runtime.get("transcript") or "").strip()
+        if not normalized_transcript:
+            raise ValueError("empty_transcript")
+        speaker_label = str(runtime.get("speaker_name") or "").strip() or "未命名用户"
+        context_label = "语音转写增强"
+        if runtime.get("entry_point"):
+            context_label = f"{context_label} · {runtime.get('entry_point')}"
+        return {
+            "detail": "已接收原始转写内容。",
+            "state_updates": {
+                "normalized_transcript": normalized_transcript,
+                "speaker_label": speaker_label,
+                "context_label": context_label,
+            },
+            "context_preview": {
+                "source_chars": len(normalized_transcript),
+                "speaker_name": speaker_label,
+            },
+        }
+
+    def _voice_prepare_executor(state, runtime, node, upstream):
+        system_prompt = (
+            "你是一个中文语音纪要整理助手。"
+            "请基于原始转写内容做轻量增强整理，去掉明显口语噪音和重复，修复少量语病，"
+            "保留原始事实、观点、风险提示与不确定性，不要补充原文没有提到的信息，不要编造数字。"
+            "输出纯文本，优先按自然段组织；如果原文明显包含多个观点，可以拆成短段。"
+        )
+        user_prompt = (
+            f"场景：{state.get('context_label') or '语音转写增强'}\n"
+            f"说话人：{state.get('speaker_label') or '未命名用户'}\n"
+            "请输出更适合后续知识入库或文案编辑的整理稿。"
+            "如果原始转写已经足够清晰，只做最少改动。\n\n"
+            f"原始转写：\n{state.get('normalized_transcript') or ''}"
+        )
+        return {
+            "detail": "已生成语音增强提示词。",
+            "state_updates": {
+                "system_prompt": system_prompt,
+                "user_prompt": user_prompt,
+            },
+            "context_preview": {"prompt_chars": len(user_prompt)},
+        }
+
+    def _voice_llm_executor(state, runtime, node, upstream):
+        llm_model = get_default_llm_config(purpose="general")
+        if not llm_model:
+            raise RuntimeError("llm_model_unavailable")
+        enhanced_text = call_openai_compatible_llm(
+            llm_model,
+            state.get("system_prompt") or "",
+            state.get("user_prompt") or "",
+            feature_code="review_voice_enhancement",
+            feature_label="语音转写增强",
+            tenant_slug=str(runtime.get("tenant_slug") or "").strip(),
+            entry_point=str(runtime.get("entry_point") or "").strip(),
+            metadata={
+                "speaker_name": state.get("speaker_label") or "",
+                "workflow_id": workflow_definition["id"],
+            },
+        )
+        normalized_enhanced = str(enhanced_text or "").strip()
+        if not normalized_enhanced:
+            raise RuntimeError("empty_llm_response")
+        return {
+            "detail": "大模型已完成语音整理。",
+            "state_updates": {
+                "enhanced_text": normalized_enhanced,
+                "llm_model": {
+                    "key": llm_model.get("key"),
+                    "label": llm_model.get("label"),
+                    "provider": llm_model.get("provider"),
+                    "model_name": llm_model.get("model_name"),
+                    "purpose": llm_model.get("purpose"),
+                },
+            },
+            "context_preview": {"output_chars": len(normalized_enhanced)},
+        }
+
+    def _voice_output_executor(state, runtime, node, upstream):
+        return {
+            "detail": "已封装语音增强结果。",
+            "state_updates": {
+                "final_result": {
+                    "text": state.get("enhanced_text") or "",
+                    "model": copy.deepcopy(state.get("llm_model") or {}),
+                }
+            },
+            "context_preview": {"has_text": bool(state.get("enhanced_text"))},
+        }
+
+    execution = run_declared_agent_workflow(
+        workflow_definition,
+        runtime={
+            "transcript": transcript,
+            "entry_point": entry_point,
+            "speaker_name": speaker_name,
+            "tenant_slug": tenant_slug,
         },
-    }
+        executor_registry={
+            "review_voice_input": _voice_input_executor,
+            "review_voice_prepare": _voice_prepare_executor,
+            "review_voice_llm": _voice_llm_executor,
+            "review_voice_output": _voice_output_executor,
+        },
+    )
+    final_result = copy.deepcopy(execution["state"].get("final_result") or {})
+    final_result["workflow_meta"] = build_declared_agent_workflow_meta(
+        workflow_definition,
+        extras={"last_execution_steps": copy.deepcopy(execution.get("node_results") or {})},
+    )
+    return final_result
 
 
 def generate_review_draft_with_llm(
@@ -238,90 +307,163 @@ def generate_review_draft_with_llm(
     tenant_slug="",
     job_code="",
 ):
-    normalized_source = str(source_text or "").strip()
-    if not normalized_source:
-        raise ValueError("review_source_text_required")
-    llm_model = get_default_llm_config(purpose="general")
-    if not llm_model:
-        raise RuntimeError("review_draft_llm_not_configured")
-    period_label_map = {
-        "day": "日复盘",
-        "week": "周复盘",
-        "month": "月复盘",
-        "quarter": "季复盘",
-        "knowledge": "知识整理",
-    }
-    review_period_key = str(review_period or "").strip().lower()
-    source_mode_key = str(source_mode or "").strip().lower()
-    speaker_label = str(speaker_name or "").strip() or "未命名大V"
-    watchlist_items = [str(item).strip() for item in (selected_watchlist or []) if str(item).strip()]
-    tag_items = [str(item).strip() for item in (prompt_tags or []) if str(item).strip()]
-    prompt_value = str(prompt_text or "").strip()
-    system_prompt = (
-        "你是一个中文投研复盘编辑助手。"
-        "请把输入材料整理成适合直接发布前预览的完整复盘草稿。"
-        "必须保留原始观点、风险提示和不确定性，不要编造事实、数字或结论。"
-        "输出纯文本，用自然段组织；优先按市场主线、行业判断、重点个股、验证节点和风险提示展开。"
-        "语言要专业、清晰、克制，避免空话和宣传语。"
-    )
-    user_prompt = "\n".join([
-        f"复盘周期：{period_label_map.get(review_period_key, review_period_key or '未指定')}",
-        f"输入来源：{source_mode_key or 'unknown'}",
-        f"作者身份：{speaker_label}",
-        f"触发入口：{entry_point or 'unknown'}",
-        f"关注股票：{'、'.join(watchlist_items) if watchlist_items else '未指定'}",
-        f"附加标签：{'、'.join(tag_items) if tag_items else '无'}",
-        f"改写规则：{prompt_value or '无，请按专业复盘风格整理'}",
-        "",
-        "请直接输出最终复盘草稿，不要解释你的处理过程，不要输出标题前缀如“以下是整理结果”。",
-        "",
-        "原始材料：",
-        normalized_source,
-    ])
-    if job_code:
-        report_user_async_job_progress(
-            job_code,
-            stage="llm_preparing",
-            percent=55,
-            summary="正在整理原始材料并构建复盘提示词",
-            log_text="已完成素材归并，正在调用大模型生成复盘草稿。",
+    workflow_definition = build_default_review_draft_workflow_definition()
+
+    def _review_draft_input_executor(state, runtime, node, upstream):
+        normalized_source = str(runtime.get("source_text") or "").strip()
+        if not normalized_source:
+            raise ValueError("review_source_text_required")
+        review_period_key = str(runtime.get("review_period") or "").strip().lower()
+        source_mode_key = str(runtime.get("source_mode") or "").strip().lower()
+        speaker_label = str(runtime.get("speaker_name") or "").strip() or "未命名大V"
+        watchlist_items = [str(item).strip() for item in (runtime.get("selected_watchlist") or []) if str(item).strip()]
+        tag_items = [str(item).strip() for item in (runtime.get("prompt_tags") or []) if str(item).strip()]
+        return {
+            "detail": "已接收复盘原始材料、标签和关注股票。",
+            "state_updates": {
+                "normalized_source": normalized_source,
+                "review_period_key": review_period_key,
+                "source_mode_key": source_mode_key,
+                "speaker_label": speaker_label,
+                "watchlist_items": watchlist_items,
+                "tag_items": tag_items,
+                "prompt_value": str(runtime.get("prompt_text") or "").strip(),
+            },
+            "context_preview": {
+                "review_period": review_period_key or "unknown",
+                "source_mode": source_mode_key or "unknown",
+                "watchlist_count": len(watchlist_items),
+                "tag_count": len(tag_items),
+            },
+        }
+
+    def _review_draft_prepare_executor(state, runtime, node, upstream):
+        period_label_map = {
+            "day": "日复盘",
+            "week": "周复盘",
+            "month": "月复盘",
+            "quarter": "季复盘",
+            "knowledge": "知识整理",
+        }
+        system_prompt = (
+            "你是一个中文投研复盘编辑助手。"
+            "请把输入材料整理成适合直接发布前预览的完整复盘草稿。"
+            "必须保留原始观点、风险提示和不确定性，不要编造事实、数字或结论。"
+            "输出纯文本，用自然段组织；优先按市场主线、行业判断、重点个股、验证节点和风险提示展开。"
+            "语言要专业、清晰、克制，避免空话和宣传语。"
         )
-    rendered_text = call_openai_compatible_llm(
-        llm_model,
-        system_prompt,
-        user_prompt,
-        feature_code="review_draft_generation",
-        feature_label="复盘草稿生成",
-        tenant_slug=tenant_slug,
-        entry_point=entry_point,
-        metadata={
-            "review_period": review_period_key,
-            "source_mode": source_mode_key,
-            "watchlist_count": len(watchlist_items),
+        user_prompt = "\n".join([
+            f"复盘周期：{period_label_map.get(state.get('review_period_key'), state.get('review_period_key') or '未指定')}",
+            f"输入来源：{state.get('source_mode_key') or 'unknown'}",
+            f"作者身份：{state.get('speaker_label') or '未命名大V'}",
+            f"触发入口：{runtime.get('entry_point') or 'unknown'}",
+            f"关注股票：{'、'.join(state.get('watchlist_items') or []) if (state.get('watchlist_items') or []) else '未指定'}",
+            f"附加标签：{'、'.join(state.get('tag_items') or []) if (state.get('tag_items') or []) else '无'}",
+            f"改写规则：{state.get('prompt_value') or '无，请按专业复盘风格整理'}",
+            "",
+            "请直接输出最终复盘草稿，不要解释你的处理过程，不要输出标题前缀如“以下是整理结果”。",
+            "",
+            "原始材料：",
+            state.get("normalized_source") or "",
+        ])
+        if runtime.get("job_code"):
+            report_user_async_job_progress(
+                runtime["job_code"],
+                stage="llm_preparing",
+                percent=55,
+                summary="正在整理原始材料并构建复盘提示词",
+                log_text="已完成素材归并，正在调用大模型生成复盘草稿。",
+            )
+        return {
+            "detail": "已生成复盘草稿提示词。",
+            "state_updates": {"system_prompt": system_prompt, "user_prompt": user_prompt},
+            "context_preview": {"prompt_chars": len(user_prompt)},
+        }
+
+    def _review_draft_llm_executor(state, runtime, node, upstream):
+        llm_model = get_default_llm_config(purpose="general")
+        if not llm_model:
+            raise RuntimeError("review_draft_llm_not_configured")
+        rendered_text = call_openai_compatible_llm(
+            llm_model,
+            state.get("system_prompt") or "",
+            state.get("user_prompt") or "",
+            feature_code="review_draft_generation",
+            feature_label="复盘草稿生成",
+            tenant_slug=str(runtime.get("tenant_slug") or "").strip(),
+            entry_point=str(runtime.get("entry_point") or "").strip(),
+            metadata={
+                "review_period": state.get("review_period_key") or "",
+                "source_mode": state.get("source_mode_key") or "",
+                "watchlist_count": len(state.get("watchlist_items") or []),
+                "job_code": runtime.get("job_code") or "",
+                "workflow_id": workflow_definition["id"],
+            },
+        )
+        normalized_text = str(rendered_text or "").strip()
+        if not normalized_text:
+            raise RuntimeError("empty_llm_response")
+        if runtime.get("job_code"):
+            report_user_async_job_progress(
+                runtime["job_code"],
+                stage="llm_postprocessing",
+                percent=85,
+                summary="大模型已返回草稿，正在整理预览结果",
+                log_text="复盘草稿已生成，正在整理模型信息和预览内容。",
+            )
+        return {
+            "detail": "大模型已生成复盘 Draft。",
+            "state_updates": {
+                "rendered_text": normalized_text,
+                "llm_model": {
+                    "key": llm_model.get("key"),
+                    "label": llm_model.get("label"),
+                    "provider": llm_model.get("provider"),
+                    "model_name": llm_model.get("model_name"),
+                    "purpose": llm_model.get("purpose"),
+                },
+            },
+            "context_preview": {"output_chars": len(normalized_text)},
+        }
+
+    def _review_draft_output_executor(state, runtime, node, upstream):
+        result = {
+            "text": state.get("rendered_text") or "",
+            "llm_model": copy.deepcopy(state.get("llm_model") or {}),
+            "workflow_meta": build_declared_agent_workflow_meta(
+                workflow_definition,
+                extras={"last_execution_steps": copy.deepcopy(upstream)},
+            ),
+        }
+        return {
+            "detail": "已封装复盘 Draft 结果。",
+            "output": result,
+            "state_key": "final_result",
+            "context_preview": {"has_text": bool(result["text"]), "model": (result["llm_model"] or {}).get("model_name") or ""},
+        }
+
+    execution = run_declared_agent_workflow(
+        workflow_definition,
+        runtime={
+            "source_text": source_text,
+            "review_period": review_period,
+            "source_mode": source_mode,
+            "prompt_text": prompt_text,
+            "prompt_tags": prompt_tags or [],
+            "selected_watchlist": selected_watchlist or [],
+            "speaker_name": speaker_name,
+            "entry_point": entry_point,
+            "tenant_slug": tenant_slug,
             "job_code": job_code,
         },
-    )
-    normalized_text = str(rendered_text or "").strip()
-    if not normalized_text:
-        raise RuntimeError("empty_llm_response")
-    if job_code:
-        report_user_async_job_progress(
-            job_code,
-            stage="llm_postprocessing",
-            percent=85,
-            summary="大模型已返回草稿，正在整理预览结果",
-            log_text="复盘草稿已生成，正在整理模型信息和预览内容。",
-        )
-    return {
-        "text": normalized_text,
-        "llm_model": {
-            "key": llm_model.get("key"),
-            "label": llm_model.get("label"),
-            "provider": llm_model.get("provider"),
-            "model_name": llm_model.get("model_name"),
-            "purpose": llm_model.get("purpose"),
+        executor_registry={
+            "review_draft_input": _review_draft_input_executor,
+            "review_draft_prepare": _review_draft_prepare_executor,
+            "review_draft_llm": _review_draft_llm_executor,
+            "review_draft_output": _review_draft_output_executor,
         },
-    }
+    )
+    return execution["state"]["final_result"]
 
 
 def _get_review_period_label(review_period):
@@ -401,68 +543,134 @@ def polish_review_input_with_llm(
     tenant_slug="",
     job_code="",
 ):
-    normalized_source = str(source_text or "").strip()
-    if not normalized_source:
-        raise ValueError("review_source_text_required")
-    llm_model = get_default_llm_config(purpose="general")
-    if not llm_model:
-        raise RuntimeError("review_polish_llm_not_configured")
-    review_cfg = get_review_generation_config()
-    speaker_label = str(speaker_name or "").strip() or "未命名大V"
-    if job_code:
-        report_user_async_job_progress(
-            job_code,
-            stage="llm_preparing",
-            percent=38,
-            summary="正在整理原始输入并准备润色",
-            log_text="已进入输入润色阶段，正在构建提示词。",
+    workflow_definition = build_default_review_polish_workflow_definition()
+
+    def _polish_input_executor(state, runtime, node, upstream):
+        normalized_source = str(runtime.get("source_text") or "").strip()
+        if not normalized_source:
+            raise ValueError("review_source_text_required")
+        return {
+            "detail": "已接收待润色的复盘输入。",
+            "state_updates": {
+                "normalized_source": normalized_source,
+                "source_mode_key": str(runtime.get("source_mode") or "").strip().lower(),
+                "speaker_label": str(runtime.get("speaker_name") or "").strip() or "未命名大V",
+            },
+            "context_preview": {"source_chars": len(normalized_source)},
+        }
+
+    def _polish_prepare_executor(state, runtime, node, upstream):
+        review_cfg = get_review_generation_config()
+        if runtime.get("job_code"):
+            report_user_async_job_progress(
+                runtime["job_code"],
+                stage="llm_preparing",
+                percent=38,
+                summary="正在整理原始输入并准备润色",
+                log_text="已进入输入润色阶段，正在构建提示词。",
+            )
+        system_prompt = review_cfg.get("polish_system_prompt") or DEFAULT_SITE_CONFIG["review_generation"]["polish_system_prompt"]
+        user_prompt = (
+            str(review_cfg.get("polish_user_template") or DEFAULT_SITE_CONFIG["review_generation"]["polish_user_template"])
+            .replace("{period_label}", _get_review_period_label(runtime.get("review_period")))
+            .replace("{source_mode}", state.get("source_mode_key") or "unknown")
+            .replace("{speaker_label}", state.get("speaker_label") or "未命名大V")
+            .replace("{entry_point}", str(runtime.get("entry_point") or "unknown").strip() or "unknown")
+            .replace("{source_text}", state.get("normalized_source") or "")
         )
-    system_prompt = review_cfg.get("polish_system_prompt") or DEFAULT_SITE_CONFIG["review_generation"]["polish_system_prompt"]
-    user_prompt = (
-        str(review_cfg.get("polish_user_template") or DEFAULT_SITE_CONFIG["review_generation"]["polish_user_template"])
-        .replace("{period_label}", _get_review_period_label(review_period))
-        .replace("{source_mode}", str(source_mode or "unknown").strip() or "unknown")
-        .replace("{speaker_label}", speaker_label)
-        .replace("{entry_point}", str(entry_point or "unknown").strip() or "unknown")
-        .replace("{source_text}", normalized_source)
-    )
-    polished_text = call_openai_compatible_llm(
-        llm_model,
-        system_prompt,
-        user_prompt,
-        feature_code="review_input_polish",
-        feature_label="复盘输入润色",
-        tenant_slug=tenant_slug,
-        entry_point=entry_point,
-        metadata={
-            "review_period": str(review_period or "").strip().lower(),
-            "source_mode": str(source_mode or "").strip().lower(),
+        return {
+            "detail": "已生成输入润色提示词。",
+            "state_updates": {
+                "review_cfg": review_cfg,
+                "system_prompt": system_prompt,
+                "user_prompt": user_prompt,
+            },
+            "context_preview": {"prompt_chars": len(user_prompt)},
+        }
+
+    def _polish_llm_executor(state, runtime, node, upstream):
+        llm_model = get_default_llm_config(purpose="general")
+        if not llm_model:
+            raise RuntimeError("review_polish_llm_not_configured")
+        review_cfg = state.get("review_cfg") if isinstance(state.get("review_cfg"), dict) else get_review_generation_config()
+        polished_text = call_openai_compatible_llm(
+            llm_model,
+            state.get("system_prompt") or "",
+            state.get("user_prompt") or "",
+            feature_code="review_input_polish",
+            feature_label="复盘输入润色",
+            tenant_slug=str(runtime.get("tenant_slug") or "").strip(),
+            entry_point=str(runtime.get("entry_point") or "").strip(),
+            metadata={
+                "review_period": str(runtime.get("review_period") or "").strip().lower(),
+                "source_mode": state.get("source_mode_key") or "",
+                "job_code": runtime.get("job_code") or "",
+                "stage": "polish",
+                "workflow_id": workflow_definition["id"],
+            },
+            request_timeout_seconds=review_cfg.get("polish_timeout_seconds", 45),
+        )
+        normalized_text = str(polished_text or "").strip()
+        if not normalized_text:
+            raise RuntimeError("empty_llm_response")
+        if runtime.get("job_code"):
+            report_user_async_job_progress(
+                runtime["job_code"],
+                stage="llm_postprocessing",
+                percent=82,
+                summary="输入润色完成，正在整理预览内容",
+                log_text="大模型已返回润色结果，正在回填复盘输入。",
+            )
+        return {
+            "detail": "大模型已完成输入润色。",
+            "state_updates": {
+                "rendered_text": normalized_text,
+                "llm_model": {
+                    "key": llm_model.get("key"),
+                    "label": llm_model.get("label"),
+                    "provider": llm_model.get("provider"),
+                    "model_name": llm_model.get("model_name"),
+                    "purpose": llm_model.get("purpose"),
+                },
+            },
+            "context_preview": {"output_chars": len(normalized_text)},
+        }
+
+    def _polish_output_executor(state, runtime, node, upstream):
+        result = {
+            "text": state.get("rendered_text") or "",
+            "llm_model": copy.deepcopy(state.get("llm_model") or {}),
+            "workflow_meta": build_declared_agent_workflow_meta(
+                workflow_definition,
+                extras={"last_execution_steps": copy.deepcopy(upstream)},
+            ),
+        }
+        return {
+            "detail": "已封装输入润色结果。",
+            "output": result,
+            "state_key": "final_result",
+            "context_preview": {"has_text": bool(result["text"])},
+        }
+
+    execution = run_declared_agent_workflow(
+        workflow_definition,
+        runtime={
+            "source_text": source_text,
+            "review_period": review_period,
+            "source_mode": source_mode,
+            "speaker_name": speaker_name,
+            "entry_point": entry_point,
+            "tenant_slug": tenant_slug,
             "job_code": job_code,
-            "stage": "polish",
         },
-        request_timeout_seconds=review_cfg.get("polish_timeout_seconds", 45),
+        executor_registry={
+            "review_polish_input": _polish_input_executor,
+            "review_polish_prepare": _polish_prepare_executor,
+            "review_polish_llm": _polish_llm_executor,
+            "review_polish_output": _polish_output_executor,
+        },
     )
-    normalized_text = str(polished_text or "").strip()
-    if not normalized_text:
-        raise RuntimeError("empty_llm_response")
-    if job_code:
-        report_user_async_job_progress(
-            job_code,
-            stage="llm_postprocessing",
-            percent=82,
-            summary="输入润色完成，正在整理预览内容",
-            log_text="大模型已返回润色结果，正在回填复盘输入。",
-        )
-    return {
-        "text": normalized_text,
-        "llm_model": {
-            "key": llm_model.get("key"),
-            "label": llm_model.get("label"),
-            "provider": llm_model.get("provider"),
-            "model_name": llm_model.get("model_name"),
-            "purpose": llm_model.get("purpose"),
-        },
-    }
+    return execution["state"]["final_result"]
 
 
 def compose_review_draft_with_llm(
@@ -478,87 +686,166 @@ def compose_review_draft_with_llm(
     knowledge_items=None,
     job_code="",
 ):
-    normalized_source = str(source_text or "").strip()
-    if not normalized_source:
-        raise ValueError("review_source_text_required")
-    llm_model = get_default_llm_config(purpose="general")
-    if not llm_model:
-        raise RuntimeError("review_compose_llm_not_configured")
-    review_cfg = get_review_generation_config()
-    speaker_label = str(speaker_name or "").strip() or "未命名大V"
-    watchlist_items = [str(item).strip() for item in (selected_watchlist or []) if str(item).strip()]
-    tag_items = [str(item).strip() for item in (prompt_tags or []) if str(item).strip()]
-    prompt_value = str(prompt_text or "").strip() or "无，请按专业复盘风格整理"
-    dashboard_blocks = _format_review_dashboard_blocks(dashboard_cards or [])
-    knowledge_blocks = _format_review_knowledge_blocks(knowledge_items or [])
-    if job_code:
-        report_user_async_job_progress(
-            job_code,
-            stage="llm_preparing",
-            percent=46,
-            summary="正在聚合智能仪表盘卡片并准备成稿",
-            log_text="已完成卡片与输入拼接，准备调用大模型生成完整复盘。",
-            extra_result={
-                "selected_card_count": len(dashboard_cards or []),
-                "knowledge_item_count": len(knowledge_items or []),
+    workflow_definition = build_default_review_compose_workflow_definition()
+
+    def _compose_input_executor(state, runtime, node, upstream):
+        normalized_source = str(runtime.get("source_text") or "").strip()
+        if not normalized_source:
+            raise ValueError("review_source_text_required")
+        watchlist_items = [str(item).strip() for item in (runtime.get("selected_watchlist") or []) if str(item).strip()]
+        tag_items = [str(item).strip() for item in (runtime.get("prompt_tags") or []) if str(item).strip()]
+        return {
+            "detail": "已接收复盘正文、卡片和知识材料。",
+            "state_updates": {
+                "normalized_source": normalized_source,
+                "speaker_label": str(runtime.get("speaker_name") or "").strip() or "未命名大V",
+                "watchlist_items": watchlist_items,
+                "tag_items": tag_items,
+                "prompt_value": str(runtime.get("prompt_text") or "").strip() or "无，请按专业复盘风格整理",
             },
+            "context_preview": {
+                "watchlist_count": len(watchlist_items),
+                "card_count": len(runtime.get("dashboard_cards") or []),
+                "knowledge_item_count": len(runtime.get("knowledge_items") or []),
+            },
+        }
+
+    def _compose_context_executor(state, runtime, node, upstream):
+        review_cfg = get_review_generation_config()
+        dashboard_blocks = _format_review_dashboard_blocks(runtime.get("dashboard_cards") or [])
+        knowledge_blocks = _format_review_knowledge_blocks(runtime.get("knowledge_items") or [])
+        if runtime.get("job_code"):
+            report_user_async_job_progress(
+                runtime["job_code"],
+                stage="llm_preparing",
+                percent=46,
+                summary="正在聚合智能仪表盘卡片并准备成稿",
+                log_text="已完成卡片与输入拼接，准备调用大模型生成完整复盘。",
+                extra_result={
+                    "selected_card_count": len(runtime.get("dashboard_cards") or []),
+                    "knowledge_item_count": len(runtime.get("knowledge_items") or []),
+                },
+            )
+        system_prompt = review_cfg.get("compose_system_prompt") or DEFAULT_SITE_CONFIG["review_generation"]["compose_system_prompt"]
+        user_prompt = (
+            str(review_cfg.get("compose_user_template") or DEFAULT_SITE_CONFIG["review_generation"]["compose_user_template"])
+            .replace("{period_label}", _get_review_period_label(runtime.get("review_period")))
+            .replace("{speaker_label}", state.get("speaker_label") or "未命名大V")
+            .replace("{entry_point}", str(runtime.get("entry_point") or "unknown").strip() or "unknown")
+            .replace("{watchlist_text}", "、".join(state.get("watchlist_items") or []) if (state.get("watchlist_items") or []) else "未指定")
+            .replace("{tag_text}", "、".join(state.get("tag_items") or []) if (state.get("tag_items") or []) else "无")
+            .replace("{prompt_text}", state.get("prompt_value") or "无，请按专业复盘风格整理")
+            .replace("{source_text}", state.get("normalized_source") or "")
+            .replace("{dashboard_blocks}", dashboard_blocks or "未选择智能仪表盘卡片")
+            .replace("{knowledge_blocks}", knowledge_blocks or "未选择知识材料")
         )
-    system_prompt = review_cfg.get("compose_system_prompt") or DEFAULT_SITE_CONFIG["review_generation"]["compose_system_prompt"]
-    user_prompt = (
-        str(review_cfg.get("compose_user_template") or DEFAULT_SITE_CONFIG["review_generation"]["compose_user_template"])
-        .replace("{period_label}", _get_review_period_label(review_period))
-        .replace("{speaker_label}", speaker_label)
-        .replace("{entry_point}", str(entry_point or "unknown").strip() or "unknown")
-        .replace("{watchlist_text}", "、".join(watchlist_items) if watchlist_items else "未指定")
-        .replace("{tag_text}", "、".join(tag_items) if tag_items else "无")
-        .replace("{prompt_text}", prompt_value)
-        .replace("{source_text}", normalized_source)
-        .replace("{dashboard_blocks}", dashboard_blocks or "未选择智能仪表盘卡片")
-        .replace("{knowledge_blocks}", knowledge_blocks or "未选择知识材料")
-    )
-    rendered_text = call_openai_compatible_llm(
-        llm_model,
-        system_prompt,
-        user_prompt,
-        feature_code="review_compose_generation",
-        feature_label="复盘完整成稿",
-        tenant_slug=tenant_slug,
-        entry_point=entry_point,
-        metadata={
-            "review_period": str(review_period or "").strip().lower(),
-            "watchlist_count": len(watchlist_items),
-            "card_count": len(dashboard_cards or []),
-            "knowledge_item_count": len(knowledge_items or []),
+        return {
+            "detail": "已完成复盘成稿上下文聚合。",
+            "state_updates": {
+                "review_cfg": review_cfg,
+                "system_prompt": system_prompt,
+                "user_prompt": user_prompt,
+            },
+            "context_preview": {
+                "prompt_chars": len(user_prompt),
+                "dashboard_count": len(runtime.get("dashboard_cards") or []),
+                "knowledge_count": len(runtime.get("knowledge_items") or []),
+            },
+        }
+
+    def _compose_llm_executor(state, runtime, node, upstream):
+        llm_model = get_default_llm_config(purpose="general")
+        if not llm_model:
+            raise RuntimeError("review_compose_llm_not_configured")
+        review_cfg = state.get("review_cfg") if isinstance(state.get("review_cfg"), dict) else get_review_generation_config()
+        rendered_text = call_openai_compatible_llm(
+            llm_model,
+            state.get("system_prompt") or "",
+            state.get("user_prompt") or "",
+            feature_code="review_compose_generation",
+            feature_label="复盘完整成稿",
+            tenant_slug=str(runtime.get("tenant_slug") or "").strip(),
+            entry_point=str(runtime.get("entry_point") or "").strip(),
+            metadata={
+                "review_period": str(runtime.get("review_period") or "").strip().lower(),
+                "watchlist_count": len(state.get("watchlist_items") or []),
+                "card_count": len(runtime.get("dashboard_cards") or []),
+                "knowledge_item_count": len(runtime.get("knowledge_items") or []),
+                "job_code": runtime.get("job_code") or "",
+                "stage": "compose",
+                "workflow_id": workflow_definition["id"],
+            },
+            request_timeout_seconds=review_cfg.get("compose_timeout_seconds", 60),
+        )
+        normalized_text = str(rendered_text or "").strip()
+        if not normalized_text:
+            raise RuntimeError("empty_llm_response")
+        if runtime.get("job_code"):
+            report_user_async_job_progress(
+                runtime["job_code"],
+                stage="llm_postprocessing",
+                percent=88,
+                summary="完整复盘草稿已返回，正在整理预览结果",
+                log_text="复盘成稿已生成，正在回填卡片与模型信息。",
+                extra_result={
+                    "selected_card_count": len(runtime.get("dashboard_cards") or []),
+                    "knowledge_item_count": len(runtime.get("knowledge_items") or []),
+                },
+            )
+        return {
+            "detail": "大模型已生成完整复盘成稿。",
+            "state_updates": {
+                "rendered_text": normalized_text,
+                "llm_model": {
+                    "key": llm_model.get("key"),
+                    "label": llm_model.get("label"),
+                    "provider": llm_model.get("provider"),
+                    "model_name": llm_model.get("model_name"),
+                    "purpose": llm_model.get("purpose"),
+                },
+            },
+            "context_preview": {"output_chars": len(normalized_text)},
+        }
+
+    def _compose_output_executor(state, runtime, node, upstream):
+        result = {
+            "text": state.get("rendered_text") or "",
+            "llm_model": copy.deepcopy(state.get("llm_model") or {}),
+            "workflow_meta": build_declared_agent_workflow_meta(
+                workflow_definition,
+                extras={"last_execution_steps": copy.deepcopy(upstream)},
+            ),
+        }
+        return {
+            "detail": "已封装复盘成稿结果。",
+            "output": result,
+            "state_key": "final_result",
+            "context_preview": {"has_text": bool(result["text"])},
+        }
+
+    execution = run_declared_agent_workflow(
+        workflow_definition,
+        runtime={
+            "source_text": source_text,
+            "review_period": review_period,
+            "prompt_text": prompt_text,
+            "prompt_tags": prompt_tags or [],
+            "selected_watchlist": selected_watchlist or [],
+            "speaker_name": speaker_name,
+            "entry_point": entry_point,
+            "tenant_slug": tenant_slug,
+            "dashboard_cards": dashboard_cards or [],
+            "knowledge_items": knowledge_items or [],
             "job_code": job_code,
-            "stage": "compose",
         },
-        request_timeout_seconds=review_cfg.get("compose_timeout_seconds", 60),
+        executor_registry={
+            "review_compose_input": _compose_input_executor,
+            "review_compose_context": _compose_context_executor,
+            "review_compose_llm": _compose_llm_executor,
+            "review_compose_output": _compose_output_executor,
+        },
     )
-    normalized_text = str(rendered_text or "").strip()
-    if not normalized_text:
-        raise RuntimeError("empty_llm_response")
-    if job_code:
-        report_user_async_job_progress(
-            job_code,
-            stage="llm_postprocessing",
-            percent=88,
-            summary="完整复盘草稿已返回，正在整理预览结果",
-            log_text="复盘成稿已生成，正在回填卡片与模型信息。",
-            extra_result={
-                "selected_card_count": len(dashboard_cards or []),
-                "knowledge_item_count": len(knowledge_items or []),
-            },
-        )
-    return {
-        "text": normalized_text,
-        "llm_model": {
-            "key": llm_model.get("key"),
-            "label": llm_model.get("label"),
-            "provider": llm_model.get("provider"),
-            "model_name": llm_model.get("model_name"),
-            "purpose": llm_model.get("purpose"),
-        },
-    }
+    return execution["state"]["final_result"]
 
 
 def get_review_vector_db_connection():
@@ -1801,113 +2088,20 @@ def build_evidence_chain_response(
     entry_point="evidence_chain",
     feature_namespace="evidence_chain",
 ):
-    result = search_evidence_chain(
+    return _build_retrieval_agent_response(
         tenant_slug=tenant_slug,
         query_text=query_text,
         limit=limit,
+        submit_to_model=submit_to_model,
         source_types=source_types,
+        entry_point=entry_point,
+        feature_namespace=feature_namespace,
+        workflow_definition=build_default_evidence_chain_workflow_definition(),
     )
-    llm_requested = bool(submit_to_model)
-    llm_enabled = False
-    llm_mode = "retrieval_only"
-    llm_model = None
-    llm_notice = "当前为纯知识检索模式，未提交给大模型。"
-    if llm_requested:
-        llm_model = get_default_llm_config(purpose="general")
-        if llm_model:
-            original_matches = result.get("evidence_items") or []
-            try:
-                filtered_matches, filter_meta, filter_model = filter_knowledge_matches_with_llm(
-                    query_text=result.get("query"),
-                    matches=original_matches,
-                    tenant_slug=tenant_slug,
-                )
-                if filter_model:
-                    llm_model = filter_model
-                result["evidence_items"] = filtered_matches
-                result["matches"] = copy.deepcopy(filtered_matches)
-                if filter_meta.get("filtered"):
-                    llm_notice = (
-                        f"已先用通用模型过滤知识召回结果，保留 {filter_meta.get('kept_count', 0)} 条，"
-                        f"过滤掉 {filter_meta.get('dropped_count', 0)} 条无关内容。"
-                    )
-                    if filter_meta.get("reason"):
-                        llm_notice = f"{llm_notice} {filter_meta.get('reason')}"
-                else:
-                    llm_notice = "已勾选提交给大模型，当前未启用额外过滤，直接基于召回结果生成回答。"
-            except Exception as exc:
-                result["evidence_items"] = original_matches
-                result["matches"] = copy.deepcopy(original_matches)
-                llm_notice = f"相关性过滤调用失败，已回退到原始召回结果：{str(exc)}"
-            filtered_matches = result.get("evidence_items") or []
-            if not filtered_matches:
-                llm_enabled = True
-                llm_mode = "model_filtered_empty"
-                result["answer"] = "当前召回结果经过大模型过滤后，没有发现与问题直接相关的知识条目。"
-                return {
-                    **result,
-                    "submit_to_model": llm_requested,
-                    "llm_enabled": llm_enabled,
-                    "llm_mode": llm_mode,
-                    "llm_notice": llm_notice,
-                    "llm_model": {
-                        "key": llm_model.get("key"),
-                        "label": llm_model.get("label"),
-                        "provider": llm_model.get("provider"),
-                        "model_name": llm_model.get("model_name"),
-                        "purpose": llm_model.get("purpose"),
-                    } if llm_model else None,
-                }
-            system_prompt, user_prompt = build_evidence_chain_chat_prompts(
-                query_text=result.get("query"),
-                evidence_items=filtered_matches,
-                tenant_slug=tenant_slug,
-            )
-            llm_enabled = True
-            try:
-                llm_answer = call_openai_compatible_llm(
-                    llm_model,
-                    system_prompt,
-                    user_prompt,
-                    feature_code=f"{feature_namespace}_answer",
-                    feature_label="证据链问答生成",
-                    tenant_slug=tenant_slug,
-                    entry_point=entry_point,
-                    metadata={"match_count": len(filtered_matches), "submit_to_model": True},
-                    request_timeout_seconds=get_evidence_chain_config().get("answer_timeout_seconds", 45),
-                )
-                result["answer"] = llm_answer
-                llm_mode = "model_answered"
-                llm_notice = (
-                    f"{llm_notice}\n\n"
-                    f"当前回答已由通用模型生成：{llm_model.get('label') or llm_model.get('model_name') or llm_model.get('key')}。"
-                    "下方保留的是过滤后的相关知识命中结果。"
-                ).strip()
-            except Exception as exc:
-                llm_enabled = False
-                llm_mode = "fallback_retrieval"
-                llm_notice = f"{llm_notice}\n\n已尝试调用通用模型生成回答，但失败并回退到纯知识检索：{str(exc)}".strip()
-        else:
-            llm_mode = "fallback_retrieval"
-            llm_notice = "已勾选提交给大模型，但当前没有可用的通用模型配置，已自动回退到纯知识检索模式。"
-    return {
-        **result,
-        "submit_to_model": llm_requested,
-        "llm_enabled": llm_enabled,
-        "llm_mode": llm_mode,
-        "llm_notice": llm_notice,
-        "llm_model": {
-            "key": llm_model.get("key"),
-            "label": llm_model.get("label"),
-            "provider": llm_model.get("provider"),
-            "model_name": llm_model.get("model_name"),
-            "purpose": llm_model.get("purpose"),
-        } if llm_model else None,
-    }
 
 
 def build_knowledge_query_response(tenant_slug, query_text, limit=5, submit_to_model=False):
-    result = build_evidence_chain_response(
+    result = _build_retrieval_agent_response(
         tenant_slug=tenant_slug,
         query_text=query_text,
         limit=limit,
@@ -1915,9 +2109,269 @@ def build_knowledge_query_response(tenant_slug, query_text, limit=5, submit_to_m
         source_types=["knowledge"],
         entry_point="knowledge_query",
         feature_namespace="knowledge_query",
+        workflow_definition=build_default_knowledge_query_workflow_definition(),
     )
     result["matches"] = copy.deepcopy(result.get("evidence_items") or [])
     return result
+
+
+def _build_retrieval_agent_response(
+    tenant_slug,
+    query_text,
+    limit=5,
+    submit_to_model=False,
+    source_types=None,
+    entry_point="evidence_chain",
+    feature_namespace="evidence_chain",
+    workflow_definition=None,
+):
+    workflow_definition = normalize_declared_agent_workflow_definition(
+        workflow_definition or build_default_evidence_chain_workflow_definition()
+    )
+    answer_feature_label = "知识问答生成" if workflow_definition.get("id") == "knowledge_query_agent" else "证据链问答生成"
+
+    def _retrieval_input_executor(state, runtime, node, upstream):
+        normalized_query = str(runtime.get("query_text") or "").strip()
+        if not normalized_query:
+            raise ValueError("evidence_query_required")
+        normalized_sources = normalize_evidence_source_types(runtime.get("source_types"))
+        return {
+            "detail": "已接收检索问题与来源范围。",
+            "state_updates": {
+                "normalized_query": normalized_query,
+                "normalized_sources": normalized_sources,
+                "llm_requested": bool(runtime.get("submit_to_model")),
+            },
+            "context_preview": {
+                "query_chars": len(normalized_query),
+                "source_count": len(normalized_sources),
+            },
+        }
+
+    def _retrieval_fetch_executor(state, runtime, node, upstream):
+        try:
+            result = search_evidence_chain(
+                tenant_slug=str(runtime.get("tenant_slug") or "").strip(),
+                query_text=state.get("normalized_query") or "",
+                limit=runtime.get("limit") or 5,
+                source_types=state.get("normalized_sources") or [],
+            )
+        except Exception as exc:
+            if not is_db_unavailable_error(exc) and not isinstance(exc, RuntimeError):
+                raise
+            app.logger.warning("Retrieval agent dependency unavailable, using empty fallback result: %s", str(exc)[:200])
+            result = {
+                "query": state.get("normalized_query") or "",
+                "answer": "当前检索依赖暂不可用，已回退为空结果。请稍后重试。",
+                "evidence_items": [],
+                "matches": [],
+                "source_types": copy.deepcopy(state.get("normalized_sources") or []),
+                "source_summaries": [],
+                "unsupported_source_types": [],
+            }
+        return {
+            "detail": f"已召回 {len(result.get('evidence_items') or [])} 条候选结果。",
+            "state_updates": {"retrieval_result": result},
+            "context_preview": {"match_count": len(result.get("evidence_items") or [])},
+        }
+
+    def _retrieval_filter_executor(state, runtime, node, upstream):
+        result = copy.deepcopy(state.get("retrieval_result") or {})
+        llm_requested = bool(state.get("llm_requested"))
+        if not llm_requested:
+            return {
+                "status": "skipped",
+                "detail": "未提交给大模型，保留原始召回结果。",
+                "state_updates": {
+                    "filtered_result": result,
+                    "llm_notice": "当前为纯知识检索模式，未提交给大模型。",
+                    "llm_mode": "retrieval_only",
+                    "llm_enabled": False,
+                    "llm_model": None,
+                },
+                "context_preview": {"filtered": False, "kept_count": len(result.get("evidence_items") or [])},
+            }
+        llm_model = get_default_llm_config(purpose="general")
+        if not llm_model:
+            return {
+                "status": "skipped",
+                "detail": "当前没有可用模型，已回退到纯检索。",
+                "state_updates": {
+                    "filtered_result": result,
+                    "llm_notice": "已勾选提交给大模型，但当前没有可用的通用模型配置，已自动回退到纯知识检索模式。",
+                    "llm_mode": "fallback_retrieval",
+                    "llm_enabled": False,
+                    "llm_model": None,
+                },
+                "context_preview": {"filtered": False, "kept_count": len(result.get("evidence_items") or [])},
+            }
+        original_matches = result.get("evidence_items") or []
+        try:
+            filtered_matches, filter_meta, filter_model = filter_knowledge_matches_with_llm(
+                query_text=result.get("query"),
+                matches=original_matches,
+                tenant_slug=str(runtime.get("tenant_slug") or "").strip(),
+            )
+            active_model = filter_model or llm_model
+            result["evidence_items"] = filtered_matches
+            result["matches"] = copy.deepcopy(filtered_matches)
+            llm_notice = (
+                f"已先用通用模型过滤知识召回结果，保留 {filter_meta.get('kept_count', 0)} 条，"
+                f"过滤掉 {filter_meta.get('dropped_count', 0)} 条无关内容。"
+            ) if filter_meta.get("filtered") else "已勾选提交给大模型，当前未启用额外过滤，直接基于召回结果生成回答。"
+            if filter_meta.get("reason"):
+                llm_notice = f"{llm_notice} {filter_meta.get('reason')}".strip()
+            return {
+                "detail": f"已完成相关性过滤，保留 {len(filtered_matches)} 条结果。",
+                "state_updates": {
+                    "filtered_result": result,
+                    "llm_notice": llm_notice,
+                    "llm_mode": "filtered",
+                    "llm_enabled": False,
+                    "llm_model": {
+                        "key": active_model.get("key"),
+                        "label": active_model.get("label"),
+                        "provider": active_model.get("provider"),
+                        "model_name": active_model.get("model_name"),
+                        "purpose": active_model.get("purpose"),
+                    },
+                },
+                "context_preview": {
+                    "filtered": True,
+                    "kept_count": len(filtered_matches),
+                    "dropped_count": max(0, len(original_matches) - len(filtered_matches)),
+                },
+            }
+        except Exception as exc:
+            result["evidence_items"] = original_matches
+            result["matches"] = copy.deepcopy(original_matches)
+            return {
+                "status": "error",
+                "detail": "相关性过滤失败，已回退到原始召回结果。",
+                "state_updates": {
+                    "filtered_result": result,
+                    "llm_notice": f"相关性过滤调用失败，已回退到原始召回结果：{str(exc)}",
+                    "llm_mode": "fallback_retrieval",
+                    "llm_enabled": False,
+                    "llm_model": {
+                        "key": llm_model.get("key"),
+                        "label": llm_model.get("label"),
+                        "provider": llm_model.get("provider"),
+                        "model_name": llm_model.get("model_name"),
+                        "purpose": llm_model.get("purpose"),
+                    },
+                },
+                "context_preview": {"filtered": False, "kept_count": len(original_matches)},
+            }
+
+    def _retrieval_answer_executor(state, runtime, node, upstream):
+        result = copy.deepcopy(state.get("filtered_result") or state.get("retrieval_result") or {})
+        llm_requested = bool(state.get("llm_requested"))
+        llm_model = copy.deepcopy(state.get("llm_model") or {})
+        llm_notice = str(state.get("llm_notice") or "当前为纯知识检索模式，未提交给大模型。").strip()
+        llm_enabled = bool(state.get("llm_enabled"))
+        llm_mode = str(state.get("llm_mode") or "retrieval_only").strip() or "retrieval_only"
+        if llm_requested and llm_model:
+            filtered_matches = result.get("evidence_items") or []
+            if not filtered_matches:
+                llm_enabled = True
+                llm_mode = "model_filtered_empty"
+                result["answer"] = "当前召回结果经过大模型过滤后，没有发现与问题直接相关的知识条目。"
+            else:
+                system_prompt, user_prompt = build_evidence_chain_chat_prompts(
+                    query_text=result.get("query"),
+                    evidence_items=filtered_matches,
+                    tenant_slug=str(runtime.get("tenant_slug") or "").strip(),
+                )
+                try:
+                    answer_model = normalize_llm_model_config(llm_model)
+                    llm_answer = call_openai_compatible_llm(
+                        answer_model,
+                        system_prompt,
+                        user_prompt,
+                        feature_code=f"{runtime.get('feature_namespace')}_answer",
+                        feature_label=answer_feature_label,
+                        tenant_slug=str(runtime.get("tenant_slug") or "").strip(),
+                        entry_point=str(runtime.get("entry_point") or "").strip(),
+                        metadata={
+                            "match_count": len(filtered_matches),
+                            "submit_to_model": True,
+                            "workflow_id": workflow_definition["id"],
+                        },
+                        request_timeout_seconds=get_evidence_chain_config().get("answer_timeout_seconds", 45),
+                    )
+                    result["answer"] = llm_answer
+                    llm_enabled = True
+                    llm_mode = "model_answered"
+                    llm_notice = (
+                        f"{llm_notice}\n\n"
+                        f"当前回答已由通用模型生成：{answer_model.get('label') or answer_model.get('model_name') or answer_model.get('key')}。"
+                        "下方保留的是过滤后的相关知识命中结果。"
+                    ).strip()
+                except Exception as exc:
+                    llm_enabled = False
+                    llm_mode = "fallback_retrieval"
+                    llm_notice = f"{llm_notice}\n\n已尝试调用通用模型生成回答，但失败并回退到纯知识检索：{str(exc)}".strip()
+        return {
+            "detail": "已完成结果回答整合。",
+            "state_updates": {
+                "final_result": {
+                    **result,
+                    "submit_to_model": llm_requested,
+                    "llm_enabled": llm_enabled,
+                    "llm_mode": llm_mode,
+                    "llm_notice": llm_notice,
+                    "llm_model": llm_model or None,
+                }
+            },
+            "context_preview": {
+                "answer_chars": len(str(result.get("answer") or "")),
+                "llm_mode": llm_mode,
+            },
+        }
+
+    def _retrieval_output_executor(state, runtime, node, upstream):
+        return {
+            "detail": "已封装检索智能体结果。",
+            "state_updates": {
+                "final_result": copy.deepcopy(state.get("final_result") or {})
+            },
+            "context_preview": {
+                "match_count": len(((state.get("final_result") or {}).get("evidence_items") or [])),
+                "llm_enabled": bool((state.get("final_result") or {}).get("llm_enabled")),
+            },
+        }
+
+    execution = run_declared_agent_workflow(
+        workflow_definition,
+        runtime={
+            "tenant_slug": tenant_slug,
+            "query_text": query_text,
+            "limit": limit,
+            "submit_to_model": submit_to_model,
+            "source_types": source_types,
+            "entry_point": entry_point,
+            "feature_namespace": feature_namespace,
+        },
+        executor_registry={
+            "knowledge_query_input": _retrieval_input_executor,
+            "knowledge_query_retrieval": _retrieval_fetch_executor,
+            "knowledge_query_filter": _retrieval_filter_executor,
+            "knowledge_query_answer": _retrieval_answer_executor,
+            "knowledge_query_output": _retrieval_output_executor,
+            "evidence_query_input": _retrieval_input_executor,
+            "evidence_query_retrieval": _retrieval_fetch_executor,
+            "evidence_query_filter": _retrieval_filter_executor,
+            "evidence_query_answer": _retrieval_answer_executor,
+            "evidence_query_output": _retrieval_output_executor,
+        },
+    )
+    final_result = copy.deepcopy(execution["state"].get("final_result") or {})
+    final_result["workflow_meta"] = build_declared_agent_workflow_meta(
+        workflow_definition,
+        extras={"last_execution_steps": copy.deepcopy(execution.get("node_results") or {})},
+    )
+    return final_result
 
 
 HERMES_QUERY_INTENT_PROMPT = (
@@ -2706,91 +3160,185 @@ def build_hermes_query_response(body):
     question_text = extract_hermes_question_text(messages, payload.get("question"))
     if not question_text:
         raise ValueError("hermes_question_required")
-    intent_plan, router_model, route_mode = route_hermes_query_intent(
-        question_text=question_text,
-        tenant_slug=tenant_slug,
-        selected_knowledge_ids=selected_knowledge_ids,
-        attachments=attachments,
-        preferred_mode=preferred_mode,
-        messages=messages,
-    )
-    tool_outputs, tool_trace = execute_hermes_tool_plan(
-        plan=intent_plan,
-        tenant_slug=tenant_slug,
-        question_text=question_text,
-        selected_knowledge_ids=selected_knowledge_ids,
-        attachments=attachments,
-    )
-    synthesis, answer_model, answer_mode = synthesize_hermes_answer(
-        question_text=question_text,
-        plan=intent_plan,
-        tool_outputs=tool_outputs,
-        tenant_slug=tenant_slug,
-        user_role=user_role,
-        preferred_mode=preferred_mode,
-        messages=messages,
-        web_answer=web_answer,
-    )
-    agent_trace = build_hermes_agent_trace(
-        intent_plan=intent_plan,
-        tool_trace=tool_trace,
-        route_mode=route_mode,
-        answer_mode=answer_mode,
-        preferred_mode=preferred_mode,
-        web_answer=web_answer,
-        attachments=attachments,
-        selected_knowledge_ids=selected_knowledge_ids,
-    )
-    citations = build_hermes_citations(tool_outputs)
-    artifacts = build_hermes_artifacts(
-        plan=intent_plan,
-        tool_outputs=tool_outputs,
-        synthesis=synthesis,
-        citations=citations,
-        tenant_slug=tenant_slug,
-        user_role=user_role,
-        question_text=question_text,
-    )
-    response_display_mode = "structured" if any(str((item or {}).get("type") or "").strip() == "watchlist_analysis" for item in artifacts) else "text"
-    return {
-        "ok": True,
-        "question": question_text,
-        "tenant_slug": tenant_slug,
-        "intent": intent_plan.get("intent"),
-        "display_mode": response_display_mode,
-        "answer": synthesis.get("answer") or "",
-        "summary": synthesis.get("summary") or "",
-        "bullets": synthesis.get("bullets") or [],
-        "citations": (synthesis.get("citations") or []) + [item for item in citations if item not in (synthesis.get("citations") or [])],
-        "artifacts": artifacts,
-        "tool_trace": tool_trace,
-        "tool_outputs": tool_outputs,
-        "agent_trace": agent_trace,
-        "preferred_mode": preferred_mode or "auto",
-        "web_answer": web_answer,
-        "router": {
-            "mode": route_mode,
-            "reason": intent_plan.get("reason") or "",
-            "model": {
-                "key": router_model.get("key"),
-                "label": router_model.get("label"),
-                "provider": router_model.get("provider"),
-                "model_name": router_model.get("model_name"),
-            } if router_model else None,
+    workflow_definition = build_default_hermes_agent_workflow_definition()
+
+    def _hermes_input_executor(state, runtime, node, upstream):
+        return {
+            "detail": "已接收问题、附件、知识范围和会话上下文。",
+            "state_updates": {"question_text": runtime.get("question_text") or ""},
+            "context_preview": {
+                "attachment_count": len(runtime.get("attachments") or []),
+                "knowledge_count": len(runtime.get("selected_knowledge_ids") or []),
+                "message_count": len(runtime.get("messages") or []),
+            },
+        }
+
+    def _hermes_router_executor(state, runtime, node, upstream):
+        intent_plan, router_model, route_mode = route_hermes_query_intent(
+            question_text=runtime.get("question_text") or "",
+            tenant_slug=runtime.get("tenant_slug") or "",
+            selected_knowledge_ids=runtime.get("selected_knowledge_ids") or [],
+            attachments=runtime.get("attachments") or [],
+            preferred_mode=runtime.get("preferred_mode") or "",
+            messages=runtime.get("messages") or [],
+        )
+        return {
+            "detail": f"已完成意图路由：{str(intent_plan.get('reason') or '').strip() or '默认通用对话'}",
+            "state_updates": {
+                "intent_plan": intent_plan,
+                "router_model": router_model,
+                "route_mode": route_mode,
+            },
+            "context_preview": {
+                "intent": intent_plan.get("intent") or "",
+                "tool_count": len(intent_plan.get("tools") or []),
+                "display_mode": intent_plan.get("display_mode") or "",
+            },
+        }
+
+    def _hermes_tool_executor(state, runtime, node, upstream):
+        tool_outputs, tool_trace = execute_hermes_tool_plan(
+            plan=state.get("intent_plan") or {},
+            tenant_slug=runtime.get("tenant_slug") or "",
+            question_text=runtime.get("question_text") or "",
+            selected_knowledge_ids=runtime.get("selected_knowledge_ids") or [],
+            attachments=runtime.get("attachments") or [],
+        )
+        return {
+            "detail": f"已执行 {len(tool_trace or [])} 个工具。",
+            "state_updates": {
+                "tool_outputs": tool_outputs,
+                "tool_trace": tool_trace,
+            },
+            "context_preview": {
+                "tool_count": len(tool_trace or []),
+                "ok_count": len([item for item in (tool_trace or []) if str((item or {}).get('status') or '') == 'ok']),
+            },
+        }
+
+    def _hermes_synthesis_executor(state, runtime, node, upstream):
+        synthesis, answer_model, answer_mode = synthesize_hermes_answer(
+            question_text=runtime.get("question_text") or "",
+            plan=state.get("intent_plan") or {},
+            tool_outputs=state.get("tool_outputs") or {},
+            tenant_slug=runtime.get("tenant_slug") or "",
+            user_role=runtime.get("user_role") or "",
+            preferred_mode=runtime.get("preferred_mode") or "",
+            messages=runtime.get("messages") or [],
+            web_answer=bool(runtime.get("web_answer")),
+        )
+        return {
+            "detail": "已完成答案合成。",
+            "state_updates": {
+                "synthesis": synthesis,
+                "answer_model": answer_model,
+                "answer_mode": answer_mode,
+            },
+            "context_preview": {
+                "answer_chars": len(str((synthesis or {}).get("answer") or "")),
+                "bullet_count": len((synthesis or {}).get("bullets") or []),
+            },
+        }
+
+    def _hermes_artifact_executor(state, runtime, node, upstream):
+        intent_plan = state.get("intent_plan") or {}
+        tool_outputs = state.get("tool_outputs") or {}
+        tool_trace = state.get("tool_trace") or []
+        synthesis = state.get("synthesis") or {}
+        route_mode = state.get("route_mode") or ""
+        answer_mode = state.get("answer_mode") or ""
+        citations = build_hermes_citations(tool_outputs)
+        agent_trace = build_hermes_agent_trace(
+            intent_plan=intent_plan,
+            tool_trace=tool_trace,
+            route_mode=route_mode,
+            answer_mode=answer_mode,
+            preferred_mode=runtime.get("preferred_mode") or "",
+            web_answer=bool(runtime.get("web_answer")),
+            attachments=runtime.get("attachments") or [],
+            selected_knowledge_ids=runtime.get("selected_knowledge_ids") or [],
+        )
+        artifacts = build_hermes_artifacts(
+            plan=intent_plan,
+            tool_outputs=tool_outputs,
+            synthesis=synthesis,
+            citations=citations,
+            tenant_slug=runtime.get("tenant_slug") or "",
+            user_role=runtime.get("user_role") or "",
+            question_text=runtime.get("question_text") or "",
+        )
+        response_display_mode = "structured" if any(str((item or {}).get("type") or "").strip() == "watchlist_analysis" for item in artifacts) else "text"
+        result = {
+            "ok": True,
+            "question": runtime.get("question_text") or "",
+            "tenant_slug": runtime.get("tenant_slug") or "",
+            "intent": intent_plan.get("intent"),
+            "display_mode": response_display_mode,
+            "answer": synthesis.get("answer") or "",
+            "summary": synthesis.get("summary") or "",
+            "bullets": synthesis.get("bullets") or [],
+            "citations": (synthesis.get("citations") or []) + [item for item in citations if item not in (synthesis.get("citations") or [])],
+            "artifacts": artifacts,
+            "tool_trace": tool_trace,
+            "tool_outputs": tool_outputs,
+            "agent_trace": agent_trace,
+            "preferred_mode": runtime.get("preferred_mode") or "auto",
+            "web_answer": bool(runtime.get("web_answer")),
+            "router": {
+                "mode": route_mode,
+                "reason": intent_plan.get("reason") or "",
+                "model": {
+                    "key": (state.get("router_model") or {}).get("key"),
+                    "label": (state.get("router_model") or {}).get("label"),
+                    "provider": (state.get("router_model") or {}).get("provider"),
+                    "model_name": (state.get("router_model") or {}).get("model_name"),
+                } if state.get("router_model") else None,
+            },
+            "answer_engine": {
+                "mode": answer_mode,
+                "model": {
+                    "key": (state.get("answer_model") or {}).get("key"),
+                    "label": (state.get("answer_model") or {}).get("label"),
+                    "provider": (state.get("answer_model") or {}).get("provider"),
+                    "model_name": (state.get("answer_model") or {}).get("model_name"),
+                } if state.get("answer_model") else None,
+            },
+            "usage": {
+                "compute_used": 1,
+            },
+            "workflow_meta": build_declared_agent_workflow_meta(
+                workflow_definition,
+                extras={"last_execution_steps": copy.deepcopy(upstream)},
+            ),
+        }
+        return {
+            "detail": "已生成最终回答与展示工件。",
+            "output": result,
+            "state_key": "response_payload",
+            "context_preview": {"artifact_count": len(artifacts), "display_mode": response_display_mode},
+        }
+
+    execution = run_declared_agent_workflow(
+        workflow_definition,
+        runtime={
+            "tenant_slug": tenant_slug,
+            "user_role": user_role,
+            "selected_knowledge_ids": selected_knowledge_ids,
+            "attachments": attachments,
+            "preferred_mode": preferred_mode,
+            "web_answer": web_answer,
+            "messages": messages,
+            "question_text": question_text,
         },
-        "answer_engine": {
-            "mode": answer_mode,
-            "model": {
-                "key": answer_model.get("key"),
-                "label": answer_model.get("label"),
-                "provider": answer_model.get("provider"),
-                "model_name": answer_model.get("model_name"),
-            } if answer_model else None,
+        executor_registry={
+            "question_input": _hermes_input_executor,
+            "intent_router": _hermes_router_executor,
+            "tool_dispatch": _hermes_tool_executor,
+            "answer_synthesis": _hermes_synthesis_executor,
+            "artifact_render": _hermes_artifact_executor,
         },
-        "usage": {
-            "compute_used": 1,
-        },
-    }
+    )
+    return execution["state"]["response_payload"]
 
 
 def process_review_voice_upload(file_storage, tenant_slug="", review_period="", entry_point="", speaker_name="", use_llm_enhancement=False, job_code=""):
@@ -2826,6 +3374,7 @@ def process_review_voice_upload(file_storage, tenant_slug="", review_period="", 
     llm_enhanced = False
     llm_notice = ""
     llm_model_info = None
+    llm_workflow_meta = None
     if use_llm_enhancement and raw_transcript:
         try:
             llm_result = enhance_review_voice_transcript_with_llm(
@@ -2836,6 +3385,7 @@ def process_review_voice_upload(file_storage, tenant_slug="", review_period="", 
             )
             enhanced_transcript = str(llm_result.get("text") or "").strip()
             llm_model_info = llm_result.get("model")
+            llm_workflow_meta = copy.deepcopy(llm_result.get("workflow_meta") or {})
             llm_enhanced = bool(enhanced_transcript)
             if llm_enhanced:
                 llm_notice = "已完成基础转写，并由大模型整理为更适合编辑和入库的文本。"
@@ -2852,6 +3402,7 @@ def process_review_voice_upload(file_storage, tenant_slug="", review_period="", 
         "llm_enhanced": llm_enhanced,
         "llm_notice": llm_notice,
         "llm_model": llm_model_info,
+        "workflow_meta": llm_workflow_meta or {},
     }
 
 

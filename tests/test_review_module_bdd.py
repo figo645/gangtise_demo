@@ -107,6 +107,16 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("async function syncLocalLlmRegistryFromStaging()", html)
         self.assertIn("/api/admin/site-config/sync-llm-registry", html)
 
+    def test_given_admin_page_when_rendered_then_agent_workflow_center_exists(self):
+        response = self.client.get("/admin")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("智能体工作流", html)
+        self.assertIn("loadAdminAgentWorkflows", html)
+        self.assertIn("/api/admin/agent-workflows", html)
+        self.assertIn("section-agent-workflows", html)
+
     def test_given_sync_request_when_api_called_then_only_llm_registry_is_synced(self):
         local_site_config = {
             "brand": {"name": "Local Brand"},

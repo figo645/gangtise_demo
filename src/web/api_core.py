@@ -871,6 +871,24 @@ def api_save_admin_forecast_config():
         }
     )
 
+
+@app.route("/api/admin/agent-workflows")
+def api_admin_agent_workflows():
+    try:
+        forecast_graph = load_forecast_workflow_graph()
+        forecast_meta = build_forecast_workflow_meta(forecast_graph)
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        app.logger.warning("Database unavailable while building agent workflow center, using forecast fallback graph")
+        forecast_meta = build_forecast_workflow_meta(build_default_forecast_workflow_graph())
+    return jsonify(
+        {
+            "ok": True,
+            "center": build_agent_workflow_center_payload(forecast_meta),
+        }
+    )
+
 @app.route("/api/ai-analysis", methods=["POST"])
 def api_ai_analysis():
     from flask import request
