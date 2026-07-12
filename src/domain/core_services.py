@@ -81,6 +81,14 @@ def gen_watchlist_details(*args, **kwargs):
     return _market_services_module().gen_watchlist_details(*args, **kwargs)
 
 
+def build_simulated_indicator_kline(*args, **kwargs):
+    return _market_services_module().build_simulated_indicator_kline(*args, **kwargs)
+
+
+def NumberLike(*args, **kwargs):
+    return _market_services_module().NumberLike(*args, **kwargs)
+
+
 def get_default_llm_config(*args, **kwargs):
     return _ai_services_module().get_default_llm_config(*args, **kwargs)
 
@@ -4645,6 +4653,25 @@ def build_tenant_dashboard_payload_fallback(tenant=None):
 def build_indicator_hub_fallback(tenant=None, admin_view=False):
     tenant = tenant or normalize_tenant_config({}, 0)
     advisor_name = tenant.get("advisor") or ""
+    fallback_kline = build_simulated_indicator_kline("fallback_shanghai_index", status="good", points=24)
+    fallback_series = [
+        {
+            "date": candle.get("date"),
+            "value": candle.get("close"),
+            "status": "good",
+        }
+        for candle in (fallback_kline.get("candles") or [])
+    ]
+    fallback_anomalies = [
+        {
+            "date": item.get("date"),
+            "value": item.get("value"),
+            "status": item.get("status") or "attention",
+            "label": item.get("label") or "波动抬升",
+            "severity": "中",
+        }
+        for item in (fallback_kline.get("anomalies") or [])
+    ]
     smart_items = [
         {
             "id": "smart_market_heat",
@@ -4665,9 +4692,9 @@ def build_indicator_hub_fallback(tenant=None, admin_view=False):
             "selected_indicators": [{"indicator_code": "smart_market_heat", "indicator_name": "市场情绪温度"}],
             "display_order": 0,
             "history": [],
-            "history_series": [],
-            "history_anomalies": [],
-            "history_kline": [],
+            "history_series": fallback_series,
+            "history_anomalies": fallback_anomalies,
+            "history_kline": fallback_kline,
             "source_type": "smart",
             "source_type_label": "智能指标",
             "provider": "fallback",
@@ -4696,9 +4723,9 @@ def build_indicator_hub_fallback(tenant=None, admin_view=False):
             "selected_indicators": [{"indicator_code": "smart_review_signal", "indicator_name": "复盘重点信号"}],
             "display_order": 1,
             "history": [],
-            "history_series": [],
-            "history_anomalies": [],
-            "history_kline": [],
+            "history_series": fallback_series,
+            "history_anomalies": fallback_anomalies,
+            "history_kline": fallback_kline,
             "source_type": "smart",
             "source_type_label": "智能指标",
             "provider": "fallback",
@@ -4711,21 +4738,22 @@ def build_indicator_hub_fallback(tenant=None, admin_view=False):
     ]
     lake_items = [
         {
-            "id": "lake_turnover",
-            "name": "市场成交额",
-            "category": "市场宽度",
+            "id": "source_shanghai_index",
+            "name": "上证指数",
+            "category": "指数走势",
             "owner": advisor_name or "平台宏观组",
-            "value": "1.12 万亿",
-            "assessment": "成交维持在相对活跃区间，说明主题轮动仍有承接。",
-            "status": "normal",
-            "alert": "量能暂未出现断崖式收缩。",
+            "value": str((fallback_kline.get("candles") or [{}])[-1].get("close") or "4093.73"),
+            "numeric_value": NumberLike((fallback_kline.get("candles") or [{}])[-1].get("close") or 4093.73),
+            "assessment": "当前为数据库降级场景，已回退为平台内置指数样本K线。",
+            "status": "good",
+            "alert": "当前优先展示K线走势与均线关系。",
             "enabled": True,
             "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "watchers": [],
             "history": [],
-            "history_series": [],
-            "history_anomalies": [],
-            "history_kline": [],
+            "history_series": fallback_series,
+            "history_anomalies": fallback_anomalies,
+            "history_kline": fallback_kline,
             "source_type": "lake",
             "source_type_label": "数据湖指标",
             "provider": "fallback",
@@ -4748,9 +4776,9 @@ def build_indicator_hub_fallback(tenant=None, admin_view=False):
             "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "watchers": [],
             "history": [],
-            "history_series": [],
-            "history_anomalies": [],
-            "history_kline": [],
+            "history_series": fallback_series,
+            "history_anomalies": fallback_anomalies,
+            "history_kline": fallback_kline,
             "source_type": "lake",
             "source_type_label": "数据湖指标",
             "provider": "fallback",

@@ -2957,6 +2957,7 @@ HERMES_ALLOWED_TOOLS = {
     "knowledge.search",
     "evidence.search",
     "watchlist.detail",
+    "indicator.detail",
     "dashboard.context",
     "attachment.context",
     "web.search",
@@ -2998,7 +2999,7 @@ HERMES_SCOPE_KEYWORDS = {
     "watchlist": ["股票", "个股", "自选股", "基本面", "估值", "盈利", "财报", "行业位置", "港股", "a股", "美股"],
     "evidence": ["复盘", "证据链", "证据", "依据", "来源", "纪要", "逻辑链"],
     "knowledge": ["知识库", "知识", "框架", "方法", "研报", "材料", "纪要速读", "方法论"],
-    "indicator": ["智能指标", "指标", "公式", "提示词", "算法", "js", "计算", "引用指标"],
+    "indicator": ["智能指标", "指标", "公式", "提示词", "算法", "js", "计算", "引用指标", "指数", "k线", "k线图", "趋势", "趋势图", "走势图", "分布", "分布图", "可视化", "蜡烛图"],
     "dashboard": ["dashboard", "看板", "面板", "卡片", "2x2", "2x3", "4x2", "布局"],
     "product": ["功能", "页面", "按钮", "工作台", "专区", "上传", "发布", "预览", "后台", "admin", "h5", "web", "怎么用", "如何用"],
 }
@@ -3029,15 +3030,16 @@ def _contains_any_keyword(text, keywords):
     return False
 
 
-def _hermes_scope_feature_flags(question_text, selected_knowledge_ids=None, attachments=None):
+def _hermes_scope_feature_flags(question_text, selected_knowledge_ids=None, attachments=None, tenant_slug=""):
     selected_knowledge_ids = selected_knowledge_ids if isinstance(selected_knowledge_ids, list) else []
     attachments = attachments if isinstance(attachments, list) else []
     text = str(question_text or "").strip()
+    indicator_match = find_indicator_reference_from_text(text, tenant_slug=tenant_slug)
     flags = {
         "watchlist": bool(find_watchlist_code_from_text(text)) or _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["watchlist"]),
         "evidence": _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["evidence"]),
         "knowledge": bool(selected_knowledge_ids) or _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["knowledge"]),
-        "indicator": _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["indicator"]),
+        "indicator": bool(indicator_match) or _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["indicator"]),
         "dashboard": _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["dashboard"]),
         "product": _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["product"]),
         "attachments": bool(attachments),
@@ -3052,12 +3054,13 @@ def _hermes_scope_feature_flags(question_text, selected_knowledge_ids=None, atta
     return flags
 
 
-def hermes_scope_guard(question_text, selected_knowledge_ids=None, attachments=None):
+def hermes_scope_guard(question_text, selected_knowledge_ids=None, attachments=None, tenant_slug=""):
     text = str(question_text or "").strip()
     flags = _hermes_scope_feature_flags(
         question_text=text,
         selected_knowledge_ids=selected_knowledge_ids,
         attachments=attachments,
+        tenant_slug=tenant_slug,
     )
     suggestions = [
         "可以改问个股 / 自选股基本面。",
@@ -4607,6 +4610,12 @@ def _normalize_hermes_mode_label(intent, answer_mode="", preferred_mode="", entr
     answer_key = str(answer_mode or "").strip().lower()
     preferred_key = str(preferred_mode or "").strip().lower()
     entry = str(entry_point or "").strip().lower()
+    if preferred_key == "line_chart":
+        return "线性图"
+    if preferred_key == "kline_chart":
+        return "K线图"
+    if preferred_key == "distribution_chart":
+        return "分布图"
     if intent_key == "watchlist_fundamental":
         return "自选股诊断"
     if intent_key == "evidence_chain_analysis":
@@ -4905,6 +4914,69 @@ def build_admin_hermes_memory_clear_preview(tenant_slug, range_key):
     }
 
 
+def build_user_hermes_usage_snapshot(tenant_slug="", user_profile_id="", quota_total=0):
+    tenant = str(tenant_slug or "").strip().lower()
+    user_id = str(user_profile_id or "").strip()
+    if not user_id:
+        raise ValueError("user_profile_id_required")
+    db = get_db()
+    now_dt = datetime.now()
+    today_start = now_dt.replace(hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+    month_start = now_dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+    where_sql = "user_profile_id = ?"
+    params = [user_id]
+    if tenant:
+        where_sql += " AND tenant_slug = ?"
+        params.append(tenant)
+    rows = db.execute(
+        f"""
+        SELECT user_profile_id, user_display_name, tenant_slug, tool_trace_json, memory_summary_json, created_at
+        FROM hermes_conversation_turns
+        WHERE {where_sql}
+        ORDER BY created_at DESC, id DESC
+        """,
+        tuple(params),
+    ).fetchall()
+    total_call_count = 0
+    today_call_count = 0
+    month_call_count = 0
+    total_compute_units = 0
+    month_compute_units = 0
+    latest_turn_at = ""
+    display_name = ""
+    resolved_tenant = tenant
+    for row in rows:
+        row_dict = dict(row or {})
+        total_call_count += 1
+        latest_turn_at = latest_turn_at or str(row_dict.get("created_at") or "").strip()
+        display_name = display_name or str(row_dict.get("user_display_name") or "").strip()
+        resolved_tenant = resolved_tenant or str(row_dict.get("tenant_slug") or "").strip().lower()
+        metrics = _extract_hermes_turn_metrics(row_dict)
+        created_at = str(row_dict.get("created_at") or "").strip()
+        if created_at >= today_start:
+            today_call_count += 1
+        if created_at >= month_start:
+            month_call_count += 1
+            month_compute_units += int(metrics.get("compute_units") or 0)
+        total_compute_units += int(metrics.get("compute_units") or 0)
+    quota_total = max(0, int(quota_total or 0))
+    remaining_count = max(0, quota_total - total_compute_units) if quota_total else 0
+    return {
+        "tenant_slug": resolved_tenant,
+        "user_profile_id": user_id,
+        "user_display_name": display_name or user_id,
+        "quota_total": quota_total,
+        "used_count": total_compute_units,
+        "remaining_count": remaining_count,
+        "total_call_count": total_call_count,
+        "today_call_count": today_call_count,
+        "month_call_count": month_call_count,
+        "month_compute_units": month_compute_units,
+        "latest_turn_at": latest_turn_at,
+        "generated_at": now_ts(),
+    }
+
+
 def _load_admin_hermes_backup_rows(db, tenant_slug, range_key):
     tenant = str(tenant_slug or "").strip().lower()
     normalized_range = normalize_hermes_memory_range_key(range_key)
@@ -5077,7 +5149,7 @@ def build_hermes_intent_router_prompt(question_text, has_attachments=False, sele
     return (
         "请根据用户问题判断 Hermes 应该如何拆解任务。\n"
         "可选 intent：small_talk, product_help, knowledge_lookup, evidence_chain_analysis, watchlist_fundamental, smart_indicator_explain, dashboard_interpretation, multi_tool_research, out_of_scope_redirect\n"
-        "可选 tools：knowledge.search, evidence.search, watchlist.detail, dashboard.context, attachment.context\n"
+        "可选 tools：knowledge.search, evidence.search, watchlist.detail, indicator.detail, dashboard.context, attachment.context\n"
         "规则：\n"
         "1. 如果用户明确问复盘、证据链、依据、来源，优先考虑 evidence_chain_analysis。\n"
         "2. 如果用户明确问基本面、估值、盈利、行业位置、个股研究，且存在股票名/代码，优先考虑 watchlist_fundamental。\n"
@@ -5090,7 +5162,8 @@ def build_hermes_intent_router_prompt(question_text, has_attachments=False, sele
         "9. 如果问题明显超范围，但能温和收口，用 out_of_scope_redirect，且不要安排任何工具。\n"
         "10. 如果有附件，工具里可以包含 attachment.context。\n"
         "11. stock_code 只在能明显识别时输出，否则为空字符串。\n"
-        "12. display_mode 只能是 text 或 structured。\n\n"
+        "12. display_mode 只能是 text 或 structured。\n"
+        "13. 如果用户偏好是 line_chart / kline_chart / distribution_chart，且问题对象是指标或指数，优先保持 smart_indicator_explain + structured。\n\n"
         f"{memory_section}"
         f"{conversation_section}"
         f"用户问题：{str(question_text or '').strip()}\n"
@@ -5107,7 +5180,7 @@ def build_hermes_intent_router_prompt(question_text, has_attachments=False, sele
     )
 
 
-def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attachments=None, preferred_mode=""):
+def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attachments=None, preferred_mode="", tenant_slug=""):
     question = str(question_text or "").strip()
     lowered = question.lower()
     attachments = attachments if isinstance(attachments, list) else []
@@ -5115,7 +5188,9 @@ def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attac
     preferred_mode = str(preferred_mode or "").strip().lower()
     has_attachments = bool(attachments)
     stock_code = find_watchlist_code_from_text(question)
-    scope_flags = _hermes_scope_feature_flags(question, selected_knowledge_ids=selected_knowledge_ids, attachments=attachments)
+    indicator_match = find_indicator_reference_from_text(question, tenant_slug=tenant_slug)
+    indicator_code = str((indicator_match or {}).get("indicator_code") or "").strip()
+    scope_flags = _hermes_scope_feature_flags(question, selected_knowledge_ids=selected_knowledge_ids, attachments=attachments, tenant_slug=tenant_slug)
     stock_keywords = HERMES_SCOPE_KEYWORDS["watchlist"]
     evidence_keywords = HERMES_SCOPE_KEYWORDS["evidence"]
     knowledge_keywords = HERMES_SCOPE_KEYWORDS["knowledge"]
@@ -5123,6 +5198,7 @@ def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attac
     dashboard_keywords = HERMES_SCOPE_KEYWORDS["dashboard"]
     product_keywords = HERMES_SCOPE_KEYWORDS["product"]
     product_action_keywords = HERMES_PRODUCT_ACTION_KEYWORDS
+    explicit_kline_request = any(keyword in lowered for keyword in ["k线", "k线图", "k线走势", "蜡烛图"])
     if preferred_mode == "evidence":
         return {
             "intent": "evidence_chain_analysis" if not stock_code else "multi_tool_research",
@@ -5130,6 +5206,25 @@ def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attac
             "stock_code": stock_code,
             "display_mode": "structured" if stock_code else "text",
             "reason": "分析方式偏向证据链归因",
+        }
+    if preferred_mode in {"line_chart", "kline_chart", "distribution_chart"}:
+        return {
+            "intent": "smart_indicator_explain",
+            "tools": ["indicator.detail", "dashboard.context"] + (["knowledge.search"] if selected_knowledge_ids else []) + (["attachment.context"] if has_attachments else []),
+            "stock_code": stock_code,
+            "indicator_code": indicator_code,
+            "display_mode": "structured" if indicator_code else "text",
+            "reason": f"分析方式偏向{ {'line_chart': '线性图', 'kline_chart': 'K线图', 'distribution_chart': '分布图'}.get(preferred_mode, '图表可视化') }",
+        }
+    if explicit_kline_request and indicator_code:
+        return {
+            "intent": "smart_indicator_explain",
+            "tools": ["indicator.detail", "dashboard.context"] + (["knowledge.search"] if selected_knowledge_ids else []) + (["attachment.context"] if has_attachments else []),
+            "stock_code": stock_code,
+            "indicator_code": indicator_code,
+            "display_mode": "structured",
+            "reason": f"用户明确要求 K线走势：{(indicator_match or {}).get('indicator_name') or indicator_code}",
+            "preferred_mode": "kline_chart",
         }
     if preferred_mode == "judgement" and stock_code:
         return {
@@ -5159,10 +5254,20 @@ def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attac
     if any(keyword in lowered for keyword in [item.lower() for item in indicator_keywords]):
         return {
             "intent": "smart_indicator_explain",
-            "tools": ["dashboard.context"] + (["knowledge.search"] if selected_knowledge_ids else []) + (["attachment.context"] if has_attachments else []),
+            "tools": ["indicator.detail", "dashboard.context"] + (["knowledge.search"] if selected_knowledge_ids else []) + (["attachment.context"] if has_attachments else []),
             "stock_code": stock_code,
-            "display_mode": "text",
-            "reason": "命中智能指标或公式说明问题",
+            "indicator_code": indicator_code,
+            "display_mode": "structured" if indicator_code else "text",
+            "reason": f"命中指标或股指问题：{(indicator_match or {}).get('indicator_name') or '智能指标 / 公式说明'}",
+        }
+    if indicator_code:
+        return {
+            "intent": "smart_indicator_explain",
+            "tools": ["indicator.detail", "dashboard.context"] + (["knowledge.search"] if selected_knowledge_ids else []) + (["attachment.context"] if has_attachments else []),
+            "stock_code": stock_code,
+            "indicator_code": indicator_code,
+            "display_mode": "structured",
+            "reason": f"命中指标或股指问题：{(indicator_match or {}).get('indicator_name') or indicator_code}",
         }
     if any(keyword in lowered for keyword in [item.lower() for item in dashboard_keywords]):
         return {
@@ -5250,6 +5355,7 @@ def build_hermes_scope_plan(scope_result, question_text, selected_knowledge_ids=
         selected_knowledge_ids=selected_knowledge_ids,
         attachments=attachments,
         preferred_mode=preferred_mode,
+        tenant_slug="",
     )
     if scope.get("status") == "soft_allowed":
         plan["intent"] = "small_talk"
@@ -5292,6 +5398,7 @@ def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_
         selected_knowledge_ids=selected_knowledge_ids,
         attachments=attachments,
         preferred_mode=preferred_mode,
+        tenant_slug=tenant_slug,
     )
     llm_model = get_default_llm_config(purpose="general")
     if not llm_model:
@@ -5334,6 +5441,7 @@ def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_
             "intent": intent,
             "tools": tools[:4],
             "stock_code": stock_code,
+            "indicator_code": str(parsed.get("indicator_code") or fallback.get("indicator_code") or "").strip(),
             "display_mode": display_mode,
             "reason": str(parsed.get("reason") or fallback["reason"]).strip()[:200] or fallback["reason"],
         }, llm_model, "llm_router"
@@ -5365,6 +5473,56 @@ def find_watchlist_code_from_text(text):
         if name and name in normalized:
             return code
     return ""
+
+
+def find_indicator_reference_from_text(text, tenant_slug=""):
+    normalized = str(text or "").strip()
+    if not normalized:
+        return None
+    lowered = normalized.lower()
+    alias_map = {
+        "上证指数": ["上证指数", "上证综指", "上证综合指数", "沪指", "sh000001"],
+        "沪深300": ["沪深300", "hs300"],
+        "上证50": ["上证50", "上证50指数", "sse50"],
+        "科创50": ["科创50", "科创50指数"],
+        "创业板指": ["创业板", "创业板指"],
+        "恒生指数": ["恒生指数", "恒指", "hsi"],
+        "纳斯达克": ["纳斯达克", "纳斯达克指数", "纳指", "nasdaq"],
+        "标普500": ["标普500", "标普", "sp500", "s&p500"],
+        "道琼斯": ["道琼斯", "道指", "dji"],
+        "CPI": ["cpi", "居民消费价格指数"],
+    }
+    hub = build_indicator_hub(tenant=get_tenant_by_slug(tenant_slug) if tenant_slug else get_tenant_by_slug(), admin_view=False)
+    items = []
+    for item in (hub.get("items") or []):
+        if isinstance(item, dict):
+            items.append(item)
+    for item in sorted(items, key=lambda current: len(str(current.get("name") or "")), reverse=True):
+        code = str(item.get("id") or "").strip()
+        name = str(item.get("name") or "").strip()
+        aliases = [code, name]
+        aliases.extend(alias_map.get(name, []))
+        for alias in aliases:
+            candidate = str(alias or "").strip()
+            if candidate and candidate.lower() in lowered:
+                return {
+                    "indicator_code": code,
+                    "indicator_name": name or code,
+                }
+    return None
+
+
+def resolve_hermes_indicator_window(question_text):
+    text = str(question_text or "").strip().lower()
+    if any(keyword in text for keyword in ["3个月", "三个月", "近3个月", "最近3个月"]):
+        return 60
+    if any(keyword in text for keyword in ["6个月", "六个月", "近6个月", "最近6个月", "半年"]):
+        return 120
+    if any(keyword in text for keyword in ["12个月", "近1年", "最近1年", "一年"]):
+        return 240
+    if any(keyword in text for keyword in ["1个月", "一个月", "近1个月", "最近1个月"]):
+        return 20
+    return 60
 
 
 def hermes_tool_attachment_context(attachments):
@@ -5600,6 +5758,37 @@ def hermes_tool_watchlist_detail(stock_code):
     }
 
 
+def hermes_tool_indicator_detail(tenant_slug, indicator_code="", question_text=""):
+    match = find_indicator_reference_from_text(question_text, tenant_slug=tenant_slug) if question_text else None
+    resolved_code = str(indicator_code or (match or {}).get("indicator_code") or "").strip()
+    if not resolved_code:
+        return {"found": False, "detail": None}
+    tenant = get_tenant_by_slug(tenant_slug)
+    hub = build_indicator_hub(tenant=tenant, admin_view=False)
+    detail = next((item for item in (hub.get("items") or []) if str((item or {}).get("id") or "").strip() == resolved_code), None)
+    if not isinstance(detail, dict):
+        return {"found": False, "detail": None}
+    window = resolve_hermes_indicator_window(question_text)
+    history_series = detail.get("history_series") if isinstance(detail.get("history_series"), list) else []
+    history_anomalies = detail.get("history_anomalies") if isinstance(detail.get("history_anomalies"), list) else []
+    history_kline = detail.get("history_kline") if isinstance(detail.get("history_kline"), dict) else {}
+    detail["history_series"] = history_series[-window:]
+    detail["history_anomalies"] = history_anomalies[-min(len(history_anomalies), 6):]
+    if history_kline:
+        detail["history_kline"] = {
+            **history_kline,
+            "candles": (history_kline.get("candles") or [])[-window:],
+            "ma5": (history_kline.get("ma5") or [])[-window:],
+            "ma10": (history_kline.get("ma10") or [])[-window:],
+            "ma20": (history_kline.get("ma20") or [])[-window:],
+            "anomalies": (history_kline.get("anomalies") or [])[-min(len(history_kline.get("anomalies") or []), 6):],
+        }
+    return {
+        "found": True,
+        "detail": copy.deepcopy(detail),
+    }
+
+
 def get_hermes_tool_registry():
     return {
         "attachment.context": {
@@ -5630,6 +5819,14 @@ def get_hermes_tool_registry():
         "watchlist.detail": {
             "output_key": "watchlist",
             "executor": lambda runtime: hermes_tool_watchlist_detail(runtime.get("stock_code")),
+        },
+        "indicator.detail": {
+            "output_key": "indicator",
+            "executor": lambda runtime: hermes_tool_indicator_detail(
+                tenant_slug=runtime.get("tenant_slug") or "",
+                indicator_code=runtime.get("indicator_code") or "",
+                question_text=runtime.get("question_text") or "",
+            ),
         },
         "web.search": {
             "output_key": "web_search",
@@ -5675,7 +5872,9 @@ def execute_hermes_tool_plan(plan, tenant_slug, question_text, selected_knowledg
         "selected_knowledge_ids": selected_knowledge_ids,
         "attachments": attachments,
         "stock_code": str(plan.get("stock_code") or "").strip(),
+        "indicator_code": str(plan.get("indicator_code") or "").strip(),
         "web_answer": bool(web_answer),
+        "preferred_mode": str(plan.get("preferred_mode") or "").strip().lower(),
     }
     for tool_name in build_hermes_tool_execution_plan(plan, web_answer=web_answer):
         started_at = time.time()
@@ -5704,6 +5903,9 @@ def execute_hermes_tool_plan(plan, tenant_slug, question_text, selected_knowledg
                 "error": str(exc)[:200],
             })
             app.logger.exception("Hermes tool execution failed: %s", tool_name)
+    outputs["_meta"] = {
+        "preferred_mode": runtime.get("preferred_mode") or "",
+    }
     return outputs, trace
 
 
@@ -5725,6 +5927,7 @@ HERMES_TOOL_LABELS = {
     "evidence.search": "证据链检索",
     "dashboard.context": "Dashboard 上下文",
     "watchlist.detail": "个股详情分析",
+    "indicator.detail": "指标图表分析",
     "web.search": "互联网补充",
 }
 
@@ -6060,15 +6263,285 @@ def build_hermes_watchlist_artifact(detail, question_text, synthesis, tool_outpu
     }
 
 
+def build_hermes_indicator_chart_html(detail, chart_kind, question_text=""):
+    safe_detail = copy.deepcopy(detail if isinstance(detail, dict) else {})
+    kind = str(chart_kind or "").strip().lower()
+    if kind == "kline":
+        history_kline = safe_detail.get("history_kline") if isinstance(safe_detail.get("history_kline"), dict) else {}
+        candles = history_kline.get("candles") if isinstance(history_kline.get("candles"), list) else []
+        if not candles:
+            return ""
+        ma5 = history_kline.get("ma5") if isinstance(history_kline.get("ma5"), list) else []
+        ma10 = history_kline.get("ma10") if isinstance(history_kline.get("ma10"), list) else []
+        ma20 = history_kline.get("ma20") if isinstance(history_kline.get("ma20"), list) else []
+        anomalies = history_kline.get("anomalies") if isinstance(history_kline.get("anomalies"), list) else []
+        width = 320
+        height = 180
+        padding_top = 14
+        padding_right = 10
+        padding_bottom = 24
+        padding_left = 10
+        chart_height = height - padding_top - padding_bottom
+        max_price = max([NumberLike(item.get("high")) for item in candles] + [1.0])
+        min_price = min([NumberLike(item.get("low")) for item in candles] + [0.0])
+        span = max(max_price - min_price, 1.0)
+        step = (width - padding_left - padding_right) / max(len(candles), 1)
+        candle_width = max(4.8, min(6.8, step * 0.52))
+
+        def scale_y(value):
+            return padding_top + ((max_price - NumberLike(value)) / span) * chart_height
+
+        def scale_x(index):
+            return padding_left + step * index + step / 2
+
+        def build_ma_path(items):
+            points = []
+            for entry in items:
+                if not isinstance(entry, dict):
+                    continue
+                date = str(entry.get("date") or "").strip()
+                index = next((idx for idx, candle in enumerate(candles) if str(candle.get("date") or "").strip() == date), -1)
+                if index < 0:
+                    continue
+                points.append(f"{scale_x(index):.2f} {scale_y(entry.get('value')):.2f}")
+            return " ".join(f"{'M' if idx == 0 else 'L'} {point}" for idx, point in enumerate(points))
+
+        candle_svg = []
+        for index, item in enumerate(candles):
+            x = scale_x(index)
+            open_y = scale_y(item.get("open"))
+            close_y = scale_y(item.get("close"))
+            high_y = scale_y(item.get("high"))
+            low_y = scale_y(item.get("low"))
+            rect_y = min(open_y, close_y)
+            rect_height = max(2.0, abs(close_y - open_y))
+            color = "#2ECC71" if NumberLike(item.get("close")) >= NumberLike(item.get("open")) else "#E74C3C"
+            candle_svg.append(
+                f'<line x1="{x:.2f}" y1="{high_y:.2f}" x2="{x:.2f}" y2="{low_y:.2f}" stroke="{color}" stroke-width="1.1"></line>'
+                f'<rect x="{(x - candle_width / 2):.2f}" y="{rect_y:.2f}" width="{candle_width:.2f}" height="{rect_height:.2f}" rx="1.2" fill="{color}"></rect>'
+            )
+
+        anomaly_marks = []
+        for entry in anomalies:
+            if not isinstance(entry, dict):
+                continue
+            date = str(entry.get("date") or "").strip()
+            index = next((idx for idx, candle in enumerate(candles) if str(candle.get("date") or "").strip() == date), -1)
+            if index < 0:
+                continue
+            x = scale_x(index)
+            y = scale_y(entry.get("value"))
+            anomaly_marks.append(
+                f'<circle cx="{x:.2f}" cy="{y:.2f}" r="3.8" fill="rgba(220,53,69,0.14)" stroke="#DC3545" stroke-width="1.2"></circle>'
+            )
+
+        tick_indexes = []
+        for candidate in [0, max(0, (len(candles) - 1) // 2), max(0, len(candles) - 1)]:
+            if candidate not in tick_indexes:
+                tick_indexes.append(candidate)
+        ticks = []
+        for index in tick_indexes:
+            label = html_escape(str((candles[index].get("date") or "--"))[5:])
+            ticks.append(
+                f'<text x="{scale_x(index):.2f}" y="{height - 6}" text-anchor="middle" font-size="9" fill="var(--gray-400)">{label}</text>'
+            )
+
+        grid_values = [max_price, min_price + span / 2, min_price]
+        gridlines = []
+        for value in grid_values:
+            y = scale_y(value)
+            gridlines.append(
+                f'<line x1="{padding_left}" y1="{y:.2f}" x2="{width - padding_right}" y2="{y:.2f}" stroke="rgba(200,169,110,0.08)" stroke-width="1"></line>'
+                f'<text x="{width - padding_right}" y="{(y - 4):.2f}" text-anchor="end" font-size="9" fill="var(--gray-400)">{NumberLike(value):.2f}</text>'
+            )
+
+        return (
+            '<div style="background:var(--navy);border:1px solid rgba(200,169,110,0.08);border-radius:12px;padding:12px">'
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">'
+            '<div style="font-size:12px;font-weight:700;color:var(--white)">K线走势</div>'
+            '<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--gray-400)">'
+            '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#F6C453;display:inline-block"></span>MA5</span>'
+            '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#5DADE2;display:inline-block"></span>MA10</span>'
+            '<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#AF7AC5;display:inline-block"></span>MA20</span>'
+            '</div></div>'
+            '<div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">当前按最近时间窗口输出 K 线走势，并保留均线和异动点标记。</div>'
+            f'<svg viewBox="0 0 {width} {height}" width="100%" height="200" preserveAspectRatio="xMidYMid meet" role="img" aria-label="指标 K 线图" style="display:block">'
+            f"{''.join(gridlines)}{''.join(candle_svg)}"
+            f'<path d="{build_ma_path(ma5)}" fill="none" stroke="#F6C453" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>'
+            f'<path d="{build_ma_path(ma10)}" fill="none" stroke="#5DADE2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>'
+            f'<path d="{build_ma_path(ma20)}" fill="none" stroke="#AF7AC5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>'
+            f"{''.join(anomaly_marks)}{''.join(ticks)}</svg></div>"
+        )
+    return ""
+
+
+def build_hermes_indicator_artifact(detail, question_text, synthesis, tool_outputs, citations, tenant_slug="", user_role=""):
+    detail = copy.deepcopy(detail if isinstance(detail, dict) else {})
+    history_series = detail.get("history_series") if isinstance(detail.get("history_series"), list) else []
+    anomalies = detail.get("history_anomalies") if isinstance(detail.get("history_anomalies"), list) else []
+    history_kline = detail.get("history_kline") if isinstance(detail.get("history_kline"), dict) else {}
+    selected_indicators = detail.get("selected_indicators") if isinstance(detail.get("selected_indicators"), list) else []
+    source_names = [
+        str(item.get("indicator_name") or item.get("indicator_code") or "").strip()
+        for item in selected_indicators
+        if isinstance(item, dict) and str(item.get("indicator_name") or item.get("indicator_code") or "").strip()
+    ]
+    value_text = str(detail.get("value") or "--").strip() or "--"
+    unit_text = str(detail.get("unit") or "").strip()
+    latest_status = str(detail.get("status") or "attention").strip() or "attention"
+    trend_summary = []
+    prev_numeric = None
+    values = []
+    for item in history_series[-24:]:
+        if not isinstance(item, dict):
+            continue
+        numeric = NumberLike(item.get("value"))
+        values.append(numeric)
+        delta = 0 if prev_numeric is None else round(numeric - prev_numeric, 2)
+        trend_summary.append(
+            {
+                "date": str(item.get("date") or "--").strip() or "--",
+                "value": str(item.get("value") or "--").strip() or "--",
+                "status": str(item.get("status") or latest_status).strip() or latest_status,
+                "delta": delta,
+                "direction": "上行" if delta > 0 else "下行" if delta < 0 else "持平",
+            }
+        )
+        prev_numeric = numeric
+    min_value = round(min(values), 2) if values else None
+    max_value = round(max(values), 2) if values else None
+    current_numeric = NumberLike(detail.get("numeric_value")) if detail.get("numeric_value") is not None else (values[-1] if values else None)
+    metrics = [
+        {
+            "label": "当前值",
+            "value": f"{value_text}{unit_text}" if unit_text else value_text,
+            "note": str(detail.get("assessment") or detail.get("interpretation") or "").strip()[:42],
+        },
+        {
+            "label": "趋势状态",
+            "value": {"good": "正常", "attention": "关注", "warning": "预警"}.get(latest_status, latest_status or "关注"),
+            "note": str(detail.get("alert") or "当前按历史趋势与异动监测结果展示。").strip()[:42],
+        },
+        {
+            "label": "区间范围",
+            "value": "--" if min_value is None or max_value is None else f"{min_value} ~ {max_value}",
+            "note": f"最近 {len(trend_summary)} 个观测点",
+        },
+        {
+            "label": "关联来源",
+            "value": str(detail.get("source_type_label") or detail.get("data_mode_label") or "指标库").strip() or "指标库",
+            "note": (source_names[0] if source_names else str(detail.get("provider") or "平台指标中心").strip() or "平台指标中心")[:42],
+        },
+    ]
+    bullets = [str(item).strip() for item in (synthesis.get("bullets") if isinstance(synthesis.get("bullets"), list) else []) if str(item).strip()][:3]
+    if not bullets:
+        bullets = [
+            str(detail.get("interpretation") or "").strip(),
+            str(detail.get("algorithm_detail") or "").strip(),
+            f"最近 {len(anomalies)} 个异动点需要重点跟踪。" if anomalies else "当前没有显著异动点。",
+        ]
+    bullets = [item for item in bullets if item][:3]
+    actions = []
+    if anomalies:
+        actions.append(f"先看最近异动点：{str(anomalies[0].get('date') or '--').strip()} · {str(anomalies[0].get('label') or '异动').strip()}")
+    if source_names:
+        actions.append(f"继续追问底层引用：{' / '.join(source_names[:2])}")
+    actions.append("如果需要，我可以继续解释这个指标适合放在 Dashboard 哪个格子。")
+    knowledge_matches = ((tool_outputs.get("knowledge") or {}).get("matches") or []) if isinstance(tool_outputs, dict) else []
+    knowledge_entries = []
+    for item in knowledge_matches[:3]:
+        if not isinstance(item, dict):
+            continue
+        knowledge_entries.append({
+            "title": str(item.get("title") or "未命名知识").strip(),
+            "summary": str(item.get("summary") or item.get("body") or "").strip()[:160],
+        })
+    answer_text = str((synthesis or {}).get("answer") or "").strip()
+    summary = trim_hermes_text(
+        str((synthesis or {}).get("summary") or detail.get("assessment") or detail.get("interpretation") or answer_text).strip(),
+        limit=220,
+    )
+    headline = trim_hermes_text(
+        str((synthesis or {}).get("summary") or answer_text or f"{detail.get('name') or '该指标'} 趋势已完成").strip(),
+        limit=90,
+    )
+    preferred_mode = str((tool_outputs.get("_meta") or {}).get("preferred_mode") or "").strip().lower() if isinstance(tool_outputs, dict) else ""
+    normalized_question = str(question_text or "").strip().lower()
+    explicit_kline_request = any(keyword in normalized_question for keyword in ["k线", "k线图", "k线走势", "蜡烛图"])
+    if preferred_mode == "line_chart":
+        chart_kind = "trend"
+    elif preferred_mode == "distribution_chart":
+        chart_kind = "distribution"
+    elif preferred_mode == "kline_chart" or explicit_kline_request:
+        chart_kind = "kline"
+    else:
+        chart_kind = "distribution" if any(keyword in str(question_text or "") for keyword in ["分布", "统计", "区间"]) else "kline"
+    if chart_kind == "kline" and not (history_kline.get("candles") or []) and history_series:
+        history_kline = build_indicator_kline_from_series_points(
+            history_series[-60:],
+            anomalies,
+            status=latest_status,
+            indicator_code=str(detail.get("id") or detail.get("indicator_code") or detail.get("name") or "indicator").strip(),
+        )
+        detail["history_kline"] = history_kline
+    if chart_kind == "trend" and not (detail.get("history_kline") or {}).get("candles"):
+        chart_kind = "trend"
+    elif chart_kind != "distribution" and not (detail.get("history_kline") or {}).get("candles") and not explicit_kline_request and preferred_mode != "kline_chart":
+        chart_kind = "trend"
+    return {
+        "type": "indicator_analysis",
+        "question": str(question_text or "").strip(),
+        "title": "📈 指标趋势分析",
+        "headline": headline,
+        "summary": summary,
+        "body": answer_text,
+        "symbol": {
+            "name": str(detail.get("name") or detail.get("indicator_name") or "指标").strip(),
+            "code": str(detail.get("id") or detail.get("indicator_code") or "").strip(),
+            "market": str(detail.get("category") or "").strip(),
+            "industry": str(detail.get("owner") or "").strip(),
+        },
+        "confidence": "中高" if len(trend_summary) >= 8 else "中",
+        "metrics": metrics,
+        "judgement": bullets,
+        "next_steps": actions[:3],
+        "citations": citations[:8],
+        "knowledge": knowledge_entries,
+        "chart": {
+            "kind": chart_kind,
+            "points": copy.deepcopy((detail.get("history_kline") or {}).get("candles") or []),
+            "kline": copy.deepcopy(detail.get("history_kline") or {}),
+            "series": copy.deepcopy(trend_summary),
+            "distribution": values[-18:],
+        },
+        "chart_html": build_hermes_indicator_chart_html(detail, chart_kind, question_text=question_text),
+        "footer": f"当前优先基于租户知识库、指标中心历史数据和平台工具回答。指标来源：{str(detail.get('provider') or detail.get('owner') or '平台指标中心').strip()}。",
+    }
+
+
 def build_hermes_artifacts(plan, tool_outputs, synthesis, citations, tenant_slug="", user_role="", question_text=""):
     display_mode = str(plan.get("display_mode") or "text").strip() or "text"
     artifacts = []
     watchlist_result = tool_outputs.get("watchlist") if isinstance(tool_outputs, dict) else {}
     watchlist_detail = (watchlist_result or {}).get("detail") if isinstance(watchlist_result, dict) else None
+    indicator_result = tool_outputs.get("indicator") if isinstance(tool_outputs, dict) else {}
+    indicator_detail = (indicator_result or {}).get("detail") if isinstance(indicator_result, dict) else None
     if display_mode == "structured" and isinstance(watchlist_detail, dict) and watchlist_detail:
         artifacts.append(
             build_hermes_watchlist_artifact(
                 detail=watchlist_detail,
+                question_text=question_text,
+                synthesis=synthesis,
+                tool_outputs=tool_outputs,
+                citations=citations,
+                tenant_slug=tenant_slug,
+                user_role=user_role,
+            )
+        )
+    elif display_mode == "structured" and isinstance(indicator_detail, dict) and indicator_detail:
+        artifacts.append(
+            build_hermes_indicator_artifact(
+                detail=indicator_detail,
                 question_text=question_text,
                 synthesis=synthesis,
                 tool_outputs=tool_outputs,
@@ -6245,6 +6718,7 @@ def build_hermes_query_response(body):
             question_text=runtime.get("question_text") or "",
             selected_knowledge_ids=runtime.get("selected_knowledge_ids") or [],
             attachments=runtime.get("attachments") or [],
+            tenant_slug=runtime.get("tenant_slug") or "",
         )
         scope_status = str(scope_result.get("status") or "allowed").strip() or "allowed"
         detail_map = {
@@ -6458,7 +6932,10 @@ def build_hermes_query_response(body):
             user_role=runtime.get("user_role") or "",
             question_text=runtime.get("question_text") or "",
         )
-        response_display_mode = "structured" if any(str((item or {}).get("type") or "").strip() == "watchlist_analysis" for item in artifacts) else "text"
+        response_display_mode = "structured" if any(
+            str((item or {}).get("type") or "").strip() in {"watchlist_analysis", "indicator_analysis"}
+            for item in artifacts
+        ) else "text"
         result = {
             "ok": True,
             "question": runtime.get("question_text") or "",

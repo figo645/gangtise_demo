@@ -873,6 +873,51 @@ body { background: var(--surface-2); color: var(--text-main); }
   border-radius:999px;
   padding:5px 9px;
 }
+.hermes-chart-shell {
+  margin-top:10px;
+  border:1px solid rgba(17,24,39,0.06);
+  border-radius:14px;
+  background:#F8FAFC;
+  padding:10px;
+  overflow:hidden;
+}
+.hermes-chart-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  margin-bottom:8px;
+  flex-wrap:wrap;
+}
+.hermes-chart-title {
+  font-size:11px;
+  font-weight:700;
+  color:#1F2937;
+}
+.hermes-chart-legend {
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  font-size:10px;
+  color:#7B8490;
+}
+.hermes-chart-legend span {
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+}
+.hermes-chart-swatch {
+  width:10px;
+  height:2px;
+  border-radius:999px;
+  display:inline-block;
+}
+.hermes-chart-svg {
+  display:block;
+  width:100%;
+  height:auto;
+  aspect-ratio:320 / 180;
+}
 .hermes-loading { display:flex; align-items:center; gap:8px; }
 .hermes-loading-text { font-size:13px; color:var(--gold); }
 .hermes-thinking-stream {
@@ -3035,7 +3080,7 @@ body,
     <div class="h5-section hermes-shell" style="padding-top:14px">
       <div class="hermes-header">
         <div class="hermes-logo">🦞 Hermes</div>
-        <div class="hermes-credits" id="hermes-credits-display">⚡ 128次</div>
+        <div class="hermes-credits" id="hermes-credits-display">⚡ --次</div>
       </div>
 
       <div class="hermes-workspace">
@@ -4810,6 +4855,7 @@ function bootH5Experience() {
   loadCommunityEvents();
   selectHermesMode('复盘速写');
   refreshTenantDashboardRemoteState({ rerenderFeed: true, rerenderWorkbench: true });
+  refreshHermesCredits({ silent: true });
 }
 
 function getDefaultDemoUser() {
@@ -8832,8 +8878,11 @@ async function logoutH5User() {
     if (!resp.ok || data.ok === false) throw new Error(data.error || 'h5_logout_failed');
     currentDemoUser = null;
     window.CURRENT_DEMO_PROFILE = null;
+    hermesUsageSnapshot = null;
+    hermesCredits = 0;
     setH5ShellLoggedOut(true);
     renderH5LoginScreen();
+    renderHermesCredits();
     showToast('已退出登录');
   } catch (error) {
     showToast('退出失败');
@@ -8855,6 +8904,7 @@ async function switchDemoProfileUser(userId, options) {
     DEMO_PROFILE_USERS = Array.isArray(data.profiles) ? JSON.parse(JSON.stringify(data.profiles)) : DEMO_PROFILE_USERS;
     window.CURRENT_DEMO_PROFILE = data.current_profile || nextUser;
     renderDemoProfile(getDefaultDemoUser());
+    await refreshHermesCredits({ silent: true });
     if (!options.silentToast) {
       showToast(`已切换到${nextUser.roleLabel}：${nextUser.username}`);
     }
@@ -10186,7 +10236,8 @@ function submitPost() {
 const HERMES_CUSTOM_SKILL_STORAGE_KEY = 'gangtise_demo_hermes_custom_skills';
 let hermesSelectedSkill = 'basic';
 let hermesConversation = [];
-let hermesCredits = 128;
+let hermesCredits = 0;
+let hermesUsageSnapshot = null;
 let hermesCustomSkillDraft = { title: '', prompt: '', knowledgeIds: [] };
 let hermesScopedKnowledgeId = '';
 let hermesUploadedFiles = [];
@@ -10257,6 +10308,45 @@ const DEFAULT_HERMES_SKILLS = {
       '请输出适合复盘引用的依据卡片。'
     ],
     knowledgeKeywords: ['纪要', '证据', '来源', '方法']
+  },
+  line_chart: {
+    id: 'line_chart',
+    icon: '📈',
+    label: '线性图',
+    desc: '优先把指标、股指或智能指标按线性趋势方式展示，适合看方向和斜率变化。',
+    promptTemplate: '优先输出线性趋势图，并围绕趋势方向、阶段拐点和最近变化做解释。',
+    suggestions: [
+      '请用线性图展示这个指标最近3个月的趋势。',
+      '请把这条指数的趋势线画出来并解释最近变化。',
+      '请用线性图展示近一段时间的方向和拐点。'
+    ],
+    knowledgeKeywords: ['趋势', '线性图', '走势图']
+  },
+  kline_chart: {
+    id: 'kline_chart',
+    icon: '🕯️',
+    label: 'K线图',
+    desc: '优先用 K 线方式展示指数或指标，适合看波动区间、均线和异动位置。',
+    promptTemplate: '优先输出 K 线图，并解释区间波动、均线关系和异常点。',
+    suggestions: [
+      '请给我这个指数最近3个月的K线图。',
+      '请用K线展示这条指标最近的波动情况。',
+      '请结合K线解释最近区间高低点。'
+    ],
+    knowledgeKeywords: ['K线', '蜡烛图', '均线']
+  },
+  distribution_chart: {
+    id: 'distribution_chart',
+    icon: '📊',
+    label: '分布图',
+    desc: '优先把指标按分布统计方式展示，适合看区间集中度、离散程度和分位位置。',
+    promptTemplate: '优先输出分布统计图，并解释当前值落在哪个区间、分布是否集中。',
+    suggestions: [
+      '请用分布图看这个指标最近3个月的分布。',
+      '请展示这条指数近阶段的区间分布统计。',
+      '请用分布图判断当前值处于什么区间。'
+    ],
+    knowledgeKeywords: ['分布', '直方图', '区间统计']
   }
 };
 
@@ -10267,6 +10357,9 @@ async function selectHermesMode(mode) {
     '基本面分析': 'basic',
     '自选股诊断': 'judgement',
     '证据链归因': 'evidence',
+    '线性图': 'line_chart',
+    'K线图': 'kline_chart',
+    '分布图': 'distribution_chart',
     '线索追踪': 'evidence',
     '复盘速写': 'basic',
     '研报精读': 'evidence',
@@ -10759,11 +10852,14 @@ function openHermesPlusMenu() {
   if (modal) modal.classList.add('show');
 }
 
-function clearHermesQuestionInputs() {
+function clearHermesQuestionInputs(options) {
+  options = options || {};
   const inputA = document.getElementById('hermes-question-input');
   if (inputA) {
     inputA.value = '';
+    inputA.scrollTop = 0;
     resizeHermesQuestionInput(inputA);
+    if (options.focus) inputA.focus();
   }
   renderHermesComposerSubmit();
 }
@@ -10842,7 +10938,65 @@ function getHermesSkillById(skillId) {
 
 function renderHermesCredits() {
   const el = document.getElementById('hermes-credits-display');
-  if (el) el.textContent = '⚡ ' + hermesCredits + '次';
+  if (!el) return;
+  const usedCount = Number((hermesUsageSnapshot || {}).used_count || 0);
+  const quotaTotal = Number((hermesUsageSnapshot || {}).quota_total || 0);
+  el.textContent = '⚡ ' + formatInt(hermesCredits) + '次';
+  el.title = quotaTotal
+    ? `真实剩余 ${formatInt(hermesCredits)} 次，累计已用 ${formatInt(usedCount)} 次 / 总额度 ${formatInt(quotaTotal)} 次`
+    : `当前累计已用 ${formatInt(usedCount)} 次`;
+}
+
+function syncHermesCreditsToActiveUser() {
+  const activeUser = getActiveDemoUser();
+  if (!activeUser || !hermesUsageSnapshot) return;
+  const remainingCount = Math.max(0, Number(hermesUsageSnapshot.remaining_count || 0));
+  activeUser.computeCredits = remainingCount;
+  if (currentDemoUser && currentDemoUser.username === activeUser.username) {
+    currentDemoUser.computeCredits = remainingCount;
+  }
+  DEMO_PROFILE_USERS = (Array.isArray(DEMO_PROFILE_USERS) ? DEMO_PROFILE_USERS : []).map((user) => (
+    user && user.username === activeUser.username
+      ? { ...user, computeCredits: remainingCount }
+      : user
+  ));
+  if (window.CURRENT_DEMO_PROFILE && window.CURRENT_DEMO_PROFILE.username === activeUser.username) {
+    window.CURRENT_DEMO_PROFILE.computeCredits = remainingCount;
+  }
+  if (el('profile-compute')) {
+    el('profile-compute').textContent = `⚡ ${formatInt(remainingCount)} 次可用`;
+  }
+}
+
+async function refreshHermesCredits(options = {}) {
+  const activeUser = getActiveDemoUser();
+  if (!activeUser || !activeUser.username) {
+    hermesUsageSnapshot = null;
+    hermesCredits = 0;
+    renderHermesCredits();
+    return null;
+  }
+  const params = new URLSearchParams({
+    tenant_slug: (((activeUser || {}).tenant || {}).slug || activeUser.tenant_slug || '').toLowerCase(),
+    user_profile_id: String(activeUser.username || '').trim(),
+  });
+  try {
+    const resp = await fetch(`/api/hermes/usage/current?${params.toString()}`, { cache: 'no-store' });
+    const data = await resp.json();
+    if (!resp.ok || data.ok === false) {
+      throw new Error((data && data.error) || 'hermes_usage_load_failed');
+    }
+    hermesUsageSnapshot = data.usage || {};
+    hermesCredits = Math.max(0, Number((hermesUsageSnapshot || {}).remaining_count || 0));
+    syncHermesCreditsToActiveUser();
+    renderHermesCredits();
+    return hermesUsageSnapshot;
+  } catch (error) {
+    if (!options.silent) {
+      showToast('Hermes 次数加载失败，已保留当前展示');
+    }
+    return null;
+  }
 }
 
 function renderHermesSkillSelector() {
@@ -10965,11 +11119,174 @@ function buildHermesWatchlistKlineSvg(points) {
   `;
 }
 
+function buildHermesIndicatorKlineSvg(klinePayload) {
+  const candles = Array.isArray(klinePayload?.candles) ? klinePayload.candles : [];
+  if (!candles.length) return '';
+  const ma5 = Array.isArray(klinePayload?.ma5) ? klinePayload.ma5 : [];
+  const ma10 = Array.isArray(klinePayload?.ma10) ? klinePayload.ma10 : [];
+  const ma20 = Array.isArray(klinePayload?.ma20) ? klinePayload.ma20 : [];
+  const anomalies = Array.isArray(klinePayload?.anomalies) ? klinePayload.anomalies : [];
+  const width = 320;
+  const height = 180;
+  const padding = { top: 14, right: 10, bottom: 24, left: 10 };
+  const chartHeight = height - padding.top - padding.bottom;
+  const maxPrice = Math.max(...candles.map(item => Number(item.high || 0)), 1);
+  const minPrice = Math.min(...candles.map(item => Number(item.low || 0)), 0);
+  const span = Math.max(maxPrice - minPrice, 1);
+  const step = (width - padding.left - padding.right) / candles.length;
+  const candleWidth = Math.max(4.8, Math.min(6.8, step * 0.52));
+  const scaleY = (value) => padding.top + ((maxPrice - Number(value || 0)) / span) * chartHeight;
+  const scaleX = (index) => padding.left + step * index + step / 2;
+  const buildMaPath = (items) => {
+    const points = items.map((entry) => {
+      const index = candles.findIndex((candle) => candle.date === entry.date);
+      if (index < 0) return null;
+      return `${scaleX(index).toFixed(2)} ${scaleY(entry.value).toFixed(2)}`;
+    }).filter(Boolean);
+    return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point}`).join(' ');
+  };
+  const candleSvg = candles.map((item, index) => {
+    const x = scaleX(index);
+    const openY = scaleY(item.open);
+    const closeY = scaleY(item.close);
+    const highY = scaleY(item.high);
+    const lowY = scaleY(item.low);
+    const rectY = Math.min(openY, closeY);
+    const rectHeight = Math.max(2, Math.abs(closeY - openY));
+    const color = Number(item.close) >= Number(item.open) ? '#2ECC71' : '#E74C3C';
+    return `
+      <line x1="${x.toFixed(2)}" y1="${highY.toFixed(2)}" x2="${x.toFixed(2)}" y2="${lowY.toFixed(2)}" stroke="${color}" stroke-width="1.1"></line>
+      <rect x="${(x - candleWidth / 2).toFixed(2)}" y="${rectY.toFixed(2)}" width="${candleWidth.toFixed(2)}" height="${rectHeight.toFixed(2)}" rx="1.2" fill="${color}"></rect>
+    `;
+  }).join('');
+  const anomalyMarks = anomalies.map((entry) => {
+    const index = candles.findIndex((candle) => candle.date === entry.date);
+    if (index < 0) return '';
+    const x = scaleX(index);
+    const y = scaleY(entry.value);
+    return `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="3.8" fill="rgba(220,53,69,0.14)" stroke="#DC3545" stroke-width="1.2"></circle>`;
+  }).join('');
+  const tickIndexes = [0, Math.floor((candles.length - 1) / 2), candles.length - 1].filter((value, index, arr) => arr.indexOf(value) === index);
+  const ticks = tickIndexes.map((index) => `
+    <text x="${scaleX(index).toFixed(2)}" y="${height - 6}" text-anchor="middle" font-size="9" fill="var(--gray-400)">${escapeHtml((candles[index].date || '--').slice(5))}</text>
+  `).join('');
+  const gridValues = [maxPrice, minPrice + span / 2, minPrice];
+  const gridlines = gridValues.map((value) => {
+    const y = scaleY(value);
+    return `
+      <line x1="${padding.left}" y1="${y.toFixed(2)}" x2="${width - padding.right}" y2="${y.toFixed(2)}" stroke="rgba(200,169,110,0.08)" stroke-width="1"></line>
+      <text x="${width - padding.right}" y="${(y - 4).toFixed(2)}" text-anchor="end" font-size="9" fill="var(--gray-400)">${Number(value).toFixed(2)}</text>
+    `;
+  }).join('');
+  return `
+    <div style="background:var(--navy);border:1px solid rgba(200,169,110,0.08);border-radius:12px;padding:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:700;color:var(--white)">K线走势</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--gray-400)">
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#F6C453;display:inline-block"></span>MA5</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#5DADE2;display:inline-block"></span>MA10</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#AF7AC5;display:inline-block"></span>MA20</span>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">当前按最近时间窗口输出 K 线走势，并保留均线和异动点标记。</div>
+      <svg viewBox="0 0 ${width} ${height}" width="100%" height="200" preserveAspectRatio="xMidYMid meet" role="img" aria-label="指标 K 线图" style="display:block">
+        ${gridlines}
+        ${candleSvg}
+        <path d="${buildMaPath(ma5)}" fill="none" stroke="#F6C453" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="${buildMaPath(ma10)}" fill="none" stroke="#5DADE2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="${buildMaPath(ma20)}" fill="none" stroke="#AF7AC5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+        ${anomalyMarks}
+        ${ticks}
+      </svg>
+    </div>
+  `;
+}
+
+function buildHermesIndicatorTrendSvg(series) {
+  const rows = Array.isArray(series) ? series.filter(item => item && typeof item === 'object') : [];
+  if (!rows.length) return '';
+  const width = 320;
+  const height = 150;
+  const paddingX = 10;
+  const paddingY = 10;
+  const values = rows.map(item => Number(item.value)).filter(value => Number.isFinite(value));
+  if (!values.length) return '';
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = Math.max(max - min, 1);
+  const step = rows.length > 1 ? (width - paddingX * 2) / (rows.length - 1) : 0;
+  const path = rows.map((item, index) => {
+    const raw = Number(item.value);
+    const value = Number.isFinite(raw) ? raw : values[0];
+    const x = paddingX + step * index;
+    const y = height - paddingY - ((value - min) / span) * (height - paddingY * 2);
+    return `${index === 0 ? 'M' : 'L'}${x.toFixed(2)} ${y.toFixed(2)}`;
+  }).join(' ');
+  return `
+    <div class="hermes-chart-shell">
+      <div class="hermes-chart-head">
+        <div class="hermes-chart-title">趋势线</div>
+      </div>
+      <svg viewBox="0 0 ${width} ${height}" class="hermes-chart-svg" preserveAspectRatio="none" role="img" aria-label="指标趋势图">
+        <path d="${path}" fill="none" stroke="#2F74C0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+    </div>
+  `;
+}
+
+function buildHermesIndicatorDistributionSvg(values) {
+  const items = Array.isArray(values) ? values.map(item => Number(item)).filter(value => Number.isFinite(value)) : [];
+  if (!items.length) return '';
+  const width = 320;
+  const height = 150;
+  const padding = { top: 12, right: 10, bottom: 20, left: 10 };
+  const bucketCount = Math.min(6, Math.max(4, Math.floor(Math.sqrt(items.length))));
+  const min = Math.min(...items);
+  const max = Math.max(...items);
+  const span = Math.max(max - min, 1);
+  const bucketSize = span / bucketCount;
+  const buckets = Array.from({ length: bucketCount }, (_, index) => ({
+    count: 0,
+    label: `${(min + bucketSize * index).toFixed(1)}`,
+  }));
+  items.forEach((value) => {
+    const rawIndex = Math.floor((value - min) / bucketSize);
+    const bucketIndex = Math.min(bucketCount - 1, Math.max(0, rawIndex));
+    buckets[bucketIndex].count += 1;
+  });
+  const maxCount = Math.max(...buckets.map(item => item.count), 1);
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const barGap = 8;
+  const barWidth = (plotWidth - barGap * (bucketCount - 1)) / bucketCount;
+  const bars = buckets.map((item, index) => {
+    const barHeight = (item.count / maxCount) * plotHeight;
+    const x = padding.left + index * (barWidth + barGap);
+    const y = padding.top + plotHeight - barHeight;
+    return `
+      <rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barWidth.toFixed(2)}" height="${barHeight.toFixed(2)}" rx="4" fill="rgba(47,116,192,0.86)"></rect>
+      <text x="${(x + barWidth / 2).toFixed(2)}" y="${(y - 4).toFixed(2)}" text-anchor="middle" font-size="9" fill="#5A6572">${item.count}</text>
+    `;
+  }).join('');
+  return `
+    <div class="hermes-chart-shell">
+      <div class="hermes-chart-head">
+        <div class="hermes-chart-title">分布统计</div>
+      </div>
+      <svg viewBox="0 0 ${width} ${height}" class="hermes-chart-svg" role="img" aria-label="指标分布统计图">
+        ${bars}
+      </svg>
+    </div>
+  `;
+}
+
 function normalizeHermesArtifact(artifact, fallbackQuestion) {
   const payload = artifact && typeof artifact === 'object' ? artifact : {};
   const type = payload.type || 'text_response';
   if (type === 'watchlist_analysis') {
     const symbol = payload.symbol && typeof payload.symbol === 'object' ? payload.symbol : {};
+    const rawChart = payload.chart && typeof payload.chart === 'object' ? payload.chart : {};
+    const rawChartHtml = String(payload.chartHtml || payload.chart_html || '').trim();
     return {
       type,
       question: payload.question || fallbackQuestion || '',
@@ -10989,7 +11306,47 @@ function normalizeHermesArtifact(artifact, fallbackQuestion) {
       nextSteps: Array.isArray(payload.next_steps) ? payload.next_steps : [],
       citations: Array.isArray(payload.citations) ? payload.citations : [],
       knowledge: Array.isArray(payload.knowledge) ? payload.knowledge : [],
-      chartHtml: payload.chart && payload.chart.kind === 'kline' ? buildHermesWatchlistKlineSvg(payload.chart.points || []) : '',
+      chart: rawChart,
+      chart_html: rawChartHtml,
+      chartHtml: rawChartHtml || (rawChart.kind === 'kline' ? buildHermesWatchlistKlineSvg(rawChart.points || []) : ''),
+      footer: payload.footer || '',
+    };
+  }
+  if (type === 'indicator_analysis') {
+    const symbol = payload.symbol && typeof payload.symbol === 'object' ? payload.symbol : {};
+    const chart = payload.chart && typeof payload.chart === 'object' ? payload.chart : {};
+    let chartHtml = String(payload.chartHtml || payload.chart_html || '').trim();
+    if (!chartHtml) {
+      if (chart.kind === 'kline') {
+        chartHtml = buildHermesIndicatorKlineSvg(chart.kline || {});
+      } else if (chart.kind === 'distribution') {
+        chartHtml = buildHermesIndicatorDistributionSvg(chart.distribution || []);
+      } else {
+        chartHtml = buildHermesIndicatorTrendSvg(chart.series || []);
+      }
+    }
+    return {
+      type,
+      question: payload.question || fallbackQuestion || '',
+      title: payload.title || '指标趋势分析',
+      headline: payload.headline || '已生成指标分析',
+      summary: payload.summary || '',
+      body: payload.body || '',
+      symbol: {
+        name: symbol.name || '指标',
+        code: symbol.code || '',
+        market: symbol.market || '',
+        industry: symbol.industry || '',
+      },
+      confidence: payload.confidence || '中',
+      metrics: Array.isArray(payload.metrics) ? payload.metrics : [],
+      judgement: Array.isArray(payload.judgement) ? payload.judgement : [],
+      nextSteps: Array.isArray(payload.next_steps) ? payload.next_steps : [],
+      citations: Array.isArray(payload.citations) ? payload.citations : [],
+      knowledge: Array.isArray(payload.knowledge) ? payload.knowledge : [],
+      chart,
+      chart_html: chartHtml,
+      chartHtml,
       footer: payload.footer || '',
     };
   }
@@ -11217,7 +11574,7 @@ function renderHermesThread() {
       `;
     }
     const artifact = normalizeHermesArtifact(entry.artifact || entry.result, entry.question);
-    if ((entry.displayMode || 'text') !== 'structured' || artifact.type !== 'watchlist_analysis') {
+    if ((entry.displayMode || 'text') !== 'structured' || !['watchlist_analysis', 'indicator_analysis'].includes(artifact.type)) {
       return renderHermesTextArtifact(artifact, entry.agentTrace, entry.id);
     }
     return `
@@ -11268,24 +11625,57 @@ function renderHermesAnalysisCards(artifact, agentTrace) {
       </div>
     `
     : '';
-  return `
-    <div class="hermes-result-card">
-      <div class="hermes-result-top">
-        <div>
-          <div class="hermes-result-kicker">${escapeHtml(artifact.title)}</div>
-          <div class="hermes-result-title">${escapeHtml(symbol.name || '对话主题')} · ${escapeHtml(symbol.code || 'Chat')}</div>
-          <div class="hermes-result-subtitle">${escapeHtml(artifact.summary || '')}</div>
-        </div>
-        <div class="hermes-result-badge">${escapeHtml(artifact.confidence || '中')} 置信度</div>
+  const resultTitle = artifact.type === 'indicator_analysis'
+    ? `${escapeHtml(symbol.name || '指标')}${symbol.code ? ` · ${escapeHtml(symbol.code)}` : ''}`
+    : `${escapeHtml(symbol.name || '对话主题')} · ${escapeHtml(symbol.code || 'Chat')}`;
+  const isIndicatorKline = artifact.type === 'indicator_analysis' && String(artifact.chartHtml || '').includes('K线走势');
+  const primaryChartHtml = isIndicatorKline ? `<div style="margin-top:10px">${artifact.chartHtml || ''}</div>` : (artifact.chartHtml || '');
+  const metricBlock = metricsHtml
+    ? `
+      <div style="margin-top:10px">
+        <div class="hermes-section-label">核心指标</div>
+        <div class="hermes-metric-grid" style="margin-top:8px">${metricsHtml}</div>
       </div>
-      ${artifact.chartHtml || ''}
-      ${artifact.body ? `<div class="hermes-result-subtitle" style="margin-top:10px;line-height:1.8">${escapeHtml(artifact.body)}</div>` : ''}
-      ${artifact.question ? `<div class="hermes-transcript-meta" style="margin-top:10px">本次问题：${escapeHtml(artifact.question)}</div>` : ''}
-    </div>
-    <div class="hermes-result-card">
-      <div class="hermes-section-label">核心指标</div>
-      <div class="hermes-metric-grid">${metricsHtml}</div>
-    </div>
+    `
+    : '';
+  const primaryCardHtml = artifact.type === 'indicator_analysis'
+    ? `
+      <div class="hermes-result-card">
+        <div class="hermes-result-top">
+          <div>
+            <div class="hermes-result-kicker">${escapeHtml(artifact.title)}</div>
+            <div class="hermes-result-title">${resultTitle}</div>
+            <div class="hermes-result-subtitle">${escapeHtml(artifact.summary || '')}</div>
+          </div>
+          <div class="hermes-result-badge">${escapeHtml(artifact.confidence || '中')} 置信度</div>
+        </div>
+        ${primaryChartHtml}
+        ${metricBlock}
+        ${artifact.body ? `<div class="hermes-result-subtitle" style="margin-top:10px;line-height:1.8">${escapeHtml(artifact.body)}</div>` : ''}
+        ${artifact.question ? `<div class="hermes-transcript-meta" style="margin-top:10px">本次问题：${escapeHtml(artifact.question)}</div>` : ''}
+      </div>
+    `
+    : `
+      <div class="hermes-result-card">
+        <div class="hermes-result-top">
+          <div>
+            <div class="hermes-result-kicker">${escapeHtml(artifact.title)}</div>
+            <div class="hermes-result-title">${resultTitle}</div>
+            <div class="hermes-result-subtitle">${escapeHtml(artifact.summary || '')}</div>
+          </div>
+          <div class="hermes-result-badge">${escapeHtml(artifact.confidence || '中')} 置信度</div>
+        </div>
+        ${primaryChartHtml}
+        ${artifact.body ? `<div class="hermes-result-subtitle" style="margin-top:10px;line-height:1.8">${escapeHtml(artifact.body)}</div>` : ''}
+        ${artifact.question ? `<div class="hermes-transcript-meta" style="margin-top:10px">本次问题：${escapeHtml(artifact.question)}</div>` : ''}
+      </div>
+      <div class="hermes-result-card">
+        <div class="hermes-section-label">核心指标</div>
+        <div class="hermes-metric-grid">${metricsHtml}</div>
+      </div>
+    `;
+  return `
+    ${primaryCardHtml}
     <div class="hermes-result-card">
       ${insightBlock}
       ${actionBlock}
@@ -11327,6 +11717,7 @@ async function runHermesAnalysis(options) {
     startedAt: Date.now(),
     thoughts: buildHermesLoadingThoughtTemplates(question, skill, stockCode),
   });
+  clearHermesQuestionInputs({ focus: true });
   renderHermesThread();
   try {
     const activeUser = getActiveDemoUser();
@@ -11372,7 +11763,7 @@ async function runHermesAnalysis(options) {
           footer: (data.router && data.router.reason) ? `路由：${data.router.reason}` : '',
         };
     const normalizedArtifact = normalizeHermesArtifact(artifact, question);
-    const displayMode = data.display_mode === 'structured' && normalizedArtifact.type === 'watchlist_analysis'
+    const displayMode = data.display_mode === 'structured' && ['watchlist_analysis', 'indicator_analysis'].includes(normalizedArtifact.type)
       ? 'structured'
       : 'text';
     hermesConversation.pop();
@@ -11385,10 +11776,8 @@ async function runHermesAnalysis(options) {
       displayMode,
       agentTrace: data.agent_trace || null,
     });
-    hermesCredits = Math.max(0, hermesCredits - 1);
-    renderHermesCredits();
+    await refreshHermesCredits({ silent: true });
     renderHermesWorkspace();
-    clearHermesQuestionInputs();
     if (options.fromWatchlist && getActiveDemoUser().role === 'investor') {
       showToast(`已按 ${getActiveDemoUser().tenant.advisor} 视角生成个股分析`);
     }
