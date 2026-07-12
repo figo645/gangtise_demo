@@ -1018,6 +1018,19 @@ def api_admin_hermes_memory_clear():
     return jsonify({"ok": True, "result": result})
 
 
+@app.route("/api/admin/hermes/usage-stats")
+def api_admin_hermes_usage_stats():
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    try:
+        payload = build_admin_hermes_usage_stats(tenant_slug)
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "hermes_usage_db_unavailable"}), 503
+        app.logger.exception("Failed to build Hermes usage stats")
+        return jsonify({"ok": False, "error": "hermes_usage_stats_failed"}), 500
+    return jsonify({"ok": True, "stats": payload})
+
+
 @app.route("/api/admin/forecast-config")
 def api_admin_forecast_config():
     if not is_feature_enabled("stock_forecast"):

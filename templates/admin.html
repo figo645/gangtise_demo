@@ -101,6 +101,135 @@
   .sync-desc { font-size:12px; color:var(--text-sub); line-height:1.7; margin-bottom:12px; }
   .sync-chip-row { display:flex; gap:8px; flex-wrap:wrap; }
   .sync-chip { font-size:11px; color:var(--gold-dark); background:rgba(200,169,110,0.10); border:1px solid rgba(200,169,110,0.18); border-radius:999px; padding:4px 10px; }
+  .hermes-memory-select,
+  .hermes-memory-input {
+    min-width:180px;
+    background:#FFFFFF;
+    border:1px solid rgba(47,116,192,0.16);
+    border-radius:10px;
+    padding:10px 12px;
+    color:var(--text-main);
+    font-size:12px;
+    box-sizing:border-box;
+  }
+  .hermes-memory-select:focus,
+  .hermes-memory-input:focus {
+    outline:none;
+    border-color:rgba(47,116,192,0.28);
+    box-shadow:0 0 0 3px rgba(47,116,192,0.10);
+  }
+  .hermes-memory-status {
+    margin-top:10px;
+    font-size:12px;
+    color:#B88A30;
+  }
+  .hermes-memory-summary-grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+    gap:12px;
+    margin-top:16px;
+  }
+  .hermes-memory-summary-card {
+    padding:14px;
+    border-radius:14px;
+    background:#F7FBFF;
+    border:1px solid rgba(47,116,192,0.10);
+    box-shadow:0 8px 22px rgba(31,73,125,0.06);
+  }
+  .hermes-memory-summary-label {
+    font-size:12px;
+    color:#5B6B7B;
+  }
+  .hermes-memory-summary-value {
+    font-size:24px;
+    font-weight:700;
+    color:var(--text-main);
+    margin-top:8px;
+  }
+  .hermes-memory-summary-meta {
+    font-size:11px;
+    color:#2F74C0;
+    margin-top:6px;
+    line-height:1.6;
+  }
+  .hermes-memory-panel-grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+    gap:14px;
+    margin-top:16px;
+  }
+  .hermes-memory-panel {
+    padding:14px;
+    border-radius:14px;
+    background:#FFFFFF;
+    border:1px solid rgba(47,116,192,0.10);
+    box-shadow:0 8px 22px rgba(31,73,125,0.06);
+  }
+  .hermes-memory-panel-title {
+    font-size:13px;
+    color:var(--text-main);
+    font-weight:700;
+  }
+  .hermes-memory-panel-desc {
+    font-size:12px;
+    color:var(--text-sub);
+    line-height:1.7;
+    margin-top:6px;
+  }
+  .hermes-memory-toolbar {
+    display:flex;
+    gap:10px;
+    align-items:center;
+    flex-wrap:wrap;
+    margin-top:12px;
+  }
+  .hermes-memory-preview {
+    margin-top:16px;
+    padding:14px;
+    border-radius:14px;
+    background:#F8FBFF;
+    border:1px dashed rgba(47,116,192,0.20);
+    font-size:12px;
+    color:var(--text-sub);
+    line-height:1.8;
+  }
+  .hermes-memory-preview-title {
+    font-size:13px;
+    color:var(--text-main);
+    font-weight:700;
+  }
+  .hermes-memory-preview-time {
+    font-size:12px;
+    color:#2F74C0;
+  }
+  .hermes-memory-preview-metrics {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    gap:10px;
+    margin-top:12px;
+  }
+  .hermes-memory-preview-metric {
+    padding:10px 12px;
+    border-radius:10px;
+    background:#FFFFFF;
+    border:1px solid rgba(47,116,192,0.10);
+  }
+  .hermes-memory-preview-metric-label {
+    font-size:11px;
+    color:#5B6B7B;
+  }
+  .hermes-memory-preview-metric-value {
+    font-size:18px;
+    color:var(--text-main);
+    font-weight:700;
+    margin-top:6px;
+  }
+  .hermes-memory-preview-footnote {
+    font-size:11px;
+    color:var(--text-sub);
+    margin-top:10px;
+    line-height:1.8;
+  }
   .sync-note-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
   .sync-note-card { background:var(--surface-2); border:1px solid rgba(200,169,110,0.15); border-radius:12px; padding:16px; }
   .sync-note-title { font-size:13px; color:var(--text-main); font-weight:600; margin-bottom:6px; }
@@ -192,18 +321,73 @@
     gap:10px;
     padding:10px 12px;
     border-radius:12px;
-    background:rgba(11,30,58,0.42);
-    border:1px solid rgba(200,169,110,0.08);
+    background:#F7FBFF;
+    border:1px solid rgba(47,116,192,0.10);
+    box-shadow:0 8px 20px rgba(31,73,125,0.05);
   }
   .indicator-side-label {
     font-size:11px;
-    color:var(--text-sub);
+    color:#5B6B7B;
   }
   .indicator-side-value {
     font-size:12px;
     color:var(--text-main);
     font-weight:700;
     text-align:right;
+  }
+  .indicator-overview-grid {
+    display:grid;
+    grid-template-columns:1.2fr 1fr 1fr;
+    gap:16px;
+  }
+  .indicator-overview-panel {
+    background:#F8FBFF;
+    border:1px solid rgba(47,116,192,0.12);
+    border-radius:12px;
+    padding:14px;
+  }
+  .indicator-overview-panel-title {
+    font-size:13px;
+    font-weight:700;
+    color:#1F497D;
+    margin-bottom:10px;
+  }
+  .indicator-overview-panel-copy {
+    font-size:12px;
+    color:var(--text-sub);
+    line-height:1.85;
+  }
+  .indicator-overview-list {
+    display:grid;
+    gap:10px;
+  }
+  .indicator-overview-list-empty {
+    font-size:12px;
+    color:var(--text-sub);
+  }
+  .indicator-overview-entry {
+    padding:12px 14px;
+    border-radius:12px;
+    background:#FFFFFF;
+    border:1px solid rgba(47,116,192,0.10);
+    box-shadow:0 8px 20px rgba(31,73,125,0.05);
+  }
+  .indicator-overview-entry-title {
+    font-size:12px;
+    color:var(--text-main);
+    font-weight:700;
+  }
+  .indicator-overview-entry-copy {
+    font-size:11px;
+    color:var(--text-sub);
+    margin-top:4px;
+    line-height:1.7;
+  }
+  .indicator-overview-entry-meta {
+    font-size:11px;
+    color:#2F74C0;
+    margin-top:6px;
+    line-height:1.6;
   }
   .indicator-page-meta {
     display:flex;
@@ -2357,34 +2541,34 @@
             </div>
             <span class="indicator-page-tag">控制台入口</span>
           </div>
-          <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:16px">
-            <div style="background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.15);border-radius:12px;padding:14px">
-              <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:10px">最近入湖批次</div>
-              <div id="admin-indicator-batch-list" style="display:grid;gap:10px">
+          <div class="indicator-overview-grid">
+            <div class="indicator-overview-panel">
+              <div class="indicator-overview-panel-title">最近入湖批次</div>
+              <div id="admin-indicator-batch-list" class="indicator-overview-list">
                 {% for batch in indicator_hub.load_batches[:4] %}
-                <div style="padding:10px 12px;border-radius:10px;background:rgba(11,30,58,0.55);border:1px solid rgba(200,169,110,0.08)">
-                  <div style="font-size:12px;color:var(--white);font-weight:600">{{ batch.batch_code }}</div>
-                  <div style="font-size:11px;color:#8899aa;margin-top:4px">{{ batch.summary }}</div>
-                  <div style="font-size:11px;color:#C8A96E;margin-top:6px">{{ batch.created_at }} · {{ batch.total_indicators }} 指标 / {{ batch.total_points }} 点</div>
+                <div class="indicator-overview-entry">
+                  <div class="indicator-overview-entry-title">{{ batch.batch_code }}</div>
+                  <div class="indicator-overview-entry-copy">{{ batch.summary }}</div>
+                  <div class="indicator-overview-entry-meta">{{ batch.created_at }} · {{ batch.total_indicators }} 指标 / {{ batch.total_points }} 点</div>
                 </div>
                 {% endfor %}
               </div>
             </div>
-            <div style="background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.15);border-radius:12px;padding:14px">
-              <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:10px">最近接口测试</div>
-              <div id="admin-indicator-test-list" style="display:grid;gap:10px">
+            <div class="indicator-overview-panel">
+              <div class="indicator-overview-panel-title">最近接口测试</div>
+              <div id="admin-indicator-test-list" class="indicator-overview-list">
                 {% for item in indicator_hub.recent_tests[:4] %}
-                <div style="padding:10px 12px;border-radius:10px;background:rgba(11,30,58,0.55);border:1px solid rgba(200,169,110,0.08)">
-                  <div style="font-size:12px;color:var(--white);font-weight:600">{{ item.source_code }}</div>
-                  <div style="font-size:11px;color:#8899aa;margin-top:4px">{{ item.tested_at }}</div>
-                  <div style="font-size:11px;color:{% if item.success %}#63B3ED{% else %}#E74C3C{% endif %};margin-top:6px">{% if item.success %}成功{% else %}失败{% endif %} · HTTP {{ item.http_status or '--' }} · {{ item.latency_ms or '--' }} ms</div>
+                <div class="indicator-overview-entry">
+                  <div class="indicator-overview-entry-title">{{ item.source_code }}</div>
+                  <div class="indicator-overview-entry-copy">{{ item.tested_at }}</div>
+                  <div class="indicator-overview-entry-meta" style="color:{% if item.success %}#2F74C0{% else %}#E74C3C{% endif %}">{% if item.success %}成功{% else %}失败{% endif %} · HTTP {{ item.http_status or '--' }} · {{ item.latency_ms or '--' }} ms</div>
                 </div>
                 {% endfor %}
               </div>
             </div>
-            <div style="background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.15);border-radius:12px;padding:14px">
-              <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:10px">接入设计原则</div>
-              <div style="font-size:12px;color:#8899aa;line-height:1.85">
+            <div class="indicator-overview-panel">
+              <div class="indicator-overview-panel-title">接入设计原则</div>
+              <div class="indicator-overview-panel-copy">
                 1. 所有前台只读指标湖，不直连源接口。<br>
                 2. 当前先写入模拟数据，保证接口与展示协议固定。<br>
                 3. 下一阶段再补原始数据接入、清洗标准化和真实入湖任务。<br>
@@ -3268,30 +3452,30 @@
 
       <!-- ===== HERMES ===== -->
       <div id="section-hermes" style="display:none">
-        <div class="stats-grid">
+        <div id="admin-hermes-usage-summary" class="stats-grid">
           <div class="stat-card">
             <div class="stat-label">今日调用</div>
             <span class="stat-icon">&#9881;</span>
-            <div class="stat-value">12,840</div>
-            <div class="stat-change up">&#9650; +8.4%</div>
+            <div class="stat-value">--</div>
+            <div class="stat-change up">加载中</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">本月调用</div>
             <span class="stat-icon">&#9654;</span>
-            <div class="stat-value">284,000</div>
-            <div class="stat-change up">&#9650; +14.2%</div>
+            <div class="stat-value">--</div>
+            <div class="stat-change up">加载中</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">人均调用</div>
             <span class="stat-icon">&#9786;</span>
-            <div class="stat-value">7.4次</div>
-            <div class="stat-change up">&#9650; +0.6次</div>
+            <div class="stat-value">--</div>
+            <div class="stat-change up">加载中</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">算力消耗</div>
             <span class="stat-icon">&#9733;</span>
-            <div class="stat-value">284,000</div>
-            <div class="stat-change" style="color:#C8A96E">积分</div>
+            <div class="stat-value">--</div>
+            <div class="stat-change" style="color:#C8A96E">加载中</div>
           </div>
         </div>
         <div class="sync-grid" style="margin-bottom:20px">
@@ -3326,95 +3510,64 @@
               <div class="chart-subtitle">按租户查看 Hermes 记忆落库情况，支持范围预览、ZIP 备份和时间段清理。范围清理后，会自动重建剩余会话记忆和用户画像。</div>
             </div>
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-              <select id="admin-hermes-memory-tenant" onchange="loadAdminHermesMemorySummary(true)" style="min-width:180px;background:#0F2745;border:1px solid rgba(200,169,110,0.18);border-radius:10px;padding:10px 12px;color:#F8F6F0;font-size:12px"></select>
+              <select id="admin-hermes-memory-tenant" class="hermes-memory-select" onchange="loadAdminHermesMemorySummary(true)"></select>
               <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="loadAdminHermesMemorySummary(true)">刷新</button>
             </div>
           </div>
-          <div id="admin-hermes-memory-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:16px"></div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-top:16px">
-            <div style="padding:14px;border-radius:14px;background:rgba(11,30,58,0.55);border:1px solid rgba(200,169,110,0.12)">
-              <div style="font-size:13px;color:#F8F6F0;font-weight:600">备份 Hermes 记忆</div>
-              <div style="font-size:12px;color:#8899aa;line-height:1.7;margin-top:6px">导出当前租户的 Hermes 记忆快照。范围备份会只打包命中时间窗口的对话及对应的聚合记忆。</div>
-              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px">
-                <select id="admin-hermes-memory-backup-range" style="flex:1;min-width:160px;background:#0F2745;border:1px solid rgba(200,169,110,0.18);border-radius:10px;padding:10px 12px;color:#F8F6F0;font-size:12px"></select>
+          <div id="admin-hermes-memory-summary" class="hermes-memory-summary-grid"></div>
+          <div class="hermes-memory-panel-grid">
+            <div class="hermes-memory-panel">
+              <div class="hermes-memory-panel-title">备份 Hermes 记忆</div>
+              <div class="hermes-memory-panel-desc">导出当前租户的 Hermes 记忆快照。范围备份会只打包命中时间窗口的对话及对应的聚合记忆。</div>
+              <div class="hermes-memory-toolbar">
+                <select id="admin-hermes-memory-backup-range" class="hermes-memory-select" style="flex:1;min-width:160px"></select>
                 <button class="btn-gold" type="button" style="padding:8px 14px;font-size:12px" onclick="backupAdminHermesMemory()">下载 ZIP 备份</button>
               </div>
             </div>
-            <div style="padding:14px;border-radius:14px;background:rgba(11,30,58,0.55);border:1px solid rgba(200,169,110,0.12)">
-              <div style="font-size:13px;color:#F8F6F0;font-weight:600">清理 Hermes 记忆</div>
-              <div style="font-size:12px;color:#8899aa;line-height:1.7;margin-top:6px">支持最近 1 个月、3 个月、6 个月、1 年，或整租户全量清理。全量清理需要输入 <code>CONFIRM</code>。</div>
-              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px">
-                <select id="admin-hermes-memory-clear-range" onchange="previewAdminHermesMemoryClear()" style="flex:1;min-width:160px;background:#0F2745;border:1px solid rgba(200,169,110,0.18);border-radius:10px;padding:10px 12px;color:#F8F6F0;font-size:12px"></select>
+            <div class="hermes-memory-panel">
+              <div class="hermes-memory-panel-title">清理 Hermes 记忆</div>
+              <div class="hermes-memory-panel-desc">支持最近 1 个月、3 个月、6 个月、1 年，或整租户全量清理。全量清理需要输入 <code>CONFIRM</code>。</div>
+              <div class="hermes-memory-toolbar">
+                <select id="admin-hermes-memory-clear-range" class="hermes-memory-select" onchange="previewAdminHermesMemoryClear()" style="flex:1;min-width:160px"></select>
                 <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="previewAdminHermesMemoryClear()">预览影响</button>
               </div>
               <div id="admin-hermes-memory-clear-confirm-wrap" style="display:none;margin-top:10px">
-                <input id="admin-hermes-memory-clear-confirm" placeholder="全量清理请输入 CONFIRM" style="width:100%;background:#0F2745;border:1px solid rgba(231,76,60,0.24);border-radius:10px;padding:10px 12px;color:#F8F6F0;font-size:12px;box-sizing:border-box">
+                <input id="admin-hermes-memory-clear-confirm" class="hermes-memory-input" placeholder="全量清理请输入 CONFIRM" style="width:100%;border-color:rgba(231,76,60,0.24)">
               </div>
-              <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+              <div class="hermes-memory-toolbar">
                 <button class="btn-sm-blue" type="button" style="padding:8px 14px;font-size:12px" onclick="clearAdminHermesMemory(true)">先备份再清理</button>
                 <button type="button" style="padding:8px 14px;font-size:12px;background:rgba(231,76,60,0.12);border:1px solid rgba(231,76,60,0.32);color:#F1948A;border-radius:10px;cursor:pointer" onclick="clearAdminHermesMemory(false)">直接清理</button>
               </div>
             </div>
           </div>
-          <div id="admin-hermes-memory-preview" style="margin-top:16px;padding:14px;border-radius:14px;background:rgba(11,30,58,0.45);border:1px dashed rgba(200,169,110,0.18);font-size:12px;color:#8899aa;line-height:1.8">请选择租户和清理范围后查看影响预览。</div>
-          <div id="admin-hermes-memory-status" style="margin-top:10px;font-size:12px;color:#C8A96E">尚未加载 Hermes 记忆治理数据。</div>
+          <div id="admin-hermes-memory-preview" class="hermes-memory-preview">请选择租户和清理范围后查看影响预览。</div>
+          <div id="admin-hermes-memory-status" class="hermes-memory-status">尚未加载 Hermes 记忆治理数据。</div>
         </div>
         <div class="table-wrap" style="margin-bottom:20px">
           <div class="table-header">
             <div class="table-title">Hermes 工具动作统计</div>
             <span class="tag tag-gold">6 个优先模式</span>
           </div>
-          <table>
+          <table id="admin-hermes-mode-table">
             <thead><tr><th>模式名称</th><th>今日调用</th><th>本月调用</th><th>占比</th><th>平均响应时间</th><th>状态</th></tr></thead>
-            <tbody>
-              <tr>
-                <td style="color:#F8F6F0;font-weight:500">复盘速写</td><td>494</td><td>19,400</td>
-                <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:35%"></div></div><span style="color:#C8A96E">35%</span></div></td>
-                <td>2.4s</td><td><span class="tag tag-green">正常</span></td>
-              </tr>
-              <tr>
-                <td style="color:#F8F6F0;font-weight:500">研报精读</td><td>286</td><td>11,280</td>
-                <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:22%"></div></div><span style="color:#C8A96E">22%</span></div></td>
-                <td>1.8s</td><td><span class="tag tag-green">正常</span></td>
-              </tr>
-              <tr>
-                <td style="color:#F8F6F0;font-weight:500">专家纪要速读</td><td>231</td><td>8,120</td>
-                <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:18%"></div></div><span style="color:#C8A96E">18%</span></div></td>
-                <td>3.2s</td><td><span class="tag tag-green">正常</span></td>
-              </tr>
-              <tr>
-                <td style="color:#F8F6F0;font-weight:500">自选股诊断</td><td>154</td><td>5,480</td>
-                <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:12%"></div></div><span style="color:#C8A96E">12%</span></div></td>
-                <td>4.1s</td><td><span class="tag tag-green">正常</span></td>
-              </tr>
-              <tr>
-                <td style="color:#F8F6F0;font-weight:500">证据链归因</td><td>108</td><td>4,120</td>
-                <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:8%"></div></div><span style="color:#C8A96E">8%</span></div></td>
-                <td>2.8s</td><td><span class="tag tag-green">正常</span></td>
-              </tr>
-              <tr>
-                <td style="color:#F8F6F0;font-weight:500">方法模板</td><td>142</td><td>4,200</td>
-                <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:5%"></div></div><span style="color:#C8A96E">5%</span></div></td>
-                <td>5.6s</td><td><span class="tag tag-gold">高负载</span></td>
-              </tr>
-            </tbody>
+            <tbody id="admin-hermes-mode-tbody"></tbody>
           </table>
         </div>
-        <div class="pool-cards">
+        <div id="admin-hermes-pool-cards" class="pool-cards">
           <div class="pool-card">
             <div class="pool-card-label">总算力池</div>
-            <div class="pool-card-value">480,000</div>
-            <div class="pool-card-sub">积分</div>
+            <div class="pool-card-value">--</div>
+            <div class="pool-card-sub">加载中</div>
           </div>
           <div class="pool-card">
             <div class="pool-card-label">本月消耗</div>
-            <div class="pool-card-value">84,000</div>
-            <div class="pool-card-sub">17.5% 使用率</div>
+            <div class="pool-card-value">--</div>
+            <div class="pool-card-sub">加载中</div>
           </div>
           <div class="pool-card">
             <div class="pool-card-label">剩余可用</div>
-            <div class="pool-card-value">396,000</div>
-            <div class="pool-card-sub">82.5% 剩余</div>
+            <div class="pool-card-value">--</div>
+            <div class="pool-card-sub">加载中</div>
           </div>
         </div>
         <div class="table-wrap">
@@ -3422,18 +3575,9 @@
             <div class="table-title">用户算力消耗排行 (本月)</div>
             <span class="tag tag-gold">Top 8</span>
           </div>
-          <table>
+          <table id="admin-hermes-ranking-table">
             <thead><tr><th>排名</th><th>用户</th><th>等级</th><th>本月调用</th><th>消耗算力</th><th>最常用模式</th></tr></thead>
-            <tbody>
-              <tr><td><span class="rank-badge rank-1">1</span></td><td style="color:#F8F6F0">张伟</td><td><span class="tag tag-gold">机构试点</span></td><td>84</td><td style="color:#C8A96E">1,680</td><td>复盘速写</td></tr>
-              <tr><td><span class="rank-badge rank-2">2</span></td><td style="color:#F8F6F0">周浩然</td><td><span class="tag tag-gold">机构试点</span></td><td>71</td><td style="color:#C8A96E">1,420</td><td>自选股诊断</td></tr>
-              <tr><td><span class="rank-badge rank-3">3</span></td><td style="color:#F8F6F0">财经老王</td><td><span class="tier-s">种子投顾</span></td><td>68</td><td style="color:#C8A96E">1,360</td><td>专家纪要速读</td></tr>
-              <tr><td><span class="rank-badge rank-n">4</span></td><td style="color:#F8F6F0">李晓梅</td><td><span class="tag tag-blue">专业会员</span></td><td>164</td><td style="color:#C8A96E">3,280</td><td>研报精读</td></tr>
-              <tr><td><span class="rank-badge rank-n">5</span></td><td style="color:#F8F6F0">方浩天</td><td><span class="tier-a">成长投顾</span></td><td>42</td><td style="color:#C8A96E">840</td><td>方法模板</td></tr>
-              <tr><td><span class="rank-badge rank-n">6</span></td><td style="color:#F8F6F0">王建国</td><td><span class="tag tag-blue">专业会员</span></td><td>128</td><td style="color:#C8A96E">2,560</td><td>证据链归因</td></tr>
-              <tr><td><span class="rank-badge rank-n">7</span></td><td style="color:#F8F6F0">科技股猎手</td><td><span class="tier-a">成长投顾</span></td><td>31</td><td style="color:#C8A96E">620</td><td>基本面分析</td></tr>
-              <tr><td><span class="rank-badge rank-n">8</span></td><td style="color:#F8F6F0">吴静怡</td><td><span class="tag tag-blue">专业会员</span></td><td>96</td><td style="color:#C8A96E">1,920</td><td>复盘速写</td></tr>
-            </tbody>
+            <tbody id="admin-hermes-ranking-tbody"></tbody>
           </table>
         </div>
       </div><!-- end section-hermes -->
@@ -4993,6 +5137,10 @@ const adminHermesMemoryState = {
   summary: null,
   preview: null,
 };
+const adminHermesUsageState = {
+  loading: false,
+  stats: null,
+};
 
 function getAdminIndicatorDefinition(indicatorCode) {
   return (adminIndicatorHub.definitions || []).find((item) => item.indicator_code === indicatorCode) || null;
@@ -5141,12 +5289,12 @@ function renderAdminIndicatorBatches() {
   if (!host) return;
   const batches = Array.isArray(adminIndicatorHub.load_batches) ? adminIndicatorHub.load_batches.slice(0, 4) : [];
   host.innerHTML = batches.length ? batches.map((batch) => `
-    <div style="padding:10px 12px;border-radius:10px;background:rgba(11,30,58,0.55);border:1px solid rgba(200,169,110,0.08)">
-      <div style="font-size:12px;color:var(--white);font-weight:600">${escapeHtml(batch.batch_code)}</div>
-      <div style="font-size:11px;color:#8899aa;margin-top:4px">${escapeHtml(batch.summary || '')}</div>
-      <div style="font-size:11px;color:#C8A96E;margin-top:6px">${escapeHtml(batch.created_at || '--')} · ${escapeHtml(String(batch.total_indicators || 0))} 指标 / ${escapeHtml(String(batch.total_points || 0))} 点</div>
+    <div class="indicator-overview-entry">
+      <div class="indicator-overview-entry-title">${escapeHtml(batch.batch_code)}</div>
+      <div class="indicator-overview-entry-copy">${escapeHtml(batch.summary || '')}</div>
+      <div class="indicator-overview-entry-meta">${escapeHtml(batch.created_at || '--')} · ${escapeHtml(String(batch.total_indicators || 0))} 指标 / ${escapeHtml(String(batch.total_points || 0))} 点</div>
     </div>
-  `).join('') : '<div style="font-size:12px;color:#8899aa">暂无入湖批次。</div>';
+  `).join('') : '<div class="indicator-overview-list-empty">暂无入湖批次。</div>';
 }
 
 function renderAdminIndicatorTests() {
@@ -5154,12 +5302,12 @@ function renderAdminIndicatorTests() {
   if (!host) return;
   const tests = Array.isArray(adminIndicatorHub.recent_tests) ? adminIndicatorHub.recent_tests.slice(0, 4) : [];
   host.innerHTML = tests.length ? tests.map((item) => `
-    <div style="padding:10px 12px;border-radius:10px;background:rgba(11,30,58,0.55);border:1px solid rgba(200,169,110,0.08)">
-      <div style="font-size:12px;color:var(--white);font-weight:600">${escapeHtml(item.source_code || '')}</div>
-      <div style="font-size:11px;color:#8899aa;margin-top:4px">${escapeHtml(item.tested_at || '--')}</div>
-      <div style="font-size:11px;color:${item.success ? '#63B3ED' : '#E74C3C'};margin-top:6px">${item.success ? '成功' : '失败'} · HTTP ${escapeHtml(item.http_status || '--')} · ${escapeHtml(item.latency_ms || '--')} ms</div>
+    <div class="indicator-overview-entry">
+      <div class="indicator-overview-entry-title">${escapeHtml(item.source_code || '')}</div>
+      <div class="indicator-overview-entry-copy">${escapeHtml(item.tested_at || '--')}</div>
+      <div class="indicator-overview-entry-meta" style="color:${item.success ? '#2F74C0' : '#E74C3C'}">${item.success ? '成功' : '失败'} · HTTP ${escapeHtml(item.http_status || '--')} · ${escapeHtml(item.latency_ms || '--')} ms</div>
     </div>
-  `).join('') : '<div style="font-size:12px;color:#8899aa">暂无测试记录。</div>';
+  `).join('') : '<div class="indicator-overview-list-empty">暂无测试记录。</div>';
 }
 
 function renderAdminIndicatorSecondStageTables() {
@@ -7497,6 +7645,93 @@ function setAdminHermesMemoryStatus(message, isError = false) {
   node.style.color = isError ? '#F1948A' : '#C8A96E';
 }
 
+function renderAdminHermesUsageStats() {
+  const summaryHost = document.getElementById('admin-hermes-usage-summary');
+  const modeBody = document.getElementById('admin-hermes-mode-tbody');
+  const rankingBody = document.getElementById('admin-hermes-ranking-tbody');
+  const poolHost = document.getElementById('admin-hermes-pool-cards');
+  const stats = adminHermesUsageState.stats || {};
+  const summary = stats.summary || {};
+  if (summaryHost) {
+    summaryHost.innerHTML = [
+      { label: '今日调用', icon: '&#9881;', value: Number(summary.today_calls || 0), change: `今日 token ${Number(summary.today_tokens || 0).toLocaleString('zh-CN')}` },
+      { label: '本月调用', icon: '&#9654;', value: Number(summary.month_calls || 0), change: `本月 token ${Number(summary.month_tokens || 0).toLocaleString('zh-CN')}` },
+      { label: '人均调用', icon: '&#9786;', value: `${Number(summary.avg_calls_per_user || 0).toFixed(2)}次`, change: `平均延迟 ${Number(summary.avg_latency_ms || 0).toFixed(0)}ms` },
+      { label: '算力消耗', icon: '&#9733;', value: Number(summary.compute_consumed || 0).toLocaleString('zh-CN'), change: '按 Hermes 调用聚合' },
+    ].map((item) => `
+      <div class="stat-card">
+        <div class="stat-label">${escapeHtml(item.label)}</div>
+        <span class="stat-icon">${item.icon}</span>
+        <div class="stat-value">${escapeHtml(String(item.value))}</div>
+        <div class="stat-change up">${escapeHtml(item.change)}</div>
+      </div>
+    `).join('');
+  }
+  if (modeBody) {
+    const rows = Array.isArray(stats.tool_modes) ? stats.tool_modes : [];
+    modeBody.innerHTML = rows.length ? rows.map((row) => `
+      <tr>
+        <td style="color:#F8F6F0;font-weight:500">${escapeHtml(row.mode_label || '')}</td>
+        <td>${escapeHtml(String(row.today_calls || 0))}</td>
+        <td>${escapeHtml(String(row.month_calls || 0))}</td>
+        <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:${Math.max(0, Math.min(100, Number(row.share_ratio || 0)))}%"></div></div><span style="color:#C8A96E">${escapeHtml(`${Number(row.share_ratio || 0).toFixed(1)}%`)}</span></div></td>
+        <td>${escapeHtml(`${Number(row.avg_latency_ms || 0).toFixed(0)}ms`)}</td>
+        <td><span class="tag ${escapeAttr(row.status_class || 'tag-green')}">${escapeHtml(row.status_label || '正常')}</span></td>
+      </tr>
+    `).join('') : '<tr><td colspan="6" style="color:#9A9590">暂无 Hermes 模式统计</td></tr>';
+  }
+  if (poolHost) {
+    const pool = stats.compute_pool || {};
+    poolHost.innerHTML = `
+      <div class="pool-card">
+        <div class="pool-card-label">总算力池</div>
+        <div class="pool-card-value">${escapeHtml(Number(pool.total || 0).toLocaleString('zh-CN'))}</div>
+        <div class="pool-card-sub">积分</div>
+      </div>
+      <div class="pool-card">
+        <div class="pool-card-label">本月消耗</div>
+        <div class="pool-card-value">${escapeHtml(Number(pool.consumed || 0).toLocaleString('zh-CN'))}</div>
+        <div class="pool-card-sub">${escapeHtml(`${Number(pool.usage_ratio || 0).toFixed(1)}% 使用率`)}</div>
+      </div>
+      <div class="pool-card">
+        <div class="pool-card-label">剩余可用</div>
+        <div class="pool-card-value">${escapeHtml(Number(pool.remaining || 0).toLocaleString('zh-CN'))}</div>
+        <div class="pool-card-sub">${escapeHtml(`${Math.max(0, 100 - Number(pool.usage_ratio || 0)).toFixed(1)}% 剩余`)}</div>
+      </div>
+    `;
+  }
+  if (rankingBody) {
+    const rows = Array.isArray(stats.user_ranking) ? stats.user_ranking : [];
+    rankingBody.innerHTML = rows.length ? rows.map((row) => `
+      <tr>
+        <td><span class="rank-badge ${row.rank === 1 ? 'rank-1' : row.rank === 2 ? 'rank-2' : row.rank === 3 ? 'rank-3' : 'rank-n'}">${escapeHtml(String(row.rank || ''))}</span></td>
+        <td style="color:#F8F6F0">${escapeHtml(row.user_name || '')}</td>
+        <td><span class="${escapeAttr(row.level_class || 'tag tag-blue')}">${escapeHtml(row.level_label || '普通用户')}</span></td>
+        <td>${escapeHtml(String(row.month_calls || 0))}</td>
+        <td style="color:#C8A96E">${escapeHtml(Number(row.compute_units || 0).toLocaleString('zh-CN'))}</td>
+        <td>${escapeHtml(row.top_mode || '')}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="6" style="color:#9A9590">暂无 Hermes 用户排行</td></tr>';
+  }
+}
+
+async function loadAdminHermesUsageStats() {
+  if (adminHermesUsageState.loading) return;
+  const tenantSlug = getAdminHermesMemorySelectedTenant();
+  adminHermesUsageState.loading = true;
+  try {
+    const resp = await fetch(`/api/admin/hermes/usage-stats?tenant_slug=${encodeURIComponent(tenantSlug || '')}`);
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'hermes_usage_stats_failed');
+    adminHermesUsageState.stats = data.stats || null;
+    renderAdminHermesUsageStats();
+  } catch (error) {
+    console.error(error);
+  } finally {
+    adminHermesUsageState.loading = false;
+  }
+}
+
 function renderAdminHermesMemoryPanel() {
   const tenantSelect = document.getElementById('admin-hermes-memory-tenant');
   const summaryNode = document.getElementById('admin-hermes-memory-summary');
@@ -7534,10 +7769,10 @@ function renderAdminHermesMemoryPanel() {
     {label: '近 30 天轮次', value: Number(summary.recent_30d_turn_count || 0), desc: `活跃用户 ${Number(summary.recent_30d_active_user_count || 0)}`},
   ];
   summaryNode.innerHTML = cards.map((item) => `
-    <div style="padding:14px;border-radius:14px;background:rgba(11,30,58,0.55);border:1px solid rgba(200,169,110,0.1)">
-      <div style="font-size:12px;color:#8899aa">${escapeHtml(item.label)}</div>
-      <div style="font-size:24px;font-weight:700;color:#F8F6F0;margin-top:8px">${escapeHtml(String(item.value))}</div>
-      <div style="font-size:11px;color:#C8A96E;margin-top:6px;line-height:1.6">${escapeHtml(item.desc)}</div>
+    <div class="hermes-memory-summary-card">
+      <div class="hermes-memory-summary-label">${escapeHtml(item.label)}</div>
+      <div class="hermes-memory-summary-value">${escapeHtml(String(item.value))}</div>
+      <div class="hermes-memory-summary-meta">${escapeHtml(item.desc)}</div>
     </div>
   `).join('');
 
@@ -7548,20 +7783,20 @@ function renderAdminHermesMemoryPanel() {
     previewNode.innerHTML = `
       <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
         <div>
-          <div style="font-size:13px;color:#F8F6F0;font-weight:600">清理预览 · ${escapeHtml(preview.range_label || preview.range_key || '')}</div>
-          <div style="font-size:12px;color:#8899aa;line-height:1.8;margin-top:6px">
+          <div class="hermes-memory-preview-title">清理预览 · ${escapeHtml(preview.range_label || preview.range_key || '')}</div>
+          <div style="font-size:12px;color:var(--text-sub);line-height:1.8;margin-top:6px">
             ${preview.cutoff ? `将删除 ${escapeHtml(preview.cutoff)} 之后的 Hermes 记忆。` : '将清空该租户全部 Hermes 记忆。'}
           </div>
         </div>
-        <div style="font-size:12px;color:#C8A96E">生成时间：${escapeHtml(preview.generated_at || '--')}</div>
+        <div class="hermes-memory-preview-time">生成时间：${escapeHtml(preview.generated_at || '--')}</div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:12px">
-        <div style="padding:10px 12px;border-radius:10px;background:rgba(15,39,69,0.7)"><div style="font-size:11px;color:#8899aa">待删轮次</div><div style="font-size:18px;color:#F8F6F0;font-weight:700;margin-top:6px">${escapeHtml(String(preview.turns_to_clear || 0))}</div></div>
-        <div style="padding:10px 12px;border-radius:10px;background:rgba(15,39,69,0.7)"><div style="font-size:11px;color:#8899aa">受影响会话</div><div style="font-size:18px;color:#F8F6F0;font-weight:700;margin-top:6px">${escapeHtml(String(preview.sessions_affected || 0))}</div></div>
-        <div style="padding:10px 12px;border-radius:10px;background:rgba(15,39,69,0.7)"><div style="font-size:11px;color:#8899aa">受影响用户</div><div style="font-size:18px;color:#F8F6F0;font-weight:700;margin-top:6px">${escapeHtml(String(preview.users_affected || 0))}</div></div>
-        <div style="padding:10px 12px;border-radius:10px;background:rgba(15,39,69,0.7)"><div style="font-size:11px;color:#8899aa">受影响画像</div><div style="font-size:18px;color:#F8F6F0;font-weight:700;margin-top:6px">${escapeHtml(String(preview.profiles_affected || 0))}</div></div>
+      <div class="hermes-memory-preview-metrics">
+        <div class="hermes-memory-preview-metric"><div class="hermes-memory-preview-metric-label">待删轮次</div><div class="hermes-memory-preview-metric-value">${escapeHtml(String(preview.turns_to_clear || 0))}</div></div>
+        <div class="hermes-memory-preview-metric"><div class="hermes-memory-preview-metric-label">受影响会话</div><div class="hermes-memory-preview-metric-value">${escapeHtml(String(preview.sessions_affected || 0))}</div></div>
+        <div class="hermes-memory-preview-metric"><div class="hermes-memory-preview-metric-label">受影响用户</div><div class="hermes-memory-preview-metric-value">${escapeHtml(String(preview.users_affected || 0))}</div></div>
+        <div class="hermes-memory-preview-metric"><div class="hermes-memory-preview-metric-label">受影响画像</div><div class="hermes-memory-preview-metric-value">${escapeHtml(String(preview.profiles_affected || 0))}</div></div>
       </div>
-      <div style="font-size:11px;color:#8899aa;margin-top:10px;line-height:1.8">
+      <div class="hermes-memory-preview-footnote">
         时间覆盖：${escapeHtml(preview.first_turn_at || '--')} 至 ${escapeHtml(preview.last_turn_at || '--')}
         ${preview.requires_strong_confirm ? ' · 全量清理需要手动输入 CONFIRM。' : ''}
       </div>
@@ -7592,6 +7827,7 @@ async function loadAdminHermesMemorySummary(forceReload = false) {
       adminHermesMemoryState.preview = null;
     }
     renderAdminHermesMemoryPanel();
+    loadAdminHermesUsageStats();
     await previewAdminHermesMemoryClear(false);
     setAdminHermesMemoryStatus(`Hermes 记忆汇总已加载 · 租户 ${tenantSlug}`);
   } catch (error) {

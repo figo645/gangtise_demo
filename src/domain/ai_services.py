@@ -4586,6 +4586,292 @@ def build_admin_hermes_memory_summary(tenant_slug):
     }
 
 
+def _parse_hermes_tool_trace_json(raw_text):
+    try:
+        payload = json.loads(raw_text or "[]")
+    except Exception:
+        return []
+    return payload if isinstance(payload, list) else []
+
+
+def _safe_json_dict(raw_text):
+    try:
+        payload = json.loads(raw_text or "{}")
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _normalize_hermes_mode_label(intent, answer_mode="", preferred_mode="", entry_point=""):
+    intent_key = str(intent or "").strip().lower()
+    answer_key = str(answer_mode or "").strip().lower()
+    preferred_key = str(preferred_mode or "").strip().lower()
+    entry = str(entry_point or "").strip().lower()
+    if intent_key == "watchlist_fundamental":
+        return "自选股诊断"
+    if intent_key == "evidence_chain_analysis":
+        return "证据链归因"
+    if intent_key == "knowledge_lookup":
+        return "研报精读"
+    if intent_key == "dashboard_interpretation":
+        return "Dashboard 解读"
+    if intent_key == "smart_indicator_explain":
+        return "智能指标解读"
+    if intent_key == "product_help":
+        return "产品帮助"
+    if intent_key == "multi_tool_research":
+        return "多工具研究"
+    if intent_key == "small_talk":
+        return "轻度闲聊"
+    if "review" in entry:
+        return "复盘速写"
+    if answer_key == "llm_synthesized" and preferred_key == "deep":
+        return "深度研究问答"
+    return "通用研究问答"
+
+
+def _extract_hermes_turn_metrics(turn_row):
+    row = dict(turn_row or {})
+    metadata = _safe_json_dict(row.get("memory_summary_json"))
+    tags = _safe_json_dict(row.get("tags_json"))
+    tool_trace = _parse_hermes_tool_trace_json(row.get("tool_trace_json"))
+    answer_text = str(row.get("answer_text") or "")
+    question_text = str(row.get("question_text") or "")
+    answer_mode = str(metadata.get("answer_mode") or "").strip()
+    preferred_mode = str(row.get("preferred_mode") or "").strip()
+    mode_label = _normalize_hermes_mode_label(
+        row.get("intent"),
+        answer_mode=answer_mode,
+        preferred_mode=preferred_mode,
+        entry_point=row.get("entry_point"),
+    )
+    function_tags = tags.get("function_tags") if isinstance(tags.get("function_tags"), list) else []
+    style_tags = tags.get("style_tags") if isinstance(tags.get("style_tags"), list) else []
+    commercial_tags = tags.get("commercial_tags") if isinstance(tags.get("commercial_tags"), list) else []
+    return {
+        "mode_label": mode_label,
+        "tool_trace": tool_trace,
+        "tool_count": len(tool_trace),
+        "latency_ms": int(metadata.get("latency_ms") or 0),
+        "compute_units": int(metadata.get("compute_used") or max(1, len(tool_trace) or 1)),
+        "response_chars": len(answer_text),
+        "request_chars": len(question_text),
+        "function_tags": function_tags,
+        "style_tags": style_tags,
+        "commercial_tags": commercial_tags,
+    }
+
+
+def build_admin_hermes_usage_stats(tenant_slug=""):
+    tenant = str(tenant_slug or "").strip().lower()
+    db = get_db()
+    now_dt = datetime.now()
+    today_start = now_dt.replace(hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+    month_start = now_dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+    params_today = [today_start]
+    params_month = [month_start]
+    turn_where = ["created_at >= ?"]
+    month_where = ["created_at >= ?"]
+    if tenant:
+        turn_where.append("tenant_slug = ?")
+        month_where.append("tenant_slug = ?")
+        params_today.append(tenant)
+        params_month.append(tenant)
+    turn_where_sql = " AND ".join(turn_where)
+    month_where_sql = " AND ".join(month_where)
+
+    today_row = db.execute(
+        f"""
+        SELECT COUNT(*) AS call_count,
+               COUNT(DISTINCT user_profile_id) AS user_count
+        FROM hermes_conversation_turns
+        WHERE {turn_where_sql}
+        """,
+        tuple(params_today),
+    ).fetchone() or {}
+    month_row = db.execute(
+        f"""
+        SELECT COUNT(*) AS call_count,
+               COUNT(DISTINCT user_profile_id) AS user_count
+        FROM hermes_conversation_turns
+        WHERE {month_where_sql}
+        """,
+        tuple(params_month),
+    ).fetchone() or {}
+
+    token_where = ["created_at >= ?", "usage_type = 'llm'", "(feature_code LIKE 'hermes_%' OR entry_point LIKE 'hermes%')"]
+    token_params = [month_start]
+    if tenant:
+        token_where.append("tenant_slug = ?")
+        token_params.append(tenant)
+    token_where_sql = " AND ".join(token_where)
+    token_month = db.execute(
+        f"""
+        SELECT COALESCE(SUM(total_tokens), 0) AS total_tokens,
+               COALESCE(SUM(request_count), 0) AS request_count,
+               COALESCE(SUM(latency_ms), 0) AS latency_ms
+        FROM token_usage_logs
+        WHERE {token_where_sql}
+        """,
+        tuple(token_params),
+    ).fetchone() or {}
+    token_today = db.execute(
+        f"""
+        SELECT COALESCE(SUM(total_tokens), 0) AS total_tokens
+        FROM token_usage_logs
+        WHERE created_at >= ? AND usage_type = 'llm' AND (feature_code LIKE 'hermes_%' OR entry_point LIKE 'hermes%')
+        {'AND tenant_slug = ?' if tenant else ''}
+        """,
+        tuple([today_start] + ([tenant] if tenant else [])),
+    ).fetchone() or {}
+
+    turn_rows = db.execute(
+        f"""
+        SELECT user_profile_id, user_display_name, user_role, entry_point, intent, preferred_mode, tool_trace_json, tags_json, memory_summary_json, created_at
+        FROM hermes_conversation_turns
+        WHERE {month_where_sql}
+        ORDER BY created_at DESC, id DESC
+        """,
+        tuple(params_month),
+    ).fetchall()
+
+    mode_today = {}
+    mode_month = {}
+    user_rank = {}
+    total_compute_units = 0
+    total_latency = 0
+    total_calls = 0
+    for row in turn_rows:
+        metrics = _extract_hermes_turn_metrics(row)
+        mode_label = metrics["mode_label"]
+        bucket = mode_month.setdefault(mode_label, {"mode_label": mode_label, "today_calls": 0, "month_calls": 0, "compute_units": 0, "latency_ms_total": 0})
+        bucket["month_calls"] += 1
+        bucket["compute_units"] += metrics["compute_units"]
+        bucket["latency_ms_total"] += metrics["latency_ms"]
+        total_compute_units += metrics["compute_units"]
+        total_latency += metrics["latency_ms"]
+        total_calls += 1
+
+        created_at = str((dict(row)).get("created_at") or "")
+        if created_at >= today_start:
+          bucket["today_calls"] += 1
+
+        user_id = str((dict(row)).get("user_profile_id") or "").strip() or "guest"
+        user_bucket = user_rank.setdefault(user_id, {
+            "user_profile_id": user_id,
+            "user_name": str((dict(row)).get("user_display_name") or user_id).strip() or user_id,
+            "user_role": str((dict(row)).get("user_role") or "").strip(),
+            "month_calls": 0,
+            "compute_units": 0,
+            "mode_counts": {},
+        })
+        user_bucket["month_calls"] += 1
+        user_bucket["compute_units"] += metrics["compute_units"]
+        user_bucket["mode_counts"][mode_label] = int(user_bucket["mode_counts"].get(mode_label) or 0) + 1
+
+        for tool_item in metrics["tool_trace"]:
+            tool_name = str((tool_item or {}).get("tool") or (tool_item or {}).get("name") or "").strip() or "未命名工具"
+            tool_bucket = mode_today.setdefault(tool_name, {"tool_name": tool_name, "today_calls": 0, "month_calls": 0, "ok_count": 0, "error_count": 0})
+            tool_bucket["month_calls"] += 1
+            status = str((tool_item or {}).get("status") or "").strip().lower()
+            if created_at >= today_start:
+                tool_bucket["today_calls"] += 1
+            if status == "ok":
+                tool_bucket["ok_count"] += 1
+            elif status == "error":
+                tool_bucket["error_count"] += 1
+
+    month_call_count = int(month_row.get("call_count") or 0)
+    today_call_count = int(today_row.get("call_count") or 0)
+    month_user_count = max(1, int(month_row.get("user_count") or 0))
+    today_token_total = int(token_today.get("total_tokens") or 0)
+    month_token_total = int(token_month.get("total_tokens") or 0)
+
+    mode_rows = []
+    for item in sorted(mode_month.values(), key=lambda row: (-row["month_calls"], row["mode_label"])):
+        month_calls = int(item["month_calls"] or 0)
+        avg_latency_ms = round((item["latency_ms_total"] / month_calls), 2) if month_calls else 0
+        share_ratio = round((month_calls / month_call_count) * 100, 1) if month_call_count else 0
+        status_label = "高负载" if avg_latency_ms >= 4500 else "正常"
+        status_class = "tag-gold" if avg_latency_ms >= 4500 else "tag-green"
+        mode_rows.append({
+            "mode_label": item["mode_label"],
+            "today_calls": int(item["today_calls"] or 0),
+            "month_calls": month_calls,
+            "share_ratio": share_ratio,
+            "avg_latency_ms": avg_latency_ms,
+            "status_label": status_label,
+            "status_class": status_class,
+            "compute_units": int(item["compute_units"] or 0),
+        })
+
+    tool_rows = []
+    for item in sorted(mode_today.values(), key=lambda row: (-row["month_calls"], row["tool_name"])):
+        month_calls = int(item["month_calls"] or 0)
+        ok_count = int(item["ok_count"] or 0)
+        error_count = int(item["error_count"] or 0)
+        success_ratio = round((ok_count / month_calls) * 100, 1) if month_calls else 0
+        tool_rows.append({
+            "tool_name": item["tool_name"],
+            "today_calls": int(item["today_calls"] or 0),
+            "month_calls": month_calls,
+            "ok_count": ok_count,
+            "error_count": error_count,
+            "success_ratio": success_ratio,
+            "status_label": "正常" if error_count == 0 else "有报错",
+            "status_class": "tag-green" if error_count == 0 else "tag-gold",
+        })
+
+    rank_rows = []
+    role_rank_labels = {
+        "dav": {"label": "种子投顾", "class_name": "tier-s"},
+        "investor": {"label": "专业会员", "class_name": "tag tag-blue"},
+        "admin": {"label": "平台管理员", "class_name": "tag tag-gold"},
+    }
+    sorted_users = sorted(user_rank.values(), key=lambda row: (-row["compute_units"], -row["month_calls"], row["user_name"]))
+    for index, item in enumerate(sorted_users[:8], start=1):
+        mode_counts = item.get("mode_counts") or {}
+        top_mode = sorted(mode_counts.items(), key=lambda pair: (-pair[1], pair[0]))[0][0] if mode_counts else "通用研究问答"
+        role_meta = role_rank_labels.get(str(item.get("user_role") or "").strip().lower(), {"label": "普通用户", "class_name": "tag tag-blue"})
+        rank_rows.append({
+            "rank": index,
+            "user_name": item["user_name"],
+            "level_label": role_meta["label"],
+            "level_class": role_meta["class_name"],
+            "month_calls": int(item["month_calls"] or 0),
+            "compute_units": int(item["compute_units"] or 0),
+            "top_mode": top_mode,
+        })
+
+    total_pool = max(50000, month_token_total * 6 if month_token_total else total_compute_units * 20)
+    consumed = max(total_compute_units, month_token_total)
+    remaining = max(0, total_pool - consumed)
+    usage_ratio = round((consumed / total_pool) * 100, 1) if total_pool else 0
+
+    return {
+        "tenant_slug": tenant,
+        "summary": {
+            "today_calls": today_call_count,
+            "month_calls": month_call_count,
+            "avg_calls_per_user": round(month_call_count / month_user_count, 2) if month_user_count else 0,
+            "compute_consumed": consumed,
+            "today_tokens": today_token_total,
+            "month_tokens": month_token_total,
+            "avg_latency_ms": round(total_latency / total_calls, 2) if total_calls else 0,
+            "generated_at": now_ts(),
+        },
+        "tool_modes": mode_rows[:8],
+        "tool_actions": tool_rows[:12],
+        "user_ranking": rank_rows,
+        "compute_pool": {
+            "total": int(total_pool),
+            "consumed": int(consumed),
+            "remaining": int(remaining),
+            "usage_ratio": usage_ratio,
+        },
+    }
+
+
 def build_admin_hermes_memory_clear_preview(tenant_slug, range_key):
     tenant = str(tenant_slug or "").strip().lower()
     normalized_range = normalize_hermes_memory_range_key(range_key)
