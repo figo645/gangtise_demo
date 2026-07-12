@@ -651,6 +651,76 @@ def api_h5_logout():
     return jsonify({"ok": True})
 
 
+@app.route("/api/h5/account-settings")
+def api_h5_account_settings():
+    try:
+        site_config = get_site_config()
+        current = get_current_demo_profile(site_config)
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        raise
+    if not current:
+        return jsonify({"ok": False, "error": "not_logged_in"}), 401
+    return jsonify(
+        {
+            "ok": True,
+            "profile": current,
+            "settings": build_h5_account_settings_payload(current),
+        }
+    )
+
+
+@app.route("/api/h5/account-settings", methods=["POST"])
+def api_h5_account_settings_save():
+    try:
+        site_config = get_site_config()
+        current = get_current_demo_profile(site_config)
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        raise
+    if not current:
+        return jsonify({"ok": False, "error": "not_logged_in"}), 401
+    body = request.get_json(silent=True) or {}
+    try:
+        save_h5_profile_settings(current, body)
+        profiles = get_h5_login_users(site_config)
+        refreshed = get_current_demo_profile(site_config)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to save h5 account settings")
+        return jsonify({"ok": False, "error": "save_account_settings_failed"}), 500
+    return jsonify(
+        {
+            "ok": True,
+            "profile": refreshed,
+            "profiles": profiles,
+            "settings": build_h5_account_settings_payload(refreshed),
+        }
+    )
+
+
+@app.route("/api/h5/help-center")
+def api_h5_help_center():
+    role = str(request.args.get("role") or "").strip().lower()
+    if not role:
+        try:
+            current = get_current_demo_profile(get_site_config())
+        except Exception:
+            current = None
+        role = str((current or {}).get("role") or "investor").strip().lower() or "investor"
+    return jsonify(
+        {
+            "ok": True,
+            "help_center": build_h5_help_center_payload(role),
+        }
+    )
+
+
 @app.route("/api/admin/users")
 def api_admin_users():
     return jsonify({"users": list_users()})

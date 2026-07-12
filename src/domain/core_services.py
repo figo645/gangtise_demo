@@ -1769,6 +1769,7 @@ def normalize_knowledge_hub_config(source, tenant):
                 title=title,
                 source_detail=str(item.get("source_detail") or "").strip(),
             ),
+            "graph_profile": copy.deepcopy(item.get("graph_profile")) if isinstance(item.get("graph_profile"), dict) else {},
             "sync_status": build_knowledge_sync_status(
                 item.get("status"),
                 item.get("sync_targets") if isinstance(item.get("sync_targets"), list) else None,
@@ -2821,6 +2822,242 @@ def get_h5_login_users(site_config=None):
     ]
 
 
+H5_PROFILE_SETTINGS_PREFIX = "h5_profile_settings:"
+
+
+def _load_json_app_setting(setting_key, default_value=None):
+    fallback = copy.deepcopy(default_value)
+    try:
+        row = get_db().execute(
+            "SELECT setting_value FROM app_settings WHERE setting_key = ?",
+            (setting_key,),
+        ).fetchone()
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return fallback
+        raise
+    if not row or not row["setting_value"]:
+        return fallback
+    try:
+        decoded = json.loads(row["setting_value"])
+    except Exception:
+        app.logger.exception("Failed to parse app setting: %s", setting_key)
+        return fallback
+    if isinstance(decoded, (dict, list)):
+        return decoded
+    return fallback
+
+
+def _save_json_app_setting(setting_key, payload):
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO app_settings (setting_key, setting_value, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(setting_key) DO UPDATE SET
+            setting_value = excluded.setting_value,
+            updated_at = excluded.updated_at
+        """,
+        (
+            setting_key,
+            json.dumps(payload, ensure_ascii=False),
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        ),
+    )
+    db.commit()
+    return copy.deepcopy(payload)
+
+
+def _normalize_profile_tag_list(items, limit=8):
+    normalized = []
+    seen = set()
+    raw_items = items if isinstance(items, list) else []
+    for value in raw_items:
+        text = re.sub(r"\s+", " ", str(value or "").strip())
+        if not text:
+            continue
+        if len(text) > 12:
+            text = text[:12]
+        key = text.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(text)
+        if len(normalized) >= limit:
+            break
+    return normalized
+
+
+def get_h5_profile_settings_key(profile_id):
+    normalized = str(profile_id or "").strip()
+    if not normalized:
+        return ""
+    return f"{H5_PROFILE_SETTINGS_PREFIX}{normalized}"
+
+
+def normalize_h5_profile_settings(source=None, user=None):
+    payload = source if isinstance(source, dict) else {}
+    user_payload = user if isinstance(user, dict) else {}
+    role = str(user_payload.get("role") or "investor").strip().lower()
+    default_avatar = str(user_payload.get("avatar") or ("👑" if role == "dav" else "👤")).strip() or ("👑" if role == "dav" else "👤")
+    default_name = str(user_payload.get("username") or user_payload.get("name") or "").strip() or "投研用户"
+    raw_avatar = str(payload.get("avatar") or default_avatar).strip() or default_avatar
+    raw_name = re.sub(r"\s+", " ", str(payload.get("display_name") or default_name).strip()) or default_name
+    raw_bio = str(payload.get("bio") or "").strip()
+    if len(raw_name) > 24:
+        raw_name = raw_name[:24]
+    if len(raw_avatar) > 8:
+        raw_avatar = raw_avatar[:8]
+    if len(raw_bio) > 160:
+        raw_bio = raw_bio[:160]
+    return {
+        "display_name": raw_name,
+        "avatar": raw_avatar,
+        "bio": raw_bio,
+        "custom_tags": _normalize_profile_tag_list(payload.get("custom_tags") or payload.get("customTags") or []),
+    }
+
+
+def load_h5_profile_settings(user=None):
+    user_payload = user if isinstance(user, dict) else {}
+    setting_key = get_h5_profile_settings_key(user_payload.get("username"))
+    defaults = normalize_h5_profile_settings({}, user_payload)
+    if not setting_key:
+        return defaults
+    stored = _load_json_app_setting(setting_key, {})
+    return normalize_h5_profile_settings(stored, user_payload)
+
+
+def save_h5_profile_settings(user, source=None):
+    user_payload = user if isinstance(user, dict) else {}
+    setting_key = get_h5_profile_settings_key(user_payload.get("username"))
+    if not setting_key:
+        raise ValueError("h5_profile_not_found")
+    normalized = normalize_h5_profile_settings(source, user_payload)
+    _save_json_app_setting(setting_key, normalized)
+    return normalized
+
+
+def build_h5_account_settings_payload(user=None):
+    user_payload = ensure_user_row_defaults(user or {}, get_site_config()) if isinstance(user, dict) else ensure_user_row_defaults({}, get_site_config())
+    profile_settings = normalize_h5_profile_settings(user_payload.get("profile_settings"), user_payload)
+    return {
+        "editable": copy.deepcopy(profile_settings),
+        "readonly": {
+            "role_label": user_payload.get("roleLabel") or ("大V投顾" if user_payload.get("role") == "dav" else "投资者"),
+            "tenant_name": ((user_payload.get("tenant") or {}).get("name")) or "--",
+            "advisor_name": ((user_payload.get("tenant") or {}).get("advisor")) or user_payload.get("advisor_name") or "--",
+            "membership": user_payload.get("membership") or "--",
+            "relationship": user_payload.get("relationship") or "--",
+            "rights": ((user_payload.get("tenant") or {}).get("rights")) or "--",
+            "phone_masked": user_payload.get("phone_masked") or "--",
+        },
+        "system_badges": copy.deepcopy(user_payload.get("systemBadges") or user_payload.get("badges") or []),
+    }
+
+
+def build_h5_help_center_payload(role="investor"):
+    normalized_role = str(role or "investor").strip().lower()
+    role_label = "大V工作台与内容生产" if normalized_role == "dav" else "投资者跟踪与互动"
+    articles = [
+        {
+            "id": "account",
+            "category": "账号",
+            "title": "账号设置怎么修改",
+            "summary": "这里维护你的头像、昵称、简介和自定义关注标签。",
+            "bullets": [
+                "租户身份、当前关系和租户权益由系统管理，不支持手动修改。",
+                "系统标签会根据角色、行为和租户关系自动生成。",
+                "你自己可维护的是基础资料和自定义关注标签。",
+            ],
+            "action_label": "打开账号设置",
+            "action_type": "account_settings",
+        },
+        {
+            "id": "dm",
+            "category": "消息",
+            "title": "消息通知在哪里看",
+            "summary": f"消息通知会直接进入消息板块，按 {role_label} 的视角查看会话。",
+            "bullets": [
+                "投资者默认只和所属大V租户互动。",
+                "大V会在消息板块查看粉丝私信和系统提醒。",
+                "复盘发布、私信回复和关键互动都会沉淀到消息链路。",
+            ],
+            "action_label": "打开消息板块",
+            "action_type": "switch_tab",
+            "action_value": "dm",
+        },
+        {
+            "id": "hermes",
+            "category": "Hermes",
+            "title": "Hermes 能问什么",
+            "summary": "Hermes 只承接平台研究相关问题，不做泛百科和高风险投资指令。",
+            "bullets": [
+                "优先查当前租户知识内容，再按需要补平台能力。",
+                "适合问个股基本面、复盘证据链、知识框架和智能指标解释。",
+                "超范围问题会被收口并引导回平台能力。",
+            ],
+            "action_label": "打开 Hermes",
+            "action_type": "switch_tab",
+            "action_value": "hermes",
+        },
+        {
+            "id": "review",
+            "category": "复盘",
+            "title": "复盘内容怎么生成",
+            "summary": "先形成用户复盘 Draft，再审核确认，最后生成摘要和自选股归纳总结。",
+            "bullets": [
+                "手写、语音、文件都先进入用户输入整理阶段。",
+                "确认 Draft 后才继续生成摘要和自选股归纳总结。",
+                "预览无误再发布，前后台展示同一篇正式复盘。",
+            ],
+            "action_label": "打开复盘",
+            "action_type": "switch_tab",
+            "action_value": "review",
+        },
+        {
+            "id": "indicator",
+            "category": "指标",
+            "title": "智能指标怎么理解",
+            "summary": "智能指标由提示词约束计算逻辑，真正保存的是系统生成并确认后的公式结果。",
+            "bullets": [
+                "单个原始指标或已存在智能指标可以直接预览。",
+                "涉及新计算逻辑时会先临时生成，再给用户确认。",
+                "普通用户查看结果与详情，大V额外在后台维护定义。",
+            ],
+            "action_label": "打开 Dashboard",
+            "action_type": "switch_tab",
+            "action_value": "feed",
+        },
+        {
+            "id": "knowledge",
+            "category": "知识",
+            "title": "知识专区怎么用",
+            "summary": "知识专区统一管理上传、清洗、同步和知识图谱关系。",
+            "bullets": [
+                "大V可维护当前租户知识内容，并在工作台里查看租户知识图谱。",
+                "Admin 可以从平台总图切到单租户细看知识结构。",
+                "Hermes 和复盘都会优先复用这些知识沉淀。",
+            ],
+            "action_label": "打开知识",
+            "action_type": "switch_tab",
+            "action_value": "knowledge",
+        },
+    ]
+    categories = ["全部"] + [item["category"] for item in articles]
+    deduped_categories = []
+    for item in categories:
+        if item not in deduped_categories:
+            deduped_categories.append(item)
+    return {
+        "title": "帮助中心",
+        "subtitle": "按功能查看使用说明，不做冗余运营文案。",
+        "role": normalized_role,
+        "categories": deduped_categories,
+        "articles": articles,
+    }
+
+
 def get_current_demo_profile_id():
     cached = g.get("current_demo_profile_id")
     if cached is not None:
@@ -3152,6 +3389,7 @@ def ensure_user_row_defaults(user, site_config=None):
         "admin": {"posts": 0, "likes": 0, "following": 0, "followers": 0, "points": 9999, "compute_credits": 999, "level": 9, "level_name": "平台管理员", "membership": "管理员视角", "relationship": "平台管理员", "tenant_card_title": "当前管理平台", "workbench_label": "进入平台后台", "workbench_hint": "管理员视角 · 管理平台用户与租户", "stat_labels": ["用户", "租户", "权限", "系统"], "badges": ["🛡️ 平台管理员"], "avatar": "🛡️"},
     }
     defaults = default_stats.get(role, default_stats["investor"])
+    profile_settings = load_h5_profile_settings(user)
     advisor_name = str(user.get("advisor_name") or tenant.get("advisor") or "").strip()
     return {
         "id": user.get("id"),
@@ -3159,8 +3397,8 @@ def ensure_user_row_defaults(user, site_config=None):
         "password": str(user.get("password") or "").strip(),
         "role": role,
         "roleLabel": role_label_map.get(role, "投资者"),
-        "avatar": str(user.get("avatar") or defaults["avatar"]).strip() or defaults["avatar"],
-        "name": str(user.get("username") or "").strip(),
+        "avatar": str(profile_settings.get("avatar") or user.get("avatar") or defaults["avatar"]).strip() or defaults["avatar"],
+        "name": str(profile_settings.get("display_name") or user.get("username") or "").strip(),
         "phone": str(user.get("phone") or "").strip(),
         "phone_masked": mask_phone(user.get("phone")),
         "status": str(user.get("status") or "active").strip(),
@@ -3188,6 +3426,10 @@ def ensure_user_row_defaults(user, site_config=None):
         "statLabels": defaults["stat_labels"],
         "tenantCardTitle": defaults["tenant_card_title"],
         "badges": defaults["badges"],
+        "systemBadges": defaults["badges"],
+        "customTags": profile_settings.get("custom_tags") or [],
+        "bio": profile_settings.get("bio") or "",
+        "profile_settings": profile_settings,
         "workbenchLabel": defaults["workbench_label"],
         "workbenchHint": defaults["workbench_hint"],
     }

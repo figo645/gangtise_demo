@@ -420,6 +420,163 @@ body { background: var(--surface-2); color: var(--text-main); }
   background:rgba(200,169,110,0.10);
   border-color:rgba(200,169,110,0.18);
 }
+.kw-kg-entry-card {
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  align-items:center;
+  padding:14px 16px;
+  border-radius:16px;
+  background:linear-gradient(135deg, rgba(20,54,92,0.18), rgba(10,28,47,0.08));
+  border:1px solid rgba(47,116,192,0.14);
+  margin-bottom:14px;
+}
+.kw-kg-entry-title { font-size:15px; font-weight:700; color:var(--text-main); }
+.kw-kg-entry-desc { margin-top:6px; font-size:12px; color:var(--text-sub); line-height:1.8; max-width:720px; }
+.kw-kg-shell { margin-top:4px; }
+.kw-kg-toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.kw-kg-search,
+.kw-kg-select {
+  border:none;
+  outline:none;
+  border-radius:12px;
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.12);
+  color:var(--text-main);
+  font-size:13px;
+  padding:10px 12px;
+  box-sizing:border-box;
+}
+.kw-kg-search { flex:1; min-width:240px; }
+.kw-kg-select { min-width:132px; }
+.kw-kg-stage { margin-top:12px; font-size:11px; color:var(--gold); }
+.kw-kg-stats {
+  margin-top:12px;
+  display:grid;
+  grid-template-columns:repeat(6, minmax(0, 1fr));
+  gap:8px;
+}
+.kw-kg-stat { padding:10px; border-radius:12px; background:#FFFFFF; border:1px solid rgba(47,116,192,0.10); }
+.kw-kg-stat-label { font-size:10px; color:var(--text-sub); }
+.kw-kg-stat-value { margin-top:6px; font-size:18px; font-weight:800; color:var(--text-main); }
+.kw-kg-legend { margin-top:10px; display:flex; flex-wrap:wrap; gap:8px; }
+.kw-kg-legend-chip {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:5px 10px;
+  border-radius:999px;
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  color:var(--text-sub);
+  font-size:11px;
+}
+.kw-kg-legend-dot {
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#8FA6C4;
+  flex:0 0 auto;
+}
+.kw-kg-legend-dot.kind-root { background:#C8A96E; }
+.kw-kg-legend-dot.kind-topic { background:#8FCCFF; }
+.kw-kg-legend-dot.kind-entity { background:#F6D38B; }
+.kw-kg-legend-dot.kind-method { background:#B9F0D2; }
+.kw-kg-legend-dot.kind-claim { background:#DCEBFA; }
+.kw-kg-legend-dot.kind-signal { background:#97B6D9; }
+.kw-kg-layout {
+  margin-top:14px;
+  display:grid;
+  grid-template-columns:minmax(0, 1.55fr) minmax(300px, 0.85fr);
+  gap:14px;
+}
+.kw-kg-board-shell,
+.kw-kg-detail {
+  border-radius:18px;
+  border:1px solid rgba(47,116,192,0.10);
+}
+.kw-kg-board-shell {
+  background:
+    radial-gradient(circle at top, rgba(47,116,192,0.16), transparent 34%),
+    linear-gradient(180deg, #09131F, #102033);
+  overflow:auto;
+}
+.kw-kg-board {
+  position:relative;
+  min-height:720px;
+  background-image:
+    linear-gradient(rgba(126,153,184,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(126,153,184,0.07) 1px, transparent 1px);
+  background-size:26px 26px;
+  overflow:hidden;
+}
+.kw-kg-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+.kw-kg-edge { fill:none; stroke:rgba(126,153,184,0.30); stroke-width:1.2; }
+.kw-kg-node {
+  position:absolute;
+  transform:translate(-50%, -50%);
+  border:none;
+  cursor:pointer;
+  text-align:left;
+  color:#E8EEF5;
+  background:rgba(17,32,49,0.86);
+  border:1px solid rgba(92,126,164,0.28);
+  border-radius:999px;
+  padding:8px 12px;
+  min-width:72px;
+  max-width:180px;
+  box-shadow:0 12px 30px rgba(3,10,18,0.28);
+}
+.kw-kg-node:hover { transform:translate(-50%, calc(-50% - 1px)); }
+.kw-kg-node.is-active {
+  border-color:rgba(200,169,110,0.56);
+  box-shadow:0 0 0 2px rgba(200,169,110,0.18), 0 16px 34px rgba(3,10,18,0.32);
+}
+.kw-kg-node.kind-root {
+  background:linear-gradient(135deg, #355D8A, #20405F);
+  color:#FFFFFF;
+  min-width:146px;
+  border-color:rgba(200,169,110,0.34);
+}
+.kw-kg-node.kind-topic { color:#A8D2FF; }
+.kw-kg-node.kind-entity { color:#F6D38B; }
+.kw-kg-node.kind-method { color:#B9F0D2; }
+.kw-kg-node.kind-claim { border-radius:16px; max-width:220px; color:#F3F7FB; }
+.kw-kg-node.kind-signal { padding:7px 10px; background:rgba(13,24,38,0.92); color:#D6E5F7; }
+.kw-kg-node-kind { font-size:10px; opacity:0.68; }
+.kw-kg-node-label { margin-top:4px; font-size:12px; font-weight:700; line-height:1.4; overflow:hidden; text-overflow:ellipsis; }
+.kw-kg-detail { background:#FFFFFF; padding:16px; }
+.kw-kg-detail-empty {
+  min-height:220px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  font-size:12px;
+  color:var(--text-sub);
+  line-height:1.8;
+}
+.kw-kg-detail-kicker { font-size:10px; color:var(--gold); letter-spacing:0.04em; }
+.kw-kg-detail-title { margin-top:6px; font-size:18px; font-weight:800; color:var(--text-main); line-height:1.35; }
+.kw-kg-detail-summary { margin-top:10px; font-size:12px; color:var(--text-sub); line-height:1.8; }
+.kw-kg-chip-row { margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; }
+.kw-kg-chip {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:5px 10px;
+  border-radius:999px;
+  background:rgba(47,116,192,0.08);
+  border:1px solid rgba(47,116,192,0.12);
+  color:#245B96;
+  font-size:11px;
+}
+.kw-kg-detail-section { margin-top:16px; }
+.kw-kg-detail-section-title { font-size:12px; font-weight:700; color:var(--text-main); }
+.kw-kg-detail-list { margin-top:8px; display:flex; flex-direction:column; gap:8px; }
+.kw-kg-detail-item { padding:10px 12px; border-radius:12px; background:#F8FBFF; border:1px solid rgba(47,116,192,0.10); }
+.kw-kg-detail-item-title { font-size:12px; font-weight:700; color:var(--text-main); }
+.kw-kg-detail-item-meta { margin-top:4px; font-size:11px; color:var(--text-sub); line-height:1.7; }
 .kw-knowledge-chat-shell { display:grid; grid-template-columns:minmax(280px, 0.82fr) minmax(0, 1.18fr); gap:14px; margin-top:14px; }
 .kw-knowledge-chat-card {
   background:#FFFFFF;
@@ -2375,7 +2532,9 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
   .kw-knowledge-entry-grid,
   .kw-knowledge-layout,
   .kw-knowledge-source-selector,
-  .kw-knowledge-detail-grid { grid-template-columns:1fr; }
+  .kw-knowledge-detail-grid,
+  .kw-kg-layout,
+  .kw-kg-stats { grid-template-columns:1fr; }
   .kw-portal-status-grid { grid-template-columns:1fr; }
   .kw-review-modal-overlay { padding:12px; }
   .kw-review-modal-sheet { padding:18px; border-radius:18px; }
@@ -2431,7 +2590,10 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <span class="admin-nav-icon">&#9998;</span> 复盘生产台
         </div>
         <div class="admin-nav-item" data-section="knowledge" data-feature="knowledge" onclick="showWorkbenchSection('knowledge', this)">
-          <span class="admin-nav-icon">&#128214;</span> 知识库微调
+          <span class="admin-nav-icon">&#128214;</span> 知识专区
+        </div>
+        <div class="admin-nav-item" data-section="knowledge-graph" data-feature="knowledge" onclick="showWorkbenchSection('knowledge-graph', this)">
+          <span class="admin-nav-icon">&#128391;</span> 知识图谱
         </div>
         <div class="admin-nav-item" data-section="hermes" data-feature="hermes" onclick="showWorkbenchSection('hermes', this)">
           <span class="admin-nav-icon">&#129438;</span> Hermes 工作台
@@ -3145,10 +3307,19 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         <div class="kw-card">
           <div class="kw-card-head">
             <div>
-              <div class="kw-card-title">知识库与微调</div>
+              <div class="kw-card-title">知识专区</div>
               <div class="kw-card-desc">{{ workbench.knowledge_hub.summary }}</div>
             </div>
             <span class="kw-tag">Knowledge</span>
+          </div>
+          <div class="kw-kg-entry-card">
+            <div>
+              <div class="kw-kg-entry-title">知识图谱已独立成页</div>
+              <div class="kw-kg-entry-desc">知识专区只负责录入、清洗、微调和检索。真正的图谱页只展示知识对象，不把文件、语音和 URL 直接当成主节点。</div>
+            </div>
+            <div class="kw-toolbar" style="margin-top:0">
+              <button class="btn-gold" type="button" style="padding:9px 14px;font-size:12px" onclick="showWorkbenchSection('knowledge-graph', document.querySelector('.admin-nav-item[data-section=&quot;knowledge-graph&quot;]'))">进入知识图谱</button>
+            </div>
           </div>
           <div id="kw-knowledge-entry-grid" class="kw-knowledge-entry-grid"></div>
           <div class="kw-knowledge-pipeline">
@@ -3183,7 +3354,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
             </div>
           </div>
           <div class="kw-toolbar" style="margin-top:12px">
-            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="kwOpenKnowledgeEntryEditor('{{ workbench.knowledge_hub['items'][0].id }}')">微调历史知识</button>
+            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="kwOpenLatestKnowledgeEntryEditor()">微调历史知识</button>
             <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="kwOpenKnowledgeIntake('manual')">新增知识</button>
           </div>
           <div class="kw-knowledge-chat-shell">
@@ -3205,6 +3376,45 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
               <div class="kw-knowledge-chat-desc">先展示回答摘要，再展示命中的知识条目和相关度，方便你判断知识库是否可用。</div>
               <div id="kw-knowledge-chat-answer" class="kw-knowledge-chat-answer">还没有发起查询。</div>
               <div id="kw-knowledge-chat-matches" class="kw-knowledge-chat-match-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="workbench-section-knowledge-graph" style="display:none">
+        <div class="kw-card">
+          <div class="kw-card-head">
+            <div>
+              <div class="kw-card-title">知识图谱</div>
+              <div class="kw-card-desc">按知识对象浏览当前租户的主题、实体、方法、观点和验证信号。原始素材只在详情里作为来源证据出现。</div>
+            </div>
+            <span class="kw-tag">Graph</span>
+          </div>
+          <div class="kw-kg-shell">
+            <div class="kw-kg-toolbar">
+              <input id="kw-kg-search" class="kw-kg-search" placeholder="搜索主题、实体、观点或验证信号..." oninput="kwHandleKnowledgeMapSearch(this.value)">
+              <select id="kw-kg-type-filter" class="kw-kg-select" onchange="kwHandleKnowledgeMapTypeChange(this.value)">
+                <option value="all">全部节点</option>
+                <option value="topic">主题</option>
+                <option value="entity">实体</option>
+                <option value="method">方法</option>
+                <option value="claim">观点</option>
+                <option value="signal">验证信号</option>
+              </select>
+              <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="loadWorkbenchKnowledgeMap(true)">刷新</button>
+              <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="kwCollapseKnowledgeMap()">收缩</button>
+              <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="kwExpandKnowledgeMapAll()">全部展示</button>
+              <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="kwAdjustKnowledgeMapDepth(-1)">-</button>
+              <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="kwAdjustKnowledgeMapDepth(1)">+</button>
+            </div>
+            <div id="kw-kg-stage" class="kw-kg-stage">正在加载知识图谱…</div>
+            <div id="kw-kg-stats" class="kw-kg-stats"></div>
+            <div id="kw-kg-legend" class="kw-kg-legend"></div>
+            <div class="kw-kg-layout">
+              <div class="kw-kg-board-shell">
+                <div id="kw-kg-board" class="kw-kg-board"></div>
+              </div>
+              <aside id="kw-kg-detail" class="kw-kg-detail"></aside>
             </div>
           </div>
         </div>
@@ -3694,7 +3904,8 @@ const workbenchSectionMeta = {
   'biz-dashboard': { title: '数据分析', summary: '整体承接 Admin 的数据分析结构，但口径只保留当前大V租户自己的转化漏斗、渠道质量、协同效能、营收趋势和用户分层。' },
   'forecast-model': { title: '预测模型', summary: '展示目标价是怎么计算出来的，并允许在后台调整自动收敛参数。' },
   review: { title: '复盘生产台', summary: '按周期、三类输入方式、智能文案规则和预览发布流程组织复盘生产。' },
-  knowledge: { title: '知识库微调', summary: '历史知识内容可继续弹框微调，修改后重新同步 Hermes 和知识专区。' },
+  knowledge: { title: '知识专区', summary: '统一管理当前租户的知识入库、知识图谱、历史微调和知识检索效果。' },
+  'knowledge-graph': { title: '知识图谱', summary: '独立查看当前租户真正的知识对象图谱：主题、实体、方法、观点和验证信号，不再把原始录入素材直接当成主节点。' },
   hermes: { title: 'Hermes 工作台', summary: '统一管理工作区版和龙虾纯对话版的产品口径、skills 和知识绑定。' },
   watchlist: { title: '自选股与详情', summary: '承接 H5 的顶部输代码、自选股详情和 K 线 + MA5/10/20 展示逻辑。' },
   dashboard: { title: '智能 Dashboard', summary: 'Dashboard 是智能化定义模式：通过提示词、布局和指标规则生成面板，再发布到前台，不等同于门户装修。' },
@@ -5746,6 +5957,7 @@ let kwKnowledgeStore = [];
 let kwKnowledgeDraft = { title: '', summary: '', rawInput: '', rawHtml: '', notes: '', notesHtml: '', url: '', processingMode: 'algorithm', useVoiceLlmEnhancement: true };
 let kwKnowledgeEditingId = '';
 let kwKnowledgeIntakeType = 'voice';
+let kwKnowledgeMapState = { loaded: false, payload: null, depth: 3, defaultDepth: 3, type: 'all', query: '', selectedNodeId: '', centerNodeId: '' };
 let kwKnowledgeRecording = false;
 let kwKnowledgeUploadSamples = [];
 let kwKnowledgeUploadBodies = [];
@@ -5965,6 +6177,365 @@ function buildKwKnowledgeDraft(entry) {
     url: entry && entry.url ? entry.url : '',
     useVoiceLlmEnhancement: entry && Object.prototype.hasOwnProperty.call(entry, 'use_voice_llm_enhancement') ? !!entry.use_voice_llm_enhancement : true,
   };
+}
+
+function kwKnowledgeTypeLabel(type) {
+  const normalized = String(type || '').trim().toLowerCase();
+  if (normalized === 'voice') return '语音资料';
+  if (normalized === 'file') return '文件资料';
+  if (normalized === 'url') return '网页资料';
+  return '手写观点';
+}
+
+function kwOpenLatestKnowledgeEntryEditor() {
+  initializeKwKnowledgeStore();
+  const latestEntry = Array.isArray(kwKnowledgeStore) && kwKnowledgeStore.length ? kwKnowledgeStore[0] : null;
+  if (!latestEntry || !latestEntry.id) {
+    showToast('当前还没有历史知识可微调');
+    return;
+  }
+  kwOpenKnowledgeEntryEditor(latestEntry.id);
+}
+
+function kwKnowledgeMapKindLabel(kind) {
+  if (kind === 'root') return '租户根节点';
+  if (kind === 'topic') return '主题';
+  if (kind === 'entity') return '实体';
+  if (kind === 'method') return '方法';
+  if (kind === 'claim') return '观点';
+  if (kind === 'signal') return '验证信号';
+  return '知识节点';
+}
+
+function kwKnowledgeMapNodeWidth(kind) {
+  if (kind === 'root') return 168;
+  if (kind === 'claim') return 192;
+  if (kind === 'signal') return 132;
+  return 142;
+}
+
+function kwHandleKnowledgeMapSearch(value) {
+  kwKnowledgeMapState.query = String(value || '').trim();
+  kwRenderKnowledgeMap();
+}
+
+function kwHandleKnowledgeMapTypeChange(value) {
+  kwKnowledgeMapState.type = value || 'all';
+  kwRenderKnowledgeMap();
+}
+
+function kwAdjustKnowledgeMapDepth(delta) {
+  const payload = kwKnowledgeMapState.payload || {};
+  const maxDepth = Number(payload.max_depth || 4);
+  kwKnowledgeMapState.depth = Math.max(2, Math.min(maxDepth, Number(kwKnowledgeMapState.depth || payload.default_depth || 3) + Number(delta || 0)));
+  kwRenderKnowledgeMap();
+}
+
+function kwExpandKnowledgeMapAll() {
+  const payload = kwKnowledgeMapState.payload || {};
+  kwKnowledgeMapState.depth = Number(payload.max_depth || 4);
+  kwRenderKnowledgeMap();
+}
+
+function kwCollapseKnowledgeMap() {
+  const payload = kwKnowledgeMapState.payload || {};
+  kwKnowledgeMapState.depth = Number(payload.default_depth || 3);
+  kwRenderKnowledgeMap();
+}
+
+function kwSelectKnowledgeMapNode(nodeId) {
+  kwKnowledgeMapState.selectedNodeId = nodeId || '';
+  kwKnowledgeMapState.centerNodeId = nodeId || '';
+  kwRenderKnowledgeMap();
+}
+
+function kwOpenKnowledgeMapSource(entryId) {
+  if (!entryId) return;
+  showWorkbenchSection('knowledge', document.querySelector('.admin-nav-item[data-section="knowledge"]'));
+  kwOpenKnowledgeEntryEditor(entryId);
+}
+
+function kwGetKnowledgeMapNodeRelations(nodeId) {
+  const payload = kwKnowledgeMapState.payload || {};
+  const nodes = Array.isArray(payload.nodes) ? payload.nodes : [];
+  const edges = Array.isArray(payload.edges) ? payload.edges : [];
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+  const parents = [];
+  const children = [];
+  edges.forEach((edge) => {
+    if (edge.to === nodeId && nodeMap.has(edge.from)) parents.push(nodeMap.get(edge.from));
+    if (edge.from === nodeId && nodeMap.has(edge.to)) children.push(nodeMap.get(edge.to));
+  });
+  return {
+    parents: parents.filter(Boolean).slice(0, 8),
+    children: children.filter(Boolean).slice(0, 8),
+  };
+}
+
+function kwCenterKnowledgeMapNode(nodeId, positions) {
+  const shell = document.querySelector('.kw-kg-board-shell');
+  const point = positions && positions[nodeId];
+  if (!shell || !point) return;
+  shell.scrollTo({
+    left: Math.max(0, Math.round(point.x - shell.clientWidth / 2)),
+    top: Math.max(0, Math.round(point.y - shell.clientHeight / 2)),
+    behavior: 'smooth',
+  });
+}
+
+function kwGetFilteredKnowledgeMapPayload() {
+  const payload = kwKnowledgeMapState.payload || {};
+  const allNodes = Array.isArray(payload.nodes) ? payload.nodes : [];
+  const allEdges = Array.isArray(payload.edges) ? payload.edges : [];
+  const depth = Math.max(2, Math.min(Number(payload.max_depth || 4), Number(kwKnowledgeMapState.depth || payload.default_depth || 3)));
+  const type = kwKnowledgeMapState.type || 'all';
+  const query = String(kwKnowledgeMapState.query || '').trim().toLowerCase();
+  const depthNodes = allNodes.filter((node) => Number(node.level || 99) <= depth);
+  const visibleIds = new Set();
+  const matches = [];
+  depthNodes.forEach((node) => {
+    const kind = String(node.kind || '').trim();
+    if (kind !== 'root' && type !== 'all' && kind !== type) {
+      return;
+    }
+    const haystack = [
+      node.label,
+      node.full_label,
+      node.summary,
+      Array.isArray(node.keywords) ? node.keywords.join(' ') : '',
+    ].join(' ').toLowerCase();
+    if (query && !haystack.includes(query)) {
+      return;
+    }
+    visibleIds.add(node.id);
+    matches.push(node.id);
+  });
+  const rootNode = depthNodes.find((node) => node.kind === 'root');
+  if (rootNode) visibleIds.add(rootNode.id);
+  if (query) {
+    allEdges.forEach((edge) => {
+      if (visibleIds.has(edge.from) || visibleIds.has(edge.to)) {
+        visibleIds.add(edge.from);
+        visibleIds.add(edge.to);
+      }
+    });
+  } else if (type !== 'all') {
+    allEdges.forEach((edge) => {
+      if (visibleIds.has(edge.to)) visibleIds.add(edge.from);
+    });
+  } else {
+    depthNodes.forEach((node) => visibleIds.add(node.id));
+  }
+  const nodes = depthNodes.filter((node) => visibleIds.has(node.id));
+  const edges = allEdges.filter((edge) => visibleIds.has(edge.from) && visibleIds.has(edge.to));
+  return { payload, nodes, edges, depth, rootNode: rootNode || null };
+}
+
+function kwRenderKnowledgeMapDetail(node) {
+  const host = document.getElementById('kw-kg-detail');
+  if (!host) return;
+  if (!node) {
+    host.innerHTML = '<div class="kw-kg-detail-empty">点击图谱节点后，这里查看知识摘要、QKV 和来源证据。</div>';
+    return;
+  }
+  const qkv = node.qkv || {};
+  const keywords = Array.isArray(node.keywords) ? node.keywords : [];
+  const sources = Array.isArray(node.source_entries) ? node.source_entries : [];
+  const relations = kwGetKnowledgeMapNodeRelations(node.id);
+  host.innerHTML = `
+    <div class="kw-kg-detail-kicker">${escapeHtml(kwKnowledgeMapKindLabel(node.kind || ''))}</div>
+    <div class="kw-kg-detail-title">${escapeHtml(node.full_label || node.label || '')}</div>
+    <div class="kw-kg-detail-summary">${escapeHtml(node.summary || '当前节点暂无摘要。')}</div>
+    ${keywords.length ? `<div class="kw-kg-chip-row">${keywords.slice(0, 10).map((item) => `<span class="kw-kg-chip">${escapeHtml(item)}</span>`).join('')}</div>` : ''}
+    <div class="kw-kg-detail-section">
+      <div class="kw-kg-detail-section-title">图谱关系</div>
+      <div class="kw-kg-detail-list">
+        <div class="kw-kg-detail-item">
+          <div class="kw-kg-detail-item-title">上游节点</div>
+          <div class="kw-kg-detail-item-meta">${relations.parents.length ? relations.parents.map((item) => escapeHtml(item.full_label || item.label || '')).join(' / ') : '当前节点位于最上层，暂无上游关系。'}</div>
+        </div>
+        <div class="kw-kg-detail-item">
+          <div class="kw-kg-detail-item-title">下游节点</div>
+          <div class="kw-kg-detail-item-meta">${relations.children.length ? relations.children.map((item) => escapeHtml(item.full_label || item.label || '')).join(' / ') : '当前节点暂无继续展开的下游关系。'}</div>
+        </div>
+        <div class="kw-kg-detail-item">
+          <div class="kw-kg-detail-item-title">来源规模</div>
+          <div class="kw-kg-detail-item-meta">当前节点关联 ${Number(node.source_count || sources.length || 0)} 条知识来源。</div>
+        </div>
+      </div>
+    </div>
+    <div class="kw-kg-detail-section">
+      <div class="kw-kg-detail-section-title">QKV 视角</div>
+      <div class="kw-kg-detail-list">
+        ${(Array.isArray(qkv.questions) ? qkv.questions : []).slice(0, 2).map((item) => `<div class="kw-kg-detail-item"><div class="kw-kg-detail-item-title">Q</div><div class="kw-kg-detail-item-meta">${escapeHtml(item)}</div></div>`).join('')}
+        ${(Array.isArray(qkv.values) ? qkv.values : []).slice(0, 2).map((item) => `<div class="kw-kg-detail-item"><div class="kw-kg-detail-item-title">V</div><div class="kw-kg-detail-item-meta">${escapeHtml(item)}</div></div>`).join('') || '<div class="kw-kg-detail-item"><div class="kw-kg-detail-item-title">V</div><div class="kw-kg-detail-item-meta">当前节点暂无可展示的知识值。</div></div>'}
+      </div>
+    </div>
+    <div class="kw-kg-detail-section">
+      <div class="kw-kg-detail-section-title">来源证据</div>
+      <div class="kw-kg-detail-list">
+        ${sources.length ? sources.slice(0, 5).map((entry) => `
+          <div class="kw-kg-detail-item">
+            <div class="kw-kg-detail-item-title">${escapeHtml(entry.title || '知识条目')}</div>
+            <div class="kw-kg-detail-item-meta">${escapeHtml(entry.summary || '暂无摘要')}${entry.time ? ` · ${escapeHtml(entry.time)}` : ''}</div>
+            <div class="kw-toolbar" style="margin-top:8px">
+              <button class="btn-outline" type="button" style="padding:7px 10px;font-size:11px" onclick="kwOpenKnowledgeMapSource('${escapeAttr(entry.id || '')}')">查看知识详情</button>
+            </div>
+          </div>
+        `).join('') : '<div class="kw-kg-detail-item"><div class="kw-kg-detail-item-meta">当前节点暂无来源证据。</div></div>'}
+      </div>
+    </div>
+  `;
+}
+
+function kwRenderKnowledgeMap() {
+  const board = document.getElementById('kw-kg-board');
+  const stage = document.getElementById('kw-kg-stage');
+  const stats = document.getElementById('kw-kg-stats');
+  const legend = document.getElementById('kw-kg-legend');
+  if (!board || !stage || !stats || !legend) return;
+  if (!kwKnowledgeMapState.payload) {
+    board.innerHTML = '<div class="kw-kg-detail-empty" style="min-height:720px;background:transparent;color:#C6D3E2">知识图谱尚未加载。</div>';
+    kwRenderKnowledgeMapDetail(null);
+    return;
+  }
+  const filtered = kwGetFilteredKnowledgeMapPayload();
+  const payload = filtered.payload;
+  const maxDepth = Number(payload.max_depth || 4);
+  kwKnowledgeMapState.depth = filtered.depth;
+  kwKnowledgeMapState.defaultDepth = Number(payload.default_depth || 3);
+  stage.textContent = `当前显示 ${filtered.depth} 层 / 共 ${maxDepth} 层。默认优先展示主题、实体、方法和观点，验证信号需要继续展开。`;
+  const statPayload = payload.stats || {};
+  stats.innerHTML = `
+    <div class="kw-kg-stat"><div class="kw-kg-stat-label">知识条目</div><div class="kw-kg-stat-value">${statPayload.artifact_count || 0}</div></div>
+    <div class="kw-kg-stat"><div class="kw-kg-stat-label">主题</div><div class="kw-kg-stat-value">${statPayload.topic_count || 0}</div></div>
+    <div class="kw-kg-stat"><div class="kw-kg-stat-label">实体</div><div class="kw-kg-stat-value">${statPayload.entity_count || 0}</div></div>
+    <div class="kw-kg-stat"><div class="kw-kg-stat-label">方法</div><div class="kw-kg-stat-value">${statPayload.method_count || 0}</div></div>
+    <div class="kw-kg-stat"><div class="kw-kg-stat-label">观点</div><div class="kw-kg-stat-value">${statPayload.claim_count || 0}</div></div>
+    <div class="kw-kg-stat"><div class="kw-kg-stat-label">验证信号</div><div class="kw-kg-stat-value">${statPayload.signal_count || 0}</div></div>
+  `;
+  legend.innerHTML = [
+    ['root', '根节点'],
+    ['topic', '主题'],
+    ['entity', '实体'],
+    ['method', '方法'],
+    ['claim', '观点'],
+    ['signal', '验证信号'],
+  ].map(([kind, label]) => `<span class="kw-kg-legend-chip"><span class="kw-kg-legend-dot kind-${kind}"></span>${escapeHtml(label)}</span>`).join('');
+  if (!filtered.nodes.length) {
+    board.innerHTML = '<div class="kw-kg-detail-empty" style="min-height:720px;background:transparent;color:#C6D3E2">当前没有匹配的知识对象。可以清空搜索词，或先补充结构化知识内容。</div>';
+    kwRenderKnowledgeMapDetail(null);
+    return;
+  }
+  const shell = document.querySelector('.kw-kg-board-shell');
+  const groups = {};
+  filtered.nodes.forEach((node) => {
+    const level = Number(node.level || 1);
+    if (!groups[level]) groups[level] = [];
+    groups[level].push(node);
+  });
+  Object.keys(groups).forEach((key) => {
+    groups[key].sort((a, b) => String(a.label || '').localeCompare(String(b.label || ''), 'zh-Hans-CN'));
+  });
+  const levelList = Object.keys(groups).map(Number).sort((a, b) => a - b);
+  const perRing = 16;
+  const baseRadius = 140;
+  const levelGap = 110;
+  const ringGap = 56;
+  let maxRadius = 0;
+  levelList.forEach((level) => {
+    if (level <= 1) return;
+    const groupSize = (groups[level] || []).length;
+    const ringIndex = Math.max(0, Math.ceil(groupSize / perRing) - 1);
+    maxRadius = Math.max(maxRadius, baseRadius + (level - 2) * levelGap + ringIndex * ringGap);
+  });
+  const viewportWidth = Math.max(960, shell ? shell.clientWidth : 960);
+  const viewportHeight = Math.max(720, shell ? shell.clientHeight : 720);
+  const width = Math.max(viewportWidth, maxRadius * 2 + 360);
+  const height = Math.max(viewportHeight, maxRadius * 2 + 300);
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const positions = {};
+  levelList.forEach((level) => {
+    const group = groups[level] || [];
+    if (level === 1) {
+      const rootNode = group[0];
+      if (rootNode) positions[rootNode.id] = { x: centerX, y: centerY };
+      return;
+    }
+    group.forEach((node, index) => {
+      const ringIndex = Math.floor(index / perRing);
+      const ringRadius = baseRadius + (level - 2) * levelGap + ringIndex * ringGap;
+      const ringSize = Math.min(perRing, Math.max(group.length - ringIndex * perRing, 1));
+      const angle = ((index % perRing) / ringSize) * Math.PI * 2 - Math.PI / 2;
+      positions[node.id] = {
+        x: centerX + Math.cos(angle) * ringRadius,
+        y: centerY + Math.sin(angle) * ringRadius,
+      };
+    });
+  });
+  const nodeMap = new Map(filtered.nodes.map((node) => [node.id, node]));
+  const edgeMarkup = filtered.edges.map((edge) => {
+    const from = positions[edge.from];
+    const to = positions[edge.to];
+    if (!from || !to) return '';
+    return `<line class="kw-kg-edge" x1="${Math.round(from.x)}" y1="${Math.round(from.y)}" x2="${Math.round(to.x)}" y2="${Math.round(to.y)}"></line>`;
+  }).join('');
+  board.innerHTML = `
+    <svg class="kw-kg-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">${edgeMarkup}</svg>
+    ${filtered.nodes.map((node) => {
+      const pos = positions[node.id] || { x: centerX, y: centerY };
+      return `
+        <button
+          type="button"
+          class="kw-kg-node kind-${escapeAttr(node.kind || 'topic')}${kwKnowledgeMapState.selectedNodeId === node.id ? ' is-active' : ''}"
+          style="left:${Math.round(pos.x)}px;top:${Math.round(pos.y)}px;width:${kwKnowledgeMapNodeWidth(node.kind)}px"
+          data-node-id="${escapeAttr(node.id || '')}"
+        >
+          <div class="kw-kg-node-kind">${escapeHtml(kwKnowledgeMapKindLabel(node.kind || ''))}</div>
+          <div class="kw-kg-node-label">${escapeHtml(node.full_label || node.label || '')}</div>
+        </button>
+      `;
+    }).join('')}
+  `;
+  board.style.width = `${Math.round(width)}px`;
+  board.style.height = `${Math.round(height)}px`;
+  Array.from(board.querySelectorAll('[data-node-id]')).forEach((nodeEl) => {
+    nodeEl.addEventListener('click', () => kwSelectKnowledgeMapNode(nodeEl.getAttribute('data-node-id') || ''));
+  });
+  const activeNode = nodeMap.get(kwKnowledgeMapState.selectedNodeId) || filtered.nodes.find((node) => node.kind === 'root') || filtered.nodes[0];
+  kwKnowledgeMapState.selectedNodeId = activeNode ? activeNode.id : '';
+  kwRenderKnowledgeMapDetail(activeNode || null);
+  const centerTarget = kwKnowledgeMapState.centerNodeId || '';
+  if (centerTarget && positions[centerTarget]) kwCenterKnowledgeMapNode(centerTarget, positions);
+  kwKnowledgeMapState.centerNodeId = '';
+}
+
+async function loadWorkbenchKnowledgeMap(forceMessage = false) {
+  const stage = document.getElementById('kw-kg-stage');
+  if (stage) stage.textContent = '正在加载知识图谱…';
+  try {
+    const tenantSlug = (window.WORKBENCH_DATA && window.WORKBENCH_DATA.tenant && window.WORKBENCH_DATA.tenant.slug) || '';
+    const resp = await fetch(`/api/kol/knowledge-graph?tenant=${encodeURIComponent(tenantSlug)}`);
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'knowledge_graph_load_failed');
+    kwKnowledgeMapState.loaded = true;
+    kwKnowledgeMapState.payload = data.graph || {};
+    kwKnowledgeMapState.depth = Number((data.graph && data.graph.default_depth) || 3);
+    kwKnowledgeMapState.defaultDepth = Number((data.graph && data.graph.default_depth) || 3);
+    if (!kwKnowledgeMapState.selectedNodeId) {
+      kwKnowledgeMapState.selectedNodeId = String((data.graph && data.graph.root_id) || '');
+      kwKnowledgeMapState.centerNodeId = kwKnowledgeMapState.selectedNodeId;
+    }
+    kwRenderKnowledgeMap();
+    if (forceMessage) showToast('知识图谱已刷新');
+  } catch (error) {
+    if (stage) stage.textContent = '知识图谱加载失败，当前无法展示。';
+    const board = document.getElementById('kw-kg-board');
+    if (board) board.innerHTML = '<div class="kw-kg-detail-empty" style="min-height:720px;background:transparent;color:#C6D3E2">知识图谱加载失败。请稍后重试，或先检查知识条目是否已成功同步。</div>';
+    kwRenderKnowledgeMapDetail(null);
+    showToast(error.message || '知识图谱加载失败');
+  }
 }
 
 function kwRenderKnowledgeList() {
@@ -8951,6 +9522,9 @@ function showWorkbenchSection(name, navEl) {
   }
   if (name === 'knowledge') {
     kwRenderKnowledgeList();
+  }
+  if (name === 'knowledge-graph') {
+    loadWorkbenchKnowledgeMap(false);
   }
   if (name === 'published') {
     kwRenderPublishedReviewList();

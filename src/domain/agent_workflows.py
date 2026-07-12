@@ -225,6 +225,30 @@ DECLARED_AGENT_WORKFLOW_CATALOG = {
             {"id": "edge_knowledge_processing_3", "from": "knowledge_processing_llm", "to": "knowledge_processing_output"},
         ],
     },
+    "knowledge_graph_agent": {
+        "id": "knowledge_graph_agent",
+        "title": "知识图谱构建智能体",
+        "summary": "把知识条目抽取为 QKV、主题、实体、方法、观点和验证信号，再聚合成可浏览的知识图谱。",
+        "category": "知识智能体",
+        "feature_key": "knowledge_module",
+        "execution_mode": "declared_agent_workflow",
+        "tags": ["知识图谱", "QKV", "实体归一", "聚合"],
+        "nodes": [
+            {"id": "knowledge_graph_input", "label": "知识条目输入", "processor": "input", "kind": "source", "x": 36, "y": 88, "description": "接收当前租户或平台范围内的知识条目。"},
+            {"id": "knowledge_graph_qkv", "label": "QKV 抽取", "processor": "qkv_extract", "kind": "planner", "x": 308, "y": 88, "description": "从知识条目中提取问题、关键词和可复用知识值。"},
+            {"id": "knowledge_graph_normalize", "label": "实体归一", "processor": "entity_normalize", "kind": "context", "x": 590, "y": 88, "description": "把别名、简写和重复指代归并到统一实体。"},
+            {"id": "knowledge_graph_cluster", "label": "主题聚类", "processor": "topic_cluster", "kind": "planner", "x": 876, "y": 88, "description": "把主题、实体和方法聚合成图谱中心节点。"},
+            {"id": "knowledge_graph_edge", "label": "关系推断", "processor": "edge_infer", "kind": "llm_or_rule", "x": 1164, "y": 88, "description": "生成 belongs_to / supports / explains 等关系。"},
+            {"id": "knowledge_graph_render", "label": "图谱封装", "processor": "output", "kind": "output", "x": 1452, "y": 88, "description": "输出前端可渲染的知识图谱节点、边和详情数据。"},
+        ],
+        "edges": [
+            {"id": "edge_knowledge_graph_1", "from": "knowledge_graph_input", "to": "knowledge_graph_qkv"},
+            {"id": "edge_knowledge_graph_2", "from": "knowledge_graph_qkv", "to": "knowledge_graph_normalize"},
+            {"id": "edge_knowledge_graph_3", "from": "knowledge_graph_normalize", "to": "knowledge_graph_cluster"},
+            {"id": "edge_knowledge_graph_4", "from": "knowledge_graph_cluster", "to": "knowledge_graph_edge"},
+            {"id": "edge_knowledge_graph_5", "from": "knowledge_graph_edge", "to": "knowledge_graph_render"},
+        ],
+    },
 }
 
 
@@ -443,6 +467,10 @@ def build_default_evidence_chain_workflow_definition():
 
 def build_default_knowledge_processing_workflow_definition():
     return copy.deepcopy(DECLARED_AGENT_WORKFLOW_CATALOG["knowledge_processing_agent"])
+
+
+def build_default_knowledge_graph_workflow_definition():
+    return copy.deepcopy(DECLARED_AGENT_WORKFLOW_CATALOG["knowledge_graph_agent"])
 
 
 def build_agent_workflow_center_payload(forecast_workflow_meta=None):

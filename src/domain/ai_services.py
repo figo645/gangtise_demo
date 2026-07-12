@@ -2,6 +2,7 @@ from src.runtime import *
 from src.domain.core_services import *
 from src.domain.core_services import _estimate_token_count, _extract_usage_tokens
 from src.domain.agent_workflows import *
+from src.domain.knowledge_graph_services import build_knowledge_graph_artifact
 from src.domain.market_services import *
 from src.web.request_helpers import get_client_ip
 from flask import has_request_context
@@ -2013,6 +2014,23 @@ def save_manual_knowledge_entry(
             else ["手动编写", "观点沉淀"]
         )
     normalized_files = [str(name).strip() for name in (files if isinstance(files, list) else []) if str(name).strip()][:12]
+    graph_profile = build_knowledge_graph_artifact(
+        {
+            "id": next_id,
+            "type": normalized_type,
+            "title": normalized_title,
+            "summary": processed_summary,
+            "body": processed_body,
+            "raw_input": normalized_body,
+            "source_detail": normalized_source_detail,
+            "tags": normalized_tags,
+            "key_points": [str(point).strip() for point in (processed_content.get("key_points") if isinstance(processed_content.get("key_points"), list) else []) if str(point).strip()][:8],
+            "validation_nodes": [str(point).strip() for point in (processed_content.get("validation_nodes") if isinstance(processed_content.get("validation_nodes"), list) else []) if str(point).strip()][:8],
+            "notes": str(notes or "").strip(),
+        },
+        tenant_slug=tenant_slug,
+        tenant_name=tenant.get("name") or tenant_slug,
+    )
     vector_record = _store_knowledge_embedding_record(
         tenant_slug=tenant_slug,
         knowledge_id=next_id,
@@ -2033,6 +2051,7 @@ def save_manual_knowledge_entry(
             "files": normalized_files,
             "url": str(source_url or "").strip(),
             "voice_minutes": int(voice_minutes or 0) if normalized_type == "voice" else None,
+            "graph_profile": graph_profile,
         },
     )
     current_hub = resolve_tenant_knowledge_hub(tenant, tenant.get("knowledge_hub_config"))
@@ -2061,6 +2080,7 @@ def save_manual_knowledge_entry(
         "voice_minutes": int(voice_minutes or 0) if normalized_type == "voice" else None,
         "parse_meta": copy.deepcopy(parse_meta) if isinstance(parse_meta, (dict, list)) else None,
         "processed_content": processed_content,
+        "graph_profile": graph_profile,
         "body": processed_body,
         "vector_record": vector_record,
         "queued_at": str(vector_record.get("created_at") or now_ts()).strip(),
@@ -2129,6 +2149,23 @@ def _build_live_knowledge_entry_from_record(record, config_item=None):
     queued_at = str(config_item.get("queued_at") or (created_at.strftime("%Y-%m-%d %H:%M:%S") if hasattr(created_at, "strftime") else str(created_at or ""))).strip()
     synced_at = str(config_item.get("synced_at") or (created_at.strftime("%Y-%m-%d %H:%M:%S") if hasattr(created_at, "strftime") else str(created_at or ""))).strip()
     failed_at = str(config_item.get("failed_at") or "").strip()
+    graph_profile = metadata.get("graph_profile") if isinstance(metadata.get("graph_profile"), dict) else build_knowledge_graph_artifact(
+        {
+            "id": str(record.get("knowledge_id") or config_item.get("id") or "").strip(),
+            "type": item_type,
+            "title": title_text,
+            "summary": summary_text,
+            "body": body_text,
+            "raw_input": str(config_item.get("raw_input") or body_text).strip(),
+            "source_detail": str(record.get("source_detail") or config_item.get("source_detail") or "").strip(),
+            "tags": config_item.get("tags") if isinstance(config_item.get("tags"), list) else [],
+            "key_points": config_item.get("key_points") if isinstance(config_item.get("key_points"), list) else [],
+            "validation_nodes": config_item.get("validation_nodes") if isinstance(config_item.get("validation_nodes"), list) else [],
+            "notes": notes_text,
+        },
+        tenant_slug=str(metadata.get("tenant_slug") or config_item.get("tenant_slug") or "").strip(),
+        tenant_name=str(metadata.get("tenant_name") or config_item.get("tenant_name") or "").strip(),
+    )
     return {
         "id": str(record.get("knowledge_id") or config_item.get("id") or "").strip() or f"kb-live-{record.get('id')}",
         "type": item_type,
@@ -2160,6 +2197,7 @@ def _build_live_knowledge_entry_from_record(record, config_item=None):
         "voice_minutes": config_item.get("voice_minutes") if isinstance(config_item.get("voice_minutes"), int) else None,
         "parse_meta": copy.deepcopy(config_item.get("parse_meta")) if isinstance(config_item.get("parse_meta"), (dict, list)) else None,
         "processed_content": copy.deepcopy(processed_content) if isinstance(processed_content, dict) else None,
+        "graph_profile": copy.deepcopy(graph_profile) if isinstance(graph_profile, dict) else {},
         "sync_status": build_knowledge_sync_status(
             config_item.get("status") or "已同步 Hermes",
             config_item.get("sync_targets") if isinstance(config_item.get("sync_targets"), list) else None,

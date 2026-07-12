@@ -136,6 +136,95 @@ def api_admin_knowledge_items():
     })
 
 
+@app.route("/api/kol/knowledge-graph")
+def api_kol_knowledge_graph():
+    tenant = get_tenant_by_slug(request.args.get("tenant"))
+    try:
+        knowledge_hub = fetch_live_knowledge_hub(tenant, limit=120)
+        payload = build_knowledge_graph_payload(
+            knowledge_hub.get("items") or [],
+            mode="tenant",
+            tenant=tenant,
+            platform_name=get_platform_brand().get("platform_name") or get_platform_brand().get("name") or "平台",
+        )
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            app.logger.warning("Database unavailable while building tenant knowledge graph, using config fallback")
+            fallback_hub = resolve_tenant_knowledge_hub(tenant, tenant.get("knowledge_hub_config"))
+            payload = build_knowledge_graph_payload(
+                fallback_hub.get("items") or [],
+                mode="tenant",
+                tenant=tenant,
+                platform_name=get_platform_brand().get("platform_name") or get_platform_brand().get("name") or "平台",
+            )
+        else:
+            app.logger.exception("Failed to build tenant knowledge graph")
+            return jsonify({"ok": False, "error": "knowledge_graph_build_failed"}), 500
+    return jsonify({
+        "ok": True,
+        "graph": payload,
+        "workflow_meta": build_declared_agent_workflow_meta(build_default_knowledge_graph_workflow_definition()),
+    })
+
+
+@app.route("/api/admin/knowledge-graph")
+def api_admin_knowledge_graph():
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    mode = "tenant" if tenant_slug else "platform"
+    try:
+        if tenant_slug:
+            tenant = get_tenant_by_slug(tenant_slug)
+            items = list_admin_knowledge_items(tenant_slug=tenant_slug, limit=240)
+            payload = build_knowledge_graph_payload(
+                items,
+                mode="tenant",
+                tenant=tenant,
+                platform_name=get_platform_brand().get("platform_name") or get_platform_brand().get("name") or "平台",
+            )
+        else:
+            items = list_admin_knowledge_items(limit=300)
+            payload = build_knowledge_graph_payload(
+                items,
+                mode="platform",
+                platform_name=get_platform_brand().get("platform_name") or get_platform_brand().get("name") or "平台",
+            )
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            app.logger.warning("Database unavailable while building admin knowledge graph, using config fallback")
+            site_config = normalize_site_config(DEFAULT_SITE_CONFIG)
+            if tenant_slug:
+                tenant = get_tenant_by_slug(tenant_slug, site_config)
+                items = resolve_tenant_knowledge_hub(tenant, tenant.get("knowledge_hub_config")).get("items") or []
+                items = [{**item, "tenant_slug": tenant.get("slug") or "", "tenant_name": tenant.get("name") or ""} for item in items if isinstance(item, dict)]
+                payload = build_knowledge_graph_payload(
+                    items,
+                    mode="tenant",
+                    tenant=tenant,
+                    platform_name=get_platform_brand(site_config).get("platform_name") or get_platform_brand(site_config).get("name") or "平台",
+                )
+            else:
+                aggregated = []
+                for tenant in get_tenant_configs(site_config):
+                    tenant_items = resolve_tenant_knowledge_hub(tenant, tenant.get("knowledge_hub_config")).get("items") or []
+                    aggregated.extend(
+                        [{**item, "tenant_slug": tenant.get("slug") or "", "tenant_name": tenant.get("name") or ""} for item in tenant_items if isinstance(item, dict)]
+                    )
+                payload = build_knowledge_graph_payload(
+                    aggregated,
+                    mode="platform",
+                    platform_name=get_platform_brand(site_config).get("platform_name") or get_platform_brand(site_config).get("name") or "平台",
+                )
+        else:
+            app.logger.exception("Failed to build admin knowledge graph")
+            return jsonify({"ok": False, "error": "knowledge_graph_build_failed"}), 500
+    return jsonify({
+        "ok": True,
+        "mode": mode,
+        "graph": payload,
+        "workflow_meta": build_declared_agent_workflow_meta(build_default_knowledge_graph_workflow_definition()),
+    })
+
+
 @app.route("/api/kol/knowledge/file-preview", methods=["POST"])
 def api_preview_kol_knowledge_file():
     file_storage = request.files.get("file")

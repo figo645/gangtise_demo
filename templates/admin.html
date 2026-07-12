@@ -1288,6 +1288,145 @@
     border-radius:999px;
     padding:4px 10px;
   }
+  .admin-knowledge-entry-card {
+    display:flex;
+    justify-content:space-between;
+    gap:16px;
+    align-items:center;
+    padding:16px;
+    margin-bottom:16px;
+    border-radius:18px;
+    background:linear-gradient(180deg, #FFFFFF, #FBFDFF);
+    border:1px solid rgba(47,116,192,0.12);
+  }
+  .admin-knowledge-entry-title { font-size:16px; font-weight:700; color:var(--text-main); }
+  .admin-knowledge-entry-desc { margin-top:6px; font-size:12px; color:var(--text-sub); line-height:1.8; max-width:760px; }
+  .admin-kg-shell {
+    background:linear-gradient(180deg, #FFFFFF, #FBFDFF);
+    border:1px solid rgba(47,116,192,0.12);
+    border-radius:18px;
+    padding:16px;
+    margin-bottom:16px;
+  }
+  .admin-kg-top { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap; }
+  .admin-kg-title { font-size:16px; font-weight:700; color:var(--text-main); }
+  .admin-kg-desc { margin-top:4px; font-size:12px; color:var(--text-sub); line-height:1.7; max-width:760px; }
+  .admin-kg-controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .admin-kg-search,
+  .admin-kg-select {
+    border:none;
+    outline:none;
+    border-radius:12px;
+    background:#FFFFFF;
+    border:1px solid rgba(47,116,192,0.12);
+    color:var(--text-main);
+    font-size:13px;
+    padding:10px 12px;
+    box-sizing:border-box;
+  }
+  .admin-kg-search { min-width:280px; flex:1; }
+  .admin-kg-select { min-width:132px; }
+  .admin-kg-stage { margin-top:12px; font-size:11px; color:var(--gold); }
+  .admin-kg-stats {
+    margin-top:12px;
+    display:grid;
+    grid-template-columns:repeat(6, minmax(0, 1fr));
+    gap:8px;
+  }
+  .admin-kg-stat { background:var(--surface); border:1px solid rgba(47,116,192,0.10); border-radius:12px; padding:10px; }
+  .admin-kg-stat-label { font-size:10px; color:var(--text-sub); }
+  .admin-kg-stat-value { margin-top:6px; font-size:18px; font-weight:800; color:var(--text-main); }
+  .admin-kg-legend { margin-top:10px; display:flex; flex-wrap:wrap; gap:8px; }
+  .admin-kg-legend-chip {
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:5px 10px;
+    border-radius:999px;
+    background:#FFFFFF;
+    border:1px solid rgba(47,116,192,0.10);
+    color:var(--text-sub);
+    font-size:11px;
+  }
+  .admin-kg-legend-dot {
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:#8FA6C4;
+    flex:0 0 auto;
+  }
+  .admin-kg-legend-dot.kind-root { background:#C8A96E; }
+  .admin-kg-legend-dot.kind-tenant { background:#D9E9FF; }
+  .admin-kg-legend-dot.kind-topic { background:#8FCCFF; }
+  .admin-kg-legend-dot.kind-entity { background:#F6D38B; }
+  .admin-kg-legend-dot.kind-method { background:#B9F0D2; }
+  .admin-kg-legend-dot.kind-claim { background:#DCEBFA; }
+  .admin-kg-legend-dot.kind-signal { background:#97B6D9; }
+  .admin-kg-layout { margin-top:14px; display:grid; grid-template-columns:minmax(0, 1.65fr) minmax(320px, 0.85fr); gap:14px; }
+  .admin-kg-board-shell,
+  .admin-kg-detail {
+    border-radius:18px;
+    border:1px solid rgba(47,116,192,0.10);
+  }
+  .admin-kg-board-shell {
+    background:
+      radial-gradient(circle at top, rgba(47,116,192,0.16), transparent 34%),
+      linear-gradient(180deg, #09131F, #102033);
+    overflow:auto;
+  }
+  .admin-kg-board {
+    position:relative;
+    min-height:760px;
+    background-image:
+      linear-gradient(rgba(126,153,184,0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(126,153,184,0.07) 1px, transparent 1px);
+    background-size:26px 26px;
+    overflow:hidden;
+  }
+  .admin-kg-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .admin-kg-edge { fill:none; stroke:rgba(126,153,184,0.30); stroke-width:1.2; }
+  .admin-kg-node {
+    position:absolute;
+    transform:translate(-50%, -50%);
+    border:none;
+    cursor:pointer;
+    text-align:left;
+    color:#E8EEF5;
+    background:rgba(17,32,49,0.86);
+    border:1px solid rgba(92,126,164,0.28);
+    border-radius:999px;
+    padding:8px 12px;
+    min-width:72px;
+    max-width:180px;
+    box-shadow:0 12px 30px rgba(3,10,18,0.28);
+  }
+  .admin-kg-node:hover { transform:translate(-50%, calc(-50% - 1px)); }
+  .admin-kg-node.is-active {
+    border-color:rgba(200,169,110,0.56);
+    box-shadow:0 0 0 2px rgba(200,169,110,0.18), 0 16px 34px rgba(3,10,18,0.32);
+  }
+  .admin-kg-node.kind-root { background:linear-gradient(135deg, #355D8A, #20405F); color:#FFFFFF; min-width:168px; border-color:rgba(200,169,110,0.34); }
+  .admin-kg-node.kind-tenant { color:#D9E9FF; min-width:150px; }
+  .admin-kg-node.kind-topic { color:#A8D2FF; }
+  .admin-kg-node.kind-entity { color:#F6D38B; }
+  .admin-kg-node.kind-method { color:#B9F0D2; }
+  .admin-kg-node.kind-claim { border-radius:16px; max-width:220px; color:#F3F7FB; }
+  .admin-kg-node.kind-signal { padding:7px 10px; background:rgba(13,24,38,0.92); color:#D6E5F7; }
+  .admin-kg-node-kind { font-size:10px; opacity:0.68; }
+  .admin-kg-node-label { margin-top:4px; font-size:12px; font-weight:700; line-height:1.4; overflow:hidden; text-overflow:ellipsis; }
+  .admin-kg-detail { background:#FFFFFF; padding:16px; }
+  .admin-kg-detail-empty { min-height:240px; display:flex; align-items:center; justify-content:center; text-align:center; padding:24px; color:var(--text-sub); font-size:12px; line-height:1.8; }
+  .admin-kg-detail-kicker { font-size:10px; color:var(--gold); letter-spacing:0.04em; }
+  .admin-kg-detail-title { margin-top:6px; font-size:18px; font-weight:800; color:var(--text-main); line-height:1.35; }
+  .admin-kg-detail-summary { margin-top:10px; font-size:12px; color:var(--text-sub); line-height:1.8; }
+  .admin-kg-chip-row { margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; }
+  .admin-kg-chip { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; background:rgba(47,116,192,0.08); border:1px solid rgba(47,116,192,0.12); color:#245B96; font-size:11px; }
+  .admin-kg-detail-section { margin-top:16px; }
+  .admin-kg-detail-section-title { font-size:12px; font-weight:700; color:var(--text-main); }
+  .admin-kg-detail-list { margin-top:8px; display:flex; flex-direction:column; gap:8px; }
+  .admin-kg-detail-item { padding:10px 12px; border-radius:12px; background:#F8FBFF; border:1px solid rgba(47,116,192,0.10); }
+  .admin-kg-detail-item-title { font-size:12px; font-weight:700; color:var(--text-main); }
+  .admin-kg-detail-item-meta { margin-top:4px; font-size:11px; color:var(--text-sub); line-height:1.7; }
   @media (max-width: 980px) {
     .admin-modal-overlay { padding:12px; }
     .admin-modal-sheet { padding:18px; border-radius:16px; }
@@ -1297,7 +1436,9 @@
     .llm-admin-model-grid,
     .tenant-admin-shell,
     .tenant-admin-detail-grid,
-    .tenant-dashboard-grid { grid-template-columns:1fr; }
+    .tenant-dashboard-grid,
+    .admin-kg-stats,
+    .admin-kg-layout { grid-template-columns:1fr; }
     .tenant-admin-sidebar { position:static; }
   }
 </style>
@@ -1464,9 +1605,12 @@
             <span class="admin-nav-icon">&#128203;</span> 发布与隔离
           </div>
           <div class="admin-nav-item" data-section="settings-knowledge" data-feature="system_module" onclick="showSection('settings-knowledge', this)">
-            <span class="admin-nav-icon">&#128214;</span> 知识与向量
+            <span class="admin-nav-icon">&#128214;</span> 知识专区
           </div>
-          <div class="admin-nav-item" data-section="knowledge-items" data-feature="system_module" onclick="showSection('knowledge-items', this)">
+          <div class="admin-nav-item" data-section="settings-knowledge-graph" data-feature="system_module" onclick="showSection('settings-knowledge-graph', this)">
+            <span class="admin-nav-icon">&#128391;</span> 知识图谱中心
+          </div>
+          <div class="admin-nav-item" data-section="knowledge-items" data-feature="system_module" onclick="showSection('knowledge-items', this)" style="display:none">
             <span class="admin-nav-icon">&#128196;</span> 知识内容管理
           </div>
           <div class="admin-nav-item" data-section="settings-llm" data-feature="system_module" onclick="showSection('settings-llm', this)">
@@ -3973,6 +4117,46 @@
       </div><!-- end section-settings-policy -->
 
       <div id="section-settings-knowledge" style="display:none">
+        <div class="admin-knowledge-entry-card">
+          <div>
+            <div class="admin-knowledge-entry-title">知识图谱已独立成页</div>
+            <div class="admin-knowledge-entry-desc">知识专区负责知识原始内容、配置和追溯；真正的图谱关系放在“知识图谱中心”里查看，不再把文件、语音和 URL 直接当成图谱主节点。</div>
+          </div>
+          <button class="btn-gold" style="padding:10px 16px;font-size:12px" type="button" onclick="showSection('settings-knowledge-graph', document.querySelector('.admin-nav-item[data-section=&quot;settings-knowledge-graph&quot;]'))">进入知识图谱中心</button>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-end;flex-wrap:wrap">
+            <div>
+              <div class="section-title" style="margin-bottom:6px">知识原始内容总览</div>
+              <div class="feature-note">这里给 Admin 直接查看用户原始输入、文件 / URL 解析正文、语音转写原文和解析元数据，确保后续给大模型生成时能追溯原材料。</div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+              <div class="config-field" style="min-width:220px;margin:0">
+                <label>租户筛选</label>
+                <select id="admin-knowledge-tenant-filter" data-admin-knowledge-tenant-filter></select>
+              </div>
+              <button class="btn-outline" style="padding:8px 14px;font-size:12px" onclick="loadAdminKnowledgeItems(true)">刷新列表</button>
+            </div>
+          </div>
+        </div>
+        <div class="table-card" style="margin-bottom:16px">
+          <table>
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>租户</th>
+                <th>类型</th>
+                <th>标题</th>
+                <th>来源</th>
+                <th>原始内容预览</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="admin-knowledge-center-items-body" data-admin-knowledge-items-body>
+              <tr><td colspan="7" style="text-align:center;color:#8899aa;padding:20px 0">正在加载知识内容…</td></tr>
+            </tbody>
+          </table>
+        </div>
         <div class="config-grid">
           <div class="config-card">
             <div class="config-card-title">租户研究资料输入源</div>
@@ -4079,6 +4263,46 @@
         </div>
       </div><!-- end section-settings-knowledge -->
 
+      <div id="section-settings-knowledge-graph" style="display:none">
+        <div class="admin-kg-shell">
+          <div class="admin-kg-top">
+            <div>
+              <div class="admin-kg-title">知识图谱中心</div>
+              <div class="admin-kg-desc">默认从平台总图看租户知识主题，再切到单租户展开实体、方法、观点和验证信号。只展示知识对象，原始素材只在详情中作为来源证据出现。</div>
+            </div>
+            <div class="admin-kg-controls">
+              <div class="config-field" style="min-width:220px;margin:0">
+                <label>租户视角</label>
+                <select id="admin-kg-tenant-filter"></select>
+              </div>
+              <input id="admin-kg-search" class="admin-kg-search" placeholder="搜索主题、实体、观点或验证信号..." oninput="handleAdminKnowledgeMapSearch(this.value)">
+              <select id="admin-kg-type-filter" class="admin-kg-select" onchange="handleAdminKnowledgeMapTypeChange(this.value)">
+                <option value="all">全部节点</option>
+                <option value="topic">主题</option>
+                <option value="entity">实体</option>
+                <option value="method">方法</option>
+                <option value="claim">观点</option>
+                <option value="signal">验证信号</option>
+              </select>
+              <button class="btn-outline" style="padding:8px 14px;font-size:12px" type="button" onclick="loadAdminKnowledgeMap(true)">刷新</button>
+              <button class="btn-outline" style="padding:8px 14px;font-size:12px" type="button" onclick="collapseAdminKnowledgeMap()">收缩</button>
+              <button class="btn-outline" style="padding:8px 14px;font-size:12px" type="button" onclick="expandAdminKnowledgeMapAll()">全部展示</button>
+              <button class="btn-outline" style="padding:8px 14px;font-size:12px" type="button" onclick="adjustAdminKnowledgeMapDepth(-1)">-</button>
+              <button class="btn-outline" style="padding:8px 14px;font-size:12px" type="button" onclick="adjustAdminKnowledgeMapDepth(1)">+</button>
+            </div>
+          </div>
+          <div id="admin-kg-stage" class="admin-kg-stage">正在加载知识图谱…</div>
+          <div id="admin-kg-stats" class="admin-kg-stats"></div>
+          <div id="admin-kg-legend" class="admin-kg-legend"></div>
+          <div class="admin-kg-layout">
+            <div class="admin-kg-board-shell">
+              <div id="admin-kg-board" class="admin-kg-board"></div>
+            </div>
+            <aside id="admin-kg-detail" class="admin-kg-detail"></aside>
+          </div>
+        </div>
+      </div><!-- end section-settings-knowledge-graph -->
+
       <div id="section-knowledge-items" style="display:none">
         <div class="card" style="margin-bottom:16px">
           <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-end;flex-wrap:wrap">
@@ -4089,7 +4313,7 @@
             <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
               <div class="config-field" style="min-width:220px;margin:0">
                 <label>租户筛选</label>
-                <select id="admin-knowledge-tenant-filter"></select>
+                <select id="admin-knowledge-items-tenant-filter" data-admin-knowledge-tenant-filter></select>
               </div>
               <button class="btn-outline" style="padding:8px 14px;font-size:12px" onclick="loadAdminKnowledgeItems(true)">刷新列表</button>
             </div>
@@ -4108,7 +4332,7 @@
                 <th>操作</th>
               </tr>
             </thead>
-            <tbody id="admin-knowledge-items-body">
+            <tbody id="admin-knowledge-items-body" data-admin-knowledge-items-body>
               <tr><td colspan="7" style="text-align:center;color:#8899aa;padding:20px 0">正在加载知识内容…</td></tr>
             </tbody>
           </table>
@@ -4506,8 +4730,9 @@ const sectionTitles = {
   'settings-brand':'系统专区 · 平台品牌',
   'settings-features':'系统专区 · 功能开关',
   'settings-policy':'系统专区 · 发布与隔离',
-  'settings-knowledge':'系统专区 · 知识与向量',
-  'knowledge-items':'系统专区 · 知识内容管理',
+  'settings-knowledge':'系统专区 · 知识专区',
+  'settings-knowledge-graph':'系统专区 · 知识图谱中心',
+  'knowledge-items':'系统专区 · 知识专区',
   'settings-llm':'系统专区 · 大模型专区',
   'token-usage':'系统专区 · Token 监控',
   'task-center':'系统专区 · 定时任务专区',
@@ -4595,6 +4820,9 @@ function showSection(name, navEl) {
   if (name === 'indicator-hub') {
     name = 'indicator-overview';
   }
+  if (name === 'knowledge-items') {
+    name = 'settings-knowledge';
+  }
   if (name === 'forecast-model' && !isAdminFeatureEnabled('stock_forecast')) {
     showToast('预测功能当前未开放');
     return;
@@ -4616,8 +4844,11 @@ function showSection(name, navEl) {
   if (name === 'task-center') {
     refreshAdminTaskCenter(false).catch((error) => showToast(error.message || '加载失败'));
   }
-  if (name === 'knowledge-items') {
+  if (name === 'settings-knowledge') {
     loadAdminKnowledgeItems(false).catch((error) => showToast(error.message || '加载失败'));
+  }
+  if (name === 'settings-knowledge-graph') {
+    loadAdminKnowledgeMap(false).catch((error) => showToast(error.message || '加载失败'));
   }
   if (name === 'token-usage') {
     refreshAdminTokenUsage(false).catch((error) => showToast(error.message || '加载失败'));
@@ -4744,6 +4975,17 @@ const adminTokenUsage = JSON.parse(JSON.stringify(window.ADMIN_TOKEN_USAGE || {
 }));
 const adminKnowledgeState = {
   items: [],
+  tenantFilter: '',
+};
+const adminKnowledgeMapState = {
+  tenantFilter: '',
+  depth: 3,
+  defaultDepth: 3,
+  type: 'all',
+  query: '',
+  selectedNodeId: '',
+  centerNodeId: '',
+  payload: null,
 };
 const adminHermesMemoryState = {
   loaded: false,
@@ -5171,27 +5413,47 @@ function applyAdminTaskCenterPayload(data) {
   renderAdminTaskCenter();
 }
 
+function getAdminKnowledgeTenantFilters() {
+  return Array.from(document.querySelectorAll('[data-admin-knowledge-tenant-filter]'));
+}
+
 function renderAdminKnowledgeTenantFilter() {
-  const select = document.getElementById('admin-knowledge-tenant-filter');
-  if (!select) return '';
+  const filters = getAdminKnowledgeTenantFilters();
   const tenants = Array.isArray((adminSiteConfig && adminSiteConfig.tenants)) ? adminSiteConfig.tenants : [];
-  const currentValue = select.value || '';
-  select.innerHTML = ['<option value="">全部租户</option>'].concat(
-    tenants.map((tenant) => `<option value="${escapeAttr(tenant.slug || '')}">${escapeHtml(tenant.name || tenant.slug || '未命名租户')}</option>`)
-  ).join('');
-  select.value = tenants.some((tenant) => tenant.slug === currentValue) ? currentValue : '';
-  if (!select.dataset.bound) {
-    select.addEventListener('change', () => loadAdminKnowledgeItems(false));
-    select.dataset.bound = '1';
+  const knownSlugs = new Set(tenants.map((tenant) => String(tenant.slug || '').trim()).filter(Boolean));
+  if (adminKnowledgeState.tenantFilter && !knownSlugs.has(adminKnowledgeState.tenantFilter)) {
+    adminKnowledgeState.tenantFilter = '';
   }
-  return select.value || '';
+  filters.forEach((select) => {
+    select.innerHTML = ['<option value="">全部租户</option>'].concat(
+      tenants.map((tenant) => `<option value="${escapeAttr(tenant.slug || '')}">${escapeHtml(tenant.name || tenant.slug || '未命名租户')}</option>`)
+    ).join('');
+    select.value = adminKnowledgeState.tenantFilter || '';
+    if (!select.dataset.bound) {
+      select.addEventListener('change', () => {
+        adminKnowledgeState.tenantFilter = select.value || '';
+        getAdminKnowledgeTenantFilters().forEach((item) => {
+          item.value = adminKnowledgeState.tenantFilter;
+        });
+        loadAdminKnowledgeItems(false).catch((error) => showToast(error.message || '加载失败'));
+      });
+      select.dataset.bound = '1';
+    }
+  });
+  return adminKnowledgeState.tenantFilter || '';
+}
+
+function adminKnowledgeTypeLabel(type) {
+  const normalized = String(type || '').trim().toLowerCase();
+  if (normalized === 'voice') return '语音资料';
+  if (normalized === 'file') return '文件资料';
+  if (normalized === 'url') return '网页资料';
+  return '手写观点';
 }
 
 function renderAdminKnowledgeItems() {
   renderAdminKnowledgeTenantFilter();
-  const body = document.getElementById('admin-knowledge-items-body');
-  if (!body) return;
-  body.innerHTML = (adminKnowledgeState.items || []).map((item) => {
+  const markup = (adminKnowledgeState.items || []).map((item) => {
     const previewText = truncateText(item.raw_input || item.body || item.summary || '', 120) || '--';
     const createdAt = item.time || (item.vector_record && item.vector_record.created_at) || '--';
     const syncMeta = getAdminKnowledgeSyncMeta(item);
@@ -5207,12 +5469,17 @@ function renderAdminKnowledgeItems() {
       </tr>
     `;
   }).join('') || '<tr><td colspan="7" style="text-align:center;color:#8899aa;padding:20px 0">暂无知识内容</td></tr>';
+  document.querySelectorAll('[data-admin-knowledge-items-body]').forEach((body) => {
+    body.innerHTML = markup;
+  });
 }
 
 async function loadAdminKnowledgeItems(showMessage = false) {
   const currentTenant = renderAdminKnowledgeTenantFilter();
-  const query = currentTenant ? `?tenant_slug=${encodeURIComponent(currentTenant)}` : '';
-  const res = await fetch(`/api/admin/knowledge-items${query}`);
+  const query = new URLSearchParams();
+  if (currentTenant) query.set('tenant_slug', currentTenant);
+  query.set('limit', '300');
+  const res = await fetch(`/api/admin/knowledge-items${query.toString() ? `?${query.toString()}` : ''}`);
   const data = await res.json();
   if (!res.ok || !data.ok) {
     showToast((data && data.error) || '知识内容加载失败');
@@ -5221,6 +5488,366 @@ async function loadAdminKnowledgeItems(showMessage = false) {
   adminKnowledgeState.items = Array.isArray(data.items) ? data.items : [];
   renderAdminKnowledgeItems();
   if (showMessage) showToast('知识内容已刷新');
+}
+
+function renderAdminKnowledgeMapTenantFilter() {
+  const select = document.getElementById('admin-kg-tenant-filter');
+  if (!select) return '';
+  const tenants = Array.isArray((adminSiteConfig && adminSiteConfig.tenants)) ? adminSiteConfig.tenants : [];
+  const knownSlugs = new Set(tenants.map((tenant) => String(tenant.slug || '').trim()).filter(Boolean));
+  if (adminKnowledgeMapState.tenantFilter && !knownSlugs.has(adminKnowledgeMapState.tenantFilter)) {
+    adminKnowledgeMapState.tenantFilter = '';
+  }
+  select.innerHTML = ['<option value="">平台总图</option>'].concat(
+    tenants.map((tenant) => `<option value="${escapeAttr(tenant.slug || '')}">${escapeHtml(tenant.name || tenant.slug || '未命名租户')}</option>`)
+  ).join('');
+  select.value = adminKnowledgeMapState.tenantFilter || '';
+  if (!select.dataset.bound) {
+    select.addEventListener('change', () => {
+      adminKnowledgeMapState.tenantFilter = select.value || '';
+      loadAdminKnowledgeMap(false).catch((error) => showToast(error.message || '加载失败'));
+    });
+    select.dataset.bound = '1';
+  }
+  return adminKnowledgeMapState.tenantFilter || '';
+}
+
+function adminKnowledgeMapKindLabel(kind) {
+  if (kind === 'root') return '平台根节点';
+  if (kind === 'tenant') return '租户';
+  if (kind === 'topic') return '主题';
+  if (kind === 'entity') return '实体';
+  if (kind === 'method') return '方法';
+  if (kind === 'claim') return '观点';
+  if (kind === 'signal') return '验证信号';
+  return '知识节点';
+}
+
+function adminKnowledgeMapNodeWidth(kind) {
+  if (kind === 'root') return 176;
+  if (kind === 'tenant') return 156;
+  if (kind === 'claim') return 196;
+  if (kind === 'signal') return 136;
+  return 144;
+}
+
+function handleAdminKnowledgeMapSearch(value) {
+  adminKnowledgeMapState.query = String(value || '').trim();
+  renderAdminKnowledgeMap();
+}
+
+function handleAdminKnowledgeMapTypeChange(value) {
+  adminKnowledgeMapState.type = value || 'all';
+  renderAdminKnowledgeMap();
+}
+
+function adjustAdminKnowledgeMapDepth(delta) {
+  const payload = adminKnowledgeMapState.payload || {};
+  const maxDepth = Number(payload.max_depth || 5);
+  adminKnowledgeMapState.depth = Math.max(2, Math.min(maxDepth, Number(adminKnowledgeMapState.depth || payload.default_depth || 3) + Number(delta || 0)));
+  renderAdminKnowledgeMap();
+}
+
+function expandAdminKnowledgeMapAll() {
+  const payload = adminKnowledgeMapState.payload || {};
+  adminKnowledgeMapState.depth = Number(payload.max_depth || 5);
+  renderAdminKnowledgeMap();
+}
+
+function collapseAdminKnowledgeMap() {
+  const payload = adminKnowledgeMapState.payload || {};
+  adminKnowledgeMapState.depth = Number(payload.default_depth || 3);
+  renderAdminKnowledgeMap();
+}
+
+function selectAdminKnowledgeMapNode(nodeId) {
+  adminKnowledgeMapState.selectedNodeId = nodeId || '';
+  adminKnowledgeMapState.centerNodeId = nodeId || '';
+  renderAdminKnowledgeMap();
+}
+
+function openAdminKnowledgeMapSource(entryId, tenantSlug) {
+  if (!entryId) return;
+  openAdminKnowledgeItemDetail(entryId, tenantSlug || '');
+}
+
+function getAdminKnowledgeMapNodeRelations(nodeId) {
+  const payload = adminKnowledgeMapState.payload || {};
+  const nodes = Array.isArray(payload.nodes) ? payload.nodes : [];
+  const edges = Array.isArray(payload.edges) ? payload.edges : [];
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+  const parents = [];
+  const children = [];
+  edges.forEach((edge) => {
+    if (edge.to === nodeId && nodeMap.has(edge.from)) parents.push(nodeMap.get(edge.from));
+    if (edge.from === nodeId && nodeMap.has(edge.to)) children.push(nodeMap.get(edge.to));
+  });
+  return {
+    parents: parents.filter(Boolean).slice(0, 8),
+    children: children.filter(Boolean).slice(0, 8),
+  };
+}
+
+function centerAdminKnowledgeMapNode(nodeId, positions) {
+  const shell = document.querySelector('.admin-kg-board-shell');
+  const point = positions && positions[nodeId];
+  if (!shell || !point) return;
+  shell.scrollTo({
+    left: Math.max(0, Math.round(point.x - shell.clientWidth / 2)),
+    top: Math.max(0, Math.round(point.y - shell.clientHeight / 2)),
+    behavior: 'smooth',
+  });
+}
+
+function getAdminKnowledgeMapFilteredPayload() {
+  const payload = adminKnowledgeMapState.payload || {};
+  const allNodes = Array.isArray(payload.nodes) ? payload.nodes : [];
+  const allEdges = Array.isArray(payload.edges) ? payload.edges : [];
+  const depth = Math.max(2, Math.min(Number(payload.max_depth || 5), Number(adminKnowledgeMapState.depth || payload.default_depth || 3)));
+  const type = adminKnowledgeMapState.type || 'all';
+  const query = String(adminKnowledgeMapState.query || '').trim().toLowerCase();
+  const depthNodes = allNodes.filter((node) => Number(node.level || 99) <= depth);
+  const visibleIds = new Set();
+  depthNodes.forEach((node) => {
+    if (node.kind !== 'root' && type !== 'all' && node.kind !== type) return;
+    const haystack = [
+      node.label,
+      node.full_label,
+      node.summary,
+      Array.isArray(node.keywords) ? node.keywords.join(' ') : '',
+    ].join(' ').toLowerCase();
+    if (query && !haystack.includes(query)) return;
+    visibleIds.add(node.id);
+  });
+  const rootNode = depthNodes.find((node) => node.kind === 'root');
+  if (rootNode) visibleIds.add(rootNode.id);
+  if (query) {
+    allEdges.forEach((edge) => {
+      if (visibleIds.has(edge.from) || visibleIds.has(edge.to)) {
+        visibleIds.add(edge.from);
+        visibleIds.add(edge.to);
+      }
+    });
+  } else if (type !== 'all') {
+    allEdges.forEach((edge) => {
+      if (visibleIds.has(edge.to)) visibleIds.add(edge.from);
+    });
+  } else {
+    depthNodes.forEach((node) => visibleIds.add(node.id));
+  }
+  return {
+    payload,
+    depth,
+    nodes: depthNodes.filter((node) => visibleIds.has(node.id)),
+    edges: allEdges.filter((edge) => visibleIds.has(edge.from) && visibleIds.has(edge.to)),
+  };
+}
+
+function renderAdminKnowledgeMapDetail(node) {
+  const host = document.getElementById('admin-kg-detail');
+  if (!host) return;
+  if (!node) {
+    host.innerHTML = '<div class="admin-kg-detail-empty">点击图谱节点后，这里查看知识摘要、QKV 和来源证据。</div>';
+    return;
+  }
+  const qkv = node.qkv || {};
+  const keywords = Array.isArray(node.keywords) ? node.keywords : [];
+  const sources = Array.isArray(node.source_entries) ? node.source_entries : [];
+  const relations = getAdminKnowledgeMapNodeRelations(node.id);
+  host.innerHTML = `
+    <div class="admin-kg-detail-kicker">${escapeHtml(adminKnowledgeMapKindLabel(node.kind || ''))}</div>
+    <div class="admin-kg-detail-title">${escapeHtml(node.full_label || node.label || '')}</div>
+    <div class="admin-kg-detail-summary">${escapeHtml(node.summary || '当前节点暂无摘要。')}</div>
+    ${keywords.length ? `<div class="admin-kg-chip-row">${keywords.slice(0, 10).map((item) => `<span class="admin-kg-chip">${escapeHtml(item)}</span>`).join('')}</div>` : ''}
+    <div class="admin-kg-detail-section">
+      <div class="admin-kg-detail-section-title">图谱关系</div>
+      <div class="admin-kg-detail-list">
+        <div class="admin-kg-detail-item">
+          <div class="admin-kg-detail-item-title">上游节点</div>
+          <div class="admin-kg-detail-item-meta">${relations.parents.length ? relations.parents.map((item) => escapeHtml(item.full_label || item.label || '')).join(' / ') : '当前节点位于最上层，暂无上游关系。'}</div>
+        </div>
+        <div class="admin-kg-detail-item">
+          <div class="admin-kg-detail-item-title">下游节点</div>
+          <div class="admin-kg-detail-item-meta">${relations.children.length ? relations.children.map((item) => escapeHtml(item.full_label || item.label || '')).join(' / ') : '当前节点暂无继续展开的下游关系。'}</div>
+        </div>
+        <div class="admin-kg-detail-item">
+          <div class="admin-kg-detail-item-title">来源规模</div>
+          <div class="admin-kg-detail-item-meta">当前节点关联 ${Number(node.source_count || sources.length || 0)} 条知识来源。</div>
+        </div>
+      </div>
+    </div>
+    <div class="admin-kg-detail-section">
+      <div class="admin-kg-detail-section-title">QKV 视角</div>
+      <div class="admin-kg-detail-list">
+        ${(Array.isArray(qkv.questions) ? qkv.questions : []).slice(0, 2).map((item) => `<div class="admin-kg-detail-item"><div class="admin-kg-detail-item-title">Q</div><div class="admin-kg-detail-item-meta">${escapeHtml(item)}</div></div>`).join('')}
+        ${(Array.isArray(qkv.values) ? qkv.values : []).slice(0, 2).map((item) => `<div class="admin-kg-detail-item"><div class="admin-kg-detail-item-title">V</div><div class="admin-kg-detail-item-meta">${escapeHtml(item)}</div></div>`).join('') || '<div class="admin-kg-detail-item"><div class="admin-kg-detail-item-title">V</div><div class="admin-kg-detail-item-meta">当前节点暂无可展示的知识值。</div></div>'}
+      </div>
+    </div>
+    <div class="admin-kg-detail-section">
+      <div class="admin-kg-detail-section-title">来源证据</div>
+      <div class="admin-kg-detail-list">
+        ${sources.length ? sources.slice(0, 6).map((entry) => `
+          <div class="admin-kg-detail-item">
+            <div class="admin-kg-detail-item-title">${escapeHtml(entry.title || '知识条目')}</div>
+            <div class="admin-kg-detail-item-meta">${escapeHtml(entry.summary || '暂无摘要')}${entry.time ? ` · ${escapeHtml(entry.time)}` : ''}${entry.tenant_name ? ` · ${escapeHtml(entry.tenant_name)}` : ''}</div>
+            <div class="modal-actions" style="margin-top:8px;justify-content:flex-start">
+              <button class="btn-outline" type="button" onclick="openAdminKnowledgeMapSource('${escapeAttr(entry.id || '')}','${escapeAttr(entry.tenant_slug || '')}')">查看知识详情</button>
+            </div>
+          </div>
+        `).join('') : '<div class="admin-kg-detail-item"><div class="admin-kg-detail-item-meta">当前节点暂无来源证据。</div></div>'}
+      </div>
+    </div>
+  `;
+}
+
+function renderAdminKnowledgeMap() {
+  const board = document.getElementById('admin-kg-board');
+  const stage = document.getElementById('admin-kg-stage');
+  const stats = document.getElementById('admin-kg-stats');
+  const legend = document.getElementById('admin-kg-legend');
+  if (!board || !stage || !stats || !legend) return;
+  if (!adminKnowledgeMapState.payload) {
+    board.innerHTML = '<div class="admin-kg-detail-empty" style="min-height:760px;background:transparent;color:#C6D3E2">知识图谱尚未加载。</div>';
+    renderAdminKnowledgeMapDetail(null);
+    return;
+  }
+  const filtered = getAdminKnowledgeMapFilteredPayload();
+  const payload = filtered.payload;
+  const maxDepth = Number(payload.max_depth || 5);
+  adminKnowledgeMapState.depth = filtered.depth;
+  adminKnowledgeMapState.defaultDepth = Number(payload.default_depth || 3);
+  stage.textContent = `当前显示 ${filtered.depth} 层 / 共 ${maxDepth} 层。平台总图默认只看租户与知识主题，继续展开后才进入观点和验证信号。`;
+  const statPayload = payload.stats || {};
+  stats.innerHTML = `
+    <div class="admin-kg-stat"><div class="admin-kg-stat-label">租户</div><div class="admin-kg-stat-value">${statPayload.tenant_count || 0}</div></div>
+    <div class="admin-kg-stat"><div class="admin-kg-stat-label">知识条目</div><div class="admin-kg-stat-value">${statPayload.artifact_count || 0}</div></div>
+    <div class="admin-kg-stat"><div class="admin-kg-stat-label">主题</div><div class="admin-kg-stat-value">${statPayload.topic_count || 0}</div></div>
+    <div class="admin-kg-stat"><div class="admin-kg-stat-label">实体</div><div class="admin-kg-stat-value">${statPayload.entity_count || 0}</div></div>
+    <div class="admin-kg-stat"><div class="admin-kg-stat-label">观点</div><div class="admin-kg-stat-value">${statPayload.claim_count || 0}</div></div>
+    <div class="admin-kg-stat"><div class="admin-kg-stat-label">验证信号</div><div class="admin-kg-stat-value">${statPayload.signal_count || 0}</div></div>
+  `;
+  legend.innerHTML = [
+    ['root', '平台根节点'],
+    ['tenant', '租户'],
+    ['topic', '主题'],
+    ['entity', '实体'],
+    ['method', '方法'],
+    ['claim', '观点'],
+    ['signal', '验证信号'],
+  ].map(([kind, label]) => `<span class="admin-kg-legend-chip"><span class="admin-kg-legend-dot kind-${kind}"></span>${escapeHtml(label)}</span>`).join('');
+  if (!filtered.nodes.length) {
+    board.innerHTML = '<div class="admin-kg-detail-empty" style="min-height:760px;background:transparent;color:#C6D3E2">当前没有匹配的知识对象。可以清空搜索词，或先补充结构化知识内容。</div>';
+    renderAdminKnowledgeMapDetail(null);
+    return;
+  }
+  const shell = document.querySelector('.admin-kg-board-shell');
+  const groups = {};
+  filtered.nodes.forEach((node) => {
+    const level = Number(node.level || 1);
+    if (!groups[level]) groups[level] = [];
+    groups[level].push(node);
+  });
+  Object.keys(groups).forEach((key) => groups[key].sort((a, b) => String(a.label || '').localeCompare(String(b.label || ''), 'zh-Hans-CN')));
+  const levelList = Object.keys(groups).map(Number).sort((a, b) => a - b);
+  const perRing = 20;
+  const baseRadius = 150;
+  const levelGap = 118;
+  const ringGap = 60;
+  let maxRadius = 0;
+  levelList.forEach((level) => {
+    if (level <= 1) return;
+    const groupSize = (groups[level] || []).length;
+    const ringIndex = Math.max(0, Math.ceil(groupSize / perRing) - 1);
+    maxRadius = Math.max(maxRadius, baseRadius + (level - 2) * levelGap + ringIndex * ringGap);
+  });
+  const viewportWidth = Math.max(1180, shell ? shell.clientWidth : 1180);
+  const viewportHeight = Math.max(760, shell ? shell.clientHeight : 760);
+  const width = Math.max(viewportWidth, maxRadius * 2 + 420);
+  const height = Math.max(viewportHeight, maxRadius * 2 + 340);
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const positions = {};
+  levelList.forEach((level) => {
+    const group = groups[level] || [];
+    if (level === 1) {
+      if (group[0]) positions[group[0].id] = { x: centerX, y: centerY };
+      return;
+    }
+    group.forEach((node, index) => {
+      const ringIndex = Math.floor(index / perRing);
+      const ringRadius = baseRadius + (level - 2) * levelGap + ringIndex * ringGap;
+      const ringSize = Math.min(perRing, Math.max(group.length - ringIndex * perRing, 1));
+      const angle = ((index % perRing) / ringSize) * Math.PI * 2 - Math.PI / 2;
+      positions[node.id] = {
+        x: centerX + Math.cos(angle) * ringRadius,
+        y: centerY + Math.sin(angle) * ringRadius,
+      };
+    });
+  });
+  const nodeMap = new Map(filtered.nodes.map((node) => [node.id, node]));
+  const edgeMarkup = filtered.edges.map((edge) => {
+    const from = positions[edge.from];
+    const to = positions[edge.to];
+    if (!from || !to) return '';
+    return `<line class="admin-kg-edge" x1="${Math.round(from.x)}" y1="${Math.round(from.y)}" x2="${Math.round(to.x)}" y2="${Math.round(to.y)}"></line>`;
+  }).join('');
+  board.innerHTML = `
+    <svg class="admin-kg-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">${edgeMarkup}</svg>
+    ${filtered.nodes.map((node) => {
+      const pos = positions[node.id] || { x: centerX, y: centerY };
+      return `
+        <button
+          type="button"
+          class="admin-kg-node kind-${escapeAttr(node.kind || 'topic')}${adminKnowledgeMapState.selectedNodeId === node.id ? ' is-active' : ''}"
+          style="left:${Math.round(pos.x)}px;top:${Math.round(pos.y)}px;width:${adminKnowledgeMapNodeWidth(node.kind)}px"
+          data-node-id="${escapeAttr(node.id || '')}"
+        >
+          <div class="admin-kg-node-kind">${escapeHtml(adminKnowledgeMapKindLabel(node.kind || ''))}</div>
+          <div class="admin-kg-node-label">${escapeHtml(node.full_label || node.label || '')}</div>
+        </button>
+      `;
+    }).join('')}
+  `;
+  board.style.width = `${Math.round(width)}px`;
+  board.style.height = `${Math.round(height)}px`;
+  Array.from(board.querySelectorAll('[data-node-id]')).forEach((nodeEl) => {
+    nodeEl.addEventListener('click', () => selectAdminKnowledgeMapNode(nodeEl.getAttribute('data-node-id') || ''));
+  });
+  const activeNode = nodeMap.get(adminKnowledgeMapState.selectedNodeId) || filtered.nodes.find((node) => node.kind === 'root') || filtered.nodes[0];
+  adminKnowledgeMapState.selectedNodeId = activeNode ? activeNode.id : '';
+  renderAdminKnowledgeMapDetail(activeNode || null);
+  const centerTarget = adminKnowledgeMapState.centerNodeId || '';
+  if (centerTarget && positions[centerTarget]) centerAdminKnowledgeMapNode(centerTarget, positions);
+  adminKnowledgeMapState.centerNodeId = '';
+}
+
+async function loadAdminKnowledgeMap(showMessage = false) {
+  renderAdminKnowledgeMapTenantFilter();
+  const stage = document.getElementById('admin-kg-stage');
+  if (stage) stage.textContent = '正在加载知识图谱…';
+  try {
+    const tenantSlug = renderAdminKnowledgeMapTenantFilter();
+    const query = new URLSearchParams();
+    if (tenantSlug) query.set('tenant_slug', tenantSlug);
+    const resp = await fetch(`/api/admin/knowledge-graph${query.toString() ? `?${query.toString()}` : ''}`);
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'knowledge_graph_load_failed');
+    adminKnowledgeMapState.payload = data.graph || {};
+    adminKnowledgeMapState.depth = Number((data.graph && data.graph.default_depth) || 3);
+    adminKnowledgeMapState.defaultDepth = Number((data.graph && data.graph.default_depth) || 3);
+    if (!adminKnowledgeMapState.selectedNodeId) {
+      adminKnowledgeMapState.selectedNodeId = String((data.graph && data.graph.root_id) || '');
+      adminKnowledgeMapState.centerNodeId = adminKnowledgeMapState.selectedNodeId;
+    }
+    renderAdminKnowledgeMap();
+    if (showMessage) showToast('知识图谱已刷新');
+  } catch (error) {
+    if (stage) stage.textContent = '知识图谱加载失败，当前无法展示。';
+    const board = document.getElementById('admin-kg-board');
+    if (board) board.innerHTML = '<div class="admin-kg-detail-empty" style="min-height:760px;background:transparent;color:#C6D3E2">知识图谱加载失败。请稍后重试，或先检查知识条目是否已成功同步。</div>';
+    renderAdminKnowledgeMapDetail(null);
+    showToast(error.message || '知识图谱加载失败');
+  }
 }
 
 function applyAdminTokenUsagePayload(data) {

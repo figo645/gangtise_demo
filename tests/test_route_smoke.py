@@ -69,6 +69,12 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("摘要和自选股归纳总结审核与详细修改", html)
         self.assertIn("用户复盘", html)
         self.assertIn("自选股归纳总结", html)
+        self.assertIn("系统标签", html)
+        self.assertIn("openAccountSettingsModal()", html)
+        self.assertIn("openProfileNotificationCenter()", html)
+        self.assertIn("openHelpCenterModal()", html)
+        self.assertIn("id=\"account-settings-modal\"", html)
+        self.assertIn("id=\"help-center-modal\"", html)
 
     def test_hermes_query_accepts_web_answer_flag(self):
         response = self.client.post(
@@ -99,7 +105,13 @@ class RouteSmokeTest(unittest.TestCase):
                 response = self.client.get(f"/kol-workbench?tenant={tenant_slug}")
                 self.assertEqual(response.status_code, 200)
                 self.assertIn("text/html", response.content_type)
-                self.assertIn("工作台", response.get_data(as_text=True))
+                html = response.get_data(as_text=True)
+                self.assertIn("工作台", html)
+                self.assertIn("知识专区", html)
+                self.assertIn("知识图谱", html)
+                self.assertIn("进入知识图谱", html)
+                self.assertIn("id=\"kw-kg-legend\"", html)
+                self.assertIn("loadWorkbenchKnowledgeMap(", html)
 
     def test_tenant_portal_pages_render(self):
         for tenant_slug in self.tenant_slugs:
@@ -186,6 +198,7 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("knowledge_query_agent", workflow_ids)
         self.assertIn("evidence_chain_agent", workflow_ids)
         self.assertIn("knowledge_processing_agent", workflow_ids)
+        self.assertIn("knowledge_graph_agent", workflow_ids)
 
     def test_review_prepare_preview_endpoint_queues_job(self):
         response = self.client.post(
@@ -236,6 +249,49 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("workflow_meta", payload)
         self.assertEqual(payload["workflow_meta"]["id"], "evidence_chain_agent")
 
+    def test_knowledge_graph_api_returns_graph_payload(self):
+        tenant_slug = self.tenant_slugs[0]
+        response = self.client.get(f"/api/kol/knowledge-graph?tenant={tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertIn("graph", payload)
+        self.assertIn("nodes", payload["graph"])
+        self.assertEqual(payload["graph"].get("default_depth"), 3)
+        kinds = {node.get("kind") for node in payload["graph"].get("nodes", [])}
+        self.assertIn("root", kinds)
+        self.assertTrue(kinds.intersection({"topic", "entity", "method", "claim", "signal"}))
+        self.assertFalse(kinds.intersection({"voice", "file", "url", "manual"}))
+        self.assertIn("workflow_meta", payload)
+        self.assertEqual(payload["workflow_meta"]["id"], "knowledge_graph_agent")
+
+    def test_admin_knowledge_graph_api_returns_graph_payload(self):
+        response = self.client.get("/api/admin/knowledge-graph")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertIn("graph", payload)
+        self.assertIn("nodes", payload["graph"])
+        self.assertEqual(payload["graph"].get("default_depth"), 3)
+        kinds = {node.get("kind") for node in payload["graph"].get("nodes", [])}
+        self.assertIn("root", kinds)
+        self.assertFalse(kinds.intersection({"voice", "file", "url", "manual"}))
+        self.assertIn("workflow_meta", payload)
+        self.assertEqual(payload["workflow_meta"]["id"], "knowledge_graph_agent")
+
+    def test_h5_help_center_api_returns_articles(self):
+        response = self.client.get("/api/h5/help-center?role=dav")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertIn("help_center", payload)
+        self.assertIn("articles", payload["help_center"])
+        self.assertTrue(payload["help_center"]["articles"])
+        self.assertEqual(payload["help_center"]["role"], "dav")
+
     def test_admin_page_contains_hermes_memory_governance_controls(self):
         response = self.client.get("/admin")
 
@@ -252,6 +308,18 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("/api/admin/hermes/memory-summary", html)
         self.assertIn("/api/admin/hermes/memory-backup", html)
         self.assertIn("/api/admin/hermes/memory-clear", html)
+
+    def test_admin_page_contains_knowledge_center_graph(self):
+        response = self.client.get("/admin")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("知识图谱中心", html)
+        self.assertIn("settings-knowledge-graph", html)
+        self.assertIn("id=\"admin-kg-board\"", html)
+        self.assertIn("id=\"admin-kg-legend\"", html)
+        self.assertIn("loadAdminKnowledgeMap(", html)
+        self.assertIn("/api/admin/knowledge-graph", html)
 
 
 if __name__ == "__main__":
