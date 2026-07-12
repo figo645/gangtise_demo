@@ -538,6 +538,32 @@ body { background: var(--surface-2); color: var(--text-main); }
   white-space:nowrap;
   flex-shrink:0;
 }
+.hermes-composer-send.is-voice {
+  width:44px;
+  min-width:44px;
+  min-height:44px;
+  padding:0;
+  border-radius:999px;
+  background:#F5F7FA;
+  border:1px solid rgba(17,24,39,0.08);
+  color:#111827;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.hermes-composer-send.is-voice.is-recording {
+  background:rgba(200,169,110,0.14);
+  border-color:rgba(200,169,110,0.34);
+  color:#8A5B00;
+}
+.hermes-composer-send.is-voice.is-processing {
+  color:#6B7280;
+}
+.hermes-composer-send-icon {
+  width:18px;
+  height:18px;
+  display:block;
+}
 .hermes-action-row { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:12px; flex-wrap:wrap; }
 .hermes-analyze-btn {
   background:linear-gradient(135deg,var(--gold-dark),var(--gold));
@@ -609,39 +635,98 @@ body { background: var(--surface-2); color: var(--text-main); }
 }
 .hermes-lobster-composer {
   display:grid;
-  grid-template-columns:auto minmax(0, 1fr) auto auto;
-  gap:8px;
-  align-items:end;
+  gap:10px;
   min-width:0;
   width:100%;
   max-width:100%;
   box-sizing:border-box;
   overflow:hidden;
+  padding:12px 12px 10px;
+  border:1px solid rgba(47,116,192,0.24);
+  border-radius:22px;
+  background:#FFFFFF;
+  box-shadow:0 10px 28px rgba(47,116,192,0.06);
 }
 .hermes-lobster-question {
   width:100%;
-  min-height:48px;
+  min-height:64px;
   max-height:160px;
-  border:1px solid rgba(17,24,39,0.08);
-  background:#FAFBFC;
+  border:none;
+  background:transparent;
   color:var(--text-main);
-  border-radius:14px;
-  padding:10px 12px;
-  font-size:12px;
-  line-height:1.6;
+  border-radius:0;
+  padding:0;
+  font-size:14px;
+  line-height:1.55;
   resize:none;
   min-width:0;
   outline:none;
   font-family:var(--font-main);
   box-sizing:border-box;
 }
+.hermes-lobster-question::placeholder {
+  color:#B8BDC6;
+}
+.hermes-lobster-toolbar {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  min-width:0;
+}
+.hermes-lobster-toolbar-left {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:0;
+  flex:1;
+}
+.hermes-lobster-divider {
+  width:1px;
+  height:20px;
+  background:rgba(17,24,39,0.10);
+  flex:0 0 auto;
+}
+.hermes-lobster-tool-row {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+  overflow-x:auto;
+  scrollbar-width:none;
+}
+.hermes-lobster-tool-row::-webkit-scrollbar {
+  display:none;
+}
+.hermes-lobster-tool {
+  border:none;
+  background:transparent;
+  color:#171A1F;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:4px 2px;
+  font-size:11px;
+  font-weight:600;
+  line-height:1;
+  cursor:pointer;
+  white-space:nowrap;
+  flex:0 0 auto;
+}
+.hermes-lobster-tool-icon {
+  font-size:15px;
+  line-height:1;
+}
+.hermes-lobster-tool.is-active {
+  color:#8A5B00;
+}
 .hermes-lobster-send {
-  flex-shrink:0;
+  flex:0 0 auto;
 }
 @media (max-width: 430px) {
   .hermes-lobster-composer {
-    gap:6px;
-    grid-template-columns:34px minmax(0, 1fr) minmax(58px, auto) minmax(58px, auto);
+    gap:7px;
+    padding:10px 10px 9px;
   }
   .hermes-composer-plus {
     width:34px;
@@ -651,7 +736,7 @@ body { background: var(--surface-2); color: var(--text-main); }
   .hermes-composer-toggle {
     min-width:58px;
     height:34px;
-    padding:0 10px;
+    padding:0 8px;
     font-size:10px;
   }
   .hermes-composer-send {
@@ -659,9 +744,23 @@ body { background: var(--surface-2); color: var(--text-main); }
     padding:0 12px;
     font-size:11px;
   }
+  .hermes-composer-send.is-voice {
+    width:38px;
+    min-width:38px;
+    min-height:38px;
+  }
   .hermes-lobster-question {
-    min-height:34px;
-    padding:9px 10px;
+    min-height:56px;
+    font-size:13px;
+  }
+  .hermes-lobster-toolbar-left {
+    gap:8px;
+  }
+  .hermes-lobster-tool {
+    font-size:10px;
+  }
+  .hermes-lobster-tool-icon {
+    font-size:14px;
   }
 }
 .hermes-plus-sheet-note {
@@ -823,6 +922,16 @@ body { background: var(--surface-2); color: var(--text-main); }
   background:var(--gold);
   box-shadow:none;
 }
+.hermes-bullet-item.is-clickable {
+  cursor:pointer;
+  transition:background .18s ease,color .18s ease,transform .18s ease;
+}
+.hermes-bullet-item.is-clickable:hover {
+  background:#ECEFF4;
+}
+.hermes-bullet-item.is-clickable:active {
+  transform:scale(.98);
+}
 .hermes-thinking-text { min-width:0; max-width:100%; word-break:break-word; overflow-wrap:anywhere; }
 .hermes-thinking-inline {
   font-size:10px;
@@ -903,18 +1012,21 @@ body { background: var(--surface-2); color: var(--text-main); }
 .profile-settings-modal-sheet {
   max-height:min(88vh, 760px);
   overflow:auto;
+  background:linear-gradient(180deg,#FFFEFC 0%,#F7FBFF 100%);
+  border-top:1px solid rgba(47,116,192,0.12);
 }
 .profile-settings-group {
   margin-top:14px;
   padding:12px;
-  background:rgba(13,27,42,0.42);
-  border:1px solid rgba(200,169,110,0.10);
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
   border-radius:14px;
+  box-shadow:0 8px 22px rgba(31,73,125,0.06);
 }
 .profile-settings-group-title {
   font-size:13px;
   font-weight:700;
-  color:var(--white);
+  color:var(--text-main);
 }
 .profile-settings-group-desc {
   margin-top:4px;
@@ -938,22 +1050,32 @@ body { background: var(--surface-2); color: var(--text-main); }
 }
 .profile-settings-field label {
   font-size:11px;
-  color:var(--gray-400);
+  color:#5B6B7B;
 }
 .profile-settings-input,
 .profile-settings-textarea,
 .help-center-search {
   width:100%;
   box-sizing:border-box;
-  border:none;
   outline:none;
   border-radius:12px;
-  background:rgba(255,255,255,0.06);
-  border:1px solid rgba(200,169,110,0.16);
-  color:var(--white);
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.12);
+  color:var(--text-main);
   padding:11px 12px;
   font-size:13px;
   font-family:var(--font-main);
+}
+.profile-settings-input::placeholder,
+.profile-settings-textarea::placeholder,
+.help-center-search::placeholder {
+  color:#8A97A5;
+}
+.profile-settings-input:focus,
+.profile-settings-textarea:focus,
+.help-center-search:focus {
+  border-color:rgba(47,116,192,0.24);
+  box-shadow:0 0 0 3px rgba(47,116,192,0.10);
 }
 .profile-settings-input[readonly] {
   opacity:0.78;
@@ -972,18 +1094,18 @@ body { background: var(--surface-2); color: var(--text-main); }
 .profile-settings-static-card {
   padding:12px;
   border-radius:12px;
-  background:rgba(255,255,255,0.04);
-  border:1px solid rgba(200,169,110,0.10);
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
 }
 .profile-settings-static-label {
   font-size:10px;
-  color:var(--gray-400);
+  color:#5B6B7B;
 }
 .profile-settings-static-value {
   margin-top:6px;
   font-size:13px;
   line-height:1.7;
-  color:var(--white);
+  color:var(--text-main);
   font-weight:600;
 }
 .profile-tag-editor {
@@ -991,8 +1113,8 @@ body { background: var(--surface-2); color: var(--text-main); }
   padding:10px;
   min-height:48px;
   border-radius:12px;
-  background:rgba(255,255,255,0.05);
-  border:1px solid rgba(200,169,110,0.16);
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.12);
 }
 .profile-tag-editor-row {
   display:flex;
@@ -2888,15 +3010,25 @@ body,
             <div class="hermes-composer-shell">
               <div class="hermes-composer-context" id="hermes-composer-context"></div>
               <div class="hermes-lobster-composer">
-                <button class="hermes-composer-plus" onclick="openHermesPlusMenu()">+</button>
                 <textarea
                   id="hermes-question-input"
                   class="hermes-lobster-question"
-                  placeholder="问 Hermes..."
-                  oninput="this.style.height='auto';this.style.height=Math.max(54,Math.min(this.scrollHeight,160))+'px'"
+                  placeholder="发消息..."
+                  oninput="handleHermesQuestionInput(this)"
                 ></textarea>
-                <button id="hermes-internet-toggle" class="hermes-composer-toggle" type="button" onclick="toggleHermesInternetAnswer()">互联网</button>
-                <button class="hermes-composer-send hermes-lobster-send" onclick="runHermesAnalysis()">发送</button>
+                <div class="hermes-lobster-toolbar">
+                  <div class="hermes-lobster-toolbar-left">
+                    <button class="hermes-composer-plus" onclick="openHermesPlusMenu()">+</button>
+                    <span class="hermes-lobster-divider"></span>
+                    <div class="hermes-lobster-tool-row">
+                      <button id="hermes-internet-toggle" class="hermes-lobster-tool hermes-composer-toggle" type="button" onclick="toggleHermesInternetAnswer()">
+                        <span class="hermes-lobster-tool-icon">🌐</span>
+                        <span>互联网</span>
+                      </button>
+                    </div>
+                  </div>
+                  <button id="hermes-composer-submit" class="hermes-composer-send hermes-lobster-send" onclick="handleHermesComposerSubmit()">发送</button>
+                </div>
               </div>
             </div>
           </div>
@@ -7646,6 +7778,7 @@ function renderHermesWorkspace() {
   renderHermesCredits();
   renderHermesComposerContext();
   renderHermesInternetToggle();
+  renderHermesComposerSubmit();
   renderHermesThread();
 }
 
@@ -9540,11 +9673,9 @@ function runWatchlistHermes(stockCode, mode) {
   setTimeout(() => {
     const input = document.getElementById('hermes-question-input');
     if (input) {
-      input.value = mode === 'forecast'
+      fillHermesQuestionInput(mode === 'forecast'
         ? `请判断 ${stockLabel} 当前更适合继续跟踪、重点研究还是暂缓处理，并说明原因。`
-        : `请围绕 ${stockLabel} 的盈利、估值、行业位置和关键争议点，给我一个简洁但完整的基本面分析。`;
-      input.style.height = 'auto';
-      input.style.height = Math.max(92, Math.min(input.scrollHeight, 180)) + 'px';
+        : `请围绕 ${stockLabel} 的盈利、估值、行业位置和关键争议点，给我一个简洁但完整的基本面分析。`);
       runHermesAnalysis({ fromWatchlist: true });
     }
   }, 80);
@@ -10027,6 +10158,10 @@ let hermesUploadedFiles = [];
 let hermesSavedKnowledgeEntries = {};
 let hermesUseInternetAnswer = false;
 let hermesLoadingTicker = null;
+let hermesVoiceRecorder = null;
+let hermesVoiceChunks = [];
+let hermesVoiceRecording = false;
+let hermesVoiceUploading = false;
 
 function getHermesSessionStorageKey() {
   const activeUser = getActiveDemoUser() || {};
@@ -10140,6 +10275,53 @@ function getHermesActiveQuestion() {
   return (input && input.value) || '';
 }
 
+function resizeHermesQuestionInput(input) {
+  const node = input || document.getElementById('hermes-question-input');
+  if (!node) return;
+  node.style.height = 'auto';
+  node.style.height = `${Math.max(88, Math.min(node.scrollHeight, 160))}px`;
+}
+
+function renderHermesComposerSubmit() {
+  const button = document.getElementById('hermes-composer-submit');
+  if (!button) return;
+  const hasText = !!String(getHermesActiveQuestion() || '').trim();
+  const isVoiceMode = !hasText;
+  button.className = `hermes-composer-send hermes-lobster-send${isVoiceMode ? ' is-voice' : ''}${hermesVoiceRecording ? ' is-recording' : ''}${hermesVoiceUploading ? ' is-processing' : ''}`;
+  if (isVoiceMode) {
+    const title = hermesVoiceUploading ? '语音转写中' : (hermesVoiceRecording ? '结束录音' : '开始录音');
+    button.innerHTML = `
+      <svg class="hermes-composer-send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3z"></path>
+        <path d="M19 11a7 7 0 0 1-14 0"></path>
+        <path d="M12 18v3"></path>
+      </svg>
+    `;
+    button.setAttribute('aria-label', title);
+    button.title = title;
+    button.disabled = !!hermesVoiceUploading;
+    return;
+  }
+  button.textContent = '发送';
+  button.removeAttribute('aria-label');
+  button.title = '发送';
+  button.disabled = false;
+}
+
+function handleHermesQuestionInput(input) {
+  resizeHermesQuestionInput(input);
+  renderHermesComposerSubmit();
+}
+
+function fillHermesQuestionInput(text, options = {}) {
+  const input = document.getElementById('hermes-question-input');
+  if (!input) return;
+  input.value = String(text || '');
+  resizeHermesQuestionInput(input);
+  renderHermesComposerSubmit();
+  if (options.focus !== false) input.focus();
+}
+
 function focusHermesQuestionComposer() {
   const input = document.getElementById('hermes-question-input');
   if (input) input.focus();
@@ -10251,8 +10433,9 @@ function renderHermesComposerContext() {
 function renderHermesInternetToggle() {
   const button = document.getElementById('hermes-internet-toggle');
   if (!button) return;
+  button.classList.add('hermes-lobster-tool');
   button.classList.toggle('is-active', !!hermesUseInternetAnswer);
-  button.textContent = hermesUseInternetAnswer ? '互联网中' : '互联网';
+  button.innerHTML = `<span class="hermes-lobster-tool-icon">🌐</span><span>${hermesUseInternetAnswer ? '互联网中' : '互联网'}</span>`;
   button.setAttribute('aria-pressed', hermesUseInternetAnswer ? 'true' : 'false');
   button.title = hermesUseInternetAnswer
     ? '已开启互联网补充，Hermes 会先查租户知识库，再补公开信息'
@@ -10268,6 +10451,105 @@ function toggleHermesInternetAnswer(forceValue) {
   hermesUseInternetAnswer = typeof forceValue === 'boolean' ? forceValue : !hermesUseInternetAnswer;
   renderHermesWorkspace();
   showToast(hermesUseInternetAnswer ? '已开启互联网补充' : '已关闭互联网补充');
+}
+
+async function uploadHermesVoiceBlob(audioBlob) {
+  const user = getActiveDemoUser();
+  const formData = new FormData();
+  const fileName = `hermes-${Date.now()}.webm`;
+  formData.append('audio', audioBlob, fileName);
+  formData.append('tenant_slug', ((user || {}).tenant || {}).slug || '');
+  formData.append('period', 'hermes');
+  formData.append('entry_point', 'h5_hermes');
+  formData.append('speaker_name', (user && (user.advisor_name || user.username)) || '');
+  formData.append('use_llm_enhancement', 'false');
+  const resp = await fetch('/api/review/voice-transcribe', {
+    method: 'POST',
+    body: formData,
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.success) {
+    throw new Error((data && data.error) || 'voice_transcribe_failed');
+  }
+  return data;
+}
+
+function toggleHermesVoiceCapture() {
+  if (hermesVoiceUploading) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
+    showToast('当前浏览器不支持录音');
+    return;
+  }
+  if (hermesVoiceRecording && hermesVoiceRecorder) {
+    hermesVoiceRecorder.stop();
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+    hermesVoiceChunks = [];
+    hermesVoiceRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    hermesVoiceRecording = true;
+    renderHermesComposerSubmit();
+    hermesVoiceRecorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) {
+        hermesVoiceChunks.push(event.data);
+      }
+    };
+    hermesVoiceRecorder.onerror = () => {
+      hermesVoiceRecording = false;
+      hermesVoiceUploading = false;
+      stream.getTracks().forEach((track) => track.stop());
+      renderHermesComposerSubmit();
+      showToast('录音失败，请重试');
+    };
+    hermesVoiceRecorder.onstop = async () => {
+      hermesVoiceRecording = false;
+      hermesVoiceUploading = true;
+      renderHermesComposerSubmit();
+      const blob = new Blob(hermesVoiceChunks, { type: hermesVoiceRecorder.mimeType || 'audio/webm' });
+      stream.getTracks().forEach((track) => track.stop());
+      try {
+        const data = await uploadHermesVoiceBlob(blob);
+        if (!data.async || !data.job_code) throw new Error('voice_transcribe_job_missing');
+        showToast('语音已提交，正在后台转写');
+        startAsyncJobPolling(data.job_code, {
+          onSuccess(job) {
+            const result = job.result || {};
+            const transcript = String(result.display_transcript || result.enhanced_transcript || result.transcript || '').trim();
+            fillHermesQuestionInput(transcript);
+            showToast('语音已转成问题草稿');
+          },
+          onFailed(job) {
+            showToast(job.error_message || '语音转写失败');
+          },
+          onError(error) {
+            showToast(error.message || '语音转写失败');
+          },
+        });
+      } catch (error) {
+        showToast(error.message || '语音转写失败');
+      } finally {
+        hermesVoiceUploading = false;
+        hermesVoiceRecorder = null;
+        hermesVoiceChunks = [];
+        renderHermesComposerSubmit();
+      }
+    };
+    hermesVoiceRecorder.start();
+  }).catch(() => {
+    showToast('未获得麦克风权限');
+    hermesVoiceRecording = false;
+    hermesVoiceUploading = false;
+    renderHermesComposerSubmit();
+  });
+}
+
+function handleHermesComposerSubmit() {
+  if (String(getHermesActiveQuestion() || '').trim()) {
+    runHermesAnalysis();
+    return;
+  }
+  toggleHermesVoiceCapture();
 }
 
 function clearHermesKnowledgeScope() {
@@ -10446,8 +10728,9 @@ function clearHermesQuestionInputs() {
   const inputA = document.getElementById('hermes-question-input');
   if (inputA) {
     inputA.value = '';
-    inputA.style.height = '54px';
+    resizeHermesQuestionInput(inputA);
   }
+  renderHermesComposerSubmit();
 }
 
 function getHermesSkillStorageByTenant() {
@@ -10593,13 +10876,7 @@ function selectHermesSkill(skillKey) {
 }
 
 function applyHermesSuggestion(text) {
-  const inputA = document.getElementById('hermes-question-input');
-  if (inputA) {
-    inputA.value = text;
-    inputA.style.height = 'auto';
-    inputA.style.height = Math.max(54, Math.min(inputA.scrollHeight, 160)) + 'px';
-  }
-  if (inputA) inputA.focus();
+  fillHermesQuestionInput(text);
 }
 
 function escapeHtml(value) {
@@ -10740,6 +11017,18 @@ function dedupeHermesTextItems(items) {
   });
 }
 
+function renderHermesClickableBullets(items, options = {}) {
+  const list = dedupeHermesTextItems(items);
+  if (!list.length) return '';
+  const clickable = !!options.clickable;
+  return `<div class="hermes-bullet-list" style="margin-top:8px">${
+    list.map((item) => clickable
+      ? `<button type="button" class="hermes-bullet-item is-clickable" onclick="applyHermesSuggestion('${escapeAttr(item)}')">${escapeHtml(item)}</button>`
+      : `<div class="hermes-bullet-item">${escapeHtml(item)}</div>`
+    ).join('')
+  }</div>`;
+}
+
 function buildHermesLoadingThoughts(entry) {
   const payload = entry && typeof entry === 'object' ? entry : {};
   const elapsedMs = Math.max(0, Date.now() - Number(payload.startedAt || Date.now()));
@@ -10793,12 +11082,8 @@ function renderHermesTextArtifact(artifact, agentTrace) {
     ? `<div class="hermes-evidence-row" style="margin-top:8px">${artifact.knowledge.map(item => `<span class="hermes-evidence-chip">${escapeHtml(item.title)}</span>`).join('')}</div>`
     : '';
   const bodyHtml = artifact.body ? `<div class="hermes-transcript-body" style="margin-top:8px">${escapeHtml(artifact.body)}</div>` : '';
-  const bulletHtml = uniqueBullets.length
-    ? `<div class="hermes-bullet-list" style="margin-top:8px">${uniqueBullets.map(item => `<div class="hermes-bullet-item">${escapeHtml(item)}</div>`).join('')}</div>`
-    : '';
-  const followupHtml = uniqueFollowups.length
-    ? `<div class="hermes-bullet-list" style="margin-top:8px">${uniqueFollowups.map(item => `<div class="hermes-bullet-item">${escapeHtml(item)}</div>`).join('')}</div>`
-    : '';
+  const bulletHtml = renderHermesClickableBullets(uniqueBullets);
+  const followupHtml = renderHermesClickableBullets(uniqueFollowups, { clickable: true });
   const thoughtLines = buildHermesTraceThoughts(agentTrace);
   const actionHtml = renderHermesKnowledgeAction(entryId);
   return `
@@ -10899,8 +11184,8 @@ function renderHermesAnalysisCards(artifact, agentTrace) {
       <div class="hermes-metric-note">${escapeHtml(metric.note)}</div>
     </div>
   `).join('');
-  const bulletsHtml = (artifact.judgement || []).map(item => `<div class="hermes-bullet-item">${escapeHtml(item)}</div>`).join('');
-  const actionsHtml = (artifact.nextSteps || []).map(item => `<div class="hermes-bullet-item">${escapeHtml(item)}</div>`).join('');
+  const bulletsHtml = renderHermesClickableBullets(artifact.judgement || []);
+  const actionsHtml = renderHermesClickableBullets(artifact.nextSteps || [], { clickable: true });
   const evidenceHtml = (artifact.citations || []).map(item => `<span class="hermes-evidence-chip">${escapeHtml(item)}</span>`).join('');
   const knowledgeHtml = (artifact.knowledge || []).length
     ? artifact.knowledge.map(entry => `<span class="hermes-evidence-chip">${escapeHtml(entry.title)}</span>`).join('')
@@ -10910,7 +11195,7 @@ function renderHermesAnalysisCards(artifact, agentTrace) {
     ? `
       <div style="margin-top:10px">
         <div class="hermes-section-label">结论</div>
-        <div class="hermes-bullet-list">${bulletsHtml}</div>
+        ${bulletsHtml}
       </div>
     `
     : '';
@@ -10918,7 +11203,7 @@ function renderHermesAnalysisCards(artifact, agentTrace) {
     ? `
       <div style="margin-top:10px">
         <div class="hermes-section-label">下一步</div>
-        <div class="hermes-bullet-list">${actionsHtml}</div>
+        ${actionsHtml}
       </div>
     `
     : '';
@@ -11075,6 +11360,7 @@ async function runHermesAnalysis(options) {
       },
     });
     renderHermesThread();
+    renderHermesComposerSubmit();
     showToast(e.message || 'Hermes 查询失败');
   }
 }
