@@ -367,6 +367,46 @@ def api_save_tenant_dashboard(tenant_slug):
     return jsonify({"success": True, "dashboard": payload, "fund_dashboard_state": payload.get("fund_dashboard_state")})
 
 
+@app.route("/api/tenant/<tenant_slug>/fan-stock-observation", methods=["GET", "POST"])
+def api_tenant_fan_stock_observation(tenant_slug):
+    tenant = get_tenant_by_slug(tenant_slug)
+    if not tenant or tenant["slug"] != tenant_slug:
+        return jsonify({"ok": False, "error": "tenant_not_found"}), 404
+    recorded_payload = None
+    if request.method == "POST":
+        body = request.get_json(silent=True) or {}
+        actor = resolve_hermes_actor_context(body, tenant_slug=tenant_slug, user_role=body.get("user_role"))
+        try:
+            recorded_payload = record_fan_stock_observation_event(
+                tenant_slug=tenant_slug,
+                user_profile_id=actor.get("profile_id") or "",
+                user_role=actor.get("user_role") or "",
+                stock_code=body.get("stock_code"),
+                stock_name=body.get("stock_name"),
+                event_type=body.get("event_type"),
+                entry_point=body.get("entry_point"),
+                source_detail=body.get("source_detail"),
+            )
+        except Exception as exc:
+            if not is_db_unavailable_error(exc):
+                raise
+            app.logger.warning("Database unavailable while recording fan stock observation event, using fallback payload")
+    try:
+        payload = build_fan_stock_observation_payload(tenant)
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        app.logger.warning("Database unavailable while building fan stock observation payload, using fallback data")
+        payload = (build_tenant_dashboard_payload_fallback(tenant) or {}).get("fan_stock_observation") or {}
+    return jsonify(
+        {
+            "ok": True,
+            "recorded": bool(recorded_payload),
+            "fan_stock_observation": payload,
+        }
+    )
+
+
 @app.route("/api/tenant/<tenant_slug>/smart-indicators", methods=["GET", "POST"])
 def api_tenant_smart_indicators(tenant_slug):
     tenant = get_tenant_by_slug(tenant_slug)

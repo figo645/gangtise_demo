@@ -4379,6 +4379,22 @@ def build_tenant_dashboard_payload_fallback(tenant=None):
             "base_indicators": [],
             "available_tags": [],
         },
+        "fan_stock_observation": {
+            "window_days": 7,
+            "summary": "当前展示为数据库不可达时的降级视图，暂不提供真实粉丝个股观察数据。",
+            "totals": {
+                "interactions": 0,
+                "detail_views": 0,
+                "hermes_queries": 0,
+                "active_fans": 0,
+                "sector_count": 0,
+            },
+            "hot_sector": "",
+            "sectors": [],
+            "top_stocks": [],
+            "fallback_mode": True,
+            "tracked_stock_codes": [],
+        },
         "reviews": [],
         "stats": {},
     }
@@ -4618,6 +4634,7 @@ def init_db():
             conn.rollback()
             execute_sql_file(conn, sql_dir / "020_knowledge_embeddings.sql")
         execute_sql_file(conn, sql_dir / "022_hermes_memory_profile.sql")
+        execute_sql_file(conn, sql_dir / "023_fan_stock_observation_events.sql")
         execute_sql_file(conn, sql_dir / "101_seed_app_core.sql")
         execute_sql_file(conn, sql_dir / "100_seed_master_data.sql")
 

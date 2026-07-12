@@ -128,6 +128,7 @@ class RouteSmokeTest(unittest.TestCase):
                 self.assertTrue(payload["success"])
                 self.assertIn("dashboard", payload)
                 self.assertIn("fund_dashboard_state", payload)
+                self.assertIn("fan_stock_observation", payload["dashboard"])
 
     def test_smart_indicator_api_payloads(self):
         for tenant_slug in self.tenant_slugs:
@@ -138,6 +139,36 @@ class RouteSmokeTest(unittest.TestCase):
                 self.assertTrue(payload["success"])
                 self.assertIn("smart_indicator_catalog", payload)
                 self.assertIn("dashboard", payload)
+
+    def test_fan_stock_observation_api_payloads(self):
+        tenant_slug = self.tenant_slugs[0]
+        response = self.client.get(f"/api/tenant/{tenant_slug}/fan-stock-observation")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertIn("fan_stock_observation", payload)
+        self.assertIn("totals", payload["fan_stock_observation"])
+
+    def test_fan_stock_observation_tracking_endpoint_accepts_watchlist_event(self):
+        tenant_slug = self.tenant_slugs[0]
+        response = self.client.post(
+            f"/api/tenant/{tenant_slug}/fan-stock-observation",
+            json={
+                "stock_code": "00700",
+                "event_type": "watchlist_detail_view",
+                "user_role": "investor",
+                "user_profile_id": "route_smoke_investor",
+                "entry_point": "watchlist_detail",
+                "source_detail": "overview",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertIn("recorded", payload)
+        self.assertIn("fan_stock_observation", payload)
 
     def test_admin_agent_workflows_api_payloads(self):
         response = self.client.get("/api/admin/agent-workflows")

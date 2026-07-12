@@ -2320,17 +2320,25 @@ body,
 .wb-broadcast-meta { font-size:11px; color:var(--gray-400); display:flex; gap:12px; }
 .wb-stock-sector-chart { display:grid; gap:10px; }
 .wb-stock-sector-summary { font-size:11px; color:var(--gray-400); line-height:1.7; padding:0 2px; }
+.wb-stock-sector-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.wb-stock-sector-stat { background:rgba(255,255,255,0.04); border:1px solid rgba(200,169,110,0.10); border-radius:12px; padding:10px; }
+.wb-stock-sector-stat-label { font-size:10px; color:var(--gray-400); }
+.wb-stock-sector-stat-value { font-size:16px; font-weight:800; color:var(--white); margin-top:6px; }
+.wb-stock-sector-stat-sub { font-size:10px; color:var(--gold); margin-top:4px; }
 .wb-stock-sector-card { background:var(--navy-mid); border:1px solid rgba(200,169,110,0.10); border-radius:14px; padding:12px; }
 .wb-stock-sector-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
 .wb-stock-sector-title { font-size:13px; font-weight:700; color:var(--white); }
 .wb-stock-sector-meta { font-size:11px; color:var(--gray-400); margin-top:4px; line-height:1.6; }
 .wb-stock-sector-count { flex-shrink:0; font-size:11px; font-weight:700; color:var(--gold); background:rgba(200,169,110,0.10); border:1px solid rgba(200,169,110,0.18); border-radius:999px; padding:5px 8px; }
+.wb-stock-sector-breakdown { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.wb-stock-sector-breakdown-pill { font-size:10px; color:var(--gray-300); border-radius:999px; padding:4px 8px; background:rgba(255,255,255,0.04); border:1px solid rgba(200,169,110,0.08); }
 .wb-stock-sector-track { position:relative; height:8px; border-radius:999px; background:rgba(255,255,255,0.06); overflow:hidden; margin-top:10px; }
 .wb-stock-sector-fill { position:absolute; inset:0 auto 0 0; border-radius:999px; background:linear-gradient(90deg, rgba(200,169,110,0.78), rgba(47,116,192,0.92)); }
 .wb-stock-sector-chip-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
 .wb-stock-sector-chip { display:inline-flex; align-items:center; gap:8px; border:none; border-radius:999px; padding:7px 10px; background:#FFFFFF; color:var(--text-main); font-size:11px; font-weight:700; cursor:pointer; box-shadow:0 8px 20px rgba(15,39,69,0.14); }
 .wb-stock-sector-chip:active { transform:translateY(1px); }
 .wb-stock-sector-chip-count { font-size:10px; color:#2F74C0; background:rgba(47,116,192,0.10); border-radius:999px; padding:3px 7px; }
+.wb-stock-sector-empty { background:rgba(255,255,255,0.04); border:1px dashed rgba(200,169,110,0.18); border-radius:14px; padding:16px 14px; }
 .wb-mode-switch { display:flex; align-items:center; gap:8px; padding:8px 14px; background:rgba(200,169,110,0.1); border:1px solid rgba(200,169,110,0.3); border-radius:20px; cursor:pointer; margin:12px 16px; }
 .wb-mode-switch-label { font-size:12px; color:var(--gold); font-weight:600; }
 </style>
@@ -3261,30 +3269,9 @@ const H5_INDICATOR_HUB = {{ indicator_hub | tojson }};
 const FUNDAMENTAL_COLUMN_DATA = {{ fundamental_column | tojson }};
 const DASHBOARD_SEED_CARDS = {{ dashboard_seed_cards | tojson }};
 const WATCHLIST_DETAILS_MAP = {{ watchlist_details | tojson }};
-const H5_FAN_STOCK_VISIT_SEED = {
-  default: [
-    { code: '688981', sector: '科技成长', visits: 34, note: '粉丝更关注算力链和半导体验证节奏。' },
-    { code: '300750', sector: '科技成长', visits: 18, note: '新能源链更多被当作中期跟踪样本。' },
-    { code: '00700', sector: '港股互联网', visits: 27, note: '估值修复、回购和利润兑现是高频追问点。' },
-    { code: '600519', sector: '消费龙头', visits: 16, note: '高端消费更偏组合配置与估值承接。' },
-    { code: '600036', sector: '金融防守', visits: 12, note: '银行更常作为防守型对照样本。' },
-  ],
-  laowang: [
-    { code: '688981', sector: '科技成长', visits: 36, note: '半导体制造和国产替代是当前最高频访问来源。' },
-    { code: '300750', sector: '科技成长', visits: 17, note: '新能源链访问集中在景气和价格战。' },
-    { code: '00700', sector: '港股互联网', visits: 22, note: '更多被拿来和 A 股主线做风格对照。' },
-    { code: '600519', sector: '消费龙头', visits: 18, note: '消费龙头通常被当作稳健资金的观察对象。' },
-    { code: '600036', sector: '金融防守', visits: 13, note: '防守风格用户会反复回看股息与资产质量。' },
-  ],
-  lisa: [
-    { code: '00700', sector: '港股互联网', visits: 38, note: '腾讯的回购、利润率和广告恢复是最高频追问点。' },
-    { code: '600036', sector: '金融防守', visits: 16, note: '高股息和资产质量常被用作防守基准。' },
-    { code: '600519', sector: '消费龙头', visits: 14, note: '消费龙头更多承担组合稳定器角色。' },
-    { code: '688981', sector: '科技成长', visits: 12, note: '粉丝会用中芯国际对比成长链风险偏好。' },
-  ],
-};
 const FUND_DASHBOARD_STORAGE_KEY = 'gangtise_fund_dashboard_state';
 const INITIAL_TENANT_DASHBOARD = {{ tenant_dashboard_payload | tojson }};
+let currentTenantDashboardPayload = INITIAL_TENANT_DASHBOARD || {};
 const DEFAULT_DASHBOARD_CELL_PROMPTS = [
   '聚焦美联储路径、通胀和降息预期，给普通投资者一个方向判断。',
   '只看南向/北向资金与成交量变化，判断今天是否有增量资金验证。',
@@ -3651,6 +3638,7 @@ async function refreshTenantDashboardRemoteState(options) {
     const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/dashboard`);
     const payload = await resp.json();
     if (!resp.ok || !payload.success) throw new Error(payload.error || 'dashboard_fetch_failed');
+    currentTenantDashboardPayload = payload.dashboard || {};
     tenantFundDashboardRemoteState = normalizeInitialRemoteDashboardState(payload.dashboard || {});
     const tenantState = ensureTenantFundDashboardState(activeUser.tenant.id);
     tenantState.published = tenantFundDashboardRemoteState.published || tenantState.published;
@@ -3658,6 +3646,7 @@ async function refreshTenantDashboardRemoteState(options) {
     persistTenantFundDashboardState();
     if (opts.rerenderFeed) renderFundMacroDashboard();
     if (opts.rerenderWorkbench) renderWorkbenchFundDashboard();
+    renderFanStockSectorChart();
     return payload;
   } catch (error) {
     return null;
@@ -4214,6 +4203,7 @@ async function syncTenantDashboardState(action, dashboardConfig) {
   });
   const payload = await resp.json();
   if (!resp.ok || !payload.success) throw new Error(payload.error || 'dashboard_sync_failed');
+  currentTenantDashboardPayload = payload.dashboard || {};
   tenantFundDashboardRemoteState = normalizeInitialRemoteDashboardState(payload.dashboard || {});
   const tenantState = ensureTenantFundDashboardState(activeUser.tenant.id);
   tenantState.published = tenantFundDashboardRemoteState.published || tenantState.published;
@@ -8072,56 +8062,86 @@ function switchTab(tab) {
   }
 }
 
-function getFanStockVisitSeedEntries() {
-  const tenantSlug = String((currentDemoUser && currentDemoUser.tenant && currentDemoUser.tenant.slug) || '').trim();
-  return H5_FAN_STOCK_VISIT_SEED[tenantSlug] || H5_FAN_STOCK_VISIT_SEED.default || [];
+function getCurrentFanStockObservationPayload() {
+  const payload = currentTenantDashboardPayload && typeof currentTenantDashboardPayload === 'object'
+    ? currentTenantDashboardPayload
+    : (INITIAL_TENANT_DASHBOARD || {});
+  const observation = payload && typeof payload === 'object' ? payload.fan_stock_observation : null;
+  return observation && typeof observation === 'object' ? observation : {};
 }
 
-function buildFanStockSectorData() {
-  const seedEntries = Array.isArray(getFanStockVisitSeedEntries()) ? getFanStockVisitSeedEntries() : [];
-  const sectorMap = {};
-  seedEntries.forEach((entry) => {
-    const detail = (WATCHLIST_DETAILS_MAP || {})[String(entry.code || '').trim()];
-    if (!detail) return;
-    const sectorName = String(entry.sector || detail.industry || '其他板块').trim() || '其他板块';
-    if (!sectorMap[sectorName]) {
-      sectorMap[sectorName] = {
-        name: sectorName,
-        visits: 0,
-        note: String(entry.note || '').trim(),
-        stocks: [],
+async function trackFanStockObservation(stockCode, eventType, options) {
+  const activeUser = getActiveDemoUser();
+  if (!activeUser || activeUser.role !== 'investor') return null;
+  const tenantSlug = String((activeUser.tenant || {}).slug || '').trim();
+  const normalizedCode = normalizeStockLookupValue(stockCode);
+  if (!tenantSlug || !normalizedCode) return null;
+  const opts = options || {};
+  try {
+    const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/fan-stock-observation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        stock_code: normalizedCode,
+        event_type: eventType || 'watchlist_detail_view',
+        entry_point: opts.entryPoint || '',
+        source_detail: opts.sourceDetail || '',
+      }),
+    });
+    const payload = await resp.json();
+    if (!resp.ok || !payload.ok) throw new Error(payload.error || 'fan_stock_observation_track_failed');
+    if (payload.fan_stock_observation) {
+      currentTenantDashboardPayload = {
+        ...(currentTenantDashboardPayload || {}),
+        fan_stock_observation: payload.fan_stock_observation,
       };
     }
-    sectorMap[sectorName].visits += Number(entry.visits || 0);
-    if (!sectorMap[sectorName].note && entry.note) {
-      sectorMap[sectorName].note = String(entry.note || '').trim();
-    }
-    sectorMap[sectorName].stocks.push({
-      code: detail.code,
-      name: detail.name,
-      visits: Number(entry.visits || 0),
-    });
-  });
-  return Object.values(sectorMap)
-    .map((sector) => ({
-      ...sector,
-      stocks: sector.stocks.sort((a, b) => b.visits - a.visits),
-    }))
-    .sort((a, b) => b.visits - a.visits);
+    return payload;
+  } catch (error) {
+    return null;
+  }
 }
 
 function renderFanStockSectorChart() {
   const host = document.getElementById('wb-fan-stock-sector-chart');
   if (!host) return;
-  const sectors = buildFanStockSectorData();
+  const activeUser = getActiveDemoUser();
+  if (!activeUser || activeUser.role !== 'dav') {
+    host.innerHTML = '<div class="wb-stock-sector-empty"><div class="wb-stock-sector-summary">当前为投资者身份，不展示粉丝个股观察数据。</div></div>';
+    return;
+  }
+  const payload = getCurrentFanStockObservationPayload();
+  const sectors = Array.isArray(payload.sectors) ? payload.sectors : [];
+  const totals = payload && typeof payload.totals === 'object' ? payload.totals : {};
   if (!sectors.length) {
-    host.innerHTML = '<div class="wb-stock-sector-summary">当前还没有可展示的粉丝个股访问分布。</div>';
+    host.innerHTML = `
+      <div class="wb-stock-sector-empty">
+        <div class="wb-stock-sector-summary">${escapeHtml(payload.summary || '当前近 7 天还没有粉丝个股观察数据。')}</div>
+      </div>
+    `;
     return;
   }
   const maxVisits = Math.max(...sectors.map((item) => Number(item.visits || 0)), 1);
   host.innerHTML = `
     <div class="wb-stock-sector-summary">
-      近 7 天按板块归并 Hermes 与个股详情访问热度。先看粉丝在哪些板块停留最多，再点进具体股票查看自选股详情。
+      ${escapeHtml(payload.summary || '近 7 天按板块归并 Hermes 与个股详情访问热度。先看粉丝在哪些板块停留最多，再点进具体股票查看自选股详情。')}
+    </div>
+    <div class="wb-stock-sector-stats">
+      <div class="wb-stock-sector-stat">
+        <div class="wb-stock-sector-stat-label">活跃粉丝</div>
+        <div class="wb-stock-sector-stat-value">${Number(totals.active_fans || 0)}</div>
+        <div class="wb-stock-sector-stat-sub">${escapeHtml(payload.hot_sector ? `最热板块：${payload.hot_sector}` : '等待更多观察行为')}</div>
+      </div>
+      <div class="wb-stock-sector-stat">
+        <div class="wb-stock-sector-stat-label">详情查看</div>
+        <div class="wb-stock-sector-stat-value">${Number(totals.detail_views || 0)}</div>
+        <div class="wb-stock-sector-stat-sub">直接点开个股详情</div>
+      </div>
+      <div class="wb-stock-sector-stat">
+        <div class="wb-stock-sector-stat-label">Hermes 追问</div>
+        <div class="wb-stock-sector-stat-value">${Number(totals.hermes_queries || 0)}</div>
+        <div class="wb-stock-sector-stat-sub">围绕个股继续研究</div>
+      </div>
     </div>
     ${sectors.map((sector) => {
       const width = Math.max(18, Math.round((Number(sector.visits || 0) / maxVisits) * 100));
@@ -8133,6 +8153,11 @@ function renderFanStockSectorChart() {
               <div class="wb-stock-sector-meta">${escapeHtml(sector.note || '点击任意股票可直接进入自选股详情。')}</div>
             </div>
             <div class="wb-stock-sector-count">${Number(sector.visits || 0)} 次访问</div>
+          </div>
+          <div class="wb-stock-sector-breakdown">
+            <span class="wb-stock-sector-breakdown-pill">详情 ${Number(sector.detail_views || 0)}</span>
+            <span class="wb-stock-sector-breakdown-pill">Hermes ${Number(sector.hermes_queries || 0)}</span>
+            <span class="wb-stock-sector-breakdown-pill">活跃粉丝 ${Number(sector.user_count || 0)}</span>
           </div>
           <div class="wb-stock-sector-track">
             <div class="wb-stock-sector-fill" style="width:${width}%"></div>
@@ -8494,6 +8519,10 @@ async function openWatchlistDetail(stockCode, section) {
     const data = await resp.json();
     currentWatchlistDetail = data;
     renderWatchlistDetail(data, section);
+    trackFanStockObservation(stockCode, 'watchlist_detail_view', {
+      entryPoint: 'watchlist_detail',
+      sourceDetail: section || 'overview',
+    });
   } catch (e) {
     host.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">加载失败，请稍后重试</div>';
   }
