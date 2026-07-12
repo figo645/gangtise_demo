@@ -942,6 +942,41 @@ body { background: var(--surface-2); color: var(--text-main); }
   padding:0;
   width:fit-content;
 }
+.hermes-thinking-disclosure {
+  margin-top:8px;
+  border-top:1px solid rgba(17,24,39,0.06);
+  padding-top:8px;
+}
+.hermes-thinking-summary {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  cursor:pointer;
+  list-style:none;
+  user-select:none;
+  color:#7B8490;
+  font-size:10px;
+  line-height:1.4;
+}
+.hermes-thinking-summary::-webkit-details-marker { display:none; }
+.hermes-thinking-summary::marker { content:''; }
+.hermes-thinking-summary-main {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+}
+.hermes-thinking-toggle {
+  flex-shrink:0;
+  color:#9AA3AE;
+}
+.hermes-thinking-disclosure[open] .hermes-thinking-toggle::before {
+  content:'收起';
+}
+.hermes-thinking-disclosure:not([open]) .hermes-thinking-toggle::before {
+  content:'展开';
+}
 .hermes-section-label {
   font-size:10px;
   font-weight:700;
@@ -11008,6 +11043,28 @@ function renderHermesThinkingStream(lines, options = {}) {
   `;
 }
 
+function renderHermesThinkingDisclosure(lines, options = {}) {
+  const items = Array.isArray(lines) ? lines.filter(Boolean) : [];
+  if (!items.length) return '';
+  const label = String(options.label || '思考过程').trim() || '思考过程';
+  const openAttr = options.open ? ' open' : '';
+  const loadingDots = options.loading
+    ? `<span class="dot-anim" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>`
+    : '';
+  return `
+    <details class="hermes-thinking-disclosure"${openAttr}>
+      <summary class="hermes-thinking-summary">
+        <span class="hermes-thinking-summary-main">
+          <span>${escapeHtml(label)}</span>
+          ${loadingDots}
+        </span>
+        <span class="hermes-thinking-toggle" aria-hidden="true"></span>
+      </summary>
+      ${renderHermesThinkingStream(items, options)}
+    </details>
+  `;
+}
+
 function dedupeHermesTextItems(items) {
   const seen = new Set();
   return (Array.isArray(items) ? items : []).map(item => String(item || '').trim()).filter(item => {
@@ -11091,7 +11148,7 @@ function renderHermesTextArtifact(artifact, agentTrace) {
       <div class="hermes-transcript-kicker">Hermes</div>
       <div class="hermes-transcript-text">${escapeHtml(artifact.headline || '')}</div>
       ${artifact.summary ? `<div class="hermes-transcript-body">${escapeHtml(artifact.summary)}</div>` : ''}
-      ${thoughtLines.length ? `<div class="hermes-thinking-inline" style="margin-top:2px">思考过程</div>${renderHermesThinkingStream(thoughtLines)}` : ''}
+      ${renderHermesThinkingDisclosure(thoughtLines)}
       ${bodyHtml}
       ${bulletHtml}
       ${followupHtml}
@@ -11150,8 +11207,12 @@ function renderHermesThread() {
       return `
         <div class="hermes-transcript-entry assistant">
           <div class="hermes-transcript-kicker">Hermes</div>
-          <div class="hermes-thinking-inline">深度思考中<span class="dot-anim"><span>.</span><span>.</span><span>.</span></span></div>
-          ${renderHermesThinkingStream(loadingThoughts.lines, { activeIndex: loadingThoughts.activeIndex })}
+          ${renderHermesThinkingDisclosure(loadingThoughts.lines, {
+            activeIndex: loadingThoughts.activeIndex,
+            label: '深度思考中',
+            loading: true,
+            open: true,
+          })}
         </div>
       `;
     }
@@ -11235,7 +11296,7 @@ function renderHermesAnalysisCards(artifact, agentTrace) {
       <div class="hermes-evidence-row" style="margin-top:8px">${evidenceHtml}</div>
       <div class="hermes-result-subtitle" style="margin-top:10px">${escapeHtml(artifact.footer || '')}</div>
     </div>
-    ${thoughtLines.length ? `<div class="hermes-thinking-inline">思考过程</div>${renderHermesThinkingStream(thoughtLines)}` : ''}
+    ${renderHermesThinkingDisclosure(thoughtLines)}
   `;
 }
 
