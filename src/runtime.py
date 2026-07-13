@@ -11,6 +11,7 @@ import hashlib
 import base64
 import csv
 import io
+import zipfile
 from pathlib import Path
 from html import escape as html_escape
 from html.parser import HTMLParser
@@ -441,6 +442,10 @@ DEFAULT_SITE_CONFIG = {
     "knowledge_ingestion": {
         "user_preview_enabled": False,
     },
+    "hermes_settings": {
+        "prompt_scope_guard_enabled": True,
+        "investor_access_enabled": True,
+    },
     "evidence_chain": {
         "filter_prompt_system": (
             "你是知识检索相关性过滤助手。"
@@ -522,7 +527,7 @@ DEFAULT_SITE_CONFIG = {
         "daily_review": True,
         "knowledge": True,
         "community": False,
-        "hermes": False,
+        "hermes": True,
         "channel_module": True,
         "analytics_module": True,
         "system_module": True,

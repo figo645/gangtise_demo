@@ -3,6 +3,318 @@ from src.domain.core_services import *
 from src.domain.market_services import *
 from src.domain.ai_services import *
 
+FAN_STOCK_OBSERVATION_WINDOW_DAYS = 7
+FAN_STOCK_OBSERVATION_EVENT_TYPES = {"watchlist_detail_view"}
+FAN_STOCK_HERMES_INTENTS = {"watchlist_fundamental", "multi_tool_research"}
+
+
+def _normalize_fan_stock_event_type(value):
+    event_type = str(value or "").strip().lower()
+    return event_type if event_type in FAN_STOCK_OBSERVATION_EVENT_TYPES else "watchlist_detail_view"
+
+
+def _normalize_fan_stock_code(stock_code="", stock_name=""):
+    code = find_watchlist_code_from_text(stock_code)
+    if code:
+        return code
+    return find_watchlist_code_from_text(stock_name)
+
+
+def _extract_recent_hermes_stock_codes(tags, memory_summary):
+    raw_values = []
+    if isinstance(tags, dict):
+        raw_values.extend(tags.get("focus_symbols") if isinstance(tags.get("focus_symbols"), list) else [])
+    if isinstance(memory_summary, dict):
+        raw_values.extend(memory_summary.get("focus_symbols") if isinstance(memory_summary.get("focus_symbols"), list) else [])
+    codes = []
+    for item in raw_values:
+        normalized = _normalize_fan_stock_code(stock_code=item)
+        if normalized and normalized not in codes:
+            codes.append(normalized)
+    return codes
+
+
+def _build_fan_stock_sector_note(sector_name, top_stock, sector_bucket, detail):
+    stock_name = str((top_stock or {}).get("name") or (detail or {}).get("name") or sector_name or "该板块").strip() or sector_name or "该板块"
+    focus_text = str(
+        (detail or {}).get("focus")
+        or ((detail or {}).get("fundamental") or {}).get("summary")
+        or (detail or {}).get("signal_summary")
+        or sector_name
+        or "相关主线"
+    ).strip()
+    focus_text = re.sub(r"\s+", " ", focus_text)
+    focus_text = focus_text[:42] + ("…" if len(focus_text) > 42 else "")
+    if int((sector_bucket or {}).get("hermes_queries") or 0) >= int((sector_bucket or {}).get("detail_views") or 0):
+        return f"粉丝更常通过 Hermes 追问 {stock_name}，关注点集中在 {focus_text}。"
+    return f"{stock_name} 的详情页被反复打开，粉丝主要在看 {focus_text}。"
+
+
+def record_fan_stock_observation_event(
+    tenant_slug="",
+    user_profile_id="",
+    user_role="investor",
+    stock_code="",
+    stock_name="",
+    event_type="watchlist_detail_view",
+    entry_point="",
+    source_detail="",
+):
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    normalized_user = str(user_profile_id or "").strip()
+    normalized_role = str(user_role or "").strip().lower() or "investor"
+    if not normalized_tenant or not normalized_user or normalized_role != "investor":
+        return None
+    normalized_code = _normalize_fan_stock_code(stock_code=stock_code, stock_name=stock_name)
+    details = gen_watchlist_details()
+    detail = details.get(normalized_code)
+    if not detail:
+        return None
+    payload = {
+        "tenant_slug": normalized_tenant,
+        "user_profile_id": normalized_user,
+        "user_role": normalized_role,
+        "stock_code": detail.get("code") or normalized_code,
+        "stock_name": detail.get("name") or normalized_code,
+        "sector_name": detail.get("industry") or detail.get("focus") or "其他板块",
+        "event_type": _normalize_fan_stock_event_type(event_type),
+        "entry_point": str(entry_point or "").strip()[:80],
+        "source_detail": str(source_detail or "").strip()[:120],
+        "created_at": now_ts(),
+    }
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO fan_stock_observation_events (
+            tenant_slug, user_profile_id, user_role, stock_code, stock_name, sector_name,
+            event_type, entry_point, source_detail, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            payload["tenant_slug"],
+            payload["user_profile_id"],
+            payload["user_role"],
+            payload["stock_code"],
+            payload["stock_name"],
+            payload["sector_name"],
+            payload["event_type"],
+            payload["entry_point"],
+            payload["source_detail"],
+            payload["created_at"],
+        ),
+    )
+    db.commit()
+    return payload
+
+
+def build_fan_stock_observation_payload(tenant=None, fallback_mode=False):
+    tenant = tenant or get_tenant_by_slug()
+    tenant_slug = str((tenant or {}).get("slug") or "").strip().lower()
+    details_map = gen_watchlist_details()
+    active_codes = [
+        str((item or {}).get("code") or "").strip()
+        for item in (build_tenant_watchlist_hub_items(tenant, details_map) or [])
+        if str((item or {}).get("code") or "").strip()
+    ]
+    cutoff = (datetime.now() - timedelta(days=FAN_STOCK_OBSERVATION_WINDOW_DAYS)).strftime("%Y-%m-%d %H:%M:%S")
+    detail_rows = []
+    hermes_rows = []
+    if not fallback_mode and tenant_slug:
+        try:
+            db = get_db()
+            detail_rows = db.execute(
+                """
+                SELECT user_profile_id, stock_code, stock_name, sector_name, event_type, entry_point, source_detail, created_at
+                FROM fan_stock_observation_events
+                WHERE tenant_slug = ? AND created_at >= ?
+                ORDER BY created_at DESC, id DESC
+                """,
+                (tenant_slug, cutoff),
+            ).fetchall()
+            hermes_rows = db.execute(
+                """
+                SELECT user_profile_id, question_text, intent, tags_json, memory_summary_json, created_at
+                FROM hermes_conversation_turns
+                WHERE tenant_slug = ? AND user_role = ? AND created_at >= ?
+                ORDER BY created_at DESC, id DESC
+                """,
+                (tenant_slug, "investor", cutoff),
+            ).fetchall()
+        except Exception as exc:
+            if not is_db_unavailable_error(exc):
+                raise
+            detail_rows = []
+            hermes_rows = []
+    sector_map = {}
+    all_active_users = set()
+    detail_view_total = 0
+    hermes_query_total = 0
+
+    def ensure_sector_bucket(sector_name):
+        normalized_sector = str(sector_name or "其他板块").strip() or "其他板块"
+        if normalized_sector not in sector_map:
+            sector_map[normalized_sector] = {
+                "name": normalized_sector,
+                "visits": 0,
+                "detail_views": 0,
+                "hermes_queries": 0,
+                "users": set(),
+                "stocks_map": {},
+                "note": "",
+            }
+        return sector_map[normalized_sector]
+
+    def apply_stock_signal(stock_code, user_profile_id="", signal_type="detail"):
+        nonlocal detail_view_total, hermes_query_total
+        normalized_code = _normalize_fan_stock_code(stock_code=stock_code)
+        detail = details_map.get(normalized_code)
+        if not detail:
+            return
+        stock_name = str(detail.get("name") or normalized_code).strip() or normalized_code
+        sector_name = str(detail.get("industry") or detail.get("focus") or "其他板块").strip() or "其他板块"
+        sector_bucket = ensure_sector_bucket(sector_name)
+        stock_bucket = sector_bucket["stocks_map"].get(normalized_code)
+        if not stock_bucket:
+            stock_bucket = {
+                "code": normalized_code,
+                "name": stock_name,
+                "sector": sector_name,
+                "visits": 0,
+                "detail_views": 0,
+                "hermes_queries": 0,
+                "users": set(),
+                "hint": str(
+                    detail.get("signal_summary")
+                    or ((detail.get("fundamental") or {}).get("summary"))
+                    or detail.get("focus")
+                    or sector_name
+                ).strip(),
+            }
+            sector_bucket["stocks_map"][normalized_code] = stock_bucket
+        if user_profile_id:
+            stock_bucket["users"].add(str(user_profile_id).strip())
+            sector_bucket["users"].add(str(user_profile_id).strip())
+            all_active_users.add(str(user_profile_id).strip())
+        stock_bucket["visits"] += 1
+        sector_bucket["visits"] += 1
+        if signal_type == "hermes":
+            stock_bucket["hermes_queries"] += 1
+            sector_bucket["hermes_queries"] += 1
+            hermes_query_total += 1
+        else:
+            stock_bucket["detail_views"] += 1
+            sector_bucket["detail_views"] += 1
+            detail_view_total += 1
+
+    for row in detail_rows:
+        item = dict(row) if isinstance(row, dict) else {}
+        apply_stock_signal(item.get("stock_code"), user_profile_id=item.get("user_profile_id"), signal_type="detail")
+
+    for row in hermes_rows:
+        item = dict(row) if isinstance(row, dict) else {}
+        if str(item.get("intent") or "").strip() not in FAN_STOCK_HERMES_INTENTS:
+            continue
+        tags = safe_json_loads(item.get("tags_json"), {})
+        memory_summary = safe_json_loads(item.get("memory_summary_json"), {})
+        codes = _extract_recent_hermes_stock_codes(tags, memory_summary)
+        if not codes:
+            fallback_code = _normalize_fan_stock_code(
+                stock_code=item.get("question_text"),
+                stock_name=item.get("question_text"),
+            )
+            codes = [fallback_code] if fallback_code else []
+        for code in codes:
+            apply_stock_signal(code, user_profile_id=item.get("user_profile_id"), signal_type="hermes")
+
+    sectors = []
+    top_stocks = []
+    for sector_name, sector_bucket in sector_map.items():
+        stocks = sorted(
+            sector_bucket["stocks_map"].values(),
+            key=lambda item: (-int(item.get("visits") or 0), -int(item.get("hermes_queries") or 0), str(item.get("code") or "")),
+        )
+        if not stocks:
+            continue
+        top_stock = stocks[0]
+        top_detail = details_map.get(top_stock.get("code")) or {}
+        sector_bucket["note"] = _build_fan_stock_sector_note(sector_name, top_stock, sector_bucket, top_detail)
+        normalized_stocks = []
+        for stock in stocks[:6]:
+            normalized_stock = {
+                "code": stock.get("code") or "",
+                "name": stock.get("name") or stock.get("code") or "",
+                "sector": stock.get("sector") or sector_name,
+                "visits": int(stock.get("visits") or 0),
+                "detail_views": int(stock.get("detail_views") or 0),
+                "hermes_queries": int(stock.get("hermes_queries") or 0),
+                "user_count": len(stock.get("users") or []),
+                "hint": stock.get("hint") or "",
+            }
+            normalized_stocks.append(normalized_stock)
+            top_stocks.append(normalized_stock)
+        sectors.append(
+            {
+                "name": sector_name,
+                "visits": int(sector_bucket.get("visits") or 0),
+                "detail_views": int(sector_bucket.get("detail_views") or 0),
+                "hermes_queries": int(sector_bucket.get("hermes_queries") or 0),
+                "user_count": len(sector_bucket.get("users") or []),
+                "note": sector_bucket.get("note") or "",
+                "stocks": normalized_stocks,
+            }
+        )
+
+    sectors = sorted(
+        sectors,
+        key=lambda item: (-int(item.get("visits") or 0), -int(item.get("hermes_queries") or 0), str(item.get("name") or "")),
+    )
+    top_stocks = sorted(
+        top_stocks,
+        key=lambda item: (-int(item.get("visits") or 0), -int(item.get("hermes_queries") or 0), str(item.get("code") or "")),
+    )[:6]
+    total_interactions = detail_view_total + hermes_query_total
+    hot_sector = sectors[0]["name"] if sectors else ""
+    return {
+        "window_days": FAN_STOCK_OBSERVATION_WINDOW_DAYS,
+        "summary": (
+            f"近 {FAN_STOCK_OBSERVATION_WINDOW_DAYS} 天共记录 {total_interactions} 次粉丝个股观察行为，"
+            f"其中详情查看 {detail_view_total} 次、Hermes 个股追问 {hermes_query_total} 次。"
+        ) if total_interactions else "当前近 7 天还没有粉丝个股观察数据。等粉丝查看个股详情或发起 Hermes 个股分析后，这里会自动开始累计。",
+        "totals": {
+            "interactions": total_interactions,
+            "detail_views": detail_view_total,
+            "hermes_queries": hermes_query_total,
+            "active_fans": len(all_active_users),
+            "sector_count": len(sectors),
+        },
+        "hot_sector": hot_sector,
+        "sectors": sectors,
+        "top_stocks": top_stocks,
+        "fallback_mode": bool(fallback_mode),
+        "tracked_stock_codes": active_codes[:8],
+    }
+
+
+def build_tenant_watchlist_hub_items(tenant, watchlist_details_map):
+    is_lisa = tenant["slug"] == "lisa"
+    target_codes = ["00700", "03690", "09988"] if is_lisa else ["688981", "00700", "600519"]
+    return [
+        {
+            "name": detail["name"],
+            "code": detail["code"],
+            "market": "港股" if detail.get("market") == "HK" else "A股",
+            "focus": detail.get("focus") or detail.get("industry") or "个股跟踪",
+            "change": f"{detail.get('change_pct', 0):+.1f}%",
+            "thesis": detail.get("signal_summary") or detail.get("fundamental", {}).get("summary") or "继续跟踪",
+            "alert_level": detail.get("alert_level") or "normal",
+            "alert_text": detail.get("alert_text") or "当前无明显预警",
+            "related_indicator_names": detail.get("related_indicator_names") or [],
+        }
+        for detail in [watchlist_details_map.get(code) for code in target_codes]
+        if detail
+    ]
+
+
 def build_tenant_dashboard_payload(tenant=None):
     tenant = tenant or get_tenant_by_slug()
     workbench = gen_kol_workbench(tenant)
@@ -23,6 +335,7 @@ def build_tenant_dashboard_payload(tenant=None):
             "base_indicators": build_dashboard_base_indicator_options(tenant),
             "available_tags": build_tenant_smart_indicator_tag_catalog(tenant),
         },
+        "fan_stock_observation": workbench.get("fan_stock_observation") or {},
         "reviews": workbench["published_reviews"],
         "stats": workbench["stats"],
     }
@@ -300,6 +613,8 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
     broadcast_history = message_center_state["broadcasts"]
     review_smart_cards = build_review_smart_cards(tenant, fund_dashboard, watchlist_details_map, news_items)
     review_generation_cfg = get_review_generation_config()
+    watchlist_hub_items = build_tenant_watchlist_hub_items(tenant, watchlist_details_map)
+    fan_stock_observation = build_fan_stock_observation_payload(tenant, fallback_mode=fallback_mode)
     return {
         "tenant": tenant,
         "fallback_mode": fallback_mode,
@@ -579,25 +894,9 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
         },
         "watchlist_hub": {
             "summary": "自选股在前台已经改成顶部直接输入股票代码，进入个股详情后再添加自选；现在工作台与 H5 共用同一套指标湖增强信号，能同步看到行业预警、核心指标和异常摘要。",
-            "items": [
-                {
-                    "name": detail["name"],
-                    "code": detail["code"],
-                    "market": "港股" if detail.get("market") == "HK" else "A股",
-                    "focus": detail.get("focus") or detail.get("industry") or "个股跟踪",
-                    "change": f"{detail.get('change_pct', 0):+.1f}%",
-                    "thesis": detail.get("signal_summary") or detail.get("fundamental", {}).get("summary") or "继续跟踪",
-                    "alert_level": detail.get("alert_level") or "normal",
-                    "alert_text": detail.get("alert_text") or "当前无明显预警",
-                    "related_indicator_names": detail.get("related_indicator_names") or [],
-                }
-                for detail in (
-                    [watchlist_details_map.get(code) for code in ["00700", "03690", "09988"]] if is_lisa
-                    else [watchlist_details_map.get(code) for code in ["688981", "00700", "600519"]]
-                )
-                if detail
-            ],
+            "items": watchlist_hub_items,
         },
+        "fan_stock_observation": fan_stock_observation,
         "fund_dashboard": fund_dashboard,
         "fund_dashboard_state": fund_dashboard_state,
         "indicator_hub": indicator_hub,
@@ -613,4 +912,3 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
             {"side": "大V工作台保留", "items": ["粉丝消息", "群发助手", "复盘生产", "Hermes 研究与租户知识经营"]},
         ],
     }
-

@@ -67,6 +67,72 @@ def api_hermes_query():
         return jsonify({"ok": False, "error": "hermes_query_failed"}), 500
     return jsonify(result)
 
+
+@app.route("/api/hermes/usage/current")
+def api_hermes_usage_current():
+    requested_tenant = str(request.args.get("tenant_slug") or "").strip().lower()
+    requested_user = str(request.args.get("user_profile_id") or "").strip()
+    try:
+        site_config = get_site_config()
+        profiles = get_h5_login_users(site_config)
+        current = get_current_demo_profile(site_config)
+        matched = next(
+            (
+                item for item in profiles
+                if str(item.get("username") or "").strip() == (requested_user or str((current or {}).get("username") or "").strip())
+            ),
+            None,
+        )
+        tenant_slug = requested_tenant or str((((matched or current) or {}).get("tenant") or {}).get("slug") or ((matched or current) or {}).get("tenant_slug") or "").strip().lower()
+        user_profile_id = requested_user or str((matched or current or {}).get("username") or "").strip()
+        if not user_profile_id:
+            return jsonify({"ok": False, "error": "user_profile_id_required"}), 400
+        quota_total = int((matched or current or {}).get("computeCredits") or 0)
+        usage = build_user_hermes_usage_snapshot(
+            tenant_slug=tenant_slug,
+            user_profile_id=user_profile_id,
+            quota_total=quota_total,
+        )
+        return jsonify({"ok": True, "usage": usage})
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        app.logger.warning("Database unavailable while loading current Hermes usage, using fallback credits")
+        fallback_config = normalize_site_config(DEFAULT_SITE_CONFIG)
+        profiles, current = resolve_demo_profile_fallback(fallback_config)
+        matched = next(
+            (
+                item for item in profiles
+                if str(item.get("username") or "").strip() == (requested_user or str((current or {}).get("username") or "").strip())
+            ),
+            None,
+        )
+        tenant_slug = requested_tenant or str((((matched or current) or {}).get("tenant") or {}).get("slug") or ((matched or current) or {}).get("tenant_slug") or "").strip().lower()
+        user_profile_id = requested_user or str((matched or current or {}).get("username") or "").strip()
+        if not user_profile_id:
+            return jsonify({"ok": False, "error": "user_profile_id_required"}), 400
+        quota_total = int((matched or current or {}).get("computeCredits") or 0)
+        return jsonify(
+            {
+                "ok": True,
+                "usage": {
+                    "tenant_slug": tenant_slug,
+                    "user_profile_id": user_profile_id,
+                    "user_display_name": str((matched or current or {}).get("name") or user_profile_id).strip() or user_profile_id,
+                    "quota_total": quota_total,
+                    "used_count": 0,
+                    "remaining_count": quota_total,
+                    "total_call_count": 0,
+                    "today_call_count": 0,
+                    "month_call_count": 0,
+                    "month_compute_units": 0,
+                    "latest_turn_at": "",
+                    "generated_at": now_ts(),
+                    "fallback_mode": True,
+                },
+            }
+        )
+
 def gen_dm_conversations(tenant_slug=None, include_fan_threads=True):
     tenant = get_tenant_by_slug(tenant_slug)
     state = resolve_tenant_message_center_state(tenant, tenant.get("message_center_state"))

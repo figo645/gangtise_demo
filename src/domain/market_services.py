@@ -2685,6 +2685,33 @@ def build_indicator_kline_from_rows(rows, anomalies):
     }
 
 
+def build_indicator_kline_from_series_points(series_points, anomalies, status="attention", indicator_code=""):
+    points = [dict(item) for item in (series_points or []) if isinstance(item, dict) and item.get("date")]
+    if not points:
+        return build_simulated_indicator_kline(indicator_code or "indicator_fallback", status=status or "attention")
+    rows = []
+    previous_close = None
+    for index, point in enumerate(points):
+        close_value = round(NumberLike(point.get("value")), 2)
+        if previous_close is None:
+            previous_close = close_value * 0.994 if close_value else 0.0
+        open_value = round(previous_close, 2)
+        base_high = max(open_value, close_value)
+        base_low = min(open_value, close_value)
+        spread = max(abs(close_value - open_value) * 0.38, max(close_value * 0.0035, 0.12))
+        rows.append(
+            {
+                "date": str(point.get("date") or "").strip(),
+                "open": round(open_value, 2),
+                "high": round(base_high + spread, 2),
+                "low": round(max(0.01, base_low - spread), 2),
+                "close": close_value,
+            }
+        )
+        previous_close = close_value
+    return build_real_indicator_kline_payload(rows[-60:])
+
+
 def build_indicator_hub_from_store():
     definitions = list_indicator_definitions()
     source_map = {}
@@ -2756,6 +2783,14 @@ def build_indicator_hub_from_store():
         else:
             data_mode = "real"
             data_mode_label = "真实数据"
+        history_series = series_map.get(definition["indicator_code"], [])
+        raw_kline_rows = kline_map.get(definition["indicator_code"], [])
+        history_kline = build_indicator_kline_from_rows(raw_kline_rows, anomalies) if raw_kline_rows else build_indicator_kline_from_series_points(
+            history_series,
+            anomalies,
+            status=latest.get("latest_status") or definition.get("status_hint") or "attention",
+            indicator_code=definition["indicator_code"],
+        )
         item = {
             "id": definition["indicator_code"],
             "name": definition["indicator_name"],
@@ -2783,11 +2818,11 @@ def build_indicator_hub_from_store():
                     "status": point["status"],
                     "event": data_mode == "real" and "真实指标点已写入指标湖" or (data_mode == "derived" and "已由真实因子推导写入指标湖" or "模拟指标点已写入指标湖"),
                 }
-                for point in series_map.get(definition["indicator_code"], [])[-6:]
+                for point in history_series[-6:]
             ],
-            "history_series": series_map.get(definition["indicator_code"], []),
+            "history_series": history_series,
             "history_anomalies": anomalies,
-            "history_kline": build_indicator_kline_from_rows(kline_map.get(definition["indicator_code"], []), anomalies),
+            "history_kline": history_kline,
             "source_type": definition.get("source_type") or "mock",
             "source_type_label": definition.get("source_type_label") or "模拟指标",
             "provider": definition.get("provider") or (primary_source["provider"] if primary_source else "平台数据层"),

@@ -103,6 +103,22 @@ body { background: var(--surface-2); color: var(--text-main); }
 .modal-textarea { width:100%; background:rgba(13,27,42,0.6); border:1px solid rgba(200,169,110,0.2); border-radius:10px; color:var(--white); font-size:13px; padding:12px; resize:none; height:100px; font-family:var(--font-main); }
 .modal-textarea::placeholder { color:var(--gray-400); }
 .modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:12px; }
+.review-flow-actions {
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.review-flow-actions .btn-outline:first-child {
+  margin-right:auto;
+}
+.review-flow-actions .btn-gold,
+.review-flow-actions .btn-outline {
+  padding:8px 14px;
+  font-size:12px;
+  line-height:1.2;
+  border-radius:999px;
+  white-space:nowrap;
+}
 
 /* ===== HERMES ===== */
 .hermes-shell {
@@ -331,14 +347,32 @@ body { background: var(--surface-2); color: var(--text-main); }
   gap:4px;
   width:100%;
   min-width:0;
+  max-width:100%;
+  overflow:hidden;
 }
 .hermes-transcript-entry.user {
   justify-items:end;
   text-align:right;
 }
 .hermes-transcript-entry.assistant {
-  justify-items:start;
+  justify-items:stretch;
   text-align:left;
+  align-items:start;
+}
+.hermes-transcript-entry.assistant .hermes-transcript-kicker {
+  justify-self:start;
+}
+.hermes-transcript-entry.assistant .hermes-transcript-text,
+.hermes-transcript-entry.assistant .hermes-transcript-body,
+.hermes-transcript-entry.assistant .hermes-transcript-meta,
+.hermes-transcript-entry.assistant .hermes-thinking-inline,
+.hermes-transcript-entry.assistant .hermes-thinking-stream,
+.hermes-transcript-entry.assistant .hermes-bullet-list,
+.hermes-transcript-entry.assistant .hermes-evidence-row {
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  box-sizing:border-box;
 }
 .hermes-transcript-kicker {
   font-size:9px;
@@ -353,6 +387,8 @@ body { background: var(--surface-2); color: var(--text-main); }
   color:var(--text-main);
   white-space:pre-line;
   word-break:break-word;
+  overflow-wrap:anywhere;
+  max-width:100%;
 }
 .hermes-transcript-entry.user .hermes-transcript-text {
   max-width:84%;
@@ -364,11 +400,39 @@ body { background: var(--surface-2); color: var(--text-main); }
   color:#66717F;
   white-space:pre-line;
   word-break:break-word;
+  overflow-wrap:anywhere;
+  max-width:100%;
 }
 .hermes-transcript-meta {
   font-size:9px;
   line-height:1.6;
   color:#98A2AE;
+  white-space:normal;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+  max-width:100%;
+}
+.hermes-transcript-actions {
+  display:flex;
+  gap:8px;
+  align-items:center;
+  flex-wrap:wrap;
+  margin-top:4px;
+}
+.hermes-transcript-action {
+  border:none;
+  background:#F3F8FE;
+  color:#1F497D;
+  border-radius:999px;
+  padding:5px 9px;
+  font-size:10px;
+  font-weight:700;
+  line-height:1;
+  cursor:pointer;
+}
+.hermes-transcript-action.is-active {
+  background:rgba(200,169,110,0.16);
+  color:#8A5B00;
 }
 .hermes-question-input {
   width:100%;
@@ -403,6 +467,8 @@ body { background: var(--surface-2); color: var(--text-main); }
   font-size:11px;
   color:#1F497D;
   line-height:1.4;
+  max-width:100%;
+  min-width:0;
 }
 .hermes-composer-chip button {
   border:none;
@@ -412,6 +478,13 @@ body { background: var(--surface-2); color: var(--text-main); }
   cursor:pointer;
   padding:0;
   line-height:1;
+  flex-shrink:0;
+}
+.hermes-composer-chip span {
+  min-width:0;
+  max-width:100%;
+  word-break:break-word;
+  overflow-wrap:anywhere;
 }
 .hermes-composer-row {
   display:flex;
@@ -432,6 +505,26 @@ body { background: var(--surface-2); color: var(--text-main); }
   cursor:pointer;
   flex-shrink:0;
 }
+.hermes-composer-toggle {
+  min-width:68px;
+  height:36px;
+  border:none;
+  border-radius:999px;
+  background:#F5F7FA;
+  border:1px solid rgba(17,24,39,0.08);
+  color:#4E5968;
+  font-size:11px;
+  font-weight:700;
+  line-height:1;
+  cursor:pointer;
+  flex-shrink:0;
+  padding:0 12px;
+}
+.hermes-composer-toggle.is-active {
+  color:#8A5B00;
+  background:rgba(200,169,110,0.14);
+  border-color:rgba(200,169,110,0.32);
+}
 .hermes-composer-send {
   border:none;
   background:linear-gradient(135deg,var(--gold-dark),var(--gold));
@@ -444,6 +537,32 @@ body { background: var(--surface-2); color: var(--text-main); }
   cursor:pointer;
   white-space:nowrap;
   flex-shrink:0;
+}
+.hermes-composer-send.is-voice {
+  width:44px;
+  min-width:44px;
+  min-height:44px;
+  padding:0;
+  border-radius:999px;
+  background:#F5F7FA;
+  border:1px solid rgba(17,24,39,0.08);
+  color:#111827;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.hermes-composer-send.is-voice.is-recording {
+  background:rgba(200,169,110,0.14);
+  border-color:rgba(200,169,110,0.34);
+  color:#8A5B00;
+}
+.hermes-composer-send.is-voice.is-processing {
+  color:#6B7280;
+}
+.hermes-composer-send-icon {
+  width:18px;
+  height:18px;
+  display:block;
 }
 .hermes-action-row { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:12px; flex-wrap:wrap; }
 .hermes-analyze-btn {
@@ -515,30 +634,134 @@ body { background: var(--surface-2); color: var(--text-main); }
   padding:8px 2px 6px;
 }
 .hermes-lobster-composer {
-  display:flex;
-  gap:8px;
-  align-items:end;
+  display:grid;
+  gap:10px;
   min-width:0;
+  width:100%;
+  max-width:100%;
+  box-sizing:border-box;
+  overflow:hidden;
+  padding:12px 12px 10px;
+  border:1px solid rgba(47,116,192,0.24);
+  border-radius:22px;
+  background:#FFFFFF;
+  box-shadow:0 10px 28px rgba(47,116,192,0.06);
 }
 .hermes-lobster-question {
-  flex:1;
-  min-height:48px;
+  width:100%;
+  min-height:64px;
   max-height:160px;
-  border:1px solid rgba(17,24,39,0.08);
-  background:#FAFBFC;
+  border:none;
+  background:transparent;
   color:var(--text-main);
-  border-radius:14px;
-  padding:10px 12px;
-  font-size:12px;
-  line-height:1.6;
+  border-radius:0;
+  padding:0;
+  font-size:14px;
+  line-height:1.55;
   resize:none;
   min-width:0;
   outline:none;
   font-family:var(--font-main);
   box-sizing:border-box;
 }
+.hermes-lobster-question::placeholder {
+  color:#B8BDC6;
+}
+.hermes-lobster-toolbar {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  min-width:0;
+}
+.hermes-lobster-toolbar-left {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:0;
+  flex:1;
+}
+.hermes-lobster-divider {
+  width:1px;
+  height:20px;
+  background:rgba(17,24,39,0.10);
+  flex:0 0 auto;
+}
+.hermes-lobster-tool-row {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+  overflow-x:auto;
+  scrollbar-width:none;
+}
+.hermes-lobster-tool-row::-webkit-scrollbar {
+  display:none;
+}
+.hermes-lobster-tool {
+  border:none;
+  background:transparent;
+  color:#171A1F;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:4px 2px;
+  font-size:11px;
+  font-weight:600;
+  line-height:1;
+  cursor:pointer;
+  white-space:nowrap;
+  flex:0 0 auto;
+}
+.hermes-lobster-tool-icon {
+  font-size:15px;
+  line-height:1;
+}
+.hermes-lobster-tool.is-active {
+  color:#8A5B00;
+}
 .hermes-lobster-send {
-  flex-shrink:0;
+  flex:0 0 auto;
+}
+@media (max-width: 430px) {
+  .hermes-lobster-composer {
+    gap:7px;
+    padding:10px 10px 9px;
+  }
+  .hermes-composer-plus {
+    width:34px;
+    height:34px;
+    font-size:18px;
+  }
+  .hermes-composer-toggle {
+    min-width:58px;
+    height:34px;
+    padding:0 8px;
+    font-size:10px;
+  }
+  .hermes-composer-send {
+    min-height:34px;
+    padding:0 12px;
+    font-size:11px;
+  }
+  .hermes-composer-send.is-voice {
+    width:38px;
+    min-width:38px;
+    min-height:38px;
+  }
+  .hermes-lobster-question {
+    min-height:56px;
+    font-size:13px;
+  }
+  .hermes-lobster-toolbar-left {
+    gap:8px;
+  }
+  .hermes-lobster-tool {
+    font-size:10px;
+  }
+  .hermes-lobster-tool-icon {
+    font-size:14px;
+  }
 }
 .hermes-plus-sheet-note {
   font-size:12px;
@@ -627,9 +850,9 @@ body { background: var(--surface-2); color: var(--text-main); }
 .hermes-metric-note { font-size:10px; color:var(--text-sub); line-height:1.55; margin-top:3px; }
 .hermes-bullet-list { display:flex; flex-direction:column; gap:6px; align-items:flex-start; }
 .hermes-bullet-item {
-  display:inline-flex;
+  display:block;
   width:fit-content;
-  max-width:88%;
+  max-width:min(100%, 88%);
   background:#F5F7FA;
   border:none;
   border-radius:999px;
@@ -637,6 +860,10 @@ body { background: var(--surface-2); color: var(--text-main); }
   font-size:10px;
   color:#4E5968;
   line-height:1.55;
+  white-space:normal;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+  box-sizing:border-box;
 }
 .hermes-evidence-row { display:flex; gap:8px; flex-wrap:wrap; }
 .hermes-evidence-chip {
@@ -645,6 +872,51 @@ body { background: var(--surface-2); color: var(--text-main); }
   background:rgba(47,116,192,0.08);
   border-radius:999px;
   padding:5px 9px;
+}
+.hermes-chart-shell {
+  margin-top:10px;
+  border:1px solid rgba(17,24,39,0.06);
+  border-radius:14px;
+  background:#F8FAFC;
+  padding:10px;
+  overflow:hidden;
+}
+.hermes-chart-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  margin-bottom:8px;
+  flex-wrap:wrap;
+}
+.hermes-chart-title {
+  font-size:11px;
+  font-weight:700;
+  color:#1F2937;
+}
+.hermes-chart-legend {
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  font-size:10px;
+  color:#7B8490;
+}
+.hermes-chart-legend span {
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+}
+.hermes-chart-swatch {
+  width:10px;
+  height:2px;
+  border-radius:999px;
+  display:inline-block;
+}
+.hermes-chart-svg {
+  display:block;
+  width:100%;
+  height:auto;
+  aspect-ratio:320 / 180;
 }
 .hermes-loading { display:flex; align-items:center; gap:8px; }
 .hermes-loading-text { font-size:13px; color:var(--gold); }
@@ -672,6 +944,7 @@ body { background: var(--surface-2); color: var(--text-main); }
   gap:7px;
   width:100%;
   max-width:100%;
+  min-width:0;
   padding:0;
   background:none;
   border:none;
@@ -694,7 +967,17 @@ body { background: var(--surface-2); color: var(--text-main); }
   background:var(--gold);
   box-shadow:none;
 }
-.hermes-thinking-text { min-width:0; word-break:break-word; }
+.hermes-bullet-item.is-clickable {
+  cursor:pointer;
+  transition:background .18s ease,color .18s ease,transform .18s ease;
+}
+.hermes-bullet-item.is-clickable:hover {
+  background:#ECEFF4;
+}
+.hermes-bullet-item.is-clickable:active {
+  transform:scale(.98);
+}
+.hermes-thinking-text { min-width:0; max-width:100%; word-break:break-word; overflow-wrap:anywhere; }
 .hermes-thinking-inline {
   font-size:10px;
   color:#8A939F;
@@ -703,6 +986,41 @@ body { background: var(--surface-2); color: var(--text-main); }
   border-radius:0;
   padding:0;
   width:fit-content;
+}
+.hermes-thinking-disclosure {
+  margin-top:8px;
+  border-top:1px solid rgba(17,24,39,0.06);
+  padding-top:8px;
+}
+.hermes-thinking-summary {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  cursor:pointer;
+  list-style:none;
+  user-select:none;
+  color:#7B8490;
+  font-size:10px;
+  line-height:1.4;
+}
+.hermes-thinking-summary::-webkit-details-marker { display:none; }
+.hermes-thinking-summary::marker { content:''; }
+.hermes-thinking-summary-main {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+}
+.hermes-thinking-toggle {
+  flex-shrink:0;
+  color:#9AA3AE;
+}
+.hermes-thinking-disclosure[open] .hermes-thinking-toggle::before {
+  content:'收起';
+}
+.hermes-thinking-disclosure:not([open]) .hermes-thinking-toggle::before {
+  content:'展开';
 }
 .hermes-section-label {
   font-size:10px;
@@ -759,6 +1077,260 @@ body { background: var(--surface-2); color: var(--text-main); }
 .settings-icon { font-size:18px; width:28px; }
 .settings-label { font-size:14px; color:var(--white); flex:1; }
 .settings-arrow { font-size:12px; color:var(--gray-400); }
+.settings-note {
+  padding:0 16px 10px;
+  font-size:11px;
+  color:var(--gray-400);
+  line-height:1.7;
+}
+.profile-tag-note {
+  padding:0 16px 10px;
+  font-size:11px;
+  color:var(--gray-400);
+  line-height:1.7;
+}
+.profile-settings-modal-sheet {
+  max-height:min(88vh, 760px);
+  overflow:auto;
+  background:linear-gradient(180deg,#FFFEFC 0%,#F7FBFF 100%);
+  border-top:1px solid rgba(47,116,192,0.12);
+}
+.profile-settings-group {
+  margin-top:14px;
+  padding:12px;
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:14px;
+  box-shadow:0 8px 22px rgba(31,73,125,0.06);
+}
+.profile-settings-group-title {
+  font-size:13px;
+  font-weight:700;
+  color:var(--text-main);
+}
+.profile-settings-group-desc {
+  margin-top:4px;
+  font-size:11px;
+  color:var(--gray-400);
+  line-height:1.7;
+}
+.profile-settings-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:12px;
+}
+.profile-settings-field {
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.profile-settings-field.wide {
+  grid-column:1 / -1;
+}
+.profile-settings-field label {
+  font-size:11px;
+  color:#5B6B7B;
+}
+.profile-settings-input,
+.profile-settings-textarea,
+.help-center-search {
+  width:100%;
+  box-sizing:border-box;
+  outline:none;
+  border-radius:12px;
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.12);
+  color:var(--text-main);
+  padding:11px 12px;
+  font-size:13px;
+  font-family:var(--font-main);
+}
+.profile-settings-input::placeholder,
+.profile-settings-textarea::placeholder,
+.help-center-search::placeholder {
+  color:#8A97A5;
+}
+.profile-settings-input:focus,
+.profile-settings-textarea:focus,
+.help-center-search:focus {
+  border-color:rgba(47,116,192,0.24);
+  box-shadow:0 0 0 3px rgba(47,116,192,0.10);
+}
+.profile-settings-input[readonly] {
+  opacity:0.78;
+}
+.profile-settings-textarea {
+  resize:none;
+  min-height:88px;
+  line-height:1.7;
+}
+.profile-settings-static-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:12px;
+}
+.profile-settings-static-card {
+  padding:12px;
+  border-radius:12px;
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+}
+.profile-settings-static-label {
+  font-size:10px;
+  color:#5B6B7B;
+}
+.profile-settings-static-value {
+  margin-top:6px;
+  font-size:13px;
+  line-height:1.7;
+  color:var(--text-main);
+  font-weight:600;
+}
+.profile-tag-editor {
+  margin-top:12px;
+  padding:10px;
+  min-height:48px;
+  border-radius:12px;
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.12);
+}
+.profile-tag-editor-row {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  align-items:center;
+}
+.profile-tag-chip {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:5px 10px;
+  border-radius:999px;
+  background:rgba(200,169,110,0.10);
+  border:1px solid rgba(200,169,110,0.20);
+  color:var(--gold);
+  font-size:11px;
+}
+.profile-tag-chip button {
+  border:none;
+  background:transparent;
+  color:var(--gold);
+  cursor:pointer;
+  padding:0;
+  font-size:11px;
+}
+.profile-tag-input {
+  flex:1;
+  min-width:120px;
+  border:none;
+  outline:none;
+  background:transparent;
+  color:var(--white);
+  font-size:12px;
+  padding:4px 0;
+  font-family:var(--font-main);
+}
+.profile-tag-placeholder {
+  font-size:11px;
+  color:var(--gray-400);
+  line-height:1.7;
+}
+.help-center-head {
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+.help-center-subtitle {
+  margin-top:4px;
+  font-size:11px;
+  color:var(--gray-400);
+  line-height:1.7;
+}
+.help-center-categories {
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:12px;
+}
+.help-center-chip {
+  border:none;
+  cursor:pointer;
+  border-radius:999px;
+  padding:7px 12px;
+  font-size:11px;
+  background:rgba(255,255,255,0.06);
+  color:var(--gray-300);
+  border:1px solid rgba(200,169,110,0.12);
+}
+.help-center-chip.active {
+  color:var(--navy);
+  background:var(--gold);
+}
+.help-center-list {
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  margin-top:14px;
+}
+.help-center-card {
+  padding:14px;
+  border-radius:14px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(200,169,110,0.12);
+}
+.help-center-card-top {
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:flex-start;
+}
+.help-center-card-category {
+  font-size:10px;
+  color:var(--gold);
+  background:rgba(200,169,110,0.10);
+  border:1px solid rgba(200,169,110,0.18);
+  border-radius:999px;
+  padding:4px 8px;
+  flex-shrink:0;
+}
+.help-center-card-title {
+  font-size:13px;
+  font-weight:700;
+  color:var(--white);
+}
+.help-center-card-summary {
+  margin-top:6px;
+  font-size:12px;
+  color:var(--gray-300);
+  line-height:1.7;
+}
+.help-center-card-bullets {
+  margin-top:10px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.help-center-card-bullet {
+  font-size:11px;
+  color:var(--gray-400);
+  line-height:1.7;
+}
+.help-center-empty {
+  padding:18px 12px;
+  text-align:center;
+  font-size:12px;
+  color:var(--gray-400);
+  line-height:1.7;
+}
+@media (max-width: 420px) {
+  .profile-settings-grid,
+  .profile-settings-static-grid {
+    grid-template-columns:1fr;
+  }
+}
 
 /* ===== TOAST ===== */
 .toast { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:rgba(200,169,110,0.9); color:var(--navy); padding:8px 20px; border-radius:20px; font-size:13px; font-weight:600; z-index:9999; opacity:0; transition:opacity 0.3s; pointer-events:none; white-space:nowrap; }
@@ -2222,17 +2794,25 @@ body,
 .wb-broadcast-meta { font-size:11px; color:var(--gray-400); display:flex; gap:12px; }
 .wb-stock-sector-chart { display:grid; gap:10px; }
 .wb-stock-sector-summary { font-size:11px; color:var(--gray-400); line-height:1.7; padding:0 2px; }
+.wb-stock-sector-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.wb-stock-sector-stat { background:rgba(255,255,255,0.04); border:1px solid rgba(200,169,110,0.10); border-radius:12px; padding:10px; }
+.wb-stock-sector-stat-label { font-size:10px; color:var(--gray-400); }
+.wb-stock-sector-stat-value { font-size:16px; font-weight:800; color:var(--white); margin-top:6px; }
+.wb-stock-sector-stat-sub { font-size:10px; color:var(--gold); margin-top:4px; }
 .wb-stock-sector-card { background:var(--navy-mid); border:1px solid rgba(200,169,110,0.10); border-radius:14px; padding:12px; }
 .wb-stock-sector-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
 .wb-stock-sector-title { font-size:13px; font-weight:700; color:var(--white); }
 .wb-stock-sector-meta { font-size:11px; color:var(--gray-400); margin-top:4px; line-height:1.6; }
 .wb-stock-sector-count { flex-shrink:0; font-size:11px; font-weight:700; color:var(--gold); background:rgba(200,169,110,0.10); border:1px solid rgba(200,169,110,0.18); border-radius:999px; padding:5px 8px; }
+.wb-stock-sector-breakdown { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.wb-stock-sector-breakdown-pill { font-size:10px; color:var(--gray-300); border-radius:999px; padding:4px 8px; background:rgba(255,255,255,0.04); border:1px solid rgba(200,169,110,0.08); }
 .wb-stock-sector-track { position:relative; height:8px; border-radius:999px; background:rgba(255,255,255,0.06); overflow:hidden; margin-top:10px; }
 .wb-stock-sector-fill { position:absolute; inset:0 auto 0 0; border-radius:999px; background:linear-gradient(90deg, rgba(200,169,110,0.78), rgba(47,116,192,0.92)); }
 .wb-stock-sector-chip-row { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
 .wb-stock-sector-chip { display:inline-flex; align-items:center; gap:8px; border:none; border-radius:999px; padding:7px 10px; background:#FFFFFF; color:var(--text-main); font-size:11px; font-weight:700; cursor:pointer; box-shadow:0 8px 20px rgba(15,39,69,0.14); }
 .wb-stock-sector-chip:active { transform:translateY(1px); }
 .wb-stock-sector-chip-count { font-size:10px; color:#2F74C0; background:rgba(47,116,192,0.10); border-radius:999px; padding:3px 7px; }
+.wb-stock-sector-empty { background:rgba(255,255,255,0.04); border:1px dashed rgba(200,169,110,0.18); border-radius:14px; padding:16px 14px; }
 .wb-mode-switch { display:flex; align-items:center; gap:8px; padding:8px 14px; background:rgba(200,169,110,0.1); border:1px solid rgba(200,169,110,0.3); border-radius:20px; cursor:pointer; margin:12px 16px; }
 .wb-mode-switch-label { font-size:12px; color:var(--gold); font-weight:600; }
 </style>
@@ -2500,7 +3080,7 @@ body,
     <div class="h5-section hermes-shell" style="padding-top:14px">
       <div class="hermes-header">
         <div class="hermes-logo">🦞 Hermes</div>
-        <div class="hermes-credits" id="hermes-credits-display">⚡ 128次</div>
+        <div class="hermes-credits" id="hermes-credits-display">⚡ --次</div>
       </div>
 
       <div class="hermes-workspace">
@@ -2510,14 +3090,25 @@ body,
             <div class="hermes-composer-shell">
               <div class="hermes-composer-context" id="hermes-composer-context"></div>
               <div class="hermes-lobster-composer">
-                <button class="hermes-composer-plus" onclick="openHermesPlusMenu()">+</button>
                 <textarea
                   id="hermes-question-input"
                   class="hermes-lobster-question"
-                  placeholder="问 Hermes..."
-                  oninput="this.style.height='auto';this.style.height=Math.max(54,Math.min(this.scrollHeight,160))+'px'"
+                  placeholder="发消息..."
+                  oninput="handleHermesQuestionInput(this)"
                 ></textarea>
-                <button class="hermes-composer-send hermes-lobster-send" onclick="runHermesAnalysis()">发送</button>
+                <div class="hermes-lobster-toolbar">
+                  <div class="hermes-lobster-toolbar-left">
+                    <button class="hermes-composer-plus" onclick="openHermesPlusMenu()">+</button>
+                    <span class="hermes-lobster-divider"></span>
+                    <div class="hermes-lobster-tool-row">
+                      <button id="hermes-internet-toggle" class="hermes-lobster-tool hermes-composer-toggle" type="button" onclick="toggleHermesInternetAnswer()">
+                        <span class="hermes-lobster-tool-icon">🌐</span>
+                        <span>互联网</span>
+                      </button>
+                    </div>
+                  </div>
+                  <button id="hermes-composer-submit" class="hermes-composer-send hermes-lobster-send" onclick="handleHermesComposerSubmit()">发送</button>
+                </div>
               </div>
             </div>
           </div>
@@ -2677,20 +3268,6 @@ body,
         </div>
         <div class="knowledge-zone-list" id="knowledge-zone-feed"></div>
       </div>
-      <div class="card" style="padding:16px;margin-bottom:12px">
-        <div style="font-size:13px;color:var(--gold);font-weight:700;margin-bottom:8px">方法与框架</div>
-        <div style="font-size:13px;color:var(--white);line-height:1.8">
-          • 复盘四步法：收拢资料 → 生成提纲 → 锁定样本 → 回填证据链<br>
-          • 个股观察法：价格位置 → 投顾视角 → 基本面判断 → 跟踪结论<br>
-          • 宏观表达法：先讲框架、变量和边界，不直接给结论性建议
-        </div>
-      </div>
-      <div class="card" style="padding:16px">
-        <div style="font-size:13px;color:var(--gold);font-weight:700;margin-bottom:8px">入库方式</div>
-        <div style="font-size:12px;color:var(--gray-400);line-height:1.8">
-          大V通过语音输入、文件上传、网页 URL 提供的内容，会在清洗后进入知识专区，供 Hermes、复盘专区和大V工作台复用。
-        </div>
-      </div>
     </div>
   </div>
 
@@ -2702,13 +3279,6 @@ body,
       <div style="font-size:16px;font-weight:700;color:var(--white)" id="dm-list-title">专属对话</div>
         <div style="font-size:11px;color:var(--gray-400);background:rgba(200,169,110,0.08);padding:4px 10px;border-radius:10px" id="dm-list-hint">与大V投顾研究交流</div>
       </div>
-      <div style="padding:0 16px 12px">
-        <div style="background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.14);border-radius:12px;padding:12px">
-          <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:6px" id="dm-role-card-title">租户私信说明</div>
-          <div style="font-size:12px;color:var(--gray-400);line-height:1.7" id="dm-role-card-desc">普通投资者只能和所属大V对话；大V进入消息页后可查看并回复自己的粉丝会话。</div>
-        </div>
-      </div>
-      <div id="dm-review-status-card" style="padding:0 16px 12px"></div>
       <div id="dm-conversations-list">
         <div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">加载中...</div>
       </div>
@@ -2921,33 +3491,30 @@ body,
     </div>
     <div class="demo-switch-list" id="demo-user-switch-list"></div>
 
-    <!-- Badges -->
+    <!-- System badges -->
     <div class="h5-section" style="padding-bottom:8px">
-      <div class="h5-section-title">我的标签</div>
+      <div class="h5-section-title">系统标签</div>
     </div>
+    <div class="profile-tag-note">这部分由系统根据角色、租户关系和使用行为自动生成，不支持手动修改。</div>
     <div class="badges-wrap" id="profile-badges-wrap"></div>
 
     <!-- Settings -->
     <div class="h5-section" style="padding-bottom:8px">
       <div class="h5-section-title">账号管理</div>
     </div>
+    <div class="settings-note">这里只处理个人资料、消息入口、帮助中心和退出登录；租户归属与权限仍以上方只读信息卡为准。</div>
     <div class="settings-list">
-      <div class="settings-item" onclick="showToast((currentDemoUser ? currentDemoUser.tenant.name : '当前租户') + ' · 由 ' + (currentDemoUser ? currentDemoUser.tenant.advisor : '投顾') + ' 主理')">
-        <div class="settings-icon">🏷️</div>
-        <div class="settings-label" id="settings-tenant-label">当前租户</div>
-        <div class="settings-arrow">›</div>
-      </div>
-      <div class="settings-item" onclick="showToast('功能开发中...')">
+      <div class="settings-item" onclick="openAccountSettingsModal()">
         <div class="settings-icon">⚙️</div>
         <div class="settings-label">账号设置</div>
         <div class="settings-arrow">›</div>
       </div>
-      <div class="settings-item" onclick="showToast('功能开发中...')">
+      <div class="settings-item" onclick="openProfileNotificationCenter()">
         <div class="settings-icon">🔔</div>
         <div class="settings-label">消息通知</div>
         <div class="settings-arrow">›</div>
       </div>
-      <div class="settings-item" onclick="showToast('功能开发中...')">
+      <div class="settings-item" onclick="openHelpCenterModal()">
         <div class="settings-icon">❓</div>
         <div class="settings-label">帮助中心</div>
         <div class="settings-arrow">›</div>
@@ -2956,6 +3523,95 @@ body,
         <div class="settings-icon">🚪</div>
         <div class="settings-label" style="color:var(--red)">退出登录</div>
         <div class="settings-arrow">›</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="account-settings-modal" onclick="if(event.target===this)closeAccountSettingsModal()">
+    <div class="modal-sheet profile-settings-modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-title">账号设置</div>
+      <div style="font-size:12px;color:var(--gray-400);line-height:1.7">可维护个人基础资料和自定义关注标签；租户关系、权益和系统标签只读。</div>
+      <div class="profile-settings-group">
+        <div class="profile-settings-group-title">基础资料</div>
+        <div class="profile-settings-grid">
+          <div class="profile-settings-field">
+            <label>头像</label>
+            <input id="account-settings-avatar" class="profile-settings-input" maxlength="8" placeholder="例如：👑">
+          </div>
+          <div class="profile-settings-field">
+            <label>昵称</label>
+            <input id="account-settings-display-name" class="profile-settings-input" maxlength="24" placeholder="输入昵称">
+          </div>
+          <div class="profile-settings-field wide">
+            <label id="account-settings-bio-label">个人简介</label>
+            <textarea id="account-settings-bio" class="profile-settings-textarea" maxlength="160" placeholder="用一句话说明你的研究方向或使用偏好"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="profile-settings-group">
+        <div class="profile-settings-group-title">自定义关注标签</div>
+        <div class="profile-settings-group-desc">这部分由你自己维护，用来描述关注方向、常看主题或研究风格。</div>
+        <div class="profile-tag-editor" onclick="focusAccountCustomTagInput()">
+          <div class="profile-tag-editor-row" id="account-settings-custom-tags"></div>
+        </div>
+      </div>
+      <div class="profile-settings-group">
+        <div class="profile-settings-group-title">系统关系与权益</div>
+        <div class="profile-settings-group-desc">这部分由平台和租户配置控制，不在前台个人设置里修改。</div>
+        <div class="profile-settings-static-grid">
+          <div class="profile-settings-static-card">
+            <div class="profile-settings-static-label">当前身份</div>
+            <div class="profile-settings-static-value" id="account-settings-role-label">--</div>
+          </div>
+          <div class="profile-settings-static-card">
+            <div class="profile-settings-static-label">当前关系</div>
+            <div class="profile-settings-static-value" id="account-settings-relationship">--</div>
+          </div>
+          <div class="profile-settings-static-card">
+            <div class="profile-settings-static-label">当前租户</div>
+            <div class="profile-settings-static-value" id="account-settings-tenant-name">--</div>
+          </div>
+          <div class="profile-settings-static-card">
+            <div class="profile-settings-static-label">主理投顾</div>
+            <div class="profile-settings-static-value" id="account-settings-advisor-name">--</div>
+          </div>
+          <div class="profile-settings-static-card">
+            <div class="profile-settings-static-label">手机号</div>
+            <div class="profile-settings-static-value" id="account-settings-phone">--</div>
+          </div>
+          <div class="profile-settings-static-card">
+            <div class="profile-settings-static-label">租户权益</div>
+            <div class="profile-settings-static-value" id="account-settings-rights">--</div>
+          </div>
+        </div>
+      </div>
+      <div class="profile-settings-group">
+        <div class="profile-settings-group-title">系统标签</div>
+        <div class="profile-settings-group-desc">系统标签根据角色、租户关系和活跃行为自动更新，不支持人工改写。</div>
+        <div class="badges-wrap" id="account-settings-system-badges" style="padding:12px 0 0"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-outline" type="button" onclick="closeAccountSettingsModal()">取消</button>
+        <button class="btn-gold" type="button" id="account-settings-save-btn" onclick="saveH5AccountSettings()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="help-center-modal" onclick="if(event.target===this)closeHelpCenterModal()">
+    <div class="modal-sheet profile-settings-modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="help-center-head">
+        <div>
+          <div class="modal-title" style="margin-bottom:0">帮助中心</div>
+          <div class="help-center-subtitle" id="help-center-subtitle">按功能快速查找，不堆砌说明文字。</div>
+        </div>
+      </div>
+      <input id="help-center-search-input" class="help-center-search" style="margin-top:12px" placeholder="搜索账号、消息、Hermes、复盘、指标、知识..." oninput="handleHelpCenterSearch(this.value)">
+      <div class="help-center-categories" id="help-center-categories"></div>
+      <div class="help-center-list" id="help-center-list"></div>
+      <div class="modal-actions">
+        <button class="btn-outline" type="button" onclick="closeHelpCenterModal()">关闭</button>
       </div>
     </div>
   </div>
@@ -3010,7 +3666,7 @@ body,
       <span class="tag tag-gold" style="cursor:pointer" onclick="appendTag('#新能源')">+ #新能源</span>
       <span class="tag tag-gold" style="cursor:pointer" onclick="appendTag('#AI科技')">+ #AI科技</span>
     </div>
-    <div class="modal-actions">
+    <div class="modal-actions review-flow-actions">
       <button class="btn-outline" onclick="document.getElementById('compose-modal').classList.remove('show')">取消</button>
       <button class="btn-gold" onclick="submitPost()">发布 +10积分</button>
     </div>
@@ -3113,6 +3769,13 @@ function isFeatureEnabled(featureName) {
     const activeUser = getActiveDemoUser();
     if (activeUser && activeUser.role === 'dav') return true;
   }
+  if (featureName === 'hermes') {
+    const activeUser = getActiveDemoUser() || {};
+    const hermesSettings = (window.SITE_CONFIG && window.SITE_CONFIG.hermes_settings) || {};
+    if (siteFeatures.hermes === false) return false;
+    if (activeUser.role === 'dav') return true;
+    return hermesSettings.investor_access_enabled !== false;
+  }
   if (featureName === 'dm') {
     return siteFeatures.dm !== false || siteFeatures.fan_interaction !== false;
   }
@@ -3178,35 +3841,16 @@ let DEMO_PROFILE_USERS = Array.isArray(window.DEMO_PROFILES) ? JSON.parse(JSON.s
 let currentDemoUser = null;
 let h5LoginPendingUser = '';
 let h5ExperienceBooted = false;
+let currentAccountSettingsState = { customTags: [], systemBadges: [], readonly: {}, editable: {} };
+let h5HelpCenterState = { loaded: false, role: '', query: '', category: '全部', payload: null };
 const DEFAULT_MACRO_INDICATORS = {{ macro_indicators | tojson }};
 const H5_INDICATOR_HUB = {{ indicator_hub | tojson }};
 const FUNDAMENTAL_COLUMN_DATA = {{ fundamental_column | tojson }};
 const DASHBOARD_SEED_CARDS = {{ dashboard_seed_cards | tojson }};
 const WATCHLIST_DETAILS_MAP = {{ watchlist_details | tojson }};
-const H5_FAN_STOCK_VISIT_SEED = {
-  default: [
-    { code: '688981', sector: '科技成长', visits: 34, note: '粉丝更关注算力链和半导体验证节奏。' },
-    { code: '300750', sector: '科技成长', visits: 18, note: '新能源链更多被当作中期跟踪样本。' },
-    { code: '00700', sector: '港股互联网', visits: 27, note: '估值修复、回购和利润兑现是高频追问点。' },
-    { code: '600519', sector: '消费龙头', visits: 16, note: '高端消费更偏组合配置与估值承接。' },
-    { code: '600036', sector: '金融防守', visits: 12, note: '银行更常作为防守型对照样本。' },
-  ],
-  laowang: [
-    { code: '688981', sector: '科技成长', visits: 36, note: '半导体制造和国产替代是当前最高频访问来源。' },
-    { code: '300750', sector: '科技成长', visits: 17, note: '新能源链访问集中在景气和价格战。' },
-    { code: '00700', sector: '港股互联网', visits: 22, note: '更多被拿来和 A 股主线做风格对照。' },
-    { code: '600519', sector: '消费龙头', visits: 18, note: '消费龙头通常被当作稳健资金的观察对象。' },
-    { code: '600036', sector: '金融防守', visits: 13, note: '防守风格用户会反复回看股息与资产质量。' },
-  ],
-  lisa: [
-    { code: '00700', sector: '港股互联网', visits: 38, note: '腾讯的回购、利润率和广告恢复是最高频追问点。' },
-    { code: '600036', sector: '金融防守', visits: 16, note: '高股息和资产质量常被用作防守基准。' },
-    { code: '600519', sector: '消费龙头', visits: 14, note: '消费龙头更多承担组合稳定器角色。' },
-    { code: '688981', sector: '科技成长', visits: 12, note: '粉丝会用中芯国际对比成长链风险偏好。' },
-  ],
-};
 const FUND_DASHBOARD_STORAGE_KEY = 'gangtise_fund_dashboard_state';
 const INITIAL_TENANT_DASHBOARD = {{ tenant_dashboard_payload | tojson }};
+let currentTenantDashboardPayload = INITIAL_TENANT_DASHBOARD || {};
 const DEFAULT_DASHBOARD_CELL_PROMPTS = [
   '聚焦美联储路径、通胀和降息预期，给普通投资者一个方向判断。',
   '只看南向/北向资金与成交量变化，判断今天是否有增量资金验证。',
@@ -3376,6 +4020,82 @@ let reviewTriggerDraft = {
 const reviewRuntimeStore = {};
 let reviewWatchlistSelectionMode = false;
 const REVIEW_PROMPT_TAGS = ['更口语化', '保留原文不改写', '强调风险提示', '适合粉丝阅读', '分成短段落'];
+let reviewStructuredPreview = null;
+let reviewPreviewGenerating = false;
+let reviewPreviewJobState = null;
+
+function normalizeReviewStructuredPreview(payload) {
+  const source = payload && typeof payload === 'object' ? payload : {};
+  const userInputSection = source.user_input_section && typeof source.user_input_section === 'object'
+    ? { ...source.user_input_section }
+    : {};
+  const watchlistAnalysisSection = source.watchlist_analysis_section && typeof source.watchlist_analysis_section === 'object'
+    ? { ...source.watchlist_analysis_section }
+    : {};
+  return {
+    ...source,
+    review_summary: String(source.review_summary || '').trim(),
+    user_input_section: {
+      source_mode: String(userInputSection.source_mode || reviewTriggerDraft.sourceMode || 'manual').trim().toLowerCase() || 'manual',
+      source_mode_label: String(userInputSection.source_mode_label || (REVIEW_SOURCE_OPTIONS.find((item) => item.value === reviewTriggerDraft.sourceMode) || {}).label || '用户输入').trim(),
+      display_text: String(userInputSection.display_text || reviewTriggerDraft.draftReviewText || reviewTriggerDraft.generatedPreviewText || getReviewDraftContentText()).trim(),
+      summary_source: String(userInputSection.summary_source || 'llm_user_input_only').trim(),
+    },
+    watchlist_analysis_section: {
+      sector_summary: String(watchlistAnalysisSection.sector_summary || '').trim(),
+      sector_profiles: Array.isArray(watchlistAnalysisSection.sector_profiles) ? watchlistAnalysisSection.sector_profiles.map((item) => ({
+        sector: String((item || {}).sector || '').trim(),
+        stock_names: Array.isArray((item || {}).stock_names) ? item.stock_names.slice(0) : [],
+        representative_description: String((item || {}).representative_description || '').trim(),
+      })) : [],
+      items: Array.isArray(watchlistAnalysisSection.items) ? watchlistAnalysisSection.items.map((item) => ({
+        stock_name: String((item || {}).stock_name || '').trim(),
+        stock_code: String((item || {}).stock_code || '').trim(),
+        sector: String((item || {}).sector || '').trim(),
+        board_role: String((item || {}).board_role || '').trim(),
+        analysis_text: String((item || {}).analysis_text || '').trim(),
+        evidence: Array.isArray((item || {}).evidence) ? item.evidence.slice(0) : [],
+      })) : [],
+    },
+    llm_models: Array.isArray(source.llm_models) ? source.llm_models.slice(0) : [],
+  };
+}
+
+function buildReviewWatchlistAnalysisText(section) {
+  const payload = section && typeof section === 'object' ? section : {};
+  const parts = [];
+  const sectorSummary = String(payload.sector_summary || '').trim();
+  if (sectorSummary) parts.push(`板块归纳：${sectorSummary}`);
+  const sectorProfiles = Array.isArray(payload.sector_profiles) ? payload.sector_profiles : [];
+  if (sectorProfiles.length) {
+    parts.push('板块代表性：');
+    sectorProfiles.forEach((item) => {
+      const label = String((item || {}).sector || '').trim();
+      const text = String((item || {}).representative_description || '').trim();
+      if (label || text) parts.push(`- ${label}：${text}`);
+    });
+  }
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  if (items.length) {
+    parts.push('逐股归纳：');
+    items.forEach((item) => {
+      const name = String((item || {}).stock_name || '').trim();
+      const sector = String((item || {}).sector || '').trim();
+      const body = String((item || {}).analysis_text || '').trim();
+      if (name || body) parts.push(`- ${name}${sector ? `（${sector}）` : ''}：${body}`);
+    });
+  }
+  return parts.join('\n').trim();
+}
+
+function buildReviewStructuredFinalText(payload) {
+  const normalized = normalizeReviewStructuredPreview(payload);
+  return [
+    normalized.review_summary ? `【摘要】\n${normalized.review_summary}` : '',
+    normalized.user_input_section.display_text ? `【用户复盘】\n${normalized.user_input_section.display_text}` : '',
+    buildReviewWatchlistAnalysisText(normalized.watchlist_analysis_section) ? `【自选股归纳总结】\n${buildReviewWatchlistAnalysisText(normalized.watchlist_analysis_section)}` : '',
+  ].filter(Boolean).join('\n\n').trim();
+}
 const KNOWLEDGE_INPUT_TYPES = {
   voice: {
     label: '语音输入',
@@ -3497,6 +4217,7 @@ async function refreshTenantDashboardRemoteState(options) {
     const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/dashboard`);
     const payload = await resp.json();
     if (!resp.ok || !payload.success) throw new Error(payload.error || 'dashboard_fetch_failed');
+    currentTenantDashboardPayload = payload.dashboard || {};
     tenantFundDashboardRemoteState = normalizeInitialRemoteDashboardState(payload.dashboard || {});
     const tenantState = ensureTenantFundDashboardState(activeUser.tenant.id);
     tenantState.published = tenantFundDashboardRemoteState.published || tenantState.published;
@@ -3504,6 +4225,7 @@ async function refreshTenantDashboardRemoteState(options) {
     persistTenantFundDashboardState();
     if (opts.rerenderFeed) renderFundMacroDashboard();
     if (opts.rerenderWorkbench) renderWorkbenchFundDashboard();
+    renderFanStockSectorChart();
     return payload;
   } catch (error) {
     return null;
@@ -4060,6 +4782,7 @@ async function syncTenantDashboardState(action, dashboardConfig) {
   });
   const payload = await resp.json();
   if (!resp.ok || !payload.success) throw new Error(payload.error || 'dashboard_sync_failed');
+  currentTenantDashboardPayload = payload.dashboard || {};
   tenantFundDashboardRemoteState = normalizeInitialRemoteDashboardState(payload.dashboard || {});
   const tenantState = ensureTenantFundDashboardState(activeUser.tenant.id);
   tenantState.published = tenantFundDashboardRemoteState.published || tenantState.published;
@@ -4139,6 +4862,7 @@ function bootH5Experience() {
   loadCommunityEvents();
   selectHermesMode('复盘速写');
   refreshTenantDashboardRemoteState({ rerenderFeed: true, rerenderWorkbench: true });
+  refreshHermesCredits({ silent: true });
 }
 
 function getDefaultDemoUser() {
@@ -4287,16 +5011,30 @@ function buildReviewArticleData(review) {
   const dataSources = Array.isArray(review.dataSources) ? review.dataSources : [];
   const newsSources = Array.isArray(review.newsSources) ? review.newsSources : [];
   const llmModels = Array.isArray(review.llmModels) ? review.llmModels : [];
-  const bodySections = [
-    {
+  const userInputSection = review.userInputSection && typeof review.userInputSection === 'object'
+    ? review.userInputSection
+    : {
+        source_mode: review.sourceMode || 'manual',
+        source_mode_label: review.sourceLabel || '用户输入',
+        display_text: ((review.paragraphs || [])[0] || {}).text || review.summary || '',
+      };
+  const watchlistAnalysisSection = review.watchlistAnalysisSection && typeof review.watchlistAnalysisSection === 'object'
+    ? review.watchlistAnalysisSection
+    : { sector_summary: '', sector_profiles: [], items: [] };
+  const bodySections = [];
+  if (review.summary) {
+    bodySections.push({
       title: '复盘核心摘要',
       text: review.summary,
-    },
-    ...((review.paragraphs || []).map(item => ({
-      title: item.title,
-      text: item.text,
-    }))),
-  ];
+    });
+  }
+  if (!userInputSection.display_text && Array.isArray(review.paragraphs)) {
+    review.paragraphs.forEach((item) => {
+      if (item && item.title && item.text) {
+        bodySections.push({ title: item.title, text: item.text });
+      }
+    });
+  }
   return {
     id: review.id,
     title: review.title,
@@ -4311,6 +5049,8 @@ function buildReviewArticleData(review) {
     coverTitle: `${review.periodLabel}重点聚焦 ${watchlistLead}`,
     coverDesc: '这是一份已经面向前台发布的复盘分析报告，普通用户和大V看到的是同一份正文内容。',
     bodySections,
+    userInputSection,
+    watchlistAnalysisSection,
     evidenceItems,
     selectedCards,
     knowledgeAttachments,
@@ -4321,6 +5061,43 @@ function buildReviewArticleData(review) {
       ? `本次复盘明确引用了 ${evidenceItems.length} 处 K 线标注，这些标注就是复盘智能化总结的依据之一。`
       : '本次复盘重点承接行业主线、关键个股和已验证资料，不做交易指令，只保留研究判断。',
   };
+}
+
+function renderReviewWatchlistAnalysisSection(article) {
+  const section = article && article.watchlistAnalysisSection && typeof article.watchlistAnalysisSection === 'object'
+    ? article.watchlistAnalysisSection
+    : {};
+  const sectorProfiles = Array.isArray(section.sector_profiles) ? section.sector_profiles : [];
+  const items = Array.isArray(section.items) ? section.items : [];
+  if (!String(section.sector_summary || '').trim() && !sectorProfiles.length && !items.length) return '';
+  return `
+    <div class="review-article-section">
+      <div class="review-article-section-title">自选股归纳总结</div>
+      ${section.sector_summary ? `<div class="review-article-section-text">${escapeHtml(section.sector_summary)}</div>` : ''}
+      ${sectorProfiles.length ? `
+        <div class="review-article-evidence-list" style="margin-top:12px">
+          ${sectorProfiles.map((profile) => `
+            <div class="review-article-evidence-item">
+              <div class="review-article-evidence-title">${escapeHtml(profile.sector || '板块代表性')}</div>
+              <div class="review-article-evidence-text">${escapeHtml(profile.representative_description || '')}</div>
+              ${Array.isArray(profile.stock_names) && profile.stock_names.length ? `<div class="review-article-evidence-text">代表样本：${escapeHtml(profile.stock_names.join('、'))}</div>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+      ${items.length ? `
+        <div class="review-article-evidence-list" style="margin-top:12px">
+          ${items.map((item) => `
+            <div class="review-article-evidence-item">
+              <div class="review-article-evidence-title">${escapeHtml(item.stock_name || '股票')} · ${escapeHtml(item.board_role || item.sector || '归纳样本')}</div>
+              <div class="review-article-evidence-text">${escapeHtml(item.analysis_text || '')}</div>
+              ${Array.isArray(item.evidence) && item.evidence.length ? `<div class="review-article-evidence-text">依据：${escapeHtml(item.evidence.join(' / '))}</div>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+    </div>
+  `;
 }
 
 function buildPublishedReviewArticles(period) {
@@ -4340,12 +5117,15 @@ function buildPublishedReviewArticles(period) {
       tags: matched.tags || [],
       watchlist: matched.watchlist || [],
       annotations: [],
+      sourceMode: matched.source_mode || 'manual',
       selectedCards: matched.selected_cards || [],
       knowledgeAttachments: matched.knowledge_attachments || [],
       dataSources: matched.data_sources || [],
       newsSources: matched.news_sources || [],
       llmModels: matched.llm_models || [],
-      paragraphs: [
+      userInputSection: matched.user_input_section || {},
+      watchlistAnalysisSection: matched.watchlist_analysis_section || {},
+      paragraphs: matched.user_input_section && matched.user_input_section.display_text ? [] : [
         { title: '完整复盘正文', text: matched.content_text || matched.summary || '' },
       ],
     } : buildKolReviewData(davUser, period);
@@ -4436,6 +5216,13 @@ function renderReviewArticleDetailContent(article, options = {}) {
           <div class="review-article-section-text">${escapeHtml(section.text).replace(/\n/g, '<br>')}</div>
         </div>
       `).join('')}
+      ${article.userInputSection && article.userInputSection.display_text ? `
+        <div class="review-article-section">
+          <div class="review-article-section-title">用户复盘</div>
+          <div class="review-article-section-text">${escapeHtml(article.userInputSection.display_text).replace(/\n/g, '<br>')}</div>
+        </div>
+      ` : ''}
+      ${renderReviewWatchlistAnalysisSection(article)}
       ${article.knowledgeAttachments.length ? `
         <div class="review-article-section">
           <div class="review-article-section-title">附加材料</div>
@@ -4507,12 +5294,27 @@ function buildReviewPreviewArticle() {
   const user = getActiveDemoUser();
   const runtime = ensureTenantReviewRuntime(user.tenant.id);
   const previewBody = getReviewPreviewText();
+  const structured = reviewStructuredPreview && typeof reviewStructuredPreview === 'object' ? reviewStructuredPreview : {};
   const periodMeta = getReviewPeriodMeta(reviewTriggerDraft.period || currentReviewPeriod || 'day');
   const focusNames = (reviewTriggerDraft.selectedWatchlist || []).length
     ? reviewTriggerDraft.selectedWatchlist.slice(0)
     : getDavReviewSelectedWatchlist(user.tenant.id);
   const sourceCfg = REVIEW_SOURCE_OPTIONS.find(item => item.value === reviewTriggerDraft.sourceMode) || REVIEW_SOURCE_OPTIONS[0];
   const paragraphLabel = reviewTriggerDraft.paragraphMode === 'ai' ? '智能优化后草稿' : '用户原稿直出';
+  const llmModels = [];
+  if (reviewIngestResult && reviewIngestResult.review_draft_llm) {
+    llmModels.push({
+      stage: 'draft',
+      label: reviewIngestResult.review_draft_llm.label || reviewIngestResult.review_draft_llm.model_name || '已调用模型',
+      model_name: reviewIngestResult.review_draft_llm.model_name || '',
+      key: reviewIngestResult.review_draft_llm.key || '',
+    });
+  }
+  (structured.llm_models || []).forEach((item) => {
+    if (item && !llmModels.some((row) => row.stage === item.stage && row.key === item.key && row.model_name === item.model_name)) {
+      llmModels.push(item);
+    }
+  });
   return buildReviewArticleData({
     id: `preview-${user.tenant.id}-${reviewTriggerDraft.period || currentReviewPeriod || 'day'}`,
     author: user.tenant.advisor,
@@ -4520,7 +5322,7 @@ function buildReviewPreviewArticle() {
     periodLabel: periodMeta.label,
     generatedAt: runtime.kolGeneratedAt || '刚刚生成',
     title: `${periodMeta.label}预览：${focusNames[0] || '重点样本'}等重点样本复盘`,
-    summary: previewBody.slice(0, 140) || '当前预览还没有生成正文。',
+    summary: structured.review_summary || previewBody.slice(0, 150) || '当前预览还没有生成正文。',
     tags: [periodMeta.label, sourceCfg.label, paragraphLabel],
     watchlist: focusNames,
     annotations: [],
@@ -4528,13 +5330,14 @@ function buildReviewPreviewArticle() {
     knowledgeAttachments: [],
     dataSources: reviewTriggerDraft.sourceMode === 'file' ? ['用户上传文件'] : (reviewTriggerDraft.sourceMode === 'voice' ? ['用户语音转写文稿'] : ['用户手写正文']),
     newsSources: [],
-    llmModels: reviewIngestResult && reviewIngestResult.review_draft_llm ? [{
-      stage: 'draft',
-      label: reviewIngestResult.review_draft_llm.label || reviewIngestResult.review_draft_llm.model_name || '已调用模型',
-      model_name: reviewIngestResult.review_draft_llm.model_name || '',
-      key: reviewIngestResult.review_draft_llm.key || '',
-    }] : [],
-    paragraphs: [
+    llmModels,
+    userInputSection: structured.user_input_section || {
+      source_mode: reviewTriggerDraft.sourceMode || 'manual',
+      source_mode_label: sourceCfg.label,
+      display_text: getReviewUserInputDisplayText(),
+    },
+    watchlistAnalysisSection: structured.watchlist_analysis_section || {},
+    paragraphs: structured.user_input_section ? [] : [
       { title: '完整复盘正文', text: previewBody || '暂无正文' },
     ],
   });
@@ -4756,9 +5559,16 @@ function getReviewDraftContentText() {
 }
 
 function getReviewPreviewText() {
+  if (reviewStructuredPreview) {
+    return buildReviewStructuredFinalText(reviewStructuredPreview);
+  }
   return String(reviewTriggerDraft.draftReviewText || '').trim()
     || String(reviewTriggerDraft.generatedPreviewText || '').trim()
     || getReviewDraftContentText();
+}
+
+function getReviewUserInputDisplayText() {
+  return String(reviewTriggerDraft.draftReviewText || '').trim() || getReviewDraftContentText();
 }
 
 let reviewVoiceRecorder = null;
@@ -4799,6 +5609,28 @@ async function generateReviewDraftWithLlm() {
   return data;
 }
 
+async function requestReviewStructuredPreview() {
+  const user = getActiveDemoUser();
+  const resp = await fetch('/api/review/prepare-preview', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      tenant_slug: ((user || {}).tenant || {}).slug || '',
+      period: reviewTriggerDraft.period || currentReviewPeriod || 'day',
+      source_mode: reviewTriggerDraft.sourceMode || 'voice',
+      source_text: getReviewUserInputDisplayText(),
+      selected_watchlist: reviewTriggerDraft.selectedWatchlist || [],
+      speaker_name: (user && (user.advisor_name || user.username)) || '',
+      entry_point: 'h5_review_preview',
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    throw new Error((data && data.error) || 'review_prepare_preview_failed');
+  }
+  return data;
+}
+
 function hasConfiguredGeneralLlm() {
   const registry = (window.SITE_CONFIG && window.SITE_CONFIG.llm_registry) || {};
   const models = Array.isArray(registry.models) ? registry.models : [];
@@ -4822,6 +5654,9 @@ function getReviewDraftGenerationErrorMessage(error) {
   if (raw.includes('llm_request_failed')) {
     return '大模型调用失败，请检查模型配置、Base URL 或网络连通性。';
   }
+  if (raw.includes('review_summary_llm_not_configured') || raw.includes('review_watchlist_analysis_llm_not_configured')) {
+    return '当前还没有配置可用的大模型。请先到 Admin 的系统专区 · 大模型专区配置一个通用模型。';
+  }
   return raw;
 }
 
@@ -4838,15 +5673,16 @@ function formatReviewJobStage(stage) {
 }
 
 function renderReviewDraftProgressPanel() {
-  if (!reviewDraftGenerating && !reviewDraftJobState) return '';
-  const job = reviewDraftJobState || {};
+  if (!reviewDraftGenerating && !reviewDraftJobState && !reviewPreviewGenerating && !reviewPreviewJobState) return '';
+  const job = reviewPreviewGenerating || reviewPreviewJobState ? (reviewPreviewJobState || {}) : (reviewDraftJobState || {});
   const percent = Math.max(5, Number(job.progress_percent || 0) || 0);
   const logs = Array.isArray(job.result && job.result.live_log) ? job.result.live_log.slice(-4).reverse() : [];
+  const previewMode = !!(reviewPreviewGenerating || reviewPreviewJobState);
   return `
     <div class="review-progress-panel">
       <div class="review-progress-head">
         <div>
-          <div class="review-progress-title">大模型正在生成复盘草稿</div>
+          <div class="review-progress-title">${previewMode ? '大模型正在生成双段式复盘预览' : '大模型正在生成复盘草稿'}</div>
           <div class="review-progress-subtitle">${escapeHtml(job.summary || '后台仍在工作中，当前会持续展示处理阶段与最新进展。')}</div>
         </div>
         <div class="review-progress-percent">${escapeHtml(String(percent))}%</div>
@@ -5116,8 +5952,9 @@ async function embedManualReviewText(text) {
   return data;
 }
 
-async function publishReviewContentEmbedding(text, transcriptionEngine, transcriptModel) {
+async function publishReviewContentEmbedding(text, transcriptionEngine, transcriptModel, extras) {
   const user = getActiveDemoUser();
+  const payload = extras && typeof extras === 'object' ? extras : {};
   const resp = await fetch('/api/review/publish-embed', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -5133,6 +5970,10 @@ async function publishReviewContentEmbedding(text, transcriptionEngine, transcri
       paragraph_mode: reviewTriggerDraft.paragraphMode || 'manual',
       selected_watchlist: reviewTriggerDraft.selectedWatchlist || [],
       prompt_tags: reviewTriggerDraft.promptTags || [],
+      review_summary: payload.review_summary || '',
+      user_input_section: payload.user_input_section || {},
+      watchlist_analysis_section: payload.watchlist_analysis_section || {},
+      llm_models: Array.isArray(payload.llm_models) ? payload.llm_models : [],
     }),
   });
   const data = await resp.json();
@@ -5242,12 +6083,50 @@ function renderReviewDraftReviewPanel() {
   `;
 }
 
+function renderReviewStructuredReviewPanel() {
+  if (reviewTriggerDraft.flowStage !== 'structured_review') return '';
+  const structured = normalizeReviewStructuredPreview(reviewStructuredPreview || {});
+  const watchlistSection = structured.watchlist_analysis_section || {};
+  const items = Array.isArray(watchlistSection.items) ? watchlistSection.items : [];
+  return `
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">摘要和自选股归纳总结审核与详细修改</label>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">这里会把用户复盘、摘要和自选股归纳总结一起展示。你可以修改后再进入最终预览。</div>
+      <div style="display:grid;gap:12px">
+        <div>
+          <div style="font-size:12px;font-weight:700;color:var(--white);margin-bottom:6px">摘要</div>
+          <textarea id="review-structured-summary-input" class="knowledge-modal-textarea" style="min-height:88px" placeholder="这里展示基于用户自主输入生成的摘要，可继续微调。">${escapeHtml(structured.review_summary || '')}</textarea>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:var(--white);margin-bottom:6px">用户复盘</div>
+          <textarea id="review-structured-user-input" class="knowledge-modal-textarea" style="min-height:220px" placeholder="在这里继续修改用户复盘内容。">${escapeHtml(((structured.user_input_section || {}).display_text) || '')}</textarea>
+        </div>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:var(--white);margin-bottom:6px">板块归纳</div>
+          <textarea id="review-structured-sector-summary" class="knowledge-modal-textarea" style="min-height:110px" placeholder="这里是板块代表性归纳，可继续修改。">${escapeHtml(watchlistSection.sector_summary || '')}</textarea>
+        </div>
+        ${items.length ? `
+          <div style="display:grid;gap:10px">
+            ${items.map((item, index) => `
+              <div style="padding:12px;border:1px solid rgba(200,169,110,0.12);border-radius:12px;background:rgba(255,255,255,0.02)">
+                <div style="font-size:12px;font-weight:700;color:var(--white)">${escapeHtml(item.stock_name || '股票')} · ${escapeHtml(item.board_role || item.sector || '归纳样本')}</div>
+                <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-top:4px">${escapeHtml(item.sector || '自选股')}${Array.isArray(item.evidence) && item.evidence.length ? ` · 依据：${escapeHtml(item.evidence.join(' / '))}` : ''}</div>
+                <textarea id="review-structured-analysis-${index}" data-review-watchlist-analysis-index="${index}" class="knowledge-modal-textarea" style="min-height:120px;margin-top:8px" placeholder="在这里继续修改这只股票的归纳内容。">${escapeHtml(item.analysis_text || '')}</textarea>
+              </div>
+            `).join('')}
+          </div>
+        ` : '<div style="font-size:11px;color:var(--gray-400);line-height:1.7">当前还没有可编辑的自选股归纳内容。</div>'}
+      </div>
+    </div>
+  `;
+}
+
 function isReviewInputStage() {
   return reviewTriggerDraft.flowStage === 'intake' || reviewTriggerDraft.flowStage === 'optimize_rule';
 }
 
 function isReviewDraftProcessingStage() {
-  return reviewTriggerDraft.flowStage === 'draft_generating';
+  return reviewTriggerDraft.flowStage === 'draft_generating' || reviewTriggerDraft.flowStage === 'preview_generating';
 }
 
 function renderReviewPreviewPanel() {
@@ -5289,11 +6168,13 @@ function renderReviewTriggerModal(user) {
   const scrollSnapshot = captureModalSheetScroll('review-trigger-modal-content');
   const focusNames = getTenantWatchlistFocus(user.tenant.id);
   const stageLabelMap = {
-    intake: '1/3 输入稿件',
-    optimize_rule: '1/3 选择优化规则',
-    draft_generating: '2/3 Draft 生成中',
-    draft_review: '2/3 Draft 审核',
-    preview: '3/3 最终预览',
+    intake: '1/4 输入稿件',
+    optimize_rule: '1/4 选择优化规则',
+    draft_generating: '2/4 Draft 生成中',
+    draft_review: '2/4 Draft 审核',
+    preview_generating: '3/4 摘要和自选股归纳总结生成中',
+    structured_review: '3/4 摘要和自选股归纳总结审核',
+    preview: '4/4 最终预览',
   };
   const stageLabel = stageLabelMap[reviewTriggerDraft.flowStage] || stageLabelMap.intake;
   host.innerHTML = `
@@ -5339,11 +6220,12 @@ function renderReviewTriggerModal(user) {
       ` : ''}
       ${isReviewDraftProcessingStage() ? `
         <div class="knowledge-modal-block">
-          <label class="knowledge-modal-label">正在生成 Draft</label>
-          <div style="font-size:11px;color:var(--gray-400);line-height:1.7">原始输入已经提交给大模型处理。当前先进入 Draft 审核流程，待草稿生成完成后，会自动切换到可审核、可详细修改的页面。</div>
+          <label class="knowledge-modal-label">${reviewTriggerDraft.flowStage === 'preview_generating' ? '正在生成摘要和自选股归纳总结' : '正在生成 Draft'}</label>
+          <div style="font-size:11px;color:var(--gray-400);line-height:1.7">${reviewTriggerDraft.flowStage === 'preview_generating' ? '系统正在根据已确认的用户复盘和自选股，生成可审核的摘要、板块归纳与逐股总结。' : '原始输入已经提交给大模型处理。当前先进入 Draft 审核流程，待草稿生成完成后，会自动切换到可审核、可详细修改的页面。'}</div>
         </div>
       ` : ''}
       ${renderReviewDraftReviewPanel()}
+      ${renderReviewStructuredReviewPanel()}
     ` : ''}
     ${reviewTriggerDraft.flowStage !== 'preview' ? `
       <div class="knowledge-modal-block">
@@ -5367,24 +6249,28 @@ function renderReviewTriggerModal(user) {
 }
 
 function renderReviewFlowActions() {
-  if (reviewDraftGenerating) {
-    return '<button class="btn-gold" disabled>优化中...</button>';
+  if (reviewDraftGenerating || reviewPreviewGenerating) {
+    return '<button class="btn-gold" disabled>处理中...</button>';
   }
   if (reviewTriggerDraft.flowStage === 'optimize_rule') {
-    return '<button class="btn-outline" onclick="backToReviewIntake()">返回输入</button><button class="btn-gold" onclick="submitReviewSmartOptimize()">开始智能优化</button>';
+    return '<button class="btn-outline" onclick="backToReviewIntake()">返回输入</button><button class="btn-gold" onclick="submitReviewSmartOptimize()">开始优化</button>';
   }
   if (reviewTriggerDraft.flowStage === 'draft_review') {
-    return '<button class="btn-outline" onclick="backToReviewIntake()">回退修改</button><button class="btn-gold" onclick="confirmReviewDraftToPreview()">直接预览</button>';
+    return '<button class="btn-outline" onclick="backToReviewIntake()">回退修改</button><button class="btn-gold" onclick="confirmReviewDraftToPreview()">生成摘要与归纳</button>';
+  }
+  if (reviewTriggerDraft.flowStage === 'structured_review') {
+    return '<button class="btn-outline" onclick="backToReviewDraftEdit()">回退修改</button><button class="btn-gold" onclick="confirmStructuredReviewToPreview()">直接预览</button>';
   }
   if (reviewTriggerDraft.flowStage === 'preview' || reviewTriggerDraft.previewReady) {
     return '<button class="btn-outline" onclick="backToReviewDraftEdit()">回退修改</button><button class="btn-gold" onclick="publishReviewDraft()">确认发布</button>';
   }
-  return '<button class="btn-outline" onclick="prepareReviewDirectPreview()">直接预览</button><button class="btn-gold" onclick="openReviewOptimizeRuleStep()">智能优化</button>';
+  return '<button class="btn-outline" onclick="prepareReviewDirectPreview()">生成摘要与归纳</button><button class="btn-gold" onclick="openReviewOptimizeRuleStep()">优化成稿</button>';
 }
 
 function setReviewTriggerPeriod(period) {
   if (!REVIEW_PERIOD_CONFIG[period]) return;
   reviewTriggerDraft.period = period;
+  reviewStructuredPreview = null;
   const user = getActiveDemoUser();
   renderReviewTriggerModal(user);
 }
@@ -5397,6 +6283,7 @@ function setReviewTriggerSourceMode(mode) {
   reviewTriggerDraft.generatedPreviewText = '';
   reviewTriggerDraft.draftReviewText = '';
   reviewTriggerDraft.flowStage = 'intake';
+  reviewStructuredPreview = null;
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
@@ -5411,6 +6298,7 @@ function toggleReviewTriggerWatchlist(name) {
   }
   reviewTriggerDraft.selectedWatchlist = fullList.filter(item => current.has(item));
   reviewTriggerDraft.previewReady = false;
+  reviewStructuredPreview = null;
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
@@ -5421,6 +6309,7 @@ function setReviewOptimizeRuleMode(mode) {
     reviewTriggerDraft.aiPrompt = '';
     reviewTriggerDraft.promptTags = [];
   }
+  reviewStructuredPreview = null;
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
@@ -5431,9 +6320,32 @@ function toggleReviewVoiceLlmEnhancement(checked) {
 function syncReviewDraftFromModal() {
   const promptInput = document.getElementById('review-ai-prompt-input');
   const draftReviewInput = document.getElementById('review-draft-review-input');
+  const structuredSummaryInput = document.getElementById('review-structured-summary-input');
+  const structuredUserInput = document.getElementById('review-structured-user-input');
+  const structuredSectorSummary = document.getElementById('review-structured-sector-summary');
   syncReviewDraftFromEditors();
   if (promptInput) reviewTriggerDraft.aiPrompt = promptInput.value;
   if (draftReviewInput) reviewTriggerDraft.draftReviewText = draftReviewInput.value;
+  if (structuredSummaryInput || structuredUserInput || structuredSectorSummary) {
+    reviewStructuredPreview = normalizeReviewStructuredPreview(reviewStructuredPreview || {});
+    if (structuredSummaryInput) reviewStructuredPreview.review_summary = structuredSummaryInput.value;
+    if (structuredUserInput) {
+      reviewStructuredPreview.user_input_section = reviewStructuredPreview.user_input_section || {};
+      reviewStructuredPreview.user_input_section.display_text = structuredUserInput.value;
+      reviewTriggerDraft.draftReviewText = structuredUserInput.value;
+    }
+    if (structuredSectorSummary) {
+      reviewStructuredPreview.watchlist_analysis_section = reviewStructuredPreview.watchlist_analysis_section || {};
+      reviewStructuredPreview.watchlist_analysis_section.sector_summary = structuredSectorSummary.value;
+    }
+    const itemNodes = Array.from(document.querySelectorAll('[data-review-watchlist-analysis-index]'));
+    const items = ((reviewStructuredPreview.watchlist_analysis_section || {}).items || []);
+    itemNodes.forEach((node) => {
+      const index = Number(node.getAttribute('data-review-watchlist-analysis-index'));
+      if (!Number.isInteger(index) || !items[index]) return;
+      items[index].analysis_text = node.value;
+    });
+  }
 }
 
 function validateReviewIntakeReady() {
@@ -5455,50 +6367,128 @@ function openReviewOptimizeRuleStep() {
   reviewTriggerDraft.paragraphMode = 'ai';
   reviewTriggerDraft.skipAiProcessing = false;
   reviewTriggerDraft.previewReady = false;
+  reviewStructuredPreview = null;
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
-function prepareReviewDirectPreview() {
+async function prepareReviewStructuredPreview() {
   const user = getActiveDemoUser();
   const runtime = ensureTenantReviewRuntime(user.tenant.id);
   if (!validateReviewIntakeReady()) return;
+  if (!hasConfiguredGeneralLlm()) {
+    showToast('当前还没有配置可用的大模型。请先到 Admin 的系统专区 · 大模型专区配置一个通用模型。');
+    return;
+  }
+  syncReviewDraftFromModal();
+  reviewStructuredPreview = null;
+  reviewPreviewGenerating = true;
+  reviewPreviewJobState = {
+    status: 'running',
+    progress_stage: 'queued',
+    progress_percent: 8,
+    summary: '已提交预览任务，正在准备摘要与自选股分析',
+    result: { live_log: [] },
+  };
+  reviewTriggerDraft.flowStage = 'preview_generating';
+  reviewTriggerDraft.previewReady = false;
+  renderReviewTriggerModal(user);
+  try {
+    const previewResult = await requestReviewStructuredPreview();
+    if (!previewResult.async || !previewResult.job_code) throw new Error('review_prepare_preview_job_missing');
+    await new Promise((resolve, reject) => {
+      startAsyncJobPolling(previewResult.job_code, {
+        onProgress(job) {
+          reviewPreviewJobState = job || reviewPreviewJobState;
+          renderReviewTriggerModal(user);
+        },
+        onSuccess(job) {
+          const result = job.result || {};
+          reviewStructuredPreview = normalizeReviewStructuredPreview(result);
+          reviewPreviewGenerating = false;
+          reviewPreviewJobState = job;
+          reviewTriggerDraft.previewReady = false;
+          reviewTriggerDraft.flowStage = 'structured_review';
+          persistReviewDraftRuntime(runtime);
+          resolve();
+        },
+        onFailed(job) {
+          reject(new Error(job.error_message || job.summary || '双段式复盘预览生成失败'));
+        },
+        onError(error) {
+          reject(error);
+        },
+      });
+    });
+  } catch (error) {
+    reviewPreviewGenerating = false;
+    reviewPreviewJobState = null;
+    reviewTriggerDraft.flowStage = reviewTriggerDraft.generatedPreviewText ? 'draft_review' : 'intake';
+    renderReviewTriggerModal(user);
+    showToast(getReviewDraftGenerationErrorMessage(error));
+    return;
+  } finally {
+    reviewPreviewGenerating = false;
+    if (reviewPreviewJobState && reviewPreviewJobState.status === 'success') {
+      reviewPreviewJobState = null;
+    }
+  }
+  renderReviewTriggerModal(user);
+  showToast('摘要和自选股归纳总结已生成，请审核后预览');
+}
+
+function prepareReviewDirectPreview() {
   reviewTriggerDraft.paragraphMode = 'manual';
   reviewTriggerDraft.skipAiProcessing = true;
   reviewTriggerDraft.generatedPreviewText = '';
   reviewTriggerDraft.draftReviewText = getReviewDraftContentText();
-  reviewTriggerDraft.flowStage = 'preview';
-  reviewTriggerDraft.previewReady = true;
-  persistReviewDraftRuntime(runtime);
-  renderReviewTriggerModal(user);
-  showToast('已进入最终预览');
+  prepareReviewStructuredPreview();
 }
 
 function backToReviewIntake() {
   syncReviewDraftFromModal();
   reviewTriggerDraft.flowStage = 'intake';
   reviewTriggerDraft.previewReady = false;
+  reviewStructuredPreview = null;
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
 function backToReviewDraftEdit() {
   syncReviewDraftFromModal();
   reviewTriggerDraft.previewReady = false;
-  reviewTriggerDraft.flowStage = reviewTriggerDraft.generatedPreviewText ? 'draft_review' : 'intake';
+  if (reviewTriggerDraft.flowStage === 'preview' && reviewStructuredPreview) {
+    reviewTriggerDraft.flowStage = 'structured_review';
+  } else {
+    reviewStructuredPreview = null;
+    reviewTriggerDraft.flowStage = reviewTriggerDraft.generatedPreviewText ? 'draft_review' : 'intake';
+  }
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
 function confirmReviewDraftToPreview() {
-  const user = getActiveDemoUser();
-  const runtime = ensureTenantReviewRuntime(user.tenant.id);
   syncReviewDraftFromModal();
   if (!String(reviewTriggerDraft.draftReviewText || '').trim()) {
     showToast('请先确认或填写 draft 正文');
     return;
   }
-  reviewTriggerDraft.flowStage = 'preview';
+  reviewTriggerDraft.paragraphMode = 'ai';
+  reviewTriggerDraft.skipAiProcessing = false;
+  prepareReviewStructuredPreview();
+}
+
+function confirmStructuredReviewToPreview() {
+  syncReviewDraftFromModal();
+  reviewStructuredPreview = normalizeReviewStructuredPreview(reviewStructuredPreview || {});
+  if (!String(reviewStructuredPreview.review_summary || '').trim()) {
+    showToast('请先确认或填写摘要');
+    return;
+  }
+  if (!String((((reviewStructuredPreview.user_input_section || {}).display_text) || '')).trim()) {
+    showToast('请先确认或填写用户复盘');
+    return;
+  }
   reviewTriggerDraft.previewReady = true;
-  persistReviewDraftRuntime(runtime);
-  renderReviewTriggerModal(user);
+  reviewTriggerDraft.flowStage = 'preview';
+  renderReviewTriggerModal(getActiveDemoUser());
   showToast('已进入最终预览');
 }
 
@@ -5564,6 +6554,7 @@ function captureReviewVoiceInput() {
             reviewTriggerDraft.generatedPreviewText = '';
             reviewTriggerDraft.draftReviewText = '';
             reviewTriggerDraft.flowStage = 'intake';
+            reviewStructuredPreview = null;
             reviewIngestResult = result;
             openReviewIngestResultModal('语音转写成功（尚未入库）', [
               `转写引擎：${result.transcript_engine || '-'}`,
@@ -5607,6 +6598,7 @@ function captureReviewFileInput() {
   reviewTriggerDraft.generatedPreviewText = '';
   reviewTriggerDraft.draftReviewText = '';
   reviewTriggerDraft.flowStage = 'intake';
+  reviewStructuredPreview = null;
   renderReviewTriggerModal(getActiveDemoUser());
   showToast('文件已转成文案');
 }
@@ -5621,6 +6613,7 @@ function toggleReviewPromptTag(tag) {
   }
   reviewTriggerDraft.promptTags = REVIEW_PROMPT_TAGS.filter(item => current.has(item));
   reviewTriggerDraft.previewReady = false;
+  reviewStructuredPreview = null;
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
@@ -5641,6 +6634,7 @@ async function submitReviewSmartOptimize() {
     reviewTriggerDraft.promptTags = [];
   }
   reviewDraftGenerating = true;
+  reviewStructuredPreview = null;
   reviewTriggerDraft.flowStage = 'draft_generating';
   reviewTriggerDraft.previewReady = false;
   reviewDraftJobState = {
@@ -5697,7 +6691,7 @@ async function submitReviewSmartOptimize() {
   reviewTriggerDraft.previewReady = false;
   persistReviewDraftRuntime(runtime);
   renderReviewTriggerModal(user);
-  showToast('智能优化已完成，请审核 draft');
+  showToast('智能优化已完成，请先审核用户内容 Draft');
 }
 
 async function submitReviewTrigger() {
@@ -5723,6 +6717,7 @@ function publishReviewDraft() {
   const user = getActiveDemoUser();
   if (user.role !== 'dav') return;
   const runtime = ensureTenantReviewRuntime(user.tenant.id);
+  syncReviewDraftFromModal();
   const finalText = getReviewPreviewText();
   const transcriptionEngine = reviewTriggerDraft.sourceMode === 'voice'
     ? ((reviewIngestResult && reviewIngestResult.transcript_engine) || 'local')
@@ -5730,7 +6725,34 @@ function publishReviewDraft() {
   const transcriptModel = reviewTriggerDraft.sourceMode === 'voice'
     ? ((reviewIngestResult && reviewIngestResult.transcript_model) || '')
     : 'manual_input';
-  publishReviewContentEmbedding(finalText, transcriptionEngine, transcriptModel).then((publishResult) => {
+  const previewPayload = reviewStructuredPreview && typeof reviewStructuredPreview === 'object' ? reviewStructuredPreview : {};
+  const llmModels = [];
+  if (reviewIngestResult && reviewIngestResult.review_draft_llm) {
+    llmModels.push({
+      stage: 'draft',
+      key: reviewIngestResult.review_draft_llm.key || '',
+      label: reviewIngestResult.review_draft_llm.label || '',
+      provider: reviewIngestResult.review_draft_llm.provider || '',
+      model_name: reviewIngestResult.review_draft_llm.model_name || '',
+      purpose: reviewIngestResult.review_draft_llm.purpose || '',
+    });
+  }
+  (previewPayload.llm_models || []).forEach((item) => {
+    if (item && !llmModels.some((row) => row.stage === item.stage && row.key === item.key && row.model_name === item.model_name)) {
+      llmModels.push(item);
+    }
+  });
+  publishReviewContentEmbedding(finalText, transcriptionEngine, transcriptModel, {
+    review_summary: previewPayload.review_summary || '',
+    user_input_section: previewPayload.user_input_section || {
+      source_mode: reviewTriggerDraft.sourceMode || 'manual',
+      source_mode_label: (REVIEW_SOURCE_OPTIONS.find((item) => item.value === reviewTriggerDraft.sourceMode) || {}).label || '用户输入',
+      display_text: getReviewUserInputDisplayText(),
+      summary_source: 'llm_user_input_only',
+    },
+    watchlist_analysis_section: previewPayload.watchlist_analysis_section || {},
+    llm_models: llmModels,
+  }).then((publishResult) => {
     if (!publishResult.async || !publishResult.job_code) throw new Error('publish_job_missing');
     runtime.kolPublishedAt = '发布处理中';
     runtime.kolGeneratedAt = '发布处理中';
@@ -6843,6 +7865,8 @@ function renderKnowledgeExperience() {
 function renderHermesWorkspace() {
   renderHermesCredits();
   renderHermesComposerContext();
+  renderHermesInternetToggle();
+  renderHermesComposerSubmit();
   renderHermesThread();
 }
 
@@ -7499,12 +8523,9 @@ function renderDemoProfile(user) {
   if (el('profile-workbench-label')) el('profile-workbench-label').textContent = user.workbenchLabel;
   if (el('profile-workbench-meta')) el('profile-workbench-meta').textContent = user.workbenchHint;
   if (el('knowledge-dav-intake-card')) el('knowledge-dav-intake-card').style.display = user.role === 'dav' ? 'block' : 'none';
-  if (el('settings-tenant-label')) el('settings-tenant-label').textContent = user.role === 'dav'
-    ? `${user.tenant.name} · 当前管理租户`
-    : `${user.tenant.name} · 当前归属租户`;
   const badgesWrap = el('profile-badges-wrap');
   if (badgesWrap) {
-    badgesWrap.innerHTML = (user.badges || []).map(badge => `<div class="badge-chip">${badge}</div>`).join('');
+    badgesWrap.innerHTML = (user.systemBadges || user.badges || []).map(badge => `<div class="badge-chip">${badge}</div>`).join('');
   }
   renderDemoUserSwitchList();
   syncTenantScopedAdvisorViews();
@@ -7522,6 +8543,320 @@ function renderDemoProfile(user) {
   loadDmConversations();
   if (typeof currentDmKol !== 'undefined' && currentDmKol && !canAccessAdvisor(currentDmKol.name)) {
     closeDmChat();
+  }
+}
+
+function buildFallbackAccountSettingsPayload(user) {
+  const profile = user || currentDemoUser || {};
+  const tenant = profile.tenant || {};
+  return {
+    editable: {
+      display_name: profile.name || profile.username || '投研用户',
+      avatar: profile.avatar || '👤',
+      bio: profile.bio || '',
+      custom_tags: Array.isArray(profile.customTags) ? profile.customTags.slice() : [],
+    },
+    readonly: {
+      role_label: profile.roleLabel || (profile.role === 'dav' ? '大V投顾' : '投资者'),
+      tenant_name: tenant.name || '--',
+      advisor_name: tenant.advisor || profile.advisor_name || '--',
+      membership: profile.membership || '--',
+      relationship: profile.relationship || '--',
+      rights: tenant.rights || '--',
+      phone_masked: profile.phone_masked || '--',
+    },
+    system_badges: Array.isArray(profile.systemBadges || profile.badges) ? (profile.systemBadges || profile.badges).slice() : [],
+  };
+}
+
+function buildFallbackHelpCenterPayload(role) {
+  const normalizedRole = String(role || 'investor').trim().toLowerCase() || 'investor';
+  return {
+    title: '帮助中心',
+    subtitle: '按功能快速查找，不堆砌说明文字。',
+    role: normalizedRole,
+    categories: ['全部', '账号', '消息', 'Hermes', '复盘', '指标', '知识'],
+    articles: [
+      { id: 'account', category: '账号', title: '账号设置怎么修改', summary: '修改昵称、头像、简介和自定义关注标签。', bullets: ['租户关系和权益不在这里改。', '系统标签自动生成。', '自定义关注标签由自己维护。'], action_label: '打开账号设置', action_type: 'account_settings' },
+      { id: 'dm', category: '消息', title: '消息通知在哪里看', summary: '消息通知会直接进入消息板块。', bullets: ['投资者默认只和所属大V互动。', '大V可在消息板块处理私信和提醒。'], action_label: '打开消息板块', action_type: 'switch_tab', action_value: 'dm' },
+      { id: 'hermes', category: 'Hermes', title: 'Hermes 能问什么', summary: '优先承接个股、复盘、知识和指标类问题。', bullets: ['先查租户知识内容。', '超范围会被引导回平台能力。'], action_label: '打开 Hermes', action_type: 'switch_tab', action_value: 'hermes' },
+      { id: 'review', category: '复盘', title: '复盘怎么生成', summary: '先形成 Draft，再审核确认，最后预览发布。', bullets: ['用户输入先整理。', '确认后再生成摘要和自选股归纳总结。'], action_label: '打开复盘', action_type: 'switch_tab', action_value: 'review' },
+      { id: 'indicator', category: '指标', title: '智能指标怎么理解', summary: '提示词先约束逻辑，再由系统生成可确认结果。', bullets: ['已有原始指标可直接预览。', '新逻辑先临时生成再确认。'], action_label: '打开 Dashboard', action_type: 'switch_tab', action_value: 'feed' },
+      { id: 'knowledge', category: '知识', title: '知识专区怎么用', summary: '统一管理知识内容、同步和图谱关系。', bullets: ['大V看租户图谱。', 'Admin 看平台总图和单租户细图。'], action_label: '打开知识', action_type: 'switch_tab', action_value: 'knowledge' },
+    ],
+  };
+}
+
+function closeAccountSettingsModal() {
+  const modal = document.getElementById('account-settings-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function focusAccountCustomTagInput() {
+  const input = document.getElementById('account-settings-custom-tag-input');
+  if (input) input.focus();
+}
+
+function renderAccountCustomTags() {
+  const host = document.getElementById('account-settings-custom-tags');
+  if (!host) return;
+  const tags = Array.isArray(currentAccountSettingsState.customTags) ? currentAccountSettingsState.customTags : [];
+  host.innerHTML = `
+    ${tags.map((tag, index) => `
+      <span class="profile-tag-chip">
+        ${escapeHtml(tag)}
+        <button type="button" onclick="removeAccountCustomTag(${index})">×</button>
+      </span>
+    `).join('')}
+    <input id="account-settings-custom-tag-input" class="profile-tag-input" placeholder="${tags.length ? '继续输入标签，回车确认' : '输入标签后回车，例如：港股互联网'}" onkeydown="handleAccountCustomTagInputKeydown(event)" onblur="commitAccountCustomTagInput()">
+    ${!tags.length ? '<span class="profile-tag-placeholder">建议只保留 3-6 个最重要的关注标签，避免信息过散。</span>' : ''}
+  `;
+}
+
+function populateAccountSettingsModal(payload) {
+  const data = payload || buildFallbackAccountSettingsPayload(currentDemoUser);
+  const editable = data.editable || {};
+  const readonly = data.readonly || {};
+  currentAccountSettingsState.editable = JSON.parse(JSON.stringify(editable));
+  currentAccountSettingsState.readonly = JSON.parse(JSON.stringify(readonly));
+  currentAccountSettingsState.customTags = Array.isArray(editable.custom_tags) ? editable.custom_tags.slice() : [];
+  currentAccountSettingsState.systemBadges = Array.isArray(data.system_badges) ? data.system_badges.slice() : [];
+  const role = currentDemoUser && currentDemoUser.role === 'dav' ? '对外简介' : '个人简介';
+  const avatarInput = document.getElementById('account-settings-avatar');
+  const nameInput = document.getElementById('account-settings-display-name');
+  const bioInput = document.getElementById('account-settings-bio');
+  if (document.getElementById('account-settings-bio-label')) document.getElementById('account-settings-bio-label').textContent = role;
+  if (avatarInput) avatarInput.value = editable.avatar || '';
+  if (nameInput) nameInput.value = editable.display_name || '';
+  if (bioInput) bioInput.value = editable.bio || '';
+  const mapping = {
+    'account-settings-role-label': readonly.role_label,
+    'account-settings-relationship': readonly.relationship,
+    'account-settings-tenant-name': readonly.tenant_name,
+    'account-settings-advisor-name': readonly.advisor_name,
+    'account-settings-phone': readonly.phone_masked,
+    'account-settings-rights': readonly.rights,
+  };
+  Object.keys(mapping).forEach((id) => {
+    const node = document.getElementById(id);
+    if (node) node.textContent = mapping[id] || '--';
+  });
+  const systemBadgesHost = document.getElementById('account-settings-system-badges');
+  if (systemBadgesHost) {
+    systemBadgesHost.innerHTML = (currentAccountSettingsState.systemBadges || []).map((badge) => `<div class="badge-chip">${escapeHtml(badge)}</div>`).join('');
+  }
+  renderAccountCustomTags();
+}
+
+async function openAccountSettingsModal() {
+  if (!currentDemoUser) {
+    showToast('请先登录');
+    return;
+  }
+  populateAccountSettingsModal(buildFallbackAccountSettingsPayload(currentDemoUser));
+  const modal = document.getElementById('account-settings-modal');
+  if (modal) modal.classList.add('show');
+  try {
+    const resp = await fetch('/api/h5/account-settings');
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'load_account_settings_failed');
+    populateAccountSettingsModal(data.settings);
+  } catch (error) {
+    showToast(error.message === 'not_logged_in' ? '请先登录' : '已使用当前页面资料作为设置初始值');
+  }
+}
+
+function addAccountCustomTag(rawValue) {
+  const values = String(rawValue || '')
+    .split(/[，,\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (!values.length) return;
+  const tags = Array.isArray(currentAccountSettingsState.customTags) ? currentAccountSettingsState.customTags.slice() : [];
+  values.forEach((value) => {
+    const normalized = value.length > 12 ? value.slice(0, 12) : value;
+    if (tags.some((item) => String(item).toLowerCase() === normalized.toLowerCase())) return;
+    if (tags.length >= 8) return;
+    tags.push(normalized);
+  });
+  currentAccountSettingsState.customTags = tags;
+  renderAccountCustomTags();
+}
+
+function removeAccountCustomTag(index) {
+  const tags = Array.isArray(currentAccountSettingsState.customTags) ? currentAccountSettingsState.customTags.slice() : [];
+  if (index < 0 || index >= tags.length) return;
+  tags.splice(index, 1);
+  currentAccountSettingsState.customTags = tags;
+  renderAccountCustomTags();
+}
+
+function commitAccountCustomTagInput() {
+  const input = document.getElementById('account-settings-custom-tag-input');
+  if (!input) return;
+  const value = input.value || '';
+  input.value = '';
+  addAccountCustomTag(value);
+}
+
+function handleAccountCustomTagInputKeydown(event) {
+  if (!event) return;
+  if (event.key === 'Enter' || event.key === ',') {
+    event.preventDefault();
+    commitAccountCustomTagInput();
+  }
+}
+
+async function saveH5AccountSettings() {
+  if (!currentDemoUser) {
+    showToast('请先登录');
+    return;
+  }
+  const saveBtn = document.getElementById('account-settings-save-btn');
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = '保存中...';
+  }
+  try {
+    const payload = {
+      avatar: (document.getElementById('account-settings-avatar') || {}).value || '',
+      display_name: (document.getElementById('account-settings-display-name') || {}).value || '',
+      bio: (document.getElementById('account-settings-bio') || {}).value || '',
+      custom_tags: Array.isArray(currentAccountSettingsState.customTags) ? currentAccountSettingsState.customTags.slice() : [],
+    };
+    const resp = await fetch('/api/h5/account-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'save_account_settings_failed');
+    DEMO_PROFILE_USERS = Array.isArray(data.profiles) ? JSON.parse(JSON.stringify(data.profiles)) : DEMO_PROFILE_USERS;
+    window.CURRENT_DEMO_PROFILE = data.profile || window.CURRENT_DEMO_PROFILE;
+    renderDemoProfile(data.profile || getDefaultDemoUser());
+    closeAccountSettingsModal();
+    showToast('账号设置已保存');
+  } catch (error) {
+    showToast(error.message || '保存失败');
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = '保存';
+    }
+  }
+}
+
+function openProfileNotificationCenter() {
+  closeAccountSettingsModal();
+  closeHelpCenterModal();
+  switchTab('dm');
+  showToast('已进入消息板块');
+}
+
+function closeHelpCenterModal() {
+  const modal = document.getElementById('help-center-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function renderHelpCenterCategories() {
+  const host = document.getElementById('help-center-categories');
+  const payload = h5HelpCenterState.payload || buildFallbackHelpCenterPayload(currentDemoUser && currentDemoUser.role);
+  if (!host) return;
+  const categories = Array.isArray(payload.categories) && payload.categories.length ? payload.categories : ['全部'];
+  host.innerHTML = categories.map((category) => `
+    <button
+      type="button"
+      class="help-center-chip ${h5HelpCenterState.category === category ? 'active' : ''}"
+      onclick="selectHelpCenterCategory('${escapeAttr(category)}')"
+    >${escapeHtml(category)}</button>
+  `).join('');
+}
+
+function runHelpCenterAction(actionType, actionValue) {
+  if (actionType === 'account_settings') {
+    closeHelpCenterModal();
+    openAccountSettingsModal();
+    return;
+  }
+  if (actionType === 'switch_tab' && actionValue) {
+    closeHelpCenterModal();
+    switchTab(actionValue);
+    return;
+  }
+}
+
+function renderHelpCenterArticles() {
+  const host = document.getElementById('help-center-list');
+  const payload = h5HelpCenterState.payload || buildFallbackHelpCenterPayload(currentDemoUser && currentDemoUser.role);
+  if (!host) return;
+  const query = String(h5HelpCenterState.query || '').trim().toLowerCase();
+  const category = h5HelpCenterState.category || '全部';
+  const articles = Array.isArray(payload.articles) ? payload.articles : [];
+  const filtered = articles.filter((item) => {
+    if (category !== '全部' && item.category !== category) return false;
+    if (!query) return true;
+    const haystack = [item.title, item.summary].concat(Array.isArray(item.bullets) ? item.bullets : []).join(' ').toLowerCase();
+    return haystack.includes(query);
+  });
+  if (!filtered.length) {
+    host.innerHTML = '<div class="help-center-empty">没有找到匹配内容。可以换个关键词，或直接去 Hermes / 复盘 / 知识专区查看对应功能。</div>';
+    return;
+  }
+  host.innerHTML = filtered.map((item) => `
+    <div class="help-center-card">
+      <div class="help-center-card-top">
+        <div>
+          <div class="help-center-card-title">${escapeHtml(item.title || '')}</div>
+          <div class="help-center-card-summary">${escapeHtml(item.summary || '')}</div>
+        </div>
+        <div class="help-center-card-category">${escapeHtml(item.category || '说明')}</div>
+      </div>
+      <div class="help-center-card-bullets">
+        ${(Array.isArray(item.bullets) ? item.bullets : []).map((bullet) => `<div class="help-center-card-bullet">• ${escapeHtml(bullet)}</div>`).join('')}
+      </div>
+      ${item.action_label ? `<div class="modal-actions" style="margin-top:10px"><button class="btn-outline" type="button" onclick="runHelpCenterAction('${escapeAttr(item.action_type || '')}','${escapeAttr(item.action_value || '')}')">${escapeHtml(item.action_label)}</button></div>` : ''}
+    </div>
+  `).join('');
+}
+
+function handleHelpCenterSearch(value) {
+  h5HelpCenterState.query = value || '';
+  renderHelpCenterArticles();
+}
+
+function selectHelpCenterCategory(category) {
+  h5HelpCenterState.category = category || '全部';
+  renderHelpCenterCategories();
+  renderHelpCenterArticles();
+}
+
+async function openHelpCenterModal() {
+  const modal = document.getElementById('help-center-modal');
+  if (modal) modal.classList.add('show');
+  const role = currentDemoUser && currentDemoUser.role ? currentDemoUser.role : 'investor';
+  if (document.getElementById('help-center-search-input')) document.getElementById('help-center-search-input').value = '';
+  h5HelpCenterState.query = '';
+  h5HelpCenterState.category = '全部';
+  h5HelpCenterState.payload = buildFallbackHelpCenterPayload(role);
+  if (document.getElementById('help-center-subtitle')) {
+    document.getElementById('help-center-subtitle').textContent = h5HelpCenterState.payload.subtitle || '按功能快速查找，不堆砌说明文字。';
+  }
+  renderHelpCenterCategories();
+  renderHelpCenterArticles();
+  try {
+    const resp = await fetch(`/api/h5/help-center?role=${encodeURIComponent(role)}`);
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'load_help_center_failed');
+    h5HelpCenterState.loaded = true;
+    h5HelpCenterState.role = role;
+    h5HelpCenterState.payload = data.help_center || buildFallbackHelpCenterPayload(role);
+    if (document.getElementById('help-center-subtitle')) {
+      document.getElementById('help-center-subtitle').textContent = h5HelpCenterState.payload.subtitle || '按功能快速查找，不堆砌说明文字。';
+    }
+    renderHelpCenterCategories();
+    renderHelpCenterArticles();
+  } catch (error) {
+    showToast('帮助中心已使用当前页面内置说明');
   }
 }
 
@@ -7550,8 +8885,11 @@ async function logoutH5User() {
     if (!resp.ok || data.ok === false) throw new Error(data.error || 'h5_logout_failed');
     currentDemoUser = null;
     window.CURRENT_DEMO_PROFILE = null;
+    hermesUsageSnapshot = null;
+    hermesCredits = 0;
     setH5ShellLoggedOut(true);
     renderH5LoginScreen();
+    renderHermesCredits();
     showToast('已退出登录');
   } catch (error) {
     showToast('退出失败');
@@ -7573,6 +8911,7 @@ async function switchDemoProfileUser(userId, options) {
     DEMO_PROFILE_USERS = Array.isArray(data.profiles) ? JSON.parse(JSON.stringify(data.profiles)) : DEMO_PROFILE_USERS;
     window.CURRENT_DEMO_PROFILE = data.current_profile || nextUser;
     renderDemoProfile(getDefaultDemoUser());
+    await refreshHermesCredits({ silent: true });
     if (!options.silentToast) {
       showToast(`已切换到${nextUser.roleLabel}：${nextUser.username}`);
     }
@@ -7619,56 +8958,86 @@ function switchTab(tab) {
   }
 }
 
-function getFanStockVisitSeedEntries() {
-  const tenantSlug = String((currentDemoUser && currentDemoUser.tenant && currentDemoUser.tenant.slug) || '').trim();
-  return H5_FAN_STOCK_VISIT_SEED[tenantSlug] || H5_FAN_STOCK_VISIT_SEED.default || [];
+function getCurrentFanStockObservationPayload() {
+  const payload = currentTenantDashboardPayload && typeof currentTenantDashboardPayload === 'object'
+    ? currentTenantDashboardPayload
+    : (INITIAL_TENANT_DASHBOARD || {});
+  const observation = payload && typeof payload === 'object' ? payload.fan_stock_observation : null;
+  return observation && typeof observation === 'object' ? observation : {};
 }
 
-function buildFanStockSectorData() {
-  const seedEntries = Array.isArray(getFanStockVisitSeedEntries()) ? getFanStockVisitSeedEntries() : [];
-  const sectorMap = {};
-  seedEntries.forEach((entry) => {
-    const detail = (WATCHLIST_DETAILS_MAP || {})[String(entry.code || '').trim()];
-    if (!detail) return;
-    const sectorName = String(entry.sector || detail.industry || '其他板块').trim() || '其他板块';
-    if (!sectorMap[sectorName]) {
-      sectorMap[sectorName] = {
-        name: sectorName,
-        visits: 0,
-        note: String(entry.note || '').trim(),
-        stocks: [],
+async function trackFanStockObservation(stockCode, eventType, options) {
+  const activeUser = getActiveDemoUser();
+  if (!activeUser || activeUser.role !== 'investor') return null;
+  const tenantSlug = String((activeUser.tenant || {}).slug || '').trim();
+  const normalizedCode = normalizeStockLookupValue(stockCode);
+  if (!tenantSlug || !normalizedCode) return null;
+  const opts = options || {};
+  try {
+    const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/fan-stock-observation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        stock_code: normalizedCode,
+        event_type: eventType || 'watchlist_detail_view',
+        entry_point: opts.entryPoint || '',
+        source_detail: opts.sourceDetail || '',
+      }),
+    });
+    const payload = await resp.json();
+    if (!resp.ok || !payload.ok) throw new Error(payload.error || 'fan_stock_observation_track_failed');
+    if (payload.fan_stock_observation) {
+      currentTenantDashboardPayload = {
+        ...(currentTenantDashboardPayload || {}),
+        fan_stock_observation: payload.fan_stock_observation,
       };
     }
-    sectorMap[sectorName].visits += Number(entry.visits || 0);
-    if (!sectorMap[sectorName].note && entry.note) {
-      sectorMap[sectorName].note = String(entry.note || '').trim();
-    }
-    sectorMap[sectorName].stocks.push({
-      code: detail.code,
-      name: detail.name,
-      visits: Number(entry.visits || 0),
-    });
-  });
-  return Object.values(sectorMap)
-    .map((sector) => ({
-      ...sector,
-      stocks: sector.stocks.sort((a, b) => b.visits - a.visits),
-    }))
-    .sort((a, b) => b.visits - a.visits);
+    return payload;
+  } catch (error) {
+    return null;
+  }
 }
 
 function renderFanStockSectorChart() {
   const host = document.getElementById('wb-fan-stock-sector-chart');
   if (!host) return;
-  const sectors = buildFanStockSectorData();
+  const activeUser = getActiveDemoUser();
+  if (!activeUser || activeUser.role !== 'dav') {
+    host.innerHTML = '<div class="wb-stock-sector-empty"><div class="wb-stock-sector-summary">当前为投资者身份，不展示粉丝个股观察数据。</div></div>';
+    return;
+  }
+  const payload = getCurrentFanStockObservationPayload();
+  const sectors = Array.isArray(payload.sectors) ? payload.sectors : [];
+  const totals = payload && typeof payload.totals === 'object' ? payload.totals : {};
   if (!sectors.length) {
-    host.innerHTML = '<div class="wb-stock-sector-summary">当前还没有可展示的粉丝个股访问分布。</div>';
+    host.innerHTML = `
+      <div class="wb-stock-sector-empty">
+        <div class="wb-stock-sector-summary">${escapeHtml(payload.summary || '当前近 7 天还没有粉丝个股观察数据。')}</div>
+      </div>
+    `;
     return;
   }
   const maxVisits = Math.max(...sectors.map((item) => Number(item.visits || 0)), 1);
   host.innerHTML = `
     <div class="wb-stock-sector-summary">
-      近 7 天按板块归并 Hermes 与个股详情访问热度。先看粉丝在哪些板块停留最多，再点进具体股票查看自选股详情。
+      ${escapeHtml(payload.summary || '近 7 天按板块归并 Hermes 与个股详情访问热度。先看粉丝在哪些板块停留最多，再点进具体股票查看自选股详情。')}
+    </div>
+    <div class="wb-stock-sector-stats">
+      <div class="wb-stock-sector-stat">
+        <div class="wb-stock-sector-stat-label">活跃粉丝</div>
+        <div class="wb-stock-sector-stat-value">${Number(totals.active_fans || 0)}</div>
+        <div class="wb-stock-sector-stat-sub">${escapeHtml(payload.hot_sector ? `最热板块：${payload.hot_sector}` : '等待更多观察行为')}</div>
+      </div>
+      <div class="wb-stock-sector-stat">
+        <div class="wb-stock-sector-stat-label">详情查看</div>
+        <div class="wb-stock-sector-stat-value">${Number(totals.detail_views || 0)}</div>
+        <div class="wb-stock-sector-stat-sub">直接点开个股详情</div>
+      </div>
+      <div class="wb-stock-sector-stat">
+        <div class="wb-stock-sector-stat-label">Hermes 追问</div>
+        <div class="wb-stock-sector-stat-value">${Number(totals.hermes_queries || 0)}</div>
+        <div class="wb-stock-sector-stat-sub">围绕个股继续研究</div>
+      </div>
     </div>
     ${sectors.map((sector) => {
       const width = Math.max(18, Math.round((Number(sector.visits || 0) / maxVisits) * 100));
@@ -7680,6 +9049,11 @@ function renderFanStockSectorChart() {
               <div class="wb-stock-sector-meta">${escapeHtml(sector.note || '点击任意股票可直接进入自选股详情。')}</div>
             </div>
             <div class="wb-stock-sector-count">${Number(sector.visits || 0)} 次访问</div>
+          </div>
+          <div class="wb-stock-sector-breakdown">
+            <span class="wb-stock-sector-breakdown-pill">详情 ${Number(sector.detail_views || 0)}</span>
+            <span class="wb-stock-sector-breakdown-pill">Hermes ${Number(sector.hermes_queries || 0)}</span>
+            <span class="wb-stock-sector-breakdown-pill">活跃粉丝 ${Number(sector.user_count || 0)}</span>
           </div>
           <div class="wb-stock-sector-track">
             <div class="wb-stock-sector-fill" style="width:${width}%"></div>
@@ -8041,6 +9415,10 @@ async function openWatchlistDetail(stockCode, section) {
     const data = await resp.json();
     currentWatchlistDetail = data;
     renderWatchlistDetail(data, section);
+    trackFanStockObservation(stockCode, 'watchlist_detail_view', {
+      entryPoint: 'watchlist_detail',
+      sourceDetail: section || 'overview',
+    });
   } catch (e) {
     host.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">加载失败，请稍后重试</div>';
   }
@@ -8387,11 +9765,9 @@ function runWatchlistHermes(stockCode, mode) {
   setTimeout(() => {
     const input = document.getElementById('hermes-question-input');
     if (input) {
-      input.value = mode === 'forecast'
+      fillHermesQuestionInput(mode === 'forecast'
         ? `请判断 ${stockLabel} 当前更适合继续跟踪、重点研究还是暂缓处理，并说明原因。`
-        : `请围绕 ${stockLabel} 的盈利、估值、行业位置和关键争议点，给我一个简洁但完整的基本面分析。`;
-      input.style.height = 'auto';
-      input.style.height = Math.max(92, Math.min(input.scrollHeight, 180)) + 'px';
+        : `请围绕 ${stockLabel} 的盈利、估值、行业位置和关键争议点，给我一个简洁但完整的基本面分析。`);
       runHermesAnalysis({ fromWatchlist: true });
     }
   }, 80);
@@ -8867,12 +10243,38 @@ function submitPost() {
 const HERMES_CUSTOM_SKILL_STORAGE_KEY = 'gangtise_demo_hermes_custom_skills';
 let hermesSelectedSkill = 'basic';
 let hermesConversation = [];
-let hermesCredits = 128;
+let hermesCredits = 0;
+let hermesUsageSnapshot = null;
 let hermesCustomSkillDraft = { title: '', prompt: '', knowledgeIds: [] };
 let hermesScopedKnowledgeId = '';
 let hermesUploadedFiles = [];
+let hermesSavedKnowledgeEntries = {};
 let hermesUseInternetAnswer = false;
 let hermesLoadingTicker = null;
+let hermesVoiceRecorder = null;
+let hermesVoiceChunks = [];
+let hermesVoiceRecording = false;
+let hermesVoiceUploading = false;
+
+function getHermesSessionStorageKey() {
+  const activeUser = getActiveDemoUser() || {};
+  const tenantSlug = (((activeUser || {}).tenant || {}).slug || 'default').toLowerCase();
+  const profileId = String(activeUser.username || activeUser.name || activeUser.role || 'guest').trim().toLowerCase() || 'guest';
+  return `gangtise_demo_hermes_session:${tenantSlug}:${profileId}`;
+}
+
+function ensureHermesSessionId() {
+  const storageKey = getHermesSessionStorageKey();
+  try {
+    const current = localStorage.getItem(storageKey);
+    if (current) return current;
+    const next = `hermes_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(storageKey, next);
+    return next;
+  } catch (e) {
+    return `hermes_${Date.now()}_fallback`;
+  }
+}
 
 const DEFAULT_HERMES_SKILLS = {
   basic: {
@@ -8913,6 +10315,84 @@ const DEFAULT_HERMES_SKILLS = {
       '请输出适合复盘引用的依据卡片。'
     ],
     knowledgeKeywords: ['纪要', '证据', '来源', '方法']
+  },
+  report_interpretation: {
+    id: 'report_interpretation',
+    icon: '📄',
+    label: '报告解读',
+    desc: '适合上传研报、纪要或文件后，让 Hermes 先读材料，再给出结构化解读。',
+    promptTemplate: '先解析当前上传文件，再输出结构化解读、重点结论和待验证项。',
+    suggestions: [
+      '请解读我刚上传的这份研报，先说核心结论。',
+      '请把这份纪要拆成结论、依据和风险提示。',
+      '请把上传文件做成一版适合继续追问的结构化摘要。'
+    ],
+    knowledgeKeywords: ['研报', '纪要', '报告', '知识']
+  },
+  content_generation: {
+    id: 'content_generation',
+    icon: '✍️',
+    label: '内容生成',
+    desc: '把已有知识、附件或研究结果整理成摘要、提纲、草稿或发布文案。',
+    promptTemplate: '结合当前上下文，输出一版可直接修改的结构化内容草稿。',
+    suggestions: [
+      '请基于当前内容生成一版结构化摘要。',
+      '请帮我起草一段研究结论，语气专业一点。',
+      '请整理成提纲，方便我后续继续修改。'
+    ],
+    knowledgeKeywords: ['摘要', '提纲', '草稿', '方法']
+  },
+  line_chart: {
+    id: 'line_chart',
+    icon: '📈',
+    label: '线性图',
+    desc: '优先把指标、股指或智能指标按线性趋势方式展示，适合看方向和斜率变化。',
+    promptTemplate: '优先输出线性趋势图，并围绕趋势方向、阶段拐点和最近变化做解释。',
+    suggestions: [
+      '请用线性图展示这个指标最近3个月的趋势。',
+      '请把这条指数的趋势线画出来并解释最近变化。',
+      '请用线性图展示近一段时间的方向和拐点。'
+    ],
+    knowledgeKeywords: ['趋势', '线性图', '走势图']
+  },
+  kline_chart: {
+    id: 'kline_chart',
+    icon: '🕯️',
+    label: 'K线图',
+    desc: '优先用 K 线方式展示指数或指标，适合看波动区间、均线和异动位置。',
+    promptTemplate: '优先输出 K 线图，并解释区间波动、均线关系和异常点。',
+    suggestions: [
+      '请给我这个指数最近3个月的K线图。',
+      '请用K线展示这条指标最近的波动情况。',
+      '请结合K线解释最近区间高低点。'
+    ],
+    knowledgeKeywords: ['K线', '蜡烛图', '均线']
+  },
+  distribution_chart: {
+    id: 'distribution_chart',
+    icon: '📊',
+    label: '分布图',
+    desc: '优先把指标按分布统计方式展示，适合看区间集中度、离散程度和分位位置。',
+    promptTemplate: '优先输出分布统计图，并解释当前值落在哪个区间、分布是否集中。',
+    suggestions: [
+      '请用分布图看这个指标最近3个月的分布。',
+      '请展示这条指数近阶段的区间分布统计。',
+      '请用分布图判断当前值处于什么区间。'
+    ],
+    knowledgeKeywords: ['分布', '直方图', '区间统计']
+  },
+  small_talk: {
+    id: 'small_talk',
+    icon: '💬',
+    label: '轻度闲聊',
+    desc: '用于轻量追问、上下文承接和研究方向确认，不替代研究型任务。',
+    promptTemplate: '简短承接上下文，必要时把问题收口到平台支持的研究能力。',
+    suggestions: [
+      '先帮我确认一下我刚才的问题更适合怎么问。',
+      '你先告诉我接下来应该补什么信息。',
+      '如果要继续研究，这一步最适合先看什么？'
+    ],
+    knowledgeKeywords: ['帮助', '确认', '方向']
   }
 };
 
@@ -8923,6 +10403,12 @@ async function selectHermesMode(mode) {
     '基本面分析': 'basic',
     '自选股诊断': 'judgement',
     '证据链归因': 'evidence',
+    '线性图': 'line_chart',
+    'K线图': 'kline_chart',
+    '分布图': 'distribution_chart',
+    '报告解读': 'report_interpretation',
+    '内容生成': 'content_generation',
+    '轻度闲聊': 'small_talk',
     '线索追踪': 'evidence',
     '复盘速写': 'basic',
     '研报精读': 'evidence',
@@ -8966,6 +10452,53 @@ function getHermesActiveQuestion() {
   return (input && input.value) || '';
 }
 
+function resizeHermesQuestionInput(input) {
+  const node = input || document.getElementById('hermes-question-input');
+  if (!node) return;
+  node.style.height = 'auto';
+  node.style.height = `${Math.max(88, Math.min(node.scrollHeight, 160))}px`;
+}
+
+function renderHermesComposerSubmit() {
+  const button = document.getElementById('hermes-composer-submit');
+  if (!button) return;
+  const hasText = !!String(getHermesActiveQuestion() || '').trim();
+  const isVoiceMode = !hasText;
+  button.className = `hermes-composer-send hermes-lobster-send${isVoiceMode ? ' is-voice' : ''}${hermesVoiceRecording ? ' is-recording' : ''}${hermesVoiceUploading ? ' is-processing' : ''}`;
+  if (isVoiceMode) {
+    const title = hermesVoiceUploading ? '语音转写中' : (hermesVoiceRecording ? '结束录音' : '开始录音');
+    button.innerHTML = `
+      <svg class="hermes-composer-send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3z"></path>
+        <path d="M19 11a7 7 0 0 1-14 0"></path>
+        <path d="M12 18v3"></path>
+      </svg>
+    `;
+    button.setAttribute('aria-label', title);
+    button.title = title;
+    button.disabled = !!hermesVoiceUploading;
+    return;
+  }
+  button.textContent = '发送';
+  button.removeAttribute('aria-label');
+  button.title = '发送';
+  button.disabled = false;
+}
+
+function handleHermesQuestionInput(input) {
+  resizeHermesQuestionInput(input);
+  renderHermesComposerSubmit();
+}
+
+function fillHermesQuestionInput(text, options = {}) {
+  const input = document.getElementById('hermes-question-input');
+  if (!input) return;
+  input.value = String(text || '');
+  resizeHermesQuestionInput(input);
+  renderHermesComposerSubmit();
+  if (options.focus !== false) input.focus();
+}
+
 function focusHermesQuestionComposer() {
   const input = document.getElementById('hermes-question-input');
   if (input) input.focus();
@@ -8979,6 +10512,62 @@ function getHermesActiveKnowledgeScopeText() {
 
 function getHermesUploadedFileNames() {
   return hermesUploadedFiles.map(item => item.filename || item.name || '文件');
+}
+
+function createHermesEntryId(prefix = 'entry') {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function getHermesCanSaveKnowledge() {
+  const activeUser = getActiveDemoUser() || {};
+  return String(activeUser.role || '').trim().toLowerCase() === 'dav';
+}
+
+function getHermesKnowledgeSaveState(entryId) {
+  return hermesSavedKnowledgeEntries[String(entryId || '').trim()] || 'idle';
+}
+
+function buildHermesKnowledgePayload(entry, artifact) {
+  const normalizedEntry = entry && typeof entry === 'object' ? entry : {};
+  const normalizedArtifact = artifact && typeof artifact === 'object' ? artifact : {};
+  const primaryBullets = dedupeHermesTextItems(
+    (normalizedArtifact.bullets || []).concat(normalizedArtifact.judgement || [])
+  );
+  const nextStepBullets = dedupeHermesTextItems(
+    (normalizedArtifact.followups || []).concat(normalizedArtifact.nextSteps || [])
+  );
+  const evidenceBullets = dedupeHermesTextItems(
+    (normalizedArtifact.knowledge || []).map(item => item && item.title ? item.title : '').concat(normalizedArtifact.citations || [])
+  );
+  const symbolTags = normalizedArtifact.symbol && normalizedArtifact.symbol.name
+    ? [normalizedArtifact.symbol.name]
+    : [];
+  const bodySections = [
+    normalizedEntry.question ? `用户问题\n${normalizedEntry.question}` : '',
+    normalizedArtifact.headline ? `核心结论\n${normalizedArtifact.headline}` : '',
+    normalizedArtifact.summary ? `摘要\n${normalizedArtifact.summary}` : '',
+    normalizedArtifact.body ? `正文\n${normalizedArtifact.body}` : '',
+    primaryBullets.length ? `要点\n${primaryBullets.map((item, index) => `${index + 1}. ${item}`).join('\n')}` : '',
+    nextStepBullets.length ? `后续建议\n${nextStepBullets.map((item, index) => `${index + 1}. ${item}`).join('\n')}` : '',
+    evidenceBullets.length ? `参考线索\n${evidenceBullets.map((item, index) => `${index + 1}. ${item}`).join('\n')}` : '',
+  ].filter(Boolean);
+  const title = String(
+    normalizedArtifact.headline || normalizedArtifact.title || normalizedEntry.question || 'Hermes问答沉淀'
+  ).trim() || 'Hermes问答沉淀';
+  const summary = String(
+    normalizedArtifact.summary || normalizedArtifact.headline || normalizedArtifact.body || normalizedEntry.question || ''
+  ).trim();
+  return {
+    knowledge_type: 'manual',
+    title: title.slice(0, 80),
+    summary: summary.slice(0, 240),
+    body: bodySections.join('\n\n').slice(0, 12000),
+    source_label: 'Hermes问答',
+    source_detail: `来源：Hermes 对话沉淀${normalizedEntry.skillLabel ? ` · ${normalizedEntry.skillLabel}` : ''}`,
+    tags: dedupeHermesTextItems(['Hermes问答', normalizedEntry.skillLabel || '', ...symbolTags]).slice(0, 6),
+    skip_ai_processing: true,
+    processing_mode: 'none',
+  };
 }
 
 function renderHermesComposerContext() {
@@ -9006,14 +10595,6 @@ function renderHermesComposerContext() {
       </div>
     `);
   }
-  if (hermesUseInternetAnswer) {
-    chips.push(`
-      <div class="hermes-composer-chip">
-        <span>互联网问答</span>
-        <button onclick="clearHermesInternetAnswer()" aria-label="关闭互联网问答">×</button>
-      </div>
-    `);
-  }
   getHermesUploadedFileNames().forEach((name, index) => {
     chips.push(`
       <div class="hermes-composer-chip">
@@ -9022,8 +10603,20 @@ function renderHermesComposerContext() {
       </div>
     `);
   });
-  const html = chips.join('') || '<div class="hermes-action-hint">默认按当前租户知识库回答。</div>';
+  const html = chips.join('') || `<div class="hermes-action-hint">${hermesUseInternetAnswer ? '默认先查当前租户知识库，再补充互联网公开信息。' : '默认先查当前租户知识库。'}</div>`;
   hosts.forEach(host => { host.innerHTML = html; });
+}
+
+function renderHermesInternetToggle() {
+  const button = document.getElementById('hermes-internet-toggle');
+  if (!button) return;
+  button.classList.add('hermes-lobster-tool');
+  button.classList.toggle('is-active', !!hermesUseInternetAnswer);
+  button.innerHTML = `<span class="hermes-lobster-tool-icon">🌐</span><span>${hermesUseInternetAnswer ? '互联网中' : '互联网'}</span>`;
+  button.setAttribute('aria-pressed', hermesUseInternetAnswer ? 'true' : 'false');
+  button.title = hermesUseInternetAnswer
+    ? '已开启互联网补充，Hermes 会先查租户知识库，再补公开信息'
+    : '开启后，Hermes 会在租户知识库之后补充互联网公开信息';
 }
 
 function clearHermesInternetAnswer() {
@@ -9031,11 +10624,109 @@ function clearHermesInternetAnswer() {
   renderHermesWorkspace();
 }
 
-function enableHermesInternetAnswer() {
-  hermesUseInternetAnswer = true;
-  closeHermesPlusMenu();
+function toggleHermesInternetAnswer(forceValue) {
+  hermesUseInternetAnswer = typeof forceValue === 'boolean' ? forceValue : !hermesUseInternetAnswer;
   renderHermesWorkspace();
-  showToast('已切换为互联网问答');
+  showToast(hermesUseInternetAnswer ? '已开启互联网补充' : '已关闭互联网补充');
+}
+
+async function uploadHermesVoiceBlob(audioBlob) {
+  const user = getActiveDemoUser();
+  const formData = new FormData();
+  const fileName = `hermes-${Date.now()}.webm`;
+  formData.append('audio', audioBlob, fileName);
+  formData.append('tenant_slug', ((user || {}).tenant || {}).slug || '');
+  formData.append('period', 'hermes');
+  formData.append('entry_point', 'h5_hermes');
+  formData.append('speaker_name', (user && (user.advisor_name || user.username)) || '');
+  formData.append('use_llm_enhancement', 'false');
+  const resp = await fetch('/api/review/voice-transcribe', {
+    method: 'POST',
+    body: formData,
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.success) {
+    throw new Error((data && data.error) || 'voice_transcribe_failed');
+  }
+  return data;
+}
+
+function toggleHermesVoiceCapture() {
+  if (hermesVoiceUploading) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
+    showToast('当前浏览器不支持录音');
+    return;
+  }
+  if (hermesVoiceRecording && hermesVoiceRecorder) {
+    hermesVoiceRecorder.stop();
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+    hermesVoiceChunks = [];
+    hermesVoiceRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    hermesVoiceRecording = true;
+    renderHermesComposerSubmit();
+    hermesVoiceRecorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) {
+        hermesVoiceChunks.push(event.data);
+      }
+    };
+    hermesVoiceRecorder.onerror = () => {
+      hermesVoiceRecording = false;
+      hermesVoiceUploading = false;
+      stream.getTracks().forEach((track) => track.stop());
+      renderHermesComposerSubmit();
+      showToast('录音失败，请重试');
+    };
+    hermesVoiceRecorder.onstop = async () => {
+      hermesVoiceRecording = false;
+      hermesVoiceUploading = true;
+      renderHermesComposerSubmit();
+      const blob = new Blob(hermesVoiceChunks, { type: hermesVoiceRecorder.mimeType || 'audio/webm' });
+      stream.getTracks().forEach((track) => track.stop());
+      try {
+        const data = await uploadHermesVoiceBlob(blob);
+        if (!data.async || !data.job_code) throw new Error('voice_transcribe_job_missing');
+        showToast('语音已提交，正在后台转写');
+        startAsyncJobPolling(data.job_code, {
+          onSuccess(job) {
+            const result = job.result || {};
+            const transcript = String(result.display_transcript || result.enhanced_transcript || result.transcript || '').trim();
+            fillHermesQuestionInput(transcript);
+            showToast('语音已转成问题草稿');
+          },
+          onFailed(job) {
+            showToast(job.error_message || '语音转写失败');
+          },
+          onError(error) {
+            showToast(error.message || '语音转写失败');
+          },
+        });
+      } catch (error) {
+        showToast(error.message || '语音转写失败');
+      } finally {
+        hermesVoiceUploading = false;
+        hermesVoiceRecorder = null;
+        hermesVoiceChunks = [];
+        renderHermesComposerSubmit();
+      }
+    };
+    hermesVoiceRecorder.start();
+  }).catch(() => {
+    showToast('未获得麦克风权限');
+    hermesVoiceRecording = false;
+    hermesVoiceUploading = false;
+    renderHermesComposerSubmit();
+  });
+}
+
+function handleHermesComposerSubmit() {
+  if (String(getHermesActiveQuestion() || '').trim()) {
+    runHermesAnalysis();
+    return;
+  }
+  toggleHermesVoiceCapture();
 }
 
 function clearHermesKnowledgeScope() {
@@ -9046,6 +10737,105 @@ function clearHermesKnowledgeScope() {
 function removeHermesUploadedFile(index) {
   hermesUploadedFiles.splice(index, 1);
   renderHermesWorkspace();
+}
+
+function renderHermesKnowledgeAction(entryId) {
+  if (!entryId || !getHermesCanSaveKnowledge()) return '';
+  const state = getHermesKnowledgeSaveState(entryId);
+  const label = state === 'saved' ? '已加入知识源' : state === 'saving' ? '加入中...' : '加入知识源';
+  const disabled = state === 'saved' || state === 'saving' ? 'disabled' : '';
+  return `<div class="hermes-transcript-actions"><button class="hermes-transcript-action ${state !== 'idle' ? 'is-active' : ''}" ${disabled} onclick="saveHermesAnswerAsKnowledge('${escapeAttr(entryId)}')">${label}</button></div>`;
+}
+
+async function saveHermesAnswerAsKnowledge(entryId) {
+  const normalizedId = String(entryId || '').trim();
+  if (!normalizedId) return;
+  if (!getHermesCanSaveKnowledge()) {
+    showToast('只有大V可以沉淀知识源');
+    return;
+  }
+  const state = getHermesKnowledgeSaveState(normalizedId);
+  if (state === 'saving' || state === 'saved') return;
+  const entry = hermesConversation.find(item => item && item.id === normalizedId && item.type === 'ai');
+  if (!entry) {
+    showToast('当前问答结果不存在');
+    return;
+  }
+  const activeUser = getActiveDemoUser() || {};
+  const tenantId = activeUser && activeUser.tenant ? activeUser.tenant.id : 0;
+  const artifact = normalizeHermesArtifact(entry.artifact || entry.result, entry.question);
+  const payload = buildHermesKnowledgePayload(entry, artifact);
+  const optimisticId = `kb-hermes-${normalizedId}`;
+  hermesSavedKnowledgeEntries[normalizedId] = 'saving';
+  addOrReplaceKnowledgeEntry({
+    id: optimisticId,
+    tenantId,
+    type: 'manual',
+    title: payload.title,
+    source: 'Hermes问答',
+    sourceDetail: payload.source_detail,
+    summary: payload.summary,
+    body: payload.body,
+    raw_input: payload.body,
+    status: '同步中',
+    destination: '同步中',
+    time: '刚刚',
+    tags: payload.tags.slice(0),
+    skip_ai_processing: true,
+    processing_mode: 'none',
+  });
+  renderHermesWorkspace();
+  renderKnowledgeExperience();
+  try {
+    const result = await ingestKnowledgeEntry(payload);
+    if (!result.async || !result.job_code) throw new Error('knowledge_job_missing');
+    showToast('已提交到知识库，正在同步');
+    startAsyncJobPolling(result.job_code, {
+      onSuccess(job) {
+        const output = job.result || {};
+        const hubItems = output.knowledge_hub && Array.isArray(output.knowledge_hub.items) ? output.knowledge_hub.items : [];
+        if (hubItems.length) {
+          knowledgeEntryStore = hubItems.map((item, index) => mapKnowledgeEntryForTenant(item, tenantId, index));
+        } else {
+          const savedEntry = getKnowledgeEntryById(optimisticId);
+          if (savedEntry) {
+            savedEntry.status = 'ready';
+            savedEntry.destination = '已同步知识专区';
+          }
+        }
+        hermesSavedKnowledgeEntries[normalizedId] = 'saved';
+        renderKnowledgeExperience();
+        renderHermesWorkspace();
+        showToast('已加入知识源');
+      },
+      onFailed(job) {
+        const failedEntry = getKnowledgeEntryById(optimisticId);
+        if (failedEntry) {
+          failedEntry.status = '失败';
+          failedEntry.destination = '同步失败';
+        }
+        hermesSavedKnowledgeEntries[normalizedId] = 'idle';
+        renderKnowledgeExperience();
+        renderHermesWorkspace();
+        showToast(job.error_message || '加入知识源失败');
+      },
+      onError(error) {
+        hermesSavedKnowledgeEntries[normalizedId] = 'idle';
+        renderHermesWorkspace();
+        showToast(error.message || '知识同步状态查询失败');
+      },
+    });
+  } catch (error) {
+    const failedEntry = getKnowledgeEntryById(optimisticId);
+    if (failedEntry) {
+      failedEntry.status = '失败';
+      failedEntry.destination = '同步失败';
+    }
+    hermesSavedKnowledgeEntries[normalizedId] = 'idle';
+    renderKnowledgeExperience();
+    renderHermesWorkspace();
+    showToast(error.message || '加入知识源失败');
+  }
 }
 
 function closeHermesPlusMenu() {
@@ -9104,23 +10894,23 @@ function openHermesPlusMenu() {
     <div class="modal-title" style="margin-bottom:10px">添加上下文</div>
     <button class="hermes-plus-action" onclick="openHermesFilePicker()">
       <div class="hermes-plus-action-title">上传文件解析</div>
-      <div class="hermes-plus-action-desc">上传 PDF、DOCX、TXT、CSV、HTML，解析后随本次问题一起给 Hermes。</div>
-    </button>
-    <button class="hermes-plus-action" onclick="enableHermesInternetAnswer()">
-      <div class="hermes-plus-action-title">互联网问答</div>
-      <div class="hermes-plus-action-desc">让 Hermes 按公开信息口径回答；默认仍会结合当前租户知识库。</div>
+      <div class="hermes-plus-action-desc">上传 PDF、DOCX、TXT、CSV、HTML，解析后随本次问题一起给 Hermes。互联网补充开关已移到输入框外侧。</div>
     </button>
   `;
   const modal = document.getElementById('hermes-plus-modal');
   if (modal) modal.classList.add('show');
 }
 
-function clearHermesQuestionInputs() {
+function clearHermesQuestionInputs(options) {
+  options = options || {};
   const inputA = document.getElementById('hermes-question-input');
   if (inputA) {
     inputA.value = '';
-    inputA.style.height = '54px';
+    inputA.scrollTop = 0;
+    resizeHermesQuestionInput(inputA);
+    if (options.focus) inputA.focus();
   }
+  renderHermesComposerSubmit();
 }
 
 function getHermesSkillStorageByTenant() {
@@ -9197,7 +10987,65 @@ function getHermesSkillById(skillId) {
 
 function renderHermesCredits() {
   const el = document.getElementById('hermes-credits-display');
-  if (el) el.textContent = '⚡ ' + hermesCredits + '次';
+  if (!el) return;
+  const usedCount = Number((hermesUsageSnapshot || {}).used_count || 0);
+  const quotaTotal = Number((hermesUsageSnapshot || {}).quota_total || 0);
+  el.textContent = '⚡ ' + formatInt(hermesCredits) + '次';
+  el.title = quotaTotal
+    ? `真实剩余 ${formatInt(hermesCredits)} 次，累计已用 ${formatInt(usedCount)} 次 / 总额度 ${formatInt(quotaTotal)} 次`
+    : `当前累计已用 ${formatInt(usedCount)} 次`;
+}
+
+function syncHermesCreditsToActiveUser() {
+  const activeUser = getActiveDemoUser();
+  if (!activeUser || !hermesUsageSnapshot) return;
+  const remainingCount = Math.max(0, Number(hermesUsageSnapshot.remaining_count || 0));
+  activeUser.computeCredits = remainingCount;
+  if (currentDemoUser && currentDemoUser.username === activeUser.username) {
+    currentDemoUser.computeCredits = remainingCount;
+  }
+  DEMO_PROFILE_USERS = (Array.isArray(DEMO_PROFILE_USERS) ? DEMO_PROFILE_USERS : []).map((user) => (
+    user && user.username === activeUser.username
+      ? { ...user, computeCredits: remainingCount }
+      : user
+  ));
+  if (window.CURRENT_DEMO_PROFILE && window.CURRENT_DEMO_PROFILE.username === activeUser.username) {
+    window.CURRENT_DEMO_PROFILE.computeCredits = remainingCount;
+  }
+  if (el('profile-compute')) {
+    el('profile-compute').textContent = `⚡ ${formatInt(remainingCount)} 次可用`;
+  }
+}
+
+async function refreshHermesCredits(options = {}) {
+  const activeUser = getActiveDemoUser();
+  if (!activeUser || !activeUser.username) {
+    hermesUsageSnapshot = null;
+    hermesCredits = 0;
+    renderHermesCredits();
+    return null;
+  }
+  const params = new URLSearchParams({
+    tenant_slug: (((activeUser || {}).tenant || {}).slug || activeUser.tenant_slug || '').toLowerCase(),
+    user_profile_id: String(activeUser.username || '').trim(),
+  });
+  try {
+    const resp = await fetch(`/api/hermes/usage/current?${params.toString()}`, { cache: 'no-store' });
+    const data = await resp.json();
+    if (!resp.ok || data.ok === false) {
+      throw new Error((data && data.error) || 'hermes_usage_load_failed');
+    }
+    hermesUsageSnapshot = data.usage || {};
+    hermesCredits = Math.max(0, Number((hermesUsageSnapshot || {}).remaining_count || 0));
+    syncHermesCreditsToActiveUser();
+    renderHermesCredits();
+    return hermesUsageSnapshot;
+  } catch (error) {
+    if (!options.silent) {
+      showToast('Hermes 次数加载失败，已保留当前展示');
+    }
+    return null;
+  }
 }
 
 function renderHermesSkillSelector() {
@@ -9266,13 +11114,7 @@ function selectHermesSkill(skillKey) {
 }
 
 function applyHermesSuggestion(text) {
-  const inputA = document.getElementById('hermes-question-input');
-  if (inputA) {
-    inputA.value = text;
-    inputA.style.height = 'auto';
-    inputA.style.height = Math.max(54, Math.min(inputA.scrollHeight, 160)) + 'px';
-  }
-  if (inputA) inputA.focus();
+  fillHermesQuestionInput(text);
 }
 
 function escapeHtml(value) {
@@ -9326,11 +11168,174 @@ function buildHermesWatchlistKlineSvg(points) {
   `;
 }
 
+function buildHermesIndicatorKlineSvg(klinePayload) {
+  const candles = Array.isArray(klinePayload?.candles) ? klinePayload.candles : [];
+  if (!candles.length) return '';
+  const ma5 = Array.isArray(klinePayload?.ma5) ? klinePayload.ma5 : [];
+  const ma10 = Array.isArray(klinePayload?.ma10) ? klinePayload.ma10 : [];
+  const ma20 = Array.isArray(klinePayload?.ma20) ? klinePayload.ma20 : [];
+  const anomalies = Array.isArray(klinePayload?.anomalies) ? klinePayload.anomalies : [];
+  const width = 320;
+  const height = 180;
+  const padding = { top: 14, right: 10, bottom: 24, left: 10 };
+  const chartHeight = height - padding.top - padding.bottom;
+  const maxPrice = Math.max(...candles.map(item => Number(item.high || 0)), 1);
+  const minPrice = Math.min(...candles.map(item => Number(item.low || 0)), 0);
+  const span = Math.max(maxPrice - minPrice, 1);
+  const step = (width - padding.left - padding.right) / candles.length;
+  const candleWidth = Math.max(4.8, Math.min(6.8, step * 0.52));
+  const scaleY = (value) => padding.top + ((maxPrice - Number(value || 0)) / span) * chartHeight;
+  const scaleX = (index) => padding.left + step * index + step / 2;
+  const buildMaPath = (items) => {
+    const points = items.map((entry) => {
+      const index = candles.findIndex((candle) => candle.date === entry.date);
+      if (index < 0) return null;
+      return `${scaleX(index).toFixed(2)} ${scaleY(entry.value).toFixed(2)}`;
+    }).filter(Boolean);
+    return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point}`).join(' ');
+  };
+  const candleSvg = candles.map((item, index) => {
+    const x = scaleX(index);
+    const openY = scaleY(item.open);
+    const closeY = scaleY(item.close);
+    const highY = scaleY(item.high);
+    const lowY = scaleY(item.low);
+    const rectY = Math.min(openY, closeY);
+    const rectHeight = Math.max(2, Math.abs(closeY - openY));
+    const color = Number(item.close) >= Number(item.open) ? '#2ECC71' : '#E74C3C';
+    return `
+      <line x1="${x.toFixed(2)}" y1="${highY.toFixed(2)}" x2="${x.toFixed(2)}" y2="${lowY.toFixed(2)}" stroke="${color}" stroke-width="1.1"></line>
+      <rect x="${(x - candleWidth / 2).toFixed(2)}" y="${rectY.toFixed(2)}" width="${candleWidth.toFixed(2)}" height="${rectHeight.toFixed(2)}" rx="1.2" fill="${color}"></rect>
+    `;
+  }).join('');
+  const anomalyMarks = anomalies.map((entry) => {
+    const index = candles.findIndex((candle) => candle.date === entry.date);
+    if (index < 0) return '';
+    const x = scaleX(index);
+    const y = scaleY(entry.value);
+    return `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="3.8" fill="rgba(220,53,69,0.14)" stroke="#DC3545" stroke-width="1.2"></circle>`;
+  }).join('');
+  const tickIndexes = [0, Math.floor((candles.length - 1) / 2), candles.length - 1].filter((value, index, arr) => arr.indexOf(value) === index);
+  const ticks = tickIndexes.map((index) => `
+    <text x="${scaleX(index).toFixed(2)}" y="${height - 6}" text-anchor="middle" font-size="9" fill="var(--gray-400)">${escapeHtml((candles[index].date || '--').slice(5))}</text>
+  `).join('');
+  const gridValues = [maxPrice, minPrice + span / 2, minPrice];
+  const gridlines = gridValues.map((value) => {
+    const y = scaleY(value);
+    return `
+      <line x1="${padding.left}" y1="${y.toFixed(2)}" x2="${width - padding.right}" y2="${y.toFixed(2)}" stroke="rgba(200,169,110,0.08)" stroke-width="1"></line>
+      <text x="${width - padding.right}" y="${(y - 4).toFixed(2)}" text-anchor="end" font-size="9" fill="var(--gray-400)">${Number(value).toFixed(2)}</text>
+    `;
+  }).join('');
+  return `
+    <div style="background:var(--navy);border:1px solid rgba(200,169,110,0.08);border-radius:12px;padding:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:700;color:var(--white)">K线走势</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--gray-400)">
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#F6C453;display:inline-block"></span>MA5</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#5DADE2;display:inline-block"></span>MA10</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#AF7AC5;display:inline-block"></span>MA20</span>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">当前按最近时间窗口输出 K 线走势，并保留均线和异动点标记。</div>
+      <svg viewBox="0 0 ${width} ${height}" width="100%" height="200" preserveAspectRatio="xMidYMid meet" role="img" aria-label="指标 K 线图" style="display:block">
+        ${gridlines}
+        ${candleSvg}
+        <path d="${buildMaPath(ma5)}" fill="none" stroke="#F6C453" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="${buildMaPath(ma10)}" fill="none" stroke="#5DADE2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="${buildMaPath(ma20)}" fill="none" stroke="#AF7AC5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+        ${anomalyMarks}
+        ${ticks}
+      </svg>
+    </div>
+  `;
+}
+
+function buildHermesIndicatorTrendSvg(series) {
+  const rows = Array.isArray(series) ? series.filter(item => item && typeof item === 'object') : [];
+  if (!rows.length) return '';
+  const width = 320;
+  const height = 150;
+  const paddingX = 10;
+  const paddingY = 10;
+  const values = rows.map(item => Number(item.value)).filter(value => Number.isFinite(value));
+  if (!values.length) return '';
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = Math.max(max - min, 1);
+  const step = rows.length > 1 ? (width - paddingX * 2) / (rows.length - 1) : 0;
+  const path = rows.map((item, index) => {
+    const raw = Number(item.value);
+    const value = Number.isFinite(raw) ? raw : values[0];
+    const x = paddingX + step * index;
+    const y = height - paddingY - ((value - min) / span) * (height - paddingY * 2);
+    return `${index === 0 ? 'M' : 'L'}${x.toFixed(2)} ${y.toFixed(2)}`;
+  }).join(' ');
+  return `
+    <div class="hermes-chart-shell">
+      <div class="hermes-chart-head">
+        <div class="hermes-chart-title">趋势线</div>
+      </div>
+      <svg viewBox="0 0 ${width} ${height}" class="hermes-chart-svg" preserveAspectRatio="none" role="img" aria-label="指标趋势图">
+        <path d="${path}" fill="none" stroke="#2F74C0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+    </div>
+  `;
+}
+
+function buildHermesIndicatorDistributionSvg(values) {
+  const items = Array.isArray(values) ? values.map(item => Number(item)).filter(value => Number.isFinite(value)) : [];
+  if (!items.length) return '';
+  const width = 320;
+  const height = 150;
+  const padding = { top: 12, right: 10, bottom: 20, left: 10 };
+  const bucketCount = Math.min(6, Math.max(4, Math.floor(Math.sqrt(items.length))));
+  const min = Math.min(...items);
+  const max = Math.max(...items);
+  const span = Math.max(max - min, 1);
+  const bucketSize = span / bucketCount;
+  const buckets = Array.from({ length: bucketCount }, (_, index) => ({
+    count: 0,
+    label: `${(min + bucketSize * index).toFixed(1)}`,
+  }));
+  items.forEach((value) => {
+    const rawIndex = Math.floor((value - min) / bucketSize);
+    const bucketIndex = Math.min(bucketCount - 1, Math.max(0, rawIndex));
+    buckets[bucketIndex].count += 1;
+  });
+  const maxCount = Math.max(...buckets.map(item => item.count), 1);
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const barGap = 8;
+  const barWidth = (plotWidth - barGap * (bucketCount - 1)) / bucketCount;
+  const bars = buckets.map((item, index) => {
+    const barHeight = (item.count / maxCount) * plotHeight;
+    const x = padding.left + index * (barWidth + barGap);
+    const y = padding.top + plotHeight - barHeight;
+    return `
+      <rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barWidth.toFixed(2)}" height="${barHeight.toFixed(2)}" rx="4" fill="rgba(47,116,192,0.86)"></rect>
+      <text x="${(x + barWidth / 2).toFixed(2)}" y="${(y - 4).toFixed(2)}" text-anchor="middle" font-size="9" fill="#5A6572">${item.count}</text>
+    `;
+  }).join('');
+  return `
+    <div class="hermes-chart-shell">
+      <div class="hermes-chart-head">
+        <div class="hermes-chart-title">分布统计</div>
+      </div>
+      <svg viewBox="0 0 ${width} ${height}" class="hermes-chart-svg" role="img" aria-label="指标分布统计图">
+        ${bars}
+      </svg>
+    </div>
+  `;
+}
+
 function normalizeHermesArtifact(artifact, fallbackQuestion) {
   const payload = artifact && typeof artifact === 'object' ? artifact : {};
   const type = payload.type || 'text_response';
   if (type === 'watchlist_analysis') {
     const symbol = payload.symbol && typeof payload.symbol === 'object' ? payload.symbol : {};
+    const rawChart = payload.chart && typeof payload.chart === 'object' ? payload.chart : {};
+    const rawChartHtml = String(payload.chartHtml || payload.chart_html || '').trim();
     return {
       type,
       question: payload.question || fallbackQuestion || '',
@@ -9350,7 +11355,47 @@ function normalizeHermesArtifact(artifact, fallbackQuestion) {
       nextSteps: Array.isArray(payload.next_steps) ? payload.next_steps : [],
       citations: Array.isArray(payload.citations) ? payload.citations : [],
       knowledge: Array.isArray(payload.knowledge) ? payload.knowledge : [],
-      chartHtml: payload.chart && payload.chart.kind === 'kline' ? buildHermesWatchlistKlineSvg(payload.chart.points || []) : '',
+      chart: rawChart,
+      chart_html: rawChartHtml,
+      chartHtml: rawChartHtml || (rawChart.kind === 'kline' ? buildHermesWatchlistKlineSvg(rawChart.points || []) : ''),
+      footer: payload.footer || '',
+    };
+  }
+  if (type === 'indicator_analysis') {
+    const symbol = payload.symbol && typeof payload.symbol === 'object' ? payload.symbol : {};
+    const chart = payload.chart && typeof payload.chart === 'object' ? payload.chart : {};
+    let chartHtml = String(payload.chartHtml || payload.chart_html || '').trim();
+    if (!chartHtml) {
+      if (chart.kind === 'kline') {
+        chartHtml = buildHermesIndicatorKlineSvg(chart.kline || {});
+      } else if (chart.kind === 'distribution') {
+        chartHtml = buildHermesIndicatorDistributionSvg(chart.distribution || []);
+      } else {
+        chartHtml = buildHermesIndicatorTrendSvg(chart.series || []);
+      }
+    }
+    return {
+      type,
+      question: payload.question || fallbackQuestion || '',
+      title: payload.title || '指标趋势分析',
+      headline: payload.headline || '已生成指标分析',
+      summary: payload.summary || '',
+      body: payload.body || '',
+      symbol: {
+        name: symbol.name || '指标',
+        code: symbol.code || '',
+        market: symbol.market || '',
+        industry: symbol.industry || '',
+      },
+      confidence: payload.confidence || '中',
+      metrics: Array.isArray(payload.metrics) ? payload.metrics : [],
+      judgement: Array.isArray(payload.judgement) ? payload.judgement : [],
+      nextSteps: Array.isArray(payload.next_steps) ? payload.next_steps : [],
+      citations: Array.isArray(payload.citations) ? payload.citations : [],
+      knowledge: Array.isArray(payload.knowledge) ? payload.knowledge : [],
+      chart,
+      chart_html: chartHtml,
+      chartHtml,
       footer: payload.footer || '',
     };
   }
@@ -9404,6 +11449,49 @@ function renderHermesThinkingStream(lines, options = {}) {
   `;
 }
 
+function renderHermesThinkingDisclosure(lines, options = {}) {
+  const items = Array.isArray(lines) ? lines.filter(Boolean) : [];
+  if (!items.length) return '';
+  const label = String(options.label || '思考过程').trim() || '思考过程';
+  const openAttr = options.open ? ' open' : '';
+  const loadingDots = options.loading
+    ? `<span class="dot-anim" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>`
+    : '';
+  return `
+    <details class="hermes-thinking-disclosure"${openAttr}>
+      <summary class="hermes-thinking-summary">
+        <span class="hermes-thinking-summary-main">
+          <span>${escapeHtml(label)}</span>
+          ${loadingDots}
+        </span>
+        <span class="hermes-thinking-toggle" aria-hidden="true"></span>
+      </summary>
+      ${renderHermesThinkingStream(items, options)}
+    </details>
+  `;
+}
+
+function dedupeHermesTextItems(items) {
+  const seen = new Set();
+  return (Array.isArray(items) ? items : []).map(item => String(item || '').trim()).filter(item => {
+    if (!item || seen.has(item)) return false;
+    seen.add(item);
+    return true;
+  });
+}
+
+function renderHermesClickableBullets(items, options = {}) {
+  const list = dedupeHermesTextItems(items);
+  if (!list.length) return '';
+  const clickable = !!options.clickable;
+  return `<div class="hermes-bullet-list" style="margin-top:8px">${
+    list.map((item) => clickable
+      ? `<button type="button" class="hermes-bullet-item is-clickable" onclick="applyHermesSuggestion('${escapeAttr(item)}')">${escapeHtml(item)}</button>`
+      : `<div class="hermes-bullet-item">${escapeHtml(item)}</div>`
+    ).join('')
+  }</div>`;
+}
+
 function buildHermesLoadingThoughts(entry) {
   const payload = entry && typeof entry === 'object' ? entry : {};
   const elapsedMs = Math.max(0, Date.now() - Number(payload.startedAt || Date.now()));
@@ -9421,10 +11509,10 @@ function buildHermesLoadingThoughtTemplates(question, skill, stockCode) {
   const suffix = String(question || '').trim().slice(0, 22);
   return [
     suffix ? `先理解你问的重点：${suffix}${String(question || '').trim().length > 22 ? '…' : ''}` : '先判断你到底在追问哪一层信息',
-    `按 ${String((skill || {}).label || '默认对话')} 的方式组织这次回答${hermesUseInternetAnswer ? '，并补上公开信息口径' : ''}`,
+    `先查当前租户知识库，再按 ${String((skill || {}).label || '默认对话')} 的方式组织回答${hermesUseInternetAnswer ? '，最后补上互联网公开信息' : ''}`,
     hasAttachments
-      ? `正在读你刚上传的文件${hasStock ? '，顺便对照个股资料' : ''}`
-      : (hasStock ? '正在对照个股资料、知识和证据' : '正在翻找能直接支撑结论的知识和证据'),
+      ? `正在读你刚上传的文件${hasStock ? '，并对照租户知识与个股资料' : '，并对照租户知识'}`
+      : (hasStock ? '正在对照租户知识、个股资料和证据' : '正在翻找租户知识里能直接支撑结论的内容'),
     hasStock ? '把个股信息压缩成可直接判断的要点' : '先把结论压短，再把依据补齐',
     '最后再整理成一版更适合直接阅读的回答',
   ];
@@ -9445,6 +11533,11 @@ function syncHermesLoadingTicker() {
 }
 
 function renderHermesTextArtifact(artifact, agentTrace) {
+  const entryId = String(arguments[2] || '').trim();
+  const uniqueBullets = dedupeHermesTextItems(artifact.bullets);
+  const uniqueFollowups = dedupeHermesTextItems(
+    (artifact.followups || []).filter(item => !uniqueBullets.includes(String(item || '').trim()))
+  );
   const evidenceHtml = artifact.citations.length
     ? `<div class="hermes-evidence-row" style="margin-top:8px">${artifact.citations.map(item => `<span class="hermes-evidence-chip">${escapeHtml(item)}</span>`).join('')}</div>`
     : '';
@@ -9452,24 +11545,22 @@ function renderHermesTextArtifact(artifact, agentTrace) {
     ? `<div class="hermes-evidence-row" style="margin-top:8px">${artifact.knowledge.map(item => `<span class="hermes-evidence-chip">${escapeHtml(item.title)}</span>`).join('')}</div>`
     : '';
   const bodyHtml = artifact.body ? `<div class="hermes-transcript-body" style="margin-top:8px">${escapeHtml(artifact.body)}</div>` : '';
-  const bulletHtml = artifact.bullets.length
-    ? `<div class="hermes-bullet-list" style="margin-top:8px">${artifact.bullets.map(item => `<div class="hermes-bullet-item">${escapeHtml(item)}</div>`).join('')}</div>`
-    : '';
-  const followupHtml = artifact.followups.length
-    ? `<div class="hermes-bullet-list" style="margin-top:8px">${artifact.followups.map(item => `<div class="hermes-bullet-item">${escapeHtml(item)}</div>`).join('')}</div>`
-    : '';
+  const bulletHtml = renderHermesClickableBullets(uniqueBullets);
+  const followupHtml = renderHermesClickableBullets(uniqueFollowups, { clickable: true });
   const thoughtLines = buildHermesTraceThoughts(agentTrace);
+  const actionHtml = renderHermesKnowledgeAction(entryId);
   return `
     <div class="hermes-transcript-entry assistant">
       <div class="hermes-transcript-kicker">Hermes</div>
       <div class="hermes-transcript-text">${escapeHtml(artifact.headline || '')}</div>
       ${artifact.summary ? `<div class="hermes-transcript-body">${escapeHtml(artifact.summary)}</div>` : ''}
-      ${thoughtLines.length ? `<div class="hermes-thinking-inline" style="margin-top:2px">思考过程</div>${renderHermesThinkingStream(thoughtLines)}` : ''}
+      ${renderHermesThinkingDisclosure(thoughtLines)}
       ${bodyHtml}
       ${bulletHtml}
       ${followupHtml}
       ${knowledgeHtml}
       ${evidenceHtml}
+      ${actionHtml}
       ${artifact.footer ? `<div class="hermes-transcript-meta">${escapeHtml(artifact.footer)}</div>` : ''}
     </div>
   `;
@@ -9482,14 +11573,14 @@ function renderHermesThread() {
   if (!hosts.length) return;
   if (!hermesConversation.length) {
     const suggestions = [
-      '最近这个方向怎么看？',
-      '帮我梳理一下这条信息值得怎么跟踪。',
-      '请先给我一个文字版结论。',
-      '如果要看基本面，我应该先补什么问题？'
+      '这只股票当前的基本面强弱怎么看？',
+      '这篇复盘的依据来源够不够扎实？',
+      '这个智能指标是按什么口径算出来的？',
+      'H5 里智能指标怎么创建和发布？'
     ];
     const emptyHtml = `
       <div class="hermes-chat-empty">
-        <div class="hermes-prompt-guide">聊聊新话题</div>
+        <div class="hermes-prompt-guide">从个股、复盘、指标或功能开始</div>
         <div class="hermes-prompt-chip-row" aria-label="Hermes 建议问题">
           ${suggestions.map(item => `<button class="hermes-prompt-chip" type="button" onclick="applyHermesSuggestion('${item.replace(/'/g, '&#39;')}')">${escapeHtml(item)}</button>`).join('')}
         </div>
@@ -9522,20 +11613,25 @@ function renderHermesThread() {
       return `
         <div class="hermes-transcript-entry assistant">
           <div class="hermes-transcript-kicker">Hermes</div>
-          <div class="hermes-thinking-inline">深度思考中<span class="dot-anim"><span>.</span><span>.</span><span>.</span></span></div>
-          ${renderHermesThinkingStream(loadingThoughts.lines, { activeIndex: loadingThoughts.activeIndex })}
+          ${renderHermesThinkingDisclosure(loadingThoughts.lines, {
+            activeIndex: loadingThoughts.activeIndex,
+            label: '深度思考中',
+            loading: true,
+            open: true,
+          })}
         </div>
       `;
     }
     const artifact = normalizeHermesArtifact(entry.artifact || entry.result, entry.question);
-    if ((entry.displayMode || 'text') !== 'structured' || artifact.type !== 'watchlist_analysis') {
-      return renderHermesTextArtifact(artifact, entry.agentTrace);
+    if ((entry.displayMode || 'text') !== 'structured' || !['watchlist_analysis', 'indicator_analysis'].includes(artifact.type)) {
+      return renderHermesTextArtifact(artifact, entry.agentTrace, entry.id);
     }
     return `
       <div class="hermes-transcript-entry assistant">
         <div class="hermes-transcript-kicker">Hermes</div>
         <div class="hermes-transcript-text">${escapeHtml(artifact.headline)}</div>
         <div class="hermes-chat-analysis">${renderHermesAnalysisCards(artifact, entry.agentTrace)}</div>
+        ${renderHermesKnowledgeAction(entry.id)}
       </div>
     `;
   }).join('');
@@ -9555,8 +11651,8 @@ function renderHermesAnalysisCards(artifact, agentTrace) {
       <div class="hermes-metric-note">${escapeHtml(metric.note)}</div>
     </div>
   `).join('');
-  const bulletsHtml = (artifact.judgement || []).map(item => `<div class="hermes-bullet-item">${escapeHtml(item)}</div>`).join('');
-  const actionsHtml = (artifact.nextSteps || []).map(item => `<div class="hermes-bullet-item">${escapeHtml(item)}</div>`).join('');
+  const bulletsHtml = renderHermesClickableBullets(artifact.judgement || []);
+  const actionsHtml = renderHermesClickableBullets(artifact.nextSteps || [], { clickable: true });
   const evidenceHtml = (artifact.citations || []).map(item => `<span class="hermes-evidence-chip">${escapeHtml(item)}</span>`).join('');
   const knowledgeHtml = (artifact.knowledge || []).length
     ? artifact.knowledge.map(entry => `<span class="hermes-evidence-chip">${escapeHtml(entry.title)}</span>`).join('')
@@ -9566,7 +11662,7 @@ function renderHermesAnalysisCards(artifact, agentTrace) {
     ? `
       <div style="margin-top:10px">
         <div class="hermes-section-label">结论</div>
-        <div class="hermes-bullet-list">${bulletsHtml}</div>
+        ${bulletsHtml}
       </div>
     `
     : '';
@@ -9574,28 +11670,61 @@ function renderHermesAnalysisCards(artifact, agentTrace) {
     ? `
       <div style="margin-top:10px">
         <div class="hermes-section-label">下一步</div>
-        <div class="hermes-bullet-list">${actionsHtml}</div>
+        ${actionsHtml}
       </div>
     `
     : '';
-  return `
-    <div class="hermes-result-card">
-      <div class="hermes-result-top">
-        <div>
-          <div class="hermes-result-kicker">${escapeHtml(artifact.title)}</div>
-          <div class="hermes-result-title">${escapeHtml(symbol.name || '对话主题')} · ${escapeHtml(symbol.code || 'Chat')}</div>
-          <div class="hermes-result-subtitle">${escapeHtml(artifact.summary || '')}</div>
-        </div>
-        <div class="hermes-result-badge">${escapeHtml(artifact.confidence || '中')} 置信度</div>
+  const resultTitle = artifact.type === 'indicator_analysis'
+    ? `${escapeHtml(symbol.name || '指标')}${symbol.code ? ` · ${escapeHtml(symbol.code)}` : ''}`
+    : `${escapeHtml(symbol.name || '对话主题')} · ${escapeHtml(symbol.code || 'Chat')}`;
+  const isIndicatorKline = artifact.type === 'indicator_analysis' && String(artifact.chartHtml || '').includes('K线走势');
+  const primaryChartHtml = isIndicatorKline ? `<div style="margin-top:10px">${artifact.chartHtml || ''}</div>` : (artifact.chartHtml || '');
+  const metricBlock = metricsHtml
+    ? `
+      <div style="margin-top:10px">
+        <div class="hermes-section-label">核心指标</div>
+        <div class="hermes-metric-grid" style="margin-top:8px">${metricsHtml}</div>
       </div>
-      ${artifact.chartHtml || ''}
-      ${artifact.body ? `<div class="hermes-result-subtitle" style="margin-top:10px;line-height:1.8">${escapeHtml(artifact.body)}</div>` : ''}
-      ${artifact.question ? `<div class="hermes-transcript-meta" style="margin-top:10px">本次问题：${escapeHtml(artifact.question)}</div>` : ''}
-    </div>
-    <div class="hermes-result-card">
-      <div class="hermes-section-label">核心指标</div>
-      <div class="hermes-metric-grid">${metricsHtml}</div>
-    </div>
+    `
+    : '';
+  const primaryCardHtml = artifact.type === 'indicator_analysis'
+    ? `
+      <div class="hermes-result-card">
+        <div class="hermes-result-top">
+          <div>
+            <div class="hermes-result-kicker">${escapeHtml(artifact.title)}</div>
+            <div class="hermes-result-title">${resultTitle}</div>
+            <div class="hermes-result-subtitle">${escapeHtml(artifact.summary || '')}</div>
+          </div>
+          <div class="hermes-result-badge">${escapeHtml(artifact.confidence || '中')} 置信度</div>
+        </div>
+        ${primaryChartHtml}
+        ${metricBlock}
+        ${artifact.body ? `<div class="hermes-result-subtitle" style="margin-top:10px;line-height:1.8">${escapeHtml(artifact.body)}</div>` : ''}
+        ${artifact.question ? `<div class="hermes-transcript-meta" style="margin-top:10px">本次问题：${escapeHtml(artifact.question)}</div>` : ''}
+      </div>
+    `
+    : `
+      <div class="hermes-result-card">
+        <div class="hermes-result-top">
+          <div>
+            <div class="hermes-result-kicker">${escapeHtml(artifact.title)}</div>
+            <div class="hermes-result-title">${resultTitle}</div>
+            <div class="hermes-result-subtitle">${escapeHtml(artifact.summary || '')}</div>
+          </div>
+          <div class="hermes-result-badge">${escapeHtml(artifact.confidence || '中')} 置信度</div>
+        </div>
+        ${primaryChartHtml}
+        ${artifact.body ? `<div class="hermes-result-subtitle" style="margin-top:10px;line-height:1.8">${escapeHtml(artifact.body)}</div>` : ''}
+        ${artifact.question ? `<div class="hermes-transcript-meta" style="margin-top:10px">本次问题：${escapeHtml(artifact.question)}</div>` : ''}
+      </div>
+      <div class="hermes-result-card">
+        <div class="hermes-section-label">核心指标</div>
+        <div class="hermes-metric-grid">${metricsHtml}</div>
+      </div>
+    `;
+  return `
+    ${primaryCardHtml}
     <div class="hermes-result-card">
       ${insightBlock}
       ${actionBlock}
@@ -9606,12 +11735,16 @@ function renderHermesAnalysisCards(artifact, agentTrace) {
       <div class="hermes-evidence-row" style="margin-top:8px">${evidenceHtml}</div>
       <div class="hermes-result-subtitle" style="margin-top:10px">${escapeHtml(artifact.footer || '')}</div>
     </div>
-    ${thoughtLines.length ? `<div class="hermes-thinking-inline">思考过程</div>${renderHermesThinkingStream(thoughtLines)}` : ''}
+    ${renderHermesThinkingDisclosure(thoughtLines)}
   `;
 }
 
 async function runHermesAnalysis(options) {
   options = options || {};
+  if (!isFeatureEnabled('hermes')) {
+    showToast('当前账号还未开放 Hermes');
+    return;
+  }
   const question = getHermesActiveQuestion().trim();
   const skill = getHermesSkillById(hermesSelectedSkill) || DEFAULT_HERMES_SKILLS.basic;
   if (!question) {
@@ -9625,6 +11758,7 @@ async function runHermesAnalysis(options) {
   }
   if (stockCode) fillHermesStockCode(stockCode);
   hermesConversation.push({
+    id: createHermesEntryId('user'),
     type: 'user',
     text: question,
     stockCode,
@@ -9636,6 +11770,7 @@ async function runHermesAnalysis(options) {
     startedAt: Date.now(),
     thoughts: buildHermesLoadingThoughtTemplates(question, skill, stockCode),
   });
+  clearHermesQuestionInputs({ focus: true });
   renderHermesThread();
   try {
     const activeUser = getActiveDemoUser();
@@ -9645,7 +11780,11 @@ async function runHermesAnalysis(options) {
       body: JSON.stringify({
         tenant_slug: ((activeUser || {}).tenant || {}).slug || '',
         user_role: (activeUser || {}).role || '',
+        user_profile_id: activeUser && activeUser.username ? activeUser.username : '',
+        user_name: activeUser && (activeUser.name || activeUser.username) ? (activeUser.name || activeUser.username) : '',
+        user_membership: activeUser && activeUser.membership ? activeUser.membership : '',
         entry_point: options.fromWatchlist ? 'watchlist_detail' : 'hermes_chat',
+        session_id: ensureHermesSessionId(),
         question,
         messages: hermesConversation
           .filter(item => item.type === 'user')
@@ -9677,11 +11816,12 @@ async function runHermesAnalysis(options) {
           footer: (data.router && data.router.reason) ? `路由：${data.router.reason}` : '',
         };
     const normalizedArtifact = normalizeHermesArtifact(artifact, question);
-    const displayMode = data.display_mode === 'structured' && normalizedArtifact.type === 'watchlist_analysis'
+    const displayMode = data.display_mode === 'structured' && ['watchlist_analysis', 'indicator_analysis'].includes(normalizedArtifact.type)
       ? 'structured'
       : 'text';
     hermesConversation.pop();
     hermesConversation.push({
+      id: createHermesEntryId('ai'),
       type: 'ai',
       question,
       result: normalizedArtifact,
@@ -9689,16 +11829,20 @@ async function runHermesAnalysis(options) {
       displayMode,
       agentTrace: data.agent_trace || null,
     });
-    hermesCredits = Math.max(0, hermesCredits - 1);
-    renderHermesCredits();
+    await refreshHermesCredits({ silent: true });
     renderHermesWorkspace();
-    clearHermesQuestionInputs();
     if (options.fromWatchlist && getActiveDemoUser().role === 'investor') {
       showToast(`已按 ${getActiveDemoUser().tenant.advisor} 视角生成个股分析`);
     }
   } catch (e) {
     hermesConversation.pop();
+    const friendlyError = e && e.message === 'hermes_investor_access_disabled'
+      ? '当前租户尚未向普通用户开放 Hermes'
+      : (e && e.message === 'hermes_disabled'
+        ? 'Hermes 当前已在后台关闭'
+        : (e && e.message) || 'Hermes 查询失败');
     hermesConversation.push({
+      id: createHermesEntryId('ai'),
       type: 'ai',
       question,
       result: normalizeHermesArtifact({
@@ -9707,7 +11851,7 @@ async function runHermesAnalysis(options) {
         headline: '本轮查询执行失败',
         summary: '统一编排入口未成功返回结果，当前已保留对话上下文。',
         body: '',
-        bullets: [e.message || 'Hermes 查询失败'],
+        bullets: [friendlyError],
         followups: ['你可以直接重试，或换一个更具体的问题。'],
         citations: ['统一查询入口失败'],
         knowledge: inferHermesKnowledgeForSkill(skill),
@@ -9724,7 +11868,8 @@ async function runHermesAnalysis(options) {
       },
     });
     renderHermesThread();
-    showToast(e.message || 'Hermes 查询失败');
+    renderHermesComposerSubmit();
+    showToast(friendlyError);
   }
 }
 
@@ -9940,64 +12085,12 @@ function getDmQuickAskOptions() {
   ];
 }
 
-function buildReviewPushDmMeta(user) {
-  const safeUser = user && user.tenant ? user : getSafeActiveDemoUser();
-  const runtime = ensureTenantReviewRuntime(safeUser.tenant.id);
-  const reviewPeriod = runtime.lastReviewPeriod || 'day';
-  const review = buildKolReviewData(safeUser, reviewPeriod);
-  const selectedNames = getDavReviewSelectedWatchlist(safeUser.tenant.id);
-  return {
-    title: review.title,
-    time: runtime.kolGeneratedAt || '刚刚',
-    periodLabel: review.periodLabel,
-    watchlist: selectedNames,
-    content: `【最新复盘已发布】${review.title}\n已同步到复盘专区，当前纳入样本：${selectedNames.join('、')}。\n现在可以直接去“复盘”页查看完整内容。`,
-  };
-}
-
-function renderDmReviewStatusCard() {
-  const host = document.getElementById('dm-review-status-card');
-  if (!host) return;
-  const activeUser = getSafeActiveDemoUser();
-  const reviewMeta = buildReviewPushDmMeta(activeUser);
-  if (isDavDmMode()) {
-    host.innerHTML = `
-      <div style="background:rgba(52,152,219,0.08);border:1px solid rgba(52,152,219,0.18);border-radius:12px;padding:12px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-          <div>
-            <div style="font-size:13px;font-weight:600;color:#63B3ED;margin-bottom:6px">复盘推送状态</div>
-            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">你的最新${reviewMeta.periodLabel}已推送到粉丝消息侧。粉丝会在消息里第一时间看到复盘更新，并可直接跳去复盘专区查看。</div>
-          </div>
-          <span class="tag tag-blue">${reviewMeta.time}</span>
-        </div>
-        <div class="review-watchlist-row" style="margin-top:10px">
-          ${reviewMeta.watchlist.map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
-        </div>
-      </div>
-    `;
-  } else {
-    host.innerHTML = `
-      <div style="background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.14);border-radius:12px;padding:12px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-          <div>
-            <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:6px">最新复盘提醒</div>
-            <div style="font-size:12px;color:var(--gray-400);line-height:1.7">${escapeHtml(activeUser.tenant.advisor)} 刚发布了一版${reviewMeta.periodLabel}，你会在专属对话里第一时间收到提醒。</div>
-          </div>
-          <button class="btn-outline" style="padding:6px 10px;font-size:11px" onclick="switchTab('review')">去看复盘</button>
-        </div>
-      </div>
-    `;
-  }
-}
-
 function getInvestorDmMessages() {
   const activeUser = getSafeActiveDemoUser();
-  const reviewMeta = buildReviewPushDmMeta(activeUser);
   return [
     { id: 1, sender: 'kol', content: `欢迎来到 ${activeUser.tenant.advisor} 的专属消息区，有问题可以直接提问。`, time: '2026-06-07 09:00', type: 'text' },
     { id: 2, sender: 'user', content: '最近想继续跟踪科技主线，也想看看你这边最新的复盘。', time: '2026-06-07 09:08', type: 'text' },
     { id: 3, sender: 'kol', content: '可以，新的复盘和后续重点样本我会第一时间同步到消息里。', time: '2026-06-07 09:12', type: 'text' },
-    { id: 4, sender: 'kol', content: reviewMeta.content, time: reviewMeta.time, type: 'review' },
   ];
 }
 
@@ -10016,8 +12109,6 @@ function renderDmQuickAsks() {
 function syncDmRoleView() {
   const title = document.getElementById('dm-list-title');
   const hint = document.getElementById('dm-list-hint');
-  const cardTitle = document.getElementById('dm-role-card-title');
-  const cardDesc = document.getElementById('dm-role-card-desc');
   const footerTitle = document.getElementById('dm-footer-title');
   const footerDesc = document.getElementById('dm-footer-desc');
   const footerBtn = document.getElementById('dm-footer-btn');
@@ -10025,8 +12116,6 @@ function syncDmRoleView() {
   if (isDavDmMode()) {
     if (title) title.textContent = '粉丝对话';
     if (hint) hint.textContent = '仅展示当前租户粉丝会话';
-    if (cardTitle) cardTitle.textContent = '粉丝私信说明';
-    if (cardDesc) cardDesc.textContent = '大V进入消息页后，可查看并回复自己租户内粉丝发来的会话。';
     if (footerTitle) footerTitle.textContent = '当前消息规则';
     if (footerDesc) footerDesc.textContent = '粉丝只能和所属大V对话；如需统一处理更多消息，可从“我的”进入工作台。';
     if (footerBtn) {
@@ -10038,8 +12127,6 @@ function syncDmRoleView() {
     const activeUser = getSafeActiveDemoUser();
     if (title) title.textContent = '专属对话';
     if (hint) hint.textContent = `仅可与所属大V ${activeUser.tenant.advisor} 对话`;
-    if (cardTitle) cardTitle.textContent = '租户私信说明';
-    if (cardDesc) cardDesc.textContent = `普通投资者只能和所属大V ${activeUser.tenant.advisor} 对话，跨租户私信默认关闭。`;
     if (footerTitle) footerTitle.textContent = '当前消息规则';
     if (footerDesc) footerDesc.textContent = '投资者只能和所属大V对话，工作台入口统一从“我的”进入。';
     if (footerBtn) {
@@ -10049,7 +12136,6 @@ function syncDmRoleView() {
     if (input) input.placeholder = '多轮提问，投顾会基于平台证据链回复...';
   }
   renderDmQuickAsks();
-  renderDmReviewStatusCard();
 }
 
 async function loadDmConversations() {
@@ -10284,15 +12370,6 @@ function renderDmMessages(messages) {
           <div style="font-size:11px;color:var(--gold);font-weight:600;margin-bottom:6px">🔒 付费内容 · ¥${m.price}</div>
           <div style="font-size:13px;color:var(--white);line-height:1.6">${escapeHtml(m.preview||'解锁查看完整内容')}</div>
           <button class="btn-gold" style="width:100%;margin-top:10px;padding:6px;font-size:12px" onclick="unlockPaidMsg(${m.price})">解锁查看 ¥${m.price}</button>
-          <div class="dm-msg-time" style="color:${timeColor}">${m.time}</div>
-        </div>`;
-    }
-    if (m.type === 'review') {
-      return `
-        <div class="dm-msg from-${bubbleSide}" style="background:rgba(200,169,110,0.08);border:1px solid rgba(200,169,110,0.18)">
-          <div style="font-size:11px;color:var(--gold);font-weight:700;margin-bottom:8px">📝 最新复盘已发布</div>
-          <div style="font-size:13px;color:var(--white);line-height:1.7">${escapeHtml(m.content || '').replace(/\n/g, '<br>')}</div>
-          <button class="btn-outline" style="width:100%;margin-top:10px;padding:6px 10px;font-size:11px" onclick="switchTab('review')">去复盘专区查看</button>
           <div class="dm-msg-time" style="color:${timeColor}">${m.time}</div>
         </div>`;
     }

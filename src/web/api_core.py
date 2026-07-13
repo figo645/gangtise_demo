@@ -128,6 +128,9 @@ def api_review_publish_embed():
             "news_sources": body.get("news_sources") if isinstance(body.get("news_sources"), list) else [],
             "llm_models": body.get("llm_models") if isinstance(body.get("llm_models"), list) else [],
             "polished_input_text": body.get("polished_input_text"),
+            "review_summary": body.get("review_summary"),
+            "user_input_section": body.get("user_input_section") if isinstance(body.get("user_input_section"), dict) else {},
+            "watchlist_analysis_section": body.get("watchlist_analysis_section") if isinstance(body.get("watchlist_analysis_section"), dict) else {},
         }
         if not str(payload.get("text") or "").strip():
             raise ValueError("publish_text_required")
@@ -154,6 +157,54 @@ def api_review_publish_embed():
             "message": "复盘已提交发布，正在后台入向量库",
         }
     )
+
+
+@app.route("/api/review/prepare-preview", methods=["POST"])
+def api_review_prepare_preview():
+    body = request.get_json(silent=True) or {}
+    try:
+        tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
+        entry_point = str(body.get("entry_point") or "").strip().lower() or "review_preview"
+        speaker_name = str(body.get("speaker_name") or "").strip()
+        payload = {
+            "tenant_slug": tenant_slug,
+            "period": str(body.get("period") or "").strip().lower(),
+            "source_mode": str(body.get("source_mode") or "").strip().lower(),
+            "source_text": body.get("source_text"),
+            "selected_watchlist": body.get("selected_watchlist") if isinstance(body.get("selected_watchlist"), list) else [],
+            "speaker_name": speaker_name,
+            "entry_point": entry_point,
+        }
+        if not str(payload.get("source_text") or "").strip():
+            raise ValueError("review_source_text_required")
+        if not payload["selected_watchlist"]:
+            raise ValueError("review_selected_watchlist_required")
+        job = create_user_async_job(
+            "review_prepare_preview",
+            payload=payload,
+            tenant_slug=tenant_slug,
+            entry_point=entry_point,
+            owner_label=speaker_name,
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to prepare review preview")
+        return jsonify({"ok": False, "error": "review_prepare_preview_failed"}), 500
+    return jsonify(
+        {
+            "ok": True,
+            "async": True,
+            "job_code": job["job_code"],
+            "job_status": job["status"],
+            "message": "复盘结构化预览已提交生成，正在后台归纳摘要与自选股分析",
+        }
+    )
+
 
 @app.route("/api/market")
 def api_market():
@@ -600,6 +651,76 @@ def api_h5_logout():
     return jsonify({"ok": True})
 
 
+@app.route("/api/h5/account-settings")
+def api_h5_account_settings():
+    try:
+        site_config = get_site_config()
+        current = get_current_demo_profile(site_config)
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        raise
+    if not current:
+        return jsonify({"ok": False, "error": "not_logged_in"}), 401
+    return jsonify(
+        {
+            "ok": True,
+            "profile": current,
+            "settings": build_h5_account_settings_payload(current),
+        }
+    )
+
+
+@app.route("/api/h5/account-settings", methods=["POST"])
+def api_h5_account_settings_save():
+    try:
+        site_config = get_site_config()
+        current = get_current_demo_profile(site_config)
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        raise
+    if not current:
+        return jsonify({"ok": False, "error": "not_logged_in"}), 401
+    body = request.get_json(silent=True) or {}
+    try:
+        save_h5_profile_settings(current, body)
+        profiles = get_h5_login_users(site_config)
+        refreshed = get_current_demo_profile(site_config)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to save h5 account settings")
+        return jsonify({"ok": False, "error": "save_account_settings_failed"}), 500
+    return jsonify(
+        {
+            "ok": True,
+            "profile": refreshed,
+            "profiles": profiles,
+            "settings": build_h5_account_settings_payload(refreshed),
+        }
+    )
+
+
+@app.route("/api/h5/help-center")
+def api_h5_help_center():
+    role = str(request.args.get("role") or "").strip().lower()
+    if not role:
+        try:
+            current = get_current_demo_profile(get_site_config())
+        except Exception:
+            current = None
+        role = str((current or {}).get("role") or "investor").strip().lower() or "investor"
+    return jsonify(
+        {
+            "ok": True,
+            "help_center": build_h5_help_center_payload(role),
+        }
+    )
+
+
 @app.route("/api/admin/users")
 def api_admin_users():
     return jsonify({"users": list_users()})
@@ -760,6 +881,11 @@ def api_admin_site_config():
                 if isinstance(payload.get("knowledge_ingestion"), dict)
                 else current.get("knowledge_ingestion")
             ),
+            "hermes_settings": normalize_hermes_settings_config(
+                payload.get("hermes_settings")
+                if isinstance(payload.get("hermes_settings"), dict)
+                else current.get("hermes_settings")
+            ),
             "evidence_chain": normalize_evidence_chain_config(
                 payload.get("evidence_chain")
                 if isinstance(payload.get("evidence_chain"), dict)
@@ -819,6 +945,97 @@ def api_admin_sync_llm_registry():
     )
 
 
+@app.route("/api/admin/hermes/memory-summary")
+def api_admin_hermes_memory_summary():
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    try:
+        summary = build_admin_hermes_memory_summary(tenant_slug)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "hermes_memory_db_unavailable"}), 503
+        app.logger.exception("Failed to build Hermes memory summary")
+        return jsonify({"ok": False, "error": "hermes_memory_summary_failed"}), 500
+    return jsonify({"ok": True, "summary": summary})
+
+
+@app.route("/api/admin/hermes/memory-clear-preview", methods=["POST"])
+def api_admin_hermes_memory_clear_preview():
+    body = request.get_json(silent=True) or {}
+    tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
+    range_key = str(body.get("range_key") or "").strip().lower()
+    try:
+        preview = build_admin_hermes_memory_clear_preview(tenant_slug, range_key)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "hermes_memory_db_unavailable"}), 503
+        app.logger.exception("Failed to build Hermes memory clear preview")
+        return jsonify({"ok": False, "error": "hermes_memory_preview_failed"}), 500
+    return jsonify({"ok": True, "preview": preview})
+
+
+@app.route("/api/admin/hermes/memory-backup", methods=["POST"])
+def api_admin_hermes_memory_backup():
+    body = request.get_json(silent=True) or {}
+    tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
+    range_key = str(body.get("range_key") or "").strip().lower()
+    try:
+        result = build_admin_hermes_memory_backup_zip(tenant_slug, range_key)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "hermes_memory_db_unavailable"}), 503
+        app.logger.exception("Failed to build Hermes memory backup zip")
+        return jsonify({"ok": False, "error": "hermes_memory_backup_failed"}), 500
+    manifest = result.get("manifest") if isinstance(result.get("manifest"), dict) else {}
+    counts = manifest.get("counts") if isinstance(manifest.get("counts"), dict) else {}
+    return app.response_class(
+        result.get("content_bytes") or b"",
+        mimetype="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{result.get("filename") or "hermes_memory_backup.zip"}"',
+            "X-Hermes-Backup-Tenant": str(manifest.get("tenant_slug") or ""),
+            "X-Hermes-Backup-Range": str(manifest.get("range_key") or ""),
+            "X-Hermes-Backup-Turns": str(counts.get("conversation_turns") or 0),
+        },
+    )
+
+
+@app.route("/api/admin/hermes/memory-clear", methods=["POST"])
+def api_admin_hermes_memory_clear():
+    body = request.get_json(silent=True) or {}
+    tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
+    range_key = str(body.get("range_key") or "").strip().lower()
+    confirm_text = str(body.get("confirm_text") or "").strip()
+    try:
+        result = clear_admin_hermes_memory(tenant_slug, range_key, confirm_text=confirm_text)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "hermes_memory_db_unavailable"}), 503
+        app.logger.exception("Failed to clear Hermes memory")
+        return jsonify({"ok": False, "error": "hermes_memory_clear_failed"}), 500
+    return jsonify({"ok": True, "result": result})
+
+
+@app.route("/api/admin/hermes/usage-stats")
+def api_admin_hermes_usage_stats():
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    try:
+        payload = build_admin_hermes_usage_stats(tenant_slug)
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "hermes_usage_db_unavailable"}), 503
+        app.logger.exception("Failed to build Hermes usage stats")
+        return jsonify({"ok": False, "error": "hermes_usage_stats_failed"}), 500
+    return jsonify({"ok": True, "stats": payload})
+
+
 @app.route("/api/admin/forecast-config")
 def api_admin_forecast_config():
     if not is_feature_enabled("stock_forecast"):
@@ -868,6 +1085,24 @@ def api_save_admin_forecast_config():
             "ok": True,
             "config": normalized,
             "workflow_meta": build_forecast_workflow_meta(saved_graph),
+        }
+    )
+
+
+@app.route("/api/admin/agent-workflows")
+def api_admin_agent_workflows():
+    try:
+        forecast_graph = load_forecast_workflow_graph()
+        forecast_meta = build_forecast_workflow_meta(forecast_graph)
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        app.logger.warning("Database unavailable while building agent workflow center, using forecast fallback graph")
+        forecast_meta = build_forecast_workflow_meta(build_default_forecast_workflow_graph())
+    return jsonify(
+        {
+            "ok": True,
+            "center": build_agent_workflow_center_payload(forecast_meta),
         }
     )
 

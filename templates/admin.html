@@ -101,6 +101,135 @@
   .sync-desc { font-size:12px; color:var(--text-sub); line-height:1.7; margin-bottom:12px; }
   .sync-chip-row { display:flex; gap:8px; flex-wrap:wrap; }
   .sync-chip { font-size:11px; color:var(--gold-dark); background:rgba(200,169,110,0.10); border:1px solid rgba(200,169,110,0.18); border-radius:999px; padding:4px 10px; }
+  .hermes-memory-select,
+  .hermes-memory-input {
+    min-width:180px;
+    background:#FFFFFF;
+    border:1px solid rgba(47,116,192,0.16);
+    border-radius:10px;
+    padding:10px 12px;
+    color:var(--text-main);
+    font-size:12px;
+    box-sizing:border-box;
+  }
+  .hermes-memory-select:focus,
+  .hermes-memory-input:focus {
+    outline:none;
+    border-color:rgba(47,116,192,0.28);
+    box-shadow:0 0 0 3px rgba(47,116,192,0.10);
+  }
+  .hermes-memory-status {
+    margin-top:10px;
+    font-size:12px;
+    color:#B88A30;
+  }
+  .hermes-memory-summary-grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+    gap:12px;
+    margin-top:16px;
+  }
+  .hermes-memory-summary-card {
+    padding:14px;
+    border-radius:14px;
+    background:#F7FBFF;
+    border:1px solid rgba(47,116,192,0.10);
+    box-shadow:0 8px 22px rgba(31,73,125,0.06);
+  }
+  .hermes-memory-summary-label {
+    font-size:12px;
+    color:#5B6B7B;
+  }
+  .hermes-memory-summary-value {
+    font-size:24px;
+    font-weight:700;
+    color:var(--text-main);
+    margin-top:8px;
+  }
+  .hermes-memory-summary-meta {
+    font-size:11px;
+    color:#2F74C0;
+    margin-top:6px;
+    line-height:1.6;
+  }
+  .hermes-memory-panel-grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+    gap:14px;
+    margin-top:16px;
+  }
+  .hermes-memory-panel {
+    padding:14px;
+    border-radius:14px;
+    background:#FFFFFF;
+    border:1px solid rgba(47,116,192,0.10);
+    box-shadow:0 8px 22px rgba(31,73,125,0.06);
+  }
+  .hermes-memory-panel-title {
+    font-size:13px;
+    color:var(--text-main);
+    font-weight:700;
+  }
+  .hermes-memory-panel-desc {
+    font-size:12px;
+    color:var(--text-sub);
+    line-height:1.7;
+    margin-top:6px;
+  }
+  .hermes-memory-toolbar {
+    display:flex;
+    gap:10px;
+    align-items:center;
+    flex-wrap:wrap;
+    margin-top:12px;
+  }
+  .hermes-memory-preview {
+    margin-top:16px;
+    padding:14px;
+    border-radius:14px;
+    background:#F8FBFF;
+    border:1px dashed rgba(47,116,192,0.20);
+    font-size:12px;
+    color:var(--text-sub);
+    line-height:1.8;
+  }
+  .hermes-memory-preview-title {
+    font-size:13px;
+    color:var(--text-main);
+    font-weight:700;
+  }
+  .hermes-memory-preview-time {
+    font-size:12px;
+    color:#2F74C0;
+  }
+  .hermes-memory-preview-metrics {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    gap:10px;
+    margin-top:12px;
+  }
+  .hermes-memory-preview-metric {
+    padding:10px 12px;
+    border-radius:10px;
+    background:#FFFFFF;
+    border:1px solid rgba(47,116,192,0.10);
+  }
+  .hermes-memory-preview-metric-label {
+    font-size:11px;
+    color:#5B6B7B;
+  }
+  .hermes-memory-preview-metric-value {
+    font-size:18px;
+    color:var(--text-main);
+    font-weight:700;
+    margin-top:6px;
+  }
+  .hermes-memory-preview-footnote {
+    font-size:11px;
+    color:var(--text-sub);
+    margin-top:10px;
+    line-height:1.8;
+  }
   .sync-note-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
   .sync-note-card { background:var(--surface-2); border:1px solid rgba(200,169,110,0.15); border-radius:12px; padding:16px; }
   .sync-note-title { font-size:13px; color:var(--text-main); font-weight:600; margin-bottom:6px; }
@@ -192,18 +321,73 @@
     gap:10px;
     padding:10px 12px;
     border-radius:12px;
-    background:rgba(11,30,58,0.42);
-    border:1px solid rgba(200,169,110,0.08);
+    background:#F7FBFF;
+    border:1px solid rgba(47,116,192,0.10);
+    box-shadow:0 8px 20px rgba(31,73,125,0.05);
   }
   .indicator-side-label {
     font-size:11px;
-    color:var(--text-sub);
+    color:#5B6B7B;
   }
   .indicator-side-value {
     font-size:12px;
     color:var(--text-main);
     font-weight:700;
     text-align:right;
+  }
+  .indicator-overview-grid {
+    display:grid;
+    grid-template-columns:1.2fr 1fr 1fr;
+    gap:16px;
+  }
+  .indicator-overview-panel {
+    background:#F8FBFF;
+    border:1px solid rgba(47,116,192,0.12);
+    border-radius:12px;
+    padding:14px;
+  }
+  .indicator-overview-panel-title {
+    font-size:13px;
+    font-weight:700;
+    color:#1F497D;
+    margin-bottom:10px;
+  }
+  .indicator-overview-panel-copy {
+    font-size:12px;
+    color:var(--text-sub);
+    line-height:1.85;
+  }
+  .indicator-overview-list {
+    display:grid;
+    gap:10px;
+  }
+  .indicator-overview-list-empty {
+    font-size:12px;
+    color:var(--text-sub);
+  }
+  .indicator-overview-entry {
+    padding:12px 14px;
+    border-radius:12px;
+    background:#FFFFFF;
+    border:1px solid rgba(47,116,192,0.10);
+    box-shadow:0 8px 20px rgba(31,73,125,0.05);
+  }
+  .indicator-overview-entry-title {
+    font-size:12px;
+    color:var(--text-main);
+    font-weight:700;
+  }
+  .indicator-overview-entry-copy {
+    font-size:11px;
+    color:var(--text-sub);
+    margin-top:4px;
+    line-height:1.7;
+  }
+  .indicator-overview-entry-meta {
+    font-size:11px;
+    color:#2F74C0;
+    margin-top:6px;
+    line-height:1.6;
   }
   .indicator-page-meta {
     display:flex;
@@ -726,6 +910,42 @@
   }
   .workflow-catalog-item strong { display:block; font-size:13px; margin-bottom:4px; color:var(--text-main); }
   .workflow-catalog-item span { display:block; font-size:11px; line-height:1.6; color:var(--text-sub); }
+  .agent-workflow-list { display:grid; gap:10px; }
+  .agent-workflow-item {
+    text-align:left;
+    padding:12px 14px;
+    border-radius:12px;
+    border:1px solid rgba(200,169,110,0.12);
+    background:var(--surface);
+    color:var(--text-main);
+    cursor:pointer;
+    transition:all 0.18s ease;
+  }
+  .agent-workflow-item.is-active {
+    border-color:rgba(47,116,192,0.35);
+    box-shadow:0 10px 24px rgba(47,116,192,0.08);
+  }
+  .agent-workflow-item-title { font-size:13px; font-weight:700; color:var(--text-main); }
+  .agent-workflow-item-desc { font-size:11px; line-height:1.6; color:var(--text-sub); margin-top:5px; }
+  .agent-workflow-chip-row { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .agent-workflow-chip {
+    font-size:10px;
+    color:var(--gold);
+    border:1px solid rgba(200,169,110,0.14);
+    border-radius:999px;
+    padding:3px 8px;
+    background:var(--surface-2);
+  }
+  .workflow-node-copy { margin-top:8px; font-size:11px; line-height:1.65; color:var(--text-sub); }
+  .agent-workflow-metric-grid { display:grid; gap:10px; }
+  .agent-workflow-metric {
+    padding:12px 14px;
+    border:1px solid var(--border-soft);
+    border-radius:10px;
+    background:var(--surface-2);
+  }
+  .agent-workflow-metric-label { font-size:11px; color:var(--text-sub); }
+  .agent-workflow-metric-value { font-size:18px; font-weight:700; color:var(--text-main); margin-top:6px; }
   .workflow-toolbar {
     display:flex;
     justify-content:space-between;
@@ -844,6 +1064,141 @@
     display:inline-block;
     margin-right:6px;
     box-shadow:0 0 0 3px rgba(47,116,192,0.14);
+  }
+  #section-agent-workflows .workflow-stage {
+    min-height:0;
+    background:
+      linear-gradient(180deg, rgba(47,116,192,0.03), rgba(47,116,192,0.01)),
+      var(--surface-2);
+  }
+  #section-agent-workflows .workflow-stage-viewport {
+    min-height:0;
+    width:100% !important;
+    height:auto !important;
+    padding:22px 20px 26px;
+    box-sizing:border-box;
+  }
+  #section-agent-workflows .workflow-edge-layer {
+    display:none;
+  }
+  #section-agent-workflows .workflow-board {
+    position:static;
+    min-height:0;
+    width:100% !important;
+    height:auto !important;
+  }
+  .agent-workflow-flow {
+    width:min(720px, 100%);
+    margin:0 auto;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .agent-workflow-flow-step {
+    display:grid;
+    grid-template-columns:42px minmax(0, 1fr);
+    gap:10px;
+    align-items:start;
+  }
+  .agent-workflow-flow-rail {
+    position:relative;
+    display:flex;
+    justify-content:center;
+    min-height:100%;
+  }
+  .agent-workflow-flow-rail::after {
+    content:"";
+    position:absolute;
+    top:34px;
+    bottom:-10px;
+    left:50%;
+    width:2px;
+    transform:translateX(-50%);
+    background:linear-gradient(180deg, rgba(47,116,192,0.28), rgba(200,169,110,0.22));
+  }
+  .agent-workflow-flow-step.is-last .agent-workflow-flow-rail::after {
+    display:none;
+  }
+  .agent-workflow-flow-index {
+    width:24px;
+    height:24px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:10px;
+    font-weight:700;
+    color:#1F497D;
+    background:linear-gradient(180deg, rgba(255,255,255,0.96), rgba(240,246,252,0.96));
+    border:1px solid rgba(47,116,192,0.18);
+    box-shadow:0 6px 14px rgba(14,33,55,0.08);
+    position:relative;
+    z-index:1;
+  }
+  body.theme-dark .agent-workflow-flow-index {
+    color:#DDE9F7;
+    background:linear-gradient(180deg, rgba(19,35,58,0.96), rgba(14,28,48,0.96));
+  }
+  .agent-workflow-flow-card {
+    border:1px solid rgba(200,169,110,0.12);
+    border-radius:14px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.92), rgba(249,251,254,0.96));
+    box-shadow:0 10px 24px rgba(14,33,55,0.05);
+    padding:10px 12px;
+    cursor:pointer;
+    transition:border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  }
+  body.theme-dark .agent-workflow-flow-card {
+    background:linear-gradient(180deg, rgba(17,31,49,0.96), rgba(13,25,42,0.98));
+  }
+  .agent-workflow-flow-card:hover {
+    border-color:rgba(47,116,192,0.28);
+    transform:translateY(-1px);
+  }
+  .agent-workflow-flow-card.is-selected {
+    border-color:rgba(200,169,110,0.32);
+    box-shadow:0 14px 28px rgba(47,116,192,0.10);
+  }
+  .agent-workflow-flow-head {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+  }
+  .agent-workflow-flow-step-label {
+    font-size:10px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    color:var(--text-sub);
+  }
+  .agent-workflow-flow-title {
+    margin-top:2px;
+    font-size:13px;
+    line-height:1.25;
+    font-weight:700;
+    color:var(--text-main);
+  }
+  .agent-workflow-flow-pill {
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:4px 8px;
+    border-radius:999px;
+    font-size:10px;
+    color:var(--text-main);
+    background:rgba(47,116,192,0.08);
+    border:1px solid rgba(47,116,192,0.12);
+  }
+  .agent-workflow-flow-pill.is-gold {
+    color:var(--gold);
+    background:rgba(200,169,110,0.10);
+    border-color:rgba(200,169,110,0.18);
+  }
+  .agent-workflow-flow-mini {
+    margin-top:6px;
+    font-size:10px;
+    line-height:1.5;
+    color:var(--text-sub);
   }
   .workflow-tool-button {
     padding:6px 10px !important;
@@ -1117,6 +1472,145 @@
     border-radius:999px;
     padding:4px 10px;
   }
+  .admin-knowledge-entry-card {
+    display:flex;
+    justify-content:space-between;
+    gap:16px;
+    align-items:center;
+    padding:16px;
+    margin-bottom:16px;
+    border-radius:18px;
+    background:linear-gradient(180deg, #FFFFFF, #FBFDFF);
+    border:1px solid rgba(47,116,192,0.12);
+  }
+  .admin-knowledge-entry-title { font-size:16px; font-weight:700; color:var(--text-main); }
+  .admin-knowledge-entry-desc { margin-top:6px; font-size:12px; color:var(--text-sub); line-height:1.8; max-width:760px; }
+  .admin-kg-shell {
+    background:linear-gradient(180deg, #FFFFFF, #FBFDFF);
+    border:1px solid rgba(47,116,192,0.12);
+    border-radius:18px;
+    padding:16px;
+    margin-bottom:16px;
+  }
+  .admin-kg-top { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap; }
+  .admin-kg-title { font-size:16px; font-weight:700; color:var(--text-main); }
+  .admin-kg-desc { margin-top:4px; font-size:12px; color:var(--text-sub); line-height:1.7; max-width:760px; }
+  .admin-kg-controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .admin-kg-search,
+  .admin-kg-select {
+    border:none;
+    outline:none;
+    border-radius:12px;
+    background:#FFFFFF;
+    border:1px solid rgba(47,116,192,0.12);
+    color:var(--text-main);
+    font-size:13px;
+    padding:10px 12px;
+    box-sizing:border-box;
+  }
+  .admin-kg-search { min-width:280px; flex:1; }
+  .admin-kg-select { min-width:132px; }
+  .admin-kg-stage { margin-top:12px; font-size:11px; color:var(--gold); }
+  .admin-kg-stats {
+    margin-top:12px;
+    display:grid;
+    grid-template-columns:repeat(6, minmax(0, 1fr));
+    gap:8px;
+  }
+  .admin-kg-stat { background:var(--surface); border:1px solid rgba(47,116,192,0.10); border-radius:12px; padding:10px; }
+  .admin-kg-stat-label { font-size:10px; color:var(--text-sub); }
+  .admin-kg-stat-value { margin-top:6px; font-size:18px; font-weight:800; color:var(--text-main); }
+  .admin-kg-legend { margin-top:10px; display:flex; flex-wrap:wrap; gap:8px; }
+  .admin-kg-legend-chip {
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:5px 10px;
+    border-radius:999px;
+    background:#FFFFFF;
+    border:1px solid rgba(47,116,192,0.10);
+    color:var(--text-sub);
+    font-size:11px;
+  }
+  .admin-kg-legend-dot {
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:#8FA6C4;
+    flex:0 0 auto;
+  }
+  .admin-kg-legend-dot.kind-root { background:#C8A96E; }
+  .admin-kg-legend-dot.kind-tenant { background:#D9E9FF; }
+  .admin-kg-legend-dot.kind-topic { background:#8FCCFF; }
+  .admin-kg-legend-dot.kind-entity { background:#F6D38B; }
+  .admin-kg-legend-dot.kind-method { background:#B9F0D2; }
+  .admin-kg-legend-dot.kind-claim { background:#DCEBFA; }
+  .admin-kg-legend-dot.kind-signal { background:#97B6D9; }
+  .admin-kg-layout { margin-top:14px; display:grid; grid-template-columns:minmax(0, 1.65fr) minmax(320px, 0.85fr); gap:14px; }
+  .admin-kg-board-shell,
+  .admin-kg-detail {
+    border-radius:18px;
+    border:1px solid rgba(47,116,192,0.10);
+  }
+  .admin-kg-board-shell {
+    background:
+      radial-gradient(circle at top, rgba(47,116,192,0.16), transparent 34%),
+      linear-gradient(180deg, #09131F, #102033);
+    overflow:auto;
+  }
+  .admin-kg-board {
+    position:relative;
+    min-height:760px;
+    background-image:
+      linear-gradient(rgba(126,153,184,0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(126,153,184,0.07) 1px, transparent 1px);
+    background-size:26px 26px;
+    overflow:hidden;
+  }
+  .admin-kg-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .admin-kg-edge { fill:none; stroke:rgba(126,153,184,0.30); stroke-width:1.2; }
+  .admin-kg-node {
+    position:absolute;
+    transform:translate(-50%, -50%);
+    border:none;
+    cursor:pointer;
+    text-align:left;
+    color:#E8EEF5;
+    background:rgba(17,32,49,0.86);
+    border:1px solid rgba(92,126,164,0.28);
+    border-radius:999px;
+    padding:8px 12px;
+    min-width:72px;
+    max-width:180px;
+    box-shadow:0 12px 30px rgba(3,10,18,0.28);
+  }
+  .admin-kg-node:hover { transform:translate(-50%, calc(-50% - 1px)); }
+  .admin-kg-node.is-active {
+    border-color:rgba(200,169,110,0.56);
+    box-shadow:0 0 0 2px rgba(200,169,110,0.18), 0 16px 34px rgba(3,10,18,0.32);
+  }
+  .admin-kg-node.kind-root { background:linear-gradient(135deg, #355D8A, #20405F); color:#FFFFFF; min-width:168px; border-color:rgba(200,169,110,0.34); }
+  .admin-kg-node.kind-tenant { color:#D9E9FF; min-width:150px; }
+  .admin-kg-node.kind-topic { color:#A8D2FF; }
+  .admin-kg-node.kind-entity { color:#F6D38B; }
+  .admin-kg-node.kind-method { color:#B9F0D2; }
+  .admin-kg-node.kind-claim { border-radius:16px; max-width:220px; color:#F3F7FB; }
+  .admin-kg-node.kind-signal { padding:7px 10px; background:rgba(13,24,38,0.92); color:#D6E5F7; }
+  .admin-kg-node-kind { font-size:10px; opacity:0.68; }
+  .admin-kg-node-label { margin-top:4px; font-size:12px; font-weight:700; line-height:1.4; overflow:hidden; text-overflow:ellipsis; }
+  .admin-kg-detail { background:#FFFFFF; padding:16px; }
+  .admin-kg-detail-empty { min-height:240px; display:flex; align-items:center; justify-content:center; text-align:center; padding:24px; color:var(--text-sub); font-size:12px; line-height:1.8; }
+  .admin-kg-detail-kicker { font-size:10px; color:var(--gold); letter-spacing:0.04em; }
+  .admin-kg-detail-title { margin-top:6px; font-size:18px; font-weight:800; color:var(--text-main); line-height:1.35; }
+  .admin-kg-detail-summary { margin-top:10px; font-size:12px; color:var(--text-sub); line-height:1.8; }
+  .admin-kg-chip-row { margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; }
+  .admin-kg-chip { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; background:rgba(47,116,192,0.08); border:1px solid rgba(47,116,192,0.12); color:#245B96; font-size:11px; }
+  .admin-kg-detail-section { margin-top:16px; }
+  .admin-kg-detail-section-title { font-size:12px; font-weight:700; color:var(--text-main); }
+  .admin-kg-detail-list { margin-top:8px; display:flex; flex-direction:column; gap:8px; }
+  .admin-kg-detail-item { padding:10px 12px; border-radius:12px; background:#F8FBFF; border:1px solid rgba(47,116,192,0.10); }
+  .admin-kg-detail-item-title { font-size:12px; font-weight:700; color:var(--text-main); }
+  .admin-kg-detail-item-meta { margin-top:4px; font-size:11px; color:var(--text-sub); line-height:1.7; }
   @media (max-width: 980px) {
     .admin-modal-overlay { padding:12px; }
     .admin-modal-sheet { padding:18px; border-radius:16px; }
@@ -1126,7 +1620,9 @@
     .llm-admin-model-grid,
     .tenant-admin-shell,
     .tenant-admin-detail-grid,
-    .tenant-dashboard-grid { grid-template-columns:1fr; }
+    .tenant-dashboard-grid,
+    .admin-kg-stats,
+    .admin-kg-layout { grid-template-columns:1fr; }
     .tenant-admin-sidebar { position:static; }
   }
 </style>
@@ -1205,6 +1701,9 @@
         <div class="admin-nav-group-body">
         <div class="admin-nav-item" data-section="hermes" data-feature="hermes" onclick="showSection('hermes', this)">
           <span class="admin-nav-icon">&#9881;</span> 使用统计
+        </div>
+        <div class="admin-nav-item" data-section="agent-workflows" data-feature="system_module" onclick="showSection('agent-workflows', this)">
+          <span class="admin-nav-icon">&#129504;</span> 智能体工作流
         </div>
         <div class="admin-nav-item" data-section="forecast-model" data-feature="stock_forecast" onclick="showSection('forecast-model', this)">
           <span class="admin-nav-icon">&#128200;</span> 预测模型
@@ -1290,9 +1789,12 @@
             <span class="admin-nav-icon">&#128203;</span> 发布与隔离
           </div>
           <div class="admin-nav-item" data-section="settings-knowledge" data-feature="system_module" onclick="showSection('settings-knowledge', this)">
-            <span class="admin-nav-icon">&#128214;</span> 知识与向量
+            <span class="admin-nav-icon">&#128214;</span> 知识专区
           </div>
-          <div class="admin-nav-item" data-section="knowledge-items" data-feature="system_module" onclick="showSection('knowledge-items', this)">
+          <div class="admin-nav-item" data-section="settings-knowledge-graph" data-feature="system_module" onclick="showSection('settings-knowledge-graph', this)">
+            <span class="admin-nav-icon">&#128391;</span> 知识图谱中心
+          </div>
+          <div class="admin-nav-item" data-section="knowledge-items" data-feature="system_module" onclick="showSection('knowledge-items', this)" style="display:none">
             <span class="admin-nav-icon">&#128196;</span> 知识内容管理
           </div>
           <div class="admin-nav-item" data-section="settings-llm" data-feature="system_module" onclick="showSection('settings-llm', this)">
@@ -2039,34 +2541,34 @@
             </div>
             <span class="indicator-page-tag">控制台入口</span>
           </div>
-          <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:16px">
-            <div style="background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.15);border-radius:12px;padding:14px">
-              <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:10px">最近入湖批次</div>
-              <div id="admin-indicator-batch-list" style="display:grid;gap:10px">
+          <div class="indicator-overview-grid">
+            <div class="indicator-overview-panel">
+              <div class="indicator-overview-panel-title">最近入湖批次</div>
+              <div id="admin-indicator-batch-list" class="indicator-overview-list">
                 {% for batch in indicator_hub.load_batches[:4] %}
-                <div style="padding:10px 12px;border-radius:10px;background:rgba(11,30,58,0.55);border:1px solid rgba(200,169,110,0.08)">
-                  <div style="font-size:12px;color:var(--white);font-weight:600">{{ batch.batch_code }}</div>
-                  <div style="font-size:11px;color:#8899aa;margin-top:4px">{{ batch.summary }}</div>
-                  <div style="font-size:11px;color:#C8A96E;margin-top:6px">{{ batch.created_at }} · {{ batch.total_indicators }} 指标 / {{ batch.total_points }} 点</div>
+                <div class="indicator-overview-entry">
+                  <div class="indicator-overview-entry-title">{{ batch.batch_code }}</div>
+                  <div class="indicator-overview-entry-copy">{{ batch.summary }}</div>
+                  <div class="indicator-overview-entry-meta">{{ batch.created_at }} · {{ batch.total_indicators }} 指标 / {{ batch.total_points }} 点</div>
                 </div>
                 {% endfor %}
               </div>
             </div>
-            <div style="background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.15);border-radius:12px;padding:14px">
-              <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:10px">最近接口测试</div>
-              <div id="admin-indicator-test-list" style="display:grid;gap:10px">
+            <div class="indicator-overview-panel">
+              <div class="indicator-overview-panel-title">最近接口测试</div>
+              <div id="admin-indicator-test-list" class="indicator-overview-list">
                 {% for item in indicator_hub.recent_tests[:4] %}
-                <div style="padding:10px 12px;border-radius:10px;background:rgba(11,30,58,0.55);border:1px solid rgba(200,169,110,0.08)">
-                  <div style="font-size:12px;color:var(--white);font-weight:600">{{ item.source_code }}</div>
-                  <div style="font-size:11px;color:#8899aa;margin-top:4px">{{ item.tested_at }}</div>
-                  <div style="font-size:11px;color:{% if item.success %}#63B3ED{% else %}#E74C3C{% endif %};margin-top:6px">{% if item.success %}成功{% else %}失败{% endif %} · HTTP {{ item.http_status or '--' }} · {{ item.latency_ms or '--' }} ms</div>
+                <div class="indicator-overview-entry">
+                  <div class="indicator-overview-entry-title">{{ item.source_code }}</div>
+                  <div class="indicator-overview-entry-copy">{{ item.tested_at }}</div>
+                  <div class="indicator-overview-entry-meta" style="color:{% if item.success %}#2F74C0{% else %}#E74C3C{% endif %}">{% if item.success %}成功{% else %}失败{% endif %} · HTTP {{ item.http_status or '--' }} · {{ item.latency_ms or '--' }} ms</div>
                 </div>
                 {% endfor %}
               </div>
             </div>
-            <div style="background:rgba(200,169,110,0.06);border:1px solid rgba(200,169,110,0.15);border-radius:12px;padding:14px">
-              <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:10px">接入设计原则</div>
-              <div style="font-size:12px;color:#8899aa;line-height:1.85">
+            <div class="indicator-overview-panel">
+              <div class="indicator-overview-panel-title">接入设计原则</div>
+              <div class="indicator-overview-panel-copy">
                 1. 所有前台只读指标湖，不直连源接口。<br>
                 2. 当前先写入模拟数据，保证接口与展示协议固定。<br>
                 3. 下一阶段再补原始数据接入、清洗标准化和真实入湖任务。<br>
@@ -2950,30 +3452,30 @@
 
       <!-- ===== HERMES ===== -->
       <div id="section-hermes" style="display:none">
-        <div class="stats-grid">
+        <div id="admin-hermes-usage-summary" class="stats-grid">
           <div class="stat-card">
             <div class="stat-label">今日调用</div>
             <span class="stat-icon">&#9881;</span>
-            <div class="stat-value">12,840</div>
-            <div class="stat-change up">&#9650; +8.4%</div>
+            <div class="stat-value">--</div>
+            <div class="stat-change up">加载中</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">本月调用</div>
             <span class="stat-icon">&#9654;</span>
-            <div class="stat-value">284,000</div>
-            <div class="stat-change up">&#9650; +14.2%</div>
+            <div class="stat-value">--</div>
+            <div class="stat-change up">加载中</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">人均调用</div>
             <span class="stat-icon">&#9786;</span>
-            <div class="stat-value">7.4次</div>
-            <div class="stat-change up">&#9650; +0.6次</div>
+            <div class="stat-value">--</div>
+            <div class="stat-change up">加载中</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">算力消耗</div>
             <span class="stat-icon">&#9733;</span>
-            <div class="stat-value">284,000</div>
-            <div class="stat-change" style="color:#C8A96E">积分</div>
+            <div class="stat-value">--</div>
+            <div class="stat-change" style="color:#C8A96E">加载中</div>
           </div>
         </div>
         <div class="sync-grid" style="margin-bottom:20px">
@@ -3001,62 +3503,71 @@
             </div>
           </div>
         </div>
+        <div class="chart-card" style="margin-bottom:20px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
+            <div>
+              <div class="chart-title">Hermes 记忆治理</div>
+              <div class="chart-subtitle">按租户查看 Hermes 记忆落库情况，支持范围预览、ZIP 备份和时间段清理。范围清理后，会自动重建剩余会话记忆和用户画像。</div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <select id="admin-hermes-memory-tenant" class="hermes-memory-select" onchange="loadAdminHermesMemorySummary(true)"></select>
+              <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="loadAdminHermesMemorySummary(true)">刷新</button>
+            </div>
+          </div>
+          <div id="admin-hermes-memory-summary" class="hermes-memory-summary-grid"></div>
+          <div class="hermes-memory-panel-grid">
+            <div class="hermes-memory-panel">
+              <div class="hermes-memory-panel-title">备份 Hermes 记忆</div>
+              <div class="hermes-memory-panel-desc">导出当前租户的 Hermes 记忆快照。范围备份会只打包命中时间窗口的对话及对应的聚合记忆。</div>
+              <div class="hermes-memory-toolbar">
+                <select id="admin-hermes-memory-backup-range" class="hermes-memory-select" style="flex:1;min-width:160px"></select>
+                <button class="btn-gold" type="button" style="padding:8px 14px;font-size:12px" onclick="backupAdminHermesMemory()">下载 ZIP 备份</button>
+              </div>
+            </div>
+            <div class="hermes-memory-panel">
+              <div class="hermes-memory-panel-title">清理 Hermes 记忆</div>
+              <div class="hermes-memory-panel-desc">支持最近 1 个月、3 个月、6 个月、1 年，或整租户全量清理。全量清理需要输入 <code>CONFIRM</code>。</div>
+              <div class="hermes-memory-toolbar">
+                <select id="admin-hermes-memory-clear-range" class="hermes-memory-select" onchange="previewAdminHermesMemoryClear()" style="flex:1;min-width:160px"></select>
+                <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="previewAdminHermesMemoryClear()">预览影响</button>
+              </div>
+              <div id="admin-hermes-memory-clear-confirm-wrap" style="display:none;margin-top:10px">
+                <input id="admin-hermes-memory-clear-confirm" class="hermes-memory-input" placeholder="全量清理请输入 CONFIRM" style="width:100%;border-color:rgba(231,76,60,0.24)">
+              </div>
+              <div class="hermes-memory-toolbar">
+                <button class="btn-sm-blue" type="button" style="padding:8px 14px;font-size:12px" onclick="clearAdminHermesMemory(true)">先备份再清理</button>
+                <button type="button" style="padding:8px 14px;font-size:12px;background:rgba(231,76,60,0.12);border:1px solid rgba(231,76,60,0.32);color:#F1948A;border-radius:10px;cursor:pointer" onclick="clearAdminHermesMemory(false)">直接清理</button>
+              </div>
+            </div>
+          </div>
+          <div id="admin-hermes-memory-preview" class="hermes-memory-preview">请选择租户和清理范围后查看影响预览。</div>
+          <div id="admin-hermes-memory-status" class="hermes-memory-status">尚未加载 Hermes 记忆治理数据。</div>
+        </div>
         <div class="table-wrap" style="margin-bottom:20px">
           <div class="table-header">
             <div class="table-title">Hermes 工具动作统计</div>
             <span class="tag tag-gold">6 个优先模式</span>
           </div>
-          <table>
+          <table id="admin-hermes-mode-table">
             <thead><tr><th>模式名称</th><th>今日调用</th><th>本月调用</th><th>占比</th><th>平均响应时间</th><th>状态</th></tr></thead>
-            <tbody>
-              <tr>
-                <td style="color:#F8F6F0;font-weight:500">复盘速写</td><td>494</td><td>19,400</td>
-                <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:35%"></div></div><span style="color:#C8A96E">35%</span></div></td>
-                <td>2.4s</td><td><span class="tag tag-green">正常</span></td>
-              </tr>
-              <tr>
-                <td style="color:#F8F6F0;font-weight:500">研报精读</td><td>286</td><td>11,280</td>
-                <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:22%"></div></div><span style="color:#C8A96E">22%</span></div></td>
-                <td>1.8s</td><td><span class="tag tag-green">正常</span></td>
-              </tr>
-              <tr>
-                <td style="color:#F8F6F0;font-weight:500">专家纪要速读</td><td>231</td><td>8,120</td>
-                <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:18%"></div></div><span style="color:#C8A96E">18%</span></div></td>
-                <td>3.2s</td><td><span class="tag tag-green">正常</span></td>
-              </tr>
-              <tr>
-                <td style="color:#F8F6F0;font-weight:500">自选股诊断</td><td>154</td><td>5,480</td>
-                <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:12%"></div></div><span style="color:#C8A96E">12%</span></div></td>
-                <td>4.1s</td><td><span class="tag tag-green">正常</span></td>
-              </tr>
-              <tr>
-                <td style="color:#F8F6F0;font-weight:500">证据链归因</td><td>108</td><td>4,120</td>
-                <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:8%"></div></div><span style="color:#C8A96E">8%</span></div></td>
-                <td>2.8s</td><td><span class="tag tag-green">正常</span></td>
-              </tr>
-              <tr>
-                <td style="color:#F8F6F0;font-weight:500">方法模板</td><td>142</td><td>4,200</td>
-                <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:5%"></div></div><span style="color:#C8A96E">5%</span></div></td>
-                <td>5.6s</td><td><span class="tag tag-gold">高负载</span></td>
-              </tr>
-            </tbody>
+            <tbody id="admin-hermes-mode-tbody"></tbody>
           </table>
         </div>
-        <div class="pool-cards">
+        <div id="admin-hermes-pool-cards" class="pool-cards">
           <div class="pool-card">
             <div class="pool-card-label">总算力池</div>
-            <div class="pool-card-value">480,000</div>
-            <div class="pool-card-sub">积分</div>
+            <div class="pool-card-value">--</div>
+            <div class="pool-card-sub">加载中</div>
           </div>
           <div class="pool-card">
             <div class="pool-card-label">本月消耗</div>
-            <div class="pool-card-value">84,000</div>
-            <div class="pool-card-sub">17.5% 使用率</div>
+            <div class="pool-card-value">--</div>
+            <div class="pool-card-sub">加载中</div>
           </div>
           <div class="pool-card">
             <div class="pool-card-label">剩余可用</div>
-            <div class="pool-card-value">396,000</div>
-            <div class="pool-card-sub">82.5% 剩余</div>
+            <div class="pool-card-value">--</div>
+            <div class="pool-card-sub">加载中</div>
           </div>
         </div>
         <div class="table-wrap">
@@ -3064,21 +3575,45 @@
             <div class="table-title">用户算力消耗排行 (本月)</div>
             <span class="tag tag-gold">Top 8</span>
           </div>
-          <table>
+          <table id="admin-hermes-ranking-table">
             <thead><tr><th>排名</th><th>用户</th><th>等级</th><th>本月调用</th><th>消耗算力</th><th>最常用模式</th></tr></thead>
-            <tbody>
-              <tr><td><span class="rank-badge rank-1">1</span></td><td style="color:#F8F6F0">张伟</td><td><span class="tag tag-gold">机构试点</span></td><td>84</td><td style="color:#C8A96E">1,680</td><td>复盘速写</td></tr>
-              <tr><td><span class="rank-badge rank-2">2</span></td><td style="color:#F8F6F0">周浩然</td><td><span class="tag tag-gold">机构试点</span></td><td>71</td><td style="color:#C8A96E">1,420</td><td>自选股诊断</td></tr>
-              <tr><td><span class="rank-badge rank-3">3</span></td><td style="color:#F8F6F0">财经老王</td><td><span class="tier-s">种子投顾</span></td><td>68</td><td style="color:#C8A96E">1,360</td><td>专家纪要速读</td></tr>
-              <tr><td><span class="rank-badge rank-n">4</span></td><td style="color:#F8F6F0">李晓梅</td><td><span class="tag tag-blue">专业会员</span></td><td>164</td><td style="color:#C8A96E">3,280</td><td>研报精读</td></tr>
-              <tr><td><span class="rank-badge rank-n">5</span></td><td style="color:#F8F6F0">方浩天</td><td><span class="tier-a">成长投顾</span></td><td>42</td><td style="color:#C8A96E">840</td><td>方法模板</td></tr>
-              <tr><td><span class="rank-badge rank-n">6</span></td><td style="color:#F8F6F0">王建国</td><td><span class="tag tag-blue">专业会员</span></td><td>128</td><td style="color:#C8A96E">2,560</td><td>证据链归因</td></tr>
-              <tr><td><span class="rank-badge rank-n">7</span></td><td style="color:#F8F6F0">科技股猎手</td><td><span class="tier-a">成长投顾</span></td><td>31</td><td style="color:#C8A96E">620</td><td>基本面分析</td></tr>
-              <tr><td><span class="rank-badge rank-n">8</span></td><td style="color:#F8F6F0">吴静怡</td><td><span class="tag tag-blue">专业会员</span></td><td>96</td><td style="color:#C8A96E">1,920</td><td>复盘速写</td></tr>
-            </tbody>
+            <tbody id="admin-hermes-ranking-tbody"></tbody>
           </table>
         </div>
       </div><!-- end section-hermes -->
+
+      <div id="section-agent-workflows" style="display:none">
+        <div class="section-header">
+          <div>
+            <div class="section-title">智能体工作流中心</div>
+            <div class="section-subtitle">统一查看 Hermes、复盘、智能指标、知识问答、证据链、知识加工与预测算法的设计链路。除预测算法外，其余智能体已统一纳入声明式工作流执行框架。</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <span id="agent-workflow-stats" class="admin-build-tag">0 个智能体工作流</span>
+          </div>
+        </div>
+        <div class="workflow-shell">
+          <aside class="chart-card">
+            <div class="chart-title">智能体列表</div>
+            <div class="chart-subtitle">平台内所有智能体程序都应该纳入这里统一审视。</div>
+            <div id="agent-workflow-list" class="agent-workflow-list" style="margin-top:12px"></div>
+          </aside>
+          <section class="chart-card">
+            <div class="chart-title" id="agent-workflow-title">工作流详情</div>
+            <div class="chart-subtitle" id="agent-workflow-summary">这里展示智能体的设计流转和关键节点职责。</div>
+            <div class="workflow-stage" style="margin-top:16px;min-height:680px">
+              <div id="agent-workflow-stage-viewport" class="workflow-stage-viewport" style="min-height:680px">
+                <svg id="agent-workflow-edge-layer" class="workflow-edge-layer"></svg>
+                <div id="agent-workflow-board" class="workflow-board workflow-board-canvas" style="min-height:680px"></div>
+              </div>
+            </div>
+          </section>
+          <aside class="chart-card">
+            <div class="chart-title">节点检查器</div>
+            <div id="agent-workflow-inspector" class="forecast-config-board"></div>
+          </aside>
+        </div>
+      </div><!-- end section-agent-workflows -->
 
       <!-- ===== FORECAST MODEL ===== -->
       <div id="section-forecast-model" style="display:none">
@@ -3645,6 +4180,14 @@
               <label class="toggle"><input id="feature-hermes" type="checkbox"><span class="toggle-slider"></span></label>
             </div>
             <div class="toggle-wrap">
+              <span class="toggle-label">Hermes 提示词范围约束</span>
+              <label class="toggle"><input id="hermes-prompt-scope-guard-enabled" type="checkbox"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
+              <span class="toggle-label">Hermes 向普通用户开放</span>
+              <label class="toggle"><input id="hermes-investor-access-enabled" type="checkbox"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
               <span class="toggle-label">渠道模块</span>
               <label class="toggle"><input id="feature-channel_module" type="checkbox" checked><span class="toggle-slider"></span></label>
             </div>
@@ -3681,6 +4224,9 @@
             </div>
             <div class="feature-note" style="margin-top:8px">
               MVP 默认优先开放：基本面、自选股、复盘、消息互动、知识归档、大V工作台和租户门户；预测分析放到约 1 个月后的第二阶段，会员收费能力按层级逐步开放。
+            </div>
+            <div class="feature-note" style="margin-top:8px">
+              Hermes 范围约束开启后，只接受固定研究范围内的提示词；关闭后，Hermes 会按更开放的问答模式继续承接。普通用户开放开关关闭时，H5 中只有大V用户能看到和使用 Hermes。
             </div>
             <div style="display:grid;gap:10px;margin-top:16px">
               <button class="btn-gold" type="button" style="padding:10px 20px;font-size:13px;width:100%" onclick="saveSiteConfig()">保存功能开关</button>
@@ -3726,6 +4272,46 @@
       </div><!-- end section-settings-policy -->
 
       <div id="section-settings-knowledge" style="display:none">
+        <div class="admin-knowledge-entry-card">
+          <div>
+            <div class="admin-knowledge-entry-title">知识图谱已独立成页</div>
+            <div class="admin-knowledge-entry-desc">知识专区负责知识原始内容、配置和追溯；真正的图谱关系放在“知识图谱中心”里查看，不再把文件、语音和 URL 直接当成图谱主节点。</div>
+          </div>
+          <button class="btn-gold" style="padding:10px 16px;font-size:12px" type="button" onclick="showSection('settings-knowledge-graph', document.querySelector('.admin-nav-item[data-section=&quot;settings-knowledge-graph&quot;]'))">进入知识图谱中心</button>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-end;flex-wrap:wrap">
+            <div>
+              <div class="section-title" style="margin-bottom:6px">知识原始内容总览</div>
+              <div class="feature-note">这里给 Admin 直接查看用户原始输入、文件 / URL 解析正文、语音转写原文和解析元数据，确保后续给大模型生成时能追溯原材料。</div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+              <div class="config-field" style="min-width:220px;margin:0">
+                <label>租户筛选</label>
+                <select id="admin-knowledge-tenant-filter" data-admin-knowledge-tenant-filter></select>
+              </div>
+              <button class="btn-outline" style="padding:8px 14px;font-size:12px" onclick="loadAdminKnowledgeItems(true)">刷新列表</button>
+            </div>
+          </div>
+        </div>
+        <div class="table-card" style="margin-bottom:16px">
+          <table>
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>租户</th>
+                <th>类型</th>
+                <th>标题</th>
+                <th>来源</th>
+                <th>原始内容预览</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="admin-knowledge-center-items-body" data-admin-knowledge-items-body>
+              <tr><td colspan="7" style="text-align:center;color:#8899aa;padding:20px 0">正在加载知识内容…</td></tr>
+            </tbody>
+          </table>
+        </div>
         <div class="config-grid">
           <div class="config-card">
             <div class="config-card-title">租户研究资料输入源</div>
@@ -3832,6 +4418,46 @@
         </div>
       </div><!-- end section-settings-knowledge -->
 
+      <div id="section-settings-knowledge-graph" style="display:none">
+        <div class="admin-kg-shell">
+          <div class="admin-kg-top">
+            <div>
+              <div class="admin-kg-title">知识图谱中心</div>
+              <div class="admin-kg-desc">默认从平台总图看租户知识主题，再切到单租户展开实体、方法、观点和验证信号。只展示知识对象，原始素材只在详情中作为来源证据出现。</div>
+            </div>
+            <div class="admin-kg-controls">
+              <div class="config-field" style="min-width:220px;margin:0">
+                <label>租户视角</label>
+                <select id="admin-kg-tenant-filter"></select>
+              </div>
+              <input id="admin-kg-search" class="admin-kg-search" placeholder="搜索主题、实体、观点或验证信号..." oninput="handleAdminKnowledgeMapSearch(this.value)">
+              <select id="admin-kg-type-filter" class="admin-kg-select" onchange="handleAdminKnowledgeMapTypeChange(this.value)">
+                <option value="all">全部节点</option>
+                <option value="topic">主题</option>
+                <option value="entity">实体</option>
+                <option value="method">方法</option>
+                <option value="claim">观点</option>
+                <option value="signal">验证信号</option>
+              </select>
+              <button class="btn-outline" style="padding:8px 14px;font-size:12px" type="button" onclick="loadAdminKnowledgeMap(true)">刷新</button>
+              <button class="btn-outline" style="padding:8px 14px;font-size:12px" type="button" onclick="collapseAdminKnowledgeMap()">收缩</button>
+              <button class="btn-outline" style="padding:8px 14px;font-size:12px" type="button" onclick="expandAdminKnowledgeMapAll()">全部展示</button>
+              <button class="btn-outline" style="padding:8px 14px;font-size:12px" type="button" onclick="adjustAdminKnowledgeMapDepth(-1)">-</button>
+              <button class="btn-outline" style="padding:8px 14px;font-size:12px" type="button" onclick="adjustAdminKnowledgeMapDepth(1)">+</button>
+            </div>
+          </div>
+          <div id="admin-kg-stage" class="admin-kg-stage">正在加载知识图谱…</div>
+          <div id="admin-kg-stats" class="admin-kg-stats"></div>
+          <div id="admin-kg-legend" class="admin-kg-legend"></div>
+          <div class="admin-kg-layout">
+            <div class="admin-kg-board-shell">
+              <div id="admin-kg-board" class="admin-kg-board"></div>
+            </div>
+            <aside id="admin-kg-detail" class="admin-kg-detail"></aside>
+          </div>
+        </div>
+      </div><!-- end section-settings-knowledge-graph -->
+
       <div id="section-knowledge-items" style="display:none">
         <div class="card" style="margin-bottom:16px">
           <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-end;flex-wrap:wrap">
@@ -3842,7 +4468,7 @@
             <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
               <div class="config-field" style="min-width:220px;margin:0">
                 <label>租户筛选</label>
-                <select id="admin-knowledge-tenant-filter"></select>
+                <select id="admin-knowledge-items-tenant-filter" data-admin-knowledge-tenant-filter></select>
               </div>
               <button class="btn-outline" style="padding:8px 14px;font-size:12px" onclick="loadAdminKnowledgeItems(true)">刷新列表</button>
             </div>
@@ -3861,7 +4487,7 @@
                 <th>操作</th>
               </tr>
             </thead>
-            <tbody id="admin-knowledge-items-body">
+            <tbody id="admin-knowledge-items-body" data-admin-knowledge-items-body>
               <tr><td colspan="7" style="text-align:center;color:#8899aa;padding:20px 0">正在加载知识内容…</td></tr>
             </tbody>
           </table>
@@ -4246,7 +4872,7 @@
 const sectionTitles = {
   overview:'运营概览', users:'用户列表', segments:'用户分层', points:'积分管理',
   kols:'大V投顾管理', commission:'收益结算', community:'帖子审核',
-  events:'活动管理', hermes:'Hermes使用统计', 'forecast-model':'预测模型', channels:'渠道管理',
+  events:'活动管理', hermes:'Hermes使用统计', 'agent-workflows':'智能体工作流中心', 'forecast-model':'预测模型', channels:'渠道管理',
   'indicator-overview':'指标专区 · 总览控制台',
   'indicator-smart':'指标专区 · 智能指标',
   'indicator-lake':'指标专区 · 数据湖指标',
@@ -4259,8 +4885,9 @@ const sectionTitles = {
   'settings-brand':'系统专区 · 平台品牌',
   'settings-features':'系统专区 · 功能开关',
   'settings-policy':'系统专区 · 发布与隔离',
-  'settings-knowledge':'系统专区 · 知识与向量',
-  'knowledge-items':'系统专区 · 知识内容管理',
+  'settings-knowledge':'系统专区 · 知识专区',
+  'settings-knowledge-graph':'系统专区 · 知识图谱中心',
+  'knowledge-items':'系统专区 · 知识专区',
   'settings-llm':'系统专区 · 大模型专区',
   'token-usage':'系统专区 · Token 监控',
   'task-center':'系统专区 · 定时任务专区',
@@ -4348,6 +4975,9 @@ function showSection(name, navEl) {
   if (name === 'indicator-hub') {
     name = 'indicator-overview';
   }
+  if (name === 'knowledge-items') {
+    name = 'settings-knowledge';
+  }
   if (name === 'forecast-model' && !isAdminFeatureEnabled('stock_forecast')) {
     showToast('预测功能当前未开放');
     return;
@@ -4356,6 +4986,12 @@ function showSection(name, navEl) {
   document.getElementById('section-' + name).style.display = 'block';
   setActiveAdminNav(navEl || document.querySelector(`.admin-nav-item[data-section="${name}"]`));
   document.getElementById('page-title').textContent = sectionTitles[name];
+  if (name === 'agent-workflows') {
+    loadAdminAgentWorkflows().catch((error) => showToast(error.message || '加载失败'));
+  }
+  if (name === 'hermes') {
+    loadAdminHermesMemorySummary(false).catch((error) => showToast(error.message || '加载失败'));
+  }
   if (name === 'forecast-model') {
     initForecastEditorEvents();
     loadAdminForecastModel().catch((error) => showToast(error.message || '加载失败'));
@@ -4363,8 +4999,11 @@ function showSection(name, navEl) {
   if (name === 'task-center') {
     refreshAdminTaskCenter(false).catch((error) => showToast(error.message || '加载失败'));
   }
-  if (name === 'knowledge-items') {
+  if (name === 'settings-knowledge') {
     loadAdminKnowledgeItems(false).catch((error) => showToast(error.message || '加载失败'));
+  }
+  if (name === 'settings-knowledge-graph') {
+    loadAdminKnowledgeMap(false).catch((error) => showToast(error.message || '加载失败'));
   }
   if (name === 'token-usage') {
     refreshAdminTokenUsage(false).catch((error) => showToast(error.message || '加载失败'));
@@ -4491,6 +5130,27 @@ const adminTokenUsage = JSON.parse(JSON.stringify(window.ADMIN_TOKEN_USAGE || {
 }));
 const adminKnowledgeState = {
   items: [],
+  tenantFilter: '',
+};
+const adminKnowledgeMapState = {
+  tenantFilter: '',
+  depth: 3,
+  defaultDepth: 3,
+  type: 'all',
+  query: '',
+  selectedNodeId: '',
+  centerNodeId: '',
+  payload: null,
+};
+const adminHermesMemoryState = {
+  loaded: false,
+  loading: false,
+  summary: null,
+  preview: null,
+};
+const adminHermesUsageState = {
+  loading: false,
+  stats: null,
 };
 
 function getAdminIndicatorDefinition(indicatorCode) {
@@ -4640,12 +5300,12 @@ function renderAdminIndicatorBatches() {
   if (!host) return;
   const batches = Array.isArray(adminIndicatorHub.load_batches) ? adminIndicatorHub.load_batches.slice(0, 4) : [];
   host.innerHTML = batches.length ? batches.map((batch) => `
-    <div style="padding:10px 12px;border-radius:10px;background:rgba(11,30,58,0.55);border:1px solid rgba(200,169,110,0.08)">
-      <div style="font-size:12px;color:var(--white);font-weight:600">${escapeHtml(batch.batch_code)}</div>
-      <div style="font-size:11px;color:#8899aa;margin-top:4px">${escapeHtml(batch.summary || '')}</div>
-      <div style="font-size:11px;color:#C8A96E;margin-top:6px">${escapeHtml(batch.created_at || '--')} · ${escapeHtml(String(batch.total_indicators || 0))} 指标 / ${escapeHtml(String(batch.total_points || 0))} 点</div>
+    <div class="indicator-overview-entry">
+      <div class="indicator-overview-entry-title">${escapeHtml(batch.batch_code)}</div>
+      <div class="indicator-overview-entry-copy">${escapeHtml(batch.summary || '')}</div>
+      <div class="indicator-overview-entry-meta">${escapeHtml(batch.created_at || '--')} · ${escapeHtml(String(batch.total_indicators || 0))} 指标 / ${escapeHtml(String(batch.total_points || 0))} 点</div>
     </div>
-  `).join('') : '<div style="font-size:12px;color:#8899aa">暂无入湖批次。</div>';
+  `).join('') : '<div class="indicator-overview-list-empty">暂无入湖批次。</div>';
 }
 
 function renderAdminIndicatorTests() {
@@ -4653,12 +5313,12 @@ function renderAdminIndicatorTests() {
   if (!host) return;
   const tests = Array.isArray(adminIndicatorHub.recent_tests) ? adminIndicatorHub.recent_tests.slice(0, 4) : [];
   host.innerHTML = tests.length ? tests.map((item) => `
-    <div style="padding:10px 12px;border-radius:10px;background:rgba(11,30,58,0.55);border:1px solid rgba(200,169,110,0.08)">
-      <div style="font-size:12px;color:var(--white);font-weight:600">${escapeHtml(item.source_code || '')}</div>
-      <div style="font-size:11px;color:#8899aa;margin-top:4px">${escapeHtml(item.tested_at || '--')}</div>
-      <div style="font-size:11px;color:${item.success ? '#63B3ED' : '#E74C3C'};margin-top:6px">${item.success ? '成功' : '失败'} · HTTP ${escapeHtml(item.http_status || '--')} · ${escapeHtml(item.latency_ms || '--')} ms</div>
+    <div class="indicator-overview-entry">
+      <div class="indicator-overview-entry-title">${escapeHtml(item.source_code || '')}</div>
+      <div class="indicator-overview-entry-copy">${escapeHtml(item.tested_at || '--')}</div>
+      <div class="indicator-overview-entry-meta" style="color:${item.success ? '#2F74C0' : '#E74C3C'}">${item.success ? '成功' : '失败'} · HTTP ${escapeHtml(item.http_status || '--')} · ${escapeHtml(item.latency_ms || '--')} ms</div>
     </div>
-  `).join('') : '<div style="font-size:12px;color:#8899aa">暂无测试记录。</div>';
+  `).join('') : '<div class="indicator-overview-list-empty">暂无测试记录。</div>';
 }
 
 function renderAdminIndicatorSecondStageTables() {
@@ -4912,27 +5572,47 @@ function applyAdminTaskCenterPayload(data) {
   renderAdminTaskCenter();
 }
 
+function getAdminKnowledgeTenantFilters() {
+  return Array.from(document.querySelectorAll('[data-admin-knowledge-tenant-filter]'));
+}
+
 function renderAdminKnowledgeTenantFilter() {
-  const select = document.getElementById('admin-knowledge-tenant-filter');
-  if (!select) return '';
+  const filters = getAdminKnowledgeTenantFilters();
   const tenants = Array.isArray((adminSiteConfig && adminSiteConfig.tenants)) ? adminSiteConfig.tenants : [];
-  const currentValue = select.value || '';
-  select.innerHTML = ['<option value="">全部租户</option>'].concat(
-    tenants.map((tenant) => `<option value="${escapeAttr(tenant.slug || '')}">${escapeHtml(tenant.name || tenant.slug || '未命名租户')}</option>`)
-  ).join('');
-  select.value = tenants.some((tenant) => tenant.slug === currentValue) ? currentValue : '';
-  if (!select.dataset.bound) {
-    select.addEventListener('change', () => loadAdminKnowledgeItems(false));
-    select.dataset.bound = '1';
+  const knownSlugs = new Set(tenants.map((tenant) => String(tenant.slug || '').trim()).filter(Boolean));
+  if (adminKnowledgeState.tenantFilter && !knownSlugs.has(adminKnowledgeState.tenantFilter)) {
+    adminKnowledgeState.tenantFilter = '';
   }
-  return select.value || '';
+  filters.forEach((select) => {
+    select.innerHTML = ['<option value="">全部租户</option>'].concat(
+      tenants.map((tenant) => `<option value="${escapeAttr(tenant.slug || '')}">${escapeHtml(tenant.name || tenant.slug || '未命名租户')}</option>`)
+    ).join('');
+    select.value = adminKnowledgeState.tenantFilter || '';
+    if (!select.dataset.bound) {
+      select.addEventListener('change', () => {
+        adminKnowledgeState.tenantFilter = select.value || '';
+        getAdminKnowledgeTenantFilters().forEach((item) => {
+          item.value = adminKnowledgeState.tenantFilter;
+        });
+        loadAdminKnowledgeItems(false).catch((error) => showToast(error.message || '加载失败'));
+      });
+      select.dataset.bound = '1';
+    }
+  });
+  return adminKnowledgeState.tenantFilter || '';
+}
+
+function adminKnowledgeTypeLabel(type) {
+  const normalized = String(type || '').trim().toLowerCase();
+  if (normalized === 'voice') return '语音资料';
+  if (normalized === 'file') return '文件资料';
+  if (normalized === 'url') return '网页资料';
+  return '手写观点';
 }
 
 function renderAdminKnowledgeItems() {
   renderAdminKnowledgeTenantFilter();
-  const body = document.getElementById('admin-knowledge-items-body');
-  if (!body) return;
-  body.innerHTML = (adminKnowledgeState.items || []).map((item) => {
+  const markup = (adminKnowledgeState.items || []).map((item) => {
     const previewText = truncateText(item.raw_input || item.body || item.summary || '', 120) || '--';
     const createdAt = item.time || (item.vector_record && item.vector_record.created_at) || '--';
     const syncMeta = getAdminKnowledgeSyncMeta(item);
@@ -4948,12 +5628,17 @@ function renderAdminKnowledgeItems() {
       </tr>
     `;
   }).join('') || '<tr><td colspan="7" style="text-align:center;color:#8899aa;padding:20px 0">暂无知识内容</td></tr>';
+  document.querySelectorAll('[data-admin-knowledge-items-body]').forEach((body) => {
+    body.innerHTML = markup;
+  });
 }
 
 async function loadAdminKnowledgeItems(showMessage = false) {
   const currentTenant = renderAdminKnowledgeTenantFilter();
-  const query = currentTenant ? `?tenant_slug=${encodeURIComponent(currentTenant)}` : '';
-  const res = await fetch(`/api/admin/knowledge-items${query}`);
+  const query = new URLSearchParams();
+  if (currentTenant) query.set('tenant_slug', currentTenant);
+  query.set('limit', '300');
+  const res = await fetch(`/api/admin/knowledge-items${query.toString() ? `?${query.toString()}` : ''}`);
   const data = await res.json();
   if (!res.ok || !data.ok) {
     showToast((data && data.error) || '知识内容加载失败');
@@ -4962,6 +5647,366 @@ async function loadAdminKnowledgeItems(showMessage = false) {
   adminKnowledgeState.items = Array.isArray(data.items) ? data.items : [];
   renderAdminKnowledgeItems();
   if (showMessage) showToast('知识内容已刷新');
+}
+
+function renderAdminKnowledgeMapTenantFilter() {
+  const select = document.getElementById('admin-kg-tenant-filter');
+  if (!select) return '';
+  const tenants = Array.isArray((adminSiteConfig && adminSiteConfig.tenants)) ? adminSiteConfig.tenants : [];
+  const knownSlugs = new Set(tenants.map((tenant) => String(tenant.slug || '').trim()).filter(Boolean));
+  if (adminKnowledgeMapState.tenantFilter && !knownSlugs.has(adminKnowledgeMapState.tenantFilter)) {
+    adminKnowledgeMapState.tenantFilter = '';
+  }
+  select.innerHTML = ['<option value="">平台总图</option>'].concat(
+    tenants.map((tenant) => `<option value="${escapeAttr(tenant.slug || '')}">${escapeHtml(tenant.name || tenant.slug || '未命名租户')}</option>`)
+  ).join('');
+  select.value = adminKnowledgeMapState.tenantFilter || '';
+  if (!select.dataset.bound) {
+    select.addEventListener('change', () => {
+      adminKnowledgeMapState.tenantFilter = select.value || '';
+      loadAdminKnowledgeMap(false).catch((error) => showToast(error.message || '加载失败'));
+    });
+    select.dataset.bound = '1';
+  }
+  return adminKnowledgeMapState.tenantFilter || '';
+}
+
+function adminKnowledgeMapKindLabel(kind) {
+  if (kind === 'root') return '平台根节点';
+  if (kind === 'tenant') return '租户';
+  if (kind === 'topic') return '主题';
+  if (kind === 'entity') return '实体';
+  if (kind === 'method') return '方法';
+  if (kind === 'claim') return '观点';
+  if (kind === 'signal') return '验证信号';
+  return '知识节点';
+}
+
+function adminKnowledgeMapNodeWidth(kind) {
+  if (kind === 'root') return 176;
+  if (kind === 'tenant') return 156;
+  if (kind === 'claim') return 196;
+  if (kind === 'signal') return 136;
+  return 144;
+}
+
+function handleAdminKnowledgeMapSearch(value) {
+  adminKnowledgeMapState.query = String(value || '').trim();
+  renderAdminKnowledgeMap();
+}
+
+function handleAdminKnowledgeMapTypeChange(value) {
+  adminKnowledgeMapState.type = value || 'all';
+  renderAdminKnowledgeMap();
+}
+
+function adjustAdminKnowledgeMapDepth(delta) {
+  const payload = adminKnowledgeMapState.payload || {};
+  const maxDepth = Number(payload.max_depth || 5);
+  adminKnowledgeMapState.depth = Math.max(2, Math.min(maxDepth, Number(adminKnowledgeMapState.depth || payload.default_depth || 3) + Number(delta || 0)));
+  renderAdminKnowledgeMap();
+}
+
+function expandAdminKnowledgeMapAll() {
+  const payload = adminKnowledgeMapState.payload || {};
+  adminKnowledgeMapState.depth = Number(payload.max_depth || 5);
+  renderAdminKnowledgeMap();
+}
+
+function collapseAdminKnowledgeMap() {
+  const payload = adminKnowledgeMapState.payload || {};
+  adminKnowledgeMapState.depth = Number(payload.default_depth || 3);
+  renderAdminKnowledgeMap();
+}
+
+function selectAdminKnowledgeMapNode(nodeId) {
+  adminKnowledgeMapState.selectedNodeId = nodeId || '';
+  adminKnowledgeMapState.centerNodeId = nodeId || '';
+  renderAdminKnowledgeMap();
+}
+
+function openAdminKnowledgeMapSource(entryId, tenantSlug) {
+  if (!entryId) return;
+  openAdminKnowledgeItemDetail(entryId, tenantSlug || '');
+}
+
+function getAdminKnowledgeMapNodeRelations(nodeId) {
+  const payload = adminKnowledgeMapState.payload || {};
+  const nodes = Array.isArray(payload.nodes) ? payload.nodes : [];
+  const edges = Array.isArray(payload.edges) ? payload.edges : [];
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+  const parents = [];
+  const children = [];
+  edges.forEach((edge) => {
+    if (edge.to === nodeId && nodeMap.has(edge.from)) parents.push(nodeMap.get(edge.from));
+    if (edge.from === nodeId && nodeMap.has(edge.to)) children.push(nodeMap.get(edge.to));
+  });
+  return {
+    parents: parents.filter(Boolean).slice(0, 8),
+    children: children.filter(Boolean).slice(0, 8),
+  };
+}
+
+function centerAdminKnowledgeMapNode(nodeId, positions) {
+  const shell = document.querySelector('.admin-kg-board-shell');
+  const point = positions && positions[nodeId];
+  if (!shell || !point) return;
+  shell.scrollTo({
+    left: Math.max(0, Math.round(point.x - shell.clientWidth / 2)),
+    top: Math.max(0, Math.round(point.y - shell.clientHeight / 2)),
+    behavior: 'smooth',
+  });
+}
+
+function getAdminKnowledgeMapFilteredPayload() {
+  const payload = adminKnowledgeMapState.payload || {};
+  const allNodes = Array.isArray(payload.nodes) ? payload.nodes : [];
+  const allEdges = Array.isArray(payload.edges) ? payload.edges : [];
+  const depth = Math.max(2, Math.min(Number(payload.max_depth || 5), Number(adminKnowledgeMapState.depth || payload.default_depth || 3)));
+  const type = adminKnowledgeMapState.type || 'all';
+  const query = String(adminKnowledgeMapState.query || '').trim().toLowerCase();
+  const depthNodes = allNodes.filter((node) => Number(node.level || 99) <= depth);
+  const visibleIds = new Set();
+  depthNodes.forEach((node) => {
+    if (node.kind !== 'root' && type !== 'all' && node.kind !== type) return;
+    const haystack = [
+      node.label,
+      node.full_label,
+      node.summary,
+      Array.isArray(node.keywords) ? node.keywords.join(' ') : '',
+    ].join(' ').toLowerCase();
+    if (query && !haystack.includes(query)) return;
+    visibleIds.add(node.id);
+  });
+  const rootNode = depthNodes.find((node) => node.kind === 'root');
+  if (rootNode) visibleIds.add(rootNode.id);
+  if (query) {
+    allEdges.forEach((edge) => {
+      if (visibleIds.has(edge.from) || visibleIds.has(edge.to)) {
+        visibleIds.add(edge.from);
+        visibleIds.add(edge.to);
+      }
+    });
+  } else if (type !== 'all') {
+    allEdges.forEach((edge) => {
+      if (visibleIds.has(edge.to)) visibleIds.add(edge.from);
+    });
+  } else {
+    depthNodes.forEach((node) => visibleIds.add(node.id));
+  }
+  return {
+    payload,
+    depth,
+    nodes: depthNodes.filter((node) => visibleIds.has(node.id)),
+    edges: allEdges.filter((edge) => visibleIds.has(edge.from) && visibleIds.has(edge.to)),
+  };
+}
+
+function renderAdminKnowledgeMapDetail(node) {
+  const host = document.getElementById('admin-kg-detail');
+  if (!host) return;
+  if (!node) {
+    host.innerHTML = '<div class="admin-kg-detail-empty">点击图谱节点后，这里查看知识摘要、QKV 和来源证据。</div>';
+    return;
+  }
+  const qkv = node.qkv || {};
+  const keywords = Array.isArray(node.keywords) ? node.keywords : [];
+  const sources = Array.isArray(node.source_entries) ? node.source_entries : [];
+  const relations = getAdminKnowledgeMapNodeRelations(node.id);
+  host.innerHTML = `
+    <div class="admin-kg-detail-kicker">${escapeHtml(adminKnowledgeMapKindLabel(node.kind || ''))}</div>
+    <div class="admin-kg-detail-title">${escapeHtml(node.full_label || node.label || '')}</div>
+    <div class="admin-kg-detail-summary">${escapeHtml(node.summary || '当前节点暂无摘要。')}</div>
+    ${keywords.length ? `<div class="admin-kg-chip-row">${keywords.slice(0, 10).map((item) => `<span class="admin-kg-chip">${escapeHtml(item)}</span>`).join('')}</div>` : ''}
+    <div class="admin-kg-detail-section">
+      <div class="admin-kg-detail-section-title">图谱关系</div>
+      <div class="admin-kg-detail-list">
+        <div class="admin-kg-detail-item">
+          <div class="admin-kg-detail-item-title">上游节点</div>
+          <div class="admin-kg-detail-item-meta">${relations.parents.length ? relations.parents.map((item) => escapeHtml(item.full_label || item.label || '')).join(' / ') : '当前节点位于最上层，暂无上游关系。'}</div>
+        </div>
+        <div class="admin-kg-detail-item">
+          <div class="admin-kg-detail-item-title">下游节点</div>
+          <div class="admin-kg-detail-item-meta">${relations.children.length ? relations.children.map((item) => escapeHtml(item.full_label || item.label || '')).join(' / ') : '当前节点暂无继续展开的下游关系。'}</div>
+        </div>
+        <div class="admin-kg-detail-item">
+          <div class="admin-kg-detail-item-title">来源规模</div>
+          <div class="admin-kg-detail-item-meta">当前节点关联 ${Number(node.source_count || sources.length || 0)} 条知识来源。</div>
+        </div>
+      </div>
+    </div>
+    <div class="admin-kg-detail-section">
+      <div class="admin-kg-detail-section-title">QKV 视角</div>
+      <div class="admin-kg-detail-list">
+        ${(Array.isArray(qkv.questions) ? qkv.questions : []).slice(0, 2).map((item) => `<div class="admin-kg-detail-item"><div class="admin-kg-detail-item-title">Q</div><div class="admin-kg-detail-item-meta">${escapeHtml(item)}</div></div>`).join('')}
+        ${(Array.isArray(qkv.values) ? qkv.values : []).slice(0, 2).map((item) => `<div class="admin-kg-detail-item"><div class="admin-kg-detail-item-title">V</div><div class="admin-kg-detail-item-meta">${escapeHtml(item)}</div></div>`).join('') || '<div class="admin-kg-detail-item"><div class="admin-kg-detail-item-title">V</div><div class="admin-kg-detail-item-meta">当前节点暂无可展示的知识值。</div></div>'}
+      </div>
+    </div>
+    <div class="admin-kg-detail-section">
+      <div class="admin-kg-detail-section-title">来源证据</div>
+      <div class="admin-kg-detail-list">
+        ${sources.length ? sources.slice(0, 6).map((entry) => `
+          <div class="admin-kg-detail-item">
+            <div class="admin-kg-detail-item-title">${escapeHtml(entry.title || '知识条目')}</div>
+            <div class="admin-kg-detail-item-meta">${escapeHtml(entry.summary || '暂无摘要')}${entry.time ? ` · ${escapeHtml(entry.time)}` : ''}${entry.tenant_name ? ` · ${escapeHtml(entry.tenant_name)}` : ''}</div>
+            <div class="modal-actions" style="margin-top:8px;justify-content:flex-start">
+              <button class="btn-outline" type="button" onclick="openAdminKnowledgeMapSource('${escapeAttr(entry.id || '')}','${escapeAttr(entry.tenant_slug || '')}')">查看知识详情</button>
+            </div>
+          </div>
+        `).join('') : '<div class="admin-kg-detail-item"><div class="admin-kg-detail-item-meta">当前节点暂无来源证据。</div></div>'}
+      </div>
+    </div>
+  `;
+}
+
+function renderAdminKnowledgeMap() {
+  const board = document.getElementById('admin-kg-board');
+  const stage = document.getElementById('admin-kg-stage');
+  const stats = document.getElementById('admin-kg-stats');
+  const legend = document.getElementById('admin-kg-legend');
+  if (!board || !stage || !stats || !legend) return;
+  if (!adminKnowledgeMapState.payload) {
+    board.innerHTML = '<div class="admin-kg-detail-empty" style="min-height:760px;background:transparent;color:#C6D3E2">知识图谱尚未加载。</div>';
+    renderAdminKnowledgeMapDetail(null);
+    return;
+  }
+  const filtered = getAdminKnowledgeMapFilteredPayload();
+  const payload = filtered.payload;
+  const maxDepth = Number(payload.max_depth || 5);
+  adminKnowledgeMapState.depth = filtered.depth;
+  adminKnowledgeMapState.defaultDepth = Number(payload.default_depth || 3);
+  stage.textContent = `当前显示 ${filtered.depth} 层 / 共 ${maxDepth} 层。平台总图默认只看租户与知识主题，继续展开后才进入观点和验证信号。`;
+  const statPayload = payload.stats || {};
+  stats.innerHTML = `
+    <div class="admin-kg-stat"><div class="admin-kg-stat-label">租户</div><div class="admin-kg-stat-value">${statPayload.tenant_count || 0}</div></div>
+    <div class="admin-kg-stat"><div class="admin-kg-stat-label">知识条目</div><div class="admin-kg-stat-value">${statPayload.artifact_count || 0}</div></div>
+    <div class="admin-kg-stat"><div class="admin-kg-stat-label">主题</div><div class="admin-kg-stat-value">${statPayload.topic_count || 0}</div></div>
+    <div class="admin-kg-stat"><div class="admin-kg-stat-label">实体</div><div class="admin-kg-stat-value">${statPayload.entity_count || 0}</div></div>
+    <div class="admin-kg-stat"><div class="admin-kg-stat-label">观点</div><div class="admin-kg-stat-value">${statPayload.claim_count || 0}</div></div>
+    <div class="admin-kg-stat"><div class="admin-kg-stat-label">验证信号</div><div class="admin-kg-stat-value">${statPayload.signal_count || 0}</div></div>
+  `;
+  legend.innerHTML = [
+    ['root', '平台根节点'],
+    ['tenant', '租户'],
+    ['topic', '主题'],
+    ['entity', '实体'],
+    ['method', '方法'],
+    ['claim', '观点'],
+    ['signal', '验证信号'],
+  ].map(([kind, label]) => `<span class="admin-kg-legend-chip"><span class="admin-kg-legend-dot kind-${kind}"></span>${escapeHtml(label)}</span>`).join('');
+  if (!filtered.nodes.length) {
+    board.innerHTML = '<div class="admin-kg-detail-empty" style="min-height:760px;background:transparent;color:#C6D3E2">当前没有匹配的知识对象。可以清空搜索词，或先补充结构化知识内容。</div>';
+    renderAdminKnowledgeMapDetail(null);
+    return;
+  }
+  const shell = document.querySelector('.admin-kg-board-shell');
+  const groups = {};
+  filtered.nodes.forEach((node) => {
+    const level = Number(node.level || 1);
+    if (!groups[level]) groups[level] = [];
+    groups[level].push(node);
+  });
+  Object.keys(groups).forEach((key) => groups[key].sort((a, b) => String(a.label || '').localeCompare(String(b.label || ''), 'zh-Hans-CN')));
+  const levelList = Object.keys(groups).map(Number).sort((a, b) => a - b);
+  const perRing = 20;
+  const baseRadius = 150;
+  const levelGap = 118;
+  const ringGap = 60;
+  let maxRadius = 0;
+  levelList.forEach((level) => {
+    if (level <= 1) return;
+    const groupSize = (groups[level] || []).length;
+    const ringIndex = Math.max(0, Math.ceil(groupSize / perRing) - 1);
+    maxRadius = Math.max(maxRadius, baseRadius + (level - 2) * levelGap + ringIndex * ringGap);
+  });
+  const viewportWidth = Math.max(1180, shell ? shell.clientWidth : 1180);
+  const viewportHeight = Math.max(760, shell ? shell.clientHeight : 760);
+  const width = Math.max(viewportWidth, maxRadius * 2 + 420);
+  const height = Math.max(viewportHeight, maxRadius * 2 + 340);
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const positions = {};
+  levelList.forEach((level) => {
+    const group = groups[level] || [];
+    if (level === 1) {
+      if (group[0]) positions[group[0].id] = { x: centerX, y: centerY };
+      return;
+    }
+    group.forEach((node, index) => {
+      const ringIndex = Math.floor(index / perRing);
+      const ringRadius = baseRadius + (level - 2) * levelGap + ringIndex * ringGap;
+      const ringSize = Math.min(perRing, Math.max(group.length - ringIndex * perRing, 1));
+      const angle = ((index % perRing) / ringSize) * Math.PI * 2 - Math.PI / 2;
+      positions[node.id] = {
+        x: centerX + Math.cos(angle) * ringRadius,
+        y: centerY + Math.sin(angle) * ringRadius,
+      };
+    });
+  });
+  const nodeMap = new Map(filtered.nodes.map((node) => [node.id, node]));
+  const edgeMarkup = filtered.edges.map((edge) => {
+    const from = positions[edge.from];
+    const to = positions[edge.to];
+    if (!from || !to) return '';
+    return `<line class="admin-kg-edge" x1="${Math.round(from.x)}" y1="${Math.round(from.y)}" x2="${Math.round(to.x)}" y2="${Math.round(to.y)}"></line>`;
+  }).join('');
+  board.innerHTML = `
+    <svg class="admin-kg-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">${edgeMarkup}</svg>
+    ${filtered.nodes.map((node) => {
+      const pos = positions[node.id] || { x: centerX, y: centerY };
+      return `
+        <button
+          type="button"
+          class="admin-kg-node kind-${escapeAttr(node.kind || 'topic')}${adminKnowledgeMapState.selectedNodeId === node.id ? ' is-active' : ''}"
+          style="left:${Math.round(pos.x)}px;top:${Math.round(pos.y)}px;width:${adminKnowledgeMapNodeWidth(node.kind)}px"
+          data-node-id="${escapeAttr(node.id || '')}"
+        >
+          <div class="admin-kg-node-kind">${escapeHtml(adminKnowledgeMapKindLabel(node.kind || ''))}</div>
+          <div class="admin-kg-node-label">${escapeHtml(node.full_label || node.label || '')}</div>
+        </button>
+      `;
+    }).join('')}
+  `;
+  board.style.width = `${Math.round(width)}px`;
+  board.style.height = `${Math.round(height)}px`;
+  Array.from(board.querySelectorAll('[data-node-id]')).forEach((nodeEl) => {
+    nodeEl.addEventListener('click', () => selectAdminKnowledgeMapNode(nodeEl.getAttribute('data-node-id') || ''));
+  });
+  const activeNode = nodeMap.get(adminKnowledgeMapState.selectedNodeId) || filtered.nodes.find((node) => node.kind === 'root') || filtered.nodes[0];
+  adminKnowledgeMapState.selectedNodeId = activeNode ? activeNode.id : '';
+  renderAdminKnowledgeMapDetail(activeNode || null);
+  const centerTarget = adminKnowledgeMapState.centerNodeId || '';
+  if (centerTarget && positions[centerTarget]) centerAdminKnowledgeMapNode(centerTarget, positions);
+  adminKnowledgeMapState.centerNodeId = '';
+}
+
+async function loadAdminKnowledgeMap(showMessage = false) {
+  renderAdminKnowledgeMapTenantFilter();
+  const stage = document.getElementById('admin-kg-stage');
+  if (stage) stage.textContent = '正在加载知识图谱…';
+  try {
+    const tenantSlug = renderAdminKnowledgeMapTenantFilter();
+    const query = new URLSearchParams();
+    if (tenantSlug) query.set('tenant_slug', tenantSlug);
+    const resp = await fetch(`/api/admin/knowledge-graph${query.toString() ? `?${query.toString()}` : ''}`);
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'knowledge_graph_load_failed');
+    adminKnowledgeMapState.payload = data.graph || {};
+    adminKnowledgeMapState.depth = Number((data.graph && data.graph.default_depth) || 3);
+    adminKnowledgeMapState.defaultDepth = Number((data.graph && data.graph.default_depth) || 3);
+    if (!adminKnowledgeMapState.selectedNodeId) {
+      adminKnowledgeMapState.selectedNodeId = String((data.graph && data.graph.root_id) || '');
+      adminKnowledgeMapState.centerNodeId = adminKnowledgeMapState.selectedNodeId;
+    }
+    renderAdminKnowledgeMap();
+    if (showMessage) showToast('知识图谱已刷新');
+  } catch (error) {
+    if (stage) stage.textContent = '知识图谱加载失败，当前无法展示。';
+    const board = document.getElementById('admin-kg-board');
+    if (board) board.innerHTML = '<div class="admin-kg-detail-empty" style="min-height:760px;background:transparent;color:#C6D3E2">知识图谱加载失败。请稍后重试，或先检查知识条目是否已成功同步。</div>';
+    renderAdminKnowledgeMapDetail(null);
+    showToast(error.message || '知识图谱加载失败');
+  }
 }
 
 function applyAdminTokenUsagePayload(data) {
@@ -6030,6 +7075,10 @@ async function openAdminIndicatorHistory(indicatorId) {
 
 let adminUsers = [];
 const ADMIN_USER_IMPORT_COLUMNS = ['username', 'password', 'phone', 'role', 'tenant_slug', 'advisor_name', 'status'];
+let agentWorkflowCenter = {summary: {}, workflows: []};
+let selectedAgentWorkflowId = '';
+let selectedAgentWorkflowNodeId = '';
+let agentWorkflowLoaded = false;
 let forecastConfig = {};
 let forecastWorkflowMeta = {};
 let forecastGraph = {nodes: [], edges: [], tuning: {}};
@@ -6337,6 +7386,579 @@ async function handleAdminUserCsvImport(file) {
   } catch (error) {
     showToast(error.message || 'CSV 导入失败');
   }
+}
+
+function getSelectedAgentWorkflow() {
+  return (agentWorkflowCenter.workflows || []).find((item) => item.id === selectedAgentWorkflowId) || null;
+}
+
+function renderAgentWorkflowDirectory() {
+  const host = document.getElementById('agent-workflow-list');
+  const stats = document.getElementById('agent-workflow-stats');
+  if (!host) return;
+  const workflows = Array.isArray(agentWorkflowCenter.workflows) ? agentWorkflowCenter.workflows : [];
+  if (!selectedAgentWorkflowId && workflows.length) {
+    selectedAgentWorkflowId = workflows[0].id || '';
+  }
+  const selected = getSelectedAgentWorkflow();
+  if (selected && !selectedAgentWorkflowNodeId) {
+    selectedAgentWorkflowNodeId = (((selected.graph || {}).nodes || [])[0] || {}).id || '';
+  }
+  host.innerHTML = workflows.map((item) => `
+    <button type="button" class="agent-workflow-item ${item.id === selectedAgentWorkflowId ? 'is-active' : ''}" data-agent-workflow-id="${escapeAttr(item.id || '')}">
+      <div class="agent-workflow-item-title">${escapeHtml(item.title || item.id || '-')}</div>
+      <div class="agent-workflow-item-desc">${escapeHtml(item.summary || '')}</div>
+      <div class="agent-workflow-chip-row">
+        <span class="agent-workflow-chip">${escapeHtml(item.execution_mode || 'workflow')}</span>
+        <span class="agent-workflow-chip">${escapeHtml(item.category || '未分类')}</span>
+      </div>
+    </button>
+  `).join('') || '<div class="compact-row"><strong>暂无工作流</strong><span>0</span></div>';
+  host.querySelectorAll('[data-agent-workflow-id]').forEach((node) => {
+    node.addEventListener('click', () => {
+      selectedAgentWorkflowId = node.dataset.agentWorkflowId || '';
+      selectedAgentWorkflowNodeId = '';
+      renderAgentWorkflowCenter();
+    });
+  });
+  if (stats) stats.textContent = `${workflows.length} 个智能体工作流`;
+}
+
+function buildAgentWorkflowVerticalOrder(nodes, edges) {
+  const nodeList = Array.isArray(nodes) ? nodes : [];
+  const edgeList = Array.isArray(edges) ? edges : [];
+  const nodeMap = new Map(nodeList.map((item) => [item.id, item]));
+  const inboundCount = new Map();
+  const adjacency = new Map();
+  nodeList.forEach((item) => {
+    inboundCount.set(item.id, 0);
+    adjacency.set(item.id, []);
+  });
+  edgeList.forEach((edge) => {
+    if (!nodeMap.has(edge.from) || !nodeMap.has(edge.to)) return;
+    inboundCount.set(edge.to, Number(inboundCount.get(edge.to) || 0) + 1);
+    adjacency.get(edge.from).push(edge.to);
+  });
+  const queue = nodeList.filter((item) => Number(inboundCount.get(item.id) || 0) === 0).map((item) => item.id);
+  const orderedIds = [];
+  while (queue.length) {
+    const nextId = queue.shift();
+    if (!nextId || orderedIds.includes(nextId)) continue;
+    orderedIds.push(nextId);
+    (adjacency.get(nextId) || []).forEach((targetId) => {
+      inboundCount.set(targetId, Number(inboundCount.get(targetId) || 0) - 1);
+      if (Number(inboundCount.get(targetId) || 0) <= 0) {
+        queue.push(targetId);
+      }
+    });
+  }
+  nodeList.forEach((item) => {
+    if (!orderedIds.includes(item.id)) orderedIds.push(item.id);
+  });
+  return orderedIds.map((id) => nodeMap.get(id)).filter(Boolean);
+}
+
+function renderAgentWorkflowGraph() {
+  const titleNode = document.getElementById('agent-workflow-title');
+  const summaryNode = document.getElementById('agent-workflow-summary');
+  const board = document.getElementById('agent-workflow-board');
+  const layer = document.getElementById('agent-workflow-edge-layer');
+  const viewport = document.getElementById('agent-workflow-stage-viewport');
+  const workflow = getSelectedAgentWorkflow();
+  if (!workflow || !board || !layer || !viewport) return;
+  const graph = workflow.graph || {};
+  const nodes = Array.isArray(graph.nodes) ? graph.nodes : [];
+  const edges = Array.isArray(graph.edges) ? graph.edges : [];
+  const orderedNodes = buildAgentWorkflowVerticalOrder(nodes, edges);
+  if (titleNode) titleNode.textContent = workflow.title || '工作流详情';
+  if (summaryNode) {
+    const preview = workflow.preview && typeof workflow.preview === 'object' ? workflow.preview.result || {} : {};
+    summaryNode.textContent = preview.predicted_change_pct !== undefined
+      ? `${workflow.summary || ''} 当前预览目标 ${Number(preview.predicted_change_pct || 0).toFixed(2)}%，波动上限 ${Number(preview.volatility_cap || 0).toFixed(2)}。`
+      : (workflow.summary || '这里展示智能体的设计流转和关键节点职责。');
+  }
+  if (!selectedAgentWorkflowNodeId && orderedNodes.length) {
+    selectedAgentWorkflowNodeId = (orderedNodes[0] || {}).id || '';
+  }
+  if (!nodes.length) {
+    board.innerHTML = '<div class="compact-row"><strong>暂无节点</strong><span>0</span></div>';
+    layer.innerHTML = '';
+    return;
+  }
+  board.style.width = '100%';
+  board.style.height = 'auto';
+  viewport.style.width = '100%';
+  viewport.style.height = 'auto';
+  layer.innerHTML = '';
+  const incomingMap = new Map();
+  const outgoingMap = new Map();
+  nodes.forEach((item) => {
+    incomingMap.set(item.id, []);
+    outgoingMap.set(item.id, []);
+  });
+  edges.forEach((edge) => {
+    if (incomingMap.has(edge.to)) incomingMap.get(edge.to).push(edge.from);
+    if (outgoingMap.has(edge.from)) outgoingMap.get(edge.from).push(edge.to);
+  });
+  const nodeNameMap = new Map(nodes.map((item) => [item.id, item.label || item.id || '-']));
+  board.innerHTML = `
+    <div class="agent-workflow-flow">
+      ${orderedNodes.map((item, index) => {
+        const upstreamNames = (incomingMap.get(item.id) || []).map((id) => nodeNameMap.get(id) || id);
+        const downstreamNames = (outgoingMap.get(item.id) || []).map((id) => nodeNameMap.get(id) || id);
+        return `
+          <div class="agent-workflow-flow-step ${index === orderedNodes.length - 1 ? 'is-last' : ''}">
+            <div class="agent-workflow-flow-rail">
+              <div class="agent-workflow-flow-index">${index + 1}</div>
+            </div>
+            <article class="agent-workflow-flow-card ${item.id === selectedAgentWorkflowNodeId ? 'is-selected' : ''}" data-agent-node-id="${escapeAttr(item.id || '')}" title="${escapeAttr(item.description || item.label || item.id || '')}">
+              <div class="agent-workflow-flow-head">
+                <div>
+                  <div class="agent-workflow-flow-step-label">Step ${index + 1}</div>
+                  <div class="agent-workflow-flow-title">${escapeHtml(item.label || item.id || '-')}</div>
+                </div>
+                <span class="agent-workflow-flow-pill is-gold">${escapeHtml(item.processor || item.kind || '')}</span>
+              </div>
+              <div class="agent-workflow-flow-mini">
+                ${upstreamNames.length ? `来自 ${escapeHtml(upstreamNames[0])}` : '起始'}
+                ${downstreamNames.length ? ` → ${escapeHtml(downstreamNames[0])}` : ' → 输出'}
+                ${(upstreamNames.length > 1 || downstreamNames.length > 1) ? ` · ${escapeHtml(`分支 ${Math.max(upstreamNames.length, downstreamNames.length)}`)}` : ''}
+              </div>
+            </article>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+  board.querySelectorAll('[data-agent-node-id]').forEach((node) => {
+    node.addEventListener('click', () => {
+      selectedAgentWorkflowNodeId = node.dataset.agentNodeId || '';
+      renderAgentWorkflowGraph();
+      renderAgentWorkflowInspector();
+    });
+  });
+}
+
+function renderAgentWorkflowInspector() {
+  const host = document.getElementById('agent-workflow-inspector');
+  if (!host) return;
+  const workflow = getSelectedAgentWorkflow();
+  if (!workflow) {
+    host.innerHTML = '<div class="compact-row"><strong>未选中工作流</strong><span>请选择左侧智能体</span></div>';
+    return;
+  }
+  const graph = workflow.graph || {};
+  const nodes = Array.isArray(graph.nodes) ? graph.nodes : [];
+  const selectedNode = nodes.find((item) => item.id === selectedAgentWorkflowNodeId) || nodes[0] || null;
+  const nodeResults = workflow.execution?.node_results || workflow.preview?.node_results || graph.node_results || {};
+  const nodeDebug = selectedNode ? nodeResults[selectedNode.id] : null;
+  const preview = workflow.preview && typeof workflow.preview === 'object' ? workflow.preview : {};
+  const previewLines = preview.result && typeof preview.result === 'object'
+    ? Object.entries(preview.result).map(([key, value]) => `<div class="result-line"><strong>${escapeHtml(key)}</strong> · ${escapeHtml(String(value))}</div>`).join('')
+    : '<div class="result-line">当前工作流暂无运行预览。</div>';
+  host.innerHTML = `
+    <div class="agent-workflow-metric-grid">
+      <div class="agent-workflow-metric">
+        <div class="agent-workflow-metric-label">执行框架</div>
+        <div class="agent-workflow-metric-value">${escapeHtml(workflow.execution_mode || 'workflow')}</div>
+      </div>
+      <div class="agent-workflow-metric">
+        <div class="agent-workflow-metric-label">节点数量</div>
+        <div class="agent-workflow-metric-value">${nodes.length}</div>
+      </div>
+    </div>
+    <div class="forecast-inspector-section" style="margin-top:12px">
+      <div class="forecast-config-section-title">工作流说明</div>
+      <div class="forecast-debug-copy">${escapeHtml(workflow.summary || '暂无说明')}</div>
+      <div class="agent-workflow-chip-row">
+        ${(Array.isArray(workflow.tags) ? workflow.tags : []).map((item) => `<span class="agent-workflow-chip">${escapeHtml(item)}</span>`).join('') || '<span class="agent-workflow-chip">暂无标签</span>'}
+      </div>
+    </div>
+    <div class="forecast-inspector-section" style="margin-top:12px">
+      <div class="forecast-config-section-title">当前节点</div>
+      ${selectedNode ? `
+        <div class="forecast-config-field">
+          <span>节点名称</span>
+          <div class="forecast-debug-copy">${escapeHtml(selectedNode.label || selectedNode.id || '-')}</div>
+        </div>
+        <div class="forecast-config-field">
+          <span>节点职责</span>
+          <div class="forecast-debug-copy">${escapeHtml(selectedNode.description || '暂无')}</div>
+        </div>
+        <div class="forecast-config-field">
+          <span>节点类型</span>
+          <div class="forecast-debug-copy">${escapeHtml(selectedNode.processor || selectedNode.kind || '-')}</div>
+        </div>
+      ` : '<div class="compact-row"><strong>暂无节点</strong><span>0</span></div>'}
+      ${nodeDebug ? `
+        <div class="forecast-config-field">
+          <span>最近执行说明</span>
+          <div class="forecast-debug-copy">${escapeHtml(nodeDebug.detail || '暂无')}</div>
+        </div>
+      ` : ''}
+    </div>
+    <div class="forecast-inspector-section" style="margin-top:12px">
+      <div class="forecast-config-section-title">运行预览</div>
+      <div class="forecast-debug-list">${previewLines}</div>
+    </div>
+  `;
+}
+
+function renderAgentWorkflowCenter() {
+  renderAgentWorkflowDirectory();
+  renderAgentWorkflowGraph();
+  renderAgentWorkflowInspector();
+}
+
+async function loadAdminAgentWorkflows(forceReload) {
+  if (agentWorkflowLoaded && !forceReload) {
+    renderAgentWorkflowCenter();
+    return;
+  }
+  const response = await fetch('/api/admin/agent-workflows');
+  const data = await response.json();
+  if (!response.ok || data.ok === false) throw new Error(data.error || 'agent_workflows_failed');
+  agentWorkflowCenter = data.center || {summary: {}, workflows: []};
+  selectedAgentWorkflowId = selectedAgentWorkflowId || (((agentWorkflowCenter.workflows || [])[0] || {}).id || '');
+  selectedAgentWorkflowNodeId = '';
+  agentWorkflowLoaded = true;
+  renderAgentWorkflowCenter();
+}
+
+function getAdminHermesMemoryTenantOptions() {
+  const tenants = ensureAdminTenants();
+  return Array.isArray(tenants) ? tenants.filter((item) => item && item.slug) : [];
+}
+
+function getAdminHermesMemorySelectedTenant() {
+  const select = document.getElementById('admin-hermes-memory-tenant');
+  const fallback = adminSiteConfig.default_tenant_slug || (((getAdminHermesMemoryTenantOptions()[0] || {}).slug) || '');
+  return String((select && select.value) || fallback || '').trim();
+}
+
+function getAdminHermesMemoryRangeOptions() {
+  const summary = adminHermesMemoryState.summary || {};
+  return Array.isArray(summary.range_options) && summary.range_options.length
+    ? summary.range_options
+    : [
+        {key: '1m', label: '最近 1 个月'},
+        {key: '3m', label: '最近 3 个月'},
+        {key: '6m', label: '最近 6 个月'},
+        {key: '1y', label: '最近 1 年'},
+        {key: 'all', label: '全部清除'},
+      ];
+}
+
+function setAdminHermesMemoryStatus(message, isError = false) {
+  const node = document.getElementById('admin-hermes-memory-status');
+  if (!node) return;
+  node.textContent = message || '';
+  node.style.color = isError ? '#F1948A' : '#C8A96E';
+}
+
+function renderAdminHermesUsageStats() {
+  const summaryHost = document.getElementById('admin-hermes-usage-summary');
+  const modeBody = document.getElementById('admin-hermes-mode-tbody');
+  const rankingBody = document.getElementById('admin-hermes-ranking-tbody');
+  const poolHost = document.getElementById('admin-hermes-pool-cards');
+  const stats = adminHermesUsageState.stats || {};
+  const summary = stats.summary || {};
+  if (summaryHost) {
+    summaryHost.innerHTML = [
+      { label: '今日调用', icon: '&#9881;', value: Number(summary.today_calls || 0), change: `今日 token ${Number(summary.today_tokens || 0).toLocaleString('zh-CN')}` },
+      { label: '本月调用', icon: '&#9654;', value: Number(summary.month_calls || 0), change: `本月 token ${Number(summary.month_tokens || 0).toLocaleString('zh-CN')}` },
+      { label: '人均调用', icon: '&#9786;', value: `${Number(summary.avg_calls_per_user || 0).toFixed(2)}次`, change: `平均延迟 ${Number(summary.avg_latency_ms || 0).toFixed(0)}ms` },
+      { label: '算力消耗', icon: '&#9733;', value: Number(summary.compute_consumed || 0).toLocaleString('zh-CN'), change: '按 Hermes 调用聚合' },
+    ].map((item) => `
+      <div class="stat-card">
+        <div class="stat-label">${escapeHtml(item.label)}</div>
+        <span class="stat-icon">${item.icon}</span>
+        <div class="stat-value">${escapeHtml(String(item.value))}</div>
+        <div class="stat-change up">${escapeHtml(item.change)}</div>
+      </div>
+    `).join('');
+  }
+  if (modeBody) {
+    const rows = Array.isArray(stats.tool_modes) ? stats.tool_modes : [];
+    modeBody.innerHTML = rows.length ? rows.map((row) => `
+      <tr>
+        <td style="color:#F8F6F0;font-weight:500">${escapeHtml(row.mode_label || '')}</td>
+        <td>${escapeHtml(String(row.today_calls || 0))}</td>
+        <td>${escapeHtml(String(row.month_calls || 0))}</td>
+        <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:${Math.max(0, Math.min(100, Number(row.share_ratio || 0)))}%"></div></div><span style="color:#C8A96E">${escapeHtml(`${Number(row.share_ratio || 0).toFixed(1)}%`)}</span></div></td>
+        <td>${escapeHtml(`${Number(row.avg_latency_ms || 0).toFixed(0)}ms`)}</td>
+        <td><span class="tag ${escapeAttr(row.status_class || 'tag-green')}">${escapeHtml(row.status_label || '正常')}</span></td>
+      </tr>
+    `).join('') : '<tr><td colspan="6" style="color:#9A9590">暂无 Hermes 模式统计</td></tr>';
+  }
+  if (poolHost) {
+    const pool = stats.compute_pool || {};
+    poolHost.innerHTML = `
+      <div class="pool-card">
+        <div class="pool-card-label">总算力池</div>
+        <div class="pool-card-value">${escapeHtml(Number(pool.total || 0).toLocaleString('zh-CN'))}</div>
+        <div class="pool-card-sub">积分</div>
+      </div>
+      <div class="pool-card">
+        <div class="pool-card-label">本月消耗</div>
+        <div class="pool-card-value">${escapeHtml(Number(pool.consumed || 0).toLocaleString('zh-CN'))}</div>
+        <div class="pool-card-sub">${escapeHtml(`${Number(pool.usage_ratio || 0).toFixed(1)}% 使用率`)}</div>
+      </div>
+      <div class="pool-card">
+        <div class="pool-card-label">剩余可用</div>
+        <div class="pool-card-value">${escapeHtml(Number(pool.remaining || 0).toLocaleString('zh-CN'))}</div>
+        <div class="pool-card-sub">${escapeHtml(`${Math.max(0, 100 - Number(pool.usage_ratio || 0)).toFixed(1)}% 剩余`)}</div>
+      </div>
+    `;
+  }
+  if (rankingBody) {
+    const rows = Array.isArray(stats.user_ranking) ? stats.user_ranking : [];
+    rankingBody.innerHTML = rows.length ? rows.map((row) => `
+      <tr>
+        <td><span class="rank-badge ${row.rank === 1 ? 'rank-1' : row.rank === 2 ? 'rank-2' : row.rank === 3 ? 'rank-3' : 'rank-n'}">${escapeHtml(String(row.rank || ''))}</span></td>
+        <td style="color:#F8F6F0">${escapeHtml(row.user_name || '')}</td>
+        <td><span class="${escapeAttr(row.level_class || 'tag tag-blue')}">${escapeHtml(row.level_label || '普通用户')}</span></td>
+        <td>${escapeHtml(String(row.month_calls || 0))}</td>
+        <td style="color:#C8A96E">${escapeHtml(Number(row.compute_units || 0).toLocaleString('zh-CN'))}</td>
+        <td>${escapeHtml(row.top_mode || '')}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="6" style="color:#9A9590">暂无 Hermes 用户排行</td></tr>';
+  }
+}
+
+async function loadAdminHermesUsageStats() {
+  if (adminHermesUsageState.loading) return;
+  const tenantSlug = getAdminHermesMemorySelectedTenant();
+  adminHermesUsageState.loading = true;
+  try {
+    const resp = await fetch(`/api/admin/hermes/usage-stats?tenant_slug=${encodeURIComponent(tenantSlug || '')}`);
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'hermes_usage_stats_failed');
+    adminHermesUsageState.stats = data.stats || null;
+    renderAdminHermesUsageStats();
+  } catch (error) {
+    console.error(error);
+  } finally {
+    adminHermesUsageState.loading = false;
+  }
+}
+
+function renderAdminHermesMemoryPanel() {
+  const tenantSelect = document.getElementById('admin-hermes-memory-tenant');
+  const summaryNode = document.getElementById('admin-hermes-memory-summary');
+  const previewNode = document.getElementById('admin-hermes-memory-preview');
+  const backupRange = document.getElementById('admin-hermes-memory-backup-range');
+  const clearRange = document.getElementById('admin-hermes-memory-clear-range');
+  const confirmWrap = document.getElementById('admin-hermes-memory-clear-confirm-wrap');
+  if (!tenantSelect || !summaryNode || !previewNode || !backupRange || !clearRange) return;
+
+  const tenants = getAdminHermesMemoryTenantOptions();
+  const currentTenant = getAdminHermesMemorySelectedTenant();
+  tenantSelect.innerHTML = tenants.map((tenant) => `
+    <option value="${escapeAttr(tenant.slug || '')}" ${(tenant.slug || '') === currentTenant ? 'selected' : ''}>${escapeHtml(tenant.name || tenant.slug || '')}</option>
+  `).join('') || '<option value="">暂无租户</option>';
+  if (!tenantSelect.value && tenants.length) {
+    tenantSelect.value = tenants[0].slug || '';
+  }
+
+  const options = getAdminHermesMemoryRangeOptions();
+  const currentBackupRange = backupRange.value || '3m';
+  const currentClearRange = clearRange.value || '3m';
+  backupRange.innerHTML = options.map((item) => `
+    <option value="${escapeAttr(item.key || '')}" ${(item.key || '') === currentBackupRange ? 'selected' : ''}>${escapeHtml(item.label || item.key || '')}</option>
+  `).join('');
+  clearRange.innerHTML = options.map((item) => `
+    <option value="${escapeAttr(item.key || '')}" ${(item.key || '') === currentClearRange ? 'selected' : ''}>${escapeHtml(item.label || item.key || '')}</option>
+  `).join('');
+
+  const summary = adminHermesMemoryState.summary || {};
+  const cards = [
+    {label: '对话总轮次', value: Number(summary.turn_count || 0), desc: summary.first_turn_at ? `首轮：${summary.first_turn_at}` : '暂无对话'},
+    {label: '会话数', value: Number(summary.session_count || 0), desc: `会话记忆行 ${Number(summary.session_memory_count || 0)}`},
+    {label: '用户数', value: Number(summary.user_count || 0), desc: `用户记忆行 ${Number(summary.user_memory_count || 0)}`},
+    {label: '画像数', value: Number(summary.profile_count || 0), desc: summary.last_turn_at ? `最近：${summary.last_turn_at}` : '暂无最近时间'},
+    {label: '近 30 天轮次', value: Number(summary.recent_30d_turn_count || 0), desc: `活跃用户 ${Number(summary.recent_30d_active_user_count || 0)}`},
+  ];
+  summaryNode.innerHTML = cards.map((item) => `
+    <div class="hermes-memory-summary-card">
+      <div class="hermes-memory-summary-label">${escapeHtml(item.label)}</div>
+      <div class="hermes-memory-summary-value">${escapeHtml(String(item.value))}</div>
+      <div class="hermes-memory-summary-meta">${escapeHtml(item.desc)}</div>
+    </div>
+  `).join('');
+
+  const preview = adminHermesMemoryState.preview || null;
+  if (!preview) {
+    previewNode.innerHTML = '请选择租户和清理范围后查看影响预览。';
+  } else {
+    previewNode.innerHTML = `
+      <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
+        <div>
+          <div class="hermes-memory-preview-title">清理预览 · ${escapeHtml(preview.range_label || preview.range_key || '')}</div>
+          <div style="font-size:12px;color:var(--text-sub);line-height:1.8;margin-top:6px">
+            ${preview.cutoff ? `将删除 ${escapeHtml(preview.cutoff)} 之后的 Hermes 记忆。` : '将清空该租户全部 Hermes 记忆。'}
+          </div>
+        </div>
+        <div class="hermes-memory-preview-time">生成时间：${escapeHtml(preview.generated_at || '--')}</div>
+      </div>
+      <div class="hermes-memory-preview-metrics">
+        <div class="hermes-memory-preview-metric"><div class="hermes-memory-preview-metric-label">待删轮次</div><div class="hermes-memory-preview-metric-value">${escapeHtml(String(preview.turns_to_clear || 0))}</div></div>
+        <div class="hermes-memory-preview-metric"><div class="hermes-memory-preview-metric-label">受影响会话</div><div class="hermes-memory-preview-metric-value">${escapeHtml(String(preview.sessions_affected || 0))}</div></div>
+        <div class="hermes-memory-preview-metric"><div class="hermes-memory-preview-metric-label">受影响用户</div><div class="hermes-memory-preview-metric-value">${escapeHtml(String(preview.users_affected || 0))}</div></div>
+        <div class="hermes-memory-preview-metric"><div class="hermes-memory-preview-metric-label">受影响画像</div><div class="hermes-memory-preview-metric-value">${escapeHtml(String(preview.profiles_affected || 0))}</div></div>
+      </div>
+      <div class="hermes-memory-preview-footnote">
+        时间覆盖：${escapeHtml(preview.first_turn_at || '--')} 至 ${escapeHtml(preview.last_turn_at || '--')}
+        ${preview.requires_strong_confirm ? ' · 全量清理需要手动输入 CONFIRM。' : ''}
+      </div>
+    `;
+  }
+
+  const showConfirm = clearRange.value === 'all';
+  if (confirmWrap) confirmWrap.style.display = showConfirm ? 'block' : 'none';
+}
+
+async function loadAdminHermesMemorySummary(forceReload = false) {
+  if (adminHermesMemoryState.loading) return;
+  renderAdminHermesMemoryPanel();
+  const tenantSlug = getAdminHermesMemorySelectedTenant();
+  if (!tenantSlug) {
+    setAdminHermesMemoryStatus('当前没有可管理的租户。', true);
+    return;
+  }
+  adminHermesMemoryState.loading = true;
+  setAdminHermesMemoryStatus('正在加载 Hermes 记忆汇总...');
+  try {
+    const resp = await fetch(`/api/admin/hermes/memory-summary?tenant_slug=${encodeURIComponent(tenantSlug)}`);
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'hermes_memory_summary_failed');
+    adminHermesMemoryState.summary = data.summary || null;
+    adminHermesMemoryState.loaded = true;
+    if (forceReload || !adminHermesMemoryState.preview || adminHermesMemoryState.preview.tenant_slug !== tenantSlug) {
+      adminHermesMemoryState.preview = null;
+    }
+    renderAdminHermesMemoryPanel();
+    loadAdminHermesUsageStats();
+    await previewAdminHermesMemoryClear(false);
+    setAdminHermesMemoryStatus(`Hermes 记忆汇总已加载 · 租户 ${tenantSlug}`);
+  } catch (error) {
+    setAdminHermesMemoryStatus(error.message || 'Hermes 记忆汇总加载失败', true);
+    throw error;
+  } finally {
+    adminHermesMemoryState.loading = false;
+  }
+}
+
+async function previewAdminHermesMemoryClear(showToastOnSuccess = true) {
+  const tenantSlug = getAdminHermesMemorySelectedTenant();
+  const rangeKey = document.getElementById('admin-hermes-memory-clear-range')?.value || '3m';
+  const confirmWrap = document.getElementById('admin-hermes-memory-clear-confirm-wrap');
+  if (confirmWrap) confirmWrap.style.display = rangeKey === 'all' ? 'block' : 'none';
+  if (!tenantSlug) return;
+  setAdminHermesMemoryStatus('正在预览 Hermes 记忆清理影响...');
+  const resp = await fetch('/api/admin/hermes/memory-clear-preview', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({tenant_slug: tenantSlug, range_key: rangeKey}),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    setAdminHermesMemoryStatus((data && data.error) || 'hermes_memory_preview_failed', true);
+    throw new Error((data && data.error) || 'hermes_memory_preview_failed');
+  }
+  adminHermesMemoryState.preview = data.preview || null;
+  renderAdminHermesMemoryPanel();
+  setAdminHermesMemoryStatus(`已生成清理预览 · ${tenantSlug} · ${rangeKey}`);
+  if (showToastOnSuccess !== false) showToast('已更新 Hermes 记忆清理预览');
+}
+
+async function backupAdminHermesMemory() {
+  const tenantSlug = getAdminHermesMemorySelectedTenant();
+  const rangeKey = document.getElementById('admin-hermes-memory-backup-range')?.value || '3m';
+  if (!tenantSlug) {
+    showToast('请先选择租户');
+    return false;
+  }
+  setAdminHermesMemoryStatus('正在生成 Hermes 记忆 ZIP 备份...');
+  const resp = await fetch('/api/admin/hermes/memory-backup', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({tenant_slug: tenantSlug, range_key: rangeKey}),
+  });
+  if (!resp.ok) {
+    let errorMessage = 'hermes_memory_backup_failed';
+    try {
+      const data = await resp.json();
+      errorMessage = (data && data.error) || errorMessage;
+    } catch (error) {}
+    setAdminHermesMemoryStatus(errorMessage, true);
+    showToast(errorMessage);
+    return false;
+  }
+  const blob = await resp.blob();
+  const downloadUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  link.download = (() => {
+    const contentDisposition = resp.headers.get('Content-Disposition') || '';
+    const matched = contentDisposition.match(/filename=\"([^\"]+)\"/);
+    return matched ? matched[1] : `hermes_memory_${tenantSlug}_${rangeKey}.zip`;
+  })();
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(downloadUrl);
+  setAdminHermesMemoryStatus(`Hermes 记忆备份已生成 · ${tenantSlug} · ${rangeKey}`);
+  showToast('Hermes 记忆 ZIP 备份已下载');
+  return true;
+}
+
+async function clearAdminHermesMemory(backupFirst) {
+  const tenantSlug = getAdminHermesMemorySelectedTenant();
+  const rangeKey = document.getElementById('admin-hermes-memory-clear-range')?.value || '3m';
+  const confirmText = document.getElementById('admin-hermes-memory-clear-confirm')?.value || '';
+  if (!tenantSlug) {
+    showToast('请先选择租户');
+    return;
+  }
+  if (rangeKey === 'all' && String(confirmText).trim() !== 'CONFIRM') {
+    showToast('全量清理前请输入 CONFIRM');
+    return;
+  }
+  if (backupFirst) {
+    const backupOk = await backupAdminHermesMemory();
+    if (!backupOk) return;
+  }
+  const preview = adminHermesMemoryState.preview || {};
+  const turnCount = Number(preview.turns_to_clear || 0);
+  const confirmed = window.confirm(
+    rangeKey === 'all'
+      ? `确认清空租户 ${tenantSlug} 的全部 Hermes 记忆吗？当前预估删除 ${turnCount} 轮对话。`
+      : `确认清理租户 ${tenantSlug} 的 Hermes 记忆吗？当前预估删除 ${turnCount} 轮对话。`
+  );
+  if (!confirmed) return;
+  setAdminHermesMemoryStatus('正在执行 Hermes 记忆清理...');
+  const resp = await fetch('/api/admin/hermes/memory-clear', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({tenant_slug: tenantSlug, range_key: rangeKey, confirm_text: confirmText}),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    const errorMessage = (data && data.error) || 'hermes_memory_clear_failed';
+    setAdminHermesMemoryStatus(errorMessage, true);
+    showToast(errorMessage);
+    return;
+  }
+  adminHermesMemoryState.summary = data.result && data.result.post_summary ? data.result.post_summary : adminHermesMemoryState.summary;
+  adminHermesMemoryState.preview = null;
+  if (document.getElementById('admin-hermes-memory-clear-confirm')) {
+    document.getElementById('admin-hermes-memory-clear-confirm').value = '';
+  }
+  renderAdminHermesMemoryPanel();
+  await previewAdminHermesMemoryClear(false);
+  setAdminHermesMemoryStatus(`Hermes 记忆清理完成 · ${tenantSlug} · ${rangeKey}`);
+  showToast('Hermes 记忆已清理并完成重建');
 }
 
 function renderForecastWorkflow() {
@@ -7591,6 +9213,7 @@ function renderSiteConfigForm() {
   const cfg = adminSiteConfig || {};
   const dbRuntime = cfg.db_runtime || {};
   const flags = cfg.feature_flags || {};
+  const hermesSettings = cfg.hermes_settings || {};
   const brand = cfg.brand || {};
   const voiceTranscription = cfg.voice_transcription || {};
   const voiceEmbedding = cfg.voice_embedding || {};
@@ -7608,6 +9231,10 @@ function renderSiteConfigForm() {
   if (embeddingEngine) embeddingEngine.value = voiceEmbedding.engine || 'api';
   const knowledgePreviewToggle = document.getElementById('knowledge-user-preview-enabled');
   if (knowledgePreviewToggle) knowledgePreviewToggle.checked = knowledgeIngestion.user_preview_enabled === true;
+  const hermesPromptScopeGuardToggle = document.getElementById('hermes-prompt-scope-guard-enabled');
+  if (hermesPromptScopeGuardToggle) hermesPromptScopeGuardToggle.checked = hermesSettings.prompt_scope_guard_enabled !== false;
+  const hermesInvestorAccessToggle = document.getElementById('hermes-investor-access-enabled');
+  if (hermesInvestorAccessToggle) hermesInvestorAccessToggle.checked = hermesSettings.investor_access_enabled !== false;
   const dbRuntimeToggle = document.getElementById('db-runtime-use-staging');
   if (dbRuntimeToggle) dbRuntimeToggle.checked = dbRuntime.use_staging === true;
   const dbRuntimeSummary = document.getElementById('db-runtime-summary');
@@ -7782,6 +9409,11 @@ async function saveSiteConfig() {
     },
     knowledge_ingestion: {
       user_preview_enabled: Boolean(knowledgePreviewToggle && knowledgePreviewToggle.checked),
+    },
+    hermes_settings: {
+      ...(adminSiteConfig.hermes_settings || {}),
+      prompt_scope_guard_enabled: Boolean(document.getElementById('hermes-prompt-scope-guard-enabled') && document.getElementById('hermes-prompt-scope-guard-enabled').checked),
+      investor_access_enabled: Boolean(document.getElementById('hermes-investor-access-enabled') && document.getElementById('hermes-investor-access-enabled').checked),
     },
     evidence_chain: {
       filter_prompt_system: document.getElementById('evidence-filter-system-prompt')

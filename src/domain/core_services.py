@@ -1,4 +1,5 @@
 from src.runtime import *
+from src.domain.agent_workflows import *
 
 
 def _market_services_module():
@@ -80,6 +81,14 @@ def gen_watchlist_details(*args, **kwargs):
     return _market_services_module().gen_watchlist_details(*args, **kwargs)
 
 
+def build_simulated_indicator_kline(*args, **kwargs):
+    return _market_services_module().build_simulated_indicator_kline(*args, **kwargs)
+
+
+def NumberLike(*args, **kwargs):
+    return _market_services_module().NumberLike(*args, **kwargs)
+
+
 def get_default_llm_config(*args, **kwargs):
     return _ai_services_module().get_default_llm_config(*args, **kwargs)
 
@@ -102,6 +111,14 @@ def polish_review_input_with_llm(*args, **kwargs):
 
 def compose_review_draft_with_llm(*args, **kwargs):
     return _ai_services_module().compose_review_draft_with_llm(*args, **kwargs)
+
+
+def analyze_review_watchlist_with_llm(*args, **kwargs):
+    return _ai_services_module().analyze_review_watchlist_with_llm(*args, **kwargs)
+
+
+def compose_review_structured_preview(*args, **kwargs):
+    return _ai_services_module().compose_review_structured_preview(*args, **kwargs)
 
 
 def process_review_publish_text(*args, **kwargs):
@@ -159,6 +176,15 @@ def normalize_knowledge_ingestion_config(source=None):
     raw = source if isinstance(source, dict) else {}
     return {
         "user_preview_enabled": bool(raw.get("user_preview_enabled", False)),
+    }
+
+
+def normalize_hermes_settings_config(source=None):
+    raw = source if isinstance(source, dict) else {}
+    defaults = copy.deepcopy(DEFAULT_SITE_CONFIG["hermes_settings"])
+    return {
+        "prompt_scope_guard_enabled": bool(raw.get("prompt_scope_guard_enabled", defaults["prompt_scope_guard_enabled"])),
+        "investor_access_enabled": bool(raw.get("investor_access_enabled", defaults["investor_access_enabled"])),
     }
 
 
@@ -243,55 +269,125 @@ def build_algorithmic_knowledge_processing(raw_text, source_type="", title="", s
 
 
 def build_llm_knowledge_processing(raw_text, source_type="", title="", source_detail=""):
-    llm_model = get_default_llm_config(purpose="general")
-    if not llm_model:
-        raise RuntimeError("knowledge_processing_llm_not_configured")
-    safe_title = str(title or "未命名知识").strip() or "未命名知识"
-    safe_source = str(source_detail or source_type or "原始输入").strip() or "原始输入"
-    safe_text = str(raw_text or "").strip()
-    system_prompt = (
-        "你是知识加工助手。"
-        "请把原始材料加工成适合大V知识库沉淀的结构化内容。"
-        "输出必须使用中文，简洁、专业、避免编造。"
-    )
-    user_prompt = (
-        f"知识标题：{safe_title}\n"
-        f"来源：{safe_source}\n"
-        f"原始材料：\n{safe_text or '暂无原始材料'}\n\n"
-        "请严格按下面模板输出：\n"
-        "一、核心结论\n"
-        "二、关键要点（3条以内）\n"
-        "三、验证节点（3条以内）\n"
-        "四、风险边界（3条以内）\n"
-        "五、可直接入库正文"
-    )
-    rendered_text = call_openai_compatible_llm(
-        llm_model,
-        system_prompt,
-        user_prompt,
-        feature_code="knowledge_processing_llm",
-        feature_label="知识加工生成",
-        entry_point="knowledge_processing",
-        metadata={"source_type": source_type, "title": safe_title[:80]},
-    )
-    sections = _split_semantic_sentences(rendered_text)
-    summary = "；".join(sections[:3])[:220] if sections else (rendered_text[:220] if rendered_text else "暂无摘要")
-    return {
-        "mode": "llm",
-        "label": "大模型加工",
-        "summary": summary,
-        "key_points": sections[:3] or ["待补充关键要点"],
-        "validation_nodes": [item for item in sections if any(token in item for token in ("验证", "跟踪", "观察", "确认"))][:3] or ["待补充验证节点"],
-        "risk_points": [item for item in sections if any(token in item for token in ("风险", "边界", "不确定", "警惕"))][:3] or ["待补充风险边界"],
-        "template_name": "llm_outline_v1",
-        "rendered_text": rendered_text,
-        "llm_model": {
-            "key": llm_model.get("key"),
-            "label": llm_model.get("label"),
-            "model_name": llm_model.get("model_name"),
-            "provider": llm_model.get("provider"),
+    workflow_definition = build_default_knowledge_processing_workflow_definition()
+
+    def _knowledge_processing_input_executor(state, runtime, node, upstream):
+        safe_text = str(runtime.get("raw_text") or "").strip()
+        if not safe_text:
+            raise ValueError("knowledge_body_required")
+        return {
+            "detail": "已接收原始知识材料。",
+            "state_updates": {
+                "safe_text": safe_text,
+                "safe_title": str(runtime.get("title") or "未命名知识").strip() or "未命名知识",
+                "safe_source": str(runtime.get("source_detail") or runtime.get("source_type") or "原始输入").strip() or "原始输入",
+            },
+            "context_preview": {
+                "source_type": str(runtime.get("source_type") or "").strip() or "manual",
+                "input_chars": len(safe_text),
+            },
+        }
+
+    def _knowledge_processing_prepare_executor(state, runtime, node, upstream):
+        system_prompt = (
+            "你是知识加工助手。"
+            "请把原始材料加工成适合大V知识库沉淀的结构化内容。"
+            "输出必须使用中文，简洁、专业、避免编造。"
+        )
+        user_prompt = (
+            f"知识标题：{state.get('safe_title') or '未命名知识'}\n"
+            f"来源：{state.get('safe_source') or '原始输入'}\n"
+            f"原始材料：\n{state.get('safe_text') or '暂无原始材料'}\n\n"
+            "请严格按下面模板输出：\n"
+            "一、核心结论\n"
+            "二、关键要点（3条以内）\n"
+            "三、验证节点（3条以内）\n"
+            "四、风险边界（3条以内）\n"
+            "五、可直接入库正文"
+        )
+        return {
+            "detail": "已生成知识加工提示词。",
+            "state_updates": {
+                "system_prompt": system_prompt,
+                "user_prompt": user_prompt,
+            },
+            "context_preview": {"prompt_chars": len(user_prompt)},
+        }
+
+    def _knowledge_processing_llm_executor(state, runtime, node, upstream):
+        llm_model = get_default_llm_config(purpose="general")
+        if not llm_model:
+            raise RuntimeError("knowledge_processing_llm_not_configured")
+        rendered_text = call_openai_compatible_llm(
+            llm_model,
+            state.get("system_prompt") or "",
+            state.get("user_prompt") or "",
+            feature_code="knowledge_processing_llm",
+            feature_label="知识加工生成",
+            entry_point="knowledge_processing",
+            metadata={
+                "source_type": str(runtime.get("source_type") or "").strip(),
+                "title": str(state.get("safe_title") or "").strip()[:80],
+                "workflow_id": workflow_definition["id"],
+            },
+        )
+        return {
+            "detail": "大模型已完成知识加工。",
+            "state_updates": {
+                "rendered_text": rendered_text,
+                "llm_model": {
+                    "key": llm_model.get("key"),
+                    "label": llm_model.get("label"),
+                    "model_name": llm_model.get("model_name"),
+                    "provider": llm_model.get("provider"),
+                },
+            },
+            "context_preview": {"output_chars": len(str(rendered_text or ""))},
+        }
+
+    def _knowledge_processing_output_executor(state, runtime, node, upstream):
+        rendered_text = str(state.get("rendered_text") or "").strip()
+        sections = _split_semantic_sentences(rendered_text)
+        summary = "；".join(sections[:3])[:220] if sections else (rendered_text[:220] if rendered_text else "暂无摘要")
+        return {
+            "detail": "已封装知识加工结果。",
+            "state_updates": {
+                "final_result": {
+                    "mode": "llm",
+                    "label": "大模型加工",
+                    "summary": summary,
+                    "key_points": sections[:3] or ["待补充关键要点"],
+                    "validation_nodes": [item for item in sections if any(token in item for token in ("验证", "跟踪", "观察", "确认"))][:3] or ["待补充验证节点"],
+                    "risk_points": [item for item in sections if any(token in item for token in ("风险", "边界", "不确定", "警惕"))][:3] or ["待补充风险边界"],
+                    "template_name": "llm_outline_v1",
+                    "rendered_text": rendered_text,
+                    "llm_model": copy.deepcopy(state.get("llm_model") or {}),
+                }
+            },
+            "context_preview": {"has_text": bool(rendered_text)},
+        }
+
+    execution = run_declared_agent_workflow(
+        workflow_definition,
+        runtime={
+            "raw_text": raw_text,
+            "source_type": source_type,
+            "title": title,
+            "source_detail": source_detail,
         },
-    }
+        executor_registry={
+            "knowledge_processing_input": _knowledge_processing_input_executor,
+            "knowledge_processing_prepare": _knowledge_processing_prepare_executor,
+            "knowledge_processing_llm": _knowledge_processing_llm_executor,
+            "knowledge_processing_output": _knowledge_processing_output_executor,
+        },
+    )
+    final_result = copy.deepcopy(execution["state"].get("final_result") or {})
+    final_result["workflow_meta"] = build_declared_agent_workflow_meta(
+        workflow_definition,
+        extras={"last_execution_steps": copy.deepcopy(execution.get("node_results") or {})},
+    )
+    return final_result
 
 
 def build_knowledge_processing_result(raw_text, processing_mode="algorithm", source_type="", title="", source_detail=""):
@@ -803,6 +899,46 @@ def normalize_review_snapshot_item(item, tenant, index=0):
             "model_name": str(model.get("model_name") or "").strip()[:240],
             "purpose": str(model.get("purpose") or "").strip()[:120],
         })
+    user_input_raw = raw.get("user_input_section") if isinstance(raw.get("user_input_section"), dict) else {}
+    watchlist_analysis_raw = raw.get("watchlist_analysis_section") if isinstance(raw.get("watchlist_analysis_section"), dict) else {}
+    user_input_section = {
+        "source_mode": str(user_input_raw.get("source_mode") or raw.get("source_mode") or fallback.get("source_mode") or "manual").strip().lower() or "manual",
+        "source_mode_label": str(user_input_raw.get("source_mode_label") or "").strip()[:80],
+        "display_text": str(
+            user_input_raw.get("display_text")
+            or user_input_raw.get("polished_text")
+            or raw.get("polished_input_text")
+            or content_text
+            or summary
+        ).strip()[:12000],
+        "summary_source": str(user_input_raw.get("summary_source") or "").strip()[:120],
+    }
+    sector_profiles = []
+    for profile in watchlist_analysis_raw.get("sector_profiles") if isinstance(watchlist_analysis_raw.get("sector_profiles"), list) else []:
+        if not isinstance(profile, dict):
+            continue
+        sector_profiles.append({
+            "sector": str(profile.get("sector") or "").strip()[:120],
+            "stock_names": [str(name).strip() for name in (profile.get("stock_names") if isinstance(profile.get("stock_names"), list) else []) if str(name).strip()][:8],
+            "representative_description": str(profile.get("representative_description") or "").strip()[:400],
+        })
+    watchlist_items = []
+    for item in watchlist_analysis_raw.get("items") if isinstance(watchlist_analysis_raw.get("items"), list) else []:
+        if not isinstance(item, dict):
+            continue
+        watchlist_items.append({
+            "stock_name": str(item.get("stock_name") or "").strip()[:120],
+            "stock_code": str(item.get("stock_code") or "").strip()[:60],
+            "sector": str(item.get("sector") or "").strip()[:120],
+            "board_role": str(item.get("board_role") or "").strip()[:180],
+            "analysis_text": str(item.get("analysis_text") or "").strip()[:1200],
+            "evidence": [str(value).strip() for value in (item.get("evidence") if isinstance(item.get("evidence"), list) else []) if str(value).strip()][:6],
+        })
+    watchlist_analysis_section = {
+        "sector_summary": str(watchlist_analysis_raw.get("sector_summary") or "").strip()[:200],
+        "sector_profiles": sector_profiles,
+        "items": watchlist_items,
+    }
     return {
         "id": str(raw.get("id") or f"{tenant['slug']}-review-{index + 1}").strip() or f"{tenant['slug']}-review-{index + 1}",
         "title": title,
@@ -824,6 +960,8 @@ def normalize_review_snapshot_item(item, tenant, index=0):
         "news_sources": [str(source).strip() for source in (raw.get("news_sources") if isinstance(raw.get("news_sources"), list) else []) if str(source).strip()][:12],
         "llm_models": llm_models,
         "polished_input_text": str(raw.get("polished_input_text") or "").strip()[:12000],
+        "user_input_section": user_input_section,
+        "watchlist_analysis_section": watchlist_analysis_section,
     }
 
 
@@ -1648,6 +1786,7 @@ def normalize_knowledge_hub_config(source, tenant):
                 title=title,
                 source_detail=str(item.get("source_detail") or "").strip(),
             ),
+            "graph_profile": copy.deepcopy(item.get("graph_profile")) if isinstance(item.get("graph_profile"), dict) else {},
             "sync_status": build_knowledge_sync_status(
                 item.get("status"),
                 item.get("sync_targets") if isinstance(item.get("sync_targets"), list) else None,
@@ -2110,47 +2249,205 @@ def build_empty_fund_dashboard_card(index=0):
     }
 
 
-def build_smart_indicator_preview(tenant_slug, payload):
+def _run_smart_indicator_agent_workflow(tenant_slug, payload, persist=False):
+    workflow_definition = build_default_smart_indicator_workflow_definition()
     tenant = get_tenant_by_slug(tenant_slug)
     body = payload if isinstance(payload, dict) else {}
-    selected_indicators = resolve_smart_indicator_selected_refs(tenant, body)
-    if not selected_indicators:
-        raise ValueError("selected_indicators_required")
-    prompt_text = str(body.get("prompt_text") or body.get("prompt") or "").strip()
-    if not prompt_text:
-        raise ValueError("prompt_text_required")
-    indicator_name = str(body.get("indicator_name") or body.get("name") or "").strip() or derive_smart_indicator_name(prompt_text, selected_indicators)
-    category = str(body.get("category") or "大V自定义指标").strip() or "大V自定义指标"
-    unit = str(body.get("unit") or "").strip()
-    generated = generate_smart_indicator_js(indicator_name, prompt_text, selected_indicators, tenant_slug=tenant_slug)
-    latest_map = {
-        row["indicator_code"]: dict(row)
-        for row in get_db().execute("SELECT * FROM indicator_latest_values").fetchall()
-    }
-    try:
-        numeric_value = evaluate_smart_indicator_formula_js(generated["formula_js"], selected_indicators, latest_map)
-        value = f"{numeric_value:.4f}".rstrip("0").rstrip(".")
-    except Exception:
-        numeric_value = None
-        value = "--"
-    algorithm_detail = str(body.get("description") or "").strip() or build_smart_indicator_algorithm_detail(prompt_text, selected_indicators)
-    interpretation = build_smart_indicator_interpretation(indicator_name, prompt_text, selected_indicators, value, unit)
-    return {
-        "indicator_code": "",
-        "indicator_name": indicator_name,
-        "category": category,
-        "value": value,
-        "numeric_value": numeric_value,
-        "unit": unit,
-        "assessment": interpretation,
-        "interpretation": interpretation,
-        "algorithm_detail": algorithm_detail,
-        "prompt_text": prompt_text,
-        "selected_indicators": selected_indicators,
-        "updated_at": now_ts(),
-        "formula_js": generated["formula_js"],
-        "formula_meta": generated,
-    }
+    existing = get_indicator_definition(body.get("indicator_code")) if body.get("indicator_code") else None
+
+    def _smart_input_executor(state, runtime, node, upstream):
+        return {
+            "detail": "已接收指标引用、提示词和展示配置。",
+            "context_preview": {
+                "persist_mode": bool(runtime.get("persist")),
+                "has_existing": bool(runtime.get("existing")),
+            },
+        }
+
+    def _smart_resolve_executor(state, runtime, node, upstream):
+        selected_indicators = resolve_smart_indicator_selected_refs(runtime.get("tenant"), runtime.get("body"))
+        if not selected_indicators:
+            raise ValueError("selected_indicators_required")
+        prompt_text = str((runtime.get("body") or {}).get("prompt_text") or (runtime.get("body") or {}).get("prompt") or "").strip()
+        if not prompt_text:
+            raise ValueError("prompt_text_required")
+        indicator_name = str((runtime.get("body") or {}).get("indicator_name") or (runtime.get("body") or {}).get("name") or "").strip() or derive_smart_indicator_name(prompt_text, selected_indicators)
+        algorithm_detail = str((runtime.get("body") or {}).get("description") or "").strip() or build_smart_indicator_algorithm_detail(prompt_text, selected_indicators)
+        return {
+            "detail": "已完成指标引用解析和提示词校验。",
+            "state_updates": {
+                "selected_indicators": selected_indicators,
+                "prompt_text": prompt_text,
+                "indicator_name": indicator_name,
+                "algorithm_detail": algorithm_detail,
+                "category": str((runtime.get("body") or {}).get("category") or "大V自定义指标").strip() or "大V自定义指标",
+                "unit": str((runtime.get("body") or {}).get("unit") or "").strip(),
+            },
+            "context_preview": {
+                "indicator_count": len(selected_indicators),
+                "indicator_name": indicator_name,
+            },
+        }
+
+    def _smart_compile_executor(state, runtime, node, upstream):
+        provided_formula_js = str((runtime.get("body") or {}).get("formula_js") or "").strip()
+        if provided_formula_js:
+            generated = {
+                "formula_js": validate_smart_indicator_js(provided_formula_js, state.get("selected_indicators") or []),
+                "generator": "preview_confirmed",
+                "llm_used": False,
+            }
+        else:
+            generated = generate_smart_indicator_js(
+                state.get("indicator_name") or "",
+                state.get("prompt_text") or "",
+                state.get("selected_indicators") or [],
+                tenant_slug=runtime.get("tenant_slug") or "",
+            )
+        return {
+            "detail": f"已完成公式编译：{generated.get('generator') or 'unknown'}。",
+            "state_updates": {"generated_formula_meta": generated},
+            "context_preview": {
+                "llm_used": bool(generated.get("llm_used")),
+                "generator": generated.get("generator") or "",
+            },
+        }
+
+    def _smart_preview_executor(state, runtime, node, upstream):
+        latest_map = {
+            row["indicator_code"]: dict(row)
+            for row in get_db().execute("SELECT * FROM indicator_latest_values").fetchall()
+        }
+        try:
+            numeric_value = evaluate_smart_indicator_formula_js(
+                (state.get("generated_formula_meta") or {}).get("formula_js"),
+                state.get("selected_indicators") or [],
+                latest_map,
+            )
+            value = f"{numeric_value:.4f}".rstrip("0").rstrip(".")
+        except Exception:
+            numeric_value = None
+            value = "--"
+        interpretation = build_smart_indicator_interpretation(
+            state.get("indicator_name") or "",
+            state.get("prompt_text") or "",
+            state.get("selected_indicators") or [],
+            value,
+            state.get("unit") or "",
+        )
+        preview = {
+            "indicator_code": "",
+            "indicator_name": state.get("indicator_name") or "",
+            "category": state.get("category") or "大V自定义指标",
+            "value": value,
+            "numeric_value": numeric_value,
+            "unit": state.get("unit") or "",
+            "assessment": interpretation,
+            "interpretation": interpretation,
+            "algorithm_detail": state.get("algorithm_detail") or "",
+            "prompt_text": state.get("prompt_text") or "",
+            "selected_indicators": copy.deepcopy(state.get("selected_indicators") or []),
+            "updated_at": now_ts(),
+            "formula_js": (state.get("generated_formula_meta") or {}).get("formula_js") or "",
+            "formula_meta": copy.deepcopy(state.get("generated_formula_meta") or {}),
+        }
+        return {
+            "detail": "已完成智能指标预览求值。",
+            "state_updates": {"preview_result": preview},
+            "context_preview": {"value": value, "has_numeric_value": numeric_value is not None},
+        }
+
+    def _smart_persist_executor(state, runtime, node, upstream):
+        if not runtime.get("persist"):
+            return {
+                "status": "skipped",
+                "detail": "当前为预览模式，未执行持久化。",
+                "output": copy.deepcopy(state.get("preview_result") or {}),
+                "state_key": "final_result",
+            }
+        definition = save_indicator_definition(
+            {
+                **(runtime.get("existing") or {}),
+                **(runtime.get("body") or {}),
+                "tenant_slug": runtime.get("tenant_slug") or "",
+                "indicator_name": state.get("indicator_name") or "",
+                "category": state.get("category") or "大V自定义指标",
+                "description": state.get("algorithm_detail") or "",
+                "owner": ((runtime.get("tenant") or {}).get("advisor") or "大V"),
+                "source_type": "smart",
+                "source_type_label": "智能指标",
+                "provider": "LLM / Prompt Formula",
+                "status_hint": str((runtime.get("body") or {}).get("status_hint") or "good").strip() or "good",
+                "assessment_template": str((runtime.get("body") or {}).get("assessment_template") or build_smart_indicator_interpretation(state.get("indicator_name"), state.get("prompt_text"), state.get("selected_indicators"), "实时值", (runtime.get("body") or {}).get("unit") or "")).strip(),
+                "alert_template": str((runtime.get("body") or {}).get("alert_template") or "").strip(),
+                "prompt_text": state.get("prompt_text") or "",
+                "formula_js": (state.get("generated_formula_meta") or {}).get("formula_js") or "",
+                "selected_indicators": copy.deepcopy(state.get("selected_indicators") or []),
+                "display_order": int((runtime.get("body") or {}).get("display_order") or 0),
+                "watchers": ["大V工作台", "H5 Dashboard", "租户门户"],
+                "display_config": {"show_in_h5": True, "show_in_workbench": True},
+                "enabled": (runtime.get("body") or {}).get("enabled", True),
+            }
+        )
+        latest_snapshot = save_smart_indicator_latest_snapshot(definition)
+        saved_site_config = None
+        if (runtime.get("body") or {}).get("add_to_dashboard", True):
+            saved_site_config = append_smart_indicator_to_dashboard(
+                runtime.get("tenant_slug") or "",
+                definition["indicator_code"],
+                title=str((runtime.get("body") or {}).get("dashboard_title") or "智能指标 Dashboard").strip() or "智能指标 Dashboard",
+                layout=(runtime.get("body") or {}).get("layout"),
+                publisher=((runtime.get("tenant") or {}).get("advisor") or "大V"),
+            )
+        latest_tenant = get_tenant_by_slug(runtime.get("tenant_slug") or "", saved_site_config) if saved_site_config else runtime.get("tenant")
+        result = {
+            "definition": get_indicator_definition(definition["indicator_code"]),
+            "latest_snapshot": latest_snapshot,
+            "tenant": latest_tenant,
+            "formula_meta": copy.deepcopy(state.get("generated_formula_meta") or {}),
+        }
+        return {
+            "detail": "已保存智能指标定义并同步 Dashboard。",
+            "output": result,
+            "state_key": "final_result",
+            "context_preview": {"indicator_code": definition.get("indicator_code") or "", "dashboard_sync": bool((runtime.get("body") or {}).get("add_to_dashboard", True))},
+        }
+
+    execution = run_declared_agent_workflow(
+        workflow_definition,
+        runtime={
+            "tenant_slug": tenant_slug,
+            "tenant": tenant,
+            "body": body,
+            "existing": existing,
+            "persist": bool(persist),
+        },
+        executor_registry={
+            "smart_indicator_input": _smart_input_executor,
+            "smart_indicator_resolve": _smart_resolve_executor,
+            "smart_indicator_compile": _smart_compile_executor,
+            "smart_indicator_preview": _smart_preview_executor,
+            "smart_indicator_publish": _smart_persist_executor,
+        },
+    )
+    final_result = execution["state"].get("final_result") or {}
+    if not persist:
+        final_result = dict(final_result)
+        final_result["workflow_meta"] = build_declared_agent_workflow_meta(
+            workflow_definition,
+            extras={"last_execution_steps": copy.deepcopy(execution.get("node_results") or {})},
+        )
+    else:
+        final_result = dict(final_result)
+        final_result["workflow_meta"] = build_declared_agent_workflow_meta(
+            workflow_definition,
+            extras={"last_execution_steps": copy.deepcopy(execution.get("node_results") or {})},
+        )
+    return final_result
+
+
+def build_smart_indicator_preview(tenant_slug, payload):
+    return _run_smart_indicator_agent_workflow(tenant_slug, payload, persist=False)
 
 
 def build_default_fund_dashboard_cards(tenant, layout="2x2"):
@@ -2472,67 +2769,7 @@ def remove_smart_indicator_from_dashboard(tenant_slug, indicator_code):
 
 
 def create_or_update_tenant_smart_indicator(tenant_slug, payload):
-    tenant = get_tenant_by_slug(tenant_slug)
-    body = payload if isinstance(payload, dict) else {}
-    existing = get_indicator_definition(body.get("indicator_code")) if body.get("indicator_code") else None
-    selected_indicators = resolve_smart_indicator_selected_refs(tenant, body)
-    if not selected_indicators:
-        raise ValueError("selected_indicators_required")
-    prompt_text = str(body.get("prompt_text") or body.get("prompt") or "").strip()
-    if not prompt_text:
-        raise ValueError("prompt_text_required")
-    indicator_name = str(body.get("indicator_name") or body.get("name") or "").strip() or derive_smart_indicator_name(prompt_text, selected_indicators)
-    algorithm_detail = str(body.get("description") or "").strip() or build_smart_indicator_algorithm_detail(prompt_text, selected_indicators)
-    provided_formula_js = str(body.get("formula_js") or "").strip()
-    if provided_formula_js:
-        generated = {
-            "formula_js": validate_smart_indicator_js(provided_formula_js, selected_indicators),
-            "generator": "preview_confirmed",
-            "llm_used": False,
-        }
-    else:
-        generated = generate_smart_indicator_js(indicator_name, prompt_text, selected_indicators, tenant_slug=tenant_slug)
-    definition = save_indicator_definition(
-        {
-            **(existing or {}),
-            **body,
-            "tenant_slug": tenant_slug,
-            "indicator_name": indicator_name,
-            "category": str(body.get("category") or "大V自定义指标").strip() or "大V自定义指标",
-            "description": algorithm_detail,
-            "owner": tenant.get("advisor") or "大V",
-            "source_type": "smart",
-            "source_type_label": "智能指标",
-            "provider": "LLM / Prompt Formula",
-            "status_hint": str(body.get("status_hint") or "good").strip() or "good",
-            "assessment_template": str(body.get("assessment_template") or build_smart_indicator_interpretation(indicator_name, prompt_text, selected_indicators, "实时值", body.get("unit") or "")).strip(),
-            "alert_template": str(body.get("alert_template") or "").strip(),
-            "prompt_text": prompt_text,
-            "formula_js": generated["formula_js"],
-            "selected_indicators": selected_indicators,
-            "display_order": int(body.get("display_order") or 0),
-            "watchers": ["大V工作台", "H5 Dashboard", "租户门户"],
-            "display_config": {"show_in_h5": True, "show_in_workbench": True},
-            "enabled": body.get("enabled", True),
-        }
-    )
-    latest_snapshot = save_smart_indicator_latest_snapshot(definition)
-    saved_site_config = None
-    if body.get("add_to_dashboard", True):
-        saved_site_config = append_smart_indicator_to_dashboard(
-            tenant_slug,
-            definition["indicator_code"],
-            title=str(body.get("dashboard_title") or "智能指标 Dashboard").strip() or "智能指标 Dashboard",
-            layout=body.get("layout"),
-            publisher=tenant.get("advisor") or "大V",
-        )
-    latest_tenant = get_tenant_by_slug(tenant_slug, saved_site_config) if saved_site_config else tenant
-    return {
-        "definition": get_indicator_definition(definition["indicator_code"]),
-        "latest_snapshot": latest_snapshot,
-        "tenant": latest_tenant,
-        "formula_meta": generated,
-    }
+    return _run_smart_indicator_agent_workflow(tenant_slug, payload, persist=True)
 
 
 def normalize_tenant_configs(source=None):
@@ -2560,6 +2797,7 @@ def normalize_site_config(source=None):
     merged = _merge_site_config(copy.deepcopy(DEFAULT_SITE_CONFIG), source or {})
     merged["brand"] = normalize_brand_config(merged.get("brand"))
     merged["knowledge_ingestion"] = normalize_knowledge_ingestion_config(merged.get("knowledge_ingestion"))
+    merged["hermes_settings"] = normalize_hermes_settings_config(merged.get("hermes_settings"))
     merged["evidence_chain"] = normalize_evidence_chain_config(merged.get("evidence_chain"))
     merged["review_generation"] = normalize_review_generation_config(merged.get("review_generation"))
     merged["llm_registry"] = normalize_llm_registry_config(merged.get("llm_registry"))
@@ -2593,6 +2831,29 @@ def is_feature_enabled(feature_name, site_config=None):
     return feature_flags.get(feature_name) is not False
 
 
+def get_hermes_settings(site_config=None):
+    config = site_config or get_site_config()
+    return normalize_hermes_settings_config(config.get("hermes_settings"))
+
+
+def is_hermes_scope_guard_enabled(site_config=None):
+    settings = get_hermes_settings(site_config)
+    return settings.get("prompt_scope_guard_enabled") is True
+
+
+def is_hermes_available_for_role(user_role="", site_config=None):
+    config = site_config or get_site_config()
+    if not is_feature_enabled("hermes", config):
+        return False
+    normalized_role = str(user_role or "").strip().lower()
+    if normalized_role == "dav":
+        return True
+    settings = get_hermes_settings(config)
+    if normalized_role == "investor":
+        return settings.get("investor_access_enabled") is True
+    return settings.get("investor_access_enabled") is True
+
+
 def get_h5_login_users(site_config=None):
     users = list_users()
     return [
@@ -2600,6 +2861,242 @@ def get_h5_login_users(site_config=None):
         for user in users
         if user.get("role") in {"investor", "dav"} and user.get("status") == "active"
     ]
+
+
+H5_PROFILE_SETTINGS_PREFIX = "h5_profile_settings:"
+
+
+def _load_json_app_setting(setting_key, default_value=None):
+    fallback = copy.deepcopy(default_value)
+    try:
+        row = get_db().execute(
+            "SELECT setting_value FROM app_settings WHERE setting_key = ?",
+            (setting_key,),
+        ).fetchone()
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return fallback
+        raise
+    if not row or not row["setting_value"]:
+        return fallback
+    try:
+        decoded = json.loads(row["setting_value"])
+    except Exception:
+        app.logger.exception("Failed to parse app setting: %s", setting_key)
+        return fallback
+    if isinstance(decoded, (dict, list)):
+        return decoded
+    return fallback
+
+
+def _save_json_app_setting(setting_key, payload):
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO app_settings (setting_key, setting_value, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(setting_key) DO UPDATE SET
+            setting_value = excluded.setting_value,
+            updated_at = excluded.updated_at
+        """,
+        (
+            setting_key,
+            json.dumps(payload, ensure_ascii=False),
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        ),
+    )
+    db.commit()
+    return copy.deepcopy(payload)
+
+
+def _normalize_profile_tag_list(items, limit=8):
+    normalized = []
+    seen = set()
+    raw_items = items if isinstance(items, list) else []
+    for value in raw_items:
+        text = re.sub(r"\s+", " ", str(value or "").strip())
+        if not text:
+            continue
+        if len(text) > 12:
+            text = text[:12]
+        key = text.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized.append(text)
+        if len(normalized) >= limit:
+            break
+    return normalized
+
+
+def get_h5_profile_settings_key(profile_id):
+    normalized = str(profile_id or "").strip()
+    if not normalized:
+        return ""
+    return f"{H5_PROFILE_SETTINGS_PREFIX}{normalized}"
+
+
+def normalize_h5_profile_settings(source=None, user=None):
+    payload = source if isinstance(source, dict) else {}
+    user_payload = user if isinstance(user, dict) else {}
+    role = str(user_payload.get("role") or "investor").strip().lower()
+    default_avatar = str(user_payload.get("avatar") or ("👑" if role == "dav" else "👤")).strip() or ("👑" if role == "dav" else "👤")
+    default_name = str(user_payload.get("username") or user_payload.get("name") or "").strip() or "投研用户"
+    raw_avatar = str(payload.get("avatar") or default_avatar).strip() or default_avatar
+    raw_name = re.sub(r"\s+", " ", str(payload.get("display_name") or default_name).strip()) or default_name
+    raw_bio = str(payload.get("bio") or "").strip()
+    if len(raw_name) > 24:
+        raw_name = raw_name[:24]
+    if len(raw_avatar) > 8:
+        raw_avatar = raw_avatar[:8]
+    if len(raw_bio) > 160:
+        raw_bio = raw_bio[:160]
+    return {
+        "display_name": raw_name,
+        "avatar": raw_avatar,
+        "bio": raw_bio,
+        "custom_tags": _normalize_profile_tag_list(payload.get("custom_tags") or payload.get("customTags") or []),
+    }
+
+
+def load_h5_profile_settings(user=None):
+    user_payload = user if isinstance(user, dict) else {}
+    setting_key = get_h5_profile_settings_key(user_payload.get("username"))
+    defaults = normalize_h5_profile_settings({}, user_payload)
+    if not setting_key:
+        return defaults
+    stored = _load_json_app_setting(setting_key, {})
+    return normalize_h5_profile_settings(stored, user_payload)
+
+
+def save_h5_profile_settings(user, source=None):
+    user_payload = user if isinstance(user, dict) else {}
+    setting_key = get_h5_profile_settings_key(user_payload.get("username"))
+    if not setting_key:
+        raise ValueError("h5_profile_not_found")
+    normalized = normalize_h5_profile_settings(source, user_payload)
+    _save_json_app_setting(setting_key, normalized)
+    return normalized
+
+
+def build_h5_account_settings_payload(user=None):
+    user_payload = ensure_user_row_defaults(user or {}, get_site_config()) if isinstance(user, dict) else ensure_user_row_defaults({}, get_site_config())
+    profile_settings = normalize_h5_profile_settings(user_payload.get("profile_settings"), user_payload)
+    return {
+        "editable": copy.deepcopy(profile_settings),
+        "readonly": {
+            "role_label": user_payload.get("roleLabel") or ("大V投顾" if user_payload.get("role") == "dav" else "投资者"),
+            "tenant_name": ((user_payload.get("tenant") or {}).get("name")) or "--",
+            "advisor_name": ((user_payload.get("tenant") or {}).get("advisor")) or user_payload.get("advisor_name") or "--",
+            "membership": user_payload.get("membership") or "--",
+            "relationship": user_payload.get("relationship") or "--",
+            "rights": ((user_payload.get("tenant") or {}).get("rights")) or "--",
+            "phone_masked": user_payload.get("phone_masked") or "--",
+        },
+        "system_badges": copy.deepcopy(user_payload.get("systemBadges") or user_payload.get("badges") or []),
+    }
+
+
+def build_h5_help_center_payload(role="investor"):
+    normalized_role = str(role or "investor").strip().lower()
+    role_label = "大V工作台与内容生产" if normalized_role == "dav" else "投资者跟踪与互动"
+    articles = [
+        {
+            "id": "account",
+            "category": "账号",
+            "title": "账号设置怎么修改",
+            "summary": "这里维护你的头像、昵称、简介和自定义关注标签。",
+            "bullets": [
+                "租户身份、当前关系和租户权益由系统管理，不支持手动修改。",
+                "系统标签会根据角色、行为和租户关系自动生成。",
+                "你自己可维护的是基础资料和自定义关注标签。",
+            ],
+            "action_label": "打开账号设置",
+            "action_type": "account_settings",
+        },
+        {
+            "id": "dm",
+            "category": "消息",
+            "title": "消息通知在哪里看",
+            "summary": f"消息通知会直接进入消息板块，按 {role_label} 的视角查看会话。",
+            "bullets": [
+                "投资者默认只和所属大V租户互动。",
+                "大V会在消息板块查看粉丝私信和系统提醒。",
+                "复盘发布、私信回复和关键互动都会沉淀到消息链路。",
+            ],
+            "action_label": "打开消息板块",
+            "action_type": "switch_tab",
+            "action_value": "dm",
+        },
+        {
+            "id": "hermes",
+            "category": "Hermes",
+            "title": "Hermes 能问什么",
+            "summary": "Hermes 只承接平台研究相关问题，不做泛百科和高风险投资指令。",
+            "bullets": [
+                "优先查当前租户知识内容，再按需要补平台能力。",
+                "适合问个股基本面、复盘证据链、知识框架和智能指标解释。",
+                "超范围问题会被收口并引导回平台能力。",
+            ],
+            "action_label": "打开 Hermes",
+            "action_type": "switch_tab",
+            "action_value": "hermes",
+        },
+        {
+            "id": "review",
+            "category": "复盘",
+            "title": "复盘内容怎么生成",
+            "summary": "先形成用户复盘 Draft，再审核确认，最后生成摘要和自选股归纳总结。",
+            "bullets": [
+                "手写、语音、文件都先进入用户输入整理阶段。",
+                "确认 Draft 后才继续生成摘要和自选股归纳总结。",
+                "预览无误再发布，前后台展示同一篇正式复盘。",
+            ],
+            "action_label": "打开复盘",
+            "action_type": "switch_tab",
+            "action_value": "review",
+        },
+        {
+            "id": "indicator",
+            "category": "指标",
+            "title": "智能指标怎么理解",
+            "summary": "智能指标由提示词约束计算逻辑，真正保存的是系统生成并确认后的公式结果。",
+            "bullets": [
+                "单个原始指标或已存在智能指标可以直接预览。",
+                "涉及新计算逻辑时会先临时生成，再给用户确认。",
+                "普通用户查看结果与详情，大V额外在后台维护定义。",
+            ],
+            "action_label": "打开 Dashboard",
+            "action_type": "switch_tab",
+            "action_value": "feed",
+        },
+        {
+            "id": "knowledge",
+            "category": "知识",
+            "title": "知识专区怎么用",
+            "summary": "知识专区统一管理上传、清洗、同步和知识图谱关系。",
+            "bullets": [
+                "大V可维护当前租户知识内容，并在工作台里查看租户知识图谱。",
+                "Admin 可以从平台总图切到单租户细看知识结构。",
+                "Hermes 和复盘都会优先复用这些知识沉淀。",
+            ],
+            "action_label": "打开知识",
+            "action_type": "switch_tab",
+            "action_value": "knowledge",
+        },
+    ]
+    categories = ["全部"] + [item["category"] for item in articles]
+    deduped_categories = []
+    for item in categories:
+        if item not in deduped_categories:
+            deduped_categories.append(item)
+    return {
+        "title": "帮助中心",
+        "subtitle": "按功能查看使用说明，不做冗余运营文案。",
+        "role": normalized_role,
+        "categories": deduped_categories,
+        "articles": articles,
+    }
 
 
 def get_current_demo_profile_id():
@@ -2933,6 +3430,7 @@ def ensure_user_row_defaults(user, site_config=None):
         "admin": {"posts": 0, "likes": 0, "following": 0, "followers": 0, "points": 9999, "compute_credits": 999, "level": 9, "level_name": "平台管理员", "membership": "管理员视角", "relationship": "平台管理员", "tenant_card_title": "当前管理平台", "workbench_label": "进入平台后台", "workbench_hint": "管理员视角 · 管理平台用户与租户", "stat_labels": ["用户", "租户", "权限", "系统"], "badges": ["🛡️ 平台管理员"], "avatar": "🛡️"},
     }
     defaults = default_stats.get(role, default_stats["investor"])
+    profile_settings = load_h5_profile_settings(user)
     advisor_name = str(user.get("advisor_name") or tenant.get("advisor") or "").strip()
     return {
         "id": user.get("id"),
@@ -2940,8 +3438,8 @@ def ensure_user_row_defaults(user, site_config=None):
         "password": str(user.get("password") or "").strip(),
         "role": role,
         "roleLabel": role_label_map.get(role, "投资者"),
-        "avatar": str(user.get("avatar") or defaults["avatar"]).strip() or defaults["avatar"],
-        "name": str(user.get("username") or "").strip(),
+        "avatar": str(profile_settings.get("avatar") or user.get("avatar") or defaults["avatar"]).strip() or defaults["avatar"],
+        "name": str(profile_settings.get("display_name") or user.get("username") or "").strip(),
         "phone": str(user.get("phone") or "").strip(),
         "phone_masked": mask_phone(user.get("phone")),
         "status": str(user.get("status") or "active").strip(),
@@ -2969,6 +3467,10 @@ def ensure_user_row_defaults(user, site_config=None):
         "statLabels": defaults["stat_labels"],
         "tenantCardTitle": defaults["tenant_card_title"],
         "badges": defaults["badges"],
+        "systemBadges": defaults["badges"],
+        "customTags": profile_settings.get("custom_tags") or [],
+        "bio": profile_settings.get("bio") or "",
+        "profile_settings": profile_settings,
         "workbenchLabel": defaults["workbench_label"],
         "workbenchHint": defaults["workbench_hint"],
     }
@@ -4160,6 +4662,22 @@ def build_tenant_dashboard_payload_fallback(tenant=None):
             "base_indicators": [],
             "available_tags": [],
         },
+        "fan_stock_observation": {
+            "window_days": 7,
+            "summary": "当前展示为数据库不可达时的降级视图，暂不提供真实粉丝个股观察数据。",
+            "totals": {
+                "interactions": 0,
+                "detail_views": 0,
+                "hermes_queries": 0,
+                "active_fans": 0,
+                "sector_count": 0,
+            },
+            "hot_sector": "",
+            "sectors": [],
+            "top_stocks": [],
+            "fallback_mode": True,
+            "tracked_stock_codes": [],
+        },
         "reviews": [],
         "stats": {},
     }
@@ -4168,6 +4686,25 @@ def build_tenant_dashboard_payload_fallback(tenant=None):
 def build_indicator_hub_fallback(tenant=None, admin_view=False):
     tenant = tenant or normalize_tenant_config({}, 0)
     advisor_name = tenant.get("advisor") or ""
+    fallback_kline = build_simulated_indicator_kline("fallback_shanghai_index", status="good", points=24)
+    fallback_series = [
+        {
+            "date": candle.get("date"),
+            "value": candle.get("close"),
+            "status": "good",
+        }
+        for candle in (fallback_kline.get("candles") or [])
+    ]
+    fallback_anomalies = [
+        {
+            "date": item.get("date"),
+            "value": item.get("value"),
+            "status": item.get("status") or "attention",
+            "label": item.get("label") or "波动抬升",
+            "severity": "中",
+        }
+        for item in (fallback_kline.get("anomalies") or [])
+    ]
     smart_items = [
         {
             "id": "smart_market_heat",
@@ -4188,9 +4725,9 @@ def build_indicator_hub_fallback(tenant=None, admin_view=False):
             "selected_indicators": [{"indicator_code": "smart_market_heat", "indicator_name": "市场情绪温度"}],
             "display_order": 0,
             "history": [],
-            "history_series": [],
-            "history_anomalies": [],
-            "history_kline": [],
+            "history_series": fallback_series,
+            "history_anomalies": fallback_anomalies,
+            "history_kline": fallback_kline,
             "source_type": "smart",
             "source_type_label": "智能指标",
             "provider": "fallback",
@@ -4219,9 +4756,9 @@ def build_indicator_hub_fallback(tenant=None, admin_view=False):
             "selected_indicators": [{"indicator_code": "smart_review_signal", "indicator_name": "复盘重点信号"}],
             "display_order": 1,
             "history": [],
-            "history_series": [],
-            "history_anomalies": [],
-            "history_kline": [],
+            "history_series": fallback_series,
+            "history_anomalies": fallback_anomalies,
+            "history_kline": fallback_kline,
             "source_type": "smart",
             "source_type_label": "智能指标",
             "provider": "fallback",
@@ -4234,21 +4771,22 @@ def build_indicator_hub_fallback(tenant=None, admin_view=False):
     ]
     lake_items = [
         {
-            "id": "lake_turnover",
-            "name": "市场成交额",
-            "category": "市场宽度",
+            "id": "source_shanghai_index",
+            "name": "上证指数",
+            "category": "指数走势",
             "owner": advisor_name or "平台宏观组",
-            "value": "1.12 万亿",
-            "assessment": "成交维持在相对活跃区间，说明主题轮动仍有承接。",
-            "status": "normal",
-            "alert": "量能暂未出现断崖式收缩。",
+            "value": str((fallback_kline.get("candles") or [{}])[-1].get("close") or "4093.73"),
+            "numeric_value": NumberLike((fallback_kline.get("candles") or [{}])[-1].get("close") or 4093.73),
+            "assessment": "当前为数据库降级场景，已回退为平台内置指数样本K线。",
+            "status": "good",
+            "alert": "当前优先展示K线走势与均线关系。",
             "enabled": True,
             "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "watchers": [],
             "history": [],
-            "history_series": [],
-            "history_anomalies": [],
-            "history_kline": [],
+            "history_series": fallback_series,
+            "history_anomalies": fallback_anomalies,
+            "history_kline": fallback_kline,
             "source_type": "lake",
             "source_type_label": "数据湖指标",
             "provider": "fallback",
@@ -4271,9 +4809,9 @@ def build_indicator_hub_fallback(tenant=None, admin_view=False):
             "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "watchers": [],
             "history": [],
-            "history_series": [],
-            "history_anomalies": [],
-            "history_kline": [],
+            "history_series": fallback_series,
+            "history_anomalies": fallback_anomalies,
+            "history_kline": fallback_kline,
             "source_type": "lake",
             "source_type_label": "数据湖指标",
             "provider": "fallback",
@@ -4398,6 +4936,8 @@ def init_db():
         except Exception:
             conn.rollback()
             execute_sql_file(conn, sql_dir / "020_knowledge_embeddings.sql")
+        execute_sql_file(conn, sql_dir / "022_hermes_memory_profile.sql")
+        execute_sql_file(conn, sql_dir / "023_fan_stock_observation_events.sql")
         execute_sql_file(conn, sql_dir / "101_seed_app_core.sql")
         execute_sql_file(conn, sql_dir / "100_seed_master_data.sql")
 
@@ -4746,6 +5286,17 @@ def execute_user_async_job(job):
             knowledge_items=payload.get("knowledge_items") if isinstance(payload.get("knowledge_items"), list) else [],
             job_code=job_code,
         )
+    if job_type == "review_prepare_preview":
+        return compose_review_structured_preview(
+            source_text=payload.get("source_text"),
+            review_period=str(payload.get("period") or "").strip().lower(),
+            source_mode=str(payload.get("source_mode") or "").strip().lower(),
+            selected_watchlist=payload.get("selected_watchlist") if isinstance(payload.get("selected_watchlist"), list) else [],
+            speaker_name=str(payload.get("speaker_name") or "").strip(),
+            entry_point=str(payload.get("entry_point") or "").strip(),
+            tenant_slug=str(payload.get("tenant_slug") or "").strip().lower(),
+            job_code=job_code,
+        )
     if job_type == "review_publish_embed":
         publish_result = process_review_publish_text(
             text=payload.get("text"),
@@ -4772,6 +5323,9 @@ def execute_user_async_job(job):
             news_sources=payload.get("news_sources") if isinstance(payload.get("news_sources"), list) else [],
             llm_models=payload.get("llm_models") if isinstance(payload.get("llm_models"), list) else [],
             polished_input_text=payload.get("polished_input_text"),
+            review_summary=payload.get("review_summary"),
+            user_input_section=payload.get("user_input_section") if isinstance(payload.get("user_input_section"), dict) else {},
+            watchlist_analysis_section=payload.get("watchlist_analysis_section") if isinstance(payload.get("watchlist_analysis_section"), dict) else {},
         )
         return {
             **publish_result,
@@ -4811,6 +5365,8 @@ def _summarize_user_async_job_result(job_type, result):
         return "复盘完整成稿完成"
     if job_type == "review_generate_draft":
         return "复盘草稿生成完成"
+    if job_type == "review_prepare_preview":
+        return "复盘结构化预览完成"
     if job_type == "review_publish_embed":
         return "复盘发布入向量完成"
     if job_type == "knowledge_manual_sync":

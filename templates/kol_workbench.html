@@ -420,6 +420,407 @@ body { background: var(--surface-2); color: var(--text-main); }
   background:rgba(200,169,110,0.10);
   border-color:rgba(200,169,110,0.18);
 }
+.kw-kg-entry-card {
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  align-items:center;
+  padding:14px 16px;
+  border-radius:16px;
+  background:linear-gradient(135deg, rgba(20,54,92,0.18), rgba(10,28,47,0.08));
+  border:1px solid rgba(47,116,192,0.14);
+  margin-bottom:14px;
+}
+.kw-kg-entry-title { font-size:15px; font-weight:700; color:var(--text-main); }
+.kw-kg-entry-desc { margin-top:6px; font-size:12px; color:var(--text-sub); line-height:1.8; max-width:720px; }
+.kw-kg-shell { margin-top:4px; }
+.kw-kg-toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.kw-kg-search,
+.kw-kg-select {
+  border:none;
+  outline:none;
+  border-radius:12px;
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.12);
+  color:var(--text-main);
+  font-size:13px;
+  padding:10px 12px;
+  box-sizing:border-box;
+}
+.kw-kg-search { flex:1; min-width:240px; }
+.kw-kg-select { min-width:132px; }
+.kw-kg-stage { margin-top:12px; font-size:11px; color:var(--gold); }
+.kw-kg-stats {
+  margin-top:12px;
+  display:grid;
+  grid-template-columns:repeat(6, minmax(0, 1fr));
+  gap:8px;
+}
+.kw-kg-stat { padding:10px; border-radius:12px; background:#FFFFFF; border:1px solid rgba(47,116,192,0.10); }
+.kw-kg-stat-label { font-size:10px; color:var(--text-sub); }
+.kw-kg-stat-value { margin-top:6px; font-size:18px; font-weight:800; color:var(--text-main); }
+.kw-kg-legend { margin-top:10px; display:flex; flex-wrap:wrap; gap:8px; }
+.kw-kg-legend-chip {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:5px 10px;
+  border-radius:999px;
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  color:var(--text-sub);
+  font-size:11px;
+}
+.kw-kg-legend-dot {
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#8FA6C4;
+  flex:0 0 auto;
+}
+.kw-kg-legend-dot.kind-root { background:#C8A96E; }
+.kw-kg-legend-dot.kind-topic { background:#8FCCFF; }
+.kw-kg-legend-dot.kind-entity { background:#F6D38B; }
+.kw-kg-legend-dot.kind-method { background:#B9F0D2; }
+.kw-kg-legend-dot.kind-claim { background:#DCEBFA; }
+.kw-kg-legend-dot.kind-signal { background:#97B6D9; }
+.kw-kg-layout {
+  margin-top:14px;
+  display:grid;
+  grid-template-columns:minmax(0, 1.55fr) minmax(300px, 0.85fr);
+  gap:14px;
+}
+.kw-kg-board-shell,
+.kw-kg-detail {
+  border-radius:18px;
+  border:1px solid rgba(47,116,192,0.10);
+}
+.kw-kg-board-shell {
+  background:
+    radial-gradient(circle at top, rgba(47,116,192,0.10), transparent 34%),
+    linear-gradient(180deg, #FFFFFF, #F5FAFF);
+  overflow:auto;
+  box-shadow:0 12px 28px rgba(31,73,125,0.06);
+}
+.kw-kg-board {
+  position:relative;
+  min-height:720px;
+  background-image:
+    linear-gradient(rgba(47,116,192,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(47,116,192,0.07) 1px, transparent 1px);
+  background-size:26px 26px;
+  overflow:hidden;
+}
+.kw-kg-svg { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+.kw-kg-edge { fill:none; stroke:rgba(47,116,192,0.18); stroke-width:1.2; }
+.kw-kg-node {
+  position:absolute;
+  transform:translate(-50%, -50%);
+  border:none;
+  cursor:pointer;
+  text-align:left;
+  color:var(--text-main);
+  background:rgba(255,255,255,0.96);
+  border:1px solid rgba(47,116,192,0.14);
+  border-radius:999px;
+  padding:8px 12px;
+  min-width:72px;
+  max-width:180px;
+  box-shadow:0 12px 30px rgba(31,73,125,0.10);
+}
+.kw-kg-node:hover { transform:translate(-50%, calc(-50% - 1px)); }
+.kw-kg-node.is-active {
+  border-color:rgba(200,169,110,0.56);
+  box-shadow:0 0 0 2px rgba(200,169,110,0.18), 0 16px 34px rgba(31,73,125,0.14);
+}
+.kw-kg-node.kind-root {
+  background:linear-gradient(135deg, #F8FBFF, #EAF3FF);
+  color:#1F497D;
+  min-width:146px;
+  border-color:rgba(47,116,192,0.24);
+}
+.kw-kg-node.kind-topic { color:#2F74C0; }
+.kw-kg-node.kind-entity { color:#A56A00; }
+.kw-kg-node.kind-method { color:#1A8F63; }
+.kw-kg-node.kind-claim { border-radius:16px; max-width:220px; color:var(--text-main); }
+.kw-kg-node.kind-signal {
+  padding:7px 10px;
+  background:#F8FBFF;
+  color:#1F497D;
+}
+.kw-kg-node-kind { font-size:10px; opacity:0.74; color:#5B6B7B; }
+.kw-kg-node-label { margin-top:4px; font-size:12px; font-weight:700; line-height:1.4; overflow:hidden; text-overflow:ellipsis; }
+.kw-kg-detail { background:#FFFFFF; padding:16px; }
+.kw-kg-detail-empty {
+  min-height:220px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  font-size:12px;
+  color:var(--text-sub);
+  line-height:1.8;
+}
+.kw-kg-detail-kicker { font-size:10px; color:var(--gold); letter-spacing:0.04em; }
+.kw-kg-detail-title { margin-top:6px; font-size:18px; font-weight:800; color:var(--text-main); line-height:1.35; }
+.kw-kg-detail-summary { margin-top:10px; font-size:12px; color:var(--text-sub); line-height:1.8; }
+.kw-kg-chip-row { margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; }
+.kw-kg-chip {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:5px 10px;
+  border-radius:999px;
+  background:rgba(47,116,192,0.08);
+  border:1px solid rgba(47,116,192,0.12);
+  color:#245B96;
+  font-size:11px;
+}
+.kw-kg-detail-section { margin-top:16px; }
+.kw-kg-detail-section-title { font-size:12px; font-weight:700; color:var(--text-main); }
+.kw-kg-detail-list { margin-top:8px; display:flex; flex-direction:column; gap:8px; }
+.kw-kg-detail-item { padding:10px 12px; border-radius:12px; background:#F8FBFF; border:1px solid rgba(47,116,192,0.10); }
+.kw-kg-detail-item-title { font-size:12px; font-weight:700; color:var(--text-main); }
+.kw-kg-detail-item-meta { margin-top:4px; font-size:11px; color:var(--text-sub); line-height:1.7; }
+.kw-hermes-admin .stats-grid {
+  margin-bottom:20px;
+}
+.kw-hermes-admin .stat-card,
+.kw-hermes-admin .table-wrap,
+.kw-hermes-admin .pool-card {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  box-shadow:0 8px 24px rgba(31,73,125,0.06);
+}
+.kw-hermes-admin .stat-label,
+.kw-hermes-admin th,
+.kw-hermes-admin .pool-card-label,
+.kw-hermes-admin .sync-desc,
+.kw-hermes-admin .chart-subtitle {
+  color:var(--text-sub);
+}
+.kw-hermes-admin .stat-value,
+.kw-hermes-admin .table-title,
+.kw-hermes-admin td,
+.kw-hermes-admin .pool-card-value {
+  color:var(--text-main);
+}
+.kw-hermes-admin .table-header {
+  border-bottom:1px solid rgba(47,116,192,0.08);
+}
+.kw-hermes-admin th {
+  background:rgba(47,116,192,0.05);
+  border-bottom:1px solid rgba(47,116,192,0.08);
+}
+.kw-hermes-admin td {
+  border-bottom:1px solid rgba(47,116,192,0.08);
+}
+.kw-hermes-admin tr:hover td {
+  background:rgba(47,116,192,0.03);
+}
+.kw-hermes-admin .sync-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+  margin-bottom:20px;
+}
+.kw-hermes-admin .sync-card {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:16px;
+  padding:18px;
+  box-shadow:0 8px 24px rgba(31,73,125,0.06);
+}
+.kw-hermes-admin .sync-title {
+  font-size:14px;
+  color:#2F74C0;
+  font-weight:700;
+  margin-bottom:8px;
+}
+.kw-hermes-admin .sync-chip-row {
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.kw-hermes-admin .sync-chip {
+  font-size:11px;
+  color:#1F497D;
+  background:#F8FBFF;
+  border:1px solid rgba(47,116,192,0.14);
+  border-radius:999px;
+  padding:4px 10px;
+}
+.kw-hermes-admin .chart-card {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:16px;
+  padding:18px;
+  box-shadow:0 8px 24px rgba(31,73,125,0.06);
+}
+.kw-hermes-admin .chart-title {
+  font-size:15px;
+  font-weight:700;
+  color:var(--text-main);
+  margin-bottom:4px;
+}
+.kw-hermes-admin .pool-cards {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:16px;
+  margin-bottom:20px;
+}
+.kw-hermes-admin .pool-card {
+  border-radius:14px;
+  padding:16px;
+  text-align:center;
+}
+.kw-hermes-admin .pool-card-sub {
+  font-size:11px;
+  color:var(--text-sub);
+  margin-top:4px;
+}
+.kw-hermes-admin .rank-badge {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:22px;
+  height:22px;
+  border-radius:50%;
+  font-size:11px;
+  font-weight:700;
+}
+.kw-hermes-admin .rank-1 { background:#C8A96E; color:#0D1B2A; }
+.kw-hermes-admin .rank-2 { background:#B9C3CF; color:#0D1B2A; }
+.kw-hermes-admin .rank-3 { background:#D7A56D; color:#0D1B2A; }
+.kw-hermes-admin .rank-n { background:#EAF3FF; color:#5B6B7B; }
+.kw-hermes-admin .hermes-memory-select,
+.kw-hermes-admin .hermes-memory-input {
+  min-width:180px;
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.16);
+  border-radius:10px;
+  padding:10px 12px;
+  color:var(--text-main);
+  font-size:12px;
+  box-sizing:border-box;
+}
+.kw-hermes-admin .hermes-memory-select:focus,
+.kw-hermes-admin .hermes-memory-input:focus {
+  outline:none;
+  border-color:rgba(47,116,192,0.28);
+  box-shadow:0 0 0 3px rgba(47,116,192,0.10);
+}
+.kw-hermes-admin .hermes-memory-status {
+  margin-top:10px;
+  font-size:12px;
+  color:#B88A30;
+}
+.kw-hermes-admin .hermes-memory-summary-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:12px;
+  margin-top:16px;
+}
+.kw-hermes-admin .hermes-memory-summary-card {
+  padding:14px;
+  border-radius:14px;
+  background:#F7FBFF;
+  border:1px solid rgba(47,116,192,0.10);
+}
+.kw-hermes-admin .hermes-memory-summary-label {
+  font-size:12px;
+  color:#5B6B7B;
+}
+.kw-hermes-admin .hermes-memory-summary-value {
+  font-size:24px;
+  font-weight:700;
+  color:var(--text-main);
+  margin-top:8px;
+}
+.kw-hermes-admin .hermes-memory-summary-meta {
+  font-size:11px;
+  color:#2F74C0;
+  margin-top:6px;
+  line-height:1.6;
+}
+.kw-hermes-admin .hermes-memory-panel-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+  gap:14px;
+  margin-top:16px;
+}
+.kw-hermes-admin .hermes-memory-panel {
+  padding:14px;
+  border-radius:14px;
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  box-shadow:0 8px 22px rgba(31,73,125,0.06);
+}
+.kw-hermes-admin .hermes-memory-panel-title {
+  font-size:13px;
+  color:var(--text-main);
+  font-weight:700;
+}
+.kw-hermes-admin .hermes-memory-panel-desc {
+  font-size:12px;
+  color:var(--text-sub);
+  line-height:1.7;
+  margin-top:6px;
+}
+.kw-hermes-admin .hermes-memory-toolbar {
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+  margin-top:12px;
+}
+.kw-hermes-admin .hermes-memory-preview {
+  margin-top:16px;
+  padding:14px;
+  border-radius:14px;
+  background:#F8FBFF;
+  border:1px dashed rgba(47,116,192,0.20);
+  font-size:12px;
+  color:var(--text-sub);
+  line-height:1.8;
+}
+.kw-hermes-admin .hermes-memory-preview-title {
+  font-size:13px;
+  color:var(--text-main);
+  font-weight:700;
+}
+.kw-hermes-admin .hermes-memory-preview-time {
+  font-size:12px;
+  color:#2F74C0;
+}
+.kw-hermes-admin .hermes-memory-preview-metrics {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  gap:10px;
+  margin-top:12px;
+}
+.kw-hermes-admin .hermes-memory-preview-metric {
+  padding:10px 12px;
+  border-radius:10px;
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+}
+.kw-hermes-admin .hermes-memory-preview-metric-label {
+  font-size:11px;
+  color:#5B6B7B;
+}
+.kw-hermes-admin .hermes-memory-preview-metric-value {
+  font-size:18px;
+  color:var(--text-main);
+  font-weight:700;
+  margin-top:6px;
+}
+.kw-hermes-admin .hermes-memory-preview-footnote {
+  font-size:11px;
+  color:var(--text-sub);
+  margin-top:10px;
+  line-height:1.8;
+}
 .kw-knowledge-chat-shell { display:grid; grid-template-columns:minmax(280px, 0.82fr) minmax(0, 1.18fr); gap:14px; margin-top:14px; }
 .kw-knowledge-chat-card {
   background:#FFFFFF;
@@ -1893,6 +2294,16 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
   gap:8px;
   flex-wrap:wrap;
 }
+.kw-review-input-mode-row {
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
+  margin-top:12px;
+}
+.kw-review-input-mode-row .kw-knowledge-source-pill {
+  flex:0 0 auto;
+}
 .kw-review-period-pill {
   min-height:36px;
   padding:0 14px;
@@ -2375,7 +2786,9 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
   .kw-knowledge-entry-grid,
   .kw-knowledge-layout,
   .kw-knowledge-source-selector,
-  .kw-knowledge-detail-grid { grid-template-columns:1fr; }
+  .kw-knowledge-detail-grid,
+  .kw-kg-layout,
+  .kw-kg-stats { grid-template-columns:1fr; }
   .kw-portal-status-grid { grid-template-columns:1fr; }
   .kw-review-modal-overlay { padding:12px; }
   .kw-review-modal-sheet { padding:18px; border-radius:18px; }
@@ -2431,7 +2844,10 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <span class="admin-nav-icon">&#9998;</span> 复盘生产台
         </div>
         <div class="admin-nav-item" data-section="knowledge" data-feature="knowledge" onclick="showWorkbenchSection('knowledge', this)">
-          <span class="admin-nav-icon">&#128214;</span> 知识库微调
+          <span class="admin-nav-icon">&#128214;</span> 知识专区
+        </div>
+        <div class="admin-nav-item" data-section="knowledge-graph" data-feature="knowledge" onclick="showWorkbenchSection('knowledge-graph', this)">
+          <span class="admin-nav-icon">&#128391;</span> 知识图谱
         </div>
         <div class="admin-nav-item" data-section="hermes" data-feature="hermes" onclick="showWorkbenchSection('hermes', this)">
           <span class="admin-nav-icon">&#129438;</span> Hermes 工作台
@@ -2978,7 +3394,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <div class="kw-card-head">
             <div>
               <div class="kw-card-title">复盘生产台</div>
-              <div class="kw-card-desc">复盘流程改成同页完成：先挑选智能仪表盘卡片，再录入大V自己的语音 / 文件 / URL / 手写内容，之后按“输入润色”与“完整成稿”两阶段调用大模型，最后人工修改确认后发布成快照给粉丝。</div>
+              <div class="kw-card-desc">复盘流程与 H5 完全一致：先录入大V原始内容，按需优化成稿生成 Draft，审核通过后再生成摘要和自选股归纳总结，最后进入用户视角预览并发布。这里仅保留 Web 的工作台交互方式。</div>
             </div>
             <span class="kw-tag">Review Studio</span>
           </div>
@@ -3009,8 +3425,8 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
               <div class="kw-review-studio-panel">
                 <div class="kw-review-studio-panel-head">
                   <div>
-                    <div class="kw-review-studio-panel-title">两阶段生成</div>
-                    <div class="kw-review-studio-panel-desc">阶段 1 可选做“输入润色”；阶段 2 基于用户输入 + 智能仪表盘卡片生成完整复盘草稿。整个过程中会实时展示模型进度和日志。</div>
+                    <div class="kw-review-studio-panel-title">审核与生成</div>
+                    <div class="kw-review-studio-panel-desc">先决定是否优化成稿，再审核 Draft；确认后系统继续生成摘要和自选股归纳总结，最后进入最终预览。整个过程中会实时展示模型进度和结果。</div>
                   </div>
                 </div>
                 <div id="kw-review-stage-actions" class="kw-review-stage-actions"></div>
@@ -3026,17 +3442,12 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
               </div>
               <div class="kw-review-studio-panel">
                 <div class="kw-review-studio-panel-title">发布前编辑</div>
-                <div class="kw-review-studio-panel-desc">最终文案会在这里生成可编辑快照。大V可以继续人工修改，再决定是否发布。</div>
-                <textarea id="kw-review-final-editor" class="kw-review-final-editor" placeholder="完成“完整成稿”后，这里会出现可编辑的最终复盘正文。"></textarea>
+                <div class="kw-review-studio-panel-desc">这里展示最终预览态正文。你仍可以在发布前继续修改，但展示方式应尽量接近前台详情页。</div>
+                <textarea id="kw-review-final-editor" class="kw-review-final-editor" placeholder="完成最终预览后，这里会出现可继续微调的发布正文。"></textarea>
                 <div class="kw-review-stage-actions" style="margin-top:12px">
-                  <button class="btn-outline" type="button" onclick="kwUseCurrentReviewDraftAsFinal()">使用当前结果</button>
+                  <button class="btn-outline" type="button" onclick="kwUseCurrentReviewDraftAsFinal()">同步当前预览</button>
                   <button class="btn-gold" type="button" onclick="kwPublishReviewDraft()">发布给粉丝</button>
                 </div>
-              </div>
-              <div class="kw-review-studio-panel">
-                <div class="kw-review-studio-panel-title">白盒提示词查看</div>
-                <div class="kw-review-studio-panel-desc">复盘阶段提示词由 Admin 统一配置。这里默认只读展示，便于监督当前系统到底按什么逻辑生成。</div>
-                <div id="kw-review-whitebox-panel" class="kw-review-whitebox-panel"></div>
               </div>
               <div class="kw-review-studio-panel">
                 <div class="kw-review-published-title">最近一次发布</div>
@@ -3145,10 +3556,19 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         <div class="kw-card">
           <div class="kw-card-head">
             <div>
-              <div class="kw-card-title">知识库与微调</div>
+              <div class="kw-card-title">知识专区</div>
               <div class="kw-card-desc">{{ workbench.knowledge_hub.summary }}</div>
             </div>
             <span class="kw-tag">Knowledge</span>
+          </div>
+          <div class="kw-kg-entry-card">
+            <div>
+              <div class="kw-kg-entry-title">知识图谱已独立成页</div>
+              <div class="kw-kg-entry-desc">知识专区只负责录入、清洗、微调和检索。真正的图谱页只展示知识对象，不把文件、语音和 URL 直接当成主节点。</div>
+            </div>
+            <div class="kw-toolbar" style="margin-top:0">
+              <button class="btn-gold" type="button" style="padding:9px 14px;font-size:12px" onclick="showWorkbenchSection('knowledge-graph', document.querySelector('.admin-nav-item[data-section=&quot;knowledge-graph&quot;]'))">进入知识图谱</button>
+            </div>
           </div>
           <div id="kw-knowledge-entry-grid" class="kw-knowledge-entry-grid"></div>
           <div class="kw-knowledge-pipeline">
@@ -3183,7 +3603,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
             </div>
           </div>
           <div class="kw-toolbar" style="margin-top:12px">
-            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="kwOpenKnowledgeEntryEditor('{{ workbench.knowledge_hub['items'][0].id }}')">微调历史知识</button>
+            <button class="btn-gold" style="padding:9px 14px;font-size:12px" onclick="kwOpenLatestKnowledgeEntryEditor()">微调历史知识</button>
             <button class="btn-outline" style="padding:9px 14px;font-size:12px" onclick="kwOpenKnowledgeIntake('manual')">新增知识</button>
           </div>
           <div class="kw-knowledge-chat-shell">
@@ -3210,40 +3630,174 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         </div>
       </div>
 
-      <div id="workbench-section-hermes" style="display:none">
+      <div id="workbench-section-knowledge-graph" style="display:none">
         <div class="kw-card">
           <div class="kw-card-head">
             <div>
-              <div class="kw-card-title">Hermes 双版本</div>
-              <div class="kw-card-desc">{{ workbench.hermes_hub.summary }}</div>
+              <div class="kw-card-title">知识图谱</div>
+              <div class="kw-card-desc">按知识对象浏览当前租户的主题、实体、方法、观点和验证信号。原始素材只在详情里作为来源证据出现。</div>
             </div>
-            <span class="kw-tag">Hermes</span>
+            <span class="kw-tag">Graph</span>
           </div>
-          <div class="kw-version-grid">
-            {% for item in workbench.hermes_hub.versions %}
-            <div class="kw-version-card">
-              <div class="kw-version-top">
-                <div>
-                  <div class="kw-version-title">{{ item.name }}</div>
-                  <div class="kw-version-desc">{{ item.desc }}</div>
+          <div class="kw-kg-shell">
+            <div class="kw-kg-toolbar">
+              <input id="kw-kg-search" class="kw-kg-search" placeholder="搜索主题、实体、观点或验证信号..." oninput="kwHandleKnowledgeMapSearch(this.value)">
+              <select id="kw-kg-type-filter" class="kw-kg-select" onchange="kwHandleKnowledgeMapTypeChange(this.value)">
+                <option value="all">全部节点</option>
+                <option value="topic">主题</option>
+                <option value="entity">实体</option>
+                <option value="method">方法</option>
+                <option value="claim">观点</option>
+                <option value="signal">验证信号</option>
+              </select>
+              <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="loadWorkbenchKnowledgeMap(true)">刷新</button>
+              <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="kwCollapseKnowledgeMap()">收缩</button>
+              <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="kwExpandKnowledgeMapAll()">全部展示</button>
+              <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="kwAdjustKnowledgeMapDepth(-1)">-</button>
+              <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="kwAdjustKnowledgeMapDepth(1)">+</button>
+            </div>
+            <div id="kw-kg-stage" class="kw-kg-stage">正在加载知识图谱…</div>
+            <div id="kw-kg-stats" class="kw-kg-stats"></div>
+            <div id="kw-kg-legend" class="kw-kg-legend"></div>
+            <div class="kw-kg-layout">
+              <div class="kw-kg-board-shell">
+                <div id="kw-kg-board" class="kw-kg-board"></div>
+              </div>
+              <aside id="kw-kg-detail" class="kw-kg-detail"></aside>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="workbench-section-hermes" style="display:none">
+        <div class="kw-hermes-admin">
+          <div id="kw-hermes-usage-summary" class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-label">今日调用</div>
+              <span class="stat-icon">&#9881;</span>
+              <div class="stat-value">--</div>
+              <div class="stat-change up">加载中</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">本月调用</div>
+              <span class="stat-icon">&#9654;</span>
+              <div class="stat-value">--</div>
+              <div class="stat-change up">加载中</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">人均调用</div>
+              <span class="stat-icon">&#9786;</span>
+              <div class="stat-value">--</div>
+              <div class="stat-change up">加载中</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">算力消耗</div>
+              <span class="stat-icon">&#9733;</span>
+              <div class="stat-value">--</div>
+              <div class="stat-change" style="color:#C8A96E">加载中</div>
+            </div>
+          </div>
+          <div class="sync-grid">
+            <div class="sync-card">
+              <div class="sync-title">Hermes 产品口径</div>
+              <div class="sync-desc">H5 现已分成两种版本：工作区版保留股票、skills、提示词和结构化结果；龙虾纯对话版只保留聊天和 skills，不强制单独输入股票代码。</div>
+              <div class="sync-chip-row">
+                <span class="sync-chip">工作区版</span>
+                <span class="sync-chip">龙虾纯对话版</span>
+                <span class="sync-chip">skills 可选</span>
+                <span class="sync-chip">skills 可自定义</span>
+                <span class="sync-chip">skills 绑定知识库</span>
+                <span class="sync-chip">问题里自然带股票对象时自动转个股分析</span>
+              </div>
+            </div>
+            <div class="sync-card">
+              <div class="sync-title">平台监控重点</div>
+              <div class="sync-desc">平台侧看的不是按钮多少，而是这两种模式的调用量、知识命中情况、个股分析触发率和响应质量是否一致。</div>
+              <div class="sync-chip-row">
+                <span class="sync-chip">双版本调用占比</span>
+                <span class="sync-chip">知识命中率</span>
+                <span class="sync-chip">自定义 skill 使用率</span>
+                <span class="sync-chip">纯对话转个股分析比率</span>
+                <span class="sync-chip">响应耗时</span>
+              </div>
+            </div>
+          </div>
+          <div class="chart-card" style="margin-bottom:20px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
+              <div>
+                <div class="chart-title">Hermes 记忆治理</div>
+                <div class="chart-subtitle">按租户查看 Hermes 记忆落库情况，支持范围预览、ZIP 备份和时间段清理。范围清理后，会自动重建剩余会话记忆和用户画像。</div>
+              </div>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <select id="kw-hermes-memory-tenant" class="hermes-memory-select" onchange="loadWorkbenchHermesMemorySummary(true)"></select>
+                <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="loadWorkbenchHermesMemorySummary(true)">刷新</button>
+              </div>
+            </div>
+            <div id="kw-hermes-memory-summary" class="hermes-memory-summary-grid"></div>
+            <div class="hermes-memory-panel-grid">
+              <div class="hermes-memory-panel">
+                <div class="hermes-memory-panel-title">备份 Hermes 记忆</div>
+                <div class="hermes-memory-panel-desc">导出当前租户的 Hermes 记忆快照。范围备份会只打包命中时间窗口的对话及对应的聚合记忆。</div>
+                <div class="hermes-memory-toolbar">
+                  <select id="kw-hermes-memory-backup-range" class="hermes-memory-select" style="flex:1;min-width:160px"></select>
+                  <button class="btn-gold" type="button" style="padding:8px 14px;font-size:12px" onclick="backupWorkbenchHermesMemory()">下载 ZIP 备份</button>
                 </div>
-                <span class="kw-tag">演示版</span>
               </div>
-              <div class="kw-watch-chip-row" style="margin-top:10px">
-                {% for point in item.points %}
-                <span class="kw-mode-chip">{{ point }}</span>
-                {% endfor %}
+              <div class="hermes-memory-panel">
+                <div class="hermes-memory-panel-title">清理 Hermes 记忆</div>
+                <div class="hermes-memory-panel-desc">支持最近 1 个月、3 个月、6 个月、1 年，或整租户全量清理。全量清理需要输入 <code>CONFIRM</code>。</div>
+                <div class="hermes-memory-toolbar">
+                  <select id="kw-hermes-memory-clear-range" class="hermes-memory-select" onchange="previewWorkbenchHermesMemoryClear()" style="flex:1;min-width:160px"></select>
+                  <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="previewWorkbenchHermesMemoryClear()">预览影响</button>
+                </div>
+                <div id="kw-hermes-memory-clear-confirm-wrap" style="display:none;margin-top:10px">
+                  <input id="kw-hermes-memory-clear-confirm" class="hermes-memory-input" placeholder="全量清理请输入 CONFIRM" style="width:100%;border-color:rgba(231,76,60,0.24)">
+                </div>
+                <div class="hermes-memory-toolbar">
+                  <button class="btn-sm-blue" type="button" style="padding:8px 14px;font-size:12px" onclick="clearWorkbenchHermesMemory(true)">先备份再清理</button>
+                  <button type="button" style="padding:8px 14px;font-size:12px;background:rgba(231,76,60,0.12);border:1px solid rgba(231,76,60,0.32);color:#F1948A;border-radius:10px;cursor:pointer" onclick="clearWorkbenchHermesMemory(false)">直接清理</button>
+                </div>
               </div>
             </div>
-            {% endfor %}
+            <div id="kw-hermes-memory-preview" class="hermes-memory-preview">请选择租户和清理范围后查看影响预览。</div>
+            <div id="kw-hermes-memory-status" class="hermes-memory-status">尚未加载 Hermes 记忆治理数据。</div>
           </div>
-          <div class="kw-skill-list" style="margin-top:12px">
-            {% for item in workbench.hermes_hub.skills %}
-            <div class="kw-mini-card">
-              <div class="kw-mini-title">{{ item.label }}</div>
-              <div class="kw-skill-meta">{{ item.type }} · 关联知识 {{ item.knowledge }} 条</div>
+          <div class="table-wrap" style="margin-bottom:20px">
+            <div class="table-header">
+              <div class="table-title">Hermes 工具动作统计</div>
+              <span class="tag tag-gold">6 个优先模式</span>
             </div>
-            {% endfor %}
+            <table id="kw-hermes-mode-table">
+              <thead><tr><th>模式名称</th><th>今日调用</th><th>本月调用</th><th>占比</th><th>平均响应时间</th><th>状态</th></tr></thead>
+              <tbody id="kw-hermes-mode-tbody"></tbody>
+            </table>
+          </div>
+          <div id="kw-hermes-pool-cards" class="pool-cards">
+            <div class="pool-card">
+              <div class="pool-card-label">总算力池</div>
+              <div class="pool-card-value">--</div>
+              <div class="pool-card-sub">加载中</div>
+            </div>
+            <div class="pool-card">
+              <div class="pool-card-label">本月消耗</div>
+              <div class="pool-card-value">--</div>
+              <div class="pool-card-sub">加载中</div>
+            </div>
+            <div class="pool-card">
+              <div class="pool-card-label">剩余可用</div>
+              <div class="pool-card-value">--</div>
+              <div class="pool-card-sub">加载中</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <div class="table-header">
+              <div class="table-title">用户算力消耗排行 (本月)</div>
+              <span class="tag tag-gold">Top 8</span>
+            </div>
+            <table id="kw-hermes-ranking-table">
+              <thead><tr><th>排名</th><th>用户</th><th>等级</th><th>本月调用</th><th>消耗算力</th><th>最常用模式</th></tr></thead>
+              <tbody id="kw-hermes-ranking-tbody"></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -3694,8 +4248,9 @@ const workbenchSectionMeta = {
   'biz-dashboard': { title: '数据分析', summary: '整体承接 Admin 的数据分析结构，但口径只保留当前大V租户自己的转化漏斗、渠道质量、协同效能、营收趋势和用户分层。' },
   'forecast-model': { title: '预测模型', summary: '展示目标价是怎么计算出来的，并允许在后台调整自动收敛参数。' },
   review: { title: '复盘生产台', summary: '按周期、三类输入方式、智能文案规则和预览发布流程组织复盘生产。' },
-  knowledge: { title: '知识库微调', summary: '历史知识内容可继续弹框微调，修改后重新同步 Hermes 和知识专区。' },
-  hermes: { title: 'Hermes 工作台', summary: '统一管理工作区版和龙虾纯对话版的产品口径、skills 和知识绑定。' },
+  knowledge: { title: '知识专区', summary: '统一管理当前租户的知识入库、知识图谱、历史微调和知识检索效果。' },
+  'knowledge-graph': { title: '知识图谱', summary: '独立查看当前租户真正的知识对象图谱：主题、实体、方法、观点和验证信号，不再把原始录入素材直接当成主节点。' },
+  hermes: { title: 'Hermes 管理', summary: '按当前租户查看 Hermes 记忆治理、工具动作统计和算力消耗，不再展示旧的工作台介绍壳。' },
   watchlist: { title: '自选股与详情', summary: '承接 H5 的顶部输代码、自选股详情和 K 线 + MA5/10/20 展示逻辑。' },
   dashboard: { title: '智能 Dashboard', summary: 'Dashboard 是智能化定义模式：通过提示词、布局和指标规则生成面板，再发布到前台，不等同于门户装修。' },
   'indicator-overview': { title: '指标专区 · 总览控制台', summary: '先看总体状态、风险分布和跟踪优先级，再进入更细的指标分组。' },
@@ -3716,6 +4271,16 @@ let kwDashboardCellDraftMode = 'market';
 let kwDashboardCellDraftComponents = [];
 let kwDashboardCellDraftPrompt = '';
 let kwDashboardCellDragIndex = -1;
+const kwHermesMemoryState = {
+  loaded: false,
+  loading: false,
+  summary: null,
+  preview: null,
+};
+const kwHermesUsageState = {
+  loading: false,
+  stats: null,
+};
 const KW_DASHBOARD_MODES = [
   {
     id: 'market',
@@ -5684,10 +6249,11 @@ const KW_REVIEW_PROMPT_TAGS = ['更口语化', '保留原文不改写', '强调�
 let kwReviewDraft = {
   period: 'day',
   sourceMode: 'voice',
-  paragraphMode: 'ai',
-  skipAiProcessing: false,
+  paragraphMode: 'manual',
+  skipAiProcessing: true,
+  flowStage: 'intake',
+  optimizeRuleMode: 'default',
   useVoiceLlmEnhancement: true,
-  useInputPolish: true,
   selectedWatchlist: [],
   selectedCardIds: [],
   selectedKnowledgeIds: [],
@@ -5702,12 +6268,15 @@ let kwReviewDraft = {
   urlText: '',
   aiPrompt: '',
   promptTags: [],
-  polishedInputText: '',
-  finalDraftText: '',
   generatedPreviewText: '',
+  draftReviewText: '',
+  finalDraftText: '',
   previewReady: false,
 };
 const kwReviewRuntimeStore = {};
+let kwReviewStructuredPreview = null;
+let kwReviewPreviewGenerating = false;
+let kwReviewPreviewJobState = null;
 const KW_KNOWLEDGE_INPUT_TYPES = {
   voice: {
     label: '语音输入',
@@ -5746,6 +6315,7 @@ let kwKnowledgeStore = [];
 let kwKnowledgeDraft = { title: '', summary: '', rawInput: '', rawHtml: '', notes: '', notesHtml: '', url: '', processingMode: 'algorithm', useVoiceLlmEnhancement: true };
 let kwKnowledgeEditingId = '';
 let kwKnowledgeIntakeType = 'voice';
+let kwKnowledgeMapState = { loaded: false, payload: null, depth: 3, defaultDepth: 3, type: 'all', query: '', selectedNodeId: '', centerNodeId: '' };
 let kwKnowledgeRecording = false;
 let kwKnowledgeUploadSamples = [];
 let kwKnowledgeUploadBodies = [];
@@ -5965,6 +6535,365 @@ function buildKwKnowledgeDraft(entry) {
     url: entry && entry.url ? entry.url : '',
     useVoiceLlmEnhancement: entry && Object.prototype.hasOwnProperty.call(entry, 'use_voice_llm_enhancement') ? !!entry.use_voice_llm_enhancement : true,
   };
+}
+
+function kwKnowledgeTypeLabel(type) {
+  const normalized = String(type || '').trim().toLowerCase();
+  if (normalized === 'voice') return '语音资料';
+  if (normalized === 'file') return '文件资料';
+  if (normalized === 'url') return '网页资料';
+  return '手写观点';
+}
+
+function kwOpenLatestKnowledgeEntryEditor() {
+  initializeKwKnowledgeStore();
+  const latestEntry = Array.isArray(kwKnowledgeStore) && kwKnowledgeStore.length ? kwKnowledgeStore[0] : null;
+  if (!latestEntry || !latestEntry.id) {
+    showToast('当前还没有历史知识可微调');
+    return;
+  }
+  kwOpenKnowledgeEntryEditor(latestEntry.id);
+}
+
+function kwKnowledgeMapKindLabel(kind) {
+  if (kind === 'root') return '租户根节点';
+  if (kind === 'topic') return '主题';
+  if (kind === 'entity') return '实体';
+  if (kind === 'method') return '方法';
+  if (kind === 'claim') return '观点';
+  if (kind === 'signal') return '验证信号';
+  return '知识节点';
+}
+
+function kwKnowledgeMapNodeWidth(kind) {
+  if (kind === 'root') return 168;
+  if (kind === 'claim') return 192;
+  if (kind === 'signal') return 132;
+  return 142;
+}
+
+function kwHandleKnowledgeMapSearch(value) {
+  kwKnowledgeMapState.query = String(value || '').trim();
+  kwRenderKnowledgeMap();
+}
+
+function kwHandleKnowledgeMapTypeChange(value) {
+  kwKnowledgeMapState.type = value || 'all';
+  kwRenderKnowledgeMap();
+}
+
+function kwAdjustKnowledgeMapDepth(delta) {
+  const payload = kwKnowledgeMapState.payload || {};
+  const maxDepth = Number(payload.max_depth || 4);
+  kwKnowledgeMapState.depth = Math.max(2, Math.min(maxDepth, Number(kwKnowledgeMapState.depth || payload.default_depth || 3) + Number(delta || 0)));
+  kwRenderKnowledgeMap();
+}
+
+function kwExpandKnowledgeMapAll() {
+  const payload = kwKnowledgeMapState.payload || {};
+  kwKnowledgeMapState.depth = Number(payload.max_depth || 4);
+  kwRenderKnowledgeMap();
+}
+
+function kwCollapseKnowledgeMap() {
+  const payload = kwKnowledgeMapState.payload || {};
+  kwKnowledgeMapState.depth = Number(payload.default_depth || 3);
+  kwRenderKnowledgeMap();
+}
+
+function kwSelectKnowledgeMapNode(nodeId) {
+  kwKnowledgeMapState.selectedNodeId = nodeId || '';
+  kwKnowledgeMapState.centerNodeId = nodeId || '';
+  kwRenderKnowledgeMap();
+}
+
+function kwOpenKnowledgeMapSource(entryId) {
+  if (!entryId) return;
+  showWorkbenchSection('knowledge', document.querySelector('.admin-nav-item[data-section="knowledge"]'));
+  kwOpenKnowledgeEntryEditor(entryId);
+}
+
+function kwGetKnowledgeMapNodeRelations(nodeId) {
+  const payload = kwKnowledgeMapState.payload || {};
+  const nodes = Array.isArray(payload.nodes) ? payload.nodes : [];
+  const edges = Array.isArray(payload.edges) ? payload.edges : [];
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+  const parents = [];
+  const children = [];
+  edges.forEach((edge) => {
+    if (edge.to === nodeId && nodeMap.has(edge.from)) parents.push(nodeMap.get(edge.from));
+    if (edge.from === nodeId && nodeMap.has(edge.to)) children.push(nodeMap.get(edge.to));
+  });
+  return {
+    parents: parents.filter(Boolean).slice(0, 8),
+    children: children.filter(Boolean).slice(0, 8),
+  };
+}
+
+function kwCenterKnowledgeMapNode(nodeId, positions) {
+  const shell = document.querySelector('.kw-kg-board-shell');
+  const point = positions && positions[nodeId];
+  if (!shell || !point) return;
+  shell.scrollTo({
+    left: Math.max(0, Math.round(point.x - shell.clientWidth / 2)),
+    top: Math.max(0, Math.round(point.y - shell.clientHeight / 2)),
+    behavior: 'smooth',
+  });
+}
+
+function kwGetFilteredKnowledgeMapPayload() {
+  const payload = kwKnowledgeMapState.payload || {};
+  const allNodes = Array.isArray(payload.nodes) ? payload.nodes : [];
+  const allEdges = Array.isArray(payload.edges) ? payload.edges : [];
+  const depth = Math.max(2, Math.min(Number(payload.max_depth || 4), Number(kwKnowledgeMapState.depth || payload.default_depth || 3)));
+  const type = kwKnowledgeMapState.type || 'all';
+  const query = String(kwKnowledgeMapState.query || '').trim().toLowerCase();
+  const depthNodes = allNodes.filter((node) => Number(node.level || 99) <= depth);
+  const visibleIds = new Set();
+  const matches = [];
+  depthNodes.forEach((node) => {
+    const kind = String(node.kind || '').trim();
+    if (kind !== 'root' && type !== 'all' && kind !== type) {
+      return;
+    }
+    const haystack = [
+      node.label,
+      node.full_label,
+      node.summary,
+      Array.isArray(node.keywords) ? node.keywords.join(' ') : '',
+    ].join(' ').toLowerCase();
+    if (query && !haystack.includes(query)) {
+      return;
+    }
+    visibleIds.add(node.id);
+    matches.push(node.id);
+  });
+  const rootNode = depthNodes.find((node) => node.kind === 'root');
+  if (rootNode) visibleIds.add(rootNode.id);
+  if (query) {
+    allEdges.forEach((edge) => {
+      if (visibleIds.has(edge.from) || visibleIds.has(edge.to)) {
+        visibleIds.add(edge.from);
+        visibleIds.add(edge.to);
+      }
+    });
+  } else if (type !== 'all') {
+    allEdges.forEach((edge) => {
+      if (visibleIds.has(edge.to)) visibleIds.add(edge.from);
+    });
+  } else {
+    depthNodes.forEach((node) => visibleIds.add(node.id));
+  }
+  const nodes = depthNodes.filter((node) => visibleIds.has(node.id));
+  const edges = allEdges.filter((edge) => visibleIds.has(edge.from) && visibleIds.has(edge.to));
+  return { payload, nodes, edges, depth, rootNode: rootNode || null };
+}
+
+function kwRenderKnowledgeMapDetail(node) {
+  const host = document.getElementById('kw-kg-detail');
+  if (!host) return;
+  if (!node) {
+    host.innerHTML = '<div class="kw-kg-detail-empty">点击图谱节点后，这里查看知识摘要、QKV 和来源证据。</div>';
+    return;
+  }
+  const qkv = node.qkv || {};
+  const keywords = Array.isArray(node.keywords) ? node.keywords : [];
+  const sources = Array.isArray(node.source_entries) ? node.source_entries : [];
+  const relations = kwGetKnowledgeMapNodeRelations(node.id);
+  host.innerHTML = `
+    <div class="kw-kg-detail-kicker">${escapeHtml(kwKnowledgeMapKindLabel(node.kind || ''))}</div>
+    <div class="kw-kg-detail-title">${escapeHtml(node.full_label || node.label || '')}</div>
+    <div class="kw-kg-detail-summary">${escapeHtml(node.summary || '当前节点暂无摘要。')}</div>
+    ${keywords.length ? `<div class="kw-kg-chip-row">${keywords.slice(0, 10).map((item) => `<span class="kw-kg-chip">${escapeHtml(item)}</span>`).join('')}</div>` : ''}
+    <div class="kw-kg-detail-section">
+      <div class="kw-kg-detail-section-title">图谱关系</div>
+      <div class="kw-kg-detail-list">
+        <div class="kw-kg-detail-item">
+          <div class="kw-kg-detail-item-title">上游节点</div>
+          <div class="kw-kg-detail-item-meta">${relations.parents.length ? relations.parents.map((item) => escapeHtml(item.full_label || item.label || '')).join(' / ') : '当前节点位于最上层，暂无上游关系。'}</div>
+        </div>
+        <div class="kw-kg-detail-item">
+          <div class="kw-kg-detail-item-title">下游节点</div>
+          <div class="kw-kg-detail-item-meta">${relations.children.length ? relations.children.map((item) => escapeHtml(item.full_label || item.label || '')).join(' / ') : '当前节点暂无继续展开的下游关系。'}</div>
+        </div>
+        <div class="kw-kg-detail-item">
+          <div class="kw-kg-detail-item-title">来源规模</div>
+          <div class="kw-kg-detail-item-meta">当前节点关联 ${Number(node.source_count || sources.length || 0)} 条知识来源。</div>
+        </div>
+      </div>
+    </div>
+    <div class="kw-kg-detail-section">
+      <div class="kw-kg-detail-section-title">QKV 视角</div>
+      <div class="kw-kg-detail-list">
+        ${(Array.isArray(qkv.questions) ? qkv.questions : []).slice(0, 2).map((item) => `<div class="kw-kg-detail-item"><div class="kw-kg-detail-item-title">Q</div><div class="kw-kg-detail-item-meta">${escapeHtml(item)}</div></div>`).join('')}
+        ${(Array.isArray(qkv.values) ? qkv.values : []).slice(0, 2).map((item) => `<div class="kw-kg-detail-item"><div class="kw-kg-detail-item-title">V</div><div class="kw-kg-detail-item-meta">${escapeHtml(item)}</div></div>`).join('') || '<div class="kw-kg-detail-item"><div class="kw-kg-detail-item-title">V</div><div class="kw-kg-detail-item-meta">当前节点暂无可展示的知识值。</div></div>'}
+      </div>
+    </div>
+    <div class="kw-kg-detail-section">
+      <div class="kw-kg-detail-section-title">来源证据</div>
+      <div class="kw-kg-detail-list">
+        ${sources.length ? sources.slice(0, 5).map((entry) => `
+          <div class="kw-kg-detail-item">
+            <div class="kw-kg-detail-item-title">${escapeHtml(entry.title || '知识条目')}</div>
+            <div class="kw-kg-detail-item-meta">${escapeHtml(entry.summary || '暂无摘要')}${entry.time ? ` · ${escapeHtml(entry.time)}` : ''}</div>
+            <div class="kw-toolbar" style="margin-top:8px">
+              <button class="btn-outline" type="button" style="padding:7px 10px;font-size:11px" onclick="kwOpenKnowledgeMapSource('${escapeAttr(entry.id || '')}')">查看知识详情</button>
+            </div>
+          </div>
+        `).join('') : '<div class="kw-kg-detail-item"><div class="kw-kg-detail-item-meta">当前节点暂无来源证据。</div></div>'}
+      </div>
+    </div>
+  `;
+}
+
+function kwRenderKnowledgeMap() {
+  const board = document.getElementById('kw-kg-board');
+  const stage = document.getElementById('kw-kg-stage');
+  const stats = document.getElementById('kw-kg-stats');
+  const legend = document.getElementById('kw-kg-legend');
+  if (!board || !stage || !stats || !legend) return;
+  if (!kwKnowledgeMapState.payload) {
+    board.innerHTML = '<div class="kw-kg-detail-empty" style="min-height:720px;background:transparent;color:var(--text-sub)">知识图谱尚未加载。</div>';
+    kwRenderKnowledgeMapDetail(null);
+    return;
+  }
+  const filtered = kwGetFilteredKnowledgeMapPayload();
+  const payload = filtered.payload;
+  const maxDepth = Number(payload.max_depth || 4);
+  kwKnowledgeMapState.depth = filtered.depth;
+  kwKnowledgeMapState.defaultDepth = Number(payload.default_depth || 3);
+  stage.textContent = `当前显示 ${filtered.depth} 层 / 共 ${maxDepth} 层。默认优先展示主题、实体、方法和观点，验证信号需要继续展开。`;
+  const statPayload = payload.stats || {};
+  stats.innerHTML = `
+    <div class="kw-kg-stat"><div class="kw-kg-stat-label">知识条目</div><div class="kw-kg-stat-value">${statPayload.artifact_count || 0}</div></div>
+    <div class="kw-kg-stat"><div class="kw-kg-stat-label">主题</div><div class="kw-kg-stat-value">${statPayload.topic_count || 0}</div></div>
+    <div class="kw-kg-stat"><div class="kw-kg-stat-label">实体</div><div class="kw-kg-stat-value">${statPayload.entity_count || 0}</div></div>
+    <div class="kw-kg-stat"><div class="kw-kg-stat-label">方法</div><div class="kw-kg-stat-value">${statPayload.method_count || 0}</div></div>
+    <div class="kw-kg-stat"><div class="kw-kg-stat-label">观点</div><div class="kw-kg-stat-value">${statPayload.claim_count || 0}</div></div>
+    <div class="kw-kg-stat"><div class="kw-kg-stat-label">验证信号</div><div class="kw-kg-stat-value">${statPayload.signal_count || 0}</div></div>
+  `;
+  legend.innerHTML = [
+    ['root', '根节点'],
+    ['topic', '主题'],
+    ['entity', '实体'],
+    ['method', '方法'],
+    ['claim', '观点'],
+    ['signal', '验证信号'],
+  ].map(([kind, label]) => `<span class="kw-kg-legend-chip"><span class="kw-kg-legend-dot kind-${kind}"></span>${escapeHtml(label)}</span>`).join('');
+  if (!filtered.nodes.length) {
+    board.innerHTML = '<div class="kw-kg-detail-empty" style="min-height:720px;background:transparent;color:var(--text-sub)">当前没有匹配的知识对象。可以清空搜索词，或先补充结构化知识内容。</div>';
+    kwRenderKnowledgeMapDetail(null);
+    return;
+  }
+  const shell = document.querySelector('.kw-kg-board-shell');
+  const groups = {};
+  filtered.nodes.forEach((node) => {
+    const level = Number(node.level || 1);
+    if (!groups[level]) groups[level] = [];
+    groups[level].push(node);
+  });
+  Object.keys(groups).forEach((key) => {
+    groups[key].sort((a, b) => String(a.label || '').localeCompare(String(b.label || ''), 'zh-Hans-CN'));
+  });
+  const levelList = Object.keys(groups).map(Number).sort((a, b) => a - b);
+  const perRing = 16;
+  const baseRadius = 140;
+  const levelGap = 110;
+  const ringGap = 56;
+  let maxRadius = 0;
+  levelList.forEach((level) => {
+    if (level <= 1) return;
+    const groupSize = (groups[level] || []).length;
+    const ringIndex = Math.max(0, Math.ceil(groupSize / perRing) - 1);
+    maxRadius = Math.max(maxRadius, baseRadius + (level - 2) * levelGap + ringIndex * ringGap);
+  });
+  const viewportWidth = Math.max(960, shell ? shell.clientWidth : 960);
+  const viewportHeight = Math.max(720, shell ? shell.clientHeight : 720);
+  const width = Math.max(viewportWidth, maxRadius * 2 + 360);
+  const height = Math.max(viewportHeight, maxRadius * 2 + 300);
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const positions = {};
+  levelList.forEach((level) => {
+    const group = groups[level] || [];
+    if (level === 1) {
+      const rootNode = group[0];
+      if (rootNode) positions[rootNode.id] = { x: centerX, y: centerY };
+      return;
+    }
+    group.forEach((node, index) => {
+      const ringIndex = Math.floor(index / perRing);
+      const ringRadius = baseRadius + (level - 2) * levelGap + ringIndex * ringGap;
+      const ringSize = Math.min(perRing, Math.max(group.length - ringIndex * perRing, 1));
+      const angle = ((index % perRing) / ringSize) * Math.PI * 2 - Math.PI / 2;
+      positions[node.id] = {
+        x: centerX + Math.cos(angle) * ringRadius,
+        y: centerY + Math.sin(angle) * ringRadius,
+      };
+    });
+  });
+  const nodeMap = new Map(filtered.nodes.map((node) => [node.id, node]));
+  const edgeMarkup = filtered.edges.map((edge) => {
+    const from = positions[edge.from];
+    const to = positions[edge.to];
+    if (!from || !to) return '';
+    return `<line class="kw-kg-edge" x1="${Math.round(from.x)}" y1="${Math.round(from.y)}" x2="${Math.round(to.x)}" y2="${Math.round(to.y)}"></line>`;
+  }).join('');
+  board.innerHTML = `
+    <svg class="kw-kg-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">${edgeMarkup}</svg>
+    ${filtered.nodes.map((node) => {
+      const pos = positions[node.id] || { x: centerX, y: centerY };
+      return `
+        <button
+          type="button"
+          class="kw-kg-node kind-${escapeAttr(node.kind || 'topic')}${kwKnowledgeMapState.selectedNodeId === node.id ? ' is-active' : ''}"
+          style="left:${Math.round(pos.x)}px;top:${Math.round(pos.y)}px;width:${kwKnowledgeMapNodeWidth(node.kind)}px"
+          data-node-id="${escapeAttr(node.id || '')}"
+        >
+          <div class="kw-kg-node-kind">${escapeHtml(kwKnowledgeMapKindLabel(node.kind || ''))}</div>
+          <div class="kw-kg-node-label">${escapeHtml(node.full_label || node.label || '')}</div>
+        </button>
+      `;
+    }).join('')}
+  `;
+  board.style.width = `${Math.round(width)}px`;
+  board.style.height = `${Math.round(height)}px`;
+  Array.from(board.querySelectorAll('[data-node-id]')).forEach((nodeEl) => {
+    nodeEl.addEventListener('click', () => kwSelectKnowledgeMapNode(nodeEl.getAttribute('data-node-id') || ''));
+  });
+  const activeNode = nodeMap.get(kwKnowledgeMapState.selectedNodeId) || filtered.nodes.find((node) => node.kind === 'root') || filtered.nodes[0];
+  kwKnowledgeMapState.selectedNodeId = activeNode ? activeNode.id : '';
+  kwRenderKnowledgeMapDetail(activeNode || null);
+  const centerTarget = kwKnowledgeMapState.centerNodeId || '';
+  if (centerTarget && positions[centerTarget]) kwCenterKnowledgeMapNode(centerTarget, positions);
+  kwKnowledgeMapState.centerNodeId = '';
+}
+
+async function loadWorkbenchKnowledgeMap(forceMessage = false) {
+  const stage = document.getElementById('kw-kg-stage');
+  if (stage) stage.textContent = '正在加载知识图谱…';
+  try {
+    const tenantSlug = (window.WORKBENCH_DATA && window.WORKBENCH_DATA.tenant && window.WORKBENCH_DATA.tenant.slug) || '';
+    const resp = await fetch(`/api/kol/knowledge-graph?tenant=${encodeURIComponent(tenantSlug)}`);
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'knowledge_graph_load_failed');
+    kwKnowledgeMapState.loaded = true;
+    kwKnowledgeMapState.payload = data.graph || {};
+    kwKnowledgeMapState.depth = Number((data.graph && data.graph.default_depth) || 3);
+    kwKnowledgeMapState.defaultDepth = Number((data.graph && data.graph.default_depth) || 3);
+    if (!kwKnowledgeMapState.selectedNodeId) {
+      kwKnowledgeMapState.selectedNodeId = String((data.graph && data.graph.root_id) || '');
+      kwKnowledgeMapState.centerNodeId = kwKnowledgeMapState.selectedNodeId;
+    }
+    kwRenderKnowledgeMap();
+    if (forceMessage) showToast('知识图谱已刷新');
+  } catch (error) {
+    if (stage) stage.textContent = '知识图谱加载失败，当前无法展示。';
+    const board = document.getElementById('kw-kg-board');
+    if (board) board.innerHTML = '<div class="kw-kg-detail-empty" style="min-height:720px;background:transparent;color:var(--text-sub)">知识图谱加载失败。请稍后重试，或先检查知识条目是否已成功同步。</div>';
+    kwRenderKnowledgeMapDetail(null);
+    showToast(error.message || '知识图谱加载失败');
+  }
 }
 
 function kwRenderKnowledgeList() {
@@ -6823,6 +7752,79 @@ function kwGetReviewDraftContentText() {
   return String(temp.textContent || '').trim();
 }
 
+function kwNormalizeReviewStructuredPreview(payload) {
+  const source = payload && typeof payload === 'object' ? payload : {};
+  const userInputSection = source.user_input_section && typeof source.user_input_section === 'object'
+    ? { ...source.user_input_section }
+    : {};
+  const watchlistAnalysisSection = source.watchlist_analysis_section && typeof source.watchlist_analysis_section === 'object'
+    ? { ...source.watchlist_analysis_section }
+    : {};
+  return {
+    ...source,
+    review_summary: String(source.review_summary || '').trim(),
+    user_input_section: {
+      source_mode: String(userInputSection.source_mode || kwReviewDraft.sourceMode || 'manual').trim().toLowerCase() || 'manual',
+      source_mode_label: String(userInputSection.source_mode_label || (KW_REVIEW_SOURCE_OPTIONS.find((item) => item.value === kwReviewDraft.sourceMode) || {}).label || '用户输入').trim(),
+      display_text: String(userInputSection.display_text || kwReviewDraft.draftReviewText || kwReviewDraft.generatedPreviewText || kwGetReviewDraftContentText()).trim(),
+      summary_source: String(userInputSection.summary_source || 'llm_user_input_only').trim(),
+    },
+    watchlist_analysis_section: {
+      sector_summary: String(watchlistAnalysisSection.sector_summary || '').trim(),
+      sector_profiles: Array.isArray(watchlistAnalysisSection.sector_profiles) ? watchlistAnalysisSection.sector_profiles.map((item) => ({
+        sector: String((item || {}).sector || '').trim(),
+        stock_names: Array.isArray((item || {}).stock_names) ? item.stock_names.slice(0) : [],
+        representative_description: String((item || {}).representative_description || '').trim(),
+      })) : [],
+      items: Array.isArray(watchlistAnalysisSection.items) ? watchlistAnalysisSection.items.map((item) => ({
+        stock_name: String((item || {}).stock_name || '').trim(),
+        stock_code: String((item || {}).stock_code || '').trim(),
+        sector: String((item || {}).sector || '').trim(),
+        board_role: String((item || {}).board_role || '').trim(),
+        analysis_text: String((item || {}).analysis_text || '').trim(),
+        evidence: Array.isArray((item || {}).evidence) ? item.evidence.slice(0) : [],
+      })) : [],
+    },
+    llm_models: Array.isArray(source.llm_models) ? source.llm_models.slice(0) : [],
+  };
+}
+
+function kwBuildReviewWatchlistAnalysisText(section) {
+  const payload = section && typeof section === 'object' ? section : {};
+  const parts = [];
+  const sectorSummary = String(payload.sector_summary || '').trim();
+  if (sectorSummary) parts.push(`板块归纳：${sectorSummary}`);
+  const sectorProfiles = Array.isArray(payload.sector_profiles) ? payload.sector_profiles : [];
+  if (sectorProfiles.length) {
+    parts.push('板块代表性：');
+    sectorProfiles.forEach((item) => {
+      const label = String((item || {}).sector || '').trim();
+      const text = String((item || {}).representative_description || '').trim();
+      if (label || text) parts.push(`- ${label}：${text}`);
+    });
+  }
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  if (items.length) {
+    parts.push('逐股归纳：');
+    items.forEach((item) => {
+      const name = String((item || {}).stock_name || '').trim();
+      const sector = String((item || {}).sector || '').trim();
+      const body = String((item || {}).analysis_text || '').trim();
+      if (name || body) parts.push(`- ${name}${sector ? `（${sector}）` : ''}：${body}`);
+    });
+  }
+  return parts.join('\n').trim();
+}
+
+function kwBuildReviewStructuredFinalText(payload) {
+  const normalized = kwNormalizeReviewStructuredPreview(payload);
+  return [
+    normalized.review_summary ? `【摘要】\n${normalized.review_summary}` : '',
+    normalized.user_input_section.display_text ? `【用户复盘】\n${normalized.user_input_section.display_text}` : '',
+    kwBuildReviewWatchlistAnalysisText(normalized.watchlist_analysis_section) ? `【自选股归纳总结】\n${kwBuildReviewWatchlistAnalysisText(normalized.watchlist_analysis_section)}` : '',
+  ].filter(Boolean).join('\n\n').trim();
+}
+
 function kwToggleReviewVoiceLlmEnhancement(checked) {
   kwReviewDraft.useVoiceLlmEnhancement = !!checked;
   kwRenderReviewStudio();
@@ -6833,13 +7835,19 @@ function kwToggleKnowledgeVoiceLlmEnhancement(checked) {
 }
 
 function kwGetReviewPreviewText() {
+  if (kwReviewStructuredPreview) {
+    return kwBuildReviewStructuredFinalText(kwReviewStructuredPreview);
+  }
   if (String(kwReviewDraft.finalDraftText || '').trim()) {
     return String(kwReviewDraft.finalDraftText || '').trim();
   }
-  if (kwReviewDraft.paragraphMode === 'manual') {
-    return kwGetReviewDraftContentText();
-  }
-  return String(kwReviewDraft.generatedPreviewText || '').trim() || kwGetReviewDraftContentText();
+  return String(kwReviewDraft.draftReviewText || '').trim()
+    || String(kwReviewDraft.generatedPreviewText || '').trim()
+    || kwGetReviewDraftContentText();
+}
+
+function kwGetReviewUserInputDisplayText() {
+  return String(kwReviewDraft.draftReviewText || '').trim() || kwGetReviewDraftContentText();
 }
 
 let kwReviewVoiceRecorder = null;
@@ -6849,7 +7857,6 @@ let kwReviewVoiceUploading = false;
 let kwReviewIngestResult = null;
 let kwReviewDraftGenerating = false;
 let kwReviewDraftJobState = null;
-let kwReviewJobMode = '';
 let kwKnowledgeVoiceRecorder = null;
 let kwKnowledgeVoiceChunks = [];
 let kwKnowledgeVoiceUploading = false;
@@ -6879,6 +7886,57 @@ async function kwGenerateReviewDraftWithLlm() {
   return data;
 }
 
+async function kwRequestReviewStructuredPreview() {
+  const tenant = window.ACTIVE_TENANT || {};
+  const resp = await fetch('/api/review/prepare-preview', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      tenant_slug: tenant.slug || '',
+      period: kwReviewDraft.period || 'day',
+      source_mode: kwReviewDraft.sourceMode || 'voice',
+      source_text: kwGetReviewUserInputDisplayText(),
+      selected_watchlist: kwReviewDraft.selectedWatchlist || [],
+      speaker_name: tenant.advisor || '',
+      entry_point: 'workbench_review_preview',
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    throw new Error((data && data.error) || 'review_prepare_preview_failed');
+  }
+  return data;
+}
+
+function kwHasConfiguredGeneralLlm() {
+  const registry = (window.SITE_CONFIG && window.SITE_CONFIG.llm_registry) || {};
+  const models = Array.isArray(registry.models) ? registry.models : [];
+  const defaultKey = String(registry.default_model_key || '').trim();
+  if (!models.length) return false;
+  if (defaultKey) {
+    return models.some((item) => item && item.enabled !== false && String(item.key || '').trim() === defaultKey);
+  }
+  return models.some((item) => item && item.enabled !== false && String(item.purpose || 'general').trim().toLowerCase() === 'general');
+}
+
+function kwGetReviewDraftGenerationErrorMessage(error) {
+  const raw = String((error && error.message) || '').trim();
+  if (!raw) return '智能优化失败，请稍后重试';
+  if (raw.includes('review_draft_llm_not_configured')) {
+    return '当前还没有配置可用的大模型。请先到 Admin 的系统专区 · 大模型专区配置一个通用模型。';
+  }
+  if (raw.includes('llm_api_key_missing')) {
+    return '大模型 API Key 未配置，请先到 Admin 的系统专区 · 大模型专区补全。';
+  }
+  if (raw.includes('llm_request_failed')) {
+    return '大模型调用失败，请检查模型配置、Base URL 或网络连通性。';
+  }
+  if (raw.includes('review_prepare_preview_failed')) {
+    return '摘要与自选股归纳总结生成失败，请稍后重试。';
+  }
+  return raw;
+}
+
 function kwFormatReviewJobStage(stage) {
   const map = {
     queued: '已进入队列',
@@ -6892,15 +7950,16 @@ function kwFormatReviewJobStage(stage) {
 }
 
 function kwRenderReviewDraftProgressPanel() {
-  if (!kwReviewDraftGenerating && !kwReviewDraftJobState) return '';
-  const job = kwReviewDraftJobState || {};
+  if (!kwReviewDraftGenerating && !kwReviewDraftJobState && !kwReviewPreviewGenerating && !kwReviewPreviewJobState) return '';
+  const isStructured = kwReviewPreviewGenerating || kwReviewDraft.flowStage === 'preview_generating';
+  const job = isStructured ? (kwReviewPreviewJobState || {}) : (kwReviewDraftJobState || {});
   const percent = Math.max(5, Number(job.progress_percent || 0) || 0);
   const logs = Array.isArray(job.result && job.result.live_log) ? job.result.live_log.slice(-4).reverse() : [];
   return `
     <div class="kw-review-progress-panel">
       <div class="kw-review-progress-head">
         <div>
-          <div class="kw-review-progress-title">大模型正在生成复盘草稿</div>
+          <div class="kw-review-progress-title">${isStructured ? '大模型正在生成摘要与自选股归纳总结' : '大模型正在生成用户复盘 Draft'}</div>
           <div class="kw-review-progress-subtitle">${escapeHtml(job.summary || '后台仍在工作中，当前会持续展示处理阶段与最新进展。')}</div>
         </div>
         <div class="kw-review-progress-percent">${escapeHtml(String(percent))}%</div>
@@ -7102,10 +8161,8 @@ async function kwPublishReviewContentEmbedding(text, transcriptionEngine, transc
       data_sources: kwGetReviewSelectedCards().flatMap(item => Array.isArray(item.data_sources) ? item.data_sources : []),
       news_sources: kwGetReviewSelectedCards().flatMap(item => Array.isArray(item.news_sources) ? item.news_sources : []),
       llm_models: [
-        kwReviewIngestResult && kwReviewIngestResult.review_polish_llm ? { stage: 'polish', ...kwReviewIngestResult.review_polish_llm } : null,
         kwReviewIngestResult && kwReviewIngestResult.review_draft_llm ? { stage: 'compose', ...kwReviewIngestResult.review_draft_llm } : null,
       ].filter(Boolean),
-      polished_input_text: kwReviewDraft.polishedInputText || '',
     }),
   });
   const data = await resp.json();
@@ -7207,7 +8264,7 @@ function kwApplyReviewCardPicker() {
 
 function kwUseCurrentReviewDraftAsFinal() {
   kwSyncReviewTextInputs();
-  kwReviewDraft.finalDraftText = String(kwReviewDraft.generatedPreviewText || kwReviewDraft.polishedInputText || kwGetReviewDraftContentText() || '').trim();
+  kwReviewDraft.finalDraftText = String(kwGetReviewPreviewText() || kwReviewDraft.generatedPreviewText || kwGetReviewDraftContentText() || '').trim();
   const editor = document.getElementById('kw-review-final-editor');
   if (editor) editor.value = kwReviewDraft.finalDraftText;
 }
@@ -7262,175 +8319,275 @@ function kwCaptureReviewFileInput() {
   input.click();
 }
 
-async function kwPolishReviewInput() {
-  kwSyncReviewDraftFromModal();
-  kwSyncReviewTextInputs();
-  const sourceText = kwGetReviewDraftContentText();
-  if (!sourceText) {
-    showToast('请先补充输入内容');
-    return;
-  }
-  const tenant = window.ACTIVE_TENANT || {};
-  kwReviewJobMode = 'polish';
-  kwReviewDraftGenerating = true;
-  kwReviewDraftJobState = {
-    status: 'running',
-    progress_stage: 'queued',
-    progress_percent: 4,
-    summary: '已提交输入润色任务，正在进入大模型队列',
-    result: { live_log: [] },
-  };
-  kwRenderReviewStudio();
-  try {
-    const resp = await fetch('/api/review/polish-input', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        tenant_slug: tenant.slug || '',
-        period: kwReviewDraft.period || 'day',
-        source_mode: kwReviewDraft.sourceMode || 'manual',
-        source_text: sourceText,
-        speaker_name: tenant.advisor || '',
-        entry_point: 'workbench_review_polish',
-      }),
-    });
-    const data = await resp.json();
-    if (!resp.ok || !data.ok || !data.job_code) throw new Error((data && data.error) || 'review_input_polish_failed');
-    kwStartAsyncJobPolling(data.job_code, {
-      onProgress(job) {
-        kwReviewDraftJobState = job || kwReviewDraftJobState;
-        kwRenderReviewStudio();
-      },
-      onSuccess(job) {
-        const result = job.result || {};
-        kwReviewDraft.polishedInputText = result.text || '';
-        kwReviewIngestResult = { ...(kwReviewIngestResult || {}), review_polish_llm: result.llm_model || null };
-        kwReviewDraftGenerating = false;
-        kwReviewDraftJobState = null;
-        kwReviewJobMode = '';
-        kwRenderReviewStudio();
-      },
-      onFailed(job) {
-        kwReviewDraftGenerating = false;
-        kwReviewDraftJobState = null;
-        kwReviewJobMode = '';
-        kwRenderReviewStudio();
-        showToast(job.error_message || job.summary || '输入润色失败');
-      },
-      onError(error) {
-        kwReviewDraftGenerating = false;
-        kwReviewDraftJobState = null;
-        kwReviewJobMode = '';
-        kwRenderReviewStudio();
-        showToast(error.message || '输入润色失败');
-      },
-    });
-  } catch (error) {
-    kwReviewDraftGenerating = false;
-    kwReviewDraftJobState = null;
-    kwReviewJobMode = '';
-    kwRenderReviewStudio();
-    showToast(error.message || '输入润色失败');
-  }
-}
-
-async function kwComposeReviewDraft() {
-  kwSyncReviewDraftFromModal();
-  kwSyncReviewTextInputs();
-  const tenant = window.ACTIVE_TENANT || {};
-  const sourceText = String(kwReviewDraft.polishedInputText || kwGetReviewDraftContentText() || '').trim();
-  if (!sourceText) {
-    showToast('请先补充输入内容');
-    return;
-  }
-  if (!(kwReviewDraft.selectedCardIds || []).length && !(kwReviewDraft.selectedKnowledgeIds || []).length) {
-    showToast('请先至少选择一张智能卡片或一份知识材料');
-    return;
-  }
-  kwReviewJobMode = 'compose';
-  kwReviewDraftGenerating = true;
-  kwReviewDraftJobState = {
-    status: 'running',
-    progress_stage: 'queued',
-    progress_percent: 4,
-    summary: '已提交完整成稿任务，正在进入大模型队列',
-    result: { live_log: [] },
-  };
-  kwRenderReviewStudio();
-  try {
-    const resp = await fetch('/api/review/compose-draft', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        tenant_slug: tenant.slug || '',
-        period: kwReviewDraft.period || 'day',
-        source_text: sourceText,
-        prompt_text: kwReviewDraft.aiPrompt || '',
-        prompt_tags: kwReviewDraft.promptTags || [],
-        selected_watchlist: kwReviewDraft.selectedWatchlist || [],
-        dashboard_cards: kwGetReviewSelectedCards(),
-        knowledge_items: kwGetReviewSelectedKnowledge().map((item) => ({
-          id: item.id || '',
-          title: item.title || '',
-          summary: item.summary || '',
-          body: item.body || item.raw_input || '',
-          raw_input: item.raw_input || item.body || '',
-          source_detail: item.source_detail || item.source || '',
-          url: item.url || '',
-          tags: item.tags || [],
-        })),
-        speaker_name: tenant.advisor || '',
-        entry_point: 'workbench_review_compose',
-      }),
-    });
-    const data = await resp.json();
-    if (!resp.ok || !data.ok || !data.job_code) throw new Error((data && data.error) || 'review_compose_draft_failed');
-    kwStartAsyncJobPolling(data.job_code, {
-      onProgress(job) {
-        kwReviewDraftJobState = job || kwReviewDraftJobState;
-        kwRenderReviewStudio();
-      },
-      onSuccess(job) {
-        const result = job.result || {};
-        kwReviewDraft.generatedPreviewText = result.text || '';
-        kwReviewDraft.finalDraftText = result.text || '';
-        kwReviewDraft.previewReady = true;
-        kwReviewIngestResult = { ...(kwReviewIngestResult || {}), review_draft_llm: result.llm_model || null };
-        kwReviewDraftGenerating = false;
-        kwReviewDraftJobState = null;
-        kwReviewJobMode = '';
-        kwRenderReviewStudio();
-      },
-      onFailed(job) {
-        kwReviewDraftGenerating = false;
-        kwReviewDraftJobState = null;
-        kwReviewJobMode = '';
-        kwRenderReviewStudio();
-        showToast(job.error_message || job.summary || '完整成稿失败');
-      },
-      onError(error) {
-        kwReviewDraftGenerating = false;
-        kwReviewDraftJobState = null;
-        kwReviewJobMode = '';
-        kwRenderReviewStudio();
-        showToast(error.message || '完整成稿失败');
-      },
-    });
-  } catch (error) {
-    kwReviewDraftGenerating = false;
-    kwReviewDraftJobState = null;
-    kwReviewJobMode = '';
-    kwRenderReviewStudio();
-    showToast(error.message || '完整成稿失败');
-  }
-}
-
 function kwSyncReviewDraftFromModal() {
   const promptInput = document.getElementById('kw-review-ai-prompt-input');
+  const draftReviewInput = document.getElementById('kw-review-draft-review-input');
+  const structuredSummaryInput = document.getElementById('kw-review-structured-summary-input');
+  const structuredUserInput = document.getElementById('kw-review-structured-user-input');
+  const structuredSectorSummary = document.getElementById('kw-review-structured-sector-summary');
   const skipAiInput = document.getElementById('kw-review-skip-ai-processing');
   kwSyncReviewDraftFromEditors();
+  kwSyncReviewTextInputs();
   if (promptInput) kwReviewDraft.aiPrompt = promptInput.value;
   if (skipAiInput) kwReviewDraft.skipAiProcessing = !!skipAiInput.checked;
+  if (draftReviewInput) kwReviewDraft.draftReviewText = draftReviewInput.value;
+  if (structuredSummaryInput || structuredUserInput || structuredSectorSummary) {
+    kwReviewStructuredPreview = kwNormalizeReviewStructuredPreview(kwReviewStructuredPreview || {});
+    if (structuredSummaryInput) kwReviewStructuredPreview.review_summary = structuredSummaryInput.value;
+    if (structuredUserInput) {
+      kwReviewStructuredPreview.user_input_section = kwReviewStructuredPreview.user_input_section || {};
+      kwReviewStructuredPreview.user_input_section.display_text = structuredUserInput.value;
+      kwReviewDraft.draftReviewText = structuredUserInput.value;
+    }
+    if (structuredSectorSummary) {
+      kwReviewStructuredPreview.watchlist_analysis_section = kwReviewStructuredPreview.watchlist_analysis_section || {};
+      kwReviewStructuredPreview.watchlist_analysis_section.sector_summary = structuredSectorSummary.value;
+    }
+    const itemNodes = Array.from(document.querySelectorAll('[data-kw-review-watchlist-analysis-index]'));
+    const items = ((kwReviewStructuredPreview.watchlist_analysis_section || {}).items || []);
+    itemNodes.forEach((node) => {
+      const index = Number(node.getAttribute('data-kw-review-watchlist-analysis-index'));
+      if (!Number.isInteger(index) || !items[index]) return;
+      items[index].analysis_text = node.value;
+    });
+  }
+}
+
+function kwValidateReviewIntakeReady(requireMaterials = false) {
+  kwSyncReviewDraftFromModal();
+  if (!kwReviewDraft.selectedWatchlist.length) {
+    showToast('请先至少选择 1 只自选股');
+    return false;
+  }
+  if (!kwGetReviewDraftContentText()) {
+    showToast('请先补充输入内容');
+    return false;
+  }
+  if (requireMaterials && !(kwReviewDraft.selectedCardIds || []).length && !(kwReviewDraft.selectedKnowledgeIds || []).length) {
+    showToast('请先至少选择一张智能卡片或一份知识材料');
+    return false;
+  }
+  return true;
+}
+
+function kwOpenReviewOptimizeRuleStep() {
+  if (!kwValidateReviewIntakeReady()) return;
+  kwReviewDraft.flowStage = 'optimize_rule';
+  kwReviewDraft.paragraphMode = 'ai';
+  kwReviewDraft.skipAiProcessing = false;
+  kwReviewDraft.previewReady = false;
+  kwReviewStructuredPreview = null;
+  kwRenderReviewStudio();
+}
+
+function kwBackToReviewIntake() {
+  kwSyncReviewDraftFromModal();
+  kwReviewDraft.flowStage = 'intake';
+  kwReviewDraft.previewReady = false;
+  kwReviewStructuredPreview = null;
+  kwRenderReviewStudio();
+}
+
+function kwBackToReviewDraftEdit() {
+  kwSyncReviewDraftFromModal();
+  kwReviewDraft.previewReady = false;
+  if (kwReviewDraft.flowStage === 'preview' && kwReviewStructuredPreview) {
+    kwReviewDraft.flowStage = 'structured_review';
+  } else {
+    kwReviewStructuredPreview = null;
+    kwReviewDraft.flowStage = kwReviewDraft.generatedPreviewText ? 'draft_review' : 'intake';
+  }
+  kwRenderReviewStudio();
+}
+
+function kwConfirmReviewDraftToPreview() {
+  kwSyncReviewDraftFromModal();
+  if (!String(kwReviewDraft.draftReviewText || '').trim()) {
+    showToast('请先确认或填写 Draft 正文');
+    return;
+  }
+  kwReviewDraft.paragraphMode = 'ai';
+  kwReviewDraft.skipAiProcessing = false;
+  kwPrepareReviewStructuredPreview();
+}
+
+function kwConfirmStructuredReviewToPreview() {
+  kwSyncReviewDraftFromModal();
+  kwReviewStructuredPreview = kwNormalizeReviewStructuredPreview(kwReviewStructuredPreview || {});
+  if (!String(kwReviewStructuredPreview.review_summary || '').trim()) {
+    showToast('请先确认或填写摘要');
+    return;
+  }
+  if (!String((((kwReviewStructuredPreview.user_input_section || {}).display_text) || '')).trim()) {
+    showToast('请先确认或填写用户复盘');
+    return;
+  }
+  kwReviewDraft.previewReady = true;
+  kwReviewDraft.flowStage = 'preview';
+  kwReviewDraft.finalDraftText = kwBuildReviewStructuredFinalText(kwReviewStructuredPreview);
+  kwRenderReviewStudio();
+  showToast('已进入最终预览');
+}
+
+function kwPrepareReviewDirectPreview() {
+  if (!kwValidateReviewIntakeReady()) return;
+  kwReviewDraft.paragraphMode = 'manual';
+  kwReviewDraft.skipAiProcessing = true;
+  kwReviewDraft.generatedPreviewText = '';
+  kwReviewDraft.draftReviewText = kwGetReviewDraftContentText();
+  kwPrepareReviewStructuredPreview();
+}
+
+async function kwPrepareReviewStructuredPreview() {
+  const runtime = ensureKwReviewRuntime();
+  if (!kwValidateReviewIntakeReady()) return;
+  if (!kwHasConfiguredGeneralLlm()) {
+    showToast('当前还没有配置可用的大模型。请先到 Admin 的系统专区 · 大模型专区配置一个通用模型。');
+    return;
+  }
+  kwSyncReviewDraftFromModal();
+  kwReviewStructuredPreview = null;
+  kwReviewPreviewGenerating = true;
+  kwReviewPreviewJobState = {
+    status: 'running',
+    progress_stage: 'queued',
+    progress_percent: 8,
+    summary: '已提交预览任务，正在准备摘要与自选股分析',
+    result: { live_log: [] },
+  };
+  kwReviewDraft.flowStage = 'preview_generating';
+  kwReviewDraft.previewReady = false;
+  kwRenderReviewStudio();
+  try {
+    const previewResult = await kwRequestReviewStructuredPreview();
+    if (!previewResult.async || !previewResult.job_code) throw new Error('review_prepare_preview_job_missing');
+    await new Promise((resolve, reject) => {
+      kwStartAsyncJobPolling(previewResult.job_code, {
+        onProgress(job) {
+          kwReviewPreviewJobState = job || kwReviewPreviewJobState;
+          kwRenderReviewStudio();
+        },
+        onSuccess(job) {
+          const result = job.result || {};
+          kwReviewStructuredPreview = kwNormalizeReviewStructuredPreview(result);
+          kwReviewPreviewGenerating = false;
+          kwReviewPreviewJobState = job;
+          kwReviewDraft.previewReady = false;
+          kwReviewDraft.flowStage = 'structured_review';
+          runtime.kolGeneratedAt = '刚刚生成';
+          resolve();
+        },
+        onFailed(job) {
+          reject(new Error(job.error_message || job.summary || '摘要与自选股归纳总结生成失败'));
+        },
+        onError(error) {
+          reject(error);
+        },
+      });
+    });
+  } catch (error) {
+    kwReviewPreviewGenerating = false;
+    kwReviewPreviewJobState = null;
+    kwReviewDraft.flowStage = kwReviewDraft.generatedPreviewText ? 'draft_review' : 'intake';
+    kwRenderReviewStudio();
+    showToast(kwGetReviewDraftGenerationErrorMessage(error));
+    return;
+  } finally {
+    kwReviewPreviewGenerating = false;
+    if (kwReviewPreviewJobState && kwReviewPreviewJobState.status === 'success') {
+      kwReviewPreviewJobState = null;
+    }
+  }
+  kwRenderReviewStudio();
+  showToast('摘要和自选股归纳总结已生成，请审核后预览');
+}
+
+async function kwSubmitReviewSmartOptimize() {
+  kwSyncReviewDraftFromModal();
+  if (!kwValidateReviewIntakeReady()) return;
+  if (!kwHasConfiguredGeneralLlm()) {
+    showToast('当前还没有配置可用的大模型。请先到 Admin 的系统专区 · 大模型专区配置一个通用模型。');
+    return;
+  }
+  const runtime = ensureKwReviewRuntime();
+  const tenant = window.ACTIVE_TENANT || {};
+  kwReviewDraft.paragraphMode = 'ai';
+  kwReviewDraft.skipAiProcessing = false;
+  if (kwReviewDraft.optimizeRuleMode !== 'custom') {
+    kwReviewDraft.aiPrompt = '';
+    kwReviewDraft.promptTags = [];
+  }
+  kwReviewStructuredPreview = null;
+  kwReviewDraft.flowStage = 'draft_generating';
+  kwReviewDraft.previewReady = false;
+  kwReviewDraftGenerating = true;
+  kwReviewDraftJobState = {
+    status: 'running',
+    progress_stage: 'queued',
+    progress_percent: 6,
+    summary: '已提交任务，正在进入大模型处理队列',
+    result: { live_log: [] },
+  };
+  kwRenderReviewStudio();
+  try {
+    const draftResult = await kwGenerateReviewDraftWithLlm();
+    if (!draftResult.async || !draftResult.job_code) throw new Error('review_draft_job_missing');
+    await new Promise((resolve, reject) => {
+      kwStartAsyncJobPolling(draftResult.job_code, {
+        onProgress(job) {
+          kwReviewDraftJobState = job || kwReviewDraftJobState;
+          kwRenderReviewStudio();
+        },
+        onSuccess(job) {
+          const result = job.result || {};
+          kwReviewDraft.generatedPreviewText = result.text || '';
+          kwReviewDraft.draftReviewText = result.text || kwGetReviewDraftContentText();
+          kwReviewIngestResult = {
+            ...(kwReviewIngestResult || {}),
+            review_draft_llm: result.llm_model || null,
+          };
+          kwReviewDraftGenerating = false;
+          kwReviewDraftJobState = job;
+          resolve();
+        },
+        onFailed(job) {
+          reject(new Error(job.error_message || job.summary || '大模型复盘草稿生成失败'));
+        },
+        onError(error) {
+          reject(error);
+        },
+      });
+    });
+  } catch (error) {
+    kwReviewDraftGenerating = false;
+    kwReviewDraftJobState = null;
+    kwReviewDraft.flowStage = 'optimize_rule';
+    kwRenderReviewStudio();
+    showToast(kwGetReviewDraftGenerationErrorMessage(error));
+    return;
+  } finally {
+    kwReviewDraftGenerating = false;
+    if (kwReviewDraftJobState && kwReviewDraftJobState.status === 'success') {
+      kwReviewDraftJobState = null;
+    }
+  }
+  kwReviewDraft.flowStage = 'draft_review';
+  kwReviewDraft.previewReady = false;
+  runtime.kolGeneratedAt = '刚刚生成';
+  runtime.kolSourceMode = kwReviewDraft.sourceMode;
+  runtime.paragraphMode = kwReviewDraft.paragraphMode;
+  runtime.kolSelectedWatchlist = kwReviewDraft.selectedWatchlist.slice(0);
+  runtime.lastReviewPeriod = kwReviewDraft.period;
+  runtime.latestVoiceTranscript = kwReviewDraft.voiceTranscript;
+  runtime.latestManualHtml = kwReviewDraft.manualHtml;
+  runtime.latestFileText = kwReviewDraft.fileText;
+  runtime.latestAiPrompt = kwReviewDraft.aiPrompt;
+  runtime.latestPromptTags = (kwReviewDraft.promptTags || []).slice(0);
+  runtime.latestGeneratedPreviewText = kwReviewDraft.generatedPreviewText || '';
+  runtime.latestDraftReviewText = kwReviewDraft.draftReviewText || '';
+  runtime.draftReady = true;
+  kwRenderReviewStudio();
+  showToast('优化成稿已完成，请先审核用户内容 Draft');
 }
 
 function kwRenderReviewInputPanel() {
@@ -7536,21 +8693,27 @@ function kwSetReviewCardPrompt(cardId, value) {
 
 function kwRenderReviewFlowNav() {
   const host = document.getElementById('kw-review-flow-nav');
-  const flowNodes = kwGetReviewStudioConfig().flow_nodes || [];
+  const flowNodes = [
+    { id: 'input', label: '输入内容' },
+    { id: 'draft', label: '优化成稿' },
+    { id: 'structured', label: '摘要与归纳' },
+    { id: 'preview', label: '最终预览' },
+  ];
   if (!host) return;
   const sourceReady = !!kwGetReviewDraftContentText();
-  const cardsReady = !!(kwReviewDraft.selectedCardIds || []).length || !!(kwReviewDraft.selectedKnowledgeIds || []).length;
-  const polishedReady = !!String(kwReviewDraft.polishedInputText || '').trim();
-  const composedReady = !!String(kwReviewDraft.generatedPreviewText || '').trim();
+  const draftReady = !!String(kwReviewDraft.draftReviewText || kwReviewDraft.generatedPreviewText || '').trim();
+  const structuredReady = !!(kwReviewStructuredPreview && String((kwReviewStructuredPreview.review_summary || '')).trim());
   const finalReady = !!String(kwGetReviewPreviewText() || '').trim();
   host.innerHTML = flowNodes.map((node) => {
     const nodeId = String(node.id || '').trim();
-    const active = (kwReviewJobMode === 'polish' && nodeId === 'polish')
-      || (kwReviewJobMode === 'compose' && nodeId === 'compose');
-    const done = (nodeId === 'cards' && cardsReady)
-      || (nodeId === 'input' && sourceReady)
-      || (nodeId === 'polish' && polishedReady)
-      || (nodeId === 'compose' && composedReady)
+    const active = (kwReviewDraft.flowStage === 'draft_generating' && nodeId === 'draft')
+      || (kwReviewDraft.flowStage === 'draft_review' && nodeId === 'draft')
+      || (kwReviewDraft.flowStage === 'preview_generating' && nodeId === 'structured')
+      || (kwReviewDraft.flowStage === 'structured_review' && nodeId === 'structured')
+      || (kwReviewDraft.flowStage === 'preview' && nodeId === 'preview');
+    const done = (nodeId === 'input' && sourceReady)
+      || (nodeId === 'draft' && draftReady)
+      || (nodeId === 'structured' && structuredReady)
       || (nodeId === 'preview' && finalReady);
     const style = active
       ? 'background:#1F497D;color:#fff;border-color:#1F497D;'
@@ -7639,17 +8802,52 @@ function kwRenderReviewInputModeRow() {
 function kwRenderReviewStageActions() {
   const host = document.getElementById('kw-review-stage-actions');
   if (!host) return;
+  const stage = kwReviewDraft.flowStage || 'intake';
+  const isGenerating = kwReviewDraftGenerating || kwReviewPreviewGenerating;
+  const actionButtons = (() => {
+    if (stage === 'optimize_rule') {
+      return `
+        <button class="btn-outline" type="button" onclick="kwBackToReviewIntake()">回退修改</button>
+        <button class="btn-gold" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwSubmitReviewSmartOptimize()">${isGenerating ? '生成中...' : '开始优化'}</button>
+      `;
+    }
+    if (stage === 'draft_review') {
+      return `
+        <button class="btn-outline" type="button" onclick="kwBackToReviewIntake()">回退修改</button>
+        <button class="btn-gold" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwConfirmReviewDraftToPreview()">生成摘要与归纳</button>
+      `;
+    }
+    if (stage === 'structured_review') {
+      return `
+        <button class="btn-outline" type="button" onclick="kwBackToReviewDraftEdit()">回退修改</button>
+        <button class="btn-gold" type="button" onclick="kwConfirmStructuredReviewToPreview()">直接预览</button>
+      `;
+    }
+    if (stage === 'preview' || kwReviewDraft.previewReady) {
+      return `
+        <button class="btn-outline" type="button" onclick="kwBackToReviewDraftEdit()">回退修改</button>
+        <button class="btn-gold" type="button" onclick="kwPublishReviewDraft()">确认发布</button>
+      `;
+    }
+    return `
+      <button class="btn-outline" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwPrepareReviewDirectPreview()">直接预览</button>
+      <button class="btn-gold" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwOpenReviewOptimizeRuleStep()">${isGenerating ? '处理中...' : '优化成稿'}</button>
+    `;
+  })();
   host.innerHTML = `
     <div class="kw-knowledge-modal-block" style="margin:0;padding:0;background:none;border:none">
-      <div class="kw-review-runtime-desc">周期：${escapeHtml(getKwReviewPeriodMeta(kwReviewDraft.period).label)}；段落方式：${escapeHtml((KW_REVIEW_PARAGRAPH_OPTIONS.find((item) => item.value === kwReviewDraft.paragraphMode) || {}).label || '智能文案')}</div>
+      <div class="kw-review-runtime-desc">周期：${escapeHtml(getKwReviewPeriodMeta(kwReviewDraft.period).label)}；当前阶段：${escapeHtml({
+        intake: '内容录入',
+        optimize_rule: '优化规则确认',
+        draft_generating: 'Draft 生成中',
+        draft_review: 'Draft 审核',
+        preview_generating: '摘要与归纳生成中',
+        structured_review: '摘要与归纳审核',
+        preview: '最终预览',
+      }[stage] || '内容录入')}</div>
       <div class="kw-toolbar" style="margin-top:10px">
         ${Object.entries(KW_REVIEW_PERIOD_CONFIG).map(([value, meta]) => `
           <button class="kw-review-period-pill ${value === kwReviewDraft.period ? 'active' : ''}" type="button" onclick="kwSetReviewTriggerPeriod('${value}')">${escapeHtml(meta.label)}</button>
-        `).join('')}
-      </div>
-      <div class="kw-toolbar" style="margin-top:10px">
-        ${KW_REVIEW_PARAGRAPH_OPTIONS.map((item) => `
-          <button class="kw-knowledge-source-pill ${item.value === kwReviewDraft.paragraphMode ? 'active' : ''}" type="button" onclick="kwSetReviewTriggerParagraphMode('${item.value}')">${escapeHtml(item.label)}</button>
         `).join('')}
       </div>
       <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--text-main);line-height:1.7;margin-top:12px">
@@ -7658,8 +8856,7 @@ function kwRenderReviewStageActions() {
       </label>
       ${kwRenderReviewPromptPanel()}
       <div class="kw-toolbar" style="margin-top:12px">
-        <button class="btn-outline" type="button" ${kwReviewDraftGenerating ? 'disabled' : ''} onclick="kwPolishReviewInput()">输入润色</button>
-        <button class="btn-gold" type="button" ${kwReviewDraftGenerating ? 'disabled' : ''} onclick="kwComposeReviewDraft()">完整成稿</button>
+        ${actionButtons}
       </div>
     </div>
   `;
@@ -7670,17 +8867,32 @@ function kwRenderReviewStageResults() {
   if (!host) return;
   const selectedKnowledge = kwGetReviewSelectedKnowledge();
   const selectedCards = kwGetReviewSelectedCards();
+  const structured = kwNormalizeReviewStructuredPreview(kwReviewStructuredPreview || {});
   host.innerHTML = `
-    ${kwReviewDraft.polishedInputText ? `
-      <div class="kw-review-runtime-item">
-        <strong>阶段 1：输入润色结果</strong>
-        <div class="kw-review-runtime-desc" style="margin-top:6px">${escapeHtml(kwReviewDraft.polishedInputText).replace(/\n/g, '<br>')}</div>
-      </div>
-    ` : ''}
     ${kwReviewDraft.generatedPreviewText ? `
       <div class="kw-review-runtime-item" style="margin-top:12px">
-        <strong>阶段 2：完整成稿</strong>
-        <div class="kw-review-runtime-desc" style="margin-top:6px">${escapeHtml(kwReviewDraft.generatedPreviewText).replace(/\n/g, '<br>')}</div>
+        <strong>用户复盘 Draft</strong>
+        <textarea id="kw-review-draft-review-input" class="kw-knowledge-modal-textarea" style="margin-top:10px;min-height:180px">${escapeHtml(kwReviewDraft.draftReviewText || kwReviewDraft.generatedPreviewText || '')}</textarea>
+      </div>
+    ` : ''}
+    ${kwReviewStructuredPreview ? `
+      <div class="kw-review-runtime-item" style="margin-top:12px">
+        <strong>摘要</strong>
+        <textarea id="kw-review-structured-summary-input" class="kw-knowledge-modal-textarea" style="margin-top:10px;min-height:100px">${escapeHtml(structured.review_summary || '')}</textarea>
+      </div>
+      <div class="kw-review-runtime-item" style="margin-top:12px">
+        <strong>用户复盘</strong>
+        <textarea id="kw-review-structured-user-input" class="kw-knowledge-modal-textarea" style="margin-top:10px;min-height:180px">${escapeHtml((((structured.user_input_section || {}).display_text) || ''))}</textarea>
+      </div>
+      <div class="kw-review-runtime-item" style="margin-top:12px">
+        <strong>自选股归纳总结</strong>
+        <textarea id="kw-review-structured-sector-summary" class="kw-knowledge-modal-textarea" style="margin-top:10px;min-height:110px">${escapeHtml((((structured.watchlist_analysis_section || {}).sector_summary) || ''))}</textarea>
+        ${(((structured.watchlist_analysis_section || {}).items) || []).map((item, index) => `
+          <div style="margin-top:10px">
+            <div class="kw-review-runtime-desc" style="margin-bottom:6px">${escapeHtml(item.stock_name || '股票')} · ${escapeHtml(item.board_role || item.sector || '归纳样本')}</div>
+            <textarea data-kw-review-watchlist-analysis-index="${index}" class="kw-knowledge-modal-textarea" style="min-height:110px">${escapeHtml(item.analysis_text || '')}</textarea>
+          </div>
+        `).join('')}
       </div>
     ` : ''}
     <div class="kw-review-runtime-item" style="margin-top:12px">
@@ -7690,131 +8902,11 @@ function kwRenderReviewStageResults() {
   `;
 }
 
-function kwRenderReviewWhiteboxPanel() {
-  const host = document.getElementById('kw-review-whitebox-panel');
-  const promptConfig = kwGetReviewStudioConfig().prompt_config || {};
-  if (!host) return;
-  host.innerHTML = `
-    <div class="kw-review-runtime-item">
-      <strong>输入润色 System Prompt</strong>
-      <div class="kw-review-runtime-desc" style="margin-top:6px;white-space:pre-wrap">${escapeHtml(promptConfig.polish_system_prompt || '未配置')}</div>
-    </div>
-    <div class="kw-review-runtime-item" style="margin-top:12px">
-      <strong>输入润色 User Template</strong>
-      <div class="kw-review-runtime-desc" style="margin-top:6px;white-space:pre-wrap">${escapeHtml(promptConfig.polish_user_template || '未配置')}</div>
-    </div>
-    <div class="kw-review-runtime-item" style="margin-top:12px">
-      <strong>完整成稿 System Prompt</strong>
-      <div class="kw-review-runtime-desc" style="margin-top:6px;white-space:pre-wrap">${escapeHtml(promptConfig.compose_system_prompt || '未配置')}</div>
-    </div>
-    <div class="kw-review-runtime-item" style="margin-top:12px">
-      <strong>完整成稿 User Template</strong>
-      <div class="kw-review-runtime-desc" style="margin-top:6px;white-space:pre-wrap">${escapeHtml(promptConfig.compose_user_template || '未配置')}</div>
-    </div>
-  `;
-}
-
-function kwRenderReviewTriggerModal() {
-  const host = document.getElementById('kw-review-trigger-modal-content');
-  if (!host) return;
-  const scrollSnapshot = kwCaptureModalSheetScroll('kw-review-trigger-modal-content');
-  const focusNames = getKwTenantWatchlistFocus();
-  host.innerHTML = `
-    <div class="kw-review-modal-head">
-      <div>
-        <div class="kw-review-modal-title">发起大V复盘</div>
-        <div class="kw-review-modal-subtitle">先选择复盘周期，再补充语音口述、手动撰写或文件上传内容。生成草稿后先预览，确认没问题再发布。</div>
-      </div>
-      <button class="kw-review-modal-close" type="button" onclick="kwCloseReviewTriggerModal()">×</button>
-    </div>
-    <div class="kw-knowledge-modal-block">
-      <label class="kw-knowledge-modal-label">复盘周期</label>
-      <div class="kw-review-period-row">
-        ${Object.entries(KW_REVIEW_PERIOD_CONFIG).map(([value, meta]) => `
-          <button class="kw-review-period-pill ${value === kwReviewDraft.period ? 'active' : ''}" type="button" onclick="kwSetReviewTriggerPeriod('${value}')">${meta.label}</button>
-        `).join('')}
-      </div>
-    </div>
-    <div class="kw-knowledge-modal-block">
-      <label class="kw-knowledge-modal-label">供稿方式</label>
-      <div class="kw-knowledge-source-selector">
-        ${KW_REVIEW_SOURCE_OPTIONS.map(item => `
-          <button class="kw-knowledge-source-pill ${item.value === kwReviewDraft.sourceMode ? 'active' : ''}" type="button" onclick="kwSetReviewTriggerSourceMode('${item.value}')">${item.icon} ${item.label}</button>
-        `).join('')}
-      </div>
-    </div>
-    <div class="kw-knowledge-modal-block">
-      <label class="kw-knowledge-modal-label">输入内容</label>
-      ${kwRenderReviewInputPanel()}
-    </div>
-    <div class="kw-knowledge-modal-block">
-      <label class="kw-knowledge-modal-label">文章段落方式</label>
-      <div class="kw-knowledge-source-selector" style="grid-template-columns:repeat(2,1fr)">
-        ${KW_REVIEW_PARAGRAPH_OPTIONS.map(item => `
-          <button class="kw-knowledge-source-pill ${item.value === kwReviewDraft.paragraphMode ? 'active' : ''}" type="button" onclick="kwSetReviewTriggerParagraphMode('${item.value}')">${item.label}</button>
-        `).join('')}
-      </div>
-      <div class="kw-review-runtime-meta" style="margin-top:8px">${kwReviewDraft.skipAiProcessing ? '当前已关闭大模型处理，系统只保留原文和本地转化结果。' : (kwReviewDraft.paragraphMode === 'manual' ? '如果是自定义文案，就直接使用你上面输入的内容，不再二次改写。' : '智能文案会基于输入材料和你的修改规则生成草稿。')}</div>
-    </div>
-    <div class="kw-knowledge-modal-block">
-      <label class="kw-knowledge-modal-label">处理选项</label>
-      <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--text-main);line-height:1.7">
-        <input type="checkbox" id="kw-review-skip-ai-processing" ${kwReviewDraft.skipAiProcessing ? 'checked' : ''} onchange="kwToggleReviewSkipAiProcessing(this.checked)" />
-        <span>不使用大模型处理。勾选后，只走原文 / 本地转化路径，不做 AI 整理。</span>
-      </label>
-    </div>
-    ${kwRenderReviewPromptPanel()}
-    <div class="kw-knowledge-modal-block">
-      <label class="kw-knowledge-modal-label">本次纳入复盘的自选股</label>
-      <div class="kw-review-runtime-meta" style="margin-bottom:8px">本次纳入复盘的自选股已经从自选列表里选择，这里只做确认，不再单独做选股归纳。</div>
-      <div class="kw-review-watchlist-row">
-        ${focusNames.map(name => `
-          <button class="kw-review-watchlist-chip selectable ${kwReviewDraft.selectedWatchlist.includes(name) ? 'active' : ''}" type="button" onclick="kwToggleReviewTriggerWatchlist('${name}')">${escapeHtml(name)}</button>
-        `).join('')}
-      </div>
-    </div>
-    <div class="kw-knowledge-modal-block">
-      <label class="kw-knowledge-modal-label">本次复盘覆盖</label>
-      <div class="kw-review-watchlist-row">
-        ${(kwReviewDraft.selectedWatchlist || []).map(name => `<span class="kw-review-watchlist-chip">${escapeHtml(name)}</span>`).join('') || '<span class="kw-review-runtime-meta">当前还没选择股票</span>'}
-      </div>
-    </div>
-    ${kwRenderReviewDraftProgressPanel()}
-    ${kwRenderReviewPreviewPanel()}
-    <div class="kw-review-modal-actions">
-      <button class="btn-outline" type="button" onclick="kwCloseReviewTriggerModal()">取消</button>
-      ${kwReviewDraft.previewReady
-        ? '<button class="btn-gold" type="button" onclick="kwPublishReviewDraft()">确认发布</button>'
-        : `<button class="btn-gold" type="button" ${kwReviewDraftGenerating ? 'disabled' : ''} onclick="kwSubmitReviewTrigger()">${kwReviewDraftGenerating ? '生成中...' : '生成草稿'}</button>`}
-    </div>
-  `;
-  kwEnsureReviewEditors();
-  kwRenderReviewStudio();
-  kwRestoreModalSheetScroll('kw-review-trigger-modal-content', scrollSnapshot);
-}
-
 function kwOpenReviewTriggerModal(sourceMode) {
-  const runtime = ensureKwReviewRuntime();
-  const existingSelected = Array.isArray(kwReviewDraft.selectedWatchlist) ? kwReviewDraft.selectedWatchlist.slice(0) : [];
-  kwReviewDraft.period = runtime.lastReviewPeriod || kwReviewDraft.period;
   if (sourceMode && KW_REVIEW_SOURCE_OPTIONS.some(item => item.value === sourceMode)) {
     kwReviewDraft.sourceMode = sourceMode;
   }
-  kwReviewDraft.paragraphMode = runtime.paragraphMode || kwReviewDraft.paragraphMode;
-  kwReviewDraft.selectedWatchlist = sourceMode === 'stocks' && existingSelected.length
-    ? existingSelected
-    : kwGetSelectedWatchlist().slice(0);
-  kwReviewDraft.voiceTranscript = runtime.latestVoiceTranscript || '';
-  kwReviewDraft.manualHtml = runtime.latestManualHtml || '';
-  kwReviewDraft.fileText = runtime.latestFileText || '';
-  kwReviewDraft.aiPrompt = runtime.latestAiPrompt || '';
-  kwReviewDraft.promptTags = Array.isArray(runtime.latestPromptTags) ? runtime.latestPromptTags.slice(0) : [];
-  kwReviewDraft.generatedPreviewText = runtime.latestGeneratedPreviewText || '';
-  kwReviewDraft.previewReady = false;
-  const modal = document.getElementById('kw-review-trigger-modal');
-  if (!modal) return;
-  kwRenderReviewTriggerModal();
-  modal.classList.add('show');
+  kwRenderReviewStudio();
 }
 
 function kwCloseReviewTriggerModal() {
@@ -7827,8 +8919,8 @@ function kwSetReviewTriggerPeriod(period) {
   kwReviewDraft.period = period;
   kwReviewDraft.generatedPreviewText = '';
   kwReviewDraft.previewReady = false;
+  kwReviewStructuredPreview = null;
   kwRenderReviewStudio();
-  kwRenderReviewTriggerModal();
 }
 
 function kwSetReviewTriggerSourceMode(mode) {
@@ -7836,9 +8928,11 @@ function kwSetReviewTriggerSourceMode(mode) {
   kwSyncReviewDraftFromModal();
   kwReviewDraft.sourceMode = mode;
   kwReviewDraft.generatedPreviewText = '';
+  kwReviewDraft.draftReviewText = '';
   kwReviewDraft.previewReady = false;
+  kwReviewDraft.flowStage = 'intake';
+  kwReviewStructuredPreview = null;
   kwRenderReviewStudio();
-  kwRenderReviewTriggerModal();
 }
 
 function kwSetReviewTriggerParagraphMode(mode) {
@@ -7846,8 +8940,8 @@ function kwSetReviewTriggerParagraphMode(mode) {
   kwSyncReviewDraftFromModal();
   kwReviewDraft.paragraphMode = mode;
   kwReviewDraft.previewReady = false;
+  kwReviewStructuredPreview = null;
   kwRenderReviewStudio();
-  kwRenderReviewTriggerModal();
 }
 
 function kwToggleReviewSkipAiProcessing(checked) {
@@ -7860,8 +8954,8 @@ function kwToggleReviewSkipAiProcessing(checked) {
     kwReviewDraft.generatedPreviewText = '';
   }
   kwReviewDraft.previewReady = false;
+  kwReviewStructuredPreview = null;
   kwRenderReviewStudio();
-  kwRenderReviewTriggerModal();
 }
 
 function kwToggleReviewTriggerWatchlist(name) {
@@ -7871,8 +8965,8 @@ function kwToggleReviewTriggerWatchlist(name) {
   if (current.has(name)) current.delete(name); else current.add(name);
   kwReviewDraft.selectedWatchlist = fullList.filter(item => current.has(item));
   kwReviewDraft.previewReady = false;
+  kwReviewStructuredPreview = null;
   kwRenderReviewStudio();
-  kwRenderReviewTriggerModal();
 }
 
 function kwCaptureReviewVoiceInput() {
@@ -7901,14 +8995,12 @@ function kwCaptureReviewVoiceInput() {
       kwReviewVoiceUploading = false;
       stream.getTracks().forEach((track) => track.stop());
       kwRenderReviewStudio();
-      kwRenderReviewTriggerModal();
       showToast('录音失败，请重试');
     };
     kwReviewVoiceRecorder.onstop = async () => {
       kwReviewVoiceRecording = false;
       kwReviewVoiceUploading = true;
       kwRenderReviewStudio();
-      kwRenderReviewTriggerModal();
       const blob = new Blob(kwReviewVoiceChunks, { type: kwReviewVoiceRecorder.mimeType || 'audio/webm' });
       stream.getTracks().forEach((track) => track.stop());
       try {
@@ -7931,7 +9023,6 @@ function kwCaptureReviewVoiceInput() {
               result.enhanced_transcript ? `原始转写：${result.raw_transcript || result.transcript || ''}` : '',
             ]);
             kwRenderReviewStudio();
-            kwRenderReviewTriggerModal();
             showToast('语音已转成文案，待确认发布');
           },
           onFailed(job) {
@@ -7949,12 +9040,10 @@ function kwCaptureReviewVoiceInput() {
         kwReviewVoiceRecorder = null;
         kwReviewVoiceChunks = [];
         kwRenderReviewStudio();
-        kwRenderReviewTriggerModal();
       }
     };
     kwReviewVoiceRecorder.start();
     kwRenderReviewStudio();
-    kwRenderReviewTriggerModal();
   }).catch(() => {
     showToast('未获得麦克风权限');
   });
@@ -7982,8 +9071,8 @@ function kwCaptureReviewFileInputLegacy() {
     kwReviewDraft.fileName = preview.filename || file.name;
     kwReviewDraft.fileText = preview.body || preview.summary || '';
     kwReviewDraft.previewReady = false;
+    kwReviewStructuredPreview = null;
     kwRenderReviewStudio();
-    kwRenderReviewTriggerModal();
     showToast('文件已转成文案');
   };
   input.click();
@@ -7995,19 +9084,17 @@ function kwToggleReviewPromptTag(tag) {
   if (current.has(tag)) current.delete(tag); else current.add(tag);
   kwReviewDraft.promptTags = KW_REVIEW_PROMPT_TAGS.filter(item => current.has(item));
   kwReviewDraft.previewReady = false;
+  kwReviewStructuredPreview = null;
   kwRenderReviewStudio();
-  kwRenderReviewTriggerModal();
 }
 
 function kwBuildPublishedReviewFromDraft() {
   const periodMeta = getKwReviewPeriodMeta(kwReviewDraft.period);
-  const contentText = kwGetReviewDraftContentText();
-  const title = kwReviewDraft.paragraphMode === 'manual'
-    ? `${periodMeta.label}：${contentText.split(/[。！？\n]/).map(item => item.trim()).find(Boolean) || '自定义文案已完成'}`
-    : `${periodMeta.label}：智能文案草稿已按你的规则生成`;
-  const tags = kwReviewDraft.paragraphMode === 'manual'
-    ? ['自定义文案', '可直接分发']
-    : ['智能文案', '规则已生效'];
+  const contentText = kwGetReviewPreviewText() || kwGetReviewDraftContentText();
+  const title = `${periodMeta.label}：${contentText.split(/[。！？\n]/).map(item => item.trim()).find(Boolean) || '复盘已完成'}`;
+  const tags = kwReviewStructuredPreview
+    ? ['摘要已生成', '自选股归纳']
+    : (kwReviewDraft.paragraphMode === 'manual' ? ['用户直发'] : ['优化成稿']);
   return {
     title: title.slice(0, 40),
     period: periodMeta.label,
@@ -8016,181 +9103,6 @@ function kwBuildPublishedReviewFromDraft() {
     watchlist: kwReviewDraft.selectedWatchlist.slice(0),
     summary: kwGetReviewPreviewText().replace(/\n+/g, ' ').slice(0, 120),
   };
-}
-
-function kwSubmitReviewTrigger() {
-  const runtime = ensureKwReviewRuntime();
-  kwSyncReviewDraftFromModal();
-  if (!kwReviewDraft.selectedWatchlist.length) {
-    showToast('请先至少选择 1 只自选股');
-    return;
-  }
-  if (!kwGetReviewDraftContentText()) {
-    showToast('请先补充输入内容');
-    return;
-  }
-  if (kwReviewDraft.sourceMode === 'manual') {
-    kwEmbedManualReviewText(kwGetReviewDraftContentText()).then((manualResult) => {
-      kwReviewIngestResult = manualResult;
-      kwOpenReviewIngestResultModal('手写正文已就绪（尚未入库）', [
-        `转写引擎：${manualResult.transcript_engine || '-'}`,
-        `转写模型：${manualResult.transcript_model || '-'}`,
-        `当前状态：仅完成正文确认，确认发布后才会写入向量库`,
-        `正文内容：${manualResult.text || ''}`,
-      ]);
-      const finalizeDraft = () => {
-        runtime.kolGeneratedAt = '刚刚生成';
-        runtime.kolSourceMode = kwReviewDraft.sourceMode;
-        runtime.paragraphMode = kwReviewDraft.paragraphMode;
-        runtime.kolSelectedWatchlist = kwReviewDraft.selectedWatchlist.slice(0);
-        runtime.lastReviewPeriod = kwReviewDraft.period;
-        runtime.latestVoiceTranscript = kwReviewDraft.voiceTranscript;
-        runtime.latestManualHtml = kwReviewDraft.manualHtml;
-        runtime.latestFileText = kwReviewDraft.fileText;
-        runtime.latestAiPrompt = kwReviewDraft.aiPrompt;
-        runtime.latestPromptTags = (kwReviewDraft.promptTags || []).slice(0);
-        runtime.latestGeneratedPreviewText = kwReviewDraft.generatedPreviewText || '';
-        runtime.draftReady = true;
-        kwReviewDraft.previewReady = true;
-        kwRenderReviewTriggerModal();
-        kwRenderReviewStudio();
-        showToast(`${getKwReviewPeriodMeta(kwReviewDraft.period).label}草稿已生成，请先预览`);
-      };
-      if (kwReviewDraft.paragraphMode === 'ai' && !kwReviewDraft.skipAiProcessing) {
-        kwReviewDraftGenerating = true;
-        kwReviewDraft.previewReady = false;
-        kwReviewDraftJobState = {
-          status: 'running',
-          progress_stage: 'queued',
-          progress_percent: 6,
-          summary: '已提交任务，正在进入大模型处理队列',
-          result: { live_log: [] },
-        };
-        kwRenderReviewTriggerModal();
-        kwGenerateReviewDraftWithLlm().then((draftResult) => {
-          if (!draftResult.async || !draftResult.job_code) throw new Error('review_draft_job_missing');
-          kwStartAsyncJobPolling(draftResult.job_code, {
-            onProgress(job) {
-              kwReviewDraftJobState = job || kwReviewDraftJobState;
-              kwRenderReviewTriggerModal();
-            },
-            onSuccess(job) {
-              const result = job.result || {};
-              kwReviewDraft.generatedPreviewText = result.text || '';
-              kwReviewIngestResult = {
-                ...(kwReviewIngestResult || {}),
-                review_draft_llm: result.llm_model || null,
-              };
-              kwReviewDraftGenerating = false;
-              kwReviewDraftJobState = null;
-              finalizeDraft();
-            },
-            onFailed(job) {
-              kwReviewDraftGenerating = false;
-              kwReviewDraftJobState = null;
-              kwRenderReviewTriggerModal();
-              showToast(job.error_message || job.summary || '大模型复盘草稿生成失败');
-            },
-            onError(error) {
-              kwReviewDraftGenerating = false;
-              kwReviewDraftJobState = null;
-              kwRenderReviewTriggerModal();
-              showToast(error.message || '大模型复盘草稿生成失败');
-            },
-          });
-        }).catch((error) => {
-          kwReviewDraftJobState = null;
-          showToast(error.message || '大模型复盘草稿生成失败');
-        }).finally(() => {
-          if (!kwReviewDraftJobState) {
-            kwReviewDraftGenerating = false;
-            kwRenderReviewTriggerModal();
-          }
-        });
-        return;
-      }
-      kwReviewDraft.generatedPreviewText = '';
-      kwReviewDraftJobState = null;
-      finalizeDraft();
-    }).catch((error) => {
-      showToast(error.message || '手写正文入库失败');
-    });
-    return;
-  }
-  const finalizeDraft = () => {
-    runtime.kolGeneratedAt = '刚刚生成';
-    runtime.kolSourceMode = kwReviewDraft.sourceMode;
-    runtime.paragraphMode = kwReviewDraft.paragraphMode;
-    runtime.kolSelectedWatchlist = kwReviewDraft.selectedWatchlist.slice(0);
-    runtime.lastReviewPeriod = kwReviewDraft.period;
-    runtime.latestVoiceTranscript = kwReviewDraft.voiceTranscript;
-    runtime.latestManualHtml = kwReviewDraft.manualHtml;
-    runtime.latestFileText = kwReviewDraft.fileText;
-    runtime.latestAiPrompt = kwReviewDraft.aiPrompt;
-    runtime.latestPromptTags = (kwReviewDraft.promptTags || []).slice(0);
-    runtime.latestGeneratedPreviewText = kwReviewDraft.generatedPreviewText || '';
-    runtime.draftReady = true;
-    kwReviewDraft.previewReady = true;
-    kwRenderReviewTriggerModal();
-    kwRenderReviewStudio();
-    showToast(`${getKwReviewPeriodMeta(kwReviewDraft.period).label}草稿已生成，请先预览`);
-  };
-  if (kwReviewDraft.paragraphMode === 'ai' && !kwReviewDraft.skipAiProcessing) {
-    kwReviewDraftGenerating = true;
-    kwReviewDraft.previewReady = false;
-    kwReviewDraftJobState = {
-      status: 'running',
-      progress_stage: 'queued',
-      progress_percent: 6,
-      summary: '已提交任务，正在进入大模型处理队列',
-      result: { live_log: [] },
-    };
-    kwRenderReviewTriggerModal();
-    kwGenerateReviewDraftWithLlm().then((draftResult) => {
-      if (!draftResult.async || !draftResult.job_code) throw new Error('review_draft_job_missing');
-      kwStartAsyncJobPolling(draftResult.job_code, {
-        onProgress(job) {
-          kwReviewDraftJobState = job || kwReviewDraftJobState;
-          kwRenderReviewTriggerModal();
-        },
-        onSuccess(job) {
-          const result = job.result || {};
-          kwReviewDraft.generatedPreviewText = result.text || '';
-          kwReviewIngestResult = {
-            ...(kwReviewIngestResult || {}),
-            review_draft_llm: result.llm_model || null,
-          };
-          kwReviewDraftGenerating = false;
-          kwReviewDraftJobState = null;
-          finalizeDraft();
-        },
-        onFailed(job) {
-          kwReviewDraftGenerating = false;
-          kwReviewDraftJobState = null;
-          kwRenderReviewTriggerModal();
-          showToast(job.error_message || job.summary || '大模型复盘草稿生成失败');
-        },
-        onError(error) {
-          kwReviewDraftGenerating = false;
-          kwReviewDraftJobState = null;
-          kwRenderReviewTriggerModal();
-          showToast(error.message || '大模型复盘草稿生成失败');
-        },
-      });
-    }).catch((error) => {
-      kwReviewDraftJobState = null;
-      showToast(error.message || '大模型复盘草稿生成失败');
-    }).finally(() => {
-      if (!kwReviewDraftJobState) {
-        kwReviewDraftGenerating = false;
-        kwRenderReviewTriggerModal();
-      }
-    });
-    return;
-  }
-  kwReviewDraft.generatedPreviewText = '';
-  kwReviewDraftJobState = null;
-  finalizeDraft();
 }
 
 function kwPublishReviewDraft() {
@@ -8204,7 +9116,34 @@ function kwPublishReviewDraft() {
   const transcriptModel = kwReviewDraft.sourceMode === 'voice'
     ? ((kwReviewIngestResult && kwReviewIngestResult.transcript_model) || '')
     : 'manual_input';
-  kwPublishReviewContentEmbedding(finalText, transcriptionEngine, transcriptModel).then((publishResult) => {
+  const previewPayload = kwReviewStructuredPreview && typeof kwReviewStructuredPreview === 'object' ? kwReviewStructuredPreview : {};
+  const llmModels = [];
+  if (kwReviewIngestResult && kwReviewIngestResult.review_draft_llm) {
+    llmModels.push({
+      stage: 'draft',
+      key: kwReviewIngestResult.review_draft_llm.key || '',
+      label: kwReviewIngestResult.review_draft_llm.label || '',
+      provider: kwReviewIngestResult.review_draft_llm.provider || '',
+      model_name: kwReviewIngestResult.review_draft_llm.model_name || '',
+      purpose: kwReviewIngestResult.review_draft_llm.purpose || '',
+    });
+  }
+  (previewPayload.llm_models || []).forEach((item) => {
+    if (item && !llmModels.some((row) => row.stage === item.stage && row.key === item.key && row.model_name === item.model_name)) {
+      llmModels.push(item);
+    }
+  });
+  kwPublishReviewContentEmbedding(finalText, transcriptionEngine, transcriptModel, {
+    review_summary: previewPayload.review_summary || '',
+    user_input_section: previewPayload.user_input_section || {
+      source_mode: kwReviewDraft.sourceMode || 'manual',
+      source_mode_label: (KW_REVIEW_SOURCE_OPTIONS.find((option) => option.value === kwReviewDraft.sourceMode) || {}).label || '用户输入',
+      display_text: kwGetReviewUserInputDisplayText(),
+      summary_source: 'llm_user_input_only',
+    },
+    watchlist_analysis_section: previewPayload.watchlist_analysis_section || {},
+    llm_models: llmModels,
+  }).then((publishResult) => {
     if (!publishResult.async || !publishResult.job_code) throw new Error('publish_job_missing');
     runtime.kolPublishedAt = '发布处理中';
     runtime.kolGeneratedAt = '发布处理中';
@@ -8297,7 +9236,6 @@ function kwRenderReviewStudio() {
   const progressHost = document.getElementById('kw-review-progress-host');
   const stageResultsHost = document.getElementById('kw-review-stage-results');
   const runtimeHost = document.getElementById('kw-review-runtime-panel');
-  const whiteboxHost = document.getElementById('kw-review-whitebox-panel');
   const latestHost = document.getElementById('kw-review-latest-published');
   const latestPublished = (window.WORKBENCH_DATA && window.WORKBENCH_DATA.published_reviews && window.WORKBENCH_DATA.published_reviews[0]) || null;
   const sourceCfg = KW_REVIEW_SOURCE_OPTIONS.find(item => item.value === runtime.kolSourceMode) || KW_REVIEW_SOURCE_OPTIONS[0];
@@ -8312,7 +9250,6 @@ function kwRenderReviewStudio() {
   if (stageActionsHost) kwRenderReviewStageActions();
   if (progressHost) progressHost.innerHTML = kwRenderReviewDraftProgressPanel();
   if (stageResultsHost) kwRenderReviewStageResults();
-  if (whiteboxHost) kwRenderReviewWhiteboxPanel();
   if (runtimeHost) {
     runtimeHost.innerHTML = `
       <div class="kw-review-runtime-item">
@@ -8347,7 +9284,7 @@ function kwRenderReviewStudio() {
   }
   const finalEditor = document.getElementById('kw-review-final-editor');
   if (finalEditor) {
-    const nextValue = String(kwReviewDraft.finalDraftText || kwReviewDraft.generatedPreviewText || kwReviewDraft.polishedInputText || kwGetReviewDraftContentText() || '').trim();
+    const nextValue = String(kwReviewDraft.finalDraftText || kwGetReviewPreviewText() || kwReviewDraft.generatedPreviewText || kwGetReviewDraftContentText() || '').trim();
     if (finalEditor.value !== nextValue) finalEditor.value = nextValue;
   }
   kwEnsureReviewEditors();
@@ -8951,6 +9888,12 @@ function showWorkbenchSection(name, navEl) {
   }
   if (name === 'knowledge') {
     kwRenderKnowledgeList();
+  }
+  if (name === 'knowledge-graph') {
+    loadWorkbenchKnowledgeMap(false);
+  }
+  if (name === 'hermes') {
+    loadWorkbenchHermesMemorySummary(false).catch((error) => showToast(error.message || '加载失败'));
   }
   if (name === 'published') {
     kwRenderPublishedReviewList();
@@ -9826,6 +10769,338 @@ async function kwDeleteSmartIndicator(indicatorCode) {
   } catch (error) {
     showToast(error.message || '智能指标删除失败');
   }
+}
+
+function getWorkbenchHermesMemoryTenantOptions() {
+  const activeTenant = window.ACTIVE_TENANT || {};
+  return activeTenant && activeTenant.slug ? [activeTenant] : [];
+}
+
+function getWorkbenchHermesMemorySelectedTenant() {
+  const select = document.getElementById('kw-hermes-memory-tenant');
+  const fallback = ((window.ACTIVE_TENANT || {}).slug) || '';
+  return String((select && select.value) || fallback || '').trim();
+}
+
+function getWorkbenchHermesMemoryRangeOptions() {
+  const summary = kwHermesMemoryState.summary || {};
+  return Array.isArray(summary.range_options) && summary.range_options.length
+    ? summary.range_options
+    : [
+        {key: '1m', label: '最近 1 个月'},
+        {key: '3m', label: '最近 3 个月'},
+        {key: '6m', label: '最近 6 个月'},
+        {key: '1y', label: '最近 1 年'},
+        {key: 'all', label: '全部清除'},
+      ];
+}
+
+function setWorkbenchHermesMemoryStatus(message, isError = false) {
+  const node = document.getElementById('kw-hermes-memory-status');
+  if (!node) return;
+  node.textContent = message || '';
+  node.style.color = isError ? '#F1948A' : '#B88A30';
+}
+
+function renderWorkbenchHermesUsageStats() {
+  const summaryHost = document.getElementById('kw-hermes-usage-summary');
+  const modeBody = document.getElementById('kw-hermes-mode-tbody');
+  const rankingBody = document.getElementById('kw-hermes-ranking-tbody');
+  const poolHost = document.getElementById('kw-hermes-pool-cards');
+  const stats = kwHermesUsageState.stats || {};
+  const summary = stats.summary || {};
+  if (summaryHost) {
+    summaryHost.innerHTML = [
+      { label: '今日调用', icon: '&#9881;', value: Number(summary.today_calls || 0), change: `今日 token ${Number(summary.today_tokens || 0).toLocaleString('zh-CN')}` },
+      { label: '本月调用', icon: '&#9654;', value: Number(summary.month_calls || 0), change: `本月 token ${Number(summary.month_tokens || 0).toLocaleString('zh-CN')}` },
+      { label: '人均调用', icon: '&#9786;', value: `${Number(summary.avg_calls_per_user || 0).toFixed(2)}次`, change: `平均延迟 ${Number(summary.avg_latency_ms || 0).toFixed(0)}ms` },
+      { label: '算力消耗', icon: '&#9733;', value: Number(summary.compute_consumed || 0).toLocaleString('zh-CN'), change: '按 Hermes 调用聚合' },
+    ].map((item) => `
+      <div class="stat-card">
+        <div class="stat-label">${escapeHtml(item.label)}</div>
+        <span class="stat-icon">${item.icon}</span>
+        <div class="stat-value">${escapeHtml(String(item.value))}</div>
+        <div class="stat-change up">${escapeHtml(item.change)}</div>
+      </div>
+    `).join('');
+  }
+  if (modeBody) {
+    const rows = Array.isArray(stats.tool_modes) ? stats.tool_modes : [];
+    modeBody.innerHTML = rows.length ? rows.map((row) => `
+      <tr>
+        <td style="color:var(--text-main);font-weight:500">${escapeHtml(row.mode_label || '')}</td>
+        <td>${escapeHtml(String(row.today_calls || 0))}</td>
+        <td>${escapeHtml(String(row.month_calls || 0))}</td>
+        <td><div style="display:flex;align-items:center;gap:8px"><div class="progress-bar-bg" style="width:80px"><div class="progress-bar-fill" style="width:${Math.max(0, Math.min(100, Number(row.share_ratio || 0)))}%"></div></div><span style="color:#C8A96E">${escapeHtml(`${Number(row.share_ratio || 0).toFixed(1)}%`)}</span></div></td>
+        <td>${escapeHtml(`${Number(row.avg_latency_ms || 0).toFixed(0)}ms`)}</td>
+        <td><span class="tag ${escapeAttr(row.status_class || 'tag-green')}">${escapeHtml(row.status_label || '正常')}</span></td>
+      </tr>
+    `).join('') : '<tr><td colspan="6" style="color:#9A9590">暂无 Hermes 模式统计</td></tr>';
+  }
+  if (poolHost) {
+    const pool = stats.compute_pool || {};
+    poolHost.innerHTML = `
+      <div class="pool-card">
+        <div class="pool-card-label">总算力池</div>
+        <div class="pool-card-value">${escapeHtml(Number(pool.total || 0).toLocaleString('zh-CN'))}</div>
+        <div class="pool-card-sub">积分</div>
+      </div>
+      <div class="pool-card">
+        <div class="pool-card-label">本月消耗</div>
+        <div class="pool-card-value">${escapeHtml(Number(pool.consumed || 0).toLocaleString('zh-CN'))}</div>
+        <div class="pool-card-sub">${escapeHtml(`${Number(pool.usage_ratio || 0).toFixed(1)}% 使用率`)}</div>
+      </div>
+      <div class="pool-card">
+        <div class="pool-card-label">剩余可用</div>
+        <div class="pool-card-value">${escapeHtml(Number(pool.remaining || 0).toLocaleString('zh-CN'))}</div>
+        <div class="pool-card-sub">${escapeHtml(`${Math.max(0, 100 - Number(pool.usage_ratio || 0)).toFixed(1)}% 剩余`)}</div>
+      </div>
+    `;
+  }
+  if (rankingBody) {
+    const rows = Array.isArray(stats.user_ranking) ? stats.user_ranking : [];
+    rankingBody.innerHTML = rows.length ? rows.map((row) => `
+      <tr>
+        <td><span class="rank-badge ${row.rank === 1 ? 'rank-1' : row.rank === 2 ? 'rank-2' : row.rank === 3 ? 'rank-3' : 'rank-n'}">${escapeHtml(String(row.rank || ''))}</span></td>
+        <td style="color:var(--text-main)">${escapeHtml(row.user_name || '')}</td>
+        <td><span class="${escapeAttr(row.level_class || 'tag tag-blue')}">${escapeHtml(row.level_label || '普通用户')}</span></td>
+        <td>${escapeHtml(String(row.month_calls || 0))}</td>
+        <td style="color:#C8A96E">${escapeHtml(Number(row.compute_units || 0).toLocaleString('zh-CN'))}</td>
+        <td>${escapeHtml(row.top_mode || '')}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="6" style="color:#9A9590">暂无 Hermes 用户排行</td></tr>';
+  }
+}
+
+function renderWorkbenchHermesMemoryPanel() {
+  const tenantSelect = document.getElementById('kw-hermes-memory-tenant');
+  const summaryNode = document.getElementById('kw-hermes-memory-summary');
+  const previewNode = document.getElementById('kw-hermes-memory-preview');
+  const backupRange = document.getElementById('kw-hermes-memory-backup-range');
+  const clearRange = document.getElementById('kw-hermes-memory-clear-range');
+  const confirmWrap = document.getElementById('kw-hermes-memory-clear-confirm-wrap');
+  if (!tenantSelect || !summaryNode || !previewNode || !backupRange || !clearRange) return;
+
+  const tenants = getWorkbenchHermesMemoryTenantOptions();
+  const currentTenant = getWorkbenchHermesMemorySelectedTenant();
+  tenantSelect.innerHTML = tenants.map((tenant) => `
+    <option value="${escapeAttr(tenant.slug || '')}" ${(tenant.slug || '') === currentTenant ? 'selected' : ''}>${escapeHtml(tenant.name || tenant.slug || '')}</option>
+  `).join('') || '<option value="">暂无租户</option>';
+  if (!tenantSelect.value && tenants.length) tenantSelect.value = tenants[0].slug || '';
+
+  const options = getWorkbenchHermesMemoryRangeOptions();
+  const currentBackupRange = backupRange.value || '3m';
+  const currentClearRange = clearRange.value || '3m';
+  backupRange.innerHTML = options.map((item) => `
+    <option value="${escapeAttr(item.key || '')}" ${(item.key || '') === currentBackupRange ? 'selected' : ''}>${escapeHtml(item.label || item.key || '')}</option>
+  `).join('');
+  clearRange.innerHTML = options.map((item) => `
+    <option value="${escapeAttr(item.key || '')}" ${(item.key || '') === currentClearRange ? 'selected' : ''}>${escapeHtml(item.label || item.key || '')}</option>
+  `).join('');
+
+  const summary = kwHermesMemoryState.summary || {};
+  const cards = [
+    {label: '对话总轮次', value: Number(summary.turn_count || 0), desc: summary.first_turn_at ? `首轮：${summary.first_turn_at}` : '暂无对话'},
+    {label: '会话数', value: Number(summary.session_count || 0), desc: `会话记忆行 ${Number(summary.session_memory_count || 0)}`},
+    {label: '用户数', value: Number(summary.user_count || 0), desc: `用户记忆行 ${Number(summary.user_memory_count || 0)}`},
+    {label: '画像数', value: Number(summary.profile_count || 0), desc: summary.last_turn_at ? `最近：${summary.last_turn_at}` : '暂无最近时间'},
+    {label: '近 30 天轮次', value: Number(summary.recent_30d_turn_count || 0), desc: `活跃用户 ${Number(summary.recent_30d_active_user_count || 0)}`},
+  ];
+  summaryNode.innerHTML = cards.map((item) => `
+    <div class="hermes-memory-summary-card">
+      <div class="hermes-memory-summary-label">${escapeHtml(item.label)}</div>
+      <div class="hermes-memory-summary-value">${escapeHtml(String(item.value))}</div>
+      <div class="hermes-memory-summary-meta">${escapeHtml(item.desc)}</div>
+    </div>
+  `).join('');
+
+  const preview = kwHermesMemoryState.preview || null;
+  if (!preview) {
+    previewNode.innerHTML = '请选择租户和清理范围后查看影响预览。';
+  } else {
+    previewNode.innerHTML = `
+      <div style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap">
+        <div>
+          <div class="hermes-memory-preview-title">清理预览 · ${escapeHtml(preview.range_label || preview.range_key || '')}</div>
+          <div style="font-size:12px;color:var(--text-sub);line-height:1.8;margin-top:6px">
+            ${preview.cutoff ? `将删除 ${escapeHtml(preview.cutoff)} 之后的 Hermes 记忆。` : '将清空该租户全部 Hermes 记忆。'}
+          </div>
+        </div>
+        <div class="hermes-memory-preview-time">生成时间：${escapeHtml(preview.generated_at || '--')}</div>
+      </div>
+      <div class="hermes-memory-preview-metrics">
+        <div class="hermes-memory-preview-metric"><div class="hermes-memory-preview-metric-label">待删轮次</div><div class="hermes-memory-preview-metric-value">${escapeHtml(String(preview.turns_to_clear || 0))}</div></div>
+        <div class="hermes-memory-preview-metric"><div class="hermes-memory-preview-metric-label">受影响会话</div><div class="hermes-memory-preview-metric-value">${escapeHtml(String(preview.sessions_affected || 0))}</div></div>
+        <div class="hermes-memory-preview-metric"><div class="hermes-memory-preview-metric-label">受影响用户</div><div class="hermes-memory-preview-metric-value">${escapeHtml(String(preview.users_affected || 0))}</div></div>
+        <div class="hermes-memory-preview-metric"><div class="hermes-memory-preview-metric-label">受影响画像</div><div class="hermes-memory-preview-metric-value">${escapeHtml(String(preview.profiles_affected || 0))}</div></div>
+      </div>
+      <div class="hermes-memory-preview-footnote">
+        时间覆盖：${escapeHtml(preview.first_turn_at || '--')} 至 ${escapeHtml(preview.last_turn_at || '--')}
+        ${preview.requires_strong_confirm ? ' · 全量清理需要手动输入 CONFIRM。' : ''}
+      </div>
+    `;
+  }
+
+  if (confirmWrap) confirmWrap.style.display = clearRange.value === 'all' ? 'block' : 'none';
+}
+
+async function loadWorkbenchHermesUsageStats() {
+  if (kwHermesUsageState.loading) return;
+  const tenantSlug = getWorkbenchHermesMemorySelectedTenant();
+  kwHermesUsageState.loading = true;
+  try {
+    const resp = await fetch(`/api/admin/hermes/usage-stats?tenant_slug=${encodeURIComponent(tenantSlug || '')}`);
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'hermes_usage_stats_failed');
+    kwHermesUsageState.stats = data.stats || null;
+    renderWorkbenchHermesUsageStats();
+  } catch (error) {
+    console.error(error);
+  } finally {
+    kwHermesUsageState.loading = false;
+  }
+}
+
+async function loadWorkbenchHermesMemorySummary(forceReload = false) {
+  if (kwHermesMemoryState.loading) return;
+  renderWorkbenchHermesMemoryPanel();
+  const tenantSlug = getWorkbenchHermesMemorySelectedTenant();
+  if (!tenantSlug) {
+    setWorkbenchHermesMemoryStatus('当前没有可管理的租户。', true);
+    return;
+  }
+  kwHermesMemoryState.loading = true;
+  setWorkbenchHermesMemoryStatus('正在加载 Hermes 记忆汇总...');
+  try {
+    const resp = await fetch(`/api/admin/hermes/memory-summary?tenant_slug=${encodeURIComponent(tenantSlug)}`);
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'hermes_memory_summary_failed');
+    kwHermesMemoryState.summary = data.summary || null;
+    kwHermesMemoryState.loaded = true;
+    if (forceReload || !kwHermesMemoryState.preview || kwHermesMemoryState.preview.tenant_slug !== tenantSlug) {
+      kwHermesMemoryState.preview = null;
+    }
+    renderWorkbenchHermesMemoryPanel();
+    loadWorkbenchHermesUsageStats();
+    await previewWorkbenchHermesMemoryClear(false);
+    setWorkbenchHermesMemoryStatus(`Hermes 记忆汇总已加载 · 租户 ${tenantSlug}`);
+  } catch (error) {
+    setWorkbenchHermesMemoryStatus(error.message || 'Hermes 记忆汇总加载失败', true);
+    throw error;
+  } finally {
+    kwHermesMemoryState.loading = false;
+  }
+}
+
+async function previewWorkbenchHermesMemoryClear(showToastOnSuccess = true) {
+  const tenantSlug = getWorkbenchHermesMemorySelectedTenant();
+  const rangeKey = document.getElementById('kw-hermes-memory-clear-range')?.value || '3m';
+  const confirmWrap = document.getElementById('kw-hermes-memory-clear-confirm-wrap');
+  if (confirmWrap) confirmWrap.style.display = rangeKey === 'all' ? 'block' : 'none';
+  if (!tenantSlug) return;
+  setWorkbenchHermesMemoryStatus('正在预览 Hermes 记忆清理影响...');
+  const resp = await fetch('/api/admin/hermes/memory-clear-preview', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({tenant_slug: tenantSlug, range_key: rangeKey}),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    setWorkbenchHermesMemoryStatus((data && data.error) || 'hermes_memory_preview_failed', true);
+    throw new Error((data && data.error) || 'hermes_memory_preview_failed');
+  }
+  kwHermesMemoryState.preview = data.preview || null;
+  renderWorkbenchHermesMemoryPanel();
+  setWorkbenchHermesMemoryStatus(`已生成清理预览 · ${tenantSlug} · ${rangeKey}`);
+  if (showToastOnSuccess !== false) showToast('已更新 Hermes 记忆清理预览');
+}
+
+async function backupWorkbenchHermesMemory() {
+  const tenantSlug = getWorkbenchHermesMemorySelectedTenant();
+  const rangeKey = document.getElementById('kw-hermes-memory-backup-range')?.value || '3m';
+  if (!tenantSlug) {
+    showToast('请先选择租户');
+    return false;
+  }
+  setWorkbenchHermesMemoryStatus('正在生成 Hermes 记忆 ZIP 备份...');
+  const resp = await fetch('/api/admin/hermes/memory-backup', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({tenant_slug: tenantSlug, range_key: rangeKey}),
+  });
+  if (!resp.ok) {
+    let errorMessage = 'hermes_memory_backup_failed';
+    try {
+      const data = await resp.json();
+      errorMessage = (data && data.error) || errorMessage;
+    } catch (error) {}
+    setWorkbenchHermesMemoryStatus(errorMessage, true);
+    showToast(errorMessage);
+    return false;
+  }
+  const blob = await resp.blob();
+  const downloadUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  link.download = (() => {
+    const contentDisposition = resp.headers.get('Content-Disposition') || '';
+    const matched = contentDisposition.match(/filename=\"([^\"]+)\"/);
+    return matched ? matched[1] : `hermes_memory_${tenantSlug}_${rangeKey}.zip`;
+  })();
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(downloadUrl);
+  setWorkbenchHermesMemoryStatus(`Hermes 记忆备份已生成 · ${tenantSlug} · ${rangeKey}`);
+  showToast('Hermes 记忆 ZIP 备份已下载');
+  return true;
+}
+
+async function clearWorkbenchHermesMemory(backupFirst) {
+  const tenantSlug = getWorkbenchHermesMemorySelectedTenant();
+  const rangeKey = document.getElementById('kw-hermes-memory-clear-range')?.value || '3m';
+  const confirmText = document.getElementById('kw-hermes-memory-clear-confirm')?.value || '';
+  if (!tenantSlug) {
+    showToast('请先选择租户');
+    return;
+  }
+  if (rangeKey === 'all' && String(confirmText).trim() !== 'CONFIRM') {
+    showToast('全量清理前请输入 CONFIRM');
+    return;
+  }
+  if (backupFirst) {
+    const backupOk = await backupWorkbenchHermesMemory();
+    if (!backupOk) return;
+  }
+  const preview = kwHermesMemoryState.preview || {};
+  const turnCount = Number(preview.turns_to_clear || 0);
+  const confirmed = window.confirm(
+    rangeKey === 'all'
+      ? `确认清空租户 ${tenantSlug} 的全部 Hermes 记忆吗？当前预估删除 ${turnCount} 轮对话。`
+      : `确认清理租户 ${tenantSlug} 的 Hermes 记忆吗？当前预估删除 ${turnCount} 轮对话。`
+  );
+  if (!confirmed) return;
+  setWorkbenchHermesMemoryStatus('正在执行 Hermes 记忆清理...');
+  const resp = await fetch('/api/admin/hermes/memory-clear', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({tenant_slug: tenantSlug, range_key: rangeKey, confirm_text: confirmText}),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    const errorMessage = (data && data.error) || 'hermes_memory_clear_failed';
+    setWorkbenchHermesMemoryStatus(errorMessage, true);
+    showToast(errorMessage);
+    return;
+  }
+  kwHermesMemoryState.summary = data.result && data.result.post_summary ? data.result.post_summary : kwHermesMemoryState.summary;
+  kwHermesMemoryState.preview = null;
+  const confirmInput = document.getElementById('kw-hermes-memory-clear-confirm');
+  if (confirmInput) confirmInput.value = '';
+  renderWorkbenchHermesMemoryPanel();
+  await previewWorkbenchHermesMemoryClear(false);
+  setWorkbenchHermesMemoryStatus(`Hermes 记忆清理完成 · ${tenantSlug} · ${rangeKey}`);
+  showToast('Hermes 记忆已清理并完成重建');
 }
 
 function kwRenderDashboardPreview() {
