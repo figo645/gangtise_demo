@@ -179,6 +179,15 @@ def normalize_knowledge_ingestion_config(source=None):
     }
 
 
+def normalize_hermes_settings_config(source=None):
+    raw = source if isinstance(source, dict) else {}
+    defaults = copy.deepcopy(DEFAULT_SITE_CONFIG["hermes_settings"])
+    return {
+        "prompt_scope_guard_enabled": bool(raw.get("prompt_scope_guard_enabled", defaults["prompt_scope_guard_enabled"])),
+        "investor_access_enabled": bool(raw.get("investor_access_enabled", defaults["investor_access_enabled"])),
+    }
+
+
 def normalize_evidence_chain_config(source=None):
     raw = source if isinstance(source, dict) else {}
     defaults = copy.deepcopy(DEFAULT_SITE_CONFIG["evidence_chain"])
@@ -2788,6 +2797,7 @@ def normalize_site_config(source=None):
     merged = _merge_site_config(copy.deepcopy(DEFAULT_SITE_CONFIG), source or {})
     merged["brand"] = normalize_brand_config(merged.get("brand"))
     merged["knowledge_ingestion"] = normalize_knowledge_ingestion_config(merged.get("knowledge_ingestion"))
+    merged["hermes_settings"] = normalize_hermes_settings_config(merged.get("hermes_settings"))
     merged["evidence_chain"] = normalize_evidence_chain_config(merged.get("evidence_chain"))
     merged["review_generation"] = normalize_review_generation_config(merged.get("review_generation"))
     merged["llm_registry"] = normalize_llm_registry_config(merged.get("llm_registry"))
@@ -2819,6 +2829,29 @@ def is_feature_enabled(feature_name, site_config=None):
     config = site_config or get_site_config()
     feature_flags = config.get("feature_flags", {}) if isinstance(config, dict) else {}
     return feature_flags.get(feature_name) is not False
+
+
+def get_hermes_settings(site_config=None):
+    config = site_config or get_site_config()
+    return normalize_hermes_settings_config(config.get("hermes_settings"))
+
+
+def is_hermes_scope_guard_enabled(site_config=None):
+    settings = get_hermes_settings(site_config)
+    return settings.get("prompt_scope_guard_enabled") is True
+
+
+def is_hermes_available_for_role(user_role="", site_config=None):
+    config = site_config or get_site_config()
+    if not is_feature_enabled("hermes", config):
+        return False
+    normalized_role = str(user_role or "").strip().lower()
+    if normalized_role == "dav":
+        return True
+    settings = get_hermes_settings(config)
+    if normalized_role == "investor":
+        return settings.get("investor_access_enabled") is True
+    return settings.get("investor_access_enabled") is True
 
 
 def get_h5_login_users(site_config=None):

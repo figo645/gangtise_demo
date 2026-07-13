@@ -3769,6 +3769,13 @@ function isFeatureEnabled(featureName) {
     const activeUser = getActiveDemoUser();
     if (activeUser && activeUser.role === 'dav') return true;
   }
+  if (featureName === 'hermes') {
+    const activeUser = getActiveDemoUser() || {};
+    const hermesSettings = (window.SITE_CONFIG && window.SITE_CONFIG.hermes_settings) || {};
+    if (siteFeatures.hermes === false) return false;
+    if (activeUser.role === 'dav') return true;
+    return hermesSettings.investor_access_enabled !== false;
+  }
   if (featureName === 'dm') {
     return siteFeatures.dm !== false || siteFeatures.fan_interaction !== false;
   }
@@ -10309,6 +10316,32 @@ const DEFAULT_HERMES_SKILLS = {
     ],
     knowledgeKeywords: ['纪要', '证据', '来源', '方法']
   },
+  report_interpretation: {
+    id: 'report_interpretation',
+    icon: '📄',
+    label: '报告解读',
+    desc: '适合上传研报、纪要或文件后，让 Hermes 先读材料，再给出结构化解读。',
+    promptTemplate: '先解析当前上传文件，再输出结构化解读、重点结论和待验证项。',
+    suggestions: [
+      '请解读我刚上传的这份研报，先说核心结论。',
+      '请把这份纪要拆成结论、依据和风险提示。',
+      '请把上传文件做成一版适合继续追问的结构化摘要。'
+    ],
+    knowledgeKeywords: ['研报', '纪要', '报告', '知识']
+  },
+  content_generation: {
+    id: 'content_generation',
+    icon: '✍️',
+    label: '内容生成',
+    desc: '把已有知识、附件或研究结果整理成摘要、提纲、草稿或发布文案。',
+    promptTemplate: '结合当前上下文，输出一版可直接修改的结构化内容草稿。',
+    suggestions: [
+      '请基于当前内容生成一版结构化摘要。',
+      '请帮我起草一段研究结论，语气专业一点。',
+      '请整理成提纲，方便我后续继续修改。'
+    ],
+    knowledgeKeywords: ['摘要', '提纲', '草稿', '方法']
+  },
   line_chart: {
     id: 'line_chart',
     icon: '📈',
@@ -10347,6 +10380,19 @@ const DEFAULT_HERMES_SKILLS = {
       '请用分布图判断当前值处于什么区间。'
     ],
     knowledgeKeywords: ['分布', '直方图', '区间统计']
+  },
+  small_talk: {
+    id: 'small_talk',
+    icon: '💬',
+    label: '轻度闲聊',
+    desc: '用于轻量追问、上下文承接和研究方向确认，不替代研究型任务。',
+    promptTemplate: '简短承接上下文，必要时把问题收口到平台支持的研究能力。',
+    suggestions: [
+      '先帮我确认一下我刚才的问题更适合怎么问。',
+      '你先告诉我接下来应该补什么信息。',
+      '如果要继续研究，这一步最适合先看什么？'
+    ],
+    knowledgeKeywords: ['帮助', '确认', '方向']
   }
 };
 
@@ -10360,6 +10406,9 @@ async function selectHermesMode(mode) {
     '线性图': 'line_chart',
     'K线图': 'kline_chart',
     '分布图': 'distribution_chart',
+    '报告解读': 'report_interpretation',
+    '内容生成': 'content_generation',
+    '轻度闲聊': 'small_talk',
     '线索追踪': 'evidence',
     '复盘速写': 'basic',
     '研报精读': 'evidence',
@@ -11692,6 +11741,10 @@ function renderHermesAnalysisCards(artifact, agentTrace) {
 
 async function runHermesAnalysis(options) {
   options = options || {};
+  if (!isFeatureEnabled('hermes')) {
+    showToast('当前账号还未开放 Hermes');
+    return;
+  }
   const question = getHermesActiveQuestion().trim();
   const skill = getHermesSkillById(hermesSelectedSkill) || DEFAULT_HERMES_SKILLS.basic;
   if (!question) {
@@ -11783,6 +11836,11 @@ async function runHermesAnalysis(options) {
     }
   } catch (e) {
     hermesConversation.pop();
+    const friendlyError = e && e.message === 'hermes_investor_access_disabled'
+      ? '当前租户尚未向普通用户开放 Hermes'
+      : (e && e.message === 'hermes_disabled'
+        ? 'Hermes 当前已在后台关闭'
+        : (e && e.message) || 'Hermes 查询失败');
     hermesConversation.push({
       id: createHermesEntryId('ai'),
       type: 'ai',
@@ -11793,7 +11851,7 @@ async function runHermesAnalysis(options) {
         headline: '本轮查询执行失败',
         summary: '统一编排入口未成功返回结果，当前已保留对话上下文。',
         body: '',
-        bullets: [e.message || 'Hermes 查询失败'],
+        bullets: [friendlyError],
         followups: ['你可以直接重试，或换一个更具体的问题。'],
         citations: ['统一查询入口失败'],
         knowledge: inferHermesKnowledgeForSkill(skill),
@@ -11811,7 +11869,7 @@ async function runHermesAnalysis(options) {
     });
     renderHermesThread();
     renderHermesComposerSubmit();
-    showToast(e.message || 'Hermes 查询失败');
+    showToast(friendlyError);
   }
 }
 

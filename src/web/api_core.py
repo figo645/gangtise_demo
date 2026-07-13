@@ -881,6 +881,11 @@ def api_admin_site_config():
                 if isinstance(payload.get("knowledge_ingestion"), dict)
                 else current.get("knowledge_ingestion")
             ),
+            "hermes_settings": normalize_hermes_settings_config(
+                payload.get("hermes_settings")
+                if isinstance(payload.get("hermes_settings"), dict)
+                else current.get("hermes_settings")
+            ),
             "evidence_chain": normalize_evidence_chain_config(
                 payload.get("evidence_chain")
                 if isinstance(payload.get("evidence_chain"), dict)

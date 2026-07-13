@@ -4180,6 +4180,14 @@
               <label class="toggle"><input id="feature-hermes" type="checkbox"><span class="toggle-slider"></span></label>
             </div>
             <div class="toggle-wrap">
+              <span class="toggle-label">Hermes 提示词范围约束</span>
+              <label class="toggle"><input id="hermes-prompt-scope-guard-enabled" type="checkbox"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
+              <span class="toggle-label">Hermes 向普通用户开放</span>
+              <label class="toggle"><input id="hermes-investor-access-enabled" type="checkbox"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
               <span class="toggle-label">渠道模块</span>
               <label class="toggle"><input id="feature-channel_module" type="checkbox" checked><span class="toggle-slider"></span></label>
             </div>
@@ -4216,6 +4224,9 @@
             </div>
             <div class="feature-note" style="margin-top:8px">
               MVP 默认优先开放：基本面、自选股、复盘、消息互动、知识归档、大V工作台和租户门户；预测分析放到约 1 个月后的第二阶段，会员收费能力按层级逐步开放。
+            </div>
+            <div class="feature-note" style="margin-top:8px">
+              Hermes 范围约束开启后，只接受固定研究范围内的提示词；关闭后，Hermes 会按更开放的问答模式继续承接。普通用户开放开关关闭时，H5 中只有大V用户能看到和使用 Hermes。
             </div>
             <div style="display:grid;gap:10px;margin-top:16px">
               <button class="btn-gold" type="button" style="padding:10px 20px;font-size:13px;width:100%" onclick="saveSiteConfig()">保存功能开关</button>
@@ -9202,6 +9213,7 @@ function renderSiteConfigForm() {
   const cfg = adminSiteConfig || {};
   const dbRuntime = cfg.db_runtime || {};
   const flags = cfg.feature_flags || {};
+  const hermesSettings = cfg.hermes_settings || {};
   const brand = cfg.brand || {};
   const voiceTranscription = cfg.voice_transcription || {};
   const voiceEmbedding = cfg.voice_embedding || {};
@@ -9219,6 +9231,10 @@ function renderSiteConfigForm() {
   if (embeddingEngine) embeddingEngine.value = voiceEmbedding.engine || 'api';
   const knowledgePreviewToggle = document.getElementById('knowledge-user-preview-enabled');
   if (knowledgePreviewToggle) knowledgePreviewToggle.checked = knowledgeIngestion.user_preview_enabled === true;
+  const hermesPromptScopeGuardToggle = document.getElementById('hermes-prompt-scope-guard-enabled');
+  if (hermesPromptScopeGuardToggle) hermesPromptScopeGuardToggle.checked = hermesSettings.prompt_scope_guard_enabled !== false;
+  const hermesInvestorAccessToggle = document.getElementById('hermes-investor-access-enabled');
+  if (hermesInvestorAccessToggle) hermesInvestorAccessToggle.checked = hermesSettings.investor_access_enabled !== false;
   const dbRuntimeToggle = document.getElementById('db-runtime-use-staging');
   if (dbRuntimeToggle) dbRuntimeToggle.checked = dbRuntime.use_staging === true;
   const dbRuntimeSummary = document.getElementById('db-runtime-summary');
@@ -9393,6 +9409,11 @@ async function saveSiteConfig() {
     },
     knowledge_ingestion: {
       user_preview_enabled: Boolean(knowledgePreviewToggle && knowledgePreviewToggle.checked),
+    },
+    hermes_settings: {
+      ...(adminSiteConfig.hermes_settings || {}),
+      prompt_scope_guard_enabled: Boolean(document.getElementById('hermes-prompt-scope-guard-enabled') && document.getElementById('hermes-prompt-scope-guard-enabled').checked),
+      investor_access_enabled: Boolean(document.getElementById('hermes-investor-access-enabled') && document.getElementById('hermes-investor-access-enabled').checked),
     },
     evidence_chain: {
       filter_prompt_system: document.getElementById('evidence-filter-system-prompt')

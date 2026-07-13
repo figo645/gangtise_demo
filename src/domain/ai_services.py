@@ -1,3 +1,5 @@
+import math
+
 from src.runtime import *
 from src.domain.core_services import *
 from src.domain.core_services import _estimate_token_count, _extract_usage_tokens
@@ -3020,6 +3022,31 @@ HERMES_OUT_OF_SCOPE_KEYWORDS = [
 
 HERMES_PRODUCT_ACTION_KEYWORDS = ["怎么", "如何", "创建", "新增", "发布", "预览", "修改", "配置", "上传", "切换", "打开", "进入", "使用"]
 
+HERMES_VISUAL_MODE_KEYWORDS = {
+    "distribution_chart": ["分布图", "分布统计", "分布", "直方图", "柱状分布", "区间分布"],
+    "kline_chart": ["k线图", "k线走势", "k线", "蜡烛图", "candlestick"],
+    "line_chart": ["线性趋势图", "历史数据线图", "折线图", "线性图", "趋势线图", "趋势线", "线图", "趋势图", "走势图", "line chart"],
+}
+
+HERMES_TASK_FAMILY_LABELS = {
+    "small_talk": "闲聊",
+    "data_visualization": "数据展示",
+    "report_interpretation": "报告解读",
+    "content_generation": "内容生成",
+    "product_help": "产品帮助",
+    "research_qa": "研究问答",
+    "out_of_scope_redirect": "范围收口",
+}
+
+HERMES_CONTENT_GENERATION_KEYWORDS = [
+    "生成", "起草", "草稿", "改写", "润色", "整理", "重写", "写一段", "写一个", "写篇", "摘要", "总结",
+    "提炼", "内容生成", "发布文案", "标题", "提纲",
+]
+
+HERMES_REPORT_INTERPRETATION_KEYWORDS = [
+    "报告", "研报", "文件", "上传", "pdf", "docx", "txt", "csv", "解读", "速读", "拆解", "读一下", "看一下",
+]
+
 
 def _contains_any_keyword(text, keywords):
     normalized = str(text or "").strip().lower()
@@ -3030,10 +3057,79 @@ def _contains_any_keyword(text, keywords):
     return False
 
 
-def _hermes_scope_feature_flags(question_text, selected_knowledge_ids=None, attachments=None, tenant_slug=""):
+def infer_hermes_visual_mode(question_text, preferred_mode=""):
+    preferred_key = str(preferred_mode or "").strip().lower()
+    if preferred_key in {"line_chart", "kline_chart", "distribution_chart"}:
+        return preferred_key
+    normalized = str(question_text or "").strip().lower()
+    if not normalized:
+        return ""
+    for mode_key in ["distribution_chart", "kline_chart", "line_chart"]:
+        if _contains_any_keyword(normalized, HERMES_VISUAL_MODE_KEYWORDS.get(mode_key) or []):
+            return mode_key
+    return ""
+
+
+def infer_hermes_task_family(question_text="", preferred_mode="", attachments=None, selected_knowledge_ids=None, intent=""):
+    text = str(question_text or "").strip()
+    lowered = text.lower()
+    attachments = attachments if isinstance(attachments, list) else []
+    selected_knowledge_ids = selected_knowledge_ids if isinstance(selected_knowledge_ids, list) else []
+    intent_key = str(intent or "").strip().lower()
+    visual_mode = infer_hermes_visual_mode(text, preferred_mode=preferred_mode)
+    preferred_key = str(preferred_mode or "").strip().lower()
+    if intent_key == "out_of_scope_redirect":
+        return "out_of_scope_redirect"
+    if intent_key == "small_talk":
+        return "small_talk"
+    if visual_mode:
+        return "data_visualization"
+    if preferred_key == "report_interpretation":
+        return "report_interpretation"
+    if preferred_key == "content_generation":
+        return "content_generation"
+    if preferred_key in {"small_talk", "chat"}:
+        return "small_talk"
+    if intent_key == "product_help":
+        return "product_help"
+    if attachments and _contains_any_keyword(lowered, HERMES_REPORT_INTERPRETATION_KEYWORDS):
+        return "report_interpretation"
+    if selected_knowledge_ids and _contains_any_keyword(lowered, HERMES_REPORT_INTERPRETATION_KEYWORDS):
+        return "report_interpretation"
+    if _contains_any_keyword(lowered, HERMES_CONTENT_GENERATION_KEYWORDS):
+        return "content_generation"
+    if _contains_any_keyword(lowered, HERMES_REPORT_INTERPRETATION_KEYWORDS) and attachments:
+        return "report_interpretation"
+    return "research_qa"
+
+
+def finalize_hermes_intent_plan(plan, question_text="", attachments=None, selected_knowledge_ids=None):
+    normalized_plan = copy.deepcopy(plan if isinstance(plan, dict) else {})
+    resolved_mode = infer_hermes_visual_mode(
+        question_text,
+        preferred_mode=normalized_plan.get("preferred_mode") or "",
+    )
+    if resolved_mode:
+        normalized_plan["preferred_mode"] = resolved_mode
+        if str(normalized_plan.get("intent") or "").strip() == "smart_indicator_explain":
+            normalized_plan["display_mode"] = "structured"
+    task_family = infer_hermes_task_family(
+        question_text=question_text,
+        preferred_mode=normalized_plan.get("preferred_mode") or "",
+        attachments=attachments,
+        selected_knowledge_ids=selected_knowledge_ids,
+        intent=normalized_plan.get("intent") or "",
+    )
+    normalized_plan["task_family"] = task_family
+    normalized_plan["capability_label"] = HERMES_TASK_FAMILY_LABELS.get(task_family, "研究问答")
+    return normalized_plan
+
+
+def _hermes_scope_feature_flags(question_text, selected_knowledge_ids=None, attachments=None, tenant_slug="", preferred_mode=""):
     selected_knowledge_ids = selected_knowledge_ids if isinstance(selected_knowledge_ids, list) else []
     attachments = attachments if isinstance(attachments, list) else []
     text = str(question_text or "").strip()
+    preferred_key = str(preferred_mode or "").strip().lower()
     indicator_match = find_indicator_reference_from_text(text, tenant_slug=tenant_slug)
     flags = {
         "watchlist": bool(find_watchlist_code_from_text(text)) or _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["watchlist"]),
@@ -3042,6 +3138,8 @@ def _hermes_scope_feature_flags(question_text, selected_knowledge_ids=None, atta
         "indicator": bool(indicator_match) or _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["indicator"]),
         "dashboard": _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["dashboard"]),
         "product": _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["product"]),
+        "report": preferred_key == "report_interpretation" or _contains_any_keyword(text, HERMES_REPORT_INTERPRETATION_KEYWORDS),
+        "content_generation": preferred_key == "content_generation" or _contains_any_keyword(text, HERMES_CONTENT_GENERATION_KEYWORDS),
         "attachments": bool(attachments),
         "small_talk": _contains_any_keyword(text, HERMES_SMALL_TALK_KEYWORDS),
         "blocked_trading": _contains_any_keyword(text, HERMES_BLOCKED_TRADING_KEYWORDS),
@@ -3049,18 +3147,19 @@ def _hermes_scope_feature_flags(question_text, selected_knowledge_ids=None, atta
     }
     flags["platform_related"] = any(
         flags[key]
-        for key in ["watchlist", "evidence", "knowledge", "indicator", "dashboard", "product", "attachments"]
+        for key in ["watchlist", "evidence", "knowledge", "indicator", "dashboard", "product", "report", "content_generation", "attachments"]
     )
     return flags
 
 
-def hermes_scope_guard(question_text, selected_knowledge_ids=None, attachments=None, tenant_slug=""):
+def hermes_scope_guard(question_text, selected_knowledge_ids=None, attachments=None, tenant_slug="", preferred_mode=""):
     text = str(question_text or "").strip()
     flags = _hermes_scope_feature_flags(
         question_text=text,
         selected_knowledge_ids=selected_knowledge_ids,
         attachments=attachments,
         tenant_slug=tenant_slug,
+        preferred_mode=preferred_mode,
     )
     suggestions = [
         "可以改问个股 / 自选股基本面。",
@@ -3084,6 +3183,10 @@ def hermes_scope_guard(question_text, selected_knowledge_ids=None, attachments=N
             intent_hint = "smart_indicator_explain"
         elif flags["dashboard"]:
             intent_hint = "dashboard_interpretation"
+        elif flags["report"] or flags["attachments"]:
+            intent_hint = "knowledge_lookup"
+        elif flags["content_generation"]:
+            intent_hint = "multi_tool_research"
         elif flags["product"]:
             intent_hint = "product_help"
         elif flags["watchlist"]:
@@ -3119,6 +3222,24 @@ def hermes_scope_guard(question_text, selected_knowledge_ids=None, attachments=N
         "message": "Hermes 主要回答个股/自选股、复盘证据链、知识框架、智能指标和平台功能使用相关问题。你可以换成这些方向继续问。",
         "suggestions": suggestions,
         "intent_hint": "out_of_scope_redirect",
+        "flags": flags,
+    }
+
+
+def build_hermes_open_scope_result(question_text="", preferred_mode="", selected_knowledge_ids=None, attachments=None, tenant_slug=""):
+    flags = _hermes_scope_feature_flags(
+        question_text=question_text,
+        selected_knowledge_ids=selected_knowledge_ids,
+        attachments=attachments,
+        tenant_slug=tenant_slug,
+        preferred_mode=preferred_mode,
+    )
+    return {
+        "status": "allowed",
+        "reason": "当前未启用 Hermes 提示词范围约束，允许按更开放的问题范围继续编排。",
+        "message": "",
+        "suggestions": [],
+        "intent_hint": "small_talk" if flags.get("small_talk") else "",
         "flags": flags,
     }
 
@@ -4616,6 +4737,12 @@ def _normalize_hermes_mode_label(intent, answer_mode="", preferred_mode="", entr
         return "K线图"
     if preferred_key == "distribution_chart":
         return "分布图"
+    if preferred_key == "report_interpretation":
+        return "报告解读"
+    if preferred_key == "content_generation":
+        return "内容生成"
+    if preferred_key in {"small_talk", "chat"}:
+        return "轻度闲聊"
     if intent_key == "watchlist_fundamental":
         return "自选股诊断"
     if intent_key == "evidence_chain_analysis":
@@ -5180,7 +5307,7 @@ def build_hermes_intent_router_prompt(question_text, has_attachments=False, sele
     )
 
 
-def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attachments=None, preferred_mode="", tenant_slug=""):
+def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attachments=None, preferred_mode="", tenant_slug="", scope_guard_enabled=True):
     question = str(question_text or "").strip()
     lowered = question.lower()
     attachments = attachments if isinstance(attachments, list) else []
@@ -5198,42 +5325,68 @@ def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attac
     dashboard_keywords = HERMES_SCOPE_KEYWORDS["dashboard"]
     product_keywords = HERMES_SCOPE_KEYWORDS["product"]
     product_action_keywords = HERMES_PRODUCT_ACTION_KEYWORDS
-    explicit_kline_request = any(keyword in lowered for keyword in ["k线", "k线图", "k线走势", "蜡烛图"])
+    inferred_visual_mode = infer_hermes_visual_mode(question, preferred_mode=preferred_mode)
+    if inferred_visual_mode:
+        preferred_mode = inferred_visual_mode
+    if preferred_mode in {"small_talk", "chat"}:
+        return finalize_hermes_intent_plan({
+            "intent": "small_talk",
+            "tools": ["attachment.context"] if has_attachments else [],
+            "stock_code": stock_code,
+            "display_mode": "text",
+            "preferred_mode": preferred_mode,
+            "reason": "分析方式偏向轻度闲聊承接",
+        }, question_text=question, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
+    if preferred_mode == "report_interpretation":
+        report_tools = ["attachment.context"]
+        if selected_knowledge_ids:
+            report_tools.append("knowledge.search")
+        return finalize_hermes_intent_plan({
+            "intent": "knowledge_lookup",
+            "tools": report_tools,
+            "stock_code": stock_code,
+            "display_mode": "text",
+            "preferred_mode": preferred_mode,
+            "reason": "分析方式偏向上传材料或报告解读",
+        }, question_text=question, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
+    if preferred_mode == "content_generation":
+        generation_tools = (["knowledge.search"] if selected_knowledge_ids else []) + (["attachment.context"] if has_attachments else [])
+        if stock_code:
+            generation_tools.append("watchlist.detail")
+        return finalize_hermes_intent_plan({
+            "intent": "multi_tool_research" if generation_tools else "knowledge_lookup",
+            "tools": generation_tools,
+            "stock_code": stock_code,
+            "display_mode": "text",
+            "preferred_mode": preferred_mode,
+            "reason": "分析方式偏向内容生成与结构化整理",
+        }, question_text=question, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
     if preferred_mode == "evidence":
-        return {
+        return finalize_hermes_intent_plan({
             "intent": "evidence_chain_analysis" if not stock_code else "multi_tool_research",
             "tools": ["evidence.search"] + (["watchlist.detail"] if stock_code else []) + (["attachment.context"] if has_attachments else []),
             "stock_code": stock_code,
             "display_mode": "structured" if stock_code else "text",
             "reason": "分析方式偏向证据链归因",
-        }
+        }, question_text=question, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
     if preferred_mode in {"line_chart", "kline_chart", "distribution_chart"}:
-        return {
+        return finalize_hermes_intent_plan({
             "intent": "smart_indicator_explain",
             "tools": ["indicator.detail", "dashboard.context"] + (["knowledge.search"] if selected_knowledge_ids else []) + (["attachment.context"] if has_attachments else []),
             "stock_code": stock_code,
             "indicator_code": indicator_code,
             "display_mode": "structured" if indicator_code else "text",
+            "preferred_mode": preferred_mode,
             "reason": f"分析方式偏向{ {'line_chart': '线性图', 'kline_chart': 'K线图', 'distribution_chart': '分布图'}.get(preferred_mode, '图表可视化') }",
-        }
-    if explicit_kline_request and indicator_code:
-        return {
-            "intent": "smart_indicator_explain",
-            "tools": ["indicator.detail", "dashboard.context"] + (["knowledge.search"] if selected_knowledge_ids else []) + (["attachment.context"] if has_attachments else []),
-            "stock_code": stock_code,
-            "indicator_code": indicator_code,
-            "display_mode": "structured",
-            "reason": f"用户明确要求 K线走势：{(indicator_match or {}).get('indicator_name') or indicator_code}",
-            "preferred_mode": "kline_chart",
-        }
+        }, question_text=question, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
     if preferred_mode == "judgement" and stock_code:
-        return {
+        return finalize_hermes_intent_plan({
             "intent": "watchlist_fundamental",
             "tools": ["watchlist.detail"] + (["attachment.context"] if has_attachments else []),
             "stock_code": stock_code,
             "display_mode": "structured",
             "reason": "分析方式偏向基本面判断",
-        }
+        }, question_text=question, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
     if any(keyword in lowered for keyword in [item.lower() for item in product_keywords]) and any(
         keyword in lowered for keyword in [item.lower() for item in product_action_keywords]
     ):
@@ -5244,39 +5397,39 @@ def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attac
             product_tools.append("knowledge.search")
         if has_attachments:
             product_tools.append("attachment.context")
-        return {
+        return finalize_hermes_intent_plan({
             "intent": "product_help",
             "tools": product_tools,
             "stock_code": stock_code,
             "display_mode": "text",
             "reason": "命中平台功能操作问题",
-        }
+        }, question_text=question, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
     if any(keyword in lowered for keyword in [item.lower() for item in indicator_keywords]):
-        return {
+        return finalize_hermes_intent_plan({
             "intent": "smart_indicator_explain",
             "tools": ["indicator.detail", "dashboard.context"] + (["knowledge.search"] if selected_knowledge_ids else []) + (["attachment.context"] if has_attachments else []),
             "stock_code": stock_code,
             "indicator_code": indicator_code,
             "display_mode": "structured" if indicator_code else "text",
             "reason": f"命中指标或股指问题：{(indicator_match or {}).get('indicator_name') or '智能指标 / 公式说明'}",
-        }
+        }, question_text=question, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
     if indicator_code:
-        return {
+        return finalize_hermes_intent_plan({
             "intent": "smart_indicator_explain",
             "tools": ["indicator.detail", "dashboard.context"] + (["knowledge.search"] if selected_knowledge_ids else []) + (["attachment.context"] if has_attachments else []),
             "stock_code": stock_code,
             "indicator_code": indicator_code,
             "display_mode": "structured",
             "reason": f"命中指标或股指问题：{(indicator_match or {}).get('indicator_name') or indicator_code}",
-        }
+        }, question_text=question, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
     if any(keyword in lowered for keyword in [item.lower() for item in dashboard_keywords]):
-        return {
+        return finalize_hermes_intent_plan({
             "intent": "dashboard_interpretation",
             "tools": ["dashboard.context"] + (["attachment.context"] if has_attachments else []),
             "stock_code": stock_code,
             "display_mode": "text",
             "reason": "命中 Dashboard 面板理解问题",
-        }
+        }, question_text=question, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
     if any(keyword in lowered for keyword in [item.lower() for item in product_keywords]):
         product_tools = []
         if scope_flags["dashboard"] or scope_flags["indicator"]:
@@ -5285,58 +5438,67 @@ def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attac
             product_tools.append("knowledge.search")
         if has_attachments:
             product_tools.append("attachment.context")
-        return {
+        return finalize_hermes_intent_plan({
             "intent": "product_help",
             "tools": product_tools,
             "stock_code": stock_code,
             "display_mode": "text",
             "reason": "命中平台功能使用问题",
-        }
+        }, question_text=question, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
     if any(keyword in lowered for keyword in [item.lower() for item in evidence_keywords]):
-        return {
+        return finalize_hermes_intent_plan({
             "intent": "evidence_chain_analysis" if not stock_code else "multi_tool_research",
             "tools": ["evidence.search"] + (["watchlist.detail"] if stock_code else []) + (["attachment.context"] if has_attachments else []),
             "stock_code": stock_code,
             "display_mode": "structured" if stock_code else "text",
             "reason": "命中复盘或证据链问题",
-        }
+        }, question_text=question, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
     if stock_code or any(keyword in lowered for keyword in [item.lower() for item in stock_keywords]):
-        return {
+        return finalize_hermes_intent_plan({
             "intent": "watchlist_fundamental" if not selected_knowledge_ids and not has_attachments else "multi_tool_research",
             "tools": ["watchlist.detail"] + (["knowledge.search"] if selected_knowledge_ids else []) + (["attachment.context"] if has_attachments else []),
             "stock_code": stock_code,
             "display_mode": "structured" if stock_code else "text",
             "reason": "命中个股基本面问题",
-        }
+        }, question_text=question, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
     if selected_knowledge_ids or any(keyword in lowered for keyword in [item.lower() for item in knowledge_keywords]):
-        return {
+        return finalize_hermes_intent_plan({
             "intent": "knowledge_lookup",
             "tools": ["knowledge.search"] + (["attachment.context"] if has_attachments else []),
             "stock_code": stock_code,
             "display_mode": "text",
             "reason": "命中知识或方法问题",
-        }
+        }, question_text=question, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
     if scope_flags["small_talk"]:
-        return {
+        return finalize_hermes_intent_plan({
             "intent": "small_talk",
             "tools": ["attachment.context"] if has_attachments else [],
             "stock_code": stock_code,
             "display_mode": "text",
             "reason": "轻度闲聊或寒暄",
-        }
-    return {
+        }, question_text=question, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
+    if not scope_guard_enabled:
+        return finalize_hermes_intent_plan({
+            "intent": "small_talk",
+            "tools": ["attachment.context"] if has_attachments else [],
+            "stock_code": stock_code,
+            "display_mode": "text",
+            "preferred_mode": preferred_mode or "chat",
+            "reason": "当前未启用固定范围约束，按开放问答继续承接。",
+        }, question_text=question, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
+    return finalize_hermes_intent_plan({
         "intent": "out_of_scope_redirect",
         "tools": [],
         "stock_code": stock_code,
         "display_mode": "text",
         "reason": "当前问题超出 Hermes 的主要服务范围，建议收口到平台相关问题。",
-    }
+    }, question_text=question, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
 
 
-def build_hermes_scope_plan(scope_result, question_text, selected_knowledge_ids=None, attachments=None, preferred_mode=""):
+def build_hermes_scope_plan(scope_result, question_text, selected_knowledge_ids=None, attachments=None, preferred_mode="", scope_guard_enabled=True):
     scope = scope_result if isinstance(scope_result, dict) else {}
     if str(scope.get("status") or "").strip() in {"redirected", "blocked"}:
-        return {
+        return finalize_hermes_intent_plan({
             "intent": "out_of_scope_redirect",
             "tools": [],
             "stock_code": "",
@@ -5349,19 +5511,25 @@ def build_hermes_scope_plan(scope_result, question_text, selected_knowledge_ids=
                 for item in (scope.get("suggestions") if isinstance(scope.get("suggestions"), list) else [])
                 if str(item).strip()
             ][:4],
-        }
+        }, question_text=question_text, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
     plan = default_hermes_intent_plan(
         question_text=question_text,
         selected_knowledge_ids=selected_knowledge_ids,
         attachments=attachments,
         preferred_mode=preferred_mode,
         tenant_slug="",
+        scope_guard_enabled=scope_guard_enabled,
     )
     if scope.get("status") == "soft_allowed":
         plan["intent"] = "small_talk"
         plan["reason"] = str(scope.get("reason") or plan.get("reason") or "").strip() or plan.get("reason") or ""
     plan["scope_status"] = str(scope.get("status") or "allowed").strip() or "allowed"
-    return plan
+    return finalize_hermes_intent_plan(
+        plan,
+        question_text=question_text,
+        attachments=attachments,
+        selected_knowledge_ids=selected_knowledge_ids,
+    )
 
 
 def build_hermes_scope_synthesis(plan):
@@ -5381,7 +5549,7 @@ def build_hermes_scope_synthesis(plan):
     }
 
 
-def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_ids=None, attachments=None, preferred_mode="", messages=None, scope_result=None, memory_state=None):
+def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_ids=None, attachments=None, preferred_mode="", messages=None, scope_result=None, memory_state=None, scope_guard_enabled=True):
     selected_knowledge_ids = selected_knowledge_ids if isinstance(selected_knowledge_ids, list) else []
     attachments = attachments if isinstance(attachments, list) else []
     messages = normalize_hermes_messages(messages)
@@ -5392,6 +5560,7 @@ def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_
             selected_knowledge_ids=selected_knowledge_ids,
             attachments=attachments,
             preferred_mode=preferred_mode,
+            scope_guard_enabled=scope_guard_enabled,
         ), None, "scope_guard"
     fallback = default_hermes_intent_plan(
         question_text=question_text,
@@ -5399,6 +5568,7 @@ def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_
         attachments=attachments,
         preferred_mode=preferred_mode,
         tenant_slug=tenant_slug,
+        scope_guard_enabled=scope_guard_enabled,
     )
     llm_model = get_default_llm_config(purpose="general")
     if not llm_model:
@@ -5437,14 +5607,15 @@ def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_
         display_mode = str(parsed.get("display_mode") or fallback["display_mode"]).strip()
         if display_mode not in {"text", "structured"}:
             display_mode = fallback["display_mode"]
-        return {
+        return finalize_hermes_intent_plan({
             "intent": intent,
             "tools": tools[:4],
             "stock_code": stock_code,
             "indicator_code": str(parsed.get("indicator_code") or fallback.get("indicator_code") or "").strip(),
             "display_mode": display_mode,
             "reason": str(parsed.get("reason") or fallback["reason"]).strip()[:200] or fallback["reason"],
-        }, llm_model, "llm_router"
+            "preferred_mode": str(parsed.get("preferred_mode") or fallback.get("preferred_mode") or preferred_mode or "").strip().lower(),
+        }, question_text=question_text, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids), llm_model, "llm_router"
     except Exception:
         app.logger.exception("Failed to route Hermes query intent")
         return fallback, llm_model, "fallback_rule_router"
@@ -5937,6 +6108,8 @@ def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode
     selected_knowledge_ids = selected_knowledge_ids if isinstance(selected_knowledge_ids, list) else []
     scope = scope_result if isinstance(scope_result, dict) else {}
     intent = str((intent_plan or {}).get("intent") or "").strip()
+    task_family = str((intent_plan or {}).get("task_family") or "").strip()
+    capability_label = str((intent_plan or {}).get("capability_label") or HERMES_TASK_FAMILY_LABELS.get(task_family, "")).strip()
     tools = [str(item).strip() for item in ((intent_plan or {}).get("tools") or []) if str(item).strip()]
     planned_tool_labels = [HERMES_TOOL_LABELS.get(item, item) for item in tools]
     ok_count = sum(1 for item in (tool_trace or []) if str((item or {}).get("status") or "").strip() == "ok")
@@ -5944,6 +6117,8 @@ def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode
     route_label = "LLM 路由" if route_mode == "llm_router" else "规则路由"
     answer_label = "模型整合回答" if answer_mode == "llm_synthesized" else "规则降级回答"
     planning_bits = []
+    if capability_label:
+        planning_bits.append(f"能力分类：{capability_label}")
     if preferred_mode and preferred_mode != "auto":
         planning_bits.append(f"偏好模式：{preferred_mode}")
     planning_bits.append("先查当前租户知识库")
@@ -6020,7 +6195,7 @@ def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode
     ]
     return {
         "headline": "Hermes Agent 已完成本轮编排",
-        "summary": "先拆解问题，再调度知识、个股、附件等工具，最后整合成可读回答。",
+        "summary": f"先按“{capability_label or '研究问答'}”拆解问题，再调度固定知识、平台工具与可选互联网补充，最后整合成可读回答。",
         "steps": steps,
     }
 
@@ -6372,7 +6547,75 @@ def build_hermes_indicator_chart_html(detail, chart_kind, question_text=""):
             f'<path d="{build_ma_path(ma20)}" fill="none" stroke="#AF7AC5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>'
             f"{''.join(anomaly_marks)}{''.join(ticks)}</svg></div>"
         )
-    return ""
+    if kind == "distribution":
+        history_series = safe_detail.get("history_series") if isinstance(safe_detail.get("history_series"), list) else []
+        values = [NumberLike(item.get("value")) for item in history_series if isinstance(item, dict)]
+        values = [value for value in values if isinstance(value, (int, float))]
+        if not values:
+            return ""
+        width = 320
+        height = 150
+        padding_top = 12
+        padding_right = 10
+        padding_bottom = 20
+        padding_left = 10
+        bucket_count = min(6, max(4, int(math.sqrt(len(values))) or 4))
+        min_value = min(values)
+        max_value = max(values)
+        span = max(max_value - min_value, 1.0)
+        bucket_size = span / max(bucket_count, 1)
+        buckets = [{"count": 0, "label": f"{(min_value + bucket_size * index):.1f}"} for index in range(bucket_count)]
+        for value in values:
+            raw_index = int((value - min_value) / bucket_size) if bucket_size else 0
+            bucket_index = min(bucket_count - 1, max(0, raw_index))
+            buckets[bucket_index]["count"] += 1
+        max_count = max([item["count"] for item in buckets] + [1])
+        plot_width = width - padding_left - padding_right
+        plot_height = height - padding_top - padding_bottom
+        bar_gap = 8
+        bar_width = (plot_width - bar_gap * max(bucket_count - 1, 0)) / max(bucket_count, 1)
+        bars = []
+        for index, item in enumerate(buckets):
+            bar_height = (item["count"] / max_count) * plot_height
+            x = padding_left + index * (bar_width + bar_gap)
+            y = padding_top + plot_height - bar_height
+            bars.append(
+                f'<rect x="{x:.2f}" y="{y:.2f}" width="{bar_width:.2f}" height="{bar_height:.2f}" rx="4" fill="rgba(47,116,192,0.86)"></rect>'
+                f'<text x="{(x + bar_width / 2):.2f}" y="{(y - 4):.2f}" text-anchor="middle" font-size="9" fill="#5A6572">{item["count"]}</text>'
+            )
+        return (
+            '<div class="hermes-chart-shell">'
+            '<div class="hermes-chart-head"><div class="hermes-chart-title">分布统计</div></div>'
+            f'<svg viewBox="0 0 {width} {height}" class="hermes-chart-svg" role="img" aria-label="指标分布统计图">'
+            f"{''.join(bars)}</svg></div>"
+        )
+    history_series = safe_detail.get("history_series") if isinstance(safe_detail.get("history_series"), list) else []
+    rows = [item for item in history_series if isinstance(item, dict)]
+    values = [NumberLike(item.get("value")) for item in rows]
+    values = [value for value in values if isinstance(value, (int, float))]
+    if not rows or not values:
+        return ""
+    width = 320
+    height = 150
+    padding_x = 10
+    padding_y = 10
+    min_value = min(values)
+    max_value = max(values)
+    span = max(max_value - min_value, 1.0)
+    step = (width - padding_x * 2) / max(len(rows) - 1, 1)
+    path = []
+    for index, item in enumerate(rows):
+        raw_value = NumberLike(item.get("value"))
+        x = padding_x + step * index
+        y = height - padding_y - ((raw_value - min_value) / span) * (height - padding_y * 2)
+        path.append(f"{'M' if index == 0 else 'L'}{x:.2f} {y:.2f}")
+    return (
+        '<div class="hermes-chart-shell">'
+        '<div class="hermes-chart-head"><div class="hermes-chart-title">线性趋势</div></div>'
+        f'<svg viewBox="0 0 {width} {height}" class="hermes-chart-svg" preserveAspectRatio="none" role="img" aria-label="指标趋势图">'
+        f'<path d="{" ".join(path)}" fill="none" stroke="#2F74C0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>'
+        '</svg></div>'
+    )
 
 
 def build_hermes_indicator_artifact(detail, question_text, synthesis, tool_outputs, citations, tenant_slug="", user_role=""):
@@ -6466,13 +6709,13 @@ def build_hermes_indicator_artifact(detail, question_text, synthesis, tool_outpu
         limit=90,
     )
     preferred_mode = str((tool_outputs.get("_meta") or {}).get("preferred_mode") or "").strip().lower() if isinstance(tool_outputs, dict) else ""
-    normalized_question = str(question_text or "").strip().lower()
-    explicit_kline_request = any(keyword in normalized_question for keyword in ["k线", "k线图", "k线走势", "蜡烛图"])
-    if preferred_mode == "line_chart":
+    resolved_visual_mode = infer_hermes_visual_mode(question_text, preferred_mode=preferred_mode)
+    explicit_kline_request = resolved_visual_mode == "kline_chart"
+    if resolved_visual_mode == "line_chart":
         chart_kind = "trend"
-    elif preferred_mode == "distribution_chart":
+    elif resolved_visual_mode == "distribution_chart":
         chart_kind = "distribution"
-    elif preferred_mode == "kline_chart" or explicit_kline_request:
+    elif resolved_visual_mode == "kline_chart":
         chart_kind = "kline"
     else:
         chart_kind = "distribution" if any(keyword in str(question_text or "") for keyword in ["分布", "统计", "区间"]) else "kline"
@@ -6486,7 +6729,7 @@ def build_hermes_indicator_artifact(detail, question_text, synthesis, tool_outpu
         detail["history_kline"] = history_kline
     if chart_kind == "trend" and not (detail.get("history_kline") or {}).get("candles"):
         chart_kind = "trend"
-    elif chart_kind != "distribution" and not (detail.get("history_kline") or {}).get("candles") and not explicit_kline_request and preferred_mode != "kline_chart":
+    elif chart_kind != "distribution" and not (detail.get("history_kline") or {}).get("candles") and not explicit_kline_request and resolved_visual_mode != "kline_chart":
         chart_kind = "trend"
     return {
         "type": "indicator_analysis",
@@ -6653,6 +6896,12 @@ def build_hermes_query_response(body):
     payload = body if isinstance(body, dict) else {}
     tenant_slug = str(payload.get("tenant_slug") or request.args.get("tenant") or get_default_tenant_slug()).strip().lower()
     user_role = str(payload.get("user_role") or "").strip().lower() or str((get_current_demo_profile() or {}).get("role") or "").strip().lower()
+    site_config = get_site_config()
+    if not is_hermes_available_for_role(user_role, site_config):
+        if is_feature_enabled("hermes", site_config):
+            raise ValueError("hermes_investor_access_disabled")
+        raise ValueError("hermes_disabled")
+    hermes_scope_guard_enabled = is_hermes_scope_guard_enabled(site_config)
     selected_knowledge_ids = payload.get("selected_knowledge_ids") if isinstance(payload.get("selected_knowledge_ids"), list) else []
     attachments = payload.get("attachments") if isinstance(payload.get("attachments"), list) else []
     preferred_mode = str(payload.get("preferred_mode") or "").strip().lower()
@@ -6719,6 +6968,13 @@ def build_hermes_query_response(body):
             selected_knowledge_ids=runtime.get("selected_knowledge_ids") or [],
             attachments=runtime.get("attachments") or [],
             tenant_slug=runtime.get("tenant_slug") or "",
+            preferred_mode=runtime.get("preferred_mode") or "",
+        ) if runtime.get("scope_guard_enabled") else build_hermes_open_scope_result(
+            question_text=runtime.get("question_text") or "",
+            selected_knowledge_ids=runtime.get("selected_knowledge_ids") or [],
+            attachments=runtime.get("attachments") or [],
+            tenant_slug=runtime.get("tenant_slug") or "",
+            preferred_mode=runtime.get("preferred_mode") or "",
         )
         scope_status = str(scope_result.get("status") or "allowed").strip() or "allowed"
         detail_map = {
@@ -6729,7 +6985,7 @@ def build_hermes_query_response(body):
         }
         return {
             "status": "error" if scope_status == "blocked" else ("skipped" if scope_status == "redirected" else "ok"),
-            "detail": detail_map.get(scope_status, "已完成范围识别。"),
+            "detail": "当前未启用 Hermes 提示词范围约束，本轮跳过固定范围拦截。 " if not runtime.get("scope_guard_enabled") else detail_map.get(scope_status, "已完成范围识别。"),
             "state_updates": {
                 "scope_result": scope_result,
             },
@@ -6749,6 +7005,7 @@ def build_hermes_query_response(body):
             messages=runtime.get("messages") or [],
             scope_result=state.get("scope_result") or {},
             memory_state=state.get("memory_state") or {},
+            scope_guard_enabled=bool(runtime.get("scope_guard_enabled", True)),
         )
         return {
             "detail": f"已完成意图路由：{str(intent_plan.get('reason') or '').strip() or '默认通用对话'}",
@@ -6942,6 +7199,8 @@ def build_hermes_query_response(body):
             "tenant_slug": runtime.get("tenant_slug") or "",
             "session_id": runtime.get("session_id") or "",
             "intent": intent_plan.get("intent"),
+            "task_family": intent_plan.get("task_family") or "research_qa",
+            "capability_label": intent_plan.get("capability_label") or "研究问答",
             "scope_status": intent_plan.get("scope_status") or str(((state.get("scope_result") or {}).get("status") or "allowed")).strip(),
             "display_mode": response_display_mode,
             "answer": synthesis.get("answer") or "",
@@ -7021,6 +7280,7 @@ def build_hermes_query_response(body):
             "entry_point": entry_point,
             "session_id": session_id,
             "actor_context": actor_context,
+            "scope_guard_enabled": hermes_scope_guard_enabled,
         },
         executor_registry={
             "question_input": _hermes_input_executor,
