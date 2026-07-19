@@ -99,6 +99,17 @@ body { background: var(--surface-2); color: var(--text-main); }
 .modal-overlay.show { display:flex; }
 .modal-sheet { background:var(--navy-mid); border-radius:20px 20px 0 0; padding:20px 16px 32px; width:100%; max-width:390px; border-top:1px solid rgba(200,169,110,0.2); }
 .modal-handle { width:36px; height:4px; background:rgba(200,169,110,0.3); border-radius:2px; margin:0 auto 16px; }
+.modal-close-row { display:flex; justify-content:flex-end; margin:-4px 0 10px; }
+.modal-close-btn {
+  border:1px solid rgba(200,169,110,0.24);
+  background:rgba(13,27,42,0.72);
+  color:var(--gold);
+  border-radius:999px;
+  padding:6px 12px;
+  font-size:12px;
+  line-height:1;
+  cursor:pointer;
+}
 .modal-title { font-size:15px; font-weight:600; color:var(--white); margin-bottom:12px; }
 .modal-textarea { width:100%; background:rgba(13,27,42,0.6); border:1px solid rgba(200,169,110,0.2); border-radius:10px; color:var(--white); font-size:13px; padding:12px; resize:none; height:100px; font-family:var(--font-main); }
 .modal-textarea::placeholder { color:var(--gray-400); }
@@ -295,6 +306,29 @@ body { background: var(--surface-2); color: var(--text-main); }
   padding:5px 9px;
   cursor:pointer;
   white-space:nowrap;
+}
+.hermes-capability-row {
+  display:flex;
+  gap:8px;
+  overflow-x:auto;
+  padding:2px 0 4px;
+  scrollbar-width:none;
+}
+.hermes-capability-row::-webkit-scrollbar { display:none; }
+.hermes-capability-chip {
+  flex-shrink:0;
+  border:none;
+  background:#EEF5FF;
+  color:#285A93;
+  border-radius:999px;
+  padding:7px 12px;
+  font-size:11px;
+  font-weight:700;
+  cursor:pointer;
+}
+.hermes-capability-chip.active {
+  background:#1F497D;
+  color:#FFFFFF;
 }
 .hermes-prompt-chip-row {
   display:flex;
@@ -697,6 +731,27 @@ body { background: var(--surface-2); color: var(--text-main); }
 }
 .hermes-lobster-tool-row::-webkit-scrollbar {
   display:none;
+}
+.hermes-modal-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin-bottom:10px;
+}
+.hermes-modal-close {
+  border:none;
+  background:#EEF5FF;
+  color:#285A93;
+  border-radius:999px;
+  padding:7px 12px;
+  font-size:12px;
+  font-weight:700;
+  cursor:pointer;
+}
+.hermes-plus-action-row {
+  display:grid;
+  gap:10px;
 }
 .hermes-lobster-tool {
   border:none;
@@ -1390,8 +1445,12 @@ body { background: var(--surface-2); color: var(--text-main); }
   padding:10px;
 }
 .watch-research-meta { font-size:10px; color:var(--gray-400); margin-bottom:6px; }
-.watch-research-title { font-size:12px; font-weight:700; color:var(--white); }
+.watch-research-title { font-size:12px; font-weight:700; color:var(--text-main); }
 .watch-research-desc { font-size:11px; color:var(--gray-400); line-height:1.6; margin-top:6px; }
+#watchlist-detail-modal .modal-sheet {
+  background:linear-gradient(180deg, #F8FBFF 0%, #EEF5FF 100%);
+  border-top:1px solid rgba(47,116,192,0.14);
+}
 .fund-overview-card {
   background:linear-gradient(160deg, #FFFFFF, #F6FAFF);
   border:1px solid rgba(47,116,192,0.14);
@@ -3088,12 +3147,14 @@ body,
           <div class="hermes-toolbar">
             <div class="hermes-lobster-thread" id="hermes-chat-thread"></div>
             <div class="hermes-composer-shell">
+              <div class="hermes-capability-row" id="hermes-capability-row"></div>
+              <div class="hermes-prompt-chip-row" id="hermes-suggestion-row" aria-label="Hermes 建议问题"></div>
               <div class="hermes-composer-context" id="hermes-composer-context"></div>
               <div class="hermes-lobster-composer">
                 <textarea
                   id="hermes-question-input"
                   class="hermes-lobster-question"
-                  placeholder="发消息..."
+                  placeholder="问 Hermes..."
                   oninput="handleHermesQuestionInput(this)"
                 ></textarea>
                 <div class="hermes-lobster-toolbar">
@@ -3120,6 +3181,7 @@ body,
   <div class="modal-overlay" id="hermes-skill-modal" onclick="if(event.target===this)closeHermesSkillModal()">
     <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
       <div class="modal-handle"></div>
+      <div class="modal-close-row"><button class="modal-close-btn" type="button" onclick="closeHermesSkillModal()">关闭</button></div>
       <div id="hermes-skill-modal-content"></div>
     </div>
   </div>
@@ -3127,6 +3189,7 @@ body,
   <div class="modal-overlay" id="hermes-plus-modal" onclick="if(event.target===this)closeHermesPlusMenu()">
     <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
       <div class="modal-handle"></div>
+      <div class="modal-close-row"><button class="modal-close-btn" type="button" onclick="closeHermesPlusMenu()">关闭</button></div>
       <div id="hermes-plus-modal-content"></div>
     </div>
   </div>
@@ -3207,6 +3270,7 @@ body,
   <div class="modal-overlay" id="watchlist-detail-modal" onclick="if(event.target===this)this.classList.remove('show')">
     <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
       <div class="modal-handle"></div>
+      <div class="modal-close-row"><button class="modal-close-btn" type="button" onclick="closeH5ModalById('watchlist-detail-modal')">关闭</button></div>
       <div id="watchlist-detail-content">
         <div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">加载中...</div>
       </div>
@@ -3530,6 +3594,7 @@ body,
   <div class="modal-overlay" id="account-settings-modal" onclick="if(event.target===this)closeAccountSettingsModal()">
     <div class="modal-sheet profile-settings-modal-sheet">
       <div class="modal-handle"></div>
+      <div class="modal-close-row"><button class="modal-close-btn" type="button" onclick="closeAccountSettingsModal()">关闭</button></div>
       <div class="modal-title">账号设置</div>
       <div style="font-size:12px;color:var(--gray-400);line-height:1.7">可维护个人基础资料和自定义关注标签；租户关系、权益和系统标签只读。</div>
       <div class="profile-settings-group">
@@ -3601,6 +3666,7 @@ body,
   <div class="modal-overlay" id="help-center-modal" onclick="if(event.target===this)closeHelpCenterModal()">
     <div class="modal-sheet profile-settings-modal-sheet">
       <div class="modal-handle"></div>
+      <div class="modal-close-row"><button class="modal-close-btn" type="button" onclick="closeHelpCenterModal()">关闭</button></div>
       <div class="help-center-head">
         <div>
           <div class="modal-title" style="margin-bottom:0">帮助中心</div>
@@ -3658,6 +3724,7 @@ body,
 <div class="modal-overlay" id="compose-modal" onclick="if(event.target===this)this.classList.remove('show')">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
+    <div class="modal-close-row"><button class="modal-close-btn" type="button" onclick="closeH5ModalById('compose-modal')">关闭</button></div>
     <div class="modal-title">发布投研观点</div>
     <textarea class="modal-textarea" id="compose-text" placeholder="分享你的投研观点，可以@大V投顾或添加标签..."></textarea>
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
@@ -3677,6 +3744,7 @@ body,
 <div class="modal-overlay" id="event-detail-modal" onclick="if(event.target===this)this.classList.remove('show')">
   <div class="modal-sheet" style="max-height:85vh;overflow-y:auto">
     <div class="modal-handle"></div>
+    <div class="modal-close-row"><button class="modal-close-btn" type="button" onclick="closeH5ModalById('event-detail-modal')">关闭</button></div>
     <div id="event-detail-content"></div>
   </div>
 </div>
@@ -3684,6 +3752,7 @@ body,
 <div class="modal-overlay" id="knowledge-intake-modal" onclick="if(event.target===this)closeKnowledgeIntake()">
   <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
     <div class="modal-handle"></div>
+    <div class="modal-close-row"><button class="modal-close-btn" type="button" onclick="closeKnowledgeIntake()">关闭</button></div>
     <div id="knowledge-intake-content"></div>
   </div>
 </div>
@@ -3691,6 +3760,7 @@ body,
 <div class="modal-overlay" id="dashboard-cell-modal" onclick="if(event.target===this)closeDashboardCellModal()">
   <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
     <div class="modal-handle"></div>
+    <div class="modal-close-row"><button class="modal-close-btn" type="button" onclick="closeDashboardCellModal()">关闭</button></div>
     <div id="dashboard-cell-modal-content"></div>
   </div>
 </div>
@@ -3698,6 +3768,7 @@ body,
 <div class="modal-overlay" id="fund-metric-detail-modal" onclick="if(event.target===this)closeFundMetricDetailModal()">
   <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
     <div class="modal-handle"></div>
+    <div class="modal-close-row"><button class="modal-close-btn" type="button" onclick="closeFundMetricDetailModal()">关闭</button></div>
     <div id="fund-metric-detail-modal-content"></div>
   </div>
 </div>
@@ -3705,6 +3776,7 @@ body,
 <div class="modal-overlay" id="review-trigger-modal" onclick="if(event.target===this)closeReviewTriggerModal()">
   <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
     <div class="modal-handle"></div>
+    <div class="modal-close-row"><button class="modal-close-btn" type="button" onclick="closeReviewTriggerModal()">关闭</button></div>
     <div id="review-trigger-modal-content"></div>
   </div>
 </div>
@@ -3712,6 +3784,7 @@ body,
 <div class="modal-overlay" id="review-ingest-result-modal" onclick="if(event.target===this)closeReviewIngestResultModal()">
   <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
     <div class="modal-handle"></div>
+    <div class="modal-close-row"><button class="modal-close-btn" type="button" onclick="closeReviewIngestResultModal()">关闭</button></div>
     <div id="review-ingest-result-modal-content"></div>
   </div>
 </div>
@@ -3719,6 +3792,7 @@ body,
 <div class="modal-overlay" id="review-article-modal" onclick="if(event.target===this)closeReviewArticleModal()">
   <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
     <div class="modal-handle"></div>
+    <div class="modal-close-row"><button class="modal-close-btn" type="button" onclick="closeReviewArticleModal()">关闭</button></div>
     <div id="review-article-modal-content"></div>
   </div>
 </div>
@@ -3726,6 +3800,7 @@ body,
 <div class="modal-overlay" id="watchlist-annotation-modal" onclick="if(event.target===this)closeWatchlistAnnotationModal()">
   <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
     <div class="modal-handle"></div>
+    <div class="modal-close-row"><button class="modal-close-btn" type="button" onclick="closeWatchlistAnnotationModal()">关闭</button></div>
     <div id="watchlist-annotation-modal-content"></div>
   </div>
 </div>
@@ -3773,7 +3848,7 @@ function isFeatureEnabled(featureName) {
     const activeUser = getActiveDemoUser() || {};
     const hermesSettings = (window.SITE_CONFIG && window.SITE_CONFIG.hermes_settings) || {};
     if (siteFeatures.hermes === false) return false;
-    if (activeUser.role === 'dav') return true;
+    if (activeUser.role === 'dav') return hermesSettings.dav_access_enabled !== false;
     return hermesSettings.investor_access_enabled !== false;
   }
   if (featureName === 'dm') {
@@ -3825,6 +3900,52 @@ async function refreshH5SiteConfig(options = {}) {
   } catch (error) {
     if (!options.silent) {
       showToast('前台功能配置刷新失败');
+    }
+  }
+}
+
+function syncPublishedReviewStateToH5(tenantSlug, result) {
+  const normalizedSlug = String(tenantSlug || '').trim().toLowerCase();
+  const payload = result && typeof result === 'object' ? result : {};
+  if (!normalizedSlug) return;
+  const nextState = {};
+  if (Array.isArray(payload.snapshots)) nextState.review_snapshots = payload.snapshots.slice(0, 20);
+  if (payload.message_center_state && typeof payload.message_center_state === 'object') {
+    nextState.message_center_state = payload.message_center_state;
+  }
+  if (!Object.keys(nextState).length) return;
+  if (window.SITE_CONFIG && Array.isArray(window.SITE_CONFIG.tenants)) {
+    window.SITE_CONFIG.tenants = window.SITE_CONFIG.tenants.map((tenant) => {
+      const tenantSlugValue = String((tenant && tenant.slug) || '').trim().toLowerCase();
+      return tenantSlugValue === normalizedSlug ? { ...tenant, ...nextState } : tenant;
+    });
+  }
+  if (window.ACTIVE_TENANT && String(window.ACTIVE_TENANT.slug || '').trim().toLowerCase() === normalizedSlug) {
+    window.ACTIVE_TENANT = { ...window.ACTIVE_TENANT, ...nextState };
+  }
+  DEMO_PROFILE_USERS = DEMO_PROFILE_USERS.map((user) => {
+    const tenant = user && user.tenant && typeof user.tenant === 'object' ? user.tenant : {};
+    const tenantSlugValue = String(tenant.slug || '').trim().toLowerCase();
+    return tenantSlugValue === normalizedSlug
+      ? { ...user, tenant: { ...tenant, ...nextState } }
+      : user;
+  });
+  if (window.CURRENT_DEMO_PROFILE && window.CURRENT_DEMO_PROFILE.tenant) {
+    const currentTenantSlug = String(window.CURRENT_DEMO_PROFILE.tenant.slug || '').trim().toLowerCase();
+    if (currentTenantSlug === normalizedSlug) {
+      window.CURRENT_DEMO_PROFILE = {
+        ...window.CURRENT_DEMO_PROFILE,
+        tenant: { ...window.CURRENT_DEMO_PROFILE.tenant, ...nextState },
+      };
+    }
+  }
+  if (currentDemoUser && currentDemoUser.tenant) {
+    const currentTenantSlug = String(currentDemoUser.tenant.slug || '').trim().toLowerCase();
+    if (currentTenantSlug === normalizedSlug) {
+      currentDemoUser = {
+        ...currentDemoUser,
+        tenant: { ...currentDemoUser.tenant, ...nextState },
+      };
     }
   }
 }
@@ -4055,6 +4176,15 @@ function normalizeReviewStructuredPreview(payload) {
         board_role: String((item || {}).board_role || '').trim(),
         analysis_text: String((item || {}).analysis_text || '').trim(),
         evidence: Array.isArray((item || {}).evidence) ? item.evidence.slice(0) : [],
+      })) : [],
+      annotation_evidence: Array.isArray(watchlistAnalysisSection.annotation_evidence) ? watchlistAnalysisSection.annotation_evidence.map((item) => ({
+        annotation_id: (item || {}).annotation_id,
+        stock_name: String((item || {}).stock_name || '').trim(),
+        stock_code: String((item || {}).stock_code || '').trim(),
+        date_label: String((item || {}).date_label || '').trim(),
+        title: String((item || {}).title || '').trim(),
+        note: String((item || {}).note || '').trim(),
+        trigger: String((item || {}).trigger || '').trim(),
       })) : [],
     },
     llm_models: Array.isArray(source.llm_models) ? source.llm_models.slice(0) : [],
@@ -5002,7 +5132,19 @@ function buildKolReviewData(user, period) {
 
 function buildReviewArticleData(review) {
   const watchlistLead = review.watchlist && review.watchlist.length ? review.watchlist.join('、') : '重点样本';
-  const evidenceItems = (review.annotations || []).map(item => ({
+  const sectionEvidence = review.watchlistAnalysisSection && Array.isArray(review.watchlistAnalysisSection.annotation_evidence)
+    ? review.watchlistAnalysisSection.annotation_evidence
+    : [];
+  const evidenceSource = (review.annotations && review.annotations.length)
+    ? review.annotations.map(item => ({
+        stockName: item.stockName,
+        summary: item.summary,
+      }))
+    : sectionEvidence.map(item => ({
+        stockName: item.stock_name,
+        summary: [item.date_label, item.title, item.note, item.trigger ? `验证节点：${item.trigger}` : ''].filter(Boolean).join(' · '),
+      }));
+  const evidenceItems = evidenceSource.map(item => ({
     title: `${item.stockName} · K线标注`,
     text: item.summary,
   }));
@@ -5611,6 +5753,7 @@ async function generateReviewDraftWithLlm() {
 
 async function requestReviewStructuredPreview() {
   const user = getActiveDemoUser();
+  await syncLocalWatchlistAnnotationsToServer(reviewTriggerDraft.selectedWatchlist || []);
   const resp = await fetch('/api/review/prepare-preview', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -5954,6 +6097,7 @@ async function embedManualReviewText(text) {
 
 async function publishReviewContentEmbedding(text, transcriptionEngine, transcriptModel, extras) {
   const user = getActiveDemoUser();
+  await syncLocalWatchlistAnnotationsToServer(reviewTriggerDraft.selectedWatchlist || []);
   const payload = extras && typeof extras === 'object' ? extras : {};
   const resp = await fetch('/api/review/publish-embed', {
     method: 'POST',
@@ -6764,17 +6908,14 @@ function publishReviewDraft() {
       onSuccess(job) {
         const result = job.result || {};
         reviewIngestResult = result;
-        openReviewIngestResultModal('确认发布成功，已写入向量库', [
-          `转写引擎：${result.transcription_engine || '-'}`,
-          `向量引擎：${result.embedding_engine || '-'}`,
-          `向量模型：${result.embedding_model || '-'}`,
-          `namespace：${(result.record && result.record.vector_namespace) || '-'}`,
-          `发布正文：${result.text || ''}`,
-        ]);
         runtime.kolPublishedAt = '刚刚发布';
         runtime.kolGeneratedAt = '刚刚发布';
+        syncPublishedReviewStateToH5((user && user.tenant && user.tenant.slug) || '', result);
         if (result.snapshots && user && user.tenant) {
           user.tenant.review_snapshots = result.snapshots;
+        }
+        if (result.message_center_state && user && user.tenant) {
+          user.tenant.message_center_state = result.message_center_state;
         }
         loadDmConversations();
         if (currentDmKol) loadDmMessages(currentDmKol.id);
@@ -7864,6 +8005,8 @@ function renderKnowledgeExperience() {
 
 function renderHermesWorkspace() {
   renderHermesCredits();
+  renderHermesCapabilityChips();
+  renderHermesSuggestionChips();
   renderHermesComposerContext();
   renderHermesInternetToggle();
   renderHermesComposerSubmit();
@@ -9088,6 +9231,7 @@ const WATCHLIST_ANNOTATION_STORAGE_KEY = 'gangtise_demo_watchlist_annotations';
 let addedWatchlistCodes = loadAddedWatchlistCodes();
 let currentWatchlistAnnotationTarget = null;
 let watchlistAnnotationStore = loadWatchlistAnnotationStore();
+const watchlistAnnotationSyncTasks = {};
 
 function loadAddedWatchlistCodes() {
   try {
@@ -9137,6 +9281,78 @@ function getWatchlistAnnotationBucket(tenantId, stockCode) {
 function getWatchlistAnnotations(tenantId, stockCode) {
   const bucket = getWatchlistAnnotationBucket(tenantId, stockCode);
   return bucket.slice().sort((a, b) => Number(a.candleIndex || 0) - Number(b.candleIndex || 0));
+}
+
+function replaceWatchlistAnnotations(tenantId, stockCode, items) {
+  const normalizedCode = normalizeStockLookupValue(stockCode);
+  const bucket = getWatchlistAnnotationBucket(tenantId, normalizedCode);
+  bucket.splice(0, bucket.length, ...((Array.isArray(items) ? items : []).map((item) => ({
+    id: item.id,
+    candleIndex: Number(item.candleIndex ?? item.candle_index ?? 0),
+    dateLabel: item.dateLabel || item.candle_date || '',
+    title: item.title || '',
+    note: item.note || '',
+    trigger: item.trigger || '',
+    updatedAt: item.updatedAt || item.updated_at || item.createdAt || item.created_at || '刚刚',
+  }))));
+  persistWatchlistAnnotationStore();
+}
+
+function getActiveWatchlistTenantSlug() {
+  const user = getActiveDemoUser();
+  return (((user || {}).tenant || {}).slug || '').trim().toLowerCase();
+}
+
+function getActiveWatchlistUserPayload() {
+  const user = getActiveDemoUser() || {};
+  return {
+    tenant_slug: (((user || {}).tenant || {}).slug || '').trim().toLowerCase(),
+    user_role: String(user.role || '').trim().toLowerCase(),
+    user_profile_id: String(user.username || user.id || '').trim(),
+    user_name: String(user.advisor_name || user.username || '').trim(),
+  };
+}
+
+async function syncLocalWatchlistAnnotationsToServer(stockRefs) {
+  const user = getActiveDemoUser() || {};
+  const tenantId = ((user || {}).tenant || {}).id;
+  const payload = getActiveWatchlistUserPayload();
+  if (!payload.tenant_slug || payload.user_role !== 'dav') return;
+  const detailsMap = WATCHLIST_DETAILS_MAP || {};
+  const codes = (Array.isArray(stockRefs) ? stockRefs : [stockRefs]).map((item) => {
+    const raw = String(item || '').trim();
+    if (!raw) return '';
+    const detail = Object.values(detailsMap).find((row) => row && (row.code === raw || row.name === raw));
+    return normalizeStockLookupValue((detail && detail.code) || raw);
+  }).filter(Boolean);
+  await Promise.all(codes.map(async (stockCode) => {
+    const taskKey = `${payload.tenant_slug}:${stockCode}`;
+    if (watchlistAnnotationSyncTasks[taskKey]) return watchlistAnnotationSyncTasks[taskKey];
+    const task = (async () => {
+      const localItems = getWatchlistAnnotations(tenantId, stockCode);
+      if (!localItems.length) return;
+      for (const item of localItems) {
+        await fetch(`/api/watchlist/${encodeURIComponent(stockCode)}/annotations`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            ...payload,
+            stock_name: ((detailsMap[stockCode] || {}).name) || stockCode,
+            candle_index: Number(item.candleIndex || 0),
+            candle_date: item.dateLabel || '',
+            title: item.title || '',
+            note: item.note || '',
+            trigger: item.trigger || '',
+            source_client: 'h5',
+          }),
+        }).catch(() => null);
+      }
+    })().finally(() => {
+      delete watchlistAnnotationSyncTasks[taskKey];
+    });
+    watchlistAnnotationSyncTasks[taskKey] = task;
+    return task;
+  }));
 }
 
 function buildAnnotationId(tenantId, stockCode, candleIndex) {
@@ -9378,16 +9594,16 @@ function buildWatchlistKlineSvg(series) {
     `;
   }).join('');
   return `
-    <div style="background:var(--navy);border:1px solid rgba(200,169,110,0.08);border-radius:12px;padding:12px">
+    <div style="background:#F7FBFF;border:1px solid rgba(47,116,192,0.10);border-radius:12px;padding:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
-        <div style="font-size:12px;font-weight:700;color:var(--white)">K线走势</div>
+        <div style="font-size:12px;font-weight:700;color:var(--text-main)">K线走势</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--gray-400)">
           <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#F6C453;display:inline-block"></span>MA5</span>
           <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#5DADE2;display:inline-block"></span>MA10</span>
           <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#AF7AC5;display:inline-block"></span>MA20</span>
         </div>
       </div>
-      ${annotations.length ? `<div style="font-size:11px;color:#63B3ED;line-height:1.7;margin-bottom:8px">当前已标注 ${annotations.length} 处 K 线节点。普通用户和大V看到的是同一套 K 线标注，这些标注会直接作为复盘智能化总结的依据。</div>` : ''}
+      ${annotations.length ? `<div style="font-size:11px;color:#2F74C0;line-height:1.7;margin-bottom:8px">当前已标注 ${annotations.length} 处 K 线节点。普通用户和大V看到的是同一套 K 线标注，这些标注会直接作为复盘智能化总结的依据。</div>` : ''}
       ${activeUser.role === 'dav' ? `<div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">点击 K 线任一蜡烛可添加标注，记录当时判断、验证节点和复盘话语。</div>` : ''}
       <svg viewBox="0 0 ${width} ${height}" width="100%" height="200" role="img" aria-label="个股K线与5日10日20日均线图">
         ${yTicks}
@@ -9411,10 +9627,21 @@ async function openWatchlistDetail(stockCode, section) {
   modal.classList.add('show');
   host.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--gray-400);font-size:13px">加载中...</div>';
   try {
-    const resp = await fetch('/api/watchlist/' + encodeURIComponent(stockCode));
+    const tenantSlug = getActiveWatchlistTenantSlug();
+    const userPayload = getActiveWatchlistUserPayload();
+    const search = new URLSearchParams();
+    if (tenantSlug) search.set('tenant_slug', tenantSlug);
+    if (userPayload.user_role) search.set('user_role', userPayload.user_role);
+    if (userPayload.user_profile_id) search.set('user_profile_id', userPayload.user_profile_id);
+    const resp = await fetch('/api/watchlist/' + encodeURIComponent(stockCode) + (String(search) ? `?${String(search)}` : ''));
     const data = await resp.json();
     currentWatchlistDetail = data;
+    const activeUser = getActiveDemoUser() || {};
+    if (tenantSlug && Array.isArray(data.annotations)) {
+      replaceWatchlistAnnotations(((activeUser || {}).tenant || {}).id, data.code || stockCode, data.annotations);
+    }
     renderWatchlistDetail(data, section);
+    syncLocalWatchlistAnnotationsToServer([data.code || stockCode]).catch(() => null);
     trackFanStockObservation(stockCode, 'watchlist_detail_view', {
       entryPoint: 'watchlist_detail',
       sourceDetail: section || 'overview',
@@ -9429,18 +9656,22 @@ function renderWatchlistDetail(data, section) {
   if (!host || !data) return;
   if (section) currentWatchlistSection = section;
   const activeUser = getActiveDemoUser();
+  const activeUserPayload = getActiveWatchlistUserPayload();
   const stockForecastEnabled = isStockForecastEnabled();
   const forecast = stockForecastEnabled ? (data.forecast || {}) : null;
   const visibleAuthors = getTenantVisibleAuthors(data.authors);
   const isInvestorView = activeUser.role === 'investor';
   const activeSection = currentWatchlistSection || 'overview';
+  const commentItems = Array.isArray(data.comments) ? data.comments : [];
+  const commentSettings = data.comment_settings || {};
+  const allowFanToFan = commentSettings.allow_fan_to_fan !== false;
   const authorCards = visibleAuthors.map(author => `
-    <div style="background:var(--navy);border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:12px">
+    <div style="background:#F7FBFF;border:1px solid rgba(47,116,192,0.12);border-radius:10px;padding:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
         <div style="display:flex;align-items:center;gap:8px">
           <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--gold-dark),var(--gold));display:flex;align-items:center;justify-content:center;font-size:16px">${author.avatar}</div>
           <div>
-            <div style="font-size:13px;font-weight:600;color:var(--white)">${author.name}</div>
+            <div style="font-size:13px;font-weight:600;color:var(--text-main)">${author.name}</div>
             <div style="font-size:10px;color:var(--gray-400)">${author.tier}</div>
           </div>
         </div>
@@ -9450,17 +9681,17 @@ function renderWatchlistDetail(data, section) {
     </div>
   `).join('');
   const metricCards = (data.fundamental?.metrics || []).map(metric => `
-    <div style="background:var(--navy);border:1px solid rgba(200,169,110,0.08);border-radius:10px;padding:10px">
+    <div style="background:#F7FBFF;border:1px solid rgba(47,116,192,0.10);border-radius:10px;padding:10px">
       <div style="font-size:10px;color:var(--gray-400)">${metric.label}</div>
       <div style="font-size:16px;font-weight:700;color:var(--gold);margin-top:4px">${metric.value}</div>
       <div style="font-size:10px;color:var(--gray-400);margin-top:4px;line-height:1.6">${metric.note}</div>
     </div>
   `).join('');
-  const thesis = (data.fundamental?.thesis || []).map(item => `<div style="font-size:12px;color:var(--white);line-height:1.7">• ${item}</div>`).join('');
+  const thesis = (data.fundamental?.thesis || []).map(item => `<div style="font-size:12px;color:var(--text-main);line-height:1.7">• ${item}</div>`).join('');
   const drivers = (forecast?.drivers || []).map(item => `
     <div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid rgba(200,169,110,0.06)">
       <div>
-        <div style="font-size:12px;color:var(--white)">${item.label}</div>
+        <div style="font-size:12px;color:var(--text-main)">${item.label}</div>
         <div style="font-size:10px;color:var(--gray-400);margin-top:2px">${item.note}</div>
       </div>
       <div style="font-size:14px;font-weight:700;color:${String(item.score).startsWith('-') ? '#E74C3C' : 'var(--green)'}">${item.score}</div>
@@ -9546,7 +9777,7 @@ function renderWatchlistDetail(data, section) {
     <div class="watch-section-card">
       <div class="watch-section-title">${forecast?.label || '基本面判断'}</div>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
-        <div style="font-size:18px;font-weight:700;color:var(--white)">${forecast?.verdict || '待分析'}</div>
+        <div style="font-size:18px;font-weight:700;color:var(--text-main)">${forecast?.verdict || '待分析'}</div>
         <span class="watch-thesis-badge">${forecast?.confidence || '中'}</span>
       </div>
       <div class="watch-section-desc" style="margin-bottom:8px">${forecast?.band || ''}</div>
@@ -9584,21 +9815,52 @@ function renderWatchlistDetail(data, section) {
       <div style="display:grid;gap:10px;margin-top:10px">${authorCards || `<div style="font-size:12px;color:var(--gray-400)">${isInvestorView ? `该自选股当前暂无来自 ${activeUser.tenant.advisor} 的租户内互动内容。` : '暂无投顾观点'}</div>`}</div>
     </div>
   `;
+  const commentNotice = isInvestorView
+    ? (allowFanToFan
+        ? '当前已开放租户内粉丝与大V共同评论。你可以看到其他粉丝在这只股票下的讨论。'
+        : `当前粉丝互评已关闭。你只会看到 ${activeUser.tenant.advisor} 的评论和你自己的评论。`)
+    : '当前为大V视角，你可以查看并管理该租户在这只股票下的全部评论。';
+  const commentCards = commentItems.length ? commentItems.map((item) => `
+    <div class="watch-research-item">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+        <div>
+          <div class="watch-research-meta">${escapeHtml(item.created_by_role_label || '')} · ${escapeHtml(item.created_by_name || '租户用户')} · ${escapeHtml(item.updated_at || item.created_at || '刚刚')}</div>
+          <div class="watch-research-title" style="margin-top:6px;font-size:13px">${escapeHtml(item.comment_text || '')}</div>
+        </div>
+        ${item.can_delete ? `<button class="btn-outline" style="padding:5px 8px;font-size:11px;white-space:nowrap" onclick="deleteWatchlistComment('${data.code}', '${String(item.id || '')}')">删除</button>` : ''}
+      </div>
+    </div>
+  `).join('') : `<div style="font-size:12px;color:var(--gray-400)">当前还没有评论，先留下第一条判断。</div>`;
+  const commentsSection = `
+    <div class="watch-section-card">
+      <div class="watch-section-title">租户评论</div>
+      <div class="watch-section-desc">${commentNotice}</div>
+      <div style="margin-top:12px;border:1px solid rgba(47,116,192,0.12);border-radius:12px;padding:10px;background:#F7FBFF">
+        <textarea id="watchlist-comment-input" class="knowledge-modal-textarea" placeholder="${allowFanToFan || !isInvestorView ? '写下你对这只股票的阶段判断、验证节点或追踪问题…' : '仍可留下你的个人评论，大V会看到。'}" style="min-height:88px;margin:0;background:#FFFFFF"></textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px">
+          <div style="font-size:11px;color:var(--gray-400)">当前显示 ${commentItems.length} 条可见评论</div>
+          <button class="btn-gold" style="padding:8px 14px;font-size:12px" onclick="submitWatchlistComment('${data.code}')">发表评论</button>
+        </div>
+      </div>
+      <div class="watch-research-grid" style="margin-top:12px">${commentCards}</div>
+    </div>
+  `;
   const sectionMap = {
     overview: overviewSection,
     profile: profileSection,
     evidence: evidenceSection,
     authors: authorsSection,
+    comments: commentsSection,
   };
   host.innerHTML = `
     <div style="padding-bottom:8px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px">
         <div>
-          <div style="font-size:18px;font-weight:700;color:var(--white)">${data.name}</div>
+          <div style="font-size:18px;font-weight:700;color:var(--text-main)">${data.name}</div>
           <div style="font-size:11px;color:var(--gray-400);margin-top:4px">${data.code} · ${data.market} · ${data.industry}</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:20px;font-weight:700;color:var(--white)">${Number(data.price || 0).toFixed(2)}</div>
+          <div style="font-size:20px;font-weight:700;color:var(--text-main)">${Number(data.price || 0).toFixed(2)}</div>
           <div style="font-size:12px;color:${data.change >= 0 ? 'var(--red)' : 'var(--green)'}">${data.change >= 0 ? '▲' : '▼'} ${Math.abs(Number(data.change || 0)).toFixed(2)} (${Number(data.change_pct || 0).toFixed(2)}%)</div>
         </div>
       </div>
@@ -9615,10 +9877,57 @@ function renderWatchlistDetail(data, section) {
         <div class="watch-detail-tab ${activeSection === 'profile' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'profile')">研究档案</div>
         <div class="watch-detail-tab ${activeSection === 'evidence' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'evidence')">证据链</div>
         <div class="watch-detail-tab ${activeSection === 'authors' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'authors')">投顾互动</div>
+        <div class="watch-detail-tab ${activeSection === 'comments' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'comments')">评论</div>
       </div>
       ${sectionMap[activeSection] || overviewSection}
     </div>
   `;
+}
+
+function submitWatchlistComment(stockCode) {
+  const detail = currentWatchlistDetail;
+  const input = document.getElementById('watchlist-comment-input');
+  const content = input && typeof input.value === 'string' ? input.value.trim() : '';
+  if (!detail || !content) {
+    showToast('请先输入评论内容');
+    return;
+  }
+  const payload = getActiveWatchlistUserPayload();
+  fetch(`/api/watchlist/${encodeURIComponent(stockCode)}/comments`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      ...payload,
+      stock_name: detail.name || stockCode,
+      comment_text: content,
+      source_client: 'h5',
+    }),
+  }).then(async (resp) => {
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'watchlist_comment_save_failed');
+    const existing = Array.isArray(currentWatchlistDetail.comments) ? currentWatchlistDetail.comments : [];
+    currentWatchlistDetail.comments = [data.item, ...existing];
+    if (input) input.value = '';
+    renderWatchlistDetail(currentWatchlistDetail, 'comments');
+    showToast('评论已发布');
+  }).catch((error) => {
+    showToast(error.message || '评论发布失败');
+  });
+}
+
+function deleteWatchlistComment(stockCode, commentId) {
+  const payload = getActiveWatchlistUserPayload();
+  fetch(`/api/watchlist/${encodeURIComponent(stockCode)}/comments/${encodeURIComponent(commentId)}` + `?tenant_slug=${encodeURIComponent(payload.tenant_slug)}&user_role=${encodeURIComponent(payload.user_role)}&user_profile_id=${encodeURIComponent(payload.user_profile_id)}`, {
+    method: 'DELETE',
+  }).then(async (resp) => {
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'watchlist_comment_delete_failed');
+    currentWatchlistDetail.comments = (Array.isArray(currentWatchlistDetail.comments) ? currentWatchlistDetail.comments : []).filter((item) => String(item.id || '') !== String(commentId || ''));
+    renderWatchlistDetail(currentWatchlistDetail, 'comments');
+    showToast('评论已删除');
+  }).catch((error) => {
+    showToast(error.message || '评论删除失败');
+  });
 }
 
 function openWatchlistAuthorDm(name) {
@@ -9726,26 +10035,77 @@ function saveWatchlistAnnotation() {
     trigger,
     updatedAt: '刚刚',
   };
+  const previousItems = bucket.slice();
   const existingIndex = bucket.findIndex(item => Number(item.candleIndex) === Number(target.candleIndex));
   if (existingIndex >= 0) bucket[existingIndex] = nextEntry;
   else bucket.push(nextEntry);
   persistWatchlistAnnotationStore();
-  closeWatchlistAnnotationModal();
-  renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
-  renderReviewExperience();
-  showToast('K线标注已保存，复盘会自动引用');
+  const userPayload = getActiveWatchlistUserPayload();
+  fetch(`/api/watchlist/${encodeURIComponent(target.stockCode)}/annotations`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      ...userPayload,
+      stock_name: target.stockName,
+      candle_index: target.candleIndex,
+      candle_date: target.candle.date || '',
+      open: target.candle.open,
+      high: target.candle.high,
+      low: target.candle.low,
+      close: target.candle.close,
+      title,
+      note,
+      trigger,
+      source_client: 'h5',
+    }),
+  }).then(async (resp) => {
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'watchlist_annotation_save_failed');
+    const currentUser = getActiveDemoUser() || {};
+    replaceWatchlistAnnotations(((currentUser || {}).tenant || {}).id, target.stockCode, [
+      ...getWatchlistAnnotations(((currentUser || {}).tenant || {}).id, target.stockCode).filter((item) => Number(item.candleIndex) !== Number(target.candleIndex)),
+      data.item,
+    ]);
+    closeWatchlistAnnotationModal();
+    renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
+    renderReviewExperience();
+    showToast('K线标注已保存，复盘会自动引用');
+  }).catch((error) => {
+    watchlistAnnotationStore[target.tenantId][normalizeStockLookupValue(target.stockCode)] = previousItems;
+    persistWatchlistAnnotationStore();
+    closeWatchlistAnnotationModal();
+    renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
+    renderReviewExperience();
+    showToast(error.message || '标注保存失败');
+  });
 }
 
 function deleteWatchlistAnnotation() {
   const target = currentWatchlistAnnotationTarget;
   if (!target) return;
+  const previousItems = getWatchlistAnnotationBucket(target.tenantId, target.stockCode).slice();
   watchlistAnnotationStore[target.tenantId][normalizeStockLookupValue(target.stockCode)] =
     getWatchlistAnnotationBucket(target.tenantId, target.stockCode).filter(item => Number(item.candleIndex) !== Number(target.candleIndex));
   persistWatchlistAnnotationStore();
-  closeWatchlistAnnotationModal();
-  renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
-  renderReviewExperience();
-  showToast('已删除该处 K 线标注');
+  const userPayload = getActiveWatchlistUserPayload();
+  const existingId = target.existing && target.existing.id ? target.existing.id : target.candleIndex;
+  fetch(`/api/watchlist/${encodeURIComponent(target.stockCode)}/annotations/${encodeURIComponent(existingId)}` + `?tenant_slug=${encodeURIComponent(userPayload.tenant_slug)}&user_role=${encodeURIComponent(userPayload.user_role)}`, {
+    method: 'DELETE',
+  }).then(async (resp) => {
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'watchlist_annotation_delete_failed');
+    closeWatchlistAnnotationModal();
+    renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
+    renderReviewExperience();
+    showToast('已删除该处 K 线标注');
+  }).catch((error) => {
+    watchlistAnnotationStore[target.tenantId][normalizeStockLookupValue(target.stockCode)] = previousItems;
+    persistWatchlistAnnotationStore();
+    closeWatchlistAnnotationModal();
+    renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
+    renderReviewExperience();
+    showToast(error.message || '删除标注失败');
+  });
 }
 
 function runWatchlistHermes(stockCode, mode) {
@@ -10256,11 +10616,36 @@ let hermesVoiceChunks = [];
 let hermesVoiceRecording = false;
 let hermesVoiceUploading = false;
 
+function getHermesSettings() {
+  return (window.SITE_CONFIG && window.SITE_CONFIG.hermes_settings) || {};
+}
+
+function getHermesEnabledChartTypes() {
+  const types = getHermesSettings().chart_types_enabled;
+  if (!Array.isArray(types) || !types.length) {
+    return ['kline_chart', 'line_chart', 'distribution_chart'];
+  }
+  return types.map(item => String(item || '').trim()).filter(Boolean);
+}
+
+function isHermesInternetAllowed() {
+  return getHermesSettings().internet_answer_enabled !== false;
+}
+
+function isHermesThinkingEnabled() {
+  return getHermesSettings().thinking_process_enabled !== false;
+}
+
 function getHermesSessionStorageKey() {
   const activeUser = getActiveDemoUser() || {};
   const tenantSlug = (((activeUser || {}).tenant || {}).slug || 'default').toLowerCase();
   const profileId = String(activeUser.username || activeUser.name || activeUser.role || 'guest').trim().toLowerCase() || 'guest';
   return `gangtise_demo_hermes_session:${tenantSlug}:${profileId}`;
+}
+
+function closeH5ModalById(modalId) {
+  const modal = document.getElementById(modalId);
+  if (modal) modal.classList.remove('show');
 }
 
 function ensureHermesSessionId() {
@@ -10520,7 +10905,10 @@ function createHermesEntryId(prefix = 'entry') {
 
 function getHermesCanSaveKnowledge() {
   const activeUser = getActiveDemoUser() || {};
-  return String(activeUser.role || '').trim().toLowerCase() === 'dav';
+  return (
+    String(activeUser.role || '').trim().toLowerCase() === 'dav'
+    && getHermesSettings().answer_save_to_knowledge_enabled !== false
+  );
 }
 
 function getHermesKnowledgeSaveState(entryId) {
@@ -10603,13 +10991,23 @@ function renderHermesComposerContext() {
       </div>
     `);
   });
-  const html = chips.join('') || `<div class="hermes-action-hint">${hermesUseInternetAnswer ? '默认先查当前租户知识库，再补充互联网公开信息。' : '默认先查当前租户知识库。'}</div>`;
+  const html = chips.join('') || `<div class="hermes-action-hint">${
+    hermesUseInternetAnswer && isHermesInternetAllowed()
+      ? '默认先查当前租户知识库，再补充互联网公开信息。'
+      : '默认先查当前租户知识库。'
+  }</div>`;
   hosts.forEach(host => { host.innerHTML = html; });
 }
 
 function renderHermesInternetToggle() {
   const button = document.getElementById('hermes-internet-toggle');
   if (!button) return;
+  const internetEnabled = isHermesInternetAllowed();
+  button.style.display = internetEnabled ? '' : 'none';
+  if (!internetEnabled) {
+    hermesUseInternetAnswer = false;
+    return;
+  }
   button.classList.add('hermes-lobster-tool');
   button.classList.toggle('is-active', !!hermesUseInternetAnswer);
   button.innerHTML = `<span class="hermes-lobster-tool-icon">🌐</span><span>${hermesUseInternetAnswer ? '互联网中' : '互联网'}</span>`;
@@ -10625,6 +11023,12 @@ function clearHermesInternetAnswer() {
 }
 
 function toggleHermesInternetAnswer(forceValue) {
+  if (!isHermesInternetAllowed()) {
+    hermesUseInternetAnswer = false;
+    renderHermesWorkspace();
+    showToast('Admin 当前未开放互联网补充');
+    return;
+  }
   hermesUseInternetAnswer = typeof forceValue === 'boolean' ? forceValue : !hermesUseInternetAnswer;
   renderHermesWorkspace();
   showToast(hermesUseInternetAnswer ? '已开启互联网补充' : '已关闭互联网补充');
@@ -10843,6 +11247,33 @@ function closeHermesPlusMenu() {
   if (modal) modal.classList.remove('show');
 }
 
+async function openHermesUrlAttachPrompt() {
+  const target = window.prompt('输入要解析的 URL');
+  const normalized = String(target || '').trim();
+  if (!normalized) return;
+  try {
+    const resp = await fetch('/api/kol/knowledge/url-preview', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ url: normalized }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'url_preview_failed');
+    const preview = data.preview || {};
+    hermesUploadedFiles = [{
+      filename: preview.title || normalized,
+      summary: preview.summary || '',
+      body: preview.body || '',
+      url: normalized,
+    }];
+    closeHermesPlusMenu();
+    renderHermesWorkspace();
+    showToast('已加入 URL 解析结果');
+  } catch (error) {
+    showToast(error.message || 'URL 解析失败');
+  }
+}
+
 function selectHermesKnowledgeScope(entryId) {
   hermesScopedKnowledgeId = entryId || '';
   closeHermesPlusMenu();
@@ -10891,11 +11322,20 @@ function openHermesPlusMenu() {
   const host = document.getElementById('hermes-plus-modal-content');
   if (!host) return;
   host.innerHTML = `
-    <div class="modal-title" style="margin-bottom:10px">添加上下文</div>
-    <button class="hermes-plus-action" onclick="openHermesFilePicker()">
-      <div class="hermes-plus-action-title">上传文件解析</div>
-      <div class="hermes-plus-action-desc">上传 PDF、DOCX、TXT、CSV、HTML，解析后随本次问题一起给 Hermes。互联网补充开关已移到输入框外侧。</div>
-    </button>
+    <div class="hermes-modal-head">
+      <div class="modal-title" style="margin-bottom:0">添加上下文</div>
+      <button class="hermes-modal-close" type="button" onclick="closeHermesPlusMenu()">关闭</button>
+    </div>
+    <div class="hermes-plus-action-row">
+      <button class="hermes-plus-action" onclick="openHermesFilePicker()">
+        <div class="hermes-plus-action-title">上传文件解析</div>
+        <div class="hermes-plus-action-desc">上传 PDF、DOCX、TXT、CSV、HTML，解析后随本次问题一起给 Hermes。互联网补充开关已移到输入框外侧。</div>
+      </button>
+      <button class="hermes-plus-action" onclick="openHermesUrlAttachPrompt()">
+        <div class="hermes-plus-action-title">解析网页 URL</div>
+        <div class="hermes-plus-action-desc">输入网页地址后，先提炼正文和摘要，再作为本轮问题的知识材料。</div>
+      </button>
+    </div>
   `;
   const modal = document.getElementById('hermes-plus-modal');
   if (modal) modal.classList.add('show');
@@ -10967,8 +11407,13 @@ function inferHermesKnowledgeForSkill(skill) {
 }
 
 function getHermesSkillCatalog() {
+  const enabledChartTypes = new Set(getHermesEnabledChartTypes());
   const builtins = Object.values(DEFAULT_HERMES_SKILLS)
     .filter(skill => isStockForecastEnabled() || skill.id !== 'judgement')
+    .filter(skill => {
+      if (!['line_chart', 'kline_chart', 'distribution_chart'].includes(skill.id)) return true;
+      return enabledChartTypes.has(skill.id);
+    })
     .map(skill => ({
     ...skill,
     source: 'system',
@@ -11101,9 +11546,26 @@ function renderHermesSuggestionChips() {
   if (!hosts.length) return;
   const skill = getHermesSkillById(hermesSelectedSkill) || DEFAULT_HERMES_SKILLS.basic;
   const html = (skill.suggestions || []).map(text => `
-    <div class="hermes-suggestion-chip" onclick="applyHermesSuggestion('${text.replace(/'/g, '&#39;')}')">${text}</div>
+    <button type="button" class="hermes-prompt-chip" onclick="applyHermesSuggestion('${text.replace(/'/g, '&#39;')}')">${text}</button>
   `).join('');
   hosts.forEach(host => { host.innerHTML = html; });
+}
+
+function renderHermesCapabilityChips() {
+  const host = document.getElementById('hermes-capability-row');
+  if (!host) return;
+  const items = [
+    { skill: 'basic', label: '研究问答' },
+    { skill: 'line_chart', label: '数据展示' },
+    { skill: 'kline_chart', label: 'K线走势' },
+    { skill: 'distribution_chart', label: '分布统计' },
+    { skill: 'report_interpretation', label: '报告解读' },
+    { skill: 'content_generation', label: '内容生成' },
+    { skill: 'small_talk', label: '轻度闲聊' },
+  ].filter((item) => getHermesSkillById(item.skill));
+  host.innerHTML = items.map((item) => `
+    <button type="button" class="hermes-capability-chip ${hermesSelectedSkill === item.skill ? 'active' : ''}" onclick="selectHermesSkill('${item.skill}')">${escapeHtml(item.label)}</button>
+  `).join('');
 }
 
 function selectHermesSkill(skillKey) {
@@ -11452,6 +11914,7 @@ function renderHermesThinkingStream(lines, options = {}) {
 function renderHermesThinkingDisclosure(lines, options = {}) {
   const items = Array.isArray(lines) ? lines.filter(Boolean) : [];
   if (!items.length) return '';
+  if (!isHermesThinkingEnabled()) return '';
   const label = String(options.label || '思考过程').trim() || '思考过程';
   const openAttr = options.open ? ' open' : '';
   const loadingDots = options.loading
@@ -11533,7 +11996,8 @@ function syncHermesLoadingTicker() {
 }
 
 function renderHermesTextArtifact(artifact, agentTrace) {
-  const entryId = String(arguments[2] || '').trim();
+  const entry = arguments[2] && typeof arguments[2] === 'object' ? arguments[2] : {};
+  const entryId = String(entry.id || '').trim();
   const uniqueBullets = dedupeHermesTextItems(artifact.bullets);
   const uniqueFollowups = dedupeHermesTextItems(
     (artifact.followups || []).filter(item => !uniqueBullets.includes(String(item || '').trim()))
@@ -11549,10 +12013,15 @@ function renderHermesTextArtifact(artifact, agentTrace) {
   const followupHtml = renderHermesClickableBullets(uniqueFollowups, { clickable: true });
   const thoughtLines = buildHermesTraceThoughts(agentTrace);
   const actionHtml = renderHermesKnowledgeAction(entryId);
+  const routeLabel = String(entry.capabilityLabel || entry.intentLabel || entry.intent || '').trim();
+  const routeMeta = routeLabel
+    ? `<div class="hermes-transcript-meta" style="margin-top:6px">本次按：${escapeHtml(routeLabel)}</div>`
+    : '';
   return `
     <div class="hermes-transcript-entry assistant">
       <div class="hermes-transcript-kicker">Hermes</div>
       <div class="hermes-transcript-text">${escapeHtml(artifact.headline || '')}</div>
+      ${routeMeta}
       ${artifact.summary ? `<div class="hermes-transcript-body">${escapeHtml(artifact.summary)}</div>` : ''}
       ${renderHermesThinkingDisclosure(thoughtLines)}
       ${bodyHtml}
@@ -11624,13 +12093,14 @@ function renderHermesThread() {
     }
     const artifact = normalizeHermesArtifact(entry.artifact || entry.result, entry.question);
     if ((entry.displayMode || 'text') !== 'structured' || !['watchlist_analysis', 'indicator_analysis'].includes(artifact.type)) {
-      return renderHermesTextArtifact(artifact, entry.agentTrace, entry.id);
+      return renderHermesTextArtifact(artifact, entry.agentTrace, entry);
     }
     return `
       <div class="hermes-transcript-entry assistant">
         <div class="hermes-transcript-kicker">Hermes</div>
+        ${entry.capabilityLabel ? `<div class="hermes-transcript-meta" style="margin-top:6px">本次按：${escapeHtml(entry.capabilityLabel)}</div>` : ''}
         <div class="hermes-transcript-text">${escapeHtml(artifact.headline)}</div>
-        <div class="hermes-chat-analysis">${renderHermesAnalysisCards(artifact, entry.agentTrace)}</div>
+        <div class="hermes-chat-analysis">${renderHermesAnalysisCards(artifact, entry.agentTrace, entry)}</div>
         ${renderHermesKnowledgeAction(entry.id)}
       </div>
     `;
@@ -11643,6 +12113,7 @@ function renderHermesThread() {
 }
 
 function renderHermesAnalysisCards(artifact, agentTrace) {
+  const entry = arguments[2] && typeof arguments[2] === 'object' ? arguments[2] : {};
   const symbol = artifact.symbol || {};
   const metricsHtml = (artifact.metrics || []).map(metric => `
     <div class="hermes-metric-card">
@@ -11695,6 +12166,7 @@ function renderHermesAnalysisCards(artifact, agentTrace) {
             <div class="hermes-result-kicker">${escapeHtml(artifact.title)}</div>
             <div class="hermes-result-title">${resultTitle}</div>
             <div class="hermes-result-subtitle">${escapeHtml(artifact.summary || '')}</div>
+            ${entry.capabilityLabel ? `<div class="hermes-transcript-meta" style="margin-top:6px">本次按：${escapeHtml(entry.capabilityLabel)}</div>` : ''}
           </div>
           <div class="hermes-result-badge">${escapeHtml(artifact.confidence || '中')} 置信度</div>
         </div>
@@ -11711,6 +12183,7 @@ function renderHermesAnalysisCards(artifact, agentTrace) {
             <div class="hermes-result-kicker">${escapeHtml(artifact.title)}</div>
             <div class="hermes-result-title">${resultTitle}</div>
             <div class="hermes-result-subtitle">${escapeHtml(artifact.summary || '')}</div>
+            ${entry.capabilityLabel ? `<div class="hermes-transcript-meta" style="margin-top:6px">本次按：${escapeHtml(entry.capabilityLabel)}</div>` : ''}
           </div>
           <div class="hermes-result-badge">${escapeHtml(artifact.confidence || '中')} 置信度</div>
         </div>
@@ -11793,7 +12266,7 @@ async function runHermesAnalysis(options) {
         selected_knowledge_ids: hermesScopedKnowledgeId ? [hermesScopedKnowledgeId] : [],
         attachments: hermesUploadedFiles.slice(0),
         preferred_mode: hermesSelectedSkill || 'basic',
-        web_answer: !!hermesUseInternetAnswer,
+        web_answer: !!hermesUseInternetAnswer && isHermesInternetAllowed(),
       }),
     });
     const data = await resp.json();
@@ -11828,6 +12301,8 @@ async function runHermesAnalysis(options) {
       artifact: normalizedArtifact,
       displayMode,
       agentTrace: data.agent_trace || null,
+      capabilityLabel: data.capability_label || data.intent || skill.label,
+      intentLabel: data.intent || '',
     });
     await refreshHermesCredits({ silent: true });
     renderHermesWorkspace();
@@ -11914,7 +12389,10 @@ function renderHermesSkillModal() {
   if (!host) return;
   const entries = getTenantKnowledgeEntries();
   host.innerHTML = `
-    <div class="modal-title" style="margin-bottom:10px">新增自定义 skill</div>
+    <div class="hermes-modal-head">
+      <div class="modal-title" style="margin-bottom:0">新增自定义 skill</div>
+      <button class="hermes-modal-close" type="button" onclick="closeHermesSkillModal()">关闭</button>
+    </div>
     <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">你可以把自己的研究动作沉淀成 skill，并且直接绑定租户知识库，让 Hermes 后续按这套方法持续对话。</div>
     <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">Skill 名称</label>

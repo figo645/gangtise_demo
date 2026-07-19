@@ -220,7 +220,11 @@ def api_watchlist():
 def api_watchlist_detail(stock_code):
     site_config = get_site_config()
     details = gen_watchlist_details()
-    payload = details.get(stock_code, {
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    viewer_role = str(request.args.get("user_role") or "").strip().lower()
+    viewer_profile_id = str(request.args.get("user_profile_id") or "").strip()
+    allow_fan_to_fan = is_feature_enabled("watchlist_fan_comment_interaction", site_config)
+    payload = get_watchlist_detail_by_code(stock_code=stock_code, stock_name=stock_code, details_map=details) or {
         "code": stock_code,
         "name": stock_code,
         "market": "CN",
@@ -242,8 +246,228 @@ def api_watchlist_detail(stock_code):
             "band": "等待更多财务、行业和作者样本。",
             "drivers": [],
         },
+    }
+    normalized = apply_watchlist_feature_flags(payload, site_config)
+    if tenant_slug:
+        try:
+            normalized["annotations"] = list_watchlist_kline_annotations(
+                tenant_slug=tenant_slug,
+                stock_code=stock_code,
+                stock_name=normalized.get("name") or stock_code,
+                details_map=details,
+            )
+        except Exception as exc:
+            if not is_db_unavailable_error(exc):
+                raise
+            normalized["annotations"] = []
+        try:
+            normalized["comments"] = list_watchlist_comments(
+                tenant_slug=tenant_slug,
+                stock_code=stock_code,
+                stock_name=normalized.get("name") or stock_code,
+                viewer_role=viewer_role,
+                viewer_profile_id=viewer_profile_id,
+                allow_fan_to_fan=allow_fan_to_fan,
+                details_map=details,
+            )
+            normalized["comment_settings"] = {
+                "allow_fan_to_fan": allow_fan_to_fan,
+                "viewer_role": viewer_role,
+            }
+        except Exception as exc:
+            if not is_db_unavailable_error(exc):
+                raise
+            normalized["comments"] = []
+            normalized["comment_settings"] = {
+                "allow_fan_to_fan": allow_fan_to_fan,
+                "viewer_role": viewer_role,
+            }
+    return jsonify(normalized)
+
+
+@app.route("/api/watchlist/<stock_code>/annotations")
+def api_watchlist_annotations(stock_code):
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    stock_name = str(request.args.get("stock_name") or "").strip()
+    if not tenant_slug:
+        return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
+    try:
+        items = list_watchlist_kline_annotations(
+            tenant_slug=tenant_slug,
+            stock_code=stock_code,
+            stock_name=stock_name,
+        )
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to load watchlist annotations")
+        return jsonify({"ok": False, "error": "watchlist_annotations_load_failed"}), 500
+    return jsonify({"ok": True, "items": items})
+
+
+@app.route("/api/watchlist/<stock_code>/annotations", methods=["POST"])
+def api_save_watchlist_annotation(stock_code):
+    body = request.get_json(silent=True) or {}
+    tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
+    user_role = str(body.get("user_role") or "").strip().lower()
+    if not tenant_slug:
+        return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
+    if user_role != "dav":
+        return jsonify({"ok": False, "error": "watchlist_annotation_forbidden"}), 403
+    try:
+        item = save_watchlist_kline_annotation(
+            tenant_slug=tenant_slug,
+            stock_code=stock_code,
+            stock_name=body.get("stock_name"),
+            candle_index=body.get("candle_index"),
+            candle_date=body.get("candle_date"),
+            open_price=body.get("open"),
+            high_price=body.get("high"),
+            low_price=body.get("low"),
+            close_price=body.get("close"),
+            title=body.get("title"),
+            note=body.get("note"),
+            trigger=body.get("trigger"),
+            created_by_user_id=body.get("user_profile_id"),
+            created_by_name=body.get("user_name"),
+            source_client=body.get("source_client") or body.get("entry_point") or "h5",
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to save watchlist annotation")
+        return jsonify({"ok": False, "error": "watchlist_annotation_save_failed"}), 500
+    return jsonify({"ok": True, "item": item})
+
+
+@app.route("/api/watchlist/<stock_code>/comments")
+def api_watchlist_comments(stock_code):
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    viewer_role = str(request.args.get("user_role") or "").strip().lower()
+    viewer_profile_id = str(request.args.get("user_profile_id") or "").strip()
+    stock_name = str(request.args.get("stock_name") or "").strip()
+    if not tenant_slug:
+        return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
+    try:
+        items = list_watchlist_comments(
+            tenant_slug=tenant_slug,
+            stock_code=stock_code,
+            stock_name=stock_name,
+            viewer_role=viewer_role,
+            viewer_profile_id=viewer_profile_id,
+            allow_fan_to_fan=is_feature_enabled("watchlist_fan_comment_interaction", get_site_config()),
+        )
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to load watchlist comments")
+        return jsonify({"ok": False, "error": "watchlist_comments_load_failed"}), 500
+    return jsonify({
+        "ok": True,
+        "items": items,
+        "comment_settings": {
+            "allow_fan_to_fan": is_feature_enabled("watchlist_fan_comment_interaction", get_site_config()),
+            "viewer_role": viewer_role,
+        },
     })
-    return jsonify(apply_watchlist_feature_flags(payload, site_config))
+
+
+@app.route("/api/tenant/<tenant_slug>/watchlist-comment-analytics")
+def api_watchlist_comment_analytics(tenant_slug):
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    if not normalized_tenant:
+        return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
+    try:
+        analytics = build_watchlist_comment_analytics(normalized_tenant)
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to build watchlist comment analytics")
+        return jsonify({"ok": False, "error": "watchlist_comment_analytics_failed"}), 500
+    return jsonify({"ok": True, "analytics": analytics})
+
+
+@app.route("/api/watchlist/<stock_code>/comments", methods=["POST"])
+def api_save_watchlist_comment(stock_code):
+    body = request.get_json(silent=True) or {}
+    tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
+    user_role = str(body.get("user_role") or "").strip().lower()
+    user_profile_id = str(body.get("user_profile_id") or "").strip()
+    if not tenant_slug:
+        return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
+    if user_role not in {"investor", "dav"}:
+        return jsonify({"ok": False, "error": "watchlist_comment_role_invalid"}), 400
+    try:
+        item = save_watchlist_comment(
+            tenant_slug=tenant_slug,
+            stock_code=stock_code,
+            stock_name=body.get("stock_name"),
+            comment_text=body.get("comment_text"),
+            created_by_user_id=user_profile_id,
+            created_by_name=body.get("user_name"),
+            created_by_role=user_role,
+            source_client=body.get("source_client") or body.get("entry_point") or "h5",
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to save watchlist comment")
+        return jsonify({"ok": False, "error": "watchlist_comment_save_failed"}), 500
+    return jsonify({"ok": True, "item": item})
+
+
+@app.route("/api/watchlist/<stock_code>/comments/<comment_ref>", methods=["DELETE"])
+def api_delete_watchlist_comment(stock_code, comment_ref):
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    user_role = str(request.args.get("user_role") or "").strip().lower()
+    user_profile_id = str(request.args.get("user_profile_id") or "").strip()
+    if not tenant_slug:
+        return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
+    try:
+        deleted = delete_watchlist_comment(
+            tenant_slug=tenant_slug,
+            stock_code=stock_code,
+            comment_id=comment_ref,
+            actor_role=user_role,
+            actor_profile_id=user_profile_id,
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to delete watchlist comment")
+        return jsonify({"ok": False, "error": "watchlist_comment_delete_failed"}), 500
+    return jsonify({"ok": True, "deleted": bool(deleted)})
+
+
+@app.route("/api/watchlist/<stock_code>/annotations/<annotation_ref>", methods=["DELETE"])
+def api_delete_watchlist_annotation(stock_code, annotation_ref):
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    user_role = str(request.args.get("user_role") or "").strip().lower()
+    if not tenant_slug:
+        return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
+    if user_role != "dav":
+        return jsonify({"ok": False, "error": "watchlist_annotation_forbidden"}), 403
+    try:
+        deleted = delete_watchlist_kline_annotation(
+            tenant_slug=tenant_slug,
+            stock_code=stock_code,
+            annotation_id=int(annotation_ref) if str(annotation_ref).isdigit() else None,
+            candle_index=int(annotation_ref) if str(annotation_ref).isdigit() else None,
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to delete watchlist annotation")
+        return jsonify({"ok": False, "error": "watchlist_annotation_delete_failed"}), 500
+    return jsonify({"ok": True, "deleted": bool(deleted)})
 
 
 def get_access_summary():

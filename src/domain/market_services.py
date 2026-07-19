@@ -698,7 +698,7 @@ def validate_smart_indicator_js(js_code, selected_indicators):
 def generate_smart_indicator_js(indicator_name, prompt_text, selected_indicators, tenant_slug=""):
     normalized_selected = normalize_selected_indicator_refs(selected_indicators)
     fallback_js = build_smart_indicator_js_fallback(prompt_text, normalized_selected)
-    model = get_default_llm_config(purpose="general")
+    model = get_default_llm_config(purpose="general", feature_code="smart_indicator_formula_generation")
     if not model:
         return {"formula_js": fallback_js, "generator": "fallback", "llm_used": False}
     try:
@@ -3233,6 +3233,826 @@ def gen_feed_boards_from_watchlist_details(watchlist_details):
     return boards
 
 
+WATCHLIST_DYNAMIC_DETAIL_PRESETS = {
+    "601988": {
+        "name": "中国银行",
+        "market": "SH",
+        "price": 5.18,
+        "change": 0.03,
+        "change_pct": 0.58,
+        "industry": "银行",
+        "focus": "稳健配置",
+        "authors": [
+            {"id": 4, "name": "全球宏观James", "avatar": "🌐", "tier": "成长作者", "angle": "银行股更适合从息差、资产质量和股息稳定性三条线去拆。"},
+            {"id": 3, "name": "量化老师陈明", "avatar": "📊", "tier": "成长作者", "angle": "这类资产更像组合稳定器，不适合用高弹性成长股的框架判断。"},
+        ],
+        "fundamental": {
+            "summary": "核心看净息差、资产质量和股息稳定性，当前更偏防守型配置视角。",
+            "metrics": [
+                {"label": "净息差", "value": "1.59%", "note": "仍需关注利率环境变化"},
+                {"label": "不良率", "value": "1.28%", "note": "整体保持可控"},
+                {"label": "拨备覆盖率", "value": "189%", "note": "风险缓冲仍充足"},
+                {"label": "股息率", "value": "5.4%", "note": "防守价值较突出"},
+            ],
+            "thesis": [
+                "大行资产负债表稳健，适合防守型资金配置。",
+                "利率和宏观信用周期会直接影响估值弹性。",
+                "更适合看分红与稳健收益，不宜期待高弹性重估。",
+            ],
+        },
+        "forecast": {
+            "label": "基本面判断",
+            "verdict": "稳健跟踪",
+            "confidence": "中高",
+            "band": "适合作为组合中的防守型样本，重点跟踪息差与资产质量变化。",
+            "drivers": [
+                {"label": "股息支撑", "score": "+2.0", "note": "分红稳定性较强"},
+                {"label": "资产质量", "score": "+1.4", "note": "大行风险暴露相对可控"},
+                {"label": "息差压力", "score": "-0.8", "note": "仍需观察利率环境"},
+            ],
+        },
+    },
+}
+
+
+def _build_watchlist_kline_series(stock_code, base_price):
+    rng = random.Random(f"kline:{stock_code}")
+    close = float(base_price) * (0.9 + rng.random() * 0.2)
+    current_date = datetime.now() - timedelta(days=33)
+    series = []
+    while len(series) < 24:
+        current_date += timedelta(days=1)
+        if current_date.weekday() >= 5:
+            continue
+        open_price = close * (1 + rng.uniform(-0.018, 0.018))
+        close_price = open_price * (1 + rng.uniform(-0.035, 0.035))
+        high_price = max(open_price, close_price) * (1 + rng.uniform(0.004, 0.022))
+        low_price = min(open_price, close_price) * (1 - rng.uniform(0.004, 0.022))
+        series.append({
+            "date": current_date.strftime("%m-%d"),
+            "open": round(open_price, 2),
+            "high": round(high_price, 2),
+            "low": round(low_price, 2),
+            "close": round(close_price, 2),
+        })
+        close = close_price
+    return series
+
+
+def _infer_watchlist_market(stock_code):
+    normalized = str(stock_code or "").strip().upper()
+    if re.fullmatch(r"\d{5}", normalized):
+        return "HK"
+    if re.fullmatch(r"\d{6}", normalized):
+        if normalized.startswith(("60", "68")):
+            return "SH"
+        if normalized.startswith(("00", "30")):
+            return "SZ"
+        if normalized.startswith(("43", "83", "87", "92")):
+            return "BJ"
+    return "CN"
+
+
+def _build_dynamic_watchlist_detail(stock_code, stock_name=""):
+    normalized_code = str(stock_code or "").strip().upper()
+    if not normalized_code:
+        return None
+    preset = copy.deepcopy(WATCHLIST_DYNAMIC_DETAIL_PRESETS.get(normalized_code) or {})
+    market = str(preset.get("market") or _infer_watchlist_market(normalized_code)).strip() or "CN"
+    seed = sum(ord(ch) for ch in normalized_code)
+    rng = random.Random(f"watchlist-fallback:{normalized_code}")
+    base_price = float(preset.get("price") or round(8 + (seed % 900) / 10.0, 2))
+    change = float(preset.get("change") or round(rng.uniform(-base_price * 0.018, base_price * 0.018), 2))
+    change_pct = float(preset.get("change_pct") or round((change / base_price) * 100 if base_price else 0, 2))
+    stock_label = str(preset.get("name") or stock_name or normalized_code).strip() or normalized_code
+    industry = str(preset.get("industry") or ("银行" if normalized_code.startswith(("600", "601", "603")) else "个股跟踪")).strip() or "个股跟踪"
+    focus = str(preset.get("focus") or industry).strip() or industry
+    return {
+        "code": normalized_code,
+        "name": stock_label,
+        "market": market,
+        "price": round(base_price, 2),
+        "change": round(change, 2),
+        "change_pct": round(change_pct, 2),
+        "industry": industry,
+        "focus": focus,
+        "kline": _build_watchlist_kline_series(normalized_code, base_price),
+        "authors": copy.deepcopy(preset.get("authors") or []),
+        "fundamental": copy.deepcopy(preset.get("fundamental") or {
+            "summary": "当前尚未沉淀该股票的专属研究样本，先提供基础行情和通用基本面观察框架。",
+            "metrics": [
+                {"label": "行情状态", "value": "可查看", "note": "已支持基础 K 线与详情展示"},
+                {"label": "研究样本", "value": "待补充", "note": "后续可通过 Hermes 和知识库持续沉淀"},
+            ],
+            "thesis": [
+                "当前可先结合价格位置、行业属性和后续研究材料继续观察。",
+                "若需要更完整判断，建议继续补充研报、公告或复盘证据链。",
+            ],
+        }),
+        "forecast": copy.deepcopy(preset.get("forecast") or {
+            "label": "基本面判断",
+            "verdict": "待补充研究",
+            "confidence": "低",
+            "band": "当前已支持基础行情与 K 线查看，后续判断需要更多财务、行业和作者样本。",
+            "drivers": [
+                {"label": "样本沉淀度", "score": "-0.6", "note": "当前平台内专属样本较少"},
+                {"label": "后续研究空间", "score": "+0.8", "note": "可继续通过 Hermes、知识库和复盘补充"},
+            ],
+        }),
+    }
+
+
+def _enrich_watchlist_details(details):
+    normalized_details = copy.deepcopy(details or {})
+    indicator_context = build_watchlist_indicator_context()
+    for detail in normalized_details.values():
+        signal_bundle = build_watchlist_signal_bundle(detail["code"], detail["name"], detail.get("industry"), indicator_context)
+        detail["indicator_context"] = signal_bundle
+        detail["focus"] = detail.get("industry") or detail.get("focus") or "个股跟踪"
+        detail["alert_level"] = signal_bundle["board_alert_level"]
+        detail["alert_text"] = sanitize_user_facing_source_text(signal_bundle["board_alert_text"], fallback="当前无明显预警")
+        detail["signal_summary"] = signal_bundle["board_summary"]
+        detail["anomaly_text"] = signal_bundle["anomaly_text"]
+        detail["related_indicator_ids"] = signal_bundle["related_indicator_ids"]
+        detail["related_indicator_names"] = signal_bundle["related_indicator_names"]
+        fundamental = detail.get("fundamental") if isinstance(detail.get("fundamental"), dict) else {}
+        base_summary = str(fundamental.get("summary") or "").strip()
+        fundamental["summary"] = f"{base_summary} 当前关联指标信号：{signal_bundle['board_summary']}" if base_summary else signal_bundle["board_summary"]
+        base_metrics = fundamental.get("metrics") if isinstance(fundamental.get("metrics"), list) else []
+        metric_labels = {str(item.get('label') or '') for item in base_metrics if isinstance(item, dict)}
+        for metric in signal_bundle["metrics"]:
+            if metric["label"] not in metric_labels:
+                base_metrics.append(metric)
+        for metric in base_metrics:
+            if not isinstance(metric, dict):
+                continue
+            metric["note"] = sanitize_user_facing_source_text(metric.get("note") or "", fallback=str(metric.get("note") or "").strip())
+        fundamental["metrics"] = base_metrics[:6]
+        base_thesis = fundamental.get("thesis") if isinstance(fundamental.get("thesis"), list) else []
+        normalized_thesis = []
+        seen_thesis = set()
+        for item in base_thesis + [item for item in signal_bundle["thesis"] if item not in base_thesis]:
+            text = sanitize_user_facing_source_text(item, fallback=str(item or "").strip())
+            if not text or text in seen_thesis:
+                continue
+            seen_thesis.add(text)
+            normalized_thesis.append(text)
+        fundamental["thesis"] = normalized_thesis[:5]
+        detail["fundamental"] = fundamental
+        forecast = detail.get("forecast") if isinstance(detail.get("forecast"), dict) else {}
+        if signal_bundle["board_alert_level"] == "warning":
+            forecast["verdict"] = "重点观察"
+            forecast["confidence"] = "中"
+            forecast["band"] = f"{forecast.get('band') or ''} 当前行业关联指标存在预警，优先核查 {signal_bundle['related_indicator_names'][0] if signal_bundle['related_indicator_names'] else '核心信号'}。".strip()
+        elif signal_bundle["board_alert_level"] == "attention":
+            forecast["band"] = f"{forecast.get('band') or ''} 当前行业关联指标进入关注区间，建议跟踪 {signal_bundle['related_indicator_names'][0] if signal_bundle['related_indicator_names'] else '核心信号'}。".strip()
+        drivers = forecast.get("drivers") if isinstance(forecast.get("drivers"), list) else []
+        if signal_bundle["related_indicator_names"]:
+            drivers = [
+                {
+                    "label": "指标湖联动",
+                    "score": "+0.6" if signal_bundle["board_alert_level"] == "normal" else ("-0.9" if signal_bundle["board_alert_level"] == "warning" else "-0.3"),
+                    "note": f"当前主要受 {signal_bundle['related_indicator_names'][0]} 影响",
+                }
+            ] + drivers
+        forecast["drivers"] = drivers[:4]
+        detail["forecast"] = forecast
+    return normalized_details
+
+
+def get_watchlist_detail_by_code(stock_code="", stock_name="", details_map=None):
+    details = details_map if isinstance(details_map, dict) else gen_watchlist_details()
+    normalized_code = str(stock_code or "").strip().upper()
+    if not normalized_code and stock_name:
+        normalized_code = find_watchlist_code_from_text(stock_name)
+    if not normalized_code:
+        return None
+    detail = copy.deepcopy((details or {}).get(normalized_code) or {})
+    if detail:
+        return detail
+    fallback = _build_dynamic_watchlist_detail(normalized_code, stock_name=stock_name)
+    if not fallback:
+        return None
+    return copy.deepcopy((_enrich_watchlist_details({normalized_code: fallback}).get(normalized_code)) or fallback)
+
+
+def _normalize_watchlist_annotation_code(stock_code="", stock_name="", details_map=None):
+    normalized_code = str(stock_code or "").strip().upper()
+    if re.search(r"\b\d{5,6}\b", normalized_code):
+        return re.search(r"\b\d{5,6}\b", normalized_code).group(0)
+    candidate_name = str(stock_name or "").strip()
+    details = details_map if isinstance(details_map, dict) else gen_watchlist_details()
+    for code, detail in (details or {}).items():
+        if normalized_code and normalized_code == str(code or "").strip().upper():
+            return str(code or "").strip()
+        if candidate_name and candidate_name == str((detail or {}).get("name") or "").strip():
+            return str(code or "").strip()
+        if normalized_code and normalized_code == str((detail or {}).get("name") or "").strip().upper():
+            return str(code or "").strip()
+    return normalized_code
+
+
+def _normalize_watchlist_annotation_row(row, detail=None):
+    raw = dict(row or {}) if isinstance(row, dict) else {}
+    candle = detail or {}
+    stock_name = str(raw.get("stock_name") or candle.get("name") or raw.get("stock_code") or "").strip()
+    stock_code = str(raw.get("stock_code") or "").strip().upper()
+    return {
+        "id": raw.get("id"),
+        "tenant_slug": str(raw.get("tenant_slug") or "").strip().lower(),
+        "stock_code": stock_code,
+        "stock_name": stock_name,
+        "candle_index": int(raw.get("candle_index") or 0),
+        "dateLabel": str(raw.get("candle_date") or "").strip(),
+        "candle_date": str(raw.get("candle_date") or "").strip(),
+        "title": str(raw.get("title") or "").strip(),
+        "note": str(raw.get("note") or "").strip(),
+        "trigger": str(raw.get("trigger") or "").strip(),
+        "updatedAt": str(raw.get("updated_at") or raw.get("created_at") or "").strip(),
+        "createdAt": str(raw.get("created_at") or "").strip(),
+        "open": round(float(raw.get("open_price") or 0), 2),
+        "high": round(float(raw.get("high_price") or 0), 2),
+        "low": round(float(raw.get("low_price") or 0), 2),
+        "close": round(float(raw.get("close_price") or 0), 2),
+        "created_by_name": str(raw.get("created_by_name") or "").strip(),
+        "created_by_user_id": str(raw.get("created_by_user_id") or "").strip(),
+        "source_client": str(raw.get("source_client") or "").strip() or "h5",
+    }
+
+
+def list_watchlist_kline_annotations(tenant_slug="", stock_code="", stock_name="", details_map=None):
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    if not normalized_tenant:
+        return []
+    details = details_map if isinstance(details_map, dict) else gen_watchlist_details()
+    normalized_code = _normalize_watchlist_annotation_code(stock_code=stock_code, stock_name=stock_name, details_map=details)
+    if not normalized_code:
+        return []
+    rows = get_db().execute(
+        """
+        SELECT *
+        FROM watchlist_kline_annotations
+        WHERE tenant_slug = ? AND stock_code = ?
+        ORDER BY candle_index ASC, updated_at ASC, id ASC
+        """,
+        (normalized_tenant, normalized_code),
+    ).fetchall()
+    detail = get_watchlist_detail_by_code(normalized_code, stock_name=stock_name, details_map=details) or {}
+    return [_normalize_watchlist_annotation_row(row, detail=detail) for row in rows]
+
+
+def save_watchlist_kline_annotation(
+    tenant_slug="",
+    stock_code="",
+    stock_name="",
+    candle_index=0,
+    candle_date="",
+    open_price=0,
+    high_price=0,
+    low_price=0,
+    close_price=0,
+    title="",
+    note="",
+    trigger="",
+    created_by_user_id="",
+    created_by_name="",
+    source_client="h5",
+):
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    if not normalized_tenant:
+        raise ValueError("tenant_slug_required")
+    details = gen_watchlist_details()
+    normalized_code = _normalize_watchlist_annotation_code(stock_code=stock_code, stock_name=stock_name, details_map=details)
+    detail = get_watchlist_detail_by_code(normalized_code, stock_name=stock_name, details_map=details)
+    if not detail:
+        raise ValueError("watchlist_stock_not_found")
+    title_text = str(title or "").strip()
+    note_text = str(note or "").strip()
+    if not title_text or not note_text:
+        raise ValueError("watchlist_annotation_title_note_required")
+    try:
+        normalized_index = max(0, int(candle_index or 0))
+    except Exception:
+        normalized_index = 0
+    kline = detail.get("kline") if isinstance(detail.get("kline"), list) else []
+    candle = kline[normalized_index] if normalized_index < len(kline) else {}
+    now_text = now_ts()
+    payload = {
+        "tenant_slug": normalized_tenant,
+        "stock_code": normalized_code,
+        "stock_name": str(stock_name or detail.get("name") or normalized_code).strip() or normalized_code,
+        "candle_index": normalized_index,
+        "candle_date": str(candle_date or candle.get("date") or "").strip(),
+        "open_price": float(open_price or candle.get("open") or 0),
+        "high_price": float(high_price or candle.get("high") or 0),
+        "low_price": float(low_price or candle.get("low") or 0),
+        "close_price": float(close_price or candle.get("close") or 0),
+        "title": title_text[:120],
+        "note": note_text[:2000],
+        "trigger": str(trigger or "").strip()[:1000],
+        "created_by_user_id": str(created_by_user_id or "").strip()[:120],
+        "created_by_name": str(created_by_name or "").strip()[:120],
+        "source_client": str(source_client or "h5").strip()[:40] or "h5",
+        "created_at": now_text,
+        "updated_at": now_text,
+    }
+    db = get_db()
+    existing = db.execute(
+        """
+        SELECT id, created_at
+        FROM watchlist_kline_annotations
+        WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ?
+        """,
+        (normalized_tenant, normalized_code, normalized_index),
+    ).fetchone()
+    if existing:
+        payload["id"] = existing.get("id")
+        payload["created_at"] = str(existing.get("created_at") or now_text)
+        db.execute(
+            """
+            UPDATE watchlist_kline_annotations
+            SET stock_name = ?, candle_date = ?, open_price = ?, high_price = ?, low_price = ?, close_price = ?,
+                title = ?, note = ?, trigger = ?, created_by_user_id = ?, created_by_name = ?, source_client = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                payload["stock_name"],
+                payload["candle_date"],
+                payload["open_price"],
+                payload["high_price"],
+                payload["low_price"],
+                payload["close_price"],
+                payload["title"],
+                payload["note"],
+                payload["trigger"],
+                payload["created_by_user_id"],
+                payload["created_by_name"],
+                payload["source_client"],
+                payload["updated_at"],
+                payload["id"],
+            ),
+        )
+    else:
+        db.execute(
+            """
+            INSERT INTO watchlist_kline_annotations (
+                tenant_slug, stock_code, stock_name, candle_index, candle_date,
+                open_price, high_price, low_price, close_price,
+                title, note, trigger, created_by_user_id, created_by_name,
+                source_client, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                payload["tenant_slug"],
+                payload["stock_code"],
+                payload["stock_name"],
+                payload["candle_index"],
+                payload["candle_date"],
+                payload["open_price"],
+                payload["high_price"],
+                payload["low_price"],
+                payload["close_price"],
+                payload["title"],
+                payload["note"],
+                payload["trigger"],
+                payload["created_by_user_id"],
+                payload["created_by_name"],
+                payload["source_client"],
+                payload["created_at"],
+                payload["updated_at"],
+            ),
+        )
+    db.commit()
+    row = db.execute(
+        """
+        SELECT *
+        FROM watchlist_kline_annotations
+        WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ?
+        """,
+        (normalized_tenant, normalized_code, normalized_index),
+    ).fetchone()
+    return _normalize_watchlist_annotation_row(row, detail=detail)
+
+
+def delete_watchlist_kline_annotation(tenant_slug="", stock_code="", stock_name="", annotation_id=None, candle_index=None):
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    if not normalized_tenant:
+        raise ValueError("tenant_slug_required")
+    details = gen_watchlist_details()
+    normalized_code = _normalize_watchlist_annotation_code(stock_code=stock_code, stock_name=stock_name, details_map=details)
+    db = get_db()
+    if annotation_id:
+        db.execute(
+            "DELETE FROM watchlist_kline_annotations WHERE tenant_slug = ? AND id = ?",
+            (normalized_tenant, int(annotation_id)),
+        )
+        db.commit()
+        remaining = db.execute(
+            "SELECT id FROM watchlist_kline_annotations WHERE tenant_slug = ? AND id = ?",
+            (normalized_tenant, int(annotation_id)),
+        ).fetchone()
+        if remaining and normalized_code and candle_index is not None:
+            db.execute(
+                "DELETE FROM watchlist_kline_annotations WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ?",
+                (normalized_tenant, normalized_code, int(candle_index or 0)),
+            )
+            db.commit()
+            remaining = db.execute(
+                """
+                SELECT id
+                FROM watchlist_kline_annotations
+                WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ?
+                """,
+                (normalized_tenant, normalized_code, int(candle_index or 0)),
+            ).fetchone()
+        return remaining is None
+    if normalized_code and candle_index is not None:
+        db.execute(
+            "DELETE FROM watchlist_kline_annotations WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ?",
+            (normalized_tenant, normalized_code, int(candle_index or 0)),
+        )
+        db.commit()
+        remaining = db.execute(
+            """
+            SELECT id
+            FROM watchlist_kline_annotations
+            WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ?
+            """,
+            (normalized_tenant, normalized_code, int(candle_index or 0)),
+        ).fetchone()
+        return remaining is None
+    raise ValueError("watchlist_annotation_target_required")
+
+
+def build_watchlist_annotation_context(tenant_slug="", selected_watchlist=None, details_map=None):
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    details = details_map if isinstance(details_map, dict) else gen_watchlist_details()
+    items = []
+    for raw_item in (selected_watchlist or []):
+        normalized_code = _normalize_watchlist_annotation_code(stock_code=raw_item, stock_name=raw_item, details_map=details)
+        if not normalized_code:
+            continue
+        detail = copy.deepcopy(get_watchlist_detail_by_code(normalized_code, stock_name=raw_item, details_map=details) or {})
+        if not detail:
+            continue
+        try:
+            annotations = list_watchlist_kline_annotations(normalized_tenant, stock_code=normalized_code, details_map=details) if normalized_tenant else []
+        except Exception as exc:
+            if not is_db_unavailable_error(exc):
+                raise
+            annotations = []
+        annotation_summary = "；".join(
+            f"{str(item.get('dateLabel') or item.get('candle_date') or '').strip()} {str(item.get('note') or '').strip()}".strip()
+            for item in annotations[:3]
+            if str(item.get("note") or "").strip()
+        ).strip()
+        detail["annotations"] = annotations
+        detail["annotation_summary"] = annotation_summary
+        detail["annotation_titles"] = [str(item.get("title") or "").strip() for item in annotations if str(item.get("title") or "").strip()][:6]
+        items.append(detail)
+    return items
+
+
+def _normalize_watchlist_comment_row(row, detail=None, viewer_role="", viewer_profile_id=""):
+    raw = dict(row or {}) if isinstance(row, dict) else {}
+    candle = detail or {}
+    created_by_role = str(raw.get("created_by_role") or "investor").strip().lower() or "investor"
+    created_by_user_id = str(raw.get("created_by_user_id") or "").strip()
+    normalized_viewer_role = str(viewer_role or "").strip().lower()
+    normalized_viewer_profile_id = str(viewer_profile_id or "").strip()
+    can_delete = False
+    if normalized_viewer_role == "dav":
+        can_delete = True
+    elif normalized_viewer_role and normalized_viewer_profile_id and normalized_viewer_profile_id == created_by_user_id:
+        can_delete = True
+    return {
+        "id": raw.get("id"),
+        "tenant_slug": str(raw.get("tenant_slug") or "").strip().lower(),
+        "stock_code": str(raw.get("stock_code") or candle.get("code") or "").strip().upper(),
+        "stock_name": str(raw.get("stock_name") or candle.get("name") or raw.get("stock_code") or "").strip(),
+        "comment_text": str(raw.get("comment_text") or "").strip(),
+        "label_tags": [str(item).strip() for item in safe_json_loads(raw.get("label_tags_json"), []) if str(item).strip()],
+        "keyword_tags": [str(item).strip() for item in safe_json_loads(raw.get("keyword_tags_json"), []) if str(item).strip()],
+        "sentiment_label": str(raw.get("sentiment_label") or "").strip(),
+        "topic_label": str(raw.get("topic_label") or "").strip(),
+        "comment_summary": str(raw.get("comment_summary") or "").strip(),
+        "labeling_source": str(raw.get("labeling_source") or "").strip(),
+        "labeling_model_key": str(raw.get("labeling_model_key") or "").strip(),
+        "labeling_model_name": str(raw.get("labeling_model_name") or "").strip(),
+        "created_by_user_id": created_by_user_id,
+        "created_by_name": str(raw.get("created_by_name") or "").strip() or created_by_user_id or "租户用户",
+        "created_by_role": created_by_role,
+        "created_by_role_label": "大V投顾" if created_by_role == "dav" else "粉丝用户",
+        "source_client": str(raw.get("source_client") or "").strip() or "h5",
+        "created_at": str(raw.get("created_at") or "").strip(),
+        "updated_at": str(raw.get("updated_at") or raw.get("created_at") or "").strip(),
+        "can_delete": can_delete,
+    }
+
+
+def list_watchlist_comments(
+    tenant_slug="",
+    stock_code="",
+    stock_name="",
+    viewer_role="",
+    viewer_profile_id="",
+    allow_fan_to_fan=True,
+    details_map=None,
+    limit=80,
+):
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    if not normalized_tenant:
+        return []
+    details = details_map if isinstance(details_map, dict) else gen_watchlist_details()
+    normalized_code = _normalize_watchlist_annotation_code(stock_code=stock_code, stock_name=stock_name, details_map=details)
+    if not normalized_code:
+        return []
+    normalized_viewer_role = str(viewer_role or "").strip().lower()
+    normalized_viewer_profile_id = str(viewer_profile_id or "").strip()
+    rows = get_db().execute(
+        """
+        SELECT *
+        FROM watchlist_comments
+        WHERE tenant_slug = ? AND stock_code = ?
+        ORDER BY updated_at DESC, id DESC
+        LIMIT ?
+        """,
+        (normalized_tenant, normalized_code, max(1, min(int(limit or 80), 200))),
+    ).fetchall()
+    detail = get_watchlist_detail_by_code(normalized_code, stock_name=stock_name, details_map=details) or {}
+    normalized_rows = [
+        _normalize_watchlist_comment_row(
+            row,
+            detail=detail,
+            viewer_role=normalized_viewer_role,
+            viewer_profile_id=normalized_viewer_profile_id,
+        )
+        for row in rows
+    ]
+    if normalized_viewer_role == "dav" or allow_fan_to_fan:
+        return normalized_rows
+    visible_rows = []
+    for item in normalized_rows:
+        if str(item.get("created_by_role") or "").strip().lower() == "dav":
+            visible_rows.append(item)
+            continue
+        if normalized_viewer_profile_id and str(item.get("created_by_user_id") or "").strip() == normalized_viewer_profile_id:
+            visible_rows.append(item)
+    return visible_rows
+
+
+def save_watchlist_comment(
+    tenant_slug="",
+    stock_code="",
+    stock_name="",
+    comment_text="",
+    created_by_user_id="",
+    created_by_name="",
+    created_by_role="investor",
+    source_client="h5",
+):
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    if not normalized_tenant:
+        raise ValueError("tenant_slug_required")
+    details = gen_watchlist_details()
+    normalized_code = _normalize_watchlist_annotation_code(stock_code=stock_code, stock_name=stock_name, details_map=details)
+    detail = get_watchlist_detail_by_code(normalized_code, stock_name=stock_name, details_map=details)
+    if not detail:
+        raise ValueError("watchlist_stock_not_found")
+    content = str(comment_text or "").strip()
+    if not content:
+        raise ValueError("watchlist_comment_text_required")
+    created_by_user_id = str(created_by_user_id or "").strip()
+    if not created_by_user_id:
+        raise ValueError("watchlist_comment_user_required")
+    normalized_role = str(created_by_role or "investor").strip().lower()
+    if normalized_role not in {"investor", "dav"}:
+        normalized_role = "investor"
+    now_text = now_ts()
+    payload = {
+        "tenant_slug": normalized_tenant,
+        "stock_code": normalized_code,
+        "stock_name": str(stock_name or detail.get("name") or normalized_code).strip() or normalized_code,
+        "comment_text": content[:1000],
+        "created_by_user_id": created_by_user_id[:120],
+        "created_by_name": str(created_by_name or created_by_user_id or "租户用户").strip()[:120] or "租户用户",
+        "created_by_role": normalized_role,
+        "source_client": str(source_client or "h5").strip()[:40] or "h5",
+        "created_at": now_text,
+        "updated_at": now_text,
+    }
+    label_result = label_watchlist_comment_with_llm(
+        payload["comment_text"],
+        stock_detail=detail,
+        tenant_slug=normalized_tenant,
+        entry_point=payload["source_client"],
+    )
+    payload["label_tags_json"] = json.dumps(label_result.get("labels") or [], ensure_ascii=False)
+    payload["keyword_tags_json"] = json.dumps(label_result.get("keywords") or [], ensure_ascii=False)
+    payload["sentiment_label"] = str(label_result.get("sentiment_label") or "").strip()[:40]
+    payload["topic_label"] = str(label_result.get("topic_label") or "").strip()[:80]
+    payload["comment_summary"] = str(label_result.get("summary") or "").strip()[:120]
+    payload["labeling_source"] = str(label_result.get("source") or "").strip()[:40]
+    llm_model = label_result.get("llm_model") if isinstance(label_result.get("llm_model"), dict) else {}
+    payload["labeling_model_key"] = str(llm_model.get("key") or "").strip()[:80]
+    payload["labeling_model_name"] = str(llm_model.get("model_name") or llm_model.get("label") or "").strip()[:120]
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO watchlist_comments (
+            tenant_slug, stock_code, stock_name, comment_text,
+            label_tags_json, keyword_tags_json, sentiment_label, topic_label, comment_summary,
+            labeling_source, labeling_model_key, labeling_model_name,
+            created_by_user_id, created_by_name, created_by_role, source_client,
+            created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            payload["tenant_slug"],
+            payload["stock_code"],
+            payload["stock_name"],
+            payload["comment_text"],
+            payload["label_tags_json"],
+            payload["keyword_tags_json"],
+            payload["sentiment_label"],
+            payload["topic_label"],
+            payload["comment_summary"],
+            payload["labeling_source"],
+            payload["labeling_model_key"],
+            payload["labeling_model_name"],
+            payload["created_by_user_id"],
+            payload["created_by_name"],
+            payload["created_by_role"],
+            payload["source_client"],
+            payload["created_at"],
+            payload["updated_at"],
+        ),
+    )
+    db.commit()
+    row = db.execute(
+        """
+        SELECT *
+        FROM watchlist_comments
+        WHERE tenant_slug = ? AND stock_code = ? AND created_by_user_id = ? AND created_at = ?
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        (
+            payload["tenant_slug"],
+            payload["stock_code"],
+            payload["created_by_user_id"],
+            payload["created_at"],
+        ),
+    ).fetchone()
+    return _normalize_watchlist_comment_row(row, detail=detail, viewer_role=normalized_role, viewer_profile_id=payload["created_by_user_id"])
+
+
+def build_watchlist_comment_analytics(tenant_slug="", limit=240):
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    if not normalized_tenant:
+        return {
+            "summary": {"total_comments": 0, "dav_comments": 0, "investor_comments": 0, "stock_count": 0},
+            "keyword_cloud": [],
+            "label_distribution": [],
+            "sentiment_distribution": [],
+            "topic_distribution": [],
+            "top_stocks": [],
+            "recent_comments": [],
+        }
+    try:
+        rows = get_db().execute(
+            """
+            SELECT *
+            FROM watchlist_comments
+            WHERE tenant_slug = ?
+            ORDER BY updated_at DESC, id DESC
+            LIMIT ?
+            """,
+            (normalized_tenant, max(1, min(int(limit or 240), 1000))),
+        ).fetchall()
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        return {
+            "summary": {"total_comments": 0, "dav_comments": 0, "investor_comments": 0, "stock_count": 0},
+            "keyword_cloud": [],
+            "label_distribution": [],
+            "sentiment_distribution": [],
+            "topic_distribution": [],
+            "top_stocks": [],
+            "recent_comments": [],
+            "fallback_mode": True,
+        }
+    detail_map = gen_watchlist_details()
+    normalized_rows = [
+        _normalize_watchlist_comment_row(
+            row,
+            detail=get_watchlist_detail_by_code(str((row or {}).get("stock_code") or "").strip(), details_map=detail_map) or {},
+            viewer_role="dav",
+            viewer_profile_id="",
+        )
+        for row in rows
+    ]
+    label_counter = {}
+    keyword_counter = {}
+    sentiment_counter = {}
+    topic_counter = {}
+    stock_counter = {}
+    dav_comments = 0
+    investor_comments = 0
+    for item in normalized_rows:
+        if str(item.get("created_by_role") or "").strip().lower() == "dav":
+            dav_comments += 1
+        else:
+            investor_comments += 1
+        stock_key = str(item.get("stock_code") or "").strip()
+        if stock_key:
+            stock_counter[stock_key] = stock_counter.get(stock_key, 0) + 1
+        for tag in (item.get("label_tags") or []):
+            label_counter[tag] = label_counter.get(tag, 0) + 1
+        for keyword in (item.get("keyword_tags") or []):
+            keyword_counter[keyword] = keyword_counter.get(keyword, 0) + 1
+        sentiment = str(item.get("sentiment_label") or "").strip()
+        if sentiment:
+            sentiment_counter[sentiment] = sentiment_counter.get(sentiment, 0) + 1
+        topic = str(item.get("topic_label") or "").strip()
+        if topic:
+            topic_counter[topic] = topic_counter.get(topic, 0) + 1
+
+    def _sorted_counter(counter_map, label_key="label", value_key="value", limit_value=12):
+        items = sorted(counter_map.items(), key=lambda pair: (-int(pair[1]), str(pair[0])))
+        return [{label_key: key, value_key: value} for key, value in items[: max(1, int(limit_value or 12))] if str(key).strip()]
+
+    top_stock_items = []
+    for code, count in sorted(stock_counter.items(), key=lambda pair: (-int(pair[1]), str(pair[0]))):
+        detail = detail_map.get(code) or {}
+        top_stock_items.append({
+            "stock_code": code,
+            "stock_name": str(detail.get("name") or code).strip() or code,
+            "industry": str(detail.get("industry") or detail.get("focus") or "").strip(),
+            "value": count,
+        })
+    return {
+        "summary": {
+            "total_comments": len(normalized_rows),
+            "dav_comments": dav_comments,
+            "investor_comments": investor_comments,
+            "stock_count": len(stock_counter),
+        },
+        "keyword_cloud": _sorted_counter(keyword_counter, label_key="keyword", value_key="value", limit_value=24),
+        "label_distribution": _sorted_counter(label_counter, label_key="label", value_key="value", limit_value=12),
+        "sentiment_distribution": _sorted_counter(sentiment_counter, label_key="label", value_key="value", limit_value=8),
+        "topic_distribution": _sorted_counter(topic_counter, label_key="label", value_key="value", limit_value=10),
+        "top_stocks": top_stock_items[:8],
+        "recent_comments": normalized_rows[:20],
+    }
+
+
+def delete_watchlist_comment(
+    tenant_slug="",
+    stock_code="",
+    stock_name="",
+    comment_id=None,
+    actor_role="",
+    actor_profile_id="",
+):
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    if not normalized_tenant:
+        raise ValueError("tenant_slug_required")
+    try:
+        normalized_id = int(comment_id or 0)
+    except Exception:
+        normalized_id = 0
+    if normalized_id <= 0:
+        raise ValueError("watchlist_comment_id_required")
+    normalized_role = str(actor_role or "").strip().lower()
+    normalized_profile_id = str(actor_profile_id or "").strip()
+    db = get_db()
+    row = db.execute(
+        """
+        SELECT *
+        FROM watchlist_comments
+        WHERE tenant_slug = ? AND id = ?
+        """,
+        (normalized_tenant, normalized_id),
+    ).fetchone()
+    if not row:
+        return False
+    owner_id = str(row.get("created_by_user_id") or "").strip()
+    if normalized_role != "dav" and (not normalized_profile_id or normalized_profile_id != owner_id):
+        raise ValueError("watchlist_comment_delete_forbidden")
+    db.execute(
+        "DELETE FROM watchlist_comments WHERE tenant_slug = ? AND id = ?",
+        (normalized_tenant, normalized_id),
+    )
+    db.commit()
+    remaining = db.execute(
+        "SELECT id FROM watchlist_comments WHERE tenant_slug = ? AND id = ?",
+        (normalized_tenant, normalized_id),
+    ).fetchone()
+    return remaining is None
+
+
 def gen_watchlist_details():
     def build_kline_series(stock_code, base_price):
         rng = random.Random(f"kline:{stock_code}")
@@ -3454,60 +4274,7 @@ def gen_watchlist_details():
             },
         },
     }
-    indicator_context = build_watchlist_indicator_context()
-    for detail in details.values():
-        signal_bundle = build_watchlist_signal_bundle(detail["code"], detail["name"], detail.get("industry"), indicator_context)
-        detail["indicator_context"] = signal_bundle
-        detail["focus"] = detail.get("industry") or detail.get("focus") or "个股跟踪"
-        detail["alert_level"] = signal_bundle["board_alert_level"]
-        detail["alert_text"] = sanitize_user_facing_source_text(signal_bundle["board_alert_text"], fallback="当前无明显预警")
-        detail["signal_summary"] = signal_bundle["board_summary"]
-        detail["anomaly_text"] = signal_bundle["anomaly_text"]
-        detail["related_indicator_ids"] = signal_bundle["related_indicator_ids"]
-        detail["related_indicator_names"] = signal_bundle["related_indicator_names"]
-        fundamental = detail.get("fundamental") if isinstance(detail.get("fundamental"), dict) else {}
-        base_summary = str(fundamental.get("summary") or "").strip()
-        fundamental["summary"] = f"{base_summary} 当前关联指标信号：{signal_bundle['board_summary']}" if base_summary else signal_bundle["board_summary"]
-        base_metrics = fundamental.get("metrics") if isinstance(fundamental.get("metrics"), list) else []
-        metric_labels = {str(item.get('label') or '') for item in base_metrics if isinstance(item, dict)}
-        for metric in signal_bundle["metrics"]:
-            if metric["label"] not in metric_labels:
-                base_metrics.append(metric)
-        for metric in base_metrics:
-            if not isinstance(metric, dict):
-                continue
-            metric["note"] = sanitize_user_facing_source_text(metric.get("note") or "", fallback=str(metric.get("note") or "").strip())
-        fundamental["metrics"] = base_metrics[:6]
-        base_thesis = fundamental.get("thesis") if isinstance(fundamental.get("thesis"), list) else []
-        normalized_thesis = []
-        seen_thesis = set()
-        for item in base_thesis + [item for item in signal_bundle["thesis"] if item not in base_thesis]:
-            text = sanitize_user_facing_source_text(item, fallback=str(item or "").strip())
-            if not text or text in seen_thesis:
-                continue
-            seen_thesis.add(text)
-            normalized_thesis.append(text)
-        fundamental["thesis"] = normalized_thesis[:5]
-        detail["fundamental"] = fundamental
-        forecast = detail.get("forecast") if isinstance(detail.get("forecast"), dict) else {}
-        if signal_bundle["board_alert_level"] == "warning":
-            forecast["verdict"] = "重点观察"
-            forecast["confidence"] = "中"
-            forecast["band"] = f"{forecast.get('band') or ''} 当前行业关联指标存在预警，优先核查 {signal_bundle['related_indicator_names'][0] if signal_bundle['related_indicator_names'] else '核心信号'}。".strip()
-        elif signal_bundle["board_alert_level"] == "attention":
-            forecast["band"] = f"{forecast.get('band') or ''} 当前行业关联指标进入关注区间，建议跟踪 {signal_bundle['related_indicator_names'][0] if signal_bundle['related_indicator_names'] else '核心信号'}。".strip()
-        drivers = forecast.get("drivers") if isinstance(forecast.get("drivers"), list) else []
-        if signal_bundle["related_indicator_names"]:
-            drivers = [
-                {
-                    "label": "指标湖联动",
-                    "score": "+0.6" if signal_bundle["board_alert_level"] == "normal" else ("-0.9" if signal_bundle["board_alert_level"] == "warning" else "-0.3"),
-                    "note": f"当前主要受 {signal_bundle['related_indicator_names'][0]} 影响",
-                }
-            ] + drivers
-        forecast["drivers"] = drivers[:4]
-        detail["forecast"] = forecast
-    return details
+    return _enrich_watchlist_details(details)
 
 
 def strip_watchlist_forecast_payload(detail):

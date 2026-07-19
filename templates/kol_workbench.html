@@ -2203,6 +2203,21 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
   box-shadow:0 26px 60px rgba(13,27,42,0.22);
   padding:24px;
 }
+.kw-review-modal-close-row {
+  display:flex;
+  justify-content:flex-end;
+  margin-bottom:10px;
+}
+.kw-review-modal-close-pill {
+  border:1px solid rgba(47,116,192,0.16);
+  background:#F3F8FE;
+  color:#1F497D;
+  border-radius:999px;
+  padding:6px 12px;
+  font-size:12px;
+  line-height:1;
+  cursor:pointer;
+}
 .kw-knowledge-modal-sheet { width:min(1180px, 100%); }
 .kw-review-modal-head {
   display:flex;
@@ -3842,6 +3857,16 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
             {% endfor %}
           </div>
         </div>
+        <div class="kw-card" style="margin-top:16px">
+          <div class="kw-card-head">
+            <div>
+              <div class="kw-card-title">评论标注总览</div>
+              <div class="kw-card-desc">这里汇总粉丝和大V在自选股下的评论，并用统一模型做标签、主题和情绪标注，方便大V判断粉丝关注焦点。</div>
+            </div>
+            <span class="kw-tag">Comment AI</span>
+          </div>
+          <div id="kw-watchlist-comment-analytics"></div>
+        </div>
       </div>
 
       <div id="workbench-section-dashboard" style="display:none">
@@ -4217,26 +4242,31 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
 <div class="toast" id="toast"></div>
 <div class="kw-review-modal-overlay" id="kw-review-trigger-modal" onclick="if(event.target===this)kwCloseReviewTriggerModal()">
   <div class="kw-review-modal-sheet">
+    <div class="kw-review-modal-close-row"><button class="kw-review-modal-close-pill" type="button" onclick="kwCloseReviewTriggerModal()">关闭</button></div>
     <div id="kw-review-trigger-modal-content"></div>
   </div>
 </div>
 <div class="kw-review-modal-overlay" id="kw-knowledge-modal" onclick="if(event.target===this)kwCloseKnowledgeModal()">
   <div class="kw-review-modal-sheet">
+    <div class="kw-review-modal-close-row"><button class="kw-review-modal-close-pill" type="button" onclick="kwCloseKnowledgeModal()">关闭</button></div>
     <div id="kw-knowledge-modal-content"></div>
   </div>
 </div>
 <div class="kw-review-modal-overlay" id="kw-indicator-modal" onclick="if(event.target===this)kwCloseIndicatorModal()">
   <div class="kw-review-modal-sheet">
+    <div class="kw-review-modal-close-row"><button class="kw-review-modal-close-pill" type="button" onclick="kwCloseIndicatorModal()">关闭</button></div>
     <div id="kw-indicator-modal-content"></div>
   </div>
 </div>
 <div class="kw-review-modal-overlay" id="kw-dashboard-cell-modal" onclick="if(event.target===this)kwCloseDashboardCellModal()">
   <div class="kw-review-modal-sheet">
+    <div class="kw-review-modal-close-row"><button class="kw-review-modal-close-pill" type="button" onclick="kwCloseDashboardCellModal()">关闭</button></div>
     <div id="kw-dashboard-cell-modal-content"></div>
   </div>
 </div>
 <div class="kw-review-modal-overlay" id="kw-fan-import-modal" onclick="if(event.target===this)closeKwFanImportModal()">
   <div class="kw-review-modal-sheet kw-knowledge-modal-sheet">
+    <div class="kw-review-modal-close-row"><button class="kw-review-modal-close-pill" type="button" onclick="closeKwFanImportModal()">关闭</button></div>
     <div id="kw-fan-import-modal-content"></div>
   </div>
 </div>
@@ -4418,6 +4448,26 @@ async function refreshWorkbenchSiteConfig(options = {}) {
   }
 }
 
+function kwSyncPublishedReviewState(result) {
+  const payload = result && typeof result === 'object' ? result : {};
+  const tenantSlug = String(((window.ACTIVE_TENANT || {}).slug) || '').trim().toLowerCase();
+  const nextState = {};
+  if (Array.isArray(payload.snapshots)) nextState.review_snapshots = payload.snapshots.slice(0, 20);
+  if (payload.message_center_state && typeof payload.message_center_state === 'object') {
+    nextState.message_center_state = payload.message_center_state;
+  }
+  if (!tenantSlug || !Object.keys(nextState).length) return;
+  if (window.SITE_CONFIG && Array.isArray(window.SITE_CONFIG.tenants)) {
+    window.SITE_CONFIG.tenants = window.SITE_CONFIG.tenants.map((tenant) => {
+      const itemSlug = String((tenant && tenant.slug) || '').trim().toLowerCase();
+      return itemSlug === tenantSlug ? { ...tenant, ...nextState } : tenant;
+    });
+  }
+  if (window.ACTIVE_TENANT) {
+    window.ACTIVE_TENANT = { ...window.ACTIVE_TENANT, ...nextState };
+  }
+}
+
 function refreshWorkbenchNavVisibility() {
   document.querySelectorAll('.admin-nav-item[data-feature]').forEach((node) => {
     const featureName = node.dataset.feature;
@@ -4517,6 +4567,60 @@ function renderWorkbenchTrendChart(hostId, items) {
       ${points}
     </svg>
   `;
+}
+
+function renderWorkbenchWatchlistCommentAnalytics() {
+  const host = document.getElementById('kw-watchlist-comment-analytics');
+  const analytics = (window.WORKBENCH_DATA && window.WORKBENCH_DATA.watchlist_comment_analytics) || {};
+  if (!host) return;
+  const summary = analytics.summary || {};
+  const keywordCloud = Array.isArray(analytics.keyword_cloud) ? analytics.keyword_cloud : [];
+  const labelDistribution = Array.isArray(analytics.label_distribution) ? analytics.label_distribution : [];
+  const sentimentDistribution = Array.isArray(analytics.sentiment_distribution) ? analytics.sentiment_distribution : [];
+  const recentComments = Array.isArray(analytics.recent_comments) ? analytics.recent_comments : [];
+  host.innerHTML = `
+    <div class="stats-grid" style="margin-top:0">
+      <div class="stat-card"><div class="stat-label">评论总量</div><div class="stat-value">${Number(summary.total_comments || 0)}</div><div class="stat-change up">租户内累计</div></div>
+      <div class="stat-card"><div class="stat-label">粉丝评论</div><div class="stat-value">${Number(summary.investor_comments || 0)}</div><div class="stat-change up">普通用户输入</div></div>
+      <div class="stat-card"><div class="stat-label">大V评论</div><div class="stat-value">${Number(summary.dav_comments || 0)}</div><div class="stat-change up">投顾侧观点</div></div>
+      <div class="stat-card"><div class="stat-label">涉及个股</div><div class="stat-value">${Number(summary.stock_count || 0)}</div><div class="stat-change up">有讨论的标的</div></div>
+    </div>
+    <div class="config-grid" style="margin-top:16px">
+      <div class="config-card">
+        <div class="config-card-title">关键词云图</div>
+        <div class="keyword-cloud">
+          ${keywordCloud.length ? keywordCloud.map((item) => `<span class="keyword-tag">${escapeHtml(item.keyword || '')} · ${Number(item.value || 0)}</span>`).join('') : '<span style="font-size:12px;color:var(--gray-400)">暂无评论关键词</span>'}
+        </div>
+      </div>
+      <div class="config-card">
+        <div class="config-card-title">最新评论标注</div>
+        <div style="display:grid;gap:10px">
+          ${recentComments.length ? recentComments.slice(0, 6).map((item) => `
+            <div style="border:1px solid rgba(47,116,192,0.12);border-radius:12px;padding:12px;background:#FFFFFF">
+              <div style="font-size:11px;color:var(--gray-400)">${escapeHtml(item.created_by_role_label || '')} · ${escapeHtml(item.created_by_name || '')} · ${escapeHtml(item.updated_at || item.created_at || '')}</div>
+              <div style="font-size:13px;color:var(--text-main);line-height:1.7;margin-top:6px">${escapeHtml(item.comment_text || '')}</div>
+              <div class="keyword-cloud" style="margin-top:8px">
+                ${(Array.isArray(item.label_tags) ? item.label_tags : []).map((tag) => `<span class="keyword-tag" style="background:rgba(47,116,192,0.08);border-color:rgba(47,116,192,0.18);color:#2F74C0">${escapeHtml(tag)}</span>`).join('')}
+                ${item.sentiment_label ? `<span class="keyword-tag" style="background:rgba(200,169,110,0.12);border-color:rgba(200,169,110,0.28);color:var(--gold-dark)">${escapeHtml(item.sentiment_label)}</span>` : ''}
+              </div>
+            </div>
+          `).join('') : '<div style="font-size:12px;color:var(--gray-400)">暂无评论记录</div>'}
+        </div>
+      </div>
+    </div>
+    <div class="config-grid" style="margin-top:16px">
+      <div class="config-card">
+        <div class="config-card-title">标签分布</div>
+        <div id="kw-watchlist-comment-label-chart"></div>
+      </div>
+      <div class="config-card">
+        <div class="config-card-title">情绪分布</div>
+        <div id="kw-watchlist-comment-sentiment-chart"></div>
+      </div>
+    </div>
+  `;
+  renderWorkbenchBarChart('kw-watchlist-comment-label-chart', labelDistribution.map((item) => ({ label: item.label, value: item.value })));
+  renderWorkbenchBarChart('kw-watchlist-comment-sentiment-chart', sentimentDistribution.map((item) => ({ label: item.label, value: item.value })));
 }
 
 function kwNormalizeDashboardLayout(layout) {
@@ -6230,6 +6334,8 @@ function kwOpenIndicatorHistory(indicatorId) {
 }
 
 const KW_WATCHLIST_ANNOTATION_STORAGE_KEY = 'gangtise_demo_watchlist_annotations';
+const kwWatchlistAnnotationSyncTasks = {};
+const kwLoadedWatchlistAnnotationCodes = {};
 const KW_REVIEW_PERIOD_CONFIG = {
   day: { label: '日复盘', shortLabel: '今日' },
   week: { label: '周复盘', shortLabel: '本周' },
@@ -7784,6 +7890,15 @@ function kwNormalizeReviewStructuredPreview(payload) {
         analysis_text: String((item || {}).analysis_text || '').trim(),
         evidence: Array.isArray((item || {}).evidence) ? item.evidence.slice(0) : [],
       })) : [],
+      annotation_evidence: Array.isArray(watchlistAnalysisSection.annotation_evidence) ? watchlistAnalysisSection.annotation_evidence.map((item) => ({
+        annotation_id: (item || {}).annotation_id,
+        stock_name: String((item || {}).stock_name || '').trim(),
+        stock_code: String((item || {}).stock_code || '').trim(),
+        date_label: String((item || {}).date_label || '').trim(),
+        title: String((item || {}).title || '').trim(),
+        note: String((item || {}).note || '').trim(),
+        trigger: String((item || {}).trigger || '').trim(),
+      })) : [],
     },
     llm_models: Array.isArray(source.llm_models) ? source.llm_models.slice(0) : [],
   };
@@ -7888,6 +8003,7 @@ async function kwGenerateReviewDraftWithLlm() {
 
 async function kwRequestReviewStructuredPreview() {
   const tenant = window.ACTIVE_TENANT || {};
+  await kwSyncLocalWatchlistAnnotationsToServer(kwReviewDraft.selectedWatchlist || []);
   const resp = await fetch('/api/review/prepare-preview', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -8131,8 +8247,10 @@ async function kwEmbedManualReviewText(text) {
   return data;
 }
 
-async function kwPublishReviewContentEmbedding(text, transcriptionEngine, transcriptModel) {
+async function kwPublishReviewContentEmbedding(text, transcriptionEngine, transcriptModel, extras) {
   const tenant = window.ACTIVE_TENANT || {};
+  await kwSyncLocalWatchlistAnnotationsToServer(kwReviewDraft.selectedWatchlist || []);
+  const payload = extras && typeof extras === 'object' ? extras : {};
   const resp = await fetch('/api/review/publish-embed', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -8160,7 +8278,10 @@ async function kwPublishReviewContentEmbedding(text, transcriptionEngine, transc
       selected_cards: kwGetReviewSelectedCards(),
       data_sources: kwGetReviewSelectedCards().flatMap(item => Array.isArray(item.data_sources) ? item.data_sources : []),
       news_sources: kwGetReviewSelectedCards().flatMap(item => Array.isArray(item.news_sources) ? item.news_sources : []),
-      llm_models: [
+      review_summary: payload.review_summary || '',
+      user_input_section: payload.user_input_section || {},
+      watchlist_analysis_section: payload.watchlist_analysis_section || {},
+      llm_models: Array.isArray(payload.llm_models) ? payload.llm_models : [
         kwReviewIngestResult && kwReviewIngestResult.review_draft_llm ? { stage: 'compose', ...kwReviewIngestResult.review_draft_llm } : null,
       ].filter(Boolean),
     }),
@@ -9155,15 +9276,9 @@ function kwPublishReviewDraft() {
       onSuccess(job) {
         const result = job.result || {};
         kwReviewIngestResult = result;
-        kwOpenReviewIngestResultModal('确认发布成功，已写入向量库', [
-          `转写引擎：${result.transcription_engine || '-'}`,
-          `向量引擎：${result.embedding_engine || '-'}`,
-          `向量模型：${result.embedding_model || '-'}`,
-          `namespace：${(result.record && result.record.vector_namespace) || '-'}`,
-          `发布正文：${result.text || ''}`,
-        ]);
         runtime.kolPublishedAt = '刚刚发布';
         runtime.kolGeneratedAt = '刚刚发布';
+        kwSyncPublishedReviewState(result);
         if (window.WORKBENCH_DATA) {
           if (Array.isArray(result.snapshots) && result.snapshots.length) {
             window.WORKBENCH_DATA.published_reviews = result.snapshots.slice(0, 20);
@@ -9300,6 +9415,101 @@ function loadWorkbenchWatchlistAnnotations() {
   }
 }
 
+function replaceWorkbenchStockAnnotations(stockCode, items) {
+  const tenantId = window.ACTIVE_TENANT && window.ACTIVE_TENANT.id;
+  if (!tenantId) return;
+  const storage = loadWorkbenchWatchlistAnnotations();
+  if (!storage[tenantId]) storage[tenantId] = {};
+  storage[tenantId][String(stockCode || '').toUpperCase()] = (Array.isArray(items) ? items : []).map((item) => ({
+    id: item.id,
+    candleIndex: Number(item.candleIndex ?? item.candle_index ?? 0),
+    dateLabel: item.dateLabel || item.candle_date || '',
+    title: item.title || '',
+    note: item.note || '',
+    trigger: item.trigger || '',
+    updatedAt: item.updatedAt || item.updated_at || item.createdAt || item.created_at || '刚刚',
+  }));
+  try {
+    if (window.localStorage) {
+      window.localStorage.setItem(KW_WATCHLIST_ANNOTATION_STORAGE_KEY, JSON.stringify(storage));
+    }
+  } catch (e) {}
+}
+
+function kwGetWatchlistTenantPayload() {
+  const tenant = window.ACTIVE_TENANT || {};
+  return {
+    tenant_slug: String(tenant.slug || '').trim().toLowerCase(),
+    user_role: 'dav',
+    user_profile_id: String(tenant.advisor || '').trim(),
+    user_name: String(tenant.advisor || '').trim(),
+  };
+}
+
+async function kwSyncLocalWatchlistAnnotationsToServer(stockRefs) {
+  const tenant = window.ACTIVE_TENANT || {};
+  if (!tenant.slug) return;
+  const detailsMap = window.WATCHLIST_DETAILS_MAP || {};
+  const tenantId = tenant.id;
+  const payload = kwGetWatchlistTenantPayload();
+  const codes = (Array.isArray(stockRefs) ? stockRefs : [stockRefs]).map((item) => {
+    const raw = String(item || '').trim();
+    if (!raw) return '';
+    const detail = Object.values(detailsMap).find((row) => row && (row.code === raw || row.name === raw));
+    return String((detail && detail.code) || raw).trim().toUpperCase();
+  }).filter(Boolean);
+  await Promise.all(codes.map(async (stockCode) => {
+    const taskKey = `${payload.tenant_slug}:${stockCode}`;
+    if (kwWatchlistAnnotationSyncTasks[taskKey]) return kwWatchlistAnnotationSyncTasks[taskKey];
+    const task = (async () => {
+      const items = getWorkbenchStockAnnotations(stockCode);
+      if (!items.length) return;
+      for (const item of items) {
+        await fetch(`/api/watchlist/${encodeURIComponent(stockCode)}/annotations`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            ...payload,
+            stock_name: ((detailsMap[stockCode] || {}).name) || stockCode,
+            candle_index: Number(item.candleIndex || 0),
+            candle_date: item.dateLabel || '',
+            title: item.title || '',
+            note: item.note || '',
+            trigger: item.trigger || '',
+            source_client: 'web_workbench',
+          }),
+        }).catch(() => null);
+      }
+    })().finally(() => {
+      delete kwWatchlistAnnotationSyncTasks[taskKey];
+    });
+    kwWatchlistAnnotationSyncTasks[taskKey] = task;
+    return task;
+  }));
+}
+
+async function kwLoadWatchlistAnnotationsFromServer(stockRefs) {
+  const tenant = window.ACTIVE_TENANT || {};
+  if (!tenant.slug) return;
+  const detailsMap = window.WATCHLIST_DETAILS_MAP || {};
+  const codes = (Array.isArray(stockRefs) ? stockRefs : [stockRefs]).map((item) => {
+    const raw = String(item || '').trim();
+    if (!raw) return '';
+    const detail = Object.values(detailsMap).find((row) => row && (row.code === raw || row.name === raw));
+    return String((detail && detail.code) || raw).trim().toUpperCase();
+  }).filter(Boolean);
+  await Promise.all(codes.map(async (stockCode) => {
+    try {
+      const resp = await fetch(`/api/watchlist/${encodeURIComponent(stockCode)}/annotations?tenant_slug=${encodeURIComponent(String(tenant.slug || '').trim().toLowerCase())}`);
+      const data = await resp.json();
+      if (resp.ok && data.ok) {
+        replaceWorkbenchStockAnnotations(stockCode, data.items || []);
+        kwLoadedWatchlistAnnotationCodes[`${String(tenant.slug || '').trim().toLowerCase()}:${stockCode}`] = true;
+      }
+    } catch (e) {}
+  }));
+}
+
 function getWorkbenchStockAnnotations(stockCode) {
   const tenantId = window.ACTIVE_TENANT && window.ACTIVE_TENANT.id;
   const storage = loadWorkbenchWatchlistAnnotations();
@@ -9323,6 +9533,23 @@ function getWorkbenchReviewAnnotations(reviewItem) {
 }
 
 function renderWorkbenchAnnotationViews() {
+  const tenant = window.ACTIVE_TENANT || {};
+  const tenantSlug = String(tenant.slug || '').trim().toLowerCase();
+  const watchNodeCodes = Array.from(document.querySelectorAll('[data-workbench-watch-annotation]')).map((node) => String(node.getAttribute('data-workbench-watch-annotation') || '').trim().toUpperCase()).filter(Boolean);
+  const reviews = (window.WORKBENCH_DATA && window.WORKBENCH_DATA.published_reviews) || [];
+  const reviewCodes = reviews.flatMap((reviewItem) => {
+    const watchlist = Array.isArray(reviewItem.watchlist) ? reviewItem.watchlist : [];
+    return watchlist.map((name) => {
+      const detail = Object.values(window.WATCHLIST_DETAILS_MAP || {}).find((item) => item && item.name === name);
+      return String((detail && detail.code) || '').trim().toUpperCase();
+    }).filter(Boolean);
+  });
+  const codesToHydrate = Array.from(new Set(watchNodeCodes.concat(reviewCodes))).filter((code) => tenantSlug && !kwLoadedWatchlistAnnotationCodes[`${tenantSlug}:${code}`]);
+  if (codesToHydrate.length) {
+    kwLoadWatchlistAnnotationsFromServer(codesToHydrate).then(() => {
+      renderWorkbenchAnnotationViews();
+    }).catch(() => null);
+  }
   document.querySelectorAll('[data-workbench-watch-annotation]').forEach((node) => {
     const stockCode = node.getAttribute('data-workbench-watch-annotation') || '';
     const annotations = getWorkbenchStockAnnotations(stockCode);
@@ -9343,7 +9570,6 @@ function renderWorkbenchAnnotationViews() {
     `;
   });
 
-  const reviews = (window.WORKBENCH_DATA && window.WORKBENCH_DATA.published_reviews) || [];
   document.querySelectorAll('[data-workbench-review-annotation]').forEach((node) => {
     const index = Number(node.getAttribute('data-workbench-review-annotation') || 0);
     const reviewItem = reviews[index];
@@ -9882,6 +10108,9 @@ function showWorkbenchSection(name, navEl) {
   }
   if (name === 'watchlist' || name === 'published' || name === 'review') {
     renderWorkbenchAnnotationViews();
+  }
+  if (name === 'watchlist') {
+    renderWorkbenchWatchlistCommentAnalytics();
   }
   if (name === 'review') {
     kwRenderReviewStudio();

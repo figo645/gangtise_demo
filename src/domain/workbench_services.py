@@ -67,7 +67,7 @@ def record_fan_stock_observation_event(
         return None
     normalized_code = _normalize_fan_stock_code(stock_code=stock_code, stock_name=stock_name)
     details = gen_watchlist_details()
-    detail = details.get(normalized_code)
+    detail = get_watchlist_detail_by_code(stock_code=normalized_code, stock_name=stock_name, details_map=details)
     if not detail:
         return None
     payload = {
@@ -615,6 +615,7 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
     review_generation_cfg = get_review_generation_config()
     watchlist_hub_items = build_tenant_watchlist_hub_items(tenant, watchlist_details_map)
     fan_stock_observation = build_fan_stock_observation_payload(tenant, fallback_mode=fallback_mode)
+    watchlist_comment_analytics = build_watchlist_comment_analytics(tenant_slug=tenant["slug"])
     return {
         "tenant": tenant,
         "fallback_mode": fallback_mode,
@@ -897,6 +898,7 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
             "items": watchlist_hub_items,
         },
         "fan_stock_observation": fan_stock_observation,
+        "watchlist_comment_analytics": watchlist_comment_analytics,
         "fund_dashboard": fund_dashboard,
         "fund_dashboard_state": fund_dashboard_state,
         "indicator_hub": indicator_hub,

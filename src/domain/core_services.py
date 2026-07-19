@@ -81,6 +81,42 @@ def gen_watchlist_details(*args, **kwargs):
     return _market_services_module().gen_watchlist_details(*args, **kwargs)
 
 
+def get_watchlist_detail_by_code(*args, **kwargs):
+    return _market_services_module().get_watchlist_detail_by_code(*args, **kwargs)
+
+
+def list_watchlist_kline_annotations(*args, **kwargs):
+    return _market_services_module().list_watchlist_kline_annotations(*args, **kwargs)
+
+
+def save_watchlist_kline_annotation(*args, **kwargs):
+    return _market_services_module().save_watchlist_kline_annotation(*args, **kwargs)
+
+
+def delete_watchlist_kline_annotation(*args, **kwargs):
+    return _market_services_module().delete_watchlist_kline_annotation(*args, **kwargs)
+
+
+def build_watchlist_annotation_context(*args, **kwargs):
+    return _market_services_module().build_watchlist_annotation_context(*args, **kwargs)
+
+
+def list_watchlist_comments(*args, **kwargs):
+    return _market_services_module().list_watchlist_comments(*args, **kwargs)
+
+
+def save_watchlist_comment(*args, **kwargs):
+    return _market_services_module().save_watchlist_comment(*args, **kwargs)
+
+
+def delete_watchlist_comment(*args, **kwargs):
+    return _market_services_module().delete_watchlist_comment(*args, **kwargs)
+
+
+def build_watchlist_comment_analytics(*args, **kwargs):
+    return _market_services_module().build_watchlist_comment_analytics(*args, **kwargs)
+
+
 def build_simulated_indicator_kline(*args, **kwargs):
     return _market_services_module().build_simulated_indicator_kline(*args, **kwargs)
 
@@ -166,9 +202,18 @@ def normalize_llm_registry_config(source=None):
     if not default_model_key and models:
         general_models = [model for model in models if model.get("purpose") == "general" and model.get("enabled")]
         default_model_key = (general_models[0] if general_models else models[0]).get("key") or ""
+    feature_model_keys = {}
+    raw_feature_model_keys = raw.get("feature_model_keys") if isinstance(raw.get("feature_model_keys"), dict) else {}
+    valid_keys = {model["key"] for model in models}
+    for feature_code, model_key in raw_feature_model_keys.items():
+        feature_code_text = str(feature_code or "").strip()
+        model_key_text = str(model_key or "").strip()
+        if feature_code_text and model_key_text and model_key_text in valid_keys:
+            feature_model_keys[feature_code_text] = model_key_text
     return {
         "default_model_key": default_model_key,
         "models": models,
+        "feature_model_keys": feature_model_keys,
     }
 
 
@@ -182,9 +227,77 @@ def normalize_knowledge_ingestion_config(source=None):
 def normalize_hermes_settings_config(source=None):
     raw = source if isinstance(source, dict) else {}
     defaults = copy.deepcopy(DEFAULT_SITE_CONFIG["hermes_settings"])
+    default_intent_tree = copy.deepcopy(defaults.get("intent_tree") or [])
+    default_template_tree = copy.deepcopy(defaults.get("template_tree") or {})
+    default_route_priority = list(defaults.get("route_priority") or [])
+    default_chart_types = list(defaults.get("chart_types_enabled") or [])
+
+    def _normalize_tree_items(items, fallback_items):
+        fallback_map = {
+            str(item.get("id") or "").strip(): copy.deepcopy(item)
+            for item in (fallback_items if isinstance(fallback_items, list) else [])
+            if isinstance(item, dict) and str(item.get("id") or "").strip()
+        }
+        normalized = []
+        source_items = items if isinstance(items, list) and items else list(fallback_map.values())
+        seen = set()
+        for item in source_items:
+            if not isinstance(item, dict):
+                continue
+            item_id = str(item.get("id") or "").strip()
+            if not item_id or item_id in seen:
+                continue
+            base = copy.deepcopy(fallback_map.get(item_id) or {})
+            merged = {**base, **copy.deepcopy(item)}
+            merged["id"] = item_id
+            merged["label"] = str(merged.get("label") or base.get("label") or item_id).strip() or item_id
+            if "group" in merged:
+                merged["group"] = str(merged.get("group") or base.get("group") or "").strip()
+            if "display_mode" in merged:
+                merged["display_mode"] = str(merged.get("display_mode") or base.get("display_mode") or "text").strip() or "text"
+            for key in ["enabled", "allow_knowledge", "allow_web", "allow_files", "allow_chart"]:
+                if key in merged:
+                    merged[key] = bool(merged.get(key, base.get(key, False)))
+            normalized.append(merged)
+            seen.add(item_id)
+        for item_id, base in fallback_map.items():
+            if item_id not in seen:
+                normalized.append(copy.deepcopy(base))
+        return normalized
+
+    template_tree = {}
+    raw_template_tree = raw.get("template_tree") if isinstance(raw.get("template_tree"), dict) else {}
+    for group_key, fallback_items in default_template_tree.items():
+        template_tree[group_key] = _normalize_tree_items(raw_template_tree.get(group_key), fallback_items)
+
+    route_priority = []
+    for item in raw.get("route_priority") if isinstance(raw.get("route_priority"), list) else default_route_priority:
+        value = str(item or "").strip()
+        if value and value not in route_priority:
+            route_priority.append(value)
+    if not route_priority:
+        route_priority = default_route_priority
+
+    chart_types_enabled = []
+    for item in raw.get("chart_types_enabled") if isinstance(raw.get("chart_types_enabled"), list) else default_chart_types:
+        value = str(item or "").strip()
+        if value and value not in chart_types_enabled:
+            chart_types_enabled.append(value)
+    if not chart_types_enabled:
+        chart_types_enabled = default_chart_types
+
     return {
         "prompt_scope_guard_enabled": bool(raw.get("prompt_scope_guard_enabled", defaults["prompt_scope_guard_enabled"])),
         "investor_access_enabled": bool(raw.get("investor_access_enabled", defaults["investor_access_enabled"])),
+        "dav_access_enabled": bool(raw.get("dav_access_enabled", defaults.get("dav_access_enabled", True))),
+        "internet_answer_enabled": bool(raw.get("internet_answer_enabled", defaults.get("internet_answer_enabled", True))),
+        "thinking_process_enabled": bool(raw.get("thinking_process_enabled", defaults.get("thinking_process_enabled", True))),
+        "answer_save_to_knowledge_enabled": bool(raw.get("answer_save_to_knowledge_enabled", defaults.get("answer_save_to_knowledge_enabled", True))),
+        "default_response_style": str(raw.get("default_response_style") or defaults.get("default_response_style") or "structured").strip() or "structured",
+        "chart_types_enabled": chart_types_enabled,
+        "route_priority": route_priority,
+        "intent_tree": _normalize_tree_items(raw.get("intent_tree"), default_intent_tree),
+        "template_tree": template_tree,
     }
 
 
@@ -315,7 +428,7 @@ def build_llm_knowledge_processing(raw_text, source_type="", title="", source_de
         }
 
     def _knowledge_processing_llm_executor(state, runtime, node, upstream):
-        llm_model = get_default_llm_config(purpose="general")
+        llm_model = get_default_llm_config(purpose="general", feature_code="knowledge_processing_llm")
         if not llm_model:
             raise RuntimeError("knowledge_processing_llm_not_configured")
         rendered_text = call_openai_compatible_llm(
@@ -934,10 +1047,24 @@ def normalize_review_snapshot_item(item, tenant, index=0):
             "analysis_text": str(item.get("analysis_text") or "").strip()[:1200],
             "evidence": [str(value).strip() for value in (item.get("evidence") if isinstance(item.get("evidence"), list) else []) if str(value).strip()][:6],
         })
+    annotation_evidence = []
+    for item in watchlist_analysis_raw.get("annotation_evidence") if isinstance(watchlist_analysis_raw.get("annotation_evidence"), list) else []:
+        if not isinstance(item, dict):
+            continue
+        annotation_evidence.append({
+            "annotation_id": item.get("annotation_id"),
+            "stock_name": str(item.get("stock_name") or "").strip()[:120],
+            "stock_code": str(item.get("stock_code") or "").strip()[:60],
+            "date_label": str(item.get("date_label") or "").strip()[:40],
+            "title": str(item.get("title") or "").strip()[:120],
+            "note": str(item.get("note") or "").strip()[:600],
+            "trigger": str(item.get("trigger") or "").strip()[:240],
+        })
     watchlist_analysis_section = {
         "sector_summary": str(watchlist_analysis_raw.get("sector_summary") or "").strip()[:200],
         "sector_profiles": sector_profiles,
         "items": watchlist_items,
+        "annotation_evidence": annotation_evidence,
     }
     return {
         "id": str(raw.get("id") or f"{tenant['slug']}-review-{index + 1}").strip() or f"{tenant['slug']}-review-{index + 1}",
@@ -2846,9 +2973,9 @@ def is_hermes_available_for_role(user_role="", site_config=None):
     if not is_feature_enabled("hermes", config):
         return False
     normalized_role = str(user_role or "").strip().lower()
-    if normalized_role == "dav":
-        return True
     settings = get_hermes_settings(config)
+    if normalized_role == "dav":
+        return settings.get("dav_access_enabled") is True
     if normalized_role == "investor":
         return settings.get("investor_access_enabled") is True
     return settings.get("investor_access_enabled") is True
@@ -4466,6 +4593,7 @@ def build_admin_site_config_payload(site_config=None):
         "vector_port": runtime_target.get("vector", {}).get("port", ""),
         "vector_db_name": runtime_target.get("vector", {}).get("dbname", ""),
     }
+    payload["llm_feature_catalog"] = copy.deepcopy(DEFAULT_LLM_FEATURE_CATALOG)
     return payload
 
 
@@ -4938,6 +5066,8 @@ def init_db():
             execute_sql_file(conn, sql_dir / "020_knowledge_embeddings.sql")
         execute_sql_file(conn, sql_dir / "022_hermes_memory_profile.sql")
         execute_sql_file(conn, sql_dir / "023_fan_stock_observation_events.sql")
+        execute_sql_file(conn, sql_dir / "024_watchlist_kline_annotations.sql")
+        execute_sql_file(conn, sql_dir / "025_watchlist_comments.sql")
         execute_sql_file(conn, sql_dir / "101_seed_app_core.sql")
         execute_sql_file(conn, sql_dir / "100_seed_master_data.sql")
 

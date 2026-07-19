@@ -40,7 +40,7 @@ class RouteSmokeTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
-        self.assertIn('placeholder="发消息..."', html)
+        self.assertIn('placeholder="问 Hermes..."', html)
         self.assertIn('class="hermes-lobster-toolbar"', html)
         self.assertIn('id="hermes-composer-submit"', html)
         self.assertIn("hermes-prompt-chip", html)
@@ -53,6 +53,8 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("handleHermesComposerSubmit()", html)
         self.assertIn("toggleHermesVoiceCapture()", html)
         self.assertIn("toggleHermesInternetAnswer()", html)
+        self.assertIn("closeH5ModalById('watchlist-detail-modal')", html)
+        self.assertIn('class="modal-close-btn"', html)
         self.assertIn("互联网补充开关已移到输入框外侧", html)
         self.assertIn("这个智能指标是按什么口径算出来的？", html)
         self.assertIn("ensureHermesSessionId()", html)
@@ -80,6 +82,15 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("id=\"account-settings-modal\"", html)
         self.assertIn("id=\"help-center-modal\"", html)
 
+    def test_h5_watchlist_comment_assets_render(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("submitWatchlistComment(", html)
+        self.assertIn("deleteWatchlistComment(", html)
+        self.assertIn("activeSection === 'comments'", html)
+
     def test_hermes_query_accepts_web_answer_flag(self):
         response = self.client.post(
             "/api/hermes/query",
@@ -103,6 +114,26 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("memory_extract", workflow_node_ids)
         self.assertIn("user_profile_update", workflow_node_ids)
 
+    def test_admin_site_config_renders_hermes_controls(self):
+        response = self.client.get("/admin")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('id="hermes-dav-access-enabled"', html)
+        self.assertIn('id="hermes-internet-answer-enabled"', html)
+        self.assertIn('id="hermes-thinking-process-enabled"', html)
+        self.assertIn('id="hermes-answer-save-to-knowledge-enabled"', html)
+        self.assertIn('id="hermes-default-response-style"', html)
+        self.assertIn('id="hermes-chart-types-enabled"', html)
+        self.assertIn('id="hermes-intent-tree"', html)
+        self.assertIn('id="hermes-route-priority"', html)
+        self.assertIn('id="hermes-template-tree"', html)
+        self.assertIn('id="feature-watchlist_fan_comment_interaction"', html)
+        self.assertIn('id="llm-feature-model-mapping"', html)
+        self.assertIn("function updateAdminLlmFeatureModel", html)
+        self.assertIn("功能级模型映射", html)
+        self.assertIn('data-section="settings-llm-features"', html)
+
     def test_workbench_pages_render(self):
         for tenant_slug in self.tenant_slugs:
             with self.subTest(route="/kol-workbench", tenant=tenant_slug):
@@ -116,6 +147,10 @@ class RouteSmokeTest(unittest.TestCase):
                 self.assertIn("进入知识图谱", html)
                 self.assertIn("id=\"kw-kg-legend\"", html)
                 self.assertIn("loadWorkbenchKnowledgeMap(", html)
+                self.assertIn('class="kw-review-modal-close-pill"', html)
+                self.assertIn("评论标注总览", html)
+                self.assertIn("kw-watchlist-comment-analytics", html)
+                self.assertIn("renderWorkbenchWatchlistCommentAnalytics()", html)
 
     def test_tenant_portal_pages_render(self):
         for tenant_slug in self.tenant_slugs:
@@ -165,6 +200,22 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertIn("fan_stock_observation", payload)
         self.assertIn("totals", payload["fan_stock_observation"])
+
+    def test_watchlist_comment_analytics_api_payloads(self):
+        tenant_slug = self.tenant_slugs[0]
+        response = self.client.get(f"/api/tenant/{tenant_slug}/watchlist-comment-analytics")
+
+        self.assertIn(response.status_code, {200, 503})
+        payload = response.get_json()
+        self.assertIsInstance(payload, dict)
+        if response.status_code == 200:
+            self.assertTrue(payload["ok"])
+            self.assertIn("analytics", payload)
+            self.assertIn("summary", payload["analytics"])
+            self.assertIn("keyword_cloud", payload["analytics"])
+        else:
+            self.assertFalse(payload["ok"])
+            self.assertIn("error", payload)
 
     def test_fan_stock_observation_tracking_endpoint_accepts_watchlist_event(self):
         tenant_slug = self.tenant_slugs[0]

@@ -1800,6 +1800,9 @@
           <div class="admin-nav-item" data-section="settings-llm" data-feature="system_module" onclick="showSection('settings-llm', this)">
             <span class="admin-nav-icon">&#129302;</span> 大模型专区
           </div>
+          <div class="admin-nav-item" data-section="settings-llm-features" data-feature="system_module" onclick="showSection('settings-llm-features', this)">
+            <span class="admin-nav-icon">&#9889;</span> 功能级模型映射
+          </div>
           <div class="admin-nav-item" data-section="token-usage" data-feature="system_module" onclick="showSection('token-usage', this)">
             <span class="admin-nav-icon">&#128202;</span> Token 监控
           </div>
@@ -3478,28 +3481,84 @@
             <div class="stat-change" style="color:#C8A96E">加载中</div>
           </div>
         </div>
-        <div class="sync-grid" style="margin-bottom:20px">
-          <div class="sync-card">
-            <div class="sync-title">Hermes 产品口径</div>
-            <div class="sync-desc">H5 现已分成两种版本：工作区版保留股票、skills、提示词和结构化结果；龙虾纯对话版只保留聊天和 skills，不强制单独输入股票代码。</div>
-            <div class="sync-chip-row">
-              <span class="sync-chip">工作区版</span>
-              <span class="sync-chip">龙虾纯对话版</span>
-              <span class="sync-chip">skills 可选</span>
-              <span class="sync-chip">skills 可自定义</span>
-              <span class="sync-chip">skills 绑定知识库</span>
-              <span class="sync-chip">问题里自然带股票对象时自动转个股分析</span>
+      <div class="sync-grid" style="margin-bottom:20px">
+        <div class="sync-card">
+          <div class="sync-title">Hermes 产品口径</div>
+          <div class="sync-desc">H5 现已分成两种版本：工作区版保留股票、skills、提示词和结构化结果；龙虾纯对话版只保留聊天和 skills，不强制单独输入股票代码。</div>
+          <div class="toggle-wrap" style="margin:14px 0 4px">
+            <span class="toggle-label">提示词范围约束</span>
+            <label class="toggle"><input id="hermes-prompt-scope-guard-enabled" type="checkbox"><span class="toggle-slider"></span></label>
+          </div>
+          <div class="toggle-wrap" style="margin:0 0 4px">
+            <span class="toggle-label">Hermes 向大V开放</span>
+            <label class="toggle"><input id="hermes-dav-access-enabled" type="checkbox"><span class="toggle-slider"></span></label>
+          </div>
+          <div class="toggle-wrap" style="margin:0 0 4px">
+            <span class="toggle-label">Hermes 向普通用户开放</span>
+            <label class="toggle"><input id="hermes-investor-access-enabled" type="checkbox"><span class="toggle-slider"></span></label>
+          </div>
+          <div class="toggle-wrap" style="margin:0 0 4px">
+            <span class="toggle-label">互联网补充</span>
+            <label class="toggle"><input id="hermes-internet-answer-enabled" type="checkbox"><span class="toggle-slider"></span></label>
+          </div>
+          <div class="toggle-wrap" style="margin:0 0 4px">
+            <span class="toggle-label">深度思考过程</span>
+            <label class="toggle"><input id="hermes-thinking-process-enabled" type="checkbox"><span class="toggle-slider"></span></label>
+          </div>
+          <div class="toggle-wrap" style="margin:0 0 4px">
+            <span class="toggle-label">回答可加入知识源</span>
+            <label class="toggle"><input id="hermes-answer-save-to-knowledge-enabled" type="checkbox"><span class="toggle-slider"></span></label>
+          </div>
+          <div class="config-field" style="margin-top:10px">
+            <label>默认回答风格</label>
+            <select id="hermes-default-response-style">
+              <option value="structured">结构化</option>
+              <option value="brief">简洁</option>
+              <option value="deep">深度研究</option>
+            </select>
+          </div>
+          <div class="config-field">
+            <label>图表能力类型（逗号分隔）</label>
+            <input id="hermes-chart-types-enabled" type="text" placeholder="kline_chart,line_chart,distribution_chart,compare_chart">
+          </div>
+          <div class="sync-chip-row">
+            <span class="sync-chip">工作区版</span>
+            <span class="sync-chip">龙虾纯对话版</span>
+            <span class="sync-chip">skills 可选</span>
+            <span class="sync-chip">skills 可自定义</span>
+            <span class="sync-chip">skills 绑定知识库</span>
+            <span class="sync-chip">问题里自然带股票对象时自动转个股分析</span>
+          </div>
+        </div>
+        <div class="sync-card">
+          <div class="sync-title">平台监控重点</div>
+          <div class="sync-desc">平台侧看的不是按钮多少，而是这两种模式的调用量、知识命中情况、个股分析触发率和响应质量是否一致。</div>
+          <div class="sync-chip-row">
+            <span class="sync-chip">双版本调用占比</span>
+            <span class="sync-chip">知识命中率</span>
+            <span class="sync-chip">自定义 skill 使用率</span>
+            <span class="sync-chip">纯对话转个股分析比率</span>
+            <span class="sync-chip">响应耗时</span>
+          </div>
+        </div>
+      </div>
+        <div class="config-grid" style="margin-bottom:20px">
+          <div class="config-card">
+            <div class="config-card-title">Hermes 意图树</div>
+            <div class="config-field">
+              <label>意图树 JSON</label>
+              <textarea id="hermes-intent-tree" rows="16" placeholder='[{"id":"knowledge_lookup","label":"知识问答"}]'></textarea>
             </div>
           </div>
-          <div class="sync-card">
-            <div class="sync-title">平台监控重点</div>
-            <div class="sync-desc">平台侧看的不是按钮多少，而是这两种模式的调用量、知识命中情况、个股分析触发率和响应质量是否一致。</div>
-            <div class="sync-chip-row">
-              <span class="sync-chip">双版本调用占比</span>
-              <span class="sync-chip">知识命中率</span>
-              <span class="sync-chip">自定义 skill 使用率</span>
-              <span class="sync-chip">纯对话转个股分析比率</span>
-              <span class="sync-chip">响应耗时</span>
+          <div class="config-card">
+            <div class="config-card-title">路由 / 模板树</div>
+            <div class="config-field">
+              <label>路由优先级（逗号分隔）</label>
+              <textarea id="hermes-route-priority" rows="3" placeholder="session_load,memory_read,fast_path,scope_guard,intent_router,knowledge.search,platform_tools,attachment.context,web.search,answer_synthesis"></textarea>
+            </div>
+            <div class="config-field">
+              <label>模板树 JSON</label>
+              <textarea id="hermes-template-tree" rows="13" placeholder='{"router":[{"id":"router.scope","label":"范围识别"}]}'></textarea>
             </div>
           </div>
         </div>
@@ -4180,10 +4239,6 @@
               <label class="toggle"><input id="feature-hermes" type="checkbox"><span class="toggle-slider"></span></label>
             </div>
             <div class="toggle-wrap">
-              <span class="toggle-label">Hermes 提示词范围约束</span>
-              <label class="toggle"><input id="hermes-prompt-scope-guard-enabled" type="checkbox"><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
               <span class="toggle-label">Hermes 向普通用户开放</span>
               <label class="toggle"><input id="hermes-investor-access-enabled" type="checkbox"><span class="toggle-slider"></span></label>
             </div>
@@ -4212,6 +4267,10 @@
               <label class="toggle"><input id="feature-fan_interaction" type="checkbox"><span class="toggle-slider"></span></label>
             </div>
             <div class="toggle-wrap">
+              <span class="toggle-label">自选股粉丝互评</span>
+              <label class="toggle"><input id="feature-watchlist_fan_comment_interaction" type="checkbox"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
               <span class="toggle-label">付费回复</span>
               <label class="toggle"><input id="feature-paid_reply" type="checkbox"><span class="toggle-slider"></span></label>
             </div>
@@ -4227,6 +4286,9 @@
             </div>
             <div class="feature-note" style="margin-top:8px">
               Hermes 范围约束开启后，只接受固定研究范围内的提示词；关闭后，Hermes 会按更开放的问答模式继续承接。普通用户开放开关关闭时，H5 中只有大V用户能看到和使用 Hermes。
+            </div>
+            <div class="feature-note" style="margin-top:8px">
+              “自选股粉丝互评”关闭后，普通用户在自选股评论区只会看到大V评论和自己的评论；大V仍可查看租户内全部评论。
             </div>
             <div style="display:grid;gap:10px;margin-top:16px">
               <button class="btn-gold" type="button" style="padding:10px 20px;font-size:13px;width:100%" onclick="saveSiteConfig()">保存功能开关</button>
@@ -4544,6 +4606,47 @@
           </div>
         </div>
       </div><!-- end section-settings-llm -->
+
+      <div id="section-settings-llm-features" style="display:none">
+        <div class="llm-admin-shell">
+          <div class="llm-admin-hero">
+            <div class="llm-admin-panel">
+              <div class="llm-admin-hero-top">
+                <div>
+                  <div class="llm-admin-title">功能级模型映射</div>
+                  <div class="llm-admin-desc">
+                    这里单独维护“功能 -> 模型”的绑定关系。默认都可以跟随通用模型；需要做功能差异化选型时，只改这里，不需要碰业务代码。
+                  </div>
+                </div>
+              </div>
+              <div class="feature-note" style="margin-top:8px">
+                当前先统一使用一个模型也可以。后续如果 Hermes、复盘、知识加工、评论标注等对速度、成本或效果有不同要求，再逐项切换。
+              </div>
+            </div>
+            <div class="llm-admin-panel">
+              <div class="llm-admin-panel-title">映射总览</div>
+              <div id="llm-admin-summary"></div>
+              <div class="llm-admin-panel-note">
+                如果某个功能没有单独指定模型，系统会自动回退到默认模型，不会影响功能可用性。
+              </div>
+            </div>
+          </div>
+          <div class="config-card">
+            <div class="config-card-title">功能级模型列表</div>
+            <div class="feature-note">
+              高频低复杂度功能可以绑定更快的模型，复杂生成和研究型功能可以绑定更强的模型。现在已经支持逐功能切换。
+            </div>
+            <div id="llm-feature-model-mapping" style="margin-top:14px"></div>
+          </div>
+          <div class="config-card">
+            <div class="config-card-title">保存发布</div>
+            <button class="btn-gold" style="padding:10px 20px;font-size:13px;margin-top:4px;width:100%" onclick="saveSiteConfig()">保存系统配置</button>
+            <div class="feature-note">
+              保存后，新的功能调用会按最新映射优先选模型；没有映射的功能继续跟随默认模型。
+            </div>
+          </div>
+        </div>
+      </div><!-- end section-settings-llm-features -->
 
       <div id="section-token-usage" style="display:none">
         <div class="section-header">
@@ -4889,6 +4992,7 @@ const sectionTitles = {
   'settings-knowledge-graph':'系统专区 · 知识图谱中心',
   'knowledge-items':'系统专区 · 知识专区',
   'settings-llm':'系统专区 · 大模型专区',
+  'settings-llm-features':'系统专区 · 功能级模型映射',
   'token-usage':'系统专区 · Token 监控',
   'task-center':'系统专区 · 定时任务专区',
   access:'访问审计'
@@ -8426,10 +8530,13 @@ let adminSiteConfig = JSON.parse(JSON.stringify(window.SITE_CONFIG || {}));
 
 function ensureAdminLlmRegistry() {
   if (!adminSiteConfig.llm_registry || typeof adminSiteConfig.llm_registry !== 'object') {
-    adminSiteConfig.llm_registry = { default_model_key: '', models: [] };
+    adminSiteConfig.llm_registry = { default_model_key: '', models: [], feature_model_keys: {} };
   }
   if (!Array.isArray(adminSiteConfig.llm_registry.models)) {
     adminSiteConfig.llm_registry.models = [];
+  }
+  if (!adminSiteConfig.llm_registry.feature_model_keys || typeof adminSiteConfig.llm_registry.feature_model_keys !== 'object') {
+    adminSiteConfig.llm_registry.feature_model_keys = {};
   }
   return adminSiteConfig.llm_registry;
 }
@@ -8478,6 +8585,7 @@ function removeAdminLlmModel(index) {
 
 function renderAdminLlmRegistry() {
   const registry = ensureAdminLlmRegistry();
+  const featureCatalog = Array.isArray(adminSiteConfig.llm_feature_catalog) ? adminSiteConfig.llm_feature_catalog : [];
   if (!registry.default_model_key && registry.models.length) {
     const generalModels = registry.models.filter(model => model.purpose === 'general' && model.enabled !== false);
     registry.default_model_key = ((generalModels[0] || registry.models[0] || {}).key || '');
@@ -8517,6 +8625,7 @@ function renderAdminLlmRegistry() {
       <div class="llm-admin-chip-row">
         <span class="llm-admin-chip is-gold">模型总数 ${total}</span>
         <span class="llm-admin-chip">已启用 ${enabledCount}</span>
+        <span class="llm-admin-chip">功能映射 ${Object.keys(registry.feature_model_keys || {}).length}</span>
         <span class="llm-admin-chip is-muted">用途标签 ${Array.from(new Set(registry.models.map(model => model.purpose || 'general'))).join(' / ') || 'general'}</span>
       </div>
       <div class="llm-admin-panel-note">
@@ -8613,6 +8722,66 @@ function renderAdminLlmRegistry() {
       </div>
     `;
   }).join('')}</div>` : '<div class="llm-admin-empty">当前还没有模型配置。先新增一个通用模型，把 Provider、模型名、Base URL 和 API Key 配完整，再设成默认。</div>';
+
+  const featureHost = document.getElementById('llm-feature-model-mapping');
+  if (featureHost) {
+    const modelOptions = registry.models.map((model) => ({
+      key: String(model.key || '').trim(),
+      label: String(model.label || model.key || '未命名模型').trim(),
+      purpose: String(model.purpose || 'general').trim(),
+      enabled: model.enabled !== false,
+    })).filter((item) => item.key);
+    featureHost.innerHTML = featureCatalog.length ? `
+      <div class="llm-admin-model-stack">
+        ${featureCatalog.map((feature) => {
+          const featureCode = String((feature || {}).feature_code || '').trim();
+          const featureLabel = String((feature || {}).feature_label || featureCode || '未命名功能').trim();
+          const defaultPurpose = String((feature || {}).default_purpose || 'general').trim();
+          const currentValue = String((registry.feature_model_keys || {})[featureCode] || '').trim();
+          const options = ['<option value="">跟随默认模型</option>'].concat(
+            modelOptions.map((model) => `<option value="${escapeAttr(model.key)}">${escapeHtml(model.label)} · ${escapeHtml(model.purpose || 'general')}${model.enabled ? '' : ' · 已停用'}</option>`)
+          ).join('');
+          return `
+            <div class="llm-admin-model-card">
+              <div class="llm-admin-model-top">
+                <div>
+                  <div class="llm-admin-model-title">${escapeHtml(featureLabel)}</div>
+                  <div class="llm-admin-model-sub">${escapeHtml(featureCode)} · 默认用途 ${escapeHtml(defaultPurpose)}</div>
+                </div>
+              </div>
+              <div class="llm-admin-model-grid">
+                <div class="config-field">
+                  <label>绑定模型</label>
+                  <select data-llm-feature-code="${escapeAttr(featureCode)}" onchange="updateAdminLlmFeatureModel('${escapeAttr(featureCode)}', this.value)">
+                    ${options}
+                  </select>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    ` : '<div class="llm-admin-empty">当前还没有功能级模型目录。</div>';
+    featureCatalog.forEach((feature) => {
+      const featureCode = String((feature || {}).feature_code || '').trim();
+      if (!featureCode) return;
+      const select = featureHost.querySelector(`select[data-llm-feature-code="${featureCode}"]`);
+      if (select) select.value = String((registry.feature_model_keys || {})[featureCode] || '').trim();
+    });
+  }
+}
+
+function updateAdminLlmFeatureModel(featureCode, modelKey) {
+  const registry = ensureAdminLlmRegistry();
+  const code = String(featureCode || '').trim();
+  const key = String(modelKey || '').trim();
+  if (!code) return;
+  if (!key) {
+    delete registry.feature_model_keys[code];
+  } else {
+    registry.feature_model_keys[code] = key;
+  }
+  renderSiteConfigForm();
 }
 
 function updateAdminLlmDefaultModel(key) {
@@ -8683,7 +8852,7 @@ function broadcastSiteConfigUpdate() {
 
 function isAdminSiteConfigField(target) {
   if (!target || !target.closest) return false;
-  return Boolean(target.closest('#section-settings-appearance, #section-settings-brand, #section-settings-features, #section-settings-knowledge, #section-settings-llm'));
+  return Boolean(target.closest('#section-settings-appearance, #section-settings-brand, #section-settings-features, #section-settings-policy, #section-settings-knowledge, #section-settings-llm, #section-settings-llm-features'));
 }
 
 function updateAdminFeatureFlagPreview(target) {
@@ -9209,6 +9378,40 @@ function markActivePill(groupId, attr, value) {
   });
 }
 
+function stringifyAdminConfigJson(value, fallbackValue) {
+  const target = value === undefined ? fallbackValue : value;
+  try {
+    return JSON.stringify(target, null, 2);
+  } catch (error) {
+    return JSON.stringify(fallbackValue, null, 2);
+  }
+}
+
+function parseAdminConfigJsonField(fieldId, fallbackValue) {
+  const field = document.getElementById(fieldId);
+  const raw = field ? String(field.value || '').trim() : '';
+  if (!raw) {
+    return JSON.parse(JSON.stringify(fallbackValue));
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`${fieldId} 不是有效 JSON，请检查格式后再保存。`);
+  }
+}
+
+function parseAdminConfigListField(fieldId, fallbackValue) {
+  const field = document.getElementById(fieldId);
+  const raw = field ? String(field.value || '').trim() : '';
+  if (!raw) {
+    return Array.isArray(fallbackValue) ? fallbackValue.slice(0) : [];
+  }
+  return raw
+    .split(/[,\n]+/)
+    .map(item => String(item || '').trim())
+    .filter((item, index, source) => item && source.indexOf(item) === index);
+}
+
 function renderSiteConfigForm() {
   const cfg = adminSiteConfig || {};
   const dbRuntime = cfg.db_runtime || {};
@@ -9233,8 +9436,26 @@ function renderSiteConfigForm() {
   if (knowledgePreviewToggle) knowledgePreviewToggle.checked = knowledgeIngestion.user_preview_enabled === true;
   const hermesPromptScopeGuardToggle = document.getElementById('hermes-prompt-scope-guard-enabled');
   if (hermesPromptScopeGuardToggle) hermesPromptScopeGuardToggle.checked = hermesSettings.prompt_scope_guard_enabled !== false;
+  const hermesDavAccessToggle = document.getElementById('hermes-dav-access-enabled');
+  if (hermesDavAccessToggle) hermesDavAccessToggle.checked = hermesSettings.dav_access_enabled !== false;
   const hermesInvestorAccessToggle = document.getElementById('hermes-investor-access-enabled');
   if (hermesInvestorAccessToggle) hermesInvestorAccessToggle.checked = hermesSettings.investor_access_enabled !== false;
+  const hermesInternetToggle = document.getElementById('hermes-internet-answer-enabled');
+  if (hermesInternetToggle) hermesInternetToggle.checked = hermesSettings.internet_answer_enabled !== false;
+  const hermesThinkingToggle = document.getElementById('hermes-thinking-process-enabled');
+  if (hermesThinkingToggle) hermesThinkingToggle.checked = hermesSettings.thinking_process_enabled !== false;
+  const hermesSaveToKnowledgeToggle = document.getElementById('hermes-answer-save-to-knowledge-enabled');
+  if (hermesSaveToKnowledgeToggle) hermesSaveToKnowledgeToggle.checked = hermesSettings.answer_save_to_knowledge_enabled !== false;
+  const hermesDefaultResponseStyle = document.getElementById('hermes-default-response-style');
+  if (hermesDefaultResponseStyle) hermesDefaultResponseStyle.value = hermesSettings.default_response_style || 'structured';
+  const hermesChartTypesInput = document.getElementById('hermes-chart-types-enabled');
+  if (hermesChartTypesInput) hermesChartTypesInput.value = (hermesSettings.chart_types_enabled || []).join(',');
+  const hermesIntentTreeField = document.getElementById('hermes-intent-tree');
+  if (hermesIntentTreeField) hermesIntentTreeField.value = stringifyAdminConfigJson(hermesSettings.intent_tree || [], []);
+  const hermesRoutePriorityField = document.getElementById('hermes-route-priority');
+  if (hermesRoutePriorityField) hermesRoutePriorityField.value = (hermesSettings.route_priority || []).join(',');
+  const hermesTemplateTreeField = document.getElementById('hermes-template-tree');
+  if (hermesTemplateTreeField) hermesTemplateTreeField.value = stringifyAdminConfigJson(hermesSettings.template_tree || {}, {});
   const dbRuntimeToggle = document.getElementById('db-runtime-use-staging');
   if (dbRuntimeToggle) dbRuntimeToggle.checked = dbRuntime.use_staging === true;
   const dbRuntimeSummary = document.getElementById('db-runtime-summary');
@@ -9262,7 +9483,7 @@ function renderSiteConfigForm() {
   if (document.getElementById('brand-hero-tagline')) document.getElementById('brand-hero-tagline').value = brand.hero_tagline || '';
   if (document.getElementById('brand-hero-description')) document.getElementById('brand-hero-description').value = brand.hero_description || '';
   if (document.getElementById('brand-footer-description')) document.getElementById('brand-footer-description').value = brand.footer_description || '';
-  ['user_module', 'kol_module', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'vip', 'dm', 'fan_interaction', 'paid_reply', 'workbench'].forEach(key => {
+  ['user_module', 'kol_module', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'paid_reply', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     if (checkbox) checkbox.checked = Boolean(flags[key]);
   });
@@ -9314,7 +9535,7 @@ function renderSiteConfigForm() {
       showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
     }
   });
-  ['section-settings-appearance', 'section-settings-brand', 'section-settings-features', 'section-settings-policy', 'section-settings-knowledge', 'section-knowledge-items', 'section-settings-llm', 'section-token-usage', 'section-task-center', 'section-access'].forEach((id) => {
+  ['section-settings-appearance', 'section-settings-brand', 'section-settings-features', 'section-settings-policy', 'section-settings-knowledge', 'section-knowledge-items', 'section-settings-llm', 'section-settings-llm-features', 'section-token-usage', 'section-task-center', 'section-access'].forEach((id) => {
     const section = document.getElementById(id);
     if (section && !isAdminFeatureEnabled('system_module') && section.style.display !== 'none') {
       showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
@@ -9386,7 +9607,22 @@ async function saveSiteConfig() {
   const dbRuntimeToggle = document.getElementById('db-runtime-use-staging');
   const tenants = ensureAdminTenants().map((tenant) => ({ ...tenant }));
   const llmRegistry = ensureAdminLlmRegistry();
-  ['user_module', 'kol_module', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'vip', 'dm', 'fan_interaction', 'workbench'].forEach(key => {
+  const currentHermesSettings = (adminSiteConfig && adminSiteConfig.hermes_settings) || {};
+  let hermesIntentTree = [];
+  let hermesRoutePriority = [];
+  let hermesTemplateTree = {};
+  let hermesChartTypesEnabled = [];
+  try {
+    hermesIntentTree = parseAdminConfigJsonField('hermes-intent-tree', currentHermesSettings.intent_tree || []);
+    hermesRoutePriority = parseAdminConfigListField('hermes-route-priority', currentHermesSettings.route_priority || []);
+    hermesTemplateTree = parseAdminConfigJsonField('hermes-template-tree', currentHermesSettings.template_tree || {});
+    hermesChartTypesEnabled = parseAdminConfigListField('hermes-chart-types-enabled', currentHermesSettings.chart_types_enabled || []);
+  } catch (error) {
+    markAdminSiteConfigDirty((error && error.message) || 'Hermes 配置格式校验失败，请检查后再保存。');
+    showToast('Hermes 配置格式有误');
+    return;
+  }
+  ['user_module', 'kol_module', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     featureFlags[key] = Boolean(checkbox && checkbox.checked);
   });
@@ -9411,9 +9647,20 @@ async function saveSiteConfig() {
       user_preview_enabled: Boolean(knowledgePreviewToggle && knowledgePreviewToggle.checked),
     },
     hermes_settings: {
-      ...(adminSiteConfig.hermes_settings || {}),
+      ...currentHermesSettings,
       prompt_scope_guard_enabled: Boolean(document.getElementById('hermes-prompt-scope-guard-enabled') && document.getElementById('hermes-prompt-scope-guard-enabled').checked),
+      dav_access_enabled: Boolean(document.getElementById('hermes-dav-access-enabled') && document.getElementById('hermes-dav-access-enabled').checked),
       investor_access_enabled: Boolean(document.getElementById('hermes-investor-access-enabled') && document.getElementById('hermes-investor-access-enabled').checked),
+      internet_answer_enabled: Boolean(document.getElementById('hermes-internet-answer-enabled') && document.getElementById('hermes-internet-answer-enabled').checked),
+      thinking_process_enabled: Boolean(document.getElementById('hermes-thinking-process-enabled') && document.getElementById('hermes-thinking-process-enabled').checked),
+      answer_save_to_knowledge_enabled: Boolean(document.getElementById('hermes-answer-save-to-knowledge-enabled') && document.getElementById('hermes-answer-save-to-knowledge-enabled').checked),
+      default_response_style: document.getElementById('hermes-default-response-style')
+        ? String(document.getElementById('hermes-default-response-style').value || 'structured').trim() || 'structured'
+        : (currentHermesSettings.default_response_style || 'structured'),
+      chart_types_enabled: hermesChartTypesEnabled,
+      route_priority: hermesRoutePriority,
+      intent_tree: hermesIntentTree,
+      template_tree: hermesTemplateTree,
     },
     evidence_chain: {
       filter_prompt_system: document.getElementById('evidence-filter-system-prompt')
@@ -9461,6 +9708,11 @@ async function saveSiteConfig() {
         purpose: String(model.purpose || 'general'),
         enabled: model.enabled !== false,
       })),
+      feature_model_keys: Object.fromEntries(
+        Object.entries((llmRegistry.feature_model_keys && typeof llmRegistry.feature_model_keys === 'object') ? llmRegistry.feature_model_keys : {})
+          .map(([featureCode, modelKey]) => [String(featureCode || '').trim(), String(modelKey || '').trim()])
+          .filter(([featureCode, modelKey]) => featureCode && modelKey)
+      ),
     },
     brand: {
       ...(adminSiteConfig.brand || {}),

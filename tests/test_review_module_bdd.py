@@ -50,6 +50,7 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn('id="review-trigger-modal-content"', html)
         self.assertIn("function renderReviewExperience()", html)
         self.assertIn("function publishReviewDraft()", html)
+        self.assertIn("function syncPublishedReviewStateToH5(tenantSlug, result)", html)
 
     def test_given_h5_dav_review_when_page_renders_then_new_review_flow_exists(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slug}")
@@ -88,6 +89,22 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("这是发布前的最终预览。当前阅读态会尽量贴近普通用户和大V最终看到的详情展示。", html)
         self.assertIn("reviewTriggerDraft.flowStage !== 'preview'", html)
         self.assertIn("renderReviewArticleDetailContent(article, { previewMode: true })", html)
+
+    def test_given_h5_publish_success_when_page_renders_then_publish_no_longer_opens_test_modal(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertNotIn("openReviewIngestResultModal('确认发布成功，已写入向量库'", html)
+        self.assertIn("syncPublishedReviewStateToH5((user && user.tenant && user.tenant.slug) || '', result);", html)
+
+    def test_given_workbench_publish_success_when_page_renders_then_publish_no_longer_opens_test_modal(self):
+        response = self.client.get(f"/kol-workbench?tenant={self.tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertNotIn("kwOpenReviewIngestResultModal('确认发布成功，已写入向量库'", html)
+        self.assertIn("function kwSyncPublishedReviewState(result)", html)
 
     def test_given_h5_review_optimize_when_page_renders_then_llm_config_guard_exists(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slug}")
@@ -132,36 +149,109 @@ class ReviewModuleBddTest(unittest.TestCase):
 
         self.assertEqual(ordered, ["knowledge.search", "watchlist.detail"])
 
+    def test_given_watchlist_annotations_when_executing_hermes_tool_plan_then_annotation_context_is_attached(self):
+        with app_entry.app.app_context():
+            with patch("src.domain.ai_services.gen_watchlist_details", return_value={}):
+                with patch("src.domain.ai_services.build_watchlist_annotation_context", return_value=[
+                    {
+                        "name": "腾讯控股",
+                        "code": "00700",
+                        "industry": "港股互联网",
+                        "annotation_summary": "回购节奏继续，等待利润率验证",
+                        "annotation_titles": ["回购验证", "利润率观察"],
+                        "annotations": [{"id": 1}, {"id": 2}],
+                    }
+                ]):
+                    with patch("src.domain.ai_services.resolve_tenant_review_snapshots", return_value=[
+                        {"watchlist": ["腾讯控股", "贵州茅台"]}
+                    ]):
+                        outputs, _ = ai_services.execute_hermes_tool_plan(
+                            {"tools": ["indicator.detail"], "indicator_code": "sh_index"},
+                            tenant_slug=self.tenant_slug,
+                            question_text="请展示上证指数K线图并解读",
+                            web_answer=False,
+                        )
+
+        self.assertIn("watchlist_annotation_context", outputs)
+        self.assertTrue(outputs["watchlist_annotation_context"]["available"])
+        self.assertIn("腾讯控股", outputs["watchlist_annotation_context"]["summary"])
+
+    def test_given_indicator_chart_question_when_synthesis_text_is_empty_then_artifact_still_contains_analysis_body(self):
+        artifact = ai_services.build_hermes_indicator_artifact(
+            detail={
+                "name": "上证综合指数",
+                "id": "sh000001",
+                "value": "4093.73",
+                "unit": "点",
+                "status": "attention",
+                "provider": "指标中心",
+                "history_series": [
+                    {"date": "2026-05-01", "value": "3980.12", "status": "attention"},
+                    {"date": "2026-06-01", "value": "4056.44", "status": "attention"},
+                    {"date": "2026-07-01", "value": "4093.73", "status": "attention"},
+                ],
+                "history_anomalies": [{"date": "2026-06-18", "label": "放量异动"}],
+                "history_kline": {
+                    "candles": [
+                        {"date": "2026-07-01", "open": "4050.21", "high": "4102.66", "low": "4042.31", "close": "4093.73"}
+                    ]
+                },
+            },
+            question_text="我需要展示最近3个月的上证综合指数的K线图并做一下解读分析",
+            synthesis={"answer": "", "summary": "", "bullets": []},
+            tool_outputs={
+                "watchlist_annotation_context": {
+                    "available": True,
+                    "summary": "腾讯控股：回购节奏继续，等待利润率验证",
+                    "items": [{"name": "腾讯控股", "annotation_titles": ["回购验证"], "annotation_summary": "回购节奏继续，等待利润率验证"}],
+                },
+                "_meta": {"preferred_mode": "kline_chart"},
+            },
+            citations=[],
+            tenant_slug=self.tenant_slug,
+            user_role="dav",
+        )
+
+        self.assertEqual(artifact["type"], "indicator_analysis")
+        self.assertTrue(artifact["body"])
+        self.assertIn("上证综合指数", artifact["body"])
+        self.assertIn("腾讯控股", artifact["body"])
+        self.assertTrue(artifact["judgement"])
+
     def test_given_out_of_scope_question_when_scope_guard_runs_then_redirected(self):
-        result = ai_services.hermes_scope_guard("今天天气怎么样，顺便推荐晚饭吃什么？")
+        with app_entry.app.app_context():
+            result = ai_services.hermes_scope_guard("今天天气怎么样，顺便推荐晚饭吃什么？")
 
         self.assertEqual(result["status"], "redirected")
         self.assertEqual(result["intent_hint"], "out_of_scope_redirect")
         self.assertIn("Hermes 主要回答", result["message"])
 
     def test_given_direct_trading_instruction_when_scope_guard_runs_then_blocked(self):
-        result = ai_services.hermes_scope_guard("明天这只股票该不该满仓买入？")
+        with app_entry.app.app_context():
+            result = ai_services.hermes_scope_guard("明天这只股票该不该满仓买入？")
 
         self.assertEqual(result["status"], "blocked")
         self.assertIn("不直接提供买卖", result["message"])
 
     def test_given_product_help_question_when_router_falls_back_then_product_help_is_selected(self):
-        with patch("src.domain.ai_services.get_default_llm_config", return_value=None):
-            plan, _, route_mode = ai_services.route_hermes_query_intent(
-                "H5 里的智能指标怎么创建和发布？",
-                tenant_slug=self.tenant_slug,
-            )
+        with app_entry.app.app_context():
+            with patch("src.domain.ai_services.get_default_llm_config", return_value=None):
+                plan, _, route_mode = ai_services.route_hermes_query_intent(
+                    "H5 里的智能指标怎么创建和发布？",
+                    tenant_slug=self.tenant_slug,
+                )
 
         self.assertEqual(route_mode, "fallback_rule_router")
         self.assertEqual(plan["intent"], "product_help")
         self.assertIn("dashboard.context", plan["tools"])
 
     def test_given_smart_indicator_question_when_router_falls_back_then_dashboard_context_is_used(self):
-        with patch("src.domain.ai_services.get_default_llm_config", return_value=None):
-            plan, _, route_mode = ai_services.route_hermes_query_intent(
-                "这个智能指标是按什么公式和提示词计算出来的？",
-                tenant_slug=self.tenant_slug,
-            )
+        with app_entry.app.app_context():
+            with patch("src.domain.ai_services.get_default_llm_config", return_value=None):
+                plan, _, route_mode = ai_services.route_hermes_query_intent(
+                    "这个智能指标是按什么公式和提示词计算出来的？",
+                    tenant_slug=self.tenant_slug,
+                )
 
         self.assertEqual(route_mode, "fallback_rule_router")
         self.assertEqual(plan["intent"], "smart_indicator_explain")
@@ -250,6 +340,21 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("从 staging 同步 LLM 配置到本地", html)
         self.assertIn("async function syncLocalLlmRegistryFromStaging()", html)
         self.assertIn("/api/admin/site-config/sync-llm-registry", html)
+        self.assertIn("功能级模型映射", html)
+        self.assertIn("watchlist_comment_labeling", html)
+
+    def test_given_watchlist_comment_when_llm_unavailable_then_rule_labeling_still_returns_tags(self):
+        with patch("src.domain.ai_services.get_default_llm_config", return_value=None):
+            result = ai_services.label_watchlist_comment_with_llm(
+                "我觉得腾讯回购节奏还在，但利润率兑现要继续验证，暂时先跟踪。",
+                stock_detail={"name": "腾讯控股", "code": "00700", "industry": "港股互联网"},
+                tenant_slug=self.tenant_slug,
+            )
+
+        self.assertTrue(result["labels"])
+        self.assertTrue(result["keywords"])
+        self.assertIn(result["sentiment_label"], {"积极", "中性", "谨慎", "追问"})
+        self.assertTrue(result["summary"])
 
     def test_given_admin_page_when_rendered_then_agent_workflow_center_exists(self):
         response = self.client.get("/admin")
@@ -430,7 +535,8 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("review_studio", html)
         self.assertIn("published_reviews", html)
         self.assertIn("/api/review/generate-draft", html)
-        self.assertIn("/api/review/compose-draft", html)
+        self.assertIn("/api/review/prepare-preview", html)
+        self.assertIn("/api/review/publish-embed", html)
 
     def test_given_workbench_when_page_renders_then_fan_message_block_is_removed(self):
         response = self.client.get(f"/kol-workbench?tenant={self.tenant_slug}")
@@ -610,6 +716,17 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertNotIn("stock_zh_index_daily", signal_text)
         self.assertNotIn("AKShare", signal_text)
 
+    def test_given_unknown_but_valid_stock_code_when_requesting_watchlist_detail_then_dynamic_detail_is_returned(self):
+        response = self.client.get("/api/watchlist/601988")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertEqual(payload["code"], "601988")
+        self.assertEqual(payload["name"], "中国银行")
+        self.assertEqual(payload["market"], "SH")
+        self.assertTrue(isinstance(payload.get("kline"), list) and len(payload["kline"]) >= 20)
+        self.assertTrue(payload.get("fundamental", {}).get("summary"))
+
     def test_given_empty_source_text_when_generating_review_draft_then_reject(self):
         response = self.client.post(
             "/api/review/generate-draft",
@@ -779,6 +896,299 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertTrue(snapshot["content_text"])
         self.assertEqual(snapshot["snapshot_type"], "published_review")
         self.assertIn("period_key", snapshot)
+
+    def test_given_watchlist_annotation_rows_when_listing_then_fields_are_normalized(self):
+        tenant_slug = self.tenant_slug
+
+        class _FakeCursor:
+            def __init__(self, rows):
+                self._rows = rows
+
+            def fetchall(self):
+                return self._rows
+
+        class _FakeDb:
+            def execute(self, sql, params):
+                self.last_sql = sql
+                self.last_params = params
+                return _FakeCursor(
+                    [
+                        {
+                            "id": 11,
+                            "tenant_slug": tenant_slug,
+                            "stock_code": "688981",
+                            "stock_name": "中芯国际",
+                            "candle_index": 3,
+                            "candle_date": "07-08",
+                            "title": "放量确认",
+                            "note": "量价配合有效，后续看均线支撑。",
+                            "trigger": "5日线不破",
+                            "updated_at": "2026-07-18 10:00:00",
+                            "created_at": "2026-07-18 09:30:00",
+                            "open_price": 45.1,
+                            "high_price": 46.2,
+                            "low_price": 44.8,
+                            "close_price": 46.0,
+                            "created_by_name": "财经老王",
+                            "created_by_user_id": "dav_1",
+                            "source_client": "h5",
+                        }
+                    ]
+                )
+
+        fake_db = _FakeDb()
+        details_map = {
+            "688981": {
+                "code": "688981",
+                "name": "中芯国际",
+            }
+        }
+
+        with patch("src.domain.market_services.get_db", return_value=fake_db), patch(
+            "src.domain.market_services.gen_watchlist_details",
+            return_value=details_map,
+        ):
+            items = market_services.list_watchlist_kline_annotations(
+                tenant_slug=self.tenant_slug,
+                stock_code="688981",
+            )
+
+        self.assertEqual(len(items), 1)
+        self.assertEqual(fake_db.last_params, (self.tenant_slug, "688981"))
+        self.assertEqual(items[0]["id"], 11)
+        self.assertEqual(items[0]["stock_name"], "中芯国际")
+        self.assertEqual(items[0]["dateLabel"], "07-08")
+        self.assertEqual(items[0]["title"], "放量确认")
+        self.assertEqual(items[0]["trigger"], "5日线不破")
+
+    def test_given_annotation_id_when_deleting_then_delete_is_confirmed_by_followup_lookup(self):
+        class _FakeCursor:
+            def __init__(self, row=None):
+                self._row = row
+
+            def fetchone(self):
+                return self._row
+
+        class _FakeDb:
+            def __init__(self):
+                self.calls = []
+
+            def execute(self, sql, params):
+                self.calls.append((sql, params))
+                if "SELECT id FROM watchlist_kline_annotations WHERE tenant_slug = ? AND id = ?" in sql:
+                    return _FakeCursor(None)
+                return _FakeCursor(None)
+
+            def commit(self):
+                self.calls.append(("COMMIT", None))
+
+        fake_db = _FakeDb()
+        details_map = {"688981": {"code": "688981", "name": "中芯国际"}}
+
+        with patch("src.domain.market_services.get_db", return_value=fake_db), patch(
+            "src.domain.market_services.gen_watchlist_details",
+            return_value=details_map,
+        ):
+            deleted = market_services.delete_watchlist_kline_annotation(
+                tenant_slug=self.tenant_slug,
+                stock_code="688981",
+                annotation_id=11,
+                candle_index=3,
+            )
+
+        self.assertTrue(deleted)
+        self.assertIn(
+            (
+                "DELETE FROM watchlist_kline_annotations WHERE tenant_slug = ? AND id = ?",
+                (self.tenant_slug, 11),
+            ),
+            fake_db.calls,
+        )
+        self.assertIn(("COMMIT", None), fake_db.calls)
+
+    def test_given_watchlist_annotations_when_composing_review_preview_then_annotation_evidence_is_preserved(self):
+        summary_result = {
+            "summary": "今天主要围绕半导体主线复盘，重点看景气兑现与市场确认。",
+            "llm_model": {"stage": "user_input_summary", "model_name": "demo-summary"},
+        }
+        watchlist_result = {
+            "sector_summary": "半导体板块以中芯国际为代表，更适合继续跟踪景气兑现和量价确认。",
+            "sector_profiles": [
+                {
+                    "sector": "半导体",
+                    "representative_description": "中芯国际是本次观察的代表样本。",
+                }
+            ],
+            "items": [
+                {
+                    "stock_name": "中芯国际",
+                    "stock_code": "688981",
+                    "sector": "半导体",
+                    "board_role": "板块代表样本",
+                    "analysis_text": "优先根据 K 线标注判断量价确认，再结合基本面观察后续催化。",
+                    "evidence": ["放量确认", "验证节点：5日线不破"],
+                }
+            ],
+            "annotation_evidence": [
+                {
+                    "annotation_id": 11,
+                    "stock_name": "中芯国际",
+                    "stock_code": "688981",
+                    "date_label": "07-08",
+                    "title": "放量确认",
+                    "note": "量价配合有效，后续看均线支撑。",
+                    "trigger": "5日线不破",
+                }
+            ],
+            "llm_model": {"stage": "watchlist_analysis", "model_name": "demo-watchlist"},
+        }
+
+        with patch("src.domain.ai_services.summarize_review_user_input_with_llm", return_value=summary_result), patch(
+            "src.domain.ai_services.analyze_review_watchlist_with_llm",
+            return_value=watchlist_result,
+        ):
+            preview = ai_services.compose_review_structured_preview(
+                source_text="今天先聚焦半导体主线，重点观察景气兑现和市场确认。",
+                review_period="day",
+                source_mode="manual",
+                selected_watchlist=["中芯国际"],
+                speaker_name="财经老王",
+                entry_point="test_review_bdd",
+                tenant_slug=self.tenant_slug,
+            )
+
+        watchlist_section = preview["watchlist_analysis_section"]
+        self.assertEqual(preview["review_summary"], summary_result["summary"])
+        self.assertEqual(len(watchlist_section["annotation_evidence"]), 1)
+        self.assertEqual(watchlist_section["annotation_evidence"][0]["title"], "放量确认")
+        self.assertIn("优先根据 K 线标注判断量价确认", watchlist_section["items"][0]["analysis_text"])
+        self.assertIn("板块归纳：半导体板块以中芯国际为代表", preview["final_text"])
+
+    def test_given_fan_comment_interaction_disabled_when_listing_watchlist_comments_then_investor_only_sees_dav_and_self(self):
+        tenant_slug = self.tenant_slug
+
+        class _FakeCursor:
+            def __init__(self, rows):
+                self._rows = rows
+
+            def fetchall(self):
+                return self._rows
+
+        class _FakeDb:
+            def execute(self, sql, params):
+                return _FakeCursor([
+                    {
+                        "id": 3,
+                        "tenant_slug": tenant_slug,
+                        "stock_code": "600519",
+                        "stock_name": "贵州茅台",
+                        "comment_text": "粉丝A的跟踪观点",
+                        "created_by_user_id": "fan_a",
+                        "created_by_name": "粉丝A",
+                        "created_by_role": "investor",
+                        "source_client": "h5",
+                        "created_at": "2026-07-19 10:00:00",
+                        "updated_at": "2026-07-19 10:00:00",
+                    },
+                    {
+                        "id": 2,
+                        "tenant_slug": tenant_slug,
+                        "stock_code": "600519",
+                        "stock_name": "贵州茅台",
+                        "comment_text": "大V给出的阶段判断",
+                        "created_by_user_id": "dav_1",
+                        "created_by_name": "财经老王",
+                        "created_by_role": "dav",
+                        "source_client": "h5",
+                        "created_at": "2026-07-19 09:30:00",
+                        "updated_at": "2026-07-19 09:30:00",
+                    },
+                    {
+                        "id": 1,
+                        "tenant_slug": tenant_slug,
+                        "stock_code": "600519",
+                        "stock_name": "贵州茅台",
+                        "comment_text": "我自己的观察",
+                        "created_by_user_id": "fan_me",
+                        "created_by_name": "我自己",
+                        "created_by_role": "investor",
+                        "source_client": "h5",
+                        "created_at": "2026-07-19 09:00:00",
+                        "updated_at": "2026-07-19 09:00:00",
+                    },
+                ])
+
+        with patch("src.domain.market_services.get_db", return_value=_FakeDb()), patch(
+            "src.domain.market_services.gen_watchlist_details",
+            return_value={"600519": {"code": "600519", "name": "贵州茅台"}},
+        ):
+            items = market_services.list_watchlist_comments(
+                tenant_slug=tenant_slug,
+                stock_code="600519",
+                viewer_role="investor",
+                viewer_profile_id="fan_me",
+                allow_fan_to_fan=False,
+            )
+
+        self.assertEqual([item["id"] for item in items], [2, 1])
+        self.assertTrue(items[1]["can_delete"])
+        self.assertFalse(items[0]["can_delete"])
+
+    def test_given_dav_when_listing_watchlist_comments_then_all_tenant_comments_are_visible(self):
+        tenant_slug = self.tenant_slug
+
+        class _FakeCursor:
+            def __init__(self, rows):
+                self._rows = rows
+
+            def fetchall(self):
+                return self._rows
+
+        class _FakeDb:
+            def execute(self, sql, params):
+                return _FakeCursor([
+                    {
+                        "id": 2,
+                        "tenant_slug": tenant_slug,
+                        "stock_code": "00700",
+                        "stock_name": "腾讯控股",
+                        "comment_text": "粉丝追问",
+                        "created_by_user_id": "fan_1",
+                        "created_by_name": "粉丝1",
+                        "created_by_role": "investor",
+                        "source_client": "h5",
+                        "created_at": "2026-07-19 11:00:00",
+                        "updated_at": "2026-07-19 11:00:00",
+                    },
+                    {
+                        "id": 1,
+                        "tenant_slug": tenant_slug,
+                        "stock_code": "00700",
+                        "stock_name": "腾讯控股",
+                        "comment_text": "大V主判断",
+                        "created_by_user_id": "dav_1",
+                        "created_by_name": "财经老王",
+                        "created_by_role": "dav",
+                        "source_client": "h5",
+                        "created_at": "2026-07-19 10:30:00",
+                        "updated_at": "2026-07-19 10:30:00",
+                    },
+                ])
+
+        with patch("src.domain.market_services.get_db", return_value=_FakeDb()), patch(
+            "src.domain.market_services.gen_watchlist_details",
+            return_value={"00700": {"code": "00700", "name": "腾讯控股"}},
+        ):
+            items = market_services.list_watchlist_comments(
+                tenant_slug=tenant_slug,
+                stock_code="00700",
+                viewer_role="dav",
+                viewer_profile_id="财经老王",
+                allow_fan_to_fan=False,
+            )
+
+        self.assertEqual(len(items), 2)
+        self.assertTrue(all(item["can_delete"] for item in items))
 
 
 if __name__ == "__main__":
