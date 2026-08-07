@@ -355,27 +355,37 @@ const SECTION_TITLES = {
 function fmtWan(n) { return (n / 10000).toFixed(1) + '万'; }
 
 async function renderFunnelSection() {
-  await Promise.all([
-    renderFunnel(),
-    renderChannelDonut(),
-    renderRevenueTrend(),
-    renderKolBar(),
-    renderSegmentDonut(),
-    renderChannelRevenue(),
-    renderHeatmap(),
-  ]);
+  const response = await fetch('/api/admin/funnel-analytics');
+  const result = await response.json();
+  if (!response.ok || !result.ok) return;
+  const analytics = result.analytics || {};
+  const funnelKpi = document.getElementById('funnel-kpi-cards');
+  if (funnelKpi) {
+    funnelKpi.innerHTML = (analytics.funnel || []).slice(0, 4).map((item) => `
+      <div class="kpi-card">
+        <div class="kpi-label">${item.layer}</div>
+        <div class="kpi-value">${Number(item.count || 0).toLocaleString('zh-CN')}</div>
+        <div class="kpi-badge kpi-badge-gold">真实记录</div>
+      </div>`).join('') || '<div style="color:#8899aa">暂无真实漏斗数据。</div>';
+  }
+  renderFunnel(analytics.funnel || []);
+  renderChannelDonut(analytics.channels || {});
+  renderRevenueTrend(analytics.monthly || []);
+  renderKolBar(analytics.kols || []);
+  renderSegmentDonut(analytics.segments || []);
+  renderChannelRevenue((analytics.channels || {}).rows || []);
+  renderHeatmap(analytics.heatmap || []);
 }
 
-async function renderFunnel() {
-  const res = await fetch('/api/funnel');
-  const data = await res.json();
+function renderFunnel(data) {
   const container = document.getElementById('funnel-container');
   if (!container) return;
-  const maxCount = data[0].count;
+  const maxCount = Number(data[0] && data[0].count) || 0;
   const minWidthPct = 32;
   container.innerHTML = data.map((item, index) => {
-    const widthPct = Math.round((item.count / maxCount) * 100);
-    const dropRate = index > 0 ? ((data[index - 1].count - item.count) / data[index - 1].count * 100).toFixed(1) : null;
+    const widthPct = maxCount ? Math.round((item.count / maxCount) * 100) : 0;
+    const previousCount = index > 0 ? Number(data[index - 1].count) : 0;
+    const dropRate = previousCount > 0 ? ((previousCount - item.count) / previousCount * 100).toFixed(1) : null;
     const stageWidth = Math.max(widthPct, minWidthPct);
     return `
       <div class="funnel-stage-group">
@@ -390,25 +400,22 @@ async function renderFunnel() {
         </div>
         <div class="funnel-stage-conv ${dropRate ? '' : 'funnel-stage-conv-base'}">${dropRate ? '↓ 较上一层流失 ' + dropRate + '%' : '验证起点'}</div>
       </div>`;
-  }).join('');
+  }).join('') || '<div style="color:var(--gray-400);padding:20px">暂无真实漏斗数据。</div>';
 }
 
-async function renderChannelDonut() {
-  const res = await fetch('/api/channels');
-  const data = await res.json();
+function renderChannelDonut(payload) {
+  const data = Array.isArray(payload) ? payload : (payload.rows || []);
   const target = document.getElementById('channelDonut');
   if (!target) return;
   renderChart(target, makeDonutOption(
     data.map((item) => item.name),
     data.map((item) => item.users),
-    CHANNEL_COLORS,
+    data.map((item, index) => item.color || CHANNEL_COLORS[index % CHANNEL_COLORS.length]),
     { center: ['38%', '50%'] },
   ));
 }
 
-async function renderRevenueTrend() {
-  const res = await fetch('/api/revenue');
-  const data = await res.json();
+function renderRevenueTrend(data) {
   const target = document.getElementById('revenueTrend');
   if (!target) return;
   const labels = data.map((item) => item.month.slice(5));
@@ -423,9 +430,7 @@ async function renderRevenueTrend() {
   }));
 }
 
-async function renderKolBar() {
-  const res = await fetch('/api/kols');
-  const data = await res.json();
+function renderKolBar(data) {
   const target = document.getElementById('kolBar');
   if (!target) return;
   renderChart(target, makeHorizontalBarOption(
@@ -446,13 +451,11 @@ async function renderKolBar() {
   ));
 }
 
-async function renderSegmentDonut() {
-  const res = await fetch('/api/segments');
-  const data = await res.json();
+function renderSegmentDonut(data) {
   const target = document.getElementById('segmentDonut');
   if (!target) return;
   renderChart(target, makeDonutOption(
-    data.map((item) => item.segment),
+    data.map((item) => item.segment || item.name),
     data.map((item) => item.count),
     SEGMENT_COLORS,
     { center: ['50%', '50%'] },
@@ -463,14 +466,12 @@ async function renderSegmentDonut() {
       <div class="segment-item">
         <div class="segment-dot" style="background:${SEGMENT_COLORS[index]}"></div>
         <div class="segment-name">${item.segment}</div>
-        <div class="segment-pct">${item.pct}%</div>
+        <div class="segment-pct">${data.reduce((sum, entry) => sum + Number(entry.count || 0), 0) ? (Number(item.count || 0) / data.reduce((sum, entry) => sum + Number(entry.count || 0), 0) * 100).toFixed(1) : '0.0'}%</div>
       </div>`).join('');
   }
 }
 
-async function renderChannelRevenue() {
-  const res = await fetch('/api/channels');
-  const data = await res.json();
+function renderChannelRevenue(data) {
   const target = document.getElementById('channelRevenue');
   if (!target) return;
   const labels = data.map((item) => item.name);
@@ -481,60 +482,35 @@ async function renderChannelRevenue() {
   }));
 }
 
-async function renderHeatmap() {
-  const channels = ['微信社群', '内容合作', '小红书', '转介绍', '直接流量'];
-  const matrix = [
-    [100, 12.0, 3.2, 0.9, 0.3],
-    [100, 10.4, 2.7, 1.0, 0.28],
-    [100, 8.1, 2.1, 0.7, 0.19],
-    [100, 16.5, 4.4, 1.6, 0.52],
-    [100, 18.0, 5.1, 2.4, 0.9],
-  ];
+function renderHeatmap(data) {
   const tbody = document.getElementById('heatmap-body');
   if (!tbody) return;
-  tbody.innerHTML = channels.map((channel, rowIndex) => `
+  tbody.innerHTML = data.map((item) => `
     <tr>
-      <td style="color:var(--text-main);font-weight:600">${channel}</td>
-      ${matrix[rowIndex].map((value, cellIndex) => {
+      <td style="color:var(--text-main);font-weight:600">${item.channel}</td>
+      ${(item.values || []).map((value, cellIndex) => {
         const intensity = cellIndex === 0 ? 0.08 : Math.min(value / (cellIndex === 1 ? 45 : cellIndex === 2 ? 15 : cellIndex === 3 ? 10 : 2.5), 1);
         const bg = `rgba(200,169,110,${(intensity * 0.6 + 0.05).toFixed(2)})`;
         const color = intensity > 0.5 ? '#0D1B2A' : '#F8F6F0';
         return `<td style="background:${bg};color:${color};font-weight:${intensity > 0.4 ? '600' : '400'};text-align:center">${value}%</td>`;
       }).join('')}
-    </tr>`).join('');
+    </tr>`).join('') || '<tr><td colspan="6" style="color:#8899aa;text-align:center">暂无真实渠道转化数据。</td></tr>';
 }
 
-const CHANNEL_DATA = [
-  { name: '微信社群', users: 2100, convRate: '6.4%', revenue: 28600, cac: 42, ltv: 620, score: 82, trend: '▲', trendCls: 'trend-up' },
-  { name: '内容合作', users: 1400, convRate: '4.8%', revenue: 19200, cac: 56, ltv: 540, score: 74, trend: '▲', trendCls: 'trend-up' },
-  { name: '小红书', users: 980, convRate: '3.6%', revenue: 13600, cac: 48, ltv: 420, score: 68, trend: '▲', trendCls: 'trend-up' },
-  { name: '转介绍', users: 620, convRate: '12.1%', revenue: 24800, cac: 18, ltv: 860, score: 93, trend: '▲', trendCls: 'trend-up' },
-  { name: '直接流量', users: 300, convRate: '15.0%', revenue: 16800, cac: 12, ltv: 940, score: 96, trend: '▲', trendCls: 'trend-up' },
-];
-
-const MONTHS_12 = ['2025-07', '2025-08', '2025-09', '2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06'];
-const MONTHS_12_LABEL = MONTHS_12.map((month) => month.slice(5) + '月');
-
-const CHANNEL_MONTHLY = [
-  [120, 136, 148, 165, 172, 186, 194, 201, 214, 228, 241, 252],
-  [82, 88, 94, 102, 110, 118, 126, 132, 139, 148, 156, 164],
-  [56, 62, 68, 72, 79, 84, 88, 93, 96, 102, 108, 112],
-  [28, 34, 38, 42, 45, 48, 52, 56, 60, 64, 68, 72],
-  [12, 16, 18, 20, 23, 24, 26, 29, 31, 34, 36, 39],
-];
-
-function renderChannelSection() {
+async function renderChannelSection() {
+  const response = await fetch('/api/admin/channels');
+  const result = await response.json();
+  if (!response.ok || !result.ok) return;
+  const channelRows = Array.isArray((result.channels || {}).rows) ? result.channels.rows : [];
   const kpiContainer = document.getElementById('channel-kpi-cards');
   if (kpiContainer) {
-    kpiContainer.innerHTML = CHANNEL_DATA.map((channel) => `
+    kpiContainer.innerHTML = channelRows.map((channel) => `
       <div class="kpi-card">
         <div class="kpi-label">${channel.name}</div>
         <div class="kpi-value" style="font-size:20px">${channel.users}</div>
-        <div class="kpi-sub">转化率 ${channel.convRate}</div>
+        <div class="kpi-sub">付费转化率 ${Number(channel.conversion || 0).toFixed(1)}%</div>
         <div class="kpi-sub">营收 ¥${channel.revenue}</div>
-        <div class="kpi-badge ${channel.trendCls === 'trend-up' ? 'kpi-badge-up' : 'kpi-badge-down'}">
-          CAC ¥${channel.cac} · LTV ¥${channel.ltv}
-        </div>
+        <div class="kpi-badge kpi-badge-gold">${Number(channel.paid_users || 0)} 位付费用户</div>
       </div>`).join('');
   }
 
@@ -548,21 +524,21 @@ function renderChannelSection() {
     }),
     legend: baseLegend({ top: 0 }),
     grid: baseGrid({ top: 36, left: 18, right: 18, bottom: 54 }),
-    dataZoom: timeZoom(MONTHS_12_LABEL),
+    dataZoom: [],
     xAxis: {
       type: 'category',
-      data: MONTHS_12_LABEL,
+      data: ['当前'],
       ...baseAxis({ splitLine: { show: false } }),
     },
     yAxis: {
       type: 'value',
       ...baseAxis(),
     },
-    series: CHANNEL_DATA.map((channel, index) => ({
+    series: channelRows.map((channel, index) => ({
       name: channel.name,
       type: 'bar',
       stack: 'total',
-      data: CHANNEL_MONTHLY[index],
+      data: [channel.users],
       barWidth: '44%',
       itemStyle: {
         color: window.GangtiseEcharts.rgba(CHANNEL_COLORS[index], 0.82),
@@ -571,76 +547,51 @@ function renderChannelSection() {
     })),
   });
 
-  renderChart('cacLtvScatter', makeBubbleOption(
-    CHANNEL_DATA.map((channel, index) => ({
-      name: channel.name,
-      users: channel.users,
-      cac: channel.cac,
-      ltv: channel.ltv,
-      color: CHANNEL_COLORS[index],
-    })),
-  ));
+  const scatterTarget = document.getElementById('cacLtvScatter');
+  if (scatterTarget) scatterTarget.innerHTML = '<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#8899aa;font-size:12px">暂无真实 CAC / LTV 数据</div>';
 
   const tbody = document.getElementById('channel-quality-body');
   if (tbody) {
-    tbody.innerHTML = CHANNEL_DATA.map((channel) => {
-      const barW = Math.round(channel.score * 0.8);
+    tbody.innerHTML = channelRows.map((channel) => {
       return `<tr>
         <td style="color:var(--text-main);font-weight:600">${channel.name}</td>
         <td>${channel.users}</td>
-        <td>¥${channel.cac}</td>
-        <td>¥${channel.ltv}</td>
-        <td>${channel.convRate}</td>
-        <td>
-          <span class="score-bar" style="width:${barW}px"></span>
-          <span style="color:var(--gold);font-weight:600">${channel.score}</span>
-        </td>
-        <td class="${channel.trendCls}">${channel.trend}</td>
+        <td>--</td>
+        <td>--</td>
+        <td>${Number(channel.conversion || 0).toFixed(1)}%</td>
+        <td>--</td>
+        <td>--</td>
       </tr>`;
     }).join('');
   }
 }
 
-const KOL_TOP10 = [
-  { name: '财经老王', platform: '微信', fans: '12.8万', gmv: 18600, commission: 2790, rate: '15%', tier: 'S', trend: '+12%' },
-  { name: '投研精选', platform: '内容合作', fans: '8.6万', gmv: 14200, commission: 2130, rate: '15%', tier: 'S', trend: '+9%' },
-  { name: '量化阿杰', platform: '小红书', fans: '5.4万', gmv: 11800, commission: 1770, rate: '15%', tier: 'A', trend: '+8%' },
-  { name: '宏观视野', platform: '微信', fans: '4.2万', gmv: 9600, commission: 1536, rate: '16%', tier: 'A', trend: '+6%' },
-  { name: '策略研究员', platform: '转介绍', fans: '3.1万', gmv: 7800, commission: 1170, rate: '15%', tier: 'A', trend: '+4%' },
-  { name: '行业深度', platform: '内容合作', fans: '2.6万', gmv: 6200, commission: 930, rate: '15%', tier: 'B', trend: '+3%' },
-  { name: '晨会纪要', platform: '小红书', fans: '2.1万', gmv: 5400, commission: 810, rate: '15%', tier: 'B', trend: '+2%' },
-  { name: '大盘解读', platform: '微信', fans: '1.8万', gmv: 4600, commission: 690, rate: '15%', tier: 'B', trend: '+1%' },
-  { name: '板块追踪', platform: '内容合作', fans: '1.5万', gmv: 3900, commission: 585, rate: '15%', tier: 'B', trend: '+1%' },
-  { name: '新能源专研', platform: '小红书', fans: '1.2万', gmv: 3200, commission: 480, rate: '15%', tier: 'B', trend: '+1%' },
-];
-
-const KOL_TIER_GROWTH = {
-  S: [1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2],
-  A: [2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 5],
-  B: [3, 3, 4, 4, 5, 5, 6, 7, 7, 8, 9, 10],
-};
-
-function renderKolSection() {
+async function renderKolSection() {
+  const response = await fetch('/api/admin/kol-analytics');
+  const result = await response.json();
+  if (!response.ok || !result.ok) return;
+  const analytics = result.analytics || {};
+  const kolRows = Array.isArray(analytics.rows) ? analytics.rows : [];
   const kpiContainer = document.getElementById('kol-kpi-cards');
   if (kpiContainer) {
-    const totalGmv = KOL_TOP10.reduce((sum, item) => sum + item.gmv, 0);
-    const totalKols = 12;
-    const topKol = KOL_TOP10[0].name;
+    const totalGmv = Number(analytics.total_revenue || 0);
+    const totalKols = Number(analytics.total_kols || 0);
+    const topKol = analytics.top_kol || '--';
     kpiContainer.innerHTML = `
       <div class="kpi-card">
         <div class="kpi-label">试点作者总数</div>
         <div class="kpi-value">${totalKols}</div>
-        <div class="kpi-badge kpi-badge-up">▲ +14 本月</div>
+        <div class="kpi-badge kpi-badge-gold">真实租户数</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">试点协同收入</div>
         <div class="kpi-value">¥${totalGmv}</div>
-        <div class="kpi-badge kpi-badge-up">▲ +22%</div>
+        <div class="kpi-badge kpi-badge-gold">付费标注 × 单价</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">平均佣金率</div>
-        <div class="kpi-value">15.3%</div>
-        <div class="kpi-badge kpi-badge-gold">加权平均</div>
+        <div class="kpi-value">${Number(analytics.average_rate || 0).toFixed(2)}%</div>
+        <div class="kpi-badge kpi-badge-gold">已配置分成比例</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">当前最佳样本</div>
@@ -650,10 +601,10 @@ function renderKolSection() {
   }
 
   renderChart('kolTop10Bar', makeHorizontalBarOption(
-    KOL_TOP10.map((item) => item.name),
+    kolRows.slice(0, 10).map((item) => item.name),
     [{
       name: '试点收入 (元)',
-      data: KOL_TOP10.map((item) => item.gmv),
+      data: kolRows.slice(0, 10).map((item) => item.gmv),
       color: currentPalette().gold,
     }],
     { valueFormatter: '¥{value}' },
@@ -669,35 +620,43 @@ function renderKolSection() {
     }),
     legend: baseLegend({ top: 0 }),
     grid: baseGrid({ top: 36, left: 18, right: 18, bottom: 54 }),
-    dataZoom: timeZoom(MONTHS_12_LABEL),
+    dataZoom: timeZoom((analytics.months || []).map((month) => month.slice(5))),
     xAxis: {
       type: 'category',
-      data: MONTHS_12_LABEL,
+      data: (analytics.months || []).map((month) => month.slice(5)),
       ...baseAxis({ splitLine: { show: false } }),
     },
     yAxis: {
       type: 'value',
       ...baseAxis(),
     },
-    series: [
-      { name: 'S级', type: 'line', smooth: true, symbol: 'circle', symbolSize: 7, data: KOL_TIER_GROWTH.S, lineStyle: { width: 2.5, color: '#FFD700' }, areaStyle: { color: 'rgba(255,215,0,0.10)' }, itemStyle: { color: '#FFD700' } },
-      { name: 'A级', type: 'line', smooth: true, symbol: 'circle', symbolSize: 7, data: KOL_TIER_GROWTH.A, lineStyle: { width: 2.5, color: currentPalette().gold }, areaStyle: { color: window.GangtiseEcharts.rgba(currentPalette().gold, 0.10) }, itemStyle: { color: currentPalette().gold } },
-      { name: 'B级', type: 'line', smooth: true, symbol: 'circle', symbolSize: 7, data: KOL_TIER_GROWTH.B, lineStyle: { width: 2.5, color: currentPalette().gray }, areaStyle: { color: 'rgba(154,149,144,0.08)' }, itemStyle: { color: currentPalette().gray } },
-    ],
+    series: Object.keys(analytics.tier_growth || {}).map((tier, index) => ({
+      name: tier,
+      type: 'line',
+      smooth: true,
+      connectNulls: false,
+      symbol: 'circle',
+      symbolSize: 7,
+      data: analytics.tier_growth[tier],
+      lineStyle: { width: 2.5, color: [currentPalette().gold, currentPalette().blue, currentPalette().gray][index % 3] },
+      itemStyle: { color: [currentPalette().gold, currentPalette().blue, currentPalette().gray][index % 3] },
+    })),
   });
 
+  const tierCounts = analytics.tier_counts || {};
+  const tierLabels = Object.keys(tierCounts);
   renderChart('kolTierDonut', makeDonutOption(
-    ['S级', 'A级', 'B级'],
-    [2, 5, 10],
-    ['#FFD700', currentPalette().gold, currentPalette().gray],
+    tierLabels,
+    tierLabels.map((tier) => tierCounts[tier]),
+    tierLabels.map((_, index) => ['#FFD700', currentPalette().gold, currentPalette().gray][index % 3]),
     { center: ['38%', '50%'] },
   ));
 
   const kolBody = document.getElementById('kol-table-body');
   if (kolBody) {
-    kolBody.innerHTML = KOL_TOP10.slice(0, 8).map((item) => {
+    kolBody.innerHTML = kolRows.slice(0, 8).map((item) => {
       const tierCls = item.tier === 'S' ? 'kol-tier-s' : item.tier === 'A' ? 'kol-tier-a' : 'kol-tier-b';
-      const trendColor = item.trend.startsWith('+') ? '#2ECC71' : '#E74C3C';
+      const trendColor = item.trend && item.trend !== '--' ? '#2ECC71' : currentPalette().gray;
       return `<tr>
         <td style="color:var(--text-main);font-weight:600">${item.name}</td>
         <td>${item.platform}</td>
@@ -705,64 +664,50 @@ function renderKolSection() {
         <td style="color:var(--gold);font-weight:600">¥${item.gmv}</td>
         <td>${item.rate}</td>
         <td><span class="${tierCls}">${item.tier}级</span></td>
-        <td style="color:${trendColor}">${item.trend}</td>
+        <td style="color:${trendColor}">${item.trend || '--'}</td>
       </tr>`;
     }).join('');
   }
 }
 
-const REVENUE_MONTHLY = [18000, 22400, 26800, 31200, 35600, 40200, 44800, 49200, 53800, 58600, 63400, 68800];
-const USERS_MONTHLY = [180, 238, 286, 332, 388, 446, 504, 566, 628, 688, 742, 806];
-
-const TIER_REVENUE = {
-  '免费': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  '验证版会员': [6200, 7400, 8600, 9800, 11200, 12600, 13800, 15100, 16200, 17400, 18600, 19800],
-  '专业会员': [8400, 10800, 13200, 15400, 17600, 19800, 22400, 24600, 27200, 29600, 32200, 34800],
-  '机构试点': [3400, 4200, 5000, 6000, 6800, 7800, 8600, 9500, 10400, 11600, 12600, 14000],
-};
-
-const COHORT_DATA = [
-  { cohort: '2026-01', data: [100, 61, 48, 40, 34, 28] },
-  { cohort: '2026-02', data: [100, 64, 52, 43, 36, null] },
-  { cohort: '2026-03', data: [100, 66, 55, 46, null, null] },
-  { cohort: '2026-04', data: [100, 68, 57, null, null, null] },
-  { cohort: '2026-05', data: [100, 69, null, null, null, null] },
-  { cohort: '2026-06', data: [100, null, null, null, null, null] },
-];
-
-function renderRevenueSection() {
+async function renderRevenueSection() {
+  const response = await fetch('/api/admin/revenue-analytics');
+  const result = await response.json();
+  if (!response.ok || !result.ok) return;
+  const analytics = result.analytics || {};
+  const monthly = Array.isArray(analytics.monthly) ? analytics.monthly : [];
+  const monthLabels = monthly.map((item) => String(item.month || '').slice(5));
   const kpiContainer = document.getElementById('revenue-kpi-cards');
   if (kpiContainer) {
-    const mrr = REVENUE_MONTHLY[REVENUE_MONTHLY.length - 1];
-    const arr = Math.round(mrr * 12);
-    const prevMrr = REVENUE_MONTHLY[REVENUE_MONTHLY.length - 2];
-    const mom = (((mrr - prevMrr) / prevMrr) * 100).toFixed(1);
+    const mrr = Number(analytics.mrr || 0);
+    const tenantCount = Number(analytics.active_tenants || 0);
+    const averagePrice = Number(analytics.average_price || 0);
     kpiContainer.innerHTML = `
       <div class="kpi-card">
-        <div class="kpi-label">MRR (本月)</div>
+        <div class="kpi-label">本月协同收入</div>
         <div class="kpi-value">¥${mrr}</div>
-        <div class="kpi-badge kpi-badge-up">▲ +${mom}% MoM</div>
+        <div class="kpi-badge kpi-badge-gold">付费用户 × 租户单价</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">ARR 预测</div>
-        <div class="kpi-value">¥${arr}</div>
-        <div class="kpi-badge kpi-badge-gold">基于当月×12</div>
+        <div class="kpi-label">当前付费样本</div>
+        <div class="kpi-value">${Number(analytics.paid_users || 0)}</div>
+        <div class="kpi-badge kpi-badge-gold">真实用户标注</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">MoM增长率</div>
-        <div class="kpi-value">+${mom}%</div>
-        <div class="kpi-badge kpi-badge-up">健康增长</div>
+        <div class="kpi-label">有定价租户</div>
+        <div class="kpi-value">${tenantCount}</div>
+        <div class="kpi-badge kpi-badge-gold">真实租户配置</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">付费用户数</div>
-        <div class="kpi-value">128</div>
-        <div class="kpi-badge kpi-badge-up">▲ +18</div>
+        <div class="kpi-label">平均单价</div>
+        <div class="kpi-value">¥${averagePrice}</div>
+        <div class="kpi-badge kpi-badge-gold">租户当前注册定价</div>
       </div>`;
   }
 
-  renderChart('revGmvUsers', makeVerticalBarOption(MONTHS_12_LABEL, [
-    { name: 'MRR (元)', type: 'bar', data: REVENUE_MONTHLY, color: window.GangtiseEcharts.rgba(currentPalette().gold, 0.82), yAxisIndex: 0 },
-    { name: '付费用户数', type: 'line', data: USERS_MONTHLY, color: currentPalette().blue, yAxisIndex: 1 },
+  renderChart('revGmvUsers', makeVerticalBarOption(monthLabels, [
+    { name: 'MRR (元)', type: 'bar', data: monthly.map((item) => item.revenue), color: window.GangtiseEcharts.rgba(currentPalette().gold, 0.82), yAxisIndex: 0 },
+    { name: '付费用户数', type: 'line', data: monthly.map((item) => item.users), color: currentPalette().blue, yAxisIndex: 1 },
   ], {
     zoom: true,
     rightAxis: true,
@@ -770,42 +715,16 @@ function renderRevenueSection() {
     rightFormatter: '{value}',
   }));
 
-  renderChart('revTierStack', makeStackedAreaOption(
-    MONTHS_12_LABEL,
-    Object.keys(TIER_REVENUE).map((name, index) => ({
-      name,
-      data: TIER_REVENUE[name],
-      color: ['#5A5650', currentPalette().blue, currentPalette().green, currentPalette().gold][index],
-    })),
-  ));
-
-  renderChart('revChannelBar', makeVerticalBarOption(
-    CHANNEL_DATA.map((item) => item.name),
+  renderChart('revTenantBar', makeHorizontalBarOption(
+    (analytics.tenant_revenue || []).map((item) => item.name),
     [{
-      name: '月度营收（元）',
+      name: '协同收入（元）',
       type: 'bar',
-      data: CHANNEL_DATA.map((item) => item.revenue),
+      data: (analytics.tenant_revenue || []).map((item) => item.revenue),
       color: currentPalette().blue,
-      yAxisIndex: 0,
     }],
-    { leftFormatter: '¥{value}' },
+    { valueFormatter: '¥{value}' },
   ));
-
-  const thead = document.getElementById('cohort-thead');
-  const tbody = document.getElementById('cohort-tbody');
-  if (thead && tbody) {
-    thead.innerHTML = '<th>队列</th>' + ['M0', 'M1', 'M2', 'M3', 'M4', 'M5'].map((item) => `<th>${item}</th>`).join('');
-    tbody.innerHTML = COHORT_DATA.map((row) => {
-      const cells = row.data.map((value) => {
-        if (value === null) return '<td style="color:var(--gray-600)">—</td>';
-        const intensity = value / 100;
-        const bg = `rgba(200,169,110,${(intensity * 0.5 + 0.05).toFixed(2)})`;
-        const color = intensity > 0.6 ? '#0D1B2A' : '#F8F6F0';
-        return `<td style="background:${bg};color:${color};font-weight:600">${value}%</td>`;
-      }).join('');
-      return `<tr><td style="color:var(--gold);font-weight:600">${row.cohort}</td>${cells}</tr>`;
-    }).join('');
-  }
 }
 
 const SEG_TIERS = [

@@ -12,6 +12,18 @@ import threading
 _watchlist_comments_schema_lock = threading.Lock()
 _watchlist_comments_schema_ready = False
 
+
+def _parse_market_datetime(value):
+    text = str(value or "").strip()
+    if not text:
+        return None
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(text[:19] if " " in text else text[:10], fmt)
+        except (TypeError, ValueError):
+            continue
+    return None
+
 def gen_funnel_data():
     base = [68000, 5400, 1260, 128, 36]
     return [{"layer": FUNNEL_LAYERS[i], "count": base[i], "rate": round(base[i]/base[0]*100, 2)} for i in range(5)]
@@ -62,6 +74,175 @@ def gen_channel_data():
         }
         for channel in CHANNELS
     ]
+
+
+def build_admin_channel_payload():
+    """Build channel metrics from persisted users without synthetic fallbacks."""
+    now = datetime.now()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    rows_by_channel = {}
+    try:
+        users = list_users()
+    except Exception:
+        raise
+    for user in users or []:
+        if not isinstance(user, dict) or str(user.get("status") or "").lower() != "active":
+            continue
+        if str(user.get("role") or "").lower() != "investor":
+            continue
+        channel = str(user.get("h5_channel_label") or user.get("source_label") or "未标注渠道").strip() or "未标注渠道"
+        bucket = rows_by_channel.setdefault(channel, {"users": 0, "new_users_month": 0, "paid_users": 0, "revenue": 0})
+        bucket["users"] += 1
+        created_at = str(user.get("created_at") or "")[:19]
+        try:
+            created = datetime.fromisoformat(created_at)
+        except ValueError:
+            created = None
+        if created and created >= month_start:
+            bucket["new_users_month"] += 1
+        if bool(user.get("is_paid_sample")):
+            bucket["paid_users"] += 1
+            tenant_slug = str(user.get("tenant_slug") or "").strip().lower()
+            price = int(load_tenant_fan_ops_settings(tenant_slug).get("registration_price") or 0) if tenant_slug else 0
+            bucket["revenue"] += price
+    colors = {"微信社群": "#07C160", "内容合作": "#FE2C55", "小红书": "#FF2442", "转介绍": "#E6162D", "直接流量": "#C8A96E"}
+    rows = []
+    for channel, bucket in sorted(rows_by_channel.items(), key=lambda pair: (-pair[1]["users"], pair[0])):
+        users_count = bucket["users"]
+        paid_count = bucket["paid_users"]
+        rows.append({
+            "name": channel,
+            "users": users_count,
+            "new_users_month": bucket["new_users_month"],
+            "paid_users": paid_count,
+            "conversion": round(paid_count / users_count * 100, 1) if users_count else 0,
+            "revenue": bucket["revenue"],
+            "average_paid_value": round(bucket["revenue"] / paid_count, 2) if paid_count else 0,
+            "cac": None,
+            "roi": None,
+            "color": colors.get(channel, "#C8A96E"),
+            "status": "有真实用户" if users_count else "无数据",
+        })
+    total_users = sum(row["users"] for row in rows)
+    total_new = sum(row["new_users_month"] for row in rows)
+    total_paid = sum(row["paid_users"] for row in rows)
+    total_revenue = sum(row["revenue"] for row in rows)
+    return {
+        "generated_at": now_ts(),
+        "basis": "用户表渠道字段、注册时间、付费标注和租户注册单价",
+        "active_channels": sum(1 for row in rows if row["users"] > 0),
+        "total_users": total_users,
+        "new_users_month": total_new,
+        "paid_users": total_paid,
+        "conversion": round(total_paid / total_users * 100, 1) if total_users else 0,
+        "revenue": total_revenue,
+        "cac_available": False,
+        "roi_available": False,
+        "rows": rows,
+    }
+
+
+def build_admin_funnel_payload():
+    """Build the analytics funnel from persisted users and access events."""
+    users = [
+        user for user in list_users(role="investor")
+        if isinstance(user, dict) and str(user.get("status") or "active").lower() == "active"
+    ]
+    channels = build_admin_channel_payload()
+    tenant_prices = {}
+    for tenant in get_tenant_configs():
+        slug = str(tenant.get("slug") or "").strip().lower()
+        if slug:
+            tenant_prices[slug] = int(load_tenant_fan_ops_settings(slug).get("registration_price") or 0)
+
+    onboarding_users = [user for user in users if str(user.get("onboarding_completed_at") or "").strip()]
+    paid_users = [user for user in users if bool(user.get("is_paid_sample"))]
+    high_frequency_users = [
+        user for user in users
+        if "高频用户" in (user.get("labels") if isinstance(user.get("labels"), list) else [])
+    ]
+    content_reach = 0
+    try:
+        since = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+        reach_row = get_db().execute(
+            "SELECT COUNT(*) AS count FROM access_logs WHERE user_role = ? AND created_at >= ?",
+            ("investor", since),
+        ).fetchone()
+        content_reach = int((reach_row or {}).get("count") or 0) if isinstance(reach_row, dict) else int(reach_row[0] or 0)
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+
+    stage_counts = [content_reach, len(users), len(onboarding_users), len(paid_users), len(high_frequency_users)]
+    funnel = [
+        {"layer": label, "count": count, "rate": round(count / content_reach * 100, 2) if content_reach else 0}
+        for label, count in zip(FUNNEL_LAYERS, stage_counts)
+    ]
+
+    monthly = []
+    cursor = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_starts = []
+    for _ in range(12):
+        month_starts.append(cursor)
+        cursor = (cursor - timedelta(days=1)).replace(day=1)
+    month_starts.reverse()
+    for month_start in month_starts:
+        next_month = (month_start + timedelta(days=32)).replace(day=1)
+        paid_until = [
+            user for user in paid_users
+            if (_parse_market_datetime(user.get("paid_sample_marked_at")) or _parse_market_datetime(user.get("created_at")))
+            and (_parse_market_datetime(user.get("paid_sample_marked_at")) or _parse_market_datetime(user.get("created_at"))) < next_month
+        ]
+        monthly.append({
+            "month": month_start.strftime("%Y-%m"),
+            "revenue": sum(tenant_prices.get(str(user.get("tenant_slug") or "").lower(), 0) for user in paid_until),
+            "users": len(paid_until),
+        })
+
+    segments = [
+        {"segment": "未付费用户", "count": max(0, len(users) - len(paid_users))},
+        {"segment": "付费用户", "count": len(paid_users)},
+        {"segment": "高频付费用户", "count": sum(1 for user in paid_users if user in high_frequency_users)},
+    ]
+    tenant_rows = []
+    for tenant in get_tenant_configs():
+        slug = str(tenant.get("slug") or "").strip().lower()
+        if not slug:
+            continue
+        tenant_fans = [user for user in users if str(user.get("tenant_slug") or "").lower() == slug]
+        paid_count = sum(1 for user in tenant_fans if bool(user.get("is_paid_sample")))
+        revenue = paid_count * tenant_prices.get(slug, 0)
+        tenant_rows.append({
+            "name": str(tenant.get("advisor") or tenant.get("name") or slug),
+            "gmv": revenue,
+            "commission": 0,
+        })
+    tenant_rows.sort(key=lambda item: (-item["gmv"], item["name"]))
+    heatmap = []
+    for row in channels.get("rows") or []:
+        channel_users = [
+            user for user in users
+            if str(user.get("h5_channel_label") or user.get("source_label") or "未标注渠道").strip() == row["name"]
+        ]
+        channel_paid = sum(1 for user in channel_users if bool(user.get("is_paid_sample")))
+        channel_onboarding = sum(1 for user in channel_users if str(user.get("onboarding_completed_at") or "").strip())
+        heatmap.append({
+            "channel": row["name"],
+            "values": [100, round(channel_onboarding / len(channel_users) * 100, 1) if channel_users else 0,
+                       round(channel_onboarding / len(channel_users) * 100, 1) if channel_users else 0,
+                       round(channel_paid / len(channel_users) * 100, 1) if channel_users else 0,
+                       round(sum(1 for user in channel_users if "高频用户" in (user.get("labels") or [])) / len(channel_users) * 100, 1) if channel_users else 0],
+        })
+    return {
+        "generated_at": now_ts(),
+        "basis": "访问日志、用户表注册/激活字段、付费标注、租户注册单价和用户渠道字段",
+        "funnel": funnel,
+        "channels": channels,
+        "monthly": monthly,
+        "kols": tenant_rows,
+        "segments": segments,
+        "heatmap": heatmap,
+    }
 
 def gen_kol_data():
     tenants = get_tenant_configs()

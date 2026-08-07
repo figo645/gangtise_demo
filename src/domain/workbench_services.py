@@ -276,6 +276,185 @@ def build_tenant_business_analytics(investor_users=None, ops_stats=None):
     }
 
 
+def build_admin_commission_payload():
+    """Build settlement estimates from persisted tenant fan/payment data."""
+    rows = []
+    for tenant in get_tenant_configs():
+        tenant_slug = str(tenant.get("slug") or "").strip().lower()
+        if not tenant_slug:
+            continue
+        users = [user for user in list_users(role="investor", tenant_slug=tenant_slug) if isinstance(user, dict)]
+        ops_stats = build_tenant_ops_stats(tenant=tenant, investor_users=users)
+        revenue = int(ops_stats.get("monthly_revenue") or 0)
+        raw_rate = tenant.get("commission_rate", tenant.get("settlement_rate", 0))
+        try:
+            rate = float(raw_rate or 0)
+        except (TypeError, ValueError):
+            rate = 0.0
+        if rate > 1:
+            rate /= 100
+        rate = max(0.0, min(1.0, rate))
+        payable = round(revenue * rate, 2)
+        rows.append({
+            "tenant_slug": tenant_slug,
+            "advisor": str(tenant.get("advisor") or tenant.get("name") or tenant_slug),
+            "tenant_name": str(tenant.get("name") or tenant_slug),
+            "tier": str(tenant.get("tier") or "未分层"),
+            "source": "付费用户标注 × 注册单价",
+            "fan_count": len(users),
+            "paid_count": int(ops_stats.get("vip_subscribers") or 0),
+            "registration_price": int(ops_stats.get("registration_price") or 0),
+            "revenue": revenue,
+            "share_rate": round(rate * 100, 2),
+            "payable": payable,
+            "status": "待结算" if payable > 0 else "暂无应结算",
+        })
+    pending = round(sum(float(row["payable"]) for row in rows), 2)
+    active_rows = [row for row in rows if row["revenue"] > 0]
+    return {
+        "basis": "真实用户表中的付费标注与租户注册单价",
+        "settlement_records_supported": False,
+        "pending_total": pending,
+        "settled_total": 0,
+        "advisor_count": len(active_rows),
+        "average_payable": round(pending / len(active_rows), 2) if active_rows else 0,
+        "rows": rows,
+        "generated_at": now_ts(),
+    }
+
+
+def build_admin_revenue_analytics_payload():
+    """Build revenue charts from actual paid markers and tenant pricing."""
+    users = [user for user in list_users() if isinstance(user, dict) and str(user.get("role") or "").lower() == "investor"]
+    tenants = {str(tenant.get("slug") or "").strip().lower(): tenant for tenant in get_tenant_configs()}
+    prices = {}
+    for slug in tenants:
+        prices[slug] = int(load_tenant_fan_ops_settings(slug).get("registration_price") or 0)
+    tenant_revenue = []
+    for slug, tenant in tenants.items():
+        tenant_users = [user for user in users if str(user.get("tenant_slug") or "").strip().lower() == slug]
+        paid_count = sum(1 for user in tenant_users if bool(user.get("is_paid_sample")))
+        tenant_revenue.append({
+            "tenant_slug": slug,
+            "name": str(tenant.get("advisor") or tenant.get("name") or slug),
+            "fans": len(tenant_users),
+            "paid_users": paid_count,
+            "registration_price": prices[slug],
+            "revenue": paid_count * prices[slug],
+        })
+    tenant_revenue.sort(key=lambda item: (-item["revenue"], item["name"]))
+    now = datetime.now()
+    cursor = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_starts = []
+    for _ in range(12):
+        month_starts.append(cursor)
+        cursor = (cursor - timedelta(days=1)).replace(day=1)
+    month_starts.reverse()
+    monthly = []
+    for month_start in month_starts:
+        next_month = (month_start + timedelta(days=32)).replace(day=1)
+        paid_users = []
+        for user in users:
+            if not bool(user.get("is_paid_sample")):
+                continue
+            paid_at = _parse_workbench_datetime(user.get("paid_sample_marked_at")) or _parse_workbench_datetime(user.get("created_at"))
+            if paid_at and paid_at < next_month:
+                paid_users.append(user)
+        revenue = sum(prices.get(str(user.get("tenant_slug") or "").lower(), 0) for user in paid_users)
+        monthly.append({"month": month_start.strftime("%Y-%m"), "revenue": revenue, "users": len(paid_users)})
+    channel_revenue = {}
+    for user in users:
+        if not bool(user.get("is_paid_sample")):
+            continue
+        channel = str(user.get("h5_channel_label") or user.get("source_label") or "未标注渠道").strip() or "未标注渠道"
+        channel_revenue[channel] = channel_revenue.get(channel, 0) + prices.get(str(user.get("tenant_slug") or "").lower(), 0)
+    current_paid = monthly[-1]["users"] if monthly else 0
+    current_revenue = monthly[-1]["revenue"] if monthly else 0
+    previous_revenue = monthly[-2]["revenue"] if len(monthly) > 1 else 0
+    mom = round((current_revenue - previous_revenue) / previous_revenue * 100, 1) if previous_revenue else 0
+    cohorts = []
+    for month_start in month_starts:
+        cohort_users = [
+            user for user in users
+            if (_parse_workbench_datetime(user.get("created_at")) or now).strftime("%Y-%m") == month_start.strftime("%Y-%m")
+        ]
+        cohorts.append({"cohort": month_start.strftime("%Y-%m"), "data": [100] + [None] * 5, "users": len(cohort_users)})
+    priced_tenants = [item for item in tenant_revenue if item["registration_price"] > 0]
+    return {
+        "generated_at": now_ts(),
+        "basis": "用户表付费标注、付费时间、租户注册单价",
+        "monthly": monthly,
+        "tier_revenue": [
+            {"name": "未付费用户", "data": [0] * len(monthly)},
+            {"name": "付费用户", "data": [item["revenue"] for item in monthly]},
+        ],
+        "channel_revenue": [{"name": name, "revenue": value} for name, value in sorted(channel_revenue.items(), key=lambda item: (-item[1], item[0]))],
+        "cohorts": cohorts,
+        "tenant_revenue": tenant_revenue,
+        "active_tenants": len(priced_tenants),
+        "average_price": round(sum(item["registration_price"] for item in priced_tenants) / len(priced_tenants), 2) if priced_tenants else 0,
+        "mrr": current_revenue,
+        "arr": current_revenue * 12,
+        "mom": mom,
+        "paid_users": current_paid,
+    }
+
+
+def build_admin_kol_analytics_payload():
+    """Build KOL collaboration analytics from real tenant fan data."""
+    rows = []
+    for tenant in get_tenant_configs():
+        slug = str(tenant.get("slug") or "").strip().lower()
+        if not slug:
+            continue
+        users = [user for user in list_users(role="investor", tenant_slug=slug) if isinstance(user, dict)]
+        settings = load_tenant_fan_ops_settings(slug)
+        price = int(settings.get("registration_price") or 0)
+        paid_count = sum(1 for user in users if bool(user.get("is_paid_sample")))
+        revenue = paid_count * price
+        raw_rate = tenant.get("commission_rate", tenant.get("settlement_rate", 0))
+        try:
+            rate = float(raw_rate or 0)
+        except (TypeError, ValueError):
+            rate = 0.0
+        if rate > 1:
+            rate /= 100
+        rows.append({
+            "name": str(tenant.get("advisor") or tenant.get("name") or slug),
+            "platform": str(tenant.get("name") or "租户门户"),
+            "fans": len(users),
+            "gmv": revenue,
+            "commission": round(revenue * rate, 2),
+            "rate": round(rate * 100, 2),
+            "tier": str(tenant.get("tier") or "未分层"),
+            "trend": "--",
+        })
+    rows.sort(key=lambda item: (-item["gmv"], item["name"]))
+    tier_counts = {}
+    for row in rows:
+        tier_counts[row["tier"]] = tier_counts.get(row["tier"], 0) + 1
+    months = []
+    cursor = datetime.now().replace(day=1).replace(hour=0, minute=0, second=0, microsecond=0)
+    for _ in range(12):
+        months.append(cursor.strftime("%Y-%m"))
+        cursor = (cursor - timedelta(days=1)).replace(day=1)
+    months.reverse()
+    growth = {tier: [None] * 11 + [count] for tier, count in tier_counts.items()}
+    rates = [row["rate"] for row in rows if row["rate"] > 0]
+    return {
+        "generated_at": now_ts(),
+        "basis": "租户配置、粉丝用户表、付费标注与注册单价",
+        "rows": rows,
+        "total_kols": len(rows),
+        "total_revenue": sum(row["gmv"] for row in rows),
+        "average_rate": round(sum(rates) / len(rates), 2) if rates else 0,
+        "top_kol": rows[0]["name"] if rows else "--",
+        "months": months,
+        "tier_growth": growth,
+        "tier_counts": tier_counts,
+    }
+
+
 def _normalize_fan_stock_event_type(value):
     event_type = str(value or "").strip().lower()
     return event_type if event_type in FAN_STOCK_OBSERVATION_EVENT_TYPES else "watchlist_detail_view"

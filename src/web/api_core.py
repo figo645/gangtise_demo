@@ -66,6 +66,24 @@ def api_funnel():
 def api_channels():
     return jsonify(gen_channel_data())
 
+
+@app.route("/api/admin/channels")
+def api_admin_channels():
+    try:
+        return jsonify({"ok": True, "channels": build_admin_channel_payload()})
+    except Exception:
+        app.logger.exception("Failed to build admin channel payload")
+        return jsonify({"ok": False, "error": "channel_data_unavailable"}), 503
+
+
+@app.route("/api/admin/funnel-analytics")
+def api_admin_funnel_analytics():
+    try:
+        return jsonify({"ok": True, "analytics": build_admin_funnel_payload()})
+    except Exception:
+        app.logger.exception("Failed to build admin funnel analytics")
+        return jsonify({"ok": False, "error": "funnel_data_unavailable"}), 503
+
 @app.route("/api/kols")
 def api_kols():
     return jsonify(gen_kol_data())
@@ -73,6 +91,24 @@ def api_kols():
 @app.route("/api/revenue")
 def api_revenue():
     return jsonify(gen_revenue_trend())
+
+
+@app.route("/api/admin/revenue-analytics")
+def api_admin_revenue_analytics():
+    try:
+        return jsonify({"ok": True, "analytics": build_admin_revenue_analytics_payload()})
+    except Exception:
+        app.logger.exception("Failed to build admin revenue analytics")
+        return jsonify({"ok": False, "error": "revenue_data_unavailable"}), 503
+
+
+@app.route("/api/admin/kol-analytics")
+def api_admin_kol_analytics():
+    try:
+        return jsonify({"ok": True, "analytics": build_admin_kol_analytics_payload()})
+    except Exception:
+        app.logger.exception("Failed to build admin KOL analytics")
+        return jsonify({"ok": False, "error": "kol_data_unavailable"}), 503
 
 @app.route("/api/segments")
 def api_segments():
@@ -771,6 +807,15 @@ def api_admin_refresh_news_sources():
         app.logger.exception("Failed to refresh real news sources")
         return jsonify({"ok": False, "error": "news_source_refresh_failed"}), 503
     return jsonify({"ok": True, "news_sources": payload})
+
+
+@app.route("/api/admin/commission")
+def api_admin_commission():
+    try:
+        return jsonify({"ok": True, "commission": build_admin_commission_payload()})
+    except Exception:
+        app.logger.exception("Failed to build admin commission payload")
+        return jsonify({"ok": False, "error": "commission_data_unavailable"}), 503
 
 
 @app.route("/api/admin/indicator-sources", methods=["POST"])

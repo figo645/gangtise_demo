@@ -2059,8 +2059,23 @@
           <span class="admin-nav-group-caret">&#9662;</span>
         </button>
         <div class="admin-nav-group-body">
-        <div class="admin-nav-item" data-section="hermes" data-feature="hermes" onclick="showSection('hermes', this)">
-          <span class="admin-nav-icon">&#9881;</span> 使用统计
+        <div class="admin-nav-subgroup">
+          <div class="admin-nav-subtitle">Hermes</div>
+          <div class="admin-nav-item active" data-section="hermes" data-hermes-subsection="overview" data-feature="hermes" onclick="showHermesSubsection('overview', this)">
+            <span class="admin-nav-icon">&#9881;</span> 总览
+          </div>
+          <div class="admin-nav-item" data-section="hermes" data-hermes-subsection="usage" data-feature="hermes" onclick="showHermesSubsection('usage', this)">
+            <span class="admin-nav-icon">&#9654;</span> 调用统计
+          </div>
+          <div class="admin-nav-item" data-section="hermes" data-hermes-subsection="compute" data-feature="hermes" onclick="showHermesSubsection('compute', this)">
+            <span class="admin-nav-icon">&#9733;</span> 算力与排行
+          </div>
+          <div class="admin-nav-item" data-section="hermes" data-hermes-subsection="memory" data-feature="hermes" onclick="showHermesSubsection('memory', this)">
+            <span class="admin-nav-icon">&#128190;</span> 记忆治理
+          </div>
+          <div class="admin-nav-item" data-section="hermes" data-hermes-subsection="config" data-feature="hermes" onclick="showHermesSubsection('config', this)">
+            <span class="admin-nav-icon">&#9881;</span> 能力配置
+          </div>
         </div>
         <div class="admin-nav-item" data-section="agent-workflows" data-feature="system_module" onclick="showSection('agent-workflows', this)">
           <span class="admin-nav-icon">&#129504;</span> 智能体工作流
@@ -2081,39 +2096,43 @@
         </div>
         </div>
       </div>
-      <div class="admin-nav-group" data-nav-group="analytics">
+      <div class="admin-nav-group" data-nav-group="indicator">
+        <button type="button" class="admin-nav-group-toggle" onclick="toggleAdminNavGroup(this)">
+          <span class="admin-nav-group-title">指标专区</span>
+          <span class="admin-nav-group-caret">&#9662;</span>
+        </button>
+        <div class="admin-nav-group-body">
+        <div class="admin-nav-item" data-section="indicator-overview" data-feature="analytics_module" onclick="showSection('indicator-overview', this)">
+          <span class="admin-nav-icon">&#128202;</span> 总览控制台
+        </div>
+        <div class="admin-nav-item" data-section="indicator-smart" data-feature="analytics_module" onclick="showSection('indicator-smart', this)">
+          <span class="admin-nav-icon">&#129504;</span> 智能指标
+        </div>
+        <div class="admin-nav-item" data-section="indicator-lake" data-feature="analytics_module" onclick="showSection('indicator-lake', this)">
+          <span class="admin-nav-icon">&#127754;</span> 数据湖指标
+        </div>
+        <div class="admin-nav-item" data-section="indicator-anomalies" data-feature="analytics_module" onclick="showSection('indicator-anomalies', this)">
+          <span class="admin-nav-icon">&#9888;</span> 异动报告
+        </div>
+        <div class="admin-nav-item" data-section="indicator-sources" data-feature="analytics_module" onclick="showSection('indicator-sources', this)">
+          <span class="admin-nav-icon">&#128279;</span> API 源接入
+        </div>
+        <div class="admin-nav-item" data-section="news-sources" data-feature="analytics_module" onclick="showSection('news-sources', this)">
+          <span class="admin-nav-icon">&#128240;</span> 新闻数据源
+        </div>
+        <div class="admin-nav-item" data-section="indicator-definitions" data-feature="analytics_module" onclick="showSection('indicator-definitions', this)">
+          <span class="admin-nav-icon">&#128451;</span> 指标定义
+        </div>
+        <div class="admin-nav-item" data-section="indicator-pipeline" data-feature="analytics_module" onclick="showSection('indicator-pipeline', this)">
+          <span class="admin-nav-icon">&#128295;</span> 清洗流水线
+        </div>
+      </div>
+      <div class="admin-nav-group" data-nav-group="data-analysis">
         <button type="button" class="admin-nav-group-toggle" onclick="toggleAdminNavGroup(this)">
           <span class="admin-nav-group-title">数据分析</span>
           <span class="admin-nav-group-caret">&#9662;</span>
         </button>
         <div class="admin-nav-group-body">
-        <div class="admin-nav-subgroup">
-          <div class="admin-nav-subtitle">指标专区</div>
-          <div class="admin-nav-item" data-section="indicator-overview" data-feature="analytics_module" onclick="showSection('indicator-overview', this)">
-            <span class="admin-nav-icon">&#128202;</span> 总览控制台
-          </div>
-          <div class="admin-nav-item" data-section="indicator-smart" data-feature="analytics_module" onclick="showSection('indicator-smart', this)">
-            <span class="admin-nav-icon">&#129504;</span> 智能指标
-          </div>
-          <div class="admin-nav-item" data-section="indicator-lake" data-feature="analytics_module" onclick="showSection('indicator-lake', this)">
-            <span class="admin-nav-icon">&#127754;</span> 数据湖指标
-          </div>
-          <div class="admin-nav-item" data-section="indicator-anomalies" data-feature="analytics_module" onclick="showSection('indicator-anomalies', this)">
-            <span class="admin-nav-icon">&#9888;</span> 异动报告
-          </div>
-          <div class="admin-nav-item" data-section="indicator-sources" data-feature="analytics_module" onclick="showSection('indicator-sources', this)">
-            <span class="admin-nav-icon">&#128279;</span> API 源接入
-          </div>
-          <div class="admin-nav-item" data-section="news-sources" data-feature="analytics_module" onclick="showSection('news-sources', this)">
-            <span class="admin-nav-icon">&#128240;</span> 新闻数据源
-          </div>
-          <div class="admin-nav-item" data-section="indicator-definitions" data-feature="analytics_module" onclick="showSection('indicator-definitions', this)">
-            <span class="admin-nav-icon">&#128451;</span> 指标定义
-          </div>
-          <div class="admin-nav-item" data-section="indicator-pipeline" data-feature="analytics_module" onclick="showSection('indicator-pipeline', this)">
-            <span class="admin-nav-icon">&#128295;</span> 清洗流水线
-          </div>
-        </div>
         <div class="admin-nav-item" id="nav-funnel" data-feature="analytics_module" onclick="showAnalyticsSection('funnel')">
           <span class="admin-nav-icon">&#128202;</span> 转化漏斗
         </div>
@@ -2125,9 +2144,6 @@
         </div>
         <div class="admin-nav-item" id="nav-revenue" data-feature="analytics_module" onclick="showAnalyticsSection('revenue')">
           <span class="admin-nav-icon">&#128176;</span> 营收趋势
-        </div>
-        <div class="admin-nav-item" id="nav-segment" data-feature="vip" onclick="showAnalyticsSection('segment')">
-          <span class="admin-nav-icon">&#127919;</span> 用户分层分析
         </div>
         </div>
       </div>
@@ -2689,26 +2705,26 @@
           <div class="stat-card">
             <div class="stat-label">待结算总额</div>
             <span class="stat-icon">&#9775;</span>
-            <div class="stat-value">¥18,400</div>
-            <div class="stat-change" style="color:#C8A96E">待处理</div>
+            <div class="stat-value" id="admin-commission-pending">¥0</div>
+            <div class="stat-change" style="color:#C8A96E">基于真实付费标注</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">本月已结算</div>
             <span class="stat-icon">&#9654;</span>
-            <div class="stat-value">¥42,600</div>
-            <div class="stat-change up">&#9650; +4.4%</div>
+            <div class="stat-value" id="admin-commission-settled">¥0</div>
+            <div class="stat-change">暂无已结算流水</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">结算投顾数</div>
             <span class="stat-icon">&#9786;</span>
-            <div class="stat-value">12</div>
-            <div class="stat-change up">&#9650; +2</div>
+            <div class="stat-value" id="admin-commission-advisor-count">0</div>
+            <div class="stat-change">有应结算收入的租户</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">平均分成</div>
             <span class="stat-icon">&#9733;</span>
-            <div class="stat-value">¥5,083</div>
-            <div class="stat-change up">&#9650; +¥320</div>
+            <div class="stat-value" id="admin-commission-average">¥0</div>
+            <div class="stat-change">按当前分成比例计算</div>
           </div>
         </div>
         <div class="table-wrap">
@@ -2722,14 +2738,8 @@
           </div>
           <table>
             <thead><tr><th><input type="checkbox" style="accent-color:#C8A96E"></th><th>投顾名称</th><th>阶段</th><th>来源</th><th>本月协同收入</th><th>分成比例</th><th>应付金额</th><th>状态</th><th>操作</th></tr></thead>
-            <tbody>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">财经老王</td><td><span class="tier-s">种子投顾</span></td><td>微信社群</td><td>¥18,600</td><td>15%</td><td style="color:#C8A96E">¥2,790</td><td><span class="status-gold">待结算</span></td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px" onclick="showToast('结算已发起')">结算</button></td></tr>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">投资女神Lisa</td><td><span class="tier-s">种子投顾</span></td><td>内容合作</td><td>¥14,200</td><td>18%</td><td style="color:#C8A96E">¥2,556</td><td><span class="status-blue">处理中</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">查看</button></td></tr>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">量化小白</td><td><span class="tier-a">成长投顾</span></td><td>小红书</td><td>¥7,800</td><td>15%</td><td style="color:#C8A96E">¥1,170</td><td><span class="status-gold">待结算</span></td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px" onclick="showToast('结算已发起')">结算</button></td></tr>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">宏观策略师</td><td><span class="tier-a">成长投顾</span></td><td>微信社群</td><td>¥9,600</td><td>16%</td><td style="color:#C8A96E">¥1,536</td><td><span class="status-green">已完成</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">凭证</button></td></tr>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">港股研究员</td><td><span class="tier-b">观察投顾</span></td><td>转介绍</td><td>¥5,400</td><td>15%</td><td style="color:#C8A96E">¥810</td><td><span class="status-gold">待结算</span></td><td><button class="btn-gold" style="padding:3px 9px;font-size:11px" onclick="showToast('结算已发起')">结算</button></td></tr>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">债券研究员</td><td><span class="tier-b">观察投顾</span></td><td>内容合作</td><td>¥4,200</td><td>14%</td><td style="color:#C8A96E">¥588</td><td><span class="status-blue">处理中</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">查看</button></td></tr>
-              <tr><td><input type="checkbox" style="accent-color:#C8A96E"></td><td style="color:#F8F6F0">科技股猎手</td><td><span class="tier-a">成长投顾</span></td><td>内容合作</td><td>¥6,800</td><td>15%</td><td style="color:#C8A96E">¥1,020</td><td><span class="status-green">已完成</span></td><td><button class="btn-outline" style="padding:3px 9px;font-size:11px">凭证</button></td></tr>
+            <tbody id="admin-commission-tbody">
+              <tr><td colspan="9" style="color:#8899aa">正在加载真实结算数据。</td></tr>
             </tbody>
           </table>
         </div>
@@ -3865,6 +3875,14 @@
 
       <!-- ===== HERMES ===== -->
       <div id="section-hermes" style="display:none">
+        <div class="admin-subsection-tabs" id="admin-hermes-subsection-tabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px">
+          <button type="button" class="btn-outline active" data-hermes-tab="overview" onclick="showHermesSubsection('overview')">总览</button>
+          <button type="button" class="btn-outline" data-hermes-tab="usage" onclick="showHermesSubsection('usage')">调用统计</button>
+          <button type="button" class="btn-outline" data-hermes-tab="compute" onclick="showHermesSubsection('compute')">算力与排行</button>
+          <button type="button" class="btn-outline" data-hermes-tab="memory" onclick="showHermesSubsection('memory')">记忆治理</button>
+          <button type="button" class="btn-outline" data-hermes-tab="config" onclick="showHermesSubsection('config')">能力配置</button>
+        </div>
+        <div data-hermes-pane="overview">
         <div id="admin-hermes-usage-summary" class="stats-grid">
           <div class="stat-card">
             <div class="stat-label">今日调用</div>
@@ -3891,6 +3909,8 @@
             <div class="stat-change" style="color:#C8A96E">加载中</div>
           </div>
         </div>
+        </div>
+      <div data-hermes-pane="config">
       <div class="sync-grid" style="margin-bottom:20px">
         <div class="sync-card">
           <div class="sync-title">Hermes 产品口径</div>
@@ -3970,8 +3990,10 @@
               <label>模板树 JSON</label>
               <textarea id="hermes-template-tree" rows="13" placeholder='{"router":[{"id":"router.scope","label":"范围识别"}]}'></textarea>
             </div>
-          </div>
         </div>
+      </div>
+      </div>
+      <div data-hermes-pane="memory">
         <div class="chart-card" style="margin-bottom:20px">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
             <div>
@@ -4012,6 +4034,8 @@
           <div id="admin-hermes-memory-preview" class="hermes-memory-preview">请选择租户和清理范围后查看影响预览。</div>
           <div id="admin-hermes-memory-status" class="hermes-memory-status">尚未加载 Hermes 记忆治理数据。</div>
         </div>
+      </div>
+      <div data-hermes-pane="usage">
         <div class="table-wrap" style="margin-bottom:20px">
           <div class="table-header">
             <div class="table-title">Hermes 工具动作统计</div>
@@ -4022,6 +4046,8 @@
             <tbody id="admin-hermes-mode-tbody"></tbody>
           </table>
         </div>
+      </div>
+      <div data-hermes-pane="compute">
         <div id="admin-hermes-pool-cards" class="pool-cards">
           <div class="pool-card">
             <div class="pool-card-label">总算力池</div>
@@ -4059,6 +4085,7 @@
             <tbody id="admin-hermes-missing-capability-tbody"></tbody>
           </table>
         </div>
+      </div>
       </div><!-- end section-hermes -->
 
       <div id="section-agent-workflows" style="display:none">
@@ -4146,25 +4173,25 @@
           <div class="stat-card">
             <div class="stat-label">活跃渠道</div>
             <span class="stat-icon">&#9741;</span>
-            <div class="stat-value">5</div>
+            <div class="stat-value" id="admin-channel-active-count">0</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">本月总获客</div>
             <span class="stat-icon">&#9786;</span>
-            <div class="stat-value">5,400</div>
-            <div class="stat-change up">&#9650; +12.2%</div>
+            <div class="stat-value" id="admin-channel-new-users">0</div>
+            <div class="stat-change">本月新增用户</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">综合转化率</div>
             <span class="stat-icon">&#9670;</span>
-            <div class="stat-value">7.9%</div>
-            <div class="stat-change up">&#9650; +0.7pp</div>
+            <div class="stat-value" id="admin-channel-conversion">0%</div>
+            <div class="stat-change">付费用户 / 活跃用户</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">获客成本 CAC</div>
             <span class="stat-icon">&#9775;</span>
-            <div class="stat-value">¥29</div>
-            <div class="stat-change down">&#9660; -¥3 优化</div>
+            <div class="stat-value">--</div>
+            <div class="stat-change">暂无渠道成本数据</div>
           </div>
         </div>
         <div class="table-wrap" style="margin-bottom:20px">
@@ -4173,14 +4200,8 @@
             <span class="tag tag-gold">本月</span>
           </div>
           <table>
-            <thead><tr><th>渠道</th><th>内容触达</th><th>留资率</th><th>试用转化</th><th>付费转化</th><th>CAC</th><th>LTV</th><th>ROI</th><th>状态</th></tr></thead>
-            <tbody>
-              <tr><td style="color:#F8F6F0">微信社群</td><td>21,000</td><td>10.0%</td><td>18.0%</td><td>6.1%</td><td>¥24</td><td>¥420</td><td><span class="up">4.4x</span></td><td><span class="tag tag-green">健康</span></td></tr>
-              <tr><td style="color:#F8F6F0">内容合作</td><td>18,000</td><td>7.8%</td><td>16.2%</td><td>5.4%</td><td>¥31</td><td>¥398</td><td><span class="up">3.8x</span></td><td><span class="tag tag-green">健康</span></td></tr>
-              <tr><td style="color:#F8F6F0">小红书</td><td>12,000</td><td>8.1%</td><td>14.8%</td><td>4.7%</td><td>¥28</td><td>¥360</td><td><span class="up">3.6x</span></td><td><span class="tag tag-green">优质</span></td></tr>
-              <tr><td style="color:#F8F6F0">转介绍</td><td>9,000</td><td>6.9%</td><td>18.6%</td><td>7.2%</td><td>¥19</td><td>¥480</td><td>5.4x</td><td><span class="tag tag-green">优质</span></td></tr>
-              <tr><td style="color:#F8F6F0">直接流量</td><td>180,000</td><td>4.2%</td><td>2.0%</td><td>6.8%</td><td>¥18</td><td>¥680</td><td><span class="up">8.2x</span></td><td><span class="tag tag-green">优质</span></td></tr>
-            </tbody>
+            <thead><tr><th>渠道</th><th>用户数</th><th>本月新增</th><th>付费用户</th><th>付费转化</th><th>收入</th><th>付费用户均价</th><th>CAC</th><th>ROI</th><th>状态</th></tr></thead>
+            <tbody id="admin-channel-data-tbody"><tr><td colspan="10" style="color:#8899aa">正在加载真实渠道数据。</td></tr></tbody>
           </table>
         </div>
         <div class="table-wrap">
@@ -4190,13 +4211,7 @@
           </div>
           <table>
             <thead><tr><th>渠道</th><th>utm_source</th><th>utm_medium</th><th>utm_campaign</th><th>操作</th></tr></thead>
-            <tbody>
-              <tr><td style="color:#F8F6F0">微信社群</td><td style="font-family:monospace;color:#C8A96E">wechat_group</td><td style="font-family:monospace;color:#C8A96E">private_domain</td><td style="font-family:monospace;color:#C8A96E">gangtise_wechat_validate_2026</td><td><button class="btn-sm-blue" onclick="showToast('UTM链接已复制')">复制链接</button></td></tr>
-              <tr><td style="color:#F8F6F0">内容合作</td><td style="font-family:monospace;color:#C8A96E">content_partner</td><td style="font-family:monospace;color:#C8A96E">co_create</td><td style="font-family:monospace;color:#C8A96E">gangtise_partner_validate_2026</td><td><button class="btn-sm-blue" onclick="showToast('UTM链接已复制')">复制链接</button></td></tr>
-              <tr><td style="color:#F8F6F0">小红书</td><td style="font-family:monospace;color:#C8A96E">xiaohongshu</td><td style="font-family:monospace;color:#C8A96E">social</td><td style="font-family:monospace;color:#C8A96E">gangtise_xhs_2026</td><td><button class="btn-sm-blue" onclick="showToast('UTM链接已复制')">复制链接</button></td></tr>
-              <tr><td style="color:#F8F6F0">转介绍</td><td style="font-family:monospace;color:#C8A96E">referral</td><td style="font-family:monospace;color:#C8A96E">invite</td><td style="font-family:monospace;color:#C8A96E">gangtise_referral_validate_2026</td><td><button class="btn-sm-blue" onclick="showToast('UTM链接已复制')">复制链接</button></td></tr>
-              <tr><td style="color:#F8F6F0">直接流量</td><td style="font-family:monospace;color:#C8A96E">direct</td><td style="font-family:monospace;color:#C8A96E">none</td><td style="font-family:monospace;color:#C8A96E">gangtise_direct_2026</td><td><button class="btn-sm-blue" onclick="showToast('UTM链接已复制')">复制链接</button></td></tr>
-            </tbody>
+            <tbody id="admin-channel-utm-tbody"><tr><td colspan="5" style="color:#8899aa">正在加载真实渠道字段。</td></tr></tbody>
           </table>
         </div>
       </div><!-- end section-channels -->
@@ -4229,7 +4244,7 @@
             </div>
           </div>
 
-          <div class="kpi-row" style="margin-bottom:20px">
+          <div class="kpi-row" style="margin-bottom:20px" id="funnel-kpi-cards">
             <div class="kpi-card">
               <div class="kpi-label">内容触达</div>
               <div class="kpi-value">6.8万</div>
@@ -4431,8 +4446,8 @@
         <div id="ds-revenue" class="dash-section">
           <div class="section-header">
             <div>
-              <div class="section-title">营收趋势</div>
-              <div class="section-subtitle">MRR/ARR、订阅分层、渠道营收全维度分析</div>
+              <div class="section-title">收益统计</div>
+              <div class="section-subtitle">与大V工作台统一：付费样本、租户单价与协同收入</div>
             </div>
           </div>
 
@@ -4440,39 +4455,17 @@
 
           <div class="charts-grid" style="margin-bottom:20px">
             <div class="chart-card">
-              <div class="chart-title">月度 MRR + 付费用户增长</div>
-              <div class="chart-subtitle">双轴图：左轴 MRR（元），右轴付费用户数</div>
+              <div class="chart-title">月度收入与付费样本</div>
+              <div class="chart-subtitle">按付费标注和租户当前单价统计</div>
               <div class="chart-container tall">
                 <canvas id="revGmvUsers"></canvas>
               </div>
             </div>
             <div class="chart-card">
-              <div class="chart-title">订阅层级收入结构</div>
-              <div class="chart-subtitle">免费/验证版/专业/机构试点各层月度收入堆叠</div>
+              <div class="chart-title">租户协同收入排行</div>
+              <div class="chart-subtitle">付费样本数 × 当前注册单价</div>
               <div class="chart-container tall">
-                <canvas id="revTierStack"></canvas>
-              </div>
-            </div>
-          </div>
-
-          <div class="charts-grid" style="margin-bottom:20px">
-            <div class="chart-card">
-              <div class="chart-title">渠道营收对比</div>
-              <div class="chart-subtitle">各渠道月度收入贡献（万元）</div>
-              <div class="chart-container">
-                <canvas id="revChannelBar"></canvas>
-              </div>
-            </div>
-            <div class="chart-card">
-              <div class="chart-title">Cohort 留存矩阵</div>
-              <div class="chart-subtitle">6个月队列留存率（%）</div>
-              <div style="overflow-x:auto;margin-top:12px">
-                <table class="cohort-table">
-                  <thead>
-                    <tr id="cohort-thead"></tr>
-                  </thead>
-                  <tbody id="cohort-tbody"></tbody>
-                </table>
+                <canvas id="revTenantBar"></canvas>
               </div>
             </div>
           </div>
@@ -5896,6 +5889,12 @@ function showSection(name, navEl) {
   if (name === 'hermes') {
     loadAdminHermesMemorySummary(false).catch((error) => showToast(error.message || '加载失败'));
   }
+  if (name === 'commission') {
+    loadAdminCommission().catch((error) => showToast(error.message || '收益数据加载失败'));
+  }
+  if (name === 'channels') {
+    loadAdminChannels().catch((error) => showToast(error.message || '渠道数据加载失败'));
+  }
   if (name === 'news-sources') {
     loadAdminNewsSources(false).catch((error) => showToast(error.message || '加载失败'));
   }
@@ -5945,6 +5944,32 @@ function showSection(name, navEl) {
     refreshAdminTokenUsage(false).catch((error) => showToast(error.message || '加载失败'));
   }
   updateAdminQuery(name);
+}
+
+function showHermesSubsection(tab, navEl) {
+  const allowed = new Set(['overview', 'usage', 'compute', 'memory', 'config']);
+  const nextTab = allowed.has(String(tab || '').trim()) ? String(tab).trim() : 'overview';
+  const labels = {overview: '总览', usage: '调用统计', compute: '算力与排行', memory: '记忆治理', config: '能力配置'};
+  const section = document.getElementById('section-hermes');
+  if (!section || section.style.display === 'none') {
+    showSection('hermes', navEl || document.querySelector(`[data-section="hermes"][data-hermes-subsection="${nextTab}"]`));
+  } else if (navEl) {
+    setActiveAdminNav(navEl);
+  }
+  document.querySelectorAll('[data-hermes-pane]').forEach((pane) => {
+    pane.style.display = pane.dataset.hermesPane === nextTab ? '' : 'none';
+  });
+  document.querySelectorAll('[data-hermes-tab]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.hermesTab === nextTab);
+  });
+  const pageTitle = document.getElementById('page-title');
+  if (pageTitle) pageTitle.textContent = `Hermes · ${labels[nextTab]}`;
+  const activeNav = document.querySelector(`[data-section="hermes"][data-hermes-subsection="${nextTab}"]`);
+  if (activeNav) setActiveAdminNav(activeNav);
+  const url = new URL(window.location.href);
+  url.searchParams.set('section', 'hermes');
+  url.searchParams.set('hermes_tab', nextTab);
+  window.history.replaceState({}, '', url);
 }
 
 function showAnalyticsSection(section) {
@@ -7935,6 +7960,93 @@ async function refreshAdminNewsSources(showMessage) {
   Object.assign(adminNewsSources, data.news_sources || {});
   renderAdminNewsSources();
   if (showMessage !== false) showToast(`已刷新 ${Number(adminNewsSources.total_events || 0)} 条真实新闻事件`);
+}
+
+function formatCommissionAmount(value) {
+  return `¥${Number(value || 0).toLocaleString('zh-CN', {minimumFractionDigits: 0, maximumFractionDigits: 2})}`;
+}
+
+function renderAdminCommission(payload) {
+  const data = payload || {};
+  const setText = (id, value) => {
+    const node = document.getElementById(id);
+    if (node) node.textContent = value;
+  };
+  setText('admin-commission-pending', formatCommissionAmount(data.pending_total));
+  setText('admin-commission-settled', formatCommissionAmount(data.settled_total));
+  setText('admin-commission-advisor-count', String(data.advisor_count || 0));
+  setText('admin-commission-average', formatCommissionAmount(data.average_payable));
+  const host = document.getElementById('admin-commission-tbody');
+  if (!host) return;
+  const rows = Array.isArray(data.rows) ? data.rows : [];
+  host.innerHTML = rows.map((row) => `
+    <tr>
+      <td><input type="checkbox" style="accent-color:#C8A96E" ${row.payable > 0 ? '' : 'disabled'}></td>
+      <td style="color:#F8F6F0;font-weight:600">${escapeHtml(row.advisor || '--')}<div style="font-size:11px;color:#8899aa;margin-top:4px">${escapeHtml(row.tenant_name || row.tenant_slug || '')}</div></td>
+      <td><span class="tier-s">${escapeHtml(row.tier || '未分层')}</span></td>
+      <td>${escapeHtml(row.source || '--')}<div style="font-size:11px;color:#8899aa;margin-top:4px">${Number(row.paid_count || 0)} 位付费用户</div></td>
+      <td>${formatCommissionAmount(row.revenue)}<div style="font-size:11px;color:#8899aa;margin-top:4px">单价 ${formatCommissionAmount(row.registration_price)}</div></td>
+      <td>${Number(row.share_rate || 0).toFixed(2)}%</td>
+      <td style="color:#C8A96E">${formatCommissionAmount(row.payable)}</td>
+      <td>${row.status === '待结算' ? '<span class="status-gold">待结算</span>' : '<span class="status-blue">暂无应结算</span>'}</td>
+      <td><button class="btn-outline" style="padding:3px 9px;font-size:11px" onclick="showToast('结算流水功能尚未启用，当前仅展示真实应结算估算')">查看口径</button></td>
+    </tr>
+  `).join('') || '<tr><td colspan="9" style="color:#8899aa">当前没有租户或真实付费数据。</td></tr>';
+}
+
+async function loadAdminCommission() {
+  const resp = await fetch('/api/admin/commission');
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) throw new Error((data && data.error) || '收益数据加载失败');
+  renderAdminCommission(data.commission || {});
+}
+
+function renderAdminChannels(payload) {
+  const data = payload || {};
+  const setText = (id, value) => {
+    const node = document.getElementById(id);
+    if (node) node.textContent = value;
+  };
+  setText('admin-channel-active-count', String(data.active_channels || 0));
+  setText('admin-channel-new-users', String(data.new_users_month || 0));
+  setText('admin-channel-conversion', `${Number(data.conversion || 0).toFixed(1)}%`);
+  const rows = Array.isArray(data.rows) ? data.rows : [];
+  const host = document.getElementById('admin-channel-data-tbody');
+  if (host) {
+    host.innerHTML = rows.map((row) => `
+      <tr>
+        <td style="color:#F8F6F0;font-weight:600">${escapeHtml(row.name || '--')}</td>
+        <td>${Number(row.users || 0).toLocaleString('zh-CN')}</td>
+        <td>${Number(row.new_users_month || 0).toLocaleString('zh-CN')}</td>
+        <td>${Number(row.paid_users || 0).toLocaleString('zh-CN')}</td>
+        <td>${Number(row.conversion || 0).toFixed(1)}%</td>
+        <td style="color:#C8A96E">¥${Number(row.revenue || 0).toLocaleString('zh-CN')}</td>
+        <td>¥${Number(row.average_paid_value || 0).toLocaleString('zh-CN')}</td>
+        <td>--</td>
+        <td>--</td>
+        <td><span class="tag ${row.users > 0 ? 'tag-green' : 'tag-blue'}">${escapeHtml(row.status || '无数据')}</span></td>
+      </tr>
+    `).join('') || '<tr><td colspan="10" style="color:#8899aa">用户表中暂无渠道数据。</td></tr>';
+  }
+  const utmHost = document.getElementById('admin-channel-utm-tbody');
+  if (utmHost) {
+    utmHost.innerHTML = rows.map((row) => `
+      <tr>
+        <td style="color:#F8F6F0;font-weight:600">${escapeHtml(row.name || '--')}</td>
+        <td style="font-family:monospace;color:#C8A96E">${escapeHtml(row.name || '--')}</td>
+        <td style="font-family:monospace;color:#C8A96E">${Number(row.users || 0) > 0 ? 'user.source_label' : '--'}</td>
+        <td style="font-family:monospace;color:#C8A96E">${Number(row.new_users_month || 0).toLocaleString('zh-CN')} 条本月记录</td>
+        <td><span class="tag ${row.users > 0 ? 'tag-green' : 'tag-blue'}">${row.users > 0 ? '已入用户表' : '暂无记录'}</span></td>
+      </tr>
+    `).join('') || '<tr><td colspan="5" style="color:#8899aa">暂无渠道字段记录。</td></tr>';
+  }
+}
+
+async function loadAdminChannels() {
+  const resp = await fetch('/api/admin/channels');
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) throw new Error((data && data.error) || '渠道数据加载失败');
+  renderAdminChannels(data.channels || {});
 }
 
 async function toggleAdminIndicator(indicatorId, enabled) {
@@ -11363,6 +11475,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const normalizedSection = normalizeAdminSection(section || '');
   if (normalizedSection.section && sectionTitles[normalizedSection.section]) {
     showSection(section);
+    if (normalizedSection.section === 'hermes') {
+      const hermesTab = new URLSearchParams(window.location.search).get('hermes_tab') || 'overview';
+      showHermesSubsection(hermesTab);
+    }
     return;
   }
   initForecastEditorEvents();
