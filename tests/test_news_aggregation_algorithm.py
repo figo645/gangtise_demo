@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
 from src.domain.core_services import normalize_tenant_config
@@ -124,6 +125,103 @@ function rankNews(input) {
         self.assertEqual(macro_rank["bucket"], "other")
         self.assertEqual(major_rank["bucket"], "major_market")
         self.assertEqual(sector_rank["bucket"], "watchlist_sector")
+
+    def test_news_feed_uses_the_inclusive_three_day_window(self):
+        now = datetime(2026, 8, 8, 12, 0, 0)
+        items = [
+            {"title": "窗口内新闻", "published_at": (now - timedelta(days=3)).isoformat()},
+            {"title": "窗口外旧新闻", "published_at": (now - timedelta(days=3, seconds=1)).isoformat()},
+            {"title": "窗口内未来校验", "published_at": (now + timedelta(days=3)).isoformat()},
+            {"title": "窗口外未来新闻", "published_at": (now + timedelta(days=3, seconds=1)).isoformat()},
+        ]
+        with patch.object(market_services, "_aggregate_real_news_sources", return_value={"items": items}), patch.object(
+            market_services, "datetime"
+        ) as datetime_mock:
+            datetime_mock.now.return_value = now
+            datetime_mock.fromisoformat.side_effect = datetime.fromisoformat
+            ranked = market_services.gen_news_feed(tenant={"slug": "laowang"}, watchlist_details=[])
+
+        self.assertEqual({item["title"] for item in ranked}, {"窗口内新闻", "窗口内未来校验"})
+
+    def test_news_feed_refreshes_stale_cache_when_window_has_no_items(self):
+        now = datetime(2026, 8, 8, 12, 0, 0)
+        stale = [{"title": "旧缓存新闻", "published_at": (now - timedelta(days=10)).isoformat()}]
+        fresh = [{"title": "刷新后的新闻", "published_at": (now - timedelta(days=1)).isoformat()}]
+        with patch.object(
+            market_services,
+            "_aggregate_real_news_sources",
+            side_effect=[{"items": stale}, {"items": fresh}],
+        ) as aggregate_mock, patch.object(market_services, "datetime") as datetime_mock:
+            datetime_mock.now.return_value = now
+            datetime_mock.fromisoformat.side_effect = datetime.fromisoformat
+            ranked = market_services.gen_news_feed(tenant={"slug": "laowang"}, watchlist_details=[])
+
+        self.assertEqual([item["title"] for item in ranked], ["刷新后的新闻"])
+        aggregate_mock.assert_any_call(force_refresh=True)
+
+    def test_news_feed_refreshes_empty_cache_instead_of_returning_no_news(self):
+        now = datetime(2026, 8, 8, 12, 0, 0)
+        fresh = [{"title": "实时来源新闻", "published_at": (now - timedelta(days=1)).isoformat()}]
+        with patch.object(
+            market_services,
+            "_aggregate_real_news_sources",
+            side_effect=[{"cached_at": now.isoformat(), "items": []}, {"items": fresh}],
+        ) as aggregate_mock, patch.object(market_services, "datetime") as datetime_mock:
+            datetime_mock.now.return_value = now
+            datetime_mock.fromisoformat.side_effect = datetime.fromisoformat
+            ranked = market_services.gen_news_feed(tenant={"slug": "laowang"}, watchlist_details=[])
+
+        self.assertEqual([item["title"] for item in ranked], ["实时来源新闻"])
+        aggregate_mock.assert_any_call(force_refresh=True)
+
+    def test_transient_source_failure_is_not_permanently_excluded(self):
+        with patch.object(
+            market_services,
+            "_load_json_app_setting",
+            return_value={"excluded_codes": ["gov_cn_policy"]},
+        ):
+            active = market_services._load_active_news_source_whitelist()
+        self.assertIn("gov_cn_policy", {item["code"] for item in active})
+
+        saved = []
+        with patch.object(market_services, "_load_json_app_setting", return_value={}), patch.object(
+            market_services, "_save_json_app_setting", side_effect=lambda key, value: saved.append(value)
+        ):
+            market_services._persist_news_source_exclusions([
+                {
+                    "source": {"code": "gov_cn_policy"},
+                    "included": False,
+                    "count": 0,
+                    "reason": "<urlopen error temporary network failure>",
+                }
+            ])
+        self.assertEqual(saved, [])
+
+    def test_admin_news_source_payload_exposes_governed_runtime_status(self):
+        aggregate_payload = {
+            "cached_at": "2026-08-08T02:00:00",
+            "items": [{"title": "真实事件"}],
+            "sources": [
+                {
+                    "code": "gov_cn_policy",
+                    "included": True,
+                    "count": 20,
+                    "reason": "已达到来源纳入门槛",
+                },
+            ],
+        }
+        with patch.object(market_services, "_aggregate_real_news_sources", return_value=aggregate_payload), patch.object(
+            market_services, "_load_json_app_setting", return_value={"excluded_codes": ["gov_cn_policy"]}
+        ):
+            payload = market_services.build_admin_news_source_payload()
+
+        self.assertEqual(payload["min_items"], 5)
+        self.assertEqual(payload["total_events"], 1)
+        self.assertEqual(payload["active_sources"], len(market_services.NEWS_SOURCE_WHITELIST))
+        source = next(item for item in payload["sources"] if item["code"] == "gov_cn_policy")
+        self.assertTrue(source["active"])
+        self.assertTrue(source["historical_exclusion"])
+        self.assertTrue(source["last_fetch_included"])
 
     def test_homepage_selection_prioritizes_related_news_and_limits_source_concentration(self):
         ranked = [

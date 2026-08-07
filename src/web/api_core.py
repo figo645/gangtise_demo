@@ -758,6 +758,21 @@ def api_admin_indicator_sources():
     return jsonify({"ok": True, "sources": list_indicator_source_defs(indicator_code=indicator_code)})
 
 
+@app.route("/api/admin/news-sources")
+def api_admin_news_sources():
+    return jsonify({"ok": True, "news_sources": build_admin_news_source_payload()})
+
+
+@app.route("/api/admin/news-sources/refresh", methods=["POST"])
+def api_admin_refresh_news_sources():
+    try:
+        payload = build_admin_news_source_payload(force_refresh=True)
+    except Exception:
+        app.logger.exception("Failed to refresh real news sources")
+        return jsonify({"ok": False, "error": "news_source_refresh_failed"}), 503
+    return jsonify({"ok": True, "news_sources": payload})
+
+
 @app.route("/api/admin/indicator-sources", methods=["POST"])
 def api_save_admin_indicator_source():
     body = request.get_json(silent=True) or {}

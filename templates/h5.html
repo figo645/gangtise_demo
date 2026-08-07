@@ -5129,6 +5129,7 @@ let reviewTriggerDraft = {
   voiceTranscript: '',
   manualHtml: '',
   fileText: '',
+  fileName: '',
   aiPrompt: '',
   promptTags: [],
   generatedPreviewText: '',
@@ -6721,7 +6722,8 @@ function ensureTenantReviewRuntime(tenantId) {
       lastReviewPeriod: 'day',
       latestVoiceTranscript: '系统已转写语音口述：今天先保留 AI 算力和港股互联网两条主线，个股上继续盯中芯国际订单兑现、腾讯回购节奏和贵州茅台稳健配置逻辑。',
       latestManualHtml: '<p><strong>市场主线</strong></p><p>今天先讲主线，不把所有盘面噪音都写进去。</p><p><strong>重点个股</strong></p><p>中芯国际看订单兑现，腾讯看回购与财报，茅台继续偏稳健配置。</p>',
-      latestFileText: '系统已从上传文件中提炼文案：保留行业主线、估值带、催化条件和不确定项，整理为可直接进入复盘的结构化文本。',
+      latestFileText: '',
+      latestFileName: '',
       latestReviewTitle: '',
       latestAiPrompt: '保持大V自己的判断口吻，适度精简，但不要改动原始观点。',
       latestPromptTags: ['适合粉丝阅读'],
@@ -7217,7 +7219,9 @@ function openReviewWatchlistSelector() {
   }
   reviewWatchlistSelectionMode = true;
   reviewTriggerDraft.period = currentReviewPeriod;
-  reviewTriggerDraft.selectedWatchlist = getDavReviewSelectedWatchlist(user.tenant.id).slice(0);
+  // The selector belongs to the current review draft; previous review
+  // selections must not be submitted unless the user selects them again.
+  reviewTriggerDraft.selectedWatchlist = [];
   switchTab('market');
   renderReviewWatchlistSelectionMode();
   showToast('请选择本次复盘要纳入的自选股');
@@ -7356,26 +7360,25 @@ function selectReviewPeriod(period) {
 
 function openReviewTriggerModal(sourceMode) {
   const user = getActiveDemoUser();
-  const runtime = ensureTenantReviewRuntime(user.tenant.id);
-  const existingSelected = Array.isArray(reviewTriggerDraft.selectedWatchlist) ? reviewTriggerDraft.selectedWatchlist.slice(0) : [];
   reviewTriggerDraft.period = currentReviewPeriod;
   if (sourceMode && REVIEW_SOURCE_OPTIONS.some(item => item.value === sourceMode)) {
     reviewTriggerDraft.sourceMode = sourceMode;
   }
-  reviewTriggerDraft.paragraphMode = runtime.paragraphMode || reviewTriggerDraft.paragraphMode;
-  reviewTriggerDraft.selectedWatchlist = (sourceMode === 'stocks' && existingSelected.length)
-    ? existingSelected
-    : (user.role === 'dav'
-      ? (Array.isArray(runtime.kolSelectedWatchlist) ? runtime.kolSelectedWatchlist.slice(0) : [])
-      : getTenantWatchlistFocus(user.tenant.id).slice(0));
-  reviewTriggerDraft.voiceTranscript = runtime.latestVoiceTranscript || '';
-  reviewTriggerDraft.manualHtml = runtime.latestManualHtml || '';
-  reviewTriggerDraft.fileText = runtime.latestFileText || '';
-  reviewTriggerDraft.reviewTitle = runtime.latestReviewTitle || '';
-  reviewTriggerDraft.aiPrompt = runtime.latestAiPrompt || '';
-  reviewTriggerDraft.promptTags = Array.isArray(runtime.latestPromptTags) ? runtime.latestPromptTags.slice(0) : [];
-  reviewTriggerDraft.generatedPreviewText = runtime.latestGeneratedPreviewText || '';
-  reviewTriggerDraft.draftReviewText = runtime.latestDraftReviewText || runtime.latestGeneratedPreviewText || '';
+  // "New review" starts a clean draft. Previous content remains available in
+  // published history, but must never become hidden input to the next run.
+  reviewTriggerDraft.paragraphMode = 'manual';
+  reviewTriggerDraft.selectedWatchlist = user.role === 'dav'
+    ? []
+    : getTenantWatchlistFocus(user.tenant.id).slice(0);
+  reviewTriggerDraft.voiceTranscript = '';
+  reviewTriggerDraft.manualHtml = '';
+  reviewTriggerDraft.fileText = '';
+  reviewTriggerDraft.fileName = '';
+  reviewTriggerDraft.reviewTitle = '';
+  reviewTriggerDraft.aiPrompt = '';
+  reviewTriggerDraft.promptTags = [];
+  reviewTriggerDraft.generatedPreviewText = '';
+  reviewTriggerDraft.draftReviewText = '';
   reviewTriggerDraft.flowStage = 'intake';
   reviewTriggerDraft.optimizeRuleMode = 'default';
   reviewTriggerDraft.skipAiProcessing = true;
@@ -7416,6 +7419,7 @@ let reviewVoiceRecorder = null;
 let reviewVoiceChunks = [];
 let reviewVoiceRecording = false;
 let reviewVoiceUploading = false;
+let reviewFileUploading = false;
 let reviewIngestResult = null;
 let reviewDraftGenerating = false;
 let reviewDraftJobState = null;
@@ -7955,11 +7959,11 @@ function renderReviewInputPanel() {
       <div class="review-intake-panel">
         ${titleField}
         <div class="review-intake-toolbar">
-          <div class="knowledge-record-status">上传文件后，系统会自动提炼成可用文案</div>
-          <button class="review-input-button" onclick="captureReviewFileInput()">上传文件</button>
+          <div class="knowledge-record-status">${reviewFileUploading ? '正在解析文件...' : '支持 PDF、Word、Excel，解析后可继续编辑'}</div>
+          <button class="review-input-button" ${reviewFileUploading ? 'disabled' : ''} onclick="captureReviewFileInput()">${reviewFileUploading ? '解析中...' : '点击上传文件'}</button>
         </div>
         <div class="review-intake-result">
-          <div class="review-intake-result-title">抽取文案</div>
+          <div class="review-intake-result-title">${reviewTriggerDraft.fileName ? `已解析：${escapeHtml(reviewTriggerDraft.fileName)}` : '解析文案'}</div>
           <div class="review-intake-result-text">${escapeHtml(reviewTriggerDraft.fileText || '完成文件上传后，这里会展示抽取后的复盘文案。')}</div>
         </div>
       </div>
@@ -8449,6 +8453,7 @@ function persistReviewDraftRuntime(runtime) {
   runtime.latestVoiceTranscript = reviewTriggerDraft.voiceTranscript;
   runtime.latestManualHtml = reviewTriggerDraft.manualHtml;
   runtime.latestFileText = reviewTriggerDraft.fileText;
+  runtime.latestFileName = reviewTriggerDraft.fileName || '';
   runtime.latestReviewTitle = reviewTriggerDraft.reviewTitle || '';
   runtime.latestAiPrompt = reviewTriggerDraft.aiPrompt;
   runtime.latestPromptTags = (reviewTriggerDraft.promptTags || []).slice(0);
@@ -8536,16 +8541,50 @@ function captureReviewVoiceInput() {
 }
 
 function captureReviewFileInput() {
-  reviewTriggerDraft.fileText = '系统已从上传文件提炼文案：行业层面保留 AI 算力、半导体和港股互联网三条线，个股层面补充估值带、催化条件和风险边界，已整理为复盘草稿输入。';
-  reviewTriggerDraft.manualHtml = mergePlainTextIntoRichHtml(reviewTriggerDraft.manualHtml || '', reviewTriggerDraft.fileText || '');
-  reviewTriggerDraft.sourceMode = 'manual';
-  reviewTriggerDraft.previewReady = false;
-  reviewTriggerDraft.generatedPreviewText = '';
-  reviewTriggerDraft.draftReviewText = '';
-  reviewTriggerDraft.flowStage = 'intake';
-  reviewStructuredPreview = null;
-  renderReviewTriggerModal(getActiveDemoUser());
-  showToast('文件已转成文案，可继续手动修改');
+  if (reviewFileUploading) return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.docx,.xlsx,.xlsm,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel';
+  input.onchange = async () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    syncReviewDraftFromModal();
+    reviewFileUploading = true;
+    renderReviewTriggerModal(getActiveDemoUser());
+    try {
+      const formData = new FormData();
+      formData.append('file', file, file.name);
+      const response = await fetch('/api/kol/knowledge/file-preview', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        throw new Error((data && data.error) || `文件解析失败：${file.name}`);
+      }
+      const preview = data.preview || {};
+      const extractedText = String(preview.body || preview.summary || '').trim();
+      if (!extractedText) throw new Error('文件未提取到可用文本，请更换文件或检查文件内容');
+      reviewTriggerDraft.fileName = String(preview.filename || file.name);
+      reviewTriggerDraft.fileText = extractedText;
+      // Parsed material becomes editable review input; it is sent to the LLM
+      // only after the user confirms the text and starts Draft generation.
+      reviewTriggerDraft.manualHtml = mergePlainTextIntoRichHtml(reviewTriggerDraft.manualHtml || '', reviewTriggerDraft.fileText || '');
+      reviewTriggerDraft.sourceMode = 'manual';
+      reviewTriggerDraft.previewReady = false;
+      reviewTriggerDraft.generatedPreviewText = '';
+      reviewTriggerDraft.draftReviewText = '';
+      reviewTriggerDraft.flowStage = 'intake';
+      reviewStructuredPreview = null;
+      showToast('文件已解析为文本，可继续编辑后生成 Draft');
+    } catch (error) {
+      showToast(error.message || '文件解析失败');
+    } finally {
+      reviewFileUploading = false;
+      renderReviewTriggerModal(getActiveDemoUser());
+    }
+  };
+  input.click();
 }
 
 function toggleReviewPromptTag(tag) {

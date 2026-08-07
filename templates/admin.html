@@ -2104,6 +2104,9 @@
           <div class="admin-nav-item" data-section="indicator-sources" data-feature="analytics_module" onclick="showSection('indicator-sources', this)">
             <span class="admin-nav-icon">&#128279;</span> API 源接入
           </div>
+          <div class="admin-nav-item" data-section="news-sources" data-feature="analytics_module" onclick="showSection('news-sources', this)">
+            <span class="admin-nav-icon">&#128240;</span> 新闻数据源
+          </div>
           <div class="admin-nav-item" data-section="indicator-definitions" data-feature="analytics_module" onclick="showSection('indicator-definitions', this)">
             <span class="admin-nav-icon">&#128451;</span> 指标定义
           </div>
@@ -3206,6 +3209,37 @@
           </div>
         </div>
       </div><!-- end section-indicator-sources -->
+
+      <div id="section-news-sources" style="display:none">
+        <div class="section-header">
+          <div>
+            <div class="section-title">新闻数据源</div>
+            <div class="section-subtitle">管理基本面所消费的事件型真实数据源，以及公开信息清洗后的入湖状态。</div>
+          </div>
+          <button class="btn-sm-blue" type="button" onclick="refreshAdminNewsSources(true)">刷新真实数据</button>
+        </div>
+        <div class="indicator-page-meta">
+          <div class="indicator-page-copy">新闻源与行情 API 分开治理。仅已完成准入验证、单源有效信息不少于 5 条的官方公开来源才可进入基本面新闻池；刷新只重新抓取和清洗，不生成演示内容。</div>
+          <div class="indicator-page-tags">
+            <span class="indicator-page-tag" id="admin-news-source-active-count">-- 个已准入</span>
+            <span class="indicator-page-tag" id="admin-news-source-event-count">-- 条入湖事件</span>
+            <span class="indicator-page-tag" id="admin-news-source-cache-at">等待加载</span>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <div class="table-header">
+            <div>
+              <div class="table-title">来源准入与抓取状态</div>
+              <div style="font-size:12px;color:#8899aa;margin-top:6px">可查看每个来源的类别、指标映射、准入样本量及最近抓取结果。</div>
+            </div>
+            <span class="tag tag-blue">事件型数据</span>
+          </div>
+          <table>
+            <thead><tr><th>来源</th><th>类别</th><th>固定指标</th><th>准入样本</th><th>最近抓取</th><th>状态</th><th>说明</th></tr></thead>
+            <tbody id="admin-news-source-tbody"><tr><td colspan="7" style="color:#8899aa">正在加载新闻源状态。</td></tr></tbody>
+          </table>
+        </div>
+      </div><!-- end section-news-sources -->
 
       <div id="section-indicator-definitions" style="display:none">
         <div class="section-header">
@@ -5669,6 +5703,7 @@ const sectionTitles = {
   'indicator-lake':'指标专区 · 数据湖指标',
   'indicator-anomalies':'指标专区 · 异动报告',
   'indicator-sources':'指标专区 · API 源接入',
+  'news-sources':'指标专区 · 新闻数据源',
   'indicator-definitions':'指标专区 · 指标定义',
   'indicator-pipeline':'指标专区 · 清洗流水线',
   analytics:'数据分析',
@@ -5861,6 +5896,9 @@ function showSection(name, navEl) {
   if (name === 'hermes') {
     loadAdminHermesMemorySummary(false).catch((error) => showToast(error.message || '加载失败'));
   }
+  if (name === 'news-sources') {
+    loadAdminNewsSources(false).catch((error) => showToast(error.message || '加载失败'));
+  }
   if (name === 'forecast-model') {
     initForecastEditorEvents();
     loadAdminForecastModel().catch((error) => showToast(error.message || '加载失败'));
@@ -6006,6 +6044,7 @@ const adminIndicatorHub = JSON.parse(JSON.stringify(window.ADMIN_INDICATOR_HUB |
   recent_tests: [],
   load_batches: []
 }));
+const adminNewsSources = {};
 const adminTaskCenter = JSON.parse(JSON.stringify(window.ADMIN_TASK_CENTER || {
   summary: {total: 0, enabled: 0, running: 0, failed: 0},
   tasks: [],
@@ -7846,6 +7885,56 @@ async function refreshAdminIndicatorHub(showMessage) {
   Object.assign(adminIndicatorHub, data.hub || {});
   renderAdminIndicatorHubAll();
   if (showMessage !== false) showToast('指标湖数据已刷新');
+}
+
+function renderAdminNewsSources() {
+  const host = document.getElementById('admin-news-source-tbody');
+  const rows = Array.isArray(adminNewsSources.sources) ? adminNewsSources.sources : [];
+  const activeNode = document.getElementById('admin-news-source-active-count');
+  const eventNode = document.getElementById('admin-news-source-event-count');
+  const cacheNode = document.getElementById('admin-news-source-cache-at');
+  if (activeNode) activeNode.textContent = `${Number(adminNewsSources.active_sources || 0)} 个已准入`;
+  if (eventNode) eventNode.textContent = `${Number(adminNewsSources.total_events || 0)} 条入湖事件`;
+  if (cacheNode) cacheNode.textContent = adminNewsSources.cached_at ? `最近抓取 ${adminNewsSources.cached_at}` : '尚未完成真实抓取';
+  if (!host) return;
+  host.innerHTML = rows.map((source) => {
+    const status = source.last_fetch_included
+      ? '<span class="tag tag-green">已入湖</span>'
+      : (source.last_fetch_count > 0 ? '<span class="tag tag-gold">待清洗</span>' : '<span class="tag tag-red">待抓取</span>');
+    const reason = source.last_fetch_reason || '等待首次抓取';
+    return `<tr>
+      <td><span style="color:#F8F6F0;font-weight:600">${escapeHtml(source.name || source.code || '--')}</span><div style="font-size:11px;color:#8899aa;margin-top:4px">${escapeHtml(source.code || '')}</div></td>
+      <td>${escapeHtml(source.category || '--')}<div style="font-size:11px;color:#8899aa;margin-top:4px">${escapeHtml(source.source_group || '')}</div></td>
+      <td style="color:#C8A96E">${escapeHtml(source.indicator_code || '--')}</td>
+      <td>${escapeHtml(String(source.admission_count || 0))} 条</td>
+      <td>${escapeHtml(String(source.last_fetch_count || 0))} 条</td>
+      <td>${status}</td>
+      <td style="max-width:340px;color:#8899aa">${escapeHtml(reason)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" style="color:#8899aa">未配置新闻数据源。</td></tr>';
+}
+
+async function loadAdminNewsSources(showMessage) {
+  const resp = await fetch('/api/admin/news-sources');
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) throw new Error((data && data.error) || '新闻源加载失败');
+  Object.keys(adminNewsSources).forEach((key) => delete adminNewsSources[key]);
+  Object.assign(adminNewsSources, data.news_sources || {});
+  renderAdminNewsSources();
+  if (showMessage) showToast('新闻数据源已加载');
+}
+
+async function refreshAdminNewsSources(showMessage) {
+  const resp = await fetch('/api/admin/news-sources/refresh', { method: 'POST' });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    showToast((data && data.error) || '真实新闻刷新失败');
+    return;
+  }
+  Object.keys(adminNewsSources).forEach((key) => delete adminNewsSources[key]);
+  Object.assign(adminNewsSources, data.news_sources || {});
+  renderAdminNewsSources();
+  if (showMessage !== false) showToast(`已刷新 ${Number(adminNewsSources.total_events || 0)} 条真实新闻事件`);
 }
 
 async function toggleAdminIndicator(indicatorId, enabled) {
@@ -10857,7 +10946,7 @@ function renderSiteConfigForm() {
   if (channelsSection && !isAdminFeatureEnabled('channel_module') && channelsSection.style.display !== 'none') {
     showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
   }
-  ['section-indicator-overview', 'section-indicator-smart', 'section-indicator-lake', 'section-indicator-anomalies', 'section-indicator-sources', 'section-indicator-definitions', 'section-indicator-pipeline'].forEach((id) => {
+  ['section-indicator-overview', 'section-indicator-smart', 'section-indicator-lake', 'section-indicator-anomalies', 'section-indicator-sources', 'section-news-sources', 'section-indicator-definitions', 'section-indicator-pipeline'].forEach((id) => {
     const section = document.getElementById(id);
     if (section && !isAdminFeatureEnabled('analytics_module') && section.style.display !== 'none') {
       showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));

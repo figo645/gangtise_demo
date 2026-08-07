@@ -83,6 +83,49 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertNotIn("function toggleReviewSkipAiProcessing", html)
         self.assertNotIn("不使用大模型处理", html)
 
+    def test_given_h5_review_file_input_when_uploaded_then_real_parser_handoff_exists(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("input.accept = '.pdf,.docx,.xlsx,.xlsm", html)
+        self.assertIn("/api/kol/knowledge/file-preview", html)
+        self.assertIn("new FormData()", html)
+        self.assertIn("文件已解析为文本，可继续编辑后生成 Draft", html)
+        self.assertNotIn("系统已从上传文件提炼文案：行业层面保留 AI 算力", html)
+
+    def test_given_new_review_when_opened_on_h5_and_workbench_then_previous_input_is_not_reused(self):
+        h5 = self.client.get(f"/h5?tenant={self.tenant_slug}").get_data(as_text=True)
+        workbench = self.client.get(f"/kol-workbench?tenant={self.tenant_slug}").get_data(as_text=True)
+        for html in (h5, workbench):
+            self.assertIn("selectedWatchlist = []", html)
+            self.assertIn("fileText = ''", html)
+        self.assertIn("Previous content remains available in", h5)
+        self.assertIn("every new review starts with an", workbench)
+
+    def test_given_review_without_watchlist_when_preview_is_composed_then_watchlist_analysis_is_skipped(self):
+        summary_result = {
+            "summary": "仅根据上传材料归纳市场主线和风险边界。",
+            "llm_model": {"stage": "user_input_summary", "model_name": "demo-summary"},
+        }
+        with patch("src.domain.ai_services.summarize_review_user_input_with_llm", return_value=summary_result), patch(
+            "src.domain.ai_services.analyze_review_watchlist_with_llm"
+        ) as watchlist_mock:
+            preview = ai_services.compose_review_structured_preview(
+                source_text="上传材料：本期重点观察订单兑现和风险边界。",
+                review_period="day",
+                source_mode="file",
+                selected_watchlist=[],
+                speaker_name="财经老王",
+                entry_point="test_review_file_without_watchlist",
+                tenant_slug=self.tenant_slug,
+            )
+
+        watchlist_mock.assert_not_called()
+        self.assertEqual(preview["review_summary"], summary_result["summary"])
+        self.assertEqual(preview["watchlist_analysis_section"]["items"], [])
+        self.assertNotIn("自选股归纳分析", preview["final_text"])
+
     def test_given_h5_review_preview_when_rendered_then_preview_uses_article_detail_view(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slug}")
 

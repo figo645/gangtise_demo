@@ -4,6 +4,7 @@ from src.domain.core_services import _load_json_app_setting, _save_json_app_sett
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from html.parser import HTMLParser
 from urllib.parse import urljoin
+from email.utils import parsedate_to_datetime
 import shutil
 import subprocess
 import threading
@@ -6050,6 +6051,7 @@ NEWS_LAKE_CACHE_KEY = "fundamental_news_lake:v1"
 NEWS_SOURCE_STATUS_KEY = "fundamental_news_source_status:v1"
 NEWS_LAKE_CACHE_TTL_SECONDS = 15 * 60
 NEWS_SOURCE_MIN_ITEMS = 5
+NEWS_AGGREGATION_WINDOW_DAYS = 3
 NEWS_ALGORITHM_KEY_PREFIX = "tenant_news_aggregation_algorithm:"
 NEWS_ALGORITHM_VERSION = "v3"
 NEWS_RULE_PLAN_VERSION = "v1"
@@ -6482,6 +6484,43 @@ def _rank_news_for_tenant(items, tenant=None, watchlist_details=None, algorithm_
     return sorted(ranked, key=lambda row: (int(row.get("relevance_score") or 0), str(row.get("published_at") or row.get("fetched_at") or "")), reverse=True)
 
 
+def _parse_news_timestamp(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        try:
+            parsed = parsedate_to_datetime(raw)
+        except (TypeError, ValueError, OverflowError):
+            try:
+                parsed = datetime.strptime(raw[:10], "%Y-%m-%d")
+            except ValueError:
+                return None
+    if parsed.tzinfo:
+        parsed = parsed.astimezone().replace(tzinfo=None)
+    return parsed
+
+
+def _filter_news_to_time_window(items, window_days=NEWS_AGGREGATION_WINDOW_DAYS, now=None):
+    """Keep news in the inclusive +/- calendar-day window around now."""
+    current = now or datetime.now()
+    days = max(0, int(window_days or NEWS_AGGREGATION_WINDOW_DAYS))
+    lower_bound = current - timedelta(days=days)
+    upper_bound = current + timedelta(days=days)
+    filtered = []
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        timestamp = _parse_news_timestamp(item.get("published_at") or item.get("fetched_at"))
+        # Sources without a publication timestamp are retained because their
+        # fetch timestamp is the only auditable time available in the lake.
+        if timestamp is None or lower_bound <= timestamp <= upper_bound:
+            filtered.append(item)
+    return filtered
+
+
 class _NewsAnchorCollector(HTMLParser):
     def __init__(self):
         super().__init__(convert_charrefs=True)
@@ -6590,13 +6629,17 @@ def _load_active_news_source_whitelist():
         for code in (state.get("excluded_codes") or [])
         if str(code).strip()
     } if isinstance(state, dict) else set()
+    source_map = {str(source.get("code") or "").strip(): source for source in NEWS_SOURCE_WHITELIST}
     return [
         copy.deepcopy(source)
         for source in NEWS_SOURCE_WHITELIST
-        # The catalog is frozen from the admission probe. A source that was
-        # already known to have fewer than five valid items must never be
-        # re-probed just to discover the same exclusion again.
-        if source["code"] not in excluded_codes
+        # Only a source whose catalog admission count is below the threshold
+        # is permanently excluded. Older runtime states may contain codes
+        # written during a transient network failure; those must recover.
+        if not (
+            source["code"] in excluded_codes
+            and int(source.get("validated_item_count") or 0) < NEWS_SOURCE_MIN_ITEMS
+        )
         and int(source.get("validated_item_count") or 0) >= NEWS_SOURCE_MIN_ITEMS
     ]
 
@@ -6606,6 +6649,7 @@ def _persist_news_source_exclusions(results):
         result["source"]["code"]
         for result in results
         if not result.get("included") and int(result.get("count") or 0) < NEWS_SOURCE_MIN_ITEMS
+        and str(result.get("reason") or "").startswith("有效信息")
     }
     if not newly_excluded:
         return
@@ -6628,9 +6672,9 @@ def _persist_news_source_exclusions(results):
         pass
 
 
-def _aggregate_real_news_sources():
+def _aggregate_real_news_sources(force_refresh=False):
     cached = _load_news_lake_cache()
-    if cached:
+    if cached and not force_refresh:
         return cached
     results = []
     active_sources = _load_active_news_source_whitelist()
@@ -6671,11 +6715,75 @@ def _aggregate_real_news_sources():
     return payload
 
 
+def build_admin_news_source_payload(force_refresh=False):
+    """Expose the event-news lake as a governed data-source domain for Admin."""
+    payload = _aggregate_real_news_sources(force_refresh=force_refresh)
+    cached_sources = {
+        str(item.get("code") or "").strip(): item
+        for item in (payload.get("sources") or [])
+        if isinstance(item, dict)
+    }
+    try:
+        status = _load_json_app_setting(NEWS_SOURCE_STATUS_KEY, {})
+    except Exception:
+        status = {}
+    historical_exclusions = {
+        str(code).strip()
+        for code in (status.get("excluded_codes") or [])
+        if str(code).strip()
+    } if isinstance(status, dict) else set()
+    rows = []
+    for source in NEWS_SOURCE_WHITELIST:
+        code = str(source.get("code") or "").strip()
+        runtime = cached_sources.get(code) or {}
+        admission_count = int(source.get("validated_item_count") or 0)
+        eligible = admission_count >= NEWS_SOURCE_MIN_ITEMS
+        rows.append({
+            "code": code,
+            "name": str(source.get("name") or code),
+            "category": str(source.get("category") or "其他"),
+            "source_group": str(source.get("source_group") or "其他"),
+            "url": str(source.get("url") or ""),
+            "indicator_code": str(source.get("indicator_code") or ""),
+            "admission_count": admission_count,
+            "eligible": eligible,
+            # A valid source is never made inactive solely by an old transient
+            # runtime exclusion record.
+            "active": eligible,
+            "historical_exclusion": code in historical_exclusions,
+            "last_fetch_count": int(runtime.get("count") or 0),
+            "last_fetch_included": bool(runtime.get("included")),
+            "last_fetch_reason": str(runtime.get("reason") or ("等待首次抓取" if not runtime else "")),
+        })
+    items = payload.get("items") or []
+    return {
+        "generated_at": now_ts(),
+        "cached_at": str(payload.get("cached_at") or ""),
+        "min_items": NEWS_SOURCE_MIN_ITEMS,
+        "cache_ttl_seconds": NEWS_LAKE_CACHE_TTL_SECONDS,
+        "total_sources": len(rows),
+        "active_sources": sum(1 for row in rows if row["active"]),
+        "included_sources": sum(1 for row in rows if row["last_fetch_included"]),
+        "total_events": len(items),
+        "sources": rows,
+    }
+
+
 def gen_news_feed(tenant=None, watchlist_details=None, algorithm_payload=None):
     try:
         payload = _aggregate_real_news_sources()
+        items = _filter_news_to_time_window(payload.get("items") or [])
+        # A cache created before the time-window rule can contain only older
+        # items. Refresh once so the new window does not turn a valid source
+        # into an empty homepage merely because the cache is still warm.
+        # An empty cache is also stale for this feature. It can be produced by
+        # a previous transient source outage and must not suppress future real
+        # source retries.
+        if not items and payload is not None:
+            refreshed = _aggregate_real_news_sources(force_refresh=True)
+            items = _filter_news_to_time_window(refreshed.get("items") or [])
         return _rank_news_for_tenant(
-            payload.get("items") or [],
+            items,
             tenant=tenant,
             watchlist_details=watchlist_details,
             algorithm_payload=algorithm_payload,

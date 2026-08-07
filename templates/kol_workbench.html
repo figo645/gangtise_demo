@@ -10262,6 +10262,27 @@ function kwRenderReviewStageResults() {
 }
 
 function kwOpenReviewTriggerModal(sourceMode) {
+  // Keep the Web workbench aligned with H5: every new review starts with an
+  // explicit user input and an empty watchlist selection.
+  kwReviewDraft.period = 'day';
+  kwReviewDraft.reviewTitle = '';
+  kwReviewDraft.selectedWatchlist = [];
+  kwReviewDraft.voiceTranscript = '';
+  kwReviewDraft.manualText = '';
+  kwReviewDraft.manualHtml = '';
+  kwReviewDraft.fileText = '';
+  kwReviewDraft.fileName = '';
+  kwReviewDraft.urlValue = '';
+  kwReviewDraft.urlTitle = '';
+  kwReviewDraft.urlText = '';
+  kwReviewDraft.aiPrompt = '';
+  kwReviewDraft.promptTags = [];
+  kwReviewDraft.generatedPreviewText = '';
+  kwReviewDraft.draftReviewText = '';
+  kwReviewDraft.finalDraftText = '';
+  kwReviewDraft.previewReady = false;
+  kwReviewDraft.flowStage = 'intake';
+  kwReviewStructuredPreview = null;
   if (sourceMode && KW_REVIEW_SOURCE_OPTIONS.some(item => item.value === sourceMode)) {
     kwReviewDraft.sourceMode = sourceMode;
   }
