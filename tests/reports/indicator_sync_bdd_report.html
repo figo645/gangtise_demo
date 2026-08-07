@@ -1,0 +1,1627 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>指标同步 BDD 测试报告</title>
+  <style>
+    :root {
+      --bg: #f4efe7;
+      --panel: #fffdf8;
+      --ink: #1d2a38;
+      --muted: #66778a;
+      --line: #dfd7ca;
+      --gold: #b5833a;
+      --green: #26734d;
+      --red: #b14432;
+      --blue: #2f74c0;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: linear-gradient(180deg, #f7f3ec 0%, #eef4fb 100%); color: var(--ink); font: 14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
+    main { max-width: 1360px; margin: 0 auto; padding: 28px 20px 56px; }
+    .hero { background: var(--panel); border: 1px solid var(--line); border-radius: 24px; padding: 24px 26px; box-shadow: 0 14px 48px rgba(22,34,48,0.08); }
+    h1 { margin: 0 0 8px; font-size: 34px; line-height: 1.05; }
+    .sub { color: var(--muted); margin: 0; }
+    .metrics { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 12px; margin-top: 18px; }
+    .metric { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px; }
+    .metric .name { color: var(--muted); font-size: 12px; }
+    .metric .value { font-size: 28px; font-weight: 800; margin-top: 6px; }
+    .section { margin-top: 20px; background: var(--panel); border: 1px solid var(--line); border-radius: 24px; padding: 20px; box-shadow: 0 10px 36px rgba(22,34,48,0.06); }
+    .section h2 { margin: 0 0 14px; font-size: 22px; }
+    .scenario-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .scenario { border: 1px solid var(--line); border-left: 5px solid var(--blue); border-radius: 18px; background: #fff; padding: 16px; }
+    .scenario.pass { border-left-color: var(--green); }
+    .scenario.fail { border-left-color: var(--red); }
+    .scenario-head { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
+    .scenario-head h3 { margin: 0; font-size: 18px; }
+    .pill { display: inline-flex; align-items: center; justify-content: center; min-width: 58px; padding: 5px 10px; border-radius: 999px; background: rgba(47,116,192,0.10); color: var(--blue); font-size: 12px; font-weight: 700; }
+    .scenario.pass .pill { background: rgba(38,115,77,0.12); color: var(--green); }
+    .scenario.fail .pill { background: rgba(177,68,50,0.12); color: var(--red); }
+    .bdd-line { margin-top: 8px; }
+    .detail { margin: 10px 0 0; color: var(--muted); }
+    details { margin-top: 10px; }
+    summary { cursor: pointer; color: var(--blue); font-weight: 700; }
+    pre { margin: 10px 0 0; padding: 12px; border-radius: 12px; background: #13202d; color: #ecf3fb; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #ece4d8; text-align: left; vertical-align: top; }
+    th { background: #f6efe3; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    code { font-size: 12px; }
+    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 980px) {
+      .metrics, .scenario-grid, .meta-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <h1>Gangtise 指标同步 BDD 测试报告</h1>
+      <p class="sub">生成时间：2026-07-23 11:19:31 · 租户：laowang · 真实同步 + 本地 DB 校验 + 前台 API 校验</p>
+      <div class="metrics">
+        <div class="metric"><div class="name">Scenario</div><div class="value">7</div></div>
+        <div class="metric"><div class="name">Pass</div><div class="value">7</div></div>
+        <div class="metric"><div class="name">Fail</div><div class="value">0</div></div>
+        <div class="metric"><div class="name">基础指标</div><div class="value">19</div></div>
+        <div class="metric"><div class="name">真实更新</div><div class="value">19</div></div>
+        <div class="metric"><div class="name">派生更新</div><div class="value">4</div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>BDD 场景</h2>
+      <div class="scenario-grid">
+        <article class="scenario pass">
+          <div class="scenario-head">
+            <h3>Given 凭证配置 When 请求 Gangtise 鉴权 Then 返回可用 token</h3>
+            <span class="pill">PASS</span>
+          </div>
+          <div class="bdd-line"><strong>Given</strong> 本地存在可复用的 Gangtise OpenAPI 凭证配置。</div>
+          <div class="bdd-line"><strong>When</strong> 执行一次真实鉴权并请求 access token。</div>
+          <div class="bdd-line"><strong>Then</strong> 系统能够拿到可用 token，后续同步可继续执行。</div>
+          <p class="detail">successful</p>
+          <details>
+            <summary>查看证据</summary>
+            <pre>{
+  &quot;ok&quot;: true,
+  &quot;http_status&quot;: 200,
+  &quot;duration_ms&quot;: 542,
+  &quot;message&quot;: &quot;successful&quot;
+}</pre>
+          </details>
+        </article>
+        
+        <article class="scenario pass">
+          <div class="scenario-head">
+            <h3>Given 指标源定义 When 检查 source defs Then 全部切到 Gangtise OpenAPI</h3>
+            <span class="pill">PASS</span>
+          </div>
+          <div class="bdd-line"><strong>Given</strong> 基础指标 source 定义已经迁移到统一指标层。</div>
+          <div class="bdd-line"><strong>When</strong> 读取数据库中的 indicator_source_defs。</div>
+          <div class="bdd-line"><strong>Then</strong> 所有基础指标 source 都应是 Gangtise OpenAPI 的 POST 配置。</div>
+          <p class="detail">共校验 19 / 19 个 source 定义。</p>
+          <details>
+            <summary>查看证据</summary>
+            <pre>[
+  {
+    &quot;indicator_code&quot;: &quot;source_bdi&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;path&quot;: &quot;/application/open-alternative/EDB/getData&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_brent&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;path&quot;: &quot;/application/open-alternative/EDB/getData&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_cpi&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;path&quot;: &quot;/application/open-alternative/EDB/getData&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_cyb&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;path&quot;: &quot;/application/open-quote/index/kline/daily&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_dji&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;path&quot;: &quot;/application/open-alternative/EDB/getData&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_gold&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;path&quot;: &quot;/application/open-alternative/EDB/getData&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_hs300&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;path&quot;: &quot;/application/open-quote/index/kline/daily&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_hsi&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;path&quot;: &quot;/application/open-alternative/EDB/getData&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_industry_index&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;path&quot;: &quot;/application/open-alternative/EDB/getData&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_kc50&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;path&quot;: &quot;/application/open-quote/index/kline/daily&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_nasdaq&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;path&quot;: &quot;/application/open-alternative/EDB/getData&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_news&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;path&quot;: &quot;/application/open-alternative/EDB/getData&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_nikkei&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;path&quot;: &quot;/application/open-alternative/EDB/getData&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_oil&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;path&quot;: &quot;/application/open-alternative/EDB/getData&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_shanghai_index&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;path&quot;: &quot;/application/open-quote/index/kline/daily&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_shenzhen_index&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;path&quot;: &quot;/application/open-quote/index/kline/daily&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_silver&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;path&quot;: &quot;/application/open-alternative/EDB/getData&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_sp500&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;path&quot;: &quot;/application/open-alternative/EDB/getData&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_sse50&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;path&quot;: &quot;/application/open-quote/index/kline/daily&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;
+  }
+]</pre>
+          </details>
+        </article>
+        
+        <article class="scenario pass">
+          <div class="scenario-head">
+            <h3>Given 每个基础指标源 When 逐一执行实时探测 Then 每个 source 都应可取到真实数据</h3>
+            <span class="pill">PASS</span>
+          </div>
+          <div class="bdd-line"><strong>Given</strong> 每个基础指标都已经映射到真实 Gangtise OpenAPI 路径。</div>
+          <div class="bdd-line"><strong>When</strong> 逐一执行 source probe。</div>
+          <div class="bdd-line"><strong>Then</strong> 所有 source 都应返回成功，不能只靠样例或 mock。</div>
+          <p class="detail">通过 19 / 19 个 source probe。</p>
+          <details>
+            <summary>查看证据</summary>
+            <pre>[
+  {
+    &quot;indicator_code&quot;: &quot;source_bdi&quot;,
+    &quot;success&quot;: true,
+    &quot;http_status&quot;: 200,
+    &quot;latency_ms&quot;: 928,
+    &quot;detail&quot;: &quot;Gangtise OpenAPI 接口测试成功。&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_brent&quot;,
+    &quot;success&quot;: true,
+    &quot;http_status&quot;: 200,
+    &quot;latency_ms&quot;: 624,
+    &quot;detail&quot;: &quot;Gangtise OpenAPI 接口测试成功。&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_cpi&quot;,
+    &quot;success&quot;: true,
+    &quot;http_status&quot;: 200,
+    &quot;latency_ms&quot;: 672,
+    &quot;detail&quot;: &quot;Gangtise OpenAPI 接口测试成功。&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_cyb&quot;,
+    &quot;success&quot;: true,
+    &quot;http_status&quot;: 200,
+    &quot;latency_ms&quot;: 608,
+    &quot;detail&quot;: &quot;Gangtise OpenAPI 接口测试成功。&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_dji&quot;,
+    &quot;success&quot;: true,
+    &quot;http_status&quot;: 200,
+    &quot;latency_ms&quot;: 1399,
+    &quot;detail&quot;: &quot;Gangtise OpenAPI 接口测试成功。&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_gold&quot;,
+    &quot;success&quot;: true,
+    &quot;http_status&quot;: 200,
+    &quot;latency_ms&quot;: 1243,
+    &quot;detail&quot;: &quot;Gangtise OpenAPI 接口测试成功。&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_hs300&quot;,
+    &quot;success&quot;: true,
+    &quot;http_status&quot;: 200,
+    &quot;latency_ms&quot;: 792,
+    &quot;detail&quot;: &quot;Gangtise OpenAPI 接口测试成功。&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_hsi&quot;,
+    &quot;success&quot;: true,
+    &quot;http_status&quot;: 200,
+    &quot;latency_ms&quot;: 1106,
+    &quot;detail&quot;: &quot;Gangtise OpenAPI 接口测试成功。&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_industry_index&quot;,
+    &quot;success&quot;: true,
+    &quot;http_status&quot;: 200,
+    &quot;latency_ms&quot;: 931,
+    &quot;detail&quot;: &quot;Gangtise OpenAPI 接口测试成功。&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_kc50&quot;,
+    &quot;success&quot;: true,
+    &quot;http_status&quot;: 200,
+    &quot;latency_ms&quot;: 375,
+    &quot;detail&quot;: &quot;Gangtise OpenAPI 接口测试成功。&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_nasdaq&quot;,
+    &quot;success&quot;: true,
+    &quot;http_status&quot;: 200,
+    &quot;latency_ms&quot;: 673,
+    &quot;detail&quot;: &quot;Gangtise OpenAPI 接口测试成功。&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_news&quot;,
+    &quot;success&quot;: true,
+    &quot;http_status&quot;: 200,
+    &quot;latency_ms&quot;: 928,
+    &quot;detail&quot;: &quot;Gangtise OpenAPI 接口测试成功。&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_nikkei&quot;,
+    &quot;success&quot;: true,
+    &quot;http_status&quot;: 200,
+    &quot;latency_ms&quot;: 614,
+    &quot;detail&quot;: &quot;Gangtise OpenAPI 接口测试成功。&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_oil&quot;,
+    &quot;success&quot;: true,
+    &quot;http_status&quot;: 200,
+    &quot;latency_ms&quot;: 831,
+    &quot;detail&quot;: &quot;Gangtise OpenAPI 接口测试成功。&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_shanghai_index&quot;,
+    &quot;success&quot;: true,
+    &quot;http_status&quot;: 200,
+    &quot;latency_ms&quot;: 317,
+    &quot;detail&quot;: &quot;Gangtise OpenAPI 接口测试成功。&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_shenzhen_index&quot;,
+    &quot;success&quot;: true,
+    &quot;http_status&quot;: 200,
+    &quot;latency_ms&quot;: 344,
+    &quot;detail&quot;: &quot;Gangtise OpenAPI 接口测试成功。&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_silver&quot;,
+    &quot;success&quot;: true,
+    &quot;http_status&quot;: 200,
+    &quot;latency_ms&quot;: 599,
+    &quot;detail&quot;: &quot;Gangtise OpenAPI 接口测试成功。&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_sp500&quot;,
+    &quot;success&quot;: true,
+    &quot;http_status&quot;: 200,
+    &quot;latency_ms&quot;: 1288,
+    &quot;detail&quot;: &quot;Gangtise OpenAPI 接口测试成功。&quot;
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_sse50&quot;,
+    &quot;success&quot;: true,
+    &quot;http_status&quot;: 200,
+    &quot;latency_ms&quot;: 380,
+    &quot;detail&quot;: &quot;Gangtise OpenAPI 接口测试成功。&quot;
+  }
+]</pre>
+          </details>
+        </article>
+        
+        <article class="scenario pass">
+          <div class="scenario-head">
+            <h3>Given 真实同步任务 When 全量强制同步 Then 每个基础指标都应落成真实 latest 与序列</h3>
+            <span class="pill">PASS</span>
+          </div>
+          <div class="bdd-line"><strong>Given</strong> 基础指标已经完成 source 切换且可访问真实 OpenAPI。</div>
+          <div class="bdd-line"><strong>When</strong> 执行一次强制全量同步。</div>
+          <div class="bdd-line"><strong>Then</strong> 每个基础指标都应写入非模拟 latest value 与至少 2 个真实序列点。</div>
+          <p class="detail">真实落库 19 / 19 个基础指标。</p>
+          <details>
+            <summary>查看证据</summary>
+            <pre>{
+  &quot;real_sync&quot;: {
+    &quot;synced&quot;: true,
+    &quot;updated&quot;: 19,
+    &quot;total_points&quot;: 2075,
+    &quot;batch_code&quot;: &quot;gangtise_openapi_sync_20260723111946786873&quot;
+  },
+  &quot;missing&quot;: []
+}</pre>
+          </details>
+        </article>
+        
+        <article class="scenario pass">
+          <div class="scenario-head">
+            <h3>Given 指数型指标 When 同步完成 Then 每个指数指标都应落 K 线点位</h3>
+            <span class="pill">PASS</span>
+          </div>
+          <div class="bdd-line"><strong>Given</strong> 指数型指标应走 index kline 接口。</div>
+          <div class="bdd-line"><strong>When</strong> 同步完成后检查 indicator_kline_points。</div>
+          <div class="bdd-line"><strong>Then</strong> 每个指数型指标都应有真实 K 线点位，供前台图表直接消费。</div>
+          <p class="detail">指数型指标 K 线覆盖 6 / 6。</p>
+          <details>
+            <summary>查看证据</summary>
+            <pre>[
+  {
+    &quot;indicator_code&quot;: &quot;source_cyb&quot;,
+    &quot;indicator_name&quot;: &quot;创业板指&quot;,
+    &quot;query_kind&quot;: &quot;index_kline&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;source_path&quot;: &quot;/application/open-quote/index/kline/daily&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;,
+    &quot;latest_value&quot;: &quot;3566.73&quot;,
+    &quot;latest_status&quot;: &quot;attention&quot;,
+    &quot;updated_at&quot;: &quot;2026-07-23 11:19:46&quot;,
+    &quot;is_simulated&quot;: false,
+    &quot;real_series_count&quot;: 117,
+    &quot;real_kline_count&quot;: 60,
+    &quot;anomaly_count&quot;: 2
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_hs300&quot;,
+    &quot;indicator_name&quot;: &quot;沪深300&quot;,
+    &quot;query_kind&quot;: &quot;index_kline&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;source_path&quot;: &quot;/application/open-quote/index/kline/daily&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;,
+    &quot;latest_value&quot;: &quot;4717.24&quot;,
+    &quot;latest_status&quot;: &quot;good&quot;,
+    &quot;updated_at&quot;: &quot;2026-07-23 11:19:46&quot;,
+    &quot;is_simulated&quot;: false,
+    &quot;real_series_count&quot;: 117,
+    &quot;real_kline_count&quot;: 60,
+    &quot;anomaly_count&quot;: 2
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_kc50&quot;,
+    &quot;indicator_name&quot;: &quot;科创50&quot;,
+    &quot;query_kind&quot;: &quot;index_kline&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;source_path&quot;: &quot;/application/open-quote/index/kline/daily&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;,
+    &quot;latest_value&quot;: &quot;1860.08&quot;,
+    &quot;latest_status&quot;: &quot;attention&quot;,
+    &quot;updated_at&quot;: &quot;2026-07-23 11:19:46&quot;,
+    &quot;is_simulated&quot;: false,
+    &quot;real_series_count&quot;: 117,
+    &quot;real_kline_count&quot;: 60,
+    &quot;anomaly_count&quot;: 2
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_shanghai_index&quot;,
+    &quot;indicator_name&quot;: &quot;上证指数&quot;,
+    &quot;query_kind&quot;: &quot;index_kline&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;source_path&quot;: &quot;/application/open-quote/index/kline/daily&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;,
+    &quot;latest_value&quot;: &quot;3867.03&quot;,
+    &quot;latest_status&quot;: &quot;good&quot;,
+    &quot;updated_at&quot;: &quot;2026-07-23 11:19:46&quot;,
+    &quot;is_simulated&quot;: false,
+    &quot;real_series_count&quot;: 117,
+    &quot;real_kline_count&quot;: 60,
+    &quot;anomaly_count&quot;: 2
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_shenzhen_index&quot;,
+    &quot;indicator_name&quot;: &quot;深证指数&quot;,
+    &quot;query_kind&quot;: &quot;index_kline&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;source_path&quot;: &quot;/application/open-quote/index/kline/daily&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;,
+    &quot;latest_value&quot;: &quot;14061.44&quot;,
+    &quot;latest_status&quot;: &quot;good&quot;,
+    &quot;updated_at&quot;: &quot;2026-07-23 11:19:46&quot;,
+    &quot;is_simulated&quot;: false,
+    &quot;real_series_count&quot;: 117,
+    &quot;real_kline_count&quot;: 60,
+    &quot;anomaly_count&quot;: 2
+  },
+  {
+    &quot;indicator_code&quot;: &quot;source_sse50&quot;,
+    &quot;indicator_name&quot;: &quot;上证50&quot;,
+    &quot;query_kind&quot;: &quot;index_kline&quot;,
+    &quot;provider&quot;: &quot;Gangtise OpenAPI&quot;,
+    &quot;source_path&quot;: &quot;/application/open-quote/index/kline/daily&quot;,
+    &quot;auth_type&quot;: &quot;gangtise_openapi&quot;,
+    &quot;latest_value&quot;: &quot;2991.05&quot;,
+    &quot;latest_status&quot;: &quot;good&quot;,
+    &quot;updated_at&quot;: &quot;2026-07-23 11:19:46&quot;,
+    &quot;is_simulated&quot;: false,
+    &quot;real_series_count&quot;: 117,
+    &quot;real_kline_count&quot;: 60,
+    &quot;anomaly_count&quot;: 2
+  }
+]</pre>
+          </details>
+        </article>
+        
+        <article class="scenario pass">
+          <div class="scenario-head">
+            <h3>Given 底层真实因子 When 派生智能指标重算 Then 四个核心派生指标都应完成刷新</h3>
+            <span class="pill">PASS</span>
+          </div>
+          <div class="bdd-line"><strong>Given</strong> 派生智能指标依赖的底层基础指标已具备真实序列。</div>
+          <div class="bdd-line"><strong>When</strong> 执行派生指标重算。</div>
+          <div class="bdd-line"><strong>Then</strong> 四个核心派生指标都应生成非模拟序列并刷新 latest。</div>
+          <p class="detail">派生指标刷新 4 / 4。</p>
+          <details>
+            <summary>查看证据</summary>
+            <pre>{
+  &quot;derived_sync&quot;: {
+    &quot;synced&quot;: true,
+    &quot;updated&quot;: 4,
+    &quot;total_points&quot;: 363,
+    &quot;batch_code&quot;: &quot;derived_smart_20260723112001179259&quot;
+  },
+  &quot;derived_matrix&quot;: [
+    {
+      &quot;indicator_code&quot;: &quot;fed_rate_path&quot;,
+      &quot;latest_value&quot;: &quot;108.15&quot;,
+      &quot;latest_status&quot;: &quot;good&quot;,
+      &quot;updated_at&quot;: &quot;2026-07-23 11:20:01&quot;,
+      &quot;is_simulated&quot;: false,
+      &quot;real_series_count&quot;: 123,
+      &quot;source_code&quot;: &quot;derived_real_factors&quot;
+    },
+    {
+      &quot;indicator_code&quot;: &quot;southbound_flow&quot;,
+      &quot;latest_value&quot;: &quot;96.74&quot;,
+      &quot;latest_status&quot;: &quot;good&quot;,
+      &quot;updated_at&quot;: &quot;2026-07-23 11:20:01&quot;,
+      &quot;is_simulated&quot;: false,
+      &quot;real_series_count&quot;: 117,
+      &quot;source_code&quot;: &quot;derived_real_factors&quot;
+    },
+    {
+      &quot;indicator_code&quot;: &quot;credit_pulse&quot;,
+      &quot;latest_value&quot;: &quot;99.12&quot;,
+      &quot;latest_status&quot;: &quot;good&quot;,
+      &quot;updated_at&quot;: &quot;2026-07-23 11:20:01&quot;,
+      &quot;is_simulated&quot;: false,
+      &quot;real_series_count&quot;: 6,
+      &quot;source_code&quot;: &quot;derived_real_factors&quot;
+    },
+    {
+      &quot;indicator_code&quot;: &quot;ai_order_signal&quot;,
+      &quot;latest_value&quot;: &quot;109.84&quot;,
+      &quot;latest_status&quot;: &quot;good&quot;,
+      &quot;updated_at&quot;: &quot;2026-07-23 11:20:01&quot;,
+      &quot;is_simulated&quot;: false,
+      &quot;real_series_count&quot;: 117,
+      &quot;source_code&quot;: &quot;derived_real_factors&quot;
+    }
+  ]
+}</pre>
+          </details>
+        </article>
+        
+        <article class="scenario pass">
+          <div class="scenario-head">
+            <h3>Given 前台消费接口 When 读取 H5 与工作台相关接口 Then 指标数据链路应保持可用</h3>
+            <span class="pill">PASS</span>
+          </div>
+          <div class="bdd-line"><strong>Given</strong> 同步后的指标数据需要继续被前台和工作台消费。</div>
+          <div class="bdd-line"><strong>When</strong> 调用 H5 页面、工作台接口、租户 Dashboard 接口和智能指标接口。</div>
+          <div class="bdd-line"><strong>Then</strong> 这些入口都应返回 200，证明迁移没有打断消费链路。</div>
+          <p class="detail">通过 4 / 4 个接口检查。</p>
+          <details>
+            <summary>查看证据</summary>
+            <pre>[
+  {
+    &quot;title&quot;: &quot;H5 页面&quot;,
+    &quot;path&quot;: &quot;/h5?tenant=laowang&quot;,
+    &quot;status_code&quot;: 200,
+    &quot;content_type&quot;: &quot;text/html; charset=utf-8&quot;,
+    &quot;ok&quot;: true,
+    &quot;payload_preview&quot;: &quot;&lt;!DOCTYPE html&gt;\n&lt;html lang=\&quot;zh-CN\&quot;&gt;\n&lt;head&gt;\n&lt;meta charset=\&quot;UTF-8\&quot;&gt;\n&lt;meta name=\&quot;viewport\&quot; content=\&quot;width=device-width, initial-scale=1.0, maximum-scale=1.0\&quot;&gt;\n&lt;title&gt;洞见智研 — 智能投研平台&lt;/title&gt;\n&lt;link rel=\&quot;stylesheet\&quot; href=\&quot;/static/css/style.css\&quot;&gt;\n&lt;link href=\&quot;https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css\&quot; rel=\&quot;stylesheet\&quot;&gt;\n&lt;script&gt;\n  window.SITE_CONFIG = {\&quot;brand\&quot;: {\&quot;footer_description\&quot;: \&quot;\\u6574\\u5408\\u5238\\u5546\\u7814\\u62a5\\u3001\\u4e13\\u5bb6\\u7eaa\\u8981\\u4e0e\\u5e02\\u573a\\u6570\\u636e\\uff0c\\u&quot;
+  },
+  {
+    &quot;title&quot;: &quot;工作台接口&quot;,
+    &quot;path&quot;: &quot;/api/kol/workbench?tenant=laowang&quot;,
+    &quot;status_code&quot;: 200,
+    &quot;content_type&quot;: &quot;application/json&quot;,
+    &quot;ok&quot;: true,
+    &quot;payload_preview&quot;: {
+      &quot;broadcast_history&quot;: [
+        {
+          &quot;content&quot;: &quot;【最新复盘已发布】日复盘：今日复盘首要聚焦市场核心主线的梳理，力求剔除盘面噪音干扰\n已同步到复盘专区，当前纳入样本：贵州茅台。\n现在可以直接去“复盘”页查看完整内容。&quot;,
+          &quot;id&quot;: 1784430035143,
+          &quot;open_rate&quot;: 57,
+          &quot;reach&quot;: 1,
+          &quot;target&quot;: &quot;review&quot;,
+          &quot;time&quot;: &quot;2026-07-19 11:00:35&quot;,
+          &quot;type&quot;: &quot;broadcast&quot;
+        },
+        {
+          &quot;content&quot;: &quot;【最新复盘已发布】日复盘：今日复盘聚焦市场主线，重点梳理核心逻辑，剔除无关盘面噪音\n已同步到复盘专区，当前纳入样本：中芯国际、寒武纪、比亚迪。\n现在可以直接去“复盘”页查看完整内容。&quot;,
+          &quot;id&quot;: 1783788571990,
+          &quot;open_rate&quot;: 72,
+          &quot;reach&quot;: 1,
+          &quot;target&quot;: &quot;review&quot;,
+          &quot;time&quot;: &quot;2026-07-12 00:49:31&quot;,
+          &quot;type&quot;: &quot;broadcast&quot;
+        },
+        {
+          &quot;content&quot;: &quot;【最新复盘已发布】日复盘：今日复盘内容聚焦于市场核心主线，明确不将短期盘面噪音写入分析框架\n已同步到复盘专区，当前纳入样本：中芯国际、腾讯控股、贵州茅台、宁德时代、招商银行、寒武纪、比亚迪。\n现在可以直接去“复盘”页查看完整内容。&quot;,
+          &quot;id&quot;: 1783787761637,
+          &quot;open_rate&quot;: 66,
+          &quot;reach&quot;: 1,
+          &quot;target&quot;: &quot;review&quot;,
+          &quot;time&quot;: &quot;2026-07-12 00:36:01&quot;,
+          &quot;type&quot;: &quot;broadcast&quot;
+        },
+        {
+          &quot;content&quot;: &quot;【最新复盘已发布】日复盘：本次日复盘首先聚焦市场主线逻辑，建议在分析过程中有效过滤盘面噪音干扰\n已同步到复盘专区，当前纳入样本：宁德时代、招商银行。\n现在可以直接去“复盘”页查看完整内容。&quot;,
+          &quot;id&quot;: 1783647268176,
+          &quot;open_rate&quot;: 44,
+          &quot;reach&quot;: 1,
+          &quot;target&quot;: &quot;review&quot;,
+          &quot;time&quot;: &quot;2026-07-10 09:34:28&quot;,
+          &quot;type&quot;: &quot;broadcast&quot;
+        },
+        {
+          &quot;content&quot;: &quot;【最新复盘已发布】日复盘：今日复盘优先聚焦市场主线，剔除盘面噪音干扰以明确核心逻辑\n已同步到复盘专区，当前纳入样本：中芯国际、腾讯控股、贵州茅台。\n现在可以直接去“复盘”页查看完整内容。&quot;,
+          &quot;id&quot;: 1783617830231,
+          &quot;open_rate&quot;: 52,
+          &quot;reach&quot;: 1,
+          &quot;target&quot;: &quot;review&quot;,
+          &quot;time&quot;: &quot;2026-07-10 01:23:50&quot;,
+          &quot;type&quot;: &quot;broadcast&quot;
+        },
+        {
+          &quot;content&quot;: &quot;【最新复盘已发布】日复盘：这是智能优化后的复盘草稿\n已同步到复盘专区，当前纳入样本：中芯国际、腾讯控股、贵州茅台。\n现在可以直接去“复盘”页查看完整内容。&quot;,
+          &quot;id&quot;: 1783617723921,
+          &quot;open_rate&quot;: 73,
+          &quot;reach&quot;: 1,
+          &quot;target&quot;: &quot;review&quot;,
+          &quot;time&quot;: &quot;2026-07-10 01:22:03&quot;,
+          &quot;type&quot;: &quot;broadcast&quot;
+        },
+        {
+          &quot;content&quot;: &quot;【最新复盘已发布】日复盘：这是智能优化后的复盘草稿\n已同步到复盘专区，当前纳入样本：中芯国际、腾讯控股、贵州茅台。\n现在可以直接去“复盘”页查看完整内容。&quot;,
+          &quot;id&quot;: 1783617388016,
+          &quot;open_rate&quot;: 51,
+          &quot;reach&quot;: 1,
+          &quot;target&quot;: &quot;review&quot;,
+          &quot;time&quot;: &quot;2026-07-10 01:16:28&quot;,
+          &quot;type&quot;: &quot;broadcast&quot;
+        },
+        {
+          &quot;content&quot;: &quot;本周策略更新：科技板块适合继续跟踪，重点看 AI 算力订单兑现&quot;,
+          &quot;id&quot;: 1,
+          &quot;open_rate&quot;: 68,
+          &quot;reach&quot;: 92,
+          &quot;target&quot;: &quot;all&quot;,
+          &quot;time&quot;: &quot;2026-05-20 08:00&quot;,
+          &quot;type&quot;: &quot;broadcast&quot;
+        },
+        {
+          &quot;content&quot;: &quot;宏观提醒：美联储纪要偏鸽，但还要等国内资金面确认&quot;,
+          &quot;id&quot;: 2,
+          &quot;open_rate&quot;: 82,
+          &quot;reach&quot;: 108,
+          &quot;target&quot;: &quot;active&quot;,
+          &quot;time&quot;: &quot;2026-05-19 22:30&quot;,
+          &quot;type&quot;: &quot;broadcast&quot;
+        },
+        {
+          &quot;content&quot;: &quot;周末复盘：本周操作回顾与下周观察重点&quot;,
+          &quot;id&quot;: 3,
+          &quot;open_rate&quot;: 55,
+          &quot;reach&quot;: 76,
+          &quot;target&quot;: &quot;review&quot;,
+          &quot;time&quot;: &quot;2026-05-18 18:00&quot;,
+          &quot;type&quot;: &quot;broadcast&quot;
+        }
+      ],
+      &quot;consistency_notes&quot;: [
+        {
+          &quot;desc&quot;: &quot;首页同时展示纯 Admin 后台和大V web 工作台两个入口，角色职责分开。&quot;,
+          &quot;title&quot;: &quot;前后台分离&quot;
+        },
+        {
+          &quot;desc&quot;: &quot;H5、工作台和 Admin 都把“粉丝消息 + 大V回复 + 复盘提醒”视为同一消息链路。&quot;,
+          &quot;title&quot;: &quot;消息口径一致&quot;
+        },
+        {
+          &quot;desc&quot;: &quot;前台支持工作区版和龙虾纯对话版，后台也按同样两种产品模式管理。&quot;,
+          &quot;title&quot;: &quot;Hermes 口径一致&quot;
+        },
+        {
+          &quot;desc&quot;: &quot;历史知识内容允许继续微调，修改后会重新同步到知识专区和 Hermes。&quot;,
+          &quot;title&quot;: &quot;知识库口径一致&quot;
+        }
+      ],
+      &quot;dashboard_metrics&quot;: {
+        &quot;analytics_sections&quot;: {
+          &quot;channel&quot;: {
+            &quot;cards&quot;: [
+              {
+                &quot;conv&quot;: &quot;8.4%&quot;,
+                &quot;label&quot;: &quot;复盘转化&quot;,
+                &quot;revenue&quot;: &quot;¥26,800&quot;,
+                &quot;score&quot;: 88,
+                &quot;users&quot;: &quot;620&quot;
+              },
+              {
+                &quot;conv&quot;: &quot;11.2%&quot;,
+                &quot;label&quot;: &quot;Hermes 转化&quot;,
+                &quot;revenue&quot;: &quot;¥24,300&quot;,
+                &quot;score&quot;: 92,
+                &quot;users&quot;: &quot;410&quot;
+              },
+              {
+                &quot;conv&quot;: &quot;15.6%&quot;,
+                &quot;label&quot;: &quot;消息追问&quot;,
+                &quot;revenue&quot;: &quot;¥18,600&quot;,
+                &quot;score&quot;: 95,
+                &quot;users&quot;: &quot;260&quot;
+              },
+              {
+                &quot;conv&quot;: &quot;18.1%&quot;,
+                &quot;label&quot;: &quot;社群转介绍&quot;,
+                &quot;revenue&quot;: &quot;¥16,200&quot;,
+                &quot;score&quot;: 97,
+                &quot;users&quot;: &quot;170&quot;
+              }
+            ],
+            &quot;quality_rows&quot;: [
+              {
+                &quot;cac&quot;: 32,
+                &quot;conv&quot;: &quot;8.4%&quot;,
+                &quot;label&quot;: &quot;复盘转化&quot;,
+                &quot;ltv&quot;: 620,
+                &quot;score&quot;: 88,
+                &quot;trend&quot;: &quot;上升&quot;,
+                &quot;users&quot;: 620
+              },
+              {
+                &quot;cac&quot;: 24,
+                &quot;conv&quot;: &quot;11.2%&quot;,
+                &quot;label&quot;: &quot;Hermes 转化&quot;,
+                &quot;ltv&quot;: 760,
+                &quot;score&quot;: 92,
+                &quot;trend&quot;: &quot;上升&quot;,
+                &quot;users&quot;: 410
+              },
+              {
+                &quot;cac&quot;: 18,
+                &quot;conv&quot;: &quot;15.6%&quot;,
+                &quot;label&quot;: &quot;消息追问&quot;,
+                &quot;ltv&quot;: 880,
+                &quot;score&quot;: 95,
+                &quot;trend&quot;: &quot;稳定&quot;,
+                &quot;users&quot;: 260
+              },
+              {
+                &quot;cac&quot;: 12,
+                &quot;conv&quot;: &quot;18.1%&quot;,
+                &quot;label&quot;: &quot;社群转介绍&quot;,
+                &quot;ltv&quot;: 960,
+                &quot;score&quot;: 97,
+                &quot;trend&quot;: &quot;上升&quot;,
+                &quot;users&quot;: 170
+              }
+            ],
+            &quot;summary&quot;: &quot;看当前租户各获客和互动来源的质量，而不是平台总渠道。&quot;
+          },
+          &quot;funnel&quot;: {
+            &quot;channel_mix&quot;: [
+              {
+                &quot;label&quot;: &quot;复盘阅读&quot;,
+                &quot;value&quot;: 42
+              },
+              {
+                &quot;label&quot;: &quot;Hermes 问答&quot;,
+                &quot;value&quot;: 24
+              },
+              {
+                &quot;label&quot;: &quot;消息追问&quot;,
+                &quot;value&quot;: 18
+              },
+              {
+                &quot;label&quot;: &quot;自选股跟踪&quot;,
+                &quot;value&quot;: 16
+              }
+            ],
+            &quot;funnel&quot;: [
+              {
+                &quot;count&quot;: 12800,
+                &quot;label&quot;: &quot;内容触达&quot;,
+                &quot;rate&quot;: 100.0
+              },
+              {
+                &quot;count&quot;: 1460,
+                &quot;label&quot;: &quot;私域留资&quot;,
+                &quot;rate&quot;: 11.4
+              },
+              {
+                &quot;count&quot;: 620,
+                &quot;label&quot;: &quot;激活试用&quot;,
+                &quot;rate&quot;: 4.8
+              },
+              {
+                &quot;count&quot;: 128,
+                &quot;label&quot;: &quot;首次付费&quot;,
+                &quot;rate&quot;: 1.0
+              },
+              {
+                &quot;count&quot;: 36,
+                &quot;label&quot;: &quot;高频留存&quot;,
+                &quot;rate&quot;: 0.3
+              }
+            ],
+            &quot;heatmap_columns&quot;: [
+              &quot;内容触达&quot;,
+              &quot;私域留资&quot;,
+              &quot;激活试用&quot;,
+              &quot;首次付费&quot;,
+              &quot;高频留存&quot;
+            ],
+            &quot;heatmap_rows&quot;: [
+              {
+                &quot;label&quot;: &quot;复盘专区&quot;,
+                &quot;values&quot;: [
+                  100,
+                  18.2,
+                  8.4,
+                  2.2,
+                  0.8
+                ]
+              },
+              {
+                &quot;label&quot;: &quot;Hermes&quot;,
+                &quot;values&quot;: [
+                  100,
+                  14.8,
+                  9.6,
+                  3.4,
+                  1.2
+                ]
+              },
+              {
+                &quot;label&quot;: &quot;消息区&quot;,
+                &quot;values&quot;: [
+                  100,
+                  22.1,
+                  11.2,
+                  3.8,
+                  1.5
+                ]
+              },
+              {
+                &quot;label&quot;: &quot;自选股&quot;,
+                &quot;values&quot;: [
+                  100,
+                  12.4,
+                  6.7,
+                  2.1,
+                  0.9
+                ]
+              }
+            ],
+            &quot;kpis&quot;: [
+              {
+                &quot;label&quot;: &quot;内容触达&quot;,
+                &quot;sub&quot;: &quot;近30日门户/H5 内容触达&quot;,
+                &quot;value&quot;: &quot;12,800&quot;
+              },
+              {
+                &quot;label&quot;: &quot;私域留资&quot;,
+                &quot;sub&quot;: &quot;留资率 11.4%&quot;,
+                &quot;value&quot;: &quot;1,460&quot;
+              },
+              {
+                &quot;label&quot;: &quot;激活试用&quot;,
+                &quot;sub&quot;: &quot;激活率 42.5%&quot;,
+                &quot;value&quot;: &quot;620&quot;
+              },
+              {
+                &quot;label&quot;: &quot;首次付费&quot;,
+                &quot;sub&quot;: &quot;付费率 20.6%&quot;,
+                &quot;value&quot;: &quot;128&quot;
+              },
+              {
+                &quot;label&quot;: &quot;高频留存&quot;,
+                &quot;sub&quot;: &quot;稳定跟踪样本用户&quot;,
+                &quot;value&quot;: &quot;36&quot;
+              }
+            ],
+            &quot;summary&quot;: &quot;从内容触达到高频留存，观察当前租户粉丝在复盘、问答和 H5 内的转化路径。&quot;
+          },
+          &quot;kol&quot;: {
+            &quot;kpis&quot;: [
+              {
+                &quot;label&quot;: &quot;本月协同收入&quot;,
+                &quot;sub&quot;: &quot;当前租户口径&quot;,
+                &quot;value&quot;: &quot;¥86,400&quot;
+              },
+              {
+                &quot;label&quot;: &quot;高价值线索&quot;,
+                &quot;sub&quot;: &quot;近30日重点粉丝&quot;,
+                &quot;value&quot;: &quot;18&quot;
+              },
+              {
+                &quot;label&quot;: &quot;复盘带动付费&quot;,
+                &quot;sub&quot;: &quot;主要转化来源&quot;,
+                &quot;value&quot;: &quot;42%&quot;
+              },
+              {
+                &quot;label&quot;: &quot;私域追问率&quot;,
+                &quot;sub&quot;: &quot;复盘后继续追问&quot;,
+                &quot;value&quot;: &quot;31%&quot;
+              }
+            ],
+            &quot;stage_cards&quot;: [
+              {
+                &quot;label&quot;: &quot;种子线索&quot;,
+                &quot;value&quot;: 42
+              },
+              {
+                &quot;label&quot;: &quot;持续互动&quot;,
+                &quot;value&quot;: 28
+              },
+              {
+                &quot;label&quot;: &quot;稳定付费&quot;,
+                &quot;value&quot;: 12
+              },
+              {
+                &quot;label&quot;: &quot;高频留存&quot;,
+                &quot;value&quot;: 6
+              }
+            ],
+            &quot;summary&quot;: &quot;这里不再比较全平台所有大V，而是拆解当前租户自己的协同效率与增长阶段。&quot;,
+            &quot;table_rows&quot;: [
+              {
+                &quot;change&quot;: &quot;+12%&quot;,
+                &quot;focus&quot;: &quot;港股互联网 / 宏观&quot;,
+                &quot;label&quot;: &quot;机构试点张总&quot;,
+                &quot;revenue&quot;: &quot;¥18,000&quot;,
+                &quot;share&quot;: &quot;30%&quot;,
+                &quot;source&quot;: &quot;闭门交流&quot;,
+                &quot;stage&quot;: &quot;高价值&quot;
+              },
+              {
+                &quot;change&quot;: &quot;+8%&quot;,
+                &quot;focus&quot;: &quot;AI 算力 / 半导体&quot;,
+                &quot;label&quot;: &quot;投研达人小陈&quot;,
+                &quot;revenue&quot;: &quot;¥8,600&quot;,
+                &quot;share&quot;: &quot;22%&quot;,
+                &quot;source&quot;: &quot;Hermes&quot;,
+                &quot;stage&quot;: &quot;稳定付费&quot;
+              },
+              {
+                &quot;change&quot;: &quot;+6%&quot;,
+                &quot;focus&quot;: &quot;港股互联网&quot;,
+                &quot;label&quot;: &quot;价值猎人小林&quot;,
+                &quot;revenue&quot;: &quot;¥4,200&quot;,
+                &quot;share&quot;: &quot;18%&quot;,
+                &quot;source&quot;: &quot;复盘&quot;,
+                &quot;stage&quot;: &quot;成长中&quot;
+              }
+            ]
+          },
+          &quot;revenue&quot;: {
+            &quot;cohort_columns&quot;: [
+              &quot;M0&quot;,
+              &quot;M1&quot;,
+              &quot;M2&quot;,
+              &quot;M3&quot;,
+              &quot;M4&quot;,
+              &quot;M5&quot;
+            ],
+            &quot;cohort_rows&quot;: [
+              {
+                &quot;label&quot;: &quot;2026-01&quot;,
+                &quot;values&quot;: [
+                  100,
+                  64,
+                  51,
+                  42,
+                  36,
+                  29
+                ]
+              },
+              {
+                &quot;label&quot;: &quot;2026-02&quot;,
+                &quot;values&quot;: [
+                  100,
+                  66,
+                  54,
+                  45,
+                  38,
+                  null
+         </pre>
+          </details>
+        </article>
+        </div>
+    </section>
+
+    <section class="section">
+      <h2>执行摘要</h2>
+      <div class="meta-grid">
+        <div>
+          <h3>认证结果</h3>
+          <pre>{
+  &quot;ok&quot;: true,
+  &quot;http_status&quot;: 200,
+  &quot;duration_ms&quot;: 542,
+  &quot;message&quot;: &quot;successful&quot;
+}</pre>
+        </div>
+        <div>
+          <h3>同步结果</h3>
+          <pre>{
+  &quot;real_sync&quot;: {
+    &quot;synced&quot;: true,
+    &quot;updated&quot;: 19,
+    &quot;total_points&quot;: 2075,
+    &quot;batch_code&quot;: &quot;gangtise_openapi_sync_20260723111946786873&quot;
+  },
+  &quot;derived_sync&quot;: {
+    &quot;synced&quot;: true,
+    &quot;updated&quot;: 4,
+    &quot;total_points&quot;: 363,
+    &quot;batch_code&quot;: &quot;derived_smart_20260723112001179259&quot;
+  },
+  &quot;hub_summary&quot;: {
+    &quot;total&quot;: 21,
+    &quot;smart_total&quot;: 2,
+    &quot;lake_total&quot;: 19,
+    &quot;enabled&quot;: 20,
+    &quot;warnings&quot;: 1,
+    &quot;attention&quot;: 7,
+    &quot;anomalies&quot;: 38
+  }
+}</pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>基础指标覆盖</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>指标 Code</th>
+            <th>指标名</th>
+            <th>类型</th>
+            <th>Provider</th>
+            <th>Path</th>
+            <th>最新值</th>
+            <th>状态</th>
+            <th>模拟</th>
+            <th>真实序列</th>
+            <th>K线点数</th>
+            <th>异动数</th>
+            <th>更新时间</th>
+          </tr>
+        </thead>
+        <tbody>
+        <tr>
+          <td>source_bdi</td>
+          <td>BDI</td>
+          <td>edb_search</td>
+          <td>Gangtise OpenAPI</td>
+          <td><code>/application/open-alternative/EDB/getData</code></td>
+          <td>2715.00</td>
+          <td>good</td>
+          <td>否</td>
+          <td>124</td>
+          <td>60</td>
+          <td>2</td>
+          <td>2026-07-23 11:19:46</td>
+        </tr>
+        
+        <tr>
+          <td>source_brent</td>
+          <td>布伦特原油</td>
+          <td>edb_search</td>
+          <td>Gangtise OpenAPI</td>
+          <td><code>/application/open-alternative/EDB/getData</code></td>
+          <td>91.01</td>
+          <td>attention</td>
+          <td>否</td>
+          <td>120</td>
+          <td>60</td>
+          <td>2</td>
+          <td>2026-07-23 11:19:46</td>
+        </tr>
+        
+        <tr>
+          <td>source_cpi</td>
+          <td>CPI</td>
+          <td>edb_search</td>
+          <td>Gangtise OpenAPI</td>
+          <td><code>/application/open-alternative/EDB/getData</code></td>
+          <td>333.95</td>
+          <td>good</td>
+          <td>否</td>
+          <td>6</td>
+          <td>6</td>
+          <td>2</td>
+          <td>2026-07-23 11:19:46</td>
+        </tr>
+        
+        <tr>
+          <td>source_cyb</td>
+          <td>创业板指</td>
+          <td>index_kline</td>
+          <td>Gangtise OpenAPI</td>
+          <td><code>/application/open-quote/index/kline/daily</code></td>
+          <td>3566.73</td>
+          <td>attention</td>
+          <td>否</td>
+          <td>117</td>
+          <td>60</td>
+          <td>2</td>
+          <td>2026-07-23 11:19:46</td>
+        </tr>
+        
+        <tr>
+          <td>source_dji</td>
+          <td>道琼斯</td>
+          <td>edb_search</td>
+          <td>Gangtise OpenAPI</td>
+          <td><code>/application/open-alternative/EDB/getData</code></td>
+          <td>52128.58</td>
+          <td>good</td>
+          <td>否</td>
+          <td>124</td>
+          <td>60</td>
+          <td>2</td>
+          <td>2026-07-23 11:19:46</td>
+        </tr>
+        
+        <tr>
+          <td>source_gold</td>
+          <td>黄金</td>
+          <td>edb_search</td>
+          <td>Gangtise OpenAPI</td>
+          <td><code>/application/open-alternative/EDB/getData</code></td>
+          <td>3103.44</td>
+          <td>attention</td>
+          <td>否</td>
+          <td>124</td>
+          <td>60</td>
+          <td>2</td>
+          <td>2026-07-23 11:19:46</td>
+        </tr>
+        
+        <tr>
+          <td>source_hs300</td>
+          <td>沪深300</td>
+          <td>index_kline</td>
+          <td>Gangtise OpenAPI</td>
+          <td><code>/application/open-quote/index/kline/daily</code></td>
+          <td>4717.24</td>
+          <td>good</td>
+          <td>否</td>
+          <td>117</td>
+          <td>60</td>
+          <td>2</td>
+          <td>2026-07-23 11:19:46</td>
+        </tr>
+        
+        <tr>
+          <td>source_hsi</td>
+          <td>恒生指数</td>
+          <td>edb_search</td>
+          <td>Gangtise OpenAPI</td>
+          <td><code>/application/open-alternative/EDB/getData</code></td>
+          <td>24892.66</td>
+          <td>good</td>
+          <td>否</td>
+          <td>118</td>
+          <td>60</td>
+          <td>2</td>
+          <td>2026-07-23 11:19:46</td>
+        </tr>
+        
+        <tr>
+          <td>source_industry_index</td>
+          <td>行业指数</td>
+          <td>edb_search</td>
+          <td>Gangtise OpenAPI</td>
+          <td><code>/application/open-alternative/EDB/getData</code></td>
+          <td>7550.53</td>
+          <td>attention</td>
+          <td>否</td>
+          <td>111</td>
+          <td>60</td>
+          <td>2</td>
+          <td>2026-07-23 11:19:46</td>
+        </tr>
+        
+        <tr>
+          <td>source_kc50</td>
+          <td>科创50</td>
+          <td>index_kline</td>
+          <td>Gangtise OpenAPI</td>
+          <td><code>/application/open-quote/index/kline/daily</code></td>
+          <td>1860.08</td>
+          <td>attention</td>
+          <td>否</td>
+          <td>117</td>
+          <td>60</td>
+          <td>2</td>
+          <td>2026-07-23 11:19:46</td>
+        </tr>
+        
+        <tr>
+          <td>source_nasdaq</td>
+          <td>纳斯达克</td>
+          <td>edb_search</td>
+          <td>Gangtise OpenAPI</td>
+          <td><code>/application/open-alternative/EDB/getData</code></td>
+          <td>25690.90</td>
+          <td>good</td>
+          <td>否</td>
+          <td>123</td>
+          <td>60</td>
+          <td>2</td>
+          <td>2026-07-23 11:19:46</td>
+        </tr>
+        
+        <tr>
+          <td>source_news</td>
+          <td>新闻情绪</td>
+          <td>edb_search</td>
+          <td>Gangtise OpenAPI</td>
+          <td><code>/application/open-alternative/EDB/getData</code></td>
+          <td>-25.00</td>
+          <td>warning</td>
+          <td>否</td>
+          <td>6</td>
+          <td>6</td>
+          <td>2</td>
+          <td>2026-07-23 11:19:46</td>
+        </tr>
+        
+        <tr>
+          <td>source_nikkei</td>
+          <td>日经225</td>
+          <td>edb_search</td>
+          <td>Gangtise OpenAPI</td>
+          <td><code>/application/open-alternative/EDB/getData</code></td>
+          <td>66583.00</td>
+          <td>good</td>
+          <td>否</td>
+          <td>148</td>
+          <td>60</td>
+          <td>2</td>
+          <td>2026-07-23 11:19:46</td>
+        </tr>
+        
+        <tr>
+          <td>source_oil</td>
+          <td>原油</td>
+          <td>edb_search</td>
+          <td>Gangtise OpenAPI</td>
+          <td><code>/application/open-alternative/EDB/getData</code></td>
+          <td>84.34</td>
+          <td>attention</td>
+          <td>否</td>
+          <td>122</td>
+          <td>60</td>
+          <td>2</td>
+          <td>2026-07-23 11:19:46</td>
+        </tr>
+        
+        <tr>
+          <td>source_shanghai_index</td>
+          <td>上证指数</td>
+          <td>index_kline</td>
+          <td>Gangtise OpenAPI</td>
+          <td><code>/application/open-quote/index/kline/daily</code></td>
+          <td>3867.03</td>
+          <td>good</td>
+          <td>否</td>
+          <td>117</td>
+          <td>60</td>
+          <td>2</td>
+          <td>2026-07-23 11:19:46</td>
+        </tr>
+        
+        <tr>
+          <td>source_shenzhen_index</td>
+          <td>深证指数</td>
+          <td>index_kline</td>
+          <td>Gangtise OpenAPI</td>
+          <td><code>/application/open-quote/index/kline/daily</code></td>
+          <td>14061.44</td>
+          <td>good</td>
+          <td>否</td>
+          <td>117</td>
+          <td>60</td>
+          <td>2</td>
+          <td>2026-07-23 11:19:46</td>
+        </tr>
+        
+        <tr>
+          <td>source_silver</td>
+          <td>白银</td>
+          <td>edb_search</td>
+          <td>Gangtise OpenAPI</td>
+          <td><code>/application/open-alternative/EDB/getData</code></td>
+          <td>59.07</td>
+          <td>attention</td>
+          <td>否</td>
+          <td>122</td>
+          <td>60</td>
+          <td>2</td>
+          <td>2026-07-23 11:19:46</td>
+        </tr>
+        
+        <tr>
+          <td>source_sp500</td>
+          <td>标普500</td>
+          <td>edb_search</td>
+          <td>Gangtise OpenAPI</td>
+          <td><code>/application/open-alternative/EDB/getData</code></td>
+          <td>7498.96</td>
+          <td>good</td>
+          <td>否</td>
+          <td>125</td>
+          <td>60</td>
+          <td>2</td>
+          <td>2026-07-23 11:19:46</td>
+        </tr>
+        
+        <tr>
+          <td>source_sse50</td>
+          <td>上证50</td>
+          <td>index_kline</td>
+          <td>Gangtise OpenAPI</td>
+          <td><code>/application/open-quote/index/kline/daily</code></td>
+          <td>2991.05</td>
+          <td>good</td>
+          <td>否</td>
+          <td>117</td>
+          <td>60</td>
+          <td>2</td>
+          <td>2026-07-23 11:19:46</td>
+        </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>派生智能指标覆盖</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>指标 Code</th>
+            <th>最新值</th>
+            <th>状态</th>
+            <th>模拟</th>
+            <th>真实序列</th>
+            <th>来源</th>
+            <th>更新时间</th>
+          </tr>
+        </thead>
+        <tbody>
+        <tr>
+          <td>fed_rate_path</td>
+          <td>108.15</td>
+          <td>good</td>
+          <td>否</td>
+          <td>123</td>
+          <td>derived_real_factors</td>
+          <td>2026-07-23 11:20:01</td>
+        </tr>
+        
+        <tr>
+          <td>southbound_flow</td>
+          <td>96.74</td>
+          <td>good</td>
+          <td>否</td>
+          <td>117</td>
+          <td>derived_real_factors</td>
+          <td>2026-07-23 11:20:01</td>
+        </tr>
+        
+        <tr>
+          <td>credit_pulse</td>
+          <td>99.12</td>
+          <td>good</td>
+          <td>否</td>
+          <td>6</td>
+          <td>derived_real_factors</td>
+          <td>2026-07-23 11:20:01</td>
+        </tr>
+        
+        <tr>
+          <td>ai_order_signal</td>
+          <td>109.84</td>
+          <td>good</td>
+          <td>否</td>
+          <td>117</td>
+          <td>derived_real_factors</td>
+          <td>2026-07-23 11:20:01</td>
+        </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>实时 Source Probe</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>指标 Code</th>
+            <th>结果</th>
+            <th>HTTP</th>
+            <th>耗时</th>
+            <th>详情</th>
+          </tr>
+        </thead>
+        <tbody>
+        <tr>
+          <td>source_bdi</td>
+          <td>通过</td>
+          <td>200</td>
+          <td>928 ms</td>
+          <td>Gangtise OpenAPI 接口测试成功。</td>
+        </tr>
+        
+        <tr>
+          <td>source_brent</td>
+          <td>通过</td>
+          <td>200</td>
+          <td>624 ms</td>
+          <td>Gangtise OpenAPI 接口测试成功。</td>
+        </tr>
+        
+        <tr>
+          <td>source_cpi</td>
+          <td>通过</td>
+          <td>200</td>
+          <td>672 ms</td>
+          <td>Gangtise OpenAPI 接口测试成功。</td>
+        </tr>
+        
+        <tr>
+          <td>source_cyb</td>
+          <td>通过</td>
+          <td>200</td>
+          <td>608 ms</td>
+          <td>Gangtise OpenAPI 接口测试成功。</td>
+        </tr>
+        
+        <tr>
+          <td>source_dji</td>
+          <td>通过</td>
+          <td>200</td>
+          <td>1399 ms</td>
+          <td>Gangtise OpenAPI 接口测试成功。</td>
+        </tr>
+        
+        <tr>
+          <td>source_gold</td>
+          <td>通过</td>
+          <td>200</td>
+          <td>1243 ms</td>
+          <td>Gangtise OpenAPI 接口测试成功。</td>
+        </tr>
+        
+        <tr>
+          <td>source_hs300</td>
+          <td>通过</td>
+          <td>200</td>
+          <td>792 ms</td>
+          <td>Gangtise OpenAPI 接口测试成功。</td>
+        </tr>
+        
+        <tr>
+          <td>source_hsi</td>
+          <td>通过</td>
+          <td>200</td>
+          <td>1106 ms</td>
+          <td>Gangtise OpenAPI 接口测试成功。</td>
+        </tr>
+        
+        <tr>
+          <td>source_industry_index</td>
+          <td>通过</td>
+          <td>200</td>
+          <td>931 ms</td>
+          <td>Gangtise OpenAPI 接口测试成功。</td>
+        </tr>
+        
+        <tr>
+          <td>source_kc50</td>
+          <td>通过</td>
+          <td>200</td>
+          <td>375 ms</td>
+          <td>Gangtise OpenAPI 接口测试成功。</td>
+        </tr>
+        
+        <tr>
+          <td>source_nasdaq</td>
+          <td>通过</td>
+          <td>200</td>
+          <td>673 ms</td>
+          <td>Gangtise OpenAPI 接口测试成功。</td>
+        </tr>
+        
+        <tr>
+          <td>source_news</td>
+          <td>通过</td>
+          <td>200</td>
+          <td>928 ms</td>
+          <td>Gangtise OpenAPI 接口测试成功。</td>
+        </tr>
+        
+        <tr>
+          <td>source_nikkei</td>
+          <td>通过</td>
+          <td>200</td>
+          <td>614 ms</td>
+          <td>Gangtise OpenAPI 接口测试成功。</td>
+        </tr>
+        
+        <tr>
+          <td>source_oil</td>
+          <td>通过</td>
+          <td>200</td>
+          <td>831 ms</td>
+          <td>Gangtise OpenAPI 接口测试成功。</td>
+        </tr>
+        
+        <tr>
+          <td>source_shanghai_index</td>
+          <td>通过</td>
+          <td>200</td>
+          <td>317 ms</td>
+          <td>Gangtise OpenAPI 接口测试成功。</td>
+        </tr>
+        
+        <tr>
+          <td>source_shenzhen_index</td>
+          <td>通过</td>
+          <td>200</td>
+          <td>344 ms</td>
+          <td>Gangtise OpenAPI 接口测试成功。</td>
+        </tr>
+        
+        <tr>
+          <td>source_silver</td>
+          <td>通过</td>
+          <td>200</td>
+          <td>599 ms</td>
+          <td>Gangtise OpenAPI 接口测试成功。</td>
+        </tr>
+        
+        <tr>
+          <td>source_sp500</td>
+          <td>通过</td>
+          <td>200</td>
+          <td>1288 ms</td>
+          <td>Gangtise OpenAPI 接口测试成功。</td>
+        </tr>
+        
+        <tr>
+          <td>source_sse50</td>
+          <td>通过</td>
+          <td>200</td>
+          <td>380 ms</td>
+          <td>Gangtise OpenAPI 接口测试成功。</td>
+        </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>前台 API 验证</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>检查项</th>
+            <th>路径</th>
+            <th>状态码</th>
+            <th>结果</th>
+            <th>Content-Type</th>
+          </tr>
+        </thead>
+        <tbody>
+        <tr>
+          <td>H5 页面</td>
+          <td><code>/h5?tenant=laowang</code></td>
+          <td>200</td>
+          <td>通过</td>
+          <td>text/html; charset=utf-8</td>
+        </tr>
+        
+        <tr>
+          <td>工作台接口</td>
+          <td><code>/api/kol/workbench?tenant=laowang</code></td>
+          <td>200</td>
+          <td>通过</td>
+          <td>application/json</td>
+        </tr>
+        
+        <tr>
+          <td>租户 Dashboard 接口</td>
+          <td><code>/api/tenant/laowang/dashboard</code></td>
+          <td>200</td>
+          <td>通过</td>
+          <td>application/json</td>
+        </tr>
+        
+        <tr>
+          <td>智能指标接口</td>
+          <td><code>/api/tenant/laowang/smart-indicators</code></td>
+          <td>200</td>
+          <td>通过</td>
+          <td>application/json</td>
+        </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

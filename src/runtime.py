@@ -8,6 +8,7 @@ import time
 import threading
 import re
 import hashlib
+import secrets
 import base64
 import csv
 import io
@@ -18,7 +19,7 @@ from html.parser import HTMLParser
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for, g, abort
 import random
 from datetime import datetime, timedelta
-from urllib.parse import urlsplit, parse_qsl
+from urllib.parse import urlsplit, parse_qsl, urlencode
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 from hmac import compare_digest
@@ -61,19 +62,52 @@ except Exception:
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+
+def _resolve_session_secret_key():
+    configured = str(os.environ.get("GANGTISE_DEMO_SECRET_KEY") or "").strip()
+    if configured:
+        return configured
+
+    # A random key generated at every restart invalidates every signed Flask
+    # session. Keep a local fallback stable across debug reloads and restarts.
+    secret_path = PROJECT_ROOT / ".gangtise_session_secret"
+    try:
+        if secret_path.exists():
+            existing = secret_path.read_text(encoding="utf-8").strip()
+            if len(existing) >= 32:
+                return existing
+        generated = secrets.token_urlsafe(48)
+        descriptor = os.open(str(secret_path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(generated)
+        return generated
+    except FileExistsError:
+        return secret_path.read_text(encoding="utf-8").strip()
+    except Exception:
+        # This only applies to a read-only development checkout. Deployments
+        # should always supply GANGTISE_DEMO_SECRET_KEY explicitly.
+        return hashlib.sha256(f"{PROJECT_ROOT}|gangtise-session-fallback".encode("utf-8")).hexdigest()
+
+
+def _resolve_session_ttl_minutes():
+    try:
+        return max(1, min(int(os.environ.get("GANGTISE_SESSION_TTL_MINUTES", "20")), 24 * 60))
+    except (TypeError, ValueError):
+        return 20
+
 app = Flask(
     __name__,
     template_folder=str(PROJECT_ROOT / "templates"),
     static_folder=str(PROJECT_ROOT / "static"),
 )
 app.config.update(
-    SECRET_KEY=os.environ.get("GANGTISE_DEMO_SECRET_KEY", os.urandom(32)),
+    SECRET_KEY=_resolve_session_secret_key(),
+    PERMANENT_SESSION_LIFETIME=timedelta(minutes=_resolve_session_ttl_minutes()),
+    SESSION_REFRESH_EACH_REQUEST=True,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
 )
 
-AUTH_PASSWORD = os.environ.get("GANGTISE_DEMO_PASSWORD", "gangtise")
-AUTH_SESSION_KEY = "gangtise_auth"
 H5_USER_SESSION_KEY = "current_h5_username"
 DB_PATH = os.environ.get("GANGTISE_DEMO_DB", str(PROJECT_ROOT / "gangtise_demo.db"))
 VECTOR_DB_HOST = os.environ.get("VECTOR_DB_HOST") or os.environ.get("IP") or "129.211.65.53"
@@ -143,6 +177,28 @@ DEFAULT_LLM_FEATURE_CATALOG = [
     {"feature_code": "hermes_intent_router", "feature_label": "Hermes 意图路由", "default_purpose": "general"},
     {"feature_code": "hermes_answer_synthesis", "feature_label": "Hermes 回答合成", "default_purpose": "general"},
     {"feature_code": "smart_indicator_formula_generation", "feature_label": "智能指标公式生成", "default_purpose": "general"},
+]
+DEFAULT_LLM_MODELS = [
+    {
+        "key": "gangtise-gemma4-12b-bf16",
+        "label": "Gangtise Gemma4 12B BF16",
+        "provider": "openai",
+        "model_name": "gemma4:12b-it-bf16",
+        "base_url": "http://8.155.160.194:6031/api",
+        "api_key": "sk-5da7f8f997d44a97ae6dcdeb74c45397",
+        "purpose": "general",
+        "enabled": True,
+    },
+    {
+        "key": "gangtise-gemma4-31b-q4km",
+        "label": "Gangtise Gemma4 31B Q4_K_M",
+        "provider": "openai",
+        "model_name": "gemma4:31b-it-q4_K_M",
+        "base_url": "http://8.155.160.194:6031/api",
+        "api_key": "sk-5da7f8f997d44a97ae6dcdeb74c45397",
+        "purpose": "general",
+        "enabled": True,
+    },
 ]
 INDICATOR_DEFINITION_FIELDS = {
     "indicator_code",
@@ -447,9 +503,25 @@ class PortalHtmlSanitizer(HTMLParser):
 DEFAULT_SITE_CONFIG = {
     "default_theme": "light",
     "default_accent": "blue",
-    "password_gate_enabled": True,
+    "auth_settings": {
+        "password_login_enabled": True,
+        "wechat_login_enabled": False,
+        "quick_select_enabled": True,
+        "wechat_runtime_test_enabled": True,
+        "wechat": {
+            "app_id": "",
+            "redirect_uri": "http://127.0.0.1:5001/api/h5/wechat/callback",
+            "scope": "snsapi_userinfo",
+            "auto_register_enabled": False,
+            "default_role": "investor",
+            "default_tenant_slug": "",
+            "default_advisor_name": "",
+        },
+    },
     "voice_transcription": {
         "engine": "local",
+        "post_process_mode": "rule_based",
+        "domain_glossary_enabled": True,
     },
     "voice_embedding": {
         "engine": "local",
@@ -667,9 +739,11 @@ DEFAULT_SITE_CONFIG = {
         "compose_timeout_seconds": 60,
     },
     "llm_registry": {
-        "default_model_key": "",
-        "models": [],
-        "feature_model_keys": {},
+        "default_model_key": "gangtise-gemma4-31b-q4km",
+        "models": copy.deepcopy(DEFAULT_LLM_MODELS),
+        "feature_model_keys": {
+            "review_voice_enhancement": "gangtise-gemma4-12b-bf16",
+        },
     },
     "brand": DEFAULT_BRAND_CONFIG,
     "default_tenant_slug": DEFAULT_TENANTS[0]["slug"],

@@ -1,19 +1,66 @@
 from src.runtime import *
 from src.domain.core_services import *
+from src.domain.core_services import _load_json_app_setting, _save_json_app_setting
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from html.parser import HTMLParser
+from urllib.parse import urljoin
+import shutil
+import subprocess
+import threading
+
+_watchlist_comments_schema_lock = threading.Lock()
+_watchlist_comments_schema_ready = False
 
 def gen_funnel_data():
     base = [68000, 5400, 1260, 128, 36]
     return [{"layer": FUNNEL_LAYERS[i], "count": base[i], "rate": round(base[i]/base[0]*100, 2)} for i in range(5)]
 
 def gen_channel_data():
-    data = [
+    color_map = {
+        "微信社群": "#07C160",
+        "内容合作": "#FE2C55",
+        "小红书": "#FF2442",
+        "转介绍": "#E6162D",
+        "直接流量": "#C8A96E",
+    }
+    fallback = [
         {"name": "微信社群", "users": 2100, "conversion": 6.4, "revenue": 28600, "color": "#07C160"},
         {"name": "内容合作", "users": 1400, "conversion": 4.8, "revenue": 19200, "color": "#FE2C55"},
         {"name": "小红书", "users": 980, "conversion": 3.6, "revenue": 13600, "color": "#FF2442"},
         {"name": "转介绍", "users": 620, "conversion": 12.1, "revenue": 24800, "color": "#E6162D"},
         {"name": "直接流量", "users": 300, "conversion": 15.0, "revenue": 16800, "color": "#C8A96E"},
     ]
-    return data
+    try:
+        users = list_users()
+    except Exception:
+        return fallback
+    stats = {
+        channel: {"users": 0, "paid_users": 0}
+        for channel in CHANNELS
+    }
+    for user in users:
+        if str(user.get("status") or "").strip().lower() != "active":
+            continue
+        if str(user.get("role") or "").strip().lower() not in {"investor", "dav"}:
+            continue
+        channel = str(user.get("h5_channel_label") or user.get("source_label") or "").strip()
+        if channel not in stats:
+            continue
+        stats[channel]["users"] += 1
+        if str(user.get("role") or "").strip().lower() == "investor" and bool(user.get("is_paid_sample")):
+            stats[channel]["paid_users"] += 1
+    if not any(item["users"] for item in stats.values()):
+        return fallback
+    return [
+        {
+            "name": channel,
+            "users": stats[channel]["users"],
+            "conversion": round((stats[channel]["paid_users"] / stats[channel]["users"] * 100), 1) if stats[channel]["users"] else 0,
+            "revenue": stats[channel]["paid_users"] * 500,
+            "color": color_map.get(channel, "#C8A96E"),
+        }
+        for channel in CHANNELS
+    ]
 
 def gen_kol_data():
     tenants = get_tenant_configs()
@@ -41,79 +88,47 @@ def gen_kol_data():
     return tenant_rows
 
 def gen_market_data():
-    indices = [
-        {
-            "code": "600519",
-            "name": "贵州茅台",
-            "market": "SH",
-            "value": 1688.20,
-            "change": 12.80,
-            "change_pct": 0.76,
-            "focus": "高端白酒",
-            "board": "稳健配置",
-            "alert_level": "normal",
-            "alert_text": "估值回到中枢附近，当前无明显预警",
-            "signal_summary": "盈利稳定，重点看消费修复持续性",
-            "authors": ["财经老王", "量化老师陈明"],
-        },
-        {
-            "code": "300750",
-            "name": "宁德时代",
-            "market": "SZ",
-            "value": 212.36,
-            "change": -3.84,
-            "change_pct": -1.78,
-            "focus": "动力电池",
-            "board": "新能源",
-            "alert_level": "warning",
-            "alert_text": "价格竞争仍在，需继续跟踪利润率和海外出货",
-            "signal_summary": "情绪回落，等待技术路线与订单验证",
-            "authors": ["新能源猎手阿强", "全球宏观James"],
-        },
-        {
-            "code": "00700",
-            "name": "腾讯控股",
-            "market": "HK",
-            "value": 388.40,
-            "change": 5.60,
-            "change_pct": 1.46,
-            "focus": "港股互联网",
-            "board": "港股互联网",
-            "alert_level": "attention",
-            "alert_text": "财报前估值修复较快，关注南向资金是否继续放量",
-            "signal_summary": "回购和财报兑现是两条主验证线",
-            "authors": ["投资女神Lisa", "港股研究员"],
-        },
-        {
-            "code": "688981",
-            "name": "中芯国际",
-            "market": "SH",
-            "value": 46.52,
-            "change": 1.18,
-            "change_pct": 2.60,
-            "focus": "半导体制造",
-            "board": "科技成长",
-            "alert_level": "attention",
-            "alert_text": "景气恢复尚未完全兑现，需继续跟踪产能利用率",
-            "signal_summary": "国产替代逻辑在，短期看盈利兑现",
-            "authors": ["财经老王", "宏观策略师"],
-        },
-        {
-            "code": "600036",
-            "name": "招商银行",
-            "market": "SH",
-            "value": 41.86,
-            "change": 0.22,
-            "change_pct": 0.53,
-            "focus": "银行",
-            "board": "稳健配置",
-            "alert_level": "normal",
-            "alert_text": "股息和资产质量稳定，当前无明显报警",
-            "signal_summary": "更适合作为组合稳定器跟踪",
-            "authors": ["全球宏观James", "量化老师陈明"],
-        },
+    display_catalog = [
+        {"code": "600519", "name": "贵州茅台", "market": "SH", "focus": "高端白酒", "board": "稳健配置"},
+        {"code": "300750", "name": "宁德时代", "market": "SZ", "focus": "动力电池", "board": "新能源"},
+        {"code": "00700", "name": "腾讯控股", "market": "HK", "focus": "港股互联网", "board": "港股互联网"},
+        {"code": "688981", "name": "中芯国际", "market": "SH", "focus": "半导体制造", "board": "科技成长"},
+        {"code": "600036", "name": "招商银行", "market": "SH", "focus": "银行", "board": "稳健配置"},
     ]
-    return indices
+    details_map = gen_watchlist_details()
+    items = []
+    for config in display_catalog:
+        detail = get_watchlist_detail_by_code(
+            stock_code=config["code"],
+            stock_name=config["name"],
+            details_map=details_map,
+        ) or {}
+        if not detail:
+            continue
+        authors = [
+            str(item.get("name") or "").strip()
+            for item in (detail.get("authors") or [])
+            if isinstance(item, dict) and str(item.get("name") or "").strip()
+        ]
+        items.append(
+            {
+                "code": config["code"],
+                "name": detail.get("name") or config["name"],
+                "market": detail.get("market") or config["market"],
+                "value": round(NumberLike(detail.get("price")), 2),
+                "change": round(NumberLike(detail.get("change")), 2),
+                "change_pct": round(NumberLike(detail.get("change_pct")), 2),
+                "focus": detail.get("focus") or detail.get("industry") or config["focus"],
+                "board": config["board"],
+                "alert_level": detail.get("alert_level") or "attention",
+                "alert_text": detail.get("alert_text") or ("Gangtise 行情暂未返回，当前先保留研究内容框架。" if detail.get("data_unavailable") else "当前无明显预警"),
+                "signal_summary": detail.get("signal_summary") or detail.get("fundamental", {}).get("summary") or "继续结合租户知识和真实行情跟踪。",
+                "authors": authors,
+                "data_source": detail.get("data_source") or "gangtise_openapi",
+                "data_unavailable": bool(detail.get("data_unavailable")),
+            }
+        )
+    return items
 
 
 def gen_macro_indicators():
@@ -151,6 +166,628 @@ def gen_macro_indicators():
             "hint": "若信用扩张迟迟不起来，顺周期与高弹性资产要谨慎。",
         },
     ]
+
+
+GANGTISE_OPENAPI_SUCCESS_CODE = "000000"
+GANGTISE_OPENAPI_LOGIN_PATH = "/application/auth/oauth/open/loginV2"
+_gangtise_env_loaded = False
+_gangtise_token_lock = threading.Lock()
+_gangtise_token_cache = {"token": "", "fetched_at": 0.0}
+GANGTISE_API_TEST_ENV_PATH = Path("/Users/xuchenfei/PycharmProjects/gangtise_api_test/.env")
+
+GANGTISE_INDICATOR_REGISTRY = {
+    "source_shanghai_index": {
+        "indicator_name": "上证指数",
+        "category": "数据湖指标",
+        "query_kind": "index_kline",
+        "security_code": "000001.SH",
+        "search_keyword": "上证指数",
+    },
+    "source_shenzhen_index": {
+        "indicator_name": "深证指数",
+        "category": "数据湖指标",
+        "query_kind": "index_kline",
+        "security_code": "399001.SZ",
+        "search_keyword": "深证指数",
+    },
+    "source_hs300": {
+        "indicator_name": "沪深300",
+        "category": "数据湖指标",
+        "query_kind": "index_kline",
+        "security_code": "000300.SH",
+        "search_keyword": "沪深300",
+    },
+    "source_sse50": {
+        "indicator_name": "上证50",
+        "category": "数据湖指标",
+        "query_kind": "index_kline",
+        "security_code": "000016.SH",
+        "search_keyword": "上证50",
+    },
+    "source_kc50": {
+        "indicator_name": "科创50",
+        "category": "数据湖指标",
+        "query_kind": "index_kline",
+        "security_code": "000688.SH",
+        "search_keyword": "科创50",
+    },
+    "source_cyb": {
+        "indicator_name": "创业板指",
+        "category": "数据湖指标",
+        "query_kind": "index_kline",
+        "security_code": "399006.SZ",
+        "search_keyword": "创业板指",
+    },
+    "source_brent": {
+        "indicator_name": "布伦特原油",
+        "category": "数据湖指标",
+        "query_kind": "edb_search",
+        "search_keyword": "布伦特原油",
+        "preferred_indicator_id": "S06000521",
+    },
+    "source_cpi": {
+        "indicator_name": "CPI",
+        "category": "数据湖指标",
+        "query_kind": "edb_search",
+        "search_keyword": "CPI:中国",
+        "preferred_indicator_id": "M00009835",
+    },
+    "source_dji": {
+        "indicator_name": "道琼斯",
+        "category": "数据湖指标",
+        "query_kind": "edb_search",
+        "search_keyword": "道琼斯工业平均指数",
+        "preferred_indicator_id": "M00009829",
+    },
+    "source_gold": {
+        "indicator_name": "黄金",
+        "category": "数据湖指标",
+        "query_kind": "edb_search",
+        "search_keyword": "伦敦黄金",
+        "preferred_indicator_id": "S04000018",
+    },
+    "source_hsi": {
+        "indicator_name": "恒生指数",
+        "category": "数据湖指标",
+        "query_kind": "edb_search",
+        "search_keyword": "恒生指数",
+        "preferred_indicator_id": "M00015437",
+    },
+    "source_industry_index": {
+        "indicator_name": "行业指数",
+        "category": "数据湖指标",
+        "query_kind": "edb_search",
+        "search_keyword": "Wind行业指数",
+        "preferred_indicator_id": "S02002067",
+    },
+    "source_news": {
+        "indicator_name": "新闻情绪",
+        "category": "数据湖指标",
+        "query_kind": "edb_search",
+        "search_keyword": "新闻情绪指数",
+        "preferred_indicator_id": "M00015816",
+    },
+    "source_nikkei": {
+        "indicator_name": "日经225",
+        "category": "数据湖指标",
+        "query_kind": "edb_search",
+        "search_keyword": "日经225指数",
+        "preferred_indicator_id": "M00015432",
+    },
+    "source_oil": {
+        "indicator_name": "原油",
+        "category": "数据湖指标",
+        "query_kind": "edb_search",
+        "search_keyword": "WTI原油",
+        "preferred_indicator_id": "S00055151",
+    },
+    "source_silver": {
+        "indicator_name": "白银",
+        "category": "数据湖指标",
+        "query_kind": "edb_search",
+        "search_keyword": "COMEX白银",
+        "preferred_indicator_id": "S04000637",
+    },
+    "source_sp500": {
+        "indicator_name": "标普500",
+        "category": "数据湖指标",
+        "query_kind": "edb_search",
+        "search_keyword": "标准普尔500指数",
+        "preferred_indicator_id": "M00006167",
+    },
+    "source_nasdaq": {
+        "indicator_name": "纳斯达克",
+        "category": "数据湖指标",
+        "query_kind": "edb_search",
+        "search_keyword": "纳斯达克综合指数",
+        "preferred_indicator_id": "M00009828",
+    },
+    "source_bdi": {
+        "indicator_name": "BDI",
+        "category": "数据湖指标",
+        "query_kind": "edb_search",
+        "search_keyword": "BDI",
+    },
+}
+
+
+def _load_gangtise_env_file(env_path):
+    path = Path(env_path)
+    if not path.exists():
+        return False
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = str(raw_line or "").strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip())
+    return True
+
+
+def _ensure_gangtise_env_loaded():
+    global _gangtise_env_loaded
+    if _gangtise_env_loaded:
+        return
+    try:
+        # Keep the loading style aligned with gangtise_api_test: parse .env directly and
+        # populate runtime env vars without introducing an extra dependency.
+        _load_gangtise_env_file(PROJECT_ROOT / ".env")
+        _load_gangtise_env_file(GANGTISE_API_TEST_ENV_PATH)
+    except Exception:
+        app.logger.exception("Failed to load .env for Gangtise OpenAPI config")
+    _gangtise_env_loaded = True
+
+
+def get_gangtise_openapi_config():
+    _ensure_gangtise_env_loaded()
+    return {
+        "base_url": str(os.getenv("GANGTISE_API_BASE_URL", "https://openapi.gangtise.com")).strip().rstrip("/"),
+        "access_key": str(os.getenv("GANGTISE_ACCESS_KEY", "")).strip(),
+        "secret_key": str(os.getenv("GANGTISE_SECRET_KEY", "")).strip(),
+        "long_token": str(os.getenv("GANGTISE_LONG_TOKEN", "")).strip(),
+    }
+
+
+def _gangtise_request_json(path, payload, headers=None, timeout=30):
+    config = get_gangtise_openapi_config()
+    body = json.dumps(payload or {}, ensure_ascii=False).encode("utf-8")
+    request_headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    if isinstance(headers, dict) and headers:
+        request_headers.update(headers)
+    started = time.perf_counter()
+    request_obj = Request(f"{config['base_url']}{path}", data=body, headers=request_headers, method="POST")
+    try:
+        with urlopen(request_obj, timeout=timeout) as response:
+            raw = response.read().decode("utf-8", errors="replace")
+            parsed = decode_json_payload(raw)
+            return response.status, parsed, round((time.perf_counter() - started) * 1000)
+    except HTTPError as error:
+        raw = error.read().decode("utf-8", errors="replace")
+        return error.code, decode_json_payload(raw), round((time.perf_counter() - started) * 1000)
+    except URLError as error:
+        return 0, {"message": f"Network error: {error.reason}"}, round((time.perf_counter() - started) * 1000)
+    except Exception as error:
+        return 0, {"message": f"Unexpected error: {error}"}, round((time.perf_counter() - started) * 1000)
+
+
+def decode_json_payload(raw):
+    try:
+        value = json.loads(raw)
+    except Exception:
+        return {"raw": raw}
+    return value if isinstance(value, dict) else {"data": value}
+
+
+def numeric_value(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def obtain_gangtise_openapi_token(force_refresh=False):
+    config = get_gangtise_openapi_config()
+    access_key = config.get("access_key") or ""
+    secret_key = config.get("secret_key") or ""
+    long_token = config.get("long_token") or ""
+    if not (access_key and secret_key) and not long_token:
+        return False, "", {"message": "Gangtise OpenAPI credentials are not configured."}, 0, 0
+    now_value = time.time()
+    with _gangtise_token_lock:
+        cached_token = _gangtise_token_cache.get("token") or ""
+        fetched_at = float(_gangtise_token_cache.get("fetched_at") or 0.0)
+        if cached_token and not force_refresh and now_value - fetched_at < 45 * 60:
+            return True, cached_token, {"source": "cache"}, 200, 0
+        if access_key and secret_key:
+            status, response, duration = _gangtise_request_json(
+                GANGTISE_OPENAPI_LOGIN_PATH,
+                {"accessKey": access_key, "secretKey": secret_key},
+                timeout=20,
+            )
+            token = str(((response.get("data") or {}).get("accessToken") or "")).strip()
+            ok = status == 200 and str(response.get("code") or "") == GANGTISE_OPENAPI_SUCCESS_CODE and bool(token)
+            if ok:
+                _gangtise_token_cache["token"] = token
+                _gangtise_token_cache["fetched_at"] = now_value
+                return True, token, response, status, duration
+        if long_token:
+            return True, long_token, {"source": "GANGTISE_LONG_TOKEN"}, 200, 0
+        return False, "", {"message": "Gangtise OpenAPI token login failed."}, 0, 0
+
+
+def _is_gangtise_token_invalid(response):
+    if not isinstance(response, dict):
+        return False
+    message = " ".join(
+        [
+            str(response.get("msg") or "").strip(),
+            str(response.get("message") or "").strip(),
+            str(response.get("error") or "").strip(),
+        ]
+    ).strip().lower()
+    return "token is invalid" in message or "invalid token" in message or "token invalid" in message
+
+
+def post_gangtise_openapi_json(path, payload, token="", timeout=30, _retried=False):
+    effective_token = str(token or "").strip()
+    auth_status = None
+    auth_response = {}
+    auth_duration = 0
+    if not effective_token:
+        token_ok, fetched_token, auth_response, auth_status, auth_duration = obtain_gangtise_openapi_token()
+        if not token_ok:
+            return auth_status, auth_response, auth_duration
+        effective_token = fetched_token
+    headers = {"Authorization": effective_token if effective_token.startswith("Bearer ") else f"Bearer {effective_token}"}
+    status, response, duration = _gangtise_request_json(path, payload, headers=headers, timeout=timeout)
+    if not _retried and _is_gangtise_token_invalid(response):
+        token_ok, refreshed_token, auth_response, auth_status, auth_duration = obtain_gangtise_openapi_token(force_refresh=True)
+        if token_ok and refreshed_token:
+            retried_status, retried_response, retried_duration = post_gangtise_openapi_json(
+                path,
+                payload,
+                token=refreshed_token,
+                timeout=timeout,
+                _retried=True,
+            )
+            return retried_status, retried_response, auth_duration + retried_duration
+    return status, response, duration
+
+
+def choose_gangtise_indicator_candidate(items, keyword="", preferred_indicator_id=""):
+    rows = items if isinstance(items, list) else []
+    if not rows:
+        return None
+    preferred = str(preferred_indicator_id or "").strip()
+    if preferred:
+        for item in rows:
+            if str(item.get("indicatorId") or "").strip() == preferred:
+                return item
+    normalized_keyword = str(keyword or "").strip().lower()
+    exact = [
+        item for item in rows
+        if normalized_keyword and normalized_keyword in str(item.get("indicatorName") or "").strip().lower()
+    ]
+    return (exact or rows)[0]
+
+
+def normalize_gangtise_kline_points(response):
+    data = response.get("data") if isinstance(response, dict) else {}
+    if not isinstance(data, dict):
+        return []
+    headers = data.get("fieldList") if isinstance(data.get("fieldList"), list) else []
+    rows = data.get("list") if isinstance(data.get("list"), list) else []
+    field_index = {field: headers.index(field) for field in headers}
+    required = ("tradeDate", "close")
+    if any(name not in field_index for name in required):
+        return []
+    points = []
+    for row in rows:
+        if not isinstance(row, list):
+            continue
+        try:
+            trade_date = str(row[field_index["tradeDate"]] or "").strip()
+            close_value = float(row[field_index["close"]])
+        except Exception:
+            continue
+        open_value = numeric_value(row[field_index["open"]]) if "open" in field_index else None
+        high_value = numeric_value(row[field_index["high"]]) if "high" in field_index else None
+        low_value = numeric_value(row[field_index["low"]]) if "low" in field_index else None
+        points.append(
+            {
+                "date": trade_date,
+                "open": close_value if open_value is None else open_value,
+                "high": close_value if high_value is None else high_value,
+                "low": close_value if low_value is None else low_value,
+                "close": close_value,
+            }
+        )
+    points.sort(key=lambda item: item["date"])
+    return points
+
+
+def normalize_gangtise_source_line_points(response):
+    data = response.get("data") if isinstance(response, dict) else {}
+    headers = data.get("fieldList") if isinstance(data, dict) and isinstance(data.get("fieldList"), list) else []
+    date_index = headers.index("tradeDate") if "tradeDate" in headers else -1
+    close_index = headers.index("close") if "close" in headers else -1
+    if date_index < 0 or close_index < 0:
+        return []
+    points = []
+    for row in data.get("list", []) if isinstance(data, dict) else []:
+        if not isinstance(row, list) or len(row) <= close_index:
+            continue
+        close_value = numeric_value(row[close_index])
+        if close_value is None:
+            continue
+        points.append([row[date_index], close_value])
+    return points
+
+
+def normalize_gangtise_source_ohlc_rows(response):
+    data = response.get("data") if isinstance(response, dict) else {}
+    headers = data.get("fieldList") if isinstance(data, dict) and isinstance(data.get("fieldList"), list) else []
+    required = ("tradeDate", "open", "high", "low", "close")
+    if any(field not in headers for field in required):
+        return []
+    indexes = {field: headers.index(field) for field in required}
+    rows = []
+    for row in data.get("list", []) if isinstance(data, dict) else []:
+        if not isinstance(row, list) or len(row) <= max(indexes.values()):
+            continue
+        values = {field: numeric_value(row[index]) for field, index in indexes.items() if field != "tradeDate"}
+        if any(value is None for value in values.values()):
+            continue
+        rows.append({"time": row[indexes["tradeDate"]], **values})
+    return rows
+
+
+def normalize_gangtise_edb_points(response):
+    data = response.get("data") if isinstance(response, dict) else {}
+    if not isinstance(data, dict):
+        return []
+    rows = data.get("dataList") if isinstance(data.get("dataList"), list) else data.get("list")
+    rows = rows if isinstance(rows, list) else []
+    points = []
+    for row in rows:
+        if not isinstance(row, list) or len(row) < 2:
+            continue
+        point_value = numeric_value(row[1])
+        trade_date = str(row[0] or "").strip()
+        if point_value is None or not trade_date:
+            continue
+        points.append({"date": trade_date, "open": point_value, "high": point_value, "low": point_value, "close": point_value})
+    points.sort(key=lambda item: item["date"])
+    return points
+
+
+def is_gangtise_openapi_success(status, response):
+    return (
+        int(status or 0) == 200
+        and isinstance(response, dict)
+        and str(response.get("code") or "").strip() == GANGTISE_OPENAPI_SUCCESS_CODE
+        and response.get("status") is True
+    )
+
+
+def build_gangtise_market_kline_payload(security_code, start_date, end_date, limit=300):
+    return {
+        "securityList": [str(security_code or "").strip().upper()],
+        "startDate": str(start_date or "").strip(),
+        "endDate": str(end_date or "").strip(),
+        "limit": max(20, min(int(limit or 300), 500)),
+        "fieldList": ["securityCode", "securityName", "tradeDate", "open", "high", "low", "close", "volume"],
+    }
+
+
+def resolve_gangtise_market_date_window(days=180):
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=max(7, int(days or 180)))
+    return start_date.isoformat(), end_date.isoformat()
+
+
+def fetch_gangtise_market_kline_series(path, security_code, token="", start_date="", end_date="", limit=300, timeout=20):
+    effective_start, effective_end = (
+        (str(start_date or "").strip(), str(end_date or "").strip())
+        if start_date and end_date else
+        resolve_gangtise_market_date_window(days=180)
+    )
+    payload = build_gangtise_market_kline_payload(
+        security_code=security_code,
+        start_date=effective_start,
+        end_date=effective_end,
+        limit=limit,
+    )
+    status, response, duration = post_gangtise_openapi_json(path, payload, token=token, timeout=timeout)
+    points = normalize_gangtise_kline_points(response)
+    return {
+        "ok": is_gangtise_openapi_success(status, response) and len(points) >= 2,
+        "http_status": int(status or 0),
+        "duration_ms": int(duration or 0),
+        "path": path,
+        "payload": payload,
+        "points": points,
+        "response": response if isinstance(response, dict) else {},
+        "message": (
+            str((response or {}).get("msg") or (response or {}).get("message") or "").strip()
+            if isinstance(response, dict) else
+            ""
+        ),
+    }
+
+
+def fetch_gangtise_indicator_series(indicator_code, start_date="", end_date="", token=""):
+    entry = GANGTISE_INDICATOR_REGISTRY.get(slugify_code(indicator_code, "indicator"))
+    if not entry:
+        return {"ok": False, "message": "indicator_registry_not_found", "points": [], "response": {}, "duration_ms": 0, "source_meta": {}}
+    effective_end = str(end_date or datetime.now().strftime("%Y-%m-%d")).strip()
+    effective_start = str(start_date or (datetime.now() - timedelta(days=180)).strftime("%Y-%m-%d")).strip()
+    query_kind = str(entry.get("query_kind") or "").strip()
+    if query_kind == "index_kline":
+        payload = build_gangtise_market_kline_payload(
+            security_code=entry["security_code"],
+            start_date=effective_start,
+            end_date=effective_end,
+            limit=240,
+        )
+        status, response, duration = post_gangtise_openapi_json(
+            "/application/open-quote/index/kline/daily",
+            payload,
+            token=token,
+            timeout=30,
+        )
+        ohlc_rows = normalize_gangtise_source_ohlc_rows(response)
+        close_points = normalize_gangtise_source_line_points(response)
+        points = [
+            {
+                "date": str(item.get("time") or "").strip(),
+                "open": numeric_value(item.get("open")),
+                "high": numeric_value(item.get("high")),
+                "low": numeric_value(item.get("low")),
+                "close": numeric_value(item.get("close")),
+            }
+            for item in ohlc_rows
+            if str(item.get("time") or "").strip()
+        ]
+        if not points:
+            points = [
+                {"date": str(item[0]).strip(), "open": item[1], "high": item[1], "low": item[1], "close": item[1]}
+                for item in close_points
+                if isinstance(item, list) and len(item) >= 2 and str(item[0]).strip()
+            ]
+        return {
+            "ok": bool(is_gangtise_openapi_success(status, response) and len(points) >= 2),
+            "message": (
+                str((response or {}).get("msg") or (response or {}).get("message") or "").strip()
+                if isinstance(response, dict) else
+                ""
+            ),
+            "points": points,
+            "response": response if isinstance(response, dict) else {},
+            "duration_ms": int(duration or 0),
+            "source_meta": {"type": "index_kline", "path": "/application/open-quote/index/kline/daily", "securityCode": entry["security_code"]},
+        }
+    search_payload = {"keyword": entry.get("search_keyword") or entry.get("indicator_name") or indicator_code, "Limit": 20}
+    search_status, search_response, search_duration = post_gangtise_openapi_json("/application/open-alternative/EDB/search", search_payload, token=token, timeout=30)
+    selected = choose_gangtise_indicator_candidate(
+        search_response.get("data") or [],
+        keyword=entry.get("search_keyword") or entry.get("indicator_name") or indicator_code,
+        preferred_indicator_id=entry.get("preferred_indicator_id") or "",
+    )
+    if not is_gangtise_openapi_success(search_status, search_response) or not selected:
+        return {
+            "ok": False,
+            "message": search_response.get("msg") or search_response.get("message") or "Gangtise EDB search failed",
+            "points": [],
+            "response": search_response,
+            "duration_ms": search_duration,
+            "source_meta": {"type": "edb_search", "keyword": search_payload["keyword"]},
+        }
+    data_payload = {"indicatorIdList": [selected["indicatorId"]], "startDate": effective_start, "endDate": effective_end}
+    status, response, duration = post_gangtise_openapi_json("/application/open-alternative/EDB/getData", data_payload, token=token, timeout=30)
+    points = normalize_gangtise_edb_points(response)
+    return {
+        "ok": is_gangtise_openapi_success(status, response) and len(points) >= 2,
+        "message": response.get("msg") or response.get("message") or "",
+        "points": points,
+        "response": response,
+        "duration_ms": search_duration + duration,
+        "source_meta": {
+            "type": "edb",
+            "path": "/application/open-alternative/EDB/getData",
+            "indicatorId": selected.get("indicatorId") or "",
+            "indicatorName": selected.get("indicatorName") or "",
+            "unit": selected.get("unit") or "",
+        },
+    }
+def build_gangtise_raw_payload(indicator_code, series_result):
+    points = series_result.get("points") if isinstance(series_result, dict) else []
+    entry = GANGTISE_INDICATOR_REGISTRY.get(slugify_code(indicator_code, "indicator")) or {}
+    if not points:
+        return {}
+    latest = points[-1]
+    prev_close = numeric_value(points[-2]["close"]) if len(points) > 1 else numeric_value(latest.get("close"))
+    latest_close = numeric_value(latest.get("close"))
+    latest_status = build_real_indicator_status(latest_close, prev_close)
+    source_meta = series_result.get("source_meta") if isinstance(series_result.get("source_meta"), dict) else {}
+    raw_preview = json.dumps(
+        {
+            "source_meta": source_meta,
+            "latest": latest,
+            "points": [{"date": item["date"], "close": item["close"]} for item in points[-5:]],
+        },
+        ensure_ascii=False,
+    )
+    return {
+        "indicator": entry.get("indicator_name") or indicator_code,
+        "provider": "Gangtise OpenAPI",
+        "connector_type": "gangtise_openapi",
+        "extractor_type": str(entry.get("query_kind") or "gangtise_openapi"),
+        "status": latest_status,
+        "timestamp": f"{str(latest.get('date') or '')[:10]} 00:00:00",
+        "value": latest_close,
+        "open": numeric_value(latest.get("open")),
+        "high": numeric_value(latest.get("high")),
+        "low": numeric_value(latest.get("low")),
+        "close": latest_close,
+        "raw_preview": raw_preview[:1200],
+        "record_summary": str(series_result.get("message") or "Gangtise OpenAPI 已返回时间序列")[:240],
+        "source_meta": source_meta,
+    }
+
+
+def build_gangtise_source_seed_payload(indicator_code, existing=None):
+    entry = GANGTISE_INDICATOR_REGISTRY.get(slugify_code(indicator_code, "indicator")) or {}
+    existing = existing or {}
+    query_kind = str(entry.get("query_kind") or "edb_search").strip()
+    path = "/application/open-quote/index/kline/daily" if query_kind == "index_kline" else "/application/open-alternative/EDB/getData"
+    search_keyword = str(entry.get("search_keyword") or entry.get("indicator_name") or indicator_code).strip()
+    preferred_indicator_id = str(entry.get("preferred_indicator_id") or "").strip()
+    response_sample = existing.get("response_sample") if isinstance(existing.get("response_sample"), dict) and existing.get("response_sample") else {
+        "indicator": entry.get("indicator_name") or indicator_code,
+        "provider": "Gangtise OpenAPI",
+        "connector_type": "gangtise_openapi",
+        "extractor_type": query_kind,
+        "status": "unavailable",
+        "timestamp": now_ts(),
+        "value": None,
+        "raw_preview": "",
+        "source_meta": {"query_kind": query_kind, "search_keyword": search_keyword, "preferred_indicator_id": preferred_indicator_id},
+        "record_summary": "Gangtise API 源已配置；如未同步到真实值，会明确显示未取到，不使用模拟值。",
+    }
+    response_mapping = {
+        "value_path": "value",
+        "time_path": "timestamp",
+        "status_path": "status",
+        "connector_type": "gangtise_openapi",
+        "extractor_type": query_kind,
+        "request_blueprint": {
+            "path": path,
+            "search_keyword": search_keyword,
+            "security_code": entry.get("security_code") or "",
+            "preferred_indicator_id": preferred_indicator_id,
+        },
+    }
+    return {
+        "source_code": slugify_code(indicator_code, "source"),
+        "indicator_code": slugify_code(indicator_code, "indicator"),
+        "provider": "Gangtise OpenAPI",
+        "base_url": get_gangtise_openapi_config()["base_url"],
+        "path": path,
+        "method": "POST",
+        "auth_type": "gangtise_openapi",
+        "headers": {},
+        "query": {},
+        "body": {},
+        "response_mapping": response_mapping,
+        "response_sample": response_sample,
+        "source_status": "configured",
+        "enabled": bool(existing.get("enabled", True)),
+        "last_test_status": str(existing.get("last_test_status") or "").strip(),
+        "last_http_status": existing.get("last_http_status"),
+        "last_tested_at": str(existing.get("last_tested_at") or "").strip(),
+        "last_test_detail": str(existing.get("last_test_detail") or "Gangtise OpenAPI 数据源").strip(),
+    }
 
 
 
@@ -241,7 +878,7 @@ def build_source_sample_from_market_dashboard(raw):
             sample["high"] = coerce_float(fields[4]) if len(fields) > 4 else None
             sample["low"] = coerce_float(fields[5]) if len(fields) > 5 else None
     elif extractor_type == "akshare":
-        sample["record_summary"] = detail or f"{indicator_name} AKShare 样例"
+        sample["record_summary"] = detail or f"{indicator_name} 历史数据样例"
         sample["value"] = coerce_float(re.search(r"(-?\\d+(?:\\.\\d+)?)", detail).group(1), None) if re.search(r"(-?\\d+(?:\\.\\d+)?)", detail) else None
     else:
         sample["record_summary"] = detail or f"{indicator_name} 样例预览"
@@ -495,6 +1132,39 @@ def execute_indicator_source_landing(source_code, prefer_live=False):
         raise ValueError("indicator_source_not_found")
     connector_type = infer_source_connector_type(source)
     response_mapping = source.get("response_mapping") if isinstance(source.get("response_mapping"), dict) else {}
+    if connector_type == "gangtise_openapi":
+        series_result = fetch_gangtise_indicator_series(source["indicator_code"])
+        raw_payload = build_gangtise_raw_payload(source["indicator_code"], series_result)
+        success = bool(series_result.get("ok")) and bool(raw_payload)
+        if not raw_payload:
+            raw_payload = {
+                "indicator": source.get("indicator_code") or source.get("source_code") or "指标",
+                "provider": "Gangtise OpenAPI",
+                "connector_type": "gangtise_openapi",
+                "extractor_type": str((source.get("response_mapping") or {}).get("extractor_type") or "gangtise_openapi"),
+                "status": "unavailable",
+                "timestamp": now_ts(),
+                "value": None,
+                "record_summary": str(series_result.get("message") or "Gangtise OpenAPI 当前未返回有效时间序列，未使用模拟值。")[:240],
+                "source_meta": series_result.get("source_meta") if isinstance(series_result.get("source_meta"), dict) else {},
+            }
+        fetch_mode = "gangtise_openapi_live" if success else "gangtise_openapi_unavailable"
+        summary = series_result.get("message") or ("Gangtise OpenAPI 实时接入成功。" if success else "Gangtise OpenAPI 当前未返回有效时间序列，未使用模拟值。")
+        record = persist_indicator_raw_record(
+            source,
+            raw_payload,
+            fetch_mode=fetch_mode,
+            http_status=200 if success else None,
+            success=success,
+            summary=summary,
+        )
+        return {
+            "record": record,
+            "connector_type": connector_type,
+            "fetch_mode": fetch_mode,
+            "detail": summary,
+            "used_sample": not success,
+        }
     if connector_type == "http" and prefer_live and str(source.get("base_url") or "").strip():
         url = source["base_url"].rstrip("/") + "/" + source["path"].lstrip("/")
         query = source["query"] if isinstance(source["query"], dict) else {}
@@ -562,9 +1232,9 @@ def execute_indicator_source_landing(source_code, prefer_live=False):
         fetch_mode = "http_blueprint_sample"
         summary = "HTTP Source 当前按蓝图样例入湖，可在下一步切换到真实实时接入。"
     elif connector_type == "akshare":
-        sample_payload.setdefault("record_summary", str(source.get("last_test_detail") or "AKShare 蓝图样例"))
+        sample_payload.setdefault("record_summary", str(source.get("last_test_detail") or "历史数据蓝图样例"))
         fetch_mode = "akshare_blueprint"
-        summary = "AKShare Source 当前按蓝图样例入湖，后续接真实执行器。"
+        summary = "历史数据 Source 当前按蓝图样例入湖，后续接真实执行器。"
     else:
         fetch_mode = "manual_blueprint"
         summary = "Manual Source 已按样例原始数据落地区。"
@@ -779,7 +1449,7 @@ def normalize_indicator_definition(payload, existing=None):
         "unit": str(base.get("unit") or "").strip(),
         "owner": str(base.get("owner") or "平台研究运营").strip(),
         "source_type": source_type,
-        "source_type_label": str(base.get("source_type_label") or "模拟指标").strip() or "模拟指标",
+        "source_type_label": str(base.get("source_type_label") or "指标").strip() or "指标",
         "provider": str(base.get("provider") or "平台数据层").strip(),
         "status_hint": str(base.get("status_hint") or "attention").strip() or "attention",
         "assessment_template": str(base.get("assessment_template") or "").strip(),
@@ -1117,6 +1787,23 @@ def test_indicator_source(source_code):
     if not source:
         raise ValueError("indicator_source_not_found")
     start = time.time()
+    connector_type = infer_source_connector_type(source)
+    if connector_type == "gangtise_openapi":
+        series_result = fetch_gangtise_indicator_series(source["indicator_code"])
+        latency_ms = int((time.time() - start) * 1000)
+        sample_payload = build_gangtise_raw_payload(source["indicator_code"], series_result)
+        success = bool(series_result.get("ok")) and bool(sample_payload)
+        http_status = 200 if success else None
+        response_text = json.dumps(sample_payload or series_result.get("response") or {}, ensure_ascii=False)
+        error_text = "" if success else (series_result.get("message") or "Gangtise OpenAPI 未返回有效时间序列")
+        record_indicator_source_test(source["source_code"], success, http_status, latency_ms, response_text if success else "", error_text)
+        return {
+            "success": success,
+            "http_status": http_status,
+            "latency_ms": latency_ms,
+            "response_sample": sample_payload or {},
+            "detail": "Gangtise OpenAPI 接口测试成功。" if success else error_text,
+        }
     if not source["base_url"]:
         sample = source["response_sample"] or {"message": "未配置真实地址，使用样例响应作为测试结果。"}
         latency_ms = int((time.time() - start) * 1000)
@@ -1634,40 +2321,37 @@ def build_indicator_lake_trace(indicator_code, limit=12):
 def ensure_default_indicator_sources():
     existing = {item["source_code"] for item in list_indicator_source_defs()}
     imported = 0
-    for raw in load_market_dashboard_indicators():
-        indicator_name = str(raw.get("indicator", "")).strip()
-        if not indicator_name:
-            continue
-        indicator_code = slugify_code(raw.get("id") or indicator_name, "lake_indicator")
+    for indicator_code, entry in GANGTISE_INDICATOR_REGISTRY.items():
+        indicator_name = str(entry.get("indicator_name") or indicator_code).strip()
         if not get_indicator_definition(indicator_code):
             save_indicator_definition(
                 {
                     "indicator_code": indicator_code,
                     "indicator_name": indicator_name,
-                    "category": str(raw.get("category") or "数据湖指标").strip(),
-                    "description": str(raw.get("notes") or "用于市场与平台统一分析的外部指标源。").strip(),
+                    "category": str(entry.get("category") or "数据湖指标").strip(),
+                    "description": "用于市场与平台统一分析的 Gangtise OpenAPI 指标源。",
                     "unit": "",
-                    "owner": "market_dashboard 数据湖",
+                    "owner": "Gangtise OpenAPI 指标层",
                     "source_type": "lake",
                     "source_type_label": "数据湖指标",
-                    "provider": str(raw.get("provider") or "market_dashboard").strip(),
+                    "provider": "Gangtise OpenAPI",
                     "status_hint": "attention",
-                    "assessment_template": str(raw.get("notes") or "该指标来自 market_dashboard 数据湖，可用于平台与工作台统一分析。").strip(),
+                    "assessment_template": f"{indicator_name} 已接入平台统一指标层，可用于 Dashboard、Hermes 和工作台分析。",
                     "alert_template": "需关注数据源刷新与连通状态",
-                    "watchers": ["market_dashboard", "Admin 指标专区", "大V 工作台"],
+                    "watchers": ["Gangtise OpenAPI", "Admin 指标专区", "大V 工作台"],
                     "display_config": {"show_in_admin": True, "show_in_h5": False},
-                    "enabled": bool(raw.get("enabled", True)),
+                    "enabled": True,
                 }
             )
-        source_code = slugify_code(raw.get("id") or f"{indicator_code}_source", "source")
+        source_code = slugify_code(indicator_code, "source")
         existing_source = get_indicator_source_def(source_code)
         if source_code in existing and existing_source:
-            seed_payload = build_indicator_source_seed_payload(raw, existing=existing_source)
+            seed_payload = build_gangtise_source_seed_payload(indicator_code, existing=existing_source)
             seed_payload["source_code"] = existing_source["source_code"]
             save_indicator_source_def(seed_payload)
             ensure_indicator_mapping_rule_for_source(get_indicator_source_def(source_code))
             continue
-        save_indicator_source_def(build_indicator_source_seed_payload(raw))
+        save_indicator_source_def(build_gangtise_source_seed_payload(indicator_code))
         existing.add(source_code)
         ensure_indicator_mapping_rule_for_source(get_indicator_source_def(source_code))
         imported += 1
@@ -1683,15 +2367,15 @@ def invalidate_indicator_hub_cache():
 
 def prepare_indicator_hub_store(force=False):
     imported = ensure_default_indicator_sources()
+    purged_simulated = purge_simulated_indicator_store()
     real_sync = sync_real_indicator_history_from_market_cache(force=force)
     derived_sync = sync_derived_smart_indicator_history(force=force)
-    mock_seed = seed_mock_indicator_lake(force=force)
     invalidate_indicator_hub_cache()
     return {
         "imported_sources": imported,
+        "purged_simulated": purged_simulated,
         "real_sync": real_sync,
         "derived_sync": derived_sync,
-        "mock_seed": mock_seed,
     }
 
 
@@ -1701,32 +2385,21 @@ DEFAULT_ADMIN_TASKS = [
         "task_name": "指标中心预处理",
         "task_group": "indicator",
         "task_type": "prepare_indicator_hub",
-        "description": "补齐指标源定义，并同步真实历史、推导智能指标和模拟底仓。",
+        "description": "补齐指标源定义、清理模拟残留，并同步真实历史与真实因子推导结果。",
         "schedule_type": "interval",
         "schedule_value": "1800",
         "enabled": 1,
         "timeout_seconds": 900,
     },
     {
-        "task_code": "indicator_market_cache_sync",
-        "task_name": "市场缓存同步",
+        "task_code": "indicator_gangtise_openapi_sync",
+        "task_name": "Gangtise 指标同步",
         "task_group": "indicator",
         "task_type": "sync_real_indicator_history",
-        "description": "从 market_dashboard 本地缓存同步真实因子历史到指标湖。",
+        "description": "从 Gangtise OpenAPI 同步真实因子历史到指标湖。",
         "schedule_type": "interval",
         "schedule_value": "3600",
         "enabled": 1,
-        "timeout_seconds": 600,
-    },
-    {
-        "task_code": "indicator_mock_seed",
-        "task_name": "模拟指标补种",
-        "task_group": "indicator",
-        "task_type": "seed_mock_indicator_lake",
-        "description": "当真实数据缺失时补齐模拟指标底仓，避免前台空白。",
-        "schedule_type": "manual",
-        "schedule_value": "",
-        "enabled": 0,
         "timeout_seconds": 600,
     },
     {
@@ -2069,41 +2742,312 @@ def build_real_indicator_kline_payload(series):
     }
 
 
+def build_empty_kline_payload():
+    return {
+        "candles": [],
+        "ma5": [],
+        "ma10": [],
+        "ma20": [],
+        "anomalies": [],
+    }
+
+
+def build_gangtise_unavailable_indicator_item(indicator_code, registry_entry=None, definition=None, sources=None, latest=None, reason=""):
+    entry = registry_entry or {}
+    definition = definition or {}
+    sources = list(sources or [])
+    latest = latest or {}
+    primary_source = sources[0] if sources else None
+    indicator_name = str(
+        definition.get("indicator_name")
+        or entry.get("indicator_name")
+        or indicator_code
+    ).strip() or indicator_code
+    unavailable_reason = str(reason or "Gangtise API 当前未返回有效数据，未使用模拟值。").strip()
+    return {
+        "id": indicator_code,
+        "name": indicator_name,
+        "tenant_slug": str(definition.get("tenant_slug") or "").strip().lower(),
+        "category": definition.get("category") or entry.get("category") or "数据湖指标",
+        "unit": definition.get("unit") or "",
+        "description": definition.get("description") or "",
+        "owner": definition.get("owner") or "平台数据层",
+        "value": "--",
+        "numeric_value": None,
+        "assessment": unavailable_reason,
+        "status": "unavailable",
+        "alert": unavailable_reason,
+        "enabled": bool(definition.get("enabled", True)),
+        "last_updated": latest.get("updated_at") or definition.get("updated_at") or "未同步",
+        "watchers": definition.get("watchers", []),
+        "prompt_text": str(definition.get("prompt_text") or "").strip(),
+        "formula_js": str(definition.get("formula_js") or "").strip(),
+        "selected_indicators": normalize_selected_indicator_refs(definition.get("selected_indicators")),
+        "display_order": int(definition.get("display_order") or 0),
+        "history": [],
+        "history_series": [],
+        "history_anomalies": [],
+        "history_kline": build_empty_kline_payload(),
+        "source_type": definition.get("source_type") or "indicator",
+        "source_type_label": definition.get("source_type_label") or "指标",
+        "provider": "Gangtise OpenAPI",
+        "source_count": len(sources),
+        "source_defs": sources,
+        "latest_source_test": primary_source and {
+            "status": primary_source.get("last_test_status") or "",
+            "detail": primary_source.get("last_test_detail") or "",
+            "tested_at": primary_source.get("last_tested_at") or "",
+        } or None,
+        "data_mode": "unavailable",
+        "data_mode_label": "Gangtise 未取到",
+        "data_source": "gangtise_openapi",
+        "data_unavailable": True,
+    }
+
+
+def build_live_gangtise_indicator_detail(indicator_code, start_date="", end_date=""):
+    normalized_code = slugify_code(indicator_code, "indicator")
+    registry_entry = GANGTISE_INDICATOR_REGISTRY.get(normalized_code)
+    if not registry_entry:
+        return None
+    definition = {}
+    try:
+        for item in list_indicator_definitions():
+            if str(item.get("indicator_code") or "").strip() == normalized_code:
+                definition = dict(item)
+                break
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        definition = {}
+    result = fetch_gangtise_indicator_series(normalized_code, start_date=start_date, end_date=end_date)
+    if not result.get("ok"):
+        return build_gangtise_unavailable_indicator_item(
+            normalized_code,
+            registry_entry=registry_entry,
+            definition=definition,
+            sources=[],
+            latest={},
+            reason=str(result.get("message") or "Gangtise API 当前未返回有效数据，未使用模拟值。").strip(),
+        )
+    points = [dict(item) for item in (result.get("points") or []) if isinstance(item, dict) and item.get("date")]
+    if len(points) < 2:
+        return build_gangtise_unavailable_indicator_item(
+            normalized_code,
+            registry_entry=registry_entry,
+            definition=definition,
+            sources=[],
+            latest={},
+            reason="Gangtise API 返回的数据点不足，未使用模拟值。",
+        )
+    latest_point = points[-1]
+    latest_value = round(NumberLike(latest_point.get("close")), 4)
+    previous_value = round(NumberLike(points[-2].get("close")), 4)
+    latest_status = build_real_indicator_status(latest_value, previous_value)
+    history_series = []
+    prev_close = None
+    for point in points:
+        point_close = round(NumberLike(point.get("close")), 4)
+        point_prev = point_close if prev_close is None else prev_close
+        history_series.append(
+            {
+                "date": str(point.get("date") or "").strip(),
+                "value": point_close,
+                "status": build_real_indicator_status(point_close, point_prev),
+            }
+        )
+        prev_close = point_close
+    source_meta = result.get("source_meta") if isinstance(result.get("source_meta"), dict) else {}
+    history_kline = (
+        build_real_indicator_kline_payload(points[-60:])
+        if any(point.get("open") is not None for point in points)
+        else build_indicator_kline_from_series_points(history_series[-60:], [], status=latest_status, indicator_code=normalized_code)
+    )
+    anomalies = copy.deepcopy(history_kline.get("anomalies") or [])
+    indicator_name = str(definition.get("indicator_name") or registry_entry.get("indicator_name") or normalized_code).strip() or normalized_code
+    category = str(definition.get("category") or registry_entry.get("category") or "数据湖指标").strip() or "数据湖指标"
+    source_path = str(source_meta.get("path") or "").strip()
+    source_security_code = str(source_meta.get("securityCode") or "").strip()
+    latest_date = str(latest_point.get("date") or "").strip()
+    latest_open = round(NumberLike(latest_point.get("open")), 4)
+    latest_high = round(NumberLike(latest_point.get("high")), 4)
+    latest_low = round(NumberLike(latest_point.get("low")), 4)
+    latest_close = round(NumberLike(latest_point.get("close")), 4)
+    assessment = (
+        str(definition.get("assessment_template") or "").strip()
+        or f"{indicator_name} 已直接通过 Gangtise OpenAPI 拉取真实历史序列，最新值为 {latest_close}。"
+    )
+    alert = (
+        str(definition.get("alert_template") or "").strip()
+        or "需关注数据源刷新与连通状态"
+    )
+    source_defs = [
+        {
+            "source_code": f"{normalized_code}_gangtise_live",
+            "indicator_code": normalized_code,
+            "provider": "Gangtise OpenAPI",
+            "base_url": get_gangtise_openapi_config().get("base_url") or "",
+            "path": source_path,
+            "method": "POST",
+            "auth_type": "bearer",
+            "source_meta": copy.deepcopy(source_meta),
+        }
+    ]
+    history = [
+        {
+            "date": point["date"],
+            "value": f"{NumberLike(point['value']):.2f}",
+            "status": str(point.get("status") or latest_status).strip() or latest_status,
+                    "event": "已直接从 Gangtise OpenAPI 获取真实历史点位",
+        }
+        for point in history_series[-6:]
+    ]
+    return {
+        "id": normalized_code,
+        "name": indicator_name,
+        "tenant_slug": str(definition.get("tenant_slug") or "").strip().lower(),
+        "category": category,
+        "unit": str(definition.get("unit") or "").strip(),
+        "description": str(definition.get("description") or "").strip(),
+        "owner": str(definition.get("owner") or "Gangtise OpenAPI 指标层").strip(),
+        "value": f"{latest_close:.4f}".rstrip("0").rstrip("."),
+        "numeric_value": latest_close,
+        "assessment": assessment,
+        "status": latest_status,
+        "alert": alert,
+        "enabled": bool(definition.get("enabled", True)),
+        "last_updated": f"{latest_date} 00:00:00" if latest_date else "未记录",
+        "watchers": definition.get("watchers", []),
+        "prompt_text": str(definition.get("prompt_text") or "").strip(),
+        "formula_js": str(definition.get("formula_js") or "").strip(),
+        "selected_indicators": normalize_selected_indicator_refs(definition.get("selected_indicators")),
+        "display_order": int(definition.get("display_order") or 0),
+        "history": history,
+        "history_series": history_series,
+        "history_anomalies": anomalies,
+        "history_kline": history_kline,
+        "source_type": str(definition.get("source_type") or "indicator").strip() or "indicator",
+        "source_type_label": str(definition.get("source_type_label") or "指标").strip() or "指标",
+        "provider": "Gangtise OpenAPI",
+        "source_count": 1,
+        "source_defs": source_defs,
+        "latest_source_test": {
+            "status": f"HTTP {int(result.get('http_status') or 0)}",
+            "detail": f"{source_path} · {source_security_code} · {str(result.get('message') or '').strip() or '操作成功'}",
+            "tested_at": now_ts(),
+        },
+        "data_mode": "real",
+        "data_mode_label": "Gangtise 真实数据",
+        "data_source": "gangtise_openapi",
+        "data_unavailable": False,
+        "source_meta": {
+            **copy.deepcopy(source_meta),
+            "latest": {
+                "date": latest_date,
+                "open": latest_open,
+                "high": latest_high,
+                "low": latest_low,
+                "close": latest_close,
+            },
+            "duration_ms": int(result.get("duration_ms") or 0),
+        },
+    }
+
+
+def normalize_gangtise_lake_items(items, definition_map, source_map, latest_map):
+    lake_by_id = {
+        str(item.get("id") or "").strip(): copy.deepcopy(item)
+        for item in (items or [])
+        if str(item.get("id") or "").strip()
+    }
+    normalized = []
+    for indicator_code, registry_entry in GANGTISE_INDICATOR_REGISTRY.items():
+        definition = definition_map.get(indicator_code) or {}
+        all_sources = list(source_map.get(indicator_code) or [])
+        gangtise_sources = [item for item in all_sources if infer_source_connector_type(item) == "gangtise_openapi"]
+        latest = latest_map.get(indicator_code) or {}
+        item = lake_by_id.get(indicator_code)
+        latest_source_code = str(latest.get("source_code") or "").strip()
+        gangtise_source_codes = {
+            str(source.get("source_code") or "").strip()
+            for source in gangtise_sources
+            if str(source.get("source_code") or "").strip()
+        }
+        unavailable_reason = ""
+        if not gangtise_sources:
+            unavailable_reason = "该指标尚未配置 Gangtise API 数据源，未使用模拟值。"
+        elif not latest:
+            unavailable_reason = "Gangtise API 当前还没有同步出这条指标的真实值。"
+        elif bool(latest.get("is_simulated", 0)):
+            unavailable_reason = "该指标当前只有模拟数据，已按要求隐藏。"
+        elif latest_source_code == "derived_real_factors":
+            unavailable_reason = "该指标当前只有推导值，不是 Gangtise API 原始值。"
+        elif latest_source_code not in gangtise_source_codes:
+            unavailable_reason = "该指标当前最新值不是 Gangtise API 返回结果。"
+        elif not item or str(item.get("data_mode") or "").strip() != "real":
+            unavailable_reason = "Gangtise API 当前未返回有效真实值。"
+        if unavailable_reason:
+            normalized.append(
+                build_gangtise_unavailable_indicator_item(
+                    indicator_code,
+                    registry_entry=registry_entry,
+                    definition=definition,
+                    sources=gangtise_sources or all_sources,
+                    latest=latest,
+                    reason=unavailable_reason,
+                )
+            )
+            continue
+        item["provider"] = "Gangtise OpenAPI"
+        item["source_count"] = len(gangtise_sources)
+        item["source_defs"] = gangtise_sources
+        item["data_source"] = "gangtise_openapi"
+        item["data_unavailable"] = False
+        item["data_mode"] = "real"
+        item["data_mode_label"] = "Gangtise 真实数据"
+        normalized.append(item)
+    return normalized
+
+
+def purge_simulated_indicator_store():
+    db = get_db()
+    deleted_latest = db.execute("DELETE FROM indicator_latest_values WHERE is_simulated = 1").rowcount or 0
+    deleted_series = db.execute("DELETE FROM indicator_series WHERE is_simulated = 1").rowcount or 0
+    deleted_kline = db.execute("DELETE FROM indicator_kline_points WHERE is_simulated = 1").rowcount or 0
+    deleted_anomalies = db.execute("DELETE FROM indicator_anomalies WHERE is_simulated = 1").rowcount or 0
+    if deleted_latest or deleted_series or deleted_kline or deleted_anomalies:
+        db.commit()
+    return {
+        "deleted_latest": int(deleted_latest),
+        "deleted_series": int(deleted_series),
+        "deleted_kline": int(deleted_kline),
+        "deleted_anomalies": int(deleted_anomalies),
+    }
+
+
 def sync_real_indicator_history_from_market_cache(force=False):
-    history_map = load_market_dashboard_factor_history()
-    if not history_map:
-        return {"synced": False, "reason": "market_cache_unavailable", "updated": 0}
+    token_ok, token, token_response, token_status, _ = obtain_gangtise_openapi_token()
+    if not token_ok:
+        return {
+            "synced": False,
+            "reason": "gangtise_openapi_auth_failed",
+            "updated": 0,
+            "detail": token_response.get("msg") or token_response.get("message") or "Gangtise OpenAPI 鉴权失败",
+            "http_status": token_status,
+        }
     db = get_db()
     definitions = list_indicator_definitions()
     timestamp = now_ts()
-    batch_code = f"real_history_{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+    batch_code = f"gangtise_openapi_sync_{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
     updated = 0
     total_points = 0
     active_sources = {item["indicator_code"]: item for item in list_indicator_source_defs()}
     for definition in definitions:
         indicator_code = definition["indicator_code"]
-        factor_name = REAL_HISTORY_FACTOR_NAME_MAP.get(indicator_code)
-        if not factor_name:
+        if indicator_code not in GANGTISE_INDICATOR_REGISTRY:
             continue
-        source_rows = history_map.get(factor_name) or []
-        if len(source_rows) < 2:
-            continue
-        rows = []
-        for item in source_rows:
-            trade_date = str(item.get("trade_date") or "").strip()
-            if not trade_date:
-                continue
-            close_value = NumberLike(item.get("close"))
-            rows.append(
-                {
-                    "date": trade_date,
-                    "close": close_value,
-                    "open": item.get("open"),
-                    "high": item.get("high"),
-                    "low": item.get("low"),
-                }
-            )
-        rows = sorted(rows, key=lambda item: item["date"])
+        series_result = fetch_gangtise_indicator_series(indicator_code, token=token)
+        rows = list(series_result.get("points") or [])
         if len(rows) < 2:
             continue
         source = active_sources.get(indicator_code)
@@ -2192,8 +3136,8 @@ def sync_real_indicator_history_from_market_cache(force=False):
                     0,
                     timestamp,
                 ),
-            )
-        assessment = definition.get("assessment_template") or f"{factor_name} 历史数据已从 market_dashboard 本地缓存同步入湖。"
+                )
+        assessment = definition.get("assessment_template") or f"{definition.get('indicator_name') or indicator_code} 历史数据已从 Gangtise OpenAPI 同步入湖。"
         alert = definition.get("alert_template") or "已按真实历史数据更新。"
         db.execute(
             """
@@ -2233,9 +3177,9 @@ def sync_real_indicator_history_from_market_cache(force=False):
             """,
             (
                 batch_code,
-                "market_cache_sync",
+                "gangtise_openapi_sync",
                 "",
-                "已从 market_dashboard 本地历史缓存同步真实指标历史，优先替代模拟序列。",
+                "已从 Gangtise OpenAPI 同步真实指标历史，优先替代模拟序列。",
                 total_points,
                 updated,
                 1,
@@ -2509,149 +3453,15 @@ def sync_derived_smart_indicator_history(force=False):
 
 
 def seed_mock_indicator_lake(force=False):
-    ensure_default_indicator_sources()
-    definitions = list_indicator_definitions()
-    db = get_db()
-    existing_latest_codes = {
-        row["indicator_code"]
-        for row in db.execute("SELECT indicator_code FROM indicator_latest_values").fetchall()
+    purged = purge_simulated_indicator_store()
+    invalidate_indicator_hub_cache()
+    return {
+        "seeded": False,
+        "disabled": True,
+        "reason": "mock_seed_disabled_use_gangtise_only",
+        "message": "模拟指标补种已关闭，当前仅允许 Gangtise 真实指标和真实因子推导结果进入指标湖。",
+        "purged_simulated": purged,
     }
-    if existing_latest_codes and not force and len(existing_latest_codes) >= len(definitions):
-        return {"seeded": False, "reason": "already_seeded"}
-    if force:
-        db.execute("DELETE FROM indicator_latest_values")
-        db.execute("DELETE FROM indicator_series")
-        db.execute("DELETE FROM indicator_anomalies")
-        db.execute("DELETE FROM indicator_kline_points")
-    batch_code = f"mock_seed_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-    timestamp = now_ts()
-    total_points = 0
-    active_sources = {item["indicator_code"]: item for item in list_indicator_source_defs()}
-    for definition in definitions:
-        if not force and definition["indicator_code"] in existing_latest_codes:
-            continue
-        status = definition.get("status_hint") or "attention"
-        series, anomalies = build_simulated_indicator_series(definition["indicator_code"], status=status)
-        kline = build_simulated_indicator_kline(definition["indicator_code"], status=status)
-        latest_point = series[-1] if series else {"value": 0, "status": status, "date": datetime.now().strftime("%Y-%m-%d")}
-        latest_assessment = definition.get("assessment_template") or "当前已接入模拟指标数据。"
-        latest_alert = definition.get("alert_template") or "已纳入指标监测。"
-        source = active_sources.get(definition["indicator_code"])
-        source_code = source["source_code"] if source else ""
-        latest_value_text = f"{latest_point['value']:.2f}" if definition.get("unit") else f"{latest_point['value']:.2f}"
-        db.execute(
-            """
-            INSERT INTO indicator_latest_values (
-                indicator_code, latest_value, latest_status, latest_assessment, latest_alert,
-                updated_at, is_simulated, source_code, batch_code
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(indicator_code) DO UPDATE SET
-                latest_value = excluded.latest_value,
-                latest_status = excluded.latest_status,
-                latest_assessment = excluded.latest_assessment,
-                latest_alert = excluded.latest_alert,
-                updated_at = excluded.updated_at,
-                is_simulated = excluded.is_simulated,
-                source_code = excluded.source_code,
-                batch_code = excluded.batch_code
-            """,
-            (
-                definition["indicator_code"],
-                latest_value_text,
-                latest_point["status"],
-                latest_assessment,
-                latest_alert,
-                timestamp,
-                1,
-                source_code,
-                batch_code,
-            ),
-        )
-        for point in series:
-            total_points += 1
-            db.execute(
-                """
-                INSERT INTO indicator_series (
-                    indicator_code, point_time, point_value, point_status, is_simulated, source_code, batch_code, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    definition["indicator_code"],
-                    f"{point['date']} 00:00:00",
-                    point["value"],
-                    point["status"],
-                    1,
-                    source_code,
-                    batch_code,
-                    timestamp,
-                ),
-            )
-        for entry in anomalies:
-            db.execute(
-                """
-                INSERT INTO indicator_anomalies (
-                    indicator_code, anomaly_time, anomaly_value, severity, anomaly_status, anomaly_label, batch_code, is_simulated, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    definition["indicator_code"],
-                    f"{entry['date']} 00:00:00",
-                    entry["value"],
-                    "高" if entry["status"] == "warning" else "中",
-                    entry["status"],
-                    entry["label"],
-                    batch_code,
-                    1,
-                    timestamp,
-                ),
-            )
-        ma_lookup = {}
-        for line_name in ("ma5", "ma10", "ma20"):
-            for point in kline.get(line_name, []):
-                ma_lookup.setdefault(point["date"], {})[line_name] = point["value"]
-        for candle in kline.get("candles", []):
-            ma_entry = ma_lookup.get(candle["date"], {})
-            db.execute(
-                """
-                INSERT INTO indicator_kline_points (
-                    indicator_code, point_date, open_value, high_value, low_value, close_value,
-                    ma5, ma10, ma20, batch_code, is_simulated, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    definition["indicator_code"],
-                    candle["date"],
-                    candle["open"],
-                    candle["high"],
-                    candle["low"],
-                    candle["close"],
-                    ma_entry.get("ma5"),
-                    ma_entry.get("ma10"),
-                    ma_entry.get("ma20"),
-                    batch_code,
-                    1,
-                    timestamp,
-                ),
-            )
-    db.execute(
-        """
-        INSERT INTO indicator_load_batches (
-            batch_code, load_type, source_code, summary, total_points, total_indicators, success, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            batch_code,
-            "mock_seed",
-            "",
-            "首阶段使用模拟随机数据写入指标湖骨架，供 Admin / 工作台 / H5 统一读取。",
-            total_points,
-            len(definitions),
-            1,
-            timestamp,
-        ),
-    )
-    db.commit()
-    return {"seeded": True, "batch_code": batch_code, "total_indicators": len(definitions), "total_points": total_points}
 
 
 def build_indicator_kline_from_rows(rows, anomalies):
@@ -2688,7 +3498,7 @@ def build_indicator_kline_from_rows(rows, anomalies):
 def build_indicator_kline_from_series_points(series_points, anomalies, status="attention", indicator_code=""):
     points = [dict(item) for item in (series_points or []) if isinstance(item, dict) and item.get("date")]
     if not points:
-        return build_simulated_indicator_kline(indicator_code or "indicator_fallback", status=status or "attention")
+        return build_empty_kline_payload()
     rows = []
     previous_close = None
     for index, point in enumerate(points):
@@ -2714,9 +3524,18 @@ def build_indicator_kline_from_series_points(series_points, anomalies, status="a
 
 def build_indicator_hub_from_store():
     definitions = list_indicator_definitions()
+    definition_map = {
+        str(item.get("indicator_code") or "").strip(): item
+        for item in definitions
+        if str(item.get("indicator_code") or "").strip()
+    }
     source_map = {}
     for source in list_indicator_source_defs():
-        source_map.setdefault(source["indicator_code"], []).append(source)
+        indicator_code = str((source or {}).get("indicator_code") or "").strip()
+        # Source definitions can be edited independently from indicators. Ignore
+        # incomplete rows instead of breaking every indicator chart.
+        if indicator_code:
+            source_map.setdefault(indicator_code, []).append(source)
     db = get_db()
     latest_map = {
         row["indicator_code"]: dict(row)
@@ -2773,8 +3592,11 @@ def build_indicator_hub_from_store():
         sources = source_map.get(definition["indicator_code"], [])
         primary_source = sources[0] if sources else None
         latest_source_code = latest.get("source_code") or ""
-        latest_is_simulated = bool(latest.get("is_simulated", 1))
-        if latest_is_simulated:
+        latest_is_simulated = bool(latest.get("is_simulated", 0))
+        if not latest:
+            data_mode = "unavailable"
+            data_mode_label = "暂无真实数据"
+        elif latest_is_simulated:
             data_mode = "simulated"
             data_mode_label = "模拟数据"
         elif latest_source_code == "derived_real_factors":
@@ -2816,15 +3638,19 @@ def build_indicator_hub_from_store():
                     "date": point["date"],
                     "value": f"{point['value']:.2f}",
                     "status": point["status"],
-                    "event": data_mode == "real" and "真实指标点已写入指标湖" or (data_mode == "derived" and "已由真实因子推导写入指标湖" or "模拟指标点已写入指标湖"),
+                    "event": (
+                        "真实指标点已写入指标湖" if data_mode == "real"
+                        else ("已由真实因子推导写入指标湖" if data_mode == "derived"
+                              else ("模拟指标点已写入指标湖" if data_mode == "simulated" else "当前尚未同步到真实指标点"))
+                    ),
                 }
                 for point in history_series[-6:]
             ],
             "history_series": history_series,
             "history_anomalies": anomalies,
             "history_kline": history_kline,
-            "source_type": definition.get("source_type") or "mock",
-            "source_type_label": definition.get("source_type_label") or "模拟指标",
+            "source_type": definition.get("source_type") or "indicator",
+            "source_type_label": definition.get("source_type_label") or "指标",
             "provider": definition.get("provider") or (primary_source["provider"] if primary_source else "平台数据层"),
             "source_count": len(sources),
             "source_defs": sources,
@@ -2838,9 +3664,17 @@ def build_indicator_hub_from_store():
         }
         items.append(item)
     smart_items = [item for item in items if item["source_type"] == "smart"]
-    lake_items = [item for item in items if item["source_type"] != "smart"]
+    lake_items = normalize_gangtise_lake_items(
+        [item for item in items if item["source_type"] != "smart"],
+        definition_map,
+        source_map,
+        latest_map,
+    )
+    items = smart_items + lake_items
     anomalies = []
-    for item in items:
+    for item in smart_items + lake_items:
+        if item.get("data_unavailable"):
+            continue
         for anomaly in anomaly_map.get(item["id"], [])[:2]:
             anomalies.append(
                 {
@@ -2900,8 +3734,22 @@ def get_indicator_hub_snapshot():
     except Exception as exc:
         if not is_db_unavailable_error(exc):
             raise
-        app.logger.warning("Database unavailable while loading indicator hub snapshot, using fallback data")
-        return build_indicator_hub_fallback()
+        app.logger.warning("Database unavailable while loading indicator hub snapshot, returning unavailable payload")
+        return {
+            "summary": {"total": 0, "smart_total": 0, "lake_total": 0, "enabled": 0, "warnings": 0, "attention": 0, "anomalies": 0},
+            "items": [],
+            "smart_items": [],
+            "lake_items": [],
+            "anomalies": [],
+            "definitions": [],
+            "source_defs": [],
+            "recent_tests": [],
+            "load_batches": [],
+            "raw_records": [],
+            "mapping_rules": [],
+            "clean_jobs": [],
+            "data_unavailable": True,
+        }
 
 
 def build_watchlist_indicator_context(indicator_hub=None):
@@ -3052,82 +3900,17 @@ def build_indicator_dashboard_seed_cards(tenant=None, count=8):
 
 
 def build_data_lake_indicator_items():
-    items = []
-    for raw in load_market_dashboard_indicators():
-        indicator_name = str(raw.get("indicator", "")).strip()
-        if not indicator_name:
-            continue
-        enabled = bool(raw.get("enabled", True))
-        source_status = str(raw.get("status", "")).strip().lower()
-        test_status = str(raw.get("last_test_status", "")).strip()
-        updated_at = str(raw.get("updated_at", "")).strip()
-        tested_at = str(raw.get("last_tested_at", "")).strip()
-        if not enabled:
-            status = "warning"
-        elif "200" in test_status or source_status == "configured":
-            status = "good"
-        elif test_status:
-            status = "attention"
-        else:
-            status = "attention"
-        current_value = test_status or ("已接入" if enabled else "未启用")
-        if not enabled:
-            assessment = "该数据湖指标当前被关闭，不会进入平台指标展示与异动监测。"
-            alert = "需确认是否重新启用该指标"
-        else:
-            assessment = str(raw.get("notes", "")).strip() or "该指标来自 market_dashboard 数据湖，可用于平台与工作台统一分析。"
-            alert = "已纳入数据湖指标监测" if status == "good" else "需关注数据源刷新与连通状态"
-        simulated_series, simulated_anomalies = build_simulated_indicator_series(raw.get("id") or indicator_name, status=status)
-        simulated_kline = build_simulated_indicator_kline(raw.get("id") or indicator_name, status=status)
-        history = []
-        if updated_at:
-            history.append(
-                {
-                    "date": updated_at[:10],
-                    "value": current_value,
-                    "status": status,
-                    "event": "数据湖源配置已同步到指标专区",
-                }
-            )
-        if tested_at:
-            history.append(
-                {
-                    "date": tested_at[:10],
-                    "value": test_status or current_value,
-                    "status": "good" if "200" in test_status else "attention",
-                    "event": str(raw.get("last_test_detail", "")).strip()[:120] or "最近一次连通性测试已完成",
-                }
-            )
-        items.append(
-            {
-                "id": f"lake_{raw.get('id') or indicator_name}",
-                "name": indicator_name,
-                "category": str(raw.get("category", "")).strip() or "数据湖指标",
-                "owner": "market_dashboard 数据湖",
-                "value": current_value,
-                "assessment": assessment,
-                "status": status,
-                "alert": alert,
-                "enabled": enabled,
-                "last_updated": updated_at or tested_at or "未记录",
-                "watchers": ["market_dashboard", "Admin 指标专区", "大V 工作台"],
-                "history": history or [
-                    {
-                        "date": datetime.now().strftime("%Y-%m-%d"),
-                        "value": current_value,
-                        "status": status,
-                        "event": "已从数据湖源注册表导入",
-                    }
-                ],
-                "history_series": simulated_series,
-                "history_anomalies": simulated_anomalies,
-                "history_kline": simulated_kline,
-                "source_type": "lake",
-                "source_type_label": "数据湖指标",
-                "provider": str(raw.get("provider", "")).strip() or "数据湖",
-            }
-        )
-    return items
+    try:
+        hub = build_indicator_hub_from_store()
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        return []
+    return [
+        copy.deepcopy(item)
+        for item in (hub.get("lake_items") or [])
+        if str(item.get("id") or "").strip() in GANGTISE_INDICATOR_REGISTRY
+    ]
 
 
 def build_indicator_hub(tenant=None, admin_view=False):
@@ -3137,8 +3920,22 @@ def build_indicator_hub(tenant=None, admin_view=False):
     except Exception as exc:
         if not is_db_unavailable_error(exc):
             raise
-        app.logger.warning("Database unavailable while building indicator hub, using fallback data")
-        return build_indicator_hub_fallback(tenant=tenant, admin_view=admin_view)
+        app.logger.warning("Database unavailable while building indicator hub, returning unavailable payload")
+        return {
+            "summary": {"total": 0, "smart_total": 0, "lake_total": 0, "enabled": 0, "warnings": 0, "attention": 0, "anomalies": 0},
+            "items": [],
+            "smart_items": [],
+            "lake_items": [],
+            "anomalies": [],
+            "definitions": [],
+            "source_defs": [],
+            "recent_tests": [],
+            "load_batches": [],
+            "raw_records": [],
+            "mapping_rules": [],
+            "clean_jobs": [],
+            "data_unavailable": True,
+        }
     hub = copy.deepcopy(hub)
     tenant_slug = str((tenant or {}).get("slug") or "").strip().lower()
     if not admin_view and tenant_slug:
@@ -3237,9 +4034,9 @@ WATCHLIST_DYNAMIC_DETAIL_PRESETS = {
     "601988": {
         "name": "中国银行",
         "market": "SH",
-        "price": 5.18,
-        "change": 0.03,
-        "change_pct": 0.58,
+        "price": 5.65,
+        "change": -0.17,
+        "change_pct": -2.92,
         "industry": "银行",
         "focus": "稳健配置",
         "authors": [
@@ -3272,7 +4069,786 @@ WATCHLIST_DYNAMIC_DETAIL_PRESETS = {
             ],
         },
     },
+    "003015": {
+        "name": "日久光电",
+        "market": "SZ",
+        "price": 10.38,
+        "change": 0.12,
+        "change_pct": 1.17,
+        "industry": "消费电子材料",
+        "focus": "显示材料",
+        "authors": [
+            {"id": 1, "name": "财经老王", "avatar": "👑", "tier": "种子作者", "angle": "先拆材料业务结构，再看消费电子链条景气和下游验证。"},
+            {"id": 4, "name": "宏观策略师", "avatar": "🎯", "tier": "成长作者", "angle": "更适合结合订单节奏和板块轮动去判断阶段预期差。"},
+        ],
+        "fundamental": {
+            "summary": "优先跟踪显示材料业务、客户结构和下游消费电子景气，当前更适合从业务拆解与订单验证切入。",
+            "metrics": [
+                {"label": "核心方向", "value": "显示材料", "note": "先看产品结构与客户绑定度"},
+                {"label": "价格位置", "value": "10.38", "note": "用于观察当前位置与阶段预期差"},
+                {"label": "研究重点", "value": "订单兑现", "note": "继续核查下游应用与出货节奏"},
+                {"label": "波动属性", "value": "中高", "note": "适合结合行业情绪与资金面观察"},
+            ],
+            "thesis": [
+                "先看产品结构和核心客户，再决定是否具备持续成长逻辑。",
+                "若下游需求回暖，材料环节更容易出现阶段性预期差。",
+                "需要继续补足财务与行业证据，避免只凭短期价格判断。",
+            ],
+        },
+        "forecast": {
+            "label": "基本面判断",
+            "verdict": "继续跟踪",
+            "confidence": "中",
+            "band": "当前先以业务结构、订单验证和价格位置做第一轮判断，再补充财报与行业证据。",
+            "drivers": [
+                {"label": "业务拆解", "score": "+1.2", "note": "先确认核心产品和客户结构"},
+                {"label": "订单验证", "score": "+0.8", "note": "下游需求回暖会放大弹性"},
+                {"label": "波动风险", "score": "-0.6", "note": "需要警惕情绪驱动带来的回撤"},
+            ],
+        },
+    },
 }
+
+WATCHLIST_QUERY_ALIAS_MAP = {
+    "中国银行": "601988",
+    "日久光新": "003015",
+    "日久光电": "003015",
+}
+WATCHLIST_NAME_ALIAS_MAP = {
+    "003015": "日久光电",
+}
+WATCHLIST_SEARCH_CACHE_TTL_SECONDS = 6 * 60 * 60
+WATCHLIST_DETAIL_CACHE_TTL_SECONDS = 30 * 60
+
+
+def _watchlist_cache_setting_key(prefix, value):
+    normalized = slugify_code(str(value or "").strip(), prefix or "watchlist")
+    return f"{prefix}:{normalized}"
+
+
+def _load_watchlist_cache(prefix, value, ttl_seconds):
+    cache_key = _watchlist_cache_setting_key(prefix, value)
+    try:
+        db = get_db()
+        row = db.execute(
+            "SELECT setting_value, updated_at FROM app_settings WHERE setting_key = ?",
+            (cache_key,),
+        ).fetchone()
+    except Exception:
+        return None
+    if not row:
+        return None
+    payload = safe_json_loads(row.get("setting_value"), {}) if isinstance(row, dict) else {}
+    cached_at_text = str(payload.get("cached_at") or row.get("updated_at") or "").strip()
+    if cached_at_text:
+        try:
+            cached_at = datetime.fromisoformat(cached_at_text.replace("Z", "+00:00"))
+            if cached_at.tzinfo is not None:
+                cached_at = cached_at.astimezone().replace(tzinfo=None)
+            if ttl_seconds and (datetime.now() - cached_at).total_seconds() > ttl_seconds:
+                return None
+        except Exception:
+            return None
+    return copy.deepcopy(payload.get("value"))
+
+
+def _save_watchlist_cache(prefix, value, payload):
+    cache_key = _watchlist_cache_setting_key(prefix, value)
+    stored_value = json.dumps(
+        {
+            "cached_at": now_ts(),
+            "value": payload,
+        },
+        ensure_ascii=False,
+    )
+    try:
+        db = get_db()
+        existing = db.execute(
+            "SELECT setting_key FROM app_settings WHERE setting_key = ?",
+            (cache_key,),
+        ).fetchone()
+        if existing:
+            db.execute(
+                "UPDATE app_settings SET setting_value = ?, updated_at = ? WHERE setting_key = ?",
+                (stored_value, now_ts(), cache_key),
+            )
+        else:
+            db.execute(
+                "INSERT INTO app_settings (setting_key, setting_value, updated_at) VALUES (?, ?, ?)",
+                (cache_key, stored_value, now_ts()),
+            )
+        db.commit()
+    except Exception:
+        return False
+    return True
+
+
+def _normalize_watchlist_query_text(value):
+    text = str(value or "").strip()
+    return WATCHLIST_QUERY_ALIAS_MAP.get(text, text)
+
+
+def _normalize_watchlist_comparable_code(value):
+    normalized = str(value or "").strip().upper()
+    if "." in normalized:
+        normalized = normalized.split(".", 1)[0]
+    normalized = normalized.replace(" ", "")
+    return normalized.lstrip("0") or "0"
+
+
+def _build_gts_security_code(code, market):
+    normalized_code = str(code or "").strip().upper()
+    if not normalized_code:
+        return ""
+    if "." in normalized_code:
+        return normalized_code
+    suffix = str(market or "").strip().upper()
+    if suffix in {"SH", "SZ", "BJ", "HK"}:
+        return f"{normalized_code}.{suffix}"
+    return normalized_code
+
+
+def _normalize_watchlist_security_candidate(item):
+    raw = item if isinstance(item, dict) else {}
+    security_code = str(raw.get("gtsCode") or raw.get("security_code") or raw.get("code") or "").strip().upper()
+    code = security_code.split(".", 1)[0] if "." in security_code else security_code
+    suffix = security_code.split(".", 1)[1] if "." in security_code else str(raw.get("market") or "").strip().upper()
+    name = str(raw.get("gtsName") or raw.get("name") or WATCHLIST_NAME_ALIAS_MAP.get(code) or code).strip()
+    market = suffix if suffix in {"SH", "SZ", "BJ", "HK"} else _infer_watchlist_market(code)
+    return {
+        "code": code,
+        "name": name or code,
+        "market": market,
+        "security_code": _build_gts_security_code(code, market),
+        "category": str(raw.get("category") or "stock").strip() or "stock",
+        "match_type": str(raw.get("matchType") or raw.get("match_type") or "").strip(),
+        "match_score": NumberLike(raw.get("matchScore")),
+        "source": str(raw.get("source") or "gangtise_openapi").strip() or "gangtise_openapi",
+    }
+
+
+def _build_watchlist_seed_details():
+    def build_kline_series(stock_code, base_price):
+        rng = random.Random(f"kline:{stock_code}")
+        close = float(base_price) * (0.9 + rng.random() * 0.2)
+        current_date = datetime.now() - timedelta(days=33)
+        series = []
+        while len(series) < 24:
+            current_date += timedelta(days=1)
+            if current_date.weekday() >= 5:
+                continue
+            open_price = close * (1 + rng.uniform(-0.018, 0.018))
+            close_price = open_price * (1 + rng.uniform(-0.035, 0.035))
+            high_price = max(open_price, close_price) * (1 + rng.uniform(0.004, 0.022))
+            low_price = min(open_price, close_price) * (1 - rng.uniform(0.004, 0.022))
+            series.append({
+                "date": current_date.strftime("%m-%d"),
+                "open": round(open_price, 2),
+                "high": round(high_price, 2),
+                "low": round(low_price, 2),
+                "close": round(close_price, 2),
+            })
+            close = close_price
+        return series
+
+    return {
+        "600519": {
+            "code": "600519",
+            "name": "贵州茅台",
+            "market": "SH",
+            "price": 1688.20,
+            "change": 12.80,
+            "change_pct": 0.76,
+            "industry": "高端白酒",
+            "kline": build_kline_series("600519", 1688.20),
+            "authors": [
+                {"id": 1, "name": "财经老王", "avatar": "👑", "tier": "种子作者", "angle": "消费龙头的现金流韧性仍在，核心要看估值是否已经反映需求修复。"},
+                {"id": 3, "name": "量化老师陈明", "avatar": "📊", "tier": "成长作者", "angle": "从历史分位看，当前更适合做中期配置跟踪，不建议把短期波动当趋势。"},
+            ],
+            "fundamental": {
+                "summary": "品牌力和现金流仍是最大护城河，当前争议主要集中在增速放缓后的估值承受力。",
+                "metrics": [
+                    {"label": "收入增速", "value": "15.2%", "note": "较去年同期放缓但仍稳健"},
+                    {"label": "净利率", "value": "52.4%", "note": "维持高位"},
+                    {"label": "ROE", "value": "31.8%", "note": "资本效率仍强"},
+                    {"label": "估值分位", "value": "43%", "note": "回到中枢附近"},
+                ],
+                "thesis": [
+                    "品牌定价权和渠道控制能力仍强。",
+                    "若消费修复延续，盈利稳定性会继续支撑估值。",
+                    "风险在于市场对高端消费增速放缓的容忍度下降。",
+                ],
+            },
+            "forecast": {
+                "label": "基本面判断",
+                "verdict": "稳健跟踪",
+                "confidence": "中高",
+                "band": "未来 1-2 个季度更像利润兑现验证，而不是高弹性重估。",
+                "drivers": [
+                    {"label": "盈利稳定性", "score": "+2.4", "note": "现金流和利润率支撑强"},
+                    {"label": "估值弹性", "score": "+0.8", "note": "缺少强扩张催化"},
+                    {"label": "行业景气", "score": "+1.2", "note": "消费修复温和"},
+                ],
+            },
+        },
+        "300750": {
+            "code": "300750",
+            "name": "宁德时代",
+            "market": "SZ",
+            "price": 212.36,
+            "change": -3.84,
+            "change_pct": -1.78,
+            "industry": "动力电池",
+            "kline": build_kline_series("300750", 212.36),
+            "authors": [
+                {"id": 5, "name": "新能源猎手阿强", "avatar": "⚡", "tier": "观察作者", "angle": "更重要的是看新技术路线和海外出货，而不是单日股价波动。"},
+                {"id": 4, "name": "全球宏观James", "avatar": "🌐", "tier": "成长作者", "angle": "海外需求和原材料价格波动会持续影响预期。"},
+            ],
+            "fundamental": {
+                "summary": "核心变量不在于短期情绪，而在于全球份额、技术迭代和海外市场进度。",
+                "metrics": [
+                    {"label": "收入增速", "value": "18.6%", "note": "出口拉动明显"},
+                    {"label": "毛利率", "value": "24.1%", "note": "原材料波动后修复"},
+                    {"label": "研发占比", "value": "7.8%", "note": "维持高投入"},
+                    {"label": "估值分位", "value": "36%", "note": "低于行业乐观期"},
+                ],
+                "thesis": [
+                    "全球动力电池龙头地位仍稳固。",
+                    "技术升级和海外布局决定中期估值空间。",
+                    "要警惕行业价格竞争压缩利润率。",
+                ],
+            },
+            "forecast": {
+                "label": "基本面判断",
+                "verdict": "继续观察",
+                "confidence": "中",
+                "band": "未来 1-2 个季度需要继续看价格战和新技术兑现。",
+                "drivers": [
+                    {"label": "技术路线", "score": "+2.0", "note": "新产品是正向变量"},
+                    {"label": "价格竞争", "score": "-1.6", "note": "盈利承压"},
+                    {"label": "海外出货", "score": "+1.5", "note": "中期支撑项"},
+                ],
+            },
+        },
+        "00700": {
+            "code": "00700",
+            "name": "腾讯控股",
+            "market": "HK",
+            "price": 388.40,
+            "change": 5.60,
+            "change_pct": 1.46,
+            "industry": "港股互联网",
+            "kline": build_kline_series("00700", 388.40),
+            "authors": [
+                {"id": 2, "name": "投资女神Lisa", "avatar": "💎", "tier": "种子作者", "angle": "广告、游戏和回购共同支撑估值修复，关键还是财报兑现。"},
+                {"id": 2, "name": "港股研究员", "avatar": "🏙️", "tier": "观察作者", "angle": "这类资产更适合中期配置，而不是追逐情绪高点。"},
+            ],
+            "fundamental": {
+                "summary": "估值修复逻辑仍在，核心看广告恢复、游戏流水和资本回报延续。",
+                "metrics": [
+                    {"label": "收入增速", "value": "9.8%", "note": "恢复中"},
+                    {"label": "经营利润率", "value": "32.1%", "note": "效率改善"},
+                    {"label": "回购强度", "value": "高", "note": "资本回报积极"},
+                    {"label": "估值分位", "value": "28%", "note": "修复但未过热"},
+                ],
+                "thesis": [
+                    "现金流和资产质量在港股互联网中仍属头部。",
+                    "回购与业务恢复共同支撑估值中枢。",
+                    "风险在于监管和宏观消费修复不及预期。",
+                ],
+            },
+            "forecast": {
+                "label": "基本面判断",
+                "verdict": "偏积极",
+                "confidence": "中高",
+                "band": "若财报继续兑现，估值还有温和修复空间。",
+                "drivers": [
+                    {"label": "业务恢复", "score": "+2.1", "note": "广告与游戏改善"},
+                    {"label": "股东回报", "score": "+1.9", "note": "回购支撑明确"},
+                    {"label": "政策扰动", "score": "-0.8", "note": "仍需观察"},
+                ],
+            },
+        },
+        "688981": {
+            "code": "688981",
+            "name": "中芯国际",
+            "market": "SH",
+            "price": 46.52,
+            "change": 1.18,
+            "change_pct": 2.60,
+            "industry": "半导体制造",
+            "kline": build_kline_series("688981", 46.52),
+            "authors": [
+                {"id": 1, "name": "财经老王", "avatar": "👑", "tier": "种子作者", "angle": "要拆开看产能利用率、成熟制程景气和国产替代订单，不要只看情绪。"},
+                {"id": 4, "name": "宏观策略师", "avatar": "🎯", "tier": "成长作者", "angle": "产业政策和资本开支周期决定中期想象空间。"},
+            ],
+            "fundamental": {
+                "summary": "国产替代逻辑稳固，但盈利释放节奏仍依赖景气和产能利用率改善。",
+                "metrics": [
+                    {"label": "收入增速", "value": "14.1%", "note": "受益国产订单"},
+                    {"label": "产能利用率", "value": "82%", "note": "仍在恢复"},
+                    {"label": "资本开支", "value": "高位", "note": "扩产持续"},
+                    {"label": "估值分位", "value": "49%", "note": "预期已反映部分利好"},
+                ],
+                "thesis": [
+                    "国产替代是长期逻辑，订单确定性高。",
+                    "短中期要看景气恢复与盈利兑现速度。",
+                    "资本开支高、回报兑现慢会压制市场耐心。",
+                ],
+            },
+            "forecast": {
+                "label": "基本面判断",
+                "verdict": "积极跟踪",
+                "confidence": "中",
+                "band": "更像中期产业趋势资产，短期波动会比较大。",
+                "drivers": [
+                    {"label": "国产替代", "score": "+2.6", "note": "长期主逻辑"},
+                    {"label": "盈利兑现", "score": "+0.9", "note": "恢复中"},
+                    {"label": "资本开支", "score": "-1.1", "note": "拖累利润释放"},
+                ],
+            },
+        },
+        "600036": {
+            "code": "600036",
+            "name": "招商银行",
+            "market": "SH",
+            "price": 41.86,
+            "change": 0.22,
+            "change_pct": 0.53,
+            "industry": "银行",
+            "kline": build_kline_series("600036", 41.86),
+            "authors": [
+                {"id": 4, "name": "全球宏观James", "avatar": "🌐", "tier": "成长作者", "angle": "利率环境和资产质量是银行股的核心框架。"},
+                {"id": 3, "name": "量化老师陈明", "avatar": "📊", "tier": "成长作者", "angle": "这类资产更适合放在组合稳定器角色里看。"},
+            ],
+            "fundamental": {
+                "summary": "核心看息差、资产质量与分红能力，作为组合稳定器价值仍在。",
+                "metrics": [
+                    {"label": "ROE", "value": "14.8%", "note": "银行中仍具优势"},
+                    {"label": "不良率", "value": "0.96%", "note": "资产质量稳"},
+                    {"label": "股息率", "value": "5.1%", "note": "防守价值明显"},
+                    {"label": "估值分位", "value": "33%", "note": "偏低区间"},
+                ],
+                "thesis": [
+                    "资产质量和零售能力构成核心护城河。",
+                    "在低利率阶段，分红和稳健性更受重视。",
+                    "息差继续承压会影响估值弹性。",
+                ],
+            },
+            "forecast": {
+                "label": "基本面判断",
+                "verdict": "稳健配置",
+                "confidence": "高",
+                "band": "适合作为组合中的防守资产，预期收益更平稳。",
+                "drivers": [
+                    {"label": "股息支撑", "score": "+2.2", "note": "分红确定性强"},
+                    {"label": "资产质量", "score": "+1.8", "note": "风险可控"},
+                    {"label": "息差压力", "score": "-0.9", "note": "估值弹性有限"},
+                ],
+            },
+        },
+    }
+
+
+def _search_local_watchlist_candidates(query, top=8):
+    normalized = _normalize_watchlist_query_text(query)
+    lowered = normalized.lower()
+    comparable_query = _normalize_watchlist_comparable_code(normalized)
+    details = _build_watchlist_seed_details()
+    for code, preset in (WATCHLIST_DYNAMIC_DETAIL_PRESETS or {}).items():
+        if not isinstance(preset, dict):
+            continue
+        details.setdefault(
+            str(code or "").strip().upper(),
+            {
+                "code": str(code or "").strip().upper(),
+                "name": str(preset.get("name") or code).strip(),
+                "market": str(preset.get("market") or _infer_watchlist_market(code)).strip() or "CN",
+                "industry": str(preset.get("industry") or "").strip(),
+                "focus": str(preset.get("focus") or preset.get("industry") or "").strip(),
+            },
+        )
+    scored = []
+    for detail in (details or {}).values():
+        if not isinstance(detail, dict):
+            continue
+        code = str(detail.get("code") or "").strip().upper()
+        name = str(detail.get("name") or "").strip()
+        if not code or not name:
+            continue
+        name_lower = name.lower()
+        comparable_code = _normalize_watchlist_comparable_code(code)
+        score = None
+        if comparable_code == comparable_query or code == normalized.upper():
+            score = 0
+        elif name == normalized:
+            score = 1
+        elif lowered and lowered in name_lower:
+            score = 2
+        elif comparable_query and comparable_query in comparable_code:
+            score = 3
+        if score is None:
+            continue
+        scored.append(
+            (
+                score,
+                len(name),
+                {
+                    "code": code,
+                    "name": name,
+                    "market": str(detail.get("market") or _infer_watchlist_market(code)).strip() or "CN",
+                    "security_code": _build_gts_security_code(code, detail.get("market")),
+                    "source": "local_watchlist",
+                    "match_type": "local",
+                    "match_score": max(0.0, 1.0 - score * 0.1),
+                },
+            )
+        )
+    scored.sort(key=lambda item: (item[0], item[1], item[2]["code"]))
+    return [copy.deepcopy(item[2]) for item in scored[: max(1, int(top or 8))]]
+
+
+def _search_remote_watchlist_candidates(query, top=8):
+    normalized = _normalize_watchlist_query_text(query)
+    if not normalized:
+        return []
+    cached = _load_watchlist_cache("watchlist_search_cache", normalized, WATCHLIST_SEARCH_CACHE_TTL_SECONDS)
+    if isinstance(cached, list) and cached:
+        return cached[: max(1, int(top or 8))]
+    payload = {
+        "keyword": normalized,
+        "category": ["stock"],
+        "top": max(1, min(int(top or 8), 12)),
+    }
+    status, response, _ = post_gangtise_openapi_json(
+        "/application/open-reference/securities/search",
+        payload,
+        timeout=20,
+    )
+    rows = (((response.get("data") or {}).get("list") or []) if isinstance(response, dict) else []) if is_gangtise_openapi_success(status, response) else []
+    items = [_normalize_watchlist_security_candidate(item) for item in rows if isinstance(item, dict)]
+    if items:
+        _save_watchlist_cache("watchlist_search_cache", normalized, items)
+    return items
+
+
+def search_watchlist_candidates(query, top=8, include_remote=True):
+    normalized = str(query or "").strip()
+    if not normalized:
+        return []
+    merged = []
+    seen = set()
+    for item in _search_local_watchlist_candidates(normalized, top=top):
+        code = str(item.get("code") or "").strip().upper()
+        if not code or code in seen:
+            continue
+        seen.add(code)
+        merged.append(item)
+    if include_remote and len(merged) < max(1, int(top or 8)):
+        for item in _search_remote_watchlist_candidates(normalized, top=top):
+            code = str(item.get("code") or "").strip().upper()
+            if not code or code in seen:
+                continue
+            seen.add(code)
+            merged.append(item)
+            if len(merged) >= max(1, int(top or 8)):
+                break
+    return merged[: max(1, int(top or 8))]
+
+
+def _resolve_watchlist_candidate(stock_code="", stock_name=""):
+    query = str(stock_code or stock_name or "").strip()
+    if not query:
+        return None
+    suggestions = search_watchlist_candidates(query, top=6, include_remote=True)
+    if not suggestions:
+        return None
+    comparable_query = _normalize_watchlist_comparable_code(query)
+    normalized_query = _normalize_watchlist_query_text(query).strip().upper()
+    for item in suggestions:
+        code = str(item.get("code") or "").strip().upper()
+        name = str(item.get("name") or "").strip().upper()
+        if code == normalized_query or _normalize_watchlist_comparable_code(code) == comparable_query or name == normalized_query:
+            return copy.deepcopy(item)
+    return copy.deepcopy(suggestions[0])
+
+
+def _build_watchlist_realtime_detail_from_candidate(candidate, stock_name=""):
+    normalized = candidate if isinstance(candidate, dict) else {}
+    security_code = str(normalized.get("security_code") or "").strip().upper()
+    code = str(normalized.get("code") or "").strip().upper()
+    name = str(normalized.get("name") or stock_name or WATCHLIST_NAME_ALIAS_MAP.get(code) or code).strip() or code
+    if not security_code:
+        return None
+    cached = _load_watchlist_cache("watchlist_detail_cache", security_code, WATCHLIST_DETAIL_CACHE_TTL_SECONDS)
+    if isinstance(cached, dict) and cached:
+        return cached
+    market = str(normalized.get("market") or _infer_watchlist_market(code)).strip() or "CN"
+    suffix = security_code.split(".", 1)[1] if "." in security_code else market
+    if suffix == "HK":
+        path = "/application/open-quote/kline-hk/daily"
+    elif suffix in {"O", "N", "US"}:
+        path = "/application/open-quote/kline-us/daily"
+    else:
+        path = "/application/open-quote/kline/daily"
+    start_date, end_date = resolve_gangtise_market_date_window(days=180)
+    series_result = fetch_gangtise_market_kline_series(
+        path=path,
+        security_code=security_code,
+        start_date=start_date,
+        end_date=end_date,
+        limit=300,
+        timeout=20,
+    )
+    points = series_result.get("points") or []
+    if not series_result.get("ok") or len(points) < 2:
+        return None
+    latest = points[-1]
+    previous = points[-2]
+    latest_close = NumberLike(latest.get("close"))
+    previous_close = NumberLike(previous.get("close"))
+    change_value = round(latest_close - previous_close, 2)
+    change_pct = round((change_value / previous_close) * 100, 2) if previous_close else 0.0
+    recent_points = points[-20:]
+    recent_closes = [NumberLike(item.get("close")) for item in recent_points if isinstance(item, dict)]
+    trend_anchor = recent_closes[0] if recent_closes else latest_close
+    trend_delta = latest_close - trend_anchor
+    interval_high = max([NumberLike(item.get("high")) for item in recent_points] + [latest_close])
+    interval_low = min([NumberLike(item.get("low")) for item in recent_points] + [latest_close])
+    interval_span_pct = round(((interval_high - interval_low) / interval_low) * 100, 2) if interval_low else 0.0
+    market_label = {
+        "SH": "A股主板",
+        "SZ": "A股深市",
+        "BJ": "北交所",
+        "HK": "港股",
+    }.get(market, "个股")
+    industry = str(normalized.get("industry") or f"{market_label}个股").strip() or "个股跟踪"
+    verdict = "偏强跟踪" if trend_delta > 0 and change_pct >= 0 else ("谨慎观察" if trend_delta < 0 and change_pct < 0 else "继续跟踪")
+    detail = {
+        "code": code,
+        "name": name,
+        "market": market,
+        "price": round(latest_close, 2),
+        "change": change_value,
+        "change_pct": change_pct,
+        "industry": industry,
+        "focus": industry,
+        "kline": [
+            {
+                "date": str(item.get("date") or "").strip()[-5:],
+                "open": round(NumberLike(item.get("open")), 2),
+                "high": round(NumberLike(item.get("high")), 2),
+                "low": round(NumberLike(item.get("low")), 2),
+                "close": round(NumberLike(item.get("close")), 2),
+            }
+            for item in recent_points
+            if isinstance(item, dict)
+        ],
+        "history_kline": build_real_indicator_kline_payload(
+            [
+                {
+                    "date": str(item.get("date") or "").strip(),
+                    "open": round(NumberLike(item.get("open")), 2),
+                    "high": round(NumberLike(item.get("high")), 2),
+                    "low": round(NumberLike(item.get("low")), 2),
+                    "close": round(NumberLike(item.get("close")), 2),
+                }
+                for item in points[-60:]
+                if isinstance(item, dict)
+            ]
+        ),
+        "history_series": [
+            {
+                "date": str(item.get("date") or "").strip(),
+                "value": round(NumberLike(item.get("close")), 2),
+                "status": build_real_indicator_status(
+                    NumberLike(item.get("close")),
+                    NumberLike(points[-60:][index - 1].get("close")) if index > 0 else NumberLike(item.get("close")),
+                ),
+            }
+            for index, item in enumerate(points[-60:])
+            if isinstance(item, dict)
+        ],
+        "authors": [],
+        "fundamental": {
+            "summary": f"当前已接入{name}的真实行情样本，先基于价格位置、波动区间和租户知识做第一轮基本面拆解；如需更深层业务与财务判断，可继续补充年报、纪要或研报。",
+            "metrics": [
+                {"label": "当前股价", "value": f"{round(latest_close, 2):.2f}", "note": "基于最近一个有效交易日收盘价"},
+                {"label": "近20日区间", "value": f"{round(interval_low, 2):.2f} ~ {round(interval_high, 2):.2f}", "note": "帮助判断当前位置与压力支撑"},
+                {"label": "近20日振幅", "value": f"{interval_span_pct:.2f}%", "note": "观察波动是否放大"},
+                {"label": "近20日趋势", "value": "偏强" if trend_delta > 0 else ("偏弱" if trend_delta < 0 else "震荡"), "note": "结合最近收盘序列归纳"},
+            ],
+            "thesis": [
+                f"{name}当前先以真实行情与阶段价格位置为起点做判断，避免继续使用演示随机价格。",
+                "如果租户知识库暂未命中公司专属材料，Hermes 会先输出结构化研究框架，再等待补充证据。",
+                "下一步应继续结合财报、行业景气和管理层纪要完善结论。",
+            ],
+        },
+        "forecast": {
+            "label": "基本面判断",
+            "verdict": verdict,
+            "confidence": "中",
+            "band": f"当前更适合先结合近20日区间 {round(interval_low, 2):.2f} - {round(interval_high, 2):.2f} 判断位置，再补充业务、财务和行业证据。",
+            "drivers": [
+                {"label": "价格位置", "score": f"{change_pct:+.2f}%", "note": "最近一日相对前收盘变化"},
+                {"label": "阶段波动", "score": f"{interval_span_pct:+.2f}%", "note": "近20日高低区间振幅"},
+                {"label": "资料沉淀度", "score": "-0.40", "note": "若租户知识不足，需要继续补充财务与业务资料"},
+            ],
+        },
+        "data_source": "gangtise_openapi",
+        "source_meta": {
+            "path": path,
+            "security_code": security_code,
+            "request_start_date": start_date,
+            "request_end_date": end_date,
+            "duration_ms": int(series_result.get("duration_ms") or 0),
+            "message": str(series_result.get("message") or "").strip(),
+        },
+        "data_unavailable": False,
+    }
+    _save_watchlist_cache("watchlist_detail_cache", security_code, detail)
+    return detail
+
+
+def _merge_watchlist_detail_with_seed(seed_detail, realtime_detail=None, stock_code="", stock_name=""):
+    seed = copy.deepcopy(seed_detail or {})
+    realtime = copy.deepcopy(realtime_detail or {})
+    code = str(realtime.get("code") or seed.get("code") or stock_code or "").strip().upper()
+    name = str(realtime.get("name") or seed.get("name") or stock_name or code).strip() or code
+    market = str(realtime.get("market") or seed.get("market") or _infer_watchlist_market(code)).strip() or "CN"
+    industry = str(seed.get("industry") or realtime.get("industry") or "个股跟踪").strip() or "个股跟踪"
+    focus = str(seed.get("focus") or realtime.get("focus") or industry).strip() or industry
+    merged = seed
+    merged.update(realtime)
+    merged["code"] = code
+    merged["name"] = name
+    merged["market"] = market
+    merged["industry"] = industry
+    merged["focus"] = focus
+    merged["authors"] = copy.deepcopy(seed.get("authors") or realtime.get("authors") or [])
+    merged["fundamental"] = copy.deepcopy(seed.get("fundamental") or realtime.get("fundamental") or {"summary": "", "metrics": [], "thesis": []})
+    merged["forecast"] = copy.deepcopy(seed.get("forecast") or realtime.get("forecast") or {"label": "基本面判断", "verdict": "继续跟踪", "confidence": "中", "band": "", "drivers": []})
+    merged["kline"] = copy.deepcopy(realtime.get("kline") or merged.get("kline") or [])
+    merged["history_kline"] = copy.deepcopy(realtime.get("history_kline") or build_empty_kline_payload())
+    merged["history_series"] = copy.deepcopy(realtime.get("history_series") or merged.get("history_series") or [])
+    merged["price"] = round(NumberLike(realtime.get("price")), 2)
+    merged["change"] = round(NumberLike(realtime.get("change")), 2)
+    merged["change_pct"] = round(NumberLike(realtime.get("change_pct")), 2)
+    merged["data_source"] = str(realtime.get("data_source") or "gangtise_openapi").strip() or "gangtise_openapi"
+    merged["data_unavailable"] = bool(realtime.get("data_unavailable"))
+    return merged
+
+
+def _build_watchlist_unavailable_detail(seed_detail=None, stock_code="", stock_name=""):
+    seed = copy.deepcopy(seed_detail or {})
+    code = str(seed.get("code") or stock_code or "").strip().upper()
+    name = str(seed.get("name") or stock_name or code).strip() or code
+    market = str(seed.get("market") or _infer_watchlist_market(code)).strip() or "CN"
+    industry = str(seed.get("industry") or ("银行" if code.startswith(("600", "601", "603")) else "个股跟踪")).strip() or "个股跟踪"
+    focus = str(seed.get("focus") or industry).strip() or industry
+    preserved_price = round(NumberLike(seed.get("price")), 2)
+    preserved_change = round(NumberLike(seed.get("change")), 2)
+    preserved_change_pct = round(NumberLike(seed.get("change_pct")), 2)
+    kline_points = copy.deepcopy(seed.get("kline") or [])
+    history_kline = copy.deepcopy(seed.get("history_kline") or {})
+
+    if preserved_price > 0 and not kline_points:
+        generated_points = _build_watchlist_kline_series(code, preserved_price)
+        kline_points = copy.deepcopy(generated_points)
+        synthetic_series = []
+        current_date = datetime.now() - timedelta(days=max(len(generated_points), 1) + 8)
+        for item in generated_points:
+            current_date += timedelta(days=1)
+            while current_date.weekday() >= 5:
+                current_date += timedelta(days=1)
+            synthetic_series.append(
+                {
+                    "date": current_date.strftime("%Y-%m-%d"),
+                    "open": round(NumberLike(item.get("open")), 2),
+                    "high": round(NumberLike(item.get("high")), 2),
+                    "low": round(NumberLike(item.get("low")), 2),
+                    "close": round(NumberLike(item.get("close")), 2),
+                }
+            )
+        history_kline = build_real_indicator_kline_payload(synthetic_series)
+    if not history_kline:
+        history_kline = build_empty_kline_payload()
+    history_series = [
+        {
+            "date": str(item.get("date") or "").strip(),
+            "value": round(NumberLike(item.get("close")), 2),
+            "status": build_real_indicator_status(
+                NumberLike(item.get("close")),
+                NumberLike(kline_points[index - 1].get("close")) if index > 0 else NumberLike(item.get("close")),
+            ),
+        }
+        for index, item in enumerate(kline_points)
+        if isinstance(item, dict)
+    ]
+
+    base_fundamental = copy.deepcopy(
+        seed.get("fundamental")
+        or {
+            "summary": "Gangtise 行情当前暂未返回该股票的可用历史样本。现阶段仅保留研究框架，等待真实行情同步后再展示价格与 K 线。",
+            "metrics": [],
+            "thesis": [],
+        }
+    )
+    summary_text = str(base_fundamental.get("summary") or "").strip()
+    if "当前展示最近一次可用快照" not in summary_text:
+        summary_text = (
+            f"{summary_text} 当前展示最近一次可用快照，待 Gangtise 实时行情恢复后会自动刷新。".strip()
+            if summary_text else
+            "当前展示最近一次可用快照，待 Gangtise 实时行情恢复后会自动刷新。"
+        )
+    base_fundamental["summary"] = summary_text
+    base_metrics = base_fundamental.get("metrics") if isinstance(base_fundamental.get("metrics"), list) else []
+    if not any(str((item or {}).get("label") or "").strip() == "行情状态" for item in base_metrics if isinstance(item, dict)):
+        base_metrics.insert(
+            0,
+            {
+                "label": "行情状态",
+                "value": "等待实时刷新",
+                "note": "当前先展示最近一次可用快照，Gangtise 恢复后自动覆盖。",
+            },
+        )
+    base_fundamental["metrics"] = base_metrics[:6]
+
+    base_forecast = copy.deepcopy(
+        seed.get("forecast")
+        or {
+            "label": "基本面判断",
+            "verdict": "等待真实行情",
+            "confidence": "低",
+            "band": "",
+            "drivers": [],
+        }
+    )
+    forecast_band = str(base_forecast.get("band") or "").strip()
+    if "最近一次可用快照" not in forecast_band:
+        base_forecast["band"] = (
+            f"{forecast_band} 当前先参考最近一次可用快照，待 Gangtise 实时行情恢复后再更新位置判断。".strip()
+            if forecast_band else
+            "当前先参考最近一次可用快照，待 Gangtise 实时行情恢复后再更新位置判断。"
+        )
+    return {
+        "code": code,
+        "name": name,
+        "market": market,
+        "price": preserved_price,
+        "change": preserved_change,
+        "change_pct": preserved_change_pct,
+        "industry": industry,
+        "focus": focus,
+        "kline": kline_points,
+        "history_kline": history_kline,
+        "history_series": history_series,
+        "authors": copy.deepcopy(seed.get("authors") or []),
+        "fundamental": base_fundamental,
+        "forecast": base_forecast,
+        "data_source": str(seed.get("data_source") or "watchlist_cached_snapshot").strip() or "watchlist_cached_snapshot",
+        "data_unavailable": True,
+    }
 
 
 def _build_watchlist_kline_series(stock_code, base_price):
@@ -3317,49 +4893,12 @@ def _build_dynamic_watchlist_detail(stock_code, stock_name=""):
     normalized_code = str(stock_code or "").strip().upper()
     if not normalized_code:
         return None
+    resolved_candidate = _resolve_watchlist_candidate(stock_code=normalized_code, stock_name=stock_name)
+    realtime_detail = _build_watchlist_realtime_detail_from_candidate(resolved_candidate, stock_name=stock_name)
+    if isinstance(realtime_detail, dict) and realtime_detail:
+        return realtime_detail
     preset = copy.deepcopy(WATCHLIST_DYNAMIC_DETAIL_PRESETS.get(normalized_code) or {})
-    market = str(preset.get("market") or _infer_watchlist_market(normalized_code)).strip() or "CN"
-    seed = sum(ord(ch) for ch in normalized_code)
-    rng = random.Random(f"watchlist-fallback:{normalized_code}")
-    base_price = float(preset.get("price") or round(8 + (seed % 900) / 10.0, 2))
-    change = float(preset.get("change") or round(rng.uniform(-base_price * 0.018, base_price * 0.018), 2))
-    change_pct = float(preset.get("change_pct") or round((change / base_price) * 100 if base_price else 0, 2))
-    stock_label = str(preset.get("name") or stock_name or normalized_code).strip() or normalized_code
-    industry = str(preset.get("industry") or ("银行" if normalized_code.startswith(("600", "601", "603")) else "个股跟踪")).strip() or "个股跟踪"
-    focus = str(preset.get("focus") or industry).strip() or industry
-    return {
-        "code": normalized_code,
-        "name": stock_label,
-        "market": market,
-        "price": round(base_price, 2),
-        "change": round(change, 2),
-        "change_pct": round(change_pct, 2),
-        "industry": industry,
-        "focus": focus,
-        "kline": _build_watchlist_kline_series(normalized_code, base_price),
-        "authors": copy.deepcopy(preset.get("authors") or []),
-        "fundamental": copy.deepcopy(preset.get("fundamental") or {
-            "summary": "当前尚未沉淀该股票的专属研究样本，先提供基础行情和通用基本面观察框架。",
-            "metrics": [
-                {"label": "行情状态", "value": "可查看", "note": "已支持基础 K 线与详情展示"},
-                {"label": "研究样本", "value": "待补充", "note": "后续可通过 Hermes 和知识库持续沉淀"},
-            ],
-            "thesis": [
-                "当前可先结合价格位置、行业属性和后续研究材料继续观察。",
-                "若需要更完整判断，建议继续补充研报、公告或复盘证据链。",
-            ],
-        }),
-        "forecast": copy.deepcopy(preset.get("forecast") or {
-            "label": "基本面判断",
-            "verdict": "待补充研究",
-            "confidence": "低",
-            "band": "当前已支持基础行情与 K 线查看，后续判断需要更多财务、行业和作者样本。",
-            "drivers": [
-                {"label": "样本沉淀度", "score": "-0.6", "note": "当前平台内专属样本较少"},
-                {"label": "后续研究空间", "score": "+0.8", "note": "可继续通过 Hermes、知识库和复盘补充"},
-            ],
-        }),
-    }
+    return _build_watchlist_unavailable_detail(preset, stock_code=normalized_code, stock_name=stock_name)
 
 
 def _enrich_watchlist_details(details):
@@ -3420,16 +4959,28 @@ def _enrich_watchlist_details(details):
     return normalized_details
 
 
-def get_watchlist_detail_by_code(stock_code="", stock_name="", details_map=None):
+def get_watchlist_detail_by_code(stock_code="", stock_name="", details_map=None, enrich=True):
     details = details_map if isinstance(details_map, dict) else gen_watchlist_details()
     normalized_code = str(stock_code or "").strip().upper()
     if not normalized_code and stock_name:
-        normalized_code = find_watchlist_code_from_text(stock_name)
+        normalized_code = _find_watchlist_code_from_text_local(stock_name)
     if not normalized_code:
         return None
     detail = copy.deepcopy((details or {}).get(normalized_code) or {})
     if detail:
-        return detail
+        if not enrich:
+            return detail
+        if detail.get("data_source") == "gangtise_openapi" or detail.get("data_unavailable"):
+            return detail
+        resolved_candidate = _resolve_watchlist_candidate(stock_code=normalized_code, stock_name=stock_name or detail.get("name") or normalized_code)
+        realtime_detail = _build_watchlist_realtime_detail_from_candidate(resolved_candidate, stock_name=stock_name or detail.get("name") or normalized_code)
+        merged = _merge_watchlist_detail_with_seed(
+            detail,
+            realtime_detail=realtime_detail,
+            stock_code=normalized_code,
+            stock_name=stock_name or detail.get("name") or normalized_code,
+        ) if realtime_detail else _build_watchlist_unavailable_detail(detail, stock_code=normalized_code, stock_name=stock_name or detail.get("name") or normalized_code)
+        return copy.deepcopy((_enrich_watchlist_details({normalized_code: merged}).get(normalized_code)) or merged)
     fallback = _build_dynamic_watchlist_detail(normalized_code, stock_name=stock_name)
     if not fallback:
         return None
@@ -3450,6 +5001,22 @@ def _normalize_watchlist_annotation_code(stock_code="", stock_name="", details_m
         if normalized_code and normalized_code == str((detail or {}).get("name") or "").strip().upper():
             return str(code or "").strip()
     return normalized_code
+
+
+def _find_watchlist_code_from_text_local(text):
+    candidate = str(text or "").strip()
+    if not candidate:
+        return ""
+    direct = re.search(r"\b\d{5,6}\b", candidate)
+    if direct:
+        return direct.group(0)
+    normalized = _normalize_watchlist_query_text(candidate)
+    if re.fullmatch(r"\d{5,6}", normalized):
+        return normalized
+    suggestions = search_watchlist_candidates(candidate, top=1, include_remote=False)
+    if suggestions:
+        return str((suggestions[0] or {}).get("code") or "").strip().upper()
+    return ""
 
 
 def _normalize_watchlist_annotation_row(row, detail=None):
@@ -3497,7 +5064,12 @@ def list_watchlist_kline_annotations(tenant_slug="", stock_code="", stock_name="
         """,
         (normalized_tenant, normalized_code),
     ).fetchall()
-    detail = get_watchlist_detail_by_code(normalized_code, stock_name=stock_name, details_map=details) or {}
+    detail = get_watchlist_detail_by_code(
+        normalized_code,
+        stock_name=stock_name,
+        details_map=details,
+        enrich=False,
+    ) or {}
     return [_normalize_watchlist_annotation_row(row, detail=detail) for row in rows]
 
 
@@ -3750,6 +5322,159 @@ def _normalize_watchlist_comment_row(row, detail=None, viewer_role="", viewer_pr
     }
 
 
+def _ensure_watchlist_comments_table(conn):
+    global _watchlist_comments_schema_ready
+    if _watchlist_comments_schema_ready:
+        return
+    with _watchlist_comments_schema_lock:
+        if _watchlist_comments_schema_ready:
+            return
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS watchlist_comments (
+                    id BIGSERIAL PRIMARY KEY,
+                    tenant_slug TEXT NOT NULL DEFAULT '',
+                    stock_code TEXT NOT NULL DEFAULT '',
+                    stock_name TEXT NOT NULL DEFAULT '',
+                    comment_text TEXT NOT NULL DEFAULT '',
+                    label_tags_json TEXT NOT NULL DEFAULT '[]',
+                    keyword_tags_json TEXT NOT NULL DEFAULT '[]',
+                    sentiment_label TEXT NOT NULL DEFAULT '',
+                    topic_label TEXT NOT NULL DEFAULT '',
+                    comment_summary TEXT NOT NULL DEFAULT '',
+                    labeling_source TEXT NOT NULL DEFAULT '',
+                    labeling_model_key TEXT NOT NULL DEFAULT '',
+                    labeling_model_name TEXT NOT NULL DEFAULT '',
+                    created_by_user_id TEXT NOT NULL DEFAULT '',
+                    created_by_name TEXT NOT NULL DEFAULT '',
+                    created_by_role TEXT NOT NULL DEFAULT 'investor',
+                    source_client TEXT NOT NULL DEFAULT 'h5',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            cur.execute(
+                "ALTER TABLE watchlist_comments ADD COLUMN IF NOT EXISTS label_tags_json TEXT NOT NULL DEFAULT '[]'"
+            )
+            cur.execute(
+                "ALTER TABLE watchlist_comments ADD COLUMN IF NOT EXISTS keyword_tags_json TEXT NOT NULL DEFAULT '[]'"
+            )
+            cur.execute(
+                "ALTER TABLE watchlist_comments ADD COLUMN IF NOT EXISTS sentiment_label TEXT NOT NULL DEFAULT ''"
+            )
+            cur.execute(
+                "ALTER TABLE watchlist_comments ADD COLUMN IF NOT EXISTS topic_label TEXT NOT NULL DEFAULT ''"
+            )
+            cur.execute(
+                "ALTER TABLE watchlist_comments ADD COLUMN IF NOT EXISTS comment_summary TEXT NOT NULL DEFAULT ''"
+            )
+            cur.execute(
+                "ALTER TABLE watchlist_comments ADD COLUMN IF NOT EXISTS labeling_source TEXT NOT NULL DEFAULT ''"
+            )
+            cur.execute(
+                "ALTER TABLE watchlist_comments ADD COLUMN IF NOT EXISTS labeling_model_key TEXT NOT NULL DEFAULT ''"
+            )
+            cur.execute(
+                "ALTER TABLE watchlist_comments ADD COLUMN IF NOT EXISTS labeling_model_name TEXT NOT NULL DEFAULT ''"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_watchlist_comments_tenant_stock_updated ON watchlist_comments(tenant_slug, stock_code, updated_at DESC, id DESC)"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_watchlist_comments_tenant_user ON watchlist_comments(tenant_slug, created_by_user_id, updated_at DESC)"
+            )
+        conn.commit()
+        _watchlist_comments_schema_ready = True
+
+
+def _extract_watchlist_comment_keywords_by_rule(comment_text, stock_detail=None, limit=6):
+    normalized = re.sub(r"\s+", " ", str(comment_text or "").strip())
+    if not normalized:
+        return []
+    detail = stock_detail if isinstance(stock_detail, dict) else {}
+    candidates = []
+    for fixed_item in [
+        str(detail.get("name") or "").strip(),
+        str(detail.get("industry") or "").strip(),
+        str(detail.get("focus") or "").strip(),
+    ]:
+        if fixed_item and fixed_item not in candidates:
+            candidates.append(fixed_item)
+    token_candidates = re.findall(r"[\u4e00-\u9fff]{2,8}|[A-Za-z][A-Za-z0-9.+-]{1,15}", normalized)
+    stop_words = {
+        "这个", "那个", "我们", "你们", "他们", "目前", "因为", "如果", "还是", "已经", "继续", "应该", "可以",
+        "需要", "看到", "感觉", "这里", "一个", "这只", "股票", "公司", "板块", "市场", "今天", "最近", "以及",
+        "但是", "还有", "就是", "自己", "觉得", "没有", "不是", "的话", "一下", "这个股", "一下子",
+    }
+    for item in token_candidates:
+        token = str(item or "").strip()
+        if len(token) < 2 or token in stop_words:
+            continue
+        if token not in candidates:
+            candidates.append(token)
+    return candidates[: max(1, int(limit or 6))]
+
+
+def _label_watchlist_comment_without_llm(comment_text, stock_detail=None):
+    normalized = re.sub(r"\s+", " ", str(comment_text or "").strip())
+    detail = stock_detail if isinstance(stock_detail, dict) else {}
+    keywords = _extract_watchlist_comment_keywords_by_rule(normalized, detail, limit=8)
+    labels = []
+    topic_label = "观点跟踪"
+    sentiment_label = "中性"
+    summary = normalized[:90]
+    if any(keyword in normalized for keyword in ["风险", "回撤", "跌破", "谨慎", "承压", "减仓", "危险", "波动"]):
+        sentiment_label = "谨慎"
+        topic_label = "风险提示"
+        labels.extend(["风险提示", "负向反馈"])
+    elif any(keyword in normalized for keyword in ["看好", "增持", "突破", "修复", "超预期", "回暖", "加强", "机会"]):
+        sentiment_label = "积极"
+        topic_label = "机会判断"
+        labels.extend(["机会判断", "正向反馈"])
+    elif any(keyword in normalized for keyword in ["为什么", "请问", "？", "?", "怎么看", "能否", "是不是"]):
+        sentiment_label = "追问"
+        topic_label = "问题追踪"
+        labels.extend(["问题追踪", "待验证"])
+    if any(keyword in normalized for keyword in ["财报", "业绩", "利润", "收入", "毛利", "估值", "PE", "PB", "现金流"]):
+        labels.append("基本面")
+        if topic_label == "观点跟踪":
+            topic_label = "基本面判断"
+    if any(keyword in normalized for keyword in ["K线", "均线", "支撑", "压力", "放量", "缩量", "趋势", "形态"]):
+        labels.append("技术面")
+        if topic_label == "观点跟踪":
+            topic_label = "走势观察"
+    if any(keyword in normalized for keyword in ["催化", "政策", "订单", "回购", "纪要", "行业", "景气"]):
+        labels.append("催化跟踪")
+    labels = _unique_watchlist_texts(labels or ["观点跟踪"], limit=6)
+    if not summary:
+        summary = "围绕该股的阶段判断与追踪意见。"
+    return {
+        "labels": labels,
+        "keywords": keywords,
+        "sentiment_label": sentiment_label,
+        "topic_label": topic_label,
+        "summary": summary[:30],
+        "source": "rule",
+        "llm_model": {},
+    }
+
+
+def _unique_watchlist_texts(items, limit=12):
+    seen = set()
+    result = []
+    for item in items if isinstance(items, list) else list(items or []):
+        text = str(item or "").strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        result.append(text)
+        if len(result) >= max(1, int(limit or 12)):
+            break
+    return result
+
+
 def list_watchlist_comments(
     tenant_slug="",
     stock_code="",
@@ -3769,7 +5494,11 @@ def list_watchlist_comments(
         return []
     normalized_viewer_role = str(viewer_role or "").strip().lower()
     normalized_viewer_profile_id = str(viewer_profile_id or "").strip()
-    rows = get_db().execute(
+    db = get_db()
+    connection = getattr(db, "_connection", None)
+    if connection is not None:
+        _ensure_watchlist_comments_table(connection)
+    rows = db.execute(
         """
         SELECT *
         FROM watchlist_comments
@@ -3779,7 +5508,12 @@ def list_watchlist_comments(
         """,
         (normalized_tenant, normalized_code, max(1, min(int(limit or 80), 200))),
     ).fetchall()
-    detail = get_watchlist_detail_by_code(normalized_code, stock_name=stock_name, details_map=details) or {}
+    detail = get_watchlist_detail_by_code(
+        normalized_code,
+        stock_name=stock_name,
+        details_map=details,
+        enrich=False,
+    ) or {}
     normalized_rows = [
         _normalize_watchlist_comment_row(
             row,
@@ -3841,22 +5575,17 @@ def save_watchlist_comment(
         "created_at": now_text,
         "updated_at": now_text,
     }
-    label_result = label_watchlist_comment_with_llm(
-        payload["comment_text"],
-        stock_detail=detail,
-        tenant_slug=normalized_tenant,
-        entry_point=payload["source_client"],
-    )
+    label_result = _label_watchlist_comment_without_llm(payload["comment_text"], stock_detail=detail)
     payload["label_tags_json"] = json.dumps(label_result.get("labels") or [], ensure_ascii=False)
     payload["keyword_tags_json"] = json.dumps(label_result.get("keywords") or [], ensure_ascii=False)
     payload["sentiment_label"] = str(label_result.get("sentiment_label") or "").strip()[:40]
     payload["topic_label"] = str(label_result.get("topic_label") or "").strip()[:80]
     payload["comment_summary"] = str(label_result.get("summary") or "").strip()[:120]
-    payload["labeling_source"] = str(label_result.get("source") or "").strip()[:40]
-    llm_model = label_result.get("llm_model") if isinstance(label_result.get("llm_model"), dict) else {}
-    payload["labeling_model_key"] = str(llm_model.get("key") or "").strip()[:80]
-    payload["labeling_model_name"] = str(llm_model.get("model_name") or llm_model.get("label") or "").strip()[:120]
+    payload["labeling_source"] = "rule"
+    payload["labeling_model_key"] = ""
+    payload["labeling_model_name"] = ""
     db = get_db()
+    _ensure_watchlist_comments_table(db._connection)
     db.execute(
         """
         INSERT INTO watchlist_comments (
@@ -3916,11 +5645,15 @@ def build_watchlist_comment_analytics(tenant_slug="", limit=240):
             "label_distribution": [],
             "sentiment_distribution": [],
             "topic_distribution": [],
+            "sector_distribution": [],
             "top_stocks": [],
             "recent_comments": [],
+            "summary_text": "当前还没有足够的评论数据可供统计。",
         }
     try:
-        rows = get_db().execute(
+        db = get_db()
+        _ensure_watchlist_comments_table(db._connection)
+        rows = db.execute(
             """
             SELECT *
             FROM watchlist_comments
@@ -3939,9 +5672,11 @@ def build_watchlist_comment_analytics(tenant_slug="", limit=240):
             "label_distribution": [],
             "sentiment_distribution": [],
             "topic_distribution": [],
+            "sector_distribution": [],
             "top_stocks": [],
             "recent_comments": [],
             "fallback_mode": True,
+            "summary_text": "当前还没有足够的评论数据可供统计。",
         }
     detail_map = gen_watchlist_details()
     normalized_rows = [
@@ -3957,6 +5692,7 @@ def build_watchlist_comment_analytics(tenant_slug="", limit=240):
     keyword_counter = {}
     sentiment_counter = {}
     topic_counter = {}
+    sector_counter = {}
     stock_counter = {}
     dav_comments = 0
     investor_comments = 0
@@ -3968,6 +5704,9 @@ def build_watchlist_comment_analytics(tenant_slug="", limit=240):
         stock_key = str(item.get("stock_code") or "").strip()
         if stock_key:
             stock_counter[stock_key] = stock_counter.get(stock_key, 0) + 1
+            stock_detail = detail_map.get(stock_key) or {}
+            sector_key = str(stock_detail.get("industry") or stock_detail.get("focus") or "").strip() or "未分类"
+            sector_counter[sector_key] = sector_counter.get(sector_key, 0) + 1
         for tag in (item.get("label_tags") or []):
             label_counter[tag] = label_counter.get(tag, 0) + 1
         for keyword in (item.get("keyword_tags") or []):
@@ -3992,19 +5731,28 @@ def build_watchlist_comment_analytics(tenant_slug="", limit=240):
             "industry": str(detail.get("industry") or detail.get("focus") or "").strip(),
             "value": count,
         })
+    sector_items = _sorted_counter(sector_counter, label_key="label", value_key="value", limit_value=10)
+    hot_sector = sector_items[0]["label"] if sector_items else ""
     return {
         "summary": {
             "total_comments": len(normalized_rows),
             "dav_comments": dav_comments,
             "investor_comments": investor_comments,
             "stock_count": len(stock_counter),
+            "sector_count": len(sector_counter),
         },
         "keyword_cloud": _sorted_counter(keyword_counter, label_key="keyword", value_key="value", limit_value=24),
         "label_distribution": _sorted_counter(label_counter, label_key="label", value_key="value", limit_value=12),
         "sentiment_distribution": _sorted_counter(sentiment_counter, label_key="label", value_key="value", limit_value=8),
         "topic_distribution": _sorted_counter(topic_counter, label_key="label", value_key="value", limit_value=10),
+        "sector_distribution": sector_items,
         "top_stocks": top_stock_items[:8],
         "recent_comments": normalized_rows[:20],
+        "hot_sector": hot_sector,
+        "summary_text": (
+            f"近 {len(normalized_rows)} 条评论中，粉丝主要关注 {hot_sector} 等行业板块。"
+            if hot_sector else "当前评论已按行业板块完成归并统计。"
+        ),
     }
 
 
@@ -4028,6 +5776,7 @@ def delete_watchlist_comment(
     normalized_role = str(actor_role or "").strip().lower()
     normalized_profile_id = str(actor_profile_id or "").strip()
     db = get_db()
+    _ensure_watchlist_comments_table(db._connection)
     row = db.execute(
         """
         SELECT *
@@ -4274,7 +6023,15 @@ def gen_watchlist_details():
             },
         },
     }
-    return _enrich_watchlist_details(details)
+    hydrated = {}
+    for code, seed_detail in details.items():
+        resolved_candidate = _resolve_watchlist_candidate(stock_code=code, stock_name=seed_detail.get("name") or code)
+        realtime_detail = _build_watchlist_realtime_detail_from_candidate(resolved_candidate, stock_name=seed_detail.get("name") or code)
+        if realtime_detail:
+            hydrated[code] = _merge_watchlist_detail_with_seed(seed_detail, realtime_detail=realtime_detail, stock_code=code, stock_name=seed_detail.get("name") or code)
+        else:
+            hydrated[code] = _build_watchlist_unavailable_detail(seed_detail, stock_code=code, stock_name=seed_detail.get("name") or code)
+    return _enrich_watchlist_details(hydrated)
 
 
 def strip_watchlist_forecast_payload(detail):
@@ -4289,58 +6046,714 @@ def apply_watchlist_feature_flags(detail, site_config=None):
         normalized = strip_watchlist_forecast_payload(normalized)
     return normalized
 
-def gen_news_feed():
-    news = [
-        {
-            "title": "美联储6月议息会议前瞻：降息预期升温，市场如何定价？",
-            "tag": "全球要闻",
-            "time": "10分钟前",
-            "hot": True,
-            "source_group": "全球要闻",
-            "why": "它会直接影响美元、港股互联网和大宗商品的估值锚，是当前最核心的宏观变量之一。",
-        },
-        {
-            "title": "【深度】新能源车渗透率突破50%，产业链投资机会梳理",
-            "tag": "自选股相关",
-            "time": "32分钟前",
-            "hot": True,
-            "source_group": "自选股",
-            "why": "你的自选股里有动力电池样本，且当前预警点正集中在价格竞争和技术路线验证。",
-        },
-        {
-            "title": "高盛最新报告：A股估值修复空间测算",
-            "tag": "全球要闻",
-            "time": "1小时前",
-            "hot": False,
-            "source_group": "全球要闻",
-            "why": "它决定科技成长板块当前估值是不是已经提前反映乐观预期，影响面广。",
-        },
-        {
-            "title": "专家会议纪要：某头部消费品牌Q2经营数据点评",
-            "tag": "大V关注趋势",
-            "time": "2小时前",
-            "hot": False,
-            "source_group": "大V趋势",
-            "why": "与大V近期关注的消费修复和高端白酒判断高度相关，适合作为租户知识延伸阅读。",
-        },
-        {
-            "title": "另类数据：卫星图像显示主要港口吞吐量环比回升8%",
-            "tag": "全球要闻",
-            "time": "3小时前",
-            "hot": False,
-            "source_group": "全球要闻",
-            "why": "它是宏观修复是否真正落地的交叉验证项，不是普通资讯，而是影响顺周期判断的旁证。",
-        },
-        {
-            "title": "DeepSeek最新研究：AI算力需求2026年增速预测上调至180%",
-            "tag": "大V关注趋势",
-            "time": "4小时前",
-            "hot": True,
-            "source_group": "大V趋势",
-            "why": "它和当前科技成长板块的核心主线一致，也会被大V方法模板优先引用为趋势依据。",
-        },
+NEWS_LAKE_CACHE_KEY = "fundamental_news_lake:v1"
+NEWS_SOURCE_STATUS_KEY = "fundamental_news_source_status:v1"
+NEWS_LAKE_CACHE_TTL_SECONDS = 15 * 60
+NEWS_SOURCE_MIN_ITEMS = 5
+NEWS_ALGORITHM_KEY_PREFIX = "tenant_news_aggregation_algorithm:"
+NEWS_ALGORITHM_VERSION = "v3"
+NEWS_RULE_PLAN_VERSION = "v1"
+NEWS_MAJOR_SIGNAL_KEYWORDS = (
+    "重大利好", "重大利空", "重大风险", "突发", "紧急", "重磅", "立案调查", "行政处罚",
+    "停牌", "退市", "暴雷", "违约", "降准", "降息", "加息", "出口管制", "关税上调",
+    "重大订单", "中标", "业绩预增", "业绩预亏", "回购", "增持", "减持", "并购重组", "重大资产重组",
+)
+NEWS_SECTOR_ALIASES = {
+    "港股互联网": ("互联网", "平台经济", "港股", "腾讯", "阿里", "美团", "百度", "快手"),
+    "半导体制造": ("半导体", "芯片", "集成电路", "晶圆", "存储", "光刻"),
+    "高端白酒": ("白酒", "贵州茅台", "五粮液", "泸州老窖"),
+    "动力电池": ("动力电池", "锂电", "新能源车", "宁德时代"),
+    "银行": ("银行", "信贷", "息差", "存款", "贷款"),
+}
+DEFAULT_NEWS_RULE_PLAN = {
+    "version": NEWS_RULE_PLAN_VERSION,
+    "candidate_scope": {
+        "watchlist_related": True,
+        "major_events": True,
+    },
+    "priority_order": ["watchlist_sector", "major_market"],
+    "filters": {
+        "exclude_unrelated": True,
+    },
+    "presentation": {
+        "home_limit": 10,
+    },
+    "diversity": {
+        "max_per_source": 3,
+        "max_per_group": 4,
+    },
+}
+DEFAULT_NEWS_AGGREGATION_JS = """function rankNews(input) {
+  const normalize = (value) => String(value || '').replace(/[\\s\\u3000·•/|_|-]+/g, ' ').trim();
+  const compact = (value) => String(value || '').replace(/[\\s\\u3000·•/|_|-.]/g, '').trim();
+  const tags = Array.isArray(input.item.tags) ? input.item.tags.map(normalize).filter(Boolean) : [];
+  const text = normalize([input.item.title, input.item.content, input.item.summary].filter(Boolean).join(' '));
+  const compactText = compact(text);
+  const sectorTokens = Array.isArray(input.watchlistSectors) ? input.watchlistSectors.map(normalize).filter(Boolean) : [];
+  const sectorAliases = {'港股互联网':['互联网','平台经济','港股','腾讯','阿里','美团','百度','快手'],'半导体制造':['半导体','芯片','集成电路','晶圆','存储','光刻'],'高端白酒':['白酒','贵州茅台','五粮液','泸州老窖'],'动力电池':['动力电池','锂电','新能源车','宁德时代'],'银行':['银行','信贷','息差','存款','贷款']};
+  const symbolTokens = Array.isArray(input.watchlistSymbols) ? input.watchlistSymbols.map(normalize).filter(Boolean) : [];
+  const majorKeywords = ['重大利好','重大利空','重大风险','突发','紧急','重磅','立案调查','行政处罚','停牌','退市','暴雷','违约','降准','降息','加息','出口管制','关税上调','重大订单','中标','业绩预增','业绩预亏','回购','增持','减持','并购重组','重大资产重组'];
+  const sectorMatch = sectorTokens.some(tag => [tag, ...(sectorAliases[tag] || [])].some(term => text.includes(term)));
+  const symbolMatch = symbolTokens.some(tag => text.includes(tag) || compactText.includes(compact(tag)));
+  const majorSignal = Boolean(input.item.isMajorPositive || input.item.isMajorNegative)
+    || majorKeywords.some(keyword => text.includes(keyword));
+  return {
+    score: ((sectorMatch || symbolMatch) ? 220 : 0) + (symbolMatch ? 65 : 0) + (majorSignal ? 100 : 0),
+    bucket: (sectorMatch || symbolMatch) ? 'watchlist_sector' : (majorSignal ? 'major_market' : 'other'),
+    reason: (sectorMatch || symbolMatch) ? '命中自选股行业板块或标的' : (majorSignal ? '命中社会性重大利好/利空或高影响事件' : '其他公开信息'),
+    matched_topics: [
+      ...new Set([
+        ...(sectorTokens.filter(tag => [tag, ...(sectorAliases[tag] || [])].some(term => text.includes(term)))),
+        ...(symbolTokens.filter(tag => text.includes(tag) || compactText.includes(compact(tag)))),
+        ...(majorKeywords.filter(keyword => text.includes(keyword)))
+      ])
     ]
-    return news
+  };
+}"""
+DEFAULT_NEWS_AGGREGATION_PROMPT = "先按自选股行业板块聚合，再看社会性重大利好/利空消息。普通用户只查看结果，大V可以在这里修改规则并预览效果。"
+NEWS_SOURCE_WHITELIST = [
+    # Frozen after the 2026-08-07 live validation. Runtime never promotes a new
+    # source; a source must pass the five-item admission test first.
+    {"code": "gov_cn_policy", "name": "中国政府网", "category": "政策", "source_group": "政策要闻", "url": "https://www.gov.cn/zhengce/index.htm", "indicator_code": "policy_news_heat", "validated_item_count": 20},
+    {"code": "pboc_policy", "name": "中国人民银行", "category": "政策", "source_group": "政策要闻", "url": "https://www.pbc.gov.cn/goutongjiaoliu/113456/113469/index.html", "indicator_code": "policy_news_heat", "validated_item_count": 18},
+    {"code": "stats_macro", "name": "国家统计局", "category": "宏观", "source_group": "宏观要闻", "url": "https://www.stats.gov.cn/sj/zxfb/", "indicator_code": "macro_news_heat", "validated_item_count": 20},
+    {"code": "csrc_regulation", "name": "中国证监会", "category": "监管", "source_group": "监管要闻", "url": "https://www.csrc.gov.cn/csrc/c101937/common_list.shtml", "indicator_code": "regulatory_event_count", "validated_item_count": 20},
+    {"code": "cninfo_announcements", "name": "巨潮资讯", "category": "公司公告", "source_group": "公司公告", "url": "https://www.cninfo.com.cn/new/index", "indicator_code": "company_event_count", "validated_item_count": 19},
+    {"code": "sse_disclosure", "name": "上海证券交易所", "category": "公司公告", "source_group": "公司公告", "url": "https://www.sse.com.cn/disclosure/listedinfo/announcement/", "indicator_code": "company_event_count", "validated_item_count": 11},
+    {"code": "szse_disclosure", "name": "深圳证券交易所", "category": "公司公告", "source_group": "公司公告", "url": "https://www.szse.cn/disclosure/listed/notice/", "indicator_code": "company_event_count", "validated_item_count": 20},
+]
+
+
+def _extract_news_rule_plan_from_prompt(source_prompt):
+    prompt = str(source_prompt or "").strip()
+    plan = copy.deepcopy(DEFAULT_NEWS_RULE_PLAN)
+    if not prompt:
+        return plan
+    compact_prompt = re.sub(r"\s+", "", prompt)
+    if any(token in compact_prompt for token in ("重大消息优先", "重大新闻优先", "重大事件优先", "利好利空优先")):
+        plan["priority_order"] = ["major_market", "watchlist_sector"]
+    if any(token in compact_prompt for token in ("只看自选股", "仅看自选股", "只保留板块", "仅保留板块", "不补充重大")):
+        plan["candidate_scope"]["major_events"] = False
+    if any(token in compact_prompt for token in ("只看重大", "仅看重大", "只保留重大")):
+        plan["candidate_scope"]["watchlist_related"] = False
+        plan["candidate_scope"]["major_events"] = True
+        plan["priority_order"] = ["major_market"]
+    home_limit_match = re.search(r"(?:首页|主页|首屏)[^。；;，,]{0,16}?(\d{1,2})\s*条", compact_prompt)
+    if not home_limit_match:
+        home_limit_match = re.search(r"(?:只展示|展示|保留)[^。；;，,]{0,8}?(\d{1,2})\s*条", compact_prompt)
+    if home_limit_match:
+        plan["presentation"]["home_limit"] = max(1, min(20, int(home_limit_match.group(1))))
+    source_cap_match = re.search(r"(?:每个来源|单一来源|同一来源)[^。；;，,]{0,8}?(\d{1,2})\s*条", compact_prompt)
+    if source_cap_match:
+        plan["diversity"]["max_per_source"] = max(1, min(10, int(source_cap_match.group(1))))
+    group_cap_match = re.search(r"(?:每类|单一类型|同一类型)[^。；;，,]{0,8}?(\d{1,2})\s*条", compact_prompt)
+    if group_cap_match:
+        plan["diversity"]["max_per_group"] = max(1, min(10, int(group_cap_match.group(1))))
+    if any(token in compact_prompt for token in ("不限制来源", "不限制类型", "不做来源去重")):
+        plan["diversity"]["max_per_source"] = 10
+        plan["diversity"]["max_per_group"] = 10
+    return plan
+
+
+def _normalize_news_rule_plan(payload=None, source_prompt=""):
+    parsed_prompt_plan = _extract_news_rule_plan_from_prompt(source_prompt)
+    raw = payload if isinstance(payload, dict) else {}
+    plan = copy.deepcopy(DEFAULT_NEWS_RULE_PLAN)
+    candidate_scope = raw.get("candidate_scope") if isinstance(raw.get("candidate_scope"), dict) else {}
+    for key in ("watchlist_related", "major_events"):
+        if key in candidate_scope:
+            plan["candidate_scope"][key] = bool(candidate_scope[key])
+        else:
+            plan["candidate_scope"][key] = parsed_prompt_plan["candidate_scope"][key]
+    if not any(plan["candidate_scope"].values()):
+        plan["candidate_scope"]["watchlist_related"] = True
+    allowed_buckets = {"watchlist_sector", "major_market"}
+    raw_order = raw.get("priority_order") if isinstance(raw.get("priority_order"), list) else parsed_prompt_plan["priority_order"]
+    priority_order = [str(item).strip() for item in raw_order if str(item).strip() in allowed_buckets]
+    priority_order = list(dict.fromkeys(priority_order))
+    for bucket, enabled in (("watchlist_sector", plan["candidate_scope"]["watchlist_related"]), ("major_market", plan["candidate_scope"]["major_events"])):
+        if enabled and bucket not in priority_order:
+            priority_order.append(bucket)
+    plan["priority_order"] = [bucket for bucket in priority_order if (bucket != "watchlist_sector" or plan["candidate_scope"]["watchlist_related"]) and (bucket != "major_market" or plan["candidate_scope"]["major_events"])]
+    filters = raw.get("filters") if isinstance(raw.get("filters"), dict) else {}
+    plan["filters"]["exclude_unrelated"] = bool(filters.get("exclude_unrelated", parsed_prompt_plan["filters"]["exclude_unrelated"]))
+    presentation = raw.get("presentation") if isinstance(raw.get("presentation"), dict) else {}
+    home_limit = presentation.get("home_limit", parsed_prompt_plan["presentation"]["home_limit"])
+    plan["presentation"]["home_limit"] = max(1, min(20, int(NumberLike(home_limit) or 10)))
+    diversity = raw.get("diversity") if isinstance(raw.get("diversity"), dict) else {}
+    for key in ("max_per_source", "max_per_group"):
+        value = diversity.get(key, parsed_prompt_plan["diversity"][key])
+        plan["diversity"][key] = max(1, min(10, int(NumberLike(value) or DEFAULT_NEWS_RULE_PLAN["diversity"][key])))
+    plan["version"] = NEWS_RULE_PLAN_VERSION
+    return plan
+
+
+def _news_rule_plan_atoms(rule_plan):
+    plan = _normalize_news_rule_plan(rule_plan)
+    scope = plan["candidate_scope"]
+    labels = []
+    if scope["watchlist_related"]:
+        labels.append({"group": "候选范围", "key": "watchlist_related", "label": "自选股关联"})
+    if scope["major_events"]:
+        labels.append({"group": "候选范围", "key": "major_events", "label": "重大事件补充"})
+    labels.append({"group": "排序", "key": plan["priority_order"][0] if plan["priority_order"] else "watchlist_sector", "label": "行业优先" if plan["priority_order"][:1] == ["watchlist_sector"] else "重大事件优先"})
+    labels.append({"group": "过滤", "key": "exclude_unrelated", "label": "过滤无关内容"})
+    labels.append({"group": "展示", "key": "home_limit", "label": f"首页 {plan['presentation']['home_limit']} 条"})
+    labels.append({"group": "配额", "key": "source_cap", "label": f"单一来源最多 {plan['diversity']['max_per_source']} 条"})
+    labels.append({"group": "配额", "key": "group_cap", "label": f"单一类型最多 {plan['diversity']['max_per_group']} 条"})
+    return labels
+
+
+def _news_algorithm_setting_key(tenant_slug):
+    normalized = str(tenant_slug or "").strip().lower() or "default"
+    return f"{NEWS_ALGORITHM_KEY_PREFIX}{normalized}"
+
+
+def _normalize_news_aggregation_algorithm(payload=None):
+    raw = payload if isinstance(payload, dict) else {}
+    strategy = str(raw.get("strategy") or "watchlist_sector_first").strip().lower()
+    if strategy != "watchlist_sector_first":
+        strategy = "watchlist_sector_first"
+    source_prompt = str(raw.get("source_prompt") or "").strip()[:4000]
+    rule_plan = _normalize_news_rule_plan(raw.get("rule_plan"), source_prompt=source_prompt)
+    # Rule plans are the executable contract. script_js remains an internal,
+    # compiled artifact for the Node ranking adapter and is never trusted from input.
+    script = _build_news_aggregation_script_from_rule_plan(rule_plan)
+    return {
+        "version": NEWS_ALGORITHM_VERSION,
+        "strategy": strategy,
+        "script_js": script,
+        "source_prompt": source_prompt,
+        "rule_plan": rule_plan,
+        "rule_atoms": _news_rule_plan_atoms(rule_plan),
+        "updated_at": str(raw.get("updated_at") or "").strip(),
+        "updated_by": str(raw.get("updated_by") or "system").strip()[:120],
+    }
+
+
+def _build_news_aggregation_script_from_rule_plan(rule_plan=None):
+    plan = _normalize_news_rule_plan(rule_plan)
+    priority = plan["priority_order"][:1]
+    sector_weight = 120 if priority == ["watchlist_sector"] else 95
+    symbol_weight = 35
+    major_weight = 90 if priority == ["major_market"] else 80
+    return (
+        "function rankNews(input) {\n"
+        "  const normalize = (value) => String(value || '').replace(/[\\s\\u3000·•/|_|-]+/g, ' ').trim();\n"
+        "  const compact = (value) => String(value || '').replace(/[\\s\\u3000·•/|_|-.]/g, '').trim();\n"
+        "  const tags = Array.isArray(input.item.tags) ? input.item.tags.map(normalize).filter(Boolean) : [];\n"
+        "  const text = normalize([input.item.title, input.item.content, input.item.summary].filter(Boolean).join(' '));\n"
+        "  const compactText = compact(text);\n"
+        "  const sectorTokens = Array.isArray(input.watchlistSectors) ? input.watchlistSectors.map(normalize).filter(Boolean) : [];\n"
+        "  const sectorAliases = {'港股互联网':['互联网','平台经济','港股','腾讯','阿里','美团','百度','快手'],'半导体制造':['半导体','芯片','集成电路','晶圆','存储','光刻'],'高端白酒':['白酒','贵州茅台','五粮液','泸州老窖'],'动力电池':['动力电池','锂电','新能源车','宁德时代'],'银行':['银行','信贷','息差','存款','贷款']};\n"
+        "  const symbolTokens = Array.isArray(input.watchlistSymbols) ? input.watchlistSymbols.map(normalize).filter(Boolean) : [];\n"
+        "  const majorKeywords = ['重大利好','重大利空','重大风险','突发','紧急','重磅','立案调查','行政处罚','停牌','退市','暴雷','违约','降准','降息','加息','出口管制','关税上调','重大订单','中标','业绩预增','业绩预亏','回购','增持','减持','并购重组','重大资产重组'];\n"
+        "  const sectorMatch = sectorTokens.some(tag => [tag, ...(sectorAliases[tag] || [])].some(term => text.includes(term)));\n"
+        "  const symbolMatch = symbolTokens.some(tag => text.includes(tag) || compactText.includes(compact(tag)));\n"
+        "  const majorSignal = Boolean(input.item.isMajorPositive || input.item.isMajorNegative)\n"
+        "    || majorKeywords.some(keyword => text.includes(keyword));\n"
+        f"  const sectorWeight = {int(sector_weight)};\n"
+        f"  const symbolWeight = {int(symbol_weight)};\n"
+        f"  const majorWeight = {int(major_weight)};\n"
+        "  return {\n"
+        "    score: ((sectorMatch || symbolMatch) ? sectorWeight + 100 : 0) + (symbolMatch ? symbolWeight + 30 : 0) + (majorSignal ? majorWeight : 0),\n"
+        "    bucket: (sectorMatch || symbolMatch) ? 'watchlist_sector' : (majorSignal ? 'major_market' : 'other'),\n"
+        "    reason: (sectorMatch || symbolMatch) ? '命中自选股行业板块或标的' : (majorSignal ? '命中社会性重大利好/利空或高影响事件' : '其他公开信息'),\n"
+        "    matched_topics: [\n"
+        "      ...new Set([\n"
+        "        ...sectorTokens.filter(tag => [tag, ...(sectorAliases[tag] || [])].some(term => text.includes(term))),\n"
+        "        ...symbolTokens.filter(tag => text.includes(tag) || compactText.includes(compact(tag))),\n"
+        "        ...majorKeywords.filter(keyword => text.includes(keyword))\n"
+        "      ])\n"
+        "    ]\n"
+        "  };\n"
+        "}"
+    )
+
+
+def _build_news_aggregation_script_from_prompt(source_prompt, fallback_script=None):
+    return _build_news_aggregation_script_from_rule_plan(_extract_news_rule_plan_from_prompt(source_prompt))
+
+
+def _find_tenant_news_algorithm_payload(tenant_slug):
+    normalized = str(tenant_slug or "").strip().lower()
+    if not normalized:
+        return {}
+    try:
+        config = get_site_config()
+        tenants = get_tenant_configs(config)
+    except Exception:
+        tenants = []
+    for tenant in tenants if isinstance(tenants, list) else []:
+        if isinstance(tenant, dict) and str(tenant.get("slug") or "").strip().lower() == normalized:
+            payload = tenant.get("news_aggregation_algorithm")
+            return payload if isinstance(payload, dict) else {}
+    return {}
+
+
+def normalize_news_aggregation_algorithm_payload(payload=None):
+    return _normalize_news_aggregation_algorithm(payload)
+
+
+def _news_aggregation_input_payload(item, sectors, symbols, tenant=None):
+    text = " ".join(str(item.get(key) or "") for key in ("title", "content", "summary", "why", "tag", "source_group"))
+    return {
+        "tenant": {
+            "slug": str((tenant or {}).get("slug") or "").strip().lower(),
+            "name": str((tenant or {}).get("name") or "").strip(),
+            "advisor": str((tenant or {}).get("advisor") or "").strip(),
+        },
+        "watchlistSectors": list(sectors or []),
+        "watchlistSymbols": list(symbols or []),
+        "item": {
+            "title": str(item.get("title") or "").strip(),
+            "content": str(item.get("content") or "").strip(),
+            "summary": str(item.get("summary") or "").strip(),
+            "text": text,
+            "tags": [
+                str(item.get(key) or "").strip()
+                for key in ("category", "source_group", "tag")
+                if str(item.get(key) or "").strip()
+            ],
+            "isMajorPositive": any(keyword in text for keyword in ("重大利好", "回购", "增持", "降息", "降准", "中标", "重大订单", "业绩预增", "并购重组")),
+            "isMajorNegative": any(keyword in text for keyword in ("重大利空", "重大风险", "立案调查", "行政处罚", "停牌", "退市", "违约", "暴雷", "业绩预亏")),
+            "publishedAt": str(item.get("published_at") or "").strip(),
+            "sourceName": str(item.get("source_name") or "").strip(),
+        },
+    }
+
+
+def _run_news_aggregation_js(script_js, item, sectors, symbols, tenant=None):
+    script = str(script_js or "").strip()
+    if not script or not shutil.which("node"):
+        return None
+    payload = _news_aggregation_input_payload(item, sectors, symbols, tenant=tenant)
+    wrapper = (
+        "const script = process.env.NEWS_SCRIPT || '';\n"
+        "const payload = JSON.parse(process.env.NEWS_INPUT || '{}');\n"
+        "try {\n"
+        "  const rankNews = new Function('input', script + '\\nreturn typeof rankNews === \"function\" ? rankNews(input) : null;');\n"
+        "  const result = rankNews(payload);\n"
+        "  process.stdout.write(JSON.stringify(result || {}));\n"
+        "} catch (error) {\n"
+        "  process.stderr.write(String(error && error.message ? error.message : error));\n"
+        "  process.exit(1);\n"
+        "}\n"
+    )
+    env = os.environ.copy()
+    env["NEWS_SCRIPT"] = script
+    env["NEWS_INPUT"] = json.dumps(payload, ensure_ascii=False)
+    try:
+        completed = subprocess.run(
+            ["node", "--input-type=module", "-e", wrapper],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=3,
+            check=False,
+        )
+    except Exception:
+        return None
+    if completed.returncode != 0:
+        return None
+    raw_output = str(completed.stdout or "").strip()
+    if not raw_output:
+        return None
+    try:
+        parsed = json.loads(raw_output)
+    except Exception:
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _fallback_news_rank(item, sectors, symbols):
+    normalize = lambda value: str(value or "").replace("·", " ").replace("•", " ").replace("/", " ").replace("|", " ").replace("_", " ").replace("-", " ").strip()
+    compact = lambda value: str(value or "").replace(" ", "").replace("·", "").replace("•", "").replace("/", "").replace("|", "").replace("_", "").replace("-", "").replace(".", "").strip()
+    text = normalize(" ".join(str(item.get(key) or "") for key in ("title", "content", "summary", "why", "tag", "source_group")))
+    sector_tokens = [normalize(sector) for sector in sectors if str(sector or "").strip()]
+    symbol_tokens = [normalize(symbol) for symbol in symbols if str(symbol or "").strip()]
+    def sector_matches(sector):
+        aliases = NEWS_SECTOR_ALIASES.get(sector, ())
+        return any(term and term in text for term in (sector, *aliases))
+
+    matched_sectors = [sector for sector in sector_tokens if sector_matches(sector)]
+    matched_symbols = [symbol for symbol in symbol_tokens if symbol and (symbol in text or compact(symbol) in compact(text))]
+    major_signal = any(keyword in text for keyword in NEWS_MAJOR_SIGNAL_KEYWORDS)
+    is_watchlist_related = bool(matched_sectors or matched_symbols)
+    score = (220 if is_watchlist_related else 0) + (65 if matched_symbols else 0) + (100 if major_signal else 0)
+    bucket = "watchlist_sector" if is_watchlist_related else ("major_market" if major_signal else "other")
+    reason = "命中自选股行业板块或标的" if is_watchlist_related else ("命中社会性重大利好/利空或高影响事件" if major_signal else "其他公开信息")
+    return {
+        "score": score,
+        "bucket": bucket,
+        "reason": reason,
+        "matched_topics": matched_sectors + matched_symbols,
+    }
+
+
+def load_tenant_news_aggregation_algorithm(tenant_slug=""):
+    normalized = str(tenant_slug or "").strip().lower()
+    payload = _find_tenant_news_algorithm_payload(normalized)
+    if not isinstance(payload, dict) or not payload:
+        try:
+            payload = _load_json_app_setting(_news_algorithm_setting_key(normalized), {})
+        except Exception:
+            payload = {}
+    return _normalize_news_aggregation_algorithm(payload)
+
+
+def save_tenant_news_aggregation_algorithm(tenant_slug="", payload=None):
+    normalized = str(tenant_slug or "").strip().lower()
+    if not normalized:
+        raise ValueError("tenant_slug_required")
+    raw = payload if isinstance(payload, dict) else {}
+    normalized_payload = _normalize_news_aggregation_algorithm(raw)
+    normalized_payload["updated_at"] = now_ts()
+    normalized_payload["updated_by"] = str(raw.get("updated_by") or "workbench").strip()[:120]
+    _save_json_app_setting(_news_algorithm_setting_key(normalized), normalized_payload)
+    try:
+        site_config = get_site_config()
+        tenants = site_config.get("tenants") if isinstance(site_config, dict) else []
+        mutated = False
+        for tenant in tenants if isinstance(tenants, list) else []:
+            if isinstance(tenant, dict) and str(tenant.get("slug") or "").strip().lower() == normalized:
+                tenant["news_aggregation_algorithm"] = copy.deepcopy(normalized_payload)
+                mutated = True
+                break
+        if mutated:
+            save_site_config(site_config)
+    except Exception:
+        pass
+    return normalized_payload
+
+
+def _news_watchlist_context(watchlist_details=None):
+    values = watchlist_details.values() if isinstance(watchlist_details, dict) else (watchlist_details or [])
+    sectors, symbols = set(), set()
+    for detail in values:
+        if not isinstance(detail, dict):
+            continue
+        for key in ("industry", "focus", "board", "sector"):
+            value = str(detail.get(key) or "").strip()
+            if len(value) >= 2:
+                sectors.add(value)
+        for key in ("name", "code", "stock_name", "stock_code"):
+            value = str(detail.get(key) or "").strip()
+            if value:
+                symbols.add(value)
+    return sorted(sectors, key=len, reverse=True), sorted(symbols, key=len, reverse=True)
+
+
+def _rank_news_for_tenant(items, tenant=None, watchlist_details=None, algorithm_payload=None):
+    tenant_slug = str((tenant or {}).get("slug") or "").strip().lower()
+    raw_algorithm = algorithm_payload if isinstance(algorithm_payload, dict) else load_tenant_news_aggregation_algorithm(tenant_slug)
+    algorithm = _normalize_news_aggregation_algorithm(raw_algorithm)
+    sectors, symbols = _news_watchlist_context(watchlist_details)
+    ranked = []
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        script_result = _run_news_aggregation_js(algorithm.get("script_js"), item, sectors, symbols, tenant=tenant)
+        fallback_result = _fallback_news_rank(item, sectors, symbols)
+        result = fallback_result if not isinstance(script_result, dict) else {
+            "score": script_result.get("score"),
+            "bucket": script_result.get("bucket"),
+            "reason": script_result.get("reason"),
+            "matched_topics": script_result.get("matched_topics"),
+        }
+        score = NumberLike(result.get("score"))
+        if score == 0 and result.get("score") not in {0, "0", 0.0}:
+            score = NumberLike(fallback_result.get("score"))
+        bucket = str(result.get("bucket") or fallback_result.get("bucket") or "other").strip() or "other"
+        reason = str(result.get("reason") or fallback_result.get("reason") or "其他公开信息").strip()
+        matched_topics = result.get("matched_topics")
+        if not isinstance(matched_topics, list):
+            matched_topics = fallback_result.get("matched_topics") or []
+        ranked_item = copy.deepcopy(item)
+        ranked_item.update({
+            "aggregation_bucket": bucket,
+            "relevance_score": score,
+            "matched_topics": matched_topics,
+            "priority_reason": reason,
+            "aggregation_algorithm_version": algorithm["version"],
+            "aggregation_algorithm_script": algorithm.get("script_js") or "",
+        })
+        ranked.append(ranked_item)
+    return sorted(ranked, key=lambda row: (int(row.get("relevance_score") or 0), str(row.get("published_at") or row.get("fetched_at") or "")), reverse=True)
+
+
+class _NewsAnchorCollector(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self._href = ""
+        self._text = []
+        self.items = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag.lower() != "a" or self._href:
+            return
+        attrs_map = dict(attrs)
+        self._href = str(attrs_map.get("href") or "").strip()
+        self._text = []
+
+    def handle_data(self, data):
+        if self._href:
+            self._text.append(str(data or ""))
+
+    def handle_endtag(self, tag):
+        if tag.lower() != "a" or not self._href:
+            return
+        title = re.sub(r"\s+", " ", "".join(self._text)).strip()
+        self.items.append({"href": self._href, "title": title})
+        self._href = ""
+        self._text = []
+
+
+def _normalize_news_anchor_items(source, raw_html):
+    parser = _NewsAnchorCollector()
+    parser.feed(str(raw_html or "")[:1200000])
+    root = source["url"]
+    candidates = []
+    seen = set()
+    blocked_titles = {"首页", "返回", "登录", "注册", "搜索", "更多", "下一页", "上一页", "网站地图"}
+    for item in parser.items:
+        title = re.sub(r"\s+", " ", str(item.get("title") or "")).strip()
+        link = urljoin(root, str(item.get("href") or "").strip())
+        if not title or len(title) < 8 or title in blocked_titles or not link.startswith(("http://", "https://")):
+            continue
+        if link == root or link in seen:
+            continue
+        seen.add(link)
+        identity = hashlib.sha256(f"{link}|{title}".encode("utf-8")).hexdigest()[:24]
+        candidates.append({
+            "event_id": identity,
+            "source_code": source["code"],
+            "source_name": source["name"],
+            "category": source["category"],
+            "title": title[:180],
+            "content": "该来源当前仅提供公告标题和原文链接，详细内容请查看原文。",
+            "summary": "",
+            "url": link[:500],
+            "published_at": "",
+            "fetched_at": now_ts(),
+            "indicator_code": source["indicator_code"],
+        })
+        if len(candidates) >= 20:
+            break
+    return candidates
+
+
+def _fetch_news_source(source):
+    try:
+        request = Request(source["url"], headers={"User-Agent": "GangtiseNewsLake/1.0"})
+        with urlopen(request, timeout=8) as response:
+            body = response.read(1200000).decode("utf-8", errors="ignore")
+        items = _normalize_news_anchor_items(source, body)
+        if len(items) < NEWS_SOURCE_MIN_ITEMS:
+            return {"source": source, "included": False, "count": len(items), "reason": f"有效信息 {len(items)} 条，低于门槛 {NEWS_SOURCE_MIN_ITEMS} 条", "items": []}
+        return {"source": source, "included": True, "count": len(items), "reason": "已达到来源纳入门槛", "items": items}
+    except Exception as exc:
+        return {"source": source, "included": False, "count": 0, "reason": str(exc)[:180], "items": []}
+
+
+def _build_news_lake_indicators(items):
+    counts = {}
+    for item in items:
+        code = str(item.get("indicator_code") or "news_event_count")
+        counts[code] = counts.get(code, 0) + 1
+    return [{"indicator_code": code, "value": count, "unit": "条/批次", "updated_at": now_ts(), "is_simulated": False} for code, count in sorted(counts.items())]
+
+
+def _load_news_lake_cache():
+    payload = _load_json_app_setting(NEWS_LAKE_CACHE_KEY, {})
+    cached_at = str(payload.get("cached_at") or "").strip() if isinstance(payload, dict) else ""
+    if not cached_at:
+        return None
+    try:
+        cached_dt = datetime.fromisoformat(cached_at.replace("Z", "+00:00"))
+        if cached_dt.tzinfo:
+            cached_dt = cached_dt.astimezone().replace(tzinfo=None)
+        if (datetime.now() - cached_dt).total_seconds() > NEWS_LAKE_CACHE_TTL_SECONDS:
+            return None
+    except Exception:
+        return None
+    return payload
+
+
+def _load_active_news_source_whitelist():
+    try:
+        state = _load_json_app_setting(NEWS_SOURCE_STATUS_KEY, {})
+    except Exception:
+        state = {}
+    excluded_codes = {
+        str(code).strip()
+        for code in (state.get("excluded_codes") or [])
+        if str(code).strip()
+    } if isinstance(state, dict) else set()
+    return [
+        copy.deepcopy(source)
+        for source in NEWS_SOURCE_WHITELIST
+        # The catalog is frozen from the admission probe. A source that was
+        # already known to have fewer than five valid items must never be
+        # re-probed just to discover the same exclusion again.
+        if source["code"] not in excluded_codes
+        and int(source.get("validated_item_count") or 0) >= NEWS_SOURCE_MIN_ITEMS
+    ]
+
+
+def _persist_news_source_exclusions(results):
+    newly_excluded = {
+        result["source"]["code"]
+        for result in results
+        if not result.get("included") and int(result.get("count") or 0) < NEWS_SOURCE_MIN_ITEMS
+    }
+    if not newly_excluded:
+        return
+    try:
+        state = _load_json_app_setting(NEWS_SOURCE_STATUS_KEY, {})
+        excluded_codes = {
+            str(code).strip()
+            for code in (state.get("excluded_codes") or [])
+            if str(code).strip()
+        } if isinstance(state, dict) else set()
+        _save_json_app_setting(
+            NEWS_SOURCE_STATUS_KEY,
+            {
+                "excluded_codes": sorted(excluded_codes | newly_excluded),
+                "updated_at": now_ts(),
+                "rule": f"exclude source permanently after fewer than {NEWS_SOURCE_MIN_ITEMS} valid items",
+            },
+        )
+    except Exception:
+        pass
+
+
+def _aggregate_real_news_sources():
+    cached = _load_news_lake_cache()
+    if cached:
+        return cached
+    results = []
+    active_sources = _load_active_news_source_whitelist()
+    if not active_sources:
+        return {"cached_at": now_ts(), "items": [], "indicators": [], "sources": []}
+    with ThreadPoolExecutor(max_workers=min(7, len(active_sources))) as executor:
+        futures = [executor.submit(_fetch_news_source, source) for source in active_sources]
+        for future in as_completed(futures):
+            results.append(future.result())
+    _persist_news_source_exclusions(results)
+    included = [item for item in results if item.get("included")]
+    items = []
+    for result in included:
+        source = result["source"]
+        for item in result.get("items") or []:
+            item["source_code"] = source["code"]
+            item["source_name"] = source["name"]
+            item["tag"] = source["source_group"]
+            item["source_group"] = source["source_group"]
+            item["time"] = item.get("published_at") or "来源未提供发布时间"
+            item["hot"] = False
+            item["why"] = f"来自{source['name']}，已完成公开信息清洗并达到每个来源至少 {NEWS_SOURCE_MIN_ITEMS} 条的纳入标准。"
+            items.append(item)
+    items = sorted(items, key=lambda item: (item.get("published_at") or item.get("fetched_at") or ""), reverse=True)[:60]
+    payload = {
+        "cached_at": now_ts(),
+        "items": items,
+        "indicators": _build_news_lake_indicators(items),
+        "sources": [
+            {"code": result["source"]["code"], "name": result["source"]["name"], "category": result["source"]["category"], "included": bool(result.get("included")), "count": int(result.get("count") or 0), "reason": result.get("reason") or ""}
+            for result in sorted(results, key=lambda item: item["source"]["code"])
+        ],
+    }
+    try:
+        _save_json_app_setting(NEWS_LAKE_CACHE_KEY, payload)
+    except Exception:
+        pass
+    return payload
+
+
+def gen_news_feed(tenant=None, watchlist_details=None, algorithm_payload=None):
+    try:
+        payload = _aggregate_real_news_sources()
+        return _rank_news_for_tenant(
+            payload.get("items") or [],
+            tenant=tenant,
+            watchlist_details=watchlist_details,
+            algorithm_payload=algorithm_payload,
+        )
+    except Exception as exc:
+        app.logger.warning("Real news aggregation unavailable: %s", exc)
+        return []
+
+
+def _select_fundamental_homepage_news(ranked_items, limit, rule_plan=None):
+    """Select only relevant news, with source diversity before filling the homepage."""
+    plan = _normalize_news_rule_plan(rule_plan)
+    selected = []
+    source_counts = {}
+    group_counts = {}
+    max_per_source = plan["diversity"]["max_per_source"]
+    max_per_group = plan["diversity"]["max_per_group"]
+    for bucket in plan["priority_order"]:
+        for item in ranked_items or []:
+            if str(item.get("aggregation_bucket") or "").strip() != bucket:
+                continue
+            source_key = str(item.get("source_code") or item.get("source_name") or item.get("source_group") or "unknown").strip()
+            group_key = str(item.get("source_group") or "其他").strip()
+            if source_counts.get(source_key, 0) >= max_per_source or group_counts.get(group_key, 0) >= max_per_group:
+                continue
+            selected.append(item)
+            source_counts[source_key] = source_counts.get(source_key, 0) + 1
+            group_counts[group_key] = group_counts.get(group_key, 0) + 1
+            if len(selected) >= limit:
+                return selected
+    return selected
+
+
+def build_fundamental_news_payload(tenant=None, watchlist_details=None, limit=10, algorithm_payload=None):
+    algorithm = _normalize_news_aggregation_algorithm(algorithm_payload) if isinstance(algorithm_payload, dict) else load_tenant_news_aggregation_algorithm(str((tenant or {}).get("slug") or ""))
+    ranked_items = gen_news_feed(tenant=tenant, watchlist_details=watchlist_details, algorithm_payload=algorithm)
+    rule_plan = algorithm.get("rule_plan") or {}
+    requested_limit = max(1, int(limit or 10))
+    effective_limit = min(requested_limit, int((rule_plan.get("presentation") or {}).get("home_limit") or requested_limit))
+    selected_items = _select_fundamental_homepage_news(ranked_items, effective_limit, rule_plan=rule_plan)
+    source_buckets = {}
+    for item in ranked_items:
+        if not isinstance(item, dict):
+            continue
+        source_code = str(item.get("source_code") or item.get("source_group") or item.get("tag") or "source_all").strip() or "source_all"
+        source_label = str(item.get("source_name") or item.get("source_group") or item.get("tag") or "综合要闻").strip() or "综合要闻"
+        source_buckets.setdefault(source_code, {"label": source_label, "items": []})["items"].append(item)
+    tabs = [
+        {
+            "key": "summary",
+            "label": "归纳聚合",
+            "count": len(selected_items),
+            "items": selected_items,
+        },
+        {
+            "key": "all",
+            "label": "全部",
+            "count": len(ranked_items),
+            "items": ranked_items,
+        }
+    ]
+    for source_code, group in sorted(
+        source_buckets.items(),
+        key=lambda item: (-len(item[1].get("items") or []), item[1].get("label") or item[0]),
+    ):
+        tabs.append({
+            "key": source_code,
+            "label": group["label"],
+            "count": len(group.get("items") or []),
+            "items": group.get("items") or [],
+        })
+    return {
+        "items": selected_items,
+        "tabs": tabs,
+        "total": len(selected_items),
+        "rule_plan": rule_plan,
+        "rule_atoms": algorithm.get("rule_atoms") or _news_rule_plan_atoms(rule_plan),
+    }
 
 def gen_revenue_trend():
     months = []

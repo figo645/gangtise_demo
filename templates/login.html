@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>洞见智研系统锁定</title>
+<title>洞见智研账户登录</title>
 <link rel="stylesheet" href="/static/css/style.css">
 <script>
   window.SITE_CONFIG = {{ site_config | tojson }};
@@ -31,15 +31,16 @@ body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:c
 </head>
 <body onload="initGangtiseTheme()">
   <div class="lock-overlay">
-    <div class="lock-title">系统已锁定</div>
-    <div class="lock-desc">请输入访问密码后进入系统。</div>
+    <div class="lock-title">账户登录</div>
+    <div class="lock-desc">使用平台账号登录。投资者、大V和管理员均使用同一套用户名体系。</div>
     {% if error %}<div class="lock-error">{{ error }}</div>{% endif %}
-    <form class="lock-form" method="post" action="/unlock">
-      <input class="lock-input" type="password" name="password" placeholder="请输入密码" autofocus required>
+    <form class="lock-form" method="post" action="/login">
+      <input class="lock-input" type="text" name="username" placeholder="用户名" autocomplete="username" autofocus required>
+      <input class="lock-input" type="password" name="password" placeholder="密码" autocomplete="current-password" required>
       <input type="hidden" name="next" value="{{ next_target }}">
       <button class="btn-lock" type="submit">进入系统</button>
     </form>
-    <div class="lock-note">仅授权用户可访问。</div>
+    <div class="lock-note">账号由用户管理统一维护；已停用账号不能登录。</div>
   </div>
 </body>
 </html>

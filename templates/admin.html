@@ -13,10 +13,13 @@
   window.AUTO_INIT_DASHBOARD = false;
 </script>
 <script src="/static/js/theme.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="/static/echarts.min.js"></script>
+<script src="/static/js/echarts_helpers.js?v=20260808-2"></script>
 <style>
   .toggle-wrap { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
   .toggle-label { font-size:13px; color:var(--text-sub); flex:1; }
+  .feature-toggle-title { font-size:12px; color:var(--text-main); font-weight:600; margin-bottom:4px; }
+  .feature-toggle-desc { font-size:11px; color:var(--text-sub); line-height:1.65; max-width:680px; }
   .toggle { position:relative; display:inline-block; width:40px; height:22px; }
   .toggle input { opacity:0; width:0; height:0; }
   .toggle-slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:var(--surface-3); border-radius:22px; transition:.3s; border:1px solid rgba(200,169,110,0.2); }
@@ -240,6 +243,193 @@
   .feature-note { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:10px; }
   .admin-status { font-size:13px; color:var(--text-sub); margin:12px 0 0; min-height:18px; }
   .config-grid.single-column { grid-template-columns:1fr; }
+  .admin-settings-hub { display:grid; gap:18px; }
+  .admin-settings-hero {
+    padding:20px 22px;
+    border-radius:16px;
+    background:linear-gradient(180deg, rgba(47,116,192,0.08), rgba(47,116,192,0.03));
+    border:1px solid rgba(47,116,192,0.12);
+  }
+  .admin-settings-hero-top {
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+  .admin-settings-hero-title {
+    font-size:20px;
+    font-weight:700;
+    color:var(--text-main);
+  }
+  .admin-settings-hero-desc {
+    margin-top:8px;
+    font-size:13px;
+    line-height:1.8;
+    color:var(--text-sub);
+    max-width:880px;
+  }
+  .admin-settings-hero-note {
+    min-width:220px;
+    padding:12px 14px;
+    border-radius:14px;
+    background:rgba(255,255,255,0.76);
+    border:1px solid rgba(47,116,192,0.10);
+    font-size:12px;
+    color:#445468;
+    line-height:1.7;
+  }
+  .admin-settings-layout {
+    display:grid;
+    grid-template-columns:260px minmax(0, 1fr);
+    gap:18px;
+    align-items:start;
+  }
+  .admin-settings-sidebar {
+    position:sticky;
+    top:84px;
+    display:grid;
+    gap:14px;
+  }
+  .admin-settings-sidebar-card,
+  .admin-settings-panel-shell {
+    border-radius:18px;
+    border:1px solid rgba(47,116,192,0.12);
+    background:#FFFFFF;
+    box-shadow:0 12px 28px rgba(31,73,125,0.06);
+  }
+  .admin-settings-sidebar-card {
+    padding:14px;
+  }
+  .admin-settings-sidebar-title {
+    font-size:12px;
+    font-weight:700;
+    color:var(--text-main);
+  }
+  .admin-settings-sidebar-desc {
+    margin-top:6px;
+    font-size:11px;
+    line-height:1.7;
+    color:var(--text-sub);
+  }
+  .admin-settings-menu-group {
+    margin-top:14px;
+  }
+  .admin-settings-menu-label {
+    margin:0 0 8px;
+    padding:0 4px;
+    font-size:10px;
+    line-height:1;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:#7D8CA0;
+    font-weight:700;
+  }
+  .admin-settings-menu {
+    display:grid;
+    gap:6px;
+  }
+  .admin-settings-menu-btn {
+    width:100%;
+    border:none;
+    padding:11px 12px;
+    border-radius:12px;
+    background:transparent;
+    color:#445468;
+    cursor:pointer;
+    text-align:left;
+    transition:background 180ms ease, color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  }
+  .admin-settings-menu-btn:hover {
+    background:rgba(47,116,192,0.06);
+    color:#1F497D;
+  }
+  .admin-settings-menu-btn.active {
+    background:linear-gradient(180deg, rgba(47,116,192,0.12), rgba(47,116,192,0.06));
+    color:#1F497D;
+    box-shadow:inset 0 0 0 1px rgba(47,116,192,0.18);
+  }
+  .admin-settings-menu-title {
+    font-size:13px;
+    line-height:1.3;
+    font-weight:700;
+  }
+  .admin-settings-menu-copy {
+    margin-top:4px;
+    font-size:11px;
+    line-height:1.6;
+    color:inherit;
+    opacity:0.82;
+  }
+  .admin-settings-panels {
+    min-width:0;
+  }
+  .admin-settings-panel-shell {
+    padding:18px;
+  }
+  .admin-settings-panel {
+    display:none;
+    min-width:0;
+  }
+  .admin-settings-panel.active {
+    display:block;
+  }
+  .admin-settings-panel-head {
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:16px;
+    flex-wrap:wrap;
+    margin-bottom:16px;
+  }
+  .admin-settings-panel-kicker {
+    font-size:11px;
+    line-height:1;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:#2F74C0;
+    font-weight:700;
+  }
+  .admin-settings-panel-title {
+    margin-top:6px;
+    font-size:20px;
+    line-height:1.2;
+    color:var(--text-main);
+    font-weight:700;
+  }
+  .admin-settings-panel-desc {
+    margin-top:8px;
+    max-width:760px;
+    font-size:12px;
+    line-height:1.8;
+    color:var(--text-sub);
+  }
+  .admin-settings-panel-note {
+    max-width:260px;
+    padding:12px 14px;
+    border-radius:14px;
+    background:rgba(47,116,192,0.05);
+    border:1px solid rgba(47,116,192,0.10);
+    font-size:11px;
+    line-height:1.7;
+    color:#445468;
+  }
+  .admin-settings-mount {
+    display:grid;
+    gap:16px;
+  }
+  .admin-settings-mount > * { margin:0; }
+  @media (max-width: 1100px) {
+    .admin-settings-layout {
+      grid-template-columns:1fr;
+    }
+    .admin-settings-sidebar {
+      position:static;
+    }
+    .admin-settings-panel-note {
+      max-width:none;
+    }
+  }
   .admin-nav-subgroup {
     margin:8px 6px 0;
     padding:8px 0 0;
@@ -1374,13 +1564,13 @@
     width:34px;
     height:34px;
     border-radius:50%;
-    border:1px solid rgba(200,169,110,0.2);
-    background:transparent;
-    color:var(--text-sub);
+    border:1px solid #2F74C0;
+    background:#163A63;
+    color:#FFFFFF;
     font-size:22px;
     cursor:pointer;
   }
-  .admin-modal-close:hover { color:var(--gold); border-color:rgba(200,169,110,0.42); }
+  .admin-modal-close:hover { color:#FFFFFF; border-color:#66A1DF; background:#1D4B7C; }
   .admin-modal-grid {
     display:grid;
     gap:16px;
@@ -1485,6 +1675,65 @@
   }
   .admin-knowledge-entry-title { font-size:16px; font-weight:700; color:var(--text-main); }
   .admin-knowledge-entry-desc { margin-top:6px; font-size:12px; color:var(--text-sub); line-height:1.8; max-width:760px; }
+  .admin-knowledge-hub-grid {
+    display:grid;
+    grid-template-columns:repeat(4, minmax(0, 1fr));
+    gap:14px;
+  }
+  .admin-knowledge-hub-card {
+    width:100%;
+    text-align:left;
+    padding:16px;
+    border-radius:16px;
+    background:linear-gradient(180deg, #FFFFFF, #F8FBFF);
+    border:1px solid rgba(47,116,192,0.10);
+    cursor:pointer;
+  }
+  .admin-knowledge-hub-title { font-size:14px; font-weight:700; color:var(--text-main); }
+  .admin-knowledge-hub-desc { margin-top:6px; font-size:12px; color:var(--text-sub); line-height:1.75; min-height:64px; }
+  .admin-knowledge-hub-meta { margin-top:10px; font-size:11px; font-weight:700; color:#245B96; }
+  .admin-knowledge-overview-grid {
+    margin-top:16px;
+    display:grid;
+    grid-template-columns:repeat(4, minmax(0, 1fr));
+    gap:12px;
+  }
+  .admin-knowledge-overview-card {
+    background:#F8FBFF;
+    border:1px solid rgba(47,116,192,0.10);
+    border-radius:14px;
+    padding:14px;
+  }
+  .admin-knowledge-overview-label { font-size:11px; color:var(--text-sub); }
+  .admin-knowledge-overview-value { margin-top:8px; font-size:22px; font-weight:800; color:var(--text-main); }
+  .admin-knowledge-overview-note { margin-top:6px; font-size:11px; color:var(--text-sub); line-height:1.6; }
+  .admin-knowledge-readable-shell {
+    display:grid;
+    grid-template-columns:minmax(0, 0.92fr) minmax(0, 1.08fr);
+    gap:14px;
+  }
+  .admin-knowledge-readable-panel {
+    background:#FFFFFF;
+    border:1px solid rgba(47,116,192,0.10);
+    border-radius:16px;
+    padding:14px;
+  }
+  .admin-knowledge-readable-title { font-size:13px; font-weight:700; color:var(--text-main); }
+  .admin-knowledge-readable-desc { margin-top:4px; font-size:11px; color:var(--text-sub); line-height:1.7; }
+  .admin-knowledge-readable-list { margin-top:12px; display:grid; gap:10px; }
+  .admin-knowledge-readable-item {
+    width:100%;
+    text-align:left;
+    padding:12px 14px;
+    border-radius:14px;
+    background:#F8FBFF;
+    border:1px solid rgba(47,116,192,0.08);
+    cursor:pointer;
+  }
+  .admin-knowledge-readable-item-title { font-size:13px; font-weight:700; color:var(--text-main); }
+  .admin-knowledge-readable-item-meta { margin-top:4px; font-size:11px; color:var(--text-sub); line-height:1.65; }
+  .admin-knowledge-readable-item-summary { margin-top:8px; font-size:12px; color:var(--text-main); line-height:1.75; }
+  .admin-knowledge-readable-item-foot { margin-top:10px; font-size:11px; color:#245B96; font-weight:700; }
   .admin-kg-shell {
     background:linear-gradient(180deg, #FFFFFF, #FBFDFF);
     border:1px solid rgba(47,116,192,0.12);
@@ -1492,6 +1741,111 @@
     padding:16px;
     margin-bottom:16px;
   }
+  .admin-ka-shell {
+    margin-top:14px;
+    padding:14px;
+    border-radius:16px;
+    background:rgba(47,116,192,0.03);
+    border:1px solid rgba(47,116,192,0.10);
+  }
+  .admin-ka-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+  .admin-ka-title { font-size:15px; font-weight:700; color:var(--text-main); }
+  .admin-ka-desc { margin-top:4px; font-size:12px; color:var(--text-sub); line-height:1.75; max-width:780px; }
+  .admin-ka-summary-grid {
+    margin-top:12px;
+    display:grid;
+    grid-template-columns:repeat(6, minmax(0, 1fr));
+    gap:8px;
+  }
+  .admin-ka-card {
+    background:#FFFFFF;
+    border:1px solid rgba(47,116,192,0.10);
+    border-radius:14px;
+    padding:12px;
+  }
+  .admin-ka-label { font-size:11px; color:var(--text-sub); }
+  .admin-ka-value { margin-top:6px; font-size:20px; font-weight:800; color:var(--text-main); }
+  .admin-ka-meta { margin-top:4px; font-size:11px; color:var(--text-sub); line-height:1.65; }
+  .admin-ka-layout {
+    margin-top:12px;
+    display:grid;
+    grid-template-columns:minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap:12px;
+  }
+  .admin-ka-panel {
+    background:#FFFFFF;
+    border:1px solid rgba(47,116,192,0.10);
+    border-radius:14px;
+    padding:14px;
+  }
+  .admin-ka-panel-title { font-size:13px; font-weight:700; color:var(--text-main); }
+  .admin-ka-panel-desc { margin-top:4px; font-size:11px; color:var(--text-sub); line-height:1.7; }
+  .admin-ka-rel-grid,
+  .admin-ka-entry-list { margin-top:12px; display:grid; gap:10px; }
+  .admin-ka-rel-list { display:grid; gap:8px; }
+  .admin-ka-rel-item,
+  .admin-ka-entry {
+    background:#F8FBFF;
+    border:1px solid rgba(47,116,192,0.09);
+    border-radius:12px;
+    padding:10px 12px;
+  }
+  .admin-ka-entry {
+    width:100%;
+    text-align:left;
+    cursor:pointer;
+  }
+  .admin-ka-rel-top,
+  .admin-ka-entry-top { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+  .admin-ka-rel-title,
+  .admin-ka-entry-title { font-size:12px; font-weight:700; color:var(--text-main); }
+  .admin-ka-rel-count {
+    font-size:11px;
+    color:#245B96;
+    background:rgba(47,116,192,0.08);
+    border:1px solid rgba(47,116,192,0.12);
+    border-radius:999px;
+    padding:4px 8px;
+    white-space:nowrap;
+  }
+  .admin-ka-chip-row { margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; }
+  .admin-ka-chip {
+    display:inline-flex;
+    align-items:center;
+    padding:4px 8px;
+    border-radius:999px;
+    background:rgba(47,116,192,0.08);
+    color:#245B96;
+    font-size:11px;
+  }
+  .admin-ka-entry-summary { margin-top:8px; font-size:12px; color:var(--text-sub); line-height:1.75; }
+  .admin-ka-entry-grid {
+    margin-top:8px;
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:8px;
+  }
+  .admin-ka-entry-stat {
+    background:#FFFFFF;
+    border:1px solid rgba(47,116,192,0.08);
+    border-radius:10px;
+    padding:8px 10px;
+  }
+  .admin-ka-entry-stat-label { font-size:10px; color:var(--text-sub); }
+  .admin-ka-entry-stat-value { margin-top:4px; font-size:11px; color:var(--text-main); line-height:1.6; }
+  .admin-ka-maturity {
+    display:inline-flex;
+    align-items:center;
+    padding:5px 9px;
+    border-radius:999px;
+    font-size:11px;
+    font-weight:700;
+    white-space:nowrap;
+  }
+  .admin-ka-maturity.tone-seed { background:rgba(143,166,196,0.16); color:#416287; }
+  .admin-ka-maturity.tone-growing { background:rgba(200,169,110,0.16); color:#9A6B10; }
+  .admin-ka-maturity.tone-ready { background:rgba(81,169,118,0.14); color:#2E7D4F; }
+  .admin-ka-entry-meta { margin-top:8px; font-size:11px; color:var(--text-sub); line-height:1.65; }
   .admin-kg-top { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap; }
   .admin-kg-title { font-size:16px; font-weight:700; color:var(--text-main); }
   .admin-kg-desc { margin-top:4px; font-size:12px; color:var(--text-sub); line-height:1.7; max-width:760px; }
@@ -1621,6 +1975,12 @@
     .tenant-admin-shell,
     .tenant-admin-detail-grid,
     .tenant-dashboard-grid,
+    .admin-knowledge-hub-grid,
+    .admin-knowledge-overview-grid,
+    .admin-knowledge-readable-shell,
+    .admin-ka-summary-grid,
+    .admin-ka-layout,
+    .admin-ka-entry-grid,
     .admin-kg-stats,
     .admin-kg-layout { grid-template-columns:1fr; }
     .tenant-admin-sidebar { position:static; }
@@ -1776,31 +2136,46 @@
         <div class="admin-nav-group-body">
         <div class="admin-nav-subgroup">
           <div class="admin-nav-subtitle">系统专区</div>
-          <div class="admin-nav-item" data-section="settings-appearance" data-feature="system_module" onclick="showSection('settings-appearance', this)">
+          <div class="admin-nav-item" data-section="settings-appearance" data-feature="system_module" data-unified-hidden="true" onclick="showSection('settings-appearance', this)" style="display:none">
             <span class="admin-nav-icon">&#9965;</span> 站点外观
           </div>
-          <div class="admin-nav-item" data-section="settings-brand" data-feature="system_module" onclick="showSection('settings-brand', this)">
+          <div class="admin-nav-item" data-section="settings-brand" data-feature="system_module" data-unified-hidden="true" onclick="showSection('settings-brand', this)" style="display:none">
             <span class="admin-nav-icon">&#9734;</span> 平台品牌
           </div>
           <div class="admin-nav-item" data-section="settings-features" data-feature="system_module" onclick="showSection('settings-features', this)">
-            <span class="admin-nav-icon">&#9881;</span> 功能开关
+            <span class="admin-nav-icon">&#9881;</span> 系统配置
           </div>
-          <div class="admin-nav-item" data-section="settings-policy" data-feature="system_module" onclick="showSection('settings-policy', this)">
+          <div class="admin-nav-item" data-section="settings-policy" data-feature="system_module" data-unified-hidden="true" onclick="showSection('settings-policy', this)" style="display:none">
             <span class="admin-nav-icon">&#128203;</span> 发布与隔离
           </div>
-          <div class="admin-nav-item" data-section="settings-knowledge" data-feature="system_module" onclick="showSection('settings-knowledge', this)">
+          <div class="admin-nav-item" data-section="knowledge-overview" data-feature="system_module" onclick="showSection('knowledge-overview', this)">
+            <span class="admin-nav-icon">&#128214;</span> 知识总览
+          </div>
+          <div class="admin-nav-item" data-section="knowledge-intake" data-feature="system_module" onclick="showSection('knowledge-intake', this)">
+            <span class="admin-nav-icon">&#9998;</span> 知识治理
+          </div>
+          <div class="admin-nav-item" data-section="knowledge-encyclopedia" data-feature="system_module" onclick="showSection('knowledge-encyclopedia', this)">
+            <span class="admin-nav-icon">&#128366;</span> 百科结构
+          </div>
+          <div class="admin-nav-item" data-section="knowledge-entries" data-feature="system_module" onclick="showSection('knowledge-entries', this)">
+            <span class="admin-nav-icon">&#128196;</span> 百科词条
+          </div>
+          <div class="admin-nav-item" data-section="knowledge-graph" data-feature="system_module" onclick="showSection('knowledge-graph', this)">
+            <span class="admin-nav-icon">&#128391;</span> 知识图谱
+          </div>
+          <div class="admin-nav-item" data-section="settings-knowledge" data-feature="system_module" data-unified-hidden="true" onclick="showSection('settings-knowledge', this)" style="display:none">
             <span class="admin-nav-icon">&#128214;</span> 知识专区
           </div>
-          <div class="admin-nav-item" data-section="settings-knowledge-graph" data-feature="system_module" onclick="showSection('settings-knowledge-graph', this)">
+          <div class="admin-nav-item" data-section="settings-knowledge-graph" data-feature="system_module" data-unified-hidden="true" onclick="showSection('settings-knowledge-graph', this)" style="display:none">
             <span class="admin-nav-icon">&#128391;</span> 知识图谱中心
           </div>
-          <div class="admin-nav-item" data-section="knowledge-items" data-feature="system_module" onclick="showSection('knowledge-items', this)" style="display:none">
+          <div class="admin-nav-item" data-section="knowledge-items" data-feature="system_module" data-unified-hidden="true" onclick="showSection('knowledge-items', this)" style="display:none">
             <span class="admin-nav-icon">&#128196;</span> 知识内容管理
           </div>
-          <div class="admin-nav-item" data-section="settings-llm" data-feature="system_module" onclick="showSection('settings-llm', this)">
+          <div class="admin-nav-item" data-section="settings-llm" data-feature="system_module" data-unified-hidden="true" onclick="showSection('settings-llm', this)" style="display:none">
             <span class="admin-nav-icon">&#129302;</span> 大模型专区
           </div>
-          <div class="admin-nav-item" data-section="settings-llm-features" data-feature="system_module" onclick="showSection('settings-llm-features', this)">
+          <div class="admin-nav-item" data-section="settings-llm-features" data-feature="system_module" data-unified-hidden="true" onclick="showSection('settings-llm-features', this)" style="display:none">
             <span class="admin-nav-icon">&#9889;</span> 功能级模型映射
           </div>
           <div class="admin-nav-item" data-section="token-usage" data-feature="system_module" onclick="showSection('token-usage', this)">
@@ -2019,7 +2394,7 @@
           </div>
           <table>
             <thead>
-              <tr><th>用户名</th><th>电话</th><th>权限</th><th>所属大V</th><th>所属租户</th><th>状态</th><th>创建时间</th><th>操作</th></tr>
+              <tr><th>用户名</th><th>电话</th><th>权限</th><th>付费样本</th><th>来源</th><th>所属大V</th><th>所属租户</th><th>状态</th><th>创建时间</th><th>操作</th></tr>
             </thead>
             <tbody id="admin-user-table-body"></tbody>
           </table>
@@ -2487,7 +2862,6 @@
             <div class="indicator-action-row">
               <button class="btn-outline" style="padding:6px 12px;font-size:12px" onclick="openIndicatorDefinitionModal()">+ 新增指标定义</button>
               <button class="btn-outline" style="padding:6px 12px;font-size:12px" onclick="openIndicatorSourceModal()">+ 新增 API 定义</button>
-              <button class="btn-gold" style="padding:6px 12px;font-size:12px" onclick="runAdminTask('indicator_mock_seed', true)">生成模拟入湖数据</button>
               <button class="btn-sm-blue" style="padding:6px 12px;font-size:12px" onclick="refreshAdminIndicatorHub()">刷新数据</button>
             </div>
           </div>
@@ -2649,9 +3023,9 @@
           </div>
         </div>
         <div class="indicator-page-meta">
-          <div class="indicator-page-copy">面向已经进入统一指标湖的数据，重点看当前值、状态、来源说明以及是否继续启用，不混入原始配置操作。</div>
+          <div class="indicator-page-copy">这里只展示 Gangtise API 已同步进指标湖的数据。任何一条当前取不到的指标都会明确显示未取到，不再回退模拟值或样例。</div>
           <div class="indicator-page-tags">
-            <span class="indicator-page-tag">湖内消费</span>
+            <span class="indicator-page-tag">Gangtise API Only</span>
             <span class="indicator-page-tag">统一展示协议</span>
             <span class="indicator-page-tag">前后台共用</span>
           </div>
@@ -2660,9 +3034,9 @@
           <div class="table-header">
             <div>
               <div class="table-title">数据湖指标列表</div>
-              <div style="font-size:12px;color:#8899aa;margin-top:6px">这类指标直接来自 `/Users/xuchenfei/PycharmProjects/market_dashboard/data_sources.json`，用于统一展示 market_dashboard 已接入的全部指标源。</div>
+              <div style="font-size:12px;color:#8899aa;margin-top:6px">这里按 Gangtise 指标注册表统一展示。若某条 Gangtise 指标当前未同步到真实值，会直接标记为“未取到”。</div>
             </div>
-            <span class="tag tag-blue">market_dashboard</span>
+            <span class="tag tag-blue">Gangtise</span>
           </div>
           <table>
             <thead><tr><th>指标</th><th>分类</th><th>当前状态</th><th>来源说明</th><th>状态</th><th>开关</th><th>最后更新</th><th>操作</th></tr></thead>
@@ -2671,10 +3045,12 @@
               <tr>
                 <td><span style="color:#F8F6F0;font-weight:600">{{ item.name }}</span><div style="font-size:11px;color:#8899aa;margin-top:4px">{{ item.owner }} · {{ item.data_mode_label }}</div></td>
                 <td>{{ item.category }}</td>
-                <td style="color:#C8A96E">{{ item.value }}</td>
+                <td style="color:#C8A96E">{{ item.value if not item.data_unavailable else '未取到' }}</td>
                 <td style="max-width:320px;color:#8899aa">{{ item.assessment }}</td>
                 <td>
-                  {% if item.status == 'warning' %}
+                  {% if item.status == 'unavailable' or item.data_unavailable %}
+                  <span class="tag tag-blue">未取到</span>
+                  {% elif item.status == 'warning' %}
                   <span class="tag tag-red">预警</span>
                   {% elif item.status == 'attention' %}
                   <span class="tag tag-gold">关注</span>
@@ -3486,27 +3862,27 @@
           <div class="sync-title">Hermes 产品口径</div>
           <div class="sync-desc">H5 现已分成两种版本：工作区版保留股票、skills、提示词和结构化结果；龙虾纯对话版只保留聊天和 skills，不强制单独输入股票代码。</div>
           <div class="toggle-wrap" style="margin:14px 0 4px">
-            <span class="toggle-label">提示词范围约束</span>
+            <div class="toggle-label"><div class="feature-toggle-title">提示词范围约束</div><div class="feature-toggle-desc">位置：Hermes 收到问题后的首个路由节点。开启后只承接平台研究范围和轻度闲聊，超范围问题会被引导回个股、复盘、知识或指标能力。</div></div>
             <label class="toggle"><input id="hermes-prompt-scope-guard-enabled" type="checkbox"><span class="toggle-slider"></span></label>
           </div>
           <div class="toggle-wrap" style="margin:0 0 4px">
-            <span class="toggle-label">Hermes 向大V开放</span>
+            <div class="toggle-label"><div class="feature-toggle-title">Hermes 向大V开放</div><div class="feature-toggle-desc">位置：H5 与 Web 大V账号。关闭后大V不显示 Hermes 入口，也不能发起新的 Agent 问答会话。</div></div>
             <label class="toggle"><input id="hermes-dav-access-enabled" type="checkbox"><span class="toggle-slider"></span></label>
           </div>
           <div class="toggle-wrap" style="margin:0 0 4px">
-            <span class="toggle-label">Hermes 向普通用户开放</span>
+            <div class="toggle-label"><div class="feature-toggle-title">Hermes 向普通用户开放</div><div class="feature-toggle-desc">位置：H5 投资者账号。关闭时 Hermes 仅对大V开放，普通粉丝不会看到问答入口或历史会话。</div></div>
             <label class="toggle"><input id="hermes-investor-access-enabled" type="checkbox"><span class="toggle-slider"></span></label>
           </div>
           <div class="toggle-wrap" style="margin:0 0 4px">
-            <span class="toggle-label">互联网补充</span>
+            <div class="toggle-label"><div class="feature-toggle-title">互联网补充</div><div class="feature-toggle-desc">位置：Hermes 输入框的“互联网”选项。开启后，Agent 先检索当前租户知识库，再按用户勾选补充公开网络信息。</div></div>
             <label class="toggle"><input id="hermes-internet-answer-enabled" type="checkbox"><span class="toggle-slider"></span></label>
           </div>
           <div class="toggle-wrap" style="margin:0 0 4px">
-            <span class="toggle-label">深度思考过程</span>
+            <div class="toggle-label"><div class="feature-toggle-title">深度思考过程</div><div class="feature-toggle-desc">位置：Hermes 回答区。开启后用户可展开查看检索、图表或工具调用的处理进度；不会展示模型内部推理文本。</div></div>
             <label class="toggle"><input id="hermes-thinking-process-enabled" type="checkbox"><span class="toggle-slider"></span></label>
           </div>
           <div class="toggle-wrap" style="margin:0 0 4px">
-            <span class="toggle-label">回答可加入知识源</span>
+            <div class="toggle-label"><div class="feature-toggle-title">回答可加入知识源</div><div class="feature-toggle-desc">位置：Hermes 回答工具栏。开启后用户可将一轮问答保存为新的知识源，进入当前租户知识专区并参与后续召回。</div></div>
             <label class="toggle"><input id="hermes-answer-save-to-knowledge-enabled" type="checkbox"><span class="toggle-slider"></span></label>
           </div>
           <div class="config-field" style="margin-top:10px">
@@ -3637,6 +4013,16 @@
           <table id="admin-hermes-ranking-table">
             <thead><tr><th>排名</th><th>用户</th><th>等级</th><th>本月调用</th><th>消耗算力</th><th>最常用模式</th></tr></thead>
             <tbody id="admin-hermes-ranking-tbody"></tbody>
+          </table>
+        </div>
+        <div class="table-wrap" style="margin-top:20px">
+          <div class="table-header">
+            <div class="table-title">Hermes 缺失能力需求</div>
+            <span class="tag tag-gold">按用户真实提问沉淀</span>
+          </div>
+          <table id="admin-hermes-missing-capability-table">
+            <thead><tr><th>能力名称</th><th>分类</th><th>提及次数</th><th>影响用户</th><th>最近对象 / 日期</th><th>最近问题</th></tr></thead>
+            <tbody id="admin-hermes-missing-capability-tbody"></tbody>
           </table>
         </div>
       </div><!-- end section-hermes -->
@@ -4186,114 +4572,367 @@
       </div><!-- end section-settings-brand -->
 
       <div id="section-settings-features" style="display:none">
-        <div class="config-grid">
-          <div class="config-card">
-            <div class="config-card-title">首发功能开关</div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">访问密码门禁</span>
-              <label class="toggle"><input id="password-gate-enabled" type="checkbox" checked><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <div class="toggle-label">
-                <div style="font-size:12px;color:var(--text-main);font-weight:600;margin-bottom:4px">Staging 数据库</div>
-                <div id="db-runtime-summary" class="feature-note" style="margin-top:0">
-                  关闭时默认连接本地 Postgres（开发环境），打开后连接 staging Postgres。
+        <div class="admin-settings-hub">
+          <div class="admin-settings-hero">
+            <div class="admin-settings-hero-top">
+              <div>
+                <div class="admin-settings-hero-title">系统配置中心</div>
+                <div class="admin-settings-hero-desc">
+                  原本分散在站点外观、平台品牌、发布与隔离、知识专区、大模型专区和功能级模型映射里的系统配置，统一收口到这里。字段、保存逻辑和接口口径不变，只调整为更易查找和更易维护的分类视图。
                 </div>
               </div>
-              <label class="toggle"><input id="db-runtime-use-staging" type="checkbox"><span class="toggle-slider"></span></label>
+              <div class="admin-settings-hero-note">
+                这里保留的是系统配置项。知识图谱中心、Token 监控、定时任务专区和访问审计继续作为独立的运行页面存在。
+              </div>
             </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">用户模块</span>
-              <label class="toggle"><input id="feature-user_module" type="checkbox" checked><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">大V租户模块</span>
-              <label class="toggle"><input id="feature-kol_module" type="checkbox" checked><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">基本面分析</span>
-              <label class="toggle"><input id="feature-fundamental_analysis" type="checkbox" checked><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">自选股</span>
-              <label class="toggle"><input id="feature-watchlist" type="checkbox" checked><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">股票 K 线预测</span>
-              <label class="toggle"><input id="feature-stock_forecast" type="checkbox"><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">每日复盘</span>
-              <label class="toggle"><input id="feature-daily_review" type="checkbox" checked><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">知识专区</span>
-              <label class="toggle"><input id="feature-knowledge" type="checkbox" checked><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">社区</span>
-              <label class="toggle"><input id="feature-community" type="checkbox"><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">Hermes</span>
-              <label class="toggle"><input id="feature-hermes" type="checkbox"><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">Hermes 向普通用户开放</span>
-              <label class="toggle"><input id="hermes-investor-access-enabled" type="checkbox"><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">渠道模块</span>
-              <label class="toggle"><input id="feature-channel_module" type="checkbox" checked><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">数据分析模块</span>
-              <label class="toggle"><input id="feature-analytics_module" type="checkbox" checked><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">系统模块</span>
-              <label class="toggle"><input id="feature-system_module" type="checkbox" checked><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">会员页</span>
-              <label class="toggle"><input id="feature-vip" type="checkbox"><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">消息/私信</span>
-              <label class="toggle"><input id="feature-dm" type="checkbox"><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">粉丝与大V互动</span>
-              <label class="toggle"><input id="feature-fan_interaction" type="checkbox"><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">自选股粉丝互评</span>
-              <label class="toggle"><input id="feature-watchlist_fan_comment_interaction" type="checkbox"><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">付费回复</span>
-              <label class="toggle"><input id="feature-paid_reply" type="checkbox"><span class="toggle-slider"></span></label>
-            </div>
-            <div class="toggle-wrap">
-              <span class="toggle-label">大V 工作台 Web</span>
-              <label class="toggle"><input id="feature-workbench" type="checkbox"><span class="toggle-slider"></span></label>
-            </div>
-            <div class="feature-note">
-              访问密码门禁可由后台直接开关。启用时仍使用服务端配置的访问密码；关闭时首页、H5 和 admin 将直接开放访问。
-            </div>
-            <div class="feature-note" style="margin-top:8px">
-              MVP 默认优先开放：基本面、自选股、复盘、消息互动、知识归档、大V工作台和租户门户；预测分析放到约 1 个月后的第二阶段，会员收费能力按层级逐步开放。
-            </div>
-            <div class="feature-note" style="margin-top:8px">
-              Hermes 范围约束开启后，只接受固定研究范围内的提示词；关闭后，Hermes 会按更开放的问答模式继续承接。普通用户开放开关关闭时，H5 中只有大V用户能看到和使用 Hermes。
-            </div>
-            <div class="feature-note" style="margin-top:8px">
-              “自选股粉丝互评”关闭后，普通用户在自选股评论区只会看到大V评论和自己的评论；大V仍可查看租户内全部评论。
-            </div>
-            <div style="display:grid;gap:10px;margin-top:16px">
-              <button class="btn-gold" type="button" style="padding:10px 20px;font-size:13px;width:100%" onclick="saveSiteConfig()">保存功能开关</button>
-              <div class="feature-note" id="feature-config-status">
-                修改开关后需要点击保存才会生效。保存后，Admin、大V工作台和 H5 会按最新配置同步显示或隐藏对应功能。
+          </div>
+          <div class="admin-settings-layout">
+            <aside class="admin-settings-sidebar">
+              <div class="admin-settings-sidebar-card">
+                <div class="admin-settings-sidebar-title">配置子菜单</div>
+                <div class="admin-settings-sidebar-desc">一次只打开一个配置面板。左侧看分类，右侧只看当前配置内容，避免系统项全部挤在同一页。</div>
+                <div class="admin-settings-menu-group">
+                  <div class="admin-settings-menu-label">基础</div>
+                  <div class="admin-settings-menu">
+                    <button class="admin-settings-menu-btn" type="button" data-settings-panel-trigger="theme" onclick="openAdminSettingsSubmenu('theme')">
+                      <div class="admin-settings-menu-title">主题与外观</div>
+                      <div class="admin-settings-menu-copy">默认明暗主题、强调色和平台整体观感。</div>
+                    </button>
+                    <button class="admin-settings-menu-btn" type="button" data-settings-panel-trigger="brand" onclick="openAdminSettingsSubmenu('brand')">
+                      <div class="admin-settings-menu-title">品牌文案</div>
+                      <div class="admin-settings-menu-copy">平台名称、Logo 文案、副标题与首页说明。</div>
+                    </button>
+                  </div>
+                </div>
+                <div class="admin-settings-menu-group">
+                  <div class="admin-settings-menu-label">访问</div>
+                  <div class="admin-settings-menu">
+                    <button class="admin-settings-menu-btn" type="button" data-settings-panel-trigger="feature-flags" onclick="openAdminSettingsSubmenu('feature-flags')">
+                      <div class="admin-settings-menu-title">功能开关</div>
+                      <div class="admin-settings-menu-copy">模块启停、数据库目标和系统级入口开放状态。</div>
+                    </button>
+                    <button class="admin-settings-menu-btn" type="button" data-settings-panel-trigger="login-access" onclick="openAdminSettingsSubmenu('login-access')">
+                      <div class="admin-settings-menu-title">登录与访问策略</div>
+                      <div class="admin-settings-menu-copy">登录方式、微信受限测试、发布口径和租户隔离。</div>
+                    </button>
+                  </div>
+                </div>
+                <div class="admin-settings-menu-group">
+                  <div class="admin-settings-menu-label">知识</div>
+                  <div class="admin-settings-menu">
+                    <button class="admin-settings-menu-btn" type="button" data-settings-panel-trigger="knowledge-source" onclick="openAdminSettingsSubmenu('knowledge-source')">
+                      <div class="admin-settings-menu-title">知识输入源</div>
+                      <div class="admin-settings-menu-copy">语音转写、向量生成和前台解析预览策略。</div>
+                    </button>
+                    <button class="admin-settings-menu-btn" type="button" data-settings-panel-trigger="evidence-chain" onclick="openAdminSettingsSubmenu('evidence-chain')">
+                      <div class="admin-settings-menu-title">证据链配置</div>
+                      <div class="admin-settings-menu-copy">知识召回过滤、回答超时和共用证据链白盒提示词。</div>
+                    </button>
+                    <button class="admin-settings-menu-btn" type="button" data-settings-panel-trigger="review-flow" onclick="openAdminSettingsSubmenu('review-flow')">
+                      <div class="admin-settings-menu-title">复盘生成配置</div>
+                      <div class="admin-settings-menu-copy">用户复盘生成、摘要与自选股归纳总结的两阶段模板。</div>
+                    </button>
+                  </div>
+                </div>
+                <div class="admin-settings-menu-group">
+                  <div class="admin-settings-menu-label">AI</div>
+                  <div class="admin-settings-menu">
+                    <button class="admin-settings-menu-btn" type="button" data-settings-panel-trigger="llm-models" onclick="openAdminSettingsSubmenu('llm-models')">
+                      <div class="admin-settings-menu-title">模型配置</div>
+                      <div class="admin-settings-menu-copy">通用模型、供应商地址、默认模型和启用状态。</div>
+                    </button>
+                    <button class="admin-settings-menu-btn" type="button" data-settings-panel-trigger="llm-feature-map" onclick="openAdminSettingsSubmenu('llm-feature-map')">
+                      <div class="admin-settings-menu-title">功能级模型映射</div>
+                      <div class="admin-settings-menu-copy">Hermes、复盘、评论标注等功能绑定指定模型。</div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </aside>
+
+            <div class="admin-settings-panels">
+              <div class="admin-settings-panel-shell">
+                <section class="admin-settings-panel" data-settings-panel="theme">
+                  <div class="admin-settings-panel-head">
+                    <div>
+                      <div class="admin-settings-panel-kicker">Foundation</div>
+                      <div class="admin-settings-panel-title">主题与外观</div>
+                      <div class="admin-settings-panel-desc">统一维护平台默认主题和强调色。这里只决定系统默认值，前台用户自己的主题偏好仍可覆盖。</div>
+                    </div>
+                    <div class="admin-settings-panel-note">建议默认保持浅色咨询风，深色只作为用户端可切换主题保留。</div>
+                  </div>
+                  <div id="settings-panel-theme" class="admin-settings-mount"></div>
+                </section>
+
+                <section class="admin-settings-panel" data-settings-panel="brand">
+                  <div class="admin-settings-panel-head">
+                    <div>
+                      <div class="admin-settings-panel-kicker">Foundation</div>
+                      <div class="admin-settings-panel-title">品牌文案</div>
+                      <div class="admin-settings-panel-desc">平台级品牌只影响首页、Admin 和平台默认文案，不覆盖租户自身的大V对外展示内容。</div>
+                    </div>
+                    <div class="admin-settings-panel-note">品牌字段适合平台运营维护，不建议把租户专属表达混入这里。</div>
+                  </div>
+                  <div id="settings-panel-brand" class="admin-settings-mount"></div>
+                </section>
+
+                <section class="admin-settings-panel" data-settings-panel="feature-flags">
+                  <div class="admin-settings-panel-head">
+                    <div>
+                      <div class="admin-settings-panel-kicker">Access</div>
+                      <div class="admin-settings-panel-title">功能开关</div>
+                      <div class="admin-settings-panel-desc">平台级模块开关、数据库目标和系统入口统一在这里控制。修改后保存即可同步到 Admin、大V 工作台和 H5。</div>
+                    </div>
+                    <div class="admin-settings-panel-note">这里控制的是“看不看得到”和“能不能用”，不处理具体内容生产参数。</div>
+                  </div>
+                  <div class="config-grid">
+                    <div class="config-card">
+                      <div class="config-card-title">首发功能开关</div>
+                      <div class="toggle-wrap">
+                        <div class="toggle-label">
+                          <div style="font-size:12px;color:var(--text-main);font-weight:600;margin-bottom:4px">Staging 数据库</div>
+                          <div id="db-runtime-summary" class="feature-note" style="margin-top:0">
+                            关闭时默认连接本地 Postgres（开发环境），打开后连接 staging Postgres。
+                          </div>
+                        </div>
+                        <label class="toggle"><input id="db-runtime-use-staging" type="checkbox"><span class="toggle-slider"></span></label>
+                      </div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">用户模块</div><div class="feature-toggle-desc">位置：Admin 用户管理、大V工作台的粉丝管理。控制用户列表、导入、新增、标签与付费用户标注入口。</div></div><label class="toggle"><input id="feature-user_module" type="checkbox" checked><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">大V租户模块</div><div class="feature-toggle-desc">位置：Admin 大V租户管理与租户门户。控制大V租户配置、租户列表、对外门户和协同管理入口。</div></div><label class="toggle"><input id="feature-kol_module" type="checkbox" checked><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">基本面分析</div><div class="feature-toggle-desc">位置：H5 基本面页和大V工作台基本面看板。控制新闻聚合、综合归纳要闻与基本面研究入口。</div></div><label class="toggle"><input id="feature-fundamental_analysis" type="checkbox" checked><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">自选股</div><div class="feature-toggle-desc">位置：H5 自选股、大V工作台自选股详情。控制标的查询、K线、指标、标注、观察记录及详情页入口。</div></div><label class="toggle"><input id="feature-watchlist" type="checkbox" checked><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">股票 K 线预测</div><div class="feature-toggle-desc">位置：自选股预测能力和大V工作台预测模型页。控制预测结果展示及预测工作流配置入口。</div></div><label class="toggle"><input id="feature-stock_forecast" type="checkbox"><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">每日复盘</div><div class="feature-toggle-desc">位置：H5 复盘专区、大V工作台复盘生产台和已发布复盘。控制复盘输入、优化成稿、摘要、自选股归纳与发布浏览。</div></div><label class="toggle"><input id="feature-daily_review" type="checkbox" checked><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">知识专区</div><div class="feature-toggle-desc">位置：H5、大V工作台和 Admin 知识专区。控制知识源入库、知识问答、百科词条和知识图谱入口。</div></div><label class="toggle"><input id="feature-knowledge" type="checkbox" checked><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">社区</div><div class="feature-toggle-desc">位置：H5 社区与 Admin 社区运营页。控制社区内容流、活动和互动运营相关入口。</div></div><label class="toggle"><input id="feature-community" type="checkbox"><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">Hermes</div><div class="feature-toggle-desc">位置：H5 Hermes 问答、大V工作台 Hermes 管理和 Admin Hermes 运营区。关闭后不展示问答、会话、记忆及使用统计入口。</div></div><label class="toggle"><input id="feature-hermes" type="checkbox"><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">渠道模块</div><div class="feature-toggle-desc">位置：Admin 渠道运营与渠道数据页。控制渠道来源、投放归因和渠道运营配置入口。</div></div><label class="toggle"><input id="feature-channel_module" type="checkbox" checked><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">数据分析模块</div><div class="feature-toggle-desc">位置：Admin 指标专区和大V工作台指标看板。控制指标总览、智能指标、数据湖、异常检测及指标定义入口。</div></div><label class="toggle"><input id="feature-analytics_module" type="checkbox" checked><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">系统模块</div><div class="feature-toggle-desc">位置：Admin 系统专区。控制主题、品牌、功能开关、访问策略、模型配置、任务中心和审计等系统级配置入口。</div></div><label class="toggle"><input id="feature-system_module" type="checkbox" checked><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">会员页</div><div class="feature-toggle-desc">位置：H5 会员权益、积分与用户分层相关页面。关闭后普通用户不再看到会员权益和积分入口。</div></div><label class="toggle"><input id="feature-vip" type="checkbox"><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">消息/私信</div><div class="feature-toggle-desc">位置：H5 消息页与大V粉丝会话。控制粉丝与所属大V的私信会话、系统消息和消息通知入口。</div></div><label class="toggle"><input id="feature-dm" type="checkbox"><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">粉丝与大V互动</div><div class="feature-toggle-desc">位置：H5 消息与自选股互动场景。控制粉丝对所属大V发起互动、反馈与回复的能力。</div></div><label class="toggle"><input id="feature-fan_interaction" type="checkbox"><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">自选股粉丝互评</div><div class="feature-toggle-desc">位置：自选股详情评论区。开启后粉丝可查看其他粉丝评论；关闭后粉丝只能看到大V评论和自己的评论，大V仍可查看租户全部评论。</div></div><label class="toggle"><input id="feature-watchlist_fan_comment_interaction" type="checkbox"><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap">
+                        <div class="toggle-label">
+                          <div style="font-size:12px;color:var(--text-main);font-weight:600;margin-bottom:4px">微信环境受限测试</div>
+                          <div class="feature-note" style="margin-top:0">
+                            只作为后台测试开关存在。关闭后，H5 前台不展示任何普通浏览器 / 微信模拟 / 严格受限入口，同时忽略 <code>wx_env</code> 测试参数。
+                          </div>
+                        </div>
+                        <label class="toggle"><input id="auth-wechat-runtime-test-enabled" type="checkbox" checked><span class="toggle-slider"></span></label>
+                      </div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">付费回复</div><div class="feature-toggle-desc">位置：消息/私信的商业化回复场景。控制需要付费或权益校验后才可发起的回复能力，不影响已开放的普通消息浏览。</div></div><label class="toggle"><input id="feature-paid_reply" type="checkbox"><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">大V 工作台 Web</div><div class="feature-toggle-desc">位置：Web 端大V工作台及租户经营页面。控制工作台、数据分析、粉丝管理、复盘生产台和租户门户管理入口。</div></div><label class="toggle"><input id="feature-workbench" type="checkbox"><span class="toggle-slider"></span></label></div>
+                      <div class="feature-note">平台统一使用用户表中的用户名和密码登录，不再使用共享访问密码或“系统锁定”门禁。账号状态由用户管理维护。</div>
+                      <div class="feature-note" style="margin-top:8px">MVP 默认优先开放：基本面、自选股、复盘、消息互动、知识归档、大V工作台和租户门户；预测分析放到第二阶段，会员收费能力按层级逐步开放。</div>
+                      <div class="feature-note" style="margin-top:8px">Hermes 范围约束开启后，只接受固定研究范围内的提示词；关闭后，Hermes 会按更开放的问答模式继续承接。普通用户开放开关关闭时，H5 中只有大V用户能看到和使用 Hermes。</div>
+                      <div class="feature-note" style="margin-top:8px">“自选股粉丝互评”关闭后，普通用户在自选股评论区只会看到大V评论和自己的评论；大V仍可查看租户内全部评论。</div>
+                      <div style="display:grid;gap:10px;margin-top:16px">
+                        <button class="btn-gold" type="button" style="padding:10px 20px;font-size:13px;width:100%" onclick="saveSiteConfig()">保存功能开关</button>
+                        <div class="feature-note" id="feature-config-status">修改开关后需要点击保存才会生效。保存后，Admin、大V工作台和 H5 会按最新配置同步显示或隐藏对应功能。</div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="admin-settings-panel" data-settings-panel="login-access">
+                  <div class="admin-settings-panel-head">
+                    <div>
+                      <div class="admin-settings-panel-kicker">Access</div>
+                      <div class="admin-settings-panel-title">登录与访问策略</div>
+                      <div class="admin-settings-panel-desc">登录方式、微信受限测试、平台发布口径和租户隔离策略统一收口在这里，避免访问规则散落在多个页面。</div>
+                    </div>
+                    <div class="admin-settings-panel-note">系统登录策略和发布边界属于平台级规则，不建议放进业务页面里临时修改。</div>
+                  </div>
+                  <div id="settings-panel-login-access" class="admin-settings-mount"></div>
+                </section>
+
+                <section class="admin-settings-panel" data-settings-panel="knowledge-source">
+                  <div class="admin-settings-panel-head">
+                    <div>
+                      <div class="admin-settings-panel-kicker">Knowledge</div>
+                      <div class="admin-settings-panel-title">知识输入源</div>
+                      <div class="admin-settings-panel-desc">统一配置知识资料如何进入系统，包括语音转写、向量生成和前台是否允许查看文件 / URL 解析预览。</div>
+                    </div>
+                    <div class="admin-settings-panel-note">知识治理页只负责查看知识入库、修改、清洗与同步链路；具体系统配置在这里维护。</div>
+                  </div>
+                  <div class="config-grid">
+                    <div class="config-card">
+                      <div class="config-card-title">租户研究资料输入源</div>
+                      <div class="config-field">
+                        <label>支持渠道</label>
+                        <input type="text" value="大V语音输入 / 文件上传 / 网页URL" readonly>
+                      </div>
+                      <div class="config-field">
+                        <label>资料用途</label>
+                        <input type="text" value="形成租户研究资料底座，并同步到基本面、自选股分析、Hermes 与工作台研究记录" readonly>
+                      </div>
+                      <div class="config-field">
+                        <label>语音转写引擎</label>
+                        <select id="voice-transcription-engine">
+                          <option value="local">本地 Python 转写（默认）</option>
+                          <option value="api">大模型 API 转写</option>
+                        </select>
+                      </div>
+                      <div class="config-field">
+                        <label>转写后处理</label>
+                        <select id="voice-transcription-post-process-mode">
+                          <option value="rule_based">规则纠错与术语清洗（推荐）</option>
+                          <option value="none">仅保留原始转写</option>
+                        </select>
+                      </div>
+                      <div class="config-field">
+                        <label style="display:flex;align-items:flex-start;gap:8px;line-height:1.7">
+                          <input type="checkbox" id="voice-transcription-domain-glossary-enabled">
+                          <span>
+                            启用财经术语纠错
+                            <span class="feature-note" style="display:block;margin-top:4px">
+                              对 CPI、PE、PB、ROE、上证指数、常见股票简称与代码做规则归一；不依赖大模型，默认开启。
+                            </span>
+                          </span>
+                        </label>
+                      </div>
+                      <div class="config-field">
+                        <label>向量生成引擎</label>
+                        <select id="voice-embedding-engine">
+                          <option value="local">本地 Embedding</option>
+                          <option value="api">大模型 API Embedding</option>
+                        </select>
+                      </div>
+                      <div class="feature-note">
+                        默认链路为：语音转写 → 规则纠错 → 术语清洗。大模型整理只在前台勾选时额外启用，不影响纯 ASR 路径。
+                      </div>
+                      <div class="feature-note" style="margin-top:8px">
+                        转写引擎和向量引擎独立配置，可自由组合。系统会按 embedding 引擎自动隔离 vector namespace，避免不同模型生成的向量混搜。
+                      </div>
+                      <div class="config-field">
+                        <label style="display:flex;align-items:flex-start;gap:8px;line-height:1.7">
+                          <input type="checkbox" id="knowledge-user-preview-enabled">
+                          <span>
+                            允许前台用户查看文件 / URL 解析预览
+                            <span class="feature-note" style="display:block;margin-top:4px">
+                              默认关闭。关闭后，用户仍可上传文件、提交 URL 并异步入库，但不会看到系统抽取出的标题、摘要和解析细节；适合日常生产。只有排查解析问题时再临时打开。
+                            </span>
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+                    <div class="config-card">
+                      <div class="config-card-title">保存发布</div>
+                      <button class="btn-gold" style="padding:10px 20px;font-size:13px;margin-top:4px;width:100%" onclick="saveSiteConfig()">保存系统配置</button>
+                      <div class="feature-note" id="site-config-status">
+                        保存后，新的知识录入请求会按当前配置生效；前台用户自己的展示偏好不会受影响。
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="admin-settings-panel" data-settings-panel="evidence-chain">
+                  <div class="admin-settings-panel-head">
+                    <div>
+                      <div class="admin-settings-panel-kicker">Knowledge</div>
+                      <div class="admin-settings-panel-title">证据链配置</div>
+                      <div class="admin-settings-panel-desc">证据链是 Hermes、知识问答、复盘和后续智能体的共用能力。相关性过滤、回答超时和白盒提示词统一在这里维护。</div>
+                    </div>
+                    <div class="admin-settings-panel-note">这里改的是公共证据链底座，不是某一个页面的局部提示词。</div>
+                  </div>
+                  <div class="config-grid single-column">
+                    <div class="config-card">
+                      <div class="config-card-title">证据链过滤配置</div>
+                      <div class="config-field">
+                        <label>过滤系统提示词</label>
+                        <textarea id="evidence-filter-system-prompt" rows="8" placeholder="系统提示词"></textarea>
+                      </div>
+                      <div class="config-field">
+                        <label>过滤用户提示词模板</label>
+                        <textarea id="evidence-filter-user-template" rows="10" placeholder="可使用 {query} 和 {candidate_blocks} 占位符"></textarea>
+                      </div>
+                      <div class="config-grid two-column" style="margin-top:12px">
+                        <div class="config-field">
+                          <label>过滤超时（秒）</label>
+                          <input id="evidence-filter-timeout-seconds" type="number" min="5" max="120" step="1" placeholder="25">
+                        </div>
+                        <div class="config-field">
+                          <label>回答超时（秒）</label>
+                          <input id="evidence-answer-timeout-seconds" type="number" min="5" max="180" step="1" placeholder="45">
+                        </div>
+                      </div>
+                      <div class="feature-note">
+                        保存后，知识库问答、证据链 API，以及复盘、自选股研究和后续复用这套能力的入口都会使用这里的提示词和超时设置。
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="admin-settings-panel" data-settings-panel="review-flow">
+                  <div class="admin-settings-panel-head">
+                    <div>
+                      <div class="admin-settings-panel-kicker">Knowledge</div>
+                      <div class="admin-settings-panel-title">复盘生成配置</div>
+                      <div class="admin-settings-panel-desc">这里配置复盘的生成链路：先生成用户复盘，再基于用户确认内容生成摘要和自选股归纳总结。工作台和 H5 共用这一套白盒模板。</div>
+                    </div>
+                    <div class="admin-settings-panel-note">复盘参数属于系统级生产配置，前台页面只消费结果，不直接暴露这些模板。</div>
+                  </div>
+                  <div class="config-grid single-column">
+                    <div class="config-card">
+                      <div class="config-card-title">复盘生成白盒配置</div>
+                      <div class="config-field">
+                        <label>阶段1：输入润色系统提示词</label>
+                        <textarea id="review-polish-system-prompt" rows="8" placeholder="输入润色系统提示词"></textarea>
+                      </div>
+                      <div class="config-field">
+                        <label>阶段1：输入润色用户模板</label>
+                        <textarea id="review-polish-user-template" rows="9" placeholder="可使用 {period_label} / {source_mode} / {speaker_label} / {entry_point} / {source_text}"></textarea>
+                      </div>
+                      <div class="config-field">
+                        <label>阶段2：完整成稿系统提示词</label>
+                        <textarea id="review-compose-system-prompt" rows="8" placeholder="完整成稿系统提示词"></textarea>
+                      </div>
+                      <div class="config-field">
+                        <label>阶段2：完整成稿用户模板</label>
+                        <textarea id="review-compose-user-template" rows="10" placeholder="可使用 {period_label} / {speaker_label} / {entry_point} / {watchlist_text} / {tag_text} / {prompt_text} / {source_text} / {dashboard_blocks}"></textarea>
+                      </div>
+                      <div class="config-grid two-column" style="margin-top:12px">
+                        <div class="config-field">
+                          <label>输入润色超时（秒）</label>
+                          <input id="review-polish-timeout-seconds" type="number" min="5" max="180" step="1" placeholder="45">
+                        </div>
+                        <div class="config-field">
+                          <label>完整成稿超时（秒）</label>
+                          <input id="review-compose-timeout-seconds" type="number" min="5" max="240" step="1" placeholder="60">
+                        </div>
+                      </div>
+                      <div class="feature-note">
+                        这里是复盘两阶段生成的白盒配置。工作台中的“开始优化”和后续的摘要、自选股归纳总结都会读取这里的提示词与超时设置。
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="admin-settings-panel" data-settings-panel="llm-models">
+                  <div class="admin-settings-panel-head">
+                    <div>
+                      <div class="admin-settings-panel-kicker">AI</div>
+                      <div class="admin-settings-panel-title">模型配置</div>
+                      <div class="admin-settings-panel-desc">统一维护平台可调用的大模型配置。默认模型、可用模型列表和 staging 同步动作都放在这里。</div>
+                    </div>
+                    <div class="admin-settings-panel-note">模型配置和业务代码解耦，运营或技术可以直接切换模型，不需要改功能逻辑。</div>
+                  </div>
+                  <div id="settings-panel-llm-models" class="admin-settings-mount"></div>
+                </section>
+
+                <section class="admin-settings-panel" data-settings-panel="llm-feature-map">
+                  <div class="admin-settings-panel-head">
+                    <div>
+                      <div class="admin-settings-panel-kicker">AI</div>
+                      <div class="admin-settings-panel-title">功能级模型映射</div>
+                      <div class="admin-settings-panel-desc">按功能维度绑定模型。Hermes、复盘、知识加工、评论标注等能力可以各自指向不同模型，同时保留默认模型回退。</div>
+                    </div>
+                    <div class="admin-settings-panel-note">统一模型是默认策略；只有明确需要时，才对单功能单独切换。</div>
+                  </div>
+                  <div id="settings-panel-llm-feature-map" class="admin-settings-mount"></div>
+                </section>
               </div>
             </div>
           </div>
@@ -4302,6 +4941,62 @@
 
       <div id="section-settings-policy" style="display:none">
         <div class="config-grid">
+          <div class="config-card">
+            <div class="config-card-title">H5 登录策略</div>
+            <div class="toggle-wrap">
+              <div class="toggle-label"><div class="feature-toggle-title">账号密码登录</div><div class="feature-toggle-desc">位置：H5 登录页。控制用户名和密码登录表单；关闭后用户只能使用其他已开启的登录方式。</div></div>
+              <label class="toggle"><input id="auth-password-login-enabled" type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
+              <div class="toggle-label"><div class="feature-toggle-title">微信登录</div><div class="feature-toggle-desc">位置：H5 登录页。控制微信 OAuth 登录入口；启用前需要完整配置 AppID、AppSecret 和回调地址。</div></div>
+              <label class="toggle"><input id="auth-wechat-login-enabled" type="checkbox"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-wrap">
+              <div class="toggle-label"><div class="feature-toggle-title">快捷选账号进入</div><div class="feature-toggle-desc">位置：本地演示和测试环境的 H5 登录页。展示已有账号的快捷入口，不应作为生产环境的正式登录方式。</div></div>
+              <label class="toggle"><input id="auth-quick-select-enabled" type="checkbox" checked><span class="toggle-slider"></span></label>
+            </div>
+            <div class="config-field">
+              <label>微信 AppID</label>
+              <input id="auth-wechat-app-id" type="text" placeholder="wx1234567890abcdef">
+            </div>
+            <div class="config-field">
+              <label>微信 AppSecret</label>
+              <input id="auth-wechat-app-secret" type="text" placeholder="仅 Admin 可见">
+            </div>
+            <div class="config-field">
+              <label>微信回调地址</label>
+              <input id="auth-wechat-redirect-uri" type="text" placeholder="http://127.0.0.1:5001/api/h5/wechat/callback">
+            </div>
+            <div class="config-field">
+              <label>微信 Scope</label>
+              <select id="auth-wechat-scope">
+                <option value="snsapi_userinfo">snsapi_userinfo</option>
+                <option value="snsapi_base">snsapi_base</option>
+              </select>
+            </div>
+            <div class="toggle-wrap">
+              <div class="toggle-label"><div class="feature-toggle-title">微信首次登录自动注册</div><div class="feature-toggle-desc">位置：微信 OAuth 回调。开启后首次登录的微信用户会按下方默认角色和租户自动创建平台账号。</div></div>
+              <label class="toggle"><input id="auth-wechat-auto-register-enabled" type="checkbox"><span class="toggle-slider"></span></label>
+            </div>
+            <div class="config-field">
+              <label>自动注册默认角色</label>
+              <select id="auth-wechat-default-role">
+                <option value="investor">投资者</option>
+                <option value="dav">大V</option>
+              </select>
+            </div>
+            <div class="config-field">
+              <label>自动注册默认租户</label>
+              <select id="auth-wechat-default-tenant-slug"></select>
+            </div>
+            <div class="config-field">
+              <label>自动注册默认顾问名</label>
+              <input id="auth-wechat-default-advisor-name" type="text" placeholder="为空时按租户主理人回填">
+            </div>
+            <div class="feature-note">
+              推荐策略：账号密码和微信同时开放，快捷选账号只保留给内部演示或验收环境。生产环境如果关闭快捷进入，H5 首屏将只保留正式登录方式。
+            </div>
+          </div>
           <div class="config-card">
             <div class="config-card-title">平台发布策略</div>
             <div class="config-field">
@@ -4333,13 +5028,58 @@
         </div>
       </div><!-- end section-settings-policy -->
 
-      <div id="section-settings-knowledge" style="display:none">
+      <div id="section-knowledge-overview" style="display:none">
         <div class="admin-knowledge-entry-card">
           <div>
-            <div class="admin-knowledge-entry-title">知识图谱已独立成页</div>
-            <div class="admin-knowledge-entry-desc">知识专区负责知识原始内容、配置和追溯；真正的图谱关系放在“知识图谱中心”里查看，不再把文件、语音和 URL 直接当成图谱主节点。</div>
+            <div class="admin-knowledge-entry-title">知识专区</div>
+            <div class="admin-knowledge-entry-desc">知识能力已拆成独立页面：总览只看规模和结构，知识治理只看知识入库、修改与同步链路，百科只看人能读懂的词条详情，图谱只看关系网络。</div>
           </div>
-          <button class="btn-gold" style="padding:10px 16px;font-size:12px" type="button" onclick="showSection('settings-knowledge-graph', document.querySelector('.admin-nav-item[data-section=&quot;settings-knowledge-graph&quot;]'))">进入知识图谱中心</button>
+          <span class="tag tag-blue">Knowledge</span>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-end;flex-wrap:wrap">
+            <div>
+              <div class="section-title" style="margin-bottom:6px">总览视角</div>
+              <div class="feature-note">Admin 可以先看平台全局，也可以切到单租户，确认知识沉淀规模和成熟度。</div>
+            </div>
+            <div class="config-field" style="min-width:240px;margin:0">
+              <label>租户筛选</label>
+              <select data-admin-knowledge-tenant-filter></select>
+            </div>
+          </div>
+        </div>
+        <div class="admin-knowledge-hub-grid">
+          <button class="admin-knowledge-hub-card" type="button" onclick="showSection('knowledge-intake', document.querySelector('.admin-nav-item[data-section=&quot;knowledge-intake&quot;]'))">
+            <div class="admin-knowledge-hub-title">知识治理</div>
+            <div class="admin-knowledge-hub-desc">查看语音、文件、网页和手动录入进入知识库的全过程，追溯原始内容、同步状态与入库结果。</div>
+            <div class="admin-knowledge-hub-meta">进入知识治理</div>
+          </button>
+          <button class="admin-knowledge-hub-card" type="button" onclick="showSection('knowledge-encyclopedia', document.querySelector('.admin-nav-item[data-section=&quot;knowledge-encyclopedia&quot;]'))">
+            <div class="admin-knowledge-hub-title">百科结构</div>
+            <div class="admin-knowledge-hub-desc">先看知识规模、成熟度、来源分布和高频主题，判断知识库是否已经长成稳定结构。</div>
+            <div class="admin-knowledge-hub-meta">进入百科结构</div>
+          </button>
+          <button class="admin-knowledge-hub-card" type="button" onclick="showSection('knowledge-entries', document.querySelector('.admin-nav-item[data-section=&quot;knowledge-entries&quot;]'))">
+            <div class="admin-knowledge-hub-title">百科词条</div>
+            <div class="admin-knowledge-hub-desc">只看人能读懂的词条列表，直接打开摘要、要点、验证节点和正文详情。</div>
+            <div class="admin-knowledge-hub-meta">进入词条列表</div>
+          </button>
+          <button class="admin-knowledge-hub-card" type="button" onclick="showSection('knowledge-graph', document.querySelector('.admin-nav-item[data-section=&quot;knowledge-graph&quot;]'))">
+            <div class="admin-knowledge-hub-title">知识图谱</div>
+            <div class="admin-knowledge-hub-desc">只看知识对象之间的主题、实体、方法、观点和验证信号关系，不把上传素材当作图谱节点。</div>
+            <div class="admin-knowledge-hub-meta">进入知识图谱</div>
+          </button>
+        </div>
+        <div id="admin-knowledge-overview-summary" class="admin-knowledge-overview-grid"></div>
+      </div><!-- end section-knowledge-overview -->
+
+      <div id="section-knowledge-intake" style="display:none">
+        <div class="admin-knowledge-entry-card">
+          <div>
+            <div class="admin-knowledge-entry-title">知识治理</div>
+            <div class="admin-knowledge-entry-desc">这里专门负责知识进入系统前后的一整条治理链路。统一查看原始输入、人工修改、解析结果、同步状态和治理配置，不和百科浏览或图谱浏览混在同一页。</div>
+          </div>
+          <button class="btn-gold" style="padding:10px 16px;font-size:12px" type="button" onclick="showSection('knowledge-graph', document.querySelector('.admin-nav-item[data-section=&quot;knowledge-graph&quot;]'))">进入知识图谱</button>
         </div>
         <div class="card" style="margin-bottom:16px">
           <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-end;flex-wrap:wrap">
@@ -4374,117 +5114,22 @@
             </tbody>
           </table>
         </div>
-        <div class="config-grid">
-          <div class="config-card">
-            <div class="config-card-title">租户研究资料输入源</div>
-            <div class="config-field">
-              <label>支持渠道</label>
-              <input type="text" value="大V语音输入 / 文件上传 / 网页URL" readonly>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap">
+            <div>
+              <div class="section-title" style="margin-bottom:6px">治理配置已拆分</div>
+              <div class="feature-note">知识输入源、证据链配置和复盘生成配置已经迁到“系统配置中心”独立子菜单中。这里现在只保留录入链路和原始素材治理。</div>
             </div>
-            <div class="config-field">
-              <label>资料用途</label>
-              <input type="text" value="形成租户研究资料底座，并同步到按需基本面、自选股分析与工作台研究记录" readonly>
-            </div>
-            <div class="config-field">
-              <label>语音转写引擎</label>
-              <select id="voice-transcription-engine">
-                <option value="local">本地 Python 转写（默认）</option>
-                <option value="api">大模型 API 转写</option>
-              </select>
-            </div>
-            <div class="config-field">
-              <label>向量生成引擎</label>
-              <select id="voice-embedding-engine">
-                <option value="local">本地 Embedding</option>
-                <option value="api">大模型 API Embedding</option>
-              </select>
-            </div>
-            <div class="feature-note">
-              转写引擎和向量引擎独立配置，可自由组合。系统会按 embedding 引擎自动隔离 vector namespace，避免不同模型生成的向量混搜。
-            </div>
-            <div class="config-field">
-              <label style="display:flex;align-items:flex-start;gap:8px;line-height:1.7">
-                <input type="checkbox" id="knowledge-user-preview-enabled">
-                <span>
-                  允许前台用户查看文件 / URL 解析预览
-                  <span class="feature-note" style="display:block;margin-top:4px">
-                    默认关闭。关闭后，用户仍可上传文件、提交 URL 并异步入库，但不会看到系统抽取出的标题、摘要和解析细节；适合日常生产。只有排查解析问题时再临时打开。
-                  </span>
-                </span>
-              </label>
-            </div>
-          </div>
-          <div class="config-card">
-            <div class="config-card-title">保存发布</div>
-            <button class="btn-gold" style="padding:10px 20px;font-size:13px;margin-top:4px;width:100%" onclick="saveSiteConfig()">保存系统配置</button>
-            <div class="feature-note" id="site-config-status">
-              保存后，新的请求会按当前数据库目标和站点配置生效；用户自己的主题选择仍然会被本地记住。
-            </div>
-          </div>
-          <div class="config-card">
-            <div class="config-card-title">证据链过滤配置</div>
-            <div class="config-field">
-              <label>过滤系统提示词</label>
-              <textarea id="evidence-filter-system-prompt" rows="8" placeholder="系统提示词"></textarea>
-            </div>
-            <div class="config-field">
-              <label>过滤用户提示词模板</label>
-              <textarea id="evidence-filter-user-template" rows="10" placeholder="可使用 {query} 和 {candidate_blocks} 占位符"></textarea>
-            </div>
-            <div class="config-grid two-column" style="margin-top:12px">
-              <div class="config-field">
-                <label>过滤超时（秒）</label>
-                <input id="evidence-filter-timeout-seconds" type="number" min="5" max="120" step="1" placeholder="25">
-              </div>
-              <div class="config-field">
-                <label>回答超时（秒）</label>
-                <input id="evidence-answer-timeout-seconds" type="number" min="5" max="180" step="1" placeholder="45">
-              </div>
-            </div>
-            <div class="feature-note">
-              这里是证据链相关性过滤的白盒配置。保存后，知识库问答、证据链 API，以及后续 H5 dashboard / 复盘等复用这套能力的入口都会使用这里的提示词和超时设置。
-            </div>
-          </div>
-          <div class="config-card">
-            <div class="config-card-title">复盘生成白盒配置</div>
-            <div class="config-field">
-              <label>阶段1：输入润色系统提示词</label>
-              <textarea id="review-polish-system-prompt" rows="8" placeholder="输入润色系统提示词"></textarea>
-            </div>
-            <div class="config-field">
-              <label>阶段1：输入润色用户模板</label>
-              <textarea id="review-polish-user-template" rows="9" placeholder="可使用 {period_label} / {source_mode} / {speaker_label} / {entry_point} / {source_text}"></textarea>
-            </div>
-            <div class="config-field">
-              <label>阶段2：完整成稿系统提示词</label>
-              <textarea id="review-compose-system-prompt" rows="8" placeholder="完整成稿系统提示词"></textarea>
-            </div>
-            <div class="config-field">
-              <label>阶段2：完整成稿用户模板</label>
-              <textarea id="review-compose-user-template" rows="10" placeholder="可使用 {period_label} / {speaker_label} / {entry_point} / {watchlist_text} / {tag_text} / {prompt_text} / {source_text} / {dashboard_blocks}"></textarea>
-            </div>
-            <div class="config-grid two-column" style="margin-top:12px">
-              <div class="config-field">
-                <label>输入润色超时（秒）</label>
-                <input id="review-polish-timeout-seconds" type="number" min="5" max="180" step="1" placeholder="45">
-              </div>
-              <div class="config-field">
-                <label>完整成稿超时（秒）</label>
-                <input id="review-compose-timeout-seconds" type="number" min="5" max="240" step="1" placeholder="60">
-              </div>
-            </div>
-            <div class="feature-note">
-              这里是复盘两阶段生成的白盒配置。工作台中的“输入润色”和“完整成稿”都会读取这里的提示词与超时设置，便于运营监督和技术排查。
-            </div>
+            <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="showSection('settings-features', document.querySelector('.admin-nav-item[data-section=&quot;settings-features&quot;]'));window.requestAnimationFrame(() => openAdminSettingsSubmenu('knowledge-source'));">去系统配置查看</button>
           </div>
         </div>
-      </div><!-- end section-settings-knowledge -->
+      </div><!-- end section-knowledge-intake -->
 
-      <div id="section-settings-knowledge-graph" style="display:none">
+      <div id="section-knowledge-graph" style="display:none">
         <div class="admin-kg-shell">
           <div class="admin-kg-top">
             <div>
-              <div class="admin-kg-title">知识图谱中心</div>
+              <div class="admin-kg-title">知识图谱</div>
               <div class="admin-kg-desc">默认从平台总图看租户知识主题，再切到单租户展开实体、方法、观点和验证信号。只展示知识对象，原始素材只在详情中作为来源证据出现。</div>
             </div>
             <div class="admin-kg-controls">
@@ -4501,7 +5146,7 @@
                 <option value="claim">观点</option>
                 <option value="signal">验证信号</option>
               </select>
-              <button class="btn-outline" style="padding:8px 14px;font-size:12px" type="button" onclick="loadAdminKnowledgeMap(true)">刷新</button>
+              <button class="btn-outline" style="padding:8px 14px;font-size:12px" type="button" onclick="refreshAdminKnowledgeIntelligence(true)">刷新</button>
               <button class="btn-outline" style="padding:8px 14px;font-size:12px" type="button" onclick="collapseAdminKnowledgeMap()">收缩</button>
               <button class="btn-outline" style="padding:8px 14px;font-size:12px" type="button" onclick="expandAdminKnowledgeMapAll()">全部展示</button>
               <button class="btn-outline" style="padding:8px 14px;font-size:12px" type="button" onclick="adjustAdminKnowledgeMapDepth(-1)">-</button>
@@ -4518,43 +5163,86 @@
             <aside id="admin-kg-detail" class="admin-kg-detail"></aside>
           </div>
         </div>
-      </div><!-- end section-settings-knowledge-graph -->
+      </div><!-- end section-knowledge-graph -->
 
-      <div id="section-knowledge-items" style="display:none">
+      <div id="section-knowledge-encyclopedia" style="display:none">
+        <div class="admin-knowledge-entry-card">
+          <div>
+            <div class="admin-knowledge-entry-title">百科结构</div>
+            <div class="admin-knowledge-entry-desc">这里先看知识是否长成体系：规模、成熟度、来源分布和高频主题都在这一页，不和具体词条列表混在一起。</div>
+          </div>
+          <span class="tag tag-blue">Structure</span>
+        </div>
         <div class="card" style="margin-bottom:16px">
           <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-end;flex-wrap:wrap">
             <div>
-              <div class="section-title" style="margin-bottom:6px">知识原始内容总览</div>
-              <div class="feature-note">这里给 admin 直接查看用户原始输入、文件 / URL 解析正文、语音转写原文和解析元数据，确保后续给大模型生成时能追溯原材料。</div>
+              <div class="section-title" style="margin-bottom:6px">知识结构视角</div>
+              <div class="feature-note">这一页只回答“知识库长成什么样了”。真正逐条浏览词条，请进入“百科词条”。</div>
             </div>
-            <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
-              <div class="config-field" style="min-width:220px;margin:0">
-                <label>租户筛选</label>
-                <select id="admin-knowledge-items-tenant-filter" data-admin-knowledge-tenant-filter></select>
-              </div>
-              <button class="btn-outline" style="padding:8px 14px;font-size:12px" onclick="loadAdminKnowledgeItems(true)">刷新列表</button>
+            <div class="config-field" style="min-width:240px;margin:0">
+              <label>租户筛选</label>
+              <select data-admin-knowledge-tenant-filter></select>
             </div>
           </div>
         </div>
-        <div class="table-card">
-          <table>
-            <thead>
-              <tr>
-                <th>时间</th>
-                <th>租户</th>
-                <th>类型</th>
-                <th>标题</th>
-                <th>来源</th>
-                <th>原始内容预览</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody id="admin-knowledge-items-body" data-admin-knowledge-items-body>
-              <tr><td colspan="7" style="text-align:center;color:#8899aa;padding:20px 0">正在加载知识内容…</td></tr>
-            </tbody>
-          </table>
+        <div class="admin-knowledge-readable-panel">
+          <div class="admin-knowledge-readable-title">词条结构概览</div>
+          <div class="admin-knowledge-readable-desc">这里看平台或单租户的知识规模、成熟度、来源分布和高频知识方向，判断知识库是否已经形成稳定结构。</div>
+          <div id="admin-knowledge-assets-summary" class="admin-ka-summary-grid" style="margin-top:12px"></div>
+          <div class="charts-grid" style="margin-top:12px">
+            <div class="chart-card">
+              <div class="chart-title">来源分布</div>
+              <div class="chart-subtitle">观察知识输入渠道是否过于单一。</div>
+              <div class="chart-container" id="admin-knowledge-source-chart"></div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-title">成熟度分布</div>
+              <div class="chart-subtitle">看知识沉淀处于种子、成长还是可复用阶段。</div>
+              <div class="chart-container" id="admin-knowledge-maturity-chart"></div>
+            </div>
+          </div>
+          <div class="charts-grid" style="margin-top:12px">
+            <div class="chart-card">
+              <div class="chart-title">高频知识方向</div>
+              <div class="chart-subtitle">按主题、实体、方法和验证信号观察热点集中度。</div>
+              <div class="chart-container tall" id="admin-knowledge-hotspot-chart"></div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-title">结构覆盖</div>
+              <div class="chart-subtitle" id="admin-knowledge-coverage-subtitle">看结构维度是否均衡展开。</div>
+              <div class="chart-container tall" id="admin-knowledge-coverage-chart"></div>
+            </div>
+          </div>
+          <div id="admin-knowledge-assets-relationships" class="admin-ka-rel-grid" style="margin-top:12px"></div>
         </div>
-      </div><!-- end section-knowledge-items -->
+      </div><!-- end section-knowledge-encyclopedia -->
+
+      <div id="section-knowledge-entries" style="display:none">
+        <div class="admin-knowledge-entry-card">
+          <div>
+            <div class="admin-knowledge-entry-title">百科词条</div>
+            <div class="admin-knowledge-entry-desc">这里专门浏览人能看懂的知识词条。结构概览和关系分析已拆到“百科结构”，这一页只负责逐条查看与下钻详情。</div>
+          </div>
+          <span class="tag tag-blue">Entries</span>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-end;flex-wrap:wrap">
+            <div>
+              <div class="section-title" style="margin-bottom:6px">词条浏览视角</div>
+              <div class="feature-note">词条列表只展示标题、摘要、成熟度和主要知识方向。点击后再查看全文、关键要点和治理细节。</div>
+            </div>
+            <div class="config-field" style="min-width:240px;margin:0">
+              <label>租户筛选</label>
+              <select data-admin-knowledge-tenant-filter></select>
+            </div>
+          </div>
+        </div>
+        <div class="admin-knowledge-readable-panel">
+          <div class="admin-knowledge-readable-title">百科词条列表</div>
+          <div class="admin-knowledge-readable-desc">按研究手册的阅读方式查看知识沉淀结果，不先暴露 QKV 或关系调试字段。</div>
+          <div id="admin-knowledge-assets-entries" class="admin-knowledge-readable-list"></div>
+        </div>
+      </div><!-- end section-knowledge-entries -->
 
       <div id="section-settings-llm" style="display:none">
         <div class="llm-admin-shell">
@@ -4584,7 +5272,7 @@
             </div>
             <div class="llm-admin-panel">
               <div class="llm-admin-panel-title">配置总览</div>
-              <div id="llm-admin-summary"></div>
+              <div data-llm-summary></div>
               <div class="llm-admin-panel-note">
                 推荐做法是把“正在试验”的模型先保留为未启用，等接口地址、模型名和 API Key 验证通过后，再切成默认模型。这样知识库对话和后续生成链路不会误用到半成品配置。
               </div>
@@ -4625,7 +5313,7 @@
             </div>
             <div class="llm-admin-panel">
               <div class="llm-admin-panel-title">映射总览</div>
-              <div id="llm-admin-summary"></div>
+              <div data-llm-summary></div>
               <div class="llm-admin-panel-note">
                 如果某个功能没有单独指定模型，系统会自动回退到默认模型，不会影响功能可用性。
               </div>
@@ -4984,13 +5672,18 @@ const sectionTitles = {
   'indicator-definitions':'指标专区 · 指标定义',
   'indicator-pipeline':'指标专区 · 清洗流水线',
   analytics:'数据分析',
-  'settings-appearance':'系统专区 · 站点外观',
-  'settings-brand':'系统专区 · 平台品牌',
-  'settings-features':'系统专区 · 功能开关',
+  'settings-appearance':'系统专区 · 系统配置',
+  'settings-brand':'系统专区 · 系统配置',
+  'settings-features':'系统专区 · 系统配置',
   'settings-policy':'系统专区 · 发布与隔离',
-  'settings-knowledge':'系统专区 · 知识专区',
-  'settings-knowledge-graph':'系统专区 · 知识图谱中心',
-  'knowledge-items':'系统专区 · 知识专区',
+  'knowledge-overview':'知识专区 · 知识总览',
+  'knowledge-intake':'知识专区 · 知识治理',
+  'knowledge-encyclopedia':'知识专区 · 百科结构',
+  'knowledge-entries':'知识专区 · 百科词条',
+  'knowledge-graph':'知识专区 · 知识图谱',
+  'settings-knowledge':'知识专区 · 知识总览',
+  'settings-knowledge-graph':'知识专区 · 知识图谱',
+  'knowledge-items':'知识专区 · 知识治理',
   'settings-llm':'系统专区 · 大模型专区',
   'settings-llm-features':'系统专区 · 功能级模型映射',
   'token-usage':'系统专区 · Token 监控',
@@ -5005,10 +5698,48 @@ const analyticsTitles = {
   segment: '数据分析 · 用户分层分析',
 };
 const ADMIN_NAV_STORAGE_KEY = 'gangtise-admin-nav-groups-v1';
+const ADMIN_UNIFIED_SETTINGS_REDIRECTS = Object.freeze({
+  settings: 'settings-features',
+  'settings-appearance': 'settings-features',
+  'settings-brand': 'settings-features',
+  'settings-policy': 'settings-features',
+  'settings-knowledge': 'knowledge-overview',
+  'knowledge-items': 'knowledge-intake',
+  'settings-knowledge-graph': 'knowledge-graph',
+  'settings-llm': 'settings-features',
+  'settings-llm-features': 'settings-features',
+});
+const ADMIN_UNIFIED_SETTINGS_PANEL_MAP = Object.freeze({
+  settings: 'theme',
+  'settings-appearance': 'theme',
+  'settings-brand': 'brand',
+  'settings-policy': 'login-access',
+  'settings-knowledge': '',
+  'knowledge-items': '',
+  'settings-knowledge-graph': '',
+  'settings-llm': 'llm-models',
+  'settings-llm-features': 'llm-feature-map',
+});
+
+function normalizeAdminSection(name) {
+  const raw = String(name || '').trim();
+  if (!raw) return { section: '', panel: '' };
+  if (raw === 'indicator-hub') return { section: 'indicator-overview', panel: '' };
+  if (ADMIN_UNIFIED_SETTINGS_REDIRECTS[raw]) {
+    return {
+      section: ADMIN_UNIFIED_SETTINGS_REDIRECTS[raw],
+      panel: ADMIN_UNIFIED_SETTINGS_PANEL_MAP[raw] || '',
+    };
+  }
+  return { section: raw, panel: '' };
+}
 
 function updateAdminQuery(name) {
   const url = new URL(window.location.href);
   url.searchParams.set('section', name);
+  if (name !== 'settings-features') {
+    url.searchParams.delete('settings_panel');
+  }
   window.history.replaceState({}, '', url);
 }
 
@@ -5072,16 +5803,50 @@ function setActiveAdminNav(target) {
   }
 }
 
+function syncAdminSettingsSubmenu(panelKey) {
+  const normalized = String(panelKey || '').trim();
+  document.querySelectorAll('.admin-settings-menu-btn[data-settings-panel-trigger]').forEach((node) => {
+    node.classList.toggle('active', !!normalized && node.dataset.settingsPanelTrigger === normalized);
+  });
+  document.querySelectorAll('.admin-settings-panel[data-settings-panel]').forEach((node) => {
+    node.classList.toggle('active', !!normalized && node.dataset.settingsPanel === normalized);
+  });
+}
+
+function openAdminSettingsSubmenu(panelKey, options) {
+  const normalized = String(panelKey || '').trim() || 'theme';
+  syncAdminSettingsSubmenu(normalized);
+  if (options && options.updateQuery === false) return;
+  const url = new URL(window.location.href);
+  url.searchParams.set('section', 'settings-features');
+  url.searchParams.set('settings_panel', normalized);
+  window.history.replaceState({}, '', url);
+}
+
+function mountUnifiedSystemSettingsSection(sourceId, targetId) {
+  const source = document.getElementById(sourceId);
+  const target = document.getElementById(targetId);
+  if (!source || !target || source.dataset.unifiedMounted === '1') return;
+  const fragment = document.createDocumentFragment();
+  Array.from(source.children).forEach((child) => fragment.appendChild(child));
+  target.appendChild(fragment);
+  source.dataset.unifiedMounted = '1';
+}
+
+function mountUnifiedSystemSettings() {
+  if (window.__adminUnifiedSystemSettingsMounted) return;
+  mountUnifiedSystemSettingsSection('section-settings-appearance', 'settings-panel-theme');
+  mountUnifiedSystemSettingsSection('section-settings-brand', 'settings-panel-brand');
+  mountUnifiedSystemSettingsSection('section-settings-policy', 'settings-panel-login-access');
+  mountUnifiedSystemSettingsSection('section-settings-llm', 'settings-panel-llm-models');
+  mountUnifiedSystemSettingsSection('section-settings-llm-features', 'settings-panel-llm-feature-map');
+  window.__adminUnifiedSystemSettingsMounted = true;
+}
+
 function showSection(name, navEl) {
-  if (name === 'settings') {
-    name = 'settings-appearance';
-  }
-  if (name === 'indicator-hub') {
-    name = 'indicator-overview';
-  }
-  if (name === 'knowledge-items') {
-    name = 'settings-knowledge';
-  }
+  const normalized = normalizeAdminSection(name);
+  name = normalized.section || name;
+  mountUnifiedSystemSettings();
   if (name === 'forecast-model' && !isAdminFeatureEnabled('stock_forecast')) {
     showToast('预测功能当前未开放');
     return;
@@ -5103,11 +5868,40 @@ function showSection(name, navEl) {
   if (name === 'task-center') {
     refreshAdminTaskCenter(false).catch((error) => showToast(error.message || '加载失败'));
   }
-  if (name === 'settings-knowledge') {
+  if (name === 'settings-features') {
+    const url = new URL(window.location.href);
+    const queryPanel = String(url.searchParams.get('settings_panel') || '').trim();
+    const initialPanel = normalized.panel || queryPanel || 'theme';
+    window.requestAnimationFrame(() => {
+      openAdminSettingsSubmenu(initialPanel, { updateQuery: true });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+  if (name === 'knowledge-overview') {
+    loadAdminKnowledgeAssets(false).then(() => {
+      renderAdminKnowledgeOverview();
+    }).catch((error) => showToast(error.message || '加载失败'));
+  }
+  if (name === 'knowledge-intake') {
     loadAdminKnowledgeItems(false).catch((error) => showToast(error.message || '加载失败'));
   }
-  if (name === 'settings-knowledge-graph') {
-    loadAdminKnowledgeMap(false).catch((error) => showToast(error.message || '加载失败'));
+  if (name === 'knowledge-encyclopedia') {
+    Promise.all([
+      loadAdminKnowledgeItems(false),
+      loadAdminKnowledgeAssets(false),
+    ]).catch((error) => showToast(error.message || '加载失败'));
+  }
+  if (name === 'knowledge-entries') {
+    Promise.all([
+      loadAdminKnowledgeItems(false),
+      loadAdminKnowledgeAssets(false),
+    ]).catch((error) => showToast(error.message || '加载失败'));
+  }
+  if (name === 'knowledge-graph') {
+    Promise.all([
+      loadAdminKnowledgeItems(false),
+      loadAdminKnowledgeMap(false),
+    ]).catch((error) => showToast(error.message || '加载失败'));
   }
   if (name === 'token-usage') {
     refreshAdminTokenUsage(false).catch((error) => showToast(error.message || '加载失败'));
@@ -5236,6 +6030,11 @@ const adminKnowledgeState = {
   items: [],
   tenantFilter: '',
 };
+const adminKnowledgeAssetState = {
+  payload: null,
+  tenantFilter: '',
+  loaded: false,
+};
 const adminKnowledgeMapState = {
   tenantFilter: '',
   depth: 3,
@@ -5281,70 +6080,30 @@ function indicatorStatusLabel(status) {
   return '正常';
 }
 
+function buildAdminInlineChartShell(prefix, height, mountFn) {
+  const chartId = window.GangtiseEcharts ? window.GangtiseEcharts.nextId(prefix) : `${prefix}-${Date.now()}`;
+  if (window.GangtiseEcharts && typeof mountFn === 'function') {
+    window.GangtiseEcharts.enqueue(chartId, mountFn);
+  }
+  return `<div id="${chartId}" style="width:100%;height:${height};min-height:${height}"></div>`;
+}
+
 function buildIndicatorKlineSvg(klinePayload) {
   const candles = Array.isArray(klinePayload?.candles) ? klinePayload.candles : [];
   if (!candles.length) {
     return '<div class="admin-modal-copy">暂无趋势数据。</div>';
   }
-  const ma5 = Array.isArray(klinePayload?.ma5) ? klinePayload.ma5 : [];
-  const ma10 = Array.isArray(klinePayload?.ma10) ? klinePayload.ma10 : [];
-  const ma20 = Array.isArray(klinePayload?.ma20) ? klinePayload.ma20 : [];
-  const anomalies = Array.isArray(klinePayload?.anomalies) ? klinePayload.anomalies : [];
-  const width = 320;
-  const height = 200;
-  const padding = { top: 14, right: 10, bottom: 24, left: 10 };
-  const candleAreaHeight = height - padding.top - padding.bottom;
-  const maxPrice = Math.max(...candles.map(item => Number(item.high || 0)), 1);
-  const minPrice = Math.min(...candles.map(item => Number(item.low || 0)), 0);
-  const span = Math.max(maxPrice - minPrice, 1);
-  const step = (width - padding.left - padding.right) / candles.length;
-  const candleWidth = Math.max(5.5, Math.min(7, step * 0.52));
-  const scaleY = (value) => padding.top + ((maxPrice - Number(value || 0)) / span) * candleAreaHeight;
-  const scaleX = (index) => padding.left + step * index + step / 2;
-  const buildMaPath = (items) => {
-    const points = items.map((entry) => {
-      const index = candles.findIndex((candle) => candle.date === entry.date);
-      if (index < 0) return null;
-      return `${scaleX(index).toFixed(2)} ${scaleY(entry.value).toFixed(2)}`;
-    }).filter(Boolean);
-    return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point}`).join(' ');
-  };
-  const gridValues = [maxPrice, minPrice + span / 2, minPrice];
-  const gridlines = gridValues.map((value) => {
-    const y = scaleY(value);
-    return `
-      <line x1="${padding.left}" y1="${y.toFixed(2)}" x2="${width - padding.right}" y2="${y.toFixed(2)}" stroke="rgba(200,169,110,0.08)" stroke-width="1"></line>
-      <text x="${width - padding.right}" y="${(y - 4).toFixed(2)}" text-anchor="end" font-size="9" fill="var(--gray-400)">${Number(value).toFixed(2)}</text>
-    `;
-  }).join('');
-  const candleSvg = candles.map((item, index) => {
-    const x = scaleX(index);
-    const openY = scaleY(item.open);
-    const closeY = scaleY(item.close);
-    const highY = scaleY(item.high);
-    const lowY = scaleY(item.low);
-    const rectY = Math.min(openY, closeY);
-    const rectHeight = Math.max(2, Math.abs(closeY - openY));
-    const color = Number(item.close) >= Number(item.open) ? '#2ECC71' : '#E74C3C';
-    return `
-      <line x1="${x.toFixed(2)}" y1="${highY.toFixed(2)}" x2="${x.toFixed(2)}" y2="${lowY.toFixed(2)}" stroke="${color}" stroke-width="1.2"></line>
-      <rect x="${(x - candleWidth / 2).toFixed(2)}" y="${rectY.toFixed(2)}" width="${candleWidth.toFixed(2)}" height="${rectHeight.toFixed(2)}" rx="1.4" fill="${color}"></rect>
-    `;
-  }).join('');
-  const anomalyMarks = anomalies.map((entry) => {
-    const index = candles.findIndex((candle) => candle.date === entry.date);
-    if (index < 0) return '';
-    const x = scaleX(index);
-    const y = scaleY(entry.value);
-    return `
-      <circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="4.5" fill="rgba(220,53,69,0.14)" stroke="#DC3545" stroke-width="1.4"></circle>
-      <text x="${x.toFixed(2)}" y="${(y - 8).toFixed(2)}" text-anchor="middle" font-size="7" fill="#DC3545">${escapeHtml(entry.label || '异动')}</text>
-    `;
-  }).join('');
-  const tickIndexes = [0, Math.floor((candles.length - 1) / 2), candles.length - 1].filter((value, index, arr) => arr.indexOf(value) === index);
-  const ticks = tickIndexes.map((index) => `
-    <text x="${scaleX(index).toFixed(2)}" y="${height - 6}" text-anchor="middle" font-size="9" fill="var(--gray-400)">${escapeHtml((candles[index].date || '--').slice(5))}</text>
-  `).join('');
+  const chartHtml = buildAdminInlineChartShell('admin-indicator-kline', '220px', (element) => {
+    window.GangtiseEcharts.render(element, window.GangtiseEcharts.buildKlineOption({
+      candles,
+      ma5: Array.isArray(klinePayload?.ma5) ? klinePayload.ma5 : [],
+      ma10: Array.isArray(klinePayload?.ma10) ? klinePayload.ma10 : [],
+      ma20: Array.isArray(klinePayload?.ma20) ? klinePayload.ma20 : [],
+      anomalies: Array.isArray(klinePayload?.anomalies) ? klinePayload.anomalies : [],
+    }, {
+      candleLabel: '指标K线',
+    }));
+  });
   return `
     <div style="background:var(--navy);border:1px solid rgba(200,169,110,0.08);border-radius:12px;padding:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
@@ -5355,15 +6114,7 @@ function buildIndicatorKlineSvg(klinePayload) {
           <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#AF7AC5;display:inline-block"></span>MA20</span>
         </div>
       </div>
-      <svg viewBox="0 0 ${width} ${height}" width="100%" role="img" aria-label="指标K线与均线图" style="display:block;width:100%;height:auto;aspect-ratio:${width} / ${height}">
-        ${gridlines}
-        ${candleSvg}
-        <path d="${buildMaPath(ma5)}" fill="none" stroke="#F6C453" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
-        <path d="${buildMaPath(ma10)}" fill="none" stroke="#5DADE2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
-        <path d="${buildMaPath(ma20)}" fill="none" stroke="#AF7AC5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
-        ${anomalyMarks}
-        ${ticks}
-      </svg>
+      ${chartHtml}
     </div>
   `;
 }
@@ -5695,9 +6446,23 @@ function renderAdminKnowledgeTenantFilter() {
     if (!select.dataset.bound) {
       select.addEventListener('change', () => {
         adminKnowledgeState.tenantFilter = select.value || '';
+        adminKnowledgeMapState.tenantFilter = adminKnowledgeState.tenantFilter;
         getAdminKnowledgeTenantFilters().forEach((item) => {
           item.value = adminKnowledgeState.tenantFilter;
         });
+        const activeSection = (document.querySelector('.admin-nav-item.active') && document.querySelector('.admin-nav-item.active').dataset.section) || '';
+        if (activeSection === 'knowledge-overview') {
+          Promise.all([loadAdminKnowledgeItems(false), loadAdminKnowledgeAssets(false)]).catch((error) => showToast(error.message || '加载失败'));
+          return;
+        }
+        if (activeSection === 'knowledge-encyclopedia') {
+          Promise.all([loadAdminKnowledgeItems(false), loadAdminKnowledgeAssets(false)]).catch((error) => showToast(error.message || '加载失败'));
+          return;
+        }
+        if (activeSection === 'knowledge-graph') {
+          Promise.all([loadAdminKnowledgeItems(false), loadAdminKnowledgeMap(false)]).catch((error) => showToast(error.message || '加载失败'));
+          return;
+        }
         loadAdminKnowledgeItems(false).catch((error) => showToast(error.message || '加载失败'));
       });
       select.dataset.bound = '1';
@@ -5750,7 +6515,392 @@ async function loadAdminKnowledgeItems(showMessage = false) {
   }
   adminKnowledgeState.items = Array.isArray(data.items) ? data.items : [];
   renderAdminKnowledgeItems();
+  renderAdminKnowledgeOverview();
   if (showMessage) showToast('知识内容已刷新');
+}
+
+function openAdminKnowledgeAssetEntry(entryId, tenantSlug) {
+  if (!entryId) return;
+  openAdminKnowledgeEncyclopediaDetail(entryId, tenantSlug || '');
+}
+
+function renderAdminKnowledgeAssets() {
+  const summaryHost = document.getElementById('admin-knowledge-assets-summary');
+  const relationHost = document.getElementById('admin-knowledge-assets-relationships');
+  const entriesHost = document.getElementById('admin-knowledge-assets-entries');
+  const payload = adminKnowledgeAssetState.payload || {};
+  const summary = payload.summary || {};
+  if (summaryHost) {
+    const cards = [
+      ['知识词条', summary.entry_count || 0, `已成型 ${summary.ready_count || 0}`],
+      ['平均成熟度', summary.avg_maturity_score || 0, '用于衡量可复用度'],
+      ['平均关系数', summary.avg_relation_count || 0, '每条知识的关系丰富度'],
+      ['主题数', summary.topic_count || 0, `实体 ${summary.entity_count || 0}`],
+      ['方法数', summary.method_count || 0, `信号 ${summary.signal_count || 0}`],
+      ['来源类型', summary.source_type_count || 0, payload.mode === 'platform' ? `租户 ${summary.tenant_count || 0}` : `平均关键词 ${summary.avg_keyword_count || 0}`],
+    ];
+    summaryHost.innerHTML = cards.map(([label, value, meta]) => `
+      <div class="admin-ka-card">
+        <div class="admin-ka-label">${escapeHtml(String(label))}</div>
+        <div class="admin-ka-value">${escapeHtml(String(value))}</div>
+        <div class="admin-ka-meta">${escapeHtml(String(meta))}</div>
+      </div>
+    `).join('');
+  }
+  if (relationHost) {
+    const sourceRows = Array.isArray(payload.source_breakdown) ? payload.source_breakdown : [];
+    const tenantRows = Array.isArray(payload.tenant_breakdown) ? payload.tenant_breakdown : [];
+    const groups = payload.relationship_groups || {};
+    const sections = [
+      { title: '来源分布', rows: sourceRows, labelKey: 'label', countKey: 'count' },
+      ...(payload.mode === 'platform' ? [{ title: '租户分布', rows: tenantRows.slice(0, 6), labelKey: 'label', countKey: 'count' }] : []),
+      { title: '高频主题', rows: Array.isArray(groups.topics) ? groups.topics.slice(0, 5) : [], labelKey: 'label', countKey: 'count' },
+      { title: '高频实体', rows: Array.isArray(groups.entities) ? groups.entities.slice(0, 5) : [], labelKey: 'label', countKey: 'count' },
+      { title: '高频方法', rows: Array.isArray(groups.methods) ? groups.methods.slice(0, 4) : [], labelKey: 'label', countKey: 'count' },
+      { title: '高频验证信号', rows: Array.isArray(groups.signals) ? groups.signals.slice(0, 5) : [], labelKey: 'label', countKey: 'count' },
+    ];
+    relationHost.innerHTML = sections.map((section) => `
+      <div class="admin-ka-rel-list">
+        <div class="admin-ka-panel-title">${escapeHtml(section.title)}</div>
+        ${(section.rows || []).length ? section.rows.map((item) => `
+          <div class="admin-ka-rel-item">
+            <div class="admin-ka-rel-top">
+              <div class="admin-ka-rel-title">${escapeHtml(item[section.labelKey] || '--')}</div>
+              <span class="admin-ka-rel-count">${escapeHtml(String(item[section.countKey] || 0))} 条</span>
+            </div>
+            ${Array.isArray(item.entry_titles) && item.entry_titles.length ? `<div class="admin-ka-meta">${escapeHtml(item.entry_titles.slice(0, 3).join(' / '))}</div>` : ''}
+            ${Array.isArray(item.keywords) && item.keywords.length ? `<div class="admin-ka-chip-row">${item.keywords.slice(0, 5).map((keyword) => `<span class="admin-ka-chip">${escapeHtml(keyword)}</span>`).join('')}</div>` : ''}
+          </div>
+        `).join('') : '<div class="admin-ka-rel-item"><div class="admin-ka-meta">当前还没有形成稳定关系。</div></div>'}
+      </div>
+    `).join('');
+  }
+  renderAdminKnowledgeAssetCharts(payload);
+  if (entriesHost) {
+    const entries = Array.isArray(payload.entries) ? payload.entries.slice(0, 12) : [];
+    entriesHost.innerHTML = entries.length ? entries.map((entry) => `
+      <button class="admin-knowledge-readable-item" type="button" onclick="openAdminKnowledgeAssetEntry('${escapeAttr(entry.id || '')}','${escapeAttr(entry.tenant_slug || '')}')">
+        <div class="admin-ka-entry-top">
+          <div>
+            <div class="admin-knowledge-readable-item-title">${escapeHtml(entry.title || '未命名知识')}</div>
+            <div class="admin-knowledge-readable-item-meta">${escapeHtml(entry.source || '--')} · ${escapeHtml(entry.time || '--')}${entry.tenant_name ? ` · ${escapeHtml(entry.tenant_name)}` : ''}</div>
+          </div>
+          <span class="admin-ka-maturity tone-${escapeAttr(entry.maturity_tone || 'seed')}">${escapeHtml(entry.maturity_label || '种子')} ${escapeHtml(String(entry.maturity_score || 0))}</span>
+        </div>
+        <div class="admin-knowledge-readable-item-summary">${escapeHtml(entry.summary || '暂无摘要')}</div>
+        <div class="admin-ka-chip-row">
+          ${(((entry.relations || {}).topics || []).slice(0, 2)).map((item) => `<span class="admin-ka-chip">${escapeHtml(item)}</span>`).join('')}
+          ${(((entry.relations || {}).entities || []).slice(0, 2)).map((item) => `<span class="admin-ka-chip">${escapeHtml(item)}</span>`).join('')}
+          ${(((entry.relations || {}).methods || []).slice(0, 1)).map((item) => `<span class="admin-ka-chip">${escapeHtml(item)}</span>`).join('')}
+        </div>
+        <div class="admin-knowledge-readable-item-foot">点击查看词条详情与治理信息</div>
+      </button>
+    `).join('') : '<div class="admin-knowledge-readable-item"><div class="admin-knowledge-readable-item-meta">当前还没有可展示的知识词条，请先完成知识录入。</div></div>';
+  }
+}
+
+function renderAdminKnowledgeAssetEmptyChart(targetId, message) {
+  const host = document.getElementById(targetId);
+  if (!host) return;
+  if (window.GangtiseEcharts) window.GangtiseEcharts.dispose(targetId);
+  host.innerHTML = `<div class="admin-ka-rel-item"><div class="admin-ka-meta">${escapeHtml(message || '暂无可视化数据')}</div></div>`;
+}
+
+function renderAdminKnowledgeAssetCharts(payload) {
+  const section = document.getElementById('section-knowledge-encyclopedia');
+  if (!section || section.style.display === 'none' || !window.GangtiseEcharts) return;
+  const summary = payload && payload.summary && typeof payload.summary === 'object' ? payload.summary : {};
+  const entries = Array.isArray(payload && payload.entries) ? payload.entries : [];
+  const groups = payload && payload.relationship_groups && typeof payload.relationship_groups === 'object' ? payload.relationship_groups : {};
+  const sourceRows = Array.isArray(payload && payload.source_breakdown) ? payload.source_breakdown : [];
+  const tenantRows = Array.isArray(payload && payload.tenant_breakdown) ? payload.tenant_breakdown : [];
+  const sourceChartId = 'admin-knowledge-source-chart';
+  const maturityChartId = 'admin-knowledge-maturity-chart';
+  const hotspotChartId = 'admin-knowledge-hotspot-chart';
+  const coverageChartId = 'admin-knowledge-coverage-chart';
+  const coverageSubtitle = document.getElementById('admin-knowledge-coverage-subtitle');
+  const axis = (overrides) => window.GangtiseEcharts.axisBase(Object.assign({
+    axisLabel: { color: '#445468', fontSize: 11 },
+  }, overrides || {}));
+  const grid = (overrides) => window.GangtiseEcharts.gridBase(Object.assign({
+    top: 28,
+    left: 18,
+    right: 18,
+    bottom: 38,
+  }, overrides || {}));
+  [sourceChartId, maturityChartId, hotspotChartId, coverageChartId].forEach((id) => window.GangtiseEcharts.dispose(id));
+
+  if (sourceRows.length) {
+    const topRows = sourceRows.slice(0, 8);
+    window.GangtiseEcharts.render(sourceChartId, {
+      color: ['#2F74C0'],
+      tooltip: window.GangtiseEcharts.tooltipBase((params) => `${params.name}<br>词条：${params.value}`),
+      grid: grid({ top: 18, left: 18, right: 18, bottom: 48 }),
+      xAxis: {
+        ...axis({ splitLine: { show: false } }),
+        type: 'category',
+        data: topRows.map((item) => item.label || '--'),
+        axisLabel: { color: '#445468', fontSize: 11, interval: 0, rotate: topRows.length > 4 ? 20 : 0 },
+      },
+      yAxis: {
+        ...axis({ axisLabel: { color: '#445468', fontSize: 11 } }),
+        type: 'value',
+      },
+      series: [{
+        type: 'bar',
+        data: topRows.map((item) => Number(item.count || 0)),
+        barWidth: 18,
+        itemStyle: { color: '#2F74C0', borderRadius: [8, 8, 0, 0] },
+      }],
+    });
+  } else {
+    renderAdminKnowledgeAssetEmptyChart(sourceChartId, '当前没有来源分布数据。');
+  }
+
+  const maturityRows = (() => {
+    const counter = new Map();
+    entries.forEach((entry) => {
+      const label = String(entry && entry.maturity_label || '未分层').trim() || '未分层';
+      counter.set(label, (counter.get(label) || 0) + 1);
+    });
+    return Array.from(counter.entries()).map(([label, value]) => ({ label, value }));
+  })();
+  if (maturityRows.length) {
+    const colorMap = { '可复用': '#3DAA77', '就绪': '#3DAA77', '成长': '#2F74C0', '成长中': '#2F74C0', '构建': '#C8A96E', '构建中': '#C8A96E', '种子': '#8FA6C4', '未分层': '#D7E3F3' };
+    window.GangtiseEcharts.render(maturityChartId, {
+      color: maturityRows.map((item) => colorMap[item.label] || '#8FA6C4'),
+      tooltip: window.GangtiseEcharts.tooltipBase((params) => `${params.name}<br>词条：${params.value}`),
+      legend: window.GangtiseEcharts.legendBase({ bottom: 0, textStyle: { color: '#445468', fontSize: 11 } }),
+      series: [{
+        type: 'pie',
+        radius: ['48%', '72%'],
+        center: ['50%', '42%'],
+        label: { color: '#445468', fontSize: 11, formatter: '{b}\n{c}' },
+        labelLine: { length: 10, length2: 8 },
+        data: maturityRows.map((item) => ({ name: item.label, value: item.value })),
+      }],
+    });
+  } else {
+    renderAdminKnowledgeAssetEmptyChart(maturityChartId, '当前没有成熟度分布数据。');
+  }
+
+  const hotspotRows = [
+    ...((Array.isArray(groups.topics) ? groups.topics : []).slice(0, 3).map((item) => ({ label: `主题 · ${item.label || '--'}`, count: Number(item.count || 0) }))),
+    ...((Array.isArray(groups.entities) ? groups.entities : []).slice(0, 3).map((item) => ({ label: `实体 · ${item.label || '--'}`, count: Number(item.count || 0) }))),
+    ...((Array.isArray(groups.methods) ? groups.methods : []).slice(0, 2).map((item) => ({ label: `方法 · ${item.label || '--'}`, count: Number(item.count || 0) }))),
+    ...((Array.isArray(groups.signals) ? groups.signals : []).slice(0, 2).map((item) => ({ label: `信号 · ${item.label || '--'}`, count: Number(item.count || 0) }))),
+  ].sort((a, b) => b.count - a.count).slice(0, 10);
+  if (hotspotRows.length) {
+    window.GangtiseEcharts.render(hotspotChartId, {
+      color: ['#C8A96E'],
+      tooltip: window.GangtiseEcharts.tooltipBase((params) => `${params.name}<br>关联：${params.value}`),
+      grid: grid({ top: 18, left: 18, right: 18, bottom: 24, containLabel: true }),
+      xAxis: {
+        ...axis({ splitLine: { show: false } }),
+        type: 'value',
+      },
+      yAxis: {
+        ...axis({ axisLabel: { color: '#445468', fontSize: 11 } }),
+        type: 'category',
+        data: hotspotRows.map((item) => item.label).reverse(),
+      },
+      series: [{
+        type: 'bar',
+        data: hotspotRows.map((item) => item.count).reverse(),
+        barWidth: 14,
+        itemStyle: { color: '#C8A96E', borderRadius: [0, 8, 8, 0] },
+      }],
+    });
+  } else {
+    renderAdminKnowledgeAssetEmptyChart(hotspotChartId, '当前没有热点结构数据。');
+  }
+
+  if (payload && payload.mode === 'platform' && tenantRows.length) {
+    if (coverageSubtitle) coverageSubtitle.textContent = '按租户观察知识沉淀是否过度集中。';
+    const topTenantRows = tenantRows.slice(0, 8);
+    window.GangtiseEcharts.render(coverageChartId, {
+      color: ['#8FA6C4'],
+      tooltip: window.GangtiseEcharts.tooltipBase((params) => `${params.name}<br>词条：${params.value}`),
+      grid: grid({ top: 18, left: 18, right: 18, bottom: 24, containLabel: true }),
+      xAxis: {
+        ...axis({ splitLine: { show: false } }),
+        type: 'value',
+      },
+      yAxis: {
+        ...axis({ axisLabel: { color: '#445468', fontSize: 11 } }),
+        type: 'category',
+        data: topTenantRows.map((item) => item.label || '--').reverse(),
+      },
+      series: [{
+        type: 'bar',
+        data: topTenantRows.map((item) => Number(item.count || 0)).reverse(),
+        barWidth: 14,
+        itemStyle: { color: '#8FA6C4', borderRadius: [0, 8, 8, 0] },
+      }],
+    });
+  } else {
+    if (coverageSubtitle) coverageSubtitle.textContent = '看主题、实体、方法和验证信号是否均衡展开。';
+    const coverageRows = [
+      { label: '主题', value: Number(summary.topic_count || 0), color: '#2F74C0' },
+      { label: '实体', value: Number(summary.entity_count || 0), color: '#C8A96E' },
+      { label: '方法', value: Number(summary.method_count || 0), color: '#3DAA77' },
+      { label: '信号', value: Number(summary.signal_count || 0), color: '#8FA6C4' },
+    ];
+    if (coverageRows.some((item) => item.value > 0)) {
+      window.GangtiseEcharts.render(coverageChartId, {
+        color: coverageRows.map((item) => item.color),
+        tooltip: window.GangtiseEcharts.tooltipBase((params) => `${params.name}<br>数量：${params.value}`),
+        grid: grid({ top: 18, left: 18, right: 18, bottom: 42 }),
+        xAxis: {
+          ...axis({ splitLine: { show: false } }),
+          type: 'category',
+          data: coverageRows.map((item) => item.label),
+        },
+        yAxis: {
+          ...axis({ axisLabel: { color: '#445468', fontSize: 11 } }),
+          type: 'value',
+        },
+        series: [{
+          type: 'bar',
+          data: coverageRows.map((item) => ({ value: item.value, itemStyle: { color: item.color, borderRadius: [8, 8, 0, 0] } })),
+          barWidth: 24,
+        }],
+      });
+    } else {
+      renderAdminKnowledgeAssetEmptyChart(coverageChartId, '当前没有结构覆盖数据。');
+    }
+  }
+}
+
+async function loadAdminKnowledgeAssets(showMessage = false) {
+  const tenantSlug = adminKnowledgeState.tenantFilter || renderAdminKnowledgeTenantFilter() || adminKnowledgeMapState.tenantFilter || '';
+  adminKnowledgeAssetState.tenantFilter = tenantSlug || '';
+  try {
+    const query = new URLSearchParams();
+    if (tenantSlug) query.set('tenant_slug', tenantSlug);
+    const resp = await fetch(`/api/admin/knowledge-assets${query.toString() ? `?${query.toString()}` : ''}`);
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'knowledge_assets_load_failed');
+    adminKnowledgeAssetState.payload = data.assets || {};
+    adminKnowledgeAssetState.loaded = true;
+    renderAdminKnowledgeAssets();
+    renderAdminKnowledgeOverview();
+    if (showMessage) showToast('知识资产已刷新');
+  } catch (error) {
+    adminKnowledgeAssetState.payload = { summary: {}, relationship_groups: {}, source_breakdown: [], tenant_breakdown: [], entries: [] };
+    renderAdminKnowledgeAssets();
+    renderAdminKnowledgeOverview();
+    if (showMessage) showToast(error.message || '知识资产加载失败');
+  }
+}
+
+function renderAdminKnowledgeOverview() {
+  const host = document.getElementById('admin-knowledge-overview-summary');
+  if (!host) return;
+  const payload = adminKnowledgeAssetState.payload || {};
+  const summary = payload.summary || {};
+  const latestEntry = (adminKnowledgeState.items || [])[0] || {};
+  const cards = [
+    ['知识词条', summary.entry_count || 0, `已成型 ${summary.ready_count || 0}`],
+    ['平均成熟度', summary.avg_maturity_score || 0, '衡量是否足够稳定可复用'],
+    ['主题 / 实体', `${summary.topic_count || 0} / ${summary.entity_count || 0}`, '反映知识是否长出结构'],
+    ['最新入库', latestEntry.title || '暂无', latestEntry.summary || '当前还没有最近知识摘要'],
+  ];
+  host.innerHTML = cards.map(([label, value, note]) => `
+    <div class="admin-knowledge-overview-card">
+      <div class="admin-knowledge-overview-label">${escapeHtml(String(label))}</div>
+      <div class="admin-knowledge-overview-value">${escapeHtml(String(value))}</div>
+      <div class="admin-knowledge-overview-note">${escapeHtml(String(note))}</div>
+    </div>
+  `).join('');
+}
+
+function getAdminKnowledgeEntryById(itemId, tenantSlug) {
+  return (adminKnowledgeState.items || []).find((entry) => entry.id === itemId && (!tenantSlug || entry.tenant_slug === tenantSlug))
+    || (adminKnowledgeState.items || []).find((entry) => entry.id === itemId)
+    || null;
+}
+
+function openAdminKnowledgeEncyclopediaDetail(itemId, tenantSlug) {
+  const item = getAdminKnowledgeEntryById(itemId, tenantSlug);
+  const host = document.getElementById('admin-task-modal-content');
+  const modal = document.getElementById('admin-task-modal');
+  if (!item || !host || !modal) {
+    showToast('未找到词条详情');
+    return;
+  }
+  const qkv = (item.graph_profile && item.graph_profile.qkv) || item.qkv || {};
+  const graph = item.graph_profile || {};
+  const topics = Array.isArray(graph.topics) ? graph.topics : [];
+  const entities = Array.isArray(graph.entities) ? graph.entities : [];
+  const methods = Array.isArray(graph.methods) ? graph.methods : [];
+  const keyPoints = Array.isArray(item.key_points) ? item.key_points : [];
+  const validationNodes = Array.isArray(item.validation_nodes) ? item.validation_nodes : [];
+  host.innerHTML = `
+    <div class="admin-modal-head">
+      <div>
+        <div class="admin-modal-title">知识百科词条</div>
+        <div class="admin-modal-subtitle">${escapeHtml(item.title || '')} · ${escapeHtml(item.tenant_name || item.tenant_slug || '')}</div>
+      </div>
+      <button class="admin-modal-close" type="button" onclick="closeAdminTaskModal()">×</button>
+    </div>
+    <div class="admin-modal-grid">
+      <div class="admin-modal-card">
+        <div class="admin-modal-card-title">词条摘要</div>
+        <div class="admin-modal-copy">${escapeHtml(item.summary || '暂无摘要')}</div>
+        <div class="admin-chip-row" style="margin-top:12px">
+          ${topics.slice(0, 4).map((entry) => `<span class="admin-chip">${escapeHtml(entry)}</span>`).join('')}
+          ${entities.slice(0, 4).map((entry) => `<span class="admin-chip">${escapeHtml(entry)}</span>`).join('')}
+          ${methods.slice(0, 3).map((entry) => `<span class="admin-chip">${escapeHtml(entry)}</span>`).join('')}
+        </div>
+      </div>
+      <div class="admin-modal-card">
+        <div class="admin-modal-card-title">关键要点</div>
+        <div class="admin-modal-list">
+          ${(keyPoints.length ? keyPoints : ['当前还没有提炼出关键要点。']).map((entry) => `<div class="admin-modal-item"><div class="admin-modal-copy">${escapeHtml(entry)}</div></div>`).join('')}
+        </div>
+      </div>
+      <div class="admin-modal-card">
+        <div class="admin-modal-card-title">验证节点</div>
+        <div class="admin-modal-list">
+          ${(validationNodes.length ? validationNodes : ['当前还没有补充验证节点。']).map((entry) => `<div class="admin-modal-item"><div class="admin-modal-copy">${escapeHtml(entry)}</div></div>`).join('')}
+        </div>
+      </div>
+      <div class="admin-modal-card">
+        <div class="admin-modal-card-title">词条正文</div>
+        <pre style="margin:0;white-space:pre-wrap;word-break:break-word;font-size:11px;line-height:1.7;color:#F8F6F0">${escapeHtml(item.body || item.body_text || item.raw_input || '暂无正文')}</pre>
+      </div>
+      <div class="admin-modal-card">
+        <div class="admin-modal-card-title">Admin 治理视角</div>
+        <div class="admin-modal-list">
+          <div class="admin-modal-item"><div class="admin-modal-item-top"><strong>Q</strong><span class="tag tag-blue">问题视角</span></div><div class="admin-modal-copy">${escapeHtml((Array.isArray(qkv.questions) ? qkv.questions : []).slice(0, 2).join(' / ') || '暂无')}</div></div>
+          <div class="admin-modal-item"><div class="admin-modal-item-top"><strong>KV</strong><span class="tag tag-gold">关键词 / 结论</span></div><div class="admin-modal-copy">${escapeHtml((Array.isArray(qkv.keywords) ? qkv.keywords : []).slice(0, 6).join(' / ') || '暂无')}</div></div>
+          <div class="admin-modal-item"><div class="admin-modal-item-top"><strong>来源</strong><span class="tag tag-blue">${escapeHtml(item.type || '--')}</span></div><div class="admin-modal-copy">${escapeHtml(item.source_detail || item.source || '--')}</div></div>
+        </div>
+      </div>
+      <div class="admin-modal-card">
+        <div class="admin-modal-card-title">继续下钻</div>
+        <div class="modal-actions" style="justify-content:flex-start">
+          <button class="btn-outline" type="button" onclick="closeAdminTaskModal();showSection('knowledge-intake', document.querySelector('.admin-nav-item[data-section=&quot;knowledge-intake&quot;]'));">去知识治理</button>
+          <button class="btn-gold" type="button" onclick="closeAdminTaskModal();showSection('knowledge-graph', document.querySelector('.admin-nav-item[data-section=&quot;knowledge-graph&quot;]'));">去知识图谱</button>
+        </div>
+      </div>
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+async function refreshAdminKnowledgeIntelligence(showMessage = false) {
+  adminKnowledgeState.tenantFilter = adminKnowledgeMapState.tenantFilter || '';
+  getAdminKnowledgeTenantFilters().forEach((item) => {
+    item.value = adminKnowledgeState.tenantFilter;
+  });
+  await Promise.all([
+    loadAdminKnowledgeItems(false),
+    loadAdminKnowledgeAssets(false),
+    loadAdminKnowledgeMap(false),
+  ]);
+  if (showMessage) showToast('知识专区已刷新');
 }
 
 function renderAdminKnowledgeMapTenantFilter() {
@@ -5768,7 +6918,8 @@ function renderAdminKnowledgeMapTenantFilter() {
   if (!select.dataset.bound) {
     select.addEventListener('change', () => {
       adminKnowledgeMapState.tenantFilter = select.value || '';
-      loadAdminKnowledgeMap(false).catch((error) => showToast(error.message || '加载失败'));
+      adminKnowledgeAssetState.tenantFilter = adminKnowledgeMapState.tenantFilter;
+      refreshAdminKnowledgeIntelligence(false).catch((error) => showToast(error.message || '加载失败'));
     });
     select.dataset.bound = '1';
   }
@@ -6192,98 +7343,98 @@ function renderAdminTokenTables() {
 }
 
 function renderAdminTokenCharts() {
-  const ui = getComputedStyle(document.body);
-  const mainText = (ui.getPropertyValue('--text-main') || '#182132').trim();
-  const subText = (ui.getPropertyValue('--text-sub') || '#445468').trim();
-  window.adminTokenCharts = window.adminTokenCharts || [];
-  while (window.adminTokenCharts.length) {
-    const chart = window.adminTokenCharts.pop();
-    if (chart && typeof chart.destroy === 'function') chart.destroy();
-  }
-  const hourlyCtx = document.getElementById('tokenHourlyChart');
-  const dailyCtx = document.getElementById('tokenDailyChart');
-  const monthlyCtx = document.getElementById('tokenMonthlyChart');
-  const featureCtx = document.getElementById('tokenFeatureChart');
-  const modelCtx = document.getElementById('tokenModelChart');
-  const modelDailyCtx = document.getElementById('tokenModelDailyChart');
-  if (hourlyCtx) {
-    window.adminTokenCharts.push(new Chart(hourlyCtx, {
+  const axis = (overrides) => window.GangtiseEcharts.axisBase(Object.assign({
+    axisLabel: { color: '#445468', fontSize: 11 },
+    splitLine: { lineStyle: { color: 'rgba(47,116,192,0.08)' } },
+  }, overrides || {}));
+  const grid = (overrides) => window.GangtiseEcharts.gridBase(Object.assign({ top: 36, left: 18, right: 18, bottom: 54 }, overrides || {}));
+  const zoom = (labels) => Array.isArray(labels) && labels.length > 8
+    ? [{ type: 'inside', xAxisIndex: [0] }, { type: 'slider', xAxisIndex: [0], height: 18, bottom: 12, borderColor: 'transparent', backgroundColor: 'rgba(47,116,192,0.05)', fillerColor: 'rgba(47,116,192,0.14)', handleSize: 0 }]
+    : [];
+  ['tokenHourlyChart', 'tokenDailyChart', 'tokenMonthlyChart', 'tokenFeatureChart', 'tokenModelChart', 'tokenModelDailyChart'].forEach((id) => window.GangtiseEcharts && window.GangtiseEcharts.dispose(id));
+  const hourlyLabels = (adminTokenUsage.hourly || []).map((item) => String(item.bucket || '').slice(11));
+  window.GangtiseEcharts.render('tokenHourlyChart', {
+    color: ['#3498DB', '#2ECC71', '#C8A96E'],
+    tooltip: window.GangtiseEcharts.tooltipBase(),
+    legend: window.GangtiseEcharts.legendBase({ textStyle: { color: '#445468', fontSize: 11 } }),
+    grid: grid(),
+    dataZoom: zoom(hourlyLabels),
+    xAxis: { type: 'category', data: hourlyLabels, ...axis({ splitLine: { show: false } }) },
+    yAxis: { type: 'value', ...axis() },
+    series: [
+      { name: '上行', type: 'line', smooth: true, symbol: 'circle', symbolSize: 6, lineStyle: { width: 2.3, color: '#3498DB' }, itemStyle: { color: '#3498DB' }, data: (adminTokenUsage.hourly || []).map((item) => item.input_tokens || 0) },
+      { name: '下行', type: 'line', smooth: true, symbol: 'circle', symbolSize: 6, lineStyle: { width: 2.3, color: '#2ECC71' }, itemStyle: { color: '#2ECC71' }, data: (adminTokenUsage.hourly || []).map((item) => item.output_tokens || 0) },
+      { name: '总量', type: 'line', smooth: true, symbol: 'circle', symbolSize: 6, lineStyle: { width: 2.4, color: '#C8A96E' }, areaStyle: { color: 'rgba(200,169,110,0.14)' }, itemStyle: { color: '#C8A96E' }, data: (adminTokenUsage.hourly || []).map((item) => item.total_tokens || 0) },
+    ],
+  });
+  const dailyLabels = (adminTokenUsage.daily || []).map((item) => String(item.bucket || '').slice(5));
+  window.GangtiseEcharts.render('tokenDailyChart', {
+    color: ['#C8A96E', '#1F497D'],
+    tooltip: window.GangtiseEcharts.tooltipBase(),
+    legend: window.GangtiseEcharts.legendBase({ textStyle: { color: '#445468', fontSize: 11 } }),
+    grid: grid({ right: 40 }),
+    dataZoom: zoom(dailyLabels),
+    xAxis: { type: 'category', data: dailyLabels, ...axis({ splitLine: { show: false } }) },
+    yAxis: [
+      { type: 'value', ...axis() },
+      { type: 'value', position: 'right', ...axis({ splitLine: { show: false } }) },
+    ],
+    series: [
+      { name: '总量', type: 'line', smooth: true, symbol: 'circle', symbolSize: 6, lineStyle: { width: 2.4, color: '#C8A96E' }, areaStyle: { color: 'rgba(200,169,110,0.14)' }, itemStyle: { color: '#C8A96E' }, data: (adminTokenUsage.daily || []).map((item) => item.total_tokens || 0) },
+      { name: '请求数', type: 'bar', yAxisIndex: 1, barWidth: '38%', itemStyle: { color: 'rgba(31,73,125,0.78)', borderRadius: [8, 8, 0, 0] }, data: (adminTokenUsage.daily || []).map((item) => item.request_count || 0) },
+    ],
+  });
+  window.GangtiseEcharts.render('tokenMonthlyChart', {
+    color: ['#C8A96E'],
+    tooltip: window.GangtiseEcharts.tooltipBase(),
+    grid: grid({ top: 24, bottom: 34 }),
+    xAxis: { type: 'category', data: (adminTokenUsage.monthly || []).map((item) => item.bucket || ''), ...axis({ splitLine: { show: false } }) },
+    yAxis: { type: 'value', ...axis() },
+    series: [{ name: '月度总 Token', type: 'bar', barWidth: '42%', itemStyle: { color: 'rgba(200,169,110,0.72)', borderRadius: [8, 8, 0, 0] }, data: (adminTokenUsage.monthly || []).map((item) => item.total_tokens || 0) }],
+  });
+  window.GangtiseEcharts.render('tokenFeatureChart', {
+    color: ['#3498DB'],
+    tooltip: window.GangtiseEcharts.tooltipBase(),
+    grid: grid({ top: 24, bottom: 18 }),
+    xAxis: { type: 'value', ...axis() },
+    yAxis: { type: 'category', data: (adminTokenUsage.features || []).map((item) => item.feature_label || item.feature_code || '--'), ...axis({ splitLine: { show: false }, axisLabel: { color: '#182132', fontSize: 11 } }) },
+    series: [{ name: '总 Token', type: 'bar', barWidth: '50%', itemStyle: { color: 'rgba(52,152,219,0.72)', borderRadius: [0, 10, 10, 0] }, data: (adminTokenUsage.features || []).map((item) => item.total_tokens || 0) }],
+  });
+  window.GangtiseEcharts.render('tokenModelChart', {
+    color: ['#2ECC71'],
+    tooltip: window.GangtiseEcharts.tooltipBase(),
+    grid: grid({ top: 24, bottom: 18 }),
+    xAxis: { type: 'value', ...axis() },
+    yAxis: { type: 'category', data: (adminTokenUsage.models || []).map((item) => formatAdminModelLabel(item)), ...axis({ splitLine: { show: false }, axisLabel: { color: '#182132', fontSize: 11 } }) },
+    series: [{ name: '总 Token', type: 'bar', barWidth: '50%', itemStyle: { color: 'rgba(46,204,113,0.72)', borderRadius: [0, 10, 10, 0] }, data: (adminTokenUsage.models || []).map((item) => item.total_tokens || 0) }],
+  });
+  const modelDailyRows = Array.isArray(adminTokenUsage.model_daily) ? adminTokenUsage.model_daily : [];
+  const modelDailyBuckets = [...new Set(modelDailyRows.map((item) => item.bucket || ''))];
+  const modelDailyLabels = modelDailyBuckets.map((item) => String(item || '').slice(5));
+  const modelKeys = [...new Set(modelDailyRows.map((item) => formatAdminModelLabel(item)))];
+  const palette = ['#C8A96E', '#3498DB', '#2ECC71', '#E67E22', '#9B59B6', '#1F497D', '#E74C3C', '#16A085'];
+  window.GangtiseEcharts.render('tokenModelDailyChart', {
+    color: palette,
+    tooltip: window.GangtiseEcharts.tooltipBase(),
+    legend: window.GangtiseEcharts.legendBase({ textStyle: { color: '#445468', fontSize: 11 } }),
+    grid: grid(),
+    dataZoom: zoom(modelDailyLabels),
+    xAxis: { type: 'category', data: modelDailyLabels, ...axis({ splitLine: { show: false } }) },
+    yAxis: { type: 'value', ...axis() },
+    series: modelKeys.map((key, index) => ({
+      name: key,
       type: 'line',
-      data: {
-        labels: (adminTokenUsage.hourly || []).map((item) => String(item.bucket || '').slice(11)),
-        datasets: [
-          { label: '上行', data: (adminTokenUsage.hourly || []).map((item) => item.input_tokens || 0), borderColor: '#3498DB', backgroundColor: 'rgba(52,152,219,0.10)', fill: false, tension: 0.3 },
-          { label: '下行', data: (adminTokenUsage.hourly || []).map((item) => item.output_tokens || 0), borderColor: '#2ECC71', backgroundColor: 'rgba(46,204,113,0.10)', fill: false, tension: 0.3 },
-          { label: '总量', data: (adminTokenUsage.hourly || []).map((item) => item.total_tokens || 0), borderColor: '#C8A96E', backgroundColor: 'rgba(200,169,110,0.16)', fill: true, tension: 0.3 },
-        ],
-      },
-      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color: mainText } } }, scales:{ x:{ ticks:{ color: subText } }, y:{ ticks:{ color: subText } } } }
-    }));
-  }
-  if (dailyCtx) {
-    window.adminTokenCharts.push(new Chart(dailyCtx, {
-      type: 'line',
-      data: {
-        labels: (adminTokenUsage.daily || []).map((item) => String(item.bucket || '').slice(5)),
-        datasets: [
-          { label: '总量', data: (adminTokenUsage.daily || []).map((item) => item.total_tokens || 0), borderColor: '#C8A96E', backgroundColor: 'rgba(200,169,110,0.16)', fill: true, tension: 0.3 },
-          { label: '请求数', data: (adminTokenUsage.daily || []).map((item) => item.request_count || 0), borderColor: '#1F497D', backgroundColor: 'rgba(31,73,125,0.08)', fill: false, tension: 0.3, yAxisID: 'y1' },
-        ],
-      },
-      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color: mainText } } }, scales:{ x:{ ticks:{ color: subText } }, y:{ ticks:{ color: subText } }, y1:{ position:'right', grid:{ drawOnChartArea:false }, ticks:{ color: subText } } } }
-    }));
-  }
-  if (monthlyCtx) {
-    window.adminTokenCharts.push(new Chart(monthlyCtx, {
-      type: 'bar',
-      data: {
-        labels: (adminTokenUsage.monthly || []).map((item) => item.bucket || ''),
-        datasets: [{ label: '月度总 Token', data: (adminTokenUsage.monthly || []).map((item) => item.total_tokens || 0), backgroundColor: 'rgba(200,169,110,0.55)', borderColor: '#C8A96E', borderWidth: 1 }],
-      },
-      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color: mainText } } }, scales:{ x:{ ticks:{ color: subText } }, y:{ ticks:{ color: subText } } } }
-    }));
-  }
-  if (featureCtx) {
-    window.adminTokenCharts.push(new Chart(featureCtx, {
-      type: 'bar',
-      data: {
-        labels: (adminTokenUsage.features || []).map((item) => item.feature_label || item.feature_code || '--'),
-        datasets: [{ label: '总 Token', data: (adminTokenUsage.features || []).map((item) => item.total_tokens || 0), backgroundColor: 'rgba(52,152,219,0.55)', borderColor: '#3498DB', borderWidth: 1 }],
-      },
-      options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color: subText } }, y:{ ticks:{ color: mainText } } } }
-    }));
-  }
-  if (modelCtx) {
-    window.adminTokenCharts.push(new Chart(modelCtx, {
-      type: 'bar',
-      data: {
-        labels: (adminTokenUsage.models || []).map((item) => formatAdminModelLabel(item)),
-        datasets: [{ label: '总 Token', data: (adminTokenUsage.models || []).map((item) => item.total_tokens || 0), backgroundColor: 'rgba(46,204,113,0.55)', borderColor: '#2ECC71', borderWidth: 1 }],
-      },
-      options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color: subText } }, y:{ ticks:{ color: mainText } } } }
-    }));
-  }
-  if (modelDailyCtx) {
-    const rows = Array.isArray(adminTokenUsage.model_daily) ? adminTokenUsage.model_daily : [];
-    const labels = [...new Set(rows.map((item) => item.bucket || ''))];
-    const modelKeys = [...new Set(rows.map((item) => formatAdminModelLabel(item)))];
-    const palette = ['#C8A96E', '#3498DB', '#2ECC71', '#E67E22', '#9B59B6', '#1F497D', '#E74C3C', '#16A085'];
-    const datasets = modelKeys.map((key, index) => ({
-      label: key,
-      data: labels.map((bucket) => {
-        const found = rows.find((item) => (item.bucket || '') === bucket && formatAdminModelLabel(item) === key);
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: 6,
+      lineStyle: { width: 2.2, color: palette[index % palette.length] },
+      itemStyle: { color: palette[index % palette.length] },
+      data: modelDailyBuckets.map((bucket) => {
+        const found = modelDailyRows.find((item) => (item.bucket || '') === bucket && formatAdminModelLabel(item) === key);
         return found ? Number(found.total_tokens || 0) : 0;
       }),
-      borderColor: palette[index % palette.length],
-      backgroundColor: 'transparent',
-      tension: 0.3,
-    }));
-    window.adminTokenCharts.push(new Chart(modelDailyCtx, {
-      type: 'line',
-      data: { labels: labels.map((item) => String(item || '').slice(5)), datasets },
-      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color: mainText } } }, scales:{ x:{ ticks:{ color: subText } }, y:{ ticks:{ color: subText } } } }
-    }));
-  }
+    })),
+  });
 }
 
 function renderAdminTokenUsage() {
@@ -6302,7 +7453,8 @@ async function refreshAdminTokenUsage(showMessage = true) {
 }
 
 function openAdminKnowledgeItemDetail(itemId, tenantSlug) {
-  const item = (adminKnowledgeState.items || []).find((entry) => entry.id === itemId && entry.tenant_slug === tenantSlug);
+  const item = (adminKnowledgeState.items || []).find((entry) => entry.id === itemId && (!tenantSlug || entry.tenant_slug === tenantSlug))
+    || (adminKnowledgeState.items || []).find((entry) => entry.id === itemId);
   const host = document.getElementById('admin-task-modal-content');
   const modal = document.getElementById('admin-task-modal');
   if (!item || !host || !modal) {
@@ -6344,6 +7496,7 @@ function openAdminKnowledgeItemDetail(itemId, tenantSlug) {
     </div>
   `;
   modal.classList.add('show');
+  if (window.GangtiseEcharts) window.GangtiseEcharts.flush(host);
 }
 
 function openAdminUserJobDetail(jobCode) {
@@ -6676,7 +7829,7 @@ async function runAdminTask(taskCode, forceRun) {
     return;
   }
   applyAdminTaskCenterPayload(data);
-  if (taskCode === 'indicator_prepare' || taskCode === 'indicator_market_cache_sync' || taskCode === 'indicator_mock_seed') {
+  if (taskCode === 'indicator_prepare' || taskCode === 'indicator_market_cache_sync') {
     await refreshAdminIndicatorHub(false);
   }
   showToast(`任务 ${taskCode} 已执行`);
@@ -6750,7 +7903,7 @@ async function toggleAdminIndicator(indicatorId, enabled) {
 }
 
 async function seedAdminIndicatorMockData(force) {
-  await runAdminTask('indicator_mock_seed', !!force);
+  showToast('模拟指标补种已关闭，当前仅允许真实 Gangtise 数据入湖');
 }
 
 async function testIndicatorSource(sourceCode) {
@@ -6869,7 +8022,7 @@ async function openIndicatorDefinitionModal(indicatorCode) {
     unit: existing ? existing.unit : '',
     owner,
     source_type: sourceType,
-    source_type_label: sourceType === 'smart' ? '智能指标' : (sourceType === 'lake' ? '数据湖指标' : '模拟指标'),
+    source_type_label: sourceType === 'smart' ? '智能指标' : (sourceType === 'lake' ? '数据湖指标' : '指标'),
     provider: existing ? existing.provider : '平台数据层',
     status_hint: existing ? existing.status_hint : 'attention',
     assessment_template: existing ? existing.assessment_template : '',
@@ -7178,7 +8331,7 @@ async function openAdminIndicatorHistory(indicatorId) {
 }
 
 let adminUsers = [];
-const ADMIN_USER_IMPORT_COLUMNS = ['username', 'password', 'phone', 'role', 'tenant_slug', 'advisor_name', 'status'];
+const ADMIN_USER_IMPORT_COLUMNS = ['username', 'password', 'phone', 'role', 'tenant_slug', 'advisor_name', 'status', 'is_paid_sample', 'source_label', 'paid_sample_note'];
 let agentWorkflowCenter = {summary: {}, workflows: []};
 let selectedAgentWorkflowId = '';
 let selectedAgentWorkflowNodeId = '';
@@ -7212,14 +8365,16 @@ function renderAdminUsersTable() {
       <td><span style="color:#F8F6F0;font-weight:500">${escapeHtml(user.username)}</span></td>
       <td><span style="font-size:10px;color:#8899aa">${escapeHtml(user.phone_masked || user.phone || '')}</span></td>
       <td><span class="tag ${user.role === 'admin' ? 'tag-red' : (user.role === 'dav' ? 'tag-gold' : 'tag-blue')}">${escapeHtml(user.role)}</span></td>
+      <td>${user.role === 'investor' ? (user.is_paid_sample ? '<span class="tag tag-gold">付费样本</span>' : '<span class="tag tag-blue">普通粉丝</span>') : '<span style="color:#8899aa">--</span>'}</td>
+      <td>${escapeHtml(user.source_label || '--')}</td>
       <td>${escapeHtml(user.advisor_name || '--')}</td>
       <td>${escapeHtml(user.tenant?.name || '--')}</td>
       <td><span class="tag ${user.status === 'active' ? 'tag-green' : 'tag-red'}">${escapeHtml(user.status === 'active' ? '正常' : '已禁用')}</span></td>
       <td>${escapeHtml(user.created_at || '--')}</td>
       <td><button class="btn-outline" style="padding:3px 9px;font-size:11px" onclick="openAdminUserDetail(${Number(user.id || 0)})">详情</button></td>
     </tr>
-  `).join('') || '<tr><td colspan="8" style="text-align:center;color:#8899aa;padding:20px 0">暂无用户</td></tr>';
-  meta.innerHTML = `<span>共 ${filtered.length} 条记录</span><span>当前数据来自 SQLite 用户表</span>`;
+  `).join('') || '<tr><td colspan="10" style="text-align:center;color:#8899aa;padding:20px 0">暂无用户</td></tr>';
+  meta.innerHTML = `<span>共 ${filtered.length} 条记录</span><span>当前数据来自本地 Postgres 用户表</span>`;
 }
 
 function closeAdminUserDetailModal() {
@@ -7283,6 +8438,27 @@ function openAdminUserDetail(userId) {
               <span class="tag tag-gold">${escapeHtml(user.tenant_slug || '--')}</span>
             </div>
             <div class="admin-modal-copy">${escapeHtml(user.tenant?.name || '--')} · 大V：${escapeHtml(user.advisor_name || user.tenant?.advisor || '--')}</div>
+          </div>
+          <div class="admin-modal-item">
+            <div class="admin-modal-item-top">
+              <strong>付费样本</strong>
+              <span class="tag ${user.is_paid_sample ? 'tag-gold' : 'tag-blue'}">${user.is_paid_sample ? '是' : '否'}</span>
+            </div>
+            <div class="admin-modal-copy">来源：${escapeHtml(user.source_label || '--')} · 备注：${escapeHtml(user.paid_sample_note || '--')}</div>
+          </div>
+          <div class="admin-modal-item">
+            <div class="admin-modal-item-top">
+              <strong>H5 渠道</strong>
+              <span class="tag tag-blue">${escapeHtml(user.h5_channel_label || '--')}</span>
+            </div>
+            <div class="admin-modal-copy">选择时间：${escapeHtml(user.h5_channel_selected_at || '--')}</div>
+          </div>
+          <div class="admin-modal-item">
+            <div class="admin-modal-item-top">
+              <strong>合规确认</strong>
+              <span class="tag ${user.compliance_acknowledged_at ? 'tag-green' : 'tag-red'}">${user.compliance_acknowledged_at ? '已确认' : '未确认'}</span>
+            </div>
+            <div class="admin-modal-copy">确认时间：${escapeHtml(user.compliance_acknowledged_at || '--')} · 版本：${escapeHtml(user.compliance_version || '--')}</div>
           </div>
         </div>
       </div>
@@ -7375,6 +8551,14 @@ function buildAdminUserImportRow(row = {}) {
           <option value="disabled" ${String(row.status || '') === 'disabled' ? 'selected' : ''}>禁用</option>
         </select>
       </td>
+      <td>
+        <select data-field="is_paid_sample">
+          <option value="0" ${String(row.is_paid_sample || '0') === '1' ? '' : 'selected'}>否</option>
+          <option value="1" ${String(row.is_paid_sample || '0') === '1' ? 'selected' : ''}>是</option>
+        </select>
+      </td>
+      <td><input data-field="source_label" type="text" value="${escapeAttr(row.source_label || '管理录入')}" placeholder="来源"></td>
+      <td><input data-field="paid_sample_note" type="text" value="${escapeAttr(row.paid_sample_note || '')}" placeholder="备注"></td>
       <td><button class="btn-outline" type="button" style="padding:4px 10px;font-size:11px" onclick="removeAdminUserImportRow(this)">删除</button></td>
     </tr>
   `;
@@ -7424,7 +8608,7 @@ function openAdminUserImportModal(mode = 'bulk') {
       <div class="feature-note" style="margin-bottom:10px">角色含义：investor = 粉丝用户，dav = 大V，admin = 管理员。</div>
       <div style="overflow:auto">
         <table>
-          <thead><tr><th>用户名</th><th>密码</th><th>手机号</th><th>角色</th><th>租户 slug</th><th>所属大V</th><th>状态</th><th>操作</th></tr></thead>
+          <thead><tr><th>用户名</th><th>密码</th><th>手机号</th><th>角色</th><th>租户 slug</th><th>所属大V</th><th>状态</th><th>付费样本</th><th>来源</th><th>备注</th><th>操作</th></tr></thead>
           <tbody id="admin-user-import-tbody"></tbody>
         </table>
       </div>
@@ -7435,8 +8619,8 @@ function openAdminUserImportModal(mode = 'bulk') {
     </div>
   `;
   modal.classList.add('show');
-  addAdminUserImportRow(isSingle ? {role: 'investor', status: 'active'} : {role: 'investor', status: 'active'});
-  if (!isSingle) addAdminUserImportRow({role: 'investor', status: 'active'});
+  addAdminUserImportRow(isSingle ? {role: 'investor', status: 'active', is_paid_sample: '0', source_label: '管理录入'} : {role: 'investor', status: 'active', is_paid_sample: '0', source_label: '管理录入'});
+  if (!isSingle) addAdminUserImportRow({role: 'investor', status: 'active', is_paid_sample: '0', source_label: '管理录入'});
 }
 
 async function submitAdminUserImportRows() {
@@ -7765,6 +8949,7 @@ function renderAdminHermesUsageStats() {
   const modeBody = document.getElementById('admin-hermes-mode-tbody');
   const rankingBody = document.getElementById('admin-hermes-ranking-tbody');
   const poolHost = document.getElementById('admin-hermes-pool-cards');
+  const missingBody = document.getElementById('admin-hermes-missing-capability-tbody');
   const stats = adminHermesUsageState.stats || {};
   const summary = stats.summary || {};
   if (summaryHost) {
@@ -7772,7 +8957,7 @@ function renderAdminHermesUsageStats() {
       { label: '今日调用', icon: '&#9881;', value: Number(summary.today_calls || 0), change: `今日 token ${Number(summary.today_tokens || 0).toLocaleString('zh-CN')}` },
       { label: '本月调用', icon: '&#9654;', value: Number(summary.month_calls || 0), change: `本月 token ${Number(summary.month_tokens || 0).toLocaleString('zh-CN')}` },
       { label: '人均调用', icon: '&#9786;', value: `${Number(summary.avg_calls_per_user || 0).toFixed(2)}次`, change: `平均延迟 ${Number(summary.avg_latency_ms || 0).toFixed(0)}ms` },
-      { label: '算力消耗', icon: '&#9733;', value: Number(summary.compute_consumed || 0).toLocaleString('zh-CN'), change: '按 Hermes 调用聚合' },
+      { label: '算力消耗', icon: '&#9733;', value: Number(summary.compute_consumed || 0).toLocaleString('zh-CN'), change: `缺失能力 ${Number(summary.missing_capability_turns || 0)} 次` },
     ].map((item) => `
       <div class="stat-card">
         <div class="stat-label">${escapeHtml(item.label)}</div>
@@ -7827,6 +9012,19 @@ function renderAdminHermesUsageStats() {
         <td>${escapeHtml(row.top_mode || '')}</td>
       </tr>
     `).join('') : '<tr><td colspan="6" style="color:#9A9590">暂无 Hermes 用户排行</td></tr>';
+  }
+  if (missingBody) {
+    const rows = Array.isArray(stats.missing_capabilities) ? stats.missing_capabilities : [];
+    missingBody.innerHTML = rows.length ? rows.map((row) => `
+      <tr>
+        <td style="color:#F8F6F0;font-weight:500">${escapeHtml(row.label || '')}</td>
+        <td><span class="tag tag-gold">${escapeHtml(row.category || '能力缺口')}</span></td>
+        <td>${escapeHtml(String(row.mentions || 0))}</td>
+        <td>${escapeHtml(String(row.user_count || 0))}</td>
+        <td>${escapeHtml([row.object_name || '', row.target_date || ''].filter(Boolean).join(' / ') || '--')}</td>
+        <td style="max-width:360px;white-space:normal;line-height:1.6">${escapeHtml(row.latest_question || '--')}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="6" style="color:#9A9590">当前还没有沉淀出缺失能力需求</td></tr>';
   }
 }
 
@@ -8616,8 +9814,7 @@ function renderAdminLlmRegistry() {
       </button>
     `).join('') : '<span class="llm-admin-chip is-muted">当前没有可切换的已启用模型</span>';
   }
-  const statsHost = document.getElementById('llm-admin-summary');
-  if (statsHost) {
+  document.querySelectorAll('[data-llm-summary]').forEach((statsHost) => {
     const total = registry.models.length;
     const enabledCount = registry.models.filter(model => model.enabled !== false).length;
     const defaultModel = registry.models.find(model => model.key === registry.default_model_key) || null;
@@ -8633,7 +9830,7 @@ function renderAdminLlmRegistry() {
         推荐只把真正可用的模型设为启用，避免工作台误选到未完成配置的模型。
       </div>
     `;
-  }
+  });
   const host = document.getElementById('llm-model-list');
   if (!host) return;
   host.innerHTML = registry.models.length ? `<div class="llm-admin-model-stack">${registry.models.map((model, index) => {
@@ -8852,7 +10049,7 @@ function broadcastSiteConfigUpdate() {
 
 function isAdminSiteConfigField(target) {
   if (!target || !target.closest) return false;
-  return Boolean(target.closest('#section-settings-appearance, #section-settings-brand, #section-settings-features, #section-settings-policy, #section-settings-knowledge, #section-settings-llm, #section-settings-llm-features'));
+  return Boolean(target.closest('#section-settings-features, #section-settings-appearance, #section-settings-brand, #section-settings-policy, #section-settings-knowledge, #section-settings-llm, #section-settings-llm-features'));
 }
 
 function updateAdminFeatureFlagPreview(target) {
@@ -8875,7 +10072,8 @@ function updateAdminFeatureFlagPreview(target) {
 function refreshAdminNavVisibility() {
   document.querySelectorAll('.admin-nav-item[data-feature]').forEach((node) => {
     const featureName = node.dataset.feature;
-    node.style.display = isAdminFeatureEnabled(featureName) ? '' : 'none';
+    const forceHidden = node.dataset.unifiedHidden === 'true';
+    node.style.display = isAdminFeatureEnabled(featureName) && !forceHidden ? '' : 'none';
   });
   document.querySelectorAll('.admin-nav-group').forEach((group) => {
     const items = Array.from(group.querySelectorAll('.admin-nav-item'));
@@ -8892,11 +10090,78 @@ function ensureAdminTenants() {
   if (!Array.isArray(adminSiteConfig.tenants) || !adminSiteConfig.tenants.length) {
     adminSiteConfig.tenants = [];
   }
+  adminSiteConfig.tenants.forEach((tenant) => ensureAdminTenantNewsAggregationAlgorithm(tenant));
   return adminSiteConfig.tenants;
+}
+
+function getAdminNewsAggregationAlgorithmDefaults() {
+  const defaults = (adminSiteConfig && adminSiteConfig.news_aggregation_algorithm_defaults) || {};
+  if (typeof defaults.script_js !== 'string' || !defaults.script_js.trim()) {
+    defaults.script_js = [
+      'function rankNews(input) {',
+      "  const normalize = (value) => String(value || '').replace(/[\s\u3000·•/|_|-]+/g, ' ').trim();",
+      "  const compact = (value) => String(value || '').replace(/[\s\u3000·•/|_|-.]/g, '').trim();",
+      '  const tags = Array.isArray(input.item.tags) ? input.item.tags.map(normalize).filter(Boolean) : [];',
+      "  const text = normalize([input.item.title, input.item.content, input.item.summary].filter(Boolean).join(' '));",
+      '  const compactText = compact(text);',
+      '  const sectorTokens = Array.isArray(input.watchlistSectors) ? input.watchlistSectors.map(normalize).filter(Boolean) : [];',
+      "  const sectorAliases = {'港股互联网':['互联网','平台经济','港股','腾讯','阿里','美团','百度','快手'],'半导体制造':['半导体','芯片','集成电路','晶圆','存储','光刻'],'高端白酒':['白酒','贵州茅台','五粮液','泸州老窖'],'动力电池':['动力电池','锂电','新能源车','宁德时代'],'银行':['银行','信贷','息差','存款','贷款']};",
+      '  const symbolTokens = Array.isArray(input.watchlistSymbols) ? input.watchlistSymbols.map(normalize).filter(Boolean) : [];',
+      "  const majorKeywords = ['重大利好','重大利空','重大风险','突发','紧急','重磅','立案调查','行政处罚','停牌','退市','暴雷','违约','降准','降息','加息','出口管制','关税上调','重大订单','中标','业绩预增','业绩预亏','回购','增持','减持','并购重组','重大资产重组'];",
+      "  const sectorMatch = sectorTokens.some(tag => [tag, ...(sectorAliases[tag] || [])].some(term => text.includes(term)));",
+      "  const symbolMatch = symbolTokens.some(tag => text.includes(tag) || compactText.includes(compact(tag)));",
+      "  const majorSignal = Boolean(input.item.isMajorPositive || input.item.isMajorNegative) || majorKeywords.some(keyword => text.includes(keyword));",
+      '  return {',
+      "    score: ((sectorMatch || symbolMatch) ? 220 : 0) + (symbolMatch ? 65 : 0) + (majorSignal ? 100 : 0),",
+      "    bucket: (sectorMatch || symbolMatch) ? 'watchlist_sector' : (majorSignal ? 'major_market' : 'other'),",
+      "    reason: (sectorMatch || symbolMatch) ? '命中自选股行业板块或标的' : (majorSignal ? '命中社会性重大利好/利空或高影响事件' : '其他公开信息'),",
+      '    matched_topics: [',
+      '      ...new Set([',
+      '        ...sectorTokens.filter(tag => [tag, ...(sectorAliases[tag] || [])].some(term => text.includes(term))),',
+      '        ...symbolTokens.filter(tag => text.includes(tag) || compactText.includes(compact(tag))),',
+      '        ...majorKeywords.filter(keyword => text.includes(keyword))',
+      '      ])',
+      '    ]',
+      '  };',
+      '}',
+    ].join('\n');
+  }
+  if (!defaults.version) defaults.version = 'v3';
+  if (!defaults.strategy) defaults.strategy = 'watchlist_sector_first';
+  return defaults;
+}
+
+function ensureAdminTenantNewsAggregationAlgorithm(tenant) {
+  if (!tenant || typeof tenant !== 'object') return { version: 'v3', strategy: 'watchlist_sector_first', script_js: '' };
+  const defaults = getAdminNewsAggregationAlgorithmDefaults();
+  if (!tenant.news_aggregation_algorithm || typeof tenant.news_aggregation_algorithm !== 'object') {
+    tenant.news_aggregation_algorithm = {
+      version: defaults.version || 'v3',
+      strategy: defaults.strategy || 'watchlist_sector_first',
+      script_js: defaults.script_js || '',
+      source_prompt: '',
+      updated_at: '',
+      updated_by: 'admin',
+    };
+  }
+  if (typeof tenant.news_aggregation_algorithm.script_js !== 'string') {
+    tenant.news_aggregation_algorithm.script_js = String(tenant.news_aggregation_algorithm.script_js || '');
+  }
+  if (!tenant.news_aggregation_algorithm.script_js.trim()) {
+    tenant.news_aggregation_algorithm.script_js = defaults.script_js || '';
+  }
+  if (!tenant.news_aggregation_algorithm.version) {
+    tenant.news_aggregation_algorithm.version = defaults.version || 'v3';
+  }
+  if (!tenant.news_aggregation_algorithm.strategy) {
+    tenant.news_aggregation_algorithm.strategy = defaults.strategy || 'watchlist_sector_first';
+  }
+  return tenant.news_aggregation_algorithm;
 }
 
 function buildNewAdminTenant(index) {
   const serial = index + 1;
+  const algorithmDefaults = getAdminNewsAggregationAlgorithmDefaults();
   return {
     id: `tenant_custom_${serial}`,
     slug: `tenant-${serial}`,
@@ -8912,6 +10177,14 @@ function buildNewAdminTenant(index) {
     portal_description: '',
     dashboard_title: '',
     dashboard_description: '',
+    news_aggregation_algorithm: {
+      version: algorithmDefaults.version || 'v3',
+      strategy: algorithmDefaults.strategy || 'watchlist_sector_first',
+      script_js: algorithmDefaults.script_js || '',
+      source_prompt: '',
+      updated_at: '',
+      updated_by: 'admin',
+    },
   };
 }
 
@@ -8983,6 +10256,19 @@ function updateAdminTenantField(field, value) {
     adminSiteConfig.default_tenant_slug = nextValue;
   }
   renderTenantSidebar();
+}
+
+function updateAdminTenantNewsAggregationPrompt(value) {
+  const tenants = ensureAdminTenants();
+  const tenant = tenants[selectedAdminTenantIndex];
+  if (!tenant) return;
+  const algorithm = ensureAdminTenantNewsAggregationAlgorithm(tenant);
+  algorithm.source_prompt = String(value || '').trim();
+  algorithm.rule_plan = {};
+  algorithm.rule_atoms = [];
+  algorithm.updated_by = 'admin';
+  algorithm.updated_at = new Date().toISOString();
+  markAdminSiteConfigDirty('新闻聚合规则已修改，保存后将按受控原子重新编译。');
 }
 
 function adminNormalizeDashboardMode(mode) {
@@ -9296,6 +10582,7 @@ function renderTenantDetail() {
     host.innerHTML = '<div class="tenant-admin-empty">请先新增一个租户，再开始维护品牌与门户配置。</div>';
     return;
   }
+  const newsAggregationAlgorithm = ensureAdminTenantNewsAggregationAlgorithm(tenant);
   host.innerHTML = `
     <div class="config-card">
       <div class="tenant-admin-detail-head">
@@ -9359,6 +10646,13 @@ function renderTenantDetail() {
         <label>Dashboard 描述</label>
         <input type="text" value="${escapeAttr(tenant.dashboard_description || '')}" oninput="updateAdminTenantField('dashboard_description', this.value)">
       </div>
+      <div class="config-field">
+        <label>新闻聚合规则</label>
+        <textarea rows="5" style="width:100%;box-sizing:border-box;background:#0D1B2A;border:1px solid rgba(200,169,110,0.18);border-radius:8px;padding:10px;color:var(--text-main);font-size:12px;line-height:1.6;resize:vertical" oninput="updateAdminTenantNewsAggregationPrompt(this.value)">${escapeHtml(newsAggregationAlgorithm.source_prompt || '先按自选股行业板块聚合，再看社会性重大利好/利空消息。首页只展示 10 条，与自选股板块无关且非重大消息的内容不进入首页。')}</textarea>
+        <div class="feature-note">
+          系统会将提示词解析为候选范围、排序、过滤、数量和配额等受控原子。执行脚本由服务端生成，不能直接编辑。
+        </div>
+      </div>
       <div class="feature-note">
         这里维护的是租户级配置，不是平台级配置。保存后，该大V对应的门户、工作台和默认展示文案会同步更新。
       </div>
@@ -9416,6 +10710,8 @@ function renderSiteConfigForm() {
   const cfg = adminSiteConfig || {};
   const dbRuntime = cfg.db_runtime || {};
   const flags = cfg.feature_flags || {};
+  const authSettings = cfg.auth_settings || {};
+  const authWechat = authSettings.wechat || {};
   const hermesSettings = cfg.hermes_settings || {};
   const brand = cfg.brand || {};
   const voiceTranscription = cfg.voice_transcription || {};
@@ -9426,10 +10722,42 @@ function renderSiteConfigForm() {
   ensureAdminLlmRegistry();
   markActivePill('theme-mode-group', 'mode', cfg.default_theme || 'light');
   markActivePill('theme-accent-group', 'accent', cfg.default_accent || 'blue');
-  const passwordGate = document.getElementById('password-gate-enabled');
-  if (passwordGate) passwordGate.checked = cfg.password_gate_enabled !== false;
+  const authPasswordToggle = document.getElementById('auth-password-login-enabled');
+  if (authPasswordToggle) authPasswordToggle.checked = authSettings.password_login_enabled !== false;
+  const authWechatToggle = document.getElementById('auth-wechat-login-enabled');
+  if (authWechatToggle) authWechatToggle.checked = authSettings.wechat_login_enabled === true;
+  const authQuickSelectToggle = document.getElementById('auth-quick-select-enabled');
+  if (authQuickSelectToggle) authQuickSelectToggle.checked = authSettings.quick_select_enabled !== false;
+  const authWechatRuntimeTestToggle = document.getElementById('auth-wechat-runtime-test-enabled');
+  if (authWechatRuntimeTestToggle) authWechatRuntimeTestToggle.checked = authSettings.wechat_runtime_test_enabled !== false;
+  const authWechatAppId = document.getElementById('auth-wechat-app-id');
+  if (authWechatAppId) authWechatAppId.value = authWechat.app_id || '';
+  const authWechatAppSecret = document.getElementById('auth-wechat-app-secret');
+  if (authWechatAppSecret) authWechatAppSecret.value = authWechat.app_secret || '';
+  const authWechatRedirectUri = document.getElementById('auth-wechat-redirect-uri');
+  if (authWechatRedirectUri) authWechatRedirectUri.value = authWechat.redirect_uri || '';
+  const authWechatScope = document.getElementById('auth-wechat-scope');
+  if (authWechatScope) authWechatScope.value = authWechat.scope || 'snsapi_userinfo';
+  const authWechatAutoRegisterToggle = document.getElementById('auth-wechat-auto-register-enabled');
+  if (authWechatAutoRegisterToggle) authWechatAutoRegisterToggle.checked = authWechat.auto_register_enabled === true;
+  const authWechatDefaultRole = document.getElementById('auth-wechat-default-role');
+  if (authWechatDefaultRole) authWechatDefaultRole.value = authWechat.default_role || 'investor';
+  const authWechatDefaultAdvisorName = document.getElementById('auth-wechat-default-advisor-name');
+  if (authWechatDefaultAdvisorName) authWechatDefaultAdvisorName.value = authWechat.default_advisor_name || '';
+  const authWechatTenant = document.getElementById('auth-wechat-default-tenant-slug');
+  if (authWechatTenant) {
+    const tenantOptions = ensureAdminTenants().map((tenant) => `
+      <option value="${escapeAttr(tenant.slug || '')}">${escapeHtml(tenant.name || tenant.slug || '--')}</option>
+    `).join('');
+    authWechatTenant.innerHTML = `<option value="">按平台默认租户</option>${tenantOptions}`;
+    authWechatTenant.value = authWechat.default_tenant_slug || '';
+  }
   const voiceEngine = document.getElementById('voice-transcription-engine');
   if (voiceEngine) voiceEngine.value = voiceTranscription.engine || 'local';
+  const voicePostProcessMode = document.getElementById('voice-transcription-post-process-mode');
+  if (voicePostProcessMode) voicePostProcessMode.value = voiceTranscription.post_process_mode || 'rule_based';
+  const voiceGlossaryToggle = document.getElementById('voice-transcription-domain-glossary-enabled');
+  if (voiceGlossaryToggle) voiceGlossaryToggle.checked = voiceTranscription.domain_glossary_enabled !== false;
   const embeddingEngine = document.getElementById('voice-embedding-engine');
   if (embeddingEngine) embeddingEngine.value = voiceEmbedding.engine || 'api';
   const knowledgePreviewToggle = document.getElementById('knowledge-user-preview-enabled');
@@ -9602,7 +10930,6 @@ async function syncLocalLlmRegistryFromStaging() {
 
 async function saveSiteConfig() {
   const featureFlags = {};
-  const passwordGate = document.getElementById('password-gate-enabled');
   const knowledgePreviewToggle = document.getElementById('knowledge-user-preview-enabled');
   const dbRuntimeToggle = document.getElementById('db-runtime-use-staging');
   const tenants = ensureAdminTenants().map((tenant) => ({ ...tenant }));
@@ -9622,7 +10949,7 @@ async function saveSiteConfig() {
     showToast('Hermes 配置格式有误');
     return;
   }
-  ['user_module', 'kol_module', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'workbench'].forEach(key => {
+  ['user_module', 'kol_module', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'paid_reply', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     featureFlags[key] = Boolean(checkbox && checkbox.checked);
   });
@@ -9632,11 +10959,48 @@ async function saveSiteConfig() {
     },
     default_theme: adminSiteConfig.default_theme || 'light',
     default_accent: adminSiteConfig.default_accent || 'blue',
-    password_gate_enabled: Boolean(passwordGate && passwordGate.checked),
+    auth_settings: {
+      password_login_enabled: Boolean(document.getElementById('auth-password-login-enabled') && document.getElementById('auth-password-login-enabled').checked),
+      wechat_login_enabled: Boolean(document.getElementById('auth-wechat-login-enabled') && document.getElementById('auth-wechat-login-enabled').checked),
+      quick_select_enabled: Boolean(document.getElementById('auth-quick-select-enabled') && document.getElementById('auth-quick-select-enabled').checked),
+      wechat_runtime_test_enabled: Boolean(document.getElementById('auth-wechat-runtime-test-enabled') && document.getElementById('auth-wechat-runtime-test-enabled').checked),
+      wechat: {
+        app_id: document.getElementById('auth-wechat-app-id')
+          ? String(document.getElementById('auth-wechat-app-id').value || '').trim()
+          : '',
+        app_secret: document.getElementById('auth-wechat-app-secret')
+          ? String(document.getElementById('auth-wechat-app-secret').value || '').trim()
+          : '',
+        redirect_uri: document.getElementById('auth-wechat-redirect-uri')
+          ? String(document.getElementById('auth-wechat-redirect-uri').value || '').trim()
+          : '',
+        scope: document.getElementById('auth-wechat-scope')
+          ? String(document.getElementById('auth-wechat-scope').value || 'snsapi_userinfo').trim() || 'snsapi_userinfo'
+          : 'snsapi_userinfo',
+        auto_register_enabled: Boolean(document.getElementById('auth-wechat-auto-register-enabled') && document.getElementById('auth-wechat-auto-register-enabled').checked),
+        default_role: document.getElementById('auth-wechat-default-role')
+          ? String(document.getElementById('auth-wechat-default-role').value || 'investor').trim() || 'investor'
+          : 'investor',
+        default_tenant_slug: document.getElementById('auth-wechat-default-tenant-slug')
+          ? String(document.getElementById('auth-wechat-default-tenant-slug').value || '').trim()
+          : '',
+        default_advisor_name: document.getElementById('auth-wechat-default-advisor-name')
+          ? String(document.getElementById('auth-wechat-default-advisor-name').value || '').trim()
+          : '',
+      },
+    },
     voice_transcription: {
       engine: document.getElementById('voice-transcription-engine')
         ? document.getElementById('voice-transcription-engine').value
         : ((adminSiteConfig.voice_transcription || {}).engine || 'local'),
+      post_process_mode: document.getElementById('voice-transcription-post-process-mode')
+        ? document.getElementById('voice-transcription-post-process-mode').value
+        : ((adminSiteConfig.voice_transcription || {}).post_process_mode || 'rule_based'),
+      domain_glossary_enabled: Boolean(
+        document.getElementById('voice-transcription-domain-glossary-enabled')
+        ? document.getElementById('voice-transcription-domain-glossary-enabled').checked
+        : ((adminSiteConfig.voice_transcription || {}).domain_glossary_enabled !== false)
+      ),
     },
     voice_embedding: {
       engine: document.getElementById('voice-embedding-engine')
@@ -9760,39 +11124,37 @@ async function renderAccessAudit() {
   const res = await fetch('/api/admin/access-stats');
   if (!res.ok) return;
   const data = await res.json();
-  const dailyCtx = document.getElementById('auditDailyChart');
-  const pathCtx = document.getElementById('auditPathChart');
-  const ipCtx = document.getElementById('auditIpChart');
   const logBody = document.getElementById('audit-log-body');
-  const ui = getComputedStyle(document.body);
-  const mainText = (ui.getPropertyValue('--text-main') || '#182132').trim();
-  const subText = (ui.getPropertyValue('--text-sub') || '#445468').trim();
-  window.accessAuditCharts = window.accessAuditCharts || [];
-  while (window.accessAuditCharts.length) {
-    const chart = window.accessAuditCharts.pop();
-    if (chart && typeof chart.destroy === 'function') chart.destroy();
-  }
-  if (dailyCtx) {
-    window.accessAuditCharts.push(new Chart(dailyCtx, {
-      type: 'line',
-      data: { labels: data.daily_counts.map(i => i.day.slice(5)), datasets: [{ label: '访问量', data: data.daily_counts.map(i => i.count), borderColor: '#C8A96E', backgroundColor: 'rgba(200,169,110,0.12)', fill: true, tension: 0.35 }] },
-      options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{ color: mainText } } }, scales:{ x:{ ticks:{ color: subText } }, y:{ ticks:{ color: subText } } } }
-    }));
-  }
-  if (pathCtx) {
-    window.accessAuditCharts.push(new Chart(pathCtx, {
-      type: 'bar',
-      data: { labels: data.top_paths.map(i => i.path), datasets: [{ label: '次数', data: data.top_paths.map(i => i.count), backgroundColor: 'rgba(52,152,219,0.6)', borderColor: '#3498DB', borderWidth: 1 }] },
-      options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color: subText } }, y:{ ticks:{ color: mainText } } } }
-    }));
-  }
-  if (ipCtx) {
-    window.accessAuditCharts.push(new Chart(ipCtx, {
-      type: 'bar',
-      data: { labels: data.top_ips.map(i => i.ip), datasets: [{ label: '次数', data: data.top_ips.map(i => i.count), backgroundColor: 'rgba(46,204,113,0.6)', borderColor: '#2ECC71', borderWidth: 1 }] },
-      options: { indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color: subText } }, y:{ ticks:{ color: mainText } } } }
-    }));
-  }
+  const axis = (overrides) => window.GangtiseEcharts.axisBase(Object.assign({
+    axisLabel: { color: '#445468', fontSize: 11 },
+    splitLine: { lineStyle: { color: 'rgba(47,116,192,0.08)' } },
+  }, overrides || {}));
+  const grid = (overrides) => window.GangtiseEcharts.gridBase(Object.assign({ top: 24, left: 18, right: 18, bottom: 34 }, overrides || {}));
+  ['auditDailyChart', 'auditPathChart', 'auditIpChart'].forEach((id) => window.GangtiseEcharts && window.GangtiseEcharts.dispose(id));
+  window.GangtiseEcharts.render('auditDailyChart', {
+    color: ['#C8A96E'],
+    tooltip: window.GangtiseEcharts.tooltipBase(),
+    grid: grid({ bottom: 44 }),
+    xAxis: { type: 'category', data: data.daily_counts.map((item) => item.day.slice(5)), ...axis({ splitLine: { show: false } }) },
+    yAxis: { type: 'value', ...axis() },
+    series: [{ name: '访问量', type: 'line', smooth: true, symbol: 'circle', symbolSize: 6, lineStyle: { width: 2.4, color: '#C8A96E' }, areaStyle: { color: 'rgba(200,169,110,0.12)' }, itemStyle: { color: '#C8A96E' }, data: data.daily_counts.map((item) => item.count) }],
+  });
+  window.GangtiseEcharts.render('auditPathChart', {
+    color: ['#3498DB'],
+    tooltip: window.GangtiseEcharts.tooltipBase(),
+    grid: grid({ bottom: 18 }),
+    xAxis: { type: 'value', ...axis() },
+    yAxis: { type: 'category', data: data.top_paths.map((item) => item.path), ...axis({ splitLine: { show: false }, axisLabel: { color: '#182132', fontSize: 11 } }) },
+    series: [{ name: '次数', type: 'bar', barWidth: '52%', itemStyle: { color: 'rgba(52,152,219,0.72)', borderRadius: [0, 10, 10, 0] }, data: data.top_paths.map((item) => item.count) }],
+  });
+  window.GangtiseEcharts.render('auditIpChart', {
+    color: ['#2ECC71'],
+    tooltip: window.GangtiseEcharts.tooltipBase(),
+    grid: grid({ bottom: 18 }),
+    xAxis: { type: 'value', ...axis() },
+    yAxis: { type: 'category', data: data.top_ips.map((item) => item.ip), ...axis({ splitLine: { show: false }, axisLabel: { color: '#182132', fontSize: 11 } }) },
+    series: [{ name: '次数', type: 'bar', barWidth: '52%', itemStyle: { color: 'rgba(46,204,113,0.72)', borderRadius: [0, 10, 10, 0] }, data: data.top_ips.map((item) => item.count) }],
+  });
   if (logBody) {
     logBody.innerHTML = data.recent_logs.map(r => `<tr><td>${r.created_at}</td><td>${r.ip}</td><td>${r.path}</td><td>${r.method}</td><td>${r.status_code}</td></tr>`).join('');
   }
@@ -9866,6 +11228,7 @@ function evUpdatePreview() {
 
 document.addEventListener('DOMContentLoaded', () => {
   initAdminNavGroups();
+  mountUnifiedSystemSettings();
   renderAdminTaskCenter();
   renderAdminTokenUsage();
   loadSiteConfig();
@@ -9908,15 +11271,8 @@ document.addEventListener('DOMContentLoaded', () => {
     showAnalyticsSection(section);
     return;
   }
-  if (section === 'settings') {
-    showSection('settings-appearance');
-    return;
-  }
-  if (section === 'indicator-hub') {
-    showSection('indicator-overview');
-    return;
-  }
-  if (section && sectionTitles[section]) {
+  const normalizedSection = normalizeAdminSection(section || '');
+  if (normalizedSection.section && sectionTitles[normalizedSection.section]) {
     showSection(section);
     return;
   }

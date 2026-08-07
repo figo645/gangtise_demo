@@ -1,37 +1,41 @@
 from src.runtime import *
 from src.services import *
 from src.web.api_core import get_access_summary
-from src.web.hooks import is_password_gate_enabled
 from src.web.request_helpers import safe_next_target
 
-@app.route("/login", methods=["GET"])
+@app.route("/login", methods=["GET", "POST"])
 def login():
     next_target = safe_next_target(request.args.get("next", "/"))
-    if not is_password_gate_enabled():
+    try:
+        current_user = get_current_authenticated_user()
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        current_user = None
+    if current_user:
         return redirect(next_target)
-    return render_template("login.html", next_target=next_target, error=None)
-
-
-@app.route("/unlock", methods=["POST"])
-def unlock():
+    if request.method == "GET":
+        return render_template("login.html", next_target=next_target, error=None, site_config=get_site_config())
     next_target = safe_next_target(request.form.get("next", "/"))
-    if not is_password_gate_enabled():
-        session[AUTH_SESSION_KEY] = True
-        session.permanent = True
-        return redirect(next_target)
-    password = request.form.get("password", "")
-    if not compare_digest(password, AUTH_PASSWORD):
-        return render_template("login.html", next_target=next_target, error="密码错误")
-    session[AUTH_SESSION_KEY] = True
-    session.permanent = True
+    username = str(request.form.get("username") or "").strip()
+    password = str(request.form.get("password") or "").strip()
+    if not username or not password:
+        return render_template("login.html", next_target=next_target, error="请输入用户名和密码", site_config=get_site_config())
+    try:
+        user = verify_platform_password_login(username, password)
+    except ValueError:
+        return render_template("login.html", next_target=next_target, error="用户名或密码错误，或账号已停用", site_config=get_site_config())
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return render_template("login.html", next_target=next_target, error="账户服务暂不可用，请稍后重试", site_config=get_site_config())
+        raise
+    save_current_demo_profile_id(user["username"])
     return redirect(next_target)
 
 
 @app.route("/logout")
 def logout():
-    session.pop(AUTH_SESSION_KEY, None)
-    if not is_password_gate_enabled():
-        return redirect("/")
+    save_current_demo_profile_id("")
     return redirect(url_for("login"))
 
 
@@ -62,7 +66,8 @@ def h5():
         fundamental_column = build_fundamental_column_payload(tenant)
         dashboard_seed_cards = build_indicator_dashboard_seed_cards(tenant, count=8)
         tenant_dashboard_payload = build_tenant_dashboard_payload(tenant)
-        demo_profiles = get_h5_login_users(site_config)
+        auth_settings = get_auth_settings(site_config)
+        demo_profiles = get_h5_login_users(site_config) if auth_settings.get("quick_select_enabled") else []
     except Exception as exc:
         if not is_db_unavailable_error(exc):
             raise
@@ -70,6 +75,9 @@ def h5():
         h5_fallback_mode = True
         fallback_config = normalize_site_config(site_config)
         demo_profiles, current_demo_profile = resolve_demo_profile_fallback(fallback_config)
+        auth_settings = get_auth_settings(fallback_config)
+        if auth_settings.get("quick_select_enabled") is not True:
+            demo_profiles = []
         effective_tenant_slug = requested_tenant_slug or (current_demo_profile.get("tenant", {}).get("slug") if current_demo_profile else None)
         tenant = get_tenant_by_slug(effective_tenant_slug, fallback_config)
         indicator_hub = build_indicator_hub_fallback(tenant=tenant, admin_view=False)
@@ -77,8 +85,10 @@ def h5():
         dashboard_seed_cards = build_indicator_dashboard_seed_cards_from_hub(indicator_hub, count=8)
         tenant_dashboard_payload = build_tenant_dashboard_payload_fallback(tenant)
     market = gen_market_data()
-    news = gen_news_feed()
     watchlist_details = gen_watchlist_details()
+    news_payload = build_fundamental_news_payload(tenant=tenant, watchlist_details=watchlist_details, limit=10)
+    news = news_payload.get("items") or []
+    news_tabs = news_payload.get("tabs") or []
     macro_indicators = [
         {
             "name": item.get("name") or "",
@@ -95,6 +105,7 @@ def h5():
         "h5.html",
         market=market,
         news=news,
+        news_tabs=news_tabs,
         macro_indicators=macro_indicators,
         feed_boards=feed_boards,
         watchlist_details=watchlist_details,

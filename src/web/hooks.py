@@ -9,15 +9,12 @@ def close_db(exc):
 
 
 def is_authenticated():
-    return session.get(AUTH_SESSION_KEY) is True
-
-
-def is_password_gate_enabled():
-    config = get_site_config()
-    if g.get("site_config_db_unavailable"):
-        app.logger.warning("Database unavailable while checking password gate, temporarily disabling gate")
-        return False
-    return bool(config.get("password_gate_enabled", True))
+    try:
+        return get_current_authenticated_user() is not None
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return False
+        raise
 
 
 def should_log_request():
@@ -28,20 +25,34 @@ def record_access(response):
     if not should_log_request():
         return response
     try:
+        current_profile = get_current_demo_profile()
+        tenant_slug = ""
+        user_profile_id = ""
+        user_role = ""
+        if isinstance(current_profile, dict):
+            tenant_slug = str((current_profile.get("tenant") or {}).get("slug") or current_profile.get("tenant_slug") or "").strip().lower()
+            user_profile_id = str(current_profile.get("username") or "").strip()
+            user_role = str(current_profile.get("role") or "").strip().lower()
+        if not tenant_slug:
+            tenant_slug = str(request.args.get("tenant") or "").strip().lower()
+        path_value = request.full_path.rstrip("?") if getattr(request, "full_path", "") else request.path
         db = get_db()
         db.execute(
             """
-            INSERT INTO access_logs (ip, path, method, status_code, created_at, user_agent, referrer)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO access_logs (ip, path, method, status_code, created_at, user_agent, referrer, tenant_slug, user_profile_id, user_role)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 get_client_ip(),
-                request.path,
+                path_value,
                 request.method,
                 response.status_code,
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 request.headers.get("User-Agent", ""),
                 request.headers.get("Referer", ""),
+                tenant_slug,
+                user_profile_id,
+                user_role,
             ),
         )
         db.commit()
@@ -53,15 +64,16 @@ def record_access(response):
 
 
 @app.before_request
-def require_password_gate():
-    if not is_password_gate_enabled():
-        return None
+def require_user_login():
     public_paths = {
         "/login",
-        "/unlock",
         "/logout",
         "/api/demo-profiles",
         "/api/demo-profile/switch",
+        "/api/h5/login/password",
+        "/api/h5/register/password",
+        "/api/h5/wechat/start",
+        "/api/h5/wechat/callback",
         "/api/h5/logout",
     }
     if request.path.startswith("/static/") or request.path in public_paths:

@@ -1,4 +1,5 @@
 import math
+import re
 
 from src.runtime import *
 from src.domain.core_services import *
@@ -23,7 +24,14 @@ def get_voice_transcription_config(site_config=None):
     engine = str((section or {}).get("engine") or "local").strip().lower()
     if engine not in {"local", "api"}:
         engine = "local"
-    return {"engine": engine}
+    post_process_mode = str((section or {}).get("post_process_mode") or "rule_based").strip().lower()
+    if post_process_mode not in {"none", "rule_based"}:
+        post_process_mode = "rule_based"
+    return {
+        "engine": engine,
+        "post_process_mode": post_process_mode,
+        "domain_glossary_enabled": (section or {}).get("domain_glossary_enabled", True) is not False,
+    }
 
 
 def get_voice_embedding_config(site_config=None):
@@ -119,6 +127,73 @@ def _extract_llm_text_content(content):
     return ""
 
 
+VOICE_TRANSCRIPT_ALIAS_TERMS = {
+    "上证指数": ["上证综指", "上证综合指数", "沪指", "sh000001"],
+    "CPI": ["cpi", "居民消费价格指数"],
+    "PPI": ["ppi", "工业生产者出厂价格指数"],
+    "PMI": ["pmi", "采购经理人指数"],
+    "GDP": ["gdp", "国内生产总值"],
+    "PE": ["pe", "市盈率"],
+    "PB": ["pb", "市净率"],
+    "PS": ["ps", "市销率"],
+    "ROE": ["roe", "净资产收益率"],
+    "EPS": ["eps", "每股收益"],
+    "AI": ["ai", "a i", "a. i."],
+    "AI算力": ["ai 算力", "人工智能算力"],
+    "腾讯控股": ["腾讯", "00700"],
+    "中芯国际": ["中芯国际", "688981", "0981"],
+    "贵州茅台": ["茅台", "600519"],
+    "宁德时代": ["300750"],
+    "中国银行": ["601988"],
+    "招商银行": ["600036"],
+    "比亚迪": ["002594"],
+    "寒武纪": ["688256"],
+    "美团-W": ["美团"],
+    "阿里巴巴-W": ["阿里", "阿里巴巴"],
+}
+
+VOICE_TRANSCRIPT_REGEX_REPLACEMENTS = [
+    (re.compile(r"(?<=[\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])"), ""),
+    (re.compile(r"[ \t]+\n"), "\n"),
+    (re.compile(r"\n{3,}"), "\n\n"),
+    (re.compile(r"[ ]{2,}"), " "),
+    (re.compile(r"[,，]{2,}"), "，"),
+    (re.compile(r"[。\.]{2,}"), "。"),
+    (re.compile(r"[；;]{2,}"), "；"),
+    (re.compile(r"[!！]{2,}"), "！"),
+    (re.compile(r"[?？]{2,}"), "？"),
+    (re.compile(r"(?<![A-Za-z])(pe|pb|ps|roe|eps|cpi|ppi|pmi|gdp)(?![A-Za-z])", re.IGNORECASE), lambda match: match.group(1).upper()),
+    (re.compile(r"\bai\b", re.IGNORECASE), "AI"),
+    (re.compile(r"\ba\s*i\b", re.IGNORECASE), "AI"),
+]
+
+
+def _apply_voice_transcript_rule_cleanup(text, domain_glossary_enabled=True):
+    cleaned = str(text or "").strip()
+    if not cleaned:
+        return ""
+    for pattern, replacement in VOICE_TRANSCRIPT_REGEX_REPLACEMENTS:
+        cleaned = pattern.sub(replacement, cleaned)
+    if domain_glossary_enabled:
+        for canonical, aliases in VOICE_TRANSCRIPT_ALIAS_TERMS.items():
+            for alias in aliases:
+                alias_text = str(alias or "").strip()
+                if not alias_text:
+                    continue
+                if re.fullmatch(r"[A-Za-z0-9 ._-]+", alias_text):
+                    cleaned = re.sub(
+                        rf"(?<![A-Za-z0-9]){re.escape(alias_text)}(?![A-Za-z0-9])",
+                        canonical,
+                        cleaned,
+                        flags=re.IGNORECASE,
+                    )
+                else:
+                    cleaned = cleaned.replace(alias_text, canonical)
+    cleaned = re.sub(r"[ \t]+", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
 def call_openai_compatible_llm(
     model_config,
     system_prompt,
@@ -199,6 +274,30 @@ def _is_truthy_flag(value):
 def enhance_review_voice_transcript_with_llm(transcript, entry_point="", speaker_name="", tenant_slug=""):
     workflow_definition = build_default_review_voice_enhancement_workflow_definition()
 
+    def _strip_transcript_editorial_preface(text):
+        normalized = str(text or "").strip()
+        if not normalized:
+            return ""
+        normalized = re.sub(r"^```[\w-]*\s*", "", normalized)
+        normalized = re.sub(r"\s*```$", "", normalized).strip()
+        preface_patterns = [
+            r"^(?:以下(?:是|为)?|下面(?:是|为)?)(?:整理后|修正后|修订后|润色后|优化后|加工后|增强后)?(?:的)?(?:文本|内容|版本|结果|正文|转写稿|整理稿)[：:\s]*",
+            r"^(?:已|已经)?(?:在不改变原意的前提下|不改变原意地)?(?:将|把)?(?:原始)?转写(?:内容)?(?:进行|做了)?(?:轻度|轻量)?(?:整理|修复|润色|优化|加工)[：:\s]*",
+            r"^由于原始转写存在.{0,80}?(?:表达|版本|内容)[：:\s]*",
+            r"^(?:说明|注|备注)[：:\s].{0,120}$",
+            r"^(?:我已|我会|现已|这里已)(?:在不改变原意的前提下)?.{0,80}?(?:如下|如下所示)[：:\s]*",
+        ]
+        previous = None
+        while normalized and normalized != previous:
+            previous = normalized
+            for pattern in preface_patterns:
+                candidate = re.sub(pattern, "", normalized, flags=re.IGNORECASE | re.DOTALL).strip()
+                if candidate != normalized:
+                    normalized = candidate
+            normalized = re.sub(r"^(?:整理稿|修订稿|优化稿|最终文本|正文)[：:\s]*", "", normalized).strip()
+            normalized = re.sub(r"^\s*[•\-]\s*", "", normalized).strip()
+        return normalized
+
     def _voice_input_executor(state, runtime, node, upstream):
         normalized_transcript = str(runtime.get("transcript") or "").strip()
         if not normalized_transcript:
@@ -226,6 +325,7 @@ def enhance_review_voice_transcript_with_llm(transcript, entry_point="", speaker
             "请基于原始转写内容做轻量增强整理，去掉明显口语噪音和重复，修复少量语病，"
             "保留原始事实、观点、风险提示与不确定性，不要补充原文没有提到的信息，不要编造数字。"
             "输出纯文本，优先按自然段组织；如果原文明显包含多个观点，可以拆成短段。"
+            "不要输出任何解释、说明、前言、后记、免责声明、处理备注或“以下是整理稿”之类的引导语，只输出最终正文。"
         )
         user_prompt = (
             f"场景：{state.get('context_label') or '语音转写增强'}\n"
@@ -260,7 +360,7 @@ def enhance_review_voice_transcript_with_llm(transcript, entry_point="", speaker
                 "workflow_id": workflow_definition["id"],
             },
         )
-        normalized_enhanced = str(enhanced_text or "").strip()
+        normalized_enhanced = _strip_transcript_editorial_preface(enhanced_text)
         if not normalized_enhanced:
             raise RuntimeError("empty_llm_response")
         return {
@@ -1041,11 +1141,22 @@ def analyze_review_watchlist_with_llm(
     job_code="",
 ):
     workflow_definition = build_default_review_watchlist_analysis_workflow_definition()
+    normalized_watchlist = [str(item).strip() for item in (selected_watchlist or []) if str(item).strip()]
+    if not normalized_watchlist:
+        return {
+            "sector_summary": "",
+            "sector_profiles": [],
+            "items": [],
+            "annotation_evidence": [],
+            "llm_model": None,
+            "workflow_meta": {
+                "status": "skipped",
+                "reason": "watchlist_not_selected",
+            },
+        }
 
     def _watchlist_input_executor(state, runtime, node, upstream):
         watchlist_items = [str(item).strip() for item in (runtime.get("selected_watchlist") or []) if str(item).strip()]
-        if not watchlist_items:
-            raise ValueError("review_selected_watchlist_required")
         return {
             "detail": "已接收本次复盘的自选股列表和用户输入正文。",
             "state_updates": {
@@ -1527,14 +1638,13 @@ def compose_review_structured_preview(
     entry_point="",
     tenant_slug="",
     job_code="",
+    include_summary=True,
 ):
     normalized_source = str(source_text or "").strip()
     if not normalized_source:
         raise ValueError("review_source_text_required")
     watchlist_items = [str(item).strip() for item in (selected_watchlist or []) if str(item).strip()]
-    if not watchlist_items:
-        raise ValueError("review_selected_watchlist_required")
-    if job_code:
+    if include_summary and job_code:
         report_user_async_job_progress(
             job_code,
             stage="review_summary_generating",
@@ -1542,31 +1652,58 @@ def compose_review_structured_preview(
             summary="正在生成复盘摘要",
             log_text="摘要仅基于用户自主输入内容生成，不引用自选股归纳。",
         )
-    summary_result = summarize_review_user_input_with_llm(
-        source_text=normalized_source,
-        review_period=review_period,
-        source_mode=source_mode,
-        speaker_name=speaker_name,
-        entry_point=entry_point,
-        tenant_slug=tenant_slug,
-    )
-    if job_code:
-        report_user_async_job_progress(
-            job_code,
-            stage="review_watchlist_analyzing",
-            percent=46,
-            summary="正在归纳自选股与板块代表性",
-            log_text="将按已选自选股归并板块，并生成逐股归纳分析。",
+    if include_summary:
+        summary_result = summarize_review_user_input_with_llm(
+            source_text=normalized_source,
+            review_period=review_period,
+            source_mode=source_mode,
+            speaker_name=speaker_name,
+            entry_point=entry_point,
+            tenant_slug=tenant_slug,
         )
-    watchlist_result = analyze_review_watchlist_with_llm(
-        selected_watchlist=watchlist_items,
-        review_period=review_period,
-        source_text=normalized_source,
-        speaker_name=speaker_name,
-        entry_point=entry_point,
-        tenant_slug=tenant_slug,
-        job_code=job_code,
-    )
+    else:
+        summary_result = {
+            "summary": "",
+            "llm_model": None,
+        }
+    if watchlist_items:
+        if job_code:
+            report_user_async_job_progress(
+                job_code,
+                stage="review_watchlist_analyzing",
+                percent=46,
+                summary="正在归纳自选股与板块代表性",
+                log_text="将按已选自选股归并板块，并生成逐股归纳分析。",
+            )
+        watchlist_result = analyze_review_watchlist_with_llm(
+            selected_watchlist=watchlist_items,
+            review_period=review_period,
+            source_text=normalized_source,
+            speaker_name=speaker_name,
+            entry_point=entry_point,
+            tenant_slug=tenant_slug,
+            job_code=job_code,
+        )
+    else:
+        if job_code:
+            report_user_async_job_progress(
+                job_code,
+                stage="review_watchlist_skipped",
+                percent=46,
+                summary="未选择自选股，跳过归纳总结",
+                log_text="本轮仅生成摘要和用户输入转化内容，不追加自选股归纳。",
+            )
+        watchlist_result = {
+            "sector_summary": "",
+            "sector_profiles": [],
+            "items": [],
+            "annotation_evidence": [],
+            "llm_model": None,
+            "workflow_meta": {
+                "status": "skipped",
+                "reason": "watchlist_not_selected",
+            },
+        }
     user_input_section = {
         "source_mode": str(source_mode or "").strip().lower() or "manual",
         "source_mode_label": _normalize_review_source_mode_label(source_mode),
@@ -1576,7 +1713,7 @@ def compose_review_structured_preview(
     watchlist_text = _compose_review_watchlist_analysis_text(watchlist_result)
     final_text = "\n\n".join(
         part for part in [
-            f"【复盘摘要】\n{summary_result['summary']}",
+            f"【复盘摘要】\n{summary_result['summary']}" if str(summary_result.get("summary") or "").strip() else "",
             f"【用户输入转化内容】\n{user_input_section['display_text']}",
             f"【自选股归纳分析】\n{watchlist_text}" if watchlist_text else "",
         ] if part
@@ -1600,8 +1737,12 @@ def compose_review_structured_preview(
             job_code,
             stage="review_preview_ready",
             percent=92,
-            summary="双段式复盘预览已准备完成",
-            log_text="用户输入部分和自选股归纳部分已合成，正在返回预览结果。",
+            summary="复盘预览已准备完成",
+            log_text=(
+                "用户输入部分和自选股归纳部分已合成，正在返回预览结果。"
+                if watchlist_items else
+                "摘要和用户输入转化内容已合成，正在返回预览结果。"
+            ),
         )
     return result
 
@@ -2791,6 +2932,20 @@ def search_evidence_chain(tenant_slug, query_text, limit=5, source_types=None):
     }
 
 
+def build_shared_agent_evidence_policy():
+    return {
+        "shared_capability": "evidence_chain",
+        "knowledge_first": True,
+        "priority": [
+            "knowledge_vector_retrieval",
+            "evidence_relevance_filter",
+            "platform_context_merge",
+            "llm_or_rule_synthesis",
+        ],
+        "description": "智能体在需要事实依据、研究上下文或证据归因时，优先从当前租户知识库向量库召回，再进入统一证据链整理。",
+    }
+
+
 def _extract_json_payload_from_llm_text(text, default):
     normalized = str(text or "").strip()
     if not normalized:
@@ -2924,6 +3079,7 @@ def _build_retrieval_agent_response(
         workflow_definition or build_default_evidence_chain_workflow_definition()
     )
     answer_feature_label = "知识问答生成" if workflow_definition.get("id") == "knowledge_query_agent" else "证据链问答生成"
+    shared_policy = build_shared_agent_evidence_policy()
 
     def _retrieval_input_executor(state, runtime, node, upstream):
         normalized_query = str(runtime.get("query_text") or "").strip()
@@ -2936,10 +3092,12 @@ def _build_retrieval_agent_response(
                 "normalized_query": normalized_query,
                 "normalized_sources": normalized_sources,
                 "llm_requested": bool(runtime.get("submit_to_model")),
+                "shared_retrieval_policy": copy.deepcopy(shared_policy),
             },
             "context_preview": {
                 "query_chars": len(normalized_query),
                 "source_count": len(normalized_sources),
+                "knowledge_first": True,
             },
         }
 
@@ -2967,7 +3125,10 @@ def _build_retrieval_agent_response(
         return {
             "detail": f"已召回 {len(result.get('evidence_items') or [])} 条候选结果。",
             "state_updates": {"retrieval_result": result},
-            "context_preview": {"match_count": len(result.get("evidence_items") or [])},
+            "context_preview": {
+                "match_count": len(result.get("evidence_items") or []),
+                "shared_capability": "evidence_chain",
+            },
         }
 
     def _retrieval_filter_executor(state, runtime, node, upstream):
@@ -3165,6 +3326,7 @@ def _build_retrieval_agent_response(
         },
     )
     final_result = copy.deepcopy(execution["state"].get("final_result") or {})
+    final_result["retrieval_policy"] = copy.deepcopy(execution["state"].get("shared_retrieval_policy") or shared_policy)
     final_result["workflow_meta"] = build_declared_agent_workflow_meta(
         workflow_definition,
         extras={"last_execution_steps": copy.deepcopy(execution.get("node_results") or {})},
@@ -3360,6 +3522,21 @@ def finalize_hermes_intent_plan(plan, question_text="", attachments=None, select
     )
     if resolved_mode:
         normalized_plan["preferred_mode"] = resolved_mode
+        stock_code = str(normalized_plan.get("stock_code") or "").strip()
+        indicator_code = str(normalized_plan.get("indicator_code") or "").strip()
+        if stock_code and not indicator_code:
+            existing_tools = [
+                str(item).strip()
+                for item in (normalized_plan.get("tools") if isinstance(normalized_plan.get("tools"), list) else [])
+                if str(item).strip()
+            ]
+            preserved_tools = []
+            for tool_name in ["knowledge.search", "evidence.search", "attachment.context"]:
+                if tool_name in existing_tools and tool_name not in preserved_tools:
+                    preserved_tools.append(tool_name)
+            normalized_plan["intent"] = "watchlist_fundamental"
+            normalized_plan["display_mode"] = "structured"
+            normalized_plan["tools"] = ["watchlist.detail"] + preserved_tools
         if str(normalized_plan.get("intent") or "").strip() == "smart_indicator_explain":
             normalized_plan["display_mode"] = "structured"
     task_family = infer_hermes_task_family(
@@ -4000,6 +4177,10 @@ def extract_hermes_memory_payload(question_text, plan, synthesis, tool_outputs=N
     topic_tags = _detect_hermes_topics(question, plan=plan, tool_outputs=tool_outputs)
     market_tags = _detect_hermes_markets(question)
     focus_symbols = _detect_hermes_focus_symbols(question, tool_outputs=tool_outputs)
+    missing_capability = detect_hermes_missing_capability(question, plan=plan, tool_outputs=tool_outputs)
+    missing_capability_tags = []
+    if isinstance(missing_capability, dict) and str(missing_capability.get("label") or "").strip():
+        missing_capability_tags.append(str(missing_capability.get("label") or "").strip())
     previous_total = int(((memory_state.get("user_profile") or {}).get("total_queries") or (memory_state.get("user_memory") or {}).get("total_turns") or 0))
     depth_base = {
         "small_talk": 10,
@@ -4067,6 +4248,7 @@ def extract_hermes_memory_payload(question_text, plan, synthesis, tool_outputs=N
             "topic_tags": topic_tags,
             "market_tags": market_tags,
             "preferred_response_style": preferred_response_style,
+            "missing_capability": copy.deepcopy(missing_capability) if missing_capability else None,
         },
     }
     existing_fact_memory = copy.deepcopy((memory_state.get("user_memory") or {}).get("fact_memory") or {})
@@ -4111,6 +4293,7 @@ def extract_hermes_memory_payload(question_text, plan, synthesis, tool_outputs=N
             "topic_tags": topic_tags,
             "market_tags": market_tags,
             "focus_symbols": focus_symbols,
+            "missing_capability_tags": missing_capability_tags,
         },
         "preferred_response_style": preferred_response_style,
         "preferred_intents": preferred_intents,
@@ -4138,6 +4321,7 @@ def extract_hermes_memory_payload(question_text, plan, synthesis, tool_outputs=N
             "topic_tags": topic_tags,
             "market_tags": market_tags,
             "focus_symbols": focus_symbols,
+            "missing_capability_tags": missing_capability_tags,
         },
     }
     turn_tags = {
@@ -4148,6 +4332,7 @@ def extract_hermes_memory_payload(question_text, plan, synthesis, tool_outputs=N
         "topic_tags": topic_tags,
         "market_tags": market_tags,
         "focus_symbols": focus_symbols,
+        "missing_capability_tags": missing_capability_tags,
     }
     return {
         "turn_record": {
@@ -4169,6 +4354,7 @@ def extract_hermes_memory_payload(question_text, plan, synthesis, tool_outputs=N
                 "conversion_signal_score": conversion_signal_score,
                 "interest_topics": interest_topics[:6],
                 "focus_symbols": merged_symbols[:6],
+                "missing_capability": copy.deepcopy(missing_capability) if missing_capability else None,
             },
         },
         "session_snapshot": session_snapshot,
@@ -5037,6 +5223,8 @@ def _extract_hermes_turn_metrics(turn_row):
     function_tags = tags.get("function_tags") if isinstance(tags.get("function_tags"), list) else []
     style_tags = tags.get("style_tags") if isinstance(tags.get("style_tags"), list) else []
     commercial_tags = tags.get("commercial_tags") if isinstance(tags.get("commercial_tags"), list) else []
+    missing_capability = metadata.get("missing_capability") if isinstance(metadata.get("missing_capability"), dict) else {}
+    missing_capability_tags = tags.get("missing_capability_tags") if isinstance(tags.get("missing_capability_tags"), list) else []
     return {
         "mode_label": mode_label,
         "tool_trace": tool_trace,
@@ -5048,6 +5236,8 @@ def _extract_hermes_turn_metrics(turn_row):
         "function_tags": function_tags,
         "style_tags": style_tags,
         "commercial_tags": commercial_tags,
+        "missing_capability": missing_capability,
+        "missing_capability_tags": missing_capability_tags,
     }
 
 
@@ -5116,7 +5306,8 @@ def build_admin_hermes_usage_stats(tenant_slug=""):
 
     turn_rows = db.execute(
         f"""
-        SELECT user_profile_id, user_display_name, user_role, entry_point, intent, preferred_mode, tool_trace_json, tags_json, memory_summary_json, created_at
+        SELECT user_profile_id, user_display_name, user_role, entry_point, intent, preferred_mode,
+               question_text, tool_trace_json, tags_json, memory_summary_json, created_at
         FROM hermes_conversation_turns
         WHERE {month_where_sql}
         ORDER BY created_at DESC, id DESC
@@ -5127,11 +5318,14 @@ def build_admin_hermes_usage_stats(tenant_slug=""):
     mode_today = {}
     mode_month = {}
     user_rank = {}
+    missing_capability_rank = {}
     total_compute_units = 0
     total_latency = 0
     total_calls = 0
+    missing_capability_turns = 0
     for row in turn_rows:
         metrics = _extract_hermes_turn_metrics(row)
+        row_data = dict(row) if isinstance(row, dict) else {}
         mode_label = metrics["mode_label"]
         bucket = mode_month.setdefault(mode_label, {"mode_label": mode_label, "today_calls": 0, "month_calls": 0, "compute_units": 0, "latency_ms_total": 0})
         bucket["month_calls"] += 1
@@ -5141,15 +5335,15 @@ def build_admin_hermes_usage_stats(tenant_slug=""):
         total_latency += metrics["latency_ms"]
         total_calls += 1
 
-        created_at = str((dict(row)).get("created_at") or "")
+        created_at = str(row_data.get("created_at") or "")
         if created_at >= today_start:
           bucket["today_calls"] += 1
 
-        user_id = str((dict(row)).get("user_profile_id") or "").strip() or "guest"
+        user_id = str(row_data.get("user_profile_id") or "").strip() or "guest"
         user_bucket = user_rank.setdefault(user_id, {
             "user_profile_id": user_id,
-            "user_name": str((dict(row)).get("user_display_name") or user_id).strip() or user_id,
-            "user_role": str((dict(row)).get("user_role") or "").strip(),
+            "user_name": str(row_data.get("user_display_name") or user_id).strip() or user_id,
+            "user_role": str(row_data.get("user_role") or "").strip(),
             "month_calls": 0,
             "compute_units": 0,
             "mode_counts": {},
@@ -5169,6 +5363,31 @@ def build_admin_hermes_usage_stats(tenant_slug=""):
                 tool_bucket["ok_count"] += 1
             elif status == "error":
                 tool_bucket["error_count"] += 1
+
+        missing_capability = metrics.get("missing_capability") if isinstance(metrics.get("missing_capability"), dict) else {}
+        missing_label = str(missing_capability.get("label") or "").strip()
+        if missing_label:
+            missing_capability_turns += 1
+            capability_code = str(missing_capability.get("code") or missing_label).strip() or missing_label
+            capability_bucket = missing_capability_rank.setdefault(capability_code, {
+                "code": capability_code,
+                "label": missing_label,
+                "category": str(missing_capability.get("category") or "能力缺口").strip() or "能力缺口",
+                "intent": str(missing_capability.get("intent") or "").strip(),
+                "mentions": 0,
+                "users": set(),
+                "latest_question": "",
+                "latest_created_at": "",
+                "target_date": str(missing_capability.get("target_date") or "").strip(),
+                "object_name": str(missing_capability.get("object_name") or "").strip(),
+            })
+            capability_bucket["mentions"] += 1
+            capability_bucket["users"].add(user_id)
+            if created_at >= str(capability_bucket.get("latest_created_at") or ""):
+                capability_bucket["latest_created_at"] = created_at
+                capability_bucket["latest_question"] = str(row_data.get("question_text") or "").strip()
+                capability_bucket["target_date"] = str(missing_capability.get("target_date") or capability_bucket.get("target_date") or "").strip()
+                capability_bucket["object_name"] = str(missing_capability.get("object_name") or capability_bucket.get("object_name") or "").strip()
 
     month_call_count = int(month_row.get("call_count") or 0)
     today_call_count = int(today_row.get("call_count") or 0)
@@ -5232,6 +5451,25 @@ def build_admin_hermes_usage_stats(tenant_slug=""):
             "top_mode": top_mode,
         })
 
+    missing_rows = []
+    sorted_missing = sorted(
+        missing_capability_rank.values(),
+        key=lambda row: (-int(row.get("mentions") or 0), -len(row.get("users") or []), row.get("label") or ""),
+    )
+    for item in sorted_missing[:12]:
+        missing_rows.append({
+            "code": item.get("code") or "",
+            "label": item.get("label") or "",
+            "category": item.get("category") or "能力缺口",
+            "intent": item.get("intent") or "",
+            "mentions": int(item.get("mentions") or 0),
+            "user_count": len(item.get("users") or []),
+            "latest_question": _hermes_trim_text(item.get("latest_question") or "", limit=88),
+            "latest_created_at": str(item.get("latest_created_at") or "").strip(),
+            "target_date": str(item.get("target_date") or "").strip(),
+            "object_name": str(item.get("object_name") or "").strip(),
+        })
+
     total_pool = max(50000, month_token_total * 6 if month_token_total else total_compute_units * 20)
     consumed = max(total_compute_units, month_token_total)
     remaining = max(0, total_pool - consumed)
@@ -5247,11 +5485,14 @@ def build_admin_hermes_usage_stats(tenant_slug=""):
             "today_tokens": today_token_total,
             "month_tokens": month_token_total,
             "avg_latency_ms": round(total_latency / total_calls, 2) if total_calls else 0,
+            "missing_capability_turns": int(missing_capability_turns or 0),
+            "missing_capability_count": len(missing_rows),
             "generated_at": now_ts(),
         },
         "tool_modes": mode_rows[:8],
         "tool_actions": tool_rows[:12],
         "user_ranking": rank_rows,
+        "missing_capabilities": missing_rows,
         "compute_pool": {
             "total": int(total_pool),
             "consumed": int(consumed),
@@ -5354,6 +5595,187 @@ def build_user_hermes_usage_snapshot(tenant_slug="", user_profile_id="", quota_t
         "month_compute_units": month_compute_units,
         "latest_turn_at": latest_turn_at,
         "generated_at": now_ts(),
+    }
+
+
+HERMES_SESSION_INTENT_LABELS = {
+    "small_talk": "轻度闲聊",
+    "product_help": "产品帮助",
+    "watchlist_fundamental": "个股研究",
+    "knowledge_lookup": "知识问答",
+    "evidence_chain_analysis": "证据链分析",
+    "smart_indicator_explain": "指标解读",
+    "dashboard_interpretation": "Dashboard解读",
+    "multi_tool_research": "综合研究",
+    "out_of_scope_redirect": "范围收口",
+}
+
+
+def get_hermes_intent_label(intent):
+    key = str(intent or "").strip()
+    return HERMES_SESSION_INTENT_LABELS.get(key) or key or "Hermes 对话"
+
+
+def build_hermes_session_list(actor_context, limit=24, keyword=""):
+    actor = actor_context if isinstance(actor_context, dict) else {}
+    tenant_slug = str(actor.get("tenant_slug") or "").strip().lower()
+    user_profile_id = str(actor.get("profile_id") or "").strip()
+    if not tenant_slug or not user_profile_id:
+        return []
+    db = get_db()
+    safe_limit = max(1, min(int(limit or 24), 80))
+    rows = db.execute(
+        """
+        SELECT
+            sm.session_id,
+            sm.user_display_name,
+            sm.turn_count,
+            sm.summary_text,
+            sm.last_intent,
+            sm.first_seen_at,
+            sm.last_seen_at,
+            COALESCE((
+                SELECT question_text
+                FROM hermes_conversation_turns t1
+                WHERE t1.tenant_slug = sm.tenant_slug AND t1.user_profile_id = sm.user_profile_id AND t1.session_id = sm.session_id
+                ORDER BY t1.created_at ASC, t1.id ASC
+                LIMIT 1
+            ), '') AS first_question,
+            COALESCE((
+                SELECT question_text
+                FROM hermes_conversation_turns t2
+                WHERE t2.tenant_slug = sm.tenant_slug AND t2.user_profile_id = sm.user_profile_id AND t2.session_id = sm.session_id
+                ORDER BY t2.created_at DESC, t2.id DESC
+                LIMIT 1
+            ), '') AS last_question,
+            COALESCE((
+                SELECT answer_summary
+                FROM hermes_conversation_turns t3
+                WHERE t3.tenant_slug = sm.tenant_slug AND t3.user_profile_id = sm.user_profile_id AND t3.session_id = sm.session_id
+                ORDER BY t3.created_at DESC, t3.id DESC
+                LIMIT 1
+            ), '') AS last_answer_summary,
+            COALESCE((
+                SELECT answer_text
+                FROM hermes_conversation_turns t4
+                WHERE t4.tenant_slug = sm.tenant_slug AND t4.user_profile_id = sm.user_profile_id AND t4.session_id = sm.session_id
+                ORDER BY t4.created_at DESC, t4.id DESC
+                LIMIT 1
+            ), '') AS last_answer_text
+        FROM hermes_session_memory sm
+        WHERE sm.tenant_slug = ? AND sm.user_profile_id = ?
+        ORDER BY sm.last_seen_at DESC, sm.session_id DESC
+        LIMIT ?
+        """,
+        (tenant_slug, user_profile_id, safe_limit),
+    ).fetchall()
+    normalized_keyword = str(keyword or "").strip().lower()
+    sessions = []
+    for row in rows:
+        item = dict(row or {})
+        title = trim_hermes_text(item.get("first_question") or item.get("summary_text") or item.get("last_question") or "新会话", limit=36)
+        preview = trim_hermes_text(
+            item.get("last_answer_summary") or item.get("summary_text") or item.get("last_answer_text") or item.get("last_question") or "",
+            limit=72,
+        )
+        last_question = trim_hermes_text(item.get("last_question") or item.get("first_question") or "", limit=72)
+        corpus = " ".join([
+            str(title or ""),
+            str(preview or ""),
+            str(last_question or ""),
+        ]).lower()
+        if normalized_keyword and normalized_keyword not in corpus:
+            continue
+        sessions.append({
+            "session_id": str(item.get("session_id") or "").strip(),
+            "title": title or "新会话",
+            "preview": preview,
+            "last_question": last_question,
+            "turn_count": int(item.get("turn_count") or 0),
+            "last_intent": str(item.get("last_intent") or "").strip(),
+            "last_intent_label": get_hermes_intent_label(item.get("last_intent")),
+            "first_seen_at": str(item.get("first_seen_at") or "").strip(),
+            "last_seen_at": str(item.get("last_seen_at") or "").strip(),
+            "user_display_name": str(item.get("user_display_name") or actor.get("display_name") or user_profile_id).strip() or user_profile_id,
+        })
+    return sessions
+
+
+def build_hermes_session_detail(actor_context, session_id):
+    actor = actor_context if isinstance(actor_context, dict) else {}
+    tenant_slug = str(actor.get("tenant_slug") or "").strip().lower()
+    user_profile_id = str(actor.get("profile_id") or "").strip()
+    normalized_session_id = slugify_code(session_id, "")
+    if not tenant_slug or not user_profile_id or not normalized_session_id:
+        raise ValueError("hermes_session_id_required")
+    db = get_db()
+    session_row = db.execute(
+        """
+        SELECT session_id, tenant_slug, user_profile_id, user_role, user_display_name, turn_count,
+               summary_text, last_intent, first_seen_at, last_seen_at
+        FROM hermes_session_memory
+        WHERE tenant_slug = ? AND user_profile_id = ? AND session_id = ?
+        """,
+        (tenant_slug, user_profile_id, normalized_session_id),
+    ).fetchone()
+    turn_rows = db.execute(
+        """
+        SELECT turn_id, question_text, answer_text, answer_summary, intent, scope_status,
+               display_mode, preferred_mode, tags_json, memory_summary_json, citations_json, created_at
+        FROM hermes_conversation_turns
+        WHERE tenant_slug = ? AND user_profile_id = ? AND session_id = ?
+        ORDER BY created_at ASC, id ASC
+        """,
+        (tenant_slug, user_profile_id, normalized_session_id),
+    ).fetchall()
+    turns = []
+    for row in turn_rows:
+        item = dict(row or {})
+        turns.append({
+            "turn_id": str(item.get("turn_id") or "").strip(),
+            "question_text": str(item.get("question_text") or "").strip(),
+            "answer_text": str(item.get("answer_text") or "").strip(),
+            "answer_summary": str(item.get("answer_summary") or "").strip(),
+            "intent": str(item.get("intent") or "").strip(),
+            "intent_label": get_hermes_intent_label(item.get("intent")),
+            "scope_status": str(item.get("scope_status") or "").strip(),
+            "display_mode": str(item.get("display_mode") or "").strip() or "text",
+            "preferred_mode": str(item.get("preferred_mode") or "").strip(),
+            "tags": _extract_json_text_field(item, "tags_json", {}),
+            "memory_summary": _extract_json_text_field(item, "memory_summary_json", {}),
+            "citations": _extract_json_text_field(item, "citations_json", []),
+            "created_at": str(item.get("created_at") or "").strip(),
+        })
+    if not session_row and not turns:
+        raise ValueError("hermes_session_not_found")
+    session_item = dict(session_row or {})
+    title = trim_hermes_text(
+        (turns[0].get("question_text") if turns else "")
+        or session_item.get("summary_text")
+        or (turns[-1].get("question_text") if turns else "")
+        or "新会话",
+        limit=36,
+    )
+    preview = trim_hermes_text(
+        (turns[-1].get("answer_summary") if turns else "")
+        or session_item.get("summary_text")
+        or (turns[-1].get("answer_text") if turns else "")
+        or "",
+        limit=72,
+    )
+    return {
+        "session": {
+            "session_id": normalized_session_id,
+            "title": title or "新会话",
+            "preview": preview,
+            "turn_count": int(session_item.get("turn_count") or len(turns)),
+            "last_intent": str(session_item.get("last_intent") or (turns[-1].get("intent") if turns else "") or "").strip(),
+            "last_intent_label": get_hermes_intent_label(session_item.get("last_intent") or (turns[-1].get("intent") if turns else "")),
+            "first_seen_at": str(session_item.get("first_seen_at") or (turns[0].get("created_at") if turns else "") or "").strip(),
+            "last_seen_at": str(session_item.get("last_seen_at") or (turns[-1].get("created_at") if turns else "") or "").strip(),
+            "user_display_name": str(session_item.get("user_display_name") or actor.get("display_name") or user_profile_id).strip() or user_profile_id,
+        },
+        "turns": turns,
     }
 
 
@@ -5793,7 +6215,12 @@ def build_hermes_scope_synthesis(plan):
         for item in (intent_plan.get("guard_suggestions") if isinstance(intent_plan.get("guard_suggestions"), list) else [])
         if str(item).strip()
     ][:4]
-    answer = message or "Hermes 这轮先不直接展开，因为当前问题没有落在平台的核心服务范围内。"
+    answer = ensure_hermes_positive_opening(
+        message or "Hermes 这轮先不直接展开，因为当前问题没有落在平台的核心服务范围内。",
+        question_text=str(intent_plan.get("question_text") or "").strip(),
+        intent=str(intent_plan.get("intent") or "").strip(),
+        scope_status=str(intent_plan.get("scope_status") or "redirected").strip(),
+    )
     return {
         "answer": answer,
         "summary": str(intent_plan.get("reason") or "问题已被范围守卫收口。").strip(),
@@ -5977,10 +6404,18 @@ def find_watchlist_code_from_text(text):
             return code
     extra_aliases = {
         "中国银行": "601988",
+        "日久光新": "003015",
+        "日久光电": "003015",
     }
     for alias, code in extra_aliases.items():
         if alias in normalized:
             return code
+    try:
+        candidates = search_watchlist_candidates(normalized, top=3, include_remote=True)
+    except Exception:
+        candidates = []
+    if candidates:
+        return str((candidates[0] or {}).get("code") or "").strip()
     return ""
 
 
@@ -6018,7 +6453,429 @@ def find_indicator_reference_from_text(text, tenant_slug=""):
                     "indicator_code": code,
                     "indicator_name": name or code,
                 }
+    for indicator_code, registry_entry in GANGTISE_INDICATOR_REGISTRY.items():
+        name = str(registry_entry.get("indicator_name") or indicator_code).strip()
+        aliases = [indicator_code, name]
+        aliases.extend(alias_map.get(name, []))
+        for alias in aliases:
+            candidate = str(alias or "").strip()
+            if candidate and candidate.lower() in lowered:
+                return {
+                    "indicator_code": indicator_code,
+                    "indicator_name": name or indicator_code,
+                }
     return None
+
+
+def extract_hermes_explicit_date(question_text):
+    text = str(question_text or "").strip()
+    if not text:
+        return ""
+    match = re.search(r"\b(20\d{2})[-/年\.](\d{1,2})[-/月\.](\d{1,2})日?\b", text)
+    if match:
+        year, month, day = [int(item) for item in match.groups()]
+        try:
+            return datetime(year, month, day).strftime("%Y-%m-%d")
+        except ValueError:
+            return ""
+    match = re.search(r"(?<!\d)(\d{1,2})月(\d{1,2})日", text)
+    if match:
+        month, day = [int(item) for item in match.groups()]
+        year = datetime.now().year
+        try:
+            return datetime(year, month, day).strftime("%Y-%m-%d")
+        except ValueError:
+            return ""
+    return ""
+
+
+def _normalize_hermes_date_text(value):
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    match = re.search(r"(20\d{2}-\d{2}-\d{2})", text)
+    return match.group(1) if match else text[:10]
+
+
+def build_hermes_indicator_fetch_window(question_text):
+    target_date = extract_hermes_explicit_date(question_text)
+    if not target_date:
+        return "", ""
+    try:
+        target_dt = datetime.strptime(target_date, "%Y-%m-%d")
+    except ValueError:
+        return "", ""
+    start_dt = target_dt - timedelta(days=180)
+    return start_dt.strftime("%Y-%m-%d"), target_date
+
+
+def resolve_hermes_indicator_target_snapshot(detail, question_text=""):
+    detail = detail if isinstance(detail, dict) else {}
+    target_date = extract_hermes_explicit_date(question_text)
+    if not target_date:
+        return None
+    candles = ((detail.get("history_kline") or {}).get("candles") or []) if isinstance(detail.get("history_kline"), dict) else []
+    normalized_candles = [item for item in candles if isinstance(item, dict) and _normalize_hermes_date_text(item.get("date"))]
+    normalized_candles.sort(key=lambda item: _normalize_hermes_date_text(item.get("date")))
+    exact_index = next((idx for idx, item in enumerate(normalized_candles) if _normalize_hermes_date_text(item.get("date")) == target_date), -1)
+    matched_index = exact_index
+    matched_exact = True
+    if matched_index < 0 and normalized_candles:
+        eligible_indexes = [
+            idx for idx, item in enumerate(normalized_candles)
+            if _normalize_hermes_date_text(item.get("date")) <= target_date
+        ]
+        if eligible_indexes:
+            matched_index = eligible_indexes[-1]
+            matched_exact = _normalize_hermes_date_text(normalized_candles[matched_index].get("date")) == target_date
+    if matched_index >= 0:
+        candle = dict(normalized_candles[matched_index])
+        previous_candle = dict(normalized_candles[matched_index - 1]) if matched_index > 0 else {}
+        close_value = NumberLike(candle.get("close"))
+        prev_close = NumberLike(previous_candle.get("close")) if previous_candle else close_value
+        change_value = round(close_value - prev_close, 4)
+        change_pct = round((change_value / prev_close) * 100, 2) if prev_close else 0.0
+        return {
+            "target_date": target_date,
+            "matched_date": _normalize_hermes_date_text(candle.get("date")),
+            "matched_exact": matched_exact,
+            "open": round(NumberLike(candle.get("open")), 4),
+            "high": round(NumberLike(candle.get("high")), 4),
+            "low": round(NumberLike(candle.get("low")), 4),
+            "close": round(close_value, 4),
+            "prev_close": round(prev_close, 4),
+            "change": change_value,
+            "change_pct": change_pct,
+            "status": build_real_indicator_status(close_value, prev_close),
+            "window_start_index": max(0, matched_index - 20),
+            "window_end_index": min(len(normalized_candles), matched_index + 21),
+        }
+    history_series = detail.get("history_series") if isinstance(detail.get("history_series"), list) else []
+    normalized_series = [item for item in history_series if isinstance(item, dict) and _normalize_hermes_date_text(item.get("date"))]
+    normalized_series.sort(key=lambda item: _normalize_hermes_date_text(item.get("date")))
+    exact_index = next((idx for idx, item in enumerate(normalized_series) if _normalize_hermes_date_text(item.get("date")) == target_date), -1)
+    matched_index = exact_index
+    matched_exact = True
+    if matched_index < 0 and normalized_series:
+        eligible_indexes = [
+            idx for idx, item in enumerate(normalized_series)
+            if _normalize_hermes_date_text(item.get("date")) <= target_date
+        ]
+        if eligible_indexes:
+            matched_index = eligible_indexes[-1]
+            matched_exact = _normalize_hermes_date_text(normalized_series[matched_index].get("date")) == target_date
+    if matched_index >= 0:
+        point = dict(normalized_series[matched_index])
+        previous_point = dict(normalized_series[matched_index - 1]) if matched_index > 0 else {}
+        value = NumberLike(point.get("value"))
+        prev_value = NumberLike(previous_point.get("value")) if previous_point else value
+        change_value = round(value - prev_value, 4)
+        change_pct = round((change_value / prev_value) * 100, 2) if prev_value else 0.0
+        return {
+            "target_date": target_date,
+            "matched_date": _normalize_hermes_date_text(point.get("date")),
+            "matched_exact": matched_exact,
+            "open": None,
+            "high": None,
+            "low": None,
+            "close": round(value, 4),
+            "prev_close": round(prev_value, 4),
+            "change": change_value,
+            "change_pct": change_pct,
+            "status": str(point.get("status") or build_real_indicator_status(value, prev_value)).strip() or "attention",
+            "window_start_index": max(0, matched_index - 20),
+            "window_end_index": min(len(normalized_series), matched_index + 21),
+        }
+    return {
+        "target_date": target_date,
+        "matched_date": "",
+        "matched_exact": False,
+        "data_unavailable": True,
+    }
+
+
+def _build_watchlist_history_series_from_detail(detail):
+    detail = detail if isinstance(detail, dict) else {}
+    history_series = detail.get("history_series") if isinstance(detail.get("history_series"), list) else []
+    normalized = [item for item in history_series if isinstance(item, dict) and _normalize_hermes_date_text(item.get("date"))]
+    if normalized:
+        normalized.sort(key=lambda item: _normalize_hermes_date_text(item.get("date")))
+        return normalized
+    candles = ((detail.get("history_kline") or {}).get("candles") or []) if isinstance(detail.get("history_kline"), dict) else []
+    normalized = []
+    previous_close = None
+    for candle in candles:
+        if not isinstance(candle, dict):
+            continue
+        date_value = _normalize_hermes_date_text(candle.get("date"))
+        if not date_value:
+            continue
+        close_value = NumberLike(candle.get("close"))
+        prev_close = previous_close if previous_close is not None else close_value
+        normalized.append({
+            "date": date_value,
+            "value": round(close_value, 4),
+            "status": build_real_indicator_status(close_value, prev_close),
+        })
+        previous_close = close_value
+    return normalized
+
+
+def resolve_hermes_watchlist_target_snapshot(detail, question_text=""):
+    detail = detail if isinstance(detail, dict) else {}
+    target_date = extract_hermes_explicit_date(question_text)
+    if not target_date:
+        return None
+    candles = ((detail.get("history_kline") or {}).get("candles") or []) if isinstance(detail.get("history_kline"), dict) else []
+    normalized_candles = [item for item in candles if isinstance(item, dict) and _normalize_hermes_date_text(item.get("date"))]
+    normalized_candles.sort(key=lambda item: _normalize_hermes_date_text(item.get("date")))
+    exact_index = next((idx for idx, item in enumerate(normalized_candles) if _normalize_hermes_date_text(item.get("date")) == target_date), -1)
+    matched_index = exact_index
+    matched_exact = True
+    if matched_index < 0 and normalized_candles:
+        eligible_indexes = [
+            idx for idx, item in enumerate(normalized_candles)
+            if _normalize_hermes_date_text(item.get("date")) <= target_date
+        ]
+        if eligible_indexes:
+            matched_index = eligible_indexes[-1]
+            matched_exact = _normalize_hermes_date_text(normalized_candles[matched_index].get("date")) == target_date
+    if matched_index >= 0:
+        candle = dict(normalized_candles[matched_index])
+        previous_candle = dict(normalized_candles[matched_index - 1]) if matched_index > 0 else {}
+        close_value = NumberLike(candle.get("close"))
+        prev_close = NumberLike(previous_candle.get("close")) if previous_candle else close_value
+        change_value = round(close_value - prev_close, 4)
+        change_pct = round((change_value / prev_close) * 100, 2) if prev_close else 0.0
+        return {
+            "target_date": target_date,
+            "matched_date": _normalize_hermes_date_text(candle.get("date")),
+            "matched_exact": matched_exact,
+            "open": round(NumberLike(candle.get("open")), 4),
+            "high": round(NumberLike(candle.get("high")), 4),
+            "low": round(NumberLike(candle.get("low")), 4),
+            "close": round(close_value, 4),
+            "prev_close": round(prev_close, 4),
+            "change": change_value,
+            "change_pct": change_pct,
+            "status": build_real_indicator_status(close_value, prev_close),
+            "window_start_index": max(0, matched_index - 20),
+            "window_end_index": min(len(normalized_candles), matched_index + 21),
+        }
+    return {
+        "target_date": target_date,
+        "matched_date": "",
+        "matched_exact": False,
+        "data_unavailable": True,
+    }
+
+
+def build_hermes_indicator_rule_synthesis(question_text, plan, detail):
+    detail = detail if isinstance(detail, dict) else {}
+    plan = plan if isinstance(plan, dict) else {}
+    name = str(detail.get("name") or detail.get("indicator_name") or "该指标").strip() or "该指标"
+    target_snapshot = detail.get("target_snapshot") if isinstance(detail.get("target_snapshot"), dict) else {}
+    if target_snapshot and not target_snapshot.get("data_unavailable"):
+        matched_date = str(target_snapshot.get("matched_date") or target_snapshot.get("target_date") or "").strip()
+        target_date = str(target_snapshot.get("target_date") or matched_date).strip()
+        exact_text = "" if target_snapshot.get("matched_exact") else f" {target_date} 不是交易日，当前改按最近一个可用交易日 {matched_date} 处理。"
+        close_value = target_snapshot.get("close")
+        prev_close = target_snapshot.get("prev_close")
+        change_value = NumberLike(target_snapshot.get("change"))
+        change_pct = NumberLike(target_snapshot.get("change_pct"))
+        high_value = target_snapshot.get("high")
+        low_value = target_snapshot.get("low")
+        direction_text = "收涨" if change_value > 0 else ("收跌" if change_value < 0 else "平收")
+        answer = (
+            f"{name}在 {matched_date} 的单日表现已经拿到。"
+            f"{exact_text}"
+            f" 当日收于 {close_value}，前一交易日收于 {prev_close}，单日{direction_text} {abs(change_value):.2f}"
+            f"{detail.get('unit') or ''}，幅度 {abs(change_pct):.2f}% 。"
+        )
+        if high_value is not None and low_value is not None:
+            answer += f" 日内区间在 {low_value} 到 {high_value} 之间。"
+        status = str(target_snapshot.get("status") or "").strip()
+        if status == "warning":
+            answer += " 当天波动偏大，适合结合前后几个交易日继续看情绪和量价确认。"
+        elif status == "good":
+            answer += " 当天表现相对偏强，但是否形成趋势还要结合后续延续性判断。"
+        else:
+            answer += " 这更适合看成单日状态点位，还不能单凭一天直接外推完整趋势。"
+        return {
+            "answer": ensure_hermes_positive_opening(
+                answer,
+                question_text=question_text,
+                intent=str(plan.get("intent") or "").strip(),
+                scope_status=str(plan.get("scope_status") or "allowed").strip(),
+            ),
+            "summary": f"{matched_date} {name}单日分析",
+            "bullets": [
+                f"收盘：{close_value}{detail.get('unit') or ''}",
+                f"单日变动：{'+' if change_value > 0 else ''}{change_value:.2f}{detail.get('unit') or ''} / {'+' if change_pct > 0 else ''}{change_pct:.2f}%",
+                (
+                    f"日内区间：{low_value} - {high_value}"
+                    if high_value is not None and low_value is not None else
+                    f"状态：{status or 'attention'}"
+                ),
+            ],
+            "citations": [],
+        }
+    if target_snapshot and target_snapshot.get("data_unavailable"):
+        target_date = str(target_snapshot.get("target_date") or extract_hermes_explicit_date(question_text) or "").strip()
+        return {
+            "answer": ensure_hermes_positive_opening(
+                f"当前没有命中 {target_date} 这一天的 {name} 可用交易数据。你可以改问最近 1 个月 / 3 个月走势，或者直接问最新走势判断。",
+                question_text=question_text,
+                intent=str(plan.get("intent") or "").strip(),
+                scope_status=str(plan.get("scope_status") or "allowed").strip(),
+            ),
+            "summary": f"{target_date or '指定日期'} {name}暂无可用交易数据",
+            "bullets": [
+                f"可以先看{name}最近 1 个月走势。",
+                f"也可以直接问{name}当前怎么解读。",
+            ],
+            "citations": [],
+        }
+    history_series = detail.get("history_series") if isinstance(detail.get("history_series"), list) else []
+    if history_series:
+        latest = history_series[-1]
+        latest_value = latest.get("value")
+        latest_date = str(latest.get("date") or "").strip()
+        return {
+            "answer": ensure_hermes_positive_opening(
+                f"{name}当前最新可用数据在 {latest_date}，最新值为 {latest_value}{detail.get('unit') or ''}。当前更适合先结合最近趋势和异动点做判断。",
+                question_text=question_text,
+                intent=str(plan.get("intent") or "").strip(),
+                scope_status=str(plan.get("scope_status") or "allowed").strip(),
+            ),
+            "summary": f"{name}最新走势摘要",
+            "bullets": [],
+            "citations": [],
+        }
+    return None
+
+
+def build_hermes_watchlist_rule_synthesis(question_text, plan, detail):
+    detail = detail if isinstance(detail, dict) else {}
+    plan = plan if isinstance(plan, dict) else {}
+    name = str(detail.get("name") or detail.get("code") or "该股票").strip() or "该股票"
+    target_snapshot = detail.get("target_snapshot") if isinstance(detail.get("target_snapshot"), dict) else {}
+    if target_snapshot and not target_snapshot.get("data_unavailable"):
+        matched_date = str(target_snapshot.get("matched_date") or target_snapshot.get("target_date") or "").strip()
+        target_date = str(target_snapshot.get("target_date") or matched_date).strip()
+        exact_text = "" if target_snapshot.get("matched_exact") else f" {target_date} 不是交易日，当前改按最近一个可用交易日 {matched_date} 处理。"
+        close_value = target_snapshot.get("close")
+        prev_close = target_snapshot.get("prev_close")
+        change_value = NumberLike(target_snapshot.get("change"))
+        change_pct = NumberLike(target_snapshot.get("change_pct"))
+        high_value = target_snapshot.get("high")
+        low_value = target_snapshot.get("low")
+        direction_text = "收涨" if change_value > 0 else ("收跌" if change_value < 0 else "平收")
+        answer = (
+            f"{name}在 {matched_date} 的单日行情已经拿到。"
+            f"{exact_text}"
+            f" 当日收于 {close_value}，前一交易日收于 {prev_close}，单日{direction_text} {abs(change_value):.2f}，幅度 {abs(change_pct):.2f}% 。"
+        )
+        if high_value is not None and low_value is not None:
+            answer += f" 日内区间在 {low_value} 到 {high_value} 之间。"
+        status = str(target_snapshot.get("status") or "").strip()
+        if status == "warning":
+            answer += " 当天波动偏大，更适合结合前后几个交易日继续确认情绪与趋势延续。"
+        elif status == "good":
+            answer += " 当天表现相对偏强，但是否形成阶段趋势还要继续看后续承接。"
+        else:
+            answer += " 这更适合先看成单日状态，还不能单凭一天外推完整结论。"
+        return {
+            "answer": ensure_hermes_positive_opening(
+                answer,
+                question_text=question_text,
+                intent=str(plan.get("intent") or "").strip(),
+                scope_status=str(plan.get("scope_status") or "allowed").strip(),
+            ),
+            "summary": f"{matched_date} {name}单日分析",
+            "bullets": [
+                f"收盘：{close_value}",
+                f"单日变动：{'+' if change_value > 0 else ''}{change_value:.2f} / {'+' if change_pct > 0 else ''}{change_pct:.2f}%",
+                (
+                    f"日内区间：{low_value} - {high_value}"
+                    if high_value is not None and low_value is not None else
+                    f"状态：{status or 'attention'}"
+                ),
+            ],
+            "citations": [],
+        }
+    if target_snapshot and target_snapshot.get("data_unavailable"):
+        target_date = str(target_snapshot.get("target_date") or extract_hermes_explicit_date(question_text) or "").strip()
+        return {
+            "answer": ensure_hermes_positive_opening(
+                f"当前没有命中 {target_date} 这一天的 {name} 可用交易数据。你可以改问最近 1 个月 / 3 个月走势，或者直接问最新基本面判断。",
+                question_text=question_text,
+                intent=str(plan.get("intent") or "").strip(),
+                scope_status=str(plan.get("scope_status") or "allowed").strip(),
+            ),
+            "summary": f"{target_date or '指定日期'} {name}暂无可用交易数据",
+            "bullets": [
+                f"可以先看{name}最近 1 个月走势。",
+                f"也可以先看{name}最近 3 个月 K 线图。",
+                f"如果只要最新判断，可以直接问{name}当前怎么解读。",
+            ],
+            "citations": [],
+        }
+    history_series = _build_watchlist_history_series_from_detail(detail)
+    if history_series:
+        latest = history_series[-1]
+        latest_value = latest.get("value")
+        latest_date = str(latest.get("date") or "").strip()
+        return {
+            "answer": ensure_hermes_positive_opening(
+                f"{name}当前最新可用数据在 {latest_date}，最新收盘值约为 {latest_value}。当前更适合先结合最近趋势、区间位置和租户知识做判断。",
+                question_text=question_text,
+                intent=str(plan.get("intent") or "").strip(),
+                scope_status=str(plan.get("scope_status") or "allowed").strip(),
+            ),
+            "summary": f"{name}最新走势摘要",
+            "bullets": [],
+            "citations": [],
+        }
+    return None
+
+
+def detect_hermes_missing_capability(question_text, plan=None, tool_outputs=None):
+    question = str(question_text or "").strip()
+    if not question:
+        return None
+    plan = plan if isinstance(plan, dict) else {}
+    tool_outputs = tool_outputs if isinstance(tool_outputs, dict) else {}
+    intent = str(plan.get("intent") or "").strip()
+    target_date = extract_hermes_explicit_date(question)
+    if not target_date:
+        return None
+    lowered = question.lower()
+    analysis_keywords = ["分析", "解读", "判断", "怎么看", "走势", "k线", "线图", "趋势"]
+    if not any(keyword in lowered for keyword in analysis_keywords):
+        return None
+    return None
+
+
+def build_hermes_missing_capability_synthesis(question_text, plan, missing_capability):
+    plan = plan if isinstance(plan, dict) else {}
+    missing_capability = missing_capability if isinstance(missing_capability, dict) else {}
+    answer = ensure_hermes_positive_opening(
+        str(missing_capability.get("user_message") or "Hermes 暂时还没升级到这一类能力，我已经帮你记录下来了。").strip(),
+        question_text=question_text,
+        intent=str(plan.get("intent") or "").strip(),
+        scope_status=str(plan.get("scope_status") or "allowed").strip(),
+    )
+    return {
+        "answer": answer,
+        "summary": str(missing_capability.get("label") or "缺失能力需求").strip(),
+        "bullets": [
+            str(item).strip()
+            for item in (missing_capability.get("suggestions") if isinstance(missing_capability.get("suggestions"), list) else [])
+            if str(item).strip()
+        ][:4],
+        "citations": [],
+    }
 
 
 def resolve_hermes_indicator_window(question_text):
@@ -6253,7 +7110,7 @@ def hermes_tool_web_search(question_text, limit=4):
         }
 
 
-def hermes_tool_watchlist_detail(stock_code):
+def hermes_tool_watchlist_detail(stock_code, question_text=""):
     if not str(stock_code or "").strip():
         return {"found": False, "detail": None}
     site_config = get_site_config()
@@ -6261,9 +7118,79 @@ def hermes_tool_watchlist_detail(stock_code):
     payload = get_watchlist_detail_by_code(stock_code=stock_code, stock_name=stock_code, details_map=details)
     if not payload:
         return {"found": False, "detail": None}
+    detail = apply_watchlist_feature_flags(copy.deepcopy(payload), site_config)
+    history_series = _build_watchlist_history_series_from_detail(detail)
+    detail["history_series"] = copy.deepcopy(history_series)
+    history_kline = detail.get("history_kline") if isinstance(detail.get("history_kline"), dict) else {}
+    candles = history_kline.get("candles") if isinstance(history_kline.get("candles"), list) else []
+    target_snapshot = resolve_hermes_watchlist_target_snapshot(detail, question_text=question_text)
+    if isinstance(target_snapshot, dict) and target_snapshot and not target_snapshot.get("data_unavailable"):
+        start_index = int(target_snapshot.get("window_start_index") or 0)
+        end_index = int(target_snapshot.get("window_end_index") or len(candles))
+        detail["target_snapshot"] = copy.deepcopy(target_snapshot)
+        detail["analysis_scope"] = "specific_date"
+        detail["history_series"] = history_series[start_index:end_index] if history_series else []
+        if history_kline:
+            window_candles = candles[start_index:end_index]
+            window_dates = {
+                str(item.get("date") or "").strip()
+                for item in window_candles
+                if isinstance(item, dict)
+            }
+            detail["history_kline"] = {
+                **history_kline,
+                "candles": window_candles,
+                "ma5": [item for item in (history_kline.get("ma5") or []) if str((item or {}).get("date") or "").strip() in window_dates],
+                "ma10": [item for item in (history_kline.get("ma10") or []) if str((item or {}).get("date") or "").strip() in window_dates],
+                "ma20": [item for item in (history_kline.get("ma20") or []) if str((item or {}).get("date") or "").strip() in window_dates],
+                "anomalies": [item for item in (history_kline.get("anomalies") or []) if str((item or {}).get("date") or "").strip() in window_dates][:6],
+            }
+            detail["kline"] = [
+                {
+                    "date": str(item.get("date") or "").strip()[-5:],
+                    "open": round(NumberLike(item.get("open")), 2),
+                    "high": round(NumberLike(item.get("high")), 2),
+                    "low": round(NumberLike(item.get("low")), 2),
+                    "close": round(NumberLike(item.get("close")), 2),
+                }
+                for item in window_candles[-24:]
+                if isinstance(item, dict)
+            ]
+        return {"found": True, "detail": detail}
+    if isinstance(target_snapshot, dict) and target_snapshot.get("data_unavailable"):
+        detail["target_snapshot"] = copy.deepcopy(target_snapshot)
+        detail["analysis_scope"] = "specific_date"
+    window = resolve_hermes_indicator_window(question_text)
+    detail["history_series"] = history_series[-window:] if history_series else []
+    if history_kline:
+        window_candles = candles[-window:] if candles else []
+        window_dates = {
+            str(item.get("date") or "").strip()
+            for item in window_candles
+            if isinstance(item, dict)
+        }
+        detail["history_kline"] = {
+            **history_kline,
+            "candles": window_candles,
+            "ma5": [item for item in (history_kline.get("ma5") or []) if str((item or {}).get("date") or "").strip() in window_dates],
+            "ma10": [item for item in (history_kline.get("ma10") or []) if str((item or {}).get("date") or "").strip() in window_dates],
+            "ma20": [item for item in (history_kline.get("ma20") or []) if str((item or {}).get("date") or "").strip() in window_dates],
+            "anomalies": [item for item in (history_kline.get("anomalies") or []) if str((item or {}).get("date") or "").strip() in window_dates][:6],
+        }
+        detail["kline"] = [
+            {
+                "date": str(item.get("date") or "").strip()[-5:],
+                "open": round(NumberLike(item.get("open")), 2),
+                "high": round(NumberLike(item.get("high")), 2),
+                "low": round(NumberLike(item.get("low")), 2),
+                "close": round(NumberLike(item.get("close")), 2),
+            }
+            for item in window_candles[-24:]
+            if isinstance(item, dict)
+        ]
     return {
         "found": True,
-        "detail": apply_watchlist_feature_flags(copy.deepcopy(payload), site_config),
+        "detail": detail,
     }
 
 
@@ -6272,15 +7199,92 @@ def hermes_tool_indicator_detail(tenant_slug, indicator_code="", question_text="
     resolved_code = str(indicator_code or (match or {}).get("indicator_code") or "").strip()
     if not resolved_code:
         return {"found": False, "detail": None}
+    explicit_target_date = extract_hermes_explicit_date(question_text)
+    fetch_start_date, fetch_end_date = build_hermes_indicator_fetch_window(question_text)
+
+    def load_live_detail():
+        # Keep the common request cache-friendly: only add a date range when
+        # the user explicitly requested one.
+        kwargs = {}
+        if fetch_start_date:
+            kwargs["start_date"] = fetch_start_date
+        if fetch_end_date:
+            kwargs["end_date"] = fetch_end_date
+        return build_live_gangtise_indicator_detail(resolved_code, **kwargs)
+
     tenant = get_tenant_by_slug(tenant_slug)
     hub = build_indicator_hub(tenant=tenant, admin_view=False)
     detail = next((item for item in (hub.get("items") or []) if str((item or {}).get("id") or "").strip() == resolved_code), None)
     if not isinstance(detail, dict):
+        detail = load_live_detail()
+    elif detail.get("data_unavailable") or not ((detail.get("history_kline") or {}).get("candles") or detail.get("history_series")):
+        live_detail = load_live_detail()
+        if isinstance(live_detail, dict) and not live_detail.get("data_unavailable"):
+            detail = live_detail
+    if not isinstance(detail, dict):
         return {"found": False, "detail": None}
+    if explicit_target_date:
+        existing_snapshot = resolve_hermes_indicator_target_snapshot(detail, question_text=question_text)
+        should_refresh_live = not (
+            isinstance(existing_snapshot, dict)
+            and existing_snapshot
+            and not existing_snapshot.get("data_unavailable")
+            and str(existing_snapshot.get("matched_date") or "").strip() == explicit_target_date
+        )
+        if should_refresh_live:
+            live_detail = load_live_detail()
+            live_snapshot = (
+                resolve_hermes_indicator_target_snapshot(live_detail, question_text=question_text)
+                if isinstance(live_detail, dict) else None
+            )
+            if (
+                isinstance(live_detail, dict)
+                and isinstance(live_snapshot, dict)
+                and live_snapshot
+                and not live_snapshot.get("data_unavailable")
+            ):
+                detail = live_detail
     window = resolve_hermes_indicator_window(question_text)
     history_series = detail.get("history_series") if isinstance(detail.get("history_series"), list) else []
     history_anomalies = detail.get("history_anomalies") if isinstance(detail.get("history_anomalies"), list) else []
     history_kline = detail.get("history_kline") if isinstance(detail.get("history_kline"), dict) else {}
+    target_snapshot = resolve_hermes_indicator_target_snapshot(detail, question_text=question_text)
+    if isinstance(target_snapshot, dict) and target_snapshot and not target_snapshot.get("data_unavailable"):
+        start_index = int(target_snapshot.get("window_start_index") or 0)
+        end_index = int(target_snapshot.get("window_end_index") or max(len(history_series), len((history_kline.get("candles") or []) if history_kline else [])))
+        detail["target_snapshot"] = copy.deepcopy(target_snapshot)
+        detail["analysis_scope"] = "specific_date"
+        detail["history_series"] = history_series[start_index:end_index] if history_series else []
+        detail["history_anomalies"] = [
+            item for item in history_anomalies
+            if start_index <= next((idx for idx, point in enumerate(history_series) if str(point.get("date") or "").strip() == str(item.get("date") or "").strip()), -1) < end_index
+        ][:6]
+        if history_kline:
+            candles = history_kline.get("candles") or []
+            ma5 = history_kline.get("ma5") or []
+            ma10 = history_kline.get("ma10") or []
+            ma20 = history_kline.get("ma20") or []
+            anomalies = history_kline.get("anomalies") or []
+            window_dates = {
+                str(item.get("date") or "").strip()
+                for item in candles[start_index:end_index]
+                if isinstance(item, dict)
+            }
+            detail["history_kline"] = {
+                **history_kline,
+                "candles": candles[start_index:end_index],
+                "ma5": [item for item in ma5 if str((item or {}).get("date") or "").strip() in window_dates],
+                "ma10": [item for item in ma10 if str((item or {}).get("date") or "").strip() in window_dates],
+                "ma20": [item for item in ma20 if str((item or {}).get("date") or "").strip() in window_dates],
+                "anomalies": [item for item in anomalies if str((item or {}).get("date") or "").strip() in window_dates][:6],
+            }
+        return {
+            "found": True,
+            "detail": copy.deepcopy(detail),
+        }
+    if isinstance(target_snapshot, dict) and target_snapshot.get("data_unavailable"):
+        detail["target_snapshot"] = copy.deepcopy(target_snapshot)
+        detail["analysis_scope"] = "specific_date"
     detail["history_series"] = history_series[-window:]
     detail["history_anomalies"] = history_anomalies[-min(len(history_anomalies), 6):]
     if history_kline:
@@ -6327,7 +7331,10 @@ def get_hermes_tool_registry():
         },
         "watchlist.detail": {
             "output_key": "watchlist",
-            "executor": lambda runtime: hermes_tool_watchlist_detail(runtime.get("stock_code")),
+            "executor": lambda runtime: hermes_tool_watchlist_detail(
+                runtime.get("stock_code"),
+                question_text=runtime.get("question_text") or "",
+            ),
         },
         "indicator.detail": {
             "output_key": "indicator",
@@ -6707,10 +7714,113 @@ def build_hermes_text_artifact(question_text, plan, synthesis, tool_outputs, cit
     }
 
 
+def _pick_watchlist_metric_values(metrics, keywords, limit=2):
+    items = metrics if isinstance(metrics, list) else []
+    normalized_keywords = [str(item).strip() for item in (keywords or []) if str(item).strip()]
+    matched = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        label = str(item.get("label") or "").strip()
+        if not label:
+            continue
+        if normalized_keywords and not any(keyword in label for keyword in normalized_keywords):
+            continue
+        value = str(item.get("value") or "").strip()
+        note = str(item.get("note") or "").strip()
+        matched.append("，".join(part for part in [label, value, note] if part))
+        if len(matched) >= limit:
+            break
+    return matched
+
+
+def _build_watchlist_section_text(title, detail, fundamental, forecast, metrics, tool_outputs):
+    stock_name = str(detail.get("name") or detail.get("code") or "该标的").strip()
+    industry = str(detail.get("industry") or detail.get("focus") or "所属赛道").strip() or "所属赛道"
+    summary = str(fundamental.get("summary") or "").strip()
+    thesis = [str(item).strip() for item in (fundamental.get("thesis") if isinstance(fundamental.get("thesis"), list) else []) if str(item).strip()]
+    drivers = [item for item in (forecast.get("drivers") if isinstance(forecast.get("drivers"), list) else []) if isinstance(item, dict)]
+    driver_labels = [str(item.get("label") or "").strip() for item in drivers if str(item.get("label") or "").strip()]
+    driver_notes = [str(item.get("note") or "").strip() for item in drivers if str(item.get("note") or "").strip()]
+    positive_drivers = [str(item.get("label") or "").strip() for item in drivers if not str(item.get("score") or "").strip().startswith("-") and str(item.get("label") or "").strip()]
+    negative_drivers = [str(item.get("label") or "").strip() for item in drivers if str(item.get("score") or "").strip().startswith("-") and str(item.get("label") or "").strip()]
+    knowledge_matches = ((tool_outputs.get("knowledge") or {}).get("matches") or []) if isinstance(tool_outputs, dict) else []
+    evidence_matches = ((tool_outputs.get("evidence") or {}).get("matches") or []) if isinstance(tool_outputs, dict) else []
+    annotation_context = (tool_outputs.get("watchlist_annotation_context") or {}) if isinstance(tool_outputs, dict) else {}
+    annotation_summary = str(annotation_context.get("summary") or "").strip()
+    latest_price = round(NumberLike(detail.get("price")), 2)
+    change_pct = round(NumberLike(detail.get("change_pct")), 2)
+    metric_map = {
+        "financial": _pick_watchlist_metric_values(metrics, ["收入", "净利", "净息差", "ROE", "毛利", "利润", "股息", "现金流"], limit=3),
+        "valuation": _pick_watchlist_metric_values(metrics, ["估值", "股价", "区间", "趋势", "振幅", "股息"], limit=3),
+    }
+    if title == "业务结构拆解":
+        return trim_hermes_text(
+            f"{stock_name} 当前先按 {industry} 框架理解。"
+            + (f" 平台已有摘要：{summary}" if summary else " 当前平台还没有完整的业务分部材料，需要继续补充年报、公告或纪要。")
+            + " 第一轮建议拆成主营业务、盈利来源和关键验证节点三层。",
+            limit=170,
+        )
+    if title == "核心竞争力":
+        return trim_hermes_text(
+            "；".join(thesis[:2]) if thesis else f"{stock_name} 的竞争力需要优先围绕行业位置、产品能力和持续兑现性来判断。"
+            + (f" 当前工具更提醒关注：{'、'.join(driver_labels[:2])}。" if driver_labels else ""),
+            limit=170,
+        )
+    if title == "估值与市场信号":
+        return trim_hermes_text(
+            f"当前价格约 {latest_price:.2f}，单日变化 {change_pct:+.2f}%。"
+            + (f" 可优先参考：{'；'.join(metric_map['valuation'])}。" if metric_map["valuation"] else " 现阶段先结合区间位置、波动和市场预期做估值判断。"),
+            limit=170,
+        )
+    if title == "风险与挑战":
+        return trim_hermes_text(
+            f"当前风险点优先看 {'、'.join(negative_drivers[:2])}。"
+            if negative_drivers else
+            f"当前最大的挑战是 {stock_name} 的公司专属样本还不够完整，容易只看到价格信号而看不到业务与财务证据。",
+            limit=170,
+        )
+    if title == "财务分析":
+        return trim_hermes_text(
+            f"财务面可先看 {'；'.join(metric_map['financial'])}。"
+            if metric_map["financial"] else
+            f"当前平台还没有命中 {stock_name} 的完整财务字段，建议继续补充收入、利润率、现金流和资产负债表证据。",
+            limit=170,
+        )
+    if title == "行业视角":
+        return trim_hermes_text(
+            f"{stock_name} 需要放回 {industry} 赛道里看，而不是只看单日波动。"
+            + (f" 当前信号更偏向：{'；'.join(driver_notes[:2])}。" if driver_notes else ""),
+            limit=170,
+        )
+    if title == "增长驱动因子":
+        return trim_hermes_text(
+            f"现阶段优先跟踪 {'、'.join(positive_drivers[:3])} 等增长驱动。"
+            if positive_drivers else
+            "如果还没有明确增长驱动结论，至少继续验证订单、盈利兑现和行业景气三个变量。",
+            limit=170,
+        )
+    if title == "估值与预期差":
+        knowledge_title = str((knowledge_matches[0] or {}).get("title") or "").strip() if knowledge_matches else ""
+        evidence_title = str((evidence_matches[0] or {}).get("title") or "").strip() if evidence_matches else ""
+        return trim_hermes_text(
+            f"{str(forecast.get('band') or '').strip() or '当前更适合先做位置判断，再补证据链。'}"
+            + (f" 已命中知识：{knowledge_title}。" if knowledge_title else "")
+            + (f" 可交叉复核的证据：{evidence_title}。" if evidence_title else "")
+            + (f" 自选股标注归纳：{annotation_summary}" if annotation_summary else ""),
+            limit=170,
+        )
+    return ""
+
+
 def build_hermes_watchlist_artifact(detail, question_text, synthesis, tool_outputs, citations, tenant_slug="", user_role=""):
     detail = copy.deepcopy(detail if isinstance(detail, dict) else {})
     fundamental = detail.get("fundamental") if isinstance(detail.get("fundamental"), dict) else {}
     forecast = detail.get("forecast") if isinstance(detail.get("forecast"), dict) else {}
+    history_series = _build_watchlist_history_series_from_detail(detail)
+    history_kline = detail.get("history_kline") if isinstance(detail.get("history_kline"), dict) else {}
+    target_snapshot = detail.get("target_snapshot") if isinstance(detail.get("target_snapshot"), dict) else {}
+    latest_status = str(target_snapshot.get("status") or "attention").strip() if target_snapshot else "attention"
     metrics = [
         {
             "label": str(item.get("label") or "").strip(),
@@ -6720,6 +7830,53 @@ def build_hermes_watchlist_artifact(detail, question_text, synthesis, tool_outpu
         for item in (fundamental.get("metrics") if isinstance(fundamental.get("metrics"), list) else [])[:4]
         if isinstance(item, dict)
     ]
+    trend_summary = []
+    prev_numeric = None
+    values = []
+    for item in history_series[-24:]:
+        if not isinstance(item, dict):
+            continue
+        numeric = NumberLike(item.get("value"))
+        values.append(numeric)
+        delta = 0 if prev_numeric is None else round(numeric - prev_numeric, 2)
+        trend_summary.append(
+            {
+                "date": str(item.get("date") or "--").strip() or "--",
+                "value": str(item.get("value") or "--").strip() or "--",
+                "status": str(item.get("status") or latest_status).strip() or latest_status,
+                "delta": delta,
+                "direction": "上行" if delta > 0 else "下行" if delta < 0 else "持平",
+            }
+        )
+        prev_numeric = numeric
+    if target_snapshot and not target_snapshot.get("data_unavailable"):
+        matched_date = str(target_snapshot.get("matched_date") or target_snapshot.get("target_date") or "--").strip() or "--"
+        low_value = target_snapshot.get("low")
+        high_value = target_snapshot.get("high")
+        change_value = NumberLike(target_snapshot.get("change"))
+        change_pct = NumberLike(target_snapshot.get("change_pct"))
+        metrics = [
+            {
+                "label": "分析日期",
+                "value": matched_date,
+                "note": "指定交易日命中",
+            },
+            {
+                "label": "收盘值",
+                "value": str(target_snapshot.get("close") or "--"),
+                "note": f"前收 {target_snapshot.get('prev_close')}",
+            },
+            {
+                "label": "单日变动",
+                "value": f"{'+' if change_value > 0 else ''}{change_value:.2f} / {'+' if change_pct > 0 else ''}{change_pct:.2f}%",
+                "note": {"good": "当日偏强", "attention": "当日中性", "warning": "当日波动偏大"}.get(latest_status, "当日状态"),
+            },
+            {
+                "label": "日内区间",
+                "value": f"{low_value} ~ {high_value}" if low_value is not None and high_value is not None else "--",
+                "note": "来自个股历史 K 线",
+            },
+        ]
     knowledge_matches = ((tool_outputs.get("knowledge") or {}).get("matches") or []) if isinstance(tool_outputs, dict) else []
     evidence_matches = ((tool_outputs.get("evidence") or {}).get("matches") or []) if isinstance(tool_outputs, dict) else []
     bullets = [str(item).strip() for item in (synthesis.get("bullets") if isinstance(synthesis.get("bullets"), list) else []) if str(item).strip()][:3]
@@ -6757,15 +7914,90 @@ def build_hermes_watchlist_artifact(detail, question_text, synthesis, tool_outpu
     tenant_advisor = str((tenant or {}).get("advisor") or "").strip()
     title_prefix = "📌" if str(forecast.get("verdict") or "").strip() else "🧭"
     answer_text = str(synthesis.get("answer") or "").strip()
-    headline = trim_hermes_text(synthesis.get("summary") or answer_text or f"{detail.get('name') or detail.get('code') or '该标的'} 已完成结构化分析", limit=90)
-    summary = trim_hermes_text(synthesis.get("summary") or fundamental.get("summary") or answer_text, limit=220)
+    kline_rows = (history_kline.get("candles") or []) if isinstance(history_kline, dict) and isinstance(history_kline.get("candles"), list) else (detail.get("kline") if isinstance(detail.get("kline"), list) else [])
+    kline_sentence = ""
+    if kline_rows and isinstance(kline_rows[-1], dict):
+        latest_candle = kline_rows[-1]
+        open_value = NumberLike(latest_candle.get("open"))
+        close_value = NumberLike(latest_candle.get("close"))
+        kline_sentence = (
+            f"最近 K 线最新一根开于 {str(latest_candle.get('open') or '--').strip()}、收于 {str(latest_candle.get('close') or '--').strip()}，"
+            f"区间 {str(latest_candle.get('low') or '--').strip()} 到 {str(latest_candle.get('high') or '--').strip()}，"
+            f"{'收盘强于开盘' if close_value >= open_value else '收盘弱于开盘'}。"
+        )
+    fallback_body = trim_hermes_text(
+        " ".join(
+            part for part in [
+                f"{str(detail.get('name') or detail.get('code') or '该标的').strip()}已按自选股 K 线和基本面资料生成结构化分析。",
+                str(fundamental.get("summary") or "").strip(),
+                kline_sentence,
+                str(forecast.get("band") or "").strip(),
+            ]
+            if part
+        ),
+        limit=520,
+    )
+    generic_answer_markers = (
+        "我先按当前可用的知识和工具结果给你一个文字回答。",
+        "当前优先基于租户知识库和平台工具给你一个结论。",
+    )
+    if (
+        len(answer_text) < 24
+        or any(marker in answer_text for marker in generic_answer_markers)
+        or answer_text.startswith("分析方式偏向")
+    ):
+        answer_text = fallback_body
+    raw_summary = str(synthesis.get("summary") or "").strip()
+    if len(raw_summary) < 24 or raw_summary.startswith("分析方式偏向"):
+        raw_summary = str(fundamental.get("summary") or "").strip() or answer_text
+    headline = trim_hermes_text(raw_summary or answer_text or f"{detail.get('name') or detail.get('code') or '该标的'} 已完成结构化分析", limit=90)
+    summary = trim_hermes_text(raw_summary or fundamental.get("summary") or answer_text, limit=220)
+    if target_snapshot and not target_snapshot.get("data_unavailable"):
+        matched_date = str(target_snapshot.get("matched_date") or target_snapshot.get("target_date") or "").strip()
+        headline = trim_hermes_text(f"{matched_date} {str(detail.get('name') or detail.get('code') or '该标的').strip()}单日分析", limit=90)
+        summary = trim_hermes_text(raw_summary or answer_text or headline, limit=220)
+    lead_conclusion = trim_hermes_text(
+        " ".join(
+            part for part in [
+                f"{str(detail.get('name') or detail.get('code') or '该标的').strip()} 当前建议先按 {str(forecast.get('verdict') or '继续跟踪').strip()} 处理。",
+                str(forecast.get("band") or "").strip(),
+                f"优先验证 {('、'.join([str(item.get('label') or '').strip() for item in drivers if str(item.get('label') or '').strip()][:3])) or '业务、财务与行业位置'}。",
+            ]
+            if part
+        ),
+        limit=190,
+    )
+    analysis_sections = []
+    for title in [
+        "业务结构拆解",
+        "核心竞争力",
+        "估值与市场信号",
+        "风险与挑战",
+        "财务分析",
+        "行业视角",
+        "增长驱动因子",
+        "估值与预期差",
+    ]:
+        body_text = _build_watchlist_section_text(title, detail, fundamental, forecast, metrics, tool_outputs)
+        if body_text:
+            analysis_sections.append({"title": title, "body": body_text})
+    preferred_mode = str((tool_outputs.get("_meta") or {}).get("preferred_mode") or "").strip().lower() if isinstance(tool_outputs, dict) else ""
+    resolved_visual_mode = infer_hermes_visual_mode(question_text, preferred_mode=preferred_mode)
+    if resolved_visual_mode == "line_chart":
+        chart_kind = "trend"
+    elif resolved_visual_mode == "distribution_chart":
+        chart_kind = "distribution"
+    else:
+        chart_kind = "kline"
     return {
         "type": "watchlist_analysis",
         "question": str(question_text or "").strip(),
-        "title": f"{title_prefix} 结构化分析",
+        "title": f"{title_prefix} 单日分析" if target_snapshot and not target_snapshot.get("data_unavailable") else f"{title_prefix} 结构化分析",
         "headline": headline,
         "summary": summary,
         "body": answer_text,
+        "lead_conclusion": lead_conclusion,
+        "analysis_sections": analysis_sections,
         "symbol": {
             "name": str(detail.get("name") or "").strip(),
             "code": str(detail.get("code") or "").strip(),
@@ -6779,9 +8011,13 @@ def build_hermes_watchlist_artifact(detail, question_text, synthesis, tool_outpu
         "citations": citations[:8],
         "knowledge": knowledge_entries,
         "chart": {
-            "kind": "kline",
-            "points": copy.deepcopy(detail.get("kline") or []),
+            "kind": chart_kind,
+            "points": copy.deepcopy(kline_rows),
+            "kline": copy.deepcopy(history_kline),
+            "series": copy.deepcopy(trend_summary),
+            "distribution": values[-24:],
         },
+        "target_snapshot": copy.deepcopy(target_snapshot) if target_snapshot else None,
         "footer": (
             f"本轮问题：{str(question_text or '').strip()}。{'已补充互联网公开信息。' if web_matches else '当前优先基于租户知识与平台内工具。'}"
             if not tenant_advisor else
@@ -6975,15 +8211,18 @@ def build_hermes_indicator_artifact(detail, question_text, synthesis, tool_outpu
     history_series = detail.get("history_series") if isinstance(detail.get("history_series"), list) else []
     anomalies = detail.get("history_anomalies") if isinstance(detail.get("history_anomalies"), list) else []
     history_kline = detail.get("history_kline") if isinstance(detail.get("history_kline"), dict) else {}
+    target_snapshot = detail.get("target_snapshot") if isinstance(detail.get("target_snapshot"), dict) else {}
     selected_indicators = detail.get("selected_indicators") if isinstance(detail.get("selected_indicators"), list) else []
     source_names = [
         str(item.get("indicator_name") or item.get("indicator_code") or "").strip()
         for item in selected_indicators
         if isinstance(item, dict) and str(item.get("indicator_name") or item.get("indicator_code") or "").strip()
     ]
-    value_text = str(detail.get("value") or "--").strip() or "--"
+    snapshot_close = target_snapshot.get("close") if target_snapshot and target_snapshot.get("close") is not None else None
+    snapshot_unit = str(detail.get("unit") or "").strip()
+    value_text = str(snapshot_close if snapshot_close is not None else (detail.get("value") or "--")).strip() or "--"
     unit_text = str(detail.get("unit") or "").strip()
-    latest_status = str(detail.get("status") or "attention").strip() or "attention"
+    latest_status = str(target_snapshot.get("status") or detail.get("status") or "attention").strip() or "attention"
     trend_summary = []
     prev_numeric = None
     values = []
@@ -7006,28 +8245,61 @@ def build_hermes_indicator_artifact(detail, question_text, synthesis, tool_outpu
     min_value = round(min(values), 2) if values else None
     max_value = round(max(values), 2) if values else None
     current_numeric = NumberLike(detail.get("numeric_value")) if detail.get("numeric_value") is not None else (values[-1] if values else None)
-    metrics = [
-        {
-            "label": "当前值",
-            "value": f"{value_text}{unit_text}" if unit_text else value_text,
-            "note": str(detail.get("assessment") or detail.get("interpretation") or "").strip()[:42],
-        },
-        {
-            "label": "趋势状态",
-            "value": {"good": "正常", "attention": "关注", "warning": "预警"}.get(latest_status, latest_status or "关注"),
-            "note": str(detail.get("alert") or "当前按历史趋势与异动监测结果展示。").strip()[:42],
-        },
-        {
-            "label": "区间范围",
-            "value": "--" if min_value is None or max_value is None else f"{min_value} ~ {max_value}",
-            "note": f"最近 {len(trend_summary)} 个观测点",
-        },
-        {
-            "label": "关联来源",
-            "value": str(detail.get("source_type_label") or detail.get("data_mode_label") or "指标库").strip() or "指标库",
-            "note": (source_names[0] if source_names else str(detail.get("provider") or "平台指标中心").strip() or "平台指标中心")[:42],
-        },
-    ]
+    if target_snapshot and not target_snapshot.get("data_unavailable"):
+        matched_date = str(target_snapshot.get("matched_date") or target_snapshot.get("target_date") or "--").strip() or "--"
+        low_value = target_snapshot.get("low")
+        high_value = target_snapshot.get("high")
+        change_value = NumberLike(target_snapshot.get("change"))
+        change_pct = NumberLike(target_snapshot.get("change_pct"))
+        metrics = [
+            {
+                "label": "分析日期",
+                "value": matched_date,
+                "note": "指定交易日命中",
+            },
+            {
+                "label": "收盘值",
+                "value": f"{value_text}{snapshot_unit}" if snapshot_unit else value_text,
+                "note": f"前收 {target_snapshot.get('prev_close')}",
+            },
+            {
+                "label": "单日变动",
+                "value": f"{'+' if change_value > 0 else ''}{change_value:.2f}{snapshot_unit} / {'+' if change_pct > 0 else ''}{change_pct:.2f}%",
+                "note": {"good": "当日偏强", "attention": "当日中性", "warning": "当日波动偏大"}.get(latest_status, "当日状态"),
+            },
+            {
+                "label": "日内区间",
+                "value": (
+                    f"{low_value} ~ {high_value}"
+                    if low_value is not None and high_value is not None else
+                    "--"
+                ),
+                "note": (source_names[0] if source_names else str(detail.get("provider") or "平台指标中心").strip() or "平台指标中心")[:42],
+            },
+        ]
+    else:
+        metrics = [
+            {
+                "label": "当前值",
+                "value": f"{value_text}{unit_text}" if unit_text else value_text,
+                "note": str(detail.get("assessment") or detail.get("interpretation") or "").strip()[:42],
+            },
+            {
+                "label": "趋势状态",
+                "value": {"good": "正常", "attention": "关注", "warning": "预警"}.get(latest_status, latest_status or "关注"),
+                "note": str(detail.get("alert") or "当前按历史趋势与异动监测结果展示。").strip()[:42],
+            },
+            {
+                "label": "区间范围",
+                "value": "--" if min_value is None or max_value is None else f"{min_value} ~ {max_value}",
+                "note": f"最近 {len(trend_summary)} 个观测点",
+            },
+            {
+                "label": "关联来源",
+                "value": str(detail.get("source_type_label") or detail.get("data_mode_label") or "指标库").strip() or "指标库",
+                "note": (source_names[0] if source_names else str(detail.get("provider") or "平台指标中心").strip() or "平台指标中心")[:42],
+            },
+        ]
     bullets = [str(item).strip() for item in (synthesis.get("bullets") if isinstance(synthesis.get("bullets"), list) else []) if str(item).strip()][:3]
     if not bullets:
         bullets = [
@@ -7060,7 +8332,19 @@ def build_hermes_indicator_artifact(detail, question_text, synthesis, tool_outpu
         ""
     )
     trend_sentence = ""
-    if trend_summary:
+    if target_snapshot and not target_snapshot.get("data_unavailable"):
+        matched_date = str(target_snapshot.get("matched_date") or target_snapshot.get("target_date") or "--").strip() or "--"
+        target_date = str(target_snapshot.get("target_date") or matched_date).strip() or matched_date
+        change_value = NumberLike(target_snapshot.get("change"))
+        change_pct = NumberLike(target_snapshot.get("change_pct"))
+        direction_text = "收涨" if change_value > 0 else ("收跌" if change_value < 0 else "平收")
+        trend_sentence = (
+            f"{str(detail.get('name') or detail.get('indicator_name') or '该指标').strip()}在 {matched_date} "
+            f"{direction_text} {abs(change_value):.2f}{unit_text}，幅度 {abs(change_pct):.2f}% 。"
+        )
+        if not target_snapshot.get("matched_exact") and target_date and target_date != matched_date:
+            trend_sentence = f"{target_date} 不是交易日，当前改按最近一个可用交易日 {matched_date} 处理。{trend_sentence}"
+    elif trend_summary:
         positive_count = len([item for item in trend_summary if NumberLike(item.get("delta")) > 0])
         negative_count = len([item for item in trend_summary if NumberLike(item.get("delta")) < 0])
         direction_text = "偏强震荡" if positive_count > negative_count else "偏弱震荡" if negative_count > positive_count else "区间震荡"
@@ -7116,8 +8400,13 @@ def build_hermes_indicator_artifact(detail, question_text, synthesis, tool_outpu
     )
     if annotation_summary and annotation_summary not in summary:
         summary = trim_hermes_text(f"{summary} 并结合自选股标注归纳。", limit=220)
+    default_headline = (
+        f"{target_snapshot.get('matched_date') or target_snapshot.get('target_date')} {detail.get('name') or '该指标'}单日分析"
+        if target_snapshot and not target_snapshot.get("data_unavailable") else
+        f"{detail.get('name') or '该指标'} 趋势已完成"
+    )
     headline = trim_hermes_text(
-        str((synthesis or {}).get("summary") or body_text or f"{detail.get('name') or '该指标'} 趋势已完成").strip(),
+        str((synthesis or {}).get("summary") or body_text or default_headline).strip(),
         limit=90,
     )
     if annotation_sentence:
@@ -7149,7 +8438,7 @@ def build_hermes_indicator_artifact(detail, question_text, synthesis, tool_outpu
     return {
         "type": "indicator_analysis",
         "question": str(question_text or "").strip(),
-        "title": "📈 指标趋势分析",
+        "title": "📈 指标单日分析" if target_snapshot and not target_snapshot.get("data_unavailable") else "📈 指标趋势分析",
         "headline": headline,
         "summary": summary,
         "body": body_text,
@@ -7166,6 +8455,7 @@ def build_hermes_indicator_artifact(detail, question_text, synthesis, tool_outpu
         "citations": citations[:8],
         "knowledge": knowledge_entries,
         "watchlist_annotations": annotation_items,
+        "target_snapshot": copy.deepcopy(target_snapshot) if target_snapshot else None,
         "chart": {
             "kind": chart_kind,
             "points": copy.deepcopy((detail.get("history_kline") or {}).get("candles") or []),
@@ -7226,6 +8516,56 @@ def build_hermes_artifacts(plan, tool_outputs, synthesis, citations, tenant_slug
     return artifacts
 
 
+def build_hermes_positive_opening(question_text="", intent="", scope_status=""):
+    question_text = str(question_text or "").strip()
+    intent = str(intent or "").strip()
+    scope_status = str(scope_status or "").strip()
+    presets = []
+    if scope_status == "blocked":
+        presets = [
+            "这个问题很重要，我先帮你把边界收清楚。",
+            "你这个问题抓得很直接，我先把可回答范围说明白。",
+        ]
+    elif scope_status == "redirected":
+        presets = [
+            "这个问题提得很自然，我先帮你收口到平台可用能力上。",
+            "你这个提问很常见，我先把它转成平台能继续处理的方向。",
+        ]
+    elif intent == "small_talk":
+        presets = [
+            "这个问题挺轻松的，我先接住你这一轮。",
+            "这个开场不错，我们先顺着聊一下。",
+        ]
+    else:
+        presets = [
+            "这个问题问得很好，我们一起来拆解。",
+            "这个方向问得很对，我来帮你快速梳理。",
+            "这个问题很有价值，我先帮你抓重点。",
+        ]
+    seed = sum(ord(ch) for ch in f"{question_text}|{intent}|{scope_status}")
+    return presets[seed % len(presets)] if presets else "这个问题很值得看，我们一起来处理。"
+
+
+def ensure_hermes_positive_opening(answer_text, question_text="", intent="", scope_status=""):
+    answer_text = str(answer_text or "").strip()
+    if not answer_text:
+        return build_hermes_positive_opening(question_text=question_text, intent=intent, scope_status=scope_status)
+    positive_markers = (
+        "这个问题",
+        "你这个问题",
+        "这个提问",
+        "这个方向",
+        "问得很好",
+        "很有价值",
+        "很值得",
+        "我先接住",
+    )
+    if any(answer_text.startswith(marker) for marker in positive_markers):
+        return answer_text
+    opening = build_hermes_positive_opening(question_text=question_text, intent=intent, scope_status=scope_status)
+    return f"{opening}{answer_text if answer_text.startswith(('，', '。', '：')) else ' ' + answer_text}"
+
+
 def build_hermes_synthesis_prompt(question_text, plan, tool_outputs, tenant_slug="", user_role="", preferred_mode="", messages=None, web_answer=False, memory_state=None, response_style="structured"):
     tenant = get_tenant_by_slug(tenant_slug)
     tenant_name = (tenant or {}).get("name") or (tenant or {}).get("short_name") or str(tenant_slug or "").strip() or "当前租户"
@@ -7258,6 +8598,8 @@ def build_hermes_synthesis_prompt(question_text, plan, tool_outputs, tenant_slug
     system_prompt = (
         "你是 Hermes 的答案合成器。"
         "你的职责是根据已执行的工具结果生成最终回答。"
+        "你同时承担正向鼓励型助手人格：面对用户问题时，先给一句简短、自然、专业的正向反馈，提供稳定的情绪价值，但不要夸张、不要肉麻，也不要偏离研究主题。"
+        "这句正向反馈要放在回答最前面，再进入结论、依据、边界或下一步。"
         "优先依据工具结果，不要编造不存在的数据。"
         "必须先依据租户知识结果，再参考平台内工具，最后才参考互联网补充结果。"
         "如果存在租户自选股K线标注摘要，应把它视为研究侧补充证据，融入结论、解读或边界说明。"
@@ -7277,11 +8619,38 @@ def build_hermes_synthesis_prompt(question_text, plan, tool_outputs, tenant_slug
 def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", user_role="", preferred_mode="", messages=None, web_answer=False, memory_state=None, response_style="structured"):
     fallback_answer = "我先按当前可用的知识和工具结果给你一个文字回答。"
     fallback = {
-        "answer": fallback_answer,
+        "answer": ensure_hermes_positive_opening(
+            fallback_answer,
+            question_text=question_text,
+            intent=str(plan.get("intent") or "").strip(),
+            scope_status=str(plan.get("scope_status") or "allowed").strip(),
+        ),
         "summary": str(plan.get("reason") or "已完成工具组合查询").strip(),
         "bullets": [],
         "citations": [],
     }
+    watchlist_detail = (((tool_outputs or {}).get("watchlist") or {}).get("detail") or {}) if isinstance((tool_outputs or {}).get("watchlist"), dict) else {}
+    if isinstance(watchlist_detail, dict) and watchlist_detail:
+        watchlist_rule_synthesis = build_hermes_watchlist_rule_synthesis(
+            question_text=question_text,
+            plan=plan,
+            detail=watchlist_detail,
+        )
+        if isinstance(watchlist_rule_synthesis, dict) and watchlist_rule_synthesis:
+            fallback = watchlist_rule_synthesis
+            if str(watchlist_detail.get("analysis_scope") or "").strip() == "specific_date":
+                return watchlist_rule_synthesis, None, "rule_watchlist_specific_date"
+    indicator_detail = (((tool_outputs or {}).get("indicator") or {}).get("detail") or {}) if isinstance((tool_outputs or {}).get("indicator"), dict) else {}
+    if isinstance(indicator_detail, dict) and indicator_detail:
+        indicator_rule_synthesis = build_hermes_indicator_rule_synthesis(
+            question_text=question_text,
+            plan=plan,
+            detail=indicator_detail,
+        )
+        if isinstance(indicator_rule_synthesis, dict) and indicator_rule_synthesis:
+            fallback = indicator_rule_synthesis
+            if str(indicator_detail.get("analysis_scope") or "").strip() == "specific_date":
+                return indicator_rule_synthesis, None, "rule_indicator_specific_date"
     llm_model = get_default_llm_config(purpose="general", feature_code="hermes_answer_synthesis")
     if not llm_model:
         return fallback, None, "fallback_plain_answer"
@@ -7312,6 +8681,12 @@ def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", 
         )
         parsed = _extract_json_payload_from_llm_text(raw, fallback)
         answer = str(parsed.get("answer") or fallback_answer).strip() or fallback_answer
+        answer = ensure_hermes_positive_opening(
+            answer,
+            question_text=question_text,
+            intent=str(plan.get("intent") or "").strip(),
+            scope_status=str(plan.get("scope_status") or "allowed").strip(),
+        )
         summary = str(parsed.get("summary") or plan.get("reason") or "").strip()[:240]
         bullets = [str(item).strip() for item in (parsed.get("bullets") if isinstance(parsed.get("bullets"), list) else []) if str(item).strip()][:6]
         citations = [str(item).strip() for item in (parsed.get("citations") if isinstance(parsed.get("citations"), list) else []) if str(item).strip()][:8]
@@ -7507,6 +8882,31 @@ def build_hermes_query_response(body):
                     "bullet_count": len((synthesis or {}).get("bullets") or []),
                 },
             }
+        missing_capability = detect_hermes_missing_capability(
+            runtime.get("question_text") or "",
+            plan=state.get("intent_plan") or {},
+            tool_outputs=state.get("tool_outputs") or {},
+        )
+        if isinstance(missing_capability, dict) and missing_capability:
+            synthesis = build_hermes_missing_capability_synthesis(
+                question_text=runtime.get("question_text") or "",
+                plan=state.get("intent_plan") or {},
+                missing_capability=missing_capability,
+            )
+            return {
+                "status": "skipped",
+                "detail": "已识别当前问题需要新增能力，先按能力缺口回复。",
+                "state_updates": {
+                    "synthesis": synthesis,
+                    "answer_model": None,
+                    "answer_mode": "capability_gap_reply",
+                    "missing_capability": missing_capability,
+                },
+                "context_preview": {
+                    "answer_chars": len(str((synthesis or {}).get("answer") or "")),
+                    "bullet_count": len((synthesis or {}).get("bullets") or []),
+                },
+            }
         synthesis, answer_model, answer_mode = synthesize_hermes_answer(
             question_text=runtime.get("question_text") or "",
             plan=state.get("intent_plan") or {},
@@ -7625,10 +9025,21 @@ def build_hermes_query_response(body):
             user_role=runtime.get("user_role") or "",
             question_text=runtime.get("question_text") or "",
         )
+        missing_capability = state.get("missing_capability") if isinstance(state.get("missing_capability"), dict) else {}
+        if missing_capability:
+            artifacts = [
+                build_hermes_text_artifact(
+                    question_text=runtime.get("question_text") or "",
+                    plan=intent_plan,
+                    synthesis=synthesis,
+                    tool_outputs=tool_outputs,
+                    citations=citations,
+                )
+            ]
         response_display_mode = "structured" if any(
             str((item or {}).get("type") or "").strip() in {"watchlist_analysis", "indicator_analysis"}
             for item in artifacts
-        ) else "text"
+        ) and not missing_capability else "text"
         result = {
             "ok": True,
             "question": runtime.get("question_text") or "",
@@ -7649,6 +9060,7 @@ def build_hermes_query_response(body):
             "agent_trace": agent_trace,
             "preferred_mode": runtime.get("preferred_mode") or "auto",
             "web_answer": bool(runtime.get("web_answer")),
+            "missing_capability": copy.deepcopy(missing_capability) if missing_capability else None,
             "source_policy": {
                 "knowledge_first": True,
                 "web_supplement_enabled": bool(runtime.get("web_answer")),
@@ -7770,6 +9182,17 @@ def process_review_voice_upload(file_storage, tenant_slug="", review_period="", 
     )
     transcript_model = LOCAL_WHISPER_MODEL_SIZE if transcript_engine == "local" else OPENAI_AUDIO_MODEL
     raw_transcript = str(transcript or "").strip()
+    cleaned_transcript = raw_transcript
+    cleanup_mode = "none"
+    cleanup_steps = []
+    if raw_transcript and transcription_cfg.get("post_process_mode") == "rule_based":
+        cleaned_transcript = _apply_voice_transcript_rule_cleanup(
+            raw_transcript,
+            domain_glossary_enabled=transcription_cfg.get("domain_glossary_enabled", True),
+        )
+        if cleaned_transcript:
+            cleanup_mode = "rule_based"
+            cleanup_steps = ["punctuation_normalize", "finance_term_normalize"]
     if job_code:
         report_user_async_job_progress(
             job_code,
@@ -7786,7 +9209,7 @@ def process_review_voice_upload(file_storage, tenant_slug="", review_period="", 
     if use_llm_enhancement and raw_transcript:
         try:
             llm_result = enhance_review_voice_transcript_with_llm(
-                raw_transcript,
+                cleaned_transcript or raw_transcript,
                 entry_point=entry_point,
                 speaker_name=speaker_name,
                 tenant_slug=tenant_slug,
@@ -7799,13 +9222,18 @@ def process_review_voice_upload(file_storage, tenant_slug="", review_period="", 
                 llm_notice = "已完成基础转写，并由大模型整理为更适合编辑和入库的文本。"
         except Exception as exc:
             llm_notice = f"已完成基础转写，但大模型增强失败，已回退原始转写：{str(exc)}"
+    elif cleaned_transcript and cleaned_transcript != raw_transcript:
+        llm_notice = "已完成基础转写，并做术语纠错与规则清洗。"
     return {
         "transcript": raw_transcript,
-        "display_transcript": enhanced_transcript or raw_transcript,
+        "display_transcript": enhanced_transcript or cleaned_transcript or raw_transcript,
         "raw_transcript": raw_transcript,
+        "cleaned_transcript": cleaned_transcript,
         "enhanced_transcript": enhanced_transcript,
         "transcript_engine": transcript_engine,
         "transcript_model": transcript_model,
+        "post_process_mode": cleanup_mode,
+        "post_process_steps": cleanup_steps,
         "llm_enhancement_requested": bool(use_llm_enhancement),
         "llm_enhanced": llm_enhanced,
         "llm_notice": llm_notice,
@@ -7862,10 +9290,173 @@ def process_review_publish_text(text, tenant_slug="", review_period="", entry_po
     }
 
 
+def _build_review_evidence_query_text(review_text="", review_title=""):
+    title_text = re.sub(r"^(日复盘|周复盘|月复盘)\s*[:：-]?\s*", "", str(review_title or "").strip())
+    def _split_review_sentences(text):
+        raw = str(text or "").replace("\r", "\n")
+        parts = re.split(r"[\n。！？；;]+", raw)
+        return [part.strip(" \t-•*") for part in parts if str(part or "").strip(" \t-•*")]
+    parts = []
+    if title_text:
+        parts.append(title_text)
+    for sentence in _split_review_sentences(review_text):
+        cleaned = str(sentence or "").strip()
+        if not cleaned:
+            continue
+        next_text = "；".join(parts + [cleaned]) if parts else cleaned
+        if len(next_text) > 240:
+            break
+        parts.append(cleaned)
+        if len(parts) >= 4:
+            break
+    query_text = "；".join(part for part in parts if part).strip()
+    if query_text:
+        return query_text[:240]
+    fallback = str(review_text or "").replace("\n", " ").strip()
+    return fallback[:240]
+
+
+def _summarize_review_evidence_chain_fallback(knowledge_items, web_matches):
+    knowledge_count = len(knowledge_items)
+    web_count = len(web_matches)
+    if not knowledge_count and not web_count:
+        return "暂无匹配的证据链"
+    if knowledge_count and web_count:
+        return f"已基于用户复盘命中 {knowledge_count} 条知识库证据，并补充 {web_count} 条互联网公开信息。"
+    if knowledge_count:
+        return f"已基于用户复盘命中 {knowledge_count} 条知识库证据。"
+    return f"当前知识库未命中，已补充 {web_count} 条互联网公开信息。"
+
+
+def build_review_evidence_chain_section(review_text="", tenant_slug="", review_title="", entry_point="review_publish"):
+    normalized_text = str(review_text or "").strip()
+    query_text = _build_review_evidence_query_text(normalized_text, review_title=review_title)
+    empty_payload = {
+        "status": "empty",
+        "query_text": query_text,
+        "summary": "暂无匹配的证据链",
+        "items": [],
+        "knowledge_match_count": 0,
+        "web_match_count": 0,
+        "llm_model": None,
+    }
+    if not query_text:
+        return empty_payload
+
+    knowledge_result = {}
+    web_result = {}
+    try:
+        knowledge_result = build_evidence_chain_response(
+            tenant_slug=tenant_slug,
+            query_text=query_text,
+            limit=4,
+            submit_to_model=True,
+            source_types=["knowledge"],
+            entry_point=entry_point,
+            feature_namespace="review_evidence_chain",
+        )
+    except Exception:
+        knowledge_result = {}
+    try:
+        web_result = hermes_tool_web_search(query_text, limit=4)
+    except Exception:
+        web_result = {"matches": []}
+
+    knowledge_items = [copy.deepcopy(item) for item in ((knowledge_result.get("evidence_items") or []) if isinstance(knowledge_result, dict) else []) if isinstance(item, dict)]
+    web_matches = [copy.deepcopy(item) for item in ((web_result.get("matches") or []) if isinstance(web_result, dict) else []) if isinstance(item, dict)]
+    if not knowledge_items and not web_matches:
+        return empty_payload
+
+    llm_model = copy.deepcopy((knowledge_result.get("llm_model") or {}) if isinstance(knowledge_result, dict) else {}) or None
+    items = []
+    for index, item in enumerate(knowledge_items[:4], start=1):
+        items.append({
+            "id": str(item.get("evidence_id") or item.get("id") or f"knowledge_{index}").strip() or f"knowledge_{index}",
+            "kind": "knowledge",
+            "title": str(item.get("title") or "知识库证据").strip()[:180] or "知识库证据",
+            "summary": str(item.get("summary") or item.get("body") or item.get("raw_input") or "暂无摘要").strip()[:320],
+            "source_label": str(item.get("source_label") or "知识库").strip()[:80] or "知识库",
+            "source_detail": sanitize_user_facing_source_text(item.get("source_detail") or item.get("source") or "")[:240],
+            "published_at": "",
+            "link": str(item.get("url") or "").strip()[:500],
+            "score": float(item.get("score") or 0.0),
+        })
+    for index, item in enumerate(web_matches[:4], start=1):
+        items.append({
+            "id": f"web_{index}",
+            "kind": "web",
+            "title": str(item.get("title") or "互联网公开信息").strip()[:180] or "互联网公开信息",
+            "summary": str(item.get("summary") or item.get("published_at") or "暂无摘要").strip()[:320],
+            "source_label": "互联网公开信息",
+            "source_detail": str(item.get("source") or "Google News RSS").strip()[:120] or "Google News RSS",
+            "published_at": str(item.get("published_at") or "").strip()[:120],
+            "link": str(item.get("link") or "").strip()[:500],
+            "score": 0.0,
+        })
+
+    summary = _summarize_review_evidence_chain_fallback(knowledge_items, web_matches)
+    synthesis_model = get_default_llm_config(purpose="general", feature_code="review_evidence_chain_synthesis")
+    if synthesis_model and items:
+        evidence_blocks = []
+        for idx, item in enumerate(items[:6], start=1):
+            evidence_blocks.append(
+                "\n".join([
+                    f"[命中 {idx}] 类型：{item.get('source_label') or item.get('kind')}",
+                    f"[命中 {idx}] 标题：{item.get('title') or '未命名命中'}",
+                    f"[命中 {idx}] 摘要：{item.get('summary') or '暂无摘要'}",
+                    f"[命中 {idx}] 来源：{item.get('source_detail') or ''}",
+                    f"[命中 {idx}] 时间：{item.get('published_at') or ''}",
+                ])
+            )
+        try:
+            summary = call_openai_compatible_llm(
+                synthesis_model,
+                "你是复盘证据链整理助手。请基于用户正文和命中证据，输出一句简洁的中文总结。"
+                "如果证据与正文关联弱，要明确说“暂无充分匹配证据”。不要编造。",
+                (
+                    f"用户复盘正文：\n{normalized_text[:1500] or '暂无正文'}\n\n"
+                    f"证据命中：\n{chr(10).join(evidence_blocks)}\n\n"
+                    "请只输出 1 到 2 句总结。"
+                ),
+                feature_code="review_evidence_chain_synthesis",
+                feature_label="复盘证据链总结",
+                tenant_slug=tenant_slug,
+                entry_point=entry_point,
+                metadata={
+                    "knowledge_match_count": len(knowledge_items),
+                    "web_match_count": len(web_matches),
+                },
+                request_timeout_seconds=25,
+            ).strip() or summary
+            llm_model = {
+                "key": synthesis_model.get("key"),
+                "label": synthesis_model.get("label"),
+                "provider": synthesis_model.get("provider"),
+                "model_name": synthesis_model.get("model_name"),
+                "purpose": synthesis_model.get("purpose"),
+            }
+        except Exception:
+            pass
+
+    summary = str(summary or "").strip() or "暂无匹配的证据链"
+    if "暂无" in summary and not knowledge_items and not web_matches:
+        return empty_payload
+    return {
+        "status": "matched" if items else "empty",
+        "query_text": query_text,
+        "summary": summary[:320],
+        "items": items[:8],
+        "knowledge_match_count": len(knowledge_items),
+        "web_match_count": len(web_matches),
+        "llm_model": llm_model,
+    }
+
+
 def persist_review_publish_snapshot(
     tenant_slug,
     text,
     review_period="",
+    review_title="",
     speaker_name="",
     source_mode="manual",
     paragraph_mode="manual",
@@ -7890,6 +9481,7 @@ def persist_review_publish_snapshot(
     cleaned_text = str(text or "").strip()
     normalized_user_input_section = copy.deepcopy(user_input_section if isinstance(user_input_section, dict) else {})
     normalized_watchlist_analysis = copy.deepcopy(watchlist_analysis_section if isinstance(watchlist_analysis_section, dict) else {})
+    explicit_title = str(review_title or "").strip()
     title_source_text = str(
         normalized_user_input_section.get("display_text")
         or normalized_user_input_section.get("polished_text")
@@ -7898,7 +9490,7 @@ def persist_review_publish_snapshot(
         or ""
     ).strip()
     title_seed = re.split(r"[。！？\n]", title_source_text, 1)[0].strip() if title_source_text else ""
-    title = f"{period_label}：{title_seed or '最新复盘已发布'}"
+    title = explicit_title or f"{period_label}：{title_seed or '最新复盘已发布'}"
     summary = str(review_summary or "").strip()
     if not summary:
         summary_source_text = str(
@@ -7911,6 +9503,12 @@ def persist_review_publish_snapshot(
         summary = re.sub(r"\s+", " ", summary_source_text).strip()[:150] if summary_source_text else f"{period_label}已发布。"
     else:
         summary = re.sub(r"\s+", " ", summary).strip()[:150]
+    evidence_chain_section = build_review_evidence_chain_section(
+        review_text=title_source_text or cleaned_text,
+        tenant_slug=tenant_slug,
+        review_title=explicit_title or title,
+        entry_point="review_publish",
+    )
     snapshot = {
         "id": f"{tenant_slug}-review-{int(time.time() * 1000)}",
         "title": title[:80],
@@ -7934,6 +9532,7 @@ def persist_review_publish_snapshot(
         "polished_input_text": str(polished_input_text or "").strip()[:12000],
         "user_input_section": normalized_user_input_section,
         "watchlist_analysis_section": normalized_watchlist_analysis,
+        "evidence_chain_section": evidence_chain_section,
     }
     snapshots = append_review_snapshot(tenant_slug, snapshot)
     review_message = {

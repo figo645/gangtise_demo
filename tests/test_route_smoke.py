@@ -17,15 +17,15 @@ def _tenant_slugs():
 class RouteSmokeTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls._original_password_gate = web_hooks.is_password_gate_enabled
-        web_hooks.is_password_gate_enabled = lambda: False
+        cls._original_is_authenticated = web_hooks.is_authenticated
+        web_hooks.is_authenticated = lambda: True
         app_entry.app.config.update(TESTING=True)
         cls.client = app_entry.app.test_client()
         cls.tenant_slugs = _tenant_slugs()
 
     @classmethod
     def tearDownClass(cls):
-        web_hooks.is_password_gate_enabled = cls._original_password_gate
+        web_hooks.is_authenticated = cls._original_is_authenticated
 
     def test_h5_pages_render(self):
         for tenant_slug in self.tenant_slugs:
@@ -72,7 +72,7 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertNotIn("加入上下文", html)
         self.assertIn("function requestReviewStructuredPreview()", html)
         self.assertIn("function confirmStructuredReviewToPreview()", html)
-        self.assertIn("摘要和自选股归纳总结审核与详细修改", html)
+        self.assertIn("Draft 审核与详细修改", html)
         self.assertIn("用户复盘", html)
         self.assertIn("自选股归纳总结", html)
         self.assertIn("系统标签", html)
@@ -90,6 +90,9 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("submitWatchlistComment(", html)
         self.assertIn("deleteWatchlistComment(", html)
         self.assertIn("activeSection === 'comments'", html)
+        self.assertIn('id="watchlist-stock-suggestion-list"', html)
+        self.assertIn("function handleWatchlistStockCodeInput(value)", html)
+        self.assertIn("function selectWatchlistSuggestionByIndex(index)", html)
 
     def test_hermes_query_accepts_web_answer_flag(self):
         response = self.client.post(
@@ -128,11 +131,32 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn('id="hermes-intent-tree"', html)
         self.assertIn('id="hermes-route-priority"', html)
         self.assertIn('id="hermes-template-tree"', html)
+        self.assertIn('id="admin-hermes-missing-capability-tbody"', html)
         self.assertIn('id="feature-watchlist_fan_comment_interaction"', html)
         self.assertIn('id="llm-feature-model-mapping"', html)
         self.assertIn("function updateAdminLlmFeatureModel", html)
         self.assertIn("功能级模型映射", html)
         self.assertIn('data-section="settings-llm-features"', html)
+        self.assertIn("百科结构", html)
+        self.assertIn("百科词条", html)
+        self.assertIn("词条结构概览", html)
+        self.assertIn("refreshAdminKnowledgeIntelligence(", html)
+        self.assertIn('id="admin-knowledge-assets-summary"', html)
+        self.assertIn('data-section="knowledge-overview"', html)
+        self.assertIn('data-section="knowledge-intake"', html)
+        self.assertIn('data-section="knowledge-encyclopedia"', html)
+        self.assertIn('data-section="knowledge-entries"', html)
+        self.assertIn('data-section="knowledge-graph"', html)
+        self.assertIn("配置子菜单", html)
+        self.assertIn("主题与外观", html)
+        self.assertIn("登录与访问策略", html)
+        self.assertIn("知识输入源", html)
+        self.assertIn("证据链配置", html)
+        self.assertIn("复盘生成配置", html)
+        self.assertIn("功能级模型映射", html)
+        self.assertIn('data-settings-panel="knowledge-source"', html)
+        self.assertIn('data-settings-panel="llm-feature-map"', html)
+        self.assertIn("openAdminSettingsSubmenu('knowledge-source')", html)
 
     def test_workbench_pages_render(self):
         for tenant_slug in self.tenant_slugs:
@@ -143,10 +167,15 @@ class RouteSmokeTest(unittest.TestCase):
                 html = response.get_data(as_text=True)
                 self.assertIn("工作台", html)
                 self.assertIn("知识专区", html)
+                self.assertIn("知识总览", html)
+                self.assertIn("知识治理", html)
+                self.assertIn("百科结构", html)
+                self.assertIn("百科词条", html)
                 self.assertIn("知识图谱", html)
-                self.assertIn("进入知识图谱", html)
+                self.assertIn("词条列表", html)
                 self.assertIn("id=\"kw-kg-legend\"", html)
                 self.assertIn("loadWorkbenchKnowledgeMap(", html)
+                self.assertIn("loadWorkbenchKnowledgeAssets(", html)
                 self.assertIn('class="kw-review-modal-close-pill"', html)
                 self.assertIn("评论标注总览", html)
                 self.assertIn("kw-watchlist-comment-analytics", html)
@@ -169,6 +198,19 @@ class RouteSmokeTest(unittest.TestCase):
                 self.assertIsInstance(payload, dict)
                 self.assertIn("fund_dashboard", payload)
                 self.assertIn("indicator_hub", payload)
+
+    def test_workbench_knowledge_assets_api_payloads(self):
+        tenant_slug = self.tenant_slugs[0]
+        response = self.client.get(f"/api/kol/knowledge-assets?tenant={tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertIn("assets", payload)
+        self.assertIn("summary", payload["assets"])
+        self.assertIn("entries", payload["assets"])
+        self.assertIn("workflow_meta", payload)
+        self.assertEqual(payload["workflow_meta"]["id"], "knowledge_asset_agent")
 
     def test_dashboard_api_payloads(self):
         for tenant_slug in self.tenant_slugs:
@@ -254,6 +296,19 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("evidence_chain_agent", workflow_ids)
         self.assertIn("knowledge_processing_agent", workflow_ids)
         self.assertIn("knowledge_graph_agent", workflow_ids)
+        self.assertIn("knowledge_asset_agent", workflow_ids)
+
+    def test_admin_knowledge_assets_api_payloads(self):
+        response = self.client.get("/api/admin/knowledge-assets")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertIn("assets", payload)
+        self.assertIn("summary", payload["assets"])
+        self.assertIn("entries", payload["assets"])
+        self.assertIn("workflow_meta", payload)
+        self.assertEqual(payload["workflow_meta"]["id"], "knowledge_asset_agent")
 
     def test_review_prepare_preview_endpoint_queues_job(self):
         response = self.client.post(
@@ -266,6 +321,28 @@ class RouteSmokeTest(unittest.TestCase):
                 "selected_watchlist": ["中芯国际", "腾讯控股"],
                 "speaker_name": "测试大V",
                 "entry_point": "test_review_preview",
+            },
+        )
+
+        self.assertIn(response.status_code, {200, 503})
+        payload = response.get_json()
+        self.assertIsInstance(payload, dict)
+        if response.status_code == 200:
+            self.assertTrue(payload["ok"])
+            self.assertTrue(payload["async"])
+            self.assertIn("job_code", payload)
+
+    def test_review_prepare_preview_endpoint_allows_empty_watchlist(self):
+        response = self.client.post(
+            "/api/review/prepare-preview",
+            json={
+                "tenant_slug": self.tenant_slugs[0],
+                "period": "day",
+                "source_mode": "manual",
+                "source_text": "今天用户自己输入的复盘内容，先只生成摘要。",
+                "selected_watchlist": [],
+                "speaker_name": "测试大V",
+                "entry_point": "test_review_preview_no_watchlist",
             },
         )
 
@@ -363,6 +440,7 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("/api/admin/hermes/memory-summary", html)
         self.assertIn("/api/admin/hermes/memory-backup", html)
         self.assertIn("/api/admin/hermes/memory-clear", html)
+        self.assertIn("Hermes 缺失能力需求", html)
 
     def test_admin_page_contains_knowledge_center_graph(self):
         response = self.client.get("/admin")
