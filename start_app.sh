@@ -33,8 +33,10 @@ if [ -z "$PYTHON_BIN" ]; then
   echo "  $SCRIPT_DIR/env/bin/python"
   echo
   echo "Example:"
+  echo "  apt-get update && apt-get install -y python3-venv python3-pip"
   echo "  python3 -m venv .venv"
   echo "  source .venv/bin/activate"
+  echo "  pip install -U pip"
   echo "  pip install -r requirements.txt"
   exit 1
 fi

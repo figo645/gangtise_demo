@@ -193,6 +193,10 @@ body.theme-light .lv1{color:var(--text-sub)}
       <div class="info-card-title">③ 后台控开而非一次性放量</div>
       <div class="info-card-body">社区、Hermes、会员、消息、工作台等能力保留在产品规划内，但默认关闭，由 admin 按运营阶段逐步开启，降低开放风险与运维复杂度。</div>
     </div>
+    <div class="info-card">
+      <div class="info-card-title">④ 模型按功能精细路由</div>
+      <div class="info-card-body">所有大模型应用统一纳入平台配置，但不再要求全站共用一个模型。Admin 已支持按功能独立选择模型，优先满足 Hermes、复盘、知识加工、评论标注等不同链路的稳定性与成本控制。</div>
+    </div>
   </div>
 
   <div class="prd-sub">
@@ -373,7 +377,8 @@ body.theme-light .lv1{color:var(--text-sub)}
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">KOL管理/结算</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">内容审核</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">渠道管理</span></div>
-      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">系统设置 / 主题色 / 功能开关</span></div>
+      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">系统设置 / 主题色 / 功能开关 / 大模型专区</span></div>
+      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">功能级模型映射 / Token监控 / 智能体工作流</span></div>
       <div class="arch-node"><span class="arch-indent">│  └─ </span><span class="arch-box sub">访问审计</span></div>
       <div class="arch-node" style="margin-top:8px"><span class="arch-indent">└─ </span><span class="arch-box page">admin 数据分析分组</span><span class="arch-route">/admin?section=funnel</span></div>
       <div class="arch-node"><span class="arch-indent">   ├─ </span><span class="arch-box sub">转化漏斗</span></div>
@@ -826,8 +831,11 @@ body.theme-light .lv1{color:var(--text-sub)}
       <tr><td>帖子审核</td><td>待审核队列、AI合规检测结果展示、一键发布/驳回、违规关键词配置</td><td>审核员、超管</td><td><span class="done">已实现</span></td></tr>
       <tr><td>活动管理</td><td>活动列表（含筛选/批量操作）、活动详情页（参与数据/报名用户/议程）、富文本创建/编辑表单（奖励配置/议程配置/权限设置/H5预览）</td><td>运营、超管</td><td><span class="done">已实现</span></td></tr>
       <tr><td>Hermes使用统计</td><td>用于扩展模块开启后的模式调用量/响应时间/算力监控</td><td>运营、超管</td><td><span class="done">已预置</span></td></tr>
+      <tr><td>大模型专区</td><td>维护模型列表、默认模型、接口地址、API Key 与启用状态</td><td>超管</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>功能级模型映射</td><td>按功能为 Hermes、复盘、知识加工、评论标注、智能指标等链路单独指定模型</td><td>超管</td><td><span class="done">已实现</span></td></tr>
       <tr><td>渠道管理</td><td>渠道详细数据（9列含ROI）、UTM参数配置与复制</td><td>运营、超管</td><td><span class="done">已实现</span></td></tr>
       <tr><td>系统设置</td><td>平台默认主题、主题色、功能开关、基础说明等站点配置</td><td>超管</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>自选股评论标注统计</td><td>查看评论标签、关键词云、情绪分布与标的讨论热度，辅助大V与运营识别粉丝关注点</td><td>运营、超管</td><td><span class="done">已实现</span></td></tr>
       <tr><td>访问审计</td><td>访问量、访问路径、IP排行、近14日趋势与明细记录</td><td>超管</td><td><span class="done">已实现</span></td></tr>
       <tr><td>数据分析分组</td><td>转化漏斗、渠道分析、KOL效能、营收趋势、用户分层分析统一在 admin 内查看</td><td>运营、超管</td><td><span class="done">已实现</span></td></tr>
     </table>
@@ -841,6 +849,8 @@ body.theme-light .lv1{color:var(--text-sub)}
       <tr><td>默认主题色</td><td>支持蓝、绿、slate、amber 等主题色</td><td>首页 / H5 / PRD / admin</td><td><span class="done">已实现</span></td></tr>
       <tr><td>用户本地偏好</td><td>用户可自行覆盖默认主题选择，本地记忆优先</td><td>首页 / H5 / PRD / admin</td><td><span class="done">已实现</span></td></tr>
       <tr><td>功能开关</td><td>控制基本面分析、自选股、复盘专区、知识专区及扩展模块的可见性</td><td>H5 首页导航 / 实际页面</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>功能级模型映射</td><td>在不改业务流程的前提下，为不同大模型功能单独指定模型</td><td>Admin 系统专区 · 功能级模型映射</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>评论标注模型化</td><td>自选股评论保存后自动做标签、关键词、情绪和主题标注，用于工作台和后台统计</td><td>H5 自选股 / 大V工作台 / Admin</td><td><span class="done">已实现</span></td></tr>
     </table>
   </div>
 
