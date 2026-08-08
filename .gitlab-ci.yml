@@ -1,56 +1,48 @@
-# This file is a template, and might need editing before it works on your project.
-# To contribute improvements to CI/CD templates, please follow the Development guide at:
-# https://docs.gitlab.com/development/cicd/templates/
-# This specific template is located at:
-# https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Python.gitlab-ci.yml
+image: python:3.12   # 建议固定版本，不要用 latest（latest 现在已经是 3.14 了）
 
-# Official language image. Look for the different tagged releases at:
-# https://hub.docker.com/r/library/python/tags/
-image: python:latest
-
-# Change pip's cache directory to be inside the project directory since we can
-# only cache local items.
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
 
-# https://pip.pypa.io/en/stable/topics/caching/
 cache:
   paths:
     - .cache/pip
+    - venv/
 
 before_script:
-  - python --version ; pip --version  # For debugging
-  - pip install virtualenv
-  - virtualenv venv
+  - python --version
+  - pip --version
+  - python -m venv venv
   - source venv/bin/activate
+  - pip install --upgrade pip
 
+# 测试 job（如果你有 tests 目录的话）
 test:
+  stage: test
   script:
-    - pip install ruff tox  # you can also use tox
-    - pip install --editable ".[test]"
-    - tox -e py,ruff
+    - pip install -r requirements.txt   # 如果有 requirements.txt 的话
+    # 或者直接安装依赖，例如：
+    # - pip install flask sqlalchemy ... （按你实际依赖写）
+    - python -m pytest tests/ -v --tb=short   # 如果你用 pytest
+  # 如果暂时没有测试，可以先注释掉整个 test job
 
+# 运行 / 检查能否启动
 run:
+  stage: test
   script:
-    - pip install .
-    # run the command here
-  artifacts:
-    paths:
-      - build/*
+    - pip install -r requirements.txt   # 同上
+    - python -c "import app; print('app import success')"   # 简单检查能不能导入
+    # 或者更完整一点：
+    # - timeout 10s python3 app.py || true   # 尝试启动几秒，防止一直挂着
 
-pages:
-  script:
-    - pip install sphinx sphinx-rtd-theme
-    - cd doc
-    - make html
-    - mv build/html/ ../public/
-  artifacts:
-    paths:
-      - public
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-
+# 部署 job（示例，按你实际部署方式改）
 deploy:
   stage: deploy
-  script: echo "Define your deployment script!"
-  environment: production
+  script:
+    - echo "这里写你的部署脚本"
+    # 例如：
+    # - scp -r . user@server:/path/to/app
+    # - ssh user@server "cd /path/to/app && ./stop_app.sh && ./start_app.sh"
+  environment:
+    name: production
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
