@@ -5675,6 +5675,7 @@ def init_db():
         execute_sql_file(conn, sql_dir / "027_h5_auth_wechat.sql")
         execute_sql_file(conn, sql_dir / "028_h5_user_onboarding.sql")
         execute_sql_file(conn, sql_dir / "029_user_labels.sql")
+        execute_sql_file(conn, sql_dir / "030_market_snapshot_payloads.sql")
         execute_sql_file(conn, sql_dir / "100_seed_master_data.sql")
         execute_sql_file(conn, sql_dir / "101_seed_app_core.sql")
         execute_sql_file(conn, sql_dir / "102_seed_market_sector_catalog.sql")

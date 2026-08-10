@@ -29,6 +29,7 @@ Notes:
 - One-shot bootstrap for a new database (creates database and then calls the same incremental updater):
   [scripts/init_postgres_vector_db.sh](/Users/xuchenfei/PycharmProjects/gangtise_demo/scripts/init_postgres_vector_db.sh)
 - Daemon deployment default: [`start_daemon_app.sh`](/Users/xuchenfei/PycharmProjects/gangtise_demo/start_daemon_app.sh) runs the same updater before restarting the application. Set `AUTO_DB_UPDATE=0` only for an emergency application-only restart.
+- The daemon also starts a non-blocking real-market snapshot refresh. Existing snapshots remain visible during refresh; set `AUTO_MARKET_SNAPSHOT_SYNC=0` only to skip that refresh.
 
 ## Change Control
 

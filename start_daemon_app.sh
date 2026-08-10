@@ -6,9 +6,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PID_FILE="$SCRIPT_DIR/.app.daemon.pid"
 LOG_FILE="$SCRIPT_DIR/app.daemon.log"
 DB_UPDATE_LOG="$SCRIPT_DIR/db.update.log"
+MARKET_SYNC_LOG="$SCRIPT_DIR/market_snapshot_sync.log"
 APP_PORT="${PORT:-5001}"
 PYTHON_BIN="${PYTHON_BIN:-}"
 AUTO_DB_UPDATE="${AUTO_DB_UPDATE:-1}"
+AUTO_MARKET_SNAPSHOT_SYNC="${AUTO_MARKET_SNAPSHOT_SYNC:-1}"
 
 cd "$SCRIPT_DIR"
 
@@ -46,6 +48,15 @@ if [[ "$AUTO_DB_UPDATE" != "0" && "$AUTO_DB_UPDATE" != "false" && "$AUTO_DB_UPDA
   echo "Database schema and master data are up to date. Audit: schema_migrations"
 else
   echo "Database auto-update skipped (AUTO_DB_UPDATE=$AUTO_DB_UPDATE)."
+fi
+
+# Existing snapshots are already available immediately after migration. Refresh
+# market data in a separate process so a slow external quote source never
+# delays the daemon restart. The helper uses a PostgreSQL advisory lock.
+if [[ "$AUTO_MARKET_SNAPSHOT_SYNC" != "0" && "$AUTO_MARKET_SNAPSHOT_SYNC" != "false" && "$AUTO_MARKET_SNAPSHOT_SYNC" != "no" ]]; then
+  nohup env PYTHONUNBUFFERED=1 "$PYTHON_BIN" "$SCRIPT_DIR/scripts/sync_market_snapshots.py" \
+    >>"$MARKET_SYNC_LOG" 2>&1 < /dev/null &
+  echo "Started background market snapshot refresh. Log: $MARKET_SYNC_LOG"
 fi
 
 if [ -f "$PID_FILE" ]; then

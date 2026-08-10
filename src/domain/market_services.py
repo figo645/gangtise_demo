@@ -4898,7 +4898,7 @@ def sync_market_snapshot(force=False):
     overview_items = []
     errors = []
     intraday_count = 0
-    previous_overview = _load_watchlist_cache("market_overview", "standard_indices", 0)
+    previous_overview = _load_market_snapshot_payload("market_overview", "standard_indices", 0) or _load_watchlist_cache("market_overview", "standard_indices", 0)
     previous_items = {
         str(item.get("indicator_code") or ""): item
         for item in ((previous_overview or {}).get("items") or [])
@@ -4940,7 +4940,10 @@ def sync_market_snapshot(force=False):
         if intraday.get("available"):
             intraday_count += 1
             _save_watchlist_cache("market_index_intraday", indicator_code, intraday)
-    cached_sector_snapshot = None if force else _load_watchlist_cache("market_sector_overview", "shenwan_level1", 60 * 60)
+    cached_sector_snapshot = None if force else (
+        _load_market_snapshot_payload("market_sector_overview", "shenwan_level1", 60 * 60)
+        or _load_watchlist_cache("market_sector_overview", "shenwan_level1", 60 * 60)
+    )
     if isinstance(cached_sector_snapshot, dict) and cached_sector_snapshot.get("source") == "AKShare" and cached_sector_snapshot.get("items"):
         sector_items = list(cached_sector_snapshot["items"])
     else:
@@ -4951,9 +4954,9 @@ def sync_market_snapshot(force=False):
     overview_payload = {"ok": True, "snapshot_version": 5, "items": overview_items, "source": "AKShare", "updated_at": updated_at}
     sector_payload = {"ok": True, "snapshot_version": 5, "items": sector_items, "total": len(sector_items), "catalog_size": len(SHENWAN_LEVEL1_INDUSTRIES), "source": "AKShare", "updated_at": updated_at}
     if any(item.get("available") for item in overview_items):
-        _save_watchlist_cache("market_overview", "standard_indices", overview_payload)
+        _save_market_snapshot_payload("market_overview", "standard_indices", overview_payload)
     if sector_items:
-        _save_watchlist_cache("market_sector_overview", "shenwan_level1", sector_payload)
+        _save_market_snapshot_payload("market_sector_overview", "shenwan_level1", sector_payload)
     return {"ok": bool(any(item.get("available") for item in overview_items) or sector_items), "updated": sum(1 for item in overview_items if item.get("available")) + len(sector_items) + intraday_count, "overview_count": sum(1 for item in overview_items if item.get("available")), "sector_count": len(sector_items), "intraday_count": intraday_count, "updated_at": updated_at, "errors": errors[:20]}
 
 
@@ -4983,7 +4986,9 @@ def request_market_snapshot_refresh():
 def build_market_overview_payload():
     """Read persisted real market data; never call a provider from an H5 GET."""
     cache_key = "standard_indices"
-    cached = _load_watchlist_cache("market_overview", cache_key, MARKET_SNAPSHOT_CACHE_TTL_SECONDS)
+    cached = _load_market_snapshot_payload("market_overview", cache_key, MARKET_SNAPSHOT_CACHE_TTL_SECONDS)
+    if cached is None:
+        cached = _load_watchlist_cache("market_overview", cache_key, MARKET_SNAPSHOT_CACHE_TTL_SECONDS)
     if isinstance(cached, dict) and cached.get("snapshot_version") in {3, 5} and cached.get("source") == "AKShare" and isinstance(cached.get("items"), list):
         return cached
     return {"ok": True, "items": [], "source": "AKShare", "refreshing": True, "message": "后台正在同步 AKShare 市场快照"}
@@ -5278,11 +5283,15 @@ def _fetch_akshare_sector_overview(ak=None):
 def build_market_sector_overview_payload(force_refresh=False):
     cache_key = "shenwan_level1"
     if not force_refresh:
-        cached = _load_watchlist_cache("market_sector_overview", cache_key, MARKET_SNAPSHOT_CACHE_TTL_SECONDS)
+        cached = _load_market_snapshot_payload("market_sector_overview", cache_key, MARKET_SNAPSHOT_CACHE_TTL_SECONDS)
+        if cached is None:
+            cached = _load_watchlist_cache("market_sector_overview", cache_key, MARKET_SNAPSHOT_CACHE_TTL_SECONDS)
         if isinstance(cached, dict) and isinstance(cached.get("items"), list) and cached["items"]:
             if cached.get("snapshot_version") in {3, 5} and str(cached.get("source") or "").lower() == "akshare":
                 return cached
-    stale = _load_watchlist_cache("market_sector_overview", cache_key, 0)
+    stale = _load_market_snapshot_payload("market_sector_overview", cache_key, 0)
+    if stale is None:
+        stale = _load_watchlist_cache("market_sector_overview", cache_key, 0)
     if isinstance(stale, dict) and isinstance(stale.get("items"), list) and stale.get("items"):
         source = str(stale.get("source") or "").lower()
         if source == "akshare" and stale.get("snapshot_version") in {3, 5}:
@@ -5497,6 +5506,64 @@ def build_watchlist_indicator_detail(indicator_code, stock_name=""):
 def _watchlist_cache_setting_key(prefix, value):
     normalized = slugify_code(str(value or "").strip(), prefix or "watchlist")
     return f"{prefix}:{normalized}"
+
+
+def _load_market_snapshot_payload(snapshot_type, snapshot_key, ttl_seconds):
+    """Load a market display snapshot from its dedicated database table."""
+    try:
+        db = get_db()
+        row = db.execute(
+            """
+            SELECT payload_json, collected_at, updated_at
+            FROM market_snapshot_payloads
+            WHERE snapshot_type = ? AND snapshot_key = ?
+            """,
+            (snapshot_type, snapshot_key),
+        ).fetchone()
+    except Exception:
+        return None
+    if not row:
+        return None
+    payload = safe_json_loads(row.get("payload_json"), {}) if isinstance(row, dict) else {}
+    if not isinstance(payload, dict):
+        return None
+    captured_at = _parse_market_datetime((row.get("collected_at") if isinstance(row, dict) else "") or (row.get("updated_at") if isinstance(row, dict) else ""))
+    if ttl_seconds and captured_at and (datetime.now() - captured_at).total_seconds() > ttl_seconds:
+        return None
+    return copy.deepcopy(payload)
+
+
+def _save_market_snapshot_payload(snapshot_type, snapshot_key, payload):
+    """Persist market UI snapshots without mixing them into app configuration."""
+    if not isinstance(payload, dict):
+        return False
+    try:
+        db = get_db()
+        db.execute(
+            """
+            INSERT INTO market_snapshot_payloads (
+                snapshot_type, snapshot_key, source, snapshot_version, payload_json, collected_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT (snapshot_type, snapshot_key) DO UPDATE SET
+                source = EXCLUDED.source,
+                snapshot_version = EXCLUDED.snapshot_version,
+                payload_json = EXCLUDED.payload_json,
+                collected_at = EXCLUDED.collected_at,
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            (
+                str(snapshot_type or "").strip(),
+                str(snapshot_key or "").strip(),
+                str(payload.get("source") or "").strip(),
+                int(payload.get("snapshot_version") or 1),
+                json.dumps(payload, ensure_ascii=False),
+                str(payload.get("updated_at") or now_ts()),
+            ),
+        )
+        db.commit()
+    except Exception:
+        return False
+    return True
 
 
 def _load_watchlist_cache(prefix, value, ttl_seconds):
