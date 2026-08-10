@@ -5656,6 +5656,7 @@ def init_db():
     with get_app_db_connection() as conn:
         execute_sql_file(conn, sql_dir / "002_app_core_tables.sql")
         execute_sql_file(conn, sql_dir / "003_admin_task_configs_task_params.sql")
+        execute_sql_file(conn, sql_dir / "004_schema_migrations.sql")
         execute_sql_file(conn, sql_dir / "010_review_voice_embeddings.sql")
         execute_sql_file(conn, sql_dir / "011_review_voice_embeddings_alter_legacy_columns.sql")
         try:
@@ -5674,8 +5675,9 @@ def init_db():
         execute_sql_file(conn, sql_dir / "027_h5_auth_wechat.sql")
         execute_sql_file(conn, sql_dir / "028_h5_user_onboarding.sql")
         execute_sql_file(conn, sql_dir / "029_user_labels.sql")
-        execute_sql_file(conn, sql_dir / "101_seed_app_core.sql")
         execute_sql_file(conn, sql_dir / "100_seed_master_data.sql")
+        execute_sql_file(conn, sql_dir / "101_seed_app_core.sql")
+        execute_sql_file(conn, sql_dir / "102_seed_market_sector_catalog.sql")
 
 
 def init_db_safe():

@@ -2,7 +2,9 @@ from src.runtime import *
 from src.services import *
 from src.web.request_helpers import get_client_ip, safe_next_target
 
+@app.teardown_appcontext
 def close_db(exc):
+    """Close the request-scoped PostgreSQL connection and its transaction."""
     db = g.pop("db", None)
     if db is not None:
         db.close()

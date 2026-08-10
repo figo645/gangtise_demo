@@ -37,24 +37,13 @@ echo "==> Target database: $TARGET_DB"
 echo "==> Login user: $PGUSER"
 
 run_sql "$PGDATABASE" "${SQL_DIR}/000_create_database.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/001_enable_pgvector.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/002_app_core_tables.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/003_admin_task_configs_task_params.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/010_review_voice_embeddings.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/011_review_voice_embeddings_alter_legacy_columns.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/012_review_voice_embeddings_pgvector.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/020_knowledge_embeddings.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/021_knowledge_embeddings_pgvector.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/022_hermes_memory_profile.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/023_fan_stock_observation_events.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/024_watchlist_kline_annotations.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/025_watchlist_comments.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/026_tenant_fan_ops.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/027_h5_auth_wechat.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/028_h5_user_onboarding.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/029_user_labels.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/100_seed_master_data.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/101_seed_app_core.sql"
+echo "==> Applying versioned schema and master-data migrations"
+PGHOST="$PGHOST" \
+PGPORT="$PGPORT" \
+PGDATABASE="$TARGET_DB" \
+PGUSER="$PGUSER" \
+PGPASSWORD="$PGPASSWORD" \
+  "${ROOT_DIR}/scripts/apply_postgres_updates.sh"
 
 if [ -f "${ROOT_DIR}/gangtise_demo.db" ]; then
   echo "==> Migrating existing SQLite data into Postgres"

@@ -5,8 +5,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PID_FILE="$SCRIPT_DIR/.app.daemon.pid"
 LOG_FILE="$SCRIPT_DIR/app.daemon.log"
+DB_UPDATE_LOG="$SCRIPT_DIR/db.update.log"
 APP_PORT="${PORT:-5001}"
 PYTHON_BIN="${PYTHON_BIN:-}"
+AUTO_DB_UPDATE="${AUTO_DB_UPDATE:-1}"
 
 cd "$SCRIPT_DIR"
 
@@ -28,6 +30,22 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 if ! command -v "$PYTHON_BIN" >/dev/null 2>&1 && [ ! -x "$PYTHON_BIN" ]; then
   echo "Python executable not found: $PYTHON_BIN" >&2
   exit 1
+fi
+
+# Apply immutable, idempotent migrations before replacing a healthy daemon.
+# A failed migration leaves an existing service running instead of starting on
+# a partially upgraded schema or losing availability during deployment.
+if [[ "$AUTO_DB_UPDATE" != "0" && "$AUTO_DB_UPDATE" != "false" && "$AUTO_DB_UPDATE" != "no" ]]; then
+  echo "Checking PostgreSQL schema and master-data updates..."
+  if ! "$SCRIPT_DIR/scripts/apply_postgres_updates.sh" >>"$DB_UPDATE_LOG" 2>&1; then
+    echo "Database update failed. Existing daemon was not stopped." >&2
+    echo "Check: $DB_UPDATE_LOG" >&2
+    tail -40 "$DB_UPDATE_LOG" >&2 || true
+    exit 1
+  fi
+  echo "Database schema and master data are up to date. Audit: schema_migrations"
+else
+  echo "Database auto-update skipped (AUTO_DB_UPDATE=$AUTO_DB_UPDATE)."
 fi
 
 if [ -f "$PID_FILE" ]; then
