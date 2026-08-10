@@ -1071,9 +1071,7 @@ def _build_review_watchlist_llm_prompt(details, sector_profiles, source_text, re
             " / ".join(
                 part for part in [
                     str(item.get("dateLabel") or item.get("candle_date") or "").strip(),
-                    str(item.get("title") or "").strip(),
-                    str(item.get("note") or "").strip(),
-                    f"验证节点：{str(item.get('trigger') or '').strip()}" if str(item.get("trigger") or "").strip() else "",
+                    get_watchlist_annotation_content(item),
                 ]
                 if part
             )
@@ -1276,9 +1274,7 @@ def analyze_review_watchlist_with_llm(
                     continue
                 block = "；".join(
                     part for part in [
-                        str(item.get("title") or "").strip(),
-                        str(item.get("note") or "").strip(),
-                        f"验证节点：{str(item.get('trigger') or '').strip()}" if str(item.get("trigger") or "").strip() else "",
+                        get_watchlist_annotation_content(item),
                     ]
                     if part
                 ).strip()
@@ -1300,9 +1296,7 @@ def analyze_review_watchlist_with_llm(
                     trim_hermes_text(
                         " / ".join(
                             part for part in [
-                                str(item.get("title") or "").strip(),
-                                str(item.get("note") or "").strip(),
-                                str(item.get("trigger") or "").strip(),
+                                get_watchlist_annotation_content(item),
                             ]
                             if part
                         ),
@@ -1327,6 +1321,8 @@ def analyze_review_watchlist_with_llm(
                     "stock_name": stock_name,
                     "stock_code": stock_code,
                     "date_label": str(item.get("dateLabel") or item.get("candle_date") or "").strip(),
+                    "content": get_watchlist_annotation_content(item),
+                    # Retain legacy-shaped fields for previously published reviews.
                     "title": str(item.get("title") or "").strip(),
                     "note": str(item.get("note") or "").strip(),
                     "trigger": str(item.get("trigger") or "").strip(),
@@ -6308,6 +6304,22 @@ def trim_hermes_text(value, limit=180):
     return f"{text[:max(0, limit - 1)]}…"
 
 
+def get_watchlist_annotation_content(annotation):
+    """Return the canonical single-field annotation text with legacy support."""
+    item = annotation if isinstance(annotation, dict) else {}
+    content = str(item.get("content") or "").strip()
+    if content:
+        return content
+    return "；".join(
+        part for part in [
+            str(item.get("title") or "").strip(),
+            str(item.get("note") or "").strip(),
+            str(item.get("trigger") or "").strip(),
+        ]
+        if part
+    )
+
+
 def resolve_hermes_watchlist_annotation_context(tenant_slug="", question_text="", limit=3):
     normalized_tenant = str(tenant_slug or "").strip().lower()
     empty_result = {"available": False, "items": [], "summary": "", "annotation_count": 0, "stock_count": 0}
@@ -6362,9 +6374,14 @@ def resolve_hermes_watchlist_annotation_context(tenant_slug="", question_text=""
             if str(title).strip()
         ][:4]
         annotation_summary = trim_hermes_text(item.get("annotation_summary") or "", limit=120)
+        annotation_contents = [
+            str(content).strip()
+            for content in (item.get("annotation_contents") if isinstance(item.get("annotation_contents"), list) else [])
+            if str(content).strip()
+        ][:4]
         annotations = item.get("annotations") if isinstance(item.get("annotations"), list) else []
         annotation_count += len(annotations)
-        if not annotation_summary and not annotation_titles:
+        if not annotation_summary and not annotation_titles and not annotation_contents:
             continue
         items.append({
             "name": str(item.get("name") or item.get("code") or "自选股").strip(),
@@ -6372,6 +6389,7 @@ def resolve_hermes_watchlist_annotation_context(tenant_slug="", question_text=""
             "industry": str(item.get("industry") or "").strip(),
             "annotation_summary": annotation_summary,
             "annotation_titles": annotation_titles,
+            "annotation_contents": annotation_contents,
         })
     summary = "；".join(
         f"{entry['name']}：{entry['annotation_summary'] or '已存在K线标注'}"
@@ -7223,6 +7241,9 @@ def hermes_tool_indicator_detail(tenant_slug, indicator_code="", question_text="
             detail = live_detail
     if not isinstance(detail, dict):
         return {"found": False, "detail": None}
+    normalized_detail = normalize_watchlist_detail_from_indicator(detail, resolved_code)
+    if isinstance(normalized_detail, dict) and normalized_detail:
+        detail = normalized_detail
     if explicit_target_date:
         existing_snapshot = resolve_hermes_indicator_target_snapshot(detail, question_text=question_text)
         should_refresh_live = not (
@@ -7609,6 +7630,10 @@ def build_hermes_citations(tool_outputs):
             continue
         for title in (item.get("annotation_titles") if isinstance(item.get("annotation_titles"), list) else []):
             normalized = str(title or "").strip()
+            if normalized and normalized not in citations:
+                citations.append(normalized)
+        for content in (item.get("annotation_contents") if isinstance(item.get("annotation_contents"), list) else []):
+            normalized = trim_hermes_text(content, limit=60)
             if normalized and normalized not in citations:
                 citations.append(normalized)
     return citations[:8]

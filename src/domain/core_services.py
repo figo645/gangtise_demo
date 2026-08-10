@@ -6340,6 +6340,7 @@ def execute_admin_task_by_type(task_type, force=False):
     from src.domain.market_services import (
         invalidate_indicator_hub_cache,
         prepare_indicator_hub_store,
+        sync_market_snapshot,
         seed_mock_indicator_lake,
         sync_real_indicator_history_from_market_cache,
     )
@@ -6350,6 +6351,8 @@ def execute_admin_task_by_type(task_type, force=False):
         result = sync_real_indicator_history_from_market_cache(force=force)
         invalidate_indicator_hub_cache()
         return result
+    if task_type == "sync_market_snapshot":
+        return sync_market_snapshot(force=force)
     if task_type == "seed_mock_indicator_lake":
         result = seed_mock_indicator_lake(force=force)
         invalidate_indicator_hub_cache()

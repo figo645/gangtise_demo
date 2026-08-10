@@ -24,6 +24,18 @@ def _parse_market_datetime(value):
             continue
     return None
 
+
+def is_cn_stock_market_open(now=None):
+    current = now or datetime.now()
+    if current.weekday() >= 5:
+        return False
+    minutes = current.hour * 60 + current.minute
+    morning_open = 9 * 60 + 30
+    morning_close = 11 * 60 + 30
+    afternoon_open = 13 * 60
+    afternoon_close = 15 * 60
+    return (morning_open <= minutes < morning_close) or (afternoon_open <= minutes < afternoon_close)
+
 def gen_funnel_data():
     base = [68000, 5400, 1260, 128, 36]
     return [{"layer": FUNNEL_LAYERS[i], "count": base[i], "rate": round(base[i]/base[0]*100, 2)} for i in range(5)]
@@ -169,9 +181,10 @@ def build_admin_funnel_payload():
             ("investor", since),
         ).fetchone()
         content_reach = int((reach_row or {}).get("count") or 0) if isinstance(reach_row, dict) else int(reach_row[0] or 0)
-    except Exception as exc:
-        if not is_db_unavailable_error(exc):
-            raise
+    except Exception:
+        # A missing DB context or unavailable DB must never trigger a provider
+        # call from the read path or manufacture a market value.
+        pass
 
     stage_counts = [content_reach, len(users), len(onboarding_users), len(paid_users), len(high_frequency_users)]
     funnel = [
@@ -300,7 +313,7 @@ def gen_market_data():
                 "value": round(NumberLike(detail.get("price")), 2),
                 "change": round(NumberLike(detail.get("change")), 2),
                 "change_pct": round(NumberLike(detail.get("change_pct")), 2),
-                "focus": detail.get("focus") or detail.get("industry") or config["focus"],
+                "focus": canonical_hot_industry_name(detail.get("industry") or detail.get("focus") or config["focus"]),
                 "board": config["board"],
                 "alert_level": detail.get("alert_level") or "attention",
                 "alert_text": detail.get("alert_text") or ("Gangtise 行情暂未返回，当前先保留研究内容框架。" if detail.get("data_unavailable") else "当前无明显预警"),
@@ -363,6 +376,7 @@ GANGTISE_INDICATOR_REGISTRY = {
         "category": "数据湖指标",
         "query_kind": "index_kline",
         "security_code": "000001.SH",
+        "tencent_symbol": "sh000001",
         "search_keyword": "上证指数",
     },
     "source_shenzhen_index": {
@@ -370,6 +384,7 @@ GANGTISE_INDICATOR_REGISTRY = {
         "category": "数据湖指标",
         "query_kind": "index_kline",
         "security_code": "399001.SZ",
+        "tencent_symbol": "sz399001",
         "search_keyword": "深证指数",
     },
     "source_hs300": {
@@ -377,6 +392,7 @@ GANGTISE_INDICATOR_REGISTRY = {
         "category": "数据湖指标",
         "query_kind": "index_kline",
         "security_code": "000300.SH",
+        "tencent_symbol": "sh000300",
         "search_keyword": "沪深300",
     },
     "source_sse50": {
@@ -384,6 +400,7 @@ GANGTISE_INDICATOR_REGISTRY = {
         "category": "数据湖指标",
         "query_kind": "index_kline",
         "security_code": "000016.SH",
+        "tencent_symbol": "sh000016",
         "search_keyword": "上证50",
     },
     "source_kc50": {
@@ -391,6 +408,7 @@ GANGTISE_INDICATOR_REGISTRY = {
         "category": "数据湖指标",
         "query_kind": "index_kline",
         "security_code": "000688.SH",
+        "tencent_symbol": "sh000688",
         "search_keyword": "科创50",
     },
     "source_cyb": {
@@ -398,7 +416,43 @@ GANGTISE_INDICATOR_REGISTRY = {
         "category": "数据湖指标",
         "query_kind": "index_kline",
         "security_code": "399006.SZ",
+        "tencent_symbol": "sz399006",
         "search_keyword": "创业板指",
+    },
+    "source_zz500": {
+        "indicator_name": "中证500",
+        "category": "数据湖指标",
+        "query_kind": "index_kline",
+        "security_code": "000905.SH",
+        "search_keyword": "中证500",
+    },
+    "source_zz1000": {
+        "indicator_name": "中证1000",
+        "category": "数据湖指标",
+        "query_kind": "index_kline",
+        "security_code": "000852.SH",
+        "search_keyword": "中证1000",
+    },
+    "source_zz800": {
+        "indicator_name": "中证800",
+        "category": "数据湖指标",
+        "query_kind": "index_kline",
+        "security_code": "000906.SH",
+        "search_keyword": "中证800",
+    },
+    "source_a500": {
+        "indicator_name": "中证A500",
+        "category": "数据湖指标",
+        "query_kind": "index_kline",
+        "security_code": "000510.SH",
+        "search_keyword": "中证A500",
+    },
+    "source_zz2000": {
+        "indicator_name": "中证2000",
+        "category": "数据湖指标",
+        "query_kind": "index_kline",
+        "security_code": "932000.CSI",
+        "search_keyword": "中证2000",
     },
     "source_brent": {
         "indicator_name": "布伦特原油",
@@ -418,6 +472,7 @@ GANGTISE_INDICATOR_REGISTRY = {
         "indicator_name": "道琼斯",
         "category": "数据湖指标",
         "query_kind": "edb_search",
+        "market": "US",
         "search_keyword": "道琼斯工业平均指数",
         "preferred_indicator_id": "M00009829",
     },
@@ -432,8 +487,23 @@ GANGTISE_INDICATOR_REGISTRY = {
         "indicator_name": "恒生指数",
         "category": "数据湖指标",
         "query_kind": "edb_search",
+        "market": "HK",
         "search_keyword": "恒生指数",
         "preferred_indicator_id": "M00015437",
+    },
+    "source_hscei": {
+        "indicator_name": "国企指数",
+        "category": "数据湖指标",
+        "query_kind": "edb_search",
+        "market": "HK",
+        "search_keyword": "恒生中国企业指数",
+    },
+    "source_hscci": {
+        "indicator_name": "红筹指数",
+        "category": "数据湖指标",
+        "query_kind": "edb_search",
+        "market": "HK",
+        "search_keyword": "恒生红筹指数",
     },
     "source_industry_index": {
         "indicator_name": "行业指数",
@@ -453,6 +523,7 @@ GANGTISE_INDICATOR_REGISTRY = {
         "indicator_name": "日经225",
         "category": "数据湖指标",
         "query_kind": "edb_search",
+        "market": "JP",
         "search_keyword": "日经225指数",
         "preferred_indicator_id": "M00015432",
     },
@@ -474,6 +545,7 @@ GANGTISE_INDICATOR_REGISTRY = {
         "indicator_name": "标普500",
         "category": "数据湖指标",
         "query_kind": "edb_search",
+        "market": "US",
         "search_keyword": "标准普尔500指数",
         "preferred_indicator_id": "M00006167",
     },
@@ -481,6 +553,7 @@ GANGTISE_INDICATOR_REGISTRY = {
         "indicator_name": "纳斯达克",
         "category": "数据湖指标",
         "query_kind": "edb_search",
+        "market": "US",
         "search_keyword": "纳斯达克综合指数",
         "preferred_indicator_id": "M00009828",
     },
@@ -706,6 +779,27 @@ def normalize_gangtise_source_line_points(response):
     return points
 
 
+def normalize_gangtise_minute_points(response):
+    data = response.get("data") if isinstance(response, dict) else {}
+    if not isinstance(data, dict):
+        return []
+    headers = data.get("headers") if isinstance(data.get("headers"), list) else data.get("fieldList") if isinstance(data.get("fieldList"), list) else []
+    time_index = headers.index("tradeTime") if "tradeTime" in headers else -1
+    close_index = headers.index("close") if "close" in headers else -1
+    if time_index < 0 or close_index < 0:
+        return []
+    points = []
+    for row in data.get("list", []) if isinstance(data, dict) else []:
+        if not isinstance(row, list) or len(row) <= max(time_index, close_index):
+            continue
+        time_value = str(row[time_index] or "").strip()
+        close_value = numeric_value(row[close_index])
+        if not time_value or close_value is None:
+            continue
+        points.append({"date": time_value, "value": round(close_value, 2)})
+    return points
+
+
 def normalize_gangtise_source_ohlc_rows(response):
     data = response.get("data") if isinstance(response, dict) else {}
     headers = data.get("fieldList") if isinstance(data, dict) and isinstance(data.get("fieldList"), list) else []
@@ -796,6 +890,64 @@ def fetch_gangtise_market_kline_series(path, security_code, token="", start_date
             ""
         ),
     }
+
+
+def _load_gangtise_intraday_snapshot(security_code, trade_date):
+    effective_date = str(trade_date or "").strip()
+    if not effective_date:
+        return None
+    cache_key = f"{str(security_code or '').strip().upper()}:{effective_date}"
+    cached = _load_watchlist_cache("watchlist_intraday_cache", cache_key, 15 * 60)
+    if not isinstance(cached, dict):
+        return None
+    cached_points = cached.get("points") if isinstance(cached.get("points"), list) else []
+    if not cached_points:
+        return None
+    return {
+        "ok": True,
+        "available": True,
+        "points": copy.deepcopy(cached_points),
+        "message": str(cached.get("message") or "cached").strip() or "cached",
+        "updated_at": str(cached.get("updated_at") or "").strip(),
+        "source": "gangtise_openapi_cache",
+        "duration_ms": 0,
+    }
+
+
+def fetch_gangtise_intraday_series(security_code, token="", trade_date="", limit=600, timeout=30, force_refresh=False):
+    effective_date = str(trade_date or datetime.now().date().isoformat()).strip()
+    cache_key = f"{str(security_code or '').strip().upper()}:{effective_date}"
+    if not force_refresh:
+        cached = _load_gangtise_intraday_snapshot(security_code, effective_date)
+        if cached:
+            return cached
+    payload = {
+        "securityCode": str(security_code or "").strip().upper(),
+        "startTime": f"{effective_date} 09:30:00",
+        "endTime": f"{effective_date} 15:00:00",
+        "Limit": max(60, min(int(limit or 600), 600)),
+        "fieldList": ["securityCode", "securityName", "tradeTime", "open", "high", "low", "close", "volume"],
+    }
+    status, response, duration = post_gangtise_openapi_json(
+        "/application/open-quote/kline/minute",
+        payload,
+        token=token,
+        timeout=timeout,
+    )
+    points = normalize_gangtise_minute_points(response)
+    message = str((response or {}).get("msg") or (response or {}).get("message") or "").strip()
+    result = {
+        "ok": is_gangtise_openapi_success(status, response) and len(points) >= 2,
+        "available": len(points) >= 2,
+        "points": points[-240:],
+        "message": message or ("ok" if len(points) >= 2 else "empty_intraday_series"),
+        "updated_at": now_ts(),
+        "source": "gangtise_openapi",
+        "duration_ms": int(duration or 0),
+    }
+    if result["available"]:
+        _save_watchlist_cache("watchlist_intraday_cache", cache_key, result)
+    return result
 
 
 def fetch_gangtise_indicator_series(indicator_code, start_date="", end_date="", token=""):
@@ -2585,6 +2737,17 @@ DEFAULT_ADMIN_TASKS = [
         "timeout_seconds": 600,
     },
     {
+        "task_code": "market_snapshot_sync",
+        "task_name": "市场与热门行业快照同步",
+        "task_group": "indicator",
+        "task_type": "sync_market_snapshot",
+        "description": "按固定周期从 AKShare 采集标准指数、分时与同花顺行业汇总，写入数据库快照供 H5 展示；前台不直接访问外部行情源。",
+        "schedule_type": "interval",
+        "schedule_value": "900",
+        "enabled": 1,
+        "timeout_seconds": 900,
+    },
+    {
         "task_code": "indicator_raw_landing",
         "task_name": "指标原始数据落地",
         "task_group": "indicator",
@@ -2992,6 +3155,27 @@ def build_live_gangtise_indicator_detail(indicator_code, start_date="", end_date
     registry_entry = GANGTISE_INDICATOR_REGISTRY.get(normalized_code)
     if not registry_entry:
         return None
+    if normalized_code in MARKET_OVERVIEW_INDEX_CODES:
+        detail = build_market_overview_index_detail(normalized_code)
+        if detail:
+            return detail
+        return {
+            "id": normalized_code,
+            "name": registry_entry.get("indicator_name") or normalized_code,
+            "provider": "AKShare",
+            "data_source": "akshare_cache",
+            "data_mode": "unavailable",
+            "data_mode_label": "AKShare 未取到",
+            "data_unavailable": True,
+            "history_series": [],
+            "history_kline": build_empty_kline_payload(),
+            "source_defs": [],
+            "source_count": 0,
+            "value": "--",
+            "numeric_value": None,
+            "assessment": "后台尚未同步 AKShare 标准指数快照。",
+            "alert": "请等待后台同步任务完成。",
+        }
     definition = {}
     try:
         for item in list_indicator_definitions():
@@ -4150,11 +4334,109 @@ def build_indicator_hub(tenant=None, admin_view=False):
     return hub
 
 
+HOT_INDUSTRY_NAME_MAP = {
+    "高端白酒": "食品饮料",
+    "白酒": "食品饮料",
+    "动力电池": "电力设备",
+    "新能源": "电力设备",
+    "半导体制造": "电子",
+    "消费电子材料": "电子",
+    "港股互联网": "传媒",
+    "互联网": "传媒",
+    "酿酒行业": "食品饮料",
+    "食品饮料": "食品饮料",
+    "电池": "电力设备",
+    "光伏设备": "电力设备",
+    "风电设备": "电力设备",
+    "半导体": "电子",
+    "电子元件": "电子",
+    "消费电子": "电子",
+    "汽车整车": "汽车",
+    "汽车零部件": "汽车",
+    "汽车服务": "汽车",
+    "证券": "非银金融",
+    "保险": "非银金融",
+    "多元金融": "非银金融",
+    "软件开发": "计算机",
+    "互联网服务": "计算机",
+    "计算机设备": "计算机",
+    "通信设备": "通信",
+    "文化传媒": "传媒",
+    "煤炭行业": "煤炭",
+    "石油行业": "石油石化",
+    "化学原料": "基础化工",
+    "化学制品": "基础化工",
+    "化肥行业": "基础化工",
+    "贵金属": "有色金属",
+    "小金属": "有色金属",
+    "能源金属": "有色金属",
+    # AKShare THS board names that need an unambiguous Shenwan level-one
+    # destination. These mappings classify real provider rows only.
+    "环境治理": "环保",
+    "环保设备": "环保",
+    "油气开采及服务": "石油石化",
+    "石油加工贸易": "石油石化",
+    "医疗服务": "医药生物",
+    "生物制品": "医药生物",
+    "中药": "医药生物",
+    "化学制药": "医药生物",
+}
+
+THS_TO_SHENWAN_LEVEL1_KEYWORDS = {
+    "农林牧渔": ("养殖", "饲料", "种植", "农产品", "农业"),
+    "基础化工": ("化工", "化学", "化肥", "农化", "塑料", "橡胶", "化纤"),
+    "钢铁": ("钢铁", "特钢"),
+    "有色金属": ("金属", "贵金属", "小金属"),
+    "电子": ("半导体", "元件", "消费电子", "光学", "电子"),
+    "汽车": ("汽车", "车零部件", "摩托"),
+    "家用电器": ("家电", "白色家电", "黑色家电", "小家电"),
+    "食品饮料": ("食品", "饮料", "白酒", "乳业", "调味", "烘焙"),
+    "纺织服饰": ("纺织", "服装", "饰品", "美容"),
+    "轻工制造": ("包装", "造纸", "家居", "文娱", "家具"),
+    "医药生物": ("医药", "医疗", "生物", "中药", "药"),
+    "公用事业": ("电力", "燃气", "水务", "环保"),
+    "交通运输": ("物流", "航运", "港口", "铁路", "航空", "机场"),
+    "房地产": ("房地产", "房产"),
+    "商贸零售": ("零售", "贸易", "商业", "免税"),
+    "社会服务": ("酒店", "旅游", "景区", "教育", "服务"),
+    "建筑材料": ("水泥", "玻璃", "建材"),
+    "建筑装饰": ("建筑", "装修", "工程"),
+    "电力设备": ("电池", "光伏", "风电", "电网", "储能", "电源设备"),
+    "国防军工": ("军工", "航天", "船舶", "兵器"),
+    "计算机": ("软件", "IT服务", "计算机", "数字"),
+    "传媒": ("传媒", "影视", "游戏", "出版", "广告"),
+    "通信": ("通信", "运营商"),
+    "银行": ("银行",),
+    "非银金融": ("证券", "保险", "多元金融"),
+    "机械设备": ("机械", "自动化", "通用设备", "专用设备"),
+    "煤炭": ("煤炭",),
+    "石油石化": ("石油", "炼化"),
+}
+
+
+def canonical_hot_industry_name(value):
+    """Use the Shenwan level-one name shown by the Hot Industries tab."""
+    name = str(value or "").strip()
+    return HOT_INDUSTRY_NAME_MAP.get(name, name or "其他行业")
+
+
+def canonical_ths_industry_name(value):
+    """Map a THS board to the existing Shenwan level-one display taxonomy."""
+    raw_name = str(value or "").strip()
+    direct = canonical_hot_industry_name(raw_name)
+    if direct in SHENWAN_LEVEL1_INDUSTRIES:
+        return direct
+    for sector, keywords in THS_TO_SHENWAN_LEVEL1_KEYWORDS.items():
+        if any(keyword in raw_name for keyword in keywords):
+            return sector
+    return ""
+
+
 def gen_feed_boards(market_items):
     boards = []
     board_map = {}
     for item in market_items:
-        board_name = item.get("board") or "自选股"
+        board_name = canonical_hot_industry_name(item.get("industry") or item.get("focus") or item.get("board"))
         if board_name not in board_map:
             board_map[board_name] = {
                 "name": board_name,
@@ -4185,7 +4467,7 @@ def gen_feed_boards_from_watchlist_details(watchlist_details):
     board_map = {}
     boards = []
     for item in (watchlist_details or {}).values():
-        board_name = item.get("industry") or item.get("focus") or "自选股"
+        board_name = canonical_hot_industry_name(item.get("industry") or item.get("focus"))
         if board_name not in board_map:
             board_map[board_name] = {
                 "name": board_name,
@@ -4203,7 +4485,7 @@ def gen_feed_boards_from_watchlist_details(watchlist_details):
                 "value": item.get("price", 0),
                 "change": item.get("change", 0),
                 "change_pct": item.get("change_pct", 0),
-                "focus": item.get("focus") or item.get("industry") or "个股跟踪",
+                "focus": canonical_hot_industry_name(item.get("industry") or item.get("focus") or "个股跟踪"),
                 "alert_level": item.get("alert_level", "normal"),
                 "alert_text": item.get("alert_text", "当前无明显预警"),
                 "signal_summary": item.get("signal_summary", ""),
@@ -4295,12 +4577,921 @@ WATCHLIST_QUERY_ALIAS_MAP = {
     "中国银行": "601988",
     "日久光新": "003015",
     "日久光电": "003015",
+    "上证指数": "source_shanghai_index",
+    "上证综合指数": "source_shanghai_index",
+    "上证综指": "source_shanghai_index",
+    "上海综合指数": "source_shanghai_index",
+    "沪指": "source_shanghai_index",
+    "大盘": "source_shanghai_index",
+    "000001.SH": "source_shanghai_index",
+    "SH000001": "source_shanghai_index",
+    "SH.000001": "source_shanghai_index",
+    "sh000001": "source_shanghai_index",
+    "深证指数": "source_shenzhen_index",
+    "深证成指": "source_shenzhen_index",
+    "深圳成指": "source_shenzhen_index",
+    "深指": "source_shenzhen_index",
+    "399001.SZ": "source_shenzhen_index",
+    "SZ399001": "source_shenzhen_index",
+    "SZ.399001": "source_shenzhen_index",
+    "sz399001": "source_shenzhen_index",
+    "沪深300": "source_hs300",
+    "沪深300指数": "source_hs300",
+    "000300.SH": "source_hs300",
+    "SH000300": "source_hs300",
+    "sh000300": "source_hs300",
+    "上证50": "source_sse50",
+    "上证50指数": "source_sse50",
+    "000016.SH": "source_sse50",
+    "SH000016": "source_sse50",
+    "sh000016": "source_sse50",
+    "科创50": "source_kc50",
+    "科创50指数": "source_kc50",
+    "000688.SH": "source_kc50",
+    "SH000688": "source_kc50",
+    "sh000688": "source_kc50",
+    "创业板指": "source_cyb",
+    "创业板指数": "source_cyb",
+    "399006.SZ": "source_cyb",
+    "SZ399006": "source_cyb",
+    "sz399006": "source_cyb",
+    "中证500": "source_zz500",
+    "中证500指数": "source_zz500",
+    "000905.SH": "source_zz500",
+    "SH000905": "source_zz500",
+    "sh000905": "source_zz500",
+    "中证1000": "source_zz1000",
+    "中证1000指数": "source_zz1000",
+    "000852.SH": "source_zz1000",
+    "SH000852": "source_zz1000",
+    "sh000852": "source_zz1000",
+    "中证800": "source_zz800",
+    "中证800指数": "source_zz800",
+    "000906.SH": "source_zz800",
+    "SH000906": "source_zz800",
+    "sh000906": "source_zz800",
+    "中证A500": "source_a500",
+    "中证A500指数": "source_a500",
+    "000510.SH": "source_a500",
+    "SH000510": "source_a500",
+    "sh000510": "source_a500",
+    "中证2000": "source_zz2000",
+    "中证2000指数": "source_zz2000",
+    "932000.CSI": "source_zz2000",
+    "恒生指数": "source_hsi",
+    "恒指": "source_hsi",
+    "国企指数": "source_hscei",
+    "恒生国企指数": "source_hscei",
+    "恒生中国企业指数": "source_hscei",
+    "红筹指数": "source_hscci",
+    "恒生红筹指数": "source_hscci",
+    "日经225": "source_nikkei",
+    "日经225指数": "source_nikkei",
+    "标普500": "source_sp500",
+    "标普500指数": "source_sp500",
+    "SP500": "source_sp500",
+    "S&P500": "source_sp500",
+    "纳斯达克指数": "source_nasdaq",
+    "纳指": "source_nasdaq",
+    "NASDAQ": "source_nasdaq",
 }
 WATCHLIST_NAME_ALIAS_MAP = {
     "003015": "日久光电",
+    "source_shanghai_index": "上证指数",
+    "source_shenzhen_index": "深证指数",
+    "source_hs300": "沪深300",
+    "source_sse50": "上证50",
+    "source_kc50": "科创50",
+    "source_cyb": "创业板指",
+    "source_zz500": "中证500",
+    "source_zz1000": "中证1000",
+    "source_zz800": "中证800",
+    "source_a500": "中证A500",
+    "source_zz2000": "中证2000",
+    "source_hsi": "恒生指数",
+    "source_hscei": "国企指数",
+    "source_hscci": "红筹指数",
+    "source_nikkei": "日经225",
+    "source_sp500": "标普500",
+    "source_nasdaq": "纳斯达克指数",
 }
 WATCHLIST_SEARCH_CACHE_TTL_SECONDS = 6 * 60 * 60
 WATCHLIST_DETAIL_CACHE_TTL_SECONDS = 30 * 60
+WATCHLIST_INDEX_DETAIL_CACHE_TTL_SECONDS = 5 * 60
+
+MARKET_OVERVIEW_INDEX_CODES = (
+    "source_shanghai_index",
+    "source_shenzhen_index",
+    "source_hsi",
+    "source_hscei",
+    "source_hscci",
+    "source_dji",
+    "source_nasdaq",
+    "source_sp500",
+    "source_nikkei",
+)
+
+AKSHARE_MARKET_INDEX_CATALOG = {
+    "source_shanghai_index": {"kind": "cn", "symbol": "sh000001", "aliases": ("上证指数", "上证综指")},
+    "source_shenzhen_index": {"kind": "cn", "symbol": "sz399001", "aliases": ("深证成指", "深证指数")},
+    # Use AKShare's Sina-backed endpoints. The prior Eastmoney global-history
+    # endpoint is not reliably reachable in deployed network environments.
+    "source_hsi": {"kind": "hk_sina", "symbol": "HSI"},
+    "source_hscei": {"kind": "hk_sina", "symbol": "HSCEI"},
+    "source_hscci": {"kind": "hk_sina", "symbol": "HSCCI"},
+    "source_dji": {"kind": "us_sina", "symbol": ".DJI"},
+    "source_nasdaq": {"kind": "us_sina", "symbol": ".IXIC"},
+    "source_sp500": {"kind": "us_sina", "symbol": ".INX"},
+    "source_nikkei": {"kind": "global_sina", "symbol": "日经225指数"},
+}
+
+# Gangtise has a verified daily-index endpoint for the mainland broad indices.
+# Keep the provider choice explicit: overseas indices remain on the AKShare
+# collector, while a Gangtise failure can still fall back to AKShare instead of
+# making the entire market snapshot unavailable.
+GANGTISE_MARKET_INDEX_CODES = frozenset({
+    "source_shanghai_index",
+    "source_shenzhen_index",
+})
+
+
+def _load_akshare():
+    try:
+        import akshare as ak
+    except Exception as exc:
+        raise RuntimeError(f"AKShare 不可用：{exc}") from exc
+    return ak
+
+
+def _akshare_float(value):
+    if value is None:
+        return None
+    try:
+        numeric = float(str(value).replace(",", "").strip())
+        return numeric if math.isfinite(numeric) else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _akshare_column(frame, candidates):
+    for candidate in candidates:
+        if candidate in frame.columns:
+            return candidate
+    return None
+
+
+def _akshare_market_index_points(frame):
+    """Normalize AKShare's domestic and global index frames into daily candles."""
+    if frame is None or getattr(frame, "empty", True):
+        return []
+    date_column = _akshare_column(frame, ("日期", "date", "Date", "时间", "日期时间"))
+    open_column = _akshare_column(frame, ("开盘", "open", "Open"))
+    high_column = _akshare_column(frame, ("最高", "high", "High"))
+    low_column = _akshare_column(frame, ("最低", "low", "Low"))
+    close_column = _akshare_column(frame, ("收盘", "最新价", "close", "Close"))
+    if not date_column or not close_column:
+        return []
+    points = []
+    for _, row in frame.iterrows():
+        close_value = _akshare_float(row.get(close_column))
+        if close_value is None:
+            continue
+        date_value = str(row.get(date_column) or "").strip()[:10]
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_value):
+            continue
+        open_value = _akshare_float(row.get(open_column)) if open_column else close_value
+        high_value = _akshare_float(row.get(high_column)) if high_column else close_value
+        low_value = _akshare_float(row.get(low_column)) if low_column else close_value
+        points.append({
+            "date": date_value,
+            "open": open_value if open_value is not None else close_value,
+            "high": high_value if high_value is not None else close_value,
+            "low": low_value if low_value is not None else close_value,
+            "close": close_value,
+        })
+    return sorted({item["date"]: item for item in points}.values(), key=lambda item: item["date"])
+
+
+def _akshare_global_index_symbols(ak):
+    """Compatibility shim for callers from the former Eastmoney collector."""
+    return {}
+
+
+def fetch_akshare_market_index_history(indicator_code, start_date, end_date, ak=None, global_symbols=None):
+    """Fetch a real standard-index daily series for the controlled collector only."""
+    config = AKSHARE_MARKET_INDEX_CATALOG.get(indicator_code)
+    if not config:
+        return {"ok": False, "points": [], "message": "未配置 AKShare 标准指数映射"}
+    try:
+        ak = ak or _load_akshare()
+        kind = config.get("kind")
+        symbol = config.get("symbol")
+        if kind == "cn":
+            frame = ak.stock_zh_index_daily(symbol=symbol)
+        elif kind == "hk_sina":
+            frame = ak.stock_hk_index_daily_sina(symbol=symbol)
+        elif kind == "us_sina":
+            frame = ak.index_us_stock_sina(symbol=symbol)
+        elif kind == "global_sina":
+            frame = ak.index_global_hist_sina(symbol=symbol)
+        else:
+            return {"ok": False, "points": [], "message": "AKShare 未配置该标准指数采集方式"}
+        points = _akshare_market_index_points(frame)
+        windowed = [item for item in points if start_date <= item["date"] <= end_date]
+        points = windowed or points[-60:]
+        if len(points) < 2:
+            return {"ok": False, "points": points, "message": "AKShare 未返回足够的真实日线"}
+        return {"ok": True, "points": points, "message": "", "provider": "AKShare"}
+    except Exception as exc:
+        return {"ok": False, "points": [], "message": f"AKShare 行情获取失败：{exc}"}
+
+
+def fetch_gangtise_market_index_history(indicator_code, start_date, end_date, token=""):
+    """Fetch a mainland broad-index series using the tested Gangtise contract."""
+    if indicator_code not in GANGTISE_MARKET_INDEX_CODES:
+        return {"ok": False, "points": [], "message": "该标准指数未配置 Gangtise 日K接口", "provider": "Gangtise OpenAPI"}
+    result = fetch_gangtise_indicator_series(
+        indicator_code,
+        start_date=start_date,
+        end_date=end_date,
+        token=token,
+    )
+    points = list(result.get("points") or []) if isinstance(result, dict) else []
+    return {
+        "ok": bool((result or {}).get("ok")) and len(points) >= 2,
+        "points": points,
+        "message": str((result or {}).get("message") or "Gangtise 未返回足够的指数日K").strip(),
+        "provider": "Gangtise OpenAPI",
+        "source_meta": (result or {}).get("source_meta") or {},
+        "duration_ms": int((result or {}).get("duration_ms") or 0),
+    }
+
+
+def fetch_akshare_market_index_intraday(indicator_code, trade_date="", ak=None):
+    """AKShare only supplies minute data for mainland indices in this catalog."""
+    config = AKSHARE_MARKET_INDEX_CATALOG.get(indicator_code) or {}
+    if config.get("kind") != "cn":
+        return {"ok": False, "available": False, "points": [], "message": "该指数暂无 AKShare 分时数据", "source": "AKShare"}
+    try:
+        ak = ak or _load_akshare()
+        date_text = str(trade_date or datetime.now().strftime("%Y-%m-%d"))[:10]
+        frame = ak.index_zh_a_hist_min_em(
+            symbol=str(config["symbol"])[2:],
+            period="1",
+            start_date=f"{date_text} 09:30:00",
+            end_date=f"{date_text} 15:00:00",
+        )
+        time_column = _akshare_column(frame, ("时间", "日期", "datetime", "date", "Date"))
+        value_column = _akshare_column(frame, ("收盘", "最新价", "close", "Close"))
+        if not time_column or not value_column:
+            return {"ok": False, "available": False, "points": [], "message": "AKShare 分时响应缺少必要字段", "source": "AKShare"}
+        points = []
+        for _, row in frame.iterrows():
+            value = _akshare_float(row.get(value_column))
+            timestamp = str(row.get(time_column) or "").strip()
+            if value is not None and timestamp:
+                points.append({"date": timestamp, "value": value})
+        if not points:
+            return {"ok": False, "available": False, "points": [], "message": "AKShare 未返回真实分时", "source": "AKShare"}
+        return {"ok": True, "available": True, "points": points, "message": "", "updated_at": points[-1]["date"], "source": "AKShare"}
+    except Exception as exc:
+        return {"ok": False, "available": False, "points": [], "message": f"AKShare 分时获取失败：{exc}", "source": "AKShare"}
+
+
+def _build_market_index_snapshot_item(indicator_code, series_result):
+    entry = GANGTISE_INDICATOR_REGISTRY.get(indicator_code) or {}
+    data_source = str((series_result or {}).get("provider") or "AKShare").strip() or "AKShare"
+    points = list((series_result or {}).get("points") or [])
+    base = {
+        "indicator_code": indicator_code,
+        "name": entry.get("indicator_name") or indicator_code,
+        "code": entry.get("security_code") or "",
+        "market": entry.get("market") or "CN",
+        "data_source": data_source,
+    }
+    if len(points) < 2:
+        return {**base, "available": False, "message": str((series_result or {}).get("message") or f"{data_source} 暂未返回足够的真实行情").strip()}
+    latest, previous = points[-1], points[-2]
+    latest_value = numeric_value(latest.get("close"))
+    previous_value = numeric_value(previous.get("close"))
+    if latest_value is None or previous_value is None:
+        return {**base, "available": False, "message": f"{data_source} 返回的行情缺少有效数值"}
+    change = latest_value - previous_value
+    return {
+        **base,
+        "price": round(latest_value, 2),
+        "change": round(change, 2),
+        "change_pct": round(change / previous_value * 100, 2) if previous_value else 0,
+        "updated_at": str(latest.get("date") or "").strip(),
+        "available": True,
+        "message": "",
+    }
+
+
+_market_snapshot_refresh_lock = threading.Lock()
+_market_snapshot_refresh_running = False
+
+
+def sync_market_snapshot(force=False):
+    """Collect AKShare market snapshots and persist only verified real results."""
+    start_date, end_date = resolve_gangtise_market_date_window(days=30)
+    overview_items = []
+    errors = []
+    intraday_count = 0
+    previous_overview = _load_watchlist_cache("market_overview", "standard_indices", 0)
+    previous_items = {
+        str(item.get("indicator_code") or ""): item
+        for item in ((previous_overview or {}).get("items") or [])
+        if isinstance(item, dict) and item.get("available") and str(item.get("data_source") or "") == "AKShare"
+    }
+    ak = None
+    try:
+        ak = _load_akshare()
+    except Exception as exc:
+        errors.append(f"AKShare: {exc}")
+    for indicator_code in MARKET_OVERVIEW_INDEX_CODES:
+        result = (
+            fetch_akshare_market_index_history(indicator_code, start_date, end_date, ak=ak, global_symbols={})
+            if ak is not None else
+            {"ok": False, "points": [], "message": "AKShare 未初始化", "provider": "AKShare"}
+        )
+        item = _build_market_index_snapshot_item(indicator_code, result)
+        if not item.get("available") and indicator_code in previous_items:
+            # Do not replace a verified AKShare point with an upstream outage.
+            item = {**copy.deepcopy(previous_items[indicator_code]), "stale": True}
+        overview_items.append(item)
+        if not item.get("available"):
+            errors.append(f"{item.get('name') or indicator_code}：{item.get('message') or '暂无数据'}")
+            continue
+        _save_watchlist_cache(
+            "market_index_history",
+            indicator_code,
+            {
+                "ok": True,
+                "provider": result.get("provider") or "未知来源",
+                "source_meta": result.get("source_meta") or {},
+                "indicator_code": indicator_code,
+                "points": result["points"],
+                "updated_at": item.get("updated_at"),
+            },
+        )
+        trade_date = str(item.get("updated_at") or end_date).strip()
+        intraday = fetch_akshare_market_index_intraday(indicator_code, trade_date=trade_date, ak=ak) if ak is not None else {"available": False}
+        if intraday.get("available"):
+            intraday_count += 1
+            _save_watchlist_cache("market_index_intraday", indicator_code, intraday)
+    cached_sector_snapshot = None if force else _load_watchlist_cache("market_sector_overview", "shenwan_level1", 60 * 60)
+    if isinstance(cached_sector_snapshot, dict) and cached_sector_snapshot.get("source") == "AKShare" and cached_sector_snapshot.get("items"):
+        sector_items = list(cached_sector_snapshot["items"])
+    else:
+        sector_items = _fetch_akshare_sector_overview(ak=ak)
+    if not sector_items:
+        errors.append("AKShare 同花顺行业汇总未返回有效数据")
+    updated_at = now_ts()
+    overview_payload = {"ok": True, "snapshot_version": 5, "items": overview_items, "source": "AKShare", "updated_at": updated_at}
+    sector_payload = {"ok": True, "snapshot_version": 5, "items": sector_items, "total": len(sector_items), "catalog_size": len(SHENWAN_LEVEL1_INDUSTRIES), "source": "AKShare", "updated_at": updated_at}
+    if any(item.get("available") for item in overview_items):
+        _save_watchlist_cache("market_overview", "standard_indices", overview_payload)
+    if sector_items:
+        _save_watchlist_cache("market_sector_overview", "shenwan_level1", sector_payload)
+    return {"ok": bool(any(item.get("available") for item in overview_items) or sector_items), "updated": sum(1 for item in overview_items if item.get("available")) + len(sector_items) + intraday_count, "overview_count": sum(1 for item in overview_items if item.get("available")), "sector_count": len(sector_items), "intraday_count": intraday_count, "updated_at": updated_at, "errors": errors[:20]}
+
+
+def request_market_snapshot_refresh():
+    """Start one controlled backend refresh when a required cache is missing."""
+    global _market_snapshot_refresh_running
+    with _market_snapshot_refresh_lock:
+        if _market_snapshot_refresh_running:
+            return False
+        _market_snapshot_refresh_running = True
+
+    def worker():
+        global _market_snapshot_refresh_running
+        try:
+            with app.app_context():
+                sync_market_snapshot(force=False)
+        except Exception as exc:
+            app.logger.warning("Automatic market snapshot refresh failed: %s", exc)
+        finally:
+            with _market_snapshot_refresh_lock:
+                _market_snapshot_refresh_running = False
+
+    threading.Thread(target=worker, name="market-snapshot-refresh", daemon=True).start()
+    return True
+
+
+def build_market_overview_payload():
+    """Read persisted real market data; never call a provider from an H5 GET."""
+    cache_key = "standard_indices"
+    cached = _load_watchlist_cache("market_overview", cache_key, MARKET_SNAPSHOT_CACHE_TTL_SECONDS)
+    if isinstance(cached, dict) and cached.get("snapshot_version") in {3, 5} and cached.get("source") == "AKShare" and isinstance(cached.get("items"), list):
+        return cached
+    return {"ok": True, "items": [], "source": "AKShare", "refreshing": True, "message": "后台正在同步 AKShare 市场快照"}
+
+
+SHENWAN_LEVEL1_INDUSTRIES = (
+    "农林牧渔", "基础化工", "钢铁", "有色金属", "电子", "汽车", "家用电器",
+    "食品饮料", "纺织服饰", "轻工制造", "医药生物", "公用事业", "交通运输",
+    "房地产", "商贸零售", "社会服务", "综合", "建筑材料", "建筑装饰", "电力设备",
+    "国防军工", "计算机", "传媒", "通信", "银行", "非银金融", "机械设备",
+    "煤炭", "石油石化", "环保", "美容护理",
+)
+MARKET_SECTOR_OVERVIEW_CACHE_TTL_SECONDS = 5 * 60
+MARKET_SNAPSHOT_CACHE_TTL_SECONDS = 26 * 60 * 60
+MARKET_SECTOR_CATALOG_CACHE_TTL_SECONDS = 24 * 60 * 60
+
+# The EDB catalogue uses a mixture of Wind and Shenwan names.  These aliases
+# are only used to resolve a real indicator ID, never to manufacture a value.
+SHENWAN_SECTOR_ALIASES = {
+    "基础化工": ("基础化工", "化工"), "有色金属": ("有色金属", "有色"),
+    "家用电器": ("家用电器", "家电"), "食品饮料": ("食品饮料", "食品", "饮料"),
+    "纺织服饰": ("纺织服饰", "纺织", "服饰"), "轻工制造": ("轻工制造", "轻工"),
+    "医药生物": ("医药生物", "医药"), "商贸零售": ("商贸零售", "商贸", "零售"),
+    "社会服务": ("社会服务", "休闲服务"), "建筑材料": ("建筑材料", "建材"),
+    "建筑装饰": ("建筑装饰", "建筑"), "电力设备": ("电力设备", "电气设备"),
+    "国防军工": ("国防军工", "军工"), "非银金融": ("非银金融", "非银行金融"),
+    "机械设备": ("机械设备", "机械"), "石油石化": ("石油石化", "石油"),
+    "美容护理": ("美容护理", "美容"),
+}
+
+
+def _market_demo_data_enabled():
+    # Demo data must be explicitly opted into for a presentation environment.
+    return str(os.environ.get("MARKET_DEMO_DATA_ENABLED", "0")).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _build_market_demo_overview_payload():
+    values = {
+        "source_shanghai_index": (3867.03, 0.42), "source_shenzhen_index": (12105.88, 0.68),
+        "source_hsi": (24836.12, -0.31), "source_hscei": (8920.44, -0.18),
+        "source_hscci": (3642.08, 0.12), "source_dji": (43910.98, 0.27),
+        "source_nasdaq": (18642.75, 0.51), "source_sp500": (6340.12, 0.35),
+        "source_nikkei": (41820.44, -0.22),
+    }
+    items = []
+    for indicator_code in MARKET_OVERVIEW_INDEX_CODES:
+        entry = GANGTISE_INDICATOR_REGISTRY.get(indicator_code) or {}
+        price, change_pct = values[indicator_code]
+        previous = price / (1 + change_pct / 100)
+        items.append({
+            "indicator_code": indicator_code, "name": entry.get("indicator_name") or indicator_code,
+            "code": entry.get("security_code") or "--", "market": entry.get("market") or "CN",
+            "price": price, "change": round(price - previous, 2), "change_pct": change_pct,
+            "updated_at": now_ts(), "available": True, "demo": True,
+            "data_source": "演示数据（待真实快照）", "message": "",
+        })
+    return {"ok": True, "snapshot_version": 0, "items": items, "source": "演示数据", "demo": True, "updated_at": now_ts()}
+
+
+def _build_market_demo_sector_payload():
+    changes = [2.86, 2.41, 1.98, 1.72, 1.46, 1.18, 0.96, 0.74, 0.51, 0.28, -0.16, -0.38, -0.62, -0.85, -1.07, -1.29, -1.54, -1.82, -2.08, -2.36]
+    items = []
+    for index, sector in enumerate(SHENWAN_LEVEL1_INDUSTRIES):
+        change_pct = changes[index % len(changes)]
+        value = round(1000 + (len(sector) * 37) + index * 23, 2)
+        items.append({
+            "sector": sector, "code": f"DEMO{index + 1:02d}", "value": value,
+            "change": round(value * change_pct / 100, 2), "change_pct": change_pct,
+            "updated_at": now_ts(), "data_source": "演示数据（待真实快照）", "demo": True,
+        })
+    return {"ok": True, "snapshot_version": 0, "items": items, "total": len(items),
+            "catalog_size": len(SHENWAN_LEVEL1_INDUSTRIES), "source": "演示数据", "demo": True, "updated_at": now_ts()}
+
+
+def _resolve_gangtise_sector_catalog(candidates):
+    """Resolve all available level-one industries from one EDB catalogue read."""
+    rows = candidates if isinstance(candidates, list) else []
+    selected = {}
+    for sector in SHENWAN_LEVEL1_INDUSTRIES:
+        aliases = SHENWAN_SECTOR_ALIASES.get(sector, (sector,))
+        matches = []
+        for item in rows:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("indicatorName") or "").strip()
+            indicator_id = str(item.get("indicatorId") or "").strip()
+            if not indicator_id or "当日值" not in name:
+                continue
+            if any(alias in name for alias in aliases):
+                matches.append(item)
+        if matches:
+            # Prefer the exact label, then a shorter canonical title.
+            matches.sort(key=lambda item: (0 if sector in str(item.get("indicatorName") or "") else 1, len(str(item.get("indicatorName") or ""))))
+            selected[sector] = matches[0]
+    return selected
+
+
+def _load_gangtise_sector_catalog():
+    cached = _load_watchlist_cache("market_sector_catalog", "shenwan_level1", MARKET_SECTOR_CATALOG_CACHE_TTL_SECONDS)
+    if isinstance(cached, dict) and isinstance(cached.get("items"), dict) and cached["items"]:
+        return cached["items"], "cache"
+    status, response, duration = post_gangtise_openapi_json(
+        "/application/open-alternative/EDB/search",
+        {"keyword": "Wind行业指数", "Limit": 500},
+        timeout=30,
+    )
+    candidates = (response.get("data") or []) if isinstance(response, dict) else []
+    selected = _resolve_gangtise_sector_catalog(candidates)
+    if not is_gangtise_openapi_success(status, response) or not selected:
+        message = str((response or {}).get("msg") or (response or {}).get("message") or "未找到申万一级行业 EDB 目录").strip()
+        return {}, message
+    _save_watchlist_cache(
+        "market_sector_catalog",
+        "shenwan_level1",
+        {"items": selected, "provider": "Gangtise OpenAPI EDB", "duration_ms": int(duration or 0)},
+    )
+    return selected, "live"
+
+
+def _normalize_gangtise_edb_batch_points(response, indicator_ids):
+    data = response.get("data") if isinstance(response, dict) else {}
+    headers = data.get("fieldList") if isinstance(data, dict) and isinstance(data.get("fieldList"), list) else []
+    rows = data.get("dataList") if isinstance(data, dict) and isinstance(data.get("dataList"), list) else []
+    date_index = next((index for index, field in enumerate(headers) if str(field).lower() in {"date", "tradedate", "time"}), -1)
+    if date_index < 0:
+        return {}
+    indexes = {str(identifier): headers.index(identifier) for identifier in indicator_ids if identifier in headers}
+    result = {identifier: [] for identifier in indexes}
+    for row in rows:
+        if not isinstance(row, list) or len(row) <= date_index:
+            continue
+        trade_date = str(row[date_index] or "").strip()
+        if not trade_date:
+            continue
+        for identifier, value_index in indexes.items():
+            if len(row) <= value_index:
+                continue
+            value = numeric_value(row[value_index])
+            if value is not None:
+                result[identifier].append({"date": trade_date, "close": value})
+    for points in result.values():
+        points.sort(key=lambda item: item["date"])
+    return result
+
+
+def _fetch_gangtise_sector_overview(start_date, end_date):
+    """Fetch all resolved industries in one EDB getData call."""
+    catalog, catalog_source = _load_gangtise_sector_catalog()
+    if not catalog:
+        return [], [f"Gangtise EDB 行业目录：{catalog_source}"]
+    id_to_sector = {
+        str(item.get("indicatorId") or "").strip(): sector
+        for sector, item in catalog.items()
+        if str(item.get("indicatorId") or "").strip()
+    }
+    indicator_ids = list(id_to_sector)
+    status, response, duration = post_gangtise_openapi_json(
+        "/application/open-alternative/EDB/getData",
+        {"indicatorIdList": indicator_ids, "startDate": start_date, "endDate": end_date},
+        timeout=45,
+    )
+    points_by_id = _normalize_gangtise_edb_batch_points(response, indicator_ids)
+    if not is_gangtise_openapi_success(status, response):
+        message = str((response or {}).get("msg") or (response or {}).get("message") or "行业 EDB 批量取数失败").strip()
+        return [], [f"Gangtise EDB 行业取数：{message}"]
+    items = []
+    missing = []
+    for indicator_id, sector in id_to_sector.items():
+        points = points_by_id.get(indicator_id) or []
+        if len(points) < 2:
+            missing.append(sector)
+            continue
+        latest, previous = points[-1], points[-2]
+        value, previous_value = numeric_value(latest.get("close")), numeric_value(previous.get("close"))
+        if value is None or previous_value is None:
+            missing.append(sector)
+            continue
+        source = catalog.get(sector) or {}
+        change = value - previous_value
+        items.append({
+            "sector": sector, "code": indicator_id,
+            "indicator_name": str(source.get("indicatorName") or sector).strip(),
+            "value": round(value, 2), "change": round(change, 4),
+            "change_pct": round(change / previous_value * 100, 2) if previous_value else 0,
+            "updated_at": str(latest.get("date") or "").strip(),
+            "data_source": "Gangtise OpenAPI EDB",
+            "duration_ms": int(duration or 0),
+        })
+    errors = [f"行业目录来源：{catalog_source}"]
+    if missing:
+        errors.append("未返回有效行业：" + "、".join(missing[:10]))
+    return items, errors
+
+
+def _fetch_gangtise_sector_index(sector_name, start_date, end_date):
+    keyword = f"Wind行业指数:{sector_name}:当日值"
+    search_status, search_response, search_duration = post_gangtise_openapi_json(
+        "/application/open-alternative/EDB/search",
+        {"keyword": keyword, "Limit": 10},
+        timeout=30,
+    )
+    candidates = (search_response.get("data") or []) if isinstance(search_response, dict) else []
+    selected = choose_gangtise_indicator_candidate(candidates, keyword=keyword)
+    if selected and (sector_name not in str(selected.get("indicatorName") or "") or "当日值" not in str(selected.get("indicatorName") or "")):
+        selected = None
+    if not selected:
+        # The API test project searches the EDB catalog by a broad keyword.
+        # Some tenants do not support the fully-qualified name, so retry the
+        # catalog search and select the exact industry from returned names.
+        broad_status, broad_response, broad_duration = post_gangtise_openapi_json(
+            "/application/open-alternative/EDB/search",
+            {"keyword": "Wind行业指数", "Limit": 100},
+            timeout=30,
+        )
+        broad_candidates = (broad_response.get("data") or []) if isinstance(broad_response, dict) else []
+        selected = next(
+            (
+                item for item in broad_candidates
+                if sector_name in str(item.get("indicatorName") or "")
+                and "当日值" in str(item.get("indicatorName") or "")
+            ),
+            None,
+        )
+        search_duration += broad_duration
+        if not is_gangtise_openapi_success(broad_status, broad_response):
+            selected = None
+    if not is_gangtise_openapi_success(search_status, search_response) or not selected:
+        return {"ok": False, "sector": sector_name, "message": "未找到真实行业指标", "duration_ms": search_duration}
+    data_status, data_response, data_duration = post_gangtise_openapi_json(
+        "/application/open-alternative/EDB/getData",
+        {"indicatorIdList": [selected["indicatorId"]], "startDate": start_date, "endDate": end_date},
+        timeout=30,
+    )
+    points = normalize_gangtise_edb_points(data_response)
+    if not is_gangtise_openapi_success(data_status, data_response) or len(points) < 2:
+        return {"ok": False, "sector": sector_name, "message": "真实行业指标数据不足", "duration_ms": search_duration + data_duration}
+    latest, previous = points[-1], points[-2]
+    latest_value = numeric_value(latest.get("close"))
+    previous_value = numeric_value(previous.get("close"))
+    if latest_value is None or previous_value is None:
+        return {"ok": False, "sector": sector_name, "message": "真实行业指标缺少有效数值", "duration_ms": search_duration + data_duration}
+    change = round(latest_value - previous_value, 4)
+    return {
+        "ok": True,
+        "sector": sector_name,
+        "code": str(selected.get("indicatorId") or "").strip(),
+        "indicator_name": str(selected.get("indicatorName") or keyword).strip(),
+        "value": round(latest_value, 2),
+        "change": change,
+        "change_pct": round(change / previous_value * 100, 2) if previous_value else 0,
+        "updated_at": str(latest.get("date") or "").strip(),
+        "data_source": "Gangtise OpenAPI EDB",
+        "duration_ms": search_duration + data_duration,
+    }
+
+
+def _fetch_akshare_sector_overview(ak=None):
+    """Read the 31 official Shenwan level-one index quotes from AKShare."""
+    try:
+        ak = ak or _load_akshare()
+        frame = ak.index_realtime_sw(symbol="一级行业")
+        name_column = _akshare_column(frame, ("指数名称", "行业名称", "名称", "name", "Name"))
+        code_column = _akshare_column(frame, ("指数代码", "行业代码", "代码", "code", "Code"))
+        value_column = _akshare_column(frame, ("最新价", "最新", "close", "Close"))
+        previous_column = _akshare_column(frame, ("昨收盘", "昨收", "previous_close", "Previous Close"))
+        if not name_column or not code_column or not value_column or not previous_column:
+            return []
+        items = []
+        for _, row in frame.iterrows():
+            sector_name = str(row.get(name_column) or "").strip()
+            value = _akshare_float(row.get(value_column))
+            previous_value = _akshare_float(row.get(previous_column))
+            if sector_name not in SHENWAN_LEVEL1_INDUSTRIES or value is None or previous_value is None:
+                continue
+            change = value - previous_value
+            items.append({
+                "sector": sector_name,
+                "code": str(row.get(code_column) or "").strip(),
+                "indicator_name": f"申万一级行业指数:{sector_name}",
+                "value": round(value, 2),
+                "change": round(change, 2),
+                "change_pct": round(change / previous_value * 100, 2) if previous_value else 0,
+                "updated_at": now_ts(),
+                "data_source": "AKShare 申万一级行业指数",
+            })
+        return items
+    except Exception as exc:
+        app.logger.warning("AKShare Shenwan level-one industry quote unavailable: %s", exc)
+        return []
+
+
+def build_market_sector_overview_payload(force_refresh=False):
+    cache_key = "shenwan_level1"
+    if not force_refresh:
+        cached = _load_watchlist_cache("market_sector_overview", cache_key, MARKET_SNAPSHOT_CACHE_TTL_SECONDS)
+        if isinstance(cached, dict) and isinstance(cached.get("items"), list) and cached["items"]:
+            if cached.get("snapshot_version") in {3, 5} and str(cached.get("source") or "").lower() == "akshare":
+                return cached
+    stale = _load_watchlist_cache("market_sector_overview", cache_key, 0)
+    if isinstance(stale, dict) and isinstance(stale.get("items"), list) and stale.get("items"):
+        source = str(stale.get("source") or "").lower()
+        if source == "akshare" and stale.get("snapshot_version") in {3, 5}:
+            preserved = copy.deepcopy(stale)
+            preserved["stale"] = True
+            preserved["message"] = "行业行情同步暂时失败，当前展示最近一次真实快照"
+            return preserved
+    return {"ok": True, "items": [], "total": 0, "catalog_size": len(SHENWAN_LEVEL1_INDUSTRIES), "source": "AKShare", "refreshing": True, "message": "后台正在同步 AKShare 热门行业快照"}
+
+
+def normalize_watchlist_indicator_code(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    compact = raw.replace(" ", "")
+    candidates = [raw, raw.upper(), raw.lower(), compact, compact.upper(), compact.lower()]
+    for candidate in candidates:
+        mapped = WATCHLIST_QUERY_ALIAS_MAP.get(candidate)
+        if mapped and mapped in GANGTISE_INDICATOR_REGISTRY:
+            return mapped
+    slug_candidate = slugify_code(raw, "") if raw.lower().startswith("source_") else raw.lower()
+    if slug_candidate in GANGTISE_INDICATOR_REGISTRY:
+        return slug_candidate
+    comparable = raw.replace(" ", "").replace("_", "").replace(".", "").lower()
+    for indicator_code, entry in GANGTISE_INDICATOR_REGISTRY.items():
+        for entry_candidate in [
+            indicator_code,
+            entry.get("indicator_name") or "",
+            entry.get("security_code") or "",
+            entry.get("tencent_symbol") or "",
+            entry.get("search_keyword") or "",
+        ]:
+            normalized_entry = str(entry_candidate or "").replace(" ", "").replace("_", "").replace(".", "").lower()
+            if normalized_entry and normalized_entry == comparable:
+                return indicator_code
+    return ""
+
+
+def normalize_watchlist_detail_from_indicator(detail, indicator_code):
+    if not isinstance(detail, dict) or not detail:
+        return None
+    normalized_code = normalize_watchlist_indicator_code(indicator_code) or slugify_code(indicator_code, "")
+    registry_entry = GANGTISE_INDICATOR_REGISTRY.get(normalized_code) or {}
+    normalized = copy.deepcopy(detail)
+    name = str(
+        normalized.get("name")
+        or normalized.get("indicator_name")
+        or registry_entry.get("indicator_name")
+        or WATCHLIST_NAME_ALIAS_MAP.get(normalized_code)
+        or normalized_code
+    ).strip()
+    history_kline = normalized.get("history_kline") if isinstance(normalized.get("history_kline"), dict) else {}
+    candles = [
+        item for item in (history_kline.get("candles") or [])
+        if isinstance(item, dict) and str(item.get("date") or "").strip()
+    ]
+    history_series = [
+        item for item in (normalized.get("history_series") or [])
+        if isinstance(item, dict) and str(item.get("date") or "").strip()
+    ]
+    if not candles and history_series:
+        candles = [
+            {
+                "date": str(item.get("date") or "").strip(),
+                "open": NumberLike(item.get("value")),
+                "high": NumberLike(item.get("value")),
+                "low": NumberLike(item.get("value")),
+                "close": NumberLike(item.get("value")),
+            }
+            for item in history_series
+            if NumberLike(item.get("value")) > 0
+        ]
+        history_kline = build_real_indicator_kline_payload(candles) if candles else build_empty_kline_payload()
+    latest_candle = candles[-1] if candles else {}
+    previous_candle = candles[-2] if len(candles) >= 2 else latest_candle
+    latest_value = NumberLike(normalized.get("numeric_value")) or NumberLike(normalized.get("value")) or NumberLike(latest_candle.get("close"))
+    previous_value = NumberLike(previous_candle.get("close")) or latest_value
+    change_value = round(latest_value - previous_value, 2) if latest_value is not None and previous_value is not None else 0
+    change_pct = round((change_value / previous_value) * 100, 2) if previous_value else 0
+    standard_code = str(registry_entry.get("security_code") or normalized.get("standard_code") or normalized.get("security_code") or "").strip().upper()
+    display_code = standard_code or normalized_code
+    normalized.update(
+        {
+            "id": normalized_code,
+            "code": display_code,
+            "indicator_code": normalized_code,
+            "name": name,
+            "market": str(registry_entry.get("market") or "CN").strip() or "CN",
+            "security_code": standard_code,
+            "standard_code": standard_code,
+            "tencent_symbol": str(registry_entry.get("tencent_symbol") or normalized.get("tencent_symbol") or "").strip(),
+            "price": round(latest_value, 2) if latest_value else 0,
+            "change": change_value,
+            "change_pct": change_pct,
+            "industry": str(normalized.get("category") or registry_entry.get("category") or "数据湖指标").strip() or "数据湖指标",
+            "focus": str(normalized.get("focus") or normalized.get("category") or registry_entry.get("indicator_name") or name).strip(),
+            "kline": [
+                {
+                    "date": str(item.get("date") or "").strip(),
+                    "open": round(NumberLike(item.get("open")), 2),
+                    "high": round(NumberLike(item.get("high")), 2),
+                    "low": round(NumberLike(item.get("low")), 2),
+                    "close": round(NumberLike(item.get("close")), 2),
+                }
+                for item in candles[-60:]
+                if NumberLike(item.get("close")) > 0
+            ],
+            "history_kline": history_kline if history_kline else build_empty_kline_payload(),
+            "history_series": history_series,
+            "data_source": str(normalized.get("data_source") or "indicator_lake").strip() or "indicator_lake",
+            "source_type_label": str(normalized.get("source_type_label") or "大盘指数").strip() or "大盘指数",
+            "standard_code": str(registry_entry.get("security_code") or "").strip(),
+            "tencent_symbol": str(registry_entry.get("tencent_symbol") or "").strip(),
+        }
+    )
+    return attach_watchlist_intraday(normalized)
+
+
+def build_market_overview_index_detail(indicator_code):
+    """Build an index detail from the same persisted market snapshot as H5."""
+    history = _load_watchlist_cache("market_index_history", indicator_code, MARKET_SNAPSHOT_CACHE_TTL_SECONDS)
+    points = list((history or {}).get("points") or []) if isinstance(history, dict) else []
+    if len(points) < 2:
+        return None
+    entry = GANGTISE_INDICATOR_REGISTRY.get(indicator_code) or {}
+    latest = points[-1]
+    previous = points[-2]
+    latest_close = numeric_value(latest.get("close"))
+    previous_close = numeric_value(previous.get("close"))
+    if latest_close is None or previous_close is None:
+        return None
+    history_series = [
+        {
+            "date": str(point.get("date") or "").strip(),
+            "value": numeric_value(point.get("close")),
+            "status": build_real_indicator_status(numeric_value(point.get("close")), numeric_value(points[index - 1].get("close")) if index else numeric_value(point.get("close"))),
+        }
+        for index, point in enumerate(points)
+        if numeric_value(point.get("close")) is not None
+    ]
+    provider = str((history or {}).get("provider") or "市场快照").strip()
+    return {
+        "id": indicator_code,
+        "indicator_code": indicator_code,
+        "indicator_name": entry.get("indicator_name") or indicator_code,
+        "name": entry.get("indicator_name") or indicator_code,
+        "security_code": entry.get("security_code") or "",
+        "standard_code": entry.get("security_code") or "",
+        "market": entry.get("market") or "CN",
+        "numeric_value": latest_close,
+        "value": latest_close,
+        "history_series": history_series,
+        "history_kline": build_real_indicator_kline_payload(points),
+        "data_source": provider,
+        "provider": provider,
+        "source_type": "market_index",
+        "source_type_label": "大盘指数",
+        "data_unavailable": False,
+        "updated_at": str(latest.get("date") or "").strip(),
+        "source_meta": {"provider": provider, "latest": latest, **((history or {}).get("source_meta") or {})},
+        "assessment": f"{entry.get('indicator_name') or indicator_code} 已从 {provider} 获取真实历史序列，最新值为 {latest_close:.2f}。",
+        "status": build_real_indicator_status(latest_close, previous_close),
+        "alert": f"已按 {provider} 真实历史数据更新。",
+        "history": [
+            {"date": item["date"], "value": f"{numeric_value(item['value']):.2f}", "status": item["status"], "event": f"{provider} 真实历史点位"}
+            for item in history_series[-6:]
+        ],
+        "data_mode": "real",
+        "data_mode_label": f"{provider} 真实数据",
+        "source_count": 1,
+        "source_defs": [{
+            "source_code": f"{indicator_code}_{slugify_code(provider, 'provider')}",
+            "indicator_code": indicator_code,
+            "provider": provider,
+            "method": "Python SDK" if provider == "AKShare" else "OpenAPI",
+        }],
+        "fundamental": {
+            "summary": "市场一览与详情均使用后台真实行情快照，不在前台实时请求外部行情。",
+            "metrics": [
+                {"label": "当前值", "value": f"{latest_close:.2f}", "note": f"{provider} 日线快照"},
+                {"label": "日涨跌", "value": f"{latest_close - previous_close:+.2f}", "note": "相对上一交易日收盘"},
+            ],
+            "thesis": [],
+        },
+    }
+
+
+def build_watchlist_indicator_detail(indicator_code, stock_name=""):
+    normalized_code = normalize_watchlist_indicator_code(indicator_code)
+    if not normalized_code:
+        return None
+    if normalized_code in MARKET_OVERVIEW_INDEX_CODES:
+        detail = build_market_overview_index_detail(normalized_code)
+        return normalize_watchlist_detail_from_indicator(detail, normalized_code) if detail else None
+    # Non-market indicators continue to read the persisted indicator lake
+    # before attempting a controlled Gangtise recovery request.
+    try:
+        hub = get_indicator_hub_from_store_cached()
+        for item in (hub.get("lake_items") or []):
+            if str((item or {}).get("id") or "").strip() != normalized_code:
+                continue
+            detail = normalize_watchlist_detail_from_indicator(item, normalized_code)
+            if detail and (detail.get("kline") or not detail.get("data_unavailable")):
+                return detail
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+    detail = build_live_gangtise_indicator_detail(normalized_code)
+    return normalize_watchlist_detail_from_indicator(detail, normalized_code) if detail else None
 
 
 def _watchlist_cache_setting_key(prefix, value):
@@ -4637,6 +5828,65 @@ def _search_local_watchlist_candidates(query, top=8):
     lowered = normalized.lower()
     comparable_query = _normalize_watchlist_comparable_code(normalized)
     details = _build_watchlist_seed_details()
+    indicator_alias = normalize_watchlist_indicator_code(normalized)
+    priority_index_codes = [
+        "source_shanghai_index",
+        "source_shenzhen_index",
+        "source_hs300",
+        "source_sse50",
+        "source_kc50",
+        "source_cyb",
+        "source_zz500",
+        "source_zz1000",
+        "source_zz800",
+        "source_a500",
+        "source_zz2000",
+        "source_hsi",
+        "source_hscei",
+        "source_hscci",
+        "source_nikkei",
+        "source_sp500",
+        "source_nasdaq",
+    ]
+    priority_index_set = set(priority_index_codes)
+    if indicator_alias and indicator_alias in GANGTISE_INDICATOR_REGISTRY:
+        registry_entry = GANGTISE_INDICATOR_REGISTRY[indicator_alias]
+        details.setdefault(
+            indicator_alias,
+            {
+                "code": indicator_alias,
+                "name": registry_entry.get("indicator_name") or indicator_alias,
+                "market": "CN",
+                "industry": registry_entry.get("category") or "数据湖指标",
+                "focus": registry_entry.get("indicator_name") or registry_entry.get("search_keyword") or indicator_alias,
+            },
+        )
+    if any(keyword in normalized for keyword in ("指数", "股指", "大盘", "标准指数", "标准库")):
+        for indicator_code in priority_index_codes:
+            registry_entry = GANGTISE_INDICATOR_REGISTRY.get(indicator_code)
+            if not registry_entry:
+                continue
+            details.setdefault(
+                indicator_code,
+                {
+                    "code": indicator_code,
+                    "name": registry_entry.get("indicator_name") or indicator_code,
+                    "market": "CN",
+                    "industry": registry_entry.get("category") or "数据湖指标",
+                    "focus": registry_entry.get("indicator_name") or registry_entry.get("search_keyword") or indicator_code,
+                },
+            )
+        for indicator_code, registry_entry in GANGTISE_INDICATOR_REGISTRY.items():
+            details.setdefault(
+                indicator_code,
+                {
+                    "code": indicator_code,
+                    "name": registry_entry.get("indicator_name") or indicator_code,
+                    "market": "CN",
+                    "industry": registry_entry.get("category") or "数据湖指标",
+                    "focus": registry_entry.get("indicator_name") or registry_entry.get("search_keyword") or indicator_code,
+                },
+            )
     for code, preset in (WATCHLIST_DYNAMIC_DETAIL_PRESETS or {}).items():
         if not isinstance(preset, dict):
             continue
@@ -4654,12 +5904,14 @@ def _search_local_watchlist_candidates(query, top=8):
     for detail in (details or {}).values():
         if not isinstance(detail, dict):
             continue
-        code = str(detail.get("code") or "").strip().upper()
+        raw_code = str(detail.get("code") or "").strip()
+        code = raw_code.upper()
         name = str(detail.get("name") or "").strip()
         if not code or not name:
             continue
         name_lower = name.lower()
         comparable_code = _normalize_watchlist_comparable_code(code)
+        priority_rank = priority_index_codes.index(code.lower()) if code.lower() in priority_index_set else len(priority_index_codes) + 1
         score = None
         if comparable_code == comparable_query or code == normalized.upper():
             score = 0
@@ -4669,14 +5921,22 @@ def _search_local_watchlist_candidates(query, top=8):
             score = 2
         elif comparable_query and comparable_query in comparable_code:
             score = 3
+        elif any(keyword in normalized for keyword in ("指数", "股指", "大盘", "标准指数", "标准库")) and code.lower() in priority_index_set:
+            score = 4
         if score is None:
             continue
+        display_code = raw_code.lower() if raw_code.lower().startswith("source_") else code
+        registry_entry = GANGTISE_INDICATOR_REGISTRY.get(display_code) if display_code.startswith("source_") else {}
+        if registry_entry:
+            display_code = str(registry_entry.get("security_code") or display_code).strip().upper()
         scored.append(
             (
+                priority_rank,
                 score,
                 len(name),
                 {
-                    "code": code,
+                    "code": display_code,
+                    "indicator_code": raw_code.lower() if raw_code.lower().startswith("source_") else "",
                     "name": name,
                     "market": str(detail.get("market") or _infer_watchlist_market(code)).strip() or "CN",
                     "security_code": _build_gts_security_code(code, detail.get("market")),
@@ -4686,8 +5946,8 @@ def _search_local_watchlist_candidates(query, top=8):
                 },
             )
         )
-    scored.sort(key=lambda item: (item[0], item[1], item[2]["code"]))
-    return [copy.deepcopy(item[2]) for item in scored[: max(1, int(top or 8))]]
+    scored.sort(key=lambda item: (item[0], item[1], item[2], item[3]["code"]))
+    return [copy.deepcopy(item[3]) for item in scored[: max(1, int(top or 8))]]
 
 
 def _search_remote_watchlist_candidates(query, top=8):
@@ -4764,7 +6024,7 @@ def _build_watchlist_realtime_detail_from_candidate(candidate, stock_name=""):
         return None
     cached = _load_watchlist_cache("watchlist_detail_cache", security_code, WATCHLIST_DETAIL_CACHE_TTL_SECONDS)
     if isinstance(cached, dict) and cached:
-        return cached
+        return attach_watchlist_intraday(cached)
     market = str(normalized.get("market") or _infer_watchlist_market(code)).strip() or "CN"
     suffix = security_code.split(".", 1)[1] if "." in security_code else market
     if suffix == "HK":
@@ -4888,7 +6148,86 @@ def _build_watchlist_realtime_detail_from_candidate(candidate, stock_name=""):
         },
         "data_unavailable": False,
     }
+    detail = attach_watchlist_intraday(detail)
     _save_watchlist_cache("watchlist_detail_cache", security_code, detail)
+    return detail
+
+
+def _resolve_watchlist_intraday_symbol(detail):
+    if not isinstance(detail, dict):
+        return ""
+    source_meta = detail.get("source_meta") if isinstance(detail.get("source_meta"), dict) else {}
+    standard_code = str(
+        detail.get("standard_code")
+        or detail.get("security_code")
+        or source_meta.get("security_code")
+        or source_meta.get("securityCode")
+        or ""
+    ).strip().upper()
+    tencent_symbol = str(detail.get("tencent_symbol") or "").strip().lower()
+    code = str(detail.get("code") or "").strip().upper()
+    market = str(detail.get("market") or "").strip().upper()
+    if re.fullmatch(r"\d{6}\.(SH|SZ|BJ)", standard_code) or re.fullmatch(r"\d{5}\.HK", standard_code) or re.fullmatch(r"\d{6}\.CSI", standard_code):
+        return standard_code
+    if code and market in {"SH", "SZ"}:
+        return f"{code}.{market}"
+    if code and re.fullmatch(r"\d{6}", code):
+        suffix = "SH" if code.startswith(("60", "68")) else ("SZ" if code.startswith(("00", "30")) else "SH")
+        return f"{code}.{suffix}"
+    tencent_match = re.fullmatch(r"(sh|sz)(\d{6})", tencent_symbol)
+    if tencent_match:
+        return f"{tencent_match.group(2)}.{tencent_match.group(1).upper()}"
+    return ""
+
+
+def _resolve_watchlist_intraday_trade_date(detail):
+    """Use the latest real trading date outside the live China-market session."""
+    if is_cn_stock_market_open():
+        return ""
+    source_meta = detail.get("source_meta") if isinstance(detail, dict) and isinstance(detail.get("source_meta"), dict) else {}
+    candidates = [
+        source_meta.get("latest", {}).get("date") if isinstance(source_meta.get("latest"), dict) else "",
+        *(item.get("date") for item in (detail.get("kline") or []) if isinstance(item, dict)),
+        *(item.get("date") for item in (detail.get("history_series") or []) if isinstance(item, dict)),
+    ] if isinstance(detail, dict) else []
+    dates = []
+    for value in candidates:
+        matched = re.search(r"\d{4}-\d{2}-\d{2}", str(value or ""))
+        if matched:
+            dates.append(matched.group(0))
+    return max(dates) if dates else ""
+
+
+def fetch_watchlist_intraday_series(detail, allow_provider_fetch=True):
+    indicator_code = str((detail or {}).get("indicator_code") or (detail or {}).get("id") or "").strip()
+    if indicator_code in MARKET_OVERVIEW_INDEX_CODES:
+        cached = _load_watchlist_cache("market_index_intraday", indicator_code, MARKET_SNAPSHOT_CACHE_TTL_SECONDS)
+        if isinstance(cached, dict) and cached.get("available"):
+            return cached
+        return {"ok": False, "available": False, "points": [], "message": "intraday_snapshot_pending", "updated_at": "", "source": "AKShare"}
+    symbol = _resolve_watchlist_intraday_symbol(detail)
+    if not symbol:
+        return {"ok": False, "available": False, "points": [], "message": "symbol_not_resolved", "updated_at": "", "source": "gangtise_openapi"}
+    trade_date = _resolve_watchlist_intraday_trade_date(detail)
+    cached = _load_gangtise_intraday_snapshot(symbol, trade_date)
+    if cached:
+        return cached
+    if not allow_provider_fetch:
+        return {"ok": False, "available": False, "points": [], "message": "intraday_snapshot_pending", "updated_at": "", "source": "gangtise_openapi_cache"}
+    return fetch_gangtise_intraday_series(symbol, trade_date=trade_date)
+
+
+def attach_watchlist_intraday(detail):
+    if not isinstance(detail, dict) or not detail:
+        return detail
+    detail["intraday_supported"] = bool(_resolve_watchlist_intraday_symbol(detail))
+    # Detail pages only consume the collector's persisted minute snapshot.
+    result = fetch_watchlist_intraday_series(detail, allow_provider_fetch=False)
+    detail["intraday_available"] = bool(result.get("available"))
+    detail["intraday_series"] = copy.deepcopy(result.get("points") or [])
+    detail["intraday_source"] = str(result.get("source") or "gangtise_openapi").strip() or "gangtise_openapi"
+    detail["intraday_updated_at"] = str(result.get("updated_at") or "").strip()
+    detail["intraday_message"] = str(result.get("message") or "").strip()
     return detail
 
 
@@ -5072,9 +6411,15 @@ def _infer_watchlist_market(stock_code):
 
 
 def _build_dynamic_watchlist_detail(stock_code, stock_name=""):
-    normalized_code = str(stock_code or "").strip().upper()
+    raw_code = str(stock_code or "").strip()
+    indicator_code = normalize_watchlist_indicator_code(raw_code)
+    normalized_code = indicator_code or raw_code.upper()
     if not normalized_code:
         return None
+    if normalized_code in GANGTISE_INDICATOR_REGISTRY:
+        detail = build_watchlist_indicator_detail(normalized_code, stock_name=stock_name)
+        if isinstance(detail, dict) and detail:
+            return detail
     resolved_candidate = _resolve_watchlist_candidate(stock_code=normalized_code, stock_name=stock_name)
     realtime_detail = _build_watchlist_realtime_detail_from_candidate(resolved_candidate, stock_name=stock_name)
     if isinstance(realtime_detail, dict) and realtime_detail:
@@ -5087,9 +6432,13 @@ def _enrich_watchlist_details(details):
     normalized_details = copy.deepcopy(details or {})
     indicator_context = build_watchlist_indicator_context()
     for detail in normalized_details.values():
-        signal_bundle = build_watchlist_signal_bundle(detail["code"], detail["name"], detail.get("industry"), indicator_context)
+        research_industry = str(detail.get("research_industry") or detail.get("industry") or detail.get("focus") or "个股跟踪").strip() or "个股跟踪"
+        canonical_industry = canonical_hot_industry_name(research_industry)
+        detail["research_industry"] = research_industry
+        detail["industry"] = canonical_industry
+        detail["focus"] = canonical_industry
+        signal_bundle = build_watchlist_signal_bundle(detail["code"], detail["name"], research_industry, indicator_context)
         detail["indicator_context"] = signal_bundle
-        detail["focus"] = detail.get("industry") or detail.get("focus") or "个股跟踪"
         detail["alert_level"] = signal_bundle["board_alert_level"]
         detail["alert_text"] = sanitize_user_facing_source_text(signal_bundle["board_alert_text"], fallback="当前无明显预警")
         detail["signal_summary"] = signal_bundle["board_summary"]
@@ -5143,7 +6492,16 @@ def _enrich_watchlist_details(details):
 
 def get_watchlist_detail_by_code(stock_code="", stock_name="", details_map=None, enrich=True):
     details = details_map if isinstance(details_map, dict) else gen_watchlist_details()
-    normalized_code = str(stock_code or "").strip().upper()
+    raw_code = str(stock_code or "").strip()
+    indicator_code = normalize_watchlist_indicator_code(raw_code)
+    normalized_code = indicator_code or raw_code.upper()
+    if normalized_code in GANGTISE_INDICATOR_REGISTRY:
+        detail = build_watchlist_indicator_detail(normalized_code, stock_name=stock_name)
+        if not detail:
+            return None
+        if not enrich:
+            return copy.deepcopy(detail)
+        return copy.deepcopy(detail)
     if not normalized_code and stock_name:
         normalized_code = _find_watchlist_code_from_text_local(stock_name)
     if not normalized_code:
@@ -5206,6 +6564,14 @@ def _normalize_watchlist_annotation_row(row, detail=None):
     candle = detail or {}
     stock_name = str(raw.get("stock_name") or candle.get("name") or raw.get("stock_code") or "").strip()
     stock_code = str(raw.get("stock_code") or "").strip().upper()
+    title = str(raw.get("title") or "").strip()
+    note = str(raw.get("note") or "").strip()
+    trigger = str(raw.get("trigger") or "").strip()
+    # Older rows used three authoring fields. Expose one canonical content
+    # value so all downstream consumers can use the simplified model.
+    content = note or "；".join(part for part in [title, trigger] if part)
+    if title and note:
+        content = "；".join(part for part in [title, note, trigger] if part)
     return {
         "id": raw.get("id"),
         "tenant_slug": str(raw.get("tenant_slug") or "").strip().lower(),
@@ -5214,9 +6580,10 @@ def _normalize_watchlist_annotation_row(row, detail=None):
         "candle_index": int(raw.get("candle_index") or 0),
         "dateLabel": str(raw.get("candle_date") or "").strip(),
         "candle_date": str(raw.get("candle_date") or "").strip(),
-        "title": str(raw.get("title") or "").strip(),
-        "note": str(raw.get("note") or "").strip(),
-        "trigger": str(raw.get("trigger") or "").strip(),
+        "title": title,
+        "note": note,
+        "trigger": trigger,
+        "content": content,
         "updatedAt": str(raw.get("updated_at") or raw.get("created_at") or "").strip(),
         "createdAt": str(raw.get("created_at") or "").strip(),
         "open": round(float(raw.get("open_price") or 0), 2),
@@ -5265,6 +6632,7 @@ def save_watchlist_kline_annotation(
     high_price=0,
     low_price=0,
     close_price=0,
+    content="",
     title="",
     note="",
     trigger="",
@@ -5280,10 +6648,16 @@ def save_watchlist_kline_annotation(
     detail = get_watchlist_detail_by_code(normalized_code, stock_name=stock_name, details_map=details)
     if not detail:
         raise ValueError("watchlist_stock_not_found")
-    title_text = str(title or "").strip()
-    note_text = str(note or "").strip()
-    if not title_text or not note_text:
-        raise ValueError("watchlist_annotation_title_note_required")
+    content_text = str(content or "").strip()
+    if not content_text:
+        # Backward compatibility for existing clients that still send the
+        # former title/note/trigger triplet.
+        content_text = "；".join(
+            part for part in [str(title or "").strip(), str(note or "").strip(), str(trigger or "").strip()]
+            if part
+        )
+    if not content_text:
+        raise ValueError("watchlist_annotation_content_required")
     try:
         normalized_index = max(0, int(candle_index or 0))
     except Exception:
@@ -5301,9 +6675,9 @@ def save_watchlist_kline_annotation(
         "high_price": float(high_price or candle.get("high") or 0),
         "low_price": float(low_price or candle.get("low") or 0),
         "close_price": float(close_price or candle.get("close") or 0),
-        "title": title_text[:120],
-        "note": note_text[:2000],
-        "trigger": str(trigger or "").strip()[:1000],
+        "title": "",
+        "note": content_text[:2000],
+        "trigger": "",
         "created_by_user_id": str(created_by_user_id or "").strip()[:120],
         "created_by_name": str(created_by_name or "").strip()[:120],
         "source_client": str(source_client or "h5").strip()[:40] or "h5",
@@ -5456,13 +6830,14 @@ def build_watchlist_annotation_context(tenant_slug="", selected_watchlist=None, 
                 raise
             annotations = []
         annotation_summary = "；".join(
-            f"{str(item.get('dateLabel') or item.get('candle_date') or '').strip()} {str(item.get('note') or '').strip()}".strip()
+            f"{str(item.get('dateLabel') or item.get('candle_date') or '').strip()} {str(item.get('content') or item.get('note') or '').strip()}".strip()
             for item in annotations[:3]
-            if str(item.get("note") or "").strip()
+            if str(item.get("content") or item.get("note") or "").strip()
         ).strip()
         detail["annotations"] = annotations
         detail["annotation_summary"] = annotation_summary
         detail["annotation_titles"] = [str(item.get("title") or "").strip() for item in annotations if str(item.get("title") or "").strip()][:6]
+        detail["annotation_contents"] = [str(item.get("content") or item.get("note") or "").strip() for item in annotations if str(item.get("content") or item.get("note") or "").strip()][:6]
         items.append(detail)
     return items
 
@@ -6627,6 +8002,57 @@ def _news_watchlist_context(watchlist_details=None):
     return sorted(sectors, key=len, reverse=True), sorted(symbols, key=len, reverse=True)
 
 
+def _news_watchlist_sector_groups(watchlist_details=None):
+    values = watchlist_details.values() if isinstance(watchlist_details, dict) else (watchlist_details or [])
+    groups = {}
+    for detail in values or []:
+        if not isinstance(detail, dict):
+            continue
+        sector = str(detail.get("industry") or detail.get("sector") or detail.get("focus") or detail.get("board") or "").strip()
+        if not sector or len(sector) < 2:
+            continue
+        group = groups.setdefault(sector, {"sector": sector, "symbols": set()})
+        for key in ("name", "code", "stock_name", "stock_code"):
+            value = str(detail.get(key) or "").strip()
+            if value:
+                group["symbols"].add(value)
+    normalized = []
+    for sector, group in groups.items():
+        normalized.append({"sector": sector, "symbols": sorted(group["symbols"], key=len, reverse=True)})
+    return sorted(normalized, key=lambda item: item["sector"])
+
+
+def _news_item_text(item):
+    return " ".join(
+        str(item.get(key) or "")
+        for key in ("title", "content", "summary", "why", "tag", "source_group", "source_name")
+    )
+
+
+def _news_item_matches_sector_group(item, sector_group):
+    if not isinstance(item, dict) or not isinstance(sector_group, dict):
+        return False
+    sector = str(sector_group.get("sector") or "").strip()
+    if not sector:
+        return False
+    text = _news_item_text(item)
+    compact_text = re.sub(r"[\s\u3000·•/|_\-.]+", "", text)
+    candidates = [sector, *(NEWS_SECTOR_ALIASES.get(sector, ()) or []), *(sector_group.get("symbols") or [])]
+    matched_topics = [
+        str(topic or "").strip()
+        for topic in (item.get("matched_topics") if isinstance(item.get("matched_topics"), list) else [])
+        if str(topic or "").strip()
+    ]
+    for candidate in candidates:
+        token = str(candidate or "").strip()
+        if not token:
+            continue
+        compact_token = re.sub(r"[\s\u3000·•/|_\-.]+", "", token)
+        if token in matched_topics or token in text or (compact_token and compact_token in compact_text):
+            return True
+    return False
+
+
 def _rank_news_for_tenant(items, tenant=None, watchlist_details=None, algorithm_payload=None):
     tenant_slug = str((tenant or {}).get("slug") or "").strip().lower()
     raw_algorithm = algorithm_payload if isinstance(algorithm_payload, dict) else load_tenant_news_aggregation_algorithm(tenant_slug)
@@ -6784,7 +8210,7 @@ def _build_news_lake_indicators(items):
     return [{"indicator_code": code, "value": count, "unit": "条/批次", "updated_at": now_ts(), "is_simulated": False} for code, count in sorted(counts.items())]
 
 
-def _load_news_lake_cache():
+def _load_news_lake_cache(allow_stale=False):
     payload = _load_json_app_setting(NEWS_LAKE_CACHE_KEY, {})
     cached_at = str(payload.get("cached_at") or "").strip() if isinstance(payload, dict) else ""
     if not cached_at:
@@ -6793,11 +8219,15 @@ def _load_news_lake_cache():
         cached_dt = datetime.fromisoformat(cached_at.replace("Z", "+00:00"))
         if cached_dt.tzinfo:
             cached_dt = cached_dt.astimezone().replace(tzinfo=None)
-        if (datetime.now() - cached_dt).total_seconds() > NEWS_LAKE_CACHE_TTL_SECONDS:
+        if (datetime.now() - cached_dt).total_seconds() > NEWS_LAKE_CACHE_TTL_SECONDS and not allow_stale:
             return None
     except Exception:
         return None
     return payload
+
+
+def _news_lake_payload_has_items(payload):
+    return bool(isinstance(payload, dict) and payload.get("items"))
 
 
 def _load_active_news_source_whitelist():
@@ -6860,6 +8290,9 @@ def _aggregate_real_news_sources(force_refresh=False):
     results = []
     active_sources = _load_active_news_source_whitelist()
     if not active_sources:
+        stale_cached = _load_news_lake_cache(allow_stale=True)
+        if _news_lake_payload_has_items(stale_cached):
+            return stale_cached
         return {"cached_at": now_ts(), "items": [], "indicators": [], "sources": []}
     with ThreadPoolExecutor(max_workers=min(7, len(active_sources))) as executor:
         futures = [executor.submit(_fetch_news_source, source) for source in active_sources]
@@ -6889,6 +8322,10 @@ def _aggregate_real_news_sources(force_refresh=False):
             for result in sorted(results, key=lambda item: item["source"]["code"])
         ],
     }
+    if not items:
+        stale_cached = _load_news_lake_cache(allow_stale=True)
+        if _news_lake_payload_has_items(stale_cached):
+            return stale_cached
     try:
         _save_json_app_setting(NEWS_LAKE_CACHE_KEY, payload)
     except Exception:
@@ -6974,25 +8411,60 @@ def gen_news_feed(tenant=None, watchlist_details=None, algorithm_payload=None):
         return []
 
 
-def _select_fundamental_homepage_news(ranked_items, limit, rule_plan=None):
-    """Select only relevant news, with source diversity before filling the homepage."""
+def _select_fundamental_homepage_news(ranked_items, limit, rule_plan=None, watchlist_details=None):
+    """Select relevant news while first covering each watchlist sector."""
     plan = _normalize_news_rule_plan(rule_plan)
     selected = []
+    selected_keys = set()
     source_counts = {}
     group_counts = {}
     max_per_source = plan["diversity"]["max_per_source"]
     max_per_group = plan["diversity"]["max_per_group"]
+
+    def item_key(item):
+        return str(item.get("url") or item.get("link") or item.get("title") or id(item)).strip()
+
+    def can_add(item, *, enforce_group=True):
+        key = item_key(item)
+        if key in selected_keys:
+            return False
+        source_key = str(item.get("source_code") or item.get("source_name") or item.get("source_group") or "unknown").strip()
+        group_key = str(item.get("source_group") or "其他").strip()
+        if source_counts.get(source_key, 0) >= max_per_source:
+            return False
+        if enforce_group and group_counts.get(group_key, 0) >= max_per_group:
+            return False
+        return True
+
+    def add_item(item):
+        selected.append(item)
+        selected_keys.add(item_key(item))
+        source_key = str(item.get("source_code") or item.get("source_name") or item.get("source_group") or "unknown").strip()
+        group_key = str(item.get("source_group") or "其他").strip()
+        source_counts[source_key] = source_counts.get(source_key, 0) + 1
+        group_counts[group_key] = group_counts.get(group_key, 0) + 1
+
+    if plan["candidate_scope"].get("watchlist_related"):
+        for sector_group in _news_watchlist_sector_groups(watchlist_details):
+            sector_candidates = [
+                item for item in (ranked_items or [])
+                if str(item.get("aggregation_bucket") or "").strip() == "watchlist_sector"
+                and _news_item_matches_sector_group(item, sector_group)
+                and can_add(item, enforce_group=False)
+            ]
+            if not sector_candidates:
+                continue
+            add_item(sector_candidates[0])
+            if len(selected) >= limit:
+                return selected
+
     for bucket in plan["priority_order"]:
         for item in ranked_items or []:
             if str(item.get("aggregation_bucket") or "").strip() != bucket:
                 continue
-            source_key = str(item.get("source_code") or item.get("source_name") or item.get("source_group") or "unknown").strip()
-            group_key = str(item.get("source_group") or "其他").strip()
-            if source_counts.get(source_key, 0) >= max_per_source or group_counts.get(group_key, 0) >= max_per_group:
+            if not can_add(item):
                 continue
-            selected.append(item)
-            source_counts[source_key] = source_counts.get(source_key, 0) + 1
-            group_counts[group_key] = group_counts.get(group_key, 0) + 1
+            add_item(item)
             if len(selected) >= limit:
                 return selected
     return selected
@@ -7004,7 +8476,7 @@ def build_fundamental_news_payload(tenant=None, watchlist_details=None, limit=10
     rule_plan = algorithm.get("rule_plan") or {}
     requested_limit = max(1, int(limit or 10))
     effective_limit = min(requested_limit, int((rule_plan.get("presentation") or {}).get("home_limit") or requested_limit))
-    selected_items = _select_fundamental_homepage_news(ranked_items, effective_limit, rule_plan=rule_plan)
+    selected_items = _select_fundamental_homepage_news(ranked_items, effective_limit, rule_plan=rule_plan, watchlist_details=watchlist_details)
     source_buckets = {}
     for item in ranked_items:
         if not isinstance(item, dict):

@@ -27,13 +27,17 @@ body { background: var(--surface-2); color: var(--text-main); }
 
 /* ===== BOTTOM NAV (6 items) ===== */
 .h5-bottom-nav {
-  position: sticky;
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(390px, 100vw);
   bottom: 0;
   background: var(--navy-mid);
   border-top: 1px solid var(--border-soft);
   display: flex;
   padding: 8px 0 16px;
   z-index: 100;
+  box-sizing: border-box;
 }
 .h5-nav-item { flex: 1; text-align: center; cursor: pointer; padding: 6px 0; }
 .h5-nav-icon { font-size: 18px; }
@@ -3524,6 +3528,7 @@ body { background: var(--surface-2); color: var(--text-main); }
 body,
 .h5-wrap {
   background:linear-gradient(180deg, #FAFCFF 0%, #F4F8FC 100%);
+  padding-bottom:96px;
 }
 .modal-overlay {
   background:rgba(244,248,252,0.88);
@@ -4118,6 +4123,24 @@ body,
   <div id="page-market" class="page" data-feature="watchlist">
     <div class="h5-section">
       <div class="h5-section-title">自选股</div>
+      <div class="h5-segmented-tabs" role="tablist" aria-label="行情视图" style="display:flex;gap:8px;margin:0 0 12px;padding:4px;background:rgba(47,116,192,0.08);border-radius:10px">
+        <button id="market-watchlist-tab" type="button" role="tab" aria-selected="true" class="h5-segmented-tab active" style="flex:1;border:0;border-radius:8px;padding:9px 6px;background:var(--gold);color:var(--navy);font-size:12px;font-weight:700;cursor:pointer" onclick="switchMarketView('watchlist')">自选股列表</button>
+        <button id="market-sector-tab" type="button" role="tab" aria-selected="false" class="h5-segmented-tab" style="flex:1;border:0;border-radius:8px;padding:9px 6px;background:transparent;color:var(--gray-400);font-size:12px;font-weight:700;cursor:pointer" onclick="switchMarketView('sectors')">热门行业</button>
+        <button id="market-overview-tab" type="button" role="tab" aria-selected="false" class="h5-segmented-tab" style="flex:1;border:0;border-radius:8px;padding:9px 6px;background:transparent;color:var(--gray-400);font-size:12px;font-weight:700;cursor:pointer" onclick="switchMarketView('overview')">市场一览</button>
+      </div>
+      <div id="market-overview-panel" role="tabpanel">
+        <div id="market-overview-source-note" style="font-size:12px;color:var(--gray-400);line-height:1.6;margin:0 2px 10px">标准指数与热门行业均由后台 AKShare 采集后入库，页面只读取数据库快照。</div>
+        <div id="market-overview-list" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+          <div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">正在读取真实行情...</div>
+        </div>
+      </div>
+      <div id="market-sector-panel" role="tabpanel" style="display:none">
+        <div id="market-sector-source-note" style="font-size:12px;color:var(--gray-400);line-height:1.6;margin:0 2px 10px">申万一级行业指数行情，按涨跌幅从高到低排列。数据由后台 AKShare 采集任务入库。</div>
+        <div id="market-sector-list" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+          <div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">正在读取真实行业行情...</div>
+        </div>
+      </div>
+      <div id="market-watchlist-panel" role="tabpanel" style="display:none">
       <div class="card" style="padding:14px;margin-bottom:12px">
         <div style="font-size:14px;font-weight:700;color:var(--white);margin-bottom:8px">输入股票代码，直接进入个股详情</div>
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
@@ -4161,30 +4184,23 @@ body,
             </div>
           </div>
         </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
-          <span style="font-size:10px;background:rgba(200,169,110,0.1);color:var(--gold);padding:3px 8px;border-radius:10px">当前租户投顾可见</span>
-          <span style="font-size:10px;background:rgba(52,152,219,0.12);color:#3498DB;padding:3px 8px;border-radius:10px">分析记录同步主理投顾</span>
-          <span style="font-size:10px;background:rgba(46,204,113,0.12);color:var(--green);padding:3px 8px;border-radius:10px">可连 Hermes</span>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-top:10px">
-          <button class="btn-gold" style="padding:7px 10px;font-size:11px" onclick="event.stopPropagation();runWatchlistHermes('{{ item.code }}','basic')">基本面分析</button>
-        </div>
         <div data-review-selection-slot="true" style="display:none"></div>
       </div>
       {% endfor %}
       </div>
+      </div>
     </div>
-    <div class="h5-section">
-      <div class="h5-section-title">跟踪提示</div>
+    <div id="market-dav-research-guide" class="h5-section" style="display:none">
+      <div class="h5-section-title">大V研究节奏</div>
       <div class="card" style="padding:14px">
-        <div style="font-size:13px;color:var(--gold);font-weight:600;margin-bottom:8px">建议使用路径</div>
+        <div style="font-size:13px;color:var(--gold);font-weight:600;margin-bottom:8px">当日跟踪重点</div>
         <div style="font-size:13px;color:var(--white);line-height:1.8">
-          1. 先看自选股价格与涨跌幅。<br>
-          2. 再看所属大V投顾的研究方法和证据角度。<br>
-          3. 用 Hermes 做个性化基本面分析，分析记录同步给主理投顾。<br>
-          4. 最后做“基本面判断”，决定是继续跟踪、重点研究还是暂不处理。
+          1. 从自选股、热门行业和市场一览确认当天的关注范围。<br>
+          2. 在日 K 线上记录关键判断，保留后续复盘可追溯的依据。<br>
+          3. 汇总粉丝留言与 Hermes 研究结果，补齐需要验证的证据。<br>
+          4. 在复盘中确认用户输入和自选股归纳后，再发布给粉丝。
         </div>
-        <div style="font-size:11px;color:var(--gray-400);margin-top:6px">重点不是给买卖建议，而是在租户隔离前提下缩短你从关注到判断的研究路径。</div>
+        <div style="font-size:11px;color:var(--gray-400);margin-top:6px">标注、评论、研究和复盘在同一租户内沉淀，便于持续追踪。</div>
       </div>
     </div>
   </div>
@@ -4431,7 +4447,7 @@ body,
       </div>
     </div>
 
-    <div class="profile-workbench-entry" onclick="switchTab('workbench')">
+    <div class="profile-workbench-entry" id="profile-workbench-entry" style="display:none" onclick="switchTab('workbench')">
       <div class="profile-workbench-entry-icon">👑</div>
       <div class="profile-workbench-entry-main">
         <div class="profile-workbench-entry-top">
@@ -4443,7 +4459,7 @@ body,
       </div>
     </div>
 
-    <div class="profile-overview-card">
+    <div class="profile-overview-card" id="profile-overview-card">
       <div class="profile-overview-head">
         <div>
           <div class="profile-overview-title">当前账号概览</div>
@@ -4464,17 +4480,17 @@ body,
           <div class="profile-overview-label">租户服务</div>
           <div class="profile-overview-value" id="profile-service-brief">复盘专区 · 知识专区 · Hermes 摘要</div>
         </div>
-        <div class="profile-overview-item">
+        <div class="profile-overview-item" id="profile-workbench-overview-item">
           <div class="profile-overview-label">工作台入口</div>
           <div class="profile-overview-value">统一从“我的”进入</div>
         </div>
       </div>
     </div>
 
-    <div class="h5-section" style="padding-bottom:8px">
+    <div class="h5-section" id="profile-switch-section" style="padding-bottom:8px;display:none">
       <div class="h5-section-title">切换账号</div>
     </div>
-    <div style="padding:0 16px 12px;font-size:12px;color:var(--gray-400);line-height:1.7">
+    <div id="profile-switch-desc" style="padding:0 16px 12px;font-size:12px;color:var(--gray-400);line-height:1.7;display:none">
       这里展示可直接切换的前台账号。退出后会返回登录选择页，重新选择用户进入。
     </div>
     <div class="demo-switch-list" id="demo-user-switch-list"></div>
@@ -5180,6 +5196,7 @@ function normalizeReviewStructuredPreview(payload) {
         stock_name: String((item || {}).stock_name || '').trim(),
         stock_code: String((item || {}).stock_code || '').trim(),
         date_label: String((item || {}).date_label || '').trim(),
+        content: String((item || {}).content || '').trim(),
         title: String((item || {}).title || '').trim(),
         note: String((item || {}).note || '').trim(),
         trigger: String((item || {}).trigger || '').trim(),
@@ -6841,7 +6858,7 @@ function buildReviewArticleData(review) {
       }))
     : sectionEvidence.map(item => ({
         stockName: item.stock_name,
-        summary: [item.date_label, item.title, item.note, item.trigger ? `验证节点：${item.trigger}` : ''].filter(Boolean).join(' · '),
+        summary: [item.date_label, item.content || item.note || item.title].filter(Boolean).join(' · '),
       }));
   const evidenceItems = evidenceSource.map(item => ({
     title: `${item.stockName} · K线标注`,
@@ -8825,7 +8842,22 @@ function syncTenantScopedAdvisorViews() {
 function renderDemoUserSwitchList() {
   const host = document.getElementById('demo-user-switch-list');
   if (!host) return;
-  host.innerHTML = DEMO_PROFILE_USERS.map(user => `
+  const activeUser = getActiveDemoUser() || {};
+  const role = String(activeUser.role || '').trim().toLowerCase();
+  const switchSection = document.getElementById('profile-switch-section');
+  const switchDesc = document.getElementById('profile-switch-desc');
+  // Account impersonation is an administrator-only operation. A DAV keeps
+  // their own workspace identity and must not switch into follower accounts.
+  const canSwitch = role === 'admin';
+  if (switchSection) switchSection.style.display = canSwitch ? '' : 'none';
+  if (switchDesc) switchDesc.style.display = canSwitch ? '' : 'none';
+  host.style.display = canSwitch ? '' : 'none';
+  if (!canSwitch) {
+    host.innerHTML = '';
+    return;
+  }
+  const visibleUsers = DEMO_PROFILE_USERS;
+  host.innerHTML = visibleUsers.map(user => `
     <div class="demo-switch-item ${currentDemoUser && currentDemoUser.username === user.username ? 'active' : ''}" onclick="switchDemoProfileUser('${escapeAttr(user.username)}')">
       <div class="demo-switch-avatar">${user.avatar}</div>
       <div class="demo-switch-main">
@@ -10716,11 +10748,18 @@ async function submitKnowledgeIntake() {
   }
 }
 
+function renderMarketDavResearchGuide(user) {
+  const guide = document.getElementById('market-dav-research-guide');
+  if (!guide) return;
+  guide.style.display = user && user.role === 'dav' ? '' : 'none';
+}
+
 function renderDemoProfile(user) {
   if (!user) {
     currentDemoUser = null;
     document.body.dataset.demoRole = '';
     window.CURRENT_DEMO_PROFILE = null;
+    renderMarketDavResearchGuide(null);
     h5OnboardingState = normalizeH5OnboardingState({});
     renderH5OnboardingModal();
     setH5ShellLoggedOut(true);
@@ -10730,6 +10769,7 @@ function renderDemoProfile(user) {
   currentDemoUser = user;
   bootH5Experience();
   document.body.dataset.demoRole = user.role || '';
+  renderMarketDavResearchGuide(user);
   applySiteFeatureFlags();
   window.CURRENT_DEMO_PROFILE = user;
   syncH5OnboardingStateFromProfile(user);
@@ -10763,6 +10803,9 @@ function renderDemoProfile(user) {
   if (el('profile-service-brief')) el('profile-service-brief').textContent = user.role === 'dav'
     ? '工作台管理 · 知识供稿 · Hermes 模板'
     : '复盘专区 · 知识专区 · Hermes 摘要';
+  if (el('profile-overview-card')) el('profile-overview-card').style.display = user.role === 'dav' ? 'none' : '';
+  if (el('profile-workbench-entry')) el('profile-workbench-entry').style.display = user.role === 'dav' || user.role === 'admin' ? 'flex' : 'none';
+  if (el('profile-workbench-overview-item')) el('profile-workbench-overview-item').style.display = user.role === 'dav' || user.role === 'admin' ? '' : 'none';
   if (el('profile-workbench-label')) el('profile-workbench-label').textContent = user.workbenchLabel;
   if (el('profile-workbench-meta')) {
     el('profile-workbench-meta').textContent = user.role === 'dav'
@@ -11224,6 +11267,11 @@ function handleH5LoginQueryFeedback() {
 }
 
 function switchTab(tab) {
+  const activeUserForRoute = getSafeActiveDemoUser();
+  if (tab === 'workbench' && activeUserForRoute.role === 'investor') {
+    tab = 'profile';
+    showToast('当前粉丝账号不开放大V工作台入口');
+  }
   let activePage = document.getElementById('page-' + tab);
   if (activePage && activePage.dataset.feature && !isFeatureEnabled(activePage.dataset.feature)) {
     tab = getFirstEnabledTab();
@@ -11247,6 +11295,10 @@ function switchTab(tab) {
 
   if (tab === 'review') {
     renderReviewExperience();
+  }
+
+  if (tab === 'market') {
+    switchMarketView('watchlist');
   }
 
   if (tab === 'knowledge') {
@@ -11770,9 +11822,7 @@ async function syncLocalWatchlistAnnotationsToServer(stockRefs) {
             stock_name: ((detailsMap[stockCode] || {}).name) || stockCode,
             candle_index: Number(item.candleIndex || 0),
             candle_date: item.dateLabel || '',
-            title: item.title || '',
-            note: item.note || '',
-            trigger: item.trigger || '',
+            content: item.content || item.note || '',
             source_client: 'h5',
           }),
         }).catch(() => null);
@@ -11792,7 +11842,7 @@ function buildAnnotationId(tenantId, stockCode, candleIndex) {
 function getWatchlistAnnotationSummary(tenantId, stockCode) {
   const annotations = getWatchlistAnnotations(tenantId, stockCode);
   if (!annotations.length) return '';
-  return annotations.slice(0, 3).map(item => `${item.dateLabel || '该K线'}：${item.note}`).join('；');
+  return annotations.slice(0, 3).map(item => `${item.dateLabel || '该K线'}：${item.content || item.note || ''}`).join('；');
 }
 
 function getReviewAnnotationEntries(tenantId, stockNames) {
@@ -11806,7 +11856,7 @@ function getReviewAnnotationEntries(tenantId, stockNames) {
       stockName: name,
       stockCode: detail.code,
       annotations,
-      summary: annotations.slice(0, 2).map(item => `${item.dateLabel} ${item.note}`).join('；'),
+      summary: annotations.slice(0, 2).map(item => `${item.dateLabel} ${item.content || item.note || ''}`).join('；'),
     };
   }).filter(Boolean);
 }
@@ -11816,7 +11866,120 @@ function getRenderedWatchlistCodes() {
 }
 
 function normalizeStockLookupValue(value) {
-  return String(value || '').trim().toUpperCase();
+  const raw = String(value || '').trim();
+  if (/^source_/i.test(raw)) return raw.toLowerCase();
+  return raw.toUpperCase();
+}
+
+const WATCHLIST_INDICATOR_ALIAS_MAP = {
+  '上证指数': 'source_shanghai_index',
+  '上证综合指数': 'source_shanghai_index',
+  '上证综指': 'source_shanghai_index',
+  '上海综合指数': 'source_shanghai_index',
+  '沪指': 'source_shanghai_index',
+  '大盘': 'source_shanghai_index',
+  '000001.SH': 'source_shanghai_index',
+  'SH000001': 'source_shanghai_index',
+  'SH.000001': 'source_shanghai_index',
+  'sh000001': 'source_shanghai_index',
+  '深证指数': 'source_shenzhen_index',
+  '深证成指': 'source_shenzhen_index',
+  '深圳成指': 'source_shenzhen_index',
+  '深指': 'source_shenzhen_index',
+  '399001.SZ': 'source_shenzhen_index',
+  'SZ399001': 'source_shenzhen_index',
+  'SZ.399001': 'source_shenzhen_index',
+  'sz399001': 'source_shenzhen_index',
+  '沪深300': 'source_hs300',
+  '沪深300指数': 'source_hs300',
+  '000300.SH': 'source_hs300',
+  'SH000300': 'source_hs300',
+  'sh000300': 'source_hs300',
+  '上证50': 'source_sse50',
+  '上证50指数': 'source_sse50',
+  '000016.SH': 'source_sse50',
+  'SH000016': 'source_sse50',
+  'sh000016': 'source_sse50',
+  '科创50': 'source_kc50',
+  '科创50指数': 'source_kc50',
+  '000688.SH': 'source_kc50',
+  'SH000688': 'source_kc50',
+  'sh000688': 'source_kc50',
+  '创业板指': 'source_cyb',
+  '创业板指数': 'source_cyb',
+  '399006.SZ': 'source_cyb',
+  'SZ399006': 'source_cyb',
+  'sz399006': 'source_cyb',
+  '中证500': 'source_zz500',
+  '中证500指数': 'source_zz500',
+  '000905.SH': 'source_zz500',
+  'SH000905': 'source_zz500',
+  'sh000905': 'source_zz500',
+  '中证1000': 'source_zz1000',
+  '中证1000指数': 'source_zz1000',
+  '000852.SH': 'source_zz1000',
+  'SH000852': 'source_zz1000',
+  'sh000852': 'source_zz1000',
+  '中证800': 'source_zz800',
+  '中证800指数': 'source_zz800',
+  '000906.SH': 'source_zz800',
+  'SH000906': 'source_zz800',
+  'sh000906': 'source_zz800',
+  '中证A500': 'source_a500',
+  '中证A500指数': 'source_a500',
+  '000510.SH': 'source_a500',
+  'SH000510': 'source_a500',
+  'sh000510': 'source_a500',
+  '中证2000': 'source_zz2000',
+  '中证2000指数': 'source_zz2000',
+  '932000.CSI': 'source_zz2000',
+  '恒生指数': 'source_hsi',
+  '恒指': 'source_hsi',
+  '国企指数': 'source_hscei',
+  '恒生国企指数': 'source_hscei',
+  '恒生中国企业指数': 'source_hscei',
+  '红筹指数': 'source_hscci',
+  '恒生红筹指数': 'source_hscci',
+  '日经225': 'source_nikkei',
+  '日经225指数': 'source_nikkei',
+  '标普500': 'source_sp500',
+  '标普500指数': 'source_sp500',
+  'SP500': 'source_sp500',
+  'S&P500': 'source_sp500',
+  '纳斯达克指数': 'source_nasdaq',
+  '纳指': 'source_nasdaq',
+  'NASDAQ': 'source_nasdaq',
+};
+
+function resolveWatchlistIndicatorAlias(value) {
+  const query = String(value || '').trim();
+  if (!query) return '';
+  return WATCHLIST_INDICATOR_ALIAS_MAP[query] || WATCHLIST_INDICATOR_ALIAS_MAP[normalizeStockLookupValue(query)] || '';
+}
+
+function resolveWatchlistIndicatorDisplayCode(value) {
+  const indicatorCode = resolveWatchlistIndicatorAlias(value);
+  if (!indicatorCode) return '';
+  const displayMap = {
+    'source_shanghai_index': '000001.SH',
+    'source_shenzhen_index': '399001.SZ',
+    'source_hs300': '000300.SH',
+    'source_sse50': '000016.SH',
+    'source_kc50': '000688.SH',
+    'source_cyb': '399006.SZ',
+    'source_zz500': '000905.SH',
+    'source_zz1000': '000852.SH',
+    'source_zz800': '000906.SH',
+    'source_a500': '000510.SH',
+    'source_zz2000': '932000.CSI',
+    'source_hsi': 'HSI',
+    'source_hscei': 'HSCEI',
+    'source_hscci': 'HSCCI',
+    'source_nikkei': 'N225',
+    'source_sp500': 'SP500',
+    'source_nasdaq': 'NASDAQ',
+  };
+  return displayMap[indicatorCode] || indicatorCode;
 }
 
 function normalizeComparableCode(value) {
@@ -11858,6 +12021,18 @@ function clearWatchlistSuggestionList() {
 function resolveWatchlistSuggestionFromInput(value) {
   const query = normalizeStockLookupValue(value);
   if (!query) return null;
+  const indicatorCode = resolveWatchlistIndicatorAlias(value);
+  if (indicatorCode) {
+    const matchedIndicator = watchlistSuggestionItems.find((item) => normalizeStockLookupValue(item.code || '') === normalizeStockLookupValue(indicatorCode));
+    if (matchedIndicator) return matchedIndicator;
+    return {
+      code: resolveWatchlistIndicatorDisplayCode(indicatorCode),
+      indicator_code: indicatorCode,
+      name: String(value || '').trim(),
+      market: 'INDICATOR',
+      source: 'local_watchlist',
+    };
+  }
   const comparableQuery = normalizeComparableCode(query);
   return watchlistSuggestionItems.find((item) => {
     const code = normalizeStockLookupValue(item.code || '');
@@ -11904,6 +12079,8 @@ function handleWatchlistStockCodeInput(value) {
 function findWatchlistCodeFromInput(value) {
   const query = normalizeStockLookupValue(value);
   if (!query) return '';
+  const indicatorCode = resolveWatchlistIndicatorDisplayCode(value);
+  if (indicatorCode) return indicatorCode;
   const suggestionMatch = resolveWatchlistSuggestionFromInput(query);
   if (suggestionMatch) return normalizeStockLookupValue(suggestionMatch.code || '');
   const cards = Array.from(document.querySelectorAll('[data-watchlist-card="true"]'));
@@ -11975,19 +12152,14 @@ function buildWatchlistCardHtml(detail) {
           </div>
         </div>
       </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
-        <span style="font-size:10px;background:rgba(200,169,110,0.1);color:var(--gold);padding:3px 8px;border-radius:10px">${statusTag}</span>
-        <span style="font-size:10px;background:rgba(52,152,219,0.12);color:#3498DB;padding:3px 8px;border-radius:10px">分析记录同步主理投顾</span>
-        <span style="font-size:10px;background:rgba(46,204,113,0.12);color:var(--green);padding:3px 8px;border-radius:10px">可连 Hermes</span>
+      ${(statusTag || annotations.length) ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+        ${statusTag ? `<span style="font-size:10px;background:rgba(200,169,110,0.1);color:var(--gold);padding:3px 8px;border-radius:10px">${statusTag}</span>` : ''}
         ${annotations.length ? `<span style="font-size:10px;background:rgba(99,179,237,0.12);color:#63B3ED;padding:3px 8px;border-radius:10px">K线标注 ${annotations.length} 条</span>` : ''}
-      </div>
+      </div>` : ''}
       ${latestAnnotation ? `<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:rgba(47,116,192,0.08);border:1px solid rgba(47,116,192,0.12)">
         <div style="font-size:10px;color:#63B3ED;font-weight:700">${escapeHtml(latestAnnotation.dateLabel || '--')} · 最新标注</div>
-        <div style="font-size:12px;color:var(--white);line-height:1.7;margin-top:4px">${escapeHtml(latestAnnotation.title || '')}：${escapeHtml(latestAnnotation.note || '')}</div>
+        <div style="font-size:12px;color:var(--white);line-height:1.7;margin-top:4px">${escapeHtml(latestAnnotation.content || latestAnnotation.note || '')}</div>
       </div>` : ''}
-      <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-top:10px">
-        <button class="btn-gold" style="padding:7px 10px;font-size:11px" onclick="event.stopPropagation();runWatchlistHermes('${detail.code}','basic')">基本面分析</button>
-      </div>
       <div data-review-selection-slot="true" style="display:none"></div>
     </div>
   `;
@@ -12015,6 +12187,154 @@ function addCurrentStockToWatchlist() {
 function renderWatchlist() {
   renderReviewWatchlistSelectionMode();
   renderHermesWorkspace();
+}
+
+let marketOverviewLoaded = false;
+let marketSectorLoaded = false;
+let marketOverviewRetryCount = 0;
+let marketSectorRetryCount = 0;
+
+function switchMarketView(view) {
+  const overview = view === 'overview';
+  const sectors = view === 'sectors';
+  const overviewPanel = document.getElementById('market-overview-panel');
+  const sectorPanel = document.getElementById('market-sector-panel');
+  const watchlistPanel = document.getElementById('market-watchlist-panel');
+  const overviewTab = document.getElementById('market-overview-tab');
+  const sectorTab = document.getElementById('market-sector-tab');
+  const watchlistTab = document.getElementById('market-watchlist-tab');
+  if (overviewPanel) overviewPanel.style.display = overview ? '' : 'none';
+  if (sectorPanel) sectorPanel.style.display = sectors ? '' : 'none';
+  if (watchlistPanel) watchlistPanel.style.display = overview || sectors ? 'none' : '';
+  if (overviewTab) {
+    overviewTab.classList.toggle('active', overview);
+    overviewTab.setAttribute('aria-selected', overview ? 'true' : 'false');
+    overviewTab.style.background = overview ? 'var(--gold)' : 'transparent';
+    overviewTab.style.color = overview ? 'var(--navy)' : 'var(--gray-400)';
+  }
+  if (sectorTab) {
+    sectorTab.classList.toggle('active', sectors);
+    sectorTab.setAttribute('aria-selected', sectors ? 'true' : 'false');
+    sectorTab.style.background = sectors ? 'var(--gold)' : 'transparent';
+    sectorTab.style.color = sectors ? 'var(--navy)' : 'var(--gray-400)';
+  }
+  if (watchlistTab) {
+    watchlistTab.classList.toggle('active', !overview && !sectors);
+    watchlistTab.setAttribute('aria-selected', !overview && !sectors ? 'true' : 'false');
+    watchlistTab.style.background = !overview && !sectors ? 'var(--gold)' : 'transparent';
+    watchlistTab.style.color = !overview && !sectors ? 'var(--navy)' : 'var(--gray-400)';
+  }
+  if (overview && !marketOverviewLoaded) loadMarketOverview();
+  if (sectors && !marketSectorLoaded) loadMarketSectors();
+}
+
+function renderMarketOverview(items) {
+  const host = document.getElementById('market-overview-list');
+  if (!host) return;
+  const rows = (Array.isArray(items) ? items : []).filter((item) => item && item.available);
+  const sourceNote = document.getElementById('market-overview-source-note');
+  if (sourceNote && rows.some((item) => item && item.demo)) sourceNote.textContent = '当前为演示数据，仅用于页面演示；真实市场快照入库后自动替换。';
+  if (sourceNote && !rows.some((item) => item && item.demo) && rows.some((item) => item && item.stale)) sourceNote.textContent = '部分指数暂未完成最新同步，当前保留最近一次 AKShare 真实快照。';
+  host.innerHTML = rows.map((item) => {
+    const available = item && item.available;
+    const change = Number(item.change || 0);
+    const pct = Number(item.change_pct || 0);
+    const value = available && Number.isFinite(Number(item.price)) ? Number(item.price).toFixed(2) : '--';
+    return `<button type="button" data-market-index-code="${escapeHtml(item.indicator_code || '')}" style="text-align:left;width:100%;min-width:0;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:12px;background:var(--navy-mid);color:var(--white);cursor:${available ? 'pointer' : 'default'}" onclick="${available ? `openWatchlistDetail('${escapeHtml(item.indicator_code || item.code || '')}')` : ''}">
+      <div style="display:flex;justify-content:space-between;gap:8px;min-width:0">
+        <div style="min-width:0"><div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.name || '--')}</div><div style="font-size:10px;color:var(--gray-400);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.code || '--')} · ${escapeHtml(item.market || '--')}</div></div>
+        <div style="text-align:right;flex:0 0 auto"><div style="font-size:16px;font-weight:700">${value}</div><div style="font-size:11px;color:${change >= 0 ? 'var(--red)' : 'var(--green)'}">${change >= 0 ? '▲' : '▼'} ${Math.abs(change).toFixed(2)} (${pct.toFixed(2)}%)</div></div>
+      </div>
+      ${available ? `<div style="display:flex;justify-content:space-between;gap:8px;font-size:10px;color:var(--gray-400);margin-top:9px"><span>更新：${escapeHtml(item.updated_at || '--')}</span><span>查看日K线</span></div>` : ''}
+    </button>`;
+  }).join('');
+  if (!rows.length) host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">市场数据正在由后台同步，请稍后查看</div>';
+}
+
+async function loadMarketOverview() {
+  const host = document.getElementById('market-overview-list');
+  if (!host) return;
+  try {
+    const response = await fetch('/api/market-overview');
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok === false) throw new Error(payload.error || 'market_overview_failed');
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    marketOverviewLoaded = items.some((item) => item && item.available);
+    if (marketOverviewLoaded) marketOverviewRetryCount = 0;
+    renderMarketOverview(items);
+    if (!marketOverviewLoaded && marketOverviewRetryCount < 10) {
+      marketOverviewRetryCount += 1;
+      window.setTimeout(loadMarketOverview, 2500);
+    }
+  } catch (error) {
+    host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">真实行情暂时不可用，请稍后重试</div>';
+  }
+}
+
+async function refreshMarketSnapshot() {
+  showToast('正在刷新市场与行业数据');
+  try {
+    const response = await fetch('/api/market-snapshot/refresh', {method: 'POST', headers: {'Content-Type': 'application/json'}});
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok === false) throw new Error(payload.error || 'market_snapshot_refresh_failed');
+    marketOverviewLoaded = true;
+    marketSectorLoaded = true;
+    renderMarketOverview((payload.overview || {}).items || []);
+    renderMarketSectors((payload.sectors || {}).items || []);
+    showToast(`已更新 ${Number((payload.result || {}).updated || 0)} 条真实行情`);
+  } catch (error) {
+    showToast(error.message || '市场数据刷新失败');
+  }
+}
+
+function renderMarketSectors(items) {
+  const host = document.getElementById('market-sector-list');
+  if (!host) return;
+  const rows = Array.isArray(items) ? items : [];
+  const sourceNote = document.getElementById('market-sector-source-note');
+  if (sourceNote && rows.some((item) => item && item.demo)) sourceNote.textContent = '当前为演示数据，仅用于页面演示；真实行业快照入库后自动替换。';
+  const renderColumn = (title, columnItems, color) => `<div style="min-width:0">
+    <div style="display:flex;align-items:center;gap:6px;margin:0 0 8px 2px;font-size:12px;font-weight:700;color:${color}"><span style="width:6px;height:6px;border-radius:50%;background:${color}"></span>${title}</div>
+    <div style="display:grid;gap:8px">
+    ${columnItems.map((item) => {
+    const change = Number(item.change || 0);
+    const pct = Number(item.change_pct || 0);
+    const positive = change >= 0;
+    return `<div style="min-width:0;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:12px;background:var(--navy-mid);color:var(--white)">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div style="min-width:0"><div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.sector || '--')}</div><div style="font-size:10px;color:var(--gray-400);margin-top:3px">${escapeHtml(item.code || '--')} · 一级行业</div></div><div style="text-align:right;flex:0 0 auto"><div style="font-size:16px;font-weight:700">${Number(item.value || 0).toFixed(2)}</div><div style="font-size:11px;color:${positive ? 'var(--red)' : 'var(--green)'}">${positive ? '▲' : '▼'} ${Math.abs(pct).toFixed(2)}%</div></div></div>
+      <div style="display:flex;justify-content:space-between;gap:8px;margin-top:9px;font-size:10px;color:var(--gray-400)"><span>点位变动 ${positive ? '+' : ''}${change.toFixed(2)}</span><span>${escapeHtml(item.updated_at || '--')}</span></div>
+    </div>`;
+    }).join('') || '<div style="padding:16px 10px;border:1px dashed rgba(200,169,110,0.18);border-radius:10px;color:var(--gray-400);font-size:11px;text-align:center">暂无真实数据</div>'}
+    </div>
+  </div>`;
+  if (!rows.length) {
+    host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">当前没有达到真实行业行情展示条件的数据</div>';
+    return;
+  }
+  const gains = rows.filter(item => Number(item.change_pct || 0) >= 0).sort((a, b) => Number(b.change_pct || 0) - Number(a.change_pct || 0));
+  const losses = rows.filter(item => Number(item.change_pct || 0) < 0).sort((a, b) => Number(a.change_pct || 0) - Number(b.change_pct || 0));
+  host.style.gridTemplateColumns = 'repeat(2,minmax(0,1fr))';
+  host.innerHTML = renderColumn('涨幅', gains, 'var(--red)') + renderColumn('跌幅', losses, 'var(--green)');
+}
+
+async function loadMarketSectors() {
+  const host = document.getElementById('market-sector-list');
+  if (!host) return;
+  try {
+    const response = await fetch('/api/market-sectors');
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok === false) throw new Error(payload.error || 'market_sector_overview_failed');
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    marketSectorLoaded = items.length > 0;
+    if (marketSectorLoaded) marketSectorRetryCount = 0;
+    renderMarketSectors(items);
+    if (!marketSectorLoaded && marketSectorRetryCount < 10) {
+      marketSectorRetryCount += 1;
+      window.setTimeout(loadMarketSectors, 2500);
+    }
+  } catch (error) {
+    host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">真实行业行情暂时不可用，请稍后重试</div>';
+  }
 }
 
 function calcMovingAverage(series, windowSize) {
@@ -12087,7 +12407,8 @@ function buildWatchlistComputedMetrics(series) {
   `).join('');
 }
 
-function buildWatchlistKlineSvg(series) {
+function buildWatchlistKlineSvg(series, options) {
+  const config = options || {};
   const list = Array.isArray(series) ? series : [];
   if (!list.length) {
     return `
@@ -12105,8 +12426,8 @@ function buildWatchlistKlineSvg(series) {
   };
   const shell = buildInlineChartShell('watchlist-kline', '220px', (element) => {
     window.GangtiseEcharts.render(element, window.GangtiseEcharts.buildKlineOption(chartPayload, {
-      candleLabel: '个股K线',
-      annotations: [],
+      candleLabel: config.candleLabel || '日K线',
+      annotations: Array.isArray(config.annotations) ? config.annotations : [],
     }), {
       onClick: (params) => {
         const activeUser = getActiveDemoUser();
@@ -12120,13 +12441,52 @@ function buildWatchlistKlineSvg(series) {
   return `
     <div style="background:#F7FBFF;border:1px solid rgba(47,116,192,0.10);border-radius:12px;padding:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
-        <div style="font-size:12px;font-weight:700;color:var(--text-main)">K线走势</div>
+        <div style="font-size:12px;font-weight:700;color:var(--text-main)">${escapeHtml(config.candleLabel || '日K线走势')}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--gray-400)">
           <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#F6C453;display:inline-block"></span>MA5</span>
           <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#5DADE2;display:inline-block"></span>MA10</span>
           <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#AF7AC5;display:inline-block"></span>MA20</span>
         </div>
       </div>
+      ${shell.chartHtml}
+    </div>
+  `;
+}
+
+function isCnStockMarketOpenNow() {
+  const now = new Date();
+  const day = now.getDay();
+  if (day === 0 || day === 6) return false;
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  return (minutes >= 9 * 60 + 30 && minutes < 11 * 60 + 30) || (minutes >= 13 * 60 && minutes < 15 * 60);
+}
+
+function buildWatchlistIntradaySvg(series) {
+  const rows = Array.isArray(series) ? series.filter(item => item && typeof item === 'object') : [];
+  if (!rows.length) {
+    return `
+      <div style="background:#F7FBFF;border:1px solid rgba(47,116,192,0.10);border-radius:12px;padding:18px;text-align:center;font-size:12px;color:var(--gray-400)">
+        当前暂未获取到分时数据
+      </div>
+    `;
+  }
+  const shell = buildInlineChartShell('watchlist-intraday', '220px', (element) => {
+    window.GangtiseEcharts.render(element, window.GangtiseEcharts.buildLineOption(rows, {
+      seriesName: '分时曲线',
+      valueLabel: '最新价',
+      lineColor: '#2F74C0',
+    }));
+  });
+  const latest = rows[rows.length - 1] || {};
+  const first = rows[0] || latest;
+  const changePct = Number(first.value || 0) > 0 ? ((Number(latest.value || 0) - Number(first.value || 0)) / Number(first.value || 0)) * 100 : 0;
+  return `
+    <div style="background:#F7FBFF;border:1px solid rgba(47,116,192,0.10);border-radius:12px;padding:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:700;color:var(--text-main)">分时曲线</div>
+        <div style="font-size:11px;color:var(--gray-400)">当前涨跌 ${changePct >= 0 ? '+' : ''}${Number(changePct || 0).toFixed(2)}%</div>
+      </div>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">仅在获取到真实分钟序列时展示。</div>
       ${shell.chartHtml}
     </div>
   `;
@@ -12151,10 +12511,10 @@ async function openWatchlistDetail(stockCode, section) {
     currentWatchlistDetail = data;
     const activeUser = getActiveDemoUser() || {};
     if (tenantSlug && Array.isArray(data.annotations)) {
-      replaceWatchlistAnnotations(((activeUser || {}).tenant || {}).id, data.code || stockCode, data.annotations);
+      replaceWatchlistAnnotations(((activeUser || {}).tenant || {}).id, data.annotation_key || data.indicator_code || data.code || stockCode, data.annotations);
     }
     renderWatchlistDetail(data, section);
-    syncLocalWatchlistAnnotationsToServer([data.code || stockCode]).catch(() => null);
+    syncLocalWatchlistAnnotationsToServer([data.annotation_key || data.indicator_code || data.code || stockCode]).catch(() => null);
     trackFanStockObservation(stockCode, 'watchlist_detail_view', {
       entryPoint: 'watchlist_detail',
       sourceDetail: section || 'overview',
@@ -12174,18 +12534,40 @@ function renderWatchlistDetail(data, section) {
   const commentItems = Array.isArray(data.comments) ? data.comments : [];
   const commentSettings = data.comment_settings || {};
   const allowFanToFan = commentSettings.allow_fan_to_fan !== false;
-  const klineChart = buildWatchlistKlineSvg(data.kline || []);
+  const annotationKey = data.annotation_key || data.indicator_code || data.code;
+  const annotations = (Array.isArray(data.annotations)
+    ? data.annotations
+    : getWatchlistAnnotations(activeUser.tenant.id, annotationKey)).map((item) => ({
+      ...item,
+      candleIndex: Number(item.candleIndex ?? item.candle_index ?? 0),
+    }));
+  const klineChart = buildWatchlistKlineSvg(data.kline || [], {
+    candleLabel: `${data.name || '标的'} 日K线`,
+    annotations,
+  });
+  const intradayChart = buildWatchlistIntradaySvg(data.intraday_series || []);
   const computedMetricCards = buildWatchlistComputedMetrics(data.kline || []);
   const overviewSection = `
     <div class="watch-section-card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
         <div>
           <div class="watch-section-title">纯计算信息</div>
-          <div class="watch-section-desc">仅展示由 K 线序列直接计算出的结果。</div>
+          <div class="watch-section-desc">仅展示由日 K 线序列直接计算出的结果。${activeUser.role === 'dav' ? ' 点击任一 K 线可添加或编辑标注。' : ''}</div>
         </div>
       </div>
       ${klineChart}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 10px">${computedMetricCards}</div>
+    </div>
+  `;
+  const intradaySection = `
+    <div class="watch-section-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
+        <div>
+          <div class="watch-section-title">分时曲线</div>
+          <div class="watch-section-desc">交易时段显示当日真实分钟数据；闭市或非交易日展示最近有效交易日的真实分钟数据。</div>
+        </div>
+      </div>
+      ${intradayChart}
     </div>
   `;
   const commentNotice = isInvestorView
@@ -12221,8 +12603,12 @@ function renderWatchlistDetail(data, section) {
   `;
   const sectionMap = {
     overview: overviewSection,
+    intraday: intradaySection,
     comments: commentsSection,
   };
+  // Keep the tab stable for every watchlist detail. An unavailable snapshot is
+  // rendered as an explicit data state instead of making the capability vanish.
+  const showIntradayTab = true;
   host.innerHTML = `
     <div style="padding-bottom:8px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px">
@@ -12241,6 +12627,7 @@ function renderWatchlistDetail(data, section) {
       </div>
       <div class="watch-detail-tabs">
         <div class="watch-detail-tab ${activeSection === 'overview' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'overview')">总览</div>
+        ${showIntradayTab ? `<div class="watch-detail-tab ${activeSection === 'intraday' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'intraday')">分时</div>` : ''}
         <div class="watch-detail-tab ${activeSection === 'comments' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'comments')">评论</div>
       </div>
       ${sectionMap[activeSection] || overviewSection}
@@ -12350,10 +12737,11 @@ function openWatchlistAnnotationModal(candleIndex) {
   if (!currentWatchlistDetail || !Array.isArray(currentWatchlistDetail.kline)) return;
   const candle = currentWatchlistDetail.kline[candleIndex];
   if (!candle) return;
-  const existing = getWatchlistAnnotations(user.tenant.id, currentWatchlistDetail.code).find(item => Number(item.candleIndex) === Number(candleIndex));
+  const annotationKey = currentWatchlistDetail.annotation_key || currentWatchlistDetail.indicator_code || currentWatchlistDetail.code;
+  const existing = getWatchlistAnnotations(user.tenant.id, annotationKey).find(item => Number(item.candleIndex) === Number(candleIndex));
   currentWatchlistAnnotationTarget = {
     tenantId: user.tenant.id,
-    stockCode: currentWatchlistDetail.code,
+    stockCode: annotationKey,
     stockName: currentWatchlistDetail.name,
     candleIndex,
     candle,
@@ -12378,16 +12766,8 @@ function openWatchlistAnnotationModal(candleIndex) {
       </div>
     </div>
     <div class="knowledge-modal-block">
-      <label class="knowledge-modal-label">标注标题</label>
-      <textarea id="watchlist-annotation-title" class="knowledge-modal-textarea" placeholder="例如：放量突破前高 / 回踩20日线">${escapeHtml(existing && existing.title || '')}</textarea>
-    </div>
-    <div class="knowledge-modal-block">
-      <label class="knowledge-modal-label">复盘话语</label>
-      <textarea id="watchlist-annotation-note" class="knowledge-modal-textarea" placeholder="写下你当时的判断、观察点和复盘话语。">${escapeHtml(existing && existing.note || '')}</textarea>
-    </div>
-    <div class="knowledge-modal-block">
-      <label class="knowledge-modal-label">验证节点</label>
-      <textarea id="watchlist-annotation-trigger" class="knowledge-modal-textarea" placeholder="例如：看次日量能、财报兑现、均线是否守住。">${escapeHtml(existing && existing.trigger || '')}</textarea>
+      <label class="knowledge-modal-label">复盘内容</label>
+      <textarea id="watchlist-annotation-content" class="knowledge-modal-textarea" placeholder="写下你对这根 K 线的判断、观察点和后续复盘。">${escapeHtml(existing && (existing.content || [existing.title, existing.note, existing.trigger].filter(Boolean).join('；')) || '')}</textarea>
     </div>
     <div class="modal-actions">
       <button class="btn-outline" onclick="closeWatchlistAnnotationModal()">取消</button>
@@ -12407,11 +12787,9 @@ function closeWatchlistAnnotationModal() {
 function saveWatchlistAnnotation() {
   const target = currentWatchlistAnnotationTarget;
   if (!target) return;
-  const title = (document.getElementById('watchlist-annotation-title') || {}).value?.trim() || '';
-  const note = (document.getElementById('watchlist-annotation-note') || {}).value?.trim() || '';
-  const trigger = (document.getElementById('watchlist-annotation-trigger') || {}).value?.trim() || '';
-  if (!title || !note) {
-    showToast('请至少填写标注标题和复盘话语');
+  const content = (document.getElementById('watchlist-annotation-content') || {}).value?.trim() || '';
+  if (!content) {
+    showToast('请填写复盘内容');
     return;
   }
   const bucket = getWatchlistAnnotationBucket(target.tenantId, target.stockCode);
@@ -12419,9 +12797,10 @@ function saveWatchlistAnnotation() {
     id: buildAnnotationId(target.tenantId, target.stockCode, target.candleIndex),
     candleIndex: target.candleIndex,
     dateLabel: target.candle.date || '',
-    title,
-    note,
-    trigger,
+    content,
+    title: '',
+    note: content,
+    trigger: '',
     updatedAt: '刚刚',
   };
   const previousItems = bucket.slice();
@@ -12442,9 +12821,7 @@ function saveWatchlistAnnotation() {
       high: target.candle.high,
       low: target.candle.low,
       close: target.candle.close,
-      title,
-      note,
-      trigger,
+      content,
       source_client: 'h5',
     }),
   }).then(async (resp) => {
@@ -17005,6 +17382,17 @@ function findWorkbenchSmartIndicator(indicatorCode) {
   return (getTenantSmartCatalog().tenant_smart_indicators || []).find((entry) => entry.indicator_code === indicatorCode);
 }
 
+const STANDARD_MARKET_INDEX_INDICATOR_CODES = new Set([
+  'source_shanghai_index', 'source_shenzhen_index', 'source_hs300', 'source_sse50',
+  'source_kc50', 'source_cyb', 'source_zz500', 'source_zz1000', 'source_zz800',
+  'source_a500', 'source_zz2000', 'source_hsi', 'source_hscei', 'source_hscci',
+  'source_dji', 'source_nasdaq', 'source_sp500', 'source_nikkei',
+]);
+
+function isStandardMarketIndexIndicator(indicatorCode) {
+  return STANDARD_MARKET_INDEX_INDICATOR_CODES.has(String(indicatorCode || '').trim());
+}
+
 function isWorkbenchSmartPlaceholderCard(card) {
   const item = card && typeof card === 'object' ? card : {};
   const indicatorCode = String(item.indicatorCode || item.indicator_code || '').trim();
@@ -17017,6 +17405,10 @@ function isWorkbenchSmartPlaceholderCard(card) {
 }
 
 function openWorkbenchSmartIndicatorLibraryDetail(indicatorCode) {
+  if (isStandardMarketIndexIndicator(indicatorCode)) {
+    openWatchlistDetail(indicatorCode, 'overview');
+    return;
+  }
   const item = findWorkbenchSmartIndicator(indicatorCode);
   if (!item) return;
   openWorkbenchSmartIndicatorDetailModal({
@@ -17041,9 +17433,14 @@ function openWorkbenchDashboardIndicatorDetail(index, sourceType) {
     openWorkbenchSmartIndicatorEditor(index);
     return;
   }
-  const catalogItem = findWorkbenchSmartIndicator(item.indicatorCode || item.indicator_code || '');
+  const indicatorCode = item.indicatorCode || item.indicator_code || '';
+  if (isStandardMarketIndexIndicator(indicatorCode)) {
+    openWatchlistDetail(indicatorCode, 'overview');
+    return;
+  }
+  const catalogItem = findWorkbenchSmartIndicator(indicatorCode);
   openWorkbenchSmartIndicatorDetailModal({
-    indicatorCode: item.indicatorCode || item.indicator_code || '',
+    indicatorCode,
     name: item.name || '',
     value: item.value || '--',
     unit: item.unit || '',

@@ -197,6 +197,36 @@ function rankNews(input) {
             ])
         self.assertEqual(saved, [])
 
+    def test_news_lake_preserves_previous_real_cache_when_refresh_fails(self):
+        stale_cache = {
+            "cached_at": "2026-08-01T10:00:00",
+            "items": [{"title": "旧的真实新闻", "published_at": "2026-08-01T09:00:00"}],
+            "indicators": [{"indicator_code": "news_event_count", "value": 1}],
+            "sources": [{"code": "gov_cn_policy", "included": True, "count": 12, "reason": "已达到来源纳入门槛"}],
+        }
+        with patch.object(market_services, "_load_json_app_setting", return_value=stale_cache), patch.object(
+            market_services,
+            "_load_active_news_source_whitelist",
+            return_value=[{"code": "gov_cn_policy", "url": "http://example.invalid", "name": "政策要闻", "category": "政策", "source_group": "政策要闻", "validated_item_count": 12}],
+        ), patch.object(
+            market_services,
+            "_fetch_news_source",
+            return_value={
+                "source": {"code": "gov_cn_policy", "name": "政策要闻", "category": "政策"},
+                "included": False,
+                "count": 0,
+                "reason": "<urlopen error [Errno 8] nodename nor servname provided, or not known>",
+                "items": [],
+            },
+        ), patch.object(
+            market_services, "_persist_news_source_exclusions"
+        ) as persist_mock, patch.object(market_services, "_save_json_app_setting") as save_mock:
+            payload = market_services._aggregate_real_news_sources(force_refresh=True)
+
+        self.assertEqual(payload["items"][0]["title"], "旧的真实新闻")
+        persist_mock.assert_called_once()
+        save_mock.assert_not_called()
+
     def test_admin_news_source_payload_exposes_governed_runtime_status(self):
         aggregate_payload = {
             "cached_at": "2026-08-08T02:00:00",
@@ -234,6 +264,52 @@ function rankNews(input) {
         selected = market_services._select_fundamental_homepage_news(ranked, 10)
         self.assertEqual([item["title"] for item in selected[:3]], ["半导体新闻 0", "半导体新闻 1", "半导体新闻 2"])
         self.assertLessEqual(sum(item["source_code"] == "stats_macro" for item in selected), 3)
+
+    def test_homepage_selection_covers_each_watchlist_sector_before_filling_bank_heavy_news(self):
+        ranked = [
+            {
+                "title": f"银行新闻 {index}",
+                "content": "银行 信贷 息差 招商银行",
+                "aggregation_bucket": "watchlist_sector",
+                "relevance_score": 400 - index,
+                "matched_topics": ["银行", "招商银行"],
+                "source_code": f"bank_{index}",
+                "source_group": "政策要闻",
+            }
+            for index in range(8)
+        ] + [
+            {
+                "title": "贵州茅台白酒渠道更新",
+                "content": "高端白酒 贵州茅台 消费修复",
+                "aggregation_bucket": "watchlist_sector",
+                "relevance_score": 180,
+                "matched_topics": ["高端白酒", "贵州茅台"],
+                "source_code": "liquor_source",
+                "source_group": "公司公告",
+            },
+            {
+                "title": "半导体晶圆制造订单改善",
+                "content": "半导体制造 中芯国际 晶圆 订单",
+                "aggregation_bucket": "watchlist_sector",
+                "relevance_score": 170,
+                "matched_topics": ["半导体制造", "中芯国际"],
+                "source_code": "chip_source",
+                "source_group": "公司公告",
+            },
+        ]
+        watchlist = [
+            {"industry": "银行", "name": "招商银行"},
+            {"industry": "高端白酒", "name": "贵州茅台"},
+            {"industry": "半导体制造", "name": "中芯国际"},
+        ]
+
+        selected = market_services._select_fundamental_homepage_news(ranked, 5, watchlist_details=watchlist)
+        titles = [item["title"] for item in selected]
+
+        self.assertIn("贵州茅台白酒渠道更新", titles)
+        self.assertIn("半导体晶圆制造订单改善", titles)
+        self.assertIn("银行新闻 0", titles)
+        self.assertLessEqual(sum(title.startswith("银行新闻") for title in titles), 3)
 
     def test_prompt_is_decomposed_into_bounded_rule_atoms(self):
         algorithm = market_services.normalize_news_aggregation_algorithm_payload({

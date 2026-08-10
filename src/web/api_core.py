@@ -337,6 +337,50 @@ def api_market():
     return jsonify(gen_market_data())
 
 
+@app.route("/api/market-overview")
+def api_market_overview():
+    try:
+        payload = build_market_overview_payload()
+        if not payload.get("items"):
+            request_market_snapshot_refresh()
+        return jsonify(payload)
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to load market overview")
+        return jsonify({"ok": False, "error": "market_overview_failed"}), 502
+
+
+@app.route("/api/market-sectors")
+def api_market_sectors():
+    try:
+        force_refresh = str(request.args.get("refresh") or "").strip().lower() in {"1", "true", "yes"}
+        payload = build_market_sector_overview_payload(force_refresh=force_refresh)
+        if not payload.get("items"):
+            request_market_snapshot_refresh()
+        return jsonify(payload)
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to load market sector overview")
+        return jsonify({"ok": False, "error": "market_sector_overview_failed"}), 502
+
+
+@app.route("/api/market-snapshot/refresh", methods=["POST"])
+def api_market_snapshot_refresh():
+    """Run the controlled market collector for an explicit manual refresh."""
+    try:
+        result = sync_market_snapshot(force=True)
+        overview = build_market_overview_payload()
+        sectors = build_market_sector_overview_payload()
+        return jsonify({"ok": bool(result.get("ok")), "result": result, "overview": overview, "sectors": sectors}), 200 if result.get("ok") else 502
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to refresh market snapshot")
+        return jsonify({"ok": False, "error": "market_snapshot_refresh_failed"}), 502
+
+
 @app.route("/api/watchlist")
 def api_watchlist():
     return jsonify(gen_market_data())
@@ -390,11 +434,13 @@ def api_watchlist_detail(stock_code):
         },
     }
     normalized = apply_watchlist_feature_flags(payload, site_config)
+    annotation_key = str(normalized.get("indicator_code") or stock_code).strip() or stock_code
+    normalized["annotation_key"] = annotation_key
     if tenant_slug:
         try:
             normalized["annotations"] = list_watchlist_kline_annotations(
                 tenant_slug=tenant_slug,
-                stock_code=stock_code,
+                stock_code=annotation_key,
                 stock_name=normalized.get("name") or stock_code,
                 details_map=details,
             )
@@ -467,6 +513,7 @@ def api_save_watchlist_annotation(stock_code):
             high_price=body.get("high"),
             low_price=body.get("low"),
             close_price=body.get("close"),
+            content=body.get("content"),
             title=body.get("title"),
             note=body.get("note"),
             trigger=body.get("trigger"),

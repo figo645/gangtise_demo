@@ -259,9 +259,9 @@
       const candle = candles[index];
       return candle ? {
         value: [index, Number(candle.high || candle.close || 0)],
-        title: item.title || '标注',
-        note: item.note || '',
-        trigger: item.trigger || '',
+        title: item.content || item.title || '复盘标注',
+        note: item.content || item.note || '',
+        trigger: '',
       } : null;
     }).filter(Boolean);
     return {

@@ -3990,6 +3990,9 @@
               <label>模板树 JSON</label>
               <textarea id="hermes-template-tree" rows="13" placeholder='{"router":[{"id":"router.scope","label":"范围识别"}]}'></textarea>
             </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:12px">
+              <button id="save-hermes-settings" class="btn-gold" type="button" style="padding:8px 16px;font-size:12px" onclick="saveHermesSettings()">保存 Hermes 配置并生效</button>
+            </div>
         </div>
       </div>
       </div>
@@ -11126,6 +11129,69 @@ async function syncLocalLlmRegistryFromStaging() {
       status.textContent = '同步失败，请检查 staging 连接和本地数据库配置后重试。';
     }
     showToast('同步失败');
+  }
+}
+
+async function saveHermesSettings() {
+  const button = document.getElementById('save-hermes-settings');
+  const currentHermesSettings = (adminSiteConfig && adminSiteConfig.hermes_settings) || {};
+  let hermesIntentTree = [];
+  let hermesRoutePriority = [];
+  let hermesTemplateTree = {};
+  let hermesChartTypesEnabled = [];
+  try {
+    hermesIntentTree = parseAdminConfigJsonField('hermes-intent-tree', currentHermesSettings.intent_tree || []);
+    hermesRoutePriority = parseAdminConfigListField('hermes-route-priority', currentHermesSettings.route_priority || []);
+    hermesTemplateTree = parseAdminConfigJsonField('hermes-template-tree', currentHermesSettings.template_tree || {});
+    hermesChartTypesEnabled = parseAdminConfigListField('hermes-chart-types-enabled', currentHermesSettings.chart_types_enabled || []);
+  } catch (error) {
+    markAdminSiteConfigDirty((error && error.message) || 'Hermes 配置格式校验失败，请检查后再保存。');
+    showToast('Hermes 配置格式有误');
+    return;
+  }
+  if (button) {
+    button.disabled = true;
+    button.textContent = '保存中...';
+  }
+  try {
+    const res = await fetch('/api/admin/site-config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        hermes_settings: {
+          ...currentHermesSettings,
+          prompt_scope_guard_enabled: Boolean(document.getElementById('hermes-prompt-scope-guard-enabled') && document.getElementById('hermes-prompt-scope-guard-enabled').checked),
+          dav_access_enabled: Boolean(document.getElementById('hermes-dav-access-enabled') && document.getElementById('hermes-dav-access-enabled').checked),
+          investor_access_enabled: Boolean(document.getElementById('hermes-investor-access-enabled') && document.getElementById('hermes-investor-access-enabled').checked),
+          internet_answer_enabled: Boolean(document.getElementById('hermes-internet-answer-enabled') && document.getElementById('hermes-internet-answer-enabled').checked),
+          thinking_process_enabled: Boolean(document.getElementById('hermes-thinking-process-enabled') && document.getElementById('hermes-thinking-process-enabled').checked),
+          answer_save_to_knowledge_enabled: Boolean(document.getElementById('hermes-answer-save-to-knowledge-enabled') && document.getElementById('hermes-answer-save-to-knowledge-enabled').checked),
+          default_response_style: document.getElementById('hermes-default-response-style')
+            ? String(document.getElementById('hermes-default-response-style').value || 'structured').trim() || 'structured'
+            : (currentHermesSettings.default_response_style || 'structured'),
+          chart_types_enabled: hermesChartTypesEnabled,
+          route_priority: hermesRoutePriority,
+          intent_tree: hermesIntentTree,
+          template_tree: hermesTemplateTree,
+        },
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error((data && data.error) || 'save_failed');
+    adminSiteConfig = data.site_config;
+    window.SITE_CONFIG = data.site_config;
+    renderSiteConfigForm();
+    broadcastSiteConfigUpdate();
+    markAdminSiteConfigSaved('Hermes 全部能力配置已保存，新的请求会立即按最新配置生效。');
+    showToast('Hermes 配置已保存');
+  } catch (error) {
+    markAdminSiteConfigDirty('Hermes 配置保存失败，请重试。');
+    showToast('保存失败');
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = '保存并生效';
+    }
   }
 }
 
