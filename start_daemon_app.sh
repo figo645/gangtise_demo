@@ -3,7 +3,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PID_FILE="$SCRIPT_DIR/.app.foreground.pid"
+PID_FILE="$SCRIPT_DIR/.app.daemon.pid"
+LOG_FILE="$SCRIPT_DIR/app.daemon.log"
 APP_PORT="${PORT:-5001}"
 PYTHON_BIN="${PYTHON_BIN:-}"
 
@@ -32,20 +33,34 @@ fi
 if [ -f "$PID_FILE" ]; then
   OLD_PID="$(cat "$PID_FILE" 2>/dev/null || true)"
   if [ -n "${OLD_PID:-}" ] && kill -0 "$OLD_PID" 2>/dev/null && pid_matches_app "$OLD_PID"; then
-    echo "Foreground app.py is already running (PID: $OLD_PID)."
-    exit 1
+    echo "Existing daemon app.py found (PID: $OLD_PID). Restarting it."
+    "$SCRIPT_DIR/stop_daemon_app.sh"
+    sleep 1
+  else
+    rm -f "$PID_FILE"
   fi
-  rm -f "$PID_FILE"
 fi
 
 if lsof -nP -iTCP:"$APP_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-  echo "Port $APP_PORT is already in use. Stop the existing process before starting the foreground app." >&2
+  echo "Port $APP_PORT is already in use. Stop the existing process before starting the daemon." >&2
   exit 1
 fi
 
-echo "$$" >"$PID_FILE"
+# Disable Flask's reloader so this PID represents the actual daemon process.
+nohup env PORT="$APP_PORT" DEBUG=0 PYTHONUNBUFFERED=1 "$PYTHON_BIN" "$SCRIPT_DIR/app.py" \
+  >"$LOG_FILE" 2>&1 < /dev/null &
+APP_PID=$!
+echo "$APP_PID" >"$PID_FILE"
 
-echo "Starting app.py in the foreground on port $APP_PORT."
-echo "Press Ctrl+C to stop it, or run ./stop_app.sh from another terminal."
+sleep 1
+if kill -0 "$APP_PID" 2>/dev/null; then
+  echo "Started daemon app.py."
+  echo "PID: $APP_PID"
+  echo "Port: $APP_PORT"
+  echo "Log: $LOG_FILE"
+  exit 0
+fi
 
-exec env PORT="$APP_PORT" PYTHONUNBUFFERED=1 "$PYTHON_BIN" "$SCRIPT_DIR/app.py"
+rm -f "$PID_FILE"
+echo "Daemon app.py failed to start. Check log: $LOG_FILE" >&2
+exit 1

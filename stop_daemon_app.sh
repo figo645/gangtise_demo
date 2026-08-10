@@ -3,7 +3,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PID_FILE="$SCRIPT_DIR/.app.foreground.pid"
+PID_FILE="$SCRIPT_DIR/.app.daemon.pid"
 
 pid_matches_app() {
   local pid="$1"
@@ -11,17 +11,28 @@ pid_matches_app() {
 }
 
 if [ ! -f "$PID_FILE" ]; then
-  echo "No foreground app process is being tracked."
+  echo "No daemon app process is being tracked."
   exit 0
 fi
 
 APP_PID="$(cat "$PID_FILE" 2>/dev/null || true)"
 if [ -z "${APP_PID:-}" ] || ! kill -0 "$APP_PID" 2>/dev/null || ! pid_matches_app "$APP_PID"; then
   rm -f "$PID_FILE"
-  echo "Foreground app.py is not running."
+  echo "Daemon app.py is not running."
   exit 0
 fi
 
 kill "$APP_PID"
+for _ in 1 2 3 4 5; do
+  if ! kill -0 "$APP_PID" 2>/dev/null; then
+    break
+  fi
+  sleep 1
+done
+
+if kill -0 "$APP_PID" 2>/dev/null; then
+  kill -9 "$APP_PID"
+fi
+
 rm -f "$PID_FILE"
-echo "Stopped foreground app.py (PID: $APP_PID)."
+echo "Stopped daemon app.py (PID: $APP_PID)."

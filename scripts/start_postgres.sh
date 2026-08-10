@@ -50,11 +50,9 @@ for ((second = 1; second <= START_TIMEOUT; second++)); do
   sleep 1
 done
 
-if command -v psql >/dev/null 2>&1; then
-  VECTOR_VERSION="$(psql -h "$DB_HOST" -p "$DB_PORT" -U "${APP_DB_USER:-gangtise_app}" -d "$DB_NAME" -Atqc "SELECT extversion FROM pg_extension WHERE extname = 'vector'" 2>/dev/null || true)"
-  if [ -n "$VECTOR_VERSION" ]; then
-    echo "pgvector ${VECTOR_VERSION} is enabled in ${DB_NAME}."
-  else
-    echo "Warning: PostgreSQL is ready, but pgvector is not enabled in ${DB_NAME}." >&2
-  fi
+ENABLE_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/enable_pgvector.sh"
+if [ -x "$ENABLE_SCRIPT" ]; then
+  "$ENABLE_SCRIPT"
+else
+  echo "Warning: ${ENABLE_SCRIPT} is missing; pgvector was not checked." >&2
 fi

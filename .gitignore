@@ -1,1 +1,4 @@
 .gangtise_session_secret
+.app.foreground.pid
+.app.daemon.pid
+app.daemon.log

@@ -436,6 +436,8 @@ class ReviewModuleBddTest(unittest.TestCase):
 
         self.assertTrue(result["found"])
         self.assertEqual(result["detail"]["id"], "source_shanghai_index")
+        self.assertEqual(result["detail"]["code"], "000001.SH")
+        self.assertEqual(result["detail"]["indicator_code"], "source_shanghai_index")
         self.assertEqual(result["detail"]["name"], "上证指数")
         self.assertGreater(len(result["detail"]["history_series"]), 0)
         self.assertGreater(len(result["detail"]["history_kline"]["candles"]), 0)
@@ -864,34 +866,285 @@ class ReviewModuleBddTest(unittest.TestCase):
 
     def test_given_index_openapi_response_when_parsing_smoke_source_then_indicator_detail_uses_real_rows(self):
         with patch(
-            "src.domain.market_services.list_indicator_definitions",
-            return_value=[],
-        ), patch(
-            "src.domain.market_services.post_gangtise_openapi_json",
-            return_value=(
-                200,
-                {
-                    "code": "000000",
-                    "status": True,
-                    "msg": "success",
-                    "data": {
-                        "fieldList": ["securityCode", "securityName", "tradeDate", "open", "high", "low", "close", "volume"],
-                        "list": [
-                            ["000001.SH", "上证综合指数", "2026-08-04", 3815.12, 3828.0, 3796.5, 3815.12, 123456],
-                            ["000001.SH", "上证综合指数", "2026-08-05", 3815.12, 3884.4, 3815.12, 3878.4296, 234567],
-                        ],
-                    },
-                },
-                245,
-            ),
+            "src.domain.market_services._load_watchlist_cache",
+            return_value={
+                "provider": "AKShare",
+                "points": [
+                    {"date": "2026-08-04", "open": 3815.12, "high": 3828.0, "low": 3796.5, "close": 3815.12},
+                    {"date": "2026-08-05", "open": 3815.12, "high": 3884.4, "low": 3815.12, "close": 3878.4296},
+                ],
+            },
         ):
             detail = market_services.build_live_gangtise_indicator_detail("source_shanghai_index")
 
         self.assertFalse(detail["data_unavailable"])
-        self.assertEqual(detail["provider"], "Gangtise OpenAPI")
+        self.assertEqual(detail["provider"], "AKShare")
         self.assertEqual(detail["history_series"][-1]["date"], "2026-08-05")
         self.assertEqual(detail["history_series"][-1]["value"], 3878.4296)
-        self.assertEqual(detail["source_defs"][0]["method"], "POST")
+        self.assertEqual(detail["source_defs"][0]["method"], "Python SDK")
+
+    def test_given_standard_index_alias_when_normalizing_then_all_common_inputs_hit_same_registry(self):
+        cases = {
+            "上证指数": "source_shanghai_index",
+            "000001.SH": "source_shanghai_index",
+            "sh000001": "source_shanghai_index",
+            "深证成指": "source_shenzhen_index",
+            "399001.SZ": "source_shenzhen_index",
+            "中证500": "source_zz500",
+            "000905.SH": "source_zz500",
+            "中证1000": "source_zz1000",
+            "000852.SH": "source_zz1000",
+            "中证800": "source_zz800",
+            "000906.SH": "source_zz800",
+            "中证A500": "source_a500",
+            "000510.SH": "source_a500",
+            "中证2000": "source_zz2000",
+            "932000.CSI": "source_zz2000",
+            "日经225": "source_nikkei",
+        }
+
+        for raw_value, expected_code in cases.items():
+            with self.subTest(raw_value=raw_value):
+                self.assertEqual(market_services.normalize_watchlist_indicator_code(raw_value), expected_code)
+
+    def test_given_all_broad_indices_when_searching_and_rendering_then_standard_code_and_intraday_are_available(self):
+        index_entries = [
+            (code, entry)
+            for code, entry in market_services.GANGTISE_INDICATOR_REGISTRY.items()
+            if entry.get("query_kind") == "index_kline"
+        ]
+        self.assertEqual(len(index_entries), 11)
+        with patch(
+            "src.domain.market_services.attach_watchlist_intraday",
+            side_effect=lambda detail: {**detail, "intraday_supported": True},
+        ):
+            for indicator_code, entry in index_entries:
+                with self.subTest(indicator_code=indicator_code):
+                    self.assertEqual(
+                        market_services.normalize_watchlist_indicator_code(entry["indicator_name"]),
+                        indicator_code,
+                    )
+                    self.assertEqual(
+                        market_services.normalize_watchlist_indicator_code(entry["security_code"]),
+                        indicator_code,
+                    )
+                    payload = market_services.normalize_watchlist_detail_from_indicator(
+                        {
+                            "id": indicator_code,
+                            "name": entry["indicator_name"],
+                            "numeric_value": 100,
+                            "history_series": [{"date": "2026-08-07", "value": 100}],
+                        },
+                        indicator_code,
+                    )
+                    self.assertEqual(payload["code"], entry["security_code"])
+                    self.assertTrue(payload["intraday_supported"])
+
+    def test_given_generic_index_query_when_searching_then_multiple_standard_indices_are_returned(self):
+        items = market_services.search_watchlist_candidates("指数", top=20, include_remote=False)
+        codes = {str(item.get("code") or "").strip() for item in items}
+
+        self.assertIn("000001.SH", codes)
+        self.assertIn("399001.SZ", codes)
+        self.assertIn("000300.SH", codes)
+        self.assertIn("000905.SH", codes)
+        self.assertIn("000852.SH", codes)
+
+    def test_given_indicator_lake_detail_when_converting_watchlist_payload_then_kline_is_exposed(self):
+        indicator_detail = {
+            "id": "source_shanghai_index",
+            "name": "上证指数",
+            "category": "数据湖指标",
+            "value": "4093.73",
+            "numeric_value": 4093.73,
+            "history_series": [
+                {"date": "2026-08-04", "value": 4080.30},
+                {"date": "2026-08-05", "value": 4093.73},
+            ],
+            "history_kline": {
+                "candles": [
+                    {"date": "2026-08-04", "open": 4079.79, "high": 4088.10, "low": 4068.20, "close": 4080.30},
+                    {"date": "2026-08-05", "open": 4080.30, "high": 4100.10, "low": 4078.50, "close": 4093.73},
+                ],
+                "ma5": [],
+                "ma10": [],
+                "ma20": [],
+                "anomalies": [],
+            },
+        }
+
+        payload = market_services.normalize_watchlist_detail_from_indicator(indicator_detail, "上证指数")
+
+        self.assertEqual(payload["code"], "000001.SH")
+        self.assertEqual(payload["indicator_code"], "source_shanghai_index")
+        self.assertEqual(payload["name"], "上证指数")
+        self.assertEqual(payload["standard_code"], "000001.SH")
+        self.assertEqual(payload["tencent_symbol"], "sh000001")
+        self.assertTrue(payload["kline"])
+        self.assertGreater(payload["price"], 0)
+
+    def test_given_persisted_index_lake_when_opening_index_detail_then_shared_series_is_used(self):
+        persisted_detail = {
+            "id": "source_shanghai_index",
+            "name": "上证指数",
+            "value": "4093.73",
+            "numeric_value": 4093.73,
+            "history_series": [
+                {"date": "2026-08-07", "value": 4080.30},
+                {"date": "2026-08-10", "value": 4093.73},
+            ],
+            "history_kline": {
+                "candles": [
+                    {"date": "2026-08-07", "open": 4079.79, "high": 4088.10, "low": 4068.20, "close": 4080.30},
+                    {"date": "2026-08-10", "open": 4080.30, "high": 4100.10, "low": 4078.50, "close": 4093.73},
+                ],
+                "ma5": [], "ma10": [], "ma20": [], "anomalies": [],
+            },
+            "data_unavailable": False,
+        }
+        with patch(
+            "src.domain.market_services._load_watchlist_cache",
+            return_value={
+                "provider": "AKShare",
+                "points": [
+                    {"date": "2026-08-07", "open": 4079.79, "high": 4088.10, "low": 4068.20, "close": 4080.30},
+                    {"date": "2026-08-10", "open": 4080.30, "high": 4100.10, "low": 4078.50, "close": 4093.73},
+                ],
+            },
+        ), patch(
+            "src.domain.market_services.build_live_gangtise_indicator_detail",
+            side_effect=AssertionError("index detail must not request an external provider"),
+        ), patch(
+            "src.domain.market_services.attach_watchlist_intraday", side_effect=lambda detail: detail,
+        ):
+            payload = market_services.build_watchlist_indicator_detail("上证指数")
+
+        self.assertEqual(payload["code"], "000001.SH")
+        self.assertEqual(payload["kline"][-1]["date"], "2026-08-10")
+
+    def test_given_market_closed_when_fetching_index_intraday_then_latest_real_trade_date_is_requested(self):
+        detail = {
+            "code": "000001.SH",
+            "market": "CN",
+            "standard_code": "000001.SH",
+            "kline": [
+                {"date": "2026-08-06", "close": 4050.0},
+                {"date": "2026-08-07", "close": 4080.3},
+            ],
+        }
+        expected = {"ok": True, "available": True, "points": [{"date": "2026-08-07 15:00:00", "value": 4080.3}]}
+        with patch("src.domain.market_services.is_cn_stock_market_open", return_value=False), patch(
+            "src.domain.market_services.fetch_gangtise_intraday_series", return_value=expected
+        ) as fetch_mock:
+            payload = market_services.fetch_watchlist_intraday_series(detail, allow_provider_fetch=True)
+
+        fetch_mock.assert_called_once_with("000001.SH", trade_date="2026-08-07")
+        self.assertTrue(payload["available"])
+        self.assertEqual(payload["points"][-1]["date"], "2026-08-07 15:00:00")
+
+    def test_given_gangtise_minute_response_when_fetching_intraday_then_points_are_normalized(self):
+        response = {
+            "code": "000000",
+            "status": True,
+            "data": {
+                "fieldList": ["securityCode", "securityName", "tradeTime", "open", "high", "low", "close", "volume"],
+                "list": [
+                    ["600519.SH", "贵州茅台", "2026-08-10 09:31:00", 1688.20, 1689.10, 1687.30, 1688.20, 1000],
+                    ["600519.SH", "贵州茅台", "2026-08-10 09:32:00", 1688.20, 1691.10, 1688.00, 1690.10, 1200],
+                ],
+            },
+        }
+
+        points = market_services.normalize_gangtise_minute_points(response)
+
+        self.assertEqual(points, [
+            {"date": "2026-08-10 09:31:00", "value": 1688.2},
+            {"date": "2026-08-10 09:32:00", "value": 1690.1},
+        ])
+
+    def test_given_intraday_request_when_fetching_real_series_then_gangtise_source_is_used(self):
+        response = {
+            "code": "000000",
+            "status": True,
+            "data": {
+                "fieldList": ["securityCode", "securityName", "tradeTime", "open", "high", "low", "close", "volume"],
+                "list": [
+                    ["600519.SH", "贵州茅台", "2026-08-10 09:31:00", 1688.20, 1689.10, 1687.30, 1688.20, 1000],
+                    ["600519.SH", "贵州茅台", "2026-08-10 09:32:00", 1688.20, 1691.10, 1688.00, 1690.10, 1200],
+                ],
+            },
+        }
+
+        captured_payloads = []
+
+        def fake_post(path, payload, token="", timeout=30):
+            captured_payloads.append(payload)
+            return 200, response, 123
+
+        with patch("src.domain.market_services._load_watchlist_cache", return_value=None), patch(
+            "src.domain.market_services._save_watchlist_cache", return_value=None
+        ), patch("src.domain.market_services.post_gangtise_openapi_json", side_effect=fake_post):
+            payload = market_services.fetch_gangtise_intraday_series("600519.SH", trade_date="2026-08-10")
+
+        self.assertTrue(payload["ok"])
+        self.assertTrue(payload["available"])
+        self.assertEqual(payload["source"], "gangtise_openapi")
+        self.assertEqual(payload["points"][-1]["value"], 1690.1)
+        self.assertEqual(captured_payloads[0]["securityCode"], "600519.SH")
+
+    def test_given_maotai_detail_when_resolving_intraday_symbol_then_gangtise_standard_code_is_used(self):
+        detail = {
+            "code": "600519",
+            "name": "贵州茅台",
+            "market": "SH",
+            "standard_code": "600519.SH",
+            "tencent_symbol": "sh600519",
+        }
+
+        symbol = market_services._resolve_watchlist_intraday_symbol(detail)
+
+        self.assertEqual(symbol, "600519.SH")
+
+    def test_given_intraday_detail_when_attaching_then_real_series_is_kept_without_market_open_gate(self):
+        detail = {
+            "code": "600519",
+            "name": "贵州茅台",
+            "market": "SH",
+            "standard_code": "600519.SH",
+            "tencent_symbol": "sh600519",
+        }
+        intraday_points = [
+            {"date": "09:31", "value": 1688.20},
+            {"date": "09:32", "value": 1690.10},
+        ]
+
+        with patch("src.domain.market_services.is_cn_stock_market_open", return_value=False), patch(
+            "src.domain.market_services.fetch_watchlist_intraday_series",
+            return_value={"available": True, "points": intraday_points, "message": "ok", "updated_at": "2026-08-10 09:32:00", "source": "gangtise_openapi"},
+        ):
+            payload = market_services.attach_watchlist_intraday(detail)
+
+        self.assertTrue(payload["intraday_available"])
+        self.assertEqual(payload["intraday_series"], intraday_points)
+        self.assertEqual(payload["intraday_source"], "gangtise_openapi")
+        self.assertTrue(payload["intraday_supported"])
+
+    def test_given_detail_page_when_intraday_snapshot_is_missing_then_no_provider_call_is_made(self):
+        detail = {
+            "code": "000001.SH",
+            "market": "CN",
+            "standard_code": "000001.SH",
+            "kline": [{"date": "2026-08-10", "close": 4093.73}],
+        }
+        with patch("src.domain.market_services._load_gangtise_intraday_snapshot", return_value=None), patch(
+            "src.domain.market_services.fetch_gangtise_intraday_series",
+            side_effect=AssertionError("H5 detail must not call Gangtise"),
+        ):
+            payload = market_services.attach_watchlist_intraday(detail)
+
+        self.assertTrue(payload["intraday_supported"])
+        self.assertFalse(payload["intraday_available"])
+        self.assertEqual(payload["intraday_message"], "intraday_snapshot_pending")
 
     def test_given_watchlist_question_when_extracting_hermes_memory_then_focus_symbols_and_persona_are_updated(self):
         payload = ai_services.extract_hermes_memory_payload(
@@ -943,7 +1196,7 @@ class ReviewModuleBddTest(unittest.TestCase):
     def test_given_hermes_query_when_db_unavailable_then_memory_meta_falls_back_without_failing(self):
         response = self.client.post(
             "/api/hermes/query",
-            json={"tenant_slug": self.tenant_slug, "question": "请解释这个智能指标的计算口径"},
+            json={"tenant_slug": self.tenant_slug, "user_role": "dav", "question": "请解释这个智能指标的计算口径"},
         )
 
         self.assertEqual(response.status_code, 200)
@@ -957,7 +1210,7 @@ class ReviewModuleBddTest(unittest.TestCase):
     def test_given_out_of_scope_question_when_calling_hermes_api_then_response_is_redirected(self):
         response = self.client.post(
             "/api/hermes/query",
-            json={"tenant_slug": self.tenant_slug, "question": "帮我推荐一个上海周末亲子旅游行程"},
+            json={"tenant_slug": self.tenant_slug, "user_role": "dav", "question": "帮我推荐一个上海周末亲子旅游行程"},
         )
 
         self.assertEqual(response.status_code, 200)
@@ -1794,6 +2047,7 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertEqual(items[0]["dateLabel"], "07-08")
         self.assertEqual(items[0]["title"], "放量确认")
         self.assertEqual(items[0]["trigger"], "5日线不破")
+        self.assertEqual(items[0]["content"], "放量确认；量价配合有效，后续看均线支撑。；5日线不破")
 
     def test_given_annotation_id_when_deleting_then_delete_is_confirmed_by_followup_lookup(self):
         class _FakeCursor:

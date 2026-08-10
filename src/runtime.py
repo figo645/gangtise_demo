@@ -531,7 +531,7 @@ DEFAULT_SITE_CONFIG = {
     },
     "hermes_settings": {
         "prompt_scope_guard_enabled": True,
-        "investor_access_enabled": True,
+        "investor_access_enabled": False,
         "dav_access_enabled": True,
         "internet_answer_enabled": True,
         "thinking_process_enabled": True,
