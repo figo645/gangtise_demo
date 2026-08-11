@@ -14,6 +14,14 @@ AUTO_MARKET_SNAPSHOT_SYNC="${AUTO_MARKET_SNAPSHOT_SYNC:-1}"
 
 cd "$SCRIPT_DIR"
 
+CREDENTIALS_FILE="${POSTGRES_CREDENTIALS_FILE:-/root/gangtise_postgres_credentials}"
+if [ -f "$CREDENTIALS_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$CREDENTIALS_FILE"
+  set +a
+fi
+
 pid_matches_app() {
   local pid="$1"
   ps -p "$pid" -o command= 2>/dev/null | grep -F -- "$SCRIPT_DIR/app.py" >/dev/null 2>&1

@@ -5679,6 +5679,7 @@ def init_db():
         execute_sql_file(conn, sql_dir / "100_seed_master_data.sql")
         execute_sql_file(conn, sql_dir / "101_seed_app_core.sql")
         execute_sql_file(conn, sql_dir / "102_seed_market_sector_catalog.sql")
+        execute_sql_file(conn, sql_dir / "103_seed_market_index_catalog.sql")
 
 
 def init_db_safe():
