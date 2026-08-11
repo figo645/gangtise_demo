@@ -11,6 +11,7 @@ APP_PORT="${PORT:-5001}"
 PYTHON_BIN="${PYTHON_BIN:-}"
 AUTO_DB_UPDATE="${AUTO_DB_UPDATE:-1}"
 AUTO_MARKET_SNAPSHOT_SYNC="${AUTO_MARKET_SNAPSHOT_SYNC:-1}"
+AUTO_START_POSTGRES="${AUTO_START_POSTGRES:-1}"
 
 cd "$SCRIPT_DIR"
 
@@ -40,6 +41,23 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 if ! command -v "$PYTHON_BIN" >/dev/null 2>&1 && [ ! -x "$PYTHON_BIN" ]; then
   echo "Python executable not found: $PYTHON_BIN" >&2
   exit 1
+fi
+
+if [[ "$AUTO_START_POSTGRES" != "0" && "$AUTO_START_POSTGRES" != "false" && "$AUTO_START_POSTGRES" != "no" ]]; then
+  DB_HOST="${LOCAL_POSTGRES_HOST:-${APP_DB_HOST:-127.0.0.1}}"
+  DB_PORT="${LOCAL_POSTGRES_PORT:-${APP_DB_PORT:-5432}}"
+  if command -v pg_isready >/dev/null 2>&1 && pg_isready -h "$DB_HOST" -p "$DB_PORT" >/dev/null 2>&1; then
+    echo "PostgreSQL is already ready at ${DB_HOST}:${DB_PORT}."
+  elif [[ "$DB_HOST" == "127.0.0.1" || "$DB_HOST" == "localhost" || "$DB_HOST" == "::1" ]] && [ "$(id -u)" -eq 0 ] && [ -x "$SCRIPT_DIR/scripts/start_postgres.sh" ]; then
+    echo "PostgreSQL is not ready. Starting it automatically..."
+    "$SCRIPT_DIR/scripts/start_postgres.sh"
+  else
+    echo "PostgreSQL is unavailable at ${DB_HOST}:${DB_PORT}." >&2
+    echo "Run ./scripts/start_postgres.sh as root, or set AUTO_START_POSTGRES=0 if PostgreSQL is managed externally." >&2
+    exit 1
+  fi
+else
+  echo "PostgreSQL auto-start check skipped (AUTO_START_POSTGRES=$AUTO_START_POSTGRES)."
 fi
 
 # Apply immutable, idempotent migrations before replacing a healthy daemon.
