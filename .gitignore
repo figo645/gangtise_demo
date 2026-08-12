@@ -2,3 +2,6 @@
 .app.foreground.pid
 .app.daemon.pid
 app.daemon.log
+.deploy/
+.database_release.env
+tools/__pycache__/

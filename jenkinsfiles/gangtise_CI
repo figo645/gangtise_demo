@@ -1,0 +1,119 @@
+pipeline {
+    agent any
+
+    triggers {
+        githubPush()
+    }
+
+    environment {
+        GITHUB_TOKEN = credentials('jenkins_cred_git')
+        REPO_URL     = "https://github.com/figo645/gangtise_demo.git"
+        BRANCH       = "main"
+        WORK_DIR     = "/opt/devsource/gangtise_jenkins_pipeline"
+        DEPLOY_DIR   = "/opt/devsource/gangtise_demo"
+    }
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '15'))
+        timeout(time: 30, unit: 'MINUTES')
+    }
+
+    stages {
+
+        stage('Clean and Prepare Workspace') {
+            steps {
+                sh """
+                    echo "清理工作目录: ${WORK_DIR}"
+                    rm -rf ${WORK_DIR}
+                    mkdir -p ${WORK_DIR}
+                    mkdir -p ${DEPLOY_DIR}
+                    echo "工作目录已清理并重新创建"
+                """
+            }
+        }
+
+        stage('Checkout Code') {
+            steps {
+                dir("${WORK_DIR}") {
+                    sh """
+                        echo "开始克隆仓库（使用 Token）..."
+
+                        for i in 1 2 3 4 5; do
+                            echo "尝试第 \$i 次 git clone..."
+                            if git clone -b ${BRANCH} https://\${GITHUB_TOKEN}@github.com/figo645/gangtise_demo.git .; then
+                                echo "git clone 成功"
+                                break
+                            else
+                                echo "git clone 失败，等待 15 秒后重试..."
+                                # 清理可能产生的残留文件
+                                rm -rf ${WORK_DIR}/* ${WORK_DIR}/.* 2>/dev/null || true
+                                sleep 15
+                            fi
+
+                            if [ \$i -eq 5 ]; then
+                                echo "多次重试后仍然失败"
+                                exit 1
+                            fi
+                        done
+                    """
+                }
+            }
+        }
+
+        stage('Check for Code Updates') {
+            steps {
+                dir("${WORK_DIR}") {
+                    script {
+                        def currentCommit = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                        def lastCommitFile = "${WORK_DIR}/.last_successful_commit"
+
+                        // 因为每次都清理目录，所以把上次成功的 commit 记录放到部署目录或固定位置
+                        def recordFile = "${DEPLOY_DIR}/.last_successful_commit"
+                        def lastCommit = fileExists(recordFile) ? readFile(recordFile).trim() : ""
+
+                        echo "当前 Commit : ${currentCommit}"
+                        echo "上次成功 Commit : ${lastCommit}"
+
+                        if (currentCommit == lastCommit) {
+                            echo "代码无更新，跳过部署"
+                            env.SKIP_PIPELINE = "true"
+                            currentBuild.result = 'SUCCESS'
+                        } else {
+                            echo "检测到代码更新，继续执行部署"
+                            env.SKIP_PIPELINE = "false"
+                            env.CURRENT_COMMIT = currentCommit
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Production Directory') {
+            when {
+                expression { return env.SKIP_PIPELINE != "true" }
+            }
+            steps {
+                sh """
+                    echo "同步代码到部署目录: ${DEPLOY_DIR}"
+
+                    rsync -av --delete \\
+                        --exclude '.git' \\
+                        --exclude 'venv' \\
+                        --exclude '__pycache__' \\
+                        --exclude '*.pyc' \\
+                        --exclude '.pytest_cache' \\
+                        --exclude '.last_successful_commit' \\
+                        ${WORK_DIR}/ ${DEPLOY_DIR}/
+
+                    # 记录本次成功的 commit（放到部署目录，避免被清理）
+                    echo \${CURRENT_COMMIT} > ${DEPLOY_DIR}/.last_successful_commit
+
+                    echo "代码已成功部署到 ${DEPLOY_DIR}"
+                    ls -la ${DEPLOY_DIR}
+                """
+            }
+        }
+    }
+}

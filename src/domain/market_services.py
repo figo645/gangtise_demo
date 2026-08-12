@@ -2954,54 +2954,6 @@ def build_simulated_indicator_kline(indicator_id, status="good", points=24):
     }
 
 
-REAL_HISTORY_FACTOR_NAME_MAP = {
-    "source_shanghai_index": "上证指数",
-    "source_shenzhen_index": "深证指数",
-    "source_hs300": "沪深300",
-    "source_sse50": "上证50",
-    "source_kc50": "科创50",
-    "source_cyb": "创业板指",
-    "source_hsi": "恒生指数",
-    "source_dji": "道琼斯",
-    "source_sp500": "标普500",
-    "source_nasdaq": "纳斯达克",
-    "source_gold": "黄金",
-    "source_oil": "原油",
-    "source_brent": "布伦特原油",
-    "source_silver": "白银",
-    "source_cpi": "CPI",
-    "source_bdi": "BDI",
-}
-
-
-def load_market_dashboard_factor_history():
-    cache_db = MARKET_DASHBOARD_CACHE_DB_PATH
-    if not cache_db.exists():
-        return {}
-    try:
-        conn = sqlite3.connect(str(cache_db))
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            """
-            SELECT name, trade_date, close, volume
-            FROM factor_history
-            ORDER BY name ASC, trade_date ASC
-            """
-        ).fetchall()
-    except Exception:
-        return {}
-    finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
-    grouped = {}
-    for row in rows:
-        item = dict(row)
-        grouped.setdefault(str(item["name"] or "").strip(), []).append(item)
-    return grouped
-
-
 def calc_moving_average(values, window):
     points = []
     if window <= 0:

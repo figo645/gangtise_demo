@@ -5,12 +5,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PID_FILE="$SCRIPT_DIR/.app.daemon.pid"
 LOG_FILE="$SCRIPT_DIR/app.daemon.log"
-DB_UPDATE_LOG="$SCRIPT_DIR/db.update.log"
-MARKET_SYNC_LOG="$SCRIPT_DIR/market_snapshot_sync.log"
 APP_PORT="${PORT:-5001}"
 PYTHON_BIN="${PYTHON_BIN:-}"
-AUTO_DB_UPDATE="${AUTO_DB_UPDATE:-1}"
-AUTO_MARKET_SNAPSHOT_SYNC="${AUTO_MARKET_SNAPSHOT_SYNC:-1}"
 AUTO_START_POSTGRES="${AUTO_START_POSTGRES:-1}"
 
 cd "$SCRIPT_DIR"
@@ -60,30 +56,9 @@ else
   echo "PostgreSQL auto-start check skipped (AUTO_START_POSTGRES=$AUTO_START_POSTGRES)."
 fi
 
-# Apply immutable, idempotent migrations before replacing a healthy daemon.
-# A failed migration leaves an existing service running instead of starting on
-# a partially upgraded schema or losing availability during deployment.
-if [[ "$AUTO_DB_UPDATE" != "0" && "$AUTO_DB_UPDATE" != "false" && "$AUTO_DB_UPDATE" != "no" ]]; then
-  echo "Checking PostgreSQL schema and master-data updates..."
-  if ! "$SCRIPT_DIR/scripts/apply_postgres_updates.sh" >>"$DB_UPDATE_LOG" 2>&1; then
-    echo "Database update failed. Existing daemon was not stopped." >&2
-    echo "Check: $DB_UPDATE_LOG" >&2
-    tail -40 "$DB_UPDATE_LOG" >&2 || true
-    exit 1
-  fi
-  echo "Database schema and master data are up to date. Audit: schema_migrations"
-else
-  echo "Database auto-update skipped (AUTO_DB_UPDATE=$AUTO_DB_UPDATE)."
-fi
-
-# Existing snapshots are already available immediately after migration. Refresh
-# market data in a separate process so a slow external quote source never
-# delays the daemon restart. The helper uses a PostgreSQL advisory lock.
-if [[ "$AUTO_MARKET_SNAPSHOT_SYNC" != "0" && "$AUTO_MARKET_SNAPSHOT_SYNC" != "false" && "$AUTO_MARKET_SNAPSHOT_SYNC" != "no" ]]; then
-  nohup env PYTHONUNBUFFERED=1 "$PYTHON_BIN" "$SCRIPT_DIR/scripts/sync_market_snapshots.py" \
-    >>"$MARKET_SYNC_LOG" 2>&1 < /dev/null &
-  echo "Started background market snapshot refresh. Log: $MARKET_SYNC_LOG"
-fi
+# Database releases, migrations, master data and market snapshots are managed
+# exclusively by the release controller on port 5051. Application startup only
+# verifies that PostgreSQL is reachable (and may start a local service).
 
 if [ -f "$PID_FILE" ]; then
   OLD_PID="$(cat "$PID_FILE" 2>/dev/null || true)"

@@ -18,6 +18,7 @@ PGDATABASE="${PGDATABASE:-postgres}"
 TARGET_DB="${TARGET_DB:-${APP_DB_NAME:-${POSTGRES_DB:-sprint_dashboard}}}"
 PGUSER="${PGUSER:-${APP_DB_USER:-${POSTGRES_USER:-postgres}}}"
 PGPASSWORD="${PGPASSWORD:-${APP_DB_PASSWORD:-${POSTGRES_PASSWORD:-your_password}}}"
+IMPORT_LEGACY_SQLITE="${IMPORT_LEGACY_SQLITE:-0}"
 
 export PGPASSWORD
 
@@ -53,7 +54,7 @@ PGUSER="$PGUSER" \
 PGPASSWORD="$PGPASSWORD" \
   "${ROOT_DIR}/scripts/apply_postgres_updates.sh"
 
-if [ -f "${ROOT_DIR}/gangtise_demo.db" ]; then
+if [[ "$IMPORT_LEGACY_SQLITE" != "0" && "$IMPORT_LEGACY_SQLITE" != "false" && "$IMPORT_LEGACY_SQLITE" != "no" ]] && [ -f "${ROOT_DIR}/gangtise_demo.db" ]; then
   echo "==> Migrating existing SQLite data into Postgres"
   APP_DB_HOST="$PGHOST" \
   APP_DB_PORT="$PGPORT" \
@@ -62,6 +63,8 @@ if [ -f "${ROOT_DIR}/gangtise_demo.db" ]; then
   APP_DB_PASSWORD="$PGPASSWORD" \
   GANGTISE_DEMO_DB="${ROOT_DIR}/gangtise_demo.db" \
   python3 "${ROOT_DIR}/scripts/migrate_sqlite_to_postgres.py"
+else
+  echo "==> Skipping legacy SQLite import (PostgreSQL is the application database)"
 fi
 
 echo "==> Postgres application database initialization completed successfully."

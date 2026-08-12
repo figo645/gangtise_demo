@@ -1,0 +1,97 @@
+pipeline {
+    agent any
+
+    environment {
+        DEPLOY_DIR = "/opt/devsource/gangtise_demo"
+    }
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timeout(time: 5, unit: 'MINUTES')
+    }
+
+    stages {
+
+        stage('Check Deploy Directory') {
+            steps {
+                sh """
+                    if [ ! -d "${DEPLOY_DIR}" ]; then
+                        echo "错误：部署目录 ${DEPLOY_DIR} 不存在！"
+                        exit 1
+                    fi
+                    echo "部署目录存在"
+                """
+            }
+        }
+
+        stage('Stop Existing Service') {
+            steps {
+                dir("${DEPLOY_DIR}") {
+                    sh '''
+                        echo "尝试停止已有守护进程..."
+
+                        if [ -f "./stop_daemon_app.sh" ]; then
+                            chmod +x ./stop_daemon_app.sh
+                            ./stop_daemon_app.sh || true
+                        fi
+
+                        if [ -f "./stop_app.sh" ]; then
+                            chmod +x ./stop_app.sh
+                            ./stop_app.sh || true
+                        fi
+
+                        # 兜底按端口杀
+                        PID=$(lsof -t -i:5001 2>/dev/null || true)
+                        if [ -n "$PID" ]; then
+                            echo "强制停止占用 5001 的进程: $PID"
+                            kill $PID 2>/dev/null || true
+                            sleep 2
+                            kill -9 $PID 2>/dev/null || true
+                        fi
+
+                        sleep 2
+                        echo "停止阶段完成"
+                    '''
+                }
+            }
+        }
+
+        stage('Start Application') {
+            steps {
+                dir("${DEPLOY_DIR}") {
+                    sh '''
+                        if [ ! -f "./start_daemon_app.sh" ]; then
+                            echo "错误：找不到 start_daemon_app.sh"
+                            exit 1
+                        fi
+
+                        chmod +x ./start_daemon_app.sh
+
+                        # 防止 Jenkins 结束后杀掉进程
+                        export BUILD_ID=dontKillMe
+                        export JENKINS_NODE_COOKIE=dontKillMe
+
+                        echo "执行启动命令: ./start_daemon_app.sh"
+                        ./start_daemon_app.sh
+
+                        echo "启动完成"
+                        sleep 3
+                        ps aux | grep -E "app.py|python" | grep -v grep || true
+                        lsof -i:5001 2>/dev/null || echo "端口 5001 未监听"
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "服务启动成功！进程应已脱离 Jenkins 继续运行"
+        }
+        failure {
+            echo "服务启动失败，请检查日志"
+        }
+    }
+}

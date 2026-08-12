@@ -1,6 +1,5 @@
 import os
 import json
-import sqlite3
 import copy
 import math
 import statistics
@@ -109,7 +108,6 @@ app.config.update(
 )
 
 H5_USER_SESSION_KEY = "current_h5_username"
-DB_PATH = os.environ.get("GANGTISE_DEMO_DB", str(PROJECT_ROOT / "gangtise_demo.db"))
 VECTOR_DB_HOST = os.environ.get("VECTOR_DB_HOST") or os.environ.get("IP") or "129.211.65.53"
 VECTOR_DB_PORT = int(os.environ.get("VECTOR_DB_PORT", "5432"))
 VECTOR_DB_NAME = os.environ.get("POSTGRES_DB", "sprint_dashboard")
@@ -154,12 +152,6 @@ MARKET_DASHBOARD_REGISTRY_PATH = Path(
     os.environ.get(
         "MARKET_DASHBOARD_REGISTRY_PATH",
         "/Users/xuchenfei/PycharmProjects/market_dashboard/data_sources.json",
-    )
-)
-MARKET_DASHBOARD_CACHE_DB_PATH = Path(
-    os.environ.get(
-        "MARKET_DASHBOARD_CACHE_DB_PATH",
-        "/Users/xuchenfei/PycharmProjects/market_dashboard/market_cache.db",
     )
 )
 DB_RUNTIME_CONFIG_PATH = PROJECT_ROOT / ".db_runtime.json"
