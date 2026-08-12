@@ -105,7 +105,13 @@ def index():
     config = get_site_config()
     tenants = get_tenant_configs(config)
     default_tenant = get_tenant_by_slug(get_default_tenant_slug(config), config)
-    return render_template("index.html", brand=get_platform_brand(config), tenants=tenants, default_tenant=default_tenant)
+    return render_template(
+        "index.html",
+        brand=get_platform_brand(config),
+        tenants=tenants,
+        default_tenant=default_tenant,
+        tenant_portal_enabled=is_feature_enabled("tenant_portal", config),
+    )
 
 @app.route("/h5")
 def h5():
@@ -269,12 +275,20 @@ def kol_workbench():
         app.logger.warning("Database unavailable while building workbench page, using fallback data")
         tenant = get_tenant_by_slug(tenant.get("slug"), site_config) if isinstance(tenant, dict) else get_tenant_by_slug(site_config=site_config)
         workbench = gen_kol_workbench(tenant, fallback_mode=True)
-    return render_template("kol_workbench.html", workbench=workbench, brand=get_platform_brand(site_config), active_tenant=tenant)
+    return render_template(
+        "kol_workbench.html",
+        workbench=workbench,
+        brand=get_platform_brand(site_config),
+        active_tenant=tenant,
+        tenant_portal_enabled=is_feature_enabled("tenant_portal", site_config),
+    )
 
 
 @app.route("/tenant/<tenant_slug>")
 def tenant_portal(tenant_slug):
     site_config = get_site_config()
+    if not is_feature_enabled("tenant_portal", site_config):
+        abort(404)
     tenant = get_tenant_by_slug(tenant_slug, site_config)
     if not tenant or tenant["slug"] != tenant_slug:
         abort(404)
@@ -289,5 +303,7 @@ def tenant_portal(tenant_slug):
 
 @app.route("/dashboard")
 def dashboard():
+    if not is_feature_enabled("tenant_portal", get_site_config()):
+        abort(404)
     tenant = get_active_tenant_from_request()
     return redirect(url_for("tenant_portal", tenant_slug=tenant["slug"]))

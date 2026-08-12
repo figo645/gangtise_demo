@@ -2464,6 +2464,27 @@ def build_empty_fund_dashboard_card(index=0):
     }
 
 
+def build_new_smart_indicator_code(tenant_slug):
+    """Return a unique code for a newly created smart indicator.
+
+    Names are display labels, not primary keys: two independent indicators may
+    legitimately use the same name and must remain independently placeable on
+    a dashboard.
+    """
+    tenant_code = slugify_code(tenant_slug, "tenant")
+    timestamp = now_ts_ms().replace("-", "").replace(" ", "_").replace(":", "").replace(".", "")
+    return f"{tenant_code}_smart_{timestamp}"
+
+
+def is_empty_fund_dashboard_card_ref(item):
+    card = item if isinstance(item, dict) else {}
+    if card.get("isEmpty"):
+        return True
+    indicator_code = slugify_code(card.get("indicatorCode") or card.get("indicator_code"), "")
+    name = str(card.get("name") or "").strip()
+    return not indicator_code and bool(re.fullmatch(r"待添加智能指标\s*\d*", name))
+
+
 def _run_smart_indicator_agent_workflow(tenant_slug, payload, persist=False):
     workflow_definition = build_default_smart_indicator_workflow_definition()
     tenant = get_tenant_by_slug(tenant_slug)
@@ -2580,28 +2601,35 @@ def _run_smart_indicator_agent_workflow(tenant_slug, payload, persist=False):
                 "output": copy.deepcopy(state.get("preview_result") or {}),
                 "state_key": "final_result",
             }
+        save_payload = {
+            **(runtime.get("existing") or {}),
+            **(runtime.get("body") or {}),
+            "tenant_slug": runtime.get("tenant_slug") or "",
+            "indicator_name": state.get("indicator_name") or "",
+            "category": state.get("category") or "大V自定义指标",
+            "description": state.get("algorithm_detail") or "",
+            "owner": ((runtime.get("tenant") or {}).get("advisor") or "大V"),
+            "source_type": "smart",
+            "source_type_label": "智能指标",
+            "provider": "LLM / Prompt Formula",
+            "status_hint": str((runtime.get("body") or {}).get("status_hint") or "good").strip() or "good",
+            "assessment_template": str((runtime.get("body") or {}).get("assessment_template") or build_smart_indicator_interpretation(state.get("indicator_name"), state.get("prompt_text"), state.get("selected_indicators"), "实时值", (runtime.get("body") or {}).get("unit") or "")).strip(),
+            "alert_template": str((runtime.get("body") or {}).get("alert_template") or "").strip(),
+            "prompt_text": state.get("prompt_text") or "",
+            "formula_js": (state.get("generated_formula_meta") or {}).get("formula_js") or "",
+            "selected_indicators": copy.deepcopy(state.get("selected_indicators") or []),
+            "display_order": int((runtime.get("body") or {}).get("display_order") or 0),
+            "watchers": ["大V工作台", "H5 Dashboard", "租户门户"],
+            "display_config": {"show_in_h5": True, "show_in_workbench": True},
+            "enabled": (runtime.get("body") or {}).get("enabled", True),
+        }
+        # Only an explicit indicator_code means an edit. New definitions need
+        # their own identity even when their display name matches an old one.
+        if not runtime.get("existing"):
+            save_payload["indicator_code"] = build_new_smart_indicator_code(runtime.get("tenant_slug") or "")
         definition = save_indicator_definition(
             {
-                **(runtime.get("existing") or {}),
-                **(runtime.get("body") or {}),
-                "tenant_slug": runtime.get("tenant_slug") or "",
-                "indicator_name": state.get("indicator_name") or "",
-                "category": state.get("category") or "大V自定义指标",
-                "description": state.get("algorithm_detail") or "",
-                "owner": ((runtime.get("tenant") or {}).get("advisor") or "大V"),
-                "source_type": "smart",
-                "source_type_label": "智能指标",
-                "provider": "LLM / Prompt Formula",
-                "status_hint": str((runtime.get("body") or {}).get("status_hint") or "good").strip() or "good",
-                "assessment_template": str((runtime.get("body") or {}).get("assessment_template") or build_smart_indicator_interpretation(state.get("indicator_name"), state.get("prompt_text"), state.get("selected_indicators"), "实时值", (runtime.get("body") or {}).get("unit") or "")).strip(),
-                "alert_template": str((runtime.get("body") or {}).get("alert_template") or "").strip(),
-                "prompt_text": state.get("prompt_text") or "",
-                "formula_js": (state.get("generated_formula_meta") or {}).get("formula_js") or "",
-                "selected_indicators": copy.deepcopy(state.get("selected_indicators") or []),
-                "display_order": int((runtime.get("body") or {}).get("display_order") or 0),
-                "watchers": ["大V工作台", "H5 Dashboard", "租户门户"],
-                "display_config": {"show_in_h5": True, "show_in_workbench": True},
-                "enabled": (runtime.get("body") or {}).get("enabled", True),
+                **save_payload,
             }
         )
         latest_snapshot = save_smart_indicator_latest_snapshot(definition)
@@ -2677,25 +2705,28 @@ def build_default_fund_dashboard_cards(tenant, layout="2x2"):
 def normalize_fund_dashboard_card_refs(raw_cards, layout):
     target_count = get_dashboard_card_target(layout)
     items = raw_cards if isinstance(raw_cards, list) else []
+    # Dashboard cards are positional.  Empty entries must remain in the list so
+    # a card deliberately placed in (for example) slot 5 is never compacted
+    # into an earlier slot during a save/load round trip.
     normalized = []
     seen_codes = set()
-    for item in items:
-        if not isinstance(item, dict):
+    for index in range(target_count):
+        item = items[index] if index < len(items) and isinstance(items[index], dict) else {}
+        if is_empty_fund_dashboard_card_ref(item):
+            normalized.append({})
             continue
         indicator_code = slugify_code(item.get("indicatorCode") or item.get("indicator_code"), "")
         if indicator_code:
             if indicator_code in seen_codes:
-                continue
-            seen_codes.add(indicator_code)
-            normalized.append({"indicatorCode": indicator_code})
-            if len(normalized) >= target_count:
-                break
-            continue
-        if str(item.get("name") or "").strip():
+                normalized.append({})
+            else:
+                seen_codes.add(indicator_code)
+                normalized.append({"indicatorCode": indicator_code})
+        elif str(item.get("name") or "").strip():
             normalized.append(item)
-            if len(normalized) >= target_count:
-                break
-    return normalized[:target_count]
+        else:
+            normalized.append({})
+    return normalized
 
 
 def normalize_fund_dashboard_view(source, tenant):
@@ -2926,27 +2957,30 @@ def append_smart_indicator_to_dashboard(tenant_slug, indicator_code, title="", l
     tenant = get_tenant_by_slug(tenant_slug)
     current_state = resolve_tenant_fund_dashboard_state(tenant, tenant.get("fund_dashboard_config"))
     base = copy.deepcopy(current_state.get("draft") or current_state.get("published") or {})
-    existing_cards = base.get("cards") if isinstance(base.get("cards"), list) else []
-    next_cards = []
-    seen_codes = set()
-    for raw in existing_cards:
-        if not isinstance(raw, dict):
-            continue
-        current_code = slugify_code(raw.get("indicatorCode") or raw.get("indicator_code"), "")
-        if current_code and current_code not in seen_codes:
-            seen_codes.add(current_code)
-            next_cards.append({"indicatorCode": current_code})
+    next_layout = normalize_dashboard_layout(layout or base.get("layout") or ensure_dashboard_layout_for_card_count(0))
+    existing_cards = normalize_fund_dashboard_card_refs(base.get("cards"), next_layout)
+    next_cards = list(existing_cards)
+    seen_codes = {
+        slugify_code(raw.get("indicatorCode") or raw.get("indicator_code"), "")
+        for raw in next_cards if isinstance(raw, dict)
+    }
+    seen_codes.discard("")
     normalized_code = slugify_code(indicator_code, "indicator")
     if normalized_code and normalized_code not in seen_codes:
-        next_cards.append({"indicatorCode": normalized_code})
-    next_layout = normalize_dashboard_layout(layout or ensure_dashboard_layout_for_card_count(len(next_cards)))
+        empty_index = next((index for index, raw in enumerate(next_cards) if not raw), None)
+        if empty_index is None:
+            next_layout = normalize_dashboard_layout(ensure_dashboard_layout_for_card_count(len(next_cards) + 1))
+            next_cards = normalize_fund_dashboard_card_refs(next_cards, next_layout)
+            empty_index = next((index for index, raw in enumerate(next_cards) if not raw), None)
+        if empty_index is not None:
+            next_cards[empty_index] = {"indicatorCode": normalized_code}
     dashboard = {
         "layout": next_layout,
         "title": title or "智能指标 Dashboard",
         "note": "大V 通过选择底层指标和自然语言规则生成智能指标，再发布到前台 Dashboard。",
         "updatedAt": now_ts(),
         "publisher": publisher or "系统同步",
-        "cards": next_cards[: get_dashboard_card_target(next_layout)],
+        "cards": next_cards,
     }
     return update_tenant_fund_dashboard_config(tenant_slug, "save_draft", dashboard)
 
@@ -2958,12 +2992,12 @@ def remove_smart_indicator_from_dashboard(tenant_slug, indicator_code):
     draft = copy.deepcopy(current_state.get("draft") or published or {})
     normalized_code = slugify_code(indicator_code, "indicator")
     def _strip_cards(source):
-        next_cards = [
-            raw for raw in (source.get("cards") or [])
-            if slugify_code((raw or {}).get("indicatorCode") or (raw or {}).get("indicator_code"), "") != normalized_code
+        layout = normalize_dashboard_layout(source.get("layout") or "2x2")
+        source["cards"] = [
+            {} if slugify_code((raw or {}).get("indicatorCode") or (raw or {}).get("indicator_code"), "") == normalized_code else raw
+            for raw in normalize_fund_dashboard_card_refs(source.get("cards"), layout)
         ]
-        source["cards"] = next_cards
-        source["layout"] = ensure_dashboard_layout_for_card_count(len(next_cards))
+        source["layout"] = layout
         source["updatedAt"] = now_ts()
         source["publisher"] = tenant.get("advisor") or "大V"
         return source
@@ -5676,6 +5710,7 @@ def init_db():
         execute_sql_file(conn, sql_dir / "028_h5_user_onboarding.sql")
         execute_sql_file(conn, sql_dir / "029_user_labels.sql")
         execute_sql_file(conn, sql_dir / "030_market_snapshot_payloads.sql")
+        execute_sql_file(conn, sql_dir / "032_simulated_fan_data_management.sql")
         execute_sql_file(conn, sql_dir / "100_seed_master_data.sql")
         execute_sql_file(conn, sql_dir / "101_seed_app_core.sql")
         execute_sql_file(conn, sql_dir / "102_seed_market_sector_catalog.sql")

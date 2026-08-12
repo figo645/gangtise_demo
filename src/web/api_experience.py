@@ -229,6 +229,7 @@ def gen_dm_messages(thread_id, tenant_slug=None):
 
 def gen_kol_workbench(tenant=None, fallback_mode=False):
     tenant = tenant or get_tenant_by_slug()
+    tenant_portal_enabled = is_feature_enabled("tenant_portal")
     is_lisa = tenant["slug"] == "lisa"
     if fallback_mode:
         fallback_config = normalize_site_config(DEFAULT_SITE_CONFIG)
@@ -277,16 +278,15 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
                 "desc": f"查看普通投资者和大V在 H5 里实际看到的 {tenant['name']} Hermes、复盘、知识和自选股路径。"
             },
             {
-                "label": "租户门户",
-                "url": f"/tenant/{tenant['slug']}",
-                "desc": f"查看 {tenant['advisor']} 对外的专属租户门户，重点承接品牌表达、已发布内容和粉丝入口。"
-            },
-            {
                 "label": "纯 Admin 后台",
                 "url": "/admin?section=kols",
                 "desc": "查看平台侧的大V租户管理、能力开关、一致性巡检和审计入口。"
             },
-        ],
+        ] + ([{
+            "label": "租户门户",
+            "url": f"/tenant/{tenant['slug']}",
+            "desc": f"查看 {tenant['advisor']} 对外的专属租户门户，重点承接品牌表达、已发布内容和粉丝入口。"
+        }] if tenant_portal_enabled else []),
         "stats": {
             "total_followers": base_followers,
             "vip_subscribers": base_vip,
@@ -309,7 +309,7 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
             {"name": "暂无粉丝", "time": "--", "msg": "请先通过 Admin 或工作台导入用户。", "tier": "--"}
         ],
         "broadcast_history": broadcast_history,
-        "portal_workspace": resolve_tenant_portal_workspace(tenant, tenant.get("portal_cms")),
+        "portal_workspace": resolve_tenant_portal_workspace(tenant, tenant.get("portal_cms")) if tenant_portal_enabled else {},
         "message_center": {
             "summary": message_center_state["summary"],
             "items": build_message_center_items((fan_threads + review_notice_threads)[:6], limit=6),

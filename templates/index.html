@@ -1043,7 +1043,7 @@ body.theme-dark .tech-layer {
   </div>
 
   <div class="hero-split-entry-grid">
-    <a href="/tenant/{{ default_tenant.slug }}" class="hero-split-entry">
+    {% if tenant_portal_enabled %}<a href="/tenant/{{ default_tenant.slug }}" class="hero-split-entry">
       <div class="hero-split-entry-top">
         <span class="hero-split-entry-icon">{{ default_tenant.logo_mark }}</span>
         <span class="hero-split-entry-tag">TENANT PORTAL</span>
@@ -1051,7 +1051,7 @@ body.theme-dark .tech-layer {
       <div class="hero-split-entry-title">{{ default_tenant.name }} 门户 CMS</div>
       <div class="hero-split-entry-desc">这是一个给大V自定义的拖拽式租户门户。可以把指标卡、复盘内容、研究框架、CTA 和自写内容块按模块自由编排成自己的主页。</div>
       <div class="hero-split-entry-arrow">进入租户门户 →</div>
-    </a>
+    </a>{% endif %}
     <a href="/kol-workbench?tenant={{ default_tenant.slug }}" class="hero-split-entry">
       <div class="hero-split-entry-top">
         <span class="hero-split-entry-icon">👑</span>
@@ -1121,7 +1121,7 @@ body.theme-dark .tech-layer {
 
         <div class="summary-link-row">
           <a href="/h5" class="summary-link">查看 H5 用户端</a>
-          <a href="/tenant/{{ default_tenant.slug }}" class="summary-link">查看默认租户门户</a>
+          {% if tenant_portal_enabled %}<a href="/tenant/{{ default_tenant.slug }}" class="summary-link">查看默认租户门户</a>{% endif %}
           <a href="/kol-workbench?tenant={{ default_tenant.slug }}" class="summary-link">查看大V工作台 Web</a>
           <a href="/admin" class="summary-link">查看纯 Admin 后台</a>
         </div>
@@ -1177,12 +1177,12 @@ body.theme-dark .tech-layer {
     <div class="ix-section-desc">现在拆成四个真实入口：租户门户 CMS、H5 用户端、大V 工作台 Web 和平台 Admin 后台。分析能力仍属于 Admin，不再单独包装成一个新产品入口。</div>
 
     <div class="nav-cards-grid">
-      <a href="/tenant/{{ default_tenant.slug }}" class="ix-nav-card">
+      {% if tenant_portal_enabled %}<a href="/tenant/{{ default_tenant.slug }}" class="ix-nav-card">
         <div class="ix-nav-card-icon">{{ default_tenant.logo_mark }}</div>
         <div class="ix-nav-card-title">租户门户 CMS</div>
         <div class="ix-nav-card-desc">每个大V对应一个租户门户。门户支持模块拖拽、指标卡编排、复盘内容露出、CTA 配置和自定义文案编辑。</div>
         <div class="ix-nav-card-arrow">进入门户 →</div>
-      </a>
+      </a>{% endif %}
       <a href="/h5" class="ix-nav-card">
         <div class="ix-nav-card-icon">📱</div>
         <div class="ix-nav-card-title">H5 用户端</div>
@@ -2175,7 +2175,7 @@ body.theme-dark .tech-layer {
       </div>
       <div>
         <div class="footer-col-title">产品</div>
-        <a href="/tenant/{{ default_tenant.slug }}" class="footer-col-link">租户门户 CMS</a>
+        {% if tenant_portal_enabled %}<a href="/tenant/{{ default_tenant.slug }}" class="footer-col-link">租户门户 CMS</a>{% endif %}
         <a href="/h5" class="footer-col-link">H5 用户端</a>
         <a href="/kol-workbench?tenant={{ default_tenant.slug }}" class="footer-col-link">大V 工作台 Web</a>
         <a href="/admin" class="footer-col-link">纯 Admin 后台</a>
@@ -2183,8 +2183,8 @@ body.theme-dark .tech-layer {
       </div>
       <div>
         <div class="footer-col-title">核心功能</div>
-        <a href="/tenant/{{ default_tenant.slug }}" class="footer-col-link">门户拖拽编排</a>
-        <a href="/tenant/{{ default_tenant.slug }}" class="footer-col-link">指标卡与自定义内容</a>
+        {% if tenant_portal_enabled %}<a href="/tenant/{{ default_tenant.slug }}" class="footer-col-link">门户拖拽编排</a>
+        <a href="/tenant/{{ default_tenant.slug }}" class="footer-col-link">指标卡与自定义内容</a>{% endif %}
         <a href="/h5" class="footer-col-link">基本面分析</a>
         <a href="/h5" class="footer-col-link">自选股</a>
         <a href="/h5" class="footer-col-link">每日复盘</a>

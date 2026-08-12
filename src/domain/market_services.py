@@ -368,6 +368,8 @@ GANGTISE_OPENAPI_LOGIN_PATH = "/application/auth/oauth/open/loginV2"
 _gangtise_env_loaded = False
 _gangtise_token_lock = threading.Lock()
 _gangtise_token_cache = {"token": "", "fetched_at": 0.0}
+_intraday_fetch_locks = {}
+_intraday_fetch_locks_guard = threading.Lock()
 GANGTISE_API_TEST_ENV_PATH = Path("/Users/xuchenfei/PycharmProjects/gangtise_api_test/.env")
 
 GANGTISE_INDICATOR_REGISTRY = {
@@ -4807,7 +4809,10 @@ def fetch_akshare_market_index_intraday(indicator_code, trade_date="", ak=None):
             return {"ok": False, "available": False, "points": [], "message": "AKShare 未返回真实分时", "source": "AKShare"}
         return {"ok": True, "available": True, "points": points, "message": "", "updated_at": points[-1]["date"], "source": "AKShare"}
     except Exception as exc:
-        return {"ok": False, "available": False, "points": [], "message": f"AKShare 分时获取失败：{exc}", "source": "AKShare"}
+        # Provider diagnostics belong in server logs. Do not leak proxy hosts,
+        # request parameters, or vendor-specific code errors to end users.
+        app.logger.warning("AKShare index intraday unavailable for %s: %s", indicator_code, exc)
+        return {"ok": False, "available": False, "points": [], "message": "AKShare 分时暂不可用，已等待后端分钟数据补采", "source": "AKShare"}
 
 
 def _build_market_index_snapshot_item(indicator_code, series_result):
@@ -4941,8 +4946,17 @@ def build_market_overview_payload():
     cached = _load_market_snapshot_payload("market_overview", cache_key, MARKET_SNAPSHOT_CACHE_TTL_SECONDS)
     if cached is None:
         cached = _load_watchlist_cache("market_overview", cache_key, MARKET_SNAPSHOT_CACHE_TTL_SECONDS)
-    if isinstance(cached, dict) and cached.get("snapshot_version") in {3, 5} and cached.get("source") == "AKShare" and isinstance(cached.get("items"), list):
+    if isinstance(cached, dict) and isinstance(cached.get("items"), list) and cached.get("items"):
         return cached
+    stale = _load_market_snapshot_payload("market_overview", cache_key, 0)
+    if stale is None:
+        stale = _load_watchlist_cache("market_overview", cache_key, 0)
+    if isinstance(stale, dict) and isinstance(stale.get("items"), list) and stale.get("items"):
+        preserved = copy.deepcopy(stale)
+        preserved["stale"] = True
+        preserved["items"] = [{**item, "stale": True} if isinstance(item, dict) else item for item in preserved["items"]]
+        preserved["message"] = "市场快照正在同步，当前展示最近一次已验证行情"
+        return preserved
     return {"ok": True, "items": [], "source": "AKShare", "refreshing": True, "message": "后台正在同步 AKShare 市场快照"}
 
 
@@ -5437,7 +5451,44 @@ def build_watchlist_indicator_detail(indicator_code, stock_name=""):
         return None
     if normalized_code in MARKET_OVERVIEW_INDEX_CODES:
         detail = build_market_overview_index_detail(normalized_code)
-        return normalize_watchlist_detail_from_indicator(detail, normalized_code) if detail else None
+        if detail:
+            return normalize_watchlist_detail_from_indicator(detail, normalized_code)
+        # The dashboard can already have a verified indicator-lake series while
+        # the separate market snapshot task is still catching up. Keep both
+        # entry points on the same canonical index instead of exposing source_*
+        # as an unknown stock with a fabricated zero price.
+        try:
+            hub = get_indicator_hub_from_store_cached()
+            for item in (hub.get("lake_items") or []):
+                if str((item or {}).get("id") or "").strip() != normalized_code:
+                    continue
+                fallback = normalize_watchlist_detail_from_indicator(item, normalized_code)
+                if fallback and (fallback.get("kline") or fallback.get("history_series")):
+                    return fallback
+        except Exception as exc:
+            if not is_db_unavailable_error(exc):
+                raise
+        entry = GANGTISE_INDICATOR_REGISTRY.get(normalized_code) or {}
+        return {
+            "id": normalized_code,
+            "indicator_code": normalized_code,
+            "code": str(entry.get("security_code") or normalized_code).strip(),
+            "standard_code": str(entry.get("security_code") or "").strip(),
+            "security_code": str(entry.get("security_code") or "").strip(),
+            "name": str(entry.get("indicator_name") or stock_name or normalized_code).strip(),
+            "market": str(entry.get("market") or "CN").strip() or "CN",
+            "industry": "大盘指数",
+            "focus": str(entry.get("indicator_name") or stock_name or "大盘指数").strip(),
+            "price": None,
+            "change": None,
+            "change_pct": None,
+            "kline": [],
+            "history_series": [],
+            "history_kline": build_empty_kline_payload(),
+            "data_source": "市场快照",
+            "data_unavailable": True,
+            "data_unavailable_message": "后台尚未完成该指数历史快照同步",
+        }
     # Non-market indicators continue to read the persisted indicator lake
     # before attempting a controlled Gangtise recovery request.
     try:
@@ -6219,11 +6270,16 @@ def _resolve_watchlist_intraday_trade_date(detail):
 
 def fetch_watchlist_intraday_series(detail, allow_provider_fetch=True):
     indicator_code = str((detail or {}).get("indicator_code") or (detail or {}).get("id") or "").strip()
-    if indicator_code in MARKET_OVERVIEW_INDEX_CODES:
-        cached = _load_watchlist_cache("market_index_intraday", indicator_code, MARKET_SNAPSHOT_CACHE_TTL_SECONDS)
-        if isinstance(cached, dict) and cached.get("available"):
-            return cached
-        return {"ok": False, "available": False, "points": [], "message": "intraday_snapshot_pending", "updated_at": "", "source": "AKShare"}
+    is_market_index = indicator_code in MARKET_OVERVIEW_INDEX_CODES
+    if is_market_index:
+        return {
+            "ok": False,
+            "available": False,
+            "points": [],
+            "message": "market_overview_intraday_disabled",
+            "updated_at": "",
+            "source": "market_overview",
+        }
     symbol = _resolve_watchlist_intraday_symbol(detail)
     if not symbol:
         return {"ok": False, "available": False, "points": [], "message": "symbol_not_resolved", "updated_at": "", "source": "gangtise_openapi"}
@@ -6233,15 +6289,45 @@ def fetch_watchlist_intraday_series(detail, allow_provider_fetch=True):
         return cached
     if not allow_provider_fetch:
         return {"ok": False, "available": False, "points": [], "message": "intraday_snapshot_pending", "updated_at": "", "source": "gangtise_openapi_cache"}
-    return fetch_gangtise_intraday_series(symbol, trade_date=trade_date)
+    cache_identity = f"{symbol}:{trade_date or datetime.now().date().isoformat()}"
+    with _intraday_fetch_locks_guard:
+        fetch_lock = _intraday_fetch_locks.setdefault(cache_identity, threading.Lock())
+    with fetch_lock:
+        # Another detail request may have filled the PostgreSQL cache while this
+        # request waited for the same symbol/date lock.
+        cached = _load_gangtise_intraday_snapshot(symbol, trade_date)
+        if cached:
+            return cached
+        akshare_error = ""
+        if is_market_index:
+            akshare_result = fetch_akshare_market_index_intraday(indicator_code, trade_date=trade_date)
+            if akshare_result.get("available"):
+                _save_watchlist_cache("market_index_intraday", indicator_code, akshare_result)
+                return akshare_result
+            akshare_error = str(akshare_result.get("message") or "").strip()
+        result = fetch_gangtise_intraday_series(symbol, trade_date=trade_date)
+        if not result.get("available") and akshare_error:
+            result["message"] = f"{akshare_error}; {result.get('message') or 'Gangtise 未返回分钟数据'}"
+        return result
 
 
 def attach_watchlist_intraday(detail):
     if not isinstance(detail, dict) or not detail:
         return detail
+    indicator_code = str(detail.get("indicator_code") or detail.get("id") or "").strip()
+    if indicator_code in MARKET_OVERVIEW_INDEX_CODES:
+        detail["intraday_supported"] = False
+        detail["intraday_available"] = False
+        detail["intraday_series"] = []
+        detail["intraday_source"] = "market_overview"
+        detail["intraday_updated_at"] = ""
+        detail["intraday_message"] = "market_overview_intraday_disabled"
+        return detail
     detail["intraday_supported"] = bool(_resolve_watchlist_intraday_symbol(detail))
-    # Detail pages only consume the collector's persisted minute snapshot.
-    result = fetch_watchlist_intraday_series(detail, allow_provider_fetch=False)
+    # The browser only reads our detail API. A missing PostgreSQL snapshot is
+    # replenished here by the backend from the verified Gangtise minute K-line
+    # endpoint, then reused from cache for the next fifteen minutes.
+    result = fetch_watchlist_intraday_series(detail, allow_provider_fetch=True)
     detail["intraday_available"] = bool(result.get("available"))
     detail["intraday_series"] = copy.deepcopy(result.get("points") or [])
     detail["intraday_source"] = str(result.get("source") or "gangtise_openapi").strip() or "gangtise_openapi"
@@ -6892,6 +6978,9 @@ def _normalize_watchlist_comment_row(row, detail=None, viewer_role="", viewer_pr
         "created_by_role": created_by_role,
         "created_by_role_label": "大V投顾" if created_by_role == "dav" else "粉丝用户",
         "source_client": str(raw.get("source_client") or "").strip() or "h5",
+        "is_simulated": bool(raw.get("is_simulated")),
+        "simulation_label": str(raw.get("simulation_label") or "").strip(),
+        "simulation_batch_code": str(raw.get("simulation_batch_code") or "").strip(),
         "created_at": str(raw.get("created_at") or "").strip(),
         "updated_at": str(raw.get("updated_at") or raw.get("created_at") or "").strip(),
         "can_delete": can_delete,

@@ -1,9 +1,11 @@
+import copy
 import os
 import unittest
 from unittest.mock import patch
 
 import app as app_entry
 import src.web.hooks as web_hooks
+import src.web.pages as web_pages
 from src.services import get_tenant_configs
 
 
@@ -20,7 +22,9 @@ class RouteSmokeTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls._original_is_authenticated = web_hooks.is_authenticated
+        cls._original_current_user = web_pages.get_current_authenticated_user
         web_hooks.is_authenticated = lambda: True
+        web_pages.get_current_authenticated_user = lambda: {"id": "test-user", "role": "dav"}
         app_entry.app.config.update(TESTING=True)
         cls.client = app_entry.app.test_client()
         cls.tenant_slugs = _tenant_slugs()
@@ -28,6 +32,7 @@ class RouteSmokeTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         web_hooks.is_authenticated = cls._original_is_authenticated
+        web_pages.get_current_authenticated_user = cls._original_current_user
 
     def test_h5_pages_render(self):
         for tenant_slug in self.tenant_slugs:
@@ -121,6 +126,23 @@ class RouteSmokeTest(unittest.TestCase):
             payload = market_services.build_market_overview_payload()
 
         self.assertEqual(payload, snapshot)
+
+    def test_market_overview_keeps_the_last_real_snapshot_while_refreshing(self):
+        from src.domain import market_services
+
+        snapshot = {
+            "ok": True,
+            "snapshot_version": 5,
+            "source": "AKShare",
+            "items": [{"indicator_code": "source_shanghai_index", "name": "上证指数", "price": 3867.03, "available": True}],
+        }
+        with patch.object(market_services, "_load_market_snapshot_payload", side_effect=[None, snapshot]), patch.object(
+            market_services, "_load_watchlist_cache", return_value=None
+        ):
+            payload = market_services.build_market_overview_payload()
+
+        self.assertTrue(payload["stale"])
+        self.assertEqual(payload["items"], snapshot["items"])
 
     def test_market_overview_does_not_use_the_legacy_gangtise_indicator_lake(self):
         from src.domain import market_services
@@ -541,6 +563,9 @@ class RouteSmokeTest(unittest.TestCase):
                 self.assertIn("id=\"kw-kg-legend\"", html)
                 self.assertIn("loadWorkbenchKnowledgeMap(", html)
                 self.assertIn("loadWorkbenchKnowledgeAssets(", html)
+                self.assertIn('data-section="knowledge-graph" data-feature="knowledge" onclick="showWorkbenchSection(\'knowledge-graph\', this)"', html)
+                self.assertIn("if (name === 'knowledge-graph') {\n    loadWorkbenchKnowledgeMap(false);", html)
+                self.assertNotIn("if (name === 'knowledge-graph') {\n    name = 'knowledge-encyclopedia';", html)
                 self.assertIn('class="kw-review-modal-close-pill"', html)
                 self.assertIn("评论标注总览", html)
                 self.assertIn("kw-watchlist-comment-analytics", html)
@@ -553,6 +578,38 @@ class RouteSmokeTest(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertIn("text/html", response.content_type)
                 self.assertIn("Dashboard", response.get_data(as_text=True))
+
+    def test_tenant_portal_feature_flag_hides_entries_and_rejects_portal_routes(self):
+        from src.runtime import DEFAULT_SITE_CONFIG
+
+        disabled_config = copy.deepcopy(DEFAULT_SITE_CONFIG)
+        disabled_config["feature_flags"]["tenant_portal"] = False
+        tenant_slug = self.tenant_slugs[0]
+
+        with patch("src.web.pages.get_site_config", return_value=disabled_config):
+            portal_response = self.client.get(f"/tenant/{tenant_slug}")
+            dashboard_response = self.client.get("/dashboard")
+            index_response = self.client.get("/")
+            workbench_response = self.client.get(f"/kol-workbench?tenant={tenant_slug}")
+
+        self.assertEqual(portal_response.status_code, 404)
+        self.assertEqual(dashboard_response.status_code, 404)
+        self.assertNotIn('href="/tenant/', index_response.get_data(as_text=True))
+        workbench_html = workbench_response.get_data(as_text=True)
+        self.assertNotIn('id="workbench-section-portal"', workbench_html)
+        self.assertNotIn('href="/tenant/', workbench_html)
+
+        with patch("src.web.api_kol.get_site_config", return_value=disabled_config):
+            cms_response = self.client.post(f"/api/kol/portal-cms?tenant={tenant_slug}", json={})
+
+        self.assertEqual(cms_response.status_code, 404)
+        self.assertEqual(cms_response.get_json()["error"], "tenant_portal_disabled")
+
+    def test_admin_includes_tenant_portal_feature_flag(self):
+        response = self.client.get("/admin")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="feature-tenant_portal"', response.get_data(as_text=True))
 
     def test_workbench_api_payloads(self):
         for tenant_slug in self.tenant_slugs:
@@ -576,6 +633,120 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("entries", payload["assets"])
         self.assertIn("workflow_meta", payload)
         self.assertEqual(payload["workflow_meta"]["id"], "knowledge_asset_agent")
+
+    def test_workbench_hermes_uses_tenant_scoped_real_data_endpoints(self):
+        tenant_slug = self.tenant_slugs[0]
+        usage_stats = {
+            "summary": {"today_calls": 3, "month_calls": 12},
+            "tool_modes": [],
+            "tool_actions": [],
+        }
+        memory_summary = {"turn_count": 12, "session_count": 3, "user_count": 2}
+        with patch("src.web.api_kol.build_admin_hermes_usage_stats", return_value=usage_stats), patch(
+            "src.web.api_kol.build_admin_hermes_memory_summary", return_value=memory_summary
+        ):
+            usage_response = self.client.get(f"/api/kol/hermes/usage-stats?tenant={tenant_slug}")
+            memory_response = self.client.get(f"/api/kol/hermes/memory-summary?tenant={tenant_slug}")
+
+        self.assertEqual(usage_response.status_code, 200)
+        self.assertEqual(usage_response.get_json()["stats"], usage_stats)
+        self.assertEqual(memory_response.status_code, 200)
+        self.assertEqual(memory_response.get_json()["summary"], memory_summary)
+
+    def test_workbench_hermes_capability_growth_uses_tenant_scoped_assets(self):
+        tenant_slug = self.tenant_slugs[0]
+        growth = {"summary": {"readiness_score": 42}, "trend": [], "principles": []}
+        with patch("src.web.api_kol.build_kol_hermes_capability_growth", return_value=growth):
+            response = self.client.get(f"/api/kol/hermes/capability-growth?tenant={tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()["ok"])
+        self.assertEqual(response.get_json()["growth"], growth)
+
+    def test_workbench_hermes_pages_are_split_and_do_not_expose_admin_governance(self):
+        response = self.client.get(f"/kol-workbench?tenant={self.tenant_slugs[0]}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('data-section="hermes-overview"', html)
+        self.assertIn('data-section="hermes-memory"', html)
+        self.assertIn('data-section="hermes-capability"', html)
+        self.assertIn('id="workbench-section-hermes-overview"', html)
+        self.assertIn('id="workbench-section-hermes-memory"', html)
+        self.assertIn('id="workbench-section-hermes-capability"', html)
+        self.assertIn('/api/kol/hermes/usage-stats', html)
+        self.assertIn('/api/kol/hermes/memory-summary', html)
+        self.assertIn('/api/kol/hermes/capability-growth', html)
+        self.assertIn('大V能力沉淀', html)
+        self.assertIn('kw-hermes-memory-hero', html)
+        self.assertIn('会话沉淀', html)
+        self.assertIn('画像覆盖', html)
+        self.assertIn('近期活跃', html)
+        self.assertIn('仅使用本租户已落库的聚合计数生成本页', html)
+        self.assertNotIn('id="kw-hermes-memory-clear-range"', html)
+        self.assertNotIn('id="kw-hermes-memory-backup-range"', html)
+        self.assertNotIn('/api/admin/hermes/', html)
+
+    def test_workbench_watchlist_pool_has_advisor_and_fan_tabs_with_comment_drilldown(self):
+        response = self.client.get(f"/kol-workbench?tenant={self.tenant_slugs[0]}&section=watchlist")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('data-section="watchlist-pool"', html)
+        self.assertIn('data-section="watchlist-insights"', html)
+        self.assertIn('id="workbench-section-watchlist-pool"', html)
+        self.assertIn('id="workbench-section-watchlist-insights"', html)
+        self.assertIn("name = 'watchlist-pool';", html)
+        self.assertIn("if (name === 'watchlist-insights')", html)
+        self.assertIn('kw-watchlist-comment-analytics', html)
+        self.assertIn('id="kw-watchlist-advisor-tab"', html)
+        self.assertIn('id="kw-watchlist-fan-tab"', html)
+        self.assertIn('id="kw-fan-watchlist-sector-chart"', html)
+        self.assertIn('openKwWatchlistComments', html)
+        self.assertNotIn('data-section="watchlist-research"', html)
+        self.assertNotIn('id="workbench-section-watchlist-research"', html)
+
+    def test_laowang_watchlist_uses_full_advisor_universe(self):
+        from src.domain.workbench_services import build_tenant_watchlist_hub_items
+
+        tenant = {"slug": "laowang"}
+        details = {
+            code: {"code": code, "name": name, "market": "SH", "industry": industry}
+            for code, name, industry in [
+                ("600519", "贵州茅台", "高端白酒"),
+                ("300750", "宁德时代", "动力电池"),
+                ("00700", "腾讯控股", "港股互联网"),
+                ("688981", "中芯国际", "半导体制造"),
+                ("600036", "招商银行", "银行"),
+            ]
+        }
+        advisor_items = build_tenant_watchlist_hub_items(tenant, details)
+        self.assertEqual([item["code"] for item in advisor_items], ["600519", "300750", "00700", "688981", "600036"])
+
+    def test_workbench_data_lake_is_split_into_market_sector_and_news_domains(self):
+        from src.domain.workbench_services import build_workbench_data_lake_payload
+
+        tenant_slug = self.tenant_slugs[0]
+        response = self.client.get(f"/kol-workbench?tenant={tenant_slug}&section=indicator-lake")
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('data-section="lake-market"', html)
+        self.assertIn('data-section="lake-sectors"', html)
+        self.assertIn('data-section="lake-news"', html)
+        self.assertIn('id="workbench-section-lake-market"', html)
+        self.assertIn('id="workbench-section-lake-sectors"', html)
+        self.assertIn('id="workbench-section-lake-news"', html)
+        self.assertIn("name = 'lake-market';", html)
+        self.assertIn('当前没有通过纳入标准的真实新闻', html)
+
+        tenant = {"slug": tenant_slug}
+        with patch("src.domain.workbench_services.build_market_overview_payload", return_value={"items": [{"name": "上证指数"}], "source": "AKShare"}), patch(
+            "src.domain.workbench_services.build_market_sector_overview_payload", return_value={"items": [{"sector": "银行"}], "source": "AKShare"}
+        ):
+            payload = build_workbench_data_lake_payload(tenant, news_items=[{"title": "真实新闻"}])
+        self.assertEqual(payload["market_overview"]["items"][0]["name"], "上证指数")
+        self.assertEqual(payload["sectors"]["items"][0]["sector"], "银行")
+        self.assertEqual(payload["news"]["items"][0]["title"], "真实新闻")
 
     def test_dashboard_api_payloads(self):
         for tenant_slug in self.tenant_slugs:

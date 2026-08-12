@@ -1,5 +1,6 @@
 import math
 import re
+from collections import Counter
 
 from src.runtime import *
 from src.domain.core_services import *
@@ -2610,12 +2611,14 @@ def fetch_live_knowledge_hub(tenant, limit=80):
                     SELECT id, knowledge_id, knowledge_type, title, summary, body_text, source_detail,
                            vector_namespace, embedding_engine, embedding_model, metadata_json, created_at
                     FROM (
-                        SELECT DISTINCT ON (knowledge_id)
+                        -- Legacy rows can have an empty knowledge_id. They are independent
+                        -- entries and must not collapse into a single DISTINCT group.
+                        SELECT DISTINCT ON (COALESCE(NULLIF(BTRIM(knowledge_id), ''), CONCAT('__legacy_row_', id)))
                             id, knowledge_id, knowledge_type, title, summary, body_text, source_detail,
                             vector_namespace, embedding_engine, embedding_model, metadata_json, created_at
                         FROM knowledge_embeddings
                         WHERE tenant_slug = %s
-                        ORDER BY knowledge_id, created_at DESC, id DESC
+                        ORDER BY COALESCE(NULLIF(BTRIM(knowledge_id), ''), CONCAT('__legacy_row_', id)), created_at DESC, id DESC
                     ) latest
                     ORDER BY created_at DESC, id DESC
                     LIMIT %s
@@ -2714,12 +2717,13 @@ def search_knowledge_embeddings(tenant_slug, query_text, limit=5):
                 SELECT id, knowledge_id, knowledge_type, title, summary, body_text, source_detail,
                        vector_namespace, embedding_engine, embedding_model, embedding_json, metadata_json, created_at
                 FROM (
-                    SELECT DISTINCT ON (knowledge_id)
+                    -- Keep legacy records with an empty knowledge_id as separate entries.
+                    SELECT DISTINCT ON (COALESCE(NULLIF(BTRIM(knowledge_id), ''), CONCAT('__legacy_row_', id)))
                         id, knowledge_id, knowledge_type, title, summary, body_text, source_detail,
                         vector_namespace, embedding_engine, embedding_model, embedding_json, metadata_json, created_at
                     FROM knowledge_embeddings
                     WHERE tenant_slug = %s
-                    ORDER BY knowledge_id, created_at DESC, id DESC
+                    ORDER BY COALESCE(NULLIF(BTRIM(knowledge_id), ''), CONCAT('__legacy_row_', id)), created_at DESC, id DESC
                 ) latest
                 ORDER BY created_at DESC, id DESC
                 LIMIT 120
@@ -5145,6 +5149,151 @@ def build_admin_hermes_memory_summary(tenant_slug):
     }
 
 
+def _capability_growth_month_key(value):
+    text = str(value or "").strip()
+    return text[:7] if re.match(r"^\d{4}-\d{2}", text) else ""
+
+
+def _capability_growth_labels(values, limit=8):
+    counter = Counter(str(value or "").strip() for value in (values or []) if str(value or "").strip())
+    return [
+        {"label": label, "count": int(count)}
+        for label, count in sorted(counter.items(), key=lambda item: (-item[1], item[0]))[:limit]
+    ]
+
+
+def build_kol_hermes_capability_growth(tenant_slug):
+    """Expose auditable research assets before they are used to tune Hermes."""
+    tenant_key = str(tenant_slug or "").strip().lower()
+    tenant = get_tenant_by_slug(tenant_key)
+    if not tenant or str(tenant.get("slug") or "").strip().lower() != tenant_key:
+        raise ValueError("tenant_not_found")
+
+    db = get_db()
+    turns = db.execute(
+        """
+        SELECT intent, entry_point, tags_json, memory_summary_json, created_at
+        FROM hermes_conversation_turns
+        WHERE tenant_slug = ?
+        ORDER BY created_at DESC, id DESC
+        """,
+        (tenant_key,),
+    ).fetchall()
+    reviews = resolve_tenant_review_snapshots(tenant, tenant.get("review_snapshots"))
+    knowledge_available = True
+    knowledge_items = []
+    try:
+        live_knowledge_items = fetch_live_knowledge_hub(tenant, limit=240).get("items") or []
+        # A config fallback is useful in the knowledge UI, but it is not proof
+        # that an asset reached the vector store. Capability growth counts only
+        # records with a persisted vector row.
+        knowledge_items = [
+            item for item in live_knowledge_items
+            if isinstance(item, dict) and int((item.get("vector_record") or {}).get("id") or 0) > 0
+        ]
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            raise
+        knowledge_available = False
+        app.logger.warning("Capability growth knowledge load failed for tenant %s: %s", tenant_key, exc)
+
+    now_dt = datetime.now()
+    recent_cutoff = (now_dt - timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+    prior_cutoff = (now_dt - timedelta(days=60)).strftime("%Y-%m-%d %H:%M:%S")
+    topic_values, object_values, method_values = [], [], []
+    monthly = {}
+    current_turns = 0
+    prior_turns = 0
+    for raw_row in turns:
+        row = dict(raw_row or {})
+        created_at = str(row.get("created_at") or "").strip()
+        if created_at >= recent_cutoff:
+            current_turns += 1
+        elif created_at >= prior_cutoff:
+            prior_turns += 1
+        month_key = _capability_growth_month_key(created_at)
+        if month_key:
+            monthly.setdefault(month_key, {"month": month_key, "knowledge": 0, "reviews": 0, "research_turns": 0})["research_turns"] += 1
+        metrics = _extract_hermes_turn_metrics(row)
+        method_values.append(metrics.get("mode_label") or "")
+        tags = _safe_json_dict(row.get("tags_json"))
+        topic_values.extend(tags.get("function_tags") if isinstance(tags.get("function_tags"), list) else [])
+        topic_values.extend(tags.get("style_tags") if isinstance(tags.get("style_tags"), list) else [])
+        metadata = _safe_json_dict(row.get("memory_summary_json"))
+        topic_values.extend(metadata.get("topics") if isinstance(metadata.get("topics"), list) else [])
+        object_values.extend(metadata.get("focus_symbols") if isinstance(metadata.get("focus_symbols"), list) else [])
+
+    validated_review_count = 0
+    review_count = 0
+    for review in reviews:
+        if not isinstance(review, dict):
+            continue
+        review_count += 1
+        topic_values.extend(review.get("tags") if isinstance(review.get("tags"), list) else [])
+        object_values.extend(review.get("watchlist") if isinstance(review.get("watchlist"), list) else [])
+        analysis = review.get("watchlist_analysis_section") if isinstance(review.get("watchlist_analysis_section"), dict) else {}
+        for profile in analysis.get("sector_profiles") if isinstance(analysis.get("sector_profiles"), list) else []:
+            if isinstance(profile, dict):
+                topic_values.append(profile.get("sector"))
+        evidence = review.get("evidence_chain_section") if isinstance(review.get("evidence_chain_section"), dict) else {}
+        has_validation = bool(evidence.get("items")) or bool(analysis.get("annotation_evidence"))
+        if has_validation:
+            validated_review_count += 1
+        method_values.append("证据链复盘" if evidence.get("items") else "复盘归纳")
+        month_key = _capability_growth_month_key(review.get("published_at") or review.get("time"))
+        if month_key:
+            monthly.setdefault(month_key, {"month": month_key, "knowledge": 0, "reviews": 0, "research_turns": 0})["reviews"] += 1
+
+    for item in knowledge_items:
+        if not isinstance(item, dict):
+            continue
+        topic_values.extend(item.get("tags") if isinstance(item.get("tags"), list) else [])
+        topic_values.append(item.get("knowledge_type"))
+        month_key = _capability_growth_month_key((item.get("vector_record") or {}).get("created_at") or item.get("time"))
+        if month_key:
+            monthly.setdefault(month_key, {"month": month_key, "knowledge": 0, "reviews": 0, "research_turns": 0})["knowledge"] += 1
+
+    active_months = [(now_dt - timedelta(days=31 * offset)).strftime("%Y-%m") for offset in range(5, -1, -1)]
+    trend = [monthly.get(month, {"month": month, "knowledge": 0, "reviews": 0, "research_turns": 0}) for month in active_months]
+    source_count = len(knowledge_items) + review_count + len(turns)
+    coverage_count = len(_capability_growth_labels(topic_values, limit=240)) + len(_capability_growth_labels(object_values, limit=240))
+    verification_ratio = round((validated_review_count / review_count) * 100, 1) if review_count else 0.0
+    readiness_score = min(100, round(
+        min(35, len(knowledge_items) * 3)
+        + min(25, review_count * 5)
+        + min(20, len(turns) * 1.2)
+        + min(20, verification_ratio * 0.2)
+    ))
+    stage = "起步沉淀" if readiness_score < 35 else "结构化积累" if readiness_score < 65 else "可验证增长"
+    return {
+        "tenant_slug": tenant_key,
+        "summary": {
+            "readiness_score": readiness_score,
+            "stage": stage,
+            "source_asset_count": source_count,
+            "knowledge_count": len(knowledge_items),
+            "knowledge_available": knowledge_available,
+            "review_count": review_count,
+            "research_turn_count": len(turns),
+            "coverage_count": coverage_count,
+            "validated_review_count": validated_review_count,
+            "verification_ratio": verification_ratio,
+            "recent_turn_count": current_turns,
+            "previous_turn_count": prior_turns,
+            "generated_at": now_ts(),
+        },
+        "trend": trend,
+        "topics": _capability_growth_labels(topic_values),
+        "objects": _capability_growth_labels(object_values),
+        "methods": _capability_growth_labels(method_values),
+        "principles": [
+            "只统计当前租户已入库的知识、已发布复盘和 Hermes 对话聚合。",
+            "能力指数反映可追溯资产的沉淀程度，不等同于模型训练完成或投资建议质量。",
+            "复盘含证据链或标注时计入验证闭环；未验证内容只计入资产，不计入闭环。",
+        ],
+    }
+
+
 def _parse_hermes_tool_trace_json(raw_text):
     try:
         payload = json.loads(raw_text or "[]")
@@ -5274,32 +5423,9 @@ def build_admin_hermes_usage_stats(tenant_slug=""):
         tuple(params_month),
     ).fetchone() or {}
 
-    token_where = ["created_at >= ?", "usage_type = 'llm'", "(feature_code LIKE 'hermes_%' OR entry_point LIKE 'hermes%')"]
-    token_params = [month_start]
-    if tenant:
-        token_where.append("tenant_slug = ?")
-        token_params.append(tenant)
-    token_where_sql = " AND ".join(token_where)
-    token_month = db.execute(
-        f"""
-        SELECT COALESCE(SUM(total_tokens), 0) AS total_tokens,
-               COALESCE(SUM(request_count), 0) AS request_count,
-               COALESCE(SUM(latency_ms), 0) AS latency_ms
-        FROM token_usage_logs
-        WHERE {token_where_sql}
-        """,
-        tuple(token_params),
-    ).fetchone() or {}
-    token_today = db.execute(
-        f"""
-        SELECT COALESCE(SUM(total_tokens), 0) AS total_tokens
-        FROM token_usage_logs
-        WHERE created_at >= ? AND usage_type = 'llm' AND (feature_code LIKE 'hermes_%' OR entry_point LIKE 'hermes%')
-        {'AND tenant_slug = ?' if tenant else ''}
-        """,
-        tuple([today_start] + ([tenant] if tenant else [])),
-    ).fetchone() or {}
-
+    # Conversation records are the source of truth for this page. Fetch them
+    # before optional token telemetry so a legacy token table cannot abort the
+    # transaction and hide otherwise valid Hermes usage statistics.
     turn_rows = db.execute(
         f"""
         SELECT user_profile_id, user_display_name, user_role, entry_point, intent, preferred_mode,
@@ -5310,6 +5436,45 @@ def build_admin_hermes_usage_stats(tenant_slug=""):
         """,
         tuple(params_month),
     ).fetchall()
+
+    token_usage_available = True
+    token_month = {}
+    token_today = {}
+    try:
+        token_where = ["created_at >= ?", "usage_type = 'llm'", "(feature_code LIKE 'hermes_%' OR entry_point LIKE 'hermes%')"]
+        token_params = [month_start]
+        if tenant:
+            token_where.append("tenant_slug = ?")
+            token_params.append(tenant)
+        token_where_sql = " AND ".join(token_where)
+        token_month = db.execute(
+            f"""
+            SELECT COALESCE(SUM(total_tokens), 0) AS total_tokens,
+                   COALESCE(SUM(request_count), 0) AS request_count,
+                   COALESCE(SUM(latency_ms), 0) AS latency_ms
+            FROM token_usage_logs
+            WHERE {token_where_sql}
+            """,
+            tuple(token_params),
+        ).fetchone() or {}
+        token_today = db.execute(
+            f"""
+            SELECT COALESCE(SUM(total_tokens), 0) AS total_tokens
+            FROM token_usage_logs
+            WHERE created_at >= ? AND usage_type = 'llm' AND (feature_code LIKE 'hermes_%' OR entry_point LIKE 'hermes%')
+            {'AND tenant_slug = ?' if tenant else ''}
+            """,
+            tuple([today_start] + ([tenant] if tenant else [])),
+        ).fetchone() or {}
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            raise
+        token_usage_available = False
+        app.logger.warning(
+            "Hermes token telemetry is unavailable for tenant %s; using conversation records only: %s",
+            tenant or "all",
+            exc,
+        )
 
     mode_today = {}
     mode_month = {}
@@ -5480,6 +5645,7 @@ def build_admin_hermes_usage_stats(tenant_slug=""):
             "compute_consumed": consumed,
             "today_tokens": today_token_total,
             "month_tokens": month_token_total,
+            "token_usage_available": token_usage_available,
             "avg_latency_ms": round(total_latency / total_calls, 2) if total_calls else 0,
             "missing_capability_turns": int(missing_capability_turns or 0),
             "missing_capability_count": len(missing_rows),

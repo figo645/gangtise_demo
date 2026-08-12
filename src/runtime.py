@@ -759,6 +759,7 @@ DEFAULT_SITE_CONFIG = {
         "watchlist_fan_comment_interaction": True,
         "paid_reply": False,
         "workbench": True,
+        "tenant_portal": True,
     },
 }
 

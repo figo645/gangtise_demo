@@ -16,6 +16,8 @@ def api_kol_workbench():
 
 @app.route("/api/kol/portal-cms", methods=["POST"])
 def api_save_kol_portal_cms():
+    if not is_feature_enabled("tenant_portal", get_site_config()):
+        return jsonify({"ok": False, "error": "tenant_portal_disabled"}), 404
     tenant = get_tenant_by_slug(request.args.get("tenant"))
     if not tenant:
         return jsonify({"ok": False, "error": "tenant_not_found"}), 404
@@ -253,6 +255,56 @@ def api_kol_knowledge_graph():
         "graph": payload,
         "workflow_meta": build_declared_agent_workflow_meta(build_default_knowledge_graph_workflow_definition()),
     })
+
+
+def _resolve_kol_hermes_tenant():
+    tenant_slug = str(request.args.get("tenant") or "").strip().lower()
+    tenant = get_tenant_by_slug(tenant_slug)
+    if not tenant or str(tenant.get("slug") or "").strip().lower() != tenant_slug:
+        raise ValueError("tenant_not_found")
+    return tenant_slug
+
+
+@app.route("/api/kol/hermes/usage-stats")
+def api_kol_hermes_usage_stats():
+    try:
+        tenant_slug = _resolve_kol_hermes_tenant()
+        return jsonify({"ok": True, "stats": build_admin_hermes_usage_stats(tenant_slug)})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "hermes_usage_db_unavailable"}), 503
+        app.logger.exception("Failed to load tenant Hermes usage stats")
+        return jsonify({"ok": False, "error": "hermes_usage_stats_failed"}), 500
+
+
+@app.route("/api/kol/hermes/memory-summary")
+def api_kol_hermes_memory_summary():
+    try:
+        tenant_slug = _resolve_kol_hermes_tenant()
+        return jsonify({"ok": True, "summary": build_admin_hermes_memory_summary(tenant_slug)})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "hermes_memory_db_unavailable"}), 503
+        app.logger.exception("Failed to load tenant Hermes memory summary")
+        return jsonify({"ok": False, "error": "hermes_memory_summary_failed"}), 500
+
+
+@app.route("/api/kol/hermes/capability-growth")
+def api_kol_hermes_capability_growth():
+    try:
+        tenant_slug = _resolve_kol_hermes_tenant()
+        return jsonify({"ok": True, "growth": build_kol_hermes_capability_growth(tenant_slug)})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "hermes_capability_db_unavailable"}), 503
+        app.logger.exception("Failed to build tenant Hermes capability growth")
+        return jsonify({"ok": False, "error": "hermes_capability_growth_failed"}), 500
 
 
 @app.route("/api/admin/knowledge-graph")

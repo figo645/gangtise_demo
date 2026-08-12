@@ -4728,7 +4728,8 @@
                         <label class="toggle"><input id="db-runtime-use-staging" type="checkbox"><span class="toggle-slider"></span></label>
                       </div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">用户模块</div><div class="feature-toggle-desc">位置：Admin 用户管理、大V工作台的粉丝管理。控制用户列表、导入、新增、标签与付费用户标注入口。</div></div><label class="toggle"><input id="feature-user_module" type="checkbox" checked><span class="toggle-slider"></span></label></div>
-                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">大V租户模块</div><div class="feature-toggle-desc">位置：Admin 大V租户管理与租户门户。控制大V租户配置、租户列表、对外门户和协同管理入口。</div></div><label class="toggle"><input id="feature-kol_module" type="checkbox" checked><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">大V租户模块</div><div class="feature-toggle-desc">位置：Admin 大V租户管理。控制大V租户配置、租户列表和协同管理入口。</div></div><label class="toggle"><input id="feature-kol_module" type="checkbox" checked><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">租户门户</div><div class="feature-toggle-desc">位置：公开租户门户 /tenant/&lt;租户标识&gt;，以及大V工作台的门户 CMS 编排与预览入口。关闭后门户链接、页面和 CMS 保存接口均不可见或不可访问；H5 的基本面、复盘与租户 Dashboard 不受影响。</div></div><label class="toggle"><input id="feature-tenant_portal" type="checkbox" checked><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">基本面分析</div><div class="feature-toggle-desc">位置：H5 基本面页和大V工作台基本面看板。控制新闻聚合、综合归纳要闻与基本面研究入口。</div></div><label class="toggle"><input id="feature-fundamental_analysis" type="checkbox" checked><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">自选股</div><div class="feature-toggle-desc">位置：H5 自选股、大V工作台自选股详情。控制标的查询、K线、指标、标注、观察记录及详情页入口。</div></div><label class="toggle"><input id="feature-watchlist" type="checkbox" checked><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">股票 K 线预测</div><div class="feature-toggle-desc">位置：自选股预测能力和大V工作台预测模型页。控制预测结果展示及预测工作流配置入口。</div></div><label class="toggle"><input id="feature-stock_forecast" type="checkbox"><span class="toggle-slider"></span></label></div>
@@ -4753,7 +4754,7 @@
                         <label class="toggle"><input id="auth-wechat-runtime-test-enabled" type="checkbox" checked><span class="toggle-slider"></span></label>
                       </div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">付费回复</div><div class="feature-toggle-desc">位置：消息/私信的商业化回复场景。控制需要付费或权益校验后才可发起的回复能力，不影响已开放的普通消息浏览。</div></div><label class="toggle"><input id="feature-paid_reply" type="checkbox"><span class="toggle-slider"></span></label></div>
-                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">大V 工作台 Web</div><div class="feature-toggle-desc">位置：Web 端大V工作台及租户经营页面。控制工作台、数据分析、粉丝管理、复盘生产台和租户门户管理入口。</div></div><label class="toggle"><input id="feature-workbench" type="checkbox"><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">大V 工作台 Web</div><div class="feature-toggle-desc">位置：Web 端大V工作台及租户经营页面。控制工作台、数据分析、粉丝管理和复盘生产台入口。</div></div><label class="toggle"><input id="feature-workbench" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="feature-note">平台统一使用用户表中的用户名和密码登录，不再使用共享访问密码或“系统锁定”门禁。账号状态由用户管理维护。</div>
                       <div class="feature-note" style="margin-top:8px">MVP 默认优先开放：基本面、自选股、复盘、消息互动、知识归档、大V工作台和租户门户；预测分析放到第二阶段，会员收费能力按层级逐步开放。</div>
                       <div class="feature-note" style="margin-top:8px">Hermes 范围约束开启后，只接受固定研究范围内的提示词；关闭后，Hermes 会按更开放的问答模式继续承接。普通用户开放开关关闭时，H5 中只有大V用户能看到和使用 Hermes。</div>
@@ -10263,6 +10264,7 @@ function updateAdminFeatureFlagPreview(target) {
   const key = target.id.replace(/^feature-/, '');
   adminSiteConfig.feature_flags[key] = Boolean(target.checked);
   refreshAdminNavVisibility();
+  if (key === 'tenant_portal') renderTenantConfigList();
   const forecastSection = document.getElementById('section-forecast-model');
   if (forecastSection && key === 'stock_forecast' && !target.checked && forecastSection.style.display !== 'none') {
     showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
@@ -10786,6 +10788,7 @@ function renderTenantDetail() {
     host.innerHTML = '<div class="tenant-admin-empty">请先新增一个租户，再开始维护品牌与门户配置。</div>';
     return;
   }
+  const tenantPortalEnabled = isAdminFeatureEnabled('tenant_portal');
   const newsAggregationAlgorithm = ensureAdminTenantNewsAggregationAlgorithm(tenant);
   host.innerHTML = `
     <div class="config-card">
@@ -10829,10 +10832,10 @@ function renderTenantDetail() {
           <label>租户权益</label>
           <input type="text" value="${escapeAttr(tenant.rights || '')}" oninput="updateAdminTenantField('rights', this.value)">
         </div>
-        <div class="config-field">
+        ${tenantPortalEnabled ? `<div class="config-field">
           <label>门户标题</label>
           <input type="text" value="${escapeAttr(tenant.portal_headline || '')}" oninput="updateAdminTenantField('portal_headline', this.value)">
-        </div>
+        </div>` : ''}
         <div class="config-field">
           <label>Dashboard 标题</label>
           <input type="text" value="${escapeAttr(tenant.dashboard_title || '')}" oninput="updateAdminTenantField('dashboard_title', this.value)">
@@ -10842,10 +10845,10 @@ function renderTenantDetail() {
         <label>租户简介</label>
         <input type="text" value="${escapeAttr(tenant.description || '')}" oninput="updateAdminTenantField('description', this.value)">
       </div>
-      <div class="config-field">
+      ${tenantPortalEnabled ? `<div class="config-field">
         <label>门户描述</label>
         <input type="text" value="${escapeAttr(tenant.portal_description || '')}" oninput="updateAdminTenantField('portal_description', this.value)">
-      </div>
+      </div>` : ''}
       <div class="config-field">
         <label>Dashboard 描述</label>
         <input type="text" value="${escapeAttr(tenant.dashboard_description || '')}" oninput="updateAdminTenantField('dashboard_description', this.value)">
@@ -10858,7 +10861,7 @@ function renderTenantDetail() {
         </div>
       </div>
       <div class="feature-note">
-        这里维护的是租户级配置，不是平台级配置。保存后，该大V对应的门户、工作台和默认展示文案会同步更新。
+        这里维护的是租户级配置，不是平台级配置。保存后，该大V对应的工作台和默认展示文案会同步更新。
       </div>
       ${renderAdminTenantDashboardPreview(tenant)}
     </div>
@@ -11015,7 +11018,7 @@ function renderSiteConfigForm() {
   if (document.getElementById('brand-hero-tagline')) document.getElementById('brand-hero-tagline').value = brand.hero_tagline || '';
   if (document.getElementById('brand-hero-description')) document.getElementById('brand-hero-description').value = brand.hero_description || '';
   if (document.getElementById('brand-footer-description')) document.getElementById('brand-footer-description').value = brand.footer_description || '';
-  ['user_module', 'kol_module', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'paid_reply', 'workbench'].forEach(key => {
+  ['user_module', 'kol_module', 'tenant_portal', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'paid_reply', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     if (checkbox) checkbox.checked = Boolean(flags[key]);
   });
@@ -11216,7 +11219,7 @@ async function saveSiteConfig() {
     showToast('Hermes 配置格式有误');
     return;
   }
-  ['user_module', 'kol_module', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'paid_reply', 'workbench'].forEach(key => {
+  ['user_module', 'kol_module', 'tenant_portal', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'paid_reply', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     featureFlags[key] = Boolean(checkbox && checkbox.checked);
   });

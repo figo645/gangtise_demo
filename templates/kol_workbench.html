@@ -171,6 +171,60 @@ body { background: var(--surface-2); color: var(--text-main); }
   color:#1F497D;
   background:#EAF3FF;
 }
+.kw-watch-terminal { display:grid; gap:14px; }
+.kw-watch-terminal-head { display:flex; justify-content:space-between; align-items:flex-end; gap:18px; padding:18px 20px; background:#F4F8FC; border:1px solid rgba(47,116,192,.14); border-radius:8px; }
+.kw-watch-terminal-kicker { color:#2F74C0; font-size:11px; font-weight:700; }
+.kw-watch-terminal-title { margin-top:6px; color:#163B64; font-size:20px; font-weight:700; }
+.kw-watch-terminal-copy { max-width:700px; margin-top:6px; color:#5B6B7B; font-size:12px; line-height:1.7; }
+.kw-watch-terminal-stat { min-width:120px; text-align:right; }
+.kw-watch-terminal-stat-label { color:#6B7785; font-size:11px; }
+.kw-watch-terminal-stat-value { margin-top:5px; color:#163B64; font-size:26px; font-weight:700; }
+.kw-watch-table-wrap { overflow-x:auto; border:1px solid rgba(47,116,192,.13); border-radius:8px; background:#FFF; }
+.kw-watch-table { width:100%; min-width:940px; border-collapse:collapse; }
+.kw-watch-table th { padding:11px 12px; background:#F6F9FC; border-bottom:1px solid rgba(47,116,192,.13); color:#647486; font-size:11px; font-weight:600; text-align:left; white-space:nowrap; }
+.kw-watch-table td { padding:13px 12px; border-bottom:1px solid rgba(47,116,192,.08); color:#33475B; font-size:12px; vertical-align:top; }
+.kw-watch-table tr:last-child td { border-bottom:none; }
+.kw-watch-table tr:hover td { background:#FAFCFE; }
+.kw-watch-symbol { color:#163B64; font-size:14px; font-weight:700; }
+.kw-watch-code { margin-top:3px; color:#7B8998; font-size:10px; }
+.kw-watch-focus { color:#355C83; font-size:12px; font-weight:600; }
+.kw-watch-thesis { max-width:330px; color:#5B6B7B; line-height:1.6; }
+.kw-watch-alert { display:inline-flex; align-items:center; gap:5px; padding:4px 7px; border-radius:4px; font-size:11px; font-weight:600; white-space:nowrap; }
+.kw-watch-alert.normal { background:#EDF8F1; color:#217A4A; }
+.kw-watch-alert.attention { background:#FFF6E5; color:#A86C16; }
+.kw-watch-alert.warning { background:#FDEEEE; color:#B94747; }
+.kw-watch-change { font-weight:700; white-space:nowrap; }
+.kw-watch-change.up { color:#C0392B; }
+.kw-watch-change.down { color:#248F66; }
+.kw-watchlist-tabs { display:flex; gap:6px; margin-top:14px; padding:4px; border:1px solid rgba(47,116,192,.12); border-radius:8px; background:#F4F8FC; }
+.kw-watchlist-tab { flex:1; min-height:34px; border:0; border-radius:5px; background:transparent; color:#5B6B7B; font-size:12px; font-weight:700; cursor:pointer; }
+.kw-watchlist-tab.active { background:#FFF; color:#163B64; box-shadow:0 1px 3px rgba(22,59,100,.10); }
+.kw-watchlist-tab-panel { margin-top:14px; }
+.kw-watchlist-fan-chart { margin-bottom:14px; padding:14px 16px; border:1px solid rgba(47,116,192,.13); border-radius:8px; background:#FFF; }
+.kw-watchlist-fan-chart-title { color:#163B64; font-size:13px; font-weight:700; }
+.kw-watchlist-fan-chart-copy { margin-top:4px; color:#6B7785; font-size:11px; line-height:1.6; }
+.kw-watchlist-comments { display:grid; gap:10px; margin-top:14px; }
+.kw-watchlist-comment { padding:11px 12px; border:1px solid rgba(47,116,192,.10); border-radius:6px; background:#F8FBFF; }
+.kw-watchlist-comment-meta { color:#6B7785; font-size:11px; }
+.kw-watchlist-comment-text { margin-top:5px; color:#33475B; font-size:12px; line-height:1.65; }
+.kw-watchlist-comment-empty { padding:22px 0; color:#6B7785; font-size:12px; text-align:center; }
+.kw-watch-signal-list { display:flex; flex-wrap:wrap; gap:6px; }
+.kw-watch-signal { padding:4px 7px; border-radius:4px; background:#F1F6FB; border:1px solid rgba(47,116,192,.10); color:#355C83; font-size:11px; }
+.kw-watch-insight-shell { display:grid; grid-template-columns:minmax(0,1.22fr) minmax(310px,.78fr); gap:14px; }
+.kw-watch-insight-main, .kw-watch-insight-side { display:grid; gap:14px; align-content:start; }
+.kw-watch-kpi-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border:1px solid rgba(47,116,192,.13); border-radius:8px; overflow:hidden; background:#FFF; }
+.kw-watch-kpi { padding:15px; border-right:1px solid rgba(47,116,192,.10); }
+.kw-watch-kpi:last-child { border-right:none; }
+.kw-watch-kpi-label { color:#718194; font-size:11px; }
+.kw-watch-kpi-value { margin-top:8px; color:#163B64; font-size:24px; font-weight:700; }
+.kw-watch-kpi-note { margin-top:4px; color:#6B7785; font-size:11px; }
+.kw-watch-insight-panel { padding:15px; border:1px solid rgba(47,116,192,.13); border-radius:8px; background:#FFF; }
+.kw-watch-insight-panel-title { color:#163B64; font-size:13px; font-weight:700; }
+.kw-watch-insight-panel-desc { margin-top:4px; color:#6B7785; font-size:11px; line-height:1.6; }
+.kw-watch-comment-row { padding:12px 0; border-bottom:1px solid rgba(47,116,192,.09); }
+.kw-watch-comment-row:last-child { border-bottom:none; }
+@media (max-width:900px) { .kw-watch-insight-shell { grid-template-columns:1fr; } .kw-watch-kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .kw-watch-kpi:nth-child(2) { border-right:none; } .kw-watch-kpi:nth-child(n+3) { border-top:1px solid rgba(47,116,192,.10); } }
+@media (max-width:620px) { .kw-watch-terminal-head { align-items:flex-start; flex-direction:column; } .kw-watch-terminal-stat { text-align:left; } }
 .kw-side-title { font-size:13px; font-weight:700; color:var(--gold); margin-bottom:10px; }
 .kw-side-item {
   display:flex;
@@ -901,6 +955,48 @@ body { background: var(--surface-2); color: var(--text-main); }
   margin-top:10px;
   line-height:1.8;
 }
+.kw-hermes-memory-hero { display:grid; grid-template-columns:minmax(0,1.25fr) minmax(260px,0.75fr); gap:18px; padding:20px; background:#F4F8FC; border:1px solid rgba(47,116,192,0.14); border-radius:8px; }
+.kw-hermes-memory-kicker { color:#2F74C0; font-size:11px; font-weight:700; }
+.kw-hermes-memory-title { color:var(--text-main); font-size:20px; font-weight:700; margin-top:8px; }
+.kw-hermes-memory-copy { color:var(--text-sub); font-size:13px; line-height:1.75; margin-top:8px; max-width:620px; }
+.kw-hermes-memory-meta { color:#5B6B7B; font-size:12px; margin-top:14px; }
+.kw-hermes-memory-signal { display:flex; flex-direction:column; justify-content:space-between; padding:16px; border-radius:8px; background:#FFFFFF; border:1px solid rgba(47,116,192,0.12); }
+.kw-hermes-memory-signal-label { color:#5B6B7B; font-size:12px; }
+.kw-hermes-memory-signal-value { color:#163B64; font-size:30px; font-weight:700; margin-top:10px; }
+.kw-hermes-memory-signal-note { color:#2F74C0; font-size:12px; line-height:1.6; margin-top:8px; }
+.kw-hermes-memory-health-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:16px; }
+.kw-hermes-memory-health-card { padding:16px; border:1px solid rgba(47,116,192,0.12); border-radius:8px; background:#FFFFFF; }
+.kw-hermes-memory-health-top { display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+.kw-hermes-memory-health-label { color:var(--text-main); font-size:13px; font-weight:600; }
+.kw-hermes-memory-health-value { color:#163B64; font-size:18px; font-weight:700; }
+.kw-hermes-memory-track { height:6px; background:#E3EDF7; border-radius:999px; overflow:hidden; margin:12px 0 8px; }
+.kw-hermes-memory-fill { height:100%; background:#2F74C0; border-radius:999px; }
+.kw-hermes-memory-health-note { color:#5B6B7B; font-size:12px; line-height:1.65; }
+.kw-hermes-memory-footnote { color:#6B7785; font-size:12px; line-height:1.7; margin-top:16px; padding:12px 14px; background:#FAFCFE; border-left:3px solid #8FA6C4; }
+@media (max-width:760px) { .kw-hermes-memory-hero, .kw-hermes-memory-health-grid { grid-template-columns:1fr; } }
+.kw-capability-hero { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(220px,.8fr); gap:18px; padding:22px; background:#F4F8FC; border:1px solid rgba(47,116,192,.16); border-radius:8px; }
+.kw-capability-kicker { color:#2F74C0; font-size:11px; font-weight:700; }
+.kw-capability-title { color:#163B64; font-size:22px; font-weight:700; margin-top:8px; }
+.kw-capability-copy { color:#5B6B7B; font-size:13px; line-height:1.75; margin-top:8px; max-width:640px; }
+.kw-capability-score { display:flex; flex-direction:column; justify-content:center; align-items:center; min-height:150px; background:#FFF; border:1px solid rgba(47,116,192,.14); border-radius:8px; }
+.kw-capability-score-value { color:#163B64; font-size:42px; font-weight:700; line-height:1; }
+.kw-capability-score-label { color:#5B6B7B; font-size:12px; margin-top:8px; }
+.kw-capability-score-note { color:#2F74C0; font-size:12px; margin-top:6px; }
+.kw-capability-metric-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:16px; }
+.kw-capability-metric { padding:15px; border:1px solid rgba(47,116,192,.12); border-radius:8px; background:#FFF; }
+.kw-capability-metric-label { color:#5B6B7B; font-size:12px; }
+.kw-capability-metric-value { color:#163B64; font-weight:700; font-size:23px; margin-top:7px; }
+.kw-capability-metric-note { color:#6B7785; font-size:11px; line-height:1.55; margin-top:6px; }
+.kw-capability-grid { display:grid; grid-template-columns:1.1fr .9fr; gap:14px; margin-top:16px; }
+.kw-capability-card { padding:16px; border:1px solid rgba(47,116,192,.12); border-radius:8px; background:#FFF; }
+.kw-capability-card-title { color:#163B64; font-size:14px; font-weight:700; }
+.kw-capability-card-desc { color:#6B7785; font-size:12px; line-height:1.65; margin-top:5px; }
+.kw-capability-trend-row { display:grid; grid-template-columns:62px repeat(3,1fr); gap:8px; align-items:center; margin-top:12px; font-size:12px; color:#5B6B7B; }
+.kw-capability-trend-value { min-height:28px; display:flex; align-items:center; padding:0 8px; background:#F5F9FD; border-left:3px solid #2F74C0; color:#163B64; font-weight:600; }
+.kw-capability-chip-list { display:flex; flex-wrap:wrap; gap:8px; margin-top:13px; }
+.kw-capability-chip { padding:6px 9px; border-radius:4px; background:#F4F8FC; border:1px solid rgba(47,116,192,.13); color:#355C83; font-size:12px; }
+.kw-capability-principles { margin:16px 0 0; padding:13px 15px; background:#FAFCFE; border-left:3px solid #8FA6C4; color:#5B6B7B; font-size:12px; line-height:1.75; }
+@media (max-width:900px) { .kw-capability-metric-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .kw-capability-grid, .kw-capability-hero { grid-template-columns:1fr; } }
 .kw-knowledge-chat-shell { display:grid; grid-template-columns:minmax(280px, 0.82fr) minmax(0, 1.18fr); gap:14px; margin-top:14px; }
 .kw-knowledge-chat-card {
   background:#FFFFFF;
@@ -1196,6 +1292,36 @@ body { background: var(--surface-2); color: var(--text-main); }
   border-color:rgba(200,169,110,0.30);
   background:rgba(200,169,110,0.10);
 }
+.kw-smart-indicator-prompt-shell {
+  margin-top:10px;
+  padding:12px;
+  border:1px solid rgba(47,116,192,0.16);
+  border-radius:10px;
+  background:#F8FBFF;
+  cursor:text;
+}
+.kw-smart-indicator-prompt-shell:focus-within {
+  border-color:#2F74C0;
+  box-shadow:0 0 0 3px rgba(47,116,192,0.10);
+}
+.kw-smart-indicator-prompt-label {
+  margin-bottom:8px;
+  color:#5B6B7B;
+  font-size:11px;
+  font-weight:600;
+}
+.kw-smart-indicator-prompt-input {
+  margin-top:10px;
+  min-height:108px;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  resize:none;
+}
+.kw-smart-indicator-prompt-input:focus { box-shadow:none; }
+.kw-smart-indicator-prompt-input::placeholder { color:#7B8998; opacity:1; }
 .kw-dashboard-input,
 .kw-dashboard-textarea {
   width:100%;
@@ -3293,7 +3419,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <span class="admin-nav-group-caret">&#9662;</span>
         </button>
         <div class="admin-nav-group-body">
-        <div class="admin-nav-item" data-section="portal" data-feature="workbench" onclick="showWorkbenchSection('portal', this)">
+        <div class="admin-nav-item" data-section="portal" data-feature="tenant_portal" onclick="showWorkbenchSection('portal', this)">
           <span class="admin-nav-icon">&#127968;</span> 租户门户
         </div>
         <div class="admin-nav-item" data-section="biz-dashboard" data-feature="workbench" onclick="showWorkbenchSection('biz-dashboard', this)">
@@ -3311,17 +3437,23 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         <div class="admin-nav-item" data-section="knowledge-intake" data-feature="knowledge" onclick="showWorkbenchSection('knowledge-intake', this)">
           <span class="admin-nav-icon">&#9998;</span> 知识治理
         </div>
-        <div class="admin-nav-item" data-section="knowledge-encyclopedia" data-feature="knowledge" onclick="showWorkbenchSection('knowledge-encyclopedia', this)">
-          <span class="admin-nav-icon">&#128366;</span> 百科结构
+        <div class="admin-nav-item" data-section="knowledge-graph" data-feature="knowledge" onclick="showWorkbenchSection('knowledge-graph', this)">
+          <span class="admin-nav-icon">&#128391;</span> 知识图谱
         </div>
         <div class="admin-nav-item" data-section="knowledge-entries" data-feature="knowledge" onclick="showWorkbenchSection('knowledge-entries', this)">
           <span class="admin-nav-icon">&#128196;</span> 百科词条
         </div>
-        <div class="admin-nav-item" data-section="knowledge-graph" data-feature="knowledge" onclick="showWorkbenchSection('knowledge-graph', this)" style="display:none">
-          <span class="admin-nav-icon">&#128391;</span> 知识图谱
-        </div>
-        <div class="admin-nav-item" data-section="hermes" data-feature="hermes" onclick="showWorkbenchSection('hermes', this)">
-          <span class="admin-nav-icon">&#129438;</span> Hermes 工作台
+        <div class="kw-nav-subgroup">
+          <div class="kw-nav-subtitle">Hermes</div>
+          <div class="admin-nav-item" data-section="hermes-overview" data-feature="hermes" onclick="showWorkbenchSection('hermes-overview', this)">
+            <span class="admin-nav-icon">&#129438;</span> 使用概览
+          </div>
+          <div class="admin-nav-item" data-section="hermes-memory" data-feature="hermes" onclick="showWorkbenchSection('hermes-memory', this)">
+            <span class="admin-nav-icon">&#128451;</span> 记忆概览
+          </div>
+          <div class="admin-nav-item" data-section="hermes-capability" data-feature="hermes" onclick="showWorkbenchSection('hermes-capability', this)">
+            <span class="admin-nav-icon">&#129504;</span> 能力沉淀
+          </div>
         </div>
         </div>
       </div>
@@ -3331,8 +3463,14 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <span class="admin-nav-group-caret">&#9662;</span>
         </button>
         <div class="admin-nav-group-body">
-        <div class="admin-nav-item" data-section="watchlist" data-feature="watchlist" onclick="showWorkbenchSection('watchlist', this)">
-          <span class="admin-nav-icon">&#128200;</span> 自选股与详情
+        <div class="kw-nav-subgroup">
+          <div class="kw-nav-subtitle">自选股</div>
+          <div class="admin-nav-item" data-section="watchlist-pool" data-feature="watchlist" onclick="showWorkbenchSection('watchlist-pool', this)">
+            <span class="admin-nav-icon">&#128200;</span> 自选股池
+          </div>
+          <div class="admin-nav-item" data-section="watchlist-insights" data-feature="watchlist" onclick="showWorkbenchSection('watchlist-insights', this)">
+            <span class="admin-nav-icon">&#128172;</span> 互动洞察
+          </div>
         </div>
         <div class="admin-nav-item" data-section="dashboard" data-feature="fundamental_analysis" onclick="showWorkbenchSection('dashboard', this)">
           <span class="admin-nav-icon">&#9638;</span> 智能 Dashboard
@@ -3345,8 +3483,17 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <div class="admin-nav-item" data-section="indicator-smart" data-feature="analytics_module" onclick="showWorkbenchSection('indicator-smart', this)">
             <span class="admin-nav-icon">&#129504;</span> 智能指标
           </div>
-          <div class="admin-nav-item" data-section="indicator-lake" data-feature="analytics_module" onclick="showWorkbenchSection('indicator-lake', this)">
-            <span class="admin-nav-icon">&#127754;</span> 数据湖指标
+          <div class="kw-nav-subgroup">
+            <div class="kw-nav-subtitle">数据湖</div>
+            <div class="admin-nav-item" data-section="lake-market" data-feature="analytics_module" onclick="showWorkbenchSection('lake-market', this)">
+              <span class="admin-nav-icon">&#127758;</span> 市场一览指标
+            </div>
+            <div class="admin-nav-item" data-section="lake-sectors" data-feature="analytics_module" onclick="showWorkbenchSection('lake-sectors', this)">
+              <span class="admin-nav-icon">&#9638;</span> 行业板块
+            </div>
+            <div class="admin-nav-item" data-section="lake-news" data-feature="analytics_module" onclick="showWorkbenchSection('lake-news', this)">
+              <span class="admin-nav-icon">&#128240;</span> 新闻
+            </div>
           </div>
           <div class="admin-nav-item" data-section="indicator-anomalies" data-feature="analytics_module" onclick="showWorkbenchSection('indicator-anomalies', this)">
             <span class="admin-nav-icon">&#9888;</span> 异动报告
@@ -3382,7 +3529,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         <div class="kw-page-summary" id="workbench-page-summary">和 H5 保持同一套产品口径，但以 {{ active_tenant.name }} 的桌面 Web 工作流组织大V日常动作。</div>
       </div>
       <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-        <a href="/tenant/{{ active_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">租户门户</a>
+        {% if tenant_portal_enabled %}<a href="/tenant/{{ active_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">租户门户</a>{% endif %}
         <a href="/h5?tenant={{ active_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">前往 H5</a>
         <a href="/admin" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">纯 Admin 后台</a>
         <a href="/" class="btn-gold" style="padding:8px 16px;font-size:12px;text-decoration:none">返回首页</a>
@@ -3426,11 +3573,13 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
               </div>
               <div class="kw-link-grid">
                 {% for item in workbench.entry_points %}
+                {% if tenant_portal_enabled or item.label != '租户门户' %}
                 <a href="{{ item.url }}" class="kw-link-card">
                   <div class="kw-link-title">{{ item.label }}</div>
                   <div class="kw-link-desc">{{ item.desc }}</div>
                   <div class="kw-link-url">{{ item.url }}</div>
                 </a>
+                {% endif %}
                 {% endfor %}
               </div>
             </div>
@@ -3991,7 +4140,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         </div>
       </div>
 
-      <div id="workbench-section-portal" style="display:none">
+      {% if tenant_portal_enabled %}<div id="workbench-section-portal" style="display:none">
         <div class="kw-card">
           <div class="kw-card-head">
             <div>
@@ -4082,7 +4231,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
             <a href="/tenant/{{ active_tenant.slug }}" class="btn-outline" style="padding:9px 14px;font-size:12px;text-decoration:none">预览粉丝端门户</a>
           </div>
         </div>
-      </div>
+      </div>{% endif %}
 
       <div id="workbench-section-knowledge-overview" style="display:none">
         <div class="kw-card">
@@ -4260,7 +4409,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         </div>
       </div>
 
-      <div id="workbench-section-hermes" style="display:none">
+      <div id="workbench-section-hermes-overview" style="display:none">
         <div class="kw-hermes-admin">
           <div id="kw-hermes-usage-summary" class="stats-grid">
             <div class="stat-card">
@@ -4288,71 +4437,6 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
               <div class="stat-change" style="color:#C8A96E">加载中</div>
             </div>
           </div>
-          <div class="sync-grid">
-            <div class="sync-card">
-              <div class="sync-title">Hermes 产品口径</div>
-              <div class="sync-desc">H5 现已分成两种版本：工作区版保留股票、skills、提示词和结构化结果；龙虾纯对话版只保留聊天和 skills，不强制单独输入股票代码。</div>
-              <div class="sync-chip-row">
-                <span class="sync-chip">工作区版</span>
-                <span class="sync-chip">龙虾纯对话版</span>
-                <span class="sync-chip">skills 可选</span>
-                <span class="sync-chip">skills 可自定义</span>
-                <span class="sync-chip">skills 绑定知识库</span>
-                <span class="sync-chip">问题里自然带股票对象时自动转个股分析</span>
-              </div>
-            </div>
-            <div class="sync-card">
-              <div class="sync-title">平台监控重点</div>
-              <div class="sync-desc">平台侧看的不是按钮多少，而是这两种模式的调用量、知识命中情况、个股分析触发率和响应质量是否一致。</div>
-              <div class="sync-chip-row">
-                <span class="sync-chip">双版本调用占比</span>
-                <span class="sync-chip">知识命中率</span>
-                <span class="sync-chip">自定义 skill 使用率</span>
-                <span class="sync-chip">纯对话转个股分析比率</span>
-                <span class="sync-chip">响应耗时</span>
-              </div>
-            </div>
-          </div>
-          <div class="chart-card" style="margin-bottom:20px">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
-              <div>
-                <div class="chart-title">Hermes 记忆治理</div>
-                <div class="chart-subtitle">按租户查看 Hermes 记忆落库情况，支持范围预览、ZIP 备份和时间段清理。范围清理后，会自动重建剩余会话记忆和用户画像。</div>
-              </div>
-              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-                <select id="kw-hermes-memory-tenant" class="hermes-memory-select" onchange="loadWorkbenchHermesMemorySummary(true)"></select>
-                <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="loadWorkbenchHermesMemorySummary(true)">刷新</button>
-              </div>
-            </div>
-            <div id="kw-hermes-memory-summary" class="hermes-memory-summary-grid"></div>
-            <div class="hermes-memory-panel-grid">
-              <div class="hermes-memory-panel">
-                <div class="hermes-memory-panel-title">备份 Hermes 记忆</div>
-                <div class="hermes-memory-panel-desc">导出当前租户的 Hermes 记忆快照。范围备份会只打包命中时间窗口的对话及对应的聚合记忆。</div>
-                <div class="hermes-memory-toolbar">
-                  <select id="kw-hermes-memory-backup-range" class="hermes-memory-select" style="flex:1;min-width:160px"></select>
-                  <button class="btn-gold" type="button" style="padding:8px 14px;font-size:12px" onclick="backupWorkbenchHermesMemory()">下载 ZIP 备份</button>
-                </div>
-              </div>
-              <div class="hermes-memory-panel">
-                <div class="hermes-memory-panel-title">清理 Hermes 记忆</div>
-                <div class="hermes-memory-panel-desc">支持最近 1 个月、3 个月、6 个月、1 年，或整租户全量清理。全量清理需要输入 <code>CONFIRM</code>。</div>
-                <div class="hermes-memory-toolbar">
-                  <select id="kw-hermes-memory-clear-range" class="hermes-memory-select" onchange="previewWorkbenchHermesMemoryClear()" style="flex:1;min-width:160px"></select>
-                  <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="previewWorkbenchHermesMemoryClear()">预览影响</button>
-                </div>
-                <div id="kw-hermes-memory-clear-confirm-wrap" style="display:none;margin-top:10px">
-                  <input id="kw-hermes-memory-clear-confirm" class="hermes-memory-input" placeholder="全量清理请输入 CONFIRM" style="width:100%;border-color:rgba(231,76,60,0.24)">
-                </div>
-                <div class="hermes-memory-toolbar">
-                  <button class="btn-sm-blue" type="button" style="padding:8px 14px;font-size:12px" onclick="clearWorkbenchHermesMemory(true)">先备份再清理</button>
-                  <button type="button" style="padding:8px 14px;font-size:12px;background:rgba(231,76,60,0.12);border:1px solid rgba(231,76,60,0.32);color:#F1948A;border-radius:10px;cursor:pointer" onclick="clearWorkbenchHermesMemory(false)">直接清理</button>
-                </div>
-              </div>
-            </div>
-            <div id="kw-hermes-memory-preview" class="hermes-memory-preview">请选择租户和清理范围后查看影响预览。</div>
-            <div id="kw-hermes-memory-status" class="hermes-memory-status">尚未加载 Hermes 记忆治理数据。</div>
-          </div>
           <div class="table-wrap" style="margin-bottom:20px">
             <div class="table-header">
               <div class="table-title">Hermes 工具动作统计</div>
@@ -4363,86 +4447,81 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
               <tbody id="kw-hermes-mode-tbody"></tbody>
             </table>
           </div>
-          <div id="kw-hermes-pool-cards" class="pool-cards">
-            <div class="pool-card">
-              <div class="pool-card-label">总算力池</div>
-              <div class="pool-card-value">--</div>
-              <div class="pool-card-sub">加载中</div>
-            </div>
-            <div class="pool-card">
-              <div class="pool-card-label">本月消耗</div>
-              <div class="pool-card-value">--</div>
-              <div class="pool-card-sub">加载中</div>
-            </div>
-            <div class="pool-card">
-              <div class="pool-card-label">剩余可用</div>
-              <div class="pool-card-value">--</div>
-              <div class="pool-card-sub">加载中</div>
-            </div>
-          </div>
           <div class="table-wrap">
             <div class="table-header">
-              <div class="table-title">用户算力消耗排行 (本月)</div>
-              <span class="tag tag-gold">Top 8</span>
+              <div class="table-title">工具动作</div>
+              <span class="tag tag-gold">本月</span>
             </div>
-            <table id="kw-hermes-ranking-table">
-              <thead><tr><th>排名</th><th>用户</th><th>等级</th><th>本月调用</th><th>消耗算力</th><th>最常用模式</th></tr></thead>
-              <tbody id="kw-hermes-ranking-tbody"></tbody>
+            <table id="kw-hermes-action-table">
+              <thead><tr><th>工具</th><th>今日调用</th><th>本月调用</th><th>成功率</th><th>状态</th></tr></thead>
+              <tbody id="kw-hermes-action-tbody"></tbody>
             </table>
           </div>
         </div>
       </div>
 
-      <div id="workbench-section-watchlist" style="display:none">
+      <div id="workbench-section-hermes-memory" style="display:none">
         <div class="kw-card">
           <div class="kw-card-head">
             <div>
-              <div class="kw-card-title">自选股与个股详情</div>
-              <div class="kw-card-desc">{{ workbench.watchlist_hub.summary }}</div>
+              <div class="kw-card-title">Hermes 记忆概览</div>
+              <div class="kw-card-desc">查看当前租户 Hermes 是否持续形成可复用的上下文，而不查看任何粉丝对话正文。</div>
             </div>
-            <span class="kw-tag">Watchlist</span>
+            <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="loadWorkbenchHermesMemorySummary(true)">刷新</button>
           </div>
-          <div class="kw-watch-grid">
-            {% for item in workbench.watchlist_hub["items"] %}
-            <div class="kw-watch-card">
-              <div class="kw-watch-top">
-                <div>
-                  <div class="kw-watch-title">{{ item.name }}</div>
-                  <div class="kw-watch-meta">{{ item.code }} · {{ item.market }} · {{ item.focus }}</div>
-                </div>
-                <span class="kw-tag">{{ item.change }}</span>
-              </div>
-              <div class="kw-watch-desc">{{ item.thesis }}</div>
-              <div class="kw-watch-chip-row" style="margin-top:10px">
-                <span class="kw-watch-chip">状态：{% if item.alert_level == 'warning' %}预警{% elif item.alert_level == 'attention' %}关注{% else %}正常{% endif %}</span>
-                <span class="kw-watch-chip">基础 K 线</span>
-                <span class="kw-watch-chip">MA5</span>
-                <span class="kw-watch-chip">MA10</span>
-                <span class="kw-watch-chip">MA20</span>
-              </div>
-              {% if item.related_indicator_names %}
-              <div class="kw-watch-chip-row" style="margin-top:8px">
-                {% for signal_name in item.related_indicator_names[:3] %}
-                <span class="kw-watch-chip">{{ signal_name }}</span>
-                {% endfor %}
-              </div>
-              {% endif %}
-              <div class="kw-watch-desc" style="margin-top:10px;color:var(--gray-400)">{{ item.alert_text }}</div>
-              <div data-workbench-watch-annotation="{{ item.code }}" style="margin-top:10px"></div>
-            </div>
-            {% endfor %}
-          </div>
+          <div id="kw-hermes-memory-summary" class="hermes-memory-summary-grid"></div>
+          <div id="kw-hermes-memory-status" class="hermes-memory-status">尚未加载本租户 Hermes 记忆数据。</div>
         </div>
-        <div class="kw-card" style="margin-top:16px">
+      </div>
+
+      <div id="workbench-section-hermes-capability" style="display:none">
+        <div class="kw-card">
           <div class="kw-card-head">
             <div>
-              <div class="kw-card-title">评论标注总览</div>
-              <div class="kw-card-desc">这里汇总粉丝和大V在自选股下的评论，并用统一模型做标签、主题和情绪标注，方便大V判断粉丝关注焦点。</div>
+              <div class="kw-card-title">大V能力沉淀</div>
+              <div class="kw-card-desc">观察知识、复盘和 Hermes 研究对话如何形成可追溯研究资产。该页面不改变 Hermes 回答，也不把资产数量等同于模型训练完成。</div>
             </div>
-            <span class="kw-tag">Comment AI</span>
+            <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="loadWorkbenchHermesCapabilityGrowth(true)">刷新</button>
           </div>
-          <div id="kw-watchlist-comment-analytics"></div>
+          <div id="kw-hermes-capability-growth" style="margin-top:16px">正在加载当前租户的能力沉淀数据...</div>
+          <div id="kw-hermes-capability-status" class="hermes-memory-status">仅计算已入库、可回溯的真实研究资产。</div>
         </div>
+      </div>
+
+      <div id="workbench-section-watchlist-pool" style="display:none">
+        <div class="kw-watch-terminal">
+          <div class="kw-watch-terminal-head">
+            <div><div class="kw-watch-terminal-kicker">WATCHLIST MONITOR</div><div class="kw-watch-terminal-title">自选股池</div><div class="kw-watch-terminal-copy">大V自选股与粉丝真实加入的自选股分开展示。两张清单使用一致字段；粉丝列表仅展示已加入自选的用户与标的。</div></div>
+            <div class="kw-watch-terminal-stat"><div class="kw-watch-terminal-stat-label">当前跟踪标的</div><div class="kw-watch-terminal-stat-value">{{ workbench.watchlist_hub["items"]|length }}</div></div>
+          </div>
+          <div class="kw-watchlist-tabs" role="tablist" aria-label="自选股范围">
+            <button id="kw-watchlist-advisor-tab" class="kw-watchlist-tab active" type="button" role="tab" aria-selected="true" onclick="kwSwitchWatchlistPoolTab('advisor')">大V自选股</button>
+            <button id="kw-watchlist-fan-tab" class="kw-watchlist-tab" type="button" role="tab" aria-selected="false" onclick="kwSwitchWatchlistPoolTab('fan')">粉丝自选股</button>
+          </div>
+          <div id="kw-watchlist-advisor-panel" class="kw-watchlist-tab-panel" role="tabpanel">
+          <div class="kw-watch-table-wrap"><table class="kw-watch-table"><thead><tr><th>标的</th><th>行业 / 跟踪线</th><th>涨跌</th><th>研究主线</th><th>风险状态</th><th>关联信号</th><th></th></tr></thead><tbody>
+            {% for item in workbench.watchlist_hub["items"] %}
+            <tr><td><div class="kw-watch-symbol">{{ item.name }}</div><div class="kw-watch-code">{{ item.code }} · {{ item.market }}</div></td><td><div class="kw-watch-focus">{{ item.focus }}</div><div class="kw-watch-code">日K · MA5 / 10 / 20</div></td><td><span class="kw-watch-change {% if '-' in item.change %}down{% else %}up{% endif %}">{{ item.change }}</span></td><td><div class="kw-watch-thesis">{{ item.thesis }}</div></td><td><span class="kw-watch-alert {{ item.alert_level }}">{% if item.alert_level == 'warning' %}预警{% elif item.alert_level == 'attention' %}关注{% else %}正常{% endif %}</span><div class="kw-watch-code">{{ item.alert_text }}</div></td><td><div class="kw-watch-signal-list">{% for signal_name in item.related_indicator_names[:3] %}<span class="kw-watch-signal">{{ signal_name }}</span>{% endfor %}{% if not item.related_indicator_names %}<span class="kw-watch-code">暂无关联信号</span>{% endif %}</div></td><td><button class="btn-outline" type="button" style="padding:7px 10px;font-size:11px;white-space:nowrap" onclick="openKwWatchlistComments('{{ item.code }}', '{{ item.name }}')">查看评论</button></td></tr>
+            {% endfor %}
+          </tbody></table></div>
+          </div>
+          <div id="kw-watchlist-fan-panel" class="kw-watchlist-tab-panel" role="tabpanel" style="display:none">
+            <div class="kw-watchlist-fan-chart"><div class="kw-watchlist-fan-chart-title">粉丝自选行业分布</div><div class="kw-watchlist-fan-chart-copy">按当前租户粉丝已加入的自选股归类，不含浏览、评论和 Hermes 行为。</div><div id="kw-fan-watchlist-sector-chart" style="width:100%;height:220px;margin-top:10px"></div></div>
+            {% if workbench.fan_stock_observation["fan_watchlist_items"] %}
+            <div class="kw-watch-table-wrap"><table class="kw-watch-table"><thead><tr><th>标的</th><th>行业 / 跟踪线</th><th>涨跌</th><th>研究主线</th><th>粉丝</th><th>加入时间</th><th></th></tr></thead><tbody>
+              {% for item in workbench.fan_stock_observation["fan_watchlist_items"] %}
+              <tr><td><div class="kw-watch-symbol">{{ item.name }}</div><div class="kw-watch-code">{{ item.code }} · {{ item.market }}</div></td><td><div class="kw-watch-focus">{{ item.focus }}</div><div class="kw-watch-code">粉丝自选</div></td><td><span class="kw-watch-change {% if '-' in item.change %}down{% else %}up{% endif %}">{{ item.change }}</span></td><td><div class="kw-watch-thesis">{{ item.thesis }}</div></td><td><div class="kw-watch-focus">{{ item.fan_name }}</div>{% if item.is_simulated %}<div class="kw-watch-code">{{ item.simulation_label or '模拟数据' }} · {{ item.simulation_batch_code }}</div>{% endif %}</td><td><div class="kw-watch-code">{{ item.added_at }}</div></td><td><button class="btn-outline" type="button" style="padding:7px 10px;font-size:11px;white-space:nowrap" onclick="openKwWatchlistComments('{{ item.code }}', '{{ item.name }}')">查看评论</button></td></tr>
+              {% endfor %}
+            </tbody></table></div>
+            {% else %}
+            <div class="kw-watch-table-wrap"><div class="kw-watchlist-comment-empty">当前没有粉丝已加入自选的真实记录。粉丝在 H5 点击“加入自选股”后会自动出现在这里。</div></div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div id="workbench-section-watchlist-insights" style="display:none">
+        <div class="kw-watch-terminal"><div class="kw-watch-terminal-head"><div><div class="kw-watch-terminal-kicker">AUDIENCE SIGNALS</div><div class="kw-watch-terminal-title">互动洞察</div><div class="kw-watch-terminal-copy">将自选股评论转为标签、情绪与行业关注分布，帮助判断粉丝真正关注的研究问题。</div></div><div class="kw-watch-terminal-stat"><div class="kw-watch-terminal-stat-label">分析范围</div><div class="kw-watch-terminal-stat-value">评论</div></div></div><div id="kw-watchlist-comment-analytics"></div></div>
       </div>
 
       <div id="workbench-section-dashboard" style="display:none">
@@ -4629,7 +4708,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
                     <span class="toggle-slider"></span>
                   </label>
                 </td>
-                <td>{{ item.last_updated }}</td>
+                <td>{{ item.updated_at or '--' }}</td>
                 <td>
                   <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="kwOpenIndicatorHistory('{{ item.id }}')">历史详情</button>
                   <button class="btn-sm-blue" onclick="showToast('已加入异动监测队列')">监测异动</button>
@@ -4641,65 +4720,67 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         </div>
       </div>
 
-      <div id="workbench-section-indicator-lake" style="display:none">
+      <div id="workbench-section-lake-market" style="display:none">
         <div class="section-header">
           <div>
-            <div class="section-title">数据湖指标</div>
-            <div class="section-subtitle">统一查看已进入指标湖的数据，便于验证市场信号和内容判断是否一致。</div>
+            <div class="section-title">市场一览指标</div>
+            <div class="section-subtitle">标准指数由后台市场快照入库，工作台与 H5 读取同一份已验证数据。</div>
           </div>
         </div>
         <div class="kw-indicator-page-meta">
-          <div class="kw-indicator-page-copy">这里只展示 Gangtise API 已同步进指标湖的数据。任何一条当前取不到的指标都会明确显示未取到，不再回退模拟值或样例。</div>
+          <div class="kw-indicator-page-copy">覆盖 {{ workbench.data_lake.market_overview['items']|length }} / {{ workbench.data_lake.market_overview.expected_count }} 个标准指数。来源：{{ workbench.data_lake.market_overview.source }}{% if workbench.data_lake.market_overview.updated_at %} · 最近入库：{{ workbench.data_lake.market_overview.updated_at }}{% endif %}。</div>
           <div class="kw-indicator-page-tags">
-            <span class="kw-indicator-page-tag">Gangtise API Only</span>
-            <span class="kw-indicator-page-tag">前后台共用</span>
-            <span class="kw-indicator-page-tag">市场信号</span>
+            <span class="kw-indicator-page-tag">后台快照</span>
+            <span class="kw-indicator-page-tag">前后台同口径</span>
+            {% if workbench.data_lake.market_overview.stale %}<span class="kw-indicator-page-tag is-gold">最近真实快照</span>{% endif %}
           </div>
         </div>
         <div class="table-wrap" style="margin-bottom:20px">
           <div class="table-header">
             <div>
-              <div class="table-title">数据湖指标</div>
-              <div style="font-size:12px;color:#8899aa;margin-top:6px">这里按 Gangtise 指标注册表统一展示。若某条 Gangtise 指标当前未同步到真实值，会直接标记为“未取到”。大V后台可查看与分析，但不可关闭。</div>
+              <div class="table-title">标准市场指数</div>
+              <div style="font-size:12px;color:#8899aa;margin-top:6px">没有入库的指数不展示数值，不会用模拟值补齐。</div>
             </div>
-            <span class="tag tag-blue">Gangtise</span>
+            <span class="tag tag-blue">{{ workbench.data_lake.market_overview.source }}</span>
           </div>
           <table>
-            <thead><tr><th>指标</th><th>分类</th><th>当前状态</th><th>来源说明</th><th>状态</th><th>开关</th><th>最后更新</th><th>操作</th></tr></thead>
+            <thead><tr><th>指数</th><th>代码</th><th>最新价</th><th>涨跌幅</th><th>市场</th><th>入库时间</th></tr></thead>
             <tbody>
-              {% for item in workbench.indicator_hub["lake_items"] %}
+              {% for item in workbench.data_lake.market_overview['items'] %}
               <tr>
-                <td><span style="color:#F8F6F0;font-weight:600">{{ item.name }}</span><div style="font-size:11px;color:#8899aa;margin-top:4px">{{ item.owner }} · {{ item.data_mode_label }}</div></td>
-                <td>{{ item.category }}</td>
-                <td style="color:#C8A96E">{{ item.value if not item.data_unavailable else '未取到' }}</td>
-                <td style="max-width:320px;color:#8899aa">{{ item.assessment }}</td>
-                <td>
-                  {% if item.status == 'unavailable' or item.data_unavailable %}
-                  <span class="tag tag-blue">未取到</span>
-                  {% elif item.status == 'warning' %}
-                  <span class="tag tag-red">预警</span>
-                  {% elif item.status == 'attention' %}
-                  <span class="tag tag-gold">关注</span>
-                  {% else %}
-                  <span class="tag tag-green">正常</span>
-                  {% endif %}
-                </td>
-                <td>
-                  <label class="toggle" style="opacity:0.72;cursor:not-allowed">
-                    <input type="checkbox" {% if item.enabled %}checked{% endif %} disabled>
-                    <span class="toggle-slider"></span>
-                  </label>
-                </td>
+                <td><span style="color:#F8F6F0;font-weight:600">{{ item.name }}</span></td>
+                <td>{{ item.code or item.indicator_code }}</td>
+                <td style="color:#C8A96E">{{ item.price if item.available else '未取到' }}</td>
+                <td style="color:{% if item.change_pct is defined and item.change_pct < 0 %}var(--red){% else %}var(--green){% endif %}">{{ '%+.2f%%'|format(item.change_pct or 0) if item.available else '--' }}</td>
+                <td>{{ item.market or '--' }}</td>
                 <td>{{ item.last_updated }}</td>
-                <td>
-                  <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="kwOpenIndicatorHistory('{{ item.id }}')">历史详情</button>
-                  <button class="btn-sm-blue" onclick="showToast('已加入数据湖异动监测队列')">监测异动</button>
-                </td>
               </tr>
               {% endfor %}
+              {% if not workbench.data_lake.market_overview['items'] %}<tr><td colspan="6" style="color:#8899aa;text-align:center;padding:20px">{{ workbench.data_lake.market_overview.message or '后台尚未完成市场快照同步。' }}</td></tr>{% endif %}
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div id="workbench-section-lake-sectors" style="display:none">
+        <div class="section-header"><div><div class="section-title">行业板块</div><div class="section-subtitle">申万一级行业行情，按已入库快照展示，供自选股行业与复盘主题共用。</div></div></div>
+        <div class="kw-indicator-page-meta">
+          <div class="kw-indicator-page-copy">覆盖 {{ workbench.data_lake.sectors['items']|length }} / {{ workbench.data_lake.sectors.expected_count }} 个申万一级行业。来源：{{ workbench.data_lake.sectors.source }}{% if workbench.data_lake.sectors.updated_at %} · 最近入库：{{ workbench.data_lake.sectors.updated_at }}{% endif %}。</div>
+          <div class="kw-indicator-page-tags"><span class="kw-indicator-page-tag">申万一级</span><span class="kw-indicator-page-tag">后台快照</span>{% if workbench.data_lake.sectors.stale %}<span class="kw-indicator-page-tag is-gold">最近真实快照</span>{% endif %}</div>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>行业</th><th>代码</th><th>最新价</th><th>涨跌幅</th><th>数据来源</th><th>入库时间</th></tr></thead><tbody>
+          {% for item in workbench.data_lake.sectors['items'] %}<tr><td><span style="color:#F8F6F0;font-weight:600">{{ item.sector }}</span></td><td>{{ item.code }}</td><td style="color:#C8A96E">{{ item.value }}</td><td style="color:{% if item.change_pct < 0 %}var(--red){% else %}var(--green){% endif %}">{{ '%+.2f%%'|format(item.change_pct or 0) }}</td><td>{{ item.data_source or workbench.data_lake.sectors.source }}</td><td>{{ item.updated_at }}</td></tr>{% endfor %}
+          {% if not workbench.data_lake.sectors['items'] %}<tr><td colspan="6" style="color:#8899aa;text-align:center;padding:20px">{{ workbench.data_lake.sectors.message or '后台尚未完成行业快照同步。' }}</td></tr>{% endif %}
+        </tbody></table></div>
+      </div>
+
+      <div id="workbench-section-lake-news" style="display:none">
+        <div class="section-header"><div><div class="section-title">新闻</div><div class="section-subtitle">从已清洗、已通过数量门槛的国内公开信息源入湖；此处展示当前租户按自选股行业归纳后的真实新闻。</div></div></div>
+        <div class="kw-indicator-page-meta"><div class="kw-indicator-page-copy">当前入湖 {{ workbench.data_lake.news['items']|length }} 条。{{ workbench.data_lake.news.message }}</div><div class="kw-indicator-page-tags"><span class="kw-indicator-page-tag">真实公开信息</span><span class="kw-indicator-page-tag">清洗入湖</span><span class="kw-indicator-page-tag">行业关联归纳</span></div></div>
+        <div class="table-wrap"><table><thead><tr><th>新闻</th><th>来源</th><th>归纳分类</th><th>关联原因</th><th>发布时间</th></tr></thead><tbody>
+          {% for item in workbench.data_lake.news['items'] %}<tr><td style="max-width:360px"><a href="{{ item.url or item.link or '#' }}" target="_blank" rel="noopener" style="color:#F8F6F0;text-decoration:none;font-weight:600">{{ item.title }}</a></td><td>{{ item.source_name or item.source_group or '--' }}</td><td>{{ item.aggregation_bucket or item.tag or '--' }}</td><td style="max-width:300px;color:#8899aa">{{ item.why or item.aggregation_reason or '--' }}</td><td>{{ item.published_at or item.time or '--' }}</td></tr>{% endfor %}
+          {% if not workbench.data_lake.news['items'] %}<tr><td colspan="5" style="color:#8899aa;text-align:center;padding:20px">当前没有通过纳入标准的真实新闻；不会展示演示内容。</td></tr>{% endif %}
+        </tbody></table></div>
       </div>
 
       <div id="workbench-section-indicator-anomalies" style="display:none">
@@ -4848,6 +4929,12 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
     <div id="kw-dashboard-cell-modal-content"></div>
   </div>
 </div>
+<div class="kw-review-modal-overlay" id="kw-watchlist-comments-modal" onclick="if(event.target===this)closeKwWatchlistComments()">
+  <div class="kw-review-modal-sheet">
+    <div class="kw-review-modal-close-row"><button class="kw-review-modal-close-pill" type="button" onclick="closeKwWatchlistComments()">关闭</button></div>
+    <div id="kw-watchlist-comments-content"></div>
+  </div>
+</div>
 <div class="kw-review-modal-overlay" id="kw-fan-import-modal" onclick="if(event.target===this)closeKwFanImportModal()">
   <div class="kw-review-modal-sheet kw-knowledge-modal-sheet">
     <div class="kw-review-modal-close-row"><button class="kw-review-modal-close-pill" type="button" onclick="closeKwFanImportModal()">关闭</button></div>
@@ -4873,13 +4960,20 @@ const workbenchSectionMeta = {
   'knowledge-intake': { title: '知识治理', summary: '按语音、文件、网页和手动输入管理知识入库、修改、清洗队列与同步状态。' },
   'knowledge-encyclopedia': { title: '百科结构', summary: '先看当前租户知识规模、成熟度和高频主题，判断知识库有没有形成稳定结构。' },
   'knowledge-entries': { title: '百科词条', summary: '按人能直接阅读的词条方式浏览知识沉淀，再下钻查看摘要、要点与正文。' },
-  'knowledge-graph': { title: '百科结构', summary: '当前大V后台默认展示可直接理解的知识结构和词条，复杂关系网络仅在 admin 后台查看。' },
-  hermes: { title: 'Hermes 管理', summary: '按当前租户查看 Hermes 记忆治理、工具动作统计和算力消耗，不再展示旧的工作台介绍壳。' },
-  watchlist: { title: '自选股与详情', summary: '承接 H5 的顶部输代码、自选股详情和 K 线 + MA5/10/20 展示逻辑。' },
+  'knowledge-graph': { title: '知识图谱', summary: '按主题、实体、方法、观点和验证信号浏览当前租户知识关系；点击节点可查看来源证据与关联对象。' },
+  'hermes-overview': { title: 'Hermes · 使用概览', summary: '基于当前租户真实调用记录查看使用量、模式分布、工具动作与响应延迟。' },
+  'hermes-memory': { title: 'Hermes · 记忆概览', summary: '查看当前租户真实会话、用户记忆和画像聚合；敏感对话内容与治理操作仅由 Admin 管理。' },
+  'hermes-capability': { title: 'Hermes · 能力沉淀', summary: '观察大V知识、复盘和研究对话形成的可追溯资产与验证闭环；该页只观测，不直接改变模型。' },
+  watchlist: { title: '自选股池', summary: '查看当前租户的跟踪标的、行业定位和风险状态。' },
+  'watchlist-pool': { title: '自选股池', summary: '在大V自选股和粉丝自选股之间切换查看；两类清单字段一致，并可下钻查看标的评论。' },
+  'watchlist-insights': { title: '互动洞察', summary: '汇总自选股评论中的标签、情绪、行业分布和近期关注问题。' },
   dashboard: { title: '智能 Dashboard', summary: 'Dashboard 是智能化定义模式：通过提示词、布局和指标规则生成面板，再发布到前台，不等同于门户装修。' },
   'indicator-overview': { title: '指标专区 · 总览控制台', summary: '先看总体状态、风险分布和跟踪优先级，再进入更细的指标分组。' },
   'indicator-smart': { title: '指标专区 · 智能指标', summary: '聚焦大V输入与智能分析相关的指标，辅助复盘内容判断。' },
-  'indicator-lake': { title: '指标专区 · 数据湖指标', summary: '查看来自统一指标湖的市场与业务信号，和前台消费保持一致。' },
+  'indicator-lake': { title: '数据湖 · 市场一览指标', summary: '查看后台入库的标准市场指数，和 H5 市场一览保持一致。' },
+  'lake-market': { title: '数据湖 · 市场一览指标', summary: '查看后台入库的标准市场指数，和 H5 市场一览保持一致。' },
+  'lake-sectors': { title: '数据湖 · 行业板块', summary: '查看后台入库的申万一级行业行情，与自选股行业和复盘主题共用。' },
+  'lake-news': { title: '数据湖 · 新闻', summary: '查看已清洗且通过来源数量门槛的真实新闻湖，并按当前租户自选股行业归纳。' },
   'indicator-anomalies': { title: '指标专区 · 异动报告', summary: '优先查看需要跟踪的波动与异常，帮助确定当天内容重点。' },
   published: { title: '已发布复盘', summary: '这里确认发布后的复盘，就是普通投资者在前台实际看到的内容。' },
   consistency: { title: '前后台一致性', summary: '明确 H5、工作台和 Admin 的一致性口径以及角色边界。' }
@@ -4904,6 +4998,10 @@ const kwHermesMemoryState = {
 const kwHermesUsageState = {
   loading: false,
   stats: null,
+};
+const kwHermesCapabilityState = {
+  loading: false,
+  growth: null,
 };
 const KW_DASHBOARD_MODES = [
   {
@@ -5081,6 +5179,10 @@ function refreshWorkbenchNavVisibility() {
     const visibleItems = items.filter((item) => item.style.display !== 'none');
     group.style.display = visibleItems.length ? '' : 'none';
   });
+  const portalSection = document.getElementById('workbench-section-portal');
+  if (portalSection && !isWorkbenchFeatureEnabled('tenant_portal')) {
+    portalSection.style.display = 'none';
+  }
   const activeSection = document.querySelector('.admin-nav-item.active[data-section]');
   if (activeSection && activeSection.style.display === 'none') {
     showWorkbenchSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
@@ -5157,53 +5259,76 @@ function renderWorkbenchWatchlistCommentAnalytics() {
     ? analytics.sector_distribution
     : buildCommentSectorDistributionFallback(recentComments);
   host.innerHTML = `
-    <div class="stats-grid" style="margin-top:0">
-      <div class="stat-card"><div class="stat-label">评论总量</div><div class="stat-value">${Number(summary.total_comments || 0)}</div><div class="stat-change up">租户内累计</div></div>
-      <div class="stat-card"><div class="stat-label">粉丝评论</div><div class="stat-value">${Number(summary.investor_comments || 0)}</div><div class="stat-change up">普通用户输入</div></div>
-      <div class="stat-card"><div class="stat-label">大V评论</div><div class="stat-value">${Number(summary.dav_comments || 0)}</div><div class="stat-change up">投顾侧观点</div></div>
-      <div class="stat-card"><div class="stat-label">涉及个股</div><div class="stat-value">${Number(summary.stock_count || 0)}</div><div class="stat-change up">有讨论的标的</div></div>
+    <div class="kw-watch-kpi-grid">
+      <div class="kw-watch-kpi"><div class="kw-watch-kpi-label">评论总量</div><div class="kw-watch-kpi-value">${Number(summary.total_comments || 0)}</div><div class="kw-watch-kpi-note">租户内累计</div></div>
+      <div class="kw-watch-kpi"><div class="kw-watch-kpi-label">粉丝评论</div><div class="kw-watch-kpi-value">${Number(summary.investor_comments || 0)}</div><div class="kw-watch-kpi-note">普通用户表达</div></div>
+      <div class="kw-watch-kpi"><div class="kw-watch-kpi-label">大V评论</div><div class="kw-watch-kpi-value">${Number(summary.dav_comments || 0)}</div><div class="kw-watch-kpi-note">投顾侧观点</div></div>
+      <div class="kw-watch-kpi"><div class="kw-watch-kpi-label">涉及标的</div><div class="kw-watch-kpi-value">${Number(summary.stock_count || 0)}</div><div class="kw-watch-kpi-note">有讨论的个股</div></div>
     </div>
-    <div class="config-grid" style="margin-top:16px">
-      <div class="config-card">
-        <div class="config-card-title">关键词云图</div>
-        <div class="keyword-cloud">
-          ${keywordCloud.length ? keywordCloud.map((item) => `<span class="keyword-tag">${escapeHtml(item.keyword || '')} · ${Number(item.value || 0)}</span>`).join('') : '<span style="font-size:12px;color:var(--gray-400)">暂无评论关键词</span>'}
-        </div>
+    <div class="kw-watch-insight-shell">
+      <div class="kw-watch-insight-main">
+        <div class="kw-watch-insight-panel"><div class="kw-watch-insight-panel-title">关注结构</div><div class="kw-watch-insight-panel-desc">标签与情绪用于比较讨论重心，不替代对具体评论的阅读。</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px"><div id="kw-watchlist-comment-label-chart" style="width:100%;height:220px"></div><div id="kw-watchlist-comment-sentiment-chart" style="width:100%;height:220px"></div></div></div>
+        <div class="kw-watch-insight-panel"><div class="kw-watch-insight-panel-title">行业关注分布</div><div class="kw-watch-insight-panel-desc">按评论所关联的自选股行业归并。</div><div id="kw-watchlist-comment-sector-chart" style="width:100%;height:240px;margin-top:10px"></div></div>
       </div>
-      <div class="config-card">
-        <div class="config-card-title">最新评论标注</div>
-        <div style="display:grid;gap:10px">
-          ${recentComments.length ? recentComments.slice(0, 6).map((item) => `
-            <div style="border:1px solid rgba(47,116,192,0.12);border-radius:12px;padding:12px;background:#FFFFFF">
-              <div style="font-size:11px;color:var(--gray-400)">${escapeHtml(item.created_by_role_label || '')} · ${escapeHtml(item.created_by_name || '')} · ${escapeHtml(item.updated_at || item.created_at || '')}</div>
-              <div style="font-size:13px;color:var(--text-main);line-height:1.7;margin-top:6px">${escapeHtml(item.comment_text || '')}</div>
-              <div class="keyword-cloud" style="margin-top:8px">
-                ${(Array.isArray(item.label_tags) ? item.label_tags : []).map((tag) => `<span class="keyword-tag" style="background:rgba(47,116,192,0.08);border-color:rgba(47,116,192,0.18);color:#2F74C0">${escapeHtml(tag)}</span>`).join('')}
-                ${item.sentiment_label ? `<span class="keyword-tag" style="background:rgba(200,169,110,0.12);border-color:rgba(200,169,110,0.28);color:var(--gold-dark)">${escapeHtml(item.sentiment_label)}</span>` : ''}
-              </div>
-            </div>
-          `).join('') : '<div style="font-size:12px;color:var(--gray-400)">暂无评论记录</div>'}
-        </div>
+      <div class="kw-watch-insight-side">
+        <div class="kw-watch-insight-panel"><div class="kw-watch-insight-panel-title">高频关键词</div><div class="kw-watch-insight-panel-desc">仅基于已有评论标注汇总。</div><div class="kw-watch-signal-list" style="margin-top:12px">${keywordCloud.length ? keywordCloud.map((item) => `<span class="kw-watch-signal">${escapeHtml(item.keyword || '')} ${Number(item.value || 0)}</span>`).join('') : '<span class="kw-watch-insight-panel-desc">暂无评论关键词</span>'}</div></div>
+        <div class="kw-watch-insight-panel"><div class="kw-watch-insight-panel-title">最新评论</div><div class="kw-watch-insight-panel-desc">先看原文，再看系统标签与情绪。</div>${recentComments.length ? recentComments.slice(0, 6).map((item) => `<div class="kw-watch-comment-row"><div class="kw-watch-code">${escapeHtml(item.created_by_role_label || '')} · ${escapeHtml(item.created_by_name || '')} · ${escapeHtml(item.updated_at || item.created_at || '')}</div><div class="kw-watchlist-comment-text" style="margin-top:5px">${escapeHtml(item.comment_text || '')}</div><div class="kw-watch-signal-list" style="margin-top:7px">${(Array.isArray(item.label_tags) ? item.label_tags : []).map((tag) => `<span class="kw-watch-signal">${escapeHtml(tag)}</span>`).join('')}${item.sentiment_label ? `<span class="kw-watch-alert attention">${escapeHtml(item.sentiment_label)}</span>` : ''}</div></div>`).join('') : '<div class="kw-watch-insight-panel-desc" style="margin-top:12px">暂无评论记录</div>'}</div>
       </div>
-    </div>
-    <div class="config-grid" style="margin-top:16px">
-      <div class="config-card">
-        <div class="config-card-title">标签分布</div>
-        <div id="kw-watchlist-comment-label-chart" style="width:100%;height:220px"></div>
-      </div>
-      <div class="config-card">
-        <div class="config-card-title">情绪分布</div>
-        <div id="kw-watchlist-comment-sentiment-chart" style="width:100%;height:220px"></div>
-      </div>
-    </div>
-    <div class="config-card" style="margin-top:16px">
-      <div class="config-card-title">行业板块分布</div>
-      <div id="kw-watchlist-comment-sector-chart" style="width:100%;height:240px"></div>
     </div>
   `;
   renderWorkbenchBarChart('kw-watchlist-comment-label-chart', labelDistribution.map((item) => ({ label: item.label, value: item.value })));
   renderWorkbenchBarChart('kw-watchlist-comment-sentiment-chart', sentimentDistribution.map((item) => ({ label: item.label, value: item.value })));
   renderWorkbenchBarChart('kw-watchlist-comment-sector-chart', sectorDistribution.map((item) => ({ label: item.label, value: item.value })));
+}
+
+function kwSwitchWatchlistPoolTab(name) {
+  const isFan = name === 'fan';
+  const advisorPanel = document.getElementById('kw-watchlist-advisor-panel');
+  const fanPanel = document.getElementById('kw-watchlist-fan-panel');
+  const advisorTab = document.getElementById('kw-watchlist-advisor-tab');
+  const fanTab = document.getElementById('kw-watchlist-fan-tab');
+  if (advisorPanel) advisorPanel.style.display = isFan ? 'none' : '';
+  if (fanPanel) fanPanel.style.display = isFan ? '' : 'none';
+  if (advisorTab) { advisorTab.classList.toggle('active', !isFan); advisorTab.setAttribute('aria-selected', String(!isFan)); }
+  if (fanTab) { fanTab.classList.toggle('active', isFan); fanTab.setAttribute('aria-selected', String(isFan)); }
+  if (isFan) {
+    const distribution = (((window.WORKBENCH_DATA || {}).fan_stock_observation || {}).fan_watchlist_sector_distribution || []);
+    renderWorkbenchBarChart('kw-fan-watchlist-sector-chart', distribution.map((item) => ({ label: item.label, value: item.value })));
+  }
+}
+
+function closeKwWatchlistComments() {
+  const modal = document.getElementById('kw-watchlist-comments-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+async function openKwWatchlistComments(stockCode, stockName) {
+  const modal = document.getElementById('kw-watchlist-comments-modal');
+  const host = document.getElementById('kw-watchlist-comments-content');
+  const tenantSlug = String(((window.ACTIVE_TENANT || {}).slug) || '').trim();
+  if (!modal || !host || !tenantSlug || !stockCode) return;
+  host.innerHTML = `<div class="kw-review-modal-title">${escapeHtml(stockName || stockCode)} · 评论</div><div class="kw-watchlist-comment-empty">正在读取当前租户的评论...</div>`;
+  modal.classList.add('show');
+  try {
+    const response = await fetch(`/api/watchlist/${encodeURIComponent(stockCode)}/comments?tenant_slug=${encodeURIComponent(tenantSlug)}&user_role=dav&stock_name=${encodeURIComponent(stockName || '')}`);
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error((payload && payload.error) || 'watchlist_comments_load_failed');
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    host.innerHTML = `
+      <div class="kw-review-modal-title">${escapeHtml(stockName || stockCode)} · 评论</div>
+      <div class="kw-dashboard-panel-note" style="margin-top:6px">仅展示当前租户已发布的该标的评论，按最新更新时间排序。</div>
+      <div class="kw-watchlist-comments">
+        ${items.length ? items.map((item) => `
+          <div class="kw-watchlist-comment">
+            <div class="kw-watchlist-comment-meta">${escapeHtml(item.created_by_role_label || '')} · ${escapeHtml(item.created_by_name || '')} · ${escapeHtml(item.updated_at || item.created_at || '')}${item.is_simulated ? ` · ${escapeHtml(item.simulation_label || '模拟数据')}` : ''}</div>
+            <div class="kw-watchlist-comment-text">${escapeHtml(item.comment_text || '')}</div>
+          </div>
+        `).join('') : '<div class="kw-watchlist-comment-empty">该标的暂无评论。</div>'}
+      </div>
+    `;
+  } catch (error) {
+    host.innerHTML = `<div class="kw-review-modal-title">${escapeHtml(stockName || stockCode)} · 评论</div><div class="kw-watchlist-comment-empty">${escapeHtml(error.message || '评论加载失败')}</div>`;
+  }
 }
 
 function kwNormalizeDashboardLayout(layout) {
@@ -6149,7 +6274,7 @@ function kwEnsurePortalSelection() {
 
 function kwSelectPortalBlock(blockId) {
   kwPortalSelectedBlockId = blockId;
-  kwRenderPortalWorkspace();
+  if (document.getElementById('workbench-section-portal')) kwRenderPortalWorkspace();
 }
 
 function kwHandlePortalBlockClick(event, blockId) {
@@ -6627,7 +6752,7 @@ function kwMovePortalBlock(index, offset) {
   blocks[index] = blocks[target];
   blocks[target] = current;
   kwPortalMarkDraft('草稿已调整排序');
-  kwRenderPortalWorkspace();
+  if (document.getElementById('workbench-section-portal')) kwRenderPortalWorkspace();
 }
 
 function kwTogglePortalBlock(index) {
@@ -6889,7 +7014,7 @@ const KW_REVIEW_PERIOD_CONFIG = {
 };
 const KW_REVIEW_SOURCE_OPTIONS = [
   { value: 'voice', icon: '🎙️', label: '语音口述' },
-  { value: 'manual', icon: '✍️', label: '手动撰写' },
+  { value: 'manual', icon: '✍️', label: '手写正文' },
   { value: 'file', icon: '📎', label: '文件上传' },
   { value: 'url', icon: '🔗', label: '网页 URL' },
 ];
@@ -8882,6 +9007,7 @@ let kwReviewVoiceRecorder = null;
 let kwReviewVoiceChunks = [];
 let kwReviewVoiceRecording = false;
 let kwReviewVoiceUploading = false;
+let kwReviewFileUploading = false;
 let kwReviewIngestResult = null;
 let kwReviewDraftGenerating = false;
 let kwReviewDraftJobState = null;
@@ -9331,51 +9457,72 @@ async function kwPreviewReviewUrl() {
     showToast('请先输入 URL');
     return;
   }
-  const resp = await fetch('/api/kol/knowledge/url-preview', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ url: kwReviewDraft.urlValue }),
-  });
-  const data = await resp.json();
-  if (!resp.ok || !data.ok) {
-    showToast((data && data.error) || '网页抓取失败');
-    return;
+  try {
+    const resp = await fetch('/api/kol/knowledge/url-preview', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ url: kwReviewDraft.urlValue }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || '网页抓取失败');
+    const preview = data.preview || {};
+    const extractedText = String(preview.body || preview.summary || '').trim();
+    if (!extractedText) throw new Error('网页未提取到可用文本，请确认链接内容');
+    kwReviewDraft.urlTitle = kwReviewDraft.urlTitle || String(preview.title || '');
+    kwReviewDraft.urlText = extractedText;
+    kwReviewDraft.manualHtml = kwMergePlainTextIntoKnowledgeHtml(kwReviewDraft.manualHtml || '', extractedText);
+    kwReviewDraft.sourceMode = 'manual';
+    kwReviewDraft.previewReady = false;
+    kwReviewDraft.generatedPreviewText = '';
+    kwReviewDraft.draftReviewText = '';
+    kwReviewDraft.flowStage = 'intake';
+    kwReviewStructuredPreview = null;
+    showToast('网页内容已提取为文本，可继续编辑后生成 Draft');
+  } catch (error) {
+    showToast(error.message || '网页抓取失败');
+  } finally {
+    kwRenderReviewStudio();
   }
-  const preview = data.preview || {};
-  kwReviewDraft.urlTitle = kwReviewDraft.urlTitle || preview.title || '';
-  kwReviewDraft.urlText = preview.body || preview.summary || '';
-  kwReviewDraft.manualHtml = kwMergePlainTextIntoKnowledgeHtml(kwReviewDraft.manualHtml || '', kwReviewDraft.urlText || '');
-  kwReviewDraft.sourceMode = 'manual';
-  kwRenderReviewStudio();
-  showToast('网页内容已提取，可继续手动修改');
 }
 
 function kwCaptureReviewFileInput() {
+  if (kwReviewFileUploading) return;
   const input = document.createElement('input');
   input.type = 'file';
-  input.accept = '.pdf,.doc,.docx,.txt,.md,.csv,.xlsx,.xls';
+  input.accept = '.pdf,.docx,.xlsx,.xlsm,.txt,.md,.csv,.html,.htm,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv,text/html';
   input.onchange = async () => {
     const file = input.files && input.files[0];
     if (!file) return;
-    const formData = new FormData();
-    formData.append('file', file, file.name);
-    const resp = await fetch('/api/kol/knowledge/file-preview', {
-      method: 'POST',
-      body: formData,
-    });
-    const data = await resp.json();
-    if (!resp.ok || !data.ok) {
-      showToast((data && data.error) || '文件解析失败');
-      return;
-    }
-    const preview = data.preview || {};
-    kwReviewDraft.fileName = preview.filename || file.name;
-    kwReviewDraft.fileText = preview.body || preview.summary || '';
-    kwReviewDraft.manualHtml = kwMergePlainTextIntoKnowledgeHtml(kwReviewDraft.manualHtml || '', kwReviewDraft.fileText || '');
-    kwReviewDraft.sourceMode = 'manual';
-    kwReviewDraft.previewReady = false;
+    kwReviewFileUploading = true;
     kwRenderReviewStudio();
-    showToast('文件已转成文案，可继续手动修改');
+    try {
+      const formData = new FormData();
+      formData.append('file', file, file.name);
+      const resp = await fetch('/api/kol/knowledge/file-preview', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) throw new Error((data && data.error) || `文件解析失败：${file.name}`);
+      const preview = data.preview || {};
+      const extractedText = String(preview.body || preview.summary || '').trim();
+      if (!extractedText) throw new Error('文件未提取到可用文本，请更换文件或检查文件内容');
+      kwReviewDraft.fileName = String(preview.filename || file.name);
+      kwReviewDraft.fileText = extractedText;
+      kwReviewDraft.manualHtml = kwMergePlainTextIntoKnowledgeHtml(kwReviewDraft.manualHtml || '', extractedText);
+      kwReviewDraft.sourceMode = 'manual';
+      kwReviewDraft.previewReady = false;
+      kwReviewDraft.generatedPreviewText = '';
+      kwReviewDraft.draftReviewText = '';
+      kwReviewDraft.flowStage = 'intake';
+      kwReviewStructuredPreview = null;
+      showToast('文件已解析为文本，可继续编辑后生成 Draft');
+    } catch (error) {
+      showToast(error.message || '文件解析失败');
+    } finally {
+      kwReviewFileUploading = false;
+      kwRenderReviewStudio();
+    }
   };
   input.click();
 }
@@ -9744,8 +9891,8 @@ function kwRenderReviewInputPanel() {
       <div class="kw-review-intake-panel">
         ${titleField}
         <div class="kw-review-intake-toolbar">
-          <div class="kw-review-runtime-meta">上传文件后，系统会自动提炼成可用文案。</div>
-          <button class="kw-review-input-button" type="button" onclick="kwCaptureReviewFileInput()">上传文件</button>
+          <div class="kw-review-runtime-meta">${kwReviewFileUploading ? '正在解析文件...' : '支持 PDF、Word、Excel，解析后可继续编辑'}</div>
+          <button class="kw-review-input-button" type="button" ${kwReviewFileUploading ? 'disabled' : ''} onclick="kwCaptureReviewFileInput()">${kwReviewFileUploading ? '解析中...' : '点击上传文件'}</button>
         </div>
         <div class="kw-review-intake-result">
           <div class="kw-review-intake-result-title">抽取文案${kwReviewDraft.fileName ? ` · ${escapeHtml(kwReviewDraft.fileName)}` : ''}</div>
@@ -9764,6 +9911,9 @@ function kwRenderReviewInputPanel() {
             <input id="kw-review-url-title" type="text" value="${escapeAttr(kwReviewDraft.urlTitle || '')}" placeholder="可选：自定义这份 URL 材料标题" class="kw-review-final-editor" style="min-height:auto;height:40px">
           </div>
           <button class="kw-review-input-button" type="button" onclick="kwPreviewReviewUrl()">抓取网页</button>
+        </div>
+        <div style="margin-top:8px;font-size:11px;line-height:1.7;color:#9B7A1C;background:rgba(200,169,110,0.10);border:1px solid rgba(200,169,110,0.16);border-radius:10px;padding:8px 10px">
+          网页 URL 解析功能当前处于测试阶段，请确认链接可公开访问，并在提交前简单检查抓取内容和来源是否完整。
         </div>
         <div class="kw-review-intake-result">
           <div class="kw-review-intake-result-title">网页提炼结果</div>
@@ -10432,7 +10582,7 @@ function kwCaptureReviewVoiceInput() {
 function kwCaptureReviewFileInputLegacy() {
   const input = document.createElement('input');
   input.type = 'file';
-  input.accept = '.pdf,.doc,.docx,.txt,.md,.csv,.xlsx,.xls';
+  input.accept = '.pdf,.docx,.xlsx,.xlsm,.txt,.md,.csv,.html,.htm,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv,text/html';
   input.onchange = async () => {
     const file = input.files && input.files[0];
     if (!file) return;
@@ -11383,11 +11533,17 @@ function showWorkbenchSection(name, navEl) {
   if (name === 'indicator-hub') {
     name = 'indicator-overview';
   }
+  if (name === 'indicator-lake') {
+    name = 'lake-market';
+  }
   if (name === 'knowledge') {
     name = 'knowledge-overview';
   }
-  if (name === 'knowledge-graph') {
-    name = 'knowledge-encyclopedia';
+  if (name === 'hermes') {
+    name = 'hermes-overview';
+  }
+  if (name === 'watchlist') {
+    name = 'watchlist-pool';
   }
   if (name === 'forecast-model' && !isWorkbenchFeatureEnabled('stock_forecast')) {
     showToast('预测功能当前未开放');
@@ -11429,10 +11585,10 @@ function showWorkbenchSection(name, navEl) {
   if (name === 'dashboard') {
     kwRenderDashboardPreview();
   }
-  if (name === 'watchlist' || name === 'published' || name === 'review') {
+  if (name === 'watchlist-pool' || name === 'published' || name === 'review') {
     renderWorkbenchAnnotationViews();
   }
-  if (name === 'watchlist') {
+  if (name === 'watchlist-insights') {
     renderWorkbenchWatchlistCommentAnalytics();
   }
   if (name === 'review') {
@@ -11452,8 +11608,17 @@ function showWorkbenchSection(name, navEl) {
   if (name === 'knowledge-entries') {
     loadWorkbenchKnowledgeAssets(false).catch((error) => showToast(error.message || '加载失败'));
   }
-  if (name === 'hermes') {
+  if (name === 'knowledge-graph') {
+    loadWorkbenchKnowledgeMap(false);
+  }
+  if (name === 'hermes-overview') {
+    loadWorkbenchHermesUsageStats();
+  }
+  if (name === 'hermes-memory') {
     loadWorkbenchHermesMemorySummary(false).catch((error) => showToast(error.message || '加载失败'));
+  }
+  if (name === 'hermes-capability') {
+    loadWorkbenchHermesCapabilityGrowth(false);
   }
   if (name === 'published') {
     kwRenderPublishedReviewList();
@@ -12447,10 +12612,10 @@ function kwRenderSmartIndicatorEditorModal() {
       </div>
       <div class="kw-dashboard-cell-block">
         <div class="kw-dashboard-section-title">提示词</div>
-        <div onclick="kwFocusSmartIndicatorPrompt()" style="margin-top:10px;border:1px solid rgba(200,169,110,0.16);border-radius:14px;background:rgba(8,18,30,0.72);padding:12px 12px 10px;cursor:text">
-          <div style="font-size:11px;color:#8899aa;margin-bottom:8px">公式引用 / 指标标签</div>
+        <div class="kw-smart-indicator-prompt-shell" onclick="kwFocusSmartIndicatorPrompt()">
+          <div class="kw-smart-indicator-prompt-label">公式引用 / 指标标签</div>
           <div id="kw-smart-indicator-selected-tags" class="kw-dashboard-chip-row" style="margin-top:0;min-height:30px"></div>
-          <textarea id="kw-smart-indicator-draft-prompt" class="kw-knowledge-modal-textarea" placeholder="例如：【上证50指数】*80/100，或者【上证50】/ 纳斯达克指数" oninput="kwHandleSmartIndicatorPromptInput(this.value)" style="margin-top:10px;border:none;background:transparent;padding:0;min-height:108px;box-shadow:none;resize:none">${escapeHtml(kwSmartIndicatorDraft.promptText || '')}</textarea>
+          <textarea id="kw-smart-indicator-draft-prompt" class="kw-knowledge-modal-textarea kw-smart-indicator-prompt-input" placeholder="例如：【上证50指数】*80/100，或者【上证50】/ 纳斯达克指数" oninput="kwHandleSmartIndicatorPromptInput(this.value)">${escapeHtml(kwSmartIndicatorDraft.promptText || '')}</textarea>
         </div>
         <div class="kw-dashboard-panel-note" style="margin-top:8px">当你输入的词与指标名称完全一致时，系统会自动识别成标签。</div>
       </div>
@@ -12528,6 +12693,16 @@ async function kwConfirmSmartIndicator() {
   const active = kwGetActiveDashboardConfig();
   const layout = active.layout || '2x2';
   const target = kwGetDashboardCardTarget(layout);
+  const slotIndex = Number(kwSmartIndicatorDraft.slotIndex);
+  if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= target) {
+    showToast('请选择 Dashboard 中的空白格后再创建指标');
+    return;
+  }
+  const selectedSlot = Array.isArray(active.cards) ? active.cards[slotIndex] : null;
+  if (selectedSlot && !kwIsSmartPlaceholderCard(selectedSlot)) {
+    showToast('该格已被占用，请重新选择空白格');
+    return;
+  }
   try {
     const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators`, {
       method: 'POST',
@@ -12551,7 +12726,7 @@ async function kwConfirmSmartIndicator() {
       const indicatorCode = raw && (raw.indicatorCode || raw.indicator_code) ? (raw.indicatorCode || raw.indicator_code) : '';
       return indicatorCode ? { indicatorCode } : {};
     });
-    nextCards[kwSmartIndicatorDraft.slotIndex] = { indicatorCode: ((payload.definition || {}).indicator_code) || '' };
+    nextCards[slotIndex] = { indicatorCode: ((payload.definition || {}).indicator_code) || '' };
     const nextDashboard = {
       ...active,
       layout,
@@ -12717,10 +12892,23 @@ async function kwSaveSmartIndicator() {
 
 async function kwAddExistingIndicatorToDraft(indicatorCode) {
   const active = kwGetActiveDashboardConfig();
-  const nextCards = (Array.isArray(active.cards) ? active.cards : [])
-    .map((item) => ({ indicatorCode: item.indicatorCode || item.indicator_code || '' }))
-    .filter((item) => item.indicatorCode);
-  if (!nextCards.some((item) => item.indicatorCode === indicatorCode)) nextCards.push({ indicatorCode });
+  const layout = active.layout || '2x2';
+  const target = kwGetDashboardCardTarget(layout);
+  const nextCards = Array.from({ length: target }, (_, index) => {
+    const item = Array.isArray(active.cards) ? active.cards[index] : null;
+    const code = item && (item.indicatorCode || item.indicator_code);
+    return code ? { indicatorCode: code } : {};
+  });
+  if (nextCards.some((item) => item.indicatorCode === indicatorCode)) {
+    showToast('该指标已经在 Dashboard 草稿中');
+    return;
+  }
+  const emptyIndex = nextCards.findIndex((item) => !item.indicatorCode);
+  if (emptyIndex < 0) {
+    showToast('当前布局已无空白格，请先调整布局或移出一个指标');
+    return;
+  }
+  nextCards[emptyIndex] = { indicatorCode };
   active.cards = nextCards;
   await kwSyncFundDashboard('save_draft', active, '已加入 Dashboard 草稿');
 }
@@ -12787,6 +12975,108 @@ function setWorkbenchHermesMemoryStatus(message, isError = false) {
   if (!node) return;
   node.textContent = message || '';
   node.style.color = isError ? '#F1948A' : '#B88A30';
+}
+
+function renderWorkbenchHermesUsageOverview() {
+  const stats = kwHermesUsageState.stats || {};
+  const summary = stats.summary || {};
+  const tokenUsageAvailable = summary.token_usage_available !== false;
+  const todayTokenNote = tokenUsageAvailable
+    ? `今日 token ${Number(summary.today_tokens || 0).toLocaleString('zh-CN')}`
+    : 'Token 用量未记录';
+  const monthTokenNote = tokenUsageAvailable
+    ? `本月 token ${Number(summary.month_tokens || 0).toLocaleString('zh-CN')}`
+    : 'Token 用量未记录';
+  const summaryHost = document.getElementById('kw-hermes-usage-summary');
+  const modeBody = document.getElementById('kw-hermes-mode-tbody');
+  const actionBody = document.getElementById('kw-hermes-action-tbody');
+  if (summaryHost) {
+    const cards = [
+      ['今日调用', Number(summary.today_calls || 0), todayTokenNote],
+      ['本月调用', Number(summary.month_calls || 0), monthTokenNote],
+      ['活跃用户人均调用', `${Number(summary.avg_calls_per_user || 0).toFixed(2)} 次`, `平均延迟 ${Number(summary.avg_latency_ms || 0).toFixed(0)} ms`],
+      ['本月算力消耗', Number(summary.compute_consumed || 0).toLocaleString('zh-CN'), '按已落库 Hermes 调用聚合'],
+    ];
+    summaryHost.innerHTML = cards.map(([label, value, note]) => `
+      <div class="stat-card"><div class="stat-label">${escapeHtml(label)}</div><div class="stat-value">${escapeHtml(String(value))}</div><div class="stat-change up">${escapeHtml(note)}</div></div>
+    `).join('');
+  }
+  if (modeBody) {
+    const rows = Array.isArray(stats.tool_modes) ? stats.tool_modes : [];
+    modeBody.innerHTML = rows.length ? rows.map((row) => `
+      <tr><td style="color:var(--text-main);font-weight:500">${escapeHtml(row.mode_label || '')}</td><td>${escapeHtml(String(row.today_calls || 0))}</td><td>${escapeHtml(String(row.month_calls || 0))}</td><td>${escapeHtml(`${Number(row.share_ratio || 0).toFixed(1)}%`)}</td><td>${escapeHtml(`${Number(row.avg_latency_ms || 0).toFixed(0)}ms`)}</td><td><span class="tag ${escapeAttr(row.status_class || 'tag-green')}">${escapeHtml(row.status_label || '正常')}</span></td></tr>
+    `).join('') : '<tr><td colspan="6" style="color:#9A9590">当前没有可展示的真实调用记录。</td></tr>';
+  }
+  if (actionBody) {
+    const rows = Array.isArray(stats.tool_actions) ? stats.tool_actions : [];
+    actionBody.innerHTML = rows.length ? rows.map((row) => `
+      <tr><td style="color:var(--text-main);font-weight:500">${escapeHtml(row.tool_name || '')}</td><td>${escapeHtml(String(row.today_calls || 0))}</td><td>${escapeHtml(String(row.month_calls || 0))}</td><td>${escapeHtml(`${Number(row.success_ratio || 0).toFixed(1)}%`)}</td><td><span class="tag ${escapeAttr(row.status_class || 'tag-green')}">${escapeHtml(row.status_label || '正常')}</span></td></tr>
+    `).join('') : '<tr><td colspan="5" style="color:#9A9590">当前没有可展示的真实工具动作。</td></tr>';
+  }
+}
+
+function renderWorkbenchHermesMemoryOverview() {
+  const summaryNode = document.getElementById('kw-hermes-memory-summary');
+  const summary = kwHermesMemoryState.summary || {};
+  if (!summaryNode) return;
+  const turns = Number(summary.turn_count || 0);
+  const sessions = Number(summary.session_count || 0);
+  const users = Number(summary.user_count || 0);
+  const profiles = Number(summary.profile_count || 0);
+  const recentTurns = Number(summary.recent_30d_turn_count || 0);
+  const recentUsers = Number(summary.recent_30d_active_user_count || 0);
+  const turnsPerSession = sessions ? turns / sessions : 0;
+  const profileCoverage = users ? Math.min(100, Math.round((profiles / users) * 100)) : 0;
+  const recentActivity = turns ? Math.min(100, Math.round((recentTurns / turns) * 100)) : 0;
+  const healthLabel = !turns ? '尚未形成记忆' : profileCoverage < 100 ? '记忆正在沉淀' : recentTurns ? '记忆持续活跃' : '记忆待激活';
+  const healthNote = !turns
+    ? '当前没有可用的真实对话记录。'
+    : profileCoverage < 100
+      ? '已有对话沉淀，但仍有用户未形成稳定画像。'
+      : recentTurns
+        ? '近期仍有真实调用，记忆上下文持续参与后续对话。'
+        : '已有历史沉淀，近 30 天暂无新的真实调用。';
+  const cards = [
+    { label: '会话沉淀', value: `${turnsPerSession.toFixed(1)} 轮 / 会话`, ratio: Math.min(100, Math.round(turnsPerSession / 8 * 100)), note: `${sessions} 个会话累计 ${turns} 轮真实对话` },
+    { label: '画像覆盖', value: `${profileCoverage}%`, ratio: profileCoverage, note: `${profiles} 个画像 / ${users} 位有对话用户` },
+    { label: '近期活跃', value: `${recentTurns} 轮`, ratio: recentActivity, note: `近 30 天 ${recentUsers} 位活跃用户` },
+  ];
+  summaryNode.className = '';
+  summaryNode.innerHTML = `
+    <div class="kw-hermes-memory-hero">
+      <div>
+        <div class="kw-hermes-memory-kicker">CURRENT TENANT MEMORY</div>
+        <div class="kw-hermes-memory-title">${escapeHtml(healthLabel)}</div>
+        <div class="kw-hermes-memory-copy">${escapeHtml(healthNote)}</div>
+        <div class="kw-hermes-memory-meta">覆盖时间：${escapeHtml(summary.first_turn_at || '--')} 至 ${escapeHtml(summary.last_turn_at || '--')}</div>
+      </div>
+      <div class="kw-hermes-memory-signal">
+        <div class="kw-hermes-memory-signal-label">当前记忆规模</div>
+        <div class="kw-hermes-memory-signal-value">${escapeHtml(String(turns))}<span style="font-size:13px;font-weight:600;margin-left:5px">轮</span></div>
+        <div class="kw-hermes-memory-signal-note">${escapeHtml(`${sessions} 个会话 · ${users} 位用户 · ${profiles} 个画像`)}</div>
+      </div>
+    </div>
+    <div class="kw-hermes-memory-health-grid">
+      ${cards.map((item) => `
+        <div class="kw-hermes-memory-health-card">
+          <div class="kw-hermes-memory-health-top"><div class="kw-hermes-memory-health-label">${escapeHtml(item.label)}</div><div class="kw-hermes-memory-health-value">${escapeHtml(item.value)}</div></div>
+          <div class="kw-hermes-memory-track"><div class="kw-hermes-memory-fill" style="width:${Math.max(0, Math.min(100, item.ratio))}%"></div></div>
+          <div class="kw-hermes-memory-health-note">${escapeHtml(item.note)}</div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="kw-hermes-memory-footnote">仅使用本租户已落库的聚合计数生成本页；不展示粉丝对话正文、问题内容或个人画像字段。</div>
+  `;
+}
+
+function renderWorkbenchHermesUsageUnavailable(message) {
+  const text = message || '当前无法读取 Hermes 真实调用数据。';
+  const summaryHost = document.getElementById('kw-hermes-usage-summary');
+  const modeBody = document.getElementById('kw-hermes-mode-tbody');
+  const actionBody = document.getElementById('kw-hermes-action-tbody');
+  if (summaryHost) summaryHost.innerHTML = `<div class="stat-card" style="grid-column:1/-1"><div class="stat-label">Hermes 使用数据</div><div class="stat-change" style="color:#F1948A">${escapeHtml(text)}</div></div>`;
+  if (modeBody) modeBody.innerHTML = `<tr><td colspan="6" style="color:#F1948A">${escapeHtml(text)}</td></tr>`;
+  if (actionBody) actionBody.innerHTML = `<tr><td colspan="5" style="color:#F1948A">${escapeHtml(text)}</td></tr>`;
 }
 
 function renderWorkbenchHermesUsageStats() {
@@ -12933,16 +13223,18 @@ function renderWorkbenchHermesMemoryPanel() {
 
 async function loadWorkbenchHermesUsageStats() {
   if (kwHermesUsageState.loading) return;
-  const tenantSlug = getWorkbenchHermesMemorySelectedTenant();
+  const tenantSlug = String(((window.ACTIVE_TENANT || {}).slug) || '').trim();
   kwHermesUsageState.loading = true;
   try {
-    const resp = await fetch(`/api/admin/hermes/usage-stats?tenant_slug=${encodeURIComponent(tenantSlug || '')}`);
+    const resp = await fetch(`/api/kol/hermes/usage-stats?tenant=${encodeURIComponent(tenantSlug)}`);
     const data = await resp.json();
     if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'hermes_usage_stats_failed');
     kwHermesUsageState.stats = data.stats || null;
-    renderWorkbenchHermesUsageStats();
+    renderWorkbenchHermesUsageOverview();
   } catch (error) {
-    console.error(error);
+    const message = error.message || 'Hermes 使用数据加载失败';
+    renderWorkbenchHermesUsageUnavailable(message);
+    showToast(message);
   } finally {
     kwHermesUsageState.loading = false;
   }
@@ -12950,8 +13242,7 @@ async function loadWorkbenchHermesUsageStats() {
 
 async function loadWorkbenchHermesMemorySummary(forceReload = false) {
   if (kwHermesMemoryState.loading) return;
-  renderWorkbenchHermesMemoryPanel();
-  const tenantSlug = getWorkbenchHermesMemorySelectedTenant();
+  const tenantSlug = String(((window.ACTIVE_TENANT || {}).slug) || '').trim();
   if (!tenantSlug) {
     setWorkbenchHermesMemoryStatus('当前没有可管理的租户。', true);
     return;
@@ -12959,17 +13250,12 @@ async function loadWorkbenchHermesMemorySummary(forceReload = false) {
   kwHermesMemoryState.loading = true;
   setWorkbenchHermesMemoryStatus('正在加载 Hermes 记忆汇总...');
   try {
-    const resp = await fetch(`/api/admin/hermes/memory-summary?tenant_slug=${encodeURIComponent(tenantSlug)}`);
+    const resp = await fetch(`/api/kol/hermes/memory-summary?tenant=${encodeURIComponent(tenantSlug)}`);
     const data = await resp.json();
     if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'hermes_memory_summary_failed');
     kwHermesMemoryState.summary = data.summary || null;
     kwHermesMemoryState.loaded = true;
-    if (forceReload || !kwHermesMemoryState.preview || kwHermesMemoryState.preview.tenant_slug !== tenantSlug) {
-      kwHermesMemoryState.preview = null;
-    }
-    renderWorkbenchHermesMemoryPanel();
-    loadWorkbenchHermesUsageStats();
-    await previewWorkbenchHermesMemoryClear(false);
+    renderWorkbenchHermesMemoryOverview();
     setWorkbenchHermesMemoryStatus(`Hermes 记忆汇总已加载 · 租户 ${tenantSlug}`);
   } catch (error) {
     setWorkbenchHermesMemoryStatus(error.message || 'Hermes 记忆汇总加载失败', true);
@@ -12979,115 +13265,79 @@ async function loadWorkbenchHermesMemorySummary(forceReload = false) {
   }
 }
 
-async function previewWorkbenchHermesMemoryClear(showToastOnSuccess = true) {
-  const tenantSlug = getWorkbenchHermesMemorySelectedTenant();
-  const rangeKey = document.getElementById('kw-hermes-memory-clear-range')?.value || '3m';
-  const confirmWrap = document.getElementById('kw-hermes-memory-clear-confirm-wrap');
-  if (confirmWrap) confirmWrap.style.display = rangeKey === 'all' ? 'block' : 'none';
+function renderWorkbenchHermesCapabilityGrowth() {
+  const host = document.getElementById('kw-hermes-capability-growth');
+  if (!host) return;
+  const growth = kwHermesCapabilityState.growth || {};
+  const summary = growth.summary || {};
+  const trend = Array.isArray(growth.trend) ? growth.trend : [];
+  const renderChips = (items, emptyText) => {
+    const rows = Array.isArray(items) ? items : [];
+    return rows.length
+      ? `<div class="kw-capability-chip-list">${rows.map((item) => `<span class="kw-capability-chip">${escapeHtml(item.label || '未命名')} ${escapeHtml(String(item.count || 0))}</span>`).join('')}</div>`
+      : `<div class="kw-capability-card-desc">${escapeHtml(emptyText)}</div>`;
+  };
+  const metrics = [
+    ['可追溯资产', Number(summary.source_asset_count || 0), `${Number(summary.knowledge_count || 0)} 条知识 · ${Number(summary.review_count || 0)} 篇复盘`],
+    ['研究覆盖', Number(summary.coverage_count || 0), '按主题与标的去重后统计'],
+    ['验证闭环', `${Number(summary.verification_ratio || 0).toFixed(1)}%`, `${Number(summary.validated_review_count || 0)} 篇复盘含证据链或标注`],
+    ['近30天研究对话', Number(summary.recent_turn_count || 0), `前30天 ${Number(summary.previous_turn_count || 0)} 轮`],
+  ];
+  host.innerHTML = `
+    <div class="kw-capability-hero">
+      <div>
+        <div class="kw-capability-kicker">AUDITABLE CAPABILITY GROWTH</div>
+        <div class="kw-capability-title">${escapeHtml(summary.stage || '能力沉淀')}</div>
+        <div class="kw-capability-copy">能力来自大V持续的知识治理、复盘发布和研究交互。当前先观察哪些资产已经结构化、哪些复盘形成验证闭环，为后续的评估、蒸馏和受控使用建立基线。</div>
+      </div>
+      <div class="kw-capability-score">
+        <div class="kw-capability-score-value">${escapeHtml(String(summary.readiness_score || 0))}</div>
+        <div class="kw-capability-score-label">沉淀就绪度 / 100</div>
+        <div class="kw-capability-score-note">资产可追溯，不代表模型已训练</div>
+      </div>
+    </div>
+    <div class="kw-capability-metric-grid">
+      ${metrics.map(([label, value, note]) => `<div class="kw-capability-metric"><div class="kw-capability-metric-label">${escapeHtml(label)}</div><div class="kw-capability-metric-value">${escapeHtml(String(value))}</div><div class="kw-capability-metric-note">${escapeHtml(note)}</div></div>`).join('')}
+    </div>
+    <div class="kw-capability-grid">
+      <div class="kw-capability-card">
+        <div class="kw-capability-card-title">资产增长轨迹</div>
+        <div class="kw-capability-card-desc">按月记录新增入库知识、发布复盘与 Hermes 研究对话。</div>
+        ${trend.length ? trend.map((item) => `<div class="kw-capability-trend-row"><span>${escapeHtml(item.month || '--')}</span><span class="kw-capability-trend-value">知识 ${escapeHtml(String(item.knowledge || 0))}</span><span class="kw-capability-trend-value">复盘 ${escapeHtml(String(item.reviews || 0))}</span><span class="kw-capability-trend-value">对话 ${escapeHtml(String(item.research_turns || 0))}</span></div>`).join('') : '<div class="kw-capability-card-desc">暂无月度沉淀记录。</div>'}
+      </div>
+      <div class="kw-capability-card">
+        <div class="kw-capability-card-title">已沉淀研究方法</div>
+        <div class="kw-capability-card-desc">来自 Hermes 已记录研究意图与发布复盘的研究方式聚合。</div>
+        ${renderChips(growth.methods, '尚无可归类的研究方法。')}
+        <div class="kw-capability-card-title" style="margin-top:18px">重点主题与标的</div>
+        ${renderChips(growth.topics, '尚无主题标签。')}
+        ${renderChips(growth.objects, '尚无标的覆盖。')}
+      </div>
+    </div>
+    <div class="kw-capability-principles">${(Array.isArray(growth.principles) ? growth.principles : []).map((item) => escapeHtml(item)).join('<br>')}</div>
+  `;
+}
+
+async function loadWorkbenchHermesCapabilityGrowth(forceReload = false) {
+  if (kwHermesCapabilityState.loading) return;
+  const tenantSlug = String(((window.ACTIVE_TENANT || {}).slug) || '').trim();
+  const status = document.getElementById('kw-hermes-capability-status');
   if (!tenantSlug) return;
-  setWorkbenchHermesMemoryStatus('正在预览 Hermes 记忆清理影响...');
-  const resp = await fetch('/api/admin/hermes/memory-clear-preview', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({tenant_slug: tenantSlug, range_key: rangeKey}),
-  });
-  const data = await resp.json();
-  if (!resp.ok || !data.ok) {
-    setWorkbenchHermesMemoryStatus((data && data.error) || 'hermes_memory_preview_failed', true);
-    throw new Error((data && data.error) || 'hermes_memory_preview_failed');
+  kwHermesCapabilityState.loading = true;
+  if (status) status.textContent = '正在汇总本租户可追溯研究资产...';
+  try {
+    const resp = await fetch(`/api/kol/hermes/capability-growth?tenant=${encodeURIComponent(tenantSlug)}`);
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'hermes_capability_growth_failed');
+    kwHermesCapabilityState.growth = data.growth || {};
+    renderWorkbenchHermesCapabilityGrowth();
+    if (status) status.textContent = `已汇总真实研究资产 · 租户 ${tenantSlug}`;
+  } catch (error) {
+    if (status) { status.textContent = error.message || '能力沉淀数据加载失败'; status.style.color = '#C0392B'; }
+    showToast(error.message || '能力沉淀数据加载失败');
+  } finally {
+    kwHermesCapabilityState.loading = false;
   }
-  kwHermesMemoryState.preview = data.preview || null;
-  renderWorkbenchHermesMemoryPanel();
-  setWorkbenchHermesMemoryStatus(`已生成清理预览 · ${tenantSlug} · ${rangeKey}`);
-  if (showToastOnSuccess !== false) showToast('已更新 Hermes 记忆清理预览');
-}
-
-async function backupWorkbenchHermesMemory() {
-  const tenantSlug = getWorkbenchHermesMemorySelectedTenant();
-  const rangeKey = document.getElementById('kw-hermes-memory-backup-range')?.value || '3m';
-  if (!tenantSlug) {
-    showToast('请先选择租户');
-    return false;
-  }
-  setWorkbenchHermesMemoryStatus('正在生成 Hermes 记忆 ZIP 备份...');
-  const resp = await fetch('/api/admin/hermes/memory-backup', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({tenant_slug: tenantSlug, range_key: rangeKey}),
-  });
-  if (!resp.ok) {
-    let errorMessage = 'hermes_memory_backup_failed';
-    try {
-      const data = await resp.json();
-      errorMessage = (data && data.error) || errorMessage;
-    } catch (error) {}
-    setWorkbenchHermesMemoryStatus(errorMessage, true);
-    showToast(errorMessage);
-    return false;
-  }
-  const blob = await resp.blob();
-  const downloadUrl = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = downloadUrl;
-  link.download = (() => {
-    const contentDisposition = resp.headers.get('Content-Disposition') || '';
-    const matched = contentDisposition.match(/filename=\"([^\"]+)\"/);
-    return matched ? matched[1] : `hermes_memory_${tenantSlug}_${rangeKey}.zip`;
-  })();
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(downloadUrl);
-  setWorkbenchHermesMemoryStatus(`Hermes 记忆备份已生成 · ${tenantSlug} · ${rangeKey}`);
-  showToast('Hermes 记忆 ZIP 备份已下载');
-  return true;
-}
-
-async function clearWorkbenchHermesMemory(backupFirst) {
-  const tenantSlug = getWorkbenchHermesMemorySelectedTenant();
-  const rangeKey = document.getElementById('kw-hermes-memory-clear-range')?.value || '3m';
-  const confirmText = document.getElementById('kw-hermes-memory-clear-confirm')?.value || '';
-  if (!tenantSlug) {
-    showToast('请先选择租户');
-    return;
-  }
-  if (rangeKey === 'all' && String(confirmText).trim() !== 'CONFIRM') {
-    showToast('全量清理前请输入 CONFIRM');
-    return;
-  }
-  if (backupFirst) {
-    const backupOk = await backupWorkbenchHermesMemory();
-    if (!backupOk) return;
-  }
-  const preview = kwHermesMemoryState.preview || {};
-  const turnCount = Number(preview.turns_to_clear || 0);
-  const confirmed = window.confirm(
-    rangeKey === 'all'
-      ? `确认清空租户 ${tenantSlug} 的全部 Hermes 记忆吗？当前预估删除 ${turnCount} 轮对话。`
-      : `确认清理租户 ${tenantSlug} 的 Hermes 记忆吗？当前预估删除 ${turnCount} 轮对话。`
-  );
-  if (!confirmed) return;
-  setWorkbenchHermesMemoryStatus('正在执行 Hermes 记忆清理...');
-  const resp = await fetch('/api/admin/hermes/memory-clear', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({tenant_slug: tenantSlug, range_key: rangeKey, confirm_text: confirmText}),
-  });
-  const data = await resp.json();
-  if (!resp.ok || !data.ok) {
-    const errorMessage = (data && data.error) || 'hermes_memory_clear_failed';
-    setWorkbenchHermesMemoryStatus(errorMessage, true);
-    showToast(errorMessage);
-    return;
-  }
-  kwHermesMemoryState.summary = data.result && data.result.post_summary ? data.result.post_summary : kwHermesMemoryState.summary;
-  kwHermesMemoryState.preview = null;
-  const confirmInput = document.getElementById('kw-hermes-memory-clear-confirm');
-  if (confirmInput) confirmInput.value = '';
-  renderWorkbenchHermesMemoryPanel();
-  await previewWorkbenchHermesMemoryClear(false);
-  setWorkbenchHermesMemoryStatus(`Hermes 记忆清理完成 · ${tenantSlug} · ${rangeKey}`);
-  showToast('Hermes 记忆已清理并完成重建');
 }
 
 function kwRenderDashboardPreview() {
@@ -13124,7 +13374,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initWorkbenchNavGroups();
   refreshWorkbenchNavVisibility();
   refreshWorkbenchSiteConfig({silent: true});
-  kwRenderPortalWorkspace();
+  if (document.getElementById('workbench-section-portal')) kwRenderPortalWorkspace();
   kwRenderDashboardPreview();
   kwRenderReviewStudio();
   kwRenderPublishedReviewList();
@@ -13145,7 +13395,11 @@ document.addEventListener('DOMContentLoaded', () => {
     showWorkbenchSection('overview');
     return;
   }
-  if ((section === 'portal' || section === 'biz-dashboard' || section === 'consistency') && !isWorkbenchFeatureEnabled('workbench')) {
+  if (section === 'portal' && !isWorkbenchFeatureEnabled('tenant_portal')) {
+    showWorkbenchSection('overview');
+    return;
+  }
+  if ((section === 'biz-dashboard' || section === 'consistency') && !isWorkbenchFeatureEnabled('workbench')) {
     showWorkbenchSection('overview');
     return;
   }
@@ -13161,11 +13415,11 @@ document.addEventListener('DOMContentLoaded', () => {
     showWorkbenchSection('overview');
     return;
   }
-  if (section === 'hermes' && !isWorkbenchFeatureEnabled('hermes')) {
+  if (['hermes', 'hermes-overview', 'hermes-memory', 'hermes-capability'].includes(section) && !isWorkbenchFeatureEnabled('hermes')) {
     showWorkbenchSection('overview');
     return;
   }
-  if (section === 'watchlist' && !isWorkbenchFeatureEnabled('watchlist')) {
+  if (['watchlist', 'watchlist-pool', 'watchlist-insights'].includes(section) && !isWorkbenchFeatureEnabled('watchlist')) {
     showWorkbenchSection('overview');
     return;
   }
@@ -13173,7 +13427,7 @@ document.addEventListener('DOMContentLoaded', () => {
     showWorkbenchSection('overview');
     return;
   }
-  if (['indicator-overview', 'indicator-smart', 'indicator-lake', 'indicator-anomalies'].includes(section) && !isWorkbenchFeatureEnabled('analytics_module')) {
+  if (['indicator-overview', 'indicator-smart', 'indicator-lake', 'lake-market', 'lake-sectors', 'lake-news', 'indicator-anomalies'].includes(section) && !isWorkbenchFeatureEnabled('analytics_module')) {
     showWorkbenchSection('overview');
     return;
   }

@@ -5132,6 +5132,7 @@ const REVIEW_SOURCE_OPTIONS = [
   { value: 'voice', icon: '🎙️', label: '语音口述', desc: '收盘后直接口述盘面、行业和个股判断。' },
   { value: 'manual', icon: '✍️', label: '手写正文', desc: '直接写完整复盘正文，再统一发布为前台文章。' },
   { value: 'file', icon: '📎', label: '文件上传', desc: '上传纪要、研报或 PDF 统一抽取重点。' },
+  { value: 'url', icon: '🔗', label: '网页 URL', desc: '抓取公开网页资料，提炼后继续编辑。' },
 ];
 const REVIEW_PARAGRAPH_OPTIONS = [
   { value: 'manual', label: '沿用手写正文', desc: '直接沿用你已经写好的完整复盘正文。' },
@@ -5155,6 +5156,9 @@ let reviewTriggerDraft = {
   manualHtml: '',
   fileText: '',
   fileName: '',
+  urlValue: '',
+  urlTitle: '',
+  urlText: '',
   aiPrompt: '',
   promptTags: [],
   generatedPreviewText: '',
@@ -7208,7 +7212,9 @@ function buildReviewPreviewArticle() {
     annotations: [],
     selectedCards: [],
     knowledgeAttachments: [],
-    dataSources: reviewTriggerDraft.sourceMode === 'file' ? ['用户上传文件'] : (reviewTriggerDraft.sourceMode === 'voice' ? ['用户语音转写文稿'] : ['用户手写正文']),
+    dataSources: reviewTriggerDraft.sourceMode === 'file'
+      ? ['用户上传文件']
+      : (reviewTriggerDraft.sourceMode === 'url' ? ['用户提供网页 URL'] : (reviewTriggerDraft.sourceMode === 'voice' ? ['用户语音转写文稿'] : ['用户手写正文'])),
     newsSources: [],
     llmModels,
     userInputSection: structured.user_input_section || {
@@ -7408,6 +7414,9 @@ function openReviewTriggerModal(sourceMode) {
   reviewTriggerDraft.manualHtml = '';
   reviewTriggerDraft.fileText = '';
   reviewTriggerDraft.fileName = '';
+  reviewTriggerDraft.urlValue = '';
+  reviewTriggerDraft.urlTitle = '';
+  reviewTriggerDraft.urlText = '';
   reviewTriggerDraft.reviewTitle = '';
   reviewTriggerDraft.aiPrompt = '';
   reviewTriggerDraft.promptTags = [];
@@ -7431,6 +7440,7 @@ function closeReviewTriggerModal() {
 function getReviewDraftContentText() {
   if (reviewTriggerDraft.sourceMode === 'voice') return String(reviewTriggerDraft.voiceTranscript || '').trim();
   if (reviewTriggerDraft.sourceMode === 'file') return String(reviewTriggerDraft.fileText || '').trim();
+  if (reviewTriggerDraft.sourceMode === 'url') return String(reviewTriggerDraft.urlText || '').trim();
   const temp = document.createElement('div');
   temp.innerHTML = reviewTriggerDraft.manualHtml || '';
   return temp.textContent.trim();
@@ -8003,6 +8013,27 @@ function renderReviewInputPanel() {
       </div>
     `;
   }
+  if (reviewTriggerDraft.sourceMode === 'url') {
+    return `
+      <div class="review-intake-panel">
+        ${titleField}
+        <div class="review-intake-toolbar" style="align-items:flex-end">
+          <div style="flex:1;display:grid;gap:10px">
+            <input id="review-url-input" class="knowledge-modal-input" placeholder="输入网页 URL 作为本次复盘补充素材" value="${escapeAttr(reviewTriggerDraft.urlValue || '')}" />
+            <input id="review-url-title" class="knowledge-modal-input" placeholder="可选：自定义这份 URL 材料标题" value="${escapeAttr(reviewTriggerDraft.urlTitle || '')}" />
+          </div>
+          <button class="review-input-button" type="button" onclick="previewReviewUrl()">抓取网页</button>
+        </div>
+        <div style="margin-top:8px;font-size:11px;line-height:1.7;color:#9B7A1C;background:rgba(200,169,110,0.10);border:1px solid rgba(200,169,110,0.16);border-radius:10px;padding:8px 10px">
+          网页 URL 解析功能当前处于测试阶段，请确认链接可公开访问，并在提交前简单检查抓取内容和来源是否完整。
+        </div>
+        <div class="review-intake-result">
+          <div class="review-intake-result-title">网页提炼结果</div>
+          <div class="review-intake-result-text">${escapeHtml(reviewTriggerDraft.urlText || '抓取网页后，这里会展示正文摘要，可作为复盘素材。')}</div>
+        </div>
+      </div>
+    `;
+  }
   return `
     <div class="review-intake-panel">
       ${titleField}
@@ -8161,7 +8192,7 @@ function renderReviewTriggerModal(user) {
     ${user.role === 'dav' ? `
       <div class="knowledge-modal-block">
         <label class="knowledge-modal-label">供稿方式</label>
-        <div class="knowledge-source-selector" style="grid-template-columns:repeat(3,1fr)">
+        <div class="knowledge-source-selector" style="grid-template-columns:repeat(4,1fr)">
           ${REVIEW_SOURCE_OPTIONS.map(item => `
             <div class="knowledge-source-pill ${item.value === reviewTriggerDraft.sourceMode ? 'active' : ''}" onclick="setReviewTriggerSourceMode('${item.value}')">${item.icon} ${item.label}</div>
           `).join('')}
@@ -8293,12 +8324,16 @@ function toggleReviewVoiceLlmEnhancement(checked) {
 
 function syncReviewDraftFromModal() {
   const titleInput = document.getElementById('review-title-input');
+  const urlInput = document.getElementById('review-url-input');
+  const urlTitleInput = document.getElementById('review-url-title');
   const promptInput = document.getElementById('review-ai-prompt-input');
   const draftReviewInput = document.getElementById('review-draft-review-input');
   const structuredUserInput = document.getElementById('review-structured-user-input');
   const structuredSectorSummary = document.getElementById('review-structured-sector-summary');
   syncReviewDraftFromEditors();
   if (titleInput) reviewTriggerDraft.reviewTitle = String(titleInput.value || '').trim();
+  if (urlInput) reviewTriggerDraft.urlValue = String(urlInput.value || '').trim();
+  if (urlTitleInput) reviewTriggerDraft.urlTitle = String(urlTitleInput.value || '').trim();
   if (promptInput) reviewTriggerDraft.aiPrompt = promptInput.value;
   if (draftReviewInput) reviewTriggerDraft.draftReviewText = draftReviewInput.value;
   if (structuredUserInput || structuredSectorSummary) {
@@ -8578,7 +8613,7 @@ function captureReviewFileInput() {
   if (reviewFileUploading) return;
   const input = document.createElement('input');
   input.type = 'file';
-  input.accept = '.pdf,.docx,.xlsx,.xlsm,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel';
+  input.accept = '.pdf,.docx,.xlsx,.xlsm,.txt,.md,.csv,.html,.htm,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv,text/html';
   input.onchange = async () => {
     const file = input.files && input.files[0];
     if (!file) return;
@@ -8619,6 +8654,40 @@ function captureReviewFileInput() {
     }
   };
   input.click();
+}
+
+async function previewReviewUrl() {
+  syncReviewDraftFromModal();
+  if (!reviewTriggerDraft.urlValue) {
+    showToast('请先输入 URL');
+    return;
+  }
+  try {
+    const response = await fetch('/api/kol/knowledge/url-preview', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({url: reviewTriggerDraft.urlValue}),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error((data && data.error) || '网页抓取失败');
+    const preview = data.preview || {};
+    const extractedText = String(preview.body || preview.summary || '').trim();
+    if (!extractedText) throw new Error('网页未提取到可用文本，请确认链接内容');
+    reviewTriggerDraft.urlTitle = reviewTriggerDraft.urlTitle || String(preview.title || '');
+    reviewTriggerDraft.urlText = extractedText;
+    reviewTriggerDraft.manualHtml = mergePlainTextIntoRichHtml(reviewTriggerDraft.manualHtml || '', extractedText);
+    reviewTriggerDraft.sourceMode = 'manual';
+    reviewTriggerDraft.previewReady = false;
+    reviewTriggerDraft.generatedPreviewText = '';
+    reviewTriggerDraft.draftReviewText = '';
+    reviewTriggerDraft.flowStage = 'intake';
+    reviewStructuredPreview = null;
+    showToast('网页内容已提取为文本，可继续编辑后生成 Draft');
+  } catch (error) {
+    showToast(error.message || '网页抓取失败');
+  } finally {
+    renderReviewTriggerModal(getActiveDemoUser());
+  }
 }
 
 function toggleReviewPromptTag(tag) {
@@ -12185,6 +12254,10 @@ function addCurrentStockToWatchlist() {
   if (!addedWatchlistCodes.includes(stockCode)) {
     addedWatchlistCodes.unshift(stockCode);
     persistAddedWatchlistCodes();
+    trackFanStockObservation(stockCode, 'watchlist_add', {
+      entryPoint: 'watchlist_add',
+      sourceDetail: 'h5_watchlist',
+    });
   }
   const listHost = document.getElementById('market-watchlist-list');
   const existingCard = document.querySelector(`[data-watchlist-card="true"][data-stock-code="${stockCode}"]`);
@@ -12247,7 +12320,8 @@ function renderMarketOverview(items) {
   const rows = (Array.isArray(items) ? items : []).filter((item) => item && item.available);
   const sourceNote = document.getElementById('market-overview-source-note');
   if (sourceNote && rows.some((item) => item && item.demo)) sourceNote.textContent = '当前为演示数据，仅用于页面演示；真实市场快照入库后自动替换。';
-  if (sourceNote && !rows.some((item) => item && item.demo) && rows.some((item) => item && item.stale)) sourceNote.textContent = '部分指数暂未完成最新同步，当前保留最近一次 AKShare 真实快照。';
+  if (sourceNote && !rows.some((item) => item && item.demo) && rows.some((item) => item && item.stale)) sourceNote.textContent = '市场快照正在同步，当前保留最近一次 AKShare 真实数据。';
+  if (!rows.length && host.querySelector('[data-market-index-code]')) return;
   host.innerHTML = rows.map((item) => {
     const available = item && item.available;
     const change = Number(item.change || 0);
@@ -12474,12 +12548,12 @@ function isCnStockMarketOpenNow() {
   return (minutes >= 9 * 60 + 30 && minutes < 11 * 60 + 30) || (minutes >= 13 * 60 && minutes < 15 * 60);
 }
 
-function buildWatchlistIntradaySvg(series) {
+function buildWatchlistIntradaySvg(series, unavailableMessage) {
   const rows = Array.isArray(series) ? series.filter(item => item && typeof item === 'object') : [];
   if (!rows.length) {
     return `
       <div style="background:#F7FBFF;border:1px solid rgba(47,116,192,0.10);border-radius:12px;padding:18px;text-align:center;font-size:12px;color:var(--gray-400)">
-        当前暂未获取到分时数据
+        ${escapeHtml(unavailableMessage || '当前暂未获取到分时数据')}
       </div>
     `;
   }
@@ -12558,7 +12632,7 @@ function renderWatchlistDetail(data, section) {
     candleLabel: `${data.name || '标的'} 日K线`,
     annotations,
   });
-  const intradayChart = buildWatchlistIntradaySvg(data.intraday_series || []);
+  const intradayChart = buildWatchlistIntradaySvg(data.intraday_series || [], data.intraday_message || '');
   const computedMetricCards = buildWatchlistComputedMetrics(data.kline || []);
   const overviewSection = `
     <div class="watch-section-card">
@@ -12621,7 +12695,7 @@ function renderWatchlistDetail(data, section) {
   };
   // Keep the tab stable for every watchlist detail. An unavailable snapshot is
   // rendered as an explicit data state instead of making the capability vanish.
-  const showIntradayTab = true;
+  const showIntradayTab = data.intraday_supported === true;
   host.innerHTML = `
     <div style="padding-bottom:8px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px">
@@ -12630,8 +12704,8 @@ function renderWatchlistDetail(data, section) {
           <div style="font-size:11px;color:var(--gray-400);margin-top:4px">${data.code} · ${data.market} · ${data.industry}</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:20px;font-weight:700;color:var(--text-main)">${Number(data.price || 0).toFixed(2)}</div>
-          <div style="font-size:12px;color:${data.change >= 0 ? 'var(--red)' : 'var(--green)'}">${data.change >= 0 ? '▲' : '▼'} ${Math.abs(Number(data.change || 0)).toFixed(2)} (${Number(data.change_pct || 0).toFixed(2)}%)</div>
+          <div style="font-size:20px;font-weight:700;color:var(--text-main)">${Number.isFinite(Number(data.price)) ? Number(data.price).toFixed(2) : '--'}</div>
+          <div style="font-size:12px;color:${Number(data.change || 0) >= 0 ? 'var(--red)' : 'var(--green)'}">${Number.isFinite(Number(data.change)) && Number.isFinite(Number(data.change_pct)) ? `${Number(data.change) >= 0 ? '▲' : '▼'} ${Math.abs(Number(data.change)).toFixed(2)} (${Number(data.change_pct).toFixed(2)}%)` : '等待真实行情同步'}</div>
         </div>
       </div>
 

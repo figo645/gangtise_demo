@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import app as app_entry
 import src.web.hooks as web_hooks
+import src.web.pages as web_pages
 from src.domain import ai_services
 from src.domain import market_services
 from src.domain.core_services import (
@@ -11,6 +12,7 @@ from src.domain.core_services import (
     normalize_site_config,
     normalize_fund_dashboard_card_refs,
     normalize_fund_dashboard_view,
+    build_new_smart_indicator_code,
     resolve_tenant_review_snapshots,
     sanitize_user_facing_source_text,
 )
@@ -33,7 +35,9 @@ class ReviewModuleBddTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls._original_is_authenticated = web_hooks.is_authenticated
+        cls._original_current_user = web_pages.get_current_authenticated_user
         web_hooks.is_authenticated = lambda: True
+        web_pages.get_current_authenticated_user = lambda: {"id": "test-user", "role": "dav"}
         app_entry.app.config.update(TESTING=True)
         cls.client = app_entry.app.test_client()
         cls.tenant_slug = _tenant_slug()
@@ -41,6 +45,7 @@ class ReviewModuleBddTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         web_hooks.is_authenticated = cls._original_is_authenticated
+        web_pages.get_current_authenticated_user = cls._original_current_user
 
     def test_given_h5_when_page_renders_then_review_surface_exists(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slug}")
@@ -141,6 +146,10 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
         self.assertIn("reviewTriggerDraft.manualHtml = mergePlainTextIntoRichHtml(reviewTriggerDraft.manualHtml || '', reviewTriggerDraft.fileText || '');", html)
+        self.assertIn("{ value: 'url', icon: '🔗', label: '网页 URL'", html)
+        self.assertIn("async function previewReviewUrl()", html)
+        self.assertIn("fetch('/api/kol/knowledge/url-preview'", html)
+        self.assertIn("reviewTriggerDraft.manualHtml = mergePlainTextIntoRichHtml(reviewTriggerDraft.manualHtml || '', extractedText);", html)
         self.assertIn("reviewTriggerDraft.sourceMode = 'manual';", html)
         self.assertIn("knowledgeIntakeType = 'manual';", html)
         self.assertIn("knowledgeDraft.bodyHtml = mergePlainTextIntoRichHtml(knowledgeDraft.bodyHtml || '', effectiveBody);", html)
@@ -151,8 +160,9 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
         self.assertIn("kwReviewDraft.manualHtml = kwMergePlainTextIntoKnowledgeHtml(kwReviewDraft.manualHtml || '', kwReviewDraft.fileText || '');", html)
-        self.assertIn("kwReviewDraft.manualHtml = kwMergePlainTextIntoKnowledgeHtml(kwReviewDraft.manualHtml || '', kwReviewDraft.urlText || '');", html)
+        self.assertIn("kwReviewDraft.manualHtml = kwMergePlainTextIntoKnowledgeHtml(kwReviewDraft.manualHtml || '', extractedText);", html)
         self.assertIn("kwReviewDraft.sourceMode = 'manual';", html)
+        self.assertIn("kwReviewDraft.flowStage = 'intake';", html)
         self.assertIn("kwKnowledgeIntakeType = 'manual';", html)
         self.assertIn("kwKnowledgeDraft.rawHtml = kwMergePlainTextIntoKnowledgeHtml(kwKnowledgeDraft.rawHtml || '', nextBody);", html)
 
@@ -698,6 +708,48 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertEqual(stats["missing_capabilities"][0]["target_date"], "2026-08-05")
         self.assertEqual(stats["missing_capabilities"][0]["user_count"], 2)
 
+    def test_given_missing_token_usage_table_when_aggregating_then_conversation_usage_remains_available(self):
+        class _FakeCursor:
+            def __init__(self, one=None, rows=None):
+                self._one = one or {}
+                self._rows = rows or []
+
+            def fetchone(self):
+                return self._one
+
+            def fetchall(self):
+                return self._rows
+
+        class _FakeDb:
+            def execute(self, sql, params):
+                normalized = " ".join(str(sql).split())
+                if "FROM token_usage_logs" in normalized:
+                    raise RuntimeError("relation token_usage_logs does not exist")
+                if "COUNT(*) AS call_count" in normalized:
+                    return _FakeCursor(one={"call_count": 1, "user_count": 1})
+                if "FROM hermes_conversation_turns" in normalized and "question_text" in normalized:
+                    return _FakeCursor(rows=[{
+                        "user_profile_id": "u1",
+                        "user_display_name": "用户A",
+                        "user_role": "investor",
+                        "entry_point": "hermes_chat",
+                        "intent": "general",
+                        "preferred_mode": "basic",
+                        "question_text": "请分析贵州茅台",
+                        "tool_trace_json": "[]",
+                        "tags_json": "{}",
+                        "memory_summary_json": "{\"latency_ms\": 800}",
+                        "created_at": "2026-08-13 10:00:00",
+                    }])
+                raise AssertionError(f"Unexpected SQL: {normalized}")
+
+        with patch("src.domain.ai_services.get_db", return_value=_FakeDb()):
+            stats = ai_services.build_admin_hermes_usage_stats(self.tenant_slug)
+
+        self.assertEqual(stats["summary"]["month_calls"], 1)
+        self.assertFalse(stats["summary"]["token_usage_available"])
+        self.assertEqual(stats["summary"]["month_tokens"], 0)
+
     def test_given_specific_date_indicator_question_when_calling_hermes_api_then_single_day_analysis_is_returned(self):
         live_detail = {
             "id": "source_shanghai_index",
@@ -1022,6 +1074,32 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertEqual(payload["code"], "000001.SH")
         self.assertEqual(payload["kline"][-1]["date"], "2026-08-10")
 
+    def test_given_market_snapshot_missing_when_opening_dashboard_index_then_indicator_lake_is_used(self):
+        lake_item = {
+            "id": "source_shanghai_index",
+            "name": "上证指数",
+            "numeric_value": 3867.03,
+            "history_series": [
+                {"date": "2026-07-22", "value": 3852.11},
+                {"date": "2026-07-23", "value": 3867.03},
+            ],
+            "history_kline": {
+                "candles": [
+                    {"date": "2026-07-22", "open": 3840.0, "high": 3860.0, "low": 3830.0, "close": 3852.11},
+                    {"date": "2026-07-23", "open": 3852.11, "high": 3875.0, "low": 3845.0, "close": 3867.03},
+                ],
+            },
+        }
+        with patch("src.domain.market_services.build_market_overview_index_detail", return_value=None), patch(
+            "src.domain.market_services.get_indicator_hub_from_store_cached",
+            return_value={"lake_items": [lake_item]},
+        ), patch("src.domain.market_services.attach_watchlist_intraday", side_effect=lambda detail: detail):
+            payload = market_services.build_watchlist_indicator_detail("source_shanghai_index")
+
+        self.assertEqual(payload["name"], "上证指数")
+        self.assertEqual(payload["code"], "000001.SH")
+        self.assertEqual(payload["kline"][-1]["close"], 3867.03)
+
     def test_given_market_closed_when_fetching_index_intraday_then_latest_real_trade_date_is_requested(self):
         detail = {
             "code": "000001.SH",
@@ -1041,6 +1119,33 @@ class ReviewModuleBddTest(unittest.TestCase):
         fetch_mock.assert_called_once_with("000001.SH", trade_date="2026-08-07")
         self.assertTrue(payload["available"])
         self.assertEqual(payload["points"][-1]["date"], "2026-08-07 15:00:00")
+
+    def test_given_market_index_intraday_cache_missing_then_akshare_refills_it_before_gangtise(self):
+        detail = {
+            "id": "source_shanghai_index",
+            "indicator_code": "source_shanghai_index",
+            "code": "000001.SH",
+            "standard_code": "000001.SH",
+            "market": "CN",
+            "kline": [{"date": "2026-08-10", "close": 3867.03}],
+        }
+        akshare_result = {
+            "ok": True,
+            "available": True,
+            "points": [{"date": "2026-08-10 09:31:00", "value": 3867.03}],
+            "source": "AKShare",
+        }
+        with patch("src.domain.market_services._load_watchlist_cache", return_value=None), patch(
+            "src.domain.market_services._load_gangtise_intraday_snapshot", return_value=None
+        ), patch("src.domain.market_services.fetch_akshare_market_index_intraday", return_value=akshare_result) as akshare_fetch, patch(
+            "src.domain.market_services._save_watchlist_cache"
+        ) as save_cache, patch("src.domain.market_services.fetch_gangtise_intraday_series", side_effect=AssertionError("AKShare should satisfy the index request")):
+            payload = market_services.fetch_watchlist_intraday_series(detail, allow_provider_fetch=True)
+
+        akshare_fetch.assert_called_once_with("source_shanghai_index", trade_date="2026-08-10")
+        save_cache.assert_called_once_with("market_index_intraday", "source_shanghai_index", akshare_result)
+        self.assertTrue(payload["available"])
+        self.assertEqual(payload["source"], "AKShare")
 
     def test_given_gangtise_minute_response_when_fetching_intraday_then_points_are_normalized(self):
         response = {
@@ -1129,22 +1234,21 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertEqual(payload["intraday_source"], "gangtise_openapi")
         self.assertTrue(payload["intraday_supported"])
 
-    def test_given_detail_page_when_intraday_snapshot_is_missing_then_no_provider_call_is_made(self):
+    def test_given_market_overview_index_when_opening_detail_then_intraday_is_disabled(self):
         detail = {
+            "indicator_code": "source_shanghai_index",
             "code": "000001.SH",
             "market": "CN",
             "standard_code": "000001.SH",
             "kline": [{"date": "2026-08-10", "close": 4093.73}],
         }
-        with patch("src.domain.market_services._load_gangtise_intraday_snapshot", return_value=None), patch(
-            "src.domain.market_services.fetch_gangtise_intraday_series",
-            side_effect=AssertionError("H5 detail must not call Gangtise"),
-        ):
+        with patch("src.domain.market_services.fetch_gangtise_intraday_series") as fetch_mock:
             payload = market_services.attach_watchlist_intraday(detail)
 
-        self.assertTrue(payload["intraday_supported"])
+        fetch_mock.assert_not_called()
+        self.assertFalse(payload["intraday_supported"])
         self.assertFalse(payload["intraday_available"])
-        self.assertEqual(payload["intraday_message"], "intraday_snapshot_pending")
+        self.assertEqual(payload["intraday_message"], "market_overview_intraday_disabled")
 
     def test_given_watchlist_question_when_extracting_hermes_memory_then_focus_symbols_and_persona_are_updated(self):
         payload = ai_services.extract_hermes_memory_payload(
@@ -1560,6 +1664,41 @@ class ReviewModuleBddTest(unittest.TestCase):
         indicator_codes = [item.get("indicatorCode") for item in normalized if item.get("indicatorCode")]
         self.assertEqual(indicator_codes, list(dict.fromkeys(indicator_codes)))
         self.assertEqual(len(indicator_codes), 2)
+
+    def test_given_2x3_dashboard_with_empty_slots_when_normalized_then_slot_positions_are_preserved(self):
+        normalized = normalize_fund_dashboard_card_refs(
+            [
+                {"indicatorCode": "market_strength"},
+                {"indicatorCode": "industry_heat"},
+                {},
+                {"indicatorCode": "risk_signal"},
+                {},
+                {"indicatorCode": "new_indicator"},
+            ],
+            "2x3",
+        )
+
+        self.assertEqual(len(normalized), 6)
+        self.assertEqual(normalized[0], {"indicatorCode": "market_strength"})
+        self.assertEqual(normalized[2], {})
+        self.assertEqual(normalized[5], {"indicatorCode": "new_indicator"})
+
+    def test_given_legacy_placeholder_when_normalized_then_it_remains_an_empty_slot(self):
+        normalized = normalize_fund_dashboard_card_refs(
+            [{"name": "待添加智能指标 1", "value": "--", "isEmpty": False}],
+            "2x3",
+        )
+
+        self.assertEqual(normalized[0], {})
+        self.assertEqual(len(normalized), 6)
+
+    def test_given_two_new_smart_indicators_when_codes_are_created_then_their_identities_differ(self):
+        with patch("src.domain.core_services.now_ts_ms", side_effect=["2026-08-13 10:00:00.001", "2026-08-13 10:00:00.002"]):
+            first = build_new_smart_indicator_code("laowang")
+            second = build_new_smart_indicator_code("laowang")
+
+        self.assertNotEqual(first, second)
+        self.assertTrue(first.startswith("laowang_smart_"))
 
     def test_given_h5_when_page_renders_then_fan_stock_observation_uses_sector_chart(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slug}")
