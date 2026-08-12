@@ -68,6 +68,7 @@ def record_access(response):
 @app.before_request
 def require_user_login():
     public_paths = {
+        "/",
         "/login",
         "/logout",
         "/api/demo-profiles",
