@@ -3,9 +3,18 @@ from src.services import *
 from src.web.api_core import get_access_summary
 from src.web.request_helpers import safe_next_target
 
+
+def resolve_login_destination(user, next_target):
+    target = safe_next_target(next_target or "/h5")
+    role = str((user or {}).get("role") or "").strip().lower()
+    if role == "dav":
+        return url_for("login_entry", next=target)
+    return target
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    next_target = safe_next_target(request.args.get("next", "/"))
+    next_target = safe_next_target(request.args.get("next") or request.form.get("next") or "/h5")
     try:
         current_user = get_current_authenticated_user()
     except Exception as exc:
@@ -13,24 +22,76 @@ def login():
             raise
         current_user = None
     if current_user:
-        return redirect(next_target)
+        return redirect(resolve_login_destination(current_user, next_target))
+    mode = "register" if request.args.get("mode") == "register" or request.form.get("mode") == "register" else "login"
     if request.method == "GET":
-        return render_template("login.html", next_target=next_target, error=None, site_config=get_site_config())
-    next_target = safe_next_target(request.form.get("next", "/"))
+        return render_template("login.html", next_target=next_target, mode=mode, error=None, site_config=get_site_config())
     username = str(request.form.get("username") or "").strip()
     password = str(request.form.get("password") or "").strip()
+    site_config = get_site_config()
+    if mode == "register":
+        display_name = str(request.form.get("display_name") or "").strip()
+        confirm_password = str(request.form.get("confirm_password") or "").strip()
+        if not display_name or not username or not password or not confirm_password:
+            return render_template("login.html", next_target=next_target, mode=mode, error="请完整填写注册信息", site_config=site_config)
+        if password != confirm_password:
+            return render_template("login.html", next_target=next_target, mode=mode, error="两次输入的密码不一致", site_config=site_config)
+        if len(password) < 6:
+            return render_template("login.html", next_target=next_target, mode=mode, error="密码至少需要 6 位", site_config=site_config)
+        try:
+            tenant = get_tenant_by_slug(get_default_tenant_slug(site_config), site_config)
+            suffix = int(time.time() * 1000) % 100000000
+            user = create_user({
+                "username": username,
+                "password": password,
+                "phone": f"139{suffix:08d}",
+                "role": "investor",
+                "tenant_slug": tenant.get("slug") or get_default_tenant_slug(site_config),
+                "advisor_name": tenant.get("advisor") or "",
+                "status": "active",
+                "source_label": "Web账号注册",
+            })
+            save_h5_profile_settings(user, {"display_name": display_name})
+            save_current_demo_profile_id(user["username"])
+            return redirect(resolve_login_destination(user, next_target))
+        except ValueError as exc:
+            messages = {"username_exists": "用户名已存在，请更换一个", "invalid_user_payload": "注册信息无效，请检查填写内容"}
+            return render_template("login.html", next_target=next_target, mode=mode, error=messages.get(str(exc), "注册失败，请稍后重试"), site_config=site_config)
+        except Exception as exc:
+            if is_db_unavailable_error(exc):
+                return render_template("login.html", next_target=next_target, mode=mode, error="账户服务暂不可用，请稍后重试", site_config=site_config)
+            raise
     if not username or not password:
-        return render_template("login.html", next_target=next_target, error="请输入用户名和密码", site_config=get_site_config())
+        return render_template("login.html", next_target=next_target, mode=mode, error="请输入用户名和密码", site_config=site_config)
     try:
         user = verify_platform_password_login(username, password)
     except ValueError:
-        return render_template("login.html", next_target=next_target, error="用户名或密码错误，或账号已停用", site_config=get_site_config())
+        return render_template("login.html", next_target=next_target, mode=mode, error="用户名或密码错误，或账号已停用", site_config=site_config)
     except Exception as exc:
         if is_db_unavailable_error(exc):
-            return render_template("login.html", next_target=next_target, error="账户服务暂不可用，请稍后重试", site_config=get_site_config())
+            return render_template("login.html", next_target=next_target, mode=mode, error="账户服务暂不可用，请稍后重试", site_config=site_config)
         raise
     save_current_demo_profile_id(user["username"])
-    return redirect(next_target)
+    return redirect(resolve_login_destination(user, next_target))
+
+
+@app.route("/login/entry")
+def login_entry():
+    user = get_current_authenticated_user()
+    if not user:
+        return redirect(url_for("login", next=safe_next_target(request.args.get("next") or "/h5")))
+    next_target = safe_next_target(request.args.get("next") or "/h5")
+    if str(user.get("role") or "").strip().lower() != "dav":
+        return redirect(next_target)
+    tenant_slug = str(user.get("tenant_slug") or "").strip().lower()
+    h5_target = f"/h5?tenant={tenant_slug}" if tenant_slug else "/h5"
+    workbench_target = next_target if next_target.startswith("/kol-workbench") else url_for("kol_workbench", tenant=tenant_slug, section="overview")
+    return render_template(
+        "login_entry.html",
+        user=user,
+        h5_target=h5_target,
+        workbench_target=workbench_target,
+    )
 
 
 @app.route("/logout")
@@ -48,6 +109,8 @@ def index():
 
 @app.route("/h5")
 def h5():
+    if not get_current_authenticated_user():
+        return redirect(url_for("login", next=safe_next_target(request.full_path.rstrip("?"))))
     site_config = get_site_config()
     h5_fallback_mode = False
     demo_profiles = []

@@ -3672,7 +3672,7 @@ def verify_h5_password_login(username, password):
     user = get_user_by_username(username)
     if not user:
         raise ValueError("user_not_found")
-    if user.get("role") not in {"investor", "dav"}:
+    if user.get("role") not in {"investor", "dav", "admin"}:
         raise ValueError("user_role_not_allowed")
     if user.get("status") != "active":
         raise ValueError("user_disabled")

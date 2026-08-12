@@ -4954,10 +4954,19 @@ let DEMO_PROFILE_USERS = Array.isArray(window.DEMO_PROFILES) ? JSON.parse(JSON.s
 let currentDemoUser = null;
 let h5LoginPendingUser = '';
 let h5PasswordLoginPending = false;
-let h5LoginMode = 'login';
+let h5LoginMode = new URLSearchParams(window.location.search || '').get('login_mode') === 'register' ? 'register' : 'login';
 let h5PasswordDraftUsername = '';
 let h5PasswordDraftDisplayName = '';
 let h5RememberPassword = false;
+function getH5PostLoginTarget() {
+  const target = new URLSearchParams(window.location.search || '').get('login_next') || '';
+  return target.startsWith('/') ? target : '';
+}
+
+function continueAfterH5Login() {
+  const target = getH5PostLoginTarget();
+  if (target) window.location.href = target;
+}
 let H5_AUTH_SETTINGS = JSON.parse(JSON.stringify((window.SITE_CONFIG && window.SITE_CONFIG.auth_settings) || {}));
 const H5_WECHAT_RUNTIME_QUERY_KEY = 'wx_env';
 const H5_LOGIN_HISTORY_STORAGE_KEY = 'gangtise_h5_login_history_v1';
@@ -6569,6 +6578,10 @@ async function loginH5Password(options) {
     window.CURRENT_DEMO_PROFILE = data.current_profile || null;
     upsertH5LoginHistoryAccount(data.current_profile || null, username, password, h5RememberPassword === true);
     setH5LoginStatus('登录成功，正在进入...', 'success');
+    if (getH5PostLoginTarget()) {
+      continueAfterH5Login();
+      return;
+    }
     renderDemoProfile(getDefaultDemoUser());
     showToast('登录成功');
   } catch (error) {
@@ -6638,6 +6651,10 @@ async function registerH5Password() {
     window.CURRENT_DEMO_PROFILE = data.current_profile || null;
     upsertH5LoginHistoryAccount(data.current_profile || null, username, password, false);
     setH5LoginStatus('注册成功，继续完成首次进入确认。', 'success');
+    if (getH5PostLoginTarget()) {
+      continueAfterH5Login();
+      return;
+    }
     h5LoginMode = 'login';
     renderDemoProfile(getDefaultDemoUser());
     showToast('注册成功');
@@ -11198,12 +11215,8 @@ async function logoutH5User() {
     hermesCredits = 0;
     h5OnboardingState = normalizeH5OnboardingState({});
     renderH5OnboardingModal();
-    setH5ShellLoggedOut(true);
-    setH5LoginStatus('已退出登录。', 'normal');
-    renderH5LoginScreen();
-    refreshH5AuthOptions({ silent: true, render: true });
-    renderHermesCredits();
-    showToast('已退出登录');
+    const target = `${window.location.pathname}${window.location.search || ''}`;
+    window.location.href = `/login?next=${encodeURIComponent(target)}`;
   } catch (error) {
     showToast('退出失败');
   }

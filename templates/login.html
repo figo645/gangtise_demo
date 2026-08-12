@@ -2,45 +2,104 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>洞见智研账户登录</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>洞见智研登录</title>
 <link rel="stylesheet" href="/static/css/style.css">
-<script>
-  window.SITE_CONFIG = {{ site_config | tojson }};
-</script>
 <script src="/static/js/theme.js"></script>
 <style>
-body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at top left,rgba(200,169,110,.12) 0%,transparent 34%),radial-gradient(circle at top right,rgba(47,116,192,.10) 0%,transparent 40%),linear-gradient(180deg,#F8FBFF 0%,#EEF4FA 100%);font-family:var(--font-main);color:var(--text-main);transition:background .2s,color .2s}
-.lock-overlay{width:min(92vw,420px);background:#FFFFFF;border:1px solid rgba(47,116,192,0.12);border-radius:18px;padding:28px;box-shadow:0 24px 80px rgba(31,73,125,.12);backdrop-filter:blur(14px)}
-.lock-title{font-size:24px;font-weight:700;color:var(--gold);letter-spacing:2px;margin-bottom:8px}
-.lock-desc{font-size:13px;color:var(--gray-400);line-height:1.7;margin-bottom:20px}
-.lock-form{display:flex;flex-direction:column;gap:12px}
-.lock-input{width:100%;border:1px solid rgba(200,169,110,0.2);border-radius:10px;padding:12px 14px;font-size:15px;outline:none;transition:background .2s,color .2s,border-color .2s,box-shadow .2s}
-.lock-input,
-.lock-input[type="password"]{background:#ffffff;color:#182132;-webkit-text-fill-color:#182132;caret-color:#182132}
-.lock-input::placeholder{color:#7E8A9A}
-.lock-input:focus{border-color:var(--gold);box-shadow:0 0 0 3px color-mix(in srgb,var(--gold) 18%,transparent)}
-.lock-input:-webkit-autofill,
-.lock-input:-webkit-autofill:hover,
-.lock-input:-webkit-autofill:focus,
-.lock-input:-webkit-autofill:active{-webkit-text-fill-color:#182132;box-shadow:0 0 0 1000px #ffffff inset;transition:background-color 9999s ease-out 0s}
-.lock-error{background:rgba(231,76,60,.12);border:1px solid rgba(231,76,60,.25);color:#ff8d80;border-radius:10px;padding:10px 12px;font-size:13px}
-.lock-note{font-size:11px;color:var(--gray-400);margin-top:10px}
-.btn-lock{width:100%;padding:12px 16px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--gold-dark),var(--gold-light));color:var(--navy);font-weight:700;cursor:pointer}
+body{margin:0;min-height:100vh;background:var(--surface-2);color:var(--text-main);font-family:var(--font-main)}
+.login-shell{min-height:100vh;box-sizing:border-box;padding:28px 18px 36px;background:radial-gradient(circle at top left,rgba(200,169,110,.1),transparent 38%),radial-gradient(circle at top right,rgba(47,116,192,.1),transparent 42%),linear-gradient(180deg,#F8FBFF 0%,#EEF4FA 100%)}
+.login-card{width:min(100%,440px);box-sizing:border-box;margin:0 auto;padding:22px 18px 18px;background:#fff;border:1px solid rgba(47,116,192,.12);border-radius:24px;box-shadow:0 24px 60px rgba(31,73,125,.1)}
+.login-kicker{display:inline-flex;padding:6px 10px;border:1px solid rgba(200,169,110,.16);border-radius:999px;background:rgba(200,169,110,.1);font-size:11px;color:var(--gold)}
+.login-title{margin-top:18px;color:var(--text-main);font-size:36px;line-height:1.2;font-weight:800}
+.login-desc{margin-top:10px;color:var(--gray-400);font-size:17px;line-height:1.8}
+.login-mode-tabs{display:flex;gap:8px;margin-top:16px}
+.login-mode-tab{flex:1;border:1px solid rgba(47,116,192,.12);border-radius:999px;padding:11px 12px;background:#F5F8FD;color:var(--gray-400);font-size:16px;font-weight:800;text-align:center;text-decoration:none}
+.login-mode-tab.active{border-color:transparent;background:linear-gradient(135deg,#1F4F86,#2F74C0);color:#fff;box-shadow:0 10px 22px rgba(47,116,192,.14)}
+.login-form{display:grid;gap:10px;margin-top:18px}
+.login-input{width:100%;box-sizing:border-box;border:1px solid rgba(47,116,192,.14);border-radius:14px;padding:14px 13px;background:#F9FBFF;color:var(--text-main);font-size:16px;outline:none}
+.login-input:focus{border-color:rgba(47,116,192,.36);box-shadow:0 0 0 3px rgba(47,116,192,.08)}
+.login-check{display:flex;align-items:center;gap:8px;margin-top:2px;color:var(--gray-400);font-size:14px;line-height:1.6}
+.login-check input{accent-color:#2F74C0}
+.login-btn{width:100%;border:0;border-radius:14px;padding:14px 12px;background:linear-gradient(135deg,#1F4F86,#2F74C0);color:#fff;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 10px 22px rgba(47,116,192,.16)}
+.login-status{min-height:18px;margin-top:10px;color:var(--gray-400);font-size:13px;line-height:1.6}
+.login-error{padding:10px 12px;border:1px solid rgba(231,76,60,.25);border-radius:10px;background:rgba(231,76,60,.12);color:#C0392B;font-size:13px}
+.login-switch{text-align:center;margin-top:10px;color:var(--gray-400);font-size:14px}.login-switch a{color:#2F74C0;font-weight:800;text-decoration:none}
+.login-divider{display:flex;align-items:center;gap:10px;margin:18px 0 10px;color:var(--gray-400);font-size:14px}.login-divider:before,.login-divider:after{content:'';flex:1;height:1px;background:rgba(47,116,192,.1)}
+.login-section-title{margin:18px 0 10px;color:#2F74C0;font-size:16px;font-weight:800}
+.account-list{display:grid;gap:12px}.account-card{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid rgba(47,116,192,.1);border-radius:18px;background:#fff}.account-avatar{width:48px;height:48px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:16px;background:linear-gradient(135deg,var(--gold-dark),var(--gold));font-size:22px}.account-main{min-width:0;flex:1}.account-name{font-size:15px;font-weight:700}.account-meta{margin-top:4px;color:var(--gray-400);font-size:12px;line-height:1.7}.account-badge{display:inline-flex;margin-top:6px;padding:4px 8px;border:1px solid rgba(47,116,192,.12);border-radius:999px;background:rgba(47,116,192,.08);color:#2F74C0;font-size:10px}.account-enter{padding:7px 10px;border-radius:999px;background:#2F74C0;color:#fff;font-size:11px;font-weight:800;cursor:pointer}.account-empty{padding:18px 12px;border:1px dashed rgba(200,169,110,.18);border-radius:16px;color:var(--gray-400);font-size:12px;line-height:1.8;text-align:center}
 </style>
 </head>
-<body onload="initGangtiseTheme()">
-  <div class="lock-overlay">
-    <div class="lock-title">账户登录</div>
-    <div class="lock-desc">使用平台账号登录。投资者、大V和管理员均使用同一套用户名体系。</div>
-    {% if error %}<div class="lock-error">{{ error }}</div>{% endif %}
-    <form class="lock-form" method="post" action="/login">
-      <input class="lock-input" type="text" name="username" placeholder="用户名" autocomplete="username" autofocus required>
-      <input class="lock-input" type="password" name="password" placeholder="密码" autocomplete="current-password" required>
-      <input type="hidden" name="next" value="{{ next_target }}">
-      <button class="btn-lock" type="submit">进入系统</button>
-    </form>
-    <div class="lock-note">账号由用户管理统一维护；已停用账号不能登录。</div>
-  </div>
+<body onload="initGangtiseTheme();loadRecentAccounts()">
+<main class="login-shell"><section class="login-card">
+  <div class="login-kicker">H5 登录</div>
+  <div class="login-title">洞见智研</div>
+  <div class="login-desc">{% if mode == 'register' %}注册后即可进入系统。{% else %}请输入账号密码登录。{% endif %}</div>
+  {% if error %}<div class="login-error">{{ error }}</div>{% endif %}
+  <nav class="login-mode-tabs">
+    <a class="login-mode-tab{% if mode != 'register' %} active{% endif %}" href="/login?next={{ next_target | urlencode }}">登录</a>
+    <a class="login-mode-tab{% if mode == 'register' %} active{% endif %}" href="/login?mode=register&amp;next={{ next_target | urlencode }}">注册</a>
+  </nav>
+  <form class="login-form" method="post" action="/login" onsubmit="submitUnifiedLogin(event)">
+    <input type="hidden" name="mode" value="{{ mode }}"><input type="hidden" name="next" value="{{ next_target }}">
+    {% if mode == 'register' %}<input class="login-input" type="text" name="display_name" autocomplete="nickname" placeholder="昵称" required>{% endif %}
+    <input class="login-input" type="text" name="username" autocomplete="username" placeholder="用户名" autofocus required>
+    <input class="login-input" type="password" name="password" autocomplete="{% if mode == 'register' %}new-password{% else %}current-password{% endif %}" placeholder="密码" required>
+    {% if mode == 'register' %}<input class="login-input" type="password" name="confirm_password" autocomplete="new-password" placeholder="确认密码" required>{% else %}<label class="login-check"><input type="checkbox" id="remember-login"><span>记住密码。勾选后，下次可直接选择这个账号进入。</span></label>{% endif %}
+    <button class="login-btn" type="submit">{% if mode == 'register' %}注册并进入系统{% else %}账号登录{% endif %}</button>
+  </form>
+  <div class="login-switch">{% if mode == 'register' %}已经有账号？ <a href="/login?next={{ next_target | urlencode }}">去登录</a>{% else %}还没有账号？ <a href="/login?mode=register&amp;next={{ next_target | urlencode }}">去注册</a>{% endif %}</div>
+  <div id="login-status" class="login-status"></div>
+  <div class="login-divider">最近登录账号</div><div class="login-section-title">选择账号进入</div>
+  <div id="recent-accounts" class="account-list"><div class="account-empty">正在加载最近登录账号...</div></div>
+</section></main>
+<script>
+const nextTarget={{ next_target|tojson }};
+const historyKey='gangtise_h5_login_history_v1';
+function loadRecentAccounts(){
+  const host=document.getElementById('recent-accounts'); if(!host)return;
+  let accounts=[]; try{accounts=JSON.parse(localStorage.getItem(historyKey)||'[]')}catch(e){}
+  accounts=Array.isArray(accounts)?accounts.filter(x=>x&&x.username).slice(0,8):[];
+  if(!accounts.length){host.innerHTML='<div class="account-empty">当前还没有最近登录账号。先用账号密码登录一次，之后这里才会出现可选账号。</div>';return;}
+  host.innerHTML=accounts.map((a,i)=>`<div class="account-card"><div class="account-avatar">${a.avatar||'👤'}</div><div class="account-main"><div class="account-name">${esc(a.display_name||a.username)}</div><div class="account-meta">${esc(a.username)}${a.role_label?' · '+esc(a.role_label):''}${a.tenant_name?' · '+esc(a.tenant_name):''}${a.advisor_name?' · 所属大V '+esc(a.advisor_name):''}</div><div class="account-badge">${a.password_saved?'已保存密码，可直接进入':'未保存密码，点击后回填账号'}</div></div><button class="account-enter" type="button" onclick="enterRecent(${i})">进入</button></div>`).join('');
+  window.recentAccounts=accounts;
+}
+function enterRecent(i){const a=(window.recentAccounts||[])[i];if(!a)return;const u=document.querySelector('input[name=username]');if(u)u.value=a.username;const p=document.querySelector('input[name=password]');if(p&&a.password_saved){p.value=a.password;document.querySelector('.login-form').submit();}else if(p){p.focus();}}
+function esc(v){return String(v||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+async function submitUnifiedLogin(event){
+  event.preventDefault();
+  const form=event.currentTarget;
+  const mode=String(form.elements.mode.value||'login');
+  const username=String(form.elements.username.value||'').trim();
+  const password=String(form.elements.password.value||'');
+  const status=document.getElementById('login-status');
+  const remember=document.getElementById('remember-login');
+  if(status)status.textContent=mode==='register'?'正在创建账号...':'正在校验账号...';
+  const payload={username,password};
+  let endpoint='/api/h5/login/password';
+  if(mode==='register'){
+    endpoint='/api/h5/register/password';
+    const target=new URL(form.elements.next.value||'/',window.location.origin);
+    payload.display_name=String(form.elements.display_name.value||'').trim();
+    payload.tenant_slug=String(target.searchParams.get('tenant')||'').trim().toLowerCase();
+    payload.confirm_password=String(form.elements.confirm_password.value||'');
+  }
+  try{
+    if(mode==='register'&&payload.password!==payload.confirm_password)throw new Error('password_mismatch');
+    const resp=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const data=await resp.json();
+    if(!resp.ok||data.ok===false)throw new Error(data.error||'login_failed');
+    const profile=data.current_profile||{};
+    const tenant=profile.tenant||{};
+    const accounts=(window.recentAccounts||[]).filter(a=>a.username!==username);
+    accounts.unshift({username,avatar:profile.avatar||'👤',display_name:profile.display_name||profile.name||username,role_label:profile.roleLabel||profile.role_label||'',tenant_name:tenant.name||'',advisor_name:tenant.advisor||'',password_saved:mode==='login'&&remember&&remember.checked,password:mode==='login'&&remember&&remember.checked?password:'',last_login_at:new Date().toISOString()});
+    localStorage.setItem(historyKey,JSON.stringify(accounts.slice(0,8)));
+    window.location.href=`/login/entry?next=${encodeURIComponent(form.elements.next.value||'/h5')}`;
+  }catch(error){
+    const messages={username_password_required:'请输入用户名和密码。',display_name_required:'请输入昵称。',password_too_short:'密码至少需要 6 位。',username_exists:'用户名已存在，请更换一个。',password_mismatch:'两次输入的密码不一致。',password_login_disabled:'当前未开放账号注册。'};
+    if(status)status.textContent=messages[error.message]||'账号或密码不正确，或当前账号不可用。';
+  }
+}
+</script>
 </body>
 </html>
