@@ -263,6 +263,15 @@ def admin():
         site_config=site_config_payload,
     )
 
+@app.route("/intern-handbook")
+def intern_handbook():
+    site_config = get_site_config()
+    return render_template(
+        "intern_handbook.html",
+        brand=get_platform_brand(site_config),
+        default_tenant=get_tenant_by_slug(get_default_tenant_slug(site_config), site_config),
+    )
+
 @app.route("/kol-workbench")
 def kol_workbench():
     site_config = get_site_config()

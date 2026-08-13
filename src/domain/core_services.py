@@ -3958,10 +3958,41 @@ def ensure_default_users():
         existing_users = list_users()
     except Exception:
         raise
-    if existing_users:
-        return {"created": [], "skipped": []}
     created = []
     skipped = []
+    if existing_users:
+        users_by_username = {
+            str((item or {}).get("username") or "").strip(): item
+            for item in existing_users
+            if str((item or {}).get("username") or "").strip()
+        }
+        default_admin = next((item for item in DEFAULT_USERS if item.get("role") == "admin"), None)
+        legacy_admin = users_by_username.get("平台管理员")
+        if default_admin and default_admin["username"] not in users_by_username:
+            if legacy_admin:
+                db = get_db()
+                db.execute(
+                    """
+                    UPDATE users
+                    SET username = ?, password = ?, role = ?, status = ?, updated_at = ?
+                    WHERE username = ?
+                    """,
+                    (
+                        default_admin["username"],
+                        default_admin["password"],
+                        "admin",
+                        "active",
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "平台管理员",
+                    ),
+                )
+                db.commit()
+            else:
+                user = create_user(default_admin)
+                if user:
+                    created.append(user)
+        return {"created": created, "skipped": skipped}
+
     for item in DEFAULT_USERS:
         try:
             user = create_user(item)

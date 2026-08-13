@@ -22,8 +22,10 @@ class RouteSmokeTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls._original_is_authenticated = web_hooks.is_authenticated
+        cls._original_hook_current_user = web_hooks.get_current_authenticated_user
         cls._original_current_user = web_pages.get_current_authenticated_user
         web_hooks.is_authenticated = lambda: True
+        web_hooks.get_current_authenticated_user = lambda: {"id": "test-admin", "role": "admin"}
         web_pages.get_current_authenticated_user = lambda: {"id": "test-user", "role": "dav"}
         app_entry.app.config.update(TESTING=True)
         cls.client = app_entry.app.test_client()
@@ -32,6 +34,7 @@ class RouteSmokeTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         web_hooks.is_authenticated = cls._original_is_authenticated
+        web_hooks.get_current_authenticated_user = cls._original_hook_current_user
         web_pages.get_current_authenticated_user = cls._original_current_user
 
     def test_h5_pages_render(self):
@@ -544,6 +547,45 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn('data-settings-panel="knowledge-source"', html)
         self.assertIn('data-settings-panel="llm-feature-map"', html)
         self.assertIn("openAdminSettingsSubmenu('knowledge-source')", html)
+
+    def test_intern_handbook_is_available_from_admin_and_links_product_docs(self):
+        admin_response = self.client.get("/admin")
+        self.assertEqual(admin_response.status_code, 200)
+        self.assertIn('id="admin-top-intern-handbook-link"', admin_response.get_data(as_text=True))
+
+        handbook_response = self.client.get("/intern-handbook")
+        self.assertEqual(handbook_response.status_code, 200)
+        handbook_html = handbook_response.get_data(as_text=True)
+        self.assertIn("实习生系统学习手册", handbook_html)
+        self.assertIn("系统地图与功能介绍", handbook_html)
+        self.assertIn("建议学习路径", handbook_html)
+        self.assertIn("按角色的模块功能测试用例", handbook_html)
+        self.assertIn("Gangtise 按角色模块功能测试用例", handbook_html)
+        self.assertIn('/static/downloads/gangtise_role_test_cases.xlsx', handbook_html)
+        self.assertNotIn("执行、BDD 与缺陷记录", handbook_html)
+        self.assertIn('/prd#s13', handbook_html)
+
+        index_response = self.client.get("/")
+        self.assertEqual(index_response.status_code, 200)
+        index_html = index_response.get_data(as_text=True)
+        self.assertIn("当前系统功能总览", index_html)
+        self.assertIn('/intern-handbook', index_html)
+
+        prd_response = self.client.get("/prd")
+        self.assertEqual(prd_response.status_code, 200)
+        self.assertIn("当前版本验收与测试策略", prd_response.get_data(as_text=True))
+
+    def test_dav_user_cannot_access_admin_pages_or_admin_apis(self):
+        original_user = web_hooks.get_current_authenticated_user
+        web_hooks.get_current_authenticated_user = lambda: {"id": "dav-user", "role": "dav"}
+        try:
+            self.assertEqual(self.client.get("/admin").status_code, 403)
+            self.assertEqual(self.client.get("/intern-handbook").status_code, 403)
+            api_response = self.client.get("/api/admin/access-stats")
+            self.assertEqual(api_response.status_code, 403)
+            self.assertEqual(api_response.get_json()["error"], "admin_required")
+        finally:
+            web_hooks.get_current_authenticated_user = original_user
 
     def test_workbench_pages_render(self):
         for tenant_slug in self.tenant_slugs:

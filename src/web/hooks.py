@@ -23,11 +23,24 @@ def should_log_request():
     return not request.path.startswith("/static/") and not request.path.startswith("/api/")
 
 
+def is_admin_only_request(path):
+    normalized_path = str(path or "").rstrip("/") or "/"
+    return normalized_path in {"/admin", "/intern-handbook"} or normalized_path.startswith("/api/admin/")
+
+
+def admin_access_denied_response():
+    if request.path.startswith("/api/"):
+        return jsonify({"success": False, "error": "admin_required"}), 403
+    abort(403)
+
+
 def record_access(response):
     if not should_log_request():
         return response
     try:
-        current_profile = get_current_demo_profile()
+        # Access logging applies to every platform role.  Resolving through the
+        # H5-only profile helper would discard an admin session after login.
+        current_profile = get_current_authenticated_user()
         tenant_slug = ""
         user_profile_id = ""
         user_role = ""
@@ -82,6 +95,10 @@ def require_user_login():
     if request.path.startswith("/static/") or request.path in public_paths:
         return None
     if is_authenticated():
+        if is_admin_only_request(request.path):
+            current_user = get_current_authenticated_user() or {}
+            if str(current_user.get("role") or "").strip().lower() != "admin":
+                return admin_access_denied_response()
         return None
     if request.path.startswith("/api/"):
         return jsonify({"success": False, "error": "auth_required"}), 401

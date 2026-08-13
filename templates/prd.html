@@ -130,7 +130,7 @@ body.theme-light .lv1{color:var(--text-sub)}
 <header class="prd-header">
   <div class="prd-header-left">
     <span class="prd-header-title">洞见智研 PRD</span>
-    <span class="prd-header-version">v1.1 · 2026-05-27</span>
+    <span class="prd-header-version">v1.4 · 2026-08-13</span>
   </div>
   <div class="prd-header-right">
     <a href="/" class="btn-back">← 返回首页</a>
@@ -154,7 +154,8 @@ body.theme-light .lv1{color:var(--text-sub)}
   <div class="prd-toc-item" onclick="scrollToSection('s9')"><span class="prd-toc-num">09</span>积分与算力扩展体系</div>
   <div class="prd-toc-item" onclick="scrollToSection('s10')"><span class="prd-toc-num">10</span>KOL合伙人扩展体系</div>
   <div class="prd-toc-item" onclick="scrollToSection('s11')"><span class="prd-toc-num">11</span>非功能性需求</div>
-  <div class="prd-toc-item" onclick="scrollToSection('s12')"><span class="prd-toc-num">12</span>版本迭代计划</div>
+  <div class="prd-toc-item" onclick="scrollToSection('s12')"><span class="prd-toc-num">12</span>版本历史</div>
+  <div class="prd-toc-item" onclick="scrollToSection('s13')"><span class="prd-toc-num">13</span>当前版本验收与测试</div>
 </nav>
 
 <!-- MAIN CONTENT -->
@@ -165,17 +166,17 @@ body.theme-light .lv1{color:var(--text-sub)}
   <div class="prd-section-num">SECTION 01</div>
   <h2 class="prd-section-title">产品概述</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">洞见智研是面向C端投资者的轻量化投研产品，当前以基本面分析、自选股、复盘专区、知识专区四类高频能力切入，并通过后台控制主题和扩展模块的开放节奏。</p>
+  <p class="prd-section-desc">洞见智研是面向投资者与研究型大V的多租户投研平台。当前交付以真实市场数据、租户知识、复盘生产与 Hermes 研究问答为主线，并由独立 Admin 管理功能开关、模型、数据治理和审计。</p>
 
   <div class="prd-sub">
     <div class="prd-sub-title">基本信息</div>
     <table class="prd-table">
       <tr><th style="width:140px">项目</th><th>内容</th></tr>
       <tr><td>产品名称</td><td>洞见智研金融科技 · 投研数据平台</td></tr>
-      <tr><td>当前版本</td><td>v1.1</td></tr>
-      <tr><td>文档日期</td><td>2026-05-27</td></tr>
-      <tr><td>产品定位</td><td>面向C端投资者的轻量化投研入口，以证据链驱动的研究表达支撑日常观察与复盘</td></tr>
-      <tr><td>技术栈</td><td>Flask · Python · HTML5 · CSS3 · JavaScript</td></tr>
+      <tr><td>当前版本</td><td>v1.4</td></tr>
+      <tr><td>文档日期</td><td>2026-08-13</td></tr>
+      <tr><td>产品定位</td><td>以租户隔离的市场数据、知识资产和证据链为基础，支持投资者跟踪、大V研究生产与平台治理</td></tr>
+      <tr><td>技术栈</td><td>Flask · Python · PostgreSQL / pgvector · HTML5 · CSS3 · JavaScript · ECharts</td></tr>
     </table>
   </div>
 
@@ -183,15 +184,15 @@ body.theme-light .lv1{color:var(--text-sub)}
     <div class="prd-sub-title">核心价值主张</div>
     <div class="info-card">
       <div class="info-card-title">① 研究辅助优先</div>
-      <div class="info-card-body">默认对外优先保留基本面分析、自选股、复盘专区、知识专区四类高频动作，强调研究辅助、低学习成本和稳定表达，不额外堆叠过多复杂能力。</div>
+      <div class="info-card-body">面向投资者提供行情、自选股、复盘阅读、知识和消息；面向大V补充复盘生产、知识录入与粉丝经营；所有研究输出坚持“结论可追溯、数据来源可说明、不构成投资建议”。</div>
     </div>
     <div class="info-card">
       <div class="info-card-title">② 主题一致性与咨询风体验</div>
       <div class="info-card-body">产品默认采用白底咨询风，并保留深色模式与主题色切换。首页、H5、PRD、admin 共享同一套主题配置，保证文档与产品状态同步。</div>
     </div>
     <div class="info-card">
-      <div class="info-card-title">③ 后台控开而非一次性放量</div>
-      <div class="info-card-body">社区、Hermes、会员、消息、工作台等能力保留在产品规划内，但默认关闭，由 admin 按运营阶段逐步开启，降低开放风险与运维复杂度。</div>
+      <div class="info-card-title">③ 多租户、权限与能力开关</div>
+      <div class="info-card-body">普通用户、大V与 Admin 使用独立权限边界。H5 和工作台按所属租户读取内容；Admin 才可配置功能开关、Hermes 访问范围、互动权限和登录策略。会员、社区和机构 API 尚未作为已交付功能。</div>
     </div>
     <div class="info-card">
       <div class="info-card-title">④ 模型按功能精细路由</div>
@@ -203,10 +204,10 @@ body.theme-light .lv1{color:var(--text-sub)}
     <div class="prd-sub-title">目标用户</div>
     <table class="prd-table">
       <tr><th>用户类型</th><th>特征描述</th><th>核心需求</th><th>规模估算</th></tr>
-      <tr><td>普通投资者</td><td>希望快速获取研究框架，不想面对复杂功能和重交互</td><td>简明分析、自选跟踪、日常复盘</td><td>当前核心目标人群</td></tr>
-      <tr><td>高频跟踪用户</td><td>每天有稳定看盘与记录习惯</td><td>自选维护、主线提炼、日终沉淀</td><td>当前重点留存对象</td></tr>
-      <tr><td>运营管理员</td><td>负责决定对外开放哪些能力与主题策略</td><td>功能开关、主题配置、访问审计、数据分析</td><td>当前关键内部角色</td></tr>
-      <tr><td>社区/KOL/机构用户</td><td>属于后续扩展阶段引入的生态角色</td><td>内容分发、合伙分成、接口服务</td><td>后续阶段拓展</td></tr>
+      <tr><td>普通投资者</td><td>在所属大V租户中阅读研究、跟踪自选和参与互动</td><td>真实行情、自选、复盘阅读、知识、消息</td><td>已交付</td></tr>
+      <tr><td>研究型大V</td><td>维护自身租户的内容、知识和粉丝经营</td><td>复盘向导、知识录入、Hermes、粉丝评论分析、定价</td><td>已交付</td></tr>
+      <tr><td>平台 Admin</td><td>负责平台级治理，不属于任何大V租户</td><td>用户/租户、开关、模型映射、知识与记忆治理、审计、数据库发布</td><td>已交付</td></tr>
+      <tr><td>会员 / 社区 / 机构 API</td><td>商业化与生态扩展方向</td><td>付费权益、公开社区、外部接口</td><td>未交付</td></tr>
     </table>
   </div>
 
@@ -242,7 +243,7 @@ body.theme-light .lv1{color:var(--text-sub)}
   <div class="prd-section-num">SECTION 02</div>
   <h2 class="prd-section-title">用户角色与权限</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">当前版本以“普通用户默认使用四项核心能力 + 管理员后台控开扩展模块”为主。会员、KOL、机构等角色仍保留在规划内，但不作为当前默认开放范围。</p>
+  <p class="prd-section-desc">平台当前只有三类实际账号：普通投资者、研究型大V和平台 Admin。所有内容与知识资产以租户隔离；Admin 不属于大V租户，且大V不能访问 Admin。</p>
 
   <div class="prd-sub">
     <div class="prd-sub-title">当前版本权限矩阵</div>
@@ -250,64 +251,71 @@ body.theme-light .lv1{color:var(--text-sub)}
       <tr>
         <th>能力 / 角色</th>
         <th>普通用户</th>
-        <th>管理员</th>
-        <th>扩展模块</th>
+        <th>研究型大V</th>
+        <th>平台 Admin</th>
         <th>当前状态</th>
       </tr>
       <tr>
         <td>基本面分析</td>
         <td><span class="check">✓</span></td>
-        <td><span class="check">✓</span></td>
-        <td>否</td>
-        <td>默认开放</td>
+        <td><span class="check">✓</span> 租户研究入口</td>
+        <td><span class="check">✓</span> 平台查看</td>
+        <td>真实数据与研究边界</td>
       </tr>
       <tr>
         <td>自选股</td>
         <td><span class="check">✓</span></td>
-        <td><span class="check">✓</span></td>
-        <td>否</td>
-        <td>默认开放</td>
+        <td><span class="check">✓</span> 管理本租户自选</td>
+        <td><span class="check">✓</span> 平台治理</td>
+        <td>仅限所属租户数据</td>
       </tr>
       <tr>
         <td>复盘专区</td>
         <td><span class="check">✓</span></td>
-        <td><span class="check">✓</span></td>
-        <td>否</td>
-        <td>默认开放</td>
+        <td><span class="check">✓</span> 生产、预览、发布</td>
+        <td><span class="check">✓</span> 平台查看</td>
+        <td>投资者阅读；大V编辑发布</td>
       </tr>
       <tr>
         <td>知识专区</td>
         <td><span class="check">✓</span></td>
-        <td><span class="check">✓</span></td>
-        <td>否</td>
-        <td>默认开放</td>
+        <td><span class="check">✓</span> 录入与浏览</td>
+        <td><span class="check">✓</span> 跨租户治理</td>
+        <td>大V看百科与结构；Admin看治理信息</td>
       </tr>
       <tr>
         <td>主题切换 / 主题色</td>
         <td><span class="check">✓</span> 本地偏好</td>
+        <td><span class="check">✓</span> 本地偏好</td>
         <td><span class="check">✓</span> 默认配置</td>
-        <td>否</td>
         <td>已实现</td>
       </tr>
       <tr>
-        <td>社区 / Hermes / 会员 / 消息 / 工作台</td>
-        <td><span class="cross">✗</span> 默认不展示</td>
-        <td><span class="check">✓</span> 可配置</td>
-        <td>是</td>
-        <td>后台控开</td>
+        <td>Hermes</td>
+        <td><span class="partial">△</span> 由 Admin 配置访问</td>
+        <td><span class="check">✓</span> 默认开放</td>
+        <td><span class="check">✓</span> 配置与治理</td>
+        <td>会话、记忆、图表、知识问答</td>
       </tr>
       <tr>
-        <td>admin 数据分析分组</td>
+        <td>消息与自选股评论</td>
+        <td><span class="check">✓</span> 所属租户互动</td>
+        <td><span class="check">✓</span> 查看粉丝互动统计</td>
+        <td><span class="check">✓</span> 平台分析</td>
+        <td>互动开关可由 Admin 关闭</td>
+      </tr>
+      <tr>
+        <td>Admin 管理与数据分析</td>
+        <td><span class="cross">✗</span></td>
         <td><span class="cross">✗</span></td>
         <td><span class="check">✓</span></td>
-        <td>内部模块</td>
-        <td>已实现</td>
+        <td>仅 Admin</td>
       </tr>
     </table>
   </div>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">扩展角色规划</div>
+    <div class="prd-sub-title">未交付的扩展角色</div>
     <table class="prd-table">
       <tr>
         <th>角色</th>
@@ -319,31 +327,30 @@ body.theme-light .lv1{color:var(--text-sub)}
         <td>基础 / 专业会员</td>
         <td>后续商业化层</td>
         <td>更多研究深度、更多使用次数、更多专属入口</td>
-        <td>规划中</td>
+        <td>未交付</td>
       </tr>
       <tr>
         <td>KOL合伙人</td>
         <td>内容生态层</td>
         <td>内容分发、认证标识、合作分成</td>
-        <td>规划中</td>
+        <td>未交付</td>
       </tr>
       <tr>
         <td>机构VIP / API客户</td>
         <td>高客单价服务层</td>
         <td>数据接口、批量分析、定制报告</td>
-        <td>后续阶段</td>
+        <td>未交付</td>
       </tr>
     </table>
   </div>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">扩展商业化定价参考</div>
+    <div class="prd-sub-title">商业化记录与边界</div>
     <table class="prd-table">
-      <tr><th>会员档位</th><th>月费</th><th>年费</th><th>核心权益</th></tr>
-      <tr><td>普通用户</td><td>¥0</td><td>¥0</td><td>默认开放基本面分析、自选股、复盘专区、知识专区、我的</td></tr>
-      <tr><td>基础会员</td><td>¥39</td><td>¥299</td><td>扩展研究深度、更多专题内容、更多使用配额</td></tr>
-      <tr><td>专业会员</td><td>¥99</td><td>¥799</td><td>高级研究模块、完整扩展能力、更多个性化服务</td></tr>
-      <tr><td>机构VIP</td><td>¥999</td><td>¥8,999</td><td>接口服务、定制分析、专属支持</td></tr>
+      <tr><th>事项</th><th>当前状态</th><th>系统已有能力</th><th>未交付边界</th></tr>
+      <tr><td>大V租户定价</td><td>已支持配置与收入估算</td><td>粉丝付费样本标记、定价和工作台经营指标</td><td>不等同于完整支付/订阅结算</td></tr>
+      <tr><td>会员 / VIP</td><td>未交付</td><td>无正式会员等级、权益或扣费流程</td><td>不在当前验收范围</td></tr>
+      <tr><td>机构 API</td><td>未交付</td><td>平台内部已有市场数据服务</td><td>不对外提供机构 API 或 SLA</td></tr>
     </table>
   </div>
 </section>
@@ -353,7 +360,7 @@ body.theme-light .lv1{color:var(--text-sub)}
   <div class="prd-section-num">SECTION 03</div>
   <h2 class="prd-section-title">页面架构与跳转流程</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">本节聚焦当前版本的真实信息架构，统一描述首页入口、H5当前默认范围、后台控开策略，以及数据分析并入 admin 后的跳转关系。</p>
+  <p class="prd-section-desc">本节只描述已经存在的入口与权限边界。首页用于产品与文档导航；H5 面向普通用户和大V；大V Web 工作台与 Admin 是两条独立后台路径。</p>
 
   <!-- 3.1 整体架构图 -->
   <div class="prd-sub">
@@ -363,15 +370,18 @@ body.theme-light .lv1{color:var(--text-sub)}
       <div class="arch-node"><span class="arch-indent">├─ </span><span class="arch-box page">首页</span><span class="arch-route">/</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">H5用户端</span><span class="arch-route">/h5</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">中后台管理</span><span class="arch-route">/admin</span></div>
-      <div class="arch-node"><span class="arch-indent">│  └─ </span><span class="arch-box sub">PRD文档</span><span class="arch-route">/prd</span></div>
-      <div class="arch-node" style="margin-top:8px"><span class="arch-indent">├─ </span><span class="arch-box page">H5用户端</span><span class="arch-route">/h5 · 默认5个核心入口</span></div>
+      <div class="arch-node"><span class="arch-indent">│  └─ </span><span class="arch-box sub">PRD / 学习手册</span><span class="arch-route">/prd · /intern-handbook</span></div>
+      <div class="arch-node" style="margin-top:8px"><span class="arch-indent">├─ </span><span class="arch-box page">H5用户端</span><span class="arch-route">/h5 · 按角色展示能力</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">基本面分析</span><span class="arch-route">默认开放</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">自选股</span><span class="arch-route">默认开放</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">复盘专区</span><span class="arch-route">默认开放</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">知识专区</span><span class="arch-route">默认开放</span></div>
-      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">我的</span><span class="arch-route">默认开放</span></div>
-      <div class="arch-node"><span class="arch-indent">│  └─ </span><span class="arch-box sub">社区 / Hermes / 会员 / 消息 / 工作台</span><span class="arch-route">后台按需开放</span></div>
-      <div class="arch-node" style="margin-top:8px"><span class="arch-indent">├─ </span><span class="arch-box page">中后台管理</span><span class="arch-route">/admin · 运营配置 + 数据分析</span></div>
+      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">消息 / 我的</span><span class="arch-route">默认开放</span></div>
+      <div class="arch-node"><span class="arch-indent">│  └─ </span><span class="arch-box sub">Hermes</span><span class="arch-route">大V默认开放；投资者由 Admin 配置</span></div>
+      <div class="arch-node" style="margin-top:8px"><span class="arch-indent">├─ </span><span class="arch-box page">大V工作台</span><span class="arch-route">/kol-workbench · 生产与经营</span></div>
+      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">复盘向导 / 知识治理 / 粉丝与评论分析</span></div>
+      <div class="arch-node"><span class="arch-indent">│  └─ </span><span class="arch-box sub">租户门户与定价</span></div>
+      <div class="arch-node" style="margin-top:8px"><span class="arch-indent">├─ </span><span class="arch-box page">平台 Admin</span><span class="arch-route">/admin · 仅 admin 角色</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">运营概览</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">用户列表/分层</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">KOL管理/结算</span></div>
@@ -402,7 +412,7 @@ body.theme-light .lv1{color:var(--text-sub)}
         <span class="flow-box action">首页 · 基本面分析</span>
       </div>
       <!-- Row 2: Tab bar -->
-      <div style="margin:4px 0 4px 0;color:var(--text-sub);font-size:12px;padding-left:2px">底部导航栏（默认 5 个核心入口）</div>
+      <div style="margin:4px 0 4px 0;color:var(--text-sub);font-size:12px;padding-left:2px">底部导航栏（研究、跟踪、复盘、知识、消息与我的；按配置展示 Hermes）</div>
       <div class="flow-row" style="justify-content:flex-start;flex-wrap:wrap;gap:6px;margin-bottom:4px">
         <span class="flow-box action">自选股</span>
         <span class="flow-arrow" style="color:#9A9590">↔</span>
@@ -411,6 +421,8 @@ body.theme-light .lv1{color:var(--text-sub)}
         <span class="flow-box action">复盘专区</span>
         <span class="flow-arrow" style="color:#9A9590">↔</span>
         <span class="flow-box action">知识专区</span>
+        <span class="flow-arrow" style="color:#9A9590">↔</span>
+        <span class="flow-box action">消息</span>
         <span class="flow-arrow" style="color:#9A9590">↔</span>
         <span class="flow-box">我的</span>
       </div>
@@ -461,7 +473,7 @@ body.theme-light .lv1{color:var(--text-sub)}
           <div style="display:flex;align-items:center;gap:8px">
             <span class="flow-box action" style="font-size:12px">切换主题</span>
             <span class="flow-arrow" style="color:#9A9590">↔</span>
-            <span class="flow-box modal" style="font-size:12px">等待后台开放更多模块</span>
+            <span class="flow-box modal" style="font-size:12px">按角色和开关进入 Hermes</span>
           </div>
         </div>
       </div>
@@ -490,18 +502,18 @@ body.theme-light .lv1{color:var(--text-sub)}
           <div class="hermes-num">3</div>
           <div class="hermes-box wide">
             配置功能开关<br>
-            <span style="font-size:11px;color:var(--text-sub)">默认开放：基本面分析 / 自选股 / 复盘专区 / 知识专区</span>
+            <span style="font-size:11px;color:var(--text-sub)">控制互动、Hermes 访问、登录方式与各业务模块</span>
           </div>
         </div>
         <div class="hermes-arrow-down">↓</div>
         <div class="hermes-step">
           <div class="hermes-num">4</div>
-          <div class="hermes-box wide modal">按阶段开放社区 / Hermes / 会员 / 消息 / 工作台</div>
+          <div class="hermes-box wide modal">大V使用工作台；Admin 维护模型、记忆、知识与发布控制</div>
         </div>
         <div class="hermes-arrow-down">↓</div>
         <div class="hermes-step">
           <div class="hermes-num">5</div>
-          <div class="hermes-box wide success">H5 与 PRD 统一按当前配置展示</div>
+          <div class="hermes-box wide success">前台、工作台与 Admin 按保存后的配置和权限生效</div>
         </div>
       </div>
     </div>
@@ -570,7 +582,7 @@ body.theme-light .lv1{color:var(--text-sub)}
   <div class="prd-section-num">SECTION 04</div>
   <h2 class="prd-section-title">H5用户端功能规格</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">H5端当前按“少量核心能力先验证”的原则收敛为 5 个核心入口：基本面分析、自选股、复盘专区、知识专区、我的。其余模块作为后台可配置能力存在，不默认对外开放。</p>
+  <p class="prd-section-desc">H5 是投资者与大V的移动入口，覆盖研究、行情跟踪、自选股、复盘、知识、消息和账户。Hermes 是否对普通投资者展示由 Admin 控制；大V可使用完整的研究与生产能力。</p>
 
   <div class="prd-sub">
     <div class="prd-sub-title">Tab 1 · 基本面分析</div>
@@ -579,7 +591,7 @@ body.theme-light .lv1{color:var(--text-sub)}
       <tr><td>研究结论卡片</td><td>按固定结构展示核心观点、估值判断、风险提示与证据链来源</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
       <tr><td>市场摘要</td><td>顶部展示核心指数、板块温度和当日主线，帮助快速进入上下文</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
       <tr><td>证据链摘要</td><td>围绕估值、盈利预期、资金流给出简明研究框架，不输出明确买卖指令</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>扩展研究入口</td><td>更深层的社区、Hermes 等能力由后台开关控制后再显示</td><td><span class="p1">P1</span></td><td><span class="planned">按需开放</span></td></tr>
+      <tr><td>Hermes 研究入口</td><td>大V可发起新会话、续问历史会话；支持个股、指数、指标图表、知识、报告和 URL 解读</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
     </table>
   </div>
 
@@ -589,7 +601,7 @@ body.theme-light .lv1{color:var(--text-sub)}
       <tr><th>功能点</th><th>描述</th><th>优先级</th><th>状态</th></tr>
       <tr><td>自选列表</td><td>用户管理重点关注标的，按价格、涨跌幅、板块进行快速浏览</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
       <tr><td>添加/移除自选</td><td>通过轻量交互维护观察池，降低首次使用门槛</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>简版行情信息</td><td>保留核心看盘信息，不叠加复杂社交或会员动作</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>行情、图表与标注</td><td>展示真实行情、ECharts K线/趋势图；用户可保存 K线标注，粉丝可在 Admin 开关允许时评论</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
       <tr><td>提醒/分组</td><td>后续可扩展价格提醒、分组管理等高级能力</td><td><span class="p1">P1</span></td><td><span class="planned">规划中</span></td></tr>
     </table>
   </div>
@@ -598,9 +610,9 @@ body.theme-light .lv1{color:var(--text-sub)}
     <div class="prd-sub-title">Tab 3 · 复盘专区</div>
     <table class="prd-table">
       <tr><th>功能点</th><th>描述</th><th>优先级</th><th>状态</th></tr>
-      <tr><td>消息聚合</td><td>把大V消息、普通用户与 Hermes 生成的复盘内容、文本和图像摘要整理到独立专区</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>重点标的关联</td><td>支持结合自选股内容生成更贴近用户关注的复盘视图</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>结构化整理</td><td>按主线、风险点、次日观察项统一整理消息里的重要复盘信息</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>复盘阅读与即时发布</td><td>普通用户阅读所属租户的已发布内容；大V发布后立即刷新到前台列表</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>大V复盘生产</td><td>手动、语音、文件与 URL 内容先进入可编辑用户复盘；自选股为可选项，确认后才生成摘要和自选股归纳</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>摘要与证据链</td><td>发布时生成不超过150字摘要；用用户提及内容和知识/公开资料匹配证据，缺失时明确说明暂无匹配</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
       <tr><td>导出/分享</td><td>后续可开放导出、分享或关联社区分发能力</td><td><span class="p1">P1</span></td><td><span class="planned">后台控制</span></td></tr>
     </table>
   </div>
@@ -612,7 +624,7 @@ body.theme-light .lv1{color:var(--text-sub)}
       <tr><td>长期知识沉淀</td><td>把大V通过语音输入、文件上传、网页URL提供的内容沉淀为知识卡，并抽取其中可复用的框架、方法和资料</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
       <tr><td>前后台共用</td><td>租户知识板块和前台知识专区使用同一套知识资产，避免重复维护</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
       <tr><td>可复用供给</td><td>知识资产可回流给 Hermes、复盘专区和大V工作台使用</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>分类运营</td><td>后续支持按方法、纪要、文件资料、网页资料等分类管理</td><td><span class="p1">P1</span></td><td><span class="planned">规划中</span></td></tr>
+      <tr><td>百科与知识分层</td><td>大V在 H5 和 Web 按层级浏览可读词条和百科；图谱用于关系观察，QKV 等治理信息仅由 Admin 查看</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
     </table>
   </div>
 
@@ -623,7 +635,7 @@ body.theme-light .lv1{color:var(--text-sub)}
       <tr><td>基础个人资料</td><td>展示个人信息、偏好设置与基础账户信息</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
       <tr><td>主题设置</td><td>用户可自行切换浅色/深色模式与主题色，覆盖后台默认值</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
       <tr><td>功能可见性承接</td><td>当后台开放新模块时，可在个人中心看到相应入口或状态说明</td><td><span class="p1">P1</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>会员/消息等扩展页</td><td>默认不展示，待后台开放后再进入完整链路</td><td><span class="p1">P1</span></td><td><span class="planned">后台控制</span></td></tr>
+      <tr><td>消息与帮助中心</td><td>投资者查看大V对话和系统消息；大V查看粉丝对话；帮助中心按角色提供功能说明</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
     </table>
   </div>
 
@@ -649,8 +661,8 @@ body.theme-light .lv1{color:var(--text-sub)}
       </tr>
       <tr>
         <td><b>大V敏感词守护</b></td>
-        <td>后续开放社区或 Hermes 时，涉及“买/卖/推荐”等敏感表达必须统一套用合规拦截与免责声明。</td>
-        <td>后台可开放模块</td>
+        <td>Hermes、大V复盘和评论均以研究辅助为边界；涉及“买/卖/推荐”等敏感表达必须统一套用合规约束与免责声明。</td>
+        <td>Hermes / 复盘 / 互动</td>
       </tr>
       <tr>
         <td><b>数据来源透明</b></td>
@@ -664,21 +676,19 @@ body.theme-light .lv1{color:var(--text-sub)}
       </tr>
       <tr>
         <td><b>后台控开优先</b></td>
-        <td>高复杂度、高解释成本或高合规风险模块不默认开放，统一由 admin 配置后再进入前台。</td>
-        <td>社区 / Hermes / 会员 / 消息 / 工作台</td>
+        <td>互动权限、Hermes 面向投资者的开放范围和登录方式由 Admin 配置；关闭时页面和接口都必须受限。</td>
+        <td>互动 / Hermes / 登录</td>
       </tr>
     </table>
   </div>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">当前不默认开放的功能</div>
+    <div class="prd-sub-title">当前未交付的功能</div>
     <table class="prd-table">
-      <tr><th>模块</th><th>当前策略</th><th>开放方式</th><th>说明</th></tr>
-      <tr><td>社区</td><td>默认关闭</td><td>后台 feature flag</td><td>避免过早引入额外审核与互动运营负担</td></tr>
-      <tr><td>Hermes</td><td>默认关闭</td><td>后台 feature flag</td><td>等研究表达、合规边界和转化路径更稳定后再放量</td></tr>
-      <tr><td>会员 / VIP</td><td>默认关闭</td><td>后台 feature flag</td><td>避免过早引入复杂付费链路</td></tr>
-      <tr><td>消息 / 大V私信</td><td>默认关闭</td><td>后台 feature flag</td><td>降低合规和客服响应压力</td></tr>
-      <tr><td>工作台</td><td>默认关闭</td><td>后台 feature flag</td><td>保留为后续高阶能力入口</td></tr>
+      <tr><th>模块</th><th>当前状态</th><th>未来处理方式</th><th>说明</th></tr>
+      <tr><td>公开社区</td><td>未交付</td><td>需单独立项</td><td>当前仅支持租户内消息和自选股评论，不是开放式帖子社区</td></tr>
+      <tr><td>会员 / VIP</td><td>未交付</td><td>需单独立项</td><td>当前大V定价与付费样本仅用于经营分析，不包含会员订阅</td></tr>
+      <tr><td>机构 API / 原生 App / 多语言</td><td>未交付</td><td>需单独立项</td><td>不属于当前发布范围</td></tr>
     </table>
   </div>
 </section>
@@ -688,7 +698,7 @@ body.theme-light .lv1{color:var(--text-sub)}
   <div class="prd-section-num">SECTION 05</div>
   <h2 class="prd-section-title">社区扩展功能规格</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">社区模块目前默认关闭。以下内容定义其在后续阶段被后台开启后的扩展规格，便于运营、合规和内容生态统一对齐。</p>
+  <p class="prd-section-desc">公开社区尚未交付。本节保留的是历史设计归档，不应被视为当前页面、接口、积分或审核流程的实现规格。</p>
 
   <div class="prd-sub">
     <div class="prd-sub-title">帖子类型规格</div>
@@ -761,52 +771,47 @@ body.theme-light .lv1{color:var(--text-sub)}
 <!-- ===== SECTION 6 ===== -->
 <section class="prd-section" id="s6">
   <div class="prd-section-num">SECTION 06</div>
-  <h2 class="prd-section-title">Hermes扩展引擎规格</h2>
+  <h2 class="prd-section-title">Hermes 研究 Agent 规格</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">Hermes 当前默认关闭，作为后续扩展研究引擎预留。以下内容定义其打开后的能力边界、数据结构和算力规则。</p>
+  <p class="prd-section-desc">Hermes 已作为围绕平台研究工作的 Agent 交付。它先读取当前会话和租户知识，再按问题路由市场数据、图表、报告解析、知识检索或产品帮助；当前默认向大V开放，普通投资者由 Admin 开关控制。</p>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">6种分析模式详细规格</div>
+    <div class="prd-sub-title">意图与输出规格</div>
     <table class="prd-table">
-      <tr><th>模式名</th><th>触发方式</th><th>数据来源</th><th>输出格式</th><th>算力消耗</th></tr>
-      <tr><td><span class="tag tag-blue">宏观分析</span></td><td>选择宏观模式+地区</td><td>宏观经济数据、央行政策、PMI</td><td>趋势判断+关键指标+风险提示</td><td>15算力</td></tr>
-      <tr><td><span class="tag tag-gold">行业分析</span></td><td>选择行业模式+行业</td><td>行业研报、产业链数据、竞争格局</td><td>行业评级+龙头推荐+催化剂</td><td>20算力</td></tr>
-      <tr><td><span class="tag tag-green">个股分析</span></td><td>选择个股模式+股票代码</td><td>财报、研报、专家纪要、舆情</td><td>多维评分+证据链+目标价</td><td>25算力</td></tr>
-      <tr><td><span class="tag tag-red">事件分析</span></td><td>选择事件模式+事件描述</td><td>新闻、公告、历史类似事件</td><td>影响评估+受益/受损标的</td><td>20算力</td></tr>
-      <tr><td><span class="tag tag-gold">量化信号</span></td><td>选择量化模式+标的</td><td>另类数据、技术指标、资金流向</td><td>信号强度+历史胜率+建议仓位</td><td>30算力</td></tr>
-      <tr><td><span class="tag tag-blue">自由对话</span></td><td>直接输入问题</td><td>全量数据库+上下文</td><td>自然语言回答+引用来源</td><td>10算力/轮</td></tr>
+      <tr><th>意图</th><th>典型问题</th><th>优先数据</th><th>输出</th><th>状态</th></tr>
+      <tr><td><span class="tag tag-green">个股 / 自选股</span></td><td>某只股票走势、K线、基本面与证据链</td><td>Gangtise 行情、自选标注、租户知识</td><td>结论、证据链、ECharts 图表和风险提示</td><td>已实现</td></tr>
+      <tr><td><span class="tag tag-blue">指数 / 指标图表</span></td><td>上证指数、指标时间序列、指定日期分析</td><td>Gangtise 指数与指标 API</td><td>K线、线图、分布图或对比图，可缩放与悬浮查看</td><td>已实现</td></tr>
+      <tr><td><span class="tag tag-gold">知识 / 报告 / URL</span></td><td>对知识源提问、上传报告或网页解读</td><td>当前租户向量知识、附件或 URL 解析结果</td><td>结构化回答、来源与可继续追问</td><td>已实现</td></tr>
+      <tr><td><span class="tag tag-red">复盘 / 证据链</span></td><td>复盘依据、标注归纳、研究框架</td><td>用户输入、K线标注、知识资产与可用公开资料</td><td>依据、缺口说明和下一步研究建议</td><td>已实现</td></tr>
+      <tr><td><span class="tag tag-blue">产品帮助 / 轻度闲聊</span></td><td>功能如何使用、非研究闲聊</td><td>产品帮助知识与会话上下文</td><td>操作指引；能力缺失时记录需求并明确说明</td><td>已实现</td></tr>
     </table>
   </div>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">上下文感知能力</div>
-    <div class="highlight-box">Hermes 开启后可感知用户当前浏览的页面内容。例如：用户在自选股页查看某只股票时，进入 Hermes 后可直接分析该股票，无需重新输入。上下文保留最近5次交互记录。</div>
+    <div class="prd-sub-title">工作流、会话与记忆</div>
+    <div class="highlight-box">工作流为：会话装载 → 长短期记忆读取 → 范围与意图识别 → 知识召回 → 工具调度 → 答案合成 → 记忆、用户画像和分析记录写入。用户可新建会话、查询历史会话并继续追问；所有持久化内容按租户隔离。Admin 可查看使用统计、记忆覆盖率，并按时间清理或备份租户记忆。</div>
   </div>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">算力计费规则</div>
+    <div class="prd-sub-title">可观测性与模型治理</div>
     <table class="prd-table">
-      <tr><th>规则项</th><th>说明</th></tr>
-      <tr><td>计费时机</td><td>AI开始生成回答时扣除算力，生成失败则退还</td></tr>
-      <tr><td>余量不足</td><td>算力不足时弹出升级提示，可用积分兑换算力</td></tr>
-      <tr><td>月度重置</td><td>每月1日重置会员赠送算力，购买算力不重置</td></tr>
-      <tr><td>兑换比例</td><td>100积分 = 10算力，最低兑换100积分</td></tr>
+      <tr><th>项目</th><th>实际能力</th></tr>
+      <tr><td>调用统计</td><td>记录今日/本月/人均调用、工具动作、用户消耗排行和算力池统计。</td></tr>
+      <tr><td>模型映射</td><td>Admin 可为 Hermes 路由、回答、知识加工、复盘、语音增强等功能独立选择模型，未配置时回退默认模型。</td></tr>
+      <tr><td>数据失败</td><td>市场或知识数据不可用时必须显式返回缺失原因，不得以模拟行情或虚构结论替代。</td></tr>
+      <tr><td>范围开关</td><td>Admin 可配置提示词范围约束、普通投资者访问、互联网补充和思考过程展示。</td></tr>
     </table>
   </div>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">快捷指令列表</div>
+    <div class="prd-sub-title">已验证提示词示例</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px">
-      <span class="tag tag-gold">分析今日A股市场</span>
-      <span class="tag tag-gold">科技板块最新动态</span>
-      <span class="tag tag-gold">美联储政策影响</span>
-      <span class="tag tag-blue">港股南向资金流向</span>
-      <span class="tag tag-blue">大宗商品走势</span>
-      <span class="tag tag-blue">人民币汇率分析</span>
-      <span class="tag tag-green">新能源行业研报摘要</span>
-      <span class="tag tag-green">半导体产业链动态</span>
-      <span class="tag tag-red">今日重要财经事件</span>
-      <span class="tag tag-red">机构最新调研动向</span>
+      <span class="tag tag-gold">中国银行的个股走势行情和分析</span>
+      <span class="tag tag-gold">展示最近3个月上证指数的K线图并解读</span>
+      <span class="tag tag-blue">展示最近3个月上证指数的历史数据线图</span>
+      <span class="tag tag-blue">我需要知道8月5日的上证指数，帮我做分析</span>
+      <span class="tag tag-green">根据这份报告总结核心证据链</span>
+      <span class="tag tag-green">把本次回答加入知识源</span>
     </div>
   </div>
 </section>
@@ -816,28 +821,20 @@ body.theme-light .lv1{color:var(--text-sub)}
   <div class="prd-section-num">SECTION 07</div>
   <h2 class="prd-section-title">中后台管理规格</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">中后台既承接运营管理，也承接站点级配置。当前特别强调两类能力：一是主题与功能开关配置，二是把原先独立的数据分析入口合并为后台中的“数据分析”分组。</p>
+  <p class="prd-section-desc">Admin 是独立的平台治理后台，仅 `admin` 角色可访问。它不承担大V日常生产，而是负责租户、用户、开关、模型、知识/记忆、数据、任务、审计和发布控制。</p>
 
   <div class="prd-sub">
     <div class="prd-sub-title">后台模块结构</div>
     <table class="prd-table">
       <tr><th>模块</th><th>核心功能点</th><th>访问权限</th><th>状态</th></tr>
-      <tr><td>运营概览</td><td>DAU/MAU趋势、新增用户、付费转化、营收概览、渠道获客表、用户圈层分布</td><td>所有管理员</td><td><span class="done">已实现</span></td></tr>
-      <tr><td>用户列表</td><td>用户搜索/筛选（等级/状态）、会员状态管理、积分/算力余额查看、封禁操作</td><td>运营、超管</td><td><span class="done">已实现</span></td></tr>
-      <tr><td>用户分层</td><td>5圈层转化漏斗可视化、各层ARPU/留存/升级率、运营策略配置入口</td><td>运营、超管</td><td><span class="done">已实现</span></td></tr>
-      <tr><td>积分管理</td><td>积分规则启用/停用、积分发放统计、用户积分排行榜、算力兑换包配置</td><td>运营、超管</td><td><span class="done">已实现</span></td></tr>
-      <tr><td>KOL合伙人管理</td><td>KOL列表（Jinja2动态渲染）、申请审核队列（通过/拒绝）、等级调整</td><td>运营、超管</td><td><span class="done">已实现</span></td></tr>
-      <tr><td>收益结算</td><td>待结算/处理中/已完成状态管理、批量结算、佣金比例展示</td><td>财务、超管</td><td><span class="done">已实现</span></td></tr>
-      <tr><td>帖子审核</td><td>待审核队列、AI合规检测结果展示、一键发布/驳回、违规关键词配置</td><td>审核员、超管</td><td><span class="done">已实现</span></td></tr>
-      <tr><td>活动管理</td><td>活动列表（含筛选/批量操作）、活动详情页（参与数据/报名用户/议程）、富文本创建/编辑表单（奖励配置/议程配置/权限设置/H5预览）</td><td>运营、超管</td><td><span class="done">已实现</span></td></tr>
-      <tr><td>Hermes使用统计</td><td>用于扩展模块开启后的模式调用量/响应时间/算力监控</td><td>运营、超管</td><td><span class="done">已预置</span></td></tr>
-      <tr><td>大模型专区</td><td>维护模型列表、默认模型、接口地址、API Key 与启用状态</td><td>超管</td><td><span class="done">已实现</span></td></tr>
-      <tr><td>功能级模型映射</td><td>按功能为 Hermes、复盘、知识加工、评论标注、智能指标等链路单独指定模型</td><td>超管</td><td><span class="done">已实现</span></td></tr>
-      <tr><td>渠道管理</td><td>渠道详细数据（9列含ROI）、UTM参数配置与复制</td><td>运营、超管</td><td><span class="done">已实现</span></td></tr>
-      <tr><td>系统设置</td><td>平台默认主题、主题色、功能开关、基础说明等站点配置</td><td>超管</td><td><span class="done">已实现</span></td></tr>
-      <tr><td>自选股评论标注统计</td><td>查看评论标签、关键词云、情绪分布与标的讨论热度，辅助大V与运营识别粉丝关注点</td><td>运营、超管</td><td><span class="done">已实现</span></td></tr>
-      <tr><td>访问审计</td><td>访问量、访问路径、IP排行、近14日趋势与明细记录</td><td>超管</td><td><span class="done">已实现</span></td></tr>
-      <tr><td>数据分析分组</td><td>转化漏斗、渠道分析、KOL效能、营收趋势、用户分层分析统一在 admin 内查看</td><td>运营、超管</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>平台总览与用户/租户</td><td>用户账号、角色、租户关系、渠道、付费样本与平台经营概览</td><td>Admin</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>Hermes 管理</td><td>调用、工具动作、算力统计、用户画像、记忆备份/清理、缺失能力需求与访问范围</td><td>Admin</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>知识治理</td><td>按租户查看知识源、词条、图谱、QKV 治理数据与向量沉淀</td><td>Admin</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>市场与指标数据</td><td>统一查看指标湖和 Gangtise 数据调用；无真实数据时禁止生成模拟展示</td><td>Admin</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>大模型与功能映射</td><td>模型注册、默认模型与功能级模型映射，覆盖 Hermes、复盘、知识、语音和评论处理</td><td>Admin</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>系统设置与开关</td><td>登录方式、微信/受限测试、互动、主题、业务模块和 Hermes 提示词范围</td><td>Admin</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>运营分析与审计</td><td>渠道、访问、用户浏览、评论统计、收入估算与任务运行记录</td><td>Admin</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>数据库发布控制台</td><td>备份、发布、回滚和模拟批次管理；所有写操作需二次口令</td><td>Admin + 二次口令</td><td><span class="done">已实现</span></td></tr>
     </table>
   </div>
 
@@ -850,28 +847,22 @@ body.theme-light .lv1{color:var(--text-sub)}
       <tr><td>用户本地偏好</td><td>用户可自行覆盖默认主题选择，本地记忆优先</td><td>首页 / H5 / PRD / admin</td><td><span class="done">已实现</span></td></tr>
       <tr><td>功能开关</td><td>控制基本面分析、自选股、复盘专区、知识专区及扩展模块的可见性</td><td>H5 首页导航 / 实际页面</td><td><span class="done">已实现</span></td></tr>
       <tr><td>功能级模型映射</td><td>在不改业务流程的前提下，为不同大模型功能单独指定模型</td><td>Admin 系统专区 · 功能级模型映射</td><td><span class="done">已实现</span></td></tr>
-      <tr><td>评论标注模型化</td><td>自选股评论保存后自动做标签、关键词、情绪和主题标注，用于工作台和后台统计</td><td>H5 自选股 / 大V工作台 / Admin</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>评论标签与统计</td><td>评论保存后立即可见，并以规则提取标签、关键词、情绪和行业主题，供工作台和后台统计</td><td>H5 自选股 / 大V工作台 / Admin</td><td><span class="done">已实现</span></td></tr>
     </table>
   </div>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">权限控制矩阵</div>
+    <div class="prd-sub-title">实际权限控制</div>
     <table class="prd-table">
-      <tr><th>功能</th><th>超级管理员</th><th>运营</th><th>内容审核员</th><th>财务</th></tr>
-      <tr><td>查看所有数据</td><td><span class="check">✓</span></td><td><span class="partial">△</span> 部分</td><td><span class="cross">✗</span></td><td><span class="partial">△</span> 财务</td></tr>
-      <tr><td>用户封禁/管理</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="cross">✗</span></td><td><span class="cross">✗</span></td></tr>
-      <tr><td>积分规则配置</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="cross">✗</span></td><td><span class="cross">✗</span></td></tr>
-      <tr><td>帖子审核/发布</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="cross">✗</span></td></tr>
-      <tr><td>活动创建/管理</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="cross">✗</span></td><td><span class="cross">✗</span></td></tr>
-      <tr><td>KOL申请审核</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="cross">✗</span></td><td><span class="cross">✗</span></td></tr>
-      <tr><td>收益结算操作</td><td><span class="check">✓</span></td><td><span class="cross">✗</span></td><td><span class="cross">✗</span></td><td><span class="check">✓</span></td></tr>
-      <tr><td>Hermes配置</td><td><span class="check">✓</span></td><td><span class="partial">△</span> 查看</td><td><span class="cross">✗</span></td><td><span class="cross">✗</span></td></tr>
-      <tr><td>系统设置</td><td><span class="check">✓</span></td><td><span class="cross">✗</span></td><td><span class="cross">✗</span></td><td><span class="cross">✗</span></td></tr>
+      <tr><th>请求方</th><th>Admin 页面</th><th>Admin API</th><th>可操作范围</th></tr>
+      <tr><td>普通投资者</td><td><span class="cross">✗</span></td><td><span class="cross">✗</span> 返回 admin_required</td><td>仅所属租户 H5 内容</td></tr>
+      <tr><td>研究型大V</td><td><span class="cross">✗</span></td><td><span class="cross">✗</span> 返回 admin_required</td><td>自身工作台和租户数据</td></tr>
+      <tr><td>admin</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td>平台治理；数据库写操作还需独立二次口令</td></tr>
     </table>
   </div>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">社区运营管理流程</div>
+    <div class="prd-sub-title">未交付：社区运营管理流程设想</div>
     <div class="flow-grid">
       <div class="flow-row" style="justify-content:flex-start;flex-wrap:wrap;gap:6px">
         <span class="flow-box entry">用户发帖</span>
@@ -887,7 +878,7 @@ body.theme-light .lv1{color:var(--text-sub)}
   </div>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">活动管理三视图设计</div>
+    <div class="prd-sub-title">未交付：活动管理三视图设想</div>
     <table class="prd-table">
       <tr><th>视图</th><th>功能</th><th>关键交互</th></tr>
       <tr><td>列表视图</td><td>活动总览、类型/状态筛选、批量操作（下线/导出）</td><td>点击标题 → 详情；点击编辑 → 表单；勾选 → 批量操作</td></tr>
@@ -897,7 +888,7 @@ body.theme-light .lv1{color:var(--text-sub)}
   </div>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">活动管理流程</div>
+    <div class="prd-sub-title">未交付：活动管理流程设想</div>
     <div class="flow-grid">
       <div class="flow-row" style="justify-content:flex-start;flex-wrap:wrap;gap:6px">
         <span class="flow-box entry">创建表单填写</span>
@@ -915,7 +906,7 @@ body.theme-light .lv1{color:var(--text-sub)}
   </div>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">KOL审核流程</div>
+    <div class="prd-sub-title">未交付：KOL认证审核流程设想</div>
     <div class="flow-grid">
       <div class="flow-row" style="justify-content:flex-start;flex-wrap:wrap;gap:6px">
         <span class="flow-box entry">用户提交申请</span>
@@ -936,9 +927,9 @@ body.theme-light .lv1{color:var(--text-sub)}
     <div class="prd-sub-title">Hermes使用统计维度</div>
     <table class="prd-table">
       <tr><th>统计维度</th><th>指标</th><th>用途</th></tr>
-      <tr><td>模式调用量</td><td>6模式各自今日/本月调用次数、占比、平均响应时间</td><td>优化热门模式性能</td></tr>
-      <tr><td>算力池状态</td><td>总算力池、本月消耗、剩余可用</td><td>算力扩容决策</td></tr>
-      <tr><td>用户消耗排行</td><td>Top用户调用次数、消耗算力、最常用模式</td><td>识别高价值用户</td></tr>
+      <tr><td>调用与性能</td><td>今日调用、本月调用、人均调用、平均响应时间和工具动作</td><td>识别性能与路由问题</td></tr>
+      <tr><td>算力消耗</td><td>模型 token、调用成本、算力池和用户消耗排行</td><td>模型与容量治理</td></tr>
+      <tr><td>用户与能力缺口</td><td>用户画像、主意图、记忆覆盖率、超范围/缺失能力需求</td><td>内容运营和后续需求排序</td></tr>
     </table>
   </div>
 </section>
@@ -987,9 +978,9 @@ body.theme-light .lv1{color:var(--text-sub)}
 <!-- ===== SECTION 9 ===== -->
 <section class="prd-section" id="s9">
   <div class="prd-section-num">SECTION 09</div>
-  <h2 class="prd-section-title">积分与算力扩展体系</h2>
+  <h2 class="prd-section-title">未交付：积分与算力扩展设计归档</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">积分与算力体系属于扩展商业化与激励层，当前不作为默认开放能力，但仍需在 PRD 中保留完整设计，供后续阶段启用。</p>
+  <p class="prd-section-desc">当前系统只记录 Hermes 调用、token 与算力消耗统计，不存在积分、等级、算力兑换、购买算力包或会员赠送。以下内容为历史设计归档，不得作为当前功能验收项。</p>
 
   <div class="prd-sub">
     <div class="prd-sub-title">积分获取规则</div>
@@ -1040,9 +1031,9 @@ body.theme-light .lv1{color:var(--text-sub)}
 <!-- ===== SECTION 10 ===== -->
 <section class="prd-section" id="s10">
   <div class="prd-section-num">SECTION 10</div>
-  <h2 class="prd-section-title">KOL合伙人扩展体系</h2>
+  <h2 class="prd-section-title">未交付：KOL 合伙人扩展设计归档</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">KOL 合伙人体系属于内容生态扩展层，当前未对普通用户默认开放。以下内容保留为后续开启社区与合作分发生态时的执行标准。</p>
+  <p class="prd-section-desc">当前已有研究型大V租户、粉丝经营和定价能力，但不存在申请认证、等级分成、提现或机构合作 API。以下内容是历史设计归档，不是当前交付或对外承诺。</p>
 
   <div class="prd-sub">
     <div class="prd-sub-title">申请条件</div>
@@ -1180,75 +1171,115 @@ body.theme-light .lv1{color:var(--text-sub)}
 <!-- ===== SECTION 12 ===== -->
 <section class="prd-section" id="s12">
   <div class="prd-section-num">SECTION 12</div>
-  <h2 class="prd-section-title">版本迭代计划</h2>
+  <h2 class="prd-section-title">版本历史</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">产品迭代遵循"核心功能优先，快速验证，持续优化"原则，以季度为单位规划大版本，以双周为单位发布小版本。</p>
+  <p class="prd-section-desc">本节仅记录已完成并进入当前代码库的产品升级。社区、会员、机构 API、原生 App、多语言和预测准确率追踪均不属于现有版本，不作为路线图或交付承诺展示。</p>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">版本路线图</div>
+    <div class="prd-sub-title">大版本升级记录</div>
     <div class="roadmap">
       <div class="roadmap-item">
         <div class="roadmap-version">v1.0</div>
-        <div class="roadmap-date">2026年5月 · 当前版本</div>
+        <div class="roadmap-date">2026年5月 · 研究平台基础版</div>
         <div class="roadmap-line"><div class="roadmap-dot"></div></div>
-        <div class="roadmap-feature">白底咨询风 + 深色模式</div>
-        <div class="roadmap-feature">基本面分析</div>
-        <div class="roadmap-feature">自选股</div>
-        <div class="roadmap-feature">复盘专区</div>
-        <div class="roadmap-feature">知识专区</div>
-        <div class="roadmap-feature">中后台管理</div>
-        <div class="roadmap-feature">admin 数据分析分组</div>
-        <div class="roadmap-feature">主题色与功能开关</div>
+        <div class="roadmap-feature">H5、基础自选股、复盘、知识与 Admin 骨架</div>
+        <div class="roadmap-feature">浅色咨询风、深色模式与主题配置</div>
+        <div class="roadmap-feature">PostgreSQL 与租户基础数据模型</div>
       </div>
       <div class="roadmap-item">
         <div class="roadmap-version">v1.1</div>
-        <div class="roadmap-date">2026年6月</div>
+        <div class="roadmap-date">2026年6月 · 多租户与生产工作台</div>
         <div class="roadmap-line"><div class="roadmap-dot"></div></div>
-        <div class="roadmap-feature">按需开放社区</div>
-        <div class="roadmap-feature">按需开放 Hermes</div>
-        <div class="roadmap-feature">访问审计与运营配置增强</div>
-        <div class="roadmap-feature">首页 / PRD / H5 口径持续同步</div>
-        <div class="roadmap-feature">性能优化</div>
+        <div class="roadmap-feature">普通用户、大V、Admin 三角色与租户隔离</div>
+        <div class="roadmap-feature">大V H5 / Web 工作台、粉丝管理与租户定价</div>
+        <div class="roadmap-feature">功能开关、渠道、访问审计和运营看板</div>
       </div>
       <div class="roadmap-item">
         <div class="roadmap-version">v1.2</div>
-        <div class="roadmap-date">2026年7月</div>
+        <div class="roadmap-date">2026年7月 · Hermes 研究 Agent</div>
         <div class="roadmap-line"><div class="roadmap-dot"></div></div>
-        <div class="roadmap-feature">会员 / VIP 渐进开放</div>
-        <div class="roadmap-feature">消息 / 私信能力评估上线</div>
-        <div class="roadmap-feature">高级数据分析与导出增强</div>
-        <div class="roadmap-feature">KOL分成结算优化</div>
-        <div class="roadmap-feature">更深层自选管理能力</div>
+        <div class="roadmap-feature">意图路由、知识优先召回、证据链与会话记忆</div>
+        <div class="roadmap-feature">个股 / 指数 / 指标的 K线、趋势、分布与对比图</div>
+        <div class="roadmap-feature">Hermes 用量、工具动作、算力与用户画像治理</div>
       </div>
       <div class="roadmap-item">
-        <div class="roadmap-version">v2.0</div>
-        <div class="roadmap-date">2026年Q3</div>
+        <div class="roadmap-version">v1.3</div>
+        <div class="roadmap-date">2026年8月 · 知识、复盘与真实数据闭环</div>
         <div class="roadmap-line"><div class="roadmap-dot"></div></div>
-        <div class="roadmap-feature">机构API接口</div>
-        <div class="roadmap-feature">多语言支持</div>
-        <div class="roadmap-feature">App原生版本</div>
-        <div class="roadmap-feature">AI预测准确率追踪</div>
-        <div class="roadmap-feature">定制化报告</div>
+        <div class="roadmap-feature">Gangtise 市场与指标 API 统一接入，缺失数据不模拟</div>
+        <div class="roadmap-feature">复盘向导：用户输入可编辑，自选股可选，发布时生成摘要</div>
+        <div class="roadmap-feature">知识源、百科词条、分层结构、图谱和共用证据链</div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-version">v1.4</div>
+        <div class="roadmap-date">2026年8月 · 治理、交付与质量闭环</div>
+        <div class="roadmap-line"><div class="roadmap-dot"></div></div>
+        <div class="roadmap-feature">账号注册、合规确认、渠道归因与 Admin 权限隔离</div>
+        <div class="roadmap-feature">功能级模型映射、数据库发布控制台与二次口令</div>
+        <div class="roadmap-feature">BDD 报告、探索性测试手册、首页与 PRD 同步</div>
       </div>
     </div>
   </div>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">迭代原则</div>
+    <div class="prd-sub-title">版本记录原则</div>
     <div class="highlight-box">
-      <strong style="color:#C8A96E">P0功能</strong>：阻塞性问题，必须在当前版本修复，不可延期。<br>
-      <strong style="color:#C8A96E">P1功能</strong>：重要功能，在当前或下一个版本完成，可小幅延期。<br>
-      <strong style="color:#C8A96E">P2功能</strong>：优化项，根据资源情况安排，可延期至后续版本。<br><br>
-      每个版本发布前须完成：功能测试 → 性能测试 → 安全扫描 → 灰度验证 → 全量发布。
+      <strong style="color:#C8A96E">以代码与验收为准</strong>：只有已经进入当前实现、可由页面或 API 验证的能力才可写入版本历史。<br>
+      <strong style="color:#C8A96E">真实数据优先</strong>：行情、指标和证券数据必须来自 Gangtise；数据不可用时明确说明，不以演示数据填补。<br>
+      <strong style="color:#C8A96E">BDD 先行</strong>：核心角色、权限、租户边界、发布、数据路由和配置生效需要具备可重复验证；跨端与异常组合用探索性测试补充。
     </div>
   </div>
 
   <div class="prd-sub">
     <div class="prd-sub-title">文档版本历史</div>
     <table class="prd-table">
-      <tr><th>版本</th><th>日期</th><th>修改内容</th><th>作者</th></tr>
-      <tr><td>v1.0</td><td>2026-05-20</td><td>初始版本，完整PRD文档</td><td>产品团队</td></tr>
-      <tr><td>v1.1</td><td>2026-05-27</td><td>同步当前默认能力范围、主题策略、后台控开和 admin 数据分析合并结构</td><td>产品团队</td></tr>
+      <tr><th>文档版本</th><th>日期</th><th>修改内容</th><th>依据</th></tr>
+      <tr><td>v1.0</td><td>2026-05</td><td>创建基础 PRD 与首批研究产品规格</td><td>基础 H5 / Admin 交付</td></tr>
+      <tr><td>v1.1</td><td>2026-06</td><td>补充多租户、大V工作台、运营与配置治理</td><td>角色与租户功能交付</td></tr>
+      <tr><td>v1.2</td><td>2026-07</td><td>补充 Hermes Agent、图表、记忆与模型治理</td><td>Hermes BDD 与使用统计</td></tr>
+      <tr><td>v1.3</td><td>2026-08</td><td>补充 Gangtise 真实数据、复盘工作流和知识分层</td><td>市场数据与复盘验收</td></tr>
+      <tr><td>v1.4</td><td>2026-08-13</td><td>清理旧路线图，按实际功能重写角色、H5、Hermes、Admin 与版本历史</td><td>当前代码、BDD 和实习生学习手册</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ===== SECTION 13 ===== -->
+<section class="prd-section" id="s13">
+  <div class="prd-section-num">SECTION 13</div>
+  <h2 class="prd-section-title">当前版本验收与测试策略</h2>
+  <div class="prd-divider"></div>
+  <p class="prd-section-desc">当前版本以角色、租户边界和共享证据链为验收主线。自动化 BDD 验证确定性业务规则，探索性测试负责发现跨端、异步、数据和配置组合问题。</p>
+
+  <div class="prd-sub">
+    <div class="prd-sub-title">当前功能范围</div>
+    <table class="prd-table">
+      <tr><th>功能域</th><th>当前验收口径</th><th>数据与边界</th></tr>
+      <tr><td>H5 用户端</td><td>注册登录、合规确认与渠道、行情查看、自选股、评论、消息、复盘阅读、知识查看和 Hermes 对话</td><td>普通用户仅访问所属租户内容；跨租户访问必须拒绝</td></tr>
+      <tr><td>大V 工作台</td><td>复盘向导、用户输入编辑、可选自选股归纳、知识录入、粉丝经营、评论统计和门户维护</td><td>复盘发布后应立即在所属租户前台可见；自选股为可选项</td></tr>
+      <tr><td>Hermes</td><td>个股/指数行情与图表、知识问答、报告和 URL 解读、复盘证据链、产品帮助、会话与长期记忆</td><td>优先召回当前租户知识；真实数据不可用时清晰说明，禁止伪造行情</td></tr>
+      <tr><td>知识与证据链</td><td>文本、语音、文件、URL、Hermes 回答和标注可进入知识源；面向大V展示词条和知识结构</td><td>知识、向量与记忆均按租户隔离；Admin 处理治理与备份</td></tr>
+      <tr><td>Admin</td><td>租户/用户/开关/模型映射/记忆治理/知识治理/指标/任务/审计与运营分析</td><td>配置变更应同步影响前台可见性与行为，并保留可审计记录</td></tr>
+    </table>
+  </div>
+
+  <div class="prd-sub">
+    <div class="prd-sub-title">BDD 与探索性测试策略</div>
+    <div class="highlight-box">
+      <strong style="color:#C8A96E">BDD 自动化</strong>：覆盖路由、权限、业务规则、API 合约、复盘发布、登录会话、Hermes 路由、指标与市场数据等可重复场景。<br><br>
+      <strong style="color:#C8A96E">探索性测试</strong>：重点验证租户隔离、角色越权、微信/移动浏览器限制、异步发布即时性、真实行情缺失、图表交互、知识召回、模型失败降级，以及 Admin 开关与前台行为的一致性。每个问题需保留角色、租户、步骤、截图或日志和影响级别。<br><br>
+      <strong style="color:#C8A96E">学习与执行入口</strong>：Admin 顶部的“实习生学习手册”提供角色测试矩阵、每日学习路径和缺陷记录模板；首页同步当前功能地图。
+    </div>
+  </div>
+
+  <div class="prd-sub">
+    <div class="prd-sub-title">高风险验收标准</div>
+    <table class="prd-table">
+      <tr><th>风险点</th><th>通过标准</th></tr>
+      <tr><td>租户与权限</td><td>任意用户不可经 URL、API 参数或会话切换读取其他租户数据；角色不可进入无权限操作。</td></tr>
+      <tr><td>真实行情与图表</td><td>个股、指数和指标均展示来源与时间；K 线、线图和分布图可正确渲染，缺数时显示明确不可用状态。</td></tr>
+      <tr><td>复盘生产</td><td>大V可仅使用用户输入发布；选择自选股时才生成对应归纳；发布成功/失败均有明确反馈并立即刷新列表。</td></tr>
+      <tr><td>知识与 Hermes</td><td>回答优先使用本租户知识源，图表/数据请求进入正确路由；模型或外部服务失败时不产生虚构结论。</td></tr>
+      <tr><td>配置生效</td><td>Admin 开关、模型映射、登录限制和互动权限在保存后前后台一致，且关闭能力时接口同样受限。</td></tr>
     </table>
   </div>
 </section>

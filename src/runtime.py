@@ -430,7 +430,7 @@ DEFAULT_USERS = [
         "status": "active",
     },
     {
-        "username": "平台管理员",
+        "username": "admin",
         "password": "admin123",
         "role": "admin",
         "tenant_slug": DEFAULT_TENANTS[0]["slug"],

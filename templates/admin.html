@@ -2200,6 +2200,9 @@
           <div class="admin-nav-item" data-section="token-usage" data-feature="system_module" onclick="showSection('token-usage', this)">
             <span class="admin-nav-icon">&#128202;</span> Token 监控
           </div>
+          <div class="admin-nav-item" data-section="database-release" data-feature="system_module" onclick="showSection('database-release', this)">
+            <span class="admin-nav-icon">&#128190;</span> 数据库发布
+          </div>
           <div class="admin-nav-item" data-section="task-center" data-feature="system_module" onclick="showSection('task-center', this)">
             <span class="admin-nav-icon">&#9201;</span> 定时任务专区
           </div>
@@ -2222,6 +2225,7 @@
       <div class="admin-page-title" id="page-title">运营概览</div>
       <div style="display:flex;gap:12px;align-items:center">
         <span style="font-size:12px;color:#8899aa">2026-06-01 业务沟通会口径</span>
+        <a id="admin-top-intern-handbook-link" href="/intern-handbook" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">实习生学习手册</a>
         <a id="admin-top-workbench-link" href="/kol-workbench?tenant={{ default_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">大V工作台 Web</a>
         <a id="admin-top-h5-link" href="/h5?tenant={{ default_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">H5 前台</a>
         <button class="btn-gold" style="padding:8px 16px;font-size:12px" onclick="showToast('报告生成中，请稍候...')">导出报告</button>
@@ -5495,6 +5499,51 @@
         </div>
       </div><!-- end section-token-usage -->
 
+      <div id="section-database-release" style="display:none">
+        <div class="section-header">
+          <div>
+            <div class="section-title">数据库发布</div>
+            <div class="section-subtitle">将数据库全量/增量发布、回滚、任务日志和模拟数据批次统一纳入平台 Admin，不再依赖独立控制台服务。</div>
+          </div>
+          <button class="btn-outline" style="padding:8px 14px;font-size:12px" onclick="loadAdminDatabaseRelease(true)">刷新状态</button>
+        </div>
+        <div style="margin-bottom:18px;padding:12px 14px;border-left:3px solid #C8A96E;background:rgba(200,169,110,0.08);font-size:12px;color:var(--text-sub);line-height:1.7">
+          发布与回滚会改变目标数据库。生产环境操作必须二次确认；同一时刻只允许一个数据库任务执行，任务日志会保留在当前应用的 <code>.deploy</code> 目录。
+        </div>
+        <div class="stats-grid" id="admin-database-release-summary">
+          <div class="stat-card"><div class="stat-label">发布状态</div><div class="stat-value">加载中</div></div>
+        </div>
+        <div class="table-wrap" style="margin-top:20px">
+          <div class="table-header"><div><div class="table-title">发布任务</div><div style="font-size:12px;color:#8899aa;margin-top:6px">可执行本地完整数据库预发布，或只执行目录白名单内的数据增量包。</div></div><span class="tag tag-gold">单任务锁</span></div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:4px 0 14px">
+            <label style="font-size:12px;color:#8899aa" for="admin-database-release-package">发布内容</label>
+            <select id="admin-database-release-package" style="min-width:280px;max-width:100%;background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);color:#F8F6F0;padding:8px 10px;border-radius:6px;font-size:12px"></select>
+            <button class="btn-outline" style="padding:8px 14px;font-size:12px" onclick="startAdminDatabaseRelease('staging')">同步 Staging</button>
+            <button class="btn-gold" style="padding:8px 14px;font-size:12px" onclick="startAdminDatabaseRelease('production')">同步 Production</button>
+          </div>
+          <div id="admin-database-release-targets" style="font-size:12px;color:#8899aa"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
+          <div class="table-wrap">
+            <div class="table-header"><div><div class="table-title">任务日志</div><div style="font-size:12px;color:#8899aa;margin-top:6px">显示当前或最近一次发布/回滚任务的最后 50,000 字符。</div></div></div>
+            <pre id="admin-database-release-log" style="margin:0;min-height:260px;max-height:420px;overflow:auto;white-space:pre-wrap;background:#0D1B2A;color:#DCE8F0;border-radius:6px;padding:14px;font:12px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace">等待任务日志...</pre>
+          </div>
+          <div class="table-wrap">
+            <div class="table-header"><div><div class="table-title">回滚记录</div><div style="font-size:12px;color:#8899aa;margin-top:6px">选择目标环境后读取发布前保留的完整数据库备份。</div></div></div>
+            <div id="admin-database-release-rollbacks" style="font-size:12px;color:#8899aa;padding:4px 0">正在加载回滚记录...</div>
+          </div>
+        </div>
+        <div class="table-wrap" style="margin-top:20px">
+          <div class="table-header"><div><div class="table-title">模拟粉丝数据批次</div><div style="font-size:12px;color:#8899aa;margin-top:6px">仅创建或删除带“模拟数据”标记的财经老王粉丝、自选股与评论，不影响真实数据。</div></div><span class="tag tag-blue">批次治理</span></div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:4px 0 14px">
+            <label style="font-size:12px;color:#8899aa" for="admin-database-simulation-target">目标环境</label>
+            <select id="admin-database-simulation-target" onchange="loadAdminSimulationBatches()" style="background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);color:#F8F6F0;padding:8px 10px;border-radius:6px;font-size:12px"></select>
+            <button class="btn-outline" style="padding:8px 14px;font-size:12px" onclick="createAdminSimulationBatch()">创建模拟批次</button>
+          </div>
+          <div id="admin-database-simulations" style="font-size:12px;color:#8899aa">正在加载模拟数据批次...</div>
+        </div>
+      </div><!-- end section-database-release -->
+
       <div id="section-task-center" style="display:none">
         <div class="section-header">
           <div>
@@ -5688,6 +5737,26 @@
     <div id="admin-tenant-dashboard-modal-content"></div>
   </div>
 </div>
+<div class="admin-modal-overlay" id="admin-database-release-password-modal" onclick="if(event.target===this)closeAdminDatabaseReleasePasswordModal()">
+  <div class="admin-modal-sheet" style="max-width:460px">
+    <div class="admin-modal-head">
+      <div>
+        <div class="admin-modal-title">验证数据库操作口令</div>
+        <div class="admin-modal-subtitle">即使已登录 Admin，也必须输入操作口令后才能发布、回滚或修改模拟数据。</div>
+      </div>
+      <button class="admin-modal-close" type="button" onclick="closeAdminDatabaseReleasePasswordModal()">关闭</button>
+    </div>
+    <div class="admin-modal-card" style="margin-top:14px">
+      <label for="admin-database-release-password" style="display:block;font-size:12px;font-weight:700;color:var(--text-main);margin-bottom:8px">操作口令</label>
+      <input id="admin-database-release-password" type="password" inputmode="numeric" autocomplete="one-time-code" onkeydown="if(event.key==='Enter')confirmAdminDatabaseReleasePassword()" style="width:100%;padding:10px 12px;border:1px solid var(--border-soft);border-radius:6px;background:var(--surface);color:var(--text-main);font-size:14px" placeholder="请输入操作口令">
+      <div id="admin-database-release-password-error" style="min-height:18px;margin-top:8px;color:#C0392B;font-size:12px"></div>
+    </div>
+    <div class="modal-actions" style="margin-top:14px;justify-content:flex-end">
+      <button class="btn-outline" type="button" onclick="closeAdminDatabaseReleasePasswordModal()">关闭</button>
+      <button class="btn-gold" id="admin-database-release-password-confirm" type="button" onclick="confirmAdminDatabaseReleasePassword()">验证并继续</button>
+    </div>
+  </div>
+</div>
 
 <script src="/static/js/charts.js"></script>
 <script>
@@ -5719,6 +5788,7 @@ const sectionTitles = {
   'settings-llm':'系统专区 · 大模型专区',
   'settings-llm-features':'系统专区 · 功能级模型映射',
   'token-usage':'系统专区 · Token 监控',
+  'database-release':'系统专区 · 数据库发布',
   'task-center':'系统专区 · 定时任务专区',
   access:'访问审计'
 };
@@ -5875,6 +5945,188 @@ function mountUnifiedSystemSettings() {
   window.__adminUnifiedSystemSettingsMounted = true;
 }
 
+const adminDatabaseReleaseState = { overview: null, pollTimer: null, pendingAction: null };
+
+function databaseReleaseStatusLabel(status) {
+  return ({ idle: '空闲', queued: '排队中', running: '执行中', succeeded: '已完成', failed: '失败' })[String(status || '')] || '--';
+}
+
+function renderAdminDatabaseRelease() {
+  const data = adminDatabaseReleaseState.overview || {};
+  const job = data.job || {};
+  const packageSelect = document.getElementById('admin-database-release-package');
+  const targetHost = document.getElementById('admin-database-release-targets');
+  const summaryHost = document.getElementById('admin-database-release-summary');
+  const simulationTarget = document.getElementById('admin-database-simulation-target');
+  if (!packageSelect || !targetHost || !summaryHost || !simulationTarget) return;
+  const currentPackage = packageSelect.value || '';
+  const packages = Array.isArray(data.packages) ? data.packages : [];
+  packageSelect.innerHTML = `<option value="">全量数据库预发布</option>${packages.map((item) => `<option value="${escapeAttr(item.id || '')}" ${item.id === currentPackage ? 'selected' : ''}>${escapeHtml(`${item.date || '--'} · ${item.version || '--'} · ${item.type === 'data' ? '数据增量' : '主数据增量'} · ${item.title || ''}`)}</option>`).join('')}`;
+  const targets = Array.isArray(data.targets) ? data.targets : [];
+  targetHost.textContent = targets.length ? `已配置发布目标：${targets.map((item) => `${item.label} (${item.host}/${item.database})`).join('；')}` : '暂无可用发布目标，请检查数据库发布环境配置。';
+  summaryHost.innerHTML = [
+    ['任务状态', databaseReleaseStatusLabel(job.status), job.target ? `${job.operation || 'release'} · ${job.target}` : '尚未执行任务'],
+    ['任务编号', job.id || '--', job.started_at || '暂无开始时间'],
+    ['返回码', job.returncode == null ? '--' : String(job.returncode), job.finished_at || '等待完成'],
+    ['操作授权', data.operation_unlocked ? '已解锁' : '未解锁', data.operation_unlocked ? '当前会话可执行数据库动作' : '执行动作时需要输入操作口令'],
+    ['可用增量包', String(packages.length), '白名单目录内的 release package'],
+  ].map(([label, value, note]) => `<div class="stat-card"><div class="stat-label">${escapeHtml(label)}</div><div class="stat-value">${escapeHtml(value)}</div><div class="stat-change ${job.status === 'failed' ? '' : 'up'}" style="${job.status === 'failed' ? 'color:#E74C3C' : ''}">${escapeHtml(note)}</div></div>`).join('');
+  const currentSimulationTarget = simulationTarget.value || 'local';
+  const simulationTargets = Array.isArray(data.simulation_targets) ? data.simulation_targets : [];
+  simulationTarget.innerHTML = simulationTargets.map((item) => `<option value="${escapeAttr(item.name || '')}" ${(item.name || '') === currentSimulationTarget ? 'selected' : ''}>${escapeHtml(`${item.label || item.name} (${item.host})`)}</option>`).join('');
+  if (!simulationTarget.value && simulationTargets.length) simulationTarget.value = simulationTargets[0].name || 'local';
+}
+
+async function loadAdminDatabaseRelease(showMessage) {
+  const resp = await fetch('/api/admin/database-release/overview');
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) throw new Error(data.error || 'database_release_overview_failed');
+  adminDatabaseReleaseState.overview = data;
+  renderAdminDatabaseRelease();
+  await Promise.all([loadAdminDatabaseReleaseLog(), loadAdminDatabaseReleaseRollbacks(), loadAdminSimulationBatches()]);
+  const status = String((data.job || {}).status || '');
+  if (adminDatabaseReleaseState.pollTimer) window.clearTimeout(adminDatabaseReleaseState.pollTimer);
+  if (status === 'queued' || status === 'running') adminDatabaseReleaseState.pollTimer = window.setTimeout(() => loadAdminDatabaseRelease(false).catch(() => {}), 1500);
+  if (showMessage) showToast('数据库发布状态已刷新');
+}
+
+async function loadAdminDatabaseReleaseLog() {
+  const host = document.getElementById('admin-database-release-log');
+  if (!host) return;
+  const resp = await fetch('/api/admin/database-release/log');
+  host.textContent = resp.ok ? await resp.text() : '任务日志读取失败';
+}
+
+function openAdminDatabaseReleasePasswordModal(pendingAction) {
+  adminDatabaseReleaseState.pendingAction = pendingAction;
+  const modal = document.getElementById('admin-database-release-password-modal');
+  const input = document.getElementById('admin-database-release-password');
+  const error = document.getElementById('admin-database-release-password-error');
+  if (!modal || !input || !error) return;
+  input.value = '';
+  error.textContent = '';
+  modal.classList.add('show');
+  window.setTimeout(() => input.focus(), 0);
+}
+
+function closeAdminDatabaseReleasePasswordModal() {
+  const modal = document.getElementById('admin-database-release-password-modal');
+  if (modal) modal.classList.remove('show');
+  adminDatabaseReleaseState.pendingAction = null;
+}
+
+async function confirmAdminDatabaseReleasePassword() {
+  const input = document.getElementById('admin-database-release-password');
+  const error = document.getElementById('admin-database-release-password-error');
+  const button = document.getElementById('admin-database-release-password-confirm');
+  if (!input || !error || !button) return;
+  const password = input.value || '';
+  if (!password) { error.textContent = '请输入操作口令。'; return; }
+  button.disabled = true;
+  error.textContent = '';
+  try {
+    const resp = await fetch('/api/admin/database-release/unlock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) { error.textContent = data.error === 'database_release_password_invalid' ? '操作口令错误。' : (data.error || '验证失败，请稍后重试。'); return; }
+    const pendingAction = adminDatabaseReleaseState.pendingAction;
+    const modal = document.getElementById('admin-database-release-password-modal');
+    if (modal) modal.classList.remove('show');
+    adminDatabaseReleaseState.pendingAction = null;
+    if (typeof pendingAction === 'function') await pendingAction();
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function handleAdminDatabaseReleaseActionError(data, retryAction) {
+  if (data && data.error === 'database_release_password_required') {
+    openAdminDatabaseReleasePasswordModal(retryAction);
+    return true;
+  }
+  return false;
+}
+
+async function startAdminDatabaseRelease(target, skipConfirmation = false) {
+  const packageSelect = document.getElementById('admin-database-release-package');
+  const packageId = packageSelect ? packageSelect.value : '';
+  const packageLabel = packageId ? '选中的数据库增量包' : '本地完整数据库';
+  const confirmProduction = target === 'production';
+  if (!skipConfirmation && !window.confirm(`确认向 ${target} 发布${packageLabel}？发布会替换或更新目标数据库。`)) return;
+  const resp = await fetch('/api/admin/database-release', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target, package_id: packageId, confirm_production: confirmProduction }) });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    if (handleAdminDatabaseReleaseActionError(data, () => startAdminDatabaseRelease(target, true))) return;
+    throw new Error(data.error || 'database_release_start_failed');
+  }
+  showToast('数据库发布任务已创建');
+  await loadAdminDatabaseRelease(false);
+}
+
+async function loadAdminDatabaseReleaseRollbacks() {
+  const host = document.getElementById('admin-database-release-rollbacks');
+  const targets = ((adminDatabaseReleaseState.overview || {}).targets || []);
+  if (!host) return;
+  if (!targets.length) { host.textContent = '暂无可读取的回滚目标。'; return; }
+  const rows = await Promise.all(targets.map(async (target) => {
+    try {
+      const resp = await fetch(`/api/admin/database-release/rollbacks?target=${encodeURIComponent(target.name || '')}`);
+      const data = await resp.json();
+      return { target, records: resp.ok && data.ok ? (data.records || []) : [], error: data.error || '' };
+    } catch (error) { return { target, records: [], error: error.message || '读取失败' }; }
+  }));
+  host.innerHTML = rows.map(({ target, records, error }) => `<div style="padding:10px 0;border-top:1px solid rgba(200,169,110,0.1)"><div style="font-weight:600;color:var(--text-main);margin-bottom:6px">${escapeHtml(target.label || target.name || '--')}</div>${error ? `<div style="color:#E74C3C">${escapeHtml(error)}</div>` : (records.length ? records.map((record) => `<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin:6px 0"><span style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">${escapeHtml(record.name || '--')} · ${escapeHtml(record.size || '--')}</span><button class="btn-outline" style="padding:4px 9px;font-size:11px" onclick="startAdminDatabaseRollback('${escapeAttr(target.name || '')}','${escapeAttr(record.name || '')}')">回滚</button></div>`).join('') : '<div style="color:#8899aa">暂无可用回滚记录</div>')}</div>`).join('');
+}
+
+async function startAdminDatabaseRollback(target, backupName, skipConfirmation = false) {
+  const confirmProduction = target === 'production';
+  if (!skipConfirmation && !window.confirm(`确认将 ${target} 回滚到 ${backupName}？当前数据库会保留为新的回滚点。`)) return;
+  const resp = await fetch('/api/admin/database-release/rollback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target, backup_name: backupName, confirm_production: confirmProduction }) });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    if (handleAdminDatabaseReleaseActionError(data, () => startAdminDatabaseRollback(target, backupName, true))) return;
+    throw new Error(data.error || 'database_rollback_start_failed');
+  }
+  showToast('数据库回滚任务已创建');
+  await loadAdminDatabaseRelease(false);
+}
+
+async function loadAdminSimulationBatches() {
+  const target = document.getElementById('admin-database-simulation-target')?.value || 'local';
+  const host = document.getElementById('admin-database-simulations');
+  if (!host) return;
+  const resp = await fetch(`/api/admin/database-release/simulations?target=${encodeURIComponent(target)}`);
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) { host.textContent = data.error || '模拟批次读取失败'; return; }
+  const batches = Array.isArray(data.batches) ? data.batches : [];
+  host.innerHTML = batches.length ? batches.map((item) => `<div style="display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 0;border-top:1px solid rgba(200,169,110,0.1)"><div><div style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text-main)">${escapeHtml(item.batch_code || '--')}</div><div style="margin-top:4px">${escapeHtml(`${item.tenant_slug || '--'} · ${item.created_at || '--'} · 账号 ${item.user_count || 0} · 自选 ${item.watchlist_count || 0} · 评论 ${item.comment_count || 0}`)}</div></div><button class="btn-outline" style="padding:4px 9px;font-size:11px" onclick="deleteAdminSimulationBatch('${escapeAttr(item.batch_code || '')}')">删除批次</button></div>`).join('') : '暂无模拟粉丝数据批次。';
+}
+
+async function createAdminSimulationBatch(skipConfirmation = false) {
+  const target = document.getElementById('admin-database-simulation-target')?.value || 'local';
+  if (!skipConfirmation && !window.confirm(`确认在 ${target} 创建财经老王的模拟粉丝、自选股和评论批次？`)) return;
+  const resp = await fetch('/api/admin/database-release/simulations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target, tenant_slug: 'laowang' }) });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    if (handleAdminDatabaseReleaseActionError(data, () => createAdminSimulationBatch(true))) return;
+    throw new Error(data.error || 'simulation_create_failed');
+  }
+  showToast(`已创建模拟批次：${data.batch_code}`);
+  await loadAdminSimulationBatches();
+}
+
+async function deleteAdminSimulationBatch(batchCode, skipConfirmation = false) {
+  const target = document.getElementById('admin-database-simulation-target')?.value || 'local';
+  if (!batchCode || (!skipConfirmation && !window.confirm(`确认删除模拟批次 ${batchCode}？仅删除带模拟标记的数据。`))) return;
+  const resp = await fetch(`/api/admin/database-release/simulations/${encodeURIComponent(batchCode)}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target }) });
+  const data = await resp.json();
+  if (!resp.ok || !data.ok) {
+    if (handleAdminDatabaseReleaseActionError(data, () => deleteAdminSimulationBatch(batchCode, true))) return;
+    throw new Error(data.error || 'simulation_delete_failed');
+  }
+  showToast('模拟批次已删除');
+  await loadAdminSimulationBatches();
+}
+
 function showSection(name, navEl) {
   const normalized = normalizeAdminSection(name);
   name = normalized.section || name;
@@ -5908,6 +6160,9 @@ function showSection(name, navEl) {
   }
   if (name === 'task-center') {
     refreshAdminTaskCenter(false).catch((error) => showToast(error.message || '加载失败'));
+  }
+  if (name === 'database-release') {
+    loadAdminDatabaseRelease(false).catch((error) => showToast(error.message || '加载失败'));
   }
   if (name === 'settings-features') {
     const url = new URL(window.location.href);
@@ -11070,7 +11325,7 @@ function renderSiteConfigForm() {
       showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
     }
   });
-  ['section-settings-appearance', 'section-settings-brand', 'section-settings-features', 'section-settings-policy', 'section-settings-knowledge', 'section-knowledge-items', 'section-settings-llm', 'section-settings-llm-features', 'section-token-usage', 'section-task-center', 'section-access'].forEach((id) => {
+  ['section-settings-appearance', 'section-settings-brand', 'section-settings-features', 'section-settings-policy', 'section-settings-knowledge', 'section-knowledge-items', 'section-settings-llm', 'section-settings-llm-features', 'section-token-usage', 'section-database-release', 'section-task-center', 'section-access'].forEach((id) => {
     const section = document.getElementById(id);
     if (section && !isAdminFeatureEnabled('system_module') && section.style.display !== 'none') {
       showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));

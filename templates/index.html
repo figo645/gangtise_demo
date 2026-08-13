@@ -984,6 +984,7 @@ body.theme-dark .tech-layer {
     <div style="font-size:18px;font-weight:700;color:var(--gold);letter-spacing:2px">{{ brand.short_name }}</div>
     <div style="display:flex;gap:28px;font-size:13px;color:var(--gray-400)">
       <a href="#modules" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">系统模块</a>
+      <a href="#current-capabilities" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">功能总览</a>
       <a href="#business" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">项目定位</a>
       <a href="#c-core" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">核心能力</a>
       <a href="#knowledge-system" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">知识能力</a>
@@ -992,6 +993,7 @@ body.theme-dark .tech-layer {
       <a href="#fundraise" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">融资计划</a>
       <a href="#tech" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">技术路径</a>
       <a href="/prd" style="color:var(--gold);text-decoration:none;font-weight:600;border:1px solid rgba(200,169,110,0.4);padding:4px 12px;border-radius:4px;transition:all 0.2s" onmouseover="this.style.background='rgba(200,169,110,0.15)'" onmouseout="this.style.background='transparent'">PRD文档</a>
+      <a href="/intern-handbook" style="color:var(--gold);text-decoration:none;font-weight:600;border:1px solid rgba(200,169,110,0.4);padding:4px 12px;border-radius:4px;transition:all 0.2s" onmouseover="this.style.background='rgba(200,169,110,0.15)'" onmouseout="this.style.background='transparent'">学习手册</a>
     </div>
     <a href="/h5" class="btn-gold" style="font-size:12px;padding:8px 18px;text-decoration:none">体验原型</a>
   </div>
@@ -1040,6 +1042,7 @@ body.theme-dark .tech-layer {
   <div class="hero-cta-row">
     <a href="/h5" class="btn-gold" style="text-decoration:none;font-size:14px;padding:12px 32px">体验产品原型</a>
     <a href="#modules" class="btn-outline" style="text-decoration:none;font-size:14px;padding:12px 32px">查看系统入口</a>
+    <a href="/intern-handbook" class="btn-outline" style="text-decoration:none;font-size:14px;padding:12px 32px">打开学习手册</a>
   </div>
 
   <div class="hero-split-entry-grid">
@@ -1160,6 +1163,48 @@ body.theme-dark .tech-layer {
           <div class="summary-role-title">大V 工作台 + Admin</div>
         </div>
         <div class="summary-role-desc">工作台负责大V自己的生产与经营动作；Admin 只处理平台级事情：租户治理、能力控开、审计、收入和一致性。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================================================
+     SECTION 1.6: 当前功能总览
+====================================================== -->
+<section class="ix-section ix-section-dark" id="current-capabilities">
+  <div class="ix-inner">
+    <div class="ix-section-label">Current Capability Map</div>
+    <div class="ix-section-title">当前系统功能总览</div>
+    <div class="ix-divider"></div>
+    <div class="ix-section-desc">系统按角色和租户划分入口。行情与指标使用统一数据服务；知识、复盘和 Hermes 共享可追溯的证据链；平台级配置只在 Admin 生效。</div>
+
+    <div class="summary-role-grid">
+      <div class="summary-role-card">
+        <div class="summary-role-top"><div class="summary-role-icon">01</div><div class="summary-role-title">普通用户 H5</div></div>
+        <div class="summary-role-desc">注册、合规确认、渠道登记、自选股、K 线标注与评论、复盘阅读、消息和 Hermes 问答。用户只访问所属租户的数据与内容。</div>
+      </div>
+      <div class="summary-role-card">
+        <div class="summary-role-top"><div class="summary-role-icon">02</div><div class="summary-role-title">大V 生产与经营</div></div>
+        <div class="summary-role-desc">通过 H5 或 Web 完成复盘向导、语音/文件/网页/手动录入、知识录入、粉丝管理、评论统计、定价和门户内容维护。</div>
+      </div>
+      <div class="summary-role-card">
+        <div class="summary-role-top"><div class="summary-role-icon">03</div><div class="summary-role-title">Hermes 研究助手</div></div>
+        <div class="summary-role-desc">支持个股和指数行情、K 线/线图/分布图、知识问答、报告与 URL 解读、复盘证据链和平台帮助；先召回租户知识，再调用对应数据能力。</div>
+      </div>
+      <div class="summary-role-card">
+        <div class="summary-role-top"><div class="summary-role-icon">04</div><div class="summary-role-title">平台 Admin</div></div>
+        <div class="summary-role-desc">管理租户、用户、功能开关、模型映射、Hermes 记忆、知识治理、指标数据、任务、访问审计和运营分析，并负责控制能力开放范围。</div>
+      </div>
+    </div>
+
+    <div class="summary-main-card" style="margin-top:24px">
+      <div class="summary-main-title">共享业务链路：数据与知识进入，研究与运营产出</div>
+      <div class="summary-main-desc">用户或大V录入文本、语音、文件、URL、K线标注与评论后，系统以租户为边界保存原始记录，抽取知识、标签和关系；Hermes、复盘和工作台优先利用这些已沉淀内容形成可回溯结论。行情、指数和指标展示由统一市场数据能力提供，无法取得真实数据时必须明确提示，不以模拟值替代。</div>
+      <div class="summary-link-row">
+        <a href="/prd#s13" class="summary-link">查看当前 PRD 与验收策略</a>
+        <a href="/intern-handbook" class="summary-link">打开实习生学习手册</a>
+        <a href="/h5" class="summary-link">进入 H5 验证</a>
+        <a href="/admin" class="summary-link">进入 Admin 治理</a>
       </div>
     </div>
   </div>

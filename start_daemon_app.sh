@@ -56,9 +56,8 @@ else
   echo "PostgreSQL auto-start check skipped (AUTO_START_POSTGRES=$AUTO_START_POSTGRES)."
 fi
 
-# Database releases, migrations, master data and market snapshots are managed
-# exclusively by the release controller on port 5051. Application startup only
-# verifies that PostgreSQL is reachable (and may start a local service).
+# Database releases are managed by the Admin database-release module. Application
+# startup only verifies that PostgreSQL is reachable (and may start a local service).
 
 if [ -f "$PID_FILE" ]; then
   OLD_PID="$(cat "$PID_FILE" 2>/dev/null || true)"
