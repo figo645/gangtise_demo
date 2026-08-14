@@ -828,6 +828,24 @@ def api_admin_start_database_release():
         )
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        # Match the former standalone 5051 controller's fast task hand-off,
+        # while keeping unexpected local filesystem/thread errors observable
+        # as JSON instead of letting a debug reload drop the browser request.
+        app.logger.exception("Unable to create Admin database release task")
+        return jsonify({"ok": False, "error": "database_release_task_create_failed", "detail": str(exc)}), 500
+    return jsonify({"ok": True, "job": job}), 202
+
+
+@app.route("/api/admin/database-release/cancel", methods=["POST"])
+def api_admin_cancel_database_release():
+    if not _database_release_is_unlocked():
+        return _database_release_unlock_required_response()
+    payload = request.get_json(silent=True) or {}
+    try:
+        job = cancel_database_release(payload.get("job_id"))
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 409
     return jsonify({"ok": True, "job": job}), 202
 
 

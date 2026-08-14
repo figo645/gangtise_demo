@@ -1,4 +1,5 @@
 import unittest
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -34,6 +35,16 @@ class DatabaseReleaseAdminBddTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "production_confirmation_required"):
                 database_release_services.start_database_release("production", confirm_production=False)
 
+    def test_given_debug_server_when_database_release_controller_is_integrated_then_reloader_is_off_by_default(self):
+        with patch.dict(os.environ, {"DEBUG": "1"}, clear=True):
+            options = app_entry.get_server_runtime_options()
+        self.assertTrue(options["debug"])
+        self.assertFalse(options["use_reloader"])
+
+        with patch.dict(os.environ, {"DEBUG": "1", "FLASK_USE_RELOADER": "1"}, clear=True):
+            options = app_entry.get_server_runtime_options()
+        self.assertTrue(options["use_reloader"])
+
     def test_given_allowlisted_release_when_admin_starts_it_then_the_service_creates_one_job(self):
         target = {"name": "staging", "db_name": "demo", "db_user": "postgres", "db_host": "127.0.0.1", "db_port": "5432", "db_password": "secret"}
         package = {"id": "2026-08-13/v1.2.0", "type": "data"}
@@ -63,6 +74,84 @@ class DatabaseReleaseAdminBddTest(unittest.TestCase):
         self.assertEqual(set_job.call_args_list[0].kwargs["progress"]["completed_steps"], 1)
         self.assertEqual(set_job.call_args_list[1].kwargs["progress"]["completed_steps"], 2)
         self.assertEqual(set_job.call_args_list[1].kwargs["progress"]["total_steps"], 4)
+
+    def test_given_release_stage_output_when_worker_reports_each_step_then_durable_timeline_events_are_available(self):
+        original_state_file = database_release_services.RELEASE_STATE_FILE
+        original_loaded = database_release_services._release_job_loaded
+        original_job = dict(database_release_services._release_job)
+        with TemporaryDirectory() as temp_dir:
+            try:
+                database_release_services.RELEASE_STATE_FILE = Path(temp_dir) / "last_job.json"
+                database_release_services._release_job_loaded = True
+                database_release_services._release_job.clear()
+                database_release_services._release_job.update({
+                    "status": "running", "id": "release_progress", "target": "staging", "operation": "release",
+                    "log": "", "started_at": "2026-08-14 12:00:00", "finished_at": "", "returncode": None,
+                    "pid": 4242, "package_plan": [], "progress": {}, "events": [], "cancel_requested": False,
+                    "cancel_requested_at": "", "cancellable": True,
+                })
+                database_release_services._update_release_progress_from_log("==> [preflight] Checking staging PostgreSQL 127.0.0.1:5432 (timeout 8s)")
+                database_release_services._update_release_progress_from_log("==> Export complete: 2048 bytes · SHA256 abc123")
+                database_release_services._update_release_progress_from_log("Validated: tables=12 migrations=3 market_rows=4 sectors=2 indices=2")
+                job = database_release_services.get_database_release_job()
+                self.assertEqual(job["progress"]["state"], "validating")
+                self.assertEqual(len(job["events"]), 3)
+                self.assertEqual(job["events"][0]["stage"], "stage")
+                self.assertIn("Export complete", job["events"][1]["detail"])
+                self.assertEqual(job["events"][2]["status"], "succeeded")
+                self.assertTrue(database_release_services.RELEASE_STATE_FILE.exists())
+            finally:
+                database_release_services.RELEASE_STATE_FILE = original_state_file
+                database_release_services._release_job_loaded = original_loaded
+                database_release_services._release_job.clear()
+                database_release_services._release_job.update(original_job)
+
+    def test_given_running_release_when_admin_cancels_then_the_release_process_group_is_terminated_and_job_enters_cancelling(self):
+        original_state_file = database_release_services.RELEASE_STATE_FILE
+        original_loaded = database_release_services._release_job_loaded
+        original_job = dict(database_release_services._release_job)
+        with TemporaryDirectory() as temp_dir:
+            try:
+                log_file = Path(temp_dir) / "release.log"
+                database_release_services.RELEASE_STATE_FILE = Path(temp_dir) / "last_job.json"
+                database_release_services._release_job_loaded = True
+                database_release_services._release_job.clear()
+                database_release_services._release_job.update({
+                    "status": "running", "id": "release_1", "target": "production", "operation": "release",
+                    "log": str(log_file), "started_at": "2026-08-14 12:00:00", "finished_at": "", "returncode": None,
+                    "pid": 4242, "package_plan": [], "progress": {"state": "running_step"},
+                    "cancel_requested": False, "cancel_requested_at": "", "cancellable": True,
+                })
+                with patch.object(database_release_services, "_terminate_release_process_group") as terminate:
+                    job = database_release_services.cancel_database_release("release_1")
+                self.assertEqual(job["status"], "cancelling")
+                self.assertTrue(job["cancel_requested"])
+                terminate.assert_called_once_with(4242)
+                self.assertIn("管理员请求取消任务", log_file.read_text(encoding="utf-8"))
+            finally:
+                database_release_services.RELEASE_STATE_FILE = original_state_file
+                database_release_services._release_job_loaded = original_loaded
+                database_release_services._release_job.clear()
+                database_release_services._release_job.update(original_job)
+
+    def test_given_full_release_in_switching_phase_when_admin_cancels_then_the_service_rejects_the_unsafe_request(self):
+        original_loaded = database_release_services._release_job_loaded
+        original_job = dict(database_release_services._release_job)
+        try:
+            database_release_services._release_job_loaded = True
+            database_release_services._release_job.clear()
+            database_release_services._release_job.update({
+                "status": "running", "id": "release_switch", "target": "production", "operation": "release",
+                "log": "", "started_at": "", "finished_at": "", "returncode": None, "pid": 4242,
+                "package_plan": [], "progress": {"state": "switching"}, "cancel_requested": False,
+                "cancel_requested_at": "", "cancellable": False,
+            })
+            with self.assertRaisesRegex(ValueError, "database_release_job_not_cancellable"):
+                database_release_services.cancel_database_release("release_switch")
+        finally:
+            database_release_services._release_job_loaded = original_loaded
+            database_release_services._release_job.clear()
+            database_release_services._release_job.update(original_job)
 
     def test_given_incremental_schema_package_when_listing_release_packages_then_it_is_available_to_admin(self):
         packages = database_release_services.list_database_release_packages()
@@ -133,12 +222,30 @@ class DatabaseReleaseAdminBddTest(unittest.TestCase):
         self.assertIn("loadAdminDatabaseRelease", html)
         self.assertIn('id="admin-database-release-staging"', html)
         self.assertIn('id="admin-database-release-production"', html)
+        self.assertIn('id="admin-database-release-cancel"', html)
         self.assertIn("await loadAdminDatabaseReleaseLog();", html)
         self.assertIn("全部剩余增量（推荐，已执行自动跳过）", html)
         self.assertIn("实时进度", html)
+        self.assertIn('id="admin-database-release-timeline"', html)
+        self.assertIn("renderAdminDatabaseReleaseTimeline", html)
+        self.assertIn("任务日志与实时执行轨迹", html)
         self.assertIn("创建数据库发布任务", html)
+        self.assertIn("cancelAdminDatabaseRelease", html)
+        self.assertIn("/api/admin/database-release/cancel", html)
+        self.assertIn("diagnoseAdminDatabaseReleaseStartFailure", html)
+        self.assertIn("后台未记录", html)
         self.assertIn('id="admin-database-release-password-modal"', html)
         self.assertIn("confirmAdminDatabaseReleasePassword", html)
+
+    def test_given_application_database_auth_is_unavailable_when_database_release_api_is_called_then_the_release_password_gate_remains_reachable(self):
+        original_is_authenticated = web_hooks.is_authenticated
+        try:
+            web_hooks.is_authenticated = lambda: False
+            response = self.client.post("/api/admin/database-release/unlock", json={"password": "wrong"})
+            self.assertEqual(response.status_code, 403)
+            self.assertEqual(response.get_json()["error"], "database_release_password_invalid")
+        finally:
+            web_hooks.is_authenticated = original_is_authenticated
 
     def test_given_admin_first_load_when_non_visible_analytics_are_slow_then_shell_renders_without_waiting_for_them(self):
         with patch("src.web.pages.get_access_summary", side_effect=AssertionError("access must be lazy")), patch(
@@ -158,6 +265,7 @@ class DatabaseReleaseAdminBddTest(unittest.TestCase):
         with patch("src.web.api_core.start_database_release") as start_release:
             locked_requests = [
                 ("post", "/api/admin/database-release", payload),
+                ("post", "/api/admin/database-release/cancel", {"job_id": "release_1"}),
                 ("post", "/api/admin/database-release/rollback", {"target": "staging", "backup_name": "backup"}),
                 ("post", "/api/admin/database-release/simulations", {"target": "local", "tenant_slug": "laowang"}),
                 ("delete", "/api/admin/database-release/simulations/sim_fans_laowang_1", {"target": "local"}),
@@ -181,6 +289,16 @@ class DatabaseReleaseAdminBddTest(unittest.TestCase):
             self.assertEqual(permitted_response.status_code, 202)
             start_release.assert_called_once_with("staging", package_id="", confirm_production=False)
 
+    def test_given_unlocked_admin_when_cancelling_release_then_cancel_api_returns_the_updated_job(self):
+        with self.client.session_transaction() as current_session:
+            current_session[api_core.DATABASE_RELEASE_UNLOCK_SESSION_KEY] = 4102444800
+        expected = {"status": "cancelling", "id": "release_1"}
+        with patch("src.web.api_core.cancel_database_release", return_value=expected) as cancel_release:
+            response = self.client.post("/api/admin/database-release/cancel", json={"job_id": "release_1"})
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.get_json()["job"], expected)
+        cancel_release.assert_called_once_with("release_1")
+
     def test_given_admin_when_release_start_fails_then_api_returns_a_machine_readable_failure_for_the_log_panel(self):
         with self.client.session_transaction() as current_session:
             current_session[api_core.DATABASE_RELEASE_UNLOCK_SESSION_KEY] = 4102444800
@@ -188,6 +306,15 @@ class DatabaseReleaseAdminBddTest(unittest.TestCase):
             response = self.client.post("/api/admin/database-release", json={"target": "invalid", "package_id": "", "confirm_production": False})
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.get_json()["error"], "database_release_target_invalid")
+
+    def test_given_unexpected_task_creation_error_when_admin_starts_release_then_the_api_returns_json_instead_of_dropping_the_request(self):
+        with self.client.session_transaction() as current_session:
+            current_session[api_core.DATABASE_RELEASE_UNLOCK_SESSION_KEY] = 4102444800
+        with patch("src.web.api_core.start_database_release", side_effect=OSError("state file unavailable")):
+            response = self.client.post("/api/admin/database-release", json={"target": "staging", "package_id": "", "confirm_production": False})
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.get_json()["error"], "database_release_task_create_failed")
+        self.assertIn("state file unavailable", response.get_json()["detail"])
 
 
 if __name__ == "__main__":

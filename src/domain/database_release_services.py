@@ -8,6 +8,7 @@ main application's Admin API.
 import os
 import json
 import re
+import signal
 import subprocess
 import threading
 import time
@@ -27,7 +28,7 @@ RELEASE_STATE_FILE = ROOT / ".deploy" / "database_release_last_job.json"
 CONFIG_FILE = Path(os.environ.get("DATABASE_RELEASE_CONFIG", str(ROOT / ".database_release.env")))
 _config_loaded = False
 _release_lock = threading.Lock()
-_release_job = {"status": "idle", "id": "", "target": "", "operation": "", "log": "", "started_at": "", "finished_at": "", "returncode": None}
+_release_job = {"status": "idle", "id": "", "target": "", "operation": "", "log": "", "started_at": "", "finished_at": "", "returncode": None, "pid": None, "package_plan": [], "progress": {}, "events": [], "cancel_requested": False, "cancel_requested_at": "", "cancellable": False}
 _release_job_loaded = False
 
 SIMULATION_LABEL = "模拟数据"
@@ -121,6 +122,10 @@ def _release_job_snapshot():
         "pid": _release_job.get("pid"),
         "package_plan": list(_release_job.get("package_plan") or []),
         "progress": dict(_release_job.get("progress") or {}),
+        "events": list(_release_job.get("events") or []),
+        "cancel_requested": bool(_release_job.get("cancel_requested")),
+        "cancel_requested_at": _release_job.get("cancel_requested_at") or "",
+        "cancellable": bool(_release_job.get("cancellable")),
     }
 
 
@@ -144,17 +149,20 @@ def _load_persisted_release_job():
         return
     if not isinstance(restored, dict):
         return
-    allowed_statuses = {"queued", "running", "succeeded", "failed"}
+    allowed_statuses = {"queued", "running", "cancelling", "cancelled", "succeeded", "failed"}
     if restored.get("status") not in allowed_statuses:
         return
     _release_job.update({key: restored.get(key) for key in _release_job_snapshot() if key in restored})
+    if "cancellable" not in restored and _release_job.get("status") in {"queued", "running"}:
+        _release_job["cancellable"] = True
     # A restarted controller cannot observe the original child process. Keep
     # the last log visible and make the interrupted state explicit.
-    if _release_job.get("status") in {"queued", "running"}:
+    if _release_job.get("status") in {"queued", "running", "cancelling"}:
         _release_job.update({
-            "status": "failed",
+            "status": "cancelled" if _release_job.get("status") == "cancelling" else "failed",
             "finished_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "returncode": _release_job.get("returncode") if _release_job.get("returncode") is not None else -1,
+            "returncode": _release_job.get("returncode") if _release_job.get("returncode") is not None else (-15 if _release_job.get("status") == "cancelling" else -1),
+            "cancellable": False,
         })
         log_path = Path(_release_job.get("log") or "")
         if log_path:
@@ -180,6 +188,88 @@ def _set_job(**values):
         _persist_release_job()
 
 
+def _record_release_event(stage, title, detail="", status="info"):
+    """Append a durable, UI-facing release event without losing raw logs."""
+    with _release_lock:
+        _load_persisted_release_job()
+        events = list(_release_job.get("events") or [])
+        events.append({
+            "sequence": (events[-1].get("sequence", len(events)) if events else 0) + 1,
+            "at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "stage": str(stage or "execution"),
+            "title": str(title or "执行明细"),
+            "detail": str(detail or ""),
+            "status": str(status or "info"),
+        })
+        # The raw task log remains complete. The timeline keeps enough recent
+        # events for a page refresh without making the state file unbounded.
+        _release_job["events"] = events[-100:]
+        _persist_release_job()
+
+
+def _is_cancel_requested(job_id):
+    with _release_lock:
+        _load_persisted_release_job()
+        return _release_job.get("id") == job_id and bool(_release_job.get("cancel_requested"))
+
+
+def _mark_job_cancelled(job_id, returncode=-15):
+    with _release_lock:
+        _load_persisted_release_job()
+        if _release_job.get("id") != job_id:
+            return
+        _release_job.update({
+            "status": "cancelled",
+            "returncode": returncode,
+            "finished_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "pid": None,
+            "cancellable": False,
+            "progress": {
+                **dict(_release_job.get("progress") or {}),
+                "state": "cancelled",
+                "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            },
+        })
+        _persist_release_job()
+    _record_release_event("cancelled", "任务已取消", f"发布进程已停止，返回码：{returncode}", "cancelled")
+
+
+def _transition_job_to_running(job_id, log_path):
+    with _release_lock:
+        _load_persisted_release_job()
+        if _release_job.get("id") != job_id or _release_job.get("cancel_requested"):
+            return False
+        _release_job.update({"status": "running", "log": str(log_path), "cancellable": True})
+        _persist_release_job()
+    _record_release_event("worker", "后台发布线程已启动", "正在创建独立发布进程。", "active")
+    return True
+
+
+def _attach_release_process(job_id, pid):
+    with _release_lock:
+        _load_persisted_release_job()
+        if _release_job.get("id") != job_id:
+            return True
+        _release_job.update({"pid": pid})
+        cancel_requested = bool(_release_job.get("cancel_requested"))
+        _persist_release_job()
+    _record_release_event("process", "发布进程已创建", f"进程 PID：{pid}；开始执行数据库命令。", "active")
+    return cancel_requested
+
+
+def _terminate_release_process_group(pid):
+    if not pid:
+        return
+    try:
+        # Every release process owns a separate session so its psql, pg_dump,
+        # pg_restore, and shell children stop together.
+        os.killpg(int(pid), signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    except OSError:
+        return
+
+
 def _run_process(command, target, job_id, operation):
     env = os.environ.copy()
     env.update({
@@ -197,7 +287,11 @@ def _run_process(command, target, job_id, operation):
         with log_path.open("a", encoding="utf-8") as log:
             log.write(f"[controller] 开始 {operation} 任务 {job_id}\n")
             log.flush()
-            _set_job(status="running", log=str(log_path))
+            if not _transition_job_to_running(job_id, log_path):
+                log.write("[controller] 已在启动前收到取消请求，任务未执行。\n")
+                log.flush()
+                _mark_job_cancelled(job_id)
+                return
             process = subprocess.Popen(
                 command,
                 cwd=ROOT,
@@ -207,26 +301,85 @@ def _run_process(command, target, job_id, operation):
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
+                start_new_session=True,
             )
-            _set_job(pid=process.pid)
+            if _attach_release_process(job_id, process.pid):
+                log.write("[controller] 已收到取消请求，正在终止发布进程。\n")
+                log.flush()
+                _terminate_release_process_group(process.pid)
             for line in iter(process.stdout.readline, ""):
                 log.write(line)
                 log.flush()
                 _update_release_progress_from_log(line)
             process.stdout.close()
             return_code = process.wait()
-        _set_job(status="succeeded" if return_code == 0 else "failed", returncode=return_code, finished_at=time.strftime("%Y-%m-%d %H:%M:%S"))
+        if _is_cancel_requested(job_id):
+            _mark_job_cancelled(job_id, returncode=return_code if return_code else -15)
+        else:
+            _set_job(status="succeeded" if return_code == 0 else "failed", returncode=return_code, finished_at=time.strftime("%Y-%m-%d %H:%M:%S"), pid=None, cancellable=False)
+            if return_code == 0:
+                _record_release_event("completed", "数据库任务执行完成", "所有命令已完成，结果校验通过。", "succeeded")
+            else:
+                _record_release_event("failed", "数据库任务执行失败", f"发布进程返回码：{return_code}。请查看原始日志定位失败命令。", "failed")
     except Exception as exc:
         try:
             with log_path.open("a", encoding="utf-8") as log:
                 log.write(f"[controller] 无法启动任务：{exc}\n")
         except OSError:
             pass
-        _set_job(status="failed", log=str(log_path), returncode=-1, finished_at=time.strftime("%Y-%m-%d %H:%M:%S"))
+        if _is_cancel_requested(job_id):
+            _mark_job_cancelled(job_id)
+        else:
+            _set_job(status="failed", log=str(log_path), returncode=-1, finished_at=time.strftime("%Y-%m-%d %H:%M:%S"), pid=None, cancellable=False)
+            _record_release_event("failed", "发布进程无法启动", str(exc), "failed")
 
 
 def _update_release_progress_from_log(line):
     text = str(line or "").strip()
+    if not text:
+        return
+    stage = "execution"
+    title = "执行明细"
+    event_status = "info"
+    if text.startswith("==> "):
+        stage = "stage"
+        title = text[4:]
+        event_status = "active"
+    elif text.startswith("Validated:"):
+        stage = "validation"
+        title = "临时数据库校验结果"
+        event_status = "succeeded"
+    elif re.search(r"\b(error|failed|unavailable|missing|invalid)\b", text, re.IGNORECASE):
+        stage = "error"
+        title = "执行错误"
+        event_status = "failed"
+    _record_release_event(stage, title, text, event_status)
+    stage_markers = (
+        ("==> [preflight]", "preflight", text.replace("==> [preflight]", "").strip()),
+        ("==> Exporting complete local database:", "exporting", "正在导出本地完整数据库"),
+        ("==> Restoring ", "restoring", "正在恢复至目标临时数据库"),
+        ("Validated:", "validating", "正在校验临时数据库"),
+        ("Database preparation complete.", "completed", "完整数据库发布完成"),
+        ("[controller] 开始", "starting", "发布进程已启动"),
+    )
+    for prefix, state, message in stage_markers:
+        if text.startswith(prefix):
+            _set_job(progress={
+                **dict(_release_job.get("progress") or {}),
+                "state": state,
+                "message": message,
+                "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            })
+            return
+    if text.startswith("==> Switching "):
+        _record_release_event("switching", "开始最终数据库切换", "即将替换目标库名称；此阶段不可取消。", "active")
+        _set_job(cancellable=False, progress={
+            **dict(_release_job.get("progress") or {}),
+            "state": "switching",
+            "message": "正在执行最终数据库切换，此阶段不可取消",
+            "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        })
+        return
     match = re.search(r"^==> \[(\d+)/(\d+)\] (开始增量包|增量包完成)", text)
     if not match:
         return
@@ -238,6 +391,7 @@ def _update_release_progress_from_log(line):
         "completed_steps": current if is_complete else max(0, current - 1),
         "total_steps": total,
         "state": "completed_step" if is_complete else "running_step",
+        "message": f"{match.group(3)}：第 {current}/{total} 个增量包",
         "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
     })
 
@@ -245,17 +399,69 @@ def _update_release_progress_from_log(line):
 def _start_job(target, command, operation, package_plan=None):
     with _release_lock:
         _load_persisted_release_job()
-        if _release_job.get("status") in {"queued", "running"}:
+        if _release_job.get("status") in {"queued", "running", "cancelling"}:
             raise ValueError("database_release_job_running")
         job_id = time.strftime("%Y%m%d_%H%M%S")
         log_path = ROOT / ".deploy" / f"admin_{operation}_{job_id}.log"
         log_path.parent.mkdir(parents=True, exist_ok=True)
-        log_path.write_text(f"[controller] 任务已排队：{operation} {job_id}\n", encoding="utf-8")
+        log_path.write_text(
+            f"[controller] 任务已创建：{operation} {job_id}\n"
+            f"[controller] 目标环境：{target['name']} · 数据库：{target['db_host']}:{target['db_port']}/{target['db_name']}\n"
+            "[controller] 状态：已落盘，正在启动发布进程。\n",
+            encoding="utf-8",
+        )
         package_count = len(package_plan or [])
-        _release_job.update({"status": "queued", "id": job_id, "target": target["name"], "operation": operation, "log": str(log_path), "started_at": time.strftime("%Y-%m-%d %H:%M:%S"), "finished_at": "", "returncode": None, "pid": None, "package_plan": list(package_plan or []), "progress": {"current_step": 0, "completed_steps": 0, "total_steps": package_count, "state": "queued", "updated_at": time.strftime("%Y-%m-%d %H:%M:%S")}})
+        _release_job.update({"status": "queued", "id": job_id, "target": target["name"], "operation": operation, "log": str(log_path), "started_at": time.strftime("%Y-%m-%d %H:%M:%S"), "finished_at": "", "returncode": None, "pid": None, "package_plan": list(package_plan or []), "cancel_requested": False, "cancel_requested_at": "", "cancellable": True, "progress": {"current_step": 0, "completed_steps": 0, "total_steps": package_count, "state": "queued", "message": "任务已落盘，等待启动发布进程", "updated_at": time.strftime("%Y-%m-%d %H:%M:%S")}, "events": [
+            {"sequence": 1, "at": time.strftime("%Y-%m-%d %H:%M:%S"), "stage": "created", "title": "任务已创建并持久化", "detail": f"目标：{target['name']} · {target['db_host']}:{target['db_port']}/{target['db_name']}", "status": "succeeded"},
+            {"sequence": 2, "at": time.strftime("%Y-%m-%d %H:%M:%S"), "stage": "queued", "title": "等待后台发布线程", "detail": "任务已交给主应用后台执行，页面会每秒刷新状态。", "status": "active"},
+        ]})
         _persist_release_job()
+        snapshot = _release_job_snapshot()
     threading.Thread(target=_run_process, args=(command, target, job_id, operation), daemon=True).start()
-    return get_database_release_job()
+    return snapshot
+
+
+def cancel_database_release(job_id=""):
+    """Request cancellation of the current database release or rollback job.
+
+    Incremental SQL executes inside a package transaction. A cancellation can
+    stop the active package but cannot undo packages which were already
+    committed. Full releases are cancellable before their database switch.
+    """
+    normalized_job_id = str(job_id or "").strip()
+    with _release_lock:
+        _load_persisted_release_job()
+        status = str(_release_job.get("status") or "")
+        if status not in {"queued", "running", "cancelling"}:
+            raise ValueError("database_release_job_not_running")
+        if normalized_job_id and normalized_job_id != _release_job.get("id"):
+            raise ValueError("database_release_job_mismatch")
+        if not _release_job.get("cancellable"):
+            raise ValueError("database_release_job_not_cancellable")
+        pid = _release_job.get("pid")
+        _release_job.update({
+            "status": "cancelling",
+            "cancel_requested": True,
+            "cancel_requested_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "cancellable": False,
+            "progress": {
+                **dict(_release_job.get("progress") or {}),
+                "state": "cancelling",
+                "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            },
+        })
+        log_path = Path(_release_job.get("log") or "")
+        _persist_release_job()
+        snapshot = _release_job_snapshot()
+    _record_release_event("cancelling", "已收到管理员取消请求", "正在向发布进程发送停止信号。", "active")
+    try:
+        if log_path:
+            with log_path.open("a", encoding="utf-8") as log:
+                log.write("[controller] 管理员请求取消任务；正在终止当前发布进程。\n")
+    except OSError:
+        pass
+    _terminate_release_process_group(pid)
+    return snapshot
 
 
 def start_database_release(target_name, package_id="", confirm_production=False):

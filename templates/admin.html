@@ -5526,13 +5526,17 @@
             <select id="admin-database-release-package" style="min-width:310px;max-width:100%;background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);color:#F8F6F0;padding:8px 10px;border-radius:6px;font-size:12px"></select>
             <button id="admin-database-release-staging" class="btn-outline" style="padding:8px 14px;font-size:12px" onclick="startAdminDatabaseRelease('staging')">同步 Staging</button>
             <button id="admin-database-release-production" class="btn-gold" style="padding:8px 14px;font-size:12px" onclick="startAdminDatabaseRelease('production')">同步 Production</button>
+            <button id="admin-database-release-cancel" class="btn-outline" type="button" style="padding:8px 14px;font-size:12px;color:#C43D36;border-color:rgba(196,61,54,0.42)" onclick="cancelAdminDatabaseRelease()" hidden>取消当前任务</button>
           </div>
           <div id="admin-database-release-targets" style="font-size:12px;color:#8899aa"></div>
+          <div style="margin-top:8px;font-size:11px;color:#8899aa;line-height:1.65">取消会终止当前发布进程。已完成的增量包不会自动回退；全量发布进入最终数据库切换阶段后不可取消。</div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
           <div class="table-wrap">
-            <div class="table-header"><div><div class="table-title">任务日志</div><div style="font-size:12px;color:#8899aa;margin-top:6px">显示当前或最近一次发布/回滚任务的最后 50,000 字符。</div></div></div>
-            <pre id="admin-database-release-log" style="margin:0;min-height:260px;max-height:420px;overflow:auto;white-space:pre-wrap;background:#10263F;color:#F7FBFF;border:1px solid rgba(119,183,255,0.34);border-radius:6px;padding:14px;font:600 12px/1.72 ui-monospace,SFMono-Regular,Menlo,monospace">正在读取最近一次发布任务...</pre>
+            <div class="table-header"><div><div class="table-title">任务日志与实时执行轨迹</div><div style="font-size:12px;color:#b8c7d9;margin-top:6px">每秒同步任务创建、连接检查、导出、恢复、校验、切换和最终结果；下方保留完整原始日志。</div></div></div>
+            <div id="admin-database-release-timeline" aria-live="polite" style="margin:0 0 12px;min-height:112px;max-height:300px;overflow:auto;background:#0D2137;border:1px solid rgba(119,183,255,0.4);border-radius:6px;padding:10px 12px;color:#F7FBFF">等待发布任务创建后显示实时执行轨迹...</div>
+            <div style="font-size:12px;font-weight:700;color:#DCEBFA;margin:0 0 7px">完整原始日志</div>
+            <pre id="admin-database-release-log" style="margin:0;min-height:240px;max-height:420px;overflow:auto;white-space:pre-wrap;background:#10263F;color:#F7FBFF;border:1px solid rgba(119,183,255,0.45);border-radius:6px;padding:14px;font:600 12px/1.72 ui-monospace,SFMono-Regular,Menlo,monospace">正在读取最近一次发布任务...</pre>
           </div>
           <div class="table-wrap">
             <div class="table-header"><div><div class="table-title">回滚记录</div><div style="font-size:12px;color:#8899aa;margin-top:6px">选择目标环境后读取发布前保留的完整数据库备份。</div></div></div>
@@ -5951,10 +5955,39 @@ function mountUnifiedSystemSettings() {
   window.__adminUnifiedSystemSettingsMounted = true;
 }
 
-const adminDatabaseReleaseState = { overview: null, pollTimer: null, pendingAction: null };
+const adminDatabaseReleaseState = { overview: null, pollTimer: null, pendingAction: null, startController: null };
 
 function databaseReleaseStatusLabel(status) {
-  return ({ idle: '空闲', queued: '排队中', running: '执行中', succeeded: '已完成', failed: '失败' })[String(status || '')] || '--';
+  return ({ idle: '空闲', queued: '排队中', running: '执行中', cancelling: '取消中', cancelled: '已取消', succeeded: '已完成', failed: '失败' })[String(status || '')] || '--';
+}
+
+function renderAdminDatabaseReleaseTimeline(job) {
+  const host = document.getElementById('admin-database-release-timeline');
+  if (!host) return;
+  const events = Array.isArray((job || {}).events) ? job.events : [];
+  if (!events.length) {
+    host.innerHTML = '<div style="font-size:12px;color:#C7D7E8;line-height:1.6">等待发布任务创建后显示实时执行轨迹。任务创建后，此区域会持续显示每一个执行步骤与结果。</div>';
+    return;
+  }
+  const eventStyle = {
+    active: ['#77B7FF', '执行中'],
+    succeeded: ['#7CCF9B', '已完成'],
+    failed: ['#FF8278', '失败'],
+    cancelled: ['#FFB66E', '已取消'],
+    info: ['#C9D8E8', '明细'],
+  };
+  host.innerHTML = events.map((event) => {
+    const style = eventStyle[String(event.status || 'info')] || eventStyle.info;
+    const detail = String(event.detail || '');
+    const title = String(event.title || '执行明细');
+    return `<div style="display:grid;grid-template-columns:76px 10px minmax(0,1fr) auto;gap:8px;align-items:start;padding:8px 0;border-bottom:1px solid rgba(119,183,255,0.14)">
+      <div style="font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;color:#AFC3D8">${escapeHtml(event.at || '--')}</div>
+      <span style="width:8px;height:8px;border-radius:50%;background:${style[0]};margin-top:4px"></span>
+      <div style="min-width:0"><div style="font-size:12px;font-weight:700;color:#F7FBFF;line-height:1.45">${escapeHtml(title)}</div>${detail && detail !== title ? `<div style="font-size:11px;line-height:1.5;color:#C7D7E8;word-break:break-word;margin-top:2px">${escapeHtml(detail)}</div>` : ''}</div>
+      <div style="font-size:11px;color:${style[0]};white-space:nowrap">${style[1]}</div>
+    </div>`;
+  }).join('');
+  host.scrollTop = host.scrollHeight;
 }
 
 function renderAdminDatabaseRelease() {
@@ -5965,7 +5998,9 @@ function renderAdminDatabaseRelease() {
   const targetHost = document.getElementById('admin-database-release-targets');
   const summaryHost = document.getElementById('admin-database-release-summary');
   const simulationTarget = document.getElementById('admin-database-simulation-target');
+  const cancelButton = document.getElementById('admin-database-release-cancel');
   if (!packageSelect || !targetHost || !summaryHost || !simulationTarget) return;
+  renderAdminDatabaseReleaseTimeline(job);
   const currentPackage = packageSelect.value || '__pending__';
   const packages = Array.isArray(data.packages) ? data.packages : [];
   const packageTypeLabel = {schema: '表结构增量', master_data: '主数据增量', data: '业务数据增量'};
@@ -5979,8 +6014,14 @@ function renderAdminDatabaseRelease() {
     ['操作授权', data.operation_unlocked ? '已解锁' : '未解锁', data.operation_unlocked ? '当前会话可执行数据库动作' : '执行动作时需要输入操作口令'],
     ['可用增量包', String(packages.length), '按版本顺序执行，已发布包自动跳过'],
     ['本次计划', (job.package_plan || []).length ? `${(job.package_plan || []).length} 个增量包` : (job.operation === 'release' ? '当前完整数据库' : '--'), (job.package_plan || []).map((item) => item.version || item.id).join(' · ') || '选择“全部剩余增量”可自动计算'],
-    ['实时进度', Number(progress.total_steps || 0) > 0 ? `${progress.completed_steps || 0} / ${progress.total_steps}` : (job.status === 'running' ? '执行中' : '--'), progress.state === 'queued' ? '等待连接目标数据库' : (progress.updated_at || '等待任务日志')],
-  ].map(([label, value, note]) => `<div class="stat-card"><div class="stat-label">${escapeHtml(label)}</div><div class="stat-value">${escapeHtml(value)}</div><div class="stat-change ${job.status === 'failed' ? '' : 'up'}" style="${job.status === 'failed' ? 'color:#E74C3C' : ''}">${escapeHtml(note)}</div></div>`).join('');
+    ['实时进度', Number(progress.total_steps || 0) > 0 ? `${progress.completed_steps || 0} / ${progress.total_steps}` : (job.status === 'running' ? '执行中' : '--'), progress.message || (progress.state === 'queued' ? '等待启动发布进程' : (progress.updated_at || '等待任务日志'))],
+  ].map(([label, value, note]) => `<div class="stat-card"><div class="stat-label">${escapeHtml(label)}</div><div class="stat-value">${escapeHtml(value)}</div><div class="stat-change ${['failed', 'cancelled'].includes(job.status) ? '' : 'up'}" style="${['failed', 'cancelled'].includes(job.status) ? 'color:#C43D36' : ''}">${escapeHtml(note)}</div></div>`).join('');
+  if (cancelButton) {
+    const cancellable = ['queued', 'running'].includes(String(job.status || '')) && job.cancellable !== false;
+    cancelButton.hidden = !cancellable;
+    cancelButton.disabled = String(job.status || '') === 'cancelling';
+    cancelButton.textContent = String(job.status || '') === 'cancelling' ? '正在取消...' : '取消当前任务';
+  }
   const currentSimulationTarget = simulationTarget.value || 'local';
   const simulationTargets = Array.isArray(data.simulation_targets) ? data.simulation_targets : [];
   simulationTarget.innerHTML = simulationTargets.map((item) => `<option value="${escapeAttr(item.name || '')}" ${(item.name || '') === currentSimulationTarget ? 'selected' : ''}>${escapeHtml(`${item.label || item.name} (${item.host})`)}</option>`).join('');
@@ -6000,7 +6041,7 @@ async function loadAdminDatabaseRelease(showMessage) {
   loadAdminSimulationBatches().catch(() => {});
   const status = String((data.job || {}).status || '');
   if (adminDatabaseReleaseState.pollTimer) window.clearTimeout(adminDatabaseReleaseState.pollTimer);
-  if (status === 'queued' || status === 'running') adminDatabaseReleaseState.pollTimer = window.setTimeout(() => loadAdminDatabaseRelease(false).catch(() => {}), 1000);
+  if (status === 'queued' || status === 'running' || status === 'cancelling') adminDatabaseReleaseState.pollTimer = window.setTimeout(() => loadAdminDatabaseRelease(false).catch(() => {}), 1000);
   if (showMessage) showToast('数据库发布状态已刷新');
 }
 
@@ -6047,6 +6088,8 @@ async function confirmAdminDatabaseReleasePassword() {
     const resp = await fetch('/api/admin/database-release/unlock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
     const data = await resp.json();
     if (!resp.ok || !data.ok) { error.textContent = data.error === 'database_release_password_invalid' ? '操作口令错误。' : (data.error || '验证失败，请稍后重试。'); return; }
+    adminDatabaseReleaseState.overview = { ...(adminDatabaseReleaseState.overview || {}), operation_unlocked: true };
+    renderAdminDatabaseRelease();
     const pendingAction = adminDatabaseReleaseState.pendingAction;
     const modal = document.getElementById('admin-database-release-password-modal');
     if (modal) modal.classList.remove('show');
@@ -6065,29 +6108,73 @@ function handleAdminDatabaseReleaseActionError(data, retryAction) {
   return false;
 }
 
-async function startAdminDatabaseRelease(target, skipConfirmation = false) {
+async function diagnoseAdminDatabaseReleaseStartFailure(target, originalError) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 5000);
+  try {
+    const resp = await fetch('/api/admin/database-release/overview', { cache: 'no-store', signal: controller.signal });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok) return `诊断请求返回 HTTP ${resp.status}：${data.error || '无法读取发布状态'}`;
+    adminDatabaseReleaseState.overview = data;
+    renderAdminDatabaseRelease();
+    const job = data.job || {};
+    const isTargetJob = job.id && String(job.target || '') === String(target || '');
+    if (isTargetJob && ['queued', 'running', 'cancelling'].includes(String(job.status || ''))) {
+      await loadAdminDatabaseReleaseLog();
+      return `创建请求的页面连接已中断，但后台任务 ${job.id} 已存在，当前状态：${databaseReleaseStatusLabel(job.status)}。日志已切换为后台实时日志。`;
+    }
+    if (isTargetJob && ['failed', 'cancelled'].includes(String(job.status || ''))) {
+      await loadAdminDatabaseReleaseLog();
+      return `后台已创建任务 ${job.id}，但任务在启动阶段变为“${databaseReleaseStatusLabel(job.status)}”。请直接查看当前任务日志；服务端异常会显示为具体错误。`;
+    }
+    return `后台未记录 ${target} 的新任务，说明请求在任务创建前中断。原始错误：${originalError || '网络连接不可用'}。请检查 Flask 服务是否正在热重载或浏览器网络是否断开。`;
+  } catch (diagnosticError) {
+    const reason = diagnosticError && diagnosticError.name === 'AbortError' ? '诊断接口 5 秒内未响应' : (diagnosticError.message || '诊断接口不可达');
+    return `无法连接发布状态接口：${reason}。原始错误：${originalError || '网络连接不可用'}。`;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+async function startAdminDatabaseRelease(target, skipConfirmation = false, passwordVerified = false) {
   const packageSelect = document.getElementById('admin-database-release-package');
   const packageId = packageSelect ? packageSelect.value : '';
   const packageLabel = packageId === '__pending__' ? '全部剩余增量包' : (packageId === '__full__' ? '当前完整数据库' : '选中的数据库增量包');
   const confirmProduction = target === 'production';
+  const releaseOverview = adminDatabaseReleaseState.overview || {};
+  if (!passwordVerified && !releaseOverview.operation_unlocked) {
+    openAdminDatabaseReleasePasswordModal(() => startAdminDatabaseRelease(target, skipConfirmation, true));
+    return;
+  }
   if (!skipConfirmation && !window.confirm(`确认向 ${target} 发布${packageLabel}？发布会替换或更新目标数据库。`)) return;
   const button = document.getElementById(`admin-database-release-${target}`);
   const logHost = document.getElementById('admin-database-release-log');
+  const cancelButton = document.getElementById('admin-database-release-cancel');
   const originalText = button ? button.textContent : '';
   if (button) { button.disabled = true; button.textContent = '正在创建任务...'; }
+  if (cancelButton) { cancelButton.hidden = false; cancelButton.disabled = false; cancelButton.textContent = '取消创建请求'; }
   if (logHost) logHost.textContent = `正在向 ${target} 创建数据库发布任务，请稍候...`;
   let taskCreated = false;
+  let creationTimedOut = false;
+  const controller = new AbortController();
+  const creationTimeout = window.setTimeout(() => {
+    creationTimedOut = true;
+    controller.abort();
+  }, 12000);
+  adminDatabaseReleaseState.startController = controller;
   try {
-    const resp = await fetch('/api/admin/database-release', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target, package_id: packageId, confirm_production: confirmProduction }) });
+    const resp = await fetch('/api/admin/database-release', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target, package_id: packageId, confirm_production: confirmProduction }), signal: controller.signal });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok || !data.ok) {
       if (handleAdminDatabaseReleaseActionError(data, () => startAdminDatabaseRelease(target, true))) return;
-      const message = data.error || `database_release_start_failed (HTTP ${resp.status})`;
+      const message = data.detail ? `${data.error || 'database_release_start_failed'}：${data.detail}` : (data.error || `database_release_start_failed (HTTP ${resp.status})`);
       if (logHost) logHost.textContent = `未能创建发布任务：${message}`;
       showToast(`数据库发布未启动：${message}`);
       return;
     }
     taskCreated = true;
+    adminDatabaseReleaseState.overview = { ...(adminDatabaseReleaseState.overview || {}), job: data.job || {} };
+    renderAdminDatabaseReleaseTimeline(data.job || {});
     const plan = Array.isArray((data.job || {}).package_plan) ? data.job.package_plan : [];
     if (logHost) logHost.textContent = `任务已创建：${target} · ${packageLabel}${plan.length ? `\n计划执行 ${plan.length} 个增量包：${plan.map((item) => item.version || item.id).join(' → ')}` : ''}\n正在连接目标数据库并获取实时日志...`;
     showToast('数据库发布任务已创建');
@@ -6098,16 +6185,65 @@ async function startAdminDatabaseRelease(target, skipConfirmation = false) {
       window.setTimeout(() => loadAdminDatabaseRelease(false).catch(() => {}), 1000);
     }
   } catch (error) {
+    if (error && error.name === 'AbortError') {
+      if (creationTimedOut) {
+        const diagnosis = await diagnoseAdminDatabaseReleaseStartFailure(target, '创建任务请求超过 12 秒未返回');
+        if (logHost) logHost.textContent = `创建数据库发布任务超时（12 秒）。\n\n${diagnosis}`;
+        showToast('发布控制器响应超时，已读取诊断状态');
+        return;
+      }
+      if (logHost) logHost.textContent = '已取消等待创建任务，正在读取后台实际任务状态...';
+      window.setTimeout(() => loadAdminDatabaseRelease(false).catch(() => {}), 400);
+      return;
+    }
     const message = error.message || '网络连接不可用';
     if (taskCreated) {
       if (logHost) logHost.textContent += `\n任务已创建，但页面暂时无法刷新：${message}。请保留此页面，系统会自动重试。`;
       showToast('任务已创建，正在重试读取日志');
     } else {
-      if (logHost) logHost.textContent = `未能创建数据库发布任务：${message}`;
+      const diagnosis = await diagnoseAdminDatabaseReleaseStartFailure(target, message);
+      if (logHost && !String(logHost.textContent || '').includes('后台实时日志')) logHost.textContent = `未能创建数据库发布任务：${message}\n\n${diagnosis}`;
       showToast(`数据库发布未启动：${message}`);
     }
   } finally {
+    window.clearTimeout(creationTimeout);
+    if (adminDatabaseReleaseState.startController === controller) adminDatabaseReleaseState.startController = null;
     if (button) { button.disabled = false; button.textContent = originalText; }
+  }
+}
+
+async function cancelAdminDatabaseRelease() {
+  const logHost = document.getElementById('admin-database-release-log');
+  const cancelButton = document.getElementById('admin-database-release-cancel');
+  if (adminDatabaseReleaseState.startController) {
+    adminDatabaseReleaseState.startController.abort();
+    if (cancelButton) { cancelButton.disabled = true; cancelButton.textContent = '正在取消等待...'; }
+    showToast('已取消等待创建任务，正在核对后台状态');
+    return;
+  }
+  const job = ((adminDatabaseReleaseState.overview || {}).job || {});
+  if (!job.id || !['queued', 'running'].includes(String(job.status || ''))) {
+    if (logHost) logHost.textContent = '当前没有可取消的数据库任务。';
+    if (cancelButton) cancelButton.hidden = true;
+    return;
+  }
+  if (!window.confirm(`确认取消 ${job.target || '当前'} 的数据库任务 ${job.id}？已完成的增量包不会自动回退。`)) return;
+  if (cancelButton) { cancelButton.disabled = true; cancelButton.textContent = '正在取消...'; }
+  try {
+    const resp = await fetch('/api/admin/database-release/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ job_id: job.id }) });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok) {
+      if (handleAdminDatabaseReleaseActionError(data, () => cancelAdminDatabaseRelease())) return;
+      throw new Error(data.error || `database_release_cancel_failed (HTTP ${resp.status})`);
+    }
+    if (logHost) logHost.textContent = `已发出取消请求：${job.id}\n正在终止发布进程并等待最终状态...`;
+    showToast('已发出取消请求');
+    await loadAdminDatabaseRelease(false);
+  } catch (error) {
+    if (logHost) logHost.textContent = `取消任务失败：${error.message || '网络连接不可用'}`;
+    showToast(`取消任务失败：${error.message || '网络连接不可用'}`);
+  } finally {
+    if (cancelButton) cancelButton.disabled = false;
   }
 }
 

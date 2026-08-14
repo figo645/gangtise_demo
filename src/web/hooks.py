@@ -28,6 +28,17 @@ def is_admin_only_request(path):
     return normalized_path in {"/admin", "/intern-handbook"} or normalized_path.startswith("/api/admin/")
 
 
+def is_database_release_api_request(path):
+    """Keep release control independent from the application business DB.
+
+    The former 5051 controller did not resolve a platform user before creating
+    a job. These endpoints are separately protected by the release operation
+    password, so a transient application PostgreSQL outage must not leave the
+    browser POST waiting before the task controller can respond.
+    """
+    return str(path or "").startswith("/api/admin/database-release")
+
+
 def admin_access_denied_response():
     if request.path.startswith("/api/"):
         return jsonify({"success": False, "error": "admin_required"}), 403
@@ -94,6 +105,10 @@ def require_user_login():
         "/api/h5/logout",
     }
     if request.path.startswith("/static/") or request.path in public_paths:
+        return None
+    if is_database_release_api_request(request.path):
+        # Database writes still require the independent operation password in
+        # api_core. The Admin page itself remains protected by normal login.
         return None
     if is_authenticated():
         if is_admin_only_request(request.path):
