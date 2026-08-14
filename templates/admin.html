@@ -5509,7 +5509,7 @@
         <div class="section-header">
           <div>
             <div class="section-title">数据库发布</div>
-            <div class="section-subtitle">将数据库全量/增量发布、回滚、任务日志和模拟数据批次统一纳入平台 Admin，不再依赖独立控制台服务。</div>
+            <div class="section-subtitle">管理数据库全量/增量发布、回滚和任务日志。模拟粉丝数据导入由本机 5051 端口的数据导入控制台独立管理。</div>
           </div>
           <button class="btn-outline" style="padding:8px 14px;font-size:12px" onclick="loadAdminDatabaseRelease(true)">刷新状态</button>
         </div>
@@ -5542,15 +5542,6 @@
             <div class="table-header"><div><div class="table-title">回滚记录</div><div style="font-size:12px;color:#8899aa;margin-top:6px">选择目标环境后读取发布前保留的完整数据库备份。</div></div></div>
             <div id="admin-database-release-rollbacks" style="font-size:12px;color:#8899aa;padding:4px 0">正在加载回滚记录...</div>
           </div>
-        </div>
-        <div class="table-wrap" style="margin-top:20px">
-          <div class="table-header"><div><div class="table-title">模拟粉丝数据批次</div><div style="font-size:12px;color:#8899aa;margin-top:6px">仅创建或删除带“模拟数据”标记的财经老王粉丝、自选股与评论，不影响真实数据。</div></div><span class="tag tag-blue">批次治理</span></div>
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:4px 0 14px">
-            <label style="font-size:12px;color:#8899aa" for="admin-database-simulation-target">目标环境</label>
-            <select id="admin-database-simulation-target" onchange="loadAdminSimulationBatches()" style="background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);color:#F8F6F0;padding:8px 10px;border-radius:6px;font-size:12px"></select>
-            <button class="btn-outline" style="padding:8px 14px;font-size:12px" onclick="createAdminSimulationBatch()">创建模拟批次</button>
-          </div>
-          <div id="admin-database-simulations" style="font-size:12px;color:#8899aa">正在加载模拟数据批次...</div>
         </div>
       </div><!-- end section-database-release -->
 
@@ -5955,7 +5946,7 @@ function mountUnifiedSystemSettings() {
   window.__adminUnifiedSystemSettingsMounted = true;
 }
 
-const adminDatabaseReleaseState = { overview: null, pollTimer: null, pendingAction: null, startController: null };
+const adminDatabaseReleaseState = { overview: null, pollTimer: null, pendingAction: null, startController: null, startInFlight: false, passwordVerificationInFlight: false };
 
 function databaseReleaseStatusLabel(status) {
   return ({ idle: '空闲', queued: '排队中', running: '执行中', cancelling: '取消中', cancelled: '已取消', succeeded: '已完成', failed: '失败' })[String(status || '')] || '--';
@@ -5997,9 +5988,10 @@ function renderAdminDatabaseRelease() {
   const packageSelect = document.getElementById('admin-database-release-package');
   const targetHost = document.getElementById('admin-database-release-targets');
   const summaryHost = document.getElementById('admin-database-release-summary');
-  const simulationTarget = document.getElementById('admin-database-simulation-target');
   const cancelButton = document.getElementById('admin-database-release-cancel');
-  if (!packageSelect || !targetHost || !summaryHost || !simulationTarget) return;
+  const stagingButton = document.getElementById('admin-database-release-staging');
+  const productionButton = document.getElementById('admin-database-release-production');
+  if (!packageSelect || !targetHost || !summaryHost) return;
   renderAdminDatabaseReleaseTimeline(job);
   const currentPackage = packageSelect.value || '__pending__';
   const packages = Array.isArray(data.packages) ? data.packages : [];
@@ -6022,10 +6014,8 @@ function renderAdminDatabaseRelease() {
     cancelButton.disabled = String(job.status || '') === 'cancelling';
     cancelButton.textContent = String(job.status || '') === 'cancelling' ? '正在取消...' : '取消当前任务';
   }
-  const currentSimulationTarget = simulationTarget.value || 'local';
-  const simulationTargets = Array.isArray(data.simulation_targets) ? data.simulation_targets : [];
-  simulationTarget.innerHTML = simulationTargets.map((item) => `<option value="${escapeAttr(item.name || '')}" ${(item.name || '') === currentSimulationTarget ? 'selected' : ''}>${escapeHtml(`${item.label || item.name} (${item.host})`)}</option>`).join('');
-  if (!simulationTarget.value && simulationTargets.length) simulationTarget.value = simulationTargets[0].name || 'local';
+  const releaseBusy = adminDatabaseReleaseState.startInFlight || ['queued', 'running', 'cancelling'].includes(String(job.status || ''));
+  [stagingButton, productionButton].filter(Boolean).forEach((button) => { button.disabled = releaseBusy; });
 }
 
 async function loadAdminDatabaseRelease(showMessage) {
@@ -6038,7 +6028,6 @@ async function loadAdminDatabaseRelease(showMessage) {
   // These panels use remote database connections and may be slow. Do not make
   // release-log polling wait for them.
   loadAdminDatabaseReleaseRollbacks().catch(() => {});
-  loadAdminSimulationBatches().catch(() => {});
   const status = String((data.job || {}).status || '');
   if (adminDatabaseReleaseState.pollTimer) window.clearTimeout(adminDatabaseReleaseState.pollTimer);
   if (status === 'queued' || status === 'running' || status === 'cancelling') adminDatabaseReleaseState.pollTimer = window.setTimeout(() => loadAdminDatabaseRelease(false).catch(() => {}), 1000);
@@ -6079,10 +6068,11 @@ async function confirmAdminDatabaseReleasePassword() {
   const input = document.getElementById('admin-database-release-password');
   const error = document.getElementById('admin-database-release-password-error');
   const button = document.getElementById('admin-database-release-password-confirm');
-  if (!input || !error || !button) return;
+  if (!input || !error || !button || adminDatabaseReleaseState.passwordVerificationInFlight) return;
   const password = input.value || '';
   if (!password) { error.textContent = '请输入操作口令。'; return; }
   button.disabled = true;
+  adminDatabaseReleaseState.passwordVerificationInFlight = true;
   error.textContent = '';
   try {
     const resp = await fetch('/api/admin/database-release/unlock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
@@ -6096,6 +6086,7 @@ async function confirmAdminDatabaseReleasePassword() {
     adminDatabaseReleaseState.pendingAction = null;
     if (typeof pendingAction === 'function') await pendingAction();
   } finally {
+    adminDatabaseReleaseState.passwordVerificationInFlight = false;
     button.disabled = false;
   }
 }
@@ -6137,12 +6128,22 @@ async function diagnoseAdminDatabaseReleaseStartFailure(target, originalError) {
 }
 
 async function startAdminDatabaseRelease(target, skipConfirmation = false, passwordVerified = false) {
+  if (adminDatabaseReleaseState.startInFlight) {
+    showToast('已有发布请求正在创建，请勿重复提交');
+    return;
+  }
   const packageSelect = document.getElementById('admin-database-release-package');
   const packageId = packageSelect ? packageSelect.value : '';
   const packageLabel = packageId === '__pending__' ? '全部剩余增量包' : (packageId === '__full__' ? '当前完整数据库' : '选中的数据库增量包');
   const confirmProduction = target === 'production';
-  const releaseOverview = adminDatabaseReleaseState.overview || {};
-  if (!passwordVerified && !releaseOverview.operation_unlocked) {
+  // Every target submission requires an explicit operator confirmation. The
+  // server-side unlock still protects the API, but must not silently carry a
+  // previous Staging confirmation into a Production submission.
+  if (!passwordVerified) {
+    if (adminDatabaseReleaseState.pendingAction) {
+      showToast('请先完成当前操作口令验证');
+      return;
+    }
     openAdminDatabaseReleasePasswordModal(() => startAdminDatabaseRelease(target, skipConfirmation, true));
     return;
   }
@@ -6151,6 +6152,8 @@ async function startAdminDatabaseRelease(target, skipConfirmation = false, passw
   const logHost = document.getElementById('admin-database-release-log');
   const cancelButton = document.getElementById('admin-database-release-cancel');
   const originalText = button ? button.textContent : '';
+  adminDatabaseReleaseState.startInFlight = true;
+  renderAdminDatabaseRelease();
   if (button) { button.disabled = true; button.textContent = '正在创建任务...'; }
   if (cancelButton) { cancelButton.hidden = false; cancelButton.disabled = false; cancelButton.textContent = '取消创建请求'; }
   if (logHost) logHost.textContent = `正在向 ${target} 创建数据库发布任务，请稍候...`;
@@ -6208,7 +6211,9 @@ async function startAdminDatabaseRelease(target, skipConfirmation = false, passw
   } finally {
     window.clearTimeout(creationTimeout);
     if (adminDatabaseReleaseState.startController === controller) adminDatabaseReleaseState.startController = null;
-    if (button) { button.disabled = false; button.textContent = originalText; }
+    adminDatabaseReleaseState.startInFlight = false;
+    if (button) button.textContent = originalText;
+    renderAdminDatabaseRelease();
   }
 }
 
@@ -6273,43 +6278,6 @@ async function startAdminDatabaseRollback(target, backupName, skipConfirmation =
   }
   showToast('数据库回滚任务已创建');
   await loadAdminDatabaseRelease(false);
-}
-
-async function loadAdminSimulationBatches() {
-  const target = document.getElementById('admin-database-simulation-target')?.value || 'local';
-  const host = document.getElementById('admin-database-simulations');
-  if (!host) return;
-  const resp = await fetch(`/api/admin/database-release/simulations?target=${encodeURIComponent(target)}`);
-  const data = await resp.json();
-  if (!resp.ok || !data.ok) { host.textContent = data.error || '模拟批次读取失败'; return; }
-  const batches = Array.isArray(data.batches) ? data.batches : [];
-  host.innerHTML = batches.length ? batches.map((item) => `<div style="display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 0;border-top:1px solid rgba(200,169,110,0.1)"><div><div style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text-main)">${escapeHtml(item.batch_code || '--')}</div><div style="margin-top:4px">${escapeHtml(`${item.tenant_slug || '--'} · ${item.created_at || '--'} · 账号 ${item.user_count || 0} · 自选 ${item.watchlist_count || 0} · 评论 ${item.comment_count || 0}`)}</div></div><button class="btn-outline" style="padding:4px 9px;font-size:11px" onclick="deleteAdminSimulationBatch('${escapeAttr(item.batch_code || '')}')">删除批次</button></div>`).join('') : '暂无模拟粉丝数据批次。';
-}
-
-async function createAdminSimulationBatch(skipConfirmation = false) {
-  const target = document.getElementById('admin-database-simulation-target')?.value || 'local';
-  if (!skipConfirmation && !window.confirm(`确认在 ${target} 创建财经老王的模拟粉丝、自选股和评论批次？`)) return;
-  const resp = await fetch('/api/admin/database-release/simulations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target, tenant_slug: 'laowang' }) });
-  const data = await resp.json();
-  if (!resp.ok || !data.ok) {
-    if (handleAdminDatabaseReleaseActionError(data, () => createAdminSimulationBatch(true))) return;
-    throw new Error(data.error || 'simulation_create_failed');
-  }
-  showToast(`已创建模拟批次：${data.batch_code}`);
-  await loadAdminSimulationBatches();
-}
-
-async function deleteAdminSimulationBatch(batchCode, skipConfirmation = false) {
-  const target = document.getElementById('admin-database-simulation-target')?.value || 'local';
-  if (!batchCode || (!skipConfirmation && !window.confirm(`确认删除模拟批次 ${batchCode}？仅删除带模拟标记的数据。`))) return;
-  const resp = await fetch(`/api/admin/database-release/simulations/${encodeURIComponent(batchCode)}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target }) });
-  const data = await resp.json();
-  if (!resp.ok || !data.ok) {
-    if (handleAdminDatabaseReleaseActionError(data, () => deleteAdminSimulationBatch(batchCode, true))) return;
-    throw new Error(data.error || 'simulation_delete_failed');
-  }
-  showToast('模拟批次已删除');
-  await loadAdminSimulationBatches();
 }
 
 function showSection(name, navEl) {

@@ -307,6 +307,17 @@ class DatabaseReleaseAdminBddTest(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.get_json()["error"], "database_release_target_invalid")
 
+    def test_given_release_job_is_already_running_when_start_is_retried_then_api_returns_conflict(self):
+        with self.client.session_transaction() as current_session:
+            current_session[api_core.DATABASE_RELEASE_UNLOCK_SESSION_KEY] = 4102444800
+        with patch("src.web.api_core.start_database_release", side_effect=ValueError("database_release_job_running")):
+            response = self.client.post(
+                "/api/admin/database-release",
+                json={"target": "staging", "package_id": "", "confirm_production": False},
+            )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.get_json()["error"], "database_release_job_running")
+
     def test_given_unexpected_task_creation_error_when_admin_starts_release_then_the_api_returns_json_instead_of_dropping_the_request(self):
         with self.client.session_transaction() as current_session:
             current_session[api_core.DATABASE_RELEASE_UNLOCK_SESSION_KEY] = 4102444800

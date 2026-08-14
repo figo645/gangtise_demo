@@ -827,7 +827,9 @@ def api_admin_start_database_release():
             confirm_production=payload.get("confirm_production") is True,
         )
     except ValueError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 400
+        error_code = str(exc)
+        status_code = 409 if error_code == "database_release_job_running" else 400
+        return jsonify({"ok": False, "error": error_code}), status_code
     except Exception as exc:
         # Match the former standalone 5051 controller's fast task hand-off,
         # while keeping unexpected local filesystem/thread errors observable
