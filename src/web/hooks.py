@@ -84,6 +84,7 @@ def require_user_login():
         "/",
         "/login",
         "/logout",
+        "/switch-account",
         "/api/demo-profiles",
         "/api/demo-profile/switch",
         "/api/h5/login/password",

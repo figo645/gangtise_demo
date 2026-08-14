@@ -18,7 +18,7 @@ REMOTE_DB_PASSWORD="${REMOTE_DB_PASSWORD:-${REMOTE_POSTGRES_PASSWORD:-your_passw
 # shellcheck disable=SC1090
 . "$PACKAGE_DIR/release.env"
 [[ "${RELEASE_VERSION:-}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid RELEASE_VERSION." >&2; exit 2; }
-[[ "${PACKAGE_TYPE:-}" == master_data || "${PACKAGE_TYPE:-}" == data ]] || { echo "Invalid PACKAGE_TYPE." >&2; exit 2; }
+[[ "${PACKAGE_TYPE:-}" == schema || "${PACKAGE_TYPE:-}" == master_data || "${PACKAGE_TYPE:-}" == data ]] || { echo "Invalid PACKAGE_TYPE." >&2; exit 2; }
 SQL_FILE="$PACKAGE_DIR/$PACKAGE_TYPE.sql"
 [[ -f "$SQL_FILE" ]] || { echo "Missing SQL payload." >&2; exit 2; }
 
@@ -30,7 +30,7 @@ sql_literal() { printf "%s" "$1" | sed "s/'/''/g"; }
 version_sql="$(sql_literal "$RELEASE_VERSION")"
 target_sql="$(sql_literal "$TARGET")"
 title_sql="$(sql_literal "${TITLE:-}")"
-"${PSQL[@]}" -c "CREATE TABLE IF NOT EXISTS database_release_packages (release_version TEXT NOT NULL,target_environment TEXT NOT NULL,package_type TEXT NOT NULL CHECK (package_type IN ('master_data','data')),title TEXT NOT NULL DEFAULT '',checksum_sha256 TEXT NOT NULL,status TEXT NOT NULL CHECK (status IN ('succeeded','failed')),applied_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,execution_ms INTEGER NOT NULL DEFAULT 0,PRIMARY KEY (release_version,target_environment));" >/dev/null
+"${PSQL[@]}" -c "CREATE TABLE IF NOT EXISTS database_release_packages (release_version TEXT NOT NULL,target_environment TEXT NOT NULL,package_type TEXT NOT NULL CHECK (package_type IN ('schema','master_data','data')),title TEXT NOT NULL DEFAULT '',checksum_sha256 TEXT NOT NULL,status TEXT NOT NULL CHECK (status IN ('succeeded','failed')),applied_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,execution_ms INTEGER NOT NULL DEFAULT 0,PRIMARY KEY (release_version,target_environment)); ALTER TABLE database_release_packages DROP CONSTRAINT IF EXISTS database_release_packages_package_type_check; ALTER TABLE database_release_packages ADD CONSTRAINT database_release_packages_package_type_check CHECK (package_type IN ('schema','master_data','data'));" >/dev/null
 recorded="$(${PSQL[@]} -Atqc "SELECT checksum_sha256 FROM database_release_packages WHERE release_version='${version_sql}' AND target_environment='${target_sql}' AND status='succeeded'")"
 if [[ -n "$recorded" ]]; then
   [[ "$recorded" == "$checksum" ]] || { echo "Released package checksum changed." >&2; exit 1; }

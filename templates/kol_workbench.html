@@ -3528,11 +3528,18 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         <div class="admin-page-title" id="workbench-page-title">{{ active_tenant.advisor }} 工作台概览</div>
         <div class="kw-page-summary" id="workbench-page-summary">和 H5 保持同一套产品口径，但以 {{ active_tenant.name }} 的桌面 Web 工作流组织大V日常动作。</div>
       </div>
-      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <div class="platform-topbar-actions">
         {% if tenant_portal_enabled %}<a href="/tenant/{{ active_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">租户门户</a>{% endif %}
         <a href="/h5?tenant={{ active_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">前往 H5</a>
-        <a href="/admin" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">纯 Admin 后台</a>
+        {% if current_user.role == 'admin' %}<a href="/admin" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">纯 Admin 后台</a>{% endif %}
         <a href="/" class="btn-gold" style="padding:8px 16px;font-size:12px;text-decoration:none">返回首页</a>
+        <div class="platform-account-chip" aria-label="当前登录账号">
+          <span>当前账号</span>
+          <span class="platform-account-name">{{ current_user.name or current_user.username or active_tenant.advisor }}</span>
+          <span class="platform-account-role">{{ current_user.roleLabel or '大V投顾' }}</span>
+        </div>
+        <a class="btn-outline platform-account-action" href="/switch-account?next={{ request.full_path.rstrip('?') | urlencode }}">切换账号</a>
+        <a class="btn-outline platform-account-action platform-account-logout" href="/logout">退出登录</a>
       </div>
     </div>
 

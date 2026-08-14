@@ -2215,7 +2215,7 @@
     </nav>
     <div style="padding:16px 20px;border-top:1px solid rgba(200,169,110,0.1)">
       <div style="font-size:11px;color:#8899aa">当前登录</div>
-      <div style="font-size:13px;color:#F8F6F0;margin-top:2px">平台管理员</div>
+      <div style="font-size:13px;color:#F8F6F0;margin-top:2px">{{ current_user.name or current_user.username or '平台管理员' }}</div>
     </div>
   </div>
 
@@ -2223,12 +2223,18 @@
   <div class="admin-main">
     <div class="admin-topbar">
       <div class="admin-page-title" id="page-title">运营概览</div>
-      <div style="display:flex;gap:12px;align-items:center">
+      <div class="platform-topbar-actions">
         <span style="font-size:12px;color:#8899aa">2026-06-01 业务沟通会口径</span>
         <a id="admin-top-intern-handbook-link" href="/intern-handbook" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">系统学习手册</a>
         <a id="admin-top-workbench-link" href="/kol-workbench?tenant={{ default_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">大V工作台 Web</a>
         <a id="admin-top-h5-link" href="/h5?tenant={{ default_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">H5 前台</a>
-        <button class="btn-gold" style="padding:8px 16px;font-size:12px" onclick="showToast('报告生成中，请稍候...')">导出报告</button>
+        <div class="platform-account-chip" aria-label="当前登录账号">
+          <span>当前账号</span>
+          <span class="platform-account-name">{{ current_user.name or current_user.username or '平台管理员' }}</span>
+          <span class="platform-account-role">{{ current_user.roleLabel or '管理员' }}</span>
+        </div>
+        <a class="btn-outline platform-account-action" href="/switch-account?next={{ request.full_path.rstrip('?') | urlencode }}">切换账号</a>
+        <a class="btn-outline platform-account-action platform-account-logout" href="/logout">退出登录</a>
       </div>
     </div>
 
@@ -5517,16 +5523,16 @@
           <div class="table-header"><div><div class="table-title">发布任务</div><div style="font-size:12px;color:#8899aa;margin-top:6px">可执行本地完整数据库预发布，或只执行目录白名单内的数据增量包。</div></div><span class="tag tag-gold">单任务锁</span></div>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:4px 0 14px">
             <label style="font-size:12px;color:#8899aa" for="admin-database-release-package">发布内容</label>
-            <select id="admin-database-release-package" style="min-width:280px;max-width:100%;background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);color:#F8F6F0;padding:8px 10px;border-radius:6px;font-size:12px"></select>
-            <button class="btn-outline" style="padding:8px 14px;font-size:12px" onclick="startAdminDatabaseRelease('staging')">同步 Staging</button>
-            <button class="btn-gold" style="padding:8px 14px;font-size:12px" onclick="startAdminDatabaseRelease('production')">同步 Production</button>
+            <select id="admin-database-release-package" style="min-width:310px;max-width:100%;background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);color:#F8F6F0;padding:8px 10px;border-radius:6px;font-size:12px"></select>
+            <button id="admin-database-release-staging" class="btn-outline" style="padding:8px 14px;font-size:12px" onclick="startAdminDatabaseRelease('staging')">同步 Staging</button>
+            <button id="admin-database-release-production" class="btn-gold" style="padding:8px 14px;font-size:12px" onclick="startAdminDatabaseRelease('production')">同步 Production</button>
           </div>
           <div id="admin-database-release-targets" style="font-size:12px;color:#8899aa"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
           <div class="table-wrap">
             <div class="table-header"><div><div class="table-title">任务日志</div><div style="font-size:12px;color:#8899aa;margin-top:6px">显示当前或最近一次发布/回滚任务的最后 50,000 字符。</div></div></div>
-            <pre id="admin-database-release-log" style="margin:0;min-height:260px;max-height:420px;overflow:auto;white-space:pre-wrap;background:#0D1B2A;color:#DCE8F0;border-radius:6px;padding:14px;font:12px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace">等待任务日志...</pre>
+            <pre id="admin-database-release-log" style="margin:0;min-height:260px;max-height:420px;overflow:auto;white-space:pre-wrap;background:#10263F;color:#F7FBFF;border:1px solid rgba(119,183,255,0.34);border-radius:6px;padding:14px;font:600 12px/1.72 ui-monospace,SFMono-Regular,Menlo,monospace">正在读取最近一次发布任务...</pre>
           </div>
           <div class="table-wrap">
             <div class="table-header"><div><div class="table-title">回滚记录</div><div style="font-size:12px;color:#8899aa;margin-top:6px">选择目标环境后读取发布前保留的完整数据库备份。</div></div></div>
@@ -5954,14 +5960,16 @@ function databaseReleaseStatusLabel(status) {
 function renderAdminDatabaseRelease() {
   const data = adminDatabaseReleaseState.overview || {};
   const job = data.job || {};
+  const progress = job.progress || {};
   const packageSelect = document.getElementById('admin-database-release-package');
   const targetHost = document.getElementById('admin-database-release-targets');
   const summaryHost = document.getElementById('admin-database-release-summary');
   const simulationTarget = document.getElementById('admin-database-simulation-target');
   if (!packageSelect || !targetHost || !summaryHost || !simulationTarget) return;
-  const currentPackage = packageSelect.value || '';
+  const currentPackage = packageSelect.value || '__pending__';
   const packages = Array.isArray(data.packages) ? data.packages : [];
-  packageSelect.innerHTML = `<option value="">全量数据库预发布</option>${packages.map((item) => `<option value="${escapeAttr(item.id || '')}" ${item.id === currentPackage ? 'selected' : ''}>${escapeHtml(`${item.date || '--'} · ${item.version || '--'} · ${item.type === 'data' ? '数据增量' : '主数据增量'} · ${item.title || ''}`)}</option>`).join('')}`;
+  const packageTypeLabel = {schema: '表结构增量', master_data: '主数据增量', data: '业务数据增量'};
+  packageSelect.innerHTML = `<option value="__pending__" ${currentPackage === '__pending__' ? 'selected' : ''}>全部剩余增量（推荐，已执行自动跳过）</option><option value="__full__" ${currentPackage === '__full__' ? 'selected' : ''}>当前完整数据库（全量替换，可回滚）</option>${packages.map((item) => `<option value="${escapeAttr(item.id || '')}" ${item.id === currentPackage ? 'selected' : ''}>${escapeHtml(`${item.date || '--'} · ${item.version || '--'} · ${packageTypeLabel[item.type] || '增量包'} · ${item.title || ''}`)}</option>`).join('')}`;
   const targets = Array.isArray(data.targets) ? data.targets : [];
   targetHost.textContent = targets.length ? `已配置发布目标：${targets.map((item) => `${item.label} (${item.host}/${item.database})`).join('；')}` : '暂无可用发布目标，请检查数据库发布环境配置。';
   summaryHost.innerHTML = [
@@ -5969,7 +5977,9 @@ function renderAdminDatabaseRelease() {
     ['任务编号', job.id || '--', job.started_at || '暂无开始时间'],
     ['返回码', job.returncode == null ? '--' : String(job.returncode), job.finished_at || '等待完成'],
     ['操作授权', data.operation_unlocked ? '已解锁' : '未解锁', data.operation_unlocked ? '当前会话可执行数据库动作' : '执行动作时需要输入操作口令'],
-    ['可用增量包', String(packages.length), '白名单目录内的 release package'],
+    ['可用增量包', String(packages.length), '按版本顺序执行，已发布包自动跳过'],
+    ['本次计划', (job.package_plan || []).length ? `${(job.package_plan || []).length} 个增量包` : (job.operation === 'release' ? '当前完整数据库' : '--'), (job.package_plan || []).map((item) => item.version || item.id).join(' · ') || '选择“全部剩余增量”可自动计算'],
+    ['实时进度', Number(progress.total_steps || 0) > 0 ? `${progress.completed_steps || 0} / ${progress.total_steps}` : (job.status === 'running' ? '执行中' : '--'), progress.state === 'queued' ? '等待连接目标数据库' : (progress.updated_at || '等待任务日志')],
   ].map(([label, value, note]) => `<div class="stat-card"><div class="stat-label">${escapeHtml(label)}</div><div class="stat-value">${escapeHtml(value)}</div><div class="stat-change ${job.status === 'failed' ? '' : 'up'}" style="${job.status === 'failed' ? 'color:#E74C3C' : ''}">${escapeHtml(note)}</div></div>`).join('');
   const currentSimulationTarget = simulationTarget.value || 'local';
   const simulationTargets = Array.isArray(data.simulation_targets) ? data.simulation_targets : [];
@@ -5983,18 +5993,27 @@ async function loadAdminDatabaseRelease(showMessage) {
   if (!resp.ok || !data.ok) throw new Error(data.error || 'database_release_overview_failed');
   adminDatabaseReleaseState.overview = data;
   renderAdminDatabaseRelease();
-  await Promise.all([loadAdminDatabaseReleaseLog(), loadAdminDatabaseReleaseRollbacks(), loadAdminSimulationBatches()]);
+  await loadAdminDatabaseReleaseLog();
+  // These panels use remote database connections and may be slow. Do not make
+  // release-log polling wait for them.
+  loadAdminDatabaseReleaseRollbacks().catch(() => {});
+  loadAdminSimulationBatches().catch(() => {});
   const status = String((data.job || {}).status || '');
   if (adminDatabaseReleaseState.pollTimer) window.clearTimeout(adminDatabaseReleaseState.pollTimer);
-  if (status === 'queued' || status === 'running') adminDatabaseReleaseState.pollTimer = window.setTimeout(() => loadAdminDatabaseRelease(false).catch(() => {}), 1500);
+  if (status === 'queued' || status === 'running') adminDatabaseReleaseState.pollTimer = window.setTimeout(() => loadAdminDatabaseRelease(false).catch(() => {}), 1000);
   if (showMessage) showToast('数据库发布状态已刷新');
 }
 
 async function loadAdminDatabaseReleaseLog() {
   const host = document.getElementById('admin-database-release-log');
   if (!host) return;
-  const resp = await fetch('/api/admin/database-release/log');
-  host.textContent = resp.ok ? await resp.text() : '任务日志读取失败';
+  try {
+    const resp = await fetch('/api/admin/database-release/log', { cache: 'no-store' });
+    host.textContent = resp.ok ? await resp.text() : `任务日志读取失败（HTTP ${resp.status}）`;
+    host.scrollTop = host.scrollHeight;
+  } catch (error) {
+    host.textContent = `任务日志读取失败：${error.message || '网络连接不可用'}`;
+  }
 }
 
 function openAdminDatabaseReleasePasswordModal(pendingAction) {
@@ -6049,17 +6068,47 @@ function handleAdminDatabaseReleaseActionError(data, retryAction) {
 async function startAdminDatabaseRelease(target, skipConfirmation = false) {
   const packageSelect = document.getElementById('admin-database-release-package');
   const packageId = packageSelect ? packageSelect.value : '';
-  const packageLabel = packageId ? '选中的数据库增量包' : '本地完整数据库';
+  const packageLabel = packageId === '__pending__' ? '全部剩余增量包' : (packageId === '__full__' ? '当前完整数据库' : '选中的数据库增量包');
   const confirmProduction = target === 'production';
   if (!skipConfirmation && !window.confirm(`确认向 ${target} 发布${packageLabel}？发布会替换或更新目标数据库。`)) return;
-  const resp = await fetch('/api/admin/database-release', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target, package_id: packageId, confirm_production: confirmProduction }) });
-  const data = await resp.json();
-  if (!resp.ok || !data.ok) {
-    if (handleAdminDatabaseReleaseActionError(data, () => startAdminDatabaseRelease(target, true))) return;
-    throw new Error(data.error || 'database_release_start_failed');
+  const button = document.getElementById(`admin-database-release-${target}`);
+  const logHost = document.getElementById('admin-database-release-log');
+  const originalText = button ? button.textContent : '';
+  if (button) { button.disabled = true; button.textContent = '正在创建任务...'; }
+  if (logHost) logHost.textContent = `正在向 ${target} 创建数据库发布任务，请稍候...`;
+  let taskCreated = false;
+  try {
+    const resp = await fetch('/api/admin/database-release', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target, package_id: packageId, confirm_production: confirmProduction }) });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok) {
+      if (handleAdminDatabaseReleaseActionError(data, () => startAdminDatabaseRelease(target, true))) return;
+      const message = data.error || `database_release_start_failed (HTTP ${resp.status})`;
+      if (logHost) logHost.textContent = `未能创建发布任务：${message}`;
+      showToast(`数据库发布未启动：${message}`);
+      return;
+    }
+    taskCreated = true;
+    const plan = Array.isArray((data.job || {}).package_plan) ? data.job.package_plan : [];
+    if (logHost) logHost.textContent = `任务已创建：${target} · ${packageLabel}${plan.length ? `\n计划执行 ${plan.length} 个增量包：${plan.map((item) => item.version || item.id).join(' → ')}` : ''}\n正在连接目标数据库并获取实时日志...`;
+    showToast('数据库发布任务已创建');
+    try {
+      await loadAdminDatabaseRelease(false);
+    } catch (refreshError) {
+      if (logHost) logHost.textContent += `\n状态刷新暂不可用：${refreshError.message || '网络波动'}。任务已提交，正在自动重试...`;
+      window.setTimeout(() => loadAdminDatabaseRelease(false).catch(() => {}), 1000);
+    }
+  } catch (error) {
+    const message = error.message || '网络连接不可用';
+    if (taskCreated) {
+      if (logHost) logHost.textContent += `\n任务已创建，但页面暂时无法刷新：${message}。请保留此页面，系统会自动重试。`;
+      showToast('任务已创建，正在重试读取日志');
+    } else {
+      if (logHost) logHost.textContent = `未能创建数据库发布任务：${message}`;
+      showToast(`数据库发布未启动：${message}`);
+    }
+  } finally {
+    if (button) { button.disabled = false; button.textContent = originalText; }
   }
-  showToast('数据库发布任务已创建');
-  await loadAdminDatabaseRelease(false);
 }
 
 async function loadAdminDatabaseReleaseRollbacks() {
@@ -6139,10 +6188,23 @@ function showSection(name, navEl) {
   document.getElementById('section-' + name).style.display = 'block';
   setActiveAdminNav(navEl || document.querySelector(`.admin-nav-item[data-section="${name}"]`));
   document.getElementById('page-title').textContent = sectionTitles[name];
+  if (name === 'users') {
+    loadAdminUsers();
+  }
+  if (name.startsWith('indicator-')) {
+    refreshAdminIndicatorHub(false).catch((error) => showToast(error.message || '加载失败'));
+  }
+  if (name === 'access') {
+    renderAccessAudit();
+  }
+  if (name === 'settings-features' || name.startsWith('settings-')) {
+    loadSiteConfig().catch((error) => showToast(error.message || '配置加载失败'));
+  }
   if (name === 'agent-workflows') {
     loadAdminAgentWorkflows().catch((error) => showToast(error.message || '加载失败'));
   }
   if (name === 'hermes') {
+    loadSiteConfig().catch((error) => showToast(error.message || '配置加载失败'));
     loadAdminHermesMemorySummary(false).catch((error) => showToast(error.message || '加载失败'));
   }
   if (name === 'commission') {
@@ -10185,6 +10247,7 @@ function initForecastEditorEvents() {
 }
 
 let adminSiteConfig = JSON.parse(JSON.stringify(window.SITE_CONFIG || {}));
+let adminSiteConfigLoaded = false;
 
 function ensureAdminLlmRegistry() {
   if (!adminSiteConfig.llm_registry || typeof adminSiteConfig.llm_registry !== 'object') {
@@ -11347,15 +11410,27 @@ function pickAdminAccent(accent) {
   setGangtiseAccent(accent);
 }
 
-async function loadSiteConfig() {
+async function loadSiteConfig(force = false) {
+  if (adminSiteConfigLoaded && !force) {
+    renderSiteConfigForm();
+    renderAdminKnowledgeTenantFilter();
+    return adminSiteConfig;
+  }
   try {
     const res = await fetch('/api/admin/site-config');
     if (res.ok) {
       adminSiteConfig = await res.json();
+      adminSiteConfigLoaded = true;
+    } else {
+      throw new Error(`site_config_load_failed_${res.status}`);
     }
-  } catch (e) {}
+  } catch (error) {
+    renderSiteConfigForm();
+    throw error;
+  }
   renderSiteConfigForm();
   renderAdminKnowledgeTenantFilter();
+  return adminSiteConfig;
 }
 
 async function syncLocalLlmRegistryFromStaging() {
@@ -11756,7 +11831,6 @@ document.addEventListener('DOMContentLoaded', () => {
   mountUnifiedSystemSettings();
   renderAdminTaskCenter();
   renderAdminTokenUsage();
-  loadSiteConfig();
   document.addEventListener('input', (event) => {
     if (isAdminSiteConfigField(event.target)) {
       markAdminSiteConfigDirty();
@@ -11768,7 +11842,6 @@ document.addEventListener('DOMContentLoaded', () => {
       markAdminSiteConfigDirty();
     }
   });
-  loadAdminUsers();
   const adminUserCsvInput = document.getElementById('admin-user-csv-input');
   if (adminUserCsvInput && !adminUserCsvInput.dataset.bound) {
     adminUserCsvInput.addEventListener('change', async (event) => {
@@ -11779,10 +11852,6 @@ document.addEventListener('DOMContentLoaded', () => {
     adminUserCsvInput.dataset.bound = '1';
   }
   renderAdminIndicatorHubAll();
-  refreshAdminIndicatorHub(false);
-  if (document.getElementById('section-access')) {
-    renderAccessAudit();
-  }
   const section = new URLSearchParams(window.location.search).get('section');
   if (section && analyticsTitles[section]) {
     if (section === 'segment' && !isAdminFeatureEnabled('vip')) {

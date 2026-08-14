@@ -6,6 +6,8 @@ main application's Admin API.
 """
 
 import os
+import json
+import re
 import subprocess
 import threading
 import time
@@ -18,12 +20,15 @@ import psycopg2
 ROOT = Path(__file__).resolve().parents[2]
 PREPARE_SCRIPT = ROOT / "scripts" / "prepare_database_release.sh"
 PACKAGE_SCRIPT = ROOT / "scripts" / "apply_database_release_package.sh"
+PACKAGE_BATCH_SCRIPT = ROOT / "scripts" / "apply_database_release_packages.sh"
 ROLLBACK_SCRIPT = ROOT / "scripts" / "rollback_database_release.sh"
 PACKAGES_DIR = ROOT / "database_release_packages"
+RELEASE_STATE_FILE = ROOT / ".deploy" / "database_release_last_job.json"
 CONFIG_FILE = Path(os.environ.get("DATABASE_RELEASE_CONFIG", str(ROOT / ".database_release.env")))
 _config_loaded = False
 _release_lock = threading.Lock()
 _release_job = {"status": "idle", "id": "", "target": "", "operation": "", "log": "", "started_at": "", "finished_at": "", "returncode": None}
+_release_job_loaded = False
 
 SIMULATION_LABEL = "模拟数据"
 SIMULATED_FAN_SEED = [
@@ -92,7 +97,7 @@ def list_database_release_packages():
                 values[key.strip()] = value.strip().strip('"').strip("'")
         package_type = values.get("PACKAGE_TYPE", "")
         payload = config_path.parent / f"{package_type}.sql"
-        if package_type in {"master_data", "data"} and values.get("RELEASE_VERSION") and payload.exists():
+        if package_type in {"schema", "master_data", "data"} and values.get("RELEASE_VERSION") and payload.exists():
             packages.append({
                 "id": str(config_path.parent.relative_to(ROOT)),
                 "date": config_path.parent.parent.name,
@@ -103,14 +108,76 @@ def list_database_release_packages():
     return packages
 
 
+def _release_job_snapshot():
+    return {
+        "status": _release_job.get("status") or "idle",
+        "id": _release_job.get("id") or "",
+        "target": _release_job.get("target") or "",
+        "operation": _release_job.get("operation") or "",
+        "log": _release_job.get("log") or "",
+        "started_at": _release_job.get("started_at") or "",
+        "finished_at": _release_job.get("finished_at") or "",
+        "returncode": _release_job.get("returncode"),
+        "pid": _release_job.get("pid"),
+        "package_plan": list(_release_job.get("package_plan") or []),
+        "progress": dict(_release_job.get("progress") or {}),
+    }
+
+
+def _persist_release_job():
+    RELEASE_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    temporary_file = RELEASE_STATE_FILE.with_suffix(".tmp")
+    temporary_file.write_text(json.dumps(_release_job_snapshot(), ensure_ascii=False), encoding="utf-8")
+    temporary_file.replace(RELEASE_STATE_FILE)
+
+
+def _load_persisted_release_job():
+    global _release_job_loaded
+    if _release_job_loaded:
+        return
+    _release_job_loaded = True
+    if not RELEASE_STATE_FILE.exists():
+        return
+    try:
+        restored = json.loads(RELEASE_STATE_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return
+    if not isinstance(restored, dict):
+        return
+    allowed_statuses = {"queued", "running", "succeeded", "failed"}
+    if restored.get("status") not in allowed_statuses:
+        return
+    _release_job.update({key: restored.get(key) for key in _release_job_snapshot() if key in restored})
+    # A restarted controller cannot observe the original child process. Keep
+    # the last log visible and make the interrupted state explicit.
+    if _release_job.get("status") in {"queued", "running"}:
+        _release_job.update({
+            "status": "failed",
+            "finished_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "returncode": _release_job.get("returncode") if _release_job.get("returncode") is not None else -1,
+        })
+        log_path = Path(_release_job.get("log") or "")
+        if log_path:
+            try:
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                with log_path.open("a", encoding="utf-8") as log:
+                    log.write("\n[controller] 发布控制器在任务执行期间重启；原任务状态无法继续追踪，请核对目标库后重新发起。\n")
+            except OSError:
+                pass
+        _persist_release_job()
+
+
 def get_database_release_job():
     with _release_lock:
-        return dict(_release_job)
+        _load_persisted_release_job()
+        return _release_job_snapshot()
 
 
 def _set_job(**values):
     with _release_lock:
+        _load_persisted_release_job()
         _release_job.update(values)
+        _persist_release_job()
 
 
 def _run_process(command, target, job_id, operation):
@@ -124,22 +191,69 @@ def _run_process(command, target, job_id, operation):
         "REMOTE_DB_PASSWORD": target["db_password"],
         "CONFIRM_DATABASE_REPLACE": "YES",
     })
-    log_path = ROOT / ".deploy" / f"admin_{operation}_{job_id}.log"
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    with log_path.open("w", encoding="utf-8") as log:
-        _set_job(status="running", log=str(log_path))
-        process = subprocess.Popen(command, cwd=ROOT, env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, text=True)
-        _set_job(pid=process.pid)
-        return_code = process.wait()
-    _set_job(status="succeeded" if return_code == 0 else "failed", returncode=return_code, finished_at=time.strftime("%Y-%m-%d %H:%M:%S"))
+    log_path = Path(_release_job.get("log") or ROOT / ".deploy" / f"admin_{operation}_{job_id}.log")
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with log_path.open("a", encoding="utf-8") as log:
+            log.write(f"[controller] 开始 {operation} 任务 {job_id}\n")
+            log.flush()
+            _set_job(status="running", log=str(log_path))
+            process = subprocess.Popen(
+                command,
+                cwd=ROOT,
+                env=env,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+            _set_job(pid=process.pid)
+            for line in iter(process.stdout.readline, ""):
+                log.write(line)
+                log.flush()
+                _update_release_progress_from_log(line)
+            process.stdout.close()
+            return_code = process.wait()
+        _set_job(status="succeeded" if return_code == 0 else "failed", returncode=return_code, finished_at=time.strftime("%Y-%m-%d %H:%M:%S"))
+    except Exception as exc:
+        try:
+            with log_path.open("a", encoding="utf-8") as log:
+                log.write(f"[controller] 无法启动任务：{exc}\n")
+        except OSError:
+            pass
+        _set_job(status="failed", log=str(log_path), returncode=-1, finished_at=time.strftime("%Y-%m-%d %H:%M:%S"))
 
 
-def _start_job(target, command, operation):
+def _update_release_progress_from_log(line):
+    text = str(line or "").strip()
+    match = re.search(r"^==> \[(\d+)/(\d+)\] (开始增量包|增量包完成)", text)
+    if not match:
+        return
+    current = int(match.group(1))
+    total = int(match.group(2))
+    is_complete = match.group(3) == "增量包完成"
+    _set_job(progress={
+        "current_step": current,
+        "completed_steps": current if is_complete else max(0, current - 1),
+        "total_steps": total,
+        "state": "completed_step" if is_complete else "running_step",
+        "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+    })
+
+
+def _start_job(target, command, operation, package_plan=None):
     with _release_lock:
+        _load_persisted_release_job()
         if _release_job.get("status") in {"queued", "running"}:
             raise ValueError("database_release_job_running")
         job_id = time.strftime("%Y%m%d_%H%M%S")
-        _release_job.update({"status": "queued", "id": job_id, "target": target["name"], "operation": operation, "log": "", "started_at": time.strftime("%Y-%m-%d %H:%M:%S"), "finished_at": "", "returncode": None})
+        log_path = ROOT / ".deploy" / f"admin_{operation}_{job_id}.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text(f"[controller] 任务已排队：{operation} {job_id}\n", encoding="utf-8")
+        package_count = len(package_plan or [])
+        _release_job.update({"status": "queued", "id": job_id, "target": target["name"], "operation": operation, "log": str(log_path), "started_at": time.strftime("%Y-%m-%d %H:%M:%S"), "finished_at": "", "returncode": None, "pid": None, "package_plan": list(package_plan or []), "progress": {"current_step": 0, "completed_steps": 0, "total_steps": package_count, "state": "queued", "updated_at": time.strftime("%Y-%m-%d %H:%M:%S")}})
+        _persist_release_job()
     threading.Thread(target=_run_process, args=(command, target, job_id, operation), daemon=True).start()
     return get_database_release_job()
 
@@ -150,12 +264,20 @@ def start_database_release(target_name, package_id="", confirm_production=False)
         raise ValueError("database_release_target_invalid")
     if target["name"] == "production" and confirm_production is not True:
         raise ValueError("production_confirmation_required")
-    package_ids = {item["id"] for item in list_database_release_packages()}
+    packages = list_database_release_packages()
+    package_ids = {item["id"] for item in packages}
     normalized_package = str(package_id or "").strip()
-    if normalized_package and normalized_package not in package_ids:
+    if normalized_package == "__full__":
+        normalized_package = ""
+    if normalized_package and normalized_package != "__pending__" and normalized_package not in package_ids:
         raise ValueError("database_release_package_invalid")
+    if normalized_package == "__pending__":
+        package_plan = sorted(packages, key=lambda item: (item.get("date") or "", item.get("version") or "", item.get("id") or ""))
+        command = [str(PACKAGE_BATCH_SCRIPT), *[str(ROOT / item["id"]) for item in package_plan]]
+        return _start_job(target, command, "release", package_plan=package_plan)
+    package_plan = [item for item in packages if item["id"] == normalized_package]
     command = [str(PACKAGE_SCRIPT), str(ROOT / normalized_package)] if normalized_package else [str(PREPARE_SCRIPT)]
-    return _start_job(target, command, "release")
+    return _start_job(target, command, "release", package_plan=package_plan)
 
 
 def list_database_release_rollbacks(target_name):
@@ -185,9 +307,10 @@ def start_database_rollback(target_name, backup_name, confirm_production=False):
 
 def get_database_release_log(limit=50000):
     with _release_lock:
+        _load_persisted_release_job()
         log_path = Path(_release_job.get("log") or "") if _release_job.get("log") else None
     if not log_path or not log_path.exists():
-        return "等待任务日志...\n"
+        return "暂无发布或回滚任务日志。发起任务后会在这里实时显示执行过程。\n"
     return log_path.read_text(encoding="utf-8", errors="replace")[-max(1024, min(int(limit or 50000), 100000)):]
 
 

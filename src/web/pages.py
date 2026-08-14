@@ -7,8 +7,16 @@ from src.web.request_helpers import safe_next_target
 def resolve_login_destination(user, next_target):
     target = safe_next_target(next_target or "/h5")
     role = str((user or {}).get("role") or "").strip().lower()
+    if role == "admin":
+        # An administrator is not a tenant advisor. Never send the account
+        # back into a role-specific page after an account switch.
+        if target == "/admin" or target.startswith("/admin?") or target == "/intern-handbook":
+            return target
+        return url_for("admin")
     if role == "dav":
         return url_for("login_entry", next=target)
+    if target == "/admin" or target.startswith("/admin?") or target == "/intern-handbook" or target.startswith("/kol-workbench"):
+        return url_for("h5", tenant=str((user or {}).get("tenant_slug") or "").strip().lower() or None)
     return target
 
 
@@ -98,6 +106,14 @@ def login_entry():
 def logout():
     save_current_demo_profile_id("")
     return redirect(url_for("login"))
+
+
+@app.route("/switch-account")
+def switch_account():
+    """Clear the shared session and keep the intended destination for the next user."""
+    next_target = safe_next_target(request.args.get("next") or "/h5")
+    save_current_demo_profile_id("")
+    return redirect(url_for("login", next=next_target))
 
 
 @app.route("/")
@@ -191,76 +207,45 @@ def h5():
 @app.route("/admin")
 def admin():
     site_config = get_site_config()
-    site_config_payload = build_admin_site_config_payload(site_config)
-    kols = gen_kol_data()
-    segments = gen_user_segments()
-    try:
-        access_stats = get_access_summary()
-        indicator_hub = build_indicator_hub(admin_view=True)
-        task_center = build_admin_task_center_payload()
-        token_usage = build_admin_token_usage_payload()
-    except Exception as exc:
-        if not is_db_unavailable_error(exc):
-            raise
-        app.logger.warning("Database unavailable while building admin page, using fallback data")
-        access_stats = build_access_summary_fallback()
-        indicator_hub = build_indicator_hub_fallback(
-            tenant=get_tenant_by_slug(get_default_tenant_slug(site_config), site_config),
-            admin_view=True,
-        )
-        task_center = {"summary": {"total": 0, "enabled": 0, "running": 0, "failed": 0, "now": now_ts()}, "tasks": [], "runs": [], "runtime": {}}
-        token_usage = {
-            "summary_24h": {
-                "request_count": 0,
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "total_tokens": 0,
-                "avg_tokens_per_request": 0,
-                "avg_latency_ms": 0,
-                "total_latency_ms": 0,
-                "total_latency_seconds": 0,
-                "avg_total_tokens_per_second": 0,
-                "avg_input_tokens_per_second": 0,
-                "avg_output_tokens_per_second": 0,
-                "p95_latency_ms": 0,
-                "max_latency_ms": 0,
-            },
-            "summary_30d": {
-                "request_count": 0,
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "total_tokens": 0,
-                "avg_tokens_per_request": 0,
-                "avg_latency_ms": 0,
-                "total_latency_ms": 0,
-                "total_latency_seconds": 0,
-                "avg_total_tokens_per_second": 0,
-                "avg_input_tokens_per_second": 0,
-                "avg_output_tokens_per_second": 0,
-                "p95_latency_ms": 0,
-                "max_latency_ms": 0,
-            },
-            "hourly": [],
-            "daily": [],
-            "monthly": [],
-            "features": [],
-            "models": [],
-            "model_daily": [],
-            "recent_logs": [],
-            "generated_at": now_ts(),
-        }
+    current_user = get_current_authenticated_user() or {}
+    # Admin is a multi-area console. Loading every analytical dataset before
+    # returning its HTML makes the first navigation wait on unrelated queries.
+    # The client requests each area's live payload after the user enters it.
+    site_config_payload = {
+        "brand": get_platform_brand(site_config),
+        "tenants": get_tenant_configs(site_config),
+        "default_theme": site_config.get("default_theme", "light"),
+        "default_accent": site_config.get("default_accent", "blue"),
+        "default_tenant_slug": get_default_tenant_slug(site_config),
+        "feature_flags": dict(site_config.get("feature_flags") or {}),
+    }
+    empty_indicator_hub = {
+        "summary": {"total": 0, "smart_total": 0, "lake_total": 0, "enabled": 0, "warnings": 0, "attention": 0, "anomalies": 0},
+        "items": [], "anomalies": [], "smart_items": [], "lake_items": [], "definitions": [], "source_defs": [],
+        "recent_tests": [], "load_batches": [], "raw_records": [], "mapping_rules": [], "clean_jobs": [],
+    }
+    empty_token_summary = {
+        "request_count": 0, "input_tokens": 0, "output_tokens": 0, "total_tokens": 0,
+        "avg_tokens_per_request": 0, "avg_latency_ms": 0, "total_latency_ms": 0, "total_latency_seconds": 0,
+        "avg_total_tokens_per_second": 0, "avg_input_tokens_per_second": 0, "avg_output_tokens_per_second": 0,
+        "p95_latency_ms": 0, "max_latency_ms": 0,
+    }
+    task_center = {"summary": {"total": 0, "enabled": 0, "running": 0, "failed": 0, "now": now_ts()}, "tasks": [], "runs": [], "runtime": {}, "user_jobs": [], "user_job_runtime": {}}
+    token_usage = {"summary_24h": dict(empty_token_summary), "summary_30d": dict(empty_token_summary), "hourly": [], "daily": [], "monthly": [], "features": [], "models": [], "model_daily": [], "recent_logs": [], "generated_at": ""}
+    access_stats = {"summary": {"total": 0, "unique_ips": 0, "today": 0, "paths": 0}, "top_paths": [], "top_ips": [], "daily_counts": [], "recent_logs": []}
     return render_template(
         "admin.html",
-        kols=kols,
-        segments=segments,
+        kols=[],
+        segments=[],
         access_stats=access_stats,
-        indicator_hub=indicator_hub,
+        indicator_hub=empty_indicator_hub,
         task_center=task_center,
         token_usage=token_usage,
         brand=get_platform_brand(site_config),
         tenants=get_tenant_configs(site_config),
         default_tenant=get_tenant_by_slug(get_default_tenant_slug(site_config), site_config),
         site_config=site_config_payload,
+        current_user=current_user,
     )
 
 @app.route("/intern-handbook")
@@ -275,6 +260,7 @@ def intern_handbook():
 @app.route("/kol-workbench")
 def kol_workbench():
     site_config = get_site_config()
+    current_user = get_current_authenticated_user() or {}
     tenant = get_active_tenant_from_request(site_config)
     try:
         workbench = gen_kol_workbench(tenant)
@@ -290,6 +276,7 @@ def kol_workbench():
         brand=get_platform_brand(site_config),
         active_tenant=tenant,
         tenant_portal_enabled=is_feature_enabled("tenant_portal", site_config),
+        current_user=current_user,
     )
 
 
