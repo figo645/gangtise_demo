@@ -1243,6 +1243,13 @@ def api_h5_login_password():
             return jsonify({"ok": False, "error": "password_login_disabled"}), 403
         user = verify_h5_password_login(username, password)
         save_current_demo_profile_id(user["username"])
+        if str(user.get("role") or "").strip().lower() == "admin":
+            # H5 profiles intentionally exclude administrators. Do not resolve
+            # one here because it would clear the just-created admin session.
+            payload = _build_h5_auth_options_payload(site_config, current_profile={})
+            payload["current_profile"] = None
+            payload["redirect_to"] = url_for("admin")
+            return jsonify({"ok": True, **payload})
         payload = _build_h5_auth_options_payload(site_config)
         payload["current_profile"] = get_current_demo_profile(site_config)
         return jsonify({"ok": True, **payload})

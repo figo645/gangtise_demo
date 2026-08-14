@@ -6577,6 +6577,10 @@ async function loginH5Password(options) {
     });
     const data = await resp.json();
     if (!resp.ok || data.ok === false) throw new Error((data && data.error) || 'password_login_failed');
+    if (data.redirect_to) {
+      window.location.assign(String(data.redirect_to));
+      return;
+    }
     H5_AUTH_SETTINGS = JSON.parse(JSON.stringify(data.auth_settings || H5_AUTH_SETTINGS || {}));
     DEMO_PROFILE_USERS = Array.isArray(data.profiles) ? JSON.parse(JSON.stringify(data.profiles)) : DEMO_PROFILE_USERS;
     window.CURRENT_DEMO_PROFILE = data.current_profile || null;
@@ -6667,7 +6671,7 @@ async function registerH5Password() {
       username_password_required: '请输入用户名和密码。',
       display_name_required: '请输入昵称。',
       password_too_short: '密码至少需要 6 位。',
-      username_exists: '用户名已存在，请更换一个。',
+      username_exists: '该用户名已经注册，请切换到“登录”后输入密码。',
       password_login_disabled: '当前未开放账号注册。',
     };
     const message = errorMap[(error && error.message) || ''] || '注册失败，请稍后重试。';

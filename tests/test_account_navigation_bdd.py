@@ -1,6 +1,7 @@
 import unittest
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
+from unittest.mock import patch
 
 from src.runtime import app
 from src.web.pages import resolve_login_destination
@@ -35,6 +36,22 @@ class AccountNavigationBddTest(unittest.TestCase):
         self.assertEqual(query.get("next"), ["/admin?section=users"])
         with client.session_transaction() as stored_session:
             self.assertNotIn("current_h5_username", stored_session)
+
+    def test_given_admin_credentials_on_h5_when_login_succeeds_then_admin_session_is_kept_and_browser_is_redirected_to_admin(self):
+        admin = {"username": "admin", "role": "admin", "status": "active"}
+        client = app.test_client()
+        with patch("src.web.api_core.get_site_config", return_value={}), patch(
+            "src.web.api_core.get_auth_settings", return_value={"password_login_enabled": True}
+        ), patch("src.web.api_core.verify_h5_password_login", return_value=admin), patch(
+            "src.web.api_core._build_h5_auth_options_payload", return_value={"auth_settings": {}, "profiles": []}
+        ):
+            response = client.post("/api/h5/login/password", json={"username": "admin", "password": "admin123"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["redirect_to"], "/admin")
+        self.assertIsNone(response.get_json()["current_profile"])
+        with client.session_transaction() as stored_session:
+            self.assertEqual(stored_session.get("current_h5_username"), "admin")
 
     def test_given_admin_and_workbench_pages_when_rendered_then_both_expose_the_same_account_actions(self):
         admin_template = (PROJECT_ROOT / "templates" / "admin.html").read_text(encoding="utf-8")
