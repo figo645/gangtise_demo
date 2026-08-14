@@ -1638,6 +1638,8 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("已直接引用指标，无需等待生成", html)
         self.assertIn("这是已有指标的直接引用，不需要等待 LLM 生成", html)
         self.assertIn("function buildWorkbenchSmartDashboardCardRefs(active, layout, slotIndex, nextIndicatorCode)", html)
+        self.assertIn("published.cards.slice(0, getDashboardCardTarget(layout))", html)
+        self.assertIn("if (!rawCard.isEmpty && (rawCard.name || rawCard.value || rawCard.assessment || rawCard.prompt)) return rawCard;", html)
         self.assertNotIn("当前值为 151.275", html)
         self.assertNotIn('wb-dashboard-summary-card filled" style="margin-top:10px"', html)
 
@@ -1699,6 +1701,15 @@ class ReviewModuleBddTest(unittest.TestCase):
 
         self.assertNotEqual(first, second)
         self.assertTrue(first.startswith("laowang_smart_"))
+
+    def test_given_five_dashboard_cards_with_legacy_2x2_layout_when_normalized_then_layout_expands_to_2x3(self):
+        tenant = {"slug": "laowang", "advisor": "财经老王"}
+        cards = [{"indicatorCode": f"indicator_{index}"} for index in range(5)]
+        with patch("src.domain.core_services.build_indicator_hub", return_value={"smart_items": [], "lake_items": []}):
+            normalized = normalize_fund_dashboard_view({"layout": "2x2", "cards": cards}, tenant)
+
+        self.assertEqual(normalized["layout"], "2x3")
+        self.assertEqual(len(normalized["cards"]), 6)
 
     def test_given_h5_when_page_renders_then_fan_stock_observation_uses_sector_chart(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slug}")

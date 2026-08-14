@@ -687,7 +687,9 @@ def api_tenant_smart_indicators(tenant_slug):
         definition = get_indicator_definition(indicator_code)
         if not definition:
             return jsonify({"success": False, "error": "indicator_not_found"}), 404
-        if str(definition.get("tenant_slug") or "").strip().lower() not in {"", tenant_slug}:
+        if str(definition.get("source_type") or "").strip().lower() != "smart":
+            return jsonify({"success": False, "error": "only_smart_indicators_can_be_deleted"}), 403
+        if str(definition.get("tenant_slug") or "").strip().lower() != tenant_slug:
             return jsonify({"success": False, "error": "indicator_forbidden"}), 403
         saved = remove_smart_indicator_from_dashboard(tenant_slug, indicator_code)
         delete_indicator_definition(indicator_code)

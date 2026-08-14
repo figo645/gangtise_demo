@@ -104,7 +104,11 @@ def login_entry():
 
 @app.route("/logout")
 def logout():
-    save_current_demo_profile_id("")
+    # A shared Flask session also carries release-unlock and onboarding state.
+    # Logout must remove all of it so a following /login cannot resolve the
+    # previous DAv account and redirect back to the entry-choice page.
+    session.clear()
+    g.current_demo_profile_id = ""
     return redirect(url_for("login"))
 
 
@@ -112,7 +116,8 @@ def logout():
 def switch_account():
     """Clear the shared session and keep the intended destination for the next user."""
     next_target = safe_next_target(request.args.get("next") or "/h5")
-    save_current_demo_profile_id("")
+    session.clear()
+    g.current_demo_profile_id = ""
     return redirect(url_for("login", next=next_target))
 
 

@@ -37,6 +37,33 @@ class AccountNavigationBddTest(unittest.TestCase):
         with client.session_transaction() as stored_session:
             self.assertNotIn("current_h5_username", stored_session)
 
+    def test_given_dav_when_logging_out_then_all_session_state_is_cleared_and_login_page_is_used(self):
+        client = app.test_client()
+        with client.session_transaction() as stored_session:
+            stored_session["current_h5_username"] = "laowang"
+            stored_session["database_release_unlock_until"] = 4102444800
+            stored_session["h5_wechat_login_state"] = "state"
+
+        response = client.get("/logout", follow_redirects=False)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "/login")
+        with client.session_transaction() as stored_session:
+            self.assertFalse(dict(stored_session))
+
+    def test_given_h5_user_when_logging_out_then_the_api_clears_the_full_shared_session(self):
+        client = app.test_client()
+        with client.session_transaction() as stored_session:
+            stored_session["current_h5_username"] = "laowang"
+            stored_session["database_release_unlock_until"] = 4102444800
+
+        response = client.post("/api/h5/logout")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()["ok"])
+        with client.session_transaction() as stored_session:
+            self.assertFalse(dict(stored_session))
+
     def test_given_admin_credentials_on_h5_when_login_succeeds_then_admin_session_is_kept_and_browser_is_redirected_to_admin(self):
         admin = {"username": "admin", "role": "admin", "status": "active"}
         client = app.test_client()

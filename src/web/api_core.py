@@ -1445,7 +1445,8 @@ def api_h5_wechat_callback():
 
 @app.route("/api/h5/logout", methods=["POST"])
 def api_h5_logout():
-    save_current_demo_profile_id("")
+    session.clear()
+    g.current_demo_profile_id = ""
     return jsonify({"ok": True})
 
 

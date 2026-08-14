@@ -4368,8 +4368,8 @@ body,
         <div class="wb-dashboard-meta" style="margin-top:10px">标签来源于自选股和平台指标库，不再单独维护“可选底层指标”面板。</div>
         <div id="wb-smart-layout-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"></div>
         <div class="wb-dashboard-actions">
-          <button class="btn-outline" style="padding:9px 10px;font-size:12px" onclick="publishFundDashboard()">发布到基本面首页</button>
-          <button class="btn-outline" style="padding:9px 10px;font-size:12px" onclick="resetFundDashboardDraft()">恢复当前发布版</button>
+          <button id="wb-dashboard-publish-button" class="btn-outline" style="padding:9px 10px;font-size:12px" onclick="publishFundDashboard()">发布到基本面首页</button>
+          <button id="wb-dashboard-reset-button" class="btn-outline" style="padding:9px 10px;font-size:12px" onclick="resetFundDashboardDraft()">恢复当前发布版</button>
         </div>
         <div class="wb-dashboard-meta" id="wb-dashboard-meta">当前未生成新的指标面板，发布后会同步到前台“基本面”页顶部。</div>
         <div class="wb-dashboard-meta" style="margin-top:10px">系统会根据提示词自动更新内部计算逻辑，不向用户直接展示实现细节。</div>
@@ -5123,6 +5123,8 @@ let currentWorkbenchDashboardMode = 'market';
 let dashboardCellEditingIndex = -1;
 let dashboardCellDraftMode = 'market';
 let currentFundMetricDetail = null;
+let workbenchDashboardAction = '';
+let workbenchDashboardActionTimer = null;
 const REVIEW_PERIOD_CONFIG = {
   day: { label: '日复盘', shortLabel: '今日', prompt: '今天收盘后', marketFocus: '当天行情', aiLabel: '自选股 + 当日行情' },
   week: { label: '周复盘', shortLabel: '本周', prompt: '本周结束后', marketFocus: '阶段行情', aiLabel: '自选股 + 周度主线' },
@@ -11288,8 +11290,7 @@ async function logoutH5User() {
     hermesCredits = 0;
     h5OnboardingState = normalizeH5OnboardingState({});
     renderH5OnboardingModal();
-    const target = `${window.location.pathname}${window.location.search || ''}`;
-    window.location.href = `/login?next=${encodeURIComponent(target)}`;
+    window.location.href = '/login';
   } catch (error) {
     showToast('退出失败');
   }
@@ -16959,12 +16960,23 @@ function buildWorkbenchSmartDashboardCardRefs(active, layout, slotIndex, nextInd
   const sourceCards = Array.isArray((active || {}).cards) ? active.cards : [];
   const seenCodes = new Set();
   return Array.from({ length: target }, (_, index) => {
-    const indicatorCode = index === slotIndex
-      ? String(nextIndicatorCode || '').trim()
-      : getWorkbenchSmartCardIndicatorCode(sourceCards[index]);
-    if (!indicatorCode || seenCodes.has(indicatorCode)) return {};
-    seenCodes.add(indicatorCode);
-    return { indicatorCode };
+    const rawCard = sourceCards[index] && typeof sourceCards[index] === 'object' ? sourceCards[index] : {};
+    if (index === slotIndex) {
+      const replacementCode = String(nextIndicatorCode || '').trim();
+      if (!replacementCode || seenCodes.has(replacementCode)) return {};
+      seenCodes.add(replacementCode);
+      return { indicatorCode: replacementCode };
+    }
+    const indicatorCode = getWorkbenchSmartCardIndicatorCode(sourceCards[index]);
+    if (indicatorCode) {
+      if (seenCodes.has(indicatorCode)) return {};
+      seenCodes.add(indicatorCode);
+      return { ...rawCard, indicatorCode };
+    }
+    // Legacy/full dashboard cards may carry display data without an indicatorCode.
+    // Keep them in place while replacing a different slot.
+    if (!rawCard.isEmpty && (rawCard.name || rawCard.value || rawCard.assessment || rawCard.prompt)) return rawCard;
+    return {};
   });
 }
 
@@ -16977,7 +16989,9 @@ function getWorkbenchSmartEditingBaseDashboard() {
     layout,
     title: (published && published.title) || '智能指标 Dashboard',
     note: (published && published.note) || '大V 自定义智能指标草稿。',
-    cards: Array.from({ length: getDashboardCardTarget(layout) }, () => ({})),
+    cards: Array.isArray(published && published.cards)
+      ? published.cards.slice(0, getDashboardCardTarget(layout))
+      : Array.from({ length: getDashboardCardTarget(layout) }, () => ({})),
   };
 }
 
@@ -16992,6 +17006,7 @@ function openWorkbenchSmartIndicatorEditor(slotIndex) {
     isGenerating: false,
     directIndicatorCode: '',
     preview: null,
+    isSaving: false,
   };
   renderWorkbenchSmartIndicatorEditorModal();
 }
@@ -17252,6 +17267,7 @@ function renderWorkbenchSmartIndicatorEditorModal() {
   const scrollSnapshot = captureModalSheetScroll('dashboard-cell-modal-content');
   const preview = wbSmartIndicatorDraft.preview;
   const isGenerating = wbSmartIndicatorDraft.isGenerating === true;
+  const isSaving = wbSmartIndicatorDraft.isSaving === true;
   const isDirectPreview = preview && preview.direct_reference === true;
   if (typeof wbSmartIndicatorDraft.tagPoolExpanded !== 'boolean') wbSmartIndicatorDraft.tagPoolExpanded = false;
   host.innerHTML = `
@@ -17299,10 +17315,19 @@ function renderWorkbenchSmartIndicatorEditorModal() {
         <div style="font-size:12px;color:var(--gray-300);line-height:1.8;margin-top:10px">解读：${escapeHtml(preview.interpretation || preview.assessment || '暂无解读')}</div>
       </div>
     ` : ''}
+    ${isSaving ? `
+      <div class="knowledge-modal-block" style="border:1px solid rgba(47,116,192,0.18);background:rgba(47,116,192,0.06);border-radius:14px;padding:12px">
+        <div style="display:flex;align-items:center;gap:10px;color:#2F74C0;font-weight:700">
+          <span class="dot-anim" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>
+          <span>正在保存指标并加入 Dashboard 草稿</span>
+        </div>
+        <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-top:6px">正在写入指标定义、计算结果和当前看板槽位，请稍候。</div>
+      </div>
+    ` : ''}
     <div class="modal-actions">
-      <button class="btn-outline" onclick="closeWorkbenchSmartIndicatorEditor()" ${isGenerating ? 'disabled' : ''}>取消</button>
-      <button class="btn-outline" onclick="previewWorkbenchSmartIndicator()" ${isGenerating ? 'disabled' : ''}>${isGenerating ? '生成中...' : '生成预览'}</button>
-      ${preview && !isGenerating ? '<button class="btn-gold" onclick="confirmWorkbenchSmartIndicator()">确认展示</button>' : ''}
+      <button class="btn-outline" onclick="closeWorkbenchSmartIndicatorEditor()" ${isGenerating || isSaving ? 'disabled' : ''}>取消</button>
+      <button class="btn-outline" onclick="previewWorkbenchSmartIndicator()" ${isGenerating || isSaving ? 'disabled' : ''}>${isGenerating ? '生成中...' : '生成预览'}</button>
+      ${preview && !isGenerating && !isSaving ? '<button class="btn-gold" onclick="confirmWorkbenchSmartIndicator()">确认展示</button>' : ''}
     </div>
   `;
   modal.classList.add('show');
@@ -17370,6 +17395,7 @@ async function previewWorkbenchSmartIndicator() {
 }
 
 async function confirmWorkbenchSmartIndicator() {
+  if (wbSmartIndicatorDraft.isSaving) return;
   const preview = wbSmartIndicatorDraft.preview;
   if (!preview) {
     showToast('请先生成预览');
@@ -17379,6 +17405,8 @@ async function confirmWorkbenchSmartIndicator() {
   const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
   const active = getWorkbenchSmartEditingBaseDashboard();
   const layout = normalizeDashboardLayout(active.layout || '2x2');
+  wbSmartIndicatorDraft.isSaving = true;
+  renderWorkbenchSmartIndicatorEditorModal();
   try {
     if (preview.direct_reference === true && preview.indicator_code) {
       const nextCards = buildWorkbenchSmartDashboardCardRefs(active, layout, wbSmartIndicatorDraft.slotIndex, preview.indicator_code);
@@ -17389,6 +17417,7 @@ async function confirmWorkbenchSmartIndicator() {
       });
       wbSmartIndicatorEditingCode = preview.indicator_code;
       wbSmartIndicatorSelectedCodes = ((preview.selected_indicators || []).map((item) => item.indicator_code)).filter(Boolean);
+      wbSmartIndicatorDraft.isSaving = false;
       closeWorkbenchSmartIndicatorEditor();
       renderWorkbenchFundDashboard();
       renderFundMacroDashboard();
@@ -17420,11 +17449,14 @@ async function confirmWorkbenchSmartIndicator() {
     });
     wbSmartIndicatorEditingCode = ((payload.definition || {}).indicator_code) || '';
     wbSmartIndicatorSelectedCodes = ((preview.selected_indicators || []).map((item) => item.indicator_code)).filter(Boolean);
+    wbSmartIndicatorDraft.isSaving = false;
     closeWorkbenchSmartIndicatorEditor();
     renderWorkbenchFundDashboard();
     renderFundMacroDashboard();
     showToast('智能指标已加入 Dashboard 草稿');
   } catch (error) {
+    wbSmartIndicatorDraft.isSaving = false;
+    renderWorkbenchSmartIndicatorEditorModal();
     showToast(error.message || '智能指标保存失败');
   }
 }
@@ -17433,15 +17465,30 @@ async function removeWorkbenchDashboardIndicator(index) {
   const active = getDraftFundDashboard() || getPublishedFundDashboard() || { layout: '2x2', cards: [] };
   const layout = normalizeDashboardLayout(active.layout || '2x2');
   const nextCards = buildWorkbenchSmartDashboardCardRefs(active, layout, index, '');
+  const tenantState = getTenantFundDashboardState();
+  const hadDraft = !!tenantState.draft;
+  const previousDraft = cloneDashboardConfig(tenantState.draft);
+  const optimisticDraft = { ...active, layout, cards: nextCards };
+  tenantState.draft = optimisticDraft;
+  tenantFundDashboardRemoteState.draft = cloneDashboardConfig(optimisticDraft);
+  persistTenantFundDashboardState();
+  closeWorkbenchSmartIndicatorDetailModal();
+  renderWorkbenchFundDashboard();
+  renderFundMacroDashboard();
+  showToast('已从看板移除，正在保存...', 2600);
   try {
     await syncTenantDashboardState('save_draft', {
       ...active,
       layout,
       cards: nextCards,
     });
-    renderWorkbenchFundDashboard();
-    showToast('已从草稿移除');
+    showToast('已从智能看板移除');
   } catch (error) {
+    tenantState.draft = hadDraft ? previousDraft : null;
+    tenantFundDashboardRemoteState.draft = hadDraft ? cloneDashboardConfig(previousDraft) : null;
+    persistTenantFundDashboardState();
+    renderWorkbenchFundDashboard();
+    renderFundMacroDashboard();
     showToast('移除失败，请稍后重试');
   }
 }
@@ -17473,17 +17520,6 @@ function findWorkbenchSmartIndicator(indicatorCode) {
   return (getTenantSmartCatalog().tenant_smart_indicators || []).find((entry) => entry.indicator_code === indicatorCode);
 }
 
-const STANDARD_MARKET_INDEX_INDICATOR_CODES = new Set([
-  'source_shanghai_index', 'source_shenzhen_index', 'source_hs300', 'source_sse50',
-  'source_kc50', 'source_cyb', 'source_zz500', 'source_zz1000', 'source_zz800',
-  'source_a500', 'source_zz2000', 'source_hsi', 'source_hscei', 'source_hscci',
-  'source_dji', 'source_nasdaq', 'source_sp500', 'source_nikkei',
-]);
-
-function isStandardMarketIndexIndicator(indicatorCode) {
-  return STANDARD_MARKET_INDEX_INDICATOR_CODES.has(String(indicatorCode || '').trim());
-}
-
 function isWorkbenchSmartPlaceholderCard(card) {
   const item = card && typeof card === 'object' ? card : {};
   const indicatorCode = String(item.indicatorCode || item.indicator_code || '').trim();
@@ -17495,24 +17531,39 @@ function isWorkbenchSmartPlaceholderCard(card) {
   );
 }
 
+function buildWorkbenchDashboardDetailCard(rawCard, fallback = {}) {
+  const card = rawCard && typeof rawCard === 'object' ? rawCard : {};
+  const indicatorCode = String(card.indicatorCode || card.indicator_code || fallback.indicatorCode || '').trim();
+  const smartIndicator = findWorkbenchSmartIndicator(indicatorCode);
+  const baseIndicator = findWorkbenchBaseIndicator(indicatorCode);
+  const isTenantSmart = !!smartIndicator;
+  const isBaseIndicator = !isTenantSmart && !!baseIndicator;
+  const sourceType = String((baseIndicator && (baseIndicator.source_type_label || baseIndicator.source_type)) || '').trim();
+  const baseName = (baseIndicator && baseIndicator.indicator_name) || indicatorCode;
+  const baseAlgorithmDetail = sourceType
+    ? `基础指标：${baseName}。数据口径由平台统一指标库维护，数据类型：${sourceType}。`
+    : `基础指标：${baseName}。数据口径由平台统一指标库维护。`;
+  return {
+    indicatorCode,
+    name: card.name || (smartIndicator && smartIndicator.indicator_name) || (baseIndicator && baseIndicator.indicator_name) || fallback.name || '指标详情',
+    value: card.value || (smartIndicator && smartIndicator.value) || (baseIndicator && baseIndicator.value) || fallback.value || '--',
+    unit: card.unit || (smartIndicator && smartIndicator.unit) || (baseIndicator && baseIndicator.unit) || fallback.unit || '',
+    prompt: card.prompt || (smartIndicator && smartIndicator.prompt_text) || '',
+    updatedAt: card.updatedAt || (smartIndicator && smartIndicator.last_updated) || fallback.updatedAt || '',
+    algorithmDetail: card.algorithmDetail || (smartIndicator && smartIndicator.algorithm_detail) || (isBaseIndicator ? baseAlgorithmDetail : '') || fallback.algorithmDetail || '暂无算法详情',
+    interpretation: card.interpretation || card.assessment || (smartIndicator && (smartIndicator.interpretation || smartIndicator.assessment)) || (isBaseIndicator ? `${baseName}为统一维护的基础指标，可作为智能指标的计算对象。` : '') || fallback.interpretation || '暂无解读',
+    selectedIndicators: card.selectedIndicators || (smartIndicator && smartIndicator.selected_indicators) || (isBaseIndicator ? [{ indicator_code: indicatorCode, indicator_name: baseName }] : []) || [],
+    isTenantSmart,
+    isBaseIndicator,
+    sourceType,
+    slotIndex: fallback.slotIndex,
+  };
+}
+
 function openWorkbenchSmartIndicatorLibraryDetail(indicatorCode) {
-  if (isStandardMarketIndexIndicator(indicatorCode)) {
-    openWatchlistDetail(indicatorCode, 'overview');
-    return;
-  }
-  const item = findWorkbenchSmartIndicator(indicatorCode);
+  const item = findWorkbenchSmartIndicator(indicatorCode) || findWorkbenchBaseIndicator(indicatorCode);
   if (!item) return;
-  openWorkbenchSmartIndicatorDetailModal({
-    indicatorCode: item.indicator_code,
-    name: item.indicator_name,
-    value: item.value || '--',
-    unit: item.unit || '',
-    prompt: item.prompt_text || '',
-    updatedAt: item.last_updated || '',
-    algorithmDetail: item.algorithm_detail || '',
-    interpretation: item.interpretation || item.assessment || '',
-    selectedIndicators: item.selected_indicators || [],
-  });
+  openWorkbenchSmartIndicatorDetailModal(buildWorkbenchDashboardDetailCard(item, { indicatorCode }));
 }
 
 function openWorkbenchDashboardIndicatorDetail(index, sourceType) {
@@ -17524,24 +17575,10 @@ function openWorkbenchDashboardIndicatorDetail(index, sourceType) {
     openWorkbenchSmartIndicatorEditor(index);
     return;
   }
-  const indicatorCode = item.indicatorCode || item.indicator_code || '';
-  if (isStandardMarketIndexIndicator(indicatorCode)) {
-    openWatchlistDetail(indicatorCode, 'overview');
-    return;
-  }
-  const catalogItem = findWorkbenchSmartIndicator(indicatorCode);
-  openWorkbenchSmartIndicatorDetailModal({
-    indicatorCode,
-    name: item.name || '',
-    value: item.value || '--',
-    unit: item.unit || '',
-    prompt: item.prompt || '',
-    updatedAt: item.updatedAt || (source && source.updatedAt) || '',
-    algorithmDetail: item.algorithmDetail || (catalogItem && catalogItem.algorithm_detail) || '',
-    interpretation: item.interpretation || item.assessment || (catalogItem && (catalogItem.interpretation || catalogItem.assessment)) || '',
-    selectedIndicators: item.selectedIndicators || (catalogItem && catalogItem.selected_indicators) || [],
+  openWorkbenchSmartIndicatorDetailModal(buildWorkbenchDashboardDetailCard(item, {
+    updatedAt: (source && source.updatedAt) || '',
     slotIndex: index,
-  });
+  }));
 }
 
 function openWorkbenchSmartIndicatorDetailModal(card) {
@@ -17553,33 +17590,53 @@ function openWorkbenchSmartIndicatorDetailModal(card) {
   const modal = document.getElementById('dashboard-cell-modal');
   if (!host || !modal || !card) return;
   const isDav = (getActiveDemoUser() || {}).role === 'dav';
+  const canEdit = isDav && card.isTenantSmart === true && !!card.indicatorCode;
+  const showWorkbenchEditor = isDav && !!card.indicatorCode;
+  const canRemoveFromDashboard = isDav && Number.isInteger(card.slotIndex) && !!card.indicatorCode;
+  const canDeleteDefinition = canEdit && !canRemoveFromDashboard;
+  const isSaving = card.isSaving === true;
+  const isDeleting = card.isDeleting === true;
   const selectedIndicators = Array.isArray(card.selectedIndicators) ? card.selectedIndicators : [];
   host.innerHTML = `
-    <div class="modal-title" style="margin-bottom:10px">${escapeHtml(card.name || '智能指标详情')}</div>
+    <div class="modal-title" style="margin-bottom:10px">${showWorkbenchEditor ? '智能指标详情' : escapeHtml(card.name || '智能指标详情')}</div>
     <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">
       当前值：${escapeHtml(`${card.value || '--'}${card.unit || ''}`)} · 更新时间：${escapeHtml(card.updatedAt || '未记录')}
     </div>
+    ${showWorkbenchEditor ? `
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">指标定义</label>
+      <div style="display:grid;gap:8px">
+        <input id="wb-smart-indicator-detail-name" class="knowledge-modal-textarea" style="min-height:auto;height:42px" value="${escapeHtml(card.name || '')}" placeholder="指标名称" ${canEdit ? '' : 'disabled'}>
+        <input id="wb-smart-indicator-detail-category" class="knowledge-modal-textarea" style="min-height:auto;height:42px" value="${escapeHtml(card.category || '')}" placeholder="指标分类" ${canEdit ? '' : 'disabled'}>
+        <input id="wb-smart-indicator-detail-unit" class="knowledge-modal-textarea" style="min-height:auto;height:42px" value="${escapeHtml(card.unit || '')}" placeholder="单位，例如：点、%" ${canEdit ? '' : 'disabled'}>
+      </div>
+      ${card.isBaseIndicator ? '<div style="font-size:11px;color:var(--gray-400);margin-top:8px">基础指标定义由平台统一维护，租户侧只读。</div>' : ''}
+    </div>
+    ` : ''}
     <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">算法详情</label>
-      <div style="font-size:12px;color:var(--gray-300);line-height:1.8">${escapeHtml(card.algorithmDetail || '暂无算法详情')}</div>
+      ${showWorkbenchEditor ? `<textarea id="wb-smart-indicator-detail-algorithm" class="knowledge-modal-textarea" ${canEdit ? '' : 'disabled'}>${escapeHtml(card.algorithmDetail || '')}</textarea>` : `<div style="font-size:12px;color:var(--gray-300);line-height:1.8">${escapeHtml(card.algorithmDetail || '暂无算法详情')}</div>`}
       <div class="review-watchlist-row" style="margin-top:10px">
         ${selectedIndicators.map((item) => `<span class="review-watchlist-chip">${escapeHtml(item.indicator_name || item.indicator_code || '')}</span>`).join('') || '<span class="review-watchlist-chip">未选择计算对象</span>'}
       </div>
     </div>
     <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">解读</label>
-      <div style="font-size:12px;color:var(--gray-300);line-height:1.8">${escapeHtml(card.interpretation || '暂无解读')}</div>
+      ${showWorkbenchEditor ? `<textarea id="wb-smart-indicator-detail-interpretation" class="knowledge-modal-textarea" ${canEdit ? '' : 'disabled'}>${escapeHtml(card.interpretation || '')}</textarea>` : `<div style="font-size:12px;color:var(--gray-300);line-height:1.8">${escapeHtml(card.interpretation || '暂无解读')}</div>`}
     </div>
-    ${isDav ? `
+    ${showWorkbenchEditor ? `
     <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">提示词</label>
-      <textarea id="wb-smart-indicator-detail-prompt" class="knowledge-modal-textarea" ${card.indicatorCode ? '' : 'disabled'}>${escapeHtml(card.prompt || '')}</textarea>
-      <div style="font-size:11px;color:var(--gray-400);margin-top:8px">保存后系统会自动重算该智能指标，不直接展示内部公式。</div>
+      <textarea id="wb-smart-indicator-detail-prompt" class="knowledge-modal-textarea" ${canEdit && !(isSaving || isDeleting) ? '' : 'disabled'}>${escapeHtml(card.prompt || '')}</textarea>
+      <div style="font-size:11px;color:var(--gray-400);margin-top:8px">${canEdit ? '保存后系统会自动重算该智能指标，不直接展示内部公式。' : '基础指标由统一数据源维护，不在租户侧修改计算口径。'}</div>
     </div>
     ` : ''}
+    ${(isSaving || isDeleting) ? `<div style="font-size:12px;color:var(--gold);margin:8px 0">正在${isDeleting ? '删除指标并同步看板' : '保存并重算指标'}<span class="dot-anim" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span></div>` : ''}
     <div class="modal-actions">
-      <button class="btn-outline" onclick="closeWorkbenchSmartIndicatorDetailModal()">关闭</button>
-      ${isDav && card.indicatorCode ? `<button class="btn-gold" onclick="saveWorkbenchSmartIndicatorPrompt('${card.indicatorCode}')">保存并更新指标</button>` : ''}
+      <button class="btn-outline" type="button" onclick="closeWorkbenchSmartIndicatorDetailModal()">关闭</button>
+      ${canRemoveFromDashboard ? `<button class="btn-outline" type="button" onclick="requestWorkbenchDashboardRemoval(${card.slotIndex}, '${escapeAttr(card.name || '当前指标')}')" ${isSaving || isDeleting ? 'disabled' : ''}>从看板移除</button>` : ''}
+      ${canDeleteDefinition ? `<button class="btn-outline" type="button" style="color:#B42318;border-color:rgba(180,35,24,0.20)" onclick="requestWorkbenchSmartIndicatorDelete('${card.indicatorCode}')" ${isSaving || isDeleting ? 'disabled' : ''}>删除指标定义</button>` : ''}
+      ${canEdit ? `<button class="btn-gold" type="button" onclick="saveWorkbenchSmartIndicatorDefinition('${card.indicatorCode}')" ${isSaving || isDeleting ? 'disabled' : ''}>${isSaving ? '保存中...' : '保存并更新指标'}</button>` : ''}
     </div>
   `;
   modal.classList.add('show');
@@ -17590,17 +17647,27 @@ function closeWorkbenchSmartIndicatorDetailModal() {
   if (modal) modal.classList.remove('show');
 }
 
-async function saveWorkbenchSmartIndicatorPrompt(indicatorCode) {
+async function saveWorkbenchSmartIndicatorDefinition(indicatorCode) {
   const item = findWorkbenchSmartIndicator(indicatorCode);
+  const nameInput = document.getElementById('wb-smart-indicator-detail-name');
+  const categoryInput = document.getElementById('wb-smart-indicator-detail-category');
+  const unitInput = document.getElementById('wb-smart-indicator-detail-unit');
+  const algorithmInput = document.getElementById('wb-smart-indicator-detail-algorithm');
+  const interpretationInput = document.getElementById('wb-smart-indicator-detail-interpretation');
   const promptInput = document.getElementById('wb-smart-indicator-detail-prompt');
+  const name = nameInput ? nameInput.value.trim() : '';
+  const category = categoryInput ? categoryInput.value.trim() : '';
+  const unit = unitInput ? unitInput.value.trim() : '';
+  const algorithm = algorithmInput ? algorithmInput.value.trim() : '';
+  const interpretation = interpretationInput ? interpretationInput.value.trim() : '';
   const promptText = promptInput ? promptInput.value.trim() : '';
   const activeUser = getActiveDemoUser();
   const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
-  const layout = (getDraftFundDashboard() || getPublishedFundDashboard() || { layout: '2x2' }).layout || '2x2';
-  if (!item || !promptText) {
-    showToast('请先填写提示词');
+  if (!item || !name || !promptText) {
+    showToast('名称和提示词不能为空');
     return;
   }
+  openWorkbenchSmartIndicatorDetailModal({...buildWorkbenchDashboardDetailCard(item), name, category, unit, algorithmDetail: algorithm, interpretation, prompt: promptText, isSaving: true});
   try {
     const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators`, {
       method: 'POST',
@@ -17608,10 +17675,13 @@ async function saveWorkbenchSmartIndicatorPrompt(indicatorCode) {
       body: JSON.stringify({
         action: 'save',
         indicator_code: item.indicator_code,
-        indicator_name: item.indicator_name,
-        category: item.category || '',
-        unit: item.unit || '',
+        indicator_name: name,
+        category,
+        unit,
         prompt_text: promptText,
+        description: algorithm,
+        assessment_template: interpretation,
+        alert_template: item.alert || '',
         selected_indicator_codes: (item.selected_indicators || []).map((entry) => entry.indicator_code).filter(Boolean),
         add_to_dashboard: false,
       }),
@@ -17633,15 +17703,100 @@ async function saveWorkbenchSmartIndicatorPrompt(indicatorCode) {
   }
 }
 
+async function saveWorkbenchSmartIndicatorPrompt(indicatorCode) {
+  return saveWorkbenchSmartIndicatorDefinition(indicatorCode);
+}
+
+function requestWorkbenchDashboardRemoval(index, indicatorName) {
+  const host = document.getElementById('dashboard-cell-modal-content');
+  const modal = document.getElementById('dashboard-cell-modal');
+  const safeIndex = Number(index);
+  if (!host || !modal || !Number.isInteger(safeIndex) || safeIndex < 0) {
+    showToast('当前看板卡片位置无效，无法移除');
+    return;
+  }
+  host.innerHTML = `
+    <div class="modal-title" style="margin-bottom:10px">从智能看板移除</div>
+    <div style="font-size:13px;color:var(--text-main);line-height:1.8">确定从当前智能看板移除“${escapeHtml(indicatorName || '当前指标')}”吗？</div>
+    <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-top:8px">只移除看板投影，不删除指标定义、历史数据或指标库记录。</div>
+    <div class="modal-actions" style="margin-top:18px">
+      <button class="btn-outline" type="button" onclick="closeWorkbenchSmartIndicatorDetailModal()">取消</button>
+      <button class="btn-gold" type="button" onclick="removeWorkbenchDashboardIndicator(${safeIndex})">确认移除</button>
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+function requestWorkbenchSmartIndicatorDelete(indicatorCode) {
+  const normalizedCode = String(indicatorCode || '').trim();
+  const item = findWorkbenchSmartIndicator(normalizedCode);
+  const host = document.getElementById('dashboard-cell-modal-content');
+  if (!normalizedCode || !host) {
+    showToast('当前指标缺少有效代码，无法删除');
+    return;
+  }
+  host.innerHTML = `
+    <div class="modal-title" style="margin-bottom:10px">删除智能指标</div>
+    <div style="font-size:13px;color:var(--text-main);line-height:1.8">确定删除“${escapeHtml((item && item.indicator_name) || '当前智能指标')}”吗？</div>
+    <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-top:8px">删除后会从指标库、草稿和已发布看板中移除，且无法撤销。</div>
+    <div class="modal-actions" style="margin-top:18px">
+      <button class="btn-outline" type="button" onclick="${item ? `openWorkbenchSmartIndicatorDetailModal(buildWorkbenchDashboardDetailCard(findWorkbenchSmartIndicator('${escapeAttr(normalizedCode)}')))` : 'closeWorkbenchSmartIndicatorDetailModal()'}">取消</button>
+      <button class="btn-gold" type="button" style="background:#B42318;border-color:#B42318" onclick="deleteWorkbenchSmartIndicator('${escapeAttr(normalizedCode)}', true)">确认删除</button>
+    </div>
+  `;
+}
+
+async function deleteWorkbenchSmartIndicator(indicatorCode, confirmed = false) {
+  const normalizedCode = String(indicatorCode || '').trim();
+  const item = findWorkbenchSmartIndicator(normalizedCode);
+  const activeUser = getActiveDemoUser();
+  const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
+  if (!confirmed) {
+    requestWorkbenchSmartIndicatorDelete(normalizedCode);
+    return;
+  }
+  if (!normalizedCode) {
+    showToast('当前看板卡片缺少指标代码，无法删除');
+    return;
+  }
+  if (!item) {
+    showToast('基础指标不能删除，请通过指标库维护');
+    return;
+  }
+  const deletingCard = item
+    ? buildWorkbenchDashboardDetailCard(item)
+    : { indicatorCode: normalizedCode, name: '当前智能指标', isTenantSmart: true, selectedIndicators: [] };
+  openWorkbenchSmartIndicatorDetailModal({...deletingCard, isDeleting: true});
+  try {
+    const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action: 'delete', indicator_code: indicatorCode}),
+    });
+    const payload = await resp.json();
+    if (!resp.ok || !payload.success) throw new Error(payload.error || 'smart_indicator_delete_failed');
+    setTenantSmartCatalog(payload.smart_indicator_catalog);
+    tenantFundDashboardRemoteState = normalizeInitialRemoteDashboardState(payload.dashboard || {});
+    persistTenantFundDashboardState();
+    closeWorkbenchSmartIndicatorDetailModal();
+    renderWorkbenchFundDashboard();
+    renderFundMacroDashboard();
+    showToast('智能指标已删除');
+  } catch (error) {
+    openWorkbenchSmartIndicatorDetailModal(deletingCard);
+    showToast(error.message || '指标删除失败');
+  }
+}
+
 function renderFundMacroDashboard() {
   const host = document.getElementById('feed-macro-dashboard');
   if (!host) return;
   const published = getPublishedFundDashboard();
-  const cards = published && Array.isArray(published.cards)
-    ? published.cards.filter((item) => item && !isWorkbenchSmartPlaceholderCard(item))
+  const publishedCards = published && Array.isArray(published.cards)
+    ? published.cards.map((item, index) => ({ item, index })).filter(({ item }) => item && !isWorkbenchSmartPlaceholderCard(item))
     : [];
-  const gridClass = cards.length === 1 ? 'single-card' : 'cols-3';
-  if (!cards.length) {
+  const layout = normalizeDashboardLayout((published && published.layout) || '2x2');
+  const gridClass = publishedCards.length === 1 ? 'single-card' : 'cols-3';
+  if (!publishedCards.length) {
     host.innerHTML = '<div class="fund-column-card"><div class="fund-column-head"><div><div class="fund-column-title">智能指标 Dashboard</div><div class="fund-column-subtitle">暂无看板内容</div></div><span class="tag tag-gold">暂无内容</span></div></div>';
     return;
   }
@@ -17649,13 +17804,13 @@ function renderFundMacroDashboard() {
     <div class="fund-column-card">
       <div class="fund-column-head">
         <div>
-          <div class="fund-column-title">${escapeHtml(published.title || '智能指标 Dashboard')}</div>
-          <div class="fund-column-subtitle">${escapeHtml(published.note || '展示当前已发布的智能指标结果。')}</div>
+          <div class="fund-column-title">今日核心指标面板 · ${escapeHtml(layout.toUpperCase())}</div>
+          <div class="fund-column-subtitle">当前已发布 ${publishedCards.length} 个有效指标。大V工作台中的草稿须发布后才会在这里同步展示。</div>
         </div>
-        <span class="tag tag-gold">${escapeHtml((published.layout || '2x2').toUpperCase())}</span>
+        <span class="tag tag-gold">${escapeHtml(layout.toUpperCase())} · 已发布</span>
       </div>
       <div class="wb-dashboard-summary-grid ${gridClass}">
-        ${cards.map((item, index) => `
+        ${publishedCards.map(({ item, index }) => `
           <div class="wb-dashboard-summary-card filled" onclick="openWorkbenchDashboardIndicatorDetail(${index}, 'published')">
             <div class="wb-dashboard-summary-head">
               <div class="wb-dashboard-summary-title">${escapeHtml(item.name || '智能指标')}</div>
@@ -17741,7 +17896,10 @@ function renderWorkbenchFundDashboard() {
             <span class="wb-dashboard-summary-tag">${escapeHtml(item.updatedAt || '未记录')}</span>
           </div>
           <div class="wb-dashboard-summary-value">${escapeHtml(`${item.value || '--'}${item.unit || ''}`)}</div>
-          ${getDraftFundDashboard() ? `<div style="margin-top:10px"><button class="btn-outline" style="padding:6px 8px;font-size:11px" onclick="event.stopPropagation();removeWorkbenchDashboardIndicator(${index})">移出草稿</button></div>` : ''}
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;padding-top:9px;border-top:1px solid rgba(47,116,192,0.10)">
+            <button class="btn-outline" style="padding:6px 8px;font-size:11px" onclick="event.stopPropagation();openWorkbenchDashboardIndicatorDetail(${index}, '${getDraftFundDashboard() ? 'draft' : 'published'}')">编辑</button>
+            <button class="btn-outline" style="padding:6px 8px;font-size:11px" onclick="event.stopPropagation();requestWorkbenchDashboardRemoval(${index}, '${escapeAttr(item.name || '当前指标')}')">移除</button>
+          </div>
         </div>
         ` : `
         <div class="wb-dashboard-summary-card empty" onclick="openWorkbenchSmartIndicatorEditor(${index})">
@@ -17761,12 +17919,44 @@ async function saveWorkbenchSmartIndicator() {
   showToast('请点击 Dashboard 空位上的加号创建智能指标');
 }
 
+function setWorkbenchDashboardActionState(action) {
+  workbenchDashboardAction = action || '';
+  if (workbenchDashboardActionTimer) {
+    clearInterval(workbenchDashboardActionTimer);
+    workbenchDashboardActionTimer = null;
+  }
+  const publishButton = document.getElementById('wb-dashboard-publish-button');
+  const resetButton = document.getElementById('wb-dashboard-reset-button');
+  const metaHost = document.getElementById('wb-dashboard-meta');
+  const isPublishing = action === 'publish';
+  const isRestoring = action === 'restore';
+  [publishButton, resetButton].filter(Boolean).forEach((button) => {
+    button.disabled = !!action;
+    button.style.opacity = action ? '0.65' : '';
+    button.style.cursor = action ? 'wait' : '';
+  });
+  if (publishButton) publishButton.innerHTML = isPublishing
+    ? '正在发布 <span class="dot-anim" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>'
+    : '发布到基本面首页';
+  if (resetButton) resetButton.innerHTML = isRestoring
+    ? '正在恢复 <span class="dot-anim" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>'
+    : '恢复当前发布版';
+  if (!action || !metaHost) return;
+  const renderProgress = () => {
+    const message = isPublishing ? '正在发布到基本面首页' : '正在等待服务端确认草稿已恢复';
+    metaHost.innerHTML = `<span style="color:#2F74C0;font-weight:600">${message}</span> <span class="dot-anim" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>`;
+  };
+  renderProgress();
+}
+
 async function publishFundDashboard() {
+  if (workbenchDashboardAction) return;
   const tenantState = getTenantFundDashboardState();
   if (!tenantState.draft) {
     showToast('请先至少生成一个智能指标草稿');
     return;
   }
+  setWorkbenchDashboardActionState('publish');
   try {
     const payload = await syncTenantDashboardState('publish', tenantState.draft);
     const state = normalizeInitialRemoteDashboardState(payload.dashboard || {});
@@ -17778,11 +17968,15 @@ async function publishFundDashboard() {
     showToast('已发布到基本面首页顶部');
   } catch (error) {
     showToast('发布失败，请稍后重试');
+  } finally {
+    setWorkbenchDashboardActionState('');
   }
 }
 
 async function resetFundDashboardDraft() {
+  if (workbenchDashboardAction) return;
   const tenantState = getTenantFundDashboardState();
+  setWorkbenchDashboardActionState('restore');
   try {
     const payload = await syncTenantDashboardState('reset_draft');
     const state = normalizeInitialRemoteDashboardState(payload.dashboard || {});
@@ -17793,6 +17987,8 @@ async function resetFundDashboardDraft() {
     showToast('已恢复到当前发布版');
   } catch (error) {
     showToast('恢复失败，请稍后重试');
+  } finally {
+    setWorkbenchDashboardActionState('');
   }
 }
 

@@ -65,13 +65,17 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("candleLabel: `${data.name || '标的'} 日K线`", html)
         self.assertIn("data.annotation_key || data.indicator_code || data.code", html)
 
-    def test_h5_core_market_index_cards_use_the_unified_market_detail(self):
+    def test_h5_core_market_index_cards_use_the_unified_dashboard_detail(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
 
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
-        self.assertIn("STANDARD_MARKET_INDEX_INDICATOR_CODES", html)
-        self.assertIn("openWatchlistDetail(indicatorCode, 'overview');", html)
+        self.assertIn("function buildWorkbenchDashboardDetailCard", html)
+        self.assertIn("findWorkbenchBaseIndicator(indicatorCode)", html)
+        self.assertIn("基础指标由统一数据源和指标库维护", html)
+        self.assertNotIn("openWatchlistDetail(indicatorCode, 'overview');", html)
+        self.assertIn("当前已发布 ${publishedCards.length} 个有效指标", html)
+        self.assertIn("今日核心指标面板 · ${escapeHtml(layout.toUpperCase())}", html)
         self.assertIn("'source_shanghai_index'", html)
         self.assertIn("'source_shenzhen_index'", html)
 

@@ -2407,6 +2407,7 @@ def build_tenant_smart_indicator_catalog(tenant=None):
                 "numeric_value": item.get("numeric_value"),
                 "unit": item.get("unit") or "",
                 "assessment": item.get("assessment") or "",
+                "assessment_template": item.get("assessment_template") or "",
                 "status": item.get("status") or "attention",
                 "alert": item.get("alert") or "",
                 "prompt_text": item.get("prompt_text") or "",
@@ -2739,6 +2740,12 @@ def normalize_fund_dashboard_view(source, tenant):
     }
     raw = source if isinstance(source, dict) else {}
     layout = normalize_dashboard_layout(raw.get("layout") or defaults["layout"])
+    # Preserve an advisor-selected layout, but repair legacy 2x2 configurations
+    # that already contain more cards than the layout can display.
+    raw_card_count = len(raw.get("cards") or []) if isinstance(raw.get("cards"), list) else 0
+    required_layout = ensure_dashboard_layout_for_card_count(raw_card_count)
+    if get_dashboard_card_target(required_layout) > get_dashboard_card_target(layout):
+        layout = required_layout
     hub = build_indicator_hub(tenant=tenant, admin_view=False)
     indicator_map = {item.get("id"): item for item in (hub.get("smart_items") or []) + (hub.get("lake_items") or []) if item.get("id")}
     raw_cards = normalize_fund_dashboard_card_refs(raw.get("cards"), layout)
@@ -2810,13 +2817,16 @@ def normalize_fund_dashboard_view(source, tenant):
 
 
 def default_tenant_fund_dashboard_state(tenant):
+    smart_indicator_count = len(build_tenant_smart_indicator_catalog(tenant))
+    layout = ensure_dashboard_layout_for_card_count(smart_indicator_count)
     published = normalize_fund_dashboard_view(
         {
-            "layout": "2x2",
+            "layout": layout,
             "title": "智能指标 Dashboard",
             "note": "大V 通过选择底层指标并输入自然语言计算规则生成智能指标，并发布到 H5 / Web Dashboard。",
             "updatedAt": "默认模板",
             "publisher": "系统初始化",
+            "cards": build_default_fund_dashboard_cards(tenant, layout),
         },
         tenant,
     )
@@ -6044,6 +6054,22 @@ def execute_user_async_job(job):
     job_type = str(job.get("job_type") or "").strip()
     payload = job.get("payload") if isinstance(job.get("payload"), dict) else {}
     job_code = str(job.get("job_code") or "").strip()
+    if job_type == "tenant_dashboard_sync":
+        tenant_slug = str(payload.get("tenant_slug") or job.get("tenant_slug") or "").strip().lower()
+        action = str(payload.get("action") or "").strip().lower()
+        if action not in {"publish", "reset_draft"} or not tenant_slug:
+            raise ValueError("tenant_dashboard_action_invalid")
+        dashboard = payload.get("dashboard") if isinstance(payload.get("dashboard"), dict) else None
+        saved = update_tenant_fund_dashboard_config(tenant_slug, action, dashboard)
+        if not saved:
+            raise ValueError("tenant_dashboard_not_found")
+        latest_tenant = get_tenant_by_slug(tenant_slug, saved)
+        result_payload = build_tenant_dashboard_payload(latest_tenant)
+        return {
+            "dashboard": result_payload,
+            "fund_dashboard_state": result_payload.get("fund_dashboard_state"),
+            "action": action,
+        }
     if job_type == "review_voice_transcribe":
         file_storage = _build_voice_file_storage_from_job_payload(payload)
         return process_review_voice_upload(
@@ -6178,6 +6204,9 @@ def execute_user_async_job(job):
 
 
 def _summarize_user_async_job_result(job_type, result):
+    if job_type == "tenant_dashboard_sync":
+        action = str((result or {}).get("action") or "").strip().lower()
+        return "看板发布完成" if action == "publish" else "看板草稿恢复完成"
     if job_type == "review_voice_transcribe":
         return "语音转写完成"
     if job_type == "review_polish_input":
