@@ -201,7 +201,7 @@ class DatabaseReleaseAdminBddTest(unittest.TestCase):
                 database_release_services._release_job.clear()
                 database_release_services._release_job.update(original_job)
 
-    def test_given_admin_when_loading_database_release_then_the_admin_api_and_page_are_available(self):
+    def test_given_admin_when_loading_database_release_then_only_the_compatibility_api_remains_available(self):
         overview = {
             "targets": [{"name": "staging", "label": "Staging", "host": "127.0.0.1", "database": "demo"}],
             "simulation_targets": [{"name": "local", "label": "本地开发库", "host": "127.0.0.1", "database": "demo"}],
@@ -217,25 +217,9 @@ class DatabaseReleaseAdminBddTest(unittest.TestCase):
         page = self.client.get("/admin")
         self.assertEqual(page.status_code, 200)
         html = page.get_data(as_text=True)
-        self.assertIn('data-section="database-release"', html)
-        self.assertIn('id="section-database-release"', html)
-        self.assertIn("loadAdminDatabaseRelease", html)
-        self.assertIn('id="admin-database-release-staging"', html)
-        self.assertIn('id="admin-database-release-production"', html)
-        self.assertIn('id="admin-database-release-cancel"', html)
-        self.assertIn("await loadAdminDatabaseReleaseLog();", html)
-        self.assertIn("全部剩余增量（推荐，已执行自动跳过）", html)
-        self.assertIn("实时进度", html)
-        self.assertIn('id="admin-database-release-timeline"', html)
-        self.assertIn("renderAdminDatabaseReleaseTimeline", html)
-        self.assertIn("任务日志与实时执行轨迹", html)
-        self.assertIn("创建数据库发布任务", html)
-        self.assertIn("cancelAdminDatabaseRelease", html)
-        self.assertIn("/api/admin/database-release/cancel", html)
-        self.assertIn("diagnoseAdminDatabaseReleaseStartFailure", html)
-        self.assertIn("后台未记录", html)
-        self.assertIn('id="admin-database-release-password-modal"', html)
-        self.assertIn("confirmAdminDatabaseReleasePassword", html)
+        self.assertNotIn('data-section="database-release"', html)
+        self.assertNotIn('id="section-database-release"', html)
+        self.assertNotIn('id="admin-database-release-password-modal"', html)
 
     def test_given_application_database_auth_is_unavailable_when_database_release_api_is_called_then_the_release_password_gate_remains_reachable(self):
         original_is_authenticated = web_hooks.is_authenticated

@@ -2200,9 +2200,6 @@
           <div class="admin-nav-item" data-section="token-usage" data-feature="system_module" onclick="showSection('token-usage', this)">
             <span class="admin-nav-icon">&#128202;</span> Token 监控
           </div>
-          <div class="admin-nav-item" data-section="database-release" data-feature="system_module" onclick="showSection('database-release', this)">
-            <span class="admin-nav-icon">&#128190;</span> 数据库发布
-          </div>
           <div class="admin-nav-item" data-section="task-center" data-feature="system_module" onclick="showSection('task-center', this)">
             <span class="admin-nav-icon">&#9201;</span> 定时任务专区
           </div>
@@ -5505,46 +5502,6 @@
         </div>
       </div><!-- end section-token-usage -->
 
-      <div id="section-database-release" style="display:none">
-        <div class="section-header">
-          <div>
-            <div class="section-title">数据库发布</div>
-            <div class="section-subtitle">管理数据库全量/增量发布、回滚和任务日志。模拟粉丝数据导入由本机 5051 端口的数据导入控制台独立管理。</div>
-          </div>
-          <button class="btn-outline" style="padding:8px 14px;font-size:12px" onclick="loadAdminDatabaseRelease(true)">刷新状态</button>
-        </div>
-        <div style="margin-bottom:18px;padding:12px 14px;border-left:3px solid #C8A96E;background:rgba(200,169,110,0.08);font-size:12px;color:var(--text-sub);line-height:1.7">
-          发布与回滚会改变目标数据库。生产环境操作必须二次确认；同一时刻只允许一个数据库任务执行，任务日志会保留在当前应用的 <code>.deploy</code> 目录。
-        </div>
-        <div class="stats-grid" id="admin-database-release-summary">
-          <div class="stat-card"><div class="stat-label">发布状态</div><div class="stat-value">加载中</div></div>
-        </div>
-        <div class="table-wrap" style="margin-top:20px">
-          <div class="table-header"><div><div class="table-title">发布任务</div><div style="font-size:12px;color:#8899aa;margin-top:6px">可执行本地完整数据库预发布，或只执行目录白名单内的数据增量包。</div></div><span class="tag tag-gold">单任务锁</span></div>
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:4px 0 14px">
-            <label style="font-size:12px;color:#8899aa" for="admin-database-release-package">发布内容</label>
-            <select id="admin-database-release-package" style="min-width:310px;max-width:100%;background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);color:#F8F6F0;padding:8px 10px;border-radius:6px;font-size:12px"></select>
-            <button id="admin-database-release-staging" class="btn-outline" style="padding:8px 14px;font-size:12px" onclick="startAdminDatabaseRelease('staging')">同步 Staging</button>
-            <button id="admin-database-release-production" class="btn-gold" style="padding:8px 14px;font-size:12px" onclick="startAdminDatabaseRelease('production')">同步 Production</button>
-            <button id="admin-database-release-cancel" class="btn-outline" type="button" style="padding:8px 14px;font-size:12px;color:#C43D36;border-color:rgba(196,61,54,0.42)" onclick="cancelAdminDatabaseRelease()" hidden>取消当前任务</button>
-          </div>
-          <div id="admin-database-release-targets" style="font-size:12px;color:#8899aa"></div>
-          <div style="margin-top:8px;font-size:11px;color:#8899aa;line-height:1.65">取消会终止当前发布进程。已完成的增量包不会自动回退；全量发布进入最终数据库切换阶段后不可取消。</div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
-          <div class="table-wrap">
-            <div class="table-header"><div><div class="table-title">任务日志与实时执行轨迹</div><div style="font-size:12px;color:#b8c7d9;margin-top:6px">每秒同步任务创建、连接检查、导出、恢复、校验、切换和最终结果；下方保留完整原始日志。</div></div></div>
-            <div id="admin-database-release-timeline" aria-live="polite" style="margin:0 0 12px;min-height:112px;max-height:300px;overflow:auto;background:#0D2137;border:1px solid rgba(119,183,255,0.4);border-radius:6px;padding:10px 12px;color:#F7FBFF">等待发布任务创建后显示实时执行轨迹...</div>
-            <div style="font-size:12px;font-weight:700;color:#DCEBFA;margin:0 0 7px">完整原始日志</div>
-            <pre id="admin-database-release-log" style="margin:0;min-height:240px;max-height:420px;overflow:auto;white-space:pre-wrap;background:#10263F;color:#F7FBFF;border:1px solid rgba(119,183,255,0.45);border-radius:6px;padding:14px;font:600 12px/1.72 ui-monospace,SFMono-Regular,Menlo,monospace">正在读取最近一次发布任务...</pre>
-          </div>
-          <div class="table-wrap">
-            <div class="table-header"><div><div class="table-title">回滚记录</div><div style="font-size:12px;color:#8899aa;margin-top:6px">选择目标环境后读取发布前保留的完整数据库备份。</div></div></div>
-            <div id="admin-database-release-rollbacks" style="font-size:12px;color:#8899aa;padding:4px 0">正在加载回滚记录...</div>
-          </div>
-        </div>
-      </div><!-- end section-database-release -->
-
       <div id="section-task-center" style="display:none">
         <div class="section-header">
           <div>
@@ -5738,27 +5695,6 @@
     <div id="admin-tenant-dashboard-modal-content"></div>
   </div>
 </div>
-<div class="admin-modal-overlay" id="admin-database-release-password-modal" onclick="if(event.target===this)closeAdminDatabaseReleasePasswordModal()">
-  <div class="admin-modal-sheet" style="max-width:460px">
-    <div class="admin-modal-head">
-      <div>
-        <div class="admin-modal-title">验证数据库操作口令</div>
-        <div class="admin-modal-subtitle">即使已登录 Admin，也必须输入操作口令后才能发布、回滚或修改模拟数据。</div>
-      </div>
-      <button class="admin-modal-close" type="button" onclick="closeAdminDatabaseReleasePasswordModal()">关闭</button>
-    </div>
-    <div class="admin-modal-card" style="margin-top:14px">
-      <label for="admin-database-release-password" style="display:block;font-size:12px;font-weight:700;color:var(--text-main);margin-bottom:8px">操作口令</label>
-      <input id="admin-database-release-password" type="password" inputmode="numeric" autocomplete="one-time-code" onkeydown="if(event.key==='Enter')confirmAdminDatabaseReleasePassword()" style="width:100%;padding:10px 12px;border:1px solid var(--border-soft);border-radius:6px;background:var(--surface);color:var(--text-main);font-size:14px" placeholder="请输入操作口令">
-      <div id="admin-database-release-password-error" style="min-height:18px;margin-top:8px;color:#C0392B;font-size:12px"></div>
-    </div>
-    <div class="modal-actions" style="margin-top:14px;justify-content:flex-end">
-      <button class="btn-outline" type="button" onclick="closeAdminDatabaseReleasePasswordModal()">关闭</button>
-      <button class="btn-gold" id="admin-database-release-password-confirm" type="button" onclick="confirmAdminDatabaseReleasePassword()">验证并继续</button>
-    </div>
-  </div>
-</div>
-
 <script src="/static/js/charts.js"></script>
 <script>
 const sectionTitles = {
@@ -5789,7 +5725,6 @@ const sectionTitles = {
   'settings-llm':'系统专区 · 大模型专区',
   'settings-llm-features':'系统专区 · 功能级模型映射',
   'token-usage':'系统专区 · Token 监控',
-  'database-release':'系统专区 · 数据库发布',
   'task-center':'系统专区 · 定时任务专区',
   access:'访问审计'
 };
@@ -6326,9 +6261,6 @@ function showSection(name, navEl) {
   }
   if (name === 'task-center') {
     refreshAdminTaskCenter(false).catch((error) => showToast(error.message || '加载失败'));
-  }
-  if (name === 'database-release') {
-    loadAdminDatabaseRelease(false).catch((error) => showToast(error.message || '加载失败'));
   }
   if (name === 'settings-features') {
     const url = new URL(window.location.href);
@@ -11492,7 +11424,7 @@ function renderSiteConfigForm() {
       showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
     }
   });
-  ['section-settings-appearance', 'section-settings-brand', 'section-settings-features', 'section-settings-policy', 'section-settings-knowledge', 'section-knowledge-items', 'section-settings-llm', 'section-settings-llm-features', 'section-token-usage', 'section-database-release', 'section-task-center', 'section-access'].forEach((id) => {
+  ['section-settings-appearance', 'section-settings-brand', 'section-settings-features', 'section-settings-policy', 'section-settings-knowledge', 'section-knowledge-items', 'section-settings-llm', 'section-settings-llm-features', 'section-token-usage', 'section-task-center', 'section-access'].forEach((id) => {
     const section = document.getElementById(id);
     if (section && !isAdminFeatureEnabled('system_module') && section.style.display !== 'none') {
       showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
