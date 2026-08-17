@@ -360,13 +360,18 @@ async function renderFunnelSection() {
   if (!response.ok || !result.ok) return;
   const analytics = result.analytics || {};
   const funnelKpi = document.getElementById('funnel-kpi-cards');
-  if (funnelKpi) {
-    funnelKpi.innerHTML = (analytics.funnel || []).slice(0, 4).map((item) => `
+  const adminKpi = document.getElementById('admin-analytics-kpis');
+  const kpiMarkup = (analytics.funnel || []).slice(0, 4).map((item) => `
       <div class="kpi-card">
         <div class="kpi-label">${item.layer}</div>
         <div class="kpi-value">${Number(item.count || 0).toLocaleString('zh-CN')}</div>
         <div class="kpi-badge kpi-badge-gold">真实记录</div>
-      </div>`).join('') || '<div style="color:#8899aa">暂无真实漏斗数据。</div>';
+      </div>`).join('');
+  if (adminKpi) {
+    adminKpi.innerHTML = kpiMarkup || '<div style="color:#8899aa">暂无真实漏斗数据。</div>';
+  }
+  if (funnelKpi) {
+    funnelKpi.innerHTML = kpiMarkup || '<div style="color:#8899aa">暂无真实漏斗数据。</div>';
   }
   renderFunnel(analytics.funnel || []);
   renderChannelDonut(analytics.channels || {});

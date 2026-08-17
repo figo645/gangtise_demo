@@ -132,6 +132,24 @@ def api_segments():
     return jsonify(gen_user_segments())
 
 
+@app.route("/api/admin/user-segments")
+def api_admin_user_segments():
+    try:
+        return jsonify({"ok": True, "segments": build_admin_user_segment_payload()})
+    except Exception:
+        app.logger.exception("Failed to build Admin user segment payload")
+        return jsonify({"ok": False, "error": "user_segments_unavailable"}), 503
+
+
+@app.route("/api/admin/points")
+def api_admin_points():
+    try:
+        return jsonify({"ok": True, "points": build_admin_points_payload()})
+    except Exception:
+        app.logger.exception("Failed to build Admin points payload")
+        return jsonify({"ok": False, "error": "points_data_unavailable"}), 503
+
+
 @app.route("/api/review/voice-transcribe", methods=["POST"])
 def api_review_voice_transcribe():
     audio_file = request.files.get("audio") or request.files.get("file")

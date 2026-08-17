@@ -64,6 +64,49 @@
   .segment-card-name { font-size:14px; color:var(--gold); font-weight:600; margin-bottom:12px; }
   .segment-card-stat { display:flex; justify-content:space-between; font-size:12px; color:var(--text-sub); margin-bottom:6px; }
   .segment-card-stat span:last-child { color:var(--text-main); }
+  /* Bootstrap-style layout, scoped to the user segment page. */
+  .segment-bs-shell.container-fluid { padding:16px 20px 40px; }
+  .segment-bs-shell .segment-bs-header { margin:0 0 24px; padding:0 2px; align-items:flex-start; }
+  .segment-bs-shell .segment-bs-kpi-row { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:18px; margin:0 0 26px; }
+  .segment-bs-shell .segment-bs-kpi-card {
+    min-height:142px; padding:20px 21px; display:flex; flex-direction:column; justify-content:space-between;
+    border:1px solid rgba(200,169,110,0.14); border-radius:8px; background:var(--surface-2);
+    box-shadow:0 8px 20px rgba(13,27,42,0.08);
+  }
+  .segment-bs-shell .segment-bs-kpi-card .stat-label { margin-bottom:14px; }
+  .segment-bs-shell .segment-bs-kpi-card .stat-value { line-height:1; margin-bottom:14px; }
+  .segment-bs-shell .segment-bs-kpi-card .stat-change { min-height:18px; }
+  .segment-bs-shell .segment-bs-grid { display:grid; gap:24px; margin-top:24px; }
+  .segment-bs-shell .segment-bs-grid.cols-2 { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .segment-bs-shell .segment-bs-panel { padding:20px 22px; border-radius:8px; }
+  .segment-bs-shell .segment-bs-panel .table-header { padding:0 0 15px; margin-bottom:8px; }
+  .segment-bs-shell .segment-bs-table { margin-top:24px; padding:20px 22px; border-radius:8px; overflow:hidden; }
+  .segment-bs-shell .segment-bs-table table { margin-top:4px; }
+  .segment-bs-shell .segment-bs-table th { padding-top:13px; padding-bottom:13px; }
+  .segment-bs-shell .segment-bs-table td { padding-top:13px; padding-bottom:13px; vertical-align:middle; }
+  @media (max-width:1100px) { .segment-bs-shell .segment-bs-kpi-row { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media (max-width:760px) {
+    .segment-bs-shell.container-fluid { padding:12px 12px 28px; }
+    .segment-bs-shell .segment-bs-header { gap:14px; margin-bottom:20px; }
+    .segment-bs-shell .segment-bs-kpi-row, .segment-bs-shell .segment-bs-grid.cols-2 { grid-template-columns:1fr; gap:14px; }
+    .segment-bs-shell .segment-bs-kpi-card, .segment-bs-shell .segment-bs-panel, .segment-bs-shell .segment-bs-table { padding:17px 16px; }
+  }
+  .points-bs-shell.container-fluid { padding:16px 20px 40px; }
+  .points-bs-shell .points-bs-header { margin:0 0 24px; padding:0 2px; align-items:flex-start; }
+  .points-bs-shell .points-bs-kpi-row { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:18px; margin:0 0 26px; }
+  .points-bs-shell .points-bs-kpi-card { min-height:126px; padding:20px 21px; border-radius:8px; display:flex; flex-direction:column; justify-content:space-between; }
+  .points-bs-shell .points-bs-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; margin-top:24px; }
+  .points-bs-shell .points-bs-panel { padding:20px 22px; border-radius:8px; }
+  .points-bs-shell .points-bs-panel .table-header { padding:0 0 15px; margin-bottom:8px; }
+  .points-bs-shell .points-bs-table { margin-top:24px; padding:20px 22px; border-radius:8px; overflow:hidden; }
+  .points-bs-shell .points-bs-table th, .points-bs-shell .points-bs-table td { padding-top:13px; padding-bottom:13px; vertical-align:middle; }
+  .points-bs-shell .points-bs-disabled { border:1px solid rgba(200,169,110,0.15); background:rgba(200,169,110,0.05); border-radius:8px; padding:18px; color:var(--text-sub); line-height:1.8; }
+  @media (max-width:1100px) { .points-bs-shell .points-bs-kpi-row { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media (max-width:760px) {
+    .points-bs-shell.container-fluid { padding:12px 12px 28px; }
+    .points-bs-shell .points-bs-kpi-row, .points-bs-shell .points-bs-grid { grid-template-columns:1fr; gap:14px; }
+    .points-bs-shell .points-bs-kpi-card, .points-bs-shell .points-bs-panel, .points-bs-shell .points-bs-table { padding:17px 16px; }
+  }
   .compute-packages { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:12px; margin-top:16px; }
   .compute-pkg { background:rgba(200,169,110,0.06); border:1px solid rgba(200,169,110,0.2); border-radius:10px; padding:14px; text-align:center; }
   .compute-pkg-name { font-size:12px; color:var(--text-sub); margin-bottom:6px; }
@@ -2549,6 +2592,8 @@
 
       <!-- ===== POINTS ===== -->
       <div id="section-points" style="display:none">
+        <div id="admin-points-root">
+        <template>
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-label">本月积分发放</div>
@@ -2655,6 +2700,8 @@
               <button class="btn-outline" style="margin-top:10px;padding:4px 12px;font-size:11px;width:100%" onclick="showToast('套餐编辑已打开')">编辑</button>
             </div>
           </div>
+        </div>
+        </template>
         </div>
       </div><!-- end section-points -->
 
@@ -4228,12 +4275,22 @@
 
       <!-- ===== ANALYTICS ===== -->
       <div id="section-analytics" style="display:none">
-        <div class="table-wrap" style="margin-bottom:20px">
-          <div class="table-header">
+        <div class="kpi-row" style="margin-bottom:20px" id="admin-analytics-kpis">
+          <div class="kpi-card"><div class="kpi-label">内容触达</div><div class="kpi-value">--</div><div class="kpi-badge kpi-badge-gold">真实记录</div></div>
+          <div class="kpi-card"><div class="kpi-label">私域留资</div><div class="kpi-value">--</div><div class="kpi-badge kpi-badge-gold">真实记录</div></div>
+          <div class="kpi-card"><div class="kpi-label">首次付费</div><div class="kpi-value">--</div><div class="kpi-badge kpi-badge-gold">真实记录</div></div>
+          <div class="kpi-card"><div class="kpi-label">高频留存</div><div class="kpi-value">--</div><div class="kpi-badge kpi-badge-gold">真实记录</div></div>
+        </div>
+        <div class="table-wrap" style="margin-bottom:20px;padding:18px 20px">
+          <div class="table-header" style="padding:0;border:0">
             <div>
-              <div class="table-title">后台数据分析</div>
-              <div class="chart-subtitle" id="topbar-title" style="margin:6px 0 0">多渠道多圈层转化分析</div>
+              <div class="table-title">数据分析</div>
+              <div class="chart-subtitle" style="margin:6px 0 0">全平台用户、渠道、付费与大V协同数据汇总。当前页面只展示真实数据库分析结果。</div>
             </div>
+            <span class="tag tag-gold">Platform Analytics</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-top:16px">
+            <div style="font-size:12px;color:var(--text-sub)" id="topbar-title">多渠道多圈层转化分析</div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
               <div class="date-filter">
                 <button class="date-btn" onclick="setDateRange(this,'7d')">7天</button>
@@ -4244,6 +4301,12 @@
               <button class="btn-gold" style="padding:7px 16px;font-size:12px" onclick="showToast('分析报告导出中，请稍候...')">导出分析</button>
             </div>
           </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+            <button class="date-btn active" id="admin-nav-funnel" onclick="showAnalyticsSection('funnel')">转化漏斗</button>
+            <button class="date-btn" id="admin-nav-channel" onclick="showAnalyticsSection('channel')">渠道分析</button>
+            <button class="date-btn" id="admin-nav-kol" onclick="showAnalyticsSection('kol')">大V协同效能</button>
+            <button class="date-btn" id="admin-nav-revenue" onclick="showAnalyticsSection('revenue')">营收趋势</button>
+          </div>
         </div>
 
         <div id="ds-funnel" class="dash-section active">
@@ -4251,29 +4314,6 @@
             <div>
               <div class="section-title">验证期增长分析</div>
               <div class="section-subtitle">从内容触达到高频留存的早期转化追踪</div>
-            </div>
-          </div>
-
-          <div class="kpi-row" style="margin-bottom:20px" id="funnel-kpi-cards">
-            <div class="kpi-card">
-              <div class="kpi-label">内容触达</div>
-              <div class="kpi-value">6.8万</div>
-              <div class="kpi-badge kpi-badge-up">▲ +12.4%</div>
-            </div>
-            <div class="kpi-card">
-              <div class="kpi-label">私域留资</div>
-              <div class="kpi-value">5,400</div>
-              <div class="kpi-badge kpi-badge-gold">留资率 7.9%</div>
-            </div>
-            <div class="kpi-card">
-              <div class="kpi-label">首次付费</div>
-              <div class="kpi-value">128</div>
-              <div class="kpi-badge kpi-badge-gold">首次付费率 10.2%</div>
-            </div>
-            <div class="kpi-card">
-              <div class="kpi-label">高频留存</div>
-              <div class="kpi-value">36</div>
-              <div class="kpi-badge kpi-badge-gold">核心验证样本</div>
             </div>
           </div>
 
@@ -5733,7 +5773,6 @@ const analyticsTitles = {
   channel: '数据分析 · 渠道分析',
   kol: '数据分析 · 大V协同效能',
   revenue: '数据分析 · 营收趋势',
-  segment: '数据分析 · 用户分层分析',
 };
 const ADMIN_NAV_STORAGE_KEY = 'gangtise-admin-nav-groups-v1';
 const ADMIN_UNIFIED_SETTINGS_REDIRECTS = Object.freeze({
@@ -6215,6 +6254,111 @@ async function startAdminDatabaseRollback(target, backupName, skipConfirmation =
   await loadAdminDatabaseRelease(false);
 }
 
+function adminSegmentRoleLabel(role) {
+  return ({ investor: '粉丝用户', dav: '大V投顾', admin: '平台管理员' })[String(role || '').toLowerCase()] || '未标注角色';
+}
+
+function renderAdminUserSegments(payload) {
+  const host = document.getElementById('section-segments');
+  if (!host) return;
+  host.classList.add('segment-bs-shell', 'container-fluid');
+  const data = payload || {};
+  const summary = data.summary || {};
+  const roles = Array.isArray(data.roles) ? data.roles : [];
+  const tenants = Array.isArray(data.tenants) ? data.tenants : [];
+  const sources = Array.isArray(data.sources) ? data.sources : [];
+  const labels = Array.isArray(data.labels) ? data.labels : [];
+  const recentUsers = Array.isArray(data.recent_users) ? data.recent_users : [];
+  const maxRoleCount = Math.max(...roles.map((item) => Number(item.count || 0)), 1);
+  const renderBars = (rows, emptyText) => rows.length ? rows.map((item) => {
+    const width = Math.max(4, Math.round((Number(item.count || 0) / Math.max(...rows.map((row) => Number(row.count || 0)), 1)) * 100));
+    return `<div style="display:grid;grid-template-columns:minmax(90px,150px) minmax(80px,1fr) 42px;gap:10px;align-items:center;padding:8px 0"><div style="font-size:12px;color:var(--text-main);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeAttr(item.label || '')}">${escapeHtml(item.label || '未标注')}</div><div style="height:7px;background:rgba(47,116,192,0.10);border-radius:6px;overflow:hidden"><div style="width:${width}%;height:100%;background:#2F74C0;border-radius:6px"></div></div><div style="text-align:right;font:12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text-sub)">${formatAdminNumber(item.count)}</div></div>`;
+  }).join('') : `<div style="padding:20px 0;color:#8899aa;font-size:12px">${emptyText}</div>`;
+  host.innerHTML = `
+    <div class="section-header segment-bs-header">
+      <div><div class="section-title">用户分群</div><div class="section-subtitle">按用户主数据实时汇总账号状态、角色、租户、来源、标签与付费样本；不使用虚构的会员等级、ARPU、LTV 或留存率。</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="loadAdminUserSegments(true)">刷新</button><button class="btn-gold" type="button" style="padding:8px 14px;font-size:12px" onclick="showSection('users')">查看用户列表</button></div>
+    </div>
+    <div class="segment-bs-kpi-row row">
+      ${[['全部账号', summary.total_users, '包含正常与禁用账号'], ['正常账号', summary.active_users, `禁用 ${formatAdminNumber(summary.disabled_users)} 个`], ['粉丝用户', summary.fan_users, `付费样本 ${formatAdminNumber(summary.paid_fans)} 个`], ['已标注用户', summary.labelled_users, '至少拥有一个用户标签']].map(([label, value, note]) => `<div class="stat-card card segment-bs-kpi-card"><div class="stat-label">${label}</div><div class="stat-value">${formatAdminNumber(value)}</div><div class="stat-change up">${note}</div></div>`).join('')}
+    </div>
+    <div class="segment-bs-grid cols-2">
+      <div class="table-wrap segment-bs-panel"><div class="table-header"><div><div class="table-title">角色分群</div><div style="font-size:12px;color:#8899aa;margin-top:6px">正常账号按系统角色统计。</div></div><span class="tag tag-blue">身份</span></div>
+        <div style="padding:4px 0">${roles.map((item) => `<div style="padding:12px 0;border-bottom:1px solid rgba(200,169,110,0.10)"><div style="display:flex;justify-content:space-between;gap:12px"><div style="font-size:13px;font-weight:700;color:var(--text-main)">${escapeHtml(item.label)}</div><div style="font:12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text-sub)">${formatAdminNumber(item.count)}</div></div><div style="margin-top:9px;height:7px;background:rgba(47,116,192,0.10);border-radius:6px;overflow:hidden"><div style="width:${Math.max(4, Math.round((Number(item.count || 0) / maxRoleCount) * 100))}%;height:100%;background:#C8A96E;border-radius:6px"></div></div></div>`).join('') || '<div style="padding:20px 0;color:#8899aa;font-size:12px">暂无用户数据</div>'}</div>
+      </div>
+      <div class="table-wrap segment-bs-panel"><div class="table-header"><div><div class="table-title">标签覆盖</div><div style="font-size:12px;color:#8899aa;margin-top:6px">只统计已写入用户主数据的标签。</div></div><span class="tag tag-gold">标签</span></div><div style="padding:4px 0">${renderBars(labels, '当前没有已标注的用户标签。')}</div></div>
+    </div>
+    <div class="segment-bs-grid cols-2">
+      <div class="table-wrap segment-bs-panel"><div class="table-header"><div><div class="table-title">租户归属</div><div style="font-size:12px;color:#8899aa;margin-top:6px">正常账号按所属租户汇总。</div></div></div><div style="padding:4px 0">${renderBars(tenants, '暂无租户归属数据。')}</div></div>
+      <div class="table-wrap segment-bs-panel"><div class="table-header"><div><div class="table-title">来源归因</div><div style="font-size:12px;color:#8899aa;margin-top:6px">来自用户导入、注册或运营录入时的来源字段。</div></div></div><div style="padding:4px 0">${renderBars(sources, '暂无来源字段数据。')}</div></div>
+    </div>
+    <div class="table-wrap segment-bs-table"><div class="table-header"><div><div class="table-title">最近创建的用户</div><div style="font-size:12px;color:#8899aa;margin-top:6px">便于核对导入、注册与标签写入是否已进入用户主数据。</div></div><div style="font-size:11px;color:#8899aa">更新于 ${escapeHtml(data.generated_at || '--')}</div></div>
+      <table><thead><tr><th>用户</th><th>角色</th><th>租户</th><th>来源</th><th>标签 / 付费样本</th><th>状态</th><th>创建时间</th></tr></thead><tbody>${recentUsers.length ? recentUsers.map((item) => `<tr><td>${escapeHtml(item.username)}</td><td>${escapeHtml(adminSegmentRoleLabel(item.role))}</td><td>${escapeHtml(item.tenant_slug || '未归属')}</td><td>${escapeHtml(item.source_label || '未标注来源')}</td><td>${[...(item.labels || []), ...(item.is_paid_sample ? ['付费样本'] : [])].length ? [...(item.labels || []), ...(item.is_paid_sample ? ['付费样本'] : [])].map((label) => `<span class="tag tag-blue" style="margin:0 4px 4px 0">${escapeHtml(label)}</span>`).join('') : '<span style="color:#8899aa">未标注</span>'}</td><td>${escapeHtml(item.status === 'active' ? '正常' : '已禁用')}</td><td>${escapeHtml(item.created_at || '--')}</td></tr>`).join('') : '<tr><td colspan="7" style="text-align:center;color:#8899aa;padding:20px 0">暂无用户主数据</td></tr>'}</tbody></table>
+    </div>`;
+}
+
+async function loadAdminUserSegments(showMessage) {
+  const host = document.getElementById('section-segments');
+  if (!host) return;
+  host.classList.add('segment-bs-shell', 'container-fluid');
+  host.innerHTML = '<div style="padding:36px 0;text-align:center;color:#8899aa;font-size:12px">正在读取用户主数据并生成分群...</div>';
+  try {
+    const response = await fetch('/api/admin/user-segments', {cache: 'no-store'});
+    const data = await response.json();
+    if (!response.ok || data.ok === false) throw new Error(data.error || 'user_segments_unavailable');
+    renderAdminUserSegments(data.segments || {});
+    if (showMessage) showToast('用户分群已刷新');
+  } catch (error) {
+    host.innerHTML = `<div style="padding:36px 0;text-align:center;color:#C43D36;font-size:12px">用户分群加载失败：${escapeHtml(error.message || '网络连接不可用')}</div>`;
+  }
+}
+
+function renderAdminPoints(payload) {
+  const host = document.getElementById('admin-points-root');
+  if (!host) return;
+  host.classList.add('points-bs-shell', 'container-fluid');
+  const data = payload || {};
+  const summary = data.summary || {};
+  const capabilities = Array.isArray(data.capabilities) ? data.capabilities : [];
+  const recentUsers = Array.isArray(data.recent_users) ? data.recent_users : [];
+  const statusBadge = (enabled) => enabled ? '<span class="tag tag-green">已接入</span>' : '<span class="tag" style="color:#B88A30;border-color:rgba(184,138,48,0.24);background:rgba(184,138,48,0.08)">未接入</span>';
+  host.innerHTML = `
+    <div class="section-header points-bs-header">
+      <div><div class="section-title">积分管理</div><div class="section-subtitle">仅展示当前数据库已落地的积分能力，不展示未持久化的演示奖励、排行榜或兑换数据。</div></div>
+      <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="loadAdminPoints(true)">刷新</button>
+    </div>
+    <div class="points-bs-kpi-row row">
+      ${[['用户主数据', summary.total_users, '真实用户账号'], ['正常账号', summary.active_users, '当前可用账号'], ['积分账户', summary.ledger_accounts, data.ledger_enabled ? '已建立账户表' : '尚未建立账户表'], ['积分流水', summary.ledger_transactions, data.ledger_enabled ? '已建立流水表' : '尚未建立流水表']].map(([label, value, note]) => `<div class="stat-card card points-bs-kpi-card"><div class="stat-label">${label}</div><div class="stat-value">${formatAdminNumber(value)}</div><div class="stat-change">${note}</div></div>`).join('')}
+    </div>
+    <div class="points-bs-grid">
+      <div class="table-wrap points-bs-panel"><div class="table-header"><div><div class="table-title">当前能力状态</div><div style="font-size:12px;color:#8899aa;margin-top:6px">后台只允许操作已经有数据库依据的能力。</div></div><span class="tag tag-gold">能力清单</span></div>
+        <div>${capabilities.length ? capabilities.map((item) => `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;padding:13px 0;border-bottom:1px solid rgba(200,169,110,0.10)"><div><div style="font-size:13px;font-weight:700;color:var(--text-main)">${escapeHtml(item.label || '--')}</div><div style="font-size:12px;color:#8899aa;margin-top:5px;line-height:1.6">${escapeHtml(item.detail || '')}</div></div>${statusBadge(item.enabled)}</div>`).join('') : '<div style="padding:20px 0;color:#8899aa;font-size:12px">暂无能力数据。</div>'}</div>
+      </div>
+      <div class="table-wrap points-bs-panel"><div class="table-header"><div><div class="table-title">积分数据边界</div><div style="font-size:12px;color:#8899aa;margin-top:6px">避免把接口返回值误认为真实积分余额。</div></div><span class="tag tag-blue">数据说明</span></div>
+        <div class="points-bs-disabled"><strong style="color:var(--text-main)">积分账本尚未接入数据库</strong><br>${escapeHtml(data.basis || '当前没有可供后台管理的积分持久化数据。')}<br><span style="font-size:11px;color:#8899aa">前台部分接口可能返回 points_earned，但当前不会写入账户或流水，因此这里不显示余额、发放量、兑换率和排行榜。</span></div>
+      </div>
+    </div>
+    <div class="table-wrap points-bs-table"><div class="table-header"><div><div class="table-title">真实用户范围</div><div style="font-size:12px;color:#8899aa;margin-top:6px">积分能力接入后，将基于这些账号建立账户与流水关联。</div></div><div style="font-size:11px;color:#8899aa">更新于 ${escapeHtml(data.generated_at || '--')}</div></div>
+      <table><thead><tr><th>用户</th><th>角色</th><th>租户</th><th>状态</th><th>创建时间</th></tr></thead><tbody>${recentUsers.length ? recentUsers.map((item) => `<tr><td>${escapeHtml(item.username || '--')}</td><td>${escapeHtml(adminSegmentRoleLabel(item.role))}</td><td>${escapeHtml(item.tenant_slug || '未归属')}</td><td>${escapeHtml(item.status === 'active' ? '正常' : '已禁用')}</td><td>${escapeHtml(item.created_at || '--')}</td></tr>`).join('') : '<tr><td colspan="5" style="text-align:center;color:#8899aa;padding:20px 0">暂无用户主数据</td></tr>'}</tbody></table>
+    </div>`;
+}
+
+async function loadAdminPoints(showMessage) {
+  const host = document.getElementById('admin-points-root');
+  if (!host) return;
+  host.classList.add('points-bs-shell', 'container-fluid');
+  host.innerHTML = '<div style="padding:36px 0;text-align:center;color:#8899aa;font-size:12px">正在读取积分能力与用户主数据...</div>';
+  try {
+    const response = await fetch('/api/admin/points', {cache: 'no-store'});
+    const data = await response.json();
+    if (!response.ok || data.ok === false) throw new Error(data.error || 'points_data_unavailable');
+    renderAdminPoints(data.points || {});
+    if (showMessage) showToast('积分数据边界已刷新');
+  } catch (error) {
+    host.innerHTML = `<div style="padding:36px 0;text-align:center;color:#C43D36;font-size:12px">积分数据加载失败：${escapeHtml(error.message || '网络连接不可用')}</div>`;
+  }
+}
+
 function showSection(name, navEl) {
   const normalized = normalizeAdminSection(name);
   name = normalized.section || name;
@@ -6229,6 +6373,12 @@ function showSection(name, navEl) {
   document.getElementById('page-title').textContent = sectionTitles[name];
   if (name === 'users') {
     loadAdminUsers();
+  }
+  if (name === 'segments') {
+    loadAdminUserSegments(false);
+  }
+  if (name === 'points') {
+    loadAdminPoints(false);
   }
   if (name.startsWith('indicator-')) {
     refreshAdminIndicatorHub(false).catch((error) => showToast(error.message || '加载失败'));
@@ -6342,6 +6492,7 @@ function showAnalyticsSection(section) {
   document.getElementById('section-analytics').style.display = 'block';
   const navEl = document.getElementById('nav-' + section);
   setActiveAdminNav(navEl);
+  document.querySelectorAll('[id^="admin-nav-"]').forEach((item) => item.classList.toggle('active', item.id === `admin-nav-${section}`));
   document.getElementById('page-title').textContent = analyticsTitles[section] || sectionTitles.analytics;
   window.dashboardDefaultSection = section;
   if (window.initDashboardCharts) {

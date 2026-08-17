@@ -3634,6 +3634,101 @@ def list_users(role=None, tenant_slug=None):
     return [ensure_user_row_defaults(dict(row)) for row in rows]
 
 
+def build_admin_user_segment_payload():
+    """Summarize persisted user master data without inventing subscription metrics."""
+    users = [item for item in list_users() if isinstance(item, dict)]
+    active_users = [item for item in users if str(item.get("status") or "active").lower() == "active"]
+    roles = (("investor", "粉丝用户"), ("dav", "大V投顾"), ("admin", "平台管理员"))
+    role_rows = [
+        {
+            "key": role,
+            "label": label,
+            "count": sum(1 for item in active_users if str(item.get("role") or "").lower() == role),
+        }
+        for role, label in roles
+    ]
+    tenant_counts = {}
+    source_counts = {}
+    label_counts = {}
+    for item in active_users:
+        tenant = str(item.get("tenant_slug") or "").strip() or "未归属租户"
+        tenant_counts[tenant] = tenant_counts.get(tenant, 0) + 1
+        source = str(item.get("source_label") or "").strip() or "未标注来源"
+        source_counts[source] = source_counts.get(source, 0) + 1
+        for label in item.get("labels") if isinstance(item.get("labels"), list) else []:
+            normalized_label = str(label or "").strip()
+            if normalized_label:
+                label_counts[normalized_label] = label_counts.get(normalized_label, 0) + 1
+    paid_fans = [
+        item for item in active_users
+        if str(item.get("role") or "").lower() == "investor" and bool(item.get("is_paid_sample"))
+    ]
+    labelled_users = [item for item in active_users if isinstance(item.get("labels"), list) and item.get("labels")]
+    return {
+        "generated_at": now_ts(),
+        "basis": "用户主数据：账号状态、角色、租户、来源、标签与付费样本标记。",
+        "summary": {
+            "total_users": len(users),
+            "active_users": len(active_users),
+            "fan_users": next((row["count"] for row in role_rows if row["key"] == "investor"), 0),
+            "paid_fans": len(paid_fans),
+            "labelled_users": len(labelled_users),
+            "disabled_users": sum(1 for item in users if str(item.get("status") or "active").lower() != "active"),
+        },
+        "roles": role_rows,
+        "tenants": [{"label": key, "count": value} for key, value in sorted(tenant_counts.items(), key=lambda item: (-item[1], item[0]))],
+        "sources": [{"label": key, "count": value} for key, value in sorted(source_counts.items(), key=lambda item: (-item[1], item[0]))],
+        "labels": [{"label": key, "count": value} for key, value in sorted(label_counts.items(), key=lambda item: (-item[1], item[0]))[:12]],
+        "recent_users": [
+            {
+                "username": str(item.get("username") or ""),
+                "role": str(item.get("role") or ""),
+                "tenant_slug": str(item.get("tenant_slug") or ""),
+                "source_label": str(item.get("source_label") or "") or "未标注来源",
+                "labels": item.get("labels") if isinstance(item.get("labels"), list) else [],
+                "is_paid_sample": bool(item.get("is_paid_sample")),
+                "status": str(item.get("status") or "active"),
+                "created_at": str(item.get("created_at") or ""),
+            }
+            for item in sorted(users, key=lambda item: str(item.get("created_at") or ""), reverse=True)[:12]
+        ],
+    }
+
+
+def build_admin_points_payload():
+    """Expose only persisted facts until a points ledger is implemented."""
+    users = [item for item in list_users() if isinstance(item, dict)]
+    active_users = [item for item in users if str(item.get("status") or "active").lower() == "active"]
+    recent_users = sorted(users, key=lambda item: str(item.get("created_at") or ""), reverse=True)[:12]
+    return {
+        "generated_at": now_ts(),
+        "ledger_enabled": False,
+        "basis": "当前数据库仅有用户主数据；尚未建立积分账户、流水、规则或兑换套餐表。",
+        "summary": {
+            "total_users": len(users),
+            "active_users": len(active_users),
+            "ledger_accounts": 0,
+            "ledger_transactions": 0,
+        },
+        "capabilities": [
+            {"key": "account", "label": "积分账户", "enabled": False, "detail": "未接入持久化积分账户"},
+            {"key": "transactions", "label": "积分流水", "enabled": False, "detail": "未接入积分流水记录"},
+            {"key": "rules", "label": "积分规则", "enabled": False, "detail": "未接入可配置规则"},
+            {"key": "exchange", "label": "兑换套餐", "enabled": False, "detail": "未接入兑换订单与套餐"},
+        ],
+        "recent_users": [
+            {
+                "username": str(item.get("username") or ""),
+                "role": str(item.get("role") or ""),
+                "tenant_slug": str(item.get("tenant_slug") or "") or "未归属",
+                "status": str(item.get("status") or "active"),
+                "created_at": str(item.get("created_at") or ""),
+            }
+            for item in recent_users
+        ],
+    }
+
+
 def get_user_by_id(user_id):
     try:
         user_pk = int(user_id)
