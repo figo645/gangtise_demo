@@ -9080,10 +9080,12 @@ function renderAdminUsersTable() {
       <td>${escapeHtml(user.tenant?.name || '--')}</td>
       <td><span class="tag ${user.status === 'active' ? 'tag-green' : 'tag-red'}">${escapeHtml(user.status === 'active' ? '正常' : '已禁用')}</span></td>
       <td>${escapeHtml(user.created_at || '--')}</td>
-      <td><button class="btn-outline" style="padding:3px 9px;font-size:11px" onclick="openAdminUserDetail(${Number(user.id || 0)})">详情</button></td>
+      <td style="white-space:nowrap"><button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="openAdminUserDetail(${Number(user.id || 0)})">详情</button><button class="btn-outline" style="padding:3px 9px;font-size:11px;color:${user.status === 'active' ? '#F2B8B5' : '#9DE0BE'};border-color:${user.status === 'active' ? 'rgba(180,35,24,0.28)' : 'rgba(22,112,74,0.28)'}" onclick="openAdminUserDetail(${Number(user.id || 0)});requestAdminUserStatusChange(${Number(user.id || 0)})">${user.status === 'active' ? '停用' : '启用'}</button></td>
     </tr>
   `).join('') || '<tr><td colspan="10" style="text-align:center;color:#8899aa;padding:20px 0">暂无用户</td></tr>';
-  meta.innerHTML = `<span>共 ${filtered.length} 条记录</span><span>当前数据来自本地 Postgres 用户表</span>`;
+  const activeCount = filtered.filter((user) => user.status === 'active').length;
+  const disabledCount = filtered.length - activeCount;
+  meta.innerHTML = `<span>共 ${filtered.length} 条记录 · 正常 ${activeCount} · 已停用 ${disabledCount}</span><span>状态变更会立即影响登录权限 · 数据来自本地 Postgres 用户表</span>`;
 }
 
 function closeAdminUserDetailModal() {
@@ -9215,8 +9217,61 @@ function openAdminUserDetail(userId) {
         </div>
       </div>
     </div>
+    <div class="admin-modal-actions" style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+      <button class="btn-outline" type="button" style="color:${user.status === 'active' ? '#B42318' : '#16704A'};border-color:${user.status === 'active' ? 'rgba(180,35,24,0.28)' : 'rgba(22,112,74,0.28)'}" onclick="requestAdminUserStatusChange(${Number(user.id || 0)})">${user.status === 'active' ? '停用账号' : '启用账号'}</button>
+      <button class="btn-outline" type="button" onclick="closeAdminUserDetailModal()">关闭</button>
+    </div>
+    <div id="admin-user-status-confirm" style="display:none;margin-top:12px;padding:12px;border:1px solid rgba(200,169,110,0.22);border-radius:10px;background:rgba(200,169,110,0.06)"></div>
   `;
   modal.classList.add('show');
+}
+
+function requestAdminUserStatusChange(userId) {
+  const user = adminUsers.find((item) => Number(item.id || 0) === Number(userId || 0));
+  const confirmNode = document.getElementById('admin-user-status-confirm');
+  if (!user || !confirmNode) return;
+  const nextStatus = user.status === 'active' ? 'disabled' : 'active';
+  const action = nextStatus === 'disabled' ? '停用' : '启用';
+  confirmNode.innerHTML = `<div style="font-size:12px;font-weight:700;color:#F8F6F0">确认${action}“${escapeHtml(user.username || '该账号')}”吗？</div><div style="font-size:11px;color:#8899aa;line-height:1.7;margin-top:5px">${nextStatus === 'disabled' ? '停用后该账号将无法登录 H5、Hermes 或大V工作台，历史数据会保留。' : '启用后该账号可以重新登录，历史数据会保留。'}</div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px"><button class="btn-outline" type="button" style="padding:6px 10px;font-size:11px" onclick="cancelAdminUserStatusChange()">取消</button><button class="btn-gold" type="button" style="padding:6px 10px;font-size:11px" onclick="confirmAdminUserStatusChange(${Number(user.id || 0)}, '${nextStatus}')">确认${action}</button></div>`;
+  confirmNode.style.display = 'block';
+}
+
+function cancelAdminUserStatusChange() {
+  const confirmNode = document.getElementById('admin-user-status-confirm');
+  if (confirmNode) {
+    confirmNode.innerHTML = '';
+    confirmNode.style.display = 'none';
+  }
+}
+
+async function confirmAdminUserStatusChange(userId, status) {
+  const confirmNode = document.getElementById('admin-user-status-confirm');
+  const buttons = confirmNode ? confirmNode.querySelectorAll('button') : [];
+  buttons.forEach((button) => { button.disabled = true; button.style.opacity = '0.6'; });
+  try {
+    const response = await fetch('/api/admin/users/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, status }),
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) {
+      const messages = {
+        cannot_disable_current_user: '不能停用当前登录的管理员账号。',
+        cannot_disable_last_admin: '平台至少需要保留一个正常的管理员账号。',
+        user_not_found: '未找到该用户。',
+        database_unavailable: '数据库当前不可用，请稍后重试。',
+      };
+      throw new Error(messages[payload.error] || payload.error || '账号状态更新失败');
+    }
+    adminUsers = Array.isArray(payload.users) ? payload.users : adminUsers;
+    renderAdminUsersTable();
+    openAdminUserDetail(userId);
+    showToast(status === 'disabled' ? '账号已停用' : '账号已启用');
+  } catch (error) {
+    if (confirmNode) confirmNode.innerHTML = `<div style="font-size:12px;color:#F2B8B5">${escapeHtml(error.message || '账号状态更新失败')}</div>`;
+    showToast(error.message || '账号状态更新失败');
+  }
 }
 
 async function loadAdminUsers() {

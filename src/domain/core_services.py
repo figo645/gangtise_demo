@@ -3424,6 +3424,31 @@ def update_tenant_user_labels(tenant_slug, user_ids, label, action="add"):
     return {"updated_user_ids": updated, "label": normalized_label, "action": normalized_action}
 
 
+def update_tenant_user_status(tenant_slug, user_id, status):
+    """Allow a tenant advisor to manage only investor accounts in that tenant."""
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    try:
+        normalized_id = int(user_id)
+    except (TypeError, ValueError):
+        raise ValueError("user_not_found")
+    normalized_status = str(status or "").strip().lower()
+    if not normalized_tenant or normalized_id <= 0:
+        raise ValueError("user_not_found")
+    if normalized_status not in {"active", "disabled"}:
+        raise ValueError("invalid_user_status")
+    db = get_db()
+    row = db.execute(
+        "SELECT id, status FROM users WHERE id = ? AND tenant_slug = ? AND role = 'investor'",
+        (normalized_id, normalized_tenant),
+    ).fetchone()
+    if not row:
+        raise ValueError("tenant_user_not_found")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    db.execute("UPDATE users SET status = ?, updated_at = ? WHERE id = ?", (normalized_status, now, normalized_id))
+    db.commit()
+    return {"user_id": normalized_id, "status": normalized_status, "updated_at": now}
+
+
 def _normalize_tenant_fan_ops_settings(payload=None):
     source = payload if isinstance(payload, dict) else {}
     try:
@@ -3826,6 +3851,38 @@ def get_user_by_id(user_id):
         (user_pk,),
     ).fetchone()
     return ensure_user_row_defaults(dict(row)) if row else None
+
+
+def update_user_status(user_id, status, actor_user_id=None):
+    """Enable or disable a user while preserving administrator access."""
+    try:
+        target_id = int(user_id)
+    except (TypeError, ValueError):
+        raise ValueError("user_not_found")
+    normalized_status = str(status or "").strip().lower()
+    if normalized_status not in {"active", "disabled"}:
+        raise ValueError("invalid_user_status")
+    user = get_user_by_id(target_id)
+    if not user:
+        raise ValueError("user_not_found")
+    try:
+        actor_id = int(actor_user_id) if actor_user_id is not None else None
+    except (TypeError, ValueError):
+        actor_id = None
+    if normalized_status == "disabled" and actor_id == target_id:
+        raise ValueError("cannot_disable_current_user")
+    if normalized_status == "disabled" and user.get("role") == "admin" and user.get("status") == "active":
+        db = get_db()
+        active_admin_count = db.execute(
+            "SELECT COUNT(*) AS count FROM users WHERE role = 'admin' AND status = 'active'"
+        ).fetchone()["count"]
+        if int(active_admin_count or 0) <= 1:
+            raise ValueError("cannot_disable_last_admin")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    db = get_db()
+    db.execute("UPDATE users SET status = ?, updated_at = ? WHERE id = ?", (normalized_status, now, target_id))
+    db.commit()
+    return get_user_by_id(target_id)
 
 
 def get_user_by_username(username):

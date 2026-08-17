@@ -3688,7 +3688,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
             <span style="font-size:12px;color:var(--gray-400)">先勾选粉丝；可全选后批量标注。</span>
           </div>
           <table>
-            <thead><tr><th><input id="kw-fans-select-all" type="checkbox" onchange="toggleKwFanSelectAll(this.checked)" title="全选粉丝"></th><th>粉丝名称</th><th>等级</th><th>来源</th><th>加入时间</th><th>备注</th><th>状态</th><th>标签</th></tr></thead>
+            <thead><tr><th><input id="kw-fans-select-all" type="checkbox" onchange="toggleKwFanSelectAll(this.checked)" title="全选粉丝"></th><th>粉丝名称</th><th>等级</th><th>来源</th><th>加入时间</th><th>备注</th><th>状态</th><th>标签</th><th>操作</th></tr></thead>
             <tbody id="kw-fans-table-body">
               {% for fan in workbench.fan_management.fans %}
               <tr>
@@ -3699,7 +3699,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
                 <td>{{ fan.joined }}</td>
                 <td>{{ fan.paid_sample_note or fan.value }}</td>
                 <td><span class="tag tag-gold">{{ fan.status }}</span></td>
-                <td>{% if fan.is_paid_sample %}<span class="tag tag-gold">付费用户</span>{% else %}<span style="color:var(--gray-400)">--</span>{% endif %}</td>
+                <td>{% if fan.is_paid_sample %}<span class="tag tag-gold">付费用户</span>{% else %}<span style="color:var(--gray-400)">--</span>{% endif %}</td><td>--</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -4992,6 +4992,12 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
   <div class="kw-review-modal-sheet kw-knowledge-modal-sheet">
     <div class="kw-review-modal-close-row"><button class="kw-review-modal-close-pill" type="button" onclick="closeKwFanImportModal()">关闭</button></div>
     <div id="kw-fan-import-modal-content"></div>
+  </div>
+</div>
+<div class="kw-review-modal-overlay" id="kw-fan-status-modal" onclick="if(event.target===this)closeKwFanStatusModal()">
+  <div class="kw-review-modal-sheet">
+    <div class="kw-review-modal-close-row"><button class="kw-review-modal-close-pill" type="button" onclick="closeKwFanStatusModal()">关闭</button></div>
+    <div id="kw-fan-status-modal-content"></div>
   </div>
 </div>
 <div class="kw-review-modal-overlay" id="kw-ops-metric-modal" onclick="if(event.target===this)closeKwOpsMetricModal()">
@@ -12073,15 +12079,77 @@ function renderKwFans() {
       <td>${escapeHtml(fan.paid_sample_note || fan.phone_masked || '--')}</td>
       <td><span class="tag tag-gold">${escapeHtml(fan.status === 'disabled' ? '已禁用' : '活跃')}</span></td>
       <td><div style="display:flex;gap:5px;flex-wrap:wrap">${labels.length ? labels.map((label) => `<span class="tag ${label === '付费用户' ? 'tag-gold' : 'tag-blue'}">${escapeHtml(label)}</span>`).join('') : '<span style="color:#8899aa">--</span>'}</div></td>
+      <td><button class="btn-outline" type="button" style="padding:4px 9px;font-size:11px;color:${fan.status === 'disabled' ? '#9DE0BE' : '#F2B8B5'};border-color:${fan.status === 'disabled' ? 'rgba(22,112,74,0.28)' : 'rgba(180,35,24,0.28)'}" onclick="requestKwFanStatusChange(${userId})">${fan.status === 'disabled' ? '启用' : '停用'}</button></td>
     </tr>
   `;
-  }).join('') : '<tr><td colspan="8" style="text-align:center;color:#8899aa;padding:20px 0">暂无粉丝用户</td></tr>';
+  }).join('') : '<tr><td colspan="9" style="text-align:center;color:#8899aa;padding:20px 0">暂无粉丝用户</td></tr>';
   const selectedCount = kwSelectedFanIds.size;
-  if (meta) meta.innerHTML = `<span>共 ${kwFans.length} 位粉丝</span><span>已选 ${selectedCount} 位 · 当前仅展示本大V租户下的粉丝用户</span>`;
+  if (meta) {
+    const activeCount = kwFans.filter((fan) => fan.status !== 'disabled').length;
+    meta.innerHTML = `<span>共 ${kwFans.length} 位粉丝 · 正常 ${activeCount} · 已停用 ${kwFans.length - activeCount}</span><span>已选 ${selectedCount} 位 · 停用后该粉丝无法登录当前租户</span>`;
+  }
   const selectAll = document.getElementById('kw-fans-select-all');
   if (selectAll) selectAll.checked = kwFans.length > 0 && kwFans.every((fan) => kwSelectedFanIds.has(Number(fan.id || 0)));
   const paidCount = kwFans.filter((fan) => fan.is_paid_sample).length;
   if (summary) summary.textContent = `当前共 ${kwFans.length} 位粉丝用户，其中 ${paidCount} 位已标记为付费样本；支持 CSV 批量导入、单个新增和批量表格式录入。`;
+}
+
+function closeKwFanStatusModal() {
+  const modal = document.getElementById('kw-fan-status-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function requestKwFanStatusChange(userId) {
+  const fan = kwFans.find((item) => Number(item.id || 0) === Number(userId || 0));
+  const modal = document.getElementById('kw-fan-status-modal');
+  const host = document.getElementById('kw-fan-status-modal-content');
+  if (!fan || !modal || !host) return;
+  const nextStatus = fan.status === 'disabled' ? 'active' : 'disabled';
+  const action = nextStatus === 'disabled' ? '停用' : '启用';
+  host.innerHTML = `
+    <div class="kw-review-modal-head">
+      <div>
+        <div class="kw-review-modal-title">${action}粉丝账号</div>
+        <div class="kw-review-modal-subtitle">当前租户：${escapeHtml((window.ACTIVE_TENANT && window.ACTIVE_TENANT.name) || '--')}</div>
+      </div>
+    </div>
+    <div class="kw-card" style="margin-top:12px">
+      <div class="kw-card-title">确认${action}“${escapeHtml(fan.username || '该粉丝')}”吗？</div>
+      <div class="kw-card-desc" style="margin-top:8px">${nextStatus === 'disabled' ? '停用后该粉丝将无法登录 H5、使用 Hermes 或访问当前租户服务，但其自选股、评论、标注和历史数据都会保留。' : '启用后该粉丝可以重新登录当前租户，原有自选股、评论、标注和历史数据会恢复可用。'}</div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+        <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="closeKwFanStatusModal()">取消</button>
+        <button class="btn-gold" type="button" style="padding:8px 12px;font-size:12px" onclick="confirmKwFanStatusChange(${Number(fan.id || 0)}, '${nextStatus}')">确认${action}</button>
+      </div>
+    </div>
+  `;
+  modal.classList.add('show');
+}
+
+async function confirmKwFanStatusChange(userId, status) {
+  const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
+  if (!tenantSlug) return;
+  const host = document.getElementById('kw-fan-status-modal-content');
+  if (host) host.innerHTML += '<div class="kw-dashboard-panel-note" style="margin-top:10px">正在更新账号状态，请稍候...</div>';
+  try {
+    const response = await fetch(`/api/kol/users/status?tenant=${encodeURIComponent(tenantSlug)}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({user_id: userId, status}),
+    });
+    const data = await response.json();
+    if (!response.ok || data.ok === false) {
+      const messages = { tenant_user_not_found: '未找到当前租户下的粉丝账号。', database_unavailable: '数据库当前不可用，请稍后重试。' };
+      throw new Error(messages[data.error] || data.error || '账号状态更新失败');
+    }
+    kwFans = Array.isArray(data.users) ? data.users.map(normalizeKwFan) : kwFans;
+    renderKwFans();
+    closeKwFanStatusModal();
+    await refreshKwBusinessAnalytics();
+    showToast(status === 'disabled' ? '粉丝账号已停用' : '粉丝账号已启用');
+  } catch (error) {
+    if (host) host.innerHTML += `<div style="font-size:12px;color:#F2B8B5;margin-top:10px">${escapeHtml(error.message || '账号状态更新失败')}</div>`;
+    showToast(error.message || '账号状态更新失败');
+  }
 }
 
 function normalizeKwFan(user) {

@@ -9,7 +9,6 @@ class DatabaseReleaseWebBddTest(unittest.TestCase):
     def setUp(self):
         database_release_web.app.config.update(TESTING=True, SECRET_KEY="database-release-web-bdd")
         self.client = database_release_web.app.test_client()
-        database_release_web._unlock_failures.clear()
 
     @staticmethod
     def _target(name, host):
@@ -60,25 +59,23 @@ class DatabaseReleaseWebBddTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "production_and_staging_must_differ"):
                 database_release_services.start_production_to_staging_sync()
 
-    def test_given_locked_5051_console_when_production_to_staging_is_requested_then_operation_password_is_required(self):
+    def test_given_5051_console_when_production_to_staging_is_requested_then_no_execution_password_is_required(self):
         csrf = self._csrf_token()
-        response = self.client.post(
-            "/api/production-to-staging-sync",
-            json={},
-            headers={"X-Data-Import-CSRF-Token": csrf},
-        )
-        self.assertEqual(response.status_code, 423)
-        self.assertEqual(response.get_json()["error"], "operation_password_required")
+        with patch.object(
+            database_release_web,
+            "start_production_to_staging_sync",
+            return_value={"id": "sync_no_password", "status": "queued", "target": "staging"},
+        ) as start_sync:
+            response = self.client.post(
+                "/api/production-to-staging-sync",
+                json={},
+                headers={"X-Data-Import-CSRF-Token": csrf},
+            )
+        self.assertEqual(response.status_code, 202)
+        start_sync.assert_called_once_with()
 
     def test_given_unlocked_5051_console_when_production_to_staging_is_requested_then_a_background_job_is_created(self):
         csrf = self._csrf_token()
-        with patch.object(database_release_web, "_operation_password", return_value="536953"):
-            unlock = self.client.post(
-                "/api/unlock",
-                json={"password": "536953"},
-                headers={"X-Data-Import-CSRF-Token": csrf},
-            )
-        self.assertEqual(unlock.status_code, 200)
         with patch.object(
             database_release_web,
             "start_production_to_staging_sync",
@@ -110,6 +107,8 @@ class DatabaseReleaseWebBddTest(unittest.TestCase):
         self.assertIn('/api/package-review', html)
         self.assertIn('/api/reviewed-release', html)
         self.assertIn('增量审核清单', html)
+        self.assertIn('免口令操作', html)
+        self.assertNotIn('验证数据导入操作口令', html)
         self.assertIn("Production 覆盖 Staging", html)
         self.assertIn("一键导入 Production 到 Staging", html)
         self.assertIn("/api/production-to-staging-sync", html)
@@ -122,6 +121,16 @@ class DatabaseReleaseWebBddTest(unittest.TestCase):
         finally:
             css_response.close()
             js_response.close()
+
+    def test_given_5051_console_when_unlock_compatibility_endpoint_is_called_then_it_confirms_password_is_disabled(self):
+        csrf = self._csrf_token()
+        response = self.client.post(
+            "/api/unlock",
+            json={},
+            headers={"X-Data-Import-CSRF-Token": csrf},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.get_json()["password_required"])
 
     def test_given_a_target_environment_when_5051_loads_increment_plan_then_it_returns_three_type_summary(self):
         plan = {
@@ -175,19 +184,18 @@ class DatabaseReleaseWebBddTest(unittest.TestCase):
         self.assertEqual(response.get_json()["sections"][0]["risk_level"], "low")
         build_review.assert_called_once_with("staging", include_schema=True, include_master_data=False, include_runtime_data=True)
 
-    def test_given_locked_5051_console_when_importing_reviewed_packages_then_the_operation_password_is_required(self):
+    def test_given_5051_console_when_importing_reviewed_packages_then_no_execution_password_is_required(self):
         csrf = self._csrf_token()
-        response = self.client.post(
-            "/api/reviewed-release",
-            json={"target": "staging", "package_ids": ["database_release_packages/2026-08-17/v1.1.3"]},
-            headers={"X-Data-Import-CSRF-Token": csrf},
-        )
-        self.assertEqual(response.status_code, 423)
+        with patch.object(database_release_web, "start_database_release_packages", return_value={"id": "reviewed_no_password", "status": "queued", "target": "staging"}):
+            response = self.client.post(
+                "/api/reviewed-release",
+                json={"target": "staging", "package_ids": ["database_release_packages/2026-08-17/v1.1.3"]},
+                headers={"X-Data-Import-CSRF-Token": csrf},
+            )
+        self.assertEqual(response.status_code, 202)
 
     def test_given_unlocked_5051_console_when_importing_reviewed_packages_then_only_the_reviewed_package_ids_are_started(self):
         csrf = self._csrf_token()
-        with patch.object(database_release_web, "_operation_password", return_value="536953"):
-            self.client.post("/api/unlock", json={"password": "536953"}, headers={"X-Data-Import-CSRF-Token": csrf})
         package_ids = ["database_release_packages/2026-08-17/v1.1.3"]
         with patch.object(database_release_web, "start_database_release_packages", return_value={"id": "reviewed_1", "status": "queued", "target": "staging"}) as start_reviewed:
             response = self.client.post(
@@ -198,20 +206,19 @@ class DatabaseReleaseWebBddTest(unittest.TestCase):
         self.assertEqual(response.status_code, 202)
         start_reviewed.assert_called_once_with("staging", package_ids=package_ids, confirm_production=False)
 
-    def test_given_locked_5051_console_when_generating_delta_then_the_operation_password_is_required(self):
+    def test_given_5051_console_when_generating_delta_then_no_execution_password_is_required(self):
         csrf = self._csrf_token()
-        response = self.client.post(
-            "/api/generate-delta",
-            json={"target": "staging", "include_schema": True, "include_master_data": True},
-            headers={"X-Data-Import-CSRF-Token": csrf},
-        )
-        self.assertEqual(response.status_code, 423)
-        self.assertEqual(response.get_json()["error"], "operation_password_required")
+        result = {"target": "staging", "generated_packages": [], "blockers": [], "safe_release_delta": {}}
+        with patch.object(database_release_web, "generate_database_release_delta", return_value=result):
+            response = self.client.post(
+                "/api/generate-delta",
+                json={"target": "staging", "include_schema": True, "include_master_data": True},
+                headers={"X-Data-Import-CSRF-Token": csrf},
+            )
+        self.assertEqual(response.status_code, 201)
 
     def test_given_unlocked_5051_console_when_generating_delta_then_a_new_package_plan_is_returned_but_not_applied(self):
         csrf = self._csrf_token()
-        with patch.object(database_release_web, "_operation_password", return_value="536953"):
-            self.client.post("/api/unlock", json={"password": "536953"}, headers={"X-Data-Import-CSRF-Token": csrf})
         result = {
             "target": "staging",
             "report_path": ".deploy/database_diff.json",

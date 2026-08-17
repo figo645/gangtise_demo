@@ -46,11 +46,6 @@ from src.domain.database_release_services import (  # noqa: E402
 
 APP_HOST = os.environ.get("DATA_IMPORT_WEB_HOST", os.environ.get("DATABASE_RELEASE_WEB_HOST", "127.0.0.1"))
 APP_PORT = int(os.environ.get("DATA_IMPORT_WEB_PORT", os.environ.get("DATABASE_RELEASE_WEB_PORT", "5051")))
-UNLOCK_TTL_SECONDS = 10 * 60
-MAX_UNLOCK_FAILURES = 5
-UNLOCK_FAILURE_WINDOW_SECONDS = 5 * 60
-_unlock_failures = {}
-
 app = Flask(__name__, static_folder=str(ROOT / "static"), static_url_path="/static")
 app.config.update(
     SECRET_KEY=os.environ.get("DATA_IMPORT_WEB_SECRET_KEY") or os.environ.get("DATABASE_RELEASE_WEB_SECRET_KEY") or secrets.token_urlsafe(32),
@@ -60,12 +55,9 @@ app.config.update(
 )
 
 
-def _operation_password():
-    return str(os.environ.get("DATA_IMPORT_OPERATION_PASSWORD") or os.environ.get("DATABASE_RELEASE_OPERATION_PASSWORD") or "536953")
-
-
 def _is_unlocked():
-    return float(session.get("data_import_unlock_until") or 0) > time.time()
+    """The standalone console no longer uses a second execution password."""
+    return True
 
 
 def _csrf_token():
@@ -74,20 +66,6 @@ def _csrf_token():
         token = secrets.token_urlsafe(32)
         session["data_import_csrf_token"] = token
     return token
-
-
-def _client_key():
-    return request.remote_addr or "unknown"
-
-
-def _unlock_rate_limited():
-    attempts = [stamp for stamp in _unlock_failures.get(_client_key(), []) if stamp > time.time() - UNLOCK_FAILURE_WINDOW_SECONDS]
-    _unlock_failures[_client_key()] = attempts
-    return len(attempts) >= MAX_UNLOCK_FAILURES
-
-
-def _record_unlock_failure():
-    _unlock_failures.setdefault(_client_key(), []).append(time.time())
 
 
 def _require_csrf(fn):
@@ -101,12 +79,8 @@ def _require_csrf(fn):
 
 
 def _require_unlock(fn):
-    @wraps(fn)
-    def wrapped(*args, **kwargs):
-        if not _is_unlocked():
-            return jsonify({"ok": False, "error": "operation_password_required"}), 423
-        return fn(*args, **kwargs)
-    return wrapped
+    """Compatibility decorator retained for route readability; no password gate remains."""
+    return fn
 
 
 @app.after_request
@@ -345,15 +319,7 @@ def delete_batch(batch_code):
 @app.post("/api/unlock")
 @_require_csrf
 def unlock():
-    if _unlock_rate_limited():
-        return jsonify({"ok": False, "error": "too_many_password_attempts"}), 429
-    password = str((request.get_json(silent=True) or {}).get("password") or "")
-    if not compare_digest(password, _operation_password()):
-        _record_unlock_failure()
-        return jsonify({"ok": False, "error": "operation_password_invalid"}), 403
-    _unlock_failures.pop(_client_key(), None)
-    session["data_import_unlock_until"] = time.time() + UNLOCK_TTL_SECONDS
-    return jsonify({"ok": True, "ttl_seconds": UNLOCK_TTL_SECONDS})
+    return jsonify({"ok": True, "password_required": False, "message": "数据库操作无需独立口令。"})
 
 
 LEGACY_SIMULATION_ONLY_PAGE = r"""<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>数据导入控制台</title><style>
@@ -443,7 +409,7 @@ PAGE = r"""<!doctype html>
     <div class="container ops-page py-0">
       <span class="navbar-brand mb-0 ops-brand"><span class="ops-brand-mark">DB</span>数据库发布控制台</span>
       <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
-        <span id="navAuthState" class="badge text-bg-secondary">操作未授权</span>
+        <span id="navAuthState" class="badge text-bg-success">免口令操作</span>
         <button class="btn btn-sm btn-outline-light" type="button" onclick="load(true)">刷新状态</button>
       </div>
     </div>
@@ -453,14 +419,14 @@ PAGE = r"""<!doctype html>
     <header class="mb-4">
       <div class="ops-eyebrow">DATABASE OPERATIONS · 5051</div>
       <h1 class="ops-title">发布、回滚与环境同步</h1>
-      <p class="ops-subtitle">所有写入操作均需要独立操作口令。一次仅允许一个任务运行，任务日志与阶段进度会实时更新。</p>
+      <p class="ops-subtitle">数据库操作无需独立口令。一次仅允许一个任务运行，任务日志与阶段进度会实时更新。</p>
     </header>
 
     <section class="row g-3 mb-4" aria-label="任务概览">
       <div class="col-6 col-xl-3"><div class="ops-stat"><div class="ops-stat-label">任务状态</div><div class="ops-stat-value" id="jobStatus">读取中</div><div class="ops-stat-note" id="jobStatusNote">正在加载任务状态</div></div></div>
       <div class="col-6 col-xl-3"><div class="ops-stat"><div class="ops-stat-label">当前任务</div><div class="ops-stat-value" id="jobId">--</div><div class="ops-stat-note" id="jobStartedAt">尚未创建任务</div></div></div>
       <div class="col-6 col-xl-3"><div class="ops-stat"><div class="ops-stat-label">当前运行环境</div><div class="ops-stat-value" id="jobTarget">--</div><div class="ops-stat-note" id="jobOperation">等待任务</div></div></div>
-      <div class="col-6 col-xl-3"><div class="ops-stat"><div class="ops-stat-label">操作授权</div><div class="ops-stat-value" id="authStatus">未验证</div><div class="ops-stat-note" id="authStatusNote">执行时需要操作口令</div></div></div>
+      <div class="col-6 col-xl-3"><div class="ops-stat"><div class="ops-stat-label">操作保护</div><div class="ops-stat-value" id="authStatus">免口令</div><div class="ops-stat-note" id="authStatusNote">页面访问控制、CSRF 和任务锁仍然有效</div></div></div>
     </section>
 
     <section class="row g-3">
@@ -524,7 +490,7 @@ PAGE = r"""<!doctype html>
   </main>
 
   <div class="toast-container position-fixed bottom-0 end-0 p-3"><div id="toast" class="toast align-items-center text-bg-dark border-0" role="status" aria-live="polite"><div class="d-flex"><div class="toast-body" id="toastBody"></div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="关闭"></button></div></div></div>
-  <div class="modal fade" id="operationModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h2 id="modalTitle" class="modal-title fs-6 fw-bold">验证操作口令</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button></div><div id="modalBody" class="modal-body"></div></div></div></div>
+  <div class="modal fade" id="operationModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h2 id="modalTitle" class="modal-title fs-6 fw-bold">确认数据库操作</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button></div><div id="modalBody" class="modal-body"></div></div></div></div>
 
   <script src="/static/vendor/bootstrap.bundle.min.js"></script>
   <script>
@@ -595,10 +561,10 @@ PAGE = r"""<!doctype html>
       $('jobStartedAt').textContent = job.started_at || '尚未创建任务';
       $('jobTarget').textContent = job.target || '--';
       $('jobOperation').textContent = operationName(job.operation);
-      $('authStatus').textContent = overview.unlocked ? '已验证' : '未验证';
-      $('authStatusNote').textContent = overview.unlocked ? '当前会话剩余有效期内可执行操作' : '执行写入操作前需要口令验证';
-      $('navAuthState').className = `badge ${overview.unlocked ? 'text-bg-success' : 'text-bg-secondary'}`;
-      $('navAuthState').textContent = overview.unlocked ? '操作已授权' : '操作未授权';
+      $('authStatus').textContent = '免口令';
+      $('authStatusNote').textContent = '页面访问控制、CSRF 和任务锁仍然有效';
+      $('navAuthState').className = 'badge text-bg-success';
+      $('navAuthState').textContent = '免口令操作';
       const progress = job.progress || {};
       const total = Number(progress.total_steps || 0);
       const completed = Number(progress.completed_steps || 0);
@@ -745,11 +711,9 @@ PAGE = r"""<!doctype html>
     async function load(showToast) { try { overview = await api('/api/overview', {headers:{}}); render(); await Promise.all([loadReleasePlan(), loadLog(), loadRollbacks(), loadBatches()]); if (showToast) toast('状态已刷新'); } catch (error) { toast('读取状态失败：' + error.message); } }
     function showModal(title, body, actions) { $('modalTitle').textContent = title; $('modalBody').innerHTML = `${body}<div class="modal-footer px-0 pb-0 mt-4">${actions}</div>`; operationModal.show(); }
     function closeModal() { operationModal.hide(); pendingAction = null; }
-    function askPassword(next) { pendingAction = next; showModal('验证数据导入操作口令', '<p class="small text-secondary mb-3">请输入操作口令后继续。授权仅在当前会话有效 10 分钟。</p><input id="password" class="form-control" type="password" autocomplete="one-time-code" placeholder="操作口令">', '<button type="button" class="btn btn-light border" onclick="closeModal()">取消</button><button type="button" class="btn btn-primary" onclick="unlockAndRun()">验证并继续</button>'); setTimeout(() => $('password')?.focus(), 160); }
-    async function unlockAndRun() { const password = $('password').value; if (!password) return toast('请输入操作口令'); try { await api('/api/unlock', {method:'POST', body:JSON.stringify({password})}); overview.unlocked = true; operationModal.hide(); const next = pendingAction; pendingAction = null; render(); await next(); } catch (error) { toast(error.status === 429 ? '口令尝试过多，请稍后再试' : '操作口令错误'); } }
     function confirmAction(title, description, action, confirmClass = 'btn-primary', confirmLabel = '确认执行') { showModal(title, `<p class="small text-secondary mb-0">${description}</p>`, `<button type="button" class="btn btn-light border" onclick="closeModal()">取消</button><button type="button" class="btn ${confirmClass}" onclick="confirmModalAction()">${confirmLabel}</button>`); pendingAction = action; }
     async function confirmModalAction() { operationModal.hide(); const action = pendingAction; pendingAction = null; await action(); }
-    function protectedAction(action) { return overview.unlocked ? action() : askPassword(action); }
+    function protectedAction(action) { return action(); }
     function startRelease() { if (isBusy()) return toast('已有数据导入任务正在执行'); const target = $('releaseTarget').value; const packageId = $('package').value; const targetPlan = currentReleasePlan(target); if (packageId === '__pending__' && (!targetPlan || targetPlan.error)) return toast('请等待目标差异比较完成'); if (packageId === '__pending__' && !Number((targetPlan.summary || {}).pending_total || 0)) return toast('当前没有待推送增量'); if (packageId === '__pending__' && Number((targetPlan.summary || {}).checksum_mismatch_total || 0)) return toast('存在校验不一致的发布包，请新建版本后再推送'); const label = packageId === '__full__' ? '本地完整数据库' : packageId === '__pending__' ? '相对目标的待推送增量' : '所选增量包'; protectedAction(() => confirmAction('确认开始数据导入', `确定将 ${esc(label)} 导入 ${esc(target)} 吗？全量同步会在目标端保留回滚备份。`, async () => { submitting = true; render(); try { await api('/api/release', {method:'POST', body:JSON.stringify({target, package_id:packageId, confirm_production:target === 'production'})}); toast('数据导入任务已创建'); await load(); } catch (error) { toast('导入未启动：' + error.message); } finally { submitting = false; render(); } })); }
     function startProductionToStagingSync() { if (isBusy()) return toast('已有数据导入任务正在执行'); protectedAction(() => confirmAction('确认用 Production 完整覆盖 Staging', 'Production 只读。Staging 的全部数据会被替换，原 Staging 数据库会保留为回滚备份。恢复、校验通过后才会最终切换。', async () => { submitting = true; render(); try { await api('/api/production-to-staging-sync', {method:'POST', body:JSON.stringify({})}); toast('Production 到 Staging 同步任务已创建'); await load(); } catch (error) { toast('同步未启动：' + error.message); } finally { submitting = false; render(); } }, 'btn-danger', '确认覆盖 Staging')); }
     function cancelRelease() { const job = overview.job || {}; if (!job.id) return; protectedAction(() => confirmAction('确认取消数据导入', '当前步骤会被停止。已完成的增量包不会自动回退。', async () => { try { await api('/api/cancel', {method:'POST', body:JSON.stringify({job_id:job.id})}); toast('已发送取消请求'); await load(); } catch (error) { toast('取消失败：' + error.message); } }, 'btn-danger', '确认取消')); }

@@ -1614,6 +1614,25 @@ def api_admin_users():
     return jsonify({"users": list_users()})
 
 
+@app.route("/api/admin/users/status", methods=["POST"])
+def api_update_admin_user_status():
+    body = request.get_json(silent=True) or {}
+    current_user = get_current_authenticated_user() or {}
+    try:
+        user = update_user_status(
+            body.get("user_id"),
+            body.get("status"),
+            actor_user_id=current_user.get("id"),
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        raise
+    return jsonify({"ok": True, "user": user, "users": list_users()})
+
+
 @app.route("/api/admin/users", methods=["POST"])
 def api_create_admin_user():
     body = request.get_json(silent=True) or {}
@@ -1714,6 +1733,29 @@ def api_update_kol_user_labels():
             body.get("label"),
             action=body.get("action") or "add",
         )
+        summary = build_user_import_summary(scope="kol", tenant_slug=tenant["slug"])
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        raise
+    return jsonify({"ok": True, "result": result, "users": summary["users"], "summary": summary})
+
+
+@app.route("/api/kol/users/status", methods=["POST"])
+def api_update_kol_user_status():
+    tenant = get_active_tenant_from_request()
+    body = request.get_json(silent=True) or {}
+    current_user = get_current_authenticated_user() or {}
+    current_role = str(current_user.get("role") or "").strip().lower()
+    current_tenant = str(current_user.get("tenant_slug") or "").strip().lower()
+    if current_role not in {"dav", "admin"}:
+        return jsonify({"ok": False, "error": "kol_access_required"}), 403
+    if current_role == "dav" and current_tenant != str(tenant.get("slug") or "").strip().lower():
+        return jsonify({"ok": False, "error": "tenant_access_denied"}), 403
+    try:
+        result = update_tenant_user_status(tenant["slug"], body.get("user_id"), body.get("status"))
         summary = build_user_import_summary(scope="kol", tenant_slug=tenant["slug"])
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
