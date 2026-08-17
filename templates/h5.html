@@ -16,7 +16,7 @@
 </script>
 <script src="/static/js/theme.js"></script>
 <script src="/static/echarts.min.js"></script>
-<script src="/static/js/echarts_helpers.js?v=20260808-2"></script>
+<script src="/static/js/echarts_helpers.js?v=20260817-1"></script>
 <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
 <style>
 /* ===== BASE ===== */
@@ -4185,6 +4185,7 @@ body,
           </div>
         </div>
         <div data-review-selection-slot="true" style="display:none"></div>
+        <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn-outline" type="button" style="padding:5px 9px;font-size:11px;color:#B42318;border-color:rgba(180,35,24,0.28)" onclick="event.stopPropagation();requestWatchlistRemoval('{{ item.code }}')">移除</button></div>
       </div>
       {% endfor %}
       </div>
@@ -5957,6 +5958,9 @@ async function syncTenantDashboardState(action, dashboardConfig) {
   tenantState.published = tenantFundDashboardRemoteState.published || tenantState.published;
   tenantState.draft = tenantFundDashboardRemoteState.draft;
   persistTenantFundDashboardState();
+  try {
+    window.localStorage?.setItem(SITE_CONFIG_BROADCAST_KEY, String(Date.now()));
+  } catch (error) {}
   return payload;
 }
 
@@ -9379,6 +9383,16 @@ function formatMetricDate(date) {
   return `${month}-${day}`;
 }
 
+function formatDashboardDataDate(value) {
+  const text = String(value || '').trim();
+  if (!text) return '未记录';
+  const compact = text.match(/^(\d{4})(\d{2})(\d{2})(?:\s+\d+)?$/);
+  if (compact) return `${compact[1]}-${compact[2]}-${compact[3]}`;
+  const separated = text.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (separated) return `${separated[1]}-${String(separated[2]).padStart(2, '0')}-${String(separated[3]).padStart(2, '0')}`;
+  return text;
+}
+
 function getIndicatorHubItems() {
   return [
     ...(((H5_INDICATOR_HUB || {}).smart_items) || []),
@@ -11590,6 +11604,78 @@ function buildCommentSectorDistributionFallback(comments) {
     .map(([label, value]) => ({ label, value }));
 }
 
+function renderH5ActivityBarChart(hostId, items, kind) {
+  const host = document.getElementById(hostId);
+  const list = Array.isArray(items) ? items : [];
+  if (!host) return;
+  if (!list.length) {
+    host.innerHTML = '<div style="height:100%;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--gray-400)">当前暂无可统计的用户活动</div>';
+    return;
+  }
+  if (!window.GangtiseEcharts || typeof window.GangtiseEcharts.render !== 'function') {
+    host.innerHTML = buildWorkbenchBarChartFallbackMarkup(list.map((item) => ({ label: item.label, value: Number(item.comments || 0) + Number(item.annotations || 0) })), '用户活动');
+    return;
+  }
+  window.GangtiseEcharts.render(host, {
+    color: ['#2F74C0', '#C8A96E'],
+    tooltip: window.GangtiseEcharts.tooltipBase((params) => `${escapeHtml(params[0].name)}<br>${params.map((item) => `${escapeHtml(item.seriesName)}：${item.value}`).join('<br>')}`),
+    legend: { top: 0, right: 8, textStyle: { color: '#64748B', fontSize: 11 } },
+    grid: window.GangtiseEcharts.gridBase({ top: 34, left: 18, right: 18, bottom: 46 }),
+    xAxis: {
+      type: 'category',
+      data: list.map((item) => item.label),
+      ...window.GangtiseEcharts.axisBase({ axisLabel: { color: '#445468', fontSize: 10, rotate: list.length > 6 ? 28 : 0 } }),
+    },
+    yAxis: { type: 'value', ...window.GangtiseEcharts.axisBase({ axisLabel: { color: '#445468', fontSize: 10 } }) },
+    series: [
+      { name: '评论', type: 'bar', barMaxWidth: 18, itemStyle: { color: 'rgba(47,116,192,0.78)', borderRadius: [6, 6, 0, 0] }, data: list.map((item) => Number(item.comments || 0)) },
+      { name: '标注', type: 'bar', barMaxWidth: 18, itemStyle: { color: 'rgba(200,169,110,0.82)', borderRadius: [6, 6, 0, 0] }, data: list.map((item) => Number(item.annotations || 0)) },
+    ],
+  }, { onClick: (params) => {
+    if (params && params.name) openH5ActivityBucketModal(kind, String(params.name));
+  } });
+}
+
+function openH5ActivityBucketModal(kind, label) {
+  const analytics = getCurrentWorkbenchCommentAnalytics();
+  const bucketKey = kind === 'sector' ? 'sector' : 'day';
+  const records = (Array.isArray(analytics.activity_records) ? analytics.activity_records : [])
+    .filter((item) => item && String(item[bucketKey] || '') === String(label || ''));
+  const comments = records.filter((item) => item.type === 'comment');
+  const annotations = records.filter((item) => item.type === 'annotation');
+  const modal = document.getElementById('workbench-ops-modal');
+  const host = document.getElementById('workbench-ops-modal-content');
+  if (!modal || !host) return;
+  const renderRecords = (items, emptyText) => {
+    const sorted = items.slice().sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
+    return sorted.length ? sorted.map((item) => `<div style="border:1px solid rgba(47,116,192,0.10);border-radius:10px;padding:10px;background:#F7FBFF"><div style="font-size:11px;color:var(--gray-400)">${escapeHtml(item.author_role || '')} · ${escapeHtml(item.author || '')} · ${escapeHtml(item.timestamp || '')}</div><div style="font-size:11px;color:var(--gray-400);margin-top:4px">${escapeHtml(item.stock_name || '')}</div><div style="font-size:12px;color:var(--text-main);line-height:1.6;margin-top:4px">${escapeHtml(item.content || '未填写内容')}</div></div>`).join('') : `<div style="font-size:12px;color:var(--gray-400);padding:16px 0">${emptyText}</div>`;
+  };
+  host.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+      <div><div style="font-size:16px;font-weight:700;color:var(--white)">${escapeHtml(label)} · 活动明细</div><div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-top:6px">${kind === 'sector' ? '行业板块' : '日期'}范围内共 ${records.length} 条活动。</div></div>
+      <button class="btn-outline" type="button" style="padding:6px 12px;font-size:12px;white-space:nowrap" onclick="closeWorkbenchOpsModal()">关闭</button>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:14px;border-bottom:1px solid rgba(47,116,192,0.12);padding-bottom:10px">
+      <button class="btn-outline active" type="button" style="padding:7px 10px;font-size:11px" data-h5-activity-tab="comments" onclick="switchH5ActivityModalTab('comments')">评论 ${comments.length}</button>
+      <button class="btn-outline" type="button" style="padding:7px 10px;font-size:11px" data-h5-activity-tab="annotations" onclick="switchH5ActivityModalTab('annotations')">标注 ${annotations.length}</button>
+    </div>
+    <div id="h5-activity-comments" style="display:grid;gap:8px;margin-top:12px">${renderRecords(comments, '该范围暂无评论。')}</div>
+    <div id="h5-activity-annotations" style="display:none;gap:8px;margin-top:12px">${renderRecords(annotations, '该范围暂无标注。')}</div>
+  `;
+  modal.classList.add('show');
+}
+
+function switchH5ActivityModalTab(tab) {
+  const showAnnotations = tab === 'annotations';
+  const comments = document.getElementById('h5-activity-comments');
+  const annotations = document.getElementById('h5-activity-annotations');
+  if (comments) comments.style.display = showAnnotations ? 'none' : 'grid';
+  if (annotations) annotations.style.display = showAnnotations ? 'grid' : 'none';
+  document.querySelectorAll('[data-h5-activity-tab]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.h5ActivityTab === (showAnnotations ? 'annotations' : 'comments'));
+  });
+}
+
 function openWorkbenchOpsModal(kind) {
   const modal = document.getElementById('workbench-ops-modal');
   const host = document.getElementById('workbench-ops-modal-content');
@@ -11719,21 +11805,19 @@ function renderFanStockSectorChart() {
   }
   const analytics = getCurrentWorkbenchCommentAnalytics();
   const summary = analytics.summary || {};
-  const sectorDistribution = Array.isArray(analytics.sector_distribution) && analytics.sector_distribution.length
-    ? analytics.sector_distribution
-    : buildCommentSectorDistributionFallback(Array.isArray(analytics.recent_comments) ? analytics.recent_comments : []);
-  const recentComments = Array.isArray(analytics.recent_comments) ? analytics.recent_comments : [];
-  if (!sectorDistribution.length) {
+  const sectorActivity = Array.isArray(analytics.sector_activity_distribution) ? analytics.sector_activity_distribution : [];
+  const dateActivity = Array.isArray(analytics.date_activity_distribution) ? analytics.date_activity_distribution : [];
+  if (!sectorActivity.length && !dateActivity.length) {
     host.innerHTML = `
       <div class="wb-stock-sector-empty">
-        <div class="wb-stock-sector-summary">${escapeHtml(analytics.summary_text || '当前近 7 天还没有粉丝自选股评论统计。')}</div>
+        <div class="wb-stock-sector-summary">${escapeHtml(analytics.summary_text || '当前还没有粉丝评论或 K 线标注统计。')}</div>
       </div>
     `;
     return;
   }
   host.innerHTML = `
     <div class="wb-stock-sector-summary">
-      ${escapeHtml(analytics.summary_text || '近 7 天按行业板块归并粉丝自选股评论，先看粉丝最关心哪些板块，再点进具体股票查看评论内容。')}
+      ${escapeHtml(analytics.summary_text || '按行业板块和日期归并粉丝评论与 K 线标注，点击柱子可查看具体清单。')}
     </div>
     <div class="wb-stock-sector-stats">
       <div class="wb-stock-sector-stat">
@@ -11752,33 +11836,40 @@ function renderFanStockSectorChart() {
         <div class="wb-stock-sector-stat-sub">有讨论的标的</div>
       </div>
       <div class="wb-stock-sector-stat">
-        <div class="wb-stock-sector-stat-label">行业板块</div>
-        <div class="wb-stock-sector-stat-value">${Number(sectorDistribution.length || 0)}</div>
-        <div class="wb-stock-sector-stat-sub">评论覆盖行业数</div>
+        <div class="wb-stock-sector-stat-label">K线标注</div>
+        <div class="wb-stock-sector-stat-value">${Number(summary.total_annotations || 0)}</div>
+        <div class="wb-stock-sector-stat-sub">租户内 K 线标注</div>
       </div>
     </div>
     <div style="margin-top:12px;border:1px solid rgba(47,116,192,0.12);border-radius:14px;background:#FFFFFF;padding:12px">
-      <div style="font-size:13px;font-weight:700;color:var(--text-main);margin-bottom:8px">行业板块分布</div>
-      <div id="wb-fan-stock-sector-bar" style="width:100%;height:240px">${buildWorkbenchBarChartFallbackMarkup(sectorDistribution, '留言数')}</div>
-    </div>
-    <div style="margin-top:12px;border:1px solid rgba(47,116,192,0.12);border-radius:14px;background:#FFFFFF;padding:12px">
-      <div style="font-size:13px;font-weight:700;color:var(--text-main);margin-bottom:8px">最新评论</div>
-      <div style="display:grid;gap:8px">
-        ${recentComments.length ? recentComments.slice(0, 4).map((item) => `
-          <div style="border:1px solid rgba(47,116,192,0.10);border-radius:10px;padding:10px;background:#F7FBFF">
-            <div style="font-size:11px;color:var(--gray-400)">${escapeHtml(item.created_by_role_label || '')} · ${escapeHtml(item.created_by_name || '')}</div>
-            <div style="font-size:12px;color:var(--text-main);line-height:1.6;margin-top:4px">${escapeHtml(item.comment_text || '')}</div>
-          </div>
-        `).join('') : '<div style="font-size:12px;color:var(--gray-400)">暂无评论记录</div>'}
+      <div style="font-size:13px;font-weight:700;color:var(--text-main);margin-bottom:8px">用户活动分布</div>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7">评论使用蓝色，标注使用金色。点击任意柱子查看该行业或日期下的两类明细。</div>
+      <div style="display:flex;gap:6px;margin-top:10px;border-bottom:1px solid rgba(47,116,192,0.12);padding-bottom:10px">
+        <button class="btn-outline active" type="button" style="padding:7px 10px;font-size:11px" data-h5-activity-chart-tab="sector" onclick="switchH5ActivityChartTab('sector')">行业板块</button>
+        <button class="btn-outline" type="button" style="padding:7px 10px;font-size:11px" data-h5-activity-chart-tab="date" onclick="switchH5ActivityChartTab('date')">日期趋势</button>
       </div>
+      <div id="wb-fan-stock-sector-bar" style="width:100%;height:260px;margin-top:10px"></div>
+      <div id="wb-fan-stock-date-bar" style="width:100%;height:260px;margin-top:10px;display:none"></div>
     </div>
   `;
-  renderWorkbenchBarChartDeferred(
-    'wb-fan-stock-sector-bar',
-    sectorDistribution.map((item) => ({ label: item.label, value: item.value })),
-    '留言数',
-    { rotateLabels: sectorDistribution.length > 4 },
-  );
+  renderH5ActivityBarChart('wb-fan-stock-sector-bar', sectorActivity, 'sector');
+}
+
+function switchH5ActivityChartTab(tab) {
+  const isDate = tab === 'date';
+  const sectorHost = document.getElementById('wb-fan-stock-sector-bar');
+  const dateHost = document.getElementById('wb-fan-stock-date-bar');
+  if (sectorHost) sectorHost.style.display = isDate ? 'none' : '';
+  if (dateHost) dateHost.style.display = isDate ? '' : 'none';
+  document.querySelectorAll('[data-h5-activity-chart-tab]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.h5ActivityChartTab === (isDate ? 'date' : 'sector'));
+  });
+  const analytics = getCurrentWorkbenchCommentAnalytics();
+  window.requestAnimationFrame(() => renderH5ActivityBarChart(
+    isDate ? 'wb-fan-stock-date-bar' : 'wb-fan-stock-sector-bar',
+    isDate ? (analytics.date_activity_distribution || []) : (analytics.sector_activity_distribution || []),
+    isDate ? 'date' : 'sector',
+  ));
 }
 
 function openFanStockInsightStock(stockCode) {
@@ -11793,9 +11884,12 @@ function openFanStockInsightStock(stockCode) {
 // ===== WATCHLIST =====
 let currentWatchlistDetail = null;
 const WATCHLIST_ADDED_STORAGE_KEY = 'gangtise_demo_added_watchlist_codes';
+const WATCHLIST_REMOVED_STORAGE_KEY = 'gangtise_demo_removed_watchlist_codes';
 const WATCHLIST_ANNOTATION_STORAGE_KEY = 'gangtise_demo_watchlist_annotations';
 let addedWatchlistCodes = loadAddedWatchlistCodes();
+let removedWatchlistCodes = loadRemovedWatchlistCodes();
 let currentWatchlistAnnotationTarget = null;
+let pendingWatchlistRemovalCode = '';
 let watchlistAnnotationStore = loadWatchlistAnnotationStore();
 let watchlistSuggestionItems = [];
 let watchlistSuggestionRequestSeq = 0;
@@ -11816,6 +11910,24 @@ function persistAddedWatchlistCodes() {
   try {
     if (window.localStorage) {
       window.localStorage.setItem(WATCHLIST_ADDED_STORAGE_KEY, JSON.stringify(addedWatchlistCodes));
+    }
+  } catch (e) {}
+}
+
+function loadRemovedWatchlistCodes() {
+  try {
+    const raw = window.localStorage ? window.localStorage.getItem(WATCHLIST_REMOVED_STORAGE_KEY) : '';
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.map(normalizeStockLookupValue).filter(Boolean) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function persistRemovedWatchlistCodes() {
+  try {
+    if (window.localStorage) {
+      window.localStorage.setItem(WATCHLIST_REMOVED_STORAGE_KEY, JSON.stringify(removedWatchlistCodes));
     }
   } catch (e) {}
 }
@@ -12204,7 +12316,8 @@ function submitWatchlistStockCode() {
 
 function isStockInWatchlist(stockCode) {
   const normalizedCode = normalizeStockLookupValue(stockCode);
-  return getRenderedWatchlistCodes().includes(normalizedCode) || addedWatchlistCodes.includes(normalizedCode);
+  return !removedWatchlistCodes.includes(normalizedCode)
+    && (getRenderedWatchlistCodes().includes(normalizedCode) || addedWatchlistCodes.includes(normalizedCode));
 }
 
 function buildWatchlistCardHtml(detail) {
@@ -12247,6 +12360,7 @@ function buildWatchlistCardHtml(detail) {
         <div style="font-size:10px;color:#63B3ED;font-weight:700">${escapeHtml(latestAnnotation.dateLabel || '--')} · 最新标注</div>
         <div style="font-size:12px;color:var(--white);line-height:1.7;margin-top:4px">${escapeHtml(latestAnnotation.content || latestAnnotation.note || '')}</div>
       </div>` : ''}
+      ${isStockInWatchlist(detail.code) ? `<div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn-outline" type="button" style="padding:5px 9px;font-size:11px;color:#B42318;border-color:rgba(180,35,24,0.28)" onclick="event.stopPropagation();requestWatchlistRemoval('${escapeAttr(detail.code)}')">移除</button></div>` : ''}
       <div data-review-selection-slot="true" style="display:none"></div>
     </div>
   `;
@@ -12256,6 +12370,8 @@ function addCurrentStockToWatchlist() {
   if (!currentWatchlistDetail) return;
   const stockCode = normalizeStockLookupValue(currentWatchlistDetail.code);
   if (!stockCode) return;
+  removedWatchlistCodes = removedWatchlistCodes.filter((code) => code !== stockCode);
+  persistRemovedWatchlistCodes();
   if (!addedWatchlistCodes.includes(stockCode)) {
     addedWatchlistCodes.unshift(stockCode);
     persistAddedWatchlistCodes();
@@ -12275,7 +12391,47 @@ function addCurrentStockToWatchlist() {
   showToast('已加入自选股');
 }
 
+function requestWatchlistRemoval(stockCode) {
+  const normalizedCode = normalizeStockLookupValue(stockCode);
+  if (!normalizedCode || !isStockInWatchlist(normalizedCode)) return;
+  pendingWatchlistRemovalCode = normalizedCode;
+  if (currentWatchlistDetail && normalizeStockLookupValue(currentWatchlistDetail.code) === normalizedCode) {
+    renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
+    return;
+  }
+  openWatchlistDetail(normalizedCode, 'overview');
+}
+
+function cancelWatchlistRemoval() {
+  pendingWatchlistRemovalCode = '';
+  if (currentWatchlistDetail) renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
+}
+
+function removeCurrentStockFromWatchlist() {
+  const detail = currentWatchlistDetail || {};
+  const stockCode = normalizeStockLookupValue(detail.code || pendingWatchlistRemovalCode);
+  if (!stockCode || stockCode !== pendingWatchlistRemovalCode) return;
+  const card = document.querySelector(`[data-watchlist-card="true"][data-stock-code="${stockCode}"]`);
+  const stockName = String((card && card.dataset.stockName) || detail.name || '').trim();
+  removedWatchlistCodes = [stockCode, ...removedWatchlistCodes.filter((code) => code !== stockCode)];
+  addedWatchlistCodes = addedWatchlistCodes.filter((code) => code !== stockCode);
+  persistRemovedWatchlistCodes();
+  persistAddedWatchlistCodes();
+  if (card) card.remove();
+  if (stockName) {
+    reviewTriggerDraft.selectedWatchlist = (reviewTriggerDraft.selectedWatchlist || []).filter((name) => name !== stockName);
+  }
+  pendingWatchlistRemovalCode = '';
+  renderReviewWatchlistSelectionMode();
+  renderHermesWorkspace();
+  if (currentWatchlistDetail) renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
+  showToast(`已从自选股移除${stockName ? `：${stockName}` : ''}`);
+}
+
 function renderWatchlist() {
+  removedWatchlistCodes.forEach((stockCode) => {
+    document.querySelector(`[data-watchlist-card="true"][data-stock-code="${stockCode}"]`)?.remove();
+  });
   renderReviewWatchlistSelectionMode();
   renderHermesWorkspace();
 }
@@ -12522,8 +12678,6 @@ function buildWatchlistKlineSvg(series, options) {
       annotations: Array.isArray(config.annotations) ? config.annotations : [],
     }), {
       onClick: (params) => {
-        const activeUser = getActiveDemoUser();
-        if (activeUser.role !== 'dav') return;
         if (params && params.seriesType === 'candlestick' && Number.isInteger(params.dataIndex)) {
           openWatchlistAnnotationModal(params.dataIndex);
         }
@@ -12715,8 +12869,15 @@ function renderWatchlistDetail(data, section) {
       </div>
 
       <div style="display:grid;gap:8px;margin-bottom:14px">
-        <button class="${isStockInWatchlist(data.code) ? 'btn-outline' : 'btn-gold'}" style="padding:10px;font-size:12px" onclick="addCurrentStockToWatchlist()">${isStockInWatchlist(data.code) ? '已加入自选股' : '添加自选股'}</button>
+        <button class="${isStockInWatchlist(data.code) ? 'btn-outline' : 'btn-gold'}" style="padding:10px;font-size:12px;${isStockInWatchlist(data.code) ? 'color:#B42318;border-color:rgba(180,35,24,0.28)' : ''}" onclick="${isStockInWatchlist(data.code) ? 'requestWatchlistRemoval(currentWatchlistDetail.code)' : 'addCurrentStockToWatchlist()'}">${isStockInWatchlist(data.code) ? '移出自选股' : '添加自选股'}</button>
       </div>
+      ${pendingWatchlistRemovalCode === normalizeStockLookupValue(data.code) ? `
+        <div style="margin:-4px 0 14px;padding:12px;border:1px solid rgba(180,35,24,0.20);border-radius:10px;background:rgba(180,35,24,0.04)">
+          <div style="font-size:12px;font-weight:700;color:var(--text-main)">从自选股移除“${escapeHtml(data.name || data.code)}”？</div>
+          <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-top:4px">不会删除评论、K线标注或历史研究记录。</div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px"><button class="btn-outline" type="button" style="padding:7px 11px;font-size:11px" onclick="cancelWatchlistRemoval()">保留</button><button class="btn-outline" type="button" style="padding:7px 11px;font-size:11px;color:#B42318;border-color:rgba(180,35,24,0.28)" onclick="removeCurrentStockFromWatchlist()">确认移出</button></div>
+        </div>
+      ` : ''}
       <div class="watch-detail-tabs">
         <div class="watch-detail-tab ${activeSection === 'overview' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'overview')">总览</div>
         ${showIntradayTab ? `<div class="watch-detail-tab ${activeSection === 'intraday' ? 'active' : ''}" onclick="renderWatchlistDetail(currentWatchlistDetail,'intraday')">分时</div>` : ''}
@@ -12822,15 +12983,12 @@ function openWatchlistAuthorDm(name) {
 
 function openWatchlistAnnotationModal(candleIndex) {
   const user = getActiveDemoUser();
-  if (user.role !== 'dav') {
-    showToast('只有大V身份可以在 K 线上做标注');
-    return;
-  }
   if (!currentWatchlistDetail || !Array.isArray(currentWatchlistDetail.kline)) return;
   const candle = currentWatchlistDetail.kline[candleIndex];
   if (!candle) return;
   const annotationKey = currentWatchlistDetail.annotation_key || currentWatchlistDetail.indicator_code || currentWatchlistDetail.code;
-  const existing = getWatchlistAnnotations(user.tenant.id, annotationKey).find(item => Number(item.candleIndex) === Number(candleIndex));
+  const profileId = String(user.username || user.id || '').trim();
+  const existing = getWatchlistAnnotations(user.tenant.id, annotationKey).find(item => Number(item.candleIndex) === Number(candleIndex) && String(item.created_by_user_id || '') === profileId);
   currentWatchlistAnnotationTarget = {
     tenantId: user.tenant.id,
     stockCode: annotationKey,
@@ -12885,8 +13043,9 @@ function saveWatchlistAnnotation() {
     return;
   }
   const bucket = getWatchlistAnnotationBucket(target.tenantId, target.stockCode);
+  const userPayload = getActiveWatchlistUserPayload();
   const nextEntry = {
-    id: buildAnnotationId(target.tenantId, target.stockCode, target.candleIndex),
+    id: `${buildAnnotationId(target.tenantId, target.stockCode, target.candleIndex)}__${userPayload.user_profile_id}`,
     candleIndex: target.candleIndex,
     dateLabel: target.candle.date || '',
     content,
@@ -12894,13 +13053,14 @@ function saveWatchlistAnnotation() {
     note: content,
     trigger: '',
     updatedAt: '刚刚',
+    created_by_user_id: userPayload.user_profile_id,
+    created_by_role: userPayload.user_role,
   };
   const previousItems = bucket.slice();
-  const existingIndex = bucket.findIndex(item => Number(item.candleIndex) === Number(target.candleIndex));
+  const existingIndex = bucket.findIndex(item => Number(item.candleIndex) === Number(target.candleIndex) && String(item.created_by_user_id || '') === String(userPayload.user_profile_id || ''));
   if (existingIndex >= 0) bucket[existingIndex] = nextEntry;
   else bucket.push(nextEntry);
   persistWatchlistAnnotationStore();
-  const userPayload = getActiveWatchlistUserPayload();
   fetch(`/api/watchlist/${encodeURIComponent(target.stockCode)}/annotations`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -12921,7 +13081,7 @@ function saveWatchlistAnnotation() {
     if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'watchlist_annotation_save_failed');
     const currentUser = getActiveDemoUser() || {};
     replaceWatchlistAnnotations(((currentUser || {}).tenant || {}).id, target.stockCode, [
-      ...getWatchlistAnnotations(((currentUser || {}).tenant || {}).id, target.stockCode).filter((item) => Number(item.candleIndex) !== Number(target.candleIndex)),
+      ...getWatchlistAnnotations(((currentUser || {}).tenant || {}).id, target.stockCode).filter((item) => Number(item.candleIndex) !== Number(target.candleIndex) || String(item.created_by_user_id || '') !== String(userPayload.user_profile_id || '')),
       data.item,
     ]);
     closeWatchlistAnnotationModal();
@@ -12947,7 +13107,7 @@ function deleteWatchlistAnnotation() {
   persistWatchlistAnnotationStore();
   const userPayload = getActiveWatchlistUserPayload();
   const existingId = target.existing && target.existing.id ? target.existing.id : target.candleIndex;
-  fetch(`/api/watchlist/${encodeURIComponent(target.stockCode)}/annotations/${encodeURIComponent(existingId)}` + `?tenant_slug=${encodeURIComponent(userPayload.tenant_slug)}&user_role=${encodeURIComponent(userPayload.user_role)}`, {
+  fetch(`/api/watchlist/${encodeURIComponent(target.stockCode)}/annotations/${encodeURIComponent(existingId)}` + `?tenant_slug=${encodeURIComponent(userPayload.tenant_slug)}&user_role=${encodeURIComponent(userPayload.user_role)}&user_profile_id=${encodeURIComponent(userPayload.user_profile_id)}`, {
     method: 'DELETE',
   }).then(async (resp) => {
     const data = await resp.json().catch(() => ({}));
@@ -17463,29 +17623,43 @@ async function confirmWorkbenchSmartIndicator() {
 
 async function removeWorkbenchDashboardIndicator(index) {
   const active = getDraftFundDashboard() || getPublishedFundDashboard() || { layout: '2x2', cards: [] };
-  const layout = normalizeDashboardLayout(active.layout || '2x2');
-  const nextCards = buildWorkbenchSmartDashboardCardRefs(active, layout, index, '');
+  const activeCard = Array.isArray(active.cards) ? active.cards[index] : null;
+  const indicatorCode = String((activeCard && (activeCard.indicatorCode || activeCard.indicator_code)) || '').trim();
+  if (!indicatorCode) {
+    showToast('未找到可移除的指标');
+    return;
+  }
+  const stripIndicator = (dashboard) => {
+    if (!dashboard || typeof dashboard !== 'object') return dashboard;
+    const layout = normalizeDashboardLayout(dashboard.layout || '2x2');
+    const cards = Array.from({ length: getDashboardCardTarget(layout) }, (_, slotIndex) => {
+      const raw = Array.isArray(dashboard.cards) && typeof dashboard.cards[slotIndex] === 'object' ? dashboard.cards[slotIndex] : {};
+      const code = String(raw.indicatorCode || raw.indicator_code || '').trim();
+      return code === indicatorCode ? {} : (code ? { indicatorCode: code } : {});
+    });
+    return { ...dashboard, layout, cards };
+  };
   const tenantState = getTenantFundDashboardState();
-  const hadDraft = !!tenantState.draft;
+  const previousPublished = cloneDashboardConfig(tenantState.published);
   const previousDraft = cloneDashboardConfig(tenantState.draft);
-  const optimisticDraft = { ...active, layout, cards: nextCards };
+  const optimisticPublished = stripIndicator(tenantState.published || getPublishedFundDashboard());
+  const optimisticDraft = tenantState.draft ? stripIndicator(tenantState.draft) : null;
+  tenantState.published = optimisticPublished;
   tenantState.draft = optimisticDraft;
+  tenantFundDashboardRemoteState.published = cloneDashboardConfig(optimisticPublished);
   tenantFundDashboardRemoteState.draft = cloneDashboardConfig(optimisticDraft);
   persistTenantFundDashboardState();
   closeWorkbenchSmartIndicatorDetailModal();
   renderWorkbenchFundDashboard();
   renderFundMacroDashboard();
-  showToast('已从看板移除，正在保存...', 2600);
+  showToast('已从看板移除', 1800);
   try {
-    await syncTenantDashboardState('save_draft', {
-      ...active,
-      layout,
-      cards: nextCards,
-    });
-    showToast('已从智能看板移除');
+    await syncTenantDashboardState('remove_indicator', { indicator_code: indicatorCode });
   } catch (error) {
-    tenantState.draft = hadDraft ? previousDraft : null;
-    tenantFundDashboardRemoteState.draft = hadDraft ? cloneDashboardConfig(previousDraft) : null;
+    tenantState.published = previousPublished;
+    tenantState.draft = previousDraft;
+    tenantFundDashboardRemoteState.published = cloneDashboardConfig(previousPublished);
+    tenantFundDashboardRemoteState.draft = cloneDashboardConfig(previousDraft);
     persistTenantFundDashboardState();
     renderWorkbenchFundDashboard();
     renderFundMacroDashboard();
@@ -17550,6 +17724,8 @@ function buildWorkbenchDashboardDetailCard(rawCard, fallback = {}) {
     unit: card.unit || (smartIndicator && smartIndicator.unit) || (baseIndicator && baseIndicator.unit) || fallback.unit || '',
     prompt: card.prompt || (smartIndicator && smartIndicator.prompt_text) || '',
     updatedAt: card.updatedAt || (smartIndicator && smartIndicator.last_updated) || fallback.updatedAt || '',
+    dataAt: card.dataAt || (smartIndicator && smartIndicator.data_at) || (baseIndicator && baseIndicator.data_at) || fallback.dataAt || '',
+    snapshotAt: card.snapshotAt || (smartIndicator && smartIndicator.last_updated) || fallback.snapshotAt || '',
     algorithmDetail: card.algorithmDetail || (smartIndicator && smartIndicator.algorithm_detail) || (isBaseIndicator ? baseAlgorithmDetail : '') || fallback.algorithmDetail || '暂无算法详情',
     interpretation: card.interpretation || card.assessment || (smartIndicator && (smartIndicator.interpretation || smartIndicator.assessment)) || (isBaseIndicator ? `${baseName}为统一维护的基础指标，可作为智能指标的计算对象。` : '') || fallback.interpretation || '暂无解读',
     selectedIndicators: card.selectedIndicators || (smartIndicator && smartIndicator.selected_indicators) || (isBaseIndicator ? [{ indicator_code: indicatorCode, indicator_name: baseName }] : []) || [],
@@ -17600,7 +17776,7 @@ function openWorkbenchSmartIndicatorDetailModal(card) {
   host.innerHTML = `
     <div class="modal-title" style="margin-bottom:10px">${showWorkbenchEditor ? '智能指标详情' : escapeHtml(card.name || '智能指标详情')}</div>
     <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">
-      当前值：${escapeHtml(`${card.value || '--'}${card.unit || ''}`)} · 更新时间：${escapeHtml(card.updatedAt || '未记录')}
+      当前值：${escapeHtml(`${card.value || '--'}${card.unit || ''}`)} · 数据日期：${escapeHtml(formatDashboardDataDate(card.dataAt))} · 最近计算：${escapeHtml(card.snapshotAt || card.updatedAt || '未记录')}
     </div>
     ${showWorkbenchEditor ? `
     <div class="knowledge-modal-block">
@@ -17668,10 +17844,13 @@ async function saveWorkbenchSmartIndicatorDefinition(indicatorCode) {
     return;
   }
   openWorkbenchSmartIndicatorDetailModal({...buildWorkbenchDashboardDetailCard(item), name, category, unit, algorithmDetail: algorithm, interpretation, prompt: promptText, isSaving: true});
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 90000);
   try {
     const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         action: 'save',
         indicator_code: item.indicator_code,
@@ -17699,7 +17878,11 @@ async function saveWorkbenchSmartIndicatorDefinition(indicatorCode) {
     renderFundMacroDashboard();
     showToast('提示词已更新，指标结果已重算');
   } catch (error) {
-    showToast(error.message || '指标更新失败');
+    const message = error && error.name === 'AbortError' ? '保存超时，请检查服务端任务状态后重试' : (error.message || '指标更新失败');
+    openWorkbenchSmartIndicatorDetailModal({...buildWorkbenchDashboardDetailCard(item), name, category, unit, algorithmDetail: algorithm, interpretation, prompt: promptText});
+    showToast(message);
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 }
 
@@ -17814,7 +17997,7 @@ function renderFundMacroDashboard() {
           <div class="wb-dashboard-summary-card filled" onclick="openWorkbenchDashboardIndicatorDetail(${index}, 'published')">
             <div class="wb-dashboard-summary-head">
               <div class="wb-dashboard-summary-title">${escapeHtml(item.name || '智能指标')}</div>
-              <div class="wb-dashboard-summary-tag">${escapeHtml(item.updatedAt || '已发布')}</div>
+              <div class="wb-dashboard-summary-tag">数据日期：${escapeHtml(formatDashboardDataDate(item.dataAt))}</div>
             </div>
             <div class="wb-dashboard-summary-value">${escapeHtml(`${item.value || '--'}${item.unit || ''}`)}</div>
           </div>
@@ -17855,7 +18038,7 @@ function renderWorkbenchFundDashboard() {
         <div class="wb-dashboard-summary-card filled" onclick="openWorkbenchDashboardIndicatorDetail(${index}, 'published')">
           <div class="wb-dashboard-summary-head">
             <div class="wb-dashboard-summary-title">${escapeHtml(item.name || '智能指标')}</div>
-            <span class="wb-dashboard-summary-tag">${escapeHtml(item.updatedAt || '已发布')}</span>
+            <span class="wb-dashboard-summary-tag">数据日期：${escapeHtml(formatDashboardDataDate(item.dataAt))}</span>
           </div>
           <div class="wb-dashboard-summary-value">${escapeHtml(`${item.value || '--'}${item.unit || ''}`)}</div>
         </div>
@@ -17893,7 +18076,7 @@ function renderWorkbenchFundDashboard() {
         <div class="wb-dashboard-summary-card filled" onclick="openWorkbenchDashboardIndicatorDetail(${index}, '${getDraftFundDashboard() ? 'draft' : 'published'}')">
           <div class="wb-dashboard-summary-head">
             <div class="wb-dashboard-summary-title">${escapeHtml(item.name || '智能指标')}</div>
-            <span class="wb-dashboard-summary-tag">${escapeHtml(item.updatedAt || '未记录')}</span>
+            <span class="wb-dashboard-summary-tag">数据日期：${escapeHtml(formatDashboardDataDate(item.dataAt))}</span>
           </div>
           <div class="wb-dashboard-summary-value">${escapeHtml(`${item.value || '--'}${item.unit || ''}`)}</div>
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;padding-top:9px;border-top:1px solid rgba(47,116,192,0.10)">
@@ -18022,6 +18205,7 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('storage', (event) => {
   if (event.key === SITE_CONFIG_BROADCAST_KEY) {
     refreshH5SiteConfig({silent: true});
+    refreshTenantDashboardRemoteState({rerenderFeed: true, rerenderWorkbench: true});
   }
 });
 </script>

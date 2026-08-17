@@ -8401,7 +8401,7 @@ async function runAdminTask(taskCode, forceRun) {
     return;
   }
   applyAdminTaskCenterPayload(data);
-  if (taskCode === 'indicator_prepare' || taskCode === 'indicator_market_cache_sync') {
+  if (taskCode === 'indicator_prepare' || taskCode === 'indicator_gangtise_openapi_sync' || taskCode === 'indicator_market_cache_sync') {
     await refreshAdminIndicatorHub(false);
   }
   showToast(`任务 ${taskCode} 已执行`);

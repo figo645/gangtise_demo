@@ -45,6 +45,10 @@ def get_indicator_definition(*args, **kwargs):
     return _market_services_module().get_indicator_definition(*args, **kwargs)
 
 
+def list_indicator_definitions(*args, **kwargs):
+    return _market_services_module().list_indicator_definitions(*args, **kwargs)
+
+
 def invalidate_indicator_hub_cache(*args, **kwargs):
     return _market_services_module().invalidate_indicator_hub_cache(*args, **kwargs)
 
@@ -2417,6 +2421,7 @@ def build_tenant_smart_indicator_catalog(tenant=None):
                 "selected_indicators": copy.deepcopy(item.get("selected_indicators") or []),
                 "display_order": int(item.get("display_order") or 0),
                 "last_updated": item.get("last_updated") or "",
+                "data_at": item.get("data_at") or "",
             }
         )
     return sorted(items, key=lambda current: (current.get("display_order", 0), current.get("indicator_name") or ""))
@@ -2442,6 +2447,8 @@ def build_fund_dashboard_card_from_indicator(indicator_item, index=0):
         "sources": source_names,
         "selectedIndicators": selected_indicators,
         "updatedAt": str(item.get("last_updated") or item.get("updatedAt") or "").strip(),
+        "dataAt": str(item.get("data_at") or "").strip(),
+        "snapshotAt": str(item.get("last_updated") or item.get("updatedAt") or "").strip(),
         "isEmpty": False,
     }
 
@@ -2836,8 +2843,79 @@ def default_tenant_fund_dashboard_state(tenant):
     }
 
 
+def refresh_tenant_smart_indicator_snapshots(tenant):
+    """Recalculate tenant smart indicators when an input snapshot is newer.
+
+    The dashboard is allowed to refresh a derived value from persisted market
+    data, but it must not advance its timestamp merely because a page was
+    opened. External market collection remains the responsibility of the
+    indicator task center.
+    """
+    tenant_slug = str((tenant or {}).get("slug") or "").strip().lower()
+    if not tenant_slug:
+        return {"checked": 0, "refreshed": 0}
+    definitions = [
+        item for item in list_indicator_definitions()
+        if str(item.get("tenant_slug") or "").strip().lower() == tenant_slug
+        and str(item.get("source_type") or "").strip().lower() == "smart"
+    ]
+    if not definitions:
+        return {"checked": 0, "refreshed": 0}
+    db = get_db()
+    latest_map = {
+        str(row["indicator_code"]): dict(row)
+        for row in db.execute("SELECT * FROM indicator_latest_values").fetchall()
+    }
+    refreshed = 0
+    for definition in definitions:
+        selected = normalize_selected_indicator_refs(definition.get("selected_indicators"))
+        source_times = [
+            str((latest_map.get(str(item.get("indicator_code") or "")) or {}).get("updated_at") or "").strip()
+            for item in selected
+        ]
+        newest_source_time = max(source_times, default="")
+        current = latest_map.get(str(definition.get("indicator_code") or "")) or {}
+        current_time = str(current.get("updated_at") or "").strip()
+        if not current or (newest_source_time and newest_source_time > current_time):
+            snapshot = save_smart_indicator_latest_snapshot(definition)
+            if snapshot:
+                refreshed += 1
+                latest_map[str(definition.get("indicator_code") or "")] = {
+                    **current,
+                    "updated_at": snapshot.get("updated_at") or now_ts(),
+                    "latest_value": snapshot.get("value"),
+                }
+    return {"checked": len(definitions), "refreshed": refreshed}
+
+
+def refresh_all_tenant_smart_indicator_snapshots():
+    """Refresh every tenant's derived indicators after a base-data sync."""
+    tenant_results = []
+    checked = 0
+    refreshed = 0
+    for tenant in get_tenant_configs():
+        result = refresh_tenant_smart_indicator_snapshots(tenant)
+        checked += int(result.get("checked") or 0)
+        refreshed += int(result.get("refreshed") or 0)
+        tenant_results.append({
+            "tenant_slug": str(tenant.get("slug") or "").strip(),
+            **result,
+        })
+    return {
+        "tenants": len(tenant_results),
+        "checked": checked,
+        "refreshed": refreshed,
+        "tenant_results": tenant_results,
+    }
+
+
 def resolve_tenant_fund_dashboard_state(tenant, config=None):
     tenant = tenant or get_tenant_by_slug()
+    try:
+        refresh_tenant_smart_indicator_snapshots(tenant)
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
     defaults = default_tenant_fund_dashboard_state(tenant)
     raw = config if isinstance(config, dict) else {}
     published = normalize_fund_dashboard_view(raw.get("published"), tenant) if isinstance(raw.get("published"), dict) else copy.deepcopy(defaults["published"])
@@ -5840,6 +5918,7 @@ def init_db():
         execute_sql_file(conn, sql_dir / "022_hermes_memory_profile.sql")
         execute_sql_file(conn, sql_dir / "023_fan_stock_observation_events.sql")
         execute_sql_file(conn, sql_dir / "024_watchlist_kline_annotations.sql")
+        execute_sql_file(conn, sql_dir / "105_watchlist_annotations_per_user.sql")
         execute_sql_file(conn, sql_dir / "025_watchlist_comments.sql")
         execute_sql_file(conn, sql_dir / "026_tenant_fan_ops.sql")
         execute_sql_file(conn, sql_dir / "027_h5_auth_wechat.sql")
@@ -6540,9 +6619,12 @@ def execute_admin_task_by_type(task_type, force=False):
     )
 
     if task_type == "prepare_indicator_hub":
-        return prepare_indicator_hub_store(force=force)
+        result = prepare_indicator_hub_store(force=force)
+        result["tenant_smart_refresh"] = refresh_all_tenant_smart_indicator_snapshots()
+        return result
     if task_type == "sync_real_indicator_history":
         result = sync_real_indicator_history_from_market_cache(force=force)
+        result["tenant_smart_refresh"] = refresh_all_tenant_smart_indicator_snapshots()
         invalidate_indicator_hub_cache()
         return result
     if task_type == "sync_market_snapshot":

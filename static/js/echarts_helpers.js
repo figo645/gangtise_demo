@@ -231,13 +231,27 @@
     return value;
   }
 
+  function formatKlineAxisDate(value) {
+    const text = String(value || '').trim();
+    const compact = text.match(/^(\d{4})(\d{2})(\d{2})(?:\s+\d+)?$/);
+    if (compact) return { short: `${compact[2]}-${compact[3]}`, full: `${compact[1]}-${compact[2]}-${compact[3]}` };
+    const separated = text.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    if (separated) {
+      const month = String(separated[2]).padStart(2, '0');
+      const day = String(separated[3]).padStart(2, '0');
+      return { short: `${month}-${day}`, full: `${separated[1]}-${month}-${day}` };
+    }
+    return { short: text.slice(5) || text || '--', full: text || '--' };
+  }
+
   function buildKlineOption(payload, config) {
     const p = palette();
     const safeConfig = config || {};
     const candles = Array.isArray(payload && payload.candles) ? payload.candles : [];
     const anomalies = Array.isArray(payload && payload.anomalies) ? payload.anomalies : [];
     const annotations = Array.isArray(safeConfig.annotations) ? safeConfig.annotations : [];
-    const categories = candles.map((item) => String(item.date || '').slice(5) || '--');
+    const dateLabels = candles.map((item) => formatKlineAxisDate(item.date));
+    const categories = dateLabels.map((item) => item.short);
     const candleData = candles.map((item) => [
       Number(item.open || 0),
       Number(item.close || 0),
@@ -274,7 +288,7 @@
         if (!main || !Array.isArray(main.value)) return '';
         const value = normalizeKlineTooltipValues(main.value);
         const lines = [
-          `<div style="font-weight:700;color:${p.textMain};margin-bottom:6px">${main.axisValueLabel || main.name || '--'}</div>`,
+          `<div style="font-weight:700;color:${p.textMain};margin-bottom:6px">${dateLabels[main.dataIndex]?.full || main.axisValueLabel || main.name || '--'}</div>`,
           `开盘：${formatTooltipMetric(value.open)}`,
           `收盘：${formatTooltipMetric(value.close)}`,
           `最低：${formatTooltipMetric(value.low)}`,
@@ -299,7 +313,17 @@
         boundaryGap: true,
         min: 'dataMin',
         max: 'dataMax',
-        ...axisBase({ splitLine: { show: false } }),
+        ...axisBase({
+          splitLine: { show: false },
+          axisLabel: {
+            color: p.textSub,
+            fontSize: 9,
+            show: true,
+            interval: Math.max(0, Math.ceil(categories.length / 5) - 1),
+            hideOverlap: true,
+          },
+          axisTick: { show: true, length: 3 },
+        }),
       },
       yAxis: {
         type: 'value',

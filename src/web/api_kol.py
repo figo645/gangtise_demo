@@ -588,7 +588,11 @@ def api_save_tenant_dashboard(tenant_slug):
     body = request.get_json(silent=True) or {}
     action = str(body.get("action") or "").strip().lower()
     dashboard = body.get("dashboard") if isinstance(body.get("dashboard"), dict) else None
-    saved = update_tenant_fund_dashboard_config(tenant_slug, action, dashboard)
+    if action == "remove_indicator":
+        indicator_code = str(body.get("indicator_code") or (dashboard or {}).get("indicator_code") or (dashboard or {}).get("indicatorCode") or "").strip()
+        saved = remove_smart_indicator_from_dashboard(tenant_slug, indicator_code) if indicator_code else None
+    else:
+        saved = update_tenant_fund_dashboard_config(tenant_slug, action, dashboard)
     if not saved:
         return jsonify({"success": False, "error": "invalid_action"}), 400
     latest_tenant = get_tenant_by_slug(tenant_slug, saved)

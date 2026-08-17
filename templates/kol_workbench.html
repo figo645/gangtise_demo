@@ -5272,6 +5272,66 @@ function renderWorkbenchBarChart(hostId, items) {
   });
 }
 
+function renderWorkbenchActivityBarChart(hostId, items, onClick) {
+  const host = document.getElementById(hostId);
+  const list = Array.isArray(items) ? items : [];
+  if (!host) return;
+  if (!list.length) {
+    host.innerHTML = '<div class="kw-watch-insight-panel-desc" style="padding:42px 12px;text-align:center">当前暂无可统计的用户活动</div>';
+    return;
+  }
+  window.GangtiseEcharts.render(host, {
+    color: ['#2F74C0', '#C8A96E'],
+    tooltip: window.GangtiseEcharts.tooltipBase((params) => `${params[0].name}<br>${params.map((item) => `${item.seriesName}：${item.value}`).join('<br>')}`),
+    legend: { top: 0, right: 8, textStyle: { color: '#64748B', fontSize: 11 } },
+    grid: window.GangtiseEcharts.gridBase({ top: 34, left: 18, right: 18, bottom: 42 }),
+    xAxis: { type: 'category', data: list.map((item) => item.label), ...window.GangtiseEcharts.axisBase({ axisLabel: { color: '#445468', fontSize: 10, rotate: list.length > 8 ? 28 : 0 } }) },
+    yAxis: { type: 'value', ...window.GangtiseEcharts.axisBase({ axisLabel: { color: '#445468', fontSize: 10 } }) },
+    series: [
+      { name: '评论', type: 'bar', barMaxWidth: 18, itemStyle: { color: 'rgba(47,116,192,0.78)', borderRadius: [6, 6, 0, 0] }, data: list.map((item) => Number(item.comments || 0)) },
+      { name: '标注', type: 'bar', barMaxWidth: 18, itemStyle: { color: 'rgba(200,169,110,0.82)', borderRadius: [6, 6, 0, 0] }, data: list.map((item) => Number(item.annotations || 0)) },
+    ],
+  }, { onClick: (params) => { if (params && params.name && typeof onClick === 'function') onClick(String(params.name)); } });
+}
+
+function openWorkbenchActivityBucketModal(kind, label) {
+  const analytics = (window.WORKBENCH_DATA && window.WORKBENCH_DATA.watchlist_comment_analytics) || {};
+  const bucketKey = kind === 'sector' ? 'sector' : 'day';
+  const allRecords = (Array.isArray(analytics.activity_records) ? analytics.activity_records : []).filter((item) => item && String(item[bucketKey] || '') === String(label || ''));
+  const comments = allRecords.filter((item) => item.type === 'comment');
+  const annotations = allRecords.filter((item) => item.type === 'annotation');
+  const modal = document.getElementById('kw-watchlist-comments-modal');
+  const host = document.getElementById('kw-watchlist-comments-content');
+  if (!modal || !host) return;
+  const scopeLabel = kind === 'sector' ? '行业板块' : '日期';
+  const renderRecords = (records, emptyText) => {
+    const sorted = records.slice().sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
+    return sorted.length ? sorted.map((item) => `<div class="kw-watchlist-comment"><div class="kw-watchlist-comment-meta">${escapeHtml(item.author_role || '')} · ${escapeHtml(item.author || '')} · ${escapeHtml(item.timestamp || '')}</div><div class="kw-watchlist-comment-meta" style="margin-top:4px">${escapeHtml(item.stock_name || '')}</div><div class="kw-watchlist-comment-text">${escapeHtml(item.content || '未填写内容')}</div></div>`).join('') : `<div class="kw-watchlist-comment-empty">${emptyText}</div>`;
+  };
+  host.innerHTML = `
+    <div class="kw-review-modal-title">${escapeHtml(label)} · 活动明细</div>
+    <div class="kw-dashboard-panel-note" style="margin-top:6px">${scopeLabel}范围内共 ${allRecords.length} 条活动，按最新时间排序。</div>
+    <div class="kw-watch-activity-modal-tabs" style="display:flex;gap:6px;margin-top:14px;border-bottom:1px solid rgba(47,116,192,0.12);padding-bottom:10px">
+      <button class="btn-outline active" type="button" style="padding:7px 10px;font-size:11px" data-activity-modal-tab="comments" onclick="switchWorkbenchActivityModalTab('comments')">评论 ${comments.length}</button>
+      <button class="btn-outline" type="button" style="padding:7px 10px;font-size:11px" data-activity-modal-tab="annotations" onclick="switchWorkbenchActivityModalTab('annotations')">标注 ${annotations.length}</button>
+    </div>
+    <div id="kw-watch-activity-modal-comments" class="kw-watchlist-comments" style="margin-top:12px">${renderRecords(comments, '该范围暂无评论。')}</div>
+    <div id="kw-watch-activity-modal-annotations" class="kw-watchlist-comments" style="margin-top:12px;display:none">${renderRecords(annotations, '该范围暂无标注。')}</div>
+  `;
+  modal.classList.add('show');
+}
+
+function switchWorkbenchActivityModalTab(tab) {
+  const showAnnotations = tab === 'annotations';
+  const comments = document.getElementById('kw-watch-activity-modal-comments');
+  const annotations = document.getElementById('kw-watch-activity-modal-annotations');
+  if (comments) comments.style.display = showAnnotations ? 'none' : '';
+  if (annotations) annotations.style.display = showAnnotations ? '' : 'none';
+  document.querySelectorAll('.kw-watch-activity-modal-tabs [data-activity-modal-tab]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.activityModalTab === (showAnnotations ? 'annotations' : 'comments'));
+  });
+}
+
 function buildCommentSectorDistributionFallback(comments) {
   const detailMap = window.WATCHLIST_DETAILS_MAP || {};
   const counter = new Map();
@@ -5309,31 +5369,44 @@ function renderWorkbenchWatchlistCommentAnalytics() {
   const keywordCloud = Array.isArray(analytics.keyword_cloud) ? analytics.keyword_cloud : [];
   const labelDistribution = Array.isArray(analytics.label_distribution) ? analytics.label_distribution : [];
   const sentimentDistribution = Array.isArray(analytics.sentiment_distribution) ? analytics.sentiment_distribution : [];
-  const recentComments = Array.isArray(analytics.recent_comments) ? analytics.recent_comments : [];
-  const sectorDistribution = Array.isArray(analytics.sector_distribution) && analytics.sector_distribution.length
-    ? analytics.sector_distribution
-    : buildCommentSectorDistributionFallback(recentComments);
   host.innerHTML = `
     <div class="kw-watch-kpi-grid">
       <div class="kw-watch-kpi"><div class="kw-watch-kpi-label">评论总量</div><div class="kw-watch-kpi-value">${Number(summary.total_comments || 0)}</div><div class="kw-watch-kpi-note">租户内累计</div></div>
       <div class="kw-watch-kpi"><div class="kw-watch-kpi-label">粉丝评论</div><div class="kw-watch-kpi-value">${Number(summary.investor_comments || 0)}</div><div class="kw-watch-kpi-note">普通用户表达</div></div>
       <div class="kw-watch-kpi"><div class="kw-watch-kpi-label">大V评论</div><div class="kw-watch-kpi-value">${Number(summary.dav_comments || 0)}</div><div class="kw-watch-kpi-note">投顾侧观点</div></div>
       <div class="kw-watch-kpi"><div class="kw-watch-kpi-label">涉及标的</div><div class="kw-watch-kpi-value">${Number(summary.stock_count || 0)}</div><div class="kw-watch-kpi-note">有讨论的个股</div></div>
+      <div class="kw-watch-kpi"><div class="kw-watch-kpi-label">K线标注</div><div class="kw-watch-kpi-value">${Number(summary.total_annotations || 0)}</div><div class="kw-watch-kpi-note">粉丝标注 ${Number(summary.investor_annotations || 0)} 条</div></div>
     </div>
     <div class="kw-watch-insight-shell">
       <div class="kw-watch-insight-main">
         <div class="kw-watch-insight-panel"><div class="kw-watch-insight-panel-title">关注结构</div><div class="kw-watch-insight-panel-desc">标签与情绪用于比较讨论重心，不替代对具体评论的阅读。</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px"><div id="kw-watchlist-comment-label-chart" style="width:100%;height:220px"></div><div id="kw-watchlist-comment-sentiment-chart" style="width:100%;height:220px"></div></div></div>
-        <div class="kw-watch-insight-panel"><div class="kw-watch-insight-panel-title">行业关注分布</div><div class="kw-watch-insight-panel-desc">按评论所关联的自选股行业归并。</div><div id="kw-watchlist-comment-sector-chart" style="width:100%;height:240px;margin-top:10px"></div></div>
+        <div class="kw-watch-insight-panel"><div class="kw-watch-insight-panel-title">用户活动分布</div><div class="kw-watch-insight-panel-desc">点击柱子查看该范围内的具体评论或 K 线标注。行业按评论与标注合并统计，日期按发生时间统计。</div><div class="kw-watch-activity-tabs" style="display:flex;gap:6px;margin-top:12px"><button class="btn-outline active" type="button" style="padding:7px 10px;font-size:11px" onclick="switchWorkbenchActivityTab('sector')">行业板块</button><button class="btn-outline" type="button" style="padding:7px 10px;font-size:11px" onclick="switchWorkbenchActivityTab('date')">日期趋势</button></div><div id="kw-watchlist-activity-sector" style="width:100%;height:280px;margin-top:10px"></div><div id="kw-watchlist-activity-date" style="width:100%;height:280px;margin-top:10px;display:none"></div></div>
       </div>
       <div class="kw-watch-insight-side">
         <div class="kw-watch-insight-panel"><div class="kw-watch-insight-panel-title">高频关键词</div><div class="kw-watch-insight-panel-desc">仅基于已有评论标注汇总。</div><div class="kw-watch-signal-list" style="margin-top:12px">${keywordCloud.length ? keywordCloud.map((item) => `<span class="kw-watch-signal">${escapeHtml(item.keyword || '')} ${Number(item.value || 0)}</span>`).join('') : '<span class="kw-watch-insight-panel-desc">暂无评论关键词</span>'}</div></div>
-        <div class="kw-watch-insight-panel"><div class="kw-watch-insight-panel-title">最新评论</div><div class="kw-watch-insight-panel-desc">先看原文，再看系统标签与情绪。</div>${recentComments.length ? recentComments.slice(0, 6).map((item) => `<div class="kw-watch-comment-row"><div class="kw-watch-code">${escapeHtml(item.created_by_role_label || '')} · ${escapeHtml(item.created_by_name || '')} · ${escapeHtml(item.updated_at || item.created_at || '')}</div><div class="kw-watchlist-comment-text" style="margin-top:5px">${escapeHtml(item.comment_text || '')}</div><div class="kw-watch-signal-list" style="margin-top:7px">${(Array.isArray(item.label_tags) ? item.label_tags : []).map((tag) => `<span class="kw-watch-signal">${escapeHtml(tag)}</span>`).join('')}${item.sentiment_label ? `<span class="kw-watch-alert attention">${escapeHtml(item.sentiment_label)}</span>` : ''}</div></div>`).join('') : '<div class="kw-watch-insight-panel-desc" style="margin-top:12px">暂无评论记录</div>'}</div>
       </div>
     </div>
   `;
   renderWorkbenchBarChart('kw-watchlist-comment-label-chart', labelDistribution.map((item) => ({ label: item.label, value: item.value })));
   renderWorkbenchBarChart('kw-watchlist-comment-sentiment-chart', sentimentDistribution.map((item) => ({ label: item.label, value: item.value })));
-  renderWorkbenchBarChart('kw-watchlist-comment-sector-chart', sectorDistribution.map((item) => ({ label: item.label, value: item.value })));
+  renderWorkbenchActivityBarChart('kw-watchlist-activity-sector', analytics.sector_activity_distribution || [], (label) => openWorkbenchActivityBucketModal('sector', label));
+  renderWorkbenchActivityBarChart('kw-watchlist-activity-date', analytics.date_activity_distribution || [], (label) => openWorkbenchActivityBucketModal('date', label));
+}
+
+function switchWorkbenchActivityTab(tab) {
+  const sector = document.getElementById('kw-watchlist-activity-sector');
+  const date = document.getElementById('kw-watchlist-activity-date');
+  const buttons = document.querySelectorAll('.kw-watch-activity-tabs button');
+  const isDate = tab === 'date';
+  if (sector) sector.style.display = isDate ? 'none' : '';
+  if (date) date.style.display = isDate ? '' : 'none';
+  buttons.forEach((button) => button.classList.toggle('active', button.textContent.trim() === (isDate ? '日期趋势' : '行业板块')));
+  const analytics = (window.WORKBENCH_DATA && window.WORKBENCH_DATA.watchlist_comment_analytics) || {};
+  window.requestAnimationFrame(() => renderWorkbenchActivityBarChart(
+    isDate ? 'kw-watchlist-activity-date' : 'kw-watchlist-activity-sector',
+    isDate ? (analytics.date_activity_distribution || []) : (analytics.sector_activity_distribution || []),
+    (label) => openWorkbenchActivityBucketModal(isDate ? 'date' : 'sector', label),
+  ));
 }
 
 function kwSwitchWatchlistPoolTab(name) {
@@ -6225,6 +6298,9 @@ async function kwSyncFundDashboard(action, dashboard, successMessage) {
       }
     }
     kwRenderDashboardPreview();
+    try {
+      window.localStorage?.setItem(SITE_CONFIG_BROADCAST_KEY, String(Date.now()));
+    } catch (error) {}
     showToast(successMessage || '已同步');
   } catch (error) {
     showToast('Dashboard 同步失败，请稍后重试');
@@ -6270,6 +6346,16 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function formatDashboardDataDate(value) {
+  const text = String(value || '').trim();
+  if (!text) return '未记录';
+  const compact = text.match(/^(\d{4})(\d{2})(\d{2})(?:\s+\d+)?$/);
+  if (compact) return `${compact[1]}-${compact[2]}-${compact[3]}`;
+  const separated = text.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (separated) return `${separated[1]}-${String(separated[2]).padStart(2, '0')}-${String(separated[3]).padStart(2, '0')}`;
+  return text;
 }
 
 function escapeAttr(value) {
@@ -12541,6 +12627,8 @@ function kwRenderSmartDashboardPreviewCards(cards) {
       unit: raw.unit || catalogItem.unit,
       interpretation: raw.interpretation || raw.assessment || catalogItem.interpretation || catalogItem.assessment,
       updatedAt: raw.updatedAt || catalogItem.last_updated,
+      dataAt: raw.dataAt || catalogItem.data_at || '',
+      snapshotAt: raw.snapshotAt || catalogItem.last_updated,
     } : raw;
     return hydrated && !hydrated.isEmpty && (indicatorCode || hydrated.name || hydrated.prompt) ? hydrated : { isEmpty: true };
   });
@@ -12549,7 +12637,7 @@ function kwRenderSmartDashboardPreviewCards(cards) {
       <div class="kw-dashboard-public-title">${escapeHtml(item.name || `智能指标 ${index + 1}`)}</div>
       <div class="kw-dashboard-public-copy">${escapeHtml(item.interpretation || item.assessment || '当前按自定义公式计算。')}</div>
       <div class="kw-dashboard-public-value">${escapeHtml(`${item.value || '--'}${item.unit || ''}`)}</div>
-      <div class="kw-dashboard-public-meta">更新时间：${escapeHtml(item.updatedAt || '未记录')}</div>
+      <div class="kw-dashboard-public-meta">数据日期：${escapeHtml(formatDashboardDataDate(item.dataAt))}</div>
       <div class="kw-smart-card-actions">
         <button class="kw-smart-card-action" type="button" onclick="event.stopPropagation();kwOpenSmartIndicatorDetail(${index})">编辑指标</button>
         <button class="kw-smart-card-action danger" type="button" onclick="event.stopPropagation();kwDeleteSmartIndicator('${escapeAttr(item.indicatorCode || item.indicator_code || '')}')">删除指标</button>
@@ -12929,7 +13017,7 @@ function kwOpenSmartIndicatorDetailModal(card) {
       <div class="kw-dashboard-cell-summary">
         <div class="kw-dashboard-cell-summary-title">${escapeHtml(card.name || '智能指标详情')}</div>
         <div class="kw-dashboard-public-value" style="margin-top:8px">${escapeHtml(`${card.value || '--'}${card.unit || ''}`)}</div>
-        <div class="kw-dashboard-panel-note" style="margin-top:8px">更新时间：${escapeHtml(card.updatedAt || '未记录')}</div>
+        <div class="kw-dashboard-panel-note" style="margin-top:8px">数据日期：${escapeHtml(formatDashboardDataDate(card.dataAt))} · 最近计算：${escapeHtml(card.snapshotAt || card.updatedAt || '未记录')}</div>
       </div>
       <div class="kw-dashboard-cell-block kw-smart-indicator-edit-section">
         <div class="kw-dashboard-section-title">指标定义</div>
@@ -12993,10 +13081,13 @@ async function kwSaveSmartIndicatorDefinitionFromDetail(indicatorCode) {
     return;
   }
   kwOpenSmartIndicatorDetailModal({...cardFromSmartIndicatorItem(item), isSaving: true});
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 90000);
   try {
     const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         action: 'save',
         indicator_code: item.indicator_code,
@@ -13034,7 +13125,9 @@ async function kwSaveSmartIndicatorDefinitionFromDetail(indicatorCode) {
       algorithmDetail: algorithm,
       assessmentTemplate: interpretation,
     });
-    showToast(error.message || '指标更新失败');
+    showToast(error && error.name === 'AbortError' ? '保存超时，请检查服务端任务状态后重试' : (error.message || '指标更新失败'));
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 }
 
@@ -13046,6 +13139,8 @@ function cardFromSmartIndicatorItem(item) {
     unit: item.unit || '',
     prompt: item.prompt_text || '',
     updatedAt: item.last_updated || '',
+    dataAt: item.data_at || '',
+    snapshotAt: item.last_updated || '',
     algorithmDetail: item.algorithm_detail || '',
     interpretation: item.interpretation || item.assessment || '',
     assessmentTemplate: item.assessment_template || item.interpretation || item.assessment || '',

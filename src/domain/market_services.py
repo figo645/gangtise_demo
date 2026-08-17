@@ -464,11 +464,14 @@ GANGTISE_INDICATOR_REGISTRY = {
         "preferred_indicator_id": "S06000521",
     },
     "source_cpi": {
-        "indicator_name": "CPI",
+        "indicator_name": "中国CPI同比指数",
         "category": "数据湖指标",
         "query_kind": "edb_search",
-        "search_keyword": "CPI:中国",
-        "preferred_indicator_id": "M00009835",
+        "search_keyword": "CPI:同比指数",
+        "preferred_indicator_id": "M00000016",
+        "expected_indicator_name": "CPI:同比指数:当月值",
+        "expected_data_source": "国家统计局",
+        "valid_value_range": (50, 200),
     },
     "source_dji": {
         "indicator_name": "道琼斯",
@@ -1019,9 +1022,45 @@ def fetch_gangtise_indicator_series(indicator_code, start_date="", end_date="", 
             "duration_ms": search_duration,
             "source_meta": {"type": "edb_search", "keyword": search_payload["keyword"]},
         }
+    expected_name = str(entry.get("expected_indicator_name") or "").strip()
+    expected_source = str(entry.get("expected_data_source") or "").strip()
+    actual_name = str(selected.get("indicatorName") or "").strip()
+    actual_source = str(selected.get("dataSource") or "").strip()
+    if (expected_name and actual_name != expected_name) or (expected_source and actual_source != expected_source):
+        return {
+            "ok": False,
+            "message": f"Gangtise 指标主数据校验失败：期望 {expected_name or '指定指标'} / {expected_source or '指定数据源'}，实际 {actual_name or '--'} / {actual_source or '--'}",
+            "points": [],
+            "response": search_response,
+            "duration_ms": search_duration,
+            "source_meta": {
+                "type": "edb_search",
+                "indicatorId": selected.get("indicatorId") or "",
+                "indicatorName": actual_name,
+                "dataSource": actual_source,
+            },
+        }
     data_payload = {"indicatorIdList": [selected["indicatorId"]], "startDate": effective_start, "endDate": effective_end}
     status, response, duration = post_gangtise_openapi_json("/application/open-alternative/EDB/getData", data_payload, token=token, timeout=30)
     points = normalize_gangtise_edb_points(response)
+    value_range = entry.get("valid_value_range")
+    if isinstance(value_range, (list, tuple)) and len(value_range) == 2 and points:
+        lower, upper = numeric_value(value_range[0]), numeric_value(value_range[1])
+        latest_value = numeric_value(points[-1].get("close"))
+        if lower is not None and upper is not None and latest_value is not None and not lower <= latest_value <= upper:
+            return {
+                "ok": False,
+                "message": f"Gangtise 指标数值校验失败：{actual_name or indicator_code} 最新值 {latest_value} 不在允许区间 {lower} ~ {upper}",
+                "points": [],
+                "response": response,
+                "duration_ms": search_duration + duration,
+                "source_meta": {
+                    "type": "edb",
+                    "indicatorId": selected.get("indicatorId") or "",
+                    "indicatorName": actual_name,
+                    "dataSource": actual_source,
+                },
+            }
     return {
         "ok": is_gangtise_openapi_success(status, response) and len(points) >= 2,
         "message": response.get("msg") or response.get("message") or "",
@@ -1704,6 +1743,18 @@ def validate_smart_indicator_js(js_code, selected_indicators):
 def generate_smart_indicator_js(indicator_name, prompt_text, selected_indicators, tenant_slug=""):
     normalized_selected = normalize_selected_indicator_refs(selected_indicators)
     fallback_js = build_smart_indicator_js_fallback(prompt_text, normalized_selected)
+    # A single source with a direct-name prompt is a projection, not an LLM
+    # formula. Compile it locally so saving a renamed prompt cannot wait on an
+    # external model service or produce a different formula for the same value.
+    prompt_key = re.sub(r"[\s【】\[\]（）()：:，,]", "", str(prompt_text or "").strip()).lower()
+    source_key = re.sub(
+        r"[\s【】\[\]（）()：:，,]",
+        "",
+        str((normalized_selected[0] if len(normalized_selected) == 1 else {}).get("indicator_name") or "").strip(),
+    ).lower()
+    direct_aliases = {"cpi", "中国cpi", "中国居民消费价格指数"}
+    if len(normalized_selected) == 1 and prompt_key and (prompt_key == source_key or prompt_key in direct_aliases):
+        return {"formula_js": fallback_js, "generator": "direct_projection", "llm_used": False}
     model = get_default_llm_config(purpose="general", feature_code="smart_indicator_formula_generation")
     if not model:
         return {"formula_js": fallback_js, "generator": "fallback", "llm_used": False}
@@ -3372,20 +3423,14 @@ def sync_real_indicator_history_from_market_cache(force=False):
             continue
         source = active_sources.get(indicator_code)
         source_code = source["source_code"] if source else indicator_code
-        if force:
-            db.execute("DELETE FROM indicator_series WHERE indicator_code = ? AND source_code = ?", (indicator_code, source_code))
-            db.execute("DELETE FROM indicator_kline_points WHERE indicator_code = ?", (indicator_code,))
-            db.execute("DELETE FROM indicator_anomalies WHERE indicator_code = ?", (indicator_code,))
-        else:
-            existing_real = db.execute(
-                "SELECT COUNT(*) AS c FROM indicator_series WHERE indicator_code = ? AND is_simulated = 0",
-                (indicator_code,),
-            ).fetchone()["c"]
-            if existing_real:
-                continue
-            db.execute("DELETE FROM indicator_series WHERE indicator_code = ? AND is_simulated = 1", (indicator_code,))
-            db.execute("DELETE FROM indicator_kline_points WHERE indicator_code = ? AND is_simulated = 1", (indicator_code,))
-            db.execute("DELETE FROM indicator_anomalies WHERE indicator_code = ? AND is_simulated = 1", (indicator_code,))
+        # The upstream response is the authoritative history for this source.
+        # Replacing the successfully fetched real series keeps incremental runs
+        # current; the previous implementation skipped any indicator that had
+        # one real row, so monthly indicators could remain permanently stale.
+        db.execute("DELETE FROM indicator_series WHERE indicator_code = ? AND source_code = ?", (indicator_code, source_code))
+        db.execute("DELETE FROM indicator_series WHERE indicator_code = ? AND is_simulated = 1", (indicator_code,))
+        db.execute("DELETE FROM indicator_kline_points WHERE indicator_code = ?", (indicator_code,))
+        db.execute("DELETE FROM indicator_anomalies WHERE indicator_code = ?", (indicator_code,))
         prev_close = NumberLike(rows[-2]["close"])
         latest_close = NumberLike(rows[-1]["close"])
         latest_status = build_real_indicator_status(latest_close, prev_close)
@@ -3948,6 +3993,7 @@ def build_indicator_hub_from_store():
             "alert": latest.get("latest_alert") or definition.get("alert_template") or "暂无预警说明",
             "enabled": bool(definition.get("enabled")),
             "last_updated": latest.get("updated_at") or definition.get("updated_at") or "未记录",
+            "data_at": str((history_series[-1] if history_series else {}).get("date") or "").strip(),
             "watchers": definition.get("watchers", []),
             "prompt_text": str(definition.get("prompt_text") or "").strip(),
             "formula_js": str(definition.get("formula_js") or "").strip(),
@@ -3991,6 +4037,13 @@ def build_indicator_hub_from_store():
         latest_map,
     )
     items = smart_items + lake_items
+    item_map = {str(item.get("id") or ""): item for item in items if str(item.get("id") or "")}
+    for item in smart_items:
+        source_dates = [
+            str((item_map.get(str(source.get("indicator_code") or "")) or {}).get("data_at") or "").strip()
+            for source in (item.get("selected_indicators") or [])
+        ]
+        item["data_at"] = max((value for value in source_dates if value), default=str(item.get("data_at") or "").strip())
     anomalies = []
     for item in smart_items + lake_items:
         if item.get("data_unavailable"):
@@ -6697,11 +6750,12 @@ def _normalize_watchlist_annotation_row(row, detail=None):
         "close": round(float(raw.get("close_price") or 0), 2),
         "created_by_name": str(raw.get("created_by_name") or "").strip(),
         "created_by_user_id": str(raw.get("created_by_user_id") or "").strip(),
+        "created_by_role": str(raw.get("created_by_role") or "investor").strip().lower() or "investor",
         "source_client": str(raw.get("source_client") or "").strip() or "h5",
     }
 
 
-def list_watchlist_kline_annotations(tenant_slug="", stock_code="", stock_name="", details_map=None):
+def list_watchlist_kline_annotations(tenant_slug="", stock_code="", stock_name="", details_map=None, viewer_role="dav", viewer_profile_id=""):
     normalized_tenant = str(tenant_slug or "").strip().lower()
     if not normalized_tenant:
         return []
@@ -6724,7 +6778,17 @@ def list_watchlist_kline_annotations(tenant_slug="", stock_code="", stock_name="
         details_map=details,
         enrich=False,
     ) or {}
-    return [_normalize_watchlist_annotation_row(row, detail=detail) for row in rows]
+    normalized_rows = [_normalize_watchlist_annotation_row(row, detail=detail) for row in rows]
+    normalized_role = str(viewer_role or "dav").strip().lower()
+    normalized_profile_id = str(viewer_profile_id or "").strip()
+    if normalized_role == "dav":
+        return normalized_rows
+    return [
+        item for item in normalized_rows
+        if item.get("created_by_role") == "dav" or (
+            normalized_profile_id and item.get("created_by_user_id") == normalized_profile_id
+        )
+    ]
 
 
 def save_watchlist_kline_annotation(
@@ -6743,6 +6807,7 @@ def save_watchlist_kline_annotation(
     trigger="",
     created_by_user_id="",
     created_by_name="",
+    created_by_role="investor",
     source_client="h5",
 ):
     normalized_tenant = str(tenant_slug or "").strip().lower()
@@ -6785,6 +6850,7 @@ def save_watchlist_kline_annotation(
         "trigger": "",
         "created_by_user_id": str(created_by_user_id or "").strip()[:120],
         "created_by_name": str(created_by_name or "").strip()[:120],
+        "created_by_role": str(created_by_role or "investor").strip().lower() or "investor",
         "source_client": str(source_client or "h5").strip()[:40] or "h5",
         "created_at": now_text,
         "updated_at": now_text,
@@ -6794,9 +6860,9 @@ def save_watchlist_kline_annotation(
         """
         SELECT id, created_at
         FROM watchlist_kline_annotations
-        WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ?
+        WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ? AND created_by_user_id = ?
         """,
-        (normalized_tenant, normalized_code, normalized_index),
+        (normalized_tenant, normalized_code, normalized_index, payload["created_by_user_id"]),
     ).fetchone()
     if existing:
         payload["id"] = existing.get("id")
@@ -6805,7 +6871,7 @@ def save_watchlist_kline_annotation(
             """
             UPDATE watchlist_kline_annotations
             SET stock_name = ?, candle_date = ?, open_price = ?, high_price = ?, low_price = ?, close_price = ?,
-                title = ?, note = ?, trigger = ?, created_by_user_id = ?, created_by_name = ?, source_client = ?, updated_at = ?
+                title = ?, note = ?, trigger = ?, created_by_user_id = ?, created_by_name = ?, created_by_role = ?, source_client = ?, updated_at = ?
             WHERE id = ?
             """,
             (
@@ -6820,6 +6886,7 @@ def save_watchlist_kline_annotation(
                 payload["trigger"],
                 payload["created_by_user_id"],
                 payload["created_by_name"],
+                payload["created_by_role"],
                 payload["source_client"],
                 payload["updated_at"],
                 payload["id"],
@@ -6831,9 +6898,9 @@ def save_watchlist_kline_annotation(
             INSERT INTO watchlist_kline_annotations (
                 tenant_slug, stock_code, stock_name, candle_index, candle_date,
                 open_price, high_price, low_price, close_price,
-                title, note, trigger, created_by_user_id, created_by_name,
+                title, note, trigger, created_by_user_id, created_by_name, created_by_role,
                 source_client, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 payload["tenant_slug"],
@@ -6850,6 +6917,7 @@ def save_watchlist_kline_annotation(
                 payload["trigger"],
                 payload["created_by_user_id"],
                 payload["created_by_name"],
+                payload["created_by_role"],
                 payload["source_client"],
                 payload["created_at"],
                 payload["updated_at"],
@@ -6860,58 +6928,61 @@ def save_watchlist_kline_annotation(
         """
         SELECT *
         FROM watchlist_kline_annotations
-        WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ?
+        WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ? AND created_by_user_id = ?
         """,
-        (normalized_tenant, normalized_code, normalized_index),
+        (normalized_tenant, normalized_code, normalized_index, payload["created_by_user_id"]),
     ).fetchone()
     return _normalize_watchlist_annotation_row(row, detail=detail)
 
 
-def delete_watchlist_kline_annotation(tenant_slug="", stock_code="", stock_name="", annotation_id=None, candle_index=None):
+def delete_watchlist_kline_annotation(tenant_slug="", stock_code="", stock_name="", annotation_id=None, candle_index=None, actor_profile_id=""):
     normalized_tenant = str(tenant_slug or "").strip().lower()
     if not normalized_tenant:
         raise ValueError("tenant_slug_required")
     details = gen_watchlist_details()
     normalized_code = _normalize_watchlist_annotation_code(stock_code=stock_code, stock_name=stock_name, details_map=details)
     db = get_db()
+    actor_id = str(actor_profile_id or "").strip()
+    owner_clause = " AND created_by_user_id = ?" if actor_id else ""
+    owner_params = (actor_id,) if actor_id else ()
     if annotation_id:
         db.execute(
-            "DELETE FROM watchlist_kline_annotations WHERE tenant_slug = ? AND id = ?",
-            (normalized_tenant, int(annotation_id)),
+            f"DELETE FROM watchlist_kline_annotations WHERE tenant_slug = ? AND id = ?{owner_clause}",
+            (normalized_tenant, int(annotation_id), *owner_params),
         )
         db.commit()
         remaining = db.execute(
-            "SELECT id FROM watchlist_kline_annotations WHERE tenant_slug = ? AND id = ?",
-            (normalized_tenant, int(annotation_id)),
+            f"SELECT id FROM watchlist_kline_annotations WHERE tenant_slug = ? AND id = ?{owner_clause}",
+            (normalized_tenant, int(annotation_id), *owner_params),
         ).fetchone()
         if remaining and normalized_code and candle_index is not None:
             db.execute(
-                "DELETE FROM watchlist_kline_annotations WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ?",
-                (normalized_tenant, normalized_code, int(candle_index or 0)),
+                f"DELETE FROM watchlist_kline_annotations WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ?{owner_clause}",
+                (normalized_tenant, normalized_code, int(candle_index or 0), *owner_params),
             )
             db.commit()
             remaining = db.execute(
                 """
                 SELECT id
                 FROM watchlist_kline_annotations
-                WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ?
+                WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ?{owner_clause}
                 """,
-                (normalized_tenant, normalized_code, int(candle_index or 0)),
+                (normalized_tenant, normalized_code, int(candle_index or 0), *owner_params),
             ).fetchone()
         return remaining is None
     if normalized_code and candle_index is not None:
         db.execute(
-            "DELETE FROM watchlist_kline_annotations WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ?",
-            (normalized_tenant, normalized_code, int(candle_index or 0)),
+            f"DELETE FROM watchlist_kline_annotations WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ?{owner_clause}",
+            (normalized_tenant, normalized_code, int(candle_index or 0), *owner_params),
         )
         db.commit()
         remaining = db.execute(
             """
             SELECT id
             FROM watchlist_kline_annotations
-            WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ?
+            WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ?{owner_clause}
             """,
-            (normalized_tenant, normalized_code, int(candle_index or 0)),
+            (normalized_tenant, normalized_code, int(candle_index or 0), *owner_params),
         ).fetchone()
         return remaining is None
     raise ValueError("watchlist_annotation_target_required")
@@ -7305,14 +7376,18 @@ def build_watchlist_comment_analytics(tenant_slug="", limit=240):
     normalized_tenant = str(tenant_slug or "").strip().lower()
     if not normalized_tenant:
         return {
-            "summary": {"total_comments": 0, "dav_comments": 0, "investor_comments": 0, "stock_count": 0},
+            "summary": {"total_comments": 0, "dav_comments": 0, "investor_comments": 0, "stock_count": 0, "total_annotations": 0, "investor_annotations": 0, "dav_annotations": 0, "annotated_stock_count": 0},
             "keyword_cloud": [],
             "label_distribution": [],
             "sentiment_distribution": [],
             "topic_distribution": [],
             "sector_distribution": [],
+            "sector_activity_distribution": [],
+            "date_activity_distribution": [],
+            "activity_records": [],
             "top_stocks": [],
             "recent_comments": [],
+            "recent_annotations": [],
             "summary_text": "当前还没有足够的评论数据可供统计。",
         }
     try:
@@ -7332,18 +7407,38 @@ def build_watchlist_comment_analytics(tenant_slug="", limit=240):
         if not is_db_unavailable_error(exc):
             raise
         return {
-            "summary": {"total_comments": 0, "dav_comments": 0, "investor_comments": 0, "stock_count": 0},
+            "summary": {"total_comments": 0, "dav_comments": 0, "investor_comments": 0, "stock_count": 0, "total_annotations": 0, "investor_annotations": 0, "dav_annotations": 0, "annotated_stock_count": 0},
             "keyword_cloud": [],
             "label_distribution": [],
             "sentiment_distribution": [],
             "topic_distribution": [],
             "sector_distribution": [],
+            "sector_activity_distribution": [],
+            "date_activity_distribution": [],
+            "activity_records": [],
             "top_stocks": [],
             "recent_comments": [],
+            "recent_annotations": [],
             "fallback_mode": True,
             "summary_text": "当前还没有足够的评论数据可供统计。",
         }
     detail_map = gen_watchlist_details()
+    annotation_rows = db.execute(
+        """
+        SELECT * FROM watchlist_kline_annotations
+        WHERE tenant_slug = ?
+        ORDER BY updated_at DESC, id DESC
+        LIMIT ?
+        """,
+        (normalized_tenant, max(1, min(int(limit or 240), 1000))),
+    ).fetchall()
+    normalized_annotations = [
+        _normalize_watchlist_annotation_row(
+            row,
+            detail=get_watchlist_detail_by_code(str((row or {}).get("stock_code") or "").strip(), details_map=detail_map) or {},
+        )
+        for row in annotation_rows
+    ]
     normalized_rows = [
         _normalize_watchlist_comment_row(
             row,
@@ -7359,6 +7454,9 @@ def build_watchlist_comment_analytics(tenant_slug="", limit=240):
     topic_counter = {}
     sector_counter = {}
     stock_counter = {}
+    activity_by_sector = {}
+    activity_by_date = {}
+    activity_records = []
     dav_comments = 0
     investor_comments = 0
     for item in normalized_rows:
@@ -7372,6 +7470,22 @@ def build_watchlist_comment_analytics(tenant_slug="", limit=240):
             stock_detail = detail_map.get(stock_key) or {}
             sector_key = str(stock_detail.get("industry") or stock_detail.get("focus") or "").strip() or "未分类"
             sector_counter[sector_key] = sector_counter.get(sector_key, 0) + 1
+        else:
+            sector_key = "未分类"
+        day_key = str(item.get("updated_at") or item.get("created_at") or "")[:10] or "未知日期"
+        activity_by_sector.setdefault(sector_key, {"comments": 0, "annotations": 0})["comments"] += 1
+        activity_by_date.setdefault(day_key, {"comments": 0, "annotations": 0})["comments"] += 1
+        activity_records.append({
+            "type": "comment",
+            "type_label": "评论",
+            "sector": sector_key,
+            "day": day_key,
+            "stock_name": item.get("stock_name") or item.get("stock_code") or "",
+            "author": item.get("created_by_name") or "租户用户",
+            "author_role": item.get("created_by_role_label") or "粉丝用户",
+            "content": item.get("comment_text") or "",
+            "timestamp": item.get("updated_at") or item.get("created_at") or "",
+        })
         for tag in (item.get("label_tags") or []):
             label_counter[tag] = label_counter.get(tag, 0) + 1
         for keyword in (item.get("keyword_tags") or []):
@@ -7398,6 +7512,38 @@ def build_watchlist_comment_analytics(tenant_slug="", limit=240):
         })
     sector_items = _sorted_counter(sector_counter, label_key="label", value_key="value", limit_value=10)
     hot_sector = sector_items[0]["label"] if sector_items else ""
+    annotation_stock_count = len({str(item.get("stock_code") or "").strip() for item in normalized_annotations if item.get("stock_code")})
+    investor_annotations = sum(1 for item in normalized_annotations if item.get("created_by_role") != "dav")
+    dav_annotations = len(normalized_annotations) - investor_annotations
+    for item in normalized_annotations:
+        stock_key = str(item.get("stock_code") or "").strip().upper()
+        detail = detail_map.get(stock_key) or {}
+        sector_key = str(detail.get("industry") or detail.get("focus") or "未分类").strip() or "未分类"
+        day_key = str(item.get("updatedAt") or item.get("createdAt") or "")[:10] or "未知日期"
+        activity_by_sector.setdefault(sector_key, {"comments": 0, "annotations": 0})["annotations"] += 1
+        activity_by_date.setdefault(day_key, {"comments": 0, "annotations": 0})["annotations"] += 1
+        activity_records.append({
+            "type": "annotation",
+            "type_label": "标注",
+            "sector": sector_key,
+            "day": day_key,
+            "stock_name": item.get("stock_name") or stock_key,
+            "author": item.get("created_by_name") or "租户用户",
+            "author_role": "大V投顾" if item.get("created_by_role") == "dav" else "粉丝用户",
+            "content": item.get("content") or item.get("note") or "",
+            "timestamp": item.get("updatedAt") or item.get("createdAt") or "",
+        })
+    activity_sort_key = lambda value: (-int(value.get("comments") or 0) - int(value.get("annotations") or 0), str(value.get("label") or ""))
+    sector_activity = [
+        {"label": label, "comments": int(values.get("comments") or 0), "annotations": int(values.get("annotations") or 0)}
+        for label, values in activity_by_sector.items()
+    ]
+    sector_activity.sort(key=activity_sort_key)
+    date_activity = [
+        {"label": label, "comments": int(values.get("comments") or 0), "annotations": int(values.get("annotations") or 0)}
+        for label, values in activity_by_date.items()
+    ]
+    date_activity.sort(key=lambda value: str(value.get("label") or ""))
     return {
         "summary": {
             "total_comments": len(normalized_rows),
@@ -7405,14 +7551,22 @@ def build_watchlist_comment_analytics(tenant_slug="", limit=240):
             "investor_comments": investor_comments,
             "stock_count": len(stock_counter),
             "sector_count": len(sector_counter),
+            "total_annotations": len(normalized_annotations),
+            "investor_annotations": investor_annotations,
+            "dav_annotations": dav_annotations,
+            "annotated_stock_count": annotation_stock_count,
         },
         "keyword_cloud": _sorted_counter(keyword_counter, label_key="keyword", value_key="value", limit_value=24),
         "label_distribution": _sorted_counter(label_counter, label_key="label", value_key="value", limit_value=12),
         "sentiment_distribution": _sorted_counter(sentiment_counter, label_key="label", value_key="value", limit_value=8),
         "topic_distribution": _sorted_counter(topic_counter, label_key="label", value_key="value", limit_value=10),
         "sector_distribution": sector_items,
+        "sector_activity_distribution": sector_activity[:20],
+        "date_activity_distribution": date_activity[-31:],
+        "activity_records": activity_records[:1000],
         "top_stocks": top_stock_items[:8],
         "recent_comments": normalized_rows[:20],
+        "recent_annotations": normalized_annotations[:20],
         "hot_sector": hot_sector,
         "summary_text": (
             f"近 {len(normalized_rows)} 条评论中，粉丝主要关注 {hot_sector} 等行业板块。"

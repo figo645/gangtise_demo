@@ -1,7 +1,7 @@
 from src.runtime import *
 from src.services import *
 from src.domain.ai_services import _is_truthy_flag
-from src.domain.core_services import _merge_site_config
+from src.domain.core_services import _merge_site_config, refresh_all_tenant_smart_indicator_snapshots
 
 H5_WECHAT_STATE_SESSION_KEY = "h5_wechat_login_state"
 H5_WECHAT_NEXT_SESSION_KEY = "h5_wechat_login_next"
@@ -478,6 +478,8 @@ def api_watchlist_detail(stock_code):
                 stock_code=annotation_key,
                 stock_name=normalized.get("name") or stock_code,
                 details_map=details,
+                viewer_role=viewer_role,
+                viewer_profile_id=viewer_profile_id,
             )
         except Exception as exc:
             if not is_db_unavailable_error(exc):
@@ -512,6 +514,8 @@ def api_watchlist_detail(stock_code):
 def api_watchlist_annotations(stock_code):
     tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
     stock_name = str(request.args.get("stock_name") or "").strip()
+    viewer_role = str(request.args.get("user_role") or "investor").strip().lower()
+    viewer_profile_id = str(request.args.get("user_profile_id") or "").strip()
     if not tenant_slug:
         return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
     try:
@@ -519,6 +523,8 @@ def api_watchlist_annotations(stock_code):
             tenant_slug=tenant_slug,
             stock_code=stock_code,
             stock_name=stock_name,
+            viewer_role=viewer_role,
+            viewer_profile_id=viewer_profile_id,
         )
     except Exception as exc:
         if is_db_unavailable_error(exc):
@@ -535,7 +541,8 @@ def api_save_watchlist_annotation(stock_code):
     user_role = str(body.get("user_role") or "").strip().lower()
     if not tenant_slug:
         return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
-    if user_role != "dav":
+    user_profile_id = str(body.get("user_profile_id") or "").strip()
+    if user_role not in {"dav", "investor"} or not user_profile_id:
         return jsonify({"ok": False, "error": "watchlist_annotation_forbidden"}), 403
     try:
         item = save_watchlist_kline_annotation(
@@ -554,6 +561,7 @@ def api_save_watchlist_annotation(stock_code):
             trigger=body.get("trigger"),
             created_by_user_id=body.get("user_profile_id"),
             created_by_name=body.get("user_name"),
+            created_by_role=user_role,
             source_client=body.get("source_client") or body.get("entry_point") or "h5",
         )
     except ValueError as exc:
@@ -649,6 +657,7 @@ def api_delete_watchlist_comment(stock_code, comment_ref):
     tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
     user_role = str(request.args.get("user_role") or "").strip().lower()
     user_profile_id = str(request.args.get("user_profile_id") or "").strip()
+    user_profile_id = str(request.args.get("user_profile_id") or "").strip()
     if not tenant_slug:
         return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
     try:
@@ -673,9 +682,10 @@ def api_delete_watchlist_comment(stock_code, comment_ref):
 def api_delete_watchlist_annotation(stock_code, annotation_ref):
     tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
     user_role = str(request.args.get("user_role") or "").strip().lower()
+    user_profile_id = str(request.args.get("user_profile_id") or "").strip()
     if not tenant_slug:
         return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
-    if user_role != "dav":
+    if user_role not in {"dav", "investor"} or not user_profile_id:
         return jsonify({"ok": False, "error": "watchlist_annotation_forbidden"}), 403
     try:
         deleted = delete_watchlist_kline_annotation(
@@ -683,6 +693,7 @@ def api_delete_watchlist_annotation(stock_code, annotation_ref):
             stock_code=stock_code,
             annotation_id=int(annotation_ref) if str(annotation_ref).isdigit() else None,
             candle_index=int(annotation_ref) if str(annotation_ref).isdigit() else None,
+            actor_profile_id=user_profile_id,
         )
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
@@ -1086,6 +1097,7 @@ def api_admin_indicator_market_cache_sync():
     body = request.get_json(silent=True) or {}
     force = bool(body.get("force"))
     result = sync_real_indicator_history_from_market_cache(force=force)
+    result["tenant_smart_refresh"] = refresh_all_tenant_smart_indicator_snapshots()
     return jsonify({"ok": True, "result": result, "hub": build_indicator_hub_from_store()})
 
 
