@@ -5,10 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ brand.name }}金融科技 — 智能投研平台</title>
 <link rel="stylesheet" href="/static/css/style.css">
+<link rel="stylesheet" href="/static/css/release_notes.css?v=20260818-1">
 <script>
   window.SITE_CONFIG = {{ site_config | tojson }};
 </script>
 <script src="/static/js/theme.js"></script>
+<script defer src="/static/js/release_notes.js?v=20260818-1"></script>
 <style>
 /* ============================================================
    INDEX PAGE – SPECIFIC STYLES
@@ -995,7 +997,7 @@ body.theme-dark .tech-layer {
       <a href="/prd" style="color:var(--gold);text-decoration:none;font-weight:600;border:1px solid rgba(200,169,110,0.4);padding:4px 12px;border-radius:4px;transition:all 0.2s" onmouseover="this.style.background='rgba(200,169,110,0.15)'" onmouseout="this.style.background='transparent'">PRD文档</a>
       <a href="/intern-handbook" style="color:var(--gold);text-decoration:none;font-weight:600;border:1px solid rgba(200,169,110,0.4);padding:4px 12px;border-radius:4px;transition:all 0.2s" onmouseover="this.style.background='rgba(200,169,110,0.15)'" onmouseout="this.style.background='transparent'">学习手册</a>
     </div>
-    <a href="/h5" class="btn-gold" style="font-size:12px;padding:8px 18px;text-decoration:none">体验原型</a>
+    <div style="display:flex;align-items:center;gap:8px"><button class="release-notes-trigger" type="button" data-release-notes-trigger aria-label="查看最新版本更新" title="版本更新"><span class="release-notes-trigger-icon" aria-hidden="true">↑</span><span class="release-notes-trigger-dot" aria-hidden="true"></span></button><a href="/h5" class="btn-gold" style="font-size:12px;padding:8px 18px;text-decoration:none">体验原型</a></div>
   </div>
 </nav>
 
@@ -1193,7 +1195,7 @@ body.theme-dark .tech-layer {
       </div>
       <div class="summary-role-card">
         <div class="summary-role-top"><div class="summary-role-icon">04</div><div class="summary-role-title">平台 Admin</div></div>
-        <div class="summary-role-desc">管理租户、用户、功能开关、模型映射、Hermes 记忆、知识治理、指标数据、任务、访问审计和运营分析，并负责控制能力开放范围。</div>
+        <div class="summary-role-desc">管理租户、用户、功能开关、模型映射、Hermes 记忆、知识治理、指标数据、任务、访问审计和运营分析，并负责数据库增量发布与受控环境同步。</div>
       </div>
     </div>
 
@@ -1206,6 +1208,11 @@ body.theme-dark .tech-layer {
         <a href="/h5" class="summary-link">进入 H5 验证</a>
         <a href="/admin" class="summary-link">进入 Admin 治理</a>
       </div>
+    </div>
+    <div class="summary-main-card" style="margin-top:16px">
+      <div class="summary-main-title">交付策略：先在 Staging 验证，再向 Production 受控发布</div>
+      <div class="summary-main-desc">日常数据库发布以“Staging 完整验证 → 扫描本地与 Production 差异 → 审核并发布结构、主数据或业务数据增量”为默认路径，优先保护 Production 的真实业务数据。Staging → Production 全量同步仅用于已确认 Staging 是权威完整快照、需要环境一致性或灾备恢复的维护窗口；切换前会恢复临时库校验，成功后保留 Production 回滚备份。</div>
+      <div class="summary-link-row"><a href="/prd#s7" class="summary-link">查看数据库发布策略</a><a href="/intern-handbook#flows" class="summary-link">查看发布操作流程</a><a href="/admin" class="summary-link">进入 Admin 治理</a></div>
     </div>
   </div>
 </section>
@@ -2250,6 +2257,12 @@ body.theme-dark .tech-layer {
     </div>
   </div>
 </footer>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  window.GangtiseReleaseNotes?.init({ surface: 'index', autoShow: true });
+});
+</script>
 
 </body>
 </html>

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ brand.name }} — 纯 Admin 后台</title>
 <link rel="stylesheet" href="/static/css/style.css">
+<link rel="stylesheet" href="/static/css/release_notes.css?v=20260818-1">
 <script>
   window.SITE_CONFIG = {{ site_config | tojson }};
   window.ADMIN_INDICATOR_HUB = {{ indicator_hub | tojson }};
@@ -13,6 +14,7 @@
   window.AUTO_INIT_DASHBOARD = false;
 </script>
 <script src="/static/js/theme.js"></script>
+<script defer src="/static/js/release_notes.js?v=20260818-1"></script>
 <script src="/static/echarts.min.js"></script>
 <script src="/static/js/echarts_helpers.js?v=20260808-2"></script>
 <style>
@@ -2265,6 +2267,7 @@
       <div class="admin-page-title" id="page-title">运营概览</div>
       <div class="platform-topbar-actions">
         <span style="font-size:12px;color:#8899aa">2026-06-01 业务沟通会口径</span>
+        <button class="release-notes-trigger" type="button" data-release-notes-trigger aria-label="查看最新版本更新" title="版本更新"><span class="release-notes-trigger-icon" aria-hidden="true">↑</span><span class="release-notes-trigger-dot" aria-hidden="true"></span></button>
         <a id="admin-top-intern-handbook-link" href="/intern-handbook" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">系统学习手册</a>
         <a id="admin-top-workbench-link" href="/kol-workbench?tenant={{ default_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">大V工作台 Web</a>
         <a id="admin-top-h5-link" href="/h5?tenant={{ default_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">H5 前台</a>
@@ -12069,6 +12072,7 @@ function evUpdatePreview() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  window.GangtiseReleaseNotes?.init({ surface: 'admin', autoShow: true });
   initAdminNavGroups();
   mountUnifiedSystemSettings();
   renderAdminTaskCenter();

@@ -130,7 +130,7 @@ body.theme-light .lv1{color:var(--text-sub)}
 <header class="prd-header">
   <div class="prd-header-left">
     <span class="prd-header-title">洞见智研 PRD</span>
-    <span class="prd-header-version">v1.4 · 2026-08-13</span>
+    <span class="prd-header-version">v1.5 · 2026-08-18</span>
   </div>
   <div class="prd-header-right">
     <a href="/" class="btn-back">← 返回首页</a>
@@ -834,8 +834,20 @@ body.theme-light .lv1{color:var(--text-sub)}
       <tr><td>大模型与功能映射</td><td>模型注册、默认模型与功能级模型映射，覆盖 Hermes、复盘、知识、语音和评论处理</td><td>Admin</td><td><span class="done">已实现</span></td></tr>
       <tr><td>系统设置与开关</td><td>登录方式、微信/受限测试、互动、主题、业务模块和 Hermes 提示词范围</td><td>Admin</td><td><span class="done">已实现</span></td></tr>
       <tr><td>运营分析与审计</td><td>渠道、访问、用户浏览、评论统计、收入估算与任务运行记录</td><td>Admin</td><td><span class="done">已实现</span></td></tr>
-      <tr><td>数据库发布控制台</td><td>备份、发布、回滚和模拟批次管理；所有写操作需二次口令</td><td>Admin + 二次口令</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>数据库发布控制台</td><td>备份、回滚、Staging 验证、审核增量发布与双向环境全量同步；全量同步在临时库校验通过后切换</td><td>Admin；CSRF、单任务锁与 Production 显式确认</td><td><span class="done">已实现</span></td></tr>
     </table>
+  </div>
+
+  <div class="prd-sub">
+    <div class="prd-sub-title">数据库发布策略与操作边界</div>
+    <table class="prd-table">
+      <tr><th>场景</th><th>标准操作</th><th>数据保护与限制</th></tr>
+      <tr><td>日常 Production 发布</td><td>先在 Staging 完整验证，再扫描本地与 Production 的结构、主数据和业务数据差异；人工审核后发布版本化增量包。</td><td>默认路径，优先保留 Production 的真实用户和业务运行数据；增量按版本、目标环境和校验和留账。</td></tr>
+      <tr><td>Staging → Production 全量发布</td><td>导出 Staging，恢复至 Production 临时数据库，校验 pgvector、表数量和迁移数量后再切换。</td><td>仅用于 Staging 已确认是权威完整快照、需要环境一致性或灾备恢复的维护窗口；旧 Production 保留为回滚备份。</td></tr>
+      <tr><td>Production → Staging 全量同步</td><td>以 Production 快照重建 Staging 临时库，校验通过后切换。</td><td>用于刷新测试基线；原 Staging 会被替换，旧 Staging 保留回滚备份。</td></tr>
+      <tr><td>取消或失败</td><td>最终数据库切换前可取消；失败时清理临时数据库与导出文件。</td><td>已完成的增量包不会自动回退；全量切换完成后通过目标环境的回滚备份执行恢复。</td></tr>
+    </table>
+    <div class="highlight-box"><strong style="color:#C8A96E">默认决策：</strong>日常发布选择“Staging 验证 + Production 增量”；不要因为 Staging 测试通过就默认用全量数据库覆盖 Production。只有确认两端业务数据可被完整替换时，才选择 Staging → Production 全量同步。</div>
   </div>
 
   <div class="prd-sub">
@@ -857,7 +869,7 @@ body.theme-light .lv1{color:var(--text-sub)}
       <tr><th>请求方</th><th>Admin 页面</th><th>Admin API</th><th>可操作范围</th></tr>
       <tr><td>普通投资者</td><td><span class="cross">✗</span></td><td><span class="cross">✗</span> 返回 admin_required</td><td>仅所属租户 H5 内容</td></tr>
       <tr><td>研究型大V</td><td><span class="cross">✗</span></td><td><span class="cross">✗</span> 返回 admin_required</td><td>自身工作台和租户数据</td></tr>
-      <tr><td>admin</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td>平台治理；数据库写操作还需独立二次口令</td></tr>
+      <tr><td>admin</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td>平台治理；数据库操作受 CSRF、单任务锁与 Production 显式确认保护</td></tr>
     </table>
   </div>
 
@@ -1215,7 +1227,7 @@ body.theme-light .lv1{color:var(--text-sub)}
         <div class="roadmap-date">2026年8月 · 治理、交付与质量闭环</div>
         <div class="roadmap-line"><div class="roadmap-dot"></div></div>
         <div class="roadmap-feature">账号注册、合规确认、渠道归因与 Admin 权限隔离</div>
-        <div class="roadmap-feature">功能级模型映射、数据库发布控制台与二次口令</div>
+        <div class="roadmap-feature">功能级模型映射、数据库发布控制台与发布审计保护</div>
         <div class="roadmap-feature">BDD 报告、探索性测试手册、首页与 PRD 同步</div>
       </div>
     </div>
@@ -1226,7 +1238,8 @@ body.theme-light .lv1{color:var(--text-sub)}
     <div class="highlight-box">
       <strong style="color:#C8A96E">以代码与验收为准</strong>：只有已经进入当前实现、可由页面或 API 验证的能力才可写入版本历史。<br>
       <strong style="color:#C8A96E">真实数据优先</strong>：行情、指标和证券数据必须来自 Gangtise；数据不可用时明确说明，不以演示数据填补。<br>
-      <strong style="color:#C8A96E">BDD 先行</strong>：核心角色、权限、租户边界、发布、数据路由和配置生效需要具备可重复验证；跨端与异常组合用探索性测试补充。
+      <strong style="color:#C8A96E">BDD 先行</strong>：核心角色、权限、租户边界、发布、数据路由和配置生效需要具备可重复验证；跨端与异常组合用探索性测试补充。<br>
+      <strong style="color:#C8A96E">版本通知分级</strong>：仅重大版本在首页、H5、大V Web 工作台和 Admin 首次自动展示；日常版本仅保留版本入口。H5 从“我的 → 关于版本”查看，桌面端从顶部版本图标查看。
     </div>
   </div>
 
@@ -1239,6 +1252,7 @@ body.theme-light .lv1{color:var(--text-sub)}
       <tr><td>v1.2</td><td>2026-07</td><td>补充 Hermes Agent、图表、记忆与模型治理</td><td>Hermes BDD 与使用统计</td></tr>
       <tr><td>v1.3</td><td>2026-08</td><td>补充 Gangtise 真实数据、复盘工作流和知识分层</td><td>市场数据与复盘验收</td></tr>
       <tr><td>v1.4</td><td>2026-08-13</td><td>清理旧路线图，按实际功能重写角色、H5、Hermes、Admin 与版本历史</td><td>当前代码、BDD 和系统学习手册</td></tr>
+      <tr><td>v1.5</td><td>2026-08-18</td><td>补充 Staging → Production 受控全量同步，明确日常增量发布策略，并上线四端版本中心与历史版本查看</td><td>数据库发布控制台、环境同步脚本、版本中心与 BDD</td></tr>
     </table>
   </div>
 </section>

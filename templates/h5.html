@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>{{ brand_config.name }} — {{ brand_config.tagline }}</title>
 <link rel="stylesheet" href="/static/css/style.css">
+<link rel="stylesheet" href="/static/css/release_notes.css?v=20260818-1">
 <link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
 <script>
   window.SITE_CONFIG = {{ site_config | tojson }};
@@ -15,6 +16,7 @@
   try { localStorage.setItem('gangtise_theme_mode', 'light'); } catch (e) {}
 </script>
 <script src="/static/js/theme.js"></script>
+<script defer src="/static/js/release_notes.js?v=20260818-1"></script>
 <script src="/static/echarts.min.js"></script>
 <script src="/static/js/echarts_helpers.js?v=20260817-1"></script>
 <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
@@ -4524,6 +4526,12 @@ body,
         <div class="settings-label">帮助中心</div>
         <div class="settings-arrow">›</div>
       </div>
+      <div class="settings-item" onclick="openH5VersionCenter()">
+        <div class="settings-icon">↑</div>
+        <div class="settings-label">关于版本</div>
+        <div style="font-size:11px;color:var(--gray-400);margin-left:auto">v1.5</div>
+        <div class="settings-arrow">›</div>
+      </div>
       <div class="settings-item" onclick="logoutH5User()">
         <div class="settings-icon">🚪</div>
         <div class="settings-label" style="color:var(--red)">退出登录</div>
@@ -6359,6 +6367,15 @@ function renderH5OnboardingModal() {
   }
 }
 
+function openH5VersionCenter() {
+  window.GangtiseReleaseNotes?.open();
+}
+
+function maybeAutoOpenH5ReleaseNotes() {
+  if (h5OnboardingState && h5OnboardingState.required === true) return;
+  window.GangtiseReleaseNotes?.maybeAutoOpen();
+}
+
 async function refreshH5OnboardingStatus(options = {}) {
   if (!hasLoggedInH5User()) return null;
   try {
@@ -6368,6 +6385,7 @@ async function refreshH5OnboardingStatus(options = {}) {
     window.CURRENT_DEMO_PROFILE = data.profile || window.CURRENT_DEMO_PROFILE;
     h5OnboardingState = normalizeH5OnboardingState(data.onboarding || ((data.profile || {}).h5Onboarding || {}));
     renderH5OnboardingModal();
+    maybeAutoOpenH5ReleaseNotes();
     return data;
   } catch (error) {
     if (!options.silent) {
@@ -6407,6 +6425,7 @@ async function submitH5Onboarding() {
     h5OnboardingState = normalizeH5OnboardingState(data.onboarding || ((data.profile || {}).h5Onboarding || {}));
     renderH5OnboardingModal();
     renderDemoProfile(data.profile || getDefaultDemoUser());
+    maybeAutoOpenH5ReleaseNotes();
     showToast('已完成首次进入确认');
   } catch (error) {
     const errorMap = {
@@ -18177,6 +18196,7 @@ async function resetFundDashboardDraft() {
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', () => {
+  window.GangtiseReleaseNotes?.init({ surface: 'h5', autoShow: false });
   syncDemoUsersWithActiveTenant();
   applySiteFeatureFlags();
   refreshH5RuntimeEnv();

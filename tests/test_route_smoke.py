@@ -573,16 +573,52 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn('/static/downloads/gangtise_role_test_cases.xlsx', handbook_html)
         self.assertNotIn("执行、BDD 与缺陷记录", handbook_html)
         self.assertIn('/prd#s13', handbook_html)
+        self.assertIn("日常流程为 Staging 完整验证后", handbook_html)
+        self.assertIn("Staging → Production 全量同步", handbook_html)
 
         index_response = self.client.get("/")
         self.assertEqual(index_response.status_code, 200)
         index_html = index_response.get_data(as_text=True)
         self.assertIn("当前系统功能总览", index_html)
         self.assertIn('/intern-handbook', index_html)
+        self.assertIn("先在 Staging 验证，再向 Production 受控发布", index_html)
 
         prd_response = self.client.get("/prd")
         self.assertEqual(prd_response.status_code, 200)
-        self.assertIn("当前版本验收与测试策略", prd_response.get_data(as_text=True))
+        prd_html = prd_response.get_data(as_text=True)
+        self.assertIn("当前版本验收与测试策略", prd_html)
+        self.assertIn("数据库发布策略与操作边界", prd_html)
+        self.assertIn("日常 Production 发布", prd_html)
+        self.assertIn("Staging → Production 全量发布", prd_html)
+
+    def test_release_notes_version_center_is_available_across_all_product_surfaces(self):
+        index_html = self.client.get("/").get_data(as_text=True)
+        self.assertIn('data-release-notes-trigger', index_html)
+        self.assertIn("surface: 'index'", index_html)
+
+        h5_html = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}").get_data(as_text=True)
+        self.assertIn('onclick="openH5VersionCenter()"', h5_html)
+        self.assertIn("surface: 'h5'", h5_html)
+        self.assertIn('maybeAutoOpenH5ReleaseNotes()', h5_html)
+
+        workbench_html = self.client.get(f"/kol-workbench?tenant={self.tenant_slugs[0]}").get_data(as_text=True)
+        self.assertIn('data-release-notes-trigger', workbench_html)
+        self.assertIn("surface: 'kol-workbench'", workbench_html)
+
+        admin_html = self.client.get("/admin").get_data(as_text=True)
+        self.assertIn('data-release-notes-trigger', admin_html)
+        self.assertIn("surface: 'admin'", admin_html)
+
+        script_response = self.client.get("/static/js/release_notes.js")
+        self.assertEqual(script_response.status_code, 200)
+        script = script_response.get_data(as_text=True)
+        self.assertIn("v1.5", script)
+        self.assertIn("Staging 到 Production 全量发布", script)
+        self.assertIn("maybeAutoOpen", script)
+
+        css_response = self.client.get("/static/css/release_notes.css")
+        self.assertEqual(css_response.status_code, 200)
+        self.assertIn("release-notes-overlay", css_response.get_data(as_text=True))
 
     def test_dav_user_cannot_access_admin_pages_or_admin_apis(self):
         original_user = web_hooks.get_current_authenticated_user
