@@ -151,6 +151,17 @@ class DatabaseReleaseAdminBddTest(unittest.TestCase):
         self.assertEqual(command[0], str(database_release_services.PACKAGE_BATCH_SCRIPT))
         self.assertEqual([item["version"] for item in plan], ["v1.1.0", "v1.1.1"])
 
+    def test_given_production_pending_incrementals_when_admin_starts_release_then_the_direct_incremental_path_remains_available(self):
+        target = {"name": "production", "db_name": "demo", "db_user": "postgres", "db_host": "127.0.0.1", "db_port": "5432", "db_password": "secret"}
+        packages = [
+            {"id": "database_release_packages/2026-08-17/v1.1.3", "date": "2026-08-17", "version": "v1.1.3", "type": "master_data"},
+        ]
+        release_plan = {"summary": {"checksum_mismatch_total": 0}, "packages": [{**item, "status": "pending"} for item in packages]}
+        with patch.object(database_release_services, "get_database_release_target", return_value=target), patch.object(database_release_services, "list_database_release_packages", return_value=packages), patch.object(database_release_services, "get_database_release_package_plan", return_value=release_plan), patch.object(database_release_services, "_start_job", return_value={"status": "queued", "target": "production"}) as start_job:
+            database_release_services.start_database_release("production", package_id="__pending__", confirm_production=True)
+        self.assertEqual(start_job.call_args.args[1][0], str(database_release_services.PACKAGE_BATCH_SCRIPT))
+        self.assertEqual(start_job.call_args.kwargs["package_plan"][0]["id"], packages[0]["id"])
+
     def test_given_target_release_ledger_when_building_increment_plan_then_schema_master_data_and_business_data_are_classified(self):
         target = {"name": "staging"}
         packages = database_release_services.list_database_release_packages()

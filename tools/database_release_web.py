@@ -39,6 +39,7 @@ from src.domain.database_release_services import (  # noqa: E402
     start_database_release_packages,
     start_database_rollback,
     start_production_to_staging_sync,
+    start_staging_to_production_sync,
     scan_database_release_delta,
     review_database_release_delta,
 )
@@ -232,6 +233,21 @@ def production_to_staging_sync():
     except Exception as exc:
         app.logger.exception("Unable to create Production-to-Staging sync task")
         return jsonify({"ok": False, "error": "production_to_staging_task_create_failed", "detail": str(exc)}), 500
+    return jsonify({"ok": True, "job": job}), 202
+
+
+@app.post("/api/staging-to-production-sync")
+@_require_csrf
+@_require_unlock
+def staging_to_production_sync():
+    try:
+        job = start_staging_to_production_sync()
+    except ValueError as exc:
+        error = str(exc)
+        return jsonify({"ok": False, "error": error}), 409 if error == "database_release_job_running" else 400
+    except Exception as exc:
+        app.logger.exception("Unable to create Staging-to-Production sync task")
+        return jsonify({"ok": False, "error": "staging_to_production_task_create_failed", "detail": str(exc)}), 500
     return jsonify({"ok": True, "job": job}), 202
 
 
@@ -456,8 +472,8 @@ PAGE = r"""<!doctype html>
       </div>
       <div class="col-12 col-xl-4">
         <div class="card ops-panel ops-danger-panel h-100">
-          <div class="card-header"><h2 class="ops-section-title text-danger-emphasis">Production 覆盖 Staging</h2><p class="ops-section-copy">固定方向，不可反向选择。</p></div>
-          <div class="card-body d-flex flex-column"><p class="small text-secondary mb-3">Production 只读。Staging 会完整替换；原 Staging 保留为可回滚备份。恢复与一致性校验失败时，现有 Staging 不会切换。</p><div class="mt-auto"><button id="productionStagingSync" class="btn btn-outline-danger w-100" type="button" onclick="startProductionToStagingSync()">一键导入 Production 到 Staging</button></div></div>
+          <div class="card-header"><h2 class="ops-section-title text-danger-emphasis">环境全量同步</h2><p class="ops-section-copy">固定方向执行，保留目标环境回滚备份。</p></div>
+          <div class="card-body d-flex flex-column"><p class="small text-secondary mb-3">全量同步会先恢复临时数据库并完成校验，再切换目标库。Production 仍可通过上方增量入口直接发布本地增量。</p><div class="mt-auto d-grid gap-2"><button id="productionStagingSync" class="btn btn-outline-secondary w-100" type="button" onclick="startProductionToStagingSync()">一键导入 Production 到 Staging</button><button id="stagingProductionSync" class="btn btn-danger w-100" type="button" onclick="startStagingToProductionSync()">一键发布 Staging 到 Production</button></div></div>
         </div>
       </div>
 
@@ -575,6 +591,7 @@ PAGE = r"""<!doctype html>
       $('release').disabled = isBusy();
       $('create').disabled = isBusy();
       $('productionStagingSync').disabled = isBusy();
+      $('stagingProductionSync').disabled = isBusy();
       $('scanDelta').disabled = isBusy();
       $('generateDelta').disabled = isBusy();
       $('cancel').hidden = !['queued','running'].includes(job.status);
@@ -716,6 +733,7 @@ PAGE = r"""<!doctype html>
     function protectedAction(action) { return action(); }
     function startRelease() { if (isBusy()) return toast('已有数据导入任务正在执行'); const target = $('releaseTarget').value; const packageId = $('package').value; const targetPlan = currentReleasePlan(target); if (packageId === '__pending__' && (!targetPlan || targetPlan.error)) return toast('请等待目标差异比较完成'); if (packageId === '__pending__' && !Number((targetPlan.summary || {}).pending_total || 0)) return toast('当前没有待推送增量'); if (packageId === '__pending__' && Number((targetPlan.summary || {}).checksum_mismatch_total || 0)) return toast('存在校验不一致的发布包，请新建版本后再推送'); const label = packageId === '__full__' ? '本地完整数据库' : packageId === '__pending__' ? '相对目标的待推送增量' : '所选增量包'; protectedAction(() => confirmAction('确认开始数据导入', `确定将 ${esc(label)} 导入 ${esc(target)} 吗？全量同步会在目标端保留回滚备份。`, async () => { submitting = true; render(); try { await api('/api/release', {method:'POST', body:JSON.stringify({target, package_id:packageId, confirm_production:target === 'production'})}); toast('数据导入任务已创建'); await load(); } catch (error) { toast('导入未启动：' + error.message); } finally { submitting = false; render(); } })); }
     function startProductionToStagingSync() { if (isBusy()) return toast('已有数据导入任务正在执行'); protectedAction(() => confirmAction('确认用 Production 完整覆盖 Staging', 'Production 只读。Staging 的全部数据会被替换，原 Staging 数据库会保留为回滚备份。恢复、校验通过后才会最终切换。', async () => { submitting = true; render(); try { await api('/api/production-to-staging-sync', {method:'POST', body:JSON.stringify({})}); toast('Production 到 Staging 同步任务已创建'); await load(); } catch (error) { toast('同步未启动：' + error.message); } finally { submitting = false; render(); } }, 'btn-danger', '确认覆盖 Staging')); }
+    function startStagingToProductionSync() { if (isBusy()) return toast('已有数据导入任务正在执行'); protectedAction(() => confirmAction('确认用 Staging 完整覆盖 Production', 'Staging 将作为完整数据源。Production 会先保留为独立回滚备份，临时库恢复和一致性校验全部通过后才会切换。', async () => { submitting = true; render(); try { await api('/api/staging-to-production-sync', {method:'POST', body:JSON.stringify({})}); toast('Staging 到 Production 同步任务已创建'); await load(); } catch (error) { toast('同步未启动：' + error.message); } finally { submitting = false; render(); } }, 'btn-danger', '确认覆盖 Production')); }
     function cancelRelease() { const job = overview.job || {}; if (!job.id) return; protectedAction(() => confirmAction('确认取消数据导入', '当前步骤会被停止。已完成的增量包不会自动回退。', async () => { try { await api('/api/cancel', {method:'POST', body:JSON.stringify({job_id:job.id})}); toast('已发送取消请求'); await load(); } catch (error) { toast('取消失败：' + error.message); } }, 'btn-danger', '确认取消')); }
     function requestRollback(target, backupName) { protectedAction(() => confirmAction('确认数据库回滚', `确定将 ${esc(target)} 回滚到 ${esc(backupName)} 吗？`, async () => { try { await api('/api/rollback', {method:'POST', body:JSON.stringify({target, backup_name:backupName, confirm_production:target === 'production'})}); toast('回滚任务已创建'); await load(); } catch (error) { toast('回滚未启动：' + error.message); } })); }
     function createBatch() { if (isBusy()) return; const target = $('simulationTarget').value || 'local'; protectedAction(() => confirmAction('确认导入模拟数据', `将在 ${esc(target)} 创建一组带独立批次编号的模拟粉丝、自选股和评论。`, async () => { submitting = true; render(); try { const result = await api('/api/batches', {method:'POST', body:JSON.stringify({target, tenant_slug:'laowang'})}); toast('模拟数据已导入：' + result.batch_code); await loadBatches(); } catch (error) { toast('导入失败：' + error.message); } finally { submitting = false; render(); } })); }

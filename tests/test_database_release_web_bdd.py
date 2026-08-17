@@ -59,6 +59,25 @@ class DatabaseReleaseWebBddTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "production_and_staging_must_differ"):
                 database_release_services.start_production_to_staging_sync()
 
+    def test_given_distinct_staging_and_production_when_staging_to_production_sync_starts_then_production_is_the_target(self):
+        staging = self._target("staging", "staging.example")
+        production = self._target("production", "production.example")
+        with patch.object(
+            database_release_services,
+            "get_database_release_target",
+            side_effect=lambda name: staging if name == "staging" else production,
+        ), patch.object(
+            database_release_services,
+            "_start_job",
+            return_value={"status": "queued", "target": "production"},
+        ) as start_job:
+            result = database_release_services.start_staging_to_production_sync()
+        self.assertEqual(result["target"], "production")
+        self.assertEqual(start_job.call_args.args[0], production)
+        self.assertEqual(start_job.call_args.args[1], [str(database_release_services.STAGING_TO_PRODUCTION_SCRIPT)])
+        self.assertEqual(start_job.call_args.args[2], "staging_to_production")
+        self.assertEqual(start_job.call_args.kwargs["extra_env"]["CONFIRM_STAGING_TO_PRODUCTION_SYNC"], "YES")
+
     def test_given_5051_console_when_production_to_staging_is_requested_then_no_execution_password_is_required(self):
         csrf = self._csrf_token()
         with patch.object(
@@ -90,6 +109,22 @@ class DatabaseReleaseWebBddTest(unittest.TestCase):
         self.assertEqual(response.get_json()["job"]["target"], "staging")
         start_sync.assert_called_once_with()
 
+    def test_given_5051_console_when_staging_to_production_is_requested_then_a_background_job_is_created_without_password(self):
+        csrf = self._csrf_token()
+        with patch.object(
+            database_release_web,
+            "start_staging_to_production_sync",
+            return_value={"id": "sync_2", "status": "queued", "target": "production"},
+        ) as start_sync:
+            response = self.client.post(
+                "/api/staging-to-production-sync",
+                json={},
+                headers={"X-Data-Import-CSRF-Token": csrf},
+            )
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.get_json()["job"]["target"], "production")
+        start_sync.assert_called_once_with()
+
     def test_given_5051_console_page_when_rendered_then_it_explains_the_fixed_direction_and_confirmation(self):
         response = self.client.get("/")
         html = response.get_data(as_text=True)
@@ -109,8 +144,10 @@ class DatabaseReleaseWebBddTest(unittest.TestCase):
         self.assertIn('增量审核清单', html)
         self.assertIn('免口令操作', html)
         self.assertNotIn('验证数据导入操作口令', html)
-        self.assertIn("Production 覆盖 Staging", html)
+        self.assertIn("环境全量同步", html)
         self.assertIn("一键导入 Production 到 Staging", html)
+        self.assertIn("一键发布 Staging 到 Production", html)
+        self.assertIn("/api/staging-to-production-sync", html)
         self.assertIn("/api/production-to-staging-sync", html)
         self.assertIn("Production 只读", html)
         css_response = self.client.get("/static/vendor/bootstrap.min.css")
@@ -244,6 +281,12 @@ class DatabaseReleaseWebBddTest(unittest.TestCase):
         self.assertIn("Validating Production and Staging temporary database equivalence", content)
         self.assertIn("trap cleanup_temp ERR", content)
         self.assertIn("==> Switching Staging database", content)
+
+        reverse_content = database_release_services.STAGING_TO_PRODUCTION_SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("CONFIRM_STAGING_TO_PRODUCTION_SYNC", reverse_content)
+        self.assertIn("Validating Staging and Production temporary database equivalence", reverse_content)
+        self.assertIn("==> Switching Production database", reverse_content)
+        self.assertIn('BACKUP_DB="${TARGET_DB}_backup_from_staging_${STAMP}"', reverse_content)
 
     def test_given_target_specific_generated_package_when_the_runner_executes_then_the_target_marker_is_verified_and_bound_to_the_checksum(self):
         content = database_release_services.PACKAGE_SCRIPT.read_text(encoding="utf-8")

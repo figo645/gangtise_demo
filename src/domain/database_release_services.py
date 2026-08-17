@@ -26,6 +26,7 @@ PACKAGE_SCRIPT = ROOT / "scripts" / "apply_database_release_package.sh"
 PACKAGE_BATCH_SCRIPT = ROOT / "scripts" / "apply_database_release_packages.sh"
 ROLLBACK_SCRIPT = ROOT / "scripts" / "rollback_database_release.sh"
 PRODUCTION_TO_STAGING_SCRIPT = ROOT / "scripts" / "sync_production_to_staging.sh"
+STAGING_TO_PRODUCTION_SCRIPT = ROOT / "scripts" / "sync_staging_to_production.sh"
 PACKAGES_DIR = ROOT / "database_release_packages"
 RELEASE_STATE_FILE = ROOT / ".deploy" / "database_release_last_job.json"
 CONFIG_FILE = Path(os.environ.get("DATABASE_RELEASE_CONFIG", str(ROOT / ".database_release.env")))
@@ -696,11 +697,14 @@ def _update_release_progress_from_log(line):
         ("==> [preflight]", "preflight", text.replace("==> [preflight]", "").strip()),
         ("==> Exporting complete local database:", "exporting", "正在导出本地完整数据库"),
         ("==> Exporting complete Production database:", "exporting", "正在导出 Production 完整数据库"),
+        ("==> Exporting complete Staging database:", "exporting", "正在导出 Staging 完整数据库"),
         ("==> Restoring ", "restoring", "正在恢复至目标临时数据库"),
         ("Validated:", "validating", "正在校验临时数据库"),
         ("==> Validating Production and Staging temporary database equivalence", "validating", "正在校验 Production 与 Staging 临时库一致性"),
+        ("==> Validating Staging and Production temporary database equivalence", "validating", "正在校验 Staging 与 Production 临时库一致性"),
         ("Database preparation complete.", "completed", "完整数据库发布完成"),
         ("Production-to-Staging sync complete.", "completed", "Production 已完整同步到 Staging"),
+        ("Staging-to-Production sync complete.", "completed", "Staging 已完整同步到 Production"),
         ("[controller] 开始", "starting", "发布进程已启动"),
     )
     for prefix, state, message in stage_markers:
@@ -930,6 +934,36 @@ def start_production_to_staging_sync():
         staging,
         [str(PRODUCTION_TO_STAGING_SCRIPT)],
         "production_to_staging",
+        extra_env=source_env,
+    )
+
+
+def start_staging_to_production_sync():
+    """Create the fixed-direction full publish from Staging to Production."""
+    staging = get_database_release_target("staging")
+    production = get_database_release_target("production")
+    if not staging or staging["name"] != "staging":
+        raise ValueError("staging_source_unavailable")
+    if not production or production["name"] != "production":
+        raise ValueError("production_target_unavailable")
+    if (
+        staging["db_host"], staging["db_port"], staging["db_name"]
+    ) == (
+        production["db_host"], production["db_port"], production["db_name"]
+    ):
+        raise ValueError("staging_and_production_must_differ")
+    source_env = {
+        "STAGING_DB_NAME": staging["db_name"],
+        "STAGING_DB_USER": staging["db_user"],
+        "STAGING_DB_HOST": staging["db_host"],
+        "STAGING_DB_PORT": staging["db_port"],
+        "STAGING_DB_PASSWORD": staging["db_password"],
+        "CONFIRM_STAGING_TO_PRODUCTION_SYNC": "YES",
+    }
+    return _start_job(
+        production,
+        [str(STAGING_TO_PRODUCTION_SCRIPT)],
+        "staging_to_production",
         extra_env=source_env,
     )
 
