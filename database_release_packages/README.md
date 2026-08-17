@@ -38,12 +38,26 @@ EXISTS`, `ADD COLUMN IF NOT EXISTS` and indexes.
 The Admin database-release page provides two top-level choices:
 
 - `全部剩余增量`: executes every allow-listed package in ascending version
-  order. The package ledger skips versions already applied to the target.
+  order only after the target release ledger has been verified. The package
+  ledger skips versions already applied to the target. If the target ledger is
+  empty, historical packages are marked `unverified` rather than assumed to be
+  pending, and batch execution is blocked to prevent replaying old data.
 - `当前完整数据库`: creates a full pre-release replacement and preserves the
   previous target database as a rollback database.
 
 Individual packages remain selectable for controlled repair. Each package has
 its own checksum and cannot be silently changed after it has been released.
+
+## Local-To-Target Delta
+
+The 5051 controller can scan the local database against Staging or Production
+and generate a new versioned package from the current difference. Generated
+packages include `DELTA_TARGET=staging` or `DELTA_TARGET=production`; this
+allows a newly scanned delta to be released without replaying historical
+packages whose target ledger is missing. The generated SQL is additive only:
+it upserts local new or changed rows, retains target-only rows, and generates
+only additive DDL. Destructive or incompatible schema changes are reported as
+manual blockers and are never generated automatically.
 
 Example `release.env`:
 

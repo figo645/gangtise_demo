@@ -22,6 +22,9 @@ CONNECT_TIMEOUT_SECONDS="${DATABASE_RELEASE_CONNECT_TIMEOUT_SECONDS:-8}"
 [[ "${PACKAGE_TYPE:-}" == schema || "${PACKAGE_TYPE:-}" == master_data || "${PACKAGE_TYPE:-}" == data ]] || { echo "Invalid PACKAGE_TYPE." >&2; exit 2; }
 SQL_FILE="$PACKAGE_DIR/$PACKAGE_TYPE.sql"
 [[ -f "$SQL_FILE" ]] || { echo "Missing SQL payload." >&2; exit 2; }
+if [[ -n "${DELTA_TARGET:-}" ]]; then
+  [[ "$DELTA_TARGET" == "$TARGET" ]] || { echo "Package target does not match release target." >&2; exit 2; }
+fi
 
 export PGPASSWORD="$REMOTE_DB_PASSWORD"
 export PGCONNECT_TIMEOUT="$CONNECT_TIMEOUT_SECONDS"
@@ -29,7 +32,11 @@ PSQL=(psql -w -h "$REMOTE_DB_HOST" -p "$REMOTE_DB_PORT" -U "$REMOTE_DB_USER" -d 
 echo "==> [preflight] Checking ${TARGET} database connection for ${RELEASE_VERSION} (timeout ${CONNECT_TIMEOUT_SECONDS}s)"
 "${PSQL[@]}" -Atqc "SELECT 1" >/dev/null
 echo "==> [preflight] ${TARGET} database connection is available"
-checksum="$(shasum -a 256 "$SQL_FILE" | awk '{print $1}')"
+if [[ -n "${DELTA_TARGET:-}" ]]; then
+  checksum="$( { cat "$SQL_FILE"; printf '\nDELTA_TARGET=%s' "$DELTA_TARGET"; } | shasum -a 256 | awk '{print $1}')"
+else
+  checksum="$(shasum -a 256 "$SQL_FILE" | awk '{print $1}')"
+fi
 echo "==> Calculated package checksum: ${checksum}"
 sql_literal() { printf "%s" "$1" | sed "s/'/''/g"; }
 version_sql="$(sql_literal "$RELEASE_VERSION")"

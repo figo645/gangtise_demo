@@ -8,6 +8,8 @@ main application's Admin API.
 import os
 import json
 import re
+import hashlib
+import shlex
 import signal
 import subprocess
 import threading
@@ -23,11 +25,13 @@ PREPARE_SCRIPT = ROOT / "scripts" / "prepare_database_release.sh"
 PACKAGE_SCRIPT = ROOT / "scripts" / "apply_database_release_package.sh"
 PACKAGE_BATCH_SCRIPT = ROOT / "scripts" / "apply_database_release_packages.sh"
 ROLLBACK_SCRIPT = ROOT / "scripts" / "rollback_database_release.sh"
+PRODUCTION_TO_STAGING_SCRIPT = ROOT / "scripts" / "sync_production_to_staging.sh"
 PACKAGES_DIR = ROOT / "database_release_packages"
 RELEASE_STATE_FILE = ROOT / ".deploy" / "database_release_last_job.json"
 CONFIG_FILE = Path(os.environ.get("DATABASE_RELEASE_CONFIG", str(ROOT / ".database_release.env")))
 _config_loaded = False
 _release_lock = threading.Lock()
+_delta_generation_lock = threading.Lock()
 _release_job = {"status": "idle", "id": "", "target": "", "operation": "", "log": "", "started_at": "", "finished_at": "", "returncode": None, "pid": None, "package_plan": [], "progress": {}, "events": [], "cancel_requested": False, "cancel_requested_at": "", "cancellable": False}
 _release_job_loaded = False
 
@@ -105,8 +109,339 @@ def list_database_release_packages():
                 "version": values["RELEASE_VERSION"],
                 "type": package_type,
                 "title": values.get("TITLE", ""),
+                "delta_target": values.get("DELTA_TARGET", "").strip().lower(),
             })
     return packages
+
+
+def _database_release_package_checksum(package):
+    package_type = str((package or {}).get("type") or "").strip()
+    package_id = str((package or {}).get("id") or "").strip()
+    payload_path = ROOT / package_id / f"{package_type}.sql"
+    if package_type not in {"schema", "master_data", "data"} or not payload_path.is_file():
+        raise ValueError("database_release_package_invalid")
+    payload = payload_path.read_bytes()
+    # Historical packages use their SQL-only checksum. Target-specific deltas
+    # additionally bind their destination into the checksum and release ledger.
+    delta_target = str((package or {}).get("delta_target") or "").strip().lower()
+    if delta_target:
+        payload += b"\nDELTA_TARGET=" + delta_target.encode("ascii")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _build_database_release_package_plan(target, packages, released_checksums, ledger_initialized=True):
+    """Classify immutable local packages against a target release ledger.
+
+    A missing target ledger is not evidence that every historical SQL package
+    still needs to run. Replaying a data package in that state could overwrite
+    data that was already introduced by a previous full release, so packages
+    stay unverified until the target baseline is reconciled.
+    """
+    normalized_target = str((target or {}).get("name") or "").strip().lower()
+    released = dict(released_checksums or {})
+    legacy_ledger_initialized = any(
+        not str(item.get("delta_target") or "").strip()
+        and str(released.get(item.get("version")) or "")
+        for item in (packages or [])
+    )
+    rows = []
+    summary = {
+        "pending_total": 0,
+        "applied_total": 0,
+        "checksum_mismatch_total": 0,
+        "unverified_total": 0,
+        "ledger_initialized": bool(ledger_initialized),
+        "baseline_verification_required": False,
+        "by_type": {
+            name: {"pending": 0, "applied": 0, "checksum_mismatch": 0, "unverified": 0}
+            for name in ("schema", "master_data", "data")
+        },
+    }
+    for package in sorted(packages or [], key=lambda item: (item.get("date") or "", item.get("version") or "", item.get("id") or "")):
+        row = dict(package)
+        checksum = _database_release_package_checksum(row)
+        released_checksum = str(released.get(row.get("version")) or "")
+        is_targeted_delta = bool(row.get("delta_target")) and row.get("delta_target") == normalized_target
+        if is_targeted_delta and not released_checksum:
+            status = "pending"
+        elif not is_targeted_delta and not released_checksum and not legacy_ledger_initialized:
+            status = "unverified"
+        elif not released_checksum:
+            status = "pending"
+        elif released_checksum == checksum:
+            status = "applied"
+        else:
+            status = "checksum_mismatch"
+        package_type = row.get("type") if row.get("type") in summary["by_type"] else "data"
+        row.update({"target": normalized_target, "checksum": checksum, "released_checksum": released_checksum, "status": status})
+        rows.append(row)
+        summary[f"{status}_total"] += 1
+        summary["by_type"][package_type][status] += 1
+    summary["baseline_verification_required"] = bool(summary["unverified_total"])
+    summary["auto_apply_allowed"] = not summary["checksum_mismatch_total"]
+    return {"target": normalized_target, "packages": rows, "summary": summary}
+
+
+def get_database_release_package_plan(target_name):
+    """Return the local package delta for Staging or Production.
+
+    This is deliberately release-package based rather than a destructive live
+    database diff. Every pending change has an immutable SQL payload, type and
+    checksum before it can be sent to a target environment.
+    """
+    target = get_database_release_target(target_name)
+    if not target or target["name"] not in {"staging", "production"}:
+        raise ValueError("database_release_target_invalid")
+    released_checksums = {}
+    ledger_initialized = False
+    try:
+        with psycopg2.connect(
+            host=target["db_host"], port=target["db_port"], dbname=target["db_name"],
+            user=target["db_user"], password=target["db_password"], connect_timeout=5,
+        ) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT to_regclass('public.database_release_packages')")
+                if cursor.fetchone()[0]:
+                    cursor.execute(
+                        """SELECT release_version, checksum_sha256
+                           FROM database_release_packages
+                           WHERE target_environment = %s AND status = 'succeeded'""",
+                        (target["name"],),
+                    )
+                    released_checksums = {str(version): str(checksum) for version, checksum in cursor.fetchall()}
+                    ledger_initialized = bool(released_checksums)
+    except Exception as exc:
+        raise RuntimeError(f"database_release_plan_unavailable:{exc}") from exc
+    return _build_database_release_package_plan(
+        target, list_database_release_packages(), released_checksums, ledger_initialized=ledger_initialized,
+    )
+
+
+def _database_release_diff_report_path(target_name):
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return ROOT / ".deploy" / f"database_diff_local_to_{target_name}_{stamp}.json"
+
+
+def _load_database_release_diff_tools():
+    # Loaded lazily because the CLI audit tool obtains release targets from this
+    # module. The late import keeps the Web controller and the CLI reusable.
+    from tools.audit_database_release_diff import audit, build_incremental_delta
+    from src.domain.core_services import get_local_app_db_target
+    return audit, build_incremental_delta, get_local_app_db_target
+
+
+def scan_database_release_delta(target_name):
+    """Read local and target metadata/data summaries without modifying either DB."""
+    target = get_database_release_target(target_name)
+    if not target or target["name"] not in {"staging", "production"}:
+        raise ValueError("database_release_target_invalid")
+    audit, _, get_local_app_db_target = _load_database_release_diff_tools()
+    report = audit(get_local_app_db_target(), target)
+    output = _database_release_diff_report_path(target["name"])
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {
+        "target": target["name"],
+        "report_path": str(output.relative_to(ROOT)),
+        "summary": report["summary"],
+        "safe_release_delta": report["safe_release_delta"],
+        "schema_migration_difference": report["schema_migration_difference"],
+        "excluded_runtime_tables": report["data"]["runtime_data_difference_tables"],
+        "raw_master_data_difference_tables": report["data"]["raw_master_data_difference_tables"],
+    }
+
+
+def _database_release_review_section(section_type, section):
+    """Convert a generated-but-not-written delta section into UI-safe review data."""
+    normalized_type = str(section_type or "").strip()
+    sql_text = str((section or {}).get("sql") or "").strip()
+    blockers = list((section or {}).get("blockers") or [])
+    if normalized_type == "schema":
+        changes = list((section or {}).get("actions") or [])
+        risk_level = "blocked" if blockers else ("low" if changes else "none")
+        risk_note = "仅包含新增表、字段、约束或索引；不会删除目标端对象。"
+    elif normalized_type == "master_data":
+        changes = list((section or {}).get("details") or [])
+        risk_level = "blocked" if blockers else ("medium" if changes else "none")
+        risk_note = "按业务主键执行幂等 upsert，目标端独有记录会保留。"
+    else:
+        changes = list((section or {}).get("details") or [])
+        risk_level = "blocked" if blockers else ("high" if changes else "none")
+        risk_note = "包含运行或业务记录 upsert，需人工核对影响范围后发布。"
+    preview_limit = 120000
+    return {
+        "type": normalized_type,
+        "risk_level": risk_level,
+        "risk_note": risk_note,
+        "changes": changes,
+        "blockers": blockers,
+        "statement_count": sum(1 for line in sql_text.splitlines() if line.strip().endswith(";")),
+        "line_count": len(sql_text.splitlines()),
+        "sql_chars": len(sql_text),
+        "sql_preview": sql_text[:preview_limit],
+        "sql_preview_truncated": len(sql_text) > preview_limit,
+    }
+
+
+def review_database_release_delta(target_name, include_schema=True, include_master_data=True, include_runtime_data=False):
+    """Build a read-only, visual-review model before a release package is written."""
+    target = get_database_release_target(target_name)
+    if not target or target["name"] not in {"staging", "production"}:
+        raise ValueError("database_release_target_invalid")
+    _, build_incremental_delta, get_local_app_db_target = _load_database_release_diff_tools()
+    delta = build_incremental_delta(
+        get_local_app_db_target(),
+        target,
+        include_schema=bool(include_schema),
+        include_master_data=bool(include_master_data),
+        include_runtime_data=bool(include_runtime_data),
+    )
+    sections = [
+        _database_release_review_section("schema", delta["schema"]),
+        _database_release_review_section("master_data", delta["master_data"]),
+        _database_release_review_section("data", delta["runtime_data"]),
+    ]
+    blockers = [
+        {"type": section["type"], **blocker}
+        for section in sections
+        for blocker in section["blockers"]
+    ]
+    return {
+        "target": target["name"],
+        "generated_at": delta["report"]["generated_at"],
+        "safe_release_delta": delta["report"]["safe_release_delta"],
+        "summary": delta["report"]["summary"],
+        "sections": sections,
+        "blockers": blockers,
+        "can_generate": bool(any(section["statement_count"] for section in sections)) and not blockers,
+        "requires_manual_review": bool(any(section["risk_level"] in {"medium", "high"} for section in sections)),
+    }
+
+
+def get_database_release_package_review(package_id):
+    """Read a local immutable package for visual inspection without executing it."""
+    normalized_id = str(package_id or "").strip()
+    package = next((item for item in list_database_release_packages() if item["id"] == normalized_id), None)
+    if not package:
+        raise ValueError("database_release_package_invalid")
+    payload_path = ROOT / package["id"] / f"{package['type']}.sql"
+    sql_text = payload_path.read_text(encoding="utf-8")
+    risk_level = {"schema": "low", "master_data": "medium", "data": "high"}.get(package["type"], "high")
+    preview_limit = 180000
+    return {
+        "package": {**package, "checksum": _database_release_package_checksum(package)},
+        "risk_level": risk_level,
+        "statement_count": sum(1 for line in sql_text.splitlines() if line.strip().endswith(";")),
+        "line_count": len(sql_text.splitlines()),
+        "sql_chars": len(sql_text),
+        "sql": sql_text[:preview_limit],
+        "sql_truncated": len(sql_text) > preview_limit,
+    }
+
+
+def _next_database_release_version(offset=0):
+    versions = []
+    for package in list_database_release_packages():
+        match = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)", str(package.get("version") or ""))
+        if match:
+            versions.append(tuple(int(value) for value in match.groups()))
+    major, minor, patch = max(versions, default=(1, 0, -1))
+    return f"v{major}.{minor}.{patch + 1 + offset}"
+
+
+def _write_generated_database_release_package(package_type, version, title, sql_text, target_name):
+    package_dir = PACKAGES_DIR / datetime.now().strftime("%Y-%m-%d") / version
+    if package_dir.exists():
+        raise RuntimeError("database_release_generated_version_exists")
+    package_dir.mkdir(parents=True, exist_ok=False)
+    (package_dir / "release.env").write_text(
+        "\n".join((
+            f"RELEASE_VERSION={shlex.quote(version)}",
+            f"PACKAGE_TYPE={shlex.quote(package_type)}",
+            f"DELTA_TARGET={shlex.quote(target_name)}",
+            f"TITLE={shlex.quote(title)}",
+            "",
+        )),
+        encoding="utf-8",
+    )
+    (package_dir / f"{package_type}.sql").write_text(
+        "-- Generated by the local-to-target delta scanner.\n"
+        "-- Additive only: target-only rows and destructive schema changes are excluded.\n\n"
+        + sql_text.rstrip() + "\n",
+        encoding="utf-8",
+    )
+    return {
+        "id": str(package_dir.relative_to(ROOT)),
+        "version": version,
+        "type": package_type,
+        "title": title,
+        "delta_target": target_name,
+    }
+
+
+def generate_database_release_delta(target_name, include_schema=True, include_master_data=True, include_runtime_data=False):
+    """Create new versioned SQL packages from a fresh local-to-target diff.
+
+    No target database is written here. The generated package must still be
+    selected and applied through the normal release operation.
+    """
+    target = get_database_release_target(target_name)
+    if not target or target["name"] not in {"staging", "production"}:
+        raise ValueError("database_release_target_invalid")
+    with _delta_generation_lock:
+        _, build_incremental_delta, get_local_app_db_target = _load_database_release_diff_tools()
+        delta = build_incremental_delta(
+            get_local_app_db_target(),
+            target,
+            include_schema=bool(include_schema),
+            include_master_data=bool(include_master_data),
+            include_runtime_data=bool(include_runtime_data),
+        )
+        report_path = _database_release_diff_report_path(target["name"])
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(delta["report"], ensure_ascii=False, indent=2), encoding="utf-8")
+        generated, blockers = [], []
+        sections = (
+            ("schema", "表结构增量", delta["schema"]),
+            ("master_data", "主数据增量", delta["master_data"]),
+            ("data", "业务运行数据增量", delta["runtime_data"]),
+        )
+        for package_type, label, section in sections:
+            section_blockers = list(section.get("blockers") or [])
+            if section_blockers:
+                blockers.extend({"type": package_type, **item} for item in section_blockers)
+                continue
+            sql_text = str(section.get("sql") or "").strip()
+            if not sql_text:
+                continue
+            version = _next_database_release_version(len(generated))
+            generated.append(
+                _write_generated_database_release_package(
+                    package_type, version, f"本地到 {target['name']} {label}", sql_text, target["name"],
+                )
+            )
+        review_sections = [
+            _database_release_review_section("schema", delta["schema"]),
+            _database_release_review_section("master_data", delta["master_data"]),
+            _database_release_review_section("data", delta["runtime_data"]),
+        ]
+        return {
+            "target": target["name"],
+            "report_path": str(report_path.relative_to(ROOT)),
+            "generated_packages": generated,
+            "blockers": blockers,
+            "safe_release_delta": delta["report"]["safe_release_delta"],
+            "details": {
+                "schema": delta["schema"].get("actions") or [],
+                "master_data": delta["master_data"].get("details") or [],
+                "runtime_data": delta["runtime_data"].get("details") or [],
+            },
+            "review": {
+                "sections": review_sections,
+                "blockers": blockers,
+                "requires_manual_review": bool(any(section["risk_level"] in {"medium", "high"} for section in review_sections)),
+            },
+        }
 
 
 def _release_job_snapshot():
@@ -270,7 +605,7 @@ def _terminate_release_process_group(pid):
         return
 
 
-def _run_process(command, target, job_id, operation):
+def _run_process(command, target, job_id, operation, extra_env=None):
     env = os.environ.copy()
     env.update({
         "DATABASE_RELEASE_TARGET": target["name"],
@@ -281,6 +616,9 @@ def _run_process(command, target, job_id, operation):
         "REMOTE_DB_PASSWORD": target["db_password"],
         "CONFIRM_DATABASE_REPLACE": "YES",
     })
+    # Source credentials are supplied only to operations that need a second
+    # database endpoint, such as Production -> Staging cloning.
+    env.update({str(key): str(value) for key, value in (extra_env or {}).items()})
     log_path = Path(_release_job.get("log") or ROOT / ".deploy" / f"admin_{operation}_{job_id}.log")
     try:
         log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -357,9 +695,12 @@ def _update_release_progress_from_log(line):
     stage_markers = (
         ("==> [preflight]", "preflight", text.replace("==> [preflight]", "").strip()),
         ("==> Exporting complete local database:", "exporting", "正在导出本地完整数据库"),
+        ("==> Exporting complete Production database:", "exporting", "正在导出 Production 完整数据库"),
         ("==> Restoring ", "restoring", "正在恢复至目标临时数据库"),
         ("Validated:", "validating", "正在校验临时数据库"),
+        ("==> Validating Production and Staging temporary database equivalence", "validating", "正在校验 Production 与 Staging 临时库一致性"),
         ("Database preparation complete.", "completed", "完整数据库发布完成"),
+        ("Production-to-Staging sync complete.", "completed", "Production 已完整同步到 Staging"),
         ("[controller] 开始", "starting", "发布进程已启动"),
     )
     for prefix, state, message in stage_markers:
@@ -396,7 +737,7 @@ def _update_release_progress_from_log(line):
     })
 
 
-def _start_job(target, command, operation, package_plan=None):
+def _start_job(target, command, operation, package_plan=None, extra_env=None):
     with _release_lock:
         _load_persisted_release_job()
         if _release_job.get("status") in {"queued", "running", "cancelling"}:
@@ -417,7 +758,7 @@ def _start_job(target, command, operation, package_plan=None):
         ]})
         _persist_release_job()
         snapshot = _release_job_snapshot()
-    threading.Thread(target=_run_process, args=(command, target, job_id, operation), daemon=True).start()
+    threading.Thread(target=_run_process, args=(command, target, job_id, operation, extra_env), daemon=True).start()
     return snapshot
 
 
@@ -478,12 +819,59 @@ def start_database_release(target_name, package_id="", confirm_production=False)
     if normalized_package and normalized_package != "__pending__" and normalized_package not in package_ids:
         raise ValueError("database_release_package_invalid")
     if normalized_package == "__pending__":
-        package_plan = sorted(packages, key=lambda item: (item.get("date") or "", item.get("version") or "", item.get("id") or ""))
+        release_plan = get_database_release_package_plan(target["name"])
+        if release_plan["summary"].get("checksum_mismatch_total"):
+            raise ValueError("database_release_package_checksum_mismatch")
+        # Historical packages without a target ledger are archived for this
+        # workflow. They remain protected from explicit replay, but they must
+        # not prevent a normal "remaining delta" request from becoming the
+        # clear no-op it is when no target-specific package is pending.
+        package_plan = sorted(
+            (item for item in release_plan["packages"] if item.get("status") == "pending"),
+            key=lambda item: (item.get("date") or "", item.get("version") or "", item.get("id") or ""),
+        )
+        if not package_plan:
+            raise ValueError("database_release_no_pending_packages")
         command = [str(PACKAGE_BATCH_SCRIPT), *[str(ROOT / item["id"]) for item in package_plan]]
         return _start_job(target, command, "release", package_plan=package_plan)
     package_plan = [item for item in packages if item["id"] == normalized_package]
+    if normalized_package:
+        release_plan = get_database_release_package_plan(target["name"])
+        selected_status = next((item.get("status") for item in release_plan["packages"] if item.get("id") == normalized_package), "")
+        if selected_status == "unverified":
+            raise ValueError("database_release_baseline_verification_required")
+        if selected_status == "checksum_mismatch":
+            raise ValueError("database_release_package_checksum_mismatch")
     command = [str(PACKAGE_SCRIPT), str(ROOT / normalized_package)] if normalized_package else [str(PREPARE_SCRIPT)]
     return _start_job(target, command, "release", package_plan=package_plan)
+
+
+def start_database_release_packages(target_name, package_ids, confirm_production=False):
+    """Publish exactly the packages reviewed in the current UI workflow."""
+    target = get_database_release_target(target_name)
+    if not target or target["name"] not in {"staging", "production"}:
+        raise ValueError("database_release_target_invalid")
+    if target["name"] == "production" and confirm_production is not True:
+        raise ValueError("production_confirmation_required")
+    requested = []
+    for package_id in package_ids or []:
+        normalized = str(package_id or "").strip()
+        if normalized and normalized not in requested:
+            requested.append(normalized)
+    packages = list_database_release_packages()
+    package_by_id = {item["id"]: item for item in packages}
+    if not requested or any(package_id not in package_by_id for package_id in requested):
+        raise ValueError("database_release_package_invalid")
+    plan = get_database_release_package_plan(target["name"])
+    plan_by_id = {item["id"]: item for item in plan["packages"]}
+    selected = [plan_by_id[package_id] for package_id in requested if package_id in plan_by_id]
+    if len(selected) != len(requested):
+        raise ValueError("database_release_package_invalid")
+    if any(item.get("status") != "pending" for item in selected):
+        raise ValueError("database_release_package_not_pending")
+    selected.sort(key=lambda item: (item.get("date") or "", item.get("version") or "", item.get("id") or ""))
+    command = [str(PACKAGE_BATCH_SCRIPT), *[str(ROOT / item["id"]) for item in selected]]
+    return _start_job(target, command, "release", package_plan=selected)
 
 
 def list_database_release_rollbacks(target_name):
@@ -509,6 +897,41 @@ def start_database_rollback(target_name, backup_name, confirm_production=False):
     if normalized_backup not in {item["name"] for item in list_database_release_rollbacks(target["name"])}:
         raise ValueError("database_rollback_backup_invalid")
     return _start_job(target, [str(ROLLBACK_SCRIPT), normalized_backup], "rollback")
+
+
+def start_production_to_staging_sync():
+    """Create a single-flight task which makes Staging a Production copy.
+
+    The task only accepts this fixed direction. The source credentials are
+    passed to the worker as private process environment, never persisted in
+    release state or task logs.
+    """
+    production = get_database_release_target("production")
+    staging = get_database_release_target("staging")
+    if not production or production["name"] != "production":
+        raise ValueError("production_source_unavailable")
+    if not staging or staging["name"] != "staging":
+        raise ValueError("staging_target_unavailable")
+    if (
+        production["db_host"], production["db_port"], production["db_name"]
+    ) == (
+        staging["db_host"], staging["db_port"], staging["db_name"]
+    ):
+        raise ValueError("production_and_staging_must_differ")
+    source_env = {
+        "PRODUCTION_DB_NAME": production["db_name"],
+        "PRODUCTION_DB_USER": production["db_user"],
+        "PRODUCTION_DB_HOST": production["db_host"],
+        "PRODUCTION_DB_PORT": production["db_port"],
+        "PRODUCTION_DB_PASSWORD": production["db_password"],
+        "CONFIRM_PRODUCTION_TO_STAGING_SYNC": "YES",
+    }
+    return _start_job(
+        staging,
+        [str(PRODUCTION_TO_STAGING_SCRIPT)],
+        "production_to_staging",
+        extra_env=source_env,
+    )
 
 
 def get_database_release_log(limit=50000):

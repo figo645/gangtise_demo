@@ -1,5 +1,7 @@
 import unittest
 import os
+import shlex
+import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -48,10 +50,92 @@ class DatabaseReleaseAdminBddTest(unittest.TestCase):
     def test_given_allowlisted_release_when_admin_starts_it_then_the_service_creates_one_job(self):
         target = {"name": "staging", "db_name": "demo", "db_user": "postgres", "db_host": "127.0.0.1", "db_port": "5432", "db_password": "secret"}
         package = {"id": "2026-08-13/v1.2.0", "type": "data"}
-        with patch.object(database_release_services, "get_database_release_target", return_value=target), patch.object(database_release_services, "list_database_release_packages", return_value=[package]), patch.object(database_release_services, "_start_job", return_value={"status": "queued", "target": "staging"}) as start_job:
+        plan = {"summary": {"checksum_mismatch_total": 0, "baseline_verification_required": False}, "packages": [{**package, "status": "pending"}]}
+        with patch.object(database_release_services, "get_database_release_target", return_value=target), patch.object(database_release_services, "list_database_release_packages", return_value=[package]), patch.object(database_release_services, "get_database_release_package_plan", return_value=plan), patch.object(database_release_services, "_start_job", return_value={"status": "queued", "target": "staging"}) as start_job:
             result = database_release_services.start_database_release("staging", package_id=package["id"])
         self.assertEqual(result["status"], "queued")
         start_job.assert_called_once()
+
+    def test_given_reviewed_pending_packages_when_starting_a_reviewed_release_then_only_that_exact_ordered_set_is_executed(self):
+        target = {"name": "staging", "db_name": "demo", "db_user": "postgres", "db_host": "127.0.0.1", "db_port": "5432", "db_password": "secret"}
+        packages = [
+            {"id": "database_release_packages/2026-08-17/v1.1.4", "date": "2026-08-17", "version": "v1.1.4", "type": "schema"},
+            {"id": "database_release_packages/2026-08-17/v1.1.5", "date": "2026-08-17", "version": "v1.1.5", "type": "data"},
+            {"id": "database_release_packages/2026-08-17/v1.1.6", "date": "2026-08-17", "version": "v1.1.6", "type": "data"},
+        ]
+        plan = {"packages": [{**item, "status": "pending"} for item in packages]}
+        requested = [packages[2]["id"], packages[0]["id"]]
+        with patch.object(database_release_services, "get_database_release_target", return_value=target), patch.object(database_release_services, "list_database_release_packages", return_value=packages), patch.object(database_release_services, "get_database_release_package_plan", return_value=plan), patch.object(database_release_services, "_start_job", return_value={"status": "queued", "target": "staging"}) as start_job:
+            result = database_release_services.start_database_release_packages("staging", requested)
+        self.assertEqual(result["status"], "queued")
+        self.assertEqual(start_job.call_args.args[1][0], str(database_release_services.PACKAGE_BATCH_SCRIPT))
+        self.assertEqual(start_job.call_args.kwargs["package_plan"], [plan["packages"][0], plan["packages"][2]])
+
+    def test_given_runtime_data_review_when_rendering_review_metadata_then_it_is_marked_high_risk_and_requires_human_confirmation(self):
+        review = database_release_services._database_release_review_section(
+            "data", {"sql": "INSERT INTO users (id) VALUES (1);", "details": [{"table": "users", "upsert_rows": 1}], "blockers": []},
+        )
+        self.assertEqual(review["risk_level"], "high")
+        self.assertEqual(review["statement_count"], 1)
+        self.assertEqual(review["changes"][0]["table"], "users")
+
+    def test_given_target_without_a_release_ledger_when_building_a_plan_then_historical_packages_are_unverified_not_pending(self):
+        package = {"id": "database_release_packages/2026-08-14/v1.1.0", "date": "2026-08-14", "version": "v1.1.0", "type": "schema"}
+        with patch.object(database_release_services, "_database_release_package_checksum", return_value="checksum"):
+            plan = database_release_services._build_database_release_package_plan(
+                {"name": "staging"}, [package], {}, ledger_initialized=False,
+            )
+        self.assertEqual(plan["packages"][0]["status"], "unverified")
+        self.assertEqual(plan["summary"]["pending_total"], 0)
+        self.assertTrue(plan["summary"]["baseline_verification_required"])
+
+    def test_given_target_specific_delta_when_the_target_ledger_is_empty_then_only_that_new_delta_is_pending(self):
+        package = {"id": "database_release_packages/2026-08-17/v1.1.3", "date": "2026-08-17", "version": "v1.1.3", "type": "master_data", "delta_target": "staging"}
+        with patch.object(database_release_services, "_database_release_package_checksum", return_value="checksum"):
+            plan = database_release_services._build_database_release_package_plan(
+                {"name": "staging"}, [package], {}, ledger_initialized=False,
+            )
+        self.assertEqual(plan["packages"][0]["status"], "pending")
+        self.assertEqual(plan["summary"]["pending_total"], 1)
+        self.assertFalse(plan["summary"]["baseline_verification_required"])
+
+    def test_given_only_target_specific_delta_in_the_ledger_when_rebuilding_the_plan_then_unrecorded_historical_packages_stay_unverified(self):
+        historical = {"id": "database_release_packages/2026-08-14/v1.1.0", "date": "2026-08-14", "version": "v1.1.0", "type": "schema", "delta_target": ""}
+        delta = {"id": "database_release_packages/2026-08-17/v1.1.3", "date": "2026-08-17", "version": "v1.1.3", "type": "data", "delta_target": "staging"}
+        with patch.object(database_release_services, "_database_release_package_checksum", side_effect=lambda item: item["version"]):
+            plan = database_release_services._build_database_release_package_plan(
+                {"name": "staging"}, [historical, delta], {"v1.1.3": "v1.1.3"}, ledger_initialized=True,
+            )
+        statuses = {item["version"]: item["status"] for item in plan["packages"]}
+        self.assertEqual(statuses["v1.1.0"], "unverified")
+        self.assertEqual(statuses["v1.1.3"], "applied")
+        self.assertEqual(plan["summary"]["pending_total"], 0)
+
+    def test_given_generated_package_title_with_spaces_when_the_runner_sources_release_env_then_the_title_remains_one_value(self):
+        original_packages_dir = database_release_services.PACKAGES_DIR
+        with TemporaryDirectory(dir=database_release_services.ROOT) as temp_dir:
+            try:
+                database_release_services.PACKAGES_DIR = Path(temp_dir) / "packages"
+                package = database_release_services._write_generated_database_release_package(
+                    "data", "v9.9.9", "本地到 staging 业务运行数据增量", "SELECT 1;", "staging",
+                )
+                env_path = database_release_services.ROOT / package["id"] / "release.env"
+                result = subprocess.run(
+                    ["bash", "-c", f"source {shlex.quote(str(env_path))}; printf '%s' \"$TITLE\""],
+                    check=True, capture_output=True, text=True,
+                )
+                self.assertEqual(result.stdout, "本地到 staging 业务运行数据增量")
+                self.assertIn("TITLE='", env_path.read_text(encoding="utf-8"))
+            finally:
+                database_release_services.PACKAGES_DIR = original_packages_dir
+
+    def test_given_only_archived_historical_packages_when_admin_starts_remaining_incrementals_then_the_service_reports_no_pending_delta(self):
+        target = {"name": "staging", "db_name": "demo", "db_user": "postgres", "db_host": "127.0.0.1", "db_port": "5432", "db_password": "secret"}
+        package = {"id": "database_release_packages/2026-08-14/v1.1.0", "date": "2026-08-14", "version": "v1.1.0", "type": "schema"}
+        plan = {"summary": {"checksum_mismatch_total": 0, "baseline_verification_required": True}, "packages": [{**package, "status": "unverified"}]}
+        with patch.object(database_release_services, "get_database_release_target", return_value=target), patch.object(database_release_services, "list_database_release_packages", return_value=[package]), patch.object(database_release_services, "get_database_release_package_plan", return_value=plan):
+            with self.assertRaisesRegex(ValueError, "database_release_no_pending_packages"):
+                database_release_services.start_database_release("staging", package_id="__pending__")
 
     def test_given_remaining_incremental_packages_when_admin_starts_release_then_the_service_uses_the_ordered_batch_runner(self):
         target = {"name": "staging", "db_name": "demo", "db_user": "postgres", "db_host": "127.0.0.1", "db_port": "5432", "db_password": "secret"}
@@ -59,12 +143,47 @@ class DatabaseReleaseAdminBddTest(unittest.TestCase):
             {"id": "database_release_packages/2026-08-14/v1.1.1", "date": "2026-08-14", "version": "v1.1.1", "type": "master_data"},
             {"id": "database_release_packages/2026-08-14/v1.1.0", "date": "2026-08-14", "version": "v1.1.0", "type": "schema"},
         ]
-        with patch.object(database_release_services, "get_database_release_target", return_value=target), patch.object(database_release_services, "list_database_release_packages", return_value=packages), patch.object(database_release_services, "_start_job", return_value={"status": "queued", "target": "staging"}) as start_job:
+        release_plan = {"summary": {"checksum_mismatch_total": 0}, "packages": [{**item, "status": "pending"} for item in packages]}
+        with patch.object(database_release_services, "get_database_release_target", return_value=target), patch.object(database_release_services, "list_database_release_packages", return_value=packages), patch.object(database_release_services, "get_database_release_package_plan", return_value=release_plan), patch.object(database_release_services, "_start_job", return_value={"status": "queued", "target": "staging"}) as start_job:
             database_release_services.start_database_release("staging", package_id="__pending__")
         command = start_job.call_args.args[1]
         plan = start_job.call_args.kwargs["package_plan"]
         self.assertEqual(command[0], str(database_release_services.PACKAGE_BATCH_SCRIPT))
         self.assertEqual([item["version"] for item in plan], ["v1.1.0", "v1.1.1"])
+
+    def test_given_target_release_ledger_when_building_increment_plan_then_schema_master_data_and_business_data_are_classified(self):
+        target = {"name": "staging"}
+        packages = database_release_services.list_database_release_packages()
+        schema_package = next(item for item in packages if item["type"] == "schema")
+        master_package = next(item for item in packages if item["type"] == "master_data")
+        data_package = next(item for item in packages if item["type"] == "data")
+        plan = database_release_services._build_database_release_package_plan(
+            target,
+            [schema_package, master_package, data_package],
+            {schema_package["version"]: database_release_services._database_release_package_checksum(schema_package)},
+        )
+        status_by_type = {item["type"]: item["status"] for item in plan["packages"]}
+        self.assertEqual(status_by_type["schema"], "applied")
+        self.assertEqual(status_by_type["master_data"], "pending")
+        self.assertEqual(status_by_type["data"], "pending")
+        self.assertEqual(plan["summary"]["by_type"]["schema"]["applied"], 1)
+        self.assertEqual(plan["summary"]["by_type"]["master_data"]["pending"], 1)
+        self.assertEqual(plan["summary"]["by_type"]["data"]["pending"], 1)
+
+    def test_given_package_checksum_changed_after_target_release_when_building_increment_plan_then_it_is_blocked(self):
+        package = next(item for item in database_release_services.list_database_release_packages() if item["type"] == "schema")
+        plan = database_release_services._build_database_release_package_plan(
+            {"name": "staging"}, [package], {package["version"]: "different-checksum"}
+        )
+        self.assertEqual(plan["packages"][0]["status"], "checksum_mismatch")
+        self.assertEqual(plan["summary"]["checksum_mismatch_total"], 1)
+
+    def test_given_checksum_mismatch_when_starting_remaining_incrementals_then_the_service_requires_a_new_package_version(self):
+        target = {"name": "staging", "db_name": "demo", "db_user": "postgres", "db_host": "127.0.0.1", "db_port": "5432", "db_password": "secret"}
+        package = {"id": "database_release_packages/2026-08-14/v1.1.0", "date": "2026-08-14", "version": "v1.1.0", "type": "schema"}
+        with patch.object(database_release_services, "get_database_release_target", return_value=target), patch.object(database_release_services, "list_database_release_packages", return_value=[package]), patch.object(database_release_services, "get_database_release_package_plan", return_value={"summary": {"checksum_mismatch_total": 1}, "packages": [{**package, "status": "checksum_mismatch"}]}):
+            with self.assertRaisesRegex(ValueError, "database_release_package_checksum_mismatch"):
+                database_release_services.start_database_release("staging", package_id="__pending__")
 
     def test_given_incremental_runner_log_when_a_package_starts_or_finishes_then_job_progress_is_updated(self):
         with patch.object(database_release_services, "_set_job") as set_job:
