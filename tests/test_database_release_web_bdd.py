@@ -1,4 +1,6 @@
 import unittest
+import os
+import tempfile
 from unittest.mock import patch
 
 from src.domain import database_release_services
@@ -149,6 +151,8 @@ class DatabaseReleaseWebBddTest(unittest.TestCase):
         self.assertIn("一键发布 Staging 到 Production", html)
         self.assertIn("/api/staging-to-production-sync", html)
         self.assertIn("/api/production-to-staging-sync", html)
+        self.assertIn("/api/csrf", html)
+        self.assertIn("csrf_validation_failed", html)
         self.assertIn("Production 只读", html)
         css_response = self.client.get("/static/vendor/bootstrap.min.css")
         js_response = self.client.get("/static/vendor/bootstrap.bundle.min.js")
@@ -168,6 +172,24 @@ class DatabaseReleaseWebBddTest(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.get_json()["password_required"])
+
+    def test_given_no_configured_web_secret_when_5051_restarts_then_the_session_secret_is_reused(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            secret_path = os.path.join(temp_dir, "database-release.secret")
+            with patch.dict(
+                os.environ,
+                {
+                    "DATA_IMPORT_WEB_SECRET_FILE": secret_path,
+                    "DATA_IMPORT_WEB_SECRET_KEY": "",
+                    "DATABASE_RELEASE_WEB_SECRET_KEY": "",
+                },
+                clear=False,
+            ):
+                first = database_release_web._load_database_release_secret_key()
+                second = database_release_web._load_database_release_secret_key()
+            self.assertTrue(first)
+            self.assertEqual(first, second)
+            self.assertTrue(os.path.exists(secret_path))
 
     def test_given_a_target_environment_when_5051_loads_increment_plan_then_it_returns_three_type_summary(self):
         plan = {

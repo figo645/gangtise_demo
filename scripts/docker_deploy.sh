@@ -9,6 +9,7 @@ CONTAINER_NAME="${DOCKER_CONTAINER_NAME:-gangtise-demo-web}"
 HOST_PORT="${HOST_PORT:-5001}"
 CONTAINER_PORT="${CONTAINER_PORT:-5001}"
 CREDENTIALS_FILE="${POSTGRES_CREDENTIALS_FILE:-/root/gangtise_postgres_credentials}"
+GANGTISE_CREDENTIALS_FILE="${GANGTISE_OPENAPI_CREDENTIALS_FILE:-/root/gangtise_openapi_credentials}"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "docker command not found. Install Docker first." >&2
@@ -21,8 +22,17 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 if [ -f "$CREDENTIALS_FILE" ]; then
+  set -a
   # shellcheck disable=SC1090
   . "$CREDENTIALS_FILE"
+  set +a
+fi
+
+if [ -f "$GANGTISE_CREDENTIALS_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$GANGTISE_CREDENTIALS_FILE"
+  set +a
 fi
 
 RAW_APP_DB_HOST="${APP_DB_HOST:-${LOCAL_POSTGRES_HOST:-}}"
@@ -87,6 +97,10 @@ RUN_ARGS=(
   -e "POSTGRES_DB=${POSTGRES_DB}"
   -e "POSTGRES_USER=${POSTGRES_USER}"
   -e "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
+  -e "GANGTISE_API_BASE_URL=${GANGTISE_API_BASE_URL:-https://openapi.gangtise.com}"
+  -e "GANGTISE_ACCESS_KEY=${GANGTISE_ACCESS_KEY:-}"
+  -e "GANGTISE_SECRET_KEY=${GANGTISE_SECRET_KEY:-}"
+  -e "GANGTISE_LONG_TOKEN=${GANGTISE_LONG_TOKEN:-}"
   "$IMAGE_NAME"
 )
 

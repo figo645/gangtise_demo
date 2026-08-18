@@ -10,6 +10,7 @@ It listens on 127.0.0.1:5051 by default.
 
 import os
 import secrets
+import hashlib
 import sys
 import time
 from functools import wraps
@@ -47,9 +48,45 @@ from src.domain.database_release_services import (  # noqa: E402
 
 APP_HOST = os.environ.get("DATA_IMPORT_WEB_HOST", os.environ.get("DATABASE_RELEASE_WEB_HOST", "127.0.0.1"))
 APP_PORT = int(os.environ.get("DATA_IMPORT_WEB_PORT", os.environ.get("DATABASE_RELEASE_WEB_PORT", "5051")))
+
+
+def _load_database_release_secret_key():
+    """Keep the 5051 session valid across restarts and worker processes."""
+    configured = str(
+        os.environ.get("DATA_IMPORT_WEB_SECRET_KEY")
+        or os.environ.get("DATABASE_RELEASE_WEB_SECRET_KEY")
+        or ""
+    ).strip()
+    if configured:
+        return configured
+
+    secret_file = Path(
+        os.environ.get("DATA_IMPORT_WEB_SECRET_FILE")
+        or os.environ.get("DATABASE_RELEASE_WEB_SECRET_FILE")
+        or str(ROOT / ".deploy" / "database_release_web.secret")
+    )
+    try:
+        secret_file.parent.mkdir(parents=True, exist_ok=True)
+        existing = secret_file.read_text(encoding="utf-8").strip() if secret_file.exists() else ""
+        if len(existing) >= 32:
+            return existing
+        generated = secrets.token_urlsafe(48)
+        secret_file.write_text(generated + "\n", encoding="utf-8")
+        try:
+            secret_file.chmod(0o600)
+        except OSError:
+            pass
+        return generated
+    except OSError:
+        # A read-only deployment must provide DATA_IMPORT_WEB_SECRET_KEY. Keep
+        # this fallback deterministic for one process rather than changing it
+        # on every request, while the deployment warning remains observable.
+        return hashlib.sha256(str(ROOT).encode("utf-8")).hexdigest()
+
+
 app = Flask(__name__, static_folder=str(ROOT / "static"), static_url_path="/static")
 app.config.update(
-    SECRET_KEY=os.environ.get("DATA_IMPORT_WEB_SECRET_KEY") or os.environ.get("DATABASE_RELEASE_WEB_SECRET_KEY") or secrets.token_urlsafe(32),
+    SECRET_KEY=_load_database_release_secret_key(),
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Strict",
     SESSION_COOKIE_SECURE=os.environ.get("DATA_IMPORT_WEB_COOKIE_SECURE", "0") == "1",
@@ -96,7 +133,39 @@ def _security_headers(response):
 
 @app.get("/")
 def index():
-    return PAGE.replace("__CSRF_TOKEN__", _csrf_token())
+    rendered = PAGE.replace("__CSRF_TOKEN__", _csrf_token())
+    csrf_recovery = r"""<script>
+(function () {
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = async function (input, options) {
+    const response = await originalFetch(input, options);
+    if (response.status !== 403) return response;
+    let body = null;
+    try { body = await response.clone().json(); } catch (error) { return response; }
+    if (!body || body.error !== 'csrf_validation_failed') return response;
+    try {
+      const tokenResponse = await originalFetch('/api/csrf', {cache: 'no-store', credentials: 'same-origin'});
+      const tokenBody = await tokenResponse.json();
+      if (!tokenResponse.ok || !tokenBody.csrf_token) return response;
+      const retryOptions = Object.assign({}, options || {});
+      const headers = new Headers((options && options.headers) || {});
+      headers.set('X-Data-Import-CSRF-Token', tokenBody.csrf_token);
+      retryOptions.headers = headers;
+      retryOptions.credentials = 'same-origin';
+      return originalFetch(input, retryOptions);
+    } catch (error) {
+      return response;
+    }
+  };
+})();
+</script>"""
+    return rendered.replace("<body>", csrf_recovery + "<body>", 1)
+
+
+@app.get("/api/csrf")
+def csrf():
+    """Issue the current session token after a stale page or session restart."""
+    return jsonify({"ok": True, "csrf_token": _csrf_token()})
 
 
 @app.get("/api/overview")
