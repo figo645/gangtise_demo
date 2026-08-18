@@ -675,7 +675,11 @@ def build_fan_stock_observation_payload(tenant=None, fallback_mode=False):
                     "name": str(detail.get("name") or code).strip() or code,
                     "market": "港股" if str(detail.get("market") or "").upper() == "HK" else "A股",
                     "focus": str(detail.get("industry") or detail.get("focus") or "其他板块").strip() or "其他板块",
-                    "change": f"{float(detail.get('change_pct') or 0):+.1f}%",
+                    "change": (
+                        f"{float(detail.get('change_pct')):+.1f}%"
+                        if detail.get("change_pct") is not None and not bool(detail.get("data_unavailable"))
+                        else "行情待同步"
+                    ),
                     "thesis": str(detail.get("signal_summary") or ((detail.get("fundamental") or {}).get("summary")) or "继续跟踪").strip() or "继续跟踪",
                     "added_at": str(item.get("created_at") or "").strip(),
                     "is_simulated": bool(item.get("is_simulated")),
@@ -795,7 +799,11 @@ def build_tenant_watchlist_hub_items(tenant, watchlist_details_map):
             "code": detail["code"],
             "market": "港股" if detail.get("market") == "HK" else "A股",
             "focus": detail.get("focus") or detail.get("industry") or "个股跟踪",
-            "change": f"{detail.get('change_pct', 0):+.1f}%",
+            "change": (
+                f"{float(detail.get('change_pct')):+.1f}%"
+                if detail.get("change_pct") is not None and not bool(detail.get("data_unavailable"))
+                else "行情待同步"
+            ),
             "thesis": detail.get("signal_summary") or detail.get("fundamental", {}).get("summary") or "继续跟踪",
             "alert_level": detail.get("alert_level") or "normal",
             "alert_text": detail.get("alert_text") or "当前无明显预警",

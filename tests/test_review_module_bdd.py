@@ -1,4 +1,6 @@
+import copy
 import unittest
+from datetime import date
 from unittest import mock
 from unittest.mock import patch
 
@@ -469,7 +471,30 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertEqual(plan["tools"], ["watchlist.detail"])
 
     def test_given_stock_kline_question_when_calling_hermes_api_then_kline_artifact_contains_chart_and_body(self):
-        with patch("src.domain.ai_services.get_default_llm_config", return_value=None):
+        candles = [
+            {"date": "2026-08-14", "open": 5.72, "high": 5.80, "low": 5.68, "close": 5.76},
+            {"date": "2026-08-15", "open": 5.76, "high": 5.87, "low": 5.73, "close": 5.84},
+            {"date": "2026-08-18", "open": 5.84, "high": 5.96, "low": 5.81, "close": 5.90},
+        ]
+        live_detail = {
+            "code": "601988",
+            "name": "中国银行",
+            "market": "SH",
+            "industry": "银行",
+            "price": 5.90,
+            "change": 0.06,
+            "change_pct": 1.03,
+            "kline": copy.deepcopy(candles),
+            "history_kline": market_services.build_real_indicator_kline_payload(candles),
+            "history_series": [{"date": item["date"], "value": item["close"], "status": "good"} for item in candles],
+            "fundamental": {"summary": "Gangtise 返回的中国银行真实日线样本。", "metrics": [], "thesis": []},
+            "forecast": {"label": "行情判断", "verdict": "继续跟踪", "confidence": "中", "band": "", "drivers": []},
+            "data_source": "gangtise_openapi",
+            "data_unavailable": False,
+        }
+        with patch("src.domain.ai_services.get_default_llm_config", return_value=None), patch(
+            "src.domain.ai_services.get_watchlist_detail_by_code", return_value=live_detail
+        ):
             response = self.client.post(
                 "/api/hermes/query",
                 json={
@@ -1167,6 +1192,35 @@ class ReviewModuleBddTest(unittest.TestCase):
             {"date": "2026-08-10 09:32:00", "value": 1690.1},
         ])
 
+    def test_given_daily_rows_in_intraday_cache_when_opening_watchlist_then_cache_is_rejected(self):
+        cached = {
+            "points": [
+                {"date": "2026-08-17", "value": 5.72},
+                {"date": "2026-08-18", "value": 5.90},
+            ],
+        }
+        with patch("src.domain.market_services._load_watchlist_cache", return_value=cached):
+            payload = market_services._load_gangtise_intraday_snapshot("601988.SH", "2026-08-18")
+
+        self.assertIsNone(payload)
+
+    def test_given_minute_response_with_daily_rows_when_fetching_intraday_then_daily_rows_are_not_rendered(self):
+        response = {
+            "code": "000000",
+            "status": True,
+            "data": {
+                "fieldList": ["securityCode", "tradeTime", "close"],
+                "list": [
+                    ["601988.SH", "2026-08-17", 5.72],
+                    ["601988.SH", "2026-08-18", 5.90],
+                ],
+            },
+        }
+
+        points = market_services.normalize_gangtise_minute_points(response, trade_date="2026-08-18")
+
+        self.assertEqual(points, [])
+
     def test_given_intraday_request_when_fetching_real_series_then_gangtise_source_is_used(self):
         response = {
             "code": "000000",
@@ -1828,7 +1882,7 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertNotIn("stock_zh_index_daily", signal_text)
         self.assertNotIn("AKShare", signal_text)
 
-    def test_given_unknown_but_valid_stock_code_when_requesting_watchlist_detail_then_dynamic_detail_is_returned(self):
+    def test_given_unknown_but_valid_stock_code_when_requesting_watchlist_detail_then_no_synthetic_market_data_is_returned(self):
         response = self.client.get("/api/watchlist/601988")
 
         self.assertEqual(response.status_code, 200)
@@ -1836,18 +1890,81 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertEqual(payload["code"], "601988")
         self.assertEqual(payload["name"], "中国银行")
         self.assertEqual(payload["market"], "SH")
-        self.assertTrue(isinstance(payload.get("kline"), list) and len(payload["kline"]) >= 20)
+        self.assertEqual(payload.get("kline"), [])
+        self.assertTrue(payload.get("data_unavailable"))
+        self.assertIsNone(payload.get("price"))
         self.assertTrue(payload.get("fundamental", {}).get("summary"))
 
-    def test_given_local_alias_name_when_requesting_watchlist_detail_then_builtin_snapshot_is_returned(self):
+    def test_given_gangtise_kline_with_future_trade_date_when_normalizing_then_future_row_is_excluded(self):
+        response = {
+            "data": {
+                "fieldList": ["securityCode", "tradeDate", "open", "high", "low", "close"],
+                "list": [
+                    ["601988.SH", "2026-08-18", 5.85, 5.96, 5.81, 5.90],
+                    ["601988.SH", "2026-08-19", 5.91, 6.02, 5.86, 5.98],
+                ],
+            },
+        }
+
+        points = market_services.normalize_gangtise_kline_points(response, max_trade_date="2026-08-18")
+
+        self.assertEqual([item["date"] for item in points], ["2026-08-18"])
+
+    def test_given_future_end_date_when_fetching_gangtise_kline_then_request_and_rows_are_capped_at_today(self):
+        response = {
+            "code": "0",
+            "status": True,
+            "data": {
+                "fieldList": ["securityCode", "tradeDate", "open", "high", "low", "close"],
+                "list": [
+                    ["601988.SH", "2026-08-18", 5.85, 5.96, 5.81, 5.90],
+                    ["601988.SH", "2026-08-19", 5.91, 6.02, 5.86, 5.98],
+                ],
+            },
+        }
+        with patch("src.domain.market_services._current_cn_market_date", return_value=date(2026, 8, 18)), patch(
+            "src.domain.market_services.post_gangtise_openapi_json", return_value=(200, response, 12)
+        ):
+            result = market_services.fetch_gangtise_market_kline_series(
+                "/application/open-quote/kline/daily",
+                "601988.SH",
+                start_date="2026-08-01",
+                end_date="2026-08-19",
+            )
+
+        self.assertEqual(result["payload"]["endDate"], "2026-08-18")
+        self.assertEqual([item["date"] for item in result["points"]], ["2026-08-18"])
+
+    def test_given_cached_watchlist_with_future_candle_when_loading_then_cache_is_rejected(self):
+        with patch("src.domain.market_services._current_cn_market_date", return_value=date(2026, 8, 18)):
+            invalid = market_services._watchlist_detail_has_future_kline(
+                {"history_kline": {"candles": [{"date": "2026-08-19", "close": 5.98}]}}
+            )
+
+        self.assertTrue(invalid)
+
+    def test_given_unavailable_stock_quote_when_building_detail_then_price_and_kline_are_not_simulated(self):
+        payload = market_services._build_watchlist_unavailable_detail(
+            {"code": "601988", "name": "中国银行", "price": 5.65, "kline": [{"date": "08-19", "close": 6.17}]},
+            stock_code="601988",
+            stock_name="中国银行",
+        )
+
+        self.assertTrue(payload["data_unavailable"])
+        self.assertIsNone(payload["price"])
+        self.assertEqual(payload["kline"], [])
+        self.assertEqual(payload["history_kline"]["candles"], [])
+
+    def test_given_local_alias_name_when_requesting_watchlist_detail_then_metadata_is_returned_without_synthetic_quote(self):
         with app_entry.app.app_context():
             payload = market_services.get_watchlist_detail_by_code(stock_code="", stock_name="日久光新")
 
         self.assertEqual(payload["code"], "003015")
         self.assertEqual(payload["name"], "日久光电")
         self.assertEqual(payload["market"], "SZ")
-        self.assertTrue(isinstance(payload.get("kline"), list) and len(payload["kline"]) >= 20)
-        self.assertGreater(payload.get("price") or 0, 0)
+        self.assertTrue(payload["data_unavailable"])
+        self.assertEqual(payload["kline"], [])
+        self.assertIsNone(payload.get("price"))
 
     def test_given_local_alias_name_when_searching_watchlist_then_dropdown_payload_returns_without_remote(self):
         items = market_services.search_watchlist_candidates("日久光新", top=8, include_remote=False)

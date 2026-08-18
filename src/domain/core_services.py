@@ -836,6 +836,8 @@ def build_review_smart_cards(tenant, fund_dashboard, watchlist_details_map=None,
         fundamental = detail.get("fundamental") if isinstance(detail.get("fundamental"), dict) else {}
         thesis = fundamental.get("thesis") if isinstance(fundamental.get("thesis"), list) else []
         related_indicator_names = detail.get("related_indicator_names") if isinstance(detail.get("related_indicator_names"), list) else []
+        raw_change_pct = detail.get("change_pct")
+        has_real_quote = raw_change_pct is not None and not bool(detail.get("data_unavailable"))
         cards.append(
             {
                 "id": _safe_card_id(f"watch_{detail.get('code') or name}", "watchlist"),
@@ -843,7 +845,7 @@ def build_review_smart_cards(tenant, fund_dashboard, watchlist_details_map=None,
                 "title": name,
                 "category": "重点个股",
                 "summary": str(detail.get("signal_summary") or fundamental.get("summary") or "继续跟踪").strip() or "继续跟踪",
-                "value": f"{detail.get('change_pct', 0):+.1f}%",
+                "value": f"{float(raw_change_pct):+.1f}%" if has_real_quote else "行情待同步",
                 "status": str(detail.get("alert_level") or "normal").strip() or "normal",
                 "prompt": f"围绕 {name} 生成重点个股复盘卡，包含当前判断、验证节点、风险边界和下一步观察。",
                 "data_sources": sanitize_user_facing_source_list(

@@ -3841,11 +3841,16 @@ body,
                 <div class="fund-stock-meta">{{ item.code }} · {{ item.market }} · {{ item.focus }}</div>
               </div>
               <div class="fund-stock-price-wrap">
-                <div class="fund-stock-price">{{ "%.2f"|format(item.value) }}</div>
-                <div class="fund-stock-change {% if item.change >= 0 %}up{% else %}down{% endif %}">
-                  {% if item.change >= 0 %}▲{% else %}▼{% endif %}
-                  {{ "%.2f%%"|format(item.change_pct|abs) }}
-                </div>
+                {% if item.value is not none and item.change is not none and item.change_pct is not none %}
+                  <div class="fund-stock-price">{{ "%.2f"|format(item.value) }}</div>
+                  <div class="fund-stock-change {% if item.change >= 0 %}up{% else %}down{% endif %}">
+                    {% if item.change >= 0 %}▲{% else %}▼{% endif %}
+                    {{ "%.2f%%"|format(item.change_pct|abs) }}
+                  </div>
+                {% else %}
+                  <div class="fund-stock-price">--</div>
+                  <div class="fund-stock-change" style="color:var(--gray-400)">暂无真实行情</div>
+                {% endif %}
               </div>
             </div>
             <div class="fund-stock-signal">{{ item.signal_summary }}</div>
@@ -12726,7 +12731,7 @@ function isCnStockMarketOpenNow() {
   return (minutes >= 9 * 60 + 30 && minutes < 11 * 60 + 30) || (minutes >= 13 * 60 && minutes < 15 * 60);
 }
 
-function buildWatchlistIntradaySvg(series, unavailableMessage) {
+function buildWatchlistIntradaySvg(series, unavailableMessage, source, tradeDate) {
   const rows = Array.isArray(series) ? series.filter(item => item && typeof item === 'object') : [];
   if (!rows.length) {
     return `
@@ -12751,7 +12756,7 @@ function buildWatchlistIntradaySvg(series, unavailableMessage) {
         <div style="font-size:12px;font-weight:700;color:var(--text-main)">分时曲线</div>
         <div style="font-size:11px;color:var(--gray-400)">当前涨跌 ${changePct >= 0 ? '+' : ''}${Number(changePct || 0).toFixed(2)}%</div>
       </div>
-      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">仅在获取到真实分钟序列时展示。</div>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">${escapeHtml(tradeDate || String(rows[0].date || '').slice(0, 10))} · ${escapeHtml(source === 'gangtise_openapi_cache' ? 'Gangtise 分钟K（缓存）' : 'Gangtise 分钟K')} · ${rows.length} 个分钟点</div>
       ${shell.chartHtml}
     </div>
   `;
@@ -12800,6 +12805,7 @@ function renderWatchlistDetail(data, section) {
   const commentSettings = data.comment_settings || {};
   const allowFanToFan = commentSettings.allow_fan_to_fan !== false;
   const annotationKey = data.annotation_key || data.indicator_code || data.code;
+  const hasRealMarketPrice = data.data_unavailable !== true && Number.isFinite(Number(data.price)) && Number(data.price) > 0;
   const annotations = (Array.isArray(data.annotations)
     ? data.annotations
     : getWatchlistAnnotations(activeUser.tenant.id, annotationKey)).map((item) => ({
@@ -12810,7 +12816,12 @@ function renderWatchlistDetail(data, section) {
     candleLabel: `${data.name || '标的'} 日K线`,
     annotations,
   });
-  const intradayChart = buildWatchlistIntradaySvg(data.intraday_series || [], data.intraday_message || '');
+  const intradayChart = buildWatchlistIntradaySvg(
+    data.intraday_series || [],
+    data.intraday_message || '',
+    data.intraday_source || '',
+    String(data.intraday_trade_date || '').trim(),
+  );
   const computedMetricCards = buildWatchlistComputedMetrics(data.kline || []);
   const overviewSection = `
     <div class="watch-section-card">
@@ -12882,8 +12893,8 @@ function renderWatchlistDetail(data, section) {
           <div style="font-size:11px;color:var(--gray-400);margin-top:4px">${data.code} · ${data.market} · ${data.industry}</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:20px;font-weight:700;color:var(--text-main)">${Number.isFinite(Number(data.price)) ? Number(data.price).toFixed(2) : '--'}</div>
-          <div style="font-size:12px;color:${Number(data.change || 0) >= 0 ? 'var(--red)' : 'var(--green)'}">${Number.isFinite(Number(data.change)) && Number.isFinite(Number(data.change_pct)) ? `${Number(data.change) >= 0 ? '▲' : '▼'} ${Math.abs(Number(data.change)).toFixed(2)} (${Number(data.change_pct).toFixed(2)}%)` : '等待真实行情同步'}</div>
+          <div style="font-size:20px;font-weight:700;color:var(--text-main)">${hasRealMarketPrice ? Number(data.price).toFixed(2) : '--'}</div>
+          <div style="font-size:12px;color:${hasRealMarketPrice && Number(data.change || 0) >= 0 ? 'var(--red)' : 'var(--gray-400)'}">${hasRealMarketPrice && Number.isFinite(Number(data.change)) && Number.isFinite(Number(data.change_pct)) ? `${Number(data.change) >= 0 ? '▲' : '▼'} ${Math.abs(Number(data.change)).toFixed(2)} (${Number(data.change_pct).toFixed(2)}%)` : '暂无真实行情'}</div>
         </div>
       </div>
 

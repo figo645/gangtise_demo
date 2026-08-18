@@ -8,6 +8,7 @@ from email.utils import parsedate_to_datetime
 import shutil
 import subprocess
 import threading
+from zoneinfo import ZoneInfo
 
 _watchlist_comments_schema_lock = threading.Lock()
 _watchlist_comments_schema_ready = False
@@ -26,7 +27,13 @@ def _parse_market_datetime(value):
 
 
 def is_cn_stock_market_open(now=None):
-    current = now or datetime.now()
+    if now is not None:
+        current = now
+    else:
+        try:
+            current = datetime.now(ZoneInfo("Asia/Shanghai"))
+        except Exception:
+            current = datetime.now()
     if current.weekday() >= 5:
         return False
     minutes = current.hour * 60 + current.minute
@@ -731,7 +738,36 @@ def choose_gangtise_indicator_candidate(items, keyword="", preferred_indicator_i
     return (exact or rows)[0]
 
 
-def normalize_gangtise_kline_points(response):
+def _parse_gangtise_trade_date(value):
+    """Return a market date only for unambiguous Gangtise trade-date values."""
+    text = str(value or "").strip()
+    if not text:
+        return None
+    matched = re.search(r"\d{4}[-/]\d{2}[-/]\d{2}|\d{8}", text)
+    if not matched:
+        return None
+    candidate = matched.group(0)
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y%m%d"):
+        try:
+            return datetime.strptime(candidate, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def _current_cn_market_date():
+    try:
+        return datetime.now(ZoneInfo("Asia/Shanghai")).date()
+    except Exception:
+        return datetime.now().date()
+
+
+def _clamp_gangtise_trade_end_date(value):
+    configured_date = _parse_gangtise_trade_date(value)
+    return min(configured_date, _current_cn_market_date()) if configured_date else _current_cn_market_date()
+
+
+def normalize_gangtise_kline_points(response, max_trade_date=None):
     data = response.get("data") if isinstance(response, dict) else {}
     if not isinstance(data, dict):
         return []
@@ -741,6 +777,7 @@ def normalize_gangtise_kline_points(response):
     required = ("tradeDate", "close")
     if any(name not in field_index for name in required):
         return []
+    cutoff_date = _clamp_gangtise_trade_end_date(max_trade_date)
     points = []
     for row in rows:
         if not isinstance(row, list):
@@ -749,6 +786,11 @@ def normalize_gangtise_kline_points(response):
             trade_date = str(row[field_index["tradeDate"]] or "").strip()
             close_value = float(row[field_index["close"]])
         except Exception:
+            continue
+        parsed_trade_date = _parse_gangtise_trade_date(trade_date)
+        # A day K line cannot be a future trading result. Do not expose an
+        # upstream placeholder, erroneous row, or future-dated test record.
+        if parsed_trade_date is None or parsed_trade_date > cutoff_date:
             continue
         open_value = numeric_value(row[field_index["open"]]) if "open" in field_index else None
         high_value = numeric_value(row[field_index["high"]]) if "high" in field_index else None
@@ -784,7 +826,32 @@ def normalize_gangtise_source_line_points(response):
     return points
 
 
-def normalize_gangtise_minute_points(response):
+def _is_valid_cn_stock_intraday_time(value, trade_date=""):
+    """Accept only a dated A-share trading-session minute timestamp."""
+    text = str(value or "").strip()
+    matched = re.match(r"^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})(?::\d{2})?$", text)
+    if not matched:
+        return False
+    date_text, hour_text, minute_text = matched.groups()
+    expected_date = _parse_gangtise_trade_date(trade_date)
+    actual_date = _parse_gangtise_trade_date(date_text)
+    if actual_date is None or (expected_date is not None and actual_date != expected_date):
+        return False
+    minutes = int(hour_text) * 60 + int(minute_text)
+    return (9 * 60 + 30) <= minutes <= (11 * 60 + 30) or (13 * 60) <= minutes <= (15 * 60)
+
+
+def _valid_gangtise_intraday_points(points, trade_date=""):
+    rows = points if isinstance(points, list) else []
+    return [
+        item for item in rows
+        if isinstance(item, dict)
+        and numeric_value(item.get("value")) is not None
+        and _is_valid_cn_stock_intraday_time(item.get("date"), trade_date=trade_date)
+    ]
+
+
+def normalize_gangtise_minute_points(response, trade_date=""):
     data = response.get("data") if isinstance(response, dict) else {}
     if not isinstance(data, dict):
         return []
@@ -799,10 +866,13 @@ def normalize_gangtise_minute_points(response):
             continue
         time_value = str(row[time_index] or "").strip()
         close_value = numeric_value(row[close_index])
-        if not time_value or close_value is None:
+        if not _is_valid_cn_stock_intraday_time(time_value, trade_date=trade_date) or close_value is None:
             continue
         points.append({"date": time_value, "value": round(close_value, 2)})
-    return points
+    # OpenAPI can return rows in reverse order; preserve a strictly chronological
+    # minute sequence and never turn a daily date into an intraday point.
+    unique = {item["date"]: item for item in points}
+    return [unique[key] for key in sorted(unique)]
 
 
 def normalize_gangtise_source_ohlc_rows(response):
@@ -862,7 +932,7 @@ def build_gangtise_market_kline_payload(security_code, start_date, end_date, lim
 
 
 def resolve_gangtise_market_date_window(days=180):
-    end_date = datetime.now().date()
+    end_date = _current_cn_market_date()
     start_date = end_date - timedelta(days=max(7, int(days or 180)))
     return start_date.isoformat(), end_date.isoformat()
 
@@ -873,6 +943,7 @@ def fetch_gangtise_market_kline_series(path, security_code, token="", start_date
         if start_date and end_date else
         resolve_gangtise_market_date_window(days=180)
     )
+    effective_end = _clamp_gangtise_trade_end_date(effective_end).isoformat()
     payload = build_gangtise_market_kline_payload(
         security_code=security_code,
         start_date=effective_start,
@@ -880,7 +951,7 @@ def fetch_gangtise_market_kline_series(path, security_code, token="", start_date
         limit=limit,
     )
     status, response, duration = post_gangtise_openapi_json(path, payload, token=token, timeout=timeout)
-    points = normalize_gangtise_kline_points(response)
+    points = normalize_gangtise_kline_points(response, max_trade_date=effective_end)
     return {
         "ok": is_gangtise_openapi_success(status, response) and len(points) >= 2,
         "http_status": int(status or 0),
@@ -906,12 +977,13 @@ def _load_gangtise_intraday_snapshot(security_code, trade_date):
     if not isinstance(cached, dict):
         return None
     cached_points = cached.get("points") if isinstance(cached.get("points"), list) else []
-    if not cached_points:
+    valid_points = _valid_gangtise_intraday_points(cached_points, trade_date=effective_date)
+    if len(valid_points) < 2:
         return None
     return {
         "ok": True,
         "available": True,
-        "points": copy.deepcopy(cached_points),
+        "points": copy.deepcopy(valid_points),
         "message": str(cached.get("message") or "cached").strip() or "cached",
         "updated_at": str(cached.get("updated_at") or "").strip(),
         "source": "gangtise_openapi_cache",
@@ -920,7 +992,7 @@ def _load_gangtise_intraday_snapshot(security_code, trade_date):
 
 
 def fetch_gangtise_intraday_series(security_code, token="", trade_date="", limit=600, timeout=30, force_refresh=False):
-    effective_date = str(trade_date or datetime.now().date().isoformat()).strip()
+    effective_date = str(trade_date or _current_cn_market_date().isoformat()).strip()
     cache_key = f"{str(security_code or '').strip().upper()}:{effective_date}"
     if not force_refresh:
         cached = _load_gangtise_intraday_snapshot(security_code, effective_date)
@@ -939,7 +1011,7 @@ def fetch_gangtise_intraday_series(security_code, token="", trade_date="", limit
         token=token,
         timeout=timeout,
     )
-    points = normalize_gangtise_minute_points(response)
+    points = normalize_gangtise_minute_points(response, trade_date=effective_date)
     message = str((response or {}).get("msg") or (response or {}).get("message") or "").strip()
     result = {
         "ok": is_gangtise_openapi_success(status, response) and len(points) >= 2,
@@ -6138,6 +6210,23 @@ def _resolve_watchlist_candidate(stock_code="", stock_name=""):
     return copy.deepcopy(suggestions[0])
 
 
+def _watchlist_detail_has_future_kline(detail):
+    if not isinstance(detail, dict):
+        return False
+    cutoff_date = _current_cn_market_date()
+    containers = [detail.get("kline"), detail.get("history_series")]
+    history_kline = detail.get("history_kline") if isinstance(detail.get("history_kline"), dict) else {}
+    containers.append(history_kline.get("candles"))
+    for rows in containers:
+        for item in rows if isinstance(rows, list) else []:
+            if not isinstance(item, dict):
+                continue
+            trade_date = _parse_gangtise_trade_date(item.get("date"))
+            if trade_date and trade_date > cutoff_date:
+                return True
+    return False
+
+
 def _build_watchlist_realtime_detail_from_candidate(candidate, stock_name=""):
     normalized = candidate if isinstance(candidate, dict) else {}
     security_code = str(normalized.get("security_code") or "").strip().upper()
@@ -6146,7 +6235,7 @@ def _build_watchlist_realtime_detail_from_candidate(candidate, stock_name=""):
     if not security_code:
         return None
     cached = _load_watchlist_cache("watchlist_detail_cache", security_code, WATCHLIST_DETAIL_CACHE_TTL_SECONDS)
-    if isinstance(cached, dict) and cached:
+    if isinstance(cached, dict) and cached and not _watchlist_detail_has_future_kline(cached):
         return attach_watchlist_intraday(cached)
     market = str(normalized.get("market") or _infer_watchlist_market(code)).strip() or "CN"
     suffix = security_code.split(".", 1)[1] if "." in security_code else market
@@ -6200,7 +6289,7 @@ def _build_watchlist_realtime_detail_from_candidate(candidate, stock_name=""):
         "focus": industry,
         "kline": [
             {
-                "date": str(item.get("date") or "").strip()[-5:],
+                "date": str(item.get("date") or "").strip(),
                 "open": round(NumberLike(item.get("open")), 2),
                 "high": round(NumberLike(item.get("high")), 2),
                 "low": round(NumberLike(item.get("low")), 2),
@@ -6385,6 +6474,7 @@ def attach_watchlist_intraday(detail):
     detail["intraday_series"] = copy.deepcopy(result.get("points") or [])
     detail["intraday_source"] = str(result.get("source") or "gangtise_openapi").strip() or "gangtise_openapi"
     detail["intraday_updated_at"] = str(result.get("updated_at") or "").strip()
+    detail["intraday_trade_date"] = _resolve_watchlist_intraday_trade_date(detail) or _current_cn_market_date().isoformat()
     detail["intraday_message"] = str(result.get("message") or "").strip()
     return detail
 
@@ -6425,45 +6515,14 @@ def _build_watchlist_unavailable_detail(seed_detail=None, stock_code="", stock_n
     market = str(seed.get("market") or _infer_watchlist_market(code)).strip() or "CN"
     industry = str(seed.get("industry") or ("银行" if code.startswith(("600", "601", "603")) else "个股跟踪")).strip() or "个股跟踪"
     focus = str(seed.get("focus") or industry).strip() or industry
-    preserved_price = round(NumberLike(seed.get("price")), 2)
-    preserved_change = round(NumberLike(seed.get("change")), 2)
-    preserved_change_pct = round(NumberLike(seed.get("change_pct")), 2)
-    kline_points = copy.deepcopy(seed.get("kline") or [])
-    history_kline = copy.deepcopy(seed.get("history_kline") or {})
-
-    if preserved_price > 0 and not kline_points:
-        generated_points = _build_watchlist_kline_series(code, preserved_price)
-        kline_points = copy.deepcopy(generated_points)
-        synthetic_series = []
-        current_date = datetime.now() - timedelta(days=max(len(generated_points), 1) + 8)
-        for item in generated_points:
-            current_date += timedelta(days=1)
-            while current_date.weekday() >= 5:
-                current_date += timedelta(days=1)
-            synthetic_series.append(
-                {
-                    "date": current_date.strftime("%Y-%m-%d"),
-                    "open": round(NumberLike(item.get("open")), 2),
-                    "high": round(NumberLike(item.get("high")), 2),
-                    "low": round(NumberLike(item.get("low")), 2),
-                    "close": round(NumberLike(item.get("close")), 2),
-                }
-            )
-        history_kline = build_real_indicator_kline_payload(synthetic_series)
-    if not history_kline:
-        history_kline = build_empty_kline_payload()
-    history_series = [
-        {
-            "date": str(item.get("date") or "").strip(),
-            "value": round(NumberLike(item.get("close")), 2),
-            "status": build_real_indicator_status(
-                NumberLike(item.get("close")),
-                NumberLike(kline_points[index - 1].get("close")) if index > 0 else NumberLike(item.get("close")),
-            ),
-        }
-        for index, item in enumerate(kline_points)
-        if isinstance(item, dict)
-    ]
+    # Static presets are only used for security metadata and research context.
+    # Price/K-line values must never be fabricated when Gangtise has no data.
+    preserved_price = None
+    preserved_change = None
+    preserved_change_pct = None
+    kline_points = []
+    history_kline = build_empty_kline_payload()
+    history_series = []
 
     base_fundamental = copy.deepcopy(
         seed.get("fundamental")
@@ -6525,7 +6584,7 @@ def _build_watchlist_unavailable_detail(seed_detail=None, stock_code="", stock_n
         "authors": copy.deepcopy(seed.get("authors") or []),
         "fundamental": base_fundamental,
         "forecast": base_forecast,
-        "data_source": str(seed.get("data_source") or "watchlist_cached_snapshot").strip() or "watchlist_cached_snapshot",
+        "data_source": "gangtise_openapi",
         "data_unavailable": True,
     }
 
