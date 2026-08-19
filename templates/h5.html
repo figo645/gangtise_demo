@@ -4185,10 +4185,15 @@ body,
             <div style="font-size:11px;color:var(--gray-400);margin-top:2px">{{ item.code }} · {{ item.market }} · {{ item.focus }}</div>
           </div>
           <div style="text-align:right">
-            <div style="font-size:18px;font-weight:700;color:var(--white)">{{ "%.2f"|format(item.value) }}</div>
-            <div style="font-size:12px;{% if item.change >= 0 %}color:var(--red){% else %}color:var(--green){% endif %}">
-              {% if item.change >= 0 %}▲ +{{ "%.2f"|format(item.change) }} (+{{ "%.2f%%"|format(item.change_pct) }}){% else %}▼ {{ "%.2f"|format(item.change) }} ({{ "%.2f%%"|format(item.change_pct) }}){% endif %}
-            </div>
+            {% if item.value is not none and item.change is not none and item.change_pct is not none %}
+              <div style="font-size:18px;font-weight:700;color:var(--white)">{{ "%.2f"|format(item.value) }}</div>
+              <div style="font-size:12px;{% if item.change >= 0 %}color:var(--red){% else %}color:var(--green){% endif %}">
+                {% if item.change >= 0 %}▲ +{{ "%.2f"|format(item.change) }} (+{{ "%.2f%%"|format(item.change_pct) }}){% else %}▼ {{ "%.2f"|format(item.change) }} ({{ "%.2f%%"|format(item.change_pct) }}){% endif %}
+              </div>
+            {% else %}
+              <div style="font-size:18px;font-weight:700;color:var(--white)">--</div>
+              <div style="font-size:12px;color:var(--gray-400)">暂无真实行情</div>
+            {% endif %}
           </div>
         </div>
         <div data-review-selection-slot="true" style="display:none"></div>

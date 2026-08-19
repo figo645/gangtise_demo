@@ -833,6 +833,16 @@ def api_admin_database_release_overview():
     return jsonify({"ok": True, "operation_unlocked": _database_release_is_unlocked(), **build_database_release_overview()})
 
 
+@app.route("/api/admin/market-data-diagnostic")
+def api_admin_market_data_diagnostic():
+    """Admin-only live Gangtise diagnosis for production incident handling."""
+    try:
+        return jsonify({"ok": True, "diagnostic": build_gangtise_market_runtime_diagnostic()})
+    except Exception as exc:
+        app.logger.exception("Unable to diagnose Gangtise market data connector")
+        return jsonify({"ok": False, "error": "market_data_diagnostic_failed", "detail": str(exc)}), 502
+
+
 @app.route("/api/admin/database-release/unlock", methods=["POST"])
 def api_admin_unlock_database_release():
     payload = request.get_json(silent=True) or {}

@@ -1955,6 +1955,36 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertEqual(payload["kline"], [])
         self.assertEqual(payload["history_kline"]["candles"], [])
 
+    def test_given_unavailable_watchlist_quote_when_building_market_cards_then_price_is_not_rendered_as_zero(self):
+        unavailable_detail = {
+            "code": "600519",
+            "name": "贵州茅台",
+            "market": "SH",
+            "industry": "高端白酒",
+            "price": None,
+            "change": None,
+            "change_pct": None,
+            "data_unavailable": True,
+            "authors": [],
+            "fundamental": {"summary": "暂无真实行情", "metrics": [], "thesis": []},
+        }
+        with app_entry.app.app_context(), patch(
+            "src.domain.market_services.gen_watchlist_details", return_value={"600519": unavailable_detail}
+        ):
+            payload = market_services.gen_market_data()
+
+        maotai = next(item for item in payload if item["code"] == "600519")
+        self.assertIsNone(maotai["value"])
+        self.assertIsNone(maotai["change"])
+        self.assertIsNone(maotai["change_pct"])
+
+    def test_given_missing_gangtise_credentials_when_admin_diagnoses_market_data_then_the_reason_is_explicit(self):
+        with patch("src.domain.market_services.get_gangtise_openapi_config", return_value={"base_url": "https://openapi.gangtise.com", "access_key": "", "secret_key": "", "long_token": ""}):
+            diagnostic = market_services.build_gangtise_market_runtime_diagnostic()
+
+        self.assertFalse(diagnostic["ok"])
+        self.assertEqual(diagnostic["status"], "credentials_missing")
+
     def test_given_local_alias_name_when_requesting_watchlist_detail_then_metadata_is_returned_without_synthetic_quote(self):
         with app_entry.app.app_context():
             payload = market_services.get_watchlist_detail_by_code(stock_code="", stock_name="日久光新")

@@ -317,9 +317,11 @@ def gen_market_data():
                 "code": config["code"],
                 "name": detail.get("name") or config["name"],
                 "market": detail.get("market") or config["market"],
-                "value": round(NumberLike(detail.get("price")), 2),
-                "change": round(NumberLike(detail.get("change")), 2),
-                "change_pct": round(NumberLike(detail.get("change_pct")), 2),
+                # A missing Gangtise quote must remain null through rendering.
+                # Converting it with NumberLike would make the H5 claim 0.00.
+                "value": round(NumberLike(detail.get("price")), 2) if not detail.get("data_unavailable") and numeric_value(detail.get("price")) is not None else None,
+                "change": round(NumberLike(detail.get("change")), 2) if not detail.get("data_unavailable") and numeric_value(detail.get("change")) is not None else None,
+                "change_pct": round(NumberLike(detail.get("change_pct")), 2) if not detail.get("data_unavailable") and numeric_value(detail.get("change_pct")) is not None else None,
                 "focus": canonical_hot_industry_name(detail.get("industry") or detail.get("focus") or config["focus"]),
                 "board": config["board"],
                 "alert_level": detail.get("alert_level") or "attention",
@@ -965,6 +967,64 @@ def fetch_gangtise_market_kline_series(path, security_code, token="", start_date
             if isinstance(response, dict) else
             ""
         ),
+    }
+
+
+def build_gangtise_market_runtime_diagnostic(probe_security_code="600519.SH"):
+    """Diagnose the deployed market connector without exposing credentials."""
+    config = get_gangtise_openapi_config()
+    has_access_key = bool(config.get("access_key"))
+    has_secret_key = bool(config.get("secret_key"))
+    has_long_token = bool(config.get("long_token"))
+    if not (has_access_key and has_secret_key) and not has_long_token:
+        return {
+            "ok": False,
+            "status": "credentials_missing",
+            "message": "未检测到 Gangtise OpenAPI 凭证。生产环境需加载 GANGTISE_ACCESS_KEY 与 GANGTISE_SECRET_KEY，或 GANGTISE_LONG_TOKEN。",
+            "base_url": config.get("base_url"),
+            "credential_mode": "missing",
+            "probe": {},
+        }
+    start_date, end_date = resolve_gangtise_market_date_window(days=14)
+    result = fetch_gangtise_market_kline_series(
+        "/application/open-quote/kline/daily",
+        probe_security_code,
+        start_date=start_date,
+        end_date=end_date,
+        limit=30,
+        timeout=20,
+    )
+    message = str(result.get("message") or "").strip()
+    response = result.get("response") if isinstance(result.get("response"), dict) else {}
+    status_code = int(result.get("http_status") or 0)
+    if result.get("ok"):
+        status = "ready"
+        diagnosis = "Gangtise 日K探针调用成功。"
+    elif status_code == 0:
+        status = "network_unavailable"
+        diagnosis = "生产运行环境无法连接 Gangtise OpenAPI。请检查服务器 DNS、出网策略、防火墙和代理配置。"
+    elif status_code in {401, 403} or "token" in message.lower() or "auth" in message.lower():
+        status = "authentication_failed"
+        diagnosis = "Gangtise 凭证无效或已失效。请核对生产凭证文件后重启应用。"
+    else:
+        status = "upstream_unavailable"
+        diagnosis = "Gangtise 接口未返回可用日K数据。请根据 HTTP 状态和接口消息继续核对。"
+    points = result.get("points") if isinstance(result.get("points"), list) else []
+    return {
+        "ok": bool(result.get("ok")),
+        "status": status,
+        "message": diagnosis,
+        "base_url": config.get("base_url"),
+        "credential_mode": "access_key_secret" if has_access_key and has_secret_key else "long_token",
+        "probe": {
+            "security_code": probe_security_code,
+            "path": result.get("path"),
+            "http_status": status_code,
+            "duration_ms": int(result.get("duration_ms") or 0),
+            "points": len(points),
+            "latest_trade_date": str((points[-1] or {}).get("date") or "") if points else "",
+            "upstream_message": message[:240],
+        },
     }
 
 
