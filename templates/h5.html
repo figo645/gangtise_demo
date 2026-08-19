@@ -2085,6 +2085,7 @@ body { background: var(--surface-2); color: var(--text-main); }
 .fund-board-tab-count { margin-left:6px; font-size:10px; opacity:0.86; }
 .fund-board-panel { display:none; }
 .fund-board-panel.active { display:block; }
+.fund-board-empty { padding:16px 12px; border:1px dashed rgba(47,116,192,0.22); border-radius:10px; color:var(--gray-400); font-size:12px; line-height:1.6; text-align:center; }
 .fund-board-summary {
   display:flex;
   justify-content:space-between;
@@ -3815,10 +3816,10 @@ body,
       <div id="feed-macro-dashboard"></div>
     </div>
 
-    <div class="h5-section">
+    <div class="h5-section" id="fundamental-watchlist-boards">
       <div class="h5-section-title">板块</div>
-      <div class="fund-board-hint">这里展示的是当前租户下由大V和粉丝共同加入的自选股列表。按板块分组后，可以直接看到哪些标的正在预警。</div>
-      <div class="fund-board-tabs">
+      <div class="fund-board-hint">这里展示当前登录用户的自选股。按行业板块分组后，可以直接看到哪些标的正在预警。</div>
+      <div class="fund-board-tabs" id="fund-board-tabs">
         {% for board in feed_boards %}
         <button class="fund-board-tab {% if loop.first %}active{% endif %}" id="fund-board-tab-{{ loop.index0 }}" onclick="switchFeedBoardTab({{ loop.index0 }})">
           {{ board.name }}
@@ -3826,6 +3827,7 @@ body,
         </button>
         {% endfor %}
       </div>
+      <div id="fund-board-panels">
       {% for board in feed_boards %}
       <div class="fund-board-panel {% if loop.first %}active{% endif %}" id="fund-board-panel-{{ loop.index0 }}">
         <div class="fund-board-summary">
@@ -3865,6 +3867,8 @@ body,
         </div>
       </div>
       {% endfor %}
+      {% if not feed_boards %}<div class="fund-board-empty">当前没有可展示的自选股行情。请先在自选股中添加标的。</div>{% endif %}
+      </div>
     </div>
 
     <div class="h5-section">
@@ -5008,7 +5012,7 @@ const DEFAULT_MACRO_INDICATORS = {{ macro_indicators | tojson }};
 const H5_INDICATOR_HUB = {{ indicator_hub | tojson }};
 const FUNDAMENTAL_COLUMN_DATA = {{ fundamental_column | tojson }};
 const DASHBOARD_SEED_CARDS = {{ dashboard_seed_cards | tojson }};
-const WATCHLIST_DETAILS_MAP = {{ watchlist_details | tojson }};
+let WATCHLIST_DETAILS_MAP = {{ watchlist_details | tojson }};
 const FUND_DASHBOARD_STORAGE_KEY = 'gangtise_fund_dashboard_state';
 const INITIAL_TENANT_DASHBOARD = {{ tenant_dashboard_payload | tojson }};
 let currentTenantDashboardPayload = INITIAL_TENANT_DASHBOARD || {};
@@ -10958,11 +10962,14 @@ function renderDemoProfile(user) {
   syncTenantScopedAdvisorViews();
   renderFundMacroDashboard();
   refreshTenantDashboardRemoteState({ rerenderFeed: true, rerenderWorkbench: true });
+  userWatchlistLoaded = false;
+  WATCHLIST_DETAILS_MAP = {};
   try {
     renderWatchlist();
   } catch (error) {
     console.error('renderWatchlist failed', error);
   }
+  loadPersistedUserWatchlist();
   renderReviewExperience();
   renderKnowledgeExperience();
   renderHermesWorkspace();
@@ -11924,6 +11931,8 @@ let watchlistSuggestionItems = [];
 let watchlistSuggestionRequestSeq = 0;
 let watchlistSuggestionTimer = null;
 const watchlistAnnotationSyncTasks = {};
+let userWatchlistLoaded = false;
+let userWatchlistLoadPromise = null;
 
 function loadAddedWatchlistCodes() {
   try {
@@ -12345,13 +12354,18 @@ function submitWatchlistStockCode() {
 
 function isStockInWatchlist(stockCode) {
   const normalizedCode = normalizeStockLookupValue(stockCode);
+  if (userWatchlistLoaded) return Boolean((WATCHLIST_DETAILS_MAP || {})[normalizedCode]);
   return !removedWatchlistCodes.includes(normalizedCode)
     && (getRenderedWatchlistCodes().includes(normalizedCode) || addedWatchlistCodes.includes(normalizedCode));
 }
 
 function buildWatchlistCardHtml(detail) {
-  const change = Number(detail.change || 0);
-  const price = Number(detail.price || 0);
+  const hasQuote = !detail.data_unavailable
+    && Number.isFinite(Number(detail.price))
+    && Number.isFinite(Number(detail.change))
+    && Number.isFinite(Number(detail.change_pct));
+  const change = hasQuote ? Number(detail.change) : null;
+  const price = hasQuote ? Number(detail.price) : null;
   const market = detail.market || '';
   const focus = detail.industry || detail.focus || '个股跟踪';
   const statusTag = isStockInWatchlist(detail.code) ? '已加入我的自选' : '支持继续加入';
@@ -12375,9 +12389,9 @@ function buildWatchlistCardHtml(detail) {
           <div style="font-size:11px;color:var(--gray-400);margin-top:2px">${detail.code} · ${market} · ${focus}</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:18px;font-weight:700;color:var(--white)">${price.toFixed(2)}</div>
-          <div style="font-size:12px;color:${change >= 0 ? 'var(--red)' : 'var(--green)'}">
-            ${change >= 0 ? '▲' : '▼'} ${Math.abs(change).toFixed(2)} (${Number(detail.change_pct || 0).toFixed(2)}%)
+          <div style="font-size:18px;font-weight:700;color:var(--white)">${hasQuote ? price.toFixed(2) : '--'}</div>
+          <div style="font-size:12px;color:${hasQuote ? (change >= 0 ? 'var(--red)' : 'var(--green)') : 'var(--gray-400)'}">
+            ${hasQuote ? `${change >= 0 ? '▲' : '▼'} ${Math.abs(change).toFixed(2)} (${Number(detail.change_pct).toFixed(2)}%)` : '暂无真实行情'}
           </div>
         </div>
       </div>
@@ -12395,29 +12409,37 @@ function buildWatchlistCardHtml(detail) {
   `;
 }
 
-function addCurrentStockToWatchlist() {
+async function addCurrentStockToWatchlist() {
   if (!currentWatchlistDetail) return;
   const stockCode = normalizeStockLookupValue(currentWatchlistDetail.code);
   if (!stockCode) return;
-  removedWatchlistCodes = removedWatchlistCodes.filter((code) => code !== stockCode);
-  persistRemovedWatchlistCodes();
-  if (!addedWatchlistCodes.includes(stockCode)) {
-    addedWatchlistCodes.unshift(stockCode);
-    persistAddedWatchlistCodes();
+  try {
+    const response = await fetch('/api/watchlist/items', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({stock_code: stockCode, stock_name: currentWatchlistDetail.name || ''}),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok === false) throw new Error(payload.error || 'watchlist_item_add_failed');
+    const saved = payload.item && typeof payload.item === 'object' ? payload.item : currentWatchlistDetail;
+    WATCHLIST_DETAILS_MAP = {...(WATCHLIST_DETAILS_MAP || {}), [stockCode]: saved};
+    userWatchlistLoaded = true;
+    removedWatchlistCodes = removedWatchlistCodes.filter((code) => code !== stockCode);
+    persistRemovedWatchlistCodes();
+    if (!addedWatchlistCodes.includes(stockCode)) {
+      addedWatchlistCodes.unshift(stockCode);
+      persistAddedWatchlistCodes();
+    }
     trackFanStockObservation(stockCode, 'watchlist_add', {
       entryPoint: 'watchlist_add',
       sourceDetail: 'h5_watchlist',
     });
+    renderWatchlist();
+    renderWatchlistDetail(saved, currentWatchlistSection);
+    showToast('已加入自选股');
+  } catch (error) {
+    showToast(error.message === 'database_unavailable' ? '自选股服务暂不可用，请稍后重试' : '加入自选股失败，请稍后重试');
   }
-  const listHost = document.getElementById('market-watchlist-list');
-  const existingCard = document.querySelector(`[data-watchlist-card="true"][data-stock-code="${stockCode}"]`);
-  if (!existingCard && listHost) {
-    listHost.insertAdjacentHTML('afterbegin', buildWatchlistCardHtml(currentWatchlistDetail));
-    renderReviewWatchlistSelectionMode();
-    renderHermesWorkspace();
-  }
-  renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
-  showToast('已加入自选股');
 }
 
 function requestWatchlistRemoval(stockCode) {
@@ -12436,33 +12458,117 @@ function cancelWatchlistRemoval() {
   if (currentWatchlistDetail) renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
 }
 
-function removeCurrentStockFromWatchlist() {
+async function removeCurrentStockFromWatchlist() {
   const detail = currentWatchlistDetail || {};
   const stockCode = normalizeStockLookupValue(detail.code || pendingWatchlistRemovalCode);
   if (!stockCode || stockCode !== pendingWatchlistRemovalCode) return;
-  const card = document.querySelector(`[data-watchlist-card="true"][data-stock-code="${stockCode}"]`);
-  const stockName = String((card && card.dataset.stockName) || detail.name || '').trim();
-  removedWatchlistCodes = [stockCode, ...removedWatchlistCodes.filter((code) => code !== stockCode)];
-  addedWatchlistCodes = addedWatchlistCodes.filter((code) => code !== stockCode);
-  persistRemovedWatchlistCodes();
-  persistAddedWatchlistCodes();
-  if (card) card.remove();
-  if (stockName) {
-    reviewTriggerDraft.selectedWatchlist = (reviewTriggerDraft.selectedWatchlist || []).filter((name) => name !== stockName);
+  const stockName = String(detail.name || '').trim();
+  try {
+    const response = await fetch(`/api/watchlist/items/${encodeURIComponent(stockCode)}`, {method: 'DELETE'});
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok === false) throw new Error(payload.error || 'watchlist_item_remove_failed');
+    const nextDetails = {...(WATCHLIST_DETAILS_MAP || {})};
+    delete nextDetails[stockCode];
+    WATCHLIST_DETAILS_MAP = nextDetails;
+    userWatchlistLoaded = true;
+    removedWatchlistCodes = [stockCode, ...removedWatchlistCodes.filter((code) => code !== stockCode)];
+    addedWatchlistCodes = addedWatchlistCodes.filter((code) => code !== stockCode);
+    persistRemovedWatchlistCodes();
+    persistAddedWatchlistCodes();
+    if (stockName) {
+      reviewTriggerDraft.selectedWatchlist = (reviewTriggerDraft.selectedWatchlist || []).filter((name) => name !== stockName);
+    }
+    pendingWatchlistRemovalCode = '';
+    renderWatchlist();
+    if (currentWatchlistDetail) renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
+    showToast(`已从自选股移除${stockName ? `：${stockName}` : ''}`);
+  } catch (error) {
+    showToast(error.message === 'database_unavailable' ? '自选股服务暂不可用，请稍后重试' : '移除自选股失败，请稍后重试');
   }
-  pendingWatchlistRemovalCode = '';
-  renderReviewWatchlistSelectionMode();
-  renderHermesWorkspace();
-  if (currentWatchlistDetail) renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
-  showToast(`已从自选股移除${stockName ? `：${stockName}` : ''}`);
 }
 
 function renderWatchlist() {
-  removedWatchlistCodes.forEach((stockCode) => {
-    document.querySelector(`[data-watchlist-card="true"][data-stock-code="${stockCode}"]`)?.remove();
-  });
+  const listHost = document.getElementById('market-watchlist-list');
+  if (userWatchlistLoaded && listHost) {
+    const details = Object.values(WATCHLIST_DETAILS_MAP || {});
+    listHost.innerHTML = details.length
+      ? details.map((detail) => buildWatchlistCardHtml(detail)).join('')
+      : '<div style="padding:28px 14px;border:1px dashed rgba(200,169,110,0.18);border-radius:12px;color:var(--gray-400);font-size:12px;text-align:center">当前没有自选股。输入股票代码后可在详情页加入。</div>';
+  } else {
+    removedWatchlistCodes.forEach((stockCode) => {
+      document.querySelector(`[data-watchlist-card="true"][data-stock-code="${stockCode}"]`)?.remove();
+    });
+  }
+  renderFundamentalWatchlistBoards();
   renderReviewWatchlistSelectionMode();
   renderHermesWorkspace();
+}
+
+function renderFundamentalWatchlistBoards() {
+  const tabsHost = document.getElementById('fund-board-tabs');
+  const panelsHost = document.getElementById('fund-board-panels');
+  if (!tabsHost || !panelsHost) return;
+  const boards = {};
+  Object.values(WATCHLIST_DETAILS_MAP || {}).forEach((detail) => {
+    const available = detail && !detail.data_unavailable
+      && Number.isFinite(Number(detail.price))
+      && Number.isFinite(Number(detail.change))
+      && Number.isFinite(Number(detail.change_pct));
+    if (!available) return;
+    const boardName = String(detail.industry || detail.focus || '个股跟踪');
+    if (!boards[boardName]) boards[boardName] = [];
+    boards[boardName].push(detail);
+  });
+  const entries = Object.entries(boards);
+  if (!entries.length) {
+    tabsHost.innerHTML = '';
+    panelsHost.innerHTML = '<div class="fund-board-empty">当前没有可展示的自选股行情。请先在自选股中添加标的。</div>';
+    return;
+  }
+  tabsHost.innerHTML = entries.map(([name, items], index) => {
+    const warnings = items.filter((item) => ['warning', 'attention'].includes(item.alert_level)).length;
+    return `<button class="fund-board-tab ${index === 0 ? 'active' : ''}" onclick="switchFeedBoardTab(${index})">${escapeHtml(name)}<span class="fund-board-tab-count">${warnings}预警</span></button>`;
+  }).join('');
+  panelsHost.innerHTML = entries.map(([name, items], index) => {
+    const warnings = items.filter((item) => ['warning', 'attention'].includes(item.alert_level)).length;
+    return `<div class="fund-board-panel ${index === 0 ? 'active' : ''}">
+      <div class="fund-board-summary"><span>${escapeHtml(name)} · 共 ${items.length} 只自选股</span><span>${warnings ? `当前有 ${warnings} 条需要关注` : '当前无明显预警'}</span></div>
+      <div class="fund-stock-list">${items.map((item) => {
+        const change = Number(item.change);
+        const positive = change >= 0;
+        return `<div class="fund-stock-card" onclick="openWatchlistDetail('${escapeAttr(item.code)}','overview'); switchTab('market');">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px"><div><div class="fund-stock-name">${escapeHtml(item.name || item.code)}</div><div class="fund-stock-meta">${escapeHtml(item.code)} · ${escapeHtml(item.market || '--')} · ${escapeHtml(item.industry || item.focus || '--')}</div></div><div class="fund-stock-price-wrap"><div class="fund-stock-price">${Number(item.price).toFixed(2)}</div><div class="fund-stock-change ${positive ? 'up' : 'down'}">${positive ? '▲' : '▼'} ${Math.abs(Number(item.change_pct)).toFixed(2)}%</div></div></div>
+          <div class="fund-stock-signal">${escapeHtml(item.signal_summary || '当前无明显预警')}</div><div class="fund-stock-alert-row"><span class="fund-stock-alert-tag ${escapeAttr(item.alert_level || 'normal')}">${item.alert_level === 'warning' ? '预警' : item.alert_level === 'attention' ? '关注' : '正常'}</span><span class="fund-stock-alert-text">${escapeHtml(item.alert_text || '当前无明显预警')}</span></div>
+        </div>`;
+      }).join('')}</div>
+    </div>`;
+  }).join('');
+}
+
+async function loadPersistedUserWatchlist() {
+  if (userWatchlistLoadPromise) return userWatchlistLoadPromise;
+  userWatchlistLoadPromise = (async () => {
+    try {
+      const response = await fetch('/api/watchlist/items');
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.ok === false) throw new Error(payload.error || 'watchlist_items_load_failed');
+      WATCHLIST_DETAILS_MAP = (Array.isArray(payload.items) ? payload.items : []).reduce((map, item) => {
+        const code = normalizeStockLookupValue(item && item.code);
+        if (code) map[code] = item;
+        return map;
+      }, {});
+      userWatchlistLoaded = true;
+      renderWatchlist();
+    } catch (error) {
+      console.warn('load persisted watchlist failed', error);
+      userWatchlistLoaded = true;
+      WATCHLIST_DETAILS_MAP = {};
+      renderWatchlist();
+    } finally {
+      userWatchlistLoadPromise = null;
+    }
+  })();
+  return userWatchlistLoadPromise;
 }
 
 let marketOverviewLoaded = false;

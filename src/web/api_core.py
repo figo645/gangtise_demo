@@ -421,6 +421,74 @@ def api_watchlist():
     return jsonify(gen_market_data())
 
 
+def _current_watchlist_owner():
+    current = get_current_authenticated_user() or {}
+    role = str(current.get("role") or "").strip().lower()
+    tenant_slug = str(current.get("tenant_slug") or ((current.get("tenant") or {}).get("slug") if isinstance(current.get("tenant"), dict) else "") or "").strip().lower()
+    profile_id = str(current.get("username") or current.get("id") or "").strip()
+    if role not in {"investor", "dav"} or not tenant_slug or not profile_id:
+        return None
+    return current, tenant_slug, profile_id
+
+
+@app.route("/api/watchlist/items", methods=["GET"])
+def api_user_watchlist_items():
+    owner = _current_watchlist_owner()
+    if not owner:
+        return jsonify({"ok": False, "error": "watchlist_auth_required"}), 403
+    _, tenant_slug, profile_id = owner
+    try:
+        items = list_user_watchlist_items(tenant_slug, profile_id)
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to load user watchlist items")
+        return jsonify({"ok": False, "error": "watchlist_items_load_failed"}), 500
+    return jsonify({"ok": True, "items": items})
+
+
+@app.route("/api/watchlist/items", methods=["POST"])
+def api_add_user_watchlist_item():
+    owner = _current_watchlist_owner()
+    if not owner:
+        return jsonify({"ok": False, "error": "watchlist_auth_required"}), 403
+    body = request.get_json(silent=True) or {}
+    _, tenant_slug, profile_id = owner
+    try:
+        item = add_user_watchlist_item(
+            tenant_slug=tenant_slug,
+            user_profile_id=profile_id,
+            stock_code=body.get("stock_code") or body.get("code"),
+            stock_name=body.get("stock_name") or body.get("name"),
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to add user watchlist item")
+        return jsonify({"ok": False, "error": "watchlist_item_add_failed"}), 500
+    return jsonify({"ok": True, "item": item})
+
+
+@app.route("/api/watchlist/items/<stock_code>", methods=["DELETE"])
+def api_remove_user_watchlist_item(stock_code):
+    owner = _current_watchlist_owner()
+    if not owner:
+        return jsonify({"ok": False, "error": "watchlist_auth_required"}), 403
+    _, tenant_slug, profile_id = owner
+    try:
+        deleted = remove_user_watchlist_item(tenant_slug, profile_id, stock_code)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to remove user watchlist item")
+        return jsonify({"ok": False, "error": "watchlist_item_remove_failed"}), 500
+    return jsonify({"ok": True, "deleted": deleted})
+
+
 @app.route("/api/watchlist/search")
 def api_watchlist_search():
     query = str(request.args.get("q") or "").strip()

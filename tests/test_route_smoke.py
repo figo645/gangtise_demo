@@ -166,10 +166,10 @@ class RouteSmokeTest(unittest.TestCase):
         from src.domain import market_services
 
         boards = market_services.gen_feed_boards_from_watchlist_details({
-            "600519": {"code": "600519", "name": "贵州茅台", "industry": "高端白酒"},
-            "300750": {"code": "300750", "name": "宁德时代", "industry": "动力电池"},
-            "688981": {"code": "688981", "name": "中芯国际", "industry": "半导体制造"},
-            "00700": {"code": "00700", "name": "腾讯控股", "industry": "港股互联网"},
+            "600519": {"code": "600519", "name": "贵州茅台", "industry": "高端白酒", "price": 1200, "change": 2, "change_pct": 0.2},
+            "300750": {"code": "300750", "name": "宁德时代", "industry": "动力电池", "price": 200, "change": -1, "change_pct": -0.5},
+            "688981": {"code": "688981", "name": "中芯国际", "industry": "半导体制造", "price": 50, "change": 0.5, "change_pct": 1},
+            "00700": {"code": "00700", "name": "腾讯控股", "industry": "港股互联网", "price": 400, "change": 3, "change_pct": 0.8},
         })
 
         self.assertEqual([board["name"] for board in boards], ["食品饮料", "电力设备", "电子", "传媒"])

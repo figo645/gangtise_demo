@@ -174,8 +174,25 @@ def h5():
         fundamental_column = build_fundamental_column_payload_from_hub(tenant, indicator_hub)
         dashboard_seed_cards = build_indicator_dashboard_seed_cards_from_hub(indicator_hub, count=8)
         tenant_dashboard_payload = build_tenant_dashboard_payload_fallback(tenant)
-    market = gen_market_data()
-    watchlist_details = gen_watchlist_details()
+    # H5 uses the persisted owner-scoped watchlist. An explicit empty map is
+    # intentional: it prevents the legacy demo catalog from reappearing after
+    # the user removes their last stock.
+    owner = current_demo_profile or get_current_authenticated_user() or {}
+    owner_tenant_slug = str(owner.get("tenant_slug") or ((owner.get("tenant") or {}).get("slug") if isinstance(owner.get("tenant"), dict) else "") or effective_tenant_slug or "").strip().lower()
+    owner_profile_id = str(owner.get("username") or owner.get("id") or "").strip()
+    try:
+        user_watchlist_details = {
+            str(item.get("code") or "").strip().upper(): item
+            for item in list_user_watchlist_items(owner_tenant_slug, owner_profile_id)
+            if isinstance(item, dict) and str(item.get("code") or "").strip()
+        }
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        app.logger.warning("User watchlist unavailable while building H5 page")
+        user_watchlist_details = {}
+    market = gen_market_data(watchlist_details=user_watchlist_details)
+    watchlist_details = user_watchlist_details
     news_payload = build_fundamental_news_payload(tenant=tenant, watchlist_details=watchlist_details, limit=10)
     news = news_payload.get("items") or []
     news_tabs = news_payload.get("tabs") or []

@@ -85,6 +85,18 @@ def gen_watchlist_details(*args, **kwargs):
     return _market_services_module().gen_watchlist_details(*args, **kwargs)
 
 
+def list_user_watchlist_items(*args, **kwargs):
+    return _market_services_module().list_user_watchlist_items(*args, **kwargs)
+
+
+def add_user_watchlist_item(*args, **kwargs):
+    return _market_services_module().add_user_watchlist_item(*args, **kwargs)
+
+
+def remove_user_watchlist_item(*args, **kwargs):
+    return _market_services_module().remove_user_watchlist_item(*args, **kwargs)
+
+
 def get_watchlist_detail_by_code(*args, **kwargs):
     return _market_services_module().get_watchlist_detail_by_code(*args, **kwargs)
 
@@ -5985,6 +5997,7 @@ def init_db():
         execute_sql_file(conn, sql_dir / "029_user_labels.sql")
         execute_sql_file(conn, sql_dir / "030_market_snapshot_payloads.sql")
         execute_sql_file(conn, sql_dir / "032_simulated_fan_data_management.sql")
+        execute_sql_file(conn, sql_dir / "033_user_watchlist_items.sql")
         execute_sql_file(conn, sql_dir / "100_seed_master_data.sql")
         execute_sql_file(conn, sql_dir / "101_seed_app_core.sql")
         execute_sql_file(conn, sql_dir / "102_seed_market_sector_catalog.sql")

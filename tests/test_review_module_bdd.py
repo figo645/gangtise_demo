@@ -1978,6 +1978,129 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIsNone(maotai["change"])
         self.assertIsNone(maotai["change_pct"])
 
+    def test_given_empty_user_watchlist_when_building_fundamental_boards_then_no_demo_stock_is_rendered(self):
+        boards = market_services.gen_feed_boards_from_watchlist_details({})
+
+        self.assertEqual(boards, [])
+
+    def test_given_unavailable_watchlist_item_when_building_fundamental_boards_then_it_is_excluded(self):
+        boards = market_services.gen_feed_boards_from_watchlist_details({
+            "600519": {
+                "code": "600519",
+                "name": "贵州茅台",
+                "industry": "高端白酒",
+                "price": None,
+                "change": None,
+                "change_pct": None,
+                "data_unavailable": True,
+            }
+        })
+
+        self.assertEqual(boards, [])
+
+    def test_given_a_user_removes_the_final_watchlist_item_when_listing_then_the_user_watchlist_is_empty(self):
+        tenant_slug = self.tenant_slug
+
+        class _Cursor:
+            def __init__(self, rows=None, rowcount=0):
+                self._rows = rows or []
+                self.rowcount = rowcount
+
+            def fetchall(self):
+                return self._rows
+
+        class _FakeDb:
+            def __init__(self):
+                self.rows = [{
+                    "id": 1,
+                    "tenant_slug": tenant_slug,
+                    "user_profile_id": "fan_a",
+                    "stock_code": "600519",
+                    "stock_name": "贵州茅台",
+                    "market": "SH",
+                    "industry": "高端白酒",
+                    "created_at": "2026-08-19 09:00:00",
+                    "updated_at": "2026-08-19 09:00:00",
+                }]
+
+            def execute(self, sql, params=()):
+                if sql.strip().startswith("DELETE FROM user_watchlist_items"):
+                    before = len(self.rows)
+                    self.rows = [row for row in self.rows if not (
+                        row["tenant_slug"] == params[0] and row["user_profile_id"] == params[1] and row["stock_code"] == params[2]
+                    )]
+                    return _Cursor(rowcount=before - len(self.rows))
+                return _Cursor(rows=list(self.rows))
+
+            def commit(self):
+                return None
+
+        db = _FakeDb()
+        with patch("src.domain.market_services.get_db", return_value=db):
+            deleted = market_services.remove_user_watchlist_item(tenant_slug, "fan_a", "600519")
+            items = market_services.list_user_watchlist_items(tenant_slug, "fan_a")
+
+        self.assertTrue(deleted)
+        self.assertEqual(items, [])
+
+    def test_given_two_users_when_one_removes_a_stock_then_the_other_users_watchlist_is_unchanged(self):
+        tenant_slug = self.tenant_slug
+
+        class _Cursor:
+            def __init__(self, rows=None, rowcount=0):
+                self._rows = rows or []
+                self.rowcount = rowcount
+
+            def fetchall(self):
+                return self._rows
+
+        class _FakeDb:
+            def __init__(self):
+                self.rows = [
+                    {"id": 1, "tenant_slug": tenant_slug, "user_profile_id": "fan_a", "stock_code": "600519", "stock_name": "贵州茅台", "market": "SH", "industry": "高端白酒", "created_at": "2026-08-19 09:00:00", "updated_at": "2026-08-19 09:00:00"},
+                    {"id": 2, "tenant_slug": tenant_slug, "user_profile_id": "fan_b", "stock_code": "600519", "stock_name": "贵州茅台", "market": "SH", "industry": "高端白酒", "created_at": "2026-08-19 09:00:00", "updated_at": "2026-08-19 09:00:00"},
+                ]
+
+            def execute(self, sql, params=()):
+                if sql.strip().startswith("DELETE FROM user_watchlist_items"):
+                    before = len(self.rows)
+                    self.rows = [row for row in self.rows if not (
+                        row["tenant_slug"] == params[0] and row["user_profile_id"] == params[1] and row["stock_code"] == params[2]
+                    )]
+                    return _Cursor(rowcount=before - len(self.rows))
+                owner_rows = [row for row in self.rows if row["tenant_slug"] == params[0] and row["user_profile_id"] == params[1]]
+                return _Cursor(rows=owner_rows)
+
+            def commit(self):
+                return None
+
+        db = _FakeDb()
+        live_detail = {"code": "600519", "name": "贵州茅台", "price": 1200, "change": 2, "change_pct": 0.2, "industry": "高端白酒"}
+        with patch("src.domain.market_services.get_db", return_value=db), patch(
+            "src.domain.market_services.get_watchlist_detail_by_code", return_value=live_detail
+        ):
+            market_services.remove_user_watchlist_item(tenant_slug, "fan_a", "600519")
+            remaining = market_services.list_user_watchlist_items(tenant_slug, "fan_b")
+
+        self.assertEqual([item["code"] for item in remaining], ["600519"])
+
+    def test_given_watchlist_list_request_when_client_supplies_another_user_then_authenticated_owner_is_used(self):
+        authenticated_owner = {
+            "username": "fan_owner",
+            "role": "investor",
+            "tenant_slug": self.tenant_slug,
+        }
+        with patch("src.web.api_core.get_current_authenticated_user", return_value=authenticated_owner), patch(
+            "src.web.api_core.list_user_watchlist_items", return_value=[]
+        ) as list_items:
+            response = self.client.get(
+                "/api/watchlist/items?tenant_slug=another_tenant&user_profile_id=another_user"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()["ok"])
+        list_items.assert_called_once_with(self.tenant_slug, "fan_owner")
+
     def test_given_missing_gangtise_credentials_when_admin_diagnoses_market_data_then_the_reason_is_explicit(self):
         with patch("src.domain.market_services.get_gangtise_openapi_config", return_value={"base_url": "https://openapi.gangtise.com", "access_key": "", "secret_key": "", "long_token": ""}):
             diagnostic = market_services.build_gangtise_market_runtime_diagnostic()

@@ -289,15 +289,32 @@ def gen_kol_data():
     )
     return tenant_rows
 
-def gen_market_data():
-    display_catalog = [
-        {"code": "600519", "name": "贵州茅台", "market": "SH", "focus": "高端白酒", "board": "稳健配置"},
-        {"code": "300750", "name": "宁德时代", "market": "SZ", "focus": "动力电池", "board": "新能源"},
-        {"code": "00700", "name": "腾讯控股", "market": "HK", "focus": "港股互联网", "board": "港股互联网"},
-        {"code": "688981", "name": "中芯国际", "market": "SH", "focus": "半导体制造", "board": "科技成长"},
-        {"code": "600036", "name": "招商银行", "market": "SH", "focus": "银行", "board": "稳健配置"},
-    ]
-    details_map = gen_watchlist_details()
+def gen_market_data(watchlist_details=None):
+    # The public market endpoint keeps its legacy catalog when no owner is
+    # supplied. H5 passes an explicit map, including {}, so a user's empty
+    # watchlist cannot be replaced by the old demo catalog.
+    if watchlist_details is not None:
+        display_catalog = [
+            {
+                "code": str(code),
+                "name": str(detail.get("name") or code),
+                "market": str(detail.get("market") or _infer_watchlist_market(code)),
+                "focus": str(detail.get("industry") or detail.get("focus") or "个股跟踪"),
+                "board": str(detail.get("industry") or detail.get("focus") or "个股跟踪"),
+            }
+            for code, detail in (watchlist_details or {}).items()
+            if isinstance(detail, dict)
+        ]
+        details_map = watchlist_details or {}
+    else:
+        display_catalog = [
+            {"code": "600519", "name": "贵州茅台", "market": "SH", "focus": "高端白酒", "board": "稳健配置"},
+            {"code": "300750", "name": "宁德时代", "market": "SZ", "focus": "动力电池", "board": "新能源"},
+            {"code": "00700", "name": "腾讯控股", "market": "HK", "focus": "港股互联网", "board": "港股互联网"},
+            {"code": "688981", "name": "中芯国际", "market": "SH", "focus": "半导体制造", "board": "科技成长"},
+            {"code": "600036", "name": "招商银行", "market": "SH", "focus": "银行", "board": "稳健配置"},
+        ]
+        details_map = gen_watchlist_details()
     items = []
     for config in display_catalog:
         detail = get_watchlist_detail_by_code(
@@ -333,6 +350,99 @@ def gen_market_data():
             }
         )
     return items
+
+
+def _normalize_user_watchlist_owner(tenant_slug="", user_profile_id=""):
+    tenant = str(tenant_slug or "").strip().lower()
+    profile = str(user_profile_id or "").strip()
+    if not tenant:
+        raise ValueError("tenant_slug_required")
+    if not profile:
+        raise ValueError("user_profile_id_required")
+    return tenant, profile
+
+
+def list_user_watchlist_items(tenant_slug="", user_profile_id=""):
+    tenant, profile = _normalize_user_watchlist_owner(tenant_slug, user_profile_id)
+    rows = get_db().execute(
+        """
+        SELECT id, tenant_slug, user_profile_id, stock_code, stock_name, market, industry,
+               created_at, updated_at
+        FROM user_watchlist_items
+        WHERE tenant_slug = ? AND user_profile_id = ?
+        ORDER BY updated_at DESC, id DESC
+        """,
+        (tenant, profile),
+    ).fetchall()
+    result = []
+    for row in rows:
+        code = str(row.get("stock_code") or "").strip().upper()
+        if not code:
+            continue
+        detail = get_watchlist_detail_by_code(
+            stock_code=code,
+            stock_name=str(row.get("stock_name") or code),
+            details_map={},
+        ) or {}
+        if detail:
+            detail["watchlist_item_id"] = row.get("id")
+            detail["watchlist_created_at"] = row.get("created_at")
+            detail["watchlist_updated_at"] = row.get("updated_at")
+            result.append(detail)
+    return result
+
+
+def add_user_watchlist_item(tenant_slug="", user_profile_id="", stock_code="", stock_name=""):
+    tenant, profile = _normalize_user_watchlist_owner(tenant_slug, user_profile_id)
+    raw_code = str(stock_code or "").strip()
+    normalized_code = normalize_watchlist_indicator_code(raw_code) or raw_code.upper()
+    if not normalized_code:
+        raise ValueError("stock_code_required")
+    detail = get_watchlist_detail_by_code(
+        stock_code=normalized_code,
+        stock_name=str(stock_name or normalized_code),
+        details_map={},
+    )
+    if not detail:
+        raise ValueError("watchlist_stock_not_found")
+    now = now_ts()
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO user_watchlist_items
+            (tenant_slug, user_profile_id, stock_code, stock_name, market, industry, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (tenant_slug, user_profile_id, stock_code)
+        DO UPDATE SET stock_name = EXCLUDED.stock_name, market = EXCLUDED.market,
+                      industry = EXCLUDED.industry, updated_at = EXCLUDED.updated_at
+        """,
+        (
+            tenant,
+            profile,
+            normalized_code,
+            str(detail.get("name") or stock_name or normalized_code).strip(),
+            str(detail.get("market") or _infer_watchlist_market(normalized_code)).strip(),
+            canonical_hot_industry_name(detail.get("industry") or detail.get("focus") or "个股跟踪"),
+            now,
+            now,
+        ),
+    )
+    db.commit()
+    return next((item for item in list_user_watchlist_items(tenant, profile) if item.get("code") == normalized_code), detail)
+
+
+def remove_user_watchlist_item(tenant_slug="", user_profile_id="", stock_code=""):
+    tenant, profile = _normalize_user_watchlist_owner(tenant_slug, user_profile_id)
+    normalized_code = normalize_watchlist_indicator_code(stock_code) or str(stock_code or "").strip().upper()
+    if not normalized_code:
+        raise ValueError("stock_code_required")
+    db = get_db()
+    deleted = db.execute(
+        "DELETE FROM user_watchlist_items WHERE tenant_slug = ? AND user_profile_id = ? AND stock_code = ?",
+        (tenant, profile, normalized_code),
+    ).rowcount or 0
+    db.commit()
+    return bool(deleted)
 
 
 def gen_macro_indicators():
@@ -4606,6 +4716,13 @@ def gen_feed_boards_from_watchlist_details(watchlist_details):
     board_map = {}
     boards = []
     for item in (watchlist_details or {}).values():
+        # A fundamental board is a quote-backed view. Keep the saved
+        # watchlist relation, but do not expose an unavailable quote as a
+        # stock card with fabricated zero-valued metrics.
+        if not isinstance(item, dict) or item.get("data_unavailable"):
+            continue
+        if any(numeric_value(item.get(field)) is None for field in ("price", "change", "change_pct")):
+            continue
         board_name = canonical_hot_industry_name(item.get("industry") or item.get("focus"))
         if board_name not in board_map:
             board_map[board_name] = {
@@ -4621,9 +4738,9 @@ def gen_feed_boards_from_watchlist_details(watchlist_details):
                 "code": item.get("code"),
                 "name": item.get("name"),
                 "market": item.get("market"),
-                "value": item.get("price", 0),
-                "change": item.get("change", 0),
-                "change_pct": item.get("change_pct", 0),
+                "value": NumberLike(item.get("price")),
+                "change": NumberLike(item.get("change")),
+                "change_pct": NumberLike(item.get("change_pct")),
                 "focus": canonical_hot_industry_name(item.get("industry") or item.get("focus") or "个股跟踪"),
                 "alert_level": item.get("alert_level", "normal"),
                 "alert_text": item.get("alert_text", "当前无明显预警"),
