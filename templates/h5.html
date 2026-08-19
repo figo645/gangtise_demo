@@ -11919,74 +11919,17 @@ function openFanStockInsightStock(stockCode) {
 
 // ===== WATCHLIST =====
 let currentWatchlistDetail = null;
-const WATCHLIST_ADDED_STORAGE_KEY = 'gangtise_demo_added_watchlist_codes';
-const WATCHLIST_REMOVED_STORAGE_KEY = 'gangtise_demo_removed_watchlist_codes';
-const WATCHLIST_ANNOTATION_STORAGE_KEY = 'gangtise_demo_watchlist_annotations';
-let addedWatchlistCodes = loadAddedWatchlistCodes();
-let removedWatchlistCodes = loadRemovedWatchlistCodes();
 let currentWatchlistAnnotationTarget = null;
 let pendingWatchlistRemovalCode = '';
-let watchlistAnnotationStore = loadWatchlistAnnotationStore();
+// Watchlist relations and annotations are server-owned. This object is only a
+// short-lived render cache for the current page session.
+let watchlistAnnotationStore = {};
 let watchlistSuggestionItems = [];
 let watchlistSuggestionRequestSeq = 0;
 let watchlistSuggestionTimer = null;
 const watchlistAnnotationSyncTasks = {};
 let userWatchlistLoaded = false;
 let userWatchlistLoadPromise = null;
-
-function loadAddedWatchlistCodes() {
-  try {
-    const raw = window.localStorage ? window.localStorage.getItem(WATCHLIST_ADDED_STORAGE_KEY) : '';
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    return [];
-  }
-}
-
-function persistAddedWatchlistCodes() {
-  try {
-    if (window.localStorage) {
-      window.localStorage.setItem(WATCHLIST_ADDED_STORAGE_KEY, JSON.stringify(addedWatchlistCodes));
-    }
-  } catch (e) {}
-}
-
-function loadRemovedWatchlistCodes() {
-  try {
-    const raw = window.localStorage ? window.localStorage.getItem(WATCHLIST_REMOVED_STORAGE_KEY) : '';
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.map(normalizeStockLookupValue).filter(Boolean) : [];
-  } catch (e) {
-    return [];
-  }
-}
-
-function persistRemovedWatchlistCodes() {
-  try {
-    if (window.localStorage) {
-      window.localStorage.setItem(WATCHLIST_REMOVED_STORAGE_KEY, JSON.stringify(removedWatchlistCodes));
-    }
-  } catch (e) {}
-}
-
-function loadWatchlistAnnotationStore() {
-  try {
-    const raw = window.localStorage ? window.localStorage.getItem(WATCHLIST_ANNOTATION_STORAGE_KEY) : '';
-    const parsed = raw ? JSON.parse(raw) : {};
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch (e) {
-    return {};
-  }
-}
-
-function persistWatchlistAnnotationStore() {
-  try {
-    if (window.localStorage) {
-      window.localStorage.setItem(WATCHLIST_ANNOTATION_STORAGE_KEY, JSON.stringify(watchlistAnnotationStore));
-    }
-  } catch (e) {}
-}
 
 function getWatchlistAnnotationBucket(tenantId, stockCode) {
   const normalizedCode = normalizeStockLookupValue(stockCode);
@@ -12014,7 +11957,6 @@ function replaceWatchlistAnnotations(tenantId, stockCode, items) {
     trigger: item.trigger || '',
     updatedAt: item.updatedAt || item.updated_at || item.createdAt || item.created_at || '刚刚',
   }))));
-  persistWatchlistAnnotationStore();
 }
 
 function getActiveWatchlistTenantSlug() {
@@ -12033,43 +11975,9 @@ function getActiveWatchlistUserPayload() {
 }
 
 async function syncLocalWatchlistAnnotationsToServer(stockRefs) {
-  const user = getActiveDemoUser() || {};
-  const tenantId = ((user || {}).tenant || {}).id;
-  const payload = getActiveWatchlistUserPayload();
-  if (!payload.tenant_slug || payload.user_role !== 'dav') return;
-  const detailsMap = WATCHLIST_DETAILS_MAP || {};
-  const codes = (Array.isArray(stockRefs) ? stockRefs : [stockRefs]).map((item) => {
-    const raw = String(item || '').trim();
-    if (!raw) return '';
-    const detail = Object.values(detailsMap).find((row) => row && (row.code === raw || row.name === raw));
-    return normalizeStockLookupValue((detail && detail.code) || raw);
-  }).filter(Boolean);
-  await Promise.all(codes.map(async (stockCode) => {
-    const taskKey = `${payload.tenant_slug}:${stockCode}`;
-    if (watchlistAnnotationSyncTasks[taskKey]) return watchlistAnnotationSyncTasks[taskKey];
-    const task = (async () => {
-      const localItems = getWatchlistAnnotations(tenantId, stockCode);
-      if (!localItems.length) return;
-      for (const item of localItems) {
-        await fetch(`/api/watchlist/${encodeURIComponent(stockCode)}/annotations`, {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            ...payload,
-            stock_name: ((detailsMap[stockCode] || {}).name) || stockCode,
-            candle_index: Number(item.candleIndex || 0),
-            candle_date: item.dateLabel || '',
-            content: item.content || item.note || '',
-            source_client: 'h5',
-          }),
-        }).catch(() => null);
-      }
-    })().finally(() => {
-      delete watchlistAnnotationSyncTasks[taskKey];
-    });
-    watchlistAnnotationSyncTasks[taskKey] = task;
-    return task;
-  }));
+  // Annotation writes are sent to the server immediately by saveWatchlistAnnotation.
+  // There is no browser-side queue to replay here.
+  return Promise.resolve();
 }
 
 function buildAnnotationId(tenantId, stockCode, candleIndex) {
@@ -12354,9 +12262,7 @@ function submitWatchlistStockCode() {
 
 function isStockInWatchlist(stockCode) {
   const normalizedCode = normalizeStockLookupValue(stockCode);
-  if (userWatchlistLoaded) return Boolean((WATCHLIST_DETAILS_MAP || {})[normalizedCode]);
-  return !removedWatchlistCodes.includes(normalizedCode)
-    && (getRenderedWatchlistCodes().includes(normalizedCode) || addedWatchlistCodes.includes(normalizedCode));
+  return Boolean((WATCHLIST_DETAILS_MAP || {})[normalizedCode]);
 }
 
 function buildWatchlistCardHtml(detail) {
@@ -12424,12 +12330,6 @@ async function addCurrentStockToWatchlist() {
     const saved = payload.item && typeof payload.item === 'object' ? payload.item : currentWatchlistDetail;
     WATCHLIST_DETAILS_MAP = {...(WATCHLIST_DETAILS_MAP || {}), [stockCode]: saved};
     userWatchlistLoaded = true;
-    removedWatchlistCodes = removedWatchlistCodes.filter((code) => code !== stockCode);
-    persistRemovedWatchlistCodes();
-    if (!addedWatchlistCodes.includes(stockCode)) {
-      addedWatchlistCodes.unshift(stockCode);
-      persistAddedWatchlistCodes();
-    }
     trackFanStockObservation(stockCode, 'watchlist_add', {
       entryPoint: 'watchlist_add',
       sourceDetail: 'h5_watchlist',
@@ -12471,10 +12371,6 @@ async function removeCurrentStockFromWatchlist() {
     delete nextDetails[stockCode];
     WATCHLIST_DETAILS_MAP = nextDetails;
     userWatchlistLoaded = true;
-    removedWatchlistCodes = [stockCode, ...removedWatchlistCodes.filter((code) => code !== stockCode)];
-    addedWatchlistCodes = addedWatchlistCodes.filter((code) => code !== stockCode);
-    persistRemovedWatchlistCodes();
-    persistAddedWatchlistCodes();
     if (stockName) {
       reviewTriggerDraft.selectedWatchlist = (reviewTriggerDraft.selectedWatchlist || []).filter((name) => name !== stockName);
     }
@@ -12494,10 +12390,8 @@ function renderWatchlist() {
     listHost.innerHTML = details.length
       ? details.map((detail) => buildWatchlistCardHtml(detail)).join('')
       : '<div style="padding:28px 14px;border:1px dashed rgba(200,169,110,0.18);border-radius:12px;color:var(--gray-400);font-size:12px;text-align:center">当前没有自选股。输入股票代码后可在详情页加入。</div>';
-  } else {
-    removedWatchlistCodes.forEach((stockCode) => {
-      document.querySelector(`[data-watchlist-card="true"][data-stock-code="${stockCode}"]`)?.remove();
-    });
+  } else if (listHost) {
+    listHost.innerHTML = '<div style="padding:28px 14px;border:1px dashed rgba(200,169,110,0.18);border-radius:12px;color:var(--gray-400);font-size:12px;text-align:center">正在加载当前用户的自选股...</div>';
   }
   renderFundamentalWatchlistBoards();
   renderReviewWatchlistSelectionMode();
@@ -13201,7 +13095,6 @@ function saveWatchlistAnnotation() {
   const existingIndex = bucket.findIndex(item => Number(item.candleIndex) === Number(target.candleIndex) && String(item.created_by_user_id || '') === String(userPayload.user_profile_id || ''));
   if (existingIndex >= 0) bucket[existingIndex] = nextEntry;
   else bucket.push(nextEntry);
-  persistWatchlistAnnotationStore();
   fetch(`/api/watchlist/${encodeURIComponent(target.stockCode)}/annotations`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -13231,7 +13124,6 @@ function saveWatchlistAnnotation() {
     showToast('K线标注已保存，复盘会自动引用');
   }).catch((error) => {
     watchlistAnnotationStore[target.tenantId][normalizeStockLookupValue(target.stockCode)] = previousItems;
-    persistWatchlistAnnotationStore();
     closeWatchlistAnnotationModal();
     renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
     renderReviewExperience();
@@ -13245,7 +13137,6 @@ function deleteWatchlistAnnotation() {
   const previousItems = getWatchlistAnnotationBucket(target.tenantId, target.stockCode).slice();
   watchlistAnnotationStore[target.tenantId][normalizeStockLookupValue(target.stockCode)] =
     getWatchlistAnnotationBucket(target.tenantId, target.stockCode).filter(item => Number(item.candleIndex) !== Number(target.candleIndex));
-  persistWatchlistAnnotationStore();
   const userPayload = getActiveWatchlistUserPayload();
   const existingId = target.existing && target.existing.id ? target.existing.id : target.candleIndex;
   fetch(`/api/watchlist/${encodeURIComponent(target.stockCode)}/annotations/${encodeURIComponent(existingId)}` + `?tenant_slug=${encodeURIComponent(userPayload.tenant_slug)}&user_role=${encodeURIComponent(userPayload.user_role)}&user_profile_id=${encodeURIComponent(userPayload.user_profile_id)}`, {
@@ -13259,7 +13150,6 @@ function deleteWatchlistAnnotation() {
     showToast('已删除该处 K 线标注');
   }).catch((error) => {
     watchlistAnnotationStore[target.tenantId][normalizeStockLookupValue(target.stockCode)] = previousItems;
-    persistWatchlistAnnotationStore();
     closeWatchlistAnnotationModal();
     renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
     renderReviewExperience();

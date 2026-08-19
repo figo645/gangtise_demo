@@ -65,6 +65,17 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("candleLabel: `${data.name || '标的'} 日K线`", html)
         self.assertIn("data.annotation_key || data.indicator_code || data.code", html)
 
+    def test_watchlist_data_is_not_persisted_in_browser_storage(self):
+        h5_response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
+        workbench_response = self.client.get(f"/kol-workbench?tenant={self.tenant_slugs[0]}")
+
+        self.assertEqual(h5_response.status_code, 200)
+        self.assertEqual(workbench_response.status_code, 200)
+        for html in (h5_response.get_data(as_text=True), workbench_response.get_data(as_text=True)):
+            self.assertNotIn("gangtise_demo_added_watchlist_codes", html)
+            self.assertNotIn("gangtise_demo_removed_watchlist_codes", html)
+            self.assertNotIn("gangtise_demo_watchlist_annotations", html)
+
     def test_h5_core_market_index_cards_use_the_unified_dashboard_detail(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
 

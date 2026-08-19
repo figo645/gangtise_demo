@@ -7154,9 +7154,10 @@ function kwOpenIndicatorHistory(indicatorId) {
   if (window.GangtiseEcharts) window.GangtiseEcharts.flush(host);
 }
 
-const KW_WATCHLIST_ANNOTATION_STORAGE_KEY = 'gangtise_demo_watchlist_annotations';
 const kwWatchlistAnnotationSyncTasks = {};
 const kwLoadedWatchlistAnnotationCodes = {};
+// K-line annotations are server-owned; this is only an in-memory render cache.
+let kwWatchlistAnnotationStore = {};
 const KW_REVIEW_PERIOD_CONFIG = {
   day: { label: '日复盘', shortLabel: '今日' },
   week: { label: '周复盘', shortLabel: '本周' },
@@ -11022,13 +11023,7 @@ function kwRenderReviewStudio() {
 }
 
 function loadWorkbenchWatchlistAnnotations() {
-  try {
-    const raw = window.localStorage ? window.localStorage.getItem(KW_WATCHLIST_ANNOTATION_STORAGE_KEY) : '';
-    const parsed = raw ? JSON.parse(raw) : {};
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch (e) {
-    return {};
-  }
+  return kwWatchlistAnnotationStore;
 }
 
 function replaceWorkbenchStockAnnotations(stockCode, items) {
@@ -11045,11 +11040,6 @@ function replaceWorkbenchStockAnnotations(stockCode, items) {
     trigger: item.trigger || '',
     updatedAt: item.updatedAt || item.updated_at || item.createdAt || item.created_at || '刚刚',
   }));
-  try {
-    if (window.localStorage) {
-      window.localStorage.setItem(KW_WATCHLIST_ANNOTATION_STORAGE_KEY, JSON.stringify(storage));
-    }
-  } catch (e) {}
 }
 
 function kwGetWatchlistTenantPayload() {
@@ -11063,45 +11053,9 @@ function kwGetWatchlistTenantPayload() {
 }
 
 async function kwSyncLocalWatchlistAnnotationsToServer(stockRefs) {
-  const tenant = window.ACTIVE_TENANT || {};
-  if (!tenant.slug) return;
-  const detailsMap = window.WATCHLIST_DETAILS_MAP || {};
-  const tenantId = tenant.id;
-  const payload = kwGetWatchlistTenantPayload();
-  const codes = (Array.isArray(stockRefs) ? stockRefs : [stockRefs]).map((item) => {
-    const raw = String(item || '').trim();
-    if (!raw) return '';
-    const detail = Object.values(detailsMap).find((row) => row && (row.code === raw || row.name === raw));
-    return String((detail && detail.code) || raw).trim().toUpperCase();
-  }).filter(Boolean);
-  await Promise.all(codes.map(async (stockCode) => {
-    const taskKey = `${payload.tenant_slug}:${stockCode}`;
-    if (kwWatchlistAnnotationSyncTasks[taskKey]) return kwWatchlistAnnotationSyncTasks[taskKey];
-    const task = (async () => {
-      const items = getWorkbenchStockAnnotations(stockCode);
-      if (!items.length) return;
-      for (const item of items) {
-        await fetch(`/api/watchlist/${encodeURIComponent(stockCode)}/annotations`, {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            ...payload,
-            stock_name: ((detailsMap[stockCode] || {}).name) || stockCode,
-            candle_index: Number(item.candleIndex || 0),
-            candle_date: item.dateLabel || '',
-            title: item.title || '',
-            note: item.note || '',
-            trigger: item.trigger || '',
-            source_client: 'web_workbench',
-          }),
-        }).catch(() => null);
-      }
-    })().finally(() => {
-      delete kwWatchlistAnnotationSyncTasks[taskKey];
-    });
-    kwWatchlistAnnotationSyncTasks[taskKey] = task;
-    return task;
-  }));
+  // Annotation writes are sent to the server at creation time. There is no
+  // browser-side queue to replay before preview or publish.
+  return Promise.resolve();
 }
 
 async function kwLoadWatchlistAnnotationsFromServer(stockRefs) {
