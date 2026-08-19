@@ -12,6 +12,8 @@ from zoneinfo import ZoneInfo
 
 _watchlist_comments_schema_lock = threading.Lock()
 _watchlist_comments_schema_ready = False
+_user_watchlist_schema_lock = threading.Lock()
+_user_watchlist_schema_targets = set()
 
 
 def _parse_market_datetime(value):
@@ -362,9 +364,57 @@ def _normalize_user_watchlist_owner(tenant_slug="", user_profile_id=""):
     return tenant, profile
 
 
+def _ensure_user_watchlist_items_table(db=None):
+    """Create the relation for databases deployed before migration 033."""
+    global _user_watchlist_schema_targets
+    database = db or get_db()
+    connection = getattr(database, "_connection", None)
+    # Test doubles and alternate adapters may not expose psycopg2's
+    # connection. The normal query remains responsible for those adapters.
+    if connection is None:
+        return
+    connection_info = getattr(connection, "info", None)
+    target_key = str(getattr(connection_info, "dsn", "") or "").strip() or str(id(connection))
+    with _user_watchlist_schema_lock:
+        if target_key in _user_watchlist_schema_targets:
+            return
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS user_watchlist_items (
+                    id BIGSERIAL PRIMARY KEY,
+                    tenant_slug TEXT NOT NULL DEFAULT '',
+                    user_profile_id TEXT NOT NULL DEFAULT '',
+                    stock_code TEXT NOT NULL DEFAULT '',
+                    stock_name TEXT NOT NULL DEFAULT '',
+                    market TEXT NOT NULL DEFAULT '',
+                    industry TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
+            cursor.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_user_watchlist_items_owner_stock
+                ON user_watchlist_items(tenant_slug, user_profile_id, stock_code)
+                """
+            )
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_user_watchlist_items_owner_updated
+                ON user_watchlist_items(tenant_slug, user_profile_id, updated_at DESC, id DESC)
+                """
+            )
+        connection.commit()
+        _user_watchlist_schema_targets.add(target_key)
+
+
 def list_user_watchlist_items(tenant_slug="", user_profile_id=""):
     tenant, profile = _normalize_user_watchlist_owner(tenant_slug, user_profile_id)
-    rows = get_db().execute(
+    db = get_db()
+    _ensure_user_watchlist_items_table(db)
+    rows = db.execute(
         """
         SELECT id, tenant_slug, user_profile_id, stock_code, stock_name, market, industry,
                created_at, updated_at
@@ -407,6 +457,7 @@ def add_user_watchlist_item(tenant_slug="", user_profile_id="", stock_code="", s
         raise ValueError("watchlist_stock_not_found")
     now = now_ts()
     db = get_db()
+    _ensure_user_watchlist_items_table(db)
     db.execute(
         """
         INSERT INTO user_watchlist_items
@@ -437,6 +488,7 @@ def remove_user_watchlist_item(tenant_slug="", user_profile_id="", stock_code=""
     if not normalized_code:
         raise ValueError("stock_code_required")
     db = get_db()
+    _ensure_user_watchlist_items_table(db)
     deleted = db.execute(
         "DELETE FROM user_watchlist_items WHERE tenant_slug = ? AND user_profile_id = ? AND stock_code = ?",
         (tenant, profile, normalized_code),

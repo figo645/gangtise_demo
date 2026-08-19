@@ -2101,6 +2101,43 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertTrue(response.get_json()["ok"])
         list_items.assert_called_once_with(self.tenant_slug, "fan_owner")
 
+    def test_given_legacy_database_without_watchlist_table_when_loading_then_runtime_schema_guard_creates_it(self):
+        class _Cursor:
+            def __init__(self, statements):
+                self.statements = statements
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def execute(self, statement):
+                self.statements.append(statement)
+
+        class _Connection:
+            def __init__(self):
+                self.statements = []
+
+            def cursor(self):
+                return _Cursor(self.statements)
+
+            def commit(self):
+                self.committed = True
+
+        class _Db:
+            def __init__(self, connection):
+                self._connection = connection
+
+        connection = _Connection()
+        with patch.object(market_services, "_user_watchlist_schema_targets", set()):
+            market_services._ensure_user_watchlist_items_table(_Db(connection))
+
+        self.assertTrue(connection.committed)
+        self.assertEqual(len(connection.statements), 3)
+        self.assertIn("CREATE TABLE IF NOT EXISTS user_watchlist_items", connection.statements[0])
+        self.assertIn("uq_user_watchlist_items_owner_stock", connection.statements[1])
+
     def test_given_missing_gangtise_credentials_when_admin_diagnoses_market_data_then_the_reason_is_explicit(self):
         with patch("src.domain.market_services.get_gangtise_openapi_config", return_value={"base_url": "https://openapi.gangtise.com", "access_key": "", "secret_key": "", "long_token": ""}):
             diagnostic = market_services.build_gangtise_market_runtime_diagnostic()
