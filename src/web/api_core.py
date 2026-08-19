@@ -537,6 +537,17 @@ def api_watchlist_detail(stock_code):
         },
     }
     normalized = apply_watchlist_feature_flags(payload, site_config)
+    app.logger.warning(
+        "Watchlist API response code=%s tenant=%s kline_points=%s data_unavailable=%s data_source=%s intraday_points=%s intraday_available=%s unavailable_message=%s",
+        str(stock_code or "").strip().upper(),
+        tenant_slug or "--",
+        len(normalized.get("kline") or []) if isinstance(normalized.get("kline"), list) else 0,
+        bool(normalized.get("data_unavailable")),
+        str(normalized.get("data_source") or "--")[:80],
+        len(normalized.get("intraday_series") or []) if isinstance(normalized.get("intraday_series"), list) else 0,
+        bool(normalized.get("intraday_available")),
+        str(normalized.get("data_unavailable_message") or "")[:160],
+    )
     annotation_key = str(normalized.get("indicator_code") or stock_code).strip() or stock_code
     normalized["annotation_key"] = annotation_key
     if tenant_slug:
@@ -905,7 +916,12 @@ def api_admin_database_release_overview():
 def api_admin_market_data_diagnostic():
     """Admin-only live Gangtise diagnosis for production incident handling."""
     try:
-        return jsonify({"ok": True, "diagnostic": build_gangtise_market_runtime_diagnostic()})
+        probe_security_code = str(request.args.get("security_code") or "600519.SH").strip().upper()
+        if not probe_security_code or len(probe_security_code) > 32 or any(
+            char not in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-" for char in probe_security_code
+        ):
+            return jsonify({"ok": False, "error": "invalid_security_code"}), 400
+        return jsonify({"ok": True, "diagnostic": build_gangtise_market_runtime_diagnostic(probe_security_code)})
     except Exception as exc:
         app.logger.exception("Unable to diagnose Gangtise market data connector")
         return jsonify({"ok": False, "error": "market_data_diagnostic_failed", "detail": str(exc)}), 502

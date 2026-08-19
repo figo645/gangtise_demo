@@ -1116,6 +1116,34 @@ def fetch_gangtise_market_kline_series(path, security_code, token="", start_date
     )
     status, response, duration = post_gangtise_openapi_json(path, payload, token=token, timeout=timeout)
     points = normalize_gangtise_kline_points(response, max_trade_date=effective_end)
+    response_obj = response if isinstance(response, dict) else {}
+    response_code = str(response_obj.get("code") or "").strip()
+    response_status = response_obj.get("status")
+    message = str(response_obj.get("msg") or response_obj.get("message") or "").strip()
+    if is_gangtise_openapi_success(status, response_obj) and len(points) >= 2:
+        app.logger.info(
+            "Gangtise daily kline ok path=%s security_code=%s http_status=%s response_code=%s response_status=%s points=%s duration_ms=%s latest_trade_date=%s",
+            path,
+            str(security_code or "").strip().upper(),
+            int(status or 0),
+            response_code or "--",
+            response_status,
+            len(points),
+            int(duration or 0),
+            str((points[-1] or {}).get("date") or "--"),
+        )
+    else:
+        app.logger.warning(
+            "Gangtise daily kline unavailable path=%s security_code=%s http_status=%s response_code=%s response_status=%s points=%s duration_ms=%s message=%s",
+            path,
+            str(security_code or "").strip().upper(),
+            int(status or 0),
+            response_code or "--",
+            response_status,
+            len(points),
+            int(duration or 0),
+            message[:240] or "--",
+        )
     return {
         "ok": is_gangtise_openapi_success(status, response) and len(points) >= 2,
         "http_status": int(status or 0),
@@ -1124,11 +1152,7 @@ def fetch_gangtise_market_kline_series(path, security_code, token="", start_date
         "payload": payload,
         "points": points,
         "response": response if isinstance(response, dict) else {},
-        "message": (
-            str((response or {}).get("msg") or (response or {}).get("message") or "").strip()
-            if isinstance(response, dict) else
-            ""
-        ),
+        "message": message,
     }
 
 
@@ -1235,6 +1259,32 @@ def fetch_gangtise_intraday_series(security_code, token="", trade_date="", limit
     )
     points = normalize_gangtise_minute_points(response, trade_date=effective_date)
     message = str((response or {}).get("msg") or (response or {}).get("message") or "").strip()
+    response_obj = response if isinstance(response, dict) else {}
+    response_code = str(response_obj.get("code") or "").strip()
+    response_status = response_obj.get("status")
+    if len(points) >= 2:
+        app.logger.info(
+            "Gangtise minute kline ok security_code=%s trade_date=%s http_status=%s response_code=%s response_status=%s points=%s duration_ms=%s",
+            str(security_code or "").strip().upper(),
+            effective_date,
+            int(status or 0),
+            response_code or "--",
+            response_status,
+            len(points),
+            int(duration or 0),
+        )
+    else:
+        app.logger.warning(
+            "Gangtise minute kline unavailable security_code=%s trade_date=%s http_status=%s response_code=%s response_status=%s points=%s duration_ms=%s message=%s",
+            str(security_code or "").strip().upper(),
+            effective_date,
+            int(status or 0),
+            response_code or "--",
+            response_status,
+            len(points),
+            int(duration or 0),
+            message[:240] or "--",
+        )
     result = {
         "ok": is_gangtise_openapi_success(status, response) and len(points) >= 2,
         "available": len(points) >= 2,
@@ -6462,9 +6512,22 @@ def _build_watchlist_realtime_detail_from_candidate(candidate, stock_name=""):
     code = str(normalized.get("code") or "").strip().upper()
     name = str(normalized.get("name") or stock_name or WATCHLIST_NAME_ALIAS_MAP.get(code) or code).strip() or code
     if not security_code:
+        app.logger.warning(
+            "Watchlist realtime detail unavailable code=%s name=%s reason=security_code_unresolved",
+            code or "--",
+            name or "--",
+        )
         return None
     cached = _load_watchlist_cache("watchlist_detail_cache", security_code, WATCHLIST_DETAIL_CACHE_TTL_SECONDS)
     if isinstance(cached, dict) and cached and not _watchlist_detail_has_future_kline(cached):
+        app.logger.warning(
+            "Watchlist detail cache hit security_code=%s code=%s kline_points=%s data_unavailable=%s cache_source=%s",
+            security_code,
+            code or "--",
+            len(cached.get("kline") or []) if isinstance(cached.get("kline"), list) else 0,
+            bool(cached.get("data_unavailable")),
+            str(cached.get("data_source") or cached.get("source") or "--")[:80],
+        )
         return attach_watchlist_intraday(cached)
     market = str(normalized.get("market") or _infer_watchlist_market(code)).strip() or "CN"
     suffix = security_code.split(".", 1)[1] if "." in security_code else market
@@ -6485,6 +6548,15 @@ def _build_watchlist_realtime_detail_from_candidate(candidate, stock_name=""):
     )
     points = series_result.get("points") or []
     if not series_result.get("ok") or len(points) < 2:
+        app.logger.warning(
+            "Watchlist realtime detail unavailable code=%s name=%s security_code=%s reason=daily_kline_not_ready http_status=%s points=%s message=%s",
+            code or "--",
+            name or "--",
+            security_code,
+            int(series_result.get("http_status") or 0),
+            len(points),
+            str(series_result.get("message") or "empty_daily_kline")[:240],
+        )
         return None
     latest = points[-1]
     previous = points[-2]
@@ -6955,8 +7027,22 @@ def get_watchlist_detail_by_code(stock_code="", stock_name="", details_map=None,
     detail = copy.deepcopy((details or {}).get(normalized_code) or {})
     if detail:
         if not enrich:
+            app.logger.warning(
+                "Watchlist detail indicator result code=%s kline_points=%s data_unavailable=%s data_source=%s",
+                normalized_code,
+                len(detail.get("kline") or []) if isinstance(detail.get("kline"), list) else 0,
+                bool(detail.get("data_unavailable")),
+                str(detail.get("data_source") or "--")[:80],
+            )
             return detail
         if detail.get("data_source") == "gangtise_openapi" or detail.get("data_unavailable"):
+            app.logger.warning(
+                "Watchlist detail seed result code=%s kline_points=%s data_unavailable=%s data_source=%s",
+                normalized_code,
+                len(detail.get("kline") or []) if isinstance(detail.get("kline"), list) else 0,
+                bool(detail.get("data_unavailable")),
+                str(detail.get("data_source") or "--")[:80],
+            )
             return detail
         resolved_candidate = _resolve_watchlist_candidate(stock_code=normalized_code, stock_name=stock_name or detail.get("name") or normalized_code)
         realtime_detail = _build_watchlist_realtime_detail_from_candidate(resolved_candidate, stock_name=stock_name or detail.get("name") or normalized_code)
@@ -6966,11 +7052,29 @@ def get_watchlist_detail_by_code(stock_code="", stock_name="", details_map=None,
             stock_code=normalized_code,
             stock_name=stock_name or detail.get("name") or normalized_code,
         ) if realtime_detail else _build_watchlist_unavailable_detail(detail, stock_code=normalized_code, stock_name=stock_name or detail.get("name") or normalized_code)
-        return copy.deepcopy((_enrich_watchlist_details({normalized_code: merged}).get(normalized_code)) or merged)
+        result = copy.deepcopy((_enrich_watchlist_details({normalized_code: merged}).get(normalized_code)) or merged)
+        app.logger.warning(
+            "Watchlist detail merged result code=%s kline_points=%s data_unavailable=%s data_source=%s message=%s",
+            normalized_code,
+            len(result.get("kline") or []) if isinstance(result.get("kline"), list) else 0,
+            bool(result.get("data_unavailable")),
+            str(result.get("data_source") or "--")[:80],
+            str(result.get("data_unavailable_message") or "")[:160],
+        )
+        return result
     fallback = _build_dynamic_watchlist_detail(normalized_code, stock_name=stock_name)
     if not fallback:
         return None
-    return copy.deepcopy((_enrich_watchlist_details({normalized_code: fallback}).get(normalized_code)) or fallback)
+    result = copy.deepcopy((_enrich_watchlist_details({normalized_code: fallback}).get(normalized_code)) or fallback)
+    app.logger.warning(
+        "Watchlist detail fallback result code=%s kline_points=%s data_unavailable=%s data_source=%s message=%s",
+        normalized_code,
+        len(result.get("kline") or []) if isinstance(result.get("kline"), list) else 0,
+        bool(result.get("data_unavailable")),
+        str(result.get("data_source") or "--")[:80],
+        str(result.get("data_unavailable_message") or "")[:160],
+    )
+    return result
 
 
 def _normalize_watchlist_annotation_code(stock_code="", stock_name="", details_map=None):
