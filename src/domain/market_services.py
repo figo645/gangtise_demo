@@ -5374,8 +5374,9 @@ SHENWAN_SECTOR_ALIASES = {
 
 
 def _market_demo_data_enabled():
-    # Demo data must be explicitly opted into for a presentation environment.
-    return str(os.environ.get("MARKET_DEMO_DATA_ENABLED", "0")).strip().lower() in {"1", "true", "yes", "on"}
+    # Market values must never be manufactured by a runtime flag. Tests and
+    # demos use explicit fixtures at the call boundary instead.
+    return False
 
 
 def _build_market_demo_overview_payload():

@@ -9,7 +9,6 @@ CONTAINER_NAME="${DOCKER_CONTAINER_NAME:-gangtise-demo-web}"
 HOST_PORT="${HOST_PORT:-5001}"
 CONTAINER_PORT="${CONTAINER_PORT:-5001}"
 CREDENTIALS_FILE="${POSTGRES_CREDENTIALS_FILE:-/root/gangtise_postgres_credentials}"
-GANGTISE_CREDENTIALS_FILE="${GANGTISE_OPENAPI_CREDENTIALS_FILE:-/root/gangtise_openapi_credentials}"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "docker command not found. Install Docker first." >&2
@@ -25,13 +24,6 @@ if [ -f "$CREDENTIALS_FILE" ]; then
   set -a
   # shellcheck disable=SC1090
   . "$CREDENTIALS_FILE"
-  set +a
-fi
-
-if [ -f "$GANGTISE_CREDENTIALS_FILE" ]; then
-  set -a
-  # shellcheck disable=SC1090
-  . "$GANGTISE_CREDENTIALS_FILE"
   set +a
 fi
 

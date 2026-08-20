@@ -1978,43 +1978,29 @@ def api_admin_site_config():
         if isinstance(payload.get("auth_settings"), dict)
         else current_auth_settings
     )
+    incoming_llm_registry = payload.get("llm_registry") if isinstance(payload.get("llm_registry"), dict) else None
+    if incoming_llm_registry is not None:
+        # Model metadata is stored in site_config; API keys are encrypted in a
+        # dedicated app_settings record and are never included in site_config.
+        save_llm_api_credentials_patch(incoming_llm_registry.get("models"), prune_missing=True)
     next_config = _merge_site_config(
         current,
         {
             "default_theme": payload.get("default_theme", current.get("default_theme", "light")),
             "default_accent": payload.get("default_accent", current.get("default_accent", "blue")),
             "auth_settings": strip_auth_settings_secret(auth_settings_payload),
-            "voice_transcription": {
-                "engine": str(
-                    (
-                        (payload.get("voice_transcription") or {}).get("engine")
-                        or (current.get("voice_transcription") or {}).get("engine")
-                        or "local"
-                    )
-                ).strip().lower() or "local"
-                ,
-                "post_process_mode": str(
-                    (
-                        (payload.get("voice_transcription") or {}).get("post_process_mode")
-                        or (current.get("voice_transcription") or {}).get("post_process_mode")
-                        or "rule_based"
-                    )
-                ).strip().lower() or "rule_based",
-                "domain_glossary_enabled": (
-                    ((payload.get("voice_transcription") or {}).get("domain_glossary_enabled"))
-                    if isinstance(payload.get("voice_transcription"), dict) and "domain_glossary_enabled" in (payload.get("voice_transcription") or {})
-                    else (current.get("voice_transcription") or {}).get("domain_glossary_enabled", True)
-                ) is not False,
-            },
-            "voice_embedding": {
-                "engine": str(
-                    (
-                        (payload.get("voice_embedding") or {}).get("engine")
-                        or (current.get("voice_embedding") or {}).get("engine")
-                        or "local"
-                    )
-                ).strip().lower() or "local"
-            },
+            "voice_transcription": normalize_voice_transcription_config(
+                _merge_site_config(
+                    current.get("voice_transcription") or {},
+                    payload.get("voice_transcription") if isinstance(payload.get("voice_transcription"), dict) else {},
+                )
+            ),
+            "voice_embedding": normalize_voice_embedding_config(
+                _merge_site_config(
+                    current.get("voice_embedding") or {},
+                    payload.get("voice_embedding") if isinstance(payload.get("voice_embedding"), dict) else {},
+                )
+            ),
             "knowledge_ingestion": normalize_knowledge_ingestion_config(
                 payload.get("knowledge_ingestion")
                 if isinstance(payload.get("knowledge_ingestion"), dict)
@@ -2035,10 +2021,8 @@ def api_admin_site_config():
                 if isinstance(payload.get("review_generation"), dict)
                 else current.get("review_generation")
             ),
-            "llm_registry": normalize_llm_registry_config(
-                payload.get("llm_registry")
-                if isinstance(payload.get("llm_registry"), dict)
-                else current.get("llm_registry")
+            "llm_registry": strip_llm_registry_api_keys(
+                incoming_llm_registry if incoming_llm_registry is not None else current.get("llm_registry")
             ),
             "brand": payload.get("brand", current.get("brand", {})),
             "default_tenant_slug": payload.get("default_tenant_slug", current.get("default_tenant_slug")),
@@ -2049,7 +2033,10 @@ def api_admin_site_config():
     )
     try:
         saved = save_site_config(next_config)
-        save_auth_wechat_secret((auth_settings_payload.get("wechat") or {}).get("app_secret"))
+        save_auth_wechat_secret_patch(
+            (auth_settings_payload.get("wechat") or {}).get("app_secret"),
+            clear=bool((auth_settings_payload.get("wechat") or {}).get("clear_app_secret")),
+        )
     except Exception:
         if runtime_switched:
             save_db_runtime_config(original_use_staging)

@@ -128,15 +128,8 @@ LOCAL_VECTOR_DB_PORT = int(os.environ.get("LOCAL_VECTOR_DB_PORT", str(VECTOR_DB_
 LOCAL_VECTOR_DB_NAME = os.environ.get("LOCAL_VECTOR_DB_NAME") or VECTOR_DB_NAME
 LOCAL_VECTOR_DB_USER = os.environ.get("LOCAL_VECTOR_DB_USER") or VECTOR_DB_USER
 LOCAL_VECTOR_DB_PASSWORD = os.environ.get("LOCAL_VECTOR_DB_PASSWORD") or VECTOR_DB_PASSWORD
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
-OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
-OPENAI_AUDIO_MODEL = os.environ.get("OPENAI_AUDIO_MODEL", "whisper-1").strip() or "whisper-1"
-OPENAI_AUDIO_LANGUAGE = os.environ.get("OPENAI_AUDIO_LANGUAGE", "zh").strip() or "zh"
-OPENAI_EMBEDDING_MODEL = os.environ.get("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small").strip() or "text-embedding-3-small"
-LOCAL_WHISPER_MODEL_SIZE = os.environ.get("LOCAL_WHISPER_MODEL_SIZE", "small").strip() or "small"
-LOCAL_WHISPER_DEVICE = os.environ.get("LOCAL_WHISPER_DEVICE", "cpu").strip() or "cpu"
-LOCAL_WHISPER_COMPUTE_TYPE = os.environ.get("LOCAL_WHISPER_COMPUTE_TYPE", "int8").strip() or "int8"
-LOCAL_EMBEDDING_MODEL_NAME = os.environ.get("LOCAL_EMBEDDING_MODEL_NAME", "BAAI/bge-small-zh-v1.5").strip() or "BAAI/bge-small-zh-v1.5"
+# External-service endpoints, models and feature behaviour are stored in
+# PostgreSQL site configuration. Environment variables remain deployment-only.
 PGVECTOR_TARGET_DIM = int(os.environ.get("PGVECTOR_TARGET_DIM", "1536"))
 VOICE_UPLOAD_MAX_BYTES = int(os.environ.get("VOICE_UPLOAD_MAX_BYTES", str(25 * 1024 * 1024)))
 ALLOWED_AUDIO_EXTENSIONS = {".mp3", ".mp4", ".m4a", ".wav", ".webm", ".ogg", ".mpeg", ".mpga"}
@@ -166,6 +159,8 @@ DEFAULT_LLM_FEATURE_CATALOG = [
     {"feature_code": "watchlist_comment_labeling", "feature_label": "自选股评论标注", "default_purpose": "general"},
     {"feature_code": "knowledge_query_filter", "feature_label": "知识检索过滤", "default_purpose": "general"},
     {"feature_code": "knowledge_query_answer", "feature_label": "知识问答生成", "default_purpose": "general"},
+    {"feature_code": "voice_transcription_api", "feature_label": "语音 API 转写连接", "default_purpose": "general"},
+    {"feature_code": "embedding_api", "feature_label": "向量 API 连接", "default_purpose": "general"},
     {"feature_code": "hermes_intent_router", "feature_label": "Hermes 意图路由", "default_purpose": "general"},
     {"feature_code": "hermes_answer_synthesis", "feature_label": "Hermes 回答合成", "default_purpose": "general"},
     {"feature_code": "smart_indicator_formula_generation", "feature_label": "智能指标公式生成", "default_purpose": "general"},
@@ -177,7 +172,7 @@ DEFAULT_LLM_MODELS = [
         "provider": "openai",
         "model_name": "gemma4:12b-it-bf16",
         "base_url": "http://8.155.160.194:6031/api",
-        "api_key": "sk-5da7f8f997d44a97ae6dcdeb74c45397",
+        "api_key": "",
         "purpose": "general",
         "enabled": True,
     },
@@ -187,7 +182,7 @@ DEFAULT_LLM_MODELS = [
         "provider": "openai",
         "model_name": "gemma4:31b-it-q4_K_M",
         "base_url": "http://8.155.160.194:6031/api",
-        "api_key": "sk-5da7f8f997d44a97ae6dcdeb74c45397",
+        "api_key": "",
         "purpose": "general",
         "enabled": True,
     },
@@ -514,9 +509,16 @@ DEFAULT_SITE_CONFIG = {
         "engine": "local",
         "post_process_mode": "rule_based",
         "domain_glossary_enabled": True,
+        "api_model": "whisper-1",
+        "api_language": "zh",
+        "local_model_size": "small",
+        "local_device": "cpu",
+        "local_compute_type": "int8",
     },
     "voice_embedding": {
         "engine": "local",
+        "api_model": "text-embedding-3-small",
+        "local_model_name": "BAAI/bge-small-zh-v1.5",
     },
     "knowledge_ingestion": {
         "user_preview_enabled": False,

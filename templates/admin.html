@@ -4912,6 +4912,18 @@
                         </select>
                       </div>
                       <div class="config-field">
+                        <label>API 转写模型名</label>
+                        <input id="voice-transcription-api-model" type="text" placeholder="例如 whisper-1">
+                      </div>
+                      <div class="config-field">
+                        <label>API 转写语言</label>
+                        <input id="voice-transcription-api-language" type="text" placeholder="zh">
+                      </div>
+                      <div class="config-field">
+                        <label>本地转写模型</label>
+                        <input id="voice-transcription-local-model-size" type="text" placeholder="例如 small">
+                      </div>
+                      <div class="config-field">
                         <label>转写后处理</label>
                         <select id="voice-transcription-post-process-mode">
                           <option value="rule_based">规则纠错与术语清洗（推荐）</option>
@@ -4935,6 +4947,14 @@
                           <option value="local">本地 Embedding</option>
                           <option value="api">大模型 API Embedding</option>
                         </select>
+                      </div>
+                      <div class="config-field">
+                        <label>API 向量模型名</label>
+                        <input id="voice-embedding-api-model" type="text" placeholder="例如 text-embedding-3-small">
+                      </div>
+                      <div class="config-field">
+                        <label>本地向量模型</label>
+                        <input id="voice-embedding-local-model" type="text" placeholder="例如 BAAI/bge-small-zh-v1.5">
                       </div>
                       <div class="feature-note">
                         默认链路为：语音转写 → 规则纠错 → 术语清洗。大模型整理只在前台勾选时额外启用，不影响纯 ASR 路径。
@@ -5097,7 +5117,12 @@
             </div>
             <div class="config-field">
               <label>微信 AppSecret</label>
-              <input id="auth-wechat-app-secret" type="text" placeholder="仅 Admin 可见">
+              <input id="auth-wechat-app-secret" type="password" autocomplete="new-password" placeholder="已加密配置，留空不修改">
+              <div id="auth-wechat-secret-status" class="feature-note" style="margin-top:6px">AppSecret 仅以密文保存到 PostgreSQL，不会回显。</div>
+              <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;font-weight:400">
+                <input id="auth-wechat-clear-secret" type="checkbox">
+                清除已保存的 AppSecret
+              </label>
             </div>
             <div class="config-field">
               <label>微信回调地址</label>
@@ -10676,6 +10701,7 @@ function renderAdminLlmRegistry() {
               <span class="llm-admin-chip">${enabled ? '已启用' : '未启用'}</span>
               <span class="llm-admin-chip is-muted">用途 ${escapeHtml(purpose)}</span>
               <span class="llm-admin-chip is-muted">接口 OpenAI Compatible</span>
+              <span class="llm-admin-chip ${model.api_key_configured ? 'is-gold' : 'is-muted'}">密钥 ${model.api_key_configured ? '已加密配置' : '未配置'}</span>
             </div>
           </div>
           <div class="llm-admin-inline-actions">
@@ -10727,7 +10753,11 @@ function renderAdminLlmRegistry() {
           </div>
           <div class="config-field">
             <label>API Key</label>
-            <input type="text" value="${escapeAttr(model.api_key || '')}" placeholder="留空则走平台环境变量 OPENAI_API_KEY" oninput="updateAdminLlmModel(${index}, 'api_key', this.value)">
+            <input type="password" value="" autocomplete="new-password" placeholder="${model.api_key_configured ? '已配置，留空不修改' : '填写后加密保存到 PostgreSQL'}" oninput="updateAdminLlmModel(${index}, 'api_key', this.value)">
+            <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;font-weight:400">
+              <input type="checkbox" ${model.clear_api_key ? 'checked' : ''} onchange="updateAdminLlmModel(${index}, 'clear_api_key', this.checked)">
+              清除该模型已保存的 API Key
+            </label>
           </div>
           <div class="config-field">
             <label>启用状态</label>
@@ -10738,7 +10768,7 @@ function renderAdminLlmRegistry() {
           </div>
         </div>
         <div class="llm-admin-model-footer">
-          建议只把已经验证过连接、模型名和 key 的配置设为“启用”。默认模型会被知识库对话、后续 AI 生成和平台通用能力优先读取。
+          API Key 仅写入当前 PostgreSQL 的加密凭证区，不会回显、不会写入站点配置，也不会回退到环境变量。删除模型时会同步清理其密钥。
         </div>
       </div>
     `;
@@ -11559,7 +11589,13 @@ function renderSiteConfigForm() {
   const authWechatAppId = document.getElementById('auth-wechat-app-id');
   if (authWechatAppId) authWechatAppId.value = authWechat.app_id || '';
   const authWechatAppSecret = document.getElementById('auth-wechat-app-secret');
-  if (authWechatAppSecret) authWechatAppSecret.value = authWechat.app_secret || '';
+  if (authWechatAppSecret) authWechatAppSecret.value = '';
+  const authWechatClearSecret = document.getElementById('auth-wechat-clear-secret');
+  if (authWechatClearSecret) authWechatClearSecret.checked = false;
+  const authWechatSecretStatus = document.getElementById('auth-wechat-secret-status');
+  if (authWechatSecretStatus) authWechatSecretStatus.textContent = authWechat.app_secret_configured
+    ? `AppSecret 已加密保存到 PostgreSQL${authWechat.credential_updated_at ? `，最后更新：${authWechat.credential_updated_at}` : ''}。留空不修改。`
+    : 'AppSecret 尚未配置；填写后加密保存到 PostgreSQL。';
   const authWechatRedirectUri = document.getElementById('auth-wechat-redirect-uri');
   if (authWechatRedirectUri) authWechatRedirectUri.value = authWechat.redirect_uri || '';
   const authWechatScope = document.getElementById('auth-wechat-scope');
@@ -11580,12 +11616,22 @@ function renderSiteConfigForm() {
   }
   const voiceEngine = document.getElementById('voice-transcription-engine');
   if (voiceEngine) voiceEngine.value = voiceTranscription.engine || 'local';
+  const voiceApiModel = document.getElementById('voice-transcription-api-model');
+  if (voiceApiModel) voiceApiModel.value = voiceTranscription.api_model || 'whisper-1';
+  const voiceApiLanguage = document.getElementById('voice-transcription-api-language');
+  if (voiceApiLanguage) voiceApiLanguage.value = voiceTranscription.api_language || 'zh';
+  const voiceLocalModel = document.getElementById('voice-transcription-local-model-size');
+  if (voiceLocalModel) voiceLocalModel.value = voiceTranscription.local_model_size || 'small';
   const voicePostProcessMode = document.getElementById('voice-transcription-post-process-mode');
   if (voicePostProcessMode) voicePostProcessMode.value = voiceTranscription.post_process_mode || 'rule_based';
   const voiceGlossaryToggle = document.getElementById('voice-transcription-domain-glossary-enabled');
   if (voiceGlossaryToggle) voiceGlossaryToggle.checked = voiceTranscription.domain_glossary_enabled !== false;
   const embeddingEngine = document.getElementById('voice-embedding-engine');
-  if (embeddingEngine) embeddingEngine.value = voiceEmbedding.engine || 'api';
+  if (embeddingEngine) embeddingEngine.value = voiceEmbedding.engine || 'local';
+  const embeddingApiModel = document.getElementById('voice-embedding-api-model');
+  if (embeddingApiModel) embeddingApiModel.value = voiceEmbedding.api_model || 'text-embedding-3-small';
+  const embeddingLocalModel = document.getElementById('voice-embedding-local-model');
+  if (embeddingLocalModel) embeddingLocalModel.value = voiceEmbedding.local_model_name || 'BAAI/bge-small-zh-v1.5';
   const knowledgePreviewToggle = document.getElementById('knowledge-user-preview-enabled');
   if (knowledgePreviewToggle) knowledgePreviewToggle.checked = knowledgeIngestion.user_preview_enabled === true;
   const hermesPromptScopeGuardToggle = document.getElementById('hermes-prompt-scope-guard-enabled');
@@ -11976,6 +12022,7 @@ async function saveSiteConfig() {
         app_secret: document.getElementById('auth-wechat-app-secret')
           ? String(document.getElementById('auth-wechat-app-secret').value || '').trim()
           : '',
+        clear_app_secret: Boolean(document.getElementById('auth-wechat-clear-secret') && document.getElementById('auth-wechat-clear-secret').checked),
         redirect_uri: document.getElementById('auth-wechat-redirect-uri')
           ? String(document.getElementById('auth-wechat-redirect-uri').value || '').trim()
           : '',
@@ -12006,11 +12053,18 @@ async function saveSiteConfig() {
         ? document.getElementById('voice-transcription-domain-glossary-enabled').checked
         : ((adminSiteConfig.voice_transcription || {}).domain_glossary_enabled !== false)
       ),
+      api_model: String(document.getElementById('voice-transcription-api-model')?.value || 'whisper-1').trim() || 'whisper-1',
+      api_language: String(document.getElementById('voice-transcription-api-language')?.value || 'zh').trim() || 'zh',
+      local_model_size: String(document.getElementById('voice-transcription-local-model-size')?.value || 'small').trim() || 'small',
+      local_device: String((adminSiteConfig.voice_transcription || {}).local_device || 'cpu').trim() || 'cpu',
+      local_compute_type: String((adminSiteConfig.voice_transcription || {}).local_compute_type || 'int8').trim() || 'int8',
     },
     voice_embedding: {
       engine: document.getElementById('voice-embedding-engine')
         ? document.getElementById('voice-embedding-engine').value
         : ((adminSiteConfig.voice_embedding || {}).engine || 'local'),
+      api_model: String(document.getElementById('voice-embedding-api-model')?.value || 'text-embedding-3-small').trim() || 'text-embedding-3-small',
+      local_model_name: String(document.getElementById('voice-embedding-local-model')?.value || 'BAAI/bge-small-zh-v1.5').trim() || 'BAAI/bge-small-zh-v1.5',
     },
     knowledge_ingestion: {
       user_preview_enabled: Boolean(knowledgePreviewToggle && knowledgePreviewToggle.checked),
@@ -12074,6 +12128,7 @@ async function saveSiteConfig() {
         model_name: String(model.model_name || ''),
         base_url: String(model.base_url || ''),
         api_key: String(model.api_key || ''),
+        clear_api_key: model.clear_api_key === true,
         purpose: String(model.purpose || 'general'),
         enabled: model.enabled !== false,
       })),

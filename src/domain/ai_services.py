@@ -21,27 +21,16 @@ def get_platform_short_name(site_config=None):
 
 def get_voice_transcription_config(site_config=None):
     config = site_config or get_site_config()
-    section = config.get("voice_transcription") if isinstance(config, dict) else {}
-    engine = str((section or {}).get("engine") or "local").strip().lower()
-    if engine not in {"local", "api"}:
-        engine = "local"
-    post_process_mode = str((section or {}).get("post_process_mode") or "rule_based").strip().lower()
-    if post_process_mode not in {"none", "rule_based"}:
-        post_process_mode = "rule_based"
-    return {
-        "engine": engine,
-        "post_process_mode": post_process_mode,
-        "domain_glossary_enabled": (section or {}).get("domain_glossary_enabled", True) is not False,
-    }
+    return normalize_voice_transcription_config(
+        config.get("voice_transcription") if isinstance(config, dict) else {}
+    )
 
 
 def get_voice_embedding_config(site_config=None):
     config = site_config or get_site_config()
-    section = config.get("voice_embedding") if isinstance(config, dict) else {}
-    engine = str((section or {}).get("engine") or "local").strip().lower()
-    if engine not in {"local", "api"}:
-        engine = "local"
-    return {"engine": engine}
+    return normalize_voice_embedding_config(
+        config.get("voice_embedding") if isinstance(config, dict) else {}
+    )
 
 
 def get_evidence_chain_config(site_config=None):
@@ -101,10 +90,7 @@ def get_default_llm_config(site_config=None, purpose="general", feature_code="")
 
 
 def _normalize_openai_compatible_base_url(base_url):
-    normalized = str(base_url or "").strip().rstrip("/")
-    if not normalized:
-        normalized = OPENAI_BASE_URL
-    return normalized.rstrip("/")
+    return str(base_url or "").strip().rstrip("/")
 
 
 def _extract_llm_text_content(content):
@@ -210,10 +196,12 @@ def call_openai_compatible_llm(
     model_name = str(config.get("model_name") or "").strip()
     if not model_name:
         raise RuntimeError("llm_model_name_missing")
-    api_key = str(config.get("api_key") or "").strip() or OPENAI_API_KEY
+    api_key = str(config.get("api_key") or "").strip() or get_llm_api_key(config.get("key"))
     if not api_key:
         raise RuntimeError("llm_api_key_missing")
     endpoint_base = _normalize_openai_compatible_base_url(config.get("base_url"))
+    if not endpoint_base:
+        raise RuntimeError("llm_base_url_missing")
     request_started = time.perf_counter()
     system_text = str(system_prompt or "").strip()
     user_text = str(user_prompt or "").strip()
@@ -1796,35 +1784,44 @@ def _write_temp_audio_file(audio_bytes, filename):
     return temp_path
 
 
-def _load_local_whisper_model():
-    cached = g.get("local_whisper_model")
+def _load_local_whisper_model(transcription_cfg=None):
+    config = transcription_cfg or get_voice_transcription_config()
+    cache_key = "local_whisper_model:" + "|".join([
+        str(config.get("local_model_size") or ""),
+        str(config.get("local_device") or ""),
+        str(config.get("local_compute_type") or ""),
+    ])
+    cached = g.get(cache_key)
     if cached is not None:
         return cached
     if WhisperModel is None:
         raise RuntimeError("local_transcriber_dependency_missing")
     try:
         model = WhisperModel(
-            LOCAL_WHISPER_MODEL_SIZE,
-            device=LOCAL_WHISPER_DEVICE,
-            compute_type=LOCAL_WHISPER_COMPUTE_TYPE,
+            config["local_model_size"],
+            device=config["local_device"],
+            compute_type=config["local_compute_type"],
         )
     except Exception as exc:
         raise RuntimeError(f"local_transcriber_init_failed:{exc}") from exc
-    g.local_whisper_model = model
+    g[cache_key] = model
     return model
 
 
-def _load_local_embedding_model():
-    cached = g.get("local_embedding_model")
+def _load_local_embedding_model(embedding_cfg=None):
+    config = embedding_cfg or get_voice_embedding_config()
+    model_name = str(config.get("local_model_name") or "").strip()
+    cache_key = f"local_embedding_model:{model_name}"
+    cached = g.get(cache_key)
     if cached is not None:
         return cached
     if SentenceTransformer is None:
         raise RuntimeError("local_embedding_dependency_missing")
     try:
-        model = SentenceTransformer(LOCAL_EMBEDDING_MODEL_NAME)
+        model = SentenceTransformer(model_name)
     except Exception as exc:
         raise RuntimeError(f"local_embedding_init_failed:{exc}") from exc
-    g.local_embedding_model = model
+    g[cache_key] = model
     return model
 
 
@@ -1940,15 +1937,28 @@ def _ensure_review_voice_vector_table(conn):
     return has_pgvector
 
 
-def _transcribe_audio_with_python(audio_bytes, filename, content_type):
-    if not OPENAI_API_KEY:
-        raise RuntimeError("openai_api_key_missing")
+def _get_external_feature_model(feature_code):
+    model = get_default_llm_config(purpose="general", feature_code=feature_code)
+    if not model:
+        raise RuntimeError(f"feature_model_not_configured:{feature_code}")
+    api_key = get_llm_api_key(model.get("key"))
+    if not api_key:
+        raise RuntimeError(f"feature_model_api_key_missing:{feature_code}")
+    base_url = _normalize_openai_compatible_base_url(model.get("base_url"))
+    if not base_url:
+        raise RuntimeError(f"feature_model_base_url_missing:{feature_code}")
+    return model, api_key, base_url
+
+
+def _transcribe_audio_with_python(audio_bytes, filename, content_type, transcription_cfg=None):
+    config = transcription_cfg or get_voice_transcription_config()
+    _model, api_key, base_url = _get_external_feature_model("voice_transcription_api")
     response = requests.post(
-        f"{OPENAI_BASE_URL}/audio/transcriptions",
-        headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+        f"{base_url}/audio/transcriptions",
+        headers={"Authorization": f"Bearer {api_key}"},
         data={
-            "model": OPENAI_AUDIO_MODEL,
-            "language": OPENAI_AUDIO_LANGUAGE,
+            "model": config["api_model"],
+            "language": config["api_language"],
             "response_format": "json",
             "prompt": "请尽量按原意转写中文金融复盘口述，保留主线、个股、风险提示和验证节点。",
         },
@@ -1964,13 +1974,14 @@ def _transcribe_audio_with_python(audio_bytes, filename, content_type):
     return transcript
 
 
-def _transcribe_audio_locally(audio_bytes, filename):
+def _transcribe_audio_locally(audio_bytes, filename, transcription_cfg=None):
+    config = transcription_cfg or get_voice_transcription_config()
     temp_path = _write_temp_audio_file(audio_bytes, filename)
     try:
-        model = _load_local_whisper_model()
+        model = _load_local_whisper_model(config)
         segments, _info = model.transcribe(
             str(temp_path),
-            language=OPENAI_AUDIO_LANGUAGE or "zh",
+            language=config["api_language"] or "zh",
             vad_filter=True,
             beam_size=5,
         )
@@ -1990,26 +2001,30 @@ def _transcribe_audio_locally(audio_bytes, filename):
 
 
 def transcribe_review_audio(audio_bytes, filename, content_type, engine="local"):
+    config = get_voice_transcription_config()
     normalized_engine = str(engine or "local").strip().lower()
     if normalized_engine == "local":
-        return _transcribe_audio_locally(audio_bytes, filename), "local"
+        return _transcribe_audio_locally(audio_bytes, filename, config), "local"
     if normalized_engine == "api":
-        return _transcribe_audio_with_python(audio_bytes, filename, content_type), "api"
+        return _transcribe_audio_with_python(audio_bytes, filename, content_type, config), "api"
     raise RuntimeError("unsupported_transcription_engine")
 
 
 def _build_text_embedding_with_api(text, feature_code="", feature_label="", tenant_slug="", entry_point="", metadata=None):
-    if not OPENAI_API_KEY:
-        raise RuntimeError("openai_api_key_missing")
+    config = get_voice_embedding_config()
+    model_config, api_key, base_url = _get_external_feature_model("embedding_api")
+    model_name = str(config.get("api_model") or model_config.get("model_name") or "").strip()
+    if not model_name:
+        raise RuntimeError("embedding_model_name_missing")
     request_started = time.perf_counter()
     response = requests.post(
-        f"{OPENAI_BASE_URL}/embeddings",
+        f"{base_url}/embeddings",
         headers={
-            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         },
         json={
-            "model": OPENAI_EMBEDDING_MODEL,
+            "model": model_name,
             "input": text,
         },
         timeout=120,
@@ -2035,7 +2050,7 @@ def _build_text_embedding_with_api(text, feature_code="", feature_label="", tena
         tenant_slug=tenant_slug,
         entry_point=entry_point,
         model_provider="openai_compatible",
-        model_name=OPENAI_EMBEDDING_MODEL,
+        model_name=model_name,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         total_tokens=total_tokens,
@@ -2063,7 +2078,8 @@ def _build_text_embedding_locally(text):
 def build_text_embedding(text, engine="api", feature_code="", feature_label="", tenant_slug="", entry_point="", metadata=None):
     normalized_engine = str(engine or "api").strip().lower()
     if normalized_engine == "local":
-        return _build_text_embedding_locally(text), "local", LOCAL_EMBEDDING_MODEL_NAME
+        local_model_name = get_voice_embedding_config().get("local_model_name")
+        return _build_text_embedding_locally(text), "local", local_model_name
     if normalized_engine == "api":
         return _build_text_embedding_with_api(
             text,
@@ -2072,7 +2088,7 @@ def build_text_embedding(text, engine="api", feature_code="", feature_label="", 
             tenant_slug=tenant_slug,
             entry_point=entry_point,
             metadata=metadata,
-        ), "api", OPENAI_EMBEDDING_MODEL
+        ), "api", get_voice_embedding_config().get("api_model")
     raise RuntimeError("unsupported_embedding_engine")
 
 
@@ -9371,7 +9387,11 @@ def process_review_voice_upload(file_storage, tenant_slug="", review_period="", 
         content_type=content_type,
         engine=transcription_cfg.get("engine", "local"),
     )
-    transcript_model = LOCAL_WHISPER_MODEL_SIZE if transcript_engine == "local" else OPENAI_AUDIO_MODEL
+    transcript_model = (
+        transcription_cfg.get("local_model_size")
+        if transcript_engine == "local"
+        else transcription_cfg.get("api_model")
+    )
     raw_transcript = str(transcript or "").strip()
     cleaned_transcript = raw_transcript
     cleanup_mode = "none"

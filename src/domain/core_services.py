@@ -290,6 +290,7 @@ def normalize_auth_settings_config(source=None):
             "default_role": default_role,
             "default_tenant_slug": str(wechat_raw.get("default_tenant_slug") or wechat_defaults.get("default_tenant_slug") or "").strip().lower(),
             "default_advisor_name": str(wechat_raw.get("default_advisor_name") or wechat_defaults.get("default_advisor_name") or "").strip(),
+            "clear_app_secret": bool(wechat_raw.get("clear_app_secret", False)),
         },
     }
 
@@ -298,6 +299,34 @@ def normalize_knowledge_ingestion_config(source=None):
     raw = source if isinstance(source, dict) else {}
     return {
         "user_preview_enabled": bool(raw.get("user_preview_enabled", False)),
+    }
+
+
+def normalize_voice_transcription_config(source=None):
+    raw = source if isinstance(source, dict) else {}
+    defaults = copy.deepcopy(DEFAULT_SITE_CONFIG["voice_transcription"])
+    engine = str(raw.get("engine") or defaults["engine"]).strip().lower()
+    post_process_mode = str(raw.get("post_process_mode") or defaults["post_process_mode"]).strip().lower()
+    return {
+        "engine": engine if engine in {"local", "api"} else "local",
+        "post_process_mode": post_process_mode if post_process_mode in {"none", "rule_based"} else "rule_based",
+        "domain_glossary_enabled": raw.get("domain_glossary_enabled", defaults["domain_glossary_enabled"]) is not False,
+        "api_model": str(raw.get("api_model") or defaults["api_model"]).strip() or defaults["api_model"],
+        "api_language": str(raw.get("api_language") or defaults["api_language"]).strip() or defaults["api_language"],
+        "local_model_size": str(raw.get("local_model_size") or defaults["local_model_size"]).strip() or defaults["local_model_size"],
+        "local_device": str(raw.get("local_device") or defaults["local_device"]).strip() or defaults["local_device"],
+        "local_compute_type": str(raw.get("local_compute_type") or defaults["local_compute_type"]).strip() or defaults["local_compute_type"],
+    }
+
+
+def normalize_voice_embedding_config(source=None):
+    raw = source if isinstance(source, dict) else {}
+    defaults = copy.deepcopy(DEFAULT_SITE_CONFIG["voice_embedding"])
+    engine = str(raw.get("engine") or defaults["engine"]).strip().lower()
+    return {
+        "engine": engine if engine in {"local", "api"} else "local",
+        "api_model": str(raw.get("api_model") or defaults["api_model"]).strip() or defaults["api_model"],
+        "local_model_name": str(raw.get("local_model_name") or defaults["local_model_name"]).strip() or defaults["local_model_name"],
     }
 
 
@@ -3156,11 +3185,14 @@ def normalize_site_config(source=None):
     merged = _merge_site_config(copy.deepcopy(DEFAULT_SITE_CONFIG), source or {})
     merged["brand"] = normalize_brand_config(merged.get("brand"))
     merged["auth_settings"] = normalize_auth_settings_config(merged.get("auth_settings"))
+    merged["auth_settings"] = strip_auth_settings_secret(merged["auth_settings"])
+    merged["voice_transcription"] = normalize_voice_transcription_config(merged.get("voice_transcription"))
+    merged["voice_embedding"] = normalize_voice_embedding_config(merged.get("voice_embedding"))
     merged["knowledge_ingestion"] = normalize_knowledge_ingestion_config(merged.get("knowledge_ingestion"))
     merged["hermes_settings"] = normalize_hermes_settings_config(merged.get("hermes_settings"))
     merged["evidence_chain"] = normalize_evidence_chain_config(merged.get("evidence_chain"))
     merged["review_generation"] = normalize_review_generation_config(merged.get("review_generation"))
-    merged["llm_registry"] = normalize_llm_registry_config(merged.get("llm_registry"))
+    merged["llm_registry"] = strip_llm_registry_api_keys(merged.get("llm_registry"))
     merged["tenants"] = normalize_tenant_configs(merged.get("tenants"))
     tenant_slugs = [tenant["slug"] for tenant in merged["tenants"]]
     default_tenant_slug = str(merged.get("default_tenant_slug", "") or "").strip()
@@ -3258,8 +3290,10 @@ def build_h5_user_onboarding_payload(user=None):
 H5_PROFILE_SETTINGS_PREFIX = "h5_profile_settings:"
 TENANT_FAN_OPS_SETTINGS_PREFIX = "tenant_fan_ops_settings:"
 AUTH_WECHAT_SECRET_SETTING_KEY = "auth_settings:wechat_app_secret"
+AUTH_WECHAT_CREDENTIAL_SETTING_KEY = "auth_credentials:wechat:v1"
 GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY = "gangtise_openapi_credentials:v1"
 GANGTISE_OPENAPI_DEFAULT_BASE_URL = "https://openapi.gangtise.com"
+LLM_API_CREDENTIAL_SETTING_KEY = "llm_api_credentials:v1"
 
 
 def _load_json_app_setting(setting_key, default_value=None):
@@ -3352,6 +3386,30 @@ def _gangtise_openapi_credential_fernet():
     return Fernet(derived_key)
 
 
+def _load_encrypted_app_setting(setting_key, default_value=None):
+    fallback = copy.deepcopy(default_value)
+    envelope = _load_json_app_setting(setting_key, {})
+    ciphertext = str((envelope or {}).get("ciphertext") or "").strip()
+    if not ciphertext:
+        return fallback
+    try:
+        raw = _gangtise_openapi_credential_fernet().decrypt(ciphertext.encode("ascii"))
+        decoded = json.loads(raw.decode("utf-8"))
+        return decoded if isinstance(decoded, type(fallback)) else fallback
+    except (InvalidToken, UnicodeDecodeError, ValueError, TypeError, json.JSONDecodeError):
+        app.logger.error("Encrypted application credential record cannot be decrypted: %s", setting_key)
+    except Exception:
+        app.logger.exception("Failed to load encrypted application credential record: %s", setting_key)
+    return fallback
+
+
+def _save_encrypted_app_setting(setting_key, payload):
+    ciphertext = _gangtise_openapi_credential_fernet().encrypt(
+        json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii")
+    _save_json_app_setting(setting_key, {"version": 1, "ciphertext": ciphertext})
+
+
 def _normalize_gangtise_openapi_credentials(payload=None):
     source = payload if isinstance(payload, dict) else {}
     return {
@@ -3362,21 +3420,16 @@ def _normalize_gangtise_openapi_credentials(payload=None):
     }
 
 
+def _normalize_wechat_credentials(payload=None):
+    source = payload if isinstance(payload, dict) else {}
+    return {"app_secret": str(source.get("app_secret") or "").strip()}
+
+
 def load_gangtise_openapi_credentials():
     """Load decrypted Gangtise credentials from PostgreSQL; never expose this payload to a response."""
-    envelope = _load_json_app_setting(GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY, {})
-    ciphertext = str((envelope or {}).get("ciphertext") or "").strip()
-    if not ciphertext:
-        return {}
-    try:
-        raw = _gangtise_openapi_credential_fernet().decrypt(ciphertext.encode("ascii"))
-        decoded = json.loads(raw.decode("utf-8"))
-        return _normalize_gangtise_openapi_credentials(decoded)
-    except (InvalidToken, UnicodeDecodeError, ValueError, TypeError, json.JSONDecodeError):
-        app.logger.error("Gangtise OpenAPI credential record cannot be decrypted; check GANGTISE_DEMO_SECRET_KEY continuity")
-    except Exception:
-        app.logger.exception("Failed to load encrypted Gangtise OpenAPI credentials")
-    return {}
+    return _normalize_gangtise_openapi_credentials(
+        _load_encrypted_app_setting(GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY, {})
+    )
 
 
 def get_gangtise_openapi_credentials_status():
@@ -3420,27 +3473,142 @@ def save_gangtise_openapi_credentials_patch(payload=None):
         raise ValueError("gangtise_access_key_and_secret_key_must_be_configured_together")
     if not has_pair and not merged["long_token"]:
         raise ValueError("gangtise_credentials_required")
-    ciphertext = _gangtise_openapi_credential_fernet().encrypt(
-        json.dumps(merged, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-    ).decode("ascii")
-    _save_json_app_setting(
-        GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY,
-        {"version": 1, "ciphertext": ciphertext},
-    )
+    _save_encrypted_app_setting(GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY, merged)
     return get_gangtise_openapi_credentials_status()
 
 
+def load_llm_api_credentials():
+    """Load API keys indexed by model key. This never reaches a public payload."""
+    raw = _load_encrypted_app_setting(LLM_API_CREDENTIAL_SETTING_KEY, {})
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        str(model_key or "").strip(): str(api_key or "").strip()
+        for model_key, api_key in raw.items()
+        if str(model_key or "").strip() and str(api_key or "").strip()
+    }
+
+
+def get_llm_api_key(model_key):
+    return str(load_llm_api_credentials().get(str(model_key or "").strip()) or "").strip()
+
+
+def save_llm_api_credentials_patch(models, prune_missing=False):
+    """Persist entered model API keys encrypted; blank inputs preserve existing keys."""
+    credentials = load_llm_api_credentials()
+    valid_model_keys = set()
+    for raw_model in models if isinstance(models, list) else []:
+        model = raw_model if isinstance(raw_model, dict) else {}
+        model_key = str(model.get("key") or "").strip()
+        if not model_key:
+            continue
+        valid_model_keys.add(model_key)
+        if bool(model.get("clear_api_key")):
+            credentials.pop(model_key, None)
+            continue
+        api_key = str(model.get("api_key") or "").strip()
+        if api_key:
+            credentials[model_key] = api_key
+    if prune_missing:
+        credentials = {key: value for key, value in credentials.items() if key in valid_model_keys}
+    _save_encrypted_app_setting(LLM_API_CREDENTIAL_SETTING_KEY, credentials)
+    return credentials
+
+
+def strip_llm_registry_api_keys(registry, include_status=False):
+    """Keep model metadata in site_config while keeping keys only in the encrypted credential record."""
+    normalized = normalize_llm_registry_config(registry)
+    credentials = load_llm_api_credentials() if include_status else {}
+    for model in normalized.get("models") or []:
+        model_key = str(model.get("key") or "").strip()
+        model["api_key"] = ""
+        model.pop("clear_api_key", None)
+        if include_status:
+            model["api_key_configured"] = bool(credentials.get(model_key))
+    return normalized
+
+
+def migrate_legacy_llm_api_keys_to_encrypted_store():
+    """One-time in-place migration for historic plaintext site_config model keys."""
+    stored = _load_json_app_setting(SITE_CONFIG_KEY, {})
+    registry = stored.get("llm_registry") if isinstance(stored, dict) else {}
+    models = registry.get("models") if isinstance(registry, dict) else []
+    if not isinstance(models, list) or not any(str((item or {}).get("api_key") or "").strip() for item in models if isinstance(item, dict)):
+        return False
+    save_llm_api_credentials_patch(models)
+    next_config = copy.deepcopy(stored)
+    next_config["llm_registry"] = strip_llm_registry_api_keys(registry)
+    _save_json_app_setting(SITE_CONFIG_KEY, normalize_site_config(next_config))
+    g.pop("site_config", None)
+    app.logger.info("Migrated legacy LLM API keys from site_config to encrypted PostgreSQL credentials")
+    return True
+
+
 def load_auth_wechat_secret():
-    return _load_text_app_setting(AUTH_WECHAT_SECRET_SETTING_KEY, "")
+    credentials = _normalize_wechat_credentials(
+        _load_encrypted_app_setting(AUTH_WECHAT_CREDENTIAL_SETTING_KEY, {})
+    )
+    return credentials["app_secret"]
 
 
-def save_auth_wechat_secret(secret):
-    return _save_text_app_setting(AUTH_WECHAT_SECRET_SETTING_KEY, str(secret or "").strip())
+def get_auth_wechat_secret_status():
+    secret = load_auth_wechat_secret()
+    row = None
+    try:
+        row = get_db().execute(
+            "SELECT updated_at FROM app_settings WHERE setting_key = ?",
+            (AUTH_WECHAT_CREDENTIAL_SETTING_KEY,),
+        ).fetchone()
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+    return {
+        "app_secret_configured": bool(secret),
+        "credential_stored_in_postgres": bool(secret),
+        "credential_updated_at": str((row or {}).get("updated_at") or ""),
+    }
+
+
+def save_auth_wechat_secret_patch(secret="", clear=False):
+    current = _normalize_wechat_credentials(
+        _load_encrypted_app_setting(AUTH_WECHAT_CREDENTIAL_SETTING_KEY, {})
+    )
+    normalized_secret = str(secret or "").strip()
+    if clear:
+        current["app_secret"] = ""
+    elif normalized_secret:
+        current["app_secret"] = normalized_secret
+    _save_encrypted_app_setting(AUTH_WECHAT_CREDENTIAL_SETTING_KEY, current)
+    return get_auth_wechat_secret_status()
+
+
+def migrate_legacy_wechat_secret_to_encrypted_store():
+    """Move the historic plaintext WeChat secret out of site settings once."""
+    if load_auth_wechat_secret():
+        return False
+    legacy_secret = _load_text_app_setting(AUTH_WECHAT_SECRET_SETTING_KEY, "").strip()
+    stored_site_config = _load_json_app_setting(SITE_CONFIG_KEY, {})
+    stored_auth = stored_site_config.get("auth_settings") if isinstance(stored_site_config, dict) else {}
+    stored_wechat = stored_auth.get("wechat") if isinstance(stored_auth, dict) else {}
+    legacy_site_secret = str((stored_wechat or {}).get("app_secret") or "").strip()
+    legacy_secret = legacy_secret or legacy_site_secret
+    if not legacy_secret:
+        return False
+    save_auth_wechat_secret_patch(legacy_secret)
+    _save_text_app_setting(AUTH_WECHAT_SECRET_SETTING_KEY, "")
+    if legacy_site_secret:
+        next_config = copy.deepcopy(stored_site_config)
+        next_config.setdefault("auth_settings", {}).setdefault("wechat", {})["app_secret"] = ""
+        _save_json_app_setting(SITE_CONFIG_KEY, normalize_site_config(next_config))
+        g.pop("site_config", None)
+    app.logger.info("Migrated legacy WeChat app secret to encrypted PostgreSQL credentials")
+    return True
 
 
 def strip_auth_settings_secret(payload=None):
     normalized = normalize_auth_settings_config(payload)
     normalized["wechat"]["app_secret"] = ""
+    normalized["wechat"].pop("clear_app_secret", None)
     return normalized
 
 
@@ -5665,7 +5833,9 @@ def reset_request_runtime_state():
 
 def build_admin_site_config_payload(site_config=None):
     payload = copy.deepcopy(site_config or get_site_config())
-    payload["auth_settings"] = get_auth_settings(payload, include_secret=True)
+    payload["auth_settings"] = get_auth_settings(payload, include_secret=False)
+    payload["auth_settings"]["wechat"].update(get_auth_wechat_secret_status())
+    payload["llm_registry"] = strip_llm_registry_api_keys(payload.get("llm_registry"), include_status=True)
     runtime_target = get_runtime_db_target()
     payload["db_runtime"] = {
         "use_staging": runtime_target.get("use_staging", False),
@@ -6138,6 +6308,8 @@ def startup_bootstrap():
         init_db_safe()
     try:
         with app.app_context():
+            migrate_legacy_llm_api_keys_to_encrypted_store()
+            migrate_legacy_wechat_secret_to_encrypted_store()
             seed_result = ensure_default_users()
             if seed_result["created"]:
                 app.logger.info("Seeded %s default users into app database", len(seed_result["created"]))
@@ -7174,6 +7346,9 @@ def get_site_config():
 
 
 def save_site_config(config):
+    raw_registry = (config or {}).get("llm_registry") if isinstance(config, dict) else None
+    if isinstance(raw_registry, dict):
+        save_llm_api_credentials_patch(raw_registry.get("models"), prune_missing=False)
     merged = normalize_site_config(config)
     db = get_db()
     db.execute(
