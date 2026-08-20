@@ -3289,7 +3289,6 @@ def build_h5_user_onboarding_payload(user=None):
 
 H5_PROFILE_SETTINGS_PREFIX = "h5_profile_settings:"
 TENANT_FAN_OPS_SETTINGS_PREFIX = "tenant_fan_ops_settings:"
-AUTH_WECHAT_SECRET_SETTING_KEY = "auth_settings:wechat_app_secret"
 AUTH_WECHAT_CREDENTIAL_SETTING_KEY = "auth_credentials:wechat:v1"
 GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY = "gangtise_openapi_credentials:v1"
 GANGTISE_OPENAPI_DEFAULT_BASE_URL = "https://openapi.gangtise.com"
@@ -3319,22 +3318,6 @@ def _load_json_app_setting(setting_key, default_value=None):
     return fallback
 
 
-def _load_text_app_setting(setting_key, default_value=""):
-    fallback = str(default_value or "")
-    try:
-        row = get_db().execute(
-            "SELECT setting_value FROM app_settings WHERE setting_key = ?",
-            (setting_key,),
-        ).fetchone()
-    except Exception as exc:
-        if is_db_unavailable_error(exc):
-            return fallback
-        raise
-    if not row:
-        return fallback
-    return str(row["setting_value"] or fallback)
-
-
 def _save_json_app_setting(setting_key, payload):
     db = get_db()
     db.execute(
@@ -3353,26 +3336,6 @@ def _save_json_app_setting(setting_key, payload):
     )
     db.commit()
     return copy.deepcopy(payload)
-
-
-def _save_text_app_setting(setting_key, value):
-    db = get_db()
-    db.execute(
-        """
-        INSERT INTO app_settings (setting_key, setting_value, updated_at)
-        VALUES (?, ?, ?)
-        ON CONFLICT(setting_key) DO UPDATE SET
-            setting_value = excluded.setting_value,
-            updated_at = excluded.updated_at
-        """,
-        (
-            setting_key,
-            str(value or ""),
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        ),
-    )
-    db.commit()
-    return str(value or "")
 
 
 def _gangtise_openapi_credential_fernet():
@@ -3430,38 +3393,6 @@ def load_gangtise_openapi_credentials():
     return _normalize_gangtise_openapi_credentials(
         _load_encrypted_app_setting(GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY, {})
     )
-
-
-def migrate_legacy_gangtise_openapi_credentials_to_encrypted_store():
-    """One-time migration from the protected legacy runtime file into PostgreSQL.
-
-    `start_daemon_app.sh` historically loads `/root/gangtise_openapi_credentials`
-    into this process. It remains a migration source only: normal market-data
-    requests continue to read exclusively from the encrypted PostgreSQL record.
-    """
-    existing = load_gangtise_openapi_credentials()
-    existing_ready = bool(existing.get("access_key") and existing.get("secret_key")) or bool(existing.get("long_token"))
-    if existing_ready:
-        return False
-
-    legacy = _normalize_gangtise_openapi_credentials(
-        {
-            "base_url": os.environ.get("GANGTISE_API_BASE_URL"),
-            "access_key": os.environ.get("GANGTISE_ACCESS_KEY"),
-            "secret_key": os.environ.get("GANGTISE_SECRET_KEY"),
-            "long_token": os.environ.get("GANGTISE_LONG_TOKEN"),
-        }
-    )
-    has_pair = bool(legacy["access_key"] and legacy["secret_key"])
-    if not has_pair and not legacy["long_token"]:
-        return False
-    if bool(legacy["access_key"]) != bool(legacy["secret_key"]) and not legacy["long_token"]:
-        app.logger.warning("Skipped incomplete legacy Gangtise credential migration")
-        return False
-
-    _save_encrypted_app_setting(GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY, legacy)
-    app.logger.info("Migrated legacy Gangtise OpenAPI credentials into encrypted PostgreSQL storage")
-    return True
 
 
 def get_gangtise_openapi_credentials_status():
@@ -3560,22 +3491,6 @@ def strip_llm_registry_api_keys(registry, include_status=False):
     return normalized
 
 
-def migrate_legacy_llm_api_keys_to_encrypted_store():
-    """One-time in-place migration for historic plaintext site_config model keys."""
-    stored = _load_json_app_setting(SITE_CONFIG_KEY, {})
-    registry = stored.get("llm_registry") if isinstance(stored, dict) else {}
-    models = registry.get("models") if isinstance(registry, dict) else []
-    if not isinstance(models, list) or not any(str((item or {}).get("api_key") or "").strip() for item in models if isinstance(item, dict)):
-        return False
-    save_llm_api_credentials_patch(models)
-    next_config = copy.deepcopy(stored)
-    next_config["llm_registry"] = strip_llm_registry_api_keys(registry)
-    _save_json_app_setting(SITE_CONFIG_KEY, normalize_site_config(next_config))
-    g.pop("site_config", None)
-    app.logger.info("Migrated legacy LLM API keys from site_config to encrypted PostgreSQL credentials")
-    return True
-
-
 def load_auth_wechat_secret():
     credentials = _normalize_wechat_credentials(
         _load_encrypted_app_setting(AUTH_WECHAT_CREDENTIAL_SETTING_KEY, {})
@@ -3612,29 +3527,6 @@ def save_auth_wechat_secret_patch(secret="", clear=False):
         current["app_secret"] = normalized_secret
     _save_encrypted_app_setting(AUTH_WECHAT_CREDENTIAL_SETTING_KEY, current)
     return get_auth_wechat_secret_status()
-
-
-def migrate_legacy_wechat_secret_to_encrypted_store():
-    """Move the historic plaintext WeChat secret out of site settings once."""
-    if load_auth_wechat_secret():
-        return False
-    legacy_secret = _load_text_app_setting(AUTH_WECHAT_SECRET_SETTING_KEY, "").strip()
-    stored_site_config = _load_json_app_setting(SITE_CONFIG_KEY, {})
-    stored_auth = stored_site_config.get("auth_settings") if isinstance(stored_site_config, dict) else {}
-    stored_wechat = stored_auth.get("wechat") if isinstance(stored_auth, dict) else {}
-    legacy_site_secret = str((stored_wechat or {}).get("app_secret") or "").strip()
-    legacy_secret = legacy_secret or legacy_site_secret
-    if not legacy_secret:
-        return False
-    save_auth_wechat_secret_patch(legacy_secret)
-    _save_text_app_setting(AUTH_WECHAT_SECRET_SETTING_KEY, "")
-    if legacy_site_secret:
-        next_config = copy.deepcopy(stored_site_config)
-        next_config.setdefault("auth_settings", {}).setdefault("wechat", {})["app_secret"] = ""
-        _save_json_app_setting(SITE_CONFIG_KEY, normalize_site_config(next_config))
-        g.pop("site_config", None)
-    app.logger.info("Migrated legacy WeChat app secret to encrypted PostgreSQL credentials")
-    return True
 
 
 def strip_auth_settings_secret(payload=None):
@@ -6340,9 +6232,6 @@ def startup_bootstrap():
         init_db_safe()
     try:
         with app.app_context():
-            migrate_legacy_gangtise_openapi_credentials_to_encrypted_store()
-            migrate_legacy_llm_api_keys_to_encrypted_store()
-            migrate_legacy_wechat_secret_to_encrypted_store()
             seed_result = ensure_default_users()
             if seed_result["created"]:
                 app.logger.info("Seeded %s default users into app database", len(seed_result["created"]))
