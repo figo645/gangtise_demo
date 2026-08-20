@@ -927,6 +927,37 @@ def api_admin_market_data_diagnostic():
         return jsonify({"ok": False, "error": "market_data_diagnostic_failed", "detail": str(exc)}), 502
 
 
+@app.route("/api/admin/gangtise-credentials", methods=["GET", "POST"])
+def api_admin_gangtise_credentials():
+    """Manage encrypted Gangtise credentials without returning secret values to the browser."""
+    if request.method == "GET":
+        return jsonify({"ok": True, "credentials": get_gangtise_openapi_credentials_status()})
+    try:
+        status = save_gangtise_openapi_credentials_patch(request.get_json(silent=True) or {})
+        invalidate_gangtise_openapi_token_cache()
+        return jsonify({"ok": True, "credentials": status})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception:
+        app.logger.exception("Unable to save encrypted Gangtise OpenAPI credentials")
+        return jsonify({"ok": False, "error": "gangtise_credentials_save_failed"}), 500
+
+
+@app.route("/api/admin/gangtise-credentials/diagnose", methods=["POST"])
+def api_admin_gangtise_credentials_diagnose():
+    body = request.get_json(silent=True) or {}
+    probe_security_code = str(body.get("security_code") or "601988.SH").strip().upper()
+    if not probe_security_code or len(probe_security_code) > 32 or any(
+        char not in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-" for char in probe_security_code
+    ):
+        return jsonify({"ok": False, "error": "invalid_security_code"}), 400
+    try:
+        return jsonify({"ok": True, "diagnostic": build_gangtise_market_runtime_diagnostic(probe_security_code)})
+    except Exception:
+        app.logger.exception("Unable to diagnose encrypted Gangtise OpenAPI credentials")
+        return jsonify({"ok": False, "error": "gangtise_credentials_diagnostic_failed"}), 502
+
+
 @app.route("/api/admin/database-release/unlock", methods=["POST"])
 def api_admin_unlock_database_release():
     payload = request.get_json(silent=True) or {}

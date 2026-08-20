@@ -536,12 +536,10 @@ def gen_macro_indicators():
 
 GANGTISE_OPENAPI_SUCCESS_CODE = "000000"
 GANGTISE_OPENAPI_LOGIN_PATH = "/application/auth/oauth/open/loginV2"
-_gangtise_env_loaded = False
 _gangtise_token_lock = threading.Lock()
 _gangtise_token_cache = {"token": "", "fetched_at": 0.0}
 _intraday_fetch_locks = {}
 _intraday_fetch_locks_guard = threading.Lock()
-GANGTISE_API_TEST_ENV_PATH = Path("/Users/xuchenfei/PycharmProjects/gangtise_api_test/.env")
 
 GANGTISE_INDICATOR_REGISTRY = {
     "source_shanghai_index": {
@@ -742,41 +740,26 @@ GANGTISE_INDICATOR_REGISTRY = {
 }
 
 
-def _load_gangtise_env_file(env_path):
-    path = Path(env_path)
-    if not path.exists():
-        return False
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = str(raw_line or "").strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip())
-    return True
-
-
-def _ensure_gangtise_env_loaded():
-    global _gangtise_env_loaded
-    if _gangtise_env_loaded:
-        return
-    try:
-        # Keep the loading style aligned with gangtise_api_test: parse .env directly and
-        # populate runtime env vars without introducing an extra dependency.
-        _load_gangtise_env_file(PROJECT_ROOT / ".env")
-        _load_gangtise_env_file(GANGTISE_API_TEST_ENV_PATH)
-    except Exception:
-        app.logger.exception("Failed to load .env for Gangtise OpenAPI config")
-    _gangtise_env_loaded = True
-
-
 def get_gangtise_openapi_config():
-    _ensure_gangtise_env_loaded()
+    database_credentials = load_gangtise_openapi_credentials()
+    if database_credentials and (
+        (database_credentials.get("access_key") and database_credentials.get("secret_key"))
+        or database_credentials.get("long_token")
+    ):
+        return database_credentials
     return {
-        "base_url": str(os.getenv("GANGTISE_API_BASE_URL", "https://openapi.gangtise.com")).strip().rstrip("/"),
-        "access_key": str(os.getenv("GANGTISE_ACCESS_KEY", "")).strip(),
-        "secret_key": str(os.getenv("GANGTISE_SECRET_KEY", "")).strip(),
-        "long_token": str(os.getenv("GANGTISE_LONG_TOKEN", "")).strip(),
+        "base_url": GANGTISE_OPENAPI_DEFAULT_BASE_URL,
+        "access_key": "",
+        "secret_key": "",
+        "long_token": "",
     }
+
+
+def invalidate_gangtise_openapi_token_cache():
+    """Forget the previous bearer token after an Admin credential update."""
+    with _gangtise_token_lock:
+        _gangtise_token_cache["token"] = ""
+        _gangtise_token_cache["fetched_at"] = 0.0
 
 
 def _gangtise_request_json(path, payload, headers=None, timeout=30):
@@ -842,7 +825,7 @@ def obtain_gangtise_openapi_token(force_refresh=False):
                 _gangtise_token_cache["fetched_at"] = now_value
                 return True, token, response, status, duration
         if long_token:
-            return True, long_token, {"source": "GANGTISE_LONG_TOKEN"}, 200, 0
+            return True, long_token, {"source": "postgresql_credentials"}, 200, 0
         return False, "", {"message": "Gangtise OpenAPI token login failed."}, 0, 0
 
 
@@ -1166,7 +1149,7 @@ def build_gangtise_market_runtime_diagnostic(probe_security_code="600519.SH"):
         return {
             "ok": False,
             "status": "credentials_missing",
-            "message": "未检测到 Gangtise OpenAPI 凭证。生产环境需加载 GANGTISE_ACCESS_KEY 与 GANGTISE_SECRET_KEY，或 GANGTISE_LONG_TOKEN。",
+            "message": "未检测到 Gangtise OpenAPI 凭证。请在 Admin 的“市场数据 > Gangtise 数据连接”中保存 Access Key + Secret Key，或保存 Long Token。",
             "base_url": config.get("base_url"),
             "credential_mode": "missing",
             "probe": {},
@@ -1191,7 +1174,7 @@ def build_gangtise_market_runtime_diagnostic(probe_security_code="600519.SH"):
         diagnosis = "生产运行环境无法连接 Gangtise OpenAPI。请检查服务器 DNS、出网策略、防火墙和代理配置。"
     elif status_code in {401, 403} or "token" in message.lower() or "auth" in message.lower():
         status = "authentication_failed"
-        diagnosis = "Gangtise 凭证无效或已失效。请核对生产凭证文件后重启应用。"
+        diagnosis = "Gangtise 凭证无效或已失效。请在 Admin 的“市场数据 > Gangtise 数据连接”中核对并重新保存凭证。"
     else:
         status = "upstream_unavailable"
         diagnosis = "Gangtise 接口未返回可用日K数据。请根据 HTTP 状态和接口消息继续核对。"

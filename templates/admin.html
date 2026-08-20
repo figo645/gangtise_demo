@@ -4698,6 +4698,15 @@
                   </div>
                 </div>
                 <div class="admin-settings-menu-group">
+                  <div class="admin-settings-menu-label">市场数据</div>
+                  <div class="admin-settings-menu">
+                    <button class="admin-settings-menu-btn" type="button" data-settings-panel-trigger="market-data" onclick="openAdminSettingsSubmenu('market-data')">
+                      <div class="admin-settings-menu-title">Gangtise 数据连接</div>
+                      <div class="admin-settings-menu-copy">加密保存 OpenAPI 凭证，并用真实日 K 数据校验连接。</div>
+                    </button>
+                  </div>
+                </div>
+                <div class="admin-settings-menu-group">
                   <div class="admin-settings-menu-label">知识</div>
                   <div class="admin-settings-menu">
                     <button class="admin-settings-menu-btn" type="button" data-settings-panel-trigger="knowledge-source" onclick="openAdminSettingsSubmenu('knowledge-source')">
@@ -4827,6 +4836,52 @@
                     <div class="admin-settings-panel-note">系统登录策略和发布边界属于平台级规则，不建议放进业务页面里临时修改。</div>
                   </div>
                   <div id="settings-panel-login-access" class="admin-settings-mount"></div>
+                </section>
+
+                <section class="admin-settings-panel" data-settings-panel="market-data">
+                  <div class="admin-settings-panel-head">
+                    <div>
+                      <div class="admin-settings-panel-kicker">Market Data</div>
+                      <div class="admin-settings-panel-title">Gangtise OpenAPI 凭证</div>
+                      <div class="admin-settings-panel-desc">凭证以密文保存到当前 PostgreSQL 的 <code>app_settings</code>，不会写入公开站点配置、浏览器或日志。保存后新请求立即优先使用数据库凭证。</div>
+                    </div>
+                    <div class="admin-settings-panel-note">切换本地 / staging 数据库时，本页显示并保存对应数据库自己的凭证。</div>
+                  </div>
+                  <div class="config-grid">
+                    <div class="config-card">
+                      <div class="config-card-title">连接配置</div>
+                      <div class="config-field">
+                        <label>OpenAPI 地址</label>
+                        <input id="gangtise-credential-base-url" type="url" placeholder="https://openapi.gangtise.com" autocomplete="off">
+                      </div>
+                      <div class="config-field">
+                        <label>Access Key</label>
+                        <input id="gangtise-credential-access-key" type="password" placeholder="未配置；填写后保存" autocomplete="new-password">
+                      </div>
+                      <div class="config-field">
+                        <label>Secret Key</label>
+                        <input id="gangtise-credential-secret-key" type="password" placeholder="未配置；填写后保存" autocomplete="new-password">
+                      </div>
+                      <div class="config-field">
+                        <label>Long Token（可选）</label>
+                        <input id="gangtise-credential-long-token" type="password" placeholder="可作为 Access Key / Secret Key 的备用认证" autocomplete="new-password">
+                      </div>
+                      <div class="feature-note">已配置的密钥不会回显。留空即保持当前值不变；推荐使用 Access Key + Secret Key，由系统自动换取短期 Token。</div>
+                    </div>
+                    <div class="config-card">
+                      <div class="config-card-title">运行状态与校验</div>
+                      <div id="gangtise-credential-status" class="feature-note">正在读取当前数据库中的凭证状态...</div>
+                      <div class="config-field" style="margin-top:14px">
+                        <label>校验标的</label>
+                        <input id="gangtise-credential-probe-code" type="text" value="601988.SH" maxlength="32" placeholder="例如 601988.SH" autocomplete="off">
+                      </div>
+                      <div style="display:grid;gap:10px;margin-top:14px">
+                        <button id="gangtise-credential-save" class="btn-gold" type="button" style="padding:10px 20px;font-size:13px;width:100%" onclick="saveGangtiseCredentials()">保存加密凭证</button>
+                        <button id="gangtise-credential-diagnose" class="btn-outline" type="button" style="padding:10px 20px;font-size:13px;width:100%" onclick="diagnoseGangtiseCredentials()">保存后校验真实日 K</button>
+                      </div>
+                      <div id="gangtise-credential-diagnostic" class="feature-note" style="margin-top:12px">校验会调用 Gangtise 的真实日 K 接口，仅返回 HTTP 状态、耗时、数据点数和最新交易日。</div>
+                    </div>
+                  </div>
                 </section>
 
                 <section class="admin-settings-panel" data-settings-panel="knowledge-source">
@@ -5896,6 +5951,7 @@ function syncAdminSettingsSubmenu(panelKey) {
 function openAdminSettingsSubmenu(panelKey, options) {
   const normalized = String(panelKey || '').trim() || 'theme';
   syncAdminSettingsSubmenu(normalized);
+  if (normalized === 'market-data') loadGangtiseCredentials();
   if (options && options.updateQuery === false) return;
   const url = new URL(window.location.href);
   url.searchParams.set('section', 'settings-features');
@@ -11676,6 +11732,110 @@ async function loadSiteConfig(force = false) {
   renderSiteConfigForm();
   renderAdminKnowledgeTenantFilter();
   return adminSiteConfig;
+}
+
+let adminGangtiseCredentialStatus = null;
+
+function renderGangtiseCredentialStatus() {
+  const statusEl = document.getElementById('gangtise-credential-status');
+  if (!statusEl) return;
+  const status = adminGangtiseCredentialStatus;
+  if (!status) {
+    statusEl.textContent = '正在读取当前数据库中的凭证状态...';
+    return;
+  }
+  const modeLabel = ({ access_key_secret: 'Access Key + Secret Key', long_token: 'Long Token', missing: '未配置' })[status.credential_mode] || '未配置';
+  const storageLabel = status.stored_in_postgres ? '已加密保存到当前 PostgreSQL' : '当前 PostgreSQL 未保存凭证';
+  statusEl.textContent = `${storageLabel}。认证方式：${modeLabel}。Access Key：${status.has_access_key ? '已配置' : '未配置'}；Secret Key：${status.has_secret_key ? '已配置' : '未配置'}；Long Token：${status.has_long_token ? '已配置' : '未配置'}。${status.updated_at ? `最后更新：${status.updated_at}。` : ''}`;
+  const baseUrl = document.getElementById('gangtise-credential-base-url');
+  if (baseUrl && !baseUrl.value) baseUrl.value = status.base_url || 'https://openapi.gangtise.com';
+  [['gangtise-credential-access-key', status.has_access_key], ['gangtise-credential-secret-key', status.has_secret_key], ['gangtise-credential-long-token', status.has_long_token]].forEach(([id, configured]) => {
+    const input = document.getElementById(id);
+    if (input) input.placeholder = configured ? '已配置，留空不修改' : '未配置；填写后保存';
+  });
+}
+
+async function loadGangtiseCredentials() {
+  const statusEl = document.getElementById('gangtise-credential-status');
+  if (statusEl) statusEl.textContent = '正在读取当前数据库中的凭证状态...';
+  try {
+    const res = await fetch('/api/admin/gangtise-credentials');
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error((data && data.error) || 'credentials_load_failed');
+    adminGangtiseCredentialStatus = data.credentials || {};
+    renderGangtiseCredentialStatus();
+  } catch (error) {
+    if (statusEl) statusEl.textContent = '凭证状态读取失败，请检查 Admin 登录和当前数据库连接。';
+  }
+}
+
+async function saveGangtiseCredentials() {
+  const button = document.getElementById('gangtise-credential-save');
+  const diagnosticEl = document.getElementById('gangtise-credential-diagnostic');
+  const payload = {
+    base_url: String(document.getElementById('gangtise-credential-base-url')?.value || '').trim(),
+    access_key: String(document.getElementById('gangtise-credential-access-key')?.value || '').trim(),
+    secret_key: String(document.getElementById('gangtise-credential-secret-key')?.value || '').trim(),
+    long_token: String(document.getElementById('gangtise-credential-long-token')?.value || '').trim(),
+  };
+  if (button) {
+    button.disabled = true;
+    button.textContent = '正在加密保存...';
+  }
+  try {
+    const res = await fetch('/api/admin/gangtise-credentials', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error((data && data.error) || 'credentials_save_failed');
+    adminGangtiseCredentialStatus = data.credentials || {};
+    ['gangtise-credential-access-key', 'gangtise-credential-secret-key', 'gangtise-credential-long-token'].forEach((id) => {
+      const input = document.getElementById(id);
+      if (input) input.value = '';
+    });
+    renderGangtiseCredentialStatus();
+    if (diagnosticEl) diagnosticEl.textContent = '凭证已加密保存到当前 PostgreSQL，旧的短期 Token 已清除。可继续执行真实日 K 校验。';
+    showToast('Gangtise 凭证已保存');
+  } catch (error) {
+    const message = String(error && error.message || 'credentials_save_failed');
+    if (diagnosticEl) diagnosticEl.textContent = `保存失败：${message}`;
+    showToast('凭证保存失败');
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = '保存加密凭证';
+    }
+  }
+}
+
+async function diagnoseGangtiseCredentials() {
+  const button = document.getElementById('gangtise-credential-diagnose');
+  const diagnosticEl = document.getElementById('gangtise-credential-diagnostic');
+  const securityCode = String(document.getElementById('gangtise-credential-probe-code')?.value || '601988.SH').trim().toUpperCase();
+  if (button) {
+    button.disabled = true;
+    button.textContent = '正在请求真实日 K...';
+  }
+  if (diagnosticEl) diagnosticEl.textContent = `正在用 ${securityCode} 请求 Gangtise 真实日 K 数据...`;
+  try {
+    const res = await fetch('/api/admin/gangtise-credentials/diagnose', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ security_code: securityCode }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error((data && data.error) || 'credentials_diagnostic_failed');
+    const diagnostic = data.diagnostic || {};
+    const probe = diagnostic.probe || {};
+    if (diagnosticEl) diagnosticEl.textContent = `${diagnostic.ok ? '校验成功' : '校验未通过'}：${diagnostic.message || '--'} HTTP ${probe.http_status || 0}，耗时 ${probe.duration_ms || 0} ms，数据点 ${probe.points || 0}，最新交易日 ${probe.latest_trade_date || '--'}。${probe.upstream_message ? `上游信息：${probe.upstream_message}` : ''}`;
+    if (diagnostic.ok) showToast('Gangtise 真实日 K 校验成功');
+  } catch (error) {
+    if (diagnosticEl) diagnosticEl.textContent = `校验失败：${String(error && error.message || 'credentials_diagnostic_failed')}`;
+    showToast('Gangtise 校验失败');
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = '保存后校验真实日 K';
+    }
+  }
 }
 
 async function syncLocalLlmRegistryFromStaging() {

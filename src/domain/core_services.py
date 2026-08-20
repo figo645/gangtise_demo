@@ -1,4 +1,12 @@
 from src.runtime import *
+import base64
+import hashlib
+
+try:
+    from cryptography.fernet import Fernet, InvalidToken
+except Exception:  # pragma: no cover - deployment dependency validation
+    Fernet = None
+    InvalidToken = Exception
 from src.domain.agent_workflows import *
 
 
@@ -3250,6 +3258,8 @@ def build_h5_user_onboarding_payload(user=None):
 H5_PROFILE_SETTINGS_PREFIX = "h5_profile_settings:"
 TENANT_FAN_OPS_SETTINGS_PREFIX = "tenant_fan_ops_settings:"
 AUTH_WECHAT_SECRET_SETTING_KEY = "auth_settings:wechat_app_secret"
+GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY = "gangtise_openapi_credentials:v1"
+GANGTISE_OPENAPI_DEFAULT_BASE_URL = "https://openapi.gangtise.com"
 
 
 def _load_json_app_setting(setting_key, default_value=None):
@@ -3329,6 +3339,95 @@ def _save_text_app_setting(setting_key, value):
     )
     db.commit()
     return str(value or "")
+
+
+def _gangtise_openapi_credential_fernet():
+    """Build a stable encryption key without persisting secrets outside PostgreSQL."""
+    if Fernet is None:
+        raise RuntimeError("cryptography_fernet_unavailable")
+    secret_key = str(app.config.get("SECRET_KEY") or "").strip()
+    if not secret_key:
+        raise RuntimeError("application_secret_key_missing")
+    derived_key = base64.urlsafe_b64encode(hashlib.sha256(secret_key.encode("utf-8")).digest())
+    return Fernet(derived_key)
+
+
+def _normalize_gangtise_openapi_credentials(payload=None):
+    source = payload if isinstance(payload, dict) else {}
+    return {
+        "base_url": str(source.get("base_url") or GANGTISE_OPENAPI_DEFAULT_BASE_URL).strip().rstrip("/"),
+        "access_key": str(source.get("access_key") or "").strip(),
+        "secret_key": str(source.get("secret_key") or "").strip(),
+        "long_token": str(source.get("long_token") or "").strip(),
+    }
+
+
+def load_gangtise_openapi_credentials():
+    """Load decrypted Gangtise credentials from PostgreSQL; never expose this payload to a response."""
+    envelope = _load_json_app_setting(GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY, {})
+    ciphertext = str((envelope or {}).get("ciphertext") or "").strip()
+    if not ciphertext:
+        return {}
+    try:
+        raw = _gangtise_openapi_credential_fernet().decrypt(ciphertext.encode("ascii"))
+        decoded = json.loads(raw.decode("utf-8"))
+        return _normalize_gangtise_openapi_credentials(decoded)
+    except (InvalidToken, UnicodeDecodeError, ValueError, TypeError, json.JSONDecodeError):
+        app.logger.error("Gangtise OpenAPI credential record cannot be decrypted; check GANGTISE_DEMO_SECRET_KEY continuity")
+    except Exception:
+        app.logger.exception("Failed to load encrypted Gangtise OpenAPI credentials")
+    return {}
+
+
+def get_gangtise_openapi_credentials_status():
+    """Return safe credential metadata for Admin only, without returning any secret material."""
+    credentials = load_gangtise_openapi_credentials()
+    has_access_key = bool(credentials.get("access_key"))
+    has_secret_key = bool(credentials.get("secret_key"))
+    has_long_token = bool(credentials.get("long_token"))
+    row = None
+    try:
+        row = get_db().execute(
+            "SELECT updated_at FROM app_settings WHERE setting_key = ?",
+            (GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY,),
+        ).fetchone()
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+    return {
+        "stored_in_postgres": bool(credentials),
+        "base_url": str(credentials.get("base_url") or GANGTISE_OPENAPI_DEFAULT_BASE_URL),
+        "has_access_key": has_access_key,
+        "has_secret_key": has_secret_key,
+        "has_long_token": has_long_token,
+        "credential_mode": "access_key_secret" if has_access_key and has_secret_key else ("long_token" if has_long_token else "missing"),
+        "updated_at": str((row or {}).get("updated_at") or ""),
+    }
+
+
+def save_gangtise_openapi_credentials_patch(payload=None):
+    """Apply non-empty Admin fields, preserving stored secrets when fields are left blank."""
+    incoming = payload if isinstance(payload, dict) else {}
+    current = _normalize_gangtise_openapi_credentials(load_gangtise_openapi_credentials())
+    merged = dict(current)
+    for field in ("base_url", "access_key", "secret_key", "long_token"):
+        value = str(incoming.get(field) or "").strip()
+        if value:
+            merged[field] = value.rstrip("/") if field == "base_url" else value
+    merged = _normalize_gangtise_openapi_credentials(merged)
+    has_pair = bool(merged["access_key"] and merged["secret_key"])
+    if (bool(merged["access_key"]) != bool(merged["secret_key"])) and not merged["long_token"]:
+        raise ValueError("gangtise_access_key_and_secret_key_must_be_configured_together")
+    if not has_pair and not merged["long_token"]:
+        raise ValueError("gangtise_credentials_required")
+    ciphertext = _gangtise_openapi_credential_fernet().encrypt(
+        json.dumps(merged, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii")
+    _save_json_app_setting(
+        GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY,
+        {"version": 1, "ciphertext": ciphertext},
+    )
+    return get_gangtise_openapi_credentials_status()
 
 
 def load_auth_wechat_secret():
