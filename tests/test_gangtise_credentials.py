@@ -72,6 +72,34 @@ class GangtiseCredentialsTest(unittest.TestCase):
         self.assertEqual(config["secret_key"], "")
         self.assertEqual(config["long_token"], "")
 
+    def test_given_legacy_runtime_credentials_when_postgres_is_empty_then_startup_migrates_them_once(self):
+        persisted = {}
+        with patch.object(core_services, "load_gangtise_openapi_credentials", return_value={}), patch.object(
+            core_services, "_save_json_app_setting", side_effect=lambda key, value: persisted.update({"key": key, "value": value})
+        ), patch.dict(
+            "os.environ",
+            {
+                "GANGTISE_API_BASE_URL": "https://openapi.example.test",
+                "GANGTISE_ACCESS_KEY": "legacy-access",
+                "GANGTISE_SECRET_KEY": "legacy-secret",
+                "GANGTISE_LONG_TOKEN": "",
+            },
+            clear=False,
+        ):
+            migrated = core_services.migrate_legacy_gangtise_openapi_credentials_to_encrypted_store()
+
+        self.assertTrue(migrated)
+        self.assertEqual(persisted["key"], core_services.GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY)
+        payload_text = json.dumps(persisted["value"], ensure_ascii=False)
+        self.assertNotIn("legacy-access", payload_text)
+        self.assertNotIn("legacy-secret", payload_text)
+        decrypted = core_services._gangtise_openapi_credential_fernet().decrypt(
+            persisted["value"]["ciphertext"].encode("ascii")
+        )
+        saved = json.loads(decrypted.decode("utf-8"))
+        self.assertEqual(saved["access_key"], "legacy-access")
+        self.assertEqual(saved["secret_key"], "legacy-secret")
+
     def test_given_admin_credential_status_when_requested_then_no_secret_is_returned(self):
         safe_status = {
             "stored_in_postgres": True, "base_url": "https://openapi.gangtise.com", "has_access_key": True,

@@ -3432,6 +3432,38 @@ def load_gangtise_openapi_credentials():
     )
 
 
+def migrate_legacy_gangtise_openapi_credentials_to_encrypted_store():
+    """One-time migration from the protected legacy runtime file into PostgreSQL.
+
+    `start_daemon_app.sh` historically loads `/root/gangtise_openapi_credentials`
+    into this process. It remains a migration source only: normal market-data
+    requests continue to read exclusively from the encrypted PostgreSQL record.
+    """
+    existing = load_gangtise_openapi_credentials()
+    existing_ready = bool(existing.get("access_key") and existing.get("secret_key")) or bool(existing.get("long_token"))
+    if existing_ready:
+        return False
+
+    legacy = _normalize_gangtise_openapi_credentials(
+        {
+            "base_url": os.environ.get("GANGTISE_API_BASE_URL"),
+            "access_key": os.environ.get("GANGTISE_ACCESS_KEY"),
+            "secret_key": os.environ.get("GANGTISE_SECRET_KEY"),
+            "long_token": os.environ.get("GANGTISE_LONG_TOKEN"),
+        }
+    )
+    has_pair = bool(legacy["access_key"] and legacy["secret_key"])
+    if not has_pair and not legacy["long_token"]:
+        return False
+    if bool(legacy["access_key"]) != bool(legacy["secret_key"]) and not legacy["long_token"]:
+        app.logger.warning("Skipped incomplete legacy Gangtise credential migration")
+        return False
+
+    _save_encrypted_app_setting(GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY, legacy)
+    app.logger.info("Migrated legacy Gangtise OpenAPI credentials into encrypted PostgreSQL storage")
+    return True
+
+
 def get_gangtise_openapi_credentials_status():
     """Return safe credential metadata for Admin only, without returning any secret material."""
     credentials = load_gangtise_openapi_credentials()
@@ -6308,6 +6340,7 @@ def startup_bootstrap():
         init_db_safe()
     try:
         with app.app_context():
+            migrate_legacy_gangtise_openapi_credentials_to_encrypted_store()
             migrate_legacy_llm_api_keys_to_encrypted_store()
             migrate_legacy_wechat_secret_to_encrypted_store()
             seed_result = ensure_default_users()

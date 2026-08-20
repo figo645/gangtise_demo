@@ -60,6 +60,9 @@ except Exception:
     openpyxl = None
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PERSISTENT_APP_SECRET_PATH = Path(
+    os.environ.get("GANGTISE_APP_SECRET_FILE") or "/root/.gangtise_demo_secret"
+)
 
 
 def _resolve_session_secret_key():
@@ -67,18 +70,47 @@ def _resolve_session_secret_key():
     if configured:
         return configured
 
-    # A random key generated at every restart invalidates every signed Flask
-    # session. Keep a local fallback stable across debug reloads and restarts.
+    # Production deployments used to retain this key in the checkout. Jenkins
+    # rsync --delete can remove it, invalidating encrypted PostgreSQL settings.
+    # Prefer a root-owned location outside the deployment directory instead.
+    try:
+        if PERSISTENT_APP_SECRET_PATH.exists():
+            existing = PERSISTENT_APP_SECRET_PATH.read_text(encoding="utf-8").strip()
+            if len(existing) >= 32:
+                return existing
+    except Exception:
+        pass
+
+    # Preserve an existing checkout key once by promoting it to the persistent
+    # location. This keeps already encrypted PostgreSQL credentials readable.
     secret_path = PROJECT_ROOT / ".gangtise_session_secret"
     try:
         if secret_path.exists():
             existing = secret_path.read_text(encoding="utf-8").strip()
             if len(existing) >= 32:
+                try:
+                    PERSISTENT_APP_SECRET_PATH.parent.mkdir(parents=True, exist_ok=True)
+                    descriptor = os.open(str(PERSISTENT_APP_SECRET_PATH), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                        handle.write(existing)
+                except FileExistsError:
+                    pass
+                except Exception:
+                    pass
                 return existing
         generated = secrets.token_urlsafe(48)
-        descriptor = os.open(str(secret_path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            handle.write(generated)
+        try:
+            PERSISTENT_APP_SECRET_PATH.parent.mkdir(parents=True, exist_ok=True)
+            descriptor = os.open(str(PERSISTENT_APP_SECRET_PATH), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                handle.write(generated)
+            return generated
+        except FileExistsError:
+            return PERSISTENT_APP_SECRET_PATH.read_text(encoding="utf-8").strip()
+        except Exception:
+            descriptor = os.open(str(secret_path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                handle.write(generated)
         return generated
     except FileExistsError:
         return secret_path.read_text(encoding="utf-8").strip()
