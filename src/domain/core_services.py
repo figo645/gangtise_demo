@@ -3293,6 +3293,7 @@ AUTH_WECHAT_CREDENTIAL_SETTING_KEY = "auth_credentials:wechat:v1"
 GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY = "gangtise_openapi_credentials:v1"
 GANGTISE_OPENAPI_DEFAULT_BASE_URL = "https://openapi.gangtise.com"
 LLM_API_CREDENTIAL_SETTING_KEY = "llm_api_credentials:v1"
+_encrypted_setting_decryption_errors = set()
 
 
 def _load_json_app_setting(setting_key, default_value=None):
@@ -3358,11 +3359,16 @@ def _load_encrypted_app_setting(setting_key, default_value=None):
     try:
         raw = _gangtise_openapi_credential_fernet().decrypt(ciphertext.encode("ascii"))
         decoded = json.loads(raw.decode("utf-8"))
+        _encrypted_setting_decryption_errors.discard(setting_key)
         return decoded if isinstance(decoded, type(fallback)) else fallback
     except (InvalidToken, UnicodeDecodeError, ValueError, TypeError, json.JSONDecodeError):
-        app.logger.error("Encrypted application credential record cannot be decrypted: %s", setting_key)
+        if setting_key not in _encrypted_setting_decryption_errors:
+            app.logger.error("Encrypted application credential record cannot be decrypted: %s", setting_key)
+        _encrypted_setting_decryption_errors.add(setting_key)
     except Exception:
-        app.logger.exception("Failed to load encrypted application credential record: %s", setting_key)
+        if setting_key not in _encrypted_setting_decryption_errors:
+            app.logger.exception("Failed to load encrypted application credential record: %s", setting_key)
+        _encrypted_setting_decryption_errors.add(setting_key)
     return fallback
 
 
@@ -3371,6 +3377,7 @@ def _save_encrypted_app_setting(setting_key, payload):
         json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     ).decode("ascii")
     _save_json_app_setting(setting_key, {"version": 1, "ciphertext": ciphertext})
+    _encrypted_setting_decryption_errors.discard(setting_key)
 
 
 def _normalize_gangtise_openapi_credentials(payload=None):
@@ -3410,13 +3417,15 @@ def get_gangtise_openapi_credentials_status():
     except Exception as exc:
         if not is_db_unavailable_error(exc):
             raise
+    decryption_failed = GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY in _encrypted_setting_decryption_errors
     return {
         "stored_in_postgres": bool(credentials),
         "base_url": str(credentials.get("base_url") or GANGTISE_OPENAPI_DEFAULT_BASE_URL),
         "has_access_key": has_access_key,
         "has_secret_key": has_secret_key,
         "has_long_token": has_long_token,
-        "credential_mode": "access_key_secret" if has_access_key and has_secret_key else ("long_token" if has_long_token else "missing"),
+        "encryption_status": "unreadable" if decryption_failed else "readable",
+        "credential_mode": "access_key_secret" if has_access_key and has_secret_key else ("long_token" if has_long_token else ("unreadable" if decryption_failed else "missing")),
         "updated_at": str((row or {}).get("updated_at") or ""),
     }
 
@@ -3424,6 +3433,9 @@ def get_gangtise_openapi_credentials_status():
 def save_gangtise_openapi_credentials_patch(payload=None):
     """Apply non-empty Admin fields, preserving stored secrets when fields are left blank."""
     incoming = payload if isinstance(payload, dict) else {}
+    # If the old ciphertext was created with a lost application key, the
+    # entered Admin credentials intentionally replace it instead of trying to
+    # merge with an unreadable record.
     current = _normalize_gangtise_openapi_credentials(load_gangtise_openapi_credentials())
     merged = dict(current)
     for field in ("base_url", "access_key", "secret_key", "long_token"):

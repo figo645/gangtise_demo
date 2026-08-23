@@ -37,6 +37,20 @@ class DatabaseReleaseAdminBddTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "production_confirmation_required"):
                 database_release_services.start_database_release("production", confirm_production=False)
 
+    def test_given_clear_confirmation_when_admin_starts_clear_then_the_allowlisted_clear_script_is_queued(self):
+        target = {"name": "staging", "db_name": "demo", "db_user": "postgres", "db_host": "127.0.0.1", "db_port": "5432", "db_password": "secret"}
+        with patch.object(database_release_services, "get_database_release_target", return_value=target), patch.object(database_release_services, "_start_job", return_value={"status": "queued", "target": "staging"}) as start_job:
+            result = database_release_services.start_database_clear("staging", confirmation="CLEAR STAGING")
+        self.assertEqual(result["status"], "queued")
+        self.assertEqual(start_job.call_args.args[1], [str(database_release_services.CLEAR_DATABASE_SCRIPT)])
+        self.assertEqual(start_job.call_args.args[2], "clear_database")
+
+    def test_given_clear_confirmation_when_production_confirmation_is_missing_then_clear_is_rejected(self):
+        target = {"name": "production", "db_name": "demo", "db_user": "postgres", "db_host": "127.0.0.1", "db_port": "5432", "db_password": "secret"}
+        with patch.object(database_release_services, "get_database_release_target", return_value=target):
+            with self.assertRaisesRegex(ValueError, "production_confirmation_required"):
+                database_release_services.start_database_clear("production", confirmation="CLEAR PRODUCTION")
+
     def test_given_debug_server_when_database_release_controller_is_integrated_then_reloader_is_off_by_default(self):
         with patch.dict(os.environ, {"DEBUG": "1"}, clear=True):
             options = app_entry.get_server_runtime_options()
@@ -204,6 +218,12 @@ class DatabaseReleaseAdminBddTest(unittest.TestCase):
         self.assertEqual(set_job.call_args_list[0].kwargs["progress"]["completed_steps"], 1)
         self.assertEqual(set_job.call_args_list[1].kwargs["progress"]["completed_steps"], 2)
         self.assertEqual(set_job.call_args_list[1].kwargs["progress"]["total_steps"], 4)
+
+    def test_given_clear_runner_log_when_database_is_switched_then_cancellation_is_disabled(self):
+        with patch.object(database_release_services, "_record_release_event"), patch.object(database_release_services, "_set_job") as set_job:
+            database_release_services._update_release_progress_from_log("==> Terminating connections to sprint_dashboard")
+        self.assertFalse(set_job.call_args.kwargs["cancellable"])
+        self.assertEqual(set_job.call_args.kwargs["progress"]["state"], "switching")
 
     def test_given_release_stage_output_when_worker_reports_each_step_then_durable_timeline_events_are_available(self):
         original_state_file = database_release_services.RELEASE_STATE_FILE

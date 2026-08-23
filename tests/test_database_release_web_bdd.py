@@ -127,6 +127,53 @@ class DatabaseReleaseWebBddTest(unittest.TestCase):
         self.assertEqual(response.get_json()["job"]["target"], "production")
         start_sync.assert_called_once_with()
 
+    def test_given_5051_console_when_staging_is_confirmed_for_clear_then_a_background_job_is_created(self):
+        csrf = self._csrf_token()
+        with patch.object(
+            database_release_web,
+            "start_database_clear",
+            return_value={"id": "clear_1", "status": "queued", "target": "staging"},
+        ) as start_clear:
+            response = self.client.post(
+                "/api/clear-target",
+                json={"target": "staging", "confirmation": "CLEAR STAGING"},
+                headers={"X-Data-Import-CSRF-Token": csrf},
+            )
+        self.assertEqual(response.status_code, 202)
+        start_clear.assert_called_once_with("staging", confirmation="CLEAR STAGING", confirm_production=False)
+
+    def test_given_5051_console_when_clear_confirmation_is_wrong_then_the_request_is_rejected(self):
+        csrf = self._csrf_token()
+        with patch.object(
+            database_release_web,
+            "start_database_clear",
+            side_effect=ValueError("database_clear_confirmation_required"),
+        ) as start_clear:
+            response = self.client.post(
+                "/api/clear-target",
+                json={"target": "staging", "confirmation": "CLEAR PRODUCTION"},
+                headers={"X-Data-Import-CSRF-Token": csrf},
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()["error"], "database_clear_confirmation_required")
+        start_clear.assert_called_once_with("staging", confirmation="CLEAR PRODUCTION", confirm_production=False)
+
+    def test_given_5051_console_when_production_clear_lacks_confirmation_then_the_request_is_rejected(self):
+        csrf = self._csrf_token()
+        with patch.object(
+            database_release_web,
+            "start_database_clear",
+            side_effect=ValueError("production_confirmation_required"),
+        ) as start_clear:
+            response = self.client.post(
+                "/api/clear-target",
+                json={"target": "production", "confirmation": "CLEAR PRODUCTION"},
+                headers={"X-Data-Import-CSRF-Token": csrf},
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()["error"], "production_confirmation_required")
+        start_clear.assert_called_once_with("production", confirmation="CLEAR PRODUCTION", confirm_production=False)
+
     def test_given_5051_console_page_when_rendered_then_it_explains_the_fixed_direction_and_confirmation(self):
         response = self.client.get("/")
         html = response.get_data(as_text=True)
@@ -149,6 +196,9 @@ class DatabaseReleaseWebBddTest(unittest.TestCase):
         self.assertIn("环境全量同步", html)
         self.assertIn("一键导入 Production 到 Staging", html)
         self.assertIn("一键发布 Staging 到 Production", html)
+        self.assertIn("清空当前目标数据库", html)
+        self.assertIn("/api/clear-target", html)
+        self.assertIn("CLEAR ", html)
         self.assertIn("/api/staging-to-production-sync", html)
         self.assertIn("/api/production-to-staging-sync", html)
         self.assertIn("/api/csrf", html)

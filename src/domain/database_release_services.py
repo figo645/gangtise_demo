@@ -27,6 +27,7 @@ PACKAGE_BATCH_SCRIPT = ROOT / "scripts" / "apply_database_release_packages.sh"
 ROLLBACK_SCRIPT = ROOT / "scripts" / "rollback_database_release.sh"
 PRODUCTION_TO_STAGING_SCRIPT = ROOT / "scripts" / "sync_production_to_staging.sh"
 STAGING_TO_PRODUCTION_SCRIPT = ROOT / "scripts" / "sync_staging_to_production.sh"
+CLEAR_DATABASE_SCRIPT = ROOT / "scripts" / "clear_database_release.sh"
 PACKAGES_DIR = ROOT / "database_release_packages"
 RELEASE_STATE_FILE = ROOT / ".deploy" / "database_release_last_job.json"
 CONFIG_FILE = Path(os.environ.get("DATABASE_RELEASE_CONFIG", str(ROOT / ".database_release.env")))
@@ -705,6 +706,7 @@ def _update_release_progress_from_log(line):
         ("Database preparation complete.", "completed", "完整数据库发布完成"),
         ("Production-to-Staging sync complete.", "completed", "Production 已完整同步到 Staging"),
         ("Staging-to-Production sync complete.", "completed", "Staging 已完整同步到 Production"),
+        ("Database clear complete.", "completed", "目标数据库已清空，可继续执行本地完整数据库导入"),
         ("[controller] 开始", "starting", "发布进程已启动"),
     )
     for prefix, state, message in stage_markers:
@@ -716,6 +718,15 @@ def _update_release_progress_from_log(line):
                 "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             })
             return
+    if text.startswith("==> Terminating connections") or text.startswith("==> Retaining current database"):
+        _record_release_event("switching", "正在清空目标数据库", "目标库连接已处理，原数据库将保留为可回滚备份；此阶段不可取消。", "active")
+        _set_job(cancellable=False, progress={
+            **dict(_release_job.get("progress") or {}),
+            "state": "switching",
+            "message": "正在清空目标数据库并保留回滚备份，此阶段不可取消",
+            "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        })
+        return
     if text.startswith("==> Switching "):
         _record_release_event("switching", "开始最终数据库切换", "即将替换目标库名称；此阶段不可取消。", "active")
         _set_job(cancellable=False, progress={
@@ -848,6 +859,19 @@ def start_database_release(target_name, package_id="", confirm_production=False)
             raise ValueError("database_release_package_checksum_mismatch")
     command = [str(PACKAGE_SCRIPT), str(ROOT / normalized_package)] if normalized_package else [str(PREPARE_SCRIPT)]
     return _start_job(target, command, "release", package_plan=package_plan)
+
+
+def start_database_clear(target_name, confirmation="", confirm_production=False):
+    """Create a destructive task that replaces the target with an empty DB."""
+    target = get_database_release_target(target_name)
+    if not target or target["name"] not in {"staging", "production"}:
+        raise ValueError("database_release_target_invalid")
+    expected = f"CLEAR {target['name'].upper()}"
+    if str(confirmation or "").strip() != expected:
+        raise ValueError("database_clear_confirmation_required")
+    if target["name"] == "production" and confirm_production is not True:
+        raise ValueError("production_confirmation_required")
+    return _start_job(target, [str(CLEAR_DATABASE_SCRIPT)], "clear_database")
 
 
 def start_database_release_packages(target_name, package_ids, confirm_production=False):

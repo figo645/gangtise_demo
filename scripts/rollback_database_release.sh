@@ -10,7 +10,7 @@ REMOTE_DB_NAME="${REMOTE_DB_NAME:-sprint_dashboard}"
 REMOTE_DB_USER="${REMOTE_DB_USER:-postgres}"
 REMOTE_DB_PASSWORD="${REMOTE_DB_PASSWORD:-${REMOTE_POSTGRES_PASSWORD:-your_password}}"
 
-[[ "$BACKUP_DB" =~ ^${REMOTE_DB_NAME}_backup_[0-9]{8}_[0-9]{6}$ ]] || { echo "Invalid rollback database name." >&2; exit 2; }
+[[ "$BACKUP_DB" =~ ^${REMOTE_DB_NAME}_backup_([0-9]{8}_[0-9]{6}|clear_[0-9]{8}_[0-9]{6})$ ]] || { echo "Invalid rollback database name." >&2; exit 2; }
 export PGPASSWORD="$REMOTE_DB_PASSWORD"
 PSQL=(psql -w -h "$REMOTE_DB_HOST" -p "$REMOTE_DB_PORT" -U "$REMOTE_DB_USER" -d postgres -v ON_ERROR_STOP=1)
 echo "==> [preflight] Checking ${TARGET} rollback database connection"

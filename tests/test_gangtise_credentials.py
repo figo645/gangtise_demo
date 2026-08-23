@@ -99,6 +99,22 @@ class GangtiseCredentialsTest(unittest.TestCase):
         save_patch.assert_called_once()
         invalidate_cache.assert_called_once()
 
+    def test_given_unreadable_old_ciphertext_when_admin_saves_new_credentials_then_it_is_replaced(self):
+        persisted = {}
+        core_services._encrypted_setting_decryption_errors.add(core_services.GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY)
+        try:
+            with patch.object(core_services, "load_gangtise_openapi_credentials", return_value={}), patch.object(
+                core_services, "_save_json_app_setting", side_effect=lambda key, value: persisted.update({"key": key, "value": value})
+            ), patch.object(core_services, "get_gangtise_openapi_credentials_status", return_value={"credential_mode": "access_key_secret"}):
+                result = core_services.save_gangtise_openapi_credentials_patch(
+                    {"access_key": "replacement-access", "secret_key": "replacement-secret"}
+                )
+        finally:
+            core_services._encrypted_setting_decryption_errors.discard(core_services.GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY)
+
+        self.assertEqual(result["credential_mode"], "access_key_secret")
+        self.assertEqual(persisted["key"], core_services.GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY)
+
 
 if __name__ == "__main__":
     unittest.main()
