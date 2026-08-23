@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ brand.name }} - 系统学习手册</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+<link rel="stylesheet" href="/static/css/style.css">
+<script src="/static/js/theme.js"></script>
+<style>
+:root{--hb-blue:#2f74c0;--hb-navy:#172b43;--hb-ink:#182132;--hb-sub:#526276;--hb-line:#d9e5f2;--hb-bg:#f4f8fc;--hb-soft:#ecf4fb;--hb-green:#1d7a51;--hb-amber:#9b6100;--hb-red:#b74343}
+*{box-sizing:border-box} body{background:var(--hb-bg);color:var(--hb-ink);font-family:"PingFang SC","Microsoft YaHei",sans-serif;letter-spacing:0;line-height:1.65}.hb-navbar{background:rgba(255,255,255,.96);border-bottom:1px solid var(--hb-line);backdrop-filter:blur(12px)}.hb-brand{font-weight:750;color:var(--hb-navy);letter-spacing:0}.hb-brand-mark{display:inline-grid;place-items:center;width:28px;height:28px;margin-right:8px;background:var(--hb-blue);color:#fff;border-radius:6px;font-size:13px}.hb-nav-link{font-size:13px;color:var(--hb-sub)!important}.hb-nav-link:hover{color:var(--hb-blue)!important}.hb-page{max-width:1200px;margin:0 auto;padding:32px 20px 64px}.hb-hero{position:relative;overflow:hidden;padding:38px;border:1px solid #cbdfee;border-radius:8px;background:linear-gradient(125deg,#fff 0%,#eef6fd 58%,#e5f1fb 100%)}.hb-hero:after{content:"";position:absolute;width:260px;height:260px;border:34px solid rgba(47,116,192,.08);border-radius:50%;right:-85px;top:-116px}.hb-eyebrow{color:var(--hb-blue);font-size:12px;font-weight:700;letter-spacing:1.2px}.hb-hero h1{position:relative;z-index:1;margin:8px 0 10px;font-size:32px;font-weight:750}.hb-hero p{position:relative;z-index:1;max-width:780px;margin:0;color:var(--hb-sub);font-size:15px}.hb-btn-primary{background:var(--hb-blue);border-color:var(--hb-blue)}.hb-btn-primary:hover{background:#235f9f;border-color:#235f9f}.hb-stat{height:100%;background:#fff;border:1px solid var(--hb-line);border-radius:7px;padding:17px}.hb-stat-value{display:block;color:var(--hb-blue);font-size:24px;font-weight:750;line-height:1.1}.hb-stat-label{display:block;margin-top:5px;color:var(--hb-sub);font-size:12px}.hb-section{scroll-margin-top:84px;margin-top:42px}.hb-section-kicker{font-size:12px;font-weight:700;color:var(--hb-blue);letter-spacing:1px}.hb-section h2{margin:4px 0 8px;font-size:25px;font-weight:750}.hb-section-intro{margin:0 0 18px;color:var(--hb-sub)}.hb-card{height:100%;border:1px solid var(--hb-line);border-radius:7px;box-shadow:none}.hb-card .card-body{padding:20px}.hb-card-title{font-size:16px;font-weight:700}.hb-card-copy{color:var(--hb-sub);font-size:13px}.hb-architecture{position:relative;border:1px solid var(--hb-line);border-radius:8px;background:#fff;padding:28px;overflow:hidden}.hb-architecture:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(47,116,192,.025) 1px,transparent 1px),linear-gradient(rgba(47,116,192,.025) 1px,transparent 1px);background-size:24px 24px;pointer-events:none}.hb-arch-root,.hb-arch-node{position:relative;z-index:1}.hb-arch-root{display:flex;justify-content:center;margin-bottom:26px}.hb-node{min-height:102px;border:1px solid #c8dceb;border-radius:7px;background:#fff;padding:15px;box-shadow:0 5px 12px rgba(22,63,100,.05)}.hb-node-title{font-weight:750;font-size:14px}.hb-node-copy{margin-top:5px;color:var(--hb-sub);font-size:12px;line-height:1.55}.hb-node-tag{display:inline-block;margin-bottom:7px;padding:2px 7px;border-radius:4px;background:var(--hb-soft);color:var(--hb-blue);font-size:10px;font-weight:700}.hb-arch-line{height:22px;width:2px;margin:0 auto;background:#9fc2df}.hb-arch-bar{height:2px;margin:-1px 12.5% 18px;background:#9fc2df}.hb-stage-track{position:relative;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.hb-stage-track:before{content:"";position:absolute;height:2px;left:8%;right:8%;top:28px;background:#bdd5e8}.hb-stage{position:relative;z-index:1;border:1px solid var(--hb-line);border-radius:7px;background:#fff;padding:17px;cursor:pointer;transition:transform .2s,border-color .2s,box-shadow .2s}.hb-stage:hover,.hb-stage.active{transform:translateY(-3px);border-color:#7aaed8;box-shadow:0 8px 20px rgba(32,93,145,.12)}.hb-stage-number{display:grid;place-items:center;width:24px;height:24px;margin-bottom:12px;border-radius:50%;background:var(--hb-blue);color:#fff;font-size:11px;font-weight:750}.hb-stage-title{font-weight:750;font-size:14px}.hb-stage-desc{margin-top:5px;color:var(--hb-sub);font-size:12px}.hb-stage-panel{display:none;margin-top:16px;border:1px solid #cde0f0;border-radius:7px;background:#fff;padding:18px}.hb-stage-panel.active{display:block}.hb-stage-panel li{margin:.38rem 0;color:#3e5167;font-size:13px}.nav-pills .nav-link{border-radius:5px;color:var(--hb-sub);font-size:13px}.nav-pills .nav-link.active{background:var(--hb-blue)}.hb-case-table{font-size:12px}.hb-case-table thead th{position:sticky;top:0;background:#edf5fc;color:#264a6c;white-space:nowrap}.hb-case-table td{vertical-align:top;color:#394c61}.hb-case-table .case-id{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--hb-blue);font-weight:700;white-space:nowrap}.hb-case-table .risk-high{color:var(--hb-red);font-weight:700}.hb-case-table .risk-medium{color:var(--hb-amber);font-weight:700}.hb-case-table .risk-low{color:var(--hb-green);font-weight:700}.accordion-button{font-weight:700;font-size:14px}.accordion-button:not(.collapsed){background:#edf5fc;color:#245b96;box-shadow:none}.accordion-button:focus{box-shadow:0 0 0 .2rem rgba(47,116,192,.16)}.hb-download{background:#fff;border:1px solid var(--hb-line);border-radius:7px;padding:20px}.hb-download-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:6px;background:#eaf7ef;color:var(--hb-green);font-weight:800}.hb-flow-legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}.hb-flow-legend span{padding:3px 8px;border:1px solid var(--hb-line);border-radius:4px;background:#fff;color:var(--hb-sub);font-size:11px}.hb-flow-lane{display:grid;grid-template-columns:132px minmax(0,1fr);gap:12px;align-items:stretch;padding:11px 0;border-bottom:1px dashed #dbe7f1}.hb-flow-lane:last-child{border-bottom:0}.hb-flow-role{display:flex;align-items:center;justify-content:center;border-radius:6px;background:#edf5fc;color:#245b96;font-size:12px;font-weight:750;text-align:center;padding:10px}.hb-flow-cells{display:grid;grid-template-columns:repeat(4,minmax(130px,1fr));gap:10px}.hb-flow-cell{position:relative;min-height:78px;padding:11px;border:1px solid #c8dceb;border-radius:6px;background:#fff;font-size:12px;color:#3f5369}.hb-flow-cell b{display:block;margin-bottom:4px;color:var(--hb-ink);font-size:12px}.hb-flow-cell.is-input{border-color:#96bfdf;background:#f2f8fd}.hb-flow-cell.is-process{border-color:#a8d0bb;background:#f2fbf5}.hb-flow-cell.is-output{border-color:#e6c790;background:#fffaf0}.hb-flow-cell.is-control{border-color:#d8b6b6;background:#fff6f6}.hb-flow-cell:not(:last-child):after{content:"→";position:absolute;right:-17px;top:50%;z-index:2;transform:translateY(-50%);color:#6e9cc0;font-size:17px;font-weight:700}.hb-flow-result{margin-top:12px;padding:10px 12px;border-left:3px solid var(--hb-blue);background:#f0f7fc;color:#365572;font-size:12px}.hb-footer{padding-top:24px;margin-top:44px;border-top:1px solid var(--hb-line);color:var(--hb-sub);font-size:12px}.badge{font-weight:650;letter-spacing:0}@media(max-width:991px){.hb-stage-track{grid-template-columns:repeat(2,1fr)}.hb-stage-track:before{display:none}.hb-arch-bar{display:none}.hb-flow-cells{grid-template-columns:repeat(2,minmax(130px,1fr))}.hb-flow-cell:nth-child(2):after{display:none}}@media(max-width:576px){.hb-page{padding:24px 16px 48px}.hb-hero{padding:25px}.hb-hero h1{font-size:26px}.hb-stage-track{grid-template-columns:1fr}.hb-architecture{padding:18px}.hb-navbar .navbar-nav{padding-top:10px}.hb-case-table{font-size:11px}.hb-flow-lane{grid-template-columns:1fr}.hb-flow-cells{grid-template-columns:1fr}.hb-flow-cell:not(:last-child):after{right:auto;top:auto;bottom:-19px;left:50%;transform:translateX(-50%) rotate(90deg)}}
+</style>
+</head>
+<body onload="initGangtiseTheme()">
+<nav class="navbar navbar-expand-lg sticky-top hb-navbar">
+  <div class="container-xl px-3">
+    <a class="navbar-brand hb-brand" href="/"><span class="hb-brand-mark">知</span>{{ brand.short_name }} 系统学习手册</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#handbookNav" aria-controls="handbookNav" aria-expanded="false" aria-label="展开导航"><span class="navbar-toggler-icon"></span></button>
+    <div class="collapse navbar-collapse" id="handbookNav">
+      <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-1">
+        <li class="nav-item"><a class="nav-link hb-nav-link" href="#map">系统地图</a></li><li class="nav-item"><a class="nav-link hb-nav-link" href="#flows">功能流程图</a></li><li class="nav-item"><a class="nav-link hb-nav-link" href="#path">学习阶段</a></li><li class="nav-item"><a class="nav-link hb-nav-link" href="#cases">测试用例</a></li>
+        <li class="nav-item"><a class="nav-link hb-nav-link" href="/prd#s13">PRD</a></li><li class="nav-item"><a class="nav-link hb-nav-link" href="/admin">Admin</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+<main class="hb-page">
+  <section class="hb-hero">
+    <div class="hb-eyebrow">PRODUCT ONBOARDING · CURRENT SYSTEM</div>
+    <h1>先看懂系统，再进入任何一个模块</h1>
+    <p>这份手册围绕当前已交付的产品编排。先建立角色、租户、数据与证据链的整体认知，再按阶段体验系统；测试用例以可下载的 Excel 维护，覆盖普通用户、研究型大V与平台 Admin。</p>
+    <div class="d-flex flex-wrap gap-2 mt-4 position-relative" style="z-index:1"><a class="btn btn-primary hb-btn-primary btn-sm px-3" href="#map">查看系统架构</a><a class="btn btn-outline-primary btn-sm px-3" href="/static/downloads/gangtise_role_test_cases.xlsx" download>下载完整测试用例</a></div>
+  </section>
+
+  <section class="row g-3 mt-1" aria-label="系统关键要点">
+    <div class="col-6 col-lg-3"><div class="hb-stat"><span class="hb-stat-value">3</span><span class="hb-stat-label">实际账号角色</span></div></div>
+    <div class="col-6 col-lg-3"><div class="hb-stat"><span class="hb-stat-value">4</span><span class="hb-stat-label">核心系统入口</span></div></div>
+    <div class="col-6 col-lg-3"><div class="hb-stat"><span class="hb-stat-value">8+</span><span class="hb-stat-label">主要业务能力域</span></div></div>
+    <div class="col-6 col-lg-3"><div class="hb-stat"><span class="hb-stat-value">1</span><span class="hb-stat-label">原则：数据可追溯</span></div></div>
+  </section>
+
+  <section class="hb-section" id="map">
+    <div class="hb-section-kicker">SYSTEM MAP</div><h2>系统地图与功能介绍</h2>
+    <p class="hb-section-intro">从入口、角色到共享数据链路理解系统。详细范围以 <a href="/prd#s13">PRD 当前版本验收</a> 为准。</p>
+    <div class="hb-architecture">
+      <div class="hb-arch-root"><div class="hb-node text-center" style="min-width:230px;min-height:auto"><span class="hb-node-tag">PLATFORM</span><div class="hb-node-title">洞见智研多租户投研平台</div><div class="hb-node-copy">真实市场数据、租户知识、研究生产与平台治理</div></div></div>
+      <div class="hb-arch-line"></div><div class="hb-arch-bar"></div>
+      <div class="row g-3 position-relative" style="z-index:1">
+        <div class="col-md-6 col-xl-3"><div class="hb-node"><span class="hb-node-tag">PUBLIC</span><div class="hb-node-title">首页与产品文档</div><div class="hb-node-copy">产品总览、PRD、学习手册与各系统入口。</div></div></div>
+        <div class="col-md-6 col-xl-3"><div class="hb-node"><span class="hb-node-tag">MOBILE</span><div class="hb-node-title">H5 用户端</div><div class="hb-node-copy">注册、合规、行情、自选、复盘阅读、知识、消息及按配置开放的 Hermes。</div></div></div>
+        <div class="col-md-6 col-xl-3"><div class="hb-node"><span class="hb-node-tag">DAV</span><div class="hb-node-title">大V 工作台</div><div class="hb-node-copy">复盘生产、知识录入、粉丝经营、评论统计、租户定价与门户维护。</div></div></div>
+        <div class="col-md-6 col-xl-3"><div class="hb-node"><span class="hb-node-tag">ADMIN</span><div class="hb-node-title">平台 Admin</div><div class="hb-node-copy">用户租户、开关、模型、知识/记忆、市场数据、审计与发布治理。</div></div></div>
+      </div>
+      <div class="hb-arch-line mt-3"></div>
+      <div class="row g-3 position-relative" style="z-index:1"><div class="col-lg-4"><div class="hb-node"><span class="hb-node-tag">DATA</span><div class="hb-node-title">Gangtise 市场与指标数据</div><div class="hb-node-copy">个股、指数和指标由统一数据服务供给；无真实数据时明确提示。</div></div></div><div class="col-lg-4"><div class="hb-node"><span class="hb-node-tag">KNOWLEDGE</span><div class="hb-node-title">租户知识与证据链</div><div class="hb-node-copy">文本、语音、文件、URL、标注与 Hermes 回答可沉淀为知识资产。</div></div></div><div class="col-lg-4"><div class="hb-node"><span class="hb-node-tag">AI</span><div class="hb-node-title">Hermes 与功能级模型</div><div class="hb-node-copy">优先召回租户知识，再按意图调度图表、市场、报告或帮助能力。</div></div></div></div>
+    </div>
+    <div class="row g-3 mt-1"><div class="col-lg-6"><div class="card hb-card"><div class="card-body"><h3 class="hb-card-title">角色与租户边界</h3><p class="hb-card-copy mb-0">普通投资者只访问所属租户内容；研究型大V管理自身租户；Admin 是平台治理角色，不能被大V替代访问。所有测试必须同时记录角色和租户。</p></div></div></div><div class="col-lg-6"><div class="card hb-card"><div class="card-body"><h3 class="hb-card-title">共享业务链路</h3><p class="hb-card-copy mb-0">内容录入与互动先按租户保存，再形成知识、标签、记忆和关系；Hermes 与复盘优先使用这条沉淀链路输出可追溯的研究结果。</p></div></div></div></div>
+  </section>
+
+  <section class="hb-section" id="flows">
+    <div class="hb-section-kicker">CORE FEATURE FLOWS</div><h2>核心功能使用流程图</h2>
+    <p class="hb-section-intro">每套流程按角色泳道展开。蓝色为输入，绿色为系统处理，金色为输出，红色为平台控制；同一流程中涉及多个角色时，底部明确说明结果会影响谁。</p>
+    <div class="hb-flow-legend"><span>输入</span><span>系统处理</span><span>输出 / 可见结果</span><span>控制 / 审计</span></div>
+    <div class="accordion" id="coreFlowAccordion">
+      <article class="accordion-item">
+        <h3 class="accordion-header"><button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#flowAccount">01 · 账户注册、合规确认与渠道归因</button></h3>
+        <div id="flowAccount" class="accordion-collapse collapse show" data-bs-parent="#coreFlowAccordion"><div class="accordion-body">
+          <div class="hb-flow-lane"><div class="hb-flow-role">普通用户</div><div class="hb-flow-cells"><div class="hb-flow-cell is-input"><b>输入</b>昵称、用户名、密码</div><div class="hb-flow-cell is-input"><b>输入</b>阅读并勾选合规条款</div><div class="hb-flow-cell is-input"><b>输入</b>选择 H5 获取渠道</div><div class="hb-flow-cell is-output"><b>输出</b>进入所属租户的 H5</div></div></div>
+          <div class="hb-flow-lane"><div class="hb-flow-role">账户服务</div><div class="hb-flow-cells"><div class="hb-flow-cell is-process"><b>校验</b>用户名、密码规则与重复账户</div><div class="hb-flow-cell is-process"><b>创建</b>投资者账号、默认租户关系和账号状态</div><div class="hb-flow-cell is-process"><b>沉淀</b>合规确认和渠道字段</div><div class="hb-flow-cell is-output"><b>会话</b>写入登录态与用户资料</div></div></div>
+          <div class="hb-flow-lane"><div class="hb-flow-role">平台 Admin</div><div class="hb-flow-cells"><div class="hb-flow-cell is-control"><b>控制</b>账号登录、微信登录和受限测试开关</div><div class="hb-flow-cell is-control"><b>查看</b>用户角色、租户、渠道和状态</div><div class="hb-flow-cell is-output"><b>经营数据</b>渠道分析使用真实登记来源</div><div class="hb-flow-cell"><b>边界</b>Admin 不属于大V租户</div></div></div>
+          <div class="hb-flow-result"><strong>用户关系：</strong>普通用户注册后成为某个大V租户的成员；大V可以经营该租户的粉丝关系，Admin 可以治理账号与渠道，但不代替大V进入其工作台。</div>
+        </div></div>
+      </article>
+      <article class="accordion-item">
+        <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#flowWatchlist">02 · 自选股、真实行情、K线标注与评论互动</button></h3>
+        <div id="flowWatchlist" class="accordion-collapse collapse" data-bs-parent="#coreFlowAccordion"><div class="accordion-body">
+          <div class="hb-flow-lane"><div class="hb-flow-role">普通用户 / 大V</div><div class="hb-flow-cells"><div class="hb-flow-cell is-input"><b>输入</b>股票代码或名称，例如 601988</div><div class="hb-flow-cell is-input"><b>操作</b>选择候选标的，添加自选或进入详情</div><div class="hb-flow-cell is-input"><b>输入</b>在 K线图上标注，或发表评论</div><div class="hb-flow-cell is-output"><b>输出</b>查看行情、图表、标注和评论列表</div></div></div>
+          <div class="hb-flow-lane"><div class="hb-flow-role">市场与互动服务</div><div class="hb-flow-cells"><div class="hb-flow-cell is-process"><b>匹配</b>证券代码与名称，调用 Gangtise 市场数据</div><div class="hb-flow-cell is-process"><b>渲染</b>标准化 OHLC / 趋势数据进入 ECharts</div><div class="hb-flow-cell is-process"><b>保存</b>标注和评论按租户/用户写入；评论规则提取标签</div><div class="hb-flow-cell is-output"><b>输出</b>价格、来源、时间、交互式图表与行业统计</div></div></div>
+          <div class="hb-flow-lane"><div class="hb-flow-role">大V / Admin</div><div class="hb-flow-cells"><div class="hb-flow-cell is-output"><b>大V使用</b>复盘可引用所选自选股的有效标注</div><div class="hb-flow-cell is-output"><b>大V使用</b>工作台汇总粉丝评论、关键词和行业分布</div><div class="hb-flow-cell is-control"><b>Admin 控制</b>评论互动开关同时作用页面与 API</div><div class="hb-flow-cell is-control"><b>数据边界</b>无真实数据时明确显示不可用，不使用模拟价格</div></div></div>
+          <div class="hb-flow-result"><strong>用户关系：</strong>普通用户和大V都可产生自选与互动数据；大V看到自己租户的聚合经营结果；Admin 只能做平台治理和分析，不能绕过租户边界生成内容。</div>
+        </div></div>
+      </article>
+      <article class="accordion-item">
+        <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#flowReview">03 · 大V复盘生产、确认与发布</button></h3>
+        <div id="flowReview" class="accordion-collapse collapse" data-bs-parent="#coreFlowAccordion"><div class="accordion-body">
+          <div class="hb-flow-lane"><div class="hb-flow-role">研究型大V</div><div class="hb-flow-cells"><div class="hb-flow-cell is-input"><b>输入</b>用户自定义主题和手动内容；也可录音、上传文件或 URL</div><div class="hb-flow-cell is-input"><b>选择</b>可选自选股；不选择也可继续</div><div class="hb-flow-cell is-input"><b>确认</b>编辑用户复盘 Draft 后确认发布</div><div class="hb-flow-cell is-output"><b>输出</b>已发布复盘与发布反馈</div></div></div>
+          <div class="hb-flow-lane"><div class="hb-flow-role">复盘工作流</div><div class="hb-flow-cells"><div class="hb-flow-cell is-process"><b>归集</b>语音/文件/URL 回填到同一可编辑用户输入</div><div class="hb-flow-cell is-process"><b>生成</b>先形成用户复盘 Draft，不替换原始输入</div><div class="hb-flow-cell is-process"><b>确认后处理</b>发布时生成150字内摘要；选择自选股才做归纳</div><div class="hb-flow-cell is-output"><b>落库</b>复盘正文、摘要、来源与关联关系写入租户内容</div></div></div>
+          <div class="hb-flow-lane"><div class="hb-flow-role">普通用户 / Hermes</div><div class="hb-flow-cells"><div class="hb-flow-cell is-output"><b>普通用户</b>复盘列表和详情立即看到新内容</div><div class="hb-flow-cell is-output"><b>普通用户</b>消息可收到对应更新</div><div class="hb-flow-cell is-output"><b>Hermes</b>可在租户知识与复盘证据链中继续回答</div><div class="hb-flow-cell is-control"><b>边界</b>没有选自选股时，不能显示虚构的自选股归纳</div></div></div>
+          <div class="hb-flow-result"><strong>用户关系：</strong>大V拥有内容的输入、编辑与发布主导权；普通用户只阅读所属租户发布内容；Hermes 使用已沉淀内容进行研究辅助，不应越过用户确认步骤自动发布。</div>
+        </div></div>
+      </article>
+      <article class="accordion-item">
+        <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#flowKnowledge">04 · 知识录入、百科结构、图谱与证据链复用</button></h3>
+        <div id="flowKnowledge" class="accordion-collapse collapse" data-bs-parent="#coreFlowAccordion"><div class="accordion-body">
+          <div class="hb-flow-lane"><div class="hb-flow-role">研究型大V</div><div class="hb-flow-cells"><div class="hb-flow-cell is-input"><b>输入</b>文本、语音、文件、URL、K线标注或 Hermes 回答</div><div class="hb-flow-cell is-input"><b>操作</b>确认作为知识源录入，而不是仅加入聊天上下文</div><div class="hb-flow-cell is-output"><b>查看</b>按 Tab 浏览百科、词条和知识分层</div><div class="hb-flow-cell is-output"><b>观察</b>在图谱中展开、收缩关系层级</div></div></div>
+          <div class="hb-flow-lane"><div class="hb-flow-role">知识服务</div><div class="hb-flow-cells"><div class="hb-flow-cell is-process"><b>解析</b>保留原始来源和内容，形成知识源</div><div class="hb-flow-cell is-process"><b>抽取</b>关键词、标签、词条、关系与向量索引</div><div class="hb-flow-cell is-process"><b>组织</b>按租户构建百科结构和图谱节点</div><div class="hb-flow-cell is-output"><b>供给</b>向 Hermes、复盘和工作台提供证据链召回</div></div></div>
+          <div class="hb-flow-lane"><div class="hb-flow-role">平台 Admin</div><div class="hb-flow-cells"><div class="hb-flow-cell is-control"><b>治理</b>跨租户选择、知识源、词条、关系和向量状态</div><div class="hb-flow-cell is-control"><b>查看</b>QKV 与录入治理细节</div><div class="hb-flow-cell is-control"><b>备份 / 清理</b>按权限管理知识与记忆资产</div><div class="hb-flow-cell is-output"><b>边界</b>大V端不暴露 Admin 治理字段</div></div></div>
+          <div class="hb-flow-result"><strong>用户关系：</strong>大V持续把研究材料变成租户知识资产；普通用户消费该租户可见知识；Hermes 优先在这里召回依据；Admin 负责治理质量与隔离，但不替代大V编写词条内容。</div>
+        </div></div>
+      </article>
+      <article class="accordion-item">
+        <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#flowHermes">05 · Hermes 研究问答、图表与长期记忆</button></h3>
+        <div id="flowHermes" class="accordion-collapse collapse" data-bs-parent="#coreFlowAccordion"><div class="accordion-body">
+          <div class="hb-flow-lane"><div class="hb-flow-role">大V / 已开放投资者</div><div class="hb-flow-cells"><div class="hb-flow-cell is-input"><b>输入</b>个股、指数、指标、知识、报告、URL、复盘或产品帮助问题</div><div class="hb-flow-cell is-input"><b>选择</b>新会话或打开历史会话继续追问</div><div class="hb-flow-cell is-input"><b>表达需求</b>明确要 K线、线图、分布图或图表加分析</div><div class="hb-flow-cell is-output"><b>输出</b>可读回答、来源、图表、追问选项和可折叠思考过程</div></div></div>
+          <div class="hb-flow-lane"><div class="hb-flow-role">Hermes 工作流</div><div class="hb-flow-cells"><div class="hb-flow-cell is-process"><b>读取</b>会话短期上下文、用户长期记忆与当前租户</div><div class="hb-flow-cell is-process"><b>路由</b>范围识别、意图识别、知识优先召回与工具调度</div><div class="hb-flow-cell is-process"><b>执行</b>Gangtise 市场/指标、知识、报告/URL、ECharts 或产品帮助</div><div class="hb-flow-cell is-output"><b>沉淀</b>记录对话、标签、画像、工作记忆和缺失能力需求</div></div></div>
+          <div class="hb-flow-lane"><div class="hb-flow-role">平台 Admin</div><div class="hb-flow-cells"><div class="hb-flow-cell is-control"><b>访问策略</b>控制普通用户访问、提示词范围、互联网补充和思考展示</div><div class="hb-flow-cell is-control"><b>模型策略</b>按功能选择模型或回退默认模型</div><div class="hb-flow-cell is-control"><b>治理</b>查看调用、工具动作、算力、画像与记忆覆盖</div><div class="hb-flow-cell is-control"><b>边界</b>数据或能力缺失时必须明确说明，不生成虚构结论</div></div></div>
+          <div class="hb-flow-result"><strong>用户关系：</strong>提问用户获得研究辅助结果；同租户的大V通过知识与内容沉淀间接受益；Admin 只管理开放范围、模型和审计，不应查看或混用其他租户的对话内容。</div>
+        </div></div>
+      </article>
+      <article class="accordion-item">
+        <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#flowAdmin">06 · Admin 配置、数据治理与受控数据库发布</button></h3>
+        <div id="flowAdmin" class="accordion-collapse collapse" data-bs-parent="#coreFlowAccordion"><div class="accordion-body">
+          <div class="hb-flow-lane"><div class="hb-flow-role">平台 Admin</div><div class="hb-flow-cells"><div class="hb-flow-cell is-input"><b>输入</b>选择租户、功能开关、模型映射、治理范围或发布动作</div><div class="hb-flow-cell is-input"><b>确认</b>确认目标环境、发布范围和 Production 风险提示</div><div class="hb-flow-cell is-output"><b>查看</b>运营、审计、市场、知识和 Hermes 统计</div><div class="hb-flow-cell is-output"><b>输出</b>受审计的配置结果、备份、发布或回滚状态</div></div></div>
+          <div class="hb-flow-lane"><div class="hb-flow-role">平台治理服务</div><div class="hb-flow-cells"><div class="hb-flow-cell is-process"><b>鉴权</b>校验 role=admin；其他角色页面403、API拒绝</div><div class="hb-flow-cell is-process"><b>校验</b>配置字段、租户范围、功能依赖和数据来源</div><div class="hb-flow-cell is-process"><b>发布</b>默认扫描差异、审核增量并发布；全量同步先恢复临时库校验</div><div class="hb-flow-cell is-output"><b>生效</b>前台页面和接口按保存后的策略同步受限或开放</div></div></div>
+          <div class="hb-flow-lane"><div class="hb-flow-role">大V / 普通用户</div><div class="hb-flow-cells"><div class="hb-flow-cell is-output"><b>感知</b>菜单、登录方式、互动、Hermes 与主题按配置变化</div><div class="hb-flow-cell is-output"><b>受限</b>关闭功能后不能仅靠直链或 API 绕过</div><div class="hb-flow-cell is-output"><b>数据使用</b>继续只读取所属租户内容</div><div class="hb-flow-cell is-control"><b>安全边界</b>无任何业务角色可以替代 Admin 执行数据库操作</div></div></div>
+          <div class="hb-flow-result"><strong>发布策略：</strong>日常流程为 Staging 完整验证后，扫描本地与 Production 差异并审核增量发布，以保留 Production 真实业务数据。只有 Staging 已确认是权威完整快照、需要环境一致性或灾备恢复时，才使用 Staging → Production 全量同步；全量同步在临时库校验通过后切换，并保留旧 Production 回滚备份。</div>
+        </div></div>
+      </article>
+    </div>
+  </section>
+
+  <section class="hb-section" id="path">
+    <div class="hb-section-kicker">LEARNING FLOW</div><h2>建议学习路径</h2>
+    <p class="hb-section-intro">按阶段推进，不绑定学习天数。每阶段完成后再进入下一阶段，可根据已有经验合并或重复任一阶段。</p>
+    <div class="hb-stage-track" id="learningStages">
+      <button class="hb-stage active text-start" type="button" data-stage="stage-one"><span class="hb-stage-number">1</span><div class="hb-stage-title">建立全局认知</div><div class="hb-stage-desc">入口、角色、租户、数据与配置。</div></button>
+      <button class="hb-stage text-start" type="button" data-stage="stage-two"><span class="hb-stage-number">2</span><div class="hb-stage-title">体验核心业务</div><div class="hb-stage-desc">行情、自选、复盘、知识和消息。</div></button>
+      <button class="hb-stage text-start" type="button" data-stage="stage-three"><span class="hb-stage-number">3</span><div class="hb-stage-title">理解研究与生产</div><div class="hb-stage-desc">Hermes、证据链、复盘向导和知识沉淀。</div></button>
+      <button class="hb-stage text-start" type="button" data-stage="stage-four"><span class="hb-stage-number">4</span><div class="hb-stage-title">掌握平台治理</div><div class="hb-stage-desc">开关、模型、数据、记忆和权限。</div></button>
+    </div>
+    <div class="hb-stage-panel active" id="stage-one"><strong>阶段目标：能说清“谁在什么入口、看什么数据、能做什么”。</strong><ul class="mb-0 mt-2"><li>从系统地图进入 H5、大V工作台与 Admin，比较三个角色可见菜单。</li><li>理解“租户”是内容、知识、互动和数据隔离边界，不是单纯展示筛选条件。</li><li>确认市场与指标请求必须展示真实来源，数据不可用时不得以模拟内容替代。</li></ul></div>
+    <div class="hb-stage-panel" id="stage-two"><strong>阶段目标：能独立完成一条普通用户与一条大V核心业务链路。</strong><ul class="mb-0 mt-2"><li>普通用户：注册、合规确认、渠道选择、自选股搜索、详情、评论、复盘阅读和消息。</li><li>大V：创建复盘、编辑用户输入、选择或不选择自选股、确认发布并在前台查看。</li><li>录入一条知识，确认大V看到的是可阅读词条和知识分层，而不是治理字段。</li></ul></div>
+    <div class="hb-stage-panel" id="stage-three"><strong>阶段目标：理解每次 AI 结果为何可信或为何需要提示缺失。</strong><ul class="mb-0 mt-2"><li>区分个股、指数/指标图表、知识问答、报告/URL 解读、复盘证据链和产品帮助意图。</li><li>查看 Hermes 新会话、历史会话续问与长期记忆如何按租户沉淀。</li><li>对“只要图”和“图加解读”分别体验，检查图表类型、数据来源和解释是否匹配。</li></ul></div>
+    <div class="hb-stage-panel" id="stage-four"><strong>阶段目标：理解平台配置和发布策略如何真实影响前台与数据，而不是只改变页面文案。</strong><ul class="mb-0 mt-2"><li>查看 Admin 的角色权限、功能开关、模型映射、知识与记忆治理、数据湖和访问审计。</li><li>理解日常数据库发布先在 Staging 验证，再按结构、主数据和业务数据差异审核增量发布到 Production。</li><li>理解 Staging → Production 全量同步仅用于维护窗口、权威快照或灾备恢复；必须核对回滚备份和临时库校验结果。</li><li>用 Excel 测试用例按角色筛选，选择对应模块开展覆盖性验证。</li></ul></div>
+  </section>
+
+  <section class="hb-section" id="cases">
+    <div class="d-flex flex-column flex-md-row justify-content-md-between align-items-md-end gap-3"><div><div class="hb-section-kicker">ROLE TEST LIBRARY</div><h2>按角色的模块功能测试用例</h2><p class="hb-section-intro mb-0">手册展示覆盖范围；完整可编辑用例库包含前置条件、步骤、预期、优先级、测试类型、状态和备注。</p></div><a class="btn btn-primary hb-btn-primary" href="/static/downloads/gangtise_role_test_cases.xlsx" download>下载 Excel 测试用例</a></div>
+    <div class="hb-download mt-3 d-flex flex-column flex-md-row align-items-md-center gap-3"><div class="hb-download-icon">XLS</div><div class="flex-grow-1"><strong>Gangtise 按角色模块功能测试用例</strong><div class="small text-secondary">含“使用说明、全量用例、普通用户、大V、Admin”五个工作表。用例覆盖账户、权限、行情、图表、自选、互动、复盘、知识、Hermes、模型与治理。</div></div><span class="badge text-bg-light border">可筛选 · 可编辑 · 按角色拆分</span></div>
+    <ul class="nav nav-pills gap-2 mt-4" id="roleCaseTabs" role="tablist"><li class="nav-item" role="presentation"><button class="nav-link active" data-role-filter="all" type="button">全部覆盖</button></li><li class="nav-item"><button class="nav-link" data-role-filter="investor" type="button">普通用户</button></li><li class="nav-item"><button class="nav-link" data-role-filter="dav" type="button">研究型大V</button></li><li class="nav-item"><button class="nav-link" data-role-filter="admin" type="button">平台 Admin</button></li></ul>
+    <div class="card hb-card mt-3"><div class="card-body p-0"><div class="table-responsive" style="max-height:540px"><table class="table table-hover mb-0 hb-case-table"><thead><tr><th>角色</th><th>模块</th><th>覆盖主题</th><th>关键预期</th><th>优先级</th></tr></thead><tbody id="caseOverviewBody">
+      <tr data-role="investor"><td>普通用户</td><td>账户与合规</td><td>注册、登录、账号选择、合规确认、渠道登记、退出</td><td>账户状态、渠道归因与会话持久化正确</td><td class="risk-high">高</td></tr>
+      <tr data-role="investor"><td>普通用户</td><td>行情与自选股</td><td>代码/名称搜索、详情、真实行情、K线、标注、空态</td><td>来源、时间、图表和保存结果可追溯</td><td class="risk-high">高</td></tr>
+      <tr data-role="investor"><td>普通用户</td><td>互动与内容</td><td>评论、消息、复盘阅读、知识查看、账户设置</td><td>租户隔离，保存即时可见，分类清楚</td><td class="risk-high">高</td></tr>
+      <tr data-role="investor"><td>普通用户</td><td>Hermes</td><td>可见性、会话、图表、知识问答、缺失能力提示</td><td>按 Admin 策略开放，不输出虚构市场结论</td><td class="risk-high">高</td></tr>
+      <tr data-role="investor"><td>普通用户</td><td>版本中心</td><td>“我的 → 关于版本”、当前版本说明与历史版本</td><td>重大版本首次进入可展示更新弹窗；日常版本不应强制打断使用</td><td class="risk-medium">中</td></tr>
+      <tr data-role="dav"><td>研究型大V</td><td>复盘生产</td><td>主题、手动/语音/文件/URL、Draft 编辑、自选股可选、发布</td><td>用户输入可编辑，发布反馈明确且前台立即可见</td><td class="risk-high">高</td></tr>
+      <tr data-role="dav"><td>研究型大V</td><td>版本中心</td><td>顶部版本图标、最新版本介绍与历史版本</td><td>重大版本每端首次展示，关闭后可通过图标再次查看</td><td class="risk-medium">中</td></tr>
+      <tr data-role="dav"><td>研究型大V</td><td>知识与证据链</td><td>知识录入、百科、结构层级、图谱、Hermes 召回</td><td>面向大V展示可读知识，不暴露 Admin 治理字段</td><td class="risk-high">高</td></tr>
+      <tr data-role="dav"><td>研究型大V</td><td>粉丝经营</td><td>粉丝、定价、浏览、付费样本、评论统计、行业分布图</td><td>统计与图表仅使用本租户数据</td><td class="risk-medium">中</td></tr>
+      <tr data-role="admin"><td>平台 Admin</td><td>权限与配置</td><td>Admin 登录、用户/租户、功能开关、登录策略、互动策略</td><td>大V不得访问 Admin；开关同时约束前台与 API</td><td class="risk-high">高</td></tr>
+      <tr data-role="admin"><td>平台 Admin</td><td>AI 与知识治理</td><td>模型映射、Hermes 统计、记忆备份/清理、知识治理、缺失能力</td><td>作用范围准确，租户数据和清理条件可追溯</td><td class="risk-high">高</td></tr>
+      <tr data-role="admin"><td>平台 Admin</td><td>数据与发布治理</td><td>指标湖、Gangtise 调用、审计、Staging 验证、增量发布、环境全量同步与回滚</td><td>日常发布审核增量；全量同步仅限权威快照或维护窗口，并检查临时库校验与回滚备份</td><td class="risk-high">高</td></tr>
+    </tbody></table></div></div></div>
+    <div class="accordion mt-3" id="coverageAccordion"><div class="accordion-item"><h3 class="accordion-header"><button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#coverageInvestor">普通用户覆盖范围</button></h3><div id="coverageInvestor" class="accordion-collapse collapse show" data-bs-parent="#coverageAccordion"><div class="accordion-body small text-secondary">账户注册与登录、合规与渠道、首页行情、自选股搜索/详情/K线/标注、评论与消息、复盘阅读、知识查看、个人设置、关于版本，以及 Hermes 开放策略下的会话、图表、知识问答与错误提示。</div></div></div><div class="accordion-item"><h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#coverageDav">研究型大V覆盖范围</button></h3><div id="coverageDav" class="accordion-collapse collapse" data-bs-parent="#coverageAccordion"><div class="accordion-body small text-secondary">H5 与 Web 工作台入口、复盘向导、主题与用户输入、多次语音追加、文件与 URL 回填、知识录入/百科/图谱、Hermes 与租户知识、粉丝用户、定价、浏览统计、评论关键词、行业分布，以及顶部版本中心。</div></div></div><div class="accordion-item"><h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#coverageAdmin">平台 Admin覆盖范围</button></h3><div id="coverageAdmin" class="accordion-collapse collapse" data-bs-parent="#coverageAccordion"><div class="accordion-body small text-secondary">Admin 身份限制、用户与租户、渠道和付费样本、各类开关、模型与功能级映射、Hermes 使用统计与记忆治理、知识治理、指标与真实数据来源、审计、顶部版本中心，以及 Staging 验证、增量发布、环境全量同步和回滚。</div></div></div></div>
+  </section>
+
+  <section class="hb-section" id="principles"><div class="hb-section-kicker">WORKING PRINCIPLES</div><h2>学习与测试中的判断原则</h2><div class="row g-3"><div class="col-md-4"><div class="card hb-card"><div class="card-body"><h3 class="hb-card-title">先问数据从哪里来</h3><p class="hb-card-copy mb-0">市场数据、指标和图表要检查来源、更新时间、代码与空态。真实数据不可用时，正确行为是解释限制，而不是给出模拟结论。</p></div></div></div><div class="col-md-4"><div class="card hb-card"><div class="card-body"><h3 class="hb-card-title">再问属于哪个租户</h3><p class="hb-card-copy mb-0">复盘、知识、消息、评论、记忆和经营统计都必须带租户边界。角色正确但租户错误，仍是严重问题。</p></div></div></div><div class="col-md-4"><div class="card hb-card"><div class="card-body"><h3 class="hb-card-title">最后问配置是否真正生效</h3><p class="hb-card-copy mb-0">功能开关、访问策略和模型映射不仅影响菜单，也必须约束对应页面与接口行为；不能只做到视觉隐藏。</p></div></div></div></div></section>
+  <footer class="hb-footer">当前版本：2026-08-18。学习手册与首页功能总览、PRD 当前版本验收、Excel 测试用例库同步维护。</footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+<script>
+document.querySelectorAll('[data-stage]').forEach((button)=>button.addEventListener('click',()=>{const target=button.dataset.stage;document.querySelectorAll('[data-stage]').forEach((item)=>item.classList.toggle('active',item===button));document.querySelectorAll('.hb-stage-panel').forEach((panel)=>panel.classList.toggle('active',panel.id===target));}));
+document.querySelectorAll('[data-role-filter]').forEach((button)=>button.addEventListener('click',()=>{const role=button.dataset.roleFilter;document.querySelectorAll('[data-role-filter]').forEach((item)=>item.classList.toggle('active',item===button));document.querySelectorAll('#caseOverviewBody tr').forEach((row)=>{row.hidden=role!=='all'&&row.dataset.role!==role;});}));
+</script>
+</body>
+</html>

@@ -1,7 +1,79 @@
 from src.runtime import *
 from src.services import *
 from src.domain.ai_services import _is_truthy_flag
-from src.domain.core_services import _merge_site_config
+from src.domain.core_services import _merge_site_config, refresh_all_tenant_smart_indicator_snapshots
+
+H5_WECHAT_STATE_SESSION_KEY = "h5_wechat_login_state"
+H5_WECHAT_NEXT_SESSION_KEY = "h5_wechat_login_next"
+DATABASE_RELEASE_UNLOCK_SESSION_KEY = "database_release_unlock_until"
+DATABASE_RELEASE_UNLOCK_TTL_SECONDS = 10 * 60
+
+
+def _database_release_operation_password():
+    return str(os.environ.get("DATABASE_RELEASE_OPERATION_PASSWORD") or "536953")
+
+
+def _database_release_is_unlocked():
+    try:
+        return float(session.get(DATABASE_RELEASE_UNLOCK_SESSION_KEY) or 0) > time.time()
+    except (TypeError, ValueError):
+        return False
+
+
+def _database_release_unlock_required_response():
+    return jsonify({"ok": False, "error": "database_release_password_required"}), 423
+
+
+def _resolve_h5_next_target(default_value="/h5"):
+    body = request.get_json(silent=True) or {}
+    next_target = str(
+        request.args.get("next")
+        or request.form.get("next")
+        or body.get("next")
+        or ""
+    ).strip()
+    if not next_target:
+        next_target = default_value
+    if not next_target.startswith("/"):
+        next_target = default_value
+    return next_target
+
+
+def _append_redirect_query(target, key, value):
+    parsed = urlsplit(str(target or "/h5"))
+    query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    query[str(key or "").strip()] = str(value or "").strip()
+    next_query = urlencode(query)
+    next_hash = f"#{parsed.fragment}" if parsed.fragment else ""
+    return f"{parsed.path}{'?' + next_query if next_query else ''}{next_hash}"
+
+
+def _build_h5_auth_options_payload(site_config=None, profiles=None, current_profile=None):
+    config = site_config or get_site_config()
+    auth_settings = get_auth_settings(config)
+    auth_settings_secret = get_auth_settings(config, include_secret=True)
+    quick_select_enabled = auth_settings.get("quick_select_enabled") is True
+    public_wechat = auth_settings.get("wechat") or {}
+    secret_wechat = auth_settings_secret.get("wechat") or {}
+    return {
+        "auth_settings": {
+            "password_login_enabled": auth_settings.get("password_login_enabled") is True,
+            "wechat_login_enabled": auth_settings.get("wechat_login_enabled") is True,
+            "quick_select_enabled": quick_select_enabled,
+            "wechat_runtime_test_enabled": auth_settings.get("wechat_runtime_test_enabled") is True,
+            "wechat_ready": bool(public_wechat.get("app_id") and public_wechat.get("redirect_uri") and secret_wechat.get("app_secret")),
+            "wechat": {
+                "app_id": str(public_wechat.get("app_id") or "").strip(),
+                "redirect_uri": str(public_wechat.get("redirect_uri") or "").strip(),
+                "scope": str(public_wechat.get("scope") or "snsapi_userinfo").strip() or "snsapi_userinfo",
+                "auto_register_enabled": bool(public_wechat.get("auto_register_enabled")),
+                "default_role": str(public_wechat.get("default_role") or "investor").strip().lower() or "investor",
+                "default_tenant_slug": str(public_wechat.get("default_tenant_slug") or "").strip().lower(),
+            },
+        },
+        "profiles": (profiles if isinstance(profiles, list) else (get_h5_login_users(config) if quick_select_enabled else [])),
+        "current_profile": current_profile if current_profile is not None else get_current_demo_profile(config),
+    }
 
 @app.route("/api/funnel")
 def api_funnel():
@@ -11,6 +83,24 @@ def api_funnel():
 def api_channels():
     return jsonify(gen_channel_data())
 
+
+@app.route("/api/admin/channels")
+def api_admin_channels():
+    try:
+        return jsonify({"ok": True, "channels": build_admin_channel_payload()})
+    except Exception:
+        app.logger.exception("Failed to build admin channel payload")
+        return jsonify({"ok": False, "error": "channel_data_unavailable"}), 503
+
+
+@app.route("/api/admin/funnel-analytics")
+def api_admin_funnel_analytics():
+    try:
+        return jsonify({"ok": True, "analytics": build_admin_funnel_payload()})
+    except Exception:
+        app.logger.exception("Failed to build admin funnel analytics")
+        return jsonify({"ok": False, "error": "funnel_data_unavailable"}), 503
+
 @app.route("/api/kols")
 def api_kols():
     return jsonify(gen_kol_data())
@@ -19,9 +109,45 @@ def api_kols():
 def api_revenue():
     return jsonify(gen_revenue_trend())
 
+
+@app.route("/api/admin/revenue-analytics")
+def api_admin_revenue_analytics():
+    try:
+        return jsonify({"ok": True, "analytics": build_admin_revenue_analytics_payload()})
+    except Exception:
+        app.logger.exception("Failed to build admin revenue analytics")
+        return jsonify({"ok": False, "error": "revenue_data_unavailable"}), 503
+
+
+@app.route("/api/admin/kol-analytics")
+def api_admin_kol_analytics():
+    try:
+        return jsonify({"ok": True, "analytics": build_admin_kol_analytics_payload()})
+    except Exception:
+        app.logger.exception("Failed to build admin KOL analytics")
+        return jsonify({"ok": False, "error": "kol_data_unavailable"}), 503
+
 @app.route("/api/segments")
 def api_segments():
     return jsonify(gen_user_segments())
+
+
+@app.route("/api/admin/user-segments")
+def api_admin_user_segments():
+    try:
+        return jsonify({"ok": True, "segments": build_admin_user_segment_payload()})
+    except Exception:
+        app.logger.exception("Failed to build Admin user segment payload")
+        return jsonify({"ok": False, "error": "user_segments_unavailable"}), 503
+
+
+@app.route("/api/admin/points")
+def api_admin_points():
+    try:
+        return jsonify({"ok": True, "points": build_admin_points_payload()})
+    except Exception:
+        app.logger.exception("Failed to build Admin points payload")
+        return jsonify({"ok": False, "error": "points_data_unavailable"}), 503
 
 
 @app.route("/api/review/voice-transcribe", methods=["POST"])
@@ -110,10 +236,12 @@ def api_review_publish_embed():
         tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
         entry_point = str(body.get("entry_point") or "").strip().lower() or "unknown"
         speaker_name = str(body.get("speaker_name") or "").strip()
+        review_title = str(body.get("review_title") or "").strip()
         payload = {
             "text": body.get("text"),
             "tenant_slug": tenant_slug,
             "period": str(body.get("period") or "").strip().lower(),
+            "review_title": review_title,
             "entry_point": entry_point,
             "speaker_name": speaker_name,
             "transcription_engine": str(body.get("transcription_engine") or "manual").strip().lower() or "manual",
@@ -134,29 +262,62 @@ def api_review_publish_embed():
         }
         if not str(payload.get("text") or "").strip():
             raise ValueError("publish_text_required")
-        job = create_user_async_job(
-            "review_publish_embed",
-            payload=payload,
+        if not review_title:
+            raise ValueError("review_title_required")
+        snapshot_result = persist_review_publish_snapshot(
             tenant_slug=tenant_slug,
-            entry_point=entry_point,
-            owner_label=speaker_name,
+            text=payload.get("text"),
+            review_period=payload.get("period"),
+            review_title=review_title,
+            speaker_name=speaker_name,
+            source_mode=payload.get("source_mode"),
+            paragraph_mode=payload.get("paragraph_mode"),
+            selected_watchlist=payload.get("selected_watchlist"),
+            prompt_tags=payload.get("prompt_tags"),
+            knowledge_attachments=payload.get("knowledge_attachments"),
+            selected_cards=payload.get("selected_cards"),
+            data_sources=payload.get("data_sources"),
+            news_sources=payload.get("news_sources"),
+            llm_models=payload.get("llm_models"),
+            polished_input_text=payload.get("polished_input_text"),
+            review_summary=payload.get("review_summary"),
+            user_input_section=payload.get("user_input_section"),
+            watchlist_analysis_section=payload.get("watchlist_analysis_section"),
         )
+        payload["snapshot_sync_applied"] = True
+        payload["snapshot_id"] = str(((snapshot_result.get("snapshot") or {}).get("id")) or "").strip()
+        job = None
+        queue_error = ""
+        try:
+            job = create_user_async_job(
+                "review_publish_embed",
+                payload=payload,
+                tenant_slug=tenant_slug,
+                entry_point=entry_point,
+                owner_label=speaker_name,
+            )
+        except RuntimeError as exc:
+            queue_error = str(exc)
+        except Exception:
+            app.logger.exception("Failed to queue review publish embedding after snapshot publish")
+            queue_error = "review_publish_embedding_queue_failed"
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
-    except RuntimeError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 503
     except Exception:
         app.logger.exception("Failed to queue review publish text")
         return jsonify({"success": False, "error": "review_publish_embed_failed"}), 500
-    return jsonify(
-        {
-            "success": True,
-            "async": True,
-            "job_code": job["job_code"],
-            "job_status": job["status"],
-            "message": "复盘已提交发布，正在后台入向量库",
-        }
-    )
+    response_payload = {
+        "success": True,
+        "async": bool(job),
+        "message": "复盘已发布，正在后台入向量库" if job else "复盘已发布，向量入库暂未排队",
+        **snapshot_result,
+    }
+    if job:
+        response_payload["job_code"] = job["job_code"]
+        response_payload["job_status"] = job["status"]
+    if queue_error:
+        response_payload["queue_error"] = queue_error
+    return jsonify(response_payload)
 
 
 @app.route("/api/review/prepare-preview", methods=["POST"])
@@ -169,16 +330,16 @@ def api_review_prepare_preview():
         payload = {
             "tenant_slug": tenant_slug,
             "period": str(body.get("period") or "").strip().lower(),
+            "review_title": str(body.get("review_title") or "").strip(),
             "source_mode": str(body.get("source_mode") or "").strip().lower(),
             "source_text": body.get("source_text"),
             "selected_watchlist": body.get("selected_watchlist") if isinstance(body.get("selected_watchlist"), list) else [],
             "speaker_name": speaker_name,
             "entry_point": entry_point,
+            "include_summary": _is_truthy_flag(body.get("include_summary")) if "include_summary" in body else True,
         }
         if not str(payload.get("source_text") or "").strip():
             raise ValueError("review_source_text_required")
-        if not payload["selected_watchlist"]:
-            raise ValueError("review_selected_watchlist_required")
         job = create_user_async_job(
             "review_prepare_preview",
             payload=payload,
@@ -201,7 +362,7 @@ def api_review_prepare_preview():
             "async": True,
             "job_code": job["job_code"],
             "job_status": job["status"],
-            "message": "复盘结构化预览已提交生成，正在后台归纳摘要与自选股分析",
+            "message": "复盘结构化预览已提交生成，正在后台整理摘要和可选归纳内容",
         }
     )
 
@@ -211,16 +372,148 @@ def api_market():
     return jsonify(gen_market_data())
 
 
+@app.route("/api/market-overview")
+def api_market_overview():
+    try:
+        payload = build_market_overview_payload()
+        if not payload.get("items"):
+            request_market_snapshot_refresh()
+        return jsonify(payload)
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to load market overview")
+        return jsonify({"ok": False, "error": "market_overview_failed"}), 502
+
+
+@app.route("/api/market-sectors")
+def api_market_sectors():
+    try:
+        force_refresh = str(request.args.get("refresh") or "").strip().lower() in {"1", "true", "yes"}
+        payload = build_market_sector_overview_payload(force_refresh=force_refresh)
+        if not payload.get("items"):
+            request_market_snapshot_refresh()
+        return jsonify(payload)
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to load market sector overview")
+        return jsonify({"ok": False, "error": "market_sector_overview_failed"}), 502
+
+
+@app.route("/api/market-snapshot/refresh", methods=["POST"])
+def api_market_snapshot_refresh():
+    """Run the controlled market collector for an explicit manual refresh."""
+    try:
+        result = sync_market_snapshot(force=True)
+        overview = build_market_overview_payload()
+        sectors = build_market_sector_overview_payload()
+        return jsonify({"ok": bool(result.get("ok")), "result": result, "overview": overview, "sectors": sectors}), 200 if result.get("ok") else 502
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to refresh market snapshot")
+        return jsonify({"ok": False, "error": "market_snapshot_refresh_failed"}), 502
+
+
 @app.route("/api/watchlist")
 def api_watchlist():
     return jsonify(gen_market_data())
+
+
+def _current_watchlist_owner():
+    current = get_current_authenticated_user() or {}
+    role = str(current.get("role") or "").strip().lower()
+    tenant_slug = str(current.get("tenant_slug") or ((current.get("tenant") or {}).get("slug") if isinstance(current.get("tenant"), dict) else "") or "").strip().lower()
+    profile_id = str(current.get("username") or current.get("id") or "").strip()
+    if role not in {"investor", "dav"} or not tenant_slug or not profile_id:
+        return None
+    return current, tenant_slug, profile_id
+
+
+@app.route("/api/watchlist/items", methods=["GET"])
+def api_user_watchlist_items():
+    owner = _current_watchlist_owner()
+    if not owner:
+        return jsonify({"ok": False, "error": "watchlist_auth_required"}), 403
+    _, tenant_slug, profile_id = owner
+    try:
+        items = list_user_watchlist_items(tenant_slug, profile_id)
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to load user watchlist items")
+        return jsonify({"ok": False, "error": "watchlist_items_load_failed"}), 500
+    return jsonify({"ok": True, "items": items})
+
+
+@app.route("/api/watchlist/items", methods=["POST"])
+def api_add_user_watchlist_item():
+    owner = _current_watchlist_owner()
+    if not owner:
+        return jsonify({"ok": False, "error": "watchlist_auth_required"}), 403
+    body = request.get_json(silent=True) or {}
+    _, tenant_slug, profile_id = owner
+    try:
+        item = add_user_watchlist_item(
+            tenant_slug=tenant_slug,
+            user_profile_id=profile_id,
+            stock_code=body.get("stock_code") or body.get("code"),
+            stock_name=body.get("stock_name") or body.get("name"),
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to add user watchlist item")
+        return jsonify({"ok": False, "error": "watchlist_item_add_failed"}), 500
+    return jsonify({"ok": True, "item": item})
+
+
+@app.route("/api/watchlist/items/<stock_code>", methods=["DELETE"])
+def api_remove_user_watchlist_item(stock_code):
+    owner = _current_watchlist_owner()
+    if not owner:
+        return jsonify({"ok": False, "error": "watchlist_auth_required"}), 403
+    _, tenant_slug, profile_id = owner
+    try:
+        deleted = remove_user_watchlist_item(tenant_slug, profile_id, stock_code)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to remove user watchlist item")
+        return jsonify({"ok": False, "error": "watchlist_item_remove_failed"}), 500
+    return jsonify({"ok": True, "deleted": deleted})
+
+
+@app.route("/api/watchlist/search")
+def api_watchlist_search():
+    query = str(request.args.get("q") or "").strip()
+    limit = max(1, min(int(request.args.get("limit") or 8), 12))
+    if not query:
+        return jsonify({"ok": True, "items": []})
+    try:
+        items = search_watchlist_candidates(query, top=limit, include_remote=True)
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to search watchlist candidates")
+        return jsonify({"ok": False, "error": "watchlist_search_failed"}), 500
+    return jsonify({"ok": True, "items": items})
 
 
 @app.route("/api/watchlist/<stock_code>")
 def api_watchlist_detail(stock_code):
     site_config = get_site_config()
     details = gen_watchlist_details()
-    payload = details.get(stock_code, {
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    viewer_role = str(request.args.get("user_role") or "").strip().lower()
+    viewer_profile_id = str(request.args.get("user_profile_id") or "").strip()
+    allow_fan_to_fan = is_feature_enabled("watchlist_fan_comment_interaction", site_config)
+    payload = get_watchlist_detail_by_code(stock_code=stock_code, stock_name=stock_code, details_map=details) or {
         "code": stock_code,
         "name": stock_code,
         "market": "CN",
@@ -242,8 +535,253 @@ def api_watchlist_detail(stock_code):
             "band": "等待更多财务、行业和作者样本。",
             "drivers": [],
         },
+    }
+    normalized = apply_watchlist_feature_flags(payload, site_config)
+    app.logger.warning(
+        "Watchlist API response code=%s tenant=%s kline_points=%s data_unavailable=%s data_source=%s intraday_points=%s intraday_available=%s unavailable_message=%s",
+        str(stock_code or "").strip().upper(),
+        tenant_slug or "--",
+        len(normalized.get("kline") or []) if isinstance(normalized.get("kline"), list) else 0,
+        bool(normalized.get("data_unavailable")),
+        str(normalized.get("data_source") or "--")[:80],
+        len(normalized.get("intraday_series") or []) if isinstance(normalized.get("intraday_series"), list) else 0,
+        bool(normalized.get("intraday_available")),
+        str(normalized.get("data_unavailable_message") or "")[:160],
+    )
+    annotation_key = str(normalized.get("indicator_code") or stock_code).strip() or stock_code
+    normalized["annotation_key"] = annotation_key
+    if tenant_slug:
+        try:
+            normalized["annotations"] = list_watchlist_kline_annotations(
+                tenant_slug=tenant_slug,
+                stock_code=annotation_key,
+                stock_name=normalized.get("name") or stock_code,
+                details_map=details,
+                viewer_role=viewer_role,
+                viewer_profile_id=viewer_profile_id,
+            )
+        except Exception as exc:
+            if not is_db_unavailable_error(exc):
+                raise
+            normalized["annotations"] = []
+        try:
+            normalized["comments"] = list_watchlist_comments(
+                tenant_slug=tenant_slug,
+                stock_code=stock_code,
+                stock_name=normalized.get("name") or stock_code,
+                viewer_role=viewer_role,
+                viewer_profile_id=viewer_profile_id,
+                allow_fan_to_fan=allow_fan_to_fan,
+                details_map=details,
+            )
+            normalized["comment_settings"] = {
+                "allow_fan_to_fan": allow_fan_to_fan,
+                "viewer_role": viewer_role,
+            }
+        except Exception as exc:
+            if not is_db_unavailable_error(exc):
+                raise
+            normalized["comments"] = []
+            normalized["comment_settings"] = {
+                "allow_fan_to_fan": allow_fan_to_fan,
+                "viewer_role": viewer_role,
+            }
+    return jsonify(normalized)
+
+
+@app.route("/api/watchlist/<stock_code>/annotations")
+def api_watchlist_annotations(stock_code):
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    stock_name = str(request.args.get("stock_name") or "").strip()
+    viewer_role = str(request.args.get("user_role") or "investor").strip().lower()
+    viewer_profile_id = str(request.args.get("user_profile_id") or "").strip()
+    if not tenant_slug:
+        return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
+    try:
+        items = list_watchlist_kline_annotations(
+            tenant_slug=tenant_slug,
+            stock_code=stock_code,
+            stock_name=stock_name,
+            viewer_role=viewer_role,
+            viewer_profile_id=viewer_profile_id,
+        )
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to load watchlist annotations")
+        return jsonify({"ok": False, "error": "watchlist_annotations_load_failed"}), 500
+    return jsonify({"ok": True, "items": items})
+
+
+@app.route("/api/watchlist/<stock_code>/annotations", methods=["POST"])
+def api_save_watchlist_annotation(stock_code):
+    body = request.get_json(silent=True) or {}
+    tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
+    user_role = str(body.get("user_role") or "").strip().lower()
+    if not tenant_slug:
+        return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
+    user_profile_id = str(body.get("user_profile_id") or "").strip()
+    if user_role not in {"dav", "investor"} or not user_profile_id:
+        return jsonify({"ok": False, "error": "watchlist_annotation_forbidden"}), 403
+    try:
+        item = save_watchlist_kline_annotation(
+            tenant_slug=tenant_slug,
+            stock_code=stock_code,
+            stock_name=body.get("stock_name"),
+            candle_index=body.get("candle_index"),
+            candle_date=body.get("candle_date"),
+            open_price=body.get("open"),
+            high_price=body.get("high"),
+            low_price=body.get("low"),
+            close_price=body.get("close"),
+            content=body.get("content"),
+            title=body.get("title"),
+            note=body.get("note"),
+            trigger=body.get("trigger"),
+            created_by_user_id=body.get("user_profile_id"),
+            created_by_name=body.get("user_name"),
+            created_by_role=user_role,
+            source_client=body.get("source_client") or body.get("entry_point") or "h5",
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to save watchlist annotation")
+        return jsonify({"ok": False, "error": "watchlist_annotation_save_failed"}), 500
+    return jsonify({"ok": True, "item": item})
+
+
+@app.route("/api/watchlist/<stock_code>/comments")
+def api_watchlist_comments(stock_code):
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    viewer_role = str(request.args.get("user_role") or "").strip().lower()
+    viewer_profile_id = str(request.args.get("user_profile_id") or "").strip()
+    stock_name = str(request.args.get("stock_name") or "").strip()
+    if not tenant_slug:
+        return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
+    try:
+        items = list_watchlist_comments(
+            tenant_slug=tenant_slug,
+            stock_code=stock_code,
+            stock_name=stock_name,
+            viewer_role=viewer_role,
+            viewer_profile_id=viewer_profile_id,
+            allow_fan_to_fan=is_feature_enabled("watchlist_fan_comment_interaction", get_site_config()),
+        )
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to load watchlist comments")
+        return jsonify({"ok": False, "error": "watchlist_comments_load_failed"}), 500
+    return jsonify({
+        "ok": True,
+        "items": items,
+        "comment_settings": {
+            "allow_fan_to_fan": is_feature_enabled("watchlist_fan_comment_interaction", get_site_config()),
+            "viewer_role": viewer_role,
+        },
     })
-    return jsonify(apply_watchlist_feature_flags(payload, site_config))
+
+
+@app.route("/api/tenant/<tenant_slug>/watchlist-comment-analytics")
+def api_watchlist_comment_analytics(tenant_slug):
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    if not normalized_tenant:
+        return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
+    try:
+        analytics = build_watchlist_comment_analytics(normalized_tenant)
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to build watchlist comment analytics")
+        return jsonify({"ok": False, "error": "watchlist_comment_analytics_failed"}), 500
+    return jsonify({"ok": True, "analytics": analytics})
+
+
+@app.route("/api/watchlist/<stock_code>/comments", methods=["POST"])
+def api_save_watchlist_comment(stock_code):
+    body = request.get_json(silent=True) or {}
+    tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
+    user_role = str(body.get("user_role") or "").strip().lower()
+    user_profile_id = str(body.get("user_profile_id") or "").strip()
+    if not tenant_slug:
+        return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
+    if user_role not in {"investor", "dav"}:
+        return jsonify({"ok": False, "error": "watchlist_comment_role_invalid"}), 400
+    try:
+        item = save_watchlist_comment(
+            tenant_slug=tenant_slug,
+            stock_code=stock_code,
+            stock_name=body.get("stock_name"),
+            comment_text=body.get("comment_text"),
+            created_by_user_id=user_profile_id,
+            created_by_name=body.get("user_name"),
+            created_by_role=user_role,
+            source_client=body.get("source_client") or body.get("entry_point") or "h5",
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to save watchlist comment")
+        return jsonify({"ok": False, "error": "watchlist_comment_save_failed"}), 500
+    return jsonify({"ok": True, "item": item})
+
+
+@app.route("/api/watchlist/<stock_code>/comments/<comment_ref>", methods=["DELETE"])
+def api_delete_watchlist_comment(stock_code, comment_ref):
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    user_role = str(request.args.get("user_role") or "").strip().lower()
+    user_profile_id = str(request.args.get("user_profile_id") or "").strip()
+    user_profile_id = str(request.args.get("user_profile_id") or "").strip()
+    if not tenant_slug:
+        return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
+    try:
+        deleted = delete_watchlist_comment(
+            tenant_slug=tenant_slug,
+            stock_code=stock_code,
+            comment_id=comment_ref,
+            actor_role=user_role,
+            actor_profile_id=user_profile_id,
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to delete watchlist comment")
+        return jsonify({"ok": False, "error": "watchlist_comment_delete_failed"}), 500
+    return jsonify({"ok": True, "deleted": bool(deleted)})
+
+
+@app.route("/api/watchlist/<stock_code>/annotations/<annotation_ref>", methods=["DELETE"])
+def api_delete_watchlist_annotation(stock_code, annotation_ref):
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    user_role = str(request.args.get("user_role") or "").strip().lower()
+    user_profile_id = str(request.args.get("user_profile_id") or "").strip()
+    if not tenant_slug:
+        return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
+    if user_role not in {"dav", "investor"} or not user_profile_id:
+        return jsonify({"ok": False, "error": "watchlist_annotation_forbidden"}), 403
+    try:
+        deleted = delete_watchlist_kline_annotation(
+            tenant_slug=tenant_slug,
+            stock_code=stock_code,
+            annotation_id=int(annotation_ref) if str(annotation_ref).isdigit() else None,
+            candle_index=int(annotation_ref) if str(annotation_ref).isdigit() else None,
+            actor_profile_id=user_profile_id,
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to delete watchlist annotation")
+        return jsonify({"ok": False, "error": "watchlist_annotation_delete_failed"}), 500
+    return jsonify({"ok": True, "deleted": bool(deleted)})
 
 
 def get_access_summary():
@@ -369,6 +907,178 @@ def api_admin_user_jobs():
     return jsonify({"ok": True, **build_user_async_jobs_payload(tenant_slug=tenant_slug, status=status, job_type=job_type, limit=limit)})
 
 
+@app.route("/api/admin/database-release/overview")
+def api_admin_database_release_overview():
+    return jsonify({"ok": True, "operation_unlocked": _database_release_is_unlocked(), **build_database_release_overview()})
+
+
+@app.route("/api/admin/market-data-diagnostic")
+def api_admin_market_data_diagnostic():
+    """Admin-only live Gangtise diagnosis for production incident handling."""
+    try:
+        probe_security_code = str(request.args.get("security_code") or "600519.SH").strip().upper()
+        if not probe_security_code or len(probe_security_code) > 32 or any(
+            char not in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-" for char in probe_security_code
+        ):
+            return jsonify({"ok": False, "error": "invalid_security_code"}), 400
+        return jsonify({"ok": True, "diagnostic": build_gangtise_market_runtime_diagnostic(probe_security_code)})
+    except Exception as exc:
+        app.logger.exception("Unable to diagnose Gangtise market data connector")
+        return jsonify({"ok": False, "error": "market_data_diagnostic_failed", "detail": str(exc)}), 502
+
+
+@app.route("/api/admin/gangtise-credentials", methods=["GET", "POST"])
+def api_admin_gangtise_credentials():
+    """Manage encrypted Gangtise credentials without returning secret values to the browser."""
+    if request.method == "GET":
+        return jsonify({"ok": True, "credentials": get_gangtise_openapi_credentials_status()})
+    try:
+        status = save_gangtise_openapi_credentials_patch(request.get_json(silent=True) or {})
+        invalidate_gangtise_openapi_token_cache()
+        return jsonify({"ok": True, "credentials": status})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception:
+        app.logger.exception("Unable to save encrypted Gangtise OpenAPI credentials")
+        return jsonify({"ok": False, "error": "gangtise_credentials_save_failed"}), 500
+
+
+@app.route("/api/admin/gangtise-credentials/diagnose", methods=["POST"])
+def api_admin_gangtise_credentials_diagnose():
+    body = request.get_json(silent=True) or {}
+    probe_security_code = str(body.get("security_code") or "601988.SH").strip().upper()
+    if not probe_security_code or len(probe_security_code) > 32 or any(
+        char not in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-" for char in probe_security_code
+    ):
+        return jsonify({"ok": False, "error": "invalid_security_code"}), 400
+    try:
+        return jsonify({"ok": True, "diagnostic": build_gangtise_market_runtime_diagnostic(probe_security_code)})
+    except Exception:
+        app.logger.exception("Unable to diagnose encrypted Gangtise OpenAPI credentials")
+        return jsonify({"ok": False, "error": "gangtise_credentials_diagnostic_failed"}), 502
+
+
+@app.route("/api/admin/database-release/unlock", methods=["POST"])
+def api_admin_unlock_database_release():
+    payload = request.get_json(silent=True) or {}
+    password = str(payload.get("password") or "")
+    if not compare_digest(password, _database_release_operation_password()):
+        return jsonify({"ok": False, "error": "database_release_password_invalid"}), 403
+    session[DATABASE_RELEASE_UNLOCK_SESSION_KEY] = time.time() + DATABASE_RELEASE_UNLOCK_TTL_SECONDS
+    session.modified = True
+    return jsonify({"ok": True, "operation_unlocked": True, "ttl_seconds": DATABASE_RELEASE_UNLOCK_TTL_SECONDS})
+
+
+@app.route("/api/admin/database-release", methods=["POST"])
+def api_admin_start_database_release():
+    if not _database_release_is_unlocked():
+        return _database_release_unlock_required_response()
+    payload = request.get_json(silent=True) or {}
+    try:
+        job = start_database_release(
+            payload.get("target"),
+            package_id=payload.get("package_id"),
+            confirm_production=payload.get("confirm_production") is True,
+        )
+    except ValueError as exc:
+        error_code = str(exc)
+        status_code = 409 if error_code == "database_release_job_running" else 400
+        return jsonify({"ok": False, "error": error_code}), status_code
+    except Exception as exc:
+        # Match the former standalone 5051 controller's fast task hand-off,
+        # while keeping unexpected local filesystem/thread errors observable
+        # as JSON instead of letting a debug reload drop the browser request.
+        app.logger.exception("Unable to create Admin database release task")
+        return jsonify({"ok": False, "error": "database_release_task_create_failed", "detail": str(exc)}), 500
+    return jsonify({"ok": True, "job": job}), 202
+
+
+@app.route("/api/admin/database-release/cancel", methods=["POST"])
+def api_admin_cancel_database_release():
+    if not _database_release_is_unlocked():
+        return _database_release_unlock_required_response()
+    payload = request.get_json(silent=True) or {}
+    try:
+        job = cancel_database_release(payload.get("job_id"))
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 409
+    return jsonify({"ok": True, "job": job}), 202
+
+
+@app.route("/api/admin/database-release/rollbacks")
+def api_admin_database_release_rollbacks():
+    try:
+        return jsonify({"ok": True, "records": list_database_release_rollbacks(request.args.get("target") or "staging")})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+
+
+@app.route("/api/admin/database-release/rollback", methods=["POST"])
+def api_admin_start_database_rollback():
+    if not _database_release_is_unlocked():
+        return _database_release_unlock_required_response()
+    payload = request.get_json(silent=True) or {}
+    try:
+        job = start_database_rollback(
+            payload.get("target"),
+            payload.get("backup_name"),
+            confirm_production=payload.get("confirm_production") is True,
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    return jsonify({"ok": True, "job": job}), 202
+
+
+@app.route("/api/admin/database-release/log")
+def api_admin_database_release_log():
+    return app.response_class(get_database_release_log(), mimetype="text/plain; charset=utf-8")
+
+
+@app.route("/api/admin/database-release/simulations")
+def api_admin_database_release_simulations():
+    try:
+        return jsonify({"ok": True, "batches": list_simulation_batches(request.args.get("target") or "local")})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        app.logger.exception("Failed to list simulated data batches")
+        return jsonify({"ok": False, "error": str(exc)}), 503
+
+
+@app.route("/api/admin/database-release/simulations", methods=["POST"])
+def api_admin_create_database_release_simulation():
+    if not _database_release_is_unlocked():
+        return _database_release_unlock_required_response()
+    payload = request.get_json(silent=True) or {}
+    try:
+        batch_code = create_simulation_batch(payload.get("target") or "local", payload.get("tenant_slug") or "laowang")
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        app.logger.exception("Failed to create simulated data batch")
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    return jsonify({"ok": True, "batch_code": batch_code}), 201
+
+
+@app.route("/api/admin/database-release/simulations/<batch_code>", methods=["DELETE"])
+def api_admin_delete_database_release_simulation(batch_code):
+    if not _database_release_is_unlocked():
+        return _database_release_unlock_required_response()
+    payload = request.get_json(silent=True) or {}
+    try:
+        delete_simulation_batch(payload.get("target") or "local", batch_code)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    except Exception as exc:
+        app.logger.exception("Failed to delete simulated data batch")
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    return jsonify({"ok": True})
+
+
 @app.route("/api/admin/token-usage")
 def api_admin_token_usage():
     return jsonify({"ok": True, **build_admin_token_usage_payload()})
@@ -428,6 +1138,30 @@ def api_admin_indicator_sources():
     return jsonify({"ok": True, "sources": list_indicator_source_defs(indicator_code=indicator_code)})
 
 
+@app.route("/api/admin/news-sources")
+def api_admin_news_sources():
+    return jsonify({"ok": True, "news_sources": build_admin_news_source_payload()})
+
+
+@app.route("/api/admin/news-sources/refresh", methods=["POST"])
+def api_admin_refresh_news_sources():
+    try:
+        payload = build_admin_news_source_payload(force_refresh=True)
+    except Exception:
+        app.logger.exception("Failed to refresh real news sources")
+        return jsonify({"ok": False, "error": "news_source_refresh_failed"}), 503
+    return jsonify({"ok": True, "news_sources": payload})
+
+
+@app.route("/api/admin/commission")
+def api_admin_commission():
+    try:
+        return jsonify({"ok": True, "commission": build_admin_commission_payload()})
+    except Exception:
+        app.logger.exception("Failed to build admin commission payload")
+        return jsonify({"ok": False, "error": "commission_data_unavailable"}), 503
+
+
 @app.route("/api/admin/indicator-sources", methods=["POST"])
 def api_save_admin_indicator_source():
     body = request.get_json(silent=True) or {}
@@ -480,7 +1214,7 @@ def api_admin_indicator_mock_seed():
     body = request.get_json(silent=True) or {}
     force = bool(body.get("force"))
     result = seed_mock_indicator_lake(force=force)
-    return jsonify({"ok": True, "result": result, "hub": build_indicator_hub_from_store()})
+    return jsonify({"ok": False, "error": result.get("reason") or "mock_seed_disabled", "result": result, "hub": build_indicator_hub_from_store()}), 410
 
 
 @app.route("/api/admin/indicator-batches/market-cache-sync", methods=["POST"])
@@ -488,6 +1222,7 @@ def api_admin_indicator_market_cache_sync():
     body = request.get_json(silent=True) or {}
     force = bool(body.get("force"))
     result = sync_real_indicator_history_from_market_cache(force=force)
+    result["tenant_smart_refresh"] = refresh_all_tenant_smart_indicator_snapshots()
     return jsonify({"ok": True, "result": result, "hub": build_indicator_hub_from_store()})
 
 
@@ -603,11 +1338,30 @@ def api_site_config():
         return jsonify(normalize_site_config(DEFAULT_SITE_CONFIG))
 
 
+@app.route("/api/h5/auth-options")
+def api_h5_auth_options():
+    try:
+        return jsonify({"ok": True, **_build_h5_auth_options_payload(get_site_config())})
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        app.logger.warning("Database unavailable while serving h5 auth options, using defaults")
+        fallback_config = normalize_site_config(DEFAULT_SITE_CONFIG)
+        fallback_profiles, fallback_current = resolve_demo_profile_fallback(fallback_config)
+        payload = _build_h5_auth_options_payload(
+            fallback_config,
+            profiles=fallback_profiles if get_auth_settings(fallback_config).get("quick_select_enabled") else [],
+            current_profile=fallback_current,
+        )
+        return jsonify({"ok": True, **payload})
+
+
 @app.route("/api/demo-profiles")
 def api_demo_profiles():
     try:
         site_config = get_site_config()
-        profiles = get_h5_login_users(site_config)
+        auth_settings = get_auth_settings(site_config)
+        profiles = get_h5_login_users(site_config) if auth_settings.get("quick_select_enabled") else []
         current = get_current_demo_profile(site_config)
     except Exception as exc:
         if not is_db_unavailable_error(exc):
@@ -615,6 +1369,8 @@ def api_demo_profiles():
         app.logger.warning("Database unavailable while serving demo profiles, using defaults")
         fallback_config = normalize_site_config(DEFAULT_SITE_CONFIG)
         profiles, current = resolve_demo_profile_fallback(fallback_config)
+        if get_auth_settings(fallback_config).get("quick_select_enabled") is not True:
+            profiles = []
     return jsonify({
         "profiles": profiles,
         "current_profile": current,
@@ -625,6 +1381,9 @@ def api_demo_profiles():
 def api_switch_demo_profile():
     try:
         site_config = get_site_config()
+        auth_settings = get_auth_settings(site_config)
+        if auth_settings.get("quick_select_enabled") is not True:
+            return jsonify({"ok": False, "error": "quick_select_disabled"}), 403
         profiles = get_h5_login_users(site_config)
     except Exception as exc:
         if not is_db_unavailable_error(exc):
@@ -645,9 +1404,206 @@ def api_switch_demo_profile():
     })
 
 
+@app.route("/api/h5/login/password", methods=["POST"])
+def api_h5_login_password():
+    body = request.get_json(silent=True) or {}
+    username = str(body.get("username") or "").strip()
+    password = str(body.get("password") or "").strip()
+    if not username or not password:
+        return jsonify({"ok": False, "error": "username_password_required"}), 400
+    try:
+        site_config = get_site_config()
+        auth_settings = get_auth_settings(site_config)
+        if auth_settings.get("password_login_enabled") is not True:
+            return jsonify({"ok": False, "error": "password_login_disabled"}), 403
+        user = verify_h5_password_login(username, password)
+        save_current_demo_profile_id(user["username"])
+        if str(user.get("role") or "").strip().lower() == "admin":
+            # H5 profiles intentionally exclude administrators. Do not resolve
+            # one here because it would clear the just-created admin session.
+            payload = _build_h5_auth_options_payload(site_config, current_profile={})
+            payload["current_profile"] = None
+            payload["redirect_to"] = url_for("admin")
+            return jsonify({"ok": True, **payload})
+        payload = _build_h5_auth_options_payload(site_config)
+        payload["current_profile"] = get_current_demo_profile(site_config)
+        return jsonify({"ok": True, **payload})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        raise
+
+
+@app.route("/api/h5/register/password", methods=["POST"])
+def api_h5_register_password():
+    body = request.get_json(silent=True) or {}
+    username = str(body.get("username") or "").strip()
+    password = str(body.get("password") or "").strip()
+    display_name = str(body.get("display_name") or "").strip()
+    requested_tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
+    if not username or not password:
+        return jsonify({"ok": False, "error": "username_password_required"}), 400
+    if not display_name:
+        return jsonify({"ok": False, "error": "display_name_required"}), 400
+    if len(password) < 6:
+        return jsonify({"ok": False, "error": "password_too_short"}), 400
+    try:
+        site_config = get_site_config()
+        auth_settings = get_auth_settings(site_config)
+        if auth_settings.get("password_login_enabled") is not True:
+            return jsonify({"ok": False, "error": "password_login_disabled"}), 403
+        tenant = get_tenant_by_slug(requested_tenant_slug or get_default_tenant_slug(site_config), site_config)
+        suffix = int(time.time() * 1000) % 100000000
+        payload = {
+            "username": username,
+            "password": password,
+            "phone": f"139{suffix:08d}",
+            "role": "investor",
+            "tenant_slug": tenant.get("slug") or get_default_tenant_slug(site_config),
+            "advisor_name": tenant.get("advisor") or "",
+            "status": "active",
+            "source_label": "H5账号注册",
+        }
+        user = create_user(payload)
+        save_h5_profile_settings(user, {"display_name": display_name})
+        save_current_demo_profile_id(user["username"])
+        payload = _build_h5_auth_options_payload(site_config)
+        payload["current_profile"] = get_current_demo_profile(site_config)
+        return jsonify({"ok": True, **payload})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        raise
+
+
+@app.route("/api/h5/wechat/start")
+def api_h5_wechat_start():
+    next_target = _resolve_h5_next_target("/h5")
+    try:
+        auth_settings = get_auth_settings(get_site_config(), include_secret=True)
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return redirect(_append_redirect_query(next_target, "login_error", "database_unavailable"))
+        raise
+    if auth_settings.get("wechat_login_enabled") is not True:
+        return redirect(_append_redirect_query(next_target, "login_error", "wechat_login_disabled"))
+    wechat = auth_settings.get("wechat") or {}
+    app_id = str(wechat.get("app_id") or "").strip()
+    app_secret = str(wechat.get("app_secret") or "").strip()
+    redirect_uri = str(wechat.get("redirect_uri") or "").strip()
+    scope = str(wechat.get("scope") or "snsapi_userinfo").strip() or "snsapi_userinfo"
+    if not app_id or not app_secret or not redirect_uri:
+        return redirect(_append_redirect_query(next_target, "login_error", "wechat_not_configured"))
+    state_seed = f"{time.time()}:{request.remote_addr or ''}:{random.random()}"
+    state_token = hashlib.sha1(state_seed.encode("utf-8")).hexdigest()[:24]
+    session[H5_WECHAT_STATE_SESSION_KEY] = state_token
+    session[H5_WECHAT_NEXT_SESSION_KEY] = next_target
+    auth_url = (
+        "https://open.weixin.qq.com/connect/oauth2/authorize?"
+        + urlencode(
+            {
+                "appid": app_id,
+                "redirect_uri": redirect_uri,
+                "response_type": "code",
+                "scope": scope,
+                "state": state_token,
+            }
+        )
+        + "#wechat_redirect"
+    )
+    return redirect(auth_url)
+
+
+@app.route("/api/h5/wechat/callback")
+def api_h5_wechat_callback():
+    next_target = str(session.get(H5_WECHAT_NEXT_SESSION_KEY) or "/h5").strip() or "/h5"
+    error_code = str(request.args.get("error") or "").strip()
+    code = str(request.args.get("code") or "").strip()
+    state = str(request.args.get("state") or "").strip()
+    expected_state = str(session.get(H5_WECHAT_STATE_SESSION_KEY) or "").strip()
+    session.pop(H5_WECHAT_STATE_SESSION_KEY, None)
+    session.pop(H5_WECHAT_NEXT_SESSION_KEY, None)
+    if error_code:
+        return redirect(_append_redirect_query(next_target, "login_error", error_code))
+    if not code:
+        return redirect(_append_redirect_query(next_target, "login_error", "wechat_code_missing"))
+    if not expected_state or state != expected_state:
+        return redirect(_append_redirect_query(next_target, "login_error", "wechat_state_invalid"))
+    try:
+        site_config = get_site_config()
+        auth_settings = get_auth_settings(site_config, include_secret=True)
+        wechat = auth_settings.get("wechat") or {}
+        app_id = str(wechat.get("app_id") or "").strip()
+        app_secret = str(wechat.get("app_secret") or "").strip()
+        if not app_id or not app_secret:
+            return redirect(_append_redirect_query(next_target, "login_error", "wechat_not_configured"))
+        token_resp = requests.get(
+            "https://api.weixin.qq.com/sns/oauth2/access_token",
+            params={
+                "appid": app_id,
+                "secret": app_secret,
+                "code": code,
+                "grant_type": "authorization_code",
+            },
+            timeout=12,
+        )
+        token_data = token_resp.json() if token_resp.content else {}
+        if not token_resp.ok or str(token_data.get("errcode") or "").strip():
+            app.logger.warning("WeChat token exchange failed: %s", token_data)
+            return redirect(_append_redirect_query(next_target, "login_error", "wechat_token_failed"))
+        openid = str(token_data.get("openid") or "").strip()
+        unionid = str(token_data.get("unionid") or "").strip()
+        access_token = str(token_data.get("access_token") or "").strip()
+        nickname = ""
+        if access_token and openid and str(wechat.get("scope") or "").strip() == "snsapi_userinfo":
+            try:
+                userinfo_resp = requests.get(
+                    "https://api.weixin.qq.com/sns/userinfo",
+                    params={
+                        "access_token": access_token,
+                        "openid": openid,
+                        "lang": "zh_CN",
+                    },
+                    timeout=12,
+                )
+                userinfo_data = userinfo_resp.json() if userinfo_resp.content else {}
+                if userinfo_resp.ok and not str(userinfo_data.get("errcode") or "").strip():
+                    nickname = str(userinfo_data.get("nickname") or "").strip()
+                    if not unionid:
+                        unionid = str(userinfo_data.get("unionid") or "").strip()
+            except Exception:
+                app.logger.exception("Failed to fetch WeChat userinfo")
+        user = get_user_by_wechat_identity(openid=openid, unionid=unionid)
+        if not user and bool(wechat.get("auto_register_enabled")):
+            user = create_wechat_h5_user(
+                openid=openid,
+                unionid=unionid,
+                nickname=nickname,
+                tenant_slug=str(wechat.get("default_tenant_slug") or get_default_tenant_slug(site_config)).strip().lower(),
+                role=str(wechat.get("default_role") or "investor").strip().lower() or "investor",
+                advisor_name=str(wechat.get("default_advisor_name") or "").strip(),
+            )
+        elif user and not user.get("wechat_bound"):
+            user = bind_user_wechat_identity(user.get("id"), openid=openid, unionid=unionid, nickname=nickname)
+        if not user:
+            return redirect(_append_redirect_query(next_target, "login_error", "wechat_user_unbound"))
+        if user.get("role") not in {"investor", "dav"} or user.get("status") != "active":
+            return redirect(_append_redirect_query(next_target, "login_error", "wechat_user_disabled"))
+        save_current_demo_profile_id(user["username"])
+        return redirect(_append_redirect_query(next_target, "login_success", "wechat"))
+    except Exception:
+        app.logger.exception("Failed to complete WeChat login callback")
+        return redirect(_append_redirect_query(next_target, "login_error", "wechat_callback_failed"))
+
+
 @app.route("/api/h5/logout", methods=["POST"])
 def api_h5_logout():
-    save_current_demo_profile_id("")
+    session.clear()
+    g.current_demo_profile_id = ""
     return jsonify({"ok": True})
 
 
@@ -667,6 +1623,63 @@ def api_h5_account_settings():
             "ok": True,
             "profile": current,
             "settings": build_h5_account_settings_payload(current),
+        }
+    )
+
+
+@app.route("/api/h5/onboarding")
+def api_h5_onboarding():
+    try:
+        site_config = get_site_config()
+        current = get_current_demo_profile(site_config)
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        raise
+    if not current:
+        return jsonify({"ok": False, "error": "not_logged_in"}), 401
+    return jsonify(
+        {
+            "ok": True,
+            "profile": current,
+            "onboarding": build_h5_user_onboarding_payload(current),
+        }
+    )
+
+
+@app.route("/api/h5/onboarding", methods=["POST"])
+def api_h5_onboarding_complete():
+    try:
+        site_config = get_site_config()
+        current = get_current_demo_profile(site_config)
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        raise
+    if not current:
+        return jsonify({"ok": False, "error": "not_logged_in"}), 401
+    body = request.get_json(silent=True) or {}
+    agreed = bool(body.get("agreed"))
+    selected_channel = str(body.get("selected_channel") or "").strip()
+    if not agreed:
+        return jsonify({"ok": False, "error": "compliance_agreement_required"}), 400
+    try:
+        updated = complete_h5_user_onboarding(current, selected_channel)
+        profiles = get_h5_login_users(site_config)
+        refreshed = get_current_demo_profile(site_config) or updated
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to complete h5 onboarding")
+        return jsonify({"ok": False, "error": "h5_onboarding_save_failed"}), 500
+    return jsonify(
+        {
+            "ok": True,
+            "profile": refreshed,
+            "profiles": profiles,
+            "onboarding": build_h5_user_onboarding_payload(refreshed),
         }
     )
 
@@ -726,6 +1739,25 @@ def api_admin_users():
     return jsonify({"users": list_users()})
 
 
+@app.route("/api/admin/users/status", methods=["POST"])
+def api_update_admin_user_status():
+    body = request.get_json(silent=True) or {}
+    current_user = get_current_authenticated_user() or {}
+    try:
+        user = update_user_status(
+            body.get("user_id"),
+            body.get("status"),
+            actor_user_id=current_user.get("id"),
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        raise
+    return jsonify({"ok": True, "user": user, "users": list_users()})
+
+
 @app.route("/api/admin/users", methods=["POST"])
 def api_create_admin_user():
     body = request.get_json(silent=True) or {}
@@ -768,8 +1800,38 @@ def api_admin_users_template():
 @app.route("/api/kol/users")
 def api_kol_users():
     tenant = get_active_tenant_from_request()
-    summary = build_user_import_summary(scope="kol", tenant_slug=tenant["slug"])
+    try:
+        summary = build_user_import_summary(scope="kol", tenant_slug=tenant["slug"])
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"users": [], "summary": {"scope": "kol", "tenant_slug": tenant["slug"], "total_users": 0, "paying_users": 0, "settings": load_tenant_fan_ops_settings(tenant["slug"]), "role_split": {"investor": 0, "dav": 0, "admin": 0}, "users": []}, "db_unavailable": True}), 503
+        raise
     return jsonify({"users": summary["users"], "summary": summary})
+
+
+@app.route("/api/kol/users/settings", methods=["GET", "POST"])
+def api_kol_user_settings():
+    tenant = get_active_tenant_from_request()
+    if request.method == "GET":
+        try:
+            settings = load_tenant_fan_ops_settings(tenant["slug"])
+            summary = build_user_import_summary(scope="kol", tenant_slug=tenant["slug"])
+        except Exception as exc:
+            if is_db_unavailable_error(exc):
+                return jsonify({"ok": False, "error": "database_unavailable"}), 503
+            raise
+        return jsonify({"ok": True, "settings": settings, "summary": summary})
+    body = request.get_json(silent=True) or {}
+    try:
+        settings = save_tenant_fan_ops_settings(tenant["slug"], body)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        raise
+    summary = build_user_import_summary(scope="kol", tenant_slug=tenant["slug"])
+    return jsonify({"ok": True, "settings": settings, "summary": summary})
 
 
 @app.route("/api/kol/users", methods=["POST"])
@@ -783,6 +1845,64 @@ def api_create_kol_user():
         return jsonify({"ok": False, "error": str(exc)}), 400
     summary = build_user_import_summary(scope="kol", tenant_slug=tenant["slug"])
     return jsonify({"ok": True, "user": user, "users": summary["users"], "summary": summary})
+
+
+@app.route("/api/kol/users/labels", methods=["POST"])
+def api_update_kol_user_labels():
+    tenant = get_active_tenant_from_request()
+    body = request.get_json(silent=True) or {}
+    try:
+        result = update_tenant_user_labels(
+            tenant["slug"],
+            body.get("user_ids"),
+            body.get("label"),
+            action=body.get("action") or "add",
+        )
+        summary = build_user_import_summary(scope="kol", tenant_slug=tenant["slug"])
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        raise
+    return jsonify({"ok": True, "result": result, "users": summary["users"], "summary": summary})
+
+
+@app.route("/api/kol/users/status", methods=["POST"])
+def api_update_kol_user_status():
+    tenant = get_active_tenant_from_request()
+    body = request.get_json(silent=True) or {}
+    current_user = get_current_authenticated_user() or {}
+    current_role = str(current_user.get("role") or "").strip().lower()
+    current_tenant = str(current_user.get("tenant_slug") or "").strip().lower()
+    if current_role not in {"dav", "admin"}:
+        return jsonify({"ok": False, "error": "kol_access_required"}), 403
+    if current_role == "dav" and current_tenant != str(tenant.get("slug") or "").strip().lower():
+        return jsonify({"ok": False, "error": "tenant_access_denied"}), 403
+    try:
+        result = update_tenant_user_status(tenant["slug"], body.get("user_id"), body.get("status"))
+        summary = build_user_import_summary(scope="kol", tenant_slug=tenant["slug"])
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        raise
+    return jsonify({"ok": True, "result": result, "users": summary["users"], "summary": summary})
+
+
+@app.route("/api/kol/business-analytics")
+def api_kol_business_analytics():
+    tenant = get_active_tenant_from_request()
+    try:
+        users = [user for user in list_users(tenant_slug=tenant["slug"]) if user.get("role") == "investor"]
+        ops_stats = build_tenant_ops_stats(tenant=tenant, investor_users=users)
+        analytics = build_tenant_business_analytics(investor_users=users, ops_stats=ops_stats)
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        raise
+    return jsonify({"ok": True, "stats": ops_stats, "analytics": analytics})
 
 
 @app.route("/api/kol/users/import", methods=["POST"])
@@ -848,34 +1968,39 @@ def api_admin_site_config():
             reset_request_runtime_state()
         raise
     feature_flags = dict(current.get("feature_flags", {}))
+    current_auth_settings = get_auth_settings(current, include_secret=True)
     incoming_flags = payload.get("feature_flags", {})
     for key in feature_flags:
         if key in incoming_flags:
             feature_flags[key] = bool(incoming_flags[key])
+    auth_settings_payload = normalize_auth_settings_config(
+        payload.get("auth_settings")
+        if isinstance(payload.get("auth_settings"), dict)
+        else current_auth_settings
+    )
+    incoming_llm_registry = payload.get("llm_registry") if isinstance(payload.get("llm_registry"), dict) else None
+    if incoming_llm_registry is not None:
+        # Model metadata is stored in site_config; API keys are encrypted in a
+        # dedicated app_settings record and are never included in site_config.
+        save_llm_api_credentials_patch(incoming_llm_registry.get("models"), prune_missing=True)
     next_config = _merge_site_config(
         current,
         {
             "default_theme": payload.get("default_theme", current.get("default_theme", "light")),
             "default_accent": payload.get("default_accent", current.get("default_accent", "blue")),
-            "password_gate_enabled": bool(payload.get("password_gate_enabled", current.get("password_gate_enabled", True))),
-            "voice_transcription": {
-                "engine": str(
-                    (
-                        (payload.get("voice_transcription") or {}).get("engine")
-                        or (current.get("voice_transcription") or {}).get("engine")
-                        or "local"
-                    )
-                ).strip().lower() or "local"
-            },
-            "voice_embedding": {
-                "engine": str(
-                    (
-                        (payload.get("voice_embedding") or {}).get("engine")
-                        or (current.get("voice_embedding") or {}).get("engine")
-                        or "local"
-                    )
-                ).strip().lower() or "local"
-            },
+            "auth_settings": strip_auth_settings_secret(auth_settings_payload),
+            "voice_transcription": normalize_voice_transcription_config(
+                _merge_site_config(
+                    current.get("voice_transcription") or {},
+                    payload.get("voice_transcription") if isinstance(payload.get("voice_transcription"), dict) else {},
+                )
+            ),
+            "voice_embedding": normalize_voice_embedding_config(
+                _merge_site_config(
+                    current.get("voice_embedding") or {},
+                    payload.get("voice_embedding") if isinstance(payload.get("voice_embedding"), dict) else {},
+                )
+            ),
             "knowledge_ingestion": normalize_knowledge_ingestion_config(
                 payload.get("knowledge_ingestion")
                 if isinstance(payload.get("knowledge_ingestion"), dict)
@@ -896,10 +2021,8 @@ def api_admin_site_config():
                 if isinstance(payload.get("review_generation"), dict)
                 else current.get("review_generation")
             ),
-            "llm_registry": normalize_llm_registry_config(
-                payload.get("llm_registry")
-                if isinstance(payload.get("llm_registry"), dict)
-                else current.get("llm_registry")
+            "llm_registry": strip_llm_registry_api_keys(
+                incoming_llm_registry if incoming_llm_registry is not None else current.get("llm_registry")
             ),
             "brand": payload.get("brand", current.get("brand", {})),
             "default_tenant_slug": payload.get("default_tenant_slug", current.get("default_tenant_slug")),
@@ -910,6 +2033,10 @@ def api_admin_site_config():
     )
     try:
         saved = save_site_config(next_config)
+        save_auth_wechat_secret_patch(
+            (auth_settings_payload.get("wechat") or {}).get("app_secret"),
+            clear=bool((auth_settings_payload.get("wechat") or {}).get("clear_app_secret")),
+        )
     except Exception:
         if runtime_switched:
             save_db_runtime_config(original_use_staging)
@@ -920,6 +2047,71 @@ def api_admin_site_config():
             "success": True,
             "site_config": build_admin_site_config_payload(saved),
             "db_runtime_switched": runtime_switched,
+        }
+    )
+
+
+@app.route("/api/admin/news-aggregation/preview", methods=["POST"])
+def api_admin_news_aggregation_preview():
+    payload = request.get_json(silent=True) or {}
+    tenant_slug = str(payload.get("tenant_slug") or "").strip().lower()
+    if not tenant_slug:
+        return jsonify({"success": False, "error": "tenant_slug_required"}), 400
+    site_config = get_site_config()
+    tenant = get_tenant_by_slug(tenant_slug, site_config)
+    algorithm = {
+        "strategy": payload.get("strategy") or "watchlist_sector_first",
+        "source_prompt": str(payload.get("source_prompt") or "").strip(),
+        "rule_plan": payload.get("rule_plan") if isinstance(payload.get("rule_plan"), dict) else {},
+        "updated_by": str(payload.get("updated_by") or "preview").strip() or "preview",
+    }
+    normalized_algorithm = normalize_news_aggregation_algorithm_payload(algorithm)
+    try:
+        news_payload = build_fundamental_news_payload(
+            tenant=tenant,
+            watchlist_details=gen_watchlist_details(),
+            limit=int(payload.get("limit") or 10),
+            algorithm_payload=normalized_algorithm,
+        )
+    except Exception:
+        app.logger.exception("Failed to preview news aggregation algorithm")
+        return jsonify({"success": False, "error": "news_aggregation_preview_failed"}), 500
+    return jsonify({"success": True, "algorithm": normalized_algorithm, "news_payload": news_payload})
+
+
+@app.route("/api/admin/news-aggregation/save", methods=["POST"])
+def api_admin_news_aggregation_save():
+    payload = request.get_json(silent=True) or {}
+    tenant_slug = str(payload.get("tenant_slug") or "").strip().lower()
+    if not tenant_slug:
+        return jsonify({"success": False, "error": "tenant_slug_required"}), 400
+    try:
+        saved_algorithm = save_tenant_news_aggregation_algorithm(
+            tenant_slug,
+            {
+                "strategy": payload.get("strategy") or "watchlist_sector_first",
+                "source_prompt": str(payload.get("source_prompt") or "").strip(),
+                "rule_plan": payload.get("rule_plan") if isinstance(payload.get("rule_plan"), dict) else {},
+                "updated_by": str(payload.get("updated_by") or "h5_workbench").strip() or "h5_workbench",
+            },
+        )
+        site_config = get_site_config()
+        news_payload = build_fundamental_news_payload(
+            tenant=get_tenant_by_slug(tenant_slug, site_config),
+            watchlist_details=gen_watchlist_details(),
+            limit=int(payload.get("limit") or 10),
+        )
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except Exception:
+        app.logger.exception("Failed to save news aggregation algorithm")
+        return jsonify({"success": False, "error": "news_aggregation_save_failed"}), 500
+    return jsonify(
+        {
+            "success": True,
+            "algorithm": saved_algorithm,
+            "site_config": build_admin_site_config_payload(site_config),
+            "news_payload": news_payload,
         }
     )
 

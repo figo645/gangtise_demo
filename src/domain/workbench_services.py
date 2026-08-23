@@ -1,11 +1,458 @@
+from collections import Counter
+
 from src.runtime import *
 from src.domain.core_services import *
 from src.domain.market_services import *
 from src.domain.ai_services import *
 
 FAN_STOCK_OBSERVATION_WINDOW_DAYS = 7
-FAN_STOCK_OBSERVATION_EVENT_TYPES = {"watchlist_detail_view"}
+FAN_STOCK_OBSERVATION_EVENT_TYPES = {"watchlist_detail_view", "watchlist_add"}
 FAN_STOCK_HERMES_INTENTS = {"watchlist_fundamental", "multi_tool_research"}
+
+
+def _parse_workbench_datetime(value):
+    text = str(value or "").strip()
+    if not text:
+        return None
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(text[: len(datetime.now().strftime(fmt))], fmt)
+        except Exception:
+            continue
+    return None
+
+
+def _count_users_within(users, start_at=None, end_at=None, predicate=None):
+    count = 0
+    for user in (users or []):
+        if predicate and not predicate(user):
+            continue
+        created_at = _parse_workbench_datetime(user.get("created_at"))
+        if start_at and (created_at is None or created_at < start_at):
+            continue
+        if end_at and (created_at is None or created_at >= end_at):
+            continue
+        count += 1
+    return count
+
+
+def _calc_change_pct(current_value, previous_value):
+    current = float(current_value or 0)
+    previous = float(previous_value or 0)
+    if previous > 0:
+        return round(((current - previous) / previous) * 100, 1)
+    if current > 0:
+        return 100.0
+    return 0.0
+
+
+def _categorize_tenant_view_path(path_value, tenant_slug=""):
+    path = str(path_value or "").strip().lower()
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    if path.startswith("/h5"):
+        return "H5前台"
+    if normalized_tenant and path.startswith(f"/tenant/{normalized_tenant}"):
+        return "租户门户"
+    if path.startswith("/kol-workbench"):
+        return "Web工作台"
+    if path.startswith("/dashboard"):
+        return "Dashboard"
+    if path.startswith("/admin"):
+        return "Admin"
+    if path in {"", "/"}:
+        return "首页"
+    return "其他页面"
+
+
+def build_tenant_view_analytics(tenant_slug=""):
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    today_start = datetime.now().strftime("%Y-%m-%d 00:00:00")
+    if not normalized_tenant:
+        return {
+            "total_views": 0,
+            "active_viewers": 0,
+            "distribution": [],
+            "trend_7d": [],
+        }
+    try:
+        rows = get_db().execute(
+            """
+            SELECT path, user_profile_id, ip, created_at
+            FROM access_logs
+            WHERE tenant_slug = ? AND user_role = ? AND created_at >= ?
+            ORDER BY created_at DESC, id DESC
+            """,
+            (normalized_tenant, "investor", today_start),
+        ).fetchall()
+        trend_rows = get_db().execute(
+            """
+            SELECT created_at
+            FROM access_logs
+            WHERE tenant_slug = ? AND user_role = ? AND created_at >= ?
+            ORDER BY created_at ASC, id ASC
+            """,
+            (
+                normalized_tenant,
+                "investor",
+                (datetime.now() - timedelta(days=6)).strftime("%Y-%m-%d 00:00:00"),
+            ),
+        ).fetchall()
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        return {
+            "total_views": 0,
+            "active_viewers": 0,
+            "distribution": [],
+            "trend_7d": [],
+            "fallback_mode": True,
+        }
+    category_counter = {}
+    active_viewers = set()
+    daily_counter = {}
+    for row in rows:
+        item = dict(row)
+        category = _categorize_tenant_view_path(item.get("path"), normalized_tenant)
+        category_counter[category] = category_counter.get(category, 0) + 1
+        viewer_key = str(item.get("user_profile_id") or "").strip() or str(item.get("ip") or "").strip()
+        if viewer_key:
+            active_viewers.add(viewer_key)
+    for row in trend_rows:
+        item = dict(row)
+        day_key = str(item.get("created_at") or "")[:10]
+        if day_key:
+            daily_counter[day_key] = daily_counter.get(day_key, 0) + 1
+    trend = []
+    for offset in range(6, -1, -1):
+        target_day = (datetime.now() - timedelta(days=offset)).strftime("%Y-%m-%d")
+        trend.append({
+            "day": target_day[5:],
+            "count": int(daily_counter.get(target_day, 0)),
+        })
+    distribution = [
+        {"label": label, "value": value}
+        for label, value in sorted(category_counter.items(), key=lambda pair: (-int(pair[1]), str(pair[0])))
+    ]
+    return {
+        "total_views": len(rows),
+        "active_viewers": len(active_viewers),
+        "distribution": distribution,
+        "trend_7d": trend,
+    }
+
+
+def build_tenant_ops_stats(tenant=None, investor_users=None, watchlist_comment_analytics=None):
+    tenant = tenant or get_tenant_by_slug()
+    tenant_slug = str((tenant or {}).get("slug") or "").strip().lower()
+    users = investor_users if isinstance(investor_users, list) else list_users(role="investor", tenant_slug=tenant_slug)
+    comment_analytics = watchlist_comment_analytics if isinstance(watchlist_comment_analytics, dict) else build_watchlist_comment_analytics(tenant_slug=tenant_slug)
+    settings = load_tenant_fan_ops_settings(tenant_slug)
+    registration_price = int(settings.get("registration_price") or 0)
+    now = datetime.now()
+    current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    previous_month_end = current_month_start
+    previous_month_start = (current_month_start - timedelta(days=1)).replace(day=1)
+    paid_users = [user for user in users if bool(user.get("is_paid_sample"))]
+    total_paid_samples = len(paid_users)
+    new_paid_current_month = _count_users_within(
+        paid_users,
+        start_at=current_month_start,
+        end_at=now + timedelta(seconds=1),
+    )
+    new_paid_previous_month = _count_users_within(
+        paid_users,
+        start_at=previous_month_start,
+        end_at=previous_month_end,
+    )
+    monthly_revenue = registration_price * total_paid_samples
+    paid_before_current_month = len([
+        user for user in paid_users
+        if (_parse_workbench_datetime(user.get("paid_sample_marked_at")) or _parse_workbench_datetime(user.get("created_at")))
+        and (_parse_workbench_datetime(user.get("paid_sample_marked_at")) or _parse_workbench_datetime(user.get("created_at"))) < current_month_start
+    ])
+    previous_month_revenue = registration_price * paid_before_current_month
+    revenue_change = _calc_change_pct(monthly_revenue, previous_month_revenue)
+    paid_sample_delta = new_paid_current_month - new_paid_previous_month
+    view_analytics = build_tenant_view_analytics(tenant_slug)
+    total_fans = len(users)
+    active_viewers = int(view_analytics.get("active_viewers") or 0)
+    engagement_rate = round((active_viewers / total_fans) * 100, 1) if total_fans > 0 else 0.0
+    comment_summary = comment_analytics.get("summary") if isinstance(comment_analytics.get("summary"), dict) else {}
+    return {
+        "total_followers": total_fans,
+        "vip_subscribers": total_paid_samples,
+        "monthly_revenue": monthly_revenue,
+        "revenue_change": revenue_change,
+        "registration_price": registration_price,
+        "new_paid_samples_month": new_paid_current_month,
+        "paid_sample_delta": paid_sample_delta,
+        "today_views": int(view_analytics.get("total_views") or 0),
+        "today_active_viewers": active_viewers,
+        "today_view_distribution": view_analytics.get("distribution") or [],
+        "today_view_trend_7d": view_analytics.get("trend_7d") or [],
+        "engagement_rate": engagement_rate,
+        "stock_comment_count": int(comment_summary.get("total_comments") or 0),
+        "stock_comment_stock_count": int(comment_summary.get("stock_count") or 0),
+        "fan_ops_settings": settings,
+    }
+
+
+def build_tenant_business_analytics(investor_users=None, ops_stats=None):
+    users = investor_users if isinstance(investor_users, list) else []
+    stats = ops_stats if isinstance(ops_stats, dict) else {}
+    price = int(stats.get("registration_price") or 0)
+    active_users = [user for user in users if str(user.get("status") or "active") == "active"]
+    paid_users = [user for user in users if bool(user.get("is_paid_sample"))]
+    high_frequency_users = [user for user in users if "高频用户" in (user.get("labels") or [])]
+    label_counter = Counter()
+    source_groups = {}
+    now = datetime.now()
+    month_starts = []
+    cursor = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    for _ in range(6):
+        month_starts.append(cursor)
+        cursor = (cursor - timedelta(days=1)).replace(day=1)
+    month_starts.reverse()
+    monthly_series = []
+    for month_start in month_starts:
+        next_month = (month_start + timedelta(days=32)).replace(day=1)
+        paid_added = 0
+        paid_cumulative = 0
+        fan_added = 0
+        for user in users:
+            created_at = _parse_workbench_datetime(user.get("created_at"))
+            paid_at = _parse_workbench_datetime(user.get("paid_sample_marked_at")) or created_at
+            if created_at and month_start <= created_at < next_month:
+                fan_added += 1
+            if bool(user.get("is_paid_sample")) and paid_at:
+                if month_start <= paid_at < next_month:
+                    paid_added += 1
+                if paid_at < next_month:
+                    paid_cumulative += 1
+        monthly_series.append({
+            "month": month_start.strftime("%Y-%m"),
+            "fans_added": fan_added,
+            "paid_added": paid_added,
+            "paid_cumulative": paid_cumulative,
+            "revenue": paid_cumulative * price,
+        })
+    for user in users:
+        labels = user.get("labels") if isinstance(user.get("labels"), list) else []
+        for label in labels:
+            if str(label or "").strip():
+                label_counter[str(label).strip()] += 1
+        source = str(user.get("source_label") or "未标注来源").strip() or "未标注来源"
+        bucket = source_groups.setdefault(source, {"label": source, "fans": 0, "paid": 0, "revenue": 0})
+        bucket["fans"] += 1
+        if bool(user.get("is_paid_sample")):
+            bucket["paid"] += 1
+            bucket["revenue"] += price
+    funnel = [
+        {"label": "租户粉丝", "count": len(users)},
+        {"label": "活跃粉丝", "count": len(active_users)},
+        {"label": "付费用户", "count": len(paid_users)},
+        {"label": "高频用户", "count": len(high_frequency_users)},
+    ]
+    for bucket in source_groups.values():
+        bucket["conversion_rate"] = round((bucket["paid"] / bucket["fans"]) * 100, 1) if bucket["fans"] else 0.0
+    paid_high_frequency = len([user for user in paid_users if "高频用户" in (user.get("labels") or [])])
+    segments = [
+        {"label": "未付费用户", "count": max(0, len(users) - len(paid_users)), "revenue": 0},
+        {"label": "付费用户", "count": max(0, len(paid_users) - paid_high_frequency), "revenue": max(0, len(paid_users) - paid_high_frequency) * price},
+        {"label": "高频用户", "count": paid_high_frequency, "revenue": paid_high_frequency * price},
+    ]
+    return {
+        "pricing": price,
+        "total_fans": len(users),
+        "active_fans": len(active_users),
+        "paid_fans": len(paid_users),
+        "high_frequency_fans": len(high_frequency_users),
+        "estimated_revenue": price * len(paid_users),
+        "funnel": funnel,
+        "source_rows": sorted(source_groups.values(), key=lambda item: (-item["fans"], item["label"])),
+        "label_distribution": [{"label": label, "value": count} for label, count in sorted(label_counter.items(), key=lambda item: (-item[1], item[0]))],
+        "monthly_series": monthly_series,
+        "segments": segments,
+    }
+
+
+def build_admin_commission_payload():
+    """Build settlement estimates from persisted tenant fan/payment data."""
+    rows = []
+    for tenant in get_tenant_configs():
+        tenant_slug = str(tenant.get("slug") or "").strip().lower()
+        if not tenant_slug:
+            continue
+        users = [user for user in list_users(role="investor", tenant_slug=tenant_slug) if isinstance(user, dict)]
+        ops_stats = build_tenant_ops_stats(tenant=tenant, investor_users=users)
+        revenue = int(ops_stats.get("monthly_revenue") or 0)
+        raw_rate = tenant.get("commission_rate", tenant.get("settlement_rate", 0))
+        try:
+            rate = float(raw_rate or 0)
+        except (TypeError, ValueError):
+            rate = 0.0
+        if rate > 1:
+            rate /= 100
+        rate = max(0.0, min(1.0, rate))
+        payable = round(revenue * rate, 2)
+        rows.append({
+            "tenant_slug": tenant_slug,
+            "advisor": str(tenant.get("advisor") or tenant.get("name") or tenant_slug),
+            "tenant_name": str(tenant.get("name") or tenant_slug),
+            "tier": str(tenant.get("tier") or "未分层"),
+            "source": "付费用户标注 × 注册单价",
+            "fan_count": len(users),
+            "paid_count": int(ops_stats.get("vip_subscribers") or 0),
+            "registration_price": int(ops_stats.get("registration_price") or 0),
+            "revenue": revenue,
+            "share_rate": round(rate * 100, 2),
+            "payable": payable,
+            "status": "待结算" if payable > 0 else "暂无应结算",
+        })
+    pending = round(sum(float(row["payable"]) for row in rows), 2)
+    active_rows = [row for row in rows if row["revenue"] > 0]
+    return {
+        "basis": "真实用户表中的付费标注与租户注册单价",
+        "settlement_records_supported": False,
+        "pending_total": pending,
+        "settled_total": 0,
+        "advisor_count": len(active_rows),
+        "average_payable": round(pending / len(active_rows), 2) if active_rows else 0,
+        "rows": rows,
+        "generated_at": now_ts(),
+    }
+
+
+def build_admin_revenue_analytics_payload():
+    """Build revenue charts from actual paid markers and tenant pricing."""
+    users = [user for user in list_users() if isinstance(user, dict) and str(user.get("role") or "").lower() == "investor"]
+    tenants = {str(tenant.get("slug") or "").strip().lower(): tenant for tenant in get_tenant_configs()}
+    prices = {}
+    for slug in tenants:
+        prices[slug] = int(load_tenant_fan_ops_settings(slug).get("registration_price") or 0)
+    tenant_revenue = []
+    for slug, tenant in tenants.items():
+        tenant_users = [user for user in users if str(user.get("tenant_slug") or "").strip().lower() == slug]
+        paid_count = sum(1 for user in tenant_users if bool(user.get("is_paid_sample")))
+        tenant_revenue.append({
+            "tenant_slug": slug,
+            "name": str(tenant.get("advisor") or tenant.get("name") or slug),
+            "fans": len(tenant_users),
+            "paid_users": paid_count,
+            "registration_price": prices[slug],
+            "revenue": paid_count * prices[slug],
+        })
+    tenant_revenue.sort(key=lambda item: (-item["revenue"], item["name"]))
+    now = datetime.now()
+    cursor = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_starts = []
+    for _ in range(12):
+        month_starts.append(cursor)
+        cursor = (cursor - timedelta(days=1)).replace(day=1)
+    month_starts.reverse()
+    monthly = []
+    for month_start in month_starts:
+        next_month = (month_start + timedelta(days=32)).replace(day=1)
+        paid_users = []
+        for user in users:
+            if not bool(user.get("is_paid_sample")):
+                continue
+            paid_at = _parse_workbench_datetime(user.get("paid_sample_marked_at")) or _parse_workbench_datetime(user.get("created_at"))
+            if paid_at and paid_at < next_month:
+                paid_users.append(user)
+        revenue = sum(prices.get(str(user.get("tenant_slug") or "").lower(), 0) for user in paid_users)
+        monthly.append({"month": month_start.strftime("%Y-%m"), "revenue": revenue, "users": len(paid_users)})
+    channel_revenue = {}
+    for user in users:
+        if not bool(user.get("is_paid_sample")):
+            continue
+        channel = str(user.get("h5_channel_label") or user.get("source_label") or "未标注渠道").strip() or "未标注渠道"
+        channel_revenue[channel] = channel_revenue.get(channel, 0) + prices.get(str(user.get("tenant_slug") or "").lower(), 0)
+    current_paid = monthly[-1]["users"] if monthly else 0
+    current_revenue = monthly[-1]["revenue"] if monthly else 0
+    previous_revenue = monthly[-2]["revenue"] if len(monthly) > 1 else 0
+    mom = round((current_revenue - previous_revenue) / previous_revenue * 100, 1) if previous_revenue else 0
+    cohorts = []
+    for month_start in month_starts:
+        cohort_users = [
+            user for user in users
+            if (_parse_workbench_datetime(user.get("created_at")) or now).strftime("%Y-%m") == month_start.strftime("%Y-%m")
+        ]
+        cohorts.append({"cohort": month_start.strftime("%Y-%m"), "data": [100] + [None] * 5, "users": len(cohort_users)})
+    priced_tenants = [item for item in tenant_revenue if item["registration_price"] > 0]
+    return {
+        "generated_at": now_ts(),
+        "basis": "用户表付费标注、付费时间、租户注册单价",
+        "monthly": monthly,
+        "tier_revenue": [
+            {"name": "未付费用户", "data": [0] * len(monthly)},
+            {"name": "付费用户", "data": [item["revenue"] for item in monthly]},
+        ],
+        "channel_revenue": [{"name": name, "revenue": value} for name, value in sorted(channel_revenue.items(), key=lambda item: (-item[1], item[0]))],
+        "cohorts": cohorts,
+        "tenant_revenue": tenant_revenue,
+        "active_tenants": len(priced_tenants),
+        "average_price": round(sum(item["registration_price"] for item in priced_tenants) / len(priced_tenants), 2) if priced_tenants else 0,
+        "mrr": current_revenue,
+        "arr": current_revenue * 12,
+        "mom": mom,
+        "paid_users": current_paid,
+    }
+
+
+def build_admin_kol_analytics_payload():
+    """Build KOL collaboration analytics from real tenant fan data."""
+    rows = []
+    for tenant in get_tenant_configs():
+        slug = str(tenant.get("slug") or "").strip().lower()
+        if not slug:
+            continue
+        users = [user for user in list_users(role="investor", tenant_slug=slug) if isinstance(user, dict)]
+        settings = load_tenant_fan_ops_settings(slug)
+        price = int(settings.get("registration_price") or 0)
+        paid_count = sum(1 for user in users if bool(user.get("is_paid_sample")))
+        revenue = paid_count * price
+        raw_rate = tenant.get("commission_rate", tenant.get("settlement_rate", 0))
+        try:
+            rate = float(raw_rate or 0)
+        except (TypeError, ValueError):
+            rate = 0.0
+        if rate > 1:
+            rate /= 100
+        rows.append({
+            "name": str(tenant.get("advisor") or tenant.get("name") or slug),
+            "platform": str(tenant.get("name") or "租户门户"),
+            "fans": len(users),
+            "gmv": revenue,
+            "commission": round(revenue * rate, 2),
+            "rate": round(rate * 100, 2),
+            "tier": str(tenant.get("tier") or "未分层"),
+            "trend": "--",
+        })
+    rows.sort(key=lambda item: (-item["gmv"], item["name"]))
+    tier_counts = {}
+    for row in rows:
+        tier_counts[row["tier"]] = tier_counts.get(row["tier"], 0) + 1
+    months = []
+    cursor = datetime.now().replace(day=1).replace(hour=0, minute=0, second=0, microsecond=0)
+    for _ in range(12):
+        months.append(cursor.strftime("%Y-%m"))
+        cursor = (cursor - timedelta(days=1)).replace(day=1)
+    months.reverse()
+    growth = {tier: [None] * 11 + [count] for tier, count in tier_counts.items()}
+    rates = [row["rate"] for row in rows if row["rate"] > 0]
+    return {
+        "generated_at": now_ts(),
+        "basis": "租户配置、粉丝用户表、付费标注与注册单价",
+        "rows": rows,
+        "total_kols": len(rows),
+        "total_revenue": sum(row["gmv"] for row in rows),
+        "average_rate": round(sum(rates) / len(rates), 2) if rates else 0,
+        "top_kol": rows[0]["name"] if rows else "--",
+        "months": months,
+        "tier_growth": growth,
+        "tier_counts": tier_counts,
+    }
 
 
 def _normalize_fan_stock_event_type(value):
@@ -67,7 +514,7 @@ def record_fan_stock_observation_event(
         return None
     normalized_code = _normalize_fan_stock_code(stock_code=stock_code, stock_name=stock_name)
     details = gen_watchlist_details()
-    detail = details.get(normalized_code)
+    detail = get_watchlist_detail_by_code(stock_code=normalized_code, stock_name=stock_name, details_map=details)
     if not detail:
         return None
     payload = {
@@ -119,12 +566,14 @@ def build_fan_stock_observation_payload(tenant=None, fallback_mode=False):
     cutoff = (datetime.now() - timedelta(days=FAN_STOCK_OBSERVATION_WINDOW_DAYS)).strftime("%Y-%m-%d %H:%M:%S")
     detail_rows = []
     hermes_rows = []
+    user_names = {}
     if not fallback_mode and tenant_slug:
         try:
             db = get_db()
             detail_rows = db.execute(
                 """
-                SELECT user_profile_id, stock_code, stock_name, sector_name, event_type, entry_point, source_detail, created_at
+                SELECT user_profile_id, stock_code, stock_name, sector_name, event_type, entry_point, source_detail, created_at,
+                       is_simulated, simulation_batch_code, simulation_label
                 FROM fan_stock_observation_events
                 WHERE tenant_slug = ? AND created_at >= ?
                 ORDER BY created_at DESC, id DESC
@@ -140,12 +589,18 @@ def build_fan_stock_observation_payload(tenant=None, fallback_mode=False):
                 """,
                 (tenant_slug, "investor", cutoff),
             ).fetchall()
+            user_names = {
+                str(item.get("username") or "").strip(): str(item.get("username") or "").strip()
+                for item in list_users(role="investor", tenant_slug=tenant_slug)
+                if str(item.get("username") or "").strip()
+            }
         except Exception as exc:
             if not is_db_unavailable_error(exc):
                 raise
             detail_rows = []
             hermes_rows = []
     sector_map = {}
+    fan_watchlist_map = {}
     all_active_users = set()
     detail_view_total = 0
     hermes_query_total = 0
@@ -208,6 +663,30 @@ def build_fan_stock_observation_payload(tenant=None, fallback_mode=False):
 
     for row in detail_rows:
         item = dict(row) if isinstance(row, dict) else {}
+        if str(item.get("event_type") or "").strip().lower() == "watchlist_add":
+            code = _normalize_fan_stock_code(stock_code=item.get("stock_code"), stock_name=item.get("stock_name"))
+            detail = details_map.get(code) if code else None
+            user_profile_id = str(item.get("user_profile_id") or "").strip()
+            if detail and user_profile_id:
+                fan_watchlist_map[(user_profile_id, code)] = {
+                    "user_profile_id": user_profile_id,
+                    "fan_name": user_names.get(user_profile_id) or user_profile_id,
+                    "code": code,
+                    "name": str(detail.get("name") or code).strip() or code,
+                    "market": "港股" if str(detail.get("market") or "").upper() == "HK" else "A股",
+                    "focus": str(detail.get("industry") or detail.get("focus") or "其他板块").strip() or "其他板块",
+                    "change": (
+                        f"{float(detail.get('change_pct')):+.1f}%"
+                        if detail.get("change_pct") is not None and not bool(detail.get("data_unavailable"))
+                        else "行情待同步"
+                    ),
+                    "thesis": str(detail.get("signal_summary") or ((detail.get("fundamental") or {}).get("summary")) or "继续跟踪").strip() or "继续跟踪",
+                    "added_at": str(item.get("created_at") or "").strip(),
+                    "is_simulated": bool(item.get("is_simulated")),
+                    "simulation_label": str(item.get("simulation_label") or "").strip(),
+                    "simulation_batch_code": str(item.get("simulation_batch_code") or "").strip(),
+                }
+            continue
         apply_stock_signal(item.get("stock_code"), user_profile_id=item.get("user_profile_id"), signal_type="detail")
 
     for row in hermes_rows:
@@ -274,6 +753,11 @@ def build_fan_stock_observation_payload(tenant=None, fallback_mode=False):
     )[:6]
     total_interactions = detail_view_total + hermes_query_total
     hot_sector = sectors[0]["name"] if sectors else ""
+    fan_watchlist_items = sorted(
+        fan_watchlist_map.values(),
+        key=lambda item: (str(item.get("fan_name") or ""), str(item.get("code") or "")),
+    )
+    fan_watchlist_sector_counter = Counter(item.get("focus") or "其他板块" for item in fan_watchlist_items)
     return {
         "window_days": FAN_STOCK_OBSERVATION_WINDOW_DAYS,
         "summary": (
@@ -290,21 +774,36 @@ def build_fan_stock_observation_payload(tenant=None, fallback_mode=False):
         "hot_sector": hot_sector,
         "sectors": sectors,
         "top_stocks": top_stocks,
+        "fan_watchlist_items": fan_watchlist_items,
+        "fan_watchlist_sector_distribution": [
+            {"label": sector, "value": count}
+            for sector, count in sorted(fan_watchlist_sector_counter.items(), key=lambda pair: (-pair[1], pair[0]))
+        ],
         "fallback_mode": bool(fallback_mode),
         "tracked_stock_codes": active_codes[:8],
     }
 
 
+TENANT_WATCHLIST_CODES = {
+    "laowang": ["600519", "300750", "00700", "688981", "600036"],
+    "lisa": ["00700", "03690", "09988"],
+}
+
+
 def build_tenant_watchlist_hub_items(tenant, watchlist_details_map):
-    is_lisa = tenant["slug"] == "lisa"
-    target_codes = ["00700", "03690", "09988"] if is_lisa else ["688981", "00700", "600519"]
+    tenant_slug = str((tenant or {}).get("slug") or "").strip().lower()
+    target_codes = TENANT_WATCHLIST_CODES.get(tenant_slug, TENANT_WATCHLIST_CODES["laowang"])
     return [
         {
             "name": detail["name"],
             "code": detail["code"],
             "market": "港股" if detail.get("market") == "HK" else "A股",
             "focus": detail.get("focus") or detail.get("industry") or "个股跟踪",
-            "change": f"{detail.get('change_pct', 0):+.1f}%",
+            "change": (
+                f"{float(detail.get('change_pct')):+.1f}%"
+                if detail.get("change_pct") is not None and not bool(detail.get("data_unavailable"))
+                else "行情待同步"
+            ),
             "thesis": detail.get("signal_summary") or detail.get("fundamental", {}).get("summary") or "继续跟踪",
             "alert_level": detail.get("alert_level") or "normal",
             "alert_text": detail.get("alert_text") or "当前无明显预警",
@@ -313,6 +812,39 @@ def build_tenant_watchlist_hub_items(tenant, watchlist_details_map):
         for detail in [watchlist_details_map.get(code) for code in target_codes]
         if detail
     ]
+
+
+def build_workbench_data_lake_payload(tenant, watchlist_details=None, news_items=None):
+    """Unify persisted market, sector, and cleaned-news assets for the KOL view."""
+    market_payload = build_market_overview_payload()
+    sector_payload = build_market_sector_overview_payload()
+    market_items = [item for item in (market_payload.get("items") or []) if isinstance(item, dict)]
+    sector_items = [item for item in (sector_payload.get("items") or []) if isinstance(item, dict)]
+    news_rows = [item for item in (news_items or []) if isinstance(item, dict)]
+    return {
+        "market_overview": {
+            "items": market_items,
+            "source": str(market_payload.get("source") or "AKShare"),
+            "updated_at": str(market_payload.get("updated_at") or ""),
+            "stale": bool(market_payload.get("stale")),
+            "message": str(market_payload.get("message") or ""),
+            "expected_count": len(MARKET_OVERVIEW_INDEX_CODES),
+        },
+        "sectors": {
+            "items": sector_items,
+            "source": str(sector_payload.get("source") or "AKShare"),
+            "updated_at": str(sector_payload.get("updated_at") or ""),
+            "stale": bool(sector_payload.get("stale")),
+            "message": str(sector_payload.get("message") or ""),
+            "expected_count": len(SHENWAN_LEVEL1_INDUSTRIES),
+        },
+        "news": {
+            "items": news_rows,
+            "source": "国内公开信息源清洗新闻湖",
+            "updated_at": max((str(item.get("published_at") or item.get("fetched_at") or "") for item in news_rows), default=""),
+            "message": "只纳入通过清洗且满足每来源最少 5 条有效信息门槛的数据源。",
+        },
+    }
 
 
 def build_tenant_dashboard_payload(tenant=None):
@@ -336,6 +868,8 @@ def build_tenant_dashboard_payload(tenant=None):
             "available_tags": build_tenant_smart_indicator_tag_catalog(tenant),
         },
         "fan_stock_observation": workbench.get("fan_stock_observation") or {},
+        "watchlist_comment_analytics": workbench.get("watchlist_comment_analytics") or {},
+        "fan_management": workbench.get("fan_management") or {},
         "reviews": workbench["published_reviews"],
         "stats": workbench["stats"],
     }
@@ -579,7 +1113,7 @@ def gen_dm_messages(thread_id, tenant_slug=None):
 
 def gen_kol_workbench(tenant=None, fallback_mode=False):
     tenant = tenant or get_tenant_by_slug()
-    is_lisa = tenant["slug"] == "lisa"
+    tenant_portal_enabled = is_feature_enabled("tenant_portal")
     if fallback_mode:
         fallback_config = normalize_site_config(DEFAULT_SITE_CONFIG)
         tenant_users = [
@@ -593,18 +1127,14 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
     watchlist_details_map = gen_watchlist_details()
     kol_name = tenant["advisor"]
     kol_avatar = tenant.get("logo_mark") or "👑"
-    base_followers = 86000 if is_lisa else 128000
-    base_vip = 29 if is_lisa else 36
-    base_revenue = 14200 if is_lisa else 18600
-    revenue_change = 6.4 if is_lisa else 8.5
-    today_views = 540 if is_lisa else 680
-    engagement_rate = 7.6 if is_lisa else 6.8
+    is_lisa = tenant["slug"] == "lisa"
     watchlist_focus = ["腾讯控股", "美团-W", "阿里巴巴-W"] if is_lisa else ["中芯国际", "腾讯控股", "贵州茅台"]
     fund_dashboard_state = resolve_tenant_fund_dashboard_state(tenant, tenant.get("fund_dashboard_config"))
     fund_dashboard = copy.deepcopy(fund_dashboard_state["published"])
     knowledge_hub = fetch_live_knowledge_hub(tenant)
     indicator_hub = build_indicator_hub_fallback(tenant=tenant, admin_view=False) if fallback_mode else build_indicator_hub(tenant=tenant, admin_view=False)
-    news_items = gen_news_feed()
+    news_items = gen_news_feed(tenant=tenant, watchlist_details=watchlist_details_map)
+    data_lake = build_workbench_data_lake_payload(tenant, watchlist_details_map, news_items)
     message_center_state = resolve_tenant_message_center_state(tenant, tenant.get("message_center_state"))
     message_center_stats = build_message_center_stats(message_center_state)
     published_reviews = resolve_tenant_review_snapshots(tenant, tenant.get("review_snapshots"))
@@ -615,6 +1145,13 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
     review_generation_cfg = get_review_generation_config()
     watchlist_hub_items = build_tenant_watchlist_hub_items(tenant, watchlist_details_map)
     fan_stock_observation = build_fan_stock_observation_payload(tenant, fallback_mode=fallback_mode)
+    watchlist_comment_analytics = build_watchlist_comment_analytics(tenant_slug=tenant["slug"])
+    ops_stats = build_tenant_ops_stats(
+        tenant=tenant,
+        investor_users=investor_users,
+        watchlist_comment_analytics=watchlist_comment_analytics,
+    )
+    business_analytics = build_tenant_business_analytics(investor_users=investor_users, ops_stats=ops_stats)
     return {
         "tenant": tenant,
         "fallback_mode": fallback_mode,
@@ -629,26 +1166,35 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
                 "desc": f"查看普通投资者和大V在 H5 里实际看到的 {tenant['name']} Hermes、复盘、知识和自选股路径。"
             },
             {
-                "label": "租户门户",
-                "url": f"/tenant/{tenant['slug']}",
-                "desc": f"查看 {tenant['advisor']} 对外的专属租户门户，重点承接品牌表达、已发布内容和粉丝入口。"
-            },
-            {
                 "label": "纯 Admin 后台",
                 "url": "/admin?section=kols",
                 "desc": "查看平台侧的大V租户管理、能力开关、一致性巡检和审计入口。"
             },
-        ],
+        ] + ([{
+            "label": "租户门户",
+            "url": f"/tenant/{tenant['slug']}",
+            "desc": f"查看 {tenant['advisor']} 对外的专属租户门户，重点承接品牌表达、已发布内容和粉丝入口。"
+        }] if tenant_portal_enabled else []),
         "stats": {
-            "total_followers": base_followers,
-            "vip_subscribers": base_vip,
-            "monthly_revenue": base_revenue,
-            "revenue_change": revenue_change,
+            "total_followers": ops_stats["total_followers"],
+            "vip_subscribers": ops_stats["vip_subscribers"],
+            "monthly_revenue": ops_stats["monthly_revenue"],
+            "revenue_change": ops_stats["revenue_change"],
             "unread_messages": message_center_stats["unread_messages"],
             "pending_replies": message_center_stats["pending_replies"],
-            "today_views": today_views,
-            "engagement_rate": engagement_rate,
+            "today_views": ops_stats["today_views"],
+            "today_active_viewers": ops_stats["today_active_viewers"],
+            "today_view_distribution": ops_stats["today_view_distribution"],
+            "today_view_trend_7d": ops_stats["today_view_trend_7d"],
+            "engagement_rate": ops_stats["engagement_rate"],
+            "registration_price": ops_stats["registration_price"],
+            "new_paid_samples_month": ops_stats["new_paid_samples_month"],
+            "paid_sample_delta": ops_stats["paid_sample_delta"],
+            "stock_comment_count": ops_stats["stock_comment_count"],
+            "stock_comment_stock_count": ops_stats["stock_comment_stock_count"],
+            "fan_ops_settings": ops_stats["fan_ops_settings"],
         },
+        "business_analytics": business_analytics,
         "recent_fans": [
             {
                 "name": user["username"],
@@ -661,7 +1207,7 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
             {"name": "暂无粉丝", "time": "--", "msg": "请先通过 Admin 或工作台导入用户。", "tier": "--"}
         ],
         "broadcast_history": broadcast_history,
-        "portal_workspace": resolve_tenant_portal_workspace(tenant, tenant.get("portal_cms")),
+        "portal_workspace": resolve_tenant_portal_workspace(tenant, tenant.get("portal_cms")) if tenant_portal_enabled else {},
         "message_center": {
             "summary": message_center_state["summary"],
             "items": build_message_center_items((fan_threads + review_notice_threads)[:6], limit=6),
@@ -671,18 +1217,27 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
             "summary": "这里看的是大V自己的粉丝分层，不是平台总用户。重点管理高频互动、付费意向、机构试点和沉默粉丝的经营动作。",
             "stats": {
                 "total_fans": len(investor_users),
-                "new_fans_7d": min(len(investor_users), 6 if is_lisa else 8),
+                "new_fans_7d": _count_users_within(
+                    investor_users,
+                    start_at=datetime.now() - timedelta(days=7),
+                    end_at=datetime.now() + timedelta(seconds=1),
+                ),
                 "active_fans_30d": len(investor_users),
-                "paying_fans": max(0, len(investor_users) // 3),
+                "paying_fans": ops_stats["vip_subscribers"],
             },
+            "settings": ops_stats["fan_ops_settings"],
             "fans": [
                 {
+                    "id": user.get("id"),
                     "name": user["username"],
                     "tier": user["membership"],
-                    "source": "用户导入",
+                    "source": user.get("source_label") or "用户导入",
                     "joined": str(user.get("created_at") or "--")[:10],
                     "value": f"手机号 {mask_phone(user.get('phone'))}",
                     "status": user["status"] == "active" and "活跃" or "已禁用",
+                    "is_paid_sample": bool(user.get("is_paid_sample")),
+                    "paid_sample_note": user.get("paid_sample_note") or "",
+                    "labels": user.get("labels") or [],
                 }
                 for user in investor_users
             ] or [
@@ -692,27 +1247,19 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
         "dashboard_metrics": {
             "summary": "这里整合的是大V自己的经营 Dashboard，口径覆盖粉丝增长、粉丝注册费、总注册收入、其他收入、token 消耗、消息数量分布和趋势、发布数量及类型趋势。",
             "kpis": [
-                {"label": "粉丝增长量", "value": is_lisa and "+1,420" or "+1,860", "sub": "近7日新增", "trend": "up", "badge": is_lisa and "+9.8%" or "+12.4%"},
-                {"label": "粉丝注册费用", "value": is_lisa and "¥42" or "¥39", "sub": "单粉平均注册成本", "trend": "down", "badge": is_lisa and "-4.1%" or "-6.2%"},
-                {"label": "总注册收入", "value": is_lisa and "¥69,800" or "¥86,400", "sub": "近30日累计", "trend": "up", "badge": is_lisa and "+15.2%" or "+18.7%"},
-                {"label": "其他收入", "value": is_lisa and "¥9,600" or "¥12,800", "sub": "群发 / 定制 / 线下活动", "trend": "up", "badge": is_lisa and "+7.4%" or "+9.5%"},
-                {"label": "Token 消耗量", "value": is_lisa and "102,300" or "128,400", "sub": "近30日 Hermes 消耗", "trend": "up", "badge": is_lisa and "+11.6%" or "+14.1%"},
+                {"label": "本月协同收入", "value": f"¥{ops_stats['monthly_revenue']:,}", "sub": "付费样本 × 当前定价", "trend": "up" if ops_stats["monthly_revenue"] >= 0 else "down", "badge": f"{ops_stats['revenue_change']:+.1f}%"},
+                {"label": "当前注册定价", "value": f"¥{ops_stats['registration_price']:,}", "sub": "每位付费样本单价", "trend": "up", "badge": "可在粉丝管理修改"},
+                {"label": "高频付费样本", "value": str(ops_stats["vip_subscribers"]), "sub": "当前租户已标注", "trend": "up", "badge": f"本月新增 {ops_stats['new_paid_samples_month']} 位"},
+                {"label": "个股留言数量", "value": str(ops_stats["stock_comment_count"]), "sub": f"覆盖 {ops_stats['stock_comment_stock_count']} 只股票", "trend": "up", "badge": "含粉丝与大V留言"},
+                {"label": "今日浏览", "value": str(ops_stats["today_views"]), "sub": f"活跃粉丝 {ops_stats['today_active_viewers']} 位", "trend": "up", "badge": "来自粉丝用户访问"},
             ],
             "message_distribution": [
-                {"label": "粉丝提问", "value": 42},
-                {"label": "复盘提醒反馈", "value": 28},
-                {"label": "大V回复追问", "value": 19},
-                {"label": "系统触达回执", "value": 11},
+                {"label": "粉丝私信", "value": len(fan_threads)},
+                {"label": "复盘提醒", "value": len(review_notice_threads)},
+                {"label": "个股留言", "value": ops_stats["stock_comment_count"]},
+                {"label": "个股观察", "value": int((fan_stock_observation.get("totals") or {}).get("interactions") or 0)},
             ],
-            "message_trend": [
-                {"day": "06-01", "count": 26},
-                {"day": "06-02", "count": 31},
-                {"day": "06-03", "count": 34},
-                {"day": "06-04", "count": 29},
-                {"day": "06-05", "count": 40},
-                {"day": "06-06", "count": 44},
-                {"day": "06-07", "count": 52},
-            ],
+            "message_trend": ops_stats["today_view_trend_7d"],
             "publish_distribution": [
                 {"label": "日复盘", "value": 18},
                 {"label": "周复盘", "value": 4},
@@ -871,35 +1418,16 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
             },
         },
         "knowledge_hub": knowledge_hub,
-        "hermes_hub": {
-            "summary": "Hermes 对大V保留两种演示版本：工作区版承接股票、skills、提示词和结构化结果；龙虾纯对话版只保留 skills + 对话，按知识库直接聊天。",
-            "versions": [
-                {
-                    "name": "工作区版",
-                    "desc": "适合带股票代码、skills、提示词建议和图表结果一起演示。",
-                    "points": ["股票代码输入", "结构化结果卡", "图表 + 指标 + 证据链"],
-                },
-                {
-                    "name": "龙虾纯对话版",
-                    "desc": "纯提示词聊天，不强制单独输入股票代码；若问题里自然带了股票对象，会自动进入个股分析。",
-                    "points": ["纯对话输入", "skills 保持一致", "知识库自动带入上下文"],
-                },
-            ],
-            "skills": [
-                {"label": "基本面分析", "type": "系统", "knowledge": 3},
-                {"label": "基本面判断", "type": "系统", "knowledge": 2},
-                {"label": "证据链归因", "type": "系统", "knowledge": 3},
-                {"label": "龙头股估值框架", "type": "自定义", "knowledge": 2},
-            ],
-        },
         "watchlist_hub": {
-            "summary": "自选股在前台已经改成顶部直接输入股票代码，进入个股详情后再添加自选；现在工作台与 H5 共用同一套指标湖增强信号，能同步看到行业预警、核心指标和异常摘要。",
+            "summary": "维护大V自己的重点跟踪标的。行情、行业预警和关联指标与 H5 个股详情使用同一套数据口径。",
             "items": watchlist_hub_items,
         },
         "fan_stock_observation": fan_stock_observation,
+        "watchlist_comment_analytics": watchlist_comment_analytics,
         "fund_dashboard": fund_dashboard,
         "fund_dashboard_state": fund_dashboard_state,
         "indicator_hub": indicator_hub,
+        "data_lake": data_lake,
         "published_reviews": published_reviews,
         "consistency_notes": [
             {"title": "前后台分离", "desc": "首页同时展示纯 Admin 后台和大V web 工作台两个入口，角色职责分开。"},

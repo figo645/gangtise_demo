@@ -249,6 +249,28 @@ DECLARED_AGENT_WORKFLOW_CATALOG = {
             {"id": "edge_knowledge_graph_5", "from": "knowledge_graph_edge", "to": "knowledge_graph_render"},
         ],
     },
+    "knowledge_asset_agent": {
+        "id": "knowledge_asset_agent",
+        "title": "知识资产台账智能体",
+        "summary": "把知识条目整理成可审阅的知识资产台账，呈现词条、QKV、关系摘要和成熟度分层。",
+        "category": "知识智能体",
+        "feature_key": "knowledge_module",
+        "execution_mode": "declared_agent_workflow",
+        "tags": ["知识资产", "词条台账", "关系摘要", "QKV"],
+        "nodes": [
+            {"id": "knowledge_asset_input", "label": "知识条目输入", "processor": "input", "kind": "source", "x": 36, "y": 88, "description": "接收当前租户或平台范围内的知识条目集合。"},
+            {"id": "knowledge_asset_profile", "label": "QKV 画像", "processor": "qkv_extract", "kind": "planner", "x": 320, "y": 88, "description": "抽取每条知识的提问、关键词、结论值和证据点。"},
+            {"id": "knowledge_asset_relation", "label": "关系归并", "processor": "relation_merge", "kind": "context", "x": 616, "y": 88, "description": "把主题、实体、方法和验证信号归并成知识关系摘要。"},
+            {"id": "knowledge_asset_grade", "label": "成熟度分层", "processor": "maturity_grade", "kind": "planner", "x": 914, "y": 88, "description": "根据向量化、结构完整度和关系丰富度计算成熟度。"},
+            {"id": "knowledge_asset_render", "label": "资产台账封装", "processor": "output", "kind": "output", "x": 1212, "y": 88, "description": "输出知识资产总览、关系摘要和条目列表。"},
+        ],
+        "edges": [
+            {"id": "edge_knowledge_asset_1", "from": "knowledge_asset_input", "to": "knowledge_asset_profile"},
+            {"id": "edge_knowledge_asset_2", "from": "knowledge_asset_profile", "to": "knowledge_asset_relation"},
+            {"id": "edge_knowledge_asset_3", "from": "knowledge_asset_relation", "to": "knowledge_asset_grade"},
+            {"id": "edge_knowledge_asset_4", "from": "knowledge_asset_grade", "to": "knowledge_asset_render"},
+        ],
+    },
 }
 
 
@@ -471,6 +493,10 @@ def build_default_knowledge_processing_workflow_definition():
 
 def build_default_knowledge_graph_workflow_definition():
     return copy.deepcopy(DECLARED_AGENT_WORKFLOW_CATALOG["knowledge_graph_agent"])
+
+
+def build_default_knowledge_asset_workflow_definition():
+    return copy.deepcopy(DECLARED_AGENT_WORKFLOW_CATALOG["knowledge_asset_agent"])
 
 
 def build_agent_workflow_center_payload(forecast_workflow_meta=None):

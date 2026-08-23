@@ -1,6 +1,5 @@
 import os
 import json
-import sqlite3
 import copy
 import math
 import statistics
@@ -8,6 +7,7 @@ import time
 import threading
 import re
 import hashlib
+import secrets
 import base64
 import csv
 import io
@@ -18,7 +18,7 @@ from html.parser import HTMLParser
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for, g, abort
 import random
 from datetime import datetime, timedelta
-from urllib.parse import urlsplit, parse_qsl
+from urllib.parse import urlsplit, parse_qsl, urlencode
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 from hmac import compare_digest
@@ -60,6 +60,71 @@ except Exception:
     openpyxl = None
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PERSISTENT_APP_SECRET_PATH = Path(
+    os.environ.get("GANGTISE_APP_SECRET_FILE") or "/root/.gangtise_demo_secret"
+)
+
+
+def _resolve_session_secret_key():
+    configured = str(os.environ.get("GANGTISE_DEMO_SECRET_KEY") or "").strip()
+    if configured:
+        return configured
+
+    # Production deployments used to retain this key in the checkout. Jenkins
+    # rsync --delete can remove it, invalidating encrypted PostgreSQL settings.
+    # Prefer a root-owned location outside the deployment directory instead.
+    try:
+        if PERSISTENT_APP_SECRET_PATH.exists():
+            existing = PERSISTENT_APP_SECRET_PATH.read_text(encoding="utf-8").strip()
+            if len(existing) >= 32:
+                return existing
+    except Exception:
+        pass
+
+    # Preserve an existing checkout key once by promoting it to the persistent
+    # location. This keeps already encrypted PostgreSQL credentials readable.
+    secret_path = PROJECT_ROOT / ".gangtise_session_secret"
+    try:
+        if secret_path.exists():
+            existing = secret_path.read_text(encoding="utf-8").strip()
+            if len(existing) >= 32:
+                try:
+                    PERSISTENT_APP_SECRET_PATH.parent.mkdir(parents=True, exist_ok=True)
+                    descriptor = os.open(str(PERSISTENT_APP_SECRET_PATH), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                        handle.write(existing)
+                except FileExistsError:
+                    pass
+                except Exception:
+                    pass
+                return existing
+        generated = secrets.token_urlsafe(48)
+        try:
+            PERSISTENT_APP_SECRET_PATH.parent.mkdir(parents=True, exist_ok=True)
+            descriptor = os.open(str(PERSISTENT_APP_SECRET_PATH), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                handle.write(generated)
+            return generated
+        except FileExistsError:
+            return PERSISTENT_APP_SECRET_PATH.read_text(encoding="utf-8").strip()
+        except Exception:
+            descriptor = os.open(str(secret_path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                handle.write(generated)
+        return generated
+    except FileExistsError:
+        return secret_path.read_text(encoding="utf-8").strip()
+    except Exception:
+        # This only applies to a read-only development checkout. Deployments
+        # should always supply GANGTISE_DEMO_SECRET_KEY explicitly.
+        return hashlib.sha256(f"{PROJECT_ROOT}|gangtise-session-fallback".encode("utf-8")).hexdigest()
+
+
+def _resolve_session_ttl_minutes():
+    try:
+        return max(1, min(int(os.environ.get("GANGTISE_SESSION_TTL_MINUTES", "20")), 24 * 60))
+    except (TypeError, ValueError):
+        return 20
 
 app = Flask(
     __name__,
@@ -67,15 +132,14 @@ app = Flask(
     static_folder=str(PROJECT_ROOT / "static"),
 )
 app.config.update(
-    SECRET_KEY=os.environ.get("GANGTISE_DEMO_SECRET_KEY", os.urandom(32)),
+    SECRET_KEY=_resolve_session_secret_key(),
+    PERMANENT_SESSION_LIFETIME=timedelta(minutes=_resolve_session_ttl_minutes()),
+    SESSION_REFRESH_EACH_REQUEST=True,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
 )
 
-AUTH_PASSWORD = os.environ.get("GANGTISE_DEMO_PASSWORD", "gangtise")
-AUTH_SESSION_KEY = "gangtise_auth"
 H5_USER_SESSION_KEY = "current_h5_username"
-DB_PATH = os.environ.get("GANGTISE_DEMO_DB", str(PROJECT_ROOT / "gangtise_demo.db"))
 VECTOR_DB_HOST = os.environ.get("VECTOR_DB_HOST") or os.environ.get("IP") or "129.211.65.53"
 VECTOR_DB_PORT = int(os.environ.get("VECTOR_DB_PORT", "5432"))
 VECTOR_DB_NAME = os.environ.get("POSTGRES_DB", "sprint_dashboard")
@@ -96,15 +160,8 @@ LOCAL_VECTOR_DB_PORT = int(os.environ.get("LOCAL_VECTOR_DB_PORT", str(VECTOR_DB_
 LOCAL_VECTOR_DB_NAME = os.environ.get("LOCAL_VECTOR_DB_NAME") or VECTOR_DB_NAME
 LOCAL_VECTOR_DB_USER = os.environ.get("LOCAL_VECTOR_DB_USER") or VECTOR_DB_USER
 LOCAL_VECTOR_DB_PASSWORD = os.environ.get("LOCAL_VECTOR_DB_PASSWORD") or VECTOR_DB_PASSWORD
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
-OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
-OPENAI_AUDIO_MODEL = os.environ.get("OPENAI_AUDIO_MODEL", "whisper-1").strip() or "whisper-1"
-OPENAI_AUDIO_LANGUAGE = os.environ.get("OPENAI_AUDIO_LANGUAGE", "zh").strip() or "zh"
-OPENAI_EMBEDDING_MODEL = os.environ.get("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small").strip() or "text-embedding-3-small"
-LOCAL_WHISPER_MODEL_SIZE = os.environ.get("LOCAL_WHISPER_MODEL_SIZE", "small").strip() or "small"
-LOCAL_WHISPER_DEVICE = os.environ.get("LOCAL_WHISPER_DEVICE", "cpu").strip() or "cpu"
-LOCAL_WHISPER_COMPUTE_TYPE = os.environ.get("LOCAL_WHISPER_COMPUTE_TYPE", "int8").strip() or "int8"
-LOCAL_EMBEDDING_MODEL_NAME = os.environ.get("LOCAL_EMBEDDING_MODEL_NAME", "BAAI/bge-small-zh-v1.5").strip() or "BAAI/bge-small-zh-v1.5"
+# External-service endpoints, models and feature behaviour are stored in
+# PostgreSQL site configuration. Environment variables remain deployment-only.
 PGVECTOR_TARGET_DIM = int(os.environ.get("PGVECTOR_TARGET_DIM", "1536"))
 VOICE_UPLOAD_MAX_BYTES = int(os.environ.get("VOICE_UPLOAD_MAX_BYTES", str(25 * 1024 * 1024)))
 ALLOWED_AUDIO_EXTENSIONS = {".mp3", ".mp4", ".m4a", ".wav", ".webm", ".ogg", ".mpeg", ".mpga"}
@@ -122,13 +179,46 @@ MARKET_DASHBOARD_REGISTRY_PATH = Path(
         "/Users/xuchenfei/PycharmProjects/market_dashboard/data_sources.json",
     )
 )
-MARKET_DASHBOARD_CACHE_DB_PATH = Path(
-    os.environ.get(
-        "MARKET_DASHBOARD_CACHE_DB_PATH",
-        "/Users/xuchenfei/PycharmProjects/market_dashboard/market_cache.db",
-    )
-)
 DB_RUNTIME_CONFIG_PATH = PROJECT_ROOT / ".db_runtime.json"
+DEFAULT_LLM_FEATURE_CATALOG = [
+    {"feature_code": "knowledge_processing_llm", "feature_label": "知识加工", "default_purpose": "general"},
+    {"feature_code": "review_voice_enhancement", "feature_label": "复盘语音增强", "default_purpose": "general"},
+    {"feature_code": "review_input_polish", "feature_label": "复盘输入润色", "default_purpose": "general"},
+    {"feature_code": "review_draft_generation", "feature_label": "复盘草稿生成", "default_purpose": "general"},
+    {"feature_code": "review_compose_generation", "feature_label": "复盘完整成稿", "default_purpose": "general"},
+    {"feature_code": "review_user_input_summary", "feature_label": "复盘用户输入摘要", "default_purpose": "general"},
+    {"feature_code": "review_watchlist_analysis", "feature_label": "复盘自选股归纳", "default_purpose": "general"},
+    {"feature_code": "watchlist_comment_labeling", "feature_label": "自选股评论标注", "default_purpose": "general"},
+    {"feature_code": "knowledge_query_filter", "feature_label": "知识检索过滤", "default_purpose": "general"},
+    {"feature_code": "knowledge_query_answer", "feature_label": "知识问答生成", "default_purpose": "general"},
+    {"feature_code": "voice_transcription_api", "feature_label": "语音 API 转写连接", "default_purpose": "general"},
+    {"feature_code": "embedding_api", "feature_label": "向量 API 连接", "default_purpose": "general"},
+    {"feature_code": "hermes_intent_router", "feature_label": "Hermes 意图路由", "default_purpose": "general"},
+    {"feature_code": "hermes_answer_synthesis", "feature_label": "Hermes 回答合成", "default_purpose": "general"},
+    {"feature_code": "smart_indicator_formula_generation", "feature_label": "智能指标公式生成", "default_purpose": "general"},
+]
+DEFAULT_LLM_MODELS = [
+    {
+        "key": "gangtise-gemma4-12b-bf16",
+        "label": "Gangtise Gemma4 12B BF16",
+        "provider": "openai",
+        "model_name": "gemma4:12b-it-bf16",
+        "base_url": "http://8.155.160.194:6031/api",
+        "api_key": "",
+        "purpose": "general",
+        "enabled": True,
+    },
+    {
+        "key": "gangtise-gemma4-31b-q4km",
+        "label": "Gangtise Gemma4 31B Q4_K_M",
+        "provider": "openai",
+        "model_name": "gemma4:31b-it-q4_K_M",
+        "base_url": "http://8.155.160.194:6031/api",
+        "api_key": "",
+        "purpose": "general",
+        "enabled": True,
+    },
+]
 INDICATOR_DEFINITION_FIELDS = {
     "indicator_code",
     "indicator_name",
@@ -367,7 +457,7 @@ DEFAULT_USERS = [
         "status": "active",
     },
     {
-        "username": "平台管理员",
+        "username": "admin",
         "password": "admin123",
         "role": "admin",
         "tenant_slug": DEFAULT_TENANTS[0]["slug"],
@@ -432,19 +522,182 @@ class PortalHtmlSanitizer(HTMLParser):
 DEFAULT_SITE_CONFIG = {
     "default_theme": "light",
     "default_accent": "blue",
-    "password_gate_enabled": True,
+    "auth_settings": {
+        "password_login_enabled": True,
+        "wechat_login_enabled": False,
+        "quick_select_enabled": True,
+        "wechat_runtime_test_enabled": True,
+        "wechat": {
+            "app_id": "",
+            "redirect_uri": "http://127.0.0.1:5001/api/h5/wechat/callback",
+            "scope": "snsapi_userinfo",
+            "auto_register_enabled": False,
+            "default_role": "investor",
+            "default_tenant_slug": "",
+            "default_advisor_name": "",
+        },
+    },
     "voice_transcription": {
         "engine": "local",
+        "post_process_mode": "rule_based",
+        "domain_glossary_enabled": True,
+        "api_model": "whisper-1",
+        "api_language": "zh",
+        "local_model_size": "small",
+        "local_device": "cpu",
+        "local_compute_type": "int8",
     },
     "voice_embedding": {
         "engine": "local",
+        "api_model": "text-embedding-3-small",
+        "local_model_name": "BAAI/bge-small-zh-v1.5",
     },
     "knowledge_ingestion": {
         "user_preview_enabled": False,
     },
     "hermes_settings": {
         "prompt_scope_guard_enabled": True,
-        "investor_access_enabled": True,
+        "investor_access_enabled": False,
+        "dav_access_enabled": True,
+        "internet_answer_enabled": True,
+        "thinking_process_enabled": True,
+        "answer_save_to_knowledge_enabled": True,
+        "default_response_style": "structured",
+        "chart_types_enabled": ["kline_chart", "line_chart", "distribution_chart", "compare_chart"],
+        "route_priority": [
+            "session_load",
+            "memory_read",
+            "fast_path",
+            "scope_guard",
+            "intent_router",
+            "knowledge.search",
+            "platform_tools",
+            "attachment.context",
+            "web.search",
+            "answer_synthesis",
+        ],
+        "intent_tree": [
+            {
+                "id": "knowledge_lookup",
+                "label": "知识问答",
+                "group": "knowledge_qa",
+                "enabled": True,
+                "display_mode": "text",
+                "allow_knowledge": True,
+                "allow_web": True,
+                "allow_files": True,
+                "allow_chart": False,
+            },
+            {
+                "id": "watchlist_fundamental",
+                "label": "个股 / 自选股",
+                "group": "market_data_query",
+                "enabled": True,
+                "display_mode": "structured",
+                "allow_knowledge": True,
+                "allow_web": True,
+                "allow_files": True,
+                "allow_chart": True,
+            },
+            {
+                "id": "smart_indicator_explain",
+                "label": "指标 / 图表",
+                "group": "chart_visualization",
+                "enabled": True,
+                "display_mode": "structured",
+                "allow_knowledge": True,
+                "allow_web": True,
+                "allow_files": False,
+                "allow_chart": True,
+            },
+            {
+                "id": "evidence_chain_analysis",
+                "label": "复盘 / 证据链",
+                "group": "review_assistant",
+                "enabled": True,
+                "display_mode": "structured",
+                "allow_knowledge": True,
+                "allow_web": True,
+                "allow_files": True,
+                "allow_chart": False,
+            },
+            {
+                "id": "dashboard_interpretation",
+                "label": "Dashboard 解读",
+                "group": "dashboard_indicator_assistant",
+                "enabled": True,
+                "display_mode": "structured",
+                "allow_knowledge": True,
+                "allow_web": False,
+                "allow_files": False,
+                "allow_chart": True,
+            },
+            {
+                "id": "multi_tool_research",
+                "label": "多工具研究",
+                "group": "content_generation",
+                "enabled": True,
+                "display_mode": "structured",
+                "allow_knowledge": True,
+                "allow_web": True,
+                "allow_files": True,
+                "allow_chart": True,
+            },
+            {
+                "id": "product_help",
+                "label": "产品帮助",
+                "group": "product_help_or_smalltalk",
+                "enabled": True,
+                "display_mode": "text",
+                "allow_knowledge": True,
+                "allow_web": False,
+                "allow_files": False,
+                "allow_chart": False,
+            },
+            {
+                "id": "small_talk",
+                "label": "轻度闲聊",
+                "group": "product_help_or_smalltalk",
+                "enabled": True,
+                "display_mode": "text",
+                "allow_knowledge": False,
+                "allow_web": False,
+                "allow_files": False,
+                "allow_chart": False,
+            },
+        ],
+        "template_tree": {
+            "router": [
+                {"id": "router.scope", "label": "范围识别", "enabled": True},
+                {"id": "router.intent", "label": "意图识别", "enabled": True},
+                {"id": "router.display_mode", "label": "展示模式判定", "enabled": True},
+                {"id": "router.tool_plan", "label": "工具编排", "enabled": True},
+            ],
+            "tool": [
+                {"id": "tool.knowledge.search", "label": "知识检索", "enabled": True},
+                {"id": "tool.watchlist.detail", "label": "个股详情", "enabled": True},
+                {"id": "tool.market.index", "label": "指数 / 指标数据", "enabled": True},
+                {"id": "tool.file.parse", "label": "文件解析", "enabled": True},
+                {"id": "tool.url.parse", "label": "URL 解析", "enabled": True},
+                {"id": "tool.web.search", "label": "互联网补充", "enabled": True},
+                {"id": "tool.chart.render", "label": "图表渲染", "enabled": True},
+            ],
+            "answer": [
+                {"id": "answer.qa.structured", "label": "结构化问答", "enabled": True},
+                {"id": "answer.market.deep", "label": "研究型回答", "enabled": True},
+                {"id": "answer.report.evidence", "label": "报告 / 证据链回答", "enabled": True},
+                {"id": "answer.redirect.soft", "label": "温和收口", "enabled": True},
+            ],
+            "render": [
+                {"id": "render.text", "label": "文本结果", "enabled": True},
+                {"id": "render.metric_cards", "label": "指标卡片", "enabled": True},
+                {"id": "render.chart_kline", "label": "K 线图", "enabled": True},
+                {"id": "render.chart_line", "label": "线性图", "enabled": True},
+                {"id": "render.chart_distribution", "label": "分布图", "enabled": True},
+                {"id": "render.followup_tags", "label": "追问标签", "enabled": True},
+                {"id": "render.thinking_stream", "label": "思考过程", "enabled": True},
+            ],
+        },
     },
     "evidence_chain": {
         "filter_prompt_system": (
@@ -512,8 +765,11 @@ DEFAULT_SITE_CONFIG = {
         "compose_timeout_seconds": 60,
     },
     "llm_registry": {
-        "default_model_key": "",
-        "models": [],
+        "default_model_key": "gangtise-gemma4-31b-q4km",
+        "models": copy.deepcopy(DEFAULT_LLM_MODELS),
+        "feature_model_keys": {
+            "review_voice_enhancement": "gangtise-gemma4-12b-bf16",
+        },
     },
     "brand": DEFAULT_BRAND_CONFIG,
     "default_tenant_slug": DEFAULT_TENANTS[0]["slug"],
@@ -534,8 +790,10 @@ DEFAULT_SITE_CONFIG = {
         "vip": False,
         "dm": True,
         "fan_interaction": False,
+        "watchlist_fan_comment_interaction": True,
         "paid_reply": False,
         "workbench": True,
+        "tenant_portal": True,
     },
 }
 

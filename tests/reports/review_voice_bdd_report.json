@@ -1,0 +1,68 @@
+{
+  "generated_at": "2026-08-04 03:24:02",
+  "scenario_count": 5,
+  "passed_count": 5,
+  "failed_count": 0,
+  "scenarios": [
+    {
+      "method": "test_given_existing_llm_registry_when_normalized_then_builtin_gemma4_12b_model_is_appended",
+      "name": "内置 12B 模型注册",
+      "given": "系统存在自定义通用模型，且需要自动补齐内置 Gangtise 模型。",
+      "when": "规范化 llm_registry。",
+      "then": "Gemma4 12B BF16 必须作为内置模型追加进可用列表。",
+      "passed": true,
+      "detail": "场景断言通过。",
+      "evidence": {
+        "result": "ok"
+      }
+    },
+    {
+      "method": "test_given_default_site_config_when_normalized_then_review_voice_enhancement_maps_to_gemma4_12b",
+      "name": "语音增强默认映射 12B",
+      "given": "系统使用默认站点配置。",
+      "when": "解析 review_voice_enhancement 的功能级模型映射。",
+      "then": "语音转录整理应默认绑定到 gemma4:12b-it-bf16。",
+      "passed": true,
+      "detail": "场景断言通过。",
+      "evidence": {
+        "result": "ok"
+      }
+    },
+    {
+      "method": "test_given_review_voice_enhancement_when_running_then_gemma4_12b_model_is_used",
+      "name": "语音增强执行使用 12B",
+      "given": "用户启用语音增强整理，且配置中已存在默认映射。",
+      "when": "执行 enhance_review_voice_transcript_with_llm。",
+      "then": "实际送入 LLM 调用的模型配置必须是 gemma4:12b-it-bf16。",
+      "passed": true,
+      "detail": "场景断言通过。",
+      "evidence": {
+        "result": "ok"
+      }
+    },
+    {
+      "method": "test_given_h5_when_review_file_or_url_is_processed_then_editor_handoff_logic_exists",
+      "name": "H5 文件与 URL 自动回到手动撰写",
+      "given": "H5 端复盘与知识录入完成文件解析或 URL 抽取。",
+      "when": "前端渲染对应页面脚本。",
+      "then": "抽取结果必须自动带入手动编辑区，并切到可继续修改的模式。",
+      "passed": true,
+      "detail": "场景断言通过。",
+      "evidence": {
+        "result": "ok"
+      }
+    },
+    {
+      "method": "test_given_workbench_when_review_file_or_url_is_processed_then_editor_handoff_logic_exists",
+      "name": "Workbench 文件与 URL 自动回到手动撰写",
+      "given": "大V 工作台完成文件解析或 URL 抽取。",
+      "when": "前端渲染工作台脚本。",
+      "then": "抽取结果必须自动带入手动编辑区，并切到可继续修改的模式。",
+      "passed": true,
+      "detail": "场景断言通过。",
+      "evidence": {
+        "result": "ok"
+      }
+    }
+  ]
+}

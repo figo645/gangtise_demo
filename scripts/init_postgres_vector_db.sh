@@ -4,12 +4,21 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SQL_DIR="${ROOT_DIR}/sql/postgres"
 
-PGHOST="${PGHOST:-${VECTOR_DB_HOST:-${IP:-129.211.65.53}}}"
-PGPORT="${PGPORT:-${VECTOR_DB_PORT:-5432}}"
+CREDENTIALS_FILE="${POSTGRES_CREDENTIALS_FILE:-/root/gangtise_postgres_credentials}"
+if [ -f "$CREDENTIALS_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$CREDENTIALS_FILE"
+  set +a
+fi
+
+PGHOST="${PGHOST:-${APP_DB_HOST:-${VECTOR_DB_HOST:-${IP:-129.211.65.53}}}}"
+PGPORT="${PGPORT:-${APP_DB_PORT:-${VECTOR_DB_PORT:-5432}}}"
 PGDATABASE="${PGDATABASE:-postgres}"
-TARGET_DB="${TARGET_DB:-${POSTGRES_DB:-sprint_dashboard}}"
-PGUSER="${PGUSER:-${POSTGRES_USER:-postgres}}"
-PGPASSWORD="${PGPASSWORD:-${POSTGRES_PASSWORD:-your_password}}"
+TARGET_DB="${TARGET_DB:-${APP_DB_NAME:-${POSTGRES_DB:-sprint_dashboard}}}"
+PGUSER="${PGUSER:-${APP_DB_USER:-${POSTGRES_USER:-postgres}}}"
+PGPASSWORD="${PGPASSWORD:-${APP_DB_PASSWORD:-${POSTGRES_PASSWORD:-your_password}}}"
+IMPORT_LEGACY_SQLITE="${IMPORT_LEGACY_SQLITE:-0}"
 
 export PGPASSWORD
 
@@ -37,17 +46,15 @@ echo "==> Target database: $TARGET_DB"
 echo "==> Login user: $PGUSER"
 
 run_sql "$PGDATABASE" "${SQL_DIR}/000_create_database.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/002_app_core_tables.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/001_enable_pgvector.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/010_review_voice_embeddings.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/011_review_voice_embeddings_alter_legacy_columns.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/012_review_voice_embeddings_pgvector.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/020_knowledge_embeddings.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/021_knowledge_embeddings_pgvector.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/101_seed_app_core.sql"
-run_sql "$TARGET_DB" "${SQL_DIR}/100_seed_master_data.sql"
+echo "==> Applying versioned schema and master-data migrations"
+PGHOST="$PGHOST" \
+PGPORT="$PGPORT" \
+PGDATABASE="$TARGET_DB" \
+PGUSER="$PGUSER" \
+PGPASSWORD="$PGPASSWORD" \
+  "${ROOT_DIR}/scripts/apply_postgres_updates.sh"
 
-if [ -f "${ROOT_DIR}/gangtise_demo.db" ]; then
+if [[ "$IMPORT_LEGACY_SQLITE" != "0" && "$IMPORT_LEGACY_SQLITE" != "false" && "$IMPORT_LEGACY_SQLITE" != "no" ]] && [ -f "${ROOT_DIR}/gangtise_demo.db" ]; then
   echo "==> Migrating existing SQLite data into Postgres"
   APP_DB_HOST="$PGHOST" \
   APP_DB_PORT="$PGPORT" \
@@ -56,6 +63,8 @@ if [ -f "${ROOT_DIR}/gangtise_demo.db" ]; then
   APP_DB_PASSWORD="$PGPASSWORD" \
   GANGTISE_DEMO_DB="${ROOT_DIR}/gangtise_demo.db" \
   python3 "${ROOT_DIR}/scripts/migrate_sqlite_to_postgres.py"
+else
+  echo "==> Skipping legacy SQLite import (PostgreSQL is the application database)"
 fi
 
 echo "==> Postgres application database initialization completed successfully."

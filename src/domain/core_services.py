@@ -1,4 +1,12 @@
 from src.runtime import *
+import base64
+import hashlib
+
+try:
+    from cryptography.fernet import Fernet, InvalidToken
+except Exception:  # pragma: no cover - deployment dependency validation
+    Fernet = None
+    InvalidToken = Exception
 from src.domain.agent_workflows import *
 
 
@@ -45,6 +53,10 @@ def get_indicator_definition(*args, **kwargs):
     return _market_services_module().get_indicator_definition(*args, **kwargs)
 
 
+def list_indicator_definitions(*args, **kwargs):
+    return _market_services_module().list_indicator_definitions(*args, **kwargs)
+
+
 def invalidate_indicator_hub_cache(*args, **kwargs):
     return _market_services_module().invalidate_indicator_hub_cache(*args, **kwargs)
 
@@ -79,6 +91,62 @@ def sync_real_indicator_history_from_market_cache(*args, **kwargs):
 
 def gen_watchlist_details(*args, **kwargs):
     return _market_services_module().gen_watchlist_details(*args, **kwargs)
+
+
+def list_user_watchlist_items(*args, **kwargs):
+    return _market_services_module().list_user_watchlist_items(*args, **kwargs)
+
+
+def add_user_watchlist_item(*args, **kwargs):
+    return _market_services_module().add_user_watchlist_item(*args, **kwargs)
+
+
+def remove_user_watchlist_item(*args, **kwargs):
+    return _market_services_module().remove_user_watchlist_item(*args, **kwargs)
+
+
+def get_watchlist_detail_by_code(*args, **kwargs):
+    return _market_services_module().get_watchlist_detail_by_code(*args, **kwargs)
+
+
+def search_watchlist_candidates(*args, **kwargs):
+    return _market_services_module().search_watchlist_candidates(*args, **kwargs)
+
+
+def list_watchlist_kline_annotations(*args, **kwargs):
+    return _market_services_module().list_watchlist_kline_annotations(*args, **kwargs)
+
+
+def save_watchlist_kline_annotation(*args, **kwargs):
+    return _market_services_module().save_watchlist_kline_annotation(*args, **kwargs)
+
+
+def delete_watchlist_kline_annotation(*args, **kwargs):
+    return _market_services_module().delete_watchlist_kline_annotation(*args, **kwargs)
+
+
+def build_watchlist_annotation_context(*args, **kwargs):
+    return _market_services_module().build_watchlist_annotation_context(*args, **kwargs)
+
+
+def list_watchlist_comments(*args, **kwargs):
+    return _market_services_module().list_watchlist_comments(*args, **kwargs)
+
+
+def save_watchlist_comment(*args, **kwargs):
+    return _market_services_module().save_watchlist_comment(*args, **kwargs)
+
+
+def delete_watchlist_comment(*args, **kwargs):
+    return _market_services_module().delete_watchlist_comment(*args, **kwargs)
+
+
+def build_watchlist_comment_analytics(*args, **kwargs):
+    return _market_services_module().build_watchlist_comment_analytics(*args, **kwargs)
+
+
+def label_watchlist_comment_with_llm(*args, **kwargs):
+    return _ai_services_module().label_watchlist_comment_with_llm(*args, **kwargs)
 
 
 def build_simulated_indicator_kline(*args, **kwargs):
@@ -155,8 +223,27 @@ def normalize_llm_model_config(source, index=0):
 def normalize_llm_registry_config(source=None):
     raw = source if isinstance(source, dict) else {}
     items = raw.get("models") if isinstance(raw.get("models"), list) else []
+    builtin_items = DEFAULT_LLM_MODELS if isinstance(DEFAULT_LLM_MODELS, list) else []
+    combined_items = []
+    seen_builtin_keys = set()
+    for item in items:
+        if isinstance(item, dict):
+            combined_items.append(item)
+    existing_keys = {
+        str(item.get("key") or "").strip()
+        for item in combined_items
+        if isinstance(item, dict) and str(item.get("key") or "").strip()
+    }
+    for item in builtin_items:
+        if not isinstance(item, dict):
+            continue
+        builtin_key = str(item.get("key") or "").strip()
+        if not builtin_key or builtin_key in existing_keys or builtin_key in seen_builtin_keys:
+            continue
+        combined_items.append(copy.deepcopy(item))
+        seen_builtin_keys.add(builtin_key)
     models = []
-    for index, item in enumerate(items[:40]):
+    for index, item in enumerate(combined_items[:40]):
         if not isinstance(item, dict):
             continue
         models.append(normalize_llm_model_config(item, index=index))
@@ -166,9 +253,45 @@ def normalize_llm_registry_config(source=None):
     if not default_model_key and models:
         general_models = [model for model in models if model.get("purpose") == "general" and model.get("enabled")]
         default_model_key = (general_models[0] if general_models else models[0]).get("key") or ""
+    feature_model_keys = {}
+    raw_feature_model_keys = raw.get("feature_model_keys") if isinstance(raw.get("feature_model_keys"), dict) else {}
+    valid_keys = {model["key"] for model in models}
+    for feature_code, model_key in raw_feature_model_keys.items():
+        feature_code_text = str(feature_code or "").strip()
+        model_key_text = str(model_key or "").strip()
+        if feature_code_text and model_key_text and model_key_text in valid_keys:
+            feature_model_keys[feature_code_text] = model_key_text
     return {
         "default_model_key": default_model_key,
         "models": models,
+        "feature_model_keys": feature_model_keys,
+    }
+
+
+def normalize_auth_settings_config(source=None):
+    raw = source if isinstance(source, dict) else {}
+    defaults = copy.deepcopy(DEFAULT_SITE_CONFIG["auth_settings"])
+    wechat_raw = raw.get("wechat") if isinstance(raw.get("wechat"), dict) else {}
+    wechat_defaults = defaults.get("wechat") or {}
+    default_role = str(wechat_raw.get("default_role") or wechat_defaults.get("default_role") or "investor").strip().lower() or "investor"
+    if default_role not in {"investor", "dav"}:
+        default_role = "investor"
+    return {
+        "password_login_enabled": bool(raw.get("password_login_enabled", defaults.get("password_login_enabled", True))),
+        "wechat_login_enabled": bool(raw.get("wechat_login_enabled", defaults.get("wechat_login_enabled", False))),
+        "quick_select_enabled": bool(raw.get("quick_select_enabled", defaults.get("quick_select_enabled", True))),
+        "wechat_runtime_test_enabled": bool(raw.get("wechat_runtime_test_enabled", defaults.get("wechat_runtime_test_enabled", True))),
+        "wechat": {
+            "app_id": str(wechat_raw.get("app_id") or wechat_defaults.get("app_id") or "").strip(),
+            "app_secret": str(wechat_raw.get("app_secret") or "").strip(),
+            "redirect_uri": str(wechat_raw.get("redirect_uri") or wechat_defaults.get("redirect_uri") or "").strip(),
+            "scope": str(wechat_raw.get("scope") or wechat_defaults.get("scope") or "snsapi_userinfo").strip() or "snsapi_userinfo",
+            "auto_register_enabled": bool(wechat_raw.get("auto_register_enabled", wechat_defaults.get("auto_register_enabled", False))),
+            "default_role": default_role,
+            "default_tenant_slug": str(wechat_raw.get("default_tenant_slug") or wechat_defaults.get("default_tenant_slug") or "").strip().lower(),
+            "default_advisor_name": str(wechat_raw.get("default_advisor_name") or wechat_defaults.get("default_advisor_name") or "").strip(),
+            "clear_app_secret": bool(wechat_raw.get("clear_app_secret", False)),
+        },
     }
 
 
@@ -179,12 +302,108 @@ def normalize_knowledge_ingestion_config(source=None):
     }
 
 
+def normalize_voice_transcription_config(source=None):
+    raw = source if isinstance(source, dict) else {}
+    defaults = copy.deepcopy(DEFAULT_SITE_CONFIG["voice_transcription"])
+    engine = str(raw.get("engine") or defaults["engine"]).strip().lower()
+    post_process_mode = str(raw.get("post_process_mode") or defaults["post_process_mode"]).strip().lower()
+    return {
+        "engine": engine if engine in {"local", "api"} else "local",
+        "post_process_mode": post_process_mode if post_process_mode in {"none", "rule_based"} else "rule_based",
+        "domain_glossary_enabled": raw.get("domain_glossary_enabled", defaults["domain_glossary_enabled"]) is not False,
+        "api_model": str(raw.get("api_model") or defaults["api_model"]).strip() or defaults["api_model"],
+        "api_language": str(raw.get("api_language") or defaults["api_language"]).strip() or defaults["api_language"],
+        "local_model_size": str(raw.get("local_model_size") or defaults["local_model_size"]).strip() or defaults["local_model_size"],
+        "local_device": str(raw.get("local_device") or defaults["local_device"]).strip() or defaults["local_device"],
+        "local_compute_type": str(raw.get("local_compute_type") or defaults["local_compute_type"]).strip() or defaults["local_compute_type"],
+    }
+
+
+def normalize_voice_embedding_config(source=None):
+    raw = source if isinstance(source, dict) else {}
+    defaults = copy.deepcopy(DEFAULT_SITE_CONFIG["voice_embedding"])
+    engine = str(raw.get("engine") or defaults["engine"]).strip().lower()
+    return {
+        "engine": engine if engine in {"local", "api"} else "local",
+        "api_model": str(raw.get("api_model") or defaults["api_model"]).strip() or defaults["api_model"],
+        "local_model_name": str(raw.get("local_model_name") or defaults["local_model_name"]).strip() or defaults["local_model_name"],
+    }
+
+
 def normalize_hermes_settings_config(source=None):
     raw = source if isinstance(source, dict) else {}
     defaults = copy.deepcopy(DEFAULT_SITE_CONFIG["hermes_settings"])
+    default_intent_tree = copy.deepcopy(defaults.get("intent_tree") or [])
+    default_template_tree = copy.deepcopy(defaults.get("template_tree") or {})
+    default_route_priority = list(defaults.get("route_priority") or [])
+    default_chart_types = list(defaults.get("chart_types_enabled") or [])
+
+    def _normalize_tree_items(items, fallback_items):
+        fallback_map = {
+            str(item.get("id") or "").strip(): copy.deepcopy(item)
+            for item in (fallback_items if isinstance(fallback_items, list) else [])
+            if isinstance(item, dict) and str(item.get("id") or "").strip()
+        }
+        normalized = []
+        source_items = items if isinstance(items, list) and items else list(fallback_map.values())
+        seen = set()
+        for item in source_items:
+            if not isinstance(item, dict):
+                continue
+            item_id = str(item.get("id") or "").strip()
+            if not item_id or item_id in seen:
+                continue
+            base = copy.deepcopy(fallback_map.get(item_id) or {})
+            merged = {**base, **copy.deepcopy(item)}
+            merged["id"] = item_id
+            merged["label"] = str(merged.get("label") or base.get("label") or item_id).strip() or item_id
+            if "group" in merged:
+                merged["group"] = str(merged.get("group") or base.get("group") or "").strip()
+            if "display_mode" in merged:
+                merged["display_mode"] = str(merged.get("display_mode") or base.get("display_mode") or "text").strip() or "text"
+            for key in ["enabled", "allow_knowledge", "allow_web", "allow_files", "allow_chart"]:
+                if key in merged:
+                    merged[key] = bool(merged.get(key, base.get(key, False)))
+            normalized.append(merged)
+            seen.add(item_id)
+        for item_id, base in fallback_map.items():
+            if item_id not in seen:
+                normalized.append(copy.deepcopy(base))
+        return normalized
+
+    template_tree = {}
+    raw_template_tree = raw.get("template_tree") if isinstance(raw.get("template_tree"), dict) else {}
+    for group_key, fallback_items in default_template_tree.items():
+        template_tree[group_key] = _normalize_tree_items(raw_template_tree.get(group_key), fallback_items)
+
+    route_priority = []
+    for item in raw.get("route_priority") if isinstance(raw.get("route_priority"), list) else default_route_priority:
+        value = str(item or "").strip()
+        if value and value not in route_priority:
+            route_priority.append(value)
+    if not route_priority:
+        route_priority = default_route_priority
+
+    chart_types_enabled = []
+    for item in raw.get("chart_types_enabled") if isinstance(raw.get("chart_types_enabled"), list) else default_chart_types:
+        value = str(item or "").strip()
+        if value and value not in chart_types_enabled:
+            chart_types_enabled.append(value)
+    if not chart_types_enabled:
+        chart_types_enabled = default_chart_types
+
     return {
         "prompt_scope_guard_enabled": bool(raw.get("prompt_scope_guard_enabled", defaults["prompt_scope_guard_enabled"])),
         "investor_access_enabled": bool(raw.get("investor_access_enabled", defaults["investor_access_enabled"])),
+        "dav_access_enabled": bool(raw.get("dav_access_enabled", defaults.get("dav_access_enabled", True))),
+        "internet_answer_enabled": bool(raw.get("internet_answer_enabled", defaults.get("internet_answer_enabled", True))),
+        "thinking_process_enabled": bool(raw.get("thinking_process_enabled", defaults.get("thinking_process_enabled", True))),
+        "answer_save_to_knowledge_enabled": bool(raw.get("answer_save_to_knowledge_enabled", defaults.get("answer_save_to_knowledge_enabled", True))),
+        "default_response_style": str(raw.get("default_response_style") or defaults.get("default_response_style") or "structured").strip() or "structured",
+        "chart_types_enabled": chart_types_enabled,
+        "route_priority": route_priority,
+        "intent_tree": _normalize_tree_items(raw.get("intent_tree"), default_intent_tree),
+        "template_tree": template_tree,
     }
 
 
@@ -315,7 +534,7 @@ def build_llm_knowledge_processing(raw_text, source_type="", title="", source_de
         }
 
     def _knowledge_processing_llm_executor(state, runtime, node, upstream):
-        llm_model = get_default_llm_config(purpose="general")
+        llm_model = get_default_llm_config(purpose="general", feature_code="knowledge_processing_llm")
         if not llm_model:
             raise RuntimeError("knowledge_processing_llm_not_configured")
         rendered_text = call_openai_compatible_llm(
@@ -559,6 +778,8 @@ def normalize_tenant_config(source=None, index=0):
         tenant["review_snapshots"] = copy.deepcopy(raw["review_snapshots"])
     if isinstance(raw.get("message_center_state"), dict):
         tenant["message_center_state"] = copy.deepcopy(raw["message_center_state"])
+    if isinstance(raw.get("news_aggregation_algorithm"), dict):
+        tenant["news_aggregation_algorithm"] = copy.deepcopy(raw["news_aggregation_algorithm"])
     return tenant
 
 
@@ -664,6 +885,8 @@ def build_review_smart_cards(tenant, fund_dashboard, watchlist_details_map=None,
         fundamental = detail.get("fundamental") if isinstance(detail.get("fundamental"), dict) else {}
         thesis = fundamental.get("thesis") if isinstance(fundamental.get("thesis"), list) else []
         related_indicator_names = detail.get("related_indicator_names") if isinstance(detail.get("related_indicator_names"), list) else []
+        raw_change_pct = detail.get("change_pct")
+        has_real_quote = raw_change_pct is not None and not bool(detail.get("data_unavailable"))
         cards.append(
             {
                 "id": _safe_card_id(f"watch_{detail.get('code') or name}", "watchlist"),
@@ -671,7 +894,7 @@ def build_review_smart_cards(tenant, fund_dashboard, watchlist_details_map=None,
                 "title": name,
                 "category": "重点个股",
                 "summary": str(detail.get("signal_summary") or fundamental.get("summary") or "继续跟踪").strip() or "继续跟踪",
-                "value": f"{detail.get('change_pct', 0):+.1f}%",
+                "value": f"{float(raw_change_pct):+.1f}%" if has_real_quote else "行情待同步",
                 "status": str(detail.get("alert_level") or "normal").strip() or "normal",
                 "prompt": f"围绕 {name} 生成重点个股复盘卡，包含当前判断、验证节点、风险边界和下一步观察。",
                 "data_sources": sanitize_user_facing_source_list(
@@ -934,10 +1157,56 @@ def normalize_review_snapshot_item(item, tenant, index=0):
             "analysis_text": str(item.get("analysis_text") or "").strip()[:1200],
             "evidence": [str(value).strip() for value in (item.get("evidence") if isinstance(item.get("evidence"), list) else []) if str(value).strip()][:6],
         })
+    annotation_evidence = []
+    for item in watchlist_analysis_raw.get("annotation_evidence") if isinstance(watchlist_analysis_raw.get("annotation_evidence"), list) else []:
+        if not isinstance(item, dict):
+            continue
+        annotation_evidence.append({
+            "annotation_id": item.get("annotation_id"),
+            "stock_name": str(item.get("stock_name") or "").strip()[:120],
+            "stock_code": str(item.get("stock_code") or "").strip()[:60],
+            "date_label": str(item.get("date_label") or "").strip()[:40],
+            "title": str(item.get("title") or "").strip()[:120],
+            "note": str(item.get("note") or "").strip()[:600],
+            "trigger": str(item.get("trigger") or "").strip()[:240],
+        })
     watchlist_analysis_section = {
         "sector_summary": str(watchlist_analysis_raw.get("sector_summary") or "").strip()[:200],
         "sector_profiles": sector_profiles,
         "items": watchlist_items,
+        "annotation_evidence": annotation_evidence,
+    }
+    evidence_chain_raw = raw.get("evidence_chain_section") if isinstance(raw.get("evidence_chain_section"), dict) else {}
+    evidence_chain_items = []
+    for item in evidence_chain_raw.get("items") if isinstance(evidence_chain_raw.get("items"), list) else []:
+        if not isinstance(item, dict):
+            continue
+        evidence_chain_items.append({
+            "id": str(item.get("id") or "").strip()[:120],
+            "kind": str(item.get("kind") or "").strip()[:40],
+            "title": str(item.get("title") or "").strip()[:180],
+            "summary": str(item.get("summary") or "").strip()[:400],
+            "source_label": str(item.get("source_label") or "").strip()[:80],
+            "source_detail": sanitize_user_facing_source_text(item.get("source_detail") or "")[:240],
+            "published_at": str(item.get("published_at") or "").strip()[:120],
+            "link": str(item.get("link") or "").strip()[:500],
+            "score": float(item.get("score") or 0.0),
+        })
+    evidence_chain_model = evidence_chain_raw.get("llm_model") if isinstance(evidence_chain_raw.get("llm_model"), dict) else {}
+    evidence_chain_section = {
+        "status": str(evidence_chain_raw.get("status") or ("matched" if evidence_chain_items else "empty")).strip()[:40] or "empty",
+        "query_text": str(evidence_chain_raw.get("query_text") or "").strip()[:280],
+        "summary": str(evidence_chain_raw.get("summary") or ("暂无匹配的证据链" if not evidence_chain_items else "")).strip()[:400] or ("暂无匹配的证据链" if not evidence_chain_items else ""),
+        "items": evidence_chain_items,
+        "knowledge_match_count": max(0, int(evidence_chain_raw.get("knowledge_match_count") or len([item for item in evidence_chain_items if item.get("kind") == "knowledge"]))),
+        "web_match_count": max(0, int(evidence_chain_raw.get("web_match_count") or len([item for item in evidence_chain_items if item.get("kind") == "web"]))),
+        "llm_model": {
+            "key": str(evidence_chain_model.get("key") or "").strip()[:120],
+            "label": str(evidence_chain_model.get("label") or "").strip()[:120],
+            "provider": str(evidence_chain_model.get("provider") or "").strip()[:120],
+            "model_name": str(evidence_chain_model.get("model_name") or "").strip()[:240],
+            "purpose": str(evidence_chain_model.get("purpose") or "").strip()[:120],
+        } if evidence_chain_model else {},
     }
     return {
         "id": str(raw.get("id") or f"{tenant['slug']}-review-{index + 1}").strip() or f"{tenant['slug']}-review-{index + 1}",
@@ -962,6 +1231,7 @@ def normalize_review_snapshot_item(item, tenant, index=0):
         "polished_input_text": str(raw.get("polished_input_text") or "").strip()[:12000],
         "user_input_section": user_input_section,
         "watchlist_analysis_section": watchlist_analysis_section,
+        "evidence_chain_section": evidence_chain_section,
     }
 
 
@@ -2192,6 +2462,7 @@ def build_tenant_smart_indicator_catalog(tenant=None):
                 "numeric_value": item.get("numeric_value"),
                 "unit": item.get("unit") or "",
                 "assessment": item.get("assessment") or "",
+                "assessment_template": item.get("assessment_template") or "",
                 "status": item.get("status") or "attention",
                 "alert": item.get("alert") or "",
                 "prompt_text": item.get("prompt_text") or "",
@@ -2201,6 +2472,7 @@ def build_tenant_smart_indicator_catalog(tenant=None):
                 "selected_indicators": copy.deepcopy(item.get("selected_indicators") or []),
                 "display_order": int(item.get("display_order") or 0),
                 "last_updated": item.get("last_updated") or "",
+                "data_at": item.get("data_at") or "",
             }
         )
     return sorted(items, key=lambda current: (current.get("display_order", 0), current.get("indicator_name") or ""))
@@ -2226,6 +2498,8 @@ def build_fund_dashboard_card_from_indicator(indicator_item, index=0):
         "sources": source_names,
         "selectedIndicators": selected_indicators,
         "updatedAt": str(item.get("last_updated") or item.get("updatedAt") or "").strip(),
+        "dataAt": str(item.get("data_at") or "").strip(),
+        "snapshotAt": str(item.get("last_updated") or item.get("updatedAt") or "").strip(),
         "isEmpty": False,
     }
 
@@ -2247,6 +2521,27 @@ def build_empty_fund_dashboard_card(index=0):
         "updatedAt": "",
         "isEmpty": True,
     }
+
+
+def build_new_smart_indicator_code(tenant_slug):
+    """Return a unique code for a newly created smart indicator.
+
+    Names are display labels, not primary keys: two independent indicators may
+    legitimately use the same name and must remain independently placeable on
+    a dashboard.
+    """
+    tenant_code = slugify_code(tenant_slug, "tenant")
+    timestamp = now_ts_ms().replace("-", "").replace(" ", "_").replace(":", "").replace(".", "")
+    return f"{tenant_code}_smart_{timestamp}"
+
+
+def is_empty_fund_dashboard_card_ref(item):
+    card = item if isinstance(item, dict) else {}
+    if card.get("isEmpty"):
+        return True
+    indicator_code = slugify_code(card.get("indicatorCode") or card.get("indicator_code"), "")
+    name = str(card.get("name") or "").strip()
+    return not indicator_code and bool(re.fullmatch(r"待添加智能指标\s*\d*", name))
 
 
 def _run_smart_indicator_agent_workflow(tenant_slug, payload, persist=False):
@@ -2365,28 +2660,35 @@ def _run_smart_indicator_agent_workflow(tenant_slug, payload, persist=False):
                 "output": copy.deepcopy(state.get("preview_result") or {}),
                 "state_key": "final_result",
             }
+        save_payload = {
+            **(runtime.get("existing") or {}),
+            **(runtime.get("body") or {}),
+            "tenant_slug": runtime.get("tenant_slug") or "",
+            "indicator_name": state.get("indicator_name") or "",
+            "category": state.get("category") or "大V自定义指标",
+            "description": state.get("algorithm_detail") or "",
+            "owner": ((runtime.get("tenant") or {}).get("advisor") or "大V"),
+            "source_type": "smart",
+            "source_type_label": "智能指标",
+            "provider": "LLM / Prompt Formula",
+            "status_hint": str((runtime.get("body") or {}).get("status_hint") or "good").strip() or "good",
+            "assessment_template": str((runtime.get("body") or {}).get("assessment_template") or build_smart_indicator_interpretation(state.get("indicator_name"), state.get("prompt_text"), state.get("selected_indicators"), "实时值", (runtime.get("body") or {}).get("unit") or "")).strip(),
+            "alert_template": str((runtime.get("body") or {}).get("alert_template") or "").strip(),
+            "prompt_text": state.get("prompt_text") or "",
+            "formula_js": (state.get("generated_formula_meta") or {}).get("formula_js") or "",
+            "selected_indicators": copy.deepcopy(state.get("selected_indicators") or []),
+            "display_order": int((runtime.get("body") or {}).get("display_order") or 0),
+            "watchers": ["大V工作台", "H5 Dashboard", "租户门户"],
+            "display_config": {"show_in_h5": True, "show_in_workbench": True},
+            "enabled": (runtime.get("body") or {}).get("enabled", True),
+        }
+        # Only an explicit indicator_code means an edit. New definitions need
+        # their own identity even when their display name matches an old one.
+        if not runtime.get("existing"):
+            save_payload["indicator_code"] = build_new_smart_indicator_code(runtime.get("tenant_slug") or "")
         definition = save_indicator_definition(
             {
-                **(runtime.get("existing") or {}),
-                **(runtime.get("body") or {}),
-                "tenant_slug": runtime.get("tenant_slug") or "",
-                "indicator_name": state.get("indicator_name") or "",
-                "category": state.get("category") or "大V自定义指标",
-                "description": state.get("algorithm_detail") or "",
-                "owner": ((runtime.get("tenant") or {}).get("advisor") or "大V"),
-                "source_type": "smart",
-                "source_type_label": "智能指标",
-                "provider": "LLM / Prompt Formula",
-                "status_hint": str((runtime.get("body") or {}).get("status_hint") or "good").strip() or "good",
-                "assessment_template": str((runtime.get("body") or {}).get("assessment_template") or build_smart_indicator_interpretation(state.get("indicator_name"), state.get("prompt_text"), state.get("selected_indicators"), "实时值", (runtime.get("body") or {}).get("unit") or "")).strip(),
-                "alert_template": str((runtime.get("body") or {}).get("alert_template") or "").strip(),
-                "prompt_text": state.get("prompt_text") or "",
-                "formula_js": (state.get("generated_formula_meta") or {}).get("formula_js") or "",
-                "selected_indicators": copy.deepcopy(state.get("selected_indicators") or []),
-                "display_order": int((runtime.get("body") or {}).get("display_order") or 0),
-                "watchers": ["大V工作台", "H5 Dashboard", "租户门户"],
-                "display_config": {"show_in_h5": True, "show_in_workbench": True},
-                "enabled": (runtime.get("body") or {}).get("enabled", True),
+                **save_payload,
             }
         )
         latest_snapshot = save_smart_indicator_latest_snapshot(definition)
@@ -2462,25 +2764,28 @@ def build_default_fund_dashboard_cards(tenant, layout="2x2"):
 def normalize_fund_dashboard_card_refs(raw_cards, layout):
     target_count = get_dashboard_card_target(layout)
     items = raw_cards if isinstance(raw_cards, list) else []
+    # Dashboard cards are positional.  Empty entries must remain in the list so
+    # a card deliberately placed in (for example) slot 5 is never compacted
+    # into an earlier slot during a save/load round trip.
     normalized = []
     seen_codes = set()
-    for item in items:
-        if not isinstance(item, dict):
+    for index in range(target_count):
+        item = items[index] if index < len(items) and isinstance(items[index], dict) else {}
+        if is_empty_fund_dashboard_card_ref(item):
+            normalized.append({})
             continue
         indicator_code = slugify_code(item.get("indicatorCode") or item.get("indicator_code"), "")
         if indicator_code:
             if indicator_code in seen_codes:
-                continue
-            seen_codes.add(indicator_code)
-            normalized.append({"indicatorCode": indicator_code})
-            if len(normalized) >= target_count:
-                break
-            continue
-        if str(item.get("name") or "").strip():
+                normalized.append({})
+            else:
+                seen_codes.add(indicator_code)
+                normalized.append({"indicatorCode": indicator_code})
+        elif str(item.get("name") or "").strip():
             normalized.append(item)
-            if len(normalized) >= target_count:
-                break
-    return normalized[:target_count]
+        else:
+            normalized.append({})
+    return normalized
 
 
 def normalize_fund_dashboard_view(source, tenant):
@@ -2493,6 +2798,12 @@ def normalize_fund_dashboard_view(source, tenant):
     }
     raw = source if isinstance(source, dict) else {}
     layout = normalize_dashboard_layout(raw.get("layout") or defaults["layout"])
+    # Preserve an advisor-selected layout, but repair legacy 2x2 configurations
+    # that already contain more cards than the layout can display.
+    raw_card_count = len(raw.get("cards") or []) if isinstance(raw.get("cards"), list) else 0
+    required_layout = ensure_dashboard_layout_for_card_count(raw_card_count)
+    if get_dashboard_card_target(required_layout) > get_dashboard_card_target(layout):
+        layout = required_layout
     hub = build_indicator_hub(tenant=tenant, admin_view=False)
     indicator_map = {item.get("id"): item for item in (hub.get("smart_items") or []) + (hub.get("lake_items") or []) if item.get("id")}
     raw_cards = normalize_fund_dashboard_card_refs(raw.get("cards"), layout)
@@ -2564,13 +2875,16 @@ def normalize_fund_dashboard_view(source, tenant):
 
 
 def default_tenant_fund_dashboard_state(tenant):
+    smart_indicator_count = len(build_tenant_smart_indicator_catalog(tenant))
+    layout = ensure_dashboard_layout_for_card_count(smart_indicator_count)
     published = normalize_fund_dashboard_view(
         {
-            "layout": "2x2",
+            "layout": layout,
             "title": "智能指标 Dashboard",
             "note": "大V 通过选择底层指标并输入自然语言计算规则生成智能指标，并发布到 H5 / Web Dashboard。",
             "updatedAt": "默认模板",
             "publisher": "系统初始化",
+            "cards": build_default_fund_dashboard_cards(tenant, layout),
         },
         tenant,
     )
@@ -2580,8 +2894,79 @@ def default_tenant_fund_dashboard_state(tenant):
     }
 
 
+def refresh_tenant_smart_indicator_snapshots(tenant):
+    """Recalculate tenant smart indicators when an input snapshot is newer.
+
+    The dashboard is allowed to refresh a derived value from persisted market
+    data, but it must not advance its timestamp merely because a page was
+    opened. External market collection remains the responsibility of the
+    indicator task center.
+    """
+    tenant_slug = str((tenant or {}).get("slug") or "").strip().lower()
+    if not tenant_slug:
+        return {"checked": 0, "refreshed": 0}
+    definitions = [
+        item for item in list_indicator_definitions()
+        if str(item.get("tenant_slug") or "").strip().lower() == tenant_slug
+        and str(item.get("source_type") or "").strip().lower() == "smart"
+    ]
+    if not definitions:
+        return {"checked": 0, "refreshed": 0}
+    db = get_db()
+    latest_map = {
+        str(row["indicator_code"]): dict(row)
+        for row in db.execute("SELECT * FROM indicator_latest_values").fetchall()
+    }
+    refreshed = 0
+    for definition in definitions:
+        selected = normalize_selected_indicator_refs(definition.get("selected_indicators"))
+        source_times = [
+            str((latest_map.get(str(item.get("indicator_code") or "")) or {}).get("updated_at") or "").strip()
+            for item in selected
+        ]
+        newest_source_time = max(source_times, default="")
+        current = latest_map.get(str(definition.get("indicator_code") or "")) or {}
+        current_time = str(current.get("updated_at") or "").strip()
+        if not current or (newest_source_time and newest_source_time > current_time):
+            snapshot = save_smart_indicator_latest_snapshot(definition)
+            if snapshot:
+                refreshed += 1
+                latest_map[str(definition.get("indicator_code") or "")] = {
+                    **current,
+                    "updated_at": snapshot.get("updated_at") or now_ts(),
+                    "latest_value": snapshot.get("value"),
+                }
+    return {"checked": len(definitions), "refreshed": refreshed}
+
+
+def refresh_all_tenant_smart_indicator_snapshots():
+    """Refresh every tenant's derived indicators after a base-data sync."""
+    tenant_results = []
+    checked = 0
+    refreshed = 0
+    for tenant in get_tenant_configs():
+        result = refresh_tenant_smart_indicator_snapshots(tenant)
+        checked += int(result.get("checked") or 0)
+        refreshed += int(result.get("refreshed") or 0)
+        tenant_results.append({
+            "tenant_slug": str(tenant.get("slug") or "").strip(),
+            **result,
+        })
+    return {
+        "tenants": len(tenant_results),
+        "checked": checked,
+        "refreshed": refreshed,
+        "tenant_results": tenant_results,
+    }
+
+
 def resolve_tenant_fund_dashboard_state(tenant, config=None):
     tenant = tenant or get_tenant_by_slug()
+    try:
+        refresh_tenant_smart_indicator_snapshots(tenant)
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
     defaults = default_tenant_fund_dashboard_state(tenant)
     raw = config if isinstance(config, dict) else {}
     published = normalize_fund_dashboard_view(raw.get("published"), tenant) if isinstance(raw.get("published"), dict) else copy.deepcopy(defaults["published"])
@@ -2711,27 +3096,30 @@ def append_smart_indicator_to_dashboard(tenant_slug, indicator_code, title="", l
     tenant = get_tenant_by_slug(tenant_slug)
     current_state = resolve_tenant_fund_dashboard_state(tenant, tenant.get("fund_dashboard_config"))
     base = copy.deepcopy(current_state.get("draft") or current_state.get("published") or {})
-    existing_cards = base.get("cards") if isinstance(base.get("cards"), list) else []
-    next_cards = []
-    seen_codes = set()
-    for raw in existing_cards:
-        if not isinstance(raw, dict):
-            continue
-        current_code = slugify_code(raw.get("indicatorCode") or raw.get("indicator_code"), "")
-        if current_code and current_code not in seen_codes:
-            seen_codes.add(current_code)
-            next_cards.append({"indicatorCode": current_code})
+    next_layout = normalize_dashboard_layout(layout or base.get("layout") or ensure_dashboard_layout_for_card_count(0))
+    existing_cards = normalize_fund_dashboard_card_refs(base.get("cards"), next_layout)
+    next_cards = list(existing_cards)
+    seen_codes = {
+        slugify_code(raw.get("indicatorCode") or raw.get("indicator_code"), "")
+        for raw in next_cards if isinstance(raw, dict)
+    }
+    seen_codes.discard("")
     normalized_code = slugify_code(indicator_code, "indicator")
     if normalized_code and normalized_code not in seen_codes:
-        next_cards.append({"indicatorCode": normalized_code})
-    next_layout = normalize_dashboard_layout(layout or ensure_dashboard_layout_for_card_count(len(next_cards)))
+        empty_index = next((index for index, raw in enumerate(next_cards) if not raw), None)
+        if empty_index is None:
+            next_layout = normalize_dashboard_layout(ensure_dashboard_layout_for_card_count(len(next_cards) + 1))
+            next_cards = normalize_fund_dashboard_card_refs(next_cards, next_layout)
+            empty_index = next((index for index, raw in enumerate(next_cards) if not raw), None)
+        if empty_index is not None:
+            next_cards[empty_index] = {"indicatorCode": normalized_code}
     dashboard = {
         "layout": next_layout,
         "title": title or "智能指标 Dashboard",
         "note": "大V 通过选择底层指标和自然语言规则生成智能指标，再发布到前台 Dashboard。",
         "updatedAt": now_ts(),
         "publisher": publisher or "系统同步",
-        "cards": next_cards[: get_dashboard_card_target(next_layout)],
+        "cards": next_cards,
     }
     return update_tenant_fund_dashboard_config(tenant_slug, "save_draft", dashboard)
 
@@ -2743,12 +3131,12 @@ def remove_smart_indicator_from_dashboard(tenant_slug, indicator_code):
     draft = copy.deepcopy(current_state.get("draft") or published or {})
     normalized_code = slugify_code(indicator_code, "indicator")
     def _strip_cards(source):
-        next_cards = [
-            raw for raw in (source.get("cards") or [])
-            if slugify_code((raw or {}).get("indicatorCode") or (raw or {}).get("indicator_code"), "") != normalized_code
+        layout = normalize_dashboard_layout(source.get("layout") or "2x2")
+        source["cards"] = [
+            {} if slugify_code((raw or {}).get("indicatorCode") or (raw or {}).get("indicator_code"), "") == normalized_code else raw
+            for raw in normalize_fund_dashboard_card_refs(source.get("cards"), layout)
         ]
-        source["cards"] = next_cards
-        source["layout"] = ensure_dashboard_layout_for_card_count(len(next_cards))
+        source["layout"] = layout
         source["updatedAt"] = now_ts()
         source["publisher"] = tenant.get("advisor") or "大V"
         return source
@@ -2796,11 +3184,15 @@ def normalize_tenant_configs(source=None):
 def normalize_site_config(source=None):
     merged = _merge_site_config(copy.deepcopy(DEFAULT_SITE_CONFIG), source or {})
     merged["brand"] = normalize_brand_config(merged.get("brand"))
+    merged["auth_settings"] = normalize_auth_settings_config(merged.get("auth_settings"))
+    merged["auth_settings"] = strip_auth_settings_secret(merged["auth_settings"])
+    merged["voice_transcription"] = normalize_voice_transcription_config(merged.get("voice_transcription"))
+    merged["voice_embedding"] = normalize_voice_embedding_config(merged.get("voice_embedding"))
     merged["knowledge_ingestion"] = normalize_knowledge_ingestion_config(merged.get("knowledge_ingestion"))
     merged["hermes_settings"] = normalize_hermes_settings_config(merged.get("hermes_settings"))
     merged["evidence_chain"] = normalize_evidence_chain_config(merged.get("evidence_chain"))
     merged["review_generation"] = normalize_review_generation_config(merged.get("review_generation"))
-    merged["llm_registry"] = normalize_llm_registry_config(merged.get("llm_registry"))
+    merged["llm_registry"] = strip_llm_registry_api_keys(merged.get("llm_registry"))
     merged["tenants"] = normalize_tenant_configs(merged.get("tenants"))
     tenant_slugs = [tenant["slug"] for tenant in merged["tenants"]]
     default_tenant_slug = str(merged.get("default_tenant_slug", "") or "").strip()
@@ -2831,6 +3223,16 @@ def is_feature_enabled(feature_name, site_config=None):
     return feature_flags.get(feature_name) is not False
 
 
+def get_auth_settings(site_config=None, include_secret=False):
+    config = site_config or get_site_config()
+    settings = normalize_auth_settings_config(config.get("auth_settings"))
+    if include_secret:
+        settings["wechat"]["app_secret"] = load_auth_wechat_secret()
+    else:
+        settings["wechat"]["app_secret"] = ""
+    return settings
+
+
 def get_hermes_settings(site_config=None):
     config = site_config or get_site_config()
     return normalize_hermes_settings_config(config.get("hermes_settings"))
@@ -2846,9 +3248,9 @@ def is_hermes_available_for_role(user_role="", site_config=None):
     if not is_feature_enabled("hermes", config):
         return False
     normalized_role = str(user_role or "").strip().lower()
-    if normalized_role == "dav":
-        return True
     settings = get_hermes_settings(config)
+    if normalized_role == "dav":
+        return settings.get("dav_access_enabled") is True
     if normalized_role == "investor":
         return settings.get("investor_access_enabled") is True
     return settings.get("investor_access_enabled") is True
@@ -2863,7 +3265,35 @@ def get_h5_login_users(site_config=None):
     ]
 
 
+def get_h5_supported_channels():
+    return list(CHANNELS)
+
+
+def build_h5_user_onboarding_payload(user=None):
+    user_payload = user if isinstance(user, dict) else {}
+    selected_channel = str(user_payload.get("h5_channel_label") or "").strip()
+    compliance_acknowledged_at = str(user_payload.get("compliance_acknowledged_at") or "").strip()
+    completed_at = str(user_payload.get("onboarding_completed_at") or "").strip()
+    requires_channel = selected_channel not in CHANNELS
+    requires_compliance = not compliance_acknowledged_at
+    return {
+        "required": requires_channel or requires_compliance or not completed_at,
+        "selected_channel": selected_channel if selected_channel in CHANNELS else "",
+        "compliance_acknowledged_at": compliance_acknowledged_at,
+        "compliance_version": str(user_payload.get("compliance_version") or "").strip(),
+        "onboarding_completed_at": completed_at,
+        "channels": get_h5_supported_channels(),
+        "notice": copy.deepcopy(H5_COMPLIANCE_NOTICE),
+    }
+
+
 H5_PROFILE_SETTINGS_PREFIX = "h5_profile_settings:"
+TENANT_FAN_OPS_SETTINGS_PREFIX = "tenant_fan_ops_settings:"
+AUTH_WECHAT_CREDENTIAL_SETTING_KEY = "auth_credentials:wechat:v1"
+GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY = "gangtise_openapi_credentials:v1"
+GANGTISE_OPENAPI_DEFAULT_BASE_URL = "https://openapi.gangtise.com"
+LLM_API_CREDENTIAL_SETTING_KEY = "llm_api_credentials:v1"
+_encrypted_setting_decryption_errors = set()
 
 
 def _load_json_app_setting(setting_key, default_value=None):
@@ -2909,6 +3339,215 @@ def _save_json_app_setting(setting_key, payload):
     return copy.deepcopy(payload)
 
 
+def _gangtise_openapi_credential_fernet():
+    """Build a stable encryption key without persisting secrets outside PostgreSQL."""
+    if Fernet is None:
+        raise RuntimeError("cryptography_fernet_unavailable")
+    secret_key = str(app.config.get("SECRET_KEY") or "").strip()
+    if not secret_key:
+        raise RuntimeError("application_secret_key_missing")
+    derived_key = base64.urlsafe_b64encode(hashlib.sha256(secret_key.encode("utf-8")).digest())
+    return Fernet(derived_key)
+
+
+def _load_encrypted_app_setting(setting_key, default_value=None):
+    fallback = copy.deepcopy(default_value)
+    envelope = _load_json_app_setting(setting_key, {})
+    ciphertext = str((envelope or {}).get("ciphertext") or "").strip()
+    if not ciphertext:
+        return fallback
+    try:
+        raw = _gangtise_openapi_credential_fernet().decrypt(ciphertext.encode("ascii"))
+        decoded = json.loads(raw.decode("utf-8"))
+        _encrypted_setting_decryption_errors.discard(setting_key)
+        return decoded if isinstance(decoded, type(fallback)) else fallback
+    except (InvalidToken, UnicodeDecodeError, ValueError, TypeError, json.JSONDecodeError):
+        if setting_key not in _encrypted_setting_decryption_errors:
+            app.logger.error("Encrypted application credential record cannot be decrypted: %s", setting_key)
+        _encrypted_setting_decryption_errors.add(setting_key)
+    except Exception:
+        if setting_key not in _encrypted_setting_decryption_errors:
+            app.logger.exception("Failed to load encrypted application credential record: %s", setting_key)
+        _encrypted_setting_decryption_errors.add(setting_key)
+    return fallback
+
+
+def _save_encrypted_app_setting(setting_key, payload):
+    ciphertext = _gangtise_openapi_credential_fernet().encrypt(
+        json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    ).decode("ascii")
+    _save_json_app_setting(setting_key, {"version": 1, "ciphertext": ciphertext})
+    _encrypted_setting_decryption_errors.discard(setting_key)
+
+
+def _normalize_gangtise_openapi_credentials(payload=None):
+    source = payload if isinstance(payload, dict) else {}
+    return {
+        "base_url": str(source.get("base_url") or GANGTISE_OPENAPI_DEFAULT_BASE_URL).strip().rstrip("/"),
+        "access_key": str(source.get("access_key") or "").strip(),
+        "secret_key": str(source.get("secret_key") or "").strip(),
+        "long_token": str(source.get("long_token") or "").strip(),
+    }
+
+
+def _normalize_wechat_credentials(payload=None):
+    source = payload if isinstance(payload, dict) else {}
+    return {"app_secret": str(source.get("app_secret") or "").strip()}
+
+
+def load_gangtise_openapi_credentials():
+    """Load decrypted Gangtise credentials from PostgreSQL; never expose this payload to a response."""
+    return _normalize_gangtise_openapi_credentials(
+        _load_encrypted_app_setting(GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY, {})
+    )
+
+
+def get_gangtise_openapi_credentials_status():
+    """Return safe credential metadata for Admin only, without returning any secret material."""
+    credentials = load_gangtise_openapi_credentials()
+    has_access_key = bool(credentials.get("access_key"))
+    has_secret_key = bool(credentials.get("secret_key"))
+    has_long_token = bool(credentials.get("long_token"))
+    row = None
+    try:
+        row = get_db().execute(
+            "SELECT updated_at FROM app_settings WHERE setting_key = ?",
+            (GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY,),
+        ).fetchone()
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+    decryption_failed = GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY in _encrypted_setting_decryption_errors
+    return {
+        "stored_in_postgres": bool(credentials),
+        "base_url": str(credentials.get("base_url") or GANGTISE_OPENAPI_DEFAULT_BASE_URL),
+        "has_access_key": has_access_key,
+        "has_secret_key": has_secret_key,
+        "has_long_token": has_long_token,
+        "encryption_status": "unreadable" if decryption_failed else "readable",
+        "credential_mode": "access_key_secret" if has_access_key and has_secret_key else ("long_token" if has_long_token else ("unreadable" if decryption_failed else "missing")),
+        "updated_at": str((row or {}).get("updated_at") or ""),
+    }
+
+
+def save_gangtise_openapi_credentials_patch(payload=None):
+    """Apply non-empty Admin fields, preserving stored secrets when fields are left blank."""
+    incoming = payload if isinstance(payload, dict) else {}
+    # If the old ciphertext was created with a lost application key, the
+    # entered Admin credentials intentionally replace it instead of trying to
+    # merge with an unreadable record.
+    current = _normalize_gangtise_openapi_credentials(load_gangtise_openapi_credentials())
+    merged = dict(current)
+    for field in ("base_url", "access_key", "secret_key", "long_token"):
+        value = str(incoming.get(field) or "").strip()
+        if value:
+            merged[field] = value.rstrip("/") if field == "base_url" else value
+    merged = _normalize_gangtise_openapi_credentials(merged)
+    has_pair = bool(merged["access_key"] and merged["secret_key"])
+    if (bool(merged["access_key"]) != bool(merged["secret_key"])) and not merged["long_token"]:
+        raise ValueError("gangtise_access_key_and_secret_key_must_be_configured_together")
+    if not has_pair and not merged["long_token"]:
+        raise ValueError("gangtise_credentials_required")
+    _save_encrypted_app_setting(GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY, merged)
+    return get_gangtise_openapi_credentials_status()
+
+
+def load_llm_api_credentials():
+    """Load API keys indexed by model key. This never reaches a public payload."""
+    raw = _load_encrypted_app_setting(LLM_API_CREDENTIAL_SETTING_KEY, {})
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        str(model_key or "").strip(): str(api_key or "").strip()
+        for model_key, api_key in raw.items()
+        if str(model_key or "").strip() and str(api_key or "").strip()
+    }
+
+
+def get_llm_api_key(model_key):
+    return str(load_llm_api_credentials().get(str(model_key or "").strip()) or "").strip()
+
+
+def save_llm_api_credentials_patch(models, prune_missing=False):
+    """Persist entered model API keys encrypted; blank inputs preserve existing keys."""
+    credentials = load_llm_api_credentials()
+    valid_model_keys = set()
+    for raw_model in models if isinstance(models, list) else []:
+        model = raw_model if isinstance(raw_model, dict) else {}
+        model_key = str(model.get("key") or "").strip()
+        if not model_key:
+            continue
+        valid_model_keys.add(model_key)
+        if bool(model.get("clear_api_key")):
+            credentials.pop(model_key, None)
+            continue
+        api_key = str(model.get("api_key") or "").strip()
+        if api_key:
+            credentials[model_key] = api_key
+    if prune_missing:
+        credentials = {key: value for key, value in credentials.items() if key in valid_model_keys}
+    _save_encrypted_app_setting(LLM_API_CREDENTIAL_SETTING_KEY, credentials)
+    return credentials
+
+
+def strip_llm_registry_api_keys(registry, include_status=False):
+    """Keep model metadata in site_config while keeping keys only in the encrypted credential record."""
+    normalized = normalize_llm_registry_config(registry)
+    credentials = load_llm_api_credentials() if include_status else {}
+    for model in normalized.get("models") or []:
+        model_key = str(model.get("key") or "").strip()
+        model["api_key"] = ""
+        model.pop("clear_api_key", None)
+        if include_status:
+            model["api_key_configured"] = bool(credentials.get(model_key))
+    return normalized
+
+
+def load_auth_wechat_secret():
+    credentials = _normalize_wechat_credentials(
+        _load_encrypted_app_setting(AUTH_WECHAT_CREDENTIAL_SETTING_KEY, {})
+    )
+    return credentials["app_secret"]
+
+
+def get_auth_wechat_secret_status():
+    secret = load_auth_wechat_secret()
+    row = None
+    try:
+        row = get_db().execute(
+            "SELECT updated_at FROM app_settings WHERE setting_key = ?",
+            (AUTH_WECHAT_CREDENTIAL_SETTING_KEY,),
+        ).fetchone()
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+    return {
+        "app_secret_configured": bool(secret),
+        "credential_stored_in_postgres": bool(secret),
+        "credential_updated_at": str((row or {}).get("updated_at") or ""),
+    }
+
+
+def save_auth_wechat_secret_patch(secret="", clear=False):
+    current = _normalize_wechat_credentials(
+        _load_encrypted_app_setting(AUTH_WECHAT_CREDENTIAL_SETTING_KEY, {})
+    )
+    normalized_secret = str(secret or "").strip()
+    if clear:
+        current["app_secret"] = ""
+    elif normalized_secret:
+        current["app_secret"] = normalized_secret
+    _save_encrypted_app_setting(AUTH_WECHAT_CREDENTIAL_SETTING_KEY, current)
+    return get_auth_wechat_secret_status()
+
+
+def strip_auth_settings_secret(payload=None):
+    normalized = normalize_auth_settings_config(payload)
+    normalized["wechat"]["app_secret"] = ""
+    normalized["wechat"].pop("clear_app_secret", None)
+    return normalized
+
+
 def _normalize_profile_tag_list(items, limit=8):
     normalized = []
     seen = set()
@@ -2926,6 +3565,140 @@ def _normalize_profile_tag_list(items, limit=8):
         normalized.append(text)
         if len(normalized) >= limit:
             break
+    return normalized
+
+
+def _is_truthy_user_flag(value):
+    return str(value or "").strip().lower() in {"1", "true", "yes", "y", "on", "paid"}
+
+
+PAID_USER_LABEL = "付费用户"
+
+
+def normalize_user_labels(value, is_paid_sample=False, limit=16):
+    raw_labels = value if isinstance(value, list) else []
+    if isinstance(value, str):
+        try:
+            decoded = json.loads(value)
+            raw_labels = decoded if isinstance(decoded, list) else re.split(r"[,，;；]", value)
+        except Exception:
+            raw_labels = re.split(r"[,，;；]", value)
+    labels = []
+    seen = set()
+    for raw_label in raw_labels:
+        label = re.sub(r"\s+", " ", str(raw_label or "").strip())[:24]
+        if not label or label.lower() in seen:
+            continue
+        seen.add(label.lower())
+        labels.append(label)
+        if len(labels) >= limit:
+            break
+    if is_paid_sample and PAID_USER_LABEL.lower() not in seen:
+        labels.insert(0, PAID_USER_LABEL)
+    return labels[:limit]
+
+
+def update_tenant_user_labels(tenant_slug, user_ids, label, action="add"):
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    normalized_label = re.sub(r"\s+", " ", str(label or "").strip())[:24]
+    if not normalized_tenant or not normalized_label:
+        raise ValueError("tenant_and_label_required")
+    normalized_action = str(action or "add").strip().lower()
+    if normalized_action not in {"add", "remove"}:
+        raise ValueError("invalid_label_action")
+    ids = []
+    for value in user_ids if isinstance(user_ids, list) else []:
+        try:
+            user_id = int(value)
+        except Exception:
+            continue
+        if user_id > 0 and user_id not in ids:
+            ids.append(user_id)
+    if not ids:
+        raise ValueError("user_ids_required")
+    placeholders = ",".join("?" for _ in ids)
+    db = get_db()
+    rows = db.execute(
+        f"SELECT id, labels_json, is_paid_sample FROM users WHERE tenant_slug = ? AND role = 'investor' AND id IN ({placeholders})",
+        tuple([normalized_tenant] + ids),
+    ).fetchall()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    updated = []
+    for row in rows:
+        current = dict(row)
+        labels = normalize_user_labels(current.get("labels_json"), is_paid_sample=bool(int(current.get("is_paid_sample") or 0)))
+        if normalized_action == "add" and normalized_label.lower() not in {item.lower() for item in labels}:
+            labels.append(normalized_label)
+        if normalized_action == "remove":
+            labels = [item for item in labels if item.lower() != normalized_label.lower()]
+        is_paid = PAID_USER_LABEL.lower() in {item.lower() for item in labels}
+        db.execute(
+            "UPDATE users SET labels_json = ?, is_paid_sample = ?, paid_sample_marked_at = ?, updated_at = ? WHERE id = ?",
+            (json.dumps(labels, ensure_ascii=False), 1 if is_paid else 0, now if is_paid else "", now, int(current["id"])),
+        )
+        updated.append(int(current["id"]))
+    db.commit()
+    return {"updated_user_ids": updated, "label": normalized_label, "action": normalized_action}
+
+
+def update_tenant_user_status(tenant_slug, user_id, status):
+    """Allow a tenant advisor to manage only investor accounts in that tenant."""
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    try:
+        normalized_id = int(user_id)
+    except (TypeError, ValueError):
+        raise ValueError("user_not_found")
+    normalized_status = str(status or "").strip().lower()
+    if not normalized_tenant or normalized_id <= 0:
+        raise ValueError("user_not_found")
+    if normalized_status not in {"active", "disabled"}:
+        raise ValueError("invalid_user_status")
+    db = get_db()
+    row = db.execute(
+        "SELECT id, status FROM users WHERE id = ? AND tenant_slug = ? AND role = 'investor'",
+        (normalized_id, normalized_tenant),
+    ).fetchone()
+    if not row:
+        raise ValueError("tenant_user_not_found")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    db.execute("UPDATE users SET status = ?, updated_at = ? WHERE id = ?", (normalized_status, now, normalized_id))
+    db.commit()
+    return {"user_id": normalized_id, "status": normalized_status, "updated_at": now}
+
+
+def _normalize_tenant_fan_ops_settings(payload=None):
+    source = payload if isinstance(payload, dict) else {}
+    try:
+        registration_price = max(0, int(float(source.get("registration_price") or source.get("fan_registration_price") or 0)))
+    except Exception:
+        registration_price = 0
+    return {
+        "registration_price": registration_price,
+        "currency": str(source.get("currency") or "CNY").strip().upper() or "CNY",
+        "updated_at": str(source.get("updated_at") or "").strip(),
+    }
+
+
+def get_tenant_fan_ops_settings_key(tenant_slug):
+    normalized = str(tenant_slug or "").strip().lower()
+    return f"{TENANT_FAN_OPS_SETTINGS_PREFIX}{normalized}" if normalized else TENANT_FAN_OPS_SETTINGS_PREFIX
+
+
+def load_tenant_fan_ops_settings(tenant_slug):
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    if not normalized_tenant:
+        return _normalize_tenant_fan_ops_settings({})
+    payload = _load_json_app_setting(get_tenant_fan_ops_settings_key(normalized_tenant), {})
+    return _normalize_tenant_fan_ops_settings(payload)
+
+
+def save_tenant_fan_ops_settings(tenant_slug, payload=None):
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    if not normalized_tenant:
+        raise ValueError("tenant_slug_required")
+    normalized = _normalize_tenant_fan_ops_settings(payload)
+    normalized["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    _save_json_app_setting(get_tenant_fan_ops_settings_key(normalized_tenant), normalized)
     return normalized
 
 
@@ -3046,10 +3819,10 @@ def build_h5_help_center_payload(role="investor"):
             "id": "review",
             "category": "复盘",
             "title": "复盘内容怎么生成",
-            "summary": "先形成用户复盘 Draft，再审核确认，最后生成摘要和自选股归纳总结。",
+            "summary": "先形成用户复盘 Draft，再审核确认，最后生成摘要；如果选择了自选股，再追加归纳总结。",
             "bullets": [
                 "手写、语音、文件都先进入用户输入整理阶段。",
-                "确认 Draft 后才继续生成摘要和自选股归纳总结。",
+                "确认 Draft 后一定会生成摘要；如果选择了自选股，再追加归纳总结。",
                 "预览无误再发布，前后台展示同一篇正式复盘。",
             ],
             "action_label": "打开复盘",
@@ -3135,6 +3908,18 @@ def get_current_demo_profile(site_config=None):
     return ensure_user_row_defaults(current_user, site_config)
 
 
+def get_current_authenticated_user():
+    """Resolve the platform account in the shared login session, including admins."""
+    current_username = get_current_demo_profile_id()
+    if not current_username:
+        return None
+    current_user = get_user_by_username(current_username)
+    if not current_user or current_user.get("role") not in {"investor", "dav", "admin"} or current_user.get("status") != "active":
+        save_current_demo_profile_id("")
+        return None
+    return ensure_user_row_defaults(current_user)
+
+
 def mask_phone(phone):
     value = str(phone or "").strip()
     if len(value) >= 7:
@@ -3155,7 +3940,11 @@ def list_users(role=None, tenant_slug=None):
     where_sql = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     rows = db.execute(
         f"""
-        SELECT id, username, password, role, tenant_slug, advisor_name, phone, status, created_at, updated_at
+        SELECT id, username, password, role, tenant_slug, advisor_name, phone, status,
+               auth_provider, wechat_openid, wechat_unionid, wechat_nickname, wechat_bound_at,
+               compliance_acknowledged_at, compliance_version, h5_channel_label, h5_channel_selected_at, onboarding_completed_at,
+               source_label, is_paid_sample, paid_sample_marked_at, paid_sample_note, labels_json,
+               created_at, updated_at
         FROM users
         {where_sql}
         ORDER BY id ASC
@@ -3165,17 +3954,337 @@ def list_users(role=None, tenant_slug=None):
     return [ensure_user_row_defaults(dict(row)) for row in rows]
 
 
+def build_admin_user_segment_payload():
+    """Summarize persisted user master data without inventing subscription metrics."""
+    users = [item for item in list_users() if isinstance(item, dict)]
+    active_users = [item for item in users if str(item.get("status") or "active").lower() == "active"]
+    roles = (("investor", "粉丝用户"), ("dav", "大V投顾"), ("admin", "平台管理员"))
+    role_rows = [
+        {
+            "key": role,
+            "label": label,
+            "count": sum(1 for item in active_users if str(item.get("role") or "").lower() == role),
+        }
+        for role, label in roles
+    ]
+    tenant_counts = {}
+    source_counts = {}
+    label_counts = {}
+    for item in active_users:
+        tenant = str(item.get("tenant_slug") or "").strip() or "未归属租户"
+        tenant_counts[tenant] = tenant_counts.get(tenant, 0) + 1
+        source = str(item.get("source_label") or "").strip() or "未标注来源"
+        source_counts[source] = source_counts.get(source, 0) + 1
+        for label in item.get("labels") if isinstance(item.get("labels"), list) else []:
+            normalized_label = str(label or "").strip()
+            if normalized_label:
+                label_counts[normalized_label] = label_counts.get(normalized_label, 0) + 1
+    paid_fans = [
+        item for item in active_users
+        if str(item.get("role") or "").lower() == "investor" and bool(item.get("is_paid_sample"))
+    ]
+    labelled_users = [item for item in active_users if isinstance(item.get("labels"), list) and item.get("labels")]
+    return {
+        "generated_at": now_ts(),
+        "basis": "用户主数据：账号状态、角色、租户、来源、标签与付费样本标记。",
+        "summary": {
+            "total_users": len(users),
+            "active_users": len(active_users),
+            "fan_users": next((row["count"] for row in role_rows if row["key"] == "investor"), 0),
+            "paid_fans": len(paid_fans),
+            "labelled_users": len(labelled_users),
+            "disabled_users": sum(1 for item in users if str(item.get("status") or "active").lower() != "active"),
+        },
+        "roles": role_rows,
+        "tenants": [{"label": key, "count": value} for key, value in sorted(tenant_counts.items(), key=lambda item: (-item[1], item[0]))],
+        "sources": [{"label": key, "count": value} for key, value in sorted(source_counts.items(), key=lambda item: (-item[1], item[0]))],
+        "labels": [{"label": key, "count": value} for key, value in sorted(label_counts.items(), key=lambda item: (-item[1], item[0]))[:12]],
+        "recent_users": [
+            {
+                "username": str(item.get("username") or ""),
+                "role": str(item.get("role") or ""),
+                "tenant_slug": str(item.get("tenant_slug") or ""),
+                "source_label": str(item.get("source_label") or "") or "未标注来源",
+                "labels": item.get("labels") if isinstance(item.get("labels"), list) else [],
+                "is_paid_sample": bool(item.get("is_paid_sample")),
+                "status": str(item.get("status") or "active"),
+                "created_at": str(item.get("created_at") or ""),
+            }
+            for item in sorted(users, key=lambda item: str(item.get("created_at") or ""), reverse=True)[:12]
+        ],
+    }
+
+
+def build_admin_points_payload():
+    """Expose only persisted facts until a points ledger is implemented."""
+    users = [item for item in list_users() if isinstance(item, dict)]
+    active_users = [item for item in users if str(item.get("status") or "active").lower() == "active"]
+    recent_users = sorted(users, key=lambda item: str(item.get("created_at") or ""), reverse=True)[:12]
+    return {
+        "generated_at": now_ts(),
+        "ledger_enabled": False,
+        "basis": "当前数据库仅有用户主数据；尚未建立积分账户、流水、规则或兑换套餐表。",
+        "summary": {
+            "total_users": len(users),
+            "active_users": len(active_users),
+            "ledger_accounts": 0,
+            "ledger_transactions": 0,
+        },
+        "capabilities": [
+            {"key": "account", "label": "积分账户", "enabled": False, "detail": "未接入持久化积分账户"},
+            {"key": "transactions", "label": "积分流水", "enabled": False, "detail": "未接入积分流水记录"},
+            {"key": "rules", "label": "积分规则", "enabled": False, "detail": "未接入可配置规则"},
+            {"key": "exchange", "label": "兑换套餐", "enabled": False, "detail": "未接入兑换订单与套餐"},
+        ],
+        "recent_users": [
+            {
+                "username": str(item.get("username") or ""),
+                "role": str(item.get("role") or ""),
+                "tenant_slug": str(item.get("tenant_slug") or "") or "未归属",
+                "status": str(item.get("status") or "active"),
+                "created_at": str(item.get("created_at") or ""),
+            }
+            for item in recent_users
+        ],
+    }
+
+
+def get_user_by_id(user_id):
+    try:
+        user_pk = int(user_id)
+    except Exception:
+        return None
+    db = get_db()
+    row = db.execute(
+        """
+        SELECT id, username, password, role, tenant_slug, advisor_name, phone, status,
+               auth_provider, wechat_openid, wechat_unionid, wechat_nickname, wechat_bound_at,
+               compliance_acknowledged_at, compliance_version, h5_channel_label, h5_channel_selected_at, onboarding_completed_at,
+               source_label, is_paid_sample, paid_sample_marked_at, paid_sample_note, labels_json,
+               created_at, updated_at
+        FROM users
+        WHERE id = ?
+        """,
+        (user_pk,),
+    ).fetchone()
+    return ensure_user_row_defaults(dict(row)) if row else None
+
+
+def update_user_status(user_id, status, actor_user_id=None):
+    """Enable or disable a user while preserving administrator access."""
+    try:
+        target_id = int(user_id)
+    except (TypeError, ValueError):
+        raise ValueError("user_not_found")
+    normalized_status = str(status or "").strip().lower()
+    if normalized_status not in {"active", "disabled"}:
+        raise ValueError("invalid_user_status")
+    user = get_user_by_id(target_id)
+    if not user:
+        raise ValueError("user_not_found")
+    try:
+        actor_id = int(actor_user_id) if actor_user_id is not None else None
+    except (TypeError, ValueError):
+        actor_id = None
+    if normalized_status == "disabled" and actor_id == target_id:
+        raise ValueError("cannot_disable_current_user")
+    if normalized_status == "disabled" and user.get("role") == "admin" and user.get("status") == "active":
+        db = get_db()
+        active_admin_count = db.execute(
+            "SELECT COUNT(*) AS count FROM users WHERE role = 'admin' AND status = 'active'"
+        ).fetchone()["count"]
+        if int(active_admin_count or 0) <= 1:
+            raise ValueError("cannot_disable_last_admin")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    db = get_db()
+    db.execute("UPDATE users SET status = ?, updated_at = ? WHERE id = ?", (normalized_status, now, target_id))
+    db.commit()
+    return get_user_by_id(target_id)
+
+
 def get_user_by_username(username):
     db = get_db()
     row = db.execute(
         """
-        SELECT id, username, password, role, tenant_slug, advisor_name, phone, status, created_at, updated_at
+        SELECT id, username, password, role, tenant_slug, advisor_name, phone, status,
+               auth_provider, wechat_openid, wechat_unionid, wechat_nickname, wechat_bound_at,
+               compliance_acknowledged_at, compliance_version, h5_channel_label, h5_channel_selected_at, onboarding_completed_at,
+               source_label, is_paid_sample, paid_sample_marked_at, paid_sample_note, labels_json,
+               created_at, updated_at
         FROM users
         WHERE username = ?
         """,
         (str(username or "").strip(),),
     ).fetchone()
     return ensure_user_row_defaults(dict(row)) if row else None
+
+
+def get_user_by_wechat_identity(openid="", unionid=""):
+    openid_text = str(openid or "").strip()
+    unionid_text = str(unionid or "").strip()
+    if not openid_text and not unionid_text:
+        return None
+    db = get_db()
+    row = None
+    if unionid_text:
+        row = db.execute(
+            """
+            SELECT id, username, password, role, tenant_slug, advisor_name, phone, status,
+                   auth_provider, wechat_openid, wechat_unionid, wechat_nickname, wechat_bound_at,
+                   compliance_acknowledged_at, compliance_version, h5_channel_label, h5_channel_selected_at, onboarding_completed_at,
+                   source_label, is_paid_sample, paid_sample_marked_at, paid_sample_note, labels_json,
+                   created_at, updated_at
+            FROM users
+            WHERE wechat_unionid = ?
+            ORDER BY id ASC
+            LIMIT 1
+            """,
+            (unionid_text,),
+        ).fetchone()
+    if row is None and openid_text:
+        row = db.execute(
+            """
+            SELECT id, username, password, role, tenant_slug, advisor_name, phone, status,
+                   auth_provider, wechat_openid, wechat_unionid, wechat_nickname, wechat_bound_at,
+                   compliance_acknowledged_at, compliance_version, h5_channel_label, h5_channel_selected_at, onboarding_completed_at,
+                   source_label, is_paid_sample, paid_sample_marked_at, paid_sample_note, labels_json,
+                   created_at, updated_at
+            FROM users
+            WHERE wechat_openid = ?
+            ORDER BY id ASC
+            LIMIT 1
+            """,
+            (openid_text,),
+        ).fetchone()
+    return ensure_user_row_defaults(dict(row)) if row else None
+
+
+def verify_h5_password_login(username, password):
+    user = get_user_by_username(username)
+    if not user:
+        raise ValueError("user_not_found")
+    if user.get("role") not in {"investor", "dav", "admin"}:
+        raise ValueError("user_role_not_allowed")
+    if user.get("status") != "active":
+        raise ValueError("user_disabled")
+    if not compare_digest(str(user.get("password") or ""), str(password or "")):
+        raise ValueError("password_invalid")
+    return user
+
+
+def verify_platform_password_login(username, password):
+    user = get_user_by_username(username)
+    if not user:
+        raise ValueError("user_not_found")
+    if user.get("role") not in {"investor", "dav", "admin"}:
+        raise ValueError("user_role_not_allowed")
+    if user.get("status") != "active":
+        raise ValueError("user_disabled")
+    if not compare_digest(str(user.get("password") or ""), str(password or "")):
+        raise ValueError("password_invalid")
+    return user
+
+
+def bind_user_wechat_identity(user_id, openid="", unionid="", nickname=""):
+    user = get_user_by_id(user_id)
+    if not user:
+        raise ValueError("user_not_found")
+    openid_text = str(openid or "").strip()
+    unionid_text = str(unionid or "").strip()
+    if not openid_text and not unionid_text:
+        raise ValueError("wechat_identity_required")
+    existing = get_user_by_wechat_identity(openid=openid_text, unionid=unionid_text)
+    if existing and int(existing.get("id") or 0) != int(user.get("id") or 0):
+        raise ValueError("wechat_identity_bound")
+    bound_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    nickname_text = str(nickname or "").strip()[:80]
+    db = get_db()
+    db.execute(
+        """
+        UPDATE users
+        SET auth_provider = ?, wechat_openid = ?, wechat_unionid = ?, wechat_nickname = ?, wechat_bound_at = ?, updated_at = ?
+        WHERE id = ?
+        """,
+        (
+            "wechat",
+            openid_text,
+            unionid_text,
+            nickname_text,
+            bound_at,
+            bound_at,
+            int(user["id"]),
+        ),
+    )
+    db.commit()
+    return get_user_by_id(user["id"])
+
+
+def create_wechat_h5_user(openid="", unionid="", nickname="", tenant_slug="", role="investor", advisor_name=""):
+    openid_text = str(openid or "").strip()
+    unionid_text = str(unionid or "").strip()
+    if not openid_text and not unionid_text:
+        raise ValueError("wechat_identity_required")
+    existing = get_user_by_wechat_identity(openid=openid_text, unionid=unionid_text)
+    if existing:
+        return existing
+    normalized_role = str(role or "investor").strip().lower()
+    if normalized_role not in {"investor", "dav"}:
+        normalized_role = "investor"
+    resolved_tenant_slug = str(tenant_slug or get_default_tenant_slug()).strip().lower()
+    tenant = get_tenant_by_slug(resolved_tenant_slug)
+    resolved_advisor_name = str(advisor_name or tenant.get("advisor") or "").strip()
+    nickname_seed = re.sub(r"[^0-9A-Za-z\u4e00-\u9fff_]+", "", str(nickname or "").strip())[:16]
+    identity_seed = unionid_text or openid_text or str(int(time.time()))
+    suffix = hashlib.sha1(identity_seed.encode("utf-8")).hexdigest()[:8]
+    base_username = nickname_seed or f"wx_{suffix}"
+    candidate = base_username
+    counter = 2
+    while get_user_by_username(candidate):
+        candidate = f"{base_username}_{counter}"
+        counter += 1
+    pseudo_phone = f"wx_{suffix[:11]}"
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO users (
+            username, password, role, tenant_slug, advisor_name, phone, status,
+            auth_provider, wechat_openid, wechat_unionid, wechat_nickname, wechat_bound_at,
+            compliance_acknowledged_at, compliance_version, h5_channel_label, h5_channel_selected_at, onboarding_completed_at,
+            source_label, is_paid_sample, paid_sample_marked_at, paid_sample_note, labels_json,
+            created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            candidate,
+            f"wechat:{suffix}",
+            normalized_role,
+            tenant.get("slug") or resolved_tenant_slug,
+            resolved_advisor_name if normalized_role == "investor" else "",
+            pseudo_phone,
+            "active",
+            "wechat",
+            openid_text,
+            unionid_text,
+            str(nickname or "").strip()[:80],
+            now,
+            "",
+            "",
+            "",
+            "",
+            "",
+            "微信登录自动注册",
+            0,
+            "",
+            "",
+            "[]",
+            now,
+            now,
+        ),
+    )
+    db.commit()
+    return get_user_by_username(candidate)
 
 
 def create_user(payload):
@@ -3187,21 +4296,106 @@ def create_user(payload):
     advisor_name = str(source.get("advisor_name") or "").strip()
     phone = str(source.get("phone") or "").strip()
     status = str(source.get("status") or "active").strip().lower()
+    source_label = str(source.get("source_label") or "").strip()[:80]
+    is_paid_sample = 1 if _is_truthy_user_flag(source.get("is_paid_sample")) else 0
+    paid_sample_note = str(source.get("paid_sample_note") or "").strip()[:240]
+    labels = normalize_user_labels(source.get("labels"), is_paid_sample=bool(is_paid_sample and role == "investor"))
+    auth_provider = str(source.get("auth_provider") or "local").strip().lower() or "local"
+    wechat_openid = str(source.get("wechat_openid") or "").strip()
+    wechat_unionid = str(source.get("wechat_unionid") or "").strip()
+    wechat_nickname = str(source.get("wechat_nickname") or "").strip()[:80]
+    compliance_acknowledged_at = str(source.get("compliance_acknowledged_at") or "").strip()
+    compliance_version = str(source.get("compliance_version") or "").strip()
+    h5_channel_label = str(source.get("h5_channel_label") or "").strip()
+    h5_channel_selected_at = str(source.get("h5_channel_selected_at") or "").strip()
+    onboarding_completed_at = str(source.get("onboarding_completed_at") or "").strip()
     if not username or not password or role not in {"investor", "dav", "admin"} or not phone:
         raise ValueError("invalid_user_payload")
     if get_user_by_username(username):
         raise ValueError("username_exists")
+    if wechat_openid or wechat_unionid:
+        existing = get_user_by_wechat_identity(openid=wechat_openid, unionid=wechat_unionid)
+        if existing:
+            raise ValueError("wechat_identity_bound")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    paid_sample_marked_at = now if role == "investor" and is_paid_sample else ""
+    wechat_bound_at = now if wechat_openid or wechat_unionid else ""
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO users (
+            username, password, role, tenant_slug, advisor_name, phone, status,
+            auth_provider, wechat_openid, wechat_unionid, wechat_nickname, wechat_bound_at,
+            compliance_acknowledged_at, compliance_version, h5_channel_label, h5_channel_selected_at, onboarding_completed_at,
+            source_label, is_paid_sample, paid_sample_marked_at, paid_sample_note, labels_json,
+            created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            username,
+            password,
+            role,
+            tenant_slug,
+            advisor_name,
+            phone,
+            status,
+            auth_provider,
+            wechat_openid,
+            wechat_unionid,
+            wechat_nickname,
+            wechat_bound_at,
+            compliance_acknowledged_at,
+            compliance_version,
+            h5_channel_label,
+            h5_channel_selected_at,
+            onboarding_completed_at,
+            source_label,
+            is_paid_sample if role == "investor" else 0,
+            paid_sample_marked_at if role == "investor" else "",
+            paid_sample_note if role == "investor" else "",
+            json.dumps(labels if role == "investor" else [], ensure_ascii=False),
+            now,
+            now,
+        ),
+    )
+    db.commit()
+    return get_user_by_username(username)
+
+
+def complete_h5_user_onboarding(user, channel_label):
+    user_payload = user if isinstance(user, dict) else {}
+    user_id = int(user_payload.get("id") or 0)
+    selected_channel = str(channel_label or "").strip()
+    if user_id <= 0:
+        raise ValueError("user_not_found")
+    if selected_channel not in CHANNELS:
+        raise ValueError("invalid_channel_label")
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     db = get_db()
     db.execute(
         """
-        INSERT INTO users (username, password, role, tenant_slug, advisor_name, phone, status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        UPDATE users
+        SET compliance_acknowledged_at = ?,
+            compliance_version = ?,
+            h5_channel_label = ?,
+            h5_channel_selected_at = ?,
+            onboarding_completed_at = ?,
+            updated_at = ?
+        WHERE id = ?
         """,
-        (username, password, role, tenant_slug, advisor_name, phone, status, now, now),
+        (
+            now,
+            H5_COMPLIANCE_VERSION,
+            selected_channel,
+            now,
+            now,
+            now,
+            user_id,
+        ),
     )
     db.commit()
-    return get_user_by_username(username)
+    return get_user_by_id(user_id)
 
 
 def import_users(items):
@@ -3221,10 +4415,41 @@ def ensure_default_users():
         existing_users = list_users()
     except Exception:
         raise
-    if existing_users:
-        return {"created": [], "skipped": []}
     created = []
     skipped = []
+    if existing_users:
+        users_by_username = {
+            str((item or {}).get("username") or "").strip(): item
+            for item in existing_users
+            if str((item or {}).get("username") or "").strip()
+        }
+        default_admin = next((item for item in DEFAULT_USERS if item.get("role") == "admin"), None)
+        legacy_admin = users_by_username.get("平台管理员")
+        if default_admin and default_admin["username"] not in users_by_username:
+            if legacy_admin:
+                db = get_db()
+                db.execute(
+                    """
+                    UPDATE users
+                    SET username = ?, password = ?, role = ?, status = ?, updated_at = ?
+                    WHERE username = ?
+                    """,
+                    (
+                        default_admin["username"],
+                        default_admin["password"],
+                        "admin",
+                        "active",
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "平台管理员",
+                    ),
+                )
+                db.commit()
+            else:
+                user = create_user(default_admin)
+                if user:
+                    created.append(user)
+        return {"created": created, "skipped": skipped}
+
     for item in DEFAULT_USERS:
         try:
             user = create_user(item)
@@ -3240,7 +4465,19 @@ def ensure_default_users():
     return {"created": created, "skipped": skipped}
 
 
-USER_IMPORT_TEMPLATE_FIELDS = ["username", "password", "phone", "role", "tenant_slug", "advisor_name", "status"]
+USER_IMPORT_TEMPLATE_FIELDS = [
+    "username",
+    "password",
+    "phone",
+    "role",
+    "tenant_slug",
+    "advisor_name",
+    "status",
+    "is_paid_sample",
+    "labels",
+    "source_label",
+    "paid_sample_note",
+]
 
 
 def build_user_import_template_csv(scope="admin", tenant_slug=""):
@@ -3256,6 +4493,10 @@ def build_user_import_template_csv(scope="admin", tenant_slug=""):
             "tenant_slug": active_tenant.get("slug") or "",
             "advisor_name": active_tenant.get("advisor") or "",
             "status": "active",
+            "is_paid_sample": "0",
+            "labels": "",
+            "source_label": "用户导入",
+            "paid_sample_note": "",
         })
     else:
         default_tenant = get_tenant_by_slug(get_default_tenant_slug())
@@ -3268,6 +4509,10 @@ def build_user_import_template_csv(scope="admin", tenant_slug=""):
                 "tenant_slug": default_tenant.get("slug") or "",
                 "advisor_name": default_tenant.get("advisor") or "",
                 "status": "active",
+                "is_paid_sample": "0",
+                "labels": "",
+                "source_label": "用户导入",
+                "paid_sample_note": "",
             },
             {
                 "username": "kol_demo_001",
@@ -3277,6 +4522,10 @@ def build_user_import_template_csv(scope="admin", tenant_slug=""):
                 "tenant_slug": default_tenant.get("slug") or "",
                 "advisor_name": default_tenant.get("advisor") or "",
                 "status": "active",
+                "is_paid_sample": "0",
+                "labels": "",
+                "source_label": "管理录入",
+                "paid_sample_note": "",
             },
             {
                 "username": "admin_demo_001",
@@ -3286,6 +4535,10 @@ def build_user_import_template_csv(scope="admin", tenant_slug=""):
                 "tenant_slug": default_tenant.get("slug") or "",
                 "advisor_name": "",
                 "status": "active",
+                "is_paid_sample": "0",
+                "labels": "",
+                "source_label": "管理录入",
+                "paid_sample_note": "",
             },
         ])
     output = io.StringIO()
@@ -3348,6 +4601,8 @@ def normalize_user_payload(source, context=None):
         advisor_name = tenant.get("advisor") or ""
     elif role == "admin":
         advisor_name = ""
+    is_paid_sample = _is_truthy_user_flag(raw.get("is_paid_sample")) if role == "investor" else False
+    default_source_label = "用户导入" if scope == "kol" or role == "investor" else "管理录入"
     return {
         "username": username,
         "password": password,
@@ -3356,6 +4611,10 @@ def normalize_user_payload(source, context=None):
         "tenant_slug": tenant_slug,
         "advisor_name": advisor_name,
         "status": status,
+        "is_paid_sample": is_paid_sample,
+        "labels": normalize_user_labels(raw.get("labels"), is_paid_sample=is_paid_sample),
+        "source_label": str(raw.get("source_label") or default_source_label).strip()[:80],
+        "paid_sample_note": str(raw.get("paid_sample_note") or "").strip()[:240],
     }
 
 
@@ -3403,13 +4662,21 @@ def bulk_create_users(items, context=None):
 
 def build_user_import_summary(scope="admin", tenant_slug=""):
     ctx = build_user_import_context(scope=scope, tenant_slug=tenant_slug)
-    users = list_users(tenant_slug=ctx["tenant_slug"] or None)
+    try:
+        users = list_users(tenant_slug=ctx["tenant_slug"] or None)
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        users = []
     if ctx["scope"] == "kol":
         users = [user for user in users if user.get("role") == "investor"]
+    paying_users = [user for user in users if user.get("role") == "investor" and bool(user.get("is_paid_sample"))]
     return {
         "scope": ctx["scope"],
         "tenant_slug": ctx["tenant_slug"],
         "total_users": len(users),
+        "paying_users": len(paying_users),
+        "settings": load_tenant_fan_ops_settings(ctx["tenant_slug"]) if ctx["tenant_slug"] else _normalize_tenant_fan_ops_settings({}),
         "role_split": {
             "investor": len([user for user in users if user.get("role") == "investor"]),
             "dav": len([user for user in users if user.get("role") == "dav"]),
@@ -3443,6 +4710,22 @@ def ensure_user_row_defaults(user, site_config=None):
         "phone": str(user.get("phone") or "").strip(),
         "phone_masked": mask_phone(user.get("phone")),
         "status": str(user.get("status") or "active").strip(),
+        "auth_provider": str(user.get("auth_provider") or "local").strip().lower() or "local",
+        "wechat_openid": str(user.get("wechat_openid") or "").strip(),
+        "wechat_unionid": str(user.get("wechat_unionid") or "").strip(),
+        "wechat_nickname": str(user.get("wechat_nickname") or "").strip(),
+        "wechat_bound_at": str(user.get("wechat_bound_at") or "").strip(),
+        "wechat_bound": bool(str(user.get("wechat_openid") or "").strip() or str(user.get("wechat_unionid") or "").strip()),
+        "compliance_acknowledged_at": str(user.get("compliance_acknowledged_at") or "").strip(),
+        "compliance_version": str(user.get("compliance_version") or "").strip(),
+        "h5_channel_label": str(user.get("h5_channel_label") or "").strip(),
+        "h5_channel_selected_at": str(user.get("h5_channel_selected_at") or "").strip(),
+        "onboarding_completed_at": str(user.get("onboarding_completed_at") or "").strip(),
+        "source_label": str(user.get("source_label") or "").strip(),
+        "is_paid_sample": bool(int(user.get("is_paid_sample") or 0)),
+        "paid_sample_marked_at": str(user.get("paid_sample_marked_at") or "").strip(),
+        "paid_sample_note": str(user.get("paid_sample_note") or "").strip(),
+        "labels": normalize_user_labels(user.get("labels_json"), is_paid_sample=bool(int(user.get("is_paid_sample") or 0))),
         "tenant_slug": tenant.get("slug"),
         "advisor_name": advisor_name,
         "tenant": {
@@ -3473,6 +4756,7 @@ def ensure_user_row_defaults(user, site_config=None):
         "profile_settings": profile_settings,
         "workbenchLabel": defaults["workbench_label"],
         "workbenchHint": defaults["workbench_hint"],
+        "h5Onboarding": build_h5_user_onboarding_payload(user),
     }
 
 
@@ -3909,6 +5193,37 @@ def build_forecast_workflow_meta(graph):
 
 # Mock data
 CHANNELS = ["微信社群", "内容合作", "小红书", "转介绍", "直接流量"]
+H5_COMPLIANCE_VERSION = "2026-08"
+H5_COMPLIANCE_NOTICE = {
+    "title": "个人权益与合规须知",
+    "summary": "首次进入前，请确认你已经阅读平台的个人权益说明与研究合规要求。",
+    "sections": [
+        {
+            "title": "个人权益说明",
+            "items": [
+                "你可以查看与自己所属租户相关的研究内容、知识问答、复盘和互动服务。",
+                "你的基础信息、交互记录和研究偏好会用于账号服务、知识记忆和运营分析。",
+                "你可以在账号设置和后台治理流程中申请修正、清理或停止部分数据使用。",
+            ],
+        },
+        {
+            "title": "法律法规与合规要求",
+            "items": [
+                "平台内容仅用于研究交流和信息整理，不构成收益承诺或个性化投资建议。",
+                "禁止传播违规信息、冒用身份、恶意营销、诱导交易或上传无合法授权的材料。",
+                "涉及证券、基金、宏观和个股解读时，应结合公开信息与风险边界独立判断。",
+            ],
+        },
+        {
+            "title": "使用确认",
+            "items": [
+                "继续进入即表示你已知悉平台的研究属性、数据使用说明和合规边界。",
+                "若不同意，请退出登录，不继续使用当前 H5 服务。",
+            ],
+        },
+    ],
+    "confirm_label": "我已阅读并知悉个人权益说明与合规要求",
+}
 FUNNEL_LAYERS = ["内容触达", "私域留资", "激活试用", "首次付费", "高频留存"]
 
 
@@ -4454,6 +5769,9 @@ def reset_request_runtime_state():
 
 def build_admin_site_config_payload(site_config=None):
     payload = copy.deepcopy(site_config or get_site_config())
+    payload["auth_settings"] = get_auth_settings(payload, include_secret=False)
+    payload["auth_settings"]["wechat"].update(get_auth_wechat_secret_status())
+    payload["llm_registry"] = strip_llm_registry_api_keys(payload.get("llm_registry"), include_status=True)
     runtime_target = get_runtime_db_target()
     payload["db_runtime"] = {
         "use_staging": runtime_target.get("use_staging", False),
@@ -4465,6 +5783,56 @@ def build_admin_site_config_payload(site_config=None):
         "vector_host": runtime_target.get("vector", {}).get("host", ""),
         "vector_port": runtime_target.get("vector", {}).get("port", ""),
         "vector_db_name": runtime_target.get("vector", {}).get("dbname", ""),
+    }
+    payload["llm_feature_catalog"] = copy.deepcopy(DEFAULT_LLM_FEATURE_CATALOG)
+    payload["news_aggregation_algorithm_defaults"] = {
+        "version": "v3",
+        "script_js": (
+            "function rankNews(input) {\n"
+            "  const normalize = (value) => String(value || '').replace(/[\\s\\u3000·•/|_|-]+/g, ' ').trim();\n"
+            "  const compact = (value) => String(value || '').replace(/[\\s\\u3000·•/|_|-.]/g, '').trim();\n"
+            "  const tags = Array.isArray(input.item.tags) ? input.item.tags.map(normalize).filter(Boolean) : [];\n"
+            "  const text = normalize([input.item.title, input.item.content, input.item.summary].filter(Boolean).join(' '));\n"
+            "  const compactText = compact(text);\n"
+            "  const sectorTokens = Array.isArray(input.watchlistSectors) ? input.watchlistSectors.map(normalize).filter(Boolean) : [];\n"
+            "  const sectorAliases = {'港股互联网':['互联网','平台经济','港股','腾讯','阿里','美团','百度','快手'],'半导体制造':['半导体','芯片','集成电路','晶圆','存储','光刻'],'高端白酒':['白酒','贵州茅台','五粮液','泸州老窖'],'动力电池':['动力电池','锂电','新能源车','宁德时代'],'银行':['银行','信贷','息差','存款','贷款']};\n"
+            "  const symbolTokens = Array.isArray(input.watchlistSymbols) ? input.watchlistSymbols.map(normalize).filter(Boolean) : [];\n"
+            "  const majorKeywords = ['重大利好','重大利空','重大风险','突发','紧急','重磅','立案调查','行政处罚','停牌','退市','暴雷','违约','降准','降息','加息','出口管制','关税上调','重大订单','中标','业绩预增','业绩预亏','回购','增持','减持','并购重组','重大资产重组'];\n"
+            "  const sectorMatch = sectorTokens.some(tag => [tag, ...(sectorAliases[tag] || [])].some(term => text.includes(term)));\n"
+            "  const symbolMatch = symbolTokens.some(tag => text.includes(tag) || compactText.includes(compact(tag)));\n"
+            "  const majorSignal = Boolean(input.item.isMajorPositive || input.item.isMajorNegative)\n"
+            "    || majorKeywords.some(keyword => text.includes(keyword));\n"
+            "  return {\n"
+            "    score: ((sectorMatch || symbolMatch) ? 220 : 0) + (symbolMatch ? 65 : 0) + (majorSignal ? 100 : 0),\n"
+            "    bucket: (sectorMatch || symbolMatch) ? 'watchlist_sector' : (majorSignal ? 'major_market' : 'other'),\n"
+            "    reason: (sectorMatch || symbolMatch) ? '命中自选股行业板块或标的' : (majorSignal ? '命中社会性重大利好/利空或高影响事件' : '其他公开信息'),\n"
+            "    matched_topics: [\n"
+            "      ...new Set([\n"
+            "        ...sectorTokens.filter(tag => [tag, ...(sectorAliases[tag] || [])].some(term => text.includes(term))),\n"
+            "        ...symbolTokens.filter(tag => text.includes(tag) || compactText.includes(compact(tag))),\n"
+            "        ...majorKeywords.filter(keyword => text.includes(keyword))\n"
+            "      ])\n"
+            "    ]\n"
+            "  };\n"
+            "}"
+        ),
+        "strategy": "watchlist_sector_first",
+        "rule_plan": {
+            "version": "v1",
+            "candidate_scope": {"watchlist_related": True, "major_events": True},
+            "priority_order": ["watchlist_sector", "major_market"],
+            "filters": {"exclude_unrelated": True},
+            "presentation": {"home_limit": 10},
+            "diversity": {"max_per_source": 3, "max_per_group": 4},
+        },
+        "rule_atoms": [
+            {"group": "候选范围", "key": "watchlist_related", "label": "自选股关联"},
+            {"group": "候选范围", "key": "major_events", "label": "重大事件补充"},
+            {"group": "排序", "key": "watchlist_sector", "label": "行业优先"},
+            {"group": "过滤", "key": "exclude_unrelated", "label": "过滤无关内容"},
+            {"group": "展示", "key": "home_limit", "label": "首页 10 条"},
+            {"group": "配额", "key": "source_cap", "label": "单一来源最多 3 条"},
+        ],
     }
     return payload
 
@@ -4678,175 +6046,60 @@ def build_tenant_dashboard_payload_fallback(tenant=None):
             "fallback_mode": True,
             "tracked_stock_codes": [],
         },
+        "watchlist_comment_analytics": {
+            "summary": {
+                "total_comments": 0,
+                "investor_comments": 0,
+                "dav_comments": 0,
+                "stock_count": 0,
+            },
+            "keyword_cloud": [],
+            "label_distribution": [],
+            "sentiment_distribution": [],
+            "recent_comments": [],
+            "fallback_mode": True,
+        },
+        "fan_management": {
+            "summary": "数据库不可达时暂不展示真实粉丝管理数据。",
+            "stats": {
+                "total_fans": 0,
+                "new_fans_7d": 0,
+                "active_fans_30d": 0,
+                "paying_fans": 0,
+            },
+            "settings": _normalize_tenant_fan_ops_settings({}),
+            "fans": [],
+        },
         "reviews": [],
-        "stats": {},
+        "stats": {
+            "total_followers": 0,
+            "vip_subscribers": 0,
+            "monthly_revenue": 0,
+            "revenue_change": 0.0,
+            "unread_messages": 0,
+            "pending_replies": 0,
+            "today_views": 0,
+            "today_active_viewers": 0,
+            "today_view_distribution": [],
+            "today_view_trend_7d": [],
+            "engagement_rate": 0.0,
+            "registration_price": 0,
+            "new_paid_samples_month": 0,
+            "paid_sample_delta": 0,
+            "stock_comment_count": 0,
+            "stock_comment_stock_count": 0,
+            "fan_ops_settings": _normalize_tenant_fan_ops_settings({}),
+        },
     }
 
 
 def build_indicator_hub_fallback(tenant=None, admin_view=False):
-    tenant = tenant or normalize_tenant_config({}, 0)
-    advisor_name = tenant.get("advisor") or ""
-    fallback_kline = build_simulated_indicator_kline("fallback_shanghai_index", status="good", points=24)
-    fallback_series = [
-        {
-            "date": candle.get("date"),
-            "value": candle.get("close"),
-            "status": "good",
-        }
-        for candle in (fallback_kline.get("candles") or [])
-    ]
-    fallback_anomalies = [
-        {
-            "date": item.get("date"),
-            "value": item.get("value"),
-            "status": item.get("status") or "attention",
-            "label": item.get("label") or "波动抬升",
-            "severity": "中",
-        }
-        for item in (fallback_kline.get("anomalies") or [])
-    ]
-    smart_items = [
-        {
-            "id": "smart_market_heat",
-            "name": "市场情绪温度",
-            "tenant_slug": "",
-            "category": "情绪信号",
-            "owner": advisor_name or "平台研究运营",
-            "value": "72",
-            "numeric_value": 72.0,
-            "assessment": "情绪处于偏活跃区间，适合输出结构化复盘而不是极端结论。",
-            "status": "attention",
-            "alert": "成交集中在主线方向，注意高位分化。",
-            "enabled": True,
-            "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "watchers": [],
-            "prompt_text": "围绕市场情绪温度生成复盘信号。",
-            "formula_js": 'return Number(inputs["smart_market_heat"] || 0);',
-            "selected_indicators": [{"indicator_code": "smart_market_heat", "indicator_name": "市场情绪温度"}],
-            "display_order": 0,
-            "history": [],
-            "history_series": fallback_series,
-            "history_anomalies": fallback_anomalies,
-            "history_kline": fallback_kline,
-            "source_type": "smart",
-            "source_type_label": "智能指标",
-            "provider": "fallback",
-            "source_count": 0,
-            "source_defs": [],
-            "latest_source_test": None,
-            "data_mode": "fallback",
-            "data_mode_label": "降级数据",
-        },
-        {
-            "id": "smart_review_signal",
-            "name": "复盘重点信号",
-            "tenant_slug": "",
-            "category": "内容生产",
-            "owner": advisor_name or "平台研究运营",
-            "value": "3 条",
-            "numeric_value": 3.0,
-            "assessment": "建议优先围绕强势主线、回撤风险和次日观察点组织内容。",
-            "status": "normal",
-            "alert": "当前无高危异常。",
-            "enabled": True,
-            "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "watchers": [],
-            "prompt_text": "围绕复盘重点信号生成内容优先级。",
-            "formula_js": 'return Number(inputs["smart_review_signal"] || 0);',
-            "selected_indicators": [{"indicator_code": "smart_review_signal", "indicator_name": "复盘重点信号"}],
-            "display_order": 1,
-            "history": [],
-            "history_series": fallback_series,
-            "history_anomalies": fallback_anomalies,
-            "history_kline": fallback_kline,
-            "source_type": "smart",
-            "source_type_label": "智能指标",
-            "provider": "fallback",
-            "source_count": 0,
-            "source_defs": [],
-            "latest_source_test": None,
-            "data_mode": "fallback",
-            "data_mode_label": "降级数据",
-        },
-    ]
-    lake_items = [
-        {
-            "id": "source_shanghai_index",
-            "name": "上证指数",
-            "category": "指数走势",
-            "owner": advisor_name or "平台宏观组",
-            "value": str((fallback_kline.get("candles") or [{}])[-1].get("close") or "4093.73"),
-            "numeric_value": NumberLike((fallback_kline.get("candles") or [{}])[-1].get("close") or 4093.73),
-            "assessment": "当前为数据库降级场景，已回退为平台内置指数样本K线。",
-            "status": "good",
-            "alert": "当前优先展示K线走势与均线关系。",
-            "enabled": True,
-            "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "watchers": [],
-            "history": [],
-            "history_series": fallback_series,
-            "history_anomalies": fallback_anomalies,
-            "history_kline": fallback_kline,
-            "source_type": "lake",
-            "source_type_label": "数据湖指标",
-            "provider": "fallback",
-            "source_count": 0,
-            "source_defs": [],
-            "latest_source_test": None,
-            "data_mode": "fallback",
-            "data_mode_label": "降级数据",
-        },
-        {
-            "id": "lake_northbound",
-            "name": "北向资金净流向",
-            "category": "资金流向",
-            "owner": advisor_name or "平台宏观组",
-            "value": "+18.6 亿",
-            "assessment": "外资风险偏好温和修复，但还不足以支撑全面进攻判断。",
-            "status": "attention",
-            "alert": "若连续转负，需要同步调整复盘语气。",
-            "enabled": True,
-            "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "watchers": [],
-            "history": [],
-            "history_series": fallback_series,
-            "history_anomalies": fallback_anomalies,
-            "history_kline": fallback_kline,
-            "source_type": "lake",
-            "source_type_label": "数据湖指标",
-            "provider": "fallback",
-            "source_count": 0,
-            "source_defs": [],
-            "latest_source_test": None,
-            "data_mode": "fallback",
-            "data_mode_label": "降级数据",
-        },
-    ]
-    anomalies = [
-        {
-            "id": "fallback_anomaly_1",
-            "level": "中",
-            "title": "主线分化加剧",
-            "summary": "高位题材出现分歧，复盘里应提示追高风险。",
-            "time": datetime.now().strftime("%Y-%m-%d"),
-            "related_indicator_id": "smart_market_heat",
-        }
-    ]
-    items = smart_items + lake_items
     return {
-        "summary": {
-            "total": len(items),
-            "smart_total": len(smart_items),
-            "lake_total": len(lake_items),
-            "enabled": len(items),
-            "warnings": 0,
-            "attention": 2,
-            "anomalies": len(anomalies),
-        },
-        "items": items,
-        "smart_items": smart_items,
-        "lake_items": lake_items,
-        "anomalies": anomalies,
+        "summary": {"total": 0, "smart_total": 0, "lake_total": 0, "enabled": 0, "warnings": 0, "attention": 0, "anomalies": 0},
+        "items": [],
+        "smart_items": [],
+        "lake_items": [],
+        "anomalies": [],
         "definitions": [],
         "source_defs": [],
         "recent_tests": [],
@@ -4854,6 +6107,7 @@ def build_indicator_hub_fallback(tenant=None, admin_view=False):
         "raw_records": [],
         "mapping_rules": [],
         "clean_jobs": [],
+        "data_unavailable": True,
     }
 
 
@@ -4926,6 +6180,7 @@ def init_db():
     with get_app_db_connection() as conn:
         execute_sql_file(conn, sql_dir / "002_app_core_tables.sql")
         execute_sql_file(conn, sql_dir / "003_admin_task_configs_task_params.sql")
+        execute_sql_file(conn, sql_dir / "004_schema_migrations.sql")
         execute_sql_file(conn, sql_dir / "010_review_voice_embeddings.sql")
         execute_sql_file(conn, sql_dir / "011_review_voice_embeddings_alter_legacy_columns.sql")
         try:
@@ -4938,8 +6193,20 @@ def init_db():
             execute_sql_file(conn, sql_dir / "020_knowledge_embeddings.sql")
         execute_sql_file(conn, sql_dir / "022_hermes_memory_profile.sql")
         execute_sql_file(conn, sql_dir / "023_fan_stock_observation_events.sql")
-        execute_sql_file(conn, sql_dir / "101_seed_app_core.sql")
+        execute_sql_file(conn, sql_dir / "024_watchlist_kline_annotations.sql")
+        execute_sql_file(conn, sql_dir / "105_watchlist_annotations_per_user.sql")
+        execute_sql_file(conn, sql_dir / "025_watchlist_comments.sql")
+        execute_sql_file(conn, sql_dir / "026_tenant_fan_ops.sql")
+        execute_sql_file(conn, sql_dir / "027_h5_auth_wechat.sql")
+        execute_sql_file(conn, sql_dir / "028_h5_user_onboarding.sql")
+        execute_sql_file(conn, sql_dir / "029_user_labels.sql")
+        execute_sql_file(conn, sql_dir / "030_market_snapshot_payloads.sql")
+        execute_sql_file(conn, sql_dir / "032_simulated_fan_data_management.sql")
+        execute_sql_file(conn, sql_dir / "033_user_watchlist_items.sql")
         execute_sql_file(conn, sql_dir / "100_seed_master_data.sql")
+        execute_sql_file(conn, sql_dir / "101_seed_app_core.sql")
+        execute_sql_file(conn, sql_dir / "102_seed_market_sector_catalog.sql")
+        execute_sql_file(conn, sql_dir / "103_seed_market_index_catalog.sql")
 
 
 def init_db_safe():
@@ -5238,6 +6505,22 @@ def execute_user_async_job(job):
     job_type = str(job.get("job_type") or "").strip()
     payload = job.get("payload") if isinstance(job.get("payload"), dict) else {}
     job_code = str(job.get("job_code") or "").strip()
+    if job_type == "tenant_dashboard_sync":
+        tenant_slug = str(payload.get("tenant_slug") or job.get("tenant_slug") or "").strip().lower()
+        action = str(payload.get("action") or "").strip().lower()
+        if action not in {"publish", "reset_draft"} or not tenant_slug:
+            raise ValueError("tenant_dashboard_action_invalid")
+        dashboard = payload.get("dashboard") if isinstance(payload.get("dashboard"), dict) else None
+        saved = update_tenant_fund_dashboard_config(tenant_slug, action, dashboard)
+        if not saved:
+            raise ValueError("tenant_dashboard_not_found")
+        latest_tenant = get_tenant_by_slug(tenant_slug, saved)
+        result_payload = build_tenant_dashboard_payload(latest_tenant)
+        return {
+            "dashboard": result_payload,
+            "fund_dashboard_state": result_payload.get("fund_dashboard_state"),
+            "action": action,
+        }
     if job_type == "review_voice_transcribe":
         file_storage = _build_voice_file_storage_from_job_payload(payload)
         return process_review_voice_upload(
@@ -5296,11 +6579,13 @@ def execute_user_async_job(job):
             entry_point=str(payload.get("entry_point") or "").strip(),
             tenant_slug=str(payload.get("tenant_slug") or "").strip().lower(),
             job_code=job_code,
+            include_summary=bool(payload.get("include_summary", True)),
         )
     if job_type == "review_publish_embed":
+        tenant_slug = str(payload.get("tenant_slug") or "").strip().lower()
         publish_result = process_review_publish_text(
             text=payload.get("text"),
-            tenant_slug=str(payload.get("tenant_slug") or "").strip().lower(),
+            tenant_slug=tenant_slug,
             review_period=str(payload.get("period") or "").strip().lower(),
             entry_point=str(payload.get("entry_point") or "").strip().lower(),
             speaker_name=str(payload.get("speaker_name") or "").strip(),
@@ -5308,25 +6593,38 @@ def execute_user_async_job(job):
             transcript_model=str(payload.get("transcript_model") or "manual_input").strip() or "manual_input",
             job_code=job_code,
         )
-        snapshot_result = persist_review_publish_snapshot(
-            tenant_slug=str(payload.get("tenant_slug") or "").strip().lower(),
-            text=payload.get("text"),
-            review_period=str(payload.get("period") or "").strip().lower(),
-            speaker_name=str(payload.get("speaker_name") or "").strip(),
-            source_mode=str(payload.get("source_mode") or "manual").strip().lower() or "manual",
-            paragraph_mode=str(payload.get("paragraph_mode") or "manual").strip().lower() or "manual",
-            selected_watchlist=payload.get("selected_watchlist") if isinstance(payload.get("selected_watchlist"), list) else [],
-            prompt_tags=payload.get("prompt_tags") if isinstance(payload.get("prompt_tags"), list) else [],
-            knowledge_attachments=payload.get("knowledge_attachments") if isinstance(payload.get("knowledge_attachments"), list) else [],
-            selected_cards=payload.get("selected_cards") if isinstance(payload.get("selected_cards"), list) else [],
-            data_sources=payload.get("data_sources") if isinstance(payload.get("data_sources"), list) else [],
-            news_sources=payload.get("news_sources") if isinstance(payload.get("news_sources"), list) else [],
-            llm_models=payload.get("llm_models") if isinstance(payload.get("llm_models"), list) else [],
-            polished_input_text=payload.get("polished_input_text"),
-            review_summary=payload.get("review_summary"),
-            user_input_section=payload.get("user_input_section") if isinstance(payload.get("user_input_section"), dict) else {},
-            watchlist_analysis_section=payload.get("watchlist_analysis_section") if isinstance(payload.get("watchlist_analysis_section"), dict) else {},
-        )
+        if payload.get("snapshot_sync_applied"):
+            tenant = get_tenant_by_slug(tenant_slug)
+            snapshots = resolve_tenant_review_snapshots(tenant, tenant.get("review_snapshots"))
+            message_state = resolve_tenant_message_center_state(tenant, tenant.get("message_center_state"))
+            snapshot_id = str(payload.get("snapshot_id") or "").strip()
+            snapshot = next((item for item in snapshots if str(item.get("id") or "").strip() == snapshot_id), None)
+            snapshot_result = {
+                "snapshot": snapshot or (snapshots[0] if snapshots else None),
+                "snapshots": snapshots,
+                "message_center_state": message_state,
+            }
+        else:
+            snapshot_result = persist_review_publish_snapshot(
+                tenant_slug=tenant_slug,
+                text=payload.get("text"),
+                review_period=str(payload.get("period") or "").strip().lower(),
+                review_title=str(payload.get("review_title") or "").strip(),
+                speaker_name=str(payload.get("speaker_name") or "").strip(),
+                source_mode=str(payload.get("source_mode") or "manual").strip().lower() or "manual",
+                paragraph_mode=str(payload.get("paragraph_mode") or "manual").strip().lower() or "manual",
+                selected_watchlist=payload.get("selected_watchlist") if isinstance(payload.get("selected_watchlist"), list) else [],
+                prompt_tags=payload.get("prompt_tags") if isinstance(payload.get("prompt_tags"), list) else [],
+                knowledge_attachments=payload.get("knowledge_attachments") if isinstance(payload.get("knowledge_attachments"), list) else [],
+                selected_cards=payload.get("selected_cards") if isinstance(payload.get("selected_cards"), list) else [],
+                data_sources=payload.get("data_sources") if isinstance(payload.get("data_sources"), list) else [],
+                news_sources=payload.get("news_sources") if isinstance(payload.get("news_sources"), list) else [],
+                llm_models=payload.get("llm_models") if isinstance(payload.get("llm_models"), list) else [],
+                polished_input_text=payload.get("polished_input_text"),
+                review_summary=payload.get("review_summary"),
+                user_input_section=payload.get("user_input_section") if isinstance(payload.get("user_input_section"), dict) else {},
+                watchlist_analysis_section=payload.get("watchlist_analysis_section") if isinstance(payload.get("watchlist_analysis_section"), dict) else {},
+            )
         return {
             **publish_result,
             **snapshot_result,
@@ -5357,6 +6655,9 @@ def execute_user_async_job(job):
 
 
 def _summarize_user_async_job_result(job_type, result):
+    if job_type == "tenant_dashboard_sync":
+        action = str((result or {}).get("action") or "").strip().lower()
+        return "看板发布完成" if action == "publish" else "看板草稿恢复完成"
     if job_type == "review_voice_transcribe":
         return "语音转写完成"
     if job_type == "review_polish_input":
@@ -5589,16 +6890,22 @@ def execute_admin_task_by_type(task_type, force=False):
     from src.domain.market_services import (
         invalidate_indicator_hub_cache,
         prepare_indicator_hub_store,
+        sync_market_snapshot,
         seed_mock_indicator_lake,
         sync_real_indicator_history_from_market_cache,
     )
 
     if task_type == "prepare_indicator_hub":
-        return prepare_indicator_hub_store(force=force)
+        result = prepare_indicator_hub_store(force=force)
+        result["tenant_smart_refresh"] = refresh_all_tenant_smart_indicator_snapshots()
+        return result
     if task_type == "sync_real_indicator_history":
         result = sync_real_indicator_history_from_market_cache(force=force)
+        result["tenant_smart_refresh"] = refresh_all_tenant_smart_indicator_snapshots()
         invalidate_indicator_hub_cache()
         return result
+    if task_type == "sync_market_snapshot":
+        return sync_market_snapshot(force=force)
     if task_type == "seed_mock_indicator_lake":
         result = seed_mock_indicator_lake(force=force)
         invalidate_indicator_hub_cache()
@@ -5700,7 +7007,7 @@ def run_admin_task(task_code, trigger_mode="manual", force=False):
         elif task["task_type"] == "sync_real_indicator_history":
             summary = "真实历史同步完成"
         elif task["task_type"] == "seed_mock_indicator_lake":
-            summary = "模拟指标补种完成"
+            summary = "模拟指标入口已关闭"
         elif task["task_type"] == "indicator_source_landing":
             summary = "指标原始数据落地完成"
         elif task["task_type"] == "indicator_clean_pipeline":
@@ -5973,6 +7280,9 @@ def get_site_config():
 
 
 def save_site_config(config):
+    raw_registry = (config or {}).get("llm_registry") if isinstance(config, dict) else None
+    if isinstance(raw_registry, dict):
+        save_llm_api_credentials_patch(raw_registry.get("models"), prune_missing=False)
     merged = normalize_site_config(config)
     db = get_db()
     db.execute(

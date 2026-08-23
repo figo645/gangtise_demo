@@ -4,3 +4,4 @@ from src.domain.market_services import *
 from src.domain.ai_services import *
 from src.domain.workbench_services import *
 from src.domain.knowledge_graph_services import *
+from src.domain.database_release_services import *

@@ -1,73 +1,51 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOG_FILE="$SCRIPT_DIR/app.log"
-PID_FILE="$SCRIPT_DIR/.app.pid"
-PYTHON_BIN=""
+PID_FILE="$SCRIPT_DIR/.app.foreground.pid"
+APP_PORT="${PORT:-5001}"
+PYTHON_BIN="${PYTHON_BIN:-}"
 
 cd "$SCRIPT_DIR"
 
-if [ -z "${PORT:-}" ]; then
-  if lsof -nP -iTCP:5000 -sTCP:LISTEN >/dev/null 2>&1; then
-    PORT=5001
-  else
-    PORT=5000
-  fi
-  export PORT
-fi
-
-for candidate in "$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/venv/bin/python" "$SCRIPT_DIR/env/bin/python"; do
-  if [ -x "$candidate" ]; then
-    PYTHON_BIN="$candidate"
-    break
-  fi
-done
+pid_matches_app() {
+  local pid="$1"
+  ps -p "$pid" -o command= 2>/dev/null | grep -F -- "$SCRIPT_DIR/app.py" >/dev/null 2>&1
+}
 
 if [ -z "$PYTHON_BIN" ]; then
-  echo "No local virtualenv found in this project directory."
-  echo "Expected one of:"
-  echo "  $SCRIPT_DIR/.venv/bin/python"
-  echo "  $SCRIPT_DIR/venv/bin/python"
-  echo "  $SCRIPT_DIR/env/bin/python"
-  echo
-  echo "Example:"
-  echo "  python3 -m venv .venv"
-  echo "  source .venv/bin/activate"
-  echo "  pip install -r requirements.txt"
+  for candidate in "$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/venv/bin/python" "$SCRIPT_DIR/env/bin/python"; do
+    if [ -x "$candidate" ]; then
+      PYTHON_BIN="$candidate"
+      break
+    fi
+  done
+fi
+PYTHON_BIN="${PYTHON_BIN:-python3}"
+
+if ! command -v "$PYTHON_BIN" >/dev/null 2>&1 && [ ! -x "$PYTHON_BIN" ]; then
+  echo "Python executable not found: $PYTHON_BIN" >&2
   exit 1
 fi
 
 if [ -f "$PID_FILE" ]; then
   OLD_PID="$(cat "$PID_FILE" 2>/dev/null || true)"
-  if [ -n "${OLD_PID:-}" ] && kill -0 "$OLD_PID" 2>/dev/null; then
-    echo "app.py is already running."
-    echo "PID: $OLD_PID"
-    exit 0
+  if [ -n "${OLD_PID:-}" ] && kill -0 "$OLD_PID" 2>/dev/null && pid_matches_app "$OLD_PID"; then
+    echo "Foreground app.py is already running (PID: $OLD_PID)."
+    exit 1
   fi
   rm -f "$PID_FILE"
 fi
 
-if pgrep -f "$SCRIPT_DIR/app.py" >/dev/null 2>&1; then
-  echo "app.py is already running."
-  pgrep -af "$SCRIPT_DIR/app.py"
-  exit 0
-fi
-
-nohup "$PYTHON_BIN" "$SCRIPT_DIR/app.py" >"$LOG_FILE" 2>&1 &
-APP_PID=$!
-echo "$APP_PID" >"$PID_FILE"
-
-sleep 1
-
-if kill -0 "$APP_PID" 2>/dev/null; then
-  echo "Started app.py successfully."
-  echo "PID: $APP_PID"
-  echo "Python: $PYTHON_BIN"
-  echo "Port: $PORT"
-  echo "Log: $LOG_FILE"
-else
-  echo "Failed to start app.py. Check log: $LOG_FILE"
+if lsof -nP -iTCP:"$APP_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "Port $APP_PORT is already in use. Stop the existing process before starting the foreground app." >&2
   exit 1
 fi
+
+echo "$$" >"$PID_FILE"
+
+echo "Starting app.py in the foreground on port $APP_PORT."
+echo "Press Ctrl+C to stop it, or run ./stop_app.sh from another terminal."
+
+exec env PORT="$APP_PORT" PYTHONUNBUFFERED=1 "$PYTHON_BIN" "$SCRIPT_DIR/app.py"

@@ -5,10 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ brand.name }}金融科技 — 智能投研平台</title>
 <link rel="stylesheet" href="/static/css/style.css">
+<link rel="stylesheet" href="/static/css/release_notes.css?v=20260818-1">
 <script>
   window.SITE_CONFIG = {{ site_config | tojson }};
 </script>
 <script src="/static/js/theme.js"></script>
+<script defer src="/static/js/release_notes.js?v=20260818-1"></script>
 <style>
 /* ============================================================
    INDEX PAGE – SPECIFIC STYLES
@@ -984,6 +986,7 @@ body.theme-dark .tech-layer {
     <div style="font-size:18px;font-weight:700;color:var(--gold);letter-spacing:2px">{{ brand.short_name }}</div>
     <div style="display:flex;gap:28px;font-size:13px;color:var(--gray-400)">
       <a href="#modules" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">系统模块</a>
+      <a href="#current-capabilities" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">功能总览</a>
       <a href="#business" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">项目定位</a>
       <a href="#c-core" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">核心能力</a>
       <a href="#knowledge-system" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">知识能力</a>
@@ -992,8 +995,9 @@ body.theme-dark .tech-layer {
       <a href="#fundraise" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">融资计划</a>
       <a href="#tech" style="color:inherit;text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--gray-400)'">技术路径</a>
       <a href="/prd" style="color:var(--gold);text-decoration:none;font-weight:600;border:1px solid rgba(200,169,110,0.4);padding:4px 12px;border-radius:4px;transition:all 0.2s" onmouseover="this.style.background='rgba(200,169,110,0.15)'" onmouseout="this.style.background='transparent'">PRD文档</a>
+      <a href="/intern-handbook" style="color:var(--gold);text-decoration:none;font-weight:600;border:1px solid rgba(200,169,110,0.4);padding:4px 12px;border-radius:4px;transition:all 0.2s" onmouseover="this.style.background='rgba(200,169,110,0.15)'" onmouseout="this.style.background='transparent'">学习手册</a>
     </div>
-    <a href="/h5" class="btn-gold" style="font-size:12px;padding:8px 18px;text-decoration:none">体验原型</a>
+    <div style="display:flex;align-items:center;gap:8px"><button class="release-notes-trigger" type="button" data-release-notes-trigger aria-label="查看最新版本更新" title="版本更新"><span class="release-notes-trigger-icon" aria-hidden="true">↑</span><span class="release-notes-trigger-dot" aria-hidden="true"></span></button><a href="/h5" class="btn-gold" style="font-size:12px;padding:8px 18px;text-decoration:none">体验原型</a></div>
   </div>
 </nav>
 
@@ -1040,10 +1044,11 @@ body.theme-dark .tech-layer {
   <div class="hero-cta-row">
     <a href="/h5" class="btn-gold" style="text-decoration:none;font-size:14px;padding:12px 32px">体验产品原型</a>
     <a href="#modules" class="btn-outline" style="text-decoration:none;font-size:14px;padding:12px 32px">查看系统入口</a>
+    <a href="/intern-handbook" class="btn-outline" style="text-decoration:none;font-size:14px;padding:12px 32px">打开学习手册</a>
   </div>
 
   <div class="hero-split-entry-grid">
-    <a href="/tenant/{{ default_tenant.slug }}" class="hero-split-entry">
+    {% if tenant_portal_enabled %}<a href="/tenant/{{ default_tenant.slug }}" class="hero-split-entry">
       <div class="hero-split-entry-top">
         <span class="hero-split-entry-icon">{{ default_tenant.logo_mark }}</span>
         <span class="hero-split-entry-tag">TENANT PORTAL</span>
@@ -1051,14 +1056,14 @@ body.theme-dark .tech-layer {
       <div class="hero-split-entry-title">{{ default_tenant.name }} 门户 CMS</div>
       <div class="hero-split-entry-desc">这是一个给大V自定义的拖拽式租户门户。可以把指标卡、复盘内容、研究框架、CTA 和自写内容块按模块自由编排成自己的主页。</div>
       <div class="hero-split-entry-arrow">进入租户门户 →</div>
-    </a>
+    </a>{% endif %}
     <a href="/kol-workbench?tenant={{ default_tenant.slug }}" class="hero-split-entry">
       <div class="hero-split-entry-top">
         <span class="hero-split-entry-icon">👑</span>
         <span class="hero-split-entry-tag">KOL WORKBENCH</span>
       </div>
       <div class="hero-split-entry-title">大V 工作台 Web</div>
-      <div class="hero-split-entry-desc">给大V单独使用的工作台，负责粉丝消息、群发助手、复盘生产、知识库微调、Hermes 维护、智能 Dashboard 定义和门户 CMS 编排。</div>
+      <div class="hero-split-entry-desc">给大V单独使用的工作台，负责复盘生产、知识库微调、Hermes 管理、智能 Dashboard 定义、门户 CMS 编排，以及自选股评论标注统计与关键词分析。</div>
       <div class="hero-split-entry-arrow">直接进入工作台 →</div>
     </a>
     <a href="/admin" class="hero-split-entry">
@@ -1067,7 +1072,7 @@ body.theme-dark .tech-layer {
         <span class="hero-split-entry-tag">PLATFORM ADMIN</span>
       </div>
       <div class="hero-split-entry-title">纯 Admin 后台</div>
-      <div class="hero-split-entry-desc">给平台运营和管理方使用的后台，承接功能控开、租户管理、审计、结算、渠道和平台级分析。</div>
+      <div class="hero-split-entry-desc">给平台运营和管理方使用的后台，承接功能控开、租户管理、审计、结算、渠道分析、大模型配置，以及独立的功能级模型映射。</div>
       <div class="hero-split-entry-arrow">直接进入 Admin →</div>
     </a>
   </div>
@@ -1121,7 +1126,7 @@ body.theme-dark .tech-layer {
 
         <div class="summary-link-row">
           <a href="/h5" class="summary-link">查看 H5 用户端</a>
-          <a href="/tenant/{{ default_tenant.slug }}" class="summary-link">查看默认租户门户</a>
+          {% if tenant_portal_enabled %}<a href="/tenant/{{ default_tenant.slug }}" class="summary-link">查看默认租户门户</a>{% endif %}
           <a href="/kol-workbench?tenant={{ default_tenant.slug }}" class="summary-link">查看大V工作台 Web</a>
           <a href="/admin" class="summary-link">查看纯 Admin 后台</a>
         </div>
@@ -1165,6 +1170,53 @@ body.theme-dark .tech-layer {
   </div>
 </section>
 
+<!-- ======================================================
+     SECTION 1.6: 当前功能总览
+====================================================== -->
+<section class="ix-section ix-section-dark" id="current-capabilities">
+  <div class="ix-inner">
+    <div class="ix-section-label">Current Capability Map</div>
+    <div class="ix-section-title">当前系统功能总览</div>
+    <div class="ix-divider"></div>
+    <div class="ix-section-desc">系统按角色和租户划分入口。行情与指标使用统一数据服务；知识、复盘和 Hermes 共享可追溯的证据链；平台级配置只在 Admin 生效。</div>
+
+    <div class="summary-role-grid">
+      <div class="summary-role-card">
+        <div class="summary-role-top"><div class="summary-role-icon">01</div><div class="summary-role-title">普通用户 H5</div></div>
+        <div class="summary-role-desc">注册、合规确认、渠道登记、自选股、K 线标注与评论、复盘阅读、消息和 Hermes 问答。用户只访问所属租户的数据与内容。</div>
+      </div>
+      <div class="summary-role-card">
+        <div class="summary-role-top"><div class="summary-role-icon">02</div><div class="summary-role-title">大V 生产与经营</div></div>
+        <div class="summary-role-desc">通过 H5 或 Web 完成复盘向导、语音/文件/网页/手动录入、知识录入、粉丝管理、评论统计、定价和门户内容维护。</div>
+      </div>
+      <div class="summary-role-card">
+        <div class="summary-role-top"><div class="summary-role-icon">03</div><div class="summary-role-title">Hermes 研究助手</div></div>
+        <div class="summary-role-desc">支持个股和指数行情、K 线/线图/分布图、知识问答、报告与 URL 解读、复盘证据链和平台帮助；先召回租户知识，再调用对应数据能力。</div>
+      </div>
+      <div class="summary-role-card">
+        <div class="summary-role-top"><div class="summary-role-icon">04</div><div class="summary-role-title">平台 Admin</div></div>
+        <div class="summary-role-desc">管理租户、用户、功能开关、模型映射、Hermes 记忆、知识治理、指标数据、任务、访问审计和运营分析，并负责数据库增量发布与受控环境同步。</div>
+      </div>
+    </div>
+
+    <div class="summary-main-card" style="margin-top:24px">
+      <div class="summary-main-title">共享业务链路：数据与知识进入，研究与运营产出</div>
+      <div class="summary-main-desc">用户或大V录入文本、语音、文件、URL、K线标注与评论后，系统以租户为边界保存原始记录，抽取知识、标签和关系；Hermes、复盘和工作台优先利用这些已沉淀内容形成可回溯结论。行情、指数和指标展示由统一市场数据能力提供，无法取得真实数据时必须明确提示，不以模拟值替代。</div>
+      <div class="summary-link-row">
+        <a href="/prd#s13" class="summary-link">查看当前 PRD 与验收策略</a>
+        <a href="/intern-handbook" class="summary-link">打开系统学习手册</a>
+        <a href="/h5" class="summary-link">进入 H5 验证</a>
+        <a href="/admin" class="summary-link">进入 Admin 治理</a>
+      </div>
+    </div>
+    <div class="summary-main-card" style="margin-top:16px">
+      <div class="summary-main-title">交付策略：先在 Staging 验证，再向 Production 受控发布</div>
+      <div class="summary-main-desc">日常数据库发布以“Staging 完整验证 → 扫描本地与 Production 差异 → 审核并发布结构、主数据或业务数据增量”为默认路径，优先保护 Production 的真实业务数据。Staging → Production 全量同步仅用于已确认 Staging 是权威完整快照、需要环境一致性或灾备恢复的维护窗口；切换前会恢复临时库校验，成功后保留 Production 回滚备份。</div>
+      <div class="summary-link-row"><a href="/prd#s7" class="summary-link">查看数据库发布策略</a><a href="/intern-handbook#flows" class="summary-link">查看发布操作流程</a><a href="/admin" class="summary-link">进入 Admin 治理</a></div>
+    </div>
+  </div>
+</section>
+
 
 <!-- ======================================================
      SECTION 2: 系统模块导航
@@ -1177,12 +1229,12 @@ body.theme-dark .tech-layer {
     <div class="ix-section-desc">现在拆成四个真实入口：租户门户 CMS、H5 用户端、大V 工作台 Web 和平台 Admin 后台。分析能力仍属于 Admin，不再单独包装成一个新产品入口。</div>
 
     <div class="nav-cards-grid">
-      <a href="/tenant/{{ default_tenant.slug }}" class="ix-nav-card">
+      {% if tenant_portal_enabled %}<a href="/tenant/{{ default_tenant.slug }}" class="ix-nav-card">
         <div class="ix-nav-card-icon">{{ default_tenant.logo_mark }}</div>
         <div class="ix-nav-card-title">租户门户 CMS</div>
         <div class="ix-nav-card-desc">每个大V对应一个租户门户。门户支持模块拖拽、指标卡编排、复盘内容露出、CTA 配置和自定义文案编辑。</div>
         <div class="ix-nav-card-arrow">进入门户 →</div>
-      </a>
+      </a>{% endif %}
       <a href="/h5" class="ix-nav-card">
         <div class="ix-nav-card-icon">📱</div>
         <div class="ix-nav-card-title">H5 用户端</div>
@@ -1555,6 +1607,7 @@ body.theme-dark .tech-layer {
         <div class="kol-col-item">可拖拽指标卡和内容模块，自定义自己的租户门户首页</div>
         <div class="kol-col-item">用平台证据链增强内容可信度，不直接做喊单式表达</div>
         <div class="kol-col-item">在工作台里维护智能 Dashboard 定义、知识库和粉丝经营动作</div>
+        <div class="kol-col-item">查看自选股评论的标签、关键词云与情绪分布，反向理解粉丝关注点</div>
       </div>
       <div class="kol-col-card" style="border-color:rgba(46,204,113,0.25)">
         <div class="kol-col-header">
@@ -1566,6 +1619,7 @@ body.theme-dark .tech-layer {
         <div class="kol-col-item">管理租户隔离规则与知识板块输入源，确保前后台一致</div>
         <div class="kol-col-item">跟进 NDA、新数据、ICP、软著等合规与商务事项</div>
         <div class="kol-col-item">负责主题、功能、租户与密码门禁等平台级控开策略</div>
+        <div class="kol-col-item">为 Hermes、复盘、知识加工、评论标注等不同大模型功能分别选择模型</div>
       </div>
     </div>
 
@@ -1594,7 +1648,7 @@ body.theme-dark .tech-layer {
           <tr>
             <td><span class="tier-badge-pro">大V投顾</span></td>
             <td>管理粉丝客群、输出研究内容、协同转化</td>
-            <td style="color:var(--gold);font-weight:600">门户 CMS / 工作台 / 私信 / 群发 / 知识板块 / Hermes / 智能 Dashboard</td>
+            <td style="color:var(--gold);font-weight:600">门户 CMS / 工作台 / 私信 / 知识板块 / Hermes / 智能 Dashboard / 评论标注分析</td>
             <td>部分 admin 能力</td>
             <td>CAC / LTV / 协同收入 / 定价带</td>
             <td>内容必须带证据链、置信度和风险提示</td>
@@ -1602,7 +1656,7 @@ body.theme-dark .tech-layer {
           <tr>
             <td><span class="tier-badge-vip" style="background:rgba(255,215,0,0.15);color:#FFD700">平台 Admin</span></td>
             <td>管理全局漏斗、多租户投顾体系和合规策略</td>
-            <td style="color:var(--gold);font-weight:600">租户管理 / 知识输入源 / 结算 / 渠道 / 功能控开</td>
+            <td style="color:var(--gold);font-weight:600">租户管理 / 知识输入源 / 结算 / 渠道 / 功能控开 / 大模型配置 / 功能级模型映射</td>
             <td>全局管理权限</td>
             <td>多租户效率 / 管理成本 / 合规完成度</td>
             <td>严格控制开放节奏与敏感表达</td>
@@ -1861,7 +1915,7 @@ body.theme-dark .tech-layer {
         <div class="tech-layer-label">📱 前端层</div>
         <div class="tech-item"><div class="tech-item-icon">📱</div><div>H5端 (原生JS / Vue)</div></div>
         <div class="tech-item"><div class="tech-item-icon">⚙️</div><div>Admin端 (Flask Templates)</div></div>
-        <div class="tech-item"><div class="tech-item-icon">📊</div><div>Dashboard (Chart.js)</div></div>
+        <div class="tech-item"><div class="tech-item-icon">📊</div><div>Dashboard (ECharts)</div></div>
         <div style="margin-top:12px;font-size:11px;color:var(--gray-600);line-height:1.5">轻量化前端，响应式设计，PWA支持</div>
       </div>
 
@@ -2173,7 +2227,7 @@ body.theme-dark .tech-layer {
       </div>
       <div>
         <div class="footer-col-title">产品</div>
-        <a href="/tenant/{{ default_tenant.slug }}" class="footer-col-link">租户门户 CMS</a>
+        {% if tenant_portal_enabled %}<a href="/tenant/{{ default_tenant.slug }}" class="footer-col-link">租户门户 CMS</a>{% endif %}
         <a href="/h5" class="footer-col-link">H5 用户端</a>
         <a href="/kol-workbench?tenant={{ default_tenant.slug }}" class="footer-col-link">大V 工作台 Web</a>
         <a href="/admin" class="footer-col-link">纯 Admin 后台</a>
@@ -2181,8 +2235,8 @@ body.theme-dark .tech-layer {
       </div>
       <div>
         <div class="footer-col-title">核心功能</div>
-        <a href="/tenant/{{ default_tenant.slug }}" class="footer-col-link">门户拖拽编排</a>
-        <a href="/tenant/{{ default_tenant.slug }}" class="footer-col-link">指标卡与自定义内容</a>
+        {% if tenant_portal_enabled %}<a href="/tenant/{{ default_tenant.slug }}" class="footer-col-link">门户拖拽编排</a>
+        <a href="/tenant/{{ default_tenant.slug }}" class="footer-col-link">指标卡与自定义内容</a>{% endif %}
         <a href="/h5" class="footer-col-link">基本面分析</a>
         <a href="/h5" class="footer-col-link">自选股</a>
         <a href="/h5" class="footer-col-link">每日复盘</a>
@@ -2203,6 +2257,12 @@ body.theme-dark .tech-layer {
     </div>
   </div>
 </footer>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  window.GangtiseReleaseNotes?.init({ surface: 'index', autoShow: true });
+});
+</script>
 
 </body>
 </html>

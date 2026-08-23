@@ -68,6 +68,58 @@ def api_hermes_query():
     return jsonify(result)
 
 
+@app.route("/api/hermes/sessions")
+def api_hermes_sessions():
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    user_role = str(request.args.get("user_role") or "").strip().lower()
+    user_profile_id = str(request.args.get("user_profile_id") or "").strip()
+    keyword = str(request.args.get("keyword") or "").strip()
+    limit = request.args.get("limit", 24)
+    try:
+        actor = resolve_hermes_actor_context(
+            {
+                "tenant_slug": tenant_slug,
+                "user_role": user_role,
+                "user_profile_id": user_profile_id,
+            },
+            tenant_slug=tenant_slug,
+            user_role=user_role,
+        )
+        sessions = build_hermes_session_list(actor, limit=limit, keyword=keyword)
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": True, "sessions": [], "db_unavailable": True})
+        app.logger.exception("Failed to load Hermes sessions")
+        return jsonify({"ok": False, "error": "hermes_sessions_failed"}), 500
+    return jsonify({"ok": True, "sessions": sessions})
+
+
+@app.route("/api/hermes/sessions/<session_id>")
+def api_hermes_session_detail(session_id):
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    user_role = str(request.args.get("user_role") or "").strip().lower()
+    user_profile_id = str(request.args.get("user_profile_id") or "").strip()
+    try:
+        actor = resolve_hermes_actor_context(
+            {
+                "tenant_slug": tenant_slug,
+                "user_role": user_role,
+                "user_profile_id": user_profile_id,
+            },
+            tenant_slug=tenant_slug,
+            user_role=user_role,
+        )
+        detail = build_hermes_session_detail(actor, session_id)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404 if str(exc) == "hermes_session_not_found" else 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "hermes_session_db_unavailable", "db_unavailable": True}), 503
+        app.logger.exception("Failed to load Hermes session detail")
+        return jsonify({"ok": False, "error": "hermes_session_detail_failed"}), 500
+    return jsonify({"ok": True, **detail})
+
+
 @app.route("/api/hermes/usage/current")
 def api_hermes_usage_current():
     requested_tenant = str(request.args.get("tenant_slug") or "").strip().lower()
@@ -177,6 +229,7 @@ def gen_dm_messages(thread_id, tenant_slug=None):
 
 def gen_kol_workbench(tenant=None, fallback_mode=False):
     tenant = tenant or get_tenant_by_slug()
+    tenant_portal_enabled = is_feature_enabled("tenant_portal")
     is_lisa = tenant["slug"] == "lisa"
     if fallback_mode:
         fallback_config = normalize_site_config(DEFAULT_SITE_CONFIG)
@@ -202,7 +255,7 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
     fund_dashboard = copy.deepcopy(fund_dashboard_state["published"])
     knowledge_hub = fetch_live_knowledge_hub(tenant)
     indicator_hub = build_indicator_hub_fallback(tenant=tenant, admin_view=False) if fallback_mode else build_indicator_hub(tenant=tenant, admin_view=False)
-    news_items = gen_news_feed()
+    news_items = gen_news_feed(tenant=tenant, watchlist_details=watchlist_details_map)
     message_center_state = resolve_tenant_message_center_state(tenant, tenant.get("message_center_state"))
     message_center_stats = build_message_center_stats(message_center_state)
     published_reviews = resolve_tenant_review_snapshots(tenant, tenant.get("review_snapshots"))
@@ -225,16 +278,15 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
                 "desc": f"查看普通投资者和大V在 H5 里实际看到的 {tenant['name']} Hermes、复盘、知识和自选股路径。"
             },
             {
-                "label": "租户门户",
-                "url": f"/tenant/{tenant['slug']}",
-                "desc": f"查看 {tenant['advisor']} 对外的专属租户门户，重点承接品牌表达、已发布内容和粉丝入口。"
-            },
-            {
                 "label": "纯 Admin 后台",
                 "url": "/admin?section=kols",
                 "desc": "查看平台侧的大V租户管理、能力开关、一致性巡检和审计入口。"
             },
-        ],
+        ] + ([{
+            "label": "租户门户",
+            "url": f"/tenant/{tenant['slug']}",
+            "desc": f"查看 {tenant['advisor']} 对外的专属租户门户，重点承接品牌表达、已发布内容和粉丝入口。"
+        }] if tenant_portal_enabled else []),
         "stats": {
             "total_followers": base_followers,
             "vip_subscribers": base_vip,
@@ -257,7 +309,7 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
             {"name": "暂无粉丝", "time": "--", "msg": "请先通过 Admin 或工作台导入用户。", "tier": "--"}
         ],
         "broadcast_history": broadcast_history,
-        "portal_workspace": resolve_tenant_portal_workspace(tenant, tenant.get("portal_cms")),
+        "portal_workspace": resolve_tenant_portal_workspace(tenant, tenant.get("portal_cms")) if tenant_portal_enabled else {},
         "message_center": {
             "summary": message_center_state["summary"],
             "items": build_message_center_items((fan_threads + review_notice_threads)[:6], limit=6),

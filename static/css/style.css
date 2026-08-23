@@ -502,9 +502,48 @@ body[data-accent="amber"] { --gold: #C7902E; --gold-light: #E5B65B; --gold-dark:
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16px;
 }
 .admin-page-title { font-size: 18px; font-weight: 600; color: var(--white); }
 .admin-content { padding: 24px; }
+
+/* Shared account controls for the Admin console and the advisor workbench. */
+.platform-topbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.platform-account-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  color: var(--text-sub);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.platform-account-name { color: var(--text-main); font-weight: 700; }
+.platform-account-role {
+  color: var(--gold);
+  font-size: 11px;
+  padding-left: 7px;
+  border-left: 1px solid var(--border-soft);
+}
+.platform-account-action { padding: 8px 12px; font-size: 12px; text-decoration: none; white-space: nowrap; }
+.platform-account-logout { color: #C43D36; border-color: rgba(196,61,54,0.42); }
+.platform-account-logout:hover { background: rgba(196,61,54,0.08); }
+
+@media (max-width: 960px) {
+  .admin-topbar { align-items: flex-start; flex-direction: column; }
+  .platform-topbar-actions { width: 100%; justify-content: flex-start; }
+}
 
 .stats-grid {
   display: grid;

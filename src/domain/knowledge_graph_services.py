@@ -518,3 +518,189 @@ def build_knowledge_graph_payload(items, mode="tenant", tenant=None, platform_na
             "node_types": ["all", "topic", "entity", "method", "claim", "signal"],
         },
     }
+
+
+def _knowledge_asset_maturity_score(item, artifact):
+    score = 0
+    if str(item.get("summary") or "").strip():
+        score += 14
+    if str(item.get("body") or item.get("raw_input") or "").strip():
+        score += 10
+    if str(((item.get("vector_record") or {}) if isinstance(item.get("vector_record"), dict) else {}).get("vector_namespace") or "").strip():
+        score += 18
+    if artifact.get("topics"):
+        score += 10
+    if artifact.get("entities"):
+        score += 10
+    if artifact.get("methods"):
+        score += 8
+    if artifact.get("claims"):
+        score += 8
+    if artifact.get("signals"):
+        score += 8
+    if artifact.get("evidence_points"):
+        score += 8
+    if artifact.get("question_set"):
+        score += 6
+    return min(100, int(score))
+
+
+def _knowledge_asset_maturity_meta(score):
+    if score >= 85:
+        return {"label": "成熟", "tone": "ready"}
+    if score >= 65:
+        return {"label": "成型", "tone": "growing"}
+    if score >= 40:
+        return {"label": "生长", "tone": "building"}
+    return {"label": "种子", "tone": "seed"}
+
+
+def _build_relationship_bucket():
+    return {"count": 0, "entry_ids": [], "entry_titles": [], "keywords": []}
+
+
+def _append_relationship_bucket(target, label, item, artifact):
+    normalized_label = _normalize_graph_text(label)
+    if not normalized_label:
+        return
+    bucket = target.setdefault(normalized_label, _build_relationship_bucket())
+    bucket["count"] += 1
+    entry_id = str(item.get("id") or artifact.get("source_entry_id") or "").strip()
+    entry_title = _normalize_graph_text(item.get("title") or artifact.get("source_title") or "知识条目")
+    if entry_id and entry_id not in bucket["entry_ids"]:
+        bucket["entry_ids"].append(entry_id)
+    if entry_title and entry_title not in bucket["entry_titles"]:
+        bucket["entry_titles"].append(entry_title)
+    bucket["keywords"] = _dedupe_text_list(list(bucket.get("keywords") or []) + list(artifact.get("keywords") or []), limit=10)
+
+
+def build_knowledge_asset_payload(items, mode="tenant", tenant=None, platform_name="平台"):
+    normalized_items = [copy.deepcopy(item) for item in (items or []) if isinstance(item, dict)]
+    tenant_payload = tenant if isinstance(tenant, dict) else {}
+    tenant_slug = _normalize_graph_text(tenant_payload.get("slug") or "")
+    tenant_name = _normalize_graph_text(tenant_payload.get("name") or tenant_slug or "当前租户")
+    is_platform_mode = str(mode or "tenant").strip().lower() == "platform"
+    topic_map = {}
+    entity_map = {}
+    method_map = {}
+    signal_map = {}
+    source_breakdown = {}
+    tenant_breakdown = {}
+    entries = []
+    ready_count = 0
+    total_score = 0
+    relation_total = 0
+    keyword_total = 0
+    for item in normalized_items:
+        item_tenant_slug = _normalize_graph_text(item.get("tenant_slug") or tenant_slug)
+        item_tenant_name = _normalize_graph_text(item.get("tenant_name") or tenant_name or item_tenant_slug or "当前租户")
+        artifact = _normalize_artifact(item, tenant_slug=item_tenant_slug, tenant_name=item_tenant_name)
+        score = _knowledge_asset_maturity_score(item, artifact)
+        maturity = _knowledge_asset_maturity_meta(score)
+        ready_count += 1 if score >= 65 else 0
+        total_score += score
+        relation_count = sum(
+            len(artifact.get(key) or [])
+            for key in ("topics", "entities", "methods", "signals", "claims")
+        )
+        relation_total += relation_count
+        keyword_count = len(artifact.get("keywords") or [])
+        keyword_total += keyword_count
+        source_label = _normalize_graph_text(item.get("source") or item.get("type") or "知识录入")
+        source_breakdown[source_label] = int(source_breakdown.get(source_label) or 0) + 1
+        if is_platform_mode:
+            tenant_label = item_tenant_name or item_tenant_slug or "未命名租户"
+            tenant_breakdown[tenant_label] = int(tenant_breakdown.get(tenant_label) or 0) + 1
+        for label in artifact.get("topics") or []:
+            _append_relationship_bucket(topic_map, label, item, artifact)
+        for label in artifact.get("entities") or []:
+            _append_relationship_bucket(entity_map, label, item, artifact)
+        for label in artifact.get("methods") or []:
+            _append_relationship_bucket(method_map, label, item, artifact)
+        for label in artifact.get("signals") or []:
+            _append_relationship_bucket(signal_map, label, item, artifact)
+        entries.append({
+            "id": str(item.get("id") or artifact.get("source_entry_id") or "").strip(),
+            "title": _normalize_graph_text(item.get("title") or artifact.get("source_title") or "知识条目"),
+            "type": _normalize_graph_text(item.get("type") or "manual"),
+            "source": source_label,
+            "source_detail": _normalize_graph_text(item.get("source_detail") or ""),
+            "summary": _normalize_graph_text(item.get("summary") or ""),
+            "time": _normalize_graph_text(item.get("time") or item.get("queued_at") or item.get("synced_at") or ""),
+            "tenant_slug": item_tenant_slug,
+            "tenant_name": item_tenant_name,
+            "tags": _dedupe_text_list(item.get("tags") if isinstance(item.get("tags"), list) else [], limit=8),
+            "maturity_score": score,
+            "maturity_label": maturity["label"],
+            "maturity_tone": maturity["tone"],
+            "relation_count": relation_count,
+            "keyword_count": keyword_count,
+            "qkv": {
+                "questions": _dedupe_text_list(artifact.get("question_set") if isinstance(artifact.get("question_set"), list) else [], limit=3),
+                "keywords": _dedupe_text_list(artifact.get("keywords") if isinstance(artifact.get("keywords"), list) else [], limit=10),
+                "values": _dedupe_text_list(artifact.get("values") if isinstance(artifact.get("values"), list) else [], limit=4),
+            },
+            "relations": {
+                "topics": _dedupe_text_list(artifact.get("topics") if isinstance(artifact.get("topics"), list) else [], limit=6),
+                "entities": _dedupe_text_list(artifact.get("entities") if isinstance(artifact.get("entities"), list) else [], limit=6),
+                "methods": _dedupe_text_list(artifact.get("methods") if isinstance(artifact.get("methods"), list) else [], limit=4),
+                "claims": _dedupe_text_list(artifact.get("claims") if isinstance(artifact.get("claims"), list) else [], limit=2),
+                "signals": _dedupe_text_list(artifact.get("signals") if isinstance(artifact.get("signals"), list) else [], limit=5),
+                "evidence_points": _dedupe_text_list(artifact.get("evidence_points") if isinstance(artifact.get("evidence_points"), list) else [], limit=4),
+            },
+            "vector_record": copy.deepcopy(item.get("vector_record")) if isinstance(item.get("vector_record"), dict) else {},
+        })
+    entries.sort(
+        key=lambda current: (
+            -int(current.get("maturity_score") or 0),
+            -int(current.get("relation_count") or 0),
+            str(current.get("time") or ""),
+        )
+    )
+
+    def _sorted_relationships(mapping, limit=10):
+        rows = []
+        for label, bucket in mapping.items():
+            rows.append({
+                "label": label,
+                "count": int(bucket.get("count") or 0),
+                "entry_ids": list(bucket.get("entry_ids") or [])[:8],
+                "entry_titles": list(bucket.get("entry_titles") or [])[:4],
+                "keywords": _dedupe_text_list(bucket.get("keywords") if isinstance(bucket.get("keywords"), list) else [], limit=8),
+            })
+        rows.sort(key=lambda item: (-int(item.get("count") or 0), item.get("label") or ""))
+        return rows[:limit]
+
+    source_rows = [{"label": label, "count": count} for label, count in source_breakdown.items()]
+    source_rows.sort(key=lambda item: (-int(item.get("count") or 0), item.get("label") or ""))
+    tenant_rows = [{"label": label, "count": count} for label, count in tenant_breakdown.items()]
+    tenant_rows.sort(key=lambda item: (-int(item.get("count") or 0), item.get("label") or ""))
+
+    return {
+        "mode": "platform" if is_platform_mode else "tenant",
+        "tenant_slug": tenant_slug,
+        "tenant_name": tenant_name,
+        "platform_name": _normalize_graph_text(platform_name or "平台") or "平台",
+        "summary": {
+            "entry_count": len(entries),
+            "ready_count": ready_count,
+            "avg_maturity_score": round((total_score / len(entries)), 1) if entries else 0,
+            "avg_relation_count": round((relation_total / len(entries)), 1) if entries else 0,
+            "avg_keyword_count": round((keyword_total / len(entries)), 1) if entries else 0,
+            "topic_count": len(topic_map),
+            "entity_count": len(entity_map),
+            "method_count": len(method_map),
+            "signal_count": len(signal_map),
+            "source_type_count": len(source_rows),
+            "tenant_count": len(tenant_rows) if is_platform_mode else (1 if entries else 0),
+        },
+        "relationship_groups": {
+            "topics": _sorted_relationships(topic_map, limit=8),
+            "entities": _sorted_relationships(entity_map, limit=8),
+            "methods": _sorted_relationships(method_map, limit=6),
+            "signals": _sorted_relationships(signal_map, limit=8),
+        },
+        "source_breakdown": source_rows,
+        "tenant_breakdown": tenant_rows,
+        "entries": entries[:80],
+    }

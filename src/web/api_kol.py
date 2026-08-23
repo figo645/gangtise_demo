@@ -16,6 +16,8 @@ def api_kol_workbench():
 
 @app.route("/api/kol/portal-cms", methods=["POST"])
 def api_save_kol_portal_cms():
+    if not is_feature_enabled("tenant_portal", get_site_config()):
+        return jsonify({"ok": False, "error": "tenant_portal_disabled"}), 404
     tenant = get_tenant_by_slug(request.args.get("tenant"))
     if not tenant:
         return jsonify({"ok": False, "error": "tenant_not_found"}), 404
@@ -136,6 +138,94 @@ def api_admin_knowledge_items():
     })
 
 
+@app.route("/api/kol/knowledge-assets")
+def api_kol_knowledge_assets():
+    tenant = get_tenant_by_slug(request.args.get("tenant"))
+    try:
+        knowledge_hub = fetch_live_knowledge_hub(tenant, limit=160)
+        payload = build_knowledge_asset_payload(
+            knowledge_hub.get("items") or [],
+            mode="tenant",
+            tenant=tenant,
+            platform_name=get_platform_brand().get("platform_name") or get_platform_brand().get("name") or "平台",
+        )
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            app.logger.warning("Database unavailable while building tenant knowledge assets, using config fallback")
+            fallback_hub = resolve_tenant_knowledge_hub(tenant, tenant.get("knowledge_hub_config"))
+            payload = build_knowledge_asset_payload(
+                fallback_hub.get("items") or [],
+                mode="tenant",
+                tenant=tenant,
+                platform_name=get_platform_brand().get("platform_name") or get_platform_brand().get("name") or "平台",
+            )
+        else:
+            app.logger.exception("Failed to build tenant knowledge assets")
+            return jsonify({"ok": False, "error": "knowledge_assets_build_failed"}), 500
+    return jsonify({
+        "ok": True,
+        "assets": payload,
+        "workflow_meta": build_declared_agent_workflow_meta(build_default_knowledge_asset_workflow_definition()),
+    })
+
+
+@app.route("/api/admin/knowledge-assets")
+def api_admin_knowledge_assets():
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    mode = "tenant" if tenant_slug else "platform"
+    try:
+        if tenant_slug:
+            tenant = get_tenant_by_slug(tenant_slug)
+            items = list_admin_knowledge_items(tenant_slug=tenant_slug, limit=240)
+            payload = build_knowledge_asset_payload(
+                items,
+                mode="tenant",
+                tenant=tenant,
+                platform_name=get_platform_brand().get("platform_name") or get_platform_brand().get("name") or "平台",
+            )
+        else:
+            items = list_admin_knowledge_items(limit=320)
+            payload = build_knowledge_asset_payload(
+                items,
+                mode="platform",
+                platform_name=get_platform_brand().get("platform_name") or get_platform_brand().get("name") or "平台",
+            )
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            app.logger.warning("Database unavailable while building admin knowledge assets, using config fallback")
+            site_config = normalize_site_config(DEFAULT_SITE_CONFIG)
+            if tenant_slug:
+                tenant = get_tenant_by_slug(tenant_slug, site_config)
+                tenant_items = resolve_tenant_knowledge_hub(tenant, tenant.get("knowledge_hub_config")).get("items") or []
+                payload = build_knowledge_asset_payload(
+                    [{**item, "tenant_slug": tenant.get("slug") or "", "tenant_name": tenant.get("name") or ""} for item in tenant_items if isinstance(item, dict)],
+                    mode="tenant",
+                    tenant=tenant,
+                    platform_name=get_platform_brand(site_config).get("platform_name") or get_platform_brand(site_config).get("name") or "平台",
+                )
+            else:
+                aggregated = []
+                for tenant in get_tenant_configs(site_config):
+                    tenant_items = resolve_tenant_knowledge_hub(tenant, tenant.get("knowledge_hub_config")).get("items") or []
+                    aggregated.extend(
+                        [{**item, "tenant_slug": tenant.get("slug") or "", "tenant_name": tenant.get("name") or ""} for item in tenant_items if isinstance(item, dict)]
+                    )
+                payload = build_knowledge_asset_payload(
+                    aggregated,
+                    mode="platform",
+                    platform_name=get_platform_brand(site_config).get("platform_name") or get_platform_brand(site_config).get("name") or "平台",
+                )
+        else:
+            app.logger.exception("Failed to build admin knowledge assets")
+            return jsonify({"ok": False, "error": "knowledge_assets_build_failed"}), 500
+    return jsonify({
+        "ok": True,
+        "mode": mode,
+        "assets": payload,
+        "workflow_meta": build_declared_agent_workflow_meta(build_default_knowledge_asset_workflow_definition()),
+    })
+
+
 @app.route("/api/kol/knowledge-graph")
 def api_kol_knowledge_graph():
     tenant = get_tenant_by_slug(request.args.get("tenant"))
@@ -165,6 +255,56 @@ def api_kol_knowledge_graph():
         "graph": payload,
         "workflow_meta": build_declared_agent_workflow_meta(build_default_knowledge_graph_workflow_definition()),
     })
+
+
+def _resolve_kol_hermes_tenant():
+    tenant_slug = str(request.args.get("tenant") or "").strip().lower()
+    tenant = get_tenant_by_slug(tenant_slug)
+    if not tenant or str(tenant.get("slug") or "").strip().lower() != tenant_slug:
+        raise ValueError("tenant_not_found")
+    return tenant_slug
+
+
+@app.route("/api/kol/hermes/usage-stats")
+def api_kol_hermes_usage_stats():
+    try:
+        tenant_slug = _resolve_kol_hermes_tenant()
+        return jsonify({"ok": True, "stats": build_admin_hermes_usage_stats(tenant_slug)})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "hermes_usage_db_unavailable"}), 503
+        app.logger.exception("Failed to load tenant Hermes usage stats")
+        return jsonify({"ok": False, "error": "hermes_usage_stats_failed"}), 500
+
+
+@app.route("/api/kol/hermes/memory-summary")
+def api_kol_hermes_memory_summary():
+    try:
+        tenant_slug = _resolve_kol_hermes_tenant()
+        return jsonify({"ok": True, "summary": build_admin_hermes_memory_summary(tenant_slug)})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "hermes_memory_db_unavailable"}), 503
+        app.logger.exception("Failed to load tenant Hermes memory summary")
+        return jsonify({"ok": False, "error": "hermes_memory_summary_failed"}), 500
+
+
+@app.route("/api/kol/hermes/capability-growth")
+def api_kol_hermes_capability_growth():
+    try:
+        tenant_slug = _resolve_kol_hermes_tenant()
+        return jsonify({"ok": True, "growth": build_kol_hermes_capability_growth(tenant_slug)})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "hermes_capability_db_unavailable"}), 503
+        app.logger.exception("Failed to build tenant Hermes capability growth")
+        return jsonify({"ok": False, "error": "hermes_capability_growth_failed"}), 500
 
 
 @app.route("/api/admin/knowledge-graph")
@@ -448,7 +588,11 @@ def api_save_tenant_dashboard(tenant_slug):
     body = request.get_json(silent=True) or {}
     action = str(body.get("action") or "").strip().lower()
     dashboard = body.get("dashboard") if isinstance(body.get("dashboard"), dict) else None
-    saved = update_tenant_fund_dashboard_config(tenant_slug, action, dashboard)
+    if action == "remove_indicator":
+        indicator_code = str(body.get("indicator_code") or (dashboard or {}).get("indicator_code") or (dashboard or {}).get("indicatorCode") or "").strip()
+        saved = remove_smart_indicator_from_dashboard(tenant_slug, indicator_code) if indicator_code else None
+    else:
+        saved = update_tenant_fund_dashboard_config(tenant_slug, action, dashboard)
     if not saved:
         return jsonify({"success": False, "error": "invalid_action"}), 400
     latest_tenant = get_tenant_by_slug(tenant_slug, saved)
@@ -547,7 +691,9 @@ def api_tenant_smart_indicators(tenant_slug):
         definition = get_indicator_definition(indicator_code)
         if not definition:
             return jsonify({"success": False, "error": "indicator_not_found"}), 404
-        if str(definition.get("tenant_slug") or "").strip().lower() not in {"", tenant_slug}:
+        if str(definition.get("source_type") or "").strip().lower() != "smart":
+            return jsonify({"success": False, "error": "only_smart_indicators_can_be_deleted"}), 403
+        if str(definition.get("tenant_slug") or "").strip().lower() != tenant_slug:
             return jsonify({"success": False, "error": "indicator_forbidden"}), 403
         saved = remove_smart_indicator_from_dashboard(tenant_slug, indicator_code)
         delete_indicator_definition(indicator_code)
