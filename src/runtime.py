@@ -301,12 +301,24 @@ class PgCompatConnection:
 
     def execute(self, sql, params=None):
         cursor = self._connection.cursor(cursor_factory=RealDictCursor)
-        cursor.execute(self._normalize_sql(sql), tuple(params or ()))
+        try:
+            cursor.execute(self._normalize_sql(sql), tuple(params or ()))
+        except Exception:
+            # PostgreSQL marks the whole transaction failed after any SQL
+            # error. Roll back here so callers that intentionally handle a
+            # compatibility/migration miss can continue with a fallback query
+            # on the same request-scoped connection.
+            self._connection.rollback()
+            raise
         return PgCompatCursor(cursor)
 
     def executemany(self, sql, seq_of_params):
         cursor = self._connection.cursor(cursor_factory=RealDictCursor)
-        cursor.executemany(self._normalize_sql(sql), list(seq_of_params or []))
+        try:
+            cursor.executemany(self._normalize_sql(sql), list(seq_of_params or []))
+        except Exception:
+            self._connection.rollback()
+            raise
         return PgCompatCursor(cursor)
 
     def commit(self):

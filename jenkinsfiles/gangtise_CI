@@ -2,7 +2,10 @@ pipeline {
     agent any
 
     triggers {
-        gitlabPush()
+        gitlab(
+            triggerOnPush: true,
+            triggerOnMergeRequest: true
+        )
     }
 
     environment {
@@ -67,9 +70,8 @@ pipeline {
                 dir("${WORK_DIR}") {
                     script {
                         def currentCommit = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
-                        def lastCommitFile = "${WORK_DIR}/.last_successful_commit"
-
-                        // 因为每次都清理目录，所以把上次成功的 commit 记录放到部署目录或固定位置
+                        
+                        // 因为每次都清理目录，所以把上次成功的 commit 记录放到部署目录
                         def recordFile = "${DEPLOY_DIR}/.last_successful_commit"
                         def lastCommit = fileExists(recordFile) ? readFile(recordFile).trim() : ""
 
@@ -117,5 +119,4 @@ pipeline {
             }
         }
     }
-
 }
