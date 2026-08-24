@@ -61,6 +61,22 @@ class GangtiseCredentialsTest(unittest.TestCase):
         self.assertEqual(saved["secret_key"], "existing-secret")
         self.assertEqual(saved["base_url"], "https://gateway.example.test")
 
+    def test_given_long_token_when_saved_then_token_is_plaintext_in_its_dedicated_postgres_setting(self):
+        encrypted_records = {}
+        with patch.object(core_services, "load_gangtise_openapi_credentials", return_value={}), patch.object(
+            core_services,
+            "_save_json_app_setting",
+            side_effect=lambda key, value: encrypted_records.update({key: value}),
+        ), patch.object(core_services, "_save_plain_app_setting") as save_plain, patch.object(
+            core_services, "get_gangtise_openapi_credentials_status", return_value={"credential_mode": "long_token"}
+        ):
+            result = core_services.save_gangtise_openapi_credentials_patch({"long_token": "plain-token-value"})
+
+        self.assertEqual(result["credential_mode"], "long_token")
+        save_plain.assert_called_once_with(core_services.GANGTISE_OPENAPI_TOKEN_SETTING_KEY, "plain-token-value")
+        encrypted_json = json.dumps(encrypted_records[core_services.GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY], ensure_ascii=False)
+        self.assertNotIn("plain-token-value", encrypted_json)
+
     def test_given_environment_credentials_when_postgres_is_empty_then_runtime_ignores_environment(self):
         with patch.object(market_services, "load_gangtise_openapi_credentials", return_value={}), patch.dict(
             "os.environ", {"GANGTISE_ACCESS_KEY": "environment-access", "GANGTISE_SECRET_KEY": "environment-secret"}, clear=False
@@ -71,6 +87,19 @@ class GangtiseCredentialsTest(unittest.TestCase):
         self.assertEqual(config["access_key"], "")
         self.assertEqual(config["secret_key"], "")
         self.assertEqual(config["long_token"], "")
+
+    def test_given_missing_runtime_credentials_when_token_is_requested_then_reason_identifies_database_state(self):
+        with patch.object(market_services, "get_gangtise_openapi_config", return_value={"base_url": "https://openapi.gangtise.com", "access_key": "", "secret_key": "", "long_token": ""}), patch.object(
+            market_services,
+            "get_gangtise_openapi_credentials_status",
+            return_value={"encryption_status": "unreadable", "credential_mode": "unreadable"},
+        ):
+            ok, token, response, status, duration = market_services.obtain_gangtise_openapi_token()
+
+        self.assertFalse(ok)
+        self.assertEqual(token, "")
+        self.assertEqual(status, 0)
+        self.assertIn("cannot be decrypted", response["message"])
 
     def test_given_admin_credential_status_when_requested_then_no_secret_is_returned(self):
         safe_status = {
