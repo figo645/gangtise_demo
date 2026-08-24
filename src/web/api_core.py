@@ -932,7 +932,7 @@ def api_admin_market_data_diagnostic():
 
 @app.route("/api/admin/gangtise-credentials", methods=["GET", "POST"])
 def api_admin_gangtise_credentials():
-    """Manage encrypted Gangtise credentials without returning secret values to the browser."""
+    """Manage PostgreSQL-backed Gangtise credentials without returning secret values to the browser."""
     if request.method == "GET":
         return jsonify({"ok": True, "credentials": get_gangtise_openapi_credentials_status()})
     try:
@@ -942,7 +942,7 @@ def api_admin_gangtise_credentials():
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception:
-        app.logger.exception("Unable to save encrypted Gangtise OpenAPI credentials")
+        app.logger.exception("Unable to save Gangtise OpenAPI credentials")
         return jsonify({"ok": False, "error": "gangtise_credentials_save_failed"}), 500
 
 
@@ -957,7 +957,7 @@ def api_admin_gangtise_credentials_diagnose():
     try:
         return jsonify({"ok": True, "diagnostic": build_gangtise_market_runtime_diagnostic(probe_security_code)})
     except Exception:
-        app.logger.exception("Unable to diagnose encrypted Gangtise OpenAPI credentials")
+        app.logger.exception("Unable to diagnose Gangtise OpenAPI credentials")
         return jsonify({"ok": False, "error": "gangtise_credentials_diagnostic_failed"}), 502
 
 

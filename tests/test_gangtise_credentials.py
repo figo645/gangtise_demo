@@ -22,7 +22,7 @@ class GangtiseCredentialsTest(unittest.TestCase):
         web_hooks.is_authenticated = cls._original_is_authenticated
         web_hooks.get_current_authenticated_user = cls._original_current_user
 
-    def test_given_credentials_when_saved_then_postgres_payload_is_encrypted(self):
+    def test_given_credentials_when_saved_then_postgres_payload_is_plaintext_and_cross_environment(self):
         persisted = {}
         safe_status = {"stored_in_postgres": True, "credential_mode": "access_key_secret"}
         with patch.object(core_services, "load_gangtise_openapi_credentials", return_value={}), patch.object(
@@ -34,14 +34,10 @@ class GangtiseCredentialsTest(unittest.TestCase):
 
         self.assertEqual(result, safe_status)
         self.assertEqual(persisted["key"], core_services.GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY)
-        encoded = json.dumps(persisted["value"], ensure_ascii=False)
-        self.assertNotIn("access-key-value", encoded)
-        self.assertNotIn("secret-key-value", encoded)
-        self.assertEqual(persisted["value"]["application_secret_fingerprint"], core_services._application_secret_fingerprint())
-        decrypted = core_services._gangtise_openapi_credential_fernet().decrypt(
-            persisted["value"]["ciphertext"].encode("ascii")
-        )
-        self.assertEqual(json.loads(decrypted.decode("utf-8"))["access_key"], "access-key-value")
+        self.assertEqual(persisted["value"]["storage_mode"], "plaintext")
+        self.assertEqual(persisted["value"]["credentials"]["access_key"], "access-key-value")
+        self.assertEqual(persisted["value"]["credentials"]["secret_key"], "secret-key-value")
+        self.assertNotIn("ciphertext", persisted["value"])
 
     def test_given_existing_credentials_when_blank_patch_then_secrets_are_preserved(self):
         persisted = {}
@@ -54,10 +50,7 @@ class GangtiseCredentialsTest(unittest.TestCase):
         ), patch.object(core_services, "get_gangtise_openapi_credentials_status", return_value={}):
             core_services.save_gangtise_openapi_credentials_patch({"base_url": "https://gateway.example.test"})
 
-        decrypted = core_services._gangtise_openapi_credential_fernet().decrypt(
-            persisted["value"]["ciphertext"].encode("ascii")
-        )
-        saved = json.loads(decrypted.decode("utf-8"))
+        saved = persisted["value"]["credentials"]
         self.assertEqual(saved["access_key"], "existing-access")
         self.assertEqual(saved["secret_key"], "existing-secret")
         self.assertEqual(saved["base_url"], "https://gateway.example.test")
@@ -75,8 +68,10 @@ class GangtiseCredentialsTest(unittest.TestCase):
 
         self.assertEqual(result["credential_mode"], "long_token")
         save_plain.assert_called_once_with(core_services.GANGTISE_OPENAPI_TOKEN_SETTING_KEY, "plain-token-value")
-        encrypted_json = json.dumps(encrypted_records[core_services.GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY], ensure_ascii=False)
-        self.assertNotIn("plain-token-value", encrypted_json)
+        self.assertEqual(
+            encrypted_records[core_services.GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY]["credentials"]["long_token"],
+            "plain-token-value",
+        )
 
     def test_given_environment_credentials_when_postgres_is_empty_then_runtime_ignores_environment(self):
         with patch.object(market_services, "load_gangtise_openapi_credentials", return_value={}), patch.dict(
@@ -159,6 +154,28 @@ class GangtiseCredentialsTest(unittest.TestCase):
             core_services._encrypted_setting_decryption_errors.discard(core_services.GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY)
 
         self.assertEqual(value, {})
+
+    def test_given_plaintext_record_when_application_secret_changes_then_credentials_are_still_readable(self):
+        with patch.object(
+            core_services,
+            "_load_json_app_setting",
+            return_value={
+                "version": 3,
+                "storage_mode": "plaintext",
+                "credentials": {
+                    "base_url": "https://openapi.example.test",
+                    "access_key": "portable-access",
+                    "secret_key": "portable-secret",
+                    "long_token": "",
+                },
+            },
+        ), patch.object(core_services, "_load_plain_app_setting", return_value=""):
+            with app_entry.app.app_context():
+                app_entry.app.config["SECRET_KEY"] = "a-different-environment-secret"
+                credentials = core_services.load_gangtise_openapi_credentials()
+
+        self.assertEqual(credentials["access_key"], "portable-access")
+        self.assertEqual(credentials["secret_key"], "portable-secret")
 
 
 if __name__ == "__main__":

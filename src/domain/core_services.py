@@ -3455,20 +3455,61 @@ def _normalize_gangtise_openapi_credentials(payload=None):
     }
 
 
+def _load_plaintext_gangtise_openapi_credentials():
+    """Load the cross-environment Gangtise credential record from PostgreSQL.
+
+    Gangtise credentials intentionally use a plaintext PostgreSQL record. The
+    database is copied between local, staging, and production, while each
+    application instance may have a different session/encryption secret.
+    Keeping this record independent of that application secret prevents a
+    valid full database release from making market data unavailable.
+    """
+    record = _load_json_app_setting(GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY, {})
+    if not isinstance(record, dict) or record.get("ciphertext"):
+        return {}
+    if str(record.get("storage_mode") or "").strip().lower() == "plaintext":
+        payload = record.get("credentials") if isinstance(record.get("credentials"), dict) else record
+        return _normalize_gangtise_openapi_credentials(payload)
+    # Accept a direct JSON payload as a forward-compatible import format, but
+    # do not mistake arbitrary settings for a Gangtise credential record.
+    if any(str(record.get(field) or "").strip() for field in ("access_key", "secret_key", "long_token")):
+        return _normalize_gangtise_openapi_credentials(record)
+    return {}
+
+
+def _save_plaintext_gangtise_openapi_credentials(payload):
+    normalized = _normalize_gangtise_openapi_credentials(payload)
+    _save_json_app_setting(
+        GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY,
+        {
+            "version": 3,
+            "storage_mode": "plaintext",
+            "credentials": normalized,
+        },
+    )
+    _encrypted_setting_decryption_errors.discard(GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY)
+
+
 def _normalize_wechat_credentials(payload=None):
     source = payload if isinstance(payload, dict) else {}
     return {"app_secret": str(source.get("app_secret") or "").strip()}
 
 
 def load_gangtise_openapi_credentials():
-    """Load decrypted Gangtise credentials from PostgreSQL; never expose this payload to a response."""
-    encrypted_payload = _load_encrypted_app_setting(GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY, {})
-    payload = dict(encrypted_payload) if isinstance(encrypted_payload, dict) else {}
-    payload.pop("long_token", None)
-    # Long Token is intentionally stored as plaintext in its own PostgreSQL
-    # setting so it can be rotated independently of the encrypted key pair.
+    """Load Gangtise credentials from PostgreSQL without an environment key dependency."""
+    plaintext_payload = _load_plaintext_gangtise_openapi_credentials()
+    if plaintext_payload:
+        payload = dict(plaintext_payload)
+    else:
+        # Legacy encrypted records remain readable when the old application
+        # secret is still available. New saves always replace them with the
+        # cross-environment plaintext format above.
+        encrypted_payload = _load_encrypted_app_setting(GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY, {})
+        payload = dict(encrypted_payload) if isinstance(encrypted_payload, dict) else {}
+    # Preserve compatibility with databases that still have the former
+    # dedicated plaintext Long Token setting.
     plaintext_token = _load_plain_app_setting(GANGTISE_OPENAPI_TOKEN_SETTING_KEY, "")
-    if plaintext_token:
+    if plaintext_token and not payload.get("long_token"):
         payload["long_token"] = plaintext_token
     return _normalize_gangtise_openapi_credentials(payload)
 
@@ -3491,10 +3532,22 @@ def _get_encrypted_app_setting_metadata(setting_key):
         envelope = json.loads(raw_value) if raw_value else {}
     except (TypeError, ValueError, json.JSONDecodeError):
         envelope = {}
+    is_plaintext_record = (
+        isinstance(envelope, dict)
+        and str(envelope.get("storage_mode") or "").strip().lower() == "plaintext"
+        and isinstance(envelope.get("credentials"), dict)
+    )
     return {
         "database_status": "available",
-        "record_present": bool(isinstance(envelope, dict) and str(envelope.get("ciphertext") or "").strip()),
-        "record_malformed": bool(raw_value) and not bool(isinstance(envelope, dict) and str(envelope.get("ciphertext") or "").strip()),
+        "record_present": bool(
+            is_plaintext_record
+            or (isinstance(envelope, dict) and str(envelope.get("ciphertext") or "").strip())
+        ),
+        "record_malformed": bool(raw_value) and not bool(
+            is_plaintext_record
+            or (isinstance(envelope, dict) and str(envelope.get("ciphertext") or "").strip())
+        ),
+        "storage_mode": "plaintext" if is_plaintext_record else ("encrypted" if isinstance(envelope, dict) and str(envelope.get("ciphertext") or "").strip() else ""),
         "application_secret_fingerprint": str((envelope or {}).get("application_secret_fingerprint") or "").strip(),
         "updated_at": str(row["updated_at"] or ""),
     }
@@ -3531,6 +3584,8 @@ def get_gangtise_openapi_credentials_status():
     decryption_failed = GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY in _encrypted_setting_decryption_errors
     if metadata.get("database_status") == "unavailable" or token_metadata.get("database_status") == "unavailable":
         encryption_status = "database_unavailable"
+    elif metadata.get("storage_mode") == "plaintext":
+        encryption_status = "plaintext"
     elif token_metadata.get("record_present"):
         encryption_status = "plaintext"
     elif decryption_failed:
@@ -3557,8 +3612,8 @@ def get_gangtise_openapi_credentials_status():
         "has_long_token": has_long_token,
         "encryption_status": encryption_status,
         "credential_mode": credential_mode,
-        "token_storage": "plaintext_postgres" if token_metadata.get("record_present") else "not_configured",
-        "token_record_present": bool(token_metadata.get("record_present")),
+        "token_storage": "plaintext_postgres" if metadata.get("storage_mode") == "plaintext" or token_metadata.get("record_present") else "not_configured",
+        "token_record_present": bool(metadata.get("storage_mode") == "plaintext" or token_metadata.get("record_present")),
         "application_secret_fingerprint": _application_secret_fingerprint(),
         "record_application_secret_fingerprint": metadata.get("application_secret_fingerprint") or "",
         "updated_at": metadata.get("updated_at") or "",
@@ -3583,9 +3638,8 @@ def save_gangtise_openapi_credentials_patch(payload=None):
         raise ValueError("gangtise_access_key_and_secret_key_must_be_configured_together")
     if not has_pair and not merged["long_token"]:
         raise ValueError("gangtise_credentials_required")
-    encrypted_payload = dict(merged)
-    plaintext_token = encrypted_payload.pop("long_token", "")
-    _save_encrypted_app_setting(GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY, encrypted_payload)
+    plaintext_token = merged.get("long_token") or ""
+    _save_plaintext_gangtise_openapi_credentials(merged)
     if plaintext_token:
         _save_plain_app_setting(GANGTISE_OPENAPI_TOKEN_SETTING_KEY, plaintext_token)
     return get_gangtise_openapi_credentials_status()

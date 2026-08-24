@@ -4702,7 +4702,7 @@
                   <div class="admin-settings-menu">
                     <button class="admin-settings-menu-btn" type="button" data-settings-panel-trigger="market-data" onclick="openAdminSettingsSubmenu('market-data')">
                       <div class="admin-settings-menu-title">Gangtise 数据连接</div>
-                      <div class="admin-settings-menu-copy">加密保存 OpenAPI 凭证，并用真实日 K 数据校验连接。</div>
+                      <div class="admin-settings-menu-copy">保存 OpenAPI 凭证，并用真实日 K 数据校验连接。</div>
                     </button>
                   </div>
                 </div>
@@ -4843,7 +4843,7 @@
                     <div>
                       <div class="admin-settings-panel-kicker">Market Data</div>
                       <div class="admin-settings-panel-title">Gangtise OpenAPI 凭证</div>
-                      <div class="admin-settings-panel-desc">Access Key 和 Secret Key 以密文保存到当前 PostgreSQL 的 <code>app_settings</code>；Long Token 按运行要求明文保存到独立配置项。任何凭证都不会写入公开站点配置、浏览器或日志。</div>
+                      <div class="admin-settings-panel-desc">Access Key、Secret Key 和 Long Token 明文保存到当前 PostgreSQL 的 <code>app_settings</code>，以便本地、staging 和 production 做完整数据库复制。任何凭证都不会回显到浏览器或写入日志。</div>
                     </div>
                     <div class="admin-settings-panel-note">切换本地 / staging 数据库时，本页显示并保存对应数据库自己的凭证。</div>
                   </div>
@@ -4866,7 +4866,7 @@
                         <label>Long Token（可选）</label>
                         <input id="gangtise-credential-long-token" type="password" placeholder="可作为 Access Key / Secret Key 的备用认证" autocomplete="new-password">
                       </div>
-                      <div class="feature-note">已配置的密钥不会回显。留空即保持当前值不变；推荐使用 Access Key + Secret Key，由系统自动换取短期 Token。Long Token 会明文保存到 PostgreSQL 的独立配置项，不会进入加密密钥记录。</div>
+                      <div class="feature-note">已配置的密钥不会回显。留空即保持当前值不变；推荐使用 Access Key + Secret Key，由系统自动换取短期 Token。凭证记录与数据库一起复制，不依赖各环境的应用密钥。</div>
                     </div>
                     <div class="config-card">
                       <div class="config-card-title">运行状态与校验</div>
@@ -4876,7 +4876,7 @@
                         <input id="gangtise-credential-probe-code" type="text" value="601988.SH" maxlength="32" placeholder="例如 601988.SH" autocomplete="off">
                       </div>
                       <div style="display:grid;gap:10px;margin-top:14px">
-                        <button id="gangtise-credential-save" class="btn-gold" type="button" style="padding:10px 20px;font-size:13px;width:100%" onclick="saveGangtiseCredentials()">保存加密凭证</button>
+                        <button id="gangtise-credential-save" class="btn-gold" type="button" style="padding:10px 20px;font-size:13px;width:100%" onclick="saveGangtiseCredentials()">保存凭证</button>
                         <button id="gangtise-credential-diagnose" class="btn-outline" type="button" style="padding:10px 20px;font-size:13px;width:100%" onclick="diagnoseGangtiseCredentials()">保存后校验真实日 K</button>
                       </div>
                       <div id="gangtise-credential-diagnostic" class="feature-note" style="margin-top:12px">校验会调用 Gangtise 的真实日 K 接口，仅返回 HTTP 状态、耗时、数据点数和最新交易日。</div>
@@ -11790,13 +11790,9 @@ function renderGangtiseCredentialStatus() {
     statusEl.textContent = '正在读取当前数据库中的凭证状态...';
     return;
   }
-  const modeLabel = ({ access_key_secret: 'Access Key + Secret Key', long_token: 'Long Token', missing: '未配置', unreadable: '凭证无法解密', database_unavailable: '数据库不可用' })[status.credential_mode] || '未配置';
-  const storageLabel = status.token_storage === 'plaintext_postgres' ? 'Long Token 已明文保存到当前 PostgreSQL' : (status.stored_in_postgres ? 'Access Key / Secret Key 已加密保存到当前 PostgreSQL' : '当前 PostgreSQL 未保存凭证');
-  const secretMismatch = status.encryption_status === 'unreadable'
-    && status.record_application_secret_fingerprint
-    && status.application_secret_fingerprint
-    && status.record_application_secret_fingerprint !== status.application_secret_fingerprint;
-  const mismatchNote = secretMismatch ? '当前运行密钥与凭证保存时不一致；请在当前环境重新保存凭证。' : '';
+  const modeLabel = ({ access_key_secret: 'Access Key + Secret Key', long_token: 'Long Token', missing: '未配置', unreadable: '旧密文无法解密', database_unavailable: '数据库不可用' })[status.credential_mode] || '未配置';
+  const storageLabel = status.token_storage === 'plaintext_postgres' ? 'Gangtise 凭证已明文保存到当前 PostgreSQL' : (status.stored_in_postgres ? 'Gangtise 凭证已保存到当前 PostgreSQL' : '当前 PostgreSQL 未保存凭证');
+  const mismatchNote = status.encryption_status === 'unreadable' ? '当前仍是旧版密文记录，请重新填写并保存凭证。' : '';
   statusEl.textContent = `${storageLabel}。认证方式：${modeLabel}。Access Key：${status.has_access_key ? '已配置' : '未配置'}；Secret Key：${status.has_secret_key ? '已配置' : '未配置'}；Long Token：${status.has_long_token ? '已配置' : '未配置'}。${mismatchNote}${status.updated_at ? `最后更新：${status.updated_at}。` : ''}`;
   const baseUrl = document.getElementById('gangtise-credential-base-url');
   if (baseUrl && !baseUrl.value) baseUrl.value = status.base_url || 'https://openapi.gangtise.com';
@@ -11831,7 +11827,7 @@ async function saveGangtiseCredentials() {
   };
   if (button) {
     button.disabled = true;
-    button.textContent = '正在加密保存...';
+    button.textContent = '正在保存...';
   }
   try {
     const res = await fetch('/api/admin/gangtise-credentials', {
@@ -11845,7 +11841,7 @@ async function saveGangtiseCredentials() {
       if (input) input.value = '';
     });
     renderGangtiseCredentialStatus();
-    if (diagnosticEl) diagnosticEl.textContent = '凭证已加密保存到当前 PostgreSQL，旧的短期 Token 已清除。可继续执行真实日 K 校验。';
+    if (diagnosticEl) diagnosticEl.textContent = '凭证已明文保存到当前 PostgreSQL，已解除环境应用密钥依赖。可继续执行真实日 K 校验。';
     showToast('Gangtise 凭证已保存');
   } catch (error) {
     const message = String(error && error.message || 'credentials_save_failed');
@@ -11854,7 +11850,7 @@ async function saveGangtiseCredentials() {
   } finally {
     if (button) {
       button.disabled = false;
-      button.textContent = '保存加密凭证';
+      button.textContent = '保存凭证';
     }
   }
 }
