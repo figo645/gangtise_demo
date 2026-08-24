@@ -540,6 +540,8 @@ _gangtise_token_lock = threading.Lock()
 _gangtise_token_cache = {"token": "", "fetched_at": 0.0}
 _intraday_fetch_locks = {}
 _intraday_fetch_locks_guard = threading.Lock()
+_watchlist_detail_fetch_locks = {}
+_watchlist_detail_fetch_locks_guard = threading.Lock()
 
 GANGTISE_INDICATOR_REGISTRY = {
     "source_shanghai_index": {
@@ -6090,6 +6092,123 @@ def _normalize_watchlist_security_candidate(item):
     }
 
 
+def _search_security_master_candidates(query, top=8):
+    """Resolve securities from the database master catalog before calling Gangtise."""
+    normalized = str(query or "").strip()
+    if not normalized:
+        return []
+    limit = max(1, min(int(top or 8), 50))
+    pattern = f"%{normalized}%"
+    try:
+        rows = get_db().execute(
+            """
+            SELECT security_code, stock_code, name, market, industry,
+                   security_type, search_aliases, source
+            FROM security_master
+            WHERE is_active = 1
+              AND (
+                stock_code = ? OR security_code = ? OR name = ?
+                OR stock_code ILIKE ? OR security_code ILIKE ?
+                OR name ILIKE ? OR COALESCE(search_aliases, '') ILIKE ?
+              )
+            ORDER BY
+                CASE
+                    WHEN stock_code = ? OR security_code = ? OR name = ? THEN 0
+                    WHEN COALESCE(search_aliases, '') ILIKE ? THEN 1
+                    ELSE 2
+                END,
+                name ASC
+            LIMIT ?
+            """,
+            (
+                normalized,
+                normalized.upper(),
+                normalized,
+                pattern,
+                pattern.upper(),
+                pattern,
+                pattern,
+                normalized,
+                normalized.upper(),
+                normalized,
+                pattern,
+                limit,
+            ),
+        ).fetchall()
+    except Exception as exc:
+        # Older databases are upgraded by the numbered SQL migration. Keep
+        # the existing seed/remote path usable while that migration rolls out.
+        if not is_db_unavailable_error(exc):
+            app.logger.debug("Security master lookup unavailable: %s", exc)
+        return []
+
+    items = []
+    for row in rows or []:
+        item = {
+            "code": str(row.get("stock_code") or "").strip().upper(),
+            "name": str(row.get("name") or "").strip(),
+            "market": str(row.get("market") or "").strip().upper(),
+            "security_code": str(row.get("security_code") or "").strip().upper(),
+            "category": str(row.get("security_type") or "stock").strip() or "stock",
+            "industry": str(row.get("industry") or "").strip(),
+            "source": str(row.get("source") or "security_master").strip() or "security_master",
+            "match_type": "security_master",
+        }
+        if item["code"] and item["name"] and item["security_code"]:
+            items.append(item)
+    return items
+
+
+def _save_security_master_candidates(items):
+    normalized_items = []
+    for item in items or []:
+        candidate = _normalize_watchlist_security_candidate(item)
+        if candidate.get("code") and candidate.get("name") and candidate.get("security_code"):
+            normalized_items.append(candidate)
+    if not normalized_items:
+        return
+    try:
+        db = get_db()
+        now = now_ts()
+        for item in normalized_items:
+            db.execute(
+                """
+                INSERT INTO security_master
+                    (security_code, stock_code, name, market, industry,
+                     security_type, search_aliases, source, is_active,
+                     created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                ON CONFLICT (security_code) DO UPDATE SET
+                    stock_code = EXCLUDED.stock_code,
+                    name = EXCLUDED.name,
+                    market = EXCLUDED.market,
+                    industry = CASE WHEN EXCLUDED.industry <> '' THEN EXCLUDED.industry ELSE security_master.industry END,
+                    security_type = EXCLUDED.security_type,
+                    source = EXCLUDED.source,
+                    is_active = 1,
+                    updated_at = EXCLUDED.updated_at
+                """,
+                (
+                    item["security_code"],
+                    item["code"],
+                    item["name"],
+                    item["market"],
+                    str(item.get("industry") or "").strip(),
+                    item.get("category") or "stock",
+                    "",
+                    item.get("source") or "gangtise_openapi",
+                    now,
+                    now,
+                ),
+            )
+        db.commit()
+    except Exception as exc:
+        # Search must remain available if a legacy target has not run the
+        # security-master migration yet; the remote result is still returned.
+        if not is_db_unavailable_error(exc):
+            app.logger.debug("Security master candidate persistence unavailable: %s", exc)
+
+
 def _build_watchlist_seed_details():
     def build_kline_series(stock_code, base_price):
         rng = random.Random(f"kline:{stock_code}")
@@ -6317,6 +6436,9 @@ def _search_local_watchlist_candidates(query, top=8):
     normalized = _normalize_watchlist_query_text(query)
     lowered = normalized.lower()
     comparable_query = _normalize_watchlist_comparable_code(normalized)
+    database_items = _search_security_master_candidates(query, top=top)
+    if database_items:
+        return database_items[: max(1, int(top or 8))]
     details = _build_watchlist_seed_details()
     indicator_alias = normalize_watchlist_indicator_code(normalized)
     priority_index_codes = [
@@ -6460,6 +6582,7 @@ def _search_remote_watchlist_candidates(query, top=8):
     rows = (((response.get("data") or {}).get("list") or []) if isinstance(response, dict) else []) if is_gangtise_openapi_success(status, response) else []
     items = [_normalize_watchlist_security_candidate(item) for item in rows if isinstance(item, dict)]
     if items:
+        _save_security_master_candidates(items)
         _save_watchlist_cache("watchlist_search_cache", normalized, items)
     return items
 
@@ -6470,14 +6593,19 @@ def search_watchlist_candidates(query, top=8, include_remote=True):
         return []
     merged = []
     seen = set()
-    for item in _search_local_watchlist_candidates(normalized, top=top):
-        code = str(item.get("code") or "").strip().upper()
-        if not code or code in seen:
-            continue
-        seen.add(code)
-        merged.append(item)
-    if include_remote and len(merged) < max(1, int(top or 8)):
+    # Identity lookup is remote-first so a newly searched security gets the
+    # latest Gangtise symbol/name mapping before the database fallback.
+    if include_remote:
         for item in _search_remote_watchlist_candidates(normalized, top=top):
+            code = str(item.get("code") or "").strip().upper()
+            if not code or code in seen:
+                continue
+            seen.add(code)
+            merged.append(item)
+            if len(merged) >= max(1, int(top or 8)):
+                break
+    if len(merged) < max(1, int(top or 8)):
+        for item in _search_local_watchlist_candidates(normalized, top=top):
             code = str(item.get("code") or "").strip().upper()
             if not code or code in seen:
                 continue
@@ -6522,7 +6650,46 @@ def _watchlist_detail_has_future_kline(detail):
     return False
 
 
+def _watchlist_detail_cache_is_usable(detail):
+    if not isinstance(detail, dict) or not detail or detail.get("data_unavailable") is True:
+        return False
+    kline = detail.get("kline")
+    if not isinstance(kline, list) or len(kline) < 2:
+        return False
+    return not _watchlist_detail_has_future_kline(detail)
+
+
 def _build_watchlist_realtime_detail_from_candidate(candidate, stock_name=""):
+    normalized = candidate if isinstance(candidate, dict) else {}
+    security_code = str(normalized.get("security_code") or "").strip().upper()
+    if not security_code:
+        return _fetch_watchlist_realtime_detail_from_candidate(candidate, stock_name=stock_name)
+    cached = _load_watchlist_cache("watchlist_detail_cache", security_code, WATCHLIST_DETAIL_CACHE_TTL_SECONDS)
+    if _watchlist_detail_cache_is_usable(cached):
+        app.logger.warning(
+            "Watchlist detail cache hit security_code=%s code=%s kline_points=%s cache_source=%s",
+            security_code,
+            str(cached.get("code") or normalized.get("code") or "--").strip().upper(),
+            len(cached.get("kline") or []),
+            str(cached.get("data_source") or cached.get("source") or "--")[:80],
+        )
+        return attach_watchlist_intraday(cached)
+    with _watchlist_detail_fetch_locks_guard:
+        fetch_lock = _watchlist_detail_fetch_locks.setdefault(security_code, threading.Lock())
+    with fetch_lock:
+        cached = _load_watchlist_cache("watchlist_detail_cache", security_code, WATCHLIST_DETAIL_CACHE_TTL_SECONDS)
+        if _watchlist_detail_cache_is_usable(cached):
+            app.logger.warning(
+                "Watchlist detail cache hit after wait security_code=%s code=%s kline_points=%s",
+                security_code,
+                str(cached.get("code") or normalized.get("code") or "--").strip().upper(),
+                len(cached.get("kline") or []),
+            )
+            return attach_watchlist_intraday(cached)
+        return _fetch_watchlist_realtime_detail_from_candidate(candidate, stock_name=stock_name)
+
+
+def _fetch_watchlist_realtime_detail_from_candidate(candidate, stock_name=""):
     normalized = candidate if isinstance(candidate, dict) else {}
     security_code = str(normalized.get("security_code") or "").strip().upper()
     code = str(normalized.get("code") or "").strip().upper()
@@ -6534,17 +6701,6 @@ def _build_watchlist_realtime_detail_from_candidate(candidate, stock_name=""):
             name or "--",
         )
         return None
-    cached = _load_watchlist_cache("watchlist_detail_cache", security_code, WATCHLIST_DETAIL_CACHE_TTL_SECONDS)
-    if isinstance(cached, dict) and cached and not _watchlist_detail_has_future_kline(cached):
-        app.logger.warning(
-            "Watchlist detail cache hit security_code=%s code=%s kline_points=%s data_unavailable=%s cache_source=%s",
-            security_code,
-            code or "--",
-            len(cached.get("kline") or []) if isinstance(cached.get("kline"), list) else 0,
-            bool(cached.get("data_unavailable")),
-            str(cached.get("data_source") or cached.get("source") or "--")[:80],
-        )
-        return attach_watchlist_intraday(cached)
     market = str(normalized.get("market") or _infer_watchlist_market(code)).strip() or "CN"
     suffix = security_code.split(".", 1)[1] if "." in security_code else market
     if suffix == "HK":

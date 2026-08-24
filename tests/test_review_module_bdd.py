@@ -60,6 +60,14 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("function publishReviewDraft()", html)
         self.assertIn("function syncPublishedReviewStateToH5(tenantSlug, result)", html)
 
+    def test_given_h5_stock_search_when_no_candidate_then_raw_stock_name_is_not_submitted(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("未找到匹配股票，请从候选列表选择", html)
+        self.assertIn("/^(?:\\d{5,6})(?:\\.(?:SH|SZ|BJ|HK))?$/i.test(query)", html)
+
     def test_given_h5_dav_review_when_page_renders_then_new_review_flow_exists(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slug}")
 
@@ -2162,6 +2170,125 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertTrue(items)
         self.assertEqual(items[0]["code"], "003015")
         self.assertEqual(items[0]["name"], "日久光电")
+
+    def test_given_common_stock_name_when_searching_watchlist_then_local_candidate_resolves_without_remote(self):
+        with patch(
+            "src.domain.market_services._search_security_master_candidates",
+            return_value=[
+                {
+                    "code": "601939",
+                    "name": "建设银行",
+                    "market": "SH",
+                    "security_code": "601939.SH",
+                    "source": "security_master",
+                }
+            ],
+        ):
+            items = market_services.search_watchlist_candidates("建设银行", top=8, include_remote=False)
+
+        self.assertTrue(items)
+        self.assertEqual(items[0]["code"], "601939")
+        self.assertEqual(items[0]["name"], "建设银行")
+        self.assertEqual(items[0]["security_code"], "601939.SH")
+
+    def test_given_security_master_row_when_searching_watchlist_then_database_identity_is_used(self):
+        query = mock.Mock()
+        query.execute.return_value.fetchall.return_value = [
+            {
+                "stock_code": "601939",
+                "name": "建设银行",
+                "market": "SH",
+                "security_code": "601939.SH",
+                "industry": "银行",
+                "security_type": "stock",
+                "source": "security_master",
+            }
+        ]
+        with patch("src.domain.market_services.get_db", return_value=query):
+            items = market_services._search_security_master_candidates("建设银行")
+
+        self.assertEqual(items[0]["code"], "601939")
+        self.assertEqual(items[0]["security_code"], "601939.SH")
+        query.execute.assert_called_once()
+
+    def test_given_remote_search_available_when_searching_watchlist_then_gangtise_is_checked_before_master_catalog(self):
+        call_order = []
+
+        def remote_candidates(query, top=8):
+            call_order.append("gangtise")
+            return [{"code": "601939", "name": "建设银行", "market": "SH", "security_code": "601939.SH"}]
+
+        def master_candidates(query, top=8):
+            call_order.append("database")
+            return [{"code": "601939", "name": "建设银行", "market": "SH", "security_code": "601939.SH"}]
+
+        with patch("src.domain.market_services._search_remote_watchlist_candidates", side_effect=remote_candidates), patch(
+            "src.domain.market_services._search_security_master_candidates", side_effect=master_candidates
+        ):
+            items = market_services.search_watchlist_candidates("建设银行", top=8, include_remote=True)
+
+        self.assertEqual(items[0]["security_code"], "601939.SH")
+        self.assertEqual(call_order, ["gangtise"])
+
+    def test_given_direct_watchlist_detail_request_then_catalog_is_not_hydrated_before_gangtise_lookup(self):
+        with patch("src.web.api_core.gen_watchlist_details", side_effect=AssertionError("catalog_should_not_be_hydrated")), patch(
+            "src.web.api_core.get_watchlist_detail_by_code",
+            return_value={
+                "code": "601939",
+                "name": "建设银行",
+                "market": "SH",
+                "price": 7.0,
+                "change": 0.1,
+                "change_pct": 1.45,
+                "kline": [{"date": "2026-08-24", "close": 7.0}],
+                "authors": [],
+                "fundamental": {"summary": "", "metrics": [], "thesis": []},
+                "forecast": {},
+            },
+        ) as detail_lookup:
+            response = self.client.get("/api/watchlist/601939")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(detail_lookup.call_args.kwargs["details_map"], {})
+
+    def test_given_empty_shared_quote_cache_when_loading_detail_then_gangtise_fetch_is_retried(self):
+        candidate = {"code": "601939", "name": "建设银行", "market": "SH", "security_code": "601939.SH"}
+        with patch("src.domain.market_services._load_watchlist_cache", return_value={"data_unavailable": True, "kline": []}), patch(
+            "src.domain.market_services._fetch_watchlist_realtime_detail_from_candidate",
+            return_value={"code": "601939", "kline": [{"date": "2026-08-23"}, {"date": "2026-08-24"}]},
+        ) as fetch_mock:
+            payload = market_services._build_watchlist_realtime_detail_from_candidate(candidate)
+
+        self.assertEqual(payload["code"], "601939")
+        fetch_mock.assert_called_once_with(candidate, stock_name="")
+
+    def test_given_valid_shared_quote_cache_when_loading_detail_then_gangtise_is_not_called_again(self):
+        candidate = {"code": "601939", "name": "建设银行", "market": "SH", "security_code": "601939.SH"}
+        cached = {
+            "code": "601939",
+            "data_unavailable": False,
+            "kline": [{"date": "2026-08-23"}, {"date": "2026-08-24"}],
+        }
+        with patch("src.domain.market_services._load_watchlist_cache", return_value=cached), patch(
+            "src.domain.market_services.attach_watchlist_intraday", return_value=cached
+        ), patch("src.domain.market_services._fetch_watchlist_realtime_detail_from_candidate") as fetch_mock:
+            payload = market_services._build_watchlist_realtime_detail_from_candidate(candidate)
+
+        self.assertEqual(payload, cached)
+        fetch_mock.assert_not_called()
+
+    def test_given_stock_name_detail_request_when_local_alias_exists_then_security_code_is_resolved(self):
+        with patch(
+            "src.domain.market_services.fetch_gangtise_market_kline_series",
+            return_value={"ok": False, "points": [], "message": "test_no_market_data"},
+        ):
+            with app_entry.app.app_context():
+                payload = market_services.get_watchlist_detail_by_code(stock_code="601939", stock_name="建设银行")
+
+        self.assertEqual(payload["code"], "601939")
+        self.assertEqual(payload["name"], "建设银行")
+        self.assertTrue(payload["data_unavailable"])
+        self.assertEqual(payload["kline"], [])
 
     def test_given_watchlist_search_api_when_candidates_exist_then_dropdown_payload_returns(self):
         with patch(

@@ -11925,6 +11925,7 @@ let pendingWatchlistRemovalCode = '';
 // short-lived render cache for the current page session.
 let watchlistAnnotationStore = {};
 let watchlistSuggestionItems = [];
+let watchlistSuggestionMessage = '';
 let watchlistSuggestionRequestSeq = 0;
 let watchlistSuggestionTimer = null;
 const watchlistAnnotationSyncTasks = {};
@@ -12136,8 +12137,13 @@ function renderWatchlistSuggestionList() {
   const host = document.getElementById('watchlist-stock-suggestion-list');
   if (!host) return;
   if (!watchlistSuggestionItems.length) {
-    host.style.display = 'none';
-    host.innerHTML = '';
+    if (!watchlistSuggestionMessage) {
+      host.style.display = 'none';
+      host.innerHTML = '';
+      return;
+    }
+    host.style.display = 'block';
+    host.innerHTML = `<div style="padding:10px 12px;color:var(--gray-400);font-size:12px;line-height:1.6">${escapeHtml(watchlistSuggestionMessage)}</div>`;
     return;
   }
   host.style.display = 'block';
@@ -12160,6 +12166,13 @@ function renderWatchlistSuggestionList() {
 
 function clearWatchlistSuggestionList() {
   watchlistSuggestionItems = [];
+  watchlistSuggestionMessage = '';
+  renderWatchlistSuggestionList();
+}
+
+function showWatchlistSuggestionMessage(message) {
+  watchlistSuggestionItems = [];
+  watchlistSuggestionMessage = String(message || '').trim();
   renderWatchlistSuggestionList();
 }
 
@@ -12205,6 +12218,7 @@ function handleWatchlistStockCodeInput(value) {
     clearWatchlistSuggestionList();
     return;
   }
+  showWatchlistSuggestionMessage('正在检索股票...');
   const requestSeq = ++watchlistSuggestionRequestSeq;
   watchlistSuggestionTimer = setTimeout(async () => {
     try {
@@ -12213,10 +12227,11 @@ function handleWatchlistStockCodeInput(value) {
       if (requestSeq !== watchlistSuggestionRequestSeq) return;
       if (!resp.ok || data.ok === false) throw new Error((data && data.error) || 'watchlist_search_failed');
       watchlistSuggestionItems = Array.isArray(data.items) ? data.items : [];
+      watchlistSuggestionMessage = watchlistSuggestionItems.length ? '' : '未找到匹配股票，请输入股票代码或选择候选结果。';
       renderWatchlistSuggestionList();
     } catch (error) {
       if (requestSeq !== watchlistSuggestionRequestSeq) return;
-      clearWatchlistSuggestionList();
+      showWatchlistSuggestionMessage('股票检索暂时不可用，请稍后重试。');
     }
   }, 160);
 }
@@ -12237,7 +12252,7 @@ function findWatchlistCodeFromInput(value) {
       || name === query;
   });
   if (matchedCard) return normalizeStockLookupValue(matchedCard.dataset.stockCode || '');
-  return query;
+  return /^(?:\d{5,6})(?:\.(?:SH|SZ|BJ|HK))?$/i.test(query) ? query : '';
 }
 
 function submitWatchlistStockCode() {
@@ -12252,7 +12267,9 @@ function submitWatchlistStockCode() {
   }
   const stockCode = findWatchlistCodeFromInput(rawValue);
   if (!stockCode) {
-    showToast('请输入股票代码');
+    const query = String(rawValue || '').trim();
+    showToast(query ? '未找到匹配股票，请从候选列表选择' : '请输入股票代码或股票名称');
+    if (query) showWatchlistSuggestionMessage('未找到匹配股票，请输入股票代码或选择候选结果。');
     return;
   }
   if (input) input.value = stockCode;

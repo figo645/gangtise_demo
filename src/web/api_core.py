@@ -508,7 +508,10 @@ def api_watchlist_search():
 @app.route("/api/watchlist/<stock_code>")
 def api_watchlist_detail(stock_code):
     site_config = get_site_config()
-    details = gen_watchlist_details()
+    # A direct stock lookup must fetch the requested security from Gangtise
+    # immediately. Do not hydrate the entire demo catalog first; that can
+    # delay or mask the first real K-line response.
+    details = {}
     tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
     viewer_role = str(request.args.get("user_role") or "").strip().lower()
     viewer_profile_id = str(request.args.get("user_profile_id") or "").strip()

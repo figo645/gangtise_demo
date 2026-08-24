@@ -9,10 +9,12 @@ Postgres / pgvector DDL is split by purpose:
 - `012_review_voice_embeddings_pgvector.sql`: review voice pgvector column and vector index
 - `020_knowledge_embeddings.sql`: create knowledge embedding table and indexes
 - `021_knowledge_embeddings_pgvector.sql`: knowledge pgvector column
+- `034_security_master.sql`: canonical stock/security identity catalog used for name-to-code resolution
 - `101_seed_app_core.sql`: app core seed entrypoint
 - `100_seed_master_data.sql`: master data seed entrypoint
 - `102_seed_market_sector_catalog.sql`: canonical Shenwan level-one industry master data
 - `103_seed_market_index_catalog.sql`: Market Overview standard-index master data
+- `106_security_master_seed.sql`: initial stock/security identity catalog; Gangtise search results are upserted here as users search
 
 Notes:
 
