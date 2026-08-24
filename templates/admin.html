@@ -4843,7 +4843,7 @@
                     <div>
                       <div class="admin-settings-panel-kicker">Market Data</div>
                       <div class="admin-settings-panel-title">Gangtise OpenAPI 凭证</div>
-                      <div class="admin-settings-panel-desc">凭证以密文保存到当前 PostgreSQL 的 <code>app_settings</code>，不会写入公开站点配置、浏览器或日志。保存后新请求立即优先使用数据库凭证。</div>
+                      <div class="admin-settings-panel-desc">Access Key 和 Secret Key 以密文保存到当前 PostgreSQL 的 <code>app_settings</code>；Long Token 按运行要求明文保存到独立配置项。任何凭证都不会写入公开站点配置、浏览器或日志。</div>
                     </div>
                     <div class="admin-settings-panel-note">切换本地 / staging 数据库时，本页显示并保存对应数据库自己的凭证。</div>
                   </div>
@@ -4866,7 +4866,7 @@
                         <label>Long Token（可选）</label>
                         <input id="gangtise-credential-long-token" type="password" placeholder="可作为 Access Key / Secret Key 的备用认证" autocomplete="new-password">
                       </div>
-                      <div class="feature-note">已配置的密钥不会回显。留空即保持当前值不变；推荐使用 Access Key + Secret Key，由系统自动换取短期 Token。</div>
+                      <div class="feature-note">已配置的密钥不会回显。留空即保持当前值不变；推荐使用 Access Key + Secret Key，由系统自动换取短期 Token。Long Token 会明文保存到 PostgreSQL 的独立配置项，不会进入加密密钥记录。</div>
                     </div>
                     <div class="config-card">
                       <div class="config-card-title">运行状态与校验</div>
@@ -11790,8 +11790,8 @@ function renderGangtiseCredentialStatus() {
     statusEl.textContent = '正在读取当前数据库中的凭证状态...';
     return;
   }
-  const modeLabel = ({ access_key_secret: 'Access Key + Secret Key', long_token: 'Long Token', missing: '未配置' })[status.credential_mode] || '未配置';
-  const storageLabel = status.stored_in_postgres ? '已加密保存到当前 PostgreSQL' : '当前 PostgreSQL 未保存凭证';
+  const modeLabel = ({ access_key_secret: 'Access Key + Secret Key', long_token: 'Long Token', missing: '未配置', unreadable: '凭证无法解密', database_unavailable: '数据库不可用' })[status.credential_mode] || '未配置';
+  const storageLabel = status.token_storage === 'plaintext_postgres' ? 'Long Token 已明文保存到当前 PostgreSQL' : (status.stored_in_postgres ? 'Access Key / Secret Key 已加密保存到当前 PostgreSQL' : '当前 PostgreSQL 未保存凭证');
   statusEl.textContent = `${storageLabel}。认证方式：${modeLabel}。Access Key：${status.has_access_key ? '已配置' : '未配置'}；Secret Key：${status.has_secret_key ? '已配置' : '未配置'}；Long Token：${status.has_long_token ? '已配置' : '未配置'}。${status.updated_at ? `最后更新：${status.updated_at}。` : ''}`;
   const baseUrl = document.getElementById('gangtise-credential-base-url');
   if (baseUrl && !baseUrl.value) baseUrl.value = status.base_url || 'https://openapi.gangtise.com';

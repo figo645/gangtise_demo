@@ -19,17 +19,6 @@ if [ -f "$CREDENTIALS_FILE" ]; then
   set +a
 fi
 
-# Gangtise OpenAPI credentials are intentionally independent from database
-# credentials. The development-only gangtise_api_test/.env path is unavailable
-# on a server, so the daemon must receive these variables before app.py starts.
-GANGTISE_CREDENTIALS_FILE="${GANGTISE_OPENAPI_CREDENTIALS_FILE:-/root/gangtise_openapi_credentials}"
-if [ -f "$GANGTISE_CREDENTIALS_FILE" ]; then
-  set -a
-  # shellcheck disable=SC1090
-  . "$GANGTISE_CREDENTIALS_FILE"
-  set +a
-fi
-
 pid_matches_app() {
   local pid="$1"
   ps -p "$pid" -o command= 2>/dev/null | grep -F -- "$SCRIPT_DIR/app.py" >/dev/null 2>&1

@@ -805,7 +805,14 @@ def obtain_gangtise_openapi_token(force_refresh=False):
     secret_key = config.get("secret_key") or ""
     long_token = config.get("long_token") or ""
     if not (access_key and secret_key) and not long_token:
-        return False, "", {"message": "Gangtise OpenAPI credentials are not configured."}, 0, 0
+        status = get_gangtise_openapi_credentials_status()
+        reason = {
+            "missing": "no encrypted credential record exists in the current PostgreSQL database",
+            "unreadable": "the PostgreSQL credential record cannot be decrypted with the current application secret",
+            "database_unavailable": "the current PostgreSQL database is unavailable",
+            "malformed": "the PostgreSQL credential record is malformed",
+        }.get(str(status.get("encryption_status") or ""), "the credential record has no usable Access Key/Secret Key or Long Token")
+        return False, "", {"message": f"Gangtise OpenAPI credentials are not configured: {reason}."}, 0, 0
     now_value = time.time()
     with _gangtise_token_lock:
         cached_token = _gangtise_token_cache.get("token") or ""
@@ -1146,12 +1153,37 @@ def build_gangtise_market_runtime_diagnostic(probe_security_code="600519.SH"):
     has_secret_key = bool(config.get("secret_key"))
     has_long_token = bool(config.get("long_token"))
     if not (has_access_key and has_secret_key) and not has_long_token:
+        try:
+            credential_status = get_gangtise_openapi_credentials_status()
+        except RuntimeError:
+            # CLI/test callers may not have a Flask request context. The
+            # runtime connector still has the same observable outcome: no
+            # usable credentials were loaded.
+            credential_status = {
+                "database_status": "unknown",
+                "record_present": False,
+                "encryption_status": "unknown",
+                "updated_at": "",
+            }
+        status_message = {
+            "missing": "生产 PostgreSQL 中没有 Gangtise 凭证记录",
+            "unreadable": "生产 PostgreSQL 中有凭证记录，但当前应用 SECRET_KEY 无法解密；需要恢复生产密钥或在生产 Admin 重新保存凭证",
+            "database_unavailable": "生产应用当前无法读取 PostgreSQL",
+            "malformed": "生产 PostgreSQL 中的 Gangtise 凭证记录格式损坏",
+        }.get(str(credential_status.get("encryption_status") or ""), "生产应用没有可用的 Gangtise 凭证")
         return {
             "ok": False,
             "status": "credentials_missing",
-            "message": "未检测到 Gangtise OpenAPI 凭证。请在 Admin 的“市场数据 > Gangtise 数据连接”中保存 Access Key + Secret Key，或保存 Long Token。",
+            "message": f"{status_message}。请在生产 Admin 的“市场数据 > Gangtise 数据连接”中保存 Access Key + Secret Key，或保存 Long Token。",
             "base_url": config.get("base_url"),
-            "credential_mode": "missing",
+            "credential_mode": credential_status.get("credential_mode") or "missing",
+            "credential_storage": {
+                "database_status": credential_status.get("database_status"),
+                "record_present": credential_status.get("record_present"),
+                "encryption_status": credential_status.get("encryption_status"),
+                "token_storage": credential_status.get("token_storage"),
+                "updated_at": credential_status.get("updated_at"),
+            },
             "probe": {},
         }
     start_date, end_date = resolve_gangtise_market_date_window(days=14)

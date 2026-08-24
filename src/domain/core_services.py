@@ -3291,6 +3291,7 @@ H5_PROFILE_SETTINGS_PREFIX = "h5_profile_settings:"
 TENANT_FAN_OPS_SETTINGS_PREFIX = "tenant_fan_ops_settings:"
 AUTH_WECHAT_CREDENTIAL_SETTING_KEY = "auth_credentials:wechat:v1"
 GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY = "gangtise_openapi_credentials:v1"
+GANGTISE_OPENAPI_TOKEN_SETTING_KEY = "gangtise_openapi_token:v1"
 GANGTISE_OPENAPI_DEFAULT_BASE_URL = "https://openapi.gangtise.com"
 LLM_API_CREDENTIAL_SETTING_KEY = "llm_api_credentials:v1"
 _encrypted_setting_decryption_errors = set()
@@ -3337,6 +3338,43 @@ def _save_json_app_setting(setting_key, payload):
     )
     db.commit()
     return copy.deepcopy(payload)
+
+
+def _load_plain_app_setting(setting_key, default_value=""):
+    """Load a deliberately plaintext app setting without exposing it in APIs."""
+    fallback = default_value
+    try:
+        row = get_db().execute(
+            "SELECT setting_value FROM app_settings WHERE setting_key = ?",
+            (setting_key,),
+        ).fetchone()
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return fallback
+        raise
+    if not row:
+        return fallback
+    return str(row["setting_value"] or "").strip() or fallback
+
+
+def _save_plain_app_setting(setting_key, value):
+    """Persist a deliberately plaintext app setting in PostgreSQL."""
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO app_settings (setting_key, setting_value, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(setting_key) DO UPDATE SET
+            setting_value = excluded.setting_value,
+            updated_at = excluded.updated_at
+        """,
+        (
+            setting_key,
+            str(value or "").strip(),
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        ),
+    )
+    db.commit()
 
 
 def _gangtise_openapi_credential_fernet():
@@ -3397,9 +3435,61 @@ def _normalize_wechat_credentials(payload=None):
 
 def load_gangtise_openapi_credentials():
     """Load decrypted Gangtise credentials from PostgreSQL; never expose this payload to a response."""
-    return _normalize_gangtise_openapi_credentials(
-        _load_encrypted_app_setting(GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY, {})
-    )
+    encrypted_payload = _load_encrypted_app_setting(GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY, {})
+    payload = dict(encrypted_payload) if isinstance(encrypted_payload, dict) else {}
+    payload.pop("long_token", None)
+    # Long Token is intentionally stored as plaintext in its own PostgreSQL
+    # setting so it can be rotated independently of the encrypted key pair.
+    plaintext_token = _load_plain_app_setting(GANGTISE_OPENAPI_TOKEN_SETTING_KEY, "")
+    if plaintext_token:
+        payload["long_token"] = plaintext_token
+    return _normalize_gangtise_openapi_credentials(payload)
+
+
+def _get_encrypted_app_setting_metadata(setting_key):
+    """Read non-secret storage metadata for an encrypted app setting."""
+    try:
+        row = get_db().execute(
+            "SELECT setting_value, updated_at FROM app_settings WHERE setting_key = ?",
+            (setting_key,),
+        ).fetchone()
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return {"database_status": "unavailable", "record_present": False, "updated_at": ""}
+        raise
+    if not row:
+        return {"database_status": "available", "record_present": False, "updated_at": ""}
+    raw_value = str(row["setting_value"] or "").strip()
+    try:
+        envelope = json.loads(raw_value) if raw_value else {}
+    except (TypeError, ValueError, json.JSONDecodeError):
+        envelope = {}
+    return {
+        "database_status": "available",
+        "record_present": bool(isinstance(envelope, dict) and str(envelope.get("ciphertext") or "").strip()),
+        "record_malformed": bool(raw_value) and not bool(isinstance(envelope, dict) and str(envelope.get("ciphertext") or "").strip()),
+        "updated_at": str(row["updated_at"] or ""),
+    }
+
+
+def _get_plain_app_setting_metadata(setting_key):
+    """Read non-secret metadata for a plaintext app setting."""
+    try:
+        row = get_db().execute(
+            "SELECT setting_value, updated_at FROM app_settings WHERE setting_key = ?",
+            (setting_key,),
+        ).fetchone()
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return {"database_status": "unavailable", "record_present": False, "updated_at": ""}
+        raise
+    if not row:
+        return {"database_status": "available", "record_present": False, "updated_at": ""}
+    return {
+        "database_status": "available",
+        "record_present": bool(str(row["setting_value"] or "").strip()),
+        "updated_at": str(row["updated_at"] or ""),
+    }
 
 
 def get_gangtise_openapi_credentials_status():
@@ -3408,25 +3498,40 @@ def get_gangtise_openapi_credentials_status():
     has_access_key = bool(credentials.get("access_key"))
     has_secret_key = bool(credentials.get("secret_key"))
     has_long_token = bool(credentials.get("long_token"))
-    row = None
-    try:
-        row = get_db().execute(
-            "SELECT updated_at FROM app_settings WHERE setting_key = ?",
-            (GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY,),
-        ).fetchone()
-    except Exception as exc:
-        if not is_db_unavailable_error(exc):
-            raise
+    metadata = _get_encrypted_app_setting_metadata(GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY)
+    token_metadata = _get_plain_app_setting_metadata(GANGTISE_OPENAPI_TOKEN_SETTING_KEY)
     decryption_failed = GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY in _encrypted_setting_decryption_errors
+    if metadata.get("database_status") == "unavailable" or token_metadata.get("database_status") == "unavailable":
+        encryption_status = "database_unavailable"
+    elif token_metadata.get("record_present"):
+        encryption_status = "plaintext"
+    elif decryption_failed:
+        encryption_status = "unreadable"
+    elif metadata.get("record_malformed"):
+        encryption_status = "malformed"
+    elif not metadata.get("record_present"):
+        encryption_status = "missing"
+    else:
+        encryption_status = "readable"
+    if encryption_status == "database_unavailable":
+        credential_mode = "database_unavailable"
+    elif encryption_status == "unreadable":
+        credential_mode = "unreadable"
+    else:
+        credential_mode = "access_key_secret" if has_access_key and has_secret_key else ("long_token" if has_long_token else "missing")
     return {
-        "stored_in_postgres": bool(credentials),
+        "stored_in_postgres": bool(metadata.get("record_present") or token_metadata.get("record_present")),
+        "record_present": bool(metadata.get("record_present") or token_metadata.get("record_present")),
+        "database_status": metadata.get("database_status") or token_metadata.get("database_status") or "unknown",
         "base_url": str(credentials.get("base_url") or GANGTISE_OPENAPI_DEFAULT_BASE_URL),
         "has_access_key": has_access_key,
         "has_secret_key": has_secret_key,
         "has_long_token": has_long_token,
-        "encryption_status": "unreadable" if decryption_failed else "readable",
-        "credential_mode": "access_key_secret" if has_access_key and has_secret_key else ("long_token" if has_long_token else ("unreadable" if decryption_failed else "missing")),
-        "updated_at": str((row or {}).get("updated_at") or ""),
+        "encryption_status": encryption_status,
+        "credential_mode": credential_mode,
+        "token_storage": "plaintext_postgres" if token_metadata.get("record_present") else "not_configured",
+        "token_record_present": bool(token_metadata.get("record_present")),
+        "updated_at": metadata.get("updated_at") or "",
     }
 
 
@@ -3448,7 +3553,11 @@ def save_gangtise_openapi_credentials_patch(payload=None):
         raise ValueError("gangtise_access_key_and_secret_key_must_be_configured_together")
     if not has_pair and not merged["long_token"]:
         raise ValueError("gangtise_credentials_required")
-    _save_encrypted_app_setting(GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY, merged)
+    encrypted_payload = dict(merged)
+    plaintext_token = encrypted_payload.pop("long_token", "")
+    _save_encrypted_app_setting(GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY, encrypted_payload)
+    if plaintext_token:
+        _save_plain_app_setting(GANGTISE_OPENAPI_TOKEN_SETTING_KEY, plaintext_token)
     return get_gangtise_openapi_credentials_status()
 
 
