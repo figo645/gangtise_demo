@@ -23,6 +23,7 @@ REMOTE_DB_USER="${REMOTE_DB_USER:-postgres}"
 REMOTE_DB_PASSWORD="${REMOTE_DB_PASSWORD:-${REMOTE_POSTGRES_PASSWORD:-your_password}}"
 REMOTE_MAINTENANCE_DB="${REMOTE_MAINTENANCE_DB:-postgres}"
 CONNECT_TIMEOUT_SECONDS="${DATABASE_RELEASE_CONNECT_TIMEOUT_SECONDS:-8}"
+PROTECTED_APP_SETTING_KEYS="'gangtise_openapi_credentials:v1','gangtise_openapi_token:v1','llm_api_credentials:v1','auth_credentials:wechat:v1'"
 
 [[ "${1:-}" != "--help" && "${1:-}" != "-h" ]] || { echo "Usage: $0"; exit 0; }
 [[ "$TARGET" == staging || "$TARGET" == production ]] || { echo "Invalid target: $TARGET" >&2; exit 2; }
@@ -62,6 +63,18 @@ echo "==> [preflight] ${TARGET} pgvector extension is available"
 
 TEMP_DB="${REMOTE_DB_NAME}_pre_release_${STAMP}"
 BACKUP_DB="${REMOTE_DB_NAME}_backup_${STAMP}"
+CURRENT_TARGET_QUERY=(psql -w -h "$REMOTE_DB_HOST" -p "$REMOTE_DB_PORT" -U "$REMOTE_DB_USER" -d "$REMOTE_DB_NAME" -Atq)
+TEMP_TARGET_EXEC=(psql -w -h "$REMOTE_DB_HOST" -p "$REMOTE_DB_PORT" -U "$REMOTE_DB_USER" -d "$TEMP_DB" -v ON_ERROR_STOP=1)
+preserve_target_environment_credentials() {
+  local count
+  count="$("${CURRENT_TARGET_QUERY[@]}" "SELECT count(*) FROM app_settings WHERE setting_key IN (${PROTECTED_APP_SETTING_KEYS})")"
+  if [[ "${count:-0}" -eq 0 ]]; then
+    echo "==> No target environment credential records to preserve"
+    return
+  fi
+  echo "==> Preserving ${count} target environment credential record(s)"
+  "${CURRENT_TARGET_QUERY[@]}" "SELECT format('INSERT INTO app_settings (setting_key, setting_value, updated_at) VALUES (%L, %L, %L) ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = EXCLUDED.updated_at;', setting_key, setting_value, updated_at) FROM app_settings WHERE setting_key IN (${PROTECTED_APP_SETTING_KEYS}) ORDER BY setting_key" | "${TEMP_TARGET_EXEC[@]}"
+}
 echo "==> Restoring ${LOCAL_SIZE} bytes into temporary ${TARGET} database"
 echo "==> Creating temporary database: ${TEMP_DB}"
 "${ADMIN[@]}" -c "CREATE DATABASE \"${TEMP_DB}\" OWNER \"${REMOTE_DB_USER}\";"
@@ -72,6 +85,7 @@ trap cleanup_temp ERR
 trap cancel_release INT TERM
 PGPASSWORD="$REMOTE_DB_PASSWORD" pg_restore -w -h "$REMOTE_DB_HOST" -p "$REMOTE_DB_PORT" -U "$REMOTE_DB_USER" -d "$TEMP_DB" --format=custom --no-owner --no-acl --exit-on-error "$DUMP_FILE"
 echo "==> Restore completed: ${TEMP_DB}"
+preserve_target_environment_credentials
 echo "==> Applying schema updates to temporary database"
 PGHOST="$REMOTE_DB_HOST" PGPORT="$REMOTE_DB_PORT" PGDATABASE="$TEMP_DB" PGUSER="$REMOTE_DB_USER" PGPASSWORD="$REMOTE_DB_PASSWORD" "$ROOT_DIR/scripts/apply_postgres_updates.sh"
 echo "==> Schema updates completed"

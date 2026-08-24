@@ -3388,11 +3388,31 @@ def _gangtise_openapi_credential_fernet():
     return Fernet(derived_key)
 
 
+def _application_secret_fingerprint():
+    """Expose only a short non-secret identifier for credential diagnostics."""
+    secret_key = str(app.config.get("SECRET_KEY") or "").strip()
+    if not secret_key:
+        return ""
+    return hashlib.sha256(secret_key.encode("utf-8")).hexdigest()[:12]
+
+
 def _load_encrypted_app_setting(setting_key, default_value=None):
     fallback = copy.deepcopy(default_value)
     envelope = _load_json_app_setting(setting_key, {})
     ciphertext = str((envelope or {}).get("ciphertext") or "").strip()
     if not ciphertext:
+        return fallback
+    stored_fingerprint = str((envelope or {}).get("application_secret_fingerprint") or "").strip()
+    current_fingerprint = _application_secret_fingerprint()
+    if stored_fingerprint and current_fingerprint and stored_fingerprint != current_fingerprint:
+        if setting_key not in _encrypted_setting_decryption_errors:
+            app.logger.error(
+                "Encrypted application credential record uses a different application secret: %s stored=%s current=%s",
+                setting_key,
+                stored_fingerprint,
+                current_fingerprint,
+            )
+        _encrypted_setting_decryption_errors.add(setting_key)
         return fallback
     try:
         raw = _gangtise_openapi_credential_fernet().decrypt(ciphertext.encode("ascii"))
@@ -3414,7 +3434,14 @@ def _save_encrypted_app_setting(setting_key, payload):
     ciphertext = _gangtise_openapi_credential_fernet().encrypt(
         json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     ).decode("ascii")
-    _save_json_app_setting(setting_key, {"version": 1, "ciphertext": ciphertext})
+    _save_json_app_setting(
+        setting_key,
+        {
+            "version": 2,
+            "ciphertext": ciphertext,
+            "application_secret_fingerprint": _application_secret_fingerprint(),
+        },
+    )
     _encrypted_setting_decryption_errors.discard(setting_key)
 
 
@@ -3468,6 +3495,7 @@ def _get_encrypted_app_setting_metadata(setting_key):
         "database_status": "available",
         "record_present": bool(isinstance(envelope, dict) and str(envelope.get("ciphertext") or "").strip()),
         "record_malformed": bool(raw_value) and not bool(isinstance(envelope, dict) and str(envelope.get("ciphertext") or "").strip()),
+        "application_secret_fingerprint": str((envelope or {}).get("application_secret_fingerprint") or "").strip(),
         "updated_at": str(row["updated_at"] or ""),
     }
 
@@ -3531,6 +3559,8 @@ def get_gangtise_openapi_credentials_status():
         "credential_mode": credential_mode,
         "token_storage": "plaintext_postgres" if token_metadata.get("record_present") else "not_configured",
         "token_record_present": bool(token_metadata.get("record_present")),
+        "application_secret_fingerprint": _application_secret_fingerprint(),
+        "record_application_secret_fingerprint": metadata.get("application_secret_fingerprint") or "",
         "updated_at": metadata.get("updated_at") or "",
     }
 

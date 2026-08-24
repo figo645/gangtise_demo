@@ -53,6 +53,14 @@ RUNTIME_SETTING_PREFIXES = (
     "h5_profile_settings:",
     "fundamental_news_lake:",
 )
+# These settings are environment-owned secrets. A database release may not
+# copy encrypted values between local, staging, and production because each
+# runtime has its own application secret.
+PROTECTED_SETTING_KEYS = {
+    "gangtise_openapi_credentials:v1",
+    "gangtise_openapi_token:v1",
+    "llm_api_credentials:v1",
+}
 RUNTIME_DATA_TABLES = {
     "access_logs",
     "admin_task_runs",
@@ -184,7 +192,10 @@ def _stable_master_rows(connection, table_name):
         rows = {}
         for key, payload_text in cursor.fetchall():
             normalized_key = str(key or "")
-            if table_name == "app_settings" and normalized_key.startswith(RUNTIME_SETTING_PREFIXES):
+            if table_name == "app_settings" and (
+                normalized_key in PROTECTED_SETTING_KEYS
+                or normalized_key.startswith(RUNTIME_SETTING_PREFIXES)
+            ):
                 continue
             rows[normalized_key] = hashlib.sha256(str(payload_text).encode("utf-8")).hexdigest()
     return rows
@@ -400,6 +411,15 @@ def _data_incremental_sql(local_connection, target_connection, table_names):
             continue
         local_rows = _data_rows(local_connection, table_name, columns, key_columns, include_values=True)
         target_rows = _data_rows(target_connection, table_name, columns, key_columns, include_values=False)
+        if table_name == "app_settings":
+            local_rows = {
+                key: row for key, row in local_rows.items()
+                if json.loads(key)[0] not in PROTECTED_SETTING_KEYS
+            }
+            target_rows = {
+                key: row for key, row in target_rows.items()
+                if json.loads(key)[0] not in PROTECTED_SETTING_KEYS
+            }
         if len(local_rows) > MAX_GENERATED_ROWS_PER_TABLE:
             blockers.append({"table": table_name, "reason": "row_limit_exceeded", "limit": MAX_GENERATED_ROWS_PER_TABLE})
             continue

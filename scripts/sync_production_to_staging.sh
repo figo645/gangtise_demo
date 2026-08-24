@@ -22,6 +22,7 @@ TARGET_USER="${REMOTE_DB_USER:-postgres}"
 TARGET_PASSWORD="${REMOTE_DB_PASSWORD:-}"
 TARGET_MAINTENANCE_DB="${REMOTE_MAINTENANCE_DB:-postgres}"
 CONNECT_TIMEOUT_SECONDS="${DATABASE_RELEASE_CONNECT_TIMEOUT_SECONDS:-8}"
+PROTECTED_APP_SETTING_KEYS="'gangtise_openapi_credentials:v1','gangtise_openapi_token:v1','llm_api_credentials:v1','auth_credentials:wechat:v1'"
 
 [[ "${CONFIRM_PRODUCTION_TO_STAGING_SYNC:-}" == "YES" ]] || { echo "Production-to-Staging confirmation is required." >&2; exit 2; }
 [[ -n "$SOURCE_HOST" && -n "$TARGET_HOST" ]] || { echo "Production and Staging database hosts must be configured." >&2; exit 2; }
@@ -65,6 +66,18 @@ echo "==> [preflight] Staging replacement privileges verified"
 
 TEMP_DB="${TARGET_DB}_pre_production_sync_${STAMP}"
 BACKUP_DB="${TARGET_DB}_backup_from_production_${STAMP}"
+CURRENT_TARGET_QUERY=(psql -w -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" -d "$TARGET_DB" -Atq)
+TEMP_TARGET_EXEC=(psql -w -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" -d "$TEMP_DB" -v ON_ERROR_STOP=1)
+preserve_target_environment_credentials() {
+  local count
+  count="$("${CURRENT_TARGET_QUERY[@]}" "SELECT count(*) FROM app_settings WHERE setting_key IN (${PROTECTED_APP_SETTING_KEYS})")"
+  if [[ "${count:-0}" -eq 0 ]]; then
+    echo "==> No Staging environment credential records to preserve"
+    return
+  fi
+  echo "==> Preserving ${count} Staging environment credential record(s)"
+  "${CURRENT_TARGET_QUERY[@]}" "SELECT format('INSERT INTO app_settings (setting_key, setting_value, updated_at) VALUES (%L, %L, %L) ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = EXCLUDED.updated_at;', setting_key, setting_value, updated_at) FROM app_settings WHERE setting_key IN (${PROTECTED_APP_SETTING_KEYS}) ORDER BY setting_key" | "${TEMP_TARGET_EXEC[@]}"
+}
 cleanup_temp() {
   "${ADMIN[@]}" -c "DROP DATABASE IF EXISTS \"${TEMP_DB}\" WITH (FORCE);" >/dev/null 2>&1 || true
   rm -f "$DUMP_FILE"
@@ -83,6 +96,7 @@ echo "==> Creating temporary database: ${TEMP_DB}"
 echo "==> Temporary database created: ${TEMP_DB}"
 PGPASSWORD="$TARGET_PASSWORD" pg_restore -w -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" -d "$TEMP_DB" --format=custom --no-owner --no-acl --exit-on-error "$DUMP_FILE"
 echo "==> Restore completed: ${TEMP_DB}"
+preserve_target_environment_credentials
 
 echo "==> Validating Production and Staging temporary database equivalence"
 TARGET_QUERY=(psql -w -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" -d "$TEMP_DB" -Atqc)

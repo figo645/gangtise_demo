@@ -37,6 +37,7 @@ class GangtiseCredentialsTest(unittest.TestCase):
         encoded = json.dumps(persisted["value"], ensure_ascii=False)
         self.assertNotIn("access-key-value", encoded)
         self.assertNotIn("secret-key-value", encoded)
+        self.assertEqual(persisted["value"]["application_secret_fingerprint"], core_services._application_secret_fingerprint())
         decrypted = core_services._gangtise_openapi_credential_fernet().decrypt(
             persisted["value"]["ciphertext"].encode("ascii")
         )
@@ -143,6 +144,21 @@ class GangtiseCredentialsTest(unittest.TestCase):
 
         self.assertEqual(result["credential_mode"], "access_key_secret")
         self.assertEqual(persisted["key"], core_services.GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY)
+
+    def test_given_credential_envelope_from_another_application_secret_when_loaded_then_it_is_marked_unreadable(self):
+        encrypted = core_services._gangtise_openapi_credential_fernet().encrypt(b'{"access_key":"test"}').decode("ascii")
+        core_services._encrypted_setting_decryption_errors.discard(core_services.GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY)
+        try:
+            with patch.object(
+                core_services,
+                "_load_json_app_setting",
+                return_value={"ciphertext": encrypted, "application_secret_fingerprint": "different-key"},
+            ):
+                value = core_services._load_encrypted_app_setting(core_services.GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY, {})
+        finally:
+            core_services._encrypted_setting_decryption_errors.discard(core_services.GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY)
+
+        self.assertEqual(value, {})
 
 
 if __name__ == "__main__":

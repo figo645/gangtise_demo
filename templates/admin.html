@@ -11792,7 +11792,12 @@ function renderGangtiseCredentialStatus() {
   }
   const modeLabel = ({ access_key_secret: 'Access Key + Secret Key', long_token: 'Long Token', missing: '未配置', unreadable: '凭证无法解密', database_unavailable: '数据库不可用' })[status.credential_mode] || '未配置';
   const storageLabel = status.token_storage === 'plaintext_postgres' ? 'Long Token 已明文保存到当前 PostgreSQL' : (status.stored_in_postgres ? 'Access Key / Secret Key 已加密保存到当前 PostgreSQL' : '当前 PostgreSQL 未保存凭证');
-  statusEl.textContent = `${storageLabel}。认证方式：${modeLabel}。Access Key：${status.has_access_key ? '已配置' : '未配置'}；Secret Key：${status.has_secret_key ? '已配置' : '未配置'}；Long Token：${status.has_long_token ? '已配置' : '未配置'}。${status.updated_at ? `最后更新：${status.updated_at}。` : ''}`;
+  const secretMismatch = status.encryption_status === 'unreadable'
+    && status.record_application_secret_fingerprint
+    && status.application_secret_fingerprint
+    && status.record_application_secret_fingerprint !== status.application_secret_fingerprint;
+  const mismatchNote = secretMismatch ? '当前运行密钥与凭证保存时不一致；请在当前环境重新保存凭证。' : '';
+  statusEl.textContent = `${storageLabel}。认证方式：${modeLabel}。Access Key：${status.has_access_key ? '已配置' : '未配置'}；Secret Key：${status.has_secret_key ? '已配置' : '未配置'}；Long Token：${status.has_long_token ? '已配置' : '未配置'}。${mismatchNote}${status.updated_at ? `最后更新：${status.updated_at}。` : ''}`;
   const baseUrl = document.getElementById('gangtise-credential-base-url');
   if (baseUrl && !baseUrl.value) baseUrl.value = status.base_url || 'https://openapi.gangtise.com';
   [['gangtise-credential-access-key', status.has_access_key], ['gangtise-credential-secret-key', status.has_secret_key], ['gangtise-credential-long-token', status.has_long_token]].forEach(([id, configured]) => {
