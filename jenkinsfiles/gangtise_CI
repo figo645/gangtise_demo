@@ -97,6 +97,15 @@ pipeline {
                 sh """
                     echo "同步代码到部署目录: ${DEPLOY_DIR}"
 
+                    if [ ! -s "${WORK_DIR}/.gangtise_openapi_credentials" ]; then
+                        echo "错误：${WORK_DIR}/.gangtise_openapi_credentials 不存在或为空，停止部署以避免行情服务无凭证启动。"
+                        exit 1
+                    fi
+                    if [ ! -s "${WORK_DIR}/.gangtise_session_secret" ]; then
+                        echo "错误：${WORK_DIR}/.gangtise_session_secret 不存在或为空，停止部署以避免会话密钥变化。"
+                        exit 1
+                    fi
+
                     rsync -av --delete \\
                         --exclude '.git' \\
                         --exclude 'venv' \\
@@ -104,9 +113,6 @@ pipeline {
                         --exclude '*.pyc' \\
                         --exclude '.pytest_cache' \\
                         --exclude '.last_successful_commit' \\
-                        --exclude '.gangtise_session_secret' \\
-                        --exclude '.gangtise_openapi_credentials' \\
-                        --exclude '.gangtise_postgres_credentials' \\
                         --exclude '.gangtise_openapi.env' \\
                         --exclude '.database_release.env' \\
                         ${WORK_DIR}/ ${DEPLOY_DIR}/

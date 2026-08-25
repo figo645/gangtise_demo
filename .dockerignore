@@ -22,6 +22,3 @@ tests/reports
 tmp
 *.sqlite
 *.db-journal
-.gangtise_session_secret
-.gangtise_openapi_credentials
-.gangtise_postgres_credentials

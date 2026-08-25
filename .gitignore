@@ -1,10 +1,7 @@
-.gangtise_session_secret
 .app.foreground.pid
 .app.daemon.pid
 app.daemon.log
 .deploy/
 .database_release.env
 .gangtise_openapi.env
-.gangtise_openapi_credentials
-.gangtise_postgres_credentials
 tools/__pycache__/
