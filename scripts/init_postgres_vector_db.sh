@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SQL_DIR="${ROOT_DIR}/sql/postgres"
 
-CREDENTIALS_FILE="${POSTGRES_CREDENTIALS_FILE:-/root/gangtise_postgres_credentials}"
+CREDENTIALS_FILE="${POSTGRES_CREDENTIALS_FILE:-${ROOT_DIR}/.gangtise_postgres_credentials}"
 if [ -f "$CREDENTIALS_FILE" ]; then
   set -a
   # shellcheck disable=SC1090
@@ -12,7 +12,7 @@ if [ -f "$CREDENTIALS_FILE" ]; then
   set +a
 fi
 
-PGHOST="${PGHOST:-${APP_DB_HOST:-${VECTOR_DB_HOST:-${IP:-129.211.65.53}}}}"
+PGHOST="${PGHOST:-${APP_DB_HOST:-${VECTOR_DB_HOST:-${IP:-127.0.0.1}}}}"
 PGPORT="${PGPORT:-${APP_DB_PORT:-${VECTOR_DB_PORT:-5432}}}"
 PGDATABASE="${PGDATABASE:-postgres}"
 TARGET_DB="${TARGET_DB:-${APP_DB_NAME:-${POSTGRES_DB:-sprint_dashboard}}}"

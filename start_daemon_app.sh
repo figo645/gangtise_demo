@@ -11,7 +11,7 @@ AUTO_START_POSTGRES="${AUTO_START_POSTGRES:-1}"
 
 cd "$SCRIPT_DIR"
 
-CREDENTIALS_FILE="${POSTGRES_CREDENTIALS_FILE:-/root/gangtise_postgres_credentials}"
+CREDENTIALS_FILE="${POSTGRES_CREDENTIALS_FILE:-$SCRIPT_DIR/.gangtise_postgres_credentials}"
 if [ -f "$CREDENTIALS_FILE" ]; then
   set -a
   # shellcheck disable=SC1090

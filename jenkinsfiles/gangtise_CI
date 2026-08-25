@@ -103,12 +103,15 @@ pipeline {
                     rsync -av --delete \\
                         --exclude '.git' \\
                         --exclude 'venv' \\
-                        --exclude '__pycache__' \\
+                        --exclude '**pycache**' \\
                         --exclude '*.pyc' \\
                         --exclude '.pytest_cache' \\
                         --exclude '.last_successful_commit' \\
                         --exclude '.gangtise_session_secret' \\
                         --exclude '.gangtise_openapi_credentials' \\
+                        --exclude '.gangtise_postgres_credentials' \\
+                        --exclude '.gangtise_openapi.env' \\
+                        --exclude '.database_release.env' \\
                         ${WORK_DIR}/ ${DEPLOY_DIR}/
 
                     # 记录本次成功的 commit（放到部署目录，避免被清理）

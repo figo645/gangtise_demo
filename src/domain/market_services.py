@@ -541,7 +541,6 @@ _gangtise_token_lock = threading.Lock()
 _gangtise_token_cache = {"token": "", "fetched_at": 0.0}
 _intraday_fetch_locks = {}
 _intraday_fetch_locks_guard = threading.Lock()
-GANGTISE_API_TEST_ENV_PATH = Path("/Users/xuchenfei/PycharmProjects/gangtise_api_test/.env")
 _watchlist_detail_fetch_locks = {}
 _watchlist_detail_fetch_locks_guard = threading.Lock()
 
@@ -761,7 +760,12 @@ def _ensure_gangtise_env_loaded():
     global _gangtise_env_loaded
     if _gangtise_env_loaded:
         return
-    for env_path in (PROJECT_ROOT / ".env", GANGTISE_API_TEST_ENV_PATH):
+    # Keep the application-owned credential file canonical. The path is
+    # overrideable for container deployments, but never points at another
+    # project by default.
+    configured_path = str(os.environ.get("GANGTISE_OPENAPI_CREDENTIALS_FILE") or "").strip()
+    env_path = Path(configured_path) if configured_path else PROJECT_ROOT / ".gangtise_openapi_credentials"
+    for env_path in (env_path,):
         try:
             _load_gangtise_env_file(env_path)
         except Exception:

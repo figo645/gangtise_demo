@@ -9,7 +9,7 @@ from psycopg2.extras import execute_values
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 SQLITE_DB_PATH = Path(os.environ.get("GANGTISE_DEMO_DB", ROOT_DIR / "gangtise_demo.db"))
-PG_HOST = os.environ.get("APP_DB_HOST") or os.environ.get("VECTOR_DB_HOST") or os.environ.get("IP") or "129.211.65.53"
+PG_HOST = os.environ.get("APP_DB_HOST") or os.environ.get("VECTOR_DB_HOST") or os.environ.get("IP") or "127.0.0.1"
 PG_PORT = int(os.environ.get("APP_DB_PORT") or os.environ.get("VECTOR_DB_PORT") or "5432")
 PG_DB = os.environ.get("APP_DB_NAME") or os.environ.get("POSTGRES_DB") or "sprint_dashboard"
 PG_USER = os.environ.get("APP_DB_USER") or os.environ.get("POSTGRES_USER") or "postgres"

@@ -3,6 +3,24 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+CREDENTIALS_FILE="${POSTGRES_CREDENTIALS_FILE:-$SCRIPT_DIR/.gangtise_postgres_credentials}"
+if [ -f "$CREDENTIALS_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$CREDENTIALS_FILE"
+  set +a
+fi
+
+GANGTISE_CREDENTIALS_FILE="${GANGTISE_OPENAPI_CREDENTIALS_FILE:-$SCRIPT_DIR/.gangtise_openapi_credentials}"
+if [ -f "$GANGTISE_CREDENTIALS_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$GANGTISE_CREDENTIALS_FILE"
+  set +a
+fi
+
 PID_FILE="$SCRIPT_DIR/.app.foreground.pid"
 APP_PORT="${PORT:-5001}"
 PYTHON_BIN="${PYTHON_BIN:-}"

@@ -60,8 +60,31 @@ except Exception:
     openpyxl = None
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _load_project_credentials_file(path):
+    """Load deployment credentials from a file owned by this project."""
+    credential_path = Path(path)
+    if not credential_path.is_file():
+        return
+    try:
+        for raw_line in credential_path.read_text(encoding="utf-8").splitlines():
+            line = str(raw_line or "").strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+    except Exception:
+        # Startup remains usable when a deployment intentionally supplies all
+        # settings through its process environment.
+        pass
+
+
+_load_project_credentials_file(PROJECT_ROOT / ".gangtise_postgres_credentials")
+# Authentication material belongs to this checkout by default. An explicit
+# deployment override remains available for read-only/container deployments.
 PERSISTENT_APP_SECRET_PATH = Path(
-    os.environ.get("GANGTISE_APP_SECRET_FILE") or "/root/.gangtise_demo_secret"
+    os.environ.get("GANGTISE_APP_SECRET_FILE") or PROJECT_ROOT / ".gangtise_session_secret"
 )
 
 
@@ -70,9 +93,6 @@ def _resolve_session_secret_key():
     if configured:
         return configured
 
-    # Production deployments used to retain this key in the checkout. Jenkins
-    # rsync --delete can remove it, invalidating encrypted PostgreSQL settings.
-    # Prefer a root-owned location outside the deployment directory instead.
     try:
         if PERSISTENT_APP_SECRET_PATH.exists():
             existing = PERSISTENT_APP_SECRET_PATH.read_text(encoding="utf-8").strip()
@@ -81,22 +101,18 @@ def _resolve_session_secret_key():
     except Exception:
         pass
 
-    # Preserve an existing checkout key once by promoting it to the persistent
-    # location. This keeps already encrypted PostgreSQL credentials readable.
     secret_path = PROJECT_ROOT / ".gangtise_session_secret"
+    if PERSISTENT_APP_SECRET_PATH != secret_path and secret_path.exists():
+        try:
+            existing = secret_path.read_text(encoding="utf-8").strip()
+            if len(existing) >= 32:
+                return existing
+        except Exception:
+            pass
     try:
         if secret_path.exists():
             existing = secret_path.read_text(encoding="utf-8").strip()
             if len(existing) >= 32:
-                try:
-                    PERSISTENT_APP_SECRET_PATH.parent.mkdir(parents=True, exist_ok=True)
-                    descriptor = os.open(str(PERSISTENT_APP_SECRET_PATH), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-                    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-                        handle.write(existing)
-                except FileExistsError:
-                    pass
-                except Exception:
-                    pass
                 return existing
         generated = secrets.token_urlsafe(48)
         try:
@@ -140,7 +156,9 @@ app.config.update(
 )
 
 H5_USER_SESSION_KEY = "current_h5_username"
-VECTOR_DB_HOST = os.environ.get("VECTOR_DB_HOST") or os.environ.get("IP") or "129.211.65.53"
+# Local development defaults to the local PostgreSQL/pgvector instance.
+# Staging and production must provide their database host explicitly.
+VECTOR_DB_HOST = os.environ.get("VECTOR_DB_HOST") or os.environ.get("IP") or "127.0.0.1"
 VECTOR_DB_PORT = int(os.environ.get("VECTOR_DB_PORT", "5432"))
 VECTOR_DB_NAME = os.environ.get("POSTGRES_DB", "sprint_dashboard")
 VECTOR_DB_USER = os.environ.get("POSTGRES_USER", "postgres")

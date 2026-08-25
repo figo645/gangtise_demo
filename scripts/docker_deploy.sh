@@ -8,7 +8,7 @@ IMAGE_NAME="${DOCKER_IMAGE_NAME:-gangtise-demo:latest}"
 CONTAINER_NAME="${DOCKER_CONTAINER_NAME:-gangtise-demo-web}"
 HOST_PORT="${HOST_PORT:-5001}"
 CONTAINER_PORT="${CONTAINER_PORT:-5001}"
-CREDENTIALS_FILE="${POSTGRES_CREDENTIALS_FILE:-/root/gangtise_postgres_credentials}"
+CREDENTIALS_FILE="${POSTGRES_CREDENTIALS_FILE:-${ROOT_DIR}/.gangtise_postgres_credentials}"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "docker command not found. Install Docker first." >&2
@@ -89,8 +89,16 @@ RUN_ARGS=(
   -e "POSTGRES_DB=${POSTGRES_DB}"
   -e "POSTGRES_USER=${POSTGRES_USER}"
   -e "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
-  "$IMAGE_NAME"
 )
+
+# Keep host-owned authentication files out of the image while making the
+# application-owned files available at the same project-root paths in /app.
+for auth_file in .gangtise_session_secret .gangtise_openapi_credentials .gangtise_postgres_credentials; do
+  if [ -f "$ROOT_DIR/$auth_file" ]; then
+    RUN_ARGS+=( -v "$ROOT_DIR/$auth_file:/app/$auth_file:ro" )
+  fi
+done
+RUN_ARGS+=( "$IMAGE_NAME" )
 
 container_id="$(docker run "${RUN_ARGS[@]}")"
 

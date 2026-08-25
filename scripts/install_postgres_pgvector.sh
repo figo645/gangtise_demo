@@ -5,9 +5,10 @@ set -euo pipefail
 # Ubuntu/Debian installer for the application's local PostgreSQL and pgvector.
 PG_MAJOR="${PG_MAJOR:-16}"
 PGVECTOR_VERSION="${PGVECTOR_VERSION:-0.8.5}"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DB_NAME="${APP_DB_NAME:-sprint_dashboard}"
 DB_USER="${APP_DB_USER:-gangtise_app}"
-CREDENTIALS_FILE="${POSTGRES_CREDENTIALS_FILE:-/root/gangtise_postgres_credentials}"
+CREDENTIALS_FILE="${POSTGRES_CREDENTIALS_FILE:-${ROOT_DIR}/.gangtise_postgres_credentials}"
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "Run this installer as root: sudo $0" >&2

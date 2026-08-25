@@ -29,7 +29,7 @@ from src.domain.core_services import get_db
 from src.services import get_tenant_configs
 
 
-DEFAULT_ENV_PATH = PROJECT_ROOT.parent / "gangtise_api_test" / ".env"
+DEFAULT_ENV_PATH = PROJECT_ROOT / ".gangtise_openapi_credentials"
 REPORT_DIR = PROJECT_ROOT / "tests" / "reports"
 REPORT_HTML_PATH = REPORT_DIR / "indicator_sync_bdd_report.html"
 REPORT_JSON_PATH = REPORT_DIR / "indicator_sync_bdd_report.json"

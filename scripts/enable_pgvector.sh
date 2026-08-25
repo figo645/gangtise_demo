@@ -2,7 +2,8 @@
 
 set -euo pipefail
 
-CREDENTIALS_FILE="${POSTGRES_CREDENTIALS_FILE:-/root/gangtise_postgres_credentials}"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CREDENTIALS_FILE="${POSTGRES_CREDENTIALS_FILE:-${ROOT_DIR}/.gangtise_postgres_credentials}"
 if [ -f "$CREDENTIALS_FILE" ]; then
   set -a
   # shellcheck disable=SC1090

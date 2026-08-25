@@ -10,7 +10,7 @@ STAMP="$(date +%Y%m%d_%H%M%S)"
 WORK_DIR="${DEPLOY_WORK_DIR:-${ROOT_DIR}/.deploy}"
 DUMP_FILE="${WORK_DIR}/sprint_dashboard_${STAMP}.dump"
 
-LOCAL_CREDENTIALS_FILE="${LOCAL_POSTGRES_CREDENTIALS_FILE:-${HOME}/.gangtise_postgres_credentials}"
+LOCAL_CREDENTIALS_FILE="${LOCAL_POSTGRES_CREDENTIALS_FILE:-${ROOT_DIR}/.gangtise_postgres_credentials}"
 if [[ -f "$LOCAL_CREDENTIALS_FILE" ]]; then
   set -a
   # shellcheck disable=SC1090
@@ -31,7 +31,7 @@ PROD_DB_USER="${PROD_DB_USER:-gangtise_app}"
 PROD_DB_HOST="${PROD_DB_HOST:-127.0.0.1}"
 PROD_DB_PORT="${PROD_DB_PORT:-5432}"
 PROD_BRANCH="${PROD_BRANCH:-$(git -C "$ROOT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || true)}"
-PROD_CREDENTIALS_FILE="${PROD_CREDENTIALS_FILE:-/root/gangtise_postgres_credentials}"
+PROD_CREDENTIALS_FILE="${PROD_CREDENTIALS_FILE:-${PROD_APP_DIR}/.gangtise_postgres_credentials}"
 
 usage() {
   cat <<'EOF'
@@ -47,7 +47,7 @@ Before running:
 
 Useful overrides:
   LOCAL_PGHOST LOCAL_PGPORT LOCAL_PGDATABASE LOCAL_PGUSER LOCAL_PGPASSWORD
-  LOCAL_POSTGRES_CREDENTIALS_FILE  defaults to ~/.gangtise_postgres_credentials
+  LOCAL_POSTGRES_CREDENTIALS_FILE  defaults to .gangtise_postgres_credentials in this project
   PROD_APP_DIR PROD_DB_NAME PROD_DB_USER PROD_DB_HOST PROD_DB_PORT PROD_BRANCH
   PROD_CREDENTIALS_FILE=...       remote credentials file
   CONFIRM_PRODUCTION_SYNC=YES     skip the interactive confirmation
