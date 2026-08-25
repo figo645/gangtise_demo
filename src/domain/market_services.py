@@ -536,10 +536,12 @@ def gen_macro_indicators():
 
 GANGTISE_OPENAPI_SUCCESS_CODE = "000000"
 GANGTISE_OPENAPI_LOGIN_PATH = "/application/auth/oauth/open/loginV2"
+_gangtise_env_loaded = False
 _gangtise_token_lock = threading.Lock()
 _gangtise_token_cache = {"token": "", "fetched_at": 0.0}
 _intraday_fetch_locks = {}
 _intraday_fetch_locks_guard = threading.Lock()
+GANGTISE_API_TEST_ENV_PATH = Path("/Users/xuchenfei/PycharmProjects/gangtise_api_test/.env")
 _watchlist_detail_fetch_locks = {}
 _watchlist_detail_fetch_locks_guard = threading.Lock()
 
@@ -742,7 +744,46 @@ GANGTISE_INDICATOR_REGISTRY = {
 }
 
 
+def _load_gangtise_env_file(env_path):
+    path = Path(env_path)
+    if not path.is_file():
+        return False
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = str(raw_line or "").strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+    return True
+
+
+def _ensure_gangtise_env_loaded():
+    global _gangtise_env_loaded
+    if _gangtise_env_loaded:
+        return
+    for env_path in (PROJECT_ROOT / ".env", GANGTISE_API_TEST_ENV_PATH):
+        try:
+            _load_gangtise_env_file(env_path)
+        except Exception:
+            app.logger.exception("Failed to load Gangtise OpenAPI environment file: %s", env_path)
+    _gangtise_env_loaded = True
+
+
 def get_gangtise_openapi_config():
+    """Use the proven runtime credentials first, then PostgreSQL as migration fallback."""
+    _ensure_gangtise_env_loaded()
+    environment_credentials = {
+        "base_url": str(os.environ.get("GANGTISE_API_BASE_URL") or "").strip().rstrip("/"),
+        "access_key": str(os.environ.get("GANGTISE_ACCESS_KEY") or "").strip(),
+        "secret_key": str(os.environ.get("GANGTISE_SECRET_KEY") or "").strip(),
+        "long_token": str(os.environ.get("GANGTISE_LONG_TOKEN") or "").strip(),
+    }
+    if (
+        (environment_credentials["access_key"] and environment_credentials["secret_key"])
+        or environment_credentials["long_token"]
+    ):
+        environment_credentials["base_url"] = environment_credentials["base_url"] or GANGTISE_OPENAPI_DEFAULT_BASE_URL
+        return environment_credentials
     database_credentials = load_gangtise_openapi_credentials()
     if database_credentials and (
         (database_credentials.get("access_key") and database_credentials.get("secret_key"))
@@ -750,7 +791,7 @@ def get_gangtise_openapi_config():
     ):
         return database_credentials
     return {
-        "base_url": GANGTISE_OPENAPI_DEFAULT_BASE_URL,
+        "base_url": environment_credentials["base_url"] or GANGTISE_OPENAPI_DEFAULT_BASE_URL,
         "access_key": "",
         "secret_key": "",
         "long_token": "",

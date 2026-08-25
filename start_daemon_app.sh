@@ -19,6 +19,18 @@ if [ -f "$CREDENTIALS_FILE" ]; then
   set +a
 fi
 
+# Transitional compatibility path: keep the previously working production
+# Gangtise credential file beside the deployed application while credentials
+# are migrated to PostgreSQL through the Admin console. The path remains
+# overrideable for existing deployments.
+GANGTISE_CREDENTIALS_FILE="${GANGTISE_OPENAPI_CREDENTIALS_FILE:-$SCRIPT_DIR/.gangtise_openapi_credentials}"
+if [ -f "$GANGTISE_CREDENTIALS_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$GANGTISE_CREDENTIALS_FILE"
+  set +a
+fi
+
 pid_matches_app() {
   local pid="$1"
   ps -p "$pid" -o command= 2>/dev/null | grep -F -- "$SCRIPT_DIR/app.py" >/dev/null 2>&1
