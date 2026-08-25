@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc" shape-rendering="crispEdges">
+  <title id="title">像素红色金元宝</title>
+  <desc id="desc">红色像素风金元宝图标</desc>
+  <path fill="#8E1F2D" d="M13 18h8v-5h22v5h8v6h5v19h-5v7H13v-7H8V24h5z"/>
+  <path fill="#C92F3F" d="M17 19h8v-5h14v5h8v5h8v14H9V24h8z"/>
+  <path fill="#F04A4A" d="M18 23h7v-5h14v5h7v5h8v8H10v-8h8z"/>
+  <path fill="#FFD45A" d="M18 27h28v4H18zM14 35h36v5H14zM21 40h22v5H21z"/>
+  <path fill="#FFF0A8" d="M25 27h14v3H25zM21 35h22v3H21z"/>
+  <path fill="#9B202D" d="M8 24h7v14H8zM49 24h7v14h-7zM13 45h38v5H13z"/>
+  <path fill="#6D1725" d="M17 50h30v4H17z"/>
+  <path fill="#FFD45A" d="M29 31h6v4h-6z"/>
+</svg>

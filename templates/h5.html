@@ -2,10 +2,11 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ brand_config.name }} — {{ brand_config.tagline }}</title>
 <link rel="stylesheet" href="/static/css/style.css">
 <link rel="stylesheet" href="/static/css/release_notes.css?v=20260818-1">
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
 <link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
 <script>
   window.SITE_CONFIG = {{ site_config | tojson }};
@@ -16,6 +17,7 @@
   try { localStorage.setItem('gangtise_theme_mode', 'light'); } catch (e) {}
 </script>
 <script src="/static/js/theme.js"></script>
+<script defer src="/static/js/brand.js?v=20260825-1"></script>
 <script defer src="/static/js/release_notes.js?v=20260818-1"></script>
 <script src="/static/echarts.min.js"></script>
 <script src="/static/js/echarts_helpers.js?v=20260817-1"></script>
@@ -452,19 +454,6 @@ body { background: var(--surface-2); color: var(--text-main); }
   border-radius:999px;
   padding:3px 7px;
 }
-.hermes-suggestion-row { display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; scrollbar-width:none; max-width:100%; min-width:0; flex:1; }
-.hermes-suggestion-row::-webkit-scrollbar { display:none; }
-.hermes-suggestion-chip {
-  flex-shrink:0;
-  font-size:10px;
-  color:#1F497D;
-  background:#F3F8FE;
-  border:1px solid rgba(47,116,192,0.12);
-  border-radius:999px;
-  padding:5px 9px;
-  cursor:pointer;
-  white-space:nowrap;
-}
 .hermes-capability-row {
   display:flex;
   gap:8px;
@@ -488,31 +477,6 @@ body { background: var(--surface-2); color: var(--text-main); }
   background:#1F497D;
   color:#FFFFFF;
 }
-.hermes-prompt-chip-row {
-  display:flex;
-  flex-direction:column;
-  align-items:flex-start;
-  gap:10px;
-  margin-top:0;
-}
-.hermes-prompt-chip {
-  border:none;
-  background:#F2F3F5;
-  color:#171A1F;
-  border-radius:16px;
-  padding:10px 14px;
-  font-size:12px;
-  line-height:1.38;
-  text-align:left;
-  width:fit-content;
-  max-width:82%;
-  cursor:pointer;
-  touch-action:manipulation;
-  box-shadow:none;
-  transition:background .18s ease,color .18s ease,transform .18s ease;
-}
-.hermes-prompt-chip:hover { background:#ECEEF2; }
-.hermes-prompt-chip:active { transform:scale(.97); }
 .hermes-chat-thread { display:grid; gap:14px; margin-top:2px; min-width:0; overflow:hidden; }
 .hermes-chat-thread.is-empty { gap:0; }
 .hermes-chat-empty {
@@ -817,7 +781,6 @@ body { background: var(--surface-2); color: var(--text-main); }
   color:#FFFFFF;
   min-height:38px;
 }
-.hermes-action-hint { font-size:10px; color:var(--text-sub); line-height:1.6; min-width:0; flex:1; }
 .hermes-chat-analysis {
   display:grid;
   gap:6px;
@@ -1198,8 +1161,8 @@ body { background: var(--surface-2); color: var(--text-main); }
   position:relative;
   display:flex;
   flex-direction:column;
-  gap:8px;
-  align-items:flex-start;
+  gap:2px;
+  align-items:stretch;
   margin-top:8px;
   padding-left:12px;
 }
@@ -1213,18 +1176,21 @@ body { background: var(--surface-2); color: var(--text-main); }
   background:linear-gradient(180deg,rgba(17,24,39,0.10),rgba(17,24,39,0.04));
 }
 .hermes-thinking-row {
-  display:inline-flex;
+  display:grid;
+  grid-template-columns:4px minmax(0,1fr) auto;
   align-items:flex-start;
   gap:7px;
   width:100%;
   max-width:100%;
   min-width:0;
-  padding:0;
+  min-height:28px;
+  padding:5px 0;
   background:none;
   border:none;
   color:#7D8793;
   font-size:11px;
   line-height:1.7;
+  box-sizing:border-box;
 }
 .hermes-thinking-row.active {
   color:#555E69;
@@ -1251,7 +1217,14 @@ body { background: var(--surface-2); color: var(--text-main); }
 .hermes-bullet-item.is-clickable:active {
   transform:scale(.98);
 }
-.hermes-thinking-text { min-width:0; max-width:100%; word-break:break-word; overflow-wrap:anywhere; }
+.hermes-thinking-text {
+  display:block;
+  min-width:0;
+  max-width:100%;
+  line-height:1.65;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+}
 .hermes-thinking-inline {
   font-size:10px;
   color:#8A939F;
@@ -1302,6 +1275,367 @@ body { background: var(--surface-2); color: var(--text-main); }
   color:#6E7884;
   margin-bottom:8px;
 }
+
+/* ===== 小金智能体 · 手机端简洁工作区 ===== */
+#page-hermes {
+  background:#F5F7FA;
+}
+#page-hermes .hermes-shell {
+  min-height:calc(100dvh - 74px);
+  padding:12px 12px 22px;
+  background:#F5F7FA;
+}
+#page-hermes .hermes-header {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:10px 2px 14px;
+  background:transparent;
+  border:0;
+  border-radius:0;
+  box-shadow:none;
+}
+#page-hermes .hermes-brand-lockup {
+  display:flex;
+  align-items:center;
+  gap:9px;
+  min-width:0;
+  flex:1;
+}
+#page-hermes .hermes-brand-lockup .pixel-gold-ingot {
+  width:34px;
+  height:34px;
+  padding:5px;
+  border-radius:10px;
+  background:#FFF0F0;
+}
+#page-hermes .hermes-brand-title {
+  color:#172132;
+  font-size:17px;
+  font-weight:750;
+  line-height:1.25;
+}
+#page-hermes .hermes-brand-subtitle {
+  margin-top:3px;
+  color:#7A8492;
+  font-size:11px;
+  line-height:1.4;
+}
+#page-hermes .hermes-header-actions {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex:0 0 auto;
+}
+#page-hermes .hermes-header-actions .btn {
+  min-height:38px;
+  padding:8px 10px;
+  border-radius:10px;
+  font-size:11px;
+  font-weight:650;
+  white-space:nowrap;
+}
+#page-hermes .hermes-header-actions .btn-light {
+  color:#526276;
+  border:1px solid #DCE3EB;
+  background:#FFFFFF;
+}
+#page-hermes .hermes-header-actions .btn-primary {
+  border-color:#2F74C0;
+  background:#2F74C0;
+}
+#page-hermes .hermes-session-strip {
+  display:block;
+  margin:0 0 10px;
+}
+#page-hermes .hermes-session-entry {
+  min-height:48px;
+  padding:9px 11px;
+  border:1px solid #E2E7EE;
+  border-radius:12px;
+  background:#FFFFFF;
+  box-shadow:0 4px 14px rgba(31,73,125,0.04);
+}
+#page-hermes .hermes-session-entry-icon {
+  width:28px;
+  height:28px;
+  border-radius:8px;
+  background:#F1F5F9;
+  color:#526276;
+  font-size:13px;
+}
+#page-hermes .hermes-session-entry-label {
+  color:#7A8492;
+  font-size:10px;
+}
+#page-hermes .hermes-session-entry-title {
+  color:#172132;
+  font-size:12px;
+}
+#page-hermes .hermes-session-entry-meta {
+  color:#8B95A2;
+  font-size:10px;
+}
+#page-hermes .hermes-session-new-btn {
+  display:none;
+}
+#page-hermes .hermes-assistant-card {
+  padding:0;
+  overflow:visible;
+  border:0;
+  border-radius:0;
+  background:transparent;
+}
+#page-hermes .hermes-toolbar {
+  gap:0;
+}
+#page-hermes .hermes-capability-row {
+  display:none !important;
+}
+#page-hermes .hermes-chat-thread {
+  min-height:calc(100dvh - 310px);
+  padding:8px 2px 280px;
+  gap:18px;
+}
+#page-hermes .hermes-chat-thread.is-empty {
+  min-height:calc(100dvh - 310px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:18px 8px 280px;
+}
+#page-hermes .hermes-chat-empty {
+  width:min(100%,320px);
+  padding:0;
+  text-align:center;
+}
+#page-hermes .hermes-chat-empty::before {
+  content:'小金智能体';
+  display:block;
+  margin-bottom:8px;
+  color:#172132;
+  font-size:20px;
+  font-weight:750;
+}
+#page-hermes .hermes-prompt-guide {
+  display:block;
+  margin:0 auto 18px;
+  color:#8B95A2;
+  font-size:12px;
+  line-height:1.6;
+}
+#page-hermes .hermes-prompt-guide::before,
+#page-hermes .hermes-prompt-guide::after {
+  display:none;
+}
+#page-hermes .hermes-transcript-entry.user .hermes-transcript-text {
+  max-width:88%;
+  padding:10px 12px;
+  border-radius:14px 14px 4px 14px;
+  background:#2F74C0;
+  color:#FFFFFF;
+  font-size:13px;
+  line-height:1.65;
+  text-align:left;
+}
+#page-hermes .hermes-transcript-entry {
+  padding-inline:2%;
+  box-sizing:border-box;
+}
+#page-hermes .hermes-transcript-entry.assistant {
+  padding-block:0;
+}
+#page-hermes .hermes-transcript-kicker {
+  color:#687587;
+  font-size:10px;
+}
+#page-hermes .hermes-transcript-entry.assistant .hermes-transcript-text {
+  color:#172132;
+  font-size:16px;
+  font-weight:700;
+  line-height:1.55;
+}
+#page-hermes .hermes-transcript-body {
+  color:#526276;
+  font-size:13px;
+  line-height:1.8;
+}
+#page-hermes .hermes-text-article {
+  gap:8px;
+  padding:12px 14px;
+  border:1px solid #E3E8EF;
+  border-radius:10px;
+  background:#FFFFFF;
+  box-shadow:0 3px 12px rgba(31,73,125,0.035);
+}
+#page-hermes .hermes-text-section-heading {
+  margin-top:2px;
+  padding:2px 0 2px 9px;
+  border-left:3px solid #2F74C0;
+  border-radius:0;
+  background:transparent;
+  color:#245B96;
+  font-size:12px;
+}
+#page-hermes .hermes-result-card {
+  border-color:#E3E8EF;
+  border-radius:10px;
+  background:#FFFFFF;
+  box-shadow:0 3px 12px rgba(31,73,125,0.035);
+}
+#page-hermes .hermes-text-paragraph {
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+}
+#page-hermes .hermes-text-list {
+  padding-top:0;
+  padding-bottom:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+}
+#page-hermes .hermes-text-paragraph,
+#page-hermes .hermes-text-list li,
+#page-hermes .hermes-result-subtitle,
+#page-hermes .hermes-metric-note {
+  color:#526276;
+  font-size:13px;
+  line-height:1.8;
+}
+#page-hermes .hermes-thinking-disclosure {
+  margin-top:12px;
+  padding:10px 12px;
+  border:1px solid #E3E8EF;
+  border-radius:10px;
+  background:#F8FAFC;
+}
+#page-hermes .hermes-thinking-summary {
+  color:#526276;
+  font-size:11px;
+}
+#page-hermes .hermes-thinking-stream {
+  margin-top:10px;
+}
+#page-hermes .hermes-thinking-row {
+  color:#7A8492;
+  font-size:11px;
+}
+#page-hermes .hermes-composer-shell {
+  position:fixed;
+  left:50%;
+  bottom:78px;
+  z-index:90;
+  width:min(390px,100vw);
+  box-sizing:border-box;
+  transform:translateX(-50%);
+  margin-top:0;
+  padding:8px 12px 10px;
+  background:linear-gradient(180deg,rgba(245,247,250,0),#F5F7FA 18%);
+}
+#page-hermes .hermes-composer-context {
+  margin:0 4px 6px;
+}
+#page-hermes .hermes-lobster-composer {
+  gap:8px;
+  padding:10px 10px 8px;
+  border:1px solid #D8E0E9;
+  border-radius:16px;
+  background:#FFFFFF;
+  box-shadow:0 8px 24px rgba(31,73,125,0.10);
+}
+#page-hermes .hermes-lobster-question {
+  min-height:48px;
+  max-height:132px;
+  color:#172132;
+  font-size:14px;
+  line-height:1.6;
+}
+#page-hermes .hermes-lobster-question::placeholder {
+  color:#9AA5B3;
+}
+#page-hermes .hermes-lobster-toolbar {
+  min-height:36px;
+}
+#page-hermes .hermes-lobster-toolbar-left {
+  gap:6px;
+}
+#page-hermes .hermes-composer-plus,
+#page-hermes .hermes-composer-toggle {
+  width:auto;
+  min-width:36px;
+  height:36px;
+  padding:0 9px;
+  border:1px solid #E1E7EE;
+  border-radius:9px;
+  background:#F8FAFC;
+  color:#526276;
+  font-size:11px;
+}
+#page-hermes .hermes-composer-plus {
+  width:36px;
+  padding:0;
+  font-size:19px;
+}
+#page-hermes .hermes-lobster-tool-row {
+  gap:6px;
+}
+#page-hermes .hermes-lobster-tool {
+  padding:0 8px;
+  color:#526276;
+  font-size:11px;
+}
+#page-hermes .hermes-lobster-tool-icon {
+  display:none;
+}
+#page-hermes .hermes-lobster-send,
+#page-hermes .hermes-composer-send {
+  min-height:36px;
+  padding:0 14px;
+  border-radius:9px;
+  background:#2F74C0;
+  color:#FFFFFF;
+  font-size:12px;
+}
+#page-hermes .hermes-composer-send:disabled {
+  opacity:.45;
+}
+#hermes-session-modal .modal-sheet {
+  padding:18px 14px 24px;
+  border:1px solid #E1E7EE;
+  border-radius:18px 18px 0 0;
+  background:#FFFFFF;
+}
+#hermes-session-modal .hermes-session-card {
+  border-color:#E1E7EE;
+  border-radius:12px;
+  box-shadow:none;
+}
+#hermes-session-modal .hermes-session-card.active {
+  border-color:#7AAEDF;
+  background:#F5FAFF;
+  box-shadow:none;
+}
+@media (min-width: 768px) {
+  #page-hermes .hermes-shell {
+    width:min(100%,720px);
+    margin:0 auto;
+    padding:20px 20px 28px;
+  }
+  #page-hermes .hermes-chat-thread,
+  #page-hermes .hermes-chat-thread.is-empty {
+    min-height:calc(100dvh - 340px);
+    padding-bottom:280px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #page-hermes .hermes-session-card {
+    transition:none !important;
+  }
+}
 .dot-anim span { display:inline-block; animation:dotBounce 1.2s infinite; }
 @media (max-width: 420px) {
   .hermes-stock-input-row {
@@ -1309,9 +1643,6 @@ body { background: var(--surface-2); color: var(--text-main); }
   }
   .hermes-metric-grid {
     grid-template-columns:1fr;
-  }
-  .hermes-prompt-chip {
-    max-width:88%;
   }
 }
 .dot-anim span:nth-child(2) { animation-delay:0.2s; }
@@ -4044,16 +4375,25 @@ body,
   <div id="page-hermes" class="page" data-feature="hermes">
     <div class="h5-section hermes-shell" style="padding-top:14px">
       <div class="hermes-header">
-        <div class="hermes-logo">🦞 Hermes</div>
-        <div class="hermes-credits" id="hermes-credits-display">⚡ --次</div>
+        <div class="hermes-brand-lockup">
+          <img class="pixel-gold-ingot" src="/static/img/pixel-red-gold-ingot.svg" alt="小金智能体图标">
+          <div>
+            <div class="hermes-brand-title">小金智能体</div>
+            <div class="hermes-brand-subtitle">先深度思考，再给你清晰答案</div>
+          </div>
+        </div>
+        <div class="hermes-header-actions">
+          <button class="btn btn-light" type="button" onclick="openHermesSessionModal()" aria-label="查看历史会话">历史会话</button>
+          <button class="btn btn-primary" type="button" onclick="startHermesNewSession({ focus: true })">新会话</button>
+        </div>
       </div>
       <div class="hermes-session-strip">
         <button type="button" class="hermes-session-entry" onclick="openHermesSessionModal()">
           <div class="hermes-session-entry-icon">🗂️</div>
           <div class="hermes-session-entry-main">
-            <div class="hermes-session-entry-label">会话</div>
+            <div class="hermes-session-entry-label">当前会话</div>
             <div class="hermes-session-entry-title" id="hermes-session-current-title">新会话</div>
-            <div class="hermes-session-entry-meta" id="hermes-session-current-meta">点击查看历史会话并继续追问</div>
+            <div class="hermes-session-entry-meta" id="hermes-session-current-meta">点击切换历史会话</div>
           </div>
         </button>
         <button type="button" class="hermes-session-new-btn" onclick="startHermesNewSession()">新会话</button>
@@ -4065,13 +4405,14 @@ body,
             <div class="hermes-lobster-thread" id="hermes-chat-thread"></div>
             <div class="hermes-composer-shell">
               <div class="hermes-capability-row" id="hermes-capability-row"></div>
-              <div class="hermes-prompt-chip-row" id="hermes-suggestion-row" aria-label="Hermes 建议问题"></div>
               <div class="hermes-composer-context" id="hermes-composer-context"></div>
               <div class="hermes-lobster-composer">
+                <label class="visually-hidden" for="hermes-question-input">向小金智能体提问</label>
                 <textarea
                   id="hermes-question-input"
                   class="hermes-lobster-question"
-                  placeholder="问 Hermes..."
+                  placeholder="问小金智能体..."
+                  maxlength="4000"
                   oninput="handleHermesQuestionInput(this)"
                 ></textarea>
                 <div class="hermes-lobster-toolbar">
@@ -4696,8 +5037,8 @@ body,
       <span id="dm-nav-badge" style="position:absolute;top:2px;right:calc(50% - 16px);width:8px;height:8px;border-radius:50%;background:#E74C3C;display:block"></span>
     </div>
     <div class="h5-nav-item" id="nav-hermes" data-feature="hermes" onclick="switchTab('hermes')">
-      <div class="h5-nav-icon">🦞</div>
-      <div class="h5-nav-label">Hermes</div>
+      <div class="h5-nav-icon"><img class="pixel-gold-ingot pixel-gold-ingot--nav" src="/static/img/pixel-red-gold-ingot.svg" alt="小金智能体"></div>
+      <div class="h5-nav-label">小金智能体</div>
     </div>
     <div class="h5-nav-item" id="nav-profile" onclick="switchTab('profile')">
       <div class="h5-nav-icon">👤</div>
@@ -14326,7 +14667,7 @@ function renderHermesSessionBar() {
   if (record.turn_count > 0) {
     metaEl.textContent = `${record.turn_count} 轮对话 · ${record.last_seen_at ? formatHermesSessionTime(record.last_seen_at) : '刚刚'}`;
   } else {
-    metaEl.textContent = '点击查看历史会话并继续追问';
+    metaEl.textContent = '点击切换历史会话';
   }
 }
 
@@ -14870,11 +15211,7 @@ function renderHermesComposerContext() {
       </div>
     `);
   });
-  const html = chips.join('') || `<div class="hermes-action-hint">${
-    hermesUseInternetAnswer && isHermesInternetAllowed()
-      ? '默认先查当前租户知识库，再补充互联网公开信息。'
-      : '默认先查当前租户知识库。'
-  }</div>`;
+  const html = chips.join('');
   hosts.forEach(host => { host.innerHTML = html; });
 }
 
@@ -15424,15 +15761,7 @@ function renderHermesSkillContext() {
 }
 
 function renderHermesSuggestionChips() {
-  const hosts = [
-    document.getElementById('hermes-suggestion-row'),
-  ].filter(Boolean);
-  if (!hosts.length) return;
-  const skill = getHermesSkillById(hermesSelectedSkill) || DEFAULT_HERMES_SKILLS.basic;
-  const html = (skill.suggestions || []).map(text => `
-    <button type="button" class="hermes-prompt-chip" onclick="applyHermesSuggestion('${text.replace(/'/g, '&#39;')}')">${text}</button>
-  `).join('');
-  hosts.forEach(host => { host.innerHTML = html; });
+  // 推荐问题已移除，保留函数以兼容已有的技能切换调用。
 }
 
 function renderHermesCapabilityChips() {
@@ -15722,7 +16051,7 @@ function renderHermesThinkingStream(lines, options = {}) {
   const activeIndex = Number.isInteger(options.activeIndex) ? options.activeIndex : -1;
   const visible = activeIndex >= 0 ? items.slice(0, activeIndex + 1) : items;
   return `
-    <div class="hermes-thinking-stream" aria-label="Hermes 深度思考">
+    <div class="hermes-thinking-stream" aria-label="小金智能体深度思考">
       ${visible.map((line, index) => `
         <div class="hermes-thinking-row ${index === activeIndex ? 'active' : ''}">
           <span class="hermes-thinking-dot"></span>
@@ -15738,7 +16067,7 @@ function renderHermesThinkingDisclosure(lines, options = {}) {
   const items = Array.isArray(lines) ? lines.filter(Boolean) : [];
   if (!items.length) return '';
   if (!isHermesThinkingEnabled()) return '';
-  const label = String(options.label || '思考过程').trim() || '思考过程';
+  const label = String(options.label || '深度思考').trim() || '深度思考';
   const openAttr = options.open ? ' open' : '';
   const loadingDots = options.loading
     ? `<span class="dot-anim" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>`
@@ -15898,6 +16227,7 @@ function syncHermesLoadingTicker() {
 function renderHermesTextArtifact(artifact, agentTrace) {
   const entry = arguments[2] && typeof arguments[2] === 'object' ? arguments[2] : {};
   const entryId = String(entry.id || '').trim();
+  const isSmallTalk = isHermesSmallTalkEntry(entry, artifact);
   const uniqueBullets = dedupeHermesTextItems(artifact.bullets);
   const uniqueFollowups = dedupeHermesTextItems(
     (artifact.followups || []).filter(item => !uniqueBullets.includes(String(item || '').trim()))
@@ -15913,16 +16243,16 @@ function renderHermesTextArtifact(artifact, agentTrace) {
   const followupHtml = renderHermesClickableBullets(uniqueFollowups, { clickable: true });
   const thoughtLines = buildHermesTraceThoughts(agentTrace);
   const actionHtml = renderHermesKnowledgeAction(entryId);
-  const routeLabel = String(entry.capabilityLabel || entry.intentLabel || entry.intent || '').trim();
+  const routeLabel = isSmallTalk ? '' : String(entry.capabilityLabel || entry.intentLabel || entry.intent || '').trim();
   const routeMeta = routeLabel
     ? `<div class="hermes-transcript-meta" style="margin-top:6px">本次按：${escapeHtml(routeLabel)}</div>`
     : '';
   return `
     <div class="hermes-transcript-entry assistant">
       <div class="hermes-transcript-kicker">Hermes</div>
-      <div class="hermes-transcript-text">${escapeHtml(artifact.headline || '')}</div>
+      ${!isSmallTalk && artifact.headline ? `<div class="hermes-transcript-text">${escapeHtml(artifact.headline)}</div>` : ''}
       ${routeMeta}
-      ${artifact.summary ? renderHermesReadableText(artifact.summary) : ''}
+      ${!isSmallTalk && artifact.summary ? renderHermesReadableText(artifact.summary) : ''}
       ${renderHermesThinkingDisclosure(thoughtLines)}
       ${bodyHtml}
       ${bulletHtml}
@@ -15935,24 +16265,25 @@ function renderHermesTextArtifact(artifact, agentTrace) {
   `;
 }
 
+function isHermesSmallTalkEntry(entry, artifact) {
+  const payload = entry && typeof entry === 'object' ? entry : {};
+  const intent = String(payload.intentLabel || payload.intent || '').trim().toLowerCase();
+  const capability = String(payload.capabilityLabel || '').trim().toLowerCase();
+  return intent === 'small_talk'
+    || intent.includes('闲聊')
+    || capability === 'small_talk'
+    || capability.includes('闲聊');
+}
+
 function renderHermesThread() {
   const hosts = [
     document.getElementById('hermes-chat-thread'),
   ].filter(Boolean);
   if (!hosts.length) return;
   if (!hermesConversation.length) {
-    const suggestions = [
-      '这只股票当前的基本面强弱怎么看？',
-      '这篇复盘的依据来源够不够扎实？',
-      '这个智能指标是按什么口径算出来的？',
-      'H5 里智能指标怎么创建和发布？'
-    ];
     const emptyHtml = `
       <div class="hermes-chat-empty">
         <div class="hermes-prompt-guide">从个股、复盘、指标或功能开始</div>
-        <div class="hermes-prompt-chip-row" aria-label="Hermes 建议问题">
-          ${suggestions.map(item => `<button class="hermes-prompt-chip" type="button" onclick="applyHermesSuggestion('${item.replace(/'/g, '&#39;')}')">${escapeHtml(item)}</button>`).join('')}
-        </div>
       </div>
     `;
     hosts.forEach(host => {
@@ -16241,11 +16572,12 @@ async function runHermesAnalysis(options) {
     }
   } catch (e) {
     hermesConversation.pop();
-    const friendlyError = e && e.message === 'hermes_investor_access_disabled'
+    const rawError = (e && e.message) || 'hermes_query_failed';
+    const friendlyError = rawError === 'hermes_investor_access_disabled'
       ? '当前租户尚未向普通用户开放 Hermes'
-      : (e && e.message === 'hermes_disabled'
+      : (rawError === 'hermes_disabled'
         ? 'Hermes 当前已在后台关闭'
-        : (e && e.message) || 'Hermes 查询失败');
+        : `模型调用失败：${rawError}`);
     hermesConversation.push({
       id: createHermesEntryId('ai'),
       type: 'ai',
@@ -16253,8 +16585,8 @@ async function runHermesAnalysis(options) {
       result: normalizeHermesArtifact({
         type: 'text_response',
         title: `${skill.icon} ${skill.label}`,
-        headline: '本轮查询执行失败',
-        summary: '统一编排入口未成功返回结果，当前已保留对话上下文。',
+        headline: 'Hermes 调用失败',
+        summary: `本轮未生成答案，统一编排入口已严格中止：${friendlyError}`,
         body: '',
         bullets: [friendlyError],
         followups: ['你可以直接重试，或换一个更具体的问题。'],

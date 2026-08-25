@@ -79,6 +79,7 @@ def api_hermes_query():
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except RuntimeError as exc:
+        app.logger.error("Hermes query execution failed: %s", str(exc)[:500])
         return jsonify({"ok": False, "error": str(exc)}), 503
     except Exception:
         app.logger.exception("Failed to execute Hermes query")
@@ -413,14 +414,14 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
                     ],
                     "channel_mix": [
                         {"label": "复盘阅读", "value": 42},
-                        {"label": "Hermes 问答", "value": 24},
+                        {"label": "小金智能体问答", "value": 24},
                         {"label": "消息追问", "value": 18},
                         {"label": "自选股跟踪", "value": 16},
                     ],
                     "heatmap_columns": ["内容触达", "私域留资", "激活试用", "首次付费", "高频留存"],
                     "heatmap_rows": [
                         {"label": "复盘专区", "values": [100, 18.2, 8.4, 2.2, 0.8]},
-                        {"label": "Hermes", "values": [100, 14.8, 9.6, 3.4, 1.2]},
+                        {"label": "小金智能体", "values": [100, 14.8, 9.6, 3.4, 1.2]},
                         {"label": "消息区", "values": [100, 22.1, 11.2, 3.8, 1.5]},
                         {"label": "自选股", "values": [100, 12.4, 6.7, 2.1, 0.9]},
                     ],
@@ -429,13 +430,13 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
                     "summary": "看当前租户各获客和互动来源的质量，而不是平台总渠道。",
                     "cards": [
                         {"label": "复盘转化", "users": "620", "conv": "8.4%", "revenue": "¥26,800", "score": 88},
-                        {"label": "Hermes 转化", "users": "410", "conv": "11.2%", "revenue": "¥24,300", "score": 92},
+                        {"label": "小金智能体转化", "users": "410", "conv": "11.2%", "revenue": "¥24,300", "score": 92},
                         {"label": "消息追问", "users": "260", "conv": "15.6%", "revenue": "¥18,600", "score": 95},
                         {"label": "社群转介绍", "users": "170", "conv": "18.1%", "revenue": "¥16,200", "score": 97},
                     ],
                     "quality_rows": [
                         {"label": "复盘转化", "users": 620, "cac": 32, "ltv": 620, "conv": "8.4%", "score": 88, "trend": "上升"},
-                        {"label": "Hermes 转化", "users": 410, "cac": 24, "ltv": 760, "conv": "11.2%", "score": 92, "trend": "上升"},
+                        {"label": "小金智能体转化", "users": 410, "cac": 24, "ltv": 760, "conv": "11.2%", "score": 92, "trend": "上升"},
                         {"label": "消息追问", "users": 260, "cac": 18, "ltv": 880, "conv": "15.6%", "score": 95, "trend": "稳定"},
                         {"label": "社群转介绍", "users": 170, "cac": 12, "ltv": 960, "conv": "18.1%", "score": 97, "trend": "上升"},
                     ],
@@ -538,7 +539,7 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
         },
         "knowledge_hub": knowledge_hub,
         "hermes_hub": {
-            "summary": "Hermes 对大V保留两种演示版本：工作区版承接股票、skills、提示词和结构化结果；龙虾纯对话版只保留 skills + 对话，按知识库直接聊天。",
+            "summary": "小金智能体对大V保留两种演示版本：工作区版承接股票、skills、提示词和结构化结果；小金纯对话版只保留 skills + 对话，按知识库直接聊天。",
             "versions": [
                 {
                     "name": "工作区版",
@@ -546,7 +547,7 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
                     "points": ["股票代码输入", "结构化结果卡", "图表 + 指标 + 证据链"],
                 },
                 {
-                    "name": "龙虾纯对话版",
+                    "name": "小金纯对话版",
                     "desc": "纯提示词聊天，不强制单独输入股票代码；若问题里自然带了股票对象，会自动进入个股分析。",
                     "points": ["纯对话输入", "skills 保持一致", "知识库自动带入上下文"],
                 },
@@ -586,7 +587,7 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
         "consistency_notes": [
             {"title": "前后台分离", "desc": "首页同时展示纯 Admin 后台和大V web 工作台两个入口，角色职责分开。"},
             {"title": "消息口径一致", "desc": "H5、工作台和 Admin 都把“粉丝消息 + 大V回复 + 复盘提醒”视为同一消息链路。"},
-            {"title": "Hermes 口径一致", "desc": "前台支持工作区版和龙虾纯对话版，后台也按同样两种产品模式管理。"},
+            {"title": "小金智能体口径一致", "desc": "前台支持工作区版和小金纯对话版，后台也按同样两种产品模式管理。"},
             {"title": "知识库口径一致", "desc": "历史知识内容允许继续微调，修改后会重新同步到知识专区和 Hermes。"},
         ],
         "role_split": [

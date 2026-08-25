@@ -53,6 +53,19 @@ class StrictLlmExecutionBddTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "invalid_llm_json_response"):
                 ai_services.route_hermes_query_intent("你好", tenant_slug="bdd")
 
+    def test_given_small_talk_router_returns_knowledge_tool_then_tools_are_cleared(self):
+        with app.app_context(), patch.object(
+            ai_services, "get_default_llm_config", return_value=self.MODEL
+        ), patch.object(
+            ai_services,
+            "call_openai_compatible_llm",
+            return_value='{"intent":"small_talk","tools":["knowledge.search"],"stock_code":"","display_mode":"text","reason":"模型路由"}',
+        ):
+            plan, _model, _mode = ai_services.route_hermes_query_intent("你好", tenant_slug="bdd")
+
+        self.assertEqual(plan["intent"], "small_talk")
+        self.assertEqual(plan["tools"], [])
+
     def test_given_hermes_answer_call_fails_then_no_rule_answer_is_returned(self):
         plan = {"intent": "small_talk", "tools": [], "scope_status": "allowed"}
         with app.app_context(), patch.object(

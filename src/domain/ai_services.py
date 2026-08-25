@@ -1,6 +1,7 @@
 import math
 import re
 from collections import Counter
+from zoneinfo import ZoneInfo
 
 from src.runtime import *
 from src.domain.core_services import *
@@ -1042,82 +1043,6 @@ def _build_review_watchlist_sector_profiles(details):
     return profiles, summary[:150]
 
 
-def _build_review_watchlist_llm_prompt(details, sector_profiles, source_text, review_period):
-    stock_blocks = []
-    for index, detail in enumerate(details or [], start=1):
-        if not isinstance(detail, dict):
-            continue
-        fundamental = detail.get("fundamental") if isinstance(detail.get("fundamental"), dict) else {}
-        forecast = detail.get("forecast") if isinstance(detail.get("forecast"), dict) else {}
-        metrics = [
-            f"{str(item.get('label') or '').strip()}：{str(item.get('value') or '').strip()}（{str(item.get('note') or '').strip()}）"
-            for item in (fundamental.get("metrics") or [])
-            if isinstance(item, dict) and str(item.get("label") or "").strip()
-        ]
-        theses = [str(item).strip() for item in (fundamental.get("thesis") or []) if str(item).strip()]
-        annotations = detail.get("annotations") if isinstance(detail.get("annotations"), list) else []
-        annotation_blocks = [
-            " / ".join(
-                part for part in [
-                    str(item.get("dateLabel") or item.get("candle_date") or "").strip(),
-                    get_watchlist_annotation_content(item),
-                ]
-                if part
-            )
-            for item in annotations[:4]
-            if isinstance(item, dict)
-        ]
-        drivers = [
-            f"{str(item.get('label') or '').strip()}：{str(item.get('note') or '').strip()}（{str(item.get('score') or '').strip()}）"
-            for item in (forecast.get("drivers") or [])
-            if isinstance(item, dict) and str(item.get("label") or "").strip()
-        ]
-        stock_blocks.append(
-            "\n".join(
-                [
-                    f"[股票 {index}] 名称：{str(detail.get('name') or '').strip()}",
-                    f"代码：{str(detail.get('code') or '').strip()}",
-                    f"所属板块：{str(detail.get('industry') or detail.get('focus') or '其他板块').strip()}",
-                    f"K线标注摘要：{str(detail.get('annotation_summary') or '').strip() or '暂无'}",
-                    f"K线标注明细：{'；'.join(annotation_blocks) if annotation_blocks else '暂无'}",
-                    f"信号摘要：{str(detail.get('signal_summary') or detail.get('alert_text') or '').strip() or '暂无'}",
-                    f"基本面摘要：{str(fundamental.get('summary') or '').strip() or '暂无'}",
-                    f"当前判断：{str(forecast.get('verdict') or '').strip() or '待观察'} / 置信度 {str(forecast.get('confidence') or '中').strip() or '中'}",
-                    f"指标要点：{'；'.join(metrics[:4]) if metrics else '暂无'}",
-                    f"核心论点：{'；'.join(theses[:3]) if theses else '暂无'}",
-                    f"驱动因素：{'；'.join(drivers[:3]) if drivers else '暂无'}",
-                ]
-            )
-        )
-    sector_blocks = [
-        f"{item['sector']}：代表股票 {'、'.join(item['stock_names'])}；代表性描述：{item['representative_description']}"
-        for item in (sector_profiles or [])
-        if isinstance(item, dict)
-    ]
-    period_label = _get_review_period_label(review_period)
-    return "\n".join(
-        [
-            f"复盘周期：{period_label}",
-            f"用户自主输入摘要参考：{trim_hermes_text(source_text, limit=300) if str(source_text or '').strip() else '未提供'}",
-            "",
-            "板块归并基础：",
-            "\n".join(sector_blocks) if sector_blocks else "暂无板块归并",
-            "",
-            "股票上下文：",
-            "\n\n".join(stock_blocks) if stock_blocks else "暂无股票上下文",
-            "",
-            "请输出 JSON，格式如下：",
-            '{"sector_summary":"150字内的板块与主线归纳","items":[{"stock_name":"股票名","stock_code":"代码","sector":"板块","board_role":"该股在本次复盘中的代表角色","analysis_text":"80到160字的归纳分析","evidence":["证据1","证据2"]}]}',
-            "要求：",
-            "1. 先从已选自选股归纳板块代表性，不要脱离这些股票泛化发挥。",
-            "2. 如果某只股票有 K线标注，必须优先根据标注中的判断、复盘话语和验证节点归纳；基本面和信号摘要只作为补充证据。",
-            "3. 每只股票的 analysis_text 要强调它为什么被纳入本次复盘，以及当前更该跟踪什么。",
-            "4. evidence 里优先引用 K线标注标题、标注摘要或验证节点；若无标注，再退回基本面/信号证据。",
-            "5. 语言要适合直接展示在复盘详情页，不输出过程说明，不要使用 Markdown。",
-        ]
-    )
-
-
 def analyze_review_watchlist_with_llm(
     selected_watchlist=None,
     review_period="",
@@ -1198,87 +1123,80 @@ def analyze_review_watchlist_with_llm(
             "state_updates": {
                 "sector_profiles": sector_profiles,
                 "sector_summary_rule": sector_summary,
-                "system_prompt": (
-                    "你是中文投研复盘助手。"
-                    "你负责根据本次已选自选股，生成可直接展示在复盘详情页里的“自选股归纳分析”部分。"
-                    "必须聚焦给定股票和对应板块，不要扩写成泛市场评论。"
-                    "输出必须是 JSON。"
-                ),
-                "user_prompt": _build_review_watchlist_llm_prompt(
-                    matched,
-                    sector_profiles,
-                    state.get("normalized_source_text") or "",
-                    runtime.get("review_period") or "",
-                ),
             },
             "context_preview": {"sector_count": len(sector_profiles)},
         }
 
     def _watchlist_llm_executor(state, runtime, node, upstream):
-        llm_model = get_default_llm_config(purpose="general", feature_code="review_watchlist_analysis")
-        if not llm_model:
-            raise RuntimeError("review_watchlist_analysis_llm_not_configured")
-        raw = call_openai_compatible_llm(
-            llm_model,
-            state.get("system_prompt") or "",
-            state.get("user_prompt") or "",
-            feature_code="review_watchlist_analysis",
-            feature_label="复盘自选股归纳",
-            tenant_slug=str(runtime.get("tenant_slug") or "").strip(),
-            entry_point=str(runtime.get("entry_point") or "").strip(),
-            metadata={
-                "review_period": str(runtime.get("review_period") or "").strip().lower(),
-                "watchlist_count": len(state.get("watchlist_items") or []),
-                "job_code": runtime.get("job_code") or "",
-                "workflow_id": workflow_definition["id"],
-            },
-            request_timeout_seconds=60,
-        )
-        parsed = _extract_json_payload_from_llm_text(raw, {}, strict=True)
-        llm_items = parsed.get("items") if isinstance(parsed.get("items"), list) else None
-        if llm_items is None:
-            raise RuntimeError("review_watchlist_analysis_invalid_items")
         matched = state.get("matched_watchlist_details") if isinstance(state.get("matched_watchlist_details"), list) else []
-        normalized_items = []
+        labels = []
+        for detail in matched:
+            if not isinstance(detail, dict):
+                continue
+            name = str(detail.get("name") or detail.get("code") or "").strip()
+            code = str(detail.get("code") or "").strip()
+            security_code = str(detail.get("security_code") or detail.get("gtsCode") or "").strip().upper()
+            if not security_code and code:
+                market = str(detail.get("market") or "").strip().upper()
+                security_code = f"{code}.{market}" if market in {"SH", "SZ", "BJ", "HK"} else code
+            if name:
+                labels.append(f"{name}{f'（{security_code or code}）' if (security_code or code) else ''}")
+        if not labels:
+            raise RuntimeError("review_watchlist_analysis_missing_item")
+        today = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
+        request_text = (
+            f"请对以下{len(labels)}只自选股做今天（{today}）的复盘与综合评估："
+            f"{'、'.join(labels)}。"
+            "要求：1）分别给出今日行情表现、资金与估值变化、核心逻辑与风险提示；"
+            "2）最后给出这些股票组合层面的综合结论和明日关注点。"
+        )
+        source_text = str(state.get("normalized_source_text") or "").strip()
+        if source_text:
+            request_text += f"\n\n大V本次复盘输入，请与上述数据分析合并理解：\n{source_text[:1800]}"
+        if runtime.get("job_code"):
+            report_user_async_job_progress(
+                runtime["job_code"],
+                stage="watchlist_gangtise_sse_started",
+                percent=70,
+                summary="正在调用 Gangtise Agent SSE",
+                log_text=f"已提交 {len(labels)} 只自选股，等待多股综合分析返回。",
+                extra_result={"endpoint": "/application/open-ai/ai/chat/sse", "watchlist_count": len(labels)},
+            )
+        progress_state = {"last_at": 0.0, "last_count": 0}
+
+        def _report_sse_progress(event_count, event_text):
+            if not runtime.get("job_code"):
+                return
+            now_value = time.time()
+            if event_count - progress_state["last_count"] < 4 and now_value - progress_state["last_at"] < 5:
+                return
+            progress_state["last_at"] = now_value
+            progress_state["last_count"] = event_count
+            report_user_async_job_progress(
+                runtime["job_code"],
+                stage="watchlist_gangtise_sse_streaming",
+                percent=min(80, 70 + min(10, event_count // 4)),
+                summary="Gangtise Agent SSE 正在返回多股分析",
+                log_text=f"已收到 Gangtise Agent SSE 第 {event_count} 个响应事件。",
+                extra_result={"event_count": event_count},
+            )
+
+        gangtise_result = call_gangtise_agent_sse(
+            request_text,
+            trace_id=f"review-{runtime.get('job_code') or int(time.time() * 1000)}",
+            mode="deep_research",
+            web_enable=True,
+            timeout=180,
+            progress_callback=_report_sse_progress,
+        )
+        combined_text = str(gangtise_result.get("text") or "").strip()
+        if not combined_text:
+            raise RuntimeError("review_watchlist_gangtise_empty_response")
         annotation_evidence = []
         for detail in matched:
             stock_name = str(detail.get("name") or "").strip()
             stock_code = str(detail.get("code") or "").strip()
-            sector_name = str(detail.get("industry") or detail.get("focus") or "其他板块").strip() or "其他板块"
             annotations = detail.get("annotations") if isinstance(detail.get("annotations"), list) else []
-            hit = next(
-                (
-                    item for item in llm_items
-                    if isinstance(item, dict) and str(item.get("stock_name") or item.get("stock_code") or "").strip() in {stock_name, stock_code}
-                ),
-                None,
-            )
-            if not isinstance(hit, dict) or not str(hit.get("analysis_text") or "").strip():
-                raise RuntimeError(f"review_watchlist_analysis_missing_item:{stock_code or stock_name}")
-            evidence = hit.get("evidence") if isinstance(hit, dict) and isinstance(hit.get("evidence"), list) else []
-            normalized_evidence = [trim_hermes_text(str(item).strip(), limit=60) for item in evidence if str(item).strip()][:4]
-            if not normalized_evidence and annotations:
-                normalized_evidence = [
-                    trim_hermes_text(
-                        " / ".join(
-                            part for part in [
-                                get_watchlist_annotation_content(item),
-                            ]
-                            if part
-                        ),
-                        limit=60,
-                    )
-                    for item in annotations[:3]
-                    if isinstance(item, dict)
-                ][:4]
-            normalized_items.append({
-                "stock_name": stock_name,
-                "stock_code": stock_code,
-                "sector": str((hit or {}).get("sector") or sector_name).strip() or sector_name,
-                "board_role": str((hit or {}).get("board_role") or f"{sector_name}代表样本").strip()[:80] or f"{sector_name}代表样本",
-                "analysis_text": trim_hermes_text(str(hit.get("analysis_text") or "").strip(), limit=220),
-                "evidence": normalized_evidence,
-            })
             for item in annotations[:4]:
                 if not isinstance(item, dict):
                     continue
@@ -1293,36 +1211,38 @@ def analyze_review_watchlist_with_llm(
                     "note": str(item.get("note") or "").strip(),
                     "trigger": str(item.get("trigger") or "").strip(),
                 })
-        sector_summary = trim_hermes_text(str(parsed.get("sector_summary") or "").strip(), limit=150)
-        if not sector_summary:
-            raise RuntimeError("review_watchlist_analysis_empty_sector_summary")
         if runtime.get("job_code"):
             report_user_async_job_progress(
                 runtime["job_code"],
                 stage="watchlist_analysis_done",
                 percent=82,
-                summary="自选股归纳分析已生成",
-                log_text="板块主线和逐股归纳已完成，正在整理发布结构。",
+                summary="Gangtise 多股综合分析已生成",
+                log_text="Gangtise Agent SSE 已返回完整多股分析，正在与大V输入合并。",
+                extra_result={"duration_ms": gangtise_result.get("duration_ms") or 0, "event_count": gangtise_result.get("events") or 0},
             )
         return {
-            "detail": "已生成板块代表性和逐股归纳分析。",
+            "detail": "已通过 Gangtise Agent SSE 生成完整多股综合分析。",
             "state_updates": {
                 "analysis_result": {
-                    "sector_summary": sector_summary,
+                    "sector_summary": "",
                     "sector_profiles": copy.deepcopy(state.get("sector_profiles") or []),
-                    "items": normalized_items,
+                    "items": [],
+                    "combined_text": combined_text,
+                    "provider": gangtise_result.get("provider") or "Gangtise Agent助手 SSE",
+                    "endpoint": gangtise_result.get("endpoint") or "/application/open-ai/ai/chat/sse",
+                    "request_text": request_text,
                     "annotation_evidence": annotation_evidence,
                     "llm_model": {
-                        "key": llm_model.get("key"),
-                        "label": llm_model.get("label"),
-                        "provider": llm_model.get("provider"),
-                        "model_name": llm_model.get("model_name"),
-                        "purpose": llm_model.get("purpose"),
-                        "stage": "watchlist_analysis",
+                        "key": "gangtise_agent_sse",
+                        "label": gangtise_result.get("provider") or "Gangtise Agent助手 SSE",
+                        "provider": "Gangtise",
+                        "model_name": "deep_research",
+                        "purpose": "multi_stock_review",
+                        "stage": "watchlist_gangtise_sse",
                     },
                 }
             },
-            "context_preview": {"item_count": len(normalized_items)},
+            "context_preview": {"item_count": len(labels), "provider": "Gangtise Agent助手 SSE"},
         }
 
     def _watchlist_output_executor(state, runtime, node, upstream):
@@ -1332,7 +1252,7 @@ def analyze_review_watchlist_with_llm(
             extras={"last_execution_steps": copy.deepcopy(upstream)},
         )
         return {
-            "detail": "已封装自选股归纳分析结果。",
+            "detail": "已封装 Gangtise Agent SSE 多股综合分析结果。",
             "output": result,
             "state_key": "final_result",
             "context_preview": {"has_items": bool((result.get("items") or []))},
@@ -1566,6 +1486,9 @@ def label_watchlist_comment_with_llm(comment_text, stock_detail=None, tenant_slu
 
 def _compose_review_watchlist_analysis_text(section):
     payload = section if isinstance(section, dict) else {}
+    combined_text = str(payload.get("combined_text") or "").strip()
+    if combined_text:
+        return combined_text
     sector_summary = str(payload.get("sector_summary") or "").strip()
     sector_profiles = payload.get("sector_profiles") if isinstance(payload.get("sector_profiles"), list) else []
     items = payload.get("items") if isinstance(payload.get("items"), list) else []
@@ -1635,8 +1558,8 @@ def compose_review_structured_preview(
                 job_code,
                 stage="review_watchlist_analyzing",
                 percent=46,
-                summary="正在归纳自选股与板块代表性",
-                log_text="将按已选自选股归并板块，并生成逐股归纳分析。",
+                summary="正在准备 Gangtise 多股综合分析",
+                log_text="正在装载已选自选股上下文，随后调用 Gangtise Agent SSE 生成个股与组合分析。",
             )
         watchlist_result = analyze_review_watchlist_with_llm(
             selected_watchlist=watchlist_items,
@@ -1674,11 +1597,12 @@ def compose_review_structured_preview(
         "summary_source": "llm_user_input_only",
     }
     watchlist_text = _compose_review_watchlist_analysis_text(watchlist_result)
+    watchlist_heading = "Gangtise 多股综合分析" if str(watchlist_result.get("combined_text") or "").strip() else "自选股归纳分析"
     final_text = "\n\n".join(
         part for part in [
             f"【复盘摘要】\n{summary_result['summary']}" if str(summary_result.get("summary") or "").strip() else "",
             f"【用户输入转化内容】\n{user_input_section['display_text']}",
-            f"【自选股归纳分析】\n{watchlist_text}" if watchlist_text else "",
+            f"【{watchlist_heading}】\n{watchlist_text}" if watchlist_text else "",
         ] if part
     ).strip()
     llm_models = [summary_result.get("llm_model"), watchlist_result.get("llm_model")]
@@ -1689,6 +1613,10 @@ def compose_review_structured_preview(
             "sector_summary": str(watchlist_result.get("sector_summary") or "").strip(),
             "sector_profiles": copy.deepcopy(watchlist_result.get("sector_profiles") or []),
             "items": copy.deepcopy(watchlist_result.get("items") or []),
+            "combined_text": str(watchlist_result.get("combined_text") or "").strip(),
+            "provider": str(watchlist_result.get("provider") or "").strip(),
+            "endpoint": str(watchlist_result.get("endpoint") or "").strip(),
+            "request_text": str(watchlist_result.get("request_text") or "").strip(),
             "annotation_evidence": copy.deepcopy(watchlist_result.get("annotation_evidence") or []),
         },
         "final_text": final_text,
@@ -1702,7 +1630,7 @@ def compose_review_structured_preview(
             percent=92,
             summary="复盘预览已准备完成",
             log_text=(
-                "用户输入部分和自选股归纳部分已合成，正在返回预览结果。"
+                "用户输入部分和 Gangtise 多股综合分析已合成，正在返回预览结果。"
                 if watchlist_items else
                 "摘要和用户输入转化内容已合成，正在返回预览结果。"
             ),
@@ -1782,7 +1710,7 @@ def _load_local_whisper_model(transcription_cfg=None):
         )
     except Exception as exc:
         raise RuntimeError(f"local_transcriber_init_failed:{exc}") from exc
-    g[cache_key] = model
+    setattr(g, cache_key, model)
     return model
 
 
@@ -1799,7 +1727,7 @@ def _load_local_embedding_model(embedding_cfg=None):
         model = SentenceTransformer(model_name)
     except Exception as exc:
         raise RuntimeError(f"local_embedding_init_failed:{exc}") from exc
-    g[cache_key] = model
+    setattr(g, cache_key, model)
     return model
 
 
@@ -3526,6 +3454,10 @@ def finalize_hermes_intent_plan(plan, question_text="", attachments=None, select
     )
     normalized_plan["task_family"] = task_family
     normalized_plan["capability_label"] = HERMES_TASK_FAMILY_LABELS.get(task_family, "研究问答")
+    if task_family == "small_talk" or str(normalized_plan.get("intent") or "").strip() == "small_talk":
+        # A greeting must remain a model-only conversation even if the router
+        # accidentally returns a research tool in its JSON plan.
+        normalized_plan["tools"] = []
     normalized_plan["intent_group"] = HERMES_INTENT_ROUTE_GROUPS.get(
         str(normalized_plan.get("intent") or "").strip(),
         "knowledge_qa",
@@ -7520,8 +7452,10 @@ def build_hermes_tool_execution_plan(plan, web_answer=False):
         if tool_name in HERMES_ALLOWED_TOOLS and tool_name not in ordered:
             ordered.append(tool_name)
 
-    # Hermes 固定先查租户知识，再走其它平台内工具，最后才补互联网公开信息。
-    _push("knowledge.search")
+    # Research plans may put knowledge first, but pure chat plans must not
+    # touch the vector store merely because Hermes is enabled.
+    if requested:
+        _push("knowledge.search")
     for tool_name in requested:
         if tool_name != "knowledge.search":
             _push(tool_name)
@@ -7820,6 +7754,7 @@ def build_hermes_followups(plan, tool_outputs):
 def build_hermes_text_artifact(question_text, plan, synthesis, tool_outputs, citations):
     answer_text = str((synthesis or {}).get("answer") or "").strip()
     summary_text = str((synthesis or {}).get("summary") or "").strip()
+    intent = str((plan or {}).get("intent") or "").strip().lower()
     bullets = [
         str(item).strip()
         for item in ((synthesis or {}).get("bullets") if isinstance((synthesis or {}).get("bullets"), list) else [])
@@ -7847,6 +7782,19 @@ def build_hermes_text_artifact(question_text, plan, synthesis, tool_outputs, cit
         })
     web_matches = ((tool_outputs.get("web_search") or {}).get("matches") or []) if isinstance(tool_outputs, dict) else []
     footer_suffix = "已先查租户知识，再补充互联网公开信息。" if web_matches else "已优先基于当前租户知识库和平台内工具回答。"
+    if intent == "small_talk":
+        return {
+            "type": "text_response",
+            "question": str(question_text or "").strip(),
+            "headline": "",
+            "summary": "",
+            "body": answer_text,
+            "bullets": [],
+            "citations": [],
+            "knowledge": [],
+            "followups": [],
+            "footer": "",
+        }
     return {
         "type": "text_response",
         "question": str(question_text or "").strip(),
@@ -8603,6 +8551,7 @@ def build_hermes_synthesis_prompt(question_text, plan, tool_outputs, tenant_slug
         "优先依据工具结果，不要编造不存在的数据。"
         "必须先依据租户知识结果，再参考平台内工具，最后才参考互联网补充结果。"
         "如果存在租户自选股K线标注摘要，应把它视为研究侧补充证据，融入结论、解读或边界说明。"
+        "如果意图是 small_talk，只输出自然、简短、像真人一样的回应；不要输出标题、摘要、路由说明、过程说明，也不要写‘用户进行了简单问候’或‘助手需要确认研究状态’这类内部描述。此时 summary、lead_conclusion、bullets、analysis_sections、next_steps、citations 应为空。"
         "如果存在互联网补充结果，可以按公开信息口径组织回答，但不能把互联网信息盖过租户知识。"
         "如果证据不足，要明确说边界。结构化展示中的判断要点、下一步、结论和分析分段也必须来自你的输出，不要让程序根据行情字段代写。"
         f"{style_instruction}"

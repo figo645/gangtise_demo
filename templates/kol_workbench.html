@@ -15,6 +15,7 @@
   window.AUTO_INIT_DASHBOARD = false;
 </script>
 <script src="/static/js/theme.js"></script>
+<script defer src="/static/js/brand.js?v=20260825-1"></script>
 <script defer src="/static/js/release_notes.js?v=20260818-1"></script>
 <script src="/static/echarts.min.js"></script>
 <script src="/static/js/echarts_helpers.js?v=20260808-2"></script>
@@ -3492,7 +3493,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <span class="admin-nav-icon">&#128196;</span> 百科词条
         </div>
         <div class="kw-nav-subgroup">
-          <div class="kw-nav-subtitle">Hermes</div>
+          <div class="kw-nav-subtitle">小金智能体</div>
           <div class="admin-nav-item" data-section="hermes-overview" data-feature="hermes" onclick="showWorkbenchSection('hermes-overview', this)">
             <span class="admin-nav-icon">&#129438;</span> 使用概览
           </div>
@@ -9066,6 +9067,10 @@ function kwNormalizeReviewStructuredPreview(payload) {
     },
     watchlist_analysis_section: {
       sector_summary: String(watchlistAnalysisSection.sector_summary || '').trim(),
+      combined_text: String(watchlistAnalysisSection.combined_text || '').trim(),
+      provider: String(watchlistAnalysisSection.provider || '').trim(),
+      endpoint: String(watchlistAnalysisSection.endpoint || '').trim(),
+      request_text: String(watchlistAnalysisSection.request_text || '').trim(),
       sector_profiles: Array.isArray(watchlistAnalysisSection.sector_profiles) ? watchlistAnalysisSection.sector_profiles.map((item) => ({
         sector: String((item || {}).sector || '').trim(),
         stock_names: Array.isArray((item || {}).stock_names) ? item.stock_names.slice(0) : [],
@@ -9095,6 +9100,8 @@ function kwNormalizeReviewStructuredPreview(payload) {
 
 function kwBuildReviewWatchlistAnalysisText(section) {
   const payload = section && typeof section === 'object' ? section : {};
+  const combinedText = String(payload.combined_text || '').trim();
+  if (combinedText) return combinedText;
   const parts = [];
   const sectorSummary = String(payload.sector_summary || '').trim();
   if (sectorSummary) parts.push(`板块归纳：${sectorSummary}`);
@@ -9125,7 +9132,7 @@ function kwBuildReviewStructuredFinalText(payload) {
   return [
     normalized.review_summary ? `【摘要】\n${normalized.review_summary}` : '',
     normalized.user_input_section.display_text ? `【用户复盘】\n${normalized.user_input_section.display_text}` : '',
-    kwBuildReviewWatchlistAnalysisText(normalized.watchlist_analysis_section) ? `【自选股归纳总结】\n${kwBuildReviewWatchlistAnalysisText(normalized.watchlist_analysis_section)}` : '',
+    kwBuildReviewWatchlistAnalysisText(normalized.watchlist_analysis_section) ? `【${normalized.watchlist_analysis_section.combined_text ? 'Gangtise 多股综合分析' : '自选股归纳总结'}】\n${kwBuildReviewWatchlistAnalysisText(normalized.watchlist_analysis_section)}` : '',
   ].filter(Boolean).join('\n\n').trim();
 }
 
@@ -9284,7 +9291,7 @@ function kwRenderReviewDraftProgressPanel() {
     <div class="kw-review-progress-panel">
       <div class="kw-review-progress-head">
         <div>
-          <div class="kw-review-progress-title">${isStructured ? '大模型正在生成自选股归纳总结' : '大模型正在生成用户复盘 Draft'}</div>
+          <div class="kw-review-progress-title">${isStructured ? 'Gangtise 正在生成多股综合分析' : '大模型正在生成用户复盘 Draft'}</div>
           <div class="kw-review-progress-subtitle">${escapeHtml(job.summary || '后台仍在工作中，当前会持续展示处理阶段与最新进展。')}</div>
         </div>
         <div class="kw-review-progress-percent">${escapeHtml(String(percent))}%</div>
@@ -9698,7 +9705,11 @@ function kwSyncReviewDraftFromModal() {
     }
     if (structuredSectorSummary) {
       kwReviewStructuredPreview.watchlist_analysis_section = kwReviewStructuredPreview.watchlist_analysis_section || {};
-      kwReviewStructuredPreview.watchlist_analysis_section.sector_summary = structuredSectorSummary.value;
+      if (String(kwReviewStructuredPreview.watchlist_analysis_section.combined_text || '').trim()) {
+        kwReviewStructuredPreview.watchlist_analysis_section.combined_text = structuredSectorSummary.value;
+      } else {
+        kwReviewStructuredPreview.watchlist_analysis_section.sector_summary = structuredSectorSummary.value;
+      }
     }
     const itemNodes = Array.from(document.querySelectorAll('[data-kw-review-watchlist-analysis-index]'));
     const items = ((kwReviewStructuredPreview.watchlist_analysis_section || {}).items || []);
@@ -9820,10 +9831,6 @@ function kwPrepareReviewDirectPreview() {
 async function kwPrepareReviewStructuredPreview() {
   const runtime = ensureKwReviewRuntime();
   if (!kwValidateReviewIntakeReady()) return;
-  if (!kwHasConfiguredGeneralLlm()) {
-    showToast('当前还没有配置可用的大模型。请先到 Admin 的系统专区 · 大模型专区配置一个通用模型。');
-    return;
-  }
   kwSyncReviewDraftFromModal();
   kwReviewStructuredPreview = null;
   kwReviewPreviewGenerating = true;
@@ -9881,7 +9888,7 @@ async function kwPrepareReviewStructuredPreview() {
     }
   }
   kwRenderReviewStudio();
-  showToast('自选股归纳总结已生成，请审核后预览');
+  showToast('Gangtise 多股综合分析已生成，请审核后预览');
 }
 
 async function kwSubmitReviewSmartOptimize() {
@@ -10132,8 +10139,8 @@ function kwGetReviewCurrentStageLabel() {
     optimize_rule: '优化规则确认',
     draft_generating: 'Draft 生成中',
     draft_review: 'Draft 审核',
-    preview_generating: '自选股归纳生成中',
-    structured_review: '自选股归纳审核',
+    preview_generating: 'Gangtise 多股分析生成中',
+    structured_review: 'Gangtise 多股分析审核',
     preview: '最终预览',
   }[stage] || '内容录入';
 }
@@ -10260,7 +10267,7 @@ function kwRenderReviewWatchlistSelector() {
   host.innerHTML = `
     <div class="kw-review-runtime-item">
       <strong>本次纳入复盘的自选股（可选）</strong>
-      <div class="kw-review-runtime-desc">用户输入内容是必填项。这里的自选股可以不选；如果有选择，后续才会追加自选股归纳总结，相关 K 线标注也会自动作为归纳依据。</div>
+      <div class="kw-review-runtime-desc">用户输入内容是必填项。这里的自选股可以不选；如果有选择，后续会调用 Gangtise 生成多股综合分析，相关 K 线标注也会作为上下文。</div>
       <div class="kw-review-watchlist-row" style="margin-top:10px">
         ${list.map((name) => `
           <button class="kw-review-watchlist-chip selectable ${selected.includes(name) ? 'active' : ''}" type="button" onclick="kwToggleReviewTriggerWatchlist('${escapeAttr(name)}')">${escapeHtml(name)}</button>
@@ -10282,7 +10289,7 @@ function kwRenderReviewOverviewSummary() {
     ['已选素材', String(kwGetReviewSelectedCards().length + kwGetReviewSelectedKnowledge().length), '包含智能卡片和知识材料'],
     ['用户内容', kwGetReviewDraftContentText() ? '已录入' : '待录入', '支持语音、手写、文件和网页 URL'],
     ['优化成稿', String(kwReviewDraft.draftReviewText || kwReviewDraft.generatedPreviewText || '').trim() ? '已生成' : '未生成', '先形成用户复盘 Draft'],
-    ['自选股归纳', kwReviewStructuredPreview ? '已生成' : '未生成', (kwReviewDraft.selectedWatchlist || []).length ? '只有选择自选股时才会生成归纳总结' : '当前未选择自选股，发布时只自动生成摘要'],
+    ['多股综合分析', kwReviewStructuredPreview ? '已生成' : '未生成', (kwReviewDraft.selectedWatchlist || []).length ? '只有选择自选股时才会调用 Gangtise 分析' : '当前未选择自选股'],
     ['最近发布', latestPublished ? String(latestPublished.time || '--') : '暂无', latestPublished ? String(latestPublished.title || '').slice(0, 36) : '发布后这里会同步更新'],
   ];
   host.innerHTML = cards.map(([label, value, note]) => `
@@ -10342,13 +10349,13 @@ function kwRenderReviewWizardFooter() {
         <button class="btn-gold" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwSubmitReviewSmartOptimize()">${isGenerating ? '生成中...' : '开始优化'}</button>
       `;
     } else if (stage === 'draft_review') {
-      desc = kwReviewDraft.selectedWatchlist.length ? 'Draft 已生成。先审核用户复盘，再继续生成自选股归纳总结。' : 'Draft 已生成。先审核用户复盘，然后可直接进入最终预览。';
+      desc = kwReviewDraft.selectedWatchlist.length ? 'Draft 已生成。先审核用户复盘，再继续生成 Gangtise 多股综合分析。' : 'Draft 已生成。先审核用户复盘，然后可直接进入最终预览。';
       actions = `
         <button class="btn-outline" type="button" onclick="kwBackToReviewIntake()">回到用户复盘</button>
-        <button class="btn-gold" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwConfirmReviewDraftToPreview()">${kwReviewDraft.selectedWatchlist.length ? '生成自选股归纳' : '直接预览'}</button>
+        <button class="btn-gold" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwConfirmReviewDraftToPreview()">${kwReviewDraft.selectedWatchlist.length ? '生成多股综合分析' : '直接预览'}</button>
       `;
     } else if (stage === 'structured_review') {
-      desc = '自选股归纳总结已生成，确认后进入最终预览。';
+      desc = 'Gangtise 多股综合分析已生成，确认后进入最终预览。';
       actions = `
         <button class="btn-outline" type="button" onclick="kwBackToReviewDraftEdit()">回退修改</button>
         <button class="btn-gold" type="button" onclick="kwConfirmStructuredReviewToPreview()">进入最终预览</button>
@@ -10360,9 +10367,9 @@ function kwRenderReviewWizardFooter() {
         <button class="btn-gold" type="button" disabled>请稍候</button>
       `;
     } else {
-      desc = kwReviewDraft.selectedWatchlist.length ? '你可以直接预览原始输入，也可以先做优化成稿，再继续自选股归纳。' : '你可以直接预览原始输入，也可以先做优化成稿，再进入最终预览。';
+      desc = kwReviewDraft.selectedWatchlist.length ? '你可以直接预览原始输入，也可以先做优化成稿，再调用 Gangtise 生成多股综合分析。' : '你可以直接预览原始输入，也可以先做优化成稿，再进入最终预览。';
       actions = `
-        <button class="btn-outline" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwPrepareReviewDirectPreview()">${kwReviewDraft.selectedWatchlist.length ? '生成自选股归纳' : '直接预览'}</button>
+        <button class="btn-outline" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwPrepareReviewDirectPreview()">${kwReviewDraft.selectedWatchlist.length ? '生成多股综合分析' : '直接预览'}</button>
         <button class="btn-gold" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwOpenReviewOptimizeRuleStep()">${isGenerating ? '处理中...' : '优化成稿'}</button>
       `;
     }
@@ -10501,7 +10508,7 @@ function kwRenderReviewStageActions() {
     optimize_rule: '这里先确认优化规则，真正的前进和回退放到底部向导操作区。',
     draft_generating: '系统正在生成用户复盘 Draft，可先看处理进度。',
     draft_review: kwReviewDraft.selectedWatchlist.length ? '先审核用户复盘 Draft，确认后再继续生成自选股归纳。' : '先审核用户复盘 Draft，确认后可直接进入最终预览。',
-    preview_generating: '系统正在整理自选股归纳总结。',
+    preview_generating: '系统正在整理 Gangtise 多股综合分析。',
     structured_review: '自选股归纳已经返回，确认后再进入最终预览。',
     preview: '已经进入最终预览，可以在下方继续微调发布正文。',
   }[stage] || '按底部向导继续推进本次复盘。';
@@ -10539,8 +10546,9 @@ function kwRenderReviewStageResults() {
       </div>
       ${hasWatchlistAnalysis ? `
         <div class="kw-review-runtime-item" style="margin-top:12px">
-          <strong>自选股归纳总结</strong>
-          <textarea id="kw-review-structured-sector-summary" class="kw-knowledge-modal-textarea" style="margin-top:10px;min-height:110px">${escapeHtml((((structured.watchlist_analysis_section || {}).sector_summary) || ''))}</textarea>
+          <strong>${structured.watchlist_analysis_section.combined_text ? 'Gangtise 多股综合分析' : '自选股归纳总结'}</strong>
+          ${structured.watchlist_analysis_section.provider ? `<div class="kw-review-runtime-desc" style="margin-top:6px">来源：${escapeHtml(structured.watchlist_analysis_section.provider)} · 可编辑后合并发布</div>` : ''}
+          <textarea id="kw-review-structured-sector-summary" class="kw-knowledge-modal-textarea" style="margin-top:10px;min-height:220px">${escapeHtml((structured.watchlist_analysis_section.combined_text || structured.watchlist_analysis_section.sector_summary || ''))}</textarea>
           ${(((structured.watchlist_analysis_section || {}).items) || []).map((item, index) => `
             <div style="margin-top:10px">
               <div class="kw-review-runtime-desc" style="margin-bottom:6px">${escapeHtml(item.stock_name || '股票')} · ${escapeHtml(item.board_role || item.sector || '归纳样本')}</div>

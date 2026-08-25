@@ -6,6 +6,7 @@
 <title>选择工作入口</title>
 <link rel="stylesheet" href="/static/css/style.css">
 <script src="/static/js/theme.js"></script>
+<script defer src="/static/js/brand.js?v=20260825-1"></script>
 <style>
 body{margin:0;min-height:100vh;font-family:var(--font-main);color:var(--text-main);background:radial-gradient(circle at top left,rgba(200,169,110,.1),transparent 38%),radial-gradient(circle at top right,rgba(47,116,192,.1),transparent 42%),linear-gradient(180deg,#F8FBFF 0%,#EEF4FA 100%)}
 .entry-shell{min-height:100vh;display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:24px}.entry-card{width:min(100%,540px);box-sizing:border-box;padding:28px;background:#fff;border:1px solid rgba(47,116,192,.12);border-radius:24px;box-shadow:0 24px 60px rgba(31,73,125,.1)}
@@ -18,7 +19,7 @@ body{margin:0;min-height:100vh;font-family:var(--font-main);color:var(--text-mai
   <div class="entry-title">选择进入方式</div>
   <div class="entry-desc">{{ user.get('display_name') or user.get('username') }}，你可以进入移动端投研界面，或继续管理大V工作台。</div>
   <div class="entry-options">
-    <a class="entry-option" href="{{ h5_target }}"><div class="entry-option-title">进入 H5</div><div class="entry-option-desc">查看基本面、自选股、复盘、消息和 Hermes。</div></a>
+    <a class="entry-option" href="{{ h5_target }}"><div class="entry-option-title">进入 H5</div><div class="entry-option-desc">查看基本面、自选股、复盘、消息和小金智能体。</div></a>
     <a class="entry-option primary" href="{{ workbench_target }}"><div class="entry-option-title">进入大V工作台</div><div class="entry-option-desc">管理粉丝、内容、协同收入与运营数据。</div></a>
   </div>
 </section></main></body>

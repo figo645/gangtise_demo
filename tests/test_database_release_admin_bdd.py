@@ -9,6 +9,7 @@ from unittest.mock import patch
 import app as app_entry
 import src.web.api_core as api_core
 import src.web.hooks as web_hooks
+from src.domain import core_services
 from src.domain import database_release_services
 
 
@@ -57,9 +58,22 @@ class DatabaseReleaseAdminBddTest(unittest.TestCase):
         self.assertTrue(options["debug"])
         self.assertFalse(options["use_reloader"])
 
+        with patch.dict(os.environ, {"DEBUG": "1"}, clear=True):
+            self.assertFalse(core_services.is_werkzeug_reloader_parent())
+
         with patch.dict(os.environ, {"DEBUG": "1", "FLASK_USE_RELOADER": "1"}, clear=True):
             options = app_entry.get_server_runtime_options()
         self.assertTrue(options["use_reloader"])
+
+        with patch.dict(os.environ, {"DEBUG": "1", "FLASK_USE_RELOADER": "1"}, clear=True):
+            self.assertTrue(core_services.is_werkzeug_reloader_parent())
+
+        with patch.dict(
+            os.environ,
+            {"DEBUG": "1", "FLASK_USE_RELOADER": "1", "WERKZEUG_RUN_MAIN": "true"},
+            clear=True,
+        ):
+            self.assertFalse(core_services.is_werkzeug_reloader_parent())
 
     def test_given_allowlisted_release_when_admin_starts_it_then_the_service_creates_one_job(self):
         target = {"name": "staging", "db_name": "demo", "db_user": "postgres", "db_host": "127.0.0.1", "db_port": "5432", "db_password": "secret"}

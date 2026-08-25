@@ -26,6 +26,22 @@
   --font-main: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
 }
 
+.pixel-gold-ingot {
+  width: 1.55em;
+  height: 1.55em;
+  display: inline-block;
+  vertical-align: -0.28em;
+  object-fit: contain;
+  image-rendering: pixelated;
+  flex: 0 0 auto;
+}
+
+.pixel-gold-ingot--nav {
+  width: 24px;
+  height: 24px;
+  vertical-align: middle;
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: var(--font-main); background: var(--surface); color: var(--text-main); }
 

@@ -922,6 +922,204 @@ def post_gangtise_openapi_json(path, payload, token="", timeout=30, _retried=Fal
     return status, response, duration
 
 
+def _extract_gangtise_sse_text(value):
+    """Extract answer-like text from one Agent SSE event payload."""
+    if isinstance(value, str):
+        text = value.strip()
+        if text.startswith(("{", "[")):
+            try:
+                nested = json.loads(text)
+            except Exception:
+                nested = None
+            if isinstance(nested, (dict, list)):
+                extracted = _extract_gangtise_sse_text(nested)
+                if extracted:
+                    return extracted
+        return text
+    if isinstance(value, list):
+        parts = [_extract_gangtise_sse_text(item) for item in value]
+        return "".join(item for item in parts if item)
+    if not isinstance(value, dict):
+        return ""
+    for key in ("answer", "content", "text", "output", "result", "message"):
+        candidate = _extract_gangtise_sse_text(value.get(key))
+        if candidate:
+            return candidate
+    for key in ("data", "payload", "response"):
+        candidate = _extract_gangtise_sse_text(value.get(key))
+        if candidate:
+            return candidate
+    raw_value = str(value.get("raw") or "").strip()
+    if raw_value:
+        return raw_value
+    return ""
+
+
+def _merge_gangtise_sse_texts(candidates):
+    """Merge either delta chunks or repeated full snapshots without duplication."""
+    merged = ""
+    for raw in candidates or []:
+        text = str(raw or "").strip()
+        if not text or text in {"[DONE]", "DONE"}:
+            continue
+        if not merged:
+            merged = text
+            continue
+        if text == merged or text.startswith(merged):
+            merged = text
+            continue
+        if merged.startswith(text):
+            continue
+        overlap = min(len(merged), len(text))
+        while overlap and not merged.endswith(text[:overlap]):
+            overlap -= 1
+        merged += text[overlap:]
+    return merged.strip()
+
+
+def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_callback=None):
+    """Call a Gangtise Agent SSE endpoint and return its accumulated answer text."""
+    effective_token = str(token or "").strip()
+    if not effective_token:
+        token_ok, fetched_token, auth_response, auth_status, auth_duration = obtain_gangtise_openapi_token()
+        if not token_ok:
+            return {
+                "ok": False,
+                "status": auth_status or 0,
+                "message": str((auth_response or {}).get("message") or "Gangtise OpenAPI 鉴权失败").strip(),
+                "duration_ms": auth_duration,
+                "text": "",
+                "events": 0,
+            }
+        effective_token = fetched_token
+    headers = {
+        "Authorization": effective_token if effective_token.startswith("Bearer ") else f"Bearer {effective_token}",
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream",
+        "Cache-Control": "no-cache",
+    }
+    body = json.dumps(payload or {}, ensure_ascii=False).encode("utf-8")
+    request_obj = Request(
+        f"{get_gangtise_openapi_config()['base_url']}{path}",
+        data=body,
+        headers=headers,
+        method="POST",
+    )
+    started = time.perf_counter()
+    candidates = []
+    event_buffer = []
+    event_count = 0
+
+    def consume_event():
+        nonlocal event_count
+        if not event_buffer:
+            return
+        raw_event = "\n".join(event_buffer).strip()
+        event_buffer.clear()
+        if not raw_event or raw_event == "[DONE]":
+            return
+        parsed = decode_json_payload(raw_event)
+        text = _extract_gangtise_sse_text(parsed)
+        if text:
+            candidates.append(text)
+        event_count += 1
+        if callable(progress_callback):
+            progress_callback(event_count, text)
+
+    try:
+        with urlopen(request_obj, timeout=timeout) as response:
+            for raw_line in response:
+                line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
+                if not line:
+                    consume_event()
+                elif line.startswith("data:"):
+                    event_buffer.append(line[5:].lstrip())
+                elif line.startswith(("event:", "id:", "retry:", ":")):
+                    continue
+                else:
+                    # Some gateways preserve the SSE payload but strip the
+                    # data: prefix. Treat each such line as a text event.
+                    event_buffer.append(line)
+            consume_event()
+        text = _merge_gangtise_sse_texts(candidates)
+        response_status = getattr(response, "status", None)
+        if response_status is None and hasattr(response, "getcode"):
+            response_status = response.getcode()
+        return {
+            "ok": bool(response_status == 200 and text),
+            "status": response_status or 0,
+            "message": "" if text else "Gangtise Agent SSE 未返回可用分析文本",
+            "duration_ms": round((time.perf_counter() - started) * 1000),
+            "text": text,
+            "events": event_count,
+        }
+    except HTTPError as error:
+        raw = error.read().decode("utf-8", errors="replace")
+        parsed = decode_json_payload(raw)
+        return {
+            "ok": False,
+            "status": error.code,
+            "message": str(parsed.get("message") or parsed.get("msg") or raw or "Gangtise Agent SSE 请求失败").strip()[:500],
+            "duration_ms": round((time.perf_counter() - started) * 1000),
+            "text": "",
+            "events": event_count,
+        }
+    except URLError as error:
+        return {
+            "ok": False,
+            "status": 0,
+            "message": f"Gangtise Agent SSE 网络错误：{error.reason}",
+            "duration_ms": round((time.perf_counter() - started) * 1000),
+            "text": "",
+            "events": event_count,
+        }
+    except Exception as error:
+        return {
+            "ok": False,
+            "status": 0,
+            "message": f"Gangtise Agent SSE 调用异常：{error}",
+            "duration_ms": round((time.perf_counter() - started) * 1000),
+            "text": "",
+            "events": event_count,
+        }
+
+
+def call_gangtise_agent_sse(text, trace_id="", mode="deep_research", web_enable=True, timeout=180, progress_callback=None):
+    """Use the tested multi-stock Agent Assistant SSE contract."""
+    request_text = str(text or "").strip()
+    if not request_text:
+        raise ValueError("gangtise_agent_question_required")
+    payload = {
+        "text": request_text,
+        "mode": str(mode or "deep_research").strip() or "deep_research",
+        "askChatParam": {
+            "iter": 2,
+            "webEnable": bool(web_enable),
+            "traceId": str(trace_id or f"gangtise-agent-{int(time.time() * 1000)}").strip(),
+        },
+    }
+    result = post_gangtise_openapi_sse(
+        "/application/open-ai/ai/chat/sse",
+        payload,
+        timeout=timeout,
+        progress_callback=progress_callback,
+    )
+    if not result.get("ok"):
+        raise RuntimeError(
+            f"gangtise_agent_sse_failed:http_status={result.get('status') or 0}:"
+            f"{str(result.get('message') or 'empty_response').strip()[:400]}"
+        )
+    return {
+        "text": str(result.get("text") or "").strip(),
+        "duration_ms": int(result.get("duration_ms") or 0),
+        "events": int(result.get("events") or 0),
+        "mode": payload["mode"],
+        "request": payload,
+        "provider": "Gangtise Agent助手 SSE",
+        "endpoint": "/application/open-ai/ai/chat/sse",
+    }
+
+
 def choose_gangtise_indicator_candidate(items, keyword="", preferred_indicator_id=""):
     rows = items if isinstance(items, list) else []
     if not rows:

@@ -3996,15 +3996,15 @@ def build_h5_help_center_payload(role="investor"):
         },
         {
             "id": "hermes",
-            "category": "Hermes",
-            "title": "Hermes 能问什么",
-            "summary": "Hermes 只承接平台研究相关问题，不做泛百科和高风险投资指令。",
+            "category": "小金智能体",
+            "title": "小金智能体能问什么",
+            "summary": "小金智能体只承接平台研究相关问题，不做泛百科和高风险投资指令。",
             "bullets": [
                 "优先查当前租户知识内容，再按需要补平台能力。",
                 "适合问个股基本面、复盘证据链、知识框架和智能指标解释。",
                 "超范围问题会被收口并引导回平台能力。",
             ],
-            "action_label": "打开 Hermes",
+            "action_label": "打开小金智能体",
             "action_type": "switch_tab",
             "action_value": "hermes",
         },
@@ -4885,8 +4885,8 @@ def ensure_user_row_defaults(user, site_config=None):
     role = str(user.get("role", "investor") or "investor").strip().lower()
     role_label_map = {"investor": "投资者", "dav": "大V投顾", "admin": "管理员"}
     default_stats = {
-        "investor": {"posts": 23, "likes": 456, "following": 12, "followers": 89, "points": 3840, "compute_credits": 128, "level": 4, "level_name": "资深分析师", "membership": "投资者视角", "relationship": "核心订阅用户", "tenant_card_title": "所属大V租户", "workbench_label": "查看当前租户工作台（demo）", "workbench_hint": "投资者视角 · 查看租户服务与互动提醒", "stat_labels": ["帖子", "获赞", "自选", "社群互动"], "badges": ["🦞 Hermes达人", "📊 投研先锋", "🧭 长期跟踪", "📅 连续签到30天"], "avatar": "👨"},
-        "dav": {"posts": 86, "likes": 3688, "following": 128, "followers": 1240, "points": 9820, "compute_credits": 420, "level": 6, "level_name": "租户主理人", "membership": "大V主理视角", "relationship": "租户主理人", "tenant_card_title": "当前管理租户", "workbench_label": "进入我的大V工作台", "workbench_hint": "大V投顾视角 · 管理粉丝、内容与协同收入", "stat_labels": ["内容", "获赞", "订阅用户", "私域线索"], "badges": ["👑 种子投顾", "🦞 Hermes高频用户", "🏆 协同标杆", "💬 私域主理人"], "avatar": "👑"},
+        "investor": {"posts": 23, "likes": 456, "following": 12, "followers": 89, "points": 3840, "compute_credits": 128, "level": 4, "level_name": "资深分析师", "membership": "投资者视角", "relationship": "核心订阅用户", "tenant_card_title": "所属大V租户", "workbench_label": "查看当前租户工作台（demo）", "workbench_hint": "投资者视角 · 查看租户服务与互动提醒", "stat_labels": ["帖子", "获赞", "自选", "社群互动"], "badges": ["小金智能体达人", "📊 投研先锋", "🧭 长期跟踪", "📅 连续签到30天"], "avatar": "👨"},
+        "dav": {"posts": 86, "likes": 3688, "following": 128, "followers": 1240, "points": 9820, "compute_credits": 420, "level": 6, "level_name": "租户主理人", "membership": "大V主理视角", "relationship": "租户主理人", "tenant_card_title": "当前管理租户", "workbench_label": "进入我的大V工作台", "workbench_hint": "大V投顾视角 · 管理粉丝、内容与协同收入", "stat_labels": ["内容", "获赞", "订阅用户", "私域线索"], "badges": ["👑 种子投顾", "小金智能体高频用户", "🏆 协同标杆", "💬 私域主理人"], "avatar": "👑"},
         "admin": {"posts": 0, "likes": 0, "following": 0, "followers": 0, "points": 9999, "compute_credits": 999, "level": 9, "level_name": "平台管理员", "membership": "管理员视角", "relationship": "平台管理员", "tenant_card_title": "当前管理平台", "workbench_label": "进入平台后台", "workbench_hint": "管理员视角 · 管理平台用户与租户", "stat_labels": ["用户", "租户", "权限", "系统"], "badges": ["🛡️ 平台管理员"], "avatar": "🛡️"},
     }
     defaults = default_stats.get(role, default_stats["investor"])
@@ -6429,7 +6429,11 @@ def is_debug_mode_enabled():
 
 
 def is_werkzeug_reloader_parent():
-    return is_debug_mode_enabled() and os.environ.get("WERKZEUG_RUN_MAIN") != "true"
+    # DEBUG alone does not imply that Werkzeug started a reloader process.
+    # The integrated server disables reloading by default, so treating every
+    # debug process without WERKZEUG_RUN_MAIN as the parent skips all workers.
+    reloader_enabled = os.environ.get("FLASK_USE_RELOADER", "").strip().lower() in {"1", "true", "yes", "y", "on"}
+    return reloader_enabled and os.environ.get("WERKZEUG_RUN_MAIN") != "true"
 
 
 def startup_bootstrap():

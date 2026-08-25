@@ -14,6 +14,7 @@
   window.AUTO_INIT_DASHBOARD = false;
 </script>
 <script src="/static/js/theme.js"></script>
+<script defer src="/static/js/brand.js?v=20260825-1"></script>
 <script defer src="/static/js/release_notes.js?v=20260818-1"></script>
 <script src="/static/echarts.min.js"></script>
 <script src="/static/js/echarts_helpers.js?v=20260808-2"></script>
@@ -2100,12 +2101,12 @@
       </div>
       <div class="admin-nav-group" data-nav-group="hermes">
         <button type="button" class="admin-nav-group-toggle" onclick="toggleAdminNavGroup(this)">
-          <span class="admin-nav-group-title">Hermes管理</span>
+          <span class="admin-nav-group-title">小金智能体管理</span>
           <span class="admin-nav-group-caret">&#9662;</span>
         </button>
         <div class="admin-nav-group-body">
         <div class="admin-nav-subgroup">
-          <div class="admin-nav-subtitle">Hermes</div>
+          <div class="admin-nav-subtitle">小金智能体</div>
           <div class="admin-nav-item active" data-section="hermes" data-hermes-subsection="overview" data-feature="hermes" onclick="showHermesSubsection('overview', this)">
             <span class="admin-nav-icon">&#9881;</span> 总览
           </div>
@@ -2401,7 +2402,7 @@
               <tr><td style="color:#F8F6F0;font-weight:500">消息链路</td><td>粉丝消息 + 大V回复 + 复盘提醒</td><td>处理消息、回复、推送复盘提醒</td><td>管理 DM 开关与审计，不直接代替回复</td></tr>
               <tr><td style="color:#F8F6F0;font-weight:500">复盘</td><td>展示大V复盘 + 智能复盘</td><td>发起复盘、选周期、挑自选股、决定段落方式</td><td>管理租户是否开通复盘工作流</td></tr>
               <tr><td style="color:#F8F6F0;font-weight:500">知识库</td><td>知识专区展示沉淀结果</td><td>语音/文件/URL 入库，历史内容继续微调</td><td>管理知识功能开关和租户能力边界</td></tr>
-              <tr><td style="color:#F8F6F0;font-weight:500">Hermes</td><td>工作区版 + 龙虾纯对话版</td><td>维护 skill、知识绑定、查看使用动作</td><td>监控调用、算力、双版本使用与知识命中</td></tr>
+              <tr><td style="color:#F8F6F0;font-weight:500">小金智能体</td><td>工作区版 + 小金纯对话版</td><td>维护 skill、知识绑定、查看使用动作</td><td>监控调用、算力、双版本使用与知识命中</td></tr>
               <tr><td style="color:#F8F6F0;font-weight:500">自选股</td><td>顶部输代码，进详情后添加自选</td><td>按复盘和 Hermes 工作流挑选重点样本</td><td>不直接管理个股内容，只管理功能可用性</td></tr>
               <tr><td style="color:#F8F6F0;font-weight:500">智能 Dashboard</td><td>默认总结态，单格提示词生成</td><td>配置单格提示词和发布面板</td><td>管理该能力的租户开关和一致性说明</td></tr>
             </tbody>
@@ -3971,7 +3972,7 @@
       <div class="sync-grid" style="margin-bottom:20px">
         <div class="sync-card">
           <div class="sync-title">Hermes 产品口径</div>
-          <div class="sync-desc">H5 现已分成两种版本：工作区版保留股票、skills、提示词和结构化结果；龙虾纯对话版只保留聊天和 skills，不强制单独输入股票代码。</div>
+          <div class="sync-desc">H5 现已分成两种版本：工作区版保留股票、skills、提示词和结构化结果；小金纯对话版只保留聊天和 skills，不强制单独输入股票代码。</div>
           <div class="toggle-wrap" style="margin:14px 0 4px">
             <div class="toggle-label"><div class="feature-toggle-title">提示词范围约束</div><div class="feature-toggle-desc">位置：Hermes 收到问题后的首个路由节点。开启后只承接平台研究范围和轻度闲聊，超范围问题会被引导回个股、复盘、知识或指标能力。</div></div>
             <label class="toggle"><input id="hermes-prompt-scope-guard-enabled" type="checkbox"><span class="toggle-slider"></span></label>
@@ -4010,7 +4011,7 @@
           </div>
           <div class="sync-chip-row">
             <span class="sync-chip">工作区版</span>
-            <span class="sync-chip">龙虾纯对话版</span>
+            <span class="sync-chip">小金纯对话版</span>
             <span class="sync-chip">skills 可选</span>
             <span class="sync-chip">skills 可自定义</span>
             <span class="sync-chip">skills 绑定知识库</span>

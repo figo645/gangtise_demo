@@ -5,7 +5,7 @@ import time
 DECLARED_AGENT_WORKFLOW_CATALOG = {
     "hermes_agent": {
         "id": "hermes_agent",
-        "title": "Hermes 智能体",
+        "title": "小金智能体",
         "summary": "围绕问题拆解、工具调度、答案合成和结果渲染的统一 Agent 主链路。",
         "category": "对话智能体",
         "feature_key": "hermes",
@@ -13,9 +13,9 @@ DECLARED_AGENT_WORKFLOW_CATALOG = {
         "tags": ["H5", "知识检索", "证据链", "自选股", "Dashboard", "LLM"],
         "nodes": [
             {"id": "question_input", "label": "问题输入", "processor": "input", "kind": "source", "x": 36, "y": 88, "description": "接收用户问题、附件、知识范围和上下文。"},
-            {"id": "session_load", "label": "会话装载", "processor": "session_load", "kind": "context", "x": 228, "y": 88, "description": "读取当前用户在本次 Hermes 会话下的历史轮次与会话摘要。"},
+            {"id": "session_load", "label": "会话装载", "processor": "session_load", "kind": "context", "x": 228, "y": 88, "description": "读取当前用户在本次小金智能体会话下的历史轮次与会话摘要。"},
             {"id": "memory_read", "label": "记忆读取", "processor": "memory_read", "kind": "context", "x": 430, "y": 88, "description": "读取用户事实记忆、工作记忆和已有画像。"},
-            {"id": "scope_guard", "label": "范围识别", "processor": "scope_guard", "kind": "guardrail", "x": 646, "y": 88, "description": "先判断问题是否落在 Hermes 的研究和产品能力范围内。"},
+            {"id": "scope_guard", "label": "范围识别", "processor": "scope_guard", "kind": "guardrail", "x": 646, "y": 88, "description": "先判断问题是否落在小金智能体的研究和产品能力范围内。"},
             {"id": "intent_router", "label": "意图路由", "processor": "router", "kind": "llm", "x": 876, "y": 88, "description": "必须调用 LLM 识别意图，模型失败即终止本轮。"},
             {"id": "tool_dispatch", "label": "工具调度", "processor": "tool_dispatch", "kind": "tooling", "x": 1110, "y": 88, "description": "按路由计划调用知识检索、证据链、Dashboard、附件解析和个股详情。"},
             {"id": "answer_synthesis", "label": "答案合成", "processor": "llm_synthesis", "kind": "llm", "x": 1348, "y": 88, "description": "根据工具结果或范围守卫结果做最终回答整合。"},
@@ -99,18 +99,18 @@ DECLARED_AGENT_WORKFLOW_CATALOG = {
     },
     "review_watchlist_analysis": {
         "id": "review_watchlist_analysis",
-        "title": "复盘自选股归纳",
-        "summary": "围绕本次选中的自选股，先归并板块代表性，再输出逐股归纳分析。",
+        "title": "复盘多股综合分析",
+        "summary": "围绕本次选中的自选股，装载本地上下文后调用 Gangtise Agent SSE 输出个股与组合综合分析。",
         "category": "复盘智能体",
         "feature_key": "daily_review",
         "execution_mode": "declared_agent_workflow",
-        "tags": ["大V", "自选股", "板块代表性", "LLM"],
+        "tags": ["大V", "自选股", "组合分析", "Gangtise Agent SSE"],
         "nodes": [
             {"id": "review_watchlist_input", "label": "自选股输入", "processor": "input", "kind": "source", "x": 36, "y": 88, "description": "接收本次复盘已选中的股票列表、用户输入正文和复盘周期。"},
             {"id": "review_watchlist_context", "label": "股票上下文装载", "processor": "context_load", "kind": "context", "x": 324, "y": 88, "description": "加载个股基础信息、行业归属、信号摘要和基本面判断。"},
-            {"id": "review_watchlist_sector_merge", "label": "板块代表性归并", "processor": "sector_merge", "kind": "planner", "x": 632, "y": 88, "description": "按行业或板块归并自选股，生成本次复盘的主线代表性描述。"},
-            {"id": "review_watchlist_llm", "label": "归纳分析生成", "processor": "llm_generation", "kind": "llm", "x": 946, "y": 88, "description": "调用模型生成板块综述和逐股归纳分析。"},
-            {"id": "review_watchlist_output", "label": "分析结果封装", "processor": "output", "kind": "output", "x": 1260, "y": 88, "description": "输出结构化的复盘第二部分，供预览和发布复用。"},
+            {"id": "review_watchlist_sector_merge", "label": "板块上下文归并", "processor": "sector_merge", "kind": "planner", "x": 632, "y": 88, "description": "按行业或板块归并自选股，为 Gangtise 多股分析准备上下文。"},
+            {"id": "review_watchlist_llm", "label": "Gangtise 多股分析", "processor": "gangtise_agent_sse", "kind": "tooling", "x": 946, "y": 88, "description": "调用 /application/open-ai/ai/chat/sse，以 deep_research 模式生成个股与组合综合分析。"},
+            {"id": "review_watchlist_output", "label": "分析结果封装", "processor": "output", "kind": "output", "x": 1260, "y": 88, "description": "保留 Gangtise 完整分析正文和调用元数据，供审核、编辑和发布复用。"},
         ],
         "edges": [
             {"id": "edge_review_watchlist_1", "from": "review_watchlist_input", "to": "review_watchlist_context"},
