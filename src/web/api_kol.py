@@ -1,6 +1,23 @@
 from src.runtime import *
 from src.services import *
 
+
+def _knowledge_feature_disabled_response():
+    if is_feature_enabled("knowledge"):
+        return None
+    return jsonify({"ok": False, "error": "knowledge_feature_disabled"}), 404
+
+
+def _validate_review_source_mode(source_mode):
+    normalized = str(source_mode or "manual").strip().lower() or "manual"
+    if normalized == "voice" and not is_feature_enabled("review_voice_input"):
+        raise ValueError("review_voice_input_disabled")
+    if normalized == "url" and not is_feature_enabled("review_url_input"):
+        raise ValueError("review_url_input_disabled")
+    if normalized not in {"manual", "file", "voice", "url"}:
+        raise ValueError("review_source_mode_invalid")
+    return normalized
+
 @app.route("/api/kol/workbench")
 def api_kol_workbench():
     tenant = get_tenant_by_slug(request.args.get("tenant"))
@@ -12,6 +29,41 @@ def api_kol_workbench():
         app.logger.warning("Database unavailable while building workbench API, using fallback data")
         payload = gen_kol_workbench(tenant, fallback_mode=True)
     return jsonify(payload)
+
+
+@app.route("/api/review/jobs")
+def api_review_jobs():
+    """Return the current DAv's active review jobs so the workspace is resumable."""
+    current_user = get_current_authenticated_user() or {}
+    current_role = str(current_user.get("role") or "").strip().lower()
+    if current_role not in {"dav", "admin"}:
+        return jsonify({"ok": False, "error": "dav_required"}), 403
+    current_tenant_slug = str(current_user.get("tenant_slug") or "").strip().lower()
+    requested_tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    tenant_slug = requested_tenant_slug or current_tenant_slug
+    if current_role != "admin" and current_tenant_slug and tenant_slug != current_tenant_slug:
+        return jsonify({"ok": False, "error": "tenant_scope_forbidden"}), 403
+    if not tenant_slug:
+        return jsonify({"ok": False, "error": "tenant_required"}), 400
+    jobs = list_user_async_jobs(tenant_slug=tenant_slug, limit=80)
+    review_types = {
+        "review_generate_draft",
+        "review_prepare_preview",
+        "review_voice_transcribe",
+        "review_polish_input",
+        "review_compose_draft",
+        "review_publish_embed",
+    }
+    active_jobs = []
+    for job in jobs:
+        if job.get("job_type") not in review_types or job.get("status") not in {"pending", "running"}:
+            continue
+        safe_job = dict(job)
+        safe_payload = dict(safe_job.get("payload") or {})
+        safe_payload.pop("audio_base64", None)
+        safe_job["payload"] = safe_payload
+        active_jobs.append(safe_job)
+    return jsonify({"ok": True, "tenant_slug": tenant_slug, "jobs": active_jobs})
 
 
 @app.route("/api/kol/portal-cms", methods=["POST"])
@@ -35,6 +87,9 @@ def api_save_kol_portal_cms():
 
 @app.route("/api/kol/knowledge/manual", methods=["POST"])
 def api_save_kol_manual_knowledge():
+    blocked = _knowledge_feature_disabled_response()
+    if blocked:
+        return blocked
     body = request.get_json(silent=True) or {}
     tenant_slug = str(body.get("tenant_slug") or request.args.get("tenant") or "").strip().lower()
     try:
@@ -79,6 +134,9 @@ def api_save_kol_manual_knowledge():
 
 @app.route("/api/kol/knowledge/ingest", methods=["POST"])
 def api_ingest_kol_knowledge():
+    blocked = _knowledge_feature_disabled_response()
+    if blocked:
+        return blocked
     body = request.get_json(silent=True) or {}
     tenant_slug = str(body.get("tenant_slug") or request.args.get("tenant") or "").strip().lower()
     knowledge_type = str(body.get("knowledge_type") or "manual").strip().lower()
@@ -130,6 +188,9 @@ def api_ingest_kol_knowledge():
 
 @app.route("/api/admin/knowledge-items")
 def api_admin_knowledge_items():
+    blocked = _knowledge_feature_disabled_response()
+    if blocked:
+        return blocked
     tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
     limit = min(max(int(request.args.get("limit", 120)), 1), 300)
     return jsonify({
@@ -140,6 +201,9 @@ def api_admin_knowledge_items():
 
 @app.route("/api/kol/knowledge-assets")
 def api_kol_knowledge_assets():
+    blocked = _knowledge_feature_disabled_response()
+    if blocked:
+        return blocked
     tenant = get_tenant_by_slug(request.args.get("tenant"))
     try:
         knowledge_hub = fetch_live_knowledge_hub(tenant, limit=160)
@@ -171,6 +235,9 @@ def api_kol_knowledge_assets():
 
 @app.route("/api/admin/knowledge-assets")
 def api_admin_knowledge_assets():
+    blocked = _knowledge_feature_disabled_response()
+    if blocked:
+        return blocked
     tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
     mode = "tenant" if tenant_slug else "platform"
     try:
@@ -228,6 +295,9 @@ def api_admin_knowledge_assets():
 
 @app.route("/api/kol/knowledge-graph")
 def api_kol_knowledge_graph():
+    blocked = _knowledge_feature_disabled_response()
+    if blocked:
+        return blocked
     tenant = get_tenant_by_slug(request.args.get("tenant"))
     try:
         knowledge_hub = fetch_live_knowledge_hub(tenant, limit=120)
@@ -309,6 +379,9 @@ def api_kol_hermes_capability_growth():
 
 @app.route("/api/admin/knowledge-graph")
 def api_admin_knowledge_graph():
+    blocked = _knowledge_feature_disabled_response()
+    if blocked:
+        return blocked
     tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
     mode = "tenant" if tenant_slug else "platform"
     try:
@@ -380,6 +453,9 @@ def api_preview_kol_knowledge_file():
 
 @app.route("/api/kol/knowledge/url-preview", methods=["POST"])
 def api_preview_kol_knowledge_url():
+    blocked = _knowledge_feature_disabled_response()
+    if blocked:
+        return blocked
     body = request.get_json(silent=True) or {}
     try:
         preview = fetch_url_preview(body.get("url"))
@@ -393,6 +469,9 @@ def api_preview_kol_knowledge_url():
 
 @app.route("/api/kol/knowledge/query", methods=["POST"])
 def api_query_kol_knowledge():
+    blocked = _knowledge_feature_disabled_response()
+    if blocked:
+        return blocked
     body = request.get_json(silent=True) or {}
     tenant_slug = str(body.get("tenant_slug") or request.args.get("tenant") or "").strip().lower()
     submit_to_model = bool(body.get("submit_to_model", False))
@@ -456,6 +535,7 @@ def api_generate_review_draft():
             "speaker_name": speaker_name,
             "entry_point": entry_point,
         }
+        payload["source_mode"] = _validate_review_source_mode(payload.get("source_mode"))
         if not str(payload.get("source_text") or "").strip():
             raise ValueError("review_source_text_required")
         job = create_user_async_job(
@@ -496,6 +576,7 @@ def api_polish_review_input():
             "speaker_name": speaker_name,
             "entry_point": entry_point,
         }
+        payload["source_mode"] = _validate_review_source_mode(payload.get("source_mode"))
         if not str(payload.get("source_text") or "").strip():
             raise ValueError("review_source_text_required")
         job = create_user_async_job(

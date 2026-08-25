@@ -3428,6 +3428,47 @@ body { background: var(--surface-2); color: var(--text-main); }
 .review-summary-desc,
 .review-meta-desc { font-size:11px; color:var(--gray-400); line-height:1.7; margin-top:6px; }
 .review-flow-row { display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
+.review-production-page {
+  margin-top:12px;
+  padding:14px;
+  border:1px solid rgba(47,116,192,0.14);
+  border-radius:16px;
+  background:#F7FBFF;
+}
+.review-production-page-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  padding-bottom:12px;
+  border-bottom:1px solid rgba(47,116,192,0.10);
+}
+.review-production-page-title { font-size:18px; color:var(--text-main); font-weight:800; }
+.review-production-page-desc { margin-top:5px; font-size:11px; color:var(--gray-400); line-height:1.7; }
+.review-active-jobs { display:grid; gap:8px; margin:12px 0; }
+.review-active-job {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  padding:10px 12px;
+  border:1px solid rgba(200,169,110,0.24);
+  border-radius:10px;
+  background:#FFFDF6;
+}
+.review-active-job-title { font-size:12px; color:var(--text-main); font-weight:700; }
+.review-active-job-meta { margin-top:3px; font-size:10px; color:var(--gray-400); line-height:1.6; }
+.review-active-job-status { flex:0 0 auto; font-size:10px; color:#9F7B1B; font-weight:700; }
+.review-production-page .review-progress-panel { margin-top:12px; }
+.review-production-page .modal-title { color:var(--text-main); }
+.review-production-page .knowledge-modal-input,
+.review-production-page .knowledge-modal-textarea { color:var(--text-main); }
+.review-production-page .modal-actions {
+  position:sticky;
+  bottom:0;
+  padding-top:12px;
+  background:#F7FBFF;
+}
 .review-flow-step {
   font-size:10px;
   color:var(--gold);
@@ -3671,6 +3712,17 @@ body { background: var(--surface-2); color: var(--text-main); }
   color:var(--gray-400);
   line-height:1.7;
 }
+.review-progress-error {
+  margin-top:10px;
+  padding:10px 12px;
+  border:1px solid rgba(180,35,24,0.22);
+  border-radius:10px;
+  background:#FFF5F3;
+  color:#B42318;
+  font-size:11px;
+  line-height:1.7;
+}
+.review-progress-error span { color:#7A271A; }
 .review-progress-percent {
   font-size:12px;
   font-weight:800;
@@ -4576,7 +4628,7 @@ body,
   <div id="page-review" class="page" data-feature="daily_review">
     <div class="h5-section">
       <div class="h5-section-title">复盘专区</div>
-      <div class="card" style="padding:16px;margin-bottom:12px">
+      <div class="card" id="review-overview-card" style="padding:16px;margin-bottom:12px">
         <div class="review-role-toolbar">
           <div>
             <div class="review-role-title">复盘专区</div>
@@ -4589,6 +4641,18 @@ body,
           <button class="btn-gold" style="flex:1;padding:10px;font-size:12px" id="review-trigger-button" onclick="openReviewTriggerModal()">发起复盘</button>
           <button class="btn-outline" style="flex:1;padding:10px;font-size:12px" onclick="openReviewWatchlistSelector()">查看自选股</button>
         </div>
+        <div id="review-active-jobs-overview-host" class="review-active-jobs" aria-live="polite"></div>
+      </div>
+      <div id="review-production-page" class="review-production-page" style="display:none">
+        <div class="review-production-page-head">
+          <div>
+            <div class="review-production-page-title">新建复盘</div>
+            <div class="review-production-page-desc">这是一个独立的复盘工作区。离开后任务仍会继续，重新进入时会恢复当前生成状态。</div>
+          </div>
+          <button class="btn-outline" type="button" style="padding:7px 11px;font-size:11px" onclick="closeReviewTriggerModal()">返回复盘列表</button>
+        </div>
+        <div id="review-active-jobs-host" class="review-active-jobs" aria-live="polite"></div>
+        <div id="review-production-page-content"></div>
       </div>
       <div id="review-dav-studio" style="display:none"></div>
       <div id="review-report-feed"></div>
@@ -5533,6 +5597,10 @@ let reviewTriggerDraft = {
 };
 const reviewRuntimeStore = {};
 let reviewWatchlistSelectionMode = false;
+let reviewProductionPage = false;
+let reviewActiveJobs = [];
+let reviewActiveJobsTimer = null;
+let reviewActiveJobsLoading = false;
 const REVIEW_PROMPT_TAGS = ['更口语化', '保留原文不改写', '强调风险提示', '适合粉丝阅读', '分成短段落'];
 let reviewStructuredPreview = null;
 let reviewPreviewGenerating = false;
@@ -5557,6 +5625,7 @@ function normalizeReviewStructuredPreview(payload) {
     },
     watchlist_analysis_section: {
       sector_summary: String(watchlistAnalysisSection.sector_summary || '').trim(),
+      combined_text: String(watchlistAnalysisSection.combined_text || source.partial_text || '').trim(),
       sector_profiles: Array.isArray(watchlistAnalysisSection.sector_profiles) ? watchlistAnalysisSection.sector_profiles.map((item) => ({
         sector: String((item || {}).sector || '').trim(),
         stock_names: Array.isArray((item || {}).stock_names) ? item.stock_names.slice(0) : [],
@@ -5588,6 +5657,8 @@ function normalizeReviewStructuredPreview(payload) {
 function buildReviewWatchlistAnalysisText(section) {
   const payload = section && typeof section === 'object' ? section : {};
   const parts = [];
+  const combinedText = String(payload.combined_text || '').trim();
+  if (combinedText) parts.push(combinedText);
   const sectorSummary = String(payload.sector_summary || '').trim();
   if (sectorSummary) parts.push(`板块归纳：${sectorSummary}`);
   const sectorProfiles = Array.isArray(payload.sector_profiles) ? payload.sector_profiles : [];
@@ -7758,6 +7829,24 @@ function renderReviewExperience() {
   const pageHeaderDesc = document.querySelector('#page-review .review-role-desc');
   const host = document.getElementById('review-report-feed');
   if (!host) return;
+  const requestedProductionPage = new URLSearchParams(window.location.search).get('review') === 'compose';
+  if (user.role === 'dav' && requestedProductionPage) reviewProductionPage = true;
+  const productionPage = document.getElementById('review-production-page');
+  const overviewCard = document.getElementById('review-overview-card');
+  if (reviewProductionPage && user.role === 'dav' && productionPage) {
+    if (overviewCard) overviewCard.style.display = 'none';
+    host.style.display = 'none';
+    productionPage.style.display = 'block';
+    renderReviewTriggerModal(user);
+    renderReviewActiveJobs();
+    const existingDraftJob = reviewActiveJobs.find((job) => job.job_type === 'review_generate_draft' && ['pending', 'running'].includes(job.status));
+    if (existingDraftJob) resumeActiveReviewDraftJob(existingDraftJob);
+    if (!reviewActiveJobsLoading && !reviewActiveJobsTimer) loadActiveReviewJobs();
+    return;
+  }
+  if (overviewCard) overviewCard.style.display = '';
+  if (productionPage) productionPage.style.display = 'none';
+  host.style.display = '';
   if (badge) badge.textContent = user.role === 'dav' ? '复盘发布中枢' : '复盘分析报告';
   if (pageHeaderTitle) pageHeaderTitle.textContent = user.role === 'dav' ? '复盘专区' : '复盘分析报告';
   if (pageHeaderDesc) {
@@ -7773,6 +7862,8 @@ function renderReviewExperience() {
   renderReviewPeriodRow();
   renderDavReviewStudio(user);
   host.innerHTML = renderReviewArticleList(currentReviewPeriod);
+  renderReviewActiveJobs();
+  if (user.role === 'dav' && !reviewActiveJobsLoading && !reviewActiveJobsTimer) loadActiveReviewJobs();
 }
 
 function selectReviewPeriod(period) {
@@ -7810,6 +7901,15 @@ function openReviewTriggerModal(sourceMode) {
   reviewTriggerDraft.optimizeRuleMode = 'default';
   reviewTriggerDraft.skipAiProcessing = true;
   reviewTriggerDraft.previewReady = false;
+  if (user.role === 'dav' && document.getElementById('review-production-page')) {
+    reviewProductionPage = true;
+    const url = new URL(window.location.href);
+    url.searchParams.set('review', 'compose');
+    window.history.pushState({}, '', url);
+    switchTab('review');
+    renderReviewExperience();
+    return;
+  }
   const modal = document.getElementById('review-trigger-modal');
   if (!modal) return;
   renderReviewTriggerModal(user);
@@ -7817,6 +7917,18 @@ function openReviewTriggerModal(sourceMode) {
 }
 
 function closeReviewTriggerModal() {
+  if (reviewProductionPage) {
+    reviewProductionPage = false;
+    if (reviewActiveJobsTimer) {
+      window.clearTimeout(reviewActiveJobsTimer);
+      reviewActiveJobsTimer = null;
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.delete('review');
+    window.history.pushState({}, '', url);
+    renderReviewExperience();
+    return;
+  }
   const modal = document.getElementById('review-trigger-modal');
   if (modal) modal.classList.remove('show');
 }
@@ -7974,18 +8086,20 @@ function renderReviewDraftProgressPanel() {
   const percent = Math.max(5, Number(job.progress_percent || 0) || 0);
   const logs = Array.isArray(job.result && job.result.live_log) ? job.result.live_log.slice(-4).reverse() : [];
   const previewMode = !!(reviewPreviewGenerating || reviewPreviewJobState);
+  const failed = String(job.status || '').toLowerCase() === 'failed';
+  const progressMarkup = failed
+    ? `<div class="review-progress-error">${escapeHtml(job.error_message || job.summary || 'Gangtise 多股分析失败')}<br><span>已保留当前任务的阶段日志和部分返回内容，请检查后重试或继续使用已生成内容。</span></div>`
+    : `<div class="review-progress-track"><div class="review-progress-fill" style="width:${Math.min(100, percent)}%"></div></div>`;
   return `
     <div class="review-progress-panel">
       <div class="review-progress-head">
         <div>
-          <div class="review-progress-title">${previewMode ? '大模型正在生成自选股归纳预览' : '大模型正在生成复盘草稿'}</div>
-          <div class="review-progress-subtitle">${escapeHtml(job.summary || '后台仍在工作中，当前会持续展示处理阶段与最新进展。')}</div>
+          <div class="review-progress-title">${failed ? (previewMode ? '自选股分析未完成' : '复盘草稿生成失败') : (previewMode ? '大模型正在生成自选股归纳预览' : '大模型正在生成复盘草稿')}</div>
+          <div class="review-progress-subtitle">${escapeHtml(failed ? (job.error_message || job.summary || 'Gangtise 多股分析失败') : (job.summary || '后台仍在工作中，当前会持续展示处理阶段与最新进展。'))}</div>
         </div>
-        <div class="review-progress-percent">${escapeHtml(String(percent))}%</div>
+        <div class="review-progress-percent">${failed ? '失败' : `${escapeHtml(String(percent))}%`}</div>
       </div>
-      <div class="review-progress-track">
-        <div class="review-progress-fill" style="width:${Math.min(100, percent)}%"></div>
-      </div>
+      ${progressMarkup}
       <div class="review-progress-log">
         <div class="review-progress-log-item">
           <div class="review-progress-log-meta">${escapeHtml(formatReviewJobStage(job.progress_stage || 'processing'))}${job.job_code ? ` · ${escapeHtml(job.job_code)}` : ''}</div>
@@ -8351,7 +8465,7 @@ function renderReviewInputPanel() {
   const titleField = `
     <div style="margin-bottom:12px">
       <label class="knowledge-modal-label" style="display:block;margin-bottom:6px">复盘主题</label>
-      <input id="review-title-input" class="knowledge-modal-input" placeholder="输入本次复盘主题，发布后会直接作为文章标题" value="${escapeAttr(reviewTriggerDraft.reviewTitle || '')}" />
+    <input id="review-title-input" class="knowledge-modal-input" placeholder="输入本次复盘主题，发布后会直接作为文章标题" value="${escapeAttr(reviewTriggerDraft.reviewTitle || '')}" oninput="reviewTriggerDraft.reviewTitle = this.value" />
     </div>
   `;
   if (reviewTriggerDraft.sourceMode === 'voice') {
@@ -8468,6 +8582,7 @@ function renderReviewStructuredReviewPanel() {
   if (reviewTriggerDraft.flowStage !== 'structured_review') return '';
   const structured = normalizeReviewStructuredPreview(reviewStructuredPreview || {});
   const watchlistSection = structured.watchlist_analysis_section || {};
+  const combinedText = String(watchlistSection.combined_text || '').trim();
   const items = Array.isArray(watchlistSection.items) ? watchlistSection.items : [];
   const hasWatchlistAnalysis = !!buildReviewWatchlistAnalysisText(watchlistSection);
   return `
@@ -8479,6 +8594,12 @@ function renderReviewStructuredReviewPanel() {
           <div style="font-size:12px;font-weight:700;color:var(--white);margin-bottom:6px">用户复盘</div>
           <textarea id="review-structured-user-input" class="knowledge-modal-textarea" style="min-height:220px" placeholder="在这里继续修改用户复盘内容。">${escapeHtml(((structured.user_input_section || {}).display_text) || '')}</textarea>
         </div>
+        ${combinedText ? `
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--white);margin-bottom:6px">Gangtise 多股分析（已返回部分）</div>
+            <textarea id="review-structured-combined-text" class="knowledge-modal-textarea" style="min-height:180px" placeholder="这里是 Gangtise 已返回的分析内容，可继续修改。">${escapeHtml(combinedText)}</textarea>
+          </div>
+        ` : ''}
         ${hasWatchlistAnalysis ? `
           <div>
             <div style="font-size:12px;font-weight:700;color:var(--white);margin-bottom:6px">自选股归纳总结</div>
@@ -8543,7 +8664,7 @@ function restoreModalSheetScroll(contentId, snapshot) {
 }
 
 function renderReviewTriggerModal(user) {
-  const host = document.getElementById('review-trigger-modal-content');
+  const host = document.getElementById(reviewProductionPage ? 'review-production-page-content' : 'review-trigger-modal-content');
   if (!host) return;
   const scrollSnapshot = captureModalSheetScroll('review-trigger-modal-content');
   const focusNames = getTenantWatchlistFocus(user.tenant.id);
@@ -8628,6 +8749,130 @@ function renderReviewTriggerModal(user) {
   restoreModalSheetScroll('review-trigger-modal-content', scrollSnapshot);
 }
 
+function reviewActiveJobLabel(job) {
+  const labels = {
+    review_generate_draft: '复盘 Draft 生成',
+    review_prepare_preview: '自选股综合分析',
+    review_voice_transcribe: '语音转写',
+    review_polish_input: '复盘输入润色',
+    review_compose_draft: '复盘完整成稿',
+    review_publish_embed: '复盘发布入库',
+  };
+  return labels[String((job || {}).job_type || '').trim()] || '复盘任务';
+}
+
+function reviewActiveJobStatusLabel(status) {
+  return String(status || '').toLowerCase() === 'running' ? '处理中' : '排队中';
+}
+
+function renderReviewActiveJobs() {
+  const hosts = [
+    document.getElementById('review-active-jobs-host'),
+    document.getElementById('review-active-jobs-overview-host'),
+  ].filter(Boolean);
+  if (!hosts.length) return;
+  const jobs = Array.isArray(reviewActiveJobs) ? reviewActiveJobs : [];
+  const html = jobs.length ? jobs.map((job) => `
+    <div class="review-active-job">
+      <div>
+        <div class="review-active-job-title">${escapeHtml(reviewActiveJobLabel(job))}</div>
+        <div class="review-active-job-meta">${escapeHtml(job.summary || '系统正在后台处理')} · ${escapeHtml(job.job_code || '')}</div>
+      </div>
+      <div class="review-active-job-status">${escapeHtml(reviewActiveJobStatusLabel(job.status))} ${Math.max(0, Number(job.progress_percent || 0))}%</div>
+    </div>
+  `).join('') : '';
+  hosts.forEach((host) => { host.innerHTML = html; });
+}
+
+function hydrateReviewDraftFromJob(job) {
+  const payload = job && job.payload && typeof job.payload === 'object' ? job.payload : {};
+  reviewTriggerDraft.period = String(payload.period || reviewTriggerDraft.period || 'day').trim().toLowerCase() || 'day';
+  reviewTriggerDraft.sourceMode = String(payload.source_mode || reviewTriggerDraft.sourceMode || 'manual').trim().toLowerCase() || 'manual';
+  reviewTriggerDraft.selectedWatchlist = Array.isArray(payload.selected_watchlist) ? payload.selected_watchlist.slice(0) : [];
+  reviewTriggerDraft.aiPrompt = String(payload.prompt_text || '');
+  reviewTriggerDraft.promptTags = Array.isArray(payload.prompt_tags) ? payload.prompt_tags.slice(0) : [];
+  const sourceText = String(payload.source_text || '').trim();
+  if (reviewTriggerDraft.sourceMode === 'voice') reviewTriggerDraft.voiceTranscript = sourceText;
+  else if (reviewTriggerDraft.sourceMode === 'file') reviewTriggerDraft.fileText = sourceText;
+  else if (reviewTriggerDraft.sourceMode === 'url') reviewTriggerDraft.urlText = sourceText;
+  else reviewTriggerDraft.manualHtml = plainTextToRichHtml(sourceText);
+}
+
+function resumeActiveReviewDraftJob(job) {
+  if (!job || !job.job_code || pendingAsyncJobs[job.job_code]) return;
+  hydrateReviewDraftFromJob(job);
+  reviewDraftGenerating = true;
+  reviewDraftJobState = job;
+  reviewTriggerDraft.flowStage = 'draft_generating';
+  renderReviewTriggerModal(getActiveDemoUser());
+  startAsyncJobPolling(job.job_code, {
+    onProgress(nextJob) {
+      reviewDraftJobState = nextJob || reviewDraftJobState;
+      reviewActiveJobs = reviewActiveJobs.map((item) => item.job_code === job.job_code ? reviewDraftJobState : item);
+      renderReviewTriggerModal(getActiveDemoUser());
+      renderReviewActiveJobs();
+    },
+    onSuccess(nextJob) {
+      const result = nextJob.result || {};
+      reviewTriggerDraft.generatedPreviewText = result.text || '';
+      reviewTriggerDraft.draftReviewText = result.text || getReviewDraftContentText();
+      reviewIngestResult = { ...(reviewIngestResult || {}), review_draft_llm: result.llm_model || null };
+      reviewDraftGenerating = false;
+      reviewDraftJobState = nextJob;
+      reviewTriggerDraft.flowStage = 'draft_review';
+      reviewActiveJobs = reviewActiveJobs.filter((item) => item.job_code !== job.job_code);
+      renderReviewTriggerModal(getActiveDemoUser());
+      renderReviewActiveJobs();
+      showToast('智能优化已完成，请先审核用户内容 Draft');
+    },
+    onFailed(nextJob) {
+      reviewDraftGenerating = false;
+      reviewDraftJobState = nextJob;
+      reviewTriggerDraft.flowStage = 'optimize_rule';
+      reviewActiveJobs = reviewActiveJobs.filter((item) => item.job_code !== job.job_code);
+      renderReviewTriggerModal(getActiveDemoUser());
+      renderReviewActiveJobs();
+      showToast(nextJob.error_message || nextJob.summary || '复盘草稿生成失败');
+    },
+  });
+}
+
+async function loadActiveReviewJobs() {
+  const reviewPageActive = document.getElementById('page-review')?.classList.contains('active');
+  if (!reviewProductionPage && !reviewPageActive) {
+    if (reviewActiveJobsTimer) {
+      window.clearTimeout(reviewActiveJobsTimer);
+      reviewActiveJobsTimer = null;
+    }
+    return;
+  }
+  if (reviewActiveJobsLoading) return;
+  reviewActiveJobsLoading = true;
+  const user = getActiveDemoUser();
+  const tenantSlug = String(((user || {}).tenant || {}).slug || '').trim().toLowerCase();
+  if (!tenantSlug || user.role !== 'dav') {
+    reviewActiveJobsLoading = false;
+    return;
+  }
+  try {
+    const response = await fetch(`/api/review/jobs?tenant_slug=${encodeURIComponent(tenantSlug)}`);
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || 'review_jobs_unavailable');
+    reviewActiveJobs = Array.isArray(data.jobs) ? data.jobs : [];
+    renderReviewActiveJobs();
+    const draftJob = reviewActiveJobs.find((job) => job.job_type === 'review_generate_draft');
+    if (draftJob && reviewProductionPage) resumeActiveReviewDraftJob(draftJob);
+  } catch (error) {
+    console.warn('active review jobs unavailable', error);
+  } finally {
+    reviewActiveJobsLoading = false;
+  }
+  if (reviewProductionPage) {
+    if (reviewActiveJobsTimer) window.clearTimeout(reviewActiveJobsTimer);
+    reviewActiveJobsTimer = window.setTimeout(loadActiveReviewJobs, 5000);
+  }
+}
+
 function renderReviewFlowActions() {
   if (reviewPublishSubmitting) {
     return '<button class="btn-outline" disabled>请稍候</button><button class="btn-gold" disabled>发布中...</button>';
@@ -8640,6 +8885,9 @@ function renderReviewFlowActions() {
   }
   if (reviewTriggerDraft.flowStage === 'draft_review') {
     return `<button class="btn-outline" onclick="backToReviewIntake()">回退修改</button><button class="btn-gold" onclick="confirmReviewDraftToPreview()">${reviewTriggerDraft.selectedWatchlist.length ? '生成自选股归纳' : '直接预览'}</button>`;
+  }
+  if (reviewTriggerDraft.flowStage === 'preview_failed') {
+    return '<button class="btn-outline" onclick="backToReviewDraftEdit()">回退修改</button><button class="btn-gold" onclick="prepareReviewStructuredPreview()">重新生成自选股分析</button>';
   }
   if (reviewTriggerDraft.flowStage === 'structured_review') {
     return '<button class="btn-outline" onclick="backToReviewDraftEdit()">回退修改</button><button class="btn-gold" onclick="confirmStructuredReviewToPreview()">进入预览</button>';
@@ -8707,12 +8955,14 @@ function toggleReviewVoiceLlmEnhancement(checked) {
 }
 
 function syncReviewDraftFromModal() {
-  const titleInput = document.getElementById('review-title-input');
+  const reviewHostSelector = reviewProductionPage ? '#review-production-page-content' : '#review-trigger-modal-content';
+  const titleInput = document.querySelector(`${reviewHostSelector} #review-title-input`) || document.getElementById('review-title-input');
   const urlInput = document.getElementById('review-url-input');
   const urlTitleInput = document.getElementById('review-url-title');
   const promptInput = document.getElementById('review-ai-prompt-input');
   const draftReviewInput = document.getElementById('review-draft-review-input');
   const structuredUserInput = document.getElementById('review-structured-user-input');
+  const structuredCombinedText = document.getElementById('review-structured-combined-text');
   const structuredSectorSummary = document.getElementById('review-structured-sector-summary');
   syncReviewDraftFromEditors();
   if (titleInput) reviewTriggerDraft.reviewTitle = String(titleInput.value || '').trim();
@@ -8720,7 +8970,7 @@ function syncReviewDraftFromModal() {
   if (urlTitleInput) reviewTriggerDraft.urlTitle = String(urlTitleInput.value || '').trim();
   if (promptInput) reviewTriggerDraft.aiPrompt = promptInput.value;
   if (draftReviewInput) reviewTriggerDraft.draftReviewText = draftReviewInput.value;
-  if (structuredUserInput || structuredSectorSummary) {
+  if (structuredUserInput || structuredCombinedText || structuredSectorSummary) {
     reviewStructuredPreview = normalizeReviewStructuredPreview(reviewStructuredPreview || {});
     if (structuredUserInput) {
       reviewStructuredPreview.user_input_section = reviewStructuredPreview.user_input_section || {};
@@ -8730,6 +8980,10 @@ function syncReviewDraftFromModal() {
     if (structuredSectorSummary) {
       reviewStructuredPreview.watchlist_analysis_section = reviewStructuredPreview.watchlist_analysis_section || {};
       reviewStructuredPreview.watchlist_analysis_section.sector_summary = structuredSectorSummary.value;
+    }
+    if (structuredCombinedText) {
+      reviewStructuredPreview.watchlist_analysis_section = reviewStructuredPreview.watchlist_analysis_section || {};
+      reviewStructuredPreview.watchlist_analysis_section.combined_text = structuredCombinedText.value;
     }
     const itemNodes = Array.from(document.querySelectorAll('[data-review-watchlist-analysis-index]'));
     const items = ((reviewStructuredPreview.watchlist_analysis_section || {}).items || []);
@@ -8805,6 +9059,16 @@ async function prepareReviewStructuredPreview() {
           resolve();
         },
         onFailed(job) {
+          reviewPreviewJobState = job || reviewPreviewJobState;
+          const failedResult = (job && job.result) || {};
+          reviewStructuredPreview = normalizeReviewStructuredPreview({
+            user_input_section: { display_text: getReviewUserInputDisplayText() },
+            partial_text: failedResult.partial_text || '',
+            watchlist_analysis_section: {
+              combined_text: failedResult.partial_text || '',
+              sector_profiles: failedResult.sector_profiles || [],
+            },
+          });
           reject(new Error(job.error_message || job.summary || '复盘预览生成失败'));
         },
         onError(error) {
@@ -8814,8 +9078,19 @@ async function prepareReviewStructuredPreview() {
     });
   } catch (error) {
     reviewPreviewGenerating = false;
-    reviewPreviewJobState = null;
-    reviewTriggerDraft.flowStage = reviewTriggerDraft.generatedPreviewText ? 'draft_review' : 'intake';
+    if (!reviewPreviewJobState || String(reviewPreviewJobState.status || '').toLowerCase() !== 'failed') {
+      reviewPreviewJobState = {
+        ...(reviewPreviewJobState || {}),
+        status: 'failed',
+        progress_stage: 'failed',
+        progress_percent: 100,
+        summary: '自选股综合分析未完成',
+        error_message: String((error && error.message) || '复盘预览生成失败'),
+        result: (reviewPreviewJobState && reviewPreviewJobState.result) || { live_log: [] },
+      };
+    }
+    const partialAnalysis = buildReviewWatchlistAnalysisText((reviewStructuredPreview || {}).watchlist_analysis_section || {});
+    reviewTriggerDraft.flowStage = partialAnalysis ? 'structured_review' : 'preview_failed';
     renderReviewTriggerModal(user);
     showToast(getReviewDraftGenerationErrorMessage(error));
     return;
@@ -9093,6 +9368,12 @@ async function submitReviewSmartOptimize() {
   const runtime = ensureTenantReviewRuntime(user.tenant.id);
   currentReviewPeriod = reviewTriggerDraft.period;
   if (!validateReviewIntakeReady()) return;
+  const existingDraftJob = reviewActiveJobs.find((job) => job.job_type === 'review_generate_draft' && ['pending', 'running'].includes(job.status));
+  if (existingDraftJob && (!reviewDraftJobState || reviewDraftJobState.job_code !== existingDraftJob.job_code)) {
+    resumeActiveReviewDraftJob(existingDraftJob);
+    showToast('已有复盘草稿正在生成，请勿重复提交');
+    return;
+  }
   if (!hasConfiguredGeneralLlm()) {
     showToast('当前还没有配置可用的大模型。请先到 Admin 的系统专区 · 大模型专区配置一个通用模型。');
     return;
@@ -18575,6 +18856,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 window.addEventListener('focus', () => {
   refreshH5SiteConfig({silent: true});
+});
+
+window.addEventListener('popstate', () => {
+  const user = getActiveDemoUser();
+  const shouldShowProductionPage = new URLSearchParams(window.location.search).get('review') === 'compose';
+  reviewProductionPage = shouldShowProductionPage && user && user.role === 'dav';
+  if (document.getElementById('page-review')?.classList.contains('active')) renderReviewExperience();
 });
 
 document.addEventListener('visibilitychange', () => {

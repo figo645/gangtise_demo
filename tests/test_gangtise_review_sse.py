@@ -66,6 +66,34 @@ class GangtiseReviewSseTest(unittest.TestCase):
         self.assertEqual(result["events"], 4)
         self.assertEqual(result["text"], "第一段第二段第三段纯文本事件")
 
+    def test_sse_client_flushes_partial_text_to_progress_callback_on_stream_error(self):
+        progress = []
+
+        class _FailingResponse(_FakeSseResponse):
+            def __iter__(self):
+                yield 'data: {"content":"已返回的部分分析"}\n'.encode("utf-8")
+                yield b"\n"
+                raise RuntimeError("connection_closed")
+
+        def fake_urlopen(request, timeout):
+            return _FailingResponse([])
+
+        with patch(
+            "src.domain.market_services.get_gangtise_openapi_config",
+            return_value={"base_url": "https://openapi.gangtise.com"},
+        ), patch("src.domain.market_services.urlopen", side_effect=fake_urlopen):
+            result = market_services.post_gangtise_openapi_sse(
+                "/application/open-ai/ai/chat/sse",
+                {"text": "请分析股票"},
+                token="test-token",
+                progress_callback=lambda *args: progress.append(args),
+            )
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["text"], "已返回的部分分析")
+        self.assertEqual(progress[-1][1], "已返回的部分分析")
+        self.assertEqual(progress[-1][2], True)
+
     def test_agent_helper_uses_the_documented_payload(self):
         with patch(
             "src.domain.market_services.post_gangtise_openapi_sse",
@@ -120,6 +148,37 @@ class GangtiseReviewSseTest(unittest.TestCase):
         self.assertEqual(result["combined_text"], "两只股票组合层面的综合结论。")
         self.assertEqual(result["items"], [])
         self.assertEqual(result["endpoint"], "/application/open-ai/ai/chat/sse")
+
+    def test_watchlist_review_progress_persists_partial_gangtise_text(self):
+        matched = [{"name": "贵州茅台", "code": "600519", "market": "SH", "industry": "白酒", "annotations": []}]
+        progress_calls = []
+
+        def fake_progress(job_code, **kwargs):
+            progress_calls.append((job_code, kwargs))
+
+        def fake_gangtise(*args, **kwargs):
+            callback = kwargs["progress_callback"]
+            callback(1, "第一段")
+            callback(5, "第一段第二段")
+            raise RuntimeError("sse_connection_closed")
+
+        with patch("src.domain.ai_services.gen_watchlist_details", return_value={}), patch(
+            "src.domain.ai_services.build_watchlist_annotation_context", return_value=matched
+        ), patch("src.domain.ai_services.report_user_async_job_progress", side_effect=fake_progress), patch(
+            "src.domain.ai_services.call_gangtise_agent_sse", side_effect=fake_gangtise
+        ):
+            with self.assertRaises(RuntimeError):
+                ai_services.analyze_review_watchlist_with_llm(
+                    selected_watchlist=["贵州茅台"],
+                    review_period="day",
+                    source_text="今天关注消费板块。",
+                    tenant_slug="laowang",
+                    job_code="review-job-partial",
+                )
+
+        streaming_updates = [kwargs for job_code, kwargs in progress_calls if kwargs.get("stage") == "watchlist_gangtise_sse_streaming"]
+        self.assertTrue(streaming_updates)
+        self.assertEqual(streaming_updates[-1]["extra_result"]["partial_text"], "第一段第二段")
 
     def test_combined_gangtise_text_is_preserved_in_final_review_text(self):
         with patch(

@@ -1,4 +1,5 @@
 import copy
+import json
 import unittest
 from datetime import date
 from unittest import mock
@@ -8,6 +9,7 @@ import app as app_entry
 import src.web.hooks as web_hooks
 import src.web.pages as web_pages
 from src.domain import ai_services
+from src.domain import core_services
 from src.domain import market_services
 from src.domain.core_services import (
     get_tenant_by_slug,
@@ -56,6 +58,8 @@ class ReviewModuleBddTest(unittest.TestCase):
         html = response.get_data(as_text=True)
         self.assertIn('id="review-report-feed"', html)
         self.assertIn('id="review-trigger-modal-content"', html)
+        self.assertIn('id="review-production-page"', html)
+        self.assertIn('id="review-active-jobs-overview-host"', html)
         self.assertIn("function renderReviewExperience()", html)
         self.assertIn("function publishReviewDraft()", html)
         self.assertIn("function syncPublishedReviewStateToH5(tenantSlug, result)", html)
@@ -94,9 +98,67 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("onclick=\"prepareReviewDirectPreview()\"", html)
         self.assertIn("onclick=\"openReviewOptimizeRuleStep()\"", html)
         self.assertIn("onclick=\"publishReviewDraft()\"", html)
+        self.assertIn("url.searchParams.set('review', 'compose')", html)
+        self.assertIn("function loadActiveReviewJobs()", html)
+        self.assertIn("已有复盘草稿正在生成，请勿重复提交", html)
+        self.assertIn('oninput="reviewTriggerDraft.reviewTitle = this.value"', html)
+        self.assertIn("reviewHostSelector = reviewProductionPage ? '#review-production-page-content' : '#review-trigger-modal-content'", html)
+        self.assertIn("reviewTriggerDraft.flowStage = partialAnalysis ? 'structured_review' : 'preview_failed'", html)
+        self.assertIn("已保留当前任务的阶段日志和部分返回内容", html)
+        self.assertIn("重新生成自选股分析", html)
+        self.assertIn("const combinedText = String(payload.combined_text || '').trim()", html)
+        self.assertIn('id="review-structured-combined-text"', html)
+        self.assertIn("reviewStructuredPreview.watchlist_analysis_section.combined_text = structuredCombinedText.value", html)
+        self.assertIn("const progressMarkup = failed", html)
         self.assertNotIn("id=\"review-skip-ai-processing\"", html)
         self.assertNotIn("function toggleReviewSkipAiProcessing", html)
         self.assertNotIn("不使用大模型处理", html)
+
+    def test_given_h5_dav_review_workspace_when_active_jobs_are_loaded_then_audio_payload_is_not_exposed(self):
+        with mock.patch("src.web.api_kol.get_current_authenticated_user", return_value={"role": "dav", "tenant_slug": self.tenant_slug}), mock.patch(
+            "src.web.api_kol.list_user_async_jobs",
+            return_value=[
+                {
+                    "job_code": "JOB-REVIEW-VOICE-1",
+                    "job_type": "review_voice_transcribe",
+                    "tenant_slug": self.tenant_slug,
+                    "status": "running",
+                    "progress_percent": 45,
+                    "summary": "语音处理中",
+                    "payload": {"audio_base64": "secret-audio", "filename": "review.webm"},
+                }
+            ],
+        ):
+            response = self.client.get(f"/api/review/jobs?tenant_slug={self.tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["jobs"][0]["payload"], {"filename": "review.webm"})
+
+    def test_given_async_review_failure_when_job_is_completed_then_progress_result_is_preserved(self):
+        existing_job = {
+            "result": {
+                "live_log": [{"stage": "watchlist_gangtise_sse_streaming", "text": "已收到部分分析"}],
+                "partial_text": "已返回的部分分析",
+            }
+        }
+        with mock.patch("src.domain.core_services.get_user_async_job", return_value=existing_job), mock.patch(
+            "src.domain.core_services.update_user_async_job"
+        ) as update_job:
+            with app_entry.app.app_context():
+                core_services._complete_user_async_job(
+                    "review-job-1",
+                    False,
+                    summary="任务执行失败",
+                    result={"error_type": "RuntimeError"},
+                    error_message="sse_connection_closed",
+                )
+
+        saved_result = json.loads(update_job.call_args.kwargs["result_json"])
+        self.assertEqual(saved_result["partial_text"], "已返回的部分分析")
+        self.assertEqual(saved_result["live_log"][0]["text"], "已收到部分分析")
+        self.assertEqual(saved_result["error_type"], "RuntimeError")
 
     def test_given_h5_review_file_input_when_uploaded_then_real_parser_handoff_exists(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slug}")

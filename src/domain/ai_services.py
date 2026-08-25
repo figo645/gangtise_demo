@@ -9,6 +9,7 @@ from src.domain.core_services import _estimate_token_count, _extract_usage_token
 from src.domain.agent_workflows import *
 from src.domain.knowledge_graph_services import build_knowledge_graph_artifact
 from src.domain.market_services import *
+from src.domain.market_services import _merge_gangtise_sse_texts
 from src.web.request_helpers import get_client_ip
 from flask import has_request_context
 
@@ -1163,22 +1164,26 @@ def analyze_review_watchlist_with_llm(
                 extra_result={"endpoint": "/application/open-ai/ai/chat/sse", "watchlist_count": len(labels)},
             )
         progress_state = {"last_at": 0.0, "last_count": 0}
+        sse_chunks = []
 
-        def _report_sse_progress(event_count, event_text):
+        def _report_sse_progress(event_count, event_text, force=False):
             if not runtime.get("job_code"):
                 return
+            if event_text:
+                sse_chunks.append(str(event_text))
             now_value = time.time()
-            if event_count - progress_state["last_count"] < 4 and now_value - progress_state["last_at"] < 5:
+            if not force and event_count - progress_state["last_count"] < 4 and now_value - progress_state["last_at"] < 5:
                 return
             progress_state["last_at"] = now_value
             progress_state["last_count"] = event_count
+            partial_text = _merge_gangtise_sse_texts(sse_chunks)
             report_user_async_job_progress(
                 runtime["job_code"],
                 stage="watchlist_gangtise_sse_streaming",
                 percent=min(80, 70 + min(10, event_count // 4)),
                 summary="Gangtise Agent SSE 正在返回多股分析",
                 log_text=f"已收到 Gangtise Agent SSE 第 {event_count} 个响应事件。",
-                extra_result={"event_count": event_count},
+                extra_result={"event_count": event_count, "partial_text": partial_text[:12000]},
             )
 
         gangtise_result = call_gangtise_agent_sse(

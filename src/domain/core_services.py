@@ -3220,6 +3220,8 @@ def is_feature_enabled(feature_name, site_config=None):
         return True
     config = site_config or get_site_config()
     feature_flags = config.get("feature_flags", {}) if isinstance(config, dict) else {}
+    if feature_name == "knowledge" and feature_flags.get("knowledge_module_enabled") is not True:
+        return False
     return feature_flags.get(feature_name) is not False
 
 
@@ -6525,6 +6527,28 @@ def row_to_user_async_job(row):
 
 def create_user_async_job(job_type, payload=None, tenant_slug="", entry_point="", owner_label="", trigger_source="user"):
     payload = payload if isinstance(payload, dict) else {}
+    normalized_job_type = slugify_code(job_type, "job")
+    normalized_tenant_slug = str(tenant_slug or "").strip().lower()
+    normalized_owner_label = str(owner_label or "").strip()
+    deduplicated_review_types = {
+        "review_generate_draft",
+        "review_prepare_preview",
+        "review_polish_input",
+        "review_compose_draft",
+    }
+    if normalized_job_type in deduplicated_review_types and normalized_tenant_slug:
+        existing = get_db().execute(
+            """
+            SELECT * FROM user_async_jobs
+            WHERE job_type = ? AND tenant_slug = ? AND owner_label = ?
+              AND status IN ('pending', 'running')
+            ORDER BY created_at ASC, id ASC
+            LIMIT 1
+            """,
+            (normalized_job_type, normalized_tenant_slug, normalized_owner_label),
+        ).fetchone()
+        if existing:
+            return row_to_user_async_job(existing)
     timestamp = now_ts()
     job_code = f"{slugify_code(job_type, 'job')}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
     db = get_db()
@@ -6538,11 +6562,11 @@ def create_user_async_job(job_type, payload=None, tenant_slug="", entry_point=""
         """,
         (
             job_code,
-            slugify_code(job_type, "job"),
-            str(tenant_slug or "").strip().lower(),
+            normalized_job_type,
+            normalized_tenant_slug,
             str(entry_point or "").strip(),
             str(trigger_source or "user").strip(),
-            str(owner_label or "").strip(),
+            normalized_owner_label,
             json.dumps(payload, ensure_ascii=False),
             "pending",
             "queued",
@@ -7364,6 +7388,11 @@ def _claim_next_user_async_job():
 
 def _complete_user_async_job(job_code, success, summary="", result=None, error_message=""):
     with app.app_context():
+        current_job = get_user_async_job(job_code) or {}
+        current_result = current_job.get("result") if isinstance(current_job.get("result"), dict) else {}
+        final_result = copy.deepcopy(current_result)
+        if isinstance(result, dict):
+            final_result.update(copy.deepcopy(result))
         update_user_async_job(
             job_code,
             status="success" if success else "failed",
@@ -7371,7 +7400,7 @@ def _complete_user_async_job(job_code, success, summary="", result=None, error_m
             progress_percent=100 if success else 100,
             summary=(summary or ("任务执行完成" if success else "任务执行失败"))[:240],
             error_message=(error_message or "")[:2000],
-            result_json=json.dumps(result or {}, ensure_ascii=False)[:20000],
+            result_json=json.dumps(final_result, ensure_ascii=False)[:20000],
             finished_at=now_ts(),
         )
 

@@ -152,6 +152,8 @@ def api_admin_points():
 
 @app.route("/api/review/voice-transcribe", methods=["POST"])
 def api_review_voice_transcribe():
+    if not is_feature_enabled("review_voice_input"):
+        return jsonify({"success": False, "error": "review_voice_input_disabled"}), 404
     audio_file = request.files.get("audio") or request.files.get("file")
     tenant_slug = str(request.form.get("tenant_slug") or "").strip().lower()
     review_period = str(request.form.get("period") or "").strip().lower()
@@ -260,6 +262,11 @@ def api_review_publish_embed():
             "user_input_section": body.get("user_input_section") if isinstance(body.get("user_input_section"), dict) else {},
             "watchlist_analysis_section": body.get("watchlist_analysis_section") if isinstance(body.get("watchlist_analysis_section"), dict) else {},
         }
+        source_mode = payload.get("source_mode")
+        if source_mode == "voice" and not is_feature_enabled("review_voice_input"):
+            raise ValueError("review_voice_input_disabled")
+        if source_mode == "url" and not is_feature_enabled("review_url_input"):
+            raise ValueError("review_url_input_disabled")
         if not str(payload.get("text") or "").strip():
             raise ValueError("publish_text_required")
         if not review_title:
@@ -338,6 +345,11 @@ def api_review_prepare_preview():
             "entry_point": entry_point,
             "include_summary": _is_truthy_flag(body.get("include_summary")) if "include_summary" in body else True,
         }
+        source_mode = payload.get("source_mode")
+        if source_mode == "voice" and not is_feature_enabled("review_voice_input"):
+            raise ValueError("review_voice_input_disabled")
+        if source_mode == "url" and not is_feature_enabled("review_url_input"):
+            raise ValueError("review_url_input_disabled")
         if not str(payload.get("source_text") or "").strip():
             raise ValueError("review_source_text_required")
         job = create_user_async_job(
@@ -1976,6 +1988,11 @@ def api_admin_site_config():
     for key in feature_flags:
         if key in incoming_flags:
             feature_flags[key] = bool(incoming_flags[key])
+    # This rollout gate intentionally starts closed so an old database row
+    # with knowledge=true cannot reopen the module during deployment. The
+    # visible knowledge switch controls both flags when an admin changes it.
+    if "knowledge" in incoming_flags:
+        feature_flags["knowledge_module_enabled"] = bool(incoming_flags["knowledge"])
     auth_settings_payload = normalize_auth_settings_config(
         payload.get("auth_settings")
         if isinstance(payload.get("auth_settings"), dict)

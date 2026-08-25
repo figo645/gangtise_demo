@@ -4794,7 +4794,9 @@
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">自选股</div><div class="feature-toggle-desc">位置：H5 自选股、大V工作台自选股详情。控制标的查询、K线、指标、标注、观察记录及详情页入口。</div></div><label class="toggle"><input id="feature-watchlist" type="checkbox" checked><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">股票 K 线预测</div><div class="feature-toggle-desc">位置：自选股预测能力和大V工作台预测模型页。控制预测结果展示及预测工作流配置入口。</div></div><label class="toggle"><input id="feature-stock_forecast" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">每日复盘</div><div class="feature-toggle-desc">位置：H5 复盘专区、大V工作台复盘生产台和已发布复盘。控制复盘输入、优化成稿、摘要、自选股归纳与发布浏览。</div></div><label class="toggle"><input id="feature-daily_review" type="checkbox" checked><span class="toggle-slider"></span></label></div>
-                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">知识专区</div><div class="feature-toggle-desc">位置：H5、大V工作台和 Admin 知识专区。控制知识源入库、知识问答、百科词条和知识图谱入口。</div></div><label class="toggle"><input id="feature-knowledge" type="checkbox" checked><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">知识专区</div><div class="feature-toggle-desc">位置：H5、大V工作台和 Admin 知识专区。当前因知识库重构暂不开放；重新勾选并保存后，才会恢复知识入口和接口。</div></div><label class="toggle"><input id="feature-knowledge" type="checkbox"><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">复盘语音供稿</div><div class="feature-toggle-desc">位置：H5 与大V工作台复盘供稿方式。当前关闭，恢复后才允许录音和语音转写。</div></div><label class="toggle"><input id="feature-review_voice_input" type="checkbox"><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">复盘网页供稿</div><div class="feature-toggle-desc">位置：H5 与大V工作台复盘供稿方式。当前关闭，恢复后才允许抓取网页 URL。</div></div><label class="toggle"><input id="feature-review_url_input" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">社区</div><div class="feature-toggle-desc">位置：H5 社区与 Admin 社区运营页。控制社区内容流、活动和互动运营相关入口。</div></div><label class="toggle"><input id="feature-community" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">Hermes</div><div class="feature-toggle-desc">位置：H5 Hermes 问答、大V工作台 Hermes 管理和 Admin Hermes 运营区。关闭后不展示问答、会话、记忆及使用统计入口。</div></div><label class="toggle"><input id="feature-hermes" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">渠道模块</div><div class="feature-toggle-desc">位置：Admin 渠道运营与渠道数据页。控制渠道来源、投放归因和渠道运营配置入口。</div></div><label class="toggle"><input id="feature-channel_module" type="checkbox" checked><span class="toggle-slider"></span></label></div>
@@ -10873,6 +10875,7 @@ const SITE_CONFIG_BROADCAST_KEY = 'gangtise-site-config-updated-at';
 
 function isAdminFeatureEnabled(featureName) {
   const flags = (adminSiteConfig && adminSiteConfig.feature_flags) || {};
+  if (featureName === 'knowledge' && flags.knowledge_module_enabled !== true) return false;
   return flags[featureName] !== false;
 }
 
@@ -10913,6 +10916,9 @@ function updateAdminFeatureFlagPreview(target) {
   adminSiteConfig.feature_flags = adminSiteConfig.feature_flags || {};
   const key = target.id.replace(/^feature-/, '');
   adminSiteConfig.feature_flags[key] = Boolean(target.checked);
+  if (key === 'knowledge') {
+    adminSiteConfig.feature_flags.knowledge_module_enabled = Boolean(target.checked);
+  }
   refreshAdminNavVisibility();
   if (key === 'tenant_portal') renderTenantConfigList();
   const forecastSection = document.getElementById('section-forecast-model');
@@ -11684,9 +11690,13 @@ function renderSiteConfigForm() {
   if (document.getElementById('brand-hero-tagline')) document.getElementById('brand-hero-tagline').value = brand.hero_tagline || '';
   if (document.getElementById('brand-hero-description')) document.getElementById('brand-hero-description').value = brand.hero_description || '';
   if (document.getElementById('brand-footer-description')) document.getElementById('brand-footer-description').value = brand.footer_description || '';
-  ['user_module', 'kol_module', 'tenant_portal', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'paid_reply', 'workbench'].forEach(key => {
+  ['user_module', 'kol_module', 'tenant_portal', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'review_voice_input', 'review_url_input', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'paid_reply', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
-    if (checkbox) checkbox.checked = Boolean(flags[key]);
+    if (checkbox) {
+      checkbox.checked = key === 'knowledge'
+        ? flags.knowledge === true && flags.knowledge_module_enabled === true
+        : Boolean(flags[key]);
+    }
   });
   refreshAdminNavVisibility();
   markAdminSiteConfigSaved('修改开关后需要点击保存才会生效。保存后，Admin、大V工作台和 H5 会按最新配置同步显示或隐藏对应功能。');

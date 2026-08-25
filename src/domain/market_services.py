@@ -1026,6 +1026,15 @@ def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_cal
         if callable(progress_callback):
             progress_callback(event_count, text)
 
+    def notify_partial_on_error():
+        partial_text = _merge_gangtise_sse_texts(candidates)
+        if not partial_text or not callable(progress_callback):
+            return
+        try:
+            progress_callback(event_count, partial_text, True)
+        except TypeError:
+            progress_callback(event_count, partial_text)
+
     try:
         with urlopen(request_obj, timeout=timeout) as response:
             for raw_line in response:
@@ -1054,6 +1063,7 @@ def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_cal
             "events": event_count,
         }
     except HTTPError as error:
+        notify_partial_on_error()
         raw = error.read().decode("utf-8", errors="replace")
         parsed = decode_json_payload(raw)
         return {
@@ -1061,25 +1071,27 @@ def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_cal
             "status": error.code,
             "message": str(parsed.get("message") or parsed.get("msg") or raw or "Gangtise Agent SSE 请求失败").strip()[:500],
             "duration_ms": round((time.perf_counter() - started) * 1000),
-            "text": "",
+            "text": _merge_gangtise_sse_texts(candidates),
             "events": event_count,
         }
     except URLError as error:
+        notify_partial_on_error()
         return {
             "ok": False,
             "status": 0,
             "message": f"Gangtise Agent SSE 网络错误：{error.reason}",
             "duration_ms": round((time.perf_counter() - started) * 1000),
-            "text": "",
+            "text": _merge_gangtise_sse_texts(candidates),
             "events": event_count,
         }
     except Exception as error:
+        notify_partial_on_error()
         return {
             "ok": False,
             "status": 0,
             "message": f"Gangtise Agent SSE 调用异常：{error}",
             "duration_ms": round((time.perf_counter() - started) * 1000),
-            "text": "",
+            "text": _merge_gangtise_sse_texts(candidates),
             "events": event_count,
         }
 
