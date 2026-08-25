@@ -2,15 +2,12 @@ pipeline {
     agent any
 
     triggers {
-        gitlab(
-            triggerOnPush: true,
-            triggerOnMergeRequest: true
-        )
+        githubPush()
     }
 
     environment {
-        GITLAB_TOKEN = credentials('jenkins_cred_git')
-        REPO_URL     = "https://gitlab.com/figo645/gangtise_demo.git"
+        GITHUB_TOKEN = credentials('jenkins_cred_git')
+        REPO_URL     = "https://github.com/figo645/gangtise_demo.git"
         BRANCH       = "main"
         WORK_DIR     = "/opt/devsource/gangtise_jenkins_pipeline"
         DEPLOY_DIR   = "/opt/devsource/gangtise_demo"
@@ -45,7 +42,7 @@ pipeline {
 
                         for i in 1 2 3 4 5; do
                             echo "尝试第 \$i 次 git clone..."
-                            if git clone -b ${BRANCH} https://oauth2:\${GITLAB_TOKEN}@\${REPO_URL#https://} .; then
+                            if git -c http.version=HTTP/1.1 clone -b ${BRANCH} https://\${GITHUB_TOKEN}@\${REPO_URL#https://} .; then
                                 echo "git clone 成功"
                                 break
                             else
