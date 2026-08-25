@@ -824,7 +824,7 @@ def build_workbench_data_lake_payload(tenant, watchlist_details=None, news_items
     return {
         "market_overview": {
             "items": market_items,
-            "source": str(market_payload.get("source") or "AKShare"),
+            "source": str(market_payload.get("source") or "Gangtise OpenAPI"),
             "updated_at": str(market_payload.get("updated_at") or ""),
             "stale": bool(market_payload.get("stale")),
             "message": str(market_payload.get("message") or ""),
@@ -832,7 +832,7 @@ def build_workbench_data_lake_payload(tenant, watchlist_details=None, news_items
         },
         "sectors": {
             "items": sector_items,
-            "source": str(sector_payload.get("source") or "AKShare"),
+            "source": str(sector_payload.get("source") or "Gangtise OpenAPI"),
             "updated_at": str(sector_payload.get("updated_at") or ""),
             "stale": bool(sector_payload.get("stale")),
             "message": str(sector_payload.get("message") or ""),

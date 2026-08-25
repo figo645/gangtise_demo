@@ -136,8 +136,13 @@ def index():
 
 @app.route("/h5")
 def h5():
-    if not get_current_authenticated_user():
+    current_authenticated_user = get_current_authenticated_user()
+    if not current_authenticated_user:
         return redirect(url_for("login", next=safe_next_target(request.full_path.rstrip("?"))))
+    # Admin is a platform-governance account, not a tenant-scoped H5 user.
+    # Keep the role boundary explicit before building tenant/user watchlist data.
+    if str(current_authenticated_user.get("role") or "").strip().lower() == "admin":
+        return redirect(url_for("admin"))
     site_config = get_site_config()
     h5_fallback_mode = False
     demo_profiles = []
@@ -177,15 +182,17 @@ def h5():
     # H5 uses the persisted owner-scoped watchlist. An explicit empty map is
     # intentional: it prevents the legacy demo catalog from reappearing after
     # the user removes their last stock.
-    owner = current_demo_profile or get_current_authenticated_user() or {}
+    owner = current_demo_profile or current_authenticated_user or {}
     owner_tenant_slug = str(owner.get("tenant_slug") or ((owner.get("tenant") or {}).get("slug") if isinstance(owner.get("tenant"), dict) else "") or effective_tenant_slug or "").strip().lower()
     owner_profile_id = str(owner.get("username") or owner.get("id") or "").strip()
     try:
-        user_watchlist_details = {
-            str(item.get("code") or "").strip().upper(): item
-            for item in list_user_watchlist_items(owner_tenant_slug, owner_profile_id)
-            if isinstance(item, dict) and str(item.get("code") or "").strip()
-        }
+        user_watchlist_details = {}
+        if owner_tenant_slug and owner_profile_id:
+            user_watchlist_details = {
+                str(item.get("code") or "").strip().upper(): item
+                for item in list_user_watchlist_items(owner_tenant_slug, owner_profile_id)
+                if isinstance(item, dict) and str(item.get("code") or "").strip()
+            }
     except Exception as exc:
         if not is_db_unavailable_error(exc):
             raise

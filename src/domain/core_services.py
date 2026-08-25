@@ -6402,6 +6402,7 @@ def init_db():
         execute_sql_file(conn, sql_dir / "102_seed_market_sector_catalog.sql")
         execute_sql_file(conn, sql_dir / "103_seed_market_index_catalog.sql")
         execute_sql_file(conn, sql_dir / "106_security_master_seed.sql")
+        execute_sql_file(conn, sql_dir / "107_migrate_market_provider_to_gangtise.sql")
 
 
 def init_db_safe():

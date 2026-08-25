@@ -1234,12 +1234,10 @@ def analyze_review_watchlist_with_llm(
             },
             request_timeout_seconds=60,
         )
-        fallback = {
-            "sector_summary": state.get("sector_summary_rule") or "",
-            "items": [],
-        }
-        parsed = _extract_json_payload_from_llm_text(raw, fallback)
-        llm_items = parsed.get("items") if isinstance(parsed.get("items"), list) else []
+        parsed = _extract_json_payload_from_llm_text(raw, {}, strict=True)
+        llm_items = parsed.get("items") if isinstance(parsed.get("items"), list) else None
+        if llm_items is None:
+            raise RuntimeError("review_watchlist_analysis_invalid_items")
         matched = state.get("matched_watchlist_details") if isinstance(state.get("matched_watchlist_details"), list) else []
         normalized_items = []
         annotation_evidence = []
@@ -1255,29 +1253,8 @@ def analyze_review_watchlist_with_llm(
                 ),
                 None,
             )
-            fundamental = detail.get("fundamental") if isinstance(detail.get("fundamental"), dict) else {}
-            forecast = detail.get("forecast") if isinstance(detail.get("forecast"), dict) else {}
-            annotation_default_parts = []
-            for item in annotations[:2]:
-                if not isinstance(item, dict):
-                    continue
-                block = "；".join(
-                    part for part in [
-                        get_watchlist_annotation_content(item),
-                    ]
-                    if part
-                ).strip()
-                if block:
-                    annotation_default_parts.append(block)
-            annotation_default = "；".join(annotation_default_parts).strip()
-            default_analysis = "；".join(
-                part for part in [
-                    annotation_default,
-                    str(detail.get("annotation_summary") or "").strip(),
-                    str(fundamental.get("summary") or "").strip(),
-                    str(forecast.get("band") or "").strip(),
-                ] if part
-            ).strip() or f"{stock_name}当前更适合继续跟踪{sector_name}主线下的业绩兑现、估值位置和下一轮催化。"
+            if not isinstance(hit, dict) or not str(hit.get("analysis_text") or "").strip():
+                raise RuntimeError(f"review_watchlist_analysis_missing_item:{stock_code or stock_name}")
             evidence = hit.get("evidence") if isinstance(hit, dict) and isinstance(hit.get("evidence"), list) else []
             normalized_evidence = [trim_hermes_text(str(item).strip(), limit=60) for item in evidence if str(item).strip()][:4]
             if not normalized_evidence and annotations:
@@ -1299,7 +1276,7 @@ def analyze_review_watchlist_with_llm(
                 "stock_code": stock_code,
                 "sector": str((hit or {}).get("sector") or sector_name).strip() or sector_name,
                 "board_role": str((hit or {}).get("board_role") or f"{sector_name}代表样本").strip()[:80] or f"{sector_name}代表样本",
-                "analysis_text": trim_hermes_text(str((hit or {}).get("analysis_text") or default_analysis).strip(), limit=220),
+                "analysis_text": trim_hermes_text(str(hit.get("analysis_text") or "").strip(), limit=220),
                 "evidence": normalized_evidence,
             })
             for item in annotations[:4]:
@@ -1316,10 +1293,9 @@ def analyze_review_watchlist_with_llm(
                     "note": str(item.get("note") or "").strip(),
                     "trigger": str(item.get("trigger") or "").strip(),
                 })
-        sector_summary = trim_hermes_text(
-            str(parsed.get("sector_summary") or state.get("sector_summary_rule") or "").strip() or (state.get("sector_summary_rule") or ""),
-            limit=150,
-        )
+        sector_summary = trim_hermes_text(str(parsed.get("sector_summary") or "").strip(), limit=150)
+        if not sector_summary:
+            raise RuntimeError("review_watchlist_analysis_empty_sector_summary")
         if runtime.get("job_code"):
             report_user_async_job_progress(
                 runtime["job_code"],
@@ -1428,7 +1404,9 @@ def summarize_review_user_input_with_llm(
     )
     summary = re.sub(r"\s+", " ", str(raw or "").strip())
     summary = summary.replace("摘要：", "").replace("总结：", "").strip()
-    summary = summary[:150].strip() or re.sub(r"\s+", " ", normalized_source)[:150].strip()
+    summary = summary[:150].strip()
+    if not summary:
+        raise RuntimeError("review_summary_empty_llm_response")
     return {
         "summary": summary,
         "llm_model": {
@@ -2956,15 +2934,17 @@ def build_shared_agent_evidence_policy():
             "knowledge_vector_retrieval",
             "evidence_relevance_filter",
             "platform_context_merge",
-            "llm_or_rule_synthesis",
+            "llm_synthesis",
         ],
         "description": "智能体在需要事实依据、研究上下文或证据归因时，优先从当前租户知识库向量库召回，再进入统一证据链整理。",
     }
 
 
-def _extract_json_payload_from_llm_text(text, default):
+def _extract_json_payload_from_llm_text(text, default, strict=False):
     normalized = str(text or "").strip()
     if not normalized:
+        if strict:
+            raise RuntimeError("invalid_llm_json_response:empty")
         return copy.deepcopy(default)
     candidates = [normalized]
     fence_match = re.search(r"```(?:json)?\s*(\{.*?\}|\[.*?\])\s*```", normalized, flags=re.S)
@@ -2977,6 +2957,8 @@ def _extract_json_payload_from_llm_text(text, default):
             continue
         if isinstance(parsed, type(default)):
             return parsed
+    if strict:
+        raise RuntimeError("invalid_llm_json_response")
     return copy.deepcopy(default)
 
 
@@ -3029,7 +3011,11 @@ def filter_knowledge_matches_with_llm(query_text, matches, tenant_slug=""):
         metadata={"candidate_count": len(normalized_matches), "query_length": len(normalized_query)},
         request_timeout_seconds=evidence_chain_cfg.get("filter_timeout_seconds", 25),
     )
-    parsed = _extract_json_payload_from_llm_text(raw, {"relevant_ids": [], "reason": ""})
+    parsed = _extract_json_payload_from_llm_text(
+        raw,
+        {"relevant_ids": [], "reason": ""},
+        strict=True,
+    )
     relevant_ids = {
         str(item).strip()
         for item in (parsed.get("relevant_ids") if isinstance(parsed.get("relevant_ids"), list) else [])
@@ -3126,18 +3112,8 @@ def _build_retrieval_agent_response(
                 source_types=state.get("normalized_sources") or [],
             )
         except Exception as exc:
-            if not is_db_unavailable_error(exc) and not isinstance(exc, RuntimeError):
-                raise
-            app.logger.warning("Retrieval agent dependency unavailable, using empty fallback result: %s", str(exc)[:200])
-            result = {
-                "query": state.get("normalized_query") or "",
-                "answer": "当前检索依赖暂不可用，已回退为空结果。请稍后重试。",
-                "evidence_items": [],
-                "matches": [],
-                "source_types": copy.deepcopy(state.get("normalized_sources") or []),
-                "source_summaries": [],
-                "unsupported_source_types": [],
-            }
+            app.logger.exception("Retrieval agent dependency failed")
+            raise RuntimeError(f"evidence_retrieval_failed:{str(exc)[:240]}") from exc
         return {
             "detail": f"已召回 {len(result.get('evidence_items') or [])} 条候选结果。",
             "state_updates": {"retrieval_result": result},
@@ -3168,19 +3144,23 @@ def _build_retrieval_agent_response(
             feature_code=f"{runtime.get('feature_namespace')}_answer",
         )
         if not llm_model:
+            raise RuntimeError(
+                f"{runtime.get('feature_namespace')}_answer_llm_not_configured"
+            )
+        original_matches = result.get("evidence_items") or []
+        if not original_matches:
             return {
-                "status": "skipped",
-                "detail": "当前没有可用模型，已回退到纯检索。",
+                "status": "ok",
+                "detail": "没有召回候选条目，保留空证据集并交由大模型明确说明证据边界。",
                 "state_updates": {
                     "filtered_result": result,
-                    "llm_notice": "已勾选提交给大模型，但当前没有可用的通用模型配置，已自动回退到纯知识检索模式。",
-                    "llm_mode": "fallback_retrieval",
-                    "llm_enabled": False,
-                    "llm_model": None,
+                    "llm_notice": "已提交给大模型；当前没有召回到候选证据。",
+                    "llm_mode": "model_pending",
+                    "llm_enabled": True,
+                    "llm_model": copy.deepcopy(llm_model),
                 },
-                "context_preview": {"filtered": False, "kept_count": len(result.get("evidence_items") or [])},
+                "context_preview": {"filtered": False, "kept_count": 0},
             }
-        original_matches = result.get("evidence_items") or []
         try:
             filtered_matches, filter_meta, filter_model = filter_knowledge_matches_with_llm(
                 query_text=result.get("query"),
@@ -3218,26 +3198,8 @@ def _build_retrieval_agent_response(
                 },
             }
         except Exception as exc:
-            result["evidence_items"] = original_matches
-            result["matches"] = copy.deepcopy(original_matches)
-            return {
-                "status": "error",
-                "detail": "相关性过滤失败，已回退到原始召回结果。",
-                "state_updates": {
-                    "filtered_result": result,
-                    "llm_notice": f"相关性过滤调用失败，已回退到原始召回结果：{str(exc)}",
-                    "llm_mode": "fallback_retrieval",
-                    "llm_enabled": False,
-                    "llm_model": {
-                        "key": llm_model.get("key"),
-                        "label": llm_model.get("label"),
-                        "provider": llm_model.get("provider"),
-                        "model_name": llm_model.get("model_name"),
-                        "purpose": llm_model.get("purpose"),
-                    },
-                },
-                "context_preview": {"filtered": False, "kept_count": len(original_matches)},
-            }
+            app.logger.exception("Evidence relevance filtering failed")
+            raise RuntimeError(f"evidence_relevance_filter_failed:{str(exc)[:240]}") from exc
 
     def _retrieval_answer_executor(state, runtime, node, upstream):
         result = copy.deepcopy(state.get("filtered_result") or state.get("retrieval_result") or {})
@@ -3246,47 +3208,47 @@ def _build_retrieval_agent_response(
         llm_notice = str(state.get("llm_notice") or "当前为纯知识检索模式，未提交给大模型。").strip()
         llm_enabled = bool(state.get("llm_enabled"))
         llm_mode = str(state.get("llm_mode") or "retrieval_only").strip() or "retrieval_only"
-        if llm_requested and llm_model:
-            filtered_matches = result.get("evidence_items") or []
-            if not filtered_matches:
-                llm_enabled = True
-                llm_mode = "model_filtered_empty"
-                result["answer"] = "当前召回结果经过大模型过滤后，没有发现与问题直接相关的知识条目。"
-            else:
-                system_prompt, user_prompt = build_evidence_chain_chat_prompts(
-                    query_text=result.get("query"),
-                    evidence_items=filtered_matches,
-                    tenant_slug=str(runtime.get("tenant_slug") or "").strip(),
+        if llm_requested:
+            if not llm_model:
+                raise RuntimeError(
+                    f"{runtime.get('feature_namespace')}_answer_llm_not_configured"
                 )
-                try:
-                    answer_model = normalize_llm_model_config(llm_model)
-                    llm_answer = call_openai_compatible_llm(
-                        answer_model,
-                        system_prompt,
-                        user_prompt,
-                        feature_code=f"{runtime.get('feature_namespace')}_answer",
-                        feature_label=answer_feature_label,
-                        tenant_slug=str(runtime.get("tenant_slug") or "").strip(),
-                        entry_point=str(runtime.get("entry_point") or "").strip(),
-                        metadata={
-                            "match_count": len(filtered_matches),
-                            "submit_to_model": True,
-                            "workflow_id": workflow_definition["id"],
-                        },
-                        request_timeout_seconds=get_evidence_chain_config().get("answer_timeout_seconds", 45),
-                    )
-                    result["answer"] = llm_answer
-                    llm_enabled = True
-                    llm_mode = "model_answered"
-                    llm_notice = (
-                        f"{llm_notice}\n\n"
-                        f"当前回答已由通用模型生成：{answer_model.get('label') or answer_model.get('model_name') or answer_model.get('key')}。"
-                        "下方保留的是过滤后的相关知识命中结果。"
-                    ).strip()
-                except Exception as exc:
-                    llm_enabled = False
-                    llm_mode = "fallback_retrieval"
-                    llm_notice = f"{llm_notice}\n\n已尝试调用通用模型生成回答，但失败并回退到纯知识检索：{str(exc)}".strip()
+            filtered_matches = result.get("evidence_items") or []
+            system_prompt, user_prompt = build_evidence_chain_chat_prompts(
+                query_text=result.get("query"),
+                evidence_items=filtered_matches,
+                tenant_slug=str(runtime.get("tenant_slug") or "").strip(),
+            )
+            try:
+                answer_model = normalize_llm_model_config(llm_model)
+                llm_answer = call_openai_compatible_llm(
+                    answer_model,
+                    system_prompt,
+                    user_prompt,
+                    feature_code=f"{runtime.get('feature_namespace')}_answer",
+                    feature_label=answer_feature_label,
+                    tenant_slug=str(runtime.get("tenant_slug") or "").strip(),
+                    entry_point=str(runtime.get("entry_point") or "").strip(),
+                    metadata={
+                        "match_count": len(filtered_matches),
+                        "submit_to_model": True,
+                        "workflow_id": workflow_definition["id"],
+                    },
+                    request_timeout_seconds=get_evidence_chain_config().get("answer_timeout_seconds", 45),
+                )
+            except Exception as exc:
+                app.logger.exception("Evidence chain answer generation failed")
+                raise RuntimeError(f"{runtime.get('feature_namespace')}_answer_llm_failed:{str(exc)[:240]}") from exc
+            if not str(llm_answer or "").strip():
+                raise RuntimeError(f"{runtime.get('feature_namespace')}_answer_empty_llm_response")
+            result["answer"] = str(llm_answer).strip()
+            llm_enabled = True
+            llm_mode = "model_answered"
+            llm_notice = (
+                f"{llm_notice}\n\n"
+                f"当前回答已由通用模型生成：{answer_model.get('label') or answer_model.get('model_name') or answer_model.get('key')}。"
+                "下方保留的是过滤后的相关知识命中结果。"
+            ).strip()
         return {
             "detail": "已完成结果回答整合。",
             "state_updates": {
@@ -6420,17 +6382,9 @@ def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_
             preferred_mode=preferred_mode,
             scope_guard_enabled=scope_guard_enabled,
         ), None, "scope_guard"
-    fallback = default_hermes_intent_plan(
-        question_text=question_text,
-        selected_knowledge_ids=selected_knowledge_ids,
-        attachments=attachments,
-        preferred_mode=preferred_mode,
-        tenant_slug=tenant_slug,
-        scope_guard_enabled=scope_guard_enabled,
-    )
     llm_model = get_default_llm_config(purpose="general", feature_code="hermes_intent_router")
     if not llm_model:
-        return fallback, None, "fallback_rule_router"
+        raise RuntimeError("hermes_intent_router_llm_not_configured")
     try:
         raw = call_openai_compatible_llm(
             llm_model,
@@ -6449,34 +6403,36 @@ def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_
             metadata={"attachment_count": len(attachments), "selected_knowledge_count": len(selected_knowledge_ids)},
             request_timeout_seconds=20,
         )
-        parsed = _extract_json_payload_from_llm_text(raw, fallback)
-        intent = str(parsed.get("intent") or fallback["intent"]).strip()
+        parsed = _extract_json_payload_from_llm_text(raw, {}, strict=True)
+        intent = str(parsed.get("intent") or "").strip()
         if intent not in HERMES_ALLOWED_INTENTS:
-            intent = fallback["intent"]
-        raw_tools = parsed.get("tools") if isinstance(parsed.get("tools"), list) else fallback["tools"]
+            raise RuntimeError("hermes_intent_router_invalid_intent")
+        raw_tools = parsed.get("tools") if isinstance(parsed.get("tools"), list) else []
         tools = []
         for tool in raw_tools:
             value = str(tool or "").strip()
             if value in HERMES_ALLOWED_TOOLS and value not in tools:
                 tools.append(value)
-        if not tools:
-            tools = fallback["tools"]
-        stock_code = find_watchlist_code_from_text(str(parsed.get("stock_code") or "").strip()) or fallback["stock_code"]
-        display_mode = str(parsed.get("display_mode") or fallback["display_mode"]).strip()
+        if "tools" not in parsed or not isinstance(parsed.get("tools"), list):
+            raise RuntimeError("hermes_intent_router_invalid_tools")
+        stock_code = find_watchlist_code_from_text(str(parsed.get("stock_code") or "").strip())
+        display_mode = str(parsed.get("display_mode") or "text").strip()
         if display_mode not in {"text", "structured"}:
-            display_mode = fallback["display_mode"]
+            raise RuntimeError("hermes_intent_router_invalid_display_mode")
         return finalize_hermes_intent_plan({
             "intent": intent,
             "tools": tools[:4],
             "stock_code": stock_code,
-            "indicator_code": str(parsed.get("indicator_code") or fallback.get("indicator_code") or "").strip(),
+            "indicator_code": str(parsed.get("indicator_code") or "").strip(),
             "display_mode": display_mode,
-            "reason": str(parsed.get("reason") or fallback["reason"]).strip()[:200] or fallback["reason"],
-            "preferred_mode": str(parsed.get("preferred_mode") or fallback.get("preferred_mode") or preferred_mode or "").strip().lower(),
+            "reason": str(parsed.get("reason") or "").strip()[:200] or "LLM 路由",
+            "preferred_mode": str(parsed.get("preferred_mode") or preferred_mode or "").strip().lower(),
         }, question_text=question_text, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids), llm_model, "llm_router"
-    except Exception:
+    except RuntimeError:
+        raise
+    except Exception as exc:
         app.logger.exception("Failed to route Hermes query intent")
-        return fallback, llm_model, "fallback_rule_router"
+        raise RuntimeError(f"hermes_intent_router_llm_failed:{str(exc)[:240]}") from exc
 
 
 def trim_hermes_text(value, limit=180):
@@ -7301,13 +7257,8 @@ def hermes_tool_web_search(question_text, limit=4):
             "provider": "google_news_rss",
         }
     except Exception as exc:
-        return {
-            "mode": "web_search_unavailable",
-            "matches": [],
-            "answer": "互联网公开信息暂不可用，当前已回退为只基于租户知识和平台内工具回答。",
-            "error": str(exc)[:200],
-            "provider": "google_news_rss",
-        }
+        app.logger.exception("Hermes web search failed")
+        raise RuntimeError(f"hermes_web_search_failed:{str(exc)[:240]}") from exc
 
 
 def hermes_tool_watchlist_detail(stock_code, question_text=""):
@@ -7599,13 +7550,7 @@ def execute_hermes_tool_plan(plan, tenant_slug, question_text, selected_knowledg
         started_at = time.time()
         tool_spec = registry.get(tool_name)
         if not tool_spec:
-            trace.append({
-                "tool": tool_name,
-                "status": "skipped",
-                "elapsed_ms": int((time.time() - started_at) * 1000),
-                "error": "tool_not_registered",
-            })
-            continue
+            raise RuntimeError(f"hermes_tool_not_registered:{tool_name}")
         try:
             output_key = str(tool_spec.get("output_key") or tool_name.replace(".", "_")).strip()
             outputs[output_key] = tool_spec["executor"](runtime)
@@ -7615,13 +7560,8 @@ def execute_hermes_tool_plan(plan, tenant_slug, question_text, selected_knowledg
                 "elapsed_ms": int((time.time() - started_at) * 1000),
             })
         except Exception as exc:
-            trace.append({
-                "tool": tool_name,
-                "status": "error",
-                "elapsed_ms": int((time.time() - started_at) * 1000),
-                "error": str(exc)[:200],
-            })
             app.logger.exception("Hermes tool execution failed: %s", tool_name)
+            raise RuntimeError(f"hermes_tool_failed:{tool_name}:{str(exc)[:240]}") from exc
     annotation_context = resolve_hermes_watchlist_annotation_context(
         tenant_slug=tenant_slug,
         question_text=question_text,
@@ -7668,8 +7608,8 @@ def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode
     planned_tool_labels = [HERMES_TOOL_LABELS.get(item, item) for item in tools]
     ok_count = sum(1 for item in (tool_trace or []) if str((item or {}).get("status") or "").strip() == "ok")
     error_count = sum(1 for item in (tool_trace or []) if str((item or {}).get("status") or "").strip() == "error")
-    route_label = "LLM 路由" if route_mode == "llm_router" else "规则路由"
-    answer_label = "模型整合回答" if answer_mode == "llm_synthesized" else "规则降级回答"
+    route_label = "LLM 路由" if route_mode == "llm_router" else "范围守卫"
+    answer_label = "模型整合回答" if answer_mode == "llm_synthesized" else "范围守卫收口"
     planning_bits = []
     if capability_label:
         planning_bits.append(f"能力分类：{capability_label}")
@@ -7743,7 +7683,7 @@ def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode
         {
             "key": "answer",
             "title": "结论整合",
-            "status": "ok" if answer_mode != "fallback_plain_answer" else "skipped",
+            "status": "ok" if answer_mode == "llm_synthesized" else "skipped",
             "detail": answer_label + "，输出面向用户的结论、依据和下一步建议。",
         },
     ]
@@ -8087,26 +8027,7 @@ def build_hermes_watchlist_artifact(detail, question_text, synthesis, tool_outpu
     knowledge_matches = ((tool_outputs.get("knowledge") or {}).get("matches") or []) if isinstance(tool_outputs, dict) else []
     evidence_matches = ((tool_outputs.get("evidence") or {}).get("matches") or []) if isinstance(tool_outputs, dict) else []
     bullets = [str(item).strip() for item in (synthesis.get("bullets") if isinstance(synthesis.get("bullets"), list) else []) if str(item).strip()][:3]
-    if not bullets:
-        bullets = [
-            str(item).strip()
-            for item in (fundamental.get("thesis") if isinstance(fundamental.get("thesis"), list) else [])
-            if str(item).strip()
-        ][:3]
-    actions = []
-    drivers = forecast.get("drivers") if isinstance(forecast.get("drivers"), list) else []
-    for item in drivers[:2]:
-        if not isinstance(item, dict):
-            continue
-        label = str(item.get("label") or "").strip()
-        note = str(item.get("note") or "").strip()
-        if label or note:
-            actions.append("：".join(part for part in [label, note] if part))
-    if not actions:
-        actions = [
-            "继续跟踪盈利、估值和行业位置三个变量。",
-            "补充下一轮验证节点，再决定是否继续深挖。",
-        ]
+    actions = [str(item).strip() for item in (synthesis.get("next_steps") if isinstance(synthesis.get("next_steps"), list) else []) if str(item).strip()][:3]
     knowledge_entries = []
     for item in knowledge_matches[:3]:
         if not isinstance(item, dict):
@@ -8121,73 +8042,25 @@ def build_hermes_watchlist_artifact(detail, question_text, synthesis, tool_outpu
     tenant_advisor = str((tenant or {}).get("advisor") or "").strip()
     title_prefix = "📌" if str(forecast.get("verdict") or "").strip() else "🧭"
     answer_text = str(synthesis.get("answer") or "").strip()
+    if not answer_text:
+        raise RuntimeError("hermes_watchlist_artifact_empty_llm_answer")
     kline_rows = (history_kline.get("candles") or []) if isinstance(history_kline, dict) and isinstance(history_kline.get("candles"), list) else (detail.get("kline") if isinstance(detail.get("kline"), list) else [])
-    kline_sentence = ""
-    if kline_rows and isinstance(kline_rows[-1], dict):
-        latest_candle = kline_rows[-1]
-        open_value = NumberLike(latest_candle.get("open"))
-        close_value = NumberLike(latest_candle.get("close"))
-        kline_sentence = (
-            f"最近 K 线最新一根开于 {str(latest_candle.get('open') or '--').strip()}、收于 {str(latest_candle.get('close') or '--').strip()}，"
-            f"区间 {str(latest_candle.get('low') or '--').strip()} 到 {str(latest_candle.get('high') or '--').strip()}，"
-            f"{'收盘强于开盘' if close_value >= open_value else '收盘弱于开盘'}。"
-        )
-    fallback_body = trim_hermes_text(
-        " ".join(
-            part for part in [
-                f"{str(detail.get('name') or detail.get('code') or '该标的').strip()}已按自选股 K 线和基本面资料生成结构化分析。",
-                str(fundamental.get("summary") or "").strip(),
-                kline_sentence,
-                str(forecast.get("band") or "").strip(),
-            ]
-            if part
-        ),
-        limit=520,
-    )
-    generic_answer_markers = (
-        "我先按当前可用的知识和工具结果给你一个文字回答。",
-        "当前优先基于租户知识库和平台工具给你一个结论。",
-    )
-    if (
-        len(answer_text) < 24
-        or any(marker in answer_text for marker in generic_answer_markers)
-        or answer_text.startswith("分析方式偏向")
-    ):
-        answer_text = fallback_body
     raw_summary = str(synthesis.get("summary") or "").strip()
-    if len(raw_summary) < 24 or raw_summary.startswith("分析方式偏向"):
-        raw_summary = str(fundamental.get("summary") or "").strip() or answer_text
-    headline = trim_hermes_text(raw_summary or answer_text or f"{detail.get('name') or detail.get('code') or '该标的'} 已完成结构化分析", limit=90)
-    summary = trim_hermes_text(raw_summary or fundamental.get("summary") or answer_text, limit=220)
+    headline = trim_hermes_text(raw_summary or answer_text, limit=90)
+    summary = trim_hermes_text(raw_summary or answer_text, limit=220)
     if target_snapshot and not target_snapshot.get("data_unavailable"):
         matched_date = str(target_snapshot.get("matched_date") or target_snapshot.get("target_date") or "").strip()
         headline = trim_hermes_text(f"{matched_date} {str(detail.get('name') or detail.get('code') or '该标的').strip()}单日分析", limit=90)
         summary = trim_hermes_text(raw_summary or answer_text or headline, limit=220)
-    lead_conclusion = trim_hermes_text(
-        " ".join(
-            part for part in [
-                f"{str(detail.get('name') or detail.get('code') or '该标的').strip()} 当前建议先按 {str(forecast.get('verdict') or '继续跟踪').strip()} 处理。",
-                str(forecast.get("band") or "").strip(),
-                f"优先验证 {('、'.join([str(item.get('label') or '').strip() for item in drivers if str(item.get('label') or '').strip()][:3])) or '业务、财务与行业位置'}。",
-            ]
-            if part
-        ),
-        limit=190,
-    )
+    lead_conclusion = trim_hermes_text(str(synthesis.get("lead_conclusion") or answer_text).strip(), limit=190)
     analysis_sections = []
-    for title in [
-        "业务结构拆解",
-        "核心竞争力",
-        "估值与市场信号",
-        "风险与挑战",
-        "财务分析",
-        "行业视角",
-        "增长驱动因子",
-        "估值与预期差",
-    ]:
-        body_text = _build_watchlist_section_text(title, detail, fundamental, forecast, metrics, tool_outputs)
-        if body_text:
-            analysis_sections.append({"title": title, "body": body_text})
+    for item in (synthesis.get("analysis_sections") if isinstance(synthesis.get("analysis_sections"), list) else []):
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title") or "").strip()
+        body = str(item.get("body") or "").strip()
+        if title and body:
+            analysis_sections.append({"title": title[:80], "body": trim_hermes_text(body, limit=220)})
     preferred_mode = str((tool_outputs.get("_meta") or {}).get("preferred_mode") or "").strip().lower() if isinstance(tool_outputs, dict) else ""
     resolved_visual_mode = infer_hermes_visual_mode(question_text, preferred_mode=preferred_mode)
     if resolved_visual_mode == "line_chart":
@@ -8211,7 +8084,7 @@ def build_hermes_watchlist_artifact(detail, question_text, synthesis, tool_outpu
             "market": str(detail.get("market") or "").strip(),
             "industry": str(detail.get("industry") or "").strip(),
         },
-        "confidence": str(forecast.get("confidence") or "中").strip() or "中",
+        "confidence": str(synthesis.get("confidence") or "").strip(),
         "metrics": metrics,
         "judgement": bullets,
         "next_steps": actions,
@@ -8508,19 +8381,7 @@ def build_hermes_indicator_artifact(detail, question_text, synthesis, tool_outpu
             },
         ]
     bullets = [str(item).strip() for item in (synthesis.get("bullets") if isinstance(synthesis.get("bullets"), list) else []) if str(item).strip()][:3]
-    if not bullets:
-        bullets = [
-            str(detail.get("interpretation") or "").strip(),
-            str(detail.get("algorithm_detail") or "").strip(),
-            f"最近 {len(anomalies)} 个异动点需要重点跟踪。" if anomalies else "当前没有显著异动点。",
-        ]
-    bullets = [item for item in bullets if item][:3]
-    actions = []
-    if anomalies:
-        actions.append(f"先看最近异动点：{str(anomalies[0].get('date') or '--').strip()} · {str(anomalies[0].get('label') or '异动').strip()}")
-    if source_names:
-        actions.append(f"继续追问底层引用：{' / '.join(source_names[:2])}")
-    actions.append("如果需要，我可以继续解释这个指标适合放在 Dashboard 哪个格子。")
+    actions = [str(item).strip() for item in (synthesis.get("next_steps") if isinstance(synthesis.get("next_steps"), list) else []) if str(item).strip()][:3]
     knowledge_matches = ((tool_outputs.get("knowledge") or {}).get("matches") or []) if isinstance(tool_outputs, dict) else []
     knowledge_entries = []
     for item in knowledge_matches[:3]:
@@ -8533,80 +8394,14 @@ def build_hermes_indicator_artifact(detail, question_text, synthesis, tool_outpu
     annotation_context = (tool_outputs.get("watchlist_annotation_context") or {}) if isinstance(tool_outputs, dict) else {}
     annotation_summary = str(annotation_context.get("summary") or "").strip()
     annotation_items = annotation_context.get("items") if isinstance(annotation_context.get("items"), list) else []
-    annotation_sentence = (
-        f"结合当前租户自选股 K 线标注，市场侧归纳可参考：{annotation_summary}。"
-        if annotation_summary else
-        ""
-    )
-    trend_sentence = ""
-    if target_snapshot and not target_snapshot.get("data_unavailable"):
-        matched_date = str(target_snapshot.get("matched_date") or target_snapshot.get("target_date") or "--").strip() or "--"
-        target_date = str(target_snapshot.get("target_date") or matched_date).strip() or matched_date
-        change_value = NumberLike(target_snapshot.get("change"))
-        change_pct = NumberLike(target_snapshot.get("change_pct"))
-        direction_text = "收涨" if change_value > 0 else ("收跌" if change_value < 0 else "平收")
-        trend_sentence = (
-            f"{str(detail.get('name') or detail.get('indicator_name') or '该指标').strip()}在 {matched_date} "
-            f"{direction_text} {abs(change_value):.2f}{unit_text}，幅度 {abs(change_pct):.2f}% 。"
-        )
-        if not target_snapshot.get("matched_exact") and target_date and target_date != matched_date:
-            trend_sentence = f"{target_date} 不是交易日，当前改按最近一个可用交易日 {matched_date} 处理。{trend_sentence}"
-    elif trend_summary:
-        positive_count = len([item for item in trend_summary if NumberLike(item.get("delta")) > 0])
-        negative_count = len([item for item in trend_summary if NumberLike(item.get("delta")) < 0])
-        direction_text = "偏强震荡" if positive_count > negative_count else "偏弱震荡" if negative_count > positive_count else "区间震荡"
-        range_text = f"{min_value} 到 {max_value}" if min_value is not None and max_value is not None else "当前样本区间"
-        trend_sentence = (
-            f"{str(detail.get('name') or detail.get('indicator_name') or '该指标').strip()}最近 {len(trend_summary)} 个观测点呈{direction_text}，"
-            f"当前值 {value_text}{unit_text}，主要运行区间在 {range_text}。"
-        )
-    kline_sentence = ""
-    candles = (history_kline.get("candles") or []) if isinstance(history_kline, dict) else []
-    if candles and isinstance(candles[-1], dict):
-        latest_candle = candles[-1]
-        open_value = NumberLike(latest_candle.get("open"))
-        close_value = NumberLike(latest_candle.get("close"))
-        kline_sentence = (
-            f"最新一根 K 线开于 {str(latest_candle.get('open') or '--').strip()}、收于 {str(latest_candle.get('close') or '--').strip()}，"
-            f"日内区间 {str(latest_candle.get('low') or '--').strip()} 到 {str(latest_candle.get('high') or '--').strip()}，"
-            f"{'收盘强于开盘' if close_value >= open_value else '收盘弱于开盘'}。"
-        )
-    anomaly_sentence = ""
-    if anomalies and isinstance(anomalies[0], dict):
-        anomaly_sentence = (
-            f"最近需要优先看的异动点在 {str(anomalies[0].get('date') or '--').strip()}，"
-            f"信号为“{str(anomalies[0].get('label') or '异动').strip()}”。"
-        )
-    knowledge_sentence = ""
-    if knowledge_entries:
-        knowledge_sentence = f"知识库里已命中 {knowledge_entries[0]['title']} 等相关资料，可继续追问依据和口径。"
     answer_text = str((synthesis or {}).get("answer") or "").strip()
-    fallback_body = trim_hermes_text(
-        " ".join(
-            item for item in [
-                trend_sentence,
-                kline_sentence,
-                anomaly_sentence,
-                annotation_sentence,
-                knowledge_sentence,
-            ] if item
-        ),
-        limit=520,
-    )
-    if answer_text:
-        body_text = trim_hermes_text(answer_text, limit=520)
-        if annotation_sentence and annotation_summary not in body_text:
-            body_text = trim_hermes_text(f"{body_text} {annotation_sentence}", limit=520)
-        elif len(body_text) < 36 and fallback_body:
-            body_text = fallback_body
-    else:
-        body_text = fallback_body
+    if not answer_text:
+        raise RuntimeError("hermes_indicator_artifact_empty_llm_answer")
+    body_text = trim_hermes_text(answer_text, limit=520)
     summary = trim_hermes_text(
-        str((synthesis or {}).get("summary") or detail.get("assessment") or detail.get("interpretation") or body_text).strip(),
+        str((synthesis or {}).get("summary") or body_text).strip(),
         limit=220,
     )
-    if annotation_summary and annotation_summary not in summary:
-        summary = trim_hermes_text(f"{summary} 并结合自选股标注归纳。", limit=220)
     default_headline = (
         f"{target_snapshot.get('matched_date') or target_snapshot.get('target_date')} {detail.get('name') or '该指标'}单日分析"
         if target_snapshot and not target_snapshot.get("data_unavailable") else
@@ -8616,8 +8411,6 @@ def build_hermes_indicator_artifact(detail, question_text, synthesis, tool_outpu
         str((synthesis or {}).get("summary") or body_text or default_headline).strip(),
         limit=90,
     )
-    if annotation_sentence:
-        bullets.append(trim_hermes_text(annotation_sentence, limit=96))
     bullets = [item for item in bullets if item][:4]
     preferred_mode = str((tool_outputs.get("_meta") or {}).get("preferred_mode") or "").strip().lower() if isinstance(tool_outputs, dict) else ""
     resolved_visual_mode = infer_hermes_visual_mode(question_text, preferred_mode=preferred_mode)
@@ -8811,56 +8604,22 @@ def build_hermes_synthesis_prompt(question_text, plan, tool_outputs, tenant_slug
         "必须先依据租户知识结果，再参考平台内工具，最后才参考互联网补充结果。"
         "如果存在租户自选股K线标注摘要，应把它视为研究侧补充证据，融入结论、解读或边界说明。"
         "如果存在互联网补充结果，可以按公开信息口径组织回答，但不能把互联网信息盖过租户知识。"
-        "如果证据不足，要明确说边界。"
+        "如果证据不足，要明确说边界。结构化展示中的判断要点、下一步、结论和分析分段也必须来自你的输出，不要让程序根据行情字段代写。"
         f"{style_instruction}"
         "输出必须是 JSON。"
     )
     user_prompt = (
         "\n\n".join(blocks) +
         "\n\n请输出 JSON："
-        '{"answer":"中文最终回答","summary":"一句摘要","bullets":["..."],"citations":["..."]}'
+        '{"answer":"中文最终回答","summary":"一句摘要","lead_conclusion":"结论","bullets":["模型判断要点"],"analysis_sections":[{"title":"分析维度","body":"模型分析"}],"next_steps":["模型建议的下一步"],"confidence":"中","citations":["..." ]}'
     )
     return system_prompt, user_prompt
 
 
 def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", user_role="", preferred_mode="", messages=None, web_answer=False, memory_state=None, response_style="structured"):
-    fallback_answer = "我先按当前可用的知识和工具结果给你一个文字回答。"
-    fallback = {
-        "answer": ensure_hermes_positive_opening(
-            fallback_answer,
-            question_text=question_text,
-            intent=str(plan.get("intent") or "").strip(),
-            scope_status=str(plan.get("scope_status") or "allowed").strip(),
-        ),
-        "summary": str(plan.get("reason") or "已完成工具组合查询").strip(),
-        "bullets": [],
-        "citations": [],
-    }
-    watchlist_detail = (((tool_outputs or {}).get("watchlist") or {}).get("detail") or {}) if isinstance((tool_outputs or {}).get("watchlist"), dict) else {}
-    if isinstance(watchlist_detail, dict) and watchlist_detail:
-        watchlist_rule_synthesis = build_hermes_watchlist_rule_synthesis(
-            question_text=question_text,
-            plan=plan,
-            detail=watchlist_detail,
-        )
-        if isinstance(watchlist_rule_synthesis, dict) and watchlist_rule_synthesis:
-            fallback = watchlist_rule_synthesis
-            if str(watchlist_detail.get("analysis_scope") or "").strip() == "specific_date":
-                return watchlist_rule_synthesis, None, "rule_watchlist_specific_date"
-    indicator_detail = (((tool_outputs or {}).get("indicator") or {}).get("detail") or {}) if isinstance((tool_outputs or {}).get("indicator"), dict) else {}
-    if isinstance(indicator_detail, dict) and indicator_detail:
-        indicator_rule_synthesis = build_hermes_indicator_rule_synthesis(
-            question_text=question_text,
-            plan=plan,
-            detail=indicator_detail,
-        )
-        if isinstance(indicator_rule_synthesis, dict) and indicator_rule_synthesis:
-            fallback = indicator_rule_synthesis
-            if str(indicator_detail.get("analysis_scope") or "").strip() == "specific_date":
-                return indicator_rule_synthesis, None, "rule_indicator_specific_date"
     llm_model = get_default_llm_config(purpose="general", feature_code="hermes_answer_synthesis")
     if not llm_model:
-        return fallback, None, "fallback_plain_answer"
+        raise RuntimeError("hermes_answer_synthesis_llm_not_configured")
     try:
         response_style = str(response_style or (memory_state or {}).get("preferred_response_style") or "").strip() or "structured"
         system_prompt, user_prompt = build_hermes_synthesis_prompt(
@@ -8886,26 +8645,36 @@ def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", 
             metadata={"intent": plan.get("intent"), "tool_count": len(plan.get("tools") or []), "response_style": response_style},
             request_timeout_seconds=40,
         )
-        parsed = _extract_json_payload_from_llm_text(raw, fallback)
-        answer = str(parsed.get("answer") or fallback_answer).strip() or fallback_answer
-        answer = ensure_hermes_positive_opening(
-            answer,
-            question_text=question_text,
-            intent=str(plan.get("intent") or "").strip(),
-            scope_status=str(plan.get("scope_status") or "allowed").strip(),
-        )
-        summary = str(parsed.get("summary") or plan.get("reason") or "").strip()[:240]
+        parsed = _extract_json_payload_from_llm_text(raw, {}, strict=True)
+        answer = str(parsed.get("answer") or "").strip()
+        summary = str(parsed.get("summary") or "").strip()[:240]
+        if not answer:
+            raise RuntimeError("hermes_answer_synthesis_empty_answer")
         bullets = [str(item).strip() for item in (parsed.get("bullets") if isinstance(parsed.get("bullets"), list) else []) if str(item).strip()][:6]
         citations = [str(item).strip() for item in (parsed.get("citations") if isinstance(parsed.get("citations"), list) else []) if str(item).strip()][:8]
+        analysis_sections = []
+        for item in (parsed.get("analysis_sections") if isinstance(parsed.get("analysis_sections"), list) else []):
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("title") or "").strip()
+            body = str(item.get("body") or "").strip()
+            if title and body:
+                analysis_sections.append({"title": title[:80], "body": body[:600]})
         return {
             "answer": answer,
             "summary": summary,
+            "lead_conclusion": str(parsed.get("lead_conclusion") or "").strip()[:240],
             "bullets": bullets,
+            "analysis_sections": analysis_sections[:8],
+            "next_steps": [str(item).strip() for item in (parsed.get("next_steps") if isinstance(parsed.get("next_steps"), list) else []) if str(item).strip()][:6],
+            "confidence": str(parsed.get("confidence") or "").strip()[:20],
             "citations": citations,
         }, llm_model, "llm_synthesized"
-    except Exception:
+    except RuntimeError:
+        raise
+    except Exception as exc:
         app.logger.exception("Failed to synthesize Hermes answer")
-        return fallback, llm_model, "fallback_plain_answer"
+        raise RuntimeError(f"hermes_answer_synthesis_llm_failed:{str(exc)[:240]}") from exc
 
 
 def build_hermes_query_response(body):
@@ -9094,26 +8863,6 @@ def build_hermes_query_response(body):
             plan=state.get("intent_plan") or {},
             tool_outputs=state.get("tool_outputs") or {},
         )
-        if isinstance(missing_capability, dict) and missing_capability:
-            synthesis = build_hermes_missing_capability_synthesis(
-                question_text=runtime.get("question_text") or "",
-                plan=state.get("intent_plan") or {},
-                missing_capability=missing_capability,
-            )
-            return {
-                "status": "skipped",
-                "detail": "已识别当前问题需要新增能力，先按能力缺口回复。",
-                "state_updates": {
-                    "synthesis": synthesis,
-                    "answer_model": None,
-                    "answer_mode": "capability_gap_reply",
-                    "missing_capability": missing_capability,
-                },
-                "context_preview": {
-                    "answer_chars": len(str((synthesis or {}).get("answer") or "")),
-                    "bullet_count": len((synthesis or {}).get("bullets") or []),
-                },
-            }
         synthesis, answer_model, answer_mode = synthesize_hermes_answer(
             question_text=runtime.get("question_text") or "",
             plan=state.get("intent_plan") or {},
@@ -9132,6 +8881,7 @@ def build_hermes_query_response(body):
                 "synthesis": synthesis,
                 "answer_model": answer_model,
                 "answer_mode": answer_mode,
+                "missing_capability": missing_capability,
             },
             "context_preview": {
                 "answer_chars": len(str((synthesis or {}).get("answer") or "")),
@@ -9393,6 +9143,8 @@ def process_review_voice_upload(file_storage, tenant_slug="", review_period="", 
         else transcription_cfg.get("api_model")
     )
     raw_transcript = str(transcript or "").strip()
+    if use_llm_enhancement and not raw_transcript:
+        raise RuntimeError("review_voice_transcript_empty")
     cleaned_transcript = raw_transcript
     cleanup_mode = "none"
     cleanup_steps = []
@@ -9418,21 +9170,18 @@ def process_review_voice_upload(file_storage, tenant_slug="", review_period="", 
     llm_model_info = None
     llm_workflow_meta = None
     if use_llm_enhancement and raw_transcript:
-        try:
-            llm_result = enhance_review_voice_transcript_with_llm(
-                cleaned_transcript or raw_transcript,
-                entry_point=entry_point,
-                speaker_name=speaker_name,
-                tenant_slug=tenant_slug,
-            )
-            enhanced_transcript = str(llm_result.get("text") or "").strip()
-            llm_model_info = llm_result.get("model")
-            llm_workflow_meta = copy.deepcopy(llm_result.get("workflow_meta") or {})
-            llm_enhanced = bool(enhanced_transcript)
-            if llm_enhanced:
-                llm_notice = "已完成基础转写，并由大模型整理为更适合编辑和入库的文本。"
-        except Exception as exc:
-            llm_notice = f"已完成基础转写，但大模型增强失败，已回退原始转写：{str(exc)}"
+        llm_result = enhance_review_voice_transcript_with_llm(
+            cleaned_transcript or raw_transcript,
+            entry_point=entry_point,
+            speaker_name=speaker_name,
+            tenant_slug=tenant_slug,
+        )
+        enhanced_transcript = str(llm_result.get("text") or "").strip()
+        llm_model_info = llm_result.get("model")
+        llm_workflow_meta = copy.deepcopy(llm_result.get("workflow_meta") or {})
+        llm_enhanced = bool(enhanced_transcript)
+        if llm_enhanced:
+            llm_notice = "已完成基础转写，并由大模型整理为更适合编辑和入库的文本。"
     elif cleaned_transcript and cleaned_transcript != raw_transcript:
         llm_notice = "已完成基础转写，并做术语纠错与规则清洗。"
     return {
@@ -9554,24 +9303,20 @@ def build_review_evidence_chain_section(review_text="", tenant_slug="", review_t
     if not query_text:
         return empty_payload
 
-    knowledge_result = {}
-    web_result = {}
-    try:
-        knowledge_result = build_evidence_chain_response(
-            tenant_slug=tenant_slug,
-            query_text=query_text,
-            limit=4,
-            submit_to_model=True,
-            source_types=["knowledge"],
-            entry_point=entry_point,
-            feature_namespace="review_evidence_chain",
-        )
-    except Exception:
-        knowledge_result = {}
+    knowledge_result = build_evidence_chain_response(
+        tenant_slug=tenant_slug,
+        query_text=query_text,
+        limit=4,
+        submit_to_model=True,
+        source_types=["knowledge"],
+        entry_point=entry_point,
+        feature_namespace="review_evidence_chain",
+    )
     try:
         web_result = hermes_tool_web_search(query_text, limit=4)
-    except Exception:
-        web_result = {"matches": []}
+    except Exception as exc:
+        app.logger.exception("Review evidence web search failed")
+        raise RuntimeError(f"review_evidence_web_search_failed:{str(exc)[:240]}") from exc
 
     knowledge_items = [copy.deepcopy(item) for item in ((knowledge_result.get("evidence_items") or []) if isinstance(knowledge_result, dict) else []) if isinstance(item, dict)]
     web_matches = [copy.deepcopy(item) for item in ((web_result.get("matches") or []) if isinstance(web_result, dict) else []) if isinstance(item, dict)]
@@ -9607,7 +9352,9 @@ def build_review_evidence_chain_section(review_text="", tenant_slug="", review_t
 
     summary = _summarize_review_evidence_chain_fallback(knowledge_items, web_matches)
     synthesis_model = get_default_llm_config(purpose="general", feature_code="review_evidence_chain_synthesis")
-    if synthesis_model and items:
+    if not synthesis_model:
+        raise RuntimeError("review_evidence_chain_synthesis_llm_not_configured")
+    if items:
         evidence_blocks = []
         for idx, item in enumerate(items[:6], start=1):
             evidence_blocks.append(
@@ -9638,7 +9385,9 @@ def build_review_evidence_chain_section(review_text="", tenant_slug="", review_t
                     "web_match_count": len(web_matches),
                 },
                 request_timeout_seconds=25,
-            ).strip() or summary
+            ).strip()
+            if not summary:
+                raise RuntimeError("review_evidence_chain_synthesis_empty_llm_response")
             llm_model = {
                 "key": synthesis_model.get("key"),
                 "label": synthesis_model.get("label"),
@@ -9646,8 +9395,9 @@ def build_review_evidence_chain_section(review_text="", tenant_slug="", review_t
                 "model_name": synthesis_model.get("model_name"),
                 "purpose": synthesis_model.get("purpose"),
             }
-        except Exception:
-            pass
+        except Exception as exc:
+            app.logger.exception("Review evidence chain synthesis failed")
+            raise RuntimeError(f"review_evidence_chain_synthesis_llm_failed:{str(exc)[:240]}") from exc
 
     summary = str(summary or "").strip() or "暂无匹配的证据链"
     if "暂无" in summary and not knowledge_items and not web_matches:

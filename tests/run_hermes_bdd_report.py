@@ -15,6 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 import app as app_entry
 import src.web.hooks as web_hooks
+import src.web.pages as web_pages
 from src.domain import ai_services
 from src.services import get_tenant_configs
 
@@ -59,6 +60,12 @@ def render_json_preview(value: Any) -> str:
 def first_artifact(payload: dict[str, Any]) -> dict[str, Any]:
     artifacts = payload.get("artifacts") if isinstance(payload.get("artifacts"), list) else []
     return artifacts[0] if artifacts and isinstance(artifacts[0], dict) else {}
+
+
+def validate_strict_llm_failure(payload: dict[str, Any]) -> tuple[bool, str]:
+    error = str(payload.get("error") or "")
+    passed = payload.get("_http_status") == 503 and payload.get("ok") is False and "llm_" in error
+    return passed, "模型未配置时已返回 503 和明确错误，未生成规则或模板答案。" if passed else f"未得到严格模型错误：{error}"
 
 
 def call_hermes(client, tenant_slug: str, question: str, **extra: Any) -> dict[str, Any]:
@@ -203,7 +210,7 @@ def render_html_report(report: dict[str, Any]) -> str:
         <div class="metric"><div class="name">Scenario</div><div class="value">{len(scenarios)}</div></div>
         <div class="metric"><div class="name">Pass</div><div class="value">{passed}</div></div>
         <div class="metric"><div class="name">Fail</div><div class="value">{failed}</div></div>
-        <div class="metric"><div class="name">LLM</div><div class="value">Fallback</div></div>
+        <div class="metric"><div class="name">LLM</div><div class="value">Strict</div></div>
       </div>
     </section>
     <section class="section">
@@ -218,7 +225,14 @@ def render_html_report(report: dict[str, Any]) -> str:
 def main() -> int:
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     original_is_authenticated = web_hooks.is_authenticated
+    original_authenticated_user = web_pages.get_current_authenticated_user
     web_hooks.is_authenticated = lambda: True
+    web_pages.get_current_authenticated_user = lambda: {
+        "username": "bdd-hermes-dav",
+        "role": "dav",
+        "tenant_slug": "laowang",
+        "tenant": {"slug": "laowang"},
+    }
     tenant_slug = pick_tenant_slug()
     report: dict[str, Any] = {
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -237,20 +251,9 @@ def main() -> int:
                     "我想看看中国银行这支股票的K线图以及分析",
                     name="个股 K 线 + 分析",
                     given="用户明确输入中国银行这只股票，并要求看 K 线图和分析。",
-                    when="调用 /api/hermes/query，且 LLM 不可用时走规则降级链路。",
-                    then="Hermes 必须返回自选股结构化 artifact，包含 K 线图数据和可读分析正文。",
-                    validator=lambda payload: (
-                        payload.get("ok") is True
-                        and payload.get("intent") == "watchlist_fundamental"
-                        and payload.get("display_mode") == "structured"
-                        and first_artifact(payload).get("type") == "watchlist_analysis"
-                        and ((first_artifact(payload).get("symbol") or {}).get("code") == "601988")
-                        and ((first_artifact(payload).get("chart") or {}).get("kind") == "kline")
-                        and len((first_artifact(payload).get("chart") or {}).get("points") or []) > 0
-                        and "中国银行" in str(first_artifact(payload).get("body") or "")
-                        and not str(first_artifact(payload).get("body") or "").startswith("分析方式偏向"),
-                        "已返回中国银行自选股 K 线 artifact，并生成正文分析。"
-                    ),
+                    when="调用 /api/hermes/query，且 LLM 未配置时执行严格失败策略。",
+                    then="Hermes 必须返回明确错误，不得返回规则或模板答案。",
+                    validator=validate_strict_llm_failure,
                 )
             )
             report["scenarios"].append(
@@ -261,17 +264,8 @@ def main() -> int:
                     name="指数 K 线 + 解读",
                     given="用户明确要求查看上证综合指数最近 3 个月 K 线图并解读。",
                     when="调用 Hermes 查询接口。",
-                    then="Hermes 必须返回指标结构化 artifact，图表类型为 kline，并带有解读正文。",
-                    validator=lambda payload: (
-                        payload.get("ok") is True
-                        and payload.get("intent") == "smart_indicator_explain"
-                        and payload.get("display_mode") == "structured"
-                        and first_artifact(payload).get("type") == "indicator_analysis"
-                        and ((first_artifact(payload).get("chart") or {}).get("kind") == "kline")
-                        and len(((first_artifact(payload).get("chart") or {}).get("kline") or {}).get("candles") or []) > 0
-                        and "上证" in str(first_artifact(payload).get("body") or first_artifact(payload).get("summary") or ""),
-                        "已返回上证指数 K 线指标 artifact，并包含指标解读。"
-                    ),
+                    then="模型未配置时必须直接返回错误，不得生成指标 artifact。",
+                    validator=validate_strict_llm_failure,
                 )
             )
             report["scenarios"].append(
@@ -282,14 +276,8 @@ def main() -> int:
                     name="指数线性趋势图",
                     given="用户明确要求线图，不要 K 线。",
                     when="调用 Hermes 查询接口。",
-                    then="Hermes 必须把图表类型解析为 trend/line，而不是 kline。",
-                    validator=lambda payload: (
-                        payload.get("ok") is True
-                        and first_artifact(payload).get("type") == "indicator_analysis"
-                        and ((first_artifact(payload).get("chart") or {}).get("kind") == "trend")
-                        and len((first_artifact(payload).get("chart") or {}).get("series") or []) > 0,
-                        "线图需求已解析为 trend，未误用 K 线图。"
-                    ),
+                    then="模型未配置时必须直接返回错误，不得生成趋势图 artifact。",
+                    validator=validate_strict_llm_failure,
                 )
             )
             report["scenarios"].append(
@@ -300,14 +288,8 @@ def main() -> int:
                     name="知识库问答",
                     given="用户围绕租户知识库提问。",
                     when="调用 Hermes 查询接口。",
-                    then="Hermes 必须先执行 knowledge.search，并以文字回答承接。",
-                    validator=lambda payload: (
-                        payload.get("ok") is True
-                        and payload.get("intent") == "knowledge_lookup"
-                        and any((item or {}).get("tool") == "knowledge.search" for item in (payload.get("tool_trace") or []))
-                        and first_artifact(payload).get("type") == "text_response",
-                        "知识库问答已进入 knowledge_lookup，并先查知识库。"
-                    ),
+                    then="模型未配置时必须直接返回错误，不得用纯检索结果回答。",
+                    validator=validate_strict_llm_failure,
                 )
             )
             report["scenarios"].append(
@@ -318,14 +300,9 @@ def main() -> int:
                     name="报告解读",
                     given="用户上传文件后要求 Hermes 解读报告。",
                     when="带附件调用 Hermes 查询接口。",
-                    then="Hermes 必须执行 attachment.context，并按报告解读/知识问答链路输出。",
+                    then="模型未配置时必须直接返回错误，不得用附件原文或模板回答。",
                     attachments=[{"filename": "demo_report.txt", "summary": "银行板块研报", "body": "银行板块需要关注净息差、资产质量和股息稳定性。"}],
-                    validator=lambda payload: (
-                        payload.get("ok") is True
-                        and any((item or {}).get("tool") == "attachment.context" for item in (payload.get("tool_trace") or []))
-                        and first_artifact(payload).get("type") == "text_response",
-                        "附件已进入 attachment.context，报告解读链路可用。"
-                    ),
+                    validator=validate_strict_llm_failure,
                 )
             )
             report["scenarios"].append(
@@ -336,13 +313,8 @@ def main() -> int:
                     name="产品帮助",
                     given="用户询问平台功能使用。",
                     when="调用 Hermes 查询接口。",
-                    then="Hermes 必须进入 product_help，而不是错误调用图表能力。",
-                    validator=lambda payload: (
-                        payload.get("ok") is True
-                        and payload.get("intent") == "product_help"
-                        and first_artifact(payload).get("type") == "text_response",
-                        "产品帮助场景路由正确。"
-                    ),
+                    then="模型未配置时必须直接返回错误，不得返回产品帮助模板。",
+                    validator=validate_strict_llm_failure,
                 )
             )
             scope = ai_services.hermes_scope_guard("今天天气什么时候来上海？", tenant_slug=tenant_slug)
@@ -404,6 +376,7 @@ def main() -> int:
         )
     finally:
         web_hooks.is_authenticated = original_is_authenticated
+        web_pages.get_current_authenticated_user = original_authenticated_user
 
     REPORT_JSON_PATH.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     REPORT_HTML_PATH.write_text(render_html_report(report), encoding="utf-8")

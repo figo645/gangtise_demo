@@ -139,7 +139,7 @@ class RouteSmokeTest(unittest.TestCase):
 
     def test_market_overview_reads_persisted_snapshot_without_provider_call(self):
         from src.domain import market_services
-        snapshot = {"ok": True, "snapshot_version": 3, "source": "AKShare", "items": [{"indicator_code": "source_shanghai_index", "name": "上证指数", "price": 3500.2, "available": True}]}
+        snapshot = {"ok": True, "snapshot_version": 6, "source": "Gangtise OpenAPI", "items": [{"indicator_code": "source_shanghai_index", "name": "上证指数", "price": 3500.2, "available": True}]}
         with patch.object(market_services, "_load_watchlist_cache", return_value=snapshot), patch.object(market_services, "_load_akshare", side_effect=AssertionError("H5 must not call AkShare")):
             payload = market_services.build_market_overview_payload()
 
@@ -150,8 +150,8 @@ class RouteSmokeTest(unittest.TestCase):
 
         snapshot = {
             "ok": True,
-            "snapshot_version": 5,
-            "source": "AKShare",
+            "snapshot_version": 6,
+            "source": "Gangtise OpenAPI",
             "items": [{"indicator_code": "source_shanghai_index", "name": "上证指数", "price": 3867.03, "available": True}],
         }
         with patch.object(market_services, "_load_market_snapshot_payload", side_effect=[None, snapshot]), patch.object(
@@ -160,7 +160,8 @@ class RouteSmokeTest(unittest.TestCase):
             payload = market_services.build_market_overview_payload()
 
         self.assertTrue(payload["stale"])
-        self.assertEqual(payload["items"], snapshot["items"])
+        self.assertEqual(payload["items"][0]["price"], snapshot["items"][0]["price"])
+        self.assertTrue(payload["items"][0]["stale"])
 
     def test_market_overview_does_not_use_the_legacy_gangtise_indicator_lake(self):
         from src.domain import market_services
@@ -170,7 +171,7 @@ class RouteSmokeTest(unittest.TestCase):
         ):
             payload = market_services.build_market_overview_payload()
 
-        self.assertEqual(payload["source"], "AKShare")
+        self.assertEqual(payload["source"], "Gangtise OpenAPI")
         self.assertEqual(payload["items"], [])
 
     def test_fundamental_boards_use_the_same_industry_names_as_hot_industries(self):
@@ -211,46 +212,41 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertEqual(details["300750"]["focus"], "电力设备")
         self.assertEqual(details["688981"]["industry"], "电子")
 
-    def test_market_snapshot_collects_akshare_index_and_industry_data(self):
+    def test_market_snapshot_collects_gangtise_index_and_industry_data(self):
         from src.domain import market_services
 
-        def index_series(code, start_date, end_date, ak, global_symbols=None):
-            return {"ok": True, "provider": "AKShare", "points": [{"date": "2026-08-09", "open": 99, "high": 101, "low": 98, "close": 100}, {"date": "2026-08-10", "open": 100, "high": 102, "low": 99, "close": 101}], "message": ""}
+        def index_series(code, start_date, end_date, token=""):
+            return {"ok": True, "provider": "Gangtise OpenAPI", "points": [{"date": "2026-08-09", "open": 99, "high": 101, "low": 98, "close": 100}, {"date": "2026-08-10", "open": 100, "high": 102, "low": 99, "close": 101}], "message": ""}
 
-        sector_rows = [{"sector": name, "code": f"801{index:03d}", "value": 100, "change": 1, "change_pct": 1, "updated_at": "2026-08-10", "data_source": "AKShare 申万一级行业指数"} for index, name in enumerate(market_services.SHENWAN_LEVEL1_INDUSTRIES)]
+        sector_rows = [{"sector": name, "code": market_services.GANGTISE_SHENWAN_LEVEL1_CODES[name], "value": 100, "change": 1, "change_pct": 1, "updated_at": "2026-08-10", "data_source": "Gangtise OpenAPI"} for name in market_services.SHENWAN_LEVEL1_INDUSTRIES]
 
-        with patch.object(market_services, "_load_akshare", return_value=object()), patch.object(market_services, "_akshare_global_index_symbols", return_value={}), patch.object(market_services, "fetch_gangtise_market_index_history", side_effect=AssertionError("market snapshots must use only AKShare")) as gangtise_fetch, patch.object(market_services, "fetch_akshare_market_index_history", side_effect=index_series) as index_fetch, patch.object(market_services, "fetch_gangtise_intraday_series", side_effect=AssertionError("market snapshots must use only AKShare")) as gangtise_intraday, patch.object(market_services, "fetch_akshare_market_index_intraday", return_value={"available": True, "points": [{"date": "2026-08-10 09:31:00", "value": 100.0}]}) as intraday_fetch, patch.object(market_services, "_fetch_akshare_sector_overview", return_value=sector_rows) as sector_fetch, patch.object(market_services, "_save_watchlist_cache") as save_cache, patch.object(market_services, "_save_market_snapshot_payload") as save_market_snapshot:
+        with patch.object(market_services, "fetch_gangtise_market_index_history", side_effect=index_series) as index_fetch, patch.object(market_services, "_fetch_gangtise_sector_overview", return_value=(sector_rows, [])) as sector_fetch, patch.object(market_services, "_load_market_snapshot_payload", return_value=None), patch.object(market_services, "_load_watchlist_cache", return_value=None), patch.object(market_services, "_save_watchlist_cache") as save_cache, patch.object(market_services, "_save_market_snapshot_payload") as save_market_snapshot:
             result = market_services.sync_market_snapshot(force=True)
 
-        self.assertEqual(gangtise_fetch.call_count, 0)
         self.assertEqual(index_fetch.call_count, 9)
-        self.assertEqual(gangtise_intraday.call_count, 0)
-        self.assertEqual(intraday_fetch.call_count, 9)
         self.assertEqual(sector_fetch.call_count, 1)
         self.assertEqual(result["overview_count"], 9)
         self.assertEqual(result["sector_count"], len(market_services.SHENWAN_LEVEL1_INDUSTRIES))
-        self.assertEqual(result["intraday_count"], 9)
-        self.assertEqual(save_cache.call_count, 18)
+        self.assertEqual(result["intraday_count"], 0)
+        self.assertEqual(save_cache.call_count, 9)
         self.assertEqual(save_market_snapshot.call_count, 2)
 
-    def test_market_snapshot_keeps_last_akshare_index_when_sync_fails(self):
+    def test_market_snapshot_keeps_last_gangtise_index_when_sync_fails(self):
         from src.domain import market_services
 
         previous = {
-            "ok": True, "snapshot_version": 5, "source": "AKShare",
+            "ok": True, "snapshot_version": 6, "source": "Gangtise OpenAPI",
             "items": [{
                 "indicator_code": "source_hsi", "name": "恒生指数", "code": "HSI",
                 "market": "HK", "price": 24500.0, "change": 120.0,
                 "change_pct": 0.49, "updated_at": "2026-08-08", "available": True,
-                "data_source": "AKShare",
+                "data_source": "Gangtise OpenAPI",
             }],
         }
-        unavailable = {"ok": False, "points": [], "message": "upstream_unavailable", "provider": "AKShare"}
-        with patch.object(market_services, "_load_akshare", return_value=object()), patch.object(
-            market_services, "_akshare_global_index_symbols", return_value={}
-        ), patch.object(market_services, "_load_market_snapshot_payload", side_effect=[previous, None]), patch.object(
-            market_services, "fetch_akshare_market_index_history", return_value=unavailable
-        ), patch.object(market_services, "_fetch_akshare_sector_overview", return_value=[]), patch.object(
+        unavailable = {"ok": False, "points": [], "message": "upstream_unavailable", "provider": "Gangtise OpenAPI"}
+        with patch.object(market_services, "_load_market_snapshot_payload", side_effect=[previous, None]), patch.object(
+            market_services, "fetch_gangtise_market_index_history", return_value=unavailable
+        ), patch.object(market_services, "_fetch_gangtise_sector_overview", return_value=([], [])), patch.object(
             market_services, "_save_market_snapshot_payload"
         ) as save_market_snapshot:
             result = market_services.sync_market_snapshot(force=True)
@@ -262,12 +258,12 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertTrue(hsi["stale"])
         self.assertEqual(hsi["price"], 24500.0)
 
-    def test_market_sector_sync_continues_when_akshare_is_unavailable(self):
+    def test_market_sector_sync_continues_when_gangtise_index_is_unavailable(self):
         from src.domain import market_services
 
-        sector_rows = [{"sector": name, "code": f"THS-{name}", "value": 100, "change": 1, "change_pct": 1, "updated_at": "2026-08-10", "data_source": "AKShare 同花顺行业汇总"} for name in market_services.SHENWAN_LEVEL1_INDUSTRIES]
-        with patch.object(market_services, "_load_akshare", side_effect=RuntimeError("AKShare unavailable")), patch.object(
-            market_services, "_fetch_akshare_sector_overview", return_value=sector_rows
+        sector_rows = [{"sector": name, "code": market_services.GANGTISE_SHENWAN_LEVEL1_CODES[name], "value": 100, "change": 1, "change_pct": 1, "updated_at": "2026-08-10", "data_source": "Gangtise OpenAPI"} for name in market_services.SHENWAN_LEVEL1_INDUSTRIES]
+        with patch.object(market_services, "fetch_gangtise_market_index_history", return_value={"ok": False, "points": [], "message": "unavailable", "provider": "Gangtise OpenAPI"}), patch.object(
+            market_services, "_fetch_gangtise_sector_overview", return_value=(sector_rows, [])
         ) as sector_fetch, patch.object(market_services, "_save_watchlist_cache"), patch.object(market_services, "_save_market_snapshot_payload"):
             result = market_services.sync_market_snapshot(force=True)
 
@@ -275,14 +271,12 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertEqual(result["sector_count"], len(market_services.SHENWAN_LEVEL1_INDUSTRIES))
         self.assertEqual(sector_fetch.call_count, 1)
 
-    def test_market_sector_uses_akshare_shenwan_level_one_snapshot(self):
+    def test_market_sector_uses_gangtise_shenwan_level_one_snapshot(self):
         from src.domain import market_services
 
-        fallback_rows = [{"sector": "食品饮料", "code": "801120", "value": 9100.0, "change": 20.0, "change_pct": 0.22, "updated_at": "2026-08-10 10:00:00", "data_source": "AKShare 申万一级行业指数"}]
-        with patch.object(market_services, "_load_akshare", return_value=object()), patch.object(
-            market_services, "_akshare_global_index_symbols", return_value={}
-        ), patch.object(market_services, "fetch_akshare_market_index_history", return_value={"ok": False, "points": [], "message": "unavailable"}), patch.object(
-            market_services, "_fetch_akshare_sector_overview", return_value=fallback_rows
+        fallback_rows = [{"sector": "食品饮料", "code": "801120.SWI", "value": 9100.0, "change": 20.0, "change_pct": 0.22, "updated_at": "2026-08-10 10:00:00", "data_source": "Gangtise OpenAPI"}]
+        with patch.object(market_services, "fetch_gangtise_market_index_history", return_value={"ok": False, "points": [], "message": "unavailable", "provider": "Gangtise OpenAPI"}), patch.object(
+            market_services, "_fetch_gangtise_sector_overview", return_value=(fallback_rows, [])
         ), patch.object(
             market_services, "_save_market_snapshot_payload"
         ) as save_market_snapshot:
@@ -290,8 +284,8 @@ class RouteSmokeTest(unittest.TestCase):
 
         self.assertEqual(result["sector_count"], 1)
         sector_payload = next(call.args[2] for call in save_market_snapshot.call_args_list if call.args[:2] == ("market_sector_overview", "shenwan_level1"))
-        self.assertEqual(sector_payload["source"], "AKShare")
-        self.assertEqual(sector_payload["snapshot_version"], 5)
+        self.assertEqual(sector_payload["source"], "Gangtise OpenAPI")
+        self.assertEqual(sector_payload["snapshot_version"], 6)
 
     def test_h5_does_not_expose_market_snapshot_refresh_to_frontend_users(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
@@ -324,7 +318,7 @@ class RouteSmokeTest(unittest.TestCase):
 
     def test_market_sector_reads_persisted_snapshot_without_provider_call(self):
         from src.domain import market_services
-        snapshot = {"ok": True, "snapshot_version": 5, "source": "AKShare", "items": [{"sector": "银行", "value": 1020, "change_pct": 2.0}]}
+        snapshot = {"ok": True, "snapshot_version": 6, "source": "Gangtise OpenAPI", "items": [{"sector": "银行", "value": 1020, "change_pct": 2.0}]}
         with patch.object(market_services, "_load_market_snapshot_payload", return_value=snapshot), patch.object(market_services, "_load_akshare", side_effect=AssertionError("H5 must not call AkShare")):
             payload = market_services.build_market_sector_overview_payload()
 
@@ -367,7 +361,7 @@ class RouteSmokeTest(unittest.TestCase):
     def test_market_sector_keeps_the_last_real_snapshot_when_refresh_is_stale(self):
         from src.domain import market_services
 
-        snapshot = {"ok": True, "snapshot_version": 5, "source": "AKShare", "items": [{"sector": "银行", "value": 1020, "change_pct": 2.0}]}
+        snapshot = {"ok": True, "snapshot_version": 6, "source": "Gangtise OpenAPI", "items": [{"sector": "银行", "value": 1020, "change_pct": 2.0}]}
         with patch.object(market_services, "_load_market_snapshot_payload", side_effect=[None, snapshot]):
             payload = market_services.build_market_sector_overview_payload()
 
@@ -413,29 +407,19 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertEqual(result["code"], "S02002067")
         self.assertEqual(result["change_pct"], 2.0)
 
-    def test_market_sector_batch_uses_one_catalog_search_and_one_get_data_call(self):
+    def test_market_sector_batch_uses_verified_swi_daily_quotes(self):
         from src.domain import market_services
 
-        catalog = [
-            {"indicatorId": "S-CHEM", "indicatorName": "Wind行业指数:化工:当日值"},
-            {"indicatorId": "S-BANK", "indicatorName": "Wind行业指数:银行:当日值"},
-        ]
-        data = {
-            "code": "000000", "status": True,
-            "data": {
-                "fieldList": ["date", "S-CHEM", "S-BANK"],
-                "dataList": [["2026-08-09", "100", "200"], ["2026-08-10", "102", "198"]],
-            },
-        }
-        with patch.object(market_services, "_load_watchlist_cache", return_value=None), patch.object(
-            market_services, "post_gangtise_openapi_json", side_effect=[(200, {"code": "000000", "status": True, "data": catalog}, 2), (200, data, 3)]
-        ) as post, patch.object(market_services, "_save_watchlist_cache"):
+        def daily_quote(path, security_code, **kwargs):
+            return {"ok": True, "points": [{"date": "2026-08-09", "close": 100}, {"date": "2026-08-10", "close": 102}], "duration_ms": 1}
+
+        with patch.object(market_services, "fetch_gangtise_market_kline_series", side_effect=daily_quote) as fetch:
             rows, errors = market_services._fetch_gangtise_sector_overview("2026-08-01", "2026-08-10")
 
-        self.assertEqual(post.call_count, 2)
-        self.assertEqual({row["sector"] for row in rows}, {"基础化工", "银行"})
-        self.assertEqual(next(row for row in rows if row["sector"] == "基础化工")["change_pct"], 2.0)
-        self.assertTrue(errors)
+        self.assertEqual(fetch.call_count, len(market_services.SHENWAN_LEVEL1_INDUSTRIES))
+        self.assertEqual(len(rows), len(market_services.SHENWAN_LEVEL1_INDUSTRIES))
+        self.assertEqual(errors, [])
+        self.assertTrue(all(row["data_source"] == "Gangtise OpenAPI" for row in rows))
 
     def test_h5_hermes_composer_is_compact(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")

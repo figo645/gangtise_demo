@@ -4,13 +4,23 @@ from urllib.parse import parse_qs, urlsplit
 from unittest.mock import patch
 
 from src.runtime import app
-from src.web.pages import resolve_login_destination
+from src.web.pages import h5, resolve_login_destination
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 class AccountNavigationBddTest(unittest.TestCase):
+    def test_given_admin_session_when_h5_is_requested_then_admin_is_redirected_to_admin(self):
+        with app.test_request_context("/h5"), patch(
+            "src.web.pages.get_current_authenticated_user",
+            return_value={"username": "admin", "role": "admin", "status": "active"},
+        ):
+            response = h5()
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "/admin")
+
     def test_given_admin_switching_from_a_role_page_when_login_completes_then_admin_returns_to_admin(self):
         with app.test_request_context("/login"):
             destination = resolve_login_destination({"role": "admin", "tenant_slug": "laowang"}, "/kol-workbench?tenant=laowang")

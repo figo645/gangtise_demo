@@ -282,8 +282,9 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertTrue(outputs["watchlist_annotation_context"]["available"])
         self.assertIn("腾讯控股", outputs["watchlist_annotation_context"]["summary"])
 
-    def test_given_indicator_chart_question_when_synthesis_text_is_empty_then_artifact_still_contains_analysis_body(self):
-        artifact = ai_services.build_hermes_indicator_artifact(
+    def test_given_indicator_chart_question_when_synthesis_text_is_empty_then_artifact_fails_without_data_fallback(self):
+        with self.assertRaisesRegex(RuntimeError, "hermes_indicator_artifact_empty_llm_answer"):
+            ai_services.build_hermes_indicator_artifact(
             detail={
                 "name": "上证综合指数",
                 "id": "sh000001",
@@ -316,13 +317,7 @@ class ReviewModuleBddTest(unittest.TestCase):
             citations=[],
             tenant_slug=self.tenant_slug,
             user_role="dav",
-        )
-
-        self.assertEqual(artifact["type"], "indicator_analysis")
-        self.assertTrue(artifact["body"])
-        self.assertIn("上证综合指数", artifact["body"])
-        self.assertIn("腾讯控股", artifact["body"])
-        self.assertTrue(artifact["judgement"])
+            )
 
     def test_given_out_of_scope_question_when_scope_guard_runs_then_redirected(self):
         with app_entry.app.app_context():
@@ -364,29 +359,23 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertTrue(answer.startswith("这个问题"))
         self.assertIn("当前优先基于租户知识库和平台工具给你一个结论。", answer)
 
-    def test_given_product_help_question_when_router_falls_back_then_product_help_is_selected(self):
+    def test_given_product_help_question_when_router_model_is_missing_then_request_fails(self):
         with app_entry.app.app_context():
             with patch("src.domain.ai_services.get_default_llm_config", return_value=None):
-                plan, _, route_mode = ai_services.route_hermes_query_intent(
-                    "H5 里的智能指标怎么创建和发布？",
-                    tenant_slug=self.tenant_slug,
-                )
+                with self.assertRaisesRegex(RuntimeError, "hermes_intent_router_llm_not_configured"):
+                    ai_services.route_hermes_query_intent(
+                        "H5 里的智能指标怎么创建和发布？",
+                        tenant_slug=self.tenant_slug,
+                    )
 
-        self.assertEqual(route_mode, "fallback_rule_router")
-        self.assertEqual(plan["intent"], "product_help")
-        self.assertIn("dashboard.context", plan["tools"])
-
-    def test_given_smart_indicator_question_when_router_falls_back_then_dashboard_context_is_used(self):
+    def test_given_smart_indicator_question_when_router_model_is_missing_then_request_fails(self):
         with app_entry.app.app_context():
             with patch("src.domain.ai_services.get_default_llm_config", return_value=None):
-                plan, _, route_mode = ai_services.route_hermes_query_intent(
-                    "这个智能指标是按什么公式和提示词计算出来的？",
-                    tenant_slug=self.tenant_slug,
-                )
-
-        self.assertEqual(route_mode, "fallback_rule_router")
-        self.assertEqual(plan["intent"], "smart_indicator_explain")
-        self.assertIn("dashboard.context", plan["tools"])
+                with self.assertRaisesRegex(RuntimeError, "hermes_intent_router_llm_not_configured"):
+                    ai_services.route_hermes_query_intent(
+                        "这个智能指标是按什么公式和提示词计算出来的？",
+                        tenant_slug=self.tenant_slug,
+                    )
 
     def test_given_shanghai_index_alias_when_indicator_hub_is_empty_then_registry_alias_still_resolves(self):
         with app_entry.app.app_context():
@@ -399,23 +388,17 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertEqual(match["indicator_code"], "source_shanghai_index")
         self.assertEqual(match["indicator_name"], "上证指数")
 
-    def test_given_shanghai_index_question_when_router_falls_back_then_indicator_plan_is_selected(self):
+    def test_given_shanghai_index_question_when_router_model_is_missing_then_request_fails(self):
         with app_entry.app.app_context():
             with patch("src.domain.ai_services.get_default_llm_config", return_value=None), patch(
                 "src.domain.ai_services.build_indicator_hub",
                 return_value={"items": []},
             ):
-                plan, _, route_mode = ai_services.route_hermes_query_intent(
-                    "我需要上证综合指数的分析",
-                    tenant_slug=self.tenant_slug,
-                )
-
-        self.assertEqual(route_mode, "fallback_rule_router")
-        self.assertEqual(plan["intent"], "smart_indicator_explain")
-        self.assertEqual(plan["indicator_code"], "source_shanghai_index")
-        self.assertEqual(plan["display_mode"], "structured")
-        self.assertIn("indicator.detail", plan["tools"])
-        self.assertIn("dashboard.context", plan["tools"])
+                with self.assertRaisesRegex(RuntimeError, "hermes_intent_router_llm_not_configured"):
+                    ai_services.route_hermes_query_intent(
+                        "我需要上证综合指数的分析",
+                        tenant_slug=self.tenant_slug,
+                    )
 
     def test_given_indicator_not_found_in_hub_when_loading_shanghai_index_then_live_gangtise_detail_is_used(self):
         live_detail = {
@@ -463,20 +446,14 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertGreater(len(result["detail"]["history_kline"]["candles"]), 0)
         live_detail_mock.assert_called_once_with("source_shanghai_index")
 
-    def test_given_stock_kline_question_when_router_falls_back_then_watchlist_structured_chart_is_selected(self):
+    def test_given_stock_kline_question_when_router_model_is_missing_then_request_fails(self):
         with app_entry.app.app_context():
             with patch("src.domain.ai_services.get_default_llm_config", return_value=None):
-                plan, _, route_mode = ai_services.route_hermes_query_intent(
-                    "我想看看中国银行这支股票的K线图以及分析",
-                    tenant_slug=self.tenant_slug,
-                )
-
-        self.assertEqual(route_mode, "fallback_rule_router")
-        self.assertEqual(plan["intent"], "watchlist_fundamental")
-        self.assertEqual(plan["stock_code"], "601988")
-        self.assertEqual(plan["display_mode"], "structured")
-        self.assertEqual(plan["preferred_mode"], "kline_chart")
-        self.assertEqual(plan["tools"], ["watchlist.detail"])
+                with self.assertRaisesRegex(RuntimeError, "hermes_intent_router_llm_not_configured"):
+                    ai_services.route_hermes_query_intent(
+                        "我想看看中国银行这支股票的K线图以及分析",
+                        tenant_slug=self.tenant_slug,
+                    )
 
     def test_given_stock_kline_question_when_calling_hermes_api_then_kline_artifact_contains_chart_and_body(self):
         candles = [
@@ -500,8 +477,16 @@ class ReviewModuleBddTest(unittest.TestCase):
             "data_source": "gangtise_openapi",
             "data_unavailable": False,
         }
-        with patch("src.domain.ai_services.get_default_llm_config", return_value=None), patch(
+        with app_entry.app.app_context(), patch("src.domain.ai_services.get_default_llm_config", return_value={"key": "mock-llm"}), patch(
+            "src.domain.ai_services.call_openai_compatible_llm",
+            side_effect=[
+                '{"intent":"watchlist_fundamental","tools":["watchlist.detail"],"stock_code":"601988","display_mode":"structured","preferred_mode":"kline_chart","reason":"模型路由"}',
+                '{"answer":"模型完成中国银行分析","summary":"模型摘要","lead_conclusion":"模型结论","bullets":["模型判断"],"analysis_sections":[{"title":"业务结构拆解","body":"模型对业务结构的分析"},{"title":"财务分析","body":"模型对财务面的分析"},{"title":"行业视角","body":"模型对行业的分析"},{"title":"估值与预期差","body":"模型对估值的分析"}],"next_steps":["模型建议继续验证"],"confidence":"中","citations":[]}',
+            ],
+        ), patch(
             "src.domain.ai_services.get_watchlist_detail_by_code", return_value=live_detail
+        ), patch(
+            "src.domain.ai_services.hermes_tool_knowledge_search", return_value={"matches": [], "answer": ""}
         ):
             response = self.client.post(
                 "/api/hermes/query",
@@ -533,17 +518,14 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("行业视角", section_titles)
         self.assertIn("估值与预期差", section_titles)
 
-    def test_given_stock_typo_alias_when_router_falls_back_then_correct_stock_code_is_selected(self):
+    def test_given_stock_typo_alias_when_router_model_is_missing_then_request_fails(self):
         with app_entry.app.app_context():
             with patch("src.domain.ai_services.get_default_llm_config", return_value=None):
-                plan, _, route_mode = ai_services.route_hermes_query_intent(
-                    "帮我分析日久光新这支股票",
-                    tenant_slug=self.tenant_slug,
-                )
-
-        self.assertEqual(route_mode, "fallback_rule_router")
-        self.assertEqual(plan["intent"], "watchlist_fundamental")
-        self.assertEqual(plan["stock_code"], "003015")
+                with self.assertRaisesRegex(RuntimeError, "hermes_intent_router_llm_not_configured"):
+                    ai_services.route_hermes_query_intent(
+                        "帮我分析日久光新这支股票",
+                        tenant_slug=self.tenant_slug,
+                    )
 
     def test_given_index_line_chart_question_when_calling_hermes_api_then_line_artifact_is_returned(self):
         live_detail = {
@@ -563,9 +545,17 @@ class ReviewModuleBddTest(unittest.TestCase):
             "history_kline": {"candles": [], "ma5": [], "ma10": [], "ma20": [], "anomalies": []},
             "data_unavailable": False,
         }
-        with patch("src.domain.ai_services.get_default_llm_config", return_value=None), patch(
+        with patch("src.domain.ai_services.get_default_llm_config", return_value={"key": "mock-llm"}), patch(
+            "src.domain.ai_services.call_openai_compatible_llm",
+            side_effect=[
+                '{"intent":"smart_indicator_explain","tools":["indicator.detail"],"indicator_code":"source_shanghai_index","display_mode":"structured","preferred_mode":"trend_chart","reason":"模型路由"}',
+                '{"answer":"模型完成指数趋势分析","summary":"模型摘要","bullets":[],"citations":[]}',
+            ],
+        ), patch(
             "src.domain.ai_services.build_indicator_hub", return_value={"items": []}
-        ), patch("src.domain.ai_services.build_live_gangtise_indicator_detail", return_value=live_detail):
+        ), patch("src.domain.ai_services.build_live_gangtise_indicator_detail", return_value=live_detail), patch(
+            "src.domain.ai_services.hermes_tool_knowledge_search", return_value={"matches": [], "answer": ""}
+        ):
             response = self.client.post(
                 "/api/hermes/query",
                 json={
@@ -812,12 +802,20 @@ class ReviewModuleBddTest(unittest.TestCase):
             },
             "data_unavailable": False,
         }
-        with patch("src.domain.ai_services.get_default_llm_config", return_value=None), patch(
+        with patch("src.domain.ai_services.get_default_llm_config", return_value={"key": "mock-llm"}), patch(
+            "src.domain.ai_services.call_openai_compatible_llm",
+            side_effect=[
+                '{"intent":"smart_indicator_explain","tools":["indicator.detail"],"indicator_code":"source_shanghai_index","display_mode":"structured","reason":"模型路由"}',
+                '{"answer":"模型基于2026-08-05目标日期数据完成分析","summary":"模型摘要","bullets":[],"citations":[]}',
+            ],
+        ), patch(
             "src.domain.ai_services.build_indicator_hub",
             return_value={"items": []},
         ), patch(
             "src.domain.ai_services.build_live_gangtise_indicator_detail",
             return_value=live_detail,
+        ), patch(
+            "src.domain.ai_services.hermes_tool_knowledge_search", return_value={"matches": [], "answer": ""}
         ):
             response = self.client.post(
                 "/api/hermes/query",
@@ -914,7 +912,7 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertEqual(result["detail"]["history_series"][-1]["date"], "2026-08-05")
         self.assertEqual(result["detail"]["history_series"][-1]["value"], 3878.4296)
 
-    def test_given_specific_date_indicator_when_llm_is_configured_then_rule_answer_still_wins(self):
+    def test_given_specific_date_indicator_when_llm_is_configured_then_model_answer_wins(self):
         live_detail = {
             "name": "上证指数",
             "unit": "点",
@@ -932,10 +930,10 @@ class ReviewModuleBddTest(unittest.TestCase):
                 "status": "good",
             },
         }
-        with patch("src.domain.ai_services.get_default_llm_config", return_value={"key": "mock-llm"}), patch(
+        with app_entry.app.app_context(), patch("src.domain.ai_services.get_default_llm_config", return_value={"key": "mock-llm"}), patch(
             "src.domain.ai_services.call_openai_compatible_llm",
-            side_effect=AssertionError("LLM should not be called for specific-date indicator synthesis"),
-        ):
+            return_value='{"answer":"模型基于目标日期数据完成分析","summary":"模型摘要","bullets":[],"citations":[]}',
+        ) as llm_call:
             synthesis, model, mode = ai_services.synthesize_hermes_answer(
                 question_text="我需要知道8月5日的上证指数，帮我做一个分析",
                 plan={"intent": "smart_indicator_explain", "scope_status": "allowed"},
@@ -944,10 +942,10 @@ class ReviewModuleBddTest(unittest.TestCase):
                 user_role="dav",
             )
 
-        self.assertIsNone(model)
-        self.assertEqual(mode, "rule_indicator_specific_date")
-        self.assertIn("2026-08-05", synthesis["answer"])
-        self.assertIn("3878.4296", synthesis["answer"])
+        self.assertIsNotNone(model)
+        self.assertEqual(mode, "llm_synthesized")
+        self.assertEqual(llm_call.call_count, 1)
+        self.assertIn("模型基于目标日期数据", synthesis["answer"])
 
     def test_given_index_openapi_response_when_parsing_smoke_source_then_indicator_detail_uses_real_rows(self):
         with patch(

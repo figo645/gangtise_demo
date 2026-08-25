@@ -16,7 +16,7 @@ DECLARED_AGENT_WORKFLOW_CATALOG = {
             {"id": "session_load", "label": "会话装载", "processor": "session_load", "kind": "context", "x": 228, "y": 88, "description": "读取当前用户在本次 Hermes 会话下的历史轮次与会话摘要。"},
             {"id": "memory_read", "label": "记忆读取", "processor": "memory_read", "kind": "context", "x": 430, "y": 88, "description": "读取用户事实记忆、工作记忆和已有画像。"},
             {"id": "scope_guard", "label": "范围识别", "processor": "scope_guard", "kind": "guardrail", "x": 646, "y": 88, "description": "先判断问题是否落在 Hermes 的研究和产品能力范围内。"},
-            {"id": "intent_router", "label": "意图路由", "processor": "router", "kind": "llm_or_rule", "x": 876, "y": 88, "description": "优先用 LLM 识别意图，失败时退回规则路由。"},
+            {"id": "intent_router", "label": "意图路由", "processor": "router", "kind": "llm", "x": 876, "y": 88, "description": "必须调用 LLM 识别意图，模型失败即终止本轮。"},
             {"id": "tool_dispatch", "label": "工具调度", "processor": "tool_dispatch", "kind": "tooling", "x": 1110, "y": 88, "description": "按路由计划调用知识检索、证据链、Dashboard、附件解析和个股详情。"},
             {"id": "answer_synthesis", "label": "答案合成", "processor": "llm_synthesis", "kind": "llm", "x": 1348, "y": 88, "description": "根据工具结果或范围守卫结果做最终回答整合。"},
             {"id": "memory_extract", "label": "记忆抽取", "processor": "memory_extract", "kind": "planner", "x": 1578, "y": 88, "description": "从本轮问答中提炼标签、偏好、关注主题和可沉淀记忆。"},
@@ -172,8 +172,8 @@ DECLARED_AGENT_WORKFLOW_CATALOG = {
         "nodes": [
             {"id": "knowledge_query_input", "label": "问题输入", "processor": "input", "kind": "source", "x": 36, "y": 88, "description": "接收知识问题、租户和检索范围。"},
             {"id": "knowledge_query_retrieval", "label": "知识召回", "processor": "retrieval", "kind": "tooling", "x": 320, "y": 88, "description": "基于向量检索召回知识条目。"},
-            {"id": "knowledge_query_filter", "label": "相关性过滤", "processor": "llm_filter", "kind": "llm_or_rule", "x": 614, "y": 88, "description": "如启用模型，则先过滤掉低相关内容。"},
-            {"id": "knowledge_query_answer", "label": "答案整合", "processor": "llm_generation", "kind": "llm_or_rule", "x": 910, "y": 88, "description": "按过滤后的命中结果生成回答，或回退到检索摘要。"},
+            {"id": "knowledge_query_filter", "label": "相关性过滤", "processor": "llm_filter", "kind": "llm", "x": 614, "y": 88, "description": "调用 LLM 过滤低相关内容，模型失败即终止本轮。"},
+            {"id": "knowledge_query_answer", "label": "答案整合", "processor": "llm_generation", "kind": "llm", "x": 910, "y": 88, "description": "必须由 LLM 基于过滤后的命中结果生成回答。"},
             {"id": "knowledge_query_output", "label": "结果封装", "processor": "output", "kind": "output", "x": 1206, "y": 88, "description": "输出知识回答、命中结果与工作流元信息。"},
         ],
         "edges": [
@@ -194,8 +194,8 @@ DECLARED_AGENT_WORKFLOW_CATALOG = {
         "nodes": [
             {"id": "evidence_query_input", "label": "问题输入", "processor": "input", "kind": "source", "x": 36, "y": 88, "description": "接收证据链问题、来源范围和租户。"},
             {"id": "evidence_query_retrieval", "label": "证据召回", "processor": "retrieval", "kind": "tooling", "x": 320, "y": 88, "description": "基于证据来源召回候选条目。"},
-            {"id": "evidence_query_filter", "label": "相关性过滤", "processor": "llm_filter", "kind": "llm_or_rule", "x": 614, "y": 88, "description": "如启用模型，则过滤掉不直接相关的证据。"},
-            {"id": "evidence_query_answer", "label": "证据回答生成", "processor": "llm_generation", "kind": "llm_or_rule", "x": 910, "y": 88, "description": "基于证据生成回答，或回退到检索摘要。"},
+            {"id": "evidence_query_filter", "label": "相关性过滤", "processor": "llm_filter", "kind": "llm", "x": 614, "y": 88, "description": "调用 LLM 过滤不直接相关的证据，模型失败即终止本轮。"},
+            {"id": "evidence_query_answer", "label": "证据回答生成", "processor": "llm_generation", "kind": "llm", "x": 910, "y": 88, "description": "必须由 LLM 基于证据生成回答。"},
             {"id": "evidence_query_output", "label": "结果封装", "processor": "output", "kind": "output", "x": 1206, "y": 88, "description": "输出证据回答、召回结果与工作流元信息。"},
         ],
         "edges": [

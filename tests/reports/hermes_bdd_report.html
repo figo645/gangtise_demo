@@ -48,12 +48,12 @@
   <main>
     <section class="hero">
       <h1>Hermes BDD 测试报告</h1>
-      <p class="sub">生成时间：2026-07-23 11:13:05 · 租户：laowang · 覆盖路由、工具、结构化 artifact、图表数据与前台渲染入口</p>
+      <p class="sub">生成时间：2026-08-25 17:30:22 · 租户：laowang · 覆盖路由、工具、结构化 artifact、图表数据与前台渲染入口</p>
       <div class="metrics">
         <div class="metric"><div class="name">Scenario</div><div class="value">8</div></div>
         <div class="metric"><div class="name">Pass</div><div class="value">8</div></div>
         <div class="metric"><div class="name">Fail</div><div class="value">0</div></div>
-        <div class="metric"><div class="name">LLM</div><div class="value">Fallback</div></div>
+        <div class="metric"><div class="name">LLM</div><div class="value">Strict</div></div>
       </div>
     </section>
     <section class="section">
@@ -64,238 +64,33 @@
             <span class="pill">PASS</span>
           </div>
           <div class="bdd-line"><strong>Given</strong> 用户明确输入中国银行这只股票，并要求看 K 线图和分析。</div>
-          <div class="bdd-line"><strong>When</strong> 调用 /api/hermes/query，且 LLM 不可用时走规则降级链路。</div>
-          <div class="bdd-line"><strong>Then</strong> Hermes 必须返回自选股结构化 artifact，包含 K 线图数据和可读分析正文。</div>
-          <p class="detail">已返回中国银行自选股 K 线 artifact，并生成正文分析。</p>
+          <div class="bdd-line"><strong>When</strong> 调用 /api/hermes/query，且 LLM 未配置时执行严格失败策略。</div>
+          <div class="bdd-line"><strong>Then</strong> Hermes 必须返回明确错误，不得返回规则或模板答案。</div>
+          <p class="detail">模型未配置时已返回 503 和明确错误，未生成规则或模板答案。</p>
           <details>
             <summary>查看证据</summary>
             <pre>{
   &quot;question&quot;: &quot;我想看看中国银行这支股票的K线图以及分析&quot;,
-  &quot;http_status&quot;: 200,
-  &quot;ok&quot;: true,
-  &quot;intent&quot;: &quot;watchlist_fundamental&quot;,
-  &quot;task_family&quot;: &quot;data_visualization&quot;,
-  &quot;capability_label&quot;: &quot;数据展示&quot;,
-  &quot;display_mode&quot;: &quot;structured&quot;,
-  &quot;preferred_mode&quot;: &quot;basic&quot;,
-  &quot;router&quot;: {
-    &quot;intent_group&quot;: &quot;market_data_query&quot;,
-    &quot;mode&quot;: &quot;fallback_rule_router&quot;,
-    &quot;model&quot;: null,
-    &quot;reason&quot;: &quot;分析方式偏向K线图&quot;
-  },
-  &quot;tool_trace&quot;: [
-    {
-      &quot;elapsed_ms&quot;: 491,
-      &quot;status&quot;: &quot;ok&quot;,
-      &quot;tool&quot;: &quot;knowledge.search&quot;
-    },
-    {
-      &quot;elapsed_ms&quot;: 16,
-      &quot;status&quot;: &quot;ok&quot;,
-      &quot;tool&quot;: &quot;watchlist.detail&quot;
-    }
-  ],
+  &quot;http_status&quot;: 503,
+  &quot;ok&quot;: false,
+  &quot;intent&quot;: null,
+  &quot;task_family&quot;: null,
+  &quot;capability_label&quot;: null,
+  &quot;display_mode&quot;: null,
+  &quot;preferred_mode&quot;: null,
+  &quot;router&quot;: null,
+  &quot;tool_trace&quot;: null,
   &quot;artifact&quot;: {
-    &quot;type&quot;: &quot;watchlist_analysis&quot;,
-    &quot;title&quot;: &quot;🧭 结构化分析&quot;,
-    &quot;headline&quot;: &quot;核心看净息差、资产质量和股息稳定性，当前更偏防守型配置视角。 当前关联指标信号：股息和资产质量稳定，更适合稳健跟踪。&quot;,
-    &quot;summary&quot;: &quot;核心看净息差、资产质量和股息稳定性，当前更偏防守型配置视角。 当前关联指标信号：股息和资产质量稳定，更适合稳健跟踪。&quot;,
-    &quot;body&quot;: &quot;中国银行已按自选股 K 线和基本面资料生成结构化分析。 核心看净息差、资产质量和股息稳定性，当前更偏防守型配置视角。 当前关联指标信号：股息和资产质量稳定，更适合稳健跟踪。 最近 K 线最新一根开于 5.82、收于 5.65，区间 5.6 到 5.94，收盘弱于开盘。&quot;,
-    &quot;symbol&quot;: {
-      &quot;code&quot;: &quot;601988&quot;,
-      &quot;industry&quot;: &quot;银行&quot;,
-      &quot;market&quot;: &quot;SH&quot;,
-      &quot;name&quot;: &quot;中国银行&quot;
-    },
-    &quot;chart&quot;: {
-      &quot;kind&quot;: &quot;kline&quot;,
-      &quot;points&quot;: [
-        {
-          &quot;close&quot;: 5.43,
-          &quot;date&quot;: &quot;06-22&quot;,
-          &quot;high&quot;: 5.6,
-          &quot;low&quot;: 5.37,
-          &quot;open&quot;: 5.5
-        },
-        {
-          &quot;close&quot;: 5.44,
-          &quot;date&quot;: &quot;06-23&quot;,
-          &quot;high&quot;: 5.49,
-          &quot;low&quot;: 5.34,
-          &quot;open&quot;: 5.42
-        },
-        {
-          &quot;close&quot;: 5.47,
-          &quot;date&quot;: &quot;06-24&quot;,
-          &quot;high&quot;: 5.54,
-          &quot;low&quot;: 5.34,
-          &quot;open&quot;: 5.41
-        },
-        {
-          &quot;close&quot;: 5.28,
-          &quot;date&quot;: &quot;06-25&quot;,
-          &quot;high&quot;: 5.48,
-          &quot;low&quot;: 5.18,
-          &quot;open&quot;: 5.41
-        },
-        {
-          &quot;close&quot;: 5.25,
-          &quot;date&quot;: &quot;06-26&quot;,
-          &quot;high&quot;: 5.32,
-          &quot;low&quot;: 5.17,
-          &quot;open&quot;: 5.23
-        },
-        {
-          &quot;close&quot;: 5.27,
-          &quot;date&quot;: &quot;06-29&quot;,
-          &quot;high&quot;: 5.34,
-          &quot;low&quot;: 5.14,
-          &quot;open&quot;: 5.18
-        },
-        {
-          &quot;close&quot;: 5.12,
-          &quot;date&quot;: &quot;06-30&quot;,
-          &quot;high&quot;: 5.29,
-          &quot;low&quot;: 5.09,
-          &quot;open&quot;: 5.19
-        },
-        {
-          &quot;close&quot;: 4.87,
-          &quot;date&quot;: &quot;07-01&quot;,
-          &quot;high&quot;: 5.08,
-          &quot;low&quot;: 4.85,
-          &quot;open&quot;: 5.04
-        },
-        {
-          &quot;close&quot;: 5.01,
-          &quot;date&quot;: &quot;07-02&quot;,
-          &quot;high&quot;: 5.06,
-          &quot;low&quot;: 4.8,
-          &quot;open&quot;: 4.88
-        },
-        {
-          &quot;close&quot;: 5.17,
-          &quot;date&quot;: &quot;07-03&quot;,
-          &quot;high&quot;: 5.26,
-          &quot;low&quot;: 5.0,
-          &quot;open&quot;: 5.03
-        },
-        {
-          &quot;close&quot;: 5.25,
-          &quot;date&quot;: &quot;07-06&quot;,
-          &quot;high&quot;: 5.33,
-          &quot;low&quot;: 5.13,
-          &quot;open&quot;: 5.2
-        },
-        {
-          &quot;close&quot;: 5.39,
-          &quot;date&quot;: &quot;07-07&quot;,
-          &quot;high&quot;: 5.44,
-          &quot;low&quot;: 5.16,
-          &quot;open&quot;: 5.21
-        },
-        {
-          &quot;close&quot;: 5.36,
-          &quot;date&quot;: &quot;07-08&quot;,
-          &quot;high&quot;: 5.56,
-          &quot;low&quot;: 5.34,
-          &quot;open&quot;: 5.46
-        },
-        {
-          &quot;close&quot;: 5.53,
-          &quot;date&quot;: &quot;07-09&quot;,
-          &quot;high&quot;: 5.63,
-          &quot;low&quot;: 5.33,
-          &quot;open&quot;: 5.44
-        },
-        {
-          &quot;close&quot;: 5.4,
-          &quot;date&quot;: &quot;07-10&quot;,
-          &quot;high&quot;: 5.68,
-          &quot;low&quot;: 5.37,
-          &quot;open&quot;: 5.56
-        },
-        {
-          &quot;close&quot;: 5.43,
-          &quot;date&quot;: &quot;07-13&quot;,
-          &quot;high&quot;: 5.46,
-          &quot;low&quot;: 5.32,
-          &quot;open&quot;: 5.37
-        },
-        {
-          &quot;close&quot;: 5.64,
-          &quot;date&quot;: &quot;07-14&quot;,
-          &quot;high&quot;: 5.76,
-          &quot;low&quot;: 5.42,
-          &quot;open&quot;: 5.47
-        },
-        {
-          &quot;close&quot;: 5.48,
-          &quot;date&quot;: &quot;07-15&quot;,
-          &quot;high&quot;: 5.77,
-          &quot;low&quot;: 5.38,
-          &quot;open&quot;: 5.67
-        },
-        {
-          &quot;close&quot;: 5.5,
-          &quot;date&quot;: &quot;07-16&quot;,
-          &quot;high&quot;: 5.59,
-          &quot;low&quot;: 5.28,
-          &quot;open&quot;: 5.39
-        },
-        {
-          &quot;close&quot;: 5.52,
-          &quot;date&quot;: &quot;07-17&quot;,
-          &quot;high&quot;: 5.56,
-          &quot;low&quot;: 5.41,
-          &quot;open&quot;: 5.5
-        },
-        {
-          &quot;close&quot;: 5.62,
-          &quot;date&quot;: &quot;07-20&quot;,
-          &quot;high&quot;: 5.69,
-          &quot;low&quot;: 5.4,
-          &quot;open&quot;: 5.49
-        },
-        {
-          &quot;close&quot;: 5.77,
-          &quot;date&quot;: &quot;07-21&quot;,
-          &quot;high&quot;: 5.89,
-          &quot;low&quot;: 5.54,
-          &quot;open&quot;: 5.6
-        },
-        {
-          &quot;close&quot;: 5.86,
-          &quot;date&quot;: &quot;07-22&quot;,
-          &quot;high&quot;: 5.98,
-          &quot;low&quot;: 5.8,
-          &quot;open&quot;: 5.82
-        },
-        {
-          &quot;close&quot;: 5.65,
-          &quot;date&quot;: &quot;07-23&quot;,
-          &quot;high&quot;: 5.94,
-          &quot;low&quot;: 5.6,
-          &quot;open&quot;: 5.82
-        }
-      ]
-    },
+    &quot;type&quot;: null,
+    &quot;title&quot;: null,
+    &quot;headline&quot;: null,
+    &quot;summary&quot;: null,
+    &quot;body&quot;: null,
+    &quot;symbol&quot;: null,
+    &quot;chart&quot;: null,
     &quot;chart_html_present&quot;: false
   },
-  &quot;settings_snapshot&quot;: {
-    &quot;answer_save_to_knowledge_enabled&quot;: true,
-    &quot;chart_types_enabled&quot;: [
-      &quot;kline_chart&quot;,
-      &quot;line_chart&quot;,
-      &quot;distribution_chart&quot;,
-      &quot;compare_chart&quot;
-    ],
-    &quot;default_response_style&quot;: &quot;structured&quot;,
-    &quot;internet_answer_enabled&quot;: true,
-    &quot;prompt_scope_guard_enabled&quot;: true,
-    &quot;thinking_process_enabled&quot;: true
-  }
+  &quot;settings_snapshot&quot;: null
 }</pre>
           </details>
         </article>
@@ -307,729 +102,33 @@
           </div>
           <div class="bdd-line"><strong>Given</strong> 用户明确要求查看上证综合指数最近 3 个月 K 线图并解读。</div>
           <div class="bdd-line"><strong>When</strong> 调用 Hermes 查询接口。</div>
-          <div class="bdd-line"><strong>Then</strong> Hermes 必须返回指标结构化 artifact，图表类型为 kline，并带有解读正文。</div>
-          <p class="detail">已返回上证指数 K 线指标 artifact，并包含指标解读。</p>
+          <div class="bdd-line"><strong>Then</strong> 模型未配置时必须直接返回错误，不得生成指标 artifact。</div>
+          <p class="detail">模型未配置时已返回 503 和明确错误，未生成规则或模板答案。</p>
           <details>
             <summary>查看证据</summary>
             <pre>{
   &quot;question&quot;: &quot;给我展示下到现在为止3个月的上证综合指数的K线图并做一下解读分析&quot;,
-  &quot;http_status&quot;: 200,
-  &quot;ok&quot;: true,
-  &quot;intent&quot;: &quot;smart_indicator_explain&quot;,
-  &quot;task_family&quot;: &quot;data_visualization&quot;,
-  &quot;capability_label&quot;: &quot;数据展示&quot;,
-  &quot;display_mode&quot;: &quot;structured&quot;,
-  &quot;preferred_mode&quot;: &quot;basic&quot;,
-  &quot;router&quot;: {
-    &quot;intent_group&quot;: &quot;chart_visualization&quot;,
-    &quot;mode&quot;: &quot;fallback_rule_router&quot;,
-    &quot;model&quot;: null,
-    &quot;reason&quot;: &quot;分析方式偏向K线图&quot;
-  },
-  &quot;tool_trace&quot;: [
-    {
-      &quot;elapsed_ms&quot;: 21,
-      &quot;status&quot;: &quot;ok&quot;,
-      &quot;tool&quot;: &quot;knowledge.search&quot;
-    },
-    {
-      &quot;elapsed_ms&quot;: 5,
-      &quot;status&quot;: &quot;ok&quot;,
-      &quot;tool&quot;: &quot;indicator.detail&quot;
-    },
-    {
-      &quot;elapsed_ms&quot;: 8,
-      &quot;status&quot;: &quot;ok&quot;,
-      &quot;tool&quot;: &quot;dashboard.context&quot;
-    }
-  ],
+  &quot;http_status&quot;: 503,
+  &quot;ok&quot;: false,
+  &quot;intent&quot;: null,
+  &quot;task_family&quot;: null,
+  &quot;capability_label&quot;: null,
+  &quot;display_mode&quot;: null,
+  &quot;preferred_mode&quot;: null,
+  &quot;router&quot;: null,
+  &quot;tool_trace&quot;: null,
   &quot;artifact&quot;: {
-    &quot;type&quot;: &quot;indicator_analysis&quot;,
-    &quot;title&quot;: &quot;📈 指标趋势分析&quot;,
-    &quot;headline&quot;: &quot;分析方式偏向K线图&quot;,
-    &quot;summary&quot;: &quot;分析方式偏向K线图&quot;,
-    &quot;body&quot;: &quot;上证指数最近 24 个观测点呈偏强震荡，当前值 48.78，主要运行区间在 40.99 到 54.62。 最新一根 K 线开于 51.29、收于 48.78，日内区间 48.37 到 51.88，收盘弱于开盘。 最近需要优先看的异动点在 2026-05-28，信号为“波动抬升”。&quot;,
-    &quot;symbol&quot;: {
-      &quot;code&quot;: &quot;source_shanghai_index&quot;,
-      &quot;industry&quot;: &quot;财经老王&quot;,
-      &quot;market&quot;: &quot;指数走势&quot;,
-      &quot;name&quot;: &quot;上证指数&quot;
-    },
-    &quot;chart&quot;: {
-      &quot;distribution&quot;: [
-        48.94,
-        50.76,
-        51.45,
-        49.98,
-        52.59,
-        54.12,
-        54.62,
-        52.47,
-        49.42,
-        48.81,
-        48.42,
-        49.83,
-        47.12,
-        49.92,
-        49.31,
-        51.89,
-        51.23,
-        48.78
-      ],
-      &quot;kind&quot;: &quot;kline&quot;,
-      &quot;kline&quot;: {
-        &quot;anomalies&quot;: [
-          {
-            &quot;date&quot;: &quot;2026-05-28&quot;,
-            &quot;label&quot;: &quot;波动抬升&quot;,
-            &quot;status&quot;: &quot;good&quot;,
-            &quot;value&quot;: 52.59
-          }
-        ],
-        &quot;candles&quot;: [
-          {
-            &quot;close&quot;: 41.18,
-            &quot;date&quot;: &quot;2026-05-18&quot;,
-            &quot;high&quot;: 42.98,
-            &quot;low&quot;: 40.39,
-            &quot;open&quot;: 42.54
-          },
-          {
-            &quot;close&quot;: 41.36,
-            &quot;date&quot;: &quot;2026-05-19&quot;,
-            &quot;high&quot;: 42.73,
-            &quot;low&quot;: 38.26,
-            &quot;open&quot;: 39.86
-          },
-          {
-            &quot;close&quot;: 42.37,
-            &quot;date&quot;: &quot;2026-05-20&quot;,
-            &quot;high&quot;: 43.93,
-            &quot;low&quot;: 40.76,
-            &quot;open&quot;: 41.39
-          },
-          {
-            &quot;close&quot;: 40.99,
-            &quot;date&quot;: &quot;2026-05-21&quot;,
-            &quot;high&quot;: 42.31,
-            &quot;low&quot;: 40.33,
-            &quot;open&quot;: 41.39
-          },
-          {
-            &quot;close&quot;: 43.62,
-            &quot;date&quot;: &quot;2026-05-22&quot;,
-            &quot;high&quot;: 44.41,
-            &quot;low&quot;: 41.27,
-            &quot;open&quot;: 42.39
-          },
-          {
-            &quot;close&quot;: 44.89,
-            &quot;date&quot;: &quot;2026-05-23&quot;,
-            &quot;high&quot;: 46.3,
-            &quot;low&quot;: 40.98,
-            &quot;open&quot;: 42.33
-          },
-          {
-            &quot;close&quot;: 48.94,
-            &quot;date&quot;: &quot;2026-05-24&quot;,
-            &quot;high&quot;: 50.45,
-            &quot;low&quot;: 44.82,
-            &quot;open&quot;: 45.84
-          },
-          {
-            &quot;close&quot;: 50.76,
-            &quot;date&quot;: &quot;2026-05-25&quot;,
-            &quot;high&quot;: 51.9,
-            &quot;low&quot;: 46.2,
-            &quot;open&quot;: 47.63
-          },
-          {
-            &quot;close&quot;: 51.45,
-            &quot;date&quot;: &quot;2026-05-26&quot;,
-            &quot;high&quot;: 51.9,
-            &quot;low&quot;: 49.64,
-            &quot;open&quot;: 50.17
-          },
-          {
-            &quot;close&quot;: 49.98,
-            &quot;date&quot;: &quot;2026-05-27&quot;,
-            &quot;high&quot;: 51.77,
-            &quot;low&quot;: 49.52,
-            &quot;open&quot;: 51.35
-          },
-          {
-            &quot;close&quot;: 52.59,
-            &quot;date&quot;: &quot;2026-05-28&quot;,
-            &quot;high&quot;: 54.04,
-            &quot;low&quot;: 48.13,
-            &quot;open&quot;: 49.47
-          },
-          {
-            &quot;close&quot;: 54.12,
-            &quot;date&quot;: &quot;2026-05-29&quot;,
-            &quot;high&quot;: 55.08,
-            &quot;low&quot;: 52.2,
-            &quot;open&quot;: 53.19
-          },
-          {
-            &quot;close&quot;: 54.62,
-            &quot;date&quot;: &quot;2026-05-30&quot;,
-            &quot;high&quot;: 56.15,
-            &quot;low&quot;: 53.08,
-            &quot;open&quot;: 55.27
-          },
-          {
-            &quot;close&quot;: 52.47,
-            &quot;date&quot;: &quot;2026-05-31&quot;,
-            &quot;high&quot;: 54.59,
-            &quot;low&quot;: 51.65,
-            &quot;open&quot;: 53.55
-          },
-          {
-            &quot;close&quot;: 49.42,
-            &quot;date&quot;: &quot;2026-06-01&quot;,
-            &quot;high&quot;: 51.78,
-            &quot;low&quot;: 49.0,
-            &quot;open&quot;: 50.97
-          },
-          {
-            &quot;close&quot;: 48.81,
-            &quot;date&quot;: &quot;2026-06-02&quot;,
-            &quot;high&quot;: 50.35,
-            &quot;low&quot;: 48.37,
-            &quot;open&quot;: 49.98
-          },
-          {
-            &quot;close&quot;: 48.42,
-            &quot;date&quot;: &quot;2026-06-03&quot;,
-            &quot;high&quot;: 51.75,
-            &quot;low&quot;: 47.05,
-            &quot;open&quot;: 50.38
-          },
-          {
-            &quot;close&quot;: 49.83,
-            &quot;date&quot;: &quot;2026-06-04&quot;,
-            &quot;high&quot;: 51.13,
-            &quot;low&quot;: 46.12,
-            &quot;open&quot;: 47.06
-          },
-          {
-            &quot;close&quot;: 47.12,
-            &quot;date&quot;: &quot;2026-06-05&quot;,
-            &quot;high&quot;: 49.76,
-            &quot;low&quot;: 46.71,
-            &quot;open&quot;: 49.17
-          },
-          {
-            &quot;close&quot;: 49.92,
-            &quot;date&quot;: &quot;2026-06-06&quot;,
-            &quot;high&quot;: 51.11,
-            &quot;low&quot;: 47.22,
-            &quot;open&quot;: 48.65
-          },
-          {
-            &quot;close&quot;: 49.31,
-            &quot;date&quot;: &quot;2026-06-07&quot;,
-            &quot;high&quot;: 50.63,
-            &quot;low&quot;: 47.95,
-            &quot;open&quot;: 50.1
-          },
-          {
-            &quot;close&quot;: 51.89,
-            &quot;date&quot;: &quot;2026-06-08&quot;,
-            &quot;high&quot;: 53.07,
-            &quot;low&quot;: 49.11,
-            &quot;open&quot;: 50.09
-          },
-          {
-            &quot;close&quot;: 51.23,
-            &quot;date&quot;: &quot;2026-06-09&quot;,
-            &quot;high&quot;: 52.11,
-            &quot;low&quot;: 50.52,
-            &quot;open&quot;: 51.47
-          },
-          {
-            &quot;close&quot;: 48.78,
-            &quot;date&quot;: &quot;2026-06-10&quot;,
-            &quot;high&quot;: 51.88,
-            &quot;low&quot;: 48.37,
-            &quot;open&quot;: 51.29
-          }
-        ],
-        &quot;ma10&quot;: [
-          {
-            &quot;date&quot;: &quot;2026-05-27&quot;,
-            &quot;value&quot;: 45.55
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-28&quot;,
-            &quot;value&quot;: 46.7
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-29&quot;,
-            &quot;value&quot;: 47.97
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-30&quot;,
-            &quot;value&quot;: 49.2
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-31&quot;,
-            &quot;value&quot;: 50.34
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-01&quot;,
-            &quot;value&quot;: 50.92
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-02&quot;,
-            &quot;value&quot;: 51.32
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-03&quot;,
-            &quot;value&quot;: 51.26
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-04&quot;,
-            &quot;value&quot;: 51.17
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-05&quot;,
-            &quot;value&quot;: 50.74
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-06&quot;,
-            &quot;value&quot;: 50.73
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-07&quot;,
-            &quot;value&quot;: 50.4
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-08&quot;,
-            &quot;value&quot;: 50.18
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-09&quot;,
-            &quot;value&quot;: 49.84
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-10&quot;,
-            &quot;value&quot;: 49.47
-          }
-        ],
-        &quot;ma20&quot;: [
-          {
-            &quot;date&quot;: &quot;2026-06-06&quot;,
-            &quot;value&quot;: 48.14
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-07&quot;,
-            &quot;value&quot;: 48.55
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-08&quot;,
-            &quot;value&quot;: 49.08
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-09&quot;,
-            &quot;value&quot;: 49.52
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-10&quot;,
-            &quot;value&quot;: 49.91
-          }
-        ],
-        &quot;ma5&quot;: [
-          {
-            &quot;date&quot;: &quot;2026-05-22&quot;,
-            &quot;value&quot;: 41.9
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-23&quot;,
-            &quot;value&quot;: 42.65
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-24&quot;,
-            &quot;value&quot;: 44.16
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-25&quot;,
-            &quot;value&quot;: 45.84
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-26&quot;,
-            &quot;value&quot;: 47.93
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-27&quot;,
-            &quot;value&quot;: 49.2
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-28&quot;,
-            &quot;value&quot;: 50.74
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-29&quot;,
-            &quot;value&quot;: 51.78
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-30&quot;,
-            &quot;value&quot;: 52.55
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-31&quot;,
-            &quot;value&quot;: 52.76
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-01&quot;,
-            &quot;value&quot;: 52.64
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-02&quot;,
-            &quot;value&quot;: 51.89
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-03&quot;,
-            &quot;value&quot;: 50.75
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-04&quot;,
-            &quot;value&quot;: 49.79
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-05&quot;,
-            &quot;value&quot;: 48.72
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-06&quot;,
-            &quot;value&quot;: 48.82
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-07&quot;,
-            &quot;value&quot;: 48.92
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-08&quot;,
-            &quot;value&quot;: 49.61
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-09&quot;,
-            &quot;value&quot;: 49.89
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-10&quot;,
-            &quot;value&quot;: 50.23
-          }
-        ]
-      },
-      &quot;points&quot;: [
-        {
-          &quot;close&quot;: 41.18,
-          &quot;date&quot;: &quot;2026-05-18&quot;,
-          &quot;high&quot;: 42.98,
-          &quot;low&quot;: 40.39,
-          &quot;open&quot;: 42.54
-        },
-        {
-          &quot;close&quot;: 41.36,
-          &quot;date&quot;: &quot;2026-05-19&quot;,
-          &quot;high&quot;: 42.73,
-          &quot;low&quot;: 38.26,
-          &quot;open&quot;: 39.86
-        },
-        {
-          &quot;close&quot;: 42.37,
-          &quot;date&quot;: &quot;2026-05-20&quot;,
-          &quot;high&quot;: 43.93,
-          &quot;low&quot;: 40.76,
-          &quot;open&quot;: 41.39
-        },
-        {
-          &quot;close&quot;: 40.99,
-          &quot;date&quot;: &quot;2026-05-21&quot;,
-          &quot;high&quot;: 42.31,
-          &quot;low&quot;: 40.33,
-          &quot;open&quot;: 41.39
-        },
-        {
-          &quot;close&quot;: 43.62,
-          &quot;date&quot;: &quot;2026-05-22&quot;,
-          &quot;high&quot;: 44.41,
-          &quot;low&quot;: 41.27,
-          &quot;open&quot;: 42.39
-        },
-        {
-          &quot;close&quot;: 44.89,
-          &quot;date&quot;: &quot;2026-05-23&quot;,
-          &quot;high&quot;: 46.3,
-          &quot;low&quot;: 40.98,
-          &quot;open&quot;: 42.33
-        },
-        {
-          &quot;close&quot;: 48.94,
-          &quot;date&quot;: &quot;2026-05-24&quot;,
-          &quot;high&quot;: 50.45,
-          &quot;low&quot;: 44.82,
-          &quot;open&quot;: 45.84
-        },
-        {
-          &quot;close&quot;: 50.76,
-          &quot;date&quot;: &quot;2026-05-25&quot;,
-          &quot;high&quot;: 51.9,
-          &quot;low&quot;: 46.2,
-          &quot;open&quot;: 47.63
-        },
-        {
-          &quot;close&quot;: 51.45,
-          &quot;date&quot;: &quot;2026-05-26&quot;,
-          &quot;high&quot;: 51.9,
-          &quot;low&quot;: 49.64,
-          &quot;open&quot;: 50.17
-        },
-        {
-          &quot;close&quot;: 49.98,
-          &quot;date&quot;: &quot;2026-05-27&quot;,
-          &quot;high&quot;: 51.77,
-          &quot;low&quot;: 49.52,
-          &quot;open&quot;: 51.35
-        },
-        {
-          &quot;close&quot;: 52.59,
-          &quot;date&quot;: &quot;2026-05-28&quot;,
-          &quot;high&quot;: 54.04,
-          &quot;low&quot;: 48.13,
-          &quot;open&quot;: 49.47
-        },
-        {
-          &quot;close&quot;: 54.12,
-          &quot;date&quot;: &quot;2026-05-29&quot;,
-          &quot;high&quot;: 55.08,
-          &quot;low&quot;: 52.2,
-          &quot;open&quot;: 53.19
-        },
-        {
-          &quot;close&quot;: 54.62,
-          &quot;date&quot;: &quot;2026-05-30&quot;,
-          &quot;high&quot;: 56.15,
-          &quot;low&quot;: 53.08,
-          &quot;open&quot;: 55.27
-        },
-        {
-          &quot;close&quot;: 52.47,
-          &quot;date&quot;: &quot;2026-05-31&quot;,
-          &quot;high&quot;: 54.59,
-          &quot;low&quot;: 51.65,
-          &quot;open&quot;: 53.55
-        },
-        {
-          &quot;close&quot;: 49.42,
-          &quot;date&quot;: &quot;2026-06-01&quot;,
-          &quot;high&quot;: 51.78,
-          &quot;low&quot;: 49.0,
-          &quot;open&quot;: 50.97
-        },
-        {
-          &quot;close&quot;: 48.81,
-          &quot;date&quot;: &quot;2026-06-02&quot;,
-          &quot;high&quot;: 50.35,
-          &quot;low&quot;: 48.37,
-          &quot;open&quot;: 49.98
-        },
-        {
-          &quot;close&quot;: 48.42,
-          &quot;date&quot;: &quot;2026-06-03&quot;,
-          &quot;high&quot;: 51.75,
-          &quot;low&quot;: 47.05,
-          &quot;open&quot;: 50.38
-        },
-        {
-          &quot;close&quot;: 49.83,
-          &quot;date&quot;: &quot;2026-06-04&quot;,
-          &quot;high&quot;: 51.13,
-          &quot;low&quot;: 46.12,
-          &quot;open&quot;: 47.06
-        },
-        {
-          &quot;close&quot;: 47.12,
-          &quot;date&quot;: &quot;2026-06-05&quot;,
-          &quot;high&quot;: 49.76,
-          &quot;low&quot;: 46.71,
-          &quot;open&quot;: 49.17
-        },
-        {
-          &quot;close&quot;: 49.92,
-          &quot;date&quot;: &quot;2026-06-06&quot;,
-          &quot;high&quot;: 51.11,
-          &quot;low&quot;: 47.22,
-          &quot;open&quot;: 48.65
-        },
-        {
-          &quot;close&quot;: 49.31,
-          &quot;date&quot;: &quot;2026-06-07&quot;,
-          &quot;high&quot;: 50.63,
-          &quot;low&quot;: 47.95,
-          &quot;open&quot;: 50.1
-        },
-        {
-          &quot;close&quot;: 51.89,
-          &quot;date&quot;: &quot;2026-06-08&quot;,
-          &quot;high&quot;: 53.07,
-          &quot;low&quot;: 49.11,
-          &quot;open&quot;: 50.09
-        },
-        {
-          &quot;close&quot;: 51.23,
-          &quot;date&quot;: &quot;2026-06-09&quot;,
-          &quot;high&quot;: 52.11,
-          &quot;low&quot;: 50.52,
-          &quot;open&quot;: 51.47
-        },
-        {
-          &quot;close&quot;: 48.78,
-          &quot;date&quot;: &quot;2026-06-10&quot;,
-          &quot;high&quot;: 51.88,
-          &quot;low&quot;: 48.37,
-          &quot;open&quot;: 51.29
-        }
-      ],
-      &quot;series&quot;: [
-        {
-          &quot;date&quot;: &quot;2026-05-18&quot;,
-          &quot;delta&quot;: 0,
-          &quot;direction&quot;: &quot;持平&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;41.18&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-19&quot;,
-          &quot;delta&quot;: 0.18,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;41.36&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-20&quot;,
-          &quot;delta&quot;: 1.01,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;42.37&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-21&quot;,
-          &quot;delta&quot;: -1.38,
-          &quot;direction&quot;: &quot;下行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;40.99&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-22&quot;,
-          &quot;delta&quot;: 2.63,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;43.62&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-23&quot;,
-          &quot;delta&quot;: 1.27,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;44.89&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-24&quot;,
-          &quot;delta&quot;: 4.05,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;48.94&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-25&quot;,
-          &quot;delta&quot;: 1.82,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;50.76&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-26&quot;,
-          &quot;delta&quot;: 0.69,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;51.45&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-27&quot;,
-          &quot;delta&quot;: -1.47,
-          &quot;direction&quot;: &quot;下行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;49.98&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-28&quot;,
-          &quot;delta&quot;: 2.61,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;52.59&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-29&quot;,
-          &quot;delta&quot;: 1.53,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;54.12&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-30&quot;,
-          &quot;delta&quot;: 0.5,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;54.62&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-31&quot;,
-          &quot;delta&quot;: -2.15,
-          &quot;direction&quot;: &quot;下行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;52.47&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-06-01&quot;,
-          &quot;delta&quot;: -3.05,
-          &quot;direction&quot;: &quot;下行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;49.42&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-06-02&quot;,
-          &quot;delta&quot;: -0.61,
-          &quot;direction&quot;: &quot;下行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;48.81&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-06-03&quot;,
-          &quot;delta&quot;: -0.39,
-          &quot;direction&quot;: &quot;下行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;48.42&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-06-04&quot;,
-          &quot;delta&quot;: 1.41,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;49.83&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-06-05&quot;,
-          &quot;delta&quot;: -2.71,
-          &quot;direction&quot;: &quot;下行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;47.12&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-06-06&quot;,
-     </pre>
+    &quot;type&quot;: null,
+    &quot;title&quot;: null,
+    &quot;headline&quot;: null,
+    &quot;summary&quot;: null,
+    &quot;body&quot;: null,
+    &quot;symbol&quot;: null,
+    &quot;chart&quot;: null,
+    &quot;chart_html_present&quot;: false
+  },
+  &quot;settings_snapshot&quot;: null
+}</pre>
           </details>
         </article>
         
@@ -1040,729 +139,33 @@
           </div>
           <div class="bdd-line"><strong>Given</strong> 用户明确要求线图，不要 K 线。</div>
           <div class="bdd-line"><strong>When</strong> 调用 Hermes 查询接口。</div>
-          <div class="bdd-line"><strong>Then</strong> Hermes 必须把图表类型解析为 trend/line，而不是 kline。</div>
-          <p class="detail">线图需求已解析为 trend，未误用 K 线图。</p>
+          <div class="bdd-line"><strong>Then</strong> 模型未配置时必须直接返回错误，不得生成趋势图 artifact。</div>
+          <p class="detail">模型未配置时已返回 503 和明确错误，未生成规则或模板答案。</p>
           <details>
             <summary>查看证据</summary>
             <pre>{
   &quot;question&quot;: &quot;请展示最近3个月的上证指数的历史数据线图（单纯的线性趋势图）&quot;,
-  &quot;http_status&quot;: 200,
-  &quot;ok&quot;: true,
-  &quot;intent&quot;: &quot;smart_indicator_explain&quot;,
-  &quot;task_family&quot;: &quot;data_visualization&quot;,
-  &quot;capability_label&quot;: &quot;数据展示&quot;,
-  &quot;display_mode&quot;: &quot;structured&quot;,
-  &quot;preferred_mode&quot;: &quot;basic&quot;,
-  &quot;router&quot;: {
-    &quot;intent_group&quot;: &quot;chart_visualization&quot;,
-    &quot;mode&quot;: &quot;fallback_rule_router&quot;,
-    &quot;model&quot;: null,
-    &quot;reason&quot;: &quot;分析方式偏向线性图&quot;
-  },
-  &quot;tool_trace&quot;: [
-    {
-      &quot;elapsed_ms&quot;: 20,
-      &quot;status&quot;: &quot;ok&quot;,
-      &quot;tool&quot;: &quot;knowledge.search&quot;
-    },
-    {
-      &quot;elapsed_ms&quot;: 6,
-      &quot;status&quot;: &quot;ok&quot;,
-      &quot;tool&quot;: &quot;indicator.detail&quot;
-    },
-    {
-      &quot;elapsed_ms&quot;: 8,
-      &quot;status&quot;: &quot;ok&quot;,
-      &quot;tool&quot;: &quot;dashboard.context&quot;
-    }
-  ],
+  &quot;http_status&quot;: 503,
+  &quot;ok&quot;: false,
+  &quot;intent&quot;: null,
+  &quot;task_family&quot;: null,
+  &quot;capability_label&quot;: null,
+  &quot;display_mode&quot;: null,
+  &quot;preferred_mode&quot;: null,
+  &quot;router&quot;: null,
+  &quot;tool_trace&quot;: null,
   &quot;artifact&quot;: {
-    &quot;type&quot;: &quot;indicator_analysis&quot;,
-    &quot;title&quot;: &quot;📈 指标趋势分析&quot;,
-    &quot;headline&quot;: &quot;分析方式偏向线性图&quot;,
-    &quot;summary&quot;: &quot;分析方式偏向线性图&quot;,
-    &quot;body&quot;: &quot;上证指数最近 24 个观测点呈偏强震荡，当前值 48.78，主要运行区间在 40.99 到 54.62。 最新一根 K 线开于 51.29、收于 48.78，日内区间 48.37 到 51.88，收盘弱于开盘。 最近需要优先看的异动点在 2026-05-28，信号为“波动抬升”。&quot;,
-    &quot;symbol&quot;: {
-      &quot;code&quot;: &quot;source_shanghai_index&quot;,
-      &quot;industry&quot;: &quot;财经老王&quot;,
-      &quot;market&quot;: &quot;指数走势&quot;,
-      &quot;name&quot;: &quot;上证指数&quot;
-    },
-    &quot;chart&quot;: {
-      &quot;distribution&quot;: [
-        48.94,
-        50.76,
-        51.45,
-        49.98,
-        52.59,
-        54.12,
-        54.62,
-        52.47,
-        49.42,
-        48.81,
-        48.42,
-        49.83,
-        47.12,
-        49.92,
-        49.31,
-        51.89,
-        51.23,
-        48.78
-      ],
-      &quot;kind&quot;: &quot;trend&quot;,
-      &quot;kline&quot;: {
-        &quot;anomalies&quot;: [
-          {
-            &quot;date&quot;: &quot;2026-05-28&quot;,
-            &quot;label&quot;: &quot;波动抬升&quot;,
-            &quot;status&quot;: &quot;good&quot;,
-            &quot;value&quot;: 52.59
-          }
-        ],
-        &quot;candles&quot;: [
-          {
-            &quot;close&quot;: 41.18,
-            &quot;date&quot;: &quot;2026-05-18&quot;,
-            &quot;high&quot;: 42.98,
-            &quot;low&quot;: 40.39,
-            &quot;open&quot;: 42.54
-          },
-          {
-            &quot;close&quot;: 41.36,
-            &quot;date&quot;: &quot;2026-05-19&quot;,
-            &quot;high&quot;: 42.73,
-            &quot;low&quot;: 38.26,
-            &quot;open&quot;: 39.86
-          },
-          {
-            &quot;close&quot;: 42.37,
-            &quot;date&quot;: &quot;2026-05-20&quot;,
-            &quot;high&quot;: 43.93,
-            &quot;low&quot;: 40.76,
-            &quot;open&quot;: 41.39
-          },
-          {
-            &quot;close&quot;: 40.99,
-            &quot;date&quot;: &quot;2026-05-21&quot;,
-            &quot;high&quot;: 42.31,
-            &quot;low&quot;: 40.33,
-            &quot;open&quot;: 41.39
-          },
-          {
-            &quot;close&quot;: 43.62,
-            &quot;date&quot;: &quot;2026-05-22&quot;,
-            &quot;high&quot;: 44.41,
-            &quot;low&quot;: 41.27,
-            &quot;open&quot;: 42.39
-          },
-          {
-            &quot;close&quot;: 44.89,
-            &quot;date&quot;: &quot;2026-05-23&quot;,
-            &quot;high&quot;: 46.3,
-            &quot;low&quot;: 40.98,
-            &quot;open&quot;: 42.33
-          },
-          {
-            &quot;close&quot;: 48.94,
-            &quot;date&quot;: &quot;2026-05-24&quot;,
-            &quot;high&quot;: 50.45,
-            &quot;low&quot;: 44.82,
-            &quot;open&quot;: 45.84
-          },
-          {
-            &quot;close&quot;: 50.76,
-            &quot;date&quot;: &quot;2026-05-25&quot;,
-            &quot;high&quot;: 51.9,
-            &quot;low&quot;: 46.2,
-            &quot;open&quot;: 47.63
-          },
-          {
-            &quot;close&quot;: 51.45,
-            &quot;date&quot;: &quot;2026-05-26&quot;,
-            &quot;high&quot;: 51.9,
-            &quot;low&quot;: 49.64,
-            &quot;open&quot;: 50.17
-          },
-          {
-            &quot;close&quot;: 49.98,
-            &quot;date&quot;: &quot;2026-05-27&quot;,
-            &quot;high&quot;: 51.77,
-            &quot;low&quot;: 49.52,
-            &quot;open&quot;: 51.35
-          },
-          {
-            &quot;close&quot;: 52.59,
-            &quot;date&quot;: &quot;2026-05-28&quot;,
-            &quot;high&quot;: 54.04,
-            &quot;low&quot;: 48.13,
-            &quot;open&quot;: 49.47
-          },
-          {
-            &quot;close&quot;: 54.12,
-            &quot;date&quot;: &quot;2026-05-29&quot;,
-            &quot;high&quot;: 55.08,
-            &quot;low&quot;: 52.2,
-            &quot;open&quot;: 53.19
-          },
-          {
-            &quot;close&quot;: 54.62,
-            &quot;date&quot;: &quot;2026-05-30&quot;,
-            &quot;high&quot;: 56.15,
-            &quot;low&quot;: 53.08,
-            &quot;open&quot;: 55.27
-          },
-          {
-            &quot;close&quot;: 52.47,
-            &quot;date&quot;: &quot;2026-05-31&quot;,
-            &quot;high&quot;: 54.59,
-            &quot;low&quot;: 51.65,
-            &quot;open&quot;: 53.55
-          },
-          {
-            &quot;close&quot;: 49.42,
-            &quot;date&quot;: &quot;2026-06-01&quot;,
-            &quot;high&quot;: 51.78,
-            &quot;low&quot;: 49.0,
-            &quot;open&quot;: 50.97
-          },
-          {
-            &quot;close&quot;: 48.81,
-            &quot;date&quot;: &quot;2026-06-02&quot;,
-            &quot;high&quot;: 50.35,
-            &quot;low&quot;: 48.37,
-            &quot;open&quot;: 49.98
-          },
-          {
-            &quot;close&quot;: 48.42,
-            &quot;date&quot;: &quot;2026-06-03&quot;,
-            &quot;high&quot;: 51.75,
-            &quot;low&quot;: 47.05,
-            &quot;open&quot;: 50.38
-          },
-          {
-            &quot;close&quot;: 49.83,
-            &quot;date&quot;: &quot;2026-06-04&quot;,
-            &quot;high&quot;: 51.13,
-            &quot;low&quot;: 46.12,
-            &quot;open&quot;: 47.06
-          },
-          {
-            &quot;close&quot;: 47.12,
-            &quot;date&quot;: &quot;2026-06-05&quot;,
-            &quot;high&quot;: 49.76,
-            &quot;low&quot;: 46.71,
-            &quot;open&quot;: 49.17
-          },
-          {
-            &quot;close&quot;: 49.92,
-            &quot;date&quot;: &quot;2026-06-06&quot;,
-            &quot;high&quot;: 51.11,
-            &quot;low&quot;: 47.22,
-            &quot;open&quot;: 48.65
-          },
-          {
-            &quot;close&quot;: 49.31,
-            &quot;date&quot;: &quot;2026-06-07&quot;,
-            &quot;high&quot;: 50.63,
-            &quot;low&quot;: 47.95,
-            &quot;open&quot;: 50.1
-          },
-          {
-            &quot;close&quot;: 51.89,
-            &quot;date&quot;: &quot;2026-06-08&quot;,
-            &quot;high&quot;: 53.07,
-            &quot;low&quot;: 49.11,
-            &quot;open&quot;: 50.09
-          },
-          {
-            &quot;close&quot;: 51.23,
-            &quot;date&quot;: &quot;2026-06-09&quot;,
-            &quot;high&quot;: 52.11,
-            &quot;low&quot;: 50.52,
-            &quot;open&quot;: 51.47
-          },
-          {
-            &quot;close&quot;: 48.78,
-            &quot;date&quot;: &quot;2026-06-10&quot;,
-            &quot;high&quot;: 51.88,
-            &quot;low&quot;: 48.37,
-            &quot;open&quot;: 51.29
-          }
-        ],
-        &quot;ma10&quot;: [
-          {
-            &quot;date&quot;: &quot;2026-05-27&quot;,
-            &quot;value&quot;: 45.55
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-28&quot;,
-            &quot;value&quot;: 46.7
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-29&quot;,
-            &quot;value&quot;: 47.97
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-30&quot;,
-            &quot;value&quot;: 49.2
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-31&quot;,
-            &quot;value&quot;: 50.34
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-01&quot;,
-            &quot;value&quot;: 50.92
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-02&quot;,
-            &quot;value&quot;: 51.32
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-03&quot;,
-            &quot;value&quot;: 51.26
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-04&quot;,
-            &quot;value&quot;: 51.17
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-05&quot;,
-            &quot;value&quot;: 50.74
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-06&quot;,
-            &quot;value&quot;: 50.73
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-07&quot;,
-            &quot;value&quot;: 50.4
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-08&quot;,
-            &quot;value&quot;: 50.18
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-09&quot;,
-            &quot;value&quot;: 49.84
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-10&quot;,
-            &quot;value&quot;: 49.47
-          }
-        ],
-        &quot;ma20&quot;: [
-          {
-            &quot;date&quot;: &quot;2026-06-06&quot;,
-            &quot;value&quot;: 48.14
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-07&quot;,
-            &quot;value&quot;: 48.55
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-08&quot;,
-            &quot;value&quot;: 49.08
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-09&quot;,
-            &quot;value&quot;: 49.52
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-10&quot;,
-            &quot;value&quot;: 49.91
-          }
-        ],
-        &quot;ma5&quot;: [
-          {
-            &quot;date&quot;: &quot;2026-05-22&quot;,
-            &quot;value&quot;: 41.9
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-23&quot;,
-            &quot;value&quot;: 42.65
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-24&quot;,
-            &quot;value&quot;: 44.16
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-25&quot;,
-            &quot;value&quot;: 45.84
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-26&quot;,
-            &quot;value&quot;: 47.93
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-27&quot;,
-            &quot;value&quot;: 49.2
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-28&quot;,
-            &quot;value&quot;: 50.74
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-29&quot;,
-            &quot;value&quot;: 51.78
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-30&quot;,
-            &quot;value&quot;: 52.55
-          },
-          {
-            &quot;date&quot;: &quot;2026-05-31&quot;,
-            &quot;value&quot;: 52.76
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-01&quot;,
-            &quot;value&quot;: 52.64
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-02&quot;,
-            &quot;value&quot;: 51.89
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-03&quot;,
-            &quot;value&quot;: 50.75
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-04&quot;,
-            &quot;value&quot;: 49.79
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-05&quot;,
-            &quot;value&quot;: 48.72
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-06&quot;,
-            &quot;value&quot;: 48.82
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-07&quot;,
-            &quot;value&quot;: 48.92
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-08&quot;,
-            &quot;value&quot;: 49.61
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-09&quot;,
-            &quot;value&quot;: 49.89
-          },
-          {
-            &quot;date&quot;: &quot;2026-06-10&quot;,
-            &quot;value&quot;: 50.23
-          }
-        ]
-      },
-      &quot;points&quot;: [
-        {
-          &quot;close&quot;: 41.18,
-          &quot;date&quot;: &quot;2026-05-18&quot;,
-          &quot;high&quot;: 42.98,
-          &quot;low&quot;: 40.39,
-          &quot;open&quot;: 42.54
-        },
-        {
-          &quot;close&quot;: 41.36,
-          &quot;date&quot;: &quot;2026-05-19&quot;,
-          &quot;high&quot;: 42.73,
-          &quot;low&quot;: 38.26,
-          &quot;open&quot;: 39.86
-        },
-        {
-          &quot;close&quot;: 42.37,
-          &quot;date&quot;: &quot;2026-05-20&quot;,
-          &quot;high&quot;: 43.93,
-          &quot;low&quot;: 40.76,
-          &quot;open&quot;: 41.39
-        },
-        {
-          &quot;close&quot;: 40.99,
-          &quot;date&quot;: &quot;2026-05-21&quot;,
-          &quot;high&quot;: 42.31,
-          &quot;low&quot;: 40.33,
-          &quot;open&quot;: 41.39
-        },
-        {
-          &quot;close&quot;: 43.62,
-          &quot;date&quot;: &quot;2026-05-22&quot;,
-          &quot;high&quot;: 44.41,
-          &quot;low&quot;: 41.27,
-          &quot;open&quot;: 42.39
-        },
-        {
-          &quot;close&quot;: 44.89,
-          &quot;date&quot;: &quot;2026-05-23&quot;,
-          &quot;high&quot;: 46.3,
-          &quot;low&quot;: 40.98,
-          &quot;open&quot;: 42.33
-        },
-        {
-          &quot;close&quot;: 48.94,
-          &quot;date&quot;: &quot;2026-05-24&quot;,
-          &quot;high&quot;: 50.45,
-          &quot;low&quot;: 44.82,
-          &quot;open&quot;: 45.84
-        },
-        {
-          &quot;close&quot;: 50.76,
-          &quot;date&quot;: &quot;2026-05-25&quot;,
-          &quot;high&quot;: 51.9,
-          &quot;low&quot;: 46.2,
-          &quot;open&quot;: 47.63
-        },
-        {
-          &quot;close&quot;: 51.45,
-          &quot;date&quot;: &quot;2026-05-26&quot;,
-          &quot;high&quot;: 51.9,
-          &quot;low&quot;: 49.64,
-          &quot;open&quot;: 50.17
-        },
-        {
-          &quot;close&quot;: 49.98,
-          &quot;date&quot;: &quot;2026-05-27&quot;,
-          &quot;high&quot;: 51.77,
-          &quot;low&quot;: 49.52,
-          &quot;open&quot;: 51.35
-        },
-        {
-          &quot;close&quot;: 52.59,
-          &quot;date&quot;: &quot;2026-05-28&quot;,
-          &quot;high&quot;: 54.04,
-          &quot;low&quot;: 48.13,
-          &quot;open&quot;: 49.47
-        },
-        {
-          &quot;close&quot;: 54.12,
-          &quot;date&quot;: &quot;2026-05-29&quot;,
-          &quot;high&quot;: 55.08,
-          &quot;low&quot;: 52.2,
-          &quot;open&quot;: 53.19
-        },
-        {
-          &quot;close&quot;: 54.62,
-          &quot;date&quot;: &quot;2026-05-30&quot;,
-          &quot;high&quot;: 56.15,
-          &quot;low&quot;: 53.08,
-          &quot;open&quot;: 55.27
-        },
-        {
-          &quot;close&quot;: 52.47,
-          &quot;date&quot;: &quot;2026-05-31&quot;,
-          &quot;high&quot;: 54.59,
-          &quot;low&quot;: 51.65,
-          &quot;open&quot;: 53.55
-        },
-        {
-          &quot;close&quot;: 49.42,
-          &quot;date&quot;: &quot;2026-06-01&quot;,
-          &quot;high&quot;: 51.78,
-          &quot;low&quot;: 49.0,
-          &quot;open&quot;: 50.97
-        },
-        {
-          &quot;close&quot;: 48.81,
-          &quot;date&quot;: &quot;2026-06-02&quot;,
-          &quot;high&quot;: 50.35,
-          &quot;low&quot;: 48.37,
-          &quot;open&quot;: 49.98
-        },
-        {
-          &quot;close&quot;: 48.42,
-          &quot;date&quot;: &quot;2026-06-03&quot;,
-          &quot;high&quot;: 51.75,
-          &quot;low&quot;: 47.05,
-          &quot;open&quot;: 50.38
-        },
-        {
-          &quot;close&quot;: 49.83,
-          &quot;date&quot;: &quot;2026-06-04&quot;,
-          &quot;high&quot;: 51.13,
-          &quot;low&quot;: 46.12,
-          &quot;open&quot;: 47.06
-        },
-        {
-          &quot;close&quot;: 47.12,
-          &quot;date&quot;: &quot;2026-06-05&quot;,
-          &quot;high&quot;: 49.76,
-          &quot;low&quot;: 46.71,
-          &quot;open&quot;: 49.17
-        },
-        {
-          &quot;close&quot;: 49.92,
-          &quot;date&quot;: &quot;2026-06-06&quot;,
-          &quot;high&quot;: 51.11,
-          &quot;low&quot;: 47.22,
-          &quot;open&quot;: 48.65
-        },
-        {
-          &quot;close&quot;: 49.31,
-          &quot;date&quot;: &quot;2026-06-07&quot;,
-          &quot;high&quot;: 50.63,
-          &quot;low&quot;: 47.95,
-          &quot;open&quot;: 50.1
-        },
-        {
-          &quot;close&quot;: 51.89,
-          &quot;date&quot;: &quot;2026-06-08&quot;,
-          &quot;high&quot;: 53.07,
-          &quot;low&quot;: 49.11,
-          &quot;open&quot;: 50.09
-        },
-        {
-          &quot;close&quot;: 51.23,
-          &quot;date&quot;: &quot;2026-06-09&quot;,
-          &quot;high&quot;: 52.11,
-          &quot;low&quot;: 50.52,
-          &quot;open&quot;: 51.47
-        },
-        {
-          &quot;close&quot;: 48.78,
-          &quot;date&quot;: &quot;2026-06-10&quot;,
-          &quot;high&quot;: 51.88,
-          &quot;low&quot;: 48.37,
-          &quot;open&quot;: 51.29
-        }
-      ],
-      &quot;series&quot;: [
-        {
-          &quot;date&quot;: &quot;2026-05-18&quot;,
-          &quot;delta&quot;: 0,
-          &quot;direction&quot;: &quot;持平&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;41.18&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-19&quot;,
-          &quot;delta&quot;: 0.18,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;41.36&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-20&quot;,
-          &quot;delta&quot;: 1.01,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;42.37&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-21&quot;,
-          &quot;delta&quot;: -1.38,
-          &quot;direction&quot;: &quot;下行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;40.99&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-22&quot;,
-          &quot;delta&quot;: 2.63,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;43.62&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-23&quot;,
-          &quot;delta&quot;: 1.27,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;44.89&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-24&quot;,
-          &quot;delta&quot;: 4.05,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;48.94&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-25&quot;,
-          &quot;delta&quot;: 1.82,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;50.76&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-26&quot;,
-          &quot;delta&quot;: 0.69,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;51.45&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-27&quot;,
-          &quot;delta&quot;: -1.47,
-          &quot;direction&quot;: &quot;下行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;49.98&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-28&quot;,
-          &quot;delta&quot;: 2.61,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;52.59&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-29&quot;,
-          &quot;delta&quot;: 1.53,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;54.12&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-30&quot;,
-          &quot;delta&quot;: 0.5,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;54.62&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-05-31&quot;,
-          &quot;delta&quot;: -2.15,
-          &quot;direction&quot;: &quot;下行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;52.47&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-06-01&quot;,
-          &quot;delta&quot;: -3.05,
-          &quot;direction&quot;: &quot;下行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;49.42&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-06-02&quot;,
-          &quot;delta&quot;: -0.61,
-          &quot;direction&quot;: &quot;下行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;48.81&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-06-03&quot;,
-          &quot;delta&quot;: -0.39,
-          &quot;direction&quot;: &quot;下行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;48.42&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-06-04&quot;,
-          &quot;delta&quot;: 1.41,
-          &quot;direction&quot;: &quot;上行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;49.83&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-06-05&quot;,
-          &quot;delta&quot;: -2.71,
-          &quot;direction&quot;: &quot;下行&quot;,
-          &quot;status&quot;: &quot;good&quot;,
-          &quot;value&quot;: &quot;47.12&quot;
-        },
-        {
-          &quot;date&quot;: &quot;2026-06-06&quot;,
-       </pre>
+    &quot;type&quot;: null,
+    &quot;title&quot;: null,
+    &quot;headline&quot;: null,
+    &quot;summary&quot;: null,
+    &quot;body&quot;: null,
+    &quot;symbol&quot;: null,
+    &quot;chart&quot;: null,
+    &quot;chart_html_present&quot;: false
+  },
+  &quot;settings_snapshot&quot;: null
+}</pre>
           </details>
         </article>
         
@@ -1773,55 +176,32 @@
           </div>
           <div class="bdd-line"><strong>Given</strong> 用户围绕租户知识库提问。</div>
           <div class="bdd-line"><strong>When</strong> 调用 Hermes 查询接口。</div>
-          <div class="bdd-line"><strong>Then</strong> Hermes 必须先执行 knowledge.search，并以文字回答承接。</div>
-          <p class="detail">知识库问答已进入 knowledge_lookup，并先查知识库。</p>
+          <div class="bdd-line"><strong>Then</strong> 模型未配置时必须直接返回错误，不得用纯检索结果回答。</div>
+          <p class="detail">模型未配置时已返回 503 和明确错误，未生成规则或模板答案。</p>
           <details>
             <summary>查看证据</summary>
             <pre>{
   &quot;question&quot;: &quot;知识库里关于固态电池的研究框架是什么？&quot;,
-  &quot;http_status&quot;: 200,
-  &quot;ok&quot;: true,
-  &quot;intent&quot;: &quot;knowledge_lookup&quot;,
-  &quot;task_family&quot;: &quot;research_qa&quot;,
-  &quot;capability_label&quot;: &quot;研究问答&quot;,
-  &quot;display_mode&quot;: &quot;text&quot;,
-  &quot;preferred_mode&quot;: &quot;basic&quot;,
-  &quot;router&quot;: {
-    &quot;intent_group&quot;: &quot;knowledge_qa&quot;,
-    &quot;mode&quot;: &quot;fallback_rule_router&quot;,
-    &quot;model&quot;: null,
-    &quot;reason&quot;: &quot;命中知识或方法问题&quot;
-  },
-  &quot;tool_trace&quot;: [
-    {
-      &quot;elapsed_ms&quot;: 20,
-      &quot;status&quot;: &quot;ok&quot;,
-      &quot;tool&quot;: &quot;knowledge.search&quot;
-    }
-  ],
+  &quot;http_status&quot;: 503,
+  &quot;ok&quot;: false,
+  &quot;intent&quot;: null,
+  &quot;task_family&quot;: null,
+  &quot;capability_label&quot;: null,
+  &quot;display_mode&quot;: null,
+  &quot;preferred_mode&quot;: null,
+  &quot;router&quot;: null,
+  &quot;tool_trace&quot;: null,
   &quot;artifact&quot;: {
-    &quot;type&quot;: &quot;text_response&quot;,
+    &quot;type&quot;: null,
     &quot;title&quot;: null,
-    &quot;headline&quot;: &quot;命中知识或方法问题&quot;,
-    &quot;summary&quot;: &quot;命中知识或方法问题&quot;,
-    &quot;body&quot;: &quot;我先按当前可用的知识和工具结果给你一个文字回答。&quot;,
+    &quot;headline&quot;: null,
+    &quot;summary&quot;: null,
+    &quot;body&quot;: null,
     &quot;symbol&quot;: null,
     &quot;chart&quot;: null,
     &quot;chart_html_present&quot;: false
   },
-  &quot;settings_snapshot&quot;: {
-    &quot;answer_save_to_knowledge_enabled&quot;: true,
-    &quot;chart_types_enabled&quot;: [
-      &quot;kline_chart&quot;,
-      &quot;line_chart&quot;,
-      &quot;distribution_chart&quot;,
-      &quot;compare_chart&quot;
-    ],
-    &quot;default_response_style&quot;: &quot;structured&quot;,
-    &quot;internet_answer_enabled&quot;: true,
-    &quot;prompt_scope_guard_enabled&quot;: true,
-    &quot;thinking_process_enabled&quot;: true
-  }
+  &quot;settings_snapshot&quot;: null
 }</pre>
           </details>
         </article>
@@ -1833,60 +213,32 @@
           </div>
           <div class="bdd-line"><strong>Given</strong> 用户上传文件后要求 Hermes 解读报告。</div>
           <div class="bdd-line"><strong>When</strong> 带附件调用 Hermes 查询接口。</div>
-          <div class="bdd-line"><strong>Then</strong> Hermes 必须执行 attachment.context，并按报告解读/知识问答链路输出。</div>
-          <p class="detail">附件已进入 attachment.context，报告解读链路可用。</p>
+          <div class="bdd-line"><strong>Then</strong> 模型未配置时必须直接返回错误，不得用附件原文或模板回答。</div>
+          <p class="detail">模型未配置时已返回 503 和明确错误，未生成规则或模板答案。</p>
           <details>
             <summary>查看证据</summary>
             <pre>{
   &quot;question&quot;: &quot;帮我解读一下刚上传的研报，提炼三条核心观点&quot;,
-  &quot;http_status&quot;: 200,
-  &quot;ok&quot;: true,
-  &quot;intent&quot;: &quot;product_help&quot;,
-  &quot;task_family&quot;: &quot;product_help&quot;,
-  &quot;capability_label&quot;: &quot;产品帮助&quot;,
-  &quot;display_mode&quot;: &quot;text&quot;,
-  &quot;preferred_mode&quot;: &quot;basic&quot;,
-  &quot;router&quot;: {
-    &quot;intent_group&quot;: &quot;product_help_or_smalltalk&quot;,
-    &quot;mode&quot;: &quot;fallback_rule_router&quot;,
-    &quot;model&quot;: null,
-    &quot;reason&quot;: &quot;命中平台功能操作问题&quot;
-  },
-  &quot;tool_trace&quot;: [
-    {
-      &quot;elapsed_ms&quot;: 18,
-      &quot;status&quot;: &quot;ok&quot;,
-      &quot;tool&quot;: &quot;knowledge.search&quot;
-    },
-    {
-      &quot;elapsed_ms&quot;: 0,
-      &quot;status&quot;: &quot;ok&quot;,
-      &quot;tool&quot;: &quot;attachment.context&quot;
-    }
-  ],
+  &quot;http_status&quot;: 503,
+  &quot;ok&quot;: false,
+  &quot;intent&quot;: null,
+  &quot;task_family&quot;: null,
+  &quot;capability_label&quot;: null,
+  &quot;display_mode&quot;: null,
+  &quot;preferred_mode&quot;: null,
+  &quot;router&quot;: null,
+  &quot;tool_trace&quot;: null,
   &quot;artifact&quot;: {
-    &quot;type&quot;: &quot;text_response&quot;,
+    &quot;type&quot;: null,
     &quot;title&quot;: null,
-    &quot;headline&quot;: &quot;命中平台功能操作问题&quot;,
-    &quot;summary&quot;: &quot;命中平台功能操作问题&quot;,
-    &quot;body&quot;: &quot;我先按当前可用的知识和工具结果给你一个文字回答。&quot;,
+    &quot;headline&quot;: null,
+    &quot;summary&quot;: null,
+    &quot;body&quot;: null,
     &quot;symbol&quot;: null,
     &quot;chart&quot;: null,
     &quot;chart_html_present&quot;: false
   },
-  &quot;settings_snapshot&quot;: {
-    &quot;answer_save_to_knowledge_enabled&quot;: true,
-    &quot;chart_types_enabled&quot;: [
-      &quot;kline_chart&quot;,
-      &quot;line_chart&quot;,
-      &quot;distribution_chart&quot;,
-      &quot;compare_chart&quot;
-    ],
-    &quot;default_response_style&quot;: &quot;structured&quot;,
-    &quot;internet_answer_enabled&quot;: true,
-    &quot;prompt_scope_guard_enabled&quot;: true,
-    &quot;thinking_process_enabled&quot;: true
-  }
+  &quot;settings_snapshot&quot;: null
 }</pre>
           </details>
         </article>
@@ -1898,60 +250,32 @@
           </div>
           <div class="bdd-line"><strong>Given</strong> 用户询问平台功能使用。</div>
           <div class="bdd-line"><strong>When</strong> 调用 Hermes 查询接口。</div>
-          <div class="bdd-line"><strong>Then</strong> Hermes 必须进入 product_help，而不是错误调用图表能力。</div>
-          <p class="detail">产品帮助场景路由正确。</p>
+          <div class="bdd-line"><strong>Then</strong> 模型未配置时必须直接返回错误，不得返回产品帮助模板。</div>
+          <p class="detail">模型未配置时已返回 503 和明确错误，未生成规则或模板答案。</p>
           <details>
             <summary>查看证据</summary>
             <pre>{
   &quot;question&quot;: &quot;H5 里的智能指标怎么创建和发布？&quot;,
-  &quot;http_status&quot;: 200,
-  &quot;ok&quot;: true,
-  &quot;intent&quot;: &quot;product_help&quot;,
-  &quot;task_family&quot;: &quot;product_help&quot;,
-  &quot;capability_label&quot;: &quot;产品帮助&quot;,
-  &quot;display_mode&quot;: &quot;text&quot;,
-  &quot;preferred_mode&quot;: &quot;basic&quot;,
-  &quot;router&quot;: {
-    &quot;intent_group&quot;: &quot;product_help_or_smalltalk&quot;,
-    &quot;mode&quot;: &quot;fallback_rule_router&quot;,
-    &quot;model&quot;: null,
-    &quot;reason&quot;: &quot;命中平台功能操作问题&quot;
-  },
-  &quot;tool_trace&quot;: [
-    {
-      &quot;elapsed_ms&quot;: 20,
-      &quot;status&quot;: &quot;ok&quot;,
-      &quot;tool&quot;: &quot;knowledge.search&quot;
-    },
-    {
-      &quot;elapsed_ms&quot;: 8,
-      &quot;status&quot;: &quot;ok&quot;,
-      &quot;tool&quot;: &quot;dashboard.context&quot;
-    }
-  ],
+  &quot;http_status&quot;: 503,
+  &quot;ok&quot;: false,
+  &quot;intent&quot;: null,
+  &quot;task_family&quot;: null,
+  &quot;capability_label&quot;: null,
+  &quot;display_mode&quot;: null,
+  &quot;preferred_mode&quot;: null,
+  &quot;router&quot;: null,
+  &quot;tool_trace&quot;: null,
   &quot;artifact&quot;: {
-    &quot;type&quot;: &quot;text_response&quot;,
+    &quot;type&quot;: null,
     &quot;title&quot;: null,
-    &quot;headline&quot;: &quot;命中平台功能操作问题&quot;,
-    &quot;summary&quot;: &quot;命中平台功能操作问题&quot;,
-    &quot;body&quot;: &quot;我先按当前可用的知识和工具结果给你一个文字回答。&quot;,
+    &quot;headline&quot;: null,
+    &quot;summary&quot;: null,
+    &quot;body&quot;: null,
     &quot;symbol&quot;: null,
     &quot;chart&quot;: null,
     &quot;chart_html_present&quot;: false
   },
-  &quot;settings_snapshot&quot;: {
-    &quot;answer_save_to_knowledge_enabled&quot;: true,
-    &quot;chart_types_enabled&quot;: [
-      &quot;kline_chart&quot;,
-      &quot;line_chart&quot;,
-      &quot;distribution_chart&quot;,
-      &quot;compare_chart&quot;
-    ],
-    &quot;default_response_style&quot;: &quot;structured&quot;,
-    &quot;internet_answer_enabled&quot;: true,
-    &quot;prompt_scope_guard_enabled&quot;: true,
-    &quot;thinking_process_enabled&quot;: true
-  }
+  &quot;settings_snapshot&quot;: null
 }</pre>
           </details>
         </article>

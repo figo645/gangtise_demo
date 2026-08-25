@@ -38,15 +38,33 @@ def api_hermes_mode_detail():
 
 @app.route("/api/hermes/analyze", methods=["POST"])
 def api_hermes_analyze():
-    mode = request.json.get("mode", "研报精读")
-    option = request.json.get("option", "")
-    key = f"{mode}_{option}"
-    platform_name = get_platform_name()
-    result = HERMES_RESPONSES.get(key, f"【{mode} · {option}】\n\n基于{platform_name}平台整合的多维度数据，AI已完成深度分析。\n\n核心发现：该领域当前呈现结构性机会，关键指标向好。建议结合个人风险偏好，参考试点作者的研究框架后做出自己的判断。\n\n数据来源：券商研报库 + 专家纪要库 + 另类数据库\nAI引擎：DeepSeek R2 + Kimi 2.6 RAG架构\n分析时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    body = request.get_json(silent=True) or {}
+    mode = str(body.get("mode") or "研报精读").strip()
+    option = str(body.get("option") or "").strip()
+    question = str(body.get("question") or "").strip() or "、".join(item for item in [mode, option] if item)
+    if not question:
+        return jsonify({"ok": False, "error": "hermes_question_required"}), 400
+    query_body = {
+        **body,
+        "question": question,
+        "messages": body.get("messages") if isinstance(body.get("messages"), list) else [{"role": "user", "content": question}],
+        "entry_point": "hermes_analyze_legacy",
+    }
+    try:
+        hermes_result = build_hermes_query_response(query_body)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    except Exception:
+        app.logger.exception("Failed to execute legacy Hermes analyze endpoint")
+        return jsonify({"ok": False, "error": "hermes_analyze_failed"}), 500
     return jsonify({
+        "ok": True,
         "mode": mode,
         "option": option,
-        "result": result,
+        "result": hermes_result.get("answer") or "",
+        "hermes": hermes_result,
         "compute_used": 1,
         "points_earned": 20,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
