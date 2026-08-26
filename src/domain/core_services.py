@@ -1172,6 +1172,11 @@ def normalize_review_snapshot_item(item, tenant, index=0):
         })
     watchlist_analysis_section = {
         "sector_summary": str(watchlist_analysis_raw.get("sector_summary") or "").strip()[:200],
+        "combined_text": str(watchlist_analysis_raw.get("combined_text") or "").strip()[:40000],
+        "raw_text": str(watchlist_analysis_raw.get("raw_text") or "").strip()[:60000],
+        "provider": str(watchlist_analysis_raw.get("provider") or "").strip()[:120],
+        "endpoint": str(watchlist_analysis_raw.get("endpoint") or "").strip()[:240],
+        "request_text": str(watchlist_analysis_raw.get("request_text") or "").strip()[:4000],
         "sector_profiles": sector_profiles,
         "items": watchlist_items,
         "annotation_evidence": annotation_evidence,
@@ -6479,7 +6484,6 @@ def ensure_default_admin_tasks():
 
     db = get_db()
     timestamp = now_ts()
-    legacy_market_snapshot_schedule_values = {"900", "3600"}
     for raw in DEFAULT_ADMIN_TASKS:
         item = normalize_admin_task_config(raw)
         existing = db.execute(
@@ -6487,21 +6491,6 @@ def ensure_default_admin_tasks():
             (item["task_code"],),
         ).fetchone()
         if existing:
-            # Upgrade the old built-in cadence while preserving other admin overrides.
-            if item["task_code"] == "market_snapshot_sync":
-                current = db.execute(
-                    "SELECT schedule_type, schedule_value FROM admin_task_configs WHERE task_code = ?",
-                    (item["task_code"],),
-                ).fetchone()
-                if current and str(current.get("schedule_value") or "").strip() in legacy_market_snapshot_schedule_values:
-                    db.execute(
-                        """
-                        UPDATE admin_task_configs
-                        SET schedule_type = ?, schedule_value = ?, updated_at = ?
-                        WHERE task_code = ?
-                        """,
-                        (item["schedule_type"], item["schedule_value"], timestamp, item["task_code"]),
-                    )
             continue
         db.execute(
             """
@@ -6692,7 +6681,9 @@ def report_user_async_job_progress(job_code, stage="", percent=None, summary="",
     if isinstance(extra_result, dict):
         result_payload.update(copy.deepcopy(extra_result))
     fields = {
-        "result_json": json.dumps(result_payload, ensure_ascii=False)[:20000],
+        # user_async_jobs.result_json is TEXT. Keep the complete structured
+        # result so large Agent SSE responses remain valid JSON and resumable.
+        "result_json": json.dumps(result_payload, ensure_ascii=False),
     }
     if stage:
         fields["progress_stage"] = str(stage).strip()
@@ -7478,7 +7469,7 @@ def _complete_user_async_job(job_code, success, summary="", result=None, error_m
             progress_percent=100 if success else 100,
             summary=(summary or ("任务执行完成" if success else "任务执行失败"))[:240],
             error_message=(error_message or "")[:2000],
-            result_json=json.dumps(final_result, ensure_ascii=False)[:20000],
+            result_json=json.dumps(final_result, ensure_ascii=False),
             finished_at=now_ts(),
         )
 

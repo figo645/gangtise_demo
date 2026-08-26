@@ -390,8 +390,6 @@ def api_market():
 def api_market_overview():
     try:
         payload = build_market_overview_payload()
-        if not payload.get("items"):
-            request_market_snapshot_refresh()
         return jsonify(payload)
     except Exception as exc:
         if is_db_unavailable_error(exc):
@@ -405,8 +403,6 @@ def api_market_sectors():
     try:
         force_refresh = str(request.args.get("refresh") or "").strip().lower() in {"1", "true", "yes"}
         payload = build_market_sector_overview_payload(force_refresh=force_refresh)
-        if not payload.get("items"):
-            request_market_snapshot_refresh()
         return jsonify(payload)
     except Exception as exc:
         if is_db_unavailable_error(exc):

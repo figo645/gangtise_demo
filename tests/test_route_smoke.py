@@ -293,6 +293,7 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
         self.assertNotIn('onclick="refreshMarketSnapshot()"', html)
+        self.assertNotIn('window.setTimeout(loadMarketSectors, 2500)', html)
         self.assertIn('后台 AKShare 采集后入库', html)
 
     def test_akshare_index_snapshot_uses_real_daily_values(self):
@@ -391,21 +392,6 @@ class RouteSmokeTest(unittest.TestCase):
         payload = response.get_json()
         self.assertEqual(payload["items"][0]["sector"], "电子")
         self.assertEqual(payload["total"], 1)
-
-    def test_market_sector_uses_api_test_edb_search_and_get_data_contract(self):
-        from src.domain import market_services
-
-        responses = [
-            (200, {"code": "000000", "status": True, "data": []}, 1),
-            (200, {"code": "000000", "status": True, "data": [{"indicatorId": "S02002067", "indicatorName": "Wind行业指数:化工:当日值"}]}, 1),
-            (200, {"code": "000000", "status": True, "data": {"fieldList": ["date", "S02002067"], "dataList": [["2026-08-09", "100"], ["2026-08-10", "102"]]}}, 1),
-        ]
-        with patch.object(market_services, "post_gangtise_openapi_json", side_effect=responses):
-            result = market_services._fetch_gangtise_sector_index("化工", "2026-06-01", "2026-08-10")
-
-        self.assertTrue(result["ok"])
-        self.assertEqual(result["code"], "S02002067")
-        self.assertEqual(result["change_pct"], 2.0)
 
     def test_market_sector_batch_uses_verified_swi_daily_quotes(self):
         from src.domain import market_services

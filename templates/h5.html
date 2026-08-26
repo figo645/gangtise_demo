@@ -3611,6 +3611,25 @@ body { background: var(--surface-2); color: var(--text-main); }
 }
 .review-article-section-title { font-size:15px; color:var(--text-main); font-weight:800; margin-bottom:10px; }
 .review-article-section-text { font-size:13px; color:var(--gray-400); line-height:1.95; }
+.review-gangtise-markdown { font-size:13px; color:var(--gray-400); line-height:1.95; overflow-wrap:anywhere; }
+.review-gangtise-markdown h2, .review-gangtise-markdown h3, .review-gangtise-markdown h4 { color:var(--text-main); line-height:1.5; margin:18px 0 8px; }
+.review-gangtise-markdown h2 { font-size:17px; }
+.review-gangtise-markdown h3 { font-size:15px; }
+.review-gangtise-markdown h4 { font-size:14px; }
+.review-gangtise-markdown p { margin:0 0 12px; }
+.review-gangtise-markdown ul { margin:0 0 12px; padding-left:20px; }
+.review-gangtise-markdown hr { border:0; border-top:1px solid rgba(47,116,192,0.14); margin:16px 0; }
+.review-gangtise-table-wrap { width:100%; overflow-x:auto; margin:12px 0 16px; -webkit-overflow-scrolling:touch; }
+.review-gangtise-markdown table { min-width:620px; width:100%; border-collapse:separate; border-spacing:0; font-size:12px; }
+.review-gangtise-markdown th, .review-gangtise-markdown td { padding:7px 8px; border:1px solid rgba(47,116,192,0.14); text-align:left; vertical-align:top; }
+.review-gangtise-markdown th { color:var(--text-main); background:rgba(47,116,192,0.05); font-weight:800; white-space:nowrap; }
+.review-gangtise-markdown td { min-width:120px; }
+.review-gangtise-markdown tr:first-child th:first-child { border-top-left-radius:8px; }
+.review-gangtise-markdown tr:first-child th:last-child { border-top-right-radius:8px; }
+.review-gangtise-markdown tr:last-child td:first-child { border-bottom-left-radius:8px; }
+.review-gangtise-markdown tr:last-child td:last-child { border-bottom-right-radius:8px; }
+.review-gangtise-citation { color:var(--gray-400); font-size:10px; margin-left:2px; }
+.review-gangtise-source { margin-top:10px; color:var(--gray-400); font-size:11px; }
 .review-article-evidence-list { display:grid; gap:10px; margin-top:12px; }
 .review-article-evidence-item {
   padding:12px;
@@ -5697,31 +5716,7 @@ function normalizeReviewStructuredPreview(payload) {
 
 function buildReviewWatchlistAnalysisText(section) {
   const payload = section && typeof section === 'object' ? section : {};
-  const parts = [];
-  const combinedText = String(payload.combined_text || '').trim();
-  if (combinedText) parts.push(combinedText);
-  const sectorSummary = String(payload.sector_summary || '').trim();
-  if (sectorSummary) parts.push(`板块归纳：${sectorSummary}`);
-  const sectorProfiles = Array.isArray(payload.sector_profiles) ? payload.sector_profiles : [];
-  if (sectorProfiles.length) {
-    parts.push('板块代表性：');
-    sectorProfiles.forEach((item) => {
-      const label = String((item || {}).sector || '').trim();
-      const text = String((item || {}).representative_description || '').trim();
-      if (label || text) parts.push(`- ${label}：${text}`);
-    });
-  }
-  const items = Array.isArray(payload.items) ? payload.items : [];
-  if (items.length) {
-    parts.push('逐股归纳：');
-    items.forEach((item) => {
-      const name = String((item || {}).stock_name || '').trim();
-      const sector = String((item || {}).sector || '').trim();
-      const body = String((item || {}).analysis_text || '').trim();
-      if (name || body) parts.push(`- ${name}${sector ? `（${sector}）` : ''}：${body}`);
-    });
-  }
-  return parts.join('\n').trim();
+  return String(payload.combined_text || payload.raw_text || payload.partial_text || '').trim();
 }
 
 function buildReviewStructuredFinalText(payload) {
@@ -6471,6 +6466,127 @@ function escapeHtml(value) {
 
 function escapeAttr(value) {
   return escapeHtml(value);
+}
+
+function renderGangtiseMarkdown(value) {
+  const source = String(value || '').replace(/\r\n?/g, '\n').trim();
+  if (!source) return '';
+
+  const recoverCompressedTable = (rawText) => {
+    const firstPipe = rawText.indexOf('|');
+    if (firstPipe <= 0 || !rawText.slice(firstPipe).includes(':---')) return rawText;
+    const remainder = rawText.slice(firstPipe);
+    const proseMarker = remainder.match(/\|\s*(?=(?:从资产配置|在当前|综合来看|综上所述|以上|注：))/);
+    if (!proseMarker || proseMarker.index === undefined) return rawText;
+    const tableRaw = remainder.slice(0, proseMarker.index);
+    const cells = tableRaw.replace(/\*\*/g, '').split('|').map((cell) => cell.trim()).filter(Boolean);
+    const dividerIndex = cells.findIndex((cell) => /^:?-{3,}:?$/.test(cell));
+    if (dividerIndex < 2 || cells.length < dividerIndex * 2) return rawText;
+    const columns = dividerIndex;
+    const tableLines = [
+      `| ${cells.slice(0, columns).join(' | ')} |`,
+      `| ${Array.from({ length: columns }, () => '---').join(' | ')} |`,
+    ];
+    for (let index = columns * 2; index + columns <= cells.length; index += columns) {
+      tableLines.push(`| ${cells.slice(index, index + columns).join(' | ')} |`);
+    }
+    const title = rawText.slice(0, firstPipe).replace(/^\*+|\*+$/g, '').trim();
+    const remainderText = remainder.slice(proseMarker.index + 1).trim()
+      .replace(/^\*\*/, '')
+      .replace(/\*\*$/, '')
+      .trim();
+    return `${title ? `## ${title}\n` : ''}${tableLines.join('\n')}\n\n${remainderText}`.trim();
+  };
+
+  // The API response is untrusted. Escape it before adding only the small,
+  // explicit HTML vocabulary produced by this renderer.
+  let normalizedSource = recoverCompressedTable(source)
+    // Older persisted SSE results may have lost the newline before a heading.
+    .replace(/(---+)(?=#{1,4}\s)/g, '$1\n')
+    .replace(/([^\n])(?=---+(?:\n|$))/g, '$1\n')
+    .replace(/([^#\n])(?=#{1,4}\s)/g, '$1\n')
+    // Recover the two fixed section labels used by the review prompt when
+    // the old merger joined the heading and its first sentence.
+    .replace(/^(#{1,4}\s+(?:结论|详细分析))(?=\S)/gm, '$1\n');
+
+  // Gangtise occasionally wraps a complete table row in bold markers and
+  // returns several Markdown lines as one SSE chunk. Recover the block
+  // boundaries before escaping the source, while keeping inline bold text.
+  normalizedSource = normalizedSource
+    .replace(/\*{2}\s+\*{2}\s*(?=[一二三四五六七八九十]+、)/g, '\n## ')
+    .replace(/\*\*([一二三四五六七八九十]+、[^*\n]{2,40}?(?:策略|要点))(?=[\u4e00-\u9fff])/g, '## $1\n')
+    .replace(/^(#{1,4}\s+[一二三四五六七八九十]+、[^\n]{2,40}?(?:策略|要点))(?=[\u4e00-\u9fff])/gm, '$1\n');
+  normalizedSource = normalizedSource
+    .replace(/^\s*\*\*(?=\|)/gm, '')
+    .replace(/\|\s*\*\*\s*$/gm, '|');
+  const lines = escapeHtml(normalizedSource)
+    .replace(/&lt;br\s*\/?&gt;/gi, '\n')
+    .split('\n');
+  const renderInline = (text) => String(text || '')
+    .replace(/\\ref\{(\d+)\}/g, '<sup class="review-gangtise-citation">[$1]</sup>')
+    .replace(/\[(\d{1,3})\]/g, '<sup class="review-gangtise-citation">[$1]</sup>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  const isTableRow = (line) => /^\s*\|.*\|\s*$/.test(line);
+  const isTableDivider = (line) => {
+    if (!isTableRow(line)) return false;
+    return line.split('|').filter((cell, index, cells) => index > 0 && index < cells.length - 1)
+      .every((cell) => /^\s*:?-{3,}:?\s*$/.test(cell));
+  };
+  const tableCells = (line) => line.trim().replace(/^\||\|$/g, '').split('|').map((cell) => cell.trim());
+  const blocks = [];
+  let paragraph = [];
+  const flushParagraph = () => {
+    if (!paragraph.length) return;
+    blocks.push(`<p>${renderInline(paragraph.join('<br>'))}</p>`);
+    paragraph = [];
+  };
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const heading = line.match(/^(#{1,4})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      const level = heading[1].length + 1;
+      blocks.push(`<h${level}>${renderInline(heading[2])}</h${level}>`);
+      continue;
+    }
+    if (/^\s*(---+|\*\*\*+)\s*$/.test(line)) {
+      flushParagraph();
+      blocks.push('<hr>');
+      continue;
+    }
+    if (isTableRow(line) && isTableDivider(lines[index + 1] || '')) {
+      flushParagraph();
+      const headers = tableCells(line);
+      const rows = [];
+      index += 2;
+      while (index < lines.length && isTableRow(lines[index])) {
+        rows.push(tableCells(lines[index]));
+        index += 1;
+      }
+      index -= 1;
+      blocks.push(`<div class="review-gangtise-table-wrap"><table><thead><tr>${headers.map((cell) => `<th>${renderInline(cell)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${headers.map((_, cellIndex) => `<td>${renderInline(row[cellIndex] || '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`);
+      continue;
+    }
+    if (/^\s*[-*]\s+/.test(line)) {
+      flushParagraph();
+      const items = [];
+      while (index < lines.length && /^\s*[-*]\s+/.test(lines[index])) {
+        items.push(lines[index].replace(/^\s*[-*]\s+/, ''));
+        index += 1;
+      }
+      index -= 1;
+      blocks.push(`<ul>${items.map((item) => `<li>${renderInline(item)}</li>`).join('')}</ul>`);
+      continue;
+    }
+    if (!line.trim()) {
+      flushParagraph();
+      continue;
+    }
+    paragraph.push(line.trim());
+  }
+  flushParagraph();
+  return `<div class="review-gangtise-markdown">${blocks.join('')}</div>`;
 }
 
 function hasLoggedInH5User() {
@@ -7389,13 +7505,12 @@ function buildReviewArticleData(review) {
   const evidenceChainSection = review.evidenceChainSection && typeof review.evidenceChainSection === 'object'
     ? review.evidenceChainSection
     : { status: '', summary: '', items: [], knowledge_match_count: 0, web_match_count: 0 };
-  const userInputSection = review.userInputSection && typeof review.userInputSection === 'object'
-    ? review.userInputSection
-    : {
-        source_mode: review.sourceMode || 'manual',
-        source_mode_label: review.sourceLabel || '用户输入',
-        display_text: ((review.paragraphs || [])[0] || {}).text || review.summary || '',
-      };
+  const userInputSection = {
+    source_mode: review.sourceMode || 'manual',
+    source_mode_label: review.sourceLabel || '用户输入',
+    display_text: ((review.paragraphs || [])[0] || {}).text || review.summary || '',
+    ...(review.userInputSection && typeof review.userInputSection === 'object' ? review.userInputSection : {}),
+  };
   const watchlistAnalysisSection = review.watchlistAnalysisSection && typeof review.watchlistAnalysisSection === 'object'
     ? review.watchlistAnalysisSection
     : { sector_summary: '', sector_profiles: [], items: [] };
@@ -7446,35 +7561,13 @@ function renderReviewWatchlistAnalysisSection(article) {
   const section = article && article.watchlistAnalysisSection && typeof article.watchlistAnalysisSection === 'object'
     ? article.watchlistAnalysisSection
     : {};
-  const sectorProfiles = Array.isArray(section.sector_profiles) ? section.sector_profiles : [];
-  const items = Array.isArray(section.items) ? section.items : [];
-  if (!String(section.sector_summary || '').trim() && !sectorProfiles.length && !items.length) return '';
+  const combinedText = String(section.combined_text || '').trim();
+  if (!combinedText) return '';
   return `
     <div class="review-article-section">
       <div class="review-article-section-title">自选股归纳总结</div>
-      ${section.sector_summary ? `<div class="review-article-section-text">${escapeHtml(section.sector_summary)}</div>` : ''}
-      ${sectorProfiles.length ? `
-        <div class="review-article-evidence-list" style="margin-top:12px">
-          ${sectorProfiles.map((profile) => `
-            <div class="review-article-evidence-item">
-              <div class="review-article-evidence-title">${escapeHtml(profile.sector || '板块代表性')}</div>
-              <div class="review-article-evidence-text">${escapeHtml(profile.representative_description || '')}</div>
-              ${Array.isArray(profile.stock_names) && profile.stock_names.length ? `<div class="review-article-evidence-text">代表样本：${escapeHtml(profile.stock_names.join('、'))}</div>` : ''}
-            </div>
-          `).join('')}
-        </div>
-      ` : ''}
-      ${items.length ? `
-        <div class="review-article-evidence-list" style="margin-top:12px">
-          ${items.map((item) => `
-            <div class="review-article-evidence-item">
-              <div class="review-article-evidence-title">${escapeHtml(item.stock_name || '股票')} · ${escapeHtml(item.board_role || item.sector || '归纳样本')}</div>
-              <div class="review-article-evidence-text">${escapeHtml(item.analysis_text || '')}</div>
-              ${Array.isArray(item.evidence) && item.evidence.length ? `<div class="review-article-evidence-text">依据：${escapeHtml(item.evidence.join(' / '))}</div>` : ''}
-            </div>
-          `).join('')}
-        </div>
-      ` : ''}
+      ${renderGangtiseMarkdown(combinedText)}
+      <div class="review-gangtise-source">归纳来源：Gangtise AI</div>
     </div>
   `;
 }
@@ -7657,12 +7750,6 @@ function renderReviewArticleDetailContent(article, options = {}) {
         </div>
         <div style="padding:12px 14px 14px">${buildReviewArticleHeroVisual(article)}</div>
       </div>
-      ${article.bodySections.map(section => `
-        <div class="review-article-section">
-          <div class="review-article-section-title">${escapeHtml(section.title)}</div>
-          <div class="review-article-section-text">${escapeHtml(section.text).replace(/\n/g, '<br>')}</div>
-        </div>
-      `).join('')}
       ${article.userInputSection && article.userInputSection.display_text ? `
         <div class="review-article-section">
           <div class="review-article-section-title">用户复盘</div>
@@ -7670,7 +7757,7 @@ function renderReviewArticleDetailContent(article, options = {}) {
         </div>
       ` : ''}
       ${renderReviewWatchlistAnalysisSection(article)}
-      ${article.knowledgeAttachments.length ? `
+      ${false && article.knowledgeAttachments.length ? `
         <div class="review-article-section">
           <div class="review-article-section-title">附加材料</div>
           <div class="review-article-evidence-list">
@@ -7685,7 +7772,7 @@ function renderReviewArticleDetailContent(article, options = {}) {
           </div>
         </div>
       ` : ''}
-      ${article.evidenceChainSection && (article.evidenceChainSection.summary || (article.evidenceChainSection.items || []).length || article.evidenceChainSection.status === 'empty') ? `
+      ${false && article.evidenceChainSection && (article.evidenceChainSection.summary || (article.evidenceChainSection.items || []).length || article.evidenceChainSection.status === 'empty') ? `
         <div class="review-article-section">
           <div class="review-article-section-title">归纳来源</div>
           <div class="review-article-evidence-list">
@@ -7710,7 +7797,7 @@ function renderReviewArticleDetailContent(article, options = {}) {
           </div>
         </div>
       ` : ''}
-      ${article.evidenceItems.length ? `
+      ${false && article.evidenceItems.length ? `
         <div class="review-article-section">
           <div class="review-article-section-title">复盘依据 · K线标注</div>
           <div class="review-article-evidence-list">
@@ -7723,10 +7810,6 @@ function renderReviewArticleDetailContent(article, options = {}) {
           </div>
         </div>
       ` : ''}
-      <div class="review-article-quote">
-        <div class="review-article-quote-label">文章说明</div>
-        <div class="review-article-quote-text">${escapeHtml(article.quote)}</div>
-      </div>
     </div>
   `;
 }
@@ -8236,7 +8319,10 @@ function renderReviewDraftProgressPanel() {
   if (!reviewDraftGenerating && !reviewDraftJobState && !reviewPreviewGenerating && !reviewPreviewJobState) return '';
   const job = reviewPreviewGenerating || reviewPreviewJobState ? (reviewPreviewJobState || {}) : (reviewDraftJobState || {});
   const percent = Math.max(5, Number(job.progress_percent || 0) || 0);
-  const logs = Array.isArray(job.result && job.result.live_log) ? job.result.live_log.slice(-4).reverse() : [];
+  const logs = (Array.isArray(job.result && job.result.live_log) ? job.result.live_log : [])
+    .filter((item) => String((item || {}).stage || '') !== 'watchlist_gangtise_sse_streaming')
+    .slice(-4)
+    .reverse();
   const previewMode = !!(reviewPreviewGenerating || reviewPreviewJobState);
   const failed = String(job.status || '').toLowerCase() === 'failed';
   const progressMarkup = failed
@@ -13559,10 +13645,8 @@ async function loadMarketSectors() {
     marketSectorLoaded = items.length > 0;
     if (marketSectorLoaded) marketSectorRetryCount = 0;
     renderMarketSectors(items);
-    if (!marketSectorLoaded && marketSectorRetryCount < 10) {
-      marketSectorRetryCount += 1;
-      window.setTimeout(loadMarketSectors, 2500);
-    }
+    // Industry data is a PostgreSQL snapshot. Do not poll the provider from
+    // the page; an Admin must run the market snapshot task manually.
   } catch (error) {
     host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">真实行业行情暂时不可用，请稍后重试</div>';
   }

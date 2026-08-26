@@ -123,6 +123,52 @@ class GangtiseReviewSseTest(unittest.TestCase):
         self.assertEqual(result["text"], "")
         self.assertEqual(result["raw_text"], "processing")
 
+    def test_sse_client_uses_only_agent_answer_phase_as_publishable_text(self):
+        def fake_urlopen(request, timeout):
+            return _FakeSseResponse(
+                [
+                    'data: {"phase":"think","result":{"delta":"内部推理"}}\n', "\n",
+                    'data: {"phase":"answer","result":{"delta":"第一段正式复盘。"}}\n', "\n",
+                    'data: {"phase":"annotation","result":{"delta":"内部标注"}}\n', "\n",
+                    'data: {"phase":"answer","result":{"delta":"第二段组合结论。"}}\n', "\n",
+                    'data: {"phase":"usage","result":{"delta":"{\\"tokens\\":1}"}}\n', "\n",
+                ]
+            )
+
+        with patch(
+            "src.domain.market_services.get_gangtise_openapi_config",
+            return_value={"base_url": "https://openapi.gangtise.com"},
+        ), patch("src.domain.market_services.urlopen", side_effect=fake_urlopen):
+            result = market_services.post_gangtise_openapi_sse(
+                "/application/open-ai/ai/chat/sse", {"text": "请分析股票"}, token="test-token"
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["text"], "第一段正式复盘。第二段组合结论。")
+        self.assertIn("内部推理", result["raw_text"])
+        self.assertIn("内部标注", result["raw_text"])
+
+    def test_sse_client_preserves_markdown_newlines_across_answer_deltas(self):
+        def fake_urlopen(request, timeout):
+            return _FakeSseResponse(
+                [
+                    'data: {"phase":"answer","result":{"delta":"## 结论\\n"}}\n', "\n",
+                    'data: {"phase":"answer","result":{"delta":"正文\\n\\n"}}\n', "\n",
+                    'data: {"phase":"answer","result":{"delta":"---\\n"}}\n', "\n",
+                    'data: {"phase":"answer","result":{"delta":"## 详细分析\\n"}}\n', "\n",
+                ]
+            )
+
+        with patch(
+            "src.domain.market_services.get_gangtise_openapi_config",
+            return_value={"base_url": "https://openapi.gangtise.com"},
+        ), patch("src.domain.market_services.urlopen", side_effect=fake_urlopen):
+            result = market_services.post_gangtise_openapi_sse(
+                "/application/open-ai/ai/chat/sse", {"text": "请分析股票"}, token="test-token"
+            )
+
+        self.assertEqual(result["text"], "## 结论\n正文\n\n---\n## 详细分析")
+
     def test_sse_client_sends_agent_contract_and_merges_snapshots_and_deltas(self):
         captured = {}
 
@@ -266,7 +312,7 @@ class GangtiseReviewSseTest(unittest.TestCase):
         self.assertEqual(result["items"], [])
         self.assertEqual(result["endpoint"], "/application/open-ai/ai/chat/sse")
 
-    def test_watchlist_review_prefers_raw_sse_response_without_post_processing(self):
+    def test_watchlist_review_uses_protocol_decoded_answer_and_keeps_raw_stream(self):
         matched = [{"name": "贵州茅台", "code": "600519", "market": "SH", "industry": "白酒", "annotations": []}]
         raw_response = '{"event":"answer","unrecognized":"Gangtise 原始返回"}'
         with patch("src.domain.ai_services.gen_watchlist_details", return_value={}), patch(
@@ -279,7 +325,7 @@ class GangtiseReviewSseTest(unittest.TestCase):
                 selected_watchlist=["贵州茅台"], review_period="day", tenant_slug="laowang"
             )
 
-        self.assertEqual(result["combined_text"], raw_response)
+        self.assertEqual(result["combined_text"], "解析后的内容")
         self.assertEqual(result["raw_text"], raw_response)
 
     def test_watchlist_review_progress_persists_partial_gangtise_text(self):
@@ -312,6 +358,7 @@ class GangtiseReviewSseTest(unittest.TestCase):
         streaming_updates = [kwargs for job_code, kwargs in progress_calls if kwargs.get("stage") == "watchlist_gangtise_sse_streaming"]
         self.assertTrue(streaming_updates)
         self.assertEqual(streaming_updates[-1]["extra_result"]["partial_text"], "第一段第二段")
+        self.assertNotIn("log_text", streaming_updates[-1])
 
     def test_combined_gangtise_text_is_preserved_in_final_review_text(self):
         with patch(

@@ -79,6 +79,16 @@ def test_shenwan_sector_sync_uses_all_verified_swi_codes():
     assert all(row["data_source"] == "Gangtise OpenAPI" for row in rows)
 
 
+def test_market_snapshot_task_is_manual_until_production_schedule_is_enabled():
+    from src.domain import market_services
+
+    task = next(item for item in market_services.DEFAULT_ADMIN_TASKS if item["task_code"] == "market_snapshot_sync")
+
+    assert task["schedule_type"] == "manual"
+    assert task["schedule_value"] == ""
+    assert task["enabled"] == 1
+
+
 def test_market_snapshot_does_not_call_akshare_and_persists_gangtise_source():
     from src.domain import market_services
 

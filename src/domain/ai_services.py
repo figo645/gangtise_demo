@@ -1177,7 +1177,6 @@ def analyze_review_watchlist_with_llm(
                 stage="watchlist_gangtise_sse_streaming",
                 percent=min(80, 70 + min(10, event_count // 4)),
                 summary="Gangtise Agent SSE 正在返回多股分析",
-                log_text=f"已收到 Gangtise Agent SSE 第 {event_count} 个响应事件。",
                 extra_result={
                     "event_count": event_count,
                     "partial_text": partial_text[:12000],
@@ -1194,7 +1193,9 @@ def analyze_review_watchlist_with_llm(
             progress_callback=_report_sse_progress,
         )
         raw_text = str(gangtise_result.get("raw_text") or "").strip()
-        combined_text = raw_text or str(gangtise_result.get("text") or "").strip()
+        # ``text`` is the protocol-decoded phase=answer stream. Keep the
+        # complete SSE response separately for diagnostics, never as review copy.
+        combined_text = str(gangtise_result.get("text") or "").strip()
         if not combined_text:
             raise RuntimeError("review_watchlist_gangtise_empty_response")
         annotation_evidence = []

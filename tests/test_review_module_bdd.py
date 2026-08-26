@@ -117,9 +117,15 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("已保留当前任务的阶段日志和部分返回内容", html)
         self.assertIn("重新生成自选股分析", html)
         self.assertIn("const combinedText = String(payload.combined_text || '').trim()", html)
+        self.assertIn("function renderGangtiseMarkdown(value)", html)
+        self.assertIn("function recoverCompressedTable", html)
+        self.assertIn("review-gangtise-table-wrap", html)
+        self.assertIn("const headers = tableCells(line)", html)
+        self.assertIn("${combinedText ? renderGangtiseMarkdown(combinedText) : ''}", html)
         self.assertIn('id="review-structured-combined-text"', html)
         self.assertIn("reviewStructuredPreview.watchlist_analysis_section.combined_text = structuredCombinedText.value", html)
         self.assertIn("const progressMarkup = failed", html)
+        self.assertIn("watchlist_gangtise_sse_streaming')", html)
         self.assertNotIn("id=\"review-skip-ai-processing\"", html)
         self.assertNotIn("function toggleReviewSkipAiProcessing", html)
         self.assertNotIn("不使用大模型处理", html)
@@ -169,6 +175,30 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertEqual(saved_result["partial_text"], "已返回的部分分析")
         self.assertEqual(saved_result["live_log"][0]["text"], "已收到部分分析")
         self.assertEqual(saved_result["error_type"], "RuntimeError")
+
+    def test_given_large_gangtise_result_when_async_job_completes_then_json_is_not_truncated(self):
+        large_answer = "正式复盘内容。" * 2200
+        existing_job = {"result": {"partial_text": "已返回的部分分析"}}
+        with mock.patch("src.domain.core_services.get_user_async_job", return_value=existing_job), mock.patch(
+            "src.domain.core_services.update_user_async_job"
+        ) as update_job:
+            with app_entry.app.app_context():
+                core_services._complete_user_async_job(
+                    "review-job-large-result",
+                    True,
+                    summary="复盘结构化预览完成",
+                    result={
+                        "watchlist_analysis_section": {
+                            "combined_text": large_answer,
+                        }
+                    },
+                )
+
+        saved_result = json.loads(update_job.call_args.kwargs["result_json"])
+        self.assertEqual(
+            saved_result["watchlist_analysis_section"]["combined_text"],
+            large_answer,
+        )
 
     def test_given_h5_review_file_input_when_uploaded_then_real_parser_handoff_exists(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slug}")

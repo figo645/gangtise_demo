@@ -1025,6 +1025,24 @@ def _extract_gangtise_sse_text(value):
     return raw_value
 
 
+def _extract_gangtise_agent_answer_delta(value):
+    """Extract only the publishable answer delta from Gangtise Agent events.
+
+    The live Agent stream contains internal ``think``, ``search``,
+    ``annotation`` and usage events in exactly the same JSON envelope as the
+    answer.  Those are useful for diagnostics but must not become review copy.
+    This is protocol decoding, not LLM post-processing.
+    """
+    if not isinstance(value, dict):
+        return None
+    if str(value.get("phase") or "").strip().lower() != "answer":
+        return None
+    result = value.get("result")
+    if not isinstance(result, dict):
+        return ""
+    return str(result.get("delta") or "")
+
+
 def _gangtise_sse_event_shape(value):
     """Return non-sensitive keys useful for diagnosing an empty HTTP 200 stream."""
     if isinstance(value, dict):
@@ -1041,8 +1059,11 @@ def _merge_gangtise_sse_texts(candidates):
     """Merge either delta chunks or repeated full snapshots without duplication."""
     merged = ""
     for raw in candidates or []:
-        text = str(raw or "").strip()
-        if not text or text in {"[DONE]", "DONE"}:
+        # Keep the exact delta boundaries. In particular, Markdown headings and
+        # paragraphs rely on a trailing newline from the upstream SSE event.
+        text = str(raw or "")
+        stripped_text = text.strip()
+        if not stripped_text or stripped_text in {"[DONE]", "DONE"}:
             continue
         if not merged:
             merged = text
@@ -1128,10 +1149,20 @@ def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_cal
             return
         parsed = decode_json_payload(raw_event)
         event_shapes.append(_gangtise_sse_event_shape(parsed))
-        text = _extract_gangtise_sse_text(parsed)
+        agent_answer_delta = _extract_gangtise_agent_answer_delta(parsed)
+        has_agent_phase = isinstance(parsed, dict) and bool(str(parsed.get("phase") or "").strip())
+        # Gangtise Agent's phase-based stream includes its private reasoning
+        # and metadata. Publish only phase=answer; retain every event in
+        # raw_text for support diagnostics.
+        if agent_answer_delta is not None:
+            text = agent_answer_delta
+        elif has_agent_phase:
+            text = ""
+        else:
+            text = _extract_gangtise_sse_text(parsed)
         # A few SSE gateways emit one logical event as multiple data lines.
         # If the joined payload is not valid JSON, still parse each fragment.
-        if "\n" in raw_event and (
+        if agent_answer_delta is None and "\n" in raw_event and (
             not text
             or (isinstance(parsed, dict) and parsed.get("raw") == raw_event)
         ):
@@ -1144,7 +1175,7 @@ def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_cal
             text = "".join(fragment_texts)
         if text:
             candidates.append(text)
-        elif _gangtise_sse_event_has_analysis(parsed, raw_event):
+        elif agent_answer_delta is None and not has_agent_phase and _gangtise_sse_event_has_analysis(parsed, raw_event):
             candidates.append(raw_event)
         event_count += 1
         if callable(progress_callback):
@@ -3558,9 +3589,9 @@ DEFAULT_ADMIN_TASKS = [
         "task_name": "市场与热门行业快照同步",
         "task_group": "indicator",
         "task_type": "sync_market_snapshot",
-        "description": "每天从 Gangtise OpenAPI 采集标准指数与申万一级行业日K，写入数据库快照供 H5 展示；前台不直接访问外部行情源。",
-        "schedule_type": "interval",
-        "schedule_value": "86400",
+        "description": "人工从 Gangtise OpenAPI 采集标准指数与申万一级行业日K，写入 PostgreSQL 快照供 H5 展示；前台不直接访问外部行情源。发布后确认数据稳定，再切换为定时执行。",
+        "schedule_type": "manual",
+        "schedule_value": "",
         "enabled": 1,
         "timeout_seconds": 900,
     },
@@ -6015,68 +6046,6 @@ def _fetch_gangtise_sector_overview(start_date, end_date):
     if missing:
         errors.append("未返回有效申万行业：" + "、".join(missing[:10]))
     return items, errors
-
-
-def _fetch_gangtise_sector_index(sector_name, start_date, end_date):
-    keyword = f"Wind行业指数:{sector_name}:当日值"
-    search_status, search_response, search_duration = post_gangtise_openapi_json(
-        "/application/open-alternative/EDB/search",
-        {"keyword": keyword, "Limit": 10},
-        timeout=30,
-    )
-    candidates = (search_response.get("data") or []) if isinstance(search_response, dict) else []
-    selected = choose_gangtise_indicator_candidate(candidates, keyword=keyword)
-    if selected and (sector_name not in str(selected.get("indicatorName") or "") or "当日值" not in str(selected.get("indicatorName") or "")):
-        selected = None
-    if not selected:
-        # The API test project searches the EDB catalog by a broad keyword.
-        # Some tenants do not support the fully-qualified name, so retry the
-        # catalog search and select the exact industry from returned names.
-        broad_status, broad_response, broad_duration = post_gangtise_openapi_json(
-            "/application/open-alternative/EDB/search",
-            {"keyword": "Wind行业指数", "Limit": 100},
-            timeout=30,
-        )
-        broad_candidates = (broad_response.get("data") or []) if isinstance(broad_response, dict) else []
-        selected = next(
-            (
-                item for item in broad_candidates
-                if sector_name in str(item.get("indicatorName") or "")
-                and "当日值" in str(item.get("indicatorName") or "")
-            ),
-            None,
-        )
-        search_duration += broad_duration
-        if not is_gangtise_openapi_success(broad_status, broad_response):
-            selected = None
-    if not is_gangtise_openapi_success(search_status, search_response) or not selected:
-        return {"ok": False, "sector": sector_name, "message": "未找到真实行业指标", "duration_ms": search_duration}
-    data_status, data_response, data_duration = post_gangtise_openapi_json(
-        "/application/open-alternative/EDB/getData",
-        {"indicatorIdList": [selected["indicatorId"]], "startDate": start_date, "endDate": end_date},
-        timeout=30,
-    )
-    points = normalize_gangtise_edb_points(data_response)
-    if not is_gangtise_openapi_success(data_status, data_response) or len(points) < 2:
-        return {"ok": False, "sector": sector_name, "message": "真实行业指标数据不足", "duration_ms": search_duration + data_duration}
-    latest, previous = points[-1], points[-2]
-    latest_value = numeric_value(latest.get("close"))
-    previous_value = numeric_value(previous.get("close"))
-    if latest_value is None or previous_value is None:
-        return {"ok": False, "sector": sector_name, "message": "真实行业指标缺少有效数值", "duration_ms": search_duration + data_duration}
-    change = round(latest_value - previous_value, 4)
-    return {
-        "ok": True,
-        "sector": sector_name,
-        "code": str(selected.get("indicatorId") or "").strip(),
-        "indicator_name": str(selected.get("indicatorName") or keyword).strip(),
-        "value": round(latest_value, 2),
-        "change": change,
-        "change_pct": round(change / previous_value * 100, 2) if previous_value else 0,
-        "updated_at": str(latest.get("date") or "").strip(),
-        "data_source": "Gangtise OpenAPI EDB",
-        "duration_ms": search_duration + data_duration,
-    }
 
 
 def _fetch_akshare_sector_overview(ak=None):

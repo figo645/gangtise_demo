@@ -9302,7 +9302,10 @@ function kwRenderReviewDraftProgressPanel() {
   const isStructured = kwReviewPreviewGenerating || kwReviewDraft.flowStage === 'preview_generating';
   const job = isStructured ? (kwReviewPreviewJobState || {}) : (kwReviewDraftJobState || {});
   const percent = Math.max(5, Number(job.progress_percent || 0) || 0);
-  const logs = Array.isArray(job.result && job.result.live_log) ? job.result.live_log.slice(-4).reverse() : [];
+  const logs = (Array.isArray(job.result && job.result.live_log) ? job.result.live_log : [])
+    .filter((item) => String((item || {}).stage || '') !== 'watchlist_gangtise_sse_streaming')
+    .slice(-4)
+    .reverse();
   return `
     <div class="kw-review-progress-panel">
       <div class="kw-review-progress-head">
