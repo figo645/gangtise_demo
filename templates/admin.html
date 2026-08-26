@@ -2213,19 +2213,19 @@
           <div class="admin-nav-item" data-section="settings-policy" data-feature="system_module" data-unified-hidden="true" onclick="showSection('settings-policy', this)" style="display:none">
             <span class="admin-nav-icon">&#128203;</span> 发布与隔离
           </div>
-          <div class="admin-nav-item" data-section="knowledge-overview" data-feature="system_module" onclick="showSection('knowledge-overview', this)">
+          <div class="admin-nav-item" data-section="knowledge-overview" data-feature="knowledge" onclick="showSection('knowledge-overview', this)">
             <span class="admin-nav-icon">&#128214;</span> 知识总览
           </div>
-          <div class="admin-nav-item" data-section="knowledge-intake" data-feature="system_module" onclick="showSection('knowledge-intake', this)">
+          <div class="admin-nav-item" data-section="knowledge-intake" data-feature="knowledge" onclick="showSection('knowledge-intake', this)">
             <span class="admin-nav-icon">&#9998;</span> 知识治理
           </div>
-          <div class="admin-nav-item" data-section="knowledge-encyclopedia" data-feature="system_module" onclick="showSection('knowledge-encyclopedia', this)">
+          <div class="admin-nav-item" data-section="knowledge-encyclopedia" data-feature="knowledge" onclick="showSection('knowledge-encyclopedia', this)">
             <span class="admin-nav-icon">&#128366;</span> 百科结构
           </div>
-          <div class="admin-nav-item" data-section="knowledge-entries" data-feature="system_module" onclick="showSection('knowledge-entries', this)">
+          <div class="admin-nav-item" data-section="knowledge-entries" data-feature="knowledge" onclick="showSection('knowledge-entries', this)">
             <span class="admin-nav-icon">&#128196;</span> 百科词条
           </div>
-          <div class="admin-nav-item" data-section="knowledge-graph" data-feature="system_module" onclick="showSection('knowledge-graph', this)">
+          <div class="admin-nav-item" data-section="knowledge-graph" data-feature="knowledge" onclick="showSection('knowledge-graph', this)">
             <span class="admin-nav-icon">&#128391;</span> 知识图谱
           </div>
           <div class="admin-nav-item" data-section="settings-knowledge" data-feature="system_module" data-unified-hidden="true" onclick="showSection('settings-knowledge', this)" style="display:none">
@@ -6450,6 +6450,11 @@ function showSection(name, navEl) {
   const normalized = normalizeAdminSection(name);
   name = normalized.section || name;
   mountUnifiedSystemSettings();
+  if (name.indexOf('knowledge-') === 0 && !isAdminFeatureEnabled('knowledge')) {
+    showToast('知识专区当前暂不开放');
+    name = 'overview';
+    navEl = document.querySelector('.admin-nav-item[data-section="overview"]');
+  }
   if (name === 'forecast-model' && !isAdminFeatureEnabled('stock_forecast')) {
     showToast('预测功能当前未开放');
     return;

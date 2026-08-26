@@ -1144,16 +1144,7 @@ def analyze_review_watchlist_with_llm(
                 labels.append(f"{name}{f'（{security_code or code}）' if (security_code or code) else ''}")
         if not labels:
             raise RuntimeError("review_watchlist_analysis_missing_item")
-        today = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
-        request_text = (
-            f"请对以下{len(labels)}只自选股做今天（{today}）的复盘与综合评估："
-            f"{'、'.join(labels)}。"
-            "要求：1）分别给出今日行情表现、资金与估值变化、核心逻辑与风险提示；"
-            "2）最后给出这些股票组合层面的综合结论和明日关注点。"
-        )
-        source_text = str(state.get("normalized_source_text") or "").strip()
-        if source_text:
-            request_text += f"\n\n大V本次复盘输入，请与上述数据分析合并理解：\n{source_text[:1800]}"
+        request_text = f"请进行{_get_review_period_label(runtime.get('review_period'))}，分析以下自选股：{'、'.join(labels)}。"
         if runtime.get("job_code"):
             report_user_async_job_progress(
                 runtime["job_code"],
@@ -3116,13 +3107,9 @@ def _build_retrieval_agent_response(
                     "llm_notice": llm_notice,
                     "llm_mode": "filtered",
                     "llm_enabled": False,
-                    "llm_model": {
-                        "key": active_model.get("key"),
-                        "label": active_model.get("label"),
-                        "provider": active_model.get("provider"),
-                        "model_name": active_model.get("model_name"),
-                        "purpose": active_model.get("purpose"),
-                    },
+                    # The answer stage needs the endpoint as well as the model label.
+                    # Keep the normalized backend-only config intact across workflow state.
+                    "llm_model": copy.deepcopy(active_model),
                 },
                 "context_preview": {
                     "filtered": True,

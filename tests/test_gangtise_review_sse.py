@@ -22,10 +22,90 @@ class _FakeSseResponse:
 
 
 class GangtiseReviewSseTest(unittest.TestCase):
+    def test_sse_client_supports_nested_agent_and_openai_stream_shapes(self):
+        def fake_urlopen(request, timeout):
+            return _FakeSseResponse(
+                [
+                    'data: {"type":"status","message":"processing"}\n',
+                    "\n",
+                    'data: {"choices":[{"delta":{"content":"第一段"}}]}\n',
+                    "\n",
+                    'data: {"data":"{\\"answerText\\":\\"第二段\\"}"}\n',
+                    "\n",
+                    'data: {"output_text":"第三段"}\n',
+                    "\n",
+                ]
+            )
+
+        with patch(
+            "src.domain.market_services.get_gangtise_openapi_config",
+            return_value={"base_url": "https://openapi.gangtise.com"},
+        ), patch("src.domain.market_services.urlopen", side_effect=fake_urlopen):
+            result = market_services.post_gangtise_openapi_sse(
+                "/application/open-ai/ai/chat/sse",
+                {"text": "请分析股票"},
+                token="test-token",
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["text"], "第一段第二段第三段")
+        self.assertEqual(result["events"], 4)
+
+    def test_sse_client_parses_multiple_data_lines_in_one_event(self):
+        def fake_urlopen(request, timeout):
+            return _FakeSseResponse(
+                [
+                    'data: {"content":"第一段"}\n',
+                    'data: {"content":"第二段"}\n',
+                    "\n",
+                ]
+            )
+
+        with patch(
+            "src.domain.market_services.get_gangtise_openapi_config",
+            return_value={"base_url": "https://openapi.gangtise.com"},
+        ), patch("src.domain.market_services.urlopen", side_effect=fake_urlopen):
+            result = market_services.post_gangtise_openapi_sse(
+                "/application/open-ai/ai/chat/sse",
+                {"text": "请分析股票"},
+                token="test-token",
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["text"], "第一段第二段")
+        self.assertEqual(result["events"], 1)
+
+    def test_sse_client_reports_event_shapes_when_only_status_events_are_returned(self):
+        def fake_urlopen(request, timeout):
+            return _FakeSseResponse(
+                [
+                    'data: {"type":"status","message":"processing"}\n',
+                    "\n",
+                    'data: {"event":"heartbeat","data":{"status":"running"}}\n',
+                    "\n",
+                ]
+            )
+
+        with patch(
+            "src.domain.market_services.get_gangtise_openapi_config",
+            return_value={"base_url": "https://openapi.gangtise.com"},
+        ), patch("src.domain.market_services.urlopen", side_effect=fake_urlopen):
+            result = market_services.post_gangtise_openapi_sse(
+                "/application/open-ai/ai/chat/sse",
+                {"text": "请分析股票"},
+                token="test-token",
+            )
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["events"], 2)
+        self.assertTrue(result["event_shapes"])
+        self.assertIn("type", result["event_shapes"][0])
+
     def test_sse_client_sends_agent_contract_and_merges_snapshots_and_deltas(self):
         captured = {}
 
         def fake_urlopen(request, timeout):
+            captured["calls"] = captured.get("calls", 0) + 1
             captured["request"] = request
             captured["timeout"] = timeout
             return _FakeSseResponse(
@@ -56,6 +136,7 @@ class GangtiseReviewSseTest(unittest.TestCase):
             )
 
         request = captured["request"]
+        self.assertEqual(captured["calls"], 1)
         self.assertEqual(captured["timeout"], 17)
         self.assertEqual(request.full_url, "https://openapi.gangtise.com/application/open-ai/ai/chat/sse")
         self.assertEqual(request.get_method(), "POST")
@@ -142,9 +223,13 @@ class GangtiseReviewSseTest(unittest.TestCase):
 
         gangtise_mock.assert_called_once()
         request_text = gangtise_mock.call_args.args[0]
+        self.assertEqual(
+            request_text,
+            "请进行日复盘，分析以下自选股：贵州茅台（600519.SH）、宁德时代（300750.SZ）。",
+        )
         self.assertIn("贵州茅台（600519.SH）", request_text)
         self.assertIn("宁德时代（300750.SZ）", request_text)
-        self.assertIn("大V本次复盘输入", request_text)
+        self.assertNotIn("大V本次复盘输入", request_text)
         self.assertEqual(result["combined_text"], "两只股票组合层面的综合结论。")
         self.assertEqual(result["items"], [])
         self.assertEqual(result["endpoint"], "/application/open-ai/ai/chat/sse")

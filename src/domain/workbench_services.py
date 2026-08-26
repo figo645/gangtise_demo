@@ -1131,7 +1131,8 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
     watchlist_focus = ["腾讯控股", "美团-W", "阿里巴巴-W"] if is_lisa else ["中芯国际", "腾讯控股", "贵州茅台"]
     fund_dashboard_state = resolve_tenant_fund_dashboard_state(tenant, tenant.get("fund_dashboard_config"))
     fund_dashboard = copy.deepcopy(fund_dashboard_state["published"])
-    knowledge_hub = fetch_live_knowledge_hub(tenant)
+    knowledge_enabled = is_feature_enabled("knowledge")
+    knowledge_hub = fetch_live_knowledge_hub(tenant) if knowledge_enabled else {"items": [], "summary": {}}
     indicator_hub = build_indicator_hub_fallback(tenant=tenant, admin_view=False) if fallback_mode else build_indicator_hub(tenant=tenant, admin_view=False)
     news_items = gen_news_feed(tenant=tenant, watchlist_details=watchlist_details_map)
     data_lake = build_workbench_data_lake_payload(tenant, watchlist_details_map, news_items)
@@ -1390,16 +1391,16 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
         },
         "review_studio": {
             "sources": [
-                {"icon": "🎙️", "label": "语音口述", "desc": "收盘后直接口述行业主线、关键公司和操作复盘，智能体自动转写并抽取段落。"},
+                *([{"icon": "🎙️", "label": "语音口述", "desc": "收盘后直接口述行业主线、关键公司和操作复盘，智能体自动转写并抽取段落。"}] if is_feature_enabled("review_voice_input") else []),
                 {"icon": "✍️", "label": "手动撰写", "desc": "提供富文本手写区域，大V自己决定文章段落、标题和表达顺序。"},
                 {"icon": "📎", "label": "文件上传", "desc": "上传研报、纪要、Excel 和 PDF，由智能体统一抽取要点并转成复盘文案。"},
-                {"icon": "🔗", "label": "URL 资料", "desc": "抓取网页资料并抽取正文，适合作为复盘证据链和背景补充。"},
+                *([{"icon": "🔗", "label": "URL 资料", "desc": "抓取网页资料并抽取正文，适合作为复盘证据链和背景补充。"}] if is_feature_enabled("review_url_input") else []),
             ],
             "paragraph_modes": [
                 {"label": "大V自定段落", "desc": "适合自己写主框架，只让智能体补摘要、证据链和风险提示。"},
                 {"label": "智能文案", "desc": "适合先交信息给智能体，并补充修改规则或常用提示词标签后生成草稿。"},
             ],
-            "default_flow": ["选择复盘周期", "确认本次自选股", "补充语音/手输/文件", "设置智能文案规则", "生成草稿预览", "确认后发布给粉丝"],
+            "default_flow": ["选择复盘周期", "确认本次自选股", "补充手输/文件", "设置智能文案规则", "生成草稿预览", "确认后发布给粉丝"],
             "watchlist_focus": watchlist_focus,
             "periods": ["日复盘", "周复盘", "月复盘"],
             "smart_cards": review_smart_cards,

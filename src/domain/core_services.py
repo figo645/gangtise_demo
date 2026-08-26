@@ -3183,6 +3183,10 @@ def normalize_tenant_configs(source=None):
 
 def normalize_site_config(source=None):
     merged = _merge_site_config(copy.deepcopy(DEFAULT_SITE_CONFIG), source or {})
+    feature_flags = merged.get("feature_flags") if isinstance(merged.get("feature_flags"), dict) else {}
+    if feature_flags.get("knowledge_module_enabled") is not True:
+        feature_flags["knowledge"] = False
+    merged["feature_flags"] = feature_flags
     merged["brand"] = normalize_brand_config(merged.get("brand"))
     merged["auth_settings"] = normalize_auth_settings_config(merged.get("auth_settings"))
     merged["auth_settings"] = strip_auth_settings_secret(merged["auth_settings"])
@@ -6475,6 +6479,7 @@ def ensure_default_admin_tasks():
 
     db = get_db()
     timestamp = now_ts()
+    legacy_market_snapshot_schedule_values = {"900", "3600"}
     for raw in DEFAULT_ADMIN_TASKS:
         item = normalize_admin_task_config(raw)
         existing = db.execute(
@@ -6482,6 +6487,21 @@ def ensure_default_admin_tasks():
             (item["task_code"],),
         ).fetchone()
         if existing:
+            # Upgrade the old built-in cadence while preserving other admin overrides.
+            if item["task_code"] == "market_snapshot_sync":
+                current = db.execute(
+                    "SELECT schedule_type, schedule_value FROM admin_task_configs WHERE task_code = ?",
+                    (item["task_code"],),
+                ).fetchone()
+                if current and str(current.get("schedule_value") or "").strip() in legacy_market_snapshot_schedule_values:
+                    db.execute(
+                        """
+                        UPDATE admin_task_configs
+                        SET schedule_type = ?, schedule_value = ?, updated_at = ?
+                        WHERE task_code = ?
+                        """,
+                        (item["schedule_type"], item["schedule_value"], timestamp, item["task_code"]),
+                    )
             continue
         db.execute(
             """

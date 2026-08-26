@@ -89,6 +89,12 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("function backToReviewDraftEdit()", html)
         self.assertIn("function buildReviewPreviewArticle()", html)
         self.assertIn("function renderReviewArticleDetailContent(article, options = {})", html)
+        self.assertIn("const isReviewSetupStage = reviewStage === 'intake' || reviewStage === 'optimize_rule';", html)
+        self.assertIn("const isReviewFinalPreview = reviewStage === 'preview' || reviewTriggerDraft.previewReady === true;", html)
+        self.assertIn("<div class=\"modal-title\" style=\"margin-bottom:${isReviewFinalPreview ? '4px' : '10px'}\">${modalTitle}</div>", html)
+        self.assertIn("${user.role === 'dav' ? `", html)
+        self.assertIn("${isReviewSetupStage ? `", html)
+        self.assertIn("<div class=\"review-stage-compact-meta\">", html)
         self.assertIn("智能优化规则", html)
         self.assertIn("忽略规则，默认优化", html)
         self.assertIn("输入规则后优化", html)
@@ -265,6 +271,25 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("证据链总结", html)
         self.assertNotIn("模型记录", html)
         self.assertIn("syncPublishedReviewStateToH5((user && user.tenant && user.tenant.slug) || '', result);", html)
+
+    def test_given_h5_review_when_page_renders_then_published_articles_use_current_tenant_pages(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("const articles = buildAllPublishedReviewArticles().slice(0, 3);", html)
+        self.assertIn("onclick=\"openReviewArticleList()\">查看全部</button>", html)
+        self.assertIn("onclick=\"openReviewArticleDetail('${escapeAttr(article.id)}')\"", html)
+        self.assertIn("reviewParams.get('review_view')", html)
+        self.assertIn("reviewParams.get('review_id')", html)
+        self.assertIn("window.history.pushState({}, '', buildReviewRouteUrl('detail', reviewDetailArticleId))", html)
+        self.assertIn("const hasReviewRoute = initialParams.get('review') === 'compose'", html)
+        self.assertIn("switchTab(hasReviewRoute ? 'review' : getFirstEnabledTab());", html)
+        self.assertIn("if (shouldShowReviewPage && !document.getElementById('page-review')?.classList.contains('active'))", html)
+        self.assertIn("const tenantSlug = String(activeUserTenant.slug || activeTenant.slug || '').trim().toLowerCase();", html)
+        self.assertIn("return matched ? [buildPublishedReviewArticleFromSnapshot(davUser, matched, period)] : [];", html)
+        self.assertNotIn("return matched\n      ? buildPublishedReviewArticleFromSnapshot(davUser, matched, period)\n      : buildKolReviewData(davUser, period);", html)
+        self.assertNotIn('id="review-article-modal"', html)
 
     def test_given_workbench_publish_success_when_page_renders_then_publish_no_longer_opens_test_modal(self):
         response = self.client.get(f"/kol-workbench?tenant={self.tenant_slug}")

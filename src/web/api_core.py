@@ -262,6 +262,8 @@ def api_review_publish_embed():
             "user_input_section": body.get("user_input_section") if isinstance(body.get("user_input_section"), dict) else {},
             "watchlist_analysis_section": body.get("watchlist_analysis_section") if isinstance(body.get("watchlist_analysis_section"), dict) else {},
         }
+        if not is_feature_enabled("knowledge"):
+            payload["knowledge_attachments"] = []
         source_mode = payload.get("source_mode")
         if source_mode == "voice" and not is_feature_enabled("review_voice_input"):
             raise ValueError("review_voice_input_disabled")

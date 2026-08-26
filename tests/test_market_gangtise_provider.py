@@ -113,6 +113,34 @@ def test_market_snapshot_does_not_call_akshare_and_persists_gangtise_source():
     assert sectors["source"] == "Gangtise OpenAPI"
 
 
+def test_market_snapshot_reuses_persisted_industry_snapshot_for_the_day():
+    from src.domain import market_services
+
+    cached_sector = {
+        "ok": True,
+        "snapshot_version": 6,
+        "source": "Gangtise OpenAPI",
+        "items": [{"sector": "银行", "value": 102, "change": 2, "change_pct": 2}],
+    }
+    index_result = {
+        "ok": True,
+        "provider": "Gangtise OpenAPI",
+        "points": [
+            {"date": "2026-08-07", "close": 100},
+            {"date": "2026-08-10", "close": 101},
+        ],
+    }
+    with patch.object(market_services, "fetch_gangtise_market_index_history", return_value=index_result), \
+        patch.object(market_services, "_load_market_snapshot_payload", side_effect=[None, cached_sector]), \
+        patch.object(market_services, "_load_watchlist_cache", return_value=None), \
+        patch.object(market_services, "_fetch_gangtise_sector_overview", side_effect=AssertionError("industry API must not be called")), \
+        patch.object(market_services, "_save_watchlist_cache"), \
+        patch.object(market_services, "_save_market_snapshot_payload"):
+        result = market_services.sync_market_snapshot(force=False)
+
+    assert result["sector_count"] == 1
+
+
 def test_market_payload_rejects_old_akshare_snapshot():
     from src.domain import market_services
 

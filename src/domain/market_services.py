@@ -922,10 +922,40 @@ def post_gangtise_openapi_json(path, payload, token="", timeout=30, _retried=Fal
     return status, response, duration
 
 
+_GANGTISE_SSE_CONTROL_TEXTS = {
+    "[DONE]",
+    "DONE",
+    "success",
+    "ok",
+    "started",
+    "start",
+    "processing",
+    "pending",
+    "thinking",
+    "retrieving",
+    "searching",
+    "generating",
+    "completed",
+    "complete",
+    "成功",
+    "处理中",
+    "正在生成",
+    "已完成",
+}
+
+
 def _extract_gangtise_sse_text(value):
-    """Extract answer-like text from one Agent SSE event payload."""
+    """Extract assistant text from the known Agent SSE response envelopes.
+
+    The Agent endpoint has returned several compatible envelopes over time:
+    direct ``content``/``answer`` fields, OpenAI-style ``choices`` deltas, and
+    JSON encoded again inside ``data``.  Status events are intentionally
+    ignored so an HTTP 200 stream cannot be mistaken for an answer.
+    """
     if isinstance(value, str):
         text = value.strip()
+        if not text or text in _GANGTISE_SSE_CONTROL_TEXTS or text.lower() in _GANGTISE_SSE_CONTROL_TEXTS:
+            return ""
         if text.startswith(("{", "[")):
             try:
                 nested = json.loads(text)
@@ -941,18 +971,70 @@ def _extract_gangtise_sse_text(value):
         return "".join(item for item in parts if item)
     if not isinstance(value, dict):
         return ""
-    for key in ("answer", "content", "text", "output", "result", "message"):
+
+    # OpenAI-compatible streaming responses use choices[].delta.content,
+    # while the non-streaming shape uses choices[].message.content.
+    choices = value.get("choices")
+    if isinstance(choices, list):
+        candidate = _extract_gangtise_sse_text(choices)
+        if candidate:
+            return candidate
+
+    for key in (
+        "answer",
+        "answerText",
+        "content",
+        "output",
+        "output_text",
+        "outputText",
+        "text",
+        "delta",
+        "reply",
+        "finalAnswer",
+        "resultText",
+        "answer_content",
+        "contentList",
+        "result",
+        "message",
+    ):
         candidate = _extract_gangtise_sse_text(value.get(key))
         if candidate:
             return candidate
-    for key in ("data", "payload", "response"):
+    for key in (
+        "data",
+        "payload",
+        "response",
+        "body",
+        "responseBody",
+        "resultData",
+        "answerData",
+        "parts",
+        "segments",
+        "items",
+        "messages",
+        "events",
+    ):
         candidate = _extract_gangtise_sse_text(value.get(key))
         if candidate:
             return candidate
     raw_value = str(value.get("raw") or "").strip()
-    if raw_value:
-        return raw_value
-    return ""
+    if not raw_value or raw_value in _GANGTISE_SSE_CONTROL_TEXTS or raw_value.lower() in _GANGTISE_SSE_CONTROL_TEXTS:
+        return ""
+    if raw_value.startswith(("{", "[")):
+        return ""
+    return raw_value
+
+
+def _gangtise_sse_event_shape(value):
+    """Return non-sensitive keys useful for diagnosing an empty HTTP 200 stream."""
+    if isinstance(value, dict):
+        shape = list(value.keys())[:20]
+        for key in ("data", "payload", "response", "body", "responseBody", "resultData"):
+            nested = value.get(key)
+            if isinstance(nested, dict):
+                shape.append(f"{key}:{{{','.join(list(nested.keys())[:12])}}}")
+        return shape
+    return [type(value).__name__]
 
 
 def _merge_gangtise_sse_texts(candidates):
@@ -1009,6 +1091,7 @@ def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_cal
     candidates = []
     event_buffer = []
     event_count = 0
+    event_shapes = []
 
     def consume_event():
         nonlocal event_count
@@ -1019,7 +1102,18 @@ def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_cal
         if not raw_event or raw_event == "[DONE]":
             return
         parsed = decode_json_payload(raw_event)
+        event_shapes.append(_gangtise_sse_event_shape(parsed))
         text = _extract_gangtise_sse_text(parsed)
+        # A few SSE gateways emit one logical event as multiple data lines.
+        # If the joined payload is not valid JSON, still parse each fragment.
+        if "\n" in raw_event and (not text or parsed.get("raw") == raw_event):
+            fragment_texts = []
+            for fragment in raw_event.splitlines():
+                fragment_payload = decode_json_payload(fragment.strip())
+                fragment_text = _extract_gangtise_sse_text(fragment_payload)
+                if fragment_text:
+                    fragment_texts.append(fragment_text)
+            text = "".join(fragment_texts)
         if text:
             candidates.append(text)
         event_count += 1
@@ -1054,6 +1148,13 @@ def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_cal
         response_status = getattr(response, "status", None)
         if response_status is None and hasattr(response, "getcode"):
             response_status = response.getcode()
+        if response_status == 200 and not text:
+            app.logger.warning(
+                "Gangtise Agent SSE returned no usable analysis text status=%s events=%s event_shapes=%s",
+                response_status,
+                event_count,
+                event_shapes[:6],
+            )
         return {
             "ok": bool(response_status == 200 and text),
             "status": response_status or 0,
@@ -1061,6 +1162,7 @@ def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_cal
             "duration_ms": round((time.perf_counter() - started) * 1000),
             "text": text,
             "events": event_count,
+            "event_shapes": event_shapes[:6],
         }
     except HTTPError as error:
         notify_partial_on_error()
@@ -1073,6 +1175,7 @@ def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_cal
             "duration_ms": round((time.perf_counter() - started) * 1000),
             "text": _merge_gangtise_sse_texts(candidates),
             "events": event_count,
+            "event_shapes": event_shapes[:6],
         }
     except URLError as error:
         notify_partial_on_error()
@@ -1083,6 +1186,7 @@ def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_cal
             "duration_ms": round((time.perf_counter() - started) * 1000),
             "text": _merge_gangtise_sse_texts(candidates),
             "events": event_count,
+            "event_shapes": event_shapes[:6],
         }
     except Exception as error:
         notify_partial_on_error()
@@ -1093,6 +1197,7 @@ def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_cal
             "duration_ms": round((time.perf_counter() - started) * 1000),
             "text": _merge_gangtise_sse_texts(candidates),
             "events": event_count,
+            "event_shapes": event_shapes[:6],
         }
 
 
@@ -1117,9 +1222,11 @@ def call_gangtise_agent_sse(text, trace_id="", mode="deep_research", web_enable=
         progress_callback=progress_callback,
     )
     if not result.get("ok"):
+        event_shapes = result.get("event_shapes") or []
+        shape_suffix = f":event_shapes={event_shapes[:3]}" if event_shapes else ""
         raise RuntimeError(
             f"gangtise_agent_sse_failed:http_status={result.get('status') or 0}:"
-            f"{str(result.get('message') or 'empty_response').strip()[:400]}"
+            f"{str(result.get('message') or 'empty_response').strip()[:400]}{shape_suffix}"
         )
     return {
         "text": str(result.get("text") or "").strip(),
@@ -3407,9 +3514,9 @@ DEFAULT_ADMIN_TASKS = [
         "task_name": "市场与热门行业快照同步",
         "task_group": "indicator",
         "task_type": "sync_market_snapshot",
-        "description": "按固定周期从 Gangtise OpenAPI 采集标准指数与申万一级行业日K，写入数据库快照供 H5 展示；前台不直接访问外部行情源。",
+        "description": "每天从 Gangtise OpenAPI 采集标准指数与申万一级行业日K，写入数据库快照供 H5 展示；前台不直接访问外部行情源。",
         "schedule_type": "interval",
-        "schedule_value": "900",
+        "schedule_value": "86400",
         "enabled": 1,
         "timeout_seconds": 900,
     },
@@ -5554,8 +5661,16 @@ def sync_market_snapshot(force=False):
             },
         )
     cached_sector_snapshot = None if force else (
-        _load_market_snapshot_payload("market_sector_overview", "shenwan_level1", 60 * 60)
-        or _load_watchlist_cache("market_sector_overview", "shenwan_level1", 60 * 60)
+        _load_market_snapshot_payload(
+            "market_sector_overview",
+            "shenwan_level1",
+            MARKET_SECTOR_SNAPSHOT_REFRESH_TTL_SECONDS,
+        )
+        or _load_watchlist_cache(
+            "market_sector_overview",
+            "shenwan_level1",
+            MARKET_SECTOR_SNAPSHOT_REFRESH_TTL_SECONDS,
+        )
     )
     if isinstance(cached_sector_snapshot, dict) and str(cached_sector_snapshot.get("source") or "").lower() == "gangtise openapi" and cached_sector_snapshot.get("items"):
         sector_items = list(cached_sector_snapshot["items"])
@@ -5673,6 +5788,9 @@ GANGTISE_SHENWAN_LEVEL1_CODES = {
     "美容护理": "801980.SWI",
 }
 MARKET_SECTOR_OVERVIEW_CACHE_TTL_SECONDS = 5 * 60
+# Industry overview data is an expensive daily snapshot. Reads within this
+# window reuse the persisted PostgreSQL payload instead of calling Gangtise.
+MARKET_SECTOR_SNAPSHOT_REFRESH_TTL_SECONDS = 24 * 60 * 60
 MARKET_SNAPSHOT_CACHE_TTL_SECONDS = 26 * 60 * 60
 MARKET_SECTOR_CATALOG_CACHE_TTL_SECONDS = 24 * 60 * 60
 

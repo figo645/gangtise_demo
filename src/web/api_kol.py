@@ -621,6 +621,9 @@ def api_compose_review_draft():
             "speaker_name": speaker_name,
             "entry_point": entry_point,
         }
+        payload["source_mode"] = _validate_review_source_mode(payload.get("source_mode"))
+        if not is_feature_enabled("knowledge"):
+            payload["knowledge_items"] = []
         if not str(payload.get("source_text") or "").strip():
             raise ValueError("review_source_text_required")
         job = create_user_async_job(

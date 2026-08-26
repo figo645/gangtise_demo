@@ -3477,6 +3477,12 @@ body { background: var(--surface-2); color: var(--text-main); }
   border-radius:999px;
   padding:4px 8px;
 }
+.review-stage-compact-meta {
+  font-size:11px;
+  color:var(--gray-400);
+  line-height:1.6;
+  margin-bottom:12px;
+}
 .review-report-head {
   display:flex;
   justify-content:space-between;
@@ -3554,14 +3560,39 @@ body { background: var(--surface-2); color: var(--text-main); }
   margin-top:12px;
 }
 .review-article-card-cta { font-size:11px; color:#2F74C0; font-weight:800; }
-.review-article-modal-head {
+.review-directory-view {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:16px;
+  padding:14px;
+  box-shadow:0 12px 28px rgba(31,73,125,0.08);
+}
+.review-directory-view-head {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+  margin-bottom:14px;
+}
+.review-directory-view-title { font-size:17px; color:var(--text-main); font-weight:800; line-height:1.5; }
+.review-directory-view-desc { font-size:12px; color:var(--gray-400); line-height:1.8; margin-top:5px; }
+.review-detail-page {
+  background:#FFFFFF;
+  border:1px solid rgba(47,116,192,0.10);
+  border-radius:16px;
+  padding:16px;
+  box-shadow:0 12px 28px rgba(31,73,125,0.08);
+}
+.review-detail-page .review-article-detail-head { padding-top:0; }
+.review-detail-page .review-article-detail-body { padding-bottom:0; }
+.review-article-detail-head {
   padding:4px 0 16px;
   border-bottom:1px solid rgba(47,116,192,0.10);
 }
-.review-article-modal-kicker { font-size:11px; color:var(--gold); font-weight:800; letter-spacing:.08em; }
-.review-article-modal-title { font-size:24px; line-height:1.45; color:var(--text-main); font-weight:800; margin-top:10px; }
-.review-article-modal-meta { font-size:12px; color:var(--gray-400); line-height:1.8; margin-top:10px; }
-.review-article-modal-body { padding:18px 0 10px; }
+.review-article-detail-kicker { font-size:11px; color:var(--gold); font-weight:800; letter-spacing:.08em; }
+.review-article-detail-title { font-size:24px; line-height:1.45; color:var(--text-main); font-weight:800; margin-top:10px; }
+.review-article-detail-meta { font-size:12px; color:var(--gray-400); line-height:1.8; margin-top:10px; }
+.review-article-detail-body { padding:18px 0 10px; }
 .review-article-hero {
   border-radius:18px;
   overflow:hidden;
@@ -5204,14 +5235,6 @@ body,
   </div>
 </div>
 
-<div class="modal-overlay" id="review-article-modal" onclick="if(event.target===this)closeReviewArticleModal()">
-  <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
-    <div class="modal-handle"></div>
-    <div class="modal-close-row"><button class="modal-close-btn" type="button" onclick="closeReviewArticleModal()">关闭</button></div>
-    <div id="review-article-modal-content"></div>
-  </div>
-</div>
-
 <div class="modal-overlay" id="watchlist-annotation-modal" onclick="if(event.target===this)closeWatchlistAnnotationModal()">
   <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
     <div class="modal-handle"></div>
@@ -5269,6 +5292,9 @@ function isFeatureEnabled(featureName) {
   }
   if (featureName === 'dm') {
     return siteFeatures.dm !== false || siteFeatures.fan_interaction !== false;
+  }
+  if (featureName === 'knowledge') {
+    return siteFeatures.knowledge === true && siteFeatures.knowledge_module_enabled === true;
   }
   return siteFeatures[featureName] !== false;
 }
@@ -5564,6 +5590,12 @@ const REVIEW_SOURCE_OPTIONS = [
   { value: 'file', icon: '📎', label: '文件上传', desc: '上传纪要、研报或 PDF 统一抽取重点。' },
   { value: 'url', icon: '🔗', label: '网页 URL', desc: '抓取公开网页资料，提炼后继续编辑。' },
 ];
+function getAvailableReviewSourceOptions() {
+  return REVIEW_SOURCE_OPTIONS.filter((item) => (
+    item.value === 'voice' ? isFeatureEnabled('review_voice_input')
+      : (item.value === 'url' ? isFeatureEnabled('review_url_input') : true)
+  ));
+}
 const REVIEW_PARAGRAPH_OPTIONS = [
   { value: 'manual', label: '沿用手写正文', desc: '直接沿用你已经写好的完整复盘正文。' },
   { value: 'ai', label: '智能整理正文', desc: '只提供资料和判断，再补一句修改规则，由系统先生成完整复盘草稿。' },
@@ -5572,16 +5604,19 @@ const REVIEW_WATCHLIST_MAP = {
   tenant_lw: ['中芯国际', '腾讯控股', '贵州茅台', '宁德时代', '招商银行', '寒武纪', '比亚迪'],
 };
 let currentReviewPeriod = 'day';
+let reviewView = 'home';
+let reviewDetailArticleId = '';
 let reviewTriggerDraft = {
   period: 'day',
   reviewTitle: '',
-  sourceMode: 'voice',
+  sourceMode: 'manual',
   paragraphMode: 'manual',
   skipAiProcessing: true,
   flowStage: 'intake',
   optimizeRuleMode: 'default',
   useVoiceLlmEnhancement: true,
   selectedWatchlist: [],
+  watchlistDecision: '',
   voiceTranscript: '',
   manualHtml: '',
   fileText: '',
@@ -5605,6 +5640,10 @@ const REVIEW_PROMPT_TAGS = ['更口语化', '保留原文不改写', '强调风�
 let reviewStructuredPreview = null;
 let reviewPreviewGenerating = false;
 let reviewPreviewJobState = null;
+let reviewWatchlistSearchItems = [];
+let reviewWatchlistSearchQuery = '';
+let reviewWatchlistSearchTimer = null;
+let reviewWatchlistSearchRequestSeq = 0;
 
 function normalizeReviewStructuredPreview(payload) {
   const source = payload && typeof payload === 'object' ? payload : {};
@@ -7438,70 +7477,92 @@ function renderReviewWatchlistAnalysisSection(article) {
   `;
 }
 
+function buildPublishedReviewArticleFromSnapshot(davUser, snapshot, period) {
+  const matched = snapshot && typeof snapshot === 'object' ? snapshot : {};
+  const watchlistAnalysisSection = matched.watchlist_analysis_section && typeof matched.watchlist_analysis_section === 'object'
+    ? matched.watchlist_analysis_section
+    : {};
+  const watchlist = hasReviewWatchlistAnalysisContent(watchlistAnalysisSection) && Array.isArray(matched.watchlist)
+    ? matched.watchlist
+    : [];
+  return buildReviewArticleData({
+    id: matched.id || `${davUser.id || davUser.tenant.slug}-${matched.time || nowTs()}`,
+    author: davUser.tenant.advisor,
+    avatar: davUser.tenant.advisor === '财经老王' ? '👑' : '🧭',
+    periodLabel: matched.period || getReviewPeriodMeta(period).label,
+    generatedAt: matched.time || matched.published_at || nowTs(),
+    title: matched.title || '复盘分析报告',
+    summary: matched.summary || matched.content_text || '',
+    tags: matched.tags || [],
+    watchlist,
+    annotations: [],
+    sourceMode: matched.source_mode || 'manual',
+    selectedCards: matched.selected_cards || [],
+    knowledgeAttachments: matched.knowledge_attachments || [],
+    dataSources: matched.data_sources || [],
+    newsSources: matched.news_sources || [],
+    llmModels: matched.llm_models || [],
+    userInputSection: matched.user_input_section || {},
+    watchlistAnalysisSection,
+    evidenceChainSection: matched.evidence_chain_section || {},
+    paragraphs: matched.user_input_section && matched.user_input_section.display_text ? [] : [
+      { title: '完整复盘正文', text: matched.content_text || matched.summary || '' },
+    ],
+  });
+}
+
 function buildPublishedReviewArticles(period) {
   const periodMap = { day: '日复盘', week: '周复盘', month: '月复盘' };
   const targetPeriod = periodMap[period] || '';
-  return getAllDavUsersForReviews().map(davUser => {
+  return getAllDavUsersForReviews().flatMap(davUser => {
     const snapshots = Array.isArray(davUser.tenant.review_snapshots) ? davUser.tenant.review_snapshots : [];
     const matched = snapshots.find(item => !targetPeriod || item.period === targetPeriod || item.period_key === period);
-    const matchedWatchlistAnalysisSection = matched && matched.watchlist_analysis_section && typeof matched.watchlist_analysis_section === 'object'
-      ? matched.watchlist_analysis_section
-      : {};
-    const matchedWatchlist = matched && hasReviewWatchlistAnalysisContent(matchedWatchlistAnalysisSection) && Array.isArray(matched.watchlist)
-      ? matched.watchlist
-      : [];
-    const review = matched ? {
-      id: matched.id,
-      author: davUser.tenant.advisor,
-      avatar: davUser.tenant.advisor === '财经老王' ? '👑' : '🧭',
-      periodLabel: matched.period || targetPeriod || getReviewPeriodMeta(period).label,
-      generatedAt: matched.time || matched.published_at || nowTs(),
-      title: matched.title,
-      summary: matched.summary,
-      tags: matched.tags || [],
-      watchlist: matchedWatchlist,
-      annotations: [],
-      sourceMode: matched.source_mode || 'manual',
-      selectedCards: matched.selected_cards || [],
-      knowledgeAttachments: matched.knowledge_attachments || [],
-      dataSources: matched.data_sources || [],
-      newsSources: matched.news_sources || [],
-      llmModels: matched.llm_models || [],
-      userInputSection: matched.user_input_section || {},
-      watchlistAnalysisSection: matchedWatchlistAnalysisSection,
-      evidenceChainSection: matched.evidence_chain_section || {},
-      paragraphs: matched.user_input_section && matched.user_input_section.display_text ? [] : [
-        { title: '完整复盘正文', text: matched.content_text || matched.summary || '' },
-      ],
-    } : buildKolReviewData(davUser, period);
-    return buildReviewArticleData(review);
+    return matched ? [buildPublishedReviewArticleFromSnapshot(davUser, matched, period)] : [];
+  });
+}
+
+function buildAllPublishedReviewArticles() {
+  return getAllDavUsersForReviews().flatMap((davUser) => {
+    const snapshots = Array.isArray(davUser.tenant.review_snapshots) ? davUser.tenant.review_snapshots : [];
+    return snapshots.map((snapshot) => buildPublishedReviewArticleFromSnapshot(davUser, snapshot, snapshot.period_key || 'day'));
+  }).sort((left, right) => {
+    const leftTime = Date.parse(left.generatedAt || '') || 0;
+    const rightTime = Date.parse(right.generatedAt || '') || 0;
+    return rightTime - leftTime;
   });
 }
 
 function getAllDavUsersForReviews() {
   const tenantConfigs = (window.SITE_CONFIG && Array.isArray(window.SITE_CONFIG.tenants)) ? window.SITE_CONFIG.tenants : [];
-  if (tenantConfigs.length) {
-    return tenantConfigs.map((tenant, index) => ({
-      id: `tenant_dav_${tenant.id || index}`,
-      role: 'dav',
-      tenant: {
-        ...tenant,
-        desc: tenant.description || '当前租户的独立管理空间，负责粉丝、内容与知识资产经营。',
-      },
-    }));
-  }
-  return DEMO_PROFILE_USERS.filter(user => user.role === 'dav');
+  const activeUser = getActiveDemoUser() || {};
+  const activeUserTenant = activeUser.tenant && typeof activeUser.tenant === 'object' ? activeUser.tenant : {};
+  const activeTenant = window.ACTIVE_TENANT && typeof window.ACTIVE_TENANT === 'object' ? window.ACTIVE_TENANT : {};
+  const tenantSlug = String(activeUserTenant.slug || activeTenant.slug || '').trim().toLowerCase();
+  const configuredTenant = tenantConfigs.find((tenant) => String((tenant || {}).slug || '').trim().toLowerCase() === tenantSlug) || {};
+  const tenant = {
+    ...configuredTenant,
+    ...activeTenant,
+    ...activeUserTenant,
+  };
+  if (!tenant.slug && !tenant.id) return [];
+  return [{
+    id: `tenant_dav_${tenant.id || tenant.slug || 'current'}`,
+    role: 'dav',
+    tenant: {
+      ...tenant,
+      desc: tenant.description || tenant.desc || '当前租户的独立管理空间，负责粉丝、内容与知识资产经营。',
+    },
+  }];
 }
 
-function renderReviewArticleList(period) {
-  const articles = buildPublishedReviewArticles(period);
+function renderReviewArticleCards(articles) {
   if (!articles.length) {
     return '<div class="card" style="padding:16px;font-size:12px;color:var(--gray-400)">当前还没有可展示的复盘分析报告。</div>';
   }
   return `
     <div class="review-article-list">
       ${articles.map(article => `
-        <div class="review-article-card" onclick="openReviewArticleModal('${escapeAttr(article.id)}')">
+        <div class="review-article-card" role="button" tabindex="0" onclick="openReviewArticleDetail('${escapeAttr(article.id)}')" onkeydown="if(event.key==='Enter'||event.key===' ')openReviewArticleDetail('${escapeAttr(article.id)}')">
           <div class="review-article-cover">
             <div class="review-article-cover-kicker">${escapeHtml(article.kicker)}</div>
             <div class="review-article-cover-title">${escapeHtml(article.coverTitle)}</div>
@@ -7524,8 +7585,47 @@ function renderReviewArticleList(period) {
   `;
 }
 
+function renderReviewArticleList(period) {
+  return renderReviewArticleCards(buildPublishedReviewArticles(period));
+}
+
 function getReviewArticleById(articleId) {
-  return buildPublishedReviewArticles(currentReviewPeriod).find(item => item.id === articleId) || null;
+  return buildAllPublishedReviewArticles().find(item => String(item.id || '') === String(articleId || '')) || null;
+}
+
+function buildReviewRouteUrl(view, articleId) {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('review_view');
+  url.searchParams.delete('review_id');
+  if (view && view !== 'home') url.searchParams.set('review_view', view);
+  if (articleId) url.searchParams.set('review_id', articleId);
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+function openReviewHome(options = {}) {
+  reviewView = 'home';
+  reviewDetailArticleId = '';
+  if (!options.skipHistory) window.history.pushState({}, '', buildReviewRouteUrl('home'));
+  renderReviewExperience();
+}
+
+function openReviewArticleList(options = {}) {
+  reviewView = 'list';
+  reviewDetailArticleId = '';
+  if (!options.skipHistory) window.history.pushState({}, '', buildReviewRouteUrl('list'));
+  renderReviewExperience();
+}
+
+function openReviewArticleDetail(articleId, options = {}) {
+  const article = getReviewArticleById(articleId);
+  if (!article) {
+    showToast('复盘文章不存在或已下线');
+    return;
+  }
+  reviewView = 'detail';
+  reviewDetailArticleId = String(article.id || articleId || '');
+  if (!options.skipHistory) window.history.pushState({}, '', buildReviewRouteUrl('detail', reviewDetailArticleId));
+  renderReviewExperience();
 }
 
 function buildReviewArticleHeroVisual(article) {
@@ -7539,15 +7639,15 @@ function renderReviewArticleDetailContent(article, options = {}) {
     : article.coverDesc;
   const metaSuffix = previewMode ? ' · 预览态' : ` · 作者 ${escapeHtml(article.author)}`;
   return `
-    <div class="review-article-modal-head">
-      <div class="review-article-modal-kicker">${escapeHtml(article.kicker)}</div>
-      <div class="review-article-modal-title">${escapeHtml(article.title)}</div>
-      <div class="review-article-modal-meta">${escapeHtml(article.meta)}${metaSuffix}</div>
+    <div class="review-article-detail-head">
+      <div class="review-article-detail-kicker">${escapeHtml(article.kicker)}</div>
+      <div class="review-article-detail-title">${escapeHtml(article.title)}</div>
+      <div class="review-article-detail-meta">${escapeHtml(article.meta)}${metaSuffix}</div>
       <div class="review-watchlist-row">
         ${(article.watchlist || []).map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
       </div>
     </div>
-    <div class="review-article-modal-body">
+    <div class="review-article-detail-body">
       <div class="review-article-hero">
         <div class="review-article-hero-copy">
           <div class="review-article-hero-title">${escapeHtml(article.coverTitle)}</div>
@@ -7684,18 +7784,49 @@ function buildReviewPreviewArticle() {
   });
 }
 
-function openReviewArticleModal(articleId) {
-  const article = getReviewArticleById(articleId);
-  const modal = document.getElementById('review-article-modal');
-  const host = document.getElementById('review-article-modal-content');
-  if (!article || !modal || !host) return;
-  host.innerHTML = renderReviewArticleDetailContent(article);
-  modal.classList.add('show');
+function renderReviewHome() {
+  const articles = buildAllPublishedReviewArticles().slice(0, 3);
+  return `
+    <div class="review-directory-view">
+      <div class="review-directory-view-head">
+        <div>
+          <div class="review-directory-view-title">最近复盘</div>
+          <div class="review-directory-view-desc">按最新发布时间展示最近 3 篇复盘文章，点击后进入独立详情页。</div>
+        </div>
+        <button class="btn-outline" type="button" style="padding:7px 11px;font-size:11px" onclick="openReviewArticleList()">查看全部</button>
+      </div>
+      ${renderReviewArticleCards(articles)}
+    </div>
+  `;
 }
 
-function closeReviewArticleModal() {
-  const modal = document.getElementById('review-article-modal');
-  if (modal) modal.classList.remove('show');
+function renderReviewListPage() {
+  return `
+    <div class="review-directory-view">
+      <div class="review-directory-view-head">
+        <div>
+          <div class="review-directory-view-title">全部复盘</div>
+          <div class="review-directory-view-desc">查看当前租户可见的全部已发布复盘文章。</div>
+        </div>
+        <button class="btn-outline" type="button" style="padding:7px 11px;font-size:11px" onclick="openReviewHome()">返回复盘专区</button>
+      </div>
+      ${renderReviewArticleCards(buildAllPublishedReviewArticles())}
+    </div>
+  `;
+}
+
+function renderReviewDetailPage() {
+  const article = getReviewArticleById(reviewDetailArticleId);
+  if (!article) return renderReviewListPage();
+  return `
+    <div class="review-detail-page">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px">
+        <button class="btn-outline" type="button" style="padding:7px 11px;font-size:11px" onclick="openReviewArticleList()">返回复盘列表</button>
+        <span class="tag tag-gold">复盘详情</span>
+      </div>
+      ${renderReviewArticleDetailContent(article)}
+    </div>
+  `;
 }
 
 function renderReviewPeriodRow() {
@@ -7829,7 +7960,13 @@ function renderReviewExperience() {
   const pageHeaderDesc = document.querySelector('#page-review .review-role-desc');
   const host = document.getElementById('review-report-feed');
   if (!host) return;
-  const requestedProductionPage = new URLSearchParams(window.location.search).get('review') === 'compose';
+  const reviewParams = new URLSearchParams(window.location.search);
+  const requestedProductionPage = reviewParams.get('review') === 'compose';
+  const requestedView = String(reviewParams.get('review_view') || 'home').trim().toLowerCase();
+  if (!requestedProductionPage && ['home', 'list', 'detail'].includes(requestedView)) {
+    reviewView = requestedView;
+    reviewDetailArticleId = String(reviewParams.get('review_id') || '').trim();
+  }
   if (user.role === 'dav' && requestedProductionPage) reviewProductionPage = true;
   const productionPage = document.getElementById('review-production-page');
   const overviewCard = document.getElementById('review-overview-card');
@@ -7844,7 +7981,7 @@ function renderReviewExperience() {
     if (!reviewActiveJobsLoading && !reviewActiveJobsTimer) loadActiveReviewJobs();
     return;
   }
-  if (overviewCard) overviewCard.style.display = '';
+  if (overviewCard) overviewCard.style.display = reviewView === 'home' ? '' : 'none';
   if (productionPage) productionPage.style.display = 'none';
   host.style.display = '';
   if (badge) badge.textContent = user.role === 'dav' ? '复盘发布中枢' : '复盘分析报告';
@@ -7858,10 +7995,17 @@ function renderReviewExperience() {
     triggerBtn.textContent = user.role === 'dav' ? '发起新复盘' : '查看复盘报告';
     triggerBtn.style.display = user.role === 'dav' ? '' : 'none';
   }
-  if (actionRow) actionRow.style.display = user.role === 'dav' ? 'flex' : 'none';
-  renderReviewPeriodRow();
+  if (actionRow) actionRow.style.display = reviewView === 'home' && user.role === 'dav' ? 'flex' : 'none';
+  if (reviewView === 'home') renderReviewPeriodRow();
   renderDavReviewStudio(user);
-  host.innerHTML = renderReviewArticleList(currentReviewPeriod);
+  if (reviewView === 'detail' && !getReviewArticleById(reviewDetailArticleId)) {
+    reviewView = 'list';
+    reviewDetailArticleId = '';
+    window.history.replaceState({}, '', buildReviewRouteUrl('list'));
+  }
+  host.innerHTML = reviewView === 'detail'
+    ? renderReviewDetailPage()
+    : (reviewView === 'list' ? renderReviewListPage() : renderReviewHome());
   renderReviewActiveJobs();
   if (user.role === 'dav' && !reviewActiveJobsLoading && !reviewActiveJobsTimer) loadActiveReviewJobs();
 }
@@ -7876,8 +8020,11 @@ function selectReviewPeriod(period) {
 function openReviewTriggerModal(sourceMode) {
   const user = getActiveDemoUser();
   reviewTriggerDraft.period = currentReviewPeriod;
-  if (sourceMode && REVIEW_SOURCE_OPTIONS.some(item => item.value === sourceMode)) {
+  if (sourceMode && getAvailableReviewSourceOptions().some(item => item.value === sourceMode)) {
     reviewTriggerDraft.sourceMode = sourceMode;
+  }
+  if (!getAvailableReviewSourceOptions().some(item => item.value === reviewTriggerDraft.sourceMode)) {
+    reviewTriggerDraft.sourceMode = 'manual';
   }
   // "New review" starts a clean draft. Previous content remains available in
   // published history, but must never become hidden input to the next run.
@@ -7885,6 +8032,7 @@ function openReviewTriggerModal(sourceMode) {
   reviewTriggerDraft.selectedWatchlist = user.role === 'dav'
     ? []
     : getTenantWatchlistFocus(user.tenant.id).slice(0);
+  reviewTriggerDraft.watchlistDecision = '';
   reviewTriggerDraft.voiceTranscript = '';
   reviewTriggerDraft.manualHtml = '';
   reviewTriggerDraft.fileText = '';
@@ -7979,11 +8127,13 @@ async function generateReviewDraftWithLlm() {
     body: JSON.stringify({
       tenant_slug: ((user || {}).tenant || {}).slug || '',
       period: reviewTriggerDraft.period || currentReviewPeriod || 'day',
-      source_mode: reviewTriggerDraft.sourceMode || 'voice',
+      source_mode: reviewTriggerDraft.sourceMode || 'manual',
       source_text: getReviewDraftContentText(),
       prompt_text: reviewTriggerDraft.aiPrompt || '',
       prompt_tags: reviewTriggerDraft.promptTags || [],
-      selected_watchlist: reviewTriggerDraft.selectedWatchlist || [],
+      // Stage one only optimizes the user's own review text. Stock analysis is
+      // submitted later, after an explicit decision and stock confirmation.
+      selected_watchlist: [],
       speaker_name: (user && (user.advisor_name || user.username)) || '',
       entry_point: 'h5_review_draft',
     }),
@@ -8005,7 +8155,7 @@ async function requestReviewStructuredPreview() {
       tenant_slug: ((user || {}).tenant || {}).slug || '',
       period: reviewTriggerDraft.period || currentReviewPeriod || 'day',
       review_title: String(reviewTriggerDraft.reviewTitle || '').trim(),
-      source_mode: reviewTriggerDraft.sourceMode || 'voice',
+      source_mode: reviewTriggerDraft.sourceMode || 'manual',
       source_text: getReviewUserInputDisplayText(),
       selected_watchlist: reviewTriggerDraft.selectedWatchlist || [],
       include_summary: false,
@@ -8630,12 +8780,114 @@ function isReviewDraftProcessingStage() {
   return reviewTriggerDraft.flowStage === 'draft_generating' || reviewTriggerDraft.flowStage === 'preview_generating';
 }
 
+function renderReviewWatchlistSelectionPanel() {
+  if (reviewTriggerDraft.flowStage !== 'watchlist_select') return '';
+  const user = getActiveDemoUser();
+  const personalList = getTenantWatchlistFocus(user.tenant.id);
+  const selected = new Set(reviewTriggerDraft.selectedWatchlist || []);
+  const candidates = Array.isArray(reviewWatchlistSearchItems) ? reviewWatchlistSearchItems : [];
+  return `
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">第二阶段：选择需要 AI 分析的自选股</label>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:10px">可以从个人自选股中勾选，也可以输入股票代码或名称搜索后加入。确认列表后才会调用 Gangtise。</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="review-watchlist-search-input" class="knowledge-modal-input" style="flex:1" value="${escapeAttr(reviewWatchlistSearchQuery)}" placeholder="输入股票代码或名称，例如 600519 / 贵州茅台" oninput="searchReviewWatchlistCandidates(this.value)" />
+      </div>
+      ${candidates.length ? `
+        <div style="margin-top:8px;border:1px solid rgba(47,116,192,0.12);border-radius:10px;overflow:hidden;background:#fff">
+          ${candidates.map((item, index) => `
+            <button type="button" style="display:flex;width:100%;justify-content:space-between;align-items:center;padding:9px 10px;border:0;border-bottom:${index === candidates.length - 1 ? '0' : '1px solid rgba(47,116,192,0.08)'};background:#fff;text-align:left;cursor:pointer" onclick="addReviewWatchlistCandidate(${index})">
+              <span><strong style="color:var(--text-main)">${escapeHtml(item.name || item.code || '')}</strong><span style="display:block;color:var(--gray-400);font-size:11px;margin-top:2px">${escapeHtml(item.code || '')} · ${escapeHtml(item.market || '')}</span></span>
+              <span style="font-size:11px;color:#2F74C0">${selected.has(item.name || item.code) ? '已加入' : '加入'}</span>
+            </button>
+          `).join('')}
+        </div>
+      ` : ''}
+      <div style="font-size:12px;font-weight:700;color:var(--text-main);margin-top:14px">我的自选股</div>
+      <div style="display:grid;gap:7px;margin-top:8px">
+        ${personalList.map((name) => `
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid rgba(47,116,192,0.10);border-radius:9px;background:#F8FBFF;color:var(--text-main);font-size:12px;cursor:pointer">
+            <input type="checkbox" ${selected.has(name) ? 'checked' : ''} onchange="toggleReviewWatchlistOption('${escapeAttr(name)}', this.checked)" />
+            <span>${escapeHtml(name)}</span>
+          </label>
+        `).join('') || '<div style="font-size:11px;color:var(--gray-400)">当前没有个人自选股，可通过上方搜索加入。</div>'}
+      </div>
+      <div style="margin-top:12px;padding:10px;border-radius:9px;background:rgba(200,169,110,0.10);color:var(--text-main);font-size:12px">待分析：${Array.from(selected).map((name) => escapeHtml(name)).join('、') || '尚未选择'}</div>
+    </div>
+  `;
+}
+
+function toggleReviewWatchlistOption(name, checked) {
+  const normalized = String(name || '').trim();
+  if (!normalized) return;
+  const next = new Set(reviewTriggerDraft.selectedWatchlist || []);
+  if (checked) next.add(normalized); else next.delete(normalized);
+  reviewTriggerDraft.selectedWatchlist = Array.from(next);
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+function addReviewWatchlistCandidate(index) {
+  const item = reviewWatchlistSearchItems[index];
+  if (!item) return;
+  const name = String(item.name || item.code || '').trim();
+  if (!name) return;
+  const next = new Set(reviewTriggerDraft.selectedWatchlist || []);
+  next.add(name);
+  reviewTriggerDraft.selectedWatchlist = Array.from(next);
+  reviewWatchlistSearchItems = [];
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+function searchReviewWatchlistCandidates(value) {
+  if (reviewWatchlistSearchTimer) clearTimeout(reviewWatchlistSearchTimer);
+  const query = String(value || '').trim();
+  reviewWatchlistSearchQuery = query;
+  reviewWatchlistSearchItems = [];
+  if (!query) {
+    renderReviewTriggerModal(getActiveDemoUser());
+    return;
+  }
+  const requestSeq = ++reviewWatchlistSearchRequestSeq;
+  reviewWatchlistSearchTimer = setTimeout(async () => {
+    try {
+      const resp = await fetch(`/api/watchlist/search?q=${encodeURIComponent(query)}&limit=8`);
+      const data = await resp.json().catch(() => ({}));
+      if (requestSeq !== reviewWatchlistSearchRequestSeq) return;
+      if (!resp.ok || data.ok === false) throw new Error((data && data.error) || 'watchlist_search_failed');
+      reviewWatchlistSearchItems = Array.isArray(data.items) ? data.items : [];
+      renderReviewTriggerModal(getActiveDemoUser());
+    } catch (error) {
+      if (requestSeq === reviewWatchlistSearchRequestSeq) renderReviewTriggerModal(getActiveDemoUser());
+    }
+  }, 180);
+}
+
 function renderReviewPreviewPanel() {
   if (!reviewTriggerDraft.previewReady || reviewTriggerDraft.flowStage !== 'preview') return '';
   const article = buildReviewPreviewArticle();
   return `
     <div class="review-preview-panel" style="padding:0;background:#FFFFFF;border-color:rgba(47,116,192,0.12)">
       ${renderReviewArticleDetailContent(article, { previewMode: true })}
+    </div>
+  `;
+}
+
+function renderReviewStageOnePreviewPanel() {
+  if (reviewTriggerDraft.flowStage !== 'stage1_preview') return '';
+  return `
+    <div class="review-preview-panel" style="margin-top:12px">
+      <div class="review-preview-head">
+        <div>
+          <div class="review-preview-title">第一阶段预览</div>
+          <div class="review-progress-subtitle">人工输入和 AI 优化内容已整理完成，请决定是否追加自选股 AI 总结分析。</div>
+        </div>
+        <span class="review-draft-status">待决定</span>
+      </div>
+      <div class="review-preview-copy" style="white-space:pre-wrap">${escapeHtml(String(reviewTriggerDraft.draftReviewText || reviewTriggerDraft.generatedPreviewText || getReviewDraftContentText()).trim())}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+        <button class="btn-gold" type="button" onclick="chooseReviewWatchlistAnalysis('yes')">需要自选股 AI 分析</button>
+        <button class="btn-outline" type="button" onclick="chooseReviewWatchlistAnalysis('no')">暂不需要，直接发布</button>
+      </div>
     </div>
   `;
 }
@@ -8668,57 +8920,65 @@ function renderReviewTriggerModal(user) {
   if (!host) return;
   const scrollSnapshot = captureModalSheetScroll('review-trigger-modal-content');
   const focusNames = getTenantWatchlistFocus(user.tenant.id);
+  const reviewStage = String(reviewTriggerDraft.flowStage || 'intake').trim().toLowerCase();
+  const isReviewSetupStage = reviewStage === 'intake' || reviewStage === 'optimize_rule';
+  const isReviewFinalPreview = reviewStage === 'preview' || reviewTriggerDraft.previewReady === true;
   const stageLabelMap = {
     intake: '1/4 输入稿件',
     optimize_rule: '1/4 选择优化规则',
     draft_generating: '2/4 Draft 生成中',
     draft_review: '2/4 Draft 审核',
-    preview_generating: '3/4 自选股归纳生成中',
-    structured_review: '3/4 自选股归纳审核',
-    preview: '4/4 最终预览',
+    preview_generating: '2/2 自选股 AI 分析生成中',
+    structured_review: '2/2 自选股 AI 分析审核',
+    watchlist_select: '2/2 选择自选股',
+    stage1_preview: '第一阶段预览',
+    preview: '第一阶段预览',
   };
   const stageLabel = stageLabelMap[reviewTriggerDraft.flowStage] || stageLabelMap.intake;
+  const modalTitle = isReviewFinalPreview
+    ? '发布前确认'
+    : (reviewStage === 'stage1_preview' ? '第一阶段预览' : (reviewStage === 'watchlist_select' ? '选择自选股' : (user.role === 'dav' ? '发起大V复盘' : '发起智能复盘')));
   host.innerHTML = `
-    <div class="modal-title" style="margin-bottom:10px">${user.role === 'dav' ? '发起大V复盘' : '发起智能复盘'}</div>
-    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">
-      ${user.role === 'dav'
-        ? '先提交手写、录音或文件内容；可以智能优化后进入 draft 审核，也可以不经大模型直接预览。预览确认后再发布。'
-        : '生成复盘前必须先选择复盘周期。系统会结合你的自选股、所属大V最近复盘和当前阶段行情生成一版短版智能复盘。'}
-    </div>
-    ${user.role === 'dav' ? `<div class="review-flow-row" style="margin-bottom:12px"><span class="review-flow-step">${escapeHtml(stageLabel)}</span><span class="review-flow-step">智能优化可选</span><span class="review-flow-step">人工确认发布</span></div>` : ''}
-    <div class="knowledge-modal-block">
-      <label class="knowledge-modal-label">复盘周期</label>
-      <div class="review-period-row">
-        ${Object.entries(REVIEW_PERIOD_CONFIG).map(([value, meta]) => `
-          <button class="review-period-pill ${value === reviewTriggerDraft.period ? 'active' : ''}" onclick="setReviewTriggerPeriod('${value}')">${meta.label}</button>
-        `).join('')}
+    <div class="modal-title" style="margin-bottom:${isReviewFinalPreview ? '4px' : '10px'}">${modalTitle}</div>
+    ${isReviewFinalPreview ? `
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:12px">${escapeHtml(getReviewPeriodMeta(reviewTriggerDraft.period).label)} · 正文和自选股分析已合并，确认后发布。</div>
+    ` : (isReviewSetupStage ? `
+      <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">
+        ${user.role === 'dav'
+          ? '先提交手写或文件内容，再决定是否进行 AI 优化和自选股分析。'
+          : '生成复盘前必须先选择复盘周期。'}
       </div>
-    </div>
-    ${user.role === 'dav' ? `
+      ${user.role === 'dav' ? `<div class="review-flow-row" style="margin-bottom:12px"><span class="review-flow-step">${escapeHtml(stageLabel)}</span><span class="review-flow-step">智能优化可选</span><span class="review-flow-step">人工确认发布</span></div>` : ''}
       <div class="knowledge-modal-block">
-        <label class="knowledge-modal-label">供稿方式</label>
-        <div class="knowledge-source-selector" style="grid-template-columns:repeat(4,1fr)">
-          ${REVIEW_SOURCE_OPTIONS.map(item => `
-            <div class="knowledge-source-pill ${item.value === reviewTriggerDraft.sourceMode ? 'active' : ''}" onclick="setReviewTriggerSourceMode('${item.value}')">${item.icon} ${item.label}</div>
+        <label class="knowledge-modal-label">复盘周期</label>
+        <div class="review-period-row">
+          ${Object.entries(REVIEW_PERIOD_CONFIG).map(([value, meta]) => `
+            <button class="review-period-pill ${value === reviewTriggerDraft.period ? 'active' : ''}" onclick="setReviewTriggerPeriod('${value}')">${meta.label}</button>
           `).join('')}
         </div>
       </div>
-      ${isReviewInputStage() ? `
+    ` : `
+      <div class="review-stage-compact-meta">${escapeHtml(getReviewPeriodMeta(reviewTriggerDraft.period).label)} · ${escapeHtml(stageLabel)}</div>
+    `)}
+    ${user.role === 'dav' ? `
+      ${isReviewSetupStage ? `
         <div class="knowledge-modal-block">
-          <label class="knowledge-modal-label">输入内容</label>
-          ${renderReviewInputPanel()}
-        </div>
-        ${renderReviewPromptPanel()}
-        <div class="knowledge-modal-block">
-          <label class="knowledge-modal-label">本次纳入复盘的自选股（可选）</label>
-          <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">用户输入内容是必填项。自选股可以不选；如果有选择，系统会基于这些股票及其 K 线标注生成归纳总结。</div>
-          <div class="review-watchlist-row">
-            ${focusNames.map(name => `
-              <button class="review-watchlist-chip selectable ${reviewTriggerDraft.selectedWatchlist.includes(name) ? 'active' : ''}" onclick="toggleReviewTriggerWatchlist('${name}')">${escapeHtml(name)}</button>
+          <label class="knowledge-modal-label">供稿方式</label>
+          <div class="knowledge-source-selector" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+            ${getAvailableReviewSourceOptions().map(item => `
+              <div class="knowledge-source-pill ${item.value === reviewTriggerDraft.sourceMode ? 'active' : ''}" onclick="setReviewTriggerSourceMode('${item.value}')">${item.icon} ${item.label}</div>
             `).join('')}
           </div>
         </div>
+        ${isReviewInputStage() ? `
+          <div class="knowledge-modal-block">
+            <label class="knowledge-modal-label">输入内容</label>
+            ${renderReviewInputPanel()}
+          </div>
+          ${renderReviewPromptPanel()}
+        ` : ''}
       ` : ''}
+      ${user.role === 'dav' ? renderReviewWatchlistSelectionPanel() : ''}
       ${isReviewDraftProcessingStage() ? `
         <div class="knowledge-modal-block">
           <label class="knowledge-modal-label">${reviewTriggerDraft.flowStage === 'preview_generating' ? '正在生成自选股归纳总结' : '正在生成 Draft'}</label>
@@ -8728,7 +8988,7 @@ function renderReviewTriggerModal(user) {
       ${renderReviewDraftReviewPanel()}
       ${renderReviewStructuredReviewPanel()}
     ` : ''}
-    ${reviewTriggerDraft.flowStage !== 'preview' ? `
+    ${isReviewSetupStage && reviewTriggerDraft.flowStage !== 'watchlist_select' ? `
       <div class="knowledge-modal-block">
         <label class="knowledge-modal-label">${user.role === 'dav' ? '本次复盘覆盖' : '本次智能复盘输入'}</label>
         <div class="review-watchlist-row">
@@ -8737,6 +8997,7 @@ function renderReviewTriggerModal(user) {
       </div>
     ` : ''}
     ${user.role === 'dav' ? renderReviewDraftProgressPanel() : ''}
+    ${user.role === 'dav' ? renderReviewStageOnePreviewPanel() : ''}
     ${user.role === 'dav' ? renderReviewPreviewPanel() : ''}
     <div class="modal-actions">
       <button class="btn-outline" onclick="closeReviewTriggerModal()">取消</button>
@@ -8884,7 +9145,13 @@ function renderReviewFlowActions() {
     return '<button class="btn-outline" onclick="backToReviewIntake()">返回输入</button><button class="btn-gold" onclick="submitReviewSmartOptimize()">开始优化</button>';
   }
   if (reviewTriggerDraft.flowStage === 'draft_review') {
-    return `<button class="btn-outline" onclick="backToReviewIntake()">回退修改</button><button class="btn-gold" onclick="confirmReviewDraftToPreview()">${reviewTriggerDraft.selectedWatchlist.length ? '生成自选股归纳' : '直接预览'}</button>`;
+    return '<button class="btn-outline" onclick="backToReviewIntake()">回退修改</button><button class="btn-gold" onclick="confirmReviewDraftToPreview()">确认第一阶段预览</button>';
+  }
+  if (reviewTriggerDraft.flowStage === 'stage1_preview') {
+    return '<button class="btn-outline" onclick="backToReviewDraftEdit()">返回修改</button>';
+  }
+  if (reviewTriggerDraft.flowStage === 'watchlist_select') {
+    return '<button class="btn-outline" onclick="backToReviewDraftEdit()">返回第一阶段</button><button class="btn-gold" onclick="confirmReviewWatchlistSelection()">确认列表并开始分析</button>';
   }
   if (reviewTriggerDraft.flowStage === 'preview_failed') {
     return '<button class="btn-outline" onclick="backToReviewDraftEdit()">回退修改</button><button class="btn-gold" onclick="prepareReviewStructuredPreview()">重新生成自选股分析</button>';
@@ -8895,7 +9162,7 @@ function renderReviewFlowActions() {
   if (reviewTriggerDraft.flowStage === 'preview' || reviewTriggerDraft.previewReady) {
     return '<button class="btn-outline" onclick="backToReviewDraftEdit()">回退修改</button><button class="btn-gold" onclick="publishReviewDraft()">确认发布</button>';
   }
-  return `<button class="btn-outline" onclick="prepareReviewDirectPreview()">${reviewTriggerDraft.selectedWatchlist.length ? '生成自选股归纳' : '直接预览'}</button><button class="btn-gold" onclick="openReviewOptimizeRuleStep()">优化成稿</button>`;
+  return `<button class="btn-outline" onclick="prepareReviewDirectPreview()">直接预览</button><button class="btn-gold" onclick="openReviewOptimizeRuleStep()">优化成稿</button>`;
 }
 
 function setReviewTriggerPeriod(period) {
@@ -8907,7 +9174,7 @@ function setReviewTriggerPeriod(period) {
 }
 
 function setReviewTriggerSourceMode(mode) {
-  if (!REVIEW_SOURCE_OPTIONS.some(item => item.value === mode)) return;
+  if (!getAvailableReviewSourceOptions().some(item => item.value === mode)) return;
   syncReviewDraftFromModal();
   if (mode === 'manual' && !String(richHtmlToPlainText(reviewTriggerDraft.manualHtml || '')).trim()) {
     const voiceText = String(reviewTriggerDraft.voiceTranscript || '').trim();
@@ -8937,6 +9204,15 @@ function toggleReviewTriggerWatchlist(name) {
   reviewTriggerDraft.previewReady = false;
   reviewStructuredPreview = null;
   renderReviewTriggerModal(getActiveDemoUser());
+}
+
+function confirmReviewWatchlistSelection() {
+  syncReviewDraftFromModal();
+  if (!(reviewTriggerDraft.selectedWatchlist || []).length) {
+    showToast('请至少选择一只股票');
+    return;
+  }
+  prepareReviewStructuredPreview();
 }
 
 function setReviewOptimizeRuleMode(mode) {
@@ -9109,15 +9385,13 @@ function prepareReviewDirectPreview() {
   reviewTriggerDraft.skipAiProcessing = true;
   reviewTriggerDraft.generatedPreviewText = '';
   reviewTriggerDraft.draftReviewText = getReviewDraftContentText();
-  if ((reviewTriggerDraft.selectedWatchlist || []).length) {
-    prepareReviewStructuredPreview();
-    return;
-  }
+  reviewTriggerDraft.watchlistDecision = '';
+  reviewTriggerDraft.selectedWatchlist = [];
   reviewStructuredPreview = null;
-  reviewTriggerDraft.previewReady = true;
-  reviewTriggerDraft.flowStage = 'preview';
+  reviewTriggerDraft.previewReady = false;
+  reviewTriggerDraft.flowStage = 'stage1_preview';
   renderReviewTriggerModal(getActiveDemoUser());
-  showToast('已进入最终预览');
+  showToast('已进入第一阶段预览，请决定是否需要自选股 AI 分析');
 }
 
 function backToReviewIntake() {
@@ -9133,6 +9407,10 @@ function backToReviewDraftEdit() {
   reviewTriggerDraft.previewReady = false;
   if (reviewTriggerDraft.flowStage === 'preview' && reviewStructuredPreview) {
     reviewTriggerDraft.flowStage = 'structured_review';
+  } else if (reviewTriggerDraft.flowStage === 'watchlist_select') {
+    reviewTriggerDraft.flowStage = 'stage1_preview';
+  } else if (reviewTriggerDraft.flowStage === 'stage1_preview') {
+    reviewTriggerDraft.flowStage = 'draft_review';
   } else {
     reviewStructuredPreview = null;
     reviewTriggerDraft.flowStage = reviewTriggerDraft.generatedPreviewText ? 'draft_review' : 'intake';
@@ -9148,15 +9426,33 @@ function confirmReviewDraftToPreview() {
   }
   reviewTriggerDraft.paragraphMode = 'ai';
   reviewTriggerDraft.skipAiProcessing = false;
-  if ((reviewTriggerDraft.selectedWatchlist || []).length) {
-    prepareReviewStructuredPreview();
+  reviewTriggerDraft.watchlistDecision = '';
+  reviewTriggerDraft.selectedWatchlist = [];
+  reviewStructuredPreview = null;
+  reviewTriggerDraft.previewReady = false;
+  reviewTriggerDraft.flowStage = 'stage1_preview';
+  renderReviewTriggerModal(getActiveDemoUser());
+  showToast('第一阶段已完成，请决定是否需要自选股 AI 分析');
+}
+
+function chooseReviewWatchlistAnalysis(decision) {
+  syncReviewDraftFromModal();
+  if (decision === 'no') {
+    reviewTriggerDraft.watchlistDecision = 'no';
+    reviewTriggerDraft.selectedWatchlist = [];
+    reviewTriggerDraft.previewReady = true;
+    reviewTriggerDraft.flowStage = 'preview';
+    renderReviewTriggerModal(getActiveDemoUser());
+    showToast('已跳过自选股分析，可直接发布');
     return;
   }
-  reviewStructuredPreview = null;
-  reviewTriggerDraft.previewReady = true;
-  reviewTriggerDraft.flowStage = 'preview';
+  reviewTriggerDraft.watchlistDecision = 'yes';
+  reviewTriggerDraft.selectedWatchlist = [];
+  reviewTriggerDraft.previewReady = false;
+  reviewTriggerDraft.flowStage = 'watchlist_select';
+  reviewWatchlistSearchItems = [];
+  reviewWatchlistSearchQuery = '';
   renderReviewTriggerModal(getActiveDemoUser());
-  showToast('已进入最终预览');
 }
 
 function confirmStructuredReviewToPreview() {
@@ -18848,7 +19144,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if (hasLoggedInH5User()) {
     renderDemoProfile(getDefaultDemoUser());
     refreshH5OnboardingStatus({ silent: true });
-    switchTab(getFirstEnabledTab());
+    const initialParams = new URLSearchParams(window.location.search);
+    const hasReviewRoute = initialParams.get('review') === 'compose'
+      || ['home', 'list', 'detail'].includes(String(initialParams.get('review_view') || '').trim().toLowerCase());
+    switchTab(hasReviewRoute ? 'review' : getFirstEnabledTab());
   } else {
     setH5ShellLoggedOut(true);
   }
@@ -18860,8 +19159,15 @@ window.addEventListener('focus', () => {
 
 window.addEventListener('popstate', () => {
   const user = getActiveDemoUser();
-  const shouldShowProductionPage = new URLSearchParams(window.location.search).get('review') === 'compose';
+  const routeParams = new URLSearchParams(window.location.search);
+  const shouldShowProductionPage = routeParams.get('review') === 'compose';
+  const shouldShowReviewPage = shouldShowProductionPage
+    || ['home', 'list', 'detail'].includes(String(routeParams.get('review_view') || '').trim().toLowerCase());
   reviewProductionPage = shouldShowProductionPage && user && user.role === 'dav';
+  if (shouldShowReviewPage && !document.getElementById('page-review')?.classList.contains('active')) {
+    switchTab('review');
+    return;
+  }
   if (document.getElementById('page-review')?.classList.contains('active')) renderReviewExperience();
 });
 

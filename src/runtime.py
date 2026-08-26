@@ -811,7 +811,7 @@ DEFAULT_SITE_CONFIG = {
         "watchlist": True,
         "stock_forecast": False,
         "daily_review": True,
-        "knowledge": True,
+        "knowledge": False,
         # Knowledge is held back while the knowledge-base redesign is in
         # progress. The separate gate also keeps legacy site_config rows with
         # knowledge=true from reopening the module accidentally.

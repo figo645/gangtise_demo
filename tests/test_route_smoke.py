@@ -709,7 +709,13 @@ class RouteSmokeTest(unittest.TestCase):
 
     def test_workbench_knowledge_assets_api_payloads(self):
         tenant_slug = self.tenant_slugs[0]
-        response = self.client.get(f"/api/kol/knowledge-assets?tenant={tenant_slug}")
+        from src.runtime import DEFAULT_SITE_CONFIG
+
+        enabled_config = copy.deepcopy(DEFAULT_SITE_CONFIG)
+        enabled_config["feature_flags"]["knowledge"] = True
+        enabled_config["feature_flags"]["knowledge_module_enabled"] = True
+        with patch("src.domain.core_services.get_site_config", return_value=enabled_config), patch("src.web.api_kol.get_site_config", return_value=enabled_config):
+            response = self.client.get(f"/api/kol/knowledge-assets?tenant={tenant_slug}")
 
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
@@ -980,10 +986,16 @@ class RouteSmokeTest(unittest.TestCase):
             self.assertIn("error", payload)
 
     def test_knowledge_query_api_returns_workflow_meta(self):
-        response = self.client.post(
-            "/api/kol/knowledge/query",
-            json={"tenant_slug": self.tenant_slugs[0], "query": "测试知识问题", "submit_to_model": False},
-        )
+        from src.runtime import DEFAULT_SITE_CONFIG
+
+        enabled_config = copy.deepcopy(DEFAULT_SITE_CONFIG)
+        enabled_config["feature_flags"]["knowledge"] = True
+        enabled_config["feature_flags"]["knowledge_module_enabled"] = True
+        with patch("src.domain.core_services.get_site_config", return_value=enabled_config), patch("src.web.api_kol.get_site_config", return_value=enabled_config):
+            response = self.client.post(
+                "/api/kol/knowledge/query",
+                json={"tenant_slug": self.tenant_slugs[0], "query": "测试知识问题", "submit_to_model": False},
+            )
 
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
@@ -1005,7 +1017,13 @@ class RouteSmokeTest(unittest.TestCase):
 
     def test_knowledge_graph_api_returns_graph_payload(self):
         tenant_slug = self.tenant_slugs[0]
-        response = self.client.get(f"/api/kol/knowledge-graph?tenant={tenant_slug}")
+        from src.runtime import DEFAULT_SITE_CONFIG
+
+        enabled_config = copy.deepcopy(DEFAULT_SITE_CONFIG)
+        enabled_config["feature_flags"]["knowledge"] = True
+        enabled_config["feature_flags"]["knowledge_module_enabled"] = True
+        with patch("src.domain.core_services.get_site_config", return_value=enabled_config), patch("src.web.api_kol.get_site_config", return_value=enabled_config):
+            response = self.client.get(f"/api/kol/knowledge-graph?tenant={tenant_slug}")
 
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
@@ -1021,7 +1039,13 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertEqual(payload["workflow_meta"]["id"], "knowledge_graph_agent")
 
     def test_admin_knowledge_graph_api_returns_graph_payload(self):
-        response = self.client.get("/api/admin/knowledge-graph")
+        from src.runtime import DEFAULT_SITE_CONFIG
+
+        enabled_config = copy.deepcopy(DEFAULT_SITE_CONFIG)
+        enabled_config["feature_flags"]["knowledge"] = True
+        enabled_config["feature_flags"]["knowledge_module_enabled"] = True
+        with patch("src.domain.core_services.get_site_config", return_value=enabled_config), patch("src.web.api_kol.get_site_config", return_value=enabled_config):
+            response = self.client.get("/api/admin/knowledge-graph")
 
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
@@ -1034,6 +1058,19 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertFalse(kinds.intersection({"voice", "file", "url", "manual"}))
         self.assertIn("workflow_meta", payload)
         self.assertEqual(payload["workflow_meta"]["id"], "knowledge_graph_agent")
+
+    def test_knowledge_apis_are_closed_by_default(self):
+        tenant_slug = self.tenant_slugs[0]
+        assets_response = self.client.get(f"/api/kol/knowledge-assets?tenant={tenant_slug}")
+        query_response = self.client.post(
+            "/api/kol/knowledge/query",
+            json={"tenant_slug": tenant_slug, "query": "暂不开放的知识问题"},
+        )
+        graph_response = self.client.get(f"/api/kol/knowledge-graph?tenant={tenant_slug}")
+
+        for response in (assets_response, query_response, graph_response):
+            self.assertEqual(response.status_code, 404)
+            self.assertEqual(response.get_json()["error"], "knowledge_feature_disabled")
 
     def test_h5_help_center_api_returns_articles(self):
         response = self.client.get("/api/h5/help-center?role=dav")

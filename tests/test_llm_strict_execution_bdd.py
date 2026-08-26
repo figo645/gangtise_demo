@@ -168,6 +168,7 @@ class StrictLlmExecutionBddTest(unittest.TestCase):
             )
 
         self.assertEqual(llm_call.call_count, 3)
+        self.assertEqual(llm_call.call_args_list[1].args[0]["base_url"], self.MODEL["base_url"])
         self.assertEqual(result["summary"], "证据链总结")
         self.assertEqual(result["llm_model"]["key"], self.MODEL["key"])
 
