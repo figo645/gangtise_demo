@@ -8,6 +8,11 @@ LOG_FILE="$SCRIPT_DIR/app.daemon.log"
 APP_PORT="${PORT:-5001}"
 PYTHON_BIN="${PYTHON_BIN:-}"
 AUTO_START_POSTGRES="${AUTO_START_POSTGRES:-1}"
+if [ "$(uname -s)" = "Darwin" ]; then
+  GANGTISE_RUNTIME_ENV="${GANGTISE_RUNTIME_ENV:-local}"
+else
+  GANGTISE_RUNTIME_ENV="${GANGTISE_RUNTIME_ENV:-production}"
+fi
 
 cd "$SCRIPT_DIR"
 
@@ -88,7 +93,7 @@ if lsof -nP -iTCP:"$APP_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
 fi
 
 # Disable Flask's reloader so this PID represents the actual daemon process.
-nohup env PORT="$APP_PORT" DEBUG=0 PYTHONUNBUFFERED=1 "$PYTHON_BIN" "$SCRIPT_DIR/app.py" \
+nohup env PORT="$APP_PORT" DEBUG=0 PYTHONUNBUFFERED=1 GANGTISE_RUNTIME_ENV="$GANGTISE_RUNTIME_ENV" "$PYTHON_BIN" "$SCRIPT_DIR/app.py" \
   >"$LOG_FILE" 2>&1 < /dev/null &
 APP_PID=$!
 echo "$APP_PID" >"$PID_FILE"

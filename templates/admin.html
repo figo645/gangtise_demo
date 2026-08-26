@@ -4804,6 +4804,13 @@
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">自选股粉丝互评</div><div class="feature-toggle-desc">位置：自选股详情评论区。开启后粉丝可查看其他粉丝评论；关闭后粉丝只能看到大V评论和自己的评论，大V仍可查看租户全部评论。</div></div><label class="toggle"><input id="feature-watchlist_fan_comment_interaction" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap">
                         <div class="toggle-label">
+                          <div class="feature-toggle-title">显示本机模拟数据</div>
+                          <div class="feature-toggle-desc" id="simulation-data-policy-status">本机写入的数据会标记为“本机模拟数据”。生产环境固定不展示，无法通过此开关解除。</div>
+                        </div>
+                        <label class="toggle"><input id="simulation-data-visible" type="checkbox" onchange="saveSimulationDataVisibility(this.checked)"><span class="toggle-slider"></span></label>
+                      </div>
+                      <div class="toggle-wrap">
+                        <div class="toggle-label">
                           <div style="font-size:12px;color:var(--text-main);font-weight:600;margin-bottom:4px">微信环境受限测试</div>
                           <div class="feature-note" style="margin-top:0">
                             只作为后台测试开关存在。关闭后，H5 前台不展示任何普通浏览器 / 微信模拟 / 严格受限入口，同时忽略 <code>wx_env</code> 测试参数。
@@ -11787,6 +11794,7 @@ function pickAdminAccent(accent) {
 async function loadSiteConfig(force = false) {
   if (adminSiteConfigLoaded && !force) {
     renderSiteConfigForm();
+    loadSimulationDataPolicy();
     renderAdminKnowledgeTenantFilter();
     return adminSiteConfig;
   }
@@ -11803,8 +11811,54 @@ async function loadSiteConfig(force = false) {
     throw error;
   }
   renderSiteConfigForm();
+  loadSimulationDataPolicy();
   renderAdminKnowledgeTenantFilter();
   return adminSiteConfig;
+}
+
+async function loadSimulationDataPolicy() {
+  const toggle = document.getElementById('simulation-data-visible');
+  const status = document.getElementById('simulation-data-policy-status');
+  if (!toggle || !status) return;
+  try {
+    const response = await fetch('/api/admin/simulation-data-policy', {cache: 'no-store'});
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error((data && data.error) || 'simulation_policy_load_failed');
+    const policy = data.policy || {};
+    toggle.checked = policy.simulated_data_visible === true;
+    toggle.disabled = policy.production_forced_hidden === true;
+    status.textContent = policy.production_forced_hidden === true
+      ? '当前为生产运行环境：本机模拟数据固定隐藏，不能在此开启。'
+      : `当前为本机运行环境：新写入会自动标记为“${policy.label || '本机模拟数据'}”。关闭后，本机也会隐藏这些记录。`;
+  } catch (error) {
+    toggle.disabled = true;
+    status.textContent = '模拟数据策略读取失败，已停止修改该开关。';
+  }
+}
+
+async function saveSimulationDataVisibility(visible) {
+  const toggle = document.getElementById('simulation-data-visible');
+  const status = document.getElementById('simulation-data-policy-status');
+  if (!toggle) return;
+  let visibilityLocked = false;
+  toggle.disabled = true;
+  try {
+    const response = await fetch('/api/admin/simulation-data-policy', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({simulated_data_visible: visible === true}),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error((data && data.error) || 'simulation_policy_save_failed');
+    const policy = data.policy || {};
+    toggle.checked = policy.simulated_data_visible === true;
+    visibilityLocked = policy.production_forced_hidden === true;
+    if (status) status.textContent = toggle.checked ? '本机模拟数据已显示；生产环境仍会强制隐藏。' : '本机模拟数据已隐藏；生产环境始终保持隐藏。';
+  } catch (error) {
+    visibilityLocked = true;
+    if (status) status.textContent = `模拟数据开关保存失败：${String(error && error.message || 'unknown_error')}`;
+    showToast('模拟数据开关保存失败');
+  } finally {
+    toggle.disabled = visibilityLocked;
+  }
 }
 
 let adminGangtiseCredentialStatus = null;

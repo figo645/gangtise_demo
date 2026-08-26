@@ -24,6 +24,11 @@ fi
 PID_FILE="$SCRIPT_DIR/.app.foreground.pid"
 APP_PORT="${PORT:-5001}"
 PYTHON_BIN="${PYTHON_BIN:-}"
+if [ "$(uname -s)" = "Darwin" ]; then
+  GANGTISE_RUNTIME_ENV="${GANGTISE_RUNTIME_ENV:-local}"
+else
+  GANGTISE_RUNTIME_ENV="${GANGTISE_RUNTIME_ENV:-production}"
+fi
 
 cd "$SCRIPT_DIR"
 
@@ -66,4 +71,4 @@ echo "$$" >"$PID_FILE"
 echo "Starting app.py in the foreground on port $APP_PORT."
 echo "Press Ctrl+C to stop it, or run ./stop_app.sh from another terminal."
 
-exec env PORT="$APP_PORT" PYTHONUNBUFFERED=1 "$PYTHON_BIN" "$SCRIPT_DIR/app.py"
+exec env PORT="$APP_PORT" PYTHONUNBUFFERED=1 GANGTISE_RUNTIME_ENV="$GANGTISE_RUNTIME_ENV" "$PYTHON_BIN" "$SCRIPT_DIR/app.py"

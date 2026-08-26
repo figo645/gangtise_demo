@@ -1648,7 +1648,7 @@ def compose_review_structured_preview(
 
 def get_review_vector_db_connection():
     target = get_runtime_db_target().get("vector", {})
-    return psycopg2.connect(
+    connection = psycopg2.connect(
         host=target.get("host") or VECTOR_DB_HOST,
         port=target.get("port") or VECTOR_DB_PORT,
         dbname=target.get("dbname") or VECTOR_DB_NAME,
@@ -1656,6 +1656,10 @@ def get_review_vector_db_connection():
         password=target.get("password") or VECTOR_DB_PASSWORD,
         connect_timeout=8,
     )
+    # Vector storage can be a separate PostgreSQL target, so it must receive
+    # the same local-write provenance setting as the primary application DB.
+    configure_simulation_data_connection(connection)
+    return connection
 
 
 def _safe_audio_filename(filename):
@@ -1737,6 +1741,64 @@ def _load_local_embedding_model(embedding_cfg=None):
         raise RuntimeError(f"local_embedding_init_failed:{exc}") from exc
     setattr(g, cache_key, model)
     return model
+
+
+_vector_simulation_schema_lock = threading.Lock()
+_vector_simulation_schema_targets = set()
+
+
+def _ensure_vector_simulation_provenance(conn, table_name):
+    """Keep a separate vector DB subject to the same local-data policy."""
+    if table_name not in {"knowledge_embeddings", "review_voice_embeddings"}:
+        raise ValueError("unsupported_vector_provenance_table")
+    target_key = (str(getattr(getattr(conn, "info", None), "dsn", "") or id(conn)), table_name)
+    if target_key in _vector_simulation_schema_targets:
+        return
+    trigger_name = f"trg_{table_name}_local_simulation_provenance"
+    with _vector_simulation_schema_lock:
+        if target_key in _vector_simulation_schema_targets:
+            return
+        with conn.cursor() as cur:
+            cur.execute(f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS is_simulated INTEGER NOT NULL DEFAULT 0")
+            cur.execute(f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS simulation_label TEXT NOT NULL DEFAULT ''")
+            cur.execute(
+                f"ALTER TABLE {table_name} ALTER COLUMN is_simulated SET DEFAULT "
+                "COALESCE(NULLIF(current_setting('gangtise.simulated_write', true), '')::integer, 0)"
+            )
+            cur.execute(
+                f"ALTER TABLE {table_name} ALTER COLUMN simulation_label SET DEFAULT "
+                "CASE WHEN COALESCE(NULLIF(current_setting('gangtise.simulated_write', true), '')::integer, 0) = 1 "
+                "THEN '本机模拟数据' ELSE '' END"
+            )
+            cur.execute(
+                """
+                CREATE OR REPLACE FUNCTION gangtise_mark_local_simulated_write()
+                RETURNS trigger LANGUAGE plpgsql AS $$
+                BEGIN
+                    IF COALESCE(NULLIF(current_setting('gangtise.simulated_write', true), '')::integer, 0) = 1 THEN
+                        NEW.is_simulated := 1;
+                        NEW.simulation_label := '本机模拟数据';
+                    END IF;
+                    RETURN NEW;
+                END;
+                $$;
+                """
+            )
+            cur.execute(f"DROP TRIGGER IF EXISTS {trigger_name} ON {table_name}")
+            cur.execute(
+                f"CREATE TRIGGER {trigger_name} BEFORE INSERT OR UPDATE ON {table_name} "
+                "FOR EACH ROW EXECUTE FUNCTION gangtise_mark_local_simulated_write()"
+            )
+            if get_simulation_runtime_environment() == "local":
+                # Existing vector records predate the provenance columns. This
+                # runs only on the local Mac and makes a later full copy safe.
+                cur.execute(
+                    f"UPDATE {table_name} SET is_simulated = 1, simulation_label = %s "
+                    "WHERE COALESCE(is_simulated, 0) = 0",
+                    (SIMULATION_LABEL_LOCAL,),
+                )
+        conn.commit()
+        _vector_simulation_schema_targets.add(target_key)
 
 
 def _ensure_review_voice_vector_table(conn):
@@ -1848,6 +1910,7 @@ def _ensure_review_voice_vector_table(conn):
                             f"ALTER TABLE review_voice_embeddings ADD COLUMN IF NOT EXISTS embedding_vector vector({PGVECTOR_TARGET_DIM})"
                         )
     conn.commit()
+    _ensure_vector_simulation_provenance(conn, "review_voice_embeddings")
     return has_pgvector
 
 
@@ -2162,6 +2225,7 @@ def _ensure_knowledge_embedding_table(conn):
                     f"ALTER TABLE knowledge_embeddings ADD COLUMN IF NOT EXISTS embedding_vector vector({PGVECTOR_TARGET_DIM})"
                 )
     conn.commit()
+    _ensure_vector_simulation_provenance(conn, "knowledge_embeddings")
     return has_pgvector
 
 
@@ -2390,6 +2454,8 @@ def save_manual_knowledge_entry(
         "queued_at": str(vector_record.get("created_at") or now_ts()).strip(),
         "synced_at": str(vector_record.get("created_at") or now_ts()).strip(),
         "failed_at": "",
+        "is_simulated": get_simulation_runtime_environment() == "local",
+        "simulation_label": SIMULATION_LABEL_LOCAL if get_simulation_runtime_environment() == "local" else "",
     }
     entry["sync_status"] = build_knowledge_sync_status(
         entry.get("status"),
@@ -2536,8 +2602,9 @@ def fetch_live_knowledge_hub(tenant, limit=80):
         with get_review_vector_db_connection() as conn:
             _ensure_knowledge_embedding_table(conn)
             with conn.cursor() as cur:
+                simulated_filter = " AND COALESCE(is_simulated, 0) = 0" if should_hide_simulated_data() else ""
                 cur.execute(
-                    """
+                    f"""
                     SELECT id, knowledge_id, knowledge_type, title, summary, body_text, source_detail,
                            vector_namespace, embedding_engine, embedding_model, metadata_json, created_at
                     FROM (
@@ -2547,7 +2614,7 @@ def fetch_live_knowledge_hub(tenant, limit=80):
                             id, knowledge_id, knowledge_type, title, summary, body_text, source_detail,
                             vector_namespace, embedding_engine, embedding_model, metadata_json, created_at
                         FROM knowledge_embeddings
-                        WHERE tenant_slug = %s
+                        WHERE tenant_slug = %s{simulated_filter}
                         ORDER BY COALESCE(NULLIF(BTRIM(knowledge_id), ''), CONCAT('__legacy_row_', id)), created_at DESC, id DESC
                     ) latest
                     ORDER BY created_at DESC, id DESC
@@ -2642,8 +2709,9 @@ def search_knowledge_embeddings(tenant_slug, query_text, limit=5):
     with get_review_vector_db_connection() as conn:
         _ensure_knowledge_embedding_table(conn)
         with conn.cursor() as cur:
+            simulated_filter = " AND COALESCE(is_simulated, 0) = 0" if should_hide_simulated_data() else ""
             cur.execute(
-                """
+                f"""
                 SELECT id, knowledge_id, knowledge_type, title, summary, body_text, source_detail,
                        vector_namespace, embedding_engine, embedding_model, embedding_json, metadata_json, created_at
                 FROM (
@@ -2652,7 +2720,7 @@ def search_knowledge_embeddings(tenant_slug, query_text, limit=5):
                         id, knowledge_id, knowledge_type, title, summary, body_text, source_detail,
                         vector_namespace, embedding_engine, embedding_model, embedding_json, metadata_json, created_at
                     FROM knowledge_embeddings
-                    WHERE tenant_slug = %s
+                    WHERE tenant_slug = %s{simulated_filter}
                     ORDER BY COALESCE(NULLIF(BTRIM(knowledge_id), ''), CONCAT('__legacy_row_', id)), created_at DESC, id DESC
                 ) latest
                 ORDER BY created_at DESC, id DESC
@@ -3262,6 +3330,11 @@ HERMES_ALLOWED_INTENTS = {
     "smart_indicator_explain",
     "dashboard_interpretation",
     "multi_tool_research",
+    "stock_today_observation",
+    "market_today_observation",
+    "stock_one_pager",
+    "stock_highlights",
+    "multi_watchlist_analysis",
     "out_of_scope_redirect",
 }
 
@@ -3270,6 +3343,11 @@ HERMES_ALLOWED_TOOLS = {
     "indicator.detail",
     "dashboard.context",
     "attachment.context",
+    "gangtise.stock_today_observation",
+    "gangtise.market_today_observation",
+    "gangtise.stock_one_pager",
+    "gangtise.stock_highlights",
+    "gangtise.multi_watchlist_analysis",
 }
 
 HERMES_INTENT_ROUTE_GROUPS = {
@@ -3279,6 +3357,11 @@ HERMES_INTENT_ROUTE_GROUPS = {
     "evidence_chain_analysis": "review_assistant",
     "dashboard_interpretation": "dashboard_indicator_assistant",
     "multi_tool_research": "content_generation",
+    "stock_today_observation": "gangtise_market_research",
+    "market_today_observation": "gangtise_market_research",
+    "stock_one_pager": "gangtise_deep_research",
+    "stock_highlights": "gangtise_stock_highlights",
+    "multi_watchlist_analysis": "gangtise_multi_stock_research",
     "product_help": "product_help_or_smalltalk",
     "small_talk": "product_help_or_smalltalk",
     "out_of_scope_redirect": "product_help_or_smalltalk",
@@ -3595,6 +3678,11 @@ HERMES_FUNCTION_TAG_MAP = {
     "smart_indicator_explain": ["指标"],
     "dashboard_interpretation": ["Dashboard", "指标"],
     "multi_tool_research": ["个股", "知识", "证据链"],
+    "stock_today_observation": ["个股", "今日观察"],
+    "market_today_observation": ["大盘", "今日观察"],
+    "stock_one_pager": ["个股", "深化研究"],
+    "stock_highlights": ["个股", "看点摘要"],
+    "multi_watchlist_analysis": ["自选股", "组合分析"],
     "out_of_scope_redirect": ["超范围收口"],
 }
 
@@ -5241,6 +5329,16 @@ def _normalize_hermes_mode_label(intent, answer_mode="", preferred_mode="", entr
         return "轻度闲聊"
     if intent_key == "watchlist_fundamental":
         return "自选股诊断"
+    if intent_key == "stock_today_observation":
+        return "今日个股观察"
+    if intent_key == "market_today_observation":
+        return "今日大盘观察"
+    if intent_key == "stock_one_pager":
+        return "个股深化研究"
+    if intent_key == "stock_highlights":
+        return "个股看点摘要"
+    if intent_key == "multi_watchlist_analysis":
+        return "多股综合分析"
     if intent_key == "evidence_chain_analysis":
         return "证据链归因"
     if intent_key == "knowledge_lookup":
@@ -6031,23 +6129,27 @@ def build_hermes_intent_router_prompt(question_text, has_attachments=False, sele
         )
     return (
         "请根据用户问题判断 Hermes 应该如何拆解任务。\n"
-        "可选 intent：small_talk, product_help, knowledge_lookup, evidence_chain_analysis, watchlist_fundamental, smart_indicator_explain, dashboard_interpretation, multi_tool_research, out_of_scope_redirect\n"
-        "可选 tools：watchlist.detail, indicator.detail, dashboard.context, attachment.context\n"
+        "可选 intent：small_talk, product_help, knowledge_lookup, evidence_chain_analysis, watchlist_fundamental, smart_indicator_explain, dashboard_interpretation, multi_tool_research, stock_today_observation, market_today_observation, stock_one_pager, stock_highlights, multi_watchlist_analysis, out_of_scope_redirect\n"
+        "可选 tools：watchlist.detail, indicator.detail, dashboard.context, attachment.context, gangtise.stock_today_observation, gangtise.market_today_observation, gangtise.stock_one_pager, gangtise.stock_highlights, gangtise.multi_watchlist_analysis\n"
         "规则：\n"
         "1. 如果用户明确问复盘、证据链、依据、来源，使用 evidence_chain_analysis；不要调用知识检索工具。\n"
-        "2. 如果用户明确问基本面、估值、盈利、行业位置、个股研究，且存在股票名/代码，使用 watchlist_fundamental 并调用 watchlist.detail。\n"
-        "3. 如果用户主要想问知识、框架、方法、纪要内容，使用 knowledge_lookup；这类问题直接交给答案模型，不调用 embedding 或知识检索工具。\n"
-        "4. 如果用户在问智能指标怎么计算、提示词/公式怎么理解，使用 smart_indicator_explain，并按需调用 indicator.detail、dashboard.context。\n"
-        "5. 如果用户在问 Dashboard 面板、看板卡片、布局或发布后的展示逻辑，使用 dashboard_interpretation，并调用 dashboard.context。\n"
-        "6. 如果用户在问 H5 / Web / Admin / 工作台里的功能、页面或操作，使用 product_help，不调用任何知识检索工具。\n"
-        "7. 如果问题同时涉及个股和证据，多工具组合时使用 multi_tool_research，但只调用实时个股、指标、Dashboard 或附件工具。\n"
-        "8. 如果只是寒暄或轻度闲聊，使用 small_talk，tools 必须为空数组。\n"
-        "9. 如果问题明显超范围但仍可温和收口，使用 out_of_scope_redirect，tools 必须为空数组。\n"
-        "10. 如果有附件，工具里可以包含 attachment.context。\n"
-        "11. stock_code 只在能明显识别时输出，否则为空字符串。\n"
-        "12. display_mode 只能是 text 或 structured。\n"
-        "13. 如果用户问‘你是谁’或‘你的功能有哪些’，优先使用 product_help 或 small_talk，直接说明小金智能体当前能力。\n"
-        "14. 禁止返回 knowledge.search、evidence.search 或任何未列出的工具。\n\n"
+        "2. 如果用户要今天/当日的单股观察报告、行情、逻辑、要闻或风险，使用 stock_today_observation 并只调用 gangtise.stock_today_observation。\n"
+        "3. 如果用户要今天/当日的大盘、指数、板块资金或市场情绪展望，使用 market_today_observation 并只调用 gangtise.market_today_observation。\n"
+        "4. 如果用户要公司一页通、深化研究、结构化深度报告，使用 stock_one_pager 并只调用 gangtise.stock_one_pager；指数不支持这个能力。\n"
+        "5. 如果用户要看点、精炼看点、批量摘要，使用 stock_highlights 并只调用 gangtise.stock_highlights。\n"
+        "6. 如果用户明确同时分析多只股票或多支自选股并需要组合结论，使用 multi_watchlist_analysis 并只调用 gangtise.multi_watchlist_analysis。\n"
+        "7. 如果用户问基本面、估值、盈利或行业位置，且不是上述 Gangtise 报告场景，使用 watchlist_fundamental 并调用 watchlist.detail。\n"
+        "8. 如果用户主要想问知识、框架、方法、纪要内容，使用 knowledge_lookup；这类问题直接交给答案模型，不调用 embedding 或知识检索工具。\n"
+        "9. 如果用户在问智能指标怎么计算、提示词/公式怎么理解，使用 smart_indicator_explain，并按需调用 indicator.detail、dashboard.context。\n"
+        "10. 如果用户在问 Dashboard 面板、看板卡片、布局或发布后的展示逻辑，使用 dashboard_interpretation，并调用 dashboard.context。\n"
+        "11. 如果用户在问 H5 / Web / Admin / 工作台里的功能、页面或操作，使用 product_help，不调用任何知识检索工具。\n"
+        "12. 如果只是寒暄或轻度闲聊，使用 small_talk，tools 必须为空数组。\n"
+        "13. 如果问题明显超范围但仍可温和收口，使用 out_of_scope_redirect，tools 必须为空数组。\n"
+        "14. 如果有附件，工具里可以包含 attachment.context。\n"
+        "15. stock_code 只在能明显识别时输出，否则为空字符串。\n"
+        "16. display_mode 只能是 text 或 structured。\n"
+        "17. 如果用户问‘你是谁’或‘你的功能有哪些’，优先使用 product_help 或 small_talk，直接说明小金智能体当前能力。\n"
+        "18. 禁止返回 knowledge.search、evidence.search 或任何未列出的工具。\n\n"
         f"{memory_section}"
         f"{conversation_section}"
         f"{scope_section}"
@@ -7401,8 +7503,148 @@ def hermes_tool_indicator_detail(tenant_slug, indicator_code="", question_text="
     }
 
 
+HERMES_MARKET_OBSERVATION_TERMS = (
+    "上证", "沪深", "创业板", "科创", "恒生", "纳斯达克", "标普", "道琼斯", "指数", "大盘",
+)
+
+
+def _resolve_hermes_gangtise_stock(stock_code="", question_text=""):
+    candidate = _resolve_watchlist_candidate(stock_code=stock_code, stock_name=question_text)
+    if not isinstance(candidate, dict) or not str(candidate.get("security_code") or "").strip():
+        raise ValueError("gangtise_stock_security_unresolved")
+    return candidate
+
+
+def _is_hermes_market_observation(question_text, stock_code=""):
+    text = f"{question_text or ''} {stock_code or ''}".strip().lower()
+    return any(term in text for term in HERMES_MARKET_OBSERVATION_TERMS)
+
+
+def _extract_hermes_gangtise_stocks(question_text, stock_code="", limit=20):
+    selected = []
+
+    def _add(candidate):
+        if not isinstance(candidate, dict):
+            return
+        security_code = str(candidate.get("security_code") or "").strip().upper()
+        if not security_code or any(item.get("security_code") == security_code for item in selected):
+            return
+        selected.append(candidate)
+
+    if stock_code:
+        try:
+            _add(_resolve_hermes_gangtise_stock(stock_code=stock_code, question_text=question_text))
+        except ValueError:
+            pass
+    details = gen_watchlist_details()
+    text = str(question_text or "")
+    for code, detail in (details or {}).items():
+        name = str((detail or {}).get("name") or "").strip()
+        if name and name in text:
+            try:
+                _add(_resolve_hermes_gangtise_stock(stock_code=str(code), question_text=name))
+            except ValueError:
+                continue
+    for code in re.findall(r"(?<!\d)(\d{5,6}(?:\.(?:SH|SZ|BJ|HK))?)(?!\d)", text, flags=re.I):
+        try:
+            _add(_resolve_hermes_gangtise_stock(stock_code=code, question_text=code))
+        except ValueError:
+            continue
+    return selected[:max(1, int(limit or 20))]
+
+
+def hermes_tool_gangtise_stock_today_observation(stock_code, question_text=""):
+    candidate = _resolve_hermes_gangtise_stock(stock_code=stock_code, question_text=question_text)
+    label = f"{candidate.get('name')}（{candidate.get('security_code')}）"
+    request_text = f"请生成今天{label}的分析观察报告，包含今日行情、核心逻辑、重要要闻和风险。"
+    result = call_gangtise_agent_sse(request_text, trace_id=f"xiaojin-stock-{int(time.time() * 1000)}", mode="deep_research", web_enable=True)
+    return {
+        "candidate": copy.deepcopy(candidate),
+        "text": str(result.get("text") or "").strip(),
+        "provider": result.get("provider"),
+        "endpoint": result.get("endpoint"),
+        "duration_ms": result.get("duration_ms"),
+    }
+
+
+def hermes_tool_gangtise_market_today_observation(question_text=""):
+    query = str(question_text or "").strip()
+    if not _is_hermes_market_observation(query):
+        raise ValueError("gangtise_market_observation_target_required")
+    request_text = f"请生成今天{query}的分析观察报告，包含指数表现、板块资金和市场情绪展望。"
+    result = call_gangtise_agent_sse(request_text, trace_id=f"xiaojin-market-{int(time.time() * 1000)}", mode="deep_research", web_enable=True)
+    return {
+        "text": str(result.get("text") or "").strip(),
+        "provider": result.get("provider"),
+        "endpoint": result.get("endpoint"),
+        "duration_ms": result.get("duration_ms"),
+    }
+
+
+def hermes_tool_gangtise_stock_one_pager(stock_code, question_text=""):
+    if _is_hermes_market_observation(question_text, stock_code=stock_code):
+        raise ValueError("one_pager_stock_only")
+    candidate = _resolve_hermes_gangtise_stock(stock_code=stock_code, question_text=question_text)
+    result = call_gangtise_stock_one_pager(candidate.get("security_code"))
+    return {"candidate": copy.deepcopy(candidate), **result}
+
+
+def hermes_tool_gangtise_stock_highlights(stock_code, question_text=""):
+    candidates = _extract_hermes_gangtise_stocks(question_text, stock_code=stock_code, limit=6000)
+    if not candidates:
+        candidates = [_resolve_hermes_gangtise_stock(stock_code=stock_code, question_text=question_text)]
+    result = call_gangtise_stock_summaries([item.get("security_code") for item in candidates])
+    return {"candidates": copy.deepcopy(candidates), **result}
+
+
+def hermes_tool_gangtise_multi_watchlist_analysis(stock_code, question_text=""):
+    candidates = _extract_hermes_gangtise_stocks(question_text, stock_code=stock_code, limit=40)
+    if len(candidates) < 2:
+        raise ValueError("gangtise_multi_stock_at_least_two_required")
+    labels = [f"{item.get('name')}（{item.get('security_code')}）" for item in candidates]
+    request_text = f"请对以下自选股做综合分析，并给出个股要点和组合层面的综合结论：{'、'.join(labels)}。"
+    result = call_gangtise_agent_sse(request_text, trace_id=f"xiaojin-multi-{int(time.time() * 1000)}", mode="deep_research", web_enable=True)
+    return {
+        "candidates": copy.deepcopy(candidates),
+        "text": str(result.get("text") or "").strip(),
+        "provider": result.get("provider"),
+        "endpoint": result.get("endpoint"),
+        "duration_ms": result.get("duration_ms"),
+    }
+
+
 def get_hermes_tool_registry():
     return {
+        "gangtise.stock_today_observation": {
+            "output_key": "gangtise_stock_observation",
+            "executor": lambda runtime: hermes_tool_gangtise_stock_today_observation(
+                runtime.get("stock_code") or "", question_text=runtime.get("question_text") or "",
+            ),
+        },
+        "gangtise.market_today_observation": {
+            "output_key": "gangtise_market_observation",
+            "executor": lambda runtime: hermes_tool_gangtise_market_today_observation(
+                question_text=runtime.get("question_text") or "",
+            ),
+        },
+        "gangtise.stock_one_pager": {
+            "output_key": "gangtise_one_pager",
+            "executor": lambda runtime: hermes_tool_gangtise_stock_one_pager(
+                runtime.get("stock_code") or "", question_text=runtime.get("question_text") or "",
+            ),
+        },
+        "gangtise.stock_highlights": {
+            "output_key": "gangtise_stock_highlights",
+            "executor": lambda runtime: hermes_tool_gangtise_stock_highlights(
+                runtime.get("stock_code") or "", question_text=runtime.get("question_text") or "",
+            ),
+        },
+        "gangtise.multi_watchlist_analysis": {
+            "output_key": "gangtise_multi_watchlist_analysis",
+            "executor": lambda runtime: hermes_tool_gangtise_multi_watchlist_analysis(
+                runtime.get("stock_code") or "", question_text=runtime.get("question_text") or "",
+            ),
+        },
         "attachment.context": {
             "output_key": "attachment_context",
             "executor": lambda runtime: hermes_tool_attachment_context(runtime.get("attachments")),
@@ -7507,11 +7749,21 @@ HERMES_INTENT_LABELS = {
     "knowledge_lookup": "知识检索问答",
     "evidence_chain_analysis": "证据链归因",
     "multi_tool_research": "多工具研究",
+    "stock_today_observation": "今日个股观察报告",
+    "market_today_observation": "今日大盘观察报告",
+    "stock_one_pager": "个股深化研究",
+    "stock_highlights": "个股看点摘要",
+    "multi_watchlist_analysis": "多支自选股综合分析",
     "small_talk": "轻度闲聊",
     "out_of_scope_redirect": "超范围收口",
 }
 
 HERMES_TOOL_LABELS = {
+    "gangtise.stock_today_observation": "Gangtise 今日个股观察",
+    "gangtise.market_today_observation": "Gangtise 今日大盘观察",
+    "gangtise.stock_one_pager": "Gangtise 公司一页通",
+    "gangtise.stock_highlights": "Gangtise 个股看点",
+    "gangtise.multi_watchlist_analysis": "Gangtise 多股综合分析",
     "attachment.context": "附件解析",
     "dashboard.context": "Dashboard 上下文",
     "watchlist.detail": "个股详情分析",
@@ -7532,7 +7784,11 @@ def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode
     ok_count = sum(1 for item in (tool_trace or []) if str((item or {}).get("status") or "").strip() == "ok")
     error_count = sum(1 for item in (tool_trace or []) if str((item or {}).get("status") or "").strip() == "error")
     route_label = "LLM 路由" if route_mode == "llm_router" else "范围守卫"
-    answer_label = "模型整合回答" if answer_mode == "llm_synthesized" else "范围守卫收口"
+    answer_label = (
+        "模型整合回答" if answer_mode == "llm_synthesized" else
+        "Gangtise AI 直接返回" if answer_mode == "gangtise_direct" else
+        "范围守卫收口"
+    )
     planning_bits = []
     if capability_label:
         planning_bits.append(f"能力分类：{capability_label}")
@@ -7606,7 +7862,7 @@ def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode
         {
             "key": "answer",
             "title": "结论整合",
-            "status": "ok" if answer_mode == "llm_synthesized" else "skipped",
+            "status": "ok" if answer_mode in {"llm_synthesized", "gangtise_direct"} else "skipped",
             "detail": answer_label + "，输出面向用户的结论、依据和下一步建议。",
         },
     ]
@@ -7681,6 +7937,20 @@ def build_hermes_citations(tool_outputs):
             normalized = trim_hermes_text(content, limit=60)
             if normalized and normalized not in citations:
                 citations.append(normalized)
+    gangtise_sources = [
+        ("gangtise_stock_observation", "Gangtise Agent 助手 SSE"),
+        ("gangtise_market_observation", "Gangtise Agent 助手 SSE"),
+        ("gangtise_one_pager", "Gangtise 公司一页通"),
+        ("gangtise_stock_highlights", "Gangtise 个股看点摘要"),
+        ("gangtise_multi_watchlist_analysis", "Gangtise Agent 助手 SSE"),
+    ]
+    for output_key, fallback_label in gangtise_sources:
+        payload = tool_outputs.get(output_key) if isinstance(tool_outputs, dict) else None
+        if not isinstance(payload, dict):
+            continue
+        label = str(payload.get("provider") or fallback_label).strip()
+        if label and label not in citations:
+            citations.append(label)
     return citations[:8]
 
 
@@ -7770,7 +8040,12 @@ def build_hermes_text_artifact(question_text, plan, synthesis, tool_outputs, cit
             "summary": str(item.get("algorithm_detail") or item.get("interpretation") or "").strip()[:160],
         })
     web_matches = ((tool_outputs.get("web_search") or {}).get("matches") or []) if isinstance(tool_outputs, dict) else []
-    footer_suffix = "已补充互联网公开信息。" if web_matches else "已基于模型和已执行的平台工具回答。"
+    direct_gangtise = intent in HERMES_GANGTISE_DIRECT_INTENTS
+    footer_suffix = (
+        "内容由 Gangtise AI 直接提供，未经过本地大模型改写。"
+        if direct_gangtise else
+        ("已补充互联网公开信息。" if web_matches else "已基于模型和已执行的平台工具回答。")
+    )
     if intent == "small_talk":
         return {
             "type": "text_response",
@@ -7794,7 +8069,7 @@ def build_hermes_text_artifact(question_text, plan, synthesis, tool_outputs, cit
         "citations": citations[:6],
         "knowledge": knowledge_entries,
         "followups": build_hermes_followups(plan, tool_outputs),
-        "footer": f"当前为文字回答。路由判断：{str((plan or {}).get('reason') or '').strip()}。{footer_suffix}",
+        "footer": footer_suffix if direct_gangtise else f"当前为文字回答。路由判断：{str((plan or {}).get('reason') or '').strip()}。{footer_suffix}",
     }
 
 
@@ -8541,6 +8816,7 @@ def build_hermes_synthesis_prompt(question_text, plan, tool_outputs, tenant_slug
         "只依据已执行的工具结果、会话记忆和用户问题作答；不要声称执行了未列出的检索。"
         "如果存在租户自选股K线标注摘要，应把它视为研究侧补充证据，融入结论、解读或边界说明。"
         "如果意图是 small_talk，只输出自然、简短、像真人一样的回应；不要输出标题、摘要、路由说明、过程说明，也不要写‘用户进行了简单问候’或‘助手需要确认研究状态’这类内部描述。此时 summary、lead_conclusion、bullets、analysis_sections、next_steps、citations 应为空。"
+        "如果用户问小金智能体有哪些功能，准确说明：今日个股观察报告、今日大盘综合分析、个股深化研究（公司一页通，非当日）、个股看点摘要（最多6000只批量）、多支自选股综合分析，以及支持上下文的多轮闲聊。"
         "如果存在互联网补充结果，可以按公开信息口径组织回答，但不能把互联网信息盖过租户知识。"
         "如果证据不足，要明确说边界。结构化展示中的判断要点、下一步、结论和分析分段也必须来自你的输出，不要让程序根据行情字段代写。"
         f"{style_instruction}"
@@ -8554,7 +8830,96 @@ def build_hermes_synthesis_prompt(question_text, plan, tool_outputs, tenant_slug
     return system_prompt, user_prompt
 
 
+HERMES_GANGTISE_DIRECT_INTENTS = {
+    "stock_today_observation",
+    "market_today_observation",
+    "stock_one_pager",
+    "stock_highlights",
+    "multi_watchlist_analysis",
+}
+
+
+def _extract_hermes_gangtise_text(value):
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, list):
+        return "\n\n".join(
+            text for text in (_extract_hermes_gangtise_text(item) for item in value)
+            if text
+        ).strip()
+    if not isinstance(value, dict):
+        return ""
+    for key in ("content", "text", "markdown", "report", "body", "answer", "summary", "result", "list", "reports", "reportList", "items"):
+        text = _extract_hermes_gangtise_text(value.get(key))
+        if text:
+            return text
+    data = value.get("data")
+    if isinstance(data, dict):
+        return _extract_hermes_gangtise_text(data)
+    return ""
+
+
+def build_hermes_gangtise_direct_synthesis(plan, tool_outputs):
+    intent = str((plan or {}).get("intent") or "").strip()
+    outputs = tool_outputs if isinstance(tool_outputs, dict) else {}
+    direct_output_map = {
+        "stock_today_observation": "gangtise_stock_observation",
+        "market_today_observation": "gangtise_market_observation",
+        "stock_one_pager": "gangtise_one_pager",
+        "multi_watchlist_analysis": "gangtise_multi_watchlist_analysis",
+    }
+    if intent == "stock_highlights":
+        result = outputs.get("gangtise_stock_highlights") or {}
+        rows = result.get("items") if isinstance(result.get("items"), list) else []
+        lines = []
+        for item in rows:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("securityName") or item.get("gtsName") or item.get("name") or item.get("securityCode") or "个股").strip()
+            date = str(item.get("date") or item.get("summaryDate") or item.get("tradeDate") or "").strip()
+            content = _extract_hermes_gangtise_text(item)
+            if content:
+                lines.append(f"### {name}{f'（{date}）' if date else ''}\n{content}")
+        answer = "\n\n".join(lines).strip()
+        if not answer:
+            raise RuntimeError("gangtise_stock_highlights_empty_response")
+        return {
+            "answer": answer,
+            "summary": "Gangtise AI 提供的个股精炼看点。",
+            "lead_conclusion": "",
+            "bullets": [],
+            "analysis_sections": [],
+            "next_steps": [],
+            "confidence": "",
+            "citations": ["Gangtise 个股看点摘要"],
+        }
+    result = outputs.get(direct_output_map.get(intent, "")) or {}
+    answer = str(result.get("text") or "").strip()
+    if not answer:
+        answer = _extract_hermes_gangtise_text(result)
+    if not answer:
+        raise RuntimeError(f"{intent or 'gangtise'}_empty_response")
+    summary_map = {
+        "stock_today_observation": "Gangtise AI 提供的今日个股观察报告。",
+        "market_today_observation": "Gangtise AI 提供的今日大盘综合分析。",
+        "stock_one_pager": "Gangtise AI 提供的最近一期个股深化研究，非当日研究。",
+        "multi_watchlist_analysis": "Gangtise AI 提供的多支自选股综合分析。",
+    }
+    return {
+        "answer": answer,
+        "summary": summary_map.get(intent, "Gangtise AI 提供的研究结果。"),
+        "lead_conclusion": "",
+        "bullets": [],
+        "analysis_sections": [],
+        "next_steps": [],
+        "confidence": "",
+        "citations": [str(result.get("provider") or "Gangtise AI")],
+    }
+
+
 def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", user_role="", preferred_mode="", messages=None, web_answer=False, memory_state=None, response_style="structured"):
+    if str((plan or {}).get("intent") or "").strip() in HERMES_GANGTISE_DIRECT_INTENTS:
+        return build_hermes_gangtise_direct_synthesis(plan, tool_outputs), None, "gangtise_direct"
     llm_model = get_default_llm_config(purpose="general", feature_code="hermes_answer_synthesis")
     if not llm_model:
         raise RuntimeError("hermes_answer_synthesis_llm_not_configured")
@@ -9437,6 +9802,8 @@ def persist_review_publish_snapshot(
         "user_input_section": normalized_user_input_section,
         "watchlist_analysis_section": normalized_watchlist_analysis,
         "evidence_chain_section": evidence_chain_section,
+        "is_simulated": get_simulation_runtime_environment() == "local",
+        "simulation_label": SIMULATION_LABEL_LOCAL if get_simulation_runtime_environment() == "local" else "",
     }
     snapshots = append_review_snapshot(tenant_slug, snapshot)
     review_message = {
@@ -9461,6 +9828,8 @@ def persist_review_publish_snapshot(
                 "type": "review",
             }
         ],
+        "is_simulated": get_simulation_runtime_environment() == "local",
+        "simulation_label": SIMULATION_LABEL_LOCAL if get_simulation_runtime_environment() == "local" else "",
     }
     message_state = append_message_thread(tenant_slug, review_message)
     review_broadcast = {
@@ -9471,6 +9840,8 @@ def persist_review_publish_snapshot(
         "open_rate": random.randint(35, 78),
         "target": "review",
         "type": "broadcast",
+        "is_simulated": get_simulation_runtime_environment() == "local",
+        "simulation_label": SIMULATION_LABEL_LOCAL if get_simulation_runtime_environment() == "local" else "",
     }
     message_state = append_broadcast_history(tenant_slug, review_broadcast)
     message_state = push_broadcast_to_fan_threads(tenant_slug, review_broadcast)

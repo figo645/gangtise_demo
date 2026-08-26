@@ -11,21 +11,42 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 class AccountNavigationBddTest(unittest.TestCase):
-    def test_given_admin_session_when_h5_is_requested_then_admin_is_redirected_to_admin(self):
-        with app.test_request_context("/h5"), patch(
+    def test_given_admin_session_when_h5_is_requested_then_h5_is_rendered(self):
+        with app.test_request_context("/h5?tenant=laowang"), patch(
             "src.web.pages.get_current_authenticated_user",
             return_value={"username": "admin", "role": "admin", "status": "active"},
+        ), patch("src.web.pages.get_site_config", return_value={}), patch(
+            "src.web.pages.get_current_demo_profile",
+            return_value={"username": "admin", "role": "admin", "tenant": {}},
+        ), patch(
+            "src.web.pages.get_tenant_by_slug",
+            return_value={"id": "tenant-laowang", "slug": "laowang", "name": "财经老王研究院", "advisor": "财经老王"},
+        ), patch("src.web.pages.build_indicator_hub", return_value={"smart_items": []}), patch(
+            "src.web.pages.build_fundamental_column_payload", return_value={}
+        ), patch("src.web.pages.build_indicator_dashboard_seed_cards", return_value=[]), patch(
+            "src.web.pages.build_tenant_dashboard_payload", return_value={}
+        ), patch("src.web.pages.get_auth_settings", return_value={"quick_select_enabled": False}), patch(
+            "src.web.pages.gen_market_data", return_value={}
+        ), patch("src.web.pages.build_fundamental_news_payload", return_value={"items": [], "tabs": []}), patch(
+            "src.web.pages.gen_feed_boards_from_watchlist_details", return_value=[]
         ):
-            response = h5()
+            response = app.make_response(h5())
 
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.headers["Location"], "/admin")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("CURRENT_DEMO_PROFILE", response.get_data(as_text=True))
+        self.assertIn('"role": "admin"', response.get_data(as_text=True))
 
-    def test_given_admin_switching_from_a_role_page_when_login_completes_then_admin_returns_to_admin(self):
+    def test_given_admin_switching_from_a_role_page_when_login_completes_then_admin_keeps_workbench_destination(self):
         with app.test_request_context("/login"):
             destination = resolve_login_destination({"role": "admin", "tenant_slug": "laowang"}, "/kol-workbench?tenant=laowang")
 
-        self.assertEqual(destination, "/admin")
+        self.assertEqual(destination, "/kol-workbench?tenant=laowang")
+
+    def test_given_admin_switching_from_h5_when_login_completes_then_admin_keeps_h5_destination(self):
+        with app.test_request_context("/login"):
+            destination = resolve_login_destination({"role": "admin", "tenant_slug": "laowang"}, "/h5?tenant=laowang")
+
+        self.assertEqual(destination, "/h5?tenant=laowang")
 
     def test_given_investor_switching_from_admin_when_login_completes_then_investor_returns_to_h5(self):
         with app.test_request_context("/login"):

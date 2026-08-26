@@ -2081,6 +2081,18 @@ def api_admin_site_config():
     )
 
 
+@app.route("/api/admin/simulation-data-policy", methods=["GET", "POST"])
+def api_admin_simulation_data_policy():
+    if request.method == "GET":
+        return jsonify({"ok": True, "policy": get_simulation_data_policy()})
+    body = request.get_json(silent=True) or {}
+    try:
+        policy = save_simulation_data_visibility(bool(body.get("simulated_data_visible")))
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 403
+    return jsonify({"ok": True, "policy": policy})
+
+
 @app.route("/api/admin/news-aggregation/preview", methods=["POST"])
 def api_admin_news_aggregation_preview():
     payload = request.get_json(silent=True) or {}

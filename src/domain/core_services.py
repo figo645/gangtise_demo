@@ -1239,15 +1239,19 @@ def normalize_review_snapshot_item(item, tenant, index=0):
         "user_input_section": user_input_section,
         "watchlist_analysis_section": watchlist_analysis_section,
         "evidence_chain_section": evidence_chain_section,
+        "is_simulated": bool(raw.get("is_simulated")),
+        "simulation_label": str(raw.get("simulation_label") or "").strip()[:80],
     }
 
 
-def resolve_tenant_review_snapshots(tenant, snapshots=None):
+def resolve_tenant_review_snapshots(tenant, snapshots=None, include_simulated=False):
     tenant = tenant or get_tenant_by_slug()
     items = snapshots if isinstance(snapshots, list) else tenant.get("review_snapshots")
     source_items = items if isinstance(items, list) and items else default_tenant_review_snapshots(tenant)
     normalized = []
     for index, item in enumerate(source_items[:20]):
+        if not include_simulated and should_hide_simulated_data() and isinstance(item, dict) and bool(item.get("is_simulated")):
+            continue
         normalized.append(normalize_review_snapshot_item(item, tenant, index=index))
     return normalized
 
@@ -1411,6 +1415,8 @@ def normalize_message_thread_item(item, tenant, index=0):
         "last_message_type": str((last_message or {}).get("type") or raw.get("last_message_type") or "text").strip() or "text",
         "vip_only": bool(raw.get("vip_only", fallback.get("vip_only", False))),
         "messages": messages,
+        "is_simulated": bool(raw.get("is_simulated")),
+        "simulation_label": str(raw.get("simulation_label") or "").strip()[:80],
     }
 
 
@@ -1426,18 +1432,21 @@ def normalize_message_broadcast_item(item, tenant, index=0):
         "open_rate": max(0, int(raw.get("open_rate") or fallback.get("open_rate") or 0)),
         "target": str(raw.get("target") or fallback.get("target") or "all").strip() or "all",
         "type": str(raw.get("type") or fallback.get("type") or "broadcast").strip() or "broadcast",
+        "is_simulated": bool(raw.get("is_simulated")),
+        "simulation_label": str(raw.get("simulation_label") or "").strip()[:80],
     }
 
 
-def resolve_tenant_message_center_state(tenant, state=None):
+def resolve_tenant_message_center_state(tenant, state=None, include_simulated=False):
     tenant = tenant or get_tenant_by_slug()
     defaults = default_tenant_message_center_state(tenant)
     raw = state if isinstance(state, dict) else tenant.get("message_center_state")
     source = raw if isinstance(raw, dict) else {}
     threads_source = source.get("threads") if isinstance(source.get("threads"), list) else defaults["threads"]
     broadcasts_source = source.get("broadcasts") if isinstance(source.get("broadcasts"), list) else defaults["broadcasts"]
-    threads = [normalize_message_thread_item(item, tenant, index=index) for index, item in enumerate(threads_source[:60])]
-    broadcasts = [normalize_message_broadcast_item(item, tenant, index=index) for index, item in enumerate(broadcasts_source[:60])]
+    hide_simulated = not include_simulated and should_hide_simulated_data()
+    threads = [normalize_message_thread_item(item, tenant, index=index) for index, item in enumerate(threads_source[:60]) if not (hide_simulated and isinstance(item, dict) and bool(item.get("is_simulated")))]
+    broadcasts = [normalize_message_broadcast_item(item, tenant, index=index) for index, item in enumerate(broadcasts_source[:60]) if not (hide_simulated and isinstance(item, dict) and bool(item.get("is_simulated")))]
     summary = str(source.get("summary") or defaults["summary"]).strip() or defaults["summary"]
     return {
         "summary": summary,
@@ -1461,19 +1470,32 @@ def _save_tenant_state_field(tenant_slug, field_name, value):
 
 def update_tenant_review_snapshots(tenant_slug, snapshots):
     tenant = get_tenant_by_slug(tenant_slug)
-    normalized = resolve_tenant_review_snapshots(tenant, snapshots=snapshots)
+    raw_snapshots = copy.deepcopy(snapshots) if isinstance(snapshots, list) else []
+    if get_simulation_runtime_environment() == "local":
+        for item in raw_snapshots:
+            if isinstance(item, dict):
+                item["is_simulated"] = True
+                item["simulation_label"] = SIMULATION_LABEL_LOCAL
+    normalized = resolve_tenant_review_snapshots(tenant, snapshots=raw_snapshots, include_simulated=True)
     return _save_tenant_state_field(tenant_slug, "review_snapshots", normalized)
 
 
 def update_tenant_message_center_state(tenant_slug, state):
     tenant = get_tenant_by_slug(tenant_slug)
-    normalized = resolve_tenant_message_center_state(tenant, state=state)
+    raw_state = copy.deepcopy(state) if isinstance(state, dict) else {}
+    if get_simulation_runtime_environment() == "local":
+        for field_name in ("threads", "broadcasts"):
+            for item in raw_state.get(field_name) if isinstance(raw_state.get(field_name), list) else []:
+                if isinstance(item, dict):
+                    item["is_simulated"] = True
+                    item["simulation_label"] = SIMULATION_LABEL_LOCAL
+    normalized = resolve_tenant_message_center_state(tenant, state=raw_state, include_simulated=True)
     return _save_tenant_state_field(tenant_slug, "message_center_state", normalized)
 
 
 def append_review_snapshot(tenant_slug, snapshot):
     tenant = get_tenant_by_slug(tenant_slug)
-    current = resolve_tenant_review_snapshots(tenant, snapshots=tenant.get("review_snapshots"))
+    current = resolve_tenant_review_snapshots(tenant, snapshots=tenant.get("review_snapshots"), include_simulated=True)
     next_items = [normalize_review_snapshot_item(snapshot, tenant, index=0)] + current
     deduped = []
     seen_ids = set()
@@ -1490,7 +1512,7 @@ def append_review_snapshot(tenant_slug, snapshot):
 
 def append_message_thread(tenant_slug, thread_item):
     tenant = get_tenant_by_slug(tenant_slug)
-    state = resolve_tenant_message_center_state(tenant, state=tenant.get("message_center_state"))
+    state = resolve_tenant_message_center_state(tenant, state=tenant.get("message_center_state"), include_simulated=True)
     next_threads = [normalize_message_thread_item(thread_item, tenant, index=0)] + state["threads"]
     saved = update_tenant_message_center_state(tenant_slug, {
         "summary": state["summary"],
@@ -1503,7 +1525,7 @@ def append_message_thread(tenant_slug, thread_item):
 
 def append_broadcast_history(tenant_slug, broadcast_item):
     tenant = get_tenant_by_slug(tenant_slug)
-    state = resolve_tenant_message_center_state(tenant, state=tenant.get("message_center_state"))
+    state = resolve_tenant_message_center_state(tenant, state=tenant.get("message_center_state"), include_simulated=True)
     next_broadcasts = [normalize_message_broadcast_item(broadcast_item, tenant, index=0)] + state["broadcasts"]
     saved = update_tenant_message_center_state(tenant_slug, {
         "summary": state["summary"],
@@ -1658,6 +1680,8 @@ def build_broadcast_thread_for_user(tenant, user_profile, broadcast_item):
         "last_msg": f"【群发】{summarize_message_preview(content, limit=56)}",
         "kol_unread": 0,
         "user_unread": 1,
+        "is_simulated": bool((broadcast_item or {}).get("is_simulated")),
+        "simulation_label": str((broadcast_item or {}).get("simulation_label") or "").strip()[:80],
         "last_sender": "kol",
         "last_message_type": "broadcast",
         "vip_only": False,
@@ -2007,7 +2031,7 @@ def default_tenant_knowledge_items(tenant):
     ]
 
 
-def normalize_knowledge_hub_config(source, tenant):
+def normalize_knowledge_hub_config(source, tenant, include_simulated=False):
     defaults = {
         "summary": "知识库支持语音、文件、URL 和纯文本四种入口；历史内容允许点开弹框继续微调，修改后会重新同步到知识专区和 Hermes 上下文。",
         "items": default_tenant_knowledge_items(tenant),
@@ -2018,6 +2042,8 @@ def normalize_knowledge_hub_config(source, tenant):
     normalized_items = []
     for index, item in enumerate(items[:80]):
         if not isinstance(item, dict):
+            continue
+        if not include_simulated and should_hide_simulated_data() and bool(item.get("is_simulated")):
             continue
         item_type = str(item.get("type") or "manual").strip().lower()
         if item_type not in {"voice", "file", "url", "manual"}:
@@ -2075,6 +2101,8 @@ def normalize_knowledge_hub_config(source, tenant):
             "synced_at": synced_at,
             "failed_at": failed_at,
             "body": str(item.get("body") or raw_input).strip(),
+            "is_simulated": bool(item.get("is_simulated")),
+            "simulation_label": str(item.get("simulation_label") or "").strip()[:80],
         })
     if not normalized_items:
         normalized_items = copy.deepcopy(defaults["items"])
@@ -2093,7 +2121,13 @@ def update_tenant_knowledge_hub_config(tenant_slug, knowledge_hub_config):
         if tenant.get("slug") != tenant_slug:
             continue
         tenants[index] = dict(tenant)
-        tenants[index]["knowledge_hub_config"] = normalize_knowledge_hub_config(knowledge_hub_config, tenant)
+        raw_config = copy.deepcopy(knowledge_hub_config) if isinstance(knowledge_hub_config, dict) else {}
+        if get_simulation_runtime_environment() == "local":
+            for item in raw_config.get("items") if isinstance(raw_config.get("items"), list) else []:
+                if isinstance(item, dict):
+                    item["is_simulated"] = True
+                    item["simulation_label"] = SIMULATION_LABEL_LOCAL
+        tenants[index]["knowledge_hub_config"] = normalize_knowledge_hub_config(raw_config, tenant, include_simulated=True)
         updated = True
         break
     if not updated:
@@ -4107,7 +4141,9 @@ def get_current_demo_profile(site_config=None):
         session.pop(H5_USER_SESSION_KEY, None)
         g.current_demo_profile_id = ""
         return None
-    if current_user.get("role") not in {"investor", "dav"} or current_user.get("status") != "active":
+    # H5 is also a supported preview surface for platform administrators.
+    # They remain excluded from the selectable H5 profile catalogue.
+    if current_user.get("role") not in {"investor", "dav", "admin"} or current_user.get("status") != "active":
         session.pop(H5_USER_SESSION_KEY, None)
         g.current_demo_profile_id = ""
         return None
@@ -6044,9 +6080,132 @@ def build_admin_site_config_payload(site_config=None):
 
 
 
+SIMULATION_DATA_VISIBILITY_SETTING_KEY = "simulation_data_visibility"
+SIMULATION_DATA_BOOTSTRAP_SETTING_KEY = "simulation_data_bootstrap_completed"
+SIMULATION_LABEL_LOCAL = "本机模拟数据"
+SIMULATION_TAGGED_TABLES = (
+    "users", "user_watchlist_items", "fan_stock_observation_events", "watchlist_kline_annotations",
+    "watchlist_comments", "hermes_conversation_turns", "hermes_session_memory", "hermes_user_memory",
+    "hermes_user_profiles", "knowledge_embeddings", "review_voice_embeddings", "user_async_jobs",
+    "token_usage_logs", "indicator_latest_values", "indicator_series", "indicator_anomalies",
+    "indicator_kline_points", "indicator_raw_records", "indicator_load_batches", "indicator_source_tests",
+    "indicator_clean_jobs",
+)
+
+
+def get_simulation_runtime_environment():
+    """Resolve data origin with a production-safe default outside this Mac."""
+    configured = str(os.environ.get("GANGTISE_RUNTIME_ENV") or "").strip().lower()
+    if configured in {"local", "staging", "production"}:
+        return configured
+    return "local" if sys.platform == "darwin" else "production"
+
+
+def _load_simulation_visibility_setting(connection):
+    if get_simulation_runtime_environment() != "local":
+        return False
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT setting_value FROM app_settings WHERE setting_key = %s", (SIMULATION_DATA_VISIBILITY_SETTING_KEY,))
+            row = cursor.fetchone()
+        if row and str(row[0] if not isinstance(row, dict) else row.get("setting_value") or "").strip().lower() in {"0", "false", "no", "off"}:
+            return False
+    except Exception:
+        connection.rollback()
+    return True
+
+
+def configure_simulation_data_connection(connection):
+    """Configure write provenance and fail-closed production visibility."""
+    runtime_environment = get_simulation_runtime_environment()
+    visible = _load_simulation_visibility_setting(connection)
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT set_config('gangtise.simulated_write', %s, false)", ("1" if runtime_environment == "local" else "0",))
+            cursor.execute("SELECT set_config('gangtise.hide_simulated_data', %s, false)", ("0" if visible else "1",))
+        connection.commit()
+    except Exception:
+        connection.rollback()
+    return {"runtime_environment": runtime_environment, "visible": visible, "hide_simulated": not visible}
+
+
+def get_simulation_data_policy():
+    runtime_environment = get_simulation_runtime_environment()
+    connection = get_app_db_connection()
+    try:
+        visible = _load_simulation_visibility_setting(connection)
+    finally:
+        connection.close()
+    return {
+        "runtime_environment": runtime_environment,
+        "local_origin_enabled": runtime_environment == "local",
+        "simulated_data_visible": bool(visible),
+        # This capability is only available on the designated local Mac.
+        # Staging must not become an accidental route to view copied local data.
+        "production_forced_hidden": runtime_environment != "local",
+        "label": SIMULATION_LABEL_LOCAL,
+    }
+
+
+def should_hide_simulated_data():
+    if get_simulation_runtime_environment() != "local":
+        return True
+    try:
+        row = get_db().execute(
+            "SELECT setting_value FROM app_settings WHERE setting_key = ?",
+            (SIMULATION_DATA_VISIBILITY_SETTING_KEY,),
+        ).fetchone()
+        return bool(row and str(row.get("setting_value") or "").strip().lower() in {"0", "false", "no", "off"})
+    except Exception:
+        return False
+
+
+def save_simulation_data_visibility(visible):
+    runtime_environment = get_simulation_runtime_environment()
+    if runtime_environment != "local":
+        raise ValueError("production_simulated_data_visibility_locked")
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO app_settings (setting_key, setting_value, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value, updated_at = excluded.updated_at
+        """,
+        (SIMULATION_DATA_VISIBILITY_SETTING_KEY, "true" if visible else "false", now_ts()),
+    )
+    db.commit()
+    return get_simulation_data_policy()
+
+
+def mark_existing_local_data_as_simulated():
+    """One-time provenance migration for records that predate the new defaults."""
+    if get_simulation_runtime_environment() != "local":
+        return {"marked": 0, "skipped": "non_local_runtime"}
+    db = get_db()
+    try:
+        existing = db.execute("SELECT setting_value FROM app_settings WHERE setting_key = ?", (SIMULATION_DATA_BOOTSTRAP_SETTING_KEY,)).fetchone()
+        if existing:
+            return {"marked": 0, "skipped": "already_completed"}
+        total = 0
+        for table in SIMULATION_TAGGED_TABLES:
+            total += db.execute(
+                f"UPDATE {table} SET is_simulated = 1, simulation_label = ? WHERE COALESCE(is_simulated, 0) = 0",
+                (SIMULATION_LABEL_LOCAL,),
+            ).rowcount or 0
+        db.execute(
+            "INSERT INTO app_settings (setting_key, setting_value, updated_at) VALUES (?, ?, ?)",
+            (SIMULATION_DATA_BOOTSTRAP_SETTING_KEY, "true", now_ts()),
+        )
+        db.commit()
+        return {"marked": total, "skipped": ""}
+    except Exception:
+        db.rollback()
+        raise
+
+
 def get_app_db_connection():
     target = get_runtime_db_target().get("app", {})
-    return psycopg2.connect(
+    connection = psycopg2.connect(
         host=target.get("host") or APP_DB_HOST,
         port=target.get("port") or APP_DB_PORT,
         dbname=target.get("dbname") or APP_DB_NAME,
@@ -6054,6 +6213,8 @@ def get_app_db_connection():
         password=target.get("password") or APP_DB_PASSWORD,
         connect_timeout=8,
     )
+    configure_simulation_data_connection(connection)
+    return connection
 
 
 def get_db_connection_for_target(target):
@@ -6410,6 +6571,7 @@ def init_db():
         execute_sql_file(conn, sql_dir / "032_simulated_fan_data_management.sql")
         execute_sql_file(conn, sql_dir / "033_user_watchlist_items.sql")
         execute_sql_file(conn, sql_dir / "034_security_master.sql")
+        execute_sql_file(conn, sql_dir / "035_local_simulation_data_visibility.sql")
         execute_sql_file(conn, sql_dir / "100_seed_master_data.sql")
         execute_sql_file(conn, sql_dir / "101_seed_app_core.sql")
         execute_sql_file(conn, sql_dir / "102_seed_market_sector_catalog.sql")
@@ -6455,6 +6617,13 @@ def startup_bootstrap():
         return
     if should_auto_init_db():
         init_db_safe()
+        try:
+            with app.app_context():
+                mark_existing_local_data_as_simulated()
+        except Exception as exc:
+            if not is_db_unavailable_error(exc):
+                raise
+            app.logger.warning("Database unavailable during local simulation provenance migration, skipping")
     try:
         with app.app_context():
             seed_result = ensure_default_users()
@@ -7426,7 +7595,7 @@ def _claim_next_user_async_job():
                 """
                 SELECT id, job_code
                 FROM user_async_jobs
-                WHERE status = 'pending'
+                WHERE status = 'pending' AND COALESCE(is_simulated, 0) = 0
                 ORDER BY created_at ASC, id ASC
                 FOR UPDATE SKIP LOCKED
                 LIMIT 1

@@ -10,6 +10,9 @@ Postgres / pgvector DDL is split by purpose:
 - `020_knowledge_embeddings.sql`: create knowledge embedding table and indexes
 - `021_knowledge_embeddings_pgvector.sql`: knowledge pgvector column
 - `034_security_master.sql`: canonical stock/security identity catalog used for name-to-code resolution
+- `035_local_simulation_data_visibility.sql`: marks records written on the local Mac and prevents non-local runtimes from reading them
+- `036_disable_legacy_industry_edb_source.sql`: disables the duplicate Wind industry-index EDB source and pauses automatic EDB indicator tasks
+- `037_use_akshare_market_snapshots_every_five_minutes.sql`: switches Market Overview and Hot Industries to the AKShare five-minute snapshot task
 - `101_seed_app_core.sql`: app core seed entrypoint
 - `100_seed_master_data.sql`: master data seed entrypoint
 - `102_seed_market_sector_catalog.sql`: canonical Shenwan level-one industry master data
@@ -29,6 +32,7 @@ Notes:
   ```bash
   ./scripts/apply_postgres_updates.sh --schema-only
   ```
+- Before a full local-to-production database replacement, apply release package `database_release_packages/2026-08-27/v1.1.6` to the target. The production daemon explicitly starts with `GANGTISE_RUNTIME_ENV=production`; simulated records are then fixed as hidden and the Admin switch cannot override that policy.
 - One-shot bootstrap for a new database (creates database and then calls the same incremental updater):
   [scripts/init_postgres_vector_db.sh](/Users/xuchenfei/PycharmProjects/gangtise_demo/scripts/init_postgres_vector_db.sh)
 - Daemon deployment default: [`start_daemon_app.sh`](/Users/xuchenfei/PycharmProjects/gangtise_demo/start_daemon_app.sh) checks and automatically starts local PostgreSQL, then runs the same updater before restarting the application. Set `AUTO_START_POSTGRES=0` when PostgreSQL is managed externally; set `AUTO_DB_UPDATE=0` only for an emergency application-only restart.

@@ -52,49 +52,84 @@ def test_market_index_history_supports_verified_edb_indices_without_akshare():
     fetch.assert_called_once_with("source_hsi", start_date="2026-08-01", end_date="2026-08-10", token="")
 
 
-def test_shenwan_sector_sync_uses_all_verified_swi_codes():
+def test_akshare_sector_sync_returns_only_shenwan_level_one_rows():
     from src.domain import market_services
 
-    calls = []
+    class Frame:
+        empty = False
+        columns = ["指数名称", "指数代码", "最新价", "昨收盘"]
 
-    def fake_fetch(path, security_code, **kwargs):
-        calls.append((path, security_code, kwargs))
-        return {
-            "ok": True,
-            "points": [
-                {"date": "2026-08-07", "close": 100},
-                {"date": "2026-08-10", "close": 102},
-            ],
-            "duration_ms": 3,
-        }
+        def iterrows(self):
+            yield 0, {"指数名称": "银行", "指数代码": "801780", "最新价": "102", "昨收盘": "100"}
+            yield 1, {"指数名称": "非行业", "指数代码": "000001", "最新价": "100", "昨收盘": "99"}
 
-    with patch.object(market_services, "fetch_gangtise_market_kline_series", side_effect=fake_fetch):
-        rows, errors = market_services._fetch_gangtise_sector_overview("2026-08-01", "2026-08-10")
+    class AkShare:
+        def index_realtime_sw(self, symbol):
+            assert symbol == "一级行业"
+            return Frame()
 
-    assert errors == []
-    assert len(rows) == 31
-    assert len(calls) == 31
-    assert {code for _, code, _ in calls} == set(market_services.GANGTISE_SHENWAN_LEVEL1_CODES.values())
-    assert all(path == "/application/open-quote/kline/daily" for path, _, _ in calls)
-    assert all(row["data_source"] == "Gangtise OpenAPI" for row in rows)
+    rows = market_services._fetch_akshare_sector_overview(ak=AkShare())
+
+    assert len(rows) == 1
+    assert rows[0]["sector"] == "银行"
+    assert rows[0]["data_source"] == "AKShare"
 
 
-def test_market_snapshot_task_is_manual_until_production_schedule_is_enabled():
+def test_market_snapshot_task_runs_every_five_minutes():
     from src.domain import market_services
 
     task = next(item for item in market_services.DEFAULT_ADMIN_TASKS if item["task_code"] == "market_snapshot_sync")
 
-    assert task["schedule_type"] == "manual"
-    assert task["schedule_value"] == ""
+    assert task["schedule_type"] == "interval"
+    assert task["schedule_value"] == "300"
     assert task["enabled"] == 1
 
 
-def test_market_snapshot_does_not_call_akshare_and_persists_gangtise_source():
+def test_gangtise_edb_tasks_are_manual_by_default_to_control_credits():
+    from src.domain import market_services
+
+    tasks = {item["task_code"]: item for item in market_services.DEFAULT_ADMIN_TASKS}
+
+    for task_code in ("indicator_prepare", "indicator_gangtise_openapi_sync"):
+        assert tasks[task_code]["schedule_type"] == "manual"
+        assert tasks[task_code]["schedule_value"] == ""
+
+
+def test_legacy_wind_industry_edb_source_is_not_registered_for_sync():
+    from src.domain import market_services
+
+    assert "source_industry_index" not in market_services.GANGTISE_INDICATOR_REGISTRY
+
+
+def test_disabled_sources_do_not_authenticate_or_call_gangtise():
+    from src.domain import market_services
+
+    definition = {"indicator_code": "source_cpi", "enabled": False}
+    source = {
+        "indicator_code": "source_cpi",
+        "source_code": "source_cpi",
+        "enabled": False,
+        "provider": "Gangtise OpenAPI",
+        "auth_type": "gangtise_openapi",
+    }
+    with patch.object(market_services, "get_db"), \
+        patch.object(market_services, "list_indicator_definitions", return_value=[definition]), \
+        patch.object(market_services, "list_indicator_source_defs", return_value=[source]), \
+        patch.object(market_services, "obtain_gangtise_openapi_token", side_effect=AssertionError("must not authenticate")), \
+        patch.object(market_services, "fetch_gangtise_indicator_series", side_effect=AssertionError("must not fetch")):
+        result = market_services.sync_real_indicator_history_from_market_cache()
+
+    assert result["synced"] is True
+    assert result["eligible"] == 0
+    assert result["skipped_disabled"] == 1
+
+
+def test_market_snapshot_uses_akshare_and_never_calls_gangtise():
     from src.domain import market_services
 
     index_result = {
         "ok": True,
-        "provider": "Gangtise OpenAPI",
+        "provider": "AKShare",
         "points": [
             {"date": "2026-08-07", "open": 100, "high": 101, "low": 99, "close": 100},
             {"date": "2026-08-10", "open": 101, "high": 102, "low": 100, "close": 101},
@@ -102,15 +137,17 @@ def test_market_snapshot_does_not_call_akshare_and_persists_gangtise_source():
     }
     sector_rows = [{
         "sector": "银行", "code": "801780.SWI", "value": 102, "change": 2,
-        "change_pct": 2, "updated_at": "2026-08-10", "data_source": "Gangtise OpenAPI",
+        "change_pct": 2, "updated_at": "2026-08-10", "data_source": "AKShare",
     }]
-    with patch.object(market_services, "fetch_gangtise_market_index_history", return_value=index_result) as index_fetch, \
-        patch.object(market_services, "_fetch_gangtise_sector_overview", return_value=(sector_rows, [])), \
+    with patch.object(market_services, "fetch_akshare_market_index_history", return_value=index_result) as index_fetch, \
+        patch.object(market_services, "_fetch_akshare_sector_overview", return_value=sector_rows), \
         patch.object(market_services, "_load_market_snapshot_payload", return_value=None), \
         patch.object(market_services, "_load_watchlist_cache", return_value=None), \
         patch.object(market_services, "_save_watchlist_cache"), \
         patch.object(market_services, "_save_market_snapshot_payload") as save_snapshot, \
-        patch.object(market_services, "_load_akshare", side_effect=AssertionError("AKShare must not be used")):
+        patch.object(market_services, "_load_akshare", return_value=object()), \
+        patch.object(market_services, "fetch_gangtise_market_index_history", side_effect=AssertionError("Gangtise must not be used")), \
+        patch.object(market_services, "_fetch_gangtise_sector_overview", side_effect=AssertionError("Gangtise must not be used")):
         result = market_services.sync_market_snapshot(force=True)
 
     assert index_fetch.call_count == len(market_services.MARKET_OVERVIEW_INDEX_CODES)
@@ -118,46 +155,42 @@ def test_market_snapshot_does_not_call_akshare_and_persists_gangtise_source():
     assert result["sector_count"] == 1
     overview = next(call.args[2] for call in save_snapshot.call_args_list if call.args[:2] == ("market_overview", "standard_indices"))
     sectors = next(call.args[2] for call in save_snapshot.call_args_list if call.args[:2] == ("market_sector_overview", "shenwan_level1"))
-    assert overview["source"] == "Gangtise OpenAPI"
-    assert overview["snapshot_version"] == 6
-    assert sectors["source"] == "Gangtise OpenAPI"
+    assert overview["source"] == "AKShare"
+    assert overview["snapshot_version"] == 7
+    assert sectors["source"] == "AKShare"
 
 
-def test_market_snapshot_reuses_persisted_industry_snapshot_for_the_day():
+def test_market_snapshot_refreshes_industry_snapshot_on_every_run():
     from src.domain import market_services
 
-    cached_sector = {
-        "ok": True,
-        "snapshot_version": 6,
-        "source": "Gangtise OpenAPI",
-        "items": [{"sector": "银行", "value": 102, "change": 2, "change_pct": 2}],
-    }
     index_result = {
         "ok": True,
-        "provider": "Gangtise OpenAPI",
+        "provider": "AKShare",
         "points": [
             {"date": "2026-08-07", "close": 100},
             {"date": "2026-08-10", "close": 101},
         ],
     }
-    with patch.object(market_services, "fetch_gangtise_market_index_history", return_value=index_result), \
-        patch.object(market_services, "_load_market_snapshot_payload", side_effect=[None, cached_sector]), \
+    with patch.object(market_services, "fetch_akshare_market_index_history", return_value=index_result), \
+        patch.object(market_services, "_load_market_snapshot_payload", return_value=None), \
         patch.object(market_services, "_load_watchlist_cache", return_value=None), \
-        patch.object(market_services, "_fetch_gangtise_sector_overview", side_effect=AssertionError("industry API must not be called")), \
+        patch.object(market_services, "_load_akshare", return_value=object()), \
+        patch.object(market_services, "_fetch_akshare_sector_overview", return_value=[{"sector": "银行", "value": 102}]) as sector_fetch, \
         patch.object(market_services, "_save_watchlist_cache"), \
         patch.object(market_services, "_save_market_snapshot_payload"):
         result = market_services.sync_market_snapshot(force=False)
 
     assert result["sector_count"] == 1
+    sector_fetch.assert_called_once()
 
 
-def test_market_payload_rejects_old_akshare_snapshot():
+def test_market_payload_rejects_old_gangtise_snapshot():
     from src.domain import market_services
 
     old_snapshot = {
         "ok": True,
-        "snapshot_version": 5,
-        "source": "AKShare",
+        "snapshot_version": 6,
+        "source": "Gangtise OpenAPI",
         "items": [{"indicator_code": "source_shanghai_index", "available": True}],
     }
     with patch.object(market_services, "_load_market_snapshot_payload", return_value=old_snapshot), \
@@ -166,6 +199,6 @@ def test_market_payload_rejects_old_akshare_snapshot():
         sectors = market_services.build_market_sector_overview_payload()
 
     assert overview["items"] == []
-    assert overview["source"] == "Gangtise OpenAPI"
+    assert overview["source"] == "AKShare"
     assert sectors["items"] == []
-    assert sectors["source"] == "Gangtise OpenAPI"
+    assert sectors["source"] == "AKShare"

@@ -1498,6 +1498,11 @@ body { background: var(--surface-2); color: var(--text-main); }
   background:transparent;
   box-shadow:none;
 }
+#page-hermes .hermes-text-table-wrap { overflow-x:auto; border:1px solid #E3E8EF; border-radius:6px; }
+#page-hermes .hermes-text-table { width:100%; min-width:520px; border-collapse:collapse; font-size:12px; color:#526276; }
+#page-hermes .hermes-text-table th, #page-hermes .hermes-text-table td { padding:8px 10px; border-bottom:1px solid #E9EDF2; text-align:left; vertical-align:top; line-height:1.65; }
+#page-hermes .hermes-text-table th { color:#245B96; background:#F5F8FC; font-weight:700; white-space:nowrap; }
+#page-hermes .hermes-text-table tr:last-child td { border-bottom:0; }
 #page-hermes .hermes-text-paragraph,
 #page-hermes .hermes-text-list li,
 #page-hermes .hermes-result-subtitle,
@@ -16629,6 +16634,7 @@ function renderHermesReadableText(text) {
   let paragraph = [];
   let listType = '';
   let listItems = [];
+  let tableRows = [];
   const flushParagraph = () => {
     const content = paragraph.join(' ').replace(/\s+/g, ' ').trim();
     if (content) blocks.push({ type: 'paragraph', content });
@@ -16639,13 +16645,29 @@ function renderHermesReadableText(text) {
     listType = '';
     listItems = [];
   };
+  const flushTable = () => {
+    if (tableRows.length) blocks.push({ type: 'table', rows: tableRows.slice() });
+    tableRows = [];
+  };
   lines.forEach((line) => {
     const current = String(line || '').trim();
     if (!current) {
       flushParagraph();
       flushList();
+      flushTable();
       return;
     }
+    const tableCells = current.startsWith('|') && current.endsWith('|')
+      ? current.slice(1, -1).split('|').map(cell => cell.trim())
+      : [];
+    const isTableDivider = tableCells.length && tableCells.every(cell => /^:?-{3,}:?$/.test(cell));
+    if (tableCells.length) {
+      flushParagraph();
+      flushList();
+      if (!isTableDivider) tableRows.push(tableCells);
+      return;
+    }
+    if (tableRows.length) flushTable();
     const headingMatch = current.match(/^(#{1,6})\s*(.+)$/);
     const orderedMatch = current.match(/^(\d+[\.、])\s*(.+)$/);
     const bulletMatch = current.match(/^[-•·]\s*(.+)$/);
@@ -16668,6 +16690,7 @@ function renderHermesReadableText(text) {
   });
   flushParagraph();
   flushList();
+  flushTable();
   if (!blocks.length) return '';
   return `
     <div class="hermes-text-article">
@@ -16677,6 +16700,13 @@ function renderHermesReadableText(text) {
         }
         if (block.type === 'paragraph') {
           return `<div class="hermes-text-paragraph">${renderHermesInlineMarkup(block.content)}</div>`;
+        }
+        if (block.type === 'table') {
+          const rows = Array.isArray(block.rows) ? block.rows : [];
+          if (!rows.length) return '';
+          const header = rows[0];
+          const body = rows.slice(1);
+          return `<div class="hermes-text-table-wrap"><table class="hermes-text-table"><thead><tr>${header.map(cell => `<th>${renderHermesInlineMarkup(cell)}</th>`).join('')}</tr></thead><tbody>${body.map(row => `<tr>${header.map((_, index) => `<td>${renderHermesInlineMarkup(row[index] || '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
         }
         const tag = block.type === 'ordered' ? 'ol' : 'ul';
         const cls = block.type === 'ordered' ? 'hermes-text-ordered' : 'hermes-text-bullet';

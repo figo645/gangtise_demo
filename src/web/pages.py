@@ -8,9 +8,17 @@ def resolve_login_destination(user, next_target):
     target = safe_next_target(next_target or "/h5")
     role = str((user or {}).get("role") or "").strip().lower()
     if role == "admin":
-        # An administrator is not a tenant advisor. Never send the account
-        # back into a role-specific page after an account switch.
-        if target == "/admin" or target.startswith("/admin?") or target == "/intern-handbook":
+        # Admin remains the default landing page, but an explicit request for
+        # a supported product surface must survive login/account switching.
+        if (
+            target == "/admin"
+            or target.startswith("/admin?")
+            or target == "/intern-handbook"
+            or target == "/h5"
+            or target.startswith("/h5?")
+            or target == "/kol-workbench"
+            or target.startswith("/kol-workbench?")
+        ):
             return target
         return url_for("admin")
     if role == "dav":
@@ -18,6 +26,23 @@ def resolve_login_destination(user, next_target):
     if target == "/admin" or target.startswith("/admin?") or target == "/intern-handbook" or target.startswith("/kol-workbench"):
         return url_for("h5", tenant=str((user or {}).get("tenant_slug") or "").strip().lower() or None)
     return target
+
+
+def build_admin_h5_preview_profile(user, tenant):
+    """Project the selected tenant into the admin's H5 preview identity."""
+    profile = dict(user or {})
+    profile["tenant_slug"] = tenant.get("slug") or ""
+    profile["advisor_name"] = tenant.get("advisor") or ""
+    profile["tenant"] = {
+        "id": tenant.get("id"),
+        "slug": tenant.get("slug"),
+        "name": tenant.get("name"),
+        "advisor": tenant.get("advisor"),
+        "focus": tenant.get("focus"),
+        "rights": tenant.get("rights"),
+        "desc": tenant.get("description"),
+    }
+    return profile
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -139,10 +164,6 @@ def h5():
     current_authenticated_user = get_current_authenticated_user()
     if not current_authenticated_user:
         return redirect(url_for("login", next=safe_next_target(request.full_path.rstrip("?"))))
-    # Admin is a platform-governance account, not a tenant-scoped H5 user.
-    # Keep the role boundary explicit before building tenant/user watchlist data.
-    if str(current_authenticated_user.get("role") or "").strip().lower() == "admin":
-        return redirect(url_for("admin"))
     site_config = get_site_config()
     h5_fallback_mode = False
     demo_profiles = []
@@ -157,6 +178,11 @@ def h5():
         current_demo_profile = get_current_demo_profile(site_config)
         effective_tenant_slug = requested_tenant_slug or (current_demo_profile.get("tenant", {}).get("slug") if current_demo_profile else None)
         tenant = get_tenant_by_slug(effective_tenant_slug, site_config)
+        # An admin may preview any tenant's H5 surface. Keep the authenticated
+        # admin identity, while projecting the requested tenant into the H5
+        # payload so client-side requests and links remain tenant-consistent.
+        if str(current_authenticated_user.get("role") or "").strip().lower() == "admin":
+            current_demo_profile = build_admin_h5_preview_profile(current_authenticated_user, tenant)
         indicator_hub = build_indicator_hub(tenant=tenant, admin_view=False)
         fundamental_column = build_fundamental_column_payload(tenant)
         dashboard_seed_cards = build_indicator_dashboard_seed_cards(tenant, count=8)
@@ -175,6 +201,8 @@ def h5():
             demo_profiles = []
         effective_tenant_slug = requested_tenant_slug or (current_demo_profile.get("tenant", {}).get("slug") if current_demo_profile else None)
         tenant = get_tenant_by_slug(effective_tenant_slug, fallback_config)
+        if str(current_authenticated_user.get("role") or "").strip().lower() == "admin":
+            current_demo_profile = build_admin_h5_preview_profile(current_authenticated_user, tenant)
         indicator_hub = build_indicator_hub_fallback(tenant=tenant, admin_view=False)
         fundamental_column = build_fundamental_column_payload_from_hub(tenant, indicator_hub)
         dashboard_seed_cards = build_indicator_dashboard_seed_cards_from_hub(indicator_hub, count=8)
