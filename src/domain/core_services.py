@@ -351,7 +351,7 @@ def normalize_hermes_settings_config(source=None):
             if not isinstance(item, dict):
                 continue
             item_id = str(item.get("id") or "").strip()
-            if not item_id or item_id in seen:
+            if not item_id or item_id in seen or item_id in {"tool.web.search", "tool.knowledge.search"}:
                 continue
             base = copy.deepcopy(fallback_map.get(item_id) or {})
             merged = {**base, **copy.deepcopy(item)}
@@ -363,7 +363,7 @@ def normalize_hermes_settings_config(source=None):
                 merged["display_mode"] = str(merged.get("display_mode") or base.get("display_mode") or "text").strip() or "text"
             for key in ["enabled", "allow_knowledge", "allow_web", "allow_files", "allow_chart"]:
                 if key in merged:
-                    merged[key] = bool(merged.get(key, base.get(key, False)))
+                    merged[key] = False if key == "allow_web" else bool(merged.get(key, base.get(key, False)))
             normalized.append(merged)
             seen.add(item_id)
         for item_id, base in fallback_map.items():
@@ -379,6 +379,8 @@ def normalize_hermes_settings_config(source=None):
     route_priority = []
     for item in raw.get("route_priority") if isinstance(raw.get("route_priority"), list) else default_route_priority:
         value = str(item or "").strip()
+        if value in {"web.search", "knowledge.search", "evidence.search"}:
+            continue
         if value and value not in route_priority:
             route_priority.append(value)
     if not route_priority:
@@ -396,7 +398,7 @@ def normalize_hermes_settings_config(source=None):
         "prompt_scope_guard_enabled": bool(raw.get("prompt_scope_guard_enabled", defaults["prompt_scope_guard_enabled"])),
         "investor_access_enabled": bool(raw.get("investor_access_enabled", defaults["investor_access_enabled"])),
         "dav_access_enabled": bool(raw.get("dav_access_enabled", defaults.get("dav_access_enabled", True))),
-        "internet_answer_enabled": bool(raw.get("internet_answer_enabled", defaults.get("internet_answer_enabled", True))),
+        "internet_answer_enabled": False,
         "thinking_process_enabled": bool(raw.get("thinking_process_enabled", defaults.get("thinking_process_enabled", True))),
         "answer_save_to_knowledge_enabled": bool(raw.get("answer_save_to_knowledge_enabled", defaults.get("answer_save_to_knowledge_enabled", True))),
         "default_response_style": str(raw.get("default_response_style") or defaults.get("default_response_style") or "structured").strip() or "structured",

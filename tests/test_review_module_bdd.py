@@ -369,7 +369,7 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertNotIn("入库方式", html)
         self.assertNotIn("大V通过语音输入、文件上传、网页 URL 提供的内容，会在清洗后进入知识专区", html)
 
-    def test_given_hermes_tool_plan_when_web_answer_enabled_then_knowledge_runs_before_web(self):
+    def test_given_hermes_tool_plan_when_web_answer_enabled_then_no_embedding_tool_is_injected(self):
         ordered = ai_services.build_hermes_tool_execution_plan(
             {
                 "tools": ["watchlist.detail", "evidence.search", "attachment.context"],
@@ -377,10 +377,11 @@ class ReviewModuleBddTest(unittest.TestCase):
             web_answer=True,
         )
 
-        self.assertEqual(ordered[0], "knowledge.search")
-        self.assertEqual(ordered[-1], "web.search")
+        self.assertEqual(ordered[0], "watchlist.detail")
+        self.assertNotIn("knowledge.search", ordered)
+        self.assertNotIn("evidence.search", ordered)
+        self.assertNotIn("web.search", ordered)
         self.assertIn("watchlist.detail", ordered)
-        self.assertIn("evidence.search", ordered)
         self.assertIn("attachment.context", ordered)
 
     def test_given_hermes_tool_plan_when_web_answer_disabled_then_only_platform_tools_run(self):
@@ -391,7 +392,7 @@ class ReviewModuleBddTest(unittest.TestCase):
             web_answer=False,
         )
 
-        self.assertEqual(ordered, ["knowledge.search", "watchlist.detail"])
+        self.assertEqual(ordered, ["watchlist.detail"])
 
     def test_given_watchlist_annotations_when_executing_hermes_tool_plan_then_annotation_context_is_attached(self):
         with app_entry.app.app_context():

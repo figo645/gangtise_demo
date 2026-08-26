@@ -66,6 +66,37 @@ class StrictLlmExecutionBddTest(unittest.TestCase):
         self.assertEqual(plan["intent"], "small_talk")
         self.assertEqual(plan["tools"], [])
 
+    def test_given_product_help_question_when_router_returns_product_help_then_no_embedding_tool_is_run(self):
+        with app.app_context(), patch.object(
+            ai_services, "get_default_llm_config", return_value=self.MODEL
+        ), patch.object(
+            ai_services,
+            "call_openai_compatible_llm",
+            side_effect=[
+                '{"intent":"product_help","tools":[],"stock_code":"","display_mode":"text","reason":"回答小金智能体能力范围"}',
+                '{"answer":"我可以帮助你查询个股和指数数据、解读指标与看板，并协助完成复盘内容整理。","summary":"当前支持的主要能力","bullets":[],"citations":[]}',
+            ],
+        ) as llm_call, patch.object(
+            ai_services, "search_knowledge_embeddings", side_effect=AssertionError("embedding must not run")
+        ) as embedding_call:
+            plan, _model, _mode = ai_services.route_hermes_query_intent(
+                "你的功能有哪些", tenant_slug="bdd"
+            )
+            synthesis, _answer_model, _answer_mode = ai_services.synthesize_hermes_answer(
+                "你的功能有哪些", plan, {}, tenant_slug="bdd"
+            )
+            outputs, trace = ai_services.execute_hermes_tool_plan(
+                plan, tenant_slug="bdd", question_text="你的功能有哪些"
+            )
+
+        self.assertEqual(plan["intent"], "product_help")
+        self.assertEqual(plan["tools"], [])
+        self.assertEqual(outputs["_meta"]["preferred_mode"], "")
+        self.assertEqual(trace, [])
+        self.assertIn("帮助你", synthesis["answer"])
+        self.assertEqual(embedding_call.call_count, 0)
+        self.assertEqual(llm_call.call_count, 2)
+
     def test_given_hermes_answer_call_fails_then_no_rule_answer_is_returned(self):
         plan = {"intent": "small_talk", "tools": [], "scope_status": "allowed"}
         with app.app_context(), patch.object(

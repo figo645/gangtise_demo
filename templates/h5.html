@@ -1392,17 +1392,17 @@ body { background: var(--surface-2); color: var(--text-main); }
 #page-hermes .hermes-capability-row {
   display:none !important;
 }
-#page-hermes .hermes-chat-thread {
+#page-hermes .hermes-lobster-thread {
   min-height:calc(100dvh - 310px);
-  padding:8px 2px 280px;
+  padding:8px 2px 180px;
   gap:18px;
 }
-#page-hermes .hermes-chat-thread.is-empty {
+#page-hermes .hermes-lobster-thread.is-empty {
   min-height:calc(100dvh - 310px);
   display:flex;
   align-items:center;
   justify-content:center;
-  padding:18px 8px 280px;
+  padding:18px 8px 180px;
 }
 #page-hermes .hermes-chat-empty {
   width:min(100%,320px);
@@ -1625,10 +1625,10 @@ body { background: var(--surface-2); color: var(--text-main); }
     margin:0 auto;
     padding:20px 20px 28px;
   }
-  #page-hermes .hermes-chat-thread,
-  #page-hermes .hermes-chat-thread.is-empty {
+  #page-hermes .hermes-lobster-thread,
+  #page-hermes .hermes-lobster-thread.is-empty {
     min-height:calc(100dvh - 340px);
-    padding-bottom:280px;
+    padding-bottom:180px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -4520,26 +4520,8 @@ body,
                 <div class="hermes-lobster-toolbar">
                   <div class="hermes-lobster-toolbar-left">
                     <button class="hermes-composer-plus" onclick="openHermesPlusMenu()">+</button>
-                    <span class="hermes-lobster-divider"></span>
-                    <div class="hermes-lobster-tool-row">
-                      <button id="hermes-voice-toggle" class="hermes-lobster-tool hermes-composer-toggle" type="button" onclick="toggleHermesVoiceCapture()">
-                        <span class="hermes-lobster-tool-icon">🎙️</span>
-                        <span>口述</span>
-                      </button>
-                      <button id="hermes-clear-toggle" class="hermes-lobster-tool hermes-composer-toggle" type="button" onclick="clearHermesQuestionInputs({ focus: true })">
-                        <span class="hermes-lobster-tool-icon">✕</span>
-                        <span>清空</span>
-                      </button>
-                      <button id="hermes-internet-toggle" class="hermes-lobster-tool hermes-composer-toggle" type="button" onclick="toggleHermesInternetAnswer()">
-                        <span class="hermes-lobster-tool-icon">🌐</span>
-                        <span>互联网</span>
-                      </button>
-                    </div>
                   </div>
 	                  <button id="hermes-composer-submit" class="hermes-composer-send hermes-lobster-send" onclick="handleHermesComposerSubmit()">发送</button>
-	                </div>
-	                <div style="margin-top:8px;font-size:11px;line-height:1.7;color:#9B7A1C;background:rgba(200,169,110,0.10);border:1px solid rgba(200,169,110,0.16);border-radius:10px;padding:7px 10px">
-	                  口述录制功能当前处于测试阶段，建议短句分段录入，并在发送前确认文本是否准确。
 	                </div>
 	              </div>
 	            </div>
@@ -11277,9 +11259,9 @@ function renderHermesWorkspace() {
   renderHermesCapabilityChips();
   renderHermesSuggestionChips();
   renderHermesComposerContext();
-  renderHermesInternetToggle();
   renderHermesComposerSubmit();
   renderHermesThread();
+  syncHermesComposerClearance();
 }
 
 function switchFeedBoardTab(index) {
@@ -15046,7 +15028,6 @@ let hermesCustomSkillDraft = { title: '', prompt: '', knowledgeIds: [] };
 let hermesScopedKnowledgeId = '';
 let hermesUploadedFiles = [];
 let hermesSavedKnowledgeEntries = {};
-let hermesUseInternetAnswer = false;
 let hermesLoadingTicker = null;
 let hermesActiveSessionId = '';
 let hermesSessionList = [];
@@ -15054,10 +15035,6 @@ let hermesSessionSearchKeyword = '';
 let hermesSessionActorKey = '';
 let hermesSessionListLoadedKey = '';
 let hermesSessionListLoading = false;
-let hermesVoiceRecorder = null;
-let hermesVoiceChunks = [];
-let hermesVoiceRecording = false;
-let hermesVoiceUploading = false;
 let fundNewsModalActiveTab = 'summary';
 let fundNewsAlgorithmWizard = {
   step: 'view',
@@ -15079,10 +15056,6 @@ function getHermesEnabledChartTypes() {
     return ['kline_chart', 'line_chart', 'distribution_chart'];
   }
   return types.map(item => String(item || '').trim()).filter(Boolean);
-}
-
-function isHermesInternetAllowed() {
-  return getHermesSettings().internet_answer_enabled !== false;
 }
 
 function isHermesThinkingEnabled() {
@@ -15734,28 +15707,29 @@ function resizeHermesQuestionInput(input) {
 
 function renderHermesComposerSubmit() {
   const button = document.getElementById('hermes-composer-submit');
-  const clearButton = document.getElementById('hermes-clear-toggle');
-  const voiceButton = document.getElementById('hermes-voice-toggle');
   const hasText = !!String(getHermesActiveQuestion() || '').trim();
-  if (clearButton) {
-    clearButton.disabled = !hasText || !!hermesVoiceRecording || !!hermesVoiceUploading;
+  if (!button) {
+    syncHermesComposerClearance();
+    return;
   }
-  if (voiceButton) {
-    const voiceLabel = hermesVoiceUploading ? '转写中' : (hermesVoiceRecording ? '结束录音' : '口述');
-    voiceButton.disabled = !!hermesVoiceUploading;
-    voiceButton.setAttribute('aria-label', voiceLabel);
-    voiceButton.title = voiceLabel;
-    voiceButton.innerHTML = `
-      <span class="hermes-lobster-tool-icon">${hermesVoiceRecording ? '⏹' : '🎙️'}</span>
-      <span>${voiceLabel}</span>
-    `;
-  }
-  if (!button) return;
   button.textContent = '发送';
   button.removeAttribute('aria-label');
   button.title = '发送';
-  button.disabled = !hasText || !!hermesVoiceRecording || !!hermesVoiceUploading;
+  button.disabled = !hasText;
+  syncHermesComposerClearance();
 }
+
+function syncHermesComposerClearance() {
+  const thread = document.getElementById('hermes-chat-thread');
+  const composer = document.querySelector('#page-hermes .hermes-composer-shell');
+  if (!thread || !composer) return;
+  const rect = composer.getBoundingClientRect();
+  const bottomOffset = Math.max(0, window.innerHeight - rect.bottom);
+  const clearance = Math.ceil(rect.height + bottomOffset + 14);
+  thread.style.paddingBottom = `${clearance}px`;
+}
+
+window.addEventListener('resize', syncHermesComposerClearance);
 
 function handleHermesQuestionInput(input) {
   resizeHermesQuestionInput(input);
@@ -15856,7 +15830,6 @@ function renderHermesComposerContext() {
   ].filter(Boolean);
   if (!hosts.length) return;
   const chips = [];
-  const voiceBlockedReason = getH5VoiceBlockedReason();
   if (hermesSelectedSkill && hermesSelectedSkill !== 'basic') {
     const skill = getHermesSkillById(hermesSelectedSkill);
     if (skill) {
@@ -15876,13 +15849,6 @@ function renderHermesComposerContext() {
       </div>
     `);
   }
-  if (voiceBlockedReason) {
-    chips.push(`
-      <div class="hermes-composer-chip">
-        <span>${escapeHtml(voiceBlockedReason)}</span>
-      </div>
-    `);
-  }
   getHermesUploadedFileNames().forEach((name, index) => {
     chips.push(`
       <div class="hermes-composer-chip">
@@ -15893,138 +15859,6 @@ function renderHermesComposerContext() {
   });
   const html = chips.join('');
   hosts.forEach(host => { host.innerHTML = html; });
-}
-
-function renderHermesInternetToggle() {
-  const button = document.getElementById('hermes-internet-toggle');
-  if (!button) return;
-  const internetEnabled = isHermesInternetAllowed();
-  button.style.display = internetEnabled ? '' : 'none';
-  if (!internetEnabled) {
-    hermesUseInternetAnswer = false;
-    return;
-  }
-  button.classList.add('hermes-lobster-tool');
-  button.classList.toggle('is-active', !!hermesUseInternetAnswer);
-  button.innerHTML = `<span class="hermes-lobster-tool-icon">🌐</span><span>${hermesUseInternetAnswer ? '互联网中' : '互联网'}</span>`;
-  button.setAttribute('aria-pressed', hermesUseInternetAnswer ? 'true' : 'false');
-  button.title = hermesUseInternetAnswer
-    ? '已开启互联网补充，Hermes 会先查租户知识库，再补公开信息'
-    : '开启后，Hermes 会在租户知识库之后补充互联网公开信息';
-}
-
-function clearHermesInternetAnswer() {
-  hermesUseInternetAnswer = false;
-  renderHermesWorkspace();
-}
-
-function toggleHermesInternetAnswer(forceValue) {
-  if (!isHermesInternetAllowed()) {
-    hermesUseInternetAnswer = false;
-    renderHermesWorkspace();
-    showToast('Admin 当前未开放互联网补充');
-    return;
-  }
-  hermesUseInternetAnswer = typeof forceValue === 'boolean' ? forceValue : !hermesUseInternetAnswer;
-  renderHermesWorkspace();
-  showToast(hermesUseInternetAnswer ? '已开启互联网补充' : '已关闭互联网补充');
-}
-
-async function uploadHermesVoiceBlob(audioBlob) {
-  const user = getActiveDemoUser();
-  const formData = new FormData();
-  const fileName = `hermes-${Date.now()}.webm`;
-  formData.append('audio', audioBlob, fileName);
-  formData.append('tenant_slug', ((user || {}).tenant || {}).slug || '');
-  formData.append('period', 'hermes');
-  formData.append('entry_point', 'h5_hermes');
-  formData.append('speaker_name', (user && (user.advisor_name || user.username)) || '');
-  formData.append('use_llm_enhancement', 'false');
-  const resp = await fetch('/api/review/voice-transcribe', {
-    method: 'POST',
-    body: formData,
-  });
-  const data = await resp.json();
-  if (!resp.ok || !data.success) {
-    throw new Error((data && data.error) || 'voice_transcribe_failed');
-  }
-  return data;
-}
-
-function toggleHermesVoiceCapture() {
-  if (hermesVoiceUploading) return;
-  const blockedReason = getH5VoiceBlockedReason();
-  if (blockedReason) {
-    showToast(blockedReason);
-    return;
-  }
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
-    showToast('当前浏览器不支持录音');
-    return;
-  }
-  if (hermesVoiceRecording && hermesVoiceRecorder) {
-    hermesVoiceRecorder.stop();
-    return;
-  }
-  navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
-    hermesVoiceChunks = [];
-    hermesVoiceRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-    hermesVoiceRecording = true;
-    renderHermesComposerSubmit();
-    hermesVoiceRecorder.ondataavailable = (event) => {
-      if (event.data && event.data.size > 0) {
-        hermesVoiceChunks.push(event.data);
-      }
-    };
-    hermesVoiceRecorder.onerror = () => {
-      hermesVoiceRecording = false;
-      hermesVoiceUploading = false;
-      stream.getTracks().forEach((track) => track.stop());
-      renderHermesComposerSubmit();
-      showToast('录音失败，请重试');
-    };
-    hermesVoiceRecorder.onstop = async () => {
-      hermesVoiceRecording = false;
-      hermesVoiceUploading = true;
-      renderHermesComposerSubmit();
-      const blob = new Blob(hermesVoiceChunks, { type: hermesVoiceRecorder.mimeType || 'audio/webm' });
-      stream.getTracks().forEach((track) => track.stop());
-      try {
-        const data = await uploadHermesVoiceBlob(blob);
-        if (!data.async || !data.job_code) throw new Error('voice_transcribe_job_missing');
-        showToast('语音已提交，正在后台转写');
-        startAsyncJobPolling(data.job_code, {
-          onSuccess(job) {
-            const result = job.result || {};
-            const transcript = String(result.display_transcript || result.enhanced_transcript || result.transcript || '').trim();
-            const hadQuestion = !!String(getHermesActiveQuestion() || '').trim();
-            fillHermesQuestionInput(transcript, { append: true });
-            showToast(hadQuestion ? '语音已追加到输入框' : '语音已转成问题草稿');
-          },
-          onFailed(job) {
-            showToast(job.error_message || '语音转写失败');
-          },
-          onError(error) {
-            showToast(error.message || '语音转写失败');
-          },
-        });
-      } catch (error) {
-        showToast(error.message || '语音转写失败');
-      } finally {
-        hermesVoiceUploading = false;
-        hermesVoiceRecorder = null;
-        hermesVoiceChunks = [];
-        renderHermesComposerSubmit();
-      }
-    };
-    hermesVoiceRecorder.start();
-  }).catch(() => {
-    showToast('未获得麦克风权限');
-    hermesVoiceRecording = false;
-    hermesVoiceUploading = false;
-    renderHermesComposerSubmit();
-  });
 }
 
 function handleHermesComposerSubmit() {
@@ -16230,7 +16064,7 @@ function openHermesPlusMenu() {
     <div class="hermes-plus-action-row">
       <button class="hermes-plus-action" onclick="openHermesFilePicker()">
         <div class="hermes-plus-action-title">上传文件解析</div>
-        <div class="hermes-plus-action-desc">上传 PDF、DOCX、TXT、CSV、HTML，解析后随本次问题一起给 Hermes。互联网补充开关已移到输入框外侧。</div>
+        <div class="hermes-plus-action-desc">上传 PDF、DOCX、TXT、CSV、HTML，解析后随本次问题一起给小金智能体。</div>
       </button>
       <button class="hermes-plus-action" onclick="openHermesUrlAttachPrompt()">
         <div class="hermes-plus-action-title">解析网页 URL</div>
@@ -16881,10 +16715,10 @@ function buildHermesLoadingThoughtTemplates(question, skill, stockCode) {
   const suffix = String(question || '').trim().slice(0, 22);
   return [
     suffix ? `先理解你问的重点：${suffix}${String(question || '').trim().length > 22 ? '…' : ''}` : '先判断你到底在追问哪一层信息',
-    `先查当前租户知识库，再按 ${String((skill || {}).label || '默认对话')} 的方式组织回答${hermesUseInternetAnswer ? '，最后补上互联网公开信息' : ''}`,
+    `由模型识别问题意图，再按 ${String((skill || {}).label || '默认对话')} 的方式组织回答`,
     hasAttachments
       ? `正在读你刚上传的文件${hasStock ? '，并对照租户知识与个股资料' : '，并对照租户知识'}`
-      : (hasStock ? '正在对照租户知识、个股资料和证据' : '正在翻找租户知识里能直接支撑结论的内容'),
+      : (hasStock ? '正在调取个股资料并整理判断依据' : '正在整理回答所需的上下文和表达重点'),
     hasStock ? '把个股信息压缩成可直接判断的要点' : '先把结论压短，再把依据补齐',
     '最后再整理成一版更适合直接阅读的回答',
   ];
@@ -17158,7 +16992,7 @@ async function runHermesAnalysis(options) {
     return;
   }
   ensureHermesSessionBootstrap();
-  const question = getHermesActiveQuestion().trim();
+  const question = String(getHermesActiveQuestion() || '').trim();
   const skill = getHermesSkillById(hermesSelectedSkill) || DEFAULT_HERMES_SKILLS.basic;
   if (!question) {
     showToast('请先输入你想让 Hermes 回答的问题');
@@ -17205,7 +17039,7 @@ async function runHermesAnalysis(options) {
         selected_knowledge_ids: hermesScopedKnowledgeId ? [hermesScopedKnowledgeId] : [],
         attachments: hermesUploadedFiles.slice(0),
         preferred_mode: hermesSelectedSkill || 'basic',
-        web_answer: !!hermesUseInternetAnswer && isHermesInternetAllowed(),
+        web_answer: false,
       }),
     });
     const data = await resp.json();

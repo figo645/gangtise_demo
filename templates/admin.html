@@ -3986,10 +3986,6 @@
             <label class="toggle"><input id="hermes-investor-access-enabled" type="checkbox"><span class="toggle-slider"></span></label>
           </div>
           <div class="toggle-wrap" style="margin:0 0 4px">
-            <div class="toggle-label"><div class="feature-toggle-title">互联网补充</div><div class="feature-toggle-desc">位置：Hermes 输入框的“互联网”选项。开启后，Agent 先检索当前租户知识库，再按用户勾选补充公开网络信息。</div></div>
-            <label class="toggle"><input id="hermes-internet-answer-enabled" type="checkbox"><span class="toggle-slider"></span></label>
-          </div>
-          <div class="toggle-wrap" style="margin:0 0 4px">
             <div class="toggle-label"><div class="feature-toggle-title">深度思考过程</div><div class="feature-toggle-desc">位置：Hermes 回答区。开启后用户可展开查看检索、图表或工具调用的处理进度；不会展示模型内部推理文本。</div></div>
             <label class="toggle"><input id="hermes-thinking-process-enabled" type="checkbox"><span class="toggle-slider"></span></label>
           </div>
@@ -4042,7 +4038,7 @@
             <div class="config-card-title">路由 / 模板树</div>
             <div class="config-field">
               <label>路由优先级（逗号分隔）</label>
-              <textarea id="hermes-route-priority" rows="3" placeholder="session_load,memory_read,fast_path,scope_guard,intent_router,knowledge.search,platform_tools,attachment.context,web.search,answer_synthesis"></textarea>
+              <textarea id="hermes-route-priority" rows="3" placeholder="session_load,memory_read,fast_path,scope_guard,intent_router,knowledge.search,platform_tools,attachment.context,answer_synthesis"></textarea>
             </div>
             <div class="config-field">
               <label>模板树 JSON</label>
@@ -11669,8 +11665,6 @@ function renderSiteConfigForm() {
   if (hermesDavAccessToggle) hermesDavAccessToggle.checked = hermesSettings.dav_access_enabled !== false;
   const hermesInvestorAccessToggle = document.getElementById('hermes-investor-access-enabled');
   if (hermesInvestorAccessToggle) hermesInvestorAccessToggle.checked = hermesSettings.investor_access_enabled !== false;
-  const hermesInternetToggle = document.getElementById('hermes-internet-answer-enabled');
-  if (hermesInternetToggle) hermesInternetToggle.checked = hermesSettings.internet_answer_enabled !== false;
   const hermesThinkingToggle = document.getElementById('hermes-thinking-process-enabled');
   if (hermesThinkingToggle) hermesThinkingToggle.checked = hermesSettings.thinking_process_enabled !== false;
   const hermesSaveToKnowledgeToggle = document.getElementById('hermes-answer-save-to-knowledge-enabled');
@@ -11981,7 +11975,6 @@ async function saveHermesSettings() {
           prompt_scope_guard_enabled: Boolean(document.getElementById('hermes-prompt-scope-guard-enabled') && document.getElementById('hermes-prompt-scope-guard-enabled').checked),
           dav_access_enabled: Boolean(document.getElementById('hermes-dav-access-enabled') && document.getElementById('hermes-dav-access-enabled').checked),
           investor_access_enabled: Boolean(document.getElementById('hermes-investor-access-enabled') && document.getElementById('hermes-investor-access-enabled').checked),
-          internet_answer_enabled: Boolean(document.getElementById('hermes-internet-answer-enabled') && document.getElementById('hermes-internet-answer-enabled').checked),
           thinking_process_enabled: Boolean(document.getElementById('hermes-thinking-process-enabled') && document.getElementById('hermes-thinking-process-enabled').checked),
           answer_save_to_knowledge_enabled: Boolean(document.getElementById('hermes-answer-save-to-knowledge-enabled') && document.getElementById('hermes-answer-save-to-knowledge-enabled').checked),
           default_response_style: document.getElementById('hermes-default-response-style')
@@ -12108,7 +12101,6 @@ async function saveSiteConfig() {
       prompt_scope_guard_enabled: Boolean(document.getElementById('hermes-prompt-scope-guard-enabled') && document.getElementById('hermes-prompt-scope-guard-enabled').checked),
       dav_access_enabled: Boolean(document.getElementById('hermes-dav-access-enabled') && document.getElementById('hermes-dav-access-enabled').checked),
       investor_access_enabled: Boolean(document.getElementById('hermes-investor-access-enabled') && document.getElementById('hermes-investor-access-enabled').checked),
-      internet_answer_enabled: Boolean(document.getElementById('hermes-internet-answer-enabled') && document.getElementById('hermes-internet-answer-enabled').checked),
       thinking_process_enabled: Boolean(document.getElementById('hermes-thinking-process-enabled') && document.getElementById('hermes-thinking-process-enabled').checked),
       answer_save_to_knowledge_enabled: Boolean(document.getElementById('hermes-answer-save-to-knowledge-enabled') && document.getElementById('hermes-answer-save-to-knowledge-enabled').checked),
       default_response_style: document.getElementById('hermes-default-response-style')

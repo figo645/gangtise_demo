@@ -3245,8 +3245,9 @@ def _build_retrieval_agent_response(
 
 
 HERMES_QUERY_INTENT_PROMPT = (
-    "你是 Hermes 的任务路由器。"
-    "你的职责不是直接回答用户，而是把用户问题路由成最合适的任务类型，并决定需要调用哪些工具。"
+    "你是小金智能体的任务路由器。"
+    "你的职责不是直接回答用户，而是只使用大模型语义理解，把用户问题路由成最合适的任务类型，并决定需要调用哪些工具。"
+    "不要使用 embedding、向量检索或关键词初筛来猜测意图。"
     "只能从给定枚举里选择 intent 和 tools。"
     "禁止编造工具名。"
     "输出必须是 JSON。"
@@ -3265,13 +3266,10 @@ HERMES_ALLOWED_INTENTS = {
 }
 
 HERMES_ALLOWED_TOOLS = {
-    "knowledge.search",
-    "evidence.search",
     "watchlist.detail",
     "indicator.detail",
     "dashboard.context",
     "attachment.context",
-    "web.search",
 }
 
 HERMES_INTENT_ROUTE_GROUPS = {
@@ -3441,7 +3439,7 @@ def finalize_hermes_intent_plan(plan, question_text="", attachments=None, select
                 if str(item).strip()
             ]
             preserved_tools = []
-            for tool_name in ["knowledge.search", "evidence.search", "attachment.context"]:
+            for tool_name in ["attachment.context"]:
                 if tool_name in existing_tools and tool_name not in preserved_tools:
                     preserved_tools.append(tool_name)
             normalized_plan["intent"] = "watchlist_fundamental"
@@ -6020,30 +6018,39 @@ def clear_admin_hermes_memory(tenant_slug, range_key, confirm_text=""):
     }
 
 
-def build_hermes_intent_router_prompt(question_text, has_attachments=False, selected_knowledge_ids=None, messages=None, memory_context_text=""):
+def build_hermes_intent_router_prompt(question_text, has_attachments=False, selected_knowledge_ids=None, messages=None, memory_context_text="", scope_result=None):
     conversation_block = format_hermes_message_context(messages, limit=6)
     conversation_section = f"最近多轮对话：\n{conversation_block}\n\n" if conversation_block else ""
     memory_section = f"历史记忆摘要：\n{str(memory_context_text or '').strip()}\n\n" if str(memory_context_text or "").strip() else ""
+    scope = scope_result if isinstance(scope_result, dict) else {}
+    scope_section = ""
+    if str(scope.get("status") or "").strip() in {"blocked", "redirected"}:
+        scope_section = (
+            f"规则守卫提示（仅作为安全边界参考，最终意图仍由你判断）："
+            f"{str(scope.get('reason') or '').strip()}\n\n"
+        )
     return (
         "请根据用户问题判断 Hermes 应该如何拆解任务。\n"
         "可选 intent：small_talk, product_help, knowledge_lookup, evidence_chain_analysis, watchlist_fundamental, smart_indicator_explain, dashboard_interpretation, multi_tool_research, out_of_scope_redirect\n"
-        "可选 tools：knowledge.search, evidence.search, watchlist.detail, indicator.detail, dashboard.context, attachment.context\n"
+        "可选 tools：watchlist.detail, indicator.detail, dashboard.context, attachment.context\n"
         "规则：\n"
-        "1. 如果用户明确问复盘、证据链、依据、来源，优先考虑 evidence_chain_analysis。\n"
-        "2. 如果用户明确问基本面、估值、盈利、行业位置、个股研究，且存在股票名/代码，优先考虑 watchlist_fundamental。\n"
-        "3. 如果用户主要想问某条知识、某个框架、方法、纪要内容，优先考虑 knowledge_lookup。\n"
-        "4. 如果用户在问智能指标怎么计算、提示词/公式怎么理解，优先考虑 smart_indicator_explain，并使用 dashboard.context。\n"
-        "5. 如果用户在问 Dashboard 面板、看板卡片、布局、发布后的展示逻辑，优先考虑 dashboard_interpretation，并使用 dashboard.context。\n"
-        "6. 如果用户主要在问 H5 / Web / Admin / 工作台里的功能如何使用，优先考虑 product_help。\n"
-        "7. 如果问题同时涉及个股 + 证据/知识，多工具组合时用 multi_tool_research。\n"
-        "8. 如果只是寒暄或轻度闲聊，用 small_talk。\n"
-        "9. 如果问题明显超范围，但能温和收口，用 out_of_scope_redirect，且不要安排任何工具。\n"
+        "1. 如果用户明确问复盘、证据链、依据、来源，使用 evidence_chain_analysis；不要调用知识检索工具。\n"
+        "2. 如果用户明确问基本面、估值、盈利、行业位置、个股研究，且存在股票名/代码，使用 watchlist_fundamental 并调用 watchlist.detail。\n"
+        "3. 如果用户主要想问知识、框架、方法、纪要内容，使用 knowledge_lookup；这类问题直接交给答案模型，不调用 embedding 或知识检索工具。\n"
+        "4. 如果用户在问智能指标怎么计算、提示词/公式怎么理解，使用 smart_indicator_explain，并按需调用 indicator.detail、dashboard.context。\n"
+        "5. 如果用户在问 Dashboard 面板、看板卡片、布局或发布后的展示逻辑，使用 dashboard_interpretation，并调用 dashboard.context。\n"
+        "6. 如果用户在问 H5 / Web / Admin / 工作台里的功能、页面或操作，使用 product_help，不调用任何知识检索工具。\n"
+        "7. 如果问题同时涉及个股和证据，多工具组合时使用 multi_tool_research，但只调用实时个股、指标、Dashboard 或附件工具。\n"
+        "8. 如果只是寒暄或轻度闲聊，使用 small_talk，tools 必须为空数组。\n"
+        "9. 如果问题明显超范围但仍可温和收口，使用 out_of_scope_redirect，tools 必须为空数组。\n"
         "10. 如果有附件，工具里可以包含 attachment.context。\n"
         "11. stock_code 只在能明显识别时输出，否则为空字符串。\n"
         "12. display_mode 只能是 text 或 structured。\n"
-        "13. 如果用户偏好是 line_chart / kline_chart / distribution_chart，且问题对象是指标或指数，优先保持 smart_indicator_explain + structured。\n\n"
+        "13. 如果用户问‘你是谁’或‘你的功能有哪些’，优先使用 product_help 或 small_talk，直接说明小金智能体当前能力。\n"
+        "14. 禁止返回 knowledge.search、evidence.search 或任何未列出的工具。\n\n"
         f"{memory_section}"
         f"{conversation_section}"
+        f"{scope_section}"
         f"用户问题：{str(question_text or '').strip()}\n"
         f"是否有附件：{'是' if has_attachments else '否'}\n"
         f"是否指定知识条目：{'是' if selected_knowledge_ids else '否'}\n\n"
@@ -6090,8 +6097,6 @@ def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attac
         }, question_text=question, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
     if preferred_mode == "report_interpretation":
         report_tools = ["attachment.context"]
-        if selected_knowledge_ids:
-            report_tools.append("knowledge.search")
         return finalize_hermes_intent_plan({
             "intent": "knowledge_lookup",
             "tools": report_tools,
@@ -6101,7 +6106,7 @@ def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attac
             "reason": "分析方式偏向上传材料或报告解读",
         }, question_text=question, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
     if preferred_mode == "content_generation":
-        generation_tools = (["knowledge.search"] if selected_knowledge_ids else []) + (["attachment.context"] if has_attachments else [])
+        generation_tools = (["attachment.context"] if has_attachments else [])
         if stock_code:
             generation_tools.append("watchlist.detail")
         return finalize_hermes_intent_plan({
@@ -6115,7 +6120,7 @@ def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attac
     if preferred_mode == "evidence":
         return finalize_hermes_intent_plan({
             "intent": "evidence_chain_analysis" if not stock_code else "multi_tool_research",
-            "tools": ["evidence.search"] + (["watchlist.detail"] if stock_code else []) + (["attachment.context"] if has_attachments else []),
+            "tools": (["watchlist.detail"] if stock_code else []) + (["attachment.context"] if has_attachments else []),
             "stock_code": stock_code,
             "display_mode": "structured" if stock_code else "text",
             "reason": "分析方式偏向证据链归因",
@@ -6123,7 +6128,7 @@ def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attac
     if preferred_mode in {"line_chart", "kline_chart", "distribution_chart"}:
         return finalize_hermes_intent_plan({
             "intent": "smart_indicator_explain",
-            "tools": ["indicator.detail", "dashboard.context"] + (["knowledge.search"] if selected_knowledge_ids else []) + (["attachment.context"] if has_attachments else []),
+            "tools": ["indicator.detail", "dashboard.context"] + (["attachment.context"] if has_attachments else []),
             "stock_code": stock_code,
             "indicator_code": indicator_code,
             "display_mode": "structured" if indicator_code else "text",
@@ -6144,8 +6149,6 @@ def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attac
         product_tools = []
         if scope_flags["dashboard"] or scope_flags["indicator"]:
             product_tools.append("dashboard.context")
-        if selected_knowledge_ids:
-            product_tools.append("knowledge.search")
         if has_attachments:
             product_tools.append("attachment.context")
         return finalize_hermes_intent_plan({
@@ -6158,7 +6161,7 @@ def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attac
     if any(keyword in lowered for keyword in [item.lower() for item in indicator_keywords]):
         return finalize_hermes_intent_plan({
             "intent": "smart_indicator_explain",
-            "tools": ["indicator.detail", "dashboard.context"] + (["knowledge.search"] if selected_knowledge_ids else []) + (["attachment.context"] if has_attachments else []),
+            "tools": ["indicator.detail", "dashboard.context"] + (["attachment.context"] if has_attachments else []),
             "stock_code": stock_code,
             "indicator_code": indicator_code,
             "display_mode": "structured" if indicator_code else "text",
@@ -6167,7 +6170,7 @@ def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attac
     if indicator_code:
         return finalize_hermes_intent_plan({
             "intent": "smart_indicator_explain",
-            "tools": ["indicator.detail", "dashboard.context"] + (["knowledge.search"] if selected_knowledge_ids else []) + (["attachment.context"] if has_attachments else []),
+            "tools": ["indicator.detail", "dashboard.context"] + (["attachment.context"] if has_attachments else []),
             "stock_code": stock_code,
             "indicator_code": indicator_code,
             "display_mode": "structured",
@@ -6185,8 +6188,6 @@ def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attac
         product_tools = []
         if scope_flags["dashboard"] or scope_flags["indicator"]:
             product_tools.append("dashboard.context")
-        if selected_knowledge_ids:
-            product_tools.append("knowledge.search")
         if has_attachments:
             product_tools.append("attachment.context")
         return finalize_hermes_intent_plan({
@@ -6199,7 +6200,7 @@ def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attac
     if any(keyword in lowered for keyword in [item.lower() for item in evidence_keywords]):
         return finalize_hermes_intent_plan({
             "intent": "evidence_chain_analysis" if not stock_code else "multi_tool_research",
-            "tools": ["evidence.search"] + (["watchlist.detail"] if stock_code else []) + (["attachment.context"] if has_attachments else []),
+            "tools": (["watchlist.detail"] if stock_code else []) + (["attachment.context"] if has_attachments else []),
             "stock_code": stock_code,
             "display_mode": "structured" if stock_code else "text",
             "reason": "命中复盘或证据链问题",
@@ -6207,7 +6208,7 @@ def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attac
     if stock_code or any(keyword in lowered for keyword in [item.lower() for item in stock_keywords]):
         return finalize_hermes_intent_plan({
             "intent": "watchlist_fundamental" if not selected_knowledge_ids and not has_attachments else "multi_tool_research",
-            "tools": ["watchlist.detail"] + (["knowledge.search"] if selected_knowledge_ids else []) + (["attachment.context"] if has_attachments else []),
+            "tools": ["watchlist.detail"] + (["attachment.context"] if has_attachments else []),
             "stock_code": stock_code,
             "display_mode": "structured" if stock_code else "text",
             "reason": "命中个股基本面问题",
@@ -6215,7 +6216,7 @@ def default_hermes_intent_plan(question_text, selected_knowledge_ids=None, attac
     if selected_knowledge_ids or any(keyword in lowered for keyword in [item.lower() for item in knowledge_keywords]):
         return finalize_hermes_intent_plan({
             "intent": "knowledge_lookup",
-            "tools": ["knowledge.search"] + (["attachment.context"] if has_attachments else []),
+            "tools": ["attachment.context"] if has_attachments else [],
             "stock_code": stock_code,
             "display_mode": "text",
             "reason": "命中知识或方法问题",
@@ -6331,6 +6332,7 @@ def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_
                 selected_knowledge_ids=selected_knowledge_ids,
                 messages=messages,
                 memory_context_text=str((memory_state or {}).get("context_text") or "").strip(),
+                scope_result=scope_result,
             ),
             feature_code="hermes_intent_router",
             feature_label="Hermes 意图路由",
@@ -6355,6 +6357,10 @@ def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_
         display_mode = str(parsed.get("display_mode") or "text").strip()
         if display_mode not in {"text", "structured"}:
             raise RuntimeError("hermes_intent_router_invalid_display_mode")
+        normalized_scope_status = str((scope_result or {}).get("status") or "allowed").strip() or "allowed"
+        if normalized_scope_status == "blocked":
+            intent = "out_of_scope_redirect"
+            tools = []
         return finalize_hermes_intent_plan({
             "intent": intent,
             "tools": tools[:4],
@@ -6363,6 +6369,9 @@ def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_
             "display_mode": display_mode,
             "reason": str(parsed.get("reason") or "").strip()[:200] or "LLM 路由",
             "preferred_mode": str(parsed.get("preferred_mode") or preferred_mode or "").strip().lower(),
+            "scope_status": normalized_scope_status,
+            "guard_message": str((scope_result or {}).get("message") or "").strip() if normalized_scope_status == "blocked" else "",
+            "guard_suggestions": copy.deepcopy((scope_result or {}).get("suggestions") or []) if normalized_scope_status == "blocked" else [],
         }, question_text=question_text, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids), llm_model, "llm_router"
     except RuntimeError:
         raise
@@ -7398,21 +7407,6 @@ def get_hermes_tool_registry():
             "output_key": "attachment_context",
             "executor": lambda runtime: hermes_tool_attachment_context(runtime.get("attachments")),
         },
-        "knowledge.search": {
-            "output_key": "knowledge",
-            "executor": lambda runtime: hermes_tool_knowledge_search(
-                tenant_slug=runtime.get("tenant_slug") or "",
-                question_text=runtime.get("question_text") or "",
-                selected_knowledge_ids=runtime.get("selected_knowledge_ids") or [],
-            ),
-        },
-        "evidence.search": {
-            "output_key": "evidence",
-            "executor": lambda runtime: hermes_tool_evidence_search(
-                tenant_slug=runtime.get("tenant_slug") or "",
-                question_text=runtime.get("question_text") or "",
-            ),
-        },
         "dashboard.context": {
             "output_key": "dashboard_context",
             "executor": lambda runtime: hermes_tool_dashboard_context(
@@ -7456,15 +7450,8 @@ def build_hermes_tool_execution_plan(plan, web_answer=False):
         if tool_name in HERMES_ALLOWED_TOOLS and tool_name not in ordered:
             ordered.append(tool_name)
 
-    # Research plans may put knowledge first, but pure chat plans must not
-    # touch the vector store merely because Hermes is enabled.
-    if requested:
-        _push("knowledge.search")
     for tool_name in requested:
-        if tool_name != "knowledge.search":
-            _push(tool_name)
-    if web_answer:
-        _push("web.search")
+        _push(tool_name)
     return ordered
 
 
@@ -7526,8 +7513,6 @@ HERMES_INTENT_LABELS = {
 
 HERMES_TOOL_LABELS = {
     "attachment.context": "附件解析",
-    "knowledge.search": "知识检索",
-    "evidence.search": "证据链检索",
     "dashboard.context": "Dashboard 上下文",
     "watchlist.detail": "个股详情分析",
     "indicator.detail": "指标图表分析",
@@ -7553,7 +7538,7 @@ def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode
         planning_bits.append(f"能力分类：{capability_label}")
     if preferred_mode and preferred_mode != "auto":
         planning_bits.append(f"偏好模式：{preferred_mode}")
-    planning_bits.append("先查当前租户知识库")
+    planning_bits.append("由 LLM 直接识别意图并选择工具")
     if web_answer:
         planning_bits.append("已启用互联网补充")
     if attachments:
@@ -7627,7 +7612,7 @@ def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode
     ]
     return {
         "headline": "Hermes Agent 已完成本轮编排",
-        "summary": f"先按“{capability_label or '研究问答'}”拆解问题，再调度固定知识、平台工具与可选互联网补充，最后整合成可读回答。",
+        "summary": f"由 LLM 直接识别“{capability_label or '研究问答'}”，按需调度平台工具，最后整合成可读回答。",
         "steps": steps,
     }
 
@@ -7785,7 +7770,7 @@ def build_hermes_text_artifact(question_text, plan, synthesis, tool_outputs, cit
             "summary": str(item.get("algorithm_detail") or item.get("interpretation") or "").strip()[:160],
         })
     web_matches = ((tool_outputs.get("web_search") or {}).get("matches") or []) if isinstance(tool_outputs, dict) else []
-    footer_suffix = "已先查租户知识，再补充互联网公开信息。" if web_matches else "已优先基于当前租户知识库和平台内工具回答。"
+    footer_suffix = "已补充互联网公开信息。" if web_matches else "已基于模型和已执行的平台工具回答。"
     if intent == "small_talk":
         return {
             "type": "text_response",
@@ -8553,7 +8538,7 @@ def build_hermes_synthesis_prompt(question_text, plan, tool_outputs, tenant_slug
         "你同时承担正向鼓励型助手人格：面对用户问题时，先给一句简短、自然、专业的正向反馈，提供稳定的情绪价值，但不要夸张、不要肉麻，也不要偏离研究主题。"
         "这句正向反馈要放在回答最前面，再进入结论、依据、边界或下一步。"
         "优先依据工具结果，不要编造不存在的数据。"
-        "必须先依据租户知识结果，再参考平台内工具，最后才参考互联网补充结果。"
+        "只依据已执行的工具结果、会话记忆和用户问题作答；不要声称执行了未列出的检索。"
         "如果存在租户自选股K线标注摘要，应把它视为研究侧补充证据，融入结论、解读或边界说明。"
         "如果意图是 small_talk，只输出自然、简短、像真人一样的回应；不要输出标题、摘要、路由说明、过程说明，也不要写‘用户进行了简单问候’或‘助手需要确认研究状态’这类内部描述。此时 summary、lead_conclusion、bullets、analysis_sections、next_steps、citations 应为空。"
         "如果存在互联网补充结果，可以按公开信息口径组织回答，但不能把互联网信息盖过租户知识。"
@@ -8644,7 +8629,10 @@ def build_hermes_query_response(body):
     selected_knowledge_ids = payload.get("selected_knowledge_ids") if isinstance(payload.get("selected_knowledge_ids"), list) else []
     attachments = payload.get("attachments") if isinstance(payload.get("attachments"), list) else []
     preferred_mode = str(payload.get("preferred_mode") or "").strip().lower()
-    web_answer = bool(payload.get("web_answer")) and hermes_settings.get("internet_answer_enabled") is True
+    # Internet search is intentionally not part of the current Hermes
+    # product surface. Keep this server-side guard so stale clients cannot
+    # re-enable it by posting web_answer=true.
+    web_answer = False
     entry_point = str(payload.get("entry_point") or "hermes_chat").strip() or "hermes_chat"
     messages = normalize_hermes_messages(payload.get("messages"))
     question_text = extract_hermes_question_text(messages, payload.get("question"))
@@ -8972,7 +8960,9 @@ def build_hermes_query_response(body):
             "web_answer": bool(runtime.get("web_answer")),
             "missing_capability": copy.deepcopy(missing_capability) if missing_capability else None,
             "source_policy": {
-                "knowledge_first": True,
+                "knowledge_first": False,
+                "intent_routing": "llm_only",
+                "embedding_query_enabled": False,
                 "web_supplement_enabled": bool(runtime.get("web_answer")),
                 "global_web_enabled": hermes_settings.get("internet_answer_enabled") is True,
             },
