@@ -1156,25 +1156,33 @@ def analyze_review_watchlist_with_llm(
             )
         progress_state = {"last_at": 0.0, "last_count": 0}
         sse_chunks = []
+        sse_raw_events = []
 
-        def _report_sse_progress(event_count, event_text, force=False):
+        def _report_sse_progress(event_count, event_text, force=False, raw_event=""):
             if not runtime.get("job_code"):
                 return
             if event_text:
                 sse_chunks.append(str(event_text))
+            if raw_event:
+                sse_raw_events.append(str(raw_event))
             now_value = time.time()
             if not force and event_count - progress_state["last_count"] < 4 and now_value - progress_state["last_at"] < 5:
                 return
             progress_state["last_at"] = now_value
             progress_state["last_count"] = event_count
             partial_text = _merge_gangtise_sse_texts(sse_chunks)
+            raw_text = "\n\n".join(sse_raw_events).strip()
             report_user_async_job_progress(
                 runtime["job_code"],
                 stage="watchlist_gangtise_sse_streaming",
                 percent=min(80, 70 + min(10, event_count // 4)),
                 summary="Gangtise Agent SSE 正在返回多股分析",
                 log_text=f"已收到 Gangtise Agent SSE 第 {event_count} 个响应事件。",
-                extra_result={"event_count": event_count, "partial_text": partial_text[:12000]},
+                extra_result={
+                    "event_count": event_count,
+                    "partial_text": partial_text[:12000],
+                    "raw_text": raw_text[:12000],
+                },
             )
 
         gangtise_result = call_gangtise_agent_sse(
@@ -1185,7 +1193,8 @@ def analyze_review_watchlist_with_llm(
             timeout=180,
             progress_callback=_report_sse_progress,
         )
-        combined_text = str(gangtise_result.get("text") or "").strip()
+        raw_text = str(gangtise_result.get("raw_text") or "").strip()
+        combined_text = raw_text or str(gangtise_result.get("text") or "").strip()
         if not combined_text:
             raise RuntimeError("review_watchlist_gangtise_empty_response")
         annotation_evidence = []
@@ -1224,6 +1233,7 @@ def analyze_review_watchlist_with_llm(
                     "sector_profiles": copy.deepcopy(state.get("sector_profiles") or []),
                     "items": [],
                     "combined_text": combined_text,
+                    "raw_text": raw_text,
                     "provider": gangtise_result.get("provider") or "Gangtise Agent助手 SSE",
                     "endpoint": gangtise_result.get("endpoint") or "/application/open-ai/ai/chat/sse",
                     "request_text": request_text,
@@ -1610,6 +1620,7 @@ def compose_review_structured_preview(
             "sector_profiles": copy.deepcopy(watchlist_result.get("sector_profiles") or []),
             "items": copy.deepcopy(watchlist_result.get("items") or []),
             "combined_text": str(watchlist_result.get("combined_text") or "").strip(),
+            "raw_text": str(watchlist_result.get("raw_text") or "").strip(),
             "provider": str(watchlist_result.get("provider") or "").strip(),
             "endpoint": str(watchlist_result.get("endpoint") or "").strip(),
             "request_text": str(watchlist_result.get("request_text") or "").strip(),

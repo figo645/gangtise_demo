@@ -5704,7 +5704,8 @@
                   <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="openAdminTaskDetail('{{ task.task_code }}')">详情</button>
                   <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="openAdminTaskEditor('{{ task.task_code }}')">编辑</button>
                   <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="runAdminTask('{{ task.task_code }}', false)">执行</button>
-                  <button class="btn-sm-blue" style="padding:3px 9px;font-size:11px" onclick="runAdminTask('{{ task.task_code }}', true)">强制</button>
+                  <button class="btn-sm-blue" style="padding:3px 9px;font-size:11px" onclick="runAdminTask('{{ task.task_code }}', true)">{% if task.task_code == 'market_snapshot_sync' %}人工刷新{% else %}强制刷新{% endif %}</button>
+                  <button class="btn-outline" style="padding:3px 9px;font-size:11px;color:#F3A6A6;border-color:rgba(243,166,166,0.35)" onclick="stopAdminTask('{{ task.task_code }}')">停止</button>
                 </td>
               </tr>
               {% endfor %}
@@ -7039,7 +7040,8 @@ function renderAdminTaskCenter() {
           <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="openAdminTaskDetail('${escapeHtml(task.task_code || '')}')">详情</button>
           <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="openAdminTaskEditor('${escapeHtml(task.task_code || '')}')">编辑</button>
           <button class="btn-outline" style="padding:3px 9px;font-size:11px;margin-right:4px" onclick="runAdminTask('${escapeHtml(task.task_code || '')}', false)">执行</button>
-          <button class="btn-sm-blue" style="padding:3px 9px;font-size:11px" onclick="runAdminTask('${escapeHtml(task.task_code || '')}', true)">强制</button>
+          <button class="btn-sm-blue" style="padding:3px 9px;font-size:11px" onclick="runAdminTask('${escapeHtml(task.task_code || '')}', true)">${task.task_code === 'market_snapshot_sync' ? '人工刷新' : '强制刷新'}</button>
+          <button class="btn-outline" style="padding:3px 9px;font-size:11px;color:#F3A6A6;border-color:rgba(243,166,166,0.35)" onclick="stopAdminTask('${escapeHtml(task.task_code || '')}')">停止</button>
         </td>
       </tr>
     `).join('') || '<tr><td colspan="8" style="text-align:center;color:#8899aa;padding:20px 0">暂无任务</td></tr>';
@@ -8497,6 +8499,21 @@ async function runAdminTask(taskCode, forceRun) {
     await refreshAdminIndicatorHub(false);
   }
   showToast(`任务 ${taskCode} 已执行`);
+}
+
+async function stopAdminTask(taskCode) {
+  if (!window.confirm(`确认停止任务 ${taskCode} 的自动调度吗？正在执行的行业同步会在当前请求结束后停止后续请求。`)) return;
+  const res = await fetch(`/api/admin/tasks/${encodeURIComponent(taskCode)}/stop`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+  });
+  const data = await res.json();
+  if (!res.ok || !data.ok) {
+    showToast((data && data.error) || '任务停止失败');
+    return;
+  }
+  applyAdminTaskCenterPayload(data);
+  showToast(`任务 ${taskCode} 已停止`);
 }
 
 async function refreshAdminIndicatorHub(showMessage) {

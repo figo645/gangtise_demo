@@ -7227,6 +7227,7 @@ let kwReviewWatchlistSearchItems = [];
 let kwReviewWatchlistSearchQuery = '';
 let kwReviewWatchlistSearchTimer = null;
 let kwReviewWatchlistSearchRequestSeq = 0;
+let kwReviewWatchlistAddedItems = [];
 const KW_KNOWLEDGE_INPUT_TYPES = {
   voice: {
     label: '语音输入',
@@ -9079,7 +9080,8 @@ function kwNormalizeReviewStructuredPreview(payload) {
     },
     watchlist_analysis_section: {
       sector_summary: String(watchlistAnalysisSection.sector_summary || '').trim(),
-      combined_text: String(watchlistAnalysisSection.combined_text || '').trim(),
+      raw_text: String(watchlistAnalysisSection.raw_text || source.raw_text || '').trim(),
+      combined_text: String(watchlistAnalysisSection.combined_text || watchlistAnalysisSection.raw_text || source.raw_text || '').trim(),
       provider: String(watchlistAnalysisSection.provider || '').trim(),
       endpoint: String(watchlistAnalysisSection.endpoint || '').trim(),
       request_text: String(watchlistAnalysisSection.request_text || '').trim(),
@@ -9805,6 +9807,7 @@ function kwChooseReviewWatchlistAnalysis(decision) {
   kwReviewDraft.flowStage = 'watchlist_select';
   kwReviewWatchlistSearchItems = [];
   kwReviewWatchlistSearchQuery = '';
+  kwReviewWatchlistAddedItems = [];
   kwReviewWorkspacePanel = 'input';
   kwRenderReviewStudio();
 }
@@ -10310,6 +10313,11 @@ function kwRenderReviewWatchlistSelector() {
     return;
   }
   const list = getKwTenantWatchlistFocus();
+  const addedItems = Array.isArray(kwReviewWatchlistAddedItems) ? kwReviewWatchlistAddedItems : [];
+  const displayItems = [
+    ...list.map((name) => ({ name: String(name || '').trim(), code: '' })),
+    ...addedItems.filter((item) => !list.includes(String(item.name || '').trim())),
+  ].filter((item) => item.name);
   const selected = Array.isArray(kwReviewDraft.selectedWatchlist) ? kwReviewDraft.selectedWatchlist : [];
   host.innerHTML = `
     <div class="kw-review-runtime-item">
@@ -10330,10 +10338,10 @@ function kwRenderReviewWatchlistSelector() {
       ` : ''}
       <div class="kw-review-runtime-desc" style="margin-top:14px;font-weight:700;color:var(--text-main)">我的自选股</div>
       <div style="display:grid;gap:7px;margin-top:8px">
-        ${list.map((name) => `
+        ${displayItems.map((item) => `
           <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid rgba(47,116,192,0.10);border-radius:9px;background:#F8FBFF;color:var(--text-main);font-size:12px;cursor:pointer">
-            <input type="checkbox" ${selected.includes(name) ? 'checked' : ''} onchange="kwToggleReviewWatchlistOption('${escapeAttr(name)}', this.checked)" />
-            <span>${escapeHtml(name)}</span>
+            <input type="checkbox" ${selected.includes(item.name) ? 'checked' : ''} onchange="kwToggleReviewWatchlistOption('${escapeAttr(item.name)}', this.checked)" />
+            <span>${escapeHtml(item.name)}${item.code ? `<small style="display:block;color:var(--gray-400);margin-top:2px">${escapeHtml(item.code)}</small>` : ''}</span>
           </label>
         `).join('') || '<div class="kw-review-runtime-desc">当前没有个人自选股，可通过上方搜索加入。</div>'}
       </div>
@@ -10359,7 +10367,10 @@ function kwAddReviewWatchlistCandidate(index) {
   const next = new Set(kwReviewDraft.selectedWatchlist || []);
   next.add(name);
   kwReviewDraft.selectedWatchlist = Array.from(next);
-  kwReviewWatchlistSearchItems = [];
+  kwReviewWatchlistAddedItems = [
+    ...(kwReviewWatchlistAddedItems || []).filter((candidate) => String(candidate.name || '').trim() !== name),
+    { name, code: String(item.code || '').trim(), market: String(item.market || '').trim() },
+  ];
   kwRenderReviewStudio();
 }
 
@@ -10380,6 +10391,12 @@ function kwSearchReviewWatchlistCandidates(value) {
       if (requestSeq !== kwReviewWatchlistSearchRequestSeq) return;
       if (!resp.ok || data.ok === false) throw new Error((data && data.error) || 'watchlist_search_failed');
       kwReviewWatchlistSearchItems = Array.isArray(data.items) ? data.items : [];
+      const exact = kwReviewWatchlistSearchItems.find((item) => {
+        const itemName = String(item && item.name || '').trim().toLowerCase();
+        const itemCode = String(item && item.code || '').trim().toLowerCase();
+        return itemName === query.toLowerCase() || itemCode === query.toLowerCase();
+      });
+      if (exact) kwAddReviewWatchlistCandidate(kwReviewWatchlistSearchItems.indexOf(exact));
       kwRenderReviewStudio();
     } catch (error) {
       if (requestSeq === kwReviewWatchlistSearchRequestSeq) kwRenderReviewStudio();

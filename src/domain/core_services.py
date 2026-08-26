@@ -7059,6 +7059,46 @@ def update_admin_task_status(task_code, **fields):
     db.commit()
 
 
+_admin_task_cancel_lock = threading.Lock()
+_admin_task_cancel_requests = set()
+
+
+def request_admin_task_stop(task_code):
+    normalized_task_code = slugify_code(task_code, "task")
+    if not get_admin_task_config(normalized_task_code):
+        raise ValueError("task_not_found")
+    with _admin_task_cancel_lock:
+        _admin_task_cancel_requests.add(normalized_task_code)
+    db = get_db()
+    db.execute(
+        """
+        UPDATE admin_task_configs
+        SET enabled = 0, last_next_run_at = '', last_run_message = ?, updated_at = ?
+        WHERE task_code = ?
+        """,
+        ("已手动停止调度", now_ts(), normalized_task_code),
+    )
+    db.commit()
+    return get_admin_task_config(normalized_task_code)
+
+
+def clear_admin_task_stop_request(task_code):
+    normalized_task_code = slugify_code(task_code, "task")
+    with _admin_task_cancel_lock:
+        _admin_task_cancel_requests.discard(normalized_task_code)
+
+
+def is_admin_task_stop_requested(task_code):
+    normalized_task_code = slugify_code(task_code, "task")
+    with _admin_task_cancel_lock:
+        return normalized_task_code in _admin_task_cancel_requests
+
+
+def assert_admin_task_not_stopped(task_code):
+    if is_admin_task_stop_requested(task_code):
+        raise RuntimeError("admin_task_cancelled")
+
+
 def create_admin_task_run(task, trigger_mode="scheduler"):
     db = get_db()
     run_code = f"{task['task_code']}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
@@ -7094,11 +7134,13 @@ def create_admin_task_run(task, trigger_mode="scheduler"):
     return run_code
 
 
-def finish_admin_task_run(run_code, task_code, success, started_at_perf, summary="", error_message="", result=None):
+def finish_admin_task_run(run_code, task_code, success, started_at_perf, summary="", error_message="", result=None, status_override=""):
     db = get_db()
     finished_at = now_ts()
     duration_ms = int((time.perf_counter() - started_at_perf) * 1000)
-    run_status = "success" if success else "failed"
+    run_status = str(status_override or "").strip().lower() or ("success" if success else "failed")
+    if run_status not in {"success", "failed", "cancelled"}:
+        run_status = "failed"
     db.execute(
         """
         UPDATE admin_task_runs
@@ -7241,6 +7283,7 @@ def run_admin_task(task_code, trigger_mode="manual", force=False):
     task = get_admin_task_config(task_code)
     if not task:
         raise ValueError("task_not_found")
+    clear_admin_task_stop_request(task_code)
     start_perf = time.perf_counter()
     run_code = create_admin_task_run(task, trigger_mode=trigger_mode)
     try:
@@ -7265,6 +7308,19 @@ def run_admin_task(task_code, trigger_mode="manual", force=False):
         finish_admin_task_run(run_code, task["task_code"], True, start_perf, summary=summary, result=result)
         return {"run_code": run_code, "task": task, "summary": summary, "result": result}
     except Exception as exc:
+        if str(exc).strip() == "admin_task_cancelled":
+            summary = "任务已手动停止"
+            result = {"cancelled": True, "error_type": type(exc).__name__}
+            finish_admin_task_run(
+                run_code,
+                task["task_code"],
+                False,
+                start_perf,
+                summary=summary,
+                result=result,
+                status_override="cancelled",
+            )
+            return {"run_code": run_code, "task": get_admin_task_config(task["task_code"]), "summary": summary, "result": result}
         finish_admin_task_run(
             run_code,
             task["task_code"],
@@ -7275,6 +7331,8 @@ def run_admin_task(task_code, trigger_mode="manual", force=False):
             result={"error_type": type(exc).__name__},
         )
         raise
+    finally:
+        clear_admin_task_stop_request(task_code)
 
 
 def build_admin_task_center_payload():

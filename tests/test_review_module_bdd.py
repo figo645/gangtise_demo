@@ -2,6 +2,7 @@ import copy
 import json
 import unittest
 from datetime import date
+from pathlib import Path
 from unittest import mock
 from unittest.mock import patch
 
@@ -21,6 +22,9 @@ from src.domain.core_services import (
     sanitize_user_facing_source_text,
 )
 from src.services import get_tenant_configs
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _tenant_slug():
@@ -271,6 +275,23 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("证据链总结", html)
         self.assertNotIn("模型记录", html)
         self.assertIn("syncPublishedReviewStateToH5((user && user.tenant && user.tenant.slug) || '', result);", html)
+
+    def test_given_exact_stock_search_in_review_stage_two_then_candidate_is_added_and_selected(self):
+        """A precise name/code lookup must become a checked analysis item without another click."""
+        h5 = (PROJECT_ROOT / "templates" / "h5.html").read_text(encoding="utf-8")
+        workbench = (PROJECT_ROOT / "templates" / "kol_workbench.html").read_text(encoding="utf-8")
+
+        for html, state_name, add_function in (
+            (h5, "reviewWatchlistAddedItems", "addReviewWatchlistCandidate"),
+            (workbench, "kwReviewWatchlistAddedItems", "kwAddReviewWatchlistCandidate"),
+        ):
+            with self.subTest(state_name=state_name):
+                self.assertIn(f"let {state_name} = [];", html)
+                self.assertIn("const displayItems = [", html)
+                self.assertIn("...addedItems.filter", html)
+                self.assertIn(f"if (exact) {add_function}(", html)
+                self.assertIn("next.add(name);", html)
+                self.assertIn("type=\"checkbox\" ${selected", html)
 
     def test_given_h5_review_when_page_renders_then_published_articles_use_current_tenant_pages(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slug}")

@@ -3355,7 +3355,7 @@ body { background: var(--surface-2); color: var(--text-main); }
   background:#FFFFFF;
   border:1px solid rgba(47,116,192,0.18);
   border-radius:12px;
-  color:var(--white);
+  color:var(--text-main);
   font-size:13px;
   padding:11px 12px;
   outline:none;
@@ -5644,6 +5644,7 @@ let reviewWatchlistSearchItems = [];
 let reviewWatchlistSearchQuery = '';
 let reviewWatchlistSearchTimer = null;
 let reviewWatchlistSearchRequestSeq = 0;
+let reviewWatchlistAddedItems = [];
 
 function normalizeReviewStructuredPreview(payload) {
   const source = payload && typeof payload === 'object' ? payload : {};
@@ -5664,7 +5665,8 @@ function normalizeReviewStructuredPreview(payload) {
     },
     watchlist_analysis_section: {
       sector_summary: String(watchlistAnalysisSection.sector_summary || '').trim(),
-      combined_text: String(watchlistAnalysisSection.combined_text || source.partial_text || '').trim(),
+      raw_text: String(watchlistAnalysisSection.raw_text || source.raw_text || '').trim(),
+      combined_text: String(watchlistAnalysisSection.combined_text || watchlistAnalysisSection.raw_text || source.raw_text || source.partial_text || '').trim(),
       sector_profiles: Array.isArray(watchlistAnalysisSection.sector_profiles) ? watchlistAnalysisSection.sector_profiles.map((item) => ({
         sector: String((item || {}).sector || '').trim(),
         stock_names: Array.isArray((item || {}).stock_names) ? item.stock_names.slice(0) : [],
@@ -8784,6 +8786,11 @@ function renderReviewWatchlistSelectionPanel() {
   if (reviewTriggerDraft.flowStage !== 'watchlist_select') return '';
   const user = getActiveDemoUser();
   const personalList = getTenantWatchlistFocus(user.tenant.id);
+  const addedItems = Array.isArray(reviewWatchlistAddedItems) ? reviewWatchlistAddedItems : [];
+  const displayItems = [
+    ...personalList.map((name) => ({ name: String(name || '').trim(), code: '' })),
+    ...addedItems.filter((item) => !personalList.includes(String(item.name || '').trim())),
+  ].filter((item) => item.name);
   const selected = new Set(reviewTriggerDraft.selectedWatchlist || []);
   const candidates = Array.isArray(reviewWatchlistSearchItems) ? reviewWatchlistSearchItems : [];
   return `
@@ -8805,10 +8812,10 @@ function renderReviewWatchlistSelectionPanel() {
       ` : ''}
       <div style="font-size:12px;font-weight:700;color:var(--text-main);margin-top:14px">我的自选股</div>
       <div style="display:grid;gap:7px;margin-top:8px">
-        ${personalList.map((name) => `
+        ${displayItems.map((item) => `
           <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid rgba(47,116,192,0.10);border-radius:9px;background:#F8FBFF;color:var(--text-main);font-size:12px;cursor:pointer">
-            <input type="checkbox" ${selected.has(name) ? 'checked' : ''} onchange="toggleReviewWatchlistOption('${escapeAttr(name)}', this.checked)" />
-            <span>${escapeHtml(name)}</span>
+            <input type="checkbox" ${selected.has(item.name) ? 'checked' : ''} onchange="toggleReviewWatchlistOption('${escapeAttr(item.name)}', this.checked)" />
+            <span>${escapeHtml(item.name)}${item.code ? `<small style="display:block;color:var(--gray-400);margin-top:2px">${escapeHtml(item.code)}</small>` : ''}</span>
           </label>
         `).join('') || '<div style="font-size:11px;color:var(--gray-400)">当前没有个人自选股，可通过上方搜索加入。</div>'}
       </div>
@@ -8834,7 +8841,10 @@ function addReviewWatchlistCandidate(index) {
   const next = new Set(reviewTriggerDraft.selectedWatchlist || []);
   next.add(name);
   reviewTriggerDraft.selectedWatchlist = Array.from(next);
-  reviewWatchlistSearchItems = [];
+  reviewWatchlistAddedItems = [
+    ...(reviewWatchlistAddedItems || []).filter((candidate) => String(candidate.name || '').trim() !== name),
+    { name, code: String(item.code || '').trim(), market: String(item.market || '').trim() },
+  ];
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
@@ -8855,6 +8865,12 @@ function searchReviewWatchlistCandidates(value) {
       if (requestSeq !== reviewWatchlistSearchRequestSeq) return;
       if (!resp.ok || data.ok === false) throw new Error((data && data.error) || 'watchlist_search_failed');
       reviewWatchlistSearchItems = Array.isArray(data.items) ? data.items : [];
+      const exact = reviewWatchlistSearchItems.find((item) => {
+        const itemName = String(item && item.name || '').trim().toLowerCase();
+        const itemCode = String(item && item.code || '').trim().toLowerCase();
+        return itemName === query.toLowerCase() || itemCode === query.toLowerCase();
+      });
+      if (exact) addReviewWatchlistCandidate(reviewWatchlistSearchItems.indexOf(exact));
       renderReviewTriggerModal(getActiveDemoUser());
     } catch (error) {
       if (requestSeq === reviewWatchlistSearchRequestSeq) renderReviewTriggerModal(getActiveDemoUser());
@@ -9339,9 +9355,11 @@ async function prepareReviewStructuredPreview() {
           const failedResult = (job && job.result) || {};
           reviewStructuredPreview = normalizeReviewStructuredPreview({
             user_input_section: { display_text: getReviewUserInputDisplayText() },
-            partial_text: failedResult.partial_text || '',
+            raw_text: failedResult.raw_text || failedResult.partial_text || '',
+            partial_text: failedResult.partial_text || failedResult.raw_text || '',
             watchlist_analysis_section: {
-              combined_text: failedResult.partial_text || '',
+              raw_text: failedResult.raw_text || failedResult.partial_text || '',
+              combined_text: failedResult.raw_text || failedResult.partial_text || '',
               sector_profiles: failedResult.sector_profiles || [],
             },
           });
@@ -9452,6 +9470,7 @@ function chooseReviewWatchlistAnalysis(decision) {
   reviewTriggerDraft.flowStage = 'watchlist_select';
   reviewWatchlistSearchItems = [];
   reviewWatchlistSearchQuery = '';
+  reviewWatchlistAddedItems = [];
   renderReviewTriggerModal(getActiveDemoUser());
 }
 

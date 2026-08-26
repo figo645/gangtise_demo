@@ -908,6 +908,18 @@ def api_run_admin_task(task_code):
     return jsonify({"ok": True, "result": result, **build_admin_task_center_payload()})
 
 
+@app.route("/api/admin/tasks/<task_code>/stop", methods=["POST"])
+def api_stop_admin_task(task_code):
+    try:
+        task = request_admin_task_stop(task_code)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    except Exception as exc:
+        app.logger.exception("Failed to stop admin task")
+        return jsonify({"ok": False, "error": str(exc)}), 500
+    return jsonify({"ok": True, "task": task, **build_admin_task_center_payload()})
+
+
 @app.route("/api/admin/task-runs")
 def api_admin_task_runs():
     task_code = str(request.args.get("task_code") or "").strip() or None

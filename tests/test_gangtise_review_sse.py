@@ -49,6 +49,9 @@ class GangtiseReviewSseTest(unittest.TestCase):
 
         self.assertTrue(result["ok"])
         self.assertEqual(result["text"], "第一段第二段第三段")
+        self.assertIn('"type":"status"', result["raw_text"])
+        self.assertIn('"data"', result["raw_text"])
+        self.assertIn("第二段", result["raw_text"])
         self.assertEqual(result["events"], 4)
 
     def test_sse_client_parses_multiple_data_lines_in_one_event(self):
@@ -98,8 +101,27 @@ class GangtiseReviewSseTest(unittest.TestCase):
 
         self.assertFalse(result["ok"])
         self.assertEqual(result["events"], 2)
+        self.assertIn('"type":"status"', result["raw_text"])
         self.assertTrue(result["event_shapes"])
         self.assertIn("type", result["event_shapes"][0])
+
+    def test_sse_client_does_not_treat_plain_processing_as_analysis(self):
+        def fake_urlopen(request, timeout):
+            return _FakeSseResponse(["data: processing\n", "\n"])
+
+        with patch(
+            "src.domain.market_services.get_gangtise_openapi_config",
+            return_value={"base_url": "https://openapi.gangtise.com"},
+        ), patch("src.domain.market_services.urlopen", side_effect=fake_urlopen):
+            result = market_services.post_gangtise_openapi_sse(
+                "/application/open-ai/ai/chat/sse",
+                {"text": "请分析股票"},
+                token="test-token",
+            )
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["text"], "")
+        self.assertEqual(result["raw_text"], "processing")
 
     def test_sse_client_sends_agent_contract_and_merges_snapshots_and_deltas(self):
         captured = {}
@@ -172,6 +194,7 @@ class GangtiseReviewSseTest(unittest.TestCase):
 
         self.assertFalse(result["ok"])
         self.assertEqual(result["text"], "已返回的部分分析")
+        self.assertIn('"content":"已返回的部分分析"', result["raw_text"])
         self.assertEqual(progress[-1][1], "已返回的部分分析")
         self.assertEqual(progress[-1][2], True)
 
@@ -193,6 +216,15 @@ class GangtiseReviewSseTest(unittest.TestCase):
         self.assertTrue(payload["askChatParam"]["webEnable"])
         self.assertEqual(payload["askChatParam"]["traceId"], "review-test")
         self.assertEqual(result["text"], "组合结论")
+
+    def test_agent_helper_returns_raw_sse_stream_for_direct_review_display(self):
+        with patch(
+            "src.domain.market_services.post_gangtise_openapi_sse",
+            return_value={"ok": True, "text": "解析文本", "raw_text": 'data: {"answerText":"解析文本"}', "duration_ms": 123, "events": 1},
+        ):
+            result = market_services.call_gangtise_agent_sse("请分析贵州茅台", trace_id="review-raw")
+
+        self.assertEqual(result["raw_text"], 'data: {"answerText":"解析文本"}')
 
     def test_watchlist_review_calls_gangtise_and_does_not_call_local_general_llm(self):
         matched = [
@@ -233,6 +265,22 @@ class GangtiseReviewSseTest(unittest.TestCase):
         self.assertEqual(result["combined_text"], "两只股票组合层面的综合结论。")
         self.assertEqual(result["items"], [])
         self.assertEqual(result["endpoint"], "/application/open-ai/ai/chat/sse")
+
+    def test_watchlist_review_prefers_raw_sse_response_without_post_processing(self):
+        matched = [{"name": "贵州茅台", "code": "600519", "market": "SH", "industry": "白酒", "annotations": []}]
+        raw_response = '{"event":"answer","unrecognized":"Gangtise 原始返回"}'
+        with patch("src.domain.ai_services.gen_watchlist_details", return_value={}), patch(
+            "src.domain.ai_services.build_watchlist_annotation_context", return_value=matched
+        ), patch(
+            "src.domain.ai_services.call_gangtise_agent_sse",
+            return_value={"text": "解析后的内容", "raw_text": raw_response, "duration_ms": 1, "events": 1},
+        ):
+            result = ai_services.analyze_review_watchlist_with_llm(
+                selected_watchlist=["贵州茅台"], review_period="day", tenant_slug="laowang"
+            )
+
+        self.assertEqual(result["combined_text"], raw_response)
+        self.assertEqual(result["raw_text"], raw_response)
 
     def test_watchlist_review_progress_persists_partial_gangtise_text(self):
         matched = [{"name": "贵州茅台", "code": "600519", "market": "SH", "industry": "白酒", "annotations": []}]

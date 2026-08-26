@@ -1059,8 +1059,28 @@ def _merge_gangtise_sse_texts(candidates):
     return merged.strip()
 
 
+def _gangtise_sse_event_has_analysis(parsed, raw_event):
+    """Keep unknown non-status events available for direct inspection."""
+    if _extract_gangtise_sse_text(parsed):
+        return True
+    if isinstance(parsed, dict):
+        if set(parsed) == {"raw"}:
+            raw_text = str(parsed.get("raw") or "").strip().lower()
+            return bool(
+                raw_text
+                and raw_text not in {"[done]", "done"}
+                and raw_text not in _GANGTISE_SSE_CONTROL_TEXTS
+            )
+        control_keys = {"type", "event", "status", "message", "msg", "code", "data", "payload"}
+        if set(parsed).issubset(control_keys):
+            return False
+        return bool(parsed)
+    raw_text = str(raw_event or "").strip().lower()
+    return bool(raw_text and raw_text not in {"[done]", "done"} and raw_text not in _GANGTISE_SSE_CONTROL_TEXTS)
+
+
 def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_callback=None):
-    """Call a Gangtise Agent SSE endpoint and return its accumulated answer text."""
+    """Call a Gangtise Agent SSE endpoint and retain the complete raw stream."""
     effective_token = str(token or "").strip()
     if not effective_token:
         token_ok, fetched_token, auth_response, auth_status, auth_duration = obtain_gangtise_openapi_token()
@@ -1071,6 +1091,7 @@ def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_cal
                 "message": str((auth_response or {}).get("message") or "Gangtise OpenAPI 鉴权失败").strip(),
                 "duration_ms": auth_duration,
                 "text": "",
+                "raw_text": "",
                 "events": 0,
             }
         effective_token = fetched_token
@@ -1089,6 +1110,7 @@ def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_cal
     )
     started = time.perf_counter()
     candidates = []
+    raw_events = []
     event_buffer = []
     event_count = 0
     event_shapes = []
@@ -1099,14 +1121,20 @@ def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_cal
             return
         raw_event = "\n".join(event_buffer).strip()
         event_buffer.clear()
-        if not raw_event or raw_event == "[DONE]":
+        if not raw_event:
+            return
+        raw_events.append(raw_event)
+        if raw_event == "[DONE]":
             return
         parsed = decode_json_payload(raw_event)
         event_shapes.append(_gangtise_sse_event_shape(parsed))
         text = _extract_gangtise_sse_text(parsed)
         # A few SSE gateways emit one logical event as multiple data lines.
         # If the joined payload is not valid JSON, still parse each fragment.
-        if "\n" in raw_event and (not text or parsed.get("raw") == raw_event):
+        if "\n" in raw_event and (
+            not text
+            or (isinstance(parsed, dict) and parsed.get("raw") == raw_event)
+        ):
             fragment_texts = []
             for fragment in raw_event.splitlines():
                 fragment_payload = decode_json_payload(fragment.strip())
@@ -1116,22 +1144,30 @@ def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_cal
             text = "".join(fragment_texts)
         if text:
             candidates.append(text)
+        elif _gangtise_sse_event_has_analysis(parsed, raw_event):
+            candidates.append(raw_event)
         event_count += 1
         if callable(progress_callback):
-            progress_callback(event_count, text)
+            try:
+                progress_callback(event_count, text, False, raw_event)
+            except TypeError:
+                progress_callback(event_count, text)
 
     def notify_partial_on_error():
         partial_text = _merge_gangtise_sse_texts(candidates)
-        if not partial_text or not callable(progress_callback):
+        raw_text = "\n\n".join(raw_events).strip()
+        if not (partial_text or raw_text) or not callable(progress_callback):
             return
         try:
-            progress_callback(event_count, partial_text, True)
+            progress_callback(event_count, partial_text, True, raw_text)
         except TypeError:
             progress_callback(event_count, partial_text)
 
     try:
         with urlopen(request_obj, timeout=timeout) as response:
             for raw_line in response:
+                if time.perf_counter() - started >= max(float(timeout or 180), 1.0):
+                    raise TimeoutError("gangtise_agent_sse_stream_timeout")
                 line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
                 if not line:
                     consume_event()
@@ -1145,6 +1181,7 @@ def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_cal
                     event_buffer.append(line)
             consume_event()
         text = _merge_gangtise_sse_texts(candidates)
+        raw_text = "\n\n".join(raw_events).strip()
         response_status = getattr(response, "status", None)
         if response_status is None and hasattr(response, "getcode"):
             response_status = response.getcode()
@@ -1161,12 +1198,15 @@ def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_cal
             "message": "" if text else "Gangtise Agent SSE 未返回可用分析文本",
             "duration_ms": round((time.perf_counter() - started) * 1000),
             "text": text,
+            "raw_text": raw_text,
             "events": event_count,
             "event_shapes": event_shapes[:6],
         }
     except HTTPError as error:
-        notify_partial_on_error()
         raw = error.read().decode("utf-8", errors="replace")
+        if raw.strip():
+            raw_events.append(raw.strip())
+        notify_partial_on_error()
         parsed = decode_json_payload(raw)
         return {
             "ok": False,
@@ -1174,6 +1214,7 @@ def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_cal
             "message": str(parsed.get("message") or parsed.get("msg") or raw or "Gangtise Agent SSE 请求失败").strip()[:500],
             "duration_ms": round((time.perf_counter() - started) * 1000),
             "text": _merge_gangtise_sse_texts(candidates),
+            "raw_text": "\n\n".join(raw_events).strip(),
             "events": event_count,
             "event_shapes": event_shapes[:6],
         }
@@ -1185,6 +1226,7 @@ def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_cal
             "message": f"Gangtise Agent SSE 网络错误：{error.reason}",
             "duration_ms": round((time.perf_counter() - started) * 1000),
             "text": _merge_gangtise_sse_texts(candidates),
+            "raw_text": "\n\n".join(raw_events).strip(),
             "events": event_count,
             "event_shapes": event_shapes[:6],
         }
@@ -1196,6 +1238,7 @@ def post_gangtise_openapi_sse(path, payload, token="", timeout=180, progress_cal
             "message": f"Gangtise Agent SSE 调用异常：{error}",
             "duration_ms": round((time.perf_counter() - started) * 1000),
             "text": _merge_gangtise_sse_texts(candidates),
+            "raw_text": "\n\n".join(raw_events).strip(),
             "events": event_count,
             "event_shapes": event_shapes[:6],
         }
@@ -1230,6 +1273,7 @@ def call_gangtise_agent_sse(text, trace_id="", mode="deep_research", web_enable=
         )
     return {
         "text": str(result.get("text") or "").strip(),
+        "raw_text": str(result.get("raw_text") or "").strip(),
         "duration_ms": int(result.get("duration_ms") or 0),
         "events": int(result.get("events") or 0),
         "mode": payload["mode"],
@@ -5628,6 +5672,7 @@ _market_snapshot_refresh_running = False
 
 def sync_market_snapshot(force=False):
     """Collect Gangtise market snapshots and persist only verified real results."""
+    assert_admin_task_not_stopped("market_snapshot_sync")
     start_date, end_date = resolve_gangtise_market_date_window(days=30)
     overview_items = []
     errors = []
@@ -5639,6 +5684,7 @@ def sync_market_snapshot(force=False):
         if isinstance(item, dict) and item.get("available") and str(item.get("data_source") or "").lower() == "gangtise openapi"
     }
     for indicator_code in MARKET_OVERVIEW_INDEX_CODES:
+        assert_admin_task_not_stopped("market_snapshot_sync")
         result = fetch_gangtise_market_index_history(indicator_code, start_date, end_date)
         item = _build_market_index_snapshot_item(indicator_code, result)
         if not item.get("available") and indicator_code in previous_items:
@@ -5929,6 +5975,7 @@ def _fetch_gangtise_sector_overview(start_date, end_date):
     items = []
     missing = []
     for sector in SHENWAN_LEVEL1_INDUSTRIES:
+        assert_admin_task_not_stopped("market_snapshot_sync")
         security_code = GANGTISE_SHENWAN_LEVEL1_CODES.get(sector)
         if not security_code:
             missing.append(f"{sector}(未配置代码)")
