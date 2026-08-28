@@ -4804,8 +4804,8 @@
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">自选股粉丝互评</div><div class="feature-toggle-desc">位置：自选股详情评论区。开启后粉丝可查看其他粉丝评论；关闭后粉丝只能看到大V评论和自己的评论，大V仍可查看租户全部评论。</div></div><label class="toggle"><input id="feature-watchlist_fan_comment_interaction" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap">
                         <div class="toggle-label">
-                          <div class="feature-toggle-title">显示本机模拟数据</div>
-                          <div class="feature-toggle-desc" id="simulation-data-policy-status">本机写入的数据会标记为“本机模拟数据”。生产环境固定不展示，无法通过此开关解除。</div>
+                          <div class="feature-toggle-title">显示开发数据</div>
+                          <div class="feature-toggle-desc" id="simulation-data-policy-status">开发环境写入的数据会标记为“本机模拟数据”。生产默认隐藏；仅平台管理员可临时开启查看。</div>
                         </div>
                         <label class="toggle"><input id="simulation-data-visible" type="checkbox" onchange="saveSimulationDataVisibility(this.checked)"><span class="toggle-slider"></span></label>
                       </div>
@@ -11843,10 +11843,10 @@ async function loadSimulationDataPolicy() {
     if (!response.ok || !data.ok) throw new Error((data && data.error) || 'simulation_policy_load_failed');
     const policy = data.policy || {};
     toggle.checked = policy.simulated_data_visible === true;
-    toggle.disabled = policy.production_forced_hidden === true;
-    status.textContent = policy.production_forced_hidden === true
-      ? '当前为生产运行环境：本机模拟数据固定隐藏，不能在此开启。'
-      : `当前为本机运行环境：新写入会自动标记为“${policy.label || '本机模拟数据'}”。关闭后，本机也会隐藏这些记录。`;
+    toggle.disabled = false;
+    status.textContent = toggle.checked
+      ? `开发数据当前可见。关闭后将仅展示真实数据。`
+      : `开发数据当前隐藏，仅展示真实数据。`;
   } catch (error) {
     toggle.disabled = true;
     status.textContent = '模拟数据策略读取失败，已停止修改该开关。';
@@ -11867,8 +11867,8 @@ async function saveSimulationDataVisibility(visible) {
     if (!response.ok || !data.ok) throw new Error((data && data.error) || 'simulation_policy_save_failed');
     const policy = data.policy || {};
     toggle.checked = policy.simulated_data_visible === true;
-    visibilityLocked = policy.production_forced_hidden === true;
-    if (status) status.textContent = toggle.checked ? '本机模拟数据已显示；生产环境仍会强制隐藏。' : '本机模拟数据已隐藏；生产环境始终保持隐藏。';
+    visibilityLocked = false;
+    if (status) status.textContent = toggle.checked ? '开发数据已显示。关闭此开关即可恢复仅显示真实数据。' : '开发数据已隐藏，当前仅显示真实数据。';
   } catch (error) {
     visibilityLocked = true;
     if (status) status.textContent = `模拟数据开关保存失败：${String(error && error.message || 'unknown_error')}`;

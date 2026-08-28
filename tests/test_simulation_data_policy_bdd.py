@@ -39,7 +39,7 @@ class SimulationDataPolicyBddTest(unittest.TestCase):
         self.assertNotIn("COALESCE(t.is_simulated, 0) = 0 AND COALESCE(sm", nested_sql)
         self.assertIn("COALESCE(knowledge_embeddings.is_simulated, 0) = 0", cte_sql)
 
-    def test_given_production_runtime_when_admin_requests_policy_then_visibility_is_forced_off(self):
+    def test_given_production_runtime_without_saved_setting_when_admin_requests_policy_then_visibility_defaults_off(self):
         with patch.dict(os.environ, {"GANGTISE_RUNTIME_ENV": "production"}, clear=False), patch.object(
             core_services, "get_app_db_connection"
         ) as get_connection:
@@ -49,16 +49,18 @@ class SimulationDataPolicyBddTest(unittest.TestCase):
 
         self.assertEqual(policy["runtime_environment"], "production")
         self.assertFalse(policy["simulated_data_visible"])
-        self.assertTrue(policy["production_forced_hidden"])
+        self.assertFalse(policy["production_forced_hidden"])
+        self.assertTrue(policy["admin_controlled"])
 
-    def test_given_production_runtime_when_admin_enables_simulated_data_then_the_request_is_rejected(self):
+    def test_given_production_runtime_when_admin_enables_simulated_data_then_the_setting_is_saved(self):
+        expected = {"simulated_data_visible": True, "admin_controlled": True}
         with app.test_request_context("/api/admin/simulation-data-policy", method="POST", json={"simulated_data_visible": True}), patch.object(
-            api_core, "save_simulation_data_visibility", side_effect=ValueError("production_simulated_data_visibility_locked")
+            api_core, "save_simulation_data_visibility", return_value=expected
         ):
-            response, status = api_core.api_admin_simulation_data_policy()
+            response = api_core.api_admin_simulation_data_policy()
 
-        self.assertEqual(status, 403)
-        self.assertEqual(response.get_json()["error"], "production_simulated_data_visibility_locked")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["policy"], expected)
 
     def test_given_visibility_migration_when_inspected_then_all_tagged_tables_receive_origin_defaults(self):
         migration = (core_services.PROJECT_ROOT / "sql" / "postgres" / "035_local_simulation_data_visibility.sql").read_text(encoding="utf-8")
@@ -69,6 +71,13 @@ class SimulationDataPolicyBddTest(unittest.TestCase):
         self.assertIn("user_watchlist_items", migration)
         self.assertIn("CREATE TRIGGER", migration)
         self.assertIn("BEFORE INSERT OR UPDATE", migration)
+
+    def test_given_control_plane_accounts_when_latest_migration_is_inspected_then_they_remain_real(self):
+        migration = (core_services.PROJECT_ROOT / "sql" / "postgres" / "041_keep_control_plane_accounts_real.sql").read_text(encoding="utf-8")
+
+        self.assertIn("role IN ('dav', 'admin')", migration)
+        self.assertIn("TG_TABLE_NAME = 'users'", migration)
+        self.assertIn("NEW.is_simulated := 0", migration)
 
     def test_given_production_visibility_when_resolving_embedded_review_snapshots_then_local_content_is_removed(self):
         tenant = {"slug": "laowang", "advisor": "财经老王", "review_snapshots": []}

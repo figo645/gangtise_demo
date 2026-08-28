@@ -37,7 +37,13 @@ RAW_VECTOR_DB_PORT="${VECTOR_DB_PORT:-${LOCAL_VECTOR_DB_PORT:-$RAW_APP_DB_PORT}}
 RAW_POSTGRES_DB="${POSTGRES_DB:-$RAW_APP_DB_NAME}"
 RAW_POSTGRES_USER="${POSTGRES_USER:-$RAW_APP_DB_USER}"
 RAW_POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$RAW_APP_DB_PASSWORD}"
-GANGTISE_RUNTIME_ENV="${GANGTISE_RUNTIME_ENV:-local}"
+if [ "$(uname -s)" = "Darwin" ]; then
+  GANGTISE_RUNTIME_ENV="${GANGTISE_RUNTIME_ENV:-local}"
+else
+  # A deployed Linux container must not inherit local-machine data behavior
+  # merely because the environment variable was omitted.
+  GANGTISE_RUNTIME_ENV="${GANGTISE_RUNTIME_ENV:-production}"
+fi
 
 APP_DB_HOST="$RAW_APP_DB_HOST"
 case "$APP_DB_HOST" in

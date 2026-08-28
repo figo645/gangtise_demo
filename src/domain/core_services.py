@@ -6152,17 +6152,20 @@ def get_simulation_runtime_environment():
 
 
 def _load_simulation_visibility_setting(connection):
-    if get_simulation_runtime_environment() != "local":
-        return False
+    runtime_environment = get_simulation_runtime_environment()
     try:
         with connection.cursor() as cursor:
             cursor.execute("SELECT setting_value FROM app_settings WHERE setting_key = %s", (SIMULATION_DATA_VISIBILITY_SETTING_KEY,))
             row = cursor.fetchone()
-        if row and str(row[0] if not isinstance(row, dict) else row.get("setting_value") or "").strip().lower() in {"0", "false", "no", "off"}:
-            return False
+        if row:
+            value = row[0] if not isinstance(row, dict) else row.get("setting_value")
+            return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
     except Exception:
         connection.rollback()
-    return True
+    # Local development keeps its historic behavior. Production and staging
+    # start fail-closed until an authenticated admin explicitly enables the
+    # development-data view.
+    return runtime_environment == "local"
 
 
 def configure_simulation_data_connection(connection):
@@ -6190,9 +6193,8 @@ def get_simulation_data_policy():
         "runtime_environment": runtime_environment,
         "local_origin_enabled": runtime_environment == "local",
         "simulated_data_visible": bool(visible),
-        # This capability is only available on the designated local Mac.
-        # Staging must not become an accidental route to view copied local data.
-        "production_forced_hidden": runtime_environment != "local",
+        "production_forced_hidden": False,
+        "admin_controlled": True,
         "label": SIMULATION_LABEL_LOCAL,
     }
 
@@ -6211,9 +6213,6 @@ def should_hide_simulated_data():
 
 
 def save_simulation_data_visibility(visible):
-    runtime_environment = get_simulation_runtime_environment()
-    if runtime_environment != "local":
-        raise ValueError("production_simulated_data_visibility_locked")
     db = get_db()
     db.execute(
         """
@@ -6238,8 +6237,14 @@ def mark_existing_local_data_as_simulated():
             return {"marked": 0, "skipped": "already_completed"}
         total = 0
         for table in SIMULATION_TAGGED_TABLES:
+            predicate = " WHERE COALESCE(is_simulated, 0) = 0"
+            # DAv and Admin identities are control-plane accounts, not
+            # development content. They must remain available to operate the
+            # production visibility switch after a full database deployment.
+            if table == "users":
+                predicate += " AND role = 'investor'"
             total += db.execute(
-                f"UPDATE {table} SET is_simulated = 1, simulation_label = ? WHERE COALESCE(is_simulated, 0) = 0",
+                f"UPDATE {table} SET is_simulated = 1, simulation_label = ?{predicate}",
                 (SIMULATION_LABEL_LOCAL,),
             ).rowcount or 0
         db.execute(
