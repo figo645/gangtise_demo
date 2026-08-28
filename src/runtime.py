@@ -238,6 +238,11 @@ DEFAULT_LLM_MODELS = [
         "enabled": True,
     },
 ]
+DEFAULT_ROLE_CAPABILITIES = {
+    "investor": ["h5", "investor"],
+    "dav": ["h5", "dav", "hermes", "workbench"],
+    "admin": ["admin", "h5", "dav", "hermes", "workbench"],
+}
 INDICATOR_DEFINITION_FIELDS = {
     "indicator_code",
     "indicator_name",
@@ -754,6 +759,7 @@ class PortalHtmlSanitizer(HTMLParser):
 DEFAULT_SITE_CONFIG = {
     "default_theme": "light",
     "default_accent": "blue",
+    "role_capabilities": copy.deepcopy(DEFAULT_ROLE_CAPABILITIES),
     "auth_settings": {
         "password_login_enabled": True,
         "wechat_login_enabled": False,

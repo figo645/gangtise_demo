@@ -4,7 +4,7 @@ from urllib.parse import parse_qs, urlsplit
 from unittest.mock import patch
 
 from src.runtime import app
-from src.web.pages import h5, resolve_login_destination
+from src.web.pages import h5, login_entry, resolve_login_destination
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -40,13 +40,24 @@ class AccountNavigationBddTest(unittest.TestCase):
         with app.test_request_context("/login"):
             destination = resolve_login_destination({"role": "admin", "tenant_slug": "laowang"}, "/kol-workbench?tenant=laowang")
 
-        self.assertEqual(destination, "/kol-workbench?tenant=laowang")
+        self.assertEqual(destination, "/login/entry?next=/kol-workbench?tenant%3Dlaowang")
 
     def test_given_admin_switching_from_h5_when_login_completes_then_admin_keeps_h5_destination(self):
         with app.test_request_context("/login"):
             destination = resolve_login_destination({"role": "admin", "tenant_slug": "laowang"}, "/h5?tenant=laowang")
 
-        self.assertEqual(destination, "/h5?tenant=laowang")
+        self.assertEqual(destination, "/login/entry?next=/h5?tenant%3Dlaowang")
+
+    def test_given_admin_entry_page_exposes_h5_workbench_and_admin_backend(self):
+        with app.test_request_context("/login/entry?next=/h5"):
+            with patch("src.web.pages.get_current_authenticated_user", return_value={"username": "admin", "role": "admin", "status": "active", "tenant_slug": "laowang"}):
+                response = app.make_response(login_entry())
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("进入 H5", html)
+        self.assertIn("进入大V工作台", html)
+        self.assertIn("进入 Admin 后台", html)
 
     def test_given_investor_switching_from_admin_when_login_completes_then_investor_returns_to_h5(self):
         with app.test_request_context("/login"):
@@ -95,7 +106,7 @@ class AccountNavigationBddTest(unittest.TestCase):
         with client.session_transaction() as stored_session:
             self.assertFalse(dict(stored_session))
 
-    def test_given_admin_credentials_on_h5_when_login_succeeds_then_admin_session_is_kept_and_browser_is_redirected_to_admin(self):
+    def test_given_admin_credentials_on_h5_when_login_succeeds_then_admin_session_is_kept_and_browser_is_redirected_to_entry_choice(self):
         admin = {"username": "admin", "role": "admin", "status": "active"}
         client = app.test_client()
         with patch("src.web.api_core.get_site_config", return_value={}), patch(
@@ -106,7 +117,7 @@ class AccountNavigationBddTest(unittest.TestCase):
             response = client.post("/api/h5/login/password", json={"username": "admin", "password": "admin123"})
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.get_json()["redirect_to"], "/admin")
+        self.assertEqual(response.get_json()["redirect_to"], "/login/entry?next=/h5")
         self.assertIsNone(response.get_json()["current_profile"])
         with client.session_transaction() as stored_session:
             self.assertEqual(stored_session.get("current_h5_username"), "admin")

@@ -436,7 +436,7 @@ def _current_watchlist_owner():
     role = str(current.get("role") or "").strip().lower()
     tenant_slug = str(current.get("tenant_slug") or ((current.get("tenant") or {}).get("slug") if isinstance(current.get("tenant"), dict) else "") or "").strip().lower()
     profile_id = str(current.get("username") or current.get("id") or "").strip()
-    if role not in {"investor", "dav"} or not tenant_slug or not profile_id:
+    if not has_role_capability(role, "h5") or not tenant_slug or not profile_id:
         return None
     return current, tenant_slug, profile_id
 
@@ -634,7 +634,7 @@ def api_save_watchlist_annotation(stock_code):
     if not tenant_slug:
         return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
     user_profile_id = str(body.get("user_profile_id") or "").strip()
-    if user_role not in {"dav", "investor"} or not user_profile_id:
+    if not has_role_capability(user_role, "h5") or not user_profile_id:
         return jsonify({"ok": False, "error": "watchlist_annotation_forbidden"}), 403
     try:
         item = save_watchlist_kline_annotation(
@@ -721,7 +721,7 @@ def api_save_watchlist_comment(stock_code):
     user_profile_id = str(body.get("user_profile_id") or "").strip()
     if not tenant_slug:
         return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
-    if user_role not in {"investor", "dav"}:
+    if not has_role_capability(user_role, "h5"):
         return jsonify({"ok": False, "error": "watchlist_comment_role_invalid"}), 400
     try:
         item = save_watchlist_comment(
@@ -777,7 +777,7 @@ def api_delete_watchlist_annotation(stock_code, annotation_ref):
     user_profile_id = str(request.args.get("user_profile_id") or "").strip()
     if not tenant_slug:
         return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
-    if user_role not in {"dav", "investor"} or not user_profile_id:
+    if not has_role_capability(user_role, "h5") or not user_profile_id:
         return jsonify({"ok": False, "error": "watchlist_annotation_forbidden"}), 403
     try:
         deleted = delete_watchlist_kline_annotation(
@@ -1448,7 +1448,7 @@ def api_h5_login_password():
             # one here because it would clear the just-created admin session.
             payload = _build_h5_auth_options_payload(site_config, current_profile={})
             payload["current_profile"] = None
-            payload["redirect_to"] = url_for("admin")
+            payload["redirect_to"] = url_for("login_entry", next="/h5")
             return jsonify({"ok": True, **payload})
         payload = _build_h5_auth_options_payload(site_config)
         payload["current_profile"] = get_current_demo_profile(site_config)
@@ -1900,9 +1900,9 @@ def api_update_kol_user_status():
     current_user = get_current_authenticated_user() or {}
     current_role = str(current_user.get("role") or "").strip().lower()
     current_tenant = str(current_user.get("tenant_slug") or "").strip().lower()
-    if current_role not in {"dav", "admin"}:
+    if not has_role_capability(current_role, "dav"):
         return jsonify({"ok": False, "error": "kol_access_required"}), 403
-    if current_role == "dav" and current_tenant != str(tenant.get("slug") or "").strip().lower():
+    if not has_role_capability(current_role, "admin") and current_tenant != str(tenant.get("slug") or "").strip().lower():
         return jsonify({"ok": False, "error": "tenant_access_denied"}), 403
     try:
         result = update_tenant_user_status(tenant["slug"], body.get("user_id"), body.get("status"))
@@ -2018,6 +2018,7 @@ def api_admin_site_config():
         {
             "default_theme": payload.get("default_theme", current.get("default_theme", "light")),
             "default_accent": payload.get("default_accent", current.get("default_accent", "blue")),
+            "role_capabilities": payload.get("role_capabilities", current.get("role_capabilities", {})),
             "auth_settings": strip_auth_settings_secret(auth_settings_payload),
             "voice_transcription": normalize_voice_transcription_config(
                 _merge_site_config(

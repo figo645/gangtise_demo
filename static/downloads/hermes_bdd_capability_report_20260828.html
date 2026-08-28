@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>小金智能体 BDD 验证报告</title>
+  <style>
+    :root { --ink:#163039; --muted:#5d7078; --line:#d7e3e6; --paper:#ffffff; --canvas:#f3f7f6; --teal:#0b6d68; --green:#087c4e; --green-bg:#e7f6ed; --blue-bg:#eaf3f8; --code:#163b46; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--canvas); color:var(--ink); font-family:"Noto Serif SC","Songti SC",serif; line-height:1.65; }
+    main { width:min(1080px,calc(100% - 32px)); margin:32px auto 56px; }
+    header { padding:30px 34px; background:var(--teal); color:#fff; border-radius:8px 8px 0 0; }
+    h1 { margin:0; font-size:30px; letter-spacing:0; }
+    .subtitle { margin:8px 0 0; color:#d6ece9; font-size:14px; }
+    .summary { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); border:1px solid var(--line); }
+    .metric { padding:17px 20px; background:var(--paper); }
+    .metric span { display:block; color:var(--muted); font-size:12px; }
+    .metric strong { display:block; margin-top:2px; color:var(--teal); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:23px; }
+    section { margin-top:20px; padding:24px 28px; background:var(--paper); border:1px solid var(--line); border-radius:8px; }
+    h2 { margin:0 0 12px; font-size:19px; color:var(--teal); }
+    h3 { margin:0; font-size:15px; }
+    p { margin:8px 0; }
+    .notice { border-left:4px solid var(--teal); background:#edf7f5; padding:13px 16px; color:#264b4c; }
+    table { width:100%; border-collapse:collapse; margin-top:14px; font-size:13px; }
+    th, td { padding:11px 12px; vertical-align:top; text-align:left; border-bottom:1px solid var(--line); }
+    th { color:#335158; background:#f1f6f6; font-size:12px; }
+    tr:last-child td { border-bottom:0; }
+    code { color:var(--code); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; overflow-wrap:anywhere; }
+    .tag { display:inline-block; padding:2px 7px; border-radius:3px; color:var(--green); background:var(--green-bg); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; font-weight:700; }
+    .scenario { margin-top:14px; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+    .scenario-head { display:flex; gap:12px; align-items:center; padding:12px 15px; background:#f7faf9; }
+    .scenario-num { flex:0 0 auto; width:25px; height:25px; border-radius:50%; display:grid; place-items:center; color:#fff; background:var(--teal); font:700 12px ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .steps { display:grid; grid-template-columns:92px 1fr; margin:0; }
+    .steps dt, .steps dd { margin:0; padding:10px 15px; border-top:1px solid var(--line); font-size:13px; }
+    .steps dt { color:var(--teal); background:#fbfdfd; font-weight:700; }
+    .steps dd { color:#31464c; }
+    .ok { color:var(--green); font-weight:700; }
+    footer { padding:16px 2px; color:var(--muted); font-size:12px; }
+    @media (max-width:720px) { main { width:min(100% - 20px,1080px); margin-top:10px; } header, section { padding:21px 18px; } h1 { font-size:24px; } .summary { grid-template-columns:repeat(2,1fr); } .steps { grid-template-columns:70px 1fr; } th,td { padding:9px 7px; } .table-wrap { overflow-x:auto; } table { min-width:700px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>小金智能体 BDD 验证报告</h1>
+      <p class="subtitle">Hermes 意图路由与 Gangtise 能力分发 · 生成日期：2026-08-28</p>
+    </header>
+    <div class="summary">
+      <div class="metric"><span>BDD 场景</span><strong>6</strong></div>
+      <div class="metric"><span>专项测试</span><strong>28 passed</strong></div>
+      <div class="metric"><span>Gangtise 直出场景</span><strong>5</strong></div>
+      <div class="metric"><span>LLM 闲聊场景</span><strong>1</strong></div>
+    </div>
+
+    <section>
+      <h2>结论</h2>
+      <div class="notice">所有定义场景均先由配置的大模型完成语义意图判断，再由服务端验证意图、目标类型、证券实体和唯一工具。研究类结果由 Gangtise 直接展示，不经过本地 LLM 二次改写。</div>
+      <p>实测用户案例“对今天中国银行的股票做下个股分析，看看今天整体情况怎么样”已路由至今日个股观察，证券实体固定为中国银行 <code>601988.SH</code>，完整编排验证仅调度一次 Gangtise Agent 工具。</p>
+    </section>
+
+    <section>
+      <h2>能力契约</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>能力</th><th>上游接口</th><th>模式 / 限制</th><th>输出策略</th></tr></thead>
+        <tbody>
+          <tr><td>今日个股观察</td><td><code>/application/open-ai/ai/chat/sse</code></td><td><code>deep_research</code> · 20 积分/次</td><td>直接展示</td></tr>
+          <tr><td>今日大盘综合分析</td><td><code>/application/open-ai/ai/chat/sse</code></td><td><code>deep_research</code> · 20 积分/次</td><td>直接展示</td></tr>
+          <tr><td>个股深化研究</td><td><code>/application/open-ai/agent/one-pager</code></td><td>最近一期，非当日 · 50 积分/篇</td><td>直接展示</td></tr>
+          <tr><td>个股看点摘要</td><td><code>/application/open-ai/stock-summary/getList</code></td><td>最多 6000 证券 · 3 积分/条</td><td>直接展示，不输出组合结论</td></tr>
+          <tr><td>多自选股综合分析</td><td><code>/application/open-ai/ai/chat/sse</code></td><td><code>deep_research</code> · 至少 2 证券 · 20 积分/次</td><td>直接展示</td></tr>
+          <tr><td>通用闲聊 / 投资教育</td><td>后台配置的 OpenAI Compatible LLM</td><td>无 Gangtise 工具</td><td>LLM 合成回答</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section>
+      <h2>BDD 场景</h2>
+
+      <article class="scenario"><div class="scenario-head"><span class="scenario-num">1</span><h3>今日个股咨询分析</h3><span class="tag">PASS</span></div><dl class="steps"><dt>Given</dt><dd>用户输入“对今天中国银行的股票做下个股分析，看看今天整体情况怎么样”。</dd><dt>When</dt><dd>LLM 路由为 <code>stock_today_observation</code>；服务端确认中国银行为 <code>601988.SH</code>。</dd><dt>Then</dt><dd>只调用一次 <code>gangtise.stock_today_observation</code>，其 SSE 参数为 <code>mode=deep_research</code>；返回行情、逻辑、要闻、风险并直接展示。</dd></dl></article>
+
+      <article class="scenario"><div class="scenario-head"><span class="scenario-num">2</span><h3>今日大盘综合分析</h3><span class="tag">PASS</span></div><dl class="steps"><dt>Given</dt><dd>用户输入“分析下今天大盘的整体走势，上证和深证指数表现如何”。</dd><dt>When</dt><dd>LLM 路由为 <code>market_today_observation</code>，目标类型为 <code>index</code>。</dd><dt>Then</dt><dd>只调用一次 <code>gangtise.market_today_observation</code>，使用 <code>deep_research</code>，直接展示指数表现、板块资金与情绪展望。</dd></dl></article>
+
+      <article class="scenario"><div class="scenario-head"><span class="scenario-num">3</span><h3>个股结构化深化研究</h3><span class="tag">PASS</span></div><dl class="steps"><dt>Given</dt><dd>用户输入“对中国银行做一下深入研究”。</dd><dt>When</dt><dd>LLM 路由为 <code>stock_one_pager</code>，并确认仅一只股票。</dd><dt>Then</dt><dd>只调用一次 <code>gangtise.stock_one_pager</code>，直出最近一期报告；明确其为非当日研究，空返回严格报错而不降级生成。</dd></dl></article>
+
+      <article class="scenario"><div class="scenario-head"><span class="scenario-num">4</span><h3>多股票精炼看点</h3><span class="tag">PASS</span></div><dl class="steps"><dt>Given</dt><dd>用户输入“中国银行、建设银行、招商银行，帮我简单介绍分析下”。</dd><dt>When</dt><dd>LLM 路由为 <code>stock_highlights</code>，确认三只证券。</dd><dt>Then</dt><dd>只调用一次 <code>gangtise.stock_highlights</code>，逐只展示上游看点；不调用本地 LLM，不声称完整观察报告或组合结论。</dd></dl></article>
+
+      <article class="scenario"><div class="scenario-head"><span class="scenario-num">5</span><h3>多自选股详细综合分析</h3><span class="tag">PASS</span></div><dl class="steps"><dt>Given</dt><dd>用户输入“中国银行、建设银行、招商银行，做详细的综合分析”。</dd><dt>When</dt><dd>LLM 路由为 <code>multi_watchlist_analysis</code>，服务端要求至少两只已确认证券。</dd><dt>Then</dt><dd>只调用一次 <code>gangtise.multi_watchlist_analysis</code>，使用 <code>deep_research</code>，直接展示个股要点和组合综合结论。</dd></dl></article>
+
+      <article class="scenario"><div class="scenario-head"><span class="scenario-num">6</span><h3>多轮闲聊与投资教育</h3><span class="tag">PASS</span></div><dl class="steps"><dt>Given</dt><dd>用户输入“我该怎么选股呢？”。</dd><dt>When</dt><dd>LLM 路由为 <code>small_talk</code>，工具列表为空。</dd><dt>Then</dt><dd>不调用 Gangtise 或本地行情工具；配置的大模型完成自然语言回答，并保留会话上下文供下一轮使用。</dd></dl></article>
+    </section>
+
+    <section>
+      <h2>自动化验证</h2>
+      <p><span class="ok">通过</span> <code>PYTHONPATH=. pytest -q tests/test_hermes_gangtise_capabilities.py</code></p>
+      <p>覆盖路由 JSON 契约、证券实体确认、唯一工具调度、SSE <code>deep_research</code> 参数、Gangtise 结果直出、看点批量上限、深化研究空结果不降级，以及闲聊不调用 Gangtise。</p>
+    </section>
+    <footer>静态报告仅描述本地验证结果。接口成本以 Gangtise 当前服务口径为准。</footer>
+  </main>
+</body>
+</html>

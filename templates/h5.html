@@ -5282,19 +5282,34 @@ const TAB_HINTS = {
   workbench: '面向大V投顾与平台运营角色的协同工作区',
 };
 
+function isDavCapableUser(user) {
+  const role = String((user || {}).role || '').trim().toLowerCase();
+  return hasRoleCapability(user, 'dav');
+}
+
+function hasRoleCapability(user, capability) {
+  const role = String((user || {}).role || '').trim().toLowerCase();
+  const target = String(capability || '').trim().toLowerCase();
+  const grants = (window.SITE_CONFIG && window.SITE_CONFIG.role_capabilities) || {};
+  const capabilities = Array.isArray(grants[role]) ? grants[role] : [];
+  return capabilities.map(item => String(item || '').trim().toLowerCase()).includes(target);
+}
+
 function isFeatureEnabled(featureName) {
   const siteFeatures = (window.SITE_CONFIG && window.SITE_CONFIG.feature_flags) || {};
   if (!featureName) return true;
   if (featureName === 'workbench') {
     const activeUser = getActiveDemoUser();
-    if (activeUser && activeUser.role === 'dav') return true;
+    return hasRoleCapability(activeUser, 'workbench');
   }
   if (featureName === 'hermes') {
     const activeUser = getActiveDemoUser() || {};
     const hermesSettings = (window.SITE_CONFIG && window.SITE_CONFIG.hermes_settings) || {};
     if (siteFeatures.hermes === false) return false;
-    if (activeUser.role === 'dav') return hermesSettings.dav_access_enabled !== false;
-    return hermesSettings.investor_access_enabled !== false;
+    if (!hasRoleCapability(activeUser, 'hermes')) return false;
+    if (isDavCapableUser(activeUser)) return hermesSettings.dav_access_enabled !== false;
+    if (hasRoleCapability(activeUser, 'investor')) return hermesSettings.investor_access_enabled !== false;
+    return true;
   }
   if (featureName === 'dm') {
     return siteFeatures.dm !== false || siteFeatures.fan_interaction !== false;
@@ -7911,7 +7926,7 @@ function renderReviewPeriodRow() {
 
 function openReviewWatchlistSelector() {
   const user = getActiveDemoUser();
-  if (user.role !== 'dav') {
+  if (!isDavCapableUser(user)) {
     switchTab('market');
     return;
   }
@@ -7932,7 +7947,7 @@ function closeReviewWatchlistSelector() {
 
 function returnFromReviewWatchlistSelector() {
   const user = getActiveDemoUser();
-  if (user.role !== 'dav') {
+  if (!isDavCapableUser(user)) {
     switchTab('review');
     return;
   }
@@ -7972,7 +7987,7 @@ function renderReviewWatchlistSelectionMode() {
   const user = getActiveDemoUser();
   const selectedCount = (reviewTriggerDraft.selectedWatchlist || []).length;
   if (banner) {
-    if (reviewWatchlistSelectionMode && user.role === 'dav') {
+    if (reviewWatchlistSelectionMode && isDavCapableUser(user)) {
       banner.style.display = 'block';
       banner.innerHTML = `
         <div class="card" style="padding:14px;margin-bottom:12px;border:1px solid rgba(200,169,110,0.24);background:linear-gradient(135deg,rgba(200,169,110,0.10),rgba(47,116,192,0.08))">
@@ -8001,7 +8016,7 @@ function renderReviewWatchlistSelectionMode() {
     const card = slot.closest('[data-watchlist-card="true"]');
     const stockCode = card ? String(card.dataset.stockCode || '') : '';
     if (!slot || !stockCode) return;
-    if (reviewWatchlistSelectionMode && user.role === 'dav') {
+    if (reviewWatchlistSelectionMode && isDavCapableUser(user)) {
       slot.style.display = 'block';
       const selected = isReviewWatchlistSelectedByCode(stockCode);
       slot.innerHTML = `
@@ -8025,6 +8040,7 @@ function renderDavReviewStudio(user) {
 
 function renderReviewExperience() {
   const user = getActiveDemoUser();
+  const hasDavCapabilities = isDavCapableUser(user);
   const badge = document.getElementById('review-role-badge');
   const triggerBtn = document.getElementById('review-trigger-button');
   const actionRow = document.getElementById('review-action-row');
@@ -8039,10 +8055,10 @@ function renderReviewExperience() {
     reviewView = requestedView;
     reviewDetailArticleId = String(reviewParams.get('review_id') || '').trim();
   }
-  if (user.role === 'dav' && requestedProductionPage) reviewProductionPage = true;
+  if (hasDavCapabilities && requestedProductionPage) reviewProductionPage = true;
   const productionPage = document.getElementById('review-production-page');
   const overviewCard = document.getElementById('review-overview-card');
-  if (reviewProductionPage && user.role === 'dav' && productionPage) {
+  if (reviewProductionPage && hasDavCapabilities && productionPage) {
     if (overviewCard) overviewCard.style.display = 'none';
     host.style.display = 'none';
     productionPage.style.display = 'block';
@@ -8056,18 +8072,18 @@ function renderReviewExperience() {
   if (overviewCard) overviewCard.style.display = reviewView === 'home' ? '' : 'none';
   if (productionPage) productionPage.style.display = 'none';
   host.style.display = '';
-  if (badge) badge.textContent = user.role === 'dav' ? '复盘发布中枢' : '复盘分析报告';
-  if (pageHeaderTitle) pageHeaderTitle.textContent = user.role === 'dav' ? '复盘专区' : '复盘分析报告';
+  if (badge) badge.textContent = hasDavCapabilities ? '复盘发布中枢' : '复盘分析报告';
+  if (pageHeaderTitle) pageHeaderTitle.textContent = hasDavCapabilities ? '复盘专区' : '复盘分析报告';
   if (pageHeaderDesc) {
-    pageHeaderDesc.textContent = user.role === 'dav'
+    pageHeaderDesc.textContent = hasDavCapabilities
       ? '大V 视角保留复盘供稿、草稿生成和发布流程，前台展示统一为已发布复盘文章。'
       : '这里默认展示所有大V已经发布的复盘分析报告。';
   }
   if (triggerBtn) {
-    triggerBtn.textContent = user.role === 'dav' ? '发起新复盘' : '查看复盘报告';
-    triggerBtn.style.display = user.role === 'dav' ? '' : 'none';
+    triggerBtn.textContent = hasDavCapabilities ? '发起新复盘' : '查看复盘报告';
+    triggerBtn.style.display = hasDavCapabilities ? '' : 'none';
   }
-  if (actionRow) actionRow.style.display = reviewView === 'home' && user.role === 'dav' ? 'flex' : 'none';
+  if (actionRow) actionRow.style.display = reviewView === 'home' && hasDavCapabilities ? 'flex' : 'none';
   if (reviewView === 'home') renderReviewPeriodRow();
   renderDavReviewStudio(user);
   if (reviewView === 'detail' && !getReviewArticleById(reviewDetailArticleId)) {
@@ -8079,7 +8095,7 @@ function renderReviewExperience() {
     ? renderReviewDetailPage()
     : (reviewView === 'list' ? renderReviewListPage() : renderReviewHome());
   renderReviewActiveJobs();
-  if (user.role === 'dav' && !reviewActiveJobsLoading && !reviewActiveJobsTimer) loadActiveReviewJobs();
+  if (hasDavCapabilities && !reviewActiveJobsLoading && !reviewActiveJobsTimer) loadActiveReviewJobs();
 }
 
 function selectReviewPeriod(period) {
@@ -8101,7 +8117,7 @@ function openReviewTriggerModal(sourceMode) {
   // "New review" starts a clean draft. Previous content remains available in
   // published history, but must never become hidden input to the next run.
   reviewTriggerDraft.paragraphMode = 'manual';
-  reviewTriggerDraft.selectedWatchlist = user.role === 'dav'
+  reviewTriggerDraft.selectedWatchlist = isDavCapableUser(user)
     ? []
     : getTenantWatchlistFocus(user.tenant.id).slice(0);
   reviewTriggerDraft.watchlistDecision = '';
@@ -8121,7 +8137,7 @@ function openReviewTriggerModal(sourceMode) {
   reviewTriggerDraft.optimizeRuleMode = 'default';
   reviewTriggerDraft.skipAiProcessing = true;
   reviewTriggerDraft.previewReady = false;
-  if (user.role === 'dav' && document.getElementById('review-production-page')) {
+  if (isDavCapableUser(user) && document.getElementById('review-production-page')) {
     reviewProductionPage = true;
     const url = new URL(window.location.href);
     url.searchParams.set('review', 'compose');
@@ -8183,6 +8199,8 @@ let reviewFileUploading = false;
 let reviewIngestResult = null;
 let reviewDraftGenerating = false;
 let reviewDraftJobState = null;
+let reviewDraftCancellationRequested = false;
+const reviewDraftCancelResolvers = {};
 let reviewPublishSubmitting = false;
 let knowledgeVoiceRecorder = null;
 let knowledgeVoiceChunks = [];
@@ -8256,6 +8274,9 @@ function hasConfiguredGeneralLlm() {
 function getReviewDraftGenerationErrorMessage(error) {
   const raw = String((error && error.message) || '').trim();
   if (!raw) return '智能优化失败，请稍后重试';
+  if (raw.includes('review_job_cancelled')) {
+    return '已停止生成，原始输入已保留。';
+  }
   if (raw.includes('review_draft_llm_not_configured')) {
     return '当前还没有配置可用的大模型。请先到 Admin 的系统专区 · 大模型专区配置一个通用模型。';
   }
@@ -8282,6 +8303,7 @@ function formatReviewJobStage(stage) {
     llm_postprocessing: '整理返回结果',
     completed: '已完成',
     failed: '已失败',
+    cancelled: '已停止',
   };
   return map[String(stage || '').trim()] || (stage || '处理中');
 }
@@ -8312,19 +8334,27 @@ function renderReviewDraftProgressPanel() {
     .reverse();
   const previewMode = !!(reviewPreviewGenerating || reviewPreviewJobState);
   const failed = String(job.status || '').toLowerCase() === 'failed';
+  const cancelled = String(job.status || '').toLowerCase() === 'cancelled';
   const progressMarkup = failed
     ? `<div class="review-progress-error">${escapeHtml(job.error_message || job.summary || 'Gangtise 多股分析失败')}<br><span>已保留当前任务的阶段日志和部分返回内容，请检查后重试或继续使用已生成内容。</span></div>`
     : `<div class="review-progress-track"><div class="review-progress-fill" style="width:${Math.min(100, percent)}%"></div></div>`;
+  const statusMarkup = cancelled
+    ? `<div class="review-progress-error" style="color:var(--gray-400)">已停止生成。原始输入已保留，本次未生成内容。</div>`
+    : progressMarkup;
+  const title = cancelled
+    ? (previewMode ? '自选股分析已停止' : '复盘草稿生成已停止')
+    : (failed ? (previewMode ? '自选股分析未完成' : '复盘草稿生成失败') : (previewMode ? '大模型正在生成自选股归纳预览' : '大模型正在生成复盘草稿'));
+  const percentLabel = cancelled ? '已停止' : (failed ? '失败' : `${escapeHtml(String(percent))}%`);
   return `
     <div class="review-progress-panel">
       <div class="review-progress-head">
         <div>
-          <div class="review-progress-title">${failed ? (previewMode ? '自选股分析未完成' : '复盘草稿生成失败') : (previewMode ? '大模型正在生成自选股归纳预览' : '大模型正在生成复盘草稿')}</div>
+          <div class="review-progress-title">${title}</div>
           <div class="review-progress-subtitle">${escapeHtml(failed ? (job.error_message || job.summary || 'Gangtise 多股分析失败') : (job.summary || '后台仍在工作中，当前会持续展示处理阶段与最新进展。'))}</div>
         </div>
-        <div class="review-progress-percent">${failed ? '失败' : `${escapeHtml(String(percent))}%`}</div>
+        <div class="review-progress-percent">${percentLabel}</div>
       </div>
-      ${progressMarkup}
+      ${statusMarkup}
       <div class="review-progress-log">
         <div class="review-progress-log-item">
           <div class="review-progress-log-meta">${escapeHtml(formatReviewJobStage(job.progress_stage || 'processing'))}${job.job_code ? ` · ${escapeHtml(job.job_code)}` : ''}</div>
@@ -8390,6 +8420,11 @@ function startAsyncJobPolling(jobCode, handlers) {
       }
       if (job.status === 'failed') {
         if (handlers && typeof handlers.onFailed === 'function') handlers.onFailed(job);
+        delete pendingAsyncJobs[jobCode];
+        return;
+      }
+      if (job.status === 'cancelled') {
+        if (handlers && typeof handlers.onCancelled === 'function') handlers.onCancelled(job);
         delete pendingAsyncJobs[jobCode];
         return;
       }
@@ -9009,6 +9044,7 @@ function renderReviewTriggerModal(user) {
   if (!host) return;
   const scrollSnapshot = captureModalSheetScroll('review-trigger-modal-content');
   const focusNames = getTenantWatchlistFocus(user.tenant.id);
+  const hasDavCapabilities = isDavCapableUser(user);
   const reviewStage = String(reviewTriggerDraft.flowStage || 'intake').trim().toLowerCase();
   const isReviewSetupStage = reviewStage === 'intake' || reviewStage === 'optimize_rule';
   const isReviewFinalPreview = reviewStage === 'preview' || reviewTriggerDraft.previewReady === true;
@@ -9026,18 +9062,18 @@ function renderReviewTriggerModal(user) {
   const stageLabel = stageLabelMap[reviewTriggerDraft.flowStage] || stageLabelMap.intake;
   const modalTitle = isReviewFinalPreview
     ? '发布前确认'
-    : (reviewStage === 'stage1_preview' ? '第一阶段预览' : (reviewStage === 'watchlist_select' ? '选择自选股' : (user.role === 'dav' ? '发起大V复盘' : '发起智能复盘')));
+    : (reviewStage === 'stage1_preview' ? '第一阶段预览' : (reviewStage === 'watchlist_select' ? '选择自选股' : (hasDavCapabilities ? '发起大V复盘' : '发起智能复盘')));
   host.innerHTML = `
     <div class="modal-title" style="margin-bottom:${isReviewFinalPreview ? '4px' : '10px'}">${modalTitle}</div>
     ${isReviewFinalPreview ? `
       <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:12px">${escapeHtml(getReviewPeriodMeta(reviewTriggerDraft.period).label)} · 正文和自选股分析已合并，确认后发布。</div>
     ` : (isReviewSetupStage ? `
       <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">
-        ${user.role === 'dav'
+        ${hasDavCapabilities
           ? '先提交手写或文件内容，再决定是否进行 AI 优化和自选股分析。'
           : '生成复盘前必须先选择复盘周期。'}
       </div>
-      ${user.role === 'dav' ? `<div class="review-flow-row" style="margin-bottom:12px"><span class="review-flow-step">${escapeHtml(stageLabel)}</span><span class="review-flow-step">智能优化可选</span><span class="review-flow-step">人工确认发布</span></div>` : ''}
+      ${hasDavCapabilities ? `<div class="review-flow-row" style="margin-bottom:12px"><span class="review-flow-step">${escapeHtml(stageLabel)}</span><span class="review-flow-step">智能优化可选</span><span class="review-flow-step">人工确认发布</span></div>` : ''}
       <div class="knowledge-modal-block">
         <label class="knowledge-modal-label">复盘周期</label>
         <div class="review-period-row">
@@ -9049,7 +9085,7 @@ function renderReviewTriggerModal(user) {
     ` : `
       <div class="review-stage-compact-meta">${escapeHtml(getReviewPeriodMeta(reviewTriggerDraft.period).label)} · ${escapeHtml(stageLabel)}</div>
     `)}
-    ${user.role === 'dav' ? `
+    ${hasDavCapabilities ? `
       ${isReviewSetupStage ? `
         <div class="knowledge-modal-block">
           <label class="knowledge-modal-label">供稿方式</label>
@@ -9067,7 +9103,7 @@ function renderReviewTriggerModal(user) {
           ${renderReviewPromptPanel()}
         ` : ''}
       ` : ''}
-      ${user.role === 'dav' ? renderReviewWatchlistSelectionPanel() : ''}
+      ${hasDavCapabilities ? renderReviewWatchlistSelectionPanel() : ''}
       ${isReviewDraftProcessingStage() ? `
         <div class="knowledge-modal-block">
           <label class="knowledge-modal-label">${reviewTriggerDraft.flowStage === 'preview_generating' ? '正在生成自选股归纳总结' : '正在生成 Draft'}</label>
@@ -9079,18 +9115,18 @@ function renderReviewTriggerModal(user) {
     ` : ''}
     ${isReviewSetupStage && reviewTriggerDraft.flowStage !== 'watchlist_select' ? `
       <div class="knowledge-modal-block">
-        <label class="knowledge-modal-label">${user.role === 'dav' ? '本次复盘覆盖' : '本次智能复盘输入'}</label>
+        <label class="knowledge-modal-label">${hasDavCapabilities ? '本次复盘覆盖' : '本次智能复盘输入'}</label>
         <div class="review-watchlist-row">
-          ${(user.role === 'dav' ? reviewTriggerDraft.selectedWatchlist : focusNames).map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
+          ${(hasDavCapabilities ? reviewTriggerDraft.selectedWatchlist : focusNames).map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
         </div>
       </div>
     ` : ''}
-    ${user.role === 'dav' ? renderReviewDraftProgressPanel() : ''}
-    ${user.role === 'dav' ? renderReviewStageOnePreviewPanel() : ''}
-    ${user.role === 'dav' ? renderReviewPreviewPanel() : ''}
+    ${hasDavCapabilities ? renderReviewDraftProgressPanel() : ''}
+    ${hasDavCapabilities ? renderReviewStageOnePreviewPanel() : ''}
+    ${hasDavCapabilities ? renderReviewPreviewPanel() : ''}
     <div class="modal-actions">
       <button class="btn-outline" onclick="closeReviewTriggerModal()">取消</button>
-      ${user.role === 'dav'
+      ${hasDavCapabilities
         ? renderReviewFlowActions()
         : '<button class="btn-gold" onclick="submitReviewTrigger()">生成智能复盘</button>'}
     </div>
@@ -9184,6 +9220,15 @@ function resumeActiveReviewDraftJob(job) {
       renderReviewActiveJobs();
       showToast(nextJob.error_message || nextJob.summary || '复盘草稿生成失败');
     },
+    onCancelled(nextJob) {
+      reviewDraftGenerating = false;
+      reviewDraftJobState = nextJob;
+      reviewTriggerDraft.flowStage = 'optimize_rule';
+      reviewActiveJobs = reviewActiveJobs.filter((item) => item.job_code !== job.job_code);
+      renderReviewTriggerModal(getActiveDemoUser());
+      renderReviewActiveJobs();
+      showToast('已停止生成，原始输入已保留。');
+    },
   });
 }
 
@@ -9200,7 +9245,7 @@ async function loadActiveReviewJobs() {
   reviewActiveJobsLoading = true;
   const user = getActiveDemoUser();
   const tenantSlug = String(((user || {}).tenant || {}).slug || '').trim().toLowerCase();
-  if (!tenantSlug || user.role !== 'dav') {
+  if (!tenantSlug || !isDavCapableUser(user)) {
     reviewActiveJobsLoading = false;
     return;
   }
@@ -9228,7 +9273,7 @@ function renderReviewFlowActions() {
     return '<button class="btn-outline" disabled>请稍候</button><button class="btn-gold" disabled>发布中...</button>';
   }
   if (reviewDraftGenerating || reviewPreviewGenerating) {
-    return '<button class="btn-gold" disabled>处理中...</button>';
+    return '<button class="btn-outline" onclick="cancelReviewAsyncJob()">停止生成</button><button class="btn-gold" disabled>处理中...</button>';
   }
   if (reviewTriggerDraft.flowStage === 'optimize_rule') {
     return '<button class="btn-outline" onclick="backToReviewIntake()">返回输入</button><button class="btn-gold" onclick="submitReviewSmartOptimize()">开始优化</button>';
@@ -9252,6 +9297,52 @@ function renderReviewFlowActions() {
     return '<button class="btn-outline" onclick="backToReviewDraftEdit()">回退修改</button><button class="btn-gold" onclick="publishReviewDraft()">确认发布</button>';
   }
   return `<button class="btn-outline" onclick="prepareReviewDirectPreview()">直接预览</button><button class="btn-gold" onclick="openReviewOptimizeRuleStep()">优化成稿</button>`;
+}
+
+async function cancelReviewAsyncJob() {
+  const isPreview = !!(reviewPreviewGenerating || reviewPreviewJobState);
+  const job = isPreview ? reviewPreviewJobState : reviewDraftJobState;
+  const jobCode = String((job || {}).job_code || '').trim();
+  // Close the current task from the user's perspective immediately. When the
+  // create request has not returned yet, its job code is cancelled below as
+  // soon as it arrives.
+  if (!isPreview) reviewDraftCancellationRequested = true;
+  if (isPreview) {
+    reviewPreviewGenerating = false;
+    reviewPreviewJobState = null;
+    reviewTriggerDraft.flowStage = 'draft_review';
+  } else {
+    reviewDraftGenerating = false;
+    reviewDraftJobState = null;
+    reviewTriggerDraft.flowStage = 'optimize_rule';
+  }
+  reviewActiveJobs = reviewActiveJobs.filter((item) => item.job_code !== jobCode);
+  if (jobCode && pendingAsyncJobs[jobCode]) {
+    clearTimeout(pendingAsyncJobs[jobCode]);
+    delete pendingAsyncJobs[jobCode];
+  }
+  if (jobCode && reviewDraftCancelResolvers[jobCode]) {
+    reviewDraftCancelResolvers[jobCode]();
+    delete reviewDraftCancelResolvers[jobCode];
+  }
+  renderReviewTriggerModal(getActiveDemoUser());
+  renderReviewActiveJobs();
+  showToast('已停止生成。当前任务已关闭，原始输入已保留。');
+  if (!jobCode) return;
+  try {
+    const response = await fetch(`/api/review/jobs/${encodeURIComponent(jobCode)}/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || 'review_job_cancel_failed');
+    // Let the existing polling callback observe the terminal state once so
+    // the generation Promise is settled and no async closure is left behind.
+  } catch (error) {
+    // A job may finish in the small race between the click and this request.
+    // The user-facing task remains closed in either case.
+    console.warn('review job close acknowledgement unavailable', error);
+  }
 }
 
 function setReviewTriggerPeriod(period) {
@@ -9774,6 +9865,7 @@ async function submitReviewSmartOptimize() {
     reviewTriggerDraft.promptTags = [];
   }
   reviewDraftGenerating = true;
+  reviewDraftCancellationRequested = false;
   reviewStructuredPreview = null;
   reviewTriggerDraft.flowStage = 'draft_generating';
   reviewTriggerDraft.previewReady = false;
@@ -9788,13 +9880,23 @@ async function submitReviewSmartOptimize() {
   try {
     const draftResult = await generateReviewDraftWithLlm();
     if (!draftResult.async || !draftResult.job_code) throw new Error('review_draft_job_missing');
+    if (reviewDraftCancellationRequested) {
+      await fetch(`/api/review/jobs/${encodeURIComponent(draftResult.job_code)}/cancel`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+      });
+      throw new Error('review_job_cancelled');
+    }
     await new Promise((resolve, reject) => {
+      reviewDraftCancelResolvers[draftResult.job_code] = resolve;
       startAsyncJobPolling(draftResult.job_code, {
         onProgress(job) {
+          if (reviewDraftCancellationRequested) return;
           reviewDraftJobState = job || reviewDraftJobState;
           renderReviewTriggerModal(user);
         },
         onSuccess(job) {
+          delete reviewDraftCancelResolvers[draftResult.job_code];
           const result = job.result || {};
           reviewTriggerDraft.generatedPreviewText = result.text || '';
           reviewTriggerDraft.draftReviewText = result.text || getReviewDraftContentText();
@@ -9807,7 +9909,13 @@ async function submitReviewSmartOptimize() {
           resolve();
         },
         onFailed(job) {
+          delete reviewDraftCancelResolvers[draftResult.job_code];
           reject(new Error(job.error_message || job.summary || '大模型复盘草稿生成失败'));
+        },
+        onCancelled(job) {
+          delete reviewDraftCancelResolvers[draftResult.job_code];
+          reviewDraftJobState = job;
+          reject(new Error('review_job_cancelled'));
         },
         onError(error) {
           reject(error);
@@ -9816,7 +9924,8 @@ async function submitReviewSmartOptimize() {
     });
   } catch (error) {
     reviewDraftGenerating = false;
-    reviewDraftJobState = null;
+    const cancelled = String((error && error.message) || '').includes('review_job_cancelled');
+    if (!cancelled) reviewDraftJobState = null;
     reviewTriggerDraft.flowStage = 'optimize_rule';
     renderReviewTriggerModal(user);
     showToast(getReviewDraftGenerationErrorMessage(error));
@@ -9827,6 +9936,7 @@ async function submitReviewSmartOptimize() {
       reviewDraftJobState = null;
     }
   }
+  if (reviewDraftCancellationRequested) return;
   reviewTriggerDraft.flowStage = 'draft_review';
   reviewTriggerDraft.previewReady = false;
   persistReviewDraftRuntime(runtime);
@@ -9838,7 +9948,7 @@ async function submitReviewTrigger() {
   const user = getActiveDemoUser();
   const runtime = ensureTenantReviewRuntime(user.tenant.id);
   currentReviewPeriod = reviewTriggerDraft.period;
-  if (user.role === 'dav') {
+  if (isDavCapableUser(user)) {
     prepareReviewDirectPreview();
     return;
   } else {
@@ -9855,7 +9965,7 @@ async function submitReviewTrigger() {
 
 function publishReviewDraft() {
   const user = getActiveDemoUser();
-  if (user.role !== 'dav') return;
+  if (!isDavCapableUser(user)) return;
   if (reviewPublishSubmitting) return;
   const runtime = ensureTenantReviewRuntime(user.tenant.id);
   syncReviewDraftFromModal();
@@ -9955,20 +10065,20 @@ function publishReviewDraft() {
 
 function getTenantVisibleAuthors(authors) {
   const activeUser = getActiveDemoUser();
-  if (activeUser.role !== 'investor') return authors || [];
+  if (isDavCapableUser(activeUser) || activeUser.role !== 'investor') return authors || [];
   return (authors || []).filter(author => author.name === activeUser.tenant.advisor);
 }
 
 function canAccessAdvisor(advisorName) {
   const activeUser = getSafeActiveDemoUser();
-  return activeUser.role === 'dav' || advisorName === activeUser.tenant.advisor;
+  return isDavCapableUser(activeUser) || advisorName === activeUser.tenant.advisor;
 }
 
 function syncTenantScopedAdvisorViews() {
   const activeUser = getActiveDemoUser();
   const hint = document.getElementById('community-dav-hint');
   if (hint) {
-    hint.textContent = activeUser.role === 'dav'
+    hint.textContent = isDavCapableUser(activeUser)
       ? '大V投顾 · 当前可查看租户工作台、知识板块与粉丝端展示内容。'
       : `大V投顾 · 当前仅展示所属租户投顾 ${activeUser.tenant.advisor} 的互动内容，跨租户内容已隐藏。`;
   }
@@ -10223,7 +10333,7 @@ function renderKnowledgeStructure() {
   const card = document.getElementById('knowledge-dav-graph-card');
   const activeUser = getActiveDemoUser() || {};
   if (!card) return;
-  const isDav = activeUser.role === 'dav';
+  const isDav = isDavCapableUser(activeUser);
   card.style.display = isDav ? 'block' : 'none';
   if (!isDav) return;
   const payload = knowledgeStructureState.payload || {};
@@ -10932,7 +11042,7 @@ function buildDashboardPromptListFromSlots() {
 
 function openDashboardCellModal(index) {
   const activeUser = getActiveDemoUser();
-  if (activeUser.role !== 'dav') {
+  if (!isDavCapableUser(activeUser)) {
     showToast('只有大V身份可以编辑核心指标面板');
     return;
   }
@@ -11011,7 +11121,7 @@ function closeDashboardCellModal() {
 
 function saveDashboardCellPrompt() {
   const activeUser = getActiveDemoUser();
-  if (activeUser.role !== 'dav') {
+  if (!isDavCapableUser(activeUser)) {
     showToast('只有大V身份可以编辑核心指标面板');
     return;
   }
@@ -11067,7 +11177,7 @@ function renderWorkbenchFundDashboard() {
   const metaHost = document.getElementById('wb-dashboard-meta');
   if (!previewHost || !metaHost) return;
   const activeUser = getActiveDemoUser();
-  if (activeUser.role !== 'dav') {
+  if (!isDavCapableUser(activeUser)) {
     previewHost.innerHTML = '';
     metaHost.textContent = '当前为投资者身份，核心指标面板只展示已发布版本。';
     return;
@@ -11088,7 +11198,7 @@ function renderWorkbenchFundDashboard() {
 
 async function generateFundDashboard(layout) {
   const activeUser = getActiveDemoUser();
-  if (activeUser.role !== 'dav') {
+  if (!isDavCapableUser(activeUser)) {
     showToast('只有大V身份可以生成核心指标面板');
     return;
   }
@@ -11132,7 +11242,7 @@ async function generateFundDashboard(layout) {
 
 async function publishFundDashboard() {
   const activeUser = getActiveDemoUser();
-  if (activeUser.role !== 'dav') {
+  if (!isDavCapableUser(activeUser)) {
     showToast('只有大V身份可以发布核心指标面板');
     return;
   }
@@ -11157,7 +11267,7 @@ async function publishFundDashboard() {
 
 async function resetFundDashboardDraft() {
   const activeUser = getActiveDemoUser();
-  if (activeUser.role !== 'dav') {
+  if (!isDavCapableUser(activeUser)) {
     showToast('当前身份没有草稿编辑权限');
     return;
   }
@@ -17121,7 +17231,11 @@ async function runHermesAnalysis(options) {
       ? '当前租户尚未向普通用户开放 Hermes'
       : (rawError === 'hermes_disabled'
         ? 'Hermes 当前已在后台关闭'
-        : `模型调用失败：${rawError}`);
+        : (rawError.includes('gangtise_one_pager_no_report')
+          ? 'Gangtise 公司一页通未返回该证券的最近一期研究报告。本轮已严格中止，未使用本地模型或模板生成替代内容。'
+          : (rawError.includes('gangtise_one_pager_response_unrecognized')
+            ? 'Gangtise 公司一页通返回了内容，但当前返回结构无法识别。本轮已严格中止，未使用本地模型或模板生成替代内容。'
+            : `模型调用失败：${rawError}`)));
     hermesConversation.push({
       id: createHermesEntryId('ai'),
       type: 'ai',
@@ -17290,7 +17404,7 @@ const DAV_DM_MESSAGES = {
 
 function isDavDmMode() {
   const activeUser = getSafeActiveDemoUser();
-  return activeUser && activeUser.role === 'dav';
+  return isDavCapableUser(activeUser);
 }
 
 function getInvestorDmConversation() {
@@ -18689,7 +18803,7 @@ function openWorkbenchSmartIndicatorDetailModal(card) {
   const host = document.getElementById('dashboard-cell-modal-content');
   const modal = document.getElementById('dashboard-cell-modal');
   if (!host || !modal || !card) return;
-  const isDav = (getActiveDemoUser() || {}).role === 'dav';
+  const isDav = isDavCapableUser(getActiveDemoUser());
   const canEdit = isDav && card.isTenantSmart === true && !!card.indicatorCode;
   const showWorkbenchEditor = isDav && !!card.indicatorCode;
   const canRemoveFromDashboard = isDav && Number.isInteger(card.slotIndex) && !!card.indicatorCode;
@@ -18941,7 +19055,7 @@ function renderWorkbenchFundDashboard() {
   const sectionTitleHost = document.getElementById('wb-dashboard-section-title');
   const sectionDescHost = document.getElementById('wb-dashboard-section-desc');
   const actionHost = document.querySelector('.wb-dashboard-actions');
-  if (activeUser.role !== 'dav') {
+  if (!isDavCapableUser(activeUser)) {
     const published = getPublishedFundDashboard() || { cards: [] };
     const cards = Array.isArray(published.cards) ? published.cards.filter((item) => item && !isWorkbenchSmartPlaceholderCard(item)) : [];
     if (layoutHost) {
@@ -19130,7 +19244,7 @@ window.addEventListener('popstate', () => {
   const shouldShowProductionPage = routeParams.get('review') === 'compose';
   const shouldShowReviewPage = shouldShowProductionPage
     || ['home', 'list', 'detail'].includes(String(routeParams.get('review_view') || '').trim().toLowerCase());
-  reviewProductionPage = shouldShowProductionPage && user && user.role === 'dav';
+  reviewProductionPage = shouldShowProductionPage && user && isDavCapableUser(user);
   if (shouldShowReviewPage && !document.getElementById('page-review')?.classList.contains('active')) {
     switchTab('review');
     return;

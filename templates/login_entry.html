@@ -11,16 +11,17 @@
 body{margin:0;min-height:100vh;font-family:var(--font-main);color:var(--text-main);background:radial-gradient(circle at top left,rgba(200,169,110,.1),transparent 38%),radial-gradient(circle at top right,rgba(47,116,192,.1),transparent 42%),linear-gradient(180deg,#F8FBFF 0%,#EEF4FA 100%)}
 .entry-shell{min-height:100vh;display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:24px}.entry-card{width:min(100%,540px);box-sizing:border-box;padding:28px;background:#fff;border:1px solid rgba(47,116,192,.12);border-radius:24px;box-shadow:0 24px 60px rgba(31,73,125,.1)}
 .entry-kicker{display:inline-flex;padding:6px 10px;border:1px solid rgba(200,169,110,.16);border-radius:999px;background:rgba(200,169,110,.1);color:var(--gold);font-size:12px}.entry-title{margin:18px 0 8px;font-size:28px;font-weight:800}.entry-desc{color:var(--gray-400);font-size:14px;line-height:1.7}
-.entry-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:22px}.entry-option{display:block;padding:18px;border:1px solid rgba(47,116,192,.14);border-radius:16px;background:#F9FBFF;color:inherit;text-decoration:none}.entry-option:hover{border-color:#2F74C0;background:#F3F8FE}.entry-option.primary{background:linear-gradient(135deg,#1F4F86,#2F74C0);border-color:transparent;color:#fff}.entry-option-title{font-size:17px;font-weight:800}.entry-option-desc{margin-top:8px;font-size:12px;line-height:1.7;opacity:.82}@media(max-width:480px){.entry-options{grid-template-columns:1fr}}
+.entry-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:22px}.entry-options.admin{grid-template-columns:repeat(3,minmax(0,1fr))}.entry-option{display:block;padding:18px;border:1px solid rgba(47,116,192,.14);border-radius:16px;background:#F9FBFF;color:inherit;text-decoration:none}.entry-option:hover{border-color:#2F74C0;background:#F3F8FE}.entry-option.primary{background:linear-gradient(135deg,#1F4F86,#2F74C0);border-color:transparent;color:#fff}.entry-option-title{font-size:17px;font-weight:800}.entry-option-desc{margin-top:8px;font-size:12px;line-height:1.7;opacity:.82}@media(max-width:480px){.entry-options,.entry-options.admin{grid-template-columns:1fr}}
 </style>
 </head>
 <body onload="initGangtiseTheme()"><main class="entry-shell"><section class="entry-card">
-  <div class="entry-kicker">大V投顾</div>
+  <div class="entry-kicker">{{ '平台管理员' if is_admin else '大V投顾' }}</div>
   <div class="entry-title">选择进入方式</div>
-  <div class="entry-desc">{{ user.get('display_name') or user.get('username') }}，你可以进入移动端投研界面，或继续管理大V工作台。</div>
-  <div class="entry-options">
+  <div class="entry-desc">{{ user.get('display_name') or user.get('username') }}，请选择要进入的工作区域。</div>
+  <div class="entry-options{{ ' admin' if is_admin else '' }}">
     <a class="entry-option" href="{{ h5_target }}"><div class="entry-option-title">进入 H5</div><div class="entry-option-desc">查看基本面、自选股、复盘、消息和小金智能体。</div></a>
     <a class="entry-option primary" href="{{ workbench_target }}"><div class="entry-option-title">进入大V工作台</div><div class="entry-option-desc">管理粉丝、内容、协同收入与运营数据。</div></a>
+    {% if is_admin %}<a class="entry-option" href="{{ admin_target }}"><div class="entry-option-title">进入 Admin 后台</div><div class="entry-option-desc">管理平台用户、租户、系统配置和运营数据。</div></a>{% endif %}
   </div>
 </section></main></body>
 </html>

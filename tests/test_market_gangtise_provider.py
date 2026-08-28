@@ -15,13 +15,13 @@ def _daily_response():
     }
 
 
-def test_market_index_uses_reported_gangtise_daily_quote_path():
+def test_market_index_rejects_gangtise_provider_calls():
     from src.domain import market_services
 
     with patch.object(
         market_services,
         "post_gangtise_openapi_json",
-        return_value=(200, _daily_response(), 5),
+        side_effect=AssertionError("market indices must not call Gangtise"),
     ) as post:
         result = market_services.fetch_gangtise_indicator_series(
             "source_shanghai_index",
@@ -29,27 +29,20 @@ def test_market_index_uses_reported_gangtise_daily_quote_path():
             end_date="2026-08-10",
         )
 
-    assert result["ok"] is True
-    assert result["source_meta"]["path"] == "/application/open-quote/kline/daily"
-    assert post.call_args.args[0] == "/application/open-quote/kline/daily"
-    assert post.call_args.args[1]["securityList"] == ["000001.SH"]
+    assert result["ok"] is False
+    assert result["message"] == "market_indicator_akshare_only"
+    post.assert_not_called()
 
 
-def test_market_index_history_supports_verified_edb_indices_without_akshare():
+def test_market_snapshot_source_definition_has_no_external_gangtise_endpoint():
     from src.domain import market_services
 
-    expected = {"ok": True, "points": [
-        {"date": "2026-08-07", "close": 25800.00},
-        {"date": "2026-08-10", "close": 26009.46},
-    ]}
-    with patch.object(market_services, "fetch_gangtise_indicator_series", return_value=expected) as fetch:
-        result = market_services.fetch_gangtise_market_index_history(
-            "source_hsi", "2026-08-01", "2026-08-10"
-        )
+    source = market_services.build_akshare_market_snapshot_source_seed_payload("source_shanghai_index")
 
-    assert result["ok"] is True
-    assert result["provider"] == "Gangtise OpenAPI"
-    fetch.assert_called_once_with("source_hsi", start_date="2026-08-01", end_date="2026-08-10", token="")
+    assert source["provider"] == "AKShare"
+    assert source["path"] == "akshare://market_snapshot"
+    assert source["auth_type"] == "none"
+    assert source["response_mapping"]["connector_type"] == "akshare_snapshot"
 
 
 def test_akshare_sector_sync_returns_only_shenwan_level_one_rows():
@@ -83,6 +76,18 @@ def test_market_snapshot_task_runs_every_five_minutes():
     assert task["schedule_type"] == "interval"
     assert task["schedule_value"] == "300"
     assert task["enabled"] == 1
+
+
+def test_market_snapshot_task_is_registered_with_admin_task_dispatcher():
+    from src.domain import core_services
+
+    task = {"task_type": "sync_market_snapshot", "task_params": {}}
+    expected = {"ok": True, "overview_count": 9, "sector_count": 31}
+    with patch.object(core_services, "execute_admin_task_by_type", return_value=expected) as execute:
+        result = core_services.execute_admin_task(task)
+
+    execute.assert_called_once_with("sync_market_snapshot", force=False)
+    assert result == expected
 
 
 def test_gangtise_edb_tasks_are_manual_by_default_to_control_credits():
@@ -145,11 +150,11 @@ def test_market_snapshot_uses_akshare_and_never_calls_gangtise():
         patch.object(market_services, "_load_watchlist_cache", return_value=None), \
         patch.object(market_services, "_save_watchlist_cache"), \
         patch.object(market_services, "_save_market_snapshot_payload") as save_snapshot, \
-        patch.object(market_services, "_load_akshare", return_value=object()), \
-        patch.object(market_services, "fetch_gangtise_market_index_history", side_effect=AssertionError("Gangtise must not be used")), \
-        patch.object(market_services, "_fetch_gangtise_sector_overview", side_effect=AssertionError("Gangtise must not be used")):
+        patch.object(market_services, "_load_akshare", return_value=object()):
         result = market_services.sync_market_snapshot(force=True)
 
+    assert not hasattr(market_services, "_fetch_gangtise_sector_overview")
+    assert not hasattr(market_services, "_load_gangtise_sector_catalog")
     assert index_fetch.call_count == len(market_services.MARKET_OVERVIEW_INDEX_CODES)
     assert result["overview_count"] == len(market_services.MARKET_OVERVIEW_INDEX_CODES)
     assert result["sector_count"] == 1

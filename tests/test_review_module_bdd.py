@@ -96,7 +96,8 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("const isReviewSetupStage = reviewStage === 'intake' || reviewStage === 'optimize_rule';", html)
         self.assertIn("const isReviewFinalPreview = reviewStage === 'preview' || reviewTriggerDraft.previewReady === true;", html)
         self.assertIn("<div class=\"modal-title\" style=\"margin-bottom:${isReviewFinalPreview ? '4px' : '10px'}\">${modalTitle}</div>", html)
-        self.assertIn("${user.role === 'dav' ? `", html)
+        self.assertIn("const hasDavCapabilities = isDavCapableUser(user);", html)
+        self.assertIn("${hasDavCapabilities ? `", html)
         self.assertIn("${isReviewSetupStage ? `", html)
         self.assertIn("<div class=\"review-stage-compact-meta\">", html)
         self.assertIn("智能优化规则", html)
@@ -116,12 +117,12 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("reviewTriggerDraft.flowStage = partialAnalysis ? 'structured_review' : 'preview_failed'", html)
         self.assertIn("已保留当前任务的阶段日志和部分返回内容", html)
         self.assertIn("重新生成自选股分析", html)
-        self.assertIn("const combinedText = String(payload.combined_text || '').trim()", html)
+        self.assertIn("const combinedText = String(watchlistSection.combined_text || '').trim()", html)
         self.assertIn("function renderGangtiseMarkdown(value)", html)
-        self.assertIn("function recoverCompressedTable", html)
+        self.assertIn("const recoverCompressedTable = (rawText) =>", html)
         self.assertIn("review-gangtise-table-wrap", html)
         self.assertIn("const headers = tableCells(line)", html)
-        self.assertIn("${combinedText ? renderGangtiseMarkdown(combinedText) : ''}", html)
+        self.assertIn('placeholder="这里是 Gangtise 已返回的分析内容，可继续修改。"', html)
         self.assertIn('id="review-structured-combined-text"', html)
         self.assertIn("reviewStructuredPreview.watchlist_analysis_section.combined_text = structuredCombinedText.value", html)
         self.assertIn("const progressMarkup = failed", html)
@@ -175,6 +176,110 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertEqual(saved_result["partial_text"], "已返回的部分分析")
         self.assertEqual(saved_result["live_log"][0]["text"], "已收到部分分析")
         self.assertEqual(saved_result["error_type"], "RuntimeError")
+
+    def test_given_cancelled_review_job_when_worker_finishes_then_cancelled_state_is_preserved(self):
+        existing_job = {
+            "status": "cancelled",
+            "result": {"cancel_reason": "user_requested"},
+        }
+        with mock.patch("src.domain.core_services.get_user_async_job", return_value=existing_job), mock.patch(
+            "src.domain.core_services.update_user_async_job"
+        ) as update_job:
+            with app_entry.app.app_context():
+                result = core_services._complete_user_async_job(
+                    "review-job-cancelled",
+                    True,
+                    summary="复盘草稿生成完成",
+                    result={"text": "不应写入"},
+                )
+
+        self.assertEqual(result["status"], "cancelled")
+        update_job.assert_not_called()
+
+    def test_given_cancelled_review_job_when_progress_is_reported_then_no_late_progress_is_written(self):
+        existing_job = {"status": "cancelled", "progress_stage": "cancelled"}
+        with mock.patch("src.domain.core_services.get_user_async_job", return_value=existing_job), mock.patch(
+            "src.domain.core_services.update_user_async_job"
+        ) as update_job:
+            with app_entry.app.app_context():
+                result = core_services.report_user_async_job_progress(
+                    "review-job-cancelled",
+                    stage="llm_postprocessing",
+                    percent=85,
+                    summary="晚到的进度",
+                )
+
+        self.assertEqual(result["status"], "cancelled")
+        update_job.assert_not_called()
+
+    def test_given_dav_owned_active_review_job_when_cancelled_then_endpoint_marks_it_cancelled(self):
+        job = {
+            "job_code": "review_generate_draft_test_1",
+            "job_type": "review_generate_draft",
+            "tenant_slug": self.tenant_slug,
+            "owner_label": "BDD Tester",
+            "status": "running",
+            "payload": {"source_text": "原始复盘", "audio_base64": "secret"},
+        }
+        cancelled = {**job, "status": "cancelled", "progress_stage": "cancelled"}
+        with mock.patch(
+            "src.web.api_kol.get_current_authenticated_user",
+            return_value={"role": "dav", "tenant_slug": self.tenant_slug, "advisor_name": "BDD Tester"},
+        ), mock.patch("src.web.api_kol.get_user_async_job", return_value=job), mock.patch(
+            "src.web.api_kol.cancel_user_async_job", return_value=cancelled
+        ) as cancel_job:
+            response = self.client.post(f"/api/review/jobs/{job['job_code']}/cancel")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()["ok"])
+        self.assertNotIn("audio_base64", response.get_json()["job"]["payload"])
+        cancel_job.assert_called_once_with(job["job_code"])
+
+    def test_given_h5_review_generation_when_rendered_then_stop_action_and_cancel_terminal_state_exist(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('onclick="cancelReviewAsyncJob()">停止生成', html)
+        self.assertIn("job.status === 'cancelled'", html)
+        self.assertIn('/api/review/jobs/${encodeURIComponent(jobCode)}/cancel', html)
+
+    def test_given_simulated_review_job_when_worker_claims_next_then_it_is_not_excluded_from_execution(self):
+        class _FakeCursor:
+            def __init__(self):
+                self.sql = ""
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def execute(self, sql, params=None):
+                self.sql = sql
+
+            def fetchone(self):
+                return None
+
+        class _FakeConnection:
+            def __init__(self):
+                self.cursor_instance = _FakeCursor()
+
+            def cursor(self, **kwargs):
+                return self.cursor_instance
+
+            def rollback(self):
+                pass
+
+            def close(self):
+                pass
+
+        connection = _FakeConnection()
+        with mock.patch("src.domain.core_services.get_app_db_connection", return_value=connection):
+            core_services._claim_next_user_async_job()
+
+        self.assertIn("WHERE status = 'pending'", connection.cursor_instance.sql)
+        self.assertNotIn("COALESCE(is_simulated", connection.cursor_instance.sql)
 
     def test_given_large_gangtise_result_when_async_job_completes_then_json_is_not_truncated(self):
         large_answer = "正式复盘内容。" * 2200
@@ -1751,22 +1856,18 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertEqual(builtin["model_name"], "gemma4:12b-it-bf16")
         self.assertEqual(builtin["base_url"], "http://8.155.160.194:6031/api")
 
-    def test_given_default_site_config_when_normalized_then_review_voice_enhancement_maps_to_gemma4_12b(self):
+    def test_given_default_site_config_when_normalized_then_all_features_use_admin_default_model(self):
         config = normalize_site_config({})
 
         registry = config["llm_registry"]
-        self.assertEqual(
-            registry["feature_model_keys"].get("review_voice_enhancement"),
-            "gangtise-gemma4-12b-bf16",
-        )
         selected = ai_services.get_default_llm_config(
             site_config=config,
             purpose="general",
             feature_code="review_voice_enhancement",
         )
         self.assertIsNotNone(selected)
-        self.assertEqual(selected["key"], "gangtise-gemma4-12b-bf16")
-        self.assertEqual(selected["model_name"], "gemma4:12b-it-bf16")
+        self.assertEqual(selected["key"], registry["default_model_key"])
+        self.assertEqual(selected["base_url"], "http://8.155.160.194:6031/api")
 
     def test_given_community_api_when_called_then_posts_and_events_render(self):
         posts_response = self.client.get("/api/community/posts")

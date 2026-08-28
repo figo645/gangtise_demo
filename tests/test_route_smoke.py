@@ -230,7 +230,7 @@ class RouteSmokeTest(unittest.TestCase):
         def index_series(code, start_date, end_date, ak=None):
             return {"ok": True, "provider": "AKShare", "points": [{"date": "2026-08-09", "open": 99, "high": 101, "low": 98, "close": 100}, {"date": "2026-08-10", "open": 100, "high": 102, "low": 99, "close": 101}], "message": ""}
 
-        sector_rows = [{"sector": name, "code": market_services.GANGTISE_SHENWAN_LEVEL1_CODES[name], "value": 100, "change": 1, "change_pct": 1, "updated_at": "2026-08-10", "data_source": "AKShare"} for name in market_services.SHENWAN_LEVEL1_INDUSTRIES]
+        sector_rows = [{"sector": name, "code": f"AK{index:05d}", "value": 100, "change": 1, "change_pct": 1, "updated_at": "2026-08-10", "data_source": "AKShare"} for index, name in enumerate(market_services.SHENWAN_LEVEL1_INDUSTRIES, start=1)]
 
         with patch.object(market_services, "fetch_akshare_market_index_history", side_effect=index_series) as index_fetch, patch.object(market_services, "_fetch_akshare_sector_overview", return_value=sector_rows) as sector_fetch, patch.object(market_services, "_load_akshare", return_value=object()), patch.object(market_services, "_load_market_snapshot_payload", return_value=None), patch.object(market_services, "_load_watchlist_cache", return_value=None), patch.object(market_services, "_save_watchlist_cache") as save_cache, patch.object(market_services, "_save_market_snapshot_payload") as save_market_snapshot:
             result = market_services.sync_market_snapshot(force=True)
@@ -273,7 +273,7 @@ class RouteSmokeTest(unittest.TestCase):
     def test_market_sector_sync_continues_when_akshare_index_is_unavailable(self):
         from src.domain import market_services
 
-        sector_rows = [{"sector": name, "code": market_services.GANGTISE_SHENWAN_LEVEL1_CODES[name], "value": 100, "change": 1, "change_pct": 1, "updated_at": "2026-08-10", "data_source": "AKShare"} for name in market_services.SHENWAN_LEVEL1_INDUSTRIES]
+        sector_rows = [{"sector": name, "code": f"AK{index:05d}", "value": 100, "change": 1, "change_pct": 1, "updated_at": "2026-08-10", "data_source": "AKShare"} for index, name in enumerate(market_services.SHENWAN_LEVEL1_INDUSTRIES, start=1)]
         with patch.object(market_services, "fetch_akshare_market_index_history", return_value={"ok": False, "points": [], "message": "unavailable", "provider": "AKShare"}), patch.object(
             market_services, "_fetch_akshare_sector_overview", return_value=sector_rows
         ) as sector_fetch, patch.object(market_services, "_load_akshare", return_value=object()), patch.object(market_services, "_save_watchlist_cache"), patch.object(market_services, "_save_market_snapshot_payload"):
@@ -405,19 +405,11 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertEqual(payload["items"][0]["sector"], "电子")
         self.assertEqual(payload["total"], 1)
 
-    def test_market_sector_batch_uses_verified_swi_daily_quotes(self):
+    def test_market_sector_has_no_legacy_gangtise_batch_fetcher(self):
         from src.domain import market_services
 
-        def daily_quote(path, security_code, **kwargs):
-            return {"ok": True, "points": [{"date": "2026-08-09", "close": 100}, {"date": "2026-08-10", "close": 102}], "duration_ms": 1}
-
-        with patch.object(market_services, "fetch_gangtise_market_kline_series", side_effect=daily_quote) as fetch:
-            rows, errors = market_services._fetch_gangtise_sector_overview("2026-08-01", "2026-08-10")
-
-        self.assertEqual(fetch.call_count, len(market_services.SHENWAN_LEVEL1_INDUSTRIES))
-        self.assertEqual(len(rows), len(market_services.SHENWAN_LEVEL1_INDUSTRIES))
-        self.assertEqual(errors, [])
-        self.assertTrue(all(row["data_source"] == "Gangtise OpenAPI" for row in rows))
+        self.assertFalse(hasattr(market_services, "_fetch_gangtise_sector_overview"))
+        self.assertFalse(hasattr(market_services, "_load_gangtise_sector_catalog"))
 
     def test_h5_hermes_composer_is_compact(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")

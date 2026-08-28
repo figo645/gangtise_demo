@@ -1642,7 +1642,7 @@ def mark_message_thread_read(tenant_slug, thread_id, actor_role):
         return None, state
     thread = dict(threads[thread_index])
     normalized_role = str(actor_role or "").strip().lower()
-    if normalized_role == "dav":
+    if normalized_role in {"dav", "admin"}:
         thread["kol_unread"] = 0
     elif normalized_role == "investor":
         thread["user_unread"] = 0
@@ -3228,6 +3228,7 @@ def normalize_site_config(source=None):
     if feature_flags.get("knowledge_module_enabled") is not True:
         feature_flags["knowledge"] = False
     merged["feature_flags"] = feature_flags
+    merged["role_capabilities"] = normalize_role_capabilities(merged.get("role_capabilities"))
     merged["brand"] = normalize_brand_config(merged.get("brand"))
     merged["auth_settings"] = normalize_auth_settings_config(merged.get("auth_settings"))
     merged["auth_settings"] = strip_auth_settings_secret(merged["auth_settings"])
@@ -3243,6 +3244,45 @@ def normalize_site_config(source=None):
     default_tenant_slug = str(merged.get("default_tenant_slug", "") or "").strip()
     merged["default_tenant_slug"] = default_tenant_slug if default_tenant_slug in tenant_slugs else tenant_slugs[0]
     return merged
+
+
+def normalize_role_capabilities(source=None):
+    """Normalize role-to-capability grants without coupling identity to access."""
+    raw_source = source if isinstance(source, dict) else {}
+    raw = {
+        str(key or "").strip().lower(): value
+        for key, value in raw_source.items()
+        if str(key or "").strip()
+    }
+    defaults = DEFAULT_ROLE_CAPABILITIES if isinstance(DEFAULT_ROLE_CAPABILITIES, dict) else {}
+    result = {}
+    role_names = set(defaults) | {str(key or "").strip().lower() for key in raw}
+    for role in sorted(role_names):
+        if not role:
+            continue
+        values = raw.get(role, defaults.get(role, []))
+        if isinstance(values, str):
+            values = re.split(r"[,\s]+", values)
+        if not isinstance(values, list):
+            values = defaults.get(role, [])
+        capabilities = []
+        for value in values:
+            capability = str(value or "").strip().lower()
+            if capability and capability not in capabilities:
+                capabilities.append(capability)
+        result[role] = capabilities
+    return result
+
+
+def has_role_capability(user_role="", capability="", site_config=None):
+    config = site_config or get_site_config()
+    role = str(user_role or "").strip().lower()
+    target = str(capability or "").strip().lower()
+    if not role or not target:
+        return False
+    grants = normalize_role_capabilities(config.get("role_capabilities") if isinstance(config, dict) else {})
+    capabilities = grants.get(role, []) if isinstance(grants, dict) else []
+    return target in {str(item or "").strip().lower() for item in capabilities}
 
 
 def get_platform_brand(site_config=None):
@@ -3294,21 +3334,24 @@ def is_hermes_available_for_role(user_role="", site_config=None):
     config = site_config or get_site_config()
     if not is_feature_enabled("hermes", config):
         return False
-    normalized_role = str(user_role or "").strip().lower()
     settings = get_hermes_settings(config)
-    if normalized_role == "dav":
+    if not has_role_capability(user_role, "hermes", config):
+        return False
+    # A role granted the DAv capability follows the DAv-level Hermes switch.
+    if has_role_capability(user_role, "dav", config):
         return settings.get("dav_access_enabled") is True
-    if normalized_role == "investor":
+    if has_role_capability(user_role, "investor", config):
         return settings.get("investor_access_enabled") is True
-    return settings.get("investor_access_enabled") is True
+    return True
 
 
 def get_h5_login_users(site_config=None):
+    config = site_config or get_site_config()
     users = list_users()
     return [
-        ensure_user_row_defaults(user, site_config)
+        ensure_user_row_defaults(user, config)
         for user in users
-        if user.get("role") in {"investor", "dav"} and user.get("status") == "active"
+        if has_role_capability(user.get("role"), "h5", config) and user.get("status") == "active"
     ]
 
 
@@ -4133,6 +4176,7 @@ def save_current_demo_profile_id(profile_id):
 
 
 def get_current_demo_profile(site_config=None):
+    config = site_config or get_site_config()
     current_username = get_current_demo_profile_id()
     if not current_username:
         return None
@@ -4143,11 +4187,12 @@ def get_current_demo_profile(site_config=None):
         return None
     # H5 is also a supported preview surface for platform administrators.
     # They remain excluded from the selectable H5 profile catalogue.
-    if current_user.get("role") not in {"investor", "dav", "admin"} or current_user.get("status") != "active":
+    role = str(current_user.get("role") or "").strip().lower()
+    if not normalize_role_capabilities(config.get("role_capabilities")).get(role) or current_user.get("status") != "active":
         session.pop(H5_USER_SESSION_KEY, None)
         g.current_demo_profile_id = ""
         return None
-    return ensure_user_row_defaults(current_user, site_config)
+    return ensure_user_row_defaults(current_user, config)
 
 
 def get_current_authenticated_user():
@@ -4156,10 +4201,12 @@ def get_current_authenticated_user():
     if not current_username:
         return None
     current_user = get_user_by_username(current_username)
-    if not current_user or current_user.get("role") not in {"investor", "dav", "admin"} or current_user.get("status") != "active":
+    config = get_site_config()
+    role = str((current_user or {}).get("role") or "").strip().lower()
+    if not current_user or not normalize_role_capabilities(config.get("role_capabilities")).get(role) or current_user.get("status") != "active":
         save_current_demo_profile_id("")
         return None
-    return ensure_user_row_defaults(current_user)
+    return ensure_user_row_defaults(current_user, config)
 
 
 def mask_phone(phone):
@@ -4551,7 +4598,8 @@ def create_user(payload):
     h5_channel_label = str(source.get("h5_channel_label") or "").strip()
     h5_channel_selected_at = str(source.get("h5_channel_selected_at") or "").strip()
     onboarding_completed_at = str(source.get("onboarding_completed_at") or "").strip()
-    if not username or not password or role not in {"investor", "dav", "admin"} or not phone:
+    configured_roles = normalize_role_capabilities(get_site_config().get("role_capabilities"))
+    if not username or not password or role not in configured_roles or not phone:
         raise ValueError("invalid_user_payload")
     if get_user_by_username(username):
         raise ValueError("username_exists")
@@ -4794,9 +4842,10 @@ def build_user_import_template_csv(scope="admin", tenant_slug=""):
 def _normalize_user_role_for_scope(role, scope):
     normalized_scope = str(scope or "admin").strip().lower()
     value = str(role or "investor").strip().lower() or "investor"
+    configured_roles = normalize_role_capabilities(get_site_config().get("role_capabilities"))
     if normalized_scope == "kol":
         return "investor"
-    return value if value in {"investor", "dav", "admin"} else "investor"
+    return value if value in configured_roles else "investor"
 
 
 def _normalize_user_status(value):
@@ -4946,7 +4995,8 @@ def ensure_user_row_defaults(user, site_config=None):
         "username": str(user.get("username") or "").strip(),
         "password": str(user.get("password") or "").strip(),
         "role": role,
-        "roleLabel": role_label_map.get(role, "投资者"),
+        "roleLabel": role_label_map.get(role, role),
+        "roleCapabilities": normalize_role_capabilities(config.get("role_capabilities")).get(role, []),
         "avatar": str(profile_settings.get("avatar") or user.get("avatar") or defaults["avatar"]).strip() or defaults["avatar"],
         "name": str(profile_settings.get("display_name") or user.get("username") or "").strip(),
         "phone": str(user.get("phone") or "").strip(),
@@ -6840,6 +6890,10 @@ def report_user_async_job_progress(job_code, stage="", percent=None, summary="",
     job = get_user_async_job(job_code)
     if not job:
         return None
+    # A worker can still return from an already-issued model request after the
+    # user stops it. Never let late progress overwrite that terminal choice.
+    if str(job.get("status") or "").strip().lower() == "cancelled":
+        return job
     result_payload = copy.deepcopy(job.get("result")) if isinstance(job.get("result"), dict) else {}
     live_log = result_payload.get("live_log") if isinstance(result_payload.get("live_log"), list) else []
     if log_text:
@@ -6863,6 +6917,36 @@ def report_user_async_job_progress(job_code, stage="", percent=None, summary="",
     if summary:
         fields["summary"] = str(summary).strip()[:240]
     return update_user_async_job(job_code, **fields)
+
+
+def is_user_async_job_cancelled(job_code):
+    job = get_user_async_job(job_code)
+    return bool(job and str(job.get("status") or "").strip().lower() == "cancelled")
+
+
+def cancel_user_async_job(job_code, summary="已停止生成"):
+    """Mark an active job as cancelled without deleting its audit trail."""
+    job = get_user_async_job(job_code)
+    if not job:
+        raise ValueError("job_not_found")
+    status = str(job.get("status") or "").strip().lower()
+    if status == "cancelled":
+        return job
+    if status not in {"pending", "running"}:
+        raise ValueError("job_not_cancellable")
+    result_payload = copy.deepcopy(job.get("result")) if isinstance(job.get("result"), dict) else {}
+    result_payload["cancelled_at"] = now_ts()
+    result_payload["cancel_reason"] = "user_requested"
+    return update_user_async_job(
+        job_code,
+        status="cancelled",
+        progress_stage="cancelled",
+        progress_percent=int(job.get("progress_percent") or 0),
+        summary=summary,
+        error_message="",
+        result_json=json.dumps(result_payload, ensure_ascii=False),
+        finished_at=now_ts(),
+    )
 
 
 def retry_user_async_job(job_code):
@@ -7364,7 +7448,12 @@ def execute_admin_task_by_type(task_type, force=False):
 def execute_admin_task(task, force=False):
     task_type = task["task_type"]
     params = task.get("task_params") if isinstance(task.get("task_params"), dict) else {}
-    if task_type in {"prepare_indicator_hub", "sync_real_indicator_history", "seed_mock_indicator_lake"}:
+    if task_type in {
+        "prepare_indicator_hub",
+        "sync_real_indicator_history",
+        "sync_market_snapshot",
+        "seed_mock_indicator_lake",
+    }:
         return execute_admin_task_by_type(task_type, force=force)
     if task_type == "indicator_source_landing":
         source_code = str(params.get("source_code") or "").strip()
@@ -7455,6 +7544,8 @@ def run_admin_task(task_code, trigger_mode="manual", force=False):
             summary = "指标中心预处理完成"
         elif task["task_type"] == "sync_real_indicator_history":
             summary = "真实历史同步完成"
+        elif task["task_type"] == "sync_market_snapshot":
+            summary = "AKShare 市场与行业快照同步完成"
         elif task["task_type"] == "seed_mock_indicator_lake":
             summary = "模拟指标入口已关闭"
         elif task["task_type"] == "indicator_source_landing":
@@ -7595,7 +7686,9 @@ def _claim_next_user_async_job():
                 """
                 SELECT id, job_code
                 FROM user_async_jobs
-                WHERE status = 'pending' AND COALESCE(is_simulated, 0) = 0
+                -- Simulation provenance controls release visibility only. A
+                -- local user action must still be executable by this worker.
+                WHERE status = 'pending'
                 ORDER BY created_at ASC, id ASC
                 FOR UPDATE SKIP LOCKED
                 LIMIT 1
@@ -7629,6 +7722,10 @@ def _claim_next_user_async_job():
 def _complete_user_async_job(job_code, success, summary="", result=None, error_message=""):
     with app.app_context():
         current_job = get_user_async_job(job_code) or {}
+        if str(current_job.get("status") or "").strip().lower() == "cancelled":
+            # The user cancelled while a synchronous provider request was in
+            # flight. Preserve cancellation and discard its late result.
+            return current_job
         current_result = current_job.get("result") if isinstance(current_job.get("result"), dict) else {}
         final_result = copy.deepcopy(current_result)
         if isinstance(result, dict):
@@ -7661,6 +7758,8 @@ def _user_async_job_loop():
                 _user_async_job_runtime["current_job_code"] = job.get("job_code")
                 _user_async_job_runtime["current_job_type"] = job.get("job_type")
             with app.app_context():
+                if is_user_async_job_cancelled(job["job_code"]):
+                    continue
                 update_user_async_job(job["job_code"], progress_stage="processing", progress_percent=45, summary="任务处理中")
                 result = execute_user_async_job(job)
                 summary = _summarize_user_async_job_result(job.get("job_type"), result)

@@ -1,6 +1,7 @@
 import math
 import re
 from collections import Counter
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 from src.runtime import *
@@ -48,34 +49,20 @@ def get_review_generation_config(site_config=None):
 
 
 def get_default_llm_config(site_config=None, purpose="general", feature_code=""):
+    """Return the single Admin-selected model used by every LLM capability."""
     config = site_config or get_site_config()
     registry = normalize_llm_registry_config((config or {}).get("llm_registry"))
     purpose_key = str(purpose or "general").strip().lower() or "general"
     default_key = str(registry.get("default_model_key") or "").strip()
-    feature_key = str(feature_code or "").strip()
     models = registry.get("models") if isinstance(registry.get("models"), list) else []
-    feature_model_keys = registry.get("feature_model_keys") if isinstance(registry.get("feature_model_keys"), dict) else {}
     selected = None
-    if feature_key:
-        bound_model_key = str(feature_model_keys.get(feature_key) or "").strip()
-        if bound_model_key:
-            for item in models:
-                if not isinstance(item, dict):
-                    continue
-                if str(item.get("key") or "").strip() != bound_model_key:
-                    continue
-                if item.get("enabled", True) is False:
-                    break
+    if default_key:
+        for item in models:
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("key") or "").strip() == default_key:
                 selected = item
                 break
-    if default_key:
-        if selected is None:
-            for item in models:
-                if not isinstance(item, dict):
-                    continue
-                if str(item.get("key") or "").strip() == default_key:
-                    selected = item
-                    break
     if not selected:
         for item in models:
             if not isinstance(item, dict):
@@ -89,6 +76,41 @@ def get_default_llm_config(site_config=None, purpose="general", feature_code="")
     if not selected or selected.get("enabled", True) is False:
         return None
     return normalize_llm_model_config(selected)
+
+
+def _is_loopback_llm_base_url(base_url):
+    """Return whether an LLM endpoint is bound to the local machine."""
+    parsed = urlparse(str(base_url or "").strip())
+    hostname = str(parsed.hostname or "").strip().lower()
+    return hostname in {"127.0.0.1", "localhost", "::1"}
+
+
+def _validate_llm_model_endpoint(model_config, feature_code=""):
+    """Enforce the Admin endpoint boundary before any LLM network request."""
+    config = normalize_llm_model_config(model_config)
+    base_url = str(config.get("base_url") or "").strip()
+    if not base_url:
+        raise RuntimeError(f"llm_base_url_missing:{str(feature_code or 'general').strip()}")
+    if _is_loopback_llm_base_url(base_url):
+        raise RuntimeError(
+            f"llm_loopback_url_not_allowed:{str(feature_code or 'general').strip()}:{base_url}"
+        )
+    return config
+
+
+def get_hermes_llm_config(feature_code, site_config=None):
+    """Resolve Hermes through the same Admin-selected model as all LLM work."""
+    model = get_default_llm_config(
+        site_config=site_config,
+        purpose="general",
+        feature_code="",
+    )
+    # Keep configuration lookup usable for isolated callers that provide a
+    # lightweight model stub; the real network boundary below still rejects a
+    # missing endpoint. A configured loopback endpoint is never acceptable.
+    if model and str(model.get("base_url") or "").strip():
+        _validate_llm_model_endpoint(model, feature_code=feature_code)
+    return model
 
 
 def _normalize_openai_compatible_base_url(base_url):
@@ -202,12 +224,13 @@ def call_openai_compatible_llm(
     if not api_key:
         raise RuntimeError("llm_api_key_missing")
     endpoint_base = _normalize_openai_compatible_base_url(config.get("base_url"))
-    if not endpoint_base:
-        raise RuntimeError("llm_base_url_missing")
+    _validate_llm_model_endpoint(config, feature_code=feature_code or "general")
     request_started = time.perf_counter()
     system_text = str(system_prompt or "").strip()
     user_text = str(user_prompt or "").strip()
-    response = requests.post(
+    session = requests.Session()
+    session.trust_env = False
+    response = session.post(
         f"{endpoint_base}/chat/completions",
         headers={
             "Authorization": f"Bearer {api_key}",
@@ -222,6 +245,7 @@ def call_openai_compatible_llm(
             ],
         },
         timeout=max(5, int(request_timeout_seconds or 120)),
+        allow_redirects=False,
     )
     if response.status_code >= 400:
         raise RuntimeError(f"llm_request_failed:{response.status_code}:{response.text[:240]}")
@@ -418,7 +442,13 @@ def generate_review_draft_with_llm(
 ):
     workflow_definition = build_default_review_draft_workflow_definition()
 
+    def _ensure_not_cancelled(runtime):
+        job_code_value = str(runtime.get("job_code") or "").strip()
+        if job_code_value and is_user_async_job_cancelled(job_code_value):
+            raise RuntimeError("user_async_job_cancelled")
+
     def _review_draft_input_executor(state, runtime, node, upstream):
+        _ensure_not_cancelled(runtime)
         normalized_source = str(runtime.get("source_text") or "").strip()
         if not normalized_source:
             raise ValueError("review_source_text_required")
@@ -447,6 +477,7 @@ def generate_review_draft_with_llm(
         }
 
     def _review_draft_prepare_executor(state, runtime, node, upstream):
+        _ensure_not_cancelled(runtime)
         period_label_map = {
             "day": "日复盘",
             "week": "周复盘",
@@ -490,6 +521,7 @@ def generate_review_draft_with_llm(
         }
 
     def _review_draft_llm_executor(state, runtime, node, upstream):
+        _ensure_not_cancelled(runtime)
         llm_model = get_default_llm_config(purpose="general", feature_code="review_draft_generation")
         if not llm_model:
             raise RuntimeError("review_draft_llm_not_configured")
@@ -509,6 +541,7 @@ def generate_review_draft_with_llm(
                 "workflow_id": workflow_definition["id"],
             },
         )
+        _ensure_not_cancelled(runtime)
         normalized_text = str(rendered_text or "").strip()
         if not normalized_text:
             raise RuntimeError("empty_llm_response")
@@ -536,6 +569,7 @@ def generate_review_draft_with_llm(
         }
 
     def _review_draft_output_executor(state, runtime, node, upstream):
+        _ensure_not_cancelled(runtime)
         result = {
             "text": state.get("rendered_text") or "",
             "llm_model": copy.deepcopy(state.get("llm_model") or {}),
@@ -585,6 +619,14 @@ def _get_review_period_label(review_period):
     }
     key = str(review_period or "").strip().lower()
     return period_label_map.get(key, key or "未指定")
+
+
+def build_gangtise_multi_stock_review_request(stock_labels, review_period="day"):
+    """Build the single Gangtise Agent SSE request shared by review and Hermes."""
+    labels = [str(item or "").strip() for item in (stock_labels or []) if str(item or "").strip()]
+    if not labels:
+        raise ValueError("gangtise_multi_stock_labels_required")
+    return f"请进行{_get_review_period_label(review_period)}，分析以下自选股：{'、'.join(labels)}。"
 
 
 def _format_review_dashboard_blocks(cards):
@@ -1144,7 +1186,10 @@ def analyze_review_watchlist_with_llm(
                 labels.append(f"{name}{f'（{security_code or code}）' if (security_code or code) else ''}")
         if not labels:
             raise RuntimeError("review_watchlist_analysis_missing_item")
-        request_text = f"请进行{_get_review_period_label(runtime.get('review_period'))}，分析以下自选股：{'、'.join(labels)}。"
+        request_text = build_gangtise_multi_stock_review_request(
+            labels,
+            review_period=runtime.get("review_period") or "day",
+        )
         if runtime.get("job_code"):
             report_user_async_job_progress(
                 runtime["job_code"],
@@ -1924,13 +1969,16 @@ def _get_external_feature_model(feature_code):
     base_url = _normalize_openai_compatible_base_url(model.get("base_url"))
     if not base_url:
         raise RuntimeError(f"feature_model_base_url_missing:{feature_code}")
+    _validate_llm_model_endpoint(model, feature_code=feature_code)
     return model, api_key, base_url
 
 
 def _transcribe_audio_with_python(audio_bytes, filename, content_type, transcription_cfg=None):
     config = transcription_cfg or get_voice_transcription_config()
     _model, api_key, base_url = _get_external_feature_model("voice_transcription_api")
-    response = requests.post(
+    session = requests.Session()
+    session.trust_env = False
+    response = session.post(
         f"{base_url}/audio/transcriptions",
         headers={"Authorization": f"Bearer {api_key}"},
         data={
@@ -1941,6 +1989,7 @@ def _transcribe_audio_with_python(audio_bytes, filename, content_type, transcrip
         },
         files={"file": (filename, audio_bytes, content_type)},
         timeout=180,
+        allow_redirects=False,
     )
     if response.status_code >= 400:
         raise RuntimeError(f"transcription_request_failed:{response.status_code}:{response.text[:240]}")
@@ -1994,7 +2043,9 @@ def _build_text_embedding_with_api(text, feature_code="", feature_label="", tena
     if not model_name:
         raise RuntimeError("embedding_model_name_missing")
     request_started = time.perf_counter()
-    response = requests.post(
+    session = requests.Session()
+    session.trust_env = False
+    response = session.post(
         f"{base_url}/embeddings",
         headers={
             "Authorization": f"Bearer {api_key}",
@@ -2005,6 +2056,7 @@ def _build_text_embedding_with_api(text, feature_code="", feature_label="", tena
             "input": text,
         },
         timeout=120,
+        allow_redirects=False,
     )
     if response.status_code >= 400:
         raise RuntimeError(f"embedding_request_failed:{response.status_code}:{response.text[:240]}")
@@ -3350,6 +3402,170 @@ HERMES_ALLOWED_TOOLS = {
     "gangtise.multi_watchlist_analysis",
 }
 
+# This registry is the routing contract. The model may select from it, but it
+# cannot change endpoint, cost, target constraints, or the output policy.
+HERMES_CAPABILITY_REGISTRY = {
+    "stock_today_observation": {
+        "tool": "gangtise.stock_today_observation",
+        "endpoint": "/application/open-ai/ai/chat/sse",
+        "provider": "Gangtise Agent助手 SSE",
+        "cost_credits": 20,
+        "target_type": "stock",
+        "time_scope": "today",
+        "output_mode": "direct_markdown",
+        "constraints": ["单只证券", "仅当日研究", "返回今日行情、核心逻辑、重要要闻和风险", "研究结果原样展示"],
+    },
+    "market_today_observation": {
+        "tool": "gangtise.market_today_observation",
+        "endpoint": "/application/open-ai/ai/chat/sse",
+        "provider": "Gangtise Agent助手 SSE",
+        "cost_credits": 20,
+        "target_type": "index",
+        "time_scope": "today",
+        "output_mode": "direct_markdown",
+        "constraints": ["指数或大盘", "仅当日研究", "返回指数表现、板块资金和市场情绪展望", "研究结果原样展示"],
+    },
+    "stock_one_pager": {
+        "tool": "gangtise.stock_one_pager",
+        "endpoint": "/application/open-ai/agent/one-pager",
+        "provider": "Gangtise OpenAPI",
+        "cost_credits": 50,
+        "target_type": "stock",
+        "time_scope": "latest",
+        "output_mode": "direct_markdown",
+        "constraints": ["仅支持单只个股", "最近一期结构化报告，非当日研究", "指数不支持"],
+    },
+    "stock_highlights": {
+        "tool": "gangtise.stock_highlights",
+        "endpoint": "/application/open-ai/stock-summary/getList",
+        "provider": "Gangtise OpenAPI",
+        "cost_credits": 3,
+        "target_type": "stock",
+        "allowed_target_types": ["stock", "multi_stock"],
+        "time_scope": "latest",
+        "output_mode": "direct_text",
+        "constraints": ["单只或多只股票，最多 6000 个证券", "只返回每只证券的精炼看点", "不能替代完整观察报告或组合结论"],
+    },
+    "multi_watchlist_analysis": {
+        "tool": "gangtise.multi_watchlist_analysis",
+        "endpoint": "/application/open-ai/ai/chat/sse",
+        "provider": "Gangtise Agent助手 SSE",
+        "cost_credits": 20,
+        "target_type": "multi_stock",
+        "time_scope": "today",
+        "output_mode": "direct_markdown",
+        "constraints": ["至少两只证券", "详细综合分析", "返回个股要点和组合综合结论", "研究结果原样展示"],
+    },
+    "watchlist_fundamental": {
+        "tool": "watchlist.detail",
+        "endpoint": "local.watchlist.detail",
+        "provider": "local",
+        "cost_credits": 0,
+        "target_type": "stock",
+        "time_scope": "latest",
+        "output_mode": "llm_synthesis",
+        "constraints": ["服务端确认证券实体"],
+    },
+    "knowledge_lookup": {
+        "tool": None,
+        "endpoint": "local.llm",
+        "provider": "local_llm",
+        "cost_credits": 0,
+        "target_type": "none",
+        "time_scope": "conversation",
+        "output_mode": "llm_synthesis",
+        "constraints": ["不使用 embedding 初筛"],
+    },
+    "evidence_chain_analysis": {
+        "tool": None,
+        "endpoint": "local.llm",
+        "provider": "local_llm",
+        "cost_credits": 0,
+        "target_type": "none",
+        "time_scope": "conversation",
+        "output_mode": "llm_synthesis",
+        "constraints": ["不使用 embedding 初筛"],
+    },
+    "multi_tool_research": {
+        "tool": None,
+        "endpoint": "local.llm",
+        "provider": "local_llm",
+        "cost_credits": 0,
+        "target_type": "none",
+        "time_scope": "conversation",
+        "output_mode": "llm_synthesis",
+        "constraints": ["只调用模型明确需要的上下文工具", "不使用 embedding 初筛"],
+    },
+    "smart_indicator_explain": {
+        "tool": "indicator.detail",
+        "endpoint": "local.indicator.detail",
+        "provider": "local",
+        "cost_credits": 0,
+        "target_type": "none",
+        "time_scope": "latest",
+        "output_mode": "llm_synthesis",
+        "constraints": ["按需读取指标和看板上下文"],
+    },
+    "dashboard_interpretation": {
+        "tool": "dashboard.context",
+        "endpoint": "local.dashboard.context",
+        "provider": "local",
+        "cost_credits": 0,
+        "target_type": "none",
+        "time_scope": "latest",
+        "output_mode": "llm_synthesis",
+        "constraints": [],
+    },
+    "product_help": {
+        "tool": None,
+        "endpoint": "local.llm",
+        "provider": "local_llm",
+        "cost_credits": 0,
+        "target_type": "none",
+        "time_scope": "conversation",
+        "output_mode": "llm_synthesis",
+        "constraints": [],
+    },
+    "small_talk": {
+        "tool": None,
+        "endpoint": "local.llm",
+        "provider": "local_llm",
+        "cost_credits": 0,
+        "target_type": "none",
+        "time_scope": "conversation",
+        "output_mode": "llm_synthesis",
+        "constraints": ["通用闲聊和投资教育问题", "不调用 Gangtise 或本地数据工具", "不提供直接买卖或仓位指令"],
+    },
+    "out_of_scope_redirect": {
+        "tool": None,
+        "endpoint": "local.llm",
+        "provider": "local_llm",
+        "cost_credits": 0,
+        "target_type": "none",
+        "time_scope": "conversation",
+        "output_mode": "llm_synthesis",
+        "constraints": ["仅用于安全或范围收口"],
+    },
+}
+
+
+def hermes_capability_registry_text():
+    """Return a compact, deterministic registry for the router prompt."""
+    rows = []
+    for intent, spec in HERMES_CAPABILITY_REGISTRY.items():
+        rows.append({
+            "intent": intent,
+            "tool": spec.get("tool"),
+            "endpoint": spec.get("endpoint"),
+            "cost_credits": spec.get("cost_credits", 0),
+            "target_type": spec.get("target_type"),
+            "allowed_target_types": spec.get("allowed_target_types") or [spec.get("target_type")],
+            "time_scope": spec.get("time_scope"),
+            "output_mode": spec.get("output_mode"),
+            "constraints": spec.get("constraints") or [],
+        })
+    return json.dumps(rows, ensure_ascii=False, separators=(",", ":"))
+
 HERMES_INTENT_ROUTE_GROUPS = {
     "knowledge_lookup": "knowledge_qa",
     "watchlist_fundamental": "market_data_query",
@@ -3410,6 +3626,10 @@ HERMES_SCOPE_KEYWORDS = {
 
 HERMES_SMALL_TALK_KEYWORDS = [
     "你好", "您好", "hi", "hello", "在吗", "谢谢", "感谢", "辛苦了", "早上好", "晚上好", "午安",
+]
+
+HERMES_GENERAL_INVESTMENT_KEYWORDS = [
+    "投资", "选股", "理财", "入门", "怎么做股票", "如何做股票", "怎么开始",
 ]
 
 HERMES_BLOCKED_TRADING_KEYWORDS = [
@@ -3513,21 +3733,6 @@ def finalize_hermes_intent_plan(plan, question_text="", attachments=None, select
     )
     if resolved_mode:
         normalized_plan["preferred_mode"] = resolved_mode
-        stock_code = str(normalized_plan.get("stock_code") or "").strip()
-        indicator_code = str(normalized_plan.get("indicator_code") or "").strip()
-        if stock_code and not indicator_code:
-            existing_tools = [
-                str(item).strip()
-                for item in (normalized_plan.get("tools") if isinstance(normalized_plan.get("tools"), list) else [])
-                if str(item).strip()
-            ]
-            preserved_tools = []
-            for tool_name in ["attachment.context"]:
-                if tool_name in existing_tools and tool_name not in preserved_tools:
-                    preserved_tools.append(tool_name)
-            normalized_plan["intent"] = "watchlist_fundamental"
-            normalized_plan["display_mode"] = "structured"
-            normalized_plan["tools"] = ["watchlist.detail"] + preserved_tools
         if str(normalized_plan.get("intent") or "").strip() == "smart_indicator_explain":
             normalized_plan["display_mode"] = "structured"
     task_family = infer_hermes_task_family(
@@ -3555,18 +3760,20 @@ def _hermes_scope_feature_flags(question_text, selected_knowledge_ids=None, atta
     attachments = attachments if isinstance(attachments, list) else []
     text = str(question_text or "").strip()
     preferred_key = str(preferred_mode or "").strip().lower()
-    indicator_match = find_indicator_reference_from_text(text, tenant_slug=tenant_slug)
     flags = {
-        "watchlist": bool(find_watchlist_code_from_text(text)) or _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["watchlist"]),
+        # Scope guard is limited to safety and coarse boundary hints. Entity
+        # resolution belongs to the LLM plan plus the server confirmation step.
+        "watchlist": _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["watchlist"]),
         "evidence": _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["evidence"]),
         "knowledge": bool(selected_knowledge_ids) or _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["knowledge"]),
-        "indicator": bool(indicator_match) or _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["indicator"]),
+        "indicator": _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["indicator"]),
         "dashboard": _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["dashboard"]),
         "product": _contains_any_keyword(text, HERMES_SCOPE_KEYWORDS["product"]),
         "report": preferred_key == "report_interpretation" or _contains_any_keyword(text, HERMES_REPORT_INTERPRETATION_KEYWORDS),
         "content_generation": preferred_key == "content_generation" or _contains_any_keyword(text, HERMES_CONTENT_GENERATION_KEYWORDS),
         "attachments": bool(attachments),
         "small_talk": _contains_any_keyword(text, HERMES_SMALL_TALK_KEYWORDS),
+        "general_investment": _contains_any_keyword(text, HERMES_GENERAL_INVESTMENT_KEYWORDS),
         "blocked_trading": _contains_any_keyword(text, HERMES_BLOCKED_TRADING_KEYWORDS),
         "out_of_scope": _contains_any_keyword(text, HERMES_OUT_OF_SCOPE_KEYWORDS),
     }
@@ -3634,6 +3841,18 @@ def hermes_scope_guard(question_text, selected_knowledge_ids=None, attachments=N
             "suggestions": [
                 "如果继续聊研究内容，可以直接补股票、复盘或指标对象。",
                 "也可以问某个功能怎么用。",
+            ],
+            "intent_hint": "small_talk",
+            "flags": flags,
+        }
+    if flags["general_investment"]:
+        return {
+            "status": "soft_allowed",
+            "reason": "识别为泛投资教育问题，交由 LLM 在不调用外部研究接口的情况下回答。",
+            "message": "",
+            "suggestions": [
+                "可以继续追问选股框架、风险管理或研究方法。",
+                "如需研究具体标的，请补充股票名称或代码。",
             ],
             "intent_hint": "small_talk",
             "flags": flags,
@@ -6116,10 +6335,26 @@ def clear_admin_hermes_memory(tenant_slug, range_key, confirm_text=""):
     }
 
 
-def build_hermes_intent_router_prompt(question_text, has_attachments=False, selected_knowledge_ids=None, messages=None, memory_context_text="", scope_result=None):
-    conversation_block = format_hermes_message_context(messages, limit=6)
+def build_hermes_intent_router_prompt(question_text, has_attachments=False, selected_knowledge_ids=None, messages=None, memory_context_text="", scope_result=None, memory_state=None):
+    conversation_block = format_hermes_message_context(messages, limit=8)
     conversation_section = f"最近多轮对话：\n{conversation_block}\n\n" if conversation_block else ""
     memory_section = f"历史记忆摘要：\n{str(memory_context_text or '').strip()}\n\n" if str(memory_context_text or "").strip() else ""
+    memory_snapshot = memory_state if isinstance(memory_state, dict) else {}
+    memory_session = memory_snapshot.get("session") if isinstance(memory_snapshot.get("session"), dict) else {}
+    memory_user = memory_snapshot.get("user_memory") if isinstance(memory_snapshot.get("user_memory"), dict) else {}
+    entity_candidates = []
+    for value in (memory_session.get("recent_symbols") or []) + (memory_user.get("focus_symbols") or []):
+        value = str(value or '').strip()
+        if value and value not in entity_candidates:
+            entity_candidates.append(value)
+    context_state_section = (
+        "可继承上下文实体（只有用户明确使用代词或省略主语时才能继承）：\n"
+        f"{json.dumps(entity_candidates[:6], ensure_ascii=False)}\n"
+        f"上一轮意图：{str(memory_session.get('last_intent') or '').strip() or '无'}\n\n"
+        if entity_candidates or memory_session.get("last_intent")
+        else ""
+    )
+    selected_ids = [str(item).strip() for item in (selected_knowledge_ids or []) if str(item).strip()]
     scope = scope_result if isinstance(scope_result, dict) else {}
     scope_section = ""
     if str(scope.get("status") or "").strip() in {"blocked", "redirected"}:
@@ -6129,37 +6364,54 @@ def build_hermes_intent_router_prompt(question_text, has_attachments=False, sele
         )
     return (
         "请根据用户问题判断 Hermes 应该如何拆解任务。\n"
-        "可选 intent：small_talk, product_help, knowledge_lookup, evidence_chain_analysis, watchlist_fundamental, smart_indicator_explain, dashboard_interpretation, multi_tool_research, stock_today_observation, market_today_observation, stock_one_pager, stock_highlights, multi_watchlist_analysis, out_of_scope_redirect\n"
+        "能力注册表（这是服务端契约，不要修改其中的 endpoint、成本或限制）：\n"
+        f"{hermes_capability_registry_text()}\n\n"
         "可选 tools：watchlist.detail, indicator.detail, dashboard.context, attachment.context, gangtise.stock_today_observation, gangtise.market_today_observation, gangtise.stock_one_pager, gangtise.stock_highlights, gangtise.multi_watchlist_analysis\n"
         "规则：\n"
         "1. 如果用户明确问复盘、证据链、依据、来源，使用 evidence_chain_analysis；不要调用知识检索工具。\n"
         "2. 如果用户要今天/当日的单股观察报告、行情、逻辑、要闻或风险，使用 stock_today_observation 并只调用 gangtise.stock_today_observation。\n"
         "3. 如果用户要今天/当日的大盘、指数、板块资金或市场情绪展望，使用 market_today_observation 并只调用 gangtise.market_today_observation。\n"
-        "4. 如果用户要公司一页通、深化研究、结构化深度报告，使用 stock_one_pager 并只调用 gangtise.stock_one_pager；指数不支持这个能力。\n"
-        "5. 如果用户要看点、精炼看点、批量摘要，使用 stock_highlights 并只调用 gangtise.stock_highlights。\n"
-        "6. 如果用户明确同时分析多只股票或多支自选股并需要组合结论，使用 multi_watchlist_analysis 并只调用 gangtise.multi_watchlist_analysis。\n"
+        "4. 如果用户要公司一页通、深入研究、深化研究或结构化深度报告，使用 stock_one_pager 并只调用 gangtise.stock_one_pager；它是最近一期而非当日报告，指数不支持。\n"
+        "5. 如果用户要看点、简单介绍、简要分析或批量摘要，使用 stock_highlights 并只调用 gangtise.stock_highlights。即使有多只股票也使用这个能力；target_type 可为 stock 或 multi_stock；不得宣称组合结论或完整观察报告。\n"
+        "6. 只有用户明确要求多只股票的详细分析、综合分析、横向比较或组合结论时，使用 multi_watchlist_analysis 并只调用 gangtise.multi_watchlist_analysis。\n"
         "7. 如果用户问基本面、估值、盈利或行业位置，且不是上述 Gangtise 报告场景，使用 watchlist_fundamental 并调用 watchlist.detail。\n"
         "8. 如果用户主要想问知识、框架、方法、纪要内容，使用 knowledge_lookup；这类问题直接交给答案模型，不调用 embedding 或知识检索工具。\n"
         "9. 如果用户在问智能指标怎么计算、提示词/公式怎么理解，使用 smart_indicator_explain，并按需调用 indicator.detail、dashboard.context。\n"
         "10. 如果用户在问 Dashboard 面板、看板卡片、布局或发布后的展示逻辑，使用 dashboard_interpretation，并调用 dashboard.context。\n"
         "11. 如果用户在问 H5 / Web / Admin / 工作台里的功能、页面或操作，使用 product_help，不调用任何知识检索工具。\n"
-        "12. 如果只是寒暄或轻度闲聊，使用 small_talk，tools 必须为空数组。\n"
+        "12. 如果只是寒暄、通用闲聊、投资入门、选股方法、投资建议或未指向具体证券的泛投资问题，使用 small_talk，tools 必须为空数组。回答交给本地 LLM，不调用 Gangtise。\n"
         "13. 如果问题明显超范围但仍可温和收口，使用 out_of_scope_redirect，tools 必须为空数组。\n"
         "14. 如果有附件，工具里可以包含 attachment.context。\n"
-        "15. stock_code 只在能明显识别时输出，否则为空字符串。\n"
-        "16. display_mode 只能是 text 或 structured。\n"
-        "17. 如果用户问‘你是谁’或‘你的功能有哪些’，优先使用 product_help 或 small_talk，直接说明小金智能体当前能力。\n"
-        "18. 禁止返回 knowledge.search、evidence.search 或任何未列出的工具。\n\n"
+        "15. 输出 securities 数组，证券可以填 name、code 或 security_code；如果用户使用‘它/这只/上一只’等代词，优先从会话记忆继承并将 use_context_entities 设为 true。\n"
+        "16. target_type 只能是 stock、index、multi_stock 或 none；market_today_observation 必须是 index，stock_one_pager 不得是 index。\n"
+        "17. display_mode 只能是 text 或 structured。\n"
+        "18. 如果用户问‘你是谁’或‘你的功能有哪些’，优先使用 product_help 或 small_talk，直接说明小金智能体当前能力。\n"
+        "19. 研究能力只能使用注册表中对应的唯一 tool；本地 LLM 能力 tools 必须为空数组或仅包含明确需要的上下文工具。\n"
+        "20. 以下示例必须按语义路由：\n"
+        "- ‘对今天中国银行的股票做下个股分析，看看今天整体情况怎么样’ => stock_today_observation / gangtise.stock_today_observation / stock / today。\n"
+        "- ‘分析下今天大盘的整体走势，上证和深证指数表现如何’ => market_today_observation / gangtise.market_today_observation / index / today。\n"
+        "- ‘对中国银行做一下深入研究’ => stock_one_pager / gangtise.stock_one_pager / stock / latest。\n"
+        "- ‘中国银行、建设银行、招商银行，帮我简单介绍分析下’ => stock_highlights / gangtise.stock_highlights / multi_stock / latest。\n"
+        "- ‘中国银行、建设银行、招商银行，做详细的综合分析’ => multi_watchlist_analysis / gangtise.multi_watchlist_analysis / multi_stock / today。\n"
+        "- ‘你好’、‘我该怎么选股’、‘投资有什么建议’ => small_talk / [] / none / conversation。\n"
+        "21. 禁止返回 knowledge.search、evidence.search 或任何未列出的工具。\n\n"
         f"{memory_section}"
+        f"{context_state_section}"
         f"{conversation_section}"
         f"{scope_section}"
         f"用户问题：{str(question_text or '').strip()}\n"
         f"是否有附件：{'是' if has_attachments else '否'}\n"
-        f"是否指定知识条目：{'是' if selected_knowledge_ids else '否'}\n\n"
+        f"是否指定知识条目：{'是' if selected_ids else '否'}\n"
+        f"指定知识条目 ID：{json.dumps(selected_ids, ensure_ascii=False)}\n\n"
         "输出 JSON 结构：\n"
         '{'
         '"intent":"...",'
         '"tools":["..."],'
+        '"target_type":"stock|index|multi_stock|none",'
+        '"securities":[{"name":"","code":"","security_code":"","market":""}],'
+        '"target":"",'
+        '"time_scope":"today|latest|conversation",'
+        '"use_context_entities":false,'
         '"stock_code":"",'
         '"display_mode":"text",'
         '"reason":"简短中文说明"'
@@ -6408,11 +6660,143 @@ def build_hermes_scope_synthesis(plan):
     }
 
 
+def _hermes_router_security_inputs(parsed, memory_state=None):
+    parsed = parsed if isinstance(parsed, dict) else {}
+    raw_items = parsed.get("securities") if isinstance(parsed.get("securities"), list) else []
+    if not raw_items:
+        legacy_code = str(parsed.get("stock_code") or "").strip()
+        if legacy_code:
+            raw_items = [{"code": legacy_code}]
+    if not raw_items and parsed.get("use_context_entities") is True:
+        memory = memory_state if isinstance(memory_state, dict) else {}
+        session = memory.get("session") if isinstance(memory.get("session"), dict) else {}
+        user_memory = memory.get("user_memory") if isinstance(memory.get("user_memory"), dict) else {}
+        symbols = []
+        for value in (session.get("recent_symbols") or []) + (user_memory.get("focus_symbols") or []):
+            value = str(value or "").strip()
+            if value and value not in symbols:
+                symbols.append(value)
+        raw_items = [{"code": value} for value in symbols[:6]]
+    return [item if isinstance(item, dict) else {"name": str(item or "").strip()} for item in raw_items]
+
+
+def _resolve_hermes_router_securities(parsed, memory_state=None, intent=""):
+    candidates = []
+    seen = set()
+    for item in _hermes_router_security_inputs(parsed, memory_state=memory_state):
+        code = str(item.get("security_code") or item.get("securityCode") or item.get("code") or "").strip()
+        name = str(item.get("name") or item.get("security_name") or item.get("securityName") or "").strip()
+        # The model commonly returns a name only. Confirm known aliases before
+        # fuzzy candidate ranking so cross-market names remain deterministic.
+        alias_code = find_watchlist_code_from_text(name) if name else ""
+        # A recognized Chinese security name is stronger than a model-filled
+        # cross-market code. Keep explicit unknown codes intact, but correct
+        # contradictory model output for known names.
+        query_code = alias_code or code
+        query = query_code or name
+        if not query:
+            continue
+        local_candidates = search_watchlist_candidates(query, top=1, include_remote=False)
+        candidate = local_candidates[0] if local_candidates else resolve_watchlist_candidate(
+            stock_code=query_code,
+            stock_name=name or query,
+        )
+        if not isinstance(candidate, dict) or not str(candidate.get("security_code") or "").strip():
+            raise RuntimeError(f"hermes_security_unresolved:{name or code}")
+        security_code = str(candidate.get("security_code") or "").strip().upper()
+        if security_code in seen:
+            continue
+        seen.add(security_code)
+        candidates.append({
+            "name": str(candidate.get("name") or name or code).strip(),
+            "code": str(candidate.get("code") or code).strip().upper(),
+            "security_code": security_code,
+            "market": str(candidate.get("market") or "").strip().upper(),
+            "source": str(candidate.get("source") or "security_master").strip(),
+        })
+    return candidates
+
+
+def validate_hermes_intent_plan(plan, question_text="", memory_state=None):
+    """Enforce server-owned routing and entity constraints before tool calls."""
+    normalized = copy.deepcopy(plan if isinstance(plan, dict) else {})
+    intent = str(normalized.get("intent") or "").strip()
+    spec = HERMES_CAPABILITY_REGISTRY.get(intent)
+    if not spec:
+        raise RuntimeError("hermes_intent_router_invalid_intent")
+    requested_tools = [
+        str(item).strip()
+        for item in (normalized.get("tools") if isinstance(normalized.get("tools"), list) else [])
+        if str(item).strip()
+    ]
+    expected_tool = str(spec.get("tool") or "").strip()
+    if expected_tool:
+        if intent in HERMES_GANGTISE_DIRECT_INTENTS and requested_tools != [expected_tool]:
+            raise RuntimeError(f"hermes_intent_tool_mismatch:{intent}")
+        if intent not in HERMES_GANGTISE_DIRECT_INTENTS and expected_tool not in requested_tools:
+            raise RuntimeError(f"hermes_intent_tool_mismatch:{intent}")
+    elif requested_tools and intent in {"small_talk", "out_of_scope_redirect"}:
+        raise RuntimeError(f"hermes_intent_tool_mismatch:{intent}")
+
+    allowed_context_tools = {
+        "attachment.context",
+        "dashboard.context",
+        "watchlist.detail",
+        "indicator.detail",
+    }
+    if intent in {"small_talk", "product_help", "knowledge_lookup", "evidence_chain_analysis", "out_of_scope_redirect"}:
+        if any(item not in allowed_context_tools for item in requested_tools):
+            raise RuntimeError(f"hermes_intent_tool_mismatch:{intent}")
+
+    target_type = str(normalized.get("target_type") or "").strip().lower()
+    expected_target = str(spec.get("target_type") or "none").strip().lower()
+    allowed_target_types = {
+        str(item or "").strip().lower()
+        for item in (spec.get("allowed_target_types") or [expected_target])
+        if str(item or "").strip()
+    }
+    if not target_type:
+        target_type = expected_target
+    if target_type not in allowed_target_types:
+        raise RuntimeError(f"hermes_target_type_mismatch:{intent}")
+    normalized["target_type"] = target_type
+    time_scope = str(normalized.get("time_scope") or spec.get("time_scope") or "conversation").strip().lower()
+    if time_scope not in {"today", "latest", "conversation"}:
+        raise RuntimeError(f"hermes_time_scope_invalid:{intent}")
+    normalized["time_scope"] = time_scope
+
+    raw_security_items = _hermes_router_security_inputs(normalized, memory_state=memory_state)
+    if intent == "stock_highlights" and len(raw_security_items) > 6000:
+        raise RuntimeError("hermes_stock_highlights_limit_exceeded:6000")
+    if intent == "market_today_observation":
+        # Index names are not entries in the stock security master. The LLM
+        # may still return them in ``securities``; market dispatch resolves
+        # index targets from the question itself, so never treat those names
+        # as stock entities or reject an otherwise valid market request.
+        securities = []
+    else:
+        securities = _resolve_hermes_router_securities(normalized, memory_state=memory_state, intent=intent)
+    if intent == "stock_today_observation" or intent == "stock_one_pager":
+        if len(securities) != 1:
+            raise RuntimeError(f"hermes_{intent}_single_stock_required")
+    elif intent == "stock_highlights":
+        if not securities:
+            raise RuntimeError("hermes_stock_highlights_stock_required")
+    elif intent == "multi_watchlist_analysis" and len(securities) < 2:
+        raise RuntimeError("hermes_multi_stock_at_least_two_required")
+
+    normalized["securities"] = securities
+    normalized["stock_code"] = str((securities[0] if securities else {}).get("code") or "").strip()
+    return normalized
+
+
 def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_ids=None, attachments=None, preferred_mode="", messages=None, scope_result=None, memory_state=None, scope_guard_enabled=True):
     selected_knowledge_ids = selected_knowledge_ids if isinstance(selected_knowledge_ids, list) else []
     attachments = attachments if isinstance(attachments, list) else []
     messages = normalize_hermes_messages(messages)
-    if isinstance(scope_result, dict) and str(scope_result.get("status") or "").strip() in {"redirected", "blocked"}:
+    # Deterministic policy decisions remain outside model routing. This is a
+    # boundary decision, not an embedding-based intent classifier.
+    if isinstance(scope_result, dict) and str(scope_result.get("status") or "").strip() == "blocked":
         return build_hermes_scope_plan(
             scope_result=scope_result,
             question_text=question_text,
@@ -6421,7 +6805,7 @@ def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_
             preferred_mode=preferred_mode,
             scope_guard_enabled=scope_guard_enabled,
         ), None, "scope_guard"
-    llm_model = get_default_llm_config(purpose="general", feature_code="hermes_intent_router")
+    llm_model = get_hermes_llm_config("hermes_intent_router")
     if not llm_model:
         raise RuntimeError("hermes_intent_router_llm_not_configured")
     try:
@@ -6435,6 +6819,7 @@ def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_
                 messages=messages,
                 memory_context_text=str((memory_state or {}).get("context_text") or "").strip(),
                 scope_result=scope_result,
+                memory_state=memory_state,
             ),
             feature_code="hermes_intent_router",
             feature_label="Hermes 意图路由",
@@ -6455,18 +6840,25 @@ def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_
                 tools.append(value)
         if "tools" not in parsed or not isinstance(parsed.get("tools"), list):
             raise RuntimeError("hermes_intent_router_invalid_tools")
-        stock_code = find_watchlist_code_from_text(str(parsed.get("stock_code") or "").strip())
         display_mode = str(parsed.get("display_mode") or "text").strip()
         if display_mode not in {"text", "structured"}:
             raise RuntimeError("hermes_intent_router_invalid_display_mode")
+        unknown_tools = [str(item or "").strip() for item in parsed.get("tools") if str(item or "").strip() not in HERMES_ALLOWED_TOOLS]
+        if unknown_tools and intent != "small_talk":
+            raise RuntimeError("hermes_intent_router_invalid_tools")
         normalized_scope_status = str((scope_result or {}).get("status") or "allowed").strip() or "allowed"
         if normalized_scope_status == "blocked":
             intent = "out_of_scope_redirect"
             tools = []
-        return finalize_hermes_intent_plan({
+        normalized_plan = finalize_hermes_intent_plan({
             "intent": intent,
             "tools": tools[:4],
-            "stock_code": stock_code,
+            "stock_code": str(parsed.get("stock_code") or "").strip(),
+            "securities": copy.deepcopy(parsed.get("securities") or []),
+            "target_type": str(parsed.get("target_type") or "").strip().lower(),
+            "target": str(parsed.get("target") or "").strip()[:120],
+            "time_scope": str(parsed.get("time_scope") or "").strip().lower(),
+            "use_context_entities": parsed.get("use_context_entities") is True,
             "indicator_code": str(parsed.get("indicator_code") or "").strip(),
             "display_mode": display_mode,
             "reason": str(parsed.get("reason") or "").strip()[:200] or "LLM 路由",
@@ -6474,7 +6866,13 @@ def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_
             "scope_status": normalized_scope_status,
             "guard_message": str((scope_result or {}).get("message") or "").strip() if normalized_scope_status == "blocked" else "",
             "guard_suggestions": copy.deepcopy((scope_result or {}).get("suggestions") or []) if normalized_scope_status == "blocked" else [],
-        }, question_text=question_text, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids), llm_model, "llm_router"
+        }, question_text=question_text, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
+        normalized_plan = validate_hermes_intent_plan(
+            normalized_plan,
+            question_text=question_text,
+            memory_state=memory_state,
+        )
+        return normalized_plan, llm_model, "llm_router"
     except RuntimeError:
         raise
     except Exception as exc:
@@ -7507,9 +7905,14 @@ HERMES_MARKET_OBSERVATION_TERMS = (
     "上证", "沪深", "创业板", "科创", "恒生", "纳斯达克", "标普", "道琼斯", "指数", "大盘",
 )
 
+HERMES_MARKET_INDEX_TARGETS = (
+    ("上证综合指数", ("上证", "沪指", "上证综指", "上证综合")),
+    ("深证成份指数", ("深证", "深成指", "深证成指", "深圳成指")),
+)
+
 
 def _resolve_hermes_gangtise_stock(stock_code="", question_text=""):
-    candidate = _resolve_watchlist_candidate(stock_code=stock_code, stock_name=question_text)
+    candidate = resolve_watchlist_candidate(stock_code=stock_code, stock_name=question_text)
     if not isinstance(candidate, dict) or not str(candidate.get("security_code") or "").strip():
         raise ValueError("gangtise_stock_security_unresolved")
     return candidate
@@ -7518,6 +7921,23 @@ def _resolve_hermes_gangtise_stock(stock_code="", question_text=""):
 def _is_hermes_market_observation(question_text, stock_code=""):
     text = f"{question_text or ''} {stock_code or ''}".strip().lower()
     return any(term in text for term in HERMES_MARKET_OBSERVATION_TERMS)
+
+
+def resolve_hermes_market_index_targets(question_text):
+    """Resolve the one or more index reports requested by a market question."""
+    text = str(question_text or "").strip()
+    targets = []
+    for index_name, aliases in HERMES_MARKET_INDEX_TARGETS:
+        if any(alias in text for alias in aliases):
+            targets.append(index_name)
+    return targets or ["上证综合指数"]
+
+
+def build_hermes_market_index_observation_request(index_name):
+    target = str(index_name or "").strip()
+    if not target:
+        raise ValueError("gangtise_market_observation_target_required")
+    return f"给我一份今天{target}的分析观察报告，包含指数表现、板块资金和市场情绪展望。"
 
 
 def _extract_hermes_gangtise_stocks(question_text, stock_code="", limit=20):
@@ -7553,10 +7973,14 @@ def _extract_hermes_gangtise_stocks(question_text, stock_code="", limit=20):
     return selected[:max(1, int(limit or 20))]
 
 
-def hermes_tool_gangtise_stock_today_observation(stock_code, question_text=""):
-    candidate = _resolve_hermes_gangtise_stock(stock_code=stock_code, question_text=question_text)
+def hermes_tool_gangtise_stock_today_observation(stock_code, question_text="", candidate=None):
+    candidate = candidate if isinstance(candidate, dict) else _resolve_hermes_gangtise_stock(stock_code=stock_code, question_text=question_text)
     label = f"{candidate.get('name')}（{candidate.get('security_code')}）"
-    request_text = f"请生成今天{label}的分析观察报告，包含今日行情、核心逻辑、重要要闻和风险。"
+    user_request = str(question_text or "").strip()
+    request_text = (
+        f"请生成{label}的个股分析观察报告。用户问题是：{user_request or f'今天{label}的分析观察报告'}。"
+        "如用户指定昨天或其他交易日，按该交易日解释行情表现；同时包含行情、核心逻辑、重要要闻和风险。"
+    )
     result = call_gangtise_agent_sse(request_text, trace_id=f"xiaojin-stock-{int(time.time() * 1000)}", mode="deep_research", web_enable=True)
     return {
         "candidate": copy.deepcopy(candidate),
@@ -7571,41 +7995,73 @@ def hermes_tool_gangtise_market_today_observation(question_text=""):
     query = str(question_text or "").strip()
     if not _is_hermes_market_observation(query):
         raise ValueError("gangtise_market_observation_target_required")
-    request_text = f"请生成今天{query}的分析观察报告，包含指数表现、板块资金和市场情绪展望。"
-    result = call_gangtise_agent_sse(request_text, trace_id=f"xiaojin-market-{int(time.time() * 1000)}", mode="deep_research", web_enable=True)
+    targets = resolve_hermes_market_index_targets(query)
+    reports = []
+    requests = []
+    total_duration_ms = 0
+    for index_name in targets:
+        request_text = build_hermes_market_index_observation_request(index_name)
+        result = call_gangtise_agent_sse(
+            request_text,
+            trace_id=f"xiaojin-market-{int(time.time() * 1000)}",
+            mode="deep_research",
+            web_enable=True,
+        )
+        report_text = str(result.get("text") or "").strip()
+        if not report_text:
+            raise RuntimeError(f"gangtise_market_observation_empty_response:{index_name}")
+        reports.append((index_name, report_text))
+        requests.append({
+            "index_name": index_name,
+            "request_text": request_text,
+            "duration_ms": int(result.get("duration_ms") or 0),
+        })
+        total_duration_ms += int(result.get("duration_ms") or 0)
+    combined_text = reports[0][1] if len(reports) == 1 else "\n\n---\n\n".join(
+        f"## {index_name}\n\n{report_text}" for index_name, report_text in reports
+    )
     return {
-        "text": str(result.get("text") or "").strip(),
-        "provider": result.get("provider"),
-        "endpoint": result.get("endpoint"),
-        "duration_ms": result.get("duration_ms"),
+        "text": combined_text,
+        "index_targets": targets,
+        "requests": requests,
+        "provider": "Gangtise Agent助手 SSE",
+        "endpoint": "/application/open-ai/ai/chat/sse",
+        "duration_ms": total_duration_ms,
     }
 
 
-def hermes_tool_gangtise_stock_one_pager(stock_code, question_text=""):
+def hermes_tool_gangtise_stock_one_pager(stock_code, question_text="", candidate=None):
     if _is_hermes_market_observation(question_text, stock_code=stock_code):
         raise ValueError("one_pager_stock_only")
-    candidate = _resolve_hermes_gangtise_stock(stock_code=stock_code, question_text=question_text)
+    candidate = candidate if isinstance(candidate, dict) else _resolve_hermes_gangtise_stock(stock_code=stock_code, question_text=question_text)
     result = call_gangtise_stock_one_pager(candidate.get("security_code"))
     return {"candidate": copy.deepcopy(candidate), **result}
 
 
-def hermes_tool_gangtise_stock_highlights(stock_code, question_text=""):
-    candidates = _extract_hermes_gangtise_stocks(question_text, stock_code=stock_code, limit=6000)
+def hermes_tool_gangtise_stock_highlights(stock_code, question_text="", securities=None):
+    candidates = [item for item in (securities or []) if isinstance(item, dict)]
+    if not candidates:
+        candidates = _extract_hermes_gangtise_stocks(question_text, stock_code=stock_code, limit=6000)
     if not candidates:
         candidates = [_resolve_hermes_gangtise_stock(stock_code=stock_code, question_text=question_text)]
     result = call_gangtise_stock_summaries([item.get("security_code") for item in candidates])
     return {"candidates": copy.deepcopy(candidates), **result}
 
 
-def hermes_tool_gangtise_multi_watchlist_analysis(stock_code, question_text=""):
-    candidates = _extract_hermes_gangtise_stocks(question_text, stock_code=stock_code, limit=40)
+def hermes_tool_gangtise_multi_watchlist_analysis(stock_code, question_text="", securities=None):
+    candidates = [item for item in (securities or []) if isinstance(item, dict)]
+    if not candidates:
+        candidates = _extract_hermes_gangtise_stocks(question_text, stock_code=stock_code, limit=40)
     if len(candidates) < 2:
         raise ValueError("gangtise_multi_stock_at_least_two_required")
     labels = [f"{item.get('name')}（{item.get('security_code')}）" for item in candidates]
-    request_text = f"请对以下自选股做综合分析，并给出个股要点和组合层面的综合结论：{'、'.join(labels)}。"
+    # Hermes intentionally shares the review phase-two Gangtise request. Do
+    # not create a second prompt or SSE contract for the same multi-stock API.
+    request_text = build_gangtise_multi_stock_review_request(labels, review_period="day")
     result = call_gangtise_agent_sse(request_text, trace_id=f"xiaojin-multi-{int(time.time() * 1000)}", mode="deep_research", web_enable=True)
     return {
         "candidates": copy.deepcopy(candidates),
+        "request_text": request_text,
         "text": str(result.get("text") or "").strip(),
         "provider": result.get("provider"),
         "endpoint": result.get("endpoint"),
@@ -7619,6 +8075,7 @@ def get_hermes_tool_registry():
             "output_key": "gangtise_stock_observation",
             "executor": lambda runtime: hermes_tool_gangtise_stock_today_observation(
                 runtime.get("stock_code") or "", question_text=runtime.get("question_text") or "",
+                candidate=(runtime.get("securities") or [None])[0],
             ),
         },
         "gangtise.market_today_observation": {
@@ -7631,18 +8088,21 @@ def get_hermes_tool_registry():
             "output_key": "gangtise_one_pager",
             "executor": lambda runtime: hermes_tool_gangtise_stock_one_pager(
                 runtime.get("stock_code") or "", question_text=runtime.get("question_text") or "",
+                candidate=(runtime.get("securities") or [None])[0],
             ),
         },
         "gangtise.stock_highlights": {
             "output_key": "gangtise_stock_highlights",
             "executor": lambda runtime: hermes_tool_gangtise_stock_highlights(
                 runtime.get("stock_code") or "", question_text=runtime.get("question_text") or "",
+                securities=runtime.get("securities") or [],
             ),
         },
         "gangtise.multi_watchlist_analysis": {
             "output_key": "gangtise_multi_watchlist_analysis",
             "executor": lambda runtime: hermes_tool_gangtise_multi_watchlist_analysis(
                 runtime.get("stock_code") or "", question_text=runtime.get("question_text") or "",
+                securities=runtime.get("securities") or [],
             ),
         },
         "attachment.context": {
@@ -7709,6 +8169,7 @@ def execute_hermes_tool_plan(plan, tenant_slug, question_text, selected_knowledg
         "selected_knowledge_ids": selected_knowledge_ids,
         "attachments": attachments,
         "stock_code": str(plan.get("stock_code") or "").strip(),
+        "securities": copy.deepcopy(plan.get("securities") if isinstance(plan.get("securities"), list) else []),
         "indicator_code": str(plan.get("indicator_code") or "").strip(),
         "web_answer": bool(web_answer),
         "preferred_mode": str(plan.get("preferred_mode") or "").strip().lower(),
@@ -7729,12 +8190,16 @@ def execute_hermes_tool_plan(plan, tenant_slug, question_text, selected_knowledg
         except Exception as exc:
             app.logger.exception("Hermes tool execution failed: %s", tool_name)
             raise RuntimeError(f"hermes_tool_failed:{tool_name}:{str(exc)[:240]}") from exc
-    annotation_context = resolve_hermes_watchlist_annotation_context(
-        tenant_slug=tenant_slug,
-        question_text=question_text,
-    )
-    if annotation_context.get("available"):
-        outputs["watchlist_annotation_context"] = annotation_context
+    # Gangtise research reports are rendered directly. Loading local
+    # watchlist annotations here would add unrelated market-data work and
+    # noisy cache logs without contributing to the displayed answer.
+    if str(plan.get("intent") or "").strip() not in HERMES_GANGTISE_DIRECT_INTENTS:
+        annotation_context = resolve_hermes_watchlist_annotation_context(
+            tenant_slug=tenant_slug,
+            question_text=question_text,
+        )
+        if annotation_context.get("available"):
+            outputs["watchlist_annotation_context"] = annotation_context
     outputs["_meta"] = {
         "preferred_mode": runtime.get("preferred_mode") or "",
     }
@@ -8853,10 +9318,50 @@ def _extract_hermes_gangtise_text(value):
         text = _extract_hermes_gangtise_text(value.get(key))
         if text:
             return text
-    data = value.get("data")
-    if isinstance(data, dict):
-        return _extract_hermes_gangtise_text(data)
+    # One-pager has returned its payload both as an object and as a direct
+    # string/list. Treat all of those as upstream content, never as a fallback.
+    if "data" in value:
+        return _extract_hermes_gangtise_text(value.get("data"))
     return ""
+
+
+def _describe_hermes_gangtise_payload(value):
+    """Return response shape metadata without exposing upstream report contents."""
+    if value is None:
+        return "data_type=null"
+    if isinstance(value, str):
+        return f"data_type=string:data_length={len(value.strip())}"
+    if isinstance(value, list):
+        return f"data_type=list:data_length={len(value)}"
+    if isinstance(value, dict):
+        keys = [str(key) for key in value.keys()][:12]
+        return f"data_type=object:data_keys={','.join(keys) or '--'}"
+    return f"data_type={type(value).__name__}"
+
+
+def _build_hermes_gangtise_empty_response_error(intent, result):
+    """Classify a strict Gangtise direct-display failure for user-facing handling."""
+    result = result if isinstance(result, dict) else {}
+    response = result.get("response") if isinstance(result.get("response"), dict) else {}
+    data = result.get("data")
+    message = str(
+        response.get("msg") or response.get("message") or response.get("error") or ""
+    ).strip()
+    http_status = int(result.get("http_status") or 0)
+    diagnostic = ":".join([
+        f"http_status={http_status}",
+        f"upstream_message={message[:160] or '--'}",
+        _describe_hermes_gangtise_payload(data),
+    ])
+    if intent == "stock_one_pager":
+        empty_collection = (
+            isinstance(data, dict)
+            and any(key in data for key in ("list", "reports", "reportList", "items"))
+            and not any(data.get(key) for key in ("list", "reports", "reportList", "items"))
+        )
+        error_kind = "no_report" if data in (None, "", [], {}) or empty_collection else "response_unrecognized"
+        return f"gangtise_one_pager_{error_kind}:{diagnostic}"
+    return f"{intent or 'gangtise'}_empty_response:{diagnostic}"
 
 
 def build_hermes_gangtise_direct_synthesis(plan, tool_outputs):
@@ -8898,7 +9403,7 @@ def build_hermes_gangtise_direct_synthesis(plan, tool_outputs):
     if not answer:
         answer = _extract_hermes_gangtise_text(result)
     if not answer:
-        raise RuntimeError(f"{intent or 'gangtise'}_empty_response")
+        raise RuntimeError(_build_hermes_gangtise_empty_response_error(intent, result))
     summary_map = {
         "stock_today_observation": "Gangtise AI 提供的今日个股观察报告。",
         "market_today_observation": "Gangtise AI 提供的今日大盘综合分析。",
@@ -8920,7 +9425,7 @@ def build_hermes_gangtise_direct_synthesis(plan, tool_outputs):
 def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", user_role="", preferred_mode="", messages=None, web_answer=False, memory_state=None, response_style="structured"):
     if str((plan or {}).get("intent") or "").strip() in HERMES_GANGTISE_DIRECT_INTENTS:
         return build_hermes_gangtise_direct_synthesis(plan, tool_outputs), None, "gangtise_direct"
-    llm_model = get_default_llm_config(purpose="general", feature_code="hermes_answer_synthesis")
+    llm_model = get_hermes_llm_config("hermes_answer_synthesis")
     if not llm_model:
         raise RuntimeError("hermes_answer_synthesis_llm_not_configured")
     try:
@@ -9309,6 +9814,8 @@ def build_hermes_query_response(body):
             "tenant_slug": runtime.get("tenant_slug") or "",
             "session_id": runtime.get("session_id") or "",
             "intent": intent_plan.get("intent"),
+            "capability_contract": copy.deepcopy(HERMES_CAPABILITY_REGISTRY.get(str(intent_plan.get("intent") or "").strip()) or {}),
+            "securities": copy.deepcopy(intent_plan.get("securities") if isinstance(intent_plan.get("securities"), list) else []),
             "task_family": intent_plan.get("task_family") or "research_qa",
             "capability_label": intent_plan.get("capability_label") or "研究问答",
             "scope_status": intent_plan.get("scope_status") or str(((state.get("scope_result") or {}).get("status") or "allowed")).strip(),
@@ -9379,6 +9886,9 @@ def build_hermes_query_response(body):
             },
             "usage": {
                 "compute_used": 1,
+                "estimated_gangtise_credits": int(
+                    (HERMES_CAPABILITY_REGISTRY.get(str(intent_plan.get("intent") or "").strip()) or {}).get("cost_credits") or 0
+                ),
             },
             "workflow_meta": build_declared_agent_workflow_meta(
                 workflow_definition,

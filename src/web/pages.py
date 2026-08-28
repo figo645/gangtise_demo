@@ -7,23 +7,15 @@ from src.web.request_helpers import safe_next_target
 def resolve_login_destination(user, next_target):
     target = safe_next_target(next_target or "/h5")
     role = str((user or {}).get("role") or "").strip().lower()
-    if role == "admin":
-        # Admin remains the default landing page, but an explicit request for
-        # a supported product surface must survive login/account switching.
-        if (
-            target == "/admin"
-            or target.startswith("/admin?")
-            or target == "/intern-handbook"
-            or target == "/h5"
-            or target.startswith("/h5?")
-            or target == "/kol-workbench"
-            or target.startswith("/kol-workbench?")
-        ):
+    if has_role_capability(role, "admin"):
+        # Keep an explicit Admin deep link direct; otherwise let admins choose
+        # between their platform, H5, and DAv workbench surfaces.
+        if target == "/admin" or target.startswith("/admin?"):
             return target
-        return url_for("admin")
-    if role == "dav":
         return url_for("login_entry", next=target)
-    if target == "/admin" or target.startswith("/admin?") or target == "/intern-handbook" or target.startswith("/kol-workbench"):
+    if has_role_capability(role, "dav"):
+        return url_for("login_entry", next=target)
+    if has_role_capability(role, "h5") and (target == "/admin" or target.startswith("/admin?") or target == "/intern-handbook" or target.startswith("/kol-workbench")):
         return url_for("h5", tenant=str((user or {}).get("tenant_slug") or "").strip().lower() or None)
     return target
 
@@ -114,16 +106,20 @@ def login_entry():
     if not user:
         return redirect(url_for("login", next=safe_next_target(request.args.get("next") or "/h5")))
     next_target = safe_next_target(request.args.get("next") or "/h5")
-    if str(user.get("role") or "").strip().lower() != "dav":
+    is_admin = has_role_capability(user.get("role"), "admin")
+    if not has_role_capability(user.get("role"), "dav") and not is_admin:
         return redirect(next_target)
     tenant_slug = str(user.get("tenant_slug") or "").strip().lower()
     h5_target = f"/h5?tenant={tenant_slug}" if tenant_slug else "/h5"
     workbench_target = next_target if next_target.startswith("/kol-workbench") else url_for("kol_workbench", tenant=tenant_slug, section="overview")
+    admin_target = url_for("admin")
     return render_template(
         "login_entry.html",
         user=user,
+        is_admin=is_admin,
         h5_target=h5_target,
         workbench_target=workbench_target,
+        admin_target=admin_target,
     )
 
 

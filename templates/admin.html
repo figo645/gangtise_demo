@@ -5192,6 +5192,16 @@
               Admin 负责统一租户隔离策略，保证前台自选股、私信、活动与工作台使用同一套权限边界。
             </div>
           </div>
+          <div class="config-card">
+            <div class="config-card-title">角色能力矩阵</div>
+            <div class="feature-note" style="margin-bottom:10px">
+              角色是身份，能力决定可访问的产品面。新增角色或调整权限只需修改此 JSON；例如 admin 保持管理员身份，同时授予 dav、hermes 和 workbench 能力。
+            </div>
+            <div class="config-field">
+              <label>角色能力 JSON</label>
+              <textarea id="role-capabilities-json" rows="9" placeholder='{"admin":["admin","h5","dav","hermes","workbench"]}'></textarea>
+            </div>
+          </div>
         </div>
       </div><!-- end section-settings-policy -->
 
@@ -9407,6 +9417,12 @@ function closeAdminUserImportModal() {
 }
 
 function buildAdminUserImportRow(row = {}) {
+  const configuredRoles = Object.keys((adminSiteConfig && adminSiteConfig.role_capabilities) || {
+    investor: ['h5', 'investor'],
+    dav: ['h5', 'dav', 'hermes', 'workbench'],
+    admin: ['admin', 'h5', 'dav', 'hermes', 'workbench'],
+  });
+  const roleOptions = configuredRoles.map((role) => `<option value="${escapeAttr(role)}" ${String(row.role || 'investor') === role ? 'selected' : ''}>${escapeHtml(role)}</option>`).join('');
   return `
     <tr>
       <td><input data-field="username" type="text" value="${escapeAttr(row.username || '')}" placeholder="用户名"></td>
@@ -9414,9 +9430,7 @@ function buildAdminUserImportRow(row = {}) {
       <td><input data-field="phone" type="text" value="${escapeAttr(row.phone || '')}" placeholder="手机号"></td>
       <td>
         <select data-field="role">
-          <option value="investor" ${String(row.role || 'investor') === 'investor' ? 'selected' : ''}>粉丝用户</option>
-          <option value="dav" ${String(row.role || '') === 'dav' ? 'selected' : ''}>大V</option>
-          <option value="admin" ${String(row.role || '') === 'admin' ? 'selected' : ''}>admin</option>
+          ${roleOptions}
         </select>
       </td>
       <td><input data-field="tenant_slug" type="text" value="${escapeAttr(row.tenant_slug || adminSiteConfig.default_tenant_slug || '')}" placeholder="租户 slug"></td>
@@ -11607,6 +11621,7 @@ function renderSiteConfigForm() {
   const knowledgeIngestion = cfg.knowledge_ingestion || {};
   const evidenceChain = cfg.evidence_chain || {};
   const reviewGeneration = cfg.review_generation || {};
+  const roleCapabilities = cfg.role_capabilities || {};
   ensureAdminLlmRegistry();
   markActivePill('theme-mode-group', 'mode', cfg.default_theme || 'light');
   markActivePill('theme-accent-group', 'accent', cfg.default_accent || 'blue');
@@ -11687,6 +11702,8 @@ function renderSiteConfigForm() {
   const hermesTemplateTreeField = document.getElementById('hermes-template-tree');
   if (hermesTemplateTreeField) hermesTemplateTreeField.value = stringifyAdminConfigJson(hermesSettings.template_tree || {}, {});
   const dbRuntimeToggle = document.getElementById('db-runtime-use-staging');
+  const roleCapabilitiesField = document.getElementById('role-capabilities-json');
+  if (roleCapabilitiesField) roleCapabilitiesField.value = stringifyAdminConfigJson(roleCapabilities, {});
   if (dbRuntimeToggle) dbRuntimeToggle.checked = dbRuntime.use_staging === true;
   const dbRuntimeSummary = document.getElementById('db-runtime-summary');
   if (dbRuntimeSummary) {
@@ -12071,11 +12088,16 @@ async function saveSiteConfig() {
   let hermesRoutePriority = [];
   let hermesTemplateTree = {};
   let hermesChartTypesEnabled = [];
+  let roleCapabilities = {};
   try {
     hermesIntentTree = parseAdminConfigJsonField('hermes-intent-tree', currentHermesSettings.intent_tree || []);
     hermesRoutePriority = parseAdminConfigListField('hermes-route-priority', currentHermesSettings.route_priority || []);
     hermesTemplateTree = parseAdminConfigJsonField('hermes-template-tree', currentHermesSettings.template_tree || {});
     hermesChartTypesEnabled = parseAdminConfigListField('hermes-chart-types-enabled', currentHermesSettings.chart_types_enabled || []);
+    roleCapabilities = parseAdminConfigJsonField('role-capabilities-json', adminSiteConfig.role_capabilities || {});
+    if (!roleCapabilities || Array.isArray(roleCapabilities) || typeof roleCapabilities !== 'object') {
+      throw new Error('role-capabilities-json 必须是对象 JSON。');
+    }
   } catch (error) {
     markAdminSiteConfigDirty((error && error.message) || 'Hermes 配置格式校验失败，请检查后再保存。');
     showToast('Hermes 配置格式有误');
@@ -12091,6 +12113,7 @@ async function saveSiteConfig() {
     },
     default_theme: adminSiteConfig.default_theme || 'light',
     default_accent: adminSiteConfig.default_accent || 'blue',
+    role_capabilities: roleCapabilities,
     auth_settings: {
       password_login_enabled: Boolean(document.getElementById('auth-password-login-enabled') && document.getElementById('auth-password-login-enabled').checked),
       wechat_login_enabled: Boolean(document.getElementById('auth-wechat-login-enabled') && document.getElementById('auth-wechat-login-enabled').checked),

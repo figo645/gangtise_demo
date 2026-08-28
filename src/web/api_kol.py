@@ -36,12 +36,12 @@ def api_review_jobs():
     """Return the current DAv's active review jobs so the workspace is resumable."""
     current_user = get_current_authenticated_user() or {}
     current_role = str(current_user.get("role") or "").strip().lower()
-    if current_role not in {"dav", "admin"}:
+    if not has_role_capability(current_role, "dav"):
         return jsonify({"ok": False, "error": "dav_required"}), 403
     current_tenant_slug = str(current_user.get("tenant_slug") or "").strip().lower()
     requested_tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
     tenant_slug = requested_tenant_slug or current_tenant_slug
-    if current_role != "admin" and current_tenant_slug and tenant_slug != current_tenant_slug:
+    if not has_role_capability(current_role, "admin") and current_tenant_slug and tenant_slug != current_tenant_slug:
         return jsonify({"ok": False, "error": "tenant_scope_forbidden"}), 403
     if not tenant_slug:
         return jsonify({"ok": False, "error": "tenant_required"}), 400
@@ -64,6 +64,50 @@ def api_review_jobs():
         safe_job["payload"] = safe_payload
         active_jobs.append(safe_job)
     return jsonify({"ok": True, "tenant_slug": tenant_slug, "jobs": active_jobs})
+
+
+@app.route("/api/review/jobs/<job_code>/cancel", methods=["POST"])
+def api_cancel_review_job(job_code):
+    """Stop a DAV-owned review generation job without deleting its source material."""
+    current_user = get_current_authenticated_user() or {}
+    current_role = str(current_user.get("role") or "").strip().lower()
+    if not has_role_capability(current_role, "dav"):
+        return jsonify({"ok": False, "error": "dav_required"}), 403
+    job = get_user_async_job(job_code)
+    if not job:
+        return jsonify({"ok": False, "error": "job_not_found"}), 404
+    cancellable_types = {
+        "review_generate_draft",
+        "review_prepare_preview",
+        "review_voice_transcribe",
+        "review_polish_input",
+        "review_compose_draft",
+    }
+    if job.get("job_type") not in cancellable_types:
+        return jsonify({"ok": False, "error": "job_not_cancellable"}), 400
+    current_tenant_slug = str(current_user.get("tenant_slug") or "").strip().lower()
+    if not has_role_capability(current_role, "admin") and (
+        not current_tenant_slug or str(job.get("tenant_slug") or "").strip().lower() != current_tenant_slug
+    ):
+        return jsonify({"ok": False, "error": "tenant_scope_forbidden"}), 403
+    owner_label = str(job.get("owner_label") or "").strip()
+    current_owner_labels = {
+        str(current_user.get("advisor_name") or "").strip(),
+        str(current_user.get("username") or "").strip(),
+        str(current_user.get("name") or "").strip(),
+    }
+    current_owner_labels.discard("")
+    if not has_role_capability(current_role, "admin") and owner_label and owner_label not in current_owner_labels:
+        return jsonify({"ok": False, "error": "job_owner_forbidden"}), 403
+    try:
+        cancelled_job = cancel_user_async_job(job_code)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 409
+    safe_job = dict(cancelled_job)
+    safe_payload = dict(safe_job.get("payload") or {})
+    safe_payload.pop("audio_base64", None)
+    safe_job["payload"] = safe_payload
+    return jsonify({"ok": True, "job": safe_job, "message": "已停止生成，原始输入已保留"})
 
 
 @app.route("/api/kol/portal-cms", methods=["POST"])
