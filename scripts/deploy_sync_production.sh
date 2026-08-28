@@ -145,6 +145,21 @@ if ! admin_sql -d postgres -Atqc "SELECT 1 FROM pg_available_extensions WHERE na
 fi
 
 git -C "$APP_DIR" pull --ff-only origin "$BRANCH"
+
+# Code and dependencies are released as one unit. The daemon selects `venv`
+# before `.venv`, so install into the exact interpreter it will execute.
+PYTHON_BIN=""
+for candidate in "$APP_DIR/venv/bin/python" "$APP_DIR/.venv/bin/python" "$APP_DIR/env/bin/python"; do
+  if [[ -x "$candidate" ]]; then
+    PYTHON_BIN="$candidate"
+    break
+  fi
+done
+[[ -n "$PYTHON_BIN" ]] || { echo "Production Python virtual environment not found under ${APP_DIR}" >&2; exit 1; }
+echo "==> Synchronizing production Python dependencies"
+"$PYTHON_BIN" -m pip install --disable-pip-version-check -r "$APP_DIR/requirements.txt"
+"$PYTHON_BIN" -c 'from cryptography.fernet import Fernet; print("cryptography dependency verified")'
+
 if admin_sql -d postgres -Atqc "SELECT 1 FROM pg_database WHERE datname='${STAGING_DB}'" | grep -q '^1$'; then
   admin_sql -d postgres -c "DROP DATABASE \"${STAGING_DB}\" WITH (FORCE);" >/dev/null
 fi

@@ -56,6 +56,13 @@ if ! command -v "$PYTHON_BIN" >/dev/null 2>&1 && [ ! -x "$PYTHON_BIN" ]; then
   exit 1
 fi
 
+# API credentials are encrypted with Fernet. Fail before serving traffic if
+# the selected production interpreter has not received the declared package.
+if ! "$PYTHON_BIN" -c 'from cryptography.fernet import Fernet' >/dev/null 2>&1; then
+  echo "Required dependency cryptography is missing from ${PYTHON_BIN}. Run: ${PYTHON_BIN} -m pip install -r ${SCRIPT_DIR}/requirements.txt" >&2
+  exit 1
+fi
+
 if [[ "$AUTO_START_POSTGRES" != "0" && "$AUTO_START_POSTGRES" != "false" && "$AUTO_START_POSTGRES" != "no" ]]; then
   DB_HOST="${LOCAL_POSTGRES_HOST:-${APP_DB_HOST:-127.0.0.1}}"
   DB_PORT="${LOCAL_POSTGRES_PORT:-${APP_DB_PORT:-5432}}"

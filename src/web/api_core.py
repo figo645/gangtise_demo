@@ -2012,7 +2012,16 @@ def api_admin_site_config():
     if incoming_llm_registry is not None:
         # Model metadata is stored in site_config; API keys are encrypted in a
         # dedicated app_settings record and are never included in site_config.
-        save_llm_api_credentials_patch(incoming_llm_registry.get("models"), prune_missing=True)
+        try:
+            save_llm_api_credentials_patch(incoming_llm_registry.get("models"), prune_missing=True)
+        except RuntimeError as exc:
+            if str(exc) in {"cryptography_fernet_unavailable", "application_secret_key_missing"}:
+                return jsonify({
+                    "success": False,
+                    "error": "credential_encryption_unavailable",
+                    "message": "凭证加密组件不可用，请检查生产环境 cryptography 依赖和应用密钥配置。",
+                }), 503
+            raise
     next_config = _merge_site_config(
         current,
         {
