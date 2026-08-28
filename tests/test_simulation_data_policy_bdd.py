@@ -79,6 +79,13 @@ class SimulationDataPolicyBddTest(unittest.TestCase):
         self.assertIn("TG_TABLE_NAME = 'users'", migration)
         self.assertIn("NEW.is_simulated := 0", migration)
 
+    def test_given_generic_provenance_trigger_when_non_user_table_writes_then_role_is_nested_under_table_guard(self):
+        migration = (core_services.PROJECT_ROOT / "sql" / "postgres" / "042_fix_simulation_provenance_trigger.sql").read_text(encoding="utf-8")
+
+        self.assertIn("IF TG_TABLE_NAME = 'users' THEN", migration)
+        self.assertIn("IF NEW.role IN ('dav', 'admin') THEN", migration)
+        self.assertNotIn("TG_TABLE_NAME = 'users' AND NEW.role", migration)
+
     def test_given_production_visibility_when_resolving_embedded_review_snapshots_then_local_content_is_removed(self):
         tenant = {"slug": "laowang", "advisor": "财经老王", "review_snapshots": []}
         snapshots = [

@@ -1820,6 +1820,16 @@ def _ensure_vector_simulation_provenance(conn, table_name):
                 CREATE OR REPLACE FUNCTION gangtise_mark_local_simulated_write()
                 RETURNS trigger LANGUAGE plpgsql AS $$
                 BEGIN
+                    -- The same function is installed on several tables. Only
+                    -- inspect NEW.role inside the users-table branch because
+                    -- vector tables do not define that field.
+                    IF TG_TABLE_NAME = 'users' THEN
+                        IF NEW.role IN ('dav', 'admin') THEN
+                            NEW.is_simulated := 0;
+                            NEW.simulation_label := '';
+                            RETURN NEW;
+                        END IF;
+                    END IF;
                     IF COALESCE(NULLIF(current_setting('gangtise.simulated_write', true), '')::integer, 0) = 1 THEN
                         NEW.is_simulated := 1;
                         NEW.simulation_label := '本机模拟数据';
