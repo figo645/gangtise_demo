@@ -2180,6 +2180,22 @@ def api_admin_sync_llm_registry():
     )
 
 
+@app.route("/api/admin/llm-credentials/reveal", methods=["POST"])
+def api_admin_reveal_llm_api_key():
+    """Reveal one saved LLM key only after an authenticated Admin action."""
+    body = request.get_json(silent=True) or {}
+    model_key = str(body.get("model_key") or "").strip()
+    if not model_key or len(model_key) > 160:
+        return jsonify({"ok": False, "error": "model_key_required"}), 400
+    api_key = get_llm_api_key(model_key)
+    if not api_key:
+        return jsonify({"ok": False, "error": "llm_api_key_not_configured"}), 404
+    response = jsonify({"ok": True, "model_key": model_key, "api_key": api_key})
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
+
 @app.route("/api/admin/hermes/memory-summary")
 def api_admin_hermes_memory_summary():
     tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()

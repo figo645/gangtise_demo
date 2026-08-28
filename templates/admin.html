@@ -10660,6 +10660,80 @@ function updateAdminLlmModel(index, field, value) {
   renderSiteConfigForm();
 }
 
+function updateAdminLlmApiKey(index, value) {
+  const registry = ensureAdminLlmRegistry();
+  if (!registry.models[index]) return;
+  // Keep the secret input mounted while typing. Re-rendering the whole model
+  // list on every keystroke loses focus and makes the field appear unusable.
+  registry.models[index].api_key = String(value || '');
+  registry.models[index].clear_api_key = false;
+}
+
+async function toggleAdminLlmApiKeyVisibility(index) {
+  const input = document.getElementById(`llm-api-key-${index}`);
+  const button = document.getElementById(`llm-api-key-toggle-${index}`);
+  if (!input) return;
+  const registry = ensureAdminLlmRegistry();
+  const model = registry.models[index] || {};
+  if (!input.value && model.api_key_configured) {
+    await revealAdminLlmApiKey(index, button);
+    return;
+  }
+  const visible = input.type === 'text';
+  input.type = visible ? 'password' : 'text';
+  if (button) button.textContent = visible ? '显示' : '隐藏';
+}
+
+async function revealAdminLlmApiKey(index, buttonOverride) {
+  const registry = ensureAdminLlmRegistry();
+  const model = registry.models[index];
+  const input = document.getElementById(`llm-api-key-${index}`);
+  const button = buttonOverride || document.getElementById(`llm-api-key-toggle-${index}`);
+  if (!model || !input || !button) return;
+  if (input.value) {
+    input.type = 'text';
+    document.getElementById(`llm-api-key-toggle-${index}`).textContent = '隐藏';
+    return;
+  }
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = '读取中';
+  try {
+    const response = await fetch('/api/admin/llm-credentials/reveal', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      cache: 'no-store',
+      body: JSON.stringify({model_key: String(model.key || '')}),
+    });
+    const rawResponse = await response.text();
+    let data = {};
+    try {
+      data = rawResponse ? JSON.parse(rawResponse) : {};
+    } catch (parseError) {
+      if (response.redirected || response.status === 401 || response.status === 403) {
+        throw new Error('管理员登录已失效，请重新登录后再查看 API Key');
+      }
+      throw new Error(`服务器未返回有效结果（HTTP ${response.status}），请重启或重新部署 5001 服务`);
+    }
+    if (!response.ok || !data.ok) {
+      const messages = {
+        llm_api_key_not_configured: '该模型尚未配置 API Key',
+        model_key_required: '模型配置无效',
+      };
+      throw new Error(messages[data && data.error] || (data && data.error) || '读取 API Key 失败');
+    }
+    input.value = String(data.api_key || '');
+    model.api_key = input.value;
+    input.type = 'text';
+    document.getElementById(`llm-api-key-toggle-${index}`).textContent = '隐藏';
+  } catch (error) {
+    if (typeof showToast === 'function') showToast(String(error && error.message || '读取 API Key 失败'));
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
+  }
+}
+
 function removeAdminLlmModel(index) {
   const registry = ensureAdminLlmRegistry();
   const current = registry.models[index];
@@ -10795,7 +10869,10 @@ function renderAdminLlmRegistry() {
           </div>
           <div class="config-field">
             <label>API Key</label>
-            <input type="password" value="" autocomplete="new-password" placeholder="${model.api_key_configured ? '已配置，留空不修改' : '填写后加密保存到 PostgreSQL'}" oninput="updateAdminLlmModel(${index}, 'api_key', this.value)">
+            <div style="display:flex;gap:8px;align-items:center">
+              <input id="llm-api-key-${index}" type="password" value="${escapeAttr(model.api_key || '')}" autocomplete="new-password" placeholder="${model.api_key_configured ? '已配置，留空不修改' : '填写后加密保存到 PostgreSQL'}" oninput="updateAdminLlmApiKey(${index}, this.value)" style="flex:1;min-width:0">
+              <button id="llm-api-key-toggle-${index}" class="btn-outline" type="button" style="padding:8px 10px;font-size:11px;white-space:nowrap" onclick="toggleAdminLlmApiKeyVisibility(${index})">显示</button>
+            </div>
             <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;font-weight:400">
               <input type="checkbox" ${model.clear_api_key ? 'checked' : ''} onchange="updateAdminLlmModel(${index}, 'clear_api_key', this.checked)">
               清除该模型已保存的 API Key
@@ -10810,7 +10887,7 @@ function renderAdminLlmRegistry() {
           </div>
         </div>
         <div class="llm-admin-model-footer">
-          API Key 仅写入当前 PostgreSQL 的加密凭证区，不会回显、不会写入站点配置，也不会回退到环境变量。删除模型时会同步清理其密钥。
+              API Key 仅写入当前 PostgreSQL 的加密凭证区。已保存的密钥不会回显；如需更换，直接输入新值后保存。删除模型时会同步清理其密钥。
         </div>
       </div>
     `;
