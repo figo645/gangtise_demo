@@ -10,7 +10,8 @@ Postgres / pgvector DDL is split by purpose:
 - `020_knowledge_embeddings.sql`: create knowledge embedding table and indexes
 - `021_knowledge_embeddings_pgvector.sql`: knowledge pgvector column
 - `034_security_master.sql`: canonical stock/security identity catalog used for name-to-code resolution
-- `035_local_simulation_data_visibility.sql`: marks records written on the local Mac and prevents non-local runtimes from reading them
+- `035_local_simulation_data_visibility.sql`: historical migration; no longer executed because environment-specific simulation visibility was removed
+- `043_remove_environment_simulation_processing.sql`: removes the historical simulation triggers/settings and restores shared neutral defaults
 - `036_disable_legacy_industry_edb_source.sql`: disables the duplicate Wind industry-index EDB source and pauses automatic EDB indicator tasks
 - `037_use_akshare_market_snapshots_every_five_minutes.sql`: switches Market Overview and Hot Industries to the AKShare five-minute snapshot task
 - `101_seed_app_core.sql`: app core seed entrypoint
@@ -32,7 +33,7 @@ Notes:
   ```bash
   ./scripts/apply_postgres_updates.sh --schema-only
   ```
-- Before a full local-to-production database replacement, apply release package `database_release_packages/2026-08-27/v1.1.6` to the target. The production daemon explicitly starts with `GANGTISE_RUNTIME_ENV=production`; simulated records are then fixed as hidden and the Admin switch cannot override that policy.
+- Before a full local-to-production database replacement, apply the numbered migrations to the target. Local and production use the same PostgreSQL rows and application visibility rules; explicit simulation batches remain identifiable and removable through database-release tooling.
 - One-shot bootstrap for a new database (creates database and then calls the same incremental updater):
   [scripts/init_postgres_vector_db.sh](/Users/xuchenfei/PycharmProjects/gangtise_demo/scripts/init_postgres_vector_db.sh)
 - Daemon deployment default: [`start_daemon_app.sh`](/Users/xuchenfei/PycharmProjects/gangtise_demo/start_daemon_app.sh) checks and automatically starts local PostgreSQL, then runs the same updater before restarting the application. Set `AUTO_START_POSTGRES=0` when PostgreSQL is managed externally; set `AUTO_DB_UPDATE=0` only for an emergency application-only restart.

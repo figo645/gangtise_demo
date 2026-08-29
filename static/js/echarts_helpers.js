@@ -6,7 +6,11 @@
 
   function cssVar(name, fallback) {
     try {
-      const value = getComputedStyle(document.body).getPropertyValue(name).trim();
+      const style = document.body ? getComputedStyle(document.body) : null;
+      const rawValue = style && typeof style.getPropertyValue === 'function'
+        ? style.getPropertyValue(name)
+        : '';
+      const value = String(rawValue == null ? '' : rawValue).trim();
       return value || fallback;
     } catch (error) {
       return fallback;

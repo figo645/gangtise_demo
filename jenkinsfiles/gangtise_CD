@@ -58,6 +58,29 @@ pipeline {
             }
         }
 
+        stage('Synchronize Python Dependencies') {
+            steps {
+                dir("${DEPLOY_DIR}") {
+                    sh '''
+                        PYTHON_BIN=""
+                        for candidate in ./venv/bin/python ./.venv/bin/python ./env/bin/python; do
+                            if [ -x "$candidate" ]; then
+                                PYTHON_BIN="$candidate"
+                                break
+                            fi
+                        done
+                        if [ -z "$PYTHON_BIN" ]; then
+                            echo "错误：未找到生产虚拟环境（venv/.venv/env）"
+                            exit 1
+                        fi
+                        echo "同步 Python 依赖: $PYTHON_BIN"
+                        "$PYTHON_BIN" -m pip install --disable-pip-version-check -r ./requirements.txt
+                        "$PYTHON_BIN" -c 'from cryptography.fernet import Fernet; print("cryptography Fernet 校验通过")'
+                    '''
+                }
+            }
+        }
+
         stage('Start Application') {
             steps {
                 dir("${DEPLOY_DIR}") {

@@ -1,11 +1,75 @@
 import unittest
 from contextlib import ExitStack
+from pathlib import Path
 from unittest.mock import patch
 
 from src.domain import ai_services, core_services, market_services
 
 
 class HermesGangtiseCapabilitiesTest(unittest.TestCase):
+    def test_explicit_hermes_question_precedes_stale_conversation_messages(self):
+        self.assertEqual(
+            ai_services.extract_hermes_question_text(
+                [{"role": "user", "content": "上一轮问题"}],
+                "对今天中国银行的股票做下个股分析，看看今天整体情况怎么样",
+            ),
+            "对今天中国银行的股票做下个股分析，看看今天整体情况怎么样",
+        )
+
+    def test_hermes_question_falls_back_to_latest_user_message_for_legacy_clients(self):
+        self.assertEqual(
+            ai_services.extract_hermes_question_text(
+                [
+                    {"role": "user", "content": "上一轮问题"},
+                    {"role": "assistant", "content": "上一轮回答"},
+                    {"role": "user", "content": "当前问题"},
+                ],
+                "",
+            ),
+            "当前问题",
+        )
+
+    def test_h5_snapshots_current_question_before_clearing_inputs(self):
+        template = (Path(__file__).parents[1] / "templates" / "h5.html").read_text(encoding="utf-8")
+        snapshot_index = template.index("const messagesSnapshot = buildHermesMessagesPayload();")
+        clear_index = template.index("clearHermesQuestionInputs({ focus: true });")
+        request_index = template.index("messages: messagesSnapshot,")
+        self.assertLess(snapshot_index, clear_index)
+        self.assertLess(clear_index, request_index)
+        self.assertIn("messagesSnapshot.push({ role: 'user', content: question });", template)
+
+    def test_hermes_router_uses_one_remote_request_with_generation_budget(self):
+        router_json = (
+            '{"intent":"stock_today_observation",'
+            '"tools":["gangtise.stock_today_observation"],'
+            '"target_type":"stock","securities":[{"name":"中国银行"}],'
+            '"time_scope":"today","display_mode":"text"}'
+        )
+        model = {
+            "key": "admin-default",
+            "base_url": "http://8.155.160.194:6031/api",
+            "model_name": "qwen3.5:27b-q4_K_M",
+            "api_key": "configured",
+            "enabled": True,
+        }
+        with patch.object(ai_services, "get_default_llm_config", return_value=model), patch.object(
+            ai_services, "call_openai_compatible_llm", return_value=router_json
+        ) as llm_call, patch.object(
+            ai_services, "search_watchlist_candidates", return_value=[]
+        ), patch.object(
+            ai_services, "find_watchlist_code_from_text", return_value="601988"
+        ), patch.object(
+            ai_services, "resolve_watchlist_candidate",
+            return_value={"name": "中国银行", "code": "601988", "security_code": "601988.SH"},
+        ):
+            ai_services.route_hermes_query_intent(
+                "对今天中国银行的股票做下个股分析，看看今天整体情况怎么样"
+            )
+
+        llm_call.assert_called_once()
+        self.assertEqual(llm_call.call_args.kwargs["request_timeout_seconds"], 60)
+        self.assertEqual(llm_call.call_args.kwargs["max_tokens"], 512)
+
     def test_admin_uses_the_dav_hermes_permission_gate_without_becoming_dav(self):
         site_config = {
             "feature_flags": {"hermes": True},
@@ -35,6 +99,65 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
         self.assertFalse(core_services.has_role_capability("dav", "admin", site_config))
         self.assertTrue(core_services.is_hermes_available_for_role("admin", site_config))
         self.assertTrue(core_services.is_hermes_available_for_role("dav", site_config))
+
+    def test_admin_workflow_catalog_exposes_current_hermes_execution_chain(self):
+        workflow = ai_services.build_default_hermes_agent_workflow_definition()
+        labels = [item["label"] for item in workflow["nodes"]]
+        edges = workflow["edges"]
+        router_edges = [item for item in edges if item["from"] == "intent_router"]
+
+        self.assertEqual(workflow["id"], "hermes_agent")
+        self.assertIn("LLM 意图拆解", labels)
+        self.assertIn("任务级工具调度", labels)
+        self.assertIn("会话与用户记忆写回", labels)
+        self.assertGreaterEqual(len(router_edges), 5)
+        self.assertEqual(
+            {item["label"] for item in router_edges},
+            {"拒绝", "需补充", "闲聊", "单任务", "多任务"},
+        )
+        self.assertTrue(any(item.get("visual_only") for item in workflow["nodes"]))
+        for label in ("今日个股观察", "今日大盘分析", "个股结构化分析报告", "个股看点摘要", "多自选股综合分析", "闲聊回答生成"):
+            self.assertIn(label, labels)
+        self.assertTrue(any(item.get("condition") == "stock_today_observation" for item in edges))
+        self.assertIn("Gangtise 研究正文原样返回", workflow["summary"])
+
+    def test_visual_only_workflow_nodes_are_retained_for_admin_but_not_executed(self):
+        workflow = {
+            "id": "visual_branch_test",
+            "nodes": [
+                {"id": "input", "label": "输入", "processor": "input"},
+                {"id": "branch", "label": "条件", "processor": "branch", "visual_only": True},
+                {"id": "output", "label": "输出", "processor": "output"},
+            ],
+            "edges": [
+                {"from": "input", "to": "branch", "label": "条件边", "condition": "enabled"},
+                {"from": "branch", "to": "output"},
+            ],
+        }
+        result = ai_services.run_declared_agent_workflow(
+            workflow,
+            executor_registry={
+                "input": lambda **_: {"output": "input"},
+                "branch": lambda **_: self.fail("visual branch must not execute"),
+                "output": lambda **_: {"output": "output"},
+            },
+        )
+
+        self.assertTrue(result["workflow"]["nodes"][1]["visual_only"])
+        self.assertEqual(result["workflow"]["edges"][0]["label"], "条件边")
+        self.assertEqual(result["workflow"]["edges"][0]["condition"], "enabled")
+        self.assertEqual(result["node_results"]["branch"]["status"], "design_only")
+        self.assertEqual(result["node_results"]["output"]["status"], "ok")
+
+    def test_admin_workflow_center_renders_agent_graph_not_vertical_sequence(self):
+        template = (Path(__file__).parents[1] / "templates" / "admin.html").read_text(encoding="utf-8")
+
+        self.assertIn("function buildAgentWorkflowTopDownLayout", template)
+        self.assertIn("const layout = buildAgentWorkflowTopDownLayout(nodes, edges);", template)
+        self.assertIn("function renderAgentWorkflowEdges", template)
+        self.assertIn("agent-workflow-edge-label", template)
+        self.assertIn("workflow-node agent-workflow-node", template)
+        self.assertNotIn("function buildAgentWorkflowVerticalOrder", template)
 
     def test_custom_role_can_receive_h5_and_hermes_without_code_changes(self):
         site_config = {
@@ -562,6 +685,75 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
         scope = ai_services.hermes_scope_guard("我该怎么选股呢？")
         self.assertEqual(scope["status"], "soft_allowed")
         self.assertEqual(scope["intent_hint"], "small_talk")
+
+    def test_planner_clarification_skips_research_tools_and_answer_llm(self):
+        model = {"key": "router", "provider": "mock", "model_name": "router", "enabled": True}
+        raw = (
+            '{"disposition":"clarify","clarifying_question":"请说明要分析哪只股票，以及要看今天还是最近一期。",'
+            '"tools":[],"reason":"缺少证券对象"}'
+        )
+        with patch.object(ai_services, "get_default_llm_config", return_value=model), patch.object(
+            ai_services, "call_openai_compatible_llm", return_value=raw
+        ) as llm_call, patch.object(ai_services, "call_gangtise_agent_sse") as gangtise_call:
+            plan, _router_model, route_mode = ai_services.route_hermes_query_intent("帮我分析一下")
+            outputs, trace = ai_services.execute_hermes_tool_plan(plan, "laowang", "帮我分析一下")
+            synthesis, answer_model, answer_mode = ai_services.synthesize_hermes_answer("帮我分析一下", plan, outputs)
+
+        self.assertEqual(route_mode, "llm_router")
+        self.assertEqual(plan["intent"], "clarify")
+        self.assertEqual(trace, [])
+        self.assertEqual(answer_mode, "clarification")
+        self.assertIsNone(answer_model)
+        self.assertIn("哪只股票", synthesis["answer"])
+        self.assertEqual(llm_call.call_count, 1)
+        gangtise_call.assert_not_called()
+
+    def test_composite_execution_keeps_successful_gangtise_result_when_another_task_fails(self):
+        plan = {
+            "intent": "composite_research",
+            "tasks": [
+                {"intent": "stock_today_observation", "tools": ["gangtise.stock_today_observation"]},
+                {"intent": "market_today_observation", "tools": ["gangtise.market_today_observation"]},
+            ],
+        }
+        registry = {
+            "gangtise.stock_today_observation": {
+                "output_key": "gangtise_stock_observation",
+                "executor": lambda runtime: {"text": "中国银行今日观察正文", "provider": "Gangtise"},
+            },
+            "gangtise.market_today_observation": {
+                "output_key": "gangtise_market_observation",
+                "executor": lambda runtime: (_ for _ in ()).throw(RuntimeError("上游超时")),
+            },
+        }
+        with patch.object(ai_services, "get_hermes_tool_registry", return_value=registry):
+            outputs, trace = ai_services.execute_hermes_tool_plan(plan, "laowang", "分别看个股和大盘")
+        synthesis, model, answer_mode = ai_services.synthesize_hermes_answer("分别看个股和大盘", plan, outputs)
+
+        self.assertEqual(answer_mode, "composite_direct")
+        self.assertIsNone(model)
+        self.assertIn("中国银行今日观察正文", synthesis["answer"])
+        self.assertIn("本任务未完成", synthesis["answer"])
+        self.assertEqual(len(outputs["composite_tasks"]), 2)
+        self.assertTrue(any(item.get("status") == "error" for item in trace))
+
+    def test_composite_memory_keeps_task_intents_and_recent_symbols(self):
+        payload = ai_services.extract_hermes_memory_payload(
+            "中国银行和贵州茅台分别做今日观察",
+            {
+                "intent": "composite_research",
+                "tasks": [
+                    {"intent": "stock_today_observation"},
+                    {"intent": "stock_highlights"},
+                ],
+            },
+            {"answer": "已完成", "summary": "两项研究"},
+            actor_context={"tenant_slug": "laowang", "profile_id": "tester", "user_role": "dav"},
+            memory_state={"session": {}, "user_memory": {}, "user_profile": {}},
+        )
+
+        self.assertEqual(payload["profile_snapshot"]["task_intents"], ["stock_today_observation", "stock_highlights"])
+        self.assertEqual(payload["session_snapshot"]["last_tags"]["task_intents"], ["stock_today_observation", "stock_highlights"])
 
     def test_router_scenario_contracts_dispatch_to_expected_capabilities(self):
         model = {"key": "router", "provider": "mock", "model_name": "router", "enabled": True}

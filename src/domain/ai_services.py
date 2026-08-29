@@ -215,6 +215,7 @@ def call_openai_compatible_llm(
     entry_point="",
     metadata=None,
     request_timeout_seconds=120,
+    max_tokens=None,
 ):
     config = normalize_llm_model_config(model_config)
     model_name = str(config.get("model_name") or "").strip()
@@ -230,20 +231,23 @@ def call_openai_compatible_llm(
     user_text = str(user_prompt or "").strip()
     session = requests.Session()
     session.trust_env = False
+    request_payload = {
+        "model": model_name,
+        "temperature": 0.25,
+        "messages": [
+            {"role": "system", "content": system_text},
+            {"role": "user", "content": user_text},
+        ],
+    }
+    if max_tokens is not None:
+        request_payload["max_tokens"] = max(64, int(max_tokens))
     response = session.post(
         f"{endpoint_base}/chat/completions",
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         },
-        json={
-            "model": model_name,
-            "temperature": 0.25,
-            "messages": [
-                {"role": "system", "content": system_text},
-                {"role": "user", "content": user_text},
-            ],
-        },
+        json=request_payload,
         timeout=max(5, int(request_timeout_seconds or 120)),
         allow_redirects=False,
     )
@@ -1701,9 +1705,6 @@ def get_review_vector_db_connection():
         password=target.get("password") or VECTOR_DB_PASSWORD,
         connect_timeout=8,
     )
-    # Vector storage can be a separate PostgreSQL target, so it must receive
-    # the same local-write provenance setting as the primary application DB.
-    configure_simulation_data_connection(connection)
     return connection
 
 
@@ -1788,72 +1789,25 @@ def _load_local_embedding_model(embedding_cfg=None):
     return model
 
 
-_vector_simulation_schema_lock = threading.Lock()
-_vector_simulation_schema_targets = set()
+_vector_origin_schema_lock = threading.Lock()
+_vector_origin_schema_targets = set()
 
 
-def _ensure_vector_simulation_provenance(conn, table_name):
-    """Keep a separate vector DB subject to the same local-data policy."""
+def _ensure_vector_origin_columns(conn, table_name):
+    """Keep compatibility origin columns on vector tables without environment rules."""
     if table_name not in {"knowledge_embeddings", "review_voice_embeddings"}:
         raise ValueError("unsupported_vector_provenance_table")
     target_key = (str(getattr(getattr(conn, "info", None), "dsn", "") or id(conn)), table_name)
-    if target_key in _vector_simulation_schema_targets:
+    if target_key in _vector_origin_schema_targets:
         return
-    trigger_name = f"trg_{table_name}_local_simulation_provenance"
-    with _vector_simulation_schema_lock:
-        if target_key in _vector_simulation_schema_targets:
+    with _vector_origin_schema_lock:
+        if target_key in _vector_origin_schema_targets:
             return
         with conn.cursor() as cur:
             cur.execute(f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS is_simulated INTEGER NOT NULL DEFAULT 0")
             cur.execute(f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS simulation_label TEXT NOT NULL DEFAULT ''")
-            cur.execute(
-                f"ALTER TABLE {table_name} ALTER COLUMN is_simulated SET DEFAULT "
-                "COALESCE(NULLIF(current_setting('gangtise.simulated_write', true), '')::integer, 0)"
-            )
-            cur.execute(
-                f"ALTER TABLE {table_name} ALTER COLUMN simulation_label SET DEFAULT "
-                "CASE WHEN COALESCE(NULLIF(current_setting('gangtise.simulated_write', true), '')::integer, 0) = 1 "
-                "THEN '本机模拟数据' ELSE '' END"
-            )
-            cur.execute(
-                """
-                CREATE OR REPLACE FUNCTION gangtise_mark_local_simulated_write()
-                RETURNS trigger LANGUAGE plpgsql AS $$
-                BEGIN
-                    -- The same function is installed on several tables. Only
-                    -- inspect NEW.role inside the users-table branch because
-                    -- vector tables do not define that field.
-                    IF TG_TABLE_NAME = 'users' THEN
-                        IF NEW.role IN ('dav', 'admin') THEN
-                            NEW.is_simulated := 0;
-                            NEW.simulation_label := '';
-                            RETURN NEW;
-                        END IF;
-                    END IF;
-                    IF COALESCE(NULLIF(current_setting('gangtise.simulated_write', true), '')::integer, 0) = 1 THEN
-                        NEW.is_simulated := 1;
-                        NEW.simulation_label := '本机模拟数据';
-                    END IF;
-                    RETURN NEW;
-                END;
-                $$;
-                """
-            )
-            cur.execute(f"DROP TRIGGER IF EXISTS {trigger_name} ON {table_name}")
-            cur.execute(
-                f"CREATE TRIGGER {trigger_name} BEFORE INSERT OR UPDATE ON {table_name} "
-                "FOR EACH ROW EXECUTE FUNCTION gangtise_mark_local_simulated_write()"
-            )
-            if get_simulation_runtime_environment() == "local":
-                # Existing vector records predate the provenance columns. This
-                # runs only on the local Mac and makes a later full copy safe.
-                cur.execute(
-                    f"UPDATE {table_name} SET is_simulated = 1, simulation_label = %s "
-                    "WHERE COALESCE(is_simulated, 0) = 0",
-                    (SIMULATION_LABEL_LOCAL,),
-                )
         conn.commit()
-        _vector_simulation_schema_targets.add(target_key)
+        _vector_origin_schema_targets.add(target_key)
 
 
 def _ensure_review_voice_vector_table(conn):
@@ -1965,7 +1919,7 @@ def _ensure_review_voice_vector_table(conn):
                             f"ALTER TABLE review_voice_embeddings ADD COLUMN IF NOT EXISTS embedding_vector vector({PGVECTOR_TARGET_DIM})"
                         )
     conn.commit()
-    _ensure_vector_simulation_provenance(conn, "review_voice_embeddings")
+    _ensure_vector_origin_columns(conn, "review_voice_embeddings")
     return has_pgvector
 
 
@@ -2287,7 +2241,7 @@ def _ensure_knowledge_embedding_table(conn):
                     f"ALTER TABLE knowledge_embeddings ADD COLUMN IF NOT EXISTS embedding_vector vector({PGVECTOR_TARGET_DIM})"
                 )
     conn.commit()
-    _ensure_vector_simulation_provenance(conn, "knowledge_embeddings")
+    _ensure_vector_origin_columns(conn, "knowledge_embeddings")
     return has_pgvector
 
 
@@ -2516,8 +2470,8 @@ def save_manual_knowledge_entry(
         "queued_at": str(vector_record.get("created_at") or now_ts()).strip(),
         "synced_at": str(vector_record.get("created_at") or now_ts()).strip(),
         "failed_at": "",
-        "is_simulated": get_simulation_runtime_environment() == "local",
-        "simulation_label": SIMULATION_LABEL_LOCAL if get_simulation_runtime_environment() == "local" else "",
+        "is_simulated": False,
+        "simulation_label": "",
     }
     entry["sync_status"] = build_knowledge_sync_status(
         entry.get("status"),
@@ -2664,7 +2618,6 @@ def fetch_live_knowledge_hub(tenant, limit=80):
         with get_review_vector_db_connection() as conn:
             _ensure_knowledge_embedding_table(conn)
             with conn.cursor() as cur:
-                simulated_filter = " AND COALESCE(is_simulated, 0) = 0" if should_hide_simulated_data() else ""
                 cur.execute(
                     f"""
                     SELECT id, knowledge_id, knowledge_type, title, summary, body_text, source_detail,
@@ -2676,7 +2629,7 @@ def fetch_live_knowledge_hub(tenant, limit=80):
                             id, knowledge_id, knowledge_type, title, summary, body_text, source_detail,
                             vector_namespace, embedding_engine, embedding_model, metadata_json, created_at
                         FROM knowledge_embeddings
-                        WHERE tenant_slug = %s{simulated_filter}
+                        WHERE tenant_slug = %s
                         ORDER BY COALESCE(NULLIF(BTRIM(knowledge_id), ''), CONCAT('__legacy_row_', id)), created_at DESC, id DESC
                     ) latest
                     ORDER BY created_at DESC, id DESC
@@ -2771,7 +2724,6 @@ def search_knowledge_embeddings(tenant_slug, query_text, limit=5):
     with get_review_vector_db_connection() as conn:
         _ensure_knowledge_embedding_table(conn)
         with conn.cursor() as cur:
-            simulated_filter = " AND COALESCE(is_simulated, 0) = 0" if should_hide_simulated_data() else ""
             cur.execute(
                 f"""
                 SELECT id, knowledge_id, knowledge_type, title, summary, body_text, source_detail,
@@ -2782,7 +2734,7 @@ def search_knowledge_embeddings(tenant_slug, query_text, limit=5):
                         id, knowledge_id, knowledge_type, title, summary, body_text, source_detail,
                         vector_namespace, embedding_engine, embedding_model, embedding_json, metadata_json, created_at
                     FROM knowledge_embeddings
-                    WHERE tenant_slug = %s{simulated_filter}
+                    WHERE tenant_slug = %s
                     ORDER BY COALESCE(NULLIF(BTRIM(knowledge_id), ''), CONCAT('__legacy_row_', id)), created_at DESC, id DESC
                 ) latest
                 ORDER BY created_at DESC, id DESC
@@ -3384,6 +3336,8 @@ HERMES_QUERY_INTENT_PROMPT = (
 )
 
 HERMES_ALLOWED_INTENTS = {
+    "clarify",
+    "composite_research",
     "small_talk",
     "product_help",
     "knowledge_lookup",
@@ -3415,6 +3369,26 @@ HERMES_ALLOWED_TOOLS = {
 # This registry is the routing contract. The model may select from it, but it
 # cannot change endpoint, cost, target constraints, or the output policy.
 HERMES_CAPABILITY_REGISTRY = {
+    "clarify": {
+        "tool": None,
+        "endpoint": "local.planner",
+        "provider": "local_llm",
+        "cost_credits": 0,
+        "target_type": "none",
+        "time_scope": "conversation",
+        "output_mode": "clarification",
+        "constraints": ["信息不足或目标不唯一时先反问", "不得盲猜并调用付费研究接口"],
+    },
+    "composite_research": {
+        "tool": None,
+        "endpoint": "composite",
+        "provider": "multi_tool_agent",
+        "cost_credits": 0,
+        "target_type": "none",
+        "time_scope": "conversation",
+        "output_mode": "task_join",
+        "constraints": ["由多个已注册场景任务组成", "逐任务执行并保留部分成功结果"],
+    },
     "stock_today_observation": {
         "tool": "gangtise.stock_today_observation",
         "endpoint": "/application/open-ai/ai/chat/sse",
@@ -3577,6 +3551,8 @@ def hermes_capability_registry_text():
     return json.dumps(rows, ensure_ascii=False, separators=(",", ":"))
 
 HERMES_INTENT_ROUTE_GROUPS = {
+    "clarify": "planner",
+    "composite_research": "multi_task_research",
     "knowledge_lookup": "knowledge_qa",
     "watchlist_fundamental": "market_data_query",
     "smart_indicator_explain": "chart_visualization",
@@ -3611,6 +3587,11 @@ def normalize_hermes_messages(messages):
 
 
 def extract_hermes_question_text(messages, question_text=""):
+    # The explicit top-level question is the current turn. Conversation
+    # messages may lag behind the UI and must only be a compatibility fallback.
+    current_question = str(question_text or "").strip()
+    if current_question:
+        return current_question[:4000]
     for message in reversed(normalize_hermes_messages(messages)):
         if message["role"] == "user" and message["content"]:
             return message["content"]
@@ -3661,6 +3642,8 @@ HERMES_VISUAL_MODE_KEYWORDS = {
 }
 
 HERMES_TASK_FAMILY_LABELS = {
+    "planner": "信息澄清",
+    "multi_task_research": "组合研究",
     "small_talk": "闲聊",
     "data_visualization": "数据展示",
     "report_interpretation": "报告解读",
@@ -3708,6 +3691,10 @@ def infer_hermes_task_family(question_text="", preferred_mode="", attachments=No
     attachments = attachments if isinstance(attachments, list) else []
     selected_knowledge_ids = selected_knowledge_ids if isinstance(selected_knowledge_ids, list) else []
     intent_key = str(intent or "").strip().lower()
+    if intent_key == "clarify":
+        return "planner"
+    if intent_key == "composite_research":
+        return "multi_task_research"
     visual_mode = infer_hermes_visual_mode(text, preferred_mode=preferred_mode)
     preferred_key = str(preferred_mode or "").strip().lower()
     if intent_key == "out_of_scope_redirect":
@@ -3817,65 +3804,21 @@ def hermes_scope_guard(question_text, selected_knowledge_ids=None, attachments=N
             "intent_hint": "out_of_scope_redirect",
             "flags": flags,
         }
-    if flags["platform_related"]:
-        intent_hint = "knowledge_lookup"
-        if flags["product"] and _contains_any_keyword(text, HERMES_PRODUCT_ACTION_KEYWORDS):
-            intent_hint = "product_help"
-        elif flags["indicator"] and not flags["dashboard"]:
-            intent_hint = "smart_indicator_explain"
-        elif flags["dashboard"]:
-            intent_hint = "dashboard_interpretation"
-        elif flags["report"] or flags["attachments"]:
-            intent_hint = "knowledge_lookup"
-        elif flags["content_generation"]:
-            intent_hint = "multi_tool_research"
-        elif flags["product"]:
-            intent_hint = "product_help"
-        elif flags["watchlist"]:
-            intent_hint = "watchlist_fundamental"
-        elif flags["evidence"]:
-            intent_hint = "evidence_chain_analysis"
+    if flags["small_talk"] or flags["general_investment"]:
         return {
-            "status": "allowed",
-            "reason": "问题落在 Hermes 的研究或产品能力范围内。",
+            "status": "soft_allowed",
+            "reason": "问题属于通用闲聊或投资入门，交由 LLM 结合会话记忆承接。",
             "message": "",
             "suggestions": suggestions,
-            "intent_hint": intent_hint,
-            "flags": flags,
-        }
-    if flags["small_talk"]:
-        return {
-            "status": "soft_allowed",
-            "reason": "识别为轻度闲聊或寒暄，可保留简短对话。",
-            "message": "",
-            "suggestions": [
-                "如果继续聊研究内容，可以直接补股票、复盘或指标对象。",
-                "也可以问某个功能怎么用。",
-            ],
             "intent_hint": "small_talk",
             "flags": flags,
         }
-    if flags["general_investment"]:
-        return {
-            "status": "soft_allowed",
-            "reason": "识别为泛投资教育问题，交由 LLM 在不调用外部研究接口的情况下回答。",
-            "message": "",
-            "suggestions": [
-                "可以继续追问选股框架、风险管理或研究方法。",
-                "如需研究具体标的，请补充股票名称或代码。",
-            ],
-            "intent_hint": "small_talk",
-            "flags": flags,
-        }
-    redirect_reason = "当前问题没有落在平台研究、复盘、知识、智能指标或产品使用范围内。"
-    if flags["out_of_scope"]:
-        redirect_reason = "当前问题更偏生活化或通用百科，不属于 Hermes 的主要服务范围。"
     return {
-        "status": "redirected",
-        "reason": redirect_reason,
-        "message": "Hermes 主要回答个股/自选股、复盘证据链、知识框架、智能指标和平台功能使用相关问题。你可以换成这些方向继续问。",
+        "status": "allowed",
+        "reason": "已完成安全边界检查，后续由 LLM 结合会话记忆判断研究、澄清或通用闲聊路径。",
+        "message": "",
         "suggestions": suggestions,
-        "intent_hint": "out_of_scope_redirect",
+        "intent_hint": "",
         "flags": flags,
     }
 
@@ -4399,8 +4342,17 @@ def extract_hermes_memory_payload(question_text, plan, synthesis, tool_outputs=N
     answer = str(synthesis.get("answer") or "").strip()
     summary = str(synthesis.get("summary") or "").strip() or _hermes_trim_text(answer, limit=120)
     intent = str(plan.get("intent") or "").strip()
+    task_plans = [item for item in (plan.get("tasks") if isinstance(plan.get("tasks"), list) else []) if isinstance(item, dict)]
+    task_intents = _hermes_unique_texts(
+        [str(item.get("intent") or "").strip() for item in task_plans if str(item.get("intent") or "").strip()],
+        limit=8,
+    )
     scope_status = str(plan.get("scope_status") or "allowed").strip() or "allowed"
-    function_tags = _hermes_unique_texts(HERMES_FUNCTION_TAG_MAP.get(intent, []), limit=6)
+    function_tags = _hermes_unique_texts(
+        HERMES_FUNCTION_TAG_MAP.get(intent, [])
+        + [tag for task_intent in task_intents for tag in HERMES_FUNCTION_TAG_MAP.get(task_intent, [])],
+        limit=6,
+    )
     style_tags = _detect_hermes_style_tags(question, plan=plan)
     behavior_tags = _compute_hermes_behavior_tags(question, plan=plan, memory_state=memory_state)
     topic_tags = _detect_hermes_topics(question, plan=plan, tool_outputs=tool_outputs)
@@ -4412,6 +4364,8 @@ def extract_hermes_memory_payload(question_text, plan, synthesis, tool_outputs=N
         missing_capability_tags.append(str(missing_capability.get("label") or "").strip())
     previous_total = int(((memory_state.get("user_profile") or {}).get("total_queries") or (memory_state.get("user_memory") or {}).get("total_turns") or 0))
     depth_base = {
+        "clarify": 12,
+        "composite_research": 86,
         "small_talk": 10,
         "product_help": 28,
         "knowledge_lookup": 60,
@@ -4471,6 +4425,7 @@ def extract_hermes_memory_payload(question_text, plan, synthesis, tool_outputs=N
         "conversion_signal_score": conversion_signal_score,
         "total_queries": previous_total + 1,
         "last_intent": intent,
+        "task_intents": task_intents,
         "last_scope_status": scope_status,
         "last_activity_at": now_ts(),
         "metadata": {
@@ -4523,9 +4478,11 @@ def extract_hermes_memory_payload(question_text, plan, synthesis, tool_outputs=N
             "market_tags": market_tags,
             "focus_symbols": focus_symbols,
             "missing_capability_tags": missing_capability_tags,
+            "task_intents": task_intents,
         },
         "preferred_response_style": preferred_response_style,
         "preferred_intents": preferred_intents,
+        "task_intents": task_intents,
     }
     session_summary = copy.deepcopy((memory_state.get("session") or {}).get("summary_text") or "")
     session_recent_questions = list((((memory_state.get("session") or {}).get("working_memory") or {}).get("recent_questions") or []))
@@ -4551,6 +4508,7 @@ def extract_hermes_memory_payload(question_text, plan, synthesis, tool_outputs=N
             "market_tags": market_tags,
             "focus_symbols": focus_symbols,
             "missing_capability_tags": missing_capability_tags,
+            "task_intents": task_intents,
         },
     }
     turn_tags = {
@@ -4562,6 +4520,7 @@ def extract_hermes_memory_payload(question_text, plan, synthesis, tool_outputs=N
         "market_tags": market_tags,
         "focus_symbols": focus_symbols,
         "missing_capability_tags": missing_capability_tags,
+        "task_intents": task_intents,
     }
     return {
         "turn_record": {
@@ -5622,6 +5581,7 @@ def _extract_hermes_turn_metrics(turn_row):
         "commercial_tags": commercial_tags,
         "missing_capability": missing_capability,
         "missing_capability_tags": missing_capability_tags,
+        "task_intents": task_intents,
     }
 
 
@@ -6397,14 +6357,18 @@ def build_hermes_intent_router_prompt(question_text, has_attachments=False, sele
         "17. display_mode 只能是 text 或 structured。\n"
         "18. 如果用户问‘你是谁’或‘你的功能有哪些’，优先使用 product_help 或 small_talk，直接说明小金智能体当前能力。\n"
         "19. 研究能力只能使用注册表中对应的唯一 tool；本地 LLM 能力 tools 必须为空数组或仅包含明确需要的上下文工具。\n"
-        "20. 以下示例必须按语义路由：\n"
+        "20. 先决定 disposition：execute（信息充分，执行任务）、clarify（对象、时间或需求不明确，先反问）、chat（通用闲聊）、refuse（仅安全拒绝）。\n"
+        "21. 用户一句话包含多个独立目标时，使用 tasks 数组逐项拆解；每个 task 都必须是能力注册表中的一个 intent。不要为了凑任务重复调用同一能力。\n"
+        "22. 证券名称或代码无法唯一确定，或用户只说‘这只/帮我分析一下’但会话记忆也不能唯一补全时，必须返回 clarify，不得调用 Gangtise 或猜测标的。\n"
+        "23. tasks 只用于独立研究请求的组合；寒暄、产品帮助或泛投资建议不要与研究任务混在 tasks 中。\n"
+        "24. 以下示例必须按语义路由：\n"
         "- ‘对今天中国银行的股票做下个股分析，看看今天整体情况怎么样’ => stock_today_observation / gangtise.stock_today_observation / stock / today。\n"
         "- ‘分析下今天大盘的整体走势，上证和深证指数表现如何’ => market_today_observation / gangtise.market_today_observation / index / today。\n"
         "- ‘对中国银行做一下深入研究’ => stock_one_pager / gangtise.stock_one_pager / stock / latest。\n"
         "- ‘中国银行、建设银行、招商银行，帮我简单介绍分析下’ => stock_highlights / gangtise.stock_highlights / multi_stock / latest。\n"
         "- ‘中国银行、建设银行、招商银行，做详细的综合分析’ => multi_watchlist_analysis / gangtise.multi_watchlist_analysis / multi_stock / today。\n"
         "- ‘你好’、‘我该怎么选股’、‘投资有什么建议’ => small_talk / [] / none / conversation。\n"
-        "21. 禁止返回 knowledge.search、evidence.search 或任何未列出的工具。\n\n"
+        "23. 禁止返回 knowledge.search、evidence.search 或任何未列出的工具。\n\n"
         f"{memory_section}"
         f"{context_state_section}"
         f"{conversation_section}"
@@ -6413,8 +6377,11 @@ def build_hermes_intent_router_prompt(question_text, has_attachments=False, sele
         f"是否有附件：{'是' if has_attachments else '否'}\n"
         f"是否指定知识条目：{'是' if selected_ids else '否'}\n"
         f"指定知识条目 ID：{json.dumps(selected_ids, ensure_ascii=False)}\n\n"
-        "输出 JSON 结构：\n"
+        "输出 JSON 结构（旧版单 intent 结构也可被兼容，但优先 tasks）：\n"
         '{'
+        '"disposition":"execute|clarify|chat|refuse",'
+        '"clarifying_question":"仅 clarify 时填写",'
+        '"tasks":[{"intent":"...","tools":["..."],"target_type":"stock|index|multi_stock|none","securities":[{"name":"","code":"","security_code":"","market":""}],"target":"","time_scope":"today|latest|conversation","use_context_entities":false,"stock_code":"","display_mode":"text","reason":"简短中文说明"}],'
         '"intent":"...",'
         '"tools":["..."],'
         '"target_type":"stock|index|multi_stock|none",'
@@ -6734,6 +6701,27 @@ def validate_hermes_intent_plan(plan, question_text="", memory_state=None):
     spec = HERMES_CAPABILITY_REGISTRY.get(intent)
     if not spec:
         raise RuntimeError("hermes_intent_router_invalid_intent")
+    if intent == "clarify":
+        normalized["tools"] = []
+        normalized["target_type"] = "none"
+        normalized["securities"] = []
+        normalized["time_scope"] = "conversation"
+        normalized["display_mode"] = "text"
+        normalized["clarifying_question"] = (
+            str(normalized.get("clarifying_question") or "").strip()[:500]
+            or "请补充你要分析的股票名称或代码，并说明希望看今日行情、深化研究、简要看点，还是多股综合分析。"
+        )
+        return normalized
+    if intent == "composite_research":
+        tasks = normalized.get("tasks") if isinstance(normalized.get("tasks"), list) else []
+        if not tasks or len(tasks) > 8 or not all(isinstance(item, dict) for item in tasks):
+            raise RuntimeError("hermes_composite_tasks_invalid")
+        normalized["tools"] = []
+        normalized["target_type"] = "none"
+        normalized["securities"] = []
+        normalized["time_scope"] = "conversation"
+        normalized["display_mode"] = "text"
+        return normalized
     requested_tools = [
         str(item).strip()
         for item in (normalized.get("tools") if isinstance(normalized.get("tools"), list) else [])
@@ -6800,6 +6788,77 @@ def validate_hermes_intent_plan(plan, question_text="", memory_state=None):
     return normalized
 
 
+def _normalize_hermes_planner_plan(parsed, question_text="", memory_state=None):
+    """Normalize the planner's disposition/tasks contract into executable plans.
+
+    The legacy router returned one intent. Newer models may return several
+    independent tasks or ask for clarification. Keeping this adapter here
+    lets the execution layer remain deterministic and backwards compatible.
+    """
+    source = parsed if isinstance(parsed, dict) else {}
+    disposition = str(source.get("disposition") or "").strip().lower()
+    raw_tasks = source.get("tasks") if isinstance(source.get("tasks"), list) else []
+    if disposition in {"clarify", "refuse", "chat"} and not raw_tasks:
+        intent = "clarify" if disposition == "clarify" else ("out_of_scope_redirect" if disposition == "refuse" else "small_talk")
+        plan = {
+            "intent": intent,
+            "tools": [],
+            "target_type": "none",
+            "securities": [],
+            "time_scope": "conversation",
+            "display_mode": "text",
+            "reason": str(source.get("reason") or disposition).strip()[:200],
+            "clarifying_question": str(source.get("clarifying_question") or source.get("message") or "").strip()[:500],
+            "disposition": disposition,
+        }
+        if intent == "small_talk":
+            plan = finalize_hermes_intent_plan(plan, question_text=question_text)
+        return plan
+    if not raw_tasks:
+        raw_tasks = [source]
+    plans = []
+    for raw_task in raw_tasks[:8]:
+        task = raw_task if isinstance(raw_task, dict) else {}
+        intent = str(task.get("intent") or task.get("scenario") or source.get("intent") or "").strip()
+        if not intent:
+            raise RuntimeError("hermes_planner_task_intent_required")
+        task_plan = {
+            "intent": intent,
+            "tools": task.get("tools") if isinstance(task.get("tools"), list) else source.get("tools") or [],
+            "target_type": task.get("target_type") or source.get("target_type") or "",
+            "securities": task.get("securities") if isinstance(task.get("securities"), list) else source.get("securities") or [],
+            "target": task.get("target") or source.get("target") or "",
+            "time_scope": task.get("time_scope") or source.get("time_scope") or "",
+            "use_context_entities": task.get("use_context_entities") is True or source.get("use_context_entities") is True,
+            "stock_code": task.get("stock_code") or source.get("stock_code") or "",
+            "display_mode": task.get("display_mode") or source.get("display_mode") or "text",
+            "reason": str(task.get("reason") or source.get("reason") or "LLM 路由").strip()[:200],
+            "preferred_mode": task.get("preferred_mode") or source.get("preferred_mode") or "",
+        }
+        task_plan = finalize_hermes_intent_plan(task_plan, question_text=question_text)
+        task_plan = validate_hermes_intent_plan(
+            task_plan,
+            question_text=question_text,
+            memory_state=memory_state,
+        )
+        plans.append(task_plan)
+    if len(plans) == 1:
+        plan = plans[0]
+        plan["disposition"] = disposition or "execute"
+        return plan
+    return {
+        "intent": "composite_research",
+        "tools": [],
+        "target_type": "none",
+        "securities": [],
+        "time_scope": "conversation",
+        "display_mode": "text",
+        "reason": str(source.get("reason") or "多个研究任务已拆解").strip()[:200],
+        "disposition": disposition or "execute",
+        "tasks": plans,
+    }
+
+
 def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_ids=None, attachments=None, preferred_mode="", messages=None, scope_result=None, memory_state=None, scope_guard_enabled=True):
     selected_knowledge_ids = selected_knowledge_ids if isinstance(selected_knowledge_ids, list) else []
     attachments = attachments if isinstance(attachments, list) else []
@@ -6836,51 +6895,42 @@ def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_
             tenant_slug=tenant_slug,
             entry_point="hermes_query",
             metadata={"attachment_count": len(attachments), "selected_knowledge_count": len(selected_knowledge_ids)},
-            request_timeout_seconds=20,
+            # The configured 27B model can spend more than 20 seconds on a
+            # short JSON classification. Keep this a single request, but do
+            # not mistake normal generation latency for a routing failure.
+            request_timeout_seconds=60,
+            max_tokens=512,
         )
         parsed = _extract_json_payload_from_llm_text(raw, {}, strict=True)
-        intent = str(parsed.get("intent") or "").strip()
-        if intent not in HERMES_ALLOWED_INTENTS:
-            raise RuntimeError("hermes_intent_router_invalid_intent")
-        raw_tools = parsed.get("tools") if isinstance(parsed.get("tools"), list) else []
-        tools = []
-        for tool in raw_tools:
-            value = str(tool or "").strip()
-            if value in HERMES_ALLOWED_TOOLS and value not in tools:
-                tools.append(value)
         if "tools" not in parsed or not isinstance(parsed.get("tools"), list):
-            raise RuntimeError("hermes_intent_router_invalid_tools")
-        display_mode = str(parsed.get("display_mode") or "text").strip()
-        if display_mode not in {"text", "structured"}:
-            raise RuntimeError("hermes_intent_router_invalid_display_mode")
-        unknown_tools = [str(item or "").strip() for item in parsed.get("tools") if str(item or "").strip() not in HERMES_ALLOWED_TOOLS]
-        if unknown_tools and intent != "small_talk":
-            raise RuntimeError("hermes_intent_router_invalid_tools")
+            # New multi-task output keeps tools inside each task, but the
+            # top-level compatibility field is still required by legacy
+            # clients and makes malformed plans fail deterministically.
+            if not isinstance(parsed.get("tasks"), list):
+                raise RuntimeError("hermes_intent_router_invalid_tools")
         normalized_scope_status = str((scope_result or {}).get("status") or "allowed").strip() or "allowed"
         if normalized_scope_status == "blocked":
-            intent = "out_of_scope_redirect"
-            tools = []
-        normalized_plan = finalize_hermes_intent_plan({
-            "intent": intent,
-            "tools": tools[:4],
-            "stock_code": str(parsed.get("stock_code") or "").strip(),
-            "securities": copy.deepcopy(parsed.get("securities") or []),
-            "target_type": str(parsed.get("target_type") or "").strip().lower(),
-            "target": str(parsed.get("target") or "").strip()[:120],
-            "time_scope": str(parsed.get("time_scope") or "").strip().lower(),
-            "use_context_entities": parsed.get("use_context_entities") is True,
-            "indicator_code": str(parsed.get("indicator_code") or "").strip(),
-            "display_mode": display_mode,
-            "reason": str(parsed.get("reason") or "").strip()[:200] or "LLM 路由",
-            "preferred_mode": str(parsed.get("preferred_mode") or preferred_mode or "").strip().lower(),
-            "scope_status": normalized_scope_status,
-            "guard_message": str((scope_result or {}).get("message") or "").strip() if normalized_scope_status == "blocked" else "",
-            "guard_suggestions": copy.deepcopy((scope_result or {}).get("suggestions") or []) if normalized_scope_status == "blocked" else [],
-        }, question_text=question_text, attachments=attachments, selected_knowledge_ids=selected_knowledge_ids)
-        normalized_plan = validate_hermes_intent_plan(
-            normalized_plan,
+            parsed = {
+                "disposition": "refuse",
+                "intent": "out_of_scope_redirect",
+                "tools": [],
+                "target_type": "none",
+                "time_scope": "conversation",
+                "reason": str((scope_result or {}).get("reason") or "范围守卫已阻断").strip(),
+            }
+        normalized_plan = _normalize_hermes_planner_plan(
+            parsed,
             question_text=question_text,
             memory_state=memory_state,
+        )
+        if normalized_scope_status == "blocked":
+            normalized_plan["scope_status"] = "blocked"
+            normalized_plan["guard_message"] = str((scope_result or {}).get("message") or "").strip()
+            normalized_plan["guard_suggestions"] = copy.deepcopy((scope_result or {}).get("suggestions") or [])
+        if normalized_plan.get("intent") not in HERMES_ALLOWED_INTENTS:
+            raise RuntimeError("hermes_intent_router_invalid_intent")
+        normalized_plan = validate_hermes_intent_plan(
+            normalized_plan, question_text=question_text, memory_state=memory_state
         )
         return normalized_plan, llm_model, "llm_router"
     except RuntimeError:
@@ -8170,53 +8220,90 @@ def build_hermes_tool_execution_plan(plan, web_answer=False):
 def execute_hermes_tool_plan(plan, tenant_slug, question_text, selected_knowledge_ids=None, attachments=None, web_answer=False):
     selected_knowledge_ids = selected_knowledge_ids if isinstance(selected_knowledge_ids, list) else []
     attachments = attachments if isinstance(attachments, list) else []
-    outputs = {}
-    trace = []
     registry = get_hermes_tool_registry()
-    runtime = {
-        "tenant_slug": tenant_slug,
-        "question_text": question_text,
-        "selected_knowledge_ids": selected_knowledge_ids,
-        "attachments": attachments,
-        "stock_code": str(plan.get("stock_code") or "").strip(),
-        "securities": copy.deepcopy(plan.get("securities") if isinstance(plan.get("securities"), list) else []),
-        "indicator_code": str(plan.get("indicator_code") or "").strip(),
-        "web_answer": bool(web_answer),
-        "preferred_mode": str(plan.get("preferred_mode") or "").strip().lower(),
-    }
-    for tool_name in build_hermes_tool_execution_plan(plan, web_answer=web_answer):
-        started_at = time.time()
-        tool_spec = registry.get(tool_name)
-        if not tool_spec:
-            raise RuntimeError(f"hermes_tool_not_registered:{tool_name}")
+    def execute_single(task_plan, task_index=None):
+        outputs = {}
+        trace = []
+        runtime = {
+            "tenant_slug": tenant_slug,
+            "question_text": question_text,
+            "selected_knowledge_ids": selected_knowledge_ids,
+            "attachments": attachments,
+            "stock_code": str(task_plan.get("stock_code") or "").strip(),
+            "securities": copy.deepcopy(task_plan.get("securities") if isinstance(task_plan.get("securities"), list) else []),
+            "indicator_code": str(task_plan.get("indicator_code") or "").strip(),
+            "web_answer": bool(web_answer),
+            "preferred_mode": str(task_plan.get("preferred_mode") or "").strip().lower(),
+        }
+        for tool_name in build_hermes_tool_execution_plan(task_plan, web_answer=web_answer):
+            started_at = time.time()
+            tool_spec = registry.get(tool_name)
+            if not tool_spec:
+                raise RuntimeError(f"hermes_tool_not_registered:{tool_name}")
+            try:
+                output_key = str(tool_spec.get("output_key") or tool_name.replace(".", "_")).strip()
+                outputs[output_key] = tool_spec["executor"](runtime)
+                item = {"tool": tool_name, "status": "ok", "elapsed_ms": int((time.time() - started_at) * 1000)}
+                if task_index is not None:
+                    item["task_index"] = task_index
+                    item["intent"] = str(task_plan.get("intent") or "").strip()
+                trace.append(item)
+            except Exception as exc:
+                app.logger.exception("Hermes tool execution failed: %s", tool_name)
+                raise RuntimeError(f"hermes_tool_failed:{tool_name}:{str(exc)[:240]}") from exc
+        # Only research tasks that use local market data need annotations.
+        # Chat and clarification must remain cheap and deterministic.
+        if build_hermes_tool_execution_plan(task_plan, web_answer=web_answer) and str(task_plan.get("intent") or "").strip() not in HERMES_GANGTISE_DIRECT_INTENTS:
+            annotation_context = resolve_hermes_watchlist_annotation_context(tenant_slug=tenant_slug, question_text=question_text)
+            if annotation_context.get("available"):
+                outputs["watchlist_annotation_context"] = annotation_context
+        outputs["_meta"] = {"preferred_mode": runtime.get("preferred_mode") or ""}
+        return outputs, trace
+
+    if str(plan.get("intent") or "").strip() != "composite_research":
+        return execute_single(plan)
+
+    composite_outputs = []
+    combined_trace = []
+    for task_index, task_plan in enumerate(plan.get("tasks") or []):
         try:
-            output_key = str(tool_spec.get("output_key") or tool_name.replace(".", "_")).strip()
-            outputs[output_key] = tool_spec["executor"](runtime)
-            trace.append({
-                "tool": tool_name,
+            task_outputs, task_trace = execute_single(task_plan, task_index=task_index)
+            composite_outputs.append({
+                "task_index": task_index,
+                "intent": str(task_plan.get("intent") or "").strip(),
+                "plan": copy.deepcopy(task_plan),
                 "status": "ok",
-                "elapsed_ms": int((time.time() - started_at) * 1000),
+                "outputs": task_outputs,
             })
+            combined_trace.extend(task_trace)
         except Exception as exc:
-            app.logger.exception("Hermes tool execution failed: %s", tool_name)
-            raise RuntimeError(f"hermes_tool_failed:{tool_name}:{str(exc)[:240]}") from exc
-    # Gangtise research reports are rendered directly. Loading local
-    # watchlist annotations here would add unrelated market-data work and
-    # noisy cache logs without contributing to the displayed answer.
-    if str(plan.get("intent") or "").strip() not in HERMES_GANGTISE_DIRECT_INTENTS:
-        annotation_context = resolve_hermes_watchlist_annotation_context(
-            tenant_slug=tenant_slug,
-            question_text=question_text,
-        )
-        if annotation_context.get("available"):
-            outputs["watchlist_annotation_context"] = annotation_context
-    outputs["_meta"] = {
-        "preferred_mode": runtime.get("preferred_mode") or "",
-    }
-    return outputs, trace
+            error_text = str(exc)[:320]
+            app.logger.warning("Hermes composite task failed task=%s intent=%s error=%s", task_index, task_plan.get("intent"), error_text)
+            composite_outputs.append({
+                "task_index": task_index,
+                "intent": str(task_plan.get("intent") or "").strip(),
+                "plan": copy.deepcopy(task_plan),
+                "status": "error",
+                "error": error_text,
+                "outputs": {},
+            })
+            combined_trace.append({
+                "tool": "composite.task",
+                "status": "error",
+                "task_index": task_index,
+                "intent": str(task_plan.get("intent") or "").strip(),
+                "error": error_text,
+                "elapsed_ms": 0,
+            })
+    if not any(item.get("status") == "ok" for item in composite_outputs):
+        errors = "; ".join(str(item.get("error") or "task_failed") for item in composite_outputs)
+        raise RuntimeError(f"hermes_composite_all_tasks_failed:{errors[:500]}")
+    return {"composite_tasks": composite_outputs, "_meta": {"task_count": len(composite_outputs)}}, combined_trace
 
 
 HERMES_INTENT_LABELS = {
+    "clarify": "补充信息",
+    "composite_research": "组合研究任务",
     "watchlist_fundamental": "个股基本面分析",
     "smart_indicator_explain": "智能指标解读",
     "dashboard_interpretation": "Dashboard 解读",
@@ -8255,11 +8342,14 @@ def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode
     task_family = str((intent_plan or {}).get("task_family") or "").strip()
     capability_label = str((intent_plan or {}).get("capability_label") or HERMES_TASK_FAMILY_LABELS.get(task_family, "")).strip()
     tools = [str(item).strip() for item in ((intent_plan or {}).get("tools") or []) if str(item).strip()]
+    task_count = len((intent_plan or {}).get("tasks") or []) if isinstance((intent_plan or {}).get("tasks"), list) else 0
     planned_tool_labels = [HERMES_TOOL_LABELS.get(item, item) for item in tools]
     ok_count = sum(1 for item in (tool_trace or []) if str((item or {}).get("status") or "").strip() == "ok")
     error_count = sum(1 for item in (tool_trace or []) if str((item or {}).get("status") or "").strip() == "error")
     route_label = "LLM 路由" if route_mode == "llm_router" else "范围守卫"
     answer_label = (
+        "信息澄清" if answer_mode == "clarification" else
+        "多任务结果直出" if answer_mode == "composite_direct" else
         "模型整合回答" if answer_mode == "llm_synthesized" else
         "Gangtise AI 直接返回" if answer_mode == "gangtise_direct" else
         "范围守卫收口"
@@ -8270,6 +8360,8 @@ def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode
     if preferred_mode and preferred_mode != "auto":
         planning_bits.append(f"偏好模式：{preferred_mode}")
     planning_bits.append("由 LLM 直接识别意图并选择工具")
+    if task_count:
+        planning_bits.append(f"已拆解 {task_count} 个独立任务")
     if web_answer:
         planning_bits.append("已启用互联网补充")
     if attachments:
@@ -9432,8 +9524,71 @@ def build_hermes_gangtise_direct_synthesis(plan, tool_outputs):
     }
 
 
+def build_hermes_clarification_synthesis(plan):
+    plan = plan if isinstance(plan, dict) else {}
+    question = (
+        str(plan.get("clarifying_question") or "").strip()
+        or "请补充你要分析的股票名称或代码，并说明希望看今日行情、深化研究、简要看点，还是多股综合分析。"
+    )
+    return {
+        "answer": question,
+        "summary": "需要补充信息",
+        "lead_conclusion": "",
+        "bullets": [],
+        "analysis_sections": [],
+        "next_steps": [],
+        "confidence": "",
+        "citations": [],
+    }
+
+
+def build_hermes_composite_direct_synthesis(plan, tool_outputs):
+    tasks = (tool_outputs or {}).get("composite_tasks") if isinstance(tool_outputs, dict) else []
+    sections = []
+    successful = 0
+    for item in tasks if isinstance(tasks, list) else []:
+        if not isinstance(item, dict):
+            continue
+        task_plan = item.get("plan") if isinstance(item.get("plan"), dict) else {}
+        intent = str(item.get("intent") or task_plan.get("intent") or "研究任务").strip()
+        label = HERMES_INTENT_LABELS.get(intent, intent)
+        if item.get("status") != "ok":
+            sections.append(f"### {label}\n本任务未完成：{str(item.get('error') or '上游接口未返回可用结果').strip()}")
+            continue
+        if intent not in HERMES_GANGTISE_DIRECT_INTENTS:
+            sections.append(f"### {label}\n该子任务不包含可直接展示的研究正文，已保留为当前会话上下文。")
+            continue
+        try:
+            task_result = build_hermes_gangtise_direct_synthesis(task_plan, item.get("outputs") or {})
+        except RuntimeError as exc:
+            sections.append(f"### {label}\n本任务未完成：{str(exc)[:320]}")
+            continue
+        answer = str(task_result.get("answer") or "").strip()
+        if answer:
+            successful += 1
+            sections.append(f"### {label}\n{answer}")
+    answer = "\n\n".join(sections).strip()
+    if not answer or not successful:
+        raise RuntimeError("hermes_composite_empty_response")
+    return {
+        "answer": answer,
+        "summary": f"已完成 {successful} 个组合研究任务，研究结果由对应能力直接返回。",
+        "lead_conclusion": "",
+        "bullets": [],
+        "analysis_sections": [],
+        "next_steps": [],
+        "confidence": "",
+        "citations": ["Gangtise AI 组合研究"],
+    }
+
+
 def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", user_role="", preferred_mode="", messages=None, web_answer=False, memory_state=None, response_style="structured"):
-    if str((plan or {}).get("intent") or "").strip() in HERMES_GANGTISE_DIRECT_INTENTS:
+    intent = str((plan or {}).get("intent") or "").strip()
+    if intent == "clarify":
+        return build_hermes_clarification_synthesis(plan), None, "clarification"
+    if intent == "composite_research":
+        return build_hermes_composite_direct_synthesis(plan, tool_outputs), None, "composite_direct"
+    if intent in HERMES_GANGTISE_DIRECT_INTENTS:
         return build_hermes_gangtise_direct_synthesis(plan, tool_outputs), None, "gangtise_direct"
     llm_model = get_hermes_llm_config("hermes_answer_synthesis")
     if not llm_model:
@@ -9518,6 +9673,21 @@ def build_hermes_query_response(body):
     question_text = extract_hermes_question_text(messages, payload.get("question"))
     if not question_text:
         raise ValueError("hermes_question_required")
+    router_model = get_hermes_llm_config("hermes_intent_router")
+    app.logger.info(
+        "Hermes request input normalized entry_point=%s question_type=%s question_chars=%d "
+        "messages=%d last_user_chars=%d preferred_mode=%s router_model_key=%s "
+        "router_model=%s router_base_url=%s",
+        entry_point,
+        type(payload.get("question")).__name__,
+        len(question_text),
+        len(messages),
+        len(next((item["content"] for item in reversed(messages) if item["role"] == "user"), "")),
+        preferred_mode,
+        str((router_model or {}).get("key") or ""),
+        str((router_model or {}).get("model_name") or ""),
+        str((router_model or {}).get("base_url") or ""),
+    )
     actor_context = resolve_hermes_actor_context(payload, tenant_slug=tenant_slug, user_role=user_role)
     session_id = resolve_hermes_session_id(payload, actor_context=actor_context)
     workflow_definition = build_default_hermes_agent_workflow_definition()
@@ -9630,10 +9800,10 @@ def build_hermes_query_response(body):
 
     def _hermes_tool_executor(state, runtime, node, upstream):
         intent_plan = state.get("intent_plan") or {}
-        if str(intent_plan.get("intent") or "").strip() == "out_of_scope_redirect":
+        if str(intent_plan.get("intent") or "").strip() in {"out_of_scope_redirect", "clarify"}:
             return {
                 "status": "skipped",
-                "detail": "当前问题已被范围守卫收口，本轮不再调度平台工具。",
+                "detail": "当前计划无需调用平台工具。",
                 "state_updates": {
                     "tool_outputs": {},
                     "tool_trace": [],
@@ -9664,7 +9834,24 @@ def build_hermes_query_response(body):
         }
 
     def _hermes_synthesis_executor(state, runtime, node, upstream):
-        if str((state.get("intent_plan") or {}).get("intent") or "").strip() == "out_of_scope_redirect":
+        plan_intent = str((state.get("intent_plan") or {}).get("intent") or "").strip()
+        if plan_intent == "clarify":
+            synthesis = build_hermes_clarification_synthesis(state.get("intent_plan") or {})
+            return {
+                "status": "skipped",
+                "detail": "信息不足，已生成澄清问题，未调用研究工具。",
+                "state_updates": {
+                    "synthesis": synthesis,
+                    "answer_model": None,
+                    "answer_mode": "clarification",
+                    "missing_capability": {},
+                },
+                "context_preview": {
+                    "answer_chars": len(str((synthesis or {}).get("answer") or "")),
+                    "bullet_count": 0,
+                },
+            }
+        if plan_intent == "out_of_scope_redirect":
             synthesis = build_hermes_scope_synthesis(state.get("intent_plan") or {})
             return {
                 "status": "skipped",
@@ -9824,6 +10011,9 @@ def build_hermes_query_response(body):
             "tenant_slug": runtime.get("tenant_slug") or "",
             "session_id": runtime.get("session_id") or "",
             "intent": intent_plan.get("intent"),
+            "disposition": intent_plan.get("disposition") or "execute",
+            "clarifying_question": intent_plan.get("clarifying_question") or "",
+            "tasks": copy.deepcopy(intent_plan.get("tasks") or []) if isinstance(intent_plan.get("tasks"), list) else [],
             "capability_contract": copy.deepcopy(HERMES_CAPABILITY_REGISTRY.get(str(intent_plan.get("intent") or "").strip()) or {}),
             "securities": copy.deepcopy(intent_plan.get("securities") if isinstance(intent_plan.get("securities"), list) else []),
             "task_family": intent_plan.get("task_family") or "research_qa",
@@ -10322,8 +10512,8 @@ def persist_review_publish_snapshot(
         "user_input_section": normalized_user_input_section,
         "watchlist_analysis_section": normalized_watchlist_analysis,
         "evidence_chain_section": evidence_chain_section,
-        "is_simulated": get_simulation_runtime_environment() == "local",
-        "simulation_label": SIMULATION_LABEL_LOCAL if get_simulation_runtime_environment() == "local" else "",
+        "is_simulated": False,
+        "simulation_label": "",
     }
     snapshots = append_review_snapshot(tenant_slug, snapshot)
     review_message = {
@@ -10348,8 +10538,8 @@ def persist_review_publish_snapshot(
                 "type": "review",
             }
         ],
-        "is_simulated": get_simulation_runtime_environment() == "local",
-        "simulation_label": SIMULATION_LABEL_LOCAL if get_simulation_runtime_environment() == "local" else "",
+        "is_simulated": False,
+        "simulation_label": "",
     }
     message_state = append_message_thread(tenant_slug, review_message)
     review_broadcast = {
@@ -10360,8 +10550,8 @@ def persist_review_publish_snapshot(
         "open_rate": random.randint(35, 78),
         "target": "review",
         "type": "broadcast",
-        "is_simulated": get_simulation_runtime_environment() == "local",
-        "simulation_label": SIMULATION_LABEL_LOCAL if get_simulation_runtime_environment() == "local" else "",
+        "is_simulated": False,
+        "simulation_label": "",
     }
     message_state = append_broadcast_history(tenant_slug, review_broadcast)
     message_state = push_broadcast_to_fan_threads(tenant_slug, review_broadcast)

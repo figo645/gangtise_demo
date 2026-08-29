@@ -169,6 +169,46 @@ class GangtiseReviewSseTest(unittest.TestCase):
 
         self.assertEqual(result["text"], "## 结论\n正文\n\n---\n## 详细分析")
 
+    def test_sse_client_decodes_nested_result_in_formal_answer_phase(self):
+        def fake_urlopen(request, timeout):
+            return _FakeSseResponse(
+                [
+                    'data: {"phase":"think","round":1,"title":"拆分问题","result":{"data":{"markdown":"内部推理"}}}\n', "\n",
+                    'data: {"phase":"answer","round":1,"title":"","result":{"data":"{\\"report\\":\\"## 上证综合指数\\\\n正式报告\\"}"}}\n', "\n",
+                    'data: {"phase":"usage","round":1,"title":"","result":{"summary":"内部用量"}}\n', "\n",
+                ]
+            )
+
+        with patch(
+            "src.domain.market_services.get_gangtise_openapi_config",
+            return_value={"base_url": "https://openapi.gangtise.com"},
+        ), patch("src.domain.market_services.urlopen", side_effect=fake_urlopen):
+            result = market_services.post_gangtise_openapi_sse(
+                "/application/open-ai/ai/chat/sse", {"text": "请分析上证指数"}, token="test-token"
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["text"], "## 上证综合指数\n正式报告")
+        self.assertNotIn("内部推理", result["text"])
+        self.assertNotIn("内部用量", result["text"])
+
+    def test_sse_client_supports_terminal_formal_answer_phase_alias(self):
+        def fake_urlopen(request, timeout):
+            return _FakeSseResponse(
+                ['data: {"phase":"final_answer","result":{"markdown":"最终正式报告"}}\n', "\n"]
+            )
+
+        with patch(
+            "src.domain.market_services.get_gangtise_openapi_config",
+            return_value={"base_url": "https://openapi.gangtise.com"},
+        ), patch("src.domain.market_services.urlopen", side_effect=fake_urlopen):
+            result = market_services.post_gangtise_openapi_sse(
+                "/application/open-ai/ai/chat/sse", {"text": "请分析上证指数"}, token="test-token"
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["text"], "最终正式报告")
+
     def test_sse_client_sends_agent_contract_and_merges_snapshots_and_deltas(self):
         captured = {}
 

@@ -1,6 +1,7 @@
 from src.runtime import *
 import base64
 import hashlib
+import re
 
 try:
     from cryptography.fernet import Fernet, InvalidToken
@@ -1250,8 +1251,6 @@ def resolve_tenant_review_snapshots(tenant, snapshots=None, include_simulated=Fa
     source_items = items if isinstance(items, list) and items else default_tenant_review_snapshots(tenant)
     normalized = []
     for index, item in enumerate(source_items[:20]):
-        if not include_simulated and should_hide_simulated_data() and isinstance(item, dict) and bool(item.get("is_simulated")):
-            continue
         normalized.append(normalize_review_snapshot_item(item, tenant, index=index))
     return normalized
 
@@ -1444,9 +1443,8 @@ def resolve_tenant_message_center_state(tenant, state=None, include_simulated=Fa
     source = raw if isinstance(raw, dict) else {}
     threads_source = source.get("threads") if isinstance(source.get("threads"), list) else defaults["threads"]
     broadcasts_source = source.get("broadcasts") if isinstance(source.get("broadcasts"), list) else defaults["broadcasts"]
-    hide_simulated = not include_simulated and should_hide_simulated_data()
-    threads = [normalize_message_thread_item(item, tenant, index=index) for index, item in enumerate(threads_source[:60]) if not (hide_simulated and isinstance(item, dict) and bool(item.get("is_simulated")))]
-    broadcasts = [normalize_message_broadcast_item(item, tenant, index=index) for index, item in enumerate(broadcasts_source[:60]) if not (hide_simulated and isinstance(item, dict) and bool(item.get("is_simulated")))]
+    threads = [normalize_message_thread_item(item, tenant, index=index) for index, item in enumerate(threads_source[:60])]
+    broadcasts = [normalize_message_broadcast_item(item, tenant, index=index) for index, item in enumerate(broadcasts_source[:60])]
     summary = str(source.get("summary") or defaults["summary"]).strip() or defaults["summary"]
     return {
         "summary": summary,
@@ -1471,11 +1469,6 @@ def _save_tenant_state_field(tenant_slug, field_name, value):
 def update_tenant_review_snapshots(tenant_slug, snapshots):
     tenant = get_tenant_by_slug(tenant_slug)
     raw_snapshots = copy.deepcopy(snapshots) if isinstance(snapshots, list) else []
-    if get_simulation_runtime_environment() == "local":
-        for item in raw_snapshots:
-            if isinstance(item, dict):
-                item["is_simulated"] = True
-                item["simulation_label"] = SIMULATION_LABEL_LOCAL
     normalized = resolve_tenant_review_snapshots(tenant, snapshots=raw_snapshots, include_simulated=True)
     return _save_tenant_state_field(tenant_slug, "review_snapshots", normalized)
 
@@ -1483,12 +1476,6 @@ def update_tenant_review_snapshots(tenant_slug, snapshots):
 def update_tenant_message_center_state(tenant_slug, state):
     tenant = get_tenant_by_slug(tenant_slug)
     raw_state = copy.deepcopy(state) if isinstance(state, dict) else {}
-    if get_simulation_runtime_environment() == "local":
-        for field_name in ("threads", "broadcasts"):
-            for item in raw_state.get(field_name) if isinstance(raw_state.get(field_name), list) else []:
-                if isinstance(item, dict):
-                    item["is_simulated"] = True
-                    item["simulation_label"] = SIMULATION_LABEL_LOCAL
     normalized = resolve_tenant_message_center_state(tenant, state=raw_state, include_simulated=True)
     return _save_tenant_state_field(tenant_slug, "message_center_state", normalized)
 
@@ -2043,8 +2030,6 @@ def normalize_knowledge_hub_config(source, tenant, include_simulated=False):
     for index, item in enumerate(items[:80]):
         if not isinstance(item, dict):
             continue
-        if not include_simulated and should_hide_simulated_data() and bool(item.get("is_simulated")):
-            continue
         item_type = str(item.get("type") or "manual").strip().lower()
         if item_type not in {"voice", "file", "url", "manual"}:
             item_type = "manual"
@@ -2122,11 +2107,6 @@ def update_tenant_knowledge_hub_config(tenant_slug, knowledge_hub_config):
             continue
         tenants[index] = dict(tenant)
         raw_config = copy.deepcopy(knowledge_hub_config) if isinstance(knowledge_hub_config, dict) else {}
-        if get_simulation_runtime_environment() == "local":
-            for item in raw_config.get("items") if isinstance(raw_config.get("items"), list) else []:
-                if isinstance(item, dict):
-                    item["is_simulated"] = True
-                    item["simulation_label"] = SIMULATION_LABEL_LOCAL
         tenants[index]["knowledge_hub_config"] = normalize_knowledge_hub_config(raw_config, tenant, include_simulated=True)
         updated = True
         break
@@ -6130,134 +6110,6 @@ def build_admin_site_config_payload(site_config=None):
 
 
 
-SIMULATION_DATA_VISIBILITY_SETTING_KEY = "simulation_data_visibility"
-SIMULATION_DATA_BOOTSTRAP_SETTING_KEY = "simulation_data_bootstrap_completed"
-SIMULATION_LABEL_LOCAL = "本机模拟数据"
-SIMULATION_TAGGED_TABLES = (
-    "users", "user_watchlist_items", "fan_stock_observation_events", "watchlist_kline_annotations",
-    "watchlist_comments", "hermes_conversation_turns", "hermes_session_memory", "hermes_user_memory",
-    "hermes_user_profiles", "knowledge_embeddings", "review_voice_embeddings", "user_async_jobs",
-    "token_usage_logs", "indicator_latest_values", "indicator_series", "indicator_anomalies",
-    "indicator_kline_points", "indicator_raw_records", "indicator_load_batches", "indicator_source_tests",
-    "indicator_clean_jobs",
-)
-
-
-def get_simulation_runtime_environment():
-    """Resolve data origin with a production-safe default outside this Mac."""
-    configured = str(os.environ.get("GANGTISE_RUNTIME_ENV") or "").strip().lower()
-    if configured in {"local", "staging", "production"}:
-        return configured
-    return "local" if sys.platform == "darwin" else "production"
-
-
-def _load_simulation_visibility_setting(connection):
-    runtime_environment = get_simulation_runtime_environment()
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT setting_value FROM app_settings WHERE setting_key = %s", (SIMULATION_DATA_VISIBILITY_SETTING_KEY,))
-            row = cursor.fetchone()
-        if row:
-            value = row[0] if not isinstance(row, dict) else row.get("setting_value")
-            return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
-    except Exception:
-        connection.rollback()
-    # Local development keeps its historic behavior. Production and staging
-    # start fail-closed until an authenticated admin explicitly enables the
-    # development-data view.
-    return runtime_environment == "local"
-
-
-def configure_simulation_data_connection(connection):
-    """Configure write provenance and fail-closed production visibility."""
-    runtime_environment = get_simulation_runtime_environment()
-    visible = _load_simulation_visibility_setting(connection)
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT set_config('gangtise.simulated_write', %s, false)", ("1" if runtime_environment == "local" else "0",))
-            cursor.execute("SELECT set_config('gangtise.hide_simulated_data', %s, false)", ("0" if visible else "1",))
-        connection.commit()
-    except Exception:
-        connection.rollback()
-    return {"runtime_environment": runtime_environment, "visible": visible, "hide_simulated": not visible}
-
-
-def get_simulation_data_policy():
-    runtime_environment = get_simulation_runtime_environment()
-    connection = get_app_db_connection()
-    try:
-        visible = _load_simulation_visibility_setting(connection)
-    finally:
-        connection.close()
-    return {
-        "runtime_environment": runtime_environment,
-        "local_origin_enabled": runtime_environment == "local",
-        "simulated_data_visible": bool(visible),
-        "production_forced_hidden": False,
-        "admin_controlled": True,
-        "label": SIMULATION_LABEL_LOCAL,
-    }
-
-
-def should_hide_simulated_data():
-    if get_simulation_runtime_environment() != "local":
-        return True
-    try:
-        row = get_db().execute(
-            "SELECT setting_value FROM app_settings WHERE setting_key = ?",
-            (SIMULATION_DATA_VISIBILITY_SETTING_KEY,),
-        ).fetchone()
-        return bool(row and str(row.get("setting_value") or "").strip().lower() in {"0", "false", "no", "off"})
-    except Exception:
-        return False
-
-
-def save_simulation_data_visibility(visible):
-    db = get_db()
-    db.execute(
-        """
-        INSERT INTO app_settings (setting_key, setting_value, updated_at)
-        VALUES (?, ?, ?)
-        ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value, updated_at = excluded.updated_at
-        """,
-        (SIMULATION_DATA_VISIBILITY_SETTING_KEY, "true" if visible else "false", now_ts()),
-    )
-    db.commit()
-    return get_simulation_data_policy()
-
-
-def mark_existing_local_data_as_simulated():
-    """One-time provenance migration for records that predate the new defaults."""
-    if get_simulation_runtime_environment() != "local":
-        return {"marked": 0, "skipped": "non_local_runtime"}
-    db = get_db()
-    try:
-        existing = db.execute("SELECT setting_value FROM app_settings WHERE setting_key = ?", (SIMULATION_DATA_BOOTSTRAP_SETTING_KEY,)).fetchone()
-        if existing:
-            return {"marked": 0, "skipped": "already_completed"}
-        total = 0
-        for table in SIMULATION_TAGGED_TABLES:
-            predicate = " WHERE COALESCE(is_simulated, 0) = 0"
-            # DAv and Admin identities are control-plane accounts, not
-            # development content. They must remain available to operate the
-            # production visibility switch after a full database deployment.
-            if table == "users":
-                predicate += " AND role = 'investor'"
-            total += db.execute(
-                f"UPDATE {table} SET is_simulated = 1, simulation_label = ?{predicate}",
-                (SIMULATION_LABEL_LOCAL,),
-            ).rowcount or 0
-        db.execute(
-            "INSERT INTO app_settings (setting_key, setting_value, updated_at) VALUES (?, ?, ?)",
-            (SIMULATION_DATA_BOOTSTRAP_SETTING_KEY, "true", now_ts()),
-        )
-        db.commit()
-        return {"marked": total, "skipped": ""}
-    except Exception:
-        db.rollback()
-        raise
-
-
 def get_app_db_connection():
     target = get_runtime_db_target().get("app", {})
     connection = psycopg2.connect(
@@ -6268,7 +6120,6 @@ def get_app_db_connection():
         password=target.get("password") or APP_DB_PASSWORD,
         connect_timeout=8,
     )
-    configure_simulation_data_connection(connection)
     return connection
 
 
@@ -6626,7 +6477,9 @@ def init_db():
         execute_sql_file(conn, sql_dir / "032_simulated_fan_data_management.sql")
         execute_sql_file(conn, sql_dir / "033_user_watchlist_items.sql")
         execute_sql_file(conn, sql_dir / "034_security_master.sql")
-        execute_sql_file(conn, sql_dir / "035_local_simulation_data_visibility.sql")
+        # 035 installed environment-specific simulation triggers. Do not
+        # execute that historical migration on startup; 043 removes them.
+        execute_sql_file(conn, sql_dir / "043_remove_environment_simulation_processing.sql")
         execute_sql_file(conn, sql_dir / "100_seed_master_data.sql")
         execute_sql_file(conn, sql_dir / "101_seed_app_core.sql")
         execute_sql_file(conn, sql_dir / "102_seed_market_sector_catalog.sql")
@@ -6672,13 +6525,6 @@ def startup_bootstrap():
         return
     if should_auto_init_db():
         init_db_safe()
-        try:
-            with app.app_context():
-                mark_existing_local_data_as_simulated()
-        except Exception as exc:
-            if not is_db_unavailable_error(exc):
-                raise
-            app.logger.warning("Database unavailable during local simulation provenance migration, skipping")
     try:
         with app.app_context():
             seed_result = ensure_default_users()

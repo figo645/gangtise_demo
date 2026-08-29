@@ -88,6 +88,13 @@ for file in "${FILES[@]}"; do
   name="$(basename "$file")"
   version="${name%%_*}"
   [[ "$version" == "000" ]] && continue
+  case "$name" in
+    035_local_simulation_data_visibility.sql|041_keep_control_plane_accounts_real.sql|042_fix_simulation_provenance_trigger.sql)
+      echo "SKIP  $name (obsolete environment simulation migration)"
+      skipped=$((skipped + 1))
+      continue
+      ;;
+  esac
   case "$version" in
     0??)
       scope="schema"

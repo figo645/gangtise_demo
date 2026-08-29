@@ -1,29 +1,26 @@
 import os
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-from src.runtime import PgCompatConnection, app
+from src.runtime import PgCompatConnection
 import src.domain.core_services as core_services
-import src.web.api_core as api_core
 
 
-class SimulationDataPolicyBddTest(unittest.TestCase):
-    def test_given_production_connection_when_selecting_business_rows_then_simulated_rows_are_filtered(self):
+class SharedDatabaseContentBddTest(unittest.TestCase):
+    def test_sql_normalization_never_adds_environment_visibility_predicates(self):
         connection = PgCompatConnection(None)
-        connection._hide_simulated_data = True
-
         sql = connection._normalize_sql(
-            "SELECT u.username FROM users u JOIN hermes_conversation_turns h ON h.user_profile_id = u.username WHERE u.status = ? ORDER BY h.created_at DESC"
+            "SELECT u.username FROM users u "
+            "JOIN hermes_conversation_turns h ON h.user_profile_id = u.username "
+            "WHERE u.status = ? ORDER BY h.created_at DESC"
         )
 
-        self.assertIn("COALESCE(u.is_simulated, 0) = 0", sql)
-        self.assertIn("COALESCE(h.is_simulated, 0) = 0", sql)
-        self.assertIn("ORDER BY h.created_at DESC", sql)
+        self.assertIn("WHERE u.status = %s", sql)
+        self.assertNotIn("is_simulated", sql)
+        self.assertFalse(hasattr(connection, "_hide_simulated_data"))
 
-    def test_given_nested_or_cte_selects_when_production_filters_then_each_scope_is_protected(self):
+    def test_sql_normalization_preserves_nested_and_cte_queries(self):
         connection = PgCompatConnection(None)
-        connection._hide_simulated_data = True
-
         nested_sql = connection._normalize_sql(
             "SELECT sm.session_id, (SELECT question_text FROM hermes_conversation_turns t "
             "WHERE t.session_id = sm.session_id LIMIT 1) AS first_question "
@@ -34,83 +31,32 @@ class SimulationDataPolicyBddTest(unittest.TestCase):
             "SELECT * FROM recent ORDER BY id DESC"
         )
 
-        self.assertIn("COALESCE(t.is_simulated, 0) = 0 LIMIT 1", nested_sql)
-        self.assertIn("COALESCE(sm.is_simulated, 0) = 0", nested_sql)
-        self.assertNotIn("COALESCE(t.is_simulated, 0) = 0 AND COALESCE(sm", nested_sql)
-        self.assertIn("COALESCE(knowledge_embeddings.is_simulated, 0) = 0", cte_sql)
+        self.assertIn("WHERE t.session_id = sm.session_id LIMIT 1", nested_sql)
+        self.assertIn("WHERE sm.tenant_slug = %s", nested_sql)
+        self.assertIn("WHERE tenant_slug = %s", cte_sql)
+        self.assertNotIn("is_simulated", nested_sql + cte_sql)
 
-    def test_given_production_runtime_without_saved_setting_when_admin_requests_policy_then_visibility_defaults_off(self):
-        with patch.dict(os.environ, {"GANGTISE_RUNTIME_ENV": "production"}, clear=False), patch.object(
-            core_services, "get_app_db_connection"
-        ) as get_connection:
-            fake_connection = MagicMock()
-            get_connection.return_value = fake_connection
-            policy = core_services.get_simulation_data_policy()
+    def test_runtime_environment_does_not_change_shared_policy(self):
+        with patch.dict(os.environ, {"GANGTISE_RUNTIME_ENV": "local"}, clear=False):
+            local_sql = PgCompatConnection(None)._normalize_sql("SELECT * FROM users")
+        with patch.dict(os.environ, {"GANGTISE_RUNTIME_ENV": "production"}, clear=False):
+            production_sql = PgCompatConnection(None)._normalize_sql("SELECT * FROM users")
 
-        self.assertEqual(policy["runtime_environment"], "production")
-        self.assertFalse(policy["simulated_data_visible"])
-        self.assertFalse(policy["production_forced_hidden"])
-        self.assertTrue(policy["admin_controlled"])
+        self.assertEqual(local_sql, production_sql)
 
-    def test_given_production_runtime_when_admin_enables_simulated_data_then_the_setting_is_saved(self):
-        expected = {"simulated_data_visible": True, "admin_controlled": True}
-        with app.test_request_context("/api/admin/simulation-data-policy", method="POST", json={"simulated_data_visible": True}), patch.object(
-            api_core, "save_simulation_data_visibility", return_value=expected
-        ):
-            response = api_core.api_admin_simulation_data_policy()
+    def test_environment_simulation_migration_removes_triggers_and_settings(self):
+        migration = (
+            core_services.PROJECT_ROOT
+            / "sql"
+            / "postgres"
+            / "043_remove_environment_simulation_processing.sql"
+        ).read_text(encoding="utf-8")
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.get_json()["policy"], expected)
-
-    def test_given_visibility_migration_when_inspected_then_all_tagged_tables_receive_origin_defaults(self):
-        migration = (core_services.PROJECT_ROOT / "sql" / "postgres" / "035_local_simulation_data_visibility.sql").read_text(encoding="utf-8")
-
-        self.assertIn("gangtise.simulated_write", migration)
-        self.assertIn("本机模拟数据", migration)
-        self.assertIn("hermes_conversation_turns", migration)
-        self.assertIn("user_watchlist_items", migration)
-        self.assertIn("CREATE TRIGGER", migration)
-        self.assertIn("BEFORE INSERT OR UPDATE", migration)
-
-    def test_given_control_plane_accounts_when_latest_migration_is_inspected_then_they_remain_real(self):
-        migration = (core_services.PROJECT_ROOT / "sql" / "postgres" / "041_keep_control_plane_accounts_real.sql").read_text(encoding="utf-8")
-
-        self.assertIn("role IN ('dav', 'admin')", migration)
-        self.assertIn("TG_TABLE_NAME = 'users'", migration)
-        self.assertIn("NEW.is_simulated := 0", migration)
-
-    def test_given_generic_provenance_trigger_when_non_user_table_writes_then_role_is_nested_under_table_guard(self):
-        migration = (core_services.PROJECT_ROOT / "sql" / "postgres" / "042_fix_simulation_provenance_trigger.sql").read_text(encoding="utf-8")
-
-        self.assertIn("IF TG_TABLE_NAME = 'users' THEN", migration)
-        self.assertIn("IF NEW.role IN ('dav', 'admin') THEN", migration)
-        self.assertNotIn("TG_TABLE_NAME = 'users' AND NEW.role", migration)
-
-    def test_given_production_visibility_when_resolving_embedded_review_snapshots_then_local_content_is_removed(self):
-        tenant = {"slug": "laowang", "advisor": "财经老王", "review_snapshots": []}
-        snapshots = [
-            {"id": "local-review", "title": "本机复盘", "is_simulated": True, "simulation_label": "本机模拟数据"},
-            {"id": "production-review", "title": "正式复盘", "is_simulated": False},
-        ]
-        with patch.object(core_services, "should_hide_simulated_data", return_value=True):
-            result = core_services.resolve_tenant_review_snapshots(tenant, snapshots=snapshots)
-
-        self.assertEqual([item["id"] for item in result], ["production-review"])
-
-    def test_given_hidden_visibility_when_resolving_embedded_knowledge_then_local_content_is_removed_without_deleting_it(self):
-        tenant = {"slug": "laowang", "advisor": "财经老王", "knowledge_hub_config": {}}
-        source = {
-            "items": [
-                {"id": "local-knowledge", "title": "本机资料", "type": "manual", "is_simulated": True},
-                {"id": "production-knowledge", "title": "正式资料", "type": "manual", "is_simulated": False},
-            ]
-        }
-        with patch.object(core_services, "should_hide_simulated_data", return_value=True):
-            visible = core_services.normalize_knowledge_hub_config(source, tenant)
-            stored = core_services.normalize_knowledge_hub_config(source, tenant, include_simulated=True)
-
-        self.assertEqual([item["id"] for item in visible["items"]], ["production-knowledge"])
-        self.assertEqual([item["id"] for item in stored["items"]], ["local-knowledge", "production-knowledge"])
+        self.assertIn("DROP TRIGGER IF EXISTS", migration)
+        self.assertIn("DROP FUNCTION IF EXISTS gangtise_mark_local_simulated_write", migration)
+        self.assertIn("simulation_data_visibility", migration)
+        self.assertIn("simulation_data_bootstrap_completed", migration)
+        self.assertIn("SET DEFAULT 0", migration)
 
 
 if __name__ == "__main__":

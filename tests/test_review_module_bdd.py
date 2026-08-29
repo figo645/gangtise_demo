@@ -1856,6 +1856,15 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertEqual(builtin["model_name"], "gemma4:12b-it-bf16")
         self.assertEqual(builtin["base_url"], "http://8.155.160.194:6031/api")
 
+    def test_given_default_llm_registry_when_normalized_then_deepseek_v4_flash_is_default(self):
+        config = core_services.normalize_site_config({})
+        registry = config["llm_registry"]
+        model = next(item for item in registry["models"] if item["key"] == "volcengine-deepseek-v4-flash")
+        self.assertEqual(registry["default_model_key"], "volcengine-deepseek-v4-flash")
+        self.assertEqual(model["model_name"], "deepseek-v4-flash-ga-260731")
+        self.assertEqual(model["base_url"], "https://ark.cn-beijing.volces.com/api/v3")
+        self.assertEqual(model["provider"], "volcengine")
+
     def test_given_default_site_config_when_normalized_then_all_features_use_admin_default_model(self):
         config = normalize_site_config({})
 

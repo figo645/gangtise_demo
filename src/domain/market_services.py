@@ -97,13 +97,14 @@ def gen_channel_data():
     ]
 
 
-def build_admin_channel_payload():
+def build_admin_channel_payload(tenant_slug=""):
     """Build channel metrics from persisted users without synthetic fallbacks."""
     now = datetime.now()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     rows_by_channel = {}
+    normalized_tenant_slug = str(tenant_slug or "").strip().lower()
     try:
-        users = list_users()
+        users = list_users(tenant_slug=normalized_tenant_slug) if normalized_tenant_slug else list_users()
     except Exception:
         raise
     for user in users or []:
@@ -151,6 +152,8 @@ def build_admin_channel_payload():
     return {
         "generated_at": now_ts(),
         "basis": "用户表渠道字段、注册时间、付费标注和租户注册单价",
+        "kol_filter": normalized_tenant_slug,
+        "kol_options": build_admin_kol_options(),
         "active_channels": sum(1 for row in rows if row["users"] > 0),
         "total_users": total_users,
         "new_users_month": total_new,
@@ -163,13 +166,38 @@ def build_admin_channel_payload():
     }
 
 
-def build_admin_funnel_payload():
+def build_admin_kol_options(tenant_configs=None):
+    if tenant_configs is None:
+        try:
+            tenant_configs = get_tenant_configs()
+        except RuntimeError:
+            # Unit callers may build a payload without a Flask request context.
+            # The analytics data remains valid; the UI can populate options on
+            # the next request made inside the application context.
+            tenant_configs = []
+    return [
+        {
+            "slug": str(tenant.get("slug") or "").strip().lower(),
+            "name": str(tenant.get("name") or tenant.get("advisor") or tenant.get("slug") or "").strip(),
+            "advisor": str(tenant.get("advisor") or tenant.get("name") or tenant.get("slug") or "").strip(),
+        }
+        for tenant in (tenant_configs or [])
+        if str(tenant.get("slug") or "").strip()
+    ]
+
+
+def build_admin_funnel_payload(tenant_slug=""):
     """Build the analytics funnel from persisted users and access events."""
+    normalized_tenant_slug = str(tenant_slug or "").strip().lower()
     users = [
-        user for user in list_users(role="investor")
+        user for user in (
+            list_users(role="investor", tenant_slug=normalized_tenant_slug)
+            if normalized_tenant_slug
+            else list_users(role="investor")
+        )
         if isinstance(user, dict) and str(user.get("status") or "active").lower() == "active"
     ]
-    channels = build_admin_channel_payload()
+    channels = build_admin_channel_payload(normalized_tenant_slug)
     tenant_prices = {}
     for tenant in get_tenant_configs():
         slug = str(tenant.get("slug") or "").strip().lower()
@@ -185,10 +213,12 @@ def build_admin_funnel_payload():
     content_reach = 0
     try:
         since = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
-        reach_row = get_db().execute(
-            "SELECT COUNT(*) AS count FROM access_logs WHERE user_role = ? AND created_at >= ?",
-            ("investor", since),
-        ).fetchone()
+        access_sql = "SELECT COUNT(*) AS count FROM access_logs WHERE user_role = ? AND created_at >= ?"
+        access_params = ["investor", since]
+        if normalized_tenant_slug:
+            access_sql += " AND tenant_slug = ?"
+            access_params.append(normalized_tenant_slug)
+        reach_row = get_db().execute(access_sql, tuple(access_params)).fetchone()
         content_reach = int((reach_row or {}).get("count") or 0) if isinstance(reach_row, dict) else int(reach_row[0] or 0)
     except Exception:
         # A missing DB context or unavailable DB must never trigger a provider
@@ -227,7 +257,13 @@ def build_admin_funnel_payload():
         {"segment": "高频付费用户", "count": sum(1 for user in paid_users if user in high_frequency_users)},
     ]
     tenant_rows = []
-    for tenant in get_tenant_configs():
+    tenant_configs = get_tenant_configs()
+    if normalized_tenant_slug:
+        tenant_configs = [
+            tenant for tenant in tenant_configs
+            if str(tenant.get("slug") or "").strip().lower() == normalized_tenant_slug
+        ]
+    for tenant in tenant_configs:
         slug = str(tenant.get("slug") or "").strip().lower()
         if not slug:
             continue
@@ -258,6 +294,8 @@ def build_admin_funnel_payload():
     return {
         "generated_at": now_ts(),
         "basis": "访问日志、用户表注册/激活字段、付费标注、租户注册单价和用户渠道字段",
+        "kol_filter": normalized_tenant_slug,
+        "kol_options": build_admin_kol_options(),
         "funnel": funnel,
         "channels": channels,
         "monthly": monthly,
@@ -982,6 +1020,10 @@ def _extract_gangtise_sse_text(value):
         "outputText",
         "text",
         "delta",
+        "markdown",
+        "report",
+        "body",
+        "summary",
         "reply",
         "finalAnswer",
         "resultText",
@@ -1024,24 +1066,72 @@ def _extract_gangtise_agent_answer_delta(value):
     The live Agent stream contains internal ``think``, ``search``,
     ``annotation`` and usage events in exactly the same JSON envelope as the
     answer.  Those are useful for diagnostics but must not become review copy.
-    This is protocol decoding, not LLM post-processing.
+    This is protocol decoding, not LLM post-processing.  The payload inside
+    ``result`` is not stable: it has been a delta, a complete answer snapshot,
+    and nested response data.  Once the event phase is known to be a formal
+    answer, decode the whole result envelope rather than assuming ``delta``.
     """
     if not isinstance(value, dict):
         return None
-    if str(value.get("phase") or "").strip().lower() != "answer":
+    phase = str(value.get("phase") or "").strip().lower().replace("-", "_")
+    # ``answer`` is the documented stream phase. Accept compatible terminal
+    # answer aliases while keeping every unrecognised phase private.
+    # Do not accept unrecognised phases: their result payload can contain
+    # private reasoning, references, suggestions, or usage metadata.
+    if phase not in {"answer", "final", "final_answer", "finalanswer", "response", "output", "report"}:
         return None
-    result = value.get("result")
-    if isinstance(result, str):
-        return result
-    if not isinstance(result, dict):
+    def _extract_formal_result(result):
+        if isinstance(result, str):
+            # Preserve leading/trailing newlines because answer deltas carry
+            # Markdown paragraph and heading boundaries.
+            stripped_result = result.strip()
+            if stripped_result.startswith(("{", "[")):
+                try:
+                    nested = json.loads(stripped_result)
+                except Exception:
+                    nested = None
+                if isinstance(nested, (dict, list)):
+                    nested_text = _extract_formal_result(nested)
+                    if nested_text:
+                        return nested_text
+            return result
+        if isinstance(result, list):
+            return "".join(_extract_formal_result(item) for item in result)
+        if not isinstance(result, dict):
+            return ""
+        for key in (
+            "delta",
+            "content",
+            "text",
+            "answer",
+            "answerText",
+            "output",
+            "markdown",
+            "report",
+            "body",
+            "summary",
+        ):
+            candidate = _extract_formal_result(result.get(key))
+            if candidate:
+                return candidate
+        for key in (
+            "data",
+            "payload",
+            "response",
+            "body",
+            "responseBody",
+            "resultData",
+            "answerData",
+            "parts",
+            "segments",
+            "items",
+        ):
+            candidate = _extract_formal_result(result.get(key))
+            if candidate:
+                return candidate
         return ""
-    # The Agent has emitted both incremental ``delta`` fields and complete
-    # answer snapshots (usually under content/text) for the answer phase.
-    for key in ("delta", "content", "text", "answer", "answerText", "output", "markdown"):
-        candidate = result.get(key)
-        if isinstance(candidate, str) and candidate:
-            return candidate
-    return ""
+
+    return _extract_formal_result(value.get("result"))
 
 
 def _gangtise_sse_event_shape(value):

@@ -6,7 +6,6 @@ import math
 import statistics
 import time
 import threading
-import re
 import hashlib
 import secrets
 import base64
@@ -218,6 +217,16 @@ DEFAULT_LLM_FEATURE_CATALOG = [
 ]
 DEFAULT_LLM_MODELS = [
     {
+        "key": "volcengine-deepseek-v4-flash",
+        "label": "DeepSeek-V4-Flash正式版",
+        "provider": "volcengine",
+        "model_name": "deepseek-v4-flash-ga-260731",
+        "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+        "api_key": "",
+        "purpose": "general",
+        "enabled": True,
+    },
+    {
         "key": "gangtise-gemma4-12b-bf16",
         "label": "Gangtise Gemma4 12B BF16",
         "provider": "openai",
@@ -316,25 +325,6 @@ class PgCompatCursor:
 class PgCompatConnection:
     def __init__(self, connection):
         self._connection = connection
-        self._hide_simulated_data = self._read_simulation_visibility(connection)
-
-    @staticmethod
-    def _read_simulation_visibility(connection):
-        """Read the policy from PostgreSQL session state, never object attributes.
-
-        psycopg2's C extension connection does not permit arbitrary Python
-        attributes, so the connection setup stores this flag with set_config.
-        """
-        if connection is None:
-            return False
-        try:
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT current_setting('gangtise.hide_simulated_data', true)")
-                row = cursor.fetchone()
-            value = row[0] if isinstance(row, (tuple, list)) else (row or {}).get("current_setting") if isinstance(row, dict) else ""
-            return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
-        except Exception:
-            return False
 
     def _normalize_sql(self, sql):
         if not isinstance(sql, str):
@@ -343,186 +333,7 @@ class PgCompatConnection:
         normalized = normalized.replace("INSERT OR IGNORE INTO", "INSERT INTO")
         normalized = normalized.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "BIGSERIAL PRIMARY KEY")
         normalized = normalized.replace("SELECT substr(created_at, 1, 10) AS day, COUNT(*) AS c", "SELECT LEFT(created_at, 10) AS day, COUNT(*) AS c")
-        if self._hide_simulated_data:
-            normalized = self._exclude_simulated_rows(normalized)
         return normalized
-
-    @staticmethod
-    def _exclude_simulated_rows(sql):
-        """Apply the production visibility guard to supported business tables.
-
-        The application still uses direct SQL in several domains. Applying the
-        guard at the adapter prevents a newly added query from accidentally
-        exposing local-machine records after a full database copy.
-        """
-        sql = PgCompatConnection._rewrite_nested_selects(sql)
-        masked = PgCompatConnection._mask_nested_sql(sql)
-        select_match = re.search(r"\bSELECT\b", masked, re.IGNORECASE)
-        if not select_match:
-            return sql
-        prefix_before_select = masked[:select_match.start()].strip().upper()
-        if prefix_before_select and not prefix_before_select.startswith("WITH"):
-            return sql
-
-        # A UNION contains independent SELECT scopes. Rewrite each side rather
-        # than appending a predicate at the end of the combined expression.
-        union_match = re.search(r"\bUNION(?:\s+ALL)?\b", masked[select_match.start():], re.IGNORECASE)
-        if union_match:
-            union_start = select_match.start() + union_match.start()
-            union_end = select_match.start() + union_match.end()
-            return (
-                PgCompatConnection._exclude_simulated_rows(sql[:union_start])
-                + sql[union_start:union_end]
-                + PgCompatConnection._exclude_simulated_rows(sql[union_end:])
-            )
-        protected_tables = {
-            "users", "user_watchlist_items", "fan_stock_observation_events", "watchlist_kline_annotations",
-            "watchlist_comments", "hermes_conversation_turns", "hermes_session_memory", "hermes_user_memory",
-            "hermes_user_profiles", "knowledge_embeddings", "review_voice_embeddings", "user_async_jobs",
-            "token_usage_logs", "indicator_latest_values", "indicator_series", "indicator_anomalies",
-            "indicator_kline_points", "indicator_raw_records", "indicator_load_batches", "indicator_source_tests",
-            "indicator_clean_jobs",
-        }
-        aliases = []
-        sql_keywords = {
-            "where", "order", "group", "limit", "on", "left", "right", "inner", "full", "outer", "cross",
-            "natural", "offset", "for", "having", "window", "fetch", "returning", "union",
-        }
-        for match in re.finditer(
-            r"\b(?:FROM|JOIN)\s+(?:[a-z_][a-z0-9_]*\.)?([a-z_][a-z0-9_]*)(?:\s+(?:AS\s+)?([a-z_][a-z0-9_]*))?",
-            masked[select_match.start():],
-            re.IGNORECASE,
-        ):
-            table = match.group(1).lower()
-            raw_alias = (match.group(2) or "").lower()
-            alias = table if raw_alias in sql_keywords else (raw_alias or table)
-            if table in protected_tables:
-                aliases.append(alias)
-        if not aliases:
-            return sql
-        predicates = " AND ".join(f"COALESCE({alias}.is_simulated, 0) = 0" for alias in dict.fromkeys(aliases))
-        terminal = re.search(r"\b(GROUP\s+BY|ORDER\s+BY|LIMIT|FOR\s+UPDATE|OFFSET|FETCH)\b", masked[select_match.start():], re.IGNORECASE)
-        insert_at = select_match.start() + terminal.start() if terminal else len(sql)
-        prefix, suffix = sql[:insert_at], sql[insert_at:]
-        masked_prefix = masked[select_match.start():insert_at]
-        if re.search(r"\bWHERE\b", masked_prefix, re.IGNORECASE):
-            return f"{prefix} AND {predicates} {suffix}"
-        return f"{prefix} WHERE {predicates} {suffix}"
-
-    @staticmethod
-    def _rewrite_nested_selects(sql):
-        """Recursively protect subqueries while preserving their own scope."""
-        parts = []
-        index = 0
-        while index < len(sql):
-            char = sql[index]
-            if char in {"'", '"'}:
-                end = PgCompatConnection._skip_quoted_sql(sql, index, char)
-                parts.append(sql[index:end])
-                index = end
-                continue
-            if sql.startswith("--", index):
-                end = sql.find("\n", index)
-                end = len(sql) if end < 0 else end
-                parts.append(sql[index:end])
-                index = end
-                continue
-            if sql.startswith("/*", index):
-                end = sql.find("*/", index + 2)
-                end = len(sql) if end < 0 else end + 2
-                parts.append(sql[index:end])
-                index = end
-                continue
-            if char != "(":
-                parts.append(char)
-                index += 1
-                continue
-            end = PgCompatConnection._find_matching_parenthesis(sql, index)
-            if end < 0:
-                parts.append(sql[index:])
-                break
-            inner = sql[index + 1:end]
-            if re.match(r"^\s*(?:SELECT|WITH)\b", inner, re.IGNORECASE):
-                inner = PgCompatConnection._exclude_simulated_rows(inner)
-            parts.append("(" + inner + ")")
-            index = end + 1
-        return "".join(parts)
-
-    @staticmethod
-    def _mask_nested_sql(sql):
-        """Mask literals and nested expressions without changing positions."""
-        masked = list(sql)
-        index = 0
-        while index < len(sql):
-            char = sql[index]
-            if char in {"'", '"'}:
-                end = PgCompatConnection._skip_quoted_sql(sql, index, char)
-                for cursor in range(index, end):
-                    masked[cursor] = " "
-                index = end
-                continue
-            if sql.startswith("--", index):
-                end = sql.find("\n", index)
-                end = len(sql) if end < 0 else end
-                for cursor in range(index, end):
-                    masked[cursor] = " "
-                index = end
-                continue
-            if sql.startswith("/*", index):
-                end = sql.find("*/", index + 2)
-                end = len(sql) if end < 0 else end + 2
-                for cursor in range(index, end):
-                    masked[cursor] = " "
-                index = end
-                continue
-            if char == "(":
-                end = PgCompatConnection._find_matching_parenthesis(sql, index)
-                if end < 0:
-                    break
-                for cursor in range(index, end + 1):
-                    masked[cursor] = " "
-                index = end + 1
-                continue
-            index += 1
-        return "".join(masked)
-
-    @staticmethod
-    def _find_matching_parenthesis(sql, start):
-        depth = 0
-        index = start
-        while index < len(sql):
-            char = sql[index]
-            if char in {"'", '"'}:
-                index = PgCompatConnection._skip_quoted_sql(sql, index, char)
-                continue
-            if sql.startswith("--", index):
-                line_end = sql.find("\n", index)
-                index = len(sql) if line_end < 0 else line_end
-                continue
-            if sql.startswith("/*", index):
-                block_end = sql.find("*/", index + 2)
-                index = len(sql) if block_end < 0 else block_end + 2
-                continue
-            if char == "(":
-                depth += 1
-            elif char == ")":
-                depth -= 1
-                if depth == 0:
-                    return index
-            index += 1
-        return -1
-
-    @staticmethod
-    def _skip_quoted_sql(sql, start, quote):
-        index = start + 1
-        while index < len(sql):
-            if sql[index] == quote:
-                if index + 1 < len(sql) and sql[index + 1] == quote:
-                    index += 2
-                    continue
-                return index + 1
-            index += 1
-        return len(sql)
 
     def execute(self, sql, params=None):
         cursor = self._connection.cursor(cursor_factory=RealDictCursor)
@@ -999,7 +810,7 @@ DEFAULT_SITE_CONFIG = {
         "compose_timeout_seconds": 60,
     },
     "llm_registry": {
-        "default_model_key": "gangtise-gemma4-31b-q4km",
+        "default_model_key": "volcengine-deepseek-v4-flash",
         "models": copy.deepcopy(DEFAULT_LLM_MODELS),
         "feature_model_keys": {
             "review_voice_enhancement": "gangtise-gemma4-12b-bf16",

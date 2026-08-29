@@ -87,7 +87,8 @@ def api_channels():
 @app.route("/api/admin/channels")
 def api_admin_channels():
     try:
-        return jsonify({"ok": True, "channels": build_admin_channel_payload()})
+        tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+        return jsonify({"ok": True, "channels": build_admin_channel_payload(tenant_slug=tenant_slug)})
     except Exception:
         app.logger.exception("Failed to build admin channel payload")
         return jsonify({"ok": False, "error": "channel_data_unavailable"}), 503
@@ -96,7 +97,8 @@ def api_admin_channels():
 @app.route("/api/admin/funnel-analytics")
 def api_admin_funnel_analytics():
     try:
-        return jsonify({"ok": True, "analytics": build_admin_funnel_payload()})
+        tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+        return jsonify({"ok": True, "analytics": build_admin_funnel_payload(tenant_slug=tenant_slug)})
     except Exception:
         app.logger.exception("Failed to build admin funnel analytics")
         return jsonify({"ok": False, "error": "funnel_data_unavailable"}), 503
@@ -113,7 +115,8 @@ def api_revenue():
 @app.route("/api/admin/revenue-analytics")
 def api_admin_revenue_analytics():
     try:
-        return jsonify({"ok": True, "analytics": build_admin_revenue_analytics_payload()})
+        tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+        return jsonify({"ok": True, "analytics": build_admin_revenue_analytics_payload(tenant_slug=tenant_slug)})
     except Exception:
         app.logger.exception("Failed to build admin revenue analytics")
         return jsonify({"ok": False, "error": "revenue_data_unavailable"}), 503
@@ -122,7 +125,8 @@ def api_admin_revenue_analytics():
 @app.route("/api/admin/kol-analytics")
 def api_admin_kol_analytics():
     try:
-        return jsonify({"ok": True, "analytics": build_admin_kol_analytics_payload()})
+        tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+        return jsonify({"ok": True, "analytics": build_admin_kol_analytics_payload(tenant_slug=tenant_slug)})
     except Exception:
         app.logger.exception("Failed to build admin KOL analytics")
         return jsonify({"ok": False, "error": "kol_data_unavailable"}), 503
@@ -2089,18 +2093,6 @@ def api_admin_site_config():
             "db_runtime_switched": runtime_switched,
         }
     )
-
-
-@app.route("/api/admin/simulation-data-policy", methods=["GET", "POST"])
-def api_admin_simulation_data_policy():
-    if request.method == "GET":
-        return jsonify({"ok": True, "policy": get_simulation_data_policy()})
-    body = request.get_json(silent=True) or {}
-    try:
-        policy = save_simulation_data_visibility(bool(body.get("simulated_data_visible")))
-    except ValueError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 403
-    return jsonify({"ok": True, "policy": policy})
 
 
 @app.route("/api/admin/news-aggregation/preview", methods=["POST"])

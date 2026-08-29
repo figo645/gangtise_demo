@@ -4,7 +4,11 @@
 // ============================================================
 
 function themeVar(name, fallback) {
-  const value = getComputedStyle(document.body).getPropertyValue(name).trim();
+  const style = document.body ? getComputedStyle(document.body) : null;
+  const rawValue = style && typeof style.getPropertyValue === 'function'
+    ? style.getPropertyValue(name)
+    : '';
+  const value = String(rawValue == null ? '' : rawValue).trim();
   return value || fallback;
 }
 
@@ -31,6 +35,8 @@ const SEGMENT_COLORS = ['#4A5568', '#3182CE', '#38A169', '#C8A96E', '#FFD700'];
 
 const renderedSections = new Set();
 const chartRegistry = new Set();
+let adminFunnelKolSlug = '';
+let adminFunnelKolOptions = [];
 
 function registerChartTarget(target) {
   const key = typeof target === 'string' ? target : (target && target.id) || '';
@@ -147,6 +153,109 @@ function renderSection(section) {
 function setDateRange(btn) {
   document.querySelectorAll('.date-btn').forEach((item) => item.classList.remove('active'));
   if (btn) btn.classList.add('active');
+}
+
+function renderAdminAnalyticsKolOptions(options) {
+  const datalist = document.getElementById('admin-analytics-kol-options');
+  adminFunnelKolOptions = Array.isArray(options) ? options.filter((item) => item && item.slug) : [];
+  if (datalist) {
+    datalist.innerHTML = adminFunnelKolOptions.map((item) => {
+      const label = item.advisor || item.name || item.slug;
+      return `<option value="${escapeAttr(label)}">${escapeHtml(item.slug)}</option>`;
+    }).join('');
+  }
+  renderAdminAnalyticsKolList();
+}
+
+function renderAdminAnalyticsKolList() {
+  const list = document.getElementById('admin-analytics-kol-list');
+  if (!list) return;
+  const input = document.getElementById('admin-analytics-kol-input');
+  const query = String(input?.value || '').trim().toLowerCase();
+  const visible = adminFunnelKolOptions.filter((item) => {
+    if (!query) return true;
+    return [item.slug, item.name, item.advisor].some((value) => String(value || '').toLowerCase().includes(query));
+  });
+  list.innerHTML = visible.length
+    ? visible.map((item) => {
+      const label = item.advisor || item.name || item.slug;
+      return `<button type="button" class="admin-funnel-kol-option" role="option" onclick="selectAdminAnalyticsKol('${escapeAttr(item.slug)}')"><span>${escapeHtml(label)}</span><small>${escapeHtml(item.slug)}</small></button>`;
+    }).join('')
+    : '<div style="padding:9px;color:var(--text-sub);font-size:12px">暂无匹配的大V</div>';
+}
+
+function openAdminAnalyticsKolList() {
+  const list = document.getElementById('admin-analytics-kol-list');
+  if (!list) return;
+  renderAdminAnalyticsKolList();
+  list.classList.add('is-open');
+}
+
+function handleAdminAnalyticsKolInput(value) {
+  const list = document.getElementById('admin-analytics-kol-list');
+  if (!list) return;
+  renderAdminAnalyticsKolList();
+  list.classList.add('is-open');
+}
+
+function selectAdminAnalyticsKol(slug) {
+  const selected = adminFunnelKolOptions.find((item) => String(item.slug || '').toLowerCase() === String(slug || '').toLowerCase());
+  if (!selected) return;
+  adminFunnelKolSlug = String(selected.slug || '').trim().toLowerCase();
+  const input = document.getElementById('admin-analytics-kol-input');
+  if (input) input.value = selected.advisor || selected.name || selected.slug;
+  const list = document.getElementById('admin-analytics-kol-list');
+  if (list) list.classList.remove('is-open');
+  rerenderDashboardSection(getActiveDashSection() || 'funnel');
+}
+
+function applyAdminAnalyticsKolFilter() {
+  const input = document.getElementById('admin-analytics-kol-input');
+  const value = String(input?.value || '').trim();
+  if (!value) {
+    adminFunnelKolSlug = '';
+    if (input) input.value = '';
+    rerenderDashboardSection(getActiveDashSection() || 'funnel');
+    return;
+  }
+  const normalized = value.toLowerCase();
+  const selected = adminFunnelKolOptions.find((item) => [item.slug, item.name, item.advisor].some((candidate) => String(candidate || '').trim().toLowerCase() === normalized));
+  if (!selected) {
+    const matches = adminFunnelKolOptions.filter((item) => [item.slug, item.name, item.advisor].some((candidate) => String(candidate || '').trim().toLowerCase().includes(normalized)));
+    if (matches.length === 1) {
+      selectAdminAnalyticsKol(matches[0].slug);
+      return;
+    }
+    renderAdminAnalyticsKolList();
+    const list = document.getElementById('admin-analytics-kol-list');
+    if (list) list.classList.add('is-open');
+    return;
+  }
+  selectAdminAnalyticsKol(selected.slug);
+}
+
+function resetAdminAnalyticsKolFilter() {
+  adminFunnelKolSlug = '';
+  const input = document.getElementById('admin-analytics-kol-input');
+  if (input) input.value = '';
+  const list = document.getElementById('admin-analytics-kol-list');
+  if (list) list.classList.remove('is-open');
+  rerenderDashboardSection(getActiveDashSection() || 'funnel');
+}
+
+document.addEventListener('click', (event) => {
+  const picker = document.querySelector('.admin-funnel-kol-picker');
+  const list = document.getElementById('admin-analytics-kol-list');
+  if (picker && list && !picker.contains(event.target)) list.classList.remove('is-open');
+});
+
+function updateAdminAnalyticsScope() {
+  const scopeNode = document.getElementById('admin-analytics-scope');
+  if (!scopeNode) return;
+  const selected = adminFunnelKolOptions.find((item) => String(item.slug || '').toLowerCase() === adminFunnelKolSlug);
+  scopeNode.textContent = selected
+    ? `当前筛选：${selected.advisor || selected.name || selected.slug}。用户、渠道、付费与协同数据均按该大V统计。`
+    : '当前筛选：全部大V。用户、渠道、付费与协同数据汇总。当前页面只展示真实数据库分析结果。';
 }
 
 function makeDonutOption(labels, values, colors, extra) {
@@ -355,10 +464,13 @@ const SECTION_TITLES = {
 function fmtWan(n) { return (n / 10000).toFixed(1) + '万'; }
 
 async function renderFunnelSection() {
-  const response = await fetch('/api/admin/funnel-analytics');
+  const query = adminFunnelKolSlug ? `?tenant_slug=${encodeURIComponent(adminFunnelKolSlug)}` : '';
+  const response = await fetch(`/api/admin/funnel-analytics${query}`);
   const result = await response.json();
   if (!response.ok || !result.ok) return;
   const analytics = result.analytics || {};
+  renderAdminAnalyticsKolOptions(analytics.kol_options || []);
+  updateAdminAnalyticsScope();
   const funnelKpi = document.getElementById('funnel-kpi-cards');
   const adminKpi = document.getElementById('admin-analytics-kpis');
   const kpiMarkup = (analytics.funnel || []).slice(0, 4).map((item) => `
@@ -503,10 +615,14 @@ function renderHeatmap(data) {
 }
 
 async function renderChannelSection() {
-  const response = await fetch('/api/admin/channels');
+  const query = adminFunnelKolSlug ? `?tenant_slug=${encodeURIComponent(adminFunnelKolSlug)}` : '';
+  const response = await fetch(`/api/admin/channels${query}`);
   const result = await response.json();
   if (!response.ok || !result.ok) return;
-  const channelRows = Array.isArray((result.channels || {}).rows) ? result.channels.rows : [];
+  const channelPayload = result.channels || {};
+  renderAdminAnalyticsKolOptions(channelPayload.kol_options || []);
+  updateAdminAnalyticsScope();
+  const channelRows = Array.isArray(channelPayload.rows) ? channelPayload.rows : [];
   const kpiContainer = document.getElementById('channel-kpi-cards');
   if (kpiContainer) {
     kpiContainer.innerHTML = channelRows.map((channel) => `
@@ -572,10 +688,13 @@ async function renderChannelSection() {
 }
 
 async function renderKolSection() {
-  const response = await fetch('/api/admin/kol-analytics');
+  const query = adminFunnelKolSlug ? `?tenant_slug=${encodeURIComponent(adminFunnelKolSlug)}` : '';
+  const response = await fetch(`/api/admin/kol-analytics${query}`);
   const result = await response.json();
   if (!response.ok || !result.ok) return;
   const analytics = result.analytics || {};
+  renderAdminAnalyticsKolOptions(analytics.kol_options || []);
+  updateAdminAnalyticsScope();
   const kolRows = Array.isArray(analytics.rows) ? analytics.rows : [];
   const kpiContainer = document.getElementById('kol-kpi-cards');
   if (kpiContainer) {
@@ -676,10 +795,13 @@ async function renderKolSection() {
 }
 
 async function renderRevenueSection() {
-  const response = await fetch('/api/admin/revenue-analytics');
+  const query = adminFunnelKolSlug ? `?tenant_slug=${encodeURIComponent(adminFunnelKolSlug)}` : '';
+  const response = await fetch(`/api/admin/revenue-analytics${query}`);
   const result = await response.json();
   if (!response.ok || !result.ok) return;
   const analytics = result.analytics || {};
+  renderAdminAnalyticsKolOptions(analytics.kol_options || []);
+  updateAdminAnalyticsScope();
   const monthly = Array.isArray(analytics.monthly) ? analytics.monthly : [];
   const monthLabels = monthly.map((item) => String(item.month || '').slice(5));
   const kpiContainer = document.getElementById('revenue-kpi-cards');

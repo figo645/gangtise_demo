@@ -20,7 +20,7 @@
 <script defer src="/static/js/brand.js?v=20260825-1"></script>
 <script defer src="/static/js/release_notes.js?v=20260818-1"></script>
 <script src="/static/echarts.min.js"></script>
-<script src="/static/js/echarts_helpers.js?v=20260817-1"></script>
+<script src="/static/js/echarts_helpers.js?v=20260828-2"></script>
 <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
 <style>
 /* ===== BASE ===== */
@@ -13082,13 +13082,13 @@ function replaceWatchlistAnnotations(tenantId, stockCode, items) {
 
 function getActiveWatchlistTenantSlug() {
   const user = getActiveDemoUser();
-  return (((user || {}).tenant || {}).slug || '').trim().toLowerCase();
+  return String((((user || {}).tenant || {}).slug) || '').trim().toLowerCase();
 }
 
 function getActiveWatchlistUserPayload() {
   const user = getActiveDemoUser() || {};
   return {
-    tenant_slug: (((user || {}).tenant || {}).slug || '').trim().toLowerCase(),
+    tenant_slug: String((((user || {}).tenant || {}).slug) || '').trim().toLowerCase(),
     user_role: String(user.role || '').trim().toLowerCase(),
     user_profile_id: String(user.username || user.id || '').trim(),
     user_name: String(user.advisor_name || user.username || '').trim(),
@@ -15179,7 +15179,7 @@ function isHermesThinkingEnabled() {
 
 function getHermesSessionStorageKey() {
   const activeUser = getActiveDemoUser() || {};
-  const tenantSlug = (((activeUser || {}).tenant || {}).slug || 'default').toLowerCase();
+  const tenantSlug = String((((activeUser || {}).tenant || {}).slug) || 'default').trim().toLowerCase() || 'default';
   const profileId = String(activeUser.username || activeUser.name || activeUser.role || 'guest').trim().toLowerCase() || 'guest';
   return `gangtise_demo_hermes_session:${tenantSlug}:${profileId}`;
 }
@@ -15194,7 +15194,7 @@ function getHermesSessionCacheStorageKey(sessionId) {
 
 function getHermesSessionActorKey() {
   const activeUser = getActiveDemoUser() || {};
-  const tenantSlug = (((activeUser || {}).tenant || {}).slug || 'default').toLowerCase();
+  const tenantSlug = String((((activeUser || {}).tenant || {}).slug) || 'default').trim().toLowerCase() || 'default';
   const profileId = String(activeUser.username || activeUser.name || activeUser.role || 'guest').trim().toLowerCase() || 'guest';
   return `${tenantSlug}:${profileId}`;
 }
@@ -16565,11 +16565,40 @@ function buildHermesIndicatorDistributionSvg(values) {
 
 function normalizeHermesArtifact(artifact, fallbackQuestion) {
   const payload = artifact && typeof artifact === 'object' ? artifact : {};
-  const type = payload.type || 'text_response';
+  const text = (value, fallback = '') => String(value == null ? fallback : value).trim();
+  const listText = (value) => (Array.isArray(value) ? value : [])
+    .map((item) => text(item))
+    .filter(Boolean);
+  const normalizeSymbol = (value, defaults = {}) => {
+    const source = value && typeof value === 'object' ? value : {};
+    return {
+      name: text(source.name, defaults.name || ''),
+      code: text(source.code, defaults.code || ''),
+      market: text(source.market, defaults.market || ''),
+      industry: text(source.industry, defaults.industry || ''),
+    };
+  };
+  const normalizeMetrics = (value) => (Array.isArray(value) ? value : []).map((item) => {
+    const metric = item && typeof item === 'object' ? item : {};
+    return {
+      label: text(metric.label),
+      value: text(metric.value),
+      note: text(metric.note),
+    };
+  });
+  const normalizeSections = (value) => (Array.isArray(value) ? value : []).map((item) => {
+    const section = item && typeof item === 'object' ? item : {};
+    return { title: text(section.title), body: text(section.body) };
+  }).filter((item) => item.title || item.body);
+  const normalizeKnowledge = (value) => (Array.isArray(value) ? value : []).map((item) => {
+    const knowledge = item && typeof item === 'object' ? item : {};
+    return { title: text(knowledge.title), summary: text(knowledge.summary) };
+  }).filter((item) => item.title || item.summary);
+  const type = text(payload.type, 'text_response') || 'text_response';
   if (type === 'watchlist_analysis') {
     const symbol = payload.symbol && typeof payload.symbol === 'object' ? payload.symbol : {};
     const rawChart = payload.chart && typeof payload.chart === 'object' ? payload.chart : {};
-    let rawChartHtml = String(payload.chartHtml || payload.chart_html || '').trim();
+    let rawChartHtml = text(payload.chartHtml || payload.chart_html);
     if (!rawChartHtml) {
       if (rawChart.kind === 'kline') {
         rawChartHtml = buildHermesWatchlistKlineSvg(rawChart.points || []);
@@ -16581,29 +16610,24 @@ function normalizeHermesArtifact(artifact, fallbackQuestion) {
     }
     return {
       type,
-      question: payload.question || fallbackQuestion || '',
-      title: payload.title || '结构化分析',
-      headline: payload.headline || '已生成结构化结果',
-      summary: payload.summary || '',
-      body: payload.body || '',
-      symbol: {
-        name: symbol.name || '对话主题',
-        code: symbol.code || 'Chat',
-        market: symbol.market || '',
-        industry: symbol.industry || '',
-      },
-      confidence: payload.confidence || '中',
-      metrics: Array.isArray(payload.metrics) ? payload.metrics : [],
-      judgement: Array.isArray(payload.judgement) ? payload.judgement : [],
-      nextSteps: Array.isArray(payload.next_steps) ? payload.next_steps : [],
-      leadConclusion: payload.lead_conclusion || '',
-      analysisSections: Array.isArray(payload.analysis_sections) ? payload.analysis_sections : [],
-      citations: Array.isArray(payload.citations) ? payload.citations : [],
-      knowledge: Array.isArray(payload.knowledge) ? payload.knowledge : [],
+      question: text(payload.question, fallbackQuestion),
+      title: text(payload.title, '结构化分析') || '结构化分析',
+      headline: text(payload.headline, '已生成结构化结果') || '已生成结构化结果',
+      summary: text(payload.summary),
+      body: text(payload.body),
+      symbol: normalizeSymbol(symbol, { name: '对话主题', code: 'Chat' }),
+      confidence: text(payload.confidence, '中') || '中',
+      metrics: normalizeMetrics(payload.metrics),
+      judgement: listText(payload.judgement),
+      nextSteps: listText(payload.next_steps),
+      leadConclusion: text(payload.lead_conclusion),
+      analysisSections: normalizeSections(payload.analysis_sections),
+      citations: listText(payload.citations),
+      knowledge: normalizeKnowledge(payload.knowledge),
       chart: rawChart,
       chart_html: rawChartHtml,
       chartHtml: rawChartHtml,
-      footer: payload.footer || '',
+      footer: text(payload.footer),
     };
   }
   if (type === 'indicator_analysis') {
@@ -16619,42 +16643,69 @@ function normalizeHermesArtifact(artifact, fallbackQuestion) {
     }
     return {
       type,
-      question: payload.question || fallbackQuestion || '',
-      title: payload.title || '指标趋势分析',
-      headline: payload.headline || '已生成指标分析',
-      summary: payload.summary || '',
-      body: payload.body || '',
-      symbol: {
-        name: symbol.name || '指标',
-        code: symbol.code || '',
-        market: symbol.market || '',
-        industry: symbol.industry || '',
-      },
-      confidence: payload.confidence || '中',
-      metrics: Array.isArray(payload.metrics) ? payload.metrics : [],
-      judgement: Array.isArray(payload.judgement) ? payload.judgement : [],
-      nextSteps: Array.isArray(payload.next_steps) ? payload.next_steps : [],
-      citations: Array.isArray(payload.citations) ? payload.citations : [],
-      knowledge: Array.isArray(payload.knowledge) ? payload.knowledge : [],
+      question: text(payload.question, fallbackQuestion),
+      title: text(payload.title, '指标趋势分析') || '指标趋势分析',
+      headline: text(payload.headline, '已生成指标分析') || '已生成指标分析',
+      summary: text(payload.summary),
+      body: text(payload.body),
+      symbol: normalizeSymbol(symbol, { name: '指标' }),
+      confidence: text(payload.confidence, '中') || '中',
+      metrics: normalizeMetrics(payload.metrics),
+      judgement: listText(payload.judgement),
+      nextSteps: listText(payload.next_steps),
+      citations: listText(payload.citations),
+      knowledge: normalizeKnowledge(payload.knowledge),
       chart,
       chart_html: chartHtml,
       chartHtml,
-      footer: payload.footer || '',
+      footer: text(payload.footer),
     };
   }
   return {
     type: 'text_response',
-    question: payload.question || fallbackQuestion || '',
-    title: payload.title || 'Hermes 对话',
-    headline: payload.headline || '',
-    summary: payload.summary || '',
-    body: payload.body || '',
-    bullets: Array.isArray(payload.bullets) ? payload.bullets : [],
-    followups: Array.isArray(payload.followups) ? payload.followups : [],
-    citations: Array.isArray(payload.citations) ? payload.citations : [],
-    knowledge: Array.isArray(payload.knowledge) ? payload.knowledge : [],
-    footer: payload.footer || '',
+    question: text(payload.question, fallbackQuestion),
+    title: text(payload.title, 'Hermes 对话') || 'Hermes 对话',
+    headline: text(payload.headline),
+    summary: text(payload.summary),
+    body: text(payload.body),
+    bullets: listText(payload.bullets),
+    followups: listText(payload.followups),
+    citations: listText(payload.citations),
+    knowledge: normalizeKnowledge(payload.knowledge),
+    footer: text(payload.footer),
   };
+}
+
+function normalizeHermesDisplayText(value) {
+  return String(value == null ? '' : value).trim();
+}
+
+function describeHermesPresentationError(error) {
+  const message = normalizeHermesDisplayText(error && error.message);
+  if (message.includes("reading 'trim'")) return '页面展示模块读取样式配置异常';
+  return '页面展示模块异常';
+}
+
+function renderHermesRawAnswerFallback(answer, title, presentationError) {
+  const host = document.getElementById('hermes-chat-thread');
+  if (!host) return;
+  const text = normalizeHermesDisplayText(answer);
+  const diagnostic = normalizeHermesDisplayText(presentationError);
+  const entries = host.querySelectorAll('.hermes-transcript-entry');
+  const lastEntry = entries.length ? entries[entries.length - 1] : null;
+  if (lastEntry && lastEntry.classList.contains('assistant') && lastEntry.querySelector('.hermes-thinking-disclosure')) {
+    lastEntry.remove();
+  }
+  const fallback = document.createElement('div');
+  fallback.className = 'hermes-transcript-entry assistant';
+  fallback.innerHTML = `
+    <div class="hermes-transcript-kicker">Hermes</div>
+    <div class="hermes-transcript-text">${escapeHtml(title || '研究结果')}</div>
+    <div class="hermes-text-article"><div class="hermes-text-paragraph" style="white-space:pre-wrap">${escapeHtml(text || '本轮已获得结果，但页面未能完成格式化展示。')}</div></div>
+    ${diagnostic ? `<div class="hermes-transcript-meta">${escapeHtml(diagnostic)}，已保留上游原始结果。</div>` : ''}
+  `;
+  host.appendChild(fallback);
+  host.classList.remove('is-empty');
 }
 
 function buildHermesTraceThoughts(agentTrace) {
@@ -16739,7 +16790,7 @@ function renderHermesReadableText(text) {
     .replace(/([^\n])\s+(#{1,6}\s+)/g, '$1\n$2')
     .replace(/([^\n])\s+(-\s+)/g, '$1\n$2')
     .replace(/([^\n])\s+(\d+[\.、]\s+)/g, '$1\n$2');
-  const lines = normalized.split('\n').map(line => line.trim());
+  const lines = normalized.split('\n').map(line => String(line == null ? '' : line).trim());
   const blocks = [];
   let paragraph = [];
   let listType = '';
@@ -16768,7 +16819,7 @@ function renderHermesReadableText(text) {
       return;
     }
     const tableCells = current.startsWith('|') && current.endsWith('|')
-      ? current.slice(1, -1).split('|').map(cell => cell.trim())
+      ? current.slice(1, -1).split('|').map(cell => String(cell == null ? '' : cell).trim())
       : [];
     const isTableDivider = tableCells.length && tableCells.every(cell => /^:?-{3,}:?$/.test(cell));
     if (tableCells.length) {
@@ -16784,7 +16835,7 @@ function renderHermesReadableText(text) {
     if (headingMatch) {
       flushParagraph();
       flushList();
-      blocks.push({ type: 'heading', content: headingMatch[2].trim() });
+      blocks.push({ type: 'heading', content: String(headingMatch[2] == null ? '' : headingMatch[2]).trim() });
       return;
     }
     if (orderedMatch || bulletMatch) {
@@ -16792,7 +16843,7 @@ function renderHermesReadableText(text) {
       const isOrdered = !!orderedMatch;
       if (listType && listType !== (isOrdered ? 'ordered' : 'bullet')) flushList();
       listType = isOrdered ? 'ordered' : 'bullet';
-      listItems.push((orderedMatch || bulletMatch)[2].trim());
+      listItems.push(String((orderedMatch || bulletMatch)[2] == null ? '' : (orderedMatch || bulletMatch)[2]).trim());
       return;
     }
     if (listItems.length) flushList();
@@ -16947,7 +16998,24 @@ function renderHermesThread() {
     syncHermesLoadingTicker();
     return;
   }
-  const html = hermesConversation.map(entry => {
+  const html = hermesConversation.map((entry, index) => {
+    try {
+      return renderHermesThreadEntry(entry);
+    } catch (error) {
+      console.error('Hermes entry render failed', { index, entry, error });
+      return renderHermesEntryFallback(entry, error, index);
+    }
+  }).join('');
+  hosts.forEach(host => {
+    host.innerHTML = html;
+    host.classList.remove('is-empty');
+    if (window.GangtiseEcharts) window.GangtiseEcharts.flush(host);
+  });
+  syncHermesLoadingTicker();
+}
+
+function renderHermesThreadEntry(entry) {
+    entry = entry && typeof entry === 'object' ? entry : {};
     if (entry.type === 'user') {
       const meta = buildHermesMetaLine([
         entry.stockCode || '',
@@ -16989,13 +17057,25 @@ function renderHermesThread() {
         ${renderHermesKnowledgeAction(entry.id)}
       </div>
     `;
-  }).join('');
-  hosts.forEach(host => {
-    host.innerHTML = html;
-    host.classList.remove('is-empty');
-    if (window.GangtiseEcharts) window.GangtiseEcharts.flush(host);
-  });
-  syncHermesLoadingTicker();
+}
+
+function renderHermesEntryFallback(entry, error, index) {
+  const payload = entry && typeof entry === 'object' ? entry : {};
+  const question = normalizeHermesDisplayText(payload.question || payload.text);
+  const artifact = payload.artifact || payload.result;
+  const rawAnswer = artifact && typeof artifact === 'object'
+    ? (artifact.body || artifact.summary || artifact.headline)
+    : artifact;
+  const answer = normalizeHermesDisplayText(rawAnswer);
+  return `
+    <div class="hermes-transcript-entry assistant">
+      <div class="hermes-transcript-kicker">Hermes</div>
+      <div class="hermes-transcript-text">页面展示异常，已保留原始结果</div>
+      ${question ? `<div class="hermes-transcript-meta">问题：${escapeHtml(question)}</div>` : ''}
+      <div class="hermes-text-article"><div class="hermes-text-paragraph" style="white-space:pre-wrap">${escapeHtml(answer || '该条历史结果无法格式化展示。')}</div></div>
+      <div class="hermes-transcript-meta">第 ${Number(index || 0) + 1} 条内容展示失败，未影响其他会话内容。</div>
+    </div>
+  `;
 }
 
 function renderHermesAnalysisCards(artifact, agentTrace) {
@@ -17138,6 +17218,9 @@ async function runHermesAnalysis(options) {
     showToast('请先输入你想让 Hermes 回答的问题');
     return;
   }
+  let responseApplied = false;
+  let completedAnswer = '';
+  let completedTitle = '研究结果';
   const rawCode = getHermesActiveStockCode();
   let stockCode = findWatchlistCodeFromInput(rawCode);
   if (!stockCode) {
@@ -17145,6 +17228,12 @@ async function runHermesAnalysis(options) {
   }
   if (stockCode) fillHermesStockCode(stockCode);
   const sessionId = ensureHermesSessionId();
+  // Freeze the request before clearing the composer. The UI state is cleared
+  // immediately for responsiveness, but the API must receive this turn.
+  const messagesSnapshot = buildHermesMessagesPayload();
+  if (!messagesSnapshot.some((item) => item.role === 'user' && item.content === question)) {
+    messagesSnapshot.push({ role: 'user', content: question });
+  }
   hermesConversation.push({
     id: createHermesEntryId('user'),
     type: 'user',
@@ -17175,17 +17264,29 @@ async function runHermesAnalysis(options) {
         entry_point: options.fromWatchlist ? 'watchlist_detail' : 'hermes_chat',
         session_id: sessionId,
         question,
-        messages: buildHermesMessagesPayload(),
+        messages: messagesSnapshot,
         selected_knowledge_ids: hermesScopedKnowledgeId ? [hermesScopedKnowledgeId] : [],
         attachments: hermesUploadedFiles.slice(0),
         preferred_mode: hermesSelectedSkill || 'basic',
         web_answer: false,
       }),
     });
-    const data = await resp.json();
+    const responseText = await resp.text();
+    let data = {};
+    try {
+      data = responseText ? JSON.parse(responseText) : {};
+    } catch (parseError) {
+      throw new Error(`hermes_http_${resp.status}_invalid_json`);
+    }
     if (!resp.ok || data.ok === false) {
       throw new Error((data && data.error) || 'hermes_query_failed');
     }
+    // HTTP 200 with ok=true means the upstream answer is already obtained.
+    // Mark it before any optional client-side normalization or rendering so a
+    // UI-only exception cannot turn a successful research call into a model error.
+    responseApplied = true;
+    completedAnswer = normalizeHermesDisplayText(data.answer || '');
+    completedTitle = normalizeHermesDisplayText(data.capability_label || '研究结果');
     const artifact = Array.isArray(data.artifacts) && data.artifacts.length
       ? data.artifacts[0]
       : {
@@ -17202,6 +17303,8 @@ async function runHermesAnalysis(options) {
           footer: (data.router && data.router.reason) ? `路由：${data.router.reason}` : '',
         };
     const normalizedArtifact = normalizeHermesArtifact(artifact, question);
+    completedAnswer = normalizeHermesDisplayText(normalizedArtifact.body || data.answer || '');
+    completedTitle = normalizeHermesDisplayText(normalizedArtifact.headline || normalizedArtifact.title || data.capability_label || '研究结果');
     const displayMode = data.display_mode === 'structured' && ['watchlist_analysis', 'indicator_analysis'].includes(normalizedArtifact.type)
       ? 'structured'
       : 'text';
@@ -17217,15 +17320,69 @@ async function runHermesAnalysis(options) {
       capabilityLabel: data.capability_label || data.intent || skill.label,
       intentLabel: data.intent || '',
     });
-    syncHermesSessionCache({ skipEmpty: false });
-    loadHermesSessionList({ force: true, silent: true }).catch(() => {});
-    await refreshHermesCredits({ silent: true });
-    renderHermesWorkspace();
+    try {
+      syncHermesSessionCache({ skipEmpty: false });
+      loadHermesSessionList({ force: true, silent: true }).catch((error) => {
+        console.error('Hermes session refresh failed after a successful answer', error);
+      });
+      await refreshHermesCredits({ silent: true });
+      renderHermesWorkspace();
+    } catch (renderError) {
+      // A presentation error must never discard a successfully returned
+      // Gangtise/LLM answer or incorrectly report it as a model failure.
+      console.error('Hermes answer presentation failed after a successful API response', renderError);
+      const presentationError = describeHermesPresentationError(renderError);
+      try {
+        renderHermesRawAnswerFallback(completedAnswer, completedTitle, presentationError);
+      } catch (fallbackError) {
+        console.error('Hermes raw answer fallback failed', fallbackError);
+      }
+      showToast(`${presentationError}，研究结果已生成并保留原始内容。`);
+      return;
+    }
     if (options.fromWatchlist && getActiveDemoUser().role === 'investor') {
       showToast(`已按 ${getActiveDemoUser().tenant.advisor} 视角生成个股分析`);
     }
   } catch (e) {
-    hermesConversation.pop();
+    if (responseApplied) {
+      console.error('Hermes completed response encountered a post-processing error', e);
+      const presentationError = describeHermesPresentationError(e);
+      if (hermesConversation.length && hermesConversation[hermesConversation.length - 1].type === 'loading') {
+        hermesConversation.pop();
+        hermesConversation.push({
+          id: createHermesEntryId('ai'),
+          type: 'ai',
+          question,
+          result: {
+            type: 'text_response',
+            question,
+            title: completedTitle || '研究结果',
+            headline: completedTitle || '研究结果',
+            summary: '',
+            body: completedAnswer,
+            bullets: [],
+            followups: [],
+            citations: [],
+            knowledge: [],
+            footer: '已保留上游返回的原始研究内容。',
+          },
+          displayMode: 'text',
+          capabilityLabel: '研究结果',
+          intentLabel: '',
+        });
+        try {
+          syncHermesSessionCache({ skipEmpty: false });
+        } catch (cacheError) {
+          console.error('Hermes session cache failed after a successful answer', cacheError);
+        }
+      }
+      renderHermesRawAnswerFallback(completedAnswer, completedTitle, presentationError);
+      showToast(`${presentationError}，研究结果已生成并保留原始内容。`);
+      return;
+    }
+    if (hermesConversation.length && hermesConversation[hermesConversation.length - 1].type === 'loading') {
+      hermesConversation.pop();
+    }
     const rawError = (e && e.message) || 'hermes_query_failed';
     const friendlyError = rawError === 'hermes_investor_access_disabled'
       ? '当前租户尚未向普通用户开放 Hermes'
@@ -17344,8 +17501,8 @@ function renderHermesSkillModal() {
 function saveHermesCustomSkill() {
   const titleInput = document.getElementById('hermes-skill-title-input');
   const promptInput = document.getElementById('hermes-skill-prompt-input');
-  const title = titleInput ? titleInput.value.trim() : '';
-  const prompt = promptInput ? promptInput.value.trim() : '';
+  const title = titleInput ? String(titleInput.value || '').trim() : '';
+  const prompt = promptInput ? String(promptInput.value || '').trim() : '';
   if (!title) {
     showToast('请先输入 skill 名称');
     return;

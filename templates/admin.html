@@ -17,7 +17,7 @@
 <script defer src="/static/js/brand.js?v=20260825-1"></script>
 <script defer src="/static/js/release_notes.js?v=20260818-1"></script>
 <script src="/static/echarts.min.js"></script>
-<script src="/static/js/echarts_helpers.js?v=20260808-2"></script>
+<script src="/static/js/echarts_helpers.js?v=20260828-2"></script>
 <style>
   .toggle-wrap { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
   .toggle-label { font-size:13px; color:var(--text-sub); flex:1; }
@@ -59,6 +59,26 @@
   .config-field input:focus,
   .config-field select:focus,
   .config-field textarea:focus { outline:none; border-color:rgba(200,169,110,0.5); }
+  .admin-funnel-kol-picker { position:relative; width:280px; }
+  .admin-funnel-kol-picker-actions { display:flex; gap:6px; align-items:center; }
+  .admin-funnel-kol-picker-actions input {
+    flex:1; min-width:0; width:100%; box-sizing:border-box; background:var(--surface);
+    border:1px solid rgba(200,169,110,0.2); border-radius:8px; padding:8px 10px;
+    color:var(--text-main); font-size:13px;
+  }
+  .admin-funnel-kol-picker-actions input:focus { outline:none; border-color:rgba(200,169,110,0.5); }
+  .admin-funnel-kol-list {
+    display:none; position:absolute; z-index:30; top:calc(100% + 6px); left:0; right:0;
+    max-height:260px; overflow:auto; padding:5px; border:1px solid rgba(200,169,110,0.28);
+    border-radius:6px; background:var(--surface-2, #172638); box-shadow:0 12px 28px rgba(0,0,0,0.24);
+  }
+  .admin-funnel-kol-list.is-open { display:grid; gap:2px; }
+  .admin-funnel-kol-option {
+    display:flex; justify-content:space-between; gap:8px; width:100%; padding:8px 9px;
+    border:0; border-radius:4px; background:transparent; color:var(--text-main); text-align:left; cursor:pointer;
+  }
+  .admin-funnel-kol-option:hover, .admin-funnel-kol-option:focus { background:rgba(200,169,110,0.14); outline:none; }
+  .admin-funnel-kol-option small { color:var(--text-sub); white-space:nowrap; }
   .keyword-cloud { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
   .keyword-tag { background:rgba(220,50,50,0.12); border:1px solid rgba(220,50,50,0.3); color:#ff7070; border-radius:20px; padding:4px 12px; font-size:12px; cursor:pointer; }
   .keyword-tag:hover { background:rgba(220,50,50,0.2); }
@@ -1302,139 +1322,105 @@
     box-shadow:0 0 0 3px rgba(47,116,192,0.14);
   }
   #section-agent-workflows .workflow-stage {
-    min-height:0;
+    min-height:760px;
     background:
       linear-gradient(180deg, rgba(47,116,192,0.03), rgba(47,116,192,0.01)),
       var(--surface-2);
   }
   #section-agent-workflows .workflow-stage-viewport {
-    min-height:0;
-    width:100% !important;
-    height:auto !important;
-    padding:22px 20px 26px;
-    box-sizing:border-box;
+    min-height:760px;
+    padding:0;
   }
   #section-agent-workflows .workflow-edge-layer {
-    display:none;
+    display:block;
   }
   #section-agent-workflows .workflow-board {
-    position:static;
-    min-height:0;
-    width:100% !important;
-    height:auto !important;
-  }
-  .agent-workflow-flow {
-    width:min(720px, 100%);
-    margin:0 auto;
-    display:flex;
-    flex-direction:column;
-    gap:10px;
-  }
-  .agent-workflow-flow-step {
-    display:grid;
-    grid-template-columns:42px minmax(0, 1fr);
-    gap:10px;
-    align-items:start;
-  }
-  .agent-workflow-flow-rail {
     position:relative;
-    display:flex;
-    justify-content:center;
-    min-height:100%;
+    min-height:760px;
   }
-  .agent-workflow-flow-rail::after {
-    content:"";
-    position:absolute;
-    top:34px;
-    bottom:-10px;
-    left:50%;
-    width:2px;
-    transform:translateX(-50%);
-    background:linear-gradient(180deg, rgba(47,116,192,0.28), rgba(200,169,110,0.22));
-  }
-  .agent-workflow-flow-step.is-last .agent-workflow-flow-rail::after {
-    display:none;
-  }
-  .agent-workflow-flow-index {
-    width:24px;
-    height:24px;
-    border-radius:50%;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-size:10px;
-    font-weight:700;
-    color:#1F497D;
-    background:linear-gradient(180deg, rgba(255,255,255,0.96), rgba(240,246,252,0.96));
-    border:1px solid rgba(47,116,192,0.18);
-    box-shadow:0 6px 14px rgba(14,33,55,0.08);
-    position:relative;
-    z-index:1;
-  }
-  body.theme-dark .agent-workflow-flow-index {
-    color:#DDE9F7;
-    background:linear-gradient(180deg, rgba(19,35,58,0.96), rgba(14,28,48,0.96));
-  }
-  .agent-workflow-flow-card {
-    border:1px solid rgba(200,169,110,0.12);
-    border-radius:14px;
-    background:linear-gradient(180deg, rgba(255,255,255,0.92), rgba(249,251,254,0.96));
-    box-shadow:0 10px 24px rgba(14,33,55,0.05);
-    padding:10px 12px;
+  .agent-workflow-node {
+    height:118px;
+    box-sizing:border-box;
     cursor:pointer;
-    transition:border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
   }
-  body.theme-dark .agent-workflow-flow-card {
-    background:linear-gradient(180deg, rgba(17,31,49,0.96), rgba(13,25,42,0.98));
+  .agent-workflow-node.is-visual-only {
+    border-style:dashed;
+    background:color-mix(in srgb, var(--surface) 92%, rgba(47,116,192,0.08));
   }
-  .agent-workflow-flow-card:hover {
-    border-color:rgba(47,116,192,0.28);
-    transform:translateY(-1px);
-  }
-  .agent-workflow-flow-card.is-selected {
-    border-color:rgba(200,169,110,0.32);
-    box-shadow:0 14px 28px rgba(47,116,192,0.10);
-  }
-  .agent-workflow-flow-head {
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    gap:10px;
-  }
-  .agent-workflow-flow-step-label {
+  .agent-workflow-node-copy {
+    margin-top:8px;
     font-size:10px;
-    letter-spacing:0.04em;
-    text-transform:uppercase;
+    line-height:1.55;
     color:var(--text-sub);
+    display:-webkit-box;
+    -webkit-box-orient:vertical;
+    -webkit-line-clamp:2;
+    overflow:hidden;
   }
-  .agent-workflow-flow-title {
-    margin-top:2px;
-    font-size:13px;
-    line-height:1.25;
+  .agent-workflow-node .workflow-node-type.is-visual {
+    color:var(--text-sub);
+    border-style:dashed;
+  }
+  .agent-workflow-edge-label {
+    fill:var(--text-main);
+    font-family:inherit;
+    font-size:11px;
     font-weight:700;
-    color:var(--text-main);
+    paint-order:stroke;
+    stroke:var(--surface-2);
+    stroke-width:5px;
+    stroke-linejoin:round;
   }
-  .agent-workflow-flow-pill {
-    display:inline-flex;
-    align-items:center;
-    gap:6px;
-    padding:4px 8px;
-    border-radius:999px;
-    font-size:10px;
-    color:var(--text-main);
-    background:rgba(47,116,192,0.08);
-    border:1px solid rgba(47,116,192,0.12);
+  .agent-workflow-edge-condition {
+    fill:var(--text-sub);
+    font-family:inherit;
+    font-size:9px;
+    paint-order:stroke;
+    stroke:var(--surface-2);
+    stroke-width:4px;
+    stroke-linejoin:round;
   }
-  .agent-workflow-flow-pill.is-gold {
+  .agent-workflow-scenario-list {
+    display:grid;
+    gap:7px;
+    margin-top:10px;
+  }
+  .agent-workflow-scenario-item {
+    width:100%;
+    display:grid;
+    grid-template-columns:24px minmax(0, 1fr);
+    gap:9px;
+    align-items:start;
+    padding:9px 10px;
+    border:1px solid var(--border-soft);
+    border-radius:8px;
+    background:var(--surface-2);
+    color:var(--text-main);
+    text-align:left;
+    font:inherit;
+    cursor:pointer;
+  }
+  .agent-workflow-scenario-item:hover,
+  .agent-workflow-scenario-item.is-active {
+    border-color:rgba(200,169,110,0.52);
+    background:rgba(200,169,110,0.08);
+  }
+  .agent-workflow-scenario-index {
     color:var(--gold);
-    background:rgba(200,169,110,0.10);
-    border-color:rgba(200,169,110,0.18);
+    font-size:11px;
+    font-weight:700;
+    line-height:20px;
   }
-  .agent-workflow-flow-mini {
-    margin-top:6px;
-    font-size:10px;
-    line-height:1.5;
+  .agent-workflow-scenario-title {
+    font-size:11px;
+    font-weight:700;
+    line-height:1.35;
+  }
+  .agent-workflow-scenario-route {
+    margin-top:3px;
     color:var(--text-sub);
+    font-size:10px;
+    line-height:1.45;
   }
   .workflow-tool-button {
     padding:6px 10px !important;
@@ -4285,13 +4271,20 @@
           <div class="table-header" style="padding:0;border:0">
             <div>
               <div class="table-title">数据分析</div>
-              <div class="chart-subtitle" style="margin:6px 0 0">全平台用户、渠道、付费与大V协同数据汇总。当前页面只展示真实数据库分析结果。</div>
+              <div class="chart-subtitle" style="margin:6px 0 0" id="admin-analytics-scope">全平台用户、渠道、付费与大V协同数据汇总。当前页面只展示真实数据库分析结果。</div>
             </div>
             <span class="tag tag-gold">Platform Analytics</span>
           </div>
           <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-top:16px">
             <div style="font-size:12px;color:var(--text-sub)" id="topbar-title">多渠道多圈层转化分析</div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <div class="admin-funnel-kol-picker">
+                <div class="admin-funnel-kol-picker-actions">
+                  <input id="admin-analytics-kol-input" type="text" list="admin-analytics-kol-options" placeholder="输入大V名称筛选，留空为全部" autocomplete="off" onchange="applyAdminAnalyticsKolFilter()" onfocus="openAdminAnalyticsKolList()" oninput="handleAdminAnalyticsKolInput(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();applyAdminAnalyticsKolFilter();}">
+                </div>
+                <datalist id="admin-analytics-kol-options"></datalist>
+                <div id="admin-analytics-kol-list" class="admin-funnel-kol-list" role="listbox" aria-label="大V候选列表"></div>
+              </div>
               <div class="date-filter">
                 <button class="date-btn" onclick="setDateRange(this,'7d')">7天</button>
                 <button class="date-btn active" onclick="setDateRange(this,'30d')">30天</button>
@@ -4802,13 +4795,6 @@
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">消息/私信</div><div class="feature-toggle-desc">位置：H5 消息页与大V粉丝会话。控制粉丝与所属大V的私信会话、系统消息和消息通知入口。</div></div><label class="toggle"><input id="feature-dm" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">粉丝与大V互动</div><div class="feature-toggle-desc">位置：H5 消息与自选股互动场景。控制粉丝对所属大V发起互动、反馈与回复的能力。</div></div><label class="toggle"><input id="feature-fan_interaction" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">自选股粉丝互评</div><div class="feature-toggle-desc">位置：自选股详情评论区。开启后粉丝可查看其他粉丝评论；关闭后粉丝只能看到大V评论和自己的评论，大V仍可查看租户全部评论。</div></div><label class="toggle"><input id="feature-watchlist_fan_comment_interaction" type="checkbox"><span class="toggle-slider"></span></label></div>
-                      <div class="toggle-wrap">
-                        <div class="toggle-label">
-                          <div class="feature-toggle-title">显示开发数据</div>
-                          <div class="feature-toggle-desc" id="simulation-data-policy-status">开发环境写入的数据会标记为“本机模拟数据”。生产默认隐藏；仅平台管理员可临时开启查看。</div>
-                        </div>
-                        <label class="toggle"><input id="simulation-data-visible" type="checkbox" onchange="saveSimulationDataVisibility(this.checked)"><span class="toggle-slider"></span></label>
-                      </div>
                       <div class="toggle-wrap">
                         <div class="toggle-label">
                           <div style="font-size:12px;color:var(--text-main);font-weight:600;margin-bottom:4px">微信环境受限测试</div>
@@ -5835,7 +5821,7 @@
     <div id="admin-tenant-dashboard-modal-content"></div>
   </div>
 </div>
-<script src="/static/js/charts.js"></script>
+<script src="/static/js/charts.js?v=20260828-2"></script>
 <script>
 const sectionTitles = {
   overview:'运营概览', users:'用户列表', segments:'用户分层', points:'积分管理',
@@ -9602,38 +9588,59 @@ function renderAgentWorkflowDirectory() {
   if (stats) stats.textContent = `${workflows.length} 个智能体工作流`;
 }
 
-function buildAgentWorkflowVerticalOrder(nodes, edges) {
+function buildAgentWorkflowTopDownLayout(nodes, edges) {
   const nodeList = Array.isArray(nodes) ? nodes : [];
-  const edgeList = Array.isArray(edges) ? edges : [];
   const nodeMap = new Map(nodeList.map((item) => [item.id, item]));
-  const inboundCount = new Map();
-  const adjacency = new Map();
-  nodeList.forEach((item) => {
-    inboundCount.set(item.id, 0);
-    adjacency.set(item.id, []);
-  });
-  edgeList.forEach((edge) => {
+  const incoming = new Map(nodeList.map((item) => [item.id, 0]));
+  const outgoing = new Map(nodeList.map((item) => [item.id, []]));
+  const depth = new Map(nodeList.map((item) => [item.id, 0]));
+  (Array.isArray(edges) ? edges : []).forEach((edge) => {
     if (!nodeMap.has(edge.from) || !nodeMap.has(edge.to)) return;
-    inboundCount.set(edge.to, Number(inboundCount.get(edge.to) || 0) + 1);
-    adjacency.get(edge.from).push(edge.to);
+    incoming.set(edge.to, Number(incoming.get(edge.to) || 0) + 1);
+    outgoing.get(edge.from).push(edge.to);
   });
-  const queue = nodeList.filter((item) => Number(inboundCount.get(item.id) || 0) === 0).map((item) => item.id);
+  const queue = nodeList.filter((item) => Number(incoming.get(item.id) || 0) === 0).map((item) => item.id);
   const orderedIds = [];
   while (queue.length) {
-    const nextId = queue.shift();
-    if (!nextId || orderedIds.includes(nextId)) continue;
-    orderedIds.push(nextId);
-    (adjacency.get(nextId) || []).forEach((targetId) => {
-      inboundCount.set(targetId, Number(inboundCount.get(targetId) || 0) - 1);
-      if (Number(inboundCount.get(targetId) || 0) <= 0) {
-        queue.push(targetId);
-      }
+    const current = queue.shift();
+    orderedIds.push(current);
+    (outgoing.get(current) || []).forEach((target) => {
+      depth.set(target, Math.max(Number(depth.get(target) || 0), Number(depth.get(current) || 0) + 1));
+      incoming.set(target, Number(incoming.get(target) || 0) - 1);
+      if (Number(incoming.get(target) || 0) === 0) queue.push(target);
     });
   }
   nodeList.forEach((item) => {
     if (!orderedIds.includes(item.id)) orderedIds.push(item.id);
   });
-  return orderedIds.map((id) => nodeMap.get(id)).filter(Boolean);
+  const layers = new Map();
+  orderedIds.forEach((nodeId) => {
+    const level = Number(depth.get(nodeId) || 0);
+    if (!layers.has(level)) layers.set(level, []);
+    layers.get(level).push(nodeMap.get(nodeId));
+  });
+  const nodeWidth = 220;
+  const nodeHeight = 118;
+  const horizontalGap = 44;
+  const verticalGap = 86;
+  const paddingX = 38;
+  const paddingY = 32;
+  const maxLayerCount = Math.max(1, ...Array.from(layers.values()).map((items) => items.length));
+  const canvasWidth = Math.max(760, paddingX * 2 + maxLayerCount * nodeWidth + Math.max(0, maxLayerCount - 1) * horizontalGap);
+  const maxLevel = Math.max(0, ...Array.from(layers.keys()));
+  const positionedNodes = [];
+  Array.from(layers.entries()).sort(([left], [right]) => left - right).forEach(([level, layer]) => {
+    const layerWidth = layer.length * nodeWidth + Math.max(0, layer.length - 1) * horizontalGap;
+    const startX = Math.round((canvasWidth - layerWidth) / 2);
+    layer.forEach((item, index) => {
+      positionedNodes.push({...item, x: startX + index * (nodeWidth + horizontalGap), y: paddingY + level * (nodeHeight + verticalGap)});
+    });
+  });
+  return {
+    nodes: positionedNodes,
+    width: canvasWidth,
+    height: Math.max(760, paddingY * 2 + (maxLevel + 1) * nodeHeight + maxLevel * verticalGap),
+  };
 }
 
 function renderAgentWorkflowGraph() {
@@ -9647,7 +9654,6 @@ function renderAgentWorkflowGraph() {
   const graph = workflow.graph || {};
   const nodes = Array.isArray(graph.nodes) ? graph.nodes : [];
   const edges = Array.isArray(graph.edges) ? graph.edges : [];
-  const orderedNodes = buildAgentWorkflowVerticalOrder(nodes, edges);
   if (titleNode) titleNode.textContent = workflow.title || '工作流详情';
   if (summaryNode) {
     const preview = workflow.preview && typeof workflow.preview === 'object' ? workflow.preview.result || {} : {};
@@ -9655,59 +9661,32 @@ function renderAgentWorkflowGraph() {
       ? `${workflow.summary || ''} 当前预览目标 ${Number(preview.predicted_change_pct || 0).toFixed(2)}%，波动上限 ${Number(preview.volatility_cap || 0).toFixed(2)}。`
       : (workflow.summary || '这里展示智能体的设计流转和关键节点职责。');
   }
-  if (!selectedAgentWorkflowNodeId && orderedNodes.length) {
-    selectedAgentWorkflowNodeId = (orderedNodes[0] || {}).id || '';
+  if (!selectedAgentWorkflowNodeId && nodes.length) {
+    selectedAgentWorkflowNodeId = (nodes[0] || {}).id || '';
   }
   if (!nodes.length) {
     board.innerHTML = '<div class="compact-row"><strong>暂无节点</strong><span>0</span></div>';
     layer.innerHTML = '';
     return;
   }
-  board.style.width = '100%';
-  board.style.height = 'auto';
-  viewport.style.width = '100%';
-  viewport.style.height = 'auto';
-  layer.innerHTML = '';
-  const incomingMap = new Map();
-  const outgoingMap = new Map();
-  nodes.forEach((item) => {
-    incomingMap.set(item.id, []);
-    outgoingMap.set(item.id, []);
-  });
-  edges.forEach((edge) => {
-    if (incomingMap.has(edge.to)) incomingMap.get(edge.to).push(edge.from);
-    if (outgoingMap.has(edge.from)) outgoingMap.get(edge.from).push(edge.to);
-  });
-  const nodeNameMap = new Map(nodes.map((item) => [item.id, item.label || item.id || '-']));
-  board.innerHTML = `
-    <div class="agent-workflow-flow">
-      ${orderedNodes.map((item, index) => {
-        const upstreamNames = (incomingMap.get(item.id) || []).map((id) => nodeNameMap.get(id) || id);
-        const downstreamNames = (outgoingMap.get(item.id) || []).map((id) => nodeNameMap.get(id) || id);
-        return `
-          <div class="agent-workflow-flow-step ${index === orderedNodes.length - 1 ? 'is-last' : ''}">
-            <div class="agent-workflow-flow-rail">
-              <div class="agent-workflow-flow-index">${index + 1}</div>
-            </div>
-            <article class="agent-workflow-flow-card ${item.id === selectedAgentWorkflowNodeId ? 'is-selected' : ''}" data-agent-node-id="${escapeAttr(item.id || '')}" title="${escapeAttr(item.description || item.label || item.id || '')}">
-              <div class="agent-workflow-flow-head">
-                <div>
-                  <div class="agent-workflow-flow-step-label">Step ${index + 1}</div>
-                  <div class="agent-workflow-flow-title">${escapeHtml(item.label || item.id || '-')}</div>
-                </div>
-                <span class="agent-workflow-flow-pill is-gold">${escapeHtml(item.processor || item.kind || '')}</span>
-              </div>
-              <div class="agent-workflow-flow-mini">
-                ${upstreamNames.length ? `来自 ${escapeHtml(upstreamNames[0])}` : '起始'}
-                ${downstreamNames.length ? ` → ${escapeHtml(downstreamNames[0])}` : ' → 输出'}
-                ${(upstreamNames.length > 1 || downstreamNames.length > 1) ? ` · ${escapeHtml(`分支 ${Math.max(upstreamNames.length, downstreamNames.length)}`)}` : ''}
-              </div>
-            </article>
-          </div>
-        `;
-      }).join('')}
-    </div>
-  `;
+  const layout = buildAgentWorkflowTopDownLayout(nodes, edges);
+  const positionedNodes = layout.nodes;
+  const width = layout.width;
+  const height = layout.height;
+  board.style.width = `${width}px`;
+  board.style.height = `${height}px`;
+  viewport.style.width = `${width}px`;
+  viewport.style.height = `${height}px`;
+  board.innerHTML = positionedNodes.map((item) => `
+    <article class="workflow-node agent-workflow-node ${item.id === selectedAgentWorkflowNodeId ? 'is-selected' : ''} ${item.visual_only ? 'is-visual-only' : ''}" data-agent-node-id="${escapeAttr(item.id || '')}" title="${escapeAttr(item.description || item.label || item.id || '')}" style="left:${Number(item.x || 0)}px;top:${Number(item.y || 0)}px;">
+      <div class="workflow-node-head">
+        <strong>${escapeHtml(item.label || item.id || '-')}</strong>
+        <span class="workflow-node-type ${item.visual_only ? 'is-visual' : ''}">${escapeHtml(item.visual_only ? '条件节点' : (item.processor || item.kind || ''))}</span>
+      </div>
+      <div class="agent-workflow-node-copy">${escapeHtml(item.description || '暂无节点说明')}</div>
+    </article>
+  `).join('');
+  renderAgentWorkflowEdges(positionedNodes, edges, width, height);
   board.querySelectorAll('[data-agent-node-id]').forEach((node) => {
     node.addEventListener('click', () => {
       selectedAgentWorkflowNodeId = node.dataset.agentNodeId || '';
@@ -9715,6 +9694,48 @@ function renderAgentWorkflowGraph() {
       renderAgentWorkflowInspector();
     });
   });
+}
+
+function renderAgentWorkflowEdges(nodes, edges, width, height) {
+  const layer = document.getElementById('agent-workflow-edge-layer');
+  if (!layer) return;
+  layer.setAttribute('width', String(width));
+  layer.setAttribute('height', String(height));
+  layer.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  layer.innerHTML = `
+    <defs>
+      <marker id="agent-workflow-arrowhead" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="12" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M 0 1 L 11 6 L 0 11 z" fill="rgba(47, 116, 192, 0.96)"></path>
+      </marker>
+    </defs>
+    ${edges.map((edge) => {
+      const fromNode = nodes.find((item) => item.id === edge.from);
+      const toNode = nodes.find((item) => item.id === edge.to);
+      if (!fromNode || !toNode) return '';
+      const startX = Number(fromNode.x || 0) + 110;
+      const startY = Number(fromNode.y || 0) + 118;
+      const endX = Number(toNode.x || 0) + 110;
+      const endY = Number(toNode.y || 0);
+      const deltaY = endY - startY;
+      const controlOffset = Math.max(42, Math.min(120, Math.abs(deltaY) * 0.42));
+      const controlA = startY + controlOffset;
+      const controlB = endY - controlOffset;
+      const path = `M ${startX} ${startY} C ${startX} ${controlA}, ${endX} ${controlB}, ${endX} ${endY}`;
+      const label = String(edge.label || '').trim();
+      const condition = String(edge.condition || '').trim();
+      const labelX = Math.round((startX + endX) / 2);
+      const labelY = Math.round((startY + endY) / 2 - (startX === endX ? 6 : 4));
+      return `
+        <g data-agent-edge-id="${escapeAttr(edge.id || '')}">
+          <path class="workflow-edge-shadow" d="${path}"></path>
+          <path class="workflow-edge" d="${path}" marker-end="url(#agent-workflow-arrowhead)"></path>
+          <circle class="workflow-edge-anchor" cx="${startX}" cy="${startY}" r="4"></circle>
+          ${label ? `<text class="agent-workflow-edge-label" x="${labelX}" y="${labelY}" text-anchor="middle">${escapeHtml(label)}</text>` : ''}
+          ${condition ? `<text class="agent-workflow-edge-condition" x="${labelX}" y="${labelY + 13}" text-anchor="middle">${escapeHtml(condition)}</text>` : ''}
+        </g>
+      `;
+    }).join('')}
+  `;
 }
 
 function renderAgentWorkflowInspector() {
@@ -9731,6 +9752,14 @@ function renderAgentWorkflowInspector() {
   const nodeResults = workflow.execution?.node_results || workflow.preview?.node_results || graph.node_results || {};
   const nodeDebug = selectedNode ? nodeResults[selectedNode.id] : null;
   const preview = workflow.preview && typeof workflow.preview === 'object' ? workflow.preview : {};
+  const scenarioDefinitions = [
+    {id: 'stock_today_capability', number: '1', title: '个股咨询分析', route: '今日行情、逻辑、要闻、风险 · Gangtise Agent SSE'},
+    {id: 'market_today_capability', number: '2', title: '大盘综合分析', route: '指数表现、板块资金、情绪展望 · Gangtise Agent SSE'},
+    {id: 'one_pager_capability', number: '3', title: '个股结构化分析报告', route: '深化研究，非当日 · /application/open-ai/agent/one-pager'},
+    {id: 'highlights_capability', number: '4', title: '个股看点摘要', route: '最多 6000 个证券 · /application/open-ai/stock-summary/getList'},
+    {id: 'multi_watchlist_capability', number: '5', title: '多支自选股综合分析', route: '复盘同源的多股综合分析 · Gangtise 多股票 SSE'},
+    {id: 'chat_answer_branch', number: '6', title: '多轮闲聊能力', route: '通用问题与投资交流 · Admin 默认 LLM'},
+  ];
   const previewLines = preview.result && typeof preview.result === 'object'
     ? Object.entries(preview.result).map(([key, value]) => `<div class="result-line"><strong>${escapeHtml(key)}</strong> · ${escapeHtml(String(value))}</div>`).join('')
     : '<div class="result-line">当前工作流暂无运行预览。</div>';
@@ -9752,6 +9781,23 @@ function renderAgentWorkflowInspector() {
         ${(Array.isArray(workflow.tags) ? workflow.tags : []).map((item) => `<span class="agent-workflow-chip">${escapeHtml(item)}</span>`).join('') || '<span class="agent-workflow-chip">暂无标签</span>'}
       </div>
     </div>
+    ${workflow.id === 'hermes_agent' ? `
+      <div class="forecast-inspector-section" style="margin-top:12px">
+        <div class="forecast-config-section-title">六类场景路由</div>
+        <div class="feature-note">点击场景可在上方图中定位对应节点。</div>
+        <div class="agent-workflow-scenario-list">
+          ${scenarioDefinitions.map((item) => `
+            <button type="button" class="agent-workflow-scenario-item ${selectedNode?.id === item.id ? 'is-active' : ''}" data-agent-scenario-id="${escapeAttr(item.id)}">
+              <span class="agent-workflow-scenario-index">${escapeHtml(item.number)}</span>
+              <span>
+                <span class="agent-workflow-scenario-title">${escapeHtml(item.title)}</span>
+                <span class="agent-workflow-scenario-route">${escapeHtml(item.route)}</span>
+              </span>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    ` : ''}
     <div class="forecast-inspector-section" style="margin-top:12px">
       <div class="forecast-config-section-title">当前节点</div>
       ${selectedNode ? `
@@ -9780,6 +9826,13 @@ function renderAgentWorkflowInspector() {
       <div class="forecast-debug-list">${previewLines}</div>
     </div>
   `;
+  host.querySelectorAll('[data-agent-scenario-id]').forEach((node) => {
+    node.addEventListener('click', () => {
+      selectedAgentWorkflowNodeId = node.dataset.agentScenarioId || '';
+      renderAgentWorkflowGraph();
+      renderAgentWorkflowInspector();
+    });
+  });
 }
 
 function renderAgentWorkflowCenter() {
@@ -11888,7 +11941,6 @@ function pickAdminAccent(accent) {
 async function loadSiteConfig(force = false) {
   if (adminSiteConfigLoaded && !force) {
     renderSiteConfigForm();
-    loadSimulationDataPolicy();
     renderAdminKnowledgeTenantFilter();
     return adminSiteConfig;
   }
@@ -11905,54 +11957,8 @@ async function loadSiteConfig(force = false) {
     throw error;
   }
   renderSiteConfigForm();
-  loadSimulationDataPolicy();
   renderAdminKnowledgeTenantFilter();
   return adminSiteConfig;
-}
-
-async function loadSimulationDataPolicy() {
-  const toggle = document.getElementById('simulation-data-visible');
-  const status = document.getElementById('simulation-data-policy-status');
-  if (!toggle || !status) return;
-  try {
-    const response = await fetch('/api/admin/simulation-data-policy', {cache: 'no-store'});
-    const data = await response.json();
-    if (!response.ok || !data.ok) throw new Error((data && data.error) || 'simulation_policy_load_failed');
-    const policy = data.policy || {};
-    toggle.checked = policy.simulated_data_visible === true;
-    toggle.disabled = false;
-    status.textContent = toggle.checked
-      ? `开发数据当前可见。关闭后将仅展示真实数据。`
-      : `开发数据当前隐藏，仅展示真实数据。`;
-  } catch (error) {
-    toggle.disabled = true;
-    status.textContent = '模拟数据策略读取失败，已停止修改该开关。';
-  }
-}
-
-async function saveSimulationDataVisibility(visible) {
-  const toggle = document.getElementById('simulation-data-visible');
-  const status = document.getElementById('simulation-data-policy-status');
-  if (!toggle) return;
-  let visibilityLocked = false;
-  toggle.disabled = true;
-  try {
-    const response = await fetch('/api/admin/simulation-data-policy', {
-      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({simulated_data_visible: visible === true}),
-    });
-    const data = await response.json();
-    if (!response.ok || !data.ok) throw new Error((data && data.error) || 'simulation_policy_save_failed');
-    const policy = data.policy || {};
-    toggle.checked = policy.simulated_data_visible === true;
-    visibilityLocked = false;
-    if (status) status.textContent = toggle.checked ? '开发数据已显示。关闭此开关即可恢复仅显示真实数据。' : '开发数据已隐藏，当前仅显示真实数据。';
-  } catch (error) {
-    visibilityLocked = true;
-    if (status) status.textContent = `模拟数据开关保存失败：${String(error && error.message || 'unknown_error')}`;
-    showToast('模拟数据开关保存失败');
-  } finally {
-    toggle.disabled = visibilityLocked;
-  }
 }
 
 let adminGangtiseCredentialStatus = null;
