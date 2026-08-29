@@ -323,10 +323,23 @@ def build_admin_commission_payload():
     }
 
 
-def build_admin_revenue_analytics_payload():
+def build_admin_revenue_analytics_payload(tenant_slug=""):
     """Build revenue charts from actual paid markers and tenant pricing."""
-    users = [user for user in list_users() if isinstance(user, dict) and str(user.get("role") or "").lower() == "investor"]
-    tenants = {str(tenant.get("slug") or "").strip().lower(): tenant for tenant in get_tenant_configs()}
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    users = [
+        user for user in (
+            list_users(role="investor", tenant_slug=normalized_tenant)
+            if normalized_tenant else list_users(role="investor")
+        )
+        if isinstance(user, dict)
+    ]
+    tenant_configs = get_tenant_configs()
+    if normalized_tenant:
+        tenant_configs = [
+            tenant for tenant in tenant_configs
+            if str(tenant.get("slug") or "").strip().lower() == normalized_tenant
+        ]
+    tenants = {str(tenant.get("slug") or "").strip().lower(): tenant for tenant in tenant_configs}
     prices = {}
     for slug in tenants:
         prices[slug] = int(load_tenant_fan_ops_settings(slug).get("registration_price") or 0)
@@ -383,6 +396,8 @@ def build_admin_revenue_analytics_payload():
     return {
         "generated_at": now_ts(),
         "basis": "用户表付费标注、付费时间、租户注册单价",
+        "kol_filter": normalized_tenant,
+        "kol_options": build_admin_kol_options(tenant_configs),
         "monthly": monthly,
         "tier_revenue": [
             {"name": "未付费用户", "data": [0] * len(monthly)},
@@ -400,10 +415,17 @@ def build_admin_revenue_analytics_payload():
     }
 
 
-def build_admin_kol_analytics_payload():
+def build_admin_kol_analytics_payload(tenant_slug=""):
     """Build KOL collaboration analytics from real tenant fan data."""
+    normalized_tenant = str(tenant_slug or "").strip().lower()
     rows = []
-    for tenant in get_tenant_configs():
+    tenant_configs = get_tenant_configs()
+    if normalized_tenant:
+        tenant_configs = [
+            tenant for tenant in tenant_configs
+            if str(tenant.get("slug") or "").strip().lower() == normalized_tenant
+        ]
+    for tenant in tenant_configs:
         slug = str(tenant.get("slug") or "").strip().lower()
         if not slug:
             continue
@@ -444,6 +466,8 @@ def build_admin_kol_analytics_payload():
     return {
         "generated_at": now_ts(),
         "basis": "租户配置、粉丝用户表、付费标注与注册单价",
+        "kol_filter": normalized_tenant,
+        "kol_options": build_admin_kol_options(tenant_configs),
         "rows": rows,
         "total_kols": len(rows),
         "total_revenue": sum(row["gmv"] for row in rows),
