@@ -8638,11 +8638,11 @@ async function embedManualReviewText(text) {
   return data;
 }
 
-async function publishReviewContentEmbedding(text, transcriptionEngine, transcriptModel, extras) {
+async function publishReviewContent(text, transcriptionEngine, transcriptModel, extras) {
   const user = getActiveDemoUser();
   await syncLocalWatchlistAnnotationsToServer(reviewTriggerDraft.selectedWatchlist || []);
   const payload = extras && typeof extras === 'object' ? extras : {};
-  const resp = await fetch('/api/review/publish-embed', {
+  const resp = await fetch('/api/review/publish', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
@@ -8666,7 +8666,7 @@ async function publishReviewContentEmbedding(text, transcriptionEngine, transcri
   });
   const data = await resp.json();
   if (!resp.ok || !data.success) {
-    throw new Error((data && data.error) || 'publish_embed_failed');
+    throw new Error((data && data.error) || 'publish_failed');
   }
   return data;
 }
@@ -8904,7 +8904,7 @@ function renderReviewWatchlistSelectionPanel() {
   return `
     <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">第二阶段：选择需要 AI 分析的自选股</label>
-      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:10px">可以从个人自选股中勾选，也可以输入股票代码或名称搜索后加入。确认列表后才会调用 Gangtise。</div>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:10px">搜索到的股票会直接纳入本次复盘，不会修改个人自选股。确认列表后才会调用 Gangtise。</div>
       <div style="display:flex;gap:8px;align-items:center">
         <input id="review-watchlist-search-input" class="knowledge-modal-input" style="flex:1" value="${escapeAttr(reviewWatchlistSearchQuery)}" placeholder="输入股票代码或名称，例如 600519 / 贵州茅台" oninput="searchReviewWatchlistCandidates(this.value)" />
       </div>
@@ -8913,19 +8913,28 @@ function renderReviewWatchlistSelectionPanel() {
           ${candidates.map((item, index) => `
             <button type="button" style="display:flex;width:100%;justify-content:space-between;align-items:center;padding:9px 10px;border:0;border-bottom:${index === candidates.length - 1 ? '0' : '1px solid rgba(47,116,192,0.08)'};background:#fff;text-align:left;cursor:pointer" onclick="addReviewWatchlistCandidate(${index})">
               <span><strong style="color:var(--text-main)">${escapeHtml(item.name || item.code || '')}</strong><span style="display:block;color:var(--gray-400);font-size:11px;margin-top:2px">${escapeHtml(item.code || '')} · ${escapeHtml(item.market || '')}</span></span>
-              <span style="font-size:11px;color:#2F74C0">${selected.has(item.name || item.code) ? '已加入' : '加入'}</span>
+              <span style="font-size:11px;color:#2F74C0">${selected.has(item.name || item.code) ? '已选择' : '选择'}</span>
             </button>
           `).join('')}
         </div>
       ` : ''}
-      <div style="font-size:12px;font-weight:700;color:var(--text-main);margin-top:14px">我的自选股</div>
-      <div style="display:grid;gap:7px;margin-top:8px">
-        ${displayItems.map((item) => `
+      <div style="font-size:12px;font-weight:700;color:var(--text-main);margin-top:14px">本次复盘已选（${Array.from(selected).length}）</div>
+      <div style="display:grid;gap:7px;margin-top:8px;max-height:180px;overflow-y:auto;padding-right:4px">
+        ${displayItems.filter((item) => selected.has(item.name)).map((item) => `
           <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid rgba(47,116,192,0.10);border-radius:9px;background:#F8FBFF;color:var(--text-main);font-size:12px;cursor:pointer">
             <input type="checkbox" ${selected.has(item.name) ? 'checked' : ''} onchange="toggleReviewWatchlistOption('${escapeAttr(item.name)}', this.checked)" />
             <span>${escapeHtml(item.name)}${item.code ? `<small style="display:block;color:var(--gray-400);margin-top:2px">${escapeHtml(item.code)}</small>` : ''}</span>
           </label>
-        `).join('') || '<div style="font-size:11px;color:var(--gray-400)">当前没有个人自选股，可通过上方搜索加入。</div>'}
+        `).join('') || '<div style="font-size:11px;color:var(--gray-400)">尚未选择股票，请搜索或从下方个人自选股中选择。</div>'}
+      </div>
+      <div style="font-size:12px;font-weight:700;color:var(--text-main);margin-top:14px">个人自选股</div>
+      <div style="display:grid;gap:7px;margin-top:8px;max-height:260px;overflow-y:auto;padding-right:4px">
+        ${displayItems.filter((item) => !selected.has(item.name)).map((item) => `
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid rgba(47,116,192,0.10);border-radius:9px;background:#F8FBFF;color:var(--text-main);font-size:12px;cursor:pointer">
+            <input type="checkbox" onchange="toggleReviewWatchlistOption('${escapeAttr(item.name)}', this.checked)" />
+            <span>${escapeHtml(item.name)}${item.code ? `<small style="display:block;color:var(--gray-400);margin-top:2px">${escapeHtml(item.code)}</small>` : ''}</span>
+          </label>
+        `).join('') || '<div style="font-size:11px;color:var(--gray-400)">当前没有个人自选股，可通过上方搜索选择。</div>'}
       </div>
       <div style="margin-top:12px;padding:10px;border-radius:9px;background:rgba(200,169,110,0.10);color:var(--text-main);font-size:12px">待分析：${Array.from(selected).map((name) => escapeHtml(name)).join('、') || '尚未选择'}</div>
     </div>
@@ -9142,7 +9151,6 @@ function reviewActiveJobLabel(job) {
     review_voice_transcribe: '语音转写',
     review_polish_input: '复盘输入润色',
     review_compose_draft: '复盘完整成稿',
-    review_publish_embed: '复盘发布入库',
   };
   return labels[String((job || {}).job_type || '').trim()] || '复盘任务';
 }
@@ -9996,7 +10004,7 @@ function publishReviewDraft() {
   reviewPublishSubmitting = true;
   renderReviewTriggerModal(user);
   showToast('正在发布复盘，请稍候');
-  publishReviewContentEmbedding(finalText, transcriptionEngine, transcriptModel, {
+  publishReviewContent(finalText, transcriptionEngine, transcriptModel, {
     review_summary: previewPayload.review_summary || '',
     user_input_section: previewPayload.user_input_section || {
       source_mode: reviewTriggerDraft.sourceMode || 'manual',
@@ -10024,38 +10032,7 @@ function publishReviewDraft() {
     loadDmConversations();
     if (currentDmKol) loadDmMessages(currentDmKol.id);
     renderReviewExperience();
-    if (!publishResult.async || !publishResult.job_code) {
-      showToast((publishResult && publishResult.message) || '复盘已发布');
-      return;
-    }
-    showToast((publishResult && publishResult.message) || '复盘已发布，正在后台入向量库');
-    startAsyncJobPolling(publishResult.job_code, {
-      onSuccess(job) {
-        const result = job.result || {};
-        reviewIngestResult = result;
-        runtime.kolPublishedAt = '刚刚发布';
-        runtime.kolGeneratedAt = '刚刚发布';
-        syncPublishedReviewStateToH5((user && user.tenant && user.tenant.slug) || '', result);
-        if (result.snapshots && user && user.tenant) {
-          user.tenant.review_snapshots = result.snapshots;
-        }
-        if (result.message_center_state && user && user.tenant) {
-          user.tenant.message_center_state = result.message_center_state;
-        }
-        loadDmConversations();
-        if (currentDmKol) loadDmMessages(currentDmKol.id);
-        renderReviewExperience();
-        showToast('复盘已发布并入向量库');
-      },
-      onFailed(job) {
-        runtime.kolPublishedAt = '刚刚发布';
-        openReviewIngestResultModal('复盘向量入库失败', [
-          `任务编号：${job.job_code || '-'}`,
-          `异常详情：${job.error_message || job.summary || '向量入库失败'}`,
-        ]);
-        showToast(job.error_message || '复盘已发布，向量入库失败');
-      },
-    });
+    showToast((publishResult && publishResult.message) || '复盘已发布');
   }).catch((error) => {
     reviewPublishSubmitting = false;
     renderReviewTriggerModal(user);

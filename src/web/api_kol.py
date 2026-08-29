@@ -52,7 +52,6 @@ def api_review_jobs():
         "review_voice_transcribe",
         "review_polish_input",
         "review_compose_draft",
-        "review_publish_embed",
     }
     active_jobs = []
     for job in jobs:

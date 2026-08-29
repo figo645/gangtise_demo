@@ -235,6 +235,7 @@ def api_review_manual_embed():
     )
 
 
+@app.route("/api/review/publish", methods=["POST"])
 @app.route("/api/review/publish-embed", methods=["POST"])
 def api_review_publish_embed():
     body = request.get_json(silent=True) or {}
@@ -299,37 +300,19 @@ def api_review_publish_embed():
         )
         payload["snapshot_sync_applied"] = True
         payload["snapshot_id"] = str(((snapshot_result.get("snapshot") or {}).get("id")) or "").strip()
-        job = None
-        queue_error = ""
-        try:
-            job = create_user_async_job(
-                "review_publish_embed",
-                payload=payload,
-                tenant_slug=tenant_slug,
-                entry_point=entry_point,
-                owner_label=speaker_name,
-            )
-        except RuntimeError as exc:
-            queue_error = str(exc)
-        except Exception:
-            app.logger.exception("Failed to queue review publish embedding after snapshot publish")
-            queue_error = "review_publish_embedding_queue_failed"
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     except Exception:
-        app.logger.exception("Failed to queue review publish text")
-        return jsonify({"success": False, "error": "review_publish_embed_failed"}), 500
+        app.logger.exception("Failed to publish review snapshot")
+        return jsonify({"success": False, "error": "review_publish_failed"}), 500
     response_payload = {
         "success": True,
-        "async": bool(job),
-        "message": "复盘已发布，正在后台入向量库" if job else "复盘已发布，向量入库暂未排队",
+        "async": False,
+        "message": "复盘已发布",
+        "publish_processing": "snapshot_only",
+        "embedding_generated": False,
         **snapshot_result,
     }
-    if job:
-        response_payload["job_code"] = job["job_code"]
-        response_payload["job_status"] = job["status"]
-    if queue_error:
-        response_payload["queue_error"] = queue_error
     return jsonify(response_payload)
 
 

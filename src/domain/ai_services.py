@@ -10691,50 +10691,23 @@ def process_review_voice_upload(file_storage, tenant_slug="", review_period="", 
 
 
 def process_review_publish_text(text, tenant_slug="", review_period="", entry_point="", speaker_name="", transcription_engine="manual", transcript_model="manual_input", job_code=""):
+    """Validate the publish payload without entering the vector/embedding pipeline."""
     normalized_text = str(text or "").strip()
     if not normalized_text:
         raise ValueError("publish_text_required")
-    embedding_cfg = get_voice_embedding_config()
     if job_code:
         report_user_async_job_progress(
             job_code,
-            stage="embedding",
-            percent=60,
-            summary="正在计算复盘向量并准备入库",
-            log_text="复盘正文已确认，正在生成向量表示。",
+            stage="published",
+            percent=100,
+            summary="复盘已发布",
+            log_text="复盘正文已确认并发布，发布流程未生成向量。",
         )
-    embedding, embedding_engine, embedding_model = build_text_embedding(
-        normalized_text,
-        engine=embedding_cfg.get("engine", "api"),
-        feature_code="review_publish_embedding",
-        feature_label="复盘发布向量入库",
-        tenant_slug=tenant_slug,
-        entry_point=entry_point,
-        metadata={"review_period": review_period, "transcription_engine": transcription_engine},
-    )
-    vector_namespace = build_vector_namespace(embedding_engine, embedding_model)
-    record = _store_review_voice_embedding_record(
-        tenant_slug=tenant_slug,
-        review_period=review_period,
-        entry_point=entry_point,
-        vector_namespace=vector_namespace,
-        speaker_name=speaker_name,
-        filename="review_publish_text.txt",
-        content_type="text/plain",
-        audio_size_bytes=0,
-        transcript=normalized_text,
-        transcription_engine=transcription_engine,
-        transcript_model=transcript_model,
-        embedding=embedding,
-        embedding_engine=embedding_engine,
-        embedding_model=embedding_model,
-    )
     return {
         "text": normalized_text,
-        "record": record,
         "transcription_engine": transcription_engine,
-        "embedding_engine": embedding_engine,
-        "embedding_model": embedding_model,
+        "publish_processing": "snapshot_only",
+        "embedding_generated": False,
     }
 
 
@@ -10952,12 +10925,16 @@ def persist_review_publish_snapshot(
         summary = re.sub(r"\s+", " ", summary_source_text).strip()[:150] if summary_source_text else f"{period_label}已发布。"
     else:
         summary = re.sub(r"\s+", " ", summary).strip()[:150]
-    evidence_chain_section = build_review_evidence_chain_section(
-        review_text=title_source_text or cleaned_text,
-        tenant_slug=tenant_slug,
-        review_title=explicit_title or title,
-        entry_point="review_publish",
-    )
+    # Publishing must not depend on retrieval, web search, or vector services.
+    evidence_chain_section = {
+        "status": "not_run",
+        "query_text": "",
+        "summary": "发布流程未执行知识检索",
+        "items": [],
+        "knowledge_match_count": 0,
+        "web_match_count": 0,
+        "llm_model": {},
+    }
     snapshot = {
         "id": f"{tenant_slug}-review-{int(time.time() * 1000)}",
         "title": title[:80],

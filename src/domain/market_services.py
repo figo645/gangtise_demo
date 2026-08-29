@@ -5655,6 +5655,26 @@ WATCHLIST_DYNAMIC_DETAIL_PRESETS = {
 
 WATCHLIST_QUERY_ALIAS_MAP = {
     "中国银行": "601988",
+    "zhongguoyinhang": "601988",
+    "zgyh": "601988",
+    "建设银行": "601939",
+    "jiansheyinhang": "601939",
+    "jsh": "601939",
+    "招商银行": "600036",
+    "zhaoshangyinhang": "600036",
+    "zsyh": "600036",
+    "贵州茅台": "600519",
+    "guizhoumaotai": "600519",
+    "gzmt": "600519",
+    "宁德时代": "300750",
+    "ningdeshidai": "300750",
+    "ndsd": "300750",
+    "中芯国际": "688981",
+    "zhongxinguoji": "688981",
+    "zxgj": "688981",
+    "腾讯控股": "00700",
+    "tengxunkonggu": "00700",
+    "txkg": "00700",
     "日久光新": "003015",
     "日久光电": "003015",
     "上证指数": "source_shanghai_index",
@@ -6526,7 +6546,10 @@ def _save_watchlist_cache(prefix, value, payload):
 
 def _normalize_watchlist_query_text(value):
     text = str(value or "").strip()
-    return WATCHLIST_QUERY_ALIAS_MAP.get(text, text)
+    if text in WATCHLIST_QUERY_ALIAS_MAP:
+        return WATCHLIST_QUERY_ALIAS_MAP[text]
+    compact = re.sub(r"[\s_-]+", "", text).lower()
+    return WATCHLIST_QUERY_ALIAS_MAP.get(compact, text)
 
 
 def _normalize_watchlist_comparable_code(value):

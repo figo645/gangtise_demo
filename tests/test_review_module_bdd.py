@@ -409,7 +409,7 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("coverTitle: deriveReviewCoverTitle(review)", html)
         self.assertIn("证据链总结", html)
         self.assertNotIn("模型记录", html)
-        self.assertIn("syncPublishedReviewStateToH5((user && user.tenant && user.tenant.slug) || '', result);", html)
+        self.assertIn("syncPublishedReviewStateToH5((user && user.tenant && user.tenant.slug) || '', publishResult);", html)
 
     def test_given_exact_stock_search_in_review_stage_two_then_candidate_is_added_and_selected(self):
         """A precise name/code lookup must become a checked analysis item without another click."""
@@ -1906,7 +1906,7 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("published_reviews", html)
         self.assertIn("/api/review/generate-draft", html)
         self.assertIn("/api/review/prepare-preview", html)
-        self.assertIn("/api/review/publish-embed", html)
+        self.assertIn("/api/review/publish", html)
 
     def test_given_workbench_when_page_renders_then_fan_message_block_is_removed(self):
         response = self.client.get(f"/kol-workbench?tenant={self.tenant_slug}")
@@ -2669,7 +2669,7 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.get_json()["error"], "review_title_required")
 
-    def test_given_valid_publish_text_when_publishing_review_then_queue_async_job(self):
+    def test_given_valid_publish_text_when_publishing_review_then_publish_without_embedding_job(self):
         snapshot_result = {
             "snapshot": {"id": "review-1", "title": "日复盘：这是确认发布后的复盘正文"},
             "snapshots": [{"id": "review-1", "title": "日复盘：这是确认发布后的复盘正文"}],
@@ -2701,17 +2701,14 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
         self.assertTrue(payload["success"])
-        self.assertTrue(payload["async"])
-        self.assertEqual(payload["job_code"], "JOB-REVIEW-PUBLISH-1")
+        self.assertFalse(payload["async"])
+        self.assertFalse(payload["embedding_generated"])
+        self.assertEqual(payload["publish_processing"], "snapshot_only")
         self.assertEqual(payload["snapshot"]["id"], "review-1")
         self.assertEqual(len(payload["snapshots"]), 1)
         persist_snapshot.assert_called_once()
         self.assertEqual(persist_snapshot.call_args.kwargs["review_title"], "手动输入的复盘主题")
-        create_job.assert_called_once()
-        self.assertEqual(create_job.call_args.args[0], "review_publish_embed")
-        self.assertTrue(create_job.call_args.kwargs["payload"]["snapshot_sync_applied"])
-        self.assertEqual(create_job.call_args.kwargs["payload"]["snapshot_id"], "review-1")
-        self.assertEqual(create_job.call_args.kwargs["payload"]["review_title"], "手动输入的复盘主题")
+        create_job.assert_not_called()
 
     def test_given_publish_text_when_embedding_queue_unavailable_then_review_is_still_published(self):
         snapshot_result = {
@@ -2722,10 +2719,7 @@ class ReviewModuleBddTest(unittest.TestCase):
         with mock.patch(
             "src.web.api_core.persist_review_publish_snapshot",
             return_value=snapshot_result,
-        ), mock.patch(
-            "src.web.api_core.create_user_async_job",
-            side_effect=RuntimeError("queue_down"),
-        ):
+        ), mock.patch("src.web.api_core.create_user_async_job") as create_job:
             response = self.client.post(
                 "/api/review/publish-embed",
                 json={
@@ -2742,15 +2736,12 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertTrue(payload["success"])
         self.assertFalse(payload["async"])
         self.assertEqual(payload["snapshot"]["id"], "review-2")
-        self.assertEqual(payload["queue_error"], "queue_down")
+        self.assertFalse(payload["embedding_generated"])
+        create_job.assert_not_called()
 
-    def test_given_publish_text_when_processing_then_transcription_engine_is_forwarded(self):
-        with mock.patch("src.domain.ai_services.get_voice_embedding_config", return_value={"engine": "local"}), mock.patch(
-            "src.domain.ai_services.build_text_embedding",
-            return_value=([0.1, 0.2], "local", "test-embedding-model"),
-        ), mock.patch(
-            "src.domain.ai_services._store_review_voice_embedding_record",
-            return_value={"id": 1, "storage_mode": "jsonb"},
+    def test_given_publish_text_when_processing_then_transcription_engine_is_forwarded_without_embedding(self):
+        with mock.patch("src.domain.ai_services.build_text_embedding") as build_embedding, mock.patch(
+            "src.domain.ai_services._store_review_voice_embedding_record"
         ) as store_record:
             result = ai_services.process_review_publish_text(
                 text="发布后的复盘正文",
@@ -2763,8 +2754,9 @@ class ReviewModuleBddTest(unittest.TestCase):
             )
 
         self.assertEqual(result["transcription_engine"], "manual")
-        store_record.assert_called_once()
-        self.assertEqual(store_record.call_args.kwargs["transcription_engine"], "manual")
+        self.assertFalse(result["embedding_generated"])
+        build_embedding.assert_not_called()
+        store_record.assert_not_called()
 
     def test_given_review_voice_enhancement_when_running_then_gemma4_12b_model_is_used(self):
         config = normalize_site_config({})

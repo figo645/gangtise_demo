@@ -9482,11 +9482,11 @@ async function kwEmbedManualReviewText(text) {
   return data;
 }
 
-async function kwPublishReviewContentEmbedding(text, transcriptionEngine, transcriptModel, extras) {
+async function kwPublishReviewContent(text, transcriptionEngine, transcriptModel, extras) {
   const tenant = window.ACTIVE_TENANT || {};
   await kwSyncLocalWatchlistAnnotationsToServer(kwReviewDraft.selectedWatchlist || []);
   const payload = extras && typeof extras === 'object' ? extras : {};
-  const resp = await fetch('/api/review/publish-embed', {
+  const resp = await fetch('/api/review/publish', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
@@ -9524,7 +9524,7 @@ async function kwPublishReviewContentEmbedding(text, transcriptionEngine, transc
   });
   const data = await resp.json();
   if (!resp.ok || !data.success) {
-    throw new Error((data && data.error) || 'publish_embed_failed');
+    throw new Error((data && data.error) || 'publish_failed');
   }
   return data;
 }
@@ -10325,7 +10325,7 @@ function kwRenderReviewWatchlistSelector() {
   host.innerHTML = `
     <div class="kw-review-runtime-item">
       <strong>第二阶段：选择需要 AI 分析的自选股</strong>
-      <div class="kw-review-runtime-desc">可以从个人自选股中勾选，也可以输入股票代码或名称搜索后加入。确认列表后才会调用 Gangtise。</div>
+      <div class="kw-review-runtime-desc">搜索到的股票会直接纳入本次复盘，不会修改个人自选股。确认列表后才会调用 Gangtise。</div>
       <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
         <input id="kw-review-watchlist-search-input" class="kw-knowledge-modal-input" style="flex:1" value="${escapeAttr(kwReviewWatchlistSearchQuery)}" placeholder="输入股票代码或名称，例如 600519 / 贵州茅台" oninput="kwSearchReviewWatchlistCandidates(this.value)" />
       </div>
@@ -10334,19 +10334,28 @@ function kwRenderReviewWatchlistSelector() {
           ${kwReviewWatchlistSearchItems.map((item, index) => `
             <button type="button" style="display:flex;width:100%;justify-content:space-between;align-items:center;padding:9px 10px;border:0;border-bottom:${index === kwReviewWatchlistSearchItems.length - 1 ? '0' : '1px solid rgba(47,116,192,0.08)'};background:#fff;text-align:left;cursor:pointer" onclick="kwAddReviewWatchlistCandidate(${index})">
               <span><strong style="color:var(--text-main)">${escapeHtml(item.name || item.code || '')}</strong><span style="display:block;color:var(--gray-400);font-size:11px;margin-top:2px">${escapeHtml(item.code || '')} · ${escapeHtml(item.market || '')}</span></span>
-              <span style="font-size:11px;color:#2F74C0">${selected.includes(item.name || item.code) ? '已加入' : '加入'}</span>
+              <span style="font-size:11px;color:#2F74C0">${selected.includes(item.name || item.code) ? '已选择' : '选择'}</span>
             </button>
           `).join('')}
         </div>
       ` : ''}
-      <div class="kw-review-runtime-desc" style="margin-top:14px;font-weight:700;color:var(--text-main)">我的自选股</div>
-      <div style="display:grid;gap:7px;margin-top:8px">
-        ${displayItems.map((item) => `
+      <div class="kw-review-runtime-desc" style="margin-top:14px;font-weight:700;color:var(--text-main)">本次复盘已选（${selected.length}）</div>
+      <div style="display:grid;gap:7px;margin-top:8px;max-height:180px;overflow-y:auto;padding-right:4px">
+        ${displayItems.filter((item) => selected.includes(item.name)).map((item) => `
           <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid rgba(47,116,192,0.10);border-radius:9px;background:#F8FBFF;color:var(--text-main);font-size:12px;cursor:pointer">
             <input type="checkbox" ${selected.includes(item.name) ? 'checked' : ''} onchange="kwToggleReviewWatchlistOption('${escapeAttr(item.name)}', this.checked)" />
             <span>${escapeHtml(item.name)}${item.code ? `<small style="display:block;color:var(--gray-400);margin-top:2px">${escapeHtml(item.code)}</small>` : ''}</span>
           </label>
-        `).join('') || '<div class="kw-review-runtime-desc">当前没有个人自选股，可通过上方搜索加入。</div>'}
+        `).join('') || '<div class="kw-review-runtime-desc">尚未选择股票，请搜索或从下方个人自选股中选择。</div>'}
+      </div>
+      <div class="kw-review-runtime-desc" style="margin-top:14px;font-weight:700;color:var(--text-main)">个人自选股</div>
+      <div style="display:grid;gap:7px;margin-top:8px;max-height:260px;overflow-y:auto;padding-right:4px">
+        ${displayItems.filter((item) => !selected.includes(item.name)).map((item) => `
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid rgba(47,116,192,0.10);border-radius:9px;background:#F8FBFF;color:var(--text-main);font-size:12px;cursor:pointer">
+            <input type="checkbox" onchange="kwToggleReviewWatchlistOption('${escapeAttr(item.name)}', this.checked)" />
+            <span>${escapeHtml(item.name)}${item.code ? `<small style="display:block;color:var(--gray-400);margin-top:2px">${escapeHtml(item.code)}</small>` : ''}</span>
+          </label>
+        `).join('') || '<div class="kw-review-runtime-desc">当前没有个人自选股，可通过上方搜索选择。</div>'}
       </div>
       <div class="kw-review-runtime-desc" style="margin-top:12px;padding:10px;border-radius:9px;background:rgba(200,169,110,0.10);color:var(--text-main)">待分析：${selected.map((name) => escapeHtml(name)).join('、') || '尚未选择'}</div>
     </div>
@@ -10972,7 +10981,7 @@ function kwPublishReviewDraft() {
   kwReviewPublishSubmitting = true;
   kwRenderReviewStudio();
   showToast('正在发布复盘，请稍候');
-  kwPublishReviewContentEmbedding(finalText, transcriptionEngine, transcriptModel, {
+  kwPublishReviewContent(finalText, transcriptionEngine, transcriptModel, {
     review_summary: previewPayload.review_summary || '',
     user_input_section: previewPayload.user_input_section || {
       source_mode: kwReviewDraft.sourceMode || 'manual',
@@ -11017,55 +11026,7 @@ function kwPublishReviewDraft() {
     kwRenderReviewStudio();
     kwRenderPublishedReviewList();
     renderWorkbenchAnnotationViews();
-    if (!publishResult.async || !publishResult.job_code) {
-      showToast((publishResult && publishResult.message) || '复盘已发布');
-      return;
-    }
-    showToast((publishResult && publishResult.message) || '复盘已发布，正在后台入向量库');
-    kwStartAsyncJobPolling(publishResult.job_code, {
-      onSuccess(job) {
-        const result = job.result || {};
-        kwReviewIngestResult = result;
-        runtime.kolPublishedAt = '刚刚发布';
-        runtime.kolGeneratedAt = '刚刚发布';
-        kwSyncPublishedReviewState(result);
-        if (window.WORKBENCH_DATA) {
-          if (Array.isArray(result.snapshots) && result.snapshots.length) {
-            window.WORKBENCH_DATA.published_reviews = result.snapshots.slice(0, 20);
-          } else {
-            const reviews = Array.isArray(window.WORKBENCH_DATA.published_reviews) ? window.WORKBENCH_DATA.published_reviews : [];
-            reviews.unshift(result.snapshot || item);
-            window.WORKBENCH_DATA.published_reviews = reviews.slice(0, 20);
-          }
-          if (result.message_center_state) {
-            const threadItems = Array.isArray(result.message_center_state.threads) ? result.message_center_state.threads : [];
-            window.WORKBENCH_DATA.message_center = {
-              summary: result.message_center_state.summary || ((window.WORKBENCH_DATA.message_center || {}).summary) || '',
-              items: threadItems.slice(0, 6).map((thread) => ({
-                name: thread.name || thread.user_name || '',
-                type: thread.type === 'review_notification' ? '系统消息' : (thread.status === '待回复' ? '粉丝提问' : '追问消息'),
-                time: thread.time || '--',
-                content: thread.content || '',
-                status: thread.status || '待处理',
-              })),
-              threads: threadItems,
-            };
-          }
-        }
-        kwRenderReviewStudio();
-        kwRenderPublishedReviewList();
-        renderWorkbenchAnnotationViews();
-        showToast('复盘已发布并入向量库');
-      },
-      onFailed(job) {
-        runtime.kolPublishedAt = '刚刚发布';
-        kwOpenReviewIngestResultModal('复盘向量入库失败', [
-          `任务编号：${job.job_code || '-'}`,
-          `异常详情：${job.error_message || job.summary || '向量入库失败'}`,
-        ]);
-        showToast(job.error_message || '复盘已发布，向量入库失败');
-      },
-    });
+    showToast((publishResult && publishResult.message) || '复盘已发布');
   }).catch((error) => {
     kwReviewPublishSubmitting = false;
     kwRenderReviewStudio();
