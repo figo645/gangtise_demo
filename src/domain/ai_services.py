@@ -120,6 +120,14 @@ def _normalize_openai_compatible_base_url(base_url):
 def _extract_llm_text_content(content):
     if isinstance(content, str):
         return content.strip()
+    if isinstance(content, dict):
+        text_value = content.get("text")
+        if isinstance(text_value, str) and text_value.strip():
+            return text_value.strip()
+        output_text = content.get("output_text")
+        if isinstance(output_text, str) and output_text.strip():
+            return output_text.strip()
+        return ""
     if isinstance(content, list):
         parts = []
         for item in content:
@@ -132,8 +140,6 @@ def _extract_llm_text_content(content):
             if isinstance(text_value, str) and text_value.strip():
                 parts.append(text_value.strip())
                 continue
-            if item.get("type") == "output_text" and isinstance(item.get("text"), str):
-                parts.append(item.get("text").strip())
         return "\n".join(part for part in parts if part).strip()
     return ""
 
@@ -260,8 +266,31 @@ def call_openai_compatible_llm(
     first_choice = choices[0] if isinstance(choices[0], dict) else {}
     message = first_choice.get("message") if isinstance(first_choice.get("message"), dict) else {}
     content = _extract_llm_text_content(message.get("content"))
+    # Some OpenAI-compatible gateways expose the legacy completion field even
+    # when the endpoint is called with /chat/completions.
     if not content:
-        raise RuntimeError("empty_llm_response")
+        content = _extract_llm_text_content(first_choice.get("text"))
+    if not content:
+        reasoning_content = _extract_llm_text_content(message.get("reasoning_content"))
+        app.logger.warning(
+            "LLM returned no user-visible content feature=%s model=%s endpoint=%s "
+            "status=%s choices=%d message_keys=%s content_type=%s content_chars=%d "
+            "reasoning_chars=%d finish_reason=%s",
+            feature_code or "general_llm",
+            model_name,
+            urlparse(endpoint_base).netloc or endpoint_base,
+            response.status_code,
+            len(choices),
+            sorted(str(key) for key in message.keys()),
+            type(message.get("content")).__name__,
+            len(_extract_llm_text_content(message.get("content"))),
+            len(reasoning_content),
+            str(first_choice.get("finish_reason") or "").strip(),
+        )
+        # Internal reasoning is not a stable user-facing answer and may carry
+        # private traces, so a reasoning-only response remains a hard failure.
+        error_code = "reasoning_only" if reasoning_content else "content_missing"
+        raise RuntimeError(f"empty_llm_response:{error_code}")
     input_tokens, output_tokens, total_tokens = _extract_usage_tokens(payload)
     if total_tokens <= 0:
         input_tokens = _estimate_token_count(system_text) + _estimate_token_count(user_text)
@@ -3337,6 +3366,7 @@ HERMES_QUERY_INTENT_PROMPT = (
 
 HERMES_ALLOWED_INTENTS = {
     "clarify",
+    "human_review",
     "composite_research",
     "small_talk",
     "product_help",
@@ -3378,6 +3408,16 @@ HERMES_CAPABILITY_REGISTRY = {
         "time_scope": "conversation",
         "output_mode": "clarification",
         "constraints": ["信息不足或目标不唯一时先反问", "不得盲猜并调用付费研究接口"],
+    },
+    "human_review": {
+        "tool": None,
+        "endpoint": "platform.manual_review",
+        "provider": "platform",
+        "cost_credits": 0,
+        "target_type": "none",
+        "time_scope": "conversation",
+        "output_mode": "manual_review",
+        "constraints": ["由管理员配置的语义拦截 Skill 触发", "不调用研究接口", "不得假称已完成人工处理"],
     },
     "composite_research": {
         "tool": None,
@@ -3552,6 +3592,7 @@ def hermes_capability_registry_text():
 
 HERMES_INTENT_ROUTE_GROUPS = {
     "clarify": "planner",
+    "human_review": "planner",
     "composite_research": "multi_task_research",
     "knowledge_lookup": "knowledge_qa",
     "watchlist_fundamental": "market_data_query",
@@ -3576,7 +3617,10 @@ def normalize_hermes_messages(messages):
         if not isinstance(item, dict):
             continue
         role = str(item.get("role") or "").strip().lower()
-        content = str(item.get("content") or "").strip()
+        raw_content = item.get("content")
+        if not isinstance(raw_content, str):
+            continue
+        content = raw_content.strip()
         if role not in {"user", "assistant"} or not content:
             continue
         normalized.append({
@@ -3589,13 +3633,15 @@ def normalize_hermes_messages(messages):
 def extract_hermes_question_text(messages, question_text=""):
     # The explicit top-level question is the current turn. Conversation
     # messages may lag behind the UI and must only be a compatibility fallback.
-    current_question = str(question_text or "").strip()
-    if current_question:
-        return current_question[:4000]
+    if question_text is not None and not isinstance(question_text, str):
+        raise ValueError("hermes_question_invalid_type")
+    current_question = question_text or ""
+    if current_question.strip():
+        return current_question[:20000]
     for message in reversed(normalize_hermes_messages(messages)):
         if message["role"] == "user" and message["content"]:
             return message["content"]
-    return str(question_text or "").strip()
+    return current_question
 
 
 def format_hermes_message_context(messages, limit=8):
@@ -3643,6 +3689,7 @@ HERMES_VISUAL_MODE_KEYWORDS = {
 
 HERMES_TASK_FAMILY_LABELS = {
     "planner": "信息澄清",
+    "human_review": "人工审核",
     "multi_task_research": "组合研究",
     "small_talk": "闲聊",
     "data_visualization": "数据展示",
@@ -3693,6 +3740,8 @@ def infer_hermes_task_family(question_text="", preferred_mode="", attachments=No
     intent_key = str(intent or "").strip().lower()
     if intent_key == "clarify":
         return "planner"
+    if intent_key == "human_review":
+        return "human_review"
     if intent_key == "composite_research":
         return "multi_task_research"
     visual_mode = infer_hermes_visual_mode(text, preferred_mode=preferred_mode)
@@ -3843,6 +3892,7 @@ def build_hermes_open_scope_result(question_text="", preferred_mode="", selected
 
 HERMES_FUNCTION_TAG_MAP = {
     "small_talk": ["闲聊"],
+    "human_review": ["人工审核"],
     "product_help": ["产品帮助"],
     "knowledge_lookup": ["知识"],
     "evidence_chain_analysis": ["证据链", "复盘"],
@@ -5568,6 +5618,7 @@ def _extract_hermes_turn_metrics(turn_row):
     commercial_tags = tags.get("commercial_tags") if isinstance(tags.get("commercial_tags"), list) else []
     missing_capability = metadata.get("missing_capability") if isinstance(metadata.get("missing_capability"), dict) else {}
     missing_capability_tags = tags.get("missing_capability_tags") if isinstance(tags.get("missing_capability_tags"), list) else []
+    task_intents = tags.get("task_intents") if isinstance(tags.get("task_intents"), list) else []
     return {
         "mode_label": mode_label,
         "tool_trace": tool_trace,
@@ -6332,6 +6383,7 @@ def build_hermes_intent_router_prompt(question_text, has_attachments=False, sele
             f"规则守卫提示（仅作为安全边界参考，最终意图仍由你判断）："
             f"{str(scope.get('reason') or '').strip()}\n\n"
         )
+    raw_question = question_text if isinstance(question_text, str) else ""
     return (
         "请根据用户问题判断 Hermes 应该如何拆解任务。\n"
         "能力注册表（这是服务端契约，不要修改其中的 endpoint、成本或限制）：\n"
@@ -6373,7 +6425,8 @@ def build_hermes_intent_router_prompt(question_text, has_attachments=False, sele
         f"{context_state_section}"
         f"{conversation_section}"
         f"{scope_section}"
-        f"用户问题：{str(question_text or '').strip()}\n"
+        f"用户问题：{raw_question}\n"
+        "以上用户问题为原始文本，除传输层必要的长度校验外不做程序改写。\n"
         f"是否有附件：{'是' if has_attachments else '否'}\n"
         f"是否指定知识条目：{'是' if selected_ids else '否'}\n"
         f"指定知识条目 ID：{json.dumps(selected_ids, ensure_ascii=False)}\n\n"
@@ -6814,6 +6867,24 @@ def _normalize_hermes_planner_plan(parsed, question_text="", memory_state=None):
         if intent == "small_talk":
             plan = finalize_hermes_intent_plan(plan, question_text=question_text)
         return plan
+    # A disposition is the planner's top-level control decision. If a model
+    # accidentally emits research tasks alongside chat/refuse/clarify, never
+    # execute those tasks silently. Preserve the safe control decision and ask
+    # or answer at the top level instead.
+    if disposition in {"clarify", "refuse", "chat"}:
+        intent = "clarify" if disposition == "clarify" else ("out_of_scope_redirect" if disposition == "refuse" else "small_talk")
+        plan = {
+            "intent": intent,
+            "tools": [],
+            "target_type": "none",
+            "securities": [],
+            "time_scope": "conversation",
+            "display_mode": "text",
+            "reason": str(source.get("reason") or disposition).strip()[:200],
+            "clarifying_question": str(source.get("clarifying_question") or source.get("message") or "").strip()[:500],
+            "disposition": disposition,
+        }
+        return finalize_hermes_intent_plan(plan, question_text=question_text)
     if not raw_tasks:
         raw_tasks = [source]
     plans = []
@@ -6863,17 +6934,8 @@ def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_
     selected_knowledge_ids = selected_knowledge_ids if isinstance(selected_knowledge_ids, list) else []
     attachments = attachments if isinstance(attachments, list) else []
     messages = normalize_hermes_messages(messages)
-    # Deterministic policy decisions remain outside model routing. This is a
-    # boundary decision, not an embedding-based intent classifier.
-    if isinstance(scope_result, dict) and str(scope_result.get("status") or "").strip() == "blocked":
-        return build_hermes_scope_plan(
-            scope_result=scope_result,
-            question_text=question_text,
-            selected_knowledge_ids=selected_knowledge_ids,
-            attachments=attachments,
-            preferred_mode=preferred_mode,
-            scope_guard_enabled=scope_guard_enabled,
-        ), None, "scope_guard"
+    # Semantic interception is a post-planner Skill. The first semantic
+    # interpretation must always be performed by the configured LLM.
     llm_model = get_hermes_llm_config("hermes_intent_router")
     if not llm_model:
         raise RuntimeError("hermes_intent_router_llm_not_configured")
@@ -6908,25 +6970,11 @@ def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_
             # clients and makes malformed plans fail deterministically.
             if not isinstance(parsed.get("tasks"), list):
                 raise RuntimeError("hermes_intent_router_invalid_tools")
-        normalized_scope_status = str((scope_result or {}).get("status") or "allowed").strip() or "allowed"
-        if normalized_scope_status == "blocked":
-            parsed = {
-                "disposition": "refuse",
-                "intent": "out_of_scope_redirect",
-                "tools": [],
-                "target_type": "none",
-                "time_scope": "conversation",
-                "reason": str((scope_result or {}).get("reason") or "范围守卫已阻断").strip(),
-            }
         normalized_plan = _normalize_hermes_planner_plan(
             parsed,
             question_text=question_text,
             memory_state=memory_state,
         )
-        if normalized_scope_status == "blocked":
-            normalized_plan["scope_status"] = "blocked"
-            normalized_plan["guard_message"] = str((scope_result or {}).get("message") or "").strip()
-            normalized_plan["guard_suggestions"] = copy.deepcopy((scope_result or {}).get("suggestions") or [])
         if normalized_plan.get("intent") not in HERMES_ALLOWED_INTENTS:
             raise RuntimeError("hermes_intent_router_invalid_intent")
         normalized_plan = validate_hermes_intent_plan(
@@ -6938,6 +6986,292 @@ def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_
     except Exception as exc:
         app.logger.exception("Failed to route Hermes query intent")
         raise RuntimeError(f"hermes_intent_router_llm_failed:{str(exc)[:240]}") from exc
+
+
+def ensure_hermes_interception_audit_table():
+    db = get_db()
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS hermes_interception_audits (
+            id BIGSERIAL PRIMARY KEY,
+            audit_id TEXT NOT NULL UNIQUE,
+            tenant_slug TEXT NOT NULL DEFAULT '',
+            user_profile_id TEXT NOT NULL DEFAULT '',
+            user_role TEXT NOT NULL DEFAULT '',
+            session_id TEXT NOT NULL DEFAULT '',
+            question_text TEXT NOT NULL DEFAULT '',
+            router_plan_json TEXT NOT NULL DEFAULT '{}',
+            skill_results_json TEXT NOT NULL DEFAULT '[]',
+            matched_skill_ids_json TEXT NOT NULL DEFAULT '[]',
+            action TEXT NOT NULL DEFAULT 'allow',
+            decision_status TEXT NOT NULL DEFAULT 'disabled',
+            final_reason TEXT NOT NULL DEFAULT '',
+            tool_called INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_hermes_interception_audits_tenant_created "
+        "ON hermes_interception_audits(tenant_slug, created_at DESC)"
+    )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_hermes_interception_audits_action_created "
+        "ON hermes_interception_audits(action, created_at DESC)"
+    )
+    db.commit()
+
+
+def record_hermes_interception_audit(
+    question_text,
+    router_plan,
+    decision,
+    tenant_slug="",
+    user_profile_id="",
+    user_role="",
+    session_id="",
+    tool_called=False,
+):
+    decision = decision if isinstance(decision, dict) else {}
+    try:
+        ensure_hermes_interception_audit_table()
+        db = get_db()
+        audit_id = f"hermes-interception-{secrets.token_urlsafe(12)}"
+        db.execute(
+            """
+            INSERT INTO hermes_interception_audits (
+                audit_id, tenant_slug, user_profile_id, user_role, session_id,
+                question_text, router_plan_json, skill_results_json,
+                matched_skill_ids_json, action, decision_status, final_reason,
+                tool_called, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                audit_id,
+                str(tenant_slug or "").strip().lower(),
+                str(user_profile_id or "").strip(),
+                str(user_role or "").strip().lower(),
+                str(session_id or "").strip(),
+                str(question_text or ""),
+                json.dumps(router_plan if isinstance(router_plan, dict) else {}, ensure_ascii=False),
+                json.dumps(decision.get("results") if isinstance(decision.get("results"), list) else [], ensure_ascii=False),
+                json.dumps(decision.get("matched_skill_ids") if isinstance(decision.get("matched_skill_ids"), list) else [], ensure_ascii=False),
+                str(decision.get("action") or "allow").strip(),
+                str(decision.get("status") or "disabled").strip(),
+                str(decision.get("reason") or "").strip()[:1000],
+                1 if tool_called else 0,
+                now_ts(),
+            ),
+        )
+        db.commit()
+        return audit_id
+    except Exception as exc:
+        # Audit failure must not turn a valid user answer into an Agent error,
+        # but it must remain visible to operators for remediation.
+        app.logger.exception("Failed to persist Hermes interception audit: %s", exc)
+        return ""
+
+
+def update_hermes_interception_audit_tool_status(audit_id, tool_called=False):
+    """Complete the audit after dispatch knows whether a tool ran."""
+    normalized_id = str(audit_id or "").strip()
+    if not normalized_id:
+        return False
+    try:
+        ensure_hermes_interception_audit_table()
+        db = get_db()
+        db.execute(
+            "UPDATE hermes_interception_audits SET tool_called = ? WHERE audit_id = ?",
+            (1 if tool_called else 0, normalized_id),
+        )
+        db.commit()
+        return True
+    except Exception as exc:
+        app.logger.exception("Failed to update Hermes interception audit: %s", exc)
+        return False
+
+
+def list_hermes_interception_audits(tenant_slug="", action="", limit=100):
+    """Return redacted semantic-interception decisions for Admin audit views."""
+    ensure_hermes_interception_audit_table()
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    normalized_action = str(action or "").strip().lower()
+    try:
+        normalized_limit = max(1, min(int(limit or 100), 500))
+    except (TypeError, ValueError):
+        normalized_limit = 100
+    clauses = []
+    params = []
+    if normalized_tenant:
+        clauses.append("tenant_slug = ?")
+        params.append(normalized_tenant)
+    if normalized_action:
+        clauses.append("action = ?")
+        params.append(normalized_action)
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    rows = get_db().execute(
+        f"""
+        SELECT audit_id, tenant_slug, user_profile_id, user_role, session_id,
+               question_text, router_plan_json, skill_results_json,
+               matched_skill_ids_json, action, decision_status, final_reason,
+               tool_called, created_at
+        FROM hermes_interception_audits
+        {where_sql}
+        ORDER BY created_at DESC
+        LIMIT ?
+        """,
+        (*params, normalized_limit),
+    ).fetchall()
+    result = []
+    for row in rows:
+        item = dict(row or {})
+        item["tool_called"] = bool(item.get("tool_called"))
+        item["router_plan"] = _safe_json_dict(item.pop("router_plan_json", "{}"))
+        try:
+            item["skill_results"] = json.loads(item.pop("skill_results_json", "[]") or "[]")
+        except Exception:
+            item["skill_results"] = []
+        try:
+            item["matched_skill_ids"] = json.loads(item.pop("matched_skill_ids_json", "[]") or "[]")
+        except Exception:
+            item["matched_skill_ids"] = []
+        # Keep internal prompts, credentials and model reasoning out of the
+        # operator-facing audit payload.
+        item["planner_intent"] = str(item["router_plan"].get("intent") or "").strip()
+        item["planner_tasks"] = [
+            str(task.get("intent") or "").strip()
+            for task in (item["router_plan"].get("tasks") or [])
+            if isinstance(task, dict) and str(task.get("intent") or "").strip()
+        ][:8]
+        item.pop("router_plan", None)
+        result.append(item)
+    return result
+
+
+def evaluate_hermes_interception_skills(
+    question_text,
+    router_plan,
+    hermes_settings=None,
+    memory_state=None,
+    tenant_slug="",
+    user_profile_id="",
+    user_role="",
+    session_id="",
+):
+    settings = normalize_hermes_settings_config(hermes_settings or {})
+    skills = [item for item in (settings.get("interception_skills") or []) if item.get("enabled") is not False]
+    if settings.get("interception_skills_enabled") is not True or not skills:
+        return {
+            "enabled": False,
+            "status": "disabled",
+            "action": "allow",
+            "matched_skill_ids": [],
+            "results": [],
+            "reason": "语义拦截 Skill 未启用或没有启用中的规则。",
+        }
+
+    skill_contract = [
+        {
+            "id": item.get("id"),
+            "label": item.get("label"),
+            "description": item.get("description"),
+            "rule_prompt": item.get("rule_prompt"),
+            "intents": item.get("intents") or [],
+        }
+        for item in skills
+        if str(item.get("rule_prompt") or "").strip()
+    ]
+    if not skill_contract:
+        return {
+            "enabled": True,
+            "status": "invalid",
+            "action": "allow",
+            "matched_skill_ids": [],
+            "results": [],
+            "reason": "已启用的语义拦截 Skill 没有可执行规则说明。",
+        }
+    model = get_hermes_llm_config("hermes_interception_skill")
+    if not model:
+        raise RuntimeError("hermes_interception_skill_llm_not_configured")
+    raw = call_openai_compatible_llm(
+        model,
+        "你是 Hermes 的语义拦截 Skill 执行器。只判断用户问题是否命中管理员配置的规则，不回答用户，不自行增加规则。输出必须是 JSON。",
+        (
+            "管理员配置的拦截规则：\n"
+            f"{json.dumps(skill_contract, ensure_ascii=False)}\n\n"
+            "LLM Planner 已完成的任务计划（只作为上下文，不要修改）：\n"
+            f"{json.dumps(router_plan if isinstance(router_plan, dict) else {}, ensure_ascii=False)}\n\n"
+            "用户原始问题：\n"
+            f"{str(question_text or '')}\n\n"
+            "输出格式：{\"decisions\":[{\"skill_id\":\"规则 id\",\"matched\":true,\"confidence\":0.0,\"reason\":\"简短理由\"}]}。"
+            "必须为每条规则输出一项；matched 只能根据规则说明判断，不得依赖关键词机械匹配。"
+        ),
+        feature_code="hermes_interception_skill",
+        feature_label="Hermes 语义拦截 Skill",
+        tenant_slug=tenant_slug,
+        entry_point="hermes_query",
+        metadata={"skill_count": len(skill_contract), "session_id": session_id},
+        request_timeout_seconds=40,
+        max_tokens=768,
+    )
+    parsed = _extract_json_payload_from_llm_text(raw, {}, strict=True)
+    decisions = parsed.get("decisions") if isinstance(parsed.get("decisions"), list) else None
+    if decisions is None:
+        raise RuntimeError("hermes_interception_skill_invalid_response:decisions_required")
+    known = {str(item.get("id") or "").strip(): item for item in skill_contract}
+    configured = {str(item.get("id") or "").strip(): item for item in skills}
+    expected_ids = set(known)
+    received_ids = set()
+    results = []
+    matched = []
+    for item in decisions:
+        if not isinstance(item, dict):
+            continue
+        skill_id = str(item.get("skill_id") or "").strip()
+        if skill_id not in known:
+            raise RuntimeError(f"hermes_interception_skill_invalid_response:unknown_skill:{skill_id or 'missing'}")
+        if skill_id in received_ids:
+            raise RuntimeError(f"hermes_interception_skill_invalid_response:duplicate_skill:{skill_id}")
+        received_ids.add(skill_id)
+        try:
+            confidence = float(item.get("confidence") or 0)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        result = {
+            "skill_id": skill_id,
+            "label": known[skill_id].get("label") or skill_id,
+            "matched": item.get("matched") is True,
+            "confidence": max(0.0, min(confidence, 1.0)),
+            "reason": str(item.get("reason") or "").strip()[:500],
+            "rule_version": configured[skill_id].get("version") or "1",
+            "configured_action": configured[skill_id].get("action") or "block",
+        }
+        results.append(result)
+        if result["matched"]:
+            matched.append(configured[skill_id])
+    missing_ids = sorted(expected_ids - received_ids)
+    if missing_ids:
+        raise RuntimeError(
+            "hermes_interception_skill_invalid_response:missing_skills:"
+            + ",".join(missing_ids[:12])
+        )
+    selected = sorted(matched, key=lambda item: (int(item.get("priority") or 100), item.get("id") or ""))[0] if matched else None
+    selected_result = next((item for item in results if item.get("skill_id") == (selected or {}).get("id")), {})
+    decision = {
+        "enabled": True,
+        "status": "intercepted" if selected else "allowed",
+        "action": (selected or {}).get("action") or "allow",
+        "matched_skill_ids": [str(item.get("id") or "") for item in matched],
+        "results": results,
+        "reason": str(selected_result.get("reason") or "未命中任何语义拦截规则。").strip(),
+        "user_message": str((selected or {}).get("user_message") or "当前问题触发了平台配置的处理规则，请调整问题后重试。").strip(),
+        "selected_skill": {
+            "id": (selected or {}).get("id") or "",
+            "label": (selected or {}).get("label") or "",
+            "version": (selected or {}).get("version") or "1",
+        } if selected else None,
+    }
+    return decision
 
 
 def trim_hermes_text(value, limit=180):
@@ -8303,6 +8637,7 @@ def execute_hermes_tool_plan(plan, tenant_slug, question_text, selected_knowledg
 
 HERMES_INTENT_LABELS = {
     "clarify": "补充信息",
+    "human_review": "人工审核",
     "composite_research": "组合研究任务",
     "watchlist_fundamental": "个股基本面分析",
     "smart_indicator_explain": "智能指标解读",
@@ -8334,7 +8669,7 @@ HERMES_TOOL_LABELS = {
 }
 
 
-def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode="", preferred_mode="", web_answer=False, attachments=None, selected_knowledge_ids=None, scope_result=None):
+def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode="", preferred_mode="", web_answer=False, attachments=None, selected_knowledge_ids=None, scope_result=None, interception_decision=None):
     attachments = attachments if isinstance(attachments, list) else []
     selected_knowledge_ids = selected_knowledge_ids if isinstance(selected_knowledge_ids, list) else []
     scope = scope_result if isinstance(scope_result, dict) else {}
@@ -8346,13 +8681,14 @@ def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode
     planned_tool_labels = [HERMES_TOOL_LABELS.get(item, item) for item in tools]
     ok_count = sum(1 for item in (tool_trace or []) if str((item or {}).get("status") or "").strip() == "ok")
     error_count = sum(1 for item in (tool_trace or []) if str((item or {}).get("status") or "").strip() == "error")
-    route_label = "LLM 路由" if route_mode == "llm_router" else "范围守卫"
+    route_label = "LLM Planner" if route_mode == "llm_router" else "LLM 路由"
+    interception = interception_decision if isinstance(interception_decision, dict) else {}
     answer_label = (
         "信息澄清" if answer_mode == "clarification" else
         "多任务结果直出" if answer_mode == "composite_direct" else
         "模型整合回答" if answer_mode == "llm_synthesized" else
         "Gangtise AI 直接返回" if answer_mode == "gangtise_direct" else
-        "范围守卫收口"
+        "平台安全收口"
     )
     planning_bits = []
     if capability_label:
@@ -8396,7 +8732,7 @@ def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode
     steps = [
         {
             "key": "scope",
-            "title": "范围识别",
+            "title": "基础技术校验",
             "status": scope_trace_status,
             "detail": scope_detail,
         },
@@ -8404,11 +8740,16 @@ def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode
             "key": "intent",
             "title": "问题拆解",
             "status": "ok",
-            "detail": (
-                "范围守卫已直接收口，无需继续做常规路由。"
-                if route_mode == "scope_guard" else
-                f"{route_label}识别为“{HERMES_INTENT_LABELS.get(intent, intent or '通用研究问答')}”。"
-            ),
+            "detail": f"{route_label}识别为“{HERMES_INTENT_LABELS.get(intent, intent or '通用研究问答')}”。",
+        },
+        {
+            "key": "semantic_interception",
+            "title": "语义拦截 Skill",
+            "status": "error" if interception.get("status") == "invalid" else ("ok" if interception.get("status") == "intercepted" else "skipped"),
+            "detail": str(
+                interception.get("reason")
+                or ("Skill 已命中并收口，不调用研究工具。" if interception.get("status") == "intercepted" else "Skill 未启用，继续执行 Planner 计划。")
+            ).strip(),
         },
         {
             "key": "plan",
@@ -9542,6 +9883,21 @@ def build_hermes_clarification_synthesis(plan):
     }
 
 
+def build_hermes_human_review_synthesis(plan):
+    plan = plan if isinstance(plan, dict) else {}
+    message = str(plan.get("interception_message") or "当前问题需要人工审核，暂不调用研究能力。").strip()
+    return {
+        "answer": message,
+        "summary": str(plan.get("interception_reason") or "已转人工审核").strip(),
+        "lead_conclusion": "",
+        "bullets": [],
+        "analysis_sections": [],
+        "next_steps": [],
+        "confidence": "",
+        "citations": [],
+    }
+
+
 def build_hermes_composite_direct_synthesis(plan, tool_outputs):
     tasks = (tool_outputs or {}).get("composite_tasks") if isinstance(tool_outputs, dict) else []
     sections = []
@@ -9586,6 +9942,8 @@ def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", 
     intent = str((plan or {}).get("intent") or "").strip()
     if intent == "clarify":
         return build_hermes_clarification_synthesis(plan), None, "clarification"
+    if intent == "human_review":
+        return build_hermes_human_review_synthesis(plan), None, "human_review"
     if intent == "composite_research":
         return build_hermes_composite_direct_synthesis(plan, tool_outputs), None, "composite_direct"
     if intent in HERMES_GANGTISE_DIRECT_INTENTS:
@@ -9693,9 +10051,14 @@ def build_hermes_query_response(body):
     workflow_definition = build_default_hermes_agent_workflow_definition()
 
     def _hermes_input_executor(state, runtime, node, upstream):
+        current_question = runtime.get("question_text")
+        if not isinstance(current_question, str) or not current_question.strip():
+            raise ValueError("hermes_question_required")
+        if len(current_question) > 20000:
+            raise ValueError("hermes_question_too_long")
         return {
             "detail": "已接收问题、附件、知识范围和会话上下文。",
-            "state_updates": {"question_text": runtime.get("question_text") or ""},
+            "state_updates": {"question_text": current_question},
             "context_preview": {
                 "attachment_count": len(runtime.get("attachments") or []),
                 "knowledge_count": len(runtime.get("selected_knowledge_ids") or []),
@@ -9740,36 +10103,18 @@ def build_hermes_query_response(body):
         }
 
     def _hermes_scope_executor(state, runtime, node, upstream):
-        scope_result = hermes_scope_guard(
-            question_text=runtime.get("question_text") or "",
-            selected_knowledge_ids=runtime.get("selected_knowledge_ids") or [],
-            attachments=runtime.get("attachments") or [],
-            tenant_slug=runtime.get("tenant_slug") or "",
-            preferred_mode=runtime.get("preferred_mode") or "",
-        ) if runtime.get("scope_guard_enabled") else build_hermes_open_scope_result(
-            question_text=runtime.get("question_text") or "",
-            selected_knowledge_ids=runtime.get("selected_knowledge_ids") or [],
-            attachments=runtime.get("attachments") or [],
-            tenant_slug=runtime.get("tenant_slug") or "",
-            preferred_mode=runtime.get("preferred_mode") or "",
-        )
-        scope_status = str(scope_result.get("status") or "allowed").strip() or "allowed"
-        detail_map = {
-            "allowed": "问题已通过范围识别。",
-            "soft_allowed": "问题属于轻度闲聊，允许简短承接。",
-            "redirected": "问题超出主要范围，已改为平台能力收口。",
-            "blocked": "问题涉及高风险或超边界诉求，已阻断直接回答。",
+        scope_result = {
+            "status": "allowed",
+            "reason": "已完成基础技术校验；语义判断交由第一轮 LLM Planner。",
+            "message": "",
+            "suggestions": [],
+            "intent_hint": "",
         }
         return {
-            "status": "error" if scope_status == "blocked" else ("skipped" if scope_status == "redirected" else "ok"),
-            "detail": "当前未启用 Hermes 提示词范围约束，本轮跳过固定范围拦截。 " if not runtime.get("scope_guard_enabled") else detail_map.get(scope_status, "已完成范围识别。"),
-            "state_updates": {
-                "scope_result": scope_result,
-            },
-            "context_preview": {
-                "scope_status": scope_status,
-                "intent_hint": scope_result.get("intent_hint") or "",
-            },
+            "status": "ok",
+            "detail": "仅完成请求格式、空值、长度和附件等技术校验，未进行程序级语义拦截。",
+            "state_updates": {"scope_result": scope_result},
+            "context_preview": {"scope_status": "allowed", "intent_hint": ""},
         }
 
     def _hermes_router_executor(state, runtime, node, upstream):
@@ -9798,9 +10143,97 @@ def build_hermes_query_response(body):
             },
         }
 
+    def _hermes_interception_executor(state, runtime, node, upstream):
+        router_plan = copy.deepcopy(state.get("intent_plan") or {})
+        audit_context = {
+            "tenant_slug": runtime.get("tenant_slug") or "",
+            "user_profile_id": (runtime.get("actor_context") or {}).get("profile_id") or "",
+            "user_role": runtime.get("user_role") or "",
+            "session_id": runtime.get("session_id") or "",
+        }
+        try:
+            decision = evaluate_hermes_interception_skills(
+                question_text=runtime.get("question_text") or "",
+                router_plan=router_plan,
+                hermes_settings=hermes_settings,
+                memory_state=state.get("memory_state") or {},
+                **audit_context,
+            )
+        except Exception as exc:
+            # An enabled interception Skill is a deliberate safety boundary.
+            # Record the failed evaluation before propagating the error so the
+            # operator can distinguish provider failure from a clean allow.
+            failed_decision = {
+                "enabled": True,
+                "status": "error",
+                "action": "allow",
+                "matched_skill_ids": [],
+                "results": [],
+                "reason": f"拦截 Skill 执行失败：{str(exc)[:500]}",
+            }
+            record_hermes_interception_audit(
+                question_text=runtime.get("question_text") or "",
+                router_plan=router_plan,
+                decision=failed_decision,
+                **audit_context,
+            )
+            raise
+        if decision.get("status") == "invalid":
+            record_hermes_interception_audit(
+                question_text=runtime.get("question_text") or "",
+                router_plan=router_plan,
+                decision=decision,
+                **audit_context,
+            )
+            raise RuntimeError("hermes_interception_skill_invalid_configuration")
+        audit_id = record_hermes_interception_audit(
+            question_text=runtime.get("question_text") or "",
+            router_plan=router_plan,
+            decision=decision,
+            **audit_context,
+        )
+        plan = copy.deepcopy(router_plan)
+        action = str(decision.get("action") or "allow").strip().lower()
+        if decision.get("status") == "intercepted":
+            plan["interception_action"] = action
+            plan["interception_reason"] = decision.get("reason") or ""
+            plan["interception_message"] = decision.get("user_message") or ""
+            plan["interception_skill"] = copy.deepcopy(decision.get("selected_skill") or {})
+            plan["tools"] = []
+            if action == "clarify":
+                plan["intent"] = "clarify"
+                plan["disposition"] = "clarify"
+                plan["clarifying_question"] = decision.get("user_message") or "请补充或调整你的问题。"
+            elif action == "human_review":
+                plan["intent"] = "human_review"
+                plan["disposition"] = "refuse"
+                plan["scope_status"] = "intercepted"
+                plan["interception_message"] = decision.get("user_message") or "当前问题需要人工审核，暂不调用研究能力。"
+            else:
+                plan["intent"] = "out_of_scope_redirect"
+                plan["disposition"] = "refuse"
+                plan["scope_status"] = "intercepted"
+                plan["guard_message"] = decision.get("user_message") or "当前问题触发了平台配置的语义拦截规则。"
+                plan["guard_suggestions"] = []
+        return {
+            "status": "error" if decision.get("status") == "invalid" else ("skipped" if not decision.get("enabled") else "ok"),
+            "detail": decision.get("reason") or "语义拦截 Skill 未启用，继续执行 Planner 计划。",
+            "state_updates": {
+                "router_plan_before_interception": router_plan,
+                "intent_plan": plan,
+                "interception_decision": decision,
+                "interception_audit_id": audit_id,
+            },
+            "context_preview": {
+                "enabled": bool(decision.get("enabled")),
+                "action": action,
+                "matched_skill_count": len(decision.get("matched_skill_ids") or []),
+            },
+        }
+
     def _hermes_tool_executor(state, runtime, node, upstream):
         intent_plan = state.get("intent_plan") or {}
-        if str(intent_plan.get("intent") or "").strip() in {"out_of_scope_redirect", "clarify"}:
+        if str(intent_plan.get("intent") or "").strip() in {"out_of_scope_redirect", "clarify", "human_review"}:
             return {
                 "status": "skipped",
                 "detail": "当前计划无需调用平台工具。",
@@ -9813,13 +10246,26 @@ def build_hermes_query_response(body):
                     "ok_count": 0,
                 },
             }
-        tool_outputs, tool_trace = execute_hermes_tool_plan(
-            plan=intent_plan,
-            tenant_slug=runtime.get("tenant_slug") or "",
-            question_text=runtime.get("question_text") or "",
-            selected_knowledge_ids=runtime.get("selected_knowledge_ids") or [],
-            attachments=runtime.get("attachments") or [],
-            web_answer=bool(runtime.get("web_answer")),
+        try:
+            tool_outputs, tool_trace = execute_hermes_tool_plan(
+                plan=intent_plan,
+                tenant_slug=runtime.get("tenant_slug") or "",
+                question_text=runtime.get("question_text") or "",
+                selected_knowledge_ids=runtime.get("selected_knowledge_ids") or [],
+                attachments=runtime.get("attachments") or [],
+                web_answer=bool(runtime.get("web_answer")),
+            )
+        except Exception:
+            # The audit tracks an attempted tool call even when the upstream
+            # provider fails before a normal tool trace can be returned.
+            update_hermes_interception_audit_tool_status(
+                state.get("interception_audit_id") or "",
+                tool_called=bool(intent_plan.get("tools")),
+            )
+            raise
+        update_hermes_interception_audit_tool_status(
+            state.get("interception_audit_id") or "",
+            tool_called=bool(tool_trace),
         )
         return {
             "detail": f"已执行 {len(tool_trace or [])} 个工具。",
@@ -9969,6 +10415,24 @@ def build_hermes_query_response(body):
         user_memory_snapshot = (memory_payload.get("user_memory_snapshot") or {}) if isinstance(memory_payload, dict) else {}
         session_snapshot = (memory_payload.get("session_snapshot") or {}) if isinstance(memory_payload, dict) else {}
         memory_state = state.get("memory_state") if isinstance(state.get("memory_state"), dict) else {}
+        interception_decision = state.get("interception_decision") if isinstance(state.get("interception_decision"), dict) else {
+            "enabled": False,
+            "status": "disabled",
+            "action": "allow",
+            "matched_skill_ids": [],
+            "results": [],
+            "reason": "语义拦截 Skill 未启用。",
+        }
+        interception_audit_id = record_hermes_interception_audit(
+            question_text=runtime.get("question_text") or "",
+            router_plan=state.get("router_plan_before_interception") or intent_plan,
+            decision=interception_decision,
+            tenant_slug=runtime.get("tenant_slug") or "",
+            user_profile_id=(runtime.get("actor_context") or {}).get("profile_id") or "",
+            user_role=runtime.get("user_role") or "",
+            session_id=runtime.get("session_id") or "",
+            tool_called=bool(tool_trace),
+        ) if not state.get("interception_audit_id") else state.get("interception_audit_id")
         citations = build_hermes_citations(tool_outputs)
         agent_trace = build_hermes_agent_trace(
             intent_plan=intent_plan,
@@ -9980,6 +10444,7 @@ def build_hermes_query_response(body):
             attachments=runtime.get("attachments") or [],
             selected_knowledge_ids=runtime.get("selected_knowledge_ids") or [],
             scope_result=state.get("scope_result") or {},
+            interception_decision=interception_decision,
         )
         artifacts = build_hermes_artifacts(
             plan=intent_plan,
@@ -10031,6 +10496,8 @@ def build_hermes_query_response(body):
             "preferred_mode": runtime.get("preferred_mode") or "auto",
             "web_answer": bool(runtime.get("web_answer")),
             "missing_capability": copy.deepcopy(missing_capability) if missing_capability else None,
+            "interception": copy.deepcopy(interception_decision),
+            "interception_audit_id": interception_audit_id,
             "source_policy": {
                 "knowledge_first": False,
                 "intent_routing": "llm_only",
@@ -10043,6 +10510,8 @@ def build_hermes_query_response(body):
             "intent_tree": copy.deepcopy(hermes_settings.get("intent_tree") or []),
             "settings_snapshot": {
                 "prompt_scope_guard_enabled": hermes_settings.get("prompt_scope_guard_enabled") is True,
+                "interception_skills_enabled": hermes_settings.get("interception_skills_enabled") is True,
+                "interception_skill_count": len(hermes_settings.get("interception_skills") or []),
                 "internet_answer_enabled": hermes_settings.get("internet_answer_enabled") is True,
                 "thinking_process_enabled": hermes_settings.get("thinking_process_enabled") is True,
                 "answer_save_to_knowledge_enabled": hermes_settings.get("answer_save_to_knowledge_enabled") is True,
@@ -10125,6 +10594,7 @@ def build_hermes_query_response(body):
             "memory_read": _hermes_memory_read_executor,
             "scope_guard": _hermes_scope_executor,
             "intent_router": _hermes_router_executor,
+            "semantic_interception": _hermes_interception_executor,
             "tool_dispatch": _hermes_tool_executor,
             "answer_synthesis": _hermes_synthesis_executor,
             "memory_extract": _hermes_memory_extract_executor,

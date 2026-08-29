@@ -2288,6 +2288,24 @@ def api_admin_hermes_usage_stats():
     return jsonify({"ok": True, "stats": payload})
 
 
+@app.route("/api/admin/hermes/interception-audits")
+def api_admin_hermes_interception_audits():
+    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
+    action = str(request.args.get("action") or "").strip().lower()
+    try:
+        items = list_hermes_interception_audits(
+            tenant_slug=tenant_slug,
+            action=action,
+            limit=request.args.get("limit") or 100,
+        )
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "hermes_interception_audits_db_unavailable"}), 503
+        app.logger.exception("Failed to load Hermes interception audits")
+        return jsonify({"ok": False, "error": "hermes_interception_audits_failed"}), 500
+    return jsonify({"ok": True, "items": items, "tenant_slug": tenant_slug, "action": action})
+
+
 @app.route("/api/admin/forecast-config")
 def api_admin_forecast_config():
     if not is_feature_enabled("stock_forecast"):

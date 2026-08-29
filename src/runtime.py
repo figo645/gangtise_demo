@@ -212,6 +212,7 @@ DEFAULT_LLM_FEATURE_CATALOG = [
     {"feature_code": "voice_transcription_api", "feature_label": "语音 API 转写连接", "default_purpose": "general"},
     {"feature_code": "embedding_api", "feature_label": "向量 API 连接", "default_purpose": "general"},
     {"feature_code": "hermes_intent_router", "feature_label": "Hermes 意图路由", "default_purpose": "general"},
+    {"feature_code": "hermes_interception_skill", "feature_label": "Hermes 语义拦截 Skill", "default_purpose": "general"},
     {"feature_code": "hermes_answer_synthesis", "feature_label": "Hermes 回答合成", "default_purpose": "general"},
     {"feature_code": "smart_indicator_formula_generation", "feature_label": "智能指标公式生成", "default_purpose": "general"},
 ]
@@ -605,7 +606,9 @@ DEFAULT_SITE_CONFIG = {
         "user_preview_enabled": False,
     },
     "hermes_settings": {
-        "prompt_scope_guard_enabled": True,
+        "prompt_scope_guard_enabled": False,
+        "interception_skills_enabled": False,
+        "interception_skills": [],
         "investor_access_enabled": False,
         "dav_access_enabled": True,
         "internet_answer_enabled": False,
@@ -617,8 +620,8 @@ DEFAULT_SITE_CONFIG = {
             "session_load",
             "memory_read",
             "fast_path",
-            "scope_guard",
             "intent_router",
+            "semantic_interception",
             "platform_tools",
             "attachment.context",
             "answer_synthesis",

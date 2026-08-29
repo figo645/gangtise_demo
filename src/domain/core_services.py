@@ -331,6 +331,48 @@ def normalize_voice_embedding_config(source=None):
     }
 
 
+def normalize_hermes_interception_skills(source=None):
+    raw_items = source if isinstance(source, list) else []
+    normalized = []
+    seen = set()
+    allowed_actions = {"block", "clarify", "redirect", "human_review"}
+    for index, item in enumerate(raw_items[:100]):
+        if not isinstance(item, dict):
+            continue
+        raw_skill_id = re.sub(r"[^a-z0-9_-]+", "-", str(item.get("id") or "").strip().lower()).strip("-")
+        if not raw_skill_id:
+            raw_skill_id = f"interception-skill-{index + 1}"
+        skill_id = raw_skill_id[:80]
+        if skill_id in seen:
+            continue
+        action = str(item.get("action") or "block").strip().lower()
+        try:
+            priority = int(item.get("priority") or 100)
+        except (TypeError, ValueError):
+            priority = 100
+        normalized.append(
+            {
+                "id": skill_id,
+                "label": str(item.get("label") or skill_id).strip()[:120] or skill_id,
+                "description": str(item.get("description") or "").strip()[:500],
+                "rule_prompt": str(item.get("rule_prompt") or item.get("prompt") or "").strip()[:6000],
+                "action": action if action in allowed_actions else "block",
+                "user_message": str(item.get("user_message") or "").strip()[:1000],
+                "enabled": item.get("enabled", True) is not False,
+                "priority": max(0, min(priority, 9999)),
+                "version": str(item.get("version") or "1").strip()[:40] or "1",
+                "intents": [
+                    str(value).strip()[:80]
+                    for value in (item.get("intents") if isinstance(item.get("intents"), list) else [])
+                    if str(value).strip()
+                ][:30],
+            }
+        )
+        seen.add(skill_id)
+    normalized.sort(key=lambda item: (int(item.get("priority") or 100), item.get("id") or ""))
+    return normalized
+
+
 def normalize_hermes_settings_config(source=None):
     raw = source if isinstance(source, dict) else {}
     defaults = copy.deepcopy(DEFAULT_SITE_CONFIG["hermes_settings"])
@@ -380,6 +422,8 @@ def normalize_hermes_settings_config(source=None):
     route_priority = []
     for item in raw.get("route_priority") if isinstance(raw.get("route_priority"), list) else default_route_priority:
         value = str(item or "").strip()
+        if value == "scope_guard":
+            value = "semantic_interception"
         if value in {"web.search", "knowledge.search", "evidence.search"}:
             continue
         if value and value not in route_priority:
@@ -396,7 +440,11 @@ def normalize_hermes_settings_config(source=None):
         chart_types_enabled = default_chart_types
 
     return {
+        # Kept for backwards-compatible configuration payloads. Semantic
+        # interception now uses the explicitly opt-in Skill switch below.
         "prompt_scope_guard_enabled": bool(raw.get("prompt_scope_guard_enabled", defaults["prompt_scope_guard_enabled"])),
+        "interception_skills_enabled": bool(raw.get("interception_skills_enabled", defaults.get("interception_skills_enabled", False))),
+        "interception_skills": normalize_hermes_interception_skills(raw.get("interception_skills")),
         "investor_access_enabled": bool(raw.get("investor_access_enabled", defaults["investor_access_enabled"])),
         "dav_access_enabled": bool(raw.get("dav_access_enabled", defaults.get("dav_access_enabled", True))),
         "internet_answer_enabled": False,
@@ -3307,7 +3355,7 @@ def get_hermes_settings(site_config=None):
 
 def is_hermes_scope_guard_enabled(site_config=None):
     settings = get_hermes_settings(site_config)
-    return settings.get("prompt_scope_guard_enabled") is True
+    return settings.get("interception_skills_enabled") is True
 
 
 def is_hermes_available_for_role(user_role="", site_config=None):
@@ -6480,6 +6528,7 @@ def init_db():
         # 035 installed environment-specific simulation triggers. Do not
         # execute that historical migration on startup; 043 removes them.
         execute_sql_file(conn, sql_dir / "043_remove_environment_simulation_processing.sql")
+        execute_sql_file(conn, sql_dir / "044_hermes_interception_audits.sql")
         execute_sql_file(conn, sql_dir / "100_seed_master_data.sql")
         execute_sql_file(conn, sql_dir / "101_seed_app_core.sql")
         execute_sql_file(conn, sql_dir / "102_seed_market_sector_catalog.sql")

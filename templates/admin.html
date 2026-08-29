@@ -3925,6 +3925,7 @@
           <button type="button" class="btn-outline" data-hermes-tab="compute" onclick="showHermesSubsection('compute')">算力与排行</button>
           <button type="button" class="btn-outline" data-hermes-tab="memory" onclick="showHermesSubsection('memory')">记忆治理</button>
           <button type="button" class="btn-outline" data-hermes-tab="config" onclick="showHermesSubsection('config')">能力配置</button>
+          <button type="button" class="btn-outline" data-hermes-tab="audit" onclick="showHermesSubsection('audit')">拦截审计</button>
         </div>
         <div data-hermes-pane="overview">
         <div id="admin-hermes-usage-summary" class="stats-grid">
@@ -3960,8 +3961,8 @@
           <div class="sync-title">Hermes 产品口径</div>
           <div class="sync-desc">H5 现已分成两种版本：工作区版保留股票、skills、提示词和结构化结果；小金纯对话版只保留聊天和 skills，不强制单独输入股票代码。</div>
           <div class="toggle-wrap" style="margin:14px 0 4px">
-            <div class="toggle-label"><div class="feature-toggle-title">提示词范围约束</div><div class="feature-toggle-desc">位置：Hermes 收到问题后的首个路由节点。开启后只承接平台研究范围和轻度闲聊，超范围问题会被引导回个股、复盘、知识或指标能力。</div></div>
-            <label class="toggle"><input id="hermes-prompt-scope-guard-enabled" type="checkbox"><span class="toggle-slider"></span></label>
+            <div class="toggle-label"><div class="feature-toggle-title">语义拦截 Skill</div><div class="feature-toggle-desc">默认关闭。开启后，第一轮 LLM 意图拆解完成后，再由 Admin 配置的 Skill 调用同一默认模型判断是否命中规则；命中结果会写入审计，不再由程序关键词拦截。</div></div>
+            <label class="toggle"><input id="hermes-interception-skills-enabled" type="checkbox"><span class="toggle-slider"></span></label>
           </div>
           <div class="toggle-wrap" style="margin:0 0 4px">
             <div class="toggle-label"><div class="feature-toggle-title">Hermes 向大V开放</div><div class="feature-toggle-desc">位置：H5 与 Web 大V账号。关闭后大V不显示 Hermes 入口，也不能发起新的 Agent 问答会话。</div></div>
@@ -4024,11 +4025,16 @@
             <div class="config-card-title">路由 / 模板树</div>
             <div class="config-field">
               <label>路由优先级（逗号分隔）</label>
-              <textarea id="hermes-route-priority" rows="3" placeholder="session_load,memory_read,fast_path,scope_guard,intent_router,knowledge.search,platform_tools,attachment.context,answer_synthesis"></textarea>
+              <textarea id="hermes-route-priority" rows="3" placeholder="session_load,memory_read,intent_router,semantic_interception,platform_tools,attachment.context,answer_synthesis"></textarea>
             </div>
             <div class="config-field">
               <label>模板树 JSON</label>
               <textarea id="hermes-template-tree" rows="13" placeholder='{"router":[{"id":"router.scope","label":"范围识别"}]}'></textarea>
+            </div>
+            <div class="config-field">
+              <label>语义拦截 Skill 规则 JSON</label>
+              <textarea id="hermes-interception-skills" rows="16" placeholder='[{"id":"no-direct-buy-sell","label":"直接交易指令","description":"识别要求买入、卖出、满仓、加仓或具体仓位指令的问题","rule_prompt":"如果用户明确要求买卖、满仓、加仓、减仓或具体仓位，请判定命中","action":"block","user_message":"我可以提供基本面、行情和风险分析，但不直接给出买卖或仓位指令。","enabled":true,"priority":10,"version":"1"}]'></textarea>
+              <div class="feature-note" style="margin-top:8px">规则是可版本化的 Skill 配置，不是程序关键词名单。开关关闭时不调用额外的拦截 LLM；开启后由当前 Admin 默认模型判断，每条规则的命中、版本、动作和理由都可在“拦截审计”查看。</div>
             </div>
             <div style="display:flex;justify-content:flex-end;margin-top:12px">
               <button id="save-hermes-settings" class="btn-gold" type="button" style="padding:8px 16px;font-size:12px" onclick="saveHermesSettings()">保存 Hermes 配置并生效</button>
@@ -4127,6 +4133,34 @@
             <thead><tr><th>能力名称</th><th>分类</th><th>提及次数</th><th>影响用户</th><th>最近对象 / 日期</th><th>最近问题</th></tr></thead>
             <tbody id="admin-hermes-missing-capability-tbody"></tbody>
           </table>
+        </div>
+      </div>
+      <div data-hermes-pane="audit">
+        <div class="table-wrap" style="margin-bottom:20px">
+          <div class="table-header">
+            <div>
+              <div class="table-title">语义拦截审计</div>
+              <div class="chart-subtitle" style="margin-top:6px">记录 LLM Planner 之后的 Skill 判定、规则版本、最终动作和是否调用研究工具。默认关闭时也记录本轮为 disabled，便于核对实际链路。</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <select id="admin-hermes-interception-audit-action" class="hermes-memory-select" onchange="loadAdminHermesInterceptionAudits(false)">
+                <option value="">全部动作</option>
+                <option value="allow">allow</option>
+                <option value="block">block</option>
+                <option value="clarify">clarify</option>
+                <option value="redirect">redirect</option>
+                <option value="human_review">human_review</option>
+              </select>
+              <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="loadAdminHermesInterceptionAudits(true)">刷新</button>
+            </div>
+          </div>
+          <div id="admin-hermes-interception-audit-status" class="hermes-memory-status">尚未加载语义拦截审计。</div>
+          <div style="overflow:auto;margin-top:12px">
+            <table id="admin-hermes-interception-audit-table">
+              <thead><tr><th>时间</th><th>用户</th><th>原始问题</th><th>Planner 意图</th><th>命中 Skill</th><th>动作</th><th>调用工具</th><th>决策原因</th></tr></thead>
+              <tbody id="admin-hermes-interception-audit-tbody"><tr><td colspan="8" style="color:#9A9590">暂无审计记录</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </div>
       </div><!-- end section-hermes -->
@@ -6546,9 +6580,9 @@ function showSection(name, navEl) {
 }
 
 function showHermesSubsection(tab, navEl) {
-  const allowed = new Set(['overview', 'usage', 'compute', 'memory', 'config']);
+  const allowed = new Set(['overview', 'usage', 'compute', 'memory', 'config', 'audit']);
   const nextTab = allowed.has(String(tab || '').trim()) ? String(tab).trim() : 'overview';
-  const labels = {overview: '总览', usage: '调用统计', compute: '算力与排行', memory: '记忆治理', config: '能力配置'};
+  const labels = {overview: '总览', usage: '调用统计', compute: '算力与排行', memory: '记忆治理', config: '能力配置', audit: '拦截审计'};
   const section = document.getElementById('section-hermes');
   if (!section || section.style.display === 'none') {
     showSection('hermes', navEl || document.querySelector(`[data-section="hermes"][data-hermes-subsection="${nextTab}"]`));
@@ -6565,6 +6599,9 @@ function showHermesSubsection(tab, navEl) {
   if (pageTitle) pageTitle.textContent = `Hermes · ${labels[nextTab]}`;
   const activeNav = document.querySelector(`[data-section="hermes"][data-hermes-subsection="${nextTab}"]`);
   if (activeNav) setActiveAdminNav(activeNav);
+  if (nextTab === 'audit') {
+    loadAdminHermesInterceptionAudits(false).catch((error) => showToast(error.message || '审计加载失败'));
+  }
   const url = new URL(window.location.href);
   url.searchParams.set('section', 'hermes');
   url.searchParams.set('hermes_tab', nextTab);
@@ -6718,6 +6755,10 @@ const adminHermesMemoryState = {
 const adminHermesUsageState = {
   loading: false,
   stats: null,
+};
+const adminHermesInterceptionAuditState = {
+  loading: false,
+  items: [],
 };
 
 function getAdminIndicatorDefinition(indicatorCode) {
@@ -9988,6 +10029,52 @@ async function loadAdminHermesUsageStats() {
   }
 }
 
+function renderAdminHermesInterceptionAudits() {
+  const body = document.getElementById('admin-hermes-interception-audit-tbody');
+  if (!body) return;
+  const items = Array.isArray(adminHermesInterceptionAuditState.items) ? adminHermesInterceptionAuditState.items : [];
+  body.innerHTML = items.length ? items.map((item) => {
+    const skillResults = Array.isArray(item.skill_results) ? item.skill_results : [];
+    const matchedIds = Array.isArray(item.matched_skill_ids) ? item.matched_skill_ids : [];
+    const matched = skillResults.filter((skill) => matchedIds.includes(skill.skill_id));
+    const matchedText = matched.map((skill) => `${skill.label || skill.skill_id || '--'} v${skill.rule_version || '1'}`).join('、') || '未命中';
+    const actionClass = item.action === 'block' || item.action === 'human_review' ? 'tag-red' : (item.action === 'clarify' || item.action === 'redirect' ? 'tag-gold' : 'tag-green');
+    return `<tr>
+      <td>${escapeHtml(item.created_at || '--')}</td>
+      <td>${escapeHtml(item.user_profile_id || '--')}<br><span style="font-size:10px;color:#8899aa">${escapeHtml(item.user_role || '')}</span></td>
+      <td style="min-width:240px;max-width:420px;white-space:normal;line-height:1.6">${escapeHtml(item.question_text || '--')}</td>
+      <td>${escapeHtml(item.planner_intent || '--')}${item.planner_tasks?.length ? `<br><span style="font-size:10px;color:#8899aa">${escapeHtml(item.planner_tasks.join('、'))}</span>` : ''}</td>
+      <td style="min-width:150px;white-space:normal">${escapeHtml(matchedText)}</td>
+      <td><span class="tag ${actionClass}">${escapeHtml(item.action || item.decision_status || '--')}</span><br><span style="font-size:10px;color:#8899aa">${escapeHtml(item.decision_status || '')}</span></td>
+      <td>${item.tool_called ? '<span class="tag tag-red">是</span>' : '<span class="tag tag-green">否</span>'}</td>
+      <td style="min-width:220px;max-width:360px;white-space:normal;line-height:1.6">${escapeHtml(item.final_reason || '--')}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="8" style="color:#9A9590">暂无语义拦截审计记录</td></tr>';
+}
+
+async function loadAdminHermesInterceptionAudits(forceReload = false) {
+  if (adminHermesInterceptionAuditState.loading && !forceReload) return;
+  const status = document.getElementById('admin-hermes-interception-audit-status');
+  const tenantSlug = getAdminHermesMemorySelectedTenant();
+  const action = document.getElementById('admin-hermes-interception-audit-action')?.value || '';
+  adminHermesInterceptionAuditState.loading = true;
+  if (status) status.textContent = '正在加载语义拦截审计...';
+  try {
+    const query = new URLSearchParams({tenant_slug: tenantSlug || '', action, limit: '100'});
+    const response = await fetch(`/api/admin/hermes/interception-audits?${query.toString()}`, {cache: 'no-store'});
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error((data && data.error) || 'hermes_interception_audits_failed');
+    adminHermesInterceptionAuditState.items = Array.isArray(data.items) ? data.items : [];
+    renderAdminHermesInterceptionAudits();
+    if (status) status.textContent = `已加载 ${adminHermesInterceptionAuditState.items.length} 条审计记录 · ${tenantSlug || '全部租户'}`;
+  } catch (error) {
+    if (status) status.textContent = error.message || '语义拦截审计加载失败';
+    throw error;
+  } finally {
+    adminHermesInterceptionAuditState.loading = false;
+  }
+}
+
 function renderAdminHermesMemoryPanel() {
   const tenantSelect = document.getElementById('admin-hermes-memory-tenant');
   const summaryNode = document.getElementById('admin-hermes-memory-summary');
@@ -11811,8 +11898,8 @@ function renderSiteConfigForm() {
   if (embeddingLocalModel) embeddingLocalModel.value = voiceEmbedding.local_model_name || 'BAAI/bge-small-zh-v1.5';
   const knowledgePreviewToggle = document.getElementById('knowledge-user-preview-enabled');
   if (knowledgePreviewToggle) knowledgePreviewToggle.checked = knowledgeIngestion.user_preview_enabled === true;
-  const hermesPromptScopeGuardToggle = document.getElementById('hermes-prompt-scope-guard-enabled');
-  if (hermesPromptScopeGuardToggle) hermesPromptScopeGuardToggle.checked = hermesSettings.prompt_scope_guard_enabled !== false;
+  const hermesInterceptionSkillsToggle = document.getElementById('hermes-interception-skills-enabled');
+  if (hermesInterceptionSkillsToggle) hermesInterceptionSkillsToggle.checked = hermesSettings.interception_skills_enabled === true;
   const hermesDavAccessToggle = document.getElementById('hermes-dav-access-enabled');
   if (hermesDavAccessToggle) hermesDavAccessToggle.checked = hermesSettings.dav_access_enabled !== false;
   const hermesInvestorAccessToggle = document.getElementById('hermes-investor-access-enabled');
@@ -11831,6 +11918,8 @@ function renderSiteConfigForm() {
   if (hermesRoutePriorityField) hermesRoutePriorityField.value = (hermesSettings.route_priority || []).join(',');
   const hermesTemplateTreeField = document.getElementById('hermes-template-tree');
   if (hermesTemplateTreeField) hermesTemplateTreeField.value = stringifyAdminConfigJson(hermesSettings.template_tree || {}, {});
+  const hermesInterceptionSkillsField = document.getElementById('hermes-interception-skills');
+  if (hermesInterceptionSkillsField) hermesInterceptionSkillsField.value = stringifyAdminConfigJson(hermesSettings.interception_skills || [], []);
   const dbRuntimeToggle = document.getElementById('db-runtime-use-staging');
   const roleCapabilitiesField = document.getElementById('role-capabilities-json');
   if (roleCapabilitiesField) roleCapabilitiesField.value = stringifyAdminConfigJson(roleCapabilities, {});
@@ -12105,11 +12194,14 @@ async function saveHermesSettings() {
   let hermesRoutePriority = [];
   let hermesTemplateTree = {};
   let hermesChartTypesEnabled = [];
+  let hermesInterceptionSkills = [];
   try {
     hermesIntentTree = parseAdminConfigJsonField('hermes-intent-tree', currentHermesSettings.intent_tree || []);
     hermesRoutePriority = parseAdminConfigListField('hermes-route-priority', currentHermesSettings.route_priority || []);
     hermesTemplateTree = parseAdminConfigJsonField('hermes-template-tree', currentHermesSettings.template_tree || {});
     hermesChartTypesEnabled = parseAdminConfigListField('hermes-chart-types-enabled', currentHermesSettings.chart_types_enabled || []);
+    hermesInterceptionSkills = parseAdminConfigJsonField('hermes-interception-skills', currentHermesSettings.interception_skills || []);
+    if (!Array.isArray(hermesInterceptionSkills)) throw new Error('hermes-interception-skills 必须是 JSON 数组。');
   } catch (error) {
     markAdminSiteConfigDirty((error && error.message) || 'Hermes 配置格式校验失败，请检查后再保存。');
     showToast('Hermes 配置格式有误');
@@ -12126,7 +12218,8 @@ async function saveHermesSettings() {
       body: JSON.stringify({
         hermes_settings: {
           ...currentHermesSettings,
-          prompt_scope_guard_enabled: Boolean(document.getElementById('hermes-prompt-scope-guard-enabled') && document.getElementById('hermes-prompt-scope-guard-enabled').checked),
+          interception_skills_enabled: Boolean(document.getElementById('hermes-interception-skills-enabled') && document.getElementById('hermes-interception-skills-enabled').checked),
+          interception_skills: hermesInterceptionSkills,
           dav_access_enabled: Boolean(document.getElementById('hermes-dav-access-enabled') && document.getElementById('hermes-dav-access-enabled').checked),
           investor_access_enabled: Boolean(document.getElementById('hermes-investor-access-enabled') && document.getElementById('hermes-investor-access-enabled').checked),
           thinking_process_enabled: Boolean(document.getElementById('hermes-thinking-process-enabled') && document.getElementById('hermes-thinking-process-enabled').checked),
@@ -12171,12 +12264,15 @@ async function saveSiteConfig() {
   let hermesRoutePriority = [];
   let hermesTemplateTree = {};
   let hermesChartTypesEnabled = [];
+  let hermesInterceptionSkills = [];
   let roleCapabilities = {};
   try {
     hermesIntentTree = parseAdminConfigJsonField('hermes-intent-tree', currentHermesSettings.intent_tree || []);
     hermesRoutePriority = parseAdminConfigListField('hermes-route-priority', currentHermesSettings.route_priority || []);
     hermesTemplateTree = parseAdminConfigJsonField('hermes-template-tree', currentHermesSettings.template_tree || {});
     hermesChartTypesEnabled = parseAdminConfigListField('hermes-chart-types-enabled', currentHermesSettings.chart_types_enabled || []);
+    hermesInterceptionSkills = parseAdminConfigJsonField('hermes-interception-skills', currentHermesSettings.interception_skills || []);
+    if (!Array.isArray(hermesInterceptionSkills)) throw new Error('hermes-interception-skills 必须是对象数组 JSON。');
     roleCapabilities = parseAdminConfigJsonField('role-capabilities-json', adminSiteConfig.role_capabilities || {});
     if (!roleCapabilities || Array.isArray(roleCapabilities) || typeof roleCapabilities !== 'object') {
       throw new Error('role-capabilities-json 必须是对象 JSON。');
@@ -12258,7 +12354,8 @@ async function saveSiteConfig() {
     },
     hermes_settings: {
       ...currentHermesSettings,
-      prompt_scope_guard_enabled: Boolean(document.getElementById('hermes-prompt-scope-guard-enabled') && document.getElementById('hermes-prompt-scope-guard-enabled').checked),
+      interception_skills_enabled: Boolean(document.getElementById('hermes-interception-skills-enabled') && document.getElementById('hermes-interception-skills-enabled').checked),
+      interception_skills: hermesInterceptionSkills,
       dav_access_enabled: Boolean(document.getElementById('hermes-dav-access-enabled') && document.getElementById('hermes-dav-access-enabled').checked),
       investor_access_enabled: Boolean(document.getElementById('hermes-investor-access-enabled') && document.getElementById('hermes-investor-access-enabled').checked),
       thinking_process_enabled: Boolean(document.getElementById('hermes-thinking-process-enabled') && document.getElementById('hermes-thinking-process-enabled').checked),

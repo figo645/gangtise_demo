@@ -70,6 +70,37 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
         self.assertEqual(llm_call.call_args.kwargs["request_timeout_seconds"], 60)
         self.assertEqual(llm_call.call_args.kwargs["max_tokens"], 512)
 
+    def test_router_sends_the_current_question_verbatim_and_uses_memory_only_as_context(self):
+        model = {
+            "key": "admin-default",
+            "base_url": "http://8.155.160.194:6031/api",
+            "model_name": "qwen3.5:27b-q4_K_M",
+            "api_key": "configured",
+            "enabled": True,
+        }
+        current_question = "对今天中国银行的股票做下个股分析，看看今天整体情况怎么样"
+        with patch.object(ai_services, "get_default_llm_config", return_value=model), patch.object(
+            ai_services,
+            "call_openai_compatible_llm",
+            return_value='{"intent":"stock_today_observation","tools":["gangtise.stock_today_observation"],"target_type":"stock","securities":[{"name":"中国银行"}],"time_scope":"today","display_mode":"text"}',
+        ) as llm_call, patch.object(
+            ai_services, "search_watchlist_candidates", return_value=[]
+        ), patch.object(
+            ai_services,
+            "resolve_watchlist_candidate",
+            return_value={"name": "中国银行", "code": "601988", "security_code": "601988.SH"},
+        ):
+            ai_services.route_hermes_query_intent(
+                current_question,
+                messages=[{"role": "user", "content": "上一轮问题"}],
+                memory_state={"session": {"last_intent": "small_talk"}},
+            )
+
+        user_prompt = llm_call.call_args.args[2]
+        self.assertIn(f"用户问题：{current_question}", user_prompt)
+        self.assertIn("上一轮问题", user_prompt)
+        self.assertNotIn("上一轮问题\n是否有附件", user_prompt)
+
     def test_admin_uses_the_dav_hermes_permission_gate_without_becoming_dav(self):
         site_config = {
             "feature_flags": {"hermes": True},
@@ -110,11 +141,17 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
         self.assertIn("LLM 意图拆解", labels)
         self.assertIn("任务级工具调度", labels)
         self.assertIn("会话与用户记忆写回", labels)
-        self.assertGreaterEqual(len(router_edges), 5)
         self.assertEqual(
-            {item["label"] for item in router_edges},
-            {"拒绝", "需补充", "闲聊", "单任务", "多任务"},
+            [(item["from"], item["to"]) for item in router_edges],
+            [("intent_router", "semantic_interception")],
         )
+        interception_edges = [item for item in edges if item["from"] == "semantic_interception"]
+        self.assertEqual(
+            {item["label"] for item in interception_edges},
+            {"拒绝", "需补充", "闲聊", "单任务", "多任务", "人工审核"},
+        )
+        self.assertIn("语义拦截 Skill", labels)
+        self.assertIn("基础技术校验", labels)
         self.assertTrue(any(item.get("visual_only") for item in workflow["nodes"]))
         for label in ("今日个股观察", "今日大盘分析", "个股结构化分析报告", "个股看点摘要", "多自选股综合分析", "闲聊回答生成"):
             self.assertIn(label, labels)
@@ -294,6 +331,77 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
         self.assertFalse(session_factory.return_value.trust_env)
         session_factory.return_value.post.assert_called_once()
         self.assertFalse(session_factory.return_value.post.call_args.kwargs["allow_redirects"])
+
+    def test_llm_response_parser_accepts_openai_content_variants(self):
+        responses = [
+            {"choices": [{"message": {"content": [{"type": "text", "text": "片段回答"}]}}]},
+            {"choices": [{"message": {"content": {"type": "output_text", "text": "对象回答"}}}]},
+            {"choices": [{"text": "兼容回答"}]},
+        ]
+        model = {
+            "key": "admin-default",
+            "base_url": "http://8.155.160.194:6031/api",
+            "model_name": "qwen3.5:27b-q4_K_M",
+            "api_key": "key",
+            "enabled": True,
+        }
+        with patch.object(ai_services.requests, "Session") as session_factory, patch.object(
+            ai_services, "log_token_usage"
+        ):
+            session_factory.return_value.post.side_effect = [
+                type("Response", (), {"status_code": 200, "text": "", "json": lambda self, payload=payload: payload})()
+                for payload in responses
+            ]
+            results = [
+                ai_services.call_openai_compatible_llm(model, "system", "user")
+                for _ in responses
+            ]
+
+        self.assertEqual(results, ["片段回答", "对象回答", "兼容回答"])
+
+    def test_llm_reasoning_only_response_remains_strict_failure(self):
+        payload = {
+            "choices": [
+                {
+                    "finish_reason": "stop",
+                    "message": {"content": "", "reasoning_content": "内部推理，不应展示"},
+                }
+            ]
+        }
+        response = type("Response", (), {"status_code": 200, "text": "", "json": lambda self: payload})()
+        model = {
+            "key": "admin-default",
+            "base_url": "http://8.155.160.194:6031/api",
+            "model_name": "qwen3.5:27b-q4_K_M",
+            "api_key": "key",
+            "enabled": True,
+        }
+        with patch.object(ai_services.requests, "Session") as session_factory, patch.object(
+            ai_services, "log_token_usage"
+        ), patch.object(ai_services.app.logger, "warning") as warning:
+            session_factory.return_value.post.return_value = response
+            with self.assertRaisesRegex(RuntimeError, "empty_llm_response:reasoning_only"):
+                ai_services.call_openai_compatible_llm(model, "system", "user", feature_code="hermes_intent_router")
+
+        warning.assert_called_once()
+        self.assertNotIn("内部推理", str(warning.call_args))
+
+    def test_hermes_turn_metrics_reads_task_intents_from_tags(self):
+        metrics = ai_services._extract_hermes_turn_metrics(
+            {
+                "question_text": "组合分析",
+                "answer_text": "已完成",
+                "intent": "composite_research",
+                "tags_json": '{"task_intents":["stock_today_observation","market_today_observation"]}',
+                "memory_summary_json": "{}",
+                "tool_trace_json": "[]",
+            }
+        )
+
+        self.assertEqual(
+            metrics["task_intents"],
+            ["stock_today_observation", "market_today_observation"],
+        )
 
     def test_hermes_ignores_feature_binding_and_uses_admin_default(self):
         admin_default_model = {
@@ -888,6 +996,192 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
                 "target_type": "multi_stock",
                 "securities": [{"code": "601988"}],
             })
+
+    def test_interception_skill_is_opt_in_and_disabled_does_not_call_a_second_llm(self):
+        decision = ai_services.evaluate_hermes_interception_skills(
+            "请帮我分析中国银行",
+            {"intent": "stock_today_observation"},
+            hermes_settings={
+                "interception_skills_enabled": False,
+                "interception_skills": [{
+                    "id": "rule-1",
+                    "rule_prompt": "判断是否为直接交易指令",
+                    "action": "block",
+                }],
+            },
+        )
+
+        self.assertFalse(decision["enabled"])
+        self.assertEqual(decision["status"], "disabled")
+
+    def test_enabled_interception_skill_can_block_without_calling_gangtise(self):
+        model = {"key": "router", "provider": "mock", "model_name": "router", "enabled": True}
+        with patch.object(ai_services, "get_default_llm_config", return_value=model), patch.object(
+            ai_services,
+            "call_openai_compatible_llm",
+            return_value='{"decisions":[{"skill_id":"no-buy","matched":true,"confidence":0.98,"reason":"用户明确要求买入"}]}',
+        ) as llm_call:
+            decision = ai_services.evaluate_hermes_interception_skills(
+                "明天买入中国银行并满仓",
+                {"intent": "stock_today_observation", "tools": ["gangtise.stock_today_observation"]},
+                hermes_settings={
+                    "interception_skills_enabled": True,
+                    "interception_skills": [{
+                        "id": "no-buy",
+                        "label": "直接交易指令",
+                        "rule_prompt": "识别买入、卖出、满仓或仓位要求",
+                        "action": "block",
+                        "version": "3",
+                    }],
+                },
+            )
+
+        self.assertEqual(llm_call.call_count, 1)
+        self.assertEqual(decision["status"], "intercepted")
+        self.assertEqual(decision["action"], "block")
+        self.assertEqual(decision["selected_skill"]["version"], "3")
+        self.assertEqual(decision["matched_skill_ids"], ["no-buy"])
+
+    def test_interception_skill_can_return_clarify_action(self):
+        model = {"key": "router", "provider": "mock", "model_name": "router", "enabled": True}
+        with patch.object(ai_services, "get_default_llm_config", return_value=model), patch.object(
+            ai_services,
+            "call_openai_compatible_llm",
+            return_value='{"decisions":[{"skill_id":"need-context","matched":true,"confidence":0.9,"reason":"缺少明确时间范围"}]}',
+        ):
+            decision = ai_services.evaluate_hermes_interception_skills(
+                "帮我看看这只股票",
+                {"intent": "stock_today_observation"},
+                hermes_settings={
+                    "interception_skills_enabled": True,
+                    "interception_skills": [{
+                        "id": "need-context",
+                        "rule_prompt": "问题缺少证券或时间范围时要求补充",
+                        "action": "clarify",
+                        "user_message": "请补充股票名称和希望查看的时间范围。",
+                    }],
+                },
+            )
+
+        self.assertEqual(decision["action"], "clarify")
+        self.assertEqual(decision["user_message"], "请补充股票名称和希望查看的时间范围。")
+
+    def test_interception_skill_requires_a_decision_for_every_configured_rule(self):
+        model = {"key": "router", "provider": "mock", "model_name": "router", "enabled": True}
+        with patch.object(ai_services, "get_default_llm_config", return_value=model), patch.object(
+            ai_services,
+            "call_openai_compatible_llm",
+            return_value='{"decisions":[{"skill_id":"rule-a","matched":false,"confidence":0.9,"reason":"未命中"}]}',
+        ):
+            with self.assertRaisesRegex(RuntimeError, "missing_skills:rule-b"):
+                ai_services.evaluate_hermes_interception_skills(
+                    "请分析中国银行",
+                    {"intent": "stock_today_observation"},
+                    hermes_settings={
+                        "interception_skills_enabled": True,
+                        "interception_skills": [
+                            {"id": "rule-a", "rule_prompt": "规则 A"},
+                            {"id": "rule-b", "rule_prompt": "规则 B"},
+                        ],
+                    },
+                )
+
+    def test_planner_safe_disposition_cannot_execute_accidental_tasks(self):
+        model = {"key": "router", "provider": "mock", "model_name": "router", "enabled": True}
+        with patch.object(ai_services, "get_default_llm_config", return_value=model), patch.object(
+            ai_services,
+            "call_openai_compatible_llm",
+            return_value=(
+                '{"disposition":"chat","reason":"用户在闲聊",'
+                '"tasks":[{"intent":"stock_today_observation","tools":["gangtise.stock_today_observation"],'
+                '"target_type":"stock","securities":[{"name":"中国银行"}],"time_scope":"today"}]}'
+            ),
+        ), patch.object(ai_services, "search_watchlist_candidates", return_value=[]):
+            plan, _model, _mode = ai_services.route_hermes_query_intent("你好，顺便分析中国银行")
+
+        self.assertEqual(plan["intent"], "small_talk")
+        self.assertEqual(plan["disposition"], "chat")
+        self.assertEqual(plan["tools"], [])
+
+    def test_question_extraction_rejects_non_string_payload_and_preserves_current_text(self):
+        with self.assertRaisesRegex(ValueError, "hermes_question_invalid_type"):
+            ai_services.extract_hermes_question_text([], {"text": "not a question"})
+
+        current = "  原始问题：请分析中国银行  \n"
+        self.assertEqual(ai_services.extract_hermes_question_text([], current), current)
+
+    def test_human_review_interception_has_a_non_llm_user_response(self):
+        synthesis, model, mode = ai_services.synthesize_hermes_answer(
+            "请帮我处理这个问题",
+            {
+                "intent": "human_review",
+                "interception_message": "已提交人工审核，请等待处理。",
+                "interception_reason": "命中人工审核规则",
+            },
+            {},
+        )
+
+        self.assertIsNone(model)
+        self.assertEqual(mode, "human_review")
+        self.assertEqual(synthesis["answer"], "已提交人工审核，请等待处理。")
+
+    def test_interception_audit_contains_raw_question_planner_and_skill_version(self):
+        class FakeDb:
+            def __init__(self):
+                self.values = None
+
+            def execute(self, _sql, params=()):
+                self.values = tuple(params)
+                return self
+
+            def commit(self):
+                return None
+
+        fake_db = FakeDb()
+        with patch.object(ai_services, "get_db", return_value=fake_db), patch.object(
+            ai_services, "ensure_hermes_interception_audit_table", return_value=None
+        ):
+            audit_id = ai_services.record_hermes_interception_audit(
+                question_text="原始问题：请分析中国银行",
+                router_plan={"intent": "stock_today_observation", "tasks": [{"intent": "stock_today_observation"}]},
+                decision={
+                    "status": "intercepted",
+                    "action": "block",
+                    "reason": "命中规则",
+                    "matched_skill_ids": ["no-buy"],
+                    "results": [{"skill_id": "no-buy", "rule_version": "7", "matched": True}],
+                },
+                tenant_slug="laowang",
+                user_profile_id="财经老王",
+            )
+
+        self.assertTrue(audit_id.startswith("hermes-interception-"))
+        self.assertIsNotNone(fake_db.values)
+        self.assertIn("原始问题：请分析中国银行", fake_db.values)
+        self.assertTrue(any('"stock_today_observation"' in str(value) for value in fake_db.values))
+        self.assertTrue(any('"rule_version": "7"' in str(value) for value in fake_db.values))
+
+    def test_interception_audit_failure_does_not_fail_normal_answer(self):
+        with patch.object(ai_services, "ensure_hermes_interception_audit_table", side_effect=RuntimeError("db down")), patch.object(
+            ai_services.app.logger, "exception"
+        ) as log_exception:
+            audit_id = ai_services.record_hermes_interception_audit(
+                question_text="你好",
+                router_plan={"intent": "small_talk"},
+                decision={"status": "disabled", "action": "allow"},
+            )
+
+        self.assertEqual(audit_id, "")
+        log_exception.assert_called_once()
+
+    def test_interception_skill_configuration_normalizes_invalid_priority(self):
+        skills = core_services.normalize_hermes_interception_skills([
+            {"id": "bad-priority", "priority": "not-a-number", "rule_prompt": "判断规则"},
+            {"id": "bad-priority", "priority": 1, "rule_prompt": "重复规则"},
+        ])
+
+        self.assertEqual(len(skills), 1)
+        self.assertEqual(skills[0]["priority"], 100)
 
 
 if __name__ == "__main__":
