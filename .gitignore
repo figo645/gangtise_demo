@@ -4,4 +4,9 @@ app.daemon.log
 .deploy/
 .database_release.env
 .gangtise_openapi.env
-tools/__pycache__/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
