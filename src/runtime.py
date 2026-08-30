@@ -841,6 +841,7 @@ DEFAULT_SITE_CONFIG = {
         "channel_module": True,
         "analytics_module": True,
         "system_module": True,
+        "h5_watermark": False,
         "vip": False,
         "dm": True,
         "fan_interaction": False,

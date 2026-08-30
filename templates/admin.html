@@ -4825,6 +4825,7 @@
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">渠道模块</div><div class="feature-toggle-desc">位置：Admin 渠道运营与渠道数据页。控制渠道来源、投放归因和渠道运营配置入口。</div></div><label class="toggle"><input id="feature-channel_module" type="checkbox" checked><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">数据分析模块</div><div class="feature-toggle-desc">位置：Admin 指标专区和大V工作台指标看板。控制指标总览、智能指标、数据湖、异常检测及指标定义入口。</div></div><label class="toggle"><input id="feature-analytics_module" type="checkbox" checked><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">系统模块</div><div class="feature-toggle-desc">位置：Admin 系统专区。控制主题、品牌、功能开关、访问策略、模型配置、任务中心和审计等系统级配置入口。</div></div><label class="toggle"><input id="feature-system_module" type="checkbox" checked><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">H5 防截图水印</div><div class="feature-toggle-desc">位置：H5 登录后的全部页面。开启后按当前用户名和日期生成低透明度、稀疏排列的 45 度水印，降低截图外传风险；关闭后不展示。</div></div><label class="toggle"><input id="feature-h5_watermark" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">会员页</div><div class="feature-toggle-desc">位置：H5 会员权益、积分与用户分层相关页面。关闭后普通用户不再看到会员权益和积分入口。</div></div><label class="toggle"><input id="feature-vip" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">消息/私信</div><div class="feature-toggle-desc">位置：H5 消息页与大V粉丝会话。控制粉丝与所属大V的私信会话、系统消息和消息通知入口。</div></div><label class="toggle"><input id="feature-dm" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">粉丝与大V互动</div><div class="feature-toggle-desc">位置：H5 消息与自选股互动场景。控制粉丝对所属大V发起互动、反馈与回复的能力。</div></div><label class="toggle"><input id="feature-fan_interaction" type="checkbox"><span class="toggle-slider"></span></label></div>
@@ -11949,7 +11950,7 @@ function renderSiteConfigForm() {
   if (document.getElementById('brand-hero-tagline')) document.getElementById('brand-hero-tagline').value = brand.hero_tagline || '';
   if (document.getElementById('brand-hero-description')) document.getElementById('brand-hero-description').value = brand.hero_description || '';
   if (document.getElementById('brand-footer-description')) document.getElementById('brand-footer-description').value = brand.footer_description || '';
-  ['user_module', 'kol_module', 'tenant_portal', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'review_voice_input', 'review_url_input', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'paid_reply', 'workbench'].forEach(key => {
+  ['user_module', 'kol_module', 'tenant_portal', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'review_voice_input', 'review_url_input', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'h5_watermark', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'paid_reply', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     if (checkbox) {
       checkbox.checked = key === 'knowledge'
@@ -12282,7 +12283,7 @@ async function saveSiteConfig() {
     showToast('Hermes 配置格式有误');
     return;
   }
-  ['user_module', 'kol_module', 'tenant_portal', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'paid_reply', 'workbench'].forEach(key => {
+  ['user_module', 'kol_module', 'tenant_portal', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'h5_watermark', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'paid_reply', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     featureFlags[key] = Boolean(checkbox && checkbox.checked);
   });

@@ -2856,6 +2856,43 @@ body { background: var(--surface-2); color: var(--text-main); }
 .demo-switch-meta { font-size:11px; color:var(--gray-400); margin-top:4px; line-height:1.5; }
 .demo-switch-tag { font-size:10px; color:var(--gold); background:rgba(200,169,110,0.12); border:1px solid rgba(200,169,110,0.2); border-radius:999px; padding:3px 8px; white-space:nowrap; }
 .h5-wrap.is-logged-out { display:none; }
+.h5-watermark-layer {
+  position:fixed;
+  inset:0;
+  z-index:4500;
+  display:none;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  grid-template-rows:repeat(2, minmax(0, 1fr));
+  align-items:center;
+  justify-items:center;
+  gap:4vh 5vw;
+  padding:12vh 7vw 18vh;
+  overflow:hidden;
+  box-sizing:border-box;
+  pointer-events:none;
+  user-select:none;
+  -webkit-user-select:none;
+}
+.h5-watermark-layer.is-visible { display:grid; }
+.h5-watermark-item {
+  width:28vw;
+  min-width:150px;
+  max-width:280px;
+  overflow:hidden;
+  color:rgba(38,76,111,.11);
+  font-size:14px;
+  font-weight:600;
+  letter-spacing:.02em;
+  line-height:1.4;
+  text-align:center;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  transform:rotate(-45deg);
+}
+@media (max-width:575.98px) {
+  .h5-watermark-layer { grid-template-columns:repeat(2, minmax(0, 1fr)); grid-template-rows:repeat(3, minmax(0, 1fr)); gap:4vh 4vw; padding:11vh 5vw 17vh; }
+  .h5-watermark-item { width:42vw; min-width:130px; font-size:13px; color:rgba(38,76,111,.10); }
+}
 .h5-login-shell {
   --login-ink:#102B49;
   --login-blue:#2F74C0;
@@ -4382,6 +4419,7 @@ body,
   </div>
 </div>
 <div class="h5-wrap">
+  <div id="h5-watermark-layer" class="h5-watermark-layer" aria-hidden="true"></div>
 
   <!-- ===== HEADER ===== -->
   <div class="h5-header">
@@ -5489,6 +5527,37 @@ function isFeatureEnabled(featureName) {
   return siteFeatures[featureName] !== false;
 }
 
+function getH5WatermarkDate() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+function renderH5Watermark() {
+  const layer = document.getElementById('h5-watermark-layer');
+  if (!layer) return;
+  const featureEnabled = isFeatureEnabled('h5_watermark');
+  const profile = window.CURRENT_DEMO_PROFILE || getActiveDemoUser() || {};
+  const username = String(profile.username || '').trim();
+  const loggedIn = hasLoggedInH5User() && !document.querySelector('.h5-wrap')?.classList.contains('is-logged-out');
+  if (!featureEnabled || !loggedIn || !username) {
+    layer.replaceChildren();
+    layer.classList.remove('is-visible');
+    return;
+  }
+  const label = `${username} · ${getH5WatermarkDate()}`;
+  const fragment = document.createDocumentFragment();
+  for (let index = 0; index < 6; index += 1) {
+    const item = document.createElement('span');
+    item.className = 'h5-watermark-item';
+    item.textContent = label;
+    fragment.appendChild(item);
+  }
+  layer.replaceChildren(fragment);
+  layer.classList.add('is-visible');
+}
+
 function isStockForecastEnabled() {
   return isFeatureEnabled('stock_forecast');
 }
@@ -5519,6 +5588,7 @@ function applySiteFeatureFlags() {
   if (activePage && activePage.dataset.feature && !isFeatureEnabled(activePage.dataset.feature)) {
     switchTab(getFirstEnabledTab());
   }
+  renderH5Watermark();
 }
 
 async function refreshH5SiteConfig(options = {}) {
@@ -7200,6 +7270,7 @@ function setH5ShellLoggedOut(isLoggedOut) {
   const loginShell = document.getElementById('h5-login-shell');
   if (appShell) appShell.classList.toggle('is-logged-out', isLoggedOut);
   if (loginShell) loginShell.classList.toggle('hidden', !isLoggedOut);
+  renderH5Watermark();
 }
 
 async function refreshH5AuthOptions(options = {}) {
@@ -12206,6 +12277,7 @@ function renderDemoProfile(user) {
     h5OnboardingState = normalizeH5OnboardingState({});
     renderH5OnboardingModal();
     setH5ShellLoggedOut(true);
+    renderH5Watermark();
     renderH5LoginScreen();
     return;
   }
@@ -12217,6 +12289,7 @@ function renderDemoProfile(user) {
   window.CURRENT_DEMO_PROFILE = user;
   syncH5OnboardingStateFromProfile(user);
   setH5ShellLoggedOut(false);
+  renderH5Watermark();
   const el = (id) => document.getElementById(id);
   if (el('global-profile-avatar')) el('global-profile-avatar').textContent = user.avatar;
   if (el('profile-avatar-lg')) el('profile-avatar-lg').textContent = user.avatar;
@@ -12645,6 +12718,7 @@ async function logoutH5User() {
     hermesCredits = 0;
     h5OnboardingState = normalizeH5OnboardingState({});
     renderH5OnboardingModal();
+    renderH5Watermark();
     window.location.href = '/login';
   } catch (error) {
     showToast('退出失败');
