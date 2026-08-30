@@ -2,14 +2,24 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>洞见智研登录</title>
 <link rel="stylesheet" href="/static/css/style.css">
 <script src="/static/js/theme.js"></script>
 <style>
-body{margin:0;min-height:100vh;background:var(--surface-2);color:var(--text-main);font-family:var(--font-main)}
-.login-shell{min-height:100vh;box-sizing:border-box;padding:28px 18px 36px;background:radial-gradient(circle at top left,rgba(200,169,110,.1),transparent 38%),radial-gradient(circle at top right,rgba(47,116,192,.1),transparent 42%),linear-gradient(180deg,#F8FBFF 0%,#EEF4FA 100%)}
-.login-card{width:min(100%,440px);box-sizing:border-box;margin:0 auto;padding:22px 18px 18px;background:#fff;border:1px solid rgba(47,116,192,.12);border-radius:24px;box-shadow:0 24px 60px rgba(31,73,125,.1)}
+body{margin:0;min-height:100dvh;background:var(--surface-2);color:var(--text-main);font-family:var(--font-main)}
+.login-shell{position:relative;display:flex;align-items:center;justify-content:center;min-height:100dvh;box-sizing:border-box;padding:max(28px,env(safe-area-inset-top)) 18px max(36px,env(safe-area-inset-bottom));overflow-x:hidden;overflow-y:auto;background:linear-gradient(115deg,rgba(255,255,255,.97),rgba(241,247,253,.99)),#F2F7FC}
+.login-shell:before,.login-shell:after{content:"";position:absolute;pointer-events:none;border:1px solid rgba(47,116,192,.13);transform:rotate(-18deg)}
+.login-shell:before{width:72vw;height:72vw;max-width:900px;max-height:900px;left:-28vw;top:-38vw}
+.login-shell:after{width:54vw;height:54vw;max-width:680px;max-height:680px;right:-22vw;bottom:-30vw}
+.login-art{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.login-art-grid{fill:none;stroke:rgba(47,116,192,.13);stroke-width:1}
+.login-art-axis{fill:none;stroke:rgba(47,116,192,.2);stroke-width:1.5;stroke-dasharray:5 8}
+.login-art-trend,.login-art-shadow{fill:none;stroke-linecap:round;stroke-linejoin:round}
+.login-art-trend{stroke:rgba(47,116,192,.72);stroke-width:3;stroke-dasharray:8 12;animation:loginTrend 5s linear infinite}
+.login-art-shadow{stroke:rgba(184,138,59,.28);stroke-width:8}
+.login-card{position:relative;z-index:1;width:min(100%,440px);box-sizing:border-box;margin:0 auto;padding:24px 20px 20px;background:rgba(255,255,255,.94);border:1px solid rgba(47,116,192,.16);border-radius:22px;box-shadow:0 24px 60px rgba(31,73,125,.14),0 4px 12px rgba(47,116,192,.05);backdrop-filter:blur(8px)}
+.login-brand-mark{width:48px;height:48px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(184,138,59,.38);border-radius:50%;color:#B88A3B;font-size:20px;font-weight:800;background:rgba(255,255,255,.74);box-shadow:0 8px 20px rgba(31,73,125,.08)}
 .login-kicker{display:inline-flex;padding:6px 10px;border:1px solid rgba(200,169,110,.16);border-radius:999px;background:rgba(200,169,110,.1);font-size:11px;color:var(--gold)}
 .login-title{margin-top:18px;color:var(--text-main);font-size:36px;line-height:1.2;font-weight:800}
 .login-desc{margin-top:10px;color:var(--gray-400);font-size:17px;line-height:1.8}
@@ -28,11 +38,24 @@ body{margin:0;min-height:100vh;background:var(--surface-2);color:var(--text-main
 .login-divider{display:flex;align-items:center;gap:10px;margin:18px 0 10px;color:var(--gray-400);font-size:14px}.login-divider:before,.login-divider:after{content:'';flex:1;height:1px;background:rgba(47,116,192,.1)}
 .login-section-title{margin:18px 0 10px;color:#2F74C0;font-size:16px;font-weight:800}
 .account-list{display:grid;gap:12px}.account-card{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid rgba(47,116,192,.1);border-radius:18px;background:#fff}.account-avatar{width:48px;height:48px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:16px;background:linear-gradient(135deg,var(--gold-dark),var(--gold));font-size:22px}.account-main{min-width:0;flex:1}.account-name{font-size:15px;font-weight:700}.account-meta{margin-top:4px;color:var(--gray-400);font-size:12px;line-height:1.7}.account-badge{display:inline-flex;margin-top:6px;padding:4px 8px;border:1px solid rgba(47,116,192,.12);border-radius:999px;background:rgba(47,116,192,.08);color:#2F74C0;font-size:10px}.account-enter{padding:7px 10px;border-radius:999px;background:#2F74C0;color:#fff;font-size:11px;font-weight:800;cursor:pointer}.account-empty{padding:18px 12px;border:1px dashed rgba(200,169,110,.18);border-radius:16px;color:var(--gray-400);font-size:12px;line-height:1.8;text-align:center}
+@keyframes loginTrend{to{stroke-dashoffset:-80px}}
+@media (max-width:575.98px){.login-shell{align-items:flex-start;padding-left:16px;padding-right:16px}.login-card{margin-top:clamp(12px,7vh,48px);padding:22px 16px 18px;border-radius:20px}.login-title{font-size:30px}.login-desc{font-size:16px}.login-mode-tab,.login-btn{min-height:44px}.login-input{min-height:44px;font-size:16px}}
+@media (max-height:620px) and (max-width:575.98px){.login-card{margin-top:8px}}
+@media (prefers-reduced-motion:reduce){.login-art-trend{animation:none}}
 </style>
 </head>
 <body onload="initGangtiseTheme();loadRecentAccounts()">
-<main class="login-shell"><section class="login-card">
-  <div class="login-kicker">H5 登录</div>
+<main class="login-shell">
+  <svg class="login-art" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
+    <defs><pattern id="login-grid-pattern" width="72" height="72" patternUnits="userSpaceOnUse"><path class="login-art-grid" d="M72 0H0V72" /></pattern></defs>
+    <rect width="1440" height="900" fill="url(#login-grid-pattern)" opacity=".72" />
+    <path class="login-art-axis" d="M88 724H1352M126 142V760" />
+    <path class="login-art-shadow" d="M116 638L278 592L376 622L510 476L638 514L780 366L914 402L1060 274L1192 310L1324 190" />
+    <path class="login-art-trend" d="M116 638L278 592L376 622L510 476L638 514L780 366L914 402L1060 274L1192 310L1324 190" />
+  </svg>
+  <section class="login-card">
+  <div class="login-brand-mark" aria-hidden="true">研</div>
+  <div class="login-kicker" style="margin-top:16px">RESEARCH SPACE</div>
   <div class="login-title">洞见智研</div>
   <div class="login-desc">{% if mode == 'register' %}注册后即可进入系统。{% else %}请输入账号密码登录。{% endif %}</div>
   {% if error %}<div class="login-error">{{ error }}</div>{% endif %}

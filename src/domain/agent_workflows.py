@@ -37,7 +37,7 @@ DECLARED_AGENT_WORKFLOW_CATALOG = {
             {"id": "shanghai_market_capability", "label": "上证指数观察", "processor": "gangtise_agent_sse", "kind": "tooling", "visual_only": True, "x": 810, "y": 1500, "description": "双指数拆解的第一项：以“今天上证综合指数的分析观察报告”调用 Gangtise Agent SSE。"},
             {"id": "shenzhen_market_capability", "label": "深证指数观察", "processor": "gangtise_agent_sse", "kind": "tooling", "visual_only": True, "x": 1050, "y": 1500, "description": "双指数拆解的第二项：以“今天深证成份指数的分析观察报告”调用 Gangtise Agent SSE。"},
             {"id": "tool_dispatch", "label": "任务级工具调度", "processor": "tool_dispatch", "kind": "tooling", "x": 650, "y": 1690, "description": "真实执行节点：单任务或组合任务按服务端契约调用 Gangtise SSE、一页通、看点或复盘多股接口；部分失败保留成功结果。"},
-            {"id": "answer_synthesis", "label": "回答策略与直出", "processor": "llm_synthesis", "kind": "llm", "x": 650, "y": 1840, "description": "真实执行节点：澄清直接追问；Gangtise 研究正文原样直出；闲聊才使用 Admin 默认 LLM 合成。"},
+            {"id": "answer_synthesis", "label": "回答策略与直出", "processor": "llm_synthesis", "kind": "llm", "x": 650, "y": 1840, "description": "真实执行节点：澄清直接追问；纯 Gangtise 研究原文直出；复合任务中的产品帮助、闲聊等非研究部分由 Admin 默认 LLM 回答，研究正文仍原样展示。"},
             {"id": "result_assembly", "label": "结果汇合", "processor": "result_assembly", "kind": "output", "visual_only": True, "x": 650, "y": 1990, "description": "统一汇合拒绝、澄清、闲聊、单任务和组合任务结果。"},
             {"id": "memory_extract", "label": "本轮记忆提炼", "processor": "memory_extract", "kind": "planner", "x": 650, "y": 2140, "description": "提炼最近证券、主题、任务意图、表达偏好和用户行为标签。"},
             {"id": "memory_write", "label": "会话与用户记忆写回", "processor": "memory_write", "kind": "storage", "x": 650, "y": 2290, "description": "写入问答原文、会话工作记忆、用户事实记忆和任务标签。"},

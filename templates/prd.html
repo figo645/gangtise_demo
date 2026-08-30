@@ -131,7 +131,7 @@ body.theme-light .lv1{color:var(--text-sub)}
 <header class="prd-header">
   <div class="prd-header-left">
     <span class="prd-header-title">洞见智研 PRD</span>
-    <span class="prd-header-version">v1.5 · 2026-08-18</span>
+    <span class="prd-header-version">v1.6 · 2026-08-31</span>
   </div>
   <div class="prd-header-right">
     <a href="/" class="btn-back">← 返回首页</a>
@@ -174,8 +174,8 @@ body.theme-light .lv1{color:var(--text-sub)}
     <table class="prd-table">
       <tr><th style="width:140px">项目</th><th>内容</th></tr>
       <tr><td>产品名称</td><td>洞见智研金融科技 · 投研数据平台</td></tr>
-      <tr><td>当前版本</td><td>v1.4</td></tr>
-      <tr><td>文档日期</td><td>2026-08-13</td></tr>
+      <tr><td>当前版本</td><td>v1.6</td></tr>
+      <tr><td>文档日期</td><td>2026-08-31</td></tr>
       <tr><td>产品定位</td><td>以租户隔离的市场数据、知识资产和证据链为基础，支持投资者跟踪、大V研究生产与平台治理</td></tr>
       <tr><td>技术栈</td><td>Flask · Python · PostgreSQL / pgvector · HTML5 · CSS3 · JavaScript · ECharts</td></tr>
     </table>
@@ -244,7 +244,7 @@ body.theme-light .lv1{color:var(--text-sub)}
   <div class="prd-section-num">SECTION 02</div>
   <h2 class="prd-section-title">用户角色与权限</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">平台当前只有三类实际账号：普通投资者、研究型大V和平台 Admin。所有内容与知识资产以租户隔离；Admin 不属于大V租户，且大V不能访问 Admin。</p>
+  <p class="prd-section-desc">平台当前只有三类实际账号：普通投资者、研究型大V和平台 Admin。角色与能力解耦：Admin 除平台治理权限外，可按配置获得大V/H5 能力；财经老王等大V仍保持独立权限和独立租户边界，大V不能访问 Admin 后台。</p>
 
   <div class="prd-sub">
     <div class="prd-sub-title">当前版本权限矩阵</div>
@@ -292,11 +292,11 @@ body.theme-light .lv1{color:var(--text-sub)}
         <td>已实现</td>
       </tr>
       <tr>
-        <td>Hermes</td>
+        <td>小金智能体</td>
         <td><span class="partial">△</span> 由 Admin 配置访问</td>
         <td><span class="check">✓</span> 默认开放</td>
         <td><span class="check">✓</span> 配置与治理</td>
-        <td>会话、记忆、图表、知识问答</td>
+        <td>六类场景、会话、记忆、组合任务</td>
       </tr>
       <tr>
         <td>消息与自选股评论</td>
@@ -774,23 +774,24 @@ body.theme-light .lv1{color:var(--text-sub)}
   <div class="prd-section-num">SECTION 06</div>
   <h2 class="prd-section-title">Hermes 研究 Agent 规格</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">Hermes 已作为围绕平台研究工作的 Agent 交付。它先读取当前会话和租户知识，再按问题路由市场数据、图表、报告解析、知识检索或产品帮助；当前默认向大V开放，普通投资者由 Admin 开关控制。</p>
+  <p class="prd-section-desc">Hermes（小金智能体）是面向投研任务的 Agent。每次接收用户原始问题后，先读取会话记忆，再由 Admin 配置的 LLM 做首轮意图与任务拆解；随后按 Skills 规则分发到 Gangtise 研究 API 或通用 LLM。当前默认向大V开放，普通投资者由 Admin 开关控制。</p>
 
   <div class="prd-sub">
     <div class="prd-sub-title">意图与输出规格</div>
     <table class="prd-table">
-      <tr><th>意图</th><th>典型问题</th><th>优先数据</th><th>输出</th><th>状态</th></tr>
-      <tr><td><span class="tag tag-green">个股 / 自选股</span></td><td>某只股票走势、K线、基本面与证据链</td><td>Gangtise 行情、自选标注、租户知识</td><td>结论、证据链、ECharts 图表和风险提示</td><td>已实现</td></tr>
-      <tr><td><span class="tag tag-blue">指数 / 指标图表</span></td><td>上证指数、指标时间序列、指定日期分析</td><td>Gangtise 指数与指标 API</td><td>K线、线图、分布图或对比图，可缩放与悬浮查看</td><td>已实现</td></tr>
-      <tr><td><span class="tag tag-gold">知识 / 报告 / URL</span></td><td>对知识源提问、上传报告或网页解读</td><td>当前租户向量知识、附件或 URL 解析结果</td><td>结构化回答、来源与可继续追问</td><td>已实现</td></tr>
-      <tr><td><span class="tag tag-red">复盘 / 证据链</span></td><td>复盘依据、标注归纳、研究框架</td><td>用户输入、K线标注、知识资产与可用公开资料</td><td>依据、缺口说明和下一步研究建议</td><td>已实现</td></tr>
-      <tr><td><span class="tag tag-blue">产品帮助 / 轻度闲聊</span></td><td>功能如何使用、非研究闲聊</td><td>产品帮助知识与会话上下文</td><td>操作指引；能力缺失时记录需求并明确说明</td><td>已实现</td></tr>
+      <tr><th>场景</th><th>典型问题</th><th>分发能力</th><th>输出边界</th><th>状态</th></tr>
+      <tr><td><span class="tag tag-green">今日个股观察</span></td><td>对今天中国银行做个股分析，看看整体情况</td><td>Gangtise Agent SSE<br><code>/application/open-ai/ai/chat/sse</code><br><code>mode=deep_research</code></td><td>今日行情、核心逻辑、重要要闻、风险；研究原文直出</td><td>已实现</td></tr>
+      <tr><td><span class="tag tag-blue">今日大盘观察</span></td><td>给我一份今天上证综合指数的分析观察报告</td><td>Gangtise Agent SSE<br><code>/application/open-ai/ai/chat/sse</code><br><code>mode=deep_research</code></td><td>指数表现、板块资金、市场情绪；同时问上证和深证时拆为两个指数任务</td><td>已实现</td></tr>
+      <tr><td><span class="tag tag-gold">个股深化研究</span></td><td>对中国银行做一下深入研究</td><td>Gangtise OpenAPI<br><code>/application/open-ai/agent/one-pager</code></td><td>最近一期公司一页通，非当日研究；仅支持个股，指数不支持</td><td>已实现</td></tr>
+      <tr><td><span class="tag tag-gold">个股看点摘要</span></td><td>中国银行、建设银行、招商银行简单介绍分析</td><td>Gangtise OpenAPI<br><code>/application/open-ai/stock-summary/getList</code></td><td>每只证券精炼看点，最多 6000 个证券；不能替代完整观察报告或组合结论</td><td>已实现</td></tr>
+      <tr><td><span class="tag tag-red">多支自选股综合</span></td><td>对三支股票做详细的综合分析</td><td>复盘使用的 Gangtise 多股分析 Agent SSE</td><td>个股要点与组合综合结论；至少两只证券</td><td>已实现</td></tr>
+      <tr><td><span class="tag tag-blue">多轮闲聊</span></td><td>你好、你有什么功能、我该怎么选股</td><td>Admin 配置的通用 LLM</td><td>通用交流、产品帮助与投资教育；不调用研究 API，不提供直接买卖指令</td><td>已实现</td></tr>
     </table>
   </div>
 
   <div class="prd-sub">
     <div class="prd-sub-title">工作流、会话与记忆</div>
-    <div class="highlight-box">工作流为：会话装载 → 长短期记忆读取 → 范围与意图识别 → 知识召回 → 工具调度 → 答案合成 → 记忆、用户画像和分析记录写入。用户可新建会话、查询历史会话并继续追问；所有持久化内容按租户隔离。Admin 可查看使用统计、记忆覆盖率，并按时间清理或备份租户记忆。</div>
+    <div class="highlight-box">工作流为：接收并保留原始问题 → 基础技术校验（空值、长度、附件结构）→ 读取短期会话与长期记忆 → Admin 配置的 LLM 首轮拆解意图和多个任务 → 按配置启用的 Skills 做语义拦截与审计 → 逐任务调用对应 Gangtise API 或通用 LLM → Gangtise 研究原文直出、非研究任务由 LLM 合成 → 写入会话、用户画像、记忆和调用轨迹。对象、时间或目的不明确时先反问，不盲猜；研究任务支持部分成功结果。</div>
   </div>
 
   <div class="prd-sub">
@@ -798,9 +799,9 @@ body.theme-light .lv1{color:var(--text-sub)}
     <table class="prd-table">
       <tr><th>项目</th><th>实际能力</th></tr>
       <tr><td>调用统计</td><td>记录今日/本月/人均调用、工具动作、用户消耗排行和算力池统计。</td></tr>
-      <tr><td>模型映射</td><td>Admin 可为 Hermes 路由、回答、知识加工、复盘、语音增强等功能独立选择模型，未配置时回退默认模型。</td></tr>
+      <tr><td>模型映射</td><td>Admin 统一维护模型、Model ID、Base URL、Key 和用途映射；Hermes 路由与闲聊使用配置模型，不允许回退到未配置的本机地址。</td></tr>
       <tr><td>数据失败</td><td>市场或知识数据不可用时必须显式返回缺失原因，不得以模拟行情或虚构结论替代。</td></tr>
-      <tr><td>范围开关</td><td>Admin 可配置提示词范围约束、普通投资者访问、互联网补充和思考过程展示。</td></tr>
+      <tr><td>范围与拦截开关</td><td>Admin 可控制 Hermes 访问、原始问题范围、互联网能力和思考展示；语义拦截默认关闭，开启后以 Skill 规则判断并保留审计记录。</td></tr>
     </table>
   </div>
 
@@ -822,7 +823,7 @@ body.theme-light .lv1{color:var(--text-sub)}
   <div class="prd-section-num">SECTION 07</div>
   <h2 class="prd-section-title">中后台管理规格</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">Admin 是独立的平台治理后台，仅 `admin` 角色可访问。它不承担大V日常生产，而是负责租户、用户、开关、模型、知识/记忆、数据、任务、审计和发布控制。</p>
+  <p class="prd-section-desc">Admin 是独立的平台治理后台，仅具备 `admin` 能力的角色可访问。角色能力可配置；当前 Admin 同时可以进入 H5、大V工作台和 Admin 后台，但不改变财经老王的大V独立权限与租户边界。Admin 负责租户、用户、开关、模型、知识/记忆、数据、任务、审计和发布控制。</p>
 
   <div class="prd-sub">
     <div class="prd-sub-title">后台模块结构</div>
@@ -830,7 +831,7 @@ body.theme-light .lv1{color:var(--text-sub)}
       <tr><th>模块</th><th>核心功能点</th><th>访问权限</th><th>状态</th></tr>
       <tr><td>平台总览与用户/租户</td><td>用户账号、角色、租户关系、渠道、付费样本与平台经营概览</td><td>Admin</td><td><span class="done">已实现</span></td></tr>
       <tr><td>Hermes 管理</td><td>调用、工具动作、算力统计、用户画像、记忆备份/清理、缺失能力需求与访问范围</td><td>Admin</td><td><span class="done">已实现</span></td></tr>
-      <tr><td>知识治理</td><td>按租户查看知识源、词条、图谱、QKV 治理数据与向量沉淀</td><td>Admin</td><td><span class="done">已实现</span></td></tr>
+      <tr><td>知识治理</td><td>按租户查看知识源、词条、图谱、QKV 结构与处理记录；小金智能体首轮意图不依赖 embedding</td><td>Admin</td><td><span class="done">已实现</span></td></tr>
       <tr><td>市场与指标数据</td><td>统一查看指标湖和 Gangtise 数据调用；无真实数据时禁止生成模拟展示</td><td>Admin</td><td><span class="done">已实现</span></td></tr>
       <tr><td>大模型与功能映射</td><td>模型注册、默认模型与功能级模型映射，覆盖 Hermes、复盘、知识、语音和评论处理</td><td>Admin</td><td><span class="done">已实现</span></td></tr>
       <tr><td>系统设置与开关</td><td>登录方式、微信/受限测试、互动、主题、业务模块和 Hermes 提示词范围</td><td>Admin</td><td><span class="done">已实现</span></td></tr>
@@ -1211,7 +1212,7 @@ body.theme-light .lv1{color:var(--text-sub)}
         <div class="roadmap-version">v1.2</div>
         <div class="roadmap-date">2026年7月 · Hermes 研究 Agent</div>
         <div class="roadmap-line"><div class="roadmap-dot"></div></div>
-        <div class="roadmap-feature">意图路由、知识优先召回、证据链与会话记忆</div>
+        <div class="roadmap-feature">LLM 意图拆解、Skills 约束、任务组合与会话记忆</div>
         <div class="roadmap-feature">个股 / 指数 / 指标的 K线、趋势、分布与对比图</div>
         <div class="roadmap-feature">Hermes 用量、工具动作、算力与用户画像治理</div>
       </div>
@@ -1254,6 +1255,7 @@ body.theme-light .lv1{color:var(--text-sub)}
       <tr><td>v1.3</td><td>2026-08</td><td>补充 Gangtise 真实数据、复盘工作流和知识分层</td><td>市场数据与复盘验收</td></tr>
       <tr><td>v1.4</td><td>2026-08-13</td><td>清理旧路线图，按实际功能重写角色、H5、Hermes、Admin 与版本历史</td><td>当前代码、BDD 和系统学习手册</td></tr>
       <tr><td>v1.5</td><td>2026-08-18</td><td>补充 Staging → Production 受控全量同步，明确日常增量发布策略，并上线四端版本中心与历史版本查看</td><td>数据库发布控制台、环境同步脚本、版本中心与 BDD</td></tr>
+      <tr><td>v1.6</td><td>2026-08-31</td><td>按最新实现重写小金智能体六类场景、LLM 首轮任务拆解、组合任务、记忆、Skills 拦截审计与 Gangtise 原文直出边界</td><td>智能体真实调用链、Admin 配置、H5 帮助中心与 BDD</td></tr>
     </table>
   </div>
 </section>
@@ -1271,8 +1273,8 @@ body.theme-light .lv1{color:var(--text-sub)}
       <tr><th>功能域</th><th>当前验收口径</th><th>数据与边界</th></tr>
       <tr><td>H5 用户端</td><td>注册登录、合规确认与渠道、行情查看、自选股、评论、消息、复盘阅读、知识查看和 Hermes 对话</td><td>普通用户仅访问所属租户内容；跨租户访问必须拒绝</td></tr>
       <tr><td>大V 工作台</td><td>复盘向导、用户输入编辑、可选自选股归纳、知识录入、粉丝经营、评论统计和门户维护</td><td>复盘发布后应立即在所属租户前台可见；自选股为可选项</td></tr>
-      <tr><td>Hermes</td><td>个股/指数行情与图表、知识问答、报告和 URL 解读、复盘证据链、产品帮助、会话与长期记忆</td><td>优先召回当前租户知识；真实数据不可用时清晰说明，禁止伪造行情</td></tr>
-      <tr><td>知识与证据链</td><td>文本、语音、文件、URL、Hermes 回答和标注可进入知识源；面向大V展示词条和知识结构</td><td>知识、向量与记忆均按租户隔离；Admin 处理治理与备份</td></tr>
+      <tr><td>小金智能体</td><td>今日个股观察、今日大盘观察、个股深化研究、个股看点摘要、多支自选股综合分析、多轮闲聊；支持组合任务、会话与长期记忆</td><td>原始问题先由 Admin 配置 LLM 拆解；研究类按 Gangtise API 原文直出；真实数据不可用时清晰说明，禁止伪造行情</td></tr>
+      <tr><td>知识与证据链</td><td>文本、语音、文件、URL、复盘内容和标注可进入知识源；面向大V展示词条和知识结构</td><td>知识资产与记忆均按租户隔离；小金智能体不使用 embedding 做首轮意图识别；Admin 处理治理与备份</td></tr>
       <tr><td>Admin</td><td>租户/用户/开关/模型映射/记忆治理/知识治理/指标/任务/审计与运营分析</td><td>配置变更应同步影响前台可见性与行为，并保留可审计记录</td></tr>
     </table>
   </div>
@@ -1281,7 +1283,7 @@ body.theme-light .lv1{color:var(--text-sub)}
     <div class="prd-sub-title">BDD 与探索性测试策略</div>
     <div class="highlight-box">
       <strong style="color:#C8A96E">BDD 自动化</strong>：覆盖路由、权限、业务规则、API 合约、复盘发布、登录会话、Hermes 路由、指标与市场数据等可重复场景。<br><br>
-      <strong style="color:#C8A96E">探索性测试</strong>：重点验证租户隔离、角色越权、微信/移动浏览器限制、异步发布即时性、真实行情缺失、图表交互、知识召回、模型失败降级，以及 Admin 开关与前台行为的一致性。每个问题需保留角色、租户、步骤、截图或日志和影响级别。<br><br>
+      <strong style="color:#C8A96E">探索性测试</strong>：重点验证租户隔离、角色越权、微信/移动浏览器限制、异步发布即时性、真实行情缺失、图表交互、六类场景路由、多任务拆解、LLM 超时、Gangtise 空响应，以及 Admin 开关与前台行为的一致性。每个问题需保留角色、租户、步骤、截图或日志和影响级别。<br><br>
       <strong style="color:#C8A96E">学习入口</strong>：Admin 顶部的“系统学习手册”提供系统地图、阶段式学习路径、核心功能流程图与角色测试矩阵；首页同步当前功能地图。
     </div>
   </div>
@@ -1293,7 +1295,7 @@ body.theme-light .lv1{color:var(--text-sub)}
       <tr><td>租户与权限</td><td>任意用户不可经 URL、API 参数或会话切换读取其他租户数据；角色不可进入无权限操作。</td></tr>
       <tr><td>真实行情与图表</td><td>个股、指数和指标均展示来源与时间；K 线、线图和分布图可正确渲染，缺数时显示明确不可用状态。</td></tr>
       <tr><td>复盘生产</td><td>大V可仅使用用户输入发布；选择自选股时才生成对应归纳；发布成功/失败均有明确反馈并立即刷新列表。</td></tr>
-      <tr><td>知识与 Hermes</td><td>回答优先使用本租户知识源，图表/数据请求进入正确路由；模型或外部服务失败时不产生虚构结论。</td></tr>
+      <tr><td>知识与小金智能体</td><td>原始问题完整传递给配置的 LLM；任务进入正确 Gangtise API 或 LLM 路径；研究原文不被二次改写；模型或外部服务失败时不产生虚构结论。</td></tr>
       <tr><td>配置生效</td><td>Admin 开关、模型映射、登录限制和互动权限在保存后前后台一致，且关闭能力时接口同样受限。</td></tr>
     </table>
   </div>

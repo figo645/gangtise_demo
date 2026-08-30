@@ -45,6 +45,35 @@ class RouteSmokeTest(unittest.TestCase):
                 self.assertIn("text/html", response.content_type)
                 self.assertIn("Hermes", response.get_data(as_text=True))
 
+    def test_h5_splash_is_responsive_and_keeps_quote_prominent_on_mobile(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('id="h5-splash-screen"', html)
+        self.assertIn('class="h5-splash-art"', html)
+        self.assertIn('class="h5-login-art"', html)
+        self.assertIn('class="h5-login-brand-mark"', html)
+        self.assertIn('min-height:100dvh', html)
+        self.assertIn('env(safe-area-inset-bottom)', html)
+        self.assertIn('@media (max-width:575.98px)', html)
+        self.assertIn('.h5-splash-quote { font-size:17px;', html)
+        self.assertIn('sessionStorage.getItem(\'gangtise_h5_splash_quote_index\')', html)
+        self.assertIn('initH5SplashScreen();', html)
+
+    def test_unified_login_uses_the_splash_visual_language(self):
+        with patch("src.web.pages.get_current_authenticated_user", return_value=None):
+            response = self.client.get("/login?next=/h5")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('class="login-art"', html)
+        self.assertIn('class="login-brand-mark"', html)
+        self.assertIn('min-height:100dvh', html)
+        self.assertIn('env(safe-area-inset-bottom)', html)
+        self.assertIn('@media (max-width:575.98px)', html)
+        self.assertIn('class="login-title">洞见智研</div>', html)
+
     def test_admin_session_can_open_admin_h5_and_workbench(self):
         original_current_user = web_pages.get_current_authenticated_user
         web_pages.get_current_authenticated_user = lambda: {"id": "test-admin", "username": "admin", "role": "admin", "status": "active"}
@@ -416,7 +445,7 @@ class RouteSmokeTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
-        self.assertIn('placeholder="问 Hermes..."', html)
+        self.assertIn('placeholder="问小金智能体..."', html)
         self.assertIn('class="hermes-lobster-toolbar"', html)
         self.assertIn('id="hermes-composer-submit"', html)
         self.assertIn("hermes-prompt-chip", html)
@@ -434,6 +463,9 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("互联网补充开关已移到输入框外侧", html)
         self.assertIn("这个智能指标是按什么口径算出来的？", html)
         self.assertIn("ensureHermesSessionId()", html)
+        self.assertIn("function scrollHermesThreadToBottom(options = {})", html)
+        self.assertIn("scrollHermesThreadToBottom();", html)
+        self.assertIn("resetHermesScrollPosition();", html)
         self.assertNotIn("hermes-chat-bubble", html)
         self.assertNotIn("默认按全部知识库做文字回答，也可以点 + 指定知识或上传文件。", html)
         self.assertNotIn("指定知识条目", html)
@@ -469,6 +501,18 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn('id="watchlist-stock-suggestion-list"', html)
         self.assertIn("function handleWatchlistStockCodeInput(value)", html)
         self.assertIn("function selectWatchlistSuggestionByIndex(index)", html)
+
+    def test_h5_hermes_history_and_send_scroll_to_bottom(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("function getHermesScrollContainer()", html)
+        self.assertIn("function scrollHermesThreadToBottom(options = {})", html)
+        self.assertIn("scrollHermesThreadToBottom({ behavior: 'auto' });", html)
+        self.assertGreaterEqual(html.count("scrollHermesThreadToBottom();"), 4)
+        self.assertIn("function resetHermesScrollPosition()", html)
+        self.assertIn("resetHermesScrollPosition();", html)
 
     def test_hermes_query_accepts_web_answer_flag(self):
         response = self.client.post(

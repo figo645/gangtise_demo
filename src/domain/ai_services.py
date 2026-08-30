@@ -8686,6 +8686,7 @@ def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode
     answer_label = (
         "信息澄清" if answer_mode == "clarification" else
         "多任务结果直出" if answer_mode == "composite_direct" else
+        "混合任务：LLM + Gangtise 原文" if answer_mode == "composite_mixed_llm" else
         "模型整合回答" if answer_mode == "llm_synthesized" else
         "Gangtise AI 直接返回" if answer_mode == "gangtise_direct" else
         "平台安全收口"
@@ -8770,7 +8771,7 @@ def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode
         {
             "key": "answer",
             "title": "结论整合",
-            "status": "ok" if answer_mode in {"llm_synthesized", "gangtise_direct"} else "skipped",
+            "status": "ok" if answer_mode in {"llm_synthesized", "gangtise_direct", "composite_direct", "composite_mixed_llm"} else "skipped",
             "detail": answer_label + "，输出面向用户的结论、依据和下一步建议。",
         },
     ]
@@ -9938,6 +9939,207 @@ def build_hermes_composite_direct_synthesis(plan, tool_outputs):
     }
 
 
+def _build_hermes_composite_task_descriptors(tool_outputs):
+    tasks = (tool_outputs or {}).get("composite_tasks") if isinstance(tool_outputs, dict) else []
+    descriptors = []
+    for item in tasks if isinstance(tasks, list) else []:
+        if not isinstance(item, dict):
+            continue
+        task_plan = item.get("plan") if isinstance(item.get("plan"), dict) else {}
+        intent = str(item.get("intent") or task_plan.get("intent") or "").strip()
+        if not intent:
+            continue
+        descriptors.append({
+            "task_index": int(item.get("task_index") or len(descriptors)),
+            "intent": intent,
+            "label": HERMES_INTENT_LABELS.get(intent, intent),
+            "status": str(item.get("status") or "error").strip() or "error",
+            "error": str(item.get("error") or "").strip()[:320],
+        })
+    return descriptors
+
+
+def _build_hermes_composite_direct_sections(tool_outputs):
+    """Keep direct-provider research content out of every LLM prompt."""
+    tasks = (tool_outputs or {}).get("composite_tasks") if isinstance(tool_outputs, dict) else []
+    sections = []
+    successful = 0
+    direct_task_count = 0
+    for item in tasks if isinstance(tasks, list) else []:
+        if not isinstance(item, dict):
+            continue
+        task_plan = item.get("plan") if isinstance(item.get("plan"), dict) else {}
+        intent = str(item.get("intent") or task_plan.get("intent") or "研究任务").strip()
+        if intent not in HERMES_GANGTISE_DIRECT_INTENTS:
+            continue
+        direct_task_count += 1
+        label = HERMES_INTENT_LABELS.get(intent, intent)
+        if item.get("status") != "ok":
+            sections.append(f"### {label}\n本任务未完成：{str(item.get('error') or '上游接口未返回可用结果').strip()}")
+            continue
+        try:
+            task_result = build_hermes_gangtise_direct_synthesis(task_plan, item.get("outputs") or {})
+        except RuntimeError as exc:
+            sections.append(f"### {label}\n本任务未完成：{str(exc)[:320]}")
+            continue
+        answer = str(task_result.get("answer") or "").strip()
+        if answer:
+            successful += 1
+            sections.append(f"### {label}\n{answer}")
+    return sections, successful, direct_task_count
+
+
+def _build_hermes_composite_non_research_synthesis(
+    question_text,
+    plan,
+    tool_outputs,
+    tenant_slug="",
+    user_role="",
+    preferred_mode="",
+    messages=None,
+    memory_state=None,
+    response_style="structured",
+):
+    """Answer chat/help/local tasks without exposing direct research to the LLM."""
+    llm_model = get_hermes_llm_config("hermes_answer_synthesis")
+    if not llm_model:
+        raise RuntimeError("hermes_answer_synthesis_llm_not_configured")
+    descriptors = _build_hermes_composite_task_descriptors(tool_outputs)
+    non_research_tasks = [
+        item for item in descriptors
+        if item.get("intent") not in HERMES_GANGTISE_DIRECT_INTENTS
+    ]
+    if not non_research_tasks:
+        return None, None
+    tenant = get_tenant_by_slug(tenant_slug)
+    tenant_name = (tenant or {}).get("name") or (tenant or {}).get("short_name") or str(tenant_slug or "").strip() or "当前租户"
+    conversation_block = format_hermes_message_context(messages, limit=8)
+    memory_context_text = str((memory_state or {}).get("context_text") or "").strip()
+    response_style = str(response_style or (memory_state or {}).get("preferred_response_style") or "").strip() or "structured"
+    style_instruction = {
+        "brief": "回答风格：简洁，先给直接答案。",
+        "deep": "回答风格：完整但克制，覆盖用户提出的每个非研究问题。",
+        "structured": "回答风格：结构化，使用清晰段落或列表回答多个非研究问题。",
+    }.get(response_style, "回答风格：结构化，使用清晰段落或列表回答多个非研究问题。")
+    system_prompt = (
+        "你是小金智能体的非研究任务回答器。"
+        "当前用户的一句话已被任务路由器拆成多个任务。"
+        "你只负责回答产品帮助、闲聊、通用投资教育或本地上下文类任务，不负责任何 Gangtise 研究任务。"
+        "必须覆盖用户原始问题中的每个非研究问题；例如用户问年龄时，明确说明你是 AI，没有真实年龄。"
+        "不要输出内部路由、任务编号、工具名、占位语或‘该子任务不包含研究正文’。"
+        "不要编造市场数据，也不要复述、总结或改写任何 Gangtise 研究报告；研究报告会由系统在你的回答后原文展示。"
+        "如果用户询问小金智能体功能，必须准确说明六类能力：今日个股观察、今日大盘综合分析、个股深化研究（公司一页通，非当日）、个股看点摘要（最多6000只批量）、多支自选股综合分析、多轮闲聊。"
+        "只输出 JSON。"
+    )
+    user_blocks = [
+        f"租户：{tenant_name}",
+        f"角色：{str(user_role or '').strip() or 'unknown'}",
+        f"用户原始问题：{str(question_text or '').strip()}",
+        f"非研究任务：{json.dumps(non_research_tasks, ensure_ascii=False)}",
+        f"回答风格：{style_instruction}",
+    ]
+    if memory_context_text:
+        user_blocks.append(f"历史记忆摘要：\n{memory_context_text}")
+    if conversation_block:
+        user_blocks.append(f"最近多轮对话：\n{conversation_block}")
+    user_blocks.append(
+        "请仅回答上述原始问题中的非研究部分。输出格式："
+        '{"answer":"中文最终回答","summary":"一句摘要","lead_conclusion":"","bullets":[],"analysis_sections":[],"next_steps":[],"confidence":"","citations":[]}'
+    )
+    raw = call_openai_compatible_llm(
+        llm_model,
+        system_prompt,
+        "\n\n".join(user_blocks),
+        feature_code="hermes_composite_answer_synthesis",
+        feature_label="Hermes 混合任务回答合成",
+        tenant_slug=tenant_slug,
+        entry_point="hermes_query",
+        metadata={
+            "intent": "composite_research",
+            "non_research_task_count": len(non_research_tasks),
+            "direct_research_task_count": len(descriptors) - len(non_research_tasks),
+            "response_style": response_style,
+        },
+        request_timeout_seconds=40,
+    )
+    parsed = _extract_json_payload_from_llm_text(raw, {}, strict=True)
+    answer = str(parsed.get("answer") or "").strip()
+    if not answer:
+        raise RuntimeError("hermes_composite_answer_synthesis_empty_answer")
+    return {
+        "answer": answer,
+        "summary": str(parsed.get("summary") or "").strip()[:240],
+        "lead_conclusion": str(parsed.get("lead_conclusion") or "").strip()[:240],
+        "bullets": [str(item).strip() for item in (parsed.get("bullets") if isinstance(parsed.get("bullets"), list) else []) if str(item).strip()][:6],
+        "analysis_sections": [
+            {"title": str(item.get("title") or "").strip()[:80], "body": str(item.get("body") or "").strip()[:600]}
+            for item in (parsed.get("analysis_sections") if isinstance(parsed.get("analysis_sections"), list) else [])
+            if isinstance(item, dict) and str(item.get("title") or "").strip() and str(item.get("body") or "").strip()
+        ][:8],
+        "next_steps": [str(item).strip() for item in (parsed.get("next_steps") if isinstance(parsed.get("next_steps"), list) else []) if str(item).strip()][:6],
+        "confidence": str(parsed.get("confidence") or "").strip()[:20],
+        "citations": [str(item).strip() for item in (parsed.get("citations") if isinstance(parsed.get("citations"), list) else []) if str(item).strip()][:8],
+    }, llm_model
+
+
+def build_hermes_composite_synthesis(
+    question_text,
+    plan,
+    tool_outputs,
+    tenant_slug="",
+    user_role="",
+    preferred_mode="",
+    messages=None,
+    web_answer=False,
+    memory_state=None,
+    response_style="structured",
+):
+    descriptors = _build_hermes_composite_task_descriptors(tool_outputs)
+    has_non_research = any(
+        item.get("intent") not in HERMES_GANGTISE_DIRECT_INTENTS
+        for item in descriptors
+    )
+    if not has_non_research:
+        return build_hermes_composite_direct_synthesis(plan, tool_outputs), None, "composite_direct"
+
+    non_research_synthesis, answer_model = _build_hermes_composite_non_research_synthesis(
+        question_text=question_text,
+        plan=plan,
+        tool_outputs=tool_outputs,
+        tenant_slug=tenant_slug,
+        user_role=user_role,
+        preferred_mode=preferred_mode,
+        messages=messages,
+        memory_state=memory_state,
+        response_style=response_style,
+    )
+    direct_sections, direct_successful, direct_task_count = _build_hermes_composite_direct_sections(tool_outputs)
+    sections = []
+    citations = ["Admin 默认 LLM"]
+    if non_research_synthesis and str(non_research_synthesis.get("answer") or "").strip():
+        sections.append(str(non_research_synthesis["answer"]).strip())
+        citations.extend(non_research_synthesis.get("citations") or [])
+    if direct_sections:
+        sections.append("### Gangtise 研究原文\n" + "\n\n".join(direct_sections))
+        citations.append("Gangtise AI 研究原文")
+    answer = "\n\n".join(item for item in sections if item).strip()
+    if not answer:
+        raise RuntimeError("hermes_composite_empty_response")
+    return {
+        "answer": answer,
+        "summary": (
+            f"已完成混合任务：非研究部分由 Admin 默认 LLM 回答，"
+            f"Gangtise 研究任务 {direct_successful}/{direct_task_count} 项原文展示。"
+        ),
+        "lead_conclusion": non_research_synthesis.get("lead_conclusion") if non_research_synthesis else "",
+        "bullets": non_research_synthesis.get("bullets") if non_research_synthesis else [],
+        "analysis_sections": non_research_synthesis.get("analysis_sections") if non_research_synthesis else [],
+        "next_steps": non_research_synthesis.get("next_steps") if non_research_synthesis else [],
+        "confidence": non_research_synthesis.get("confidence") if non_research_synthesis else "",
+        "citations": list(dict.fromkeys(citations)),
+    }, answer_model, "composite_mixed_llm"
+
+
 def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", user_role="", preferred_mode="", messages=None, web_answer=False, memory_state=None, response_style="structured"):
     intent = str((plan or {}).get("intent") or "").strip()
     if intent == "clarify":
@@ -9945,7 +10147,18 @@ def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", 
     if intent == "human_review":
         return build_hermes_human_review_synthesis(plan), None, "human_review"
     if intent == "composite_research":
-        return build_hermes_composite_direct_synthesis(plan, tool_outputs), None, "composite_direct"
+        return build_hermes_composite_synthesis(
+            question_text=question_text,
+            plan=plan,
+            tool_outputs=tool_outputs,
+            tenant_slug=tenant_slug,
+            user_role=user_role,
+            preferred_mode=preferred_mode,
+            messages=messages,
+            web_answer=web_answer,
+            memory_state=memory_state,
+            response_style=response_style,
+        )
     if intent in HERMES_GANGTISE_DIRECT_INTENTS:
         return build_hermes_gangtise_direct_synthesis(plan, tool_outputs), None, "gangtise_direct"
     llm_model = get_hermes_llm_config("hermes_answer_synthesis")
@@ -10946,6 +11159,7 @@ def persist_review_publish_snapshot(
         "watchlist": [str(name).strip() for name in (selected_watchlist if isinstance(selected_watchlist, list) else []) if str(name).strip()][:8],
         "summary": summary or title[:80],
         "content_text": cleaned_text,
+        "view_count": 0,
         "source_mode": str(source_mode or "manual").strip().lower() or "manual",
         "paragraph_mode": str(paragraph_mode or "manual").strip().lower() or "manual",
         "publisher": str(speaker_name or tenant.get("advisor") or "").strip() or tenant.get("advisor") or "",

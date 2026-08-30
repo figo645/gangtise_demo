@@ -707,6 +707,24 @@ def api_tenant_dashboard(tenant_slug):
     return jsonify({"success": True, "dashboard": payload, "fund_dashboard_state": payload.get("fund_dashboard_state")})
 
 
+@app.route("/api/tenant/<tenant_slug>/reviews/<review_id>/view", methods=["POST"])
+def api_record_tenant_review_view(tenant_slug, review_id):
+    try:
+        article = increment_tenant_review_snapshot_view_count(tenant_slug, review_id)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "review_view_storage_unavailable"}), 503
+        app.logger.exception("Failed to record tenant review view")
+        return jsonify({"ok": False, "error": "review_view_record_failed"}), 500
+    return jsonify({
+        "ok": True,
+        "review_id": str(review_id or "").strip(),
+        "view_count": int((article or {}).get("view_count") or 0),
+    })
+
+
 @app.route("/api/tenant/<tenant_slug>/dashboard", methods=["POST"])
 def api_save_tenant_dashboard(tenant_slug):
     tenant = get_tenant_by_slug(tenant_slug)

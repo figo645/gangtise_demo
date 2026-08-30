@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ brand_config.name }} — {{ brand_config.tagline }}</title>
 <link rel="stylesheet" href="/static/css/style.css">
-<link rel="stylesheet" href="/static/css/release_notes.css?v=20260818-1">
+<link rel="stylesheet" href="/static/css/release_notes.css?v=20260831-1">
 <link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
 <link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
 <script>
@@ -18,7 +18,7 @@
 </script>
 <script src="/static/js/theme.js"></script>
 <script defer src="/static/js/brand.js?v=20260825-1"></script>
-<script defer src="/static/js/release_notes.js?v=20260818-1"></script>
+<script defer src="/static/js/release_notes.js?v=20260831-1"></script>
 <script src="/static/echarts.min.js"></script>
 <script src="/static/js/echarts_helpers.js?v=20260828-2"></script>
 <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
@@ -2857,25 +2857,64 @@ body { background: var(--surface-2); color: var(--text-main); }
 .demo-switch-tag { font-size:10px; color:var(--gold); background:rgba(200,169,110,0.12); border:1px solid rgba(200,169,110,0.2); border-radius:999px; padding:3px 8px; white-space:nowrap; }
 .h5-wrap.is-logged-out { display:none; }
 .h5-login-shell {
-  min-height:100vh;
+  --login-ink:#102B49;
+  --login-blue:#2F74C0;
+  --login-gold:#B88A3B;
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:100dvh;
+  overflow-x:hidden;
+  overflow-y:auto;
   color:var(--text-main);
-  background:
-    radial-gradient(circle at top left, rgba(200,169,110,0.10), transparent 38%),
-    radial-gradient(circle at top right, rgba(47,116,192,0.10), transparent 42%),
-    linear-gradient(180deg, #F8FBFF 0%, #EEF4FA 100%);
-  padding:28px 18px 36px;
+  background:linear-gradient(115deg,rgba(255,255,255,.97),rgba(241,247,253,.99)),#F2F7FC;
+  padding:max(28px,env(safe-area-inset-top)) 18px max(36px,env(safe-area-inset-bottom));
   box-sizing:border-box;
 }
+.h5-login-shell::before,
+.h5-login-shell::after {
+  content:"";
+  position:absolute;
+  pointer-events:none;
+  border:1px solid rgba(47,116,192,.13);
+  transform:rotate(-18deg);
+}
+.h5-login-shell::before { width:72vw; height:72vw; max-width:900px; max-height:900px; left:-28vw; top:-38vw; }
+.h5-login-shell::after { width:54vw; height:54vw; max-width:680px; max-height:680px; right:-22vw; bottom:-30vw; }
 .h5-login-shell.hidden { display:none; }
+.h5-login-art { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+.h5-login-art-grid { fill:none; stroke:rgba(47,116,192,.13); stroke-width:1; }
+.h5-login-art-axis { fill:none; stroke:rgba(47,116,192,.20); stroke-width:1.5; stroke-dasharray:5 8; }
+.h5-login-art-trend { fill:none; stroke:rgba(47,116,192,.72); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:8 12; animation:h5SplashTrend 5s linear infinite; }
+.h5-login-art-shadow { fill:none; stroke:rgba(184,138,59,.28); stroke-width:8; stroke-linecap:round; stroke-linejoin:round; }
 .h5-login-card {
+  position:relative;
+  z-index:1;
+  width:min(100%,440px);
   max-width:440px;
   margin:0 auto;
-  background:#FFFFFF;
-  border:1px solid rgba(47,116,192,0.12);
-  border-radius:24px;
-  padding:22px 18px 18px;
-  box-shadow:0 24px 60px rgba(31,73,125,0.10);
+  background:rgba(255,255,255,.94);
+  border:1px solid rgba(47,116,192,.16);
+  border-radius:22px;
+  padding:24px 20px 20px;
+  box-shadow:0 24px 60px rgba(31,73,125,.14),0 4px 12px rgba(47,116,192,.05);
+  backdrop-filter:blur(8px);
   color:var(--text-main);
+}
+.h5-login-brand-mark {
+  width:48px;
+  height:48px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid rgba(184,138,59,.38);
+  border-radius:50%;
+  color:var(--login-gold);
+  font-size:20px;
+  font-weight:800;
+  background:rgba(255,255,255,.74);
+  box-shadow:0 8px 20px rgba(31,73,125,.08);
 }
 .h5-login-kicker {
   display:inline-flex;
@@ -3200,6 +3239,17 @@ body { background: var(--surface-2); color: var(--text-main); }
   color:var(--gray-400);
   font-size:12px;
   line-height:1.8;
+}
+@media (max-width:575.98px) {
+  .h5-login-shell { align-items:flex-start; padding-left:16px; padding-right:16px; }
+  .h5-login-card { margin-top:clamp(12px,7vh,48px); padding:22px 16px 18px; border-radius:20px; }
+  .h5-login-title { font-size:26px; }
+  .h5-login-desc { font-size:14px; line-height:1.75; }
+  .h5-login-input { min-height:44px; font-size:16px; }
+  .h5-login-mode-tab,.h5-login-btn { min-height:44px; }
+}
+@media (max-height:620px) and (max-width:575.98px) {
+  .h5-login-card { margin-top:8px; }
 }
 
 /* ===== KNOWLEDGE UX ===== */
@@ -3555,8 +3605,9 @@ body { background: var(--surface-2); color: var(--text-main); }
 .review-article-cover-kicker { font-size:10px; font-weight:700; color:rgba(248,246,240,0.72); letter-spacing:.08em; }
 .review-article-cover-title { font-size:18px; line-height:1.45; font-weight:800; margin-top:10px; }
 .review-article-cover-meta { font-size:11px; color:rgba(248,246,240,0.72); line-height:1.7; margin-top:8px; }
-.review-article-card-title { font-size:15px; color:var(--text-main); font-weight:800; line-height:1.6; margin-top:12px; }
 .review-article-card-summary { font-size:12px; color:var(--gray-400); line-height:1.8; margin-top:8px; }
+.review-article-card-meta { display:flex; flex-wrap:wrap; gap:8px 14px; margin-top:9px; font-size:11px; color:var(--gray-400); line-height:1.6; }
+.review-article-card-meta span { white-space:nowrap; }
 .review-article-card-footer {
   display:flex;
   justify-content:space-between;
@@ -4199,12 +4250,130 @@ body,
 }
 .wb-mode-switch { display:flex; align-items:center; gap:8px; padding:8px 14px; background:rgba(200,169,110,0.1); border:1px solid rgba(200,169,110,0.3); border-radius:20px; cursor:pointer; margin:12px 16px; }
 .wb-mode-switch-label { font-size:12px; color:var(--gold); font-weight:600; }
+
+/* ===== H5 SPLASH SCREEN ===== */
+.h5-splash-screen {
+  --splash-ink:#102B49;
+  --splash-blue:#2F74C0;
+  --splash-gold:#B88A3B;
+  --splash-line:rgba(47,116,192,0.13);
+  position:fixed;
+  inset:0;
+  z-index:5000;
+  overflow:hidden;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:100dvh;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  box-sizing:border-box;
+  background:linear-gradient(115deg,rgba(255,255,255,.97),rgba(241,247,253,.99)),#F2F7FC;
+  color:var(--splash-ink);
+  opacity:1;
+  visibility:visible;
+  transition:opacity .55s ease,visibility .55s ease;
+}
+.h5-splash-screen::before,
+.h5-splash-screen::after {
+  content:"";
+  position:absolute;
+  pointer-events:none;
+  border:1px solid var(--splash-line);
+  transform:rotate(-18deg);
+}
+.h5-splash-screen::before { width:72vw; height:72vw; max-width:900px; max-height:900px; left:-28vw; top:-38vw; }
+.h5-splash-screen::after { width:54vw; height:54vw; max-width:680px; max-height:680px; right:-22vw; bottom:-30vw; }
+.h5-splash-screen.is-hidden { opacity:0; visibility:hidden; pointer-events:none; }
+.h5-splash-art { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+.h5-splash-art-grid { fill:none; stroke:var(--splash-line); stroke-width:1; }
+.h5-splash-art-axis { fill:none; stroke:rgba(47,116,192,.22); stroke-width:1.5; stroke-dasharray:5 8; }
+.h5-splash-art-trend,
+.h5-splash-art-trend-shadow { fill:none; stroke-linecap:round; stroke-linejoin:round; }
+.h5-splash-art-trend { stroke:var(--splash-blue); stroke-width:3; stroke-dasharray:8 12; animation:h5SplashTrend 5s linear infinite; }
+.h5-splash-art-trend-shadow { stroke:rgba(184,138,59,.34); stroke-width:8; opacity:.55; }
+.h5-splash-art-node { fill:#fff; stroke:var(--splash-gold); stroke-width:2; transform-box:fill-box; transform-origin:center; animation:h5SplashNode 2.2s ease-in-out infinite; }
+.h5-splash-art-node:nth-of-type(2) { animation-delay:.35s; }
+.h5-splash-art-node:nth-of-type(3) { animation-delay:.7s; }
+.h5-splash-content { position:relative; z-index:1; width:100%; min-height:100%; padding:clamp(34px,8vh,92px) 18px calc(132px + env(safe-area-inset-bottom)); box-sizing:border-box; }
+.h5-splash-mark { width:86px; height:86px; margin:0 auto 24px; display:flex; align-items:center; justify-content:center; border:1px solid rgba(47,116,192,.22); border-radius:24px; background:rgba(255,255,255,.76); box-shadow:0 18px 48px rgba(31,73,125,.13); }
+.h5-splash-mark-inner { width:56px; height:56px; display:flex; align-items:center; justify-content:center; border-radius:50%; border:1px solid rgba(184,138,59,.38); color:var(--splash-gold); font-size:24px; font-weight:800; }
+.h5-splash-kicker { margin-bottom:10px; color:var(--splash-gold); font-size:11px; font-weight:800; letter-spacing:2px; text-transform:uppercase; }
+.h5-splash-product { max-width:760px; margin:0 auto; color:var(--splash-ink); font-size:clamp(30px,5vw,36px); font-weight:800; line-height:1.2; overflow-wrap:anywhere; }
+.h5-splash-subtitle { max-width:520px; margin:12px auto 0; color:#58718D; font-size:13px; line-height:1.8; }
+.h5-splash-loader { position:relative; width:112px; height:112px; margin:34px auto 0; }
+.h5-splash-loader::before,.h5-splash-loader::after { content:""; position:absolute; inset:0; border-radius:50%; border:1px solid rgba(47,116,192,.18); }
+.h5-splash-loader::after { inset:12px; border-color:transparent rgba(184,138,59,.72) transparent rgba(47,116,192,.55); animation:h5SplashSpin 1.25s linear infinite; }
+.h5-splash-loader-ring { position:absolute; inset:22px; border-radius:50%; border:2px solid transparent; border-top-color:var(--splash-blue); border-right-color:var(--splash-gold); animation:h5SplashSpin 1.8s linear infinite reverse; }
+.h5-splash-loader-dot { position:absolute; inset:47px; border-radius:50%; background:var(--splash-gold); box-shadow:0 0 0 7px rgba(184,138,59,.12),0 0 22px rgba(184,138,59,.42); animation:h5SplashPulse 1.5s ease-in-out infinite; }
+.h5-splash-status { margin-top:16px; color:#58718D; font-size:11px; letter-spacing:1px; }
+.h5-splash-quote-wrap { position:absolute; left:18px; right:18px; bottom:calc(28px + env(safe-area-inset-bottom)); max-width:760px; margin:0 auto; padding-top:18px; border-top:1px solid rgba(47,116,192,.16); }
+.h5-splash-quote-label { margin-bottom:8px; color:var(--splash-gold); font-size:11px; font-weight:800; letter-spacing:1.5px; }
+.h5-splash-quote { color:#38536D; font-size:16px; font-weight:700; line-height:1.7; letter-spacing:.01em; text-wrap:balance; }
+@keyframes h5SplashSpin { to { transform:rotate(360deg); } }
+@keyframes h5SplashPulse { 0%,100% { transform:scale(.82); opacity:.72; } 50% { transform:scale(1.12); opacity:1; } }
+@keyframes h5SplashTrend { to { stroke-dashoffset:-80; } }
+@keyframes h5SplashNode { 0%,100% { transform:scale(.86); } 50% { transform:scale(1.12); } }
+@media (max-width:575.98px) {
+  .h5-splash-content { padding-top:clamp(28px,7vh,48px); padding-left:16px; padding-right:16px; }
+  .h5-splash-mark { width:70px; height:70px; margin-bottom:18px; border-radius:20px; }
+  .h5-splash-mark-inner { width:46px; height:46px; font-size:20px; }
+  .h5-splash-kicker { font-size:10px; letter-spacing:1.6px; }
+  .h5-splash-product { font-size:clamp(26px,8vw,32px); }
+  .h5-splash-subtitle { margin-top:10px; font-size:12px; }
+  .h5-splash-loader { width:94px; height:94px; margin-top:24px; }
+  .h5-splash-loader-dot { inset:39px; }
+  .h5-splash-quote-wrap { left:16px; right:16px; bottom:calc(20px + env(safe-area-inset-bottom)); padding-top:14px; }
+  .h5-splash-quote-label { font-size:11px; margin-bottom:6px; }
+  .h5-splash-quote { font-size:17px; line-height:1.65; font-weight:800; }
+}
+@media (max-height:620px) and (max-width:575.98px) {
+  .h5-splash-content { padding-top:20px; padding-bottom:108px; }
+  .h5-splash-mark { width:56px; height:56px; margin-bottom:12px; }
+  .h5-splash-mark-inner { width:38px; height:38px; font-size:17px; }
+  .h5-splash-loader { width:72px; height:72px; margin-top:14px; }
+  .h5-splash-loader-dot { inset:30px; }
+  .h5-splash-status { margin-top:8px; }
+  .h5-splash-quote { font-size:15px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .h5-splash-screen { transition:none; }
+  .h5-splash-art-trend,.h5-splash-art-node,.h5-splash-loader::after,.h5-splash-loader-ring,.h5-splash-loader-dot { animation:none; }
+}
 </style>
 </head>
 <body onload="initGangtiseTheme()">
+<div id="h5-splash-screen" class="h5-splash-screen" role="status" aria-live="polite" aria-label="正在加载">
+  <svg class="h5-splash-art" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
+    <defs><pattern id="h5-splash-grid-pattern" width="72" height="72" patternUnits="userSpaceOnUse"><path class="h5-splash-art-grid" d="M72 0H0V72" /></pattern></defs>
+    <rect width="1440" height="900" fill="url(#h5-splash-grid-pattern)" opacity=".72" />
+    <path class="h5-splash-art-axis" d="M88 724H1352M126 142V760" />
+    <path class="h5-splash-art-trend-shadow" d="M116 638L278 592L376 622L510 476L638 514L780 366L914 402L1060 274L1192 310L1324 190" />
+    <path class="h5-splash-art-trend" d="M116 638L278 592L376 622L510 476L638 514L780 366L914 402L1060 274L1192 310L1324 190" />
+    <circle class="h5-splash-art-node" cx="510" cy="476" r="7" /><circle class="h5-splash-art-node" cx="780" cy="366" r="7" /><circle class="h5-splash-art-node" cx="1060" cy="274" r="7" />
+  </svg>
+  <div class="h5-splash-content container-fluid d-flex flex-column text-center">
+    <div class="row flex-grow-1 align-items-center"><div class="col-12">
+      <div class="h5-splash-mark" aria-hidden="true"><div class="h5-splash-mark-inner">研</div></div>
+      <div class="h5-splash-kicker">INVESTMENT INTELLIGENCE</div>
+      <div id="h5-splash-product-name" class="h5-splash-product">智能投研平台</div>
+      <div class="h5-splash-subtitle">正在为你整理市场脉络与重要信息</div>
+      <div class="h5-splash-loader" aria-hidden="true"><div class="h5-splash-loader-ring"></div><div class="h5-splash-loader-dot"></div></div>
+      <div class="h5-splash-status">正在进入研究空间</div>
+    </div></div>
+    <div id="h5-splash-quote-wrap" class="h5-splash-quote-wrap"><div class="h5-splash-quote-label">今日投资箴言</div><div id="h5-splash-quote" class="h5-splash-quote">投资的第一原则是不要亏损。——本杰明·格雷厄姆</div></div>
+  </div>
+</div>
 <div class="h5-login-shell hidden" id="h5-login-shell">
+  <svg class="h5-login-art" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
+    <defs><pattern id="h5-login-grid-pattern" width="72" height="72" patternUnits="userSpaceOnUse"><path class="h5-login-art-grid" d="M72 0H0V72" /></pattern></defs>
+    <rect width="1440" height="900" fill="url(#h5-login-grid-pattern)" opacity=".72" />
+    <path class="h5-login-art-axis" d="M88 724H1352M126 142V760" />
+    <path class="h5-login-art-shadow" d="M116 638L278 592L376 622L510 476L638 514L780 366L914 402L1060 274L1192 310L1324 190" />
+    <path class="h5-login-art-trend" d="M116 638L278 592L376 622L510 476L638 514L780 366L914 402L1060 274L1192 310L1324 190" />
+  </svg>
   <div class="h5-login-card">
-    <div class="h5-login-kicker">H5 登录</div>
+    <div class="h5-login-brand-mark" aria-hidden="true">研</div>
+    <div class="h5-login-kicker" style="margin-top:16px">RESEARCH SPACE</div>
     <div class="h5-login-title">{{ brand_config.short_name }}</div>
     <div class="h5-login-desc" id="h5-login-desc">请输入账号密码登录。若已配置微信 OAuth，也可以直接使用微信登录。</div>
     <div id="h5-login-form-host"></div>
@@ -4483,7 +4652,7 @@ body,
     <div class="h5-section hermes-shell" style="padding-top:14px">
       <div class="hermes-header">
         <div class="hermes-brand-lockup">
-          <img class="pixel-gold-ingot" src="/static/img/pixel-red-gold-ingot.svg" alt="小金智能体图标">
+          <img class="pixel-gold-ingot" src="/static/img/pixel-gold-bull.svg" alt="小金智能体像素金牛图标">
           <div>
             <div class="hermes-brand-title">小金智能体</div>
             <div class="hermes-brand-subtitle">先深度思考，再给你清晰答案</div>
@@ -5078,7 +5247,7 @@ body,
           <div class="help-center-subtitle" id="help-center-subtitle">按功能快速查找，不堆砌说明文字。</div>
         </div>
       </div>
-      <input id="help-center-search-input" class="help-center-search" style="margin-top:12px" placeholder="搜索账号、消息、Hermes、复盘、指标、知识..." oninput="handleHelpCenterSearch(this.value)">
+      <input id="help-center-search-input" class="help-center-search" style="margin-top:12px" placeholder="搜索账号、消息、小金智能体、复盘、指标、知识..." oninput="handleHelpCenterSearch(this.value)">
       <div class="help-center-categories" id="help-center-categories"></div>
       <div class="help-center-list" id="help-center-list"></div>
       <div class="modal-actions">
@@ -5138,7 +5307,7 @@ body,
       <span id="dm-nav-badge" style="position:absolute;top:2px;right:calc(50% - 16px);width:8px;height:8px;border-radius:50%;background:#E74C3C;display:block"></span>
     </div>
     <div class="h5-nav-item" id="nav-hermes" data-feature="hermes" onclick="switchTab('hermes')">
-      <div class="h5-nav-icon"><img class="pixel-gold-ingot pixel-gold-ingot--nav" src="/static/img/pixel-red-gold-ingot.svg" alt="小金智能体"></div>
+      <div class="h5-nav-icon"><img class="pixel-gold-ingot pixel-gold-ingot--nav" src="/static/img/pixel-gold-bull.svg" alt="小金智能体像素金牛"></div>
       <div class="h5-nav-label">小金智能体</div>
     </div>
     <div class="h5-nav-item" id="nav-profile" onclick="switchTab('profile')">
@@ -7530,11 +7699,19 @@ function buildReviewArticleData(review) {
       }
     });
   }
+  const articleId = String(review.id || '').trim();
+  const overriddenViewCount = articleId && Object.prototype.hasOwnProperty.call(reviewViewCountOverrides, articleId)
+    ? reviewViewCountOverrides[articleId]
+    : review.viewCount;
+  const viewCount = Math.max(0, Number(overriddenViewCount) || 0);
+  const publishedAt = String(review.publishedAt || review.generatedAt || '').trim() || '日期未提供';
   return {
     id: review.id,
     title: review.title,
     kicker: `${review.author} ${review.periodLabel}`,
-    meta: `${review.generatedAt} · 已发布复盘分析报告`,
+    meta: `发布日期 ${publishedAt} · 阅读量 ${formatReviewViewCount(viewCount)}`,
+    publishedAt,
+    viewCount,
     summary: review.summary,
     author: review.author,
     avatar: review.avatar,
@@ -7588,6 +7765,8 @@ function buildPublishedReviewArticleFromSnapshot(davUser, snapshot, period) {
     avatar: davUser.tenant.advisor === '财经老王' ? '👑' : '🧭',
     periodLabel: matched.period || getReviewPeriodMeta(period).label,
     generatedAt: matched.time || matched.published_at || nowTs(),
+    publishedAt: matched.published_at || matched.time || nowTs(),
+    viewCount: matched.view_count,
     title: matched.title || '复盘分析报告',
     summary: matched.summary || matched.content_text || '',
     tags: matched.tags || [],
@@ -7662,10 +7841,9 @@ function renderReviewArticleCards(articles) {
         <div class="review-article-card" role="button" tabindex="0" onclick="openReviewArticleDetail('${escapeAttr(article.id)}')" onkeydown="if(event.key==='Enter'||event.key===' ')openReviewArticleDetail('${escapeAttr(article.id)}')">
           <div class="review-article-cover">
             <div class="review-article-cover-kicker">${escapeHtml(article.kicker)}</div>
-            <div class="review-article-cover-title">${escapeHtml(article.coverTitle)}</div>
-            <div class="review-article-cover-meta">${escapeHtml(article.meta)}</div>
+            <div class="review-article-cover-title">${escapeHtml(article.title)}</div>
+            <div class="review-article-cover-meta">发布日期 ${escapeHtml(article.publishedAt || article.generatedAt || '日期未提供')} · 阅读量 ${escapeHtml(formatReviewViewCount(article.viewCount))}</div>
           </div>
-          <div class="review-article-card-title">${escapeHtml(article.title)}</div>
           <div class="review-article-card-summary">${escapeHtml(article.summary)}</div>
           <div class="review-watchlist-row">
             ${(article.watchlist || []).map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
@@ -7680,6 +7858,34 @@ function renderReviewArticleCards(articles) {
       `).join('')}
     </div>
   `;
+}
+
+function formatReviewViewCount(value) {
+  const count = Math.max(0, Number(value) || 0);
+  if (count >= 10000) return `${(count / 10000).toFixed(1).replace(/\.0$/, '')}万`;
+  if (count >= 1000) return `${(count / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+  return String(Math.round(count));
+}
+
+const reviewViewCountOverrides = {};
+const reviewViewRequestIds = new Set();
+
+function recordReviewArticleView(articleId) {
+  const id = String(articleId || '').trim();
+  const tenantSlug = String(((window.ACTIVE_TENANT || {}).slug) || '').trim().toLowerCase();
+  if (!id || !tenantSlug || reviewViewRequestIds.has(id)) return;
+  reviewViewRequestIds.add(id);
+  fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/reviews/${encodeURIComponent(id)}/view`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: '{}',
+  }).then(response => response.json().catch(() => ({})).then(data => ({response, data}))).then(({response, data}) => {
+    if (!response.ok || !data.ok) return;
+    reviewViewCountOverrides[id] = Number(data.view_count) || 0;
+    if (reviewView === 'detail' && reviewDetailArticleId === id) renderReviewExperience();
+  }).catch(() => {
+    // Reading remains available when analytics storage is unavailable.
+  });
 }
 
 function renderReviewArticleList(period) {
@@ -8094,6 +8300,7 @@ function renderReviewExperience() {
   host.innerHTML = reviewView === 'detail'
     ? renderReviewDetailPage()
     : (reviewView === 'list' ? renderReviewListPage() : renderReviewHome());
+  if (reviewView === 'detail') recordReviewArticleView(reviewDetailArticleId);
   renderReviewActiveJobs();
   if (hasDavCapabilities && !reviewActiveJobsLoading && !reviewActiveJobsTimer) loadActiveReviewJobs();
 }
@@ -12107,14 +12314,15 @@ function buildFallbackHelpCenterPayload(role) {
     title: '帮助中心',
     subtitle: '按功能快速查找，不堆砌说明文字。',
     role: normalizedRole,
-    categories: ['全部', '账号', '消息', 'Hermes', '复盘', '指标', '知识'],
+    categories: ['全部', '账号', '消息', '小金智能体', '复盘', '指标', '知识'],
     articles: [
       { id: 'account', category: '账号', title: '账号设置怎么修改', summary: '修改昵称、头像、简介和自定义关注标签。', bullets: ['租户关系和权益不在这里改。', '系统标签自动生成。', '自定义关注标签由自己维护。'], action_label: '打开账号设置', action_type: 'account_settings' },
       { id: 'dm', category: '消息', title: '消息通知在哪里看', summary: '消息通知会直接进入消息板块。', bullets: ['投资者默认只和所属大V互动。', '大V可在消息板块处理私信和提醒。'], action_label: '打开消息板块', action_type: 'switch_tab', action_value: 'dm' },
-      { id: 'hermes', category: 'Hermes', title: 'Hermes 能问什么', summary: '优先承接个股、复盘、知识和指标类问题。', bullets: ['先查租户知识内容。', '超范围会被引导回平台能力。'], action_label: '打开 Hermes', action_type: 'switch_tab', action_value: 'hermes' },
+      { id: 'hermes', category: '小金智能体', title: '小金智能体能做什么', summary: '先由配置的 LLM 识别意图，再按六类场景分发。', bullets: ['支持今日个股观察、今日大盘观察、个股深化研究、个股看点、多支自选股综合分析和多轮闲聊。', '研究类内容由 Gangtise 返回，闲聊和产品帮助由 LLM 处理。', '会话保留上下文；对象或时间不明确时先追问，不盲猜。'], action_label: '打开小金智能体', action_type: 'switch_tab', action_value: 'hermes' },
+      { id: 'hermes-scenarios', category: '小金智能体', title: '六类场景怎么区分', summary: '简单介绍与详细综合分析是不同任务，系统会按用户目的选择能力。', bullets: ['“今天某只股票怎么样”是今日个股观察；“今天上证怎么样”是今日大盘观察。', '“深入研究”是最近一期公司一页通，不是当日报告；“简单介绍”是看点摘要，最多 6000 个证券。', '明确要求多支股票详细综合分析时，调用复盘使用的 Gangtise 多股分析能力。'], action_label: '打开小金智能体', action_type: 'switch_tab', action_value: 'hermes' },
       { id: 'review', category: '复盘', title: '复盘怎么生成', summary: '先形成 Draft，再审核确认，最后预览发布。', bullets: ['用户输入先整理。', '没有自选股时可直接预览发布。', '如果选择了自选股，会先追加归纳总结，摘要则在发布时自动生成。'], action_label: '打开复盘', action_type: 'switch_tab', action_value: 'review' },
       { id: 'indicator', category: '指标', title: '智能指标怎么理解', summary: '提示词先约束逻辑，再由系统生成可确认结果。', bullets: ['已有原始指标可直接预览。', '新逻辑先临时生成再确认。'], action_label: '打开 Dashboard', action_type: 'switch_tab', action_value: 'feed' },
-      { id: 'knowledge', category: '知识', title: '知识专区怎么用', summary: '统一管理知识内容、同步和图谱关系。', bullets: ['大V看租户图谱。', 'Admin 看平台总图和单租户细图。'], action_label: '打开知识', action_type: 'switch_tab', action_value: 'knowledge' },
+      { id: 'knowledge', category: '知识', title: '知识专区怎么用', summary: '统一管理知识内容、来源和图谱关系。', bullets: ['大V看租户图谱。', 'Admin 看平台总图和单租户细图。', '小金智能体首轮意图判断直接由配置的 LLM 完成，不使用 embedding 做场景初筛。'], action_label: '打开知识', action_type: 'switch_tab', action_value: 'knowledge' },
     ],
   };
 }
@@ -12543,6 +12751,7 @@ function switchTab(tab) {
     ensureHermesSessionBootstrap();
     loadHermesSessionList({ silent: true }).catch(() => {});
     renderHermesWorkspace();
+    scrollHermesThreadToBottom({ behavior: 'auto' });
   }
 
   if (tab === 'workbench') {
@@ -15551,6 +15760,7 @@ async function switchHermesSession(sessionId, options = {}) {
     hermesConversation = cache.conversation.slice(0);
     clearHermesQuestionInputs();
     renderHermesWorkspace();
+    scrollHermesThreadToBottom();
     if (options.closeModal) closeHermesSessionModal();
     return;
   }
@@ -15568,6 +15778,7 @@ async function switchHermesSession(sessionId, options = {}) {
     syncHermesSessionCache();
     clearHermesQuestionInputs();
     renderHermesWorkspace();
+    scrollHermesThreadToBottom();
     if (options.closeModal) closeHermesSessionModal();
   } catch (error) {
     showToast('历史会话加载失败');
@@ -15587,6 +15798,7 @@ function startHermesNewSession(options = {}) {
   } catch (e) {}
   clearHermesQuestionInputs({ focus: options.focus !== false });
   renderHermesWorkspace();
+  resetHermesScrollPosition();
   if (options.closeModal) closeHermesSessionModal();
   if (!options.silent) showToast('已开始新会话');
 }
@@ -15809,6 +16021,45 @@ function renderHermesComposerSubmit() {
   button.title = '发送';
   button.disabled = !hasText;
   syncHermesComposerClearance();
+}
+
+function getHermesScrollContainer() {
+  const thread = document.getElementById('hermes-chat-thread');
+  if (!thread) return document.scrollingElement || document.documentElement;
+  let node = thread.parentElement;
+  while (node && node !== document.body) {
+    const style = window.getComputedStyle(node);
+    if ((style.overflowY === 'auto' || style.overflowY === 'scroll')
+      && node.scrollHeight > node.clientHeight) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return document.scrollingElement || document.documentElement;
+}
+
+function scrollHermesThreadToBottom(options = {}) {
+  if (!hermesConversation.length) return;
+  const behavior = options.behavior || 'smooth';
+  const scroll = () => {
+    const container = getHermesScrollContainer();
+    const targetTop = Math.max(0, container.scrollHeight - container.clientHeight);
+    if (typeof container.scrollTo === 'function') {
+      container.scrollTo({ top: targetTop, behavior });
+    } else {
+      container.scrollTop = targetTop;
+    }
+  };
+  window.requestAnimationFrame(() => window.requestAnimationFrame(scroll));
+}
+
+function resetHermesScrollPosition() {
+  const container = getHermesScrollContainer();
+  if (typeof container.scrollTo === 'function') {
+    container.scrollTo({ top: 0, behavior: 'auto' });
+  } else {
+    container.scrollTop = 0;
+  }
 }
 
 function syncHermesComposerClearance() {
@@ -16683,6 +16934,7 @@ function renderHermesRawAnswerFallback(answer, title, presentationError) {
   `;
   host.appendChild(fallback);
   host.classList.remove('is-empty');
+  scrollHermesThreadToBottom();
 }
 
 function buildHermesTraceThoughts(agentTrace) {
@@ -17227,6 +17479,7 @@ async function runHermesAnalysis(options) {
   syncHermesSessionCache({ skipEmpty: false });
   clearHermesQuestionInputs({ focus: true });
   renderHermesThread();
+  scrollHermesThreadToBottom();
   try {
     const activeUser = getActiveDemoUser();
     const resp = await fetch('/api/hermes/query', {
@@ -17304,6 +17557,7 @@ async function runHermesAnalysis(options) {
       });
       await refreshHermesCredits({ silent: true });
       renderHermesWorkspace();
+      scrollHermesThreadToBottom();
     } catch (renderError) {
       // A presentation error must never discard a successfully returned
       // Gangtise/LLM answer or incorrectly report it as a model failure.
@@ -17400,6 +17654,7 @@ async function runHermesAnalysis(options) {
     loadHermesSessionList({ force: true, silent: true }).catch(() => {});
     renderHermesThread();
     renderHermesComposerSubmit();
+    scrollHermesThreadToBottom();
     showToast(friendlyError);
   }
 }
@@ -19348,7 +19603,44 @@ async function resetFundDashboardDraft() {
 }
 
 // ===== INIT =====
+function initH5SplashScreen() {
+  const splash = document.getElementById('h5-splash-screen');
+  if (!splash) return;
+
+  const tenant = window.ACTIVE_TENANT && typeof window.ACTIVE_TENANT === 'object' ? window.ACTIVE_TENANT : {};
+  const brand = window.SITE_CONFIG && typeof window.SITE_CONFIG.brand === 'object' ? window.SITE_CONFIG.brand : {};
+  const productName = String(tenant.short_name || tenant.name || tenant.advisor || brand.short_name || brand.name || '智能投研平台').trim() || '智能投研平台';
+  const quotes = [
+    '投资的第一原则是不要亏损。——本杰明·格雷厄姆',
+    '市场短期是投票机，长期是称重机。——本杰明·格雷厄姆',
+    '风险来自你不知道自己在做什么。——沃伦·巴菲特',
+    '价格是你付出的，价值是你得到的。——沃伦·巴菲特',
+    '耐心是投资者最重要的品质之一。——查理·芒格',
+    '投资不是智商竞赛，而是纪律与耐心的考验。——彼得·林奇'
+  ];
+  let quoteIndex = Math.floor(Math.random() * quotes.length);
+  try {
+    const previousIndex = Number(window.sessionStorage.getItem('gangtise_h5_splash_quote_index'));
+    if (quotes.length > 1 && Number.isInteger(previousIndex) && previousIndex === quoteIndex) quoteIndex = (quoteIndex + 1) % quotes.length;
+    window.sessionStorage.setItem('gangtise_h5_splash_quote_index', String(quoteIndex));
+  } catch (error) {
+    // Private browsing can reject sessionStorage; the random quote still works.
+  }
+  const productHost = document.getElementById('h5-splash-product-name');
+  const quoteHost = document.getElementById('h5-splash-quote');
+  if (productHost) productHost.textContent = productName;
+  if (quoteHost) quoteHost.textContent = quotes[quoteIndex];
+
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const hideDelay = reduceMotion ? 900 : 2600;
+  window.setTimeout(() => {
+    splash.classList.add('is-hidden');
+    window.setTimeout(() => splash.remove(), reduceMotion ? 0 : 600);
+  }, hideDelay);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  initH5SplashScreen();
   window.GangtiseReleaseNotes?.init({ surface: 'h5', autoShow: false });
   syncDemoUsersWithActiveTenant();
   applySiteFeatureFlags();

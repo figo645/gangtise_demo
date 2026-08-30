@@ -447,6 +447,24 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertNotIn("return matched\n      ? buildPublishedReviewArticleFromSnapshot(davUser, matched, period)\n      : buildKolReviewData(davUser, period);", html)
         self.assertNotIn('id="review-article-modal"', html)
 
+    def test_given_review_cards_when_page_renders_then_each_card_has_one_title_and_real_view_meta(self):
+        html = (PROJECT_ROOT / "templates" / "h5.html").read_text(encoding="utf-8")
+
+        self.assertIn('${escapeHtml(article.title)}', html)
+        self.assertIn('发布日期 ${escapeHtml(article.publishedAt || article.generatedAt || \'日期未提供\')}', html)
+        self.assertIn('阅读量 ${escapeHtml(formatReviewViewCount(article.viewCount))}', html)
+        self.assertNotIn('${escapeHtml(article.coverTitle)}</div>\n            <div class="review-article-cover-meta">${escapeHtml(article.meta)}', html)
+        self.assertNotIn('<div class="review-article-card-title">${escapeHtml(article.title)}</div>', html)
+
+    def test_given_review_snapshot_when_normalized_then_view_count_is_persisted_and_legacy_views_are_supported(self):
+        tenant = {"slug": "bdd", "advisor": "测试大V"}
+        normalized = core_services.normalize_review_snapshot_item(
+            {"id": "bdd-review-1", "title": "唯一主题", "views": "12"},
+            tenant,
+            index=0,
+        )
+        self.assertEqual(normalized["view_count"], 12)
+
     def test_given_workbench_publish_success_when_page_renders_then_publish_no_longer_opens_test_modal(self):
         response = self.client.get(f"/kol-workbench?tenant={self.tenant_slug}")
 

@@ -1,18 +1,19 @@
 (function () {
   const currentRelease = {
-    id: 'v1.5-20260818',
-    version: 'v1.5',
-    date: '2026-08-18',
+    id: 'v1.6-20260831',
+    version: 'v1.6',
+    date: '2026-08-31',
     isMajor: true,
-    title: '受控交付与环境同步',
-    summary: '本次更新把数据库发布从单一导入动作升级为可验证、可回滚的环境交付流程。',
+    title: '小金智能体统一编排',
+    summary: '本次更新把小金智能体收敛为可审计的六类投研场景，由 Admin 配置的 LLM 先理解任务，再分发到 Gangtise 研究能力或通用对话能力。',
     features: [
-      { tag: 'DEFAULT PATH', title: '日常增量发布', copy: '先在 Staging 完整验证，再审核结构、主数据和业务数据差异，向 Production 发布版本化增量。' },
-      { tag: 'FULL PROMOTION', title: '环境全量同步', copy: 'Staging 到 Production 全量发布先恢复临时库，校验 pgvector、表和迁移后才切换。' },
-      { tag: 'ROLLBACK READY', title: '可回滚交付', copy: '全量切换会保留目标环境原数据库作为回滚备份；任务过程提供实时日志与阶段状态。' }
+      { tag: 'SIX SCENARIOS', title: '六类能力统一入口', copy: '支持今日个股观察、今日大盘观察、个股深化研究、个股看点摘要、多支自选股综合分析和多轮闲聊。' },
+      { tag: 'LLM PLANNER', title: '先理解，再执行', copy: '用户原始问题先交给 Admin 配置的 LLM；一句话包含多个目的时拆成独立任务，信息不足时先澄清。' },
+      { tag: 'TRACEABLE AI', title: '研究结果可追溯', copy: '研究任务按场景调用 Gangtise API 并直出原文；会话记忆、模型、工具、Skills 规则与审计轨迹统一留存。' }
     ]
   };
   const history = [
+    { version: 'v1.5', title: '受控交付与环境同步', copy: 'Staging 验证、增量发布、环境全量同步与可回滚交付。' },
     { version: 'v1.4', title: '治理、交付与质量闭环', copy: '账号合规、渠道归因、模型映射、BDD 与系统学习手册。' },
     { version: 'v1.3', title: '知识、复盘与真实数据闭环', copy: 'Gangtise 数据接入、复盘向导、知识分层与共用证据链。' },
     { version: 'v1.2', title: 'Hermes 研究 Agent', copy: '意图路由、知识优先召回、图表、会话记忆和使用治理。' },

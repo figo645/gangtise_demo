@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc" shape-rendering="crispEdges">
+  <title id="title">像素金牛牛脸</title>
+  <desc id="desc">正面金色像素风牛脸，带牛角、耳朵、眼睛和鼻环</desc>
+
+  <!-- Horns and ears establish the unmistakable front-facing bull silhouette. -->
+  <path fill="#5A3218" d="M19 17H8v4H4v8h5v-4h10zM45 17h11v4h4v8h-5v-4H45z"/>
+  <path fill="#B86F24" d="M18 14h7v5h-5v7h-5v-5h3zM46 14h-7v5h5v7h5v-5h-3z"/>
+  <path fill="#7B451E" d="M7 21h8v4H8v4H4v-7h3zM57 21h-8v4h7v4h4v-7h-3z"/>
+
+  <!-- Head, cheeks and forehead. -->
+  <path fill="#6F3D16" d="M18 18h28v4h6v9h4v18h-7v7H15v-7H8V31h4v-9h6z"/>
+  <path fill="#D28A2E" d="M20 18h24v5h6v10h3v13h-7v8H18v-8h-7V33h3V23h6z"/>
+  <path fill="#F2B83F" d="M25 19h14v6h5v8H20v-8h5zM17 34h30v10H17z"/>
+  <path fill="#FFD45A" d="M23 22h6v5h-6zM35 22h6v5h-6zM14 35h6v7h-6zM44 35h6v7h-6z"/>
+
+  <!-- Symmetrical eyes and brows. -->
+  <path fill="#7E4218" d="M18 29h11v3H18zM35 29h11v3H35z"/>
+  <path fill="#FFF0A8" d="M20 31h7v7h-7zM37 31h7v7h-7z"/>
+  <path fill="#3F2617" d="M22 32h4v5h-4zM38 32h4v5h-4z"/>
+  <path fill="#FFFFFF" d="M23 32h2v2h-2zM39 32h2v2h-2z"/>
+
+  <!-- Broad muzzle, nostrils and a small nose ring. -->
+  <path fill="#B86F24" d="M17 41h30v9h-5v5H22v-5h-5z"/>
+  <path fill="#E3A83B" d="M21 42h9v10h-7v-4h-2zM34 42h9v6h-2v4h-7z"/>
+  <path fill="#5A3218" d="M23 44h5v4h-5zM36 44h5v4h-5z"/>
+  <path fill="#FFD45A" d="M25 45h2v2h-2zM38 45h2v2h-2z"/>
+  <path fill="none" stroke="#FFF0A8" stroke-width="2" d="M27 51v4h10v-4"/>
+  <path fill="#FFF0A8" d="M28 52h8v2h-8z"/>
+</svg>

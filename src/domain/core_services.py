@@ -1134,6 +1134,10 @@ def normalize_review_snapshot_item(item, tenant, index=0):
     content_text = str(raw.get("content_text") or raw.get("content") or raw.get("body_text") or fallback.get("content_text") or "").strip()
     summary = str(raw.get("summary") or fallback.get("summary") or content_text[:180]).strip() or fallback["summary"]
     published_at = normalize_datetime_text(raw.get("published_at") or raw.get("time") or fallback.get("published_at") or fallback.get("time"))
+    try:
+        view_count = max(0, int(raw.get("view_count") if raw.get("view_count") is not None else raw.get("views") or 0))
+    except (TypeError, ValueError):
+        view_count = 0
     attachments = []
     for offset, attachment in enumerate(raw.get("knowledge_attachments") if isinstance(raw.get("knowledge_attachments"), list) else []):
         if not isinstance(attachment, dict):
@@ -1275,6 +1279,7 @@ def normalize_review_snapshot_item(item, tenant, index=0):
         "watchlist": watchlist or copy.deepcopy(fallback.get("watchlist") or []),
         "summary": summary,
         "content_text": content_text or summary,
+        "view_count": view_count,
         "source_mode": str(raw.get("source_mode") or fallback.get("source_mode") or "manual").strip().lower() or "manual",
         "paragraph_mode": str(raw.get("paragraph_mode") or fallback.get("paragraph_mode") or "manual").strip().lower() or "manual",
         "publisher": str(raw.get("publisher") or tenant.get("advisor") or "").strip() or tenant.get("advisor") or "",
@@ -1543,6 +1548,38 @@ def append_review_snapshot(tenant_slug, snapshot):
     saved = update_tenant_review_snapshots(tenant_slug, deduped[:20])
     latest_tenant = get_tenant_by_slug(tenant_slug, saved) if saved else tenant
     return resolve_tenant_review_snapshots(latest_tenant, snapshots=latest_tenant.get("review_snapshots"))
+
+
+def increment_tenant_review_snapshot_view_count(tenant_slug, review_id):
+    """Persist one published article's next view count."""
+    normalized_tenant_slug = str(tenant_slug or "").strip().lower()
+    normalized_review_id = str(review_id or "").strip()
+    tenant = get_tenant_by_slug(normalized_tenant_slug)
+    if not tenant or tenant.get("slug") != normalized_tenant_slug:
+        raise ValueError("tenant_not_found")
+    snapshots = resolve_tenant_review_snapshots(
+        tenant,
+        snapshots=tenant.get("review_snapshots"),
+        include_simulated=True,
+    )
+    matched = None
+    for item in snapshots:
+        if str(item.get("id") or "").strip() == normalized_review_id:
+            item["view_count"] = max(0, int(item.get("view_count") or 0)) + 1
+            matched = item
+            break
+    if matched is None:
+        raise ValueError("review_not_found")
+    saved = update_tenant_review_snapshots(normalized_tenant_slug, snapshots)
+    latest_tenant = get_tenant_by_slug(normalized_tenant_slug, saved) if saved else tenant
+    latest_snapshots = resolve_tenant_review_snapshots(
+        latest_tenant,
+        snapshots=latest_tenant.get("review_snapshots"),
+    )
+    return next(
+        (item for item in latest_snapshots if str(item.get("id") or "").strip() == normalized_review_id),
+        matched,
+    )
 
 
 def append_message_thread(tenant_slug, thread_item):
@@ -4045,12 +4082,12 @@ def build_h5_help_center_payload(role="investor"):
         {
             "id": "hermes",
             "category": "小金智能体",
-            "title": "小金智能体能问什么",
-            "summary": "小金智能体只承接平台研究相关问题，不做泛百科和高风险投资指令。",
+            "title": "小金智能体能做什么",
+            "summary": "先由 Admin 配置的 LLM 识别意图，再按六类场景调用对应能力。",
             "bullets": [
-                "优先查当前租户知识内容，再按需要补平台能力。",
-                "适合问个股基本面、复盘证据链、知识框架和智能指标解释。",
-                "超范围问题会被收口并引导回平台能力。",
+                "今日个股观察、大盘观察、个股深化研究、个股看点、多支自选股综合分析和多轮闲聊均有独立处理路径。",
+                "研究类内容由 Gangtise 原文返回；闲聊、产品帮助和组合编排由配置的 LLM 处理。",
+                "会话会保留短期上下文和用户记忆；对象或时间不明确时先追问，不盲猜。",
             ],
             "action_label": "打开小金智能体",
             "action_type": "switch_tab",
@@ -4071,6 +4108,22 @@ def build_h5_help_center_payload(role="investor"):
             "action_value": "review",
         },
         {
+            "id": "hermes_scenarios",
+            "category": "小金智能体",
+            "title": "六类智能体场景怎么区分",
+            "summary": "同一句话可以拆成多个任务，系统按任务顺序执行并合并结果。",
+            "bullets": [
+                "个股咨询：今天某只股票怎么样；大盘综合：今天上证或深证怎么样。",
+                "深化研究：对某家公司做深入研究，返回最近一期一页通，不是当日报告，指数不支持。",
+                "看点摘要：简单介绍一只或多只股票，最多 6000 个证券，不能替代完整报告。",
+                "多股综合：明确要求多支股票详细综合分析时，调用复盘使用的 Gangtise 多股分析能力。",
+                "闲聊与产品帮助：由通用 LLM 回答，不调用研究 API；问题含多个目的时会先拆解。",
+            ],
+            "action_label": "打开小金智能体",
+            "action_type": "switch_tab",
+            "action_value": "hermes",
+        },
+        {
             "id": "indicator",
             "category": "指标",
             "title": "智能指标怎么理解",
@@ -4088,11 +4141,11 @@ def build_h5_help_center_payload(role="investor"):
             "id": "knowledge",
             "category": "知识",
             "title": "知识专区怎么用",
-            "summary": "知识专区统一管理上传、清洗、同步和知识图谱关系。",
+            "summary": "知识专区统一管理内容、来源、结构和租户边界。",
             "bullets": [
                 "大V可维护当前租户知识内容，并在工作台里查看租户知识图谱。",
                 "Admin 可以从平台总图切到单租户细看知识结构。",
-                "Hermes 和复盘都会优先复用这些知识沉淀。",
+                "小金智能体的当前问答链路由 LLM 做意图与任务判断，不使用 embedding 做第一轮意图识别。",
             ],
             "action_label": "打开知识",
             "action_type": "switch_tab",

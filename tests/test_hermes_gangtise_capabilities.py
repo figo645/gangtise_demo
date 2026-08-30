@@ -845,6 +845,106 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
         self.assertEqual(len(outputs["composite_tasks"]), 2)
         self.assertTrue(any(item.get("status") == "error" for item in trace))
 
+    def test_mixed_composite_answers_chat_with_admin_llm_and_keeps_gangtise_report_out_of_prompt(self):
+        question = "你有什么功能，自我介绍一下吧，你多大呀？今天上证指数表现如何？"
+        plan = {
+            "intent": "composite_research",
+            "tasks": [
+                {"intent": "product_help", "tools": []},
+                {"intent": "small_talk", "tools": []},
+                {"intent": "market_today_observation", "tools": ["gangtise.market_today_observation"]},
+            ],
+        }
+        gangtise_report = "上证指数 Gangtise 原始观察报告，禁止进入回答 LLM。"
+        outputs = {
+            "composite_tasks": [
+                {"task_index": 0, "intent": "product_help", "status": "ok", "plan": plan["tasks"][0], "outputs": {}},
+                {"task_index": 1, "intent": "small_talk", "status": "ok", "plan": plan["tasks"][1], "outputs": {}},
+                {
+                    "task_index": 2,
+                    "intent": "market_today_observation",
+                    "status": "ok",
+                    "plan": plan["tasks"][2],
+                    "outputs": {"gangtise_market_observation": {"text": gangtise_report, "provider": "Gangtise AI"}},
+                },
+            ],
+        }
+        model = {"key": "admin-default", "label": "Admin 默认模型", "provider": "mock", "model_name": "mock", "enabled": True}
+        llm_response = (
+            '{"answer":"我是小金智能体，没有真实年龄。可提供六类能力，包括今日个股观察、今日大盘综合分析、个股深化研究、个股看点摘要、多支自选股综合分析和多轮闲聊。",'
+            '"summary":"已回答功能与自我介绍","lead_conclusion":"","bullets":[],"analysis_sections":[],"next_steps":[],"confidence":"","citations":[]}'
+        )
+        with patch.object(ai_services, "get_default_llm_config", return_value=model), patch.object(
+            ai_services, "get_tenant_by_slug", return_value={"name": "财经老王"}
+        ), patch.object(ai_services, "call_openai_compatible_llm", return_value=llm_response) as llm_call:
+            synthesis, answer_model, answer_mode = ai_services.synthesize_hermes_answer(
+                question,
+                plan,
+                outputs,
+                tenant_slug="laowang",
+                user_role="dav",
+            )
+
+        self.assertEqual(answer_mode, "composite_mixed_llm")
+        self.assertEqual(answer_model["key"], "admin-default")
+        self.assertEqual(llm_call.call_count, 1)
+        llm_prompt = llm_call.call_args.args[2]
+        self.assertIn(question, llm_prompt)
+        self.assertIn("product_help", llm_prompt)
+        self.assertIn("small_talk", llm_prompt)
+        self.assertNotIn(gangtise_report, llm_prompt)
+        self.assertIn("没有真实年龄", synthesis["answer"])
+        self.assertIn(gangtise_report, synthesis["answer"])
+        self.assertIn("### Gangtise 研究原文", synthesis["answer"])
+        self.assertIn("Admin 默认 LLM", synthesis["citations"])
+        self.assertIn("Gangtise AI 研究原文", synthesis["citations"])
+
+    def test_pure_gangtise_composite_remains_direct_without_answer_llm(self):
+        plan = {
+            "intent": "composite_research",
+            "tasks": [
+                {"intent": "stock_today_observation", "tools": ["gangtise.stock_today_observation"]},
+                {"intent": "market_today_observation", "tools": ["gangtise.market_today_observation"]},
+            ],
+        }
+        outputs = {
+            "composite_tasks": [
+                {
+                    "task_index": 0,
+                    "intent": "stock_today_observation",
+                    "status": "ok",
+                    "plan": plan["tasks"][0],
+                    "outputs": {"gangtise_stock_observation": {"text": "个股 Gangtise 原文"}},
+                },
+                {
+                    "task_index": 1,
+                    "intent": "market_today_observation",
+                    "status": "ok",
+                    "plan": plan["tasks"][1],
+                    "outputs": {"gangtise_market_observation": {"text": "大盘 Gangtise 原文"}},
+                },
+            ],
+        }
+        with patch.object(ai_services, "call_openai_compatible_llm") as llm_call:
+            synthesis, answer_model, answer_mode = ai_services.synthesize_hermes_answer("分别看个股和大盘", plan, outputs)
+
+        self.assertEqual(answer_mode, "composite_direct")
+        self.assertIsNone(answer_model)
+        self.assertIn("个股 Gangtise 原文", synthesis["answer"])
+        self.assertIn("大盘 Gangtise 原文", synthesis["answer"])
+        llm_call.assert_not_called()
+
+    def test_mixed_composite_trace_is_marked_as_llm_and_gangtise_original(self):
+        trace = ai_services.build_hermes_agent_trace(
+            {"intent": "composite_research", "task_family": "research_qa", "tasks": [{}, {}, {}]},
+            [],
+            route_mode="llm_router",
+            answer_mode="composite_mixed_llm",
+        )
+        answer_step = next(item for item in trace["steps"] if item["key"] == "answer")
+        self.assertEqual(answer_step["status"], "ok")
+        self.assertIn("LLM + Gangtise 原文", answer_step["detail"])
+
     def test_composite_memory_keeps_task_intents_and_recent_symbols(self):
         payload = ai_services.extract_hermes_memory_payload(
             "中国银行和贵州茅台分别做今日观察",

@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ brand.name }}金融科技 — 智能投研平台</title>
 <link rel="stylesheet" href="/static/css/style.css">
-<link rel="stylesheet" href="/static/css/release_notes.css?v=20260818-1">
+<link rel="stylesheet" href="/static/css/release_notes.css?v=20260831-1">
 <script>
   window.SITE_CONFIG = {{ site_config | tojson }};
 </script>
 <script src="/static/js/theme.js"></script>
 <script defer src="/static/js/brand.js?v=20260825-1"></script>
-<script defer src="/static/js/release_notes.js?v=20260818-1"></script>
+<script defer src="/static/js/release_notes.js?v=20260831-1"></script>
 <style>
 /* ============================================================
    INDEX PAGE – SPECIFIC STYLES
@@ -923,7 +923,34 @@ body.index-page .tech-layer {
   background: rgba(255,255,255,0.92);
   backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border-soft);
-  padding: 0 40px;
+  padding: 0 clamp(16px, 3vw, 40px);
+  overflow: hidden;
+}
+.ix-top-nav > div {
+  width: 100%;
+  max-width: 1440px !important;
+  min-width: 0;
+  gap: 16px;
+}
+.ix-top-nav > div > div:first-child,
+.ix-top-nav > div > div:last-child {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.ix-top-nav > div > div:nth-child(2) {
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: nowrap;
+  gap: clamp(12px, 1.7vw, 24px) !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+.ix-top-nav > div > div:nth-child(2)::-webkit-scrollbar { display: none; }
+.ix-top-nav a {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 body.theme-dark .ix-section-alt {
@@ -969,6 +996,10 @@ body.theme-dark .tech-layer {
   .funnel-channels-row .funnel-channel-card { min-width: 100px; }
 }
 @media (max-width: 600px) {
+  .ix-top-nav > div { gap: 10px; }
+  .ix-top-nav > div > div:nth-child(2) { gap: 16px !important; justify-content: flex-start; }
+  .ix-top-nav > div > div:first-child { font-size: 16px !important; letter-spacing: 1px !important; }
+  .ix-top-nav > div > div:last-child .btn-gold { padding-left: 12px !important; padding-right: 12px !important; }
   .hero-kpi-row { gap: 24px; }
   .tech-arch { grid-template-columns: 1fr; }
   .ix-footer-inner { grid-template-columns: 1fr; }
@@ -1368,7 +1399,7 @@ body.theme-dark .tech-layer {
     <div class="ix-section-label">Business Model</div>
     <div class="ix-section-title">项目定位与商业逻辑</div>
     <div class="ix-divider"></div>
-    <div class="ix-section-desc">这次会议把定位讲得很清楚：不是做一个泛金融 SaaS，而是作为独立第三方研究工具层，聚焦复盘、基本面分析、自选股诊断、Hermes 与证据链输出。</div>
+    <div class="ix-section-desc">这次会议把定位讲得很清楚：不是做一个泛金融 SaaS，而是作为独立第三方研究工具层，聚焦复盘、六类小金智能体场景、真实市场数据与可审计的研究输出。</div>
 
     <div class="biz-model-wrap">
       <!-- Left: Data sources -->
@@ -1389,7 +1420,7 @@ body.theme-dark .tech-layer {
           <div class="biz-engine-tags">
             <span class="biz-engine-tag">复盘工具</span>
             <span class="biz-engine-tag">基本面分析</span>
-            <span class="biz-engine-tag">自选股诊断</span>
+            <span class="biz-engine-tag">小金智能体六类场景</span>
             <span class="biz-engine-tag">证据链输出</span>
             <span class="biz-engine-tag">租户知识库</span>
             <span class="biz-engine-tag">置信度说明</span>
@@ -1440,7 +1471,7 @@ body.theme-dark .tech-layer {
       <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.14);border-radius:14px;padding:22px">
         <div style="font-size:28px;color:var(--gold);font-weight:700;margin-bottom:6px">02</div>
         <div style="font-size:16px;font-weight:700;color:var(--white);margin-bottom:8px">场景先收敛</div>
-        <div style="font-size:12px;color:var(--gray-400);line-height:1.8">需求已经收敛到复盘、基本面分析、自选股诊断和 Hermes 双交互四个场景，不再追求功能大而全。</div>
+        <div style="font-size:12px;color:var(--gray-400);line-height:1.8">小金智能体已收敛为六类可验证场景，并支持一句话拆成多个独立任务后组合执行。</div>
       </div>
       <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.14);border-radius:14px;padding:22px">
         <div style="font-size:28px;color:var(--gold);font-weight:700;margin-bottom:6px">03</div>
@@ -1591,7 +1622,7 @@ body.theme-dark .tech-layer {
           <div class="kol-col-icon">👤</div>
           <div class="kol-col-title">普通用户 / 粉丝用户</div>
         </div>
-        <div class="kol-col-item">消费复盘、基本面分析、自选股诊断等低风险能力</div>
+        <div class="kol-col-item">消费复盘、六类小金智能体能力和真实市场研究结果</div>
         <div class="kol-col-item">跟随所属大V投顾查看研究框架、证据链和互动内容</div>
         <div class="kol-col-item">通过会员、私信和活动接收租户内研究服务</div>
         <div class="kol-col-item">默认不直接接触复杂后台能力</div>
@@ -1685,7 +1716,7 @@ body.theme-dark .tech-layer {
     <div class="ix-section-label">Knowledge System</div>
     <div class="ix-section-title">知识库 / Skills / 智能体上下文</div>
     <div class="ix-divider"></div>
-    <div class="ix-section-desc">知识库不是附属功能，而是和“普通用户 / 大V投顾 / 平台 Admin”同级的一条产品主线。它决定 Hermes 不是通用问答，而是带着租户方法论、历史研究和提示词约束在工作。</div>
+    <div class="ix-section-desc">知识库是租户内容与方法论的长期资产；Skills 负责定义规则，LLM 负责理解任务，小金智能体负责把任务分发到正确的研究能力。Hermes 的首轮意图判断不使用 embedding。</div>
 
     <div class="kol-three-col">
       <div class="kol-col-card" style="border-color:rgba(47,116,192,0.22)">
@@ -1695,7 +1726,7 @@ body.theme-dark .tech-layer {
         </div>
         <div class="kol-col-item">沉淀历史复盘、行业观点、会议纪要、研究模板和个股跟踪资料</div>
         <div class="kol-col-item">已有内容支持选中后弹框微调和修改，持续更新租户知识资产</div>
-        <div class="kol-col-item">作为 Hermes 与复盘生产台的底层上下文，不只是静态内容展示</div>
+        <div class="kol-col-item">作为复盘生产和小金智能体的可选上下文，不替代第一轮 LLM 意图判断</div>
         <div class="kol-col-item">支持平台按租户做隔离，保证不同大V之间的方法论和素材不混用</div>
       </div>
       <div class="kol-col-card" style="border-color:rgba(200,169,110,0.24)">
@@ -1716,15 +1747,15 @@ body.theme-dark .tech-layer {
         <div class="kol-col-item">普通用户对话时会自动继承当前 Skill 和知识库上下文，不需要手动理解复杂配置</div>
         <div class="kol-col-item">大V在工作台里负责维护这些上下文，决定 Hermes 回答的风格、依据和结构</div>
         <div class="kol-col-item">Admin 负责能力控开、知识来源审计和一致性说明，确保前后台口径统一</div>
-        <div class="kol-col-item">最终形成“知识库 -> Skills -> Hermes -> 复盘/分析输出”的独有链路</div>
+        <div class="kol-col-item">最终形成“原始问题 -> LLM 任务拆解 -> Skills / API -> 研究输出”的可审计链路</div>
       </div>
     </div>
 
     <div class="kol-compliance" style="margin-top:20px">
       <div class="kol-compliance-icon">🔗</div>
       <div>
-        <strong style="color:var(--gold)">独有能力总结：</strong>
-        知识库负责沉淀内容，Skills 负责组织调用方式，Hermes 负责把这套上下文转成图表加内容的回答。这一层是整个系统最核心的差异化能力，不属于普通内容平台或通用聊天产品。
+        <strong style="color:var(--gold)">能力链路总结：</strong>
+        知识库负责沉淀租户内容，Skills 负责规则、拦截与输出约束，Admin 配置的 LLM 先拆解原始问题，再按六类场景调用 Gangtise 或 LLM。每轮都保留任务、模型、工具与审计信息。
       </div>
     </div>
   </div>
@@ -1889,7 +1920,7 @@ body.theme-dark .tech-layer {
     <div class="ix-section-label">Tech Architecture</div>
     <div class="ix-section-title">技术架构</div>
     <div class="ix-divider"></div>
-    <div class="ix-section-desc">四层架构设计，前端轻量化，后端模块化，AI引擎可插拔，数据层持续扩充</div>
+    <div class="ix-section-desc">前端轻量化，后端模块化；小金智能体采用“LLM 规划 + Skills 约束 + Gangtise 研究 API / 通用 LLM”的可观测架构。</div>
 
     <!-- Architecture layers with arrow flow indicator -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:0 4px">
@@ -1933,11 +1964,11 @@ body.theme-dark .tech-layer {
       <!-- AI Layer -->
       <div class="tech-layer" style="border-color:rgba(200,169,110,0.25)">
         <div class="tech-layer-label">🤖 AI引擎层</div>
-        <div class="tech-item" style="border-color:rgba(200,169,110,0.2)"><div class="tech-item-icon">🔍</div><div>RAG 检索增强引擎</div></div>
-        <div class="tech-item" style="border-color:rgba(200,169,110,0.2)"><div class="tech-item-icon">🧠</div><div>DeepSeek LLM</div></div>
-        <div class="tech-item" style="border-color:rgba(200,169,110,0.2)"><div class="tech-item-icon">✨</div><div>Kimi 2.6 长文本</div></div>
-        <div class="tech-item" style="border-color:rgba(200,169,110,0.2)"><div class="tech-item-icon">📝</div><div>证据链生成器</div></div>
-        <div style="margin-top:12px;font-size:11px;color:var(--gray-600);line-height:1.5">可插拔AI模块，支持模型切换与版本回退</div>
+        <div class="tech-item" style="border-color:rgba(200,169,110,0.2)"><div class="tech-item-icon">🧠</div><div>Admin 配置的 LLM Planner</div></div>
+        <div class="tech-item" style="border-color:rgba(200,169,110,0.2)"><div class="tech-item-icon">🧩</div><div>Skills 与语义审计</div></div>
+        <div class="tech-item" style="border-color:rgba(200,169,110,0.2)"><div class="tech-item-icon">🔌</div><div>Gangtise 研究 API</div></div>
+        <div class="tech-item" style="border-color:rgba(200,169,110,0.2)"><div class="tech-item-icon">📝</div><div>LLM 合成与记忆</div></div>
+        <div style="margin-top:12px;font-size:11px;color:var(--gray-600);line-height:1.5">模型、Base URL 和功能映射统一由 Admin 配置</div>
       </div>
 
       <!-- Data Layer -->
@@ -1947,7 +1978,7 @@ body.theme-dark .tech-layer {
         <div class="tech-item"><div class="tech-item-icon">🎙️</div><div>专家纪要库</div></div>
         <div class="tech-item"><div class="tech-item-icon">🔍</div><div>另类数据库</div></div>
         <div class="tech-item"><div class="tech-item-icon">📈</div><div>市场行情数据</div></div>
-        <div style="margin-top:12px;font-size:11px;color:var(--gray-600);line-height:1.5">向量化存储，语义检索，定期增量更新</div>
+        <div style="margin-top:12px;font-size:11px;color:var(--gray-600);line-height:1.5">市场数据、租户内容、复盘文章、会话记忆与审计记录分层管理</div>
       </div>
     </div>
 
@@ -1955,7 +1986,7 @@ body.theme-dark .tech-layer {
     <div style="margin-top:28px;background:rgba(200,169,110,0.04);border:1px solid rgba(200,169,110,0.1);border-radius:10px;padding:20px 24px">
       <div style="font-size:13px;color:var(--gray-400);line-height:1.8">
         <strong style="color:var(--gold)">数据流向：</strong>
-        用户在H5端提交分析请求 → Flask后端接收并路由到AI引擎 → RAG引擎在数据层检索相关研报与纪要 → DeepSeek/Kimi 2.6生成有证据链的分析结论 → 结果缓存并返回前端渲染
+        用户在 H5 提交原始问题 → 后端保留原文并做基础技术校验 → Admin 配置的 LLM 首轮拆解意图与多个任务 → Skills 做可配置的语义拦截与审计 → Gangtise 研究任务原文直出、闲聊与组合说明由 LLM 回答 → 记忆与调用轨迹写入数据库并返回前端
       </div>
     </div>
   </div>
@@ -2078,9 +2109,9 @@ body.theme-dark .tech-layer {
 <section class="ix-section ix-section-dark" id="hermes">
   <div class="ix-inner">
     <div class="ix-section-label">Hermes · AI Engine</div>
-    <div class="ix-section-title"><img class="pixel-gold-ingot" src="/static/img/pixel-red-gold-ingot.svg" alt="小金智能体图标"> 小金智能体投研引擎</div>
+    <div class="ix-section-title"><img class="pixel-gold-ingot" src="/static/img/pixel-gold-bull.svg" alt="小金智能体像素金牛图标"> 小金智能体投研引擎</div>
     <div class="ix-divider"></div>
-    <div class="ix-section-desc">Hermes 不是泛聊天机器人，而是围绕复盘、研报、纪要、自选股和证据链输出设计的工具层。它的价值在于把高频研究动作标准化，并把知识库与 Skills 一起带入回答，而不是只有自由对话本身。</div>
+    <div class="ix-section-desc">小金智能体不是泛聊天机器人，而是围绕六类投研场景设计的任务编排层。它保留用户原始问题，由 Admin 配置的 LLM 首轮拆解，再通过 Skills 分发到 Gangtise 研究 API 或通用 LLM，并保留记忆、审计与可追溯结果。</div>
 
     <!-- Hermes vs chatbot comparison -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:48px">
@@ -2123,38 +2154,38 @@ body.theme-dark .tech-layer {
       </div>
     </div>
 
-    <!-- 6 modes grid -->
-    <div style="font-size:16px;font-weight:700;color:var(--white);margin-bottom:20px">六个优先模式</div>
+    <!-- Six routed scenarios -->
+    <div style="font-size:16px;font-weight:700;color:var(--white);margin-bottom:20px">六类可分发场景</div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:48px">
       <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.12);border-radius:14px;padding:20px">
-        <div style="font-size:28px;margin-bottom:10px">📅</div>
-        <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:6px">复盘速写</div>
-        <div style="font-size:12px;color:var(--gray-400);line-height:1.7">把全天资料压成 3 分钟可读复盘提纲，直接解决高频整理与内容输出问题。</div>
+        <div style="font-size:28px;margin-bottom:10px">📈</div>
+        <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:6px">今日个股观察</div>
+        <div style="font-size:12px;color:var(--gray-400);line-height:1.7">回答今日行情、核心逻辑、重要要闻和风险，调用 Gangtise Agent SSE，研究原文直接展示。</div>
       </div>
       <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.12);border-radius:14px;padding:20px">
-        <div style="font-size:28px;margin-bottom:10px">⭐</div>
-        <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:6px">自选股诊断</div>
-        <div style="font-size:12px;color:var(--gray-400);line-height:1.7">围绕价格、投顾视角、基本面和处理结论形成最短研究路径，适合普通投资者理解和使用。</div>
+        <div style="font-size:28px;margin-bottom:10px">🌐</div>
+        <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:6px">今日大盘观察</div>
+        <div style="font-size:12px;color:var(--gray-400);line-height:1.7">输出指数表现、板块资金和情绪展望；同时问上证与深证时，会拆成两个指数观察任务。</div>
       </div>
       <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.12);border-radius:14px;padding:20px">
-        <div style="font-size:28px;margin-bottom:10px">🧭</div>
-        <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:6px">基本面分析</div>
-        <div style="font-size:12px;color:var(--gray-400);line-height:1.7">重点看盈利、估值、行业位置和争议点，输出结构化研究框架，而不是直接给买卖动作。</div>
+        <div style="font-size:28px;margin-bottom:10px">📄</div>
+        <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:6px">个股深化研究</div>
+        <div style="font-size:12px;color:var(--gray-400);line-height:1.7">调用公司一页通，返回最近一期结构化报告。它不是当日研究，指数不支持。</div>
       </div>
       <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.12);border-radius:14px;padding:20px">
         <div style="font-size:28px;margin-bottom:10px">📋</div>
-        <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:6px">研报精读</div>
-        <div style="font-size:12px;color:var(--gray-400);line-height:1.7">提炼核心判断、关键数据、风险提示和可复用表达，降低阅读成本，提升内容交付效率。</div>
+        <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:6px">个股看点摘要</div>
+        <div style="font-size:12px;color:var(--gray-400);line-height:1.7">调用批量摘要接口，最多支持 6000 个证券；只给精炼看点，不能替代完整观察报告。</div>
       </div>
       <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.12);border-radius:14px;padding:20px">
-        <div style="font-size:28px;margin-bottom:10px">🎙️</div>
-        <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:6px">专家纪要速读</div>
-        <div style="font-size:12px;color:var(--gray-400);line-height:1.7">聚焦一手信息、验证节点和尚未确认的判断，让纪要更适合被快速消费和二次引用。</div>
+        <div style="font-size:28px;margin-bottom:10px">🧮</div>
+        <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:6px">多支自选股综合分析</div>
+        <div style="font-size:12px;color:var(--gray-400);line-height:1.7">复用复盘中的 Gangtise 多股分析能力，适合明确要求多股详细分析、横向比较或组合结论。</div>
       </div>
       <div style="background:var(--navy-mid);border:1px solid rgba(200,169,110,0.12);border-radius:14px;padding:20px">
-        <div style="font-size:28px;margin-bottom:10px">🔗</div>
-        <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:6px">证据链归因</div>
-        <div style="font-size:12px;color:var(--gray-400);line-height:1.7">把同一结论同时挂接研报、纪要与市场数据，并补充置信度说明，直接服务合规表达。</div>
+        <div style="font-size:28px;margin-bottom:10px">💬</div>
+        <div style="font-size:15px;font-weight:700;color:var(--gold);margin-bottom:6px">多轮闲聊</div>
+        <div style="font-size:12px;color:var(--gray-400);line-height:1.7">通用问题、产品帮助与投资教育由 Admin 配置的 LLM 处理，保留会话上下文，不调用 Gangtise 研究接口。</div>
       </div>
     </div>
 
@@ -2164,31 +2195,31 @@ body.theme-dark .tech-layer {
       <div style="flex-shrink:0;text-align:center;padding:20px 24px;background:var(--navy-mid);border:1px solid rgba(200,169,110,0.15);border-radius:12px;min-width:140px">
         <div style="font-size:24px;margin-bottom:8px">1️⃣</div>
         <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:4px">选择高频动作</div>
-        <div style="font-size:11px;color:var(--gray-400)">复盘 / 自选股 / 研报 / 纪要等模式</div>
+        <div style="font-size:11px;color:var(--gray-400)">保留用户原始问题与会话记忆</div>
       </div>
       <div style="flex-shrink:0;padding:0 12px;color:var(--gold);font-size:20px">→</div>
       <div style="flex-shrink:0;text-align:center;padding:20px 24px;background:var(--navy-mid);border:1px solid rgba(200,169,110,0.15);border-radius:12px;min-width:140px">
         <div style="font-size:24px;margin-bottom:8px">2️⃣</div>
         <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:4px">选择样本或模板</div>
-        <div style="font-size:11px;color:var(--gray-400)">点击式与对话式两种方式都可触发</div>
+        <div style="font-size:11px;color:var(--gray-400)">LLM 判断一个或多个任务</div>
       </div>
       <div style="flex-shrink:0;padding:0 12px;color:var(--gold);font-size:20px">→</div>
       <div style="flex-shrink:0;text-align:center;padding:20px 24px;background:var(--navy-mid);border:1px solid rgba(200,169,110,0.15);border-radius:12px;min-width:140px">
         <div style="font-size:24px;margin-bottom:8px">3️⃣</div>
         <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:4px">AI分析中</div>
-        <div style="font-size:11px;color:var(--gray-400)">DeepSeek+Kimi RAG引擎处理</div>
+        <div style="font-size:11px;color:var(--gray-400)">Skills 校验、拦截并记录审计</div>
       </div>
       <div style="flex-shrink:0;padding:0 12px;color:var(--gold);font-size:20px">→</div>
       <div style="flex-shrink:0;text-align:center;padding:20px 24px;background:var(--navy-mid);border:1px solid rgba(200,169,110,0.15);border-radius:12px;min-width:140px">
         <div style="font-size:24px;margin-bottom:8px">4️⃣</div>
         <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:4px">结构化结果</div>
-        <div style="font-size:11px;color:var(--gray-400)">默认带来源条目、置信度和风险提示</div>
+        <div style="font-size:11px;color:var(--gray-400)">Gangtise 原文或 LLM 回答</div>
       </div>
       <div style="flex-shrink:0;padding:0 12px;color:var(--gold);font-size:20px">→</div>
       <div style="flex-shrink:0;text-align:center;padding:20px 24px;background:var(--navy-mid);border:1px solid rgba(200,169,110,0.15);border-radius:12px;min-width:140px">
         <div style="font-size:24px;margin-bottom:8px">5️⃣</div>
         <div style="font-size:13px;font-weight:600;color:var(--gold);margin-bottom:4px">继续沉淀</div>
-        <div style="font-size:11px;color:var(--gray-400)">追问 / 摘要 / 分享 / 模板化复用</div>
+        <div style="font-size:11px;color:var(--gray-400)">记忆、模型、工具和结果可审计</div>
       </div>
     </div>
 
