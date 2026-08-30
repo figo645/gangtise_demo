@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch
 
 from src.domain import ai_services
+from src.domain import core_services
 
 
 class _FakeCursor:
@@ -37,6 +38,14 @@ class _FakeConnection:
 
 
 class KnowledgeLiveHubTest(unittest.TestCase):
+    def test_default_tenant_knowledge_hub_is_empty_until_explicit_ingestion(self):
+        tenant = {"slug": "laowang", "name": "财经老王研究院"}
+
+        hub = core_services.normalize_knowledge_hub_config({}, tenant)
+
+        self.assertEqual(hub["items"], [])
+        self.assertIn("尚未初始化", hub["summary"])
+
     def test_empty_legacy_knowledge_ids_are_not_collapsed(self):
         rows = [
             (11, "", "manual", "第一条历史知识", "摘要一", "正文一", "手动录入", "", "", "", {}, "2026-08-01"),
@@ -53,4 +62,3 @@ class KnowledgeLiveHubTest(unittest.TestCase):
 
         self.assertEqual([item["title"] for item in hub["items"]], ["第一条历史知识", "第二条历史知识"])
         self.assertIn("COALESCE(NULLIF(BTRIM(knowledge_id), ''), CONCAT('__legacy_row_', id))", cursor.query)
-

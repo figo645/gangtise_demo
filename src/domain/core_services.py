@@ -1991,84 +1991,14 @@ def update_tenant_portal_cms(tenant_slug, portal_cms):
 
 
 def default_tenant_knowledge_items(tenant):
-    is_lisa = tenant["slug"] == "lisa"
-    return [
-        {
-            "id": "kb-hk-internet-valuation",
-            "type": "file",
-            "title": "港股互联网估值框架",
-            "source": "文件上传 · 12页 PDF",
-            "source_detail": "来源：文件上传 · 港股互联网估值框架.pdf · 12页",
-            "status": "可微调",
-            "summary": "拆出回购强度、估值带与催化条件，已关联腾讯 / 美团 / 阿里。",
-            "tags": ["估值框架", "港股互联网"],
-            "raw_input": "原始材料重点包括：腾讯 / 美团 / 阿里的历史估值带、回购力度、自由现金流、财报兑现节奏，以及对行业竞争格局和监管预期的补充说明。",
-            "key_points": ["回购强度直接影响估值修复斜率", "估值带必须结合利润兑现看，不单看 PS/PE", "催化条件要和财报、回购公告、南向资金一起验证"],
-            "validation_nodes": ["财报后利润率是否兑现", "回购节奏是否持续", "南向资金是否继续净流入"],
-            "sync_targets": ["租户知识队列", "知识专区", "Hermes 上下文", "港股互联网 Skill"],
-            "tuning_focus": ["标题是否更贴近大V表达", "摘要是否保留关键判断", "关键要点是否足够结构化", "验证节点是否可直接复用到复盘"],
-            "notes": "适合继续补公司层估值带、买回购和财报验证的先后顺序，以及哪些结论只适用于龙头公司。",
-            "files": ["港股互联网估值框架.pdf"],
-        },
-        {
-            "id": "kb-may-industry-call",
-            "type": "voice",
-            "title": "5月产业电话会录音整理",
-            "source": "语音转写 · 28分钟",
-            "source_detail": "来源：语音转写 · 产业电话会录音 · 28分钟",
-            "status": "已同步 Hermes",
-            "summary": "提炼固态电池、订单验证和量产节点，当前可直接被 Hermes 调用。",
-            "tags": ["电话会", "新能源"],
-            "raw_input": "原始语音中重点讨论了固态电池量产路径、下游车厂验证节奏、订单兑现的不确定项，以及短期市场情绪和长期产业趋势的区别。",
-            "key_points": ["先分清产业趋势和交易情绪", "订单验证比概念热度更重要", "量产节点要拆成时间、客户、成本三层"],
-            "validation_nodes": ["样品送测是否进入下一阶段", "订单是否从试产切换到量产", "成本曲线是否出现拐点"],
-            "sync_targets": ["租户知识队列", "知识专区", "Hermes 上下文", "新能源相关复盘"],
-            "tuning_focus": ["转写口语是否要收敛成书面结论", "关键判断是否已经拆成可复用节点", "风险边界是否写清", "是否适合直接进入复盘或 Hermes"],
-            "notes": "建议把口语化表达进一步压缩成“观点 - 证据 - 验证节点 - 风险”四段式，便于 Hermes 后续直接调用。",
-            "voice_minutes": 28,
-        },
-        {
-            "id": "kb-semiconductor-cycle",
-            "type": "url",
-            "title": "半导体景气验证节点",
-            "source": "网页 URL · 3篇行业资料",
-            "source_detail": "来源：网页 URL · 3篇行业资料抓取摘要",
-            "status": "同步中",
-            "summary": "整理产能利用率、成熟制程价格与资本开支节奏，适合继续补充验证节点。",
-            "tags": ["半导体", "网页资料"],
-            "raw_input": "系统已抓取 3 篇行业网页资料，内容涉及成熟制程价格变化、产能利用率、资本开支收缩节奏，以及下游消费电子和服务器需求恢复情况。",
-            "key_points": ["成熟制程价格是景气验证先行指标", "资本开支变化会领先反映景气预期", "不能只看单篇新闻，要归并成长期跟踪节点"],
-            "validation_nodes": ["晶圆代工价格是否止跌", "主要厂商 capex 指引是否收缩", "下游需求恢复是否扩散到更多品类"],
-            "sync_targets": ["租户知识队列", "知识专区", "Hermes 上下文"],
-            "tuning_focus": ["网页摘要是否准确", "要点是否去噪", "验证节点是否可持续追踪", "是否需要补更多来源链接"],
-            "notes": "当前更适合补充来源链接、删除噪音表述，并把验证节点改成可按月跟踪的版本。",
-            "url": "https://example.com/semiconductor-cycle",
-        },
-        {
-            "id": "kb-manual-thesis-note",
-            "type": "manual",
-            "title": is_lisa and "港股互联网判断口径手记" or "科技主线判断手记",
-            "source": "纯文本编写",
-            "source_detail": "来源：纯文本编写 · 186字",
-            "status": "可微调",
-            "summary": is_lisa and "手工整理港股互联网判断口径，保留估值、回购与财报验证顺序。" or "手工整理科技主线判断框架，保留景气、订单和验证节点顺序。",
-            "tags": ["手动编写", "观点沉淀"],
-            "raw_input": is_lisa and "观点：港股互联网先看回购与现金流，再看财报兑现，最后才看估值修复弹性。\n\n验证节点：回购节奏、利润率、南向资金。"
-                or "观点：科技主线先看产业趋势和订单兑现，再看估值扩张是否有利润支撑。\n\n验证节点：订单、毛利率、资本开支。",
-            "key_points": ["先写观点，再写证据", "验证节点要能持续跟踪", "风险边界要单独写清楚"],
-            "validation_nodes": ["继续跟踪验证节点是否兑现"],
-            "sync_targets": ["租户知识队列", "知识专区", "Hermes 上下文"],
-            "tuning_focus": ["收敛表达", "补证据链", "补风险边界"],
-            "notes": "适合直接从后台或 H5 手工录入，再继续细化成长期知识卡。",
-            "body": is_lisa and "观点：港股互联网先看回购与现金流，再看财报兑现，最后才看估值修复弹性。\n\n验证节点：回购节奏、利润率、南向资金。"
-                or "观点：科技主线先看产业趋势和订单兑现，再看估值扩张是否有利润支撑。\n\n验证节点：订单、毛利率、资本开支。",
-        },
-    ]
+    # A fresh checkout must not manufacture knowledge assets. New knowledge
+    # is added explicitly after the knowledge-base redesign is initialized.
+    return []
 
 
 def normalize_knowledge_hub_config(source, tenant, include_simulated=False):
     defaults = {
-        "summary": "知识库支持语音、文件、URL 和纯文本四种入口；历史内容允许点开弹框继续微调，修改后会重新同步到知识专区和 Hermes 上下文。",
+        "summary": "知识库尚未初始化。完成新的知识库设计后，再从管理端录入知识源。",
         "items": default_tenant_knowledge_items(tenant),
     }
     raw = source if isinstance(source, dict) else {}
