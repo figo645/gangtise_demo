@@ -2755,14 +2755,36 @@ def generate_smart_indicator_js(indicator_name, prompt_text, selected_indicators
     # A single source with a direct-name prompt is a projection, not an LLM
     # formula. Compile it locally so saving a renamed prompt cannot wait on an
     # external model service or produce a different formula for the same value.
-    prompt_key = re.sub(r"[\s【】\[\]（）()：:，,]", "", str(prompt_text or "").strip()).lower()
+    prompt_value = str(prompt_text or "").strip()
+    prompt_key = re.sub(r"[\s【】\[\]（）()：:，,。.!！?？]", "", prompt_value).lower()
+    source_code = str((normalized_selected[0] if len(normalized_selected) == 1 else {}).get("indicator_code") or "").strip()
     source_key = re.sub(
-        r"[\s【】\[\]（）()：:，,]",
+        r"[\s【】\[\]（）()：:，,。.!！?？]",
         "",
         str((normalized_selected[0] if len(normalized_selected) == 1 else {}).get("indicator_name") or "").strip(),
     ).lower()
     direct_aliases = {"cpi", "中国cpi", "中国居民消费价格指数"}
-    if len(normalized_selected) == 1 and prompt_key and (prompt_key == source_key or prompt_key in direct_aliases):
+    source_entry = GANGTISE_INDICATOR_REGISTRY.get(source_code) or {}
+    source_aliases = {
+        re.sub(r"[\s【】\[\]（）()：:，,。.!！?？]", "", str(candidate or "")).lower()
+        for candidate in (
+            source_entry.get("indicator_name"),
+            source_entry.get("search_keyword"),
+            source_entry.get("security_code"),
+            source_entry.get("tencent_symbol"),
+        )
+    }
+    source_aliases.update(
+        re.sub(r"[\s【】\[\]（）()：:，,。.!！?？]", "", str(alias or "")).lower()
+        for alias, target in WATCHLIST_QUERY_ALIAS_MAP.items()
+        if str(target or "").strip() == source_code
+    )
+    is_simple_reference = not re.search(r"[+\-*/()]", prompt_key)
+    if len(normalized_selected) == 1 and prompt_key and is_simple_reference and (
+        prompt_key == source_key
+        or prompt_key in direct_aliases
+        or any(alias and alias in prompt_key for alias in source_aliases)
+    ):
         return {"formula_js": fallback_js, "generator": "direct_projection", "llm_used": False}
     model = get_default_llm_config(purpose="general", feature_code="smart_indicator_formula_generation")
     if not model:

@@ -18683,15 +18683,16 @@ function escapeWorkbenchRegExp(value) {
 function collectWorkbenchPromptMatchedTagCodes(promptText, tagCatalog) {
   const prompt = String(promptText || '').trim();
   if (!prompt) return [];
+  const normalize = (value) => String(value || '').replace(/[\s_\-.\/：:，,。.!！?？【】\[\]()（）]/g, '').toLowerCase();
+  const normalizedPrompt = normalize(prompt);
   return (Array.isArray(tagCatalog) ? tagCatalog.slice() : [])
     .sort((left, right) => normalizeWorkbenchSmartTagLabel(right.label).length - normalizeWorkbenchSmartTagLabel(left.label).length)
     .filter((tag) => {
-      const rawLabel = String(tag && tag.label || '').trim();
-      const normalizedLabel = normalizeWorkbenchSmartTagLabel(rawLabel);
-      if (!normalizedLabel) return false;
-      const bracketPattern = new RegExp(`【\\s*${escapeWorkbenchRegExp(normalizedLabel)}\\s*】`);
-      if (bracketPattern.test(prompt)) return true;
-      return prompt.includes(normalizedLabel);
+      const candidates = [tag && tag.label].concat(Array.isArray(tag && tag.prompt_aliases) ? tag.prompt_aliases : []);
+      return candidates.some((candidate) => {
+        const normalizedCandidate = normalize(normalizeWorkbenchSmartTagLabel(candidate));
+        return normalizedCandidate && normalizedPrompt.includes(normalizedCandidate);
+      });
     })
     .map((tag) => tag.tag_code)
     .filter(Boolean);
@@ -18933,7 +18934,7 @@ function renderWorkbenchSmartIndicatorEditorModal() {
   if (typeof wbSmartIndicatorDraft.tagPoolExpanded !== 'boolean') wbSmartIndicatorDraft.tagPoolExpanded = false;
   host.innerHTML = `
     <div class="modal-title" style="margin-bottom:10px">新增智能指标</div>
-    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">先选引用指标，再点击运算符或直接输入数字、括号和规则说明。系统会把整个公式型提示词交给 LLM 生成临时 JS，确认展示后才正式保存。</div>
+    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">可直接输入个股、热门行业、CPI 或市场指数；系统会在服务端自动识别真实底层指标。也可点击下方指标和运算符补充公式规则，确认展示后才正式保存。</div>
     <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">指标名称</label>
       <input id="wb-smart-indicator-draft-name" class="knowledge-modal-textarea" style="min-height:auto;height:42px" placeholder="可选，不填则系统自动命名" value="${escapeHtml(wbSmartIndicatorDraft.indicatorName || '')}">
@@ -18953,7 +18954,7 @@ function renderWorkbenchSmartIndicatorEditorModal() {
         <textarea id="wb-smart-indicator-draft-prompt" class="knowledge-modal-textarea" placeholder="例如：【上证50指数】*80/100，或者【上证50】/ 纳斯达克指数" oninput="handleWorkbenchSmartIndicatorPromptInput(this.value)" style="margin-top:10px;border:none;background:transparent;padding:0;min-height:108px;box-shadow:none;resize:none;color:var(--text-main)">${escapeHtml(wbSmartIndicatorDraft.promptText || '')}</textarea>
       </div>
       <div id="wb-smart-indicator-formula-hint" class="review-watchlist-row" style="margin-top:8px"></div>
-      <div style="font-size:11px;color:var(--gray-400);margin-top:8px">当你输入的词与指标名称完全一致时，系统会自动识别成引用指标；运算符和数值会和提示词一起用于生成 JS。</div>
+      <div style="font-size:11px;color:var(--gray-400);margin-top:8px">服务端会识别别名和常用简称，例如 CPI、上证综合指数、沪指、证券名称或代码；运算符和数值会和提示词一起用于生成 JS。</div>
     </div>
     ${isGenerating ? `
       <div class="knowledge-modal-block" style="border:1px solid rgba(47,116,192,0.18);background:linear-gradient(135deg,rgba(47,116,192,0.08),rgba(200,169,110,0.08));border-radius:14px;padding:12px">
@@ -18974,6 +18975,7 @@ function renderWorkbenchSmartIndicatorEditorModal() {
         <div style="font-size:12px;color:var(--gray-300);line-height:1.8;margin-top:6px">当前值：${escapeHtml(`${preview.value || '--'}${preview.unit || ''}`)}</div>
         <div style="font-size:12px;color:var(--gray-300);line-height:1.8;margin-top:10px">算法详情：${escapeHtml(preview.algorithm_detail || '暂无算法详情')}</div>
         <div style="font-size:12px;color:var(--gray-300);line-height:1.8;margin-top:10px">解读：${escapeHtml(preview.interpretation || preview.assessment || '暂无解读')}</div>
+        <div style="font-size:12px;line-height:1.8;margin-top:10px;color:${preview.data_status === 'available' ? '#146B4A' : '#A56A00'}">数据状态：${escapeHtml(preview.data_status_label || (preview.value && preview.value !== '--' ? '已读取最新快照' : '已识别，等待底层数据同步'))}</div>
       </div>
     ` : ''}
     ${isSaving ? `
@@ -19009,10 +19011,6 @@ async function previewWorkbenchSmartIndicator() {
     return;
   }
   const selectedTagCodes = getWorkbenchSmartIndicatorEffectiveTagCodes();
-  if (!selectedTagCodes.length) {
-    showToast('请先至少选择一个标签');
-    return;
-  }
   const directPreview = getWorkbenchDirectPreviewCandidate(selectedTagCodes);
   if (directPreview) {
     wbSmartIndicatorDraft.isGenerating = false;
@@ -19041,8 +19039,14 @@ async function previewWorkbenchSmartIndicator() {
     const payload = await resp.json();
     if (!resp.ok || !payload.success) throw new Error(payload.error || 'smart_indicator_preview_failed');
     setTenantSmartCatalog(payload.smart_indicator_catalog);
-    wbSmartIndicatorDraft.selectedTagCodes = selectedTagCodes;
     wbSmartIndicatorDraft.preview = payload.preview || null;
+    const resolvedCodes = (wbSmartIndicatorDraft.preview && Array.isArray(wbSmartIndicatorDraft.preview.selected_indicators))
+      ? wbSmartIndicatorDraft.preview.selected_indicators.map((item) => item && item.indicator_code).filter(Boolean)
+      : [];
+    const resolvedTagCodes = getTenantSmartTagCatalog()
+      .filter((tag) => (tag.selected_indicators || []).some((item) => resolvedCodes.includes(item.indicator_code)))
+      .map((tag) => tag.tag_code);
+    wbSmartIndicatorDraft.selectedTagCodes = Array.from(new Set(selectedTagCodes.concat(resolvedTagCodes)));
     if (wbSmartIndicatorDraft.preview && wbSmartIndicatorDraft.preview.indicator_name) {
       wbSmartIndicatorDraft.indicatorName = wbSmartIndicatorDraft.preview.indicator_name;
     }

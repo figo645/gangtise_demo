@@ -655,6 +655,7 @@ def api_compose_review_draft():
         payload = {
             "tenant_slug": tenant_slug,
             "period": str(body.get("period") or "").strip().lower(),
+            "source_mode": str(body.get("source_mode") or "").strip().lower(),
             "source_text": body.get("source_text"),
             "prompt_text": body.get("prompt_text"),
             "prompt_tags": body.get("prompt_tags") if isinstance(body.get("prompt_tags"), list) else [],

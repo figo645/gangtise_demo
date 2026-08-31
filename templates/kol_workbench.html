@@ -4086,11 +4086,12 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <div class="kw-review-shell">
             <div class="kw-review-topbar">
               <div>
-                <div class="kw-review-panel-title">H5 同步 Wizard</div>
-                <div class="kw-review-topbar-copy">Web 端改成线性的复盘向导：按步骤依次完成准备、素材、用户复盘、优化与审核、最终预览。生成链路和 H5 保持一致，但交互改成更适合桌面的 Wizard 模式。</div>
+                <div class="kw-review-panel-title">H5 同步复盘向导</div>
+                <div class="kw-review-topbar-copy">Web 端与 H5 使用同一条复盘链路：录入内容、选择优化规则、审核 Draft、决定是否追加自选股分析、审核结果、最终预览并发布。</div>
               </div>
               <div class="kw-review-topbar-actions">
                 <div id="kw-review-top-period-row" class="kw-review-period-row"></div>
+                <button class="btn-gold" type="button" style="padding:8px 12px;font-size:12px" onclick="kwOpenReviewTriggerModal()">新建复盘</button>
                 <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="showWorkbenchSection('watchlist', document.querySelector('.admin-nav-item[data-section=&quot;watchlist&quot;]'))">查看自选股</button>
                 <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="showWorkbenchSection('published', document.querySelector('.admin-nav-item[data-section=&quot;published&quot;]'))">查看已发布</button>
               </div>
@@ -4104,50 +4105,12 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
                 </div>
               </aside>
               <div class="kw-review-directory-main">
-                <section class="kw-review-panel" data-kw-review-panel="overview">
-                  <div class="kw-review-studio-panel">
-                    <div class="kw-review-panel-head">
-                      <div>
-                        <div class="kw-review-panel-title">复盘总览</div>
-                        <div class="kw-review-panel-desc">这里先看当前复盘处在哪个阶段、已经选了哪些素材和股票，以及最近一次发布结果。</div>
-                      </div>
-                      <span class="kw-tag">Overview</span>
-                    </div>
-                    <div id="kw-review-flow-nav" class="kw-review-flow-nav"></div>
-                    <div id="kw-review-overview-summary" class="kw-review-overview-stats"></div>
-                    <div class="kw-review-overview-grid">
-                      <div class="kw-review-studio-panel">
-                        <div class="kw-review-studio-panel-title">当前运行态</div>
-                        <div class="kw-review-studio-panel-desc">同步显示当前周期、输入来源、已选素材和最近一次生成状态。</div>
-                        <div id="kw-review-runtime-panel" class="kw-review-runtime-list"></div>
-                      </div>
-                      <div class="kw-review-studio-panel">
-                        <div class="kw-review-published-title">最近一次发布</div>
-                        <div class="kw-review-published-desc">这里展示最近一次确认发布后，前台粉丝实际会看到的复盘摘要。</div>
-                        <div id="kw-review-latest-published" class="kw-review-runtime-list"></div>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-                <section class="kw-review-panel" data-kw-review-panel="cards">
-                  <div class="kw-review-studio-panel">
-                    <div class="kw-review-panel-head">
-                      <div>
-                        <div class="kw-review-panel-title">复盘素材</div>
-                        <div class="kw-review-panel-desc">这里统一选择智能仪表盘卡片和知识材料，作为本次复盘的辅助依据。</div>
-                      </div>
-                      <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="kwOpenReviewCardPicker()">添加素材</button>
-                    </div>
-                    <div id="kw-review-card-slot-grid" class="kw-review-card-slot-grid"></div>
-                    <div id="kw-review-card-detail-list" class="kw-review-card-detail-list"></div>
-                  </div>
-                </section>
                 <section class="kw-review-panel" data-kw-review-panel="input">
                   <div class="kw-review-studio-panel">
                     <div class="kw-review-panel-head">
                       <div>
                         <div class="kw-review-panel-title">用户复盘</div>
-                        <div class="kw-review-panel-desc">这里录入用户自己的复盘内容，并确认本次要纳入总结的自选股。</div>
+                        <div class="kw-review-panel-desc">这里录入本次复盘内容。自选股不是前置必填项，会在第一阶段 Draft 审核后再决定是否追加分析。</div>
                       </div>
                       <span class="kw-tag">Input</span>
                     </div>
@@ -4161,7 +4124,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
                     <div class="kw-review-panel-head">
                       <div>
                         <div class="kw-review-panel-title">优化与审核</div>
-                        <div class="kw-review-panel-desc">先决定是否优化成稿，再审核 Draft；没有自选股时可直接预览发布，选择了自选股时再追加归纳总结。摘要改为最终发布时自动生成。</div>
+                        <div class="kw-review-panel-desc">按 H5 阶段显示当前任务：优化规则、Draft 审核、自选股选择、Gangtise 分析审核。摘要在最终发布时自动生成。</div>
                       </div>
                       <span class="kw-tag">Generate</span>
                     </div>
@@ -7213,13 +7176,11 @@ let kwReviewDraft = {
 };
 const kwReviewRuntimeStore = {};
 const KW_REVIEW_WORKSPACE_PANELS = [
-  { id: 'overview', label: '开始准备', desc: '先看本次复盘的整体状态和最近发布结果。', tone: 'default' },
-  { id: 'cards', label: '复盘素材', desc: '选择智能卡片和知识材料作为辅助依据。', tone: 'default' },
-  { id: 'input', label: '用户复盘', desc: '录入用户内容，并确认纳入总结的自选股。', tone: 'default' },
-  { id: 'generation', label: '优化与审核', desc: '生成 Draft；如已选择自选股，再审核归纳结果。', tone: 'gold' },
-  { id: 'preview', label: '最终预览', desc: '按前台阅读态确认内容，然后发布给粉丝。', tone: 'gold' },
+  { id: 'input', label: '输入内容', desc: '选择复盘周期和输入方式，录入本次复盘正文。', tone: 'default' },
+  { id: 'generation', label: '优化与审核', desc: '按 H5 流程生成 Draft，决定是否追加自选股 Gangtise 分析。', tone: 'gold' },
+  { id: 'preview', label: '最终预览', desc: '确认前台阅读态和发布正文，然后发布给粉丝。', tone: 'gold' },
 ];
-let kwReviewWorkspacePanel = 'overview';
+let kwReviewWorkspacePanel = 'input';
 let kwReviewStructuredPreview = null;
 let kwReviewPreviewGenerating = false;
 let kwReviewPreviewJobState = null;
@@ -9183,11 +9144,15 @@ let kwReviewFileUploading = false;
 let kwReviewIngestResult = null;
 let kwReviewDraftGenerating = false;
 let kwReviewDraftJobState = null;
+let kwReviewCancellationRequested = false;
 let kwReviewPublishSubmitting = false;
 let kwKnowledgeVoiceRecorder = null;
 let kwKnowledgeVoiceChunks = [];
 let kwKnowledgeVoiceUploading = false;
 const kwPendingAsyncJobs = {};
+let kwReviewActiveJobs = [];
+let kwReviewActiveJobsTimer = null;
+let kwReviewActiveJobsLoading = false;
 
 async function kwGenerateReviewDraftWithLlm() {
   const tenant = window.ACTIVE_TENANT || {};
@@ -9277,6 +9242,7 @@ function kwFormatReviewJobStage(stage) {
     llm_postprocessing: '整理返回结果',
     completed: '已完成',
     failed: '已失败',
+    cancelled: '已停止',
   };
   return map[String(stage || '').trim()] || (stage || '处理中');
 }
@@ -9401,6 +9367,11 @@ function kwStartAsyncJobPolling(jobCode, handlers) {
         delete kwPendingAsyncJobs[jobCode];
         return;
       }
+      if (job.status === 'cancelled') {
+        if (handlers && typeof handlers.onCancelled === 'function') handlers.onCancelled(job);
+        delete kwPendingAsyncJobs[jobCode];
+        return;
+      }
       kwPendingAsyncJobs[jobCode] = setTimeout(tick, 1500);
     } catch (error) {
       if (handlers && typeof handlers.onError === 'function') handlers.onError(error);
@@ -9408,6 +9379,199 @@ function kwStartAsyncJobPolling(jobCode, handlers) {
     }
   };
   kwPendingAsyncJobs[jobCode] = setTimeout(tick, 1200);
+}
+
+function kwReviewActiveJobLabel(job) {
+  const labels = {
+    review_generate_draft: '复盘 Draft 生成',
+    review_prepare_preview: '自选股综合分析',
+    review_voice_transcribe: '语音转写',
+    review_polish_input: '复盘输入润色',
+    review_compose_draft: '复盘完整成稿',
+  };
+  return labels[String((job || {}).job_type || '').trim()] || '复盘任务';
+}
+
+function kwHydrateReviewDraftFromJob(job) {
+  const payload = job && job.payload && typeof job.payload === 'object' ? job.payload : {};
+  kwReviewDraft.period = String(payload.period || kwReviewDraft.period || 'day').trim().toLowerCase() || 'day';
+  kwReviewDraft.reviewTitle = String(payload.review_title || kwReviewDraft.reviewTitle || '').trim();
+  kwReviewDraft.sourceMode = String(payload.source_mode || kwReviewDraft.sourceMode || 'manual').trim().toLowerCase() || 'manual';
+  kwReviewDraft.selectedWatchlist = Array.isArray(payload.selected_watchlist) ? payload.selected_watchlist.slice(0) : [];
+  kwReviewDraft.aiPrompt = String(payload.prompt_text || '');
+  kwReviewDraft.promptTags = Array.isArray(payload.prompt_tags) ? payload.prompt_tags.slice(0) : [];
+  const sourceText = String(payload.source_text || '').trim();
+  if (kwReviewDraft.sourceMode === 'voice') kwReviewDraft.voiceTranscript = sourceText;
+  else if (kwReviewDraft.sourceMode === 'file') kwReviewDraft.fileText = sourceText;
+  else if (kwReviewDraft.sourceMode === 'url') kwReviewDraft.urlText = sourceText;
+  else if (sourceText) kwReviewDraft.manualHtml = kwPlainTextToKnowledgeHtml(sourceText);
+}
+
+function kwRemoveActiveReviewJob(jobCode) {
+  const normalized = String(jobCode || '').trim();
+  kwReviewActiveJobs = kwReviewActiveJobs.filter((item) => String(item.job_code || '').trim() !== normalized);
+}
+
+function kwResumeActiveReviewJob(job) {
+  if (!job || !job.job_code || kwPendingAsyncJobs[job.job_code]) return;
+  const jobType = String(job.job_type || '').trim();
+  if (!['review_generate_draft', 'review_prepare_preview'].includes(jobType)) return;
+  kwHydrateReviewDraftFromJob(job);
+  kwReviewWorkspacePanel = 'generation';
+  if (jobType === 'review_generate_draft') {
+    kwReviewDraftGenerating = true;
+    kwReviewDraftJobState = job;
+    kwReviewDraft.flowStage = 'draft_generating';
+  } else {
+    kwReviewPreviewGenerating = true;
+    kwReviewPreviewJobState = job;
+    kwReviewDraft.flowStage = 'preview_generating';
+  }
+  kwRenderReviewStudio();
+  kwStartAsyncJobPolling(job.job_code, {
+    onProgress(nextJob) {
+      if (jobType === 'review_generate_draft') kwReviewDraftJobState = nextJob || kwReviewDraftJobState;
+      else kwReviewPreviewJobState = nextJob || kwReviewPreviewJobState;
+      kwReviewActiveJobs = kwReviewActiveJobs.map((item) => item.job_code === job.job_code ? (nextJob || item) : item);
+      kwRenderReviewStudio();
+    },
+    onSuccess(nextJob) {
+      const result = nextJob.result || {};
+      if (jobType === 'review_generate_draft') {
+        kwReviewDraft.generatedPreviewText = result.text || '';
+        kwReviewDraft.draftReviewText = result.text || kwGetReviewDraftContentText();
+        kwReviewIngestResult = { ...(kwReviewIngestResult || {}), review_draft_llm: result.llm_model || null };
+        kwReviewDraftGenerating = false;
+        kwReviewDraftJobState = nextJob;
+        kwReviewDraft.flowStage = 'draft_review';
+      } else {
+        kwReviewStructuredPreview = kwNormalizeReviewStructuredPreview(result);
+        kwReviewPreviewGenerating = false;
+        kwReviewPreviewJobState = nextJob;
+        kwReviewDraft.flowStage = 'structured_review';
+      }
+      kwRemoveActiveReviewJob(job.job_code);
+      kwReviewWorkspacePanel = 'generation';
+      kwRenderReviewStudio();
+      showToast(jobType === 'review_generate_draft' ? '优化成稿已完成，请先审核用户内容 Draft' : 'Gangtise 多股综合分析已生成，请审核后预览');
+    },
+    onFailed(nextJob) {
+      if (jobType === 'review_generate_draft') {
+        kwReviewDraftGenerating = false;
+        kwReviewDraftJobState = nextJob;
+        kwReviewDraft.flowStage = 'optimize_rule';
+      } else {
+        kwReviewPreviewGenerating = false;
+        kwReviewPreviewJobState = nextJob;
+        kwReviewDraft.flowStage = 'preview_failed';
+      }
+      kwRemoveActiveReviewJob(job.job_code);
+      kwReviewWorkspacePanel = 'generation';
+      kwRenderReviewStudio();
+      showToast(nextJob.error_message || nextJob.summary || '复盘任务生成失败');
+    },
+    onCancelled(nextJob) {
+      if (jobType === 'review_generate_draft') {
+        kwReviewDraftGenerating = false;
+        kwReviewDraftJobState = nextJob;
+        kwReviewDraft.flowStage = 'optimize_rule';
+      } else {
+        kwReviewPreviewGenerating = false;
+        kwReviewPreviewJobState = nextJob;
+        kwReviewDraft.flowStage = 'draft_review';
+      }
+      kwRemoveActiveReviewJob(job.job_code);
+      kwReviewWorkspacePanel = 'generation';
+      kwRenderReviewStudio();
+      showToast('已停止生成，原始输入已保留。');
+    },
+    onError(error) {
+      if (jobType === 'review_generate_draft') kwReviewDraftGenerating = false;
+      else kwReviewPreviewGenerating = false;
+      kwRenderReviewStudio();
+      showToast(error.message || '复盘任务状态读取失败');
+    },
+  });
+}
+
+async function kwLoadActiveReviewJobs() {
+  const section = document.getElementById('workbench-section-review');
+  if (!section || section.style.display === 'none' || kwReviewActiveJobsLoading) return;
+  const tenant = window.ACTIVE_TENANT || {};
+  const tenantSlug = String(tenant.slug || '').trim().toLowerCase();
+  if (!tenantSlug) return;
+  kwReviewActiveJobsLoading = true;
+  try {
+    const resp = await fetch(`/api/review/jobs?tenant_slug=${encodeURIComponent(tenantSlug)}`);
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'review_jobs_unavailable');
+    kwReviewActiveJobs = Array.isArray(data.jobs) ? data.jobs : [];
+    kwReviewActiveJobs
+      .filter((job) => ['review_generate_draft', 'review_prepare_preview'].includes(String(job.job_type || '').trim()))
+      .forEach((job) => kwResumeActiveReviewJob(job));
+  } catch (error) {
+    console.warn('active workbench review jobs unavailable', error);
+  } finally {
+    kwReviewActiveJobsLoading = false;
+  }
+  if (section.style.display !== 'none') {
+    if (kwReviewActiveJobsTimer) window.clearTimeout(kwReviewActiveJobsTimer);
+    kwReviewActiveJobsTimer = window.setTimeout(kwLoadActiveReviewJobs, 5000);
+  }
+}
+
+function kwRegisterActiveReviewJob(jobCode, jobType, payload) {
+  const normalized = String(jobCode || '').trim();
+  if (!normalized) return;
+  const existing = kwReviewActiveJobs.find((item) => String(item.job_code || '').trim() === normalized);
+  const job = {
+    ...(existing || {}),
+    job_code: normalized,
+    job_type: jobType,
+    status: 'running',
+    progress_stage: 'queued',
+    progress_percent: 0,
+    summary: '任务已提交，正在后台处理',
+    payload: payload && typeof payload === 'object' ? payload : {},
+    result: { live_log: [] },
+  };
+  kwReviewActiveJobs = existing
+    ? kwReviewActiveJobs.map((item) => String(item.job_code || '').trim() === normalized ? job : item)
+    : [job, ...kwReviewActiveJobs];
+}
+
+async function kwCancelReviewAsyncJob() {
+  const isPreview = !!(kwReviewPreviewGenerating || kwReviewPreviewJobState || kwReviewDraft.flowStage === 'preview_generating');
+  const job = isPreview ? kwReviewPreviewJobState : kwReviewDraftJobState;
+  const jobCode = String((job || {}).job_code || '').trim();
+  kwReviewCancellationRequested = true;
+  if (isPreview) {
+    kwReviewPreviewGenerating = false;
+    kwReviewPreviewJobState = null;
+    kwReviewDraft.flowStage = 'draft_review';
+  } else {
+    kwReviewDraftGenerating = false;
+    kwReviewDraftJobState = null;
+    kwReviewDraft.flowStage = 'optimize_rule';
+  }
+  if (jobCode && kwPendingAsyncJobs[jobCode]) {
+    clearTimeout(kwPendingAsyncJobs[jobCode]);
+    delete kwPendingAsyncJobs[jobCode];
+  }
+  kwRemoveActiveReviewJob(jobCode);
+  kwRenderReviewStudio();
+  showToast('已停止生成，原始输入已保留。');
+  if (!jobCode) return;
+  try {
+    const resp = await fetch(`/api/review/jobs/${encodeURIComponent(jobCode)}/cancel`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'review_job_cancel_failed');
+  } catch (error) {
+    console.warn('review job cancellation acknowledgement unavailable', error);
+  }
 }
 
 function kwGetReviewVoiceButtonLabel() {
@@ -9861,6 +10025,7 @@ async function kwPrepareReviewStructuredPreview() {
   kwSyncReviewDraftFromModal();
   kwReviewStructuredPreview = null;
   kwReviewPreviewGenerating = true;
+  kwReviewCancellationRequested = false;
   kwReviewPreviewJobState = {
     status: 'running',
     progress_stage: 'queued',
@@ -9875,6 +10040,29 @@ async function kwPrepareReviewStructuredPreview() {
   try {
     const previewResult = await kwRequestReviewStructuredPreview();
     if (!previewResult.async || !previewResult.job_code) throw new Error('review_prepare_preview_job_missing');
+    kwReviewPreviewJobState = {
+      ...kwReviewPreviewJobState,
+      job_code: previewResult.job_code,
+      job_type: 'review_prepare_preview',
+    };
+    kwRegisterActiveReviewJob(previewResult.job_code, 'review_prepare_preview', {
+      tenant_slug: (window.ACTIVE_TENANT || {}).slug || '',
+      period: kwReviewDraft.period || 'day',
+      review_title: kwReviewDraft.reviewTitle || '',
+      source_mode: kwReviewDraft.sourceMode || 'manual',
+      source_text: kwGetReviewUserInputDisplayText(),
+      selected_watchlist: (kwReviewDraft.selectedWatchlist || []).slice(0),
+    });
+    if (kwReviewCancellationRequested) {
+      await fetch(`/api/review/jobs/${encodeURIComponent(previewResult.job_code)}/cancel`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+      }).catch(() => {});
+      kwReviewPreviewJobState = null;
+      kwRemoveActiveReviewJob(previewResult.job_code);
+      return;
+    }
+    let completed = false;
     await new Promise((resolve, reject) => {
       kwStartAsyncJobPolling(previewResult.job_code, {
         onProgress(job) {
@@ -9890,20 +10078,41 @@ async function kwPrepareReviewStructuredPreview() {
           kwReviewDraft.flowStage = 'structured_review';
           runtime.kolGeneratedAt = '刚刚生成';
           kwReviewWorkspacePanel = 'generation';
+          completed = true;
+          kwRemoveActiveReviewJob(previewResult.job_code);
           resolve();
         },
         onFailed(job) {
-          reject(new Error(job.error_message || job.summary || '复盘预览生成失败'));
+          kwReviewPreviewGenerating = false;
+          kwReviewPreviewJobState = job;
+          kwReviewDraft.flowStage = 'preview_failed';
+          kwReviewWorkspacePanel = 'generation';
+          kwRemoveActiveReviewJob(previewResult.job_code);
+          kwRenderReviewStudio();
+          showToast(job.error_message || job.summary || '复盘预览生成失败');
+          resolve();
+        },
+        onCancelled(job) {
+          kwReviewPreviewGenerating = false;
+          kwReviewPreviewJobState = job;
+          kwReviewDraft.flowStage = 'draft_review';
+          kwReviewWorkspacePanel = 'generation';
+          kwRemoveActiveReviewJob(previewResult.job_code);
+          kwRenderReviewStudio();
+          resolve();
         },
         onError(error) {
           reject(error);
         },
       });
     });
+    if (!completed) return;
   } catch (error) {
     kwReviewPreviewGenerating = false;
-    kwReviewPreviewJobState = null;
-    kwReviewDraft.flowStage = kwReviewDraft.generatedPreviewText ? 'draft_review' : 'intake';
+    if (kwReviewDraft.flowStage !== 'preview_failed') {
+      kwReviewPreviewJobState = null;
+      kwReviewDraft.flowStage = kwReviewDraft.generatedPreviewText ? 'draft_review' : 'intake';
+    }
     kwReviewWorkspacePanel = kwReviewDraft.flowStage === 'intake' ? 'input' : 'generation';
     kwRenderReviewStudio();
     showToast(kwGetReviewDraftGenerationErrorMessage(error));
@@ -9938,6 +10147,7 @@ async function kwSubmitReviewSmartOptimize() {
   kwReviewDraft.previewReady = false;
   kwReviewWorkspacePanel = 'generation';
   kwReviewDraftGenerating = true;
+  kwReviewCancellationRequested = false;
   kwReviewDraftJobState = {
     status: 'running',
     progress_stage: 'queued',
@@ -9949,6 +10159,30 @@ async function kwSubmitReviewSmartOptimize() {
   try {
     const draftResult = await kwGenerateReviewDraftWithLlm();
     if (!draftResult.async || !draftResult.job_code) throw new Error('review_draft_job_missing');
+    kwReviewDraftJobState = {
+      ...kwReviewDraftJobState,
+      job_code: draftResult.job_code,
+      job_type: 'review_generate_draft',
+    };
+    kwRegisterActiveReviewJob(draftResult.job_code, 'review_generate_draft', {
+      tenant_slug: tenant.slug || '',
+      period: kwReviewDraft.period || 'day',
+      source_mode: kwReviewDraft.sourceMode || 'manual',
+      source_text: kwGetReviewDraftContentText(),
+      prompt_text: kwReviewDraft.aiPrompt || '',
+      prompt_tags: (kwReviewDraft.promptTags || []).slice(0),
+      selected_watchlist: [],
+    });
+    if (kwReviewCancellationRequested) {
+      await fetch(`/api/review/jobs/${encodeURIComponent(draftResult.job_code)}/cancel`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+      }).catch(() => {});
+      kwReviewDraftJobState = null;
+      kwRemoveActiveReviewJob(draftResult.job_code);
+      return;
+    }
+    let completed = false;
     await new Promise((resolve, reject) => {
       kwStartAsyncJobPolling(draftResult.job_code, {
         onProgress(job) {
@@ -9965,19 +10199,36 @@ async function kwSubmitReviewSmartOptimize() {
           };
           kwReviewDraftGenerating = false;
           kwReviewDraftJobState = job;
+          completed = true;
+          kwRemoveActiveReviewJob(draftResult.job_code);
           resolve();
         },
         onFailed(job) {
-          reject(new Error(job.error_message || job.summary || '大模型复盘草稿生成失败'));
+          kwReviewDraftGenerating = false;
+          kwReviewDraftJobState = job;
+          kwReviewDraft.flowStage = 'optimize_rule';
+          kwRemoveActiveReviewJob(draftResult.job_code);
+          kwRenderReviewStudio();
+          showToast(job.error_message || job.summary || '大模型复盘草稿生成失败');
+          resolve();
+        },
+        onCancelled(job) {
+          kwReviewDraftGenerating = false;
+          kwReviewDraftJobState = job;
+          kwReviewDraft.flowStage = 'optimize_rule';
+          kwRemoveActiveReviewJob(draftResult.job_code);
+          kwRenderReviewStudio();
+          resolve();
         },
         onError(error) {
           reject(error);
         },
       });
     });
+    if (!completed) return;
   } catch (error) {
     kwReviewDraftGenerating = false;
-    kwReviewDraftJobState = null;
+    if (kwReviewDraft.flowStage !== 'optimize_rule') kwReviewDraftJobState = null;
     kwReviewDraft.flowStage = 'optimize_rule';
     kwReviewWorkspacePanel = 'generation';
     kwRenderReviewStudio();
@@ -10120,32 +10371,51 @@ function kwRenderReviewInputPanel() {
 }
 
 function kwRenderReviewPromptPanel() {
-  if (kwReviewDraft.paragraphMode !== 'ai' || kwReviewDraft.skipAiProcessing) return '';
+  if (kwReviewDraft.flowStage !== 'optimize_rule') return '';
+  const useCustomRule = kwReviewDraft.optimizeRuleMode === 'custom';
   return `
     <div class="kw-knowledge-modal-block">
-      <label class="kw-knowledge-modal-label">智能文案修改规则</label>
-      <textarea id="kw-review-ai-prompt-input" class="kw-knowledge-modal-textarea" placeholder="例如：更口语化，但保留原始观点，不要写买卖建议。">${escapeHtml(kwReviewDraft.aiPrompt || '')}</textarea>
-      <div class="kw-review-prompt-tag-row" style="margin-top:10px">
-        ${KW_REVIEW_PROMPT_TAGS.map(tag => `
-          <button class="kw-review-prompt-tag ${kwReviewDraft.promptTags.includes(tag) ? 'active' : ''}" type="button" onclick="kwToggleReviewPromptTag('${tag}')">${escapeHtml(tag)}</button>
-        `).join('')}
+      <label class="kw-knowledge-modal-label">智能优化规则</label>
+      <div class="kw-review-runtime-desc" style="margin-top:6px;margin-bottom:10px">默认优化会保留用户观点并整理表达；也可以补充具体规则。这里不会直接发布，结果会先进入 Draft 审核。</div>
+      <div class="kw-knowledge-source-selector" style="grid-template-columns:repeat(2,1fr)">
+        <button class="kw-knowledge-source-pill ${kwReviewDraft.optimizeRuleMode === 'default' ? 'active' : ''}" type="button" onclick="kwSetReviewOptimizeRuleMode('default')">忽略规则，默认优化</button>
+        <button class="kw-knowledge-source-pill ${useCustomRule ? 'active' : ''}" type="button" onclick="kwSetReviewOptimizeRuleMode('custom')">输入规则后优化</button>
       </div>
+      ${useCustomRule ? `
+        <textarea id="kw-review-ai-prompt-input" class="kw-review-final-editor" style="margin-top:10px;min-height:100px" placeholder="例如：更口语化，但保留原始观点，不要写买卖建议。">${escapeHtml(kwReviewDraft.aiPrompt || '')}</textarea>
+        <div class="kw-review-prompt-tag-row" style="margin-top:10px">
+          ${KW_REVIEW_PROMPT_TAGS.map(tag => `
+            <button class="kw-review-prompt-tag ${kwReviewDraft.promptTags.includes(tag) ? 'active' : ''}" type="button" onclick="kwToggleReviewPromptTag('${tag}')">${escapeHtml(tag)}</button>
+          `).join('')}
+        </div>
+      ` : ''}
     </div>
   `;
 }
 
 function kwRenderReviewPreviewPanel() {
   if (!kwReviewDraft.previewReady) return '';
+  const periodMeta = getKwReviewPeriodMeta(kwReviewDraft.period || 'day');
+  const structured = kwNormalizeReviewStructuredPreview(kwReviewStructuredPreview || {});
+  const title = String(kwReviewDraft.reviewTitle || '').trim() || `${periodMeta.label}复盘预览`;
+  const userInput = String((structured.user_input_section || {}).display_text || '').trim() || kwGetReviewUserInputDisplayText();
+  const watchlistText = kwBuildReviewWatchlistAnalysisText(structured.watchlist_analysis_section || {});
   return `
     <div class="kw-review-preview-panel">
       <div class="kw-review-preview-head">
         <div>
-          <div class="kw-review-preview-title">草稿预览</div>
-          <div class="kw-review-runtime-meta">预览没问题再发布</div>
+          <div class="kw-review-preview-title">${escapeHtml(title)}</div>
+          <div class="kw-review-runtime-meta">${escapeHtml(periodMeta.label)} · ${escapeHtml(kwReviewDraft.sourceMode === 'voice' ? '语音口述' : (kwReviewDraft.sourceMode === 'file' ? '文件上传' : (kwReviewDraft.sourceMode === 'url' ? '网页 URL' : '手写正文')))} · 预览态</div>
         </div>
         <span class="kw-review-draft-status">待发布</span>
       </div>
-      <div class="kw-review-preview-copy">${escapeHtml(kwGetReviewPreviewText())}</div>
+      <div class="kw-review-preview-copy" style="margin-top:14px">
+        ${structured.review_summary ? `<div><strong>摘要</strong><div style="white-space:pre-wrap;margin-top:6px">${escapeHtml(structured.review_summary)}</div></div>` : ''}
+        ${userInput ? `<div style="margin-top:${structured.review_summary ? '16px' : '0'}"><strong>用户复盘</strong><div style="white-space:pre-wrap;margin-top:6px">${escapeHtml(userInput)}</div></div>` : ''}
+        ${watchlistText ? `<div style="margin-top:16px"><strong>Gangtise 多股综合分析</strong><div style="white-space:pre-wrap;margin-top:6px">${escapeHtml(watchlistText)}</div></div>` : ''}
+        ${!structured.review_summary && !userInput && !watchlistText ? `<div style="white-space:pre-wrap">${escapeHtml(kwGetReviewPreviewText())}</div>` : ''}
+      </div>
+      ${(kwReviewDraft.selectedWatchlist || []).length ? `<div class="kw-chip-row" style="margin-top:14px">${kwReviewDraft.selectedWatchlist.map((name) => `<span class="kw-chip">${escapeHtml(name)}</span>`).join('')}</div>` : ''}
     </div>
   `;
 }
@@ -10188,6 +10458,7 @@ function kwGetReviewCurrentStageLabel() {
     draft_review: 'Draft 审核',
     preview_generating: 'Gangtise 多股分析生成中',
     structured_review: 'Gangtise 多股分析审核',
+    preview_failed: 'Gangtise 分析失败',
     stage1_preview: '第一阶段预览',
     watchlist_select: '选择待分析股票',
     preview: '最终预览',
@@ -10218,7 +10489,7 @@ function kwGetReviewWizardStepState(panelId) {
   }
   if (panelId === 'generation') {
     if (kwReviewWorkspacePanel === panelId) return 'active';
-    if (stage === 'draft_generating' || stage === 'draft_review' || stage === 'preview_generating' || stage === 'structured_review') return 'done';
+    if (stage === 'draft_generating' || stage === 'draft_review' || stage === 'preview_generating' || stage === 'structured_review' || stage === 'preview_failed') return 'done';
     return hasDraft || hasStructured ? 'done' : 'todo';
   }
   if (panelId === 'preview') {
@@ -10259,10 +10530,10 @@ function kwTryOpenReviewWorkspacePanel(panelId) {
 function kwInferReviewWorkspacePanel() {
   const stage = kwReviewDraft.flowStage || 'intake';
   if (kwReviewDraft.previewReady || stage === 'preview') return 'preview';
-  if (stage === 'draft_generating' || stage === 'draft_review' || stage === 'optimize_rule' || stage === 'preview_generating' || stage === 'structured_review') {
+  if (stage === 'draft_generating' || stage === 'draft_review' || stage === 'optimize_rule' || stage === 'preview_generating' || stage === 'structured_review' || stage === 'preview_failed') {
     return 'generation';
   }
-  return 'overview';
+  return 'input';
 }
 
 function kwSetReviewWorkspacePanel(panelId, options) {
@@ -10460,23 +10731,11 @@ function kwRenderReviewWizardFooter() {
   const isGenerating = kwReviewDraftGenerating || kwReviewPreviewGenerating || kwReviewPublishSubmitting;
   let desc = step.desc || '';
   let actions = '';
-  if (kwReviewWorkspacePanel === 'overview') {
-    desc = '先快速确认本次复盘周期、最近发布结果，再进入素材和输入准备。';
+  if (kwReviewWorkspacePanel === 'input') {
+    desc = '确认输入内容后，可以直接预览，也可以进入优化规则。自选股在第一阶段审核后再决定。';
     actions = `
-      <button class="btn-outline" type="button" onclick="kwSetReviewWorkspacePanel('cards')">先看复盘素材</button>
-      <button class="btn-gold" type="button" onclick="kwSetReviewWorkspacePanel('input')">开始录入复盘</button>
-    `;
-  } else if (kwReviewWorkspacePanel === 'cards') {
-    desc = '先把需要纳入的智能卡片和知识材料准备好，再进入用户复盘。';
-    actions = `
-      <button class="btn-outline" type="button" onclick="kwSetReviewWorkspacePanel('overview')">上一步</button>
-      <button class="btn-gold" type="button" onclick="kwSetReviewWorkspacePanel('input')">继续录入复盘</button>
-    `;
-  } else if (kwReviewWorkspacePanel === 'input') {
-    desc = '确认输入内容后即可进入优化与审核。自选股是可选项，只影响是否追加归纳总结。';
-    actions = `
-      <button class="btn-outline" type="button" onclick="kwSetReviewWorkspacePanel('cards')">上一步</button>
-      <button class="btn-gold" type="button" onclick="if (kwValidateReviewIntakeReady()) { kwSetReviewWorkspacePanel('generation'); }">进入优化与审核</button>
+      <button class="btn-outline" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwPrepareReviewDirectPreview()">直接预览</button>
+      <button class="btn-gold" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwOpenReviewOptimizeRuleStep()">优化成稿</button>
     `;
   } else if (kwReviewWorkspacePanel === 'generation') {
     const stage = kwReviewDraft.flowStage || 'intake';
@@ -10509,17 +10768,22 @@ function kwRenderReviewWizardFooter() {
         <button class="btn-outline" type="button" onclick="kwBackToReviewDraftEdit()">回退修改</button>
         <button class="btn-gold" type="button" onclick="kwConfirmStructuredReviewToPreview()">进入最终预览</button>
       `;
+    } else if (stage === 'preview_failed') {
+      desc = '自选股分析没有返回可用结果。原始复盘和已选股票均已保留，可以直接重新提交 Gangtise。';
+      actions = `
+        <button class="btn-outline" type="button" onclick="kwBackToReviewDraftEdit()">回退修改</button>
+        <button class="btn-gold" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwPrepareReviewStructuredPreview()">重新生成自选股分析</button>
+      `;
     } else if (stage === 'draft_generating' || stage === 'preview_generating') {
       desc = '系统正在处理中。这里会持续刷新进度，处理完成后可以继续下一步。';
       actions = `
-        <button class="btn-outline" type="button" disabled>处理中</button>
-        <button class="btn-gold" type="button" disabled>请稍候</button>
+        <button class="btn-outline" type="button" onclick="kwCancelReviewAsyncJob()">停止生成</button>
+        <button class="btn-gold" type="button" disabled>处理中...</button>
       `;
     } else {
-      desc = '可以直接预览原始输入，也可以先做优化成稿。第一阶段完成后再决定是否需要自选股 AI 分析。';
+      desc = '当前内容还没有进入生成阶段。';
       actions = `
-        <button class="btn-outline" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwPrepareReviewDirectPreview()">直接预览</button>
-        <button class="btn-gold" type="button" ${isGenerating ? 'disabled' : ''} onclick="kwOpenReviewOptimizeRuleStep()">${isGenerating ? '处理中...' : '优化成稿'}</button>
+        <button class="btn-outline" type="button" onclick="kwSetReviewWorkspacePanel('input')">返回输入</button>
       `;
     }
   } else if (kwReviewWorkspacePanel === 'preview') {
@@ -10558,7 +10822,7 @@ function kwRenderReviewFlowNav() {
     const active = (kwReviewDraft.flowStage === 'draft_generating' && nodeId === 'draft')
       || (kwReviewDraft.flowStage === 'draft_review' && nodeId === 'draft')
       || (kwReviewDraft.flowStage === 'preview_generating' && nodeId === 'structured')
-      || (kwReviewDraft.flowStage === 'structured_review' && nodeId === 'structured')
+      || (['structured_review', 'preview_failed'].includes(kwReviewDraft.flowStage) && nodeId === 'structured')
       || (kwReviewDraft.flowStage === 'preview' && nodeId === 'preview');
     const done = (nodeId === 'input' && sourceReady)
       || (nodeId === 'draft' && draftReady)
@@ -10661,15 +10925,12 @@ function kwRenderReviewStageActions() {
     watchlist_select: '确认待分析股票列表后，才会提交 Gangtise。',
     preview_generating: '系统正在整理 Gangtise 多股综合分析。',
     structured_review: '自选股归纳已经返回，确认后再进入最终预览。',
+    preview_failed: 'Gangtise 没有返回可用分析，保留当前输入和股票列表后可以重试。',
     preview: '已经进入最终预览，可以在下方继续微调发布正文。',
   }[stage] || '按底部向导继续推进本次复盘。';
   host.innerHTML = `
     <div class="kw-knowledge-modal-block" style="margin:0;padding:0;background:none;border:none">
       <div class="kw-review-runtime-desc">周期：${escapeHtml(getKwReviewPeriodMeta(kwReviewDraft.period).label)}；当前阶段：${escapeHtml(kwGetReviewCurrentStageLabel())}</div>
-      <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--text-main);line-height:1.7;margin-top:12px">
-        <input type="checkbox" id="kw-review-skip-ai-processing" ${kwReviewDraft.skipAiProcessing ? 'checked' : ''} onchange="kwToggleReviewSkipAiProcessing(this.checked)" />
-        <span>关闭大模型处理，只保留原始输入和人工编辑结果。</span>
-      </label>
       ${kwRenderReviewPromptPanel()}
       <div class="kw-review-runtime-desc" style="margin-top:12px">${escapeHtml(stageHint)}</div>
     </div>
@@ -10679,19 +10940,26 @@ function kwRenderReviewStageActions() {
 function kwRenderReviewStageResults() {
   const host = document.getElementById('kw-review-stage-results');
   if (!host) return;
-  const selectedKnowledge = kwGetReviewSelectedKnowledge();
-  const selectedCards = kwGetReviewSelectedCards();
   const structured = kwNormalizeReviewStructuredPreview(kwReviewStructuredPreview || {});
   const hasWatchlistAnalysis = !!kwBuildReviewWatchlistAnalysisText(structured.watchlist_analysis_section);
+  const stage = kwReviewDraft.flowStage || 'intake';
+  const showDraftReview = stage === 'draft_review';
+  const showStructuredReview = stage === 'structured_review';
   host.innerHTML = `
     ${kwRenderReviewStageOnePreviewPanel()}
-    ${kwReviewDraft.generatedPreviewText ? `
+    ${showDraftReview && (kwReviewDraft.generatedPreviewText || kwReviewDraft.draftReviewText) ? `
       <div class="kw-review-runtime-item" style="margin-top:12px">
         <strong>用户复盘 Draft</strong>
         <textarea id="kw-review-draft-review-input" class="kw-knowledge-modal-textarea" style="margin-top:10px;min-height:180px">${escapeHtml(kwReviewDraft.draftReviewText || kwReviewDraft.generatedPreviewText || '')}</textarea>
       </div>
     ` : ''}
-    ${kwReviewStructuredPreview ? `
+    ${stage === 'preview_failed' ? `
+      <div class="kw-review-runtime-item" style="margin-top:12px;border-color:rgba(170,65,48,0.24);background:rgba(170,65,48,0.05)">
+        <strong>自选股分析生成失败</strong>
+        <div class="kw-review-runtime-desc" style="margin-top:8px">${escapeHtml((kwReviewPreviewJobState && (kwReviewPreviewJobState.error_message || kwReviewPreviewJobState.summary)) || 'Gangtise 分析任务未能返回可用结果，请重试。')}</div>
+      </div>
+    ` : ''}
+    ${showStructuredReview && kwReviewStructuredPreview ? `
       <div class="kw-review-runtime-item" style="margin-top:12px">
         <strong>用户复盘</strong>
         <textarea id="kw-review-structured-user-input" class="kw-knowledge-modal-textarea" style="margin-top:10px;min-height:180px">${escapeHtml((((structured.user_input_section || {}).display_text) || ''))}</textarea>
@@ -10715,10 +10983,12 @@ function kwRenderReviewStageResults() {
         </div>
       `}
     ` : ''}
-    <div class="kw-review-runtime-item" style="margin-top:12px">
-      <strong>本次归纳素材</strong>
-      <div class="kw-review-runtime-desc" style="margin-top:6px">智能卡片 ${selectedCards.length} 张，知识材料 ${selectedKnowledge.length} 份。</div>
-    </div>
+    ${stage === 'intake' || stage === 'optimize_rule' ? `
+      <div class="kw-review-runtime-item" style="margin-top:12px">
+        <strong>当前输入状态</strong>
+        <div class="kw-review-runtime-desc" style="margin-top:6px">${kwGetReviewDraftContentText() ? '用户复盘内容已录入。' : '等待录入用户复盘内容。'}</div>
+      </div>
+    ` : ''}
   `;
 }
 
@@ -10729,6 +10999,9 @@ function kwOpenReviewTriggerModal(sourceMode) {
   kwReviewDraft.reviewTitle = '';
   kwReviewDraft.selectedWatchlist = [];
   kwReviewDraft.watchlistDecision = '';
+  kwReviewDraft.paragraphMode = 'manual';
+  kwReviewDraft.skipAiProcessing = true;
+  kwReviewDraft.optimizeRuleMode = 'default';
   kwReviewDraft.voiceTranscript = '';
   kwReviewDraft.manualText = '';
   kwReviewDraft.manualHtml = '';
@@ -10747,6 +11020,9 @@ function kwOpenReviewTriggerModal(sourceMode) {
   kwReviewStructuredPreview = null;
   if (sourceMode && KW_REVIEW_SOURCE_OPTIONS.some(item => item.value === sourceMode)) {
     kwReviewDraft.sourceMode = sourceMode;
+  }
+  if (!getAvailableKwReviewSourceOptions().some(item => item.value === kwReviewDraft.sourceMode)) {
+    kwReviewDraft.sourceMode = 'manual';
   }
   kwSetReviewWorkspacePanel('input', { render: false });
   kwRenderReviewStudio();
@@ -10791,6 +11067,16 @@ function kwSetReviewTriggerParagraphMode(mode) {
   kwReviewDraft.paragraphMode = mode;
   kwReviewDraft.previewReady = false;
   kwReviewStructuredPreview = null;
+  kwRenderReviewStudio();
+}
+
+function kwSetReviewOptimizeRuleMode(mode) {
+  kwSyncReviewDraftFromModal();
+  kwReviewDraft.optimizeRuleMode = mode === 'custom' ? 'custom' : 'default';
+  if (kwReviewDraft.optimizeRuleMode === 'default') {
+    kwReviewDraft.aiPrompt = '';
+    kwReviewDraft.promptTags = [];
+  }
   kwRenderReviewStudio();
 }
 
@@ -11076,7 +11362,9 @@ function kwRenderReviewStudio() {
   const paragraphCfg = KW_REVIEW_PARAGRAPH_OPTIONS.find(item => item.value === runtime.paragraphMode) || KW_REVIEW_PARAGRAPH_OPTIONS[0];
   const selectedKnowledge = kwGetReviewSelectedKnowledge();
   const selectedCards = kwGetReviewSelectedCards();
-  kwReviewDraft.reviewTitle = kwReviewDraft.reviewTitle || runtime.latestReviewTitle || '';
+  // A new review must start with a blank title; the last published title is
+  // runtime history, not input for the next review.
+  kwReviewDraft.reviewTitle = kwReviewDraft.reviewTitle || '';
   if (!KW_REVIEW_WORKSPACE_PANELS.some((item) => item.id === kwReviewWorkspacePanel)) {
     kwReviewWorkspacePanel = kwInferReviewWorkspacePanel();
   }
@@ -11815,6 +12103,7 @@ function showWorkbenchSection(name, navEl) {
   }
   if (name === 'review') {
     kwRenderReviewStudio();
+    kwLoadActiveReviewJobs();
   }
   if (name === 'knowledge-overview') {
     loadWorkbenchKnowledgeAssets(false).then(() => {
@@ -12826,15 +13115,16 @@ function kwEscapeRegExp(value) {
 function kwCollectPromptMatchedTagCodes(promptText, tagCatalog) {
   const prompt = String(promptText || '').trim();
   if (!prompt) return [];
+  const normalize = (value) => String(value || '').replace(/[\s_\-.\/：:，,。.!！?？【】\[\]()（）]/g, '').toLowerCase();
+  const normalizedPrompt = normalize(prompt);
   return (Array.isArray(tagCatalog) ? tagCatalog.slice() : [])
     .sort((left, right) => kwNormalizeSmartTagLabel(right.label).length - kwNormalizeSmartTagLabel(left.label).length)
     .filter((tag) => {
-      const rawLabel = String(tag && tag.label || '').trim();
-      const normalizedLabel = kwNormalizeSmartTagLabel(rawLabel);
-      if (!normalizedLabel) return false;
-      const bracketPattern = new RegExp(`【\\s*${kwEscapeRegExp(normalizedLabel)}\\s*】`);
-      if (bracketPattern.test(prompt)) return true;
-      return prompt.includes(normalizedLabel);
+      const candidates = [tag && tag.label].concat(Array.isArray(tag && tag.prompt_aliases) ? tag.prompt_aliases : []);
+      return candidates.some((candidate) => {
+        const normalizedCandidate = normalize(kwNormalizeSmartTagLabel(candidate));
+        return normalizedCandidate && normalizedPrompt.includes(normalizedCandidate);
+      });
     })
     .map((tag) => tag.tag_code)
     .filter(Boolean);
@@ -12913,7 +13203,7 @@ function kwRenderSmartIndicatorEditorModal() {
   if (typeof kwSmartIndicatorDraft.tagPoolExpanded !== 'boolean') kwSmartIndicatorDraft.tagPoolExpanded = false;
   host.innerHTML = `
     <div class="kw-review-modal-title">新增智能指标</div>
-    <div class="kw-dashboard-panel-note" style="margin-top:8px">先选热门指标或点击“...”展开全部，再在提示词里组合描述计算逻辑。系统会自动识别与指标名称完全一致的词并转成标签。</div>
+    <div class="kw-dashboard-panel-note" style="margin-top:8px">可直接输入个股、热门行业、CPI 或市场指数；系统会在服务端自动识别真实底层指标。也可选择热门指标或点击“...”展开全部，再补充计算逻辑。</div>
     <div class="kw-dashboard-cell-modal-grid">
       <div class="kw-dashboard-cell-block">
         <div class="kw-dashboard-section-title">指标名称</div>
@@ -12932,11 +13222,12 @@ function kwRenderSmartIndicatorEditorModal() {
           <div id="kw-smart-indicator-selected-tags" class="kw-dashboard-chip-row" style="margin-top:0;min-height:30px"></div>
           <textarea id="kw-smart-indicator-draft-prompt" class="kw-knowledge-modal-textarea kw-smart-indicator-prompt-input" placeholder="例如：【上证50指数】*80/100，或者【上证50】/ 纳斯达克指数" oninput="kwHandleSmartIndicatorPromptInput(this.value)">${escapeHtml(kwSmartIndicatorDraft.promptText || '')}</textarea>
         </div>
-        <div class="kw-dashboard-panel-note" style="margin-top:8px">当你输入的词与指标名称完全一致时，系统会自动识别成标签。</div>
+        <div class="kw-dashboard-panel-note" style="margin-top:8px">服务端会识别别名和常用简称，例如 CPI、上证综合指数、沪指、证券名称或代码。</div>
       </div>
       <div class="kw-dashboard-cell-block">
         <div class="kw-dashboard-section-title">已识别逻辑</div>
-        <div class="kw-dashboard-panel-note" style="margin-top:8px">已选指标会和提示词一起提交给系统生成临时 JS，确认展示后才正式保存。</div>
+        <div class="kw-dashboard-panel-note" style="margin-top:8px">提示词会先由服务端识别个股、行业、市场和宏观指标，再和可选标签一起提交；确认展示后才正式保存。</div>
+        <div class="kw-dashboard-panel-note" style="margin-top:8px">${preview ? `已识别：${escapeHtml((preview.selected_indicators || []).map((item) => item.indicator_name || item.indicator_code).join(' / ') || '无')}` : '等待生成预览后显示识别结果。'}</div>
       </div>
       ${preview ? `
       <div class="kw-dashboard-cell-block">
@@ -12945,6 +13236,7 @@ function kwRenderSmartIndicatorEditorModal() {
         <div class="kw-dashboard-public-value" style="margin-top:8px">${escapeHtml(`${preview.value || '--'}${preview.unit || ''}`)}</div>
         <div class="kw-dashboard-panel-note" style="margin-top:8px">算法详情：${escapeHtml(preview.algorithm_detail || '暂无算法详情')}</div>
         <div class="kw-dashboard-panel-note" style="margin-top:8px">解读：${escapeHtml(preview.interpretation || preview.assessment || '暂无解读')}</div>
+        <div class="kw-dashboard-panel-note" style="margin-top:8px;color:${preview.data_status === 'available' ? '#146B4A' : '#A56A00'}">数据状态：${escapeHtml(preview.data_status_label || (preview.value && preview.value !== '--' ? '已读取最新快照' : '已识别，等待底层数据同步'))}</div>
       </div>
       ` : ''}
       ${isGenerating ? `
@@ -12982,10 +13274,6 @@ async function kwPreviewSmartIndicator() {
     return;
   }
   const selectedTagCodes = kwGetSmartIndicatorEffectiveTagCodes();
-  if (!selectedTagCodes.length) {
-    showToast('请先至少选择一个标签');
-    return;
-  }
   kwSmartIndicatorDraft.isGenerating = true;
   kwSmartIndicatorDraft.preview = null;
   kwRenderSmartIndicatorEditorModal();
@@ -13003,8 +13291,14 @@ async function kwPreviewSmartIndicator() {
     const payload = await resp.json();
     if (!resp.ok || !payload.success) throw new Error(payload.error || 'smart_indicator_preview_failed');
     kwSetSmartIndicatorCatalog(payload.smart_indicator_catalog);
-    kwSmartIndicatorDraft.selectedTagCodes = selectedTagCodes;
     kwSmartIndicatorDraft.preview = payload.preview || null;
+    const resolvedCodes = (kwSmartIndicatorDraft.preview && Array.isArray(kwSmartIndicatorDraft.preview.selected_indicators))
+      ? kwSmartIndicatorDraft.preview.selected_indicators.map((item) => item && item.indicator_code).filter(Boolean)
+      : [];
+    const resolvedTagCodes = kwGetSmartTagCatalog()
+      .filter((tag) => (tag.selected_indicators || []).some((item) => resolvedCodes.includes(item.indicator_code)))
+      .map((tag) => tag.tag_code);
+    kwSmartIndicatorDraft.selectedTagCodes = Array.from(new Set(selectedTagCodes.concat(resolvedTagCodes)));
     if (kwSmartIndicatorDraft.preview && kwSmartIndicatorDraft.preview.indicator_name) {
       kwSmartIndicatorDraft.indicatorName = kwSmartIndicatorDraft.preview.indicator_name;
     }
