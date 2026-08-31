@@ -3621,6 +3621,9 @@ def append_smart_indicator_to_dashboard(tenant_slug, indicator_code, title="", l
 def remove_smart_indicator_from_dashboard(tenant_slug, indicator_code):
     tenant = get_tenant_by_slug(tenant_slug)
     current_state = resolve_tenant_fund_dashboard_state(tenant, tenant.get("fund_dashboard_config"))
+    # Removing a card is a reversible dashboard edit. Keep the last published
+    # version untouched and create/update a draft from it when no draft exists;
+    # reset_draft can then reliably restore the published card.
     published = copy.deepcopy(current_state.get("published") or {})
     draft = copy.deepcopy(current_state.get("draft") or published or {})
     normalized_code = slugify_code(indicator_code, "indicator")
@@ -3641,7 +3644,7 @@ def remove_smart_indicator_from_dashboard(tenant_slug, indicator_code):
             continue
         tenants[index] = dict(current_tenant)
         tenants[index]["fund_dashboard_config"] = {
-            "published": normalize_fund_dashboard_view(_strip_cards(published), tenant),
+            "published": normalize_fund_dashboard_view(published, tenant),
             "draft": normalize_fund_dashboard_view(_strip_cards(draft), tenant),
         }
         next_config = dict(site_config)

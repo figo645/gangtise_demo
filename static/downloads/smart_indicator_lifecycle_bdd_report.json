@@ -1,0 +1,292 @@
+{
+  "generated_at": "2026-08-31 23:49:20",
+  "tenant_slug": "laowang",
+  "scenarios": [
+    {
+      "name": "1. 建立 2×2 看板",
+      "given": "用户进入智能指标看板编辑器。",
+      "when": "通过真实 Dashboard API 保存 2×2 空白草稿。",
+      "then": "服务端返回 200 且草稿保留 4 个槽位。",
+      "passed": true,
+      "detail": "HTTP 200",
+      "evidence": {
+        "status": 200,
+        "draft_codes": [
+          "",
+          "",
+          "",
+          ""
+        ]
+      }
+    },
+    {
+      "name": "2. 添加第一个指标 CPI",
+      "given": "2×2 看板已建立，CPI 是已注册基础指标。",
+      "when": "通过智能指标真实保存 API 创建 CPI，并写入第一个看板槽位。",
+      "then": "CPI 卡片与指标定义、最新快照均已持久化。",
+      "passed": true,
+      "detail": "HTTP 200；看板 HTTP 200",
+      "evidence": {
+        "indicator_code": "laowang_smart_20260831_234945360",
+        "indicator": {
+          "definition_exists": true,
+          "definition": {
+            "indicator_code": "laowang_smart_20260831_234945360",
+            "indicator_name": "BDD-CPI",
+            "tenant_slug": "laowang",
+            "source_type": "smart",
+            "provider": "LLM / Prompt Formula",
+            "prompt_text": "CPI",
+            "formula_js": "return Number(inputs[\"source_cpi\"] || 0);",
+            "selected_indicators_json": "[{\"indicator_code\": \"source_cpi\", \"indicator_name\": \"中国CPI同比指数\"}]"
+          },
+          "latest_exists": true,
+          "latest": {
+            "latest_value": "100.5",
+            "updated_at": "2026-08-31 23:49:45",
+            "is_simulated": 0,
+            "source_code": "tenant_smart_formula"
+          },
+          "series": {
+            "total": 1,
+            "real_count": 1
+          }
+        },
+        "formula_meta": {
+          "formula_js": "return Number(inputs[\"source_cpi\"] || 0);",
+          "generator": "preview_confirmed",
+          "llm_used": false
+        }
+      }
+    },
+    {
+      "name": "3. 添加第二个指标 深证指数",
+      "given": "CPI 已在第一个槽位。",
+      "when": "创建深证指数指标并写入第二个看板槽位。",
+      "then": "第二个卡片可见，且定义与快照已保存。",
+      "passed": true,
+      "detail": "HTTP 200；看板 HTTP 200",
+      "evidence": {
+        "indicator_code": "laowang_smart_20260831_234952200",
+        "indicator": {
+          "definition_exists": true,
+          "definition": {
+            "indicator_code": "laowang_smart_20260831_234952200",
+            "indicator_name": "BDD-深证指数",
+            "tenant_slug": "laowang",
+            "source_type": "smart",
+            "provider": "LLM / Prompt Formula",
+            "prompt_text": "深证指数",
+            "formula_js": "return Number(inputs[\"source_shenzhen_index\"] || 0);",
+            "selected_indicators_json": "[{\"indicator_code\": \"source_shenzhen_index\", \"indicator_name\": \"深证指数\"}]"
+          },
+          "latest_exists": true,
+          "latest": {
+            "latest_value": "14015.00",
+            "updated_at": "2026-08-31 23:49:52",
+            "is_simulated": 0,
+            "source_code": "tenant_smart_formula"
+          },
+          "series": {
+            "total": 1,
+            "real_count": 1
+          }
+        },
+        "formula_meta": {
+          "formula_js": "return Number(inputs[\"source_shenzhen_index\"] || 0);",
+          "generator": "preview_confirmed",
+          "llm_used": false
+        }
+      }
+    },
+    {
+      "name": "4. 添加第三个指标 黄金 / 白银",
+      "given": "CPI、深证指数已经占用前两个槽位。",
+      "when": "创建黄金/白银比值指标并写入第三个槽位。",
+      "then": "复合计算卡片成功保存，两个底层引用和计算公式均可审计。",
+      "passed": true,
+      "detail": "HTTP 200；看板 HTTP 200",
+      "evidence": {
+        "indicator_code": "laowang_smart_20260831_234958990",
+        "indicator": {
+          "definition_exists": true,
+          "definition": {
+            "indicator_code": "laowang_smart_20260831_234958990",
+            "indicator_name": "BDD-黄金白银",
+            "tenant_slug": "laowang",
+            "source_type": "smart",
+            "provider": "LLM / Prompt Formula",
+            "prompt_text": "黄金/白银",
+            "formula_js": "return Number(inputs[\"source_gold\"] || 0) / Number(inputs[\"source_silver\"] || 0);",
+            "selected_indicators_json": "[{\"indicator_code\": \"source_gold\", \"indicator_name\": \"黄金\"}, {\"indicator_code\": \"source_silver\", \"indicator_name\": \"白银\"}]"
+          },
+          "latest_exists": true,
+          "latest": {
+            "latest_value": "50.2181",
+            "updated_at": "2026-08-31 23:49:59",
+            "is_simulated": 0,
+            "source_code": "tenant_smart_formula"
+          },
+          "series": {
+            "total": 1,
+            "real_count": 1
+          }
+        },
+        "formula_meta": {
+          "formula_js": "return Number(inputs[\"source_gold\"] || 0) / Number(inputs[\"source_silver\"] || 0);",
+          "generator": "preview_confirmed",
+          "llm_used": false
+        }
+      }
+    },
+    {
+      "name": "5. 删除第一个指标 CPI",
+      "given": "CPI 已发布，且当前操作是从看板移除。",
+      "when": "调用真实 remove_indicator 接口移除 CPI 卡片。",
+      "then": "草稿不再展示 CPI，但数据库定义、最新值和历史序列仍保留。",
+      "passed": true,
+      "detail": "HTTP 200",
+      "evidence": {
+        "draft_codes": [
+          "",
+          "laowang_smart_20260831_234952200",
+          "laowang_smart_20260831_234958990",
+          ""
+        ],
+        "cpi_db_after_remove": {
+          "definition_exists": true,
+          "definition": {
+            "indicator_code": "laowang_smart_20260831_234945360",
+            "indicator_name": "BDD-CPI",
+            "tenant_slug": "laowang",
+            "source_type": "smart",
+            "provider": "LLM / Prompt Formula",
+            "prompt_text": "CPI",
+            "formula_js": "return Number(inputs[\"source_cpi\"] || 0);",
+            "selected_indicators_json": "[{\"indicator_code\": \"source_cpi\", \"indicator_name\": \"中国CPI同比指数\"}]"
+          },
+          "latest_exists": true,
+          "latest": {
+            "latest_value": "100.5",
+            "updated_at": "2026-08-31 23:49:45",
+            "is_simulated": 0,
+            "source_code": "tenant_smart_formula"
+          },
+          "series": {
+            "total": 1,
+            "real_count": 1
+          }
+        },
+        "published_codes": [
+          "laowang_smart_20260831_234945360",
+          "laowang_smart_20260831_234952200",
+          "laowang_smart_20260831_234958990",
+          ""
+        ]
+      }
+    },
+    {
+      "name": "6. 恢复",
+      "given": "CPI 仅从草稿看板移除，发布版未改写。",
+      "when": "调用真实 reset_draft 接口恢复当前发布版。",
+      "then": "CPI 卡片恢复，草稿清空，之前保存的数据仍可读取。",
+      "passed": true,
+      "detail": "HTTP 200",
+      "evidence": {
+        "published_codes": [
+          "laowang_smart_20260831_234945360",
+          "laowang_smart_20260831_234952200",
+          "laowang_smart_20260831_234958990",
+          ""
+        ],
+        "draft": null,
+        "cpi_db_after_restore": {
+          "definition_exists": true,
+          "definition": {
+            "indicator_code": "laowang_smart_20260831_234945360",
+            "indicator_name": "BDD-CPI",
+            "tenant_slug": "laowang",
+            "source_type": "smart",
+            "provider": "LLM / Prompt Formula",
+            "prompt_text": "CPI",
+            "formula_js": "return Number(inputs[\"source_cpi\"] || 0);",
+            "selected_indicators_json": "[{\"indicator_code\": \"source_cpi\", \"indicator_name\": \"中国CPI同比指数\"}]"
+          },
+          "latest_exists": true,
+          "latest": {
+            "latest_value": "100.5",
+            "updated_at": "2026-08-31 23:49:45",
+            "is_simulated": 0,
+            "source_code": "tenant_smart_formula"
+          },
+          "series": {
+            "total": 1,
+            "real_count": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "7. 再添加一个指标 上证指数",
+      "given": "恢复后 CPI、深证指数和黄金/白银数据仍可复用。",
+      "when": "将注册指标 source_shanghai_index 写入第四个槽位。",
+      "then": "2×2 草稿包含 CPI、深证指数、黄金/白银和上证指数四个卡片引用。",
+      "passed": true,
+      "detail": "HTTP 200",
+      "evidence": {
+        "draft_codes": [
+          "laowang_smart_20260831_234945360",
+          "laowang_smart_20260831_234952200",
+          "laowang_smart_20260831_234958990",
+          "source_shanghai_index"
+        ],
+        "shanghai_code": "source_shanghai_index"
+      }
+    }
+  ],
+  "refresh": {
+    "market_snapshot": {
+      "ok": true,
+      "updated": 40,
+      "overview_count": 9,
+      "sector_count": 31,
+      "intraday_count": 0,
+      "updated_at": "2026-08-31 23:49:25",
+      "errors": []
+    },
+    "indicator_history": {
+      "synced": true,
+      "updated": 13,
+      "total_points": 1376,
+      "eligible": 15,
+      "skipped_disabled": 10,
+      "batch_code": "gangtise_openapi_sync_20260831234927045255"
+    }
+  },
+  "llm_model": {
+    "key": "volcengine-deepseek-v4-flash",
+    "model_name": "deepseek-v4-flash-ga-260731",
+    "provider": "volcengine",
+    "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+    "expected_model": "deepseek-v4-flash-ga-260731",
+    "expected_base_url": "https://ark.cn-beijing.volces.com/api/v3",
+    "matches_v4": true
+  },
+  "temporary_codes": [
+    "laowang_smart_20260831_234945360",
+    "laowang_smart_20260831_234952200",
+    "laowang_smart_20260831_234958990"
+  ],
+  "exception": "",
+  "publish": {
+    "status": 200,
+    "published_codes": [
+      "laowang_smart_20260831_234945360",
+      "laowang_smart_20260831_234952200",
+      "laowang_smart_20260831_234958990",
+      ""
+    ],
+    "ok": true
+  },
+  "conclusion": "通过标准：所有场景必须由真实接口返回成功，且删除 CPI 后数据库仍存在定义、最新快照和历史序列。模型配置必须解析到 DeepSeek-V4-Flash 正式版。"
+}
