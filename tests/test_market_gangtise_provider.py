@@ -90,6 +90,26 @@ def test_market_snapshot_task_is_registered_with_admin_task_dispatcher():
     assert result == expected
 
 
+def test_smart_indicator_refresh_task_runs_every_five_minutes_without_llm():
+    from src.domain import core_services, market_services
+
+    task = next(item for item in market_services.DEFAULT_ADMIN_TASKS if item["task_code"] == "smart_indicator_refresh")
+    assert task["task_type"] == "smart_indicator_refresh"
+    assert task["schedule_type"] == "interval"
+    assert task["schedule_value"] == "300"
+    assert task["enabled"] == 1
+
+    expected = {"tenants": 1, "checked": 2, "refreshed": 1}
+    with patch.object(core_services, "refresh_all_tenant_smart_indicator_snapshots", return_value=expected) as refresh, patch.object(
+        market_services, "invalidate_indicator_hub_cache"
+    ) as invalidate:
+        result = core_services.execute_admin_task_by_type("smart_indicator_refresh")
+
+    refresh.assert_called_once_with()
+    invalidate.assert_called_once_with()
+    assert result == expected
+
+
 def test_gangtise_edb_tasks_are_manual_by_default_to_control_credits():
     from src.domain import market_services
 

@@ -2337,26 +2337,147 @@ def build_smart_indicator_interpretation(indicator_name, prompt_text, selected_i
     return f"{name} 当前值为 {display_value}，系统会按“{prompt_value}”这条口径持续更新结果。"
 
 
+def format_smart_indicator_numeric_value(value, selected_indicators, prompt_text=""):
+    """Use the market-card precision for direct registered index references."""
+    numeric_value = float(value)
+    selected = normalize_selected_indicator_refs(selected_indicators)
+    market = _market_services_module()
+    is_direct_market_index = (
+        len(selected) == 1
+        and selected[0].get("indicator_code") in getattr(market, "MARKET_OVERVIEW_INDEX_CODES", ())
+        and not re.search(r"[+\-*/()]", str(prompt_text or ""))
+    )
+    if is_direct_market_index:
+        return f"{numeric_value:.2f}"
+    return f"{numeric_value:.4f}".rstrip("0").rstrip(".")
+
+
 def build_dashboard_base_indicator_options(tenant=None):
     hub = build_indicator_hub(tenant=tenant, admin_view=False)
     options = []
+    option_codes = set()
     for item in (hub.get("items") or []):
         numeric_value = item.get("numeric_value")
         if numeric_value is None:
             continue
+        indicator_code = item.get("id")
+        option_codes.add(indicator_code)
         options.append(
             {
-                "indicator_code": item.get("id"),
+                "indicator_code": indicator_code,
                 "indicator_name": item.get("name"),
                 "category": item.get("category") or "未分类指标",
-                "value": item.get("value") or "--",
+                "value": item.get("value") if item.get("value") is not None and str(item.get("value")).strip() else "--",
                 "numeric_value": numeric_value,
                 "unit": item.get("unit") or "",
                 "source_type": item.get("source_type") or "",
                 "source_type_label": item.get("source_type_label") or "",
+                "prompt_text": item.get("prompt_text") or item.get("name") or indicator_code,
+                "selected_indicators": [{
+                    "indicator_code": indicator_code,
+                    "indicator_name": item.get("name") or indicator_code,
+                }],
+                "updated_at": item.get("last_updated") or "",
+                "data_at": item.get("data_at") or "",
+                "data_status": item.get("data_status") or "",
+                "data_status_label": item.get("data_status_label") or "",
+                "data_unavailable": bool(item.get("data_unavailable")),
+            }
+        )
+    # Market overview indices are persisted in the dedicated market snapshot
+    # cache rather than indicator_latest_values. They are still registered
+    # indicators and must be available to the smart-indicator formula engine.
+    market = _market_services_module()
+    market_overview = market.build_market_overview_payload()
+    market_overview_items = {
+        str(item.get("indicator_code") or "").strip(): item
+        for item in (market_overview.get("items") or [])
+        if isinstance(item, dict)
+    }
+    for indicator_code in getattr(market, "MARKET_OVERVIEW_INDEX_CODES", ()):
+        if indicator_code in option_codes:
+            continue
+        detail = market.build_market_overview_index_detail(indicator_code)
+        overview_item = market_overview_items.get(indicator_code) or {}
+        numeric_value = (
+            detail.get("numeric_value") if isinstance(detail, dict) else None
+        )
+        if numeric_value is None:
+            numeric_value = market.parse_numeric_indicator_value(overview_item.get("price"))
+        if numeric_value is None:
+            continue
+        entry = (getattr(market, "GANGTISE_INDICATOR_REGISTRY", {}) or {}).get(indicator_code) or {}
+        options.append(
+            {
+                "indicator_code": indicator_code,
+                "indicator_name": (detail.get("name") if isinstance(detail, dict) else None) or overview_item.get("name") or entry.get("indicator_name") or indicator_code,
+                "selected_indicators": [{
+                    "indicator_code": indicator_code,
+                    "indicator_name": (detail.get("name") if isinstance(detail, dict) else None) or overview_item.get("name") or entry.get("indicator_name") or indicator_code,
+                }],
+                "category": entry.get("category") or "大盘指数",
+                "value": round(float(numeric_value), 2),
+                "numeric_value": round(float(numeric_value), 2),
+                "unit": "",
+                "source_type": "market_index",
+                "source_type_label": (detail.get("source_type_label") if isinstance(detail, dict) else None) or "大盘指数",
+                "prompt_text": (detail.get("name") if isinstance(detail, dict) else None) or overview_item.get("name") or entry.get("indicator_name") or indicator_code,
+                "updated_at": (detail.get("updated_at") if isinstance(detail, dict) else None) or overview_item.get("updated_at") or "",
+                "data_at": (detail.get("updated_at") if isinstance(detail, dict) else None) or overview_item.get("updated_at") or "",
+                "data_status": "available",
+                "data_status_label": "已读取市场快照",
+                "data_unavailable": False,
             }
         )
     return options
+
+
+def build_smart_indicator_latest_value_map(selected_indicators=None):
+    """Merge indicator-lake values and market-index snapshots for formulas."""
+    db = get_db()
+    latest_map = {
+        row["indicator_code"]: dict(row)
+        for row in db.execute("SELECT * FROM indicator_latest_values").fetchall()
+    }
+    market = _market_services_module()
+    market_overview = market.build_market_overview_payload()
+    market_overview_items = {
+        str(item.get("indicator_code") or "").strip(): item
+        for item in (market_overview.get("items") or [])
+        if isinstance(item, dict)
+    }
+    if selected_indicators is None:
+        market_codes = getattr(market, "MARKET_OVERVIEW_INDEX_CODES", ())
+    else:
+        selected_codes = {
+            str(item.get("indicator_code") or "").strip()
+            for item in normalize_selected_indicator_refs(selected_indicators)
+        }
+        market_codes = tuple(
+            code for code in getattr(market, "MARKET_OVERVIEW_INDEX_CODES", ())
+            if code in selected_codes
+        )
+    for indicator_code in market_codes:
+        detail = market.build_market_overview_index_detail(indicator_code)
+        overview_item = market_overview_items.get(indicator_code) or {}
+        numeric_value = market.parse_numeric_indicator_value(
+            detail.get("numeric_value") if isinstance(detail, dict) else overview_item.get("price")
+        )
+        if numeric_value is None:
+            continue
+        numeric_value = round(numeric_value, 2)
+        latest_map[indicator_code] = {
+            **(latest_map.get(indicator_code) or {}),
+            "indicator_code": indicator_code,
+            "latest_value": str(numeric_value),
+            "latest_status": (detail.get("status") if isinstance(detail, dict) else None) or "normal",
+            "latest_assessment": (detail.get("assessment") if isinstance(detail, dict) else None) or "",
+            "latest_alert": (detail.get("alert") if isinstance(detail, dict) else None) or "",
+            "updated_at": (detail.get("updated_at") if isinstance(detail, dict) else None) or overview_item.get("updated_at") or "",
+            "is_simulated": 0,
+            "source_code": "market_snapshot",
+        }
+    return latest_map
 
 
 def build_tenant_smart_indicator_tag_catalog(tenant=None):
@@ -2723,6 +2844,9 @@ def build_tenant_smart_indicator_catalog(tenant=None):
                 "display_order": int(item.get("display_order") or 0),
                 "last_updated": item.get("last_updated") or "",
                 "data_at": item.get("data_at") or "",
+                "data_status": item.get("data_status") or ("unavailable" if item.get("data_unavailable") else "available"),
+                "data_status_label": item.get("data_status_label") or "",
+                "data_unavailable": bool(item.get("data_unavailable")),
             }
         )
     return sorted(items, key=lambda current: (current.get("display_order", 0), current.get("indicator_name") or ""))
@@ -2734,10 +2858,26 @@ def build_fund_dashboard_card_from_indicator(indicator_item, index=0):
     source_names = [source.get("indicator_name") for source in selected_indicators if source.get("indicator_name")]
     title = str(item.get("indicator_name") or item.get("name") or f"智能指标 {index + 1}").strip() or f"智能指标 {index + 1}"
     assessment = str(item.get("assessment") or item.get("alert") or "当前按自定义公式计算。").strip() or "当前按自定义公式计算。"
+    raw_value = item.get("value")
+    market = _market_services_module()
+    item_code = str(item.get("indicator_code") or item.get("id") or "").strip()
+    is_direct_market_index = (
+        item_code in getattr(market, "MARKET_OVERVIEW_INDEX_CODES", ())
+        and (
+            not selected_indicators
+            or len(selected_indicators) == 1
+            and selected_indicators[0].get("indicator_code") == item_code
+        )
+        and raw_value is not None
+        and str(raw_value).strip() not in {"", "--"}
+    )
+    display_value = f"{float(raw_value):.2f}" if is_direct_market_index else (
+        str(raw_value).strip() if raw_value is not None and str(raw_value).strip() else "--"
+    )
     return {
         "indicatorCode": str(item.get("indicator_code") or item.get("id") or "").strip(),
         "name": title,
-        "value": str(item.get("value") or "--").strip() or "--",
+        "value": display_value,
         "unit": str(item.get("unit") or "").strip(),
         "assessment": assessment,
         "interpretation": str(item.get("interpretation") or assessment).strip() or assessment,
@@ -2750,6 +2890,11 @@ def build_fund_dashboard_card_from_indicator(indicator_item, index=0):
         "updatedAt": str(item.get("last_updated") or item.get("updatedAt") or "").strip(),
         "dataAt": str(item.get("data_at") or "").strip(),
         "snapshotAt": str(item.get("last_updated") or item.get("updatedAt") or "").strip(),
+        "category": str(item.get("category") or "").strip(),
+        "numeric_value": item.get("numeric_value"),
+        "data_status": str(item.get("data_status") or "").strip(),
+        "data_status_label": str(item.get("data_status_label") or "").strip(),
+        "data_unavailable": bool(item.get("data_unavailable")),
         "isEmpty": False,
     }
 
@@ -2859,10 +3004,7 @@ def _run_smart_indicator_agent_workflow(tenant_slug, payload, persist=False):
         }
 
     def _smart_preview_executor(state, runtime, node, upstream):
-        latest_map = {
-            row["indicator_code"]: dict(row)
-            for row in get_db().execute("SELECT * FROM indicator_latest_values").fetchall()
-        }
+        latest_map = build_smart_indicator_latest_value_map(state.get("selected_indicators"))
         market = _market_services_module()
         parse_numeric_value = getattr(market, "parse_numeric_indicator_value")
         unavailable_indicators = [
@@ -2878,7 +3020,11 @@ def _run_smart_indicator_agent_workflow(tenant_slug, payload, persist=False):
                 state.get("selected_indicators") or [],
                 latest_map,
             )
-            value = f"{numeric_value:.4f}".rstrip("0").rstrip(".")
+            value = format_smart_indicator_numeric_value(
+                numeric_value,
+                state.get("selected_indicators") or [],
+                state.get("prompt_text") or "",
+            )
         except Exception:
             numeric_value = None
             value = "--"
@@ -3080,12 +3226,43 @@ def normalize_fund_dashboard_view(source, tenant):
         layout = required_layout
     hub = build_indicator_hub(tenant=tenant, admin_view=False)
     indicator_map = {item.get("id"): item for item in (hub.get("smart_items") or []) + (hub.get("lake_items") or []) if item.get("id")}
+    # Base market indicators use the market snapshot store. Prefer this
+    # canonical representation over legacy dashboard card payloads, which may
+    # contain only a name and an old placeholder value.
+    base_indicator_options = build_dashboard_base_indicator_options(tenant)
+    for option in base_indicator_options:
+        code = str(option.get("indicator_code") or "").strip()
+        if code in getattr(_market_services_module(), "MARKET_OVERVIEW_INDEX_CODES", ()):
+            indicator_map[code] = {
+                **option,
+                "id": code,
+                "name": option.get("indicator_name") or code,
+                "assessment": f"{option.get('indicator_name') or code} 已从市场快照读取最新值。",
+                "status": "normal",
+                "alert": "已按市场快照更新。",
+                "enabled": True,
+                "last_updated": option.get("updated_at") or "",
+                "data_at": option.get("data_at") or option.get("updated_at") or "",
+                "selected_indicators": [{"indicator_code": code, "indicator_name": option.get("indicator_name") or code}],
+                "source_type_label": option.get("source_type_label") or "大盘指数",
+            }
+    indicator_name_map = {
+        str(item.get("indicator_name") or "").strip(): item
+        for item in base_indicator_options
+        if str(item.get("indicator_name") or "").strip()
+    }
     raw_cards = normalize_fund_dashboard_card_refs(raw.get("cards"), layout)
     cards = []
     for index in range(get_dashboard_card_target(layout)):
         item = raw_cards[index] if index < len(raw_cards) and isinstance(raw_cards[index], dict) else {}
         indicator_code = slugify_code(item.get("indicatorCode") or item.get("indicator_code"), "")
         resolved = indicator_map.get(indicator_code) if indicator_code else None
+        if not resolved:
+            # Older saved dashboards stored only the visible name. Resolve
+            # that legacy shape against the registered indicator directory so
+            # it receives the canonical code and live value on read.
+            legacy_name = str(item.get("name") or item.get("title") or "").strip()
+            resolved = indicator_name_map.get(legacy_name)
         if resolved:
             cards.append(build_fund_dashboard_card_from_indicator(resolved, index=index))
             continue
@@ -3132,6 +3309,13 @@ def normalize_fund_dashboard_view(source, tenant):
             "sources": copy.deepcopy(card.get("sources") or []),
             "selectedIndicators": copy.deepcopy(card.get("selectedIndicators") or []),
             "updatedAt": str(card.get("updatedAt") or updated_at).strip(),
+            "dataAt": str(card.get("dataAt") or "").strip(),
+            "snapshotAt": str(card.get("snapshotAt") or "").strip(),
+            "category": str(card.get("category") or "").strip(),
+            "numeric_value": card.get("numeric_value"),
+            "data_status": str(card.get("data_status") or "").strip(),
+            "data_status_label": str(card.get("data_status_label") or "").strip(),
+            "data_unavailable": bool(card.get("data_unavailable")),
             "isEmpty": bool(card.get("isEmpty")),
         }
         for index, card in enumerate(cards)
@@ -3187,10 +3371,7 @@ def refresh_tenant_smart_indicator_snapshots(tenant):
     if not definitions:
         return {"checked": 0, "refreshed": 0}
     db = get_db()
-    latest_map = {
-        str(row["indicator_code"]): dict(row)
-        for row in db.execute("SELECT * FROM indicator_latest_values").fetchall()
-    }
+    latest_map = build_smart_indicator_latest_value_map()
     refreshed = 0
     for definition in definitions:
         selected = normalize_selected_indicator_refs(definition.get("selected_indicators"))
@@ -3294,17 +3475,56 @@ def save_smart_indicator_latest_snapshot(definition):
     if not selected_indicators:
         return None
     db = get_db()
-    latest_map = {
-        row["indicator_code"]: dict(row)
-        for row in db.execute("SELECT * FROM indicator_latest_values").fetchall()
-    }
+    latest_map = build_smart_indicator_latest_value_map(selected_indicators)
+    market = _market_services_module()
+    parse_numeric_value = getattr(market, "parse_numeric_indicator_value")
+    unavailable_indicators = [
+        item
+        for item in selected_indicators
+        if parse_numeric_value((latest_map.get(item.get("indicator_code")) or {}).get("latest_value")) is None
+    ]
+    if unavailable_indicators:
+        # Never persist a derived zero when an input snapshot is absent. Keep
+        # the definition, but remove a previously fabricated derived latest
+        # value so every consumer renders this cell as unavailable.
+        db.execute(
+            "DELETE FROM indicator_latest_values WHERE indicator_code = ? AND source_code = ?",
+            (normalized.get("indicator_code"), "tenant_smart_formula"),
+        )
+        db.execute(
+            "DELETE FROM indicator_series WHERE indicator_code = ? AND source_code = ?",
+            (normalized.get("indicator_code"), "tenant_smart_formula"),
+        )
+        db.commit()
+        invalidate_indicator_hub_cache()
+        unavailable_names = " / ".join(
+            item.get("indicator_name") or item.get("indicator_code") or "指标"
+            for item in unavailable_indicators
+        )
+        return {
+            "value": None,
+            "display_value": "--",
+            "assessment": f"已识别 {unavailable_names}，但该指标尚无可用的最新快照；请等待后台同步后再生成数值结果。",
+            "alert": normalized.get("alert_template") or "等待底层数据同步。",
+            "status": "attention",
+            "updated_at": now_ts(),
+            "unit": normalized.get("unit") or "",
+            "data_status": "unavailable",
+            "data_status_label": "已识别，等待底层数据同步",
+            "unavailable_indicators": unavailable_indicators,
+        }
     value = evaluate_smart_indicator_formula_js(normalized.get("formula_js"), selected_indicators, latest_map)
+    formatted_value = format_smart_indicator_numeric_value(
+        value,
+        selected_indicators,
+        normalized.get("prompt_text") or "",
+    )
     timestamp = now_ts()
     assessment = build_smart_indicator_interpretation(
         normalized.get("indicator_name"),
         normalized.get("prompt_text"),
         selected_indicators,
-        f"{value:.4f}".rstrip("0").rstrip("."),
+        formatted_value,
         normalized.get("unit"),
     )
     alert = normalized.get("alert_template") or "如需修改计算口径，请在大V工作台重新编辑智能指标。"
@@ -3327,7 +3547,7 @@ def save_smart_indicator_latest_snapshot(definition):
         """,
         (
             normalized.get("indicator_code"),
-            f"{value:.4f}".rstrip("0").rstrip("."),
+            formatted_value,
             latest_status,
             assessment,
             alert,
@@ -6756,6 +6976,9 @@ def init_db():
         execute_sql_file(conn, sql_dir / "103_seed_market_index_catalog.sql")
         execute_sql_file(conn, sql_dir / "106_security_master_seed.sql")
         execute_sql_file(conn, sql_dir / "107_migrate_market_provider_to_gangtise.sql")
+        execute_sql_file(conn, sql_dir / "109_add_smart_indicator_refresh_task.sql")
+        execute_sql_file(conn, sql_dir / "111_finalize_unused_admin_task_cleanup.sql")
+        execute_sql_file(conn, sql_dir / "112_remove_recreated_unused_admin_tasks.sql")
 
 
 def init_db_safe():
@@ -7559,6 +7782,10 @@ def execute_admin_task_by_type(task_type, force=False):
         return result
     if task_type == "sync_market_snapshot":
         return sync_market_snapshot(force=force)
+    if task_type == "smart_indicator_refresh":
+        result = refresh_all_tenant_smart_indicator_snapshots()
+        invalidate_indicator_hub_cache()
+        return result
     if task_type == "seed_mock_indicator_lake":
         result = seed_mock_indicator_lake(force=force)
         invalidate_indicator_hub_cache()
@@ -7573,6 +7800,7 @@ def execute_admin_task(task, force=False):
         "prepare_indicator_hub",
         "sync_real_indicator_history",
         "sync_market_snapshot",
+        "smart_indicator_refresh",
         "seed_mock_indicator_lake",
     }:
         return execute_admin_task_by_type(task_type, force=force)
@@ -7667,6 +7895,8 @@ def run_admin_task(task_code, trigger_mode="manual", force=False):
             summary = "真实历史同步完成"
         elif task["task_type"] == "sync_market_snapshot":
             summary = "AKShare 市场与行业快照同步完成"
+        elif task["task_type"] == "smart_indicator_refresh":
+            summary = "智能指标定时刷新完成"
         elif task["task_type"] == "seed_mock_indicator_lake":
             summary = "模拟指标入口已关闭"
         elif task["task_type"] == "indicator_source_landing":

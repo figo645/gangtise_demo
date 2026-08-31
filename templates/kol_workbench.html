@@ -5564,7 +5564,7 @@ function kwGetIndicatorDashboardSeedCards() {
     .concat((window.WORKBENCH_DATA && window.WORKBENCH_DATA.indicator_hub && window.WORKBENCH_DATA.indicator_hub.lake_items) || []);
   return items.map((item) => ({
     name: item.name || '核心指标',
-    value: item.value || '--',
+    value: item.value !== null && item.value !== undefined && String(item.value).trim() ? item.value : '--',
     assessment: item.assessment || item.alert || '继续观察',
     status: item.status || 'attention',
     alert: item.alert || '',
@@ -12919,6 +12919,9 @@ function kwBuildInitialSmartIndicatorCatalog() {
       selected_indicators: Array.isArray(item.selected_indicators) ? item.selected_indicators : [],
       display_order: Number(item.display_order || 0),
       last_updated: item.last_updated || '',
+      data_status: item.data_status || '',
+      data_status_label: item.data_status_label || '',
+      data_unavailable: item.data_unavailable === true,
     })),
     base_indicators: baseItems
       .filter((item) => item && item.id && item.numeric_value !== null && item.numeric_value !== undefined)
@@ -12931,6 +12934,9 @@ function kwBuildInitialSmartIndicatorCatalog() {
         unit: item.unit || '',
         source_type: item.source_type || '',
         source_type_label: item.source_type_label || '',
+        data_status: item.data_status || '',
+        data_status_label: item.data_status_label || '',
+        data_unavailable: item.data_unavailable === true,
       })),
     available_tags: [],
   };
@@ -13008,6 +13014,14 @@ function kwGetSmartTagCatalog() {
   return kwBuildFallbackSmartTags(catalog);
 }
 
+function kwFormatSmartIndicatorValue(item) {
+  const value = item && item.value;
+  if (item && (item.data_status === 'unavailable' || item.data_unavailable === true)) return '--';
+  if (value !== null && value !== undefined && String(value).trim() !== '') return String(value);
+  if (item && item.numeric_value !== null && item.numeric_value !== undefined) return String(item.numeric_value);
+  return '--';
+}
+
 function kwRenderSmartIndicatorLibrary() {
   const host = document.getElementById('kw-smart-indicator-library');
   if (!host) return;
@@ -13029,7 +13043,7 @@ function kwRenderSmartIndicatorLibrary() {
             <div class="kw-smart-indicator-row-meta">计算对象</div>
             <div class="kw-smart-indicator-row-meta" style="color:var(--text-main)">${escapeHtml((item.selected_indicators || []).map((source) => source.indicator_name || source.indicator_code).join(' / ') || '未选择')}</div>
           </div>
-          <div class="kw-smart-indicator-row-value">${escapeHtml(item.value || '--')}<small>${escapeHtml(item.unit || '')}</small></div>
+          <div class="kw-smart-indicator-row-value">${escapeHtml(kwFormatSmartIndicatorValue(item))}<small>${escapeHtml(item.unit || '')}</small></div>
           <div class="kw-smart-indicator-row-actions">
             <button type="button" onclick="kwOpenSmartIndicatorLibraryDetail('${escapeHtml(item.indicator_code)}')">编辑</button>
             <button type="button" onclick="kwAddExistingIndicatorToDraft('${escapeHtml(item.indicator_code)}')">加入草稿</button>
@@ -13055,7 +13069,7 @@ function kwRenderSmartDashboardPreviewCards(cards) {
       ...raw,
       indicatorCode,
       name: raw.name || catalogItem.indicator_name,
-      value: raw.value || catalogItem.value,
+      value: raw.value !== null && raw.value !== undefined && String(raw.value).trim() ? raw.value : catalogItem.value,
       unit: raw.unit || catalogItem.unit,
       interpretation: raw.interpretation || raw.assessment || catalogItem.interpretation || catalogItem.assessment,
       updatedAt: raw.updatedAt || catalogItem.last_updated,
@@ -13068,7 +13082,7 @@ function kwRenderSmartDashboardPreviewCards(cards) {
     <div class="kw-dashboard-public-card" onclick="kwOpenSmartIndicatorDetail(${index})" style="cursor:pointer">
       <div class="kw-dashboard-public-title">${escapeHtml(item.name || `智能指标 ${index + 1}`)}</div>
       <div class="kw-dashboard-public-copy">${escapeHtml(item.interpretation || item.assessment || '当前按自定义公式计算。')}</div>
-      <div class="kw-dashboard-public-value">${escapeHtml(`${item.value || '--'}${item.unit || ''}`)}</div>
+      <div class="kw-dashboard-public-value">${escapeHtml(`${kwFormatSmartIndicatorValue(item)}${item.unit || ''}`)}</div>
       <div class="kw-dashboard-public-meta">数据日期：${escapeHtml(formatDashboardDataDate(item.dataAt))}</div>
       <div class="kw-smart-card-actions">
         <button class="kw-smart-card-action" type="button" onclick="event.stopPropagation();kwOpenSmartIndicatorDetail(${index})">编辑指标</button>
@@ -13432,6 +13446,9 @@ function kwOpenSmartIndicatorDetail(index) {
     alertTemplate: (catalogItem && catalogItem.alert) || '',
     selectedIndicators: item.selectedIndicators || (catalogItem && catalogItem.selected_indicators) || [],
     category: (catalogItem && catalogItem.category) || '',
+    data_status: item.data_status || (catalogItem && catalogItem.data_status) || '',
+    data_status_label: item.data_status_label || (catalogItem && catalogItem.data_status_label) || '',
+    data_unavailable: item.data_unavailable === true || (catalogItem && catalogItem.data_unavailable === true),
     slotIndex: index,
   });
 }
@@ -13453,7 +13470,7 @@ function kwOpenSmartIndicatorDetailModal(card) {
     <div class="kw-dashboard-cell-modal-grid">
       <div class="kw-dashboard-cell-summary">
         <div class="kw-dashboard-cell-summary-title">${escapeHtml(card.name || '智能指标详情')}</div>
-        <div class="kw-dashboard-public-value" style="margin-top:8px">${escapeHtml(`${card.value || '--'}${card.unit || ''}`)}</div>
+        <div class="kw-dashboard-public-value" style="margin-top:8px">${escapeHtml(`${kwFormatSmartIndicatorValue(card)}${card.unit || ''}`)}</div>
         <div class="kw-dashboard-panel-note" style="margin-top:8px">数据日期：${escapeHtml(formatDashboardDataDate(card.dataAt))} · 最近计算：${escapeHtml(card.snapshotAt || card.updatedAt || '未记录')}</div>
       </div>
       <div class="kw-dashboard-cell-block kw-smart-indicator-edit-section">
@@ -13572,7 +13589,7 @@ function cardFromSmartIndicatorItem(item) {
   return {
     indicatorCode: item.indicator_code,
     name: item.indicator_name,
-    value: item.value || '--',
+    value: item.value !== null && item.value !== undefined && String(item.value).trim() ? item.value : '--',
     unit: item.unit || '',
     prompt: item.prompt_text || '',
     updatedAt: item.last_updated || '',
@@ -13583,6 +13600,9 @@ function cardFromSmartIndicatorItem(item) {
     assessmentTemplate: item.assessment_template || item.interpretation || item.assessment || '',
     selectedIndicators: item.selected_indicators || [],
     category: item.category || '',
+    data_status: item.data_status || '',
+    data_status_label: item.data_status_label || '',
+    data_unavailable: item.data_unavailable === true,
   };
 }
 

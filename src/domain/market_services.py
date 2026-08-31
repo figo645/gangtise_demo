@@ -2699,14 +2699,39 @@ def build_smart_indicator_expression_fallback(prompt_text, selected_indicators):
         code = item["indicator_code"]
         name = item["indicator_name"]
         token = f'Number(inputs["{code}"] || 0)'
-        bracket_token = f"[[{name}]]"
-        if bracket_token in expression:
-            expression = expression.replace(bracket_token, token)
-            replaced = True
-        plain_pattern = re.compile(re.escape(name))
-        if plain_pattern.search(expression):
-            expression = plain_pattern.sub(token, expression)
-            replaced = True
+        source_entry = GANGTISE_INDICATOR_REGISTRY.get(code) or {}
+        aliases = [
+            name,
+            source_entry.get("indicator_name"),
+            source_entry.get("search_keyword"),
+            source_entry.get("security_code"),
+            source_entry.get("tencent_symbol"),
+        ]
+        aliases.extend(
+            alias
+            for alias, target in WATCHLIST_QUERY_ALIAS_MAP.items()
+            if str(target or "").strip() == code
+        )
+        if code == "source_cpi":
+            aliases.extend(["CPI", "中国CPI", "中国居民消费价格指数"])
+        aliases = sorted(
+            {
+                str(alias).strip()
+                for alias in aliases
+                if str(alias or "").strip()
+            },
+            key=len,
+            reverse=True,
+        )
+        for alias in aliases:
+            bracket_token = f"[[{alias}]]"
+            if bracket_token in expression:
+                expression = expression.replace(bracket_token, token)
+                replaced = True
+            plain_pattern = re.compile(re.escape(alias), re.IGNORECASE)
+            if plain_pattern.search(expression):
+                expression = plain_pattern.sub(token, expression)
+                replaced = True
     if not replaced:
         first_token = f'Number(inputs["{items[0]["indicator_code"]}"] || 0)'
         if re.match(r"^[\+\-\*\/]", expression):
@@ -2779,7 +2804,15 @@ def generate_smart_indicator_js(indicator_name, prompt_text, selected_indicators
         for alias, target in WATCHLIST_QUERY_ALIAS_MAP.items()
         if str(target or "").strip() == source_code
     )
-    is_simple_reference = not re.search(r"[+\-*/()]", prompt_key)
+    has_arithmetic = bool(re.search(r"[+\-*/()]", prompt_value))
+    is_simple_reference = not has_arithmetic
+    # Explicit arithmetic over known references is deterministic. Do not send
+    # expressions such as "CPI/2" to an LLM that may silently drop the
+    # operator or reinterpret the user's formula.
+    arithmetic_expression = build_smart_indicator_expression_fallback(prompt_value, normalized_selected)
+    arithmetic_source_references = 'inputs["' in arithmetic_expression or "inputs['" in arithmetic_expression
+    if has_arithmetic and arithmetic_source_references:
+        return {"formula_js": f"return {arithmetic_expression};", "generator": "arithmetic_expression", "llm_used": False}
     if len(normalized_selected) == 1 and prompt_key and is_simple_reference and (
         prompt_key == source_key
         or prompt_key in direct_aliases
@@ -2830,7 +2863,9 @@ def evaluate_smart_indicator_formula_js(formula_js, selected_indicators, latest_
         indicator_code = item["indicator_code"]
         latest = latest_value_map.get(indicator_code) or {}
         numeric_value = parse_numeric_indicator_value(latest.get("latest_value"))
-        numeric_text = str(0.0 if numeric_value is None else numeric_value)
+        if numeric_value is None:
+            raise ValueError(f"smart_indicator_source_unavailable:{indicator_code}")
+        numeric_text = str(numeric_value)
         expression = expression.replace(f'Number(inputs["{indicator_code}"] || 0)', numeric_text)
         expression = expression.replace(f"inputs[\"{indicator_code}\"]", numeric_text)
         expression = expression.replace(f"inputs['{indicator_code}']", numeric_text)
@@ -3857,59 +3892,15 @@ DEFAULT_ADMIN_TASKS = [
         "timeout_seconds": 900,
     },
     {
-        "task_code": "indicator_raw_landing",
-        "task_name": "指标原始数据落地",
+        "task_code": "smart_indicator_refresh",
+        "task_name": "智能指标定时刷新",
         "task_group": "indicator",
-        "task_type": "indicator_source_landing",
-        "description": "按 source 配置把样例或实时响应落到原始记录区。",
-        "schedule_type": "manual",
-        "schedule_value": "",
-        "enabled": 0,
-        "timeout_seconds": 600,
-    },
-    {
-        "task_code": "indicator_clean_pipeline",
-        "task_name": "指标清洗入湖",
-        "task_group": "indicator",
-        "task_type": "indicator_clean_pipeline",
-        "description": "把原始记录按映射规则标准化并写入指标湖。",
-        "schedule_type": "manual",
-        "schedule_value": "",
-        "enabled": 0,
-        "timeout_seconds": 600,
-    },
-    {
-        "task_code": "knowledge_sync_manual",
-        "task_name": "知识库同步入向量",
-        "task_group": "knowledge",
-        "task_type": "knowledge_manual_sync",
-        "description": "把文本知识同步到租户知识库和向量库，支持批量补录。",
-        "schedule_type": "manual",
-        "schedule_value": "",
-        "enabled": 0,
-        "timeout_seconds": 1200,
-    },
-    {
-        "task_code": "review_publish_embed",
-        "task_name": "纪要文本向量补录",
-        "task_group": "knowledge",
-        "task_type": "review_publish_embed",
-        "description": "把已有文本纪要补录到向量库，用于搜索和知识召回。",
-        "schedule_type": "manual",
-        "schedule_value": "",
-        "enabled": 0,
-        "timeout_seconds": 1200,
-    },
-    {
-        "task_code": "knowledge_query_batch",
-        "task_name": "知识检索批处理",
-        "task_group": "knowledge",
-        "task_type": "knowledge_query_batch",
-        "description": "按任务参数批量执行知识检索与可选的大模型回答，用于验证召回效果。",
-        "schedule_type": "manual",
-        "schedule_value": "",
-        "enabled": 0,
-        "timeout_seconds": 1200,
+        "task_type": "smart_indicator_refresh",
+        "description": "每 5 分钟检查底层指标快照，仅对数据已更新的租户智能指标复用已保存公式重算；不重新调用 LLM。",
+        "schedule_type": "interval",
+        "schedule_value": "300",
+        "enabled": 1,
+        "timeout_seconds": 900,
     },
 ]
 
@@ -5044,9 +5035,18 @@ def build_indicator_hub_from_store():
         anomalies = anomaly_map.get(definition["indicator_code"], [])
         sources = source_map.get(definition["indicator_code"], [])
         primary_source = sources[0] if sources else None
+        selected_indicators = normalize_selected_indicator_refs(definition.get("selected_indicators"))
+        unavailable_indicators = [
+            item
+            for item in selected_indicators
+            if parse_numeric_indicator_value((latest_map.get(item.get("indicator_code")) or {}).get("latest_value")) is None
+        ] if definition.get("source_type") == "smart" else []
         latest_source_code = latest.get("source_code") or ""
         latest_is_simulated = bool(latest.get("is_simulated", 0))
-        if not latest:
+        if unavailable_indicators:
+            data_mode = "unavailable"
+            data_mode_label = "已识别，等待底层数据同步"
+        elif not latest:
             data_mode = "unavailable"
             data_mode_label = "暂无真实数据"
         elif latest_is_simulated:
@@ -5074,9 +5074,14 @@ def build_indicator_hub_from_store():
             "unit": definition.get("unit") or "",
             "description": definition.get("description") or "",
             "owner": definition["owner"],
-            "value": latest.get("latest_value") or "--",
-            "numeric_value": parse_numeric_indicator_value(latest.get("latest_value")),
-            "assessment": latest.get("latest_assessment") or definition.get("assessment_template") or "暂无说明",
+            "value": "--" if unavailable_indicators else (latest.get("latest_value") if latest.get("latest_value") is not None else "--"),
+            "numeric_value": None if unavailable_indicators else parse_numeric_indicator_value(latest.get("latest_value")),
+            "assessment": (
+                "已识别 " + " / ".join(item.get("indicator_name") or item.get("indicator_code") or "指标" for item in unavailable_indicators)
+                + "，但该指标尚无可用的最新快照；请等待后台同步后再生成数值结果。"
+                if unavailable_indicators
+                else latest.get("latest_assessment") or definition.get("assessment_template") or "暂无说明"
+            ),
             "status": latest.get("latest_status") or definition.get("status_hint") or "attention",
             "alert": latest.get("latest_alert") or definition.get("alert_template") or "暂无预警说明",
             "enabled": bool(definition.get("enabled")),
@@ -5085,7 +5090,7 @@ def build_indicator_hub_from_store():
             "watchers": definition.get("watchers", []),
             "prompt_text": str(definition.get("prompt_text") or "").strip(),
             "formula_js": str(definition.get("formula_js") or "").strip(),
-            "selected_indicators": normalize_selected_indicator_refs(definition.get("selected_indicators")),
+            "selected_indicators": selected_indicators,
             "display_order": int(definition.get("display_order") or 0),
             "history": [
                 {
@@ -5115,6 +5120,10 @@ def build_indicator_hub_from_store():
             } or None,
             "data_mode": data_mode,
             "data_mode_label": data_mode_label,
+            "data_status": "unavailable" if unavailable_indicators else "available",
+            "data_status_label": data_mode_label if unavailable_indicators else "已读取最新快照",
+            "data_unavailable": bool(unavailable_indicators),
+            "unavailable_indicators": unavailable_indicators,
         }
         items.append(item)
     smart_items = [item for item in items if item["source_type"] == "smart"]

@@ -18,6 +18,10 @@ Postgres / pgvector DDL is split by purpose:
 - `100_seed_master_data.sql`: master data seed entrypoint
 - `102_seed_market_sector_catalog.sql`: canonical Shenwan level-one industry master data
 - `103_seed_market_index_catalog.sql`: Market Overview standard-index master data
+- `109_add_smart_indicator_refresh_task.sql`: registers the five-minute server-side smart-indicator refresh task
+- `110_remove_unused_admin_tasks.sql`: removes task-center configurations with no execution history while preserving their API/worker capabilities
+- `111_finalize_unused_admin_task_cleanup.sql`: finalizes removal after stale processes recreated obsolete defaults
+- `112_remove_recreated_unused_admin_tasks.sql`: removes obsolete defaults recreated by an old application process
 - `106_security_master_seed.sql`: initial stock/security identity catalog; Gangtise search results are upserted here as users search
 
 Notes:

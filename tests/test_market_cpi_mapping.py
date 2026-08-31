@@ -6,6 +6,86 @@ from src.domain import market_services
 
 
 class ChinaCpiMappingTest(unittest.TestCase):
+    def test_registered_market_index_snapshot_is_a_smart_indicator_input(self):
+        class Result:
+            def fetchall(self):
+                return []
+
+        class Db:
+            def execute(self, query, params=()):
+                self.query = query
+                return Result()
+
+        with patch.object(core_services, "get_db", return_value=Db()), patch.object(
+            market_services,
+            "build_market_overview_index_detail",
+            side_effect=lambda code: {
+                "numeric_value": 3986.30,
+                "value": 3986.30,
+                "status": "normal",
+                "updated_at": "2026-08-31",
+            } if code == "source_shanghai_index" else None,
+        ):
+            latest_map = core_services.build_smart_indicator_latest_value_map(
+                [{"indicator_code": "source_shanghai_index", "indicator_name": "上证指数"}]
+            )
+
+        self.assertEqual(latest_map["source_shanghai_index"]["latest_value"], "3986.3")
+
+    def test_dashboard_card_for_registered_market_index_keeps_value_and_source(self):
+        card = core_services.build_fund_dashboard_card_from_indicator(
+            {
+                "indicator_code": "source_shanghai_index",
+                "indicator_name": "上证指数",
+                "category": "数据湖指标",
+                "value": 3986.30,
+                "numeric_value": 3986.30,
+                "selected_indicators": [
+                    {"indicator_code": "source_shanghai_index", "indicator_name": "上证指数"}
+                ],
+                "data_status": "available",
+                "data_at": "2026-08-31",
+            }
+        )
+
+        self.assertEqual(card["indicatorCode"], "source_shanghai_index")
+        self.assertEqual(card["value"], "3986.30")
+        self.assertEqual(card["selectedIndicators"][0]["indicator_code"], "source_shanghai_index")
+
+    def test_legacy_name_only_dashboard_card_is_rehydrated_from_registered_index(self):
+        with patch.object(core_services, "build_indicator_hub", return_value={"smart_items": [], "lake_items": []}), patch.object(
+            core_services,
+            "build_dashboard_base_indicator_options",
+            return_value=[
+                {
+                    "indicator_code": "source_shanghai_index",
+                    "indicator_name": "上证指数",
+                    "category": "大盘指数",
+                    "value": 3986.30,
+                    "numeric_value": 3986.30,
+                    "source_type": "market_index",
+                    "source_type_label": "大盘指数",
+                    "selected_indicators": [
+                        {"indicator_code": "source_shanghai_index", "indicator_name": "上证指数"}
+                    ],
+                    "prompt_text": "上证指数",
+                    "updated_at": "2026-08-31",
+                    "data_at": "2026-08-31",
+                    "data_status": "available",
+                }
+            ],
+        ):
+            dashboard = core_services.normalize_fund_dashboard_view(
+                {"layout": "2x2", "cards": [{"name": "上证指数"}]},
+                {"slug": "laowang"},
+            )
+
+        card = dashboard["cards"][0]
+        self.assertEqual(card["indicatorCode"], "source_shanghai_index")
+        self.assertEqual(card["value"], "3986.30")
+        self.assertEqual(card["selectedIndicators"][0]["indicator_name"], "上证指数")
+        self.assertEqual(card["prompt"], "上证指数")
+
     def test_china_cpi_uses_verified_nbs_index(self):
         entry = market_services.GANGTISE_INDICATOR_REGISTRY["source_cpi"]
 
@@ -26,6 +106,52 @@ class ChinaCpiMappingTest(unittest.TestCase):
         self.assertEqual(result["generator"], "direct_projection")
         self.assertFalse(result["llm_used"])
         self.assertIn('inputs["source_cpi"]', result["formula_js"])
+
+    def test_cpi_divided_by_two_compiles_to_the_explicit_arithmetic_formula(self):
+        with patch.object(market_services, "get_default_llm_config", side_effect=AssertionError("explicit arithmetic must not call LLM")):
+            result = market_services.generate_smart_indicator_js(
+                "CPI折算指标",
+                "CPI/2",
+                [{"indicator_code": "source_cpi", "indicator_name": "中国CPI同比指数"}],
+                tenant_slug="laowang",
+            )
+
+        self.assertEqual(result["generator"], "arithmetic_expression")
+        self.assertFalse(result["llm_used"])
+        self.assertEqual(result["formula_js"], 'return Number(inputs["source_cpi"] || 0)/2;')
+
+    def test_indicator_formula_never_converts_a_missing_source_to_zero(self):
+        with self.assertRaisesRegex(ValueError, "smart_indicator_source_unavailable:source_cpi"):
+            market_services.evaluate_smart_indicator_formula_js(
+                'return Number(inputs["source_cpi"] || 0);',
+                [{"indicator_code": "source_cpi", "indicator_name": "中国CPI同比指数"}],
+                {},
+            )
+
+    def test_indicator_formula_preserves_a_real_zero_source_value(self):
+        result = market_services.evaluate_smart_indicator_formula_js(
+            'return Number(inputs["source_cpi"] || 0);',
+            [{"indicator_code": "source_cpi", "indicator_name": "中国CPI同比指数"}],
+            {"source_cpi": {"latest_value": "0"}},
+        )
+
+        self.assertEqual(result, 0.0)
+
+    def test_cpi_divided_by_two_uses_the_real_source_value(self):
+        formula = market_services.generate_smart_indicator_js(
+            "CPI折算指标",
+            "CPI/2",
+            [{"indicator_code": "source_cpi", "indicator_name": "中国CPI同比指数"}],
+            tenant_slug="laowang",
+        )["formula_js"]
+
+        result = market_services.evaluate_smart_indicator_formula_js(
+            formula,
+            [{"indicator_code": "source_cpi", "indicator_name": "中国CPI同比指数"}],
+            {"source_cpi": {"latest_value": "123.4"}},
+        )
+
+        self.assertEqual(result, 61.7)
 
     def test_shanghai_index_alias_compiles_without_llm(self):
         with patch.object(market_services, "get_default_llm_config", side_effect=AssertionError("direct projection must not call LLM")):

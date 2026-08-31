@@ -18489,6 +18489,19 @@ function getDraftFundDashboard() {
   return cloneSimpleDashboardConfig((tenantFundDashboardRemoteState && tenantFundDashboardRemoteState.draft) || state.draft);
 }
 
+function formatWorkbenchDashboardValue(item) {
+  const value = item && item.value;
+  if (item && (item.data_status === 'unavailable' || item.data_unavailable === true)) return '--';
+  if (value !== null && value !== undefined && String(value).trim() !== '') {
+    const selected = Array.isArray(item && item.selectedIndicators) ? item.selectedIndicators : [];
+    const isDirectMarketIndex = selected.length === 1 && /^source_/.test(String(selected[0].indicator_code || '')) && !/[+\-*/()]/.test(String(item && item.prompt || ''));
+    if (isDirectMarketIndex && Number.isFinite(Number(value))) return Number(value).toFixed(2);
+    return String(value);
+  }
+  if (item && item.numeric_value !== null && item.numeric_value !== undefined) return String(item.numeric_value);
+  return '--';
+}
+
 tenantFundDashboardRemoteState = normalizeInitialRemoteDashboardState(INITIAL_TENANT_DASHBOARD);
 
 function buildInitialTenantSmartCatalog() {
@@ -18503,21 +18516,27 @@ function buildInitialTenantSmartCatalog() {
       indicator_name: item.name,
       category: item.category || '智能指标',
       unit: item.unit || '',
-      value: item.value || '--',
+      value: item.value !== null && item.value !== undefined && String(item.value).trim() ? item.value : '--',
       assessment: item.assessment || '',
       prompt_text: item.prompt_text || '',
       formula_js: item.formula_js || '',
       algorithm_detail: item.algorithm_detail || item.description || '',
       interpretation: item.interpretation || item.assessment || '',
       selected_indicators: Array.isArray(item.selected_indicators) ? item.selected_indicators : [],
+      data_status: item.data_status || '',
+      data_status_label: item.data_status_label || '',
+      data_unavailable: item.data_unavailable === true,
     })) : [],
     base_indicators: Array.isArray(hub.items) ? hub.items.filter((item) => item && item.id && item.numeric_value !== null && item.numeric_value !== undefined).map((item) => ({
       indicator_code: item.id,
       indicator_name: item.name,
       category: item.category || '未分类指标',
-      value: item.value || '--',
+      value: item.value !== null && item.value !== undefined && String(item.value).trim() ? item.value : '--',
       numeric_value: item.numeric_value,
       source_type_label: item.source_type_label || item.source_type || '',
+      data_status: item.data_status || '',
+      data_status_label: item.data_status_label || '',
+      data_unavailable: item.data_unavailable === true,
     })) : [],
     available_tags: [],
   };
@@ -19222,18 +19241,28 @@ function buildWorkbenchDashboardDetailCard(rawCard, fallback = {}) {
   const baseAlgorithmDetail = sourceType
     ? `基础指标：${baseName}。数据口径由平台统一指标库维护，数据类型：${sourceType}。`
     : `基础指标：${baseName}。数据口径由平台统一指标库维护。`;
+  const usableValue = (value) => value !== null && value !== undefined && String(value).trim() !== '' && String(value).trim() !== '--';
+  const cardIndicators = Array.isArray(card.selectedIndicators) && card.selectedIndicators.length ? card.selectedIndicators : null;
+  const smartIndicators = smartIndicator && Array.isArray(smartIndicator.selected_indicators) && smartIndicator.selected_indicators.length
+    ? smartIndicator.selected_indicators
+    : null;
+  const baseIndicators = isBaseIndicator ? [{ indicator_code: indicatorCode, indicator_name: baseName }] : null;
   return {
     indicatorCode,
     name: card.name || (smartIndicator && smartIndicator.indicator_name) || (baseIndicator && baseIndicator.indicator_name) || fallback.name || '指标详情',
-    value: card.value || (smartIndicator && smartIndicator.value) || (baseIndicator && baseIndicator.value) || fallback.value || '--',
+    value: usableValue(card.value) ? card.value : (usableValue(smartIndicator && smartIndicator.value) ? smartIndicator.value : (usableValue(baseIndicator && baseIndicator.value) ? baseIndicator.value : (fallback.value || '--'))),
     unit: card.unit || (smartIndicator && smartIndicator.unit) || (baseIndicator && baseIndicator.unit) || fallback.unit || '',
-    prompt: card.prompt || (smartIndicator && smartIndicator.prompt_text) || '',
-    updatedAt: card.updatedAt || (smartIndicator && smartIndicator.last_updated) || fallback.updatedAt || '',
+    prompt: card.prompt || (smartIndicator && smartIndicator.prompt_text) || (baseIndicator && (baseIndicator.prompt_text || baseIndicator.indicator_name)) || '',
+    updatedAt: usableValue(card.value) ? (card.updatedAt || (smartIndicator && smartIndicator.last_updated) || fallback.updatedAt || '') : ((baseIndicator && baseIndicator.last_updated) || (smartIndicator && smartIndicator.last_updated) || card.updatedAt || fallback.updatedAt || ''),
     dataAt: card.dataAt || (smartIndicator && smartIndicator.data_at) || (baseIndicator && baseIndicator.data_at) || fallback.dataAt || '',
     snapshotAt: card.snapshotAt || (smartIndicator && smartIndicator.last_updated) || fallback.snapshotAt || '',
+    data_status: card.data_status || (smartIndicator && smartIndicator.data_status) || '',
+    data_status_label: card.data_status_label || (smartIndicator && smartIndicator.data_status_label) || '',
+    data_unavailable: card.data_unavailable === true || (smartIndicator && smartIndicator.data_unavailable === true),
+    category: card.category || (smartIndicator && smartIndicator.category) || (baseIndicator && baseIndicator.category) || '',
     algorithmDetail: card.algorithmDetail || (smartIndicator && smartIndicator.algorithm_detail) || (isBaseIndicator ? baseAlgorithmDetail : '') || fallback.algorithmDetail || '暂无算法详情',
     interpretation: card.interpretation || card.assessment || (smartIndicator && (smartIndicator.interpretation || smartIndicator.assessment)) || (isBaseIndicator ? `${baseName}为统一维护的基础指标，可作为智能指标的计算对象。` : '') || fallback.interpretation || '暂无解读',
-    selectedIndicators: card.selectedIndicators || (smartIndicator && smartIndicator.selected_indicators) || (isBaseIndicator ? [{ indicator_code: indicatorCode, indicator_name: baseName }] : []) || [],
+    selectedIndicators: cardIndicators || smartIndicators || baseIndicators || [],
     isTenantSmart,
     isBaseIndicator,
     sourceType,
@@ -19504,7 +19533,7 @@ function renderFundMacroDashboard() {
               <div class="wb-dashboard-summary-title">${escapeHtml(item.name || '智能指标')}</div>
               <div class="wb-dashboard-summary-tag">数据日期：${escapeHtml(formatDashboardDataDate(item.dataAt))}</div>
             </div>
-            <div class="wb-dashboard-summary-value">${escapeHtml(`${item.value || '--'}${item.unit || ''}`)}</div>
+            <div class="wb-dashboard-summary-value">${escapeHtml(`${formatWorkbenchDashboardValue(item)}${item.unit || ''}`)}</div>
           </div>
         `).join('')}
       </div>
@@ -19545,7 +19574,7 @@ function renderWorkbenchFundDashboard() {
             <div class="wb-dashboard-summary-title">${escapeHtml(item.name || '智能指标')}</div>
             <span class="wb-dashboard-summary-tag">数据日期：${escapeHtml(formatDashboardDataDate(item.dataAt))}</span>
           </div>
-          <div class="wb-dashboard-summary-value">${escapeHtml(`${item.value || '--'}${item.unit || ''}`)}</div>
+          <div class="wb-dashboard-summary-value">${escapeHtml(`${formatWorkbenchDashboardValue(item)}${item.unit || ''}`)}</div>
         </div>
         `).join('')}
       </div>
@@ -19583,7 +19612,7 @@ function renderWorkbenchFundDashboard() {
             <div class="wb-dashboard-summary-title">${escapeHtml(item.name || '智能指标')}</div>
             <span class="wb-dashboard-summary-tag">数据日期：${escapeHtml(formatDashboardDataDate(item.dataAt))}</span>
           </div>
-          <div class="wb-dashboard-summary-value">${escapeHtml(`${item.value || '--'}${item.unit || ''}`)}</div>
+          <div class="wb-dashboard-summary-value">${escapeHtml(`${formatWorkbenchDashboardValue(item)}${item.unit || ''}`)}</div>
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;padding-top:9px;border-top:1px solid rgba(47,116,192,0.10)">
             <button class="btn-outline" style="padding:6px 8px;font-size:11px" onclick="event.stopPropagation();openWorkbenchDashboardIndicatorDetail(${index}, '${getDraftFundDashboard() ? 'draft' : 'published'}')">编辑</button>
             <button class="btn-outline" style="padding:6px 8px;font-size:11px" onclick="event.stopPropagation();requestWorkbenchDashboardRemoval(${index}, '${escapeAttr(item.name || '当前指标')}')">移除</button>
