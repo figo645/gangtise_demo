@@ -18,6 +18,19 @@ def _validate_review_source_mode(source_mode):
         raise ValueError("review_source_mode_invalid")
     return normalized
 
+
+def _tenant_smart_indicator_write_guard(tenant_slug):
+    """Require DAv capability and enforce tenant scope for mutations."""
+    current_user = get_current_authenticated_user() or {}
+    role = str(current_user.get("role") or "").strip().lower()
+    if not has_role_capability(role, "dav"):
+        return jsonify({"success": False, "error": "dav_required"}), 403
+    current_tenant = str(current_user.get("tenant_slug") or "").strip().lower()
+    requested_tenant = str(tenant_slug or "").strip().lower()
+    if not has_role_capability(role, "admin") and current_tenant != requested_tenant:
+        return jsonify({"success": False, "error": "tenant_scope_forbidden"}), 403
+    return None
+
 @app.route("/api/kol/workbench")
 def api_kol_workbench():
     tenant = get_tenant_by_slug(request.args.get("tenant"))
@@ -733,6 +746,9 @@ def api_save_tenant_dashboard(tenant_slug):
     tenant = get_tenant_by_slug(tenant_slug)
     if not tenant or tenant["slug"] != tenant_slug:
         return jsonify({"success": False, "error": "tenant_not_found"}), 404
+    denied = _tenant_smart_indicator_write_guard(tenant_slug)
+    if denied:
+        return denied
     body = request.get_json(silent=True) or {}
     action = str(body.get("action") or "").strip().lower()
     dashboard = body.get("dashboard") if isinstance(body.get("dashboard"), dict) else None
@@ -811,6 +827,9 @@ def api_tenant_smart_indicators(tenant_slug):
                 "dashboard": payload,
             }
         )
+    denied = _tenant_smart_indicator_write_guard(tenant_slug)
+    if denied:
+        return denied
     body = request.get_json(silent=True) or {}
     action = str(body.get("action") or "save").strip().lower()
     if action == "preview":
@@ -843,9 +862,10 @@ def api_tenant_smart_indicators(tenant_slug):
             return jsonify({"success": False, "error": "only_smart_indicators_can_be_deleted"}), 403
         if str(definition.get("tenant_slug") or "").strip().lower() != tenant_slug:
             return jsonify({"success": False, "error": "indicator_forbidden"}), 403
-        saved = remove_smart_indicator_from_dashboard(tenant_slug, indicator_code)
-        delete_indicator_definition(indicator_code)
-        latest_tenant = get_tenant_by_slug(tenant_slug, saved) if saved else tenant
+        saved = delete_tenant_smart_indicator(tenant_slug, indicator_code)
+        if not saved:
+            return jsonify({"success": False, "error": "indicator_delete_failed"}), 409
+        latest_tenant = get_tenant_by_slug(tenant_slug, saved)
         payload = build_tenant_dashboard_payload(latest_tenant)
         return jsonify({"success": True, "dashboard": payload, "smart_indicator_catalog": payload.get("smart_indicator_catalog")})
     try:

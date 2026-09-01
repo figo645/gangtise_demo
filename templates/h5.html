@@ -18644,6 +18644,7 @@ let wbSmartIndicatorDraft = {
   category: '',
   unit: '',
   selectedTagCodes: [],
+  suppressedTagCodes: [],
   isGenerating: false,
   directIndicatorCode: '',
   preview: null,
@@ -18823,7 +18824,56 @@ function renderWorkbenchSmartLayoutRow() {
 function renderWorkbenchSmartIndicatorLibrary() {
   const host = document.getElementById('wb-smart-indicator-library');
   if (!host) return;
-  host.innerHTML = '';
+  const items = (getTenantSmartCatalog().tenant_smart_indicators || []).filter((item) => item && item.indicator_code);
+  if (!items.length) {
+    host.innerHTML = '<div class="feature-note">当前租户还没有已保存的智能指标。</div>';
+    return;
+  }
+  host.innerHTML = `
+    <div class="feature-note" style="margin-bottom:8px">${items.length} 个已保存指标 · 可编辑定义、加入草稿或删除</div>
+    <div style="display:grid;gap:8px">
+      ${items.map((item) => `
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;border:1px solid rgba(47,116,192,0.14);border-radius:10px;padding:10px 12px;background:rgba(47,116,192,0.035)">
+          <div style="min-width:0">
+            <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.indicator_name || '未命名指标')}</div>
+            <div style="font-size:11px;color:var(--gray-400);margin-top:3px">${escapeHtml(item.category || '智能指标')} · ${escapeHtml(formatWorkbenchDashboardValue(item))}${escapeHtml(item.unit || '')} · ${escapeHtml(item.last_updated || '未记录')}</div>
+          </div>
+          <button class="btn-outline" type="button" style="padding:6px 9px;font-size:11px" onclick="openWorkbenchSmartIndicatorLibraryDetail('${escapeAttr(item.indicator_code)}')">编辑</button>
+          <button class="btn-outline" type="button" style="padding:6px 9px;font-size:11px" onclick="addExistingWorkbenchSmartIndicatorToDraft('${escapeAttr(item.indicator_code)}')">加入草稿</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+async function addExistingWorkbenchSmartIndicatorToDraft(indicatorCode) {
+  const code = String(indicatorCode || '').trim();
+  if (!code) return;
+  const active = getDraftFundDashboard() || getPublishedFundDashboard() || { layout: '2x2', cards: [] };
+  const layout = normalizeDashboardLayout(active.layout || '2x2');
+  const target = getDashboardCardTarget(layout);
+  const cards = Array.from({ length: target }, (_, index) => {
+    const raw = Array.isArray(active.cards) && typeof active.cards[index] === 'object' ? active.cards[index] : {};
+    return raw.indicatorCode || raw.indicator_code ? { indicatorCode: raw.indicatorCode || raw.indicator_code } : {};
+  });
+  if (cards.some((card) => card.indicatorCode === code)) {
+    showToast('该指标已经在 Dashboard 草稿中');
+    return;
+  }
+  const emptyIndex = cards.findIndex((card) => !card.indicatorCode);
+  if (emptyIndex < 0) {
+    showToast('当前布局已无空白格，请先调整布局或移除一个指标');
+    return;
+  }
+  cards[emptyIndex] = { indicatorCode: code };
+  try {
+    await syncTenantDashboardState('save_draft', { ...active, layout, cards });
+    renderWorkbenchFundDashboard();
+    renderFundMacroDashboard();
+    showToast('已加入 Dashboard 草稿');
+  } catch (error) {
+    showToast(error.message || '加入草稿失败');
+  }
 }
 
 function buildWorkbenchSmartSlotCards(layout, cards) {
@@ -18837,7 +18887,18 @@ function buildWorkbenchSmartSlotCards(layout, cards) {
       if (seenCodes.has(indicatorCode)) return { isEmpty: true };
       seenCodes.add(indicatorCode);
     }
-    return raw && !raw.isEmpty && (raw.indicatorCode || raw.indicator_code || raw.name || raw.prompt) ? raw : { isEmpty: true };
+    if (!raw || raw.isEmpty) return { isEmpty: true };
+    if (indicatorCode) {
+      // Dashboard state may intentionally contain only an indicator reference
+      // after a delete/update response. Rehydrate it from the fresh catalog so
+      // one mutation cannot turn every remaining card into "智能指标 / --".
+      const hydrated = buildWorkbenchDashboardDetailCard(raw, { slotIndex: index });
+      if (hydrated && (hydrated.name || hydrated.value !== '--')) {
+        return { ...hydrated, ...raw, slotIndex: index, isEmpty: false };
+      }
+      return { isEmpty: true };
+    }
+    return raw.name || raw.prompt ? { ...raw, slotIndex: index } : { isEmpty: true };
   });
 }
 
@@ -18893,6 +18954,7 @@ function openWorkbenchSmartIndicatorEditor(slotIndex) {
     category: '',
     unit: '',
     selectedTagCodes: [],
+    suppressedTagCodes: [],
     isGenerating: false,
     directIndicatorCode: '',
     preview: null,
@@ -18920,7 +18982,10 @@ function collectWorkbenchPromptMatchedTagCodes(promptText, tagCatalog) {
       const candidates = [tag && tag.label].concat(Array.isArray(tag && tag.prompt_aliases) ? tag.prompt_aliases : []);
       return candidates.some((candidate) => {
         const normalizedCandidate = normalize(normalizeWorkbenchSmartTagLabel(candidate));
-        return normalizedCandidate && normalizedPrompt.includes(normalizedCandidate);
+        if (!normalizedCandidate) return false;
+        if (normalizedPrompt.includes(normalizedCandidate)) return true;
+        if (normalizedPrompt.length >= 3 && normalizedCandidate.includes(normalizedPrompt)) return true;
+        return normalizedPrompt.length >= 3 && normalizedPrompt.length <= 8 && normalizedCandidate.includes(normalizedPrompt);
       });
     })
     .map((tag) => tag.tag_code)
@@ -18930,7 +18995,8 @@ function collectWorkbenchPromptMatchedTagCodes(promptText, tagCatalog) {
 function getWorkbenchSmartIndicatorEffectiveTagCodes() {
   const manualCodes = Array.isArray(wbSmartIndicatorDraft.selectedTagCodes) ? wbSmartIndicatorDraft.selectedTagCodes : [];
   const matchedCodes = collectWorkbenchPromptMatchedTagCodes(wbSmartIndicatorDraft.promptText, getTenantSmartTagCatalog());
-  return Array.from(new Set(manualCodes.concat(matchedCodes)));
+  const suppressed = new Set(wbSmartIndicatorDraft.suppressedTagCodes || []);
+  return Array.from(new Set(manualCodes.concat(matchedCodes))).filter((code) => !suppressed.has(code));
 }
 
 function findWorkbenchSmartTagByCode(tagCode) {
@@ -19024,6 +19090,39 @@ function tokenizeWorkbenchSmartPrompt(promptText, tagCatalog) {
   });
 }
 
+function escapeWorkbenchSmartRegExp(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Convert a recognized alias into a canonical reference token immediately.
+function canonicalizeWorkbenchSmartPrompt(promptText, tagCatalog) {
+  const source = String(promptText || '');
+  const candidates = [];
+  const seen = new Set();
+  (Array.isArray(tagCatalog) ? tagCatalog : []).forEach((tag) => {
+    const label = normalizeWorkbenchSmartTagLabel(tag && tag.label);
+    if (!label) return;
+    [label].concat(Array.isArray(tag && tag.prompt_aliases) ? tag.prompt_aliases : []).forEach((value) => {
+      const alias = normalizeWorkbenchSmartTagLabel(value);
+      const key = `${alias}\u0000${label}`;
+      if (!alias || alias.length < 2 || seen.has(key)) return;
+      seen.add(key);
+      candidates.push({ alias, label });
+    });
+  });
+  candidates.sort((left, right) => right.alias.length - left.alias.length);
+  if (!candidates.length) return source;
+  const pattern = new RegExp(candidates.map((item) => escapeWorkbenchSmartRegExp(item.alias)).join('|'), 'gi');
+  return source.split(/(【[^】]*】)/g).map((part) => {
+    if (/^【[^】]*】$/.test(part)) return part;
+    return part.replace(pattern, (match) => {
+      const normalized = normalizeWorkbenchSmartTagLabel(match).toLowerCase();
+      const found = candidates.find((item) => item.alias.toLowerCase() === normalized);
+      return found ? `【${found.label}】` : match;
+    });
+  }).join('');
+}
+
 function buildWorkbenchSmartPromptTokenHtml(token) {
   if (!token || token.type === 'space') return '';
   if (token.type === 'reference') {
@@ -19069,6 +19168,7 @@ function insertWorkbenchSmartTagReference(tagCode) {
   const normalizedLabel = normalizeWorkbenchSmartTagLabel(tag.label);
   if (!normalizedLabel) return;
   if (!Array.isArray(wbSmartIndicatorDraft.selectedTagCodes)) wbSmartIndicatorDraft.selectedTagCodes = [];
+  wbSmartIndicatorDraft.suppressedTagCodes = (wbSmartIndicatorDraft.suppressedTagCodes || []).filter((code) => code !== tagCode);
   if (!wbSmartIndicatorDraft.selectedTagCodes.includes(tagCode)) {
     wbSmartIndicatorDraft.selectedTagCodes = wbSmartIndicatorDraft.selectedTagCodes.concat(tagCode);
   }
@@ -19114,7 +19214,7 @@ function renderWorkbenchSmartTagSelection() {
     formulaHintHost.innerHTML = selectedTags.length
       ? selectedTags.map((tag) => {
           const autoMatched = matchedCodes.has(tag.tag_code);
-          return `<span class="review-watchlist-chip selectable active" title="${autoMatched ? '已从公式中识别' : '已选中'}">${escapeHtml(tag.label)}${autoMatched ? ' · 已识别' : ''}</span>`;
+          return `<button type="button" class="review-watchlist-chip selectable active" onclick="toggleWorkbenchSmartTag('${escapeHtml(tag.tag_code)}')" title="点击移除该标签">${escapeHtml(tag.label)}${autoMatched ? ' · 已识别' : ''} ×</button>`;
         }).join('')
       : '<span style="font-size:11px;color:var(--gray-400)">当前还没有识别到引用指标。</span>';
   }
@@ -19126,10 +19226,14 @@ function toggleWorkbenchSmartTagPool() {
 }
 
 function handleWorkbenchSmartIndicatorPromptInput(value) {
-  wbSmartIndicatorDraft.promptText = String(value || '');
+  const input = document.getElementById('wb-smart-indicator-draft-prompt');
+  wbSmartIndicatorDraft.promptText = canonicalizeWorkbenchSmartPrompt(value, getTenantSmartTagCatalog());
+  if (input && input.value !== wbSmartIndicatorDraft.promptText) input.value = wbSmartIndicatorDraft.promptText;
   wbSmartIndicatorDraft.isGenerating = false;
   wbSmartIndicatorDraft.directIndicatorCode = '';
   wbSmartIndicatorDraft.preview = null;
+  const matchedCodes = collectWorkbenchPromptMatchedTagCodes(wbSmartIndicatorDraft.promptText, getTenantSmartTagCatalog());
+  wbSmartIndicatorDraft.suppressedTagCodes = (wbSmartIndicatorDraft.suppressedTagCodes || []).filter((code) => matchedCodes.includes(code));
   renderWorkbenchSmartTagSelection();
 }
 
@@ -19139,9 +19243,15 @@ function focusWorkbenchSmartPrompt() {
 }
 
 function toggleWorkbenchSmartTag(tagCode) {
-  wbSmartIndicatorDraft.selectedTagCodes = wbSmartIndicatorDraft.selectedTagCodes.includes(tagCode)
-    ? wbSmartIndicatorDraft.selectedTagCodes.filter((code) => code !== tagCode)
-    : wbSmartIndicatorDraft.selectedTagCodes.concat(tagCode);
+  const effective = getWorkbenchSmartIndicatorEffectiveTagCodes();
+  const matched = collectWorkbenchPromptMatchedTagCodes(wbSmartIndicatorDraft.promptText, getTenantSmartTagCatalog()).includes(tagCode);
+  if (effective.includes(tagCode)) {
+    wbSmartIndicatorDraft.selectedTagCodes = wbSmartIndicatorDraft.selectedTagCodes.filter((code) => code !== tagCode);
+    if (matched && !(wbSmartIndicatorDraft.suppressedTagCodes || []).includes(tagCode)) wbSmartIndicatorDraft.suppressedTagCodes = (wbSmartIndicatorDraft.suppressedTagCodes || []).concat(tagCode);
+  } else {
+    wbSmartIndicatorDraft.suppressedTagCodes = (wbSmartIndicatorDraft.suppressedTagCodes || []).filter((code) => code !== tagCode);
+    wbSmartIndicatorDraft.selectedTagCodes = wbSmartIndicatorDraft.selectedTagCodes.concat(tagCode);
+  }
   wbSmartIndicatorDraft.preview = null;
   renderWorkbenchSmartIndicatorEditorModal();
 }
@@ -19183,7 +19293,7 @@ function renderWorkbenchSmartIndicatorEditorModal() {
         <textarea id="wb-smart-indicator-draft-prompt" class="knowledge-modal-textarea" placeholder="例如：【上证50指数】*80/100，或者【上证50】/ 纳斯达克指数" oninput="handleWorkbenchSmartIndicatorPromptInput(this.value)" style="margin-top:10px;border:none;background:transparent;padding:0;min-height:108px;box-shadow:none;resize:none;color:var(--text-main)">${escapeHtml(wbSmartIndicatorDraft.promptText || '')}</textarea>
       </div>
       <div id="wb-smart-indicator-formula-hint" class="review-watchlist-row" style="margin-top:8px"></div>
-      <div style="font-size:11px;color:var(--gray-400);margin-top:8px">服务端会识别别名和常用简称，例如 CPI、上证综合指数、沪指、证券名称或代码；运算符和数值会和提示词一起用于生成 JS。</div>
+      <div style="font-size:11px;color:var(--gray-400);margin-top:8px">服务端会模糊识别注册目录中的市场一览、热门行业、宏观经济和个股标签；自动识别的标签可点击“×”移除，避免不必要的匹配继续参与计算。</div>
     </div>
     ${isGenerating ? `
       <div class="knowledge-modal-block" style="border:1px solid rgba(47,116,192,0.18);background:linear-gradient(135deg,rgba(47,116,192,0.08),rgba(200,169,110,0.08));border-radius:14px;padding:12px">
@@ -19232,7 +19342,8 @@ async function previewWorkbenchSmartIndicator() {
   const nameInput = document.getElementById('wb-smart-indicator-draft-name');
   const promptInput = document.getElementById('wb-smart-indicator-draft-prompt');
   wbSmartIndicatorDraft.indicatorName = nameInput ? nameInput.value.trim() : '';
-  wbSmartIndicatorDraft.promptText = promptInput ? promptInput.value.trim() : '';
+  wbSmartIndicatorDraft.promptText = canonicalizeWorkbenchSmartPrompt(promptInput ? promptInput.value.trim() : '', getTenantSmartTagCatalog());
+  if (promptInput) promptInput.value = wbSmartIndicatorDraft.promptText;
   const activeUser = getActiveDemoUser();
   const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
   if (!wbSmartIndicatorDraft.promptText) {
@@ -19263,6 +19374,8 @@ async function previewWorkbenchSmartIndicator() {
         indicator_name: wbSmartIndicatorDraft.indicatorName,
         prompt_text: wbSmartIndicatorDraft.promptText,
         selected_tag_codes: selectedTagCodes,
+        suppressed_tag_codes: wbSmartIndicatorDraft.suppressedTagCodes || [],
+        formula_tokens: tokenizeWorkbenchSmartPrompt(wbSmartIndicatorDraft.promptText, getTenantSmartTagCatalog()),
       }),
     });
     const payload = await resp.json();
@@ -19376,8 +19489,8 @@ async function removeWorkbenchDashboardIndicator(index) {
   const tenantState = getTenantFundDashboardState();
   const previousPublished = cloneDashboardConfig(tenantState.published);
   const previousDraft = cloneDashboardConfig(tenantState.draft);
-  const optimisticPublished = stripIndicator(tenantState.published || getPublishedFundDashboard());
-  const optimisticDraft = tenantState.draft ? stripIndicator(tenantState.draft) : null;
+  const optimisticPublished = cloneDashboardConfig(tenantState.published || getPublishedFundDashboard());
+  const optimisticDraft = stripIndicator(tenantState.draft || tenantState.published || getPublishedFundDashboard());
   tenantState.published = optimisticPublished;
   tenantState.draft = optimisticDraft;
   tenantFundDashboardRemoteState.published = cloneDashboardConfig(optimisticPublished);
@@ -19426,6 +19539,12 @@ async function selectFundDashboardLayout(layout) {
 
 function findWorkbenchSmartIndicator(indicatorCode) {
   return (getTenantSmartCatalog().tenant_smart_indicators || []).find((entry) => entry.indicator_code === indicatorCode);
+}
+
+function openWorkbenchSmartIndicatorLibraryDetail(indicatorCode) {
+  const item = findWorkbenchSmartIndicator(indicatorCode);
+  if (!item) return;
+  openWorkbenchSmartIndicatorDetailModal(buildWorkbenchDashboardDetailCard(item, { indicatorCode }));
 }
 
 function isWorkbenchSmartPlaceholderCard(card) {
@@ -19503,6 +19622,22 @@ function openWorkbenchDashboardIndicatorDetail(index, sourceType) {
   }));
 }
 
+// The H5 fundamental page is a fan-facing read-only projection. Dashboard
+// mutations remain available only from the H5/Web KOL workbench.
+function openFundamentalDashboardIndicatorDetail(index) {
+  const source = getPublishedFundDashboard();
+  const cards = source && Array.isArray(source.cards) ? source.cards : [];
+  const item = cards[index];
+  if (!item || isWorkbenchSmartPlaceholderCard(item)) return;
+  openWorkbenchSmartIndicatorDetailModal({
+    ...buildWorkbenchDashboardDetailCard(item, {
+      updatedAt: (source && source.updatedAt) || '',
+      slotIndex: index,
+    }),
+    readOnly: true,
+  });
+}
+
 function openWorkbenchSmartIndicatorDetailModal(card) {
   if (isWorkbenchSmartPlaceholderCard(card)) {
     openWorkbenchSmartIndicatorEditor(Number.isInteger(card.slotIndex) ? card.slotIndex : 0);
@@ -19512,9 +19647,10 @@ function openWorkbenchSmartIndicatorDetailModal(card) {
   const modal = document.getElementById('dashboard-cell-modal');
   if (!host || !modal || !card) return;
   const isDav = isDavCapableUser(getActiveDemoUser());
-  const canEdit = isDav && card.isTenantSmart === true && !!card.indicatorCode;
-  const showWorkbenchEditor = isDav && !!card.indicatorCode;
-  const canRemoveFromDashboard = isDav && Number.isInteger(card.slotIndex) && !!card.indicatorCode;
+  const isReadOnly = card.readOnly === true;
+  const canEdit = !isReadOnly && isDav && card.isTenantSmart === true && !!card.indicatorCode;
+  const showWorkbenchEditor = !isReadOnly && isDav && !!card.indicatorCode;
+  const canRemoveFromDashboard = !isReadOnly && isDav && Number.isInteger(card.slotIndex) && !!card.indicatorCode;
   const canDeleteDefinition = canEdit && !canRemoveFromDashboard;
   const isSaving = card.isSaving === true;
   const isDeleting = card.isDeleting === true;
@@ -19721,7 +19857,9 @@ function renderFundMacroDashboard() {
   if (!host) return;
   const published = getPublishedFundDashboard();
   const publishedCards = published && Array.isArray(published.cards)
-    ? published.cards.map((item, index) => ({ item, index })).filter(({ item }) => item && !isWorkbenchSmartPlaceholderCard(item))
+    ? buildWorkbenchSmartSlotCards(published.layout || '2x2', published.cards)
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => item && !isWorkbenchSmartPlaceholderCard(item))
     : [];
   const layout = normalizeDashboardLayout((published && published.layout) || '2x2');
   const gridClass = publishedCards.length === 1 ? 'single-card' : 'cols-3';
@@ -19734,13 +19872,13 @@ function renderFundMacroDashboard() {
       <div class="fund-column-head">
         <div>
           <div class="fund-column-title">今日核心指标面板 · ${escapeHtml(layout.toUpperCase())}</div>
-          <div class="fund-column-subtitle">当前已发布 ${publishedCards.length} 个有效指标。大V工作台中的草稿须发布后才会在这里同步展示。</div>
+          <div class="fund-column-subtitle">当前已发布 ${publishedCards.length} 个有效指标。这里仅供查看详情；指标的新增、修改和移除请前往大V工作台。</div>
         </div>
         <span class="tag tag-gold">${escapeHtml(layout.toUpperCase())} · 已发布</span>
       </div>
       <div class="wb-dashboard-summary-grid ${gridClass}">
         ${publishedCards.map(({ item, index }) => `
-          <div class="wb-dashboard-summary-card filled" onclick="openWorkbenchDashboardIndicatorDetail(${index}, 'published')">
+          <div class="wb-dashboard-summary-card filled" onclick="openFundamentalDashboardIndicatorDetail(${index})">
             <div class="wb-dashboard-summary-head">
               <div class="wb-dashboard-summary-title">${escapeHtml(item.name || '智能指标')}</div>
               <div class="wb-dashboard-summary-tag">数据日期：${escapeHtml(formatDashboardDataDate(item.dataAt))}</div>
@@ -19765,7 +19903,11 @@ function renderWorkbenchFundDashboard() {
   const actionHost = document.querySelector('.wb-dashboard-actions');
   if (!isDavCapableUser(activeUser)) {
     const published = getPublishedFundDashboard() || { cards: [] };
-    const cards = Array.isArray(published.cards) ? published.cards.filter((item) => item && !isWorkbenchSmartPlaceholderCard(item)) : [];
+    const cards = Array.isArray(published.cards)
+      ? buildWorkbenchSmartSlotCards(published.layout || '2x2', published.cards)
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => item && !item.isEmpty)
+      : [];
     if (layoutHost) {
       layoutHost.innerHTML = '';
       layoutHost.style.display = 'none';
@@ -19780,8 +19922,8 @@ function renderWorkbenchFundDashboard() {
     metaHost.textContent = cards.length ? `当前已发布 ${cards.length} 个智能指标` : '暂无看板内容';
     previewHost.innerHTML = cards.length ? `
       <div class="wb-dashboard-summary-grid cols-3">
-        ${cards.map((item, index) => `
-        <div class="wb-dashboard-summary-card filled" onclick="openWorkbenchDashboardIndicatorDetail(${index}, 'published')">
+        ${cards.map(({ item, index }) => `
+        <div class="wb-dashboard-summary-card filled" onclick="openFundamentalDashboardIndicatorDetail(${index})">
           <div class="wb-dashboard-summary-head">
             <div class="wb-dashboard-summary-title">${escapeHtml(item.name || '智能指标')}</div>
             <span class="wb-dashboard-summary-tag">数据日期：${escapeHtml(formatDashboardDataDate(item.dataAt))}</span>

@@ -12,25 +12,30 @@ h1{margin:0 0 8px;font-size:30px} h2{margin:0;font-size:18px} .muted{color:#6878
 @media(max-width:760px){.grid{grid-template-columns:1fr}}
 </style></head><body><main>
 <section class="hero"><h1>智能指标生命周期 BDD 测试报告</h1>
-<div class="muted">真实执行时间：2026-08-31 23:49:20 · 租户：laowang · 真实 PostgreSQL + 真实应用接口，不使用 mock</div>
+<div class="muted">真实执行时间：2026-09-02 01:30:28 · 租户：laowang · 真实 PostgreSQL + 真实应用接口，不使用 mock</div>
 <div class="summary"><span class="pill">通过 <b class="good">7/7</b></span><span class="pill">失败 <b class="bad">0</b></span><span class="pill">看板布局 <b>2×2</b></span><span class="pill">模型 <code>deepseek-v4-flash-ga-260731</code></span></div></section>
 <section class="section"><h2>执行前提与模型</h2><div class="grid"><div class="box"><b>上游真实刷新</b><pre>{
   &quot;market_snapshot&quot;: {
     &quot;ok&quot;: true,
-    &quot;updated&quot;: 40,
+    &quot;updated&quot;: 46,
     &quot;overview_count&quot;: 9,
     &quot;sector_count&quot;: 31,
+    &quot;macro_count&quot;: 6,
+    &quot;macro_refreshed&quot;: true,
     &quot;intraday_count&quot;: 0,
-    &quot;updated_at&quot;: &quot;2026-08-31 23:49:25&quot;,
-    &quot;errors&quot;: []
+    &quot;updated_at&quot;: &quot;2026-09-02 01:30:32&quot;,
+    &quot;errors&quot;: [
+      &quot;全国城镇调查失业率：AKShare 宏观数据暂不可用&quot;,
+      &quot;房地产开发投资累计同比：当前 AKShare 未提供房地产开发投资累计同比的精确序列&quot;
+    ]
   },
   &quot;indicator_history&quot;: {
     &quot;synced&quot;: true,
-    &quot;updated&quot;: 13,
-    &quot;total_points&quot;: 1376,
-    &quot;eligible&quot;: 15,
-    &quot;skipped_disabled&quot;: 10,
-    &quot;batch_code&quot;: &quot;gangtise_openapi_sync_20260831234927045255&quot;
+    &quot;updated&quot;: 12,
+    &quot;total_points&quot;: 1359,
+    &quot;eligible&quot;: 14,
+    &quot;skipped_disabled&quot;: 18,
+    &quot;batch_code&quot;: &quot;gangtise_openapi_sync_20260902013034045337&quot;
   }
 }</pre></div><div class="box"><b>智能指标公式模型</b><pre>{
   &quot;key&quot;: &quot;volcengine-deepseek-v4-flash&quot;,
@@ -66,23 +71,23 @@ h1{margin:0 0 8px;font-size:30px} h2{margin:0;font-size:18px} .muted{color:#6878
               <p><b>Then</b> CPI 卡片与指标定义、最新快照均已持久化。</p>
               <div class="detail">HTTP 200；看板 HTTP 200</div>
               <details><summary>查看真实证据</summary><pre>{
-  &quot;indicator_code&quot;: &quot;laowang_smart_20260831_234945360&quot;,
+  &quot;indicator_code&quot;: &quot;laowang_smart_20260902_013053400&quot;,
   &quot;indicator&quot;: {
     &quot;definition_exists&quot;: true,
     &quot;definition&quot;: {
-      &quot;indicator_code&quot;: &quot;laowang_smart_20260831_234945360&quot;,
+      &quot;indicator_code&quot;: &quot;laowang_smart_20260902_013053400&quot;,
       &quot;indicator_name&quot;: &quot;BDD-CPI&quot;,
       &quot;tenant_slug&quot;: &quot;laowang&quot;,
       &quot;source_type&quot;: &quot;smart&quot;,
       &quot;provider&quot;: &quot;LLM / Prompt Formula&quot;,
       &quot;prompt_text&quot;: &quot;CPI&quot;,
       &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_cpi\&quot;] || 0);&quot;,
-      &quot;selected_indicators_json&quot;: &quot;[{\&quot;indicator_code\&quot;: \&quot;source_cpi\&quot;, \&quot;indicator_name\&quot;: \&quot;中国CPI同比指数\&quot;}]&quot;
+      &quot;selected_indicators_json&quot;: &quot;[{\&quot;indicator_code\&quot;: \&quot;source_cpi\&quot;, \&quot;indicator_name\&quot;: \&quot;中国CPI同比指数\&quot;}, {\&quot;indicator_code\&quot;: \&quot;laowang_smart_20260902_010043483\&quot;, \&quot;indicator_name\&quot;: \&quot;中国CPI同比指数组合指标\&quot;}, {\&quot;indicator_code\&quot;: \&quot;laowang_cpi\&quot;, \&quot;indicator_name\&quot;: \&quot;CPI智能指标\&quot;}]&quot;
     },
     &quot;latest_exists&quot;: true,
     &quot;latest&quot;: {
-      &quot;latest_value&quot;: &quot;100.5&quot;,
-      &quot;updated_at&quot;: &quot;2026-08-31 23:49:45&quot;,
+      &quot;latest_value&quot;: &quot;0.5&quot;,
+      &quot;updated_at&quot;: &quot;2026-09-02 01:30:53&quot;,
       &quot;is_simulated&quot;: 0,
       &quot;source_code&quot;: &quot;tenant_smart_formula&quot;
     },
@@ -106,23 +111,23 @@ h1{margin:0 0 8px;font-size:30px} h2{margin:0;font-size:18px} .muted{color:#6878
               <p><b>Then</b> 第二个卡片可见，且定义与快照已保存。</p>
               <div class="detail">HTTP 200；看板 HTTP 200</div>
               <details><summary>查看真实证据</summary><pre>{
-  &quot;indicator_code&quot;: &quot;laowang_smart_20260831_234952200&quot;,
+  &quot;indicator_code&quot;: &quot;laowang_smart_20260902_013100979&quot;,
   &quot;indicator&quot;: {
     &quot;definition_exists&quot;: true,
     &quot;definition&quot;: {
-      &quot;indicator_code&quot;: &quot;laowang_smart_20260831_234952200&quot;,
+      &quot;indicator_code&quot;: &quot;laowang_smart_20260902_013100979&quot;,
       &quot;indicator_name&quot;: &quot;BDD-深证指数&quot;,
       &quot;tenant_slug&quot;: &quot;laowang&quot;,
       &quot;source_type&quot;: &quot;smart&quot;,
       &quot;provider&quot;: &quot;LLM / Prompt Formula&quot;,
       &quot;prompt_text&quot;: &quot;深证指数&quot;,
       &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_shenzhen_index\&quot;] || 0);&quot;,
-      &quot;selected_indicators_json&quot;: &quot;[{\&quot;indicator_code\&quot;: \&quot;source_shenzhen_index\&quot;, \&quot;indicator_name\&quot;: \&quot;深证指数\&quot;}]&quot;
+      &quot;selected_indicators_json&quot;: &quot;[{\&quot;indicator_code\&quot;: \&quot;source_shenzhen_index\&quot;, \&quot;indicator_name\&quot;: \&quot;深证指数\&quot;}, {\&quot;indicator_code\&quot;: \&quot;laowang_smart_20260814_202231136\&quot;, \&quot;indicator_name\&quot;: \&quot;深证指数80\&quot;}]&quot;
     },
     &quot;latest_exists&quot;: true,
     &quot;latest&quot;: {
-      &quot;latest_value&quot;: &quot;14015.00&quot;,
-      &quot;updated_at&quot;: &quot;2026-08-31 23:49:52&quot;,
+      &quot;latest_value&quot;: &quot;13872.38&quot;,
+      &quot;updated_at&quot;: &quot;2026-09-02 01:31:00&quot;,
       &quot;is_simulated&quot;: 0,
       &quot;source_code&quot;: &quot;tenant_smart_formula&quot;
     },
@@ -146,11 +151,11 @@ h1{margin:0 0 8px;font-size:30px} h2{margin:0;font-size:18px} .muted{color:#6878
               <p><b>Then</b> 复合计算卡片成功保存，两个底层引用和计算公式均可审计。</p>
               <div class="detail">HTTP 200；看板 HTTP 200</div>
               <details><summary>查看真实证据</summary><pre>{
-  &quot;indicator_code&quot;: &quot;laowang_smart_20260831_234958990&quot;,
+  &quot;indicator_code&quot;: &quot;laowang_smart_20260902_013108717&quot;,
   &quot;indicator&quot;: {
     &quot;definition_exists&quot;: true,
     &quot;definition&quot;: {
-      &quot;indicator_code&quot;: &quot;laowang_smart_20260831_234958990&quot;,
+      &quot;indicator_code&quot;: &quot;laowang_smart_20260902_013108717&quot;,
       &quot;indicator_name&quot;: &quot;BDD-黄金白银&quot;,
       &quot;tenant_slug&quot;: &quot;laowang&quot;,
       &quot;source_type&quot;: &quot;smart&quot;,
@@ -161,8 +166,8 @@ h1{margin:0 0 8px;font-size:30px} h2{margin:0;font-size:18px} .muted{color:#6878
     },
     &quot;latest_exists&quot;: true,
     &quot;latest&quot;: {
-      &quot;latest_value&quot;: &quot;50.2181&quot;,
-      &quot;updated_at&quot;: &quot;2026-08-31 23:49:59&quot;,
+      &quot;latest_value&quot;: &quot;50.1359&quot;,
+      &quot;updated_at&quot;: &quot;2026-09-02 01:31:08&quot;,
       &quot;is_simulated&quot;: 0,
       &quot;source_code&quot;: &quot;tenant_smart_formula&quot;
     },
@@ -188,26 +193,26 @@ h1{margin:0 0 8px;font-size:30px} h2{margin:0;font-size:18px} .muted{color:#6878
               <details><summary>查看真实证据</summary><pre>{
   &quot;draft_codes&quot;: [
     &quot;&quot;,
-    &quot;laowang_smart_20260831_234952200&quot;,
-    &quot;laowang_smart_20260831_234958990&quot;,
+    &quot;laowang_smart_20260902_013100979&quot;,
+    &quot;laowang_smart_20260902_013108717&quot;,
     &quot;&quot;
   ],
   &quot;cpi_db_after_remove&quot;: {
     &quot;definition_exists&quot;: true,
     &quot;definition&quot;: {
-      &quot;indicator_code&quot;: &quot;laowang_smart_20260831_234945360&quot;,
+      &quot;indicator_code&quot;: &quot;laowang_smart_20260902_013053400&quot;,
       &quot;indicator_name&quot;: &quot;BDD-CPI&quot;,
       &quot;tenant_slug&quot;: &quot;laowang&quot;,
       &quot;source_type&quot;: &quot;smart&quot;,
       &quot;provider&quot;: &quot;LLM / Prompt Formula&quot;,
       &quot;prompt_text&quot;: &quot;CPI&quot;,
       &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_cpi\&quot;] || 0);&quot;,
-      &quot;selected_indicators_json&quot;: &quot;[{\&quot;indicator_code\&quot;: \&quot;source_cpi\&quot;, \&quot;indicator_name\&quot;: \&quot;中国CPI同比指数\&quot;}]&quot;
+      &quot;selected_indicators_json&quot;: &quot;[{\&quot;indicator_code\&quot;: \&quot;source_cpi\&quot;, \&quot;indicator_name\&quot;: \&quot;中国CPI同比指数\&quot;}, {\&quot;indicator_code\&quot;: \&quot;laowang_smart_20260902_010043483\&quot;, \&quot;indicator_name\&quot;: \&quot;中国CPI同比指数组合指标\&quot;}, {\&quot;indicator_code\&quot;: \&quot;laowang_cpi\&quot;, \&quot;indicator_name\&quot;: \&quot;CPI智能指标\&quot;}]&quot;
     },
     &quot;latest_exists&quot;: true,
     &quot;latest&quot;: {
-      &quot;latest_value&quot;: &quot;100.5&quot;,
-      &quot;updated_at&quot;: &quot;2026-08-31 23:49:45&quot;,
+      &quot;latest_value&quot;: &quot;0.5&quot;,
+      &quot;updated_at&quot;: &quot;2026-09-02 01:30:53&quot;,
       &quot;is_simulated&quot;: 0,
       &quot;source_code&quot;: &quot;tenant_smart_formula&quot;
     },
@@ -217,9 +222,9 @@ h1{margin:0 0 8px;font-size:30px} h2{margin:0;font-size:18px} .muted{color:#6878
     }
   },
   &quot;published_codes&quot;: [
-    &quot;laowang_smart_20260831_234945360&quot;,
-    &quot;laowang_smart_20260831_234952200&quot;,
-    &quot;laowang_smart_20260831_234958990&quot;,
+    &quot;laowang_smart_20260902_013053400&quot;,
+    &quot;laowang_smart_20260902_013100979&quot;,
+    &quot;laowang_smart_20260902_013108717&quot;,
     &quot;&quot;
   ]
 }</pre></details>
@@ -233,28 +238,28 @@ h1{margin:0 0 8px;font-size:30px} h2{margin:0;font-size:18px} .muted{color:#6878
               <div class="detail">HTTP 200</div>
               <details><summary>查看真实证据</summary><pre>{
   &quot;published_codes&quot;: [
-    &quot;laowang_smart_20260831_234945360&quot;,
-    &quot;laowang_smart_20260831_234952200&quot;,
-    &quot;laowang_smart_20260831_234958990&quot;,
+    &quot;laowang_smart_20260902_013053400&quot;,
+    &quot;laowang_smart_20260902_013100979&quot;,
+    &quot;laowang_smart_20260902_013108717&quot;,
     &quot;&quot;
   ],
   &quot;draft&quot;: null,
   &quot;cpi_db_after_restore&quot;: {
     &quot;definition_exists&quot;: true,
     &quot;definition&quot;: {
-      &quot;indicator_code&quot;: &quot;laowang_smart_20260831_234945360&quot;,
+      &quot;indicator_code&quot;: &quot;laowang_smart_20260902_013053400&quot;,
       &quot;indicator_name&quot;: &quot;BDD-CPI&quot;,
       &quot;tenant_slug&quot;: &quot;laowang&quot;,
       &quot;source_type&quot;: &quot;smart&quot;,
       &quot;provider&quot;: &quot;LLM / Prompt Formula&quot;,
       &quot;prompt_text&quot;: &quot;CPI&quot;,
       &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_cpi\&quot;] || 0);&quot;,
-      &quot;selected_indicators_json&quot;: &quot;[{\&quot;indicator_code\&quot;: \&quot;source_cpi\&quot;, \&quot;indicator_name\&quot;: \&quot;中国CPI同比指数\&quot;}]&quot;
+      &quot;selected_indicators_json&quot;: &quot;[{\&quot;indicator_code\&quot;: \&quot;source_cpi\&quot;, \&quot;indicator_name\&quot;: \&quot;中国CPI同比指数\&quot;}, {\&quot;indicator_code\&quot;: \&quot;laowang_smart_20260902_010043483\&quot;, \&quot;indicator_name\&quot;: \&quot;中国CPI同比指数组合指标\&quot;}, {\&quot;indicator_code\&quot;: \&quot;laowang_cpi\&quot;, \&quot;indicator_name\&quot;: \&quot;CPI智能指标\&quot;}]&quot;
     },
     &quot;latest_exists&quot;: true,
     &quot;latest&quot;: {
-      &quot;latest_value&quot;: &quot;100.5&quot;,
-      &quot;updated_at&quot;: &quot;2026-08-31 23:49:45&quot;,
+      &quot;latest_value&quot;: &quot;0.5&quot;,
+      &quot;updated_at&quot;: &quot;2026-09-02 01:30:53&quot;,
       &quot;is_simulated&quot;: 0,
       &quot;source_code&quot;: &quot;tenant_smart_formula&quot;
     },
@@ -274,9 +279,9 @@ h1{margin:0 0 8px;font-size:30px} h2{margin:0;font-size:18px} .muted{color:#6878
               <div class="detail">HTTP 200</div>
               <details><summary>查看真实证据</summary><pre>{
   &quot;draft_codes&quot;: [
-    &quot;laowang_smart_20260831_234945360&quot;,
-    &quot;laowang_smart_20260831_234952200&quot;,
-    &quot;laowang_smart_20260831_234958990&quot;,
+    &quot;laowang_smart_20260902_013053400&quot;,
+    &quot;laowang_smart_20260902_013100979&quot;,
+    &quot;laowang_smart_20260902_013108717&quot;,
     &quot;source_shanghai_index&quot;
   ],
   &quot;shanghai_code&quot;: &quot;source_shanghai_index&quot;

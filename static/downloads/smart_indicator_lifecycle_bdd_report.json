@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-31 23:49:20",
+  "generated_at": "2026-09-02 01:30:28",
   "tenant_slug": "laowang",
   "scenarios": [
     {
@@ -27,23 +27,23 @@
       "passed": true,
       "detail": "HTTP 200；看板 HTTP 200",
       "evidence": {
-        "indicator_code": "laowang_smart_20260831_234945360",
+        "indicator_code": "laowang_smart_20260902_013053400",
         "indicator": {
           "definition_exists": true,
           "definition": {
-            "indicator_code": "laowang_smart_20260831_234945360",
+            "indicator_code": "laowang_smart_20260902_013053400",
             "indicator_name": "BDD-CPI",
             "tenant_slug": "laowang",
             "source_type": "smart",
             "provider": "LLM / Prompt Formula",
             "prompt_text": "CPI",
             "formula_js": "return Number(inputs[\"source_cpi\"] || 0);",
-            "selected_indicators_json": "[{\"indicator_code\": \"source_cpi\", \"indicator_name\": \"中国CPI同比指数\"}]"
+            "selected_indicators_json": "[{\"indicator_code\": \"source_cpi\", \"indicator_name\": \"中国CPI同比指数\"}, {\"indicator_code\": \"laowang_smart_20260902_010043483\", \"indicator_name\": \"中国CPI同比指数组合指标\"}, {\"indicator_code\": \"laowang_cpi\", \"indicator_name\": \"CPI智能指标\"}]"
           },
           "latest_exists": true,
           "latest": {
-            "latest_value": "100.5",
-            "updated_at": "2026-08-31 23:49:45",
+            "latest_value": "0.5",
+            "updated_at": "2026-09-02 01:30:53",
             "is_simulated": 0,
             "source_code": "tenant_smart_formula"
           },
@@ -67,23 +67,23 @@
       "passed": true,
       "detail": "HTTP 200；看板 HTTP 200",
       "evidence": {
-        "indicator_code": "laowang_smart_20260831_234952200",
+        "indicator_code": "laowang_smart_20260902_013100979",
         "indicator": {
           "definition_exists": true,
           "definition": {
-            "indicator_code": "laowang_smart_20260831_234952200",
+            "indicator_code": "laowang_smart_20260902_013100979",
             "indicator_name": "BDD-深证指数",
             "tenant_slug": "laowang",
             "source_type": "smart",
             "provider": "LLM / Prompt Formula",
             "prompt_text": "深证指数",
             "formula_js": "return Number(inputs[\"source_shenzhen_index\"] || 0);",
-            "selected_indicators_json": "[{\"indicator_code\": \"source_shenzhen_index\", \"indicator_name\": \"深证指数\"}]"
+            "selected_indicators_json": "[{\"indicator_code\": \"source_shenzhen_index\", \"indicator_name\": \"深证指数\"}, {\"indicator_code\": \"laowang_smart_20260814_202231136\", \"indicator_name\": \"深证指数80\"}]"
           },
           "latest_exists": true,
           "latest": {
-            "latest_value": "14015.00",
-            "updated_at": "2026-08-31 23:49:52",
+            "latest_value": "13872.38",
+            "updated_at": "2026-09-02 01:31:00",
             "is_simulated": 0,
             "source_code": "tenant_smart_formula"
           },
@@ -107,11 +107,11 @@
       "passed": true,
       "detail": "HTTP 200；看板 HTTP 200",
       "evidence": {
-        "indicator_code": "laowang_smart_20260831_234958990",
+        "indicator_code": "laowang_smart_20260902_013108717",
         "indicator": {
           "definition_exists": true,
           "definition": {
-            "indicator_code": "laowang_smart_20260831_234958990",
+            "indicator_code": "laowang_smart_20260902_013108717",
             "indicator_name": "BDD-黄金白银",
             "tenant_slug": "laowang",
             "source_type": "smart",
@@ -122,8 +122,8 @@
           },
           "latest_exists": true,
           "latest": {
-            "latest_value": "50.2181",
-            "updated_at": "2026-08-31 23:49:59",
+            "latest_value": "50.1359",
+            "updated_at": "2026-09-02 01:31:08",
             "is_simulated": 0,
             "source_code": "tenant_smart_formula"
           },
@@ -149,26 +149,26 @@
       "evidence": {
         "draft_codes": [
           "",
-          "laowang_smart_20260831_234952200",
-          "laowang_smart_20260831_234958990",
+          "laowang_smart_20260902_013100979",
+          "laowang_smart_20260902_013108717",
           ""
         ],
         "cpi_db_after_remove": {
           "definition_exists": true,
           "definition": {
-            "indicator_code": "laowang_smart_20260831_234945360",
+            "indicator_code": "laowang_smart_20260902_013053400",
             "indicator_name": "BDD-CPI",
             "tenant_slug": "laowang",
             "source_type": "smart",
             "provider": "LLM / Prompt Formula",
             "prompt_text": "CPI",
             "formula_js": "return Number(inputs[\"source_cpi\"] || 0);",
-            "selected_indicators_json": "[{\"indicator_code\": \"source_cpi\", \"indicator_name\": \"中国CPI同比指数\"}]"
+            "selected_indicators_json": "[{\"indicator_code\": \"source_cpi\", \"indicator_name\": \"中国CPI同比指数\"}, {\"indicator_code\": \"laowang_smart_20260902_010043483\", \"indicator_name\": \"中国CPI同比指数组合指标\"}, {\"indicator_code\": \"laowang_cpi\", \"indicator_name\": \"CPI智能指标\"}]"
           },
           "latest_exists": true,
           "latest": {
-            "latest_value": "100.5",
-            "updated_at": "2026-08-31 23:49:45",
+            "latest_value": "0.5",
+            "updated_at": "2026-09-02 01:30:53",
             "is_simulated": 0,
             "source_code": "tenant_smart_formula"
           },
@@ -178,9 +178,9 @@
           }
         },
         "published_codes": [
-          "laowang_smart_20260831_234945360",
-          "laowang_smart_20260831_234952200",
-          "laowang_smart_20260831_234958990",
+          "laowang_smart_20260902_013053400",
+          "laowang_smart_20260902_013100979",
+          "laowang_smart_20260902_013108717",
           ""
         ]
       }
@@ -194,28 +194,28 @@
       "detail": "HTTP 200",
       "evidence": {
         "published_codes": [
-          "laowang_smart_20260831_234945360",
-          "laowang_smart_20260831_234952200",
-          "laowang_smart_20260831_234958990",
+          "laowang_smart_20260902_013053400",
+          "laowang_smart_20260902_013100979",
+          "laowang_smart_20260902_013108717",
           ""
         ],
         "draft": null,
         "cpi_db_after_restore": {
           "definition_exists": true,
           "definition": {
-            "indicator_code": "laowang_smart_20260831_234945360",
+            "indicator_code": "laowang_smart_20260902_013053400",
             "indicator_name": "BDD-CPI",
             "tenant_slug": "laowang",
             "source_type": "smart",
             "provider": "LLM / Prompt Formula",
             "prompt_text": "CPI",
             "formula_js": "return Number(inputs[\"source_cpi\"] || 0);",
-            "selected_indicators_json": "[{\"indicator_code\": \"source_cpi\", \"indicator_name\": \"中国CPI同比指数\"}]"
+            "selected_indicators_json": "[{\"indicator_code\": \"source_cpi\", \"indicator_name\": \"中国CPI同比指数\"}, {\"indicator_code\": \"laowang_smart_20260902_010043483\", \"indicator_name\": \"中国CPI同比指数组合指标\"}, {\"indicator_code\": \"laowang_cpi\", \"indicator_name\": \"CPI智能指标\"}]"
           },
           "latest_exists": true,
           "latest": {
-            "latest_value": "100.5",
-            "updated_at": "2026-08-31 23:49:45",
+            "latest_value": "0.5",
+            "updated_at": "2026-09-02 01:30:53",
             "is_simulated": 0,
             "source_code": "tenant_smart_formula"
           },
@@ -235,9 +235,9 @@
       "detail": "HTTP 200",
       "evidence": {
         "draft_codes": [
-          "laowang_smart_20260831_234945360",
-          "laowang_smart_20260831_234952200",
-          "laowang_smart_20260831_234958990",
+          "laowang_smart_20260902_013053400",
+          "laowang_smart_20260902_013100979",
+          "laowang_smart_20260902_013108717",
           "source_shanghai_index"
         ],
         "shanghai_code": "source_shanghai_index"
@@ -247,20 +247,25 @@
   "refresh": {
     "market_snapshot": {
       "ok": true,
-      "updated": 40,
+      "updated": 46,
       "overview_count": 9,
       "sector_count": 31,
+      "macro_count": 6,
+      "macro_refreshed": true,
       "intraday_count": 0,
-      "updated_at": "2026-08-31 23:49:25",
-      "errors": []
+      "updated_at": "2026-09-02 01:30:32",
+      "errors": [
+        "全国城镇调查失业率：AKShare 宏观数据暂不可用",
+        "房地产开发投资累计同比：当前 AKShare 未提供房地产开发投资累计同比的精确序列"
+      ]
     },
     "indicator_history": {
       "synced": true,
-      "updated": 13,
-      "total_points": 1376,
-      "eligible": 15,
-      "skipped_disabled": 10,
-      "batch_code": "gangtise_openapi_sync_20260831234927045255"
+      "updated": 12,
+      "total_points": 1359,
+      "eligible": 14,
+      "skipped_disabled": 18,
+      "batch_code": "gangtise_openapi_sync_20260902013034045337"
     }
   },
   "llm_model": {
@@ -273,17 +278,17 @@
     "matches_v4": true
   },
   "temporary_codes": [
-    "laowang_smart_20260831_234945360",
-    "laowang_smart_20260831_234952200",
-    "laowang_smart_20260831_234958990"
+    "laowang_smart_20260902_013053400",
+    "laowang_smart_20260902_013100979",
+    "laowang_smart_20260902_013108717"
   ],
   "exception": "",
   "publish": {
     "status": 200,
     "published_codes": [
-      "laowang_smart_20260831_234945360",
-      "laowang_smart_20260831_234952200",
-      "laowang_smart_20260831_234958990",
+      "laowang_smart_20260902_013053400",
+      "laowang_smart_20260902_013100979",
+      "laowang_smart_20260902_013108717",
       ""
     ],
     "ok": true

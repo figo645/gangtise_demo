@@ -2499,6 +2499,55 @@ def build_dashboard_base_indicator_options(tenant=None):
                 "data_unavailable": False,
             }
         )
+    # Hot industries use the same registered market snapshot as the Hot
+    # Industries page. Keep a stable local reference code for each Shenwan
+    # level-one sector so formulas can use the exact displayed value.
+    for item in build_hot_industry_indicator_catalog():
+        if item.get("numeric_value") is None:
+            continue
+        _upsert_option(item)
+    return options
+
+
+def build_hot_industry_indicator_catalog():
+    """Project the existing Hot Industries snapshot into smart-indicator refs."""
+    market = _market_services_module()
+    sectors = tuple(getattr(market, "SHENWAN_LEVEL1_INDUSTRIES", ()) or ())
+    payload = market.build_market_sector_overview_payload()
+    rows = {
+        str(item.get("sector") or "").strip(): item
+        for item in (payload.get("items") or [])
+        if isinstance(item, dict) and str(item.get("sector") or "").strip()
+    }
+    options = []
+    for index, sector_name in enumerate(sectors, start=1):
+        row = rows.get(sector_name) or {}
+        indicator_code = f"source_sector_{index:02d}"
+        numeric_value = market.parse_numeric_indicator_value(row.get("value"))
+        options.append(
+            {
+                "indicator_code": indicator_code,
+                "indicator_name": f"申万一级行业指数:{sector_name}",
+                "sector_name": sector_name,
+                "category": "热门行业",
+                "value": round(float(numeric_value), 2) if numeric_value is not None else "--",
+                "numeric_value": numeric_value,
+                "unit": "",
+                "source_type": "market_sector",
+                "source_type_label": "热门行业",
+                "provider": row.get("data_source") or "AKShare",
+                "source_defs": [],
+                "algorithm_detail": "与热门行业页面使用同一份 AKShare 申万一级行业快照。",
+                "interpretation": f"已读取 {sector_name} 的热门行业快照。" if numeric_value is not None else f"{sector_name} 尚无可用的最新行业快照。",
+                "prompt_text": sector_name,
+                "selected_indicators": [{"indicator_code": indicator_code, "indicator_name": f"申万一级行业指数:{sector_name}"}],
+                "updated_at": row.get("updated_at") or "",
+                "data_at": row.get("updated_at") or "",
+                "data_status": "available" if numeric_value is not None else "unavailable",
+                "data_status_label": "已读取行业快照" if numeric_value is not None else "已识别，等待行业快照同步",
+                "data_unavailable": numeric_value is None,
+            }
+        )
     return options
 
 
@@ -2576,6 +2625,27 @@ def build_smart_indicator_latest_value_map(selected_indicators=None):
             "is_simulated": 0,
             "source_code": "macro_snapshot",
         }
+    sector_options = build_hot_industry_indicator_catalog()
+    if selected_indicators is not None:
+        selected_codes = {
+            str(item.get("indicator_code") or "").strip()
+            for item in normalize_selected_indicator_refs(selected_indicators)
+        }
+        sector_options = [item for item in sector_options if item.get("indicator_code") in selected_codes]
+    for item in sector_options:
+        if item.get("numeric_value") is None:
+            continue
+        indicator_code = item.get("indicator_code")
+        latest_map[indicator_code] = {
+            "indicator_code": indicator_code,
+            "latest_value": str(round(float(item["numeric_value"]), 2)),
+            "latest_status": "normal",
+            "latest_assessment": item.get("interpretation") or "",
+            "latest_alert": "",
+            "updated_at": item.get("updated_at") or "",
+            "is_simulated": 0,
+            "source_code": "market_sector_snapshot",
+        }
     return latest_map
 
 
@@ -2584,6 +2654,14 @@ def build_tenant_smart_indicator_tag_catalog(tenant=None):
     market = _market_services_module()
     registry = getattr(market, "GANGTISE_INDICATOR_REGISTRY", {}) or {}
     aliases = getattr(market, "WATCHLIST_QUERY_ALIAS_MAP", {}) or {}
+    macro_aliases = {
+        "source_cpi": ("CPI", "中国CPI", "居民消费价格指数"),
+        "source_ppi": ("PPI", "中国PPI", "工业生产者出厂价格指数"),
+        "source_manufacturing_pmi": ("PMI", "制造业PMI", "中国制造业采购经理指数"),
+        "source_industrial_production_yoy": ("工业增加值", "工业增加值同比"),
+        "source_retail_sales_yoy": ("社零", "社会消费品零售"),
+        "source_fixed_asset_investment_yoy": ("固定资产投资", "固定资产投资同比"),
+    }
     aliases_by_code = {}
     for alias, target in aliases.items():
         aliases_by_code.setdefault(str(target or "").strip(), []).append(str(alias or "").strip())
@@ -2605,7 +2683,10 @@ def build_tenant_smart_indicator_tag_catalog(tenant=None):
                 "subtitle": item.get("source_type_label") or item.get("source_type") or "基础指标",
                 "value": item.get("value") or "--",
                 "unit": item.get("unit") or "",
-                "prompt_aliases": aliases_by_code.get(indicator_code, []),
+                "prompt_aliases": sorted(set(
+                    aliases_by_code.get(indicator_code, [])
+                    + list(macro_aliases.get(indicator_code, ()))
+                )),
                 "selected_indicators": [
                     {
                         "indicator_code": indicator_code,
@@ -2668,6 +2749,7 @@ def build_tenant_smart_indicator_tag_catalog(tenant=None):
                 "unit": "",
                 "prompt_aliases": sorted(set(
                     aliases_by_code.get(indicator_code, [])
+                    + list(macro_aliases.get(indicator_code, ()))
                     + [
                         registry_entry.get("search_keyword") or "",
                         registry_entry.get("security_code") or "",
@@ -2682,13 +2764,6 @@ def build_tenant_smart_indicator_tag_catalog(tenant=None):
         )
         seen.add(f"indicator:{indicator_code}")
 
-    industry_signals = {
-        "电子": ("ai_order_signal", "credit_pulse", "source_hs300"),
-        "电力设备": ("credit_pulse", "source_oil", "source_brent"),
-        "传媒": ("southbound_flow", "fed_rate_path", "source_hsi"),
-        "食品饮料": ("credit_pulse", "source_cpi", "source_shanghai_index"),
-        "银行": ("credit_pulse", "fed_rate_path", "source_shanghai_index"),
-    }
     tags.append(
         {
             "tag_code": "market:overview",
@@ -2705,7 +2780,11 @@ def build_tenant_smart_indicator_tag_catalog(tenant=None):
             ],
         }
     )
-    for industry_name, indicator_codes in industry_signals.items():
+    for industry_item in build_hot_industry_indicator_catalog():
+        industry_name = industry_item.get("sector_name") or ""
+        indicator_code = industry_item.get("indicator_code") or ""
+        if not industry_name or not indicator_code:
+            continue
         industry_aliases = [
             alias for alias, canonical in (getattr(market, "HOT_INDUSTRY_NAME_MAP", {}) or {}).items()
             if canonical == industry_name
@@ -2716,16 +2795,15 @@ def build_tenant_smart_indicator_tag_catalog(tenant=None):
                 "label": industry_name,
                 "tag_type": "industry",
                 "category": "热门行业",
-                "subtitle": "行业综合引用 · " + " / ".join(indicator_codes),
-                "value": "--",
-                "unit": "",
+                "subtitle": "申万一级行业指数 · 与热门行业页面同源",
+                "value": industry_item.get("value") or "--",
+                "unit": industry_item.get("unit") or "",
                 "prompt_aliases": industry_aliases,
                 "selected_indicators": [
                     {
                         "indicator_code": indicator_code,
-                        "indicator_name": indicator_code,
+                        "indicator_name": industry_item.get("indicator_name") or indicator_code,
                     }
-                    for indicator_code in indicator_codes
                 ],
             }
         )
@@ -2759,6 +2837,38 @@ def resolve_smart_indicator_selected_refs(tenant, payload):
         for item in tag_catalog_items
         if item.get("tag_code")
     }
+    suppressed_tag_codes = {
+        item["tag_code"]
+        for item in normalize_selected_tag_refs(body.get("suppressed_tag_codes") or body.get("suppressed_tags") or [])
+    }
+    suppressed_indicator_codes = {
+        str(indicator.get("indicator_code") or "").strip()
+        for tag_code, tag_item in tag_catalog.items()
+        if tag_code in suppressed_tag_codes
+        for indicator in (tag_item.get("selected_indicators") or [])
+        if str(indicator.get("indicator_code") or "").strip()
+    }
+    # Keep formula references structural. A label typed in the textarea may be
+    # normalized by the client, but the token code is the authoritative link.
+    for token in body.get("formula_tokens") or []:
+        if not isinstance(token, dict) or str(token.get("type") or "").strip().lower() != "reference":
+            continue
+        tag_code = str(token.get("tagCode") or token.get("tag_code") or "").strip()
+        indicator_code = str(token.get("indicatorCode") or token.get("indicator_code") or "").strip()
+        if tag_code in suppressed_tag_codes or indicator_code in suppressed_indicator_codes:
+            continue
+        tag_item = tag_catalog.get(tag_code) if tag_code else None
+        if tag_item:
+            selected.extend(
+                item for item in (tag_item.get("selected_indicators") or [])
+                if str(item.get("indicator_code") or "").strip() not in suppressed_indicator_codes
+            )
+        elif indicator_code and any(
+            str(source.get("indicator_code") or "").strip() == indicator_code
+            for tag in tag_catalog_items
+            for source in (tag.get("selected_indicators") or [])
+        ):
+            selected.append({"indicator_code": indicator_code, "indicator_name": token.get("label") or ""})
     for tag in normalize_selected_tag_refs(body.get("selected_tags") or body.get("selected_tag_codes") or []):
         tag_item = tag_catalog.get(tag["tag_code"])
         if tag_item:
@@ -2773,13 +2883,17 @@ def resolve_smart_indicator_selected_refs(tenant, payload):
     # This also keeps H5 and the desktop workbench consistent when their cached
     # tag catalogues are behind the server's latest indicator catalogue.
     selected.extend(
-        resolve_smart_indicator_prompt_refs(
+        item for item in resolve_smart_indicator_prompt_refs(
             body.get("prompt_text") or body.get("prompt") or "",
             tag_catalog_items,
             indicator_name_map,
         )
+        if item.get("indicator_code") not in suppressed_indicator_codes
     )
-    selected = normalize_selected_indicator_refs(selected)
+    selected = [
+        item for item in normalize_selected_indicator_refs(selected)
+        if item.get("indicator_code") not in suppressed_indicator_codes
+    ]
     return [
         {
             "indicator_code": item["indicator_code"],
@@ -2827,7 +2941,14 @@ def resolve_smart_indicator_prompt_refs(prompt_text, tag_catalog, indicator_name
 
     def _matches(value):
         comparable = re.sub(r"[\s_\-.]", "", str(value or "")).lower()
-        return bool(comparable and comparable in compact_prompt)
+        if not comparable:
+            return False
+        if comparable in compact_prompt:
+            return True
+        # For a short standalone query, allow prefix completion (for example
+        # "商贸零" -> "商贸零售"), but do not let generic words such as
+        # "指数" select every index in the catalog.
+        return len(compact_prompt) >= 3 and len(compact_prompt) <= 8 and compact_prompt in comparable
 
     # Existing tenant/base tags are checked first, including stock tags whose
     # selected_indicators already encode the verified research signal bundle.
@@ -2882,25 +3003,28 @@ def resolve_smart_indicator_prompt_refs(prompt_text, tag_catalog, indicator_name
         _append("source_shanghai_index")
         _append("source_shenzhen_index")
 
-    # Hot industries currently have real sector snapshots for presentation but
-    # no individual formula input IDs. Reuse the same real signal bundles as
-    # the watchlist instead of creating a fictitious sector value.
-    industry_signals = {
-        "电子": ("ai_order_signal", "credit_pulse", "source_hs300"),
-        "电力设备": ("credit_pulse", "source_oil", "source_brent"),
-        "传媒": ("southbound_flow", "fed_rate_path", "source_hsi"),
-        "食品饮料": ("credit_pulse", "source_cpi", "source_shanghai_index"),
-        "银行": ("credit_pulse", "fed_rate_path", "source_shanghai_index"),
-    }
-    hot_industry_aliases = getattr(market, "HOT_INDUSTRY_NAME_MAP", {}) or {}
-    industry_names = set(industry_signals)
-    for alias, canonical in hot_industry_aliases.items():
-        if canonical in industry_signals and _matches(alias):
-            industry_names.add(canonical)
-    for industry_name in industry_names:
-        if _matches(industry_name):
-            for indicator_code in industry_signals[industry_name]:
-                _append(indicator_code)
+    # Resolve every registered Shenwan level-one industry, including sectors
+    # that currently have no latest value. The preview layer reports missing
+    # snapshots instead of inventing a number.
+    for industry_item in build_hot_industry_indicator_catalog():
+        industry_name = industry_item.get("sector_name") or ""
+        # "综合" is a valid Shenwan sector, but it is also part of phrases
+        # such as "上证综合指数". Do not add a sector tag to an index query.
+        if industry_name == "综合" and re.search(r"上证综合指数|上证综指|上海综合指数", compact_prompt):
+            continue
+        aliases = [industry_name]
+        aliases.extend(
+            alias
+            for alias, canonical in (getattr(market, "HOT_INDUSTRY_NAME_MAP", {}) or {}).items()
+            if canonical == industry_name
+        )
+        aliases.extend(
+            keyword
+            for keyword in (getattr(market, "THS_TO_SHENWAN_LEVEL1_KEYWORDS", {}) or {}).get(industry_name, ())
+            if keyword
+        )
+        if any(_matches(candidate) for candidate in aliases):
+            _append(industry_item.get("indicator_code"), industry_item.get("indicator_name"))
 
     return normalize_selected_indicator_refs(selected)
 
@@ -3764,6 +3888,69 @@ def remove_smart_indicator_from_dashboard(tenant_slug, indicator_code):
         next_config["tenants"] = tenants
         return save_site_config(next_config)
     return None
+
+
+def delete_tenant_smart_indicator(tenant_slug, indicator_code):
+    """Delete a tenant smart indicator and every dashboard projection.
+
+    Removing a card is reversible and only changes the draft. Deleting the
+    definition is a destructive library operation, so both published and
+    draft dashboard states must be cleaned in the same request.
+    """
+    normalized_tenant_slug = str(tenant_slug or "").strip().lower()
+    normalized_code = slugify_code(indicator_code, "indicator")
+    if not normalized_tenant_slug or not normalized_code:
+        return None
+    definition = get_indicator_definition(normalized_code)
+    if not definition:
+        return None
+    if str(definition.get("tenant_slug") or "").strip().lower() != normalized_tenant_slug:
+        return None
+    if str(definition.get("source_type") or "").strip().lower() != "smart":
+        return None
+
+    site_config = get_site_config()
+    tenants = get_tenant_configs(site_config)
+    updated = False
+
+    def _strip(source):
+        current = copy.deepcopy(source or {})
+        layout = normalize_dashboard_layout(current.get("layout") or "2x2")
+        current["layout"] = layout
+        current["cards"] = [
+            {}
+            if slugify_code(
+                (card or {}).get("indicatorCode") or (card or {}).get("indicator_code"), ""
+            ) == normalized_code
+            else card
+            for card in normalize_fund_dashboard_card_refs(current.get("cards"), layout)
+        ]
+        return current
+
+    for index, tenant in enumerate(tenants):
+        if str(tenant.get("slug") or "").strip().lower() != normalized_tenant_slug:
+            continue
+        state = resolve_tenant_fund_dashboard_state(tenant, tenant.get("fund_dashboard_config"))
+        tenants[index] = dict(tenant)
+        tenants[index]["fund_dashboard_config"] = {
+            "published": normalize_fund_dashboard_view(_strip(state.get("published")), tenant),
+            "draft": (
+                normalize_fund_dashboard_view(_strip(state.get("draft")), tenant)
+                if state.get("draft") is not None
+                else None
+            ),
+        }
+        updated = True
+        break
+    if not updated:
+        return None
+
+    # Remove definition, snapshots and history only after tenant ownership and
+    # dashboard scope have been validated above.
+    _market_services_module().delete_indicator_definition(normalized_code)
+    next_config = dict(site_config)
+    next_config["tenants"] = tenants
+    return save_site_config(next_config)
 
 
 def create_or_update_tenant_smart_indicator(tenant_slug, payload):

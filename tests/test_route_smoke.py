@@ -134,6 +134,39 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("'source_shanghai_index'", html)
         self.assertIn("'source_shenzhen_index'", html)
 
+    def test_h5_smart_indicator_workbench_has_library_and_fan_view_is_read_only(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("function renderWorkbenchSmartIndicatorLibrary()", html)
+        self.assertIn("addExistingWorkbenchSmartIndicatorToDraft", html)
+        self.assertIn("openFundamentalDashboardIndicatorDetail", html)
+        self.assertIn("这里仅供查看详情；指标的新增、修改和移除请前往大V工作台", html)
+        self.assertIn("canonicalizeWorkbenchSmartPrompt", html)
+        self.assertIn("formula_tokens", html)
+
+    def test_investor_cannot_mutate_smart_indicator_dashboard(self):
+        import src.web.api_kol as api_kol
+
+        original_current_user = api_kol.get_current_authenticated_user
+        api_kol.get_current_authenticated_user = lambda: {
+            "id": "route-smoke-investor",
+            "username": "route-smoke-investor",
+            "role": "investor",
+            "tenant_slug": self.tenant_slugs[0],
+            "status": "active",
+        }
+        try:
+            response = self.client.post(
+                f"/api/tenant/{self.tenant_slugs[0]}/dashboard",
+                json={"action": "reset_draft"},
+            )
+        finally:
+            api_kol.get_current_authenticated_user = original_current_user
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.get_json().get("error"), "dav_required")
+
     def test_dav_profile_does_not_offer_account_switching(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
 

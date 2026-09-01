@@ -6,6 +6,51 @@ from src.domain import market_services
 
 
 class ChinaCpiMappingTest(unittest.TestCase):
+    def test_structured_formula_token_resolves_ppi_reference(self):
+        tag = {
+            "tag_code": "indicator:source_ppi",
+            "label": "中国PPI同比指数",
+            "prompt_aliases": ["PPI"],
+            "selected_indicators": [{
+                "indicator_code": "source_ppi",
+                "indicator_name": "中国PPI同比指数",
+            }],
+        }
+        with patch.object(core_services, "build_tenant_smart_indicator_tag_catalog", return_value=[tag]), patch.object(
+            core_services,
+            "build_indicator_hub",
+            return_value={"items": [{"id": "source_ppi", "name": "中国PPI同比指数"}]},
+        ), patch.object(
+            market_services,
+            "GANGTISE_INDICATOR_REGISTRY",
+            {"source_ppi": {"indicator_name": "中国PPI同比指数"}},
+        ):
+            refs = core_services.resolve_smart_indicator_selected_refs(
+                {"slug": "laowang"},
+                {
+                    "prompt_text": "PPI*2",
+                    "formula_tokens": [{
+                        "type": "reference",
+                        "tagCode": "indicator:source_ppi",
+                        "indicatorCode": "source_ppi",
+                        "label": "中国PPI同比指数",
+                    }, {"type": "operator", "text": "*"}, {"type": "number", "text": "2"}],
+                },
+            )
+
+        self.assertEqual(refs, [{"indicator_code": "source_ppi", "indicator_name": "中国PPI同比指数"}])
+
+    def test_registered_macro_tag_exposes_ppi_short_alias(self):
+        with patch.object(core_services, "build_dashboard_base_indicator_options", return_value=[{
+            "indicator_code": "source_ppi",
+            "indicator_name": "中国PPI同比",
+            "category": "宏观经济",
+            "unit": "%",
+        }]), patch.object(core_services, "gen_watchlist_details", return_value={}):
+            tags = core_services.build_tenant_smart_indicator_tag_catalog({"slug": "laowang"})
+
+        ppi_tag = next(item for item in tags if item.get("tag_code") == "indicator:source_ppi")
+        self.assertIn("PPI", ppi_tag.get("prompt_aliases") or [])
     def test_registered_market_index_snapshot_is_a_smart_indicator_input(self):
         class Result:
             def fetchall(self):
@@ -126,6 +171,78 @@ class ChinaCpiMappingTest(unittest.TestCase):
         self.assertEqual(card["provider"], "AKShare")
         self.assertEqual(card["sourceType"], "macro_economic")
 
+    def test_smart_indicator_reads_the_same_sector_snapshot_as_hot_industries(self):
+        class Result:
+            def __init__(self, rows=None):
+                self.rows = rows or []
+
+            def fetchall(self):
+                return self.rows
+
+        class Db:
+            def __init__(self):
+                self.latest_rows = [
+                    {
+                        "indicator_code": "laowang_smart_mechanical",
+                        "latest_value": "2242.01",
+                        "latest_status": "normal",
+                        "latest_assessment": "已计算",
+                        "latest_alert": "",
+                        "updated_at": "2026-09-02",
+                        "is_simulated": 0,
+                        "source_code": "derived_smart_indicator",
+                    }
+                ]
+
+            def execute(self, query, params=()):
+                if "FROM indicator_latest_values" in query:
+                    return Result(self.latest_rows)
+                return Result()
+
+        definition = {
+            "indicator_code": "laowang_smart_mechanical",
+            "indicator_name": "申万一级行业指数:机械设备智能指标",
+            "tenant_slug": "laowang",
+            "category": "大V自定义指标",
+            "unit": "",
+            "description": "",
+            "owner": "财经老王",
+            "enabled": 1,
+            "status_hint": "normal",
+            "assessment_template": "",
+            "alert_template": "",
+            "prompt_text": "机械设备",
+            "formula_js": 'return Number(inputs["source_sector_27"] || 0);',
+            "selected_indicators": [
+                {"indicator_code": "source_sector_27", "indicator_name": "申万一级行业指数:机械设备"}
+            ],
+            "source_type": "smart",
+            "source_type_label": "智能指标",
+            "provider": "DeepSeek-V4-Flash",
+            "display_order": 1,
+            "updated_at": "2026-09-02",
+        }
+        with patch.object(market_services, "GANGTISE_INDICATOR_REGISTRY", {}), patch.object(
+            market_services, "list_indicator_definitions", return_value=[definition]
+        ), patch.object(
+            market_services, "list_indicator_source_defs", return_value=[]
+        ), patch.object(market_services, "build_macro_economic_payload", return_value={"items": []}), patch.object(
+            market_services,
+            "build_market_sector_overview_payload",
+            return_value={
+                "items": [{"sector": "机械设备", "value": 2242.01, "updated_at": "2026-09-02"}],
+                "updated_at": "2026-09-02",
+            },
+        ), patch.object(market_services, "get_db", return_value=Db()):
+            hub = market_services.build_indicator_hub_from_store()
+
+        item = hub["smart_items"][0]
+        self.assertEqual(item["value"], "2242.01")
+        self.assertEqual(item["numeric_value"], 2242.01)
+        self.assertFalse(item["data_unavailable"])
+        self.assertEqual(item["data_mode"], "real")
+        self.assertEqual(item["data_at"], "2026-09-02")
+
     def test_china_cpi_uses_verified_nbs_index(self):
         entry = market_services.GANGTISE_INDICATOR_REGISTRY["source_cpi"]
 
@@ -217,6 +334,71 @@ class ChinaCpiMappingTest(unittest.TestCase):
             with self.subTest(prompt=prompt):
                 resolved = core_services.resolve_smart_indicator_prompt_refs(prompt, [], {})
                 self.assertEqual([item["indicator_code"] for item in resolved], expected_codes)
+
+    def test_hot_industry_partial_query_resolves_to_registered_sector_snapshot(self):
+        industry_item = {
+            "sector_name": "商贸零售",
+            "indicator_code": "source_sector_15",
+            "indicator_name": "申万一级行业指数:商贸零售",
+            "value": 1234.5,
+            "numeric_value": 1234.5,
+        }
+        with patch.object(core_services, "build_hot_industry_indicator_catalog", return_value=[industry_item]):
+            resolved = core_services.resolve_smart_indicator_prompt_refs("商贸零", [], {})
+        self.assertEqual(
+            resolved,
+            [{"indicator_code": "source_sector_15", "indicator_name": "申万一级行业指数:商贸零售"}],
+        )
+
+    def test_suppressed_auto_matched_tag_is_excluded_from_resolution(self):
+        tag = {
+            "tag_code": "industry:商贸零售",
+            "label": "商贸零售",
+            "tag_type": "industry",
+            "selected_indicators": [{"indicator_code": "source_sector_15", "indicator_name": "申万一级行业指数:商贸零售"}],
+        }
+        with patch.object(core_services, "build_tenant_smart_indicator_tag_catalog", return_value=[tag]), patch.object(
+            core_services, "build_indicator_hub", return_value={"items": []}
+        ):
+            resolved = core_services.resolve_smart_indicator_selected_refs(
+                {"slug": "laowang"},
+                {"prompt_text": "商贸零售", "suppressed_tag_codes": ["industry:商贸零售"]},
+            )
+        self.assertEqual(resolved, [])
+
+    def test_suppressed_structured_formula_token_is_excluded_from_resolution(self):
+        tag = {
+            "tag_code": "indicator:source_ppi",
+            "label": "中国PPI同比指数",
+            "selected_indicators": [{
+                "indicator_code": "source_ppi",
+                "indicator_name": "中国PPI同比指数",
+            }],
+        }
+        with patch.object(core_services, "build_tenant_smart_indicator_tag_catalog", return_value=[tag]), patch.object(
+            core_services,
+            "build_indicator_hub",
+            return_value={"items": [{"id": "source_ppi", "name": "中国PPI同比指数"}]},
+        ), patch.object(
+            market_services,
+            "GANGTISE_INDICATOR_REGISTRY",
+            {"source_ppi": {"indicator_name": "中国PPI同比指数"}},
+        ):
+            refs = core_services.resolve_smart_indicator_selected_refs(
+                {"slug": "laowang"},
+                {
+                    "prompt_text": "PPI*2",
+                    "suppressed_tag_codes": ["indicator:source_ppi"],
+                    "formula_tokens": [{
+                        "type": "reference",
+                        "tagCode": "indicator:source_ppi",
+                        "indicatorCode": "source_ppi",
+                        "label": "中国PPI同比指数",
+                    }, {"type": "operator", "text": "*"}, {"type": "number", "text": "2"}],
+                },
+            )
+
+        self.assertEqual(refs, [])
 
     def test_cpi_alias_keeps_the_registered_display_name_after_resolution(self):
         selected = market_services.normalize_selected_indicator_refs(

@@ -5199,6 +5199,47 @@ def build_indicator_hub_from_store():
             for point in (macro_item.get("history_series") or [])
             if isinstance(point, dict) and point.get("date") and parse_numeric_indicator_value(point.get("value")) is not None
         ]
+    # Hot-industry cards and smart indicators must read the same persisted
+    # AKShare Shenwan snapshot. Without this overlay, a smart indicator that
+    # references source_sector_* is incorrectly reported as unavailable even
+    # when the industry page already has a real latest value.
+    sector_snapshot = build_market_sector_overview_payload()
+    sector_rows = {
+        str(item.get("sector") or "").strip(): item
+        for item in (sector_snapshot.get("items") or [])
+        if isinstance(item, dict) and str(item.get("sector") or "").strip()
+    }
+    for index, sector_name in enumerate(SHENWAN_LEVEL1_INDUSTRIES, start=1):
+        indicator_code = f"source_sector_{index:02d}"
+        sector_item = sector_rows.get(sector_name) or {}
+        value = parse_numeric_indicator_value(sector_item.get("value"))
+        if value is None:
+            latest_map.pop(indicator_code, None)
+            series_map.pop(indicator_code, None)
+            continue
+        updated_at = sector_item.get("updated_at") or sector_snapshot.get("updated_at") or ""
+        latest_map[indicator_code] = {
+            **(latest_map.get(indicator_code) or {}),
+            "indicator_code": indicator_code,
+            "latest_value": str(round(value, 2)),
+            "latest_status": "normal",
+            "latest_assessment": f"已读取 {sector_name} AKShare 行业快照。",
+            "latest_alert": "",
+            "updated_at": updated_at,
+            "is_simulated": 0,
+            "source_code": "market_sector_snapshot",
+        }
+        series_map[indicator_code] = [
+            {
+                "date": str(point.get("date") or ""),
+                "value": point.get("value"),
+                "status": "normal",
+            }
+            for point in (sector_item.get("history_series") or [])
+            if isinstance(point, dict)
+            and point.get("date")
+            and parse_numeric_indicator_value(point.get("value")) is not None
+        ]
     anomaly_map = {}
     for row in db.execute(
         """
@@ -5284,7 +5325,11 @@ def build_indicator_hub_from_store():
             "alert": latest.get("latest_alert") or definition.get("alert_template") or "暂无预警说明",
             "enabled": bool(definition.get("enabled")),
             "last_updated": latest.get("updated_at") or definition.get("updated_at") or "未记录",
-            "data_at": str((history_series[-1] if history_series else {}).get("date") or "").strip(),
+            "data_at": str(
+                (history_series[-1] if history_series else {}).get("date")
+                or latest.get("updated_at")
+                or ""
+            ).strip(),
             "watchers": definition.get("watchers", []),
             "prompt_text": str(definition.get("prompt_text") or "").strip(),
             "formula_js": str(definition.get("formula_js") or "").strip(),
@@ -5637,6 +5682,11 @@ def build_indicator_hub(tenant=None, admin_view=False):
 
 
 HOT_INDUSTRY_NAME_MAP = {
+    "商贸": "商贸零售",
+    "零售": "商贸零售",
+    "贸易": "商贸零售",
+    "商业": "商贸零售",
+    "免税": "商贸零售",
     "高端白酒": "食品饮料",
     "白酒": "食品饮料",
     "动力电池": "电力设备",

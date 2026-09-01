@@ -150,6 +150,8 @@ def main() -> int:
         web_hooks.is_authenticated = lambda: True
         app_entry.app.config.update(TESTING=True)
         client = app_entry.app.test_client()
+        with client.session_transaction() as session:
+            session[core_services.H5_USER_SESSION_KEY] = "admin"
         with app_entry.app.app_context():
             original_config = copy.deepcopy(core_services.get_site_config())
             model = core_services.get_default_llm_config(
