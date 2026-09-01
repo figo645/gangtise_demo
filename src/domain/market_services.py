@@ -675,13 +675,67 @@ GANGTISE_INDICATOR_REGISTRY = {
     },
     "source_cpi": {
         "indicator_name": "中国CPI同比指数",
-        "category": "数据湖指标",
-        "query_kind": "edb_search",
-        "search_keyword": "CPI:同比指数",
-        "preferred_indicator_id": "M00000016",
-        "expected_indicator_name": "CPI:同比指数:当月值",
-        "expected_data_source": "国家统计局",
-        "valid_value_range": (50, 200),
+        "category": "宏观经济",
+        "query_kind": "macro_latest",
+        "macro_key": "cpi_yoy",
+        "unit": "%",
+        "search_keyword": "中国CPI同比",
+    },
+    "source_ppi": {
+        "indicator_name": "中国PPI同比",
+        "category": "宏观经济",
+        "query_kind": "macro_latest",
+        "macro_key": "ppi_yoy",
+        "unit": "%",
+        "search_keyword": "中国PPI同比",
+    },
+    "source_manufacturing_pmi": {
+        "indicator_name": "中国制造业PMI",
+        "category": "宏观经济",
+        "query_kind": "macro_latest",
+        "macro_key": "manufacturing_pmi",
+        "unit": "点",
+        "search_keyword": "制造业PMI",
+    },
+    "source_industrial_production_yoy": {
+        "indicator_name": "规模以上工业增加值同比",
+        "category": "宏观经济",
+        "query_kind": "macro_latest",
+        "macro_key": "industrial_production_yoy",
+        "unit": "%",
+        "search_keyword": "规模以上工业增加值同比",
+    },
+    "source_retail_sales_yoy": {
+        "indicator_name": "社会消费品零售总额同比",
+        "category": "宏观经济",
+        "query_kind": "macro_latest",
+        "macro_key": "retail_sales_yoy",
+        "unit": "%",
+        "search_keyword": "社会消费品零售总额同比",
+    },
+    "source_fixed_asset_investment_yoy": {
+        "indicator_name": "固定资产投资累计同比",
+        "category": "宏观经济",
+        "query_kind": "macro_latest",
+        "macro_key": "fixed_asset_investment_yoy",
+        "unit": "%",
+        "search_keyword": "固定资产投资累计同比",
+    },
+    "source_urban_unemployment": {
+        "indicator_name": "全国城镇调查失业率",
+        "category": "宏观经济",
+        "query_kind": "macro_latest",
+        "macro_key": "urban_unemployment",
+        "unit": "%",
+        "search_keyword": "全国城镇调查失业率",
+    },
+    "source_real_estate_investment_yoy": {
+        "indicator_name": "房地产开发投资累计同比",
+        "category": "宏观经济",
+        "query_kind": "macro_latest",
+        "macro_key": "real_estate_investment_yoy",
+        "unit": "%",
+        "search_keyword": "房地产开发投资累计同比",
     },
     "source_dji": {
         "indicator_name": "道琼斯",
@@ -1926,6 +1980,15 @@ def fetch_gangtise_indicator_series(indicator_code, start_date="", end_date="", 
             "duration_ms": 0,
             "source_meta": {"provider": "AKShare"},
         }
+    if normalized_code in MACRO_ECONOMIC_INDICATOR_CODES:
+        return {
+            "ok": False,
+            "message": "macro_indicator_akshare_only",
+            "points": [],
+            "response": {},
+            "duration_ms": 0,
+            "source_meta": {"provider": "AKShare"},
+        }
     entry = GANGTISE_INDICATOR_REGISTRY.get(normalized_code)
     if not entry:
         return {"ok": False, "message": "indicator_registry_not_found", "points": [], "response": {}, "duration_ms": 0, "source_meta": {}}
@@ -2171,6 +2234,30 @@ def build_akshare_market_snapshot_source_seed_payload(indicator_code):
         "last_http_status": None,
         "last_tested_at": "",
         "last_test_detail": "AKShare 市场快照源",
+    }
+
+
+def build_akshare_macro_source_seed_payload(indicator_code):
+    """Describe a registered macro indicator backed by the macro snapshot."""
+    entry = GANGTISE_INDICATOR_REGISTRY.get(slugify_code(indicator_code, "indicator")) or {}
+    indicator_name = str(entry.get("indicator_name") or indicator_code).strip()
+    return {
+        "source_code": slugify_code(indicator_code, "source"),
+        "indicator_code": slugify_code(indicator_code, "indicator"),
+        "provider": "AKShare",
+        "base_url": "",
+        "path": "akshare://macro_economic",
+        "method": "SNAPSHOT",
+        "auth_type": "none",
+        "headers": {}, "query": {}, "body": {},
+        "response_mapping": {
+            "value_path": "value", "time_path": "updated_at", "status_path": "available",
+            "connector_type": "akshare_snapshot", "extractor_type": "macro_economic",
+            "request_blueprint": {"snapshot_type": "macro_economic", "provider": "AKShare"},
+        },
+        "response_sample": {"indicator": indicator_name, "provider": "AKShare", "connector_type": "akshare_snapshot", "status": "configured", "value": None},
+        "source_status": "configured", "enabled": True, "last_test_status": "", "last_http_status": None,
+        "last_tested_at": "", "last_test_detail": "AKShare 宏观经济快照源",
     }
 
 
@@ -2665,6 +2752,16 @@ def normalize_selected_indicator_refs(raw_selected):
         if not indicator_code or indicator_code in seen:
             continue
         seen.add(indicator_code)
+        # Aliases such as "CPI" are accepted for lookup, but they are not
+        # canonical display names. Once a reference has been resolved to a
+        # registered indicator, every downstream consumer must use the
+        # registry name so tags, previews, formulas and saved definitions do
+        # not disagree about the same source.
+        registry_name = str(
+            (GANGTISE_INDICATOR_REGISTRY.get(indicator_code) or {}).get("indicator_name") or ""
+        ).strip()
+        if registry_name:
+            indicator_name = registry_name
         normalized.append({"indicator_code": indicator_code, "indicator_name": indicator_name})
     return normalized
 
@@ -3801,6 +3898,33 @@ def ensure_default_indicator_sources():
             ensure_indicator_mapping_rule_for_source(get_indicator_source_def(indicator_code))
             existing.add(indicator_code)
             continue
+        if indicator_code in MACRO_ECONOMIC_INDICATOR_CODES:
+            # These are platform-owned reference definitions.  Re-seed them
+            # so an earlier Gangtise EDB definition is migrated to the shared
+            # AKShare macro snapshot contract on the next bootstrap.
+            save_indicator_definition(
+                {
+                    "indicator_code": indicator_code,
+                    "indicator_name": indicator_name,
+                    "category": "宏观经济",
+                    "description": "由后台 AKShare 公开宏观数据采集后入库，供宏观经济页面与智能指标统一读取。",
+                    "unit": str(entry.get("unit") or "").strip(),
+                    "owner": "AKShare 宏观经济快照",
+                    "source_type": "lake",
+                    "source_type_label": "宏观经济指标",
+                    "provider": "AKShare",
+                    "status_hint": "attention",
+                    "assessment_template": f"{indicator_name} 由 AKShare 宏观经济快照更新。",
+                    "alert_template": "需关注 AKShare 宏观数据刷新与连通状态",
+                    "watchers": ["AKShare", "宏观经济", "大V 工作台"],
+                    "display_config": {"show_in_admin": True, "show_in_h5": False},
+                    "enabled": True,
+                }
+            )
+            save_indicator_source_def(build_akshare_macro_source_seed_payload(indicator_code))
+            ensure_indicator_mapping_rule_for_source(get_indicator_source_def(indicator_code))
+            existing.add(indicator_code)
+            continue
         if not get_indicator_definition(indicator_code):
             save_indicator_definition(
                 {
@@ -4382,9 +4506,49 @@ def normalize_gangtise_lake_items(items, definition_map, source_map, latest_map)
     for indicator_code, registry_entry in GANGTISE_INDICATOR_REGISTRY.items():
         definition = definition_map.get(indicator_code) or {}
         all_sources = list(source_map.get(indicator_code) or [])
+        item = lake_by_id.get(indicator_code)
+
+        # Macro indicators are registered in the same indicator directory, but
+        # their canonical source is the persisted AKShare macro snapshot, not
+        # Gangtise. Do not run them through the Gangtise availability gate.
+        if indicator_code in MACRO_ECONOMIC_INDICATOR_CODES:
+            if item and not item.get("data_unavailable"):
+                item["provider"] = "AKShare"
+                item["source_defs"] = [
+                    source for source in all_sources
+                    if infer_source_connector_type(source) == "akshare_snapshot"
+                ] or all_sources
+                item["source_count"] = len(item["source_defs"])
+                item["data_source"] = "akshare_macro_snapshot"
+                item["data_mode"] = "real"
+                item["data_mode_label"] = "AKShare 真实数据"
+                item["data_status"] = "available"
+                item["data_status_label"] = "已读取宏观快照"
+                item["data_unavailable"] = False
+                normalized.append(item)
+            else:
+                normalized.append(
+                    {
+                        **(item or {}),
+                        "id": indicator_code,
+                        "name": (item or {}).get("name") or registry_entry.get("indicator_name") or indicator_code,
+                        "category": (item or {}).get("category") or "宏观经济",
+                        "unit": (item or {}).get("unit") or registry_entry.get("unit") or "%",
+                        "provider": "AKShare",
+                        "source_defs": all_sources,
+                        "source_count": len(all_sources),
+                        "data_source": "akshare_macro_snapshot",
+                        "data_mode": "unavailable",
+                        "data_mode_label": "AKShare 未取到",
+                        "data_status": "unavailable",
+                        "data_status_label": "等待宏观快照同步",
+                        "data_unavailable": True,
+                    }
+                )
+            continue
+
         gangtise_sources = [item for item in all_sources if infer_source_connector_type(item) == "gangtise_openapi"]
         latest = latest_map.get(indicator_code) or {}
-        item = lake_by_id.get(indicator_code)
         latest_source_code = str(latest.get("source_code") or "").strip()
         gangtise_source_codes = {
             str(source.get("source_code") or "").strip()
@@ -5001,6 +5165,40 @@ def build_indicator_hub_from_store():
                 "status": item["point_status"],
             }
         )
+    # Macro cards use the same registered indicator and hub contracts as all
+    # other indicators, but their source is the dedicated AKShare snapshot.
+    # Overlaying the snapshot here prevents legacy EDB rows from resurfacing
+    # in the Admin indicator hub while retaining the existing tables/API.
+    macro_snapshot = build_macro_economic_payload()
+    for macro_item in macro_snapshot.get("items") or []:
+        if not isinstance(macro_item, dict):
+            continue
+        indicator_code = str(macro_item.get("indicator_code") or "").strip()
+        if indicator_code not in MACRO_ECONOMIC_INDICATOR_CODES:
+            continue
+        if not macro_item.get("available"):
+            latest_map.pop(indicator_code, None)
+            series_map.pop(indicator_code, None)
+            continue
+        value = parse_numeric_indicator_value(macro_item.get("value"))
+        if value is None:
+            continue
+        latest_map[indicator_code] = {
+            **(latest_map.get(indicator_code) or {}),
+            "indicator_code": indicator_code,
+            "latest_value": str(round(value, 2)),
+            "latest_status": "normal",
+            "latest_assessment": f"已读取 {macro_item.get('name') or indicator_code} AKShare 宏观快照。",
+            "latest_alert": "",
+            "updated_at": macro_item.get("updated_at") or "",
+            "is_simulated": 0,
+            "source_code": "macro_snapshot",
+        }
+        series_map[indicator_code] = [
+            {"date": str(point.get("date") or ""), "value": point.get("value"), "status": "normal"}
+            for point in (macro_item.get("history_series") or [])
+            if isinstance(point, dict) and point.get("date") and parse_numeric_indicator_value(point.get("value")) is not None
+        ]
     anomaly_map = {}
     for row in db.execute(
         """
@@ -5822,6 +6020,28 @@ MARKET_OVERVIEW_INDEX_CODES = (
     "source_nikkei",
 )
 
+MACRO_ECONOMIC_INDICATOR_CODES = (
+    "source_cpi",
+    "source_ppi",
+    "source_manufacturing_pmi",
+    "source_industrial_production_yoy",
+    "source_retail_sales_yoy",
+    "source_fixed_asset_investment_yoy",
+    "source_urban_unemployment",
+    "source_real_estate_investment_yoy",
+)
+
+# Keep the two definitions registered for future source adapters, but do not
+# expose them while no precise public series is available.
+MACRO_ECONOMIC_VISIBLE_CODES = (
+    "source_cpi",
+    "source_ppi",
+    "source_manufacturing_pmi",
+    "source_industrial_production_yoy",
+    "source_retail_sales_yoy",
+    "source_fixed_asset_investment_yoy",
+)
+
 AKSHARE_MARKET_INDEX_CATALOG = {
     "source_shanghai_index": {"kind": "cn", "symbol": "sh000001", "aliases": ("上证指数", "上证综指")},
     "source_shenzhen_index": {"kind": "cn", "symbol": "sz399001", "aliases": ("深证成指", "深证指数")},
@@ -5834,6 +6054,20 @@ AKSHARE_MARKET_INDEX_CATALOG = {
     "source_nasdaq": {"kind": "us_sina", "symbol": ".IXIC"},
     "source_sp500": {"kind": "us_sina", "symbol": ".INX"},
     "source_nikkei": {"kind": "global_sina", "symbol": "日经225指数"},
+}
+
+# These are public AKShare adapters.  The last item is intentionally marked
+# unavailable: AKShare exposes the real-estate prosperity index, not the
+# requested real-estate development investment cumulative growth series.
+AKSHARE_MACRO_CATALOG = {
+    "source_cpi": {"function": "macro_china_cpi", "value_columns": ("全国-同比增长",), "unit": "%", "source": "国家统计局/东方财富"},
+    "source_ppi": {"function": "macro_china_ppi", "value_columns": ("当月同比增长",), "unit": "%", "source": "国家统计局/东方财富"},
+    "source_manufacturing_pmi": {"function": "macro_china_pmi", "value_columns": ("制造业-指数",), "unit": "点", "source": "国家统计局/东方财富"},
+    "source_industrial_production_yoy": {"function": "macro_china_gyzjz", "value_columns": ("同比增长",), "unit": "%", "source": "国家统计局/东方财富"},
+    "source_retail_sales_yoy": {"function": "macro_china_consumer_goods_retail", "value_columns": ("同比增长",), "unit": "%", "source": "国家统计局/东方财富"},
+    "source_fixed_asset_investment_yoy": {"function": "macro_china_gdzctz", "value_columns": ("自年初累计",), "unit": "%", "source": "国家统计局/东方财富", "derive": "cumulative_yoy"},
+    "source_urban_unemployment": {"function": "macro_china_urban_unemployment", "value_columns": ("value",), "unit": "%", "source": "国家统计局"},
+    "source_real_estate_investment_yoy": {"function": "__unsupported__", "value_columns": (), "unit": "%", "source": "国家统计局", "preserve_on_failure": False, "message": "当前 AKShare 未提供房地产开发投资累计同比的精确序列"},
 }
 
 def _load_akshare():
@@ -5991,6 +6225,117 @@ def _build_market_index_snapshot_item(indicator_code, series_result):
     }
 
 
+def _normalize_macro_period(value):
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    match = re.search(r"(\d{4})[^0-9]?(\d{1,2})", text)
+    if match:
+        return f"{match.group(1)}-{int(match.group(2)):02d}"
+    digits = re.sub(r"[^0-9]", "", text)
+    if len(digits) >= 6:
+        return f"{digits[:4]}-{digits[4:6]}"
+    return text[:10]
+
+
+def _build_macro_points(frame, value_column, derive=""):
+    if frame is None or getattr(frame, "empty", True) or value_column not in frame.columns:
+        return []
+    date_columns = ("月份", "日期", "date", "发布时间")
+    date_column = next((column for column in date_columns if column in frame.columns), None)
+    if not date_column:
+        return []
+    rows = []
+    for _, row in frame.iterrows():
+        period = _normalize_macro_period(row.get(date_column))
+        value = _akshare_float(row.get(value_column))
+        if period and value is not None:
+            rows.append({"date": period, "value": value})
+    rows = sorted({item["date"]: item for item in rows}.values(), key=lambda item: item["date"])
+    if derive != "cumulative_yoy":
+        return rows
+    by_period = {item["date"]: item["value"] for item in rows}
+    derived = []
+    for item in rows:
+        year, month = item["date"].split("-")
+        previous = by_period.get(f"{int(year) - 1:04d}-{month}")
+        if previous is None or previous == 0:
+            continue
+        derived.append({"date": item["date"], "value": round((item["value"] / previous - 1) * 100, 2)})
+    return derived
+
+
+def fetch_akshare_macro_indicator_series(indicator_code, ak=None):
+    """Fetch one registered macro series from a public AKShare adapter."""
+    config = AKSHARE_MACRO_CATALOG.get(indicator_code) or {}
+    if not config or config.get("function") == "__unsupported__":
+        return {"ok": False, "available": False, "points": [], "provider": "AKShare", "message": config.get("message") or "未配置 AKShare 宏观指标映射"}
+    try:
+        ak = ak or _load_akshare()
+        frame = getattr(ak, config["function"])()
+        points = []
+        for column in config.get("value_columns") or ():
+            points = _build_macro_points(frame, column, config.get("derive") or "")
+            if points:
+                break
+        if not points:
+            return {"ok": False, "available": False, "points": [], "provider": "AKShare", "message": "AKShare 未返回有效宏观数据"}
+        return {"ok": True, "available": True, "points": points, "provider": "AKShare", "unit": config.get("unit") or "", "source": config.get("source") or "AKShare", "message": ""}
+    except Exception as exc:
+        app.logger.warning("AKShare macro indicator unavailable for %s: %s", indicator_code, exc)
+        return {"ok": False, "available": False, "points": [], "provider": "AKShare", "message": "AKShare 宏观数据暂不可用"}
+
+
+def _build_macro_snapshot_item(indicator_code, series_result):
+    entry = GANGTISE_INDICATOR_REGISTRY.get(indicator_code) or {}
+    points = list((series_result or {}).get("points") or [])
+    base = {
+        "indicator_code": indicator_code,
+        "name": entry.get("indicator_name") or indicator_code,
+        "unit": entry.get("unit") or (series_result or {}).get("unit") or "",
+        "data_source": (series_result or {}).get("source") or "AKShare",
+    }
+    if not points:
+        return {**base, "available": False, "message": str((series_result or {}).get("message") or "暂无真实宏观数据").strip()}
+    latest = points[-1]
+    return {
+        **base,
+        "value": round(float(latest["value"]), 2),
+        "updated_at": latest["date"],
+        "history_series": copy.deepcopy(points[-120:]),
+        "available": True,
+        "message": "",
+        "source_type": "macro_economic",
+    }
+
+
+def build_macro_economic_payload():
+    """Read the persisted macro snapshot; the H5 request never calls AKShare."""
+    cache_key = "china_macro"
+    visible_codes = set(MACRO_ECONOMIC_VISIBLE_CODES)
+
+    def _visible_payload(payload):
+        if not isinstance(payload, dict) or not isinstance(payload.get("items"), list):
+            return payload
+        result = copy.deepcopy(payload)
+        result["items"] = [
+            item for item in result["items"]
+            if isinstance(item, dict) and str(item.get("indicator_code") or "").strip() in visible_codes
+        ]
+        return result
+
+    cached = _load_market_snapshot_payload("macro_economic", cache_key, MACRO_SNAPSHOT_REFRESH_TTL_SECONDS)
+    if isinstance(cached, dict) and isinstance(cached.get("items"), list) and cached.get("snapshot_version") == 1:
+        return _visible_payload(cached)
+    stale = _load_market_snapshot_payload("macro_economic", cache_key, 0)
+    if isinstance(stale, dict) and isinstance(stale.get("items"), list) and stale.get("snapshot_version") == 1:
+        preserved = _visible_payload(stale)
+        preserved["stale"] = True
+        preserved["message"] = "宏观数据正在同步，当前展示最近一次真实快照"
+        return preserved
+    return {"ok": True, "snapshot_version": 1, "items": [], "source": "AKShare", "refreshing": True, "message": "后台正在同步 AKShare 宏观数据"}
+
+
 _market_snapshot_refresh_lock = threading.Lock()
 _market_snapshot_refresh_running = False
 
@@ -6043,7 +6388,30 @@ def sync_market_snapshot(force=False):
         _save_market_snapshot_payload("market_overview", "standard_indices", overview_payload)
     if sector_items:
         _save_market_snapshot_payload("market_sector_overview", "shenwan_level1", sector_payload)
-    return {"ok": bool(any(item.get("available") for item in overview_items) or sector_items), "updated": sum(1 for item in overview_items if item.get("available")) + len(sector_items) + intraday_count, "overview_count": sum(1 for item in overview_items if item.get("available")), "sector_count": len(sector_items), "intraday_count": intraday_count, "updated_at": updated_at, "errors": errors[:20]}
+    previous_macro = _load_market_snapshot_payload("macro_economic", "china_macro", 0) or {}
+    macro_refresh_due = force or _load_market_snapshot_payload(
+        "macro_economic", "china_macro", MACRO_SNAPSHOT_REFRESH_TTL_SECONDS
+    ) is None
+    previous_macro_items = {
+        str(item.get("indicator_code") or ""): item
+        for item in (previous_macro.get("items") or [])
+        if isinstance(item, dict) and item.get("available")
+    }
+    macro_items = list((previous_macro or {}).get("items") or []) if not macro_refresh_due else []
+    if macro_refresh_due:
+        for indicator_code in MACRO_ECONOMIC_INDICATOR_CODES:
+            assert_admin_task_not_stopped("market_snapshot_sync")
+            result = fetch_akshare_macro_indicator_series(indicator_code, ak=ak)
+            item = _build_macro_snapshot_item(indicator_code, result)
+            if not item.get("available") and indicator_code in previous_macro_items and (AKSHARE_MACRO_CATALOG.get(indicator_code) or {}).get("preserve_on_failure", True):
+                item = {**copy.deepcopy(previous_macro_items[indicator_code]), "stale": True}
+            macro_items.append(item)
+            if not item.get("available"):
+                errors.append(f"{item.get('name') or indicator_code}：{item.get('message') or '暂无数据'}")
+        macro_payload = {"ok": True, "snapshot_version": 1, "items": macro_items, "source": "AKShare", "updated_at": updated_at}
+        if any(item.get("available") for item in macro_items):
+            _save_market_snapshot_payload("macro_economic", "china_macro", macro_payload)
+    return {"ok": bool(any(item.get("available") for item in overview_items) or sector_items or any(item.get("available") for item in macro_items)), "updated": sum(1 for item in overview_items if item.get("available")) + len(sector_items) + (sum(1 for item in macro_items if item.get("available")) if macro_refresh_due else 0) + intraday_count, "overview_count": sum(1 for item in overview_items if item.get("available")), "sector_count": len(sector_items), "macro_count": sum(1 for item in macro_items if item.get("available")), "macro_refreshed": macro_refresh_due, "intraday_count": intraday_count, "updated_at": updated_at, "errors": errors[:20]}
 
 
 def request_market_snapshot_refresh():
@@ -6114,6 +6482,7 @@ MARKET_SECTOR_OVERVIEW_CACHE_TTL_SECONDS = 5 * 60
 # reads are slightly more tolerant so a slow run cannot blank the page.
 MARKET_SECTOR_SNAPSHOT_REFRESH_TTL_SECONDS = 6 * 60
 MARKET_SNAPSHOT_CACHE_TTL_SECONDS = 6 * 60
+MACRO_SNAPSHOT_REFRESH_TTL_SECONDS = 12 * 60 * 60
 
 
 def _market_demo_data_enabled():

@@ -49,6 +49,7 @@ def api_review_jobs():
     review_types = {
         "review_generate_draft",
         "review_prepare_preview",
+        "review_sector_summary_constraint",
         "review_voice_transcribe",
         "review_polish_input",
         "review_compose_draft",
@@ -78,6 +79,7 @@ def api_cancel_review_job(job_code):
     cancellable_types = {
         "review_generate_draft",
         "review_prepare_preview",
+        "review_sector_summary_constraint",
         "review_voice_transcribe",
         "review_polish_input",
         "review_compose_draft",

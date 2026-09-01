@@ -1308,7 +1308,8 @@ def analyze_review_watchlist_with_llm(
             "detail": "已通过 Gangtise Agent SSE 生成完整多股综合分析。",
             "state_updates": {
                 "analysis_result": {
-                    "sector_summary": "",
+                    "sector_summary": str(state.get("sector_summary_rule") or "").strip(),
+                    "sector_summary_rule": str(state.get("sector_summary_rule") or "").strip(),
                     "sector_profiles": copy.deepcopy(state.get("sector_profiles") or []),
                     "items": [],
                     "combined_text": combined_text,
@@ -1421,6 +1422,92 @@ def summarize_review_user_input_with_llm(
             "model_name": llm_model.get("model_name"),
             "purpose": llm_model.get("purpose"),
             "stage": "user_input_summary",
+        },
+    }
+
+
+def refine_review_sector_summary_with_llm(
+    sector_summary,
+    sector_profiles=None,
+    watchlist_items=None,
+    rule_text="",
+    review_period="",
+    speaker_name="",
+    entry_point="",
+    tenant_slug="",
+    job_code="",
+):
+    """Apply the user's writing constraints to the watchlist sector summary."""
+    current_summary = str(sector_summary or "").strip()
+    normalized_rule = str(rule_text or "").strip()
+    if not current_summary:
+        raise ValueError("review_sector_summary_required")
+    if not normalized_rule:
+        raise ValueError("review_sector_summary_rule_required")
+    llm_model = get_default_llm_config(
+        purpose="general",
+        feature_code="review_sector_summary_constraint",
+    )
+    if not llm_model:
+        raise RuntimeError("review_sector_summary_llm_not_configured")
+    profiles = sector_profiles if isinstance(sector_profiles, list) else []
+    selected = [str(item).strip() for item in (watchlist_items or []) if str(item).strip()]
+    context_lines = [
+        f"复盘周期：{_get_review_period_label(review_period)}",
+        f"自选股：{'、'.join(selected) if selected else '未提供'}",
+        "当前自选股归纳总结：",
+        current_summary,
+    ]
+    if profiles:
+        context_lines.extend([
+            "板块结构资料（只能据此改写，不得新增事实）：",
+            json.dumps(profiles[:12], ensure_ascii=False),
+        ])
+    raw = call_openai_compatible_llm(
+        llm_model,
+        (
+            "你是中文投研复盘文案约束助手。"
+            "请根据用户给出的规则，重写自选股的板块归纳总结。"
+            "只能使用输入中已有事实，不得编造行情、业绩、资金或新闻。"
+            "输出纯文本，不要标题前缀、解释、Markdown代码块或引号。"
+            "必须结构清晰，最多1000个中文字符；若用户规则与此冲突，以最多1000字和不编造事实为准。"
+        ),
+        "\n".join([
+            *context_lines,
+            "",
+            "用户规则约束：",
+            normalized_rule,
+            "",
+            "请直接输出约束后的最终板块归纳总结。",
+        ]),
+        feature_code="review_sector_summary_constraint",
+        feature_label="自选股总结规则约束",
+        tenant_slug=str(tenant_slug or "").strip(),
+        entry_point=str(entry_point or "").strip() or "review_sector_summary_constraint",
+        metadata={
+            "review_period": str(review_period or "").strip().lower(),
+            "watchlist_count": len(selected),
+            "rule_chars": len(normalized_rule),
+            "max_output_chars": 1000,
+            "stage": "sector_summary_constraint",
+        },
+        request_timeout_seconds=60,
+    )
+    refined = re.sub(r"^```(?:text|markdown)?\s*|\s*```$", "", str(raw or "").strip(), flags=re.IGNORECASE).strip()
+    refined = re.sub(r"^(?:板块归纳|自选股归纳总结|总结)\s*[:：]\s*", "", refined).strip()
+    refined = refined[:1000].strip()
+    if not refined:
+        raise RuntimeError("review_sector_summary_empty_llm_response")
+    return {
+        "sector_summary": refined,
+        "rule_text": normalized_rule,
+        "llm_model": {
+            "key": llm_model.get("key"),
+            "label": llm_model.get("label"),
+            "provider": llm_model.get("provider"),
+            "model_name": llm_model.get("model_name"),
+            "purpose": llm_model.get("purpose"),
+            "stage": "sector_summary_constraint",
         },
     }
 
@@ -1572,9 +1659,11 @@ def label_watchlist_comment_with_llm(comment_text, stock_detail=None, tenant_slu
 def _compose_review_watchlist_analysis_text(section):
     payload = section if isinstance(section, dict) else {}
     combined_text = str(payload.get("combined_text") or "").strip()
-    if combined_text:
-        return combined_text
     sector_summary = str(payload.get("sector_summary") or "").strip()
+    if combined_text:
+        return "\n\n".join(
+            item for item in [combined_text, f"板块归纳：{sector_summary}" if sector_summary else ""] if item
+        ).strip()
     sector_profiles = payload.get("sector_profiles") if isinstance(payload.get("sector_profiles"), list) else []
     items = payload.get("items") if isinstance(payload.get("items"), list) else []
     lines = []
@@ -1696,6 +1785,7 @@ def compose_review_structured_preview(
         "user_input_section": user_input_section,
         "watchlist_analysis_section": {
             "sector_summary": str(watchlist_result.get("sector_summary") or "").strip(),
+            "sector_summary_rule": str(watchlist_result.get("sector_summary_rule") or "").strip(),
             "sector_profiles": copy.deepcopy(watchlist_result.get("sector_profiles") or []),
             "items": copy.deepcopy(watchlist_result.get("items") or []),
             "combined_text": str(watchlist_result.get("combined_text") or "").strip(),

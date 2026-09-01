@@ -425,8 +425,70 @@ class ReviewModuleBddTest(unittest.TestCase):
                 self.assertIn("const displayItems = [", html)
                 self.assertIn("...addedItems.filter", html)
                 self.assertIn(f"if (exact) {add_function}(", html)
-                self.assertIn("next.add(name);", html)
+                self.assertIn("next.add(actualName);", html)
                 self.assertIn("type=\"checkbox\" ${selected", html)
+
+    def test_given_h5_review_stage_two_then_candidates_are_read_from_the_current_user_watchlist(self):
+        html = (PROJECT_ROOT / "templates" / "h5.html").read_text(encoding="utf-8")
+        self.assertIn("getCurrentUserWatchlistItems()", html)
+        self.assertIn("这里只显示当前用户在自选股板块中已保存的股票", html)
+        self.assertIn("if (!userWatchlistLoaded) return [];", html)
+        self.assertNotIn("tenant_lw: ['中芯国际', '腾讯控股', '贵州茅台', '宁德时代', '招商银行', '寒武纪', '比亚迪']", html)
+
+        workbench = (PROJECT_ROOT / "templates" / "kol_workbench.html").read_text(encoding="utf-8")
+        self.assertIn("getKwTenantWatchlistItems()", workbench)
+        self.assertIn("这里只显示当前大V在自选股板块中已保存的股票", workbench)
+        self.assertIn('"watchlist_items": watchlist_items', (PROJECT_ROOT / "src/domain/workbench_services.py").read_text(encoding="utf-8"))
+
+    def test_given_sector_summary_rule_when_refining_then_llm_receives_rule_and_output_is_limited(self):
+        captured = {}
+
+        def fake_call(model_config, system_prompt, user_prompt, **kwargs):
+            captured["model_config"] = model_config
+            captured["system_prompt"] = system_prompt
+            captured["user_prompt"] = user_prompt
+            return "板块现状：" + ("结构清晰内容。" * 300)
+
+        model = {
+            "key": "deepseek-v4-flash",
+            "label": "DeepSeek V4 Flash",
+            "provider": "volcengine",
+            "model_name": "deepseek-v4-flash-ga-260731",
+            "purpose": "general",
+        }
+        with patch.object(ai_services, "get_default_llm_config", return_value=model), patch.object(
+            ai_services, "call_openai_compatible_llm", side_effect=fake_call
+        ):
+            result = ai_services.refine_review_sector_summary_with_llm(
+                sector_summary="当前自选股集中在科技与消费板块。",
+                sector_profiles=[{"sector": "科技", "stock_names": ["中芯国际"]}],
+                watchlist_items=["中芯国际", "贵州茅台"],
+                rule_text="分成板块现状、代表个股、风险三段，不要写买卖建议。",
+                review_period="day",
+                entry_point="bdd_sector_rule",
+                tenant_slug=self.tenant_slug,
+            )
+
+        self.assertLessEqual(len(result["sector_summary"]), 1000)
+        self.assertIn("用户规则约束", captured["user_prompt"])
+        self.assertIn("不要写买卖建议", captured["user_prompt"])
+        self.assertEqual(result["llm_model"]["stage"], "sector_summary_constraint")
+
+    def test_given_gangtise_text_and_constrained_sector_summary_then_both_are_kept_for_publish(self):
+        rendered = ai_services._compose_review_watchlist_analysis_text({
+            "combined_text": "Gangtise 多股综合分析正文",
+            "sector_summary": "按规则生成的板块归纳总结",
+        })
+        self.assertIn("Gangtise 多股综合分析正文", rendered)
+        self.assertIn("板块归纳：按规则生成的板块归纳总结", rendered)
+
+    def test_given_h5_structured_review_then_sector_summary_rule_control_is_rendered(self):
+        html = (PROJECT_ROOT / "templates" / "h5.html").read_text(encoding="utf-8")
+        self.assertIn('id="review-structured-sector-summary-rule"', html)
+        self.assertIn("应用规则并重新生成", html)
+        self.assertIn("async function applyReviewSectorSummaryRule()", html)
+        self.assertIn("/api/review/refine-sector-summary", html)
+        self.assertIn('maxlength="1000"', html)
 
     def test_given_h5_review_when_page_renders_then_published_articles_use_current_tenant_pages(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slug}")

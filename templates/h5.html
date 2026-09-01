@@ -4775,6 +4775,7 @@ body,
         <button id="market-watchlist-tab" type="button" role="tab" aria-selected="true" class="h5-segmented-tab active" style="flex:1;border:0;border-radius:8px;padding:9px 6px;background:var(--gold);color:var(--navy);font-size:12px;font-weight:700;cursor:pointer" onclick="switchMarketView('watchlist')">自选股列表</button>
         <button id="market-sector-tab" type="button" role="tab" aria-selected="false" class="h5-segmented-tab" style="flex:1;border:0;border-radius:8px;padding:9px 6px;background:transparent;color:var(--gray-400);font-size:12px;font-weight:700;cursor:pointer" onclick="switchMarketView('sectors')">热门行业</button>
         <button id="market-overview-tab" type="button" role="tab" aria-selected="false" class="h5-segmented-tab" style="flex:1;border:0;border-radius:8px;padding:9px 6px;background:transparent;color:var(--gray-400);font-size:12px;font-weight:700;cursor:pointer" onclick="switchMarketView('overview')">市场一览</button>
+        <button id="market-macro-tab" type="button" role="tab" aria-selected="false" class="h5-segmented-tab" style="flex:1;border:0;border-radius:8px;padding:9px 6px;background:transparent;color:var(--gray-400);font-size:12px;font-weight:700;cursor:pointer" onclick="switchMarketView('macro')">宏观经济</button>
       </div>
       <div id="market-overview-panel" role="tabpanel">
         <div id="market-overview-source-note" style="font-size:12px;color:var(--gray-400);line-height:1.6;margin:0 2px 10px">标准指数与热门行业均由后台 AKShare 采集后入库，页面只读取数据库快照。</div>
@@ -4786,6 +4787,12 @@ body,
         <div id="market-sector-source-note" style="font-size:12px;color:var(--gray-400);line-height:1.6;margin:0 2px 10px">申万一级行业指数行情，按涨跌幅从高到低排列。数据由后台 AKShare 采集任务入库。</div>
         <div id="market-sector-list" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
           <div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">正在读取真实行业行情...</div>
+        </div>
+      </div>
+      <div id="market-macro-panel" role="tabpanel" style="display:none">
+        <div id="market-macro-source-note" style="font-size:12px;color:var(--gray-400);line-height:1.6;margin:0 2px 10px">月度宏观统计由后台通过 AKShare 公开数据源采集后入库，页面只读取数据库快照。</div>
+        <div id="market-macro-list" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+          <div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">正在读取真实宏观数据...</div>
         </div>
       </div>
       <div id="market-watchlist-panel" role="tabpanel" style="display:none">
@@ -5860,9 +5867,6 @@ const REVIEW_PARAGRAPH_OPTIONS = [
   { value: 'manual', label: '沿用手写正文', desc: '直接沿用你已经写好的完整复盘正文。' },
   { value: 'ai', label: '智能整理正文', desc: '只提供资料和判断，再补一句修改规则，由系统先生成完整复盘草稿。' },
 ];
-const REVIEW_WATCHLIST_MAP = {
-  tenant_lw: ['中芯国际', '腾讯控股', '贵州茅台', '宁德时代', '招商银行', '寒武纪', '比亚迪'],
-};
 let currentReviewPeriod = 'day';
 let reviewView = 'home';
 let reviewDetailArticleId = '';
@@ -5886,6 +5890,7 @@ let reviewTriggerDraft = {
   urlText: '',
   aiPrompt: '',
   promptTags: [],
+  sectorSummaryRule: '',
   generatedPreviewText: '',
   draftReviewText: '',
   previewReady: false,
@@ -5900,6 +5905,9 @@ const REVIEW_PROMPT_TAGS = ['更口语化', '保留原文不改写', '强调风�
 let reviewStructuredPreview = null;
 let reviewPreviewGenerating = false;
 let reviewPreviewJobState = null;
+let reviewSectorSummaryConstraintGenerating = false;
+let reviewSectorSummaryConstraintJobState = null;
+let reviewSectorSummaryRuleApplied = '';
 let reviewWatchlistSearchItems = [];
 let reviewWatchlistSearchQuery = '';
 let reviewWatchlistSearchTimer = null;
@@ -5925,6 +5933,7 @@ function normalizeReviewStructuredPreview(payload) {
     },
     watchlist_analysis_section: {
       sector_summary: String(watchlistAnalysisSection.sector_summary || '').trim(),
+      sector_summary_rule: String(watchlistAnalysisSection.sector_summary_rule || '').trim(),
       raw_text: String(watchlistAnalysisSection.raw_text || source.raw_text || '').trim(),
       combined_text: String(watchlistAnalysisSection.combined_text || watchlistAnalysisSection.raw_text || source.raw_text || source.partial_text || '').trim(),
       sector_profiles: Array.isArray(watchlistAnalysisSection.sector_profiles) ? watchlistAnalysisSection.sector_profiles.map((item) => ({
@@ -5957,7 +5966,12 @@ function normalizeReviewStructuredPreview(payload) {
 
 function buildReviewWatchlistAnalysisText(section) {
   const payload = section && typeof section === 'object' ? section : {};
-  return String(payload.combined_text || payload.raw_text || payload.partial_text || '').trim();
+  const combinedText = String(payload.combined_text || '').trim();
+  const sectorSummary = String(payload.sector_summary || '').trim();
+  return [combinedText || String(payload.raw_text || payload.partial_text || '').trim(), sectorSummary ? `板块归纳：${sectorSummary}` : '']
+    .filter(Boolean)
+    .join('\n\n')
+    .trim();
 }
 
 function buildReviewStructuredFinalText(payload) {
@@ -7592,7 +7606,23 @@ function getReviewPeriodMeta(period) {
 }
 
 function getTenantWatchlistFocus(tenantId) {
-  return REVIEW_WATCHLIST_MAP[tenantId] || ['中芯国际', '腾讯控股', '贵州茅台'];
+  // Review selection must use the same owner-scoped list rendered by the
+  // watchlist section; never fall back to the tenant demo list.
+  if (!userWatchlistLoaded) return [];
+  return Object.values(WATCHLIST_DETAILS_MAP || {})
+    .map((item) => String(item && item.name || '').trim())
+    .filter(Boolean);
+}
+
+function getCurrentUserWatchlistItems() {
+  if (!userWatchlistLoaded) return [];
+  return Object.values(WATCHLIST_DETAILS_MAP || {})
+    .filter((item) => item && String(item.name || '').trim())
+    .map((item) => ({
+      name: String(item.name || '').trim(),
+      code: String(item.code || '').trim(),
+      market: String(item.market || '').trim(),
+    }));
 }
 
 function getDavReviewSelectedWatchlist(tenantId) {
@@ -8409,6 +8439,10 @@ function openReviewTriggerModal(sourceMode) {
   reviewTriggerDraft.reviewTitle = '';
   reviewTriggerDraft.aiPrompt = '';
   reviewTriggerDraft.promptTags = [];
+  reviewTriggerDraft.sectorSummaryRule = '';
+  reviewSectorSummaryConstraintGenerating = false;
+  reviewSectorSummaryConstraintJobState = null;
+  reviewSectorSummaryRuleApplied = '';
   reviewTriggerDraft.generatedPreviewText = '';
   reviewTriggerDraft.draftReviewText = '';
   reviewTriggerDraft.flowStage = 'intake';
@@ -8569,6 +8603,12 @@ function getReviewDraftGenerationErrorMessage(error) {
   }
   if (raw.includes('review_prepare_preview_failed')) {
     return '复盘归纳预览生成失败，请稍后重试。';
+  }
+  if (raw.includes('review_sector_summary_llm_not_configured')) {
+    return '当前没有配置可用的大模型，无法按规则重新生成自选股归纳。';
+  }
+  if (raw.includes('review_sector_summary_empty_llm_response')) {
+    return '大模型未返回有效的自选股归纳，请重试。';
   }
   return raw;
 }
@@ -9141,7 +9181,14 @@ function renderReviewStructuredReviewPanel() {
         ${hasWatchlistAnalysis ? `
           <div>
             <div style="font-size:12px;font-weight:700;color:var(--white);margin-bottom:6px">自选股归纳总结</div>
-            <textarea id="review-structured-sector-summary" class="knowledge-modal-textarea" style="min-height:110px" placeholder="这里是板块代表性归纳，可继续修改。">${escapeHtml(watchlistSection.sector_summary || '')}</textarea>
+            <textarea id="review-structured-sector-summary" maxlength="1000" class="knowledge-modal-textarea" style="min-height:110px" placeholder="这里是板块代表性归纳，可继续修改。">${escapeHtml(watchlistSection.sector_summary || '')}</textarea>
+            <div style="font-size:12px;font-weight:700;color:var(--white);margin:12px 0 6px">自选股总结规则约束</div>
+            <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:6px">输入本次总结的写作要求，点击应用后由大模型重新整理上面的自选股归纳。只改写总结，不新增事实，最多1000字。</div>
+            <textarea id="review-structured-sector-summary-rule" class="knowledge-modal-textarea" style="min-height:92px" placeholder="例如：按板块现状、代表个股、主要风险三段输出，语言简洁，突出差异，不要写买卖建议。">${escapeHtml(watchlistSection.sector_summary_rule || reviewTriggerDraft.sectorSummaryRule || '')}</textarea>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">
+              <button class="btn-outline" type="button" onclick="applyReviewSectorSummaryRule()" ${reviewSectorSummaryConstraintGenerating ? 'disabled' : ''}>${reviewSectorSummaryConstraintGenerating ? '大模型处理中...' : '应用规则并重新生成'}</button>
+              ${reviewSectorSummaryConstraintJobState && reviewSectorSummaryConstraintJobState.status === 'failed' ? `<span style="font-size:11px;color:#B42318">${escapeHtml(reviewSectorSummaryConstraintJobState.error_message || reviewSectorSummaryConstraintJobState.summary || '规则应用失败')}</span>` : ''}
+            </div>
           </div>
         ` : ''}
         ${items.length ? `
@@ -9171,18 +9218,20 @@ function isReviewDraftProcessingStage() {
 function renderReviewWatchlistSelectionPanel() {
   if (reviewTriggerDraft.flowStage !== 'watchlist_select') return '';
   const user = getActiveDemoUser();
-  const personalList = getTenantWatchlistFocus(user.tenant.id);
+  const personalItems = getCurrentUserWatchlistItems();
+  const personalNames = new Set(personalItems.map((item) => item.name));
+  reviewTriggerDraft.selectedWatchlist = (reviewTriggerDraft.selectedWatchlist || []).filter((name) => personalNames.has(name));
+  const selected = new Set(reviewTriggerDraft.selectedWatchlist);
   const addedItems = Array.isArray(reviewWatchlistAddedItems) ? reviewWatchlistAddedItems : [];
   const displayItems = [
-    ...personalList.map((name) => ({ name: String(name || '').trim(), code: '' })),
-    ...addedItems.filter((item) => !personalList.includes(String(item.name || '').trim())),
-  ].filter((item) => item.name);
-  const selected = new Set(reviewTriggerDraft.selectedWatchlist || []);
+    ...personalItems,
+    ...addedItems.filter((item) => personalNames.has(String(item && item.name || '').trim())),
+  ].filter((item, index, items) => item.name && items.findIndex((candidate) => candidate.name === item.name) === index);
   const candidates = Array.isArray(reviewWatchlistSearchItems) ? reviewWatchlistSearchItems : [];
   return `
     <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">第二阶段：选择需要 AI 分析的自选股</label>
-      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:10px">搜索到的股票会直接纳入本次复盘，不会修改个人自选股。确认列表后才会调用 Gangtise。</div>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:10px">这里只显示当前用户在自选股板块中已保存的股票。选择仅决定本次复盘分析范围，不会新增或修改自选股。</div>
       <div style="display:flex;gap:8px;align-items:center">
         <input id="review-watchlist-search-input" class="knowledge-modal-input" style="flex:1" value="${escapeAttr(reviewWatchlistSearchQuery)}" placeholder="输入股票代码或名称，例如 600519 / 贵州茅台" oninput="searchReviewWatchlistCandidates(this.value)" />
       </div>
@@ -9205,14 +9254,14 @@ function renderReviewWatchlistSelectionPanel() {
           </label>
         `).join('') || '<div style="font-size:11px;color:var(--gray-400)">尚未选择股票，请搜索或从下方个人自选股中选择。</div>'}
       </div>
-      <div style="font-size:12px;font-weight:700;color:var(--text-main);margin-top:14px">个人自选股</div>
+      <div style="font-size:12px;font-weight:700;color:var(--text-main);margin-top:14px">当前个人自选股</div>
       <div style="display:grid;gap:7px;margin-top:8px;max-height:260px;overflow-y:auto;padding-right:4px">
         ${displayItems.filter((item) => !selected.has(item.name)).map((item) => `
           <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid rgba(47,116,192,0.10);border-radius:9px;background:#F8FBFF;color:var(--text-main);font-size:12px;cursor:pointer">
             <input type="checkbox" onchange="toggleReviewWatchlistOption('${escapeAttr(item.name)}', this.checked)" />
             <span>${escapeHtml(item.name)}${item.code ? `<small style="display:block;color:var(--gray-400);margin-top:2px">${escapeHtml(item.code)}</small>` : ''}</span>
           </label>
-        `).join('') || '<div style="font-size:11px;color:var(--gray-400)">当前没有个人自选股，可通过上方搜索选择。</div>'}
+        `).join('') || `<div style="font-size:11px;color:var(--gray-400)">${userWatchlistLoaded ? '当前没有个人自选股，请先在自选股板块添加。' : '正在读取当前个人自选股...'}</div>`}
       </div>
       <div style="margin-top:12px;padding:10px;border-radius:9px;background:rgba(200,169,110,0.10);color:var(--text-main);font-size:12px">待分析：${Array.from(selected).map((name) => escapeHtml(name)).join('、') || '尚未选择'}</div>
     </div>
@@ -9233,13 +9282,18 @@ function addReviewWatchlistCandidate(index) {
   if (!item) return;
   const name = String(item.name || item.code || '').trim();
   if (!name) return;
+  const actualItem = getCurrentUserWatchlistItems().find((candidate) => (
+    normalizeStockLookupValue(candidate.code) === normalizeStockLookupValue(item.code)
+    || normalizeStockLookupValue(candidate.name) === normalizeStockLookupValue(item.name)
+  ));
+  if (!actualItem) {
+    showToast('只能选择当前个人自选股，请先在自选股板块添加');
+    return;
+  }
+  const actualName = actualItem.name;
   const next = new Set(reviewTriggerDraft.selectedWatchlist || []);
-  next.add(name);
+  next.add(actualName);
   reviewTriggerDraft.selectedWatchlist = Array.from(next);
-  reviewWatchlistAddedItems = [
-    ...(reviewWatchlistAddedItems || []).filter((candidate) => String(candidate.name || '').trim() !== name),
-    { name, code: String(item.code || '').trim(), market: String(item.market || '').trim() },
-  ];
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
@@ -9255,11 +9309,12 @@ function searchReviewWatchlistCandidates(value) {
   const requestSeq = ++reviewWatchlistSearchRequestSeq;
   reviewWatchlistSearchTimer = setTimeout(async () => {
     try {
-      const resp = await fetch(`/api/watchlist/search?q=${encodeURIComponent(query)}&limit=8`);
-      const data = await resp.json().catch(() => ({}));
       if (requestSeq !== reviewWatchlistSearchRequestSeq) return;
-      if (!resp.ok || data.ok === false) throw new Error((data && data.error) || 'watchlist_search_failed');
-      reviewWatchlistSearchItems = Array.isArray(data.items) ? data.items : [];
+      const normalizedQuery = normalizeStockLookupValue(query);
+      reviewWatchlistSearchItems = getCurrentUserWatchlistItems().filter((item) => (
+        normalizeStockLookupValue(item.name).includes(normalizedQuery)
+        || normalizeStockLookupValue(item.code).includes(normalizedQuery)
+      ));
       const exact = reviewWatchlistSearchItems.find((item) => {
         const itemName = String(item && item.name || '').trim().toLowerCase();
         const itemCode = String(item && item.code || '').trim().toLowerCase();
@@ -9426,6 +9481,7 @@ function reviewActiveJobLabel(job) {
   const labels = {
     review_generate_draft: '复盘 Draft 生成',
     review_prepare_preview: '自选股综合分析',
+    review_sector_summary_constraint: '自选股总结规则约束',
     review_voice_transcribe: '语音转写',
     review_polish_input: '复盘输入润色',
     review_compose_draft: '复盘完整成稿',
@@ -9706,6 +9762,7 @@ function syncReviewDraftFromModal() {
   const structuredUserInput = document.getElementById('review-structured-user-input');
   const structuredCombinedText = document.getElementById('review-structured-combined-text');
   const structuredSectorSummary = document.getElementById('review-structured-sector-summary');
+  const structuredSectorSummaryRule = document.getElementById('review-structured-sector-summary-rule');
   syncReviewDraftFromEditors();
   if (titleInput) reviewTriggerDraft.reviewTitle = String(titleInput.value || '').trim();
   if (urlInput) reviewTriggerDraft.urlValue = String(urlInput.value || '').trim();
@@ -9723,6 +9780,11 @@ function syncReviewDraftFromModal() {
       reviewStructuredPreview.watchlist_analysis_section = reviewStructuredPreview.watchlist_analysis_section || {};
       reviewStructuredPreview.watchlist_analysis_section.sector_summary = structuredSectorSummary.value;
     }
+    if (structuredSectorSummaryRule) {
+      reviewTriggerDraft.sectorSummaryRule = String(structuredSectorSummaryRule.value || '').trim();
+      reviewStructuredPreview.watchlist_analysis_section = reviewStructuredPreview.watchlist_analysis_section || {};
+      reviewStructuredPreview.watchlist_analysis_section.sector_summary_rule = reviewTriggerDraft.sectorSummaryRule;
+    }
     if (structuredCombinedText) {
       reviewStructuredPreview.watchlist_analysis_section = reviewStructuredPreview.watchlist_analysis_section || {};
       reviewStructuredPreview.watchlist_analysis_section.combined_text = structuredCombinedText.value;
@@ -9734,6 +9796,89 @@ function syncReviewDraftFromModal() {
       if (!Number.isInteger(index) || !items[index]) return;
       items[index].analysis_text = node.value;
     });
+  }
+}
+
+async function applyReviewSectorSummaryRule() {
+  syncReviewDraftFromModal();
+  const user = getActiveDemoUser();
+  const section = reviewStructuredPreview && reviewStructuredPreview.watchlist_analysis_section;
+  const ruleText = String(reviewTriggerDraft.sectorSummaryRule || '').trim();
+  const sectorSummary = String((section || {}).sector_summary || '').trim();
+  if (!sectorSummary) {
+    showToast('当前没有可约束的自选股归纳总结');
+    return;
+  }
+  if (!ruleText) {
+    showToast('请先输入自选股总结规则');
+    return;
+  }
+  if (reviewSectorSummaryConstraintGenerating) return;
+  reviewSectorSummaryConstraintGenerating = true;
+  reviewSectorSummaryConstraintJobState = {
+    status: 'running',
+    progress_stage: 'queued',
+    progress_percent: 8,
+    summary: '已提交总结规则，正在调用大模型',
+    result: { live_log: [] },
+  };
+  renderReviewTriggerModal(user);
+  try {
+    const response = await fetch('/api/review/refine-sector-summary', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        tenant_slug: ((user || {}).tenant || {}).slug || '',
+        period: reviewTriggerDraft.period || currentReviewPeriod || 'day',
+        sector_summary: sectorSummary,
+        sector_profiles: (section || {}).sector_profiles || [],
+        watchlist_items: reviewTriggerDraft.selectedWatchlist || [],
+        rule_text: ruleText,
+        speaker_name: (user && (user.advisor_name || user.username)) || '',
+        entry_point: 'h5_review_sector_summary_constraint',
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.ok || !payload.job_code) throw new Error(payload.error || 'review_sector_summary_constraint_failed');
+    await new Promise((resolve, reject) => {
+      startAsyncJobPolling(payload.job_code, {
+        onProgress(job) {
+          reviewSectorSummaryConstraintJobState = job || reviewSectorSummaryConstraintJobState;
+          renderReviewTriggerModal(user);
+        },
+        onSuccess(job) {
+          const result = job.result || {};
+          reviewStructuredPreview = normalizeReviewStructuredPreview(reviewStructuredPreview || {});
+          reviewStructuredPreview.watchlist_analysis_section = reviewStructuredPreview.watchlist_analysis_section || {};
+          reviewStructuredPreview.watchlist_analysis_section.sector_summary = String(result.sector_summary || '').trim();
+          reviewStructuredPreview.watchlist_analysis_section.sector_summary_rule = ruleText;
+          reviewStructuredPreview.llm_models = Array.isArray(reviewStructuredPreview.llm_models) ? reviewStructuredPreview.llm_models : [];
+          if (result.llm_model && !reviewStructuredPreview.llm_models.some((item) => item && item.stage === 'sector_summary_constraint')) {
+            reviewStructuredPreview.llm_models.push(result.llm_model);
+          }
+          reviewTriggerDraft.sectorSummaryRule = ruleText;
+          reviewSectorSummaryRuleApplied = ruleText;
+          reviewSectorSummaryConstraintJobState = job;
+          reviewSectorSummaryConstraintGenerating = false;
+          resolve();
+        },
+        onFailed(job) {
+          reviewSectorSummaryConstraintJobState = job || reviewSectorSummaryConstraintJobState;
+          reviewSectorSummaryConstraintGenerating = false;
+          reject(new Error(job.error_message || job.summary || 'review_sector_summary_constraint_failed'));
+        },
+        onError(error) {
+          reviewSectorSummaryConstraintGenerating = false;
+          reject(error);
+        },
+      });
+    });
+    renderReviewTriggerModal(user);
+    showToast('自选股归纳总结已按规则重新生成');
+  } catch (error) {
+    reviewSectorSummaryConstraintGenerating = false;
+    renderReviewTriggerModal(user);
+    showToast(getReviewDraftGenerationErrorMessage(error));
   }
 }
 
@@ -13850,11 +13995,13 @@ async function loadPersistedUserWatchlist() {
       }, {});
       userWatchlistLoaded = true;
       renderWatchlist();
+      if (reviewTriggerDraft.flowStage === 'watchlist_select') renderReviewTriggerModal(getActiveDemoUser());
     } catch (error) {
       console.warn('load persisted watchlist failed', error);
       userWatchlistLoaded = true;
       WATCHLIST_DETAILS_MAP = {};
       renderWatchlist();
+      if (reviewTriggerDraft.flowStage === 'watchlist_select') renderReviewTriggerModal(getActiveDemoUser());
     } finally {
       userWatchlistLoadPromise = null;
     }
@@ -13864,21 +14011,27 @@ async function loadPersistedUserWatchlist() {
 
 let marketOverviewLoaded = false;
 let marketSectorLoaded = false;
+let marketMacroLoaded = false;
 let marketOverviewRetryCount = 0;
 let marketSectorRetryCount = 0;
+let marketMacroRetryCount = 0;
 
 function switchMarketView(view) {
   const overview = view === 'overview';
   const sectors = view === 'sectors';
+  const macro = view === 'macro';
   const overviewPanel = document.getElementById('market-overview-panel');
   const sectorPanel = document.getElementById('market-sector-panel');
+  const macroPanel = document.getElementById('market-macro-panel');
   const watchlistPanel = document.getElementById('market-watchlist-panel');
   const overviewTab = document.getElementById('market-overview-tab');
   const sectorTab = document.getElementById('market-sector-tab');
+  const macroTab = document.getElementById('market-macro-tab');
   const watchlistTab = document.getElementById('market-watchlist-tab');
   if (overviewPanel) overviewPanel.style.display = overview ? '' : 'none';
   if (sectorPanel) sectorPanel.style.display = sectors ? '' : 'none';
-  if (watchlistPanel) watchlistPanel.style.display = overview || sectors ? 'none' : '';
+  if (macroPanel) macroPanel.style.display = macro ? '' : 'none';
+  if (watchlistPanel) watchlistPanel.style.display = overview || sectors || macro ? 'none' : '';
   if (overviewTab) {
     overviewTab.classList.toggle('active', overview);
     overviewTab.setAttribute('aria-selected', overview ? 'true' : 'false');
@@ -13891,14 +14044,21 @@ function switchMarketView(view) {
     sectorTab.style.background = sectors ? 'var(--gold)' : 'transparent';
     sectorTab.style.color = sectors ? 'var(--navy)' : 'var(--gray-400)';
   }
+  if (macroTab) {
+    macroTab.classList.toggle('active', macro);
+    macroTab.setAttribute('aria-selected', macro ? 'true' : 'false');
+    macroTab.style.background = macro ? 'var(--gold)' : 'transparent';
+    macroTab.style.color = macro ? 'var(--navy)' : 'var(--gray-400)';
+  }
   if (watchlistTab) {
-    watchlistTab.classList.toggle('active', !overview && !sectors);
-    watchlistTab.setAttribute('aria-selected', !overview && !sectors ? 'true' : 'false');
-    watchlistTab.style.background = !overview && !sectors ? 'var(--gold)' : 'transparent';
-    watchlistTab.style.color = !overview && !sectors ? 'var(--navy)' : 'var(--gray-400)';
+    watchlistTab.classList.toggle('active', !overview && !sectors && !macro);
+    watchlistTab.setAttribute('aria-selected', !overview && !sectors && !macro ? 'true' : 'false');
+    watchlistTab.style.background = !overview && !sectors && !macro ? 'var(--gold)' : 'transparent';
+    watchlistTab.style.color = !overview && !sectors && !macro ? 'var(--navy)' : 'var(--gray-400)';
   }
   if (overview && !marketOverviewLoaded) loadMarketOverview();
   if (sectors && !marketSectorLoaded) loadMarketSectors();
+  if (macro && !marketMacroLoaded) loadMarketMacro();
 }
 
 function renderMarketOverview(items) {
@@ -13945,6 +14105,46 @@ async function loadMarketOverview() {
   }
 }
 
+function renderMarketMacro(items) {
+  const host = document.getElementById('market-macro-list');
+  if (!host) return;
+  const hiddenMacroCodes = new Set(['source_urban_unemployment', 'source_real_estate_investment_yoy']);
+  const rows = (Array.isArray(items) ? items : []).filter((item) => item && !hiddenMacroCodes.has(String(item.indicator_code || '')));
+  const sourceNote = document.getElementById('market-macro-source-note');
+  if (sourceNote && rows.some((item) => item && item.stale)) sourceNote.textContent = '宏观数据正在同步，当前展示最近一次 AKShare 真实快照。';
+  host.innerHTML = rows.map((item) => {
+    const available = Boolean(item && item.available);
+    const value = available && Number.isFinite(Number(item.value)) ? Number(item.value).toFixed(2) : '--';
+    const unit = String((item && item.unit) || '');
+    return `<div style="min-width:0;border:1px solid rgba(200,169,110,0.12);border-radius:10px;padding:12px;background:var(--navy-mid);color:var(--white);opacity:${available ? '1' : '0.72'}">
+      <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.name || '--')}</div>
+      <div style="margin-top:8px;font-size:18px;font-weight:700">${value}${unit ? `<span style="font-size:11px;margin-left:3px;color:var(--gray-300)">${escapeHtml(unit)}</span>` : ''}</div>
+      <div style="margin-top:9px;font-size:10px;color:var(--gray-400);line-height:1.5">${available ? `数据期：${escapeHtml(item.updated_at || '--')}` : escapeHtml(item.message || '暂未获取到精确口径数据')}<br>${escapeHtml(item.data_source || 'AKShare')}</div>
+    </div>`;
+  }).join('');
+  if (!rows.length) host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">宏观数据正在由后台同步，请稍后查看</div>';
+}
+
+async function loadMarketMacro() {
+  const host = document.getElementById('market-macro-list');
+  if (!host) return;
+  try {
+    const response = await fetch('/api/macro-overview');
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || payload.ok === false) throw new Error(payload.error || 'macro_overview_failed');
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    marketMacroLoaded = items.length > 0;
+    if (marketMacroLoaded) marketMacroRetryCount = 0;
+    renderMarketMacro(items);
+    if (!marketMacroLoaded && marketMacroRetryCount < 10) {
+      marketMacroRetryCount += 1;
+      window.setTimeout(loadMarketMacro, 2500);
+    }
+  } catch (error) {
+    host.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">真实宏观数据暂时不可用，请稍后重试</div>';
+  }
+}
+
 async function refreshMarketSnapshot() {
   showToast('正在刷新市场与行业数据');
   try {
@@ -13955,6 +14155,7 @@ async function refreshMarketSnapshot() {
     marketSectorLoaded = true;
     renderMarketOverview((payload.overview || {}).items || []);
     renderMarketSectors((payload.sectors || {}).items || []);
+    renderMarketMacro((payload.macro || {}).items || []);
     showToast(`已更新 ${Number((payload.result || {}).updated || 0)} 条真实行情`);
   } catch (error) {
     showToast(error.message || '市场数据刷新失败');
@@ -18494,8 +18695,17 @@ function formatWorkbenchDashboardValue(item) {
   if (item && (item.data_status === 'unavailable' || item.data_unavailable === true)) return '--';
   if (value !== null && value !== undefined && String(value).trim() !== '') {
     const selected = Array.isArray(item && item.selectedIndicators) ? item.selectedIndicators : [];
-    const isDirectMarketIndex = selected.length === 1 && /^source_/.test(String(selected[0].indicator_code || '')) && !/[+\-*/()]/.test(String(item && item.prompt || ''));
-    if (isDirectMarketIndex && Number.isFinite(Number(value))) return Number(value).toFixed(2);
+    const directSnapshotCodes = new Set([
+      'source_shanghai_index', 'source_shenzhen_index', 'source_hsi', 'source_hscei', 'source_hscci',
+      'source_dji', 'source_nasdaq', 'source_sp500', 'source_nikkei',
+      'source_cpi', 'source_ppi', 'source_manufacturing_pmi', 'source_industrial_production_yoy',
+      'source_retail_sales_yoy', 'source_fixed_asset_investment_yoy', 'source_urban_unemployment',
+      'source_real_estate_investment_yoy',
+    ]);
+    const isDirectSnapshot = selected.length === 1
+      && directSnapshotCodes.has(String(selected[0].indicator_code || ''))
+      && !/[+\-*/()]/.test(String(item && item.prompt || ''));
+    if (isDirectSnapshot && Number.isFinite(Number(value))) return Number(value).toFixed(2);
     return String(value);
   }
   if (item && item.numeric_value !== null && item.numeric_value !== undefined) return String(item.numeric_value);
@@ -19238,9 +19448,11 @@ function buildWorkbenchDashboardDetailCard(rawCard, fallback = {}) {
   const isBaseIndicator = !isTenantSmart && !!baseIndicator;
   const sourceType = String((baseIndicator && (baseIndicator.source_type_label || baseIndicator.source_type)) || '').trim();
   const baseName = (baseIndicator && baseIndicator.indicator_name) || indicatorCode;
-  const baseAlgorithmDetail = sourceType
+  const baseAlgorithmDetail = (baseIndicator && baseIndicator.algorithm_detail) || (sourceType
     ? `基础指标：${baseName}。数据口径由平台统一指标库维护，数据类型：${sourceType}。`
-    : `基础指标：${baseName}。数据口径由平台统一指标库维护。`;
+    : `基础指标：${baseName}。数据口径由平台统一指标库维护。`);
+  const baseInterpretation = (baseIndicator && (baseIndicator.interpretation || baseIndicator.assessment))
+    || `${baseName}为统一维护的基础指标，可作为智能指标的计算对象。`;
   const usableValue = (value) => value !== null && value !== undefined && String(value).trim() !== '' && String(value).trim() !== '--';
   const cardIndicators = Array.isArray(card.selectedIndicators) && card.selectedIndicators.length ? card.selectedIndicators : null;
   const smartIndicators = smartIndicator && Array.isArray(smartIndicator.selected_indicators) && smartIndicator.selected_indicators.length
@@ -19260,8 +19472,8 @@ function buildWorkbenchDashboardDetailCard(rawCard, fallback = {}) {
     data_status_label: card.data_status_label || (smartIndicator && smartIndicator.data_status_label) || '',
     data_unavailable: card.data_unavailable === true || (smartIndicator && smartIndicator.data_unavailable === true),
     category: card.category || (smartIndicator && smartIndicator.category) || (baseIndicator && baseIndicator.category) || '',
-    algorithmDetail: card.algorithmDetail || (smartIndicator && smartIndicator.algorithm_detail) || (isBaseIndicator ? baseAlgorithmDetail : '') || fallback.algorithmDetail || '暂无算法详情',
-    interpretation: card.interpretation || card.assessment || (smartIndicator && (smartIndicator.interpretation || smartIndicator.assessment)) || (isBaseIndicator ? `${baseName}为统一维护的基础指标，可作为智能指标的计算对象。` : '') || fallback.interpretation || '暂无解读',
+    algorithmDetail: isBaseIndicator ? baseAlgorithmDetail : (card.algorithmDetail || (smartIndicator && smartIndicator.algorithm_detail) || fallback.algorithmDetail || '暂无算法详情'),
+    interpretation: isBaseIndicator ? baseInterpretation : (card.interpretation || card.assessment || (smartIndicator && (smartIndicator.interpretation || smartIndicator.assessment)) || fallback.interpretation || '暂无解读'),
     selectedIndicators: cardIndicators || smartIndicators || baseIndicators || [],
     isTenantSmart,
     isBaseIndicator,

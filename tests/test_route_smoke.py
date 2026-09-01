@@ -93,11 +93,14 @@ class RouteSmokeTest(unittest.TestCase):
         html = response.get_data(as_text=True)
         self.assertIn('id="market-overview-tab"', html)
         self.assertIn('id="market-sector-tab"', html)
+        self.assertIn('id="market-macro-tab"', html)
         self.assertIn('id="market-watchlist-tab"', html)
         self.assertIn('id="market-overview-list"', html)
         self.assertIn('id="market-sector-list"', html)
+        self.assertIn('id="market-macro-list"', html)
         self.assertIn("switchMarketView('overview')", html)
         self.assertIn("switchMarketView('sectors')", html)
+        self.assertIn("switchMarketView('macro')", html)
         self.assertIn("switchMarketView('watchlist')", html)
         self.assertLess(html.index('id="market-watchlist-tab"'), html.index('id="market-sector-tab"'))
         self.assertLess(html.index('id="market-sector-tab"'), html.index('id="market-overview-tab"'))
@@ -177,6 +180,14 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertEqual(len(payload["items"]), 9)
         self.assertTrue(all("available" in item for item in payload["items"]))
         self.assertTrue(all(item["available"] is False or item.get("price") is not None for item in payload["items"]))
+
+    def test_macro_overview_returns_persisted_macro_snapshot(self):
+        rows = [{"indicator_code": "source_cpi", "name": "中国CPI同比指数", "value": 0.5, "unit": "%", "available": True, "updated_at": "2026-07"}]
+        with patch("src.web.api_core.build_macro_economic_payload", return_value={"ok": True, "items": rows, "source": "AKShare"}):
+            response = self.client.get("/api/macro-overview")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["items"][0]["name"], "中国CPI同比指数")
 
     def test_market_overview_reads_persisted_snapshot_without_provider_call(self):
         from src.domain import market_services

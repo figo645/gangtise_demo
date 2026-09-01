@@ -190,6 +190,10 @@ def compose_review_structured_preview(*args, **kwargs):
     return _ai_services_module().compose_review_structured_preview(*args, **kwargs)
 
 
+def refine_review_sector_summary_with_llm(*args, **kwargs):
+    return _ai_services_module().refine_review_sector_summary_with_llm(*args, **kwargs)
+
+
 def process_review_publish_text(*args, **kwargs):
     return _ai_services_module().process_review_publish_text(*args, **kwargs)
 
@@ -2356,13 +2360,31 @@ def build_dashboard_base_indicator_options(tenant=None):
     hub = build_indicator_hub(tenant=tenant, admin_view=False)
     options = []
     option_codes = set()
+    hub_item_map = {
+        str(item.get("id") or "").strip(): item
+        for item in (hub.get("items") or [])
+        if str(item.get("id") or "").strip()
+    }
+
+    def _upsert_option(option):
+        """Keep one canonical dashboard projection for each registered code."""
+        indicator_code = str(option.get("indicator_code") or "").strip()
+        if not indicator_code:
+            return
+        for index, current in enumerate(options):
+            if str(current.get("indicator_code") or "").strip() == indicator_code:
+                options[index] = option
+                break
+        else:
+            options.append(option)
+        option_codes.add(indicator_code)
+
     for item in (hub.get("items") or []):
         numeric_value = item.get("numeric_value")
         if numeric_value is None:
             continue
         indicator_code = item.get("id")
-        option_codes.add(indicator_code)
-        options.append(
+        _upsert_option(
             {
                 "indicator_code": indicator_code,
                 "indicator_name": item.get("name"),
@@ -2372,6 +2394,10 @@ def build_dashboard_base_indicator_options(tenant=None):
                 "unit": item.get("unit") or "",
                 "source_type": item.get("source_type") or "",
                 "source_type_label": item.get("source_type_label") or "",
+                "provider": item.get("provider") or "",
+                "source_defs": copy.deepcopy(item.get("source_defs") or []),
+                "algorithm_detail": item.get("description") or "",
+                "interpretation": item.get("assessment") or "",
                 "prompt_text": item.get("prompt_text") or item.get("name") or indicator_code,
                 "selected_indicators": [{
                     "indicator_code": indicator_code,
@@ -2395,8 +2421,6 @@ def build_dashboard_base_indicator_options(tenant=None):
         if isinstance(item, dict)
     }
     for indicator_code in getattr(market, "MARKET_OVERVIEW_INDEX_CODES", ()):
-        if indicator_code in option_codes:
-            continue
         detail = market.build_market_overview_index_detail(indicator_code)
         overview_item = market_overview_items.get(indicator_code) or {}
         numeric_value = (
@@ -2407,13 +2431,14 @@ def build_dashboard_base_indicator_options(tenant=None):
         if numeric_value is None:
             continue
         entry = (getattr(market, "GANGTISE_INDICATOR_REGISTRY", {}) or {}).get(indicator_code) or {}
-        options.append(
+        indicator_name = (detail.get("name") if isinstance(detail, dict) else None) or overview_item.get("name") or entry.get("indicator_name") or indicator_code
+        _upsert_option(
             {
                 "indicator_code": indicator_code,
-                "indicator_name": (detail.get("name") if isinstance(detail, dict) else None) or overview_item.get("name") or entry.get("indicator_name") or indicator_code,
+                "indicator_name": indicator_name,
                 "selected_indicators": [{
                     "indicator_code": indicator_code,
-                    "indicator_name": (detail.get("name") if isinstance(detail, dict) else None) or overview_item.get("name") or entry.get("indicator_name") or indicator_code,
+                    "indicator_name": indicator_name,
                 }],
                 "category": entry.get("category") or "大盘指数",
                 "value": round(float(numeric_value), 2),
@@ -2421,11 +2446,56 @@ def build_dashboard_base_indicator_options(tenant=None):
                 "unit": "",
                 "source_type": "market_index",
                 "source_type_label": (detail.get("source_type_label") if isinstance(detail, dict) else None) or "大盘指数",
-                "prompt_text": (detail.get("name") if isinstance(detail, dict) else None) or overview_item.get("name") or entry.get("indicator_name") or indicator_code,
+                "provider": "AKShare",
+                "source_defs": [],
+                "algorithm_detail": "由后台 AKShare 市场快照统一采集，用于市场一览展示。",
+                "interpretation": f"已读取 {indicator_name} AKShare 市场快照。",
+                "prompt_text": indicator_name,
                 "updated_at": (detail.get("updated_at") if isinstance(detail, dict) else None) or overview_item.get("updated_at") or "",
                 "data_at": (detail.get("updated_at") if isinstance(detail, dict) else None) or overview_item.get("updated_at") or "",
                 "data_status": "available",
                 "data_status_label": "已读取市场快照",
+                "data_unavailable": False,
+            }
+        )
+    macro_payload = market.build_macro_economic_payload()
+    macro_items = {
+        str(item.get("indicator_code") or "").strip(): item
+        for item in (macro_payload.get("items") or [])
+        if isinstance(item, dict)
+    }
+    for indicator_code in getattr(market, "MACRO_ECONOMIC_VISIBLE_CODES", getattr(market, "MACRO_ECONOMIC_INDICATOR_CODES", ())):
+        macro_item = macro_items.get(indicator_code) or {}
+        numeric_value = market.parse_numeric_indicator_value(macro_item.get("value"))
+        if numeric_value is None:
+            continue
+        entry = (getattr(market, "GANGTISE_INDICATOR_REGISTRY", {}) or {}).get(indicator_code) or {}
+        indicator_name = macro_item.get("name") or entry.get("indicator_name") or indicator_code
+        data_source = str(macro_item.get("data_source") or "AKShare").strip() or "AKShare"
+        hub_item = hub_item_map.get(indicator_code) or {}
+        source_defs = copy.deepcopy(hub_item.get("source_defs") or [])
+        if not source_defs:
+            source_defs = market.list_indicator_source_defs(indicator_code=indicator_code)
+        _upsert_option(
+            {
+                "indicator_code": indicator_code,
+                "indicator_name": indicator_name,
+                "selected_indicators": [{"indicator_code": indicator_code, "indicator_name": indicator_name}],
+                "category": "宏观经济",
+                "value": round(float(numeric_value), 2),
+                "numeric_value": round(float(numeric_value), 2),
+                "unit": macro_item.get("unit") or entry.get("unit") or "",
+                "source_type": "macro_economic",
+                "source_type_label": "宏观经济指标",
+                "provider": "AKShare",
+                "source_defs": source_defs,
+                "algorithm_detail": "由后台 AKShare 公开宏观数据采集后入库，供宏观经济页面与智能指标统一读取。",
+                "interpretation": f"已读取 {indicator_name} AKShare 宏观快照。数据来源：{data_source}。",
+                "prompt_text": indicator_name,
+                "updated_at": macro_item.get("updated_at") or "",
+                "data_at": macro_item.get("updated_at") or "",
+                "data_status": "available",
+                "data_status_label": "已读取宏观快照",
                 "data_unavailable": False,
             }
         )
@@ -2476,6 +2546,35 @@ def build_smart_indicator_latest_value_map(selected_indicators=None):
             "updated_at": (detail.get("updated_at") if isinstance(detail, dict) else None) or overview_item.get("updated_at") or "",
             "is_simulated": 0,
             "source_code": "market_snapshot",
+        }
+    macro_payload = market.build_macro_economic_payload()
+    macro_items = {
+        str(item.get("indicator_code") or "").strip(): item
+        for item in (macro_payload.get("items") or [])
+        if isinstance(item, dict)
+    }
+    if selected_indicators is None:
+        macro_codes = getattr(market, "MACRO_ECONOMIC_VISIBLE_CODES", getattr(market, "MACRO_ECONOMIC_INDICATOR_CODES", ()))
+    else:
+        macro_codes = tuple(
+            code for code in getattr(market, "MACRO_ECONOMIC_VISIBLE_CODES", getattr(market, "MACRO_ECONOMIC_INDICATOR_CODES", ()))
+            if code in selected_codes
+        )
+    for indicator_code in macro_codes:
+        macro_item = macro_items.get(indicator_code) or {}
+        numeric_value = market.parse_numeric_indicator_value(macro_item.get("value"))
+        if numeric_value is None:
+            continue
+        latest_map[indicator_code] = {
+            **(latest_map.get(indicator_code) or {}),
+            "indicator_code": indicator_code,
+            "latest_value": str(round(numeric_value, 2)),
+            "latest_status": "normal",
+            "latest_assessment": f"已读取 {macro_item.get('name') or indicator_code} 宏观快照。",
+            "latest_alert": "",
+            "updated_at": macro_item.get("updated_at") or "",
+            "is_simulated": 0,
+            "source_code": "macro_snapshot",
         }
     return latest_map
 
@@ -2770,6 +2869,8 @@ def resolve_smart_indicator_prompt_refs(prompt_text, tag_catalog, indicator_name
     # watchlist alias. The data availability check remains in the preview
     # stage; an unavailable source is shown as unavailable, never fabricated.
     for indicator_code, entry in registry.items():
+        if indicator_code in getattr(market, "MACRO_ECONOMIC_INDICATOR_CODES", ()) and indicator_code not in getattr(market, "MACRO_ECONOMIC_VISIBLE_CODES", ()):
+            continue
         for candidate in (entry.get("indicator_name"), entry.get("search_keyword"), entry.get("security_code"), entry.get("tencent_symbol")):
             if _matches(candidate):
                 _append(indicator_code)
@@ -2861,8 +2962,11 @@ def build_fund_dashboard_card_from_indicator(indicator_item, index=0):
     raw_value = item.get("value")
     market = _market_services_module()
     item_code = str(item.get("indicator_code") or item.get("id") or "").strip()
-    is_direct_market_index = (
-        item_code in getattr(market, "MARKET_OVERVIEW_INDEX_CODES", ())
+    is_direct_snapshot_indicator = (
+        item_code in (
+            *getattr(market, "MARKET_OVERVIEW_INDEX_CODES", ()),
+            *getattr(market, "MACRO_ECONOMIC_INDICATOR_CODES", ()),
+        )
         and (
             not selected_indicators
             or len(selected_indicators) == 1
@@ -2871,7 +2975,7 @@ def build_fund_dashboard_card_from_indicator(indicator_item, index=0):
         and raw_value is not None
         and str(raw_value).strip() not in {"", "--"}
     )
-    display_value = f"{float(raw_value):.2f}" if is_direct_market_index else (
+    display_value = f"{float(raw_value):.2f}" if is_direct_snapshot_indicator else (
         str(raw_value).strip() if raw_value is not None and str(raw_value).strip() else "--"
     )
     return {
@@ -2891,6 +2995,10 @@ def build_fund_dashboard_card_from_indicator(indicator_item, index=0):
         "dataAt": str(item.get("data_at") or "").strip(),
         "snapshotAt": str(item.get("last_updated") or item.get("updatedAt") or "").strip(),
         "category": str(item.get("category") or "").strip(),
+        "provider": str(item.get("provider") or "").strip(),
+        "sourceType": str(item.get("source_type") or "").strip(),
+        "sourceTypeLabel": str(item.get("source_type_label") or "").strip(),
+        "sourceDefs": copy.deepcopy(item.get("source_defs") or []),
         "numeric_value": item.get("numeric_value"),
         "data_status": str(item.get("data_status") or "").strip(),
         "data_status_label": str(item.get("data_status_label") or "").strip(),
@@ -3226,25 +3334,30 @@ def normalize_fund_dashboard_view(source, tenant):
         layout = required_layout
     hub = build_indicator_hub(tenant=tenant, admin_view=False)
     indicator_map = {item.get("id"): item for item in (hub.get("smart_items") or []) + (hub.get("lake_items") or []) if item.get("id")}
-    # Base market indicators use the market snapshot store. Prefer this
-    # canonical representation over legacy dashboard card payloads, which may
-    # contain only a name and an old placeholder value.
+    # Base market and macro indicators use dedicated snapshot stores. Prefer
+    # their canonical projections over legacy indicator-lake cards, which may
+    # contain an old placeholder value or an obsolete Gangtise-only message.
     base_indicator_options = build_dashboard_base_indicator_options(tenant)
     for option in base_indicator_options:
         code = str(option.get("indicator_code") or "").strip()
-        if code in getattr(_market_services_module(), "MARKET_OVERVIEW_INDEX_CODES", ()):
+        market = _market_services_module()
+        if code in (
+            *getattr(market, "MARKET_OVERVIEW_INDEX_CODES", ()),
+            *getattr(market, "MACRO_ECONOMIC_INDICATOR_CODES", ()),
+        ):
+            source_label = option.get("source_type_label") or "基础指标"
             indicator_map[code] = {
                 **option,
                 "id": code,
                 "name": option.get("indicator_name") or code,
-                "assessment": f"{option.get('indicator_name') or code} 已从市场快照读取最新值。",
+                "assessment": option.get("interpretation") or f"{option.get('indicator_name') or code} 已从统一快照读取最新值。",
                 "status": "normal",
-                "alert": "已按市场快照更新。",
+                "alert": f"已按{source_label}更新。",
                 "enabled": True,
                 "last_updated": option.get("updated_at") or "",
                 "data_at": option.get("data_at") or option.get("updated_at") or "",
                 "selected_indicators": [{"indicator_code": code, "indicator_name": option.get("indicator_name") or code}],
-                "source_type_label": option.get("source_type_label") or "大盘指数",
+                "source_type_label": source_label,
             }
     indicator_name_map = {
         str(item.get("indicator_name") or "").strip(): item
@@ -7112,6 +7225,7 @@ def create_user_async_job(job_type, payload=None, tenant_slug="", entry_point=""
         "review_prepare_preview",
         "review_polish_input",
         "review_compose_draft",
+        "review_sector_summary_constraint",
     }
     if normalized_job_type in deduplicated_review_types and normalized_tenant_slug:
         existing = get_db().execute(
@@ -7418,6 +7532,19 @@ def execute_user_async_job(job):
             job_code=job_code,
             include_summary=bool(payload.get("include_summary", True)),
         )
+    if job_type == "review_sector_summary_constraint":
+        result = refine_review_sector_summary_with_llm(
+            sector_summary=payload.get("sector_summary"),
+            sector_profiles=payload.get("sector_profiles") if isinstance(payload.get("sector_profiles"), list) else [],
+            watchlist_items=payload.get("watchlist_items") if isinstance(payload.get("watchlist_items"), list) else [],
+            rule_text=payload.get("rule_text"),
+            review_period=str(payload.get("period") or "").strip().lower(),
+            speaker_name=str(payload.get("speaker_name") or "").strip(),
+            entry_point=str(payload.get("entry_point") or "").strip(),
+            tenant_slug=str(payload.get("tenant_slug") or "").strip().lower(),
+            job_code=job_code,
+        )
+        return result
     if job_type == "review_publish_embed":
         tenant_slug = str(payload.get("tenant_slug") or "").strip().lower()
         publish_result = process_review_publish_text(
@@ -7505,6 +7632,8 @@ def _summarize_user_async_job_result(job_type, result):
         return "复盘草稿生成完成"
     if job_type == "review_prepare_preview":
         return "复盘结构化预览完成"
+    if job_type == "review_sector_summary_constraint":
+        return "自选股总结规则约束完成"
     if job_type == "review_publish_embed":
         return "复盘发布入向量完成"
     if job_type == "knowledge_manual_sync":

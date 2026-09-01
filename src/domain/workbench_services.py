@@ -1137,6 +1137,8 @@ def gen_dm_messages(thread_id, tenant_slug=None):
 
 def gen_kol_workbench(tenant=None, fallback_mode=False):
     tenant = tenant or get_tenant_by_slug()
+    # Keep tenant-specific demo metrics consistent with the other workbench builders.
+    is_lisa = str(tenant.get("slug") or "").strip().lower() == "lisa"
     tenant_portal_enabled = is_feature_enabled("tenant_portal")
     if fallback_mode:
         fallback_config = normalize_site_config(DEFAULT_SITE_CONFIG)
@@ -1151,8 +1153,31 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
     watchlist_details_map = gen_watchlist_details()
     kol_name = tenant["advisor"]
     kol_avatar = tenant.get("logo_mark") or "👑"
-    is_lisa = tenant["slug"] == "lisa"
-    watchlist_focus = ["腾讯控股", "美团-W", "阿里巴巴-W"] if is_lisa else ["中芯国际", "腾讯控股", "贵州茅台"]
+    # Review selection must use the DAv's persisted watchlist. The old
+    # tenant-level demo list made the workbench disagree with H5.
+    watchlist_items = []
+    if not fallback_mode:
+        try:
+            dav_users = list_users(role="dav", tenant_slug=tenant["slug"])
+            dav_user = next(
+                (
+                    item for item in dav_users
+                    if str(item.get("advisor_name") or item.get("username") or "").strip() == kol_name
+                ),
+                dav_users[0] if dav_users else None,
+            )
+            dav_profile_id = str((dav_user or {}).get("username") or kol_name).strip()
+            if dav_profile_id:
+                watchlist_items = list_user_watchlist_items(tenant["slug"], dav_profile_id)
+        except Exception as exc:
+            if not is_db_unavailable_error(exc):
+                raise
+            watchlist_items = []
+    watchlist_focus = [
+        str(item.get("name") or "").strip()
+        for item in watchlist_items
+        if isinstance(item, dict) and str(item.get("name") or "").strip()
+    ]
     fund_dashboard_state = resolve_tenant_fund_dashboard_state(tenant, tenant.get("fund_dashboard_config"))
     fund_dashboard = copy.deepcopy(fund_dashboard_state["published"])
     knowledge_enabled = is_feature_enabled("knowledge")
@@ -1426,6 +1451,7 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
             ],
             "default_flow": ["选择复盘周期", "确认本次自选股", "补充手输/文件", "设置智能文案规则", "生成草稿预览", "确认后发布给粉丝"],
             "watchlist_focus": watchlist_focus,
+            "watchlist_items": watchlist_items,
             "periods": ["日复盘", "周复盘", "月复盘"],
             "smart_cards": review_smart_cards,
             "flow_nodes": [

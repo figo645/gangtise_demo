@@ -7169,6 +7169,7 @@ let kwReviewDraft = {
   urlText: '',
   aiPrompt: '',
   promptTags: [],
+  sectorSummaryRule: '',
   generatedPreviewText: '',
   draftReviewText: '',
   finalDraftText: '',
@@ -7184,6 +7185,8 @@ let kwReviewWorkspacePanel = 'input';
 let kwReviewStructuredPreview = null;
 let kwReviewPreviewGenerating = false;
 let kwReviewPreviewJobState = null;
+let kwReviewSectorSummaryConstraintGenerating = false;
+let kwReviewSectorSummaryConstraintJobState = null;
 let kwReviewWatchlistSearchItems = [];
 let kwReviewWatchlistSearchQuery = '';
 let kwReviewWatchlistSearchTimer = null;
@@ -8979,8 +8982,13 @@ async function kwSubmitKnowledgeTuning() {
 
 function getKwTenantWatchlistFocus() {
   const reviewStudio = window.WORKBENCH_DATA && window.WORKBENCH_DATA.review_studio;
-  const list = reviewStudio && Array.isArray(reviewStudio.watchlist_focus) ? reviewStudio.watchlist_focus : [];
-  return list.slice(0);
+  const items = reviewStudio && Array.isArray(reviewStudio.watchlist_items) ? reviewStudio.watchlist_items : [];
+  return items.map((item) => String(item && item.name || '').trim()).filter(Boolean);
+}
+
+function getKwTenantWatchlistItems() {
+  const reviewStudio = window.WORKBENCH_DATA && window.WORKBENCH_DATA.review_studio;
+  return reviewStudio && Array.isArray(reviewStudio.watchlist_items) ? reviewStudio.watchlist_items : [];
 }
 
 function ensureKwReviewRuntime() {
@@ -9041,6 +9049,7 @@ function kwNormalizeReviewStructuredPreview(payload) {
     },
     watchlist_analysis_section: {
       sector_summary: String(watchlistAnalysisSection.sector_summary || '').trim(),
+      sector_summary_rule: String(watchlistAnalysisSection.sector_summary_rule || '').trim(),
       raw_text: String(watchlistAnalysisSection.raw_text || source.raw_text || '').trim(),
       combined_text: String(watchlistAnalysisSection.combined_text || watchlistAnalysisSection.raw_text || source.raw_text || '').trim(),
       provider: String(watchlistAnalysisSection.provider || '').trim(),
@@ -9076,9 +9085,9 @@ function kwNormalizeReviewStructuredPreview(payload) {
 function kwBuildReviewWatchlistAnalysisText(section) {
   const payload = section && typeof section === 'object' ? section : {};
   const combinedText = String(payload.combined_text || '').trim();
-  if (combinedText) return combinedText;
-  const parts = [];
   const sectorSummary = String(payload.sector_summary || '').trim();
+  if (combinedText) return [combinedText, sectorSummary ? `板块归纳：${sectorSummary}` : ''].filter(Boolean).join('\n\n');
+  const parts = [];
   if (sectorSummary) parts.push(`板块归纳：${sectorSummary}`);
   const sectorProfiles = Array.isArray(payload.sector_profiles) ? payload.sector_profiles : [];
   if (sectorProfiles.length) {
@@ -9230,6 +9239,12 @@ function kwGetReviewDraftGenerationErrorMessage(error) {
   }
   if (raw.includes('review_prepare_preview_failed')) {
     return '复盘归纳预览生成失败，请稍后重试。';
+  }
+  if (raw.includes('review_sector_summary_llm_not_configured')) {
+    return '当前没有配置可用的大模型，无法按规则重新生成自选股归纳。';
+  }
+  if (raw.includes('review_sector_summary_empty_llm_response')) {
+    return '大模型未返回有效的自选股归纳，请重试。';
   }
   return raw;
 }
@@ -9385,6 +9400,7 @@ function kwReviewActiveJobLabel(job) {
   const labels = {
     review_generate_draft: '复盘 Draft 生成',
     review_prepare_preview: '自选股综合分析',
+    review_sector_summary_constraint: '自选股总结规则约束',
     review_voice_transcribe: '语音转写',
     review_polish_input: '复盘输入润色',
     review_compose_draft: '复盘完整成稿',
@@ -10586,17 +10602,20 @@ function kwRenderReviewWatchlistSelector() {
     host.innerHTML = '';
     return;
   }
-  const list = getKwTenantWatchlistFocus();
+  const personalItems = getKwTenantWatchlistItems();
+  const personalNames = new Set(personalItems.map((item) => String(item && item.name || '').trim()).filter(Boolean));
+  kwReviewDraft.selectedWatchlist = (kwReviewDraft.selectedWatchlist || []).filter((name) => personalNames.has(name));
+  const list = Array.from(personalNames);
   const addedItems = Array.isArray(kwReviewWatchlistAddedItems) ? kwReviewWatchlistAddedItems : [];
   const displayItems = [
-    ...list.map((name) => ({ name: String(name || '').trim(), code: '' })),
-    ...addedItems.filter((item) => !list.includes(String(item.name || '').trim())),
+    ...personalItems,
+    ...addedItems.filter((item) => personalNames.has(String(item && item.name || '').trim())),
   ].filter((item) => item.name);
   const selected = Array.isArray(kwReviewDraft.selectedWatchlist) ? kwReviewDraft.selectedWatchlist : [];
   host.innerHTML = `
     <div class="kw-review-runtime-item">
       <strong>第二阶段：选择需要 AI 分析的自选股</strong>
-      <div class="kw-review-runtime-desc">搜索到的股票会直接纳入本次复盘，不会修改个人自选股。确认列表后才会调用 Gangtise。</div>
+      <div class="kw-review-runtime-desc">这里只显示当前大V在自选股板块中已保存的股票。选择仅决定本次复盘范围，不会新增或修改自选股。</div>
       <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
         <input id="kw-review-watchlist-search-input" class="kw-knowledge-modal-input" style="flex:1" value="${escapeAttr(kwReviewWatchlistSearchQuery)}" placeholder="输入股票代码或名称，例如 600519 / 贵州茅台" oninput="kwSearchReviewWatchlistCandidates(this.value)" />
       </div>
@@ -10619,14 +10638,14 @@ function kwRenderReviewWatchlistSelector() {
           </label>
         `).join('') || '<div class="kw-review-runtime-desc">尚未选择股票，请搜索或从下方个人自选股中选择。</div>'}
       </div>
-      <div class="kw-review-runtime-desc" style="margin-top:14px;font-weight:700;color:var(--text-main)">个人自选股</div>
+      <div class="kw-review-runtime-desc" style="margin-top:14px;font-weight:700;color:var(--text-main)">当前个人自选股</div>
       <div style="display:grid;gap:7px;margin-top:8px;max-height:260px;overflow-y:auto;padding-right:4px">
         ${displayItems.filter((item) => !selected.includes(item.name)).map((item) => `
           <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid rgba(47,116,192,0.10);border-radius:9px;background:#F8FBFF;color:var(--text-main);font-size:12px;cursor:pointer">
             <input type="checkbox" onchange="kwToggleReviewWatchlistOption('${escapeAttr(item.name)}', this.checked)" />
             <span>${escapeHtml(item.name)}${item.code ? `<small style="display:block;color:var(--gray-400);margin-top:2px">${escapeHtml(item.code)}</small>` : ''}</span>
           </label>
-        `).join('') || '<div class="kw-review-runtime-desc">当前没有个人自选股，可通过上方搜索选择。</div>'}
+        `).join('') || '<div class="kw-review-runtime-desc">当前没有个人自选股，请先在自选股板块添加。</div>'}
       </div>
       <div class="kw-review-runtime-desc" style="margin-top:12px;padding:10px;border-radius:9px;background:rgba(200,169,110,0.10);color:var(--text-main)">待分析：${selected.map((name) => escapeHtml(name)).join('、') || '尚未选择'}</div>
     </div>
@@ -10647,13 +10666,20 @@ function kwAddReviewWatchlistCandidate(index) {
   if (!item) return;
   const name = String(item.name || item.code || '').trim();
   if (!name) return;
+  const actualItem = getKwTenantWatchlistItems().find((candidate) => {
+    const candidateName = String(candidate && candidate.name || '').trim().toUpperCase();
+    const candidateCode = String(candidate && candidate.code || '').trim().toUpperCase();
+    return candidateName === String(item.name || '').trim().toUpperCase()
+      || (candidateCode && candidateCode === String(item.code || '').trim().toUpperCase());
+  });
+  if (!actualItem) {
+    showToast('只能选择当前个人自选股，请先在自选股板块添加');
+    return;
+  }
+  const actualName = String(actualItem.name || '').trim();
   const next = new Set(kwReviewDraft.selectedWatchlist || []);
-  next.add(name);
+  next.add(actualName);
   kwReviewDraft.selectedWatchlist = Array.from(next);
-  kwReviewWatchlistAddedItems = [
-    ...(kwReviewWatchlistAddedItems || []).filter((candidate) => String(candidate.name || '').trim() !== name),
-    { name, code: String(item.code || '').trim(), market: String(item.market || '').trim() },
-  ];
   kwRenderReviewStudio();
 }
 
@@ -10669,11 +10695,12 @@ function kwSearchReviewWatchlistCandidates(value) {
   const requestSeq = ++kwReviewWatchlistSearchRequestSeq;
   kwReviewWatchlistSearchTimer = setTimeout(async () => {
     try {
-      const resp = await fetch(`/api/watchlist/search?q=${encodeURIComponent(query)}&limit=8`);
-      const data = await resp.json().catch(() => ({}));
       if (requestSeq !== kwReviewWatchlistSearchRequestSeq) return;
-      if (!resp.ok || data.ok === false) throw new Error((data && data.error) || 'watchlist_search_failed');
-      kwReviewWatchlistSearchItems = Array.isArray(data.items) ? data.items : [];
+      const normalizedQuery = query.toUpperCase();
+      kwReviewWatchlistSearchItems = getKwTenantWatchlistItems().filter((item) => (
+        String(item && item.name || '').trim().toUpperCase().includes(normalizedQuery)
+        || String(item && item.code || '').trim().toUpperCase().includes(normalizedQuery)
+      ));
       const exact = kwReviewWatchlistSearchItems.find((item) => {
         const itemName = String(item && item.name || '').trim().toLowerCase();
         const itemCode = String(item && item.code || '').trim().toLowerCase();

@@ -368,6 +368,52 @@ def api_review_prepare_preview():
     )
 
 
+@app.route("/api/review/refine-sector-summary", methods=["POST"])
+def api_review_refine_sector_summary():
+    body = request.get_json(silent=True) or {}
+    try:
+        tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
+        entry_point = str(body.get("entry_point") or "").strip().lower() or "review_sector_summary_constraint"
+        speaker_name = str(body.get("speaker_name") or "").strip()
+        sector_summary = str(body.get("sector_summary") or "").strip()
+        rule_text = str(body.get("rule_text") or "").strip()
+        if not sector_summary:
+            raise ValueError("review_sector_summary_required")
+        if not rule_text:
+            raise ValueError("review_sector_summary_rule_required")
+        payload = {
+            "tenant_slug": tenant_slug,
+            "period": str(body.get("period") or "").strip().lower(),
+            "sector_summary": sector_summary,
+            "sector_profiles": body.get("sector_profiles") if isinstance(body.get("sector_profiles"), list) else [],
+            "watchlist_items": body.get("watchlist_items") if isinstance(body.get("watchlist_items"), list) else [],
+            "rule_text": rule_text,
+            "speaker_name": speaker_name,
+            "entry_point": entry_point,
+        }
+        job = create_user_async_job(
+            "review_sector_summary_constraint",
+            payload=payload,
+            tenant_slug=tenant_slug,
+            entry_point=entry_point,
+            owner_label=speaker_name,
+        )
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    except Exception:
+        app.logger.exception("Failed to refine review sector summary")
+        return jsonify({"ok": False, "error": "review_sector_summary_constraint_failed"}), 500
+    return jsonify({
+        "ok": True,
+        "async": True,
+        "job_code": job["job_code"],
+        "job_status": job["status"],
+        "message": "自选股总结规则已提交，正在后台调用大模型",
+    })
+
+
 @app.route("/api/market")
 def api_market():
     return jsonify(gen_market_data())
@@ -383,6 +429,17 @@ def api_market_overview():
             return jsonify({"ok": False, "error": "database_unavailable"}), 503
         app.logger.exception("Failed to load market overview")
         return jsonify({"ok": False, "error": "market_overview_failed"}), 502
+
+
+@app.route("/api/macro-overview")
+def api_macro_overview():
+    try:
+        return jsonify(build_macro_economic_payload())
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to load macro overview")
+        return jsonify({"ok": False, "error": "macro_overview_failed"}), 502
 
 
 @app.route("/api/market-sectors")
@@ -405,7 +462,8 @@ def api_market_snapshot_refresh():
         result = sync_market_snapshot(force=True)
         overview = build_market_overview_payload()
         sectors = build_market_sector_overview_payload()
-        return jsonify({"ok": bool(result.get("ok")), "result": result, "overview": overview, "sectors": sectors}), 200 if result.get("ok") else 502
+        macro = build_macro_economic_payload()
+        return jsonify({"ok": bool(result.get("ok")), "result": result, "overview": overview, "sectors": sectors, "macro": macro}), 200 if result.get("ok") else 502
     except Exception as exc:
         if is_db_unavailable_error(exc):
             return jsonify({"ok": False, "error": "database_unavailable"}), 503
