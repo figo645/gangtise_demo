@@ -10817,7 +10817,6 @@ def build_hermes_query_response(body):
                 "interception_skill_count": len(hermes_settings.get("interception_skills") or []),
                 "internet_answer_enabled": hermes_settings.get("internet_answer_enabled") is True,
                 "thinking_process_enabled": hermes_settings.get("thinking_process_enabled") is True,
-                "answer_save_to_knowledge_enabled": hermes_settings.get("answer_save_to_knowledge_enabled") is True,
                 "default_response_style": hermes_settings.get("default_response_style") or "structured",
                 "chart_types_enabled": copy.deepcopy(hermes_settings.get("chart_types_enabled") or []),
             },

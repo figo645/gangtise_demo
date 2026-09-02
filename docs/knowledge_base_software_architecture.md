@@ -103,7 +103,6 @@
 - 文件上传入口
 - 知识问答展示
 - Hermes 附件问答入口
-- “加入知识源”交互
 - 知识图谱展示入口
 
 
@@ -220,7 +219,6 @@ Hermes 与知识库不是分离的。
 
 - `knowledge/manual`
 - `knowledge/ingest`
-- `saveHermesAnswerAsKnowledge`
 
 当前特点：
 

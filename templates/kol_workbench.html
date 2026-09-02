@@ -4862,6 +4862,9 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
                 <span class="kw-chip">{{ tag }}</span>
                 {% endfor %}
               </div>
+              <div style="display:flex;justify-content:flex-end;margin-top:10px">
+                <button class="btn-outline" type="button" style="padding:5px 9px;font-size:11px;color:#B42318;border-color:rgba(180,35,24,0.24)" onclick="kwDeletePublishedReview('{{ item.id }}')">删除复盘</button>
+              </div>
             </div>
             {% endfor %}
           </div>
@@ -6203,37 +6206,11 @@ async function kwSaveDashboardCellPrompt() {
 }
 
 async function kwGenerateFundDashboard(layout) {
-  const normalizedLayout = kwNormalizeDashboardLayout(layout || kwDashboardCurrentLayout || '2x2');
-  const target = kwGetDashboardCardTarget(normalizedLayout);
-  const currentDraft = kwGetFundDashboardDraft() || kwGetFundDashboardPublished();
-  const cards = Array.from({ length: target }, (_, index) => {
-    const existing = currentDraft.cards && currentDraft.cards[index] ? currentDraft.cards[index] : null;
-    const mode = kwInferDashboardCardMode(existing, (existing && existing.mode) || kwDashboardStudioState.mode || kwGetDefaultDashboardCardMode(index));
-    const segment = kwGetDashboardSegmentConfig(mode);
-    const prompt = (existing && existing.prompt) || (segment.cards[index % segment.cards.length] && segment.cards[index % segment.cards.length].prompt) || kwBuildFallbackDashboardCard(index).prompt;
-    const nextCard = kwBuildDashboardCardFromPrompt(prompt, index, mode);
-    const components = kwNormalizeDashboardComponents(existing && existing.components, mode);
-    return {
-      ...nextCard,
-      components,
-      formula: String((existing && existing.formula) || '').trim() || kwBuildDashboardFormulaText(mode, components),
-      sources: kwBuildDashboardSourceList(mode, components, existing && existing.sources),
-    };
-  });
-  const composition = kwBuildDashboardCompositionSummary(cards);
-  const primaryMode = kwGetPrimaryDashboardMode(cards);
-  const primarySegment = kwGetDashboardSegmentConfig(primaryMode);
-  const nextDraft = {
-    mode: primaryMode,
-    layout: normalizedLayout,
-    title: kwIsMixedDashboard(cards) ? `今日核心指标面板 · 混合策略 · ${normalizedLayout.toUpperCase()}` : `${primarySegment.title} · 今日核心指标面板 · ${normalizedLayout.toUpperCase()}`,
-    note: `当前面板支持按格子混搭。组合结构：${composition}。`,
-    summary: `当前面板支持按格子混搭。组合结构：${composition}。`,
-    cards,
-    updatedAt: '刚刚生成',
-    publisher: (window.WORKBENCH_DATA && window.WORKBENCH_DATA.kol_name) || '当前大V',
-  };
-  await kwSyncFundDashboard('save_draft', nextDraft, `已生成混合仪表盘 ${normalizedLayout.toUpperCase()} 草稿`);
+  // Compatibility bridge for the retired white-box editor. Dashboard cards
+  // must now be created through the same smart-indicator flow as H5.
+  const normalizedLayout = kwNormalizeDashboardLayout(layout || '2x2');
+  await kwSelectSmartDashboardLayout(normalizedLayout);
+  showToast('请点击空白格新增智能指标');
 }
 
 async function kwPublishFundDashboard() {
@@ -6251,34 +6228,32 @@ async function kwResetFundDashboardDraft() {
 
 async function kwSyncFundDashboard(action, dashboard, successMessage) {
   const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
-  try {
-    const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/dashboard`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action,
-        dashboard: dashboard || null,
-      }),
-    });
-    const payload = await resp.json();
-    if (!resp.ok || !payload.success) throw new Error(payload.error || 'dashboard_sync_failed');
-    kwFundDashboardState = JSON.parse(JSON.stringify(payload.fund_dashboard_state || ((payload.dashboard || {}).fund_dashboard_state) || {}));
-    if (window.WORKBENCH_DATA) {
-      window.WORKBENCH_DATA.fund_dashboard_state = JSON.parse(JSON.stringify(kwFundDashboardState || {}));
-      if (payload.dashboard && payload.dashboard.fund_dashboard) {
-        window.WORKBENCH_DATA.fund_dashboard = JSON.parse(JSON.stringify(payload.dashboard.fund_dashboard));
-      } else if (kwFundDashboardState.published) {
-        window.WORKBENCH_DATA.fund_dashboard = JSON.parse(JSON.stringify(kwFundDashboardState.published));
-      }
+  if (!tenantSlug) throw new Error('tenant_missing');
+  const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/dashboard`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action,
+      dashboard: dashboard || null,
+    }),
+  });
+  const payload = await resp.json();
+  if (!resp.ok || !payload.success) throw new Error(payload.error || 'dashboard_sync_failed');
+  kwFundDashboardState = JSON.parse(JSON.stringify(payload.fund_dashboard_state || ((payload.dashboard || {}).fund_dashboard_state) || {}));
+  if (window.WORKBENCH_DATA) {
+    window.WORKBENCH_DATA.fund_dashboard_state = JSON.parse(JSON.stringify(kwFundDashboardState || {}));
+    if (payload.dashboard && payload.dashboard.fund_dashboard) {
+      window.WORKBENCH_DATA.fund_dashboard = JSON.parse(JSON.stringify(payload.dashboard.fund_dashboard));
+    } else if (kwFundDashboardState.published) {
+      window.WORKBENCH_DATA.fund_dashboard = JSON.parse(JSON.stringify(kwFundDashboardState.published));
     }
-    kwRenderDashboardPreview();
-    try {
-      window.localStorage?.setItem(SITE_CONFIG_BROADCAST_KEY, String(Date.now()));
-    } catch (error) {}
-    showToast(successMessage || '已同步');
-  } catch (error) {
-    showToast('Dashboard 同步失败，请稍后重试');
   }
+  kwRenderDashboardPreview();
+  try {
+    window.localStorage?.setItem(SITE_CONFIG_BROADCAST_KEY, String(Date.now()));
+  } catch (error) {}
+  showToast(successMessage || '已同步');
+  return payload;
 }
 
 function renderWorkbenchBizCharts() {
@@ -9682,24 +9657,10 @@ async function kwPublishReviewContent(text, transcriptionEngine, transcriptModel
       paragraph_mode: kwReviewDraft.paragraphMode || 'manual',
       selected_watchlist: kwReviewDraft.selectedWatchlist || [],
       prompt_tags: kwReviewDraft.promptTags || [],
-      knowledge_attachments: kwGetReviewSelectedKnowledge().map(item => ({
-        id: item.id || '',
-        title: item.title || '',
-        summary: item.summary || '',
-        body: item.body || item.raw_input || '',
-        source_detail: item.source_detail || item.source || '',
-        url: item.url || '',
-        tags: item.tags || [],
-      })),
-      selected_cards: kwGetReviewSelectedCards(),
-      data_sources: kwGetReviewSelectedCards().flatMap(item => Array.isArray(item.data_sources) ? item.data_sources : []),
-      news_sources: kwGetReviewSelectedCards().flatMap(item => Array.isArray(item.news_sources) ? item.news_sources : []),
       review_summary: payload.review_summary || '',
       user_input_section: payload.user_input_section || {},
       watchlist_analysis_section: payload.watchlist_analysis_section || {},
-      llm_models: Array.isArray(payload.llm_models) ? payload.llm_models : [
-        kwReviewIngestResult && kwReviewIngestResult.review_draft_llm ? { stage: 'compose', ...kwReviewIngestResult.review_draft_llm } : null,
-      ].filter(Boolean),
+      llm_models: Array.isArray(payload.llm_models) ? payload.llm_models : [],
     }),
   });
   const data = await resp.json();
@@ -11362,8 +11323,37 @@ function kwRenderPublishedReviewList() {
       <div class="kw-chip-row" style="margin-top:10px">
         ${Array.isArray(item.tags) ? item.tags.map(tag => `<span class="kw-chip">${escapeHtml(tag)}</span>`).join('') : ''}
       </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:10px">
+        <button class="btn-outline" type="button" style="padding:5px 9px;font-size:11px;color:#B42318;border-color:rgba(180,35,24,0.24)" onclick="kwDeletePublishedReview('${escapeAttr(item.id || '')}')">删除复盘</button>
+      </div>
     </div>
   `).join('');
+}
+
+async function kwDeletePublishedReview(reviewId) {
+  const normalizedReviewId = String(reviewId || '').trim();
+  const tenantSlug = String(((window.ACTIVE_TENANT || {}).slug) || '').trim().toLowerCase();
+  if (!normalizedReviewId || !tenantSlug) {
+    showToast('当前复盘缺少有效标识，无法删除');
+    return;
+  }
+  if (!window.confirm('确认删除这篇已发布复盘吗？删除后将不再对前台用户展示，且无法撤销。')) return;
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/reviews/${encodeURIComponent(normalizedReviewId)}`, {
+      method: 'DELETE',
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'review_delete_failed');
+    kwSyncPublishedReviewState(payload);
+    if (window.WORKBENCH_DATA) {
+      window.WORKBENCH_DATA.published_reviews = Array.isArray(payload.snapshots) ? payload.snapshots.slice(0, 20) : [];
+    }
+    kwRenderPublishedReviewList();
+    kwRenderReviewStudio();
+    showToast(payload.message || '复盘已删除');
+  } catch (error) {
+    showToast(error.message || '复盘删除失败');
+  }
 }
 
 function kwRenderReviewStudio() {
@@ -13042,6 +13032,66 @@ function kwGetSmartTagCatalog() {
   return kwBuildFallbackSmartTags(catalog);
 }
 
+function kwFindSmartTagByCode(tagCode) {
+  return kwGetSmartTagCatalog().find((tag) => tag && tag.tag_code === tagCode) || null;
+}
+
+function kwFindBaseIndicator(indicatorCode) {
+  const code = String(indicatorCode || '').trim();
+  if (!code) return null;
+  return (kwGetSmartIndicatorCatalog().base_indicators || []).find((item) => String((item || {}).indicator_code || '').trim() === code) || null;
+}
+
+function kwFindIndicatorForTag(tagCode) {
+  const tag = kwFindSmartTagByCode(tagCode);
+  const selectedIndicators = tag && Array.isArray(tag.selected_indicators) ? tag.selected_indicators : [];
+  if (!tag || selectedIndicators.length !== 1) return null;
+  const indicatorCode = String(selectedIndicators[0].indicator_code || '').trim();
+  const smart = kwFindSmartIndicatorCatalogItem(indicatorCode);
+  const base = kwFindBaseIndicator(indicatorCode);
+  return smart || base || {
+    indicator_code: indicatorCode,
+    indicator_name: selectedIndicators[0].indicator_name || tag.label || indicatorCode,
+    category: tag.category || '指标',
+    value: tag.value || '--',
+    unit: tag.unit || '',
+    assessment: tag.subtitle || '',
+    interpretation: tag.subtitle || '',
+    selected_indicators: selectedIndicators,
+  };
+}
+
+function kwGetDirectPreviewCandidate(selectedTagCodes) {
+  const tagCodes = Array.isArray(selectedTagCodes) ? selectedTagCodes.filter(Boolean) : [];
+  if (tagCodes.length !== 1) return null;
+  const prompt = String(kwSmartIndicatorDraft.promptText || '').trim();
+  const tag = kwFindSmartTagByCode(tagCodes[0]);
+  if (!tag) return null;
+  const normalizedLabel = kwNormalizeSmartTagLabel(tag.label);
+  if (!normalizedLabel || !new Set([normalizedLabel, `【${normalizedLabel}】`]).has(prompt)) return null;
+  const indicator = kwFindIndicatorForTag(tagCodes[0]);
+  if (!indicator || !String(indicator.indicator_code || '').trim()) return null;
+  const selectedIndicators = Array.isArray(indicator.selected_indicators) && indicator.selected_indicators.length
+    ? indicator.selected_indicators
+    : [{ indicator_code: indicator.indicator_code, indicator_name: indicator.indicator_name || normalizedLabel }];
+  return {
+    indicator_code: String(indicator.indicator_code || '').trim(),
+    indicator_name: kwSmartIndicatorDraft.indicatorName || indicator.indicator_name || normalizedLabel,
+    category: indicator.category || tag.category || '直接引用指标',
+    value: indicator.value || '--',
+    numeric_value: indicator.numeric_value,
+    unit: indicator.unit || '',
+    assessment: indicator.interpretation || indicator.assessment || '直接引用原指标，不需要额外加工。',
+    interpretation: indicator.interpretation || indicator.assessment || '直接引用原指标，不需要额外加工。',
+    algorithm_detail: indicator.algorithm_detail || indicator.description || '直接引用已有指标，不生成新的计算公式。',
+    prompt_text: prompt,
+    selected_indicators: selectedIndicators,
+    formula_js: indicator.formula_js || '',
+    formula_meta: { generator: 'direct_reference', llm_used: false },
+    direct_reference: true,
+  };
+}
+
 function kwFormatSmartIndicatorValue(item) {
   const value = item && item.value;
   if (item && (item.data_status === 'unavailable' || item.data_unavailable === true)) return '--';
@@ -13130,7 +13180,11 @@ function kwRenderSmartDashboardPreviewCards(cards) {
 async function kwSelectSmartDashboardLayout(layout) {
   const draft = kwGetActiveDashboardConfig();
   draft.layout = layout;
-  await kwSyncFundDashboard('save_draft', draft, `已切换为 ${layout.toUpperCase()} 布局草稿`);
+  try {
+    await kwSyncFundDashboard('save_draft', draft, `已切换为 ${layout.toUpperCase()} 布局草稿`);
+  } catch (error) {
+    showToast(error.message || '布局切换失败，请稍后重试');
+  }
 }
 
 function kwOpenSmartIndicatorEditor(slotIndex) {
@@ -13274,8 +13328,12 @@ function kwHandleSmartIndicatorPromptInput(value) {
   const input = document.getElementById('kw-smart-indicator-draft-prompt');
   kwSmartIndicatorDraft.promptText = kwCanonicalizeSmartPrompt(value, kwGetSmartTagCatalog());
   if (input && input.value !== kwSmartIndicatorDraft.promptText) input.value = kwSmartIndicatorDraft.promptText;
+  kwSmartIndicatorDraft.isGenerating = false;
+  kwSmartIndicatorDraft.directIndicatorCode = '';
   kwSmartIndicatorDraft.preview = null;
   const matchedCodes = kwCollectPromptMatchedTagCodes(kwSmartIndicatorDraft.promptText, kwGetSmartTagCatalog());
+  kwSmartIndicatorDraft.selectedTagCodes = (kwSmartIndicatorDraft.selectedTagCodes || [])
+    .filter((code) => matchedCodes.includes(code));
   kwSmartIndicatorDraft.suppressedTagCodes = (kwSmartIndicatorDraft.suppressedTagCodes || []).filter((code) => matchedCodes.includes(code));
   kwRenderSmartIndicatorTagSelection();
 }
@@ -13386,6 +13444,17 @@ async function kwPreviewSmartIndicator() {
     return;
   }
   const selectedTagCodes = kwGetSmartIndicatorEffectiveTagCodes();
+  const directPreview = kwGetDirectPreviewCandidate(selectedTagCodes);
+  if (directPreview) {
+    kwSmartIndicatorDraft.isGenerating = false;
+    kwSmartIndicatorDraft.selectedTagCodes = selectedTagCodes;
+    kwSmartIndicatorDraft.directIndicatorCode = directPreview.indicator_code || '';
+    kwSmartIndicatorDraft.preview = directPreview;
+    kwRenderSmartIndicatorEditorModal();
+    showToast('已直接引用指标，无需重复生成');
+    return;
+  }
+  kwSmartIndicatorDraft.directIndicatorCode = '';
   kwSmartIndicatorDraft.isGenerating = true;
   kwSmartIndicatorDraft.preview = null;
   kwRenderSmartIndicatorEditorModal();
@@ -13449,6 +13518,20 @@ async function kwConfirmSmartIndicator() {
   kwSmartIndicatorDraft.isSaving = true;
   kwRenderSmartIndicatorEditorModal();
   try {
+    if (preview.direct_reference === true && preview.indicator_code) {
+      const nextCards = Array.from({ length: target }, (_, index) => {
+        const raw = Array.isArray(active.cards) && typeof active.cards[index] === 'object' ? active.cards[index] : {};
+        const indicatorCode = String(raw.indicatorCode || raw.indicator_code || '').trim();
+        return indicatorCode ? { indicatorCode } : {};
+      });
+      nextCards[slotIndex] = { indicatorCode: preview.indicator_code };
+      await kwSyncFundDashboard('save_draft', { ...active, layout, cards: nextCards }, '已直接加入 Dashboard 草稿');
+      kwSmartIndicatorEditingCode = preview.indicator_code;
+      kwSmartIndicatorSelectedCodes = (preview.selected_indicators || []).map((item) => item && item.indicator_code).filter(Boolean);
+      kwSmartIndicatorDraft.isSaving = false;
+      kwCloseSmartIndicatorEditor();
+      return;
+    }
     const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -13656,7 +13739,6 @@ async function kwSaveSmartIndicatorDefinitionFromDetail(indicatorCode) {
         assessment_template: interpretation,
         alert_template: item.alert || '',
         selected_indicator_codes: (item.selected_indicators || []).map((source) => source.indicator_code).filter(Boolean),
-        formula_js: '',
         add_to_dashboard: false,
       }),
     });
@@ -13737,7 +13819,11 @@ async function kwAddExistingIndicatorToDraft(indicatorCode) {
   }
   nextCards[emptyIndex] = { indicatorCode };
   active.cards = nextCards;
-  await kwSyncFundDashboard('save_draft', active, '已加入 Dashboard 草稿');
+  try {
+    await kwSyncFundDashboard('save_draft', active, '已加入 Dashboard 草稿');
+  } catch (error) {
+    showToast(error.message || '加入 Dashboard 草稿失败');
+  }
 }
 
 async function kwRemoveSmartDashboardCard(index) {
@@ -13751,7 +13837,11 @@ async function kwRemoveSmartDashboardCard(index) {
     return indicatorCode ? { indicatorCode } : {};
   });
   active.cards = nextCards;
-  await kwSyncFundDashboard('save_draft', active, '已从草稿移除，指标定义仍保留');
+  try {
+    await kwSyncFundDashboard('save_draft', active, '已从草稿移除，指标定义仍保留');
+  } catch (error) {
+    showToast(error.message || '从 Dashboard 移除失败');
+  }
 }
 
 async function kwDeleteSmartIndicator(indicatorCode, fromDetail = false) {
@@ -14227,6 +14317,8 @@ async function kwPublishFundDashboard() {
   kwSetDashboardPublishActionState('publish');
   try {
     await kwSyncFundDashboard('publish', draft, '已发布到前台 H5 和租户门户');
+  } catch (error) {
+    showToast(error.message || '发布失败，请稍后重试');
   } finally {
     kwSetDashboardPublishActionState('');
   }
@@ -14237,6 +14329,8 @@ async function kwResetFundDashboardDraft() {
   kwSetDashboardPublishActionState('restore');
   try {
     await kwSyncFundDashboard('reset_draft', null, '已恢复到当前发布版');
+  } catch (error) {
+    showToast(error.message || '恢复失败，请稍后重试');
   } finally {
     kwSetDashboardPublishActionState('');
   }

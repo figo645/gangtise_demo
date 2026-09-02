@@ -4864,8 +4864,8 @@ body,
         ⚠️ 大V投顾分享为个人研究观点，仅供参考，不构成投资建议。投资有风险，决策需谨慎。
       </div>
       <div class="dm-messages" id="dm-messages-container"></div>
-      <div style="padding:8px 14px 0;display:flex;gap:6px;flex-wrap:wrap;background:var(--navy)" id="dm-quick-asks"></div>
-      <div class="dm-input-bar" id="dm-input-bar">
+      <div style="padding:8px 14px 0;display:none;gap:6px;flex-wrap:wrap;background:var(--navy)" id="dm-quick-asks"></div>
+      <div class="dm-input-bar" id="dm-input-bar" style="display:none">
         <input class="dm-input" id="dm-input" placeholder="多轮提问，投顾会基于平台证据链回复..." onkeydown="if(event.key==='Enter')sendDm()">
         <button class="dm-send-btn" id="dm-send-btn" onclick="sendDm()">➤</button>
       </div>
@@ -7805,6 +7805,7 @@ function renderReviewArticleCards(articles) {
   if (!articles.length) {
     return '<div class="card" style="padding:16px;font-size:12px;color:var(--gray-400)">当前还没有可展示的复盘分析报告。</div>';
   }
+  const canDelete = isDavCapableUser(getActiveDemoUser());
   return `
     <div class="review-article-list">
       ${articles.map(article => `
@@ -7822,12 +7823,43 @@ function renderReviewArticleCards(articles) {
             <div class="review-watchlist-row">
               ${(article.tags || []).slice(0, 3).map(tag => `<span class="review-watchlist-chip">${escapeHtml(tag)}</span>`).join('')}
             </div>
-            <div class="review-article-card-cta">查看全文</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="review-article-card-cta">查看全文</div>
+              ${canDelete ? `<button class="btn-outline" type="button" style="padding:5px 8px;font-size:10px;color:#B42318;border-color:rgba(180,35,24,0.24)" onclick="event.stopPropagation();deletePublishedReviewArticle('${escapeAttr(article.id)}')">删除</button>` : ''}
+            </div>
           </div>
         </div>
       `).join('')}
     </div>
   `;
+}
+
+async function deletePublishedReviewArticle(articleId) {
+  const reviewId = String(articleId || '').trim();
+  const user = getActiveDemoUser();
+  const tenantSlug = String((((user || {}).tenant || {}).slug) || ((window.ACTIVE_TENANT || {}).slug) || '').trim().toLowerCase();
+  if (!isDavCapableUser(user) || !reviewId || !tenantSlug) {
+    showToast('当前账号无权删除复盘');
+    return;
+  }
+  if (!window.confirm('确认删除这篇已发布复盘吗？删除后将不再对前台用户展示，且无法撤销。')) return;
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/reviews/${encodeURIComponent(reviewId)}`, {
+      method: 'DELETE',
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'review_delete_failed');
+    syncPublishedReviewStateToH5(tenantSlug, payload);
+    delete reviewViewCountOverrides[reviewId];
+    if (reviewDetailArticleId === reviewId) {
+      reviewDetailArticleId = '';
+      reviewView = 'list';
+    }
+    renderReviewExperience();
+    showToast(payload.message || '复盘已删除');
+  } catch (error) {
+    showToast(error.message || '复盘删除失败');
+  }
 }
 
 function formatReviewViewCount(value) {
@@ -13364,7 +13396,7 @@ function getActiveWatchlistUserPayload() {
     tenant_slug: String((((user || {}).tenant || {}).slug) || '').trim().toLowerCase(),
     user_role: String(user.role || '').trim().toLowerCase(),
     user_profile_id: String(user.username || user.id || '').trim(),
-    user_name: String(user.advisor_name || user.username || '').trim(),
+    user_name: String(user.name || user.username || '').trim(),
   };
 }
 
@@ -15195,7 +15227,6 @@ let hermesUsageSnapshot = null;
 let hermesCustomSkillDraft = { title: '', prompt: '', knowledgeIds: [] };
 let hermesScopedKnowledgeId = '';
 let hermesUploadedFiles = [];
-let hermesSavedKnowledgeEntries = {};
 let hermesLoadingTicker = null;
 let hermesActiveSessionId = '';
 let hermesSessionList = [];
@@ -15648,7 +15679,6 @@ function startHermesNewSession(options = {}) {
   hermesConversation = [];
   hermesUploadedFiles = [];
   hermesScopedKnowledgeId = '';
-  hermesSavedKnowledgeEntries = {};
   try {
     if (window.localStorage) {
       window.localStorage.setItem(getHermesSessionStorageKey(), hermesActiveSessionId);
@@ -15671,7 +15701,6 @@ function ensureHermesSessionBootstrap() {
     hermesSessionListLoadedKey = '';
     hermesUploadedFiles = [];
     hermesScopedKnowledgeId = '';
-    hermesSavedKnowledgeEntries = {};
     hermesActiveSessionId = '';
   }
   const sessionId = ensureHermesSessionId();
@@ -15970,61 +15999,6 @@ function createHermesEntryId(prefix = 'entry') {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function getHermesCanSaveKnowledge() {
-  const activeUser = getActiveDemoUser() || {};
-  return (
-    String(activeUser.role || '').trim().toLowerCase() === 'dav'
-    && getHermesSettings().answer_save_to_knowledge_enabled !== false
-  );
-}
-
-function getHermesKnowledgeSaveState(entryId) {
-  return hermesSavedKnowledgeEntries[String(entryId || '').trim()] || 'idle';
-}
-
-function buildHermesKnowledgePayload(entry, artifact) {
-  const normalizedEntry = entry && typeof entry === 'object' ? entry : {};
-  const normalizedArtifact = artifact && typeof artifact === 'object' ? artifact : {};
-  const primaryBullets = dedupeHermesTextItems(
-    (normalizedArtifact.bullets || []).concat(normalizedArtifact.judgement || [])
-  );
-  const nextStepBullets = dedupeHermesTextItems(
-    (normalizedArtifact.followups || []).concat(normalizedArtifact.nextSteps || [])
-  );
-  const evidenceBullets = dedupeHermesTextItems(
-    (normalizedArtifact.knowledge || []).map(item => item && item.title ? item.title : '').concat(normalizedArtifact.citations || [])
-  );
-  const symbolTags = normalizedArtifact.symbol && normalizedArtifact.symbol.name
-    ? [normalizedArtifact.symbol.name]
-    : [];
-  const bodySections = [
-    normalizedEntry.question ? `用户问题\n${normalizedEntry.question}` : '',
-    normalizedArtifact.headline ? `核心结论\n${normalizedArtifact.headline}` : '',
-    normalizedArtifact.summary ? `摘要\n${normalizedArtifact.summary}` : '',
-    normalizedArtifact.body ? `正文\n${normalizedArtifact.body}` : '',
-    primaryBullets.length ? `要点\n${primaryBullets.map((item, index) => `${index + 1}. ${item}`).join('\n')}` : '',
-    nextStepBullets.length ? `后续建议\n${nextStepBullets.map((item, index) => `${index + 1}. ${item}`).join('\n')}` : '',
-    evidenceBullets.length ? `参考线索\n${evidenceBullets.map((item, index) => `${index + 1}. ${item}`).join('\n')}` : '',
-  ].filter(Boolean);
-  const title = String(
-    normalizedArtifact.headline || normalizedArtifact.title || normalizedEntry.question || 'Hermes问答沉淀'
-  ).trim() || 'Hermes问答沉淀';
-  const summary = String(
-    normalizedArtifact.summary || normalizedArtifact.headline || normalizedArtifact.body || normalizedEntry.question || ''
-  ).trim();
-  return {
-    knowledge_type: 'manual',
-    title: title.slice(0, 80),
-    summary: summary.slice(0, 240),
-    body: bodySections.join('\n\n').slice(0, 12000),
-    source_label: 'Hermes问答',
-    source_detail: `来源：Hermes 对话沉淀${normalizedEntry.skillLabel ? ` · ${normalizedEntry.skillLabel}` : ''}`,
-    tags: dedupeHermesTextItems(['Hermes问答', normalizedEntry.skillLabel || '', ...symbolTags]).slice(0, 6),
-    skip_ai_processing: true,
-    processing_mode: 'none',
-  };
-}
-
 function renderHermesComposerContext() {
   const hosts = [
     document.getElementById('hermes-composer-context'),
@@ -16075,107 +16049,6 @@ function clearHermesKnowledgeScope() {
 function removeHermesUploadedFile(index) {
   hermesUploadedFiles.splice(index, 1);
   renderHermesWorkspace();
-}
-
-function renderHermesKnowledgeAction(entryId) {
-  if (!entryId || !getHermesCanSaveKnowledge()) return '';
-  const state = getHermesKnowledgeSaveState(entryId);
-  const label = state === 'saved' ? '已加入知识源' : state === 'saving' ? '加入中...' : '加入知识源';
-  const disabled = state === 'saved' || state === 'saving' ? 'disabled' : '';
-  return `<div class="hermes-transcript-actions"><button class="hermes-transcript-action ${state !== 'idle' ? 'is-active' : ''}" ${disabled} onclick="saveHermesAnswerAsKnowledge('${escapeAttr(entryId)}')">${label}</button></div>`;
-}
-
-async function saveHermesAnswerAsKnowledge(entryId) {
-  const normalizedId = String(entryId || '').trim();
-  if (!normalizedId) return;
-  if (!getHermesCanSaveKnowledge()) {
-    showToast('只有大V可以沉淀知识源');
-    return;
-  }
-  const state = getHermesKnowledgeSaveState(normalizedId);
-  if (state === 'saving' || state === 'saved') return;
-  const entry = hermesConversation.find(item => item && item.id === normalizedId && item.type === 'ai');
-  if (!entry) {
-    showToast('当前问答结果不存在');
-    return;
-  }
-  const activeUser = getActiveDemoUser() || {};
-  const tenantId = activeUser && activeUser.tenant ? activeUser.tenant.id : 0;
-  const artifact = normalizeHermesArtifact(entry.artifact || entry.result, entry.question);
-  const payload = buildHermesKnowledgePayload(entry, artifact);
-  const optimisticId = `kb-hermes-${normalizedId}`;
-  hermesSavedKnowledgeEntries[normalizedId] = 'saving';
-  addOrReplaceKnowledgeEntry({
-    id: optimisticId,
-    tenantId,
-    type: 'manual',
-    title: payload.title,
-    source: 'Hermes问答',
-    sourceDetail: payload.source_detail,
-    summary: payload.summary,
-    body: payload.body,
-    raw_input: payload.body,
-    status: '同步中',
-    destination: '同步中',
-    time: '刚刚',
-    tags: payload.tags.slice(0),
-    skip_ai_processing: true,
-    processing_mode: 'none',
-  });
-  renderHermesWorkspace();
-  renderKnowledgeExperience();
-  try {
-    const result = await ingestKnowledgeEntry(payload);
-    if (!result.async || !result.job_code) throw new Error('knowledge_job_missing');
-    showToast('已提交到知识库，正在同步');
-    startAsyncJobPolling(result.job_code, {
-      onSuccess(job) {
-        const output = job.result || {};
-        const hubItems = output.knowledge_hub && Array.isArray(output.knowledge_hub.items) ? output.knowledge_hub.items : [];
-        if (hubItems.length) {
-          knowledgeEntryStore = hubItems.map((item, index) => mapKnowledgeEntryForTenant(item, tenantId, index));
-        } else {
-          const savedEntry = getKnowledgeEntryById(optimisticId);
-          if (savedEntry) {
-            savedEntry.status = 'ready';
-            savedEntry.destination = '已同步知识专区';
-          }
-        }
-        hermesSavedKnowledgeEntries[normalizedId] = 'saved';
-        knowledgeStructureState.loaded = false;
-        renderKnowledgeExperience();
-        refreshKnowledgeStructure(false);
-        renderHermesWorkspace();
-        showToast('已加入知识源');
-      },
-      onFailed(job) {
-        const failedEntry = getKnowledgeEntryById(optimisticId);
-        if (failedEntry) {
-          failedEntry.status = '失败';
-          failedEntry.destination = '同步失败';
-        }
-        hermesSavedKnowledgeEntries[normalizedId] = 'idle';
-        renderKnowledgeExperience();
-        renderHermesWorkspace();
-        showToast(job.error_message || '加入知识源失败');
-      },
-      onError(error) {
-        hermesSavedKnowledgeEntries[normalizedId] = 'idle';
-        renderHermesWorkspace();
-        showToast(error.message || '知识同步状态查询失败');
-      },
-    });
-  } catch (error) {
-    const failedEntry = getKnowledgeEntryById(optimisticId);
-    if (failedEntry) {
-      failedEntry.status = '失败';
-      failedEntry.destination = '同步失败';
-    }
-    hermesSavedKnowledgeEntries[normalizedId] = 'idle';
-    renderKnowledgeExperience();
-    renderHermesWorkspace();
-    showToast(error.message || '加入知识源失败');
-  }
 }
 
 function closeHermesPlusMenu() {
@@ -16835,12 +16708,15 @@ function renderHermesThinkingDisclosure(lines, options = {}) {
   if (!items.length) return '';
   if (!isHermesThinkingEnabled()) return '';
   const label = String(options.label || '深度思考').trim() || '深度思考';
-  const openAttr = options.open ? ' open' : '';
+  const entryId = String(options.entryId || '').trim();
+  const entry = entryId ? hermesConversation.find((item) => item && item.id === entryId) : null;
+  // Closed by default. The per-entry state protects a user choice during loading re-renders.
+  const openAttr = entry && entry.thinkingExpanded === true ? ' open' : '';
   const loadingDots = options.loading
     ? `<span class="dot-anim" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>`
     : '';
   return `
-    <details class="hermes-thinking-disclosure"${openAttr}>
+    <details class="hermes-thinking-disclosure" data-hermes-thinking-entry-id="${escapeAttr(entryId)}"${openAttr} ontoggle="handleHermesThinkingDisclosureToggle(this)">
       <summary class="hermes-thinking-summary">
         <span class="hermes-thinking-summary-main">
           <span>${escapeHtml(label)}</span>
@@ -16851,6 +16727,17 @@ function renderHermesThinkingDisclosure(lines, options = {}) {
       ${renderHermesThinkingStream(items, options)}
     </details>
   `;
+}
+
+function handleHermesThinkingDisclosureToggle(disclosure) {
+  const entryId = String(disclosure && disclosure.dataset ? disclosure.dataset.hermesThinkingEntryId : '').trim();
+  if (!entryId) return;
+  const entry = hermesConversation.find((item) => item && item.id === entryId);
+  if (!entry) return;
+  const isExpanded = !!disclosure.open;
+  if (entry.thinkingExpanded === isExpanded) return;
+  entry.thinkingExpanded = isExpanded;
+  syncHermesSessionCache({ skipEmpty: false });
 }
 
 function dedupeHermesTextItems(items) {
@@ -17034,7 +16921,6 @@ function renderHermesTextArtifact(artifact, agentTrace) {
   const bulletHtml = renderHermesClickableBullets(uniqueBullets);
   const followupHtml = renderHermesClickableBullets(uniqueFollowups, { clickable: true });
   const thoughtLines = buildHermesTraceThoughts(agentTrace);
-  const actionHtml = renderHermesKnowledgeAction(entryId);
   const routeLabel = isSmallTalk ? '' : String(entry.capabilityLabel || entry.intentLabel || entry.intent || '').trim();
   const routeMeta = routeLabel
     ? `<div class="hermes-transcript-meta" style="margin-top:6px">本次按：${escapeHtml(routeLabel)}</div>`
@@ -17045,13 +16931,12 @@ function renderHermesTextArtifact(artifact, agentTrace) {
       ${!isSmallTalk && artifact.headline ? `<div class="hermes-transcript-text">${escapeHtml(artifact.headline)}</div>` : ''}
       ${routeMeta}
       ${!isSmallTalk && artifact.summary ? renderHermesReadableText(artifact.summary) : ''}
-      ${renderHermesThinkingDisclosure(thoughtLines)}
+      ${renderHermesThinkingDisclosure(thoughtLines, { entryId })}
       ${bodyHtml}
       ${bulletHtml}
       ${followupHtml}
       ${knowledgeHtml}
       ${evidenceHtml}
-      ${actionHtml}
       ${artifact.footer ? `<div class="hermes-transcript-meta">${escapeHtml(artifact.footer)}</div>` : ''}
     </div>
   `;
@@ -17123,10 +17008,10 @@ function renderHermesThreadEntry(entry) {
         <div class="hermes-transcript-entry assistant">
           <div class="hermes-transcript-kicker">Hermes</div>
           ${renderHermesThinkingDisclosure(loadingThoughts.lines, {
+            entryId: entry.id,
             activeIndex: loadingThoughts.activeIndex,
             label: '深度思考中',
             loading: true,
-            open: true,
           })}
         </div>
       `;
@@ -17141,7 +17026,6 @@ function renderHermesThreadEntry(entry) {
         ${entry.capabilityLabel ? `<div class="hermes-transcript-meta" style="margin-top:6px">本次按：${escapeHtml(entry.capabilityLabel)}</div>` : ''}
         <div class="hermes-transcript-text">${escapeHtml(artifact.headline)}</div>
         <div class="hermes-chat-analysis">${renderHermesAnalysisCards(artifact, entry.agentTrace, entry)}</div>
-        ${renderHermesKnowledgeAction(entry.id)}
       </div>
     `;
 }
@@ -17288,7 +17172,7 @@ function renderHermesAnalysisCards(artifact, agentTrace) {
       <div class="hermes-evidence-row" style="margin-top:8px">${evidenceHtml}</div>
       <div class="hermes-result-subtitle" style="margin-top:10px">${escapeHtml(artifact.footer || '')}</div>
     </div>
-    ${renderHermesThinkingDisclosure(thoughtLines)}
+    ${renderHermesThinkingDisclosure(thoughtLines, { entryId: entry.id })}
   `;
 }
 
@@ -17330,6 +17214,7 @@ async function runHermesAnalysis(options) {
     displayMode: 'text',
   });
   hermesConversation.push({
+    id: createHermesEntryId('loading'),
     type: 'loading',
     startedAt: Date.now(),
     thoughts: buildHermesLoadingThoughtTemplates(question, skill, stockCode),
@@ -17744,7 +17629,7 @@ function getInvestorDmMessages() {
 function renderDmQuickAsks() {
   const host = document.getElementById('dm-quick-asks');
   if (!host) return;
-  if (isCurrentDmSystemThread()) {
+  if (!isFeatureEnabled('fan_interaction') || isCurrentDmSystemThread()) {
     host.innerHTML = '';
     host.style.display = 'none';
     return;
@@ -17771,12 +17656,13 @@ function syncDmComposerState() {
   const input = document.getElementById('dm-input');
   const sendButton = document.getElementById('dm-send-btn');
   const isSystemThread = isCurrentDmSystemThread();
-  if (inputBar) inputBar.style.display = isSystemThread ? 'none' : 'flex';
+  const interactionEnabled = isFeatureEnabled('fan_interaction');
+  if (inputBar) inputBar.style.display = interactionEnabled && !isSystemThread ? 'flex' : 'none';
   if (input) {
-    input.disabled = isSystemThread;
-    if (isSystemThread) input.value = '';
+    input.disabled = !interactionEnabled || isSystemThread;
+    if (!interactionEnabled || isSystemThread) input.value = '';
   }
-  if (sendButton) sendButton.disabled = isSystemThread;
+  if (sendButton) sendButton.disabled = !interactionEnabled || isSystemThread;
   const host = document.getElementById('dm-quick-asks');
   if (host) renderDmQuickAsks();
 }
@@ -17786,13 +17672,15 @@ function syncDmRoleView() {
   const hint = document.getElementById('dm-list-hint');
   const input = document.getElementById('dm-input');
   if (isDavDmMode()) {
-    if (title) title.textContent = '粉丝对话';
-    if (hint) hint.textContent = '仅展示当前租户粉丝会话';
+    if (title) title.textContent = isFeatureEnabled('fan_interaction') ? '粉丝对话' : '粉丝站内信';
+    if (hint) hint.textContent = isFeatureEnabled('fan_interaction') ? '仅展示当前租户粉丝会话' : '仅展示当前租户粉丝站内信，暂不支持回复';
     if (input) input.placeholder = '回复粉丝问题，支持多轮沟通...';
   } else {
     const activeUser = getSafeActiveDemoUser();
-    if (title) title.textContent = '大V对话与系统消息';
-    if (hint) hint.textContent = `展示所属大V ${activeUser.tenant.advisor} 的对话，以及当前租户系统通知`;
+    if (title) title.textContent = isFeatureEnabled('fan_interaction') ? '大V对话与系统消息' : '大V消息与系统通知';
+    if (hint) hint.textContent = isFeatureEnabled('fan_interaction')
+      ? `展示所属大V ${activeUser.tenant.advisor} 的对话，以及当前租户系统通知`
+      : `展示所属大V ${activeUser.tenant.advisor} 的站内信，以及当前租户系统通知，暂不支持回复`;
     if (input) input.placeholder = '多轮提问，投顾会基于平台证据链回复...';
   }
   syncDmComposerState();
@@ -17979,12 +17867,16 @@ async function openDmChat(kolId, name, avatar, tier) {
     document.getElementById('dm-chat-avatar').textContent = avatar;
     const badge = document.getElementById('dm-chat-badge');
     const banner = document.getElementById('dm-compliance-banner');
-    if (badge) badge.textContent = isDavDmMode() ? '粉丝会话' : (isSystemThread ? '系统消息' : '大V对话');
-    if (banner) banner.textContent = isDavDmMode()
+    if (badge) badge.textContent = !isFeatureEnabled('fan_interaction')
+      ? '站内信'
+      : (isDavDmMode() ? '粉丝会话' : (isSystemThread ? '系统消息' : '大V对话'));
+    if (banner) banner.textContent = !isFeatureEnabled('fan_interaction')
+      ? '当前为站内信查看模式，暂不开放回复和互动。'
+      : (isDavDmMode()
       ? '⚠️ 回复粉丝时请保持研究表达克制，避免直接给出买卖建议，所有结论建议附上依据和风险边界。'
       : (isSystemThread
         ? '⚠️ 这里展示的是当前租户推送给你的系统消息与复盘提醒，可直接查看，无需回复。'
-        : '⚠️ 大V投顾分享为个人研究观点，仅供参考，不构成投资建议。投资有风险，决策需谨慎。');
+        : '⚠️ 大V投顾分享为个人研究观点，仅供参考，不构成投资建议。投资有风险，决策需谨慎。'));
     syncDmComposerState();
     loadDmMessages(kolId);
     markDmThreadRead(kolId).catch(() => {});
@@ -18093,8 +17985,8 @@ async function sendDm() {
     return;
   }
   const siteFeatures = (window.SITE_CONFIG && window.SITE_CONFIG.feature_flags) || {};
-  if (!isDavDmMode() && siteFeatures.fan_interaction === false) {
-    showToast('当前租户暂未开放粉丝互动');
+  if (siteFeatures.fan_interaction === false) {
+    showToast('当前为站内信查看模式，暂不开放回复');
     return;
   }
   input.value = '';
@@ -18394,6 +18286,14 @@ function getTenantSmartTagCatalog() {
   return buildFallbackTenantSmartTags(catalog);
 }
 
+function sortWorkbenchSmartIndicatorsByRecent(items) {
+  return (Array.isArray(items) ? items.slice() : []).sort((left, right) => {
+    const leftTime = Date.parse(String(left && (left.last_updated || left.updated_at || left.created_at) || '')) || 0;
+    const rightTime = Date.parse(String(right && (right.last_updated || right.updated_at || right.created_at) || '')) || 0;
+    return rightTime - leftTime;
+  });
+}
+
 function renderWorkbenchSmartLayoutRow() {
   const host = document.getElementById('wb-smart-layout-row');
   if (!host) return;
@@ -18407,27 +18307,64 @@ function renderWorkbenchSmartLayoutRow() {
 function renderWorkbenchSmartIndicatorLibrary() {
   const host = document.getElementById('wb-smart-indicator-library');
   if (!host) return;
-  const items = (getTenantSmartCatalog().tenant_smart_indicators || []).filter((item) => item && item.indicator_code);
+  const items = sortWorkbenchSmartIndicatorsByRecent(
+    (getTenantSmartCatalog().tenant_smart_indicators || []).filter((item) => item && item.indicator_code),
+  );
   if (!items.length) {
     host.innerHTML = '<div class="feature-note">当前租户还没有已保存的智能指标。</div>';
     return;
   }
+  const recentItems = items.slice(0, 3);
+  const remainingCount = Math.max(0, items.length - recentItems.length);
   host.innerHTML = `
-    <div class="feature-note" style="margin-bottom:8px">${items.length} 个已保存指标 · 可编辑定义、加入草稿或删除指标定义</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px">
+      <div class="feature-note" style="margin:0">${items.length} 个已保存指标 · 最近 ${recentItems.length} 个</div>
+      <button class="btn-outline" type="button" style="padding:6px 10px;font-size:11px;flex:0 0 auto" onclick="openWorkbenchSmartIndicatorLibraryModal()">${remainingCount ? `更多（${remainingCount}）` : '管理指标'}</button>
+    </div>
     <div style="display:grid;gap:8px">
-      ${items.map((item) => `
-        <div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:10px;align-items:center;border:1px solid rgba(47,116,192,0.14);border-radius:10px;padding:10px 12px;background:rgba(47,116,192,0.035)">
+      ${recentItems.map((item) => `
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid rgba(47,116,192,0.14);border-radius:10px;padding:10px 12px;background:rgba(47,116,192,0.035)">
           <div style="min-width:0">
             <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.indicator_name || '未命名指标')}</div>
             <div style="font-size:11px;color:var(--gray-400);margin-top:3px">${escapeHtml(item.category || '智能指标')} · ${escapeHtml(formatWorkbenchDashboardValue(item))}${escapeHtml(item.unit || '')} · ${escapeHtml(item.last_updated || '未记录')}</div>
           </div>
-          <button class="btn-outline" type="button" style="padding:6px 9px;font-size:11px" onclick="openWorkbenchSmartIndicatorLibraryDetail('${escapeAttr(item.indicator_code)}')">编辑</button>
-          <button class="btn-outline" type="button" style="padding:6px 9px;font-size:11px" onclick="addExistingWorkbenchSmartIndicatorToDraft('${escapeAttr(item.indicator_code)}')">加入草稿</button>
-          <button class="btn-outline" type="button" style="padding:6px 9px;font-size:11px;color:#B42318;border-color:rgba(180,35,24,0.20)" onclick="requestWorkbenchSmartIndicatorDelete('${escapeAttr(item.indicator_code)}')">删除定义</button>
+          <span style="font-size:11px;color:#2F74C0;white-space:nowrap">已保存</span>
         </div>
       `).join('')}
     </div>
   `;
+}
+
+function openWorkbenchSmartIndicatorLibraryModal() {
+  const host = document.getElementById('dashboard-cell-modal-content');
+  const modal = document.getElementById('dashboard-cell-modal');
+  if (!host || !modal) return;
+  const items = sortWorkbenchSmartIndicatorsByRecent(
+    (getTenantSmartCatalog().tenant_smart_indicators || []).filter((item) => item && item.indicator_code),
+  );
+  host.innerHTML = `
+    <div class="modal-title" style="margin-bottom:10px">已保存智能指标</div>
+    <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">共 ${items.length} 个指标。这里集中管理指标定义；可编辑、加入 Dashboard 草稿或删除指标定义。</div>
+    ${items.length ? `<div style="display:grid;gap:8px">
+      ${items.map((item) => `
+        <div style="display:grid;grid-template-columns:minmax(0,1fr);gap:8px;border:1px solid rgba(47,116,192,0.14);border-radius:10px;padding:10px 12px;background:rgba(47,116,192,0.035)">
+          <div style="min-width:0">
+            <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.indicator_name || '未命名指标')}</div>
+            <div style="font-size:11px;color:var(--gray-400);margin-top:3px">${escapeHtml(item.category || '智能指标')} · ${escapeHtml(formatWorkbenchDashboardValue(item))}${escapeHtml(item.unit || '')} · ${escapeHtml(item.last_updated || '未记录')}</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn-outline" type="button" style="padding:6px 9px;font-size:11px" onclick="openWorkbenchSmartIndicatorLibraryDetail('${escapeAttr(item.indicator_code)}')">编辑</button>
+            <button class="btn-outline" type="button" style="padding:6px 9px;font-size:11px" onclick="addExistingWorkbenchSmartIndicatorToDraft('${escapeAttr(item.indicator_code)}')">加入草稿</button>
+            <button class="btn-outline" type="button" style="padding:6px 9px;font-size:11px;color:#B42318;border-color:rgba(180,35,24,0.20)" onclick="requestWorkbenchSmartIndicatorDelete('${escapeAttr(item.indicator_code)}')">删除定义</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>` : '<div class="feature-note">当前租户还没有已保存的智能指标。</div>'}
+    <div class="modal-actions" style="margin-top:18px">
+      <button class="btn-outline" type="button" onclick="closeWorkbenchSmartIndicatorDetailModal()">关闭</button>
+    </div>
+  `;
+  modal.classList.add('show');
 }
 
 async function addExistingWorkbenchSmartIndicatorToDraft(indicatorCode) {

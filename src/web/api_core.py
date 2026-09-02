@@ -9,6 +9,33 @@ DATABASE_RELEASE_UNLOCK_SESSION_KEY = "database_release_unlock_until"
 DATABASE_RELEASE_UNLOCK_TTL_SECONDS = 10 * 60
 
 
+def _resolve_authenticated_watchlist_comment_actor(requested_tenant_slug=""):
+    """Use the signed-in account as the sole authority for comment identity."""
+    current_user = get_current_authenticated_user() or {}
+    role = str(current_user.get("role") or "").strip().lower()
+    username = str(current_user.get("username") or "").strip()
+    account_tenant = str(current_user.get("tenant_slug") or ((current_user.get("tenant") or {}).get("slug") or "")).strip().lower()
+    requested_tenant = str(requested_tenant_slug or "").strip().lower()
+    if not username or not role:
+        return None, (jsonify({"ok": False, "error": "auth_required"}), 401)
+    if not has_role_capability(role, "h5"):
+        return None, (jsonify({"ok": False, "error": "watchlist_comment_role_invalid"}), 403)
+    tenant_slug = requested_tenant or account_tenant
+    if not tenant_slug:
+        return None, (jsonify({"ok": False, "error": "tenant_slug_required"}), 400)
+    if role != "admin" and tenant_slug != account_tenant:
+        return None, (jsonify({"ok": False, "error": "tenant_scope_forbidden"}), 403)
+    tenant = get_tenant_by_slug(tenant_slug)
+    if str((tenant or {}).get("slug") or "").strip().lower() != tenant_slug:
+        return None, (jsonify({"ok": False, "error": "tenant_not_found"}), 404)
+    return {
+        "tenant_slug": tenant_slug,
+        "user_role": role,
+        "user_profile_id": username,
+        "user_name": str(current_user.get("name") or username).strip() or username,
+    }, None
+
+
 def _database_release_operation_password():
     return str(os.environ.get("DATABASE_RELEASE_OPERATION_PASSWORD") or "536953")
 
@@ -570,6 +597,13 @@ def api_watchlist_detail(stock_code):
     tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
     viewer_role = str(request.args.get("user_role") or "").strip().lower()
     viewer_profile_id = str(request.args.get("user_profile_id") or "").strip()
+    if tenant_slug:
+        actor, error_response = _resolve_authenticated_watchlist_comment_actor(tenant_slug)
+        if error_response:
+            return error_response
+        tenant_slug = actor["tenant_slug"]
+        viewer_role = actor["user_role"]
+        viewer_profile_id = actor["user_profile_id"]
     allow_fan_to_fan = is_feature_enabled("watchlist_fan_comment_interaction", site_config)
     payload = get_watchlist_detail_by_code(stock_code=stock_code, stock_name=stock_code, details_map=details) or {
         "code": stock_code,
@@ -713,19 +747,17 @@ def api_save_watchlist_annotation(stock_code):
 
 @app.route("/api/watchlist/<stock_code>/comments")
 def api_watchlist_comments(stock_code):
-    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
-    viewer_role = str(request.args.get("user_role") or "").strip().lower()
-    viewer_profile_id = str(request.args.get("user_profile_id") or "").strip()
+    actor, error_response = _resolve_authenticated_watchlist_comment_actor(request.args.get("tenant_slug"))
+    if error_response:
+        return error_response
     stock_name = str(request.args.get("stock_name") or "").strip()
-    if not tenant_slug:
-        return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
     try:
         items = list_watchlist_comments(
-            tenant_slug=tenant_slug,
+            tenant_slug=actor["tenant_slug"],
             stock_code=stock_code,
             stock_name=stock_name,
-            viewer_role=viewer_role,
-            viewer_profile_id=viewer_profile_id,
+            viewer_role=actor["user_role"],
+            viewer_profile_id=actor["user_profile_id"],
             allow_fan_to_fan=is_feature_enabled("watchlist_fan_comment_interaction", get_site_config()),
         )
     except Exception as exc:
@@ -738,7 +770,7 @@ def api_watchlist_comments(stock_code):
         "items": items,
         "comment_settings": {
             "allow_fan_to_fan": is_feature_enabled("watchlist_fan_comment_interaction", get_site_config()),
-            "viewer_role": viewer_role,
+            "viewer_role": actor["user_role"],
         },
     })
 
@@ -761,22 +793,18 @@ def api_watchlist_comment_analytics(tenant_slug):
 @app.route("/api/watchlist/<stock_code>/comments", methods=["POST"])
 def api_save_watchlist_comment(stock_code):
     body = request.get_json(silent=True) or {}
-    tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
-    user_role = str(body.get("user_role") or "").strip().lower()
-    user_profile_id = str(body.get("user_profile_id") or "").strip()
-    if not tenant_slug:
-        return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
-    if not has_role_capability(user_role, "h5"):
-        return jsonify({"ok": False, "error": "watchlist_comment_role_invalid"}), 400
+    actor, error_response = _resolve_authenticated_watchlist_comment_actor(body.get("tenant_slug"))
+    if error_response:
+        return error_response
     try:
         item = save_watchlist_comment(
-            tenant_slug=tenant_slug,
+            tenant_slug=actor["tenant_slug"],
             stock_code=stock_code,
             stock_name=body.get("stock_name"),
             comment_text=body.get("comment_text"),
-            created_by_user_id=user_profile_id,
-            created_by_name=body.get("user_name"),
-            created_by_role=user_role,
+            created_by_user_id=actor["user_profile_id"],
+            created_by_name=actor["user_name"],
+            created_by_role=actor["user_role"],
             source_client=body.get("source_client") or body.get("entry_point") or "h5",
         )
     except ValueError as exc:
@@ -791,19 +819,16 @@ def api_save_watchlist_comment(stock_code):
 
 @app.route("/api/watchlist/<stock_code>/comments/<comment_ref>", methods=["DELETE"])
 def api_delete_watchlist_comment(stock_code, comment_ref):
-    tenant_slug = str(request.args.get("tenant_slug") or "").strip().lower()
-    user_role = str(request.args.get("user_role") or "").strip().lower()
-    user_profile_id = str(request.args.get("user_profile_id") or "").strip()
-    user_profile_id = str(request.args.get("user_profile_id") or "").strip()
-    if not tenant_slug:
-        return jsonify({"ok": False, "error": "tenant_slug_required"}), 400
+    actor, error_response = _resolve_authenticated_watchlist_comment_actor(request.args.get("tenant_slug"))
+    if error_response:
+        return error_response
     try:
         deleted = delete_watchlist_comment(
-            tenant_slug=tenant_slug,
+            tenant_slug=actor["tenant_slug"],
             stock_code=stock_code,
             comment_id=comment_ref,
-            actor_role=user_role,
-            actor_profile_id=user_profile_id,
+            actor_role=actor["user_role"],
+            actor_profile_id=actor["user_profile_id"],
         )
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400

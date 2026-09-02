@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>权限不足</title>
+<link rel="stylesheet" href="/static/css/style.css">
+<script src="/static/js/theme.js"></script>
+<style>
+body{margin:0;min-height:100dvh;font-family:var(--font-main);color:var(--text-main);background:#f3f7fb}
+.access-denied{position:relative;display:flex;align-items:center;justify-content:center;min-height:100dvh;box-sizing:border-box;padding:24px;overflow:hidden;background:linear-gradient(135deg,rgba(255,255,255,.96),rgba(237,245,252,.98))}
+.access-denied:before,.access-denied:after{content:"";position:absolute;width:min(64vw,760px);height:min(64vw,760px);border:1px solid rgba(47,116,192,.14);transform:rotate(-18deg);pointer-events:none}.access-denied:before{top:-40vw;left:-24vw}.access-denied:after{right:-30vw;bottom:-42vw;border-color:rgba(184,138,59,.22)}
+.access-card{position:relative;width:min(100%,540px);box-sizing:border-box;padding:32px;background:rgba(255,255,255,.94);border:1px solid rgba(47,116,192,.15);border-radius:12px;box-shadow:0 24px 64px rgba(31,79,134,.13)}
+.access-mark{display:flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:50%;background:rgba(184,138,59,.12);border:1px solid rgba(184,138,59,.28);color:#a56a00;font-size:24px;font-weight:800}.access-kicker{margin-top:20px;color:#2f74c0;font-size:12px;font-weight:800;letter-spacing:1px}.access-title{margin:9px 0 0;font-size:28px;line-height:1.3}.access-copy{margin:14px 0 0;color:var(--gray-400);font-size:14px;line-height:1.8}.access-account{margin-top:20px;padding:12px 14px;border-left:3px solid #c8a96e;background:rgba(200,169,110,.09);color:var(--text-main);font-size:13px;line-height:1.7}.access-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}.access-actions a{display:inline-flex;align-items:center;justify-content:center;min-height:42px;box-sizing:border-box;padding:0 15px;border-radius:7px;text-decoration:none;font-size:13px;font-weight:700}.access-primary{background:#2f74c0;color:#fff}.access-secondary{border:1px solid rgba(47,116,192,.2);background:#fff;color:#1f4f86}@media(max-width:520px){.access-denied{align-items:flex-start;padding:16px}.access-card{margin-top:clamp(56px,16vh,128px);padding:26px 20px}.access-title{font-size:25px}.access-actions a{width:100%}}
+</style>
+</head>
+<body onload="initGangtiseTheme()">
+<main class="access-denied">
+  <section class="access-card" aria-labelledby="access-denied-title">
+    <div class="access-mark" aria-hidden="true">!</div>
+    <div class="access-kicker">ACCESS RESTRICTED</div>
+    <h1 class="access-title" id="access-denied-title">用户权限不足</h1>
+    <p class="access-copy">当前账号没有访问平台 Admin 后台的权限。请联系系统管理员申请更高权限后再访问。</p>
+    <div class="access-account">当前账号：{{ current_user.get('name') or current_user.get('display_name') or current_user.get('username') or '当前用户' }}<br>当前角色：{{ current_user.get('role') or '未知' }}</div>
+    <div class="access-actions">
+      <a class="access-primary" href="{{ workbench_target }}">返回大V工作台</a>
+      <a class="access-secondary" href="{{ h5_target }}">进入 H5 首页</a>
+    </div>
+  </section>
+</main>
+</body>
+</html>

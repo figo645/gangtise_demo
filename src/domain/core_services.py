@@ -453,7 +453,6 @@ def normalize_hermes_settings_config(source=None):
         "dav_access_enabled": bool(raw.get("dav_access_enabled", defaults.get("dav_access_enabled", True))),
         "internet_answer_enabled": False,
         "thinking_process_enabled": bool(raw.get("thinking_process_enabled", defaults.get("thinking_process_enabled", True))),
-        "answer_save_to_knowledge_enabled": bool(raw.get("answer_save_to_knowledge_enabled", defaults.get("answer_save_to_knowledge_enabled", True))),
         "default_response_style": str(raw.get("default_response_style") or defaults.get("default_response_style") or "structured").strip() or "structured",
         "chart_types_enabled": chart_types_enabled,
         "route_priority": route_priority,
@@ -1305,7 +1304,9 @@ def normalize_review_snapshot_item(item, tenant, index=0):
 def resolve_tenant_review_snapshots(tenant, snapshots=None, include_simulated=False):
     tenant = tenant or get_tenant_by_slug()
     items = snapshots if isinstance(snapshots, list) else tenant.get("review_snapshots")
-    source_items = items if isinstance(items, list) and items else default_tenant_review_snapshots(tenant)
+    # An explicit empty list is a valid state: a DAV may have deleted every
+    # published review. Only a missing/non-list value uses demo defaults.
+    source_items = items if isinstance(items, list) else default_tenant_review_snapshots(tenant)
     normalized = []
     for index, item in enumerate(source_items[:20]):
         normalized.append(normalize_review_snapshot_item(item, tenant, index=index))
@@ -1528,6 +1529,41 @@ def update_tenant_review_snapshots(tenant_slug, snapshots):
     raw_snapshots = copy.deepcopy(snapshots) if isinstance(snapshots, list) else []
     normalized = resolve_tenant_review_snapshots(tenant, snapshots=raw_snapshots, include_simulated=True)
     return _save_tenant_state_field(tenant_slug, "review_snapshots", normalized)
+
+
+def delete_tenant_review_snapshot(tenant_slug, review_id):
+    """Delete one published review while retaining message/audit history."""
+    normalized_tenant_slug = str(tenant_slug or "").strip().lower()
+    normalized_review_id = str(review_id or "").strip()
+    if not normalized_tenant_slug:
+        raise ValueError("tenant_not_found")
+    if not normalized_review_id:
+        raise ValueError("review_id_required")
+    tenant = get_tenant_by_slug(normalized_tenant_slug)
+    if not tenant or tenant.get("slug") != normalized_tenant_slug:
+        raise ValueError("tenant_not_found")
+    raw_snapshots = tenant.get("review_snapshots")
+    snapshots = resolve_tenant_review_snapshots(
+        tenant,
+        snapshots=raw_snapshots if isinstance(raw_snapshots, list) else None,
+        include_simulated=True,
+    )
+    remaining = [
+        item for item in snapshots
+        if str(item.get("id") or "").strip() != normalized_review_id
+    ]
+    if len(remaining) == len(snapshots):
+        raise ValueError("review_not_found")
+    saved = update_tenant_review_snapshots(normalized_tenant_slug, remaining)
+    latest_tenant = get_tenant_by_slug(normalized_tenant_slug, saved) if saved else tenant
+    return {
+        "review_id": normalized_review_id,
+        "snapshots": resolve_tenant_review_snapshots(
+            latest_tenant,
+            snapshots=latest_tenant.get("review_snapshots"),
+            include_simulated=True,
+        ),
+    }
 
 
 def update_tenant_message_center_state(tenant_slug, state):

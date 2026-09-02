@@ -741,6 +741,33 @@ def api_record_tenant_review_view(tenant_slug, review_id):
     })
 
 
+@app.route("/api/tenant/<tenant_slug>/reviews/<review_id>", methods=["DELETE", "POST"])
+def api_delete_tenant_review(tenant_slug, review_id):
+    """Allow a DAV to remove a published review from the tenant feed."""
+    current_user = get_current_authenticated_user() or {}
+    role = str(current_user.get("role") or "").strip().lower()
+    if not has_role_capability(role, "dav"):
+        return jsonify({"ok": False, "error": "dav_required"}), 403
+    requested_tenant = str(tenant_slug or "").strip().lower()
+    current_tenant = str(current_user.get("tenant_slug") or "").strip().lower()
+    if not has_role_capability(role, "admin") and current_tenant != requested_tenant:
+        return jsonify({"ok": False, "error": "tenant_scope_forbidden"}), 403
+    try:
+        result = delete_tenant_review_snapshot(requested_tenant, review_id)
+    except ValueError as exc:
+        status = 404 if str(exc) in {"tenant_not_found", "review_not_found"} else 400
+        return jsonify({"ok": False, "error": str(exc)}), status
+    except Exception:
+        app.logger.exception("Failed to delete tenant review snapshot")
+        return jsonify({"ok": False, "error": "review_delete_failed"}), 500
+    return jsonify({
+        "ok": True,
+        "message": "复盘已删除",
+        "review_id": result["review_id"],
+        "snapshots": result["snapshots"],
+    })
+
+
 @app.route("/api/tenant/<tenant_slug>/dashboard", methods=["POST"])
 def api_save_tenant_dashboard(tenant_slug):
     tenant = get_tenant_by_slug(tenant_slug)
@@ -919,6 +946,8 @@ def api_kol_broadcast():
 
 @app.route("/api/kol/reply", methods=["POST"])
 def api_kol_reply():
+    if not is_feature_enabled("fan_interaction"):
+        return jsonify({"success": False, "error": "fan_interaction_disabled"}), 403
     body = request.get_json(silent=True) or {}
     tenant_slug = str(body.get("tenant_slug") or request.args.get("tenant") or "").strip().lower()
     thread_id = str(body.get("thread_id") or "").strip()

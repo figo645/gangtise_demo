@@ -19,6 +19,7 @@ from src.domain.core_services import (
     normalize_fund_dashboard_view,
     build_new_smart_indicator_code,
     resolve_tenant_review_snapshots,
+    delete_tenant_review_snapshot,
     sanitize_user_facing_source_text,
 )
 from src.services import get_tenant_configs
@@ -2886,6 +2887,42 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertTrue(snapshot["content_text"])
         self.assertEqual(snapshot["snapshot_type"], "published_review")
         self.assertIn("period_key", snapshot)
+
+    def test_given_explicit_empty_review_list_when_resolving_then_no_demo_review_is_recreated(self):
+        with app_entry.app.app_context():
+            tenant = get_tenant_by_slug(self.tenant_slug)
+            snapshots = resolve_tenant_review_snapshots(tenant, snapshots=[])
+        self.assertEqual(snapshots, [])
+
+    def test_given_published_review_when_deleted_then_snapshot_is_removed(self):
+        tenant = {"slug": self.tenant_slug, "advisor": "测试大V", "review_snapshots": [
+            {"id": "review-to-delete", "title": "待删除复盘", "content_text": "正文"},
+            {"id": "review-to-keep", "title": "保留复盘", "content_text": "正文"},
+        ]}
+        saved_state = {}
+        def get_tenant_side_effect(slug, config=None):
+            if config and isinstance(config, dict) and "review_snapshots" in config:
+                return {**tenant, "review_snapshots": config["review_snapshots"]}
+            return tenant
+
+        with patch("src.domain.core_services.get_tenant_by_slug", side_effect=get_tenant_side_effect), patch(
+            "src.domain.core_services._save_tenant_state_field",
+            side_effect=lambda slug, field, value: saved_state.update({field: value}) or {"slug": slug, field: value},
+        ):
+            result = delete_tenant_review_snapshot(self.tenant_slug, "review-to-delete")
+        self.assertEqual(result["review_id"], "review-to-delete")
+        self.assertEqual([item["id"] for item in result["snapshots"]], ["review-to-keep"])
+        self.assertEqual([item["id"] for item in saved_state["review_snapshots"]], ["review-to-keep"])
+
+        tenant["review_snapshots"] = saved_state["review_snapshots"]
+        saved_state.clear()
+        with patch("src.domain.core_services.get_tenant_by_slug", side_effect=get_tenant_side_effect), patch(
+            "src.domain.core_services._save_tenant_state_field",
+            side_effect=lambda slug, field, value: saved_state.update({field: value}) or {"slug": slug, field: value},
+        ):
+            result = delete_tenant_review_snapshot(self.tenant_slug, "review-to-keep")
+        self.assertEqual(result["snapshots"], [])
+        self.assertEqual(saved_state["review_snapshots"], [])
 
     def test_given_watchlist_annotation_rows_when_listing_then_fields_are_normalized(self):
         tenant_slug = self.tenant_slug

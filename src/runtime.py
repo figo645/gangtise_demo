@@ -613,7 +613,6 @@ DEFAULT_SITE_CONFIG = {
         "dav_access_enabled": True,
         "internet_answer_enabled": False,
         "thinking_process_enabled": True,
-        "answer_save_to_knowledge_enabled": True,
         "default_response_style": "structured",
         "chart_types_enabled": ["kline_chart", "line_chart", "distribution_chart", "compare_chart"],
         "route_priority": [

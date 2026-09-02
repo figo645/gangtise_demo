@@ -42,7 +42,17 @@ def is_database_release_api_request(path):
 def admin_access_denied_response():
     if request.path.startswith("/api/"):
         return jsonify({"success": False, "error": "admin_required"}), 403
-    abort(403)
+    current_user = get_current_authenticated_user() or {}
+    tenant_slug = str(
+        current_user.get("tenant_slug")
+        or ((current_user.get("tenant") or {}).get("slug") or "")
+    ).strip().lower()
+    return render_template(
+        "access_denied.html",
+        current_user=current_user,
+        h5_target=url_for("h5", tenant=tenant_slug) if tenant_slug else url_for("h5"),
+        workbench_target=url_for("kol_workbench", tenant=tenant_slug, section="overview") if tenant_slug else url_for("kol_workbench"),
+    ), 403
 
 
 def record_access(response):

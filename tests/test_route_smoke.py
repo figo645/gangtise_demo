@@ -45,6 +45,28 @@ class RouteSmokeTest(unittest.TestCase):
                 self.assertIn("text/html", response.content_type)
                 self.assertIn("Hermes", response.get_data(as_text=True))
 
+    def test_dav_admin_page_access_uses_friendly_permission_denied_view(self):
+        dav_user = {
+            "id": "route-smoke-dav",
+            "username": "route-smoke-dav",
+            "name": "测试大V",
+            "role": "dav",
+            "tenant_slug": self.tenant_slugs[0],
+        }
+        original_current_user = web_hooks.get_current_authenticated_user
+        try:
+            web_hooks.get_current_authenticated_user = lambda: dav_user
+            page = self.client.get("/admin")
+            api = self.client.get("/api/admin/site-config")
+        finally:
+            web_hooks.get_current_authenticated_user = original_current_user
+
+        self.assertEqual(page.status_code, 403)
+        self.assertIn("用户权限不足", page.get_data(as_text=True))
+        self.assertIn("联系系统管理员申请更高权限", page.get_data(as_text=True))
+        self.assertEqual(api.status_code, 403)
+        self.assertEqual(api.get_json().get("error"), "admin_required")
+
     def test_h5_splash_is_responsive_and_keeps_quote_prominent_on_mobile(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
 
@@ -134,17 +156,84 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("'source_shanghai_index'", html)
         self.assertIn("'source_shenzhen_index'", html)
 
+    def test_published_review_delete_api_requires_dav_and_returns_updated_snapshots(self):
+        import src.web.api_kol as api_kol
+        original_current_user = api_kol.get_current_authenticated_user
+        original_delete = api_kol.delete_tenant_review_snapshot
+        try:
+            api_kol.get_current_authenticated_user = lambda: {
+                "id": "route-smoke-dav",
+                "username": "route-smoke-dav",
+                "role": "dav",
+                "tenant_slug": self.tenant_slugs[0],
+            }
+            api_kol.delete_tenant_review_snapshot = lambda tenant_slug, review_id: {
+                "review_id": review_id,
+                "snapshots": [{"id": "remaining-review"}],
+            }
+            response = self.client.delete(
+                f"/api/tenant/{self.tenant_slugs[0]}/reviews/review-to-delete"
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.get_json().get("snapshots")[0]["id"], "remaining-review")
+
+            api_kol.get_current_authenticated_user = lambda: {
+                "id": "route-smoke-investor",
+                "username": "route-smoke-investor",
+                "role": "investor",
+                "tenant_slug": self.tenant_slugs[0],
+            }
+            denied = self.client.delete(
+                f"/api/tenant/{self.tenant_slugs[0]}/reviews/review-to-delete"
+            )
+            self.assertEqual(denied.status_code, 403)
+            self.assertEqual(denied.get_json().get("error"), "dav_required")
+        finally:
+            api_kol.get_current_authenticated_user = original_current_user
+            api_kol.delete_tenant_review_snapshot = original_delete
+
+    def test_published_review_delete_controls_exist_on_h5_and_workbench(self):
+        h5_response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
+        workbench_response = self.client.get(f"/kol-workbench?tenant={self.tenant_slugs[0]}")
+
+        self.assertEqual(h5_response.status_code, 200)
+        self.assertEqual(workbench_response.status_code, 200)
+        self.assertIn("deletePublishedReviewArticle", h5_response.get_data(as_text=True))
+        self.assertIn("kwDeletePublishedReview", workbench_response.get_data(as_text=True))
+
     def test_h5_smart_indicator_workbench_has_library_and_fan_view_is_read_only(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
 
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
         self.assertIn("function renderWorkbenchSmartIndicatorLibrary()", html)
+        self.assertIn("function openWorkbenchSmartIndicatorLibraryModal()", html)
+        self.assertIn("const recentItems = items.slice(0, 3)", html)
+        self.assertIn("更多（${remainingCount}）", html)
+        self.assertIn("管理指标", html)
         self.assertIn("addExistingWorkbenchSmartIndicatorToDraft", html)
         self.assertIn("openFundamentalDashboardIndicatorDetail", html)
         self.assertIn("这里仅供查看详情；指标的新增、修改和移除请前往大V工作台", html)
         self.assertIn("canonicalizeWorkbenchSmartPrompt", html)
         self.assertIn("formula_tokens", html)
+
+    def test_web_workbench_smart_indicator_and_review_api_contract_matches_h5(self):
+        web_html = self.client.get("/kol-workbench?tenant=laowang").get_data(as_text=True)
+        h5_html = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}").get_data(as_text=True)
+
+        for html in (h5_html, web_html):
+            self.assertIn("/api/review/generate-draft", html)
+            self.assertIn("/api/review/prepare-preview", html)
+            self.assertIn("/api/review/publish", html)
+            self.assertIn("/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators", html)
+
+        self.assertIn("function kwGetDirectPreviewCandidate(selectedTagCodes)", web_html)
+        self.assertIn("if (preview.direct_reference === true && preview.indicator_code)", web_html)
+        self.assertIn("await kwSelectSmartDashboardLayout(normalizedLayout)", web_html)
+        self.assertIn("if (!tenantSlug) throw new Error('tenant_missing');", web_html)
+        self.assertIn("showToast(successMessage || '已同步');\n  return payload;", web_html)
+        self.assertNotIn("knowledge_attachments: kwGetReviewSelectedKnowledge()", web_html)
+        self.assertNotIn("selected_cards: kwGetReviewSelectedCards()", web_html)
 
     def test_smart_indicator_dashboard_removal_is_not_definition_deletion(self):
         web_html = self.client.get("/kol-workbench?tenant=laowang").get_data(as_text=True)
@@ -525,12 +614,16 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertNotIn("指定知识条目", html)
         self.assertNotIn("Hermes 扩展能力", html)
         self.assertIn("function dedupeHermesTextItems(items)", html)
+        self.assertIn("function handleHermesThinkingDisclosureToggle(disclosure)", html)
+        self.assertIn('data-hermes-thinking-entry-id="${escapeAttr(entryId)}"', html)
+        self.assertIn("entry && entry.thinkingExpanded === true ? ' open' : ''", html)
+        self.assertNotIn("open: true,\n          })}", html)
         self.assertIn("overflow-wrap:anywhere;", html)
         self.assertIn(".hermes-transcript-entry.assistant .hermes-transcript-text,", html)
         self.assertIn("justify-items:stretch;", html)
-        self.assertIn("function saveHermesAnswerAsKnowledge(entryId)", html)
-        self.assertIn("function buildHermesKnowledgePayload(entry, artifact)", html)
-        self.assertIn("加入知识源", html)
+        self.assertNotIn("function saveHermesAnswerAsKnowledge(entryId)", html)
+        self.assertNotIn("function buildHermesKnowledgePayload(entry, artifact)", html)
+        self.assertNotIn("加入知识源", html)
         self.assertNotIn("加入上下文", html)
         self.assertIn("function requestReviewStructuredPreview()", html)
         self.assertIn("function confirmStructuredReviewToPreview()", html)
@@ -555,6 +648,102 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn('id="watchlist-stock-suggestion-list"', html)
         self.assertIn("function handleWatchlistStockCodeInput(value)", html)
         self.assertIn("function selectWatchlistSuggestionByIndex(index)", html)
+        self.assertIn("user_name: String(user.name || user.username || '').trim()", html)
+
+    def test_watchlist_comment_author_uses_authenticated_account_not_client_payload(self):
+        import src.web.api_core as api_core
+
+        captured = {}
+        original_current_user = api_core.get_current_authenticated_user
+        original_get_tenant = api_core.get_tenant_by_slug
+        original_save = api_core.save_watchlist_comment
+        try:
+            api_core.get_current_authenticated_user = lambda: {
+                "username": "actual_account",
+                "name": "真实昵称",
+                "role": "investor",
+                "tenant_slug": self.tenant_slugs[0],
+            }
+            api_core.get_tenant_by_slug = lambda slug: {"slug": slug}
+            api_core.save_watchlist_comment = lambda **kwargs: captured.update(kwargs) or {"id": 1, **kwargs}
+            response = self.client.post(
+                "/api/watchlist/600519/comments",
+                json={
+                    "tenant_slug": self.tenant_slugs[0],
+                    "user_profile_id": "forged_account",
+                    "user_name": "伪造昵称",
+                    "user_role": "dav",
+                    "comment_text": "测试评论",
+                },
+            )
+        finally:
+            api_core.get_current_authenticated_user = original_current_user
+            api_core.get_tenant_by_slug = original_get_tenant
+            api_core.save_watchlist_comment = original_save
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured["created_by_user_id"], "actual_account")
+        self.assertEqual(captured["created_by_name"], "真实昵称")
+        self.assertEqual(captured["created_by_role"], "investor")
+
+    def test_watchlist_comment_delete_uses_authenticated_account_not_query_payload(self):
+        import src.web.api_core as api_core
+
+        captured = {}
+        original_current_user = api_core.get_current_authenticated_user
+        original_get_tenant = api_core.get_tenant_by_slug
+        original_delete = api_core.delete_watchlist_comment
+        try:
+            api_core.get_current_authenticated_user = lambda: {
+                "username": "actual_account",
+                "name": "真实昵称",
+                "role": "investor",
+                "tenant_slug": self.tenant_slugs[0],
+            }
+            api_core.get_tenant_by_slug = lambda slug: {"slug": slug}
+            api_core.delete_watchlist_comment = lambda **kwargs: captured.update(kwargs) or True
+            response = self.client.delete(
+                f"/api/watchlist/600519/comments/12?tenant_slug={self.tenant_slugs[0]}&user_profile_id=forged_account&user_role=dav"
+            )
+        finally:
+            api_core.get_current_authenticated_user = original_current_user
+            api_core.get_tenant_by_slug = original_get_tenant
+            api_core.delete_watchlist_comment = original_delete
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured["actor_profile_id"], "actual_account")
+        self.assertEqual(captured["actor_role"], "investor")
+
+    def test_watchlist_comment_list_uses_authenticated_account_and_rejects_other_tenant(self):
+        import src.web.api_core as api_core
+
+        captured = {}
+        original_current_user = api_core.get_current_authenticated_user
+        original_get_tenant = api_core.get_tenant_by_slug
+        original_list = api_core.list_watchlist_comments
+        try:
+            api_core.get_current_authenticated_user = lambda: {
+                "username": "actual_account",
+                "name": "真实昵称",
+                "role": "investor",
+                "tenant_slug": self.tenant_slugs[0],
+            }
+            api_core.get_tenant_by_slug = lambda slug: {"slug": slug}
+            api_core.list_watchlist_comments = lambda **kwargs: captured.update(kwargs) or []
+            response = self.client.get(
+                f"/api/watchlist/600519/comments?tenant_slug={self.tenant_slugs[0]}&user_profile_id=forged_account&user_role=dav"
+            )
+            denied = self.client.get("/api/watchlist/600519/comments?tenant_slug=another_tenant")
+        finally:
+            api_core.get_current_authenticated_user = original_current_user
+            api_core.get_tenant_by_slug = original_get_tenant
+            api_core.list_watchlist_comments = original_list
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured["viewer_profile_id"], "actual_account")
+        self.assertEqual(captured["viewer_role"], "investor")
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(denied.get_json().get("error"), "tenant_scope_forbidden")
 
     def test_h5_hermes_history_and_send_scroll_to_bottom(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
@@ -567,6 +756,27 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertGreaterEqual(html.count("scrollHermesThreadToBottom();"), 4)
         self.assertIn("function resetHermesScrollPosition()", html)
         self.assertIn("resetHermesScrollPosition();", html)
+
+    def test_h5_message_center_hides_reply_controls_when_fan_interaction_disabled(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('id="dm-quick-asks"', html)
+        self.assertIn('id="dm-input-bar" style="display:none"', html)
+        self.assertIn("if (!isFeatureEnabled('fan_interaction') || isCurrentDmSystemThread())", html)
+        self.assertIn("const interactionEnabled = isFeatureEnabled('fan_interaction');", html)
+        self.assertIn("当前为站内信查看模式，暂不开放回复", html)
+        self.assertIn("暂不支持回复", html)
+
+    def test_kol_reply_api_is_disabled_with_fan_interaction(self):
+        response = self.client.post(
+            "/api/kol/reply",
+            json={"tenant_slug": self.tenant_slugs[0], "thread_id": "thread-1", "content": "测试回复"},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.get_json().get("error"), "fan_interaction_disabled")
 
     def test_hermes_query_accepts_web_answer_flag(self):
         response = self.client.post(
