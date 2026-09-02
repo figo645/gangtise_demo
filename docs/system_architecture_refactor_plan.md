@@ -511,3 +511,16 @@ src/
 - 《系统架构重构实施清单》
 - 《模块迁移顺序与风险回退方案》
 - 《容量压测与监控建设方案》
+
+## 13. 启动依赖与脚本契约
+
+现有启动命令和脚本名称保持不变：
+
+- `python3 app.py`
+- `start_app.sh` / `stop_app.sh`
+- `start_daemon_app.sh` / `stop_daemon_app.sh`
+- `start_local_with_postgres.sh`
+
+启动脚本会优先选择项目目录下的 `.venv`、`venv` 或 `env`，然后检查 `requirements.txt` 中的发行包。缺失依赖时默认执行当前解释器的 `python -m pip install -r requirements.txt`；设置 `AUTO_INSTALL_PYTHON_DEPS=0` 可关闭自动安装并改为明确失败。Gunicorn 通过同一个 Python 解释器的 `python -m gunicorn` 启动，避免全局 Python 与项目环境串用。
+
+`stop_daemon_app.sh` 和 `stop_app.sh` 不依赖 Python 包，也不会执行安装动作，确保即使运行环境损坏仍能回收 Web、Worker 和 Scheduler 进程。

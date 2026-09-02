@@ -20,6 +20,72 @@ resolve_python_bin() {
   printf '%s\n' "python3"
 }
 
+ensure_python_dependencies() {
+  local root_dir="$1"
+  local python_bin="$2"
+  local requirements_file="${REQUIREMENTS_FILE:-$root_dir/requirements.txt}"
+  local auto_install="${AUTO_INSTALL_PYTHON_DEPS:-1}"
+
+  if [[ ! -f "$requirements_file" ]]; then
+    echo "requirements.txt not found: $requirements_file" >&2
+    return 1
+  fi
+  if ! "$python_bin" -m pip --version >/dev/null 2>&1; then
+    echo "pip is unavailable for $python_bin. Create or repair the Python environment first." >&2
+    return 1
+  fi
+
+  local missing
+  missing="$("$python_bin" - "$requirements_file" <<'PY'
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
+import re
+import sys
+
+requirements_path = Path(sys.argv[1])
+missing = []
+for raw_line in requirements_path.read_text(encoding="utf-8").splitlines():
+    line = raw_line.strip()
+    if not line or line.startswith("#") or line.startswith(("-", "--")):
+        continue
+    match = re.match(r"^([A-Za-z0-9][A-Za-z0-9_.-]*)", line)
+    if not match:
+        continue
+    package_name = match.group(1)
+    try:
+        version(package_name)
+    except PackageNotFoundError:
+        missing.append(package_name)
+print(" ".join(missing))
+sys.exit(1 if missing else 0)
+PY
+)" || true
+
+  if [[ -n "$missing" ]]; then
+    if [[ "$auto_install" == "0" || "$auto_install" == "false" || "$auto_install" == "no" ]]; then
+      echo "Missing Python dependencies for $python_bin: $missing" >&2
+      echo "Install them with: $python_bin -m pip install -r $requirements_file" >&2
+      return 1
+    fi
+    echo "Installing missing Python dependencies: $missing"
+    "$python_bin" -m pip install --disable-pip-version-check -r "$requirements_file"
+  fi
+
+  if ! "$python_bin" -m pip check >/dev/null 2>&1; then
+    # A shared system interpreter can contain unrelated applications with
+    # conflicting optional packages. The application gate below checks the
+    # modules this service actually imports, so retain the diagnostic without
+    # making those unrelated conflicts impossible to recover from at startup.
+    echo "Warning: unrelated Python dependency conflicts detected for $python_bin." >&2
+    "$python_bin" -m pip check >&2 || true
+  fi
+  "$python_bin" -c 'import flask, requests, psycopg2; import gunicorn; from cryptography.fernet import Fernet' >/dev/null 2>&1 || {
+    echo "Core Python runtime dependencies are not importable for $python_bin." >&2
+    return 1
+  }
+  echo "Python dependencies verified: $python_bin"
+}
+
 runtime_pid_matches() {
   local pid="$1"
   local expected="$2"

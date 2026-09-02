@@ -1,5 +1,4 @@
 import os
-import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -61,36 +60,39 @@ if __name__ == "__main__":
     server_options = get_server_runtime_options()
     server_mode = str(os.environ.get("APP_SERVER", "gunicorn")).strip().lower()
     if server_mode in {"gunicorn", "prod", "production"}:
-        gunicorn = shutil.which("gunicorn")
-        if not gunicorn:
-            gunicorn = os.path.join(os.path.dirname(sys.executable), "gunicorn")
-        if not os.path.exists(gunicorn):
-            raise SystemExit("Gunicorn is required for startup. Install requirements.txt before serving traffic, or explicitly set APP_SERVER=flask for development only.")
-        else:
-            # Bootstrap is run before exec so it happens once, while the
-            # Gunicorn workers begin with no inherited PostgreSQL sockets.
-            startup_bootstrap(start_background=False)
-            close_app_db_pool()
-            workers = max(1, int(os.environ.get("WEB_WORKERS", "3")))
-            threads = max(1, int(os.environ.get("WEB_THREADS", "4")))
-            bind = f"{server_options['host']}:{server_options['port']}"
-            os.execv(
-                gunicorn,
-                [
-                    gunicorn,
-                    "--bind", bind,
-                    "--workers", str(workers),
-                    "--threads", str(threads),
-                    "--worker-class", "gthread",
-                    "--timeout", os.environ.get("WEB_TIMEOUT_SECONDS", "180"),
-                    "--graceful-timeout", os.environ.get("WEB_GRACEFUL_TIMEOUT_SECONDS", "30"),
-                    "--keep-alive", os.environ.get("WEB_KEEPALIVE_SECONDS", "5"),
-                    "--max-requests", os.environ.get("WEB_MAX_REQUESTS", "1000"),
-                    "--max-requests-jitter", os.environ.get("WEB_MAX_REQUESTS_JITTER", "100"),
-                    "--access-logfile", "-",
-                    "--error-logfile", "-",
-                    "wsgi:app",
-                ],
-            )
+        if not os.path.exists(os.path.join(os.path.dirname(sys.executable), "gunicorn")):
+            try:
+                import gunicorn  # noqa: F401
+            except Exception as exc:
+                raise SystemExit(
+                    "Gunicorn is required for startup. Install requirements.txt before serving traffic, "
+                    "or explicitly set APP_SERVER=flask for development only."
+                ) from exc
+        # Bootstrap is run before exec so it happens once, while the Gunicorn
+        # workers begin with no inherited PostgreSQL sockets. Running the
+        # module through this interpreter prevents a global Gunicorn binary
+        # from silently using a different Python environment.
+        startup_bootstrap(start_background=False)
+        close_app_db_pool()
+        workers = max(1, int(os.environ.get("WEB_WORKERS", "3")))
+        threads = max(1, int(os.environ.get("WEB_THREADS", "4")))
+        bind = f"{server_options['host']}:{server_options['port']}"
+        gunicorn_args = [
+            sys.executable,
+            "-m", "gunicorn",
+            "--bind", bind,
+            "--workers", str(workers),
+            "--threads", str(threads),
+            "--worker-class", "gthread",
+            "--timeout", os.environ.get("WEB_TIMEOUT_SECONDS", "180"),
+            "--graceful-timeout", os.environ.get("WEB_GRACEFUL_TIMEOUT_SECONDS", "30"),
+            "--keep-alive", os.environ.get("WEB_KEEPALIVE_SECONDS", "5"),
+            "--max-requests", os.environ.get("WEB_MAX_REQUESTS", "1000"),
+            "--max-requests-jitter", os.environ.get("WEB_MAX_REQUESTS_JITTER", "100"),
+            "--access-logfile", "-",
+            "--error-logfile", "-",
+            "wsgi:app",
+        ]
+        os.execv(sys.executable, gunicorn_args)
     startup_bootstrap(start_background=True)
     app.run(**server_options)
