@@ -1,4 +1,6 @@
 import os
+import shutil
+import sys
 import tempfile
 from pathlib import Path
 
@@ -29,7 +31,7 @@ def _ensure_tempdir():
 _ensure_tempdir()
 
 from src.runtime import app
-from src.domain.core_services import startup_bootstrap
+from src.domain.core_services import close_app_db_pool, startup_bootstrap
 import src.app_setup  # noqa: F401
 
 
@@ -57,5 +59,38 @@ def get_server_runtime_options():
 
 if __name__ == "__main__":
     server_options = get_server_runtime_options()
-    startup_bootstrap()
+    server_mode = str(os.environ.get("APP_SERVER", "gunicorn")).strip().lower()
+    if server_mode in {"gunicorn", "prod", "production"}:
+        gunicorn = shutil.which("gunicorn")
+        if not gunicorn:
+            gunicorn = os.path.join(os.path.dirname(sys.executable), "gunicorn")
+        if not os.path.exists(gunicorn):
+            raise SystemExit("Gunicorn is required for startup. Install requirements.txt before serving traffic, or explicitly set APP_SERVER=flask for development only.")
+        else:
+            # Bootstrap is run before exec so it happens once, while the
+            # Gunicorn workers begin with no inherited PostgreSQL sockets.
+            startup_bootstrap(start_background=False)
+            close_app_db_pool()
+            workers = max(1, int(os.environ.get("WEB_WORKERS", "3")))
+            threads = max(1, int(os.environ.get("WEB_THREADS", "4")))
+            bind = f"{server_options['host']}:{server_options['port']}"
+            os.execv(
+                gunicorn,
+                [
+                    gunicorn,
+                    "--bind", bind,
+                    "--workers", str(workers),
+                    "--threads", str(threads),
+                    "--worker-class", "gthread",
+                    "--timeout", os.environ.get("WEB_TIMEOUT_SECONDS", "180"),
+                    "--graceful-timeout", os.environ.get("WEB_GRACEFUL_TIMEOUT_SECONDS", "30"),
+                    "--keep-alive", os.environ.get("WEB_KEEPALIVE_SECONDS", "5"),
+                    "--max-requests", os.environ.get("WEB_MAX_REQUESTS", "1000"),
+                    "--max-requests-jitter", os.environ.get("WEB_MAX_REQUESTS_JITTER", "100"),
+                    "--access-logfile", "-",
+                    "--error-logfile", "-",
+                    "wsgi:app",
+                ],
+            )
+    startup_bootstrap(start_background=True)
     app.run(**server_options)

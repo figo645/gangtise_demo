@@ -7015,17 +7015,103 @@ def build_admin_site_config_payload(site_config=None):
 
 
 
-def get_app_db_connection():
+_app_db_pool_lock = threading.Lock()
+_app_db_pool = None
+_app_db_pool_signature = None
+
+
+class _PooledRawConnection:
+    """Return a psycopg2 connection to the process-local pool on close."""
+
+    def __init__(self, connection, release_callback):
+        self._connection = connection
+        self._release_callback = release_callback
+        self._closed = False
+
+    def __getattr__(self, name):
+        return getattr(self._connection, name)
+
+    def close(self):
+        if self._closed:
+            return
+        self._closed = True
+        self._release_callback(self._connection)
+
+    def __enter__(self):
+        self._connection.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            return self._connection.__exit__(exc_type, exc_value, traceback)
+        finally:
+            self.close()
+
+
+def _app_db_pool_config():
     target = get_runtime_db_target().get("app", {})
-    connection = psycopg2.connect(
-        host=target.get("host") or APP_DB_HOST,
-        port=target.get("port") or APP_DB_PORT,
-        dbname=target.get("dbname") or APP_DB_NAME,
-        user=target.get("user") or APP_DB_USER,
-        password=target.get("password") or APP_DB_PASSWORD,
-        connect_timeout=8,
-    )
-    return connection
+    return {
+        "host": target.get("host") or APP_DB_HOST,
+        "port": int(target.get("port") or APP_DB_PORT),
+        "dbname": target.get("dbname") or APP_DB_NAME,
+        "user": target.get("user") or APP_DB_USER,
+        "password": target.get("password") or APP_DB_PASSWORD,
+    }
+
+
+def _release_app_db_connection(connection):
+    try:
+        # Request handlers normally commit explicitly, but resetting the
+        # session here prevents an uncaught exception from returning an
+        # aborted transaction to the next request.
+        connection.rollback()
+    except Exception:
+        connection.close()
+        return
+    with _app_db_pool_lock:
+        pool = _app_db_pool
+    if pool is None:
+        connection.close()
+        return
+    try:
+        pool.putconn(connection, close=False)
+    except Exception:
+        connection.close()
+
+
+def _get_app_db_pool():
+    global _app_db_pool, _app_db_pool_signature
+    config = _app_db_pool_config()
+    signature = tuple(config.items())
+    with _app_db_pool_lock:
+        if _app_db_pool is not None and _app_db_pool_signature == signature:
+            return _app_db_pool
+        if _app_db_pool is not None:
+            _app_db_pool.closeall()
+        _app_db_pool = ThreadedConnectionPool(
+            DATABASE_POOL_MIN_CONNECTIONS,
+            DATABASE_POOL_MAX_CONNECTIONS,
+            connect_timeout=8,
+            **config,
+        )
+        _app_db_pool_signature = signature
+        return _app_db_pool
+
+
+def close_app_db_pool():
+    """Release process-local connections before an exec or orderly shutdown."""
+    global _app_db_pool, _app_db_pool_signature
+    with _app_db_pool_lock:
+        if _app_db_pool is not None:
+            _app_db_pool.closeall()
+        _app_db_pool = None
+        _app_db_pool_signature = None
+
+
+def get_app_db_connection():
+    pool = _get_app_db_pool()
+    connection = pool.getconn()
+    return _PooledRawConnection(connection, _release_app_db_connection)
 
 
 def get_db_connection_for_target(target):
@@ -7428,7 +7514,14 @@ def is_werkzeug_reloader_parent():
     return reloader_enabled and os.environ.get("WERKZEUG_RUN_MAIN") != "true"
 
 
-def startup_bootstrap():
+def startup_bootstrap(start_background=False):
+    """Initialize shared data without tying background loops to the Web app.
+
+    Web, Scheduler and Worker are separate processes in production.  The
+    explicit ``start_background`` switch remains for a local legacy process,
+    but production entry points leave it false so Gunicorn workers never each
+    create another scheduler or queue consumer.
+    """
     if is_werkzeug_reloader_parent():
         app.logger.info("Skipping startup bootstrap in Werkzeug reloader parent process")
         return
@@ -7450,8 +7543,9 @@ def startup_bootstrap():
         if not is_db_unavailable_error(exc):
             raise
         app.logger.warning("Database unavailable during task-center init, skipping default tasks")
-    ensure_task_center_started()
-    ensure_user_async_job_worker_started()
+    if start_background:
+        ensure_task_center_started()
+        ensure_user_async_job_worker_started()
 
 
 def get_db():
@@ -8418,33 +8512,8 @@ def _task_should_run(task, now_epoch):
 
 def _task_center_loop():
     while True:
-        try:
-            with app.app_context():
-                tasks = list_admin_task_configs()
-                now_epoch = time.time()
-                next_run_map = {}
-                for task in tasks:
-                    should_run, interval_seconds = _task_should_run(task, now_epoch)
-                    if interval_seconds:
-                        if task.get("last_run_started_at"):
-                            try:
-                                last_dt = datetime.strptime(task["last_run_started_at"], "%Y-%m-%d %H:%M:%S")
-                                next_run_map[task["task_code"]] = datetime.fromtimestamp(last_dt.timestamp() + interval_seconds).strftime("%Y-%m-%d %H:%M:%S")
-                            except Exception:
-                                next_run_map[task["task_code"]] = ""
-                        else:
-                            next_run_map[task["task_code"]] = now_ts()
-                        update_admin_task_status(task["task_code"], last_next_run_at=next_run_map[task["task_code"]])
-                    if not should_run:
-                        continue
-                    run_admin_task(task["task_code"], trigger_mode="scheduler", force=False)
-                with _task_center_lock:
-                    _task_center_runtime["last_poll_at"] = now_ts()
-                    _task_center_runtime["tasks_seen"] = len(tasks)
-        except Exception as exc:
-            with _task_center_lock:
-                _task_center_runtime["last_poll_error"] = str(exc)
-                _task_center_runtime["last_poll_at"] = now_ts()
+        with app.app_context():
+            _task_center_loop_iteration()
         time.sleep(TASK_CENTER_POLL_INTERVAL_SECONDS)
 
 
@@ -8588,6 +8657,73 @@ def ensure_user_async_job_worker_started():
         _user_async_job_started = True
         _user_async_job_runtime["started_at"] = now_ts()
         _user_async_job_runtime["queue_state"] = "booting"
+
+
+def run_user_async_job_worker_forever():
+    """Run the queue consumer as a dedicated process entry point."""
+    _user_async_job_loop()
+
+
+SCHEDULER_ADVISORY_LOCK_ID = 72951002
+
+
+def run_scheduler_forever():
+    """Run one scheduler instance, guarded by a PostgreSQL advisory lock."""
+    while True:
+        lock_connection = None
+        try:
+            lock_config = _app_db_pool_config()
+            lock_connection = psycopg2.connect(connect_timeout=8, **lock_config)
+            lock = lock_connection.cursor()
+            lock.execute("SELECT pg_try_advisory_lock(%s) AS locked", (SCHEDULER_ADVISORY_LOCK_ID,))
+            row = lock.fetchone()
+            locked = row.get("locked") if isinstance(row, dict) else (row[0] if row else False)
+            if not locked:
+                app.logger.warning("Scheduler already active in another process; retrying")
+                lock_connection.close()
+                time.sleep(max(5, TASK_CENTER_POLL_INTERVAL_SECONDS))
+                continue
+            # Keep this connection open for the lifetime of the scheduler. The
+            # advisory lock is released automatically if the process dies.
+            while True:
+                with app.app_context():
+                    _task_center_loop_iteration()
+                time.sleep(TASK_CENTER_POLL_INTERVAL_SECONDS)
+        except Exception as exc:
+            app.logger.exception("Scheduler loop failed: %s", exc)
+            time.sleep(max(5, TASK_CENTER_POLL_INTERVAL_SECONDS))
+        finally:
+            if lock_connection is not None:
+                lock_connection.close()
+
+
+def _task_center_loop_iteration():
+    """Execute one scheduler poll; shared by the legacy loop and Scheduler."""
+    try:
+        tasks = list_admin_task_configs()
+        now_epoch = time.time()
+        next_run_map = {}
+        for task in tasks:
+            should_run, interval_seconds = _task_should_run(task, now_epoch)
+            if interval_seconds:
+                if task.get("last_run_started_at"):
+                    try:
+                        last_dt = datetime.strptime(task["last_run_started_at"], "%Y-%m-%d %H:%M:%S")
+                        next_run_map[task["task_code"]] = datetime.fromtimestamp(last_dt.timestamp() + interval_seconds).strftime("%Y-%m-%d %H:%M:%S")
+                    except Exception:
+                        next_run_map[task["task_code"]] = ""
+                else:
+                    next_run_map[task["task_code"]] = now_ts()
+                update_admin_task_status(task["task_code"], last_next_run_at=next_run_map[task["task_code"]])
+            if should_run:
+                run_admin_task(task["task_code"], trigger_mode="scheduler", force=False)
+        with _task_center_lock:
+            _task_center_runtime["last_poll_at"] = now_ts()
+            _task_center_runtime["tasks_seen"] = len(tasks)
+    except Exception as exc:
+        with _task_center_lock:
+            _task_center_runtime["last_poll_error"] = str(exc)
+            _task_center_runtime["last_poll_at"] = now_ts()
 
 
 def _merge_site_config(base, override):

@@ -292,17 +292,18 @@ src/
 
 动作：
 
-- 引入 app factory
-- 区分 `dev / prod` 配置
-- `app.py` 只保留入口组装
-- 启动脚本改为 `gunicorn`
-- 去除依赖 Flask reloader 的启动逻辑
+- `python3 app.py` 仍是统一 Web 启动入口，内部默认执行 Gunicorn；仅显式设置 `APP_SERVER=flask` 才允许开发服务器
+- 现有 `start_app.sh`、`start_daemon_app.sh`、`start_local_with_postgres.sh` 和停止脚本保持名称不变
+- Web 运行参数通过 `WEB_WORKERS`、`WEB_THREADS`、`WEB_TIMEOUT_SECONDS` 等环境变量调节
+- PostgreSQL 改为每个进程一个 `ThreadedConnectionPool`，请求结束归还连接并重置事务
+- Web 进程不启动后台循环；`src/process_worker.py` 和 `src/process_scheduler.py` 承担独立运行角色
+- Scheduler 使用 PostgreSQL advisory lock，避免多实例重复调度
 
 阶段产出：
 
-- 应用可通过 `gunicorn` 稳定运行
+- 应用可通过 Gunicorn 稳定运行
 - 启动行为更可控
-- 后续拆 Worker 不会受 Web 进程启动方式影响
+- 多 Web worker 不会复制后台任务线程
 
 ## 8.2 第二阶段：拆出 Worker 与 Scheduler
 

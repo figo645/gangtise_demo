@@ -110,5 +110,5 @@ if ! command -v "$PYTHON_BIN" >/dev/null 2>&1 && [ ! -x "$PYTHON_BIN" ]; then
   exit 1
 fi
 
-echo "Starting app.py on port $APP_PORT..."
-exec "$PYTHON_BIN" app.py
+echo "Starting the complete local runtime on port $APP_PORT..."
+exec env PORT="$APP_PORT" PYTHON_BIN="$PYTHON_BIN" GANGTISE_RUNTIME_ENV="${GANGTISE_RUNTIME_ENV:-local}" "$SCRIPT_DIR/start_app.sh"

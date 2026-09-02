@@ -4,6 +4,8 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     HOST=0.0.0.0 \
     PORT=5001 \
+    APP_SERVER=gunicorn \
+    DEBUG=0 \
     TMPDIR=/tmp
 
 WORKDIR /app

@@ -26,6 +26,7 @@ import requests
 import psycopg2
 from psycopg2.extras import Json, RealDictCursor
 from psycopg2 import OperationalError
+from psycopg2.pool import ThreadedConnectionPool
 try:
     from faster_whisper import WhisperModel
 except Exception:
@@ -190,6 +191,11 @@ TASK_CENTER_POLL_INTERVAL_SECONDS = max(5, int(os.environ.get("TASK_CENTER_POLL_
 TASK_CENTER_LOG_LIMIT = 80
 USER_ASYNC_JOB_POLL_INTERVAL_SECONDS = max(1, int(os.environ.get("USER_ASYNC_JOB_POLL_INTERVAL_SECONDS", "2")))
 USER_ASYNC_JOB_LOG_LIMIT = 80
+DATABASE_POOL_MIN_CONNECTIONS = max(1, int(os.environ.get("DATABASE_POOL_MIN_CONNECTIONS", "1")))
+DATABASE_POOL_MAX_CONNECTIONS = max(
+    DATABASE_POOL_MIN_CONNECTIONS,
+    int(os.environ.get("DATABASE_POOL_MAX_CONNECTIONS", "12")),
+)
 AUTO_INIT_DB_MODE = str(os.environ.get("AUTO_INIT_DB", "dev")).strip().lower()
 MARKET_DASHBOARD_REGISTRY_PATH = Path(
     os.environ.get(
@@ -324,8 +330,10 @@ class PgCompatCursor:
 
 
 class PgCompatConnection:
-    def __init__(self, connection):
+    def __init__(self, connection, release_callback=None):
         self._connection = connection
+        self._release_callback = release_callback
+        self._closed = False
 
     def _normalize_sql(self, sql):
         if not isinstance(sql, str):
@@ -365,7 +373,13 @@ class PgCompatConnection:
         self._connection.rollback()
 
     def close(self):
-        self._connection.close()
+        if self._closed:
+            return
+        self._closed = True
+        if self._release_callback:
+            self._release_callback(self._connection)
+        else:
+            self._connection.close()
 
 DEFAULT_SMART_INDICATOR_DEFINITIONS = [
     {
