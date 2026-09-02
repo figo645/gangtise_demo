@@ -1,0 +1,818 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>H5 与大V工作台全量体验回归 BDD 报告</title>
+  <style>
+    :root { --ink:#17324d; --muted:#66788a; --line:#dbe5ed; --panel:#ffffff; --bg:#f3f7fb; --blue:#206aaf; --green:#14724b; --red:#b42318; --gold:#a56a00; }
+    * { box-sizing:border-box; } body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
+    main { width:min(1440px,100%); margin:0 auto; padding:28px 20px 56px; } .top { border-bottom:3px solid var(--blue); padding:0 0 20px; }
+    h1 { margin:0; font-size:28px; line-height:1.25; } .sub { margin:8px 0 0; color:var(--muted); } .notice { margin-top:14px; padding:10px 12px; border-left:3px solid var(--gold); background:#fff8e9; color:#705012; font-size:13px; }
+    .metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:20px; } .metric { border:1px solid var(--line); background:var(--panel); padding:14px; min-height:88px; } .metric-label { color:var(--muted); font-size:12px; } .metric-value { margin-top:5px; font-size:28px; font-weight:800; } .metric-value.pass { color:var(--green); } .metric-value.fail { color:var(--red); }
+    section { margin-top:24px; } h2 { margin:0 0 10px; font-size:18px; } .summary-table,.scenario-table { width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--line); } th,td { padding:11px 12px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; } th { background:#eef5fb; color:#456078; font-size:12px; white-space:nowrap; } .pass-text { color:var(--green); font-weight:700; } .fail-text { color:var(--red); font-weight:700; } .muted { color:var(--muted); }
+    .filters { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 10px; } .filter { border:1px solid #b9ccdd; background:#fff; color:#315978; padding:7px 10px; border-radius:6px; cursor:pointer; font-size:12px; } .filter.active { border-color:var(--blue); background:var(--blue); color:#fff; } .table-wrap { overflow:auto; border:1px solid var(--line); } .scenario-table { min-width:1080px; border:0; } .scenario-row.pass .status span,.scenario-row.fail .status span { display:inline-block; min-width:48px; padding:3px 7px; border-radius:4px; font-size:11px; font-weight:800; text-align:center; } .scenario-row.pass .status span { background:#e7f5ed; color:var(--green); } .scenario-row.fail .status span { background:#fbe9e7; color:var(--red); } .scenario-name { font-weight:800; } .scenario-id { color:var(--muted); font:11px ui-monospace,SFMono-Regular,Menlo,monospace; margin-top:3px; } details { margin-top:8px; } summary { cursor:pointer; color:var(--blue); font-size:12px; font-weight:700; } pre { max-width:520px; margin:8px 0 0; padding:10px; overflow:auto; background:#122334; color:#edf5fb; font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; white-space:pre-wrap; word-break:break-word; }
+    .empty { display:none; margin-top:12px; color:var(--muted); } @media(max-width:760px) { main { padding:20px 12px 40px; } h1 { font-size:23px; } .metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="top">
+      <h1>H5 与大V工作台全量体验回归 BDD 报告</h1>
+      <p class="sub">执行时间：2026-09-02 13:02:57 · 结果：<strong class="pass-text">通过</strong></p>
+      <div class="notice">Flask 测试客户端渲染真实路由、真实模板和实际鉴权钩子；不写入业务数据、不提交 LLM 生成任务。页面启动按当前运行环境执行既有的只读数据库和市场数据探测，数据不可用时验证其回退渲染路径。</div>
+    </header>
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">BDD 场景</div><div class="metric-value">47</div></div>
+      <div class="metric"><div class="metric-label">通过</div><div class="metric-value pass">47</div></div>
+      <div class="metric"><div class="metric-label">失败</div><div class="metric-value pass">0</div></div>
+      <div class="metric"><div class="metric-label">覆盖范围</div><div class="metric-value" style="font-size:17px">三端 + 同源 + 权限</div></div>
+    </div>
+    <section><h2>覆盖汇总</h2><table class="summary-table"><thead><tr><th>端</th><th>场景</th><th>通过</th><th>失败</th></tr></thead><tbody><tr><td>H5</td><td>19</td><td class='pass-text'>19</td><td class='muted'>0</td></tr><tr><td>H5 大V工作台</td><td>6</td><td class='pass-text'>6</td><td class='muted'>0</td></tr><tr><td>Web 大V工作台</td><td>15</td><td class='pass-text'>15</td><td class='muted'>0</td></tr><tr><td>权限边界</td><td>2</td><td class='pass-text'>2</td><td class='muted'>0</td></tr><tr><td>跨端一致性</td><td>5</td><td class='pass-text'>5</td><td class='muted'>0</td></tr></tbody></table></section>
+    <section><h2>BDD 场景</h2><div class="filters"><button type="button" class="filter active" data-filter="全部">全部</button><button type="button" class="filter" data-filter="H5">H5</button><button type="button" class="filter" data-filter="H5 大V工作台">H5 大V工作台</button><button type="button" class="filter" data-filter="Web 大V工作台">Web 大V工作台</button><button type="button" class="filter" data-filter="权限边界">权限边界</button><button type="button" class="filter" data-filter="跨端一致性">跨端一致性</button><button type="button" class="filter" data-filter="失败">仅失败</button></div><div class="table-wrap"><table class="scenario-table"><thead><tr><th>结果</th><th>场景</th><th>端</th><th>行为</th><th>执行证据</th></tr></thead><tbody id="scenario-body">
+        <tr class="scenario-row pass" data-surface="H5" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">开屏与租户品牌</div><div class="scenario-id">h5-splash</div></td>
+          <td>H5</td>
+          <td><b>Given</b> 用户打开租户 H5。<br><b>When</b> 页面完成首屏渲染。<br><b>Then</b> 开屏、品牌名称和投资箴言均可用。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;id=\&quot;h5-splash-screen\&quot;&quot;,
+    &quot;id=\&quot;h5-splash-product-name\&quot;&quot;,
+    &quot;id=\&quot;h5-splash-quote\&quot;&quot;,
+    &quot;initH5SplashScreen();&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">移动端安全区域适配</div><div class="scenario-id">h5-mobile</div></td>
+          <td>H5</td>
+          <td><b>Given</b> 用户在移动端访问 H5。<br><b>When</b> 视口与开屏样式加载。<br><b>Then</b> 页面必须使用动态视口和安全区域间距。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;min-height:100dvh&quot;,
+    &quot;env(safe-area-inset-bottom)&quot;,
+    &quot;@media (max-width:575.98px)&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">市场四分类切换</div><div class="scenario-id">h5-market-tabs</div></td>
+          <td>H5</td>
+          <td><b>Given</b> 用户位于市场页面。<br><b>When</b> 切换自选股、热门行业、市场一览和宏观经济。<br><b>Then</b> 四个标签与对应面板都存在。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;market-watchlist-tab&quot;,
+    &quot;market-sector-tab&quot;,
+    &quot;market-overview-tab&quot;,
+    &quot;market-macro-tab&quot;,
+    &quot;market-watchlist-panel&quot;,
+    &quot;market-sector-panel&quot;,
+    &quot;market-overview-panel&quot;,
+    &quot;market-macro-panel&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">市场与宏观数据来源说明</div><div class="scenario-id">h5-market-sources</div></td>
+          <td>H5</td>
+          <td><b>Given</b> 用户查看市场一览或宏观经济。<br><b>When</b> 阅读数据来源。<br><b>Then</b> 页面明确只读取后台快照，不伪造实时值。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;market-overview-source-note&quot;,
+    &quot;market-sector-source-note&quot;,
+    &quot;market-macro-source-note&quot;,
+    &quot;页面只读取数据库快照&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">市场指数统一详情</div><div class="scenario-id">h5-market-index-detail</div></td>
+          <td>H5</td>
+          <td><b>Given</b> 用户点击上证或深证指数。<br><b>When</b> 系统打开指标详情。<br><b>Then</b> 页面从统一指标库构建详情，不跳转为自选股详情。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;function buildWorkbenchDashboardDetailCard&quot;,
+    &quot;findWorkbenchBaseIndicator(indicatorCode)&quot;,
+    &quot;基础指标由统一数据源和指标库维护&quot;
+  ],
+  &quot;forbidden_contracts&quot;: [
+    &quot;openWatchlistDetail(indicatorCode, &#x27;overview&#x27;);&quot;
+  ]
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">自选股模糊搜索</div><div class="scenario-id">h5-watchlist-search</div></td>
+          <td>H5</td>
+          <td><b>Given</b> 用户要添加自选股。<br><b>When</b> 输入中文、拼音或代码。<br><b>Then</b> 搜索输入框、建议列表和键盘选择逻辑均存在。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;watchlist-stock-code-input&quot;,
+    &quot;watchlist-stock-suggestion-list&quot;,
+    &quot;handleWatchlistStockCodeInput&quot;,
+    &quot;selectWatchlistSuggestionByIndex&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">自选股服务端持久化</div><div class="scenario-id">h5-watchlist-server-owned</div></td>
+          <td>H5</td>
+          <td><b>Given</b> 用户管理自选股。<br><b>When</b> 页面加载或刷新。<br><b>Then</b> 浏览器不保存本地自选股副本。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [],
+  &quot;forbidden_contracts&quot;: [
+    &quot;gangtise_demo_added_watchlist_codes&quot;,
+    &quot;gangtise_demo_removed_watchlist_codes&quot;,
+    &quot;gangtise_demo_watchlist_annotations&quot;
+  ]
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">个股评论与身份展示</div><div class="scenario-id">h5-watchlist-comments</div></td>
+          <td>H5</td>
+          <td><b>Given</b> 用户查看个股详情。<br><b>When</b> 打开评论区。<br><b>Then</b> 评论区使用当前登录账户身份，不信任页面提交的昵称。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;/api/watchlist/${encodeURIComponent(stockCode)}/comments&quot;,
+    &quot;user_name: String(user.name || user.username || &#x27;&#x27;).trim()&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">粉丝端基本面只读</div><div class="scenario-id">h5-fundamental-read-only</div></td>
+          <td>H5</td>
+          <td><b>Given</b> 普通用户查看基本面智能指标。<br><b>When</b> 打开任意指标详情。<br><b>Then</b> 详情只能查看，新增、修改和移除要前往大V工作台。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;openFundamentalDashboardIndicatorDetail&quot;,
+    &quot;这里仅供查看详情；指标的新增、修改和移除请前往大V工作台&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">水印功能开关</div><div class="scenario-id">h5-watermark</div></td>
+          <td>H5</td>
+          <td><b>Given</b> 管理员启用 H5 水印。<br><b>When</b> 用户进入 H5。<br><b>Then</b> 页面具备用户名与日期水印容器。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;id=\&quot;h5-watermark-layer\&quot;&quot;,
+    &quot;renderH5Watermark&quot;,
+    &quot;h5_watermark&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">复盘生产入口</div><div class="scenario-id">h5-review-entry</div></td>
+          <td>H5</td>
+          <td><b>Given</b> 大V在 H5 发起复盘。<br><b>When</b> 打开复盘生产区。<br><b>Then</b> 复盘独立工作区、期间选择和发布入口均可用。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;id=\&quot;review-production-page\&quot;&quot;,
+    &quot;openReviewTriggerModal()&quot;,
+    &quot;id=\&quot;review-period-row\&quot;&quot;,
+    &quot;publishReviewDraft()&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">复盘三阶段审核</div><div class="scenario-id">h5-review-stages</div></td>
+          <td>H5</td>
+          <td><b>Given</b> 大V录入复盘材料。<br><b>When</b> 依次生成 Draft、选择自选股并审核预览。<br><b>Then</b> 用户输入、规则和结构化自选股分析均可继续编辑。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;智能优化规则&quot;,
+    &quot;Draft 审核与详细修改&quot;,
+    &quot;重新生成自选股分析&quot;,
+    &quot;id=\&quot;review-structured-combined-text\&quot;&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">复盘任务恢复与停止</div><div class="scenario-id">h5-review-jobs</div></td>
+          <td>H5</td>
+          <td><b>Given</b> 复盘异步任务正在运行。<br><b>When</b> 用户重新进入页面或点击停止生成。<br><b>Then</b> 页面可恢复任务状态，并调用同一取消接口。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;function loadActiveReviewJobs()&quot;,
+    &quot;cancelReviewAsyncJob()&quot;,
+    &quot;/api/review/jobs/${encodeURIComponent(jobCode)}/cancel&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">复盘 API 编排</div><div class="scenario-id">h5-review-api</div></td>
+          <td>H5</td>
+          <td><b>Given</b> 大V提交复盘。<br><b>When</b> 执行 Draft、结构化预览和发布。<br><b>Then</b> 三个阶段必须调用统一服务端 API。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;/api/review/generate-draft&quot;,
+    &quot;/api/review/prepare-preview&quot;,
+    &quot;/api/review/publish&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">已发布复盘阅读与删除</div><div class="scenario-id">h5-review-published</div></td>
+          <td>H5</td>
+          <td><b>Given</b> 大V查看已发布复盘。<br><b>When</b> 打开详情或删除一篇复盘。<br><b>Then</b> 阅读入口和受权限保护的删除动作均存在。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;openReviewArticleDetail&quot;,
+    &quot;deletePublishedReviewArticle&quot;,
+    &quot;/api/tenant/${encodeURIComponent(tenantSlug)}/reviews/${encodeURIComponent(reviewId)}&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">消息中心站内信模式</div><div class="scenario-id">h5-messages-read-only</div></td>
+          <td>H5</td>
+          <td><b>Given</b> 粉丝互动能力关闭。<br><b>When</b> 用户查看任意消息。<br><b>Then</b> 回复区隐藏并明确提示当前不开放回复。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;id=\&quot;dm-quick-asks\&quot;&quot;,
+    &quot;id=\&quot;dm-input-bar\&quot; style=\&quot;display:none\&quot;&quot;,
+    &quot;当前为站内信查看模式，暂不开放回复&quot;,
+    &quot;暂不支持回复&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">小金会话与自动滚动</div><div class="scenario-id">h5-hermes-session</div></td>
+          <td>H5</td>
+          <td><b>Given</b> 用户进入小金智能体。<br><b>When</b> 切换会话或发送新问题。<br><b>Then</b> 会话列表、历史恢复和到底部滚动逻辑均存在。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;id=\&quot;hermes-chat-thread\&quot;&quot;,
+    &quot;function resetHermesScrollPosition()&quot;,
+    &quot;handleHermesComposerSubmit()&quot;,
+    &quot;/api/hermes/sessions&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">小金思考默认收起</div><div class="scenario-id">h5-hermes-thinking</div></td>
+          <td>H5</td>
+          <td><b>Given</b> 回答携带思考过程。<br><b>When</b> 用户主动点击展开。<br><b>Then</b> 思考过程默认不展开，状态由用户动作决定。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;function handleHermesThinkingDisclosureToggle(disclosure)&quot;,
+    &quot;thinkingExpanded === true ? &#x27; open&#x27; : &#x27;&#x27;&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">小金不再写入知识源</div><div class="scenario-id">h5-hermes-no-knowledge-save</div></td>
+          <td>H5</td>
+          <td><b>Given</b> 用户获得小金回答。<br><b>When</b> 查看回答操作。<br><b>Then</b> 页面不得出现将答案加入知识源的入口。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [],
+  &quot;forbidden_contracts&quot;: [
+    &quot;function saveHermesAnswerAsKnowledge(entryId)&quot;,
+    &quot;function buildHermesKnowledgePayload(entry, artifact)&quot;,
+    &quot;加入知识源&quot;
+  ]
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5 大V工作台" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">大V智能看板入口</div><div class="scenario-id">h5-dav-dashboard</div></td>
+          <td>H5 大V工作台</td>
+          <td><b>Given</b> 大V进入 H5 工作台。<br><b>When</b> 查看智能指标看板。<br><b>Then</b> 大V拥有草稿、发布、恢复和指标编辑入口。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;const hasDavCapabilities = isDavCapableUser(user);&quot;,
+    &quot;id=\&quot;wb-dashboard-preview\&quot;&quot;,
+    &quot;publishFundDashboard()&quot;,
+    &quot;resetFundDashboardDraft()&quot;,
+    &quot;openWorkbenchSmartIndicatorEditor&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5 大V工作台" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">大V指标库折叠管理</div><div class="scenario-id">h5-dav-library</div></td>
+          <td>H5 大V工作台</td>
+          <td><b>Given</b> 租户已有多个已保存指标。<br><b>When</b> 打开 H5 大V工作台。<br><b>Then</b> 页面只显示最近三个指标，其余通过更多和管理弹窗查看。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;function renderWorkbenchSmartIndicatorLibrary()&quot;,
+    &quot;function openWorkbenchSmartIndicatorLibraryModal()&quot;,
+    &quot;const recentItems = items.slice(0, 3)&quot;,
+    &quot;更多（${remainingCount}）&quot;,
+    &quot;管理指标&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5 大V工作台" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">指标标签与公式编辑</div><div class="scenario-id">h5-dav-formula</div></td>
+          <td>H5 大V工作台</td>
+          <td><b>Given</b> 大V输入 CPI、PPI、行业或市场指标。<br><b>When</b> 构造加减乘除公式。<br><b>Then</b> 系统使用标签、公式 token 和可移除的误匹配标签。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;canonicalizeWorkbenchSmartPrompt&quot;,
+    &quot;tokenizeWorkbenchSmartPrompt&quot;,
+    &quot;formula_tokens&quot;,
+    &quot;toggleWorkbenchSmartTag&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5 大V工作台" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">单一已注册指标直接引用</div><div class="scenario-id">h5-dav-direct-reference</div></td>
+          <td>H5 大V工作台</td>
+          <td><b>Given</b> 大V输入一个已注册指标名称。<br><b>When</b> 生成预览并确认展示。<br><b>Then</b> 系统复用指标定义而不是创建重复智能指标。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;function getWorkbenchDirectPreviewCandidate&quot;,
+    &quot;preview.direct_reference === true&quot;,
+    &quot;已直接引用指标，无需等待生成&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5 大V工作台" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">从看板移除不删除定义</div><div class="scenario-id">h5-dav-dashboard-removal</div></td>
+          <td>H5 大V工作台</td>
+          <td><b>Given</b> 大V要移除一个展示指标。<br><b>When</b> 确认从 Dashboard 移除。<br><b>Then</b> 只移除看板引用，定义、快照和历史数据保留。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;function removeWorkbenchDashboardIndicator(index)&quot;,
+    &quot;syncTenantDashboardState(&#x27;remove_indicator&#x27;&quot;,
+    &quot;只移除看板投影，不删除指标定义、历史数据或指标库记录。&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5 大V工作台" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">智能指标统一 API</div><div class="scenario-id">h5-dav-indicator-api</div></td>
+          <td>H5 大V工作台</td>
+          <td><b>Given</b> 大V预览、保存或更新智能指标。<br><b>When</b> 提交标签和公式。<br><b>Then</b> 请求统一指向租户 smart-indicators API。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators&quot;,
+    &quot;action: &#x27;preview&#x27;&quot;,
+    &quot;action: &#x27;save&#x27;&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="Web 大V工作台" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">桌面工作台主导航</div><div class="scenario-id">web-shell</div></td>
+          <td>Web 大V工作台</td>
+          <td><b>Given</b> 大V进入桌面工作台。<br><b>When</b> 查看工作台导航。<br><b>Then</b> 概览、粉丝、复盘、指标、看板和已发布内容均可进入。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;data-section=\&quot;overview\&quot;&quot;,
+    &quot;data-section=\&quot;fans\&quot;&quot;,
+    &quot;data-section=\&quot;review\&quot;&quot;,
+    &quot;data-section=\&quot;dashboard\&quot;&quot;,
+    &quot;data-section=\&quot;indicator-smart\&quot;&quot;,
+    &quot;data-section=\&quot;published\&quot;&quot;,
+    &quot;function showWorkbenchSection&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="Web 大V工作台" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">粉丝与经营分析</div><div class="scenario-id">web-fans</div></td>
+          <td>Web 大V工作台</td>
+          <td><b>Given</b> 大V进入粉丝或经营分析。<br><b>When</b> 切换漏斗、渠道、营收和分层。<br><b>Then</b> 粉丝运营和四类经营分析使用租户范围接口。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;workbench-section-fans&quot;,
+    &quot;workbench-section-biz-dashboard&quot;,
+    &quot;showWorkbenchAnalyticsSection(&#x27;funnel&#x27;)&quot;,
+    &quot;showWorkbenchAnalyticsSection(&#x27;channel&#x27;)&quot;,
+    &quot;showWorkbenchAnalyticsSection(&#x27;revenue&#x27;)&quot;,
+    &quot;showWorkbenchAnalyticsSection(&#x27;segment&#x27;)&quot;,
+    &quot;/api/kol/business-analytics?tenant=&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="Web 大V工作台" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">桌面复盘生产</div><div class="scenario-id">web-review-production</div></td>
+          <td>Web 大V工作台</td>
+          <td><b>Given</b> 大V在桌面工作台发起复盘。<br><b>When</b> 生成 Draft、预览并发布。<br><b>Then</b> 桌面端使用与 H5 相同的复盘三阶段 API。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;function kwGenerateReviewDraftWithLlm()&quot;,
+    &quot;function kwRequestReviewStructuredPreview()&quot;,
+    &quot;function kwPublishReviewContent&quot;,
+    &quot;/api/review/generate-draft&quot;,
+    &quot;/api/review/prepare-preview&quot;,
+    &quot;/api/review/publish&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="Web 大V工作台" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">桌面复盘任务恢复</div><div class="scenario-id">web-review-jobs</div></td>
+          <td>Web 大V工作台</td>
+          <td><b>Given</b> 复盘任务在后台运行。<br><b>When</b> 工作台重新加载或用户取消任务。<br><b>Then</b> 任务列表、轮询和取消调用与 H5 使用相同服务端作业。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;function kwLoadActiveReviewJobs()&quot;,
+    &quot;function kwStartAsyncJobPolling&quot;,
+    &quot;/api/review/jobs?tenant_slug=&quot;,
+    &quot;/api/review/jobs/${encodeURIComponent(jobCode)}/cancel&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="Web 大V工作台" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">已发布复盘管理</div><div class="scenario-id">web-published-reviews</div></td>
+          <td>Web 大V工作台</td>
+          <td><b>Given</b> 大V查看已发布复盘。<br><b>When</b> 删除一篇已发布复盘。<br><b>Then</b> 删除必须走租户范围 API 并刷新列表状态。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;function kwDeletePublishedReview(reviewId)&quot;,
+    &quot;/api/tenant/${encodeURIComponent(tenantSlug)}/reviews/${encodeURIComponent(normalizedReviewId)}&quot;,
+    &quot;kwSyncPublishedReviewState&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="Web 大V工作台" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">桌面智能指标看板</div><div class="scenario-id">web-dashboard</div></td>
+          <td>Web 大V工作台</td>
+          <td><b>Given</b> 大V进入 Dashboard。<br><b>When</b> 切换布局或点击空位。<br><b>Then</b> 空位只能通过智能指标编辑器添加，不使用旧白盒拼卡片。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;kwRenderSmartDashboardLayoutRow&quot;,
+    &quot;kwOpenSmartIndicatorEditor&quot;,
+    &quot;function kwGenerateFundDashboard(layout)&quot;,
+    &quot;请点击空白格新增智能指标&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="Web 大V工作台" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">桌面指标定义维护</div><div class="scenario-id">web-indicator-library</div></td>
+          <td>Web 大V工作台</td>
+          <td><b>Given</b> 大V查看已保存智能指标。<br><b>When</b> 编辑、加入草稿或删除定义。<br><b>Then</b> 指标库和看板投影区分明确。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;function kwRenderSmartIndicatorLibrary()&quot;,
+    &quot;kwOpenSmartIndicatorLibraryDetail&quot;,
+    &quot;kwAddExistingIndicatorToDraft&quot;,
+    &quot;kwDeleteSmartIndicator&quot;,
+    &quot;删除指标定义&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="Web 大V工作台" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">桌面标签公式计算</div><div class="scenario-id">web-indicator-formula</div></td>
+          <td>Web 大V工作台</td>
+          <td><b>Given</b> 大V输入市场、行业、宏观或个股标签。<br><b>When</b> 生成预览。<br><b>Then</b> 前端发送标签、抑制标签和公式 token 给统一 API。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;kwCanonicalizeSmartPrompt&quot;,
+    &quot;kwTokenizeSmartPrompt&quot;,
+    &quot;selected_tag_codes&quot;,
+    &quot;suppressed_tag_codes&quot;,
+    &quot;formula_tokens&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="Web 大V工作台" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">桌面直接引用不重复建指标</div><div class="scenario-id">web-indicator-direct-reference</div></td>
+          <td>Web 大V工作台</td>
+          <td><b>Given</b> 大V仅引用一个已注册指标。<br><b>When</b> 确认展示。<br><b>Then</b> 直接将已有 indicator_code 加入草稿。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;function kwGetDirectPreviewCandidate&quot;,
+    &quot;preview.direct_reference === true&quot;,
+    &quot;已直接引用指标，无需重复生成&quot;,
+    &quot;nextCards[slotIndex] = { indicatorCode: preview.indicator_code }&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="Web 大V工作台" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">桌面看板移除保留定义</div><div class="scenario-id">web-indicator-removal</div></td>
+          <td>Web 大V工作台</td>
+          <td><b>Given</b> 大V从当前 Dashboard 移除指标。<br><b>When</b> 确认移除。<br><b>Then</b> 只保存草稿引用变化，不调用删除指标定义 API。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;function kwRemoveSmartDashboardCard(index)&quot;,
+    &quot;已从草稿移除，指标定义仍保留&quot;
+  ],
+  &quot;forbidden_contracts&quot;: [
+    &quot;kwDeleteSmartIndicator(&#x27;${escapeAttr(item.indicatorCode || item.indicator_code || &#x27;&#x27;)}&#x27;)&quot;
+  ]
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="Web 大V工作台" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">桌面看板服务端失败可见</div><div class="scenario-id">web-dashboard-sync</div></td>
+          <td>Web 大V工作台</td>
+          <td><b>Given</b> 服务端拒绝保存 Dashboard。<br><b>When</b> 工作台同步草稿、发布或恢复。<br><b>Then</b> 同步函数校验租户、抛出失败并返回确认载荷。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;if (!tenantSlug) throw new Error(&#x27;tenant_missing&#x27;);&quot;,
+    &quot;throw new Error(payload.error || &#x27;dashboard_sync_failed&#x27;);&quot;,
+    &quot;return payload;&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="Web 大V工作台" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">桌面看板发布与恢复</div><div class="scenario-id">web-dashboard-publish</div></td>
+          <td>Web 大V工作台</td>
+          <td><b>Given</b> 大V有一个 Dashboard 草稿。<br><b>When</b> 发布或恢复。<br><b>Then</b> 发布与恢复使用统一 dashboard API，失败会反馈给用户。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;kwSyncFundDashboard(&#x27;publish&#x27;&quot;,
+    &quot;kwSyncFundDashboard(&#x27;reset_draft&#x27;&quot;,
+    &quot;发布失败，请稍后重试&quot;,
+    &quot;恢复失败，请稍后重试&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="Web 大V工作台" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">桌面 Hermes 运营视图</div><div class="scenario-id">web-hermes-operations</div></td>
+          <td>Web 大V工作台</td>
+          <td><b>Given</b> 大V打开 Hermes 运营页。<br><b>When</b> 读取用量、记忆和能力沉淀。<br><b>Then</b> 所有读取都限定在当前租户。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;/api/kol/hermes/usage-stats?tenant=&quot;,
+    &quot;/api/kol/hermes/memory-summary?tenant=&quot;,
+    &quot;/api/kol/hermes/capability-growth?tenant=&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="Web 大V工作台" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">桌面自选与评论洞察</div><div class="scenario-id">web-watchlist-operations</div></td>
+          <td>Web 大V工作台</td>
+          <td><b>Given</b> 大V查看自选股池或互动洞察。<br><b>When</b> 打开评论详情。<br><b>Then</b> 工作台提供大V自选、粉丝自选和评论洞察入口。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;workbench-section-watchlist-pool&quot;,
+    &quot;workbench-section-watchlist-insights&quot;,
+    &quot;openKwWatchlistComments&quot;,
+    &quot;kw-fan-watchlist-sector-chart&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="Web 大V工作台" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">桌面功能开关保护</div><div class="scenario-id">web-feature-guards</div></td>
+          <td>Web 大V工作台</td>
+          <td><b>Given</b> 管理员关闭某个模块。<br><b>When</b> 大V通过直链尝试打开。<br><b>Then</b> 页面会根据功能开关回退到概览。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;section === &#x27;dashboard&#x27; &amp;&amp; !isWorkbenchFeatureEnabled(&#x27;fundamental_analysis&#x27;)&quot;,
+    &quot;section === &#x27;review&#x27; || section === &#x27;published&#x27;&quot;,
+    &quot;showWorkbenchSection(&#x27;overview&#x27;)&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="跨端一致性" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">H5 与 Web 复盘同源</div><div class="scenario-id">cross-review-contract</div></td>
+          <td>跨端一致性</td>
+          <td><b>Given</b> 大V从 H5 或 Web 发起复盘。<br><b>When</b> 执行三个复盘阶段。<br><b>Then</b> 两端均使用 generate-draft、prepare-preview、publish 三个 API。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;cross_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;/api/review/generate-draft&quot;,
+    &quot;/api/review/prepare-preview&quot;,
+    &quot;/api/review/publish&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="跨端一致性" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">H5 与 Web 指标同源</div><div class="scenario-id">cross-indicator-contract</div></td>
+          <td>跨端一致性</td>
+          <td><b>Given</b> 大V从 H5 或 Web 编辑智能指标。<br><b>When</b> 预览或保存指标。<br><b>Then</b> 两端均调用同一个 tenant smart-indicators API，并传递公式 token。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;cross_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators&quot;,
+    &quot;formula_tokens&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="跨端一致性" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">H5 与 Web 看板同源</div><div class="scenario-id">cross-dashboard-contract</div></td>
+          <td>跨端一致性</td>
+          <td><b>Given</b> 大V在任一端维护 Dashboard。<br><b>When</b> 保存草稿、发布、恢复或移除。<br><b>Then</b> 两端均使用同一个 tenant dashboard API。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;cross_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;/api/tenant/${encodeURIComponent(tenantSlug)}/dashboard&quot;,
+    &quot;&#x27;save_draft&#x27;&quot;,
+    &quot;&#x27;publish&#x27;&quot;,
+    &quot;&#x27;reset_draft&#x27;&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="跨端一致性" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">两端均避免重复指标定义</div><div class="scenario-id">cross-direct-indicator</div></td>
+          <td>跨端一致性</td>
+          <td><b>Given</b> 用户只引用一个已注册基础指标。<br><b>When</b> 生成预览。<br><b>Then</b> H5 和 Web 都启用 direct_reference 快路径。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;cross_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;direct_reference === true&quot;,
+    &quot;DirectPreviewCandidate&quot;
+  ],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="跨端一致性" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">Web 不再附加 H5 没有的复盘字段</div><div class="scenario-id">cross-review-payload</div></td>
+          <td>跨端一致性</td>
+          <td><b>Given</b> 大V从桌面端发布复盘。<br><b>When</b> 构造 publish 请求。<br><b>Then</b> Web 不得额外发送知识附件或智能卡片载荷。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;web_only&quot;,
+  &quot;required_contracts&quot;: [],
+  &quot;forbidden_contracts&quot;: [
+    &quot;knowledge_attachments: kwGetReviewSelectedKnowledge()&quot;,
+    &quot;selected_cards: kwGetReviewSelectedCards()&quot;
+  ]
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="权限边界" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">大V访问 Admin 显示友好提示</div><div class="scenario-id">security-dav-admin-page</div></td>
+          <td>权限边界</td>
+          <td><b>Given</b> 已登录用户角色为大V。<br><b>When</b> 直接访问 /admin。<br><b>Then</b> 页面返回 403，但显示权限不足和联系管理员指引。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;dav_admin_page&quot;,
+  &quot;required_contracts&quot;: [],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="权限边界" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">大V调用 Admin API 被拒绝</div><div class="scenario-id">security-dav-admin-api</div></td>
+          <td>权限边界</td>
+          <td><b>Given</b> 已登录用户角色为大V。<br><b>When</b> 请求 /api/admin/site-config。<br><b>Then</b> API 返回结构化 403 admin_required，不泄露后台数据。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;dav_admin_api&quot;,
+  &quot;required_contracts&quot;: [],
+  &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        </tbody></table></div><p id="empty" class="empty">当前筛选条件下没有场景。</p></section>
+  </main>
+  <script>
+    const buttons = Array.from(document.querySelectorAll('.filter')); const rows = Array.from(document.querySelectorAll('.scenario-row')); const empty = document.getElementById('empty');
+    buttons.forEach((button) => button.addEventListener('click', () => { const filter = button.dataset.filter; buttons.forEach((item) => item.classList.toggle('active', item === button)); let count = 0; rows.forEach((row) => { const visible = filter === '全部' || (filter === '失败' ? row.dataset.status === 'fail' : row.dataset.surface === filter); row.style.display = visible ? '' : 'none'; if (visible) count += 1; }); empty.style.display = count ? 'none' : 'block'; }));
+  </script>
+</body>
+</html>

@@ -1,6 +1,9 @@
 import unittest
 import os
 import tempfile
+import inspect
+import subprocess
+from pathlib import Path
 from unittest.mock import patch
 
 from src.domain import database_release_services
@@ -365,3 +368,74 @@ class DatabaseReleaseWebBddTest(unittest.TestCase):
         self.assertIn('"${DELTA_TARGET:-}"', content)
         self.assertIn("Package target does not match release target.", content)
         self.assertIn("DELTA_TARGET=%s", content)
+
+    def test_given_production_incremental_release_when_a_package_is_applied_then_a_validated_full_rollback_snapshot_exists_first(self):
+        backup_script = database_release_services.ROOT / "scripts" / "create_database_release_backup.sh"
+        package_script = database_release_services.PACKAGE_SCRIPT.read_text(encoding="utf-8")
+        batch_script = database_release_services.PACKAGE_BATCH_SCRIPT.read_text(encoding="utf-8")
+        backup_content = backup_script.read_text(encoding="utf-8")
+
+        self.assertIn('[[ "$TARGET" == "production" ]]', backup_content)
+        self.assertIn("pg_dump", backup_content)
+        self.assertIn("pg_restore", backup_content)
+        self.assertIn("Rollback snapshot validation failed", backup_content)
+        self.assertIn("Complete Production rollback snapshot ready", backup_content)
+        self.assertIn('"$BACKUP_SCRIPT"', package_script)
+        self.assertLess(package_script.index('"$BACKUP_SCRIPT"'), package_script.index("Starting transactional SQL execution"))
+        self.assertIn('"$BACKUP_SCRIPT"', batch_script)
+        self.assertIn("DATABASE_RELEASE_PRODUCTION_BACKUP_READY=1", batch_script)
+
+    def test_given_a_new_full_rollback_snapshot_when_history_exceeds_two_then_only_the_two_newest_are_retained(self):
+        prune_script = database_release_services.ROOT / "scripts" / "prune_database_release_backups.sh"
+        backup_content = (database_release_services.ROOT / "scripts" / "create_database_release_backup.sh").read_text(encoding="utf-8")
+        prune_content = prune_script.read_text(encoding="utf-8")
+        full_release_content = database_release_services.PREPARE_SCRIPT.read_text(encoding="utf-8")
+        rollback_content = database_release_services.ROLLBACK_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn("RETAIN_COUNT=2", prune_content)
+        self.assertIn("ORDER BY substring(datname", prune_content)
+        self.assertIn("DROP DATABASE", prune_content)
+        self.assertIn("prune_database_release_backups.sh", backup_content)
+        self.assertIn("prune_database_release_backups.sh", full_release_content)
+        self.assertIn("prune_database_release_backups.sh", rollback_content)
+
+    def test_given_rollback_history_when_the_controller_lists_available_snapshots_then_incremental_and_rollback_snapshots_are_visible(self):
+        source = inspect.getsource(database_release_services.list_database_release_rollbacks)
+        self.assertIn("substring(datname", source)
+        self.assertIn("rollback_from", source)
+
+    def test_given_three_complete_snapshots_when_retention_runs_then_only_the_oldest_is_deleted(self):
+        prune_script = database_release_services.ROOT / "scripts" / "prune_database_release_backups.sh"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            command_log = root / "psql.log"
+            fake_psql = fake_bin / "psql"
+            fake_psql.write_text(
+                "#!/usr/bin/env bash\n"
+                "if [[ \"$*\" == *\"SELECT datname FROM pg_database\"* ]]; then\n"
+                "  printf '%s\\n' sprint_dashboard_backup_20260902_030000 sprint_dashboard_backup_from_staging_20260901_030000 sprint_dashboard_rollback_from_20260831_030000\n"
+                "else\n"
+                "  printf '%s\\n' \"$*\" >> \"$FAKE_PSQL_LOG\"\n"
+                "fi\n",
+                encoding="utf-8",
+            )
+            fake_psql.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+                "FAKE_PSQL_LOG": str(command_log),
+                "DATABASE_RELEASE_TARGET": "production",
+                "REMOTE_DB_HOST": "production.example",
+                "REMOTE_DB_PASSWORD": "test-secret",
+                "REMOTE_DB_NAME": "sprint_dashboard",
+                "DATABASE_RELEASE_WORK_DIR": str(root / "work"),
+            }
+            completed = subprocess.run(["bash", str(prune_script)], text=True, capture_output=True, env=env, check=False)
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            commands = command_log.read_text(encoding="utf-8")
+            self.assertIn('DROP DATABASE "sprint_dashboard_rollback_from_20260831_030000" WITH (FORCE);', commands)
+            self.assertNotIn('DROP DATABASE "sprint_dashboard_backup_20260902_030000"', commands)
+            self.assertNotIn('DROP DATABASE "sprint_dashboard_backup_from_staging_20260901_030000"', commands)

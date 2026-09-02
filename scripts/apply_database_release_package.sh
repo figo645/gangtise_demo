@@ -3,6 +3,7 @@ set -euo pipefail
 
 # Apply one locally stored immutable package through direct PostgreSQL TCP.
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BACKUP_SCRIPT="${ROOT_DIR}/scripts/create_database_release_backup.sh"
 PACKAGES_DIR="${DATABASE_RELEASE_PACKAGES_DIR:-${ROOT_DIR}/database_release_packages}"
 PACKAGE_DIR="${1:-}"
 TARGET="${DATABASE_RELEASE_TARGET:-staging}"
@@ -49,6 +50,10 @@ if [[ -n "$recorded" ]]; then
   [[ "$recorded" == "$checksum" ]] || { echo "Released package checksum changed." >&2; exit 1; }
   echo "SKIP ${RELEASE_VERSION}"
   exit 0
+fi
+if [[ "$TARGET" == "production" && "${DATABASE_RELEASE_PRODUCTION_BACKUP_READY:-}" != "1" ]]; then
+  "$BACKUP_SCRIPT"
+  export DATABASE_RELEASE_PRODUCTION_BACKUP_READY=1
 fi
 started="$(date +%s)"
 wrapper="$(mktemp)"

@@ -115,6 +115,7 @@ echo "==> Existing Staging database connections terminated"
 "${ADMIN[@]}" -c "BEGIN; ALTER DATABASE \"${TARGET_DB}\" RENAME TO \"${BACKUP_DB}\"; ALTER DATABASE \"${TEMP_DB}\" RENAME TO \"${TARGET_DB}\"; COMMIT;"
 echo "==> Current Staging database retained for rollback: ${BACKUP_DB}"
 echo "==> Production snapshot promoted as Staging database"
+DATABASE_RELEASE_TARGET=staging REMOTE_DB_HOST="$TARGET_HOST" REMOTE_DB_PORT="$TARGET_PORT" REMOTE_DB_NAME="$TARGET_DB" REMOTE_DB_USER="$TARGET_USER" REMOTE_DB_PASSWORD="$TARGET_PASSWORD" REMOTE_MAINTENANCE_DB="$TARGET_MAINTENANCE_DB" DATABASE_RELEASE_WORK_DIR="$WORK_DIR" "$ROOT_DIR/scripts/prune_database_release_backups.sh"
 trap - ERR INT TERM
 rm -f "$DUMP_FILE"
 echo "==> Temporary Production export file removed"

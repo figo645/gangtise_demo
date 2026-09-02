@@ -108,6 +108,7 @@ echo "==> Existing ${TARGET} database connections terminated"
 echo "==> Current database retained for rollback: ${BACKUP_DB}"
 "${ADMIN[@]}" -c "ALTER DATABASE \"${TEMP_DB}\" RENAME TO \"${REMOTE_DB_NAME}\";"
 echo "==> Temporary database promoted as ${REMOTE_DB_NAME}"
+DATABASE_RELEASE_TARGET="$TARGET" REMOTE_DB_HOST="$REMOTE_DB_HOST" REMOTE_DB_PORT="$REMOTE_DB_PORT" REMOTE_DB_NAME="$REMOTE_DB_NAME" REMOTE_DB_USER="$REMOTE_DB_USER" REMOTE_DB_PASSWORD="$REMOTE_DB_PASSWORD" REMOTE_MAINTENANCE_DB="$REMOTE_MAINTENANCE_DB" DATABASE_RELEASE_WORK_DIR="$WORK_DIR" "$ROOT_DIR/scripts/prune_database_release_backups.sh"
 trap - ERR INT TERM
 cat > "$MANIFEST_FILE" <<EOF
 target=${TARGET}

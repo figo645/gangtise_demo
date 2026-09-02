@@ -192,6 +192,7 @@ if admin_sql -d postgres -Atqc "SELECT 1 FROM pg_database WHERE datname='${BACKU
 fi
 admin_sql -d postgres -c "ALTER DATABASE \"${DB_NAME}\" RENAME TO \"${BACKUP_DB}\";"
 admin_sql -d postgres -c "ALTER DATABASE \"${STAGING_DB}\" RENAME TO \"${DB_NAME}\";"
+DATABASE_RELEASE_TARGET=production REMOTE_DB_HOST="$DB_HOST" REMOTE_DB_PORT="$DB_PORT" REMOTE_DB_NAME="$DB_NAME" REMOTE_DB_USER="$DB_USER" REMOTE_DB_PASSWORD="$APP_PASSWORD" "$APP_DIR/scripts/prune_database_release_backups.sh"
 rm -f "$DUMP_FILE"
 AUTO_START_POSTGRES=0 AUTO_DB_UPDATE=1 AUTO_MARKET_SNAPSHOT_SYNC=1 "$APP_DIR/start_daemon_app.sh"
 "$APP_DIR/scripts/check_market_data.sh"

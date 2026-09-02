@@ -699,6 +699,9 @@ def _update_release_progress_from_log(line):
         ("==> Exporting complete local database:", "exporting", "正在导出本地完整数据库"),
         ("==> Exporting complete Production database:", "exporting", "正在导出 Production 完整数据库"),
         ("==> Exporting complete Staging database:", "exporting", "正在导出 Staging 完整数据库"),
+        ("==> [preflight] Creating complete Production rollback snapshot", "snapshotting", "正在创建 Production 全量回滚快照"),
+        ("==> Complete Production rollback snapshot ready:", "snapshot_ready", "Production 全量回滚快照已校验完成"),
+        ("==> Rollback snapshot retention complete:", "retention", "已清理过期回滚快照，仅保留最近两份"),
         ("==> Restoring ", "restoring", "正在恢复至目标临时数据库"),
         ("Validated:", "validating", "正在校验临时数据库"),
         ("==> Validating Production and Staging temporary database equivalence", "validating", "正在校验 Production 与 Staging 临时库一致性"),
@@ -909,7 +912,13 @@ def list_database_release_rollbacks(target_name):
     try:
         with psycopg2.connect(host=target["db_host"], port=target["db_port"], dbname="postgres", user=target["db_user"], password=target["db_password"], connect_timeout=5) as connection:
             with connection.cursor() as cursor:
-                cursor.execute("SELECT datname, pg_size_pretty(pg_database_size(datname)) FROM pg_database WHERE datname LIKE %s ORDER BY datname DESC", (f"{target['db_name']}_backup_%",))
+                cursor.execute(
+                    """SELECT datname, pg_size_pretty(pg_database_size(datname))
+                       FROM pg_database
+                       WHERE datname ~ %s
+                       ORDER BY substring(datname FROM '([0-9]{8}_[0-9]{6})$') DESC, datname DESC""",
+                    (rf"^{re.escape(target['db_name'])}_(backup(_[A-Za-z0-9_]+)?|rollback_from)_[0-9]{{8}}_[0-9]{{6}}$",),
+                )
                 return [{"name": row[0], "size": row[1]} for row in cursor.fetchall()]
     except Exception as exc:
         raise RuntimeError(f"database_rollback_records_unavailable:{exc}") from exc

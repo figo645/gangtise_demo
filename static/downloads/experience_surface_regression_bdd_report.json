@@ -1,0 +1,1366 @@
+{
+  "title": "H5 与大V工作台全量体验回归 BDD 报告",
+  "generated_at": "2026-09-02 13:02:57",
+  "execution_mode": "Flask 测试客户端渲染真实路由、真实模板和实际鉴权钩子；不写入业务数据、不提交 LLM 生成任务。页面启动按当前运行环境执行既有的只读数据库和市场数据探测，数据不可用时验证其回退渲染路径。",
+  "scope": "H5、H5 大V工作台、Web 大V工作台、跨端 API 同源性与权限边界。",
+  "scenario_count": 47,
+  "passed_count": 47,
+  "failed_count": 0,
+  "surface_summary": [
+    {
+      "surface": "H5",
+      "total": 19,
+      "passed": 19,
+      "failed": 0
+    },
+    {
+      "surface": "H5 大V工作台",
+      "total": 6,
+      "passed": 6,
+      "failed": 0
+    },
+    {
+      "surface": "Web 大V工作台",
+      "total": 15,
+      "passed": 15,
+      "failed": 0
+    },
+    {
+      "surface": "权限边界",
+      "total": 2,
+      "passed": 2,
+      "failed": 0
+    },
+    {
+      "surface": "跨端一致性",
+      "total": 5,
+      "passed": 5,
+      "failed": 0
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "h5-splash",
+      "surface": "H5",
+      "name": "开屏与租户品牌",
+      "given": "用户打开租户 H5。",
+      "when": "页面完成首屏渲染。",
+      "then": "开屏、品牌名称和投资箴言均可用。",
+      "required": [
+        "id=\"h5-splash-screen\"",
+        "id=\"h5-splash-product-name\"",
+        "id=\"h5-splash-quote\"",
+        "initH5SplashScreen();"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_splash",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "id=\"h5-splash-screen\"",
+          "id=\"h5-splash-product-name\"",
+          "id=\"h5-splash-quote\"",
+          "initH5SplashScreen();"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-mobile",
+      "surface": "H5",
+      "name": "移动端安全区域适配",
+      "given": "用户在移动端访问 H5。",
+      "when": "视口与开屏样式加载。",
+      "then": "页面必须使用动态视口和安全区域间距。",
+      "required": [
+        "min-height:100dvh",
+        "env(safe-area-inset-bottom)",
+        "@media (max-width:575.98px)"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_mobile",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "min-height:100dvh",
+          "env(safe-area-inset-bottom)",
+          "@media (max-width:575.98px)"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-market-tabs",
+      "surface": "H5",
+      "name": "市场四分类切换",
+      "given": "用户位于市场页面。",
+      "when": "切换自选股、热门行业、市场一览和宏观经济。",
+      "then": "四个标签与对应面板都存在。",
+      "required": [
+        "market-watchlist-tab",
+        "market-sector-tab",
+        "market-overview-tab",
+        "market-macro-tab",
+        "market-watchlist-panel",
+        "market-sector-panel",
+        "market-overview-panel",
+        "market-macro-panel"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_market_tabs",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "market-watchlist-tab",
+          "market-sector-tab",
+          "market-overview-tab",
+          "market-macro-tab",
+          "market-watchlist-panel",
+          "market-sector-panel",
+          "market-overview-panel",
+          "market-macro-panel"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-market-sources",
+      "surface": "H5",
+      "name": "市场与宏观数据来源说明",
+      "given": "用户查看市场一览或宏观经济。",
+      "when": "阅读数据来源。",
+      "then": "页面明确只读取后台快照，不伪造实时值。",
+      "required": [
+        "market-overview-source-note",
+        "market-sector-source-note",
+        "market-macro-source-note",
+        "页面只读取数据库快照"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_market_sources",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "market-overview-source-note",
+          "market-sector-source-note",
+          "market-macro-source-note",
+          "页面只读取数据库快照"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-market-index-detail",
+      "surface": "H5",
+      "name": "市场指数统一详情",
+      "given": "用户点击上证或深证指数。",
+      "when": "系统打开指标详情。",
+      "then": "页面从统一指标库构建详情，不跳转为自选股详情。",
+      "required": [
+        "function buildWorkbenchDashboardDetailCard",
+        "findWorkbenchBaseIndicator(indicatorCode)",
+        "基础指标由统一数据源和指标库维护"
+      ],
+      "forbidden": [
+        "openWatchlistDetail(indicatorCode, 'overview');"
+      ],
+      "check": "html_contract",
+      "method": "test_bdd_h5_market_index_detail",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "function buildWorkbenchDashboardDetailCard",
+          "findWorkbenchBaseIndicator(indicatorCode)",
+          "基础指标由统一数据源和指标库维护"
+        ],
+        "forbidden_contracts": [
+          "openWatchlistDetail(indicatorCode, 'overview');"
+        ]
+      }
+    },
+    {
+      "id": "h5-watchlist-search",
+      "surface": "H5",
+      "name": "自选股模糊搜索",
+      "given": "用户要添加自选股。",
+      "when": "输入中文、拼音或代码。",
+      "then": "搜索输入框、建议列表和键盘选择逻辑均存在。",
+      "required": [
+        "watchlist-stock-code-input",
+        "watchlist-stock-suggestion-list",
+        "handleWatchlistStockCodeInput",
+        "selectWatchlistSuggestionByIndex"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_watchlist_search",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "watchlist-stock-code-input",
+          "watchlist-stock-suggestion-list",
+          "handleWatchlistStockCodeInput",
+          "selectWatchlistSuggestionByIndex"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-watchlist-server-owned",
+      "surface": "H5",
+      "name": "自选股服务端持久化",
+      "given": "用户管理自选股。",
+      "when": "页面加载或刷新。",
+      "then": "浏览器不保存本地自选股副本。",
+      "required": [],
+      "forbidden": [
+        "gangtise_demo_added_watchlist_codes",
+        "gangtise_demo_removed_watchlist_codes",
+        "gangtise_demo_watchlist_annotations"
+      ],
+      "check": "html_contract",
+      "method": "test_bdd_h5_watchlist_server_owned",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [],
+        "forbidden_contracts": [
+          "gangtise_demo_added_watchlist_codes",
+          "gangtise_demo_removed_watchlist_codes",
+          "gangtise_demo_watchlist_annotations"
+        ]
+      }
+    },
+    {
+      "id": "h5-watchlist-comments",
+      "surface": "H5",
+      "name": "个股评论与身份展示",
+      "given": "用户查看个股详情。",
+      "when": "打开评论区。",
+      "then": "评论区使用当前登录账户身份，不信任页面提交的昵称。",
+      "required": [
+        "/api/watchlist/${encodeURIComponent(stockCode)}/comments",
+        "user_name: String(user.name || user.username || '').trim()"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_watchlist_comments",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "/api/watchlist/${encodeURIComponent(stockCode)}/comments",
+          "user_name: String(user.name || user.username || '').trim()"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-fundamental-read-only",
+      "surface": "H5",
+      "name": "粉丝端基本面只读",
+      "given": "普通用户查看基本面智能指标。",
+      "when": "打开任意指标详情。",
+      "then": "详情只能查看，新增、修改和移除要前往大V工作台。",
+      "required": [
+        "openFundamentalDashboardIndicatorDetail",
+        "这里仅供查看详情；指标的新增、修改和移除请前往大V工作台"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_fundamental_read_only",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "openFundamentalDashboardIndicatorDetail",
+          "这里仅供查看详情；指标的新增、修改和移除请前往大V工作台"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-watermark",
+      "surface": "H5",
+      "name": "水印功能开关",
+      "given": "管理员启用 H5 水印。",
+      "when": "用户进入 H5。",
+      "then": "页面具备用户名与日期水印容器。",
+      "required": [
+        "id=\"h5-watermark-layer\"",
+        "renderH5Watermark",
+        "h5_watermark"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_watermark",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "id=\"h5-watermark-layer\"",
+          "renderH5Watermark",
+          "h5_watermark"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-review-entry",
+      "surface": "H5",
+      "name": "复盘生产入口",
+      "given": "大V在 H5 发起复盘。",
+      "when": "打开复盘生产区。",
+      "then": "复盘独立工作区、期间选择和发布入口均可用。",
+      "required": [
+        "id=\"review-production-page\"",
+        "openReviewTriggerModal()",
+        "id=\"review-period-row\"",
+        "publishReviewDraft()"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_review_entry",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "id=\"review-production-page\"",
+          "openReviewTriggerModal()",
+          "id=\"review-period-row\"",
+          "publishReviewDraft()"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-review-stages",
+      "surface": "H5",
+      "name": "复盘三阶段审核",
+      "given": "大V录入复盘材料。",
+      "when": "依次生成 Draft、选择自选股并审核预览。",
+      "then": "用户输入、规则和结构化自选股分析均可继续编辑。",
+      "required": [
+        "智能优化规则",
+        "Draft 审核与详细修改",
+        "重新生成自选股分析",
+        "id=\"review-structured-combined-text\""
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_review_stages",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "智能优化规则",
+          "Draft 审核与详细修改",
+          "重新生成自选股分析",
+          "id=\"review-structured-combined-text\""
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-review-jobs",
+      "surface": "H5",
+      "name": "复盘任务恢复与停止",
+      "given": "复盘异步任务正在运行。",
+      "when": "用户重新进入页面或点击停止生成。",
+      "then": "页面可恢复任务状态，并调用同一取消接口。",
+      "required": [
+        "function loadActiveReviewJobs()",
+        "cancelReviewAsyncJob()",
+        "/api/review/jobs/${encodeURIComponent(jobCode)}/cancel"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_review_jobs",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "function loadActiveReviewJobs()",
+          "cancelReviewAsyncJob()",
+          "/api/review/jobs/${encodeURIComponent(jobCode)}/cancel"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-review-api",
+      "surface": "H5",
+      "name": "复盘 API 编排",
+      "given": "大V提交复盘。",
+      "when": "执行 Draft、结构化预览和发布。",
+      "then": "三个阶段必须调用统一服务端 API。",
+      "required": [
+        "/api/review/generate-draft",
+        "/api/review/prepare-preview",
+        "/api/review/publish"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_review_api",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "/api/review/generate-draft",
+          "/api/review/prepare-preview",
+          "/api/review/publish"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-review-published",
+      "surface": "H5",
+      "name": "已发布复盘阅读与删除",
+      "given": "大V查看已发布复盘。",
+      "when": "打开详情或删除一篇复盘。",
+      "then": "阅读入口和受权限保护的删除动作均存在。",
+      "required": [
+        "openReviewArticleDetail",
+        "deletePublishedReviewArticle",
+        "/api/tenant/${encodeURIComponent(tenantSlug)}/reviews/${encodeURIComponent(reviewId)}"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_review_published",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "openReviewArticleDetail",
+          "deletePublishedReviewArticle",
+          "/api/tenant/${encodeURIComponent(tenantSlug)}/reviews/${encodeURIComponent(reviewId)}"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-messages-read-only",
+      "surface": "H5",
+      "name": "消息中心站内信模式",
+      "given": "粉丝互动能力关闭。",
+      "when": "用户查看任意消息。",
+      "then": "回复区隐藏并明确提示当前不开放回复。",
+      "required": [
+        "id=\"dm-quick-asks\"",
+        "id=\"dm-input-bar\" style=\"display:none\"",
+        "当前为站内信查看模式，暂不开放回复",
+        "暂不支持回复"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_messages_read_only",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "id=\"dm-quick-asks\"",
+          "id=\"dm-input-bar\" style=\"display:none\"",
+          "当前为站内信查看模式，暂不开放回复",
+          "暂不支持回复"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-hermes-session",
+      "surface": "H5",
+      "name": "小金会话与自动滚动",
+      "given": "用户进入小金智能体。",
+      "when": "切换会话或发送新问题。",
+      "then": "会话列表、历史恢复和到底部滚动逻辑均存在。",
+      "required": [
+        "id=\"hermes-chat-thread\"",
+        "function resetHermesScrollPosition()",
+        "handleHermesComposerSubmit()",
+        "/api/hermes/sessions"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_hermes_session",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "id=\"hermes-chat-thread\"",
+          "function resetHermesScrollPosition()",
+          "handleHermesComposerSubmit()",
+          "/api/hermes/sessions"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-hermes-thinking",
+      "surface": "H5",
+      "name": "小金思考默认收起",
+      "given": "回答携带思考过程。",
+      "when": "用户主动点击展开。",
+      "then": "思考过程默认不展开，状态由用户动作决定。",
+      "required": [
+        "function handleHermesThinkingDisclosureToggle(disclosure)",
+        "thinkingExpanded === true ? ' open' : ''"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_hermes_thinking",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "function handleHermesThinkingDisclosureToggle(disclosure)",
+          "thinkingExpanded === true ? ' open' : ''"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-hermes-no-knowledge-save",
+      "surface": "H5",
+      "name": "小金不再写入知识源",
+      "given": "用户获得小金回答。",
+      "when": "查看回答操作。",
+      "then": "页面不得出现将答案加入知识源的入口。",
+      "required": [],
+      "forbidden": [
+        "function saveHermesAnswerAsKnowledge(entryId)",
+        "function buildHermesKnowledgePayload(entry, artifact)",
+        "加入知识源"
+      ],
+      "check": "html_contract",
+      "method": "test_bdd_h5_hermes_no_knowledge_save",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [],
+        "forbidden_contracts": [
+          "function saveHermesAnswerAsKnowledge(entryId)",
+          "function buildHermesKnowledgePayload(entry, artifact)",
+          "加入知识源"
+        ]
+      }
+    },
+    {
+      "id": "h5-dav-dashboard",
+      "surface": "H5 大V工作台",
+      "name": "大V智能看板入口",
+      "given": "大V进入 H5 工作台。",
+      "when": "查看智能指标看板。",
+      "then": "大V拥有草稿、发布、恢复和指标编辑入口。",
+      "required": [
+        "const hasDavCapabilities = isDavCapableUser(user);",
+        "id=\"wb-dashboard-preview\"",
+        "publishFundDashboard()",
+        "resetFundDashboardDraft()",
+        "openWorkbenchSmartIndicatorEditor"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_dav_dashboard",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "const hasDavCapabilities = isDavCapableUser(user);",
+          "id=\"wb-dashboard-preview\"",
+          "publishFundDashboard()",
+          "resetFundDashboardDraft()",
+          "openWorkbenchSmartIndicatorEditor"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-dav-library",
+      "surface": "H5 大V工作台",
+      "name": "大V指标库折叠管理",
+      "given": "租户已有多个已保存指标。",
+      "when": "打开 H5 大V工作台。",
+      "then": "页面只显示最近三个指标，其余通过更多和管理弹窗查看。",
+      "required": [
+        "function renderWorkbenchSmartIndicatorLibrary()",
+        "function openWorkbenchSmartIndicatorLibraryModal()",
+        "const recentItems = items.slice(0, 3)",
+        "更多（${remainingCount}）",
+        "管理指标"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_dav_library",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "function renderWorkbenchSmartIndicatorLibrary()",
+          "function openWorkbenchSmartIndicatorLibraryModal()",
+          "const recentItems = items.slice(0, 3)",
+          "更多（${remainingCount}）",
+          "管理指标"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-dav-formula",
+      "surface": "H5 大V工作台",
+      "name": "指标标签与公式编辑",
+      "given": "大V输入 CPI、PPI、行业或市场指标。",
+      "when": "构造加减乘除公式。",
+      "then": "系统使用标签、公式 token 和可移除的误匹配标签。",
+      "required": [
+        "canonicalizeWorkbenchSmartPrompt",
+        "tokenizeWorkbenchSmartPrompt",
+        "formula_tokens",
+        "toggleWorkbenchSmartTag"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_dav_formula",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "canonicalizeWorkbenchSmartPrompt",
+          "tokenizeWorkbenchSmartPrompt",
+          "formula_tokens",
+          "toggleWorkbenchSmartTag"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-dav-direct-reference",
+      "surface": "H5 大V工作台",
+      "name": "单一已注册指标直接引用",
+      "given": "大V输入一个已注册指标名称。",
+      "when": "生成预览并确认展示。",
+      "then": "系统复用指标定义而不是创建重复智能指标。",
+      "required": [
+        "function getWorkbenchDirectPreviewCandidate",
+        "preview.direct_reference === true",
+        "已直接引用指标，无需等待生成"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_dav_direct_reference",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "function getWorkbenchDirectPreviewCandidate",
+          "preview.direct_reference === true",
+          "已直接引用指标，无需等待生成"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-dav-dashboard-removal",
+      "surface": "H5 大V工作台",
+      "name": "从看板移除不删除定义",
+      "given": "大V要移除一个展示指标。",
+      "when": "确认从 Dashboard 移除。",
+      "then": "只移除看板引用，定义、快照和历史数据保留。",
+      "required": [
+        "function removeWorkbenchDashboardIndicator(index)",
+        "syncTenantDashboardState('remove_indicator'",
+        "只移除看板投影，不删除指标定义、历史数据或指标库记录。"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_dav_dashboard_removal",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "function removeWorkbenchDashboardIndicator(index)",
+          "syncTenantDashboardState('remove_indicator'",
+          "只移除看板投影，不删除指标定义、历史数据或指标库记录。"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-dav-indicator-api",
+      "surface": "H5 大V工作台",
+      "name": "智能指标统一 API",
+      "given": "大V预览、保存或更新智能指标。",
+      "when": "提交标签和公式。",
+      "then": "请求统一指向租户 smart-indicators API。",
+      "required": [
+        "/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators",
+        "action: 'preview'",
+        "action: 'save'"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_h5_dav_indicator_api",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators",
+          "action: 'preview'",
+          "action: 'save'"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "web-shell",
+      "surface": "Web 大V工作台",
+      "name": "桌面工作台主导航",
+      "given": "大V进入桌面工作台。",
+      "when": "查看工作台导航。",
+      "then": "概览、粉丝、复盘、指标、看板和已发布内容均可进入。",
+      "required": [
+        "data-section=\"overview\"",
+        "data-section=\"fans\"",
+        "data-section=\"review\"",
+        "data-section=\"dashboard\"",
+        "data-section=\"indicator-smart\"",
+        "data-section=\"published\"",
+        "function showWorkbenchSection"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_web_shell",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "data-section=\"overview\"",
+          "data-section=\"fans\"",
+          "data-section=\"review\"",
+          "data-section=\"dashboard\"",
+          "data-section=\"indicator-smart\"",
+          "data-section=\"published\"",
+          "function showWorkbenchSection"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "web-fans",
+      "surface": "Web 大V工作台",
+      "name": "粉丝与经营分析",
+      "given": "大V进入粉丝或经营分析。",
+      "when": "切换漏斗、渠道、营收和分层。",
+      "then": "粉丝运营和四类经营分析使用租户范围接口。",
+      "required": [
+        "workbench-section-fans",
+        "workbench-section-biz-dashboard",
+        "showWorkbenchAnalyticsSection('funnel')",
+        "showWorkbenchAnalyticsSection('channel')",
+        "showWorkbenchAnalyticsSection('revenue')",
+        "showWorkbenchAnalyticsSection('segment')",
+        "/api/kol/business-analytics?tenant="
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_web_fans",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "workbench-section-fans",
+          "workbench-section-biz-dashboard",
+          "showWorkbenchAnalyticsSection('funnel')",
+          "showWorkbenchAnalyticsSection('channel')",
+          "showWorkbenchAnalyticsSection('revenue')",
+          "showWorkbenchAnalyticsSection('segment')",
+          "/api/kol/business-analytics?tenant="
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "web-review-production",
+      "surface": "Web 大V工作台",
+      "name": "桌面复盘生产",
+      "given": "大V在桌面工作台发起复盘。",
+      "when": "生成 Draft、预览并发布。",
+      "then": "桌面端使用与 H5 相同的复盘三阶段 API。",
+      "required": [
+        "function kwGenerateReviewDraftWithLlm()",
+        "function kwRequestReviewStructuredPreview()",
+        "function kwPublishReviewContent",
+        "/api/review/generate-draft",
+        "/api/review/prepare-preview",
+        "/api/review/publish"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_web_review_production",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "function kwGenerateReviewDraftWithLlm()",
+          "function kwRequestReviewStructuredPreview()",
+          "function kwPublishReviewContent",
+          "/api/review/generate-draft",
+          "/api/review/prepare-preview",
+          "/api/review/publish"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "web-review-jobs",
+      "surface": "Web 大V工作台",
+      "name": "桌面复盘任务恢复",
+      "given": "复盘任务在后台运行。",
+      "when": "工作台重新加载或用户取消任务。",
+      "then": "任务列表、轮询和取消调用与 H5 使用相同服务端作业。",
+      "required": [
+        "function kwLoadActiveReviewJobs()",
+        "function kwStartAsyncJobPolling",
+        "/api/review/jobs?tenant_slug=",
+        "/api/review/jobs/${encodeURIComponent(jobCode)}/cancel"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_web_review_jobs",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "function kwLoadActiveReviewJobs()",
+          "function kwStartAsyncJobPolling",
+          "/api/review/jobs?tenant_slug=",
+          "/api/review/jobs/${encodeURIComponent(jobCode)}/cancel"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "web-published-reviews",
+      "surface": "Web 大V工作台",
+      "name": "已发布复盘管理",
+      "given": "大V查看已发布复盘。",
+      "when": "删除一篇已发布复盘。",
+      "then": "删除必须走租户范围 API 并刷新列表状态。",
+      "required": [
+        "function kwDeletePublishedReview(reviewId)",
+        "/api/tenant/${encodeURIComponent(tenantSlug)}/reviews/${encodeURIComponent(normalizedReviewId)}",
+        "kwSyncPublishedReviewState"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_web_published_reviews",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "function kwDeletePublishedReview(reviewId)",
+          "/api/tenant/${encodeURIComponent(tenantSlug)}/reviews/${encodeURIComponent(normalizedReviewId)}",
+          "kwSyncPublishedReviewState"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "web-dashboard",
+      "surface": "Web 大V工作台",
+      "name": "桌面智能指标看板",
+      "given": "大V进入 Dashboard。",
+      "when": "切换布局或点击空位。",
+      "then": "空位只能通过智能指标编辑器添加，不使用旧白盒拼卡片。",
+      "required": [
+        "kwRenderSmartDashboardLayoutRow",
+        "kwOpenSmartIndicatorEditor",
+        "function kwGenerateFundDashboard(layout)",
+        "请点击空白格新增智能指标"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_web_dashboard",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "kwRenderSmartDashboardLayoutRow",
+          "kwOpenSmartIndicatorEditor",
+          "function kwGenerateFundDashboard(layout)",
+          "请点击空白格新增智能指标"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "web-indicator-library",
+      "surface": "Web 大V工作台",
+      "name": "桌面指标定义维护",
+      "given": "大V查看已保存智能指标。",
+      "when": "编辑、加入草稿或删除定义。",
+      "then": "指标库和看板投影区分明确。",
+      "required": [
+        "function kwRenderSmartIndicatorLibrary()",
+        "kwOpenSmartIndicatorLibraryDetail",
+        "kwAddExistingIndicatorToDraft",
+        "kwDeleteSmartIndicator",
+        "删除指标定义"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_web_indicator_library",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "function kwRenderSmartIndicatorLibrary()",
+          "kwOpenSmartIndicatorLibraryDetail",
+          "kwAddExistingIndicatorToDraft",
+          "kwDeleteSmartIndicator",
+          "删除指标定义"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "web-indicator-formula",
+      "surface": "Web 大V工作台",
+      "name": "桌面标签公式计算",
+      "given": "大V输入市场、行业、宏观或个股标签。",
+      "when": "生成预览。",
+      "then": "前端发送标签、抑制标签和公式 token 给统一 API。",
+      "required": [
+        "kwCanonicalizeSmartPrompt",
+        "kwTokenizeSmartPrompt",
+        "selected_tag_codes",
+        "suppressed_tag_codes",
+        "formula_tokens"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_web_indicator_formula",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "kwCanonicalizeSmartPrompt",
+          "kwTokenizeSmartPrompt",
+          "selected_tag_codes",
+          "suppressed_tag_codes",
+          "formula_tokens"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "web-indicator-direct-reference",
+      "surface": "Web 大V工作台",
+      "name": "桌面直接引用不重复建指标",
+      "given": "大V仅引用一个已注册指标。",
+      "when": "确认展示。",
+      "then": "直接将已有 indicator_code 加入草稿。",
+      "required": [
+        "function kwGetDirectPreviewCandidate",
+        "preview.direct_reference === true",
+        "已直接引用指标，无需重复生成",
+        "nextCards[slotIndex] = { indicatorCode: preview.indicator_code }"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_web_indicator_direct_reference",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "function kwGetDirectPreviewCandidate",
+          "preview.direct_reference === true",
+          "已直接引用指标，无需重复生成",
+          "nextCards[slotIndex] = { indicatorCode: preview.indicator_code }"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "web-indicator-removal",
+      "surface": "Web 大V工作台",
+      "name": "桌面看板移除保留定义",
+      "given": "大V从当前 Dashboard 移除指标。",
+      "when": "确认移除。",
+      "then": "只保存草稿引用变化，不调用删除指标定义 API。",
+      "required": [
+        "function kwRemoveSmartDashboardCard(index)",
+        "已从草稿移除，指标定义仍保留"
+      ],
+      "forbidden": [
+        "kwDeleteSmartIndicator('${escapeAttr(item.indicatorCode || item.indicator_code || '')}')"
+      ],
+      "check": "html_contract",
+      "method": "test_bdd_web_indicator_removal",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "function kwRemoveSmartDashboardCard(index)",
+          "已从草稿移除，指标定义仍保留"
+        ],
+        "forbidden_contracts": [
+          "kwDeleteSmartIndicator('${escapeAttr(item.indicatorCode || item.indicator_code || '')}')"
+        ]
+      }
+    },
+    {
+      "id": "web-dashboard-sync",
+      "surface": "Web 大V工作台",
+      "name": "桌面看板服务端失败可见",
+      "given": "服务端拒绝保存 Dashboard。",
+      "when": "工作台同步草稿、发布或恢复。",
+      "then": "同步函数校验租户、抛出失败并返回确认载荷。",
+      "required": [
+        "if (!tenantSlug) throw new Error('tenant_missing');",
+        "throw new Error(payload.error || 'dashboard_sync_failed');",
+        "return payload;"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_web_dashboard_sync",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "if (!tenantSlug) throw new Error('tenant_missing');",
+          "throw new Error(payload.error || 'dashboard_sync_failed');",
+          "return payload;"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "web-dashboard-publish",
+      "surface": "Web 大V工作台",
+      "name": "桌面看板发布与恢复",
+      "given": "大V有一个 Dashboard 草稿。",
+      "when": "发布或恢复。",
+      "then": "发布与恢复使用统一 dashboard API，失败会反馈给用户。",
+      "required": [
+        "kwSyncFundDashboard('publish'",
+        "kwSyncFundDashboard('reset_draft'",
+        "发布失败，请稍后重试",
+        "恢复失败，请稍后重试"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_web_dashboard_publish",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "kwSyncFundDashboard('publish'",
+          "kwSyncFundDashboard('reset_draft'",
+          "发布失败，请稍后重试",
+          "恢复失败，请稍后重试"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "web-hermes-operations",
+      "surface": "Web 大V工作台",
+      "name": "桌面 Hermes 运营视图",
+      "given": "大V打开 Hermes 运营页。",
+      "when": "读取用量、记忆和能力沉淀。",
+      "then": "所有读取都限定在当前租户。",
+      "required": [
+        "/api/kol/hermes/usage-stats?tenant=",
+        "/api/kol/hermes/memory-summary?tenant=",
+        "/api/kol/hermes/capability-growth?tenant="
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_web_hermes_operations",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "/api/kol/hermes/usage-stats?tenant=",
+          "/api/kol/hermes/memory-summary?tenant=",
+          "/api/kol/hermes/capability-growth?tenant="
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "web-watchlist-operations",
+      "surface": "Web 大V工作台",
+      "name": "桌面自选与评论洞察",
+      "given": "大V查看自选股池或互动洞察。",
+      "when": "打开评论详情。",
+      "then": "工作台提供大V自选、粉丝自选和评论洞察入口。",
+      "required": [
+        "workbench-section-watchlist-pool",
+        "workbench-section-watchlist-insights",
+        "openKwWatchlistComments",
+        "kw-fan-watchlist-sector-chart"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_web_watchlist_operations",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "workbench-section-watchlist-pool",
+          "workbench-section-watchlist-insights",
+          "openKwWatchlistComments",
+          "kw-fan-watchlist-sector-chart"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "web-feature-guards",
+      "surface": "Web 大V工作台",
+      "name": "桌面功能开关保护",
+      "given": "管理员关闭某个模块。",
+      "when": "大V通过直链尝试打开。",
+      "then": "页面会根据功能开关回退到概览。",
+      "required": [
+        "section === 'dashboard' && !isWorkbenchFeatureEnabled('fundamental_analysis')",
+        "section === 'review' || section === 'published'",
+        "showWorkbenchSection('overview')"
+      ],
+      "forbidden": [],
+      "check": "html_contract",
+      "method": "test_bdd_web_feature_guards",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "section === 'dashboard' && !isWorkbenchFeatureEnabled('fundamental_analysis')",
+          "section === 'review' || section === 'published'",
+          "showWorkbenchSection('overview')"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "cross-review-contract",
+      "surface": "跨端一致性",
+      "name": "H5 与 Web 复盘同源",
+      "given": "大V从 H5 或 Web 发起复盘。",
+      "when": "执行三个复盘阶段。",
+      "then": "两端均使用 generate-draft、prepare-preview、publish 三个 API。",
+      "required": [
+        "/api/review/generate-draft",
+        "/api/review/prepare-preview",
+        "/api/review/publish"
+      ],
+      "forbidden": [],
+      "check": "cross_contract",
+      "method": "test_bdd_cross_review_contract",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "cross_contract",
+        "required_contracts": [
+          "/api/review/generate-draft",
+          "/api/review/prepare-preview",
+          "/api/review/publish"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "cross-indicator-contract",
+      "surface": "跨端一致性",
+      "name": "H5 与 Web 指标同源",
+      "given": "大V从 H5 或 Web 编辑智能指标。",
+      "when": "预览或保存指标。",
+      "then": "两端均调用同一个 tenant smart-indicators API，并传递公式 token。",
+      "required": [
+        "/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators",
+        "formula_tokens"
+      ],
+      "forbidden": [],
+      "check": "cross_contract",
+      "method": "test_bdd_cross_indicator_contract",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "cross_contract",
+        "required_contracts": [
+          "/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators",
+          "formula_tokens"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "cross-dashboard-contract",
+      "surface": "跨端一致性",
+      "name": "H5 与 Web 看板同源",
+      "given": "大V在任一端维护 Dashboard。",
+      "when": "保存草稿、发布、恢复或移除。",
+      "then": "两端均使用同一个 tenant dashboard API。",
+      "required": [
+        "/api/tenant/${encodeURIComponent(tenantSlug)}/dashboard",
+        "'save_draft'",
+        "'publish'",
+        "'reset_draft'"
+      ],
+      "forbidden": [],
+      "check": "cross_contract",
+      "method": "test_bdd_cross_dashboard_contract",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "cross_contract",
+        "required_contracts": [
+          "/api/tenant/${encodeURIComponent(tenantSlug)}/dashboard",
+          "'save_draft'",
+          "'publish'",
+          "'reset_draft'"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "cross-direct-indicator",
+      "surface": "跨端一致性",
+      "name": "两端均避免重复指标定义",
+      "given": "用户只引用一个已注册基础指标。",
+      "when": "生成预览。",
+      "then": "H5 和 Web 都启用 direct_reference 快路径。",
+      "required": [
+        "direct_reference === true",
+        "DirectPreviewCandidate"
+      ],
+      "forbidden": [],
+      "check": "cross_contract",
+      "method": "test_bdd_cross_direct_indicator",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "cross_contract",
+        "required_contracts": [
+          "direct_reference === true",
+          "DirectPreviewCandidate"
+        ],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "cross-review-payload",
+      "surface": "跨端一致性",
+      "name": "Web 不再附加 H5 没有的复盘字段",
+      "given": "大V从桌面端发布复盘。",
+      "when": "构造 publish 请求。",
+      "then": "Web 不得额外发送知识附件或智能卡片载荷。",
+      "required": [],
+      "forbidden": [
+        "knowledge_attachments: kwGetReviewSelectedKnowledge()",
+        "selected_cards: kwGetReviewSelectedCards()"
+      ],
+      "check": "web_only",
+      "method": "test_bdd_cross_review_payload",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "web_only",
+        "required_contracts": [],
+        "forbidden_contracts": [
+          "knowledge_attachments: kwGetReviewSelectedKnowledge()",
+          "selected_cards: kwGetReviewSelectedCards()"
+        ]
+      }
+    },
+    {
+      "id": "security-dav-admin-page",
+      "surface": "权限边界",
+      "name": "大V访问 Admin 显示友好提示",
+      "given": "已登录用户角色为大V。",
+      "when": "直接访问 /admin。",
+      "then": "页面返回 403，但显示权限不足和联系管理员指引。",
+      "required": [],
+      "forbidden": [],
+      "check": "dav_admin_page",
+      "method": "test_bdd_security_dav_admin_page",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "dav_admin_page",
+        "required_contracts": [],
+        "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "security-dav-admin-api",
+      "surface": "权限边界",
+      "name": "大V调用 Admin API 被拒绝",
+      "given": "已登录用户角色为大V。",
+      "when": "请求 /api/admin/site-config。",
+      "then": "API 返回结构化 403 admin_required，不泄露后台数据。",
+      "required": [],
+      "forbidden": [],
+      "check": "dav_admin_api",
+      "method": "test_bdd_security_dav_admin_api",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "dav_admin_api",
+        "required_contracts": [],
+        "forbidden_contracts": []
+      }
+    }
+  ]
+}
