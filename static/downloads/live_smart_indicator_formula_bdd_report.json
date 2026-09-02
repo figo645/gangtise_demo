@@ -1,0 +1,994 @@
+{
+  "title": "H5 大V工作台智能指标公式真实数据 BDD 报告",
+  "generated_at": "2026-09-02 13:29:42",
+  "execution_mode": "真实 PostgreSQL 当前快照 + 真实 H5 大V smart-indicators preview API；不使用 mock、模拟值、保存或看板写入。",
+  "tenant_slug": "laowang",
+  "dav_username": "财经老王",
+  "scenarios": [
+    {
+      "id": "macro-two-add",
+      "category": "宏观 + 宏观",
+      "name": "中国 CPI 与 PPI 相加",
+      "given": "当前 PostgreSQL 已存在可用的注册指标快照。",
+      "when": "H5 大V以结构化标签 token 提交：【中国CPI同比指数】+【中国PPI同比】",
+      "then": "预览接口必须用真实快照完成确定性计算，且不返回不可用或回退值。",
+      "passed": true,
+      "detail": "HTTP 200；data_status=available；value=4；generator=arithmetic_expression；llm_used=False",
+      "evidence": {
+        "request": {
+          "action": "preview",
+          "indicator_name": "BDD 宏观双指标",
+          "prompt_text": "【中国CPI同比指数】+【中国PPI同比】",
+          "selected_tag_codes": [
+            "indicator:source_cpi",
+            "indicator:source_ppi"
+          ],
+          "formula_tokens": [
+            {
+              "type": "reference",
+              "text": "【中国CPI同比指数】",
+              "label": "中国CPI同比指数",
+              "tagCode": "indicator:source_cpi",
+              "indicatorCode": "source_cpi"
+            },
+            {
+              "type": "operator",
+              "text": "+"
+            },
+            {
+              "type": "reference",
+              "text": "【中国PPI同比】",
+              "label": "中国PPI同比",
+              "tagCode": "indicator:source_ppi",
+              "indicatorCode": "source_ppi"
+            }
+          ]
+        },
+        "response_success": true,
+        "response_error": null,
+        "preview": {
+          "value": "4",
+          "numeric_value": 4.0,
+          "data_status": "available",
+          "updated_at": "2026-09-02 13:29:44",
+          "resolved_indicator_codes": [
+            "source_cpi",
+            "source_ppi"
+          ],
+          "selected_indicators": [
+            {
+              "indicator_code": "source_cpi",
+              "indicator_name": "中国CPI同比指数"
+            },
+            {
+              "indicator_code": "source_ppi",
+              "indicator_name": "中国PPI同比"
+            }
+          ],
+          "unavailable_indicators": [],
+          "formula_js": "return Number(inputs[\"source_cpi\"] || 0)+Number(inputs[\"source_ppi\"] || 0);",
+          "formula_meta": {
+            "formula_js": "return Number(inputs[\"source_cpi\"] || 0)+Number(inputs[\"source_ppi\"] || 0);",
+            "generator": "arithmetic_expression",
+            "llm_used": false
+          },
+          "source_snapshots": [
+            {
+              "indicator_code": "source_cpi",
+              "indicator_name": "中国CPI同比指数",
+              "latest_value": "0.5",
+              "updated_at": "2026-07",
+              "source_code": "macro_snapshot",
+              "is_simulated": 0
+            },
+            {
+              "indicator_code": "source_ppi",
+              "indicator_name": "中国PPI同比",
+              "latest_value": "3.5",
+              "updated_at": "2026-07",
+              "source_code": "macro_snapshot",
+              "is_simulated": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "macro-three-multiply-add",
+      "category": "宏观 + 宏观 + 数值",
+      "name": "中国 PPI 乘以 5 再加 CPI",
+      "given": "当前 PostgreSQL 已存在可用的注册指标快照。",
+      "when": "H5 大V以结构化标签 token 提交：【中国PPI同比】*5+【中国CPI同比指数】",
+      "then": "预览接口必须用真实快照完成确定性计算，且不返回不可用或回退值。",
+      "passed": true,
+      "detail": "HTTP 200；data_status=available；value=18；generator=arithmetic_expression；llm_used=False",
+      "evidence": {
+        "request": {
+          "action": "preview",
+          "indicator_name": "BDD 宏观三操作数",
+          "prompt_text": "【中国PPI同比】*5+【中国CPI同比指数】",
+          "selected_tag_codes": [
+            "indicator:source_ppi",
+            "indicator:source_cpi"
+          ],
+          "formula_tokens": [
+            {
+              "type": "reference",
+              "text": "【中国PPI同比】",
+              "label": "中国PPI同比",
+              "tagCode": "indicator:source_ppi",
+              "indicatorCode": "source_ppi"
+            },
+            {
+              "type": "operator",
+              "text": "*"
+            },
+            {
+              "type": "number",
+              "text": "5"
+            },
+            {
+              "type": "operator",
+              "text": "+"
+            },
+            {
+              "type": "reference",
+              "text": "【中国CPI同比指数】",
+              "label": "中国CPI同比指数",
+              "tagCode": "indicator:source_cpi",
+              "indicatorCode": "source_cpi"
+            }
+          ]
+        },
+        "response_success": true,
+        "response_error": null,
+        "preview": {
+          "value": "18",
+          "numeric_value": 18.0,
+          "data_status": "available",
+          "updated_at": "2026-09-02 13:29:44",
+          "resolved_indicator_codes": [
+            "source_ppi",
+            "source_cpi"
+          ],
+          "selected_indicators": [
+            {
+              "indicator_code": "source_ppi",
+              "indicator_name": "中国PPI同比"
+            },
+            {
+              "indicator_code": "source_cpi",
+              "indicator_name": "中国CPI同比指数"
+            }
+          ],
+          "unavailable_indicators": [],
+          "formula_js": "return Number(inputs[\"source_ppi\"] || 0)*5+Number(inputs[\"source_cpi\"] || 0);",
+          "formula_meta": {
+            "formula_js": "return Number(inputs[\"source_ppi\"] || 0)*5+Number(inputs[\"source_cpi\"] || 0);",
+            "generator": "arithmetic_expression",
+            "llm_used": false
+          },
+          "source_snapshots": [
+            {
+              "indicator_code": "source_ppi",
+              "indicator_name": "中国PPI同比",
+              "latest_value": "3.5",
+              "updated_at": "2026-07",
+              "source_code": "macro_snapshot",
+              "is_simulated": 0
+            },
+            {
+              "indicator_code": "source_cpi",
+              "indicator_name": "中国CPI同比指数",
+              "latest_value": "0.5",
+              "updated_at": "2026-07",
+              "source_code": "macro_snapshot",
+              "is_simulated": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "market-two-subtract",
+      "category": "市场 + 市场",
+      "name": "上证指数减深证指数",
+      "given": "当前 PostgreSQL 已存在可用的注册指标快照。",
+      "when": "H5 大V以结构化标签 token 提交：【上证指数】-【深证指数】",
+      "then": "预览接口必须用真实快照完成确定性计算，且不返回不可用或回退值。",
+      "passed": true,
+      "detail": "HTTP 200；data_status=available；value=-9892.49；generator=arithmetic_expression；llm_used=False",
+      "evidence": {
+        "request": {
+          "action": "preview",
+          "indicator_name": "BDD 市场双指标",
+          "prompt_text": "【上证指数】-【深证指数】",
+          "selected_tag_codes": [
+            "indicator:source_shanghai_index",
+            "indicator:source_shenzhen_index"
+          ],
+          "formula_tokens": [
+            {
+              "type": "reference",
+              "text": "【上证指数】",
+              "label": "上证指数",
+              "tagCode": "indicator:source_shanghai_index",
+              "indicatorCode": "source_shanghai_index"
+            },
+            {
+              "type": "operator",
+              "text": "-"
+            },
+            {
+              "type": "reference",
+              "text": "【深证指数】",
+              "label": "深证指数",
+              "tagCode": "indicator:source_shenzhen_index",
+              "indicatorCode": "source_shenzhen_index"
+            }
+          ]
+        },
+        "response_success": true,
+        "response_error": null,
+        "preview": {
+          "value": "-9892.49",
+          "numeric_value": -9892.49,
+          "data_status": "available",
+          "updated_at": "2026-09-02 13:29:44",
+          "resolved_indicator_codes": [
+            "source_shanghai_index",
+            "source_shenzhen_index"
+          ],
+          "selected_indicators": [
+            {
+              "indicator_code": "source_shanghai_index",
+              "indicator_name": "上证指数"
+            },
+            {
+              "indicator_code": "source_shenzhen_index",
+              "indicator_name": "深证指数"
+            }
+          ],
+          "unavailable_indicators": [],
+          "formula_js": "return Number(inputs[\"source_shanghai_index\"] || 0)-Number(inputs[\"source_shenzhen_index\"] || 0);",
+          "formula_meta": {
+            "formula_js": "return Number(inputs[\"source_shanghai_index\"] || 0)-Number(inputs[\"source_shenzhen_index\"] || 0);",
+            "generator": "arithmetic_expression",
+            "llm_used": false
+          },
+          "source_snapshots": [
+            {
+              "indicator_code": "source_shanghai_index",
+              "indicator_name": "上证指数",
+              "latest_value": "3979.89",
+              "updated_at": "2026-09-01",
+              "source_code": "market_snapshot",
+              "is_simulated": 0
+            },
+            {
+              "indicator_code": "source_shenzhen_index",
+              "indicator_name": "深证指数",
+              "latest_value": "13872.38",
+              "updated_at": "2026-09-01",
+              "source_code": "market_snapshot",
+              "is_simulated": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "market-three-parentheses",
+      "category": "市场 + 市场 + 市场",
+      "name": "上证加深证后除以沪深300",
+      "given": "当前 PostgreSQL 已存在可用的注册指标快照。",
+      "when": "H5 大V以结构化标签 token 提交：(【上证指数】+【深证指数】)/【沪深300】",
+      "then": "预览接口必须用真实快照完成确定性计算，且不返回不可用或回退值。",
+      "passed": true,
+      "detail": "HTTP 200；data_status=available；value=3.8713；generator=arithmetic_expression；llm_used=False",
+      "evidence": {
+        "request": {
+          "action": "preview",
+          "indicator_name": "BDD 市场三指标",
+          "prompt_text": "(【上证指数】+【深证指数】)/【沪深300】",
+          "selected_tag_codes": [
+            "indicator:source_shanghai_index",
+            "indicator:source_shenzhen_index",
+            "indicator:source_hs300"
+          ],
+          "formula_tokens": [
+            {
+              "type": "operator",
+              "text": "("
+            },
+            {
+              "type": "reference",
+              "text": "【上证指数】",
+              "label": "上证指数",
+              "tagCode": "indicator:source_shanghai_index",
+              "indicatorCode": "source_shanghai_index"
+            },
+            {
+              "type": "operator",
+              "text": "+"
+            },
+            {
+              "type": "reference",
+              "text": "【深证指数】",
+              "label": "深证指数",
+              "tagCode": "indicator:source_shenzhen_index",
+              "indicatorCode": "source_shenzhen_index"
+            },
+            {
+              "type": "operator",
+              "text": ")"
+            },
+            {
+              "type": "operator",
+              "text": "/"
+            },
+            {
+              "type": "reference",
+              "text": "【沪深300】",
+              "label": "沪深300",
+              "tagCode": "indicator:source_hs300",
+              "indicatorCode": "source_hs300"
+            }
+          ]
+        },
+        "response_success": true,
+        "response_error": null,
+        "preview": {
+          "value": "3.8713",
+          "numeric_value": 3.8713,
+          "data_status": "available",
+          "updated_at": "2026-09-02 13:29:45",
+          "resolved_indicator_codes": [
+            "source_shanghai_index",
+            "source_shenzhen_index",
+            "source_hs300"
+          ],
+          "selected_indicators": [
+            {
+              "indicator_code": "source_shanghai_index",
+              "indicator_name": "上证指数"
+            },
+            {
+              "indicator_code": "source_shenzhen_index",
+              "indicator_name": "深证指数"
+            },
+            {
+              "indicator_code": "source_hs300",
+              "indicator_name": "沪深300"
+            }
+          ],
+          "unavailable_indicators": [],
+          "formula_js": "return (Number(inputs[\"source_shanghai_index\"] || 0)+Number(inputs[\"source_shenzhen_index\"] || 0))/Number(inputs[\"source_hs300\"] || 0);",
+          "formula_meta": {
+            "formula_js": "return (Number(inputs[\"source_shanghai_index\"] || 0)+Number(inputs[\"source_shenzhen_index\"] || 0))/Number(inputs[\"source_hs300\"] || 0);",
+            "generator": "arithmetic_expression",
+            "llm_used": false
+          },
+          "source_snapshots": [
+            {
+              "indicator_code": "source_shanghai_index",
+              "indicator_name": "上证指数",
+              "latest_value": "3979.89",
+              "updated_at": "2026-09-01",
+              "source_code": "market_snapshot",
+              "is_simulated": 0
+            },
+            {
+              "indicator_code": "source_shenzhen_index",
+              "indicator_name": "深证指数",
+              "latest_value": "13872.38",
+              "updated_at": "2026-09-01",
+              "source_code": "market_snapshot",
+              "is_simulated": 0
+            },
+            {
+              "indicator_code": "source_hs300",
+              "indicator_name": "沪深300",
+              "latest_value": "4611.44",
+              "updated_at": "2026-09-02 01:30:34",
+              "source_code": "source_hs300",
+              "is_simulated": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "industry-two-add",
+      "category": "行业 + 行业",
+      "name": "农林牧渔 与 基础化工相加",
+      "given": "当前 PostgreSQL 已存在可用的注册指标快照。",
+      "when": "H5 大V以结构化标签 token 提交：【农林牧渔】+【基础化工】",
+      "then": "预览接口必须用真实快照完成确定性计算，且不返回不可用或回退值。",
+      "passed": true,
+      "detail": "HTTP 200；data_status=available；value=6978.9；generator=arithmetic_expression；llm_used=False",
+      "evidence": {
+        "request": {
+          "action": "preview",
+          "indicator_name": "BDD 行业双指标",
+          "prompt_text": "【农林牧渔】+【基础化工】",
+          "selected_tag_codes": [
+            "industry:农林牧渔",
+            "industry:基础化工"
+          ],
+          "formula_tokens": [
+            {
+              "type": "reference",
+              "text": "【农林牧渔】",
+              "label": "农林牧渔",
+              "tagCode": "industry:农林牧渔",
+              "indicatorCode": "source_sector_01"
+            },
+            {
+              "type": "operator",
+              "text": "+"
+            },
+            {
+              "type": "reference",
+              "text": "【基础化工】",
+              "label": "基础化工",
+              "tagCode": "industry:基础化工",
+              "indicatorCode": "source_sector_02"
+            }
+          ]
+        },
+        "response_success": true,
+        "response_error": null,
+        "preview": {
+          "value": "6978.9",
+          "numeric_value": 6978.9,
+          "data_status": "available",
+          "updated_at": "2026-09-02 13:29:45",
+          "resolved_indicator_codes": [
+            "source_sector_01",
+            "source_sector_02"
+          ],
+          "selected_indicators": [
+            {
+              "indicator_code": "source_sector_01",
+              "indicator_name": "申万一级行业指数:农林牧渔"
+            },
+            {
+              "indicator_code": "source_sector_02",
+              "indicator_name": "申万一级行业指数:基础化工"
+            }
+          ],
+          "unavailable_indicators": [],
+          "formula_js": "return Number(inputs[\"source_sector_01\"] || 0)+Number(inputs[\"source_sector_02\"] || 0);",
+          "formula_meta": {
+            "formula_js": "return Number(inputs[\"source_sector_01\"] || 0)+Number(inputs[\"source_sector_02\"] || 0);",
+            "generator": "arithmetic_expression",
+            "llm_used": false
+          },
+          "source_snapshots": [
+            {
+              "indicator_code": "source_sector_01",
+              "indicator_name": "申万一级行业指数:农林牧渔",
+              "latest_value": "2611.08",
+              "updated_at": "2026-09-02 13:24:47",
+              "source_code": "market_sector_snapshot",
+              "is_simulated": 0
+            },
+            {
+              "indicator_code": "source_sector_02",
+              "indicator_name": "申万一级行业指数:基础化工",
+              "latest_value": "4367.82",
+              "updated_at": "2026-09-02 13:24:47",
+              "source_code": "market_sector_snapshot",
+              "is_simulated": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cross-market-macro",
+      "category": "市场 + 宏观",
+      "name": "上证指数与中国 CPI 相加",
+      "given": "当前 PostgreSQL 已存在可用的注册指标快照。",
+      "when": "H5 大V以结构化标签 token 提交：【上证指数】+【中国CPI同比指数】",
+      "then": "预览接口必须用真实快照完成确定性计算，且不返回不可用或回退值。",
+      "passed": true,
+      "detail": "HTTP 200；data_status=available；value=3980.39；generator=arithmetic_expression；llm_used=False",
+      "evidence": {
+        "request": {
+          "action": "preview",
+          "indicator_name": "BDD 市场宏观组合",
+          "prompt_text": "【上证指数】+【中国CPI同比指数】",
+          "selected_tag_codes": [
+            "indicator:source_shanghai_index",
+            "indicator:source_cpi"
+          ],
+          "formula_tokens": [
+            {
+              "type": "reference",
+              "text": "【上证指数】",
+              "label": "上证指数",
+              "tagCode": "indicator:source_shanghai_index",
+              "indicatorCode": "source_shanghai_index"
+            },
+            {
+              "type": "operator",
+              "text": "+"
+            },
+            {
+              "type": "reference",
+              "text": "【中国CPI同比指数】",
+              "label": "中国CPI同比指数",
+              "tagCode": "indicator:source_cpi",
+              "indicatorCode": "source_cpi"
+            }
+          ]
+        },
+        "response_success": true,
+        "response_error": null,
+        "preview": {
+          "value": "3980.39",
+          "numeric_value": 3980.39,
+          "data_status": "available",
+          "updated_at": "2026-09-02 13:29:45",
+          "resolved_indicator_codes": [
+            "source_shanghai_index",
+            "source_cpi"
+          ],
+          "selected_indicators": [
+            {
+              "indicator_code": "source_shanghai_index",
+              "indicator_name": "上证指数"
+            },
+            {
+              "indicator_code": "source_cpi",
+              "indicator_name": "中国CPI同比指数"
+            }
+          ],
+          "unavailable_indicators": [],
+          "formula_js": "return Number(inputs[\"source_shanghai_index\"] || 0)+Number(inputs[\"source_cpi\"] || 0);",
+          "formula_meta": {
+            "formula_js": "return Number(inputs[\"source_shanghai_index\"] || 0)+Number(inputs[\"source_cpi\"] || 0);",
+            "generator": "arithmetic_expression",
+            "llm_used": false
+          },
+          "source_snapshots": [
+            {
+              "indicator_code": "source_shanghai_index",
+              "indicator_name": "上证指数",
+              "latest_value": "3979.89",
+              "updated_at": "2026-09-01",
+              "source_code": "market_snapshot",
+              "is_simulated": 0
+            },
+            {
+              "indicator_code": "source_cpi",
+              "indicator_name": "中国CPI同比指数",
+              "latest_value": "0.5",
+              "updated_at": "2026-07",
+              "source_code": "macro_snapshot",
+              "is_simulated": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cross-industry-market",
+      "category": "行业 + 市场",
+      "name": "农林牧渔 与上证指数相加",
+      "given": "当前 PostgreSQL 已存在可用的注册指标快照。",
+      "when": "H5 大V以结构化标签 token 提交：【农林牧渔】+【上证指数】",
+      "then": "预览接口必须用真实快照完成确定性计算，且不返回不可用或回退值。",
+      "passed": true,
+      "detail": "HTTP 200；data_status=available；value=6590.97；generator=arithmetic_expression；llm_used=False",
+      "evidence": {
+        "request": {
+          "action": "preview",
+          "indicator_name": "BDD 行业市场组合",
+          "prompt_text": "【农林牧渔】+【上证指数】",
+          "selected_tag_codes": [
+            "industry:农林牧渔",
+            "indicator:source_shanghai_index"
+          ],
+          "formula_tokens": [
+            {
+              "type": "reference",
+              "text": "【农林牧渔】",
+              "label": "农林牧渔",
+              "tagCode": "industry:农林牧渔",
+              "indicatorCode": "source_sector_01"
+            },
+            {
+              "type": "operator",
+              "text": "+"
+            },
+            {
+              "type": "reference",
+              "text": "【上证指数】",
+              "label": "上证指数",
+              "tagCode": "indicator:source_shanghai_index",
+              "indicatorCode": "source_shanghai_index"
+            }
+          ]
+        },
+        "response_success": true,
+        "response_error": null,
+        "preview": {
+          "value": "6590.97",
+          "numeric_value": 6590.97,
+          "data_status": "available",
+          "updated_at": "2026-09-02 13:29:46",
+          "resolved_indicator_codes": [
+            "source_sector_01",
+            "source_shanghai_index"
+          ],
+          "selected_indicators": [
+            {
+              "indicator_code": "source_sector_01",
+              "indicator_name": "申万一级行业指数:农林牧渔"
+            },
+            {
+              "indicator_code": "source_shanghai_index",
+              "indicator_name": "上证指数"
+            }
+          ],
+          "unavailable_indicators": [],
+          "formula_js": "return Number(inputs[\"source_sector_01\"] || 0)+Number(inputs[\"source_shanghai_index\"] || 0);",
+          "formula_meta": {
+            "formula_js": "return Number(inputs[\"source_sector_01\"] || 0)+Number(inputs[\"source_shanghai_index\"] || 0);",
+            "generator": "arithmetic_expression",
+            "llm_used": false
+          },
+          "source_snapshots": [
+            {
+              "indicator_code": "source_sector_01",
+              "indicator_name": "申万一级行业指数:农林牧渔",
+              "latest_value": "2611.08",
+              "updated_at": "2026-09-02 13:24:47",
+              "source_code": "market_sector_snapshot",
+              "is_simulated": 0
+            },
+            {
+              "indicator_code": "source_shanghai_index",
+              "indicator_name": "上证指数",
+              "latest_value": "3979.89",
+              "updated_at": "2026-09-01",
+              "source_code": "market_snapshot",
+              "is_simulated": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cross-stock-macro",
+      "category": "个股 + 宏观",
+      "name": "贵州茅台 与中国 CPI 相加",
+      "given": "当前 PostgreSQL 已存在可用的注册指标快照。",
+      "when": "H5 大V以结构化标签 token 提交：【贵州茅台】+【中国CPI同比指数】",
+      "then": "预览接口必须用真实快照完成确定性计算，且不返回不可用或回退值。",
+      "passed": true,
+      "detail": "HTTP 200；data_status=available；value=1300.06；generator=arithmetic_expression；llm_used=False",
+      "evidence": {
+        "request": {
+          "action": "preview",
+          "indicator_name": "BDD 个股宏观组合",
+          "prompt_text": "【贵州茅台】+【中国CPI同比指数】",
+          "selected_tag_codes": [
+            "watchlist:600519",
+            "indicator:source_cpi"
+          ],
+          "formula_tokens": [
+            {
+              "type": "reference",
+              "text": "【贵州茅台】",
+              "label": "贵州茅台",
+              "tagCode": "watchlist:600519",
+              "indicatorCode": "source_stock_600519"
+            },
+            {
+              "type": "operator",
+              "text": "+"
+            },
+            {
+              "type": "reference",
+              "text": "【中国CPI同比指数】",
+              "label": "中国CPI同比指数",
+              "tagCode": "indicator:source_cpi",
+              "indicatorCode": "source_cpi"
+            }
+          ]
+        },
+        "response_success": true,
+        "response_error": null,
+        "preview": {
+          "value": "1300.06",
+          "numeric_value": 1300.06,
+          "data_status": "available",
+          "updated_at": "2026-09-02 13:29:46",
+          "resolved_indicator_codes": [
+            "source_stock_600519",
+            "source_cpi"
+          ],
+          "selected_indicators": [
+            {
+              "indicator_code": "source_stock_600519",
+              "indicator_name": "贵州茅台"
+            },
+            {
+              "indicator_code": "source_cpi",
+              "indicator_name": "中国CPI同比指数"
+            }
+          ],
+          "unavailable_indicators": [],
+          "formula_js": "return Number(inputs[\"source_stock_600519\"] || 0)+Number(inputs[\"source_cpi\"] || 0);",
+          "formula_meta": {
+            "formula_js": "return Number(inputs[\"source_stock_600519\"] || 0)+Number(inputs[\"source_cpi\"] || 0);",
+            "generator": "arithmetic_expression",
+            "llm_used": false
+          },
+          "source_snapshots": [
+            {
+              "indicator_code": "source_stock_600519",
+              "indicator_name": "贵州茅台",
+              "latest_value": "1299.56",
+              "updated_at": "2026-09-01",
+              "source_code": "watchlist_market_cache",
+              "is_simulated": 0
+            },
+            {
+              "indicator_code": "source_cpi",
+              "indicator_name": "中国CPI同比指数",
+              "latest_value": "0.5",
+              "updated_at": "2026-07",
+              "source_code": "macro_snapshot",
+              "is_simulated": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cross-stock-market-industry",
+      "category": "个股 + 市场 + 行业",
+      "name": "贵州茅台、上证指数与 农林牧渔相加",
+      "given": "当前 PostgreSQL 已存在可用的注册指标快照。",
+      "when": "H5 大V以结构化标签 token 提交：【贵州茅台】+【上证指数】+【农林牧渔】",
+      "then": "预览接口必须用真实快照完成确定性计算，且不返回不可用或回退值。",
+      "passed": true,
+      "detail": "HTTP 200；data_status=available；value=7890.53；generator=arithmetic_expression；llm_used=False",
+      "evidence": {
+        "request": {
+          "action": "preview",
+          "indicator_name": "BDD 个股市场行业组合",
+          "prompt_text": "【贵州茅台】+【上证指数】+【农林牧渔】",
+          "selected_tag_codes": [
+            "watchlist:600519",
+            "indicator:source_shanghai_index",
+            "industry:农林牧渔"
+          ],
+          "formula_tokens": [
+            {
+              "type": "reference",
+              "text": "【贵州茅台】",
+              "label": "贵州茅台",
+              "tagCode": "watchlist:600519",
+              "indicatorCode": "source_stock_600519"
+            },
+            {
+              "type": "operator",
+              "text": "+"
+            },
+            {
+              "type": "reference",
+              "text": "【上证指数】",
+              "label": "上证指数",
+              "tagCode": "indicator:source_shanghai_index",
+              "indicatorCode": "source_shanghai_index"
+            },
+            {
+              "type": "operator",
+              "text": "+"
+            },
+            {
+              "type": "reference",
+              "text": "【农林牧渔】",
+              "label": "农林牧渔",
+              "tagCode": "industry:农林牧渔",
+              "indicatorCode": "source_sector_01"
+            }
+          ]
+        },
+        "response_success": true,
+        "response_error": null,
+        "preview": {
+          "value": "7890.53",
+          "numeric_value": 7890.53,
+          "data_status": "available",
+          "updated_at": "2026-09-02 13:29:47",
+          "resolved_indicator_codes": [
+            "source_stock_600519",
+            "source_shanghai_index",
+            "source_sector_01"
+          ],
+          "selected_indicators": [
+            {
+              "indicator_code": "source_stock_600519",
+              "indicator_name": "贵州茅台"
+            },
+            {
+              "indicator_code": "source_shanghai_index",
+              "indicator_name": "上证指数"
+            },
+            {
+              "indicator_code": "source_sector_01",
+              "indicator_name": "申万一级行业指数:农林牧渔"
+            }
+          ],
+          "unavailable_indicators": [],
+          "formula_js": "return Number(inputs[\"source_stock_600519\"] || 0)+Number(inputs[\"source_shanghai_index\"] || 0)+Number(inputs[\"source_sector_01\"] || 0);",
+          "formula_meta": {
+            "formula_js": "return Number(inputs[\"source_stock_600519\"] || 0)+Number(inputs[\"source_shanghai_index\"] || 0)+Number(inputs[\"source_sector_01\"] || 0);",
+            "generator": "arithmetic_expression",
+            "llm_used": false
+          },
+          "source_snapshots": [
+            {
+              "indicator_code": "source_stock_600519",
+              "indicator_name": "贵州茅台",
+              "latest_value": "1299.56",
+              "updated_at": "2026-09-01",
+              "source_code": "watchlist_market_cache",
+              "is_simulated": 0
+            },
+            {
+              "indicator_code": "source_shanghai_index",
+              "indicator_name": "上证指数",
+              "latest_value": "3979.89",
+              "updated_at": "2026-09-01",
+              "source_code": "market_snapshot",
+              "is_simulated": 0
+            },
+            {
+              "indicator_code": "source_sector_01",
+              "indicator_name": "申万一级行业指数:农林牧渔",
+              "latest_value": "2611.08",
+              "updated_at": "2026-09-02 13:24:47",
+              "source_code": "market_sector_snapshot",
+              "is_simulated": 0
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "snapshots": [
+    {
+      "snapshot_type": "market_sector_overview",
+      "snapshot_key": "shenwan_level1",
+      "source": "AKShare",
+      "collected_at": "2026-09-02 13:24:47",
+      "updated_at": "2026-09-02 13:24:47.949167+08:00"
+    },
+    {
+      "snapshot_type": "market_overview",
+      "snapshot_key": "standard_indices",
+      "source": "AKShare",
+      "collected_at": "2026-09-02 13:24:47",
+      "updated_at": "2026-09-02 13:24:47.942661+08:00"
+    },
+    {
+      "snapshot_type": "macro_economic",
+      "snapshot_key": "china_macro",
+      "source": "AKShare",
+      "collected_at": "2026-09-02 01:30:32",
+      "updated_at": "2026-09-02 01:30:32.150453+08:00"
+    }
+  ],
+  "catalog": {
+    "tag_catalog_total": 114,
+    "available_tag_total": 109,
+    "required_tags": {
+      "macro_cpi": {
+        "tag_code": "indicator:source_cpi",
+        "label": "中国CPI同比指数",
+        "tag_type": "indicator",
+        "category": "宏观经济",
+        "selected_indicators": [
+          {
+            "indicator_code": "source_cpi",
+            "indicator_name": "中国CPI同比指数"
+          }
+        ]
+      },
+      "macro_ppi": {
+        "tag_code": "indicator:source_ppi",
+        "label": "中国PPI同比",
+        "tag_type": "indicator",
+        "category": "宏观经济",
+        "selected_indicators": [
+          {
+            "indicator_code": "source_ppi",
+            "indicator_name": "中国PPI同比"
+          }
+        ]
+      },
+      "market_shanghai": {
+        "tag_code": "indicator:source_shanghai_index",
+        "label": "上证指数",
+        "tag_type": "indicator",
+        "category": "数据湖指标",
+        "selected_indicators": [
+          {
+            "indicator_code": "source_shanghai_index",
+            "indicator_name": "上证指数"
+          }
+        ]
+      },
+      "market_shenzhen": {
+        "tag_code": "indicator:source_shenzhen_index",
+        "label": "深证指数",
+        "tag_type": "indicator",
+        "category": "数据湖指标",
+        "selected_indicators": [
+          {
+            "indicator_code": "source_shenzhen_index",
+            "indicator_name": "深证指数"
+          }
+        ]
+      },
+      "market_hs300": {
+        "tag_code": "indicator:source_hs300",
+        "label": "沪深300",
+        "tag_type": "indicator",
+        "category": "核心指数",
+        "selected_indicators": [
+          {
+            "indicator_code": "source_hs300",
+            "indicator_name": "沪深300"
+          }
+        ]
+      },
+      "industry_a": {
+        "tag_code": "industry:农林牧渔",
+        "label": "农林牧渔",
+        "tag_type": "industry",
+        "category": "热门行业",
+        "selected_indicators": [
+          {
+            "indicator_code": "source_sector_01",
+            "indicator_name": "申万一级行业指数:农林牧渔"
+          }
+        ]
+      },
+      "industry_b": {
+        "tag_code": "industry:基础化工",
+        "label": "基础化工",
+        "tag_type": "industry",
+        "category": "热门行业",
+        "selected_indicators": [
+          {
+            "indicator_code": "source_sector_02",
+            "indicator_name": "申万一级行业指数:基础化工"
+          }
+        ]
+      },
+      "stock": {
+        "tag_code": "watchlist:600519",
+        "label": "贵州茅台",
+        "tag_type": "watchlist",
+        "category": "食品饮料",
+        "selected_indicators": [
+          {
+            "indicator_code": "source_stock_600519",
+            "indicator_name": "贵州茅台"
+          }
+        ]
+      }
+    }
+  },
+  "passed_count": 9,
+  "failed_count": 0
+}

@@ -2588,7 +2588,7 @@ def build_hot_industry_indicator_catalog():
 
 
 def build_smart_indicator_latest_value_map(selected_indicators=None):
-    """Merge indicator-lake values and market-index snapshots for formulas."""
+    """Merge registered values, market snapshots, and live watchlist prices for formulas."""
     db = get_db()
     latest_map = {
         row["indicator_code"]: dict(row)
@@ -2682,6 +2682,40 @@ def build_smart_indicator_latest_value_map(selected_indicators=None):
             "is_simulated": 0,
             "source_code": "market_sector_snapshot",
         }
+    # A stock tag is a quote input when used inside a formula.  Its related
+    # research indicators remain useful to the stock-detail experience, but
+    # must never be silently substituted for the stock's market price in an
+    # arithmetic expression such as "贵州茅台 + 上证指数".
+    stock_prefix = "source_stock_"
+    stock_source_codes = [
+        code for code in (selected_codes if selected_indicators is not None else set())
+        if code.startswith(stock_prefix)
+    ]
+    if stock_source_codes:
+        watchlist_details = gen_watchlist_details()
+        details_by_code = {
+            slugify_code((detail or {}).get("code") or code, ""): detail
+            for code, detail in (watchlist_details or {}).items()
+            if isinstance(detail, dict)
+        }
+        for indicator_code in stock_source_codes:
+            stock_code = slugify_code(indicator_code[len(stock_prefix):], "")
+            detail = details_by_code.get(stock_code) or {}
+            if detail.get("data_unavailable"):
+                continue
+            numeric_value = market.parse_numeric_indicator_value(detail.get("price"))
+            if numeric_value is None:
+                continue
+            latest_map[indicator_code] = {
+                "indicator_code": indicator_code,
+                "latest_value": str(round(numeric_value, 2)),
+                "latest_status": "normal",
+                "latest_assessment": f"已读取 {detail.get('name') or stock_code} 自选股行情快照。",
+                "latest_alert": "",
+                "updated_at": detail.get("updated_at") or ((detail.get("kline") or [{}])[-1] or {}).get("date") or "",
+                "is_simulated": 0,
+                "source_code": str(detail.get("cache_source") or "watchlist_market_cache"),
+            }
     return latest_map
 
 
@@ -2734,20 +2768,13 @@ def build_tenant_smart_indicator_tag_catalog(tenant=None):
     for detail in watchlist_details.values():
         stock_code = str(detail.get("code") or "").strip().upper()
         stock_name = str(detail.get("name") or stock_code).strip() or stock_code
-        related_ids = detail.get("related_indicator_ids") if isinstance(detail.get("related_indicator_ids"), list) else []
-        related_names = detail.get("related_indicator_names") if isinstance(detail.get("related_indicator_names"), list) else []
-        selected_indicators = normalize_selected_indicator_refs(
-            [
-                {
-                    "indicator_code": indicator_code,
-                    "indicator_name": related_names[index] if index < len(related_names) else indicator_code,
-                }
-                for index, indicator_code in enumerate(related_ids)
-                if indicator_code
-            ]
-        )
-        if not selected_indicators:
+        normalized_stock_code = slugify_code(stock_code, "")
+        if not normalized_stock_code:
             continue
+        selected_indicators = [{
+            "indicator_code": f"source_stock_{normalized_stock_code}",
+            "indicator_name": stock_name,
+        }]
         tag_code = f"watchlist:{stock_code}"
         if tag_code in seen:
             continue
@@ -2758,7 +2785,7 @@ def build_tenant_smart_indicator_tag_catalog(tenant=None):
                 "label": stock_name,
                 "tag_type": "watchlist",
                 "category": detail.get("industry") or "自选股",
-                "subtitle": "自选股标签",
+                "subtitle": "自选股行情标签 · 公式引用当前价格快照",
                 "value": f"{detail.get('price', '--')}",
                 "unit": "",
                 "stock_code": stock_code,

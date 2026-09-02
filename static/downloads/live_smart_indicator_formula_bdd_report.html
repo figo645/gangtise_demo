@@ -1,0 +1,931 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>H5 大V工作台智能指标公式真实数据 BDD 报告</title><style>
+:root{--ink:#19324c;--muted:#617287;--paper:#fffdf9;--line:#d9e1e7;--blue:#1769aa;--green:#16704d;--red:#ae342a;--gold:#9b6a12}*{box-sizing:border-box}body{margin:0;background:#eef4f7;color:var(--ink);font:14px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}main{max-width:1160px;margin:auto;padding:28px 18px 60px}.hero,.panel,.scenario{background:var(--paper);border:1px solid var(--line);border-radius:10px}.hero{padding:23px;border-top:4px solid var(--blue)}h1{font-size:28px;margin:0 0 8px}h2{font-size:18px;margin:5px 0 0}.muted,.detail{color:var(--muted)}.notice{margin-top:14px;padding:11px 13px;border-left:3px solid var(--gold);background:#fff6df;color:#76530e}.metrics{display:flex;gap:10px;flex-wrap:wrap;margin-top:17px}.metric{padding:8px 12px;border:1px solid var(--line);border-radius:7px;background:#fff}.pass-text{color:var(--green);font-weight:800}.fail-text{color:var(--red);font-weight:800}.panel{padding:16px;margin-top:18px}.scenario{padding:16px;margin:13px 0;border-left:5px solid var(--green)}.scenario.fail{border-left-color:var(--red)}.scenario header{display:flex;justify-content:space-between;gap:12px;align-items:start}.scenario header strong{color:var(--green)}.scenario.fail header strong{color:var(--red)}.category{font-size:11px;color:var(--blue);font-weight:800}p{margin:8px 0}details{margin-top:10px}summary{cursor:pointer;color:var(--blue);font-weight:700}pre{margin:8px 0 0;padding:12px;border-radius:7px;overflow:auto;background:#13283a;color:#eaf2f8;white-space:pre-wrap;word-break:break-word;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}@media(max-width:640px){main{padding:18px 12px 40px}h1{font-size:23px}}
+</style></head><body><main><section class="hero"><h1>H5 大V工作台智能指标公式真实数据 BDD 报告</h1><div class="muted">执行时间：2026-09-02 13:29:42 · 租户：laowang · 大V会话：财经老王 · 结果：<b class="pass-text">通过</b></div><div class="notice">真实 PostgreSQL 当前快照 + 真实 H5 大V smart-indicators preview API；不使用 mock、模拟值、保存或看板写入。</div><div class="metrics"><div class="metric">场景 <b>9</b></div><div class="metric">通过 <b class="pass-text">9</b></div><div class="metric">失败 <b class="pass-text">0</b></div><div class="metric">公式执行 <b>确定性算术，不调用 LLM</b></div></div></section><section class="panel"><h2>当前真实快照</h2><pre>[
+  {
+    &quot;snapshot_type&quot;: &quot;market_sector_overview&quot;,
+    &quot;snapshot_key&quot;: &quot;shenwan_level1&quot;,
+    &quot;source&quot;: &quot;AKShare&quot;,
+    &quot;collected_at&quot;: &quot;2026-09-02 13:24:47&quot;,
+    &quot;updated_at&quot;: &quot;2026-09-02 13:24:47.949167+08:00&quot;
+  },
+  {
+    &quot;snapshot_type&quot;: &quot;market_overview&quot;,
+    &quot;snapshot_key&quot;: &quot;standard_indices&quot;,
+    &quot;source&quot;: &quot;AKShare&quot;,
+    &quot;collected_at&quot;: &quot;2026-09-02 13:24:47&quot;,
+    &quot;updated_at&quot;: &quot;2026-09-02 13:24:47.942661+08:00&quot;
+  },
+  {
+    &quot;snapshot_type&quot;: &quot;macro_economic&quot;,
+    &quot;snapshot_key&quot;: &quot;china_macro&quot;,
+    &quot;source&quot;: &quot;AKShare&quot;,
+    &quot;collected_at&quot;: &quot;2026-09-02 01:30:32&quot;,
+    &quot;updated_at&quot;: &quot;2026-09-02 01:30:32.150453+08:00&quot;
+  }
+]</pre></section><section class="panel"><h2>标签目录选择</h2><pre>{
+  &quot;tag_catalog_total&quot;: 114,
+  &quot;available_tag_total&quot;: 109,
+  &quot;required_tags&quot;: {
+    &quot;macro_cpi&quot;: {
+      &quot;tag_code&quot;: &quot;indicator:source_cpi&quot;,
+      &quot;label&quot;: &quot;中国CPI同比指数&quot;,
+      &quot;tag_type&quot;: &quot;indicator&quot;,
+      &quot;category&quot;: &quot;宏观经济&quot;,
+      &quot;selected_indicators&quot;: [
+        {
+          &quot;indicator_code&quot;: &quot;source_cpi&quot;,
+          &quot;indicator_name&quot;: &quot;中国CPI同比指数&quot;
+        }
+      ]
+    },
+    &quot;macro_ppi&quot;: {
+      &quot;tag_code&quot;: &quot;indicator:source_ppi&quot;,
+      &quot;label&quot;: &quot;中国PPI同比&quot;,
+      &quot;tag_type&quot;: &quot;indicator&quot;,
+      &quot;category&quot;: &quot;宏观经济&quot;,
+      &quot;selected_indicators&quot;: [
+        {
+          &quot;indicator_code&quot;: &quot;source_ppi&quot;,
+          &quot;indicator_name&quot;: &quot;中国PPI同比&quot;
+        }
+      ]
+    },
+    &quot;market_shanghai&quot;: {
+      &quot;tag_code&quot;: &quot;indicator:source_shanghai_index&quot;,
+      &quot;label&quot;: &quot;上证指数&quot;,
+      &quot;tag_type&quot;: &quot;indicator&quot;,
+      &quot;category&quot;: &quot;数据湖指标&quot;,
+      &quot;selected_indicators&quot;: [
+        {
+          &quot;indicator_code&quot;: &quot;source_shanghai_index&quot;,
+          &quot;indicator_name&quot;: &quot;上证指数&quot;
+        }
+      ]
+    },
+    &quot;market_shenzhen&quot;: {
+      &quot;tag_code&quot;: &quot;indicator:source_shenzhen_index&quot;,
+      &quot;label&quot;: &quot;深证指数&quot;,
+      &quot;tag_type&quot;: &quot;indicator&quot;,
+      &quot;category&quot;: &quot;数据湖指标&quot;,
+      &quot;selected_indicators&quot;: [
+        {
+          &quot;indicator_code&quot;: &quot;source_shenzhen_index&quot;,
+          &quot;indicator_name&quot;: &quot;深证指数&quot;
+        }
+      ]
+    },
+    &quot;market_hs300&quot;: {
+      &quot;tag_code&quot;: &quot;indicator:source_hs300&quot;,
+      &quot;label&quot;: &quot;沪深300&quot;,
+      &quot;tag_type&quot;: &quot;indicator&quot;,
+      &quot;category&quot;: &quot;核心指数&quot;,
+      &quot;selected_indicators&quot;: [
+        {
+          &quot;indicator_code&quot;: &quot;source_hs300&quot;,
+          &quot;indicator_name&quot;: &quot;沪深300&quot;
+        }
+      ]
+    },
+    &quot;industry_a&quot;: {
+      &quot;tag_code&quot;: &quot;industry:农林牧渔&quot;,
+      &quot;label&quot;: &quot;农林牧渔&quot;,
+      &quot;tag_type&quot;: &quot;industry&quot;,
+      &quot;category&quot;: &quot;热门行业&quot;,
+      &quot;selected_indicators&quot;: [
+        {
+          &quot;indicator_code&quot;: &quot;source_sector_01&quot;,
+          &quot;indicator_name&quot;: &quot;申万一级行业指数:农林牧渔&quot;
+        }
+      ]
+    },
+    &quot;industry_b&quot;: {
+      &quot;tag_code&quot;: &quot;industry:基础化工&quot;,
+      &quot;label&quot;: &quot;基础化工&quot;,
+      &quot;tag_type&quot;: &quot;industry&quot;,
+      &quot;category&quot;: &quot;热门行业&quot;,
+      &quot;selected_indicators&quot;: [
+        {
+          &quot;indicator_code&quot;: &quot;source_sector_02&quot;,
+          &quot;indicator_name&quot;: &quot;申万一级行业指数:基础化工&quot;
+        }
+      ]
+    },
+    &quot;stock&quot;: {
+      &quot;tag_code&quot;: &quot;watchlist:600519&quot;,
+      &quot;label&quot;: &quot;贵州茅台&quot;,
+      &quot;tag_type&quot;: &quot;watchlist&quot;,
+      &quot;category&quot;: &quot;食品饮料&quot;,
+      &quot;selected_indicators&quot;: [
+        {
+          &quot;indicator_code&quot;: &quot;source_stock_600519&quot;,
+          &quot;indicator_name&quot;: &quot;贵州茅台&quot;
+        }
+      ]
+    }
+  }
+}</pre></section><section class="panel"><h2>BDD 场景</h2>
+        <article class="scenario pass">
+          <header><div><span class="category">宏观 + 宏观</span><h2>中国 CPI 与 PPI 相加</h2></div><strong>PASS</strong></header>
+          <p><b>Given</b> 当前 PostgreSQL 已存在可用的注册指标快照。</p><p><b>When</b> H5 大V以结构化标签 token 提交：【中国CPI同比指数】+【中国PPI同比】</p><p><b>Then</b> 预览接口必须用真实快照完成确定性计算，且不返回不可用或回退值。</p>
+          <div class="detail">HTTP 200；data_status=available；value=4；generator=arithmetic_expression；llm_used=False</div><details><summary>查看真实请求与快照证据</summary><pre>{
+  &quot;request&quot;: {
+    &quot;action&quot;: &quot;preview&quot;,
+    &quot;indicator_name&quot;: &quot;BDD 宏观双指标&quot;,
+    &quot;prompt_text&quot;: &quot;【中国CPI同比指数】+【中国PPI同比】&quot;,
+    &quot;selected_tag_codes&quot;: [
+      &quot;indicator:source_cpi&quot;,
+      &quot;indicator:source_ppi&quot;
+    ],
+    &quot;formula_tokens&quot;: [
+      {
+        &quot;type&quot;: &quot;reference&quot;,
+        &quot;text&quot;: &quot;【中国CPI同比指数】&quot;,
+        &quot;label&quot;: &quot;中国CPI同比指数&quot;,
+        &quot;tagCode&quot;: &quot;indicator:source_cpi&quot;,
+        &quot;indicatorCode&quot;: &quot;source_cpi&quot;
+      },
+      {
+        &quot;type&quot;: &quot;operator&quot;,
+        &quot;text&quot;: &quot;+&quot;
+      },
+      {
+        &quot;type&quot;: &quot;reference&quot;,
+        &quot;text&quot;: &quot;【中国PPI同比】&quot;,
+        &quot;label&quot;: &quot;中国PPI同比&quot;,
+        &quot;tagCode&quot;: &quot;indicator:source_ppi&quot;,
+        &quot;indicatorCode&quot;: &quot;source_ppi&quot;
+      }
+    ]
+  },
+  &quot;response_success&quot;: true,
+  &quot;response_error&quot;: null,
+  &quot;preview&quot;: {
+    &quot;value&quot;: &quot;4&quot;,
+    &quot;numeric_value&quot;: 4.0,
+    &quot;data_status&quot;: &quot;available&quot;,
+    &quot;updated_at&quot;: &quot;2026-09-02 13:29:44&quot;,
+    &quot;resolved_indicator_codes&quot;: [
+      &quot;source_cpi&quot;,
+      &quot;source_ppi&quot;
+    ],
+    &quot;selected_indicators&quot;: [
+      {
+        &quot;indicator_code&quot;: &quot;source_cpi&quot;,
+        &quot;indicator_name&quot;: &quot;中国CPI同比指数&quot;
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_ppi&quot;,
+        &quot;indicator_name&quot;: &quot;中国PPI同比&quot;
+      }
+    ],
+    &quot;unavailable_indicators&quot;: [],
+    &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_cpi\&quot;] || 0)+Number(inputs[\&quot;source_ppi\&quot;] || 0);&quot;,
+    &quot;formula_meta&quot;: {
+      &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_cpi\&quot;] || 0)+Number(inputs[\&quot;source_ppi\&quot;] || 0);&quot;,
+      &quot;generator&quot;: &quot;arithmetic_expression&quot;,
+      &quot;llm_used&quot;: false
+    },
+    &quot;source_snapshots&quot;: [
+      {
+        &quot;indicator_code&quot;: &quot;source_cpi&quot;,
+        &quot;indicator_name&quot;: &quot;中国CPI同比指数&quot;,
+        &quot;latest_value&quot;: &quot;0.5&quot;,
+        &quot;updated_at&quot;: &quot;2026-07&quot;,
+        &quot;source_code&quot;: &quot;macro_snapshot&quot;,
+        &quot;is_simulated&quot;: 0
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_ppi&quot;,
+        &quot;indicator_name&quot;: &quot;中国PPI同比&quot;,
+        &quot;latest_value&quot;: &quot;3.5&quot;,
+        &quot;updated_at&quot;: &quot;2026-07&quot;,
+        &quot;source_code&quot;: &quot;macro_snapshot&quot;,
+        &quot;is_simulated&quot;: 0
+      }
+    ]
+  }
+}</pre></details>
+        </article>
+        <article class="scenario pass">
+          <header><div><span class="category">宏观 + 宏观 + 数值</span><h2>中国 PPI 乘以 5 再加 CPI</h2></div><strong>PASS</strong></header>
+          <p><b>Given</b> 当前 PostgreSQL 已存在可用的注册指标快照。</p><p><b>When</b> H5 大V以结构化标签 token 提交：【中国PPI同比】*5+【中国CPI同比指数】</p><p><b>Then</b> 预览接口必须用真实快照完成确定性计算，且不返回不可用或回退值。</p>
+          <div class="detail">HTTP 200；data_status=available；value=18；generator=arithmetic_expression；llm_used=False</div><details><summary>查看真实请求与快照证据</summary><pre>{
+  &quot;request&quot;: {
+    &quot;action&quot;: &quot;preview&quot;,
+    &quot;indicator_name&quot;: &quot;BDD 宏观三操作数&quot;,
+    &quot;prompt_text&quot;: &quot;【中国PPI同比】*5+【中国CPI同比指数】&quot;,
+    &quot;selected_tag_codes&quot;: [
+      &quot;indicator:source_ppi&quot;,
+      &quot;indicator:source_cpi&quot;
+    ],
+    &quot;formula_tokens&quot;: [
+      {
+        &quot;type&quot;: &quot;reference&quot;,
+        &quot;text&quot;: &quot;【中国PPI同比】&quot;,
+        &quot;label&quot;: &quot;中国PPI同比&quot;,
+        &quot;tagCode&quot;: &quot;indicator:source_ppi&quot;,
+        &quot;indicatorCode&quot;: &quot;source_ppi&quot;
+      },
+      {
+        &quot;type&quot;: &quot;operator&quot;,
+        &quot;text&quot;: &quot;*&quot;
+      },
+      {
+        &quot;type&quot;: &quot;number&quot;,
+        &quot;text&quot;: &quot;5&quot;
+      },
+      {
+        &quot;type&quot;: &quot;operator&quot;,
+        &quot;text&quot;: &quot;+&quot;
+      },
+      {
+        &quot;type&quot;: &quot;reference&quot;,
+        &quot;text&quot;: &quot;【中国CPI同比指数】&quot;,
+        &quot;label&quot;: &quot;中国CPI同比指数&quot;,
+        &quot;tagCode&quot;: &quot;indicator:source_cpi&quot;,
+        &quot;indicatorCode&quot;: &quot;source_cpi&quot;
+      }
+    ]
+  },
+  &quot;response_success&quot;: true,
+  &quot;response_error&quot;: null,
+  &quot;preview&quot;: {
+    &quot;value&quot;: &quot;18&quot;,
+    &quot;numeric_value&quot;: 18.0,
+    &quot;data_status&quot;: &quot;available&quot;,
+    &quot;updated_at&quot;: &quot;2026-09-02 13:29:44&quot;,
+    &quot;resolved_indicator_codes&quot;: [
+      &quot;source_ppi&quot;,
+      &quot;source_cpi&quot;
+    ],
+    &quot;selected_indicators&quot;: [
+      {
+        &quot;indicator_code&quot;: &quot;source_ppi&quot;,
+        &quot;indicator_name&quot;: &quot;中国PPI同比&quot;
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_cpi&quot;,
+        &quot;indicator_name&quot;: &quot;中国CPI同比指数&quot;
+      }
+    ],
+    &quot;unavailable_indicators&quot;: [],
+    &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_ppi\&quot;] || 0)*5+Number(inputs[\&quot;source_cpi\&quot;] || 0);&quot;,
+    &quot;formula_meta&quot;: {
+      &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_ppi\&quot;] || 0)*5+Number(inputs[\&quot;source_cpi\&quot;] || 0);&quot;,
+      &quot;generator&quot;: &quot;arithmetic_expression&quot;,
+      &quot;llm_used&quot;: false
+    },
+    &quot;source_snapshots&quot;: [
+      {
+        &quot;indicator_code&quot;: &quot;source_ppi&quot;,
+        &quot;indicator_name&quot;: &quot;中国PPI同比&quot;,
+        &quot;latest_value&quot;: &quot;3.5&quot;,
+        &quot;updated_at&quot;: &quot;2026-07&quot;,
+        &quot;source_code&quot;: &quot;macro_snapshot&quot;,
+        &quot;is_simulated&quot;: 0
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_cpi&quot;,
+        &quot;indicator_name&quot;: &quot;中国CPI同比指数&quot;,
+        &quot;latest_value&quot;: &quot;0.5&quot;,
+        &quot;updated_at&quot;: &quot;2026-07&quot;,
+        &quot;source_code&quot;: &quot;macro_snapshot&quot;,
+        &quot;is_simulated&quot;: 0
+      }
+    ]
+  }
+}</pre></details>
+        </article>
+        <article class="scenario pass">
+          <header><div><span class="category">市场 + 市场</span><h2>上证指数减深证指数</h2></div><strong>PASS</strong></header>
+          <p><b>Given</b> 当前 PostgreSQL 已存在可用的注册指标快照。</p><p><b>When</b> H5 大V以结构化标签 token 提交：【上证指数】-【深证指数】</p><p><b>Then</b> 预览接口必须用真实快照完成确定性计算，且不返回不可用或回退值。</p>
+          <div class="detail">HTTP 200；data_status=available；value=-9892.49；generator=arithmetic_expression；llm_used=False</div><details><summary>查看真实请求与快照证据</summary><pre>{
+  &quot;request&quot;: {
+    &quot;action&quot;: &quot;preview&quot;,
+    &quot;indicator_name&quot;: &quot;BDD 市场双指标&quot;,
+    &quot;prompt_text&quot;: &quot;【上证指数】-【深证指数】&quot;,
+    &quot;selected_tag_codes&quot;: [
+      &quot;indicator:source_shanghai_index&quot;,
+      &quot;indicator:source_shenzhen_index&quot;
+    ],
+    &quot;formula_tokens&quot;: [
+      {
+        &quot;type&quot;: &quot;reference&quot;,
+        &quot;text&quot;: &quot;【上证指数】&quot;,
+        &quot;label&quot;: &quot;上证指数&quot;,
+        &quot;tagCode&quot;: &quot;indicator:source_shanghai_index&quot;,
+        &quot;indicatorCode&quot;: &quot;source_shanghai_index&quot;
+      },
+      {
+        &quot;type&quot;: &quot;operator&quot;,
+        &quot;text&quot;: &quot;-&quot;
+      },
+      {
+        &quot;type&quot;: &quot;reference&quot;,
+        &quot;text&quot;: &quot;【深证指数】&quot;,
+        &quot;label&quot;: &quot;深证指数&quot;,
+        &quot;tagCode&quot;: &quot;indicator:source_shenzhen_index&quot;,
+        &quot;indicatorCode&quot;: &quot;source_shenzhen_index&quot;
+      }
+    ]
+  },
+  &quot;response_success&quot;: true,
+  &quot;response_error&quot;: null,
+  &quot;preview&quot;: {
+    &quot;value&quot;: &quot;-9892.49&quot;,
+    &quot;numeric_value&quot;: -9892.49,
+    &quot;data_status&quot;: &quot;available&quot;,
+    &quot;updated_at&quot;: &quot;2026-09-02 13:29:44&quot;,
+    &quot;resolved_indicator_codes&quot;: [
+      &quot;source_shanghai_index&quot;,
+      &quot;source_shenzhen_index&quot;
+    ],
+    &quot;selected_indicators&quot;: [
+      {
+        &quot;indicator_code&quot;: &quot;source_shanghai_index&quot;,
+        &quot;indicator_name&quot;: &quot;上证指数&quot;
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_shenzhen_index&quot;,
+        &quot;indicator_name&quot;: &quot;深证指数&quot;
+      }
+    ],
+    &quot;unavailable_indicators&quot;: [],
+    &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_shanghai_index\&quot;] || 0)-Number(inputs[\&quot;source_shenzhen_index\&quot;] || 0);&quot;,
+    &quot;formula_meta&quot;: {
+      &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_shanghai_index\&quot;] || 0)-Number(inputs[\&quot;source_shenzhen_index\&quot;] || 0);&quot;,
+      &quot;generator&quot;: &quot;arithmetic_expression&quot;,
+      &quot;llm_used&quot;: false
+    },
+    &quot;source_snapshots&quot;: [
+      {
+        &quot;indicator_code&quot;: &quot;source_shanghai_index&quot;,
+        &quot;indicator_name&quot;: &quot;上证指数&quot;,
+        &quot;latest_value&quot;: &quot;3979.89&quot;,
+        &quot;updated_at&quot;: &quot;2026-09-01&quot;,
+        &quot;source_code&quot;: &quot;market_snapshot&quot;,
+        &quot;is_simulated&quot;: 0
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_shenzhen_index&quot;,
+        &quot;indicator_name&quot;: &quot;深证指数&quot;,
+        &quot;latest_value&quot;: &quot;13872.38&quot;,
+        &quot;updated_at&quot;: &quot;2026-09-01&quot;,
+        &quot;source_code&quot;: &quot;market_snapshot&quot;,
+        &quot;is_simulated&quot;: 0
+      }
+    ]
+  }
+}</pre></details>
+        </article>
+        <article class="scenario pass">
+          <header><div><span class="category">市场 + 市场 + 市场</span><h2>上证加深证后除以沪深300</h2></div><strong>PASS</strong></header>
+          <p><b>Given</b> 当前 PostgreSQL 已存在可用的注册指标快照。</p><p><b>When</b> H5 大V以结构化标签 token 提交：(【上证指数】+【深证指数】)/【沪深300】</p><p><b>Then</b> 预览接口必须用真实快照完成确定性计算，且不返回不可用或回退值。</p>
+          <div class="detail">HTTP 200；data_status=available；value=3.8713；generator=arithmetic_expression；llm_used=False</div><details><summary>查看真实请求与快照证据</summary><pre>{
+  &quot;request&quot;: {
+    &quot;action&quot;: &quot;preview&quot;,
+    &quot;indicator_name&quot;: &quot;BDD 市场三指标&quot;,
+    &quot;prompt_text&quot;: &quot;(【上证指数】+【深证指数】)/【沪深300】&quot;,
+    &quot;selected_tag_codes&quot;: [
+      &quot;indicator:source_shanghai_index&quot;,
+      &quot;indicator:source_shenzhen_index&quot;,
+      &quot;indicator:source_hs300&quot;
+    ],
+    &quot;formula_tokens&quot;: [
+      {
+        &quot;type&quot;: &quot;operator&quot;,
+        &quot;text&quot;: &quot;(&quot;
+      },
+      {
+        &quot;type&quot;: &quot;reference&quot;,
+        &quot;text&quot;: &quot;【上证指数】&quot;,
+        &quot;label&quot;: &quot;上证指数&quot;,
+        &quot;tagCode&quot;: &quot;indicator:source_shanghai_index&quot;,
+        &quot;indicatorCode&quot;: &quot;source_shanghai_index&quot;
+      },
+      {
+        &quot;type&quot;: &quot;operator&quot;,
+        &quot;text&quot;: &quot;+&quot;
+      },
+      {
+        &quot;type&quot;: &quot;reference&quot;,
+        &quot;text&quot;: &quot;【深证指数】&quot;,
+        &quot;label&quot;: &quot;深证指数&quot;,
+        &quot;tagCode&quot;: &quot;indicator:source_shenzhen_index&quot;,
+        &quot;indicatorCode&quot;: &quot;source_shenzhen_index&quot;
+      },
+      {
+        &quot;type&quot;: &quot;operator&quot;,
+        &quot;text&quot;: &quot;)&quot;
+      },
+      {
+        &quot;type&quot;: &quot;operator&quot;,
+        &quot;text&quot;: &quot;/&quot;
+      },
+      {
+        &quot;type&quot;: &quot;reference&quot;,
+        &quot;text&quot;: &quot;【沪深300】&quot;,
+        &quot;label&quot;: &quot;沪深300&quot;,
+        &quot;tagCode&quot;: &quot;indicator:source_hs300&quot;,
+        &quot;indicatorCode&quot;: &quot;source_hs300&quot;
+      }
+    ]
+  },
+  &quot;response_success&quot;: true,
+  &quot;response_error&quot;: null,
+  &quot;preview&quot;: {
+    &quot;value&quot;: &quot;3.8713&quot;,
+    &quot;numeric_value&quot;: 3.8713,
+    &quot;data_status&quot;: &quot;available&quot;,
+    &quot;updated_at&quot;: &quot;2026-09-02 13:29:45&quot;,
+    &quot;resolved_indicator_codes&quot;: [
+      &quot;source_shanghai_index&quot;,
+      &quot;source_shenzhen_index&quot;,
+      &quot;source_hs300&quot;
+    ],
+    &quot;selected_indicators&quot;: [
+      {
+        &quot;indicator_code&quot;: &quot;source_shanghai_index&quot;,
+        &quot;indicator_name&quot;: &quot;上证指数&quot;
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_shenzhen_index&quot;,
+        &quot;indicator_name&quot;: &quot;深证指数&quot;
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_hs300&quot;,
+        &quot;indicator_name&quot;: &quot;沪深300&quot;
+      }
+    ],
+    &quot;unavailable_indicators&quot;: [],
+    &quot;formula_js&quot;: &quot;return (Number(inputs[\&quot;source_shanghai_index\&quot;] || 0)+Number(inputs[\&quot;source_shenzhen_index\&quot;] || 0))/Number(inputs[\&quot;source_hs300\&quot;] || 0);&quot;,
+    &quot;formula_meta&quot;: {
+      &quot;formula_js&quot;: &quot;return (Number(inputs[\&quot;source_shanghai_index\&quot;] || 0)+Number(inputs[\&quot;source_shenzhen_index\&quot;] || 0))/Number(inputs[\&quot;source_hs300\&quot;] || 0);&quot;,
+      &quot;generator&quot;: &quot;arithmetic_expression&quot;,
+      &quot;llm_used&quot;: false
+    },
+    &quot;source_snapshots&quot;: [
+      {
+        &quot;indicator_code&quot;: &quot;source_shanghai_index&quot;,
+        &quot;indicator_name&quot;: &quot;上证指数&quot;,
+        &quot;latest_value&quot;: &quot;3979.89&quot;,
+        &quot;updated_at&quot;: &quot;2026-09-01&quot;,
+        &quot;source_code&quot;: &quot;market_snapshot&quot;,
+        &quot;is_simulated&quot;: 0
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_shenzhen_index&quot;,
+        &quot;indicator_name&quot;: &quot;深证指数&quot;,
+        &quot;latest_value&quot;: &quot;13872.38&quot;,
+        &quot;updated_at&quot;: &quot;2026-09-01&quot;,
+        &quot;source_code&quot;: &quot;market_snapshot&quot;,
+        &quot;is_simulated&quot;: 0
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_hs300&quot;,
+        &quot;indicator_name&quot;: &quot;沪深300&quot;,
+        &quot;latest_value&quot;: &quot;4611.44&quot;,
+        &quot;updated_at&quot;: &quot;2026-09-02 01:30:34&quot;,
+        &quot;source_code&quot;: &quot;source_hs300&quot;,
+        &quot;is_simulated&quot;: 0
+      }
+    ]
+  }
+}</pre></details>
+        </article>
+        <article class="scenario pass">
+          <header><div><span class="category">行业 + 行业</span><h2>农林牧渔 与 基础化工相加</h2></div><strong>PASS</strong></header>
+          <p><b>Given</b> 当前 PostgreSQL 已存在可用的注册指标快照。</p><p><b>When</b> H5 大V以结构化标签 token 提交：【农林牧渔】+【基础化工】</p><p><b>Then</b> 预览接口必须用真实快照完成确定性计算，且不返回不可用或回退值。</p>
+          <div class="detail">HTTP 200；data_status=available；value=6978.9；generator=arithmetic_expression；llm_used=False</div><details><summary>查看真实请求与快照证据</summary><pre>{
+  &quot;request&quot;: {
+    &quot;action&quot;: &quot;preview&quot;,
+    &quot;indicator_name&quot;: &quot;BDD 行业双指标&quot;,
+    &quot;prompt_text&quot;: &quot;【农林牧渔】+【基础化工】&quot;,
+    &quot;selected_tag_codes&quot;: [
+      &quot;industry:农林牧渔&quot;,
+      &quot;industry:基础化工&quot;
+    ],
+    &quot;formula_tokens&quot;: [
+      {
+        &quot;type&quot;: &quot;reference&quot;,
+        &quot;text&quot;: &quot;【农林牧渔】&quot;,
+        &quot;label&quot;: &quot;农林牧渔&quot;,
+        &quot;tagCode&quot;: &quot;industry:农林牧渔&quot;,
+        &quot;indicatorCode&quot;: &quot;source_sector_01&quot;
+      },
+      {
+        &quot;type&quot;: &quot;operator&quot;,
+        &quot;text&quot;: &quot;+&quot;
+      },
+      {
+        &quot;type&quot;: &quot;reference&quot;,
+        &quot;text&quot;: &quot;【基础化工】&quot;,
+        &quot;label&quot;: &quot;基础化工&quot;,
+        &quot;tagCode&quot;: &quot;industry:基础化工&quot;,
+        &quot;indicatorCode&quot;: &quot;source_sector_02&quot;
+      }
+    ]
+  },
+  &quot;response_success&quot;: true,
+  &quot;response_error&quot;: null,
+  &quot;preview&quot;: {
+    &quot;value&quot;: &quot;6978.9&quot;,
+    &quot;numeric_value&quot;: 6978.9,
+    &quot;data_status&quot;: &quot;available&quot;,
+    &quot;updated_at&quot;: &quot;2026-09-02 13:29:45&quot;,
+    &quot;resolved_indicator_codes&quot;: [
+      &quot;source_sector_01&quot;,
+      &quot;source_sector_02&quot;
+    ],
+    &quot;selected_indicators&quot;: [
+      {
+        &quot;indicator_code&quot;: &quot;source_sector_01&quot;,
+        &quot;indicator_name&quot;: &quot;申万一级行业指数:农林牧渔&quot;
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_sector_02&quot;,
+        &quot;indicator_name&quot;: &quot;申万一级行业指数:基础化工&quot;
+      }
+    ],
+    &quot;unavailable_indicators&quot;: [],
+    &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_sector_01\&quot;] || 0)+Number(inputs[\&quot;source_sector_02\&quot;] || 0);&quot;,
+    &quot;formula_meta&quot;: {
+      &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_sector_01\&quot;] || 0)+Number(inputs[\&quot;source_sector_02\&quot;] || 0);&quot;,
+      &quot;generator&quot;: &quot;arithmetic_expression&quot;,
+      &quot;llm_used&quot;: false
+    },
+    &quot;source_snapshots&quot;: [
+      {
+        &quot;indicator_code&quot;: &quot;source_sector_01&quot;,
+        &quot;indicator_name&quot;: &quot;申万一级行业指数:农林牧渔&quot;,
+        &quot;latest_value&quot;: &quot;2611.08&quot;,
+        &quot;updated_at&quot;: &quot;2026-09-02 13:24:47&quot;,
+        &quot;source_code&quot;: &quot;market_sector_snapshot&quot;,
+        &quot;is_simulated&quot;: 0
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_sector_02&quot;,
+        &quot;indicator_name&quot;: &quot;申万一级行业指数:基础化工&quot;,
+        &quot;latest_value&quot;: &quot;4367.82&quot;,
+        &quot;updated_at&quot;: &quot;2026-09-02 13:24:47&quot;,
+        &quot;source_code&quot;: &quot;market_sector_snapshot&quot;,
+        &quot;is_simulated&quot;: 0
+      }
+    ]
+  }
+}</pre></details>
+        </article>
+        <article class="scenario pass">
+          <header><div><span class="category">市场 + 宏观</span><h2>上证指数与中国 CPI 相加</h2></div><strong>PASS</strong></header>
+          <p><b>Given</b> 当前 PostgreSQL 已存在可用的注册指标快照。</p><p><b>When</b> H5 大V以结构化标签 token 提交：【上证指数】+【中国CPI同比指数】</p><p><b>Then</b> 预览接口必须用真实快照完成确定性计算，且不返回不可用或回退值。</p>
+          <div class="detail">HTTP 200；data_status=available；value=3980.39；generator=arithmetic_expression；llm_used=False</div><details><summary>查看真实请求与快照证据</summary><pre>{
+  &quot;request&quot;: {
+    &quot;action&quot;: &quot;preview&quot;,
+    &quot;indicator_name&quot;: &quot;BDD 市场宏观组合&quot;,
+    &quot;prompt_text&quot;: &quot;【上证指数】+【中国CPI同比指数】&quot;,
+    &quot;selected_tag_codes&quot;: [
+      &quot;indicator:source_shanghai_index&quot;,
+      &quot;indicator:source_cpi&quot;
+    ],
+    &quot;formula_tokens&quot;: [
+      {
+        &quot;type&quot;: &quot;reference&quot;,
+        &quot;text&quot;: &quot;【上证指数】&quot;,
+        &quot;label&quot;: &quot;上证指数&quot;,
+        &quot;tagCode&quot;: &quot;indicator:source_shanghai_index&quot;,
+        &quot;indicatorCode&quot;: &quot;source_shanghai_index&quot;
+      },
+      {
+        &quot;type&quot;: &quot;operator&quot;,
+        &quot;text&quot;: &quot;+&quot;
+      },
+      {
+        &quot;type&quot;: &quot;reference&quot;,
+        &quot;text&quot;: &quot;【中国CPI同比指数】&quot;,
+        &quot;label&quot;: &quot;中国CPI同比指数&quot;,
+        &quot;tagCode&quot;: &quot;indicator:source_cpi&quot;,
+        &quot;indicatorCode&quot;: &quot;source_cpi&quot;
+      }
+    ]
+  },
+  &quot;response_success&quot;: true,
+  &quot;response_error&quot;: null,
+  &quot;preview&quot;: {
+    &quot;value&quot;: &quot;3980.39&quot;,
+    &quot;numeric_value&quot;: 3980.39,
+    &quot;data_status&quot;: &quot;available&quot;,
+    &quot;updated_at&quot;: &quot;2026-09-02 13:29:45&quot;,
+    &quot;resolved_indicator_codes&quot;: [
+      &quot;source_shanghai_index&quot;,
+      &quot;source_cpi&quot;
+    ],
+    &quot;selected_indicators&quot;: [
+      {
+        &quot;indicator_code&quot;: &quot;source_shanghai_index&quot;,
+        &quot;indicator_name&quot;: &quot;上证指数&quot;
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_cpi&quot;,
+        &quot;indicator_name&quot;: &quot;中国CPI同比指数&quot;
+      }
+    ],
+    &quot;unavailable_indicators&quot;: [],
+    &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_shanghai_index\&quot;] || 0)+Number(inputs[\&quot;source_cpi\&quot;] || 0);&quot;,
+    &quot;formula_meta&quot;: {
+      &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_shanghai_index\&quot;] || 0)+Number(inputs[\&quot;source_cpi\&quot;] || 0);&quot;,
+      &quot;generator&quot;: &quot;arithmetic_expression&quot;,
+      &quot;llm_used&quot;: false
+    },
+    &quot;source_snapshots&quot;: [
+      {
+        &quot;indicator_code&quot;: &quot;source_shanghai_index&quot;,
+        &quot;indicator_name&quot;: &quot;上证指数&quot;,
+        &quot;latest_value&quot;: &quot;3979.89&quot;,
+        &quot;updated_at&quot;: &quot;2026-09-01&quot;,
+        &quot;source_code&quot;: &quot;market_snapshot&quot;,
+        &quot;is_simulated&quot;: 0
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_cpi&quot;,
+        &quot;indicator_name&quot;: &quot;中国CPI同比指数&quot;,
+        &quot;latest_value&quot;: &quot;0.5&quot;,
+        &quot;updated_at&quot;: &quot;2026-07&quot;,
+        &quot;source_code&quot;: &quot;macro_snapshot&quot;,
+        &quot;is_simulated&quot;: 0
+      }
+    ]
+  }
+}</pre></details>
+        </article>
+        <article class="scenario pass">
+          <header><div><span class="category">行业 + 市场</span><h2>农林牧渔 与上证指数相加</h2></div><strong>PASS</strong></header>
+          <p><b>Given</b> 当前 PostgreSQL 已存在可用的注册指标快照。</p><p><b>When</b> H5 大V以结构化标签 token 提交：【农林牧渔】+【上证指数】</p><p><b>Then</b> 预览接口必须用真实快照完成确定性计算，且不返回不可用或回退值。</p>
+          <div class="detail">HTTP 200；data_status=available；value=6590.97；generator=arithmetic_expression；llm_used=False</div><details><summary>查看真实请求与快照证据</summary><pre>{
+  &quot;request&quot;: {
+    &quot;action&quot;: &quot;preview&quot;,
+    &quot;indicator_name&quot;: &quot;BDD 行业市场组合&quot;,
+    &quot;prompt_text&quot;: &quot;【农林牧渔】+【上证指数】&quot;,
+    &quot;selected_tag_codes&quot;: [
+      &quot;industry:农林牧渔&quot;,
+      &quot;indicator:source_shanghai_index&quot;
+    ],
+    &quot;formula_tokens&quot;: [
+      {
+        &quot;type&quot;: &quot;reference&quot;,
+        &quot;text&quot;: &quot;【农林牧渔】&quot;,
+        &quot;label&quot;: &quot;农林牧渔&quot;,
+        &quot;tagCode&quot;: &quot;industry:农林牧渔&quot;,
+        &quot;indicatorCode&quot;: &quot;source_sector_01&quot;
+      },
+      {
+        &quot;type&quot;: &quot;operator&quot;,
+        &quot;text&quot;: &quot;+&quot;
+      },
+      {
+        &quot;type&quot;: &quot;reference&quot;,
+        &quot;text&quot;: &quot;【上证指数】&quot;,
+        &quot;label&quot;: &quot;上证指数&quot;,
+        &quot;tagCode&quot;: &quot;indicator:source_shanghai_index&quot;,
+        &quot;indicatorCode&quot;: &quot;source_shanghai_index&quot;
+      }
+    ]
+  },
+  &quot;response_success&quot;: true,
+  &quot;response_error&quot;: null,
+  &quot;preview&quot;: {
+    &quot;value&quot;: &quot;6590.97&quot;,
+    &quot;numeric_value&quot;: 6590.97,
+    &quot;data_status&quot;: &quot;available&quot;,
+    &quot;updated_at&quot;: &quot;2026-09-02 13:29:46&quot;,
+    &quot;resolved_indicator_codes&quot;: [
+      &quot;source_sector_01&quot;,
+      &quot;source_shanghai_index&quot;
+    ],
+    &quot;selected_indicators&quot;: [
+      {
+        &quot;indicator_code&quot;: &quot;source_sector_01&quot;,
+        &quot;indicator_name&quot;: &quot;申万一级行业指数:农林牧渔&quot;
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_shanghai_index&quot;,
+        &quot;indicator_name&quot;: &quot;上证指数&quot;
+      }
+    ],
+    &quot;unavailable_indicators&quot;: [],
+    &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_sector_01\&quot;] || 0)+Number(inputs[\&quot;source_shanghai_index\&quot;] || 0);&quot;,
+    &quot;formula_meta&quot;: {
+      &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_sector_01\&quot;] || 0)+Number(inputs[\&quot;source_shanghai_index\&quot;] || 0);&quot;,
+      &quot;generator&quot;: &quot;arithmetic_expression&quot;,
+      &quot;llm_used&quot;: false
+    },
+    &quot;source_snapshots&quot;: [
+      {
+        &quot;indicator_code&quot;: &quot;source_sector_01&quot;,
+        &quot;indicator_name&quot;: &quot;申万一级行业指数:农林牧渔&quot;,
+        &quot;latest_value&quot;: &quot;2611.08&quot;,
+        &quot;updated_at&quot;: &quot;2026-09-02 13:24:47&quot;,
+        &quot;source_code&quot;: &quot;market_sector_snapshot&quot;,
+        &quot;is_simulated&quot;: 0
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_shanghai_index&quot;,
+        &quot;indicator_name&quot;: &quot;上证指数&quot;,
+        &quot;latest_value&quot;: &quot;3979.89&quot;,
+        &quot;updated_at&quot;: &quot;2026-09-01&quot;,
+        &quot;source_code&quot;: &quot;market_snapshot&quot;,
+        &quot;is_simulated&quot;: 0
+      }
+    ]
+  }
+}</pre></details>
+        </article>
+        <article class="scenario pass">
+          <header><div><span class="category">个股 + 宏观</span><h2>贵州茅台 与中国 CPI 相加</h2></div><strong>PASS</strong></header>
+          <p><b>Given</b> 当前 PostgreSQL 已存在可用的注册指标快照。</p><p><b>When</b> H5 大V以结构化标签 token 提交：【贵州茅台】+【中国CPI同比指数】</p><p><b>Then</b> 预览接口必须用真实快照完成确定性计算，且不返回不可用或回退值。</p>
+          <div class="detail">HTTP 200；data_status=available；value=1300.06；generator=arithmetic_expression；llm_used=False</div><details><summary>查看真实请求与快照证据</summary><pre>{
+  &quot;request&quot;: {
+    &quot;action&quot;: &quot;preview&quot;,
+    &quot;indicator_name&quot;: &quot;BDD 个股宏观组合&quot;,
+    &quot;prompt_text&quot;: &quot;【贵州茅台】+【中国CPI同比指数】&quot;,
+    &quot;selected_tag_codes&quot;: [
+      &quot;watchlist:600519&quot;,
+      &quot;indicator:source_cpi&quot;
+    ],
+    &quot;formula_tokens&quot;: [
+      {
+        &quot;type&quot;: &quot;reference&quot;,
+        &quot;text&quot;: &quot;【贵州茅台】&quot;,
+        &quot;label&quot;: &quot;贵州茅台&quot;,
+        &quot;tagCode&quot;: &quot;watchlist:600519&quot;,
+        &quot;indicatorCode&quot;: &quot;source_stock_600519&quot;
+      },
+      {
+        &quot;type&quot;: &quot;operator&quot;,
+        &quot;text&quot;: &quot;+&quot;
+      },
+      {
+        &quot;type&quot;: &quot;reference&quot;,
+        &quot;text&quot;: &quot;【中国CPI同比指数】&quot;,
+        &quot;label&quot;: &quot;中国CPI同比指数&quot;,
+        &quot;tagCode&quot;: &quot;indicator:source_cpi&quot;,
+        &quot;indicatorCode&quot;: &quot;source_cpi&quot;
+      }
+    ]
+  },
+  &quot;response_success&quot;: true,
+  &quot;response_error&quot;: null,
+  &quot;preview&quot;: {
+    &quot;value&quot;: &quot;1300.06&quot;,
+    &quot;numeric_value&quot;: 1300.06,
+    &quot;data_status&quot;: &quot;available&quot;,
+    &quot;updated_at&quot;: &quot;2026-09-02 13:29:46&quot;,
+    &quot;resolved_indicator_codes&quot;: [
+      &quot;source_stock_600519&quot;,
+      &quot;source_cpi&quot;
+    ],
+    &quot;selected_indicators&quot;: [
+      {
+        &quot;indicator_code&quot;: &quot;source_stock_600519&quot;,
+        &quot;indicator_name&quot;: &quot;贵州茅台&quot;
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_cpi&quot;,
+        &quot;indicator_name&quot;: &quot;中国CPI同比指数&quot;
+      }
+    ],
+    &quot;unavailable_indicators&quot;: [],
+    &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_stock_600519\&quot;] || 0)+Number(inputs[\&quot;source_cpi\&quot;] || 0);&quot;,
+    &quot;formula_meta&quot;: {
+      &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_stock_600519\&quot;] || 0)+Number(inputs[\&quot;source_cpi\&quot;] || 0);&quot;,
+      &quot;generator&quot;: &quot;arithmetic_expression&quot;,
+      &quot;llm_used&quot;: false
+    },
+    &quot;source_snapshots&quot;: [
+      {
+        &quot;indicator_code&quot;: &quot;source_stock_600519&quot;,
+        &quot;indicator_name&quot;: &quot;贵州茅台&quot;,
+        &quot;latest_value&quot;: &quot;1299.56&quot;,
+        &quot;updated_at&quot;: &quot;2026-09-01&quot;,
+        &quot;source_code&quot;: &quot;watchlist_market_cache&quot;,
+        &quot;is_simulated&quot;: 0
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_cpi&quot;,
+        &quot;indicator_name&quot;: &quot;中国CPI同比指数&quot;,
+        &quot;latest_value&quot;: &quot;0.5&quot;,
+        &quot;updated_at&quot;: &quot;2026-07&quot;,
+        &quot;source_code&quot;: &quot;macro_snapshot&quot;,
+        &quot;is_simulated&quot;: 0
+      }
+    ]
+  }
+}</pre></details>
+        </article>
+        <article class="scenario pass">
+          <header><div><span class="category">个股 + 市场 + 行业</span><h2>贵州茅台、上证指数与 农林牧渔相加</h2></div><strong>PASS</strong></header>
+          <p><b>Given</b> 当前 PostgreSQL 已存在可用的注册指标快照。</p><p><b>When</b> H5 大V以结构化标签 token 提交：【贵州茅台】+【上证指数】+【农林牧渔】</p><p><b>Then</b> 预览接口必须用真实快照完成确定性计算，且不返回不可用或回退值。</p>
+          <div class="detail">HTTP 200；data_status=available；value=7890.53；generator=arithmetic_expression；llm_used=False</div><details><summary>查看真实请求与快照证据</summary><pre>{
+  &quot;request&quot;: {
+    &quot;action&quot;: &quot;preview&quot;,
+    &quot;indicator_name&quot;: &quot;BDD 个股市场行业组合&quot;,
+    &quot;prompt_text&quot;: &quot;【贵州茅台】+【上证指数】+【农林牧渔】&quot;,
+    &quot;selected_tag_codes&quot;: [
+      &quot;watchlist:600519&quot;,
+      &quot;indicator:source_shanghai_index&quot;,
+      &quot;industry:农林牧渔&quot;
+    ],
+    &quot;formula_tokens&quot;: [
+      {
+        &quot;type&quot;: &quot;reference&quot;,
+        &quot;text&quot;: &quot;【贵州茅台】&quot;,
+        &quot;label&quot;: &quot;贵州茅台&quot;,
+        &quot;tagCode&quot;: &quot;watchlist:600519&quot;,
+        &quot;indicatorCode&quot;: &quot;source_stock_600519&quot;
+      },
+      {
+        &quot;type&quot;: &quot;operator&quot;,
+        &quot;text&quot;: &quot;+&quot;
+      },
+      {
+        &quot;type&quot;: &quot;reference&quot;,
+        &quot;text&quot;: &quot;【上证指数】&quot;,
+        &quot;label&quot;: &quot;上证指数&quot;,
+        &quot;tagCode&quot;: &quot;indicator:source_shanghai_index&quot;,
+        &quot;indicatorCode&quot;: &quot;source_shanghai_index&quot;
+      },
+      {
+        &quot;type&quot;: &quot;operator&quot;,
+        &quot;text&quot;: &quot;+&quot;
+      },
+      {
+        &quot;type&quot;: &quot;reference&quot;,
+        &quot;text&quot;: &quot;【农林牧渔】&quot;,
+        &quot;label&quot;: &quot;农林牧渔&quot;,
+        &quot;tagCode&quot;: &quot;industry:农林牧渔&quot;,
+        &quot;indicatorCode&quot;: &quot;source_sector_01&quot;
+      }
+    ]
+  },
+  &quot;response_success&quot;: true,
+  &quot;response_error&quot;: null,
+  &quot;preview&quot;: {
+    &quot;value&quot;: &quot;7890.53&quot;,
+    &quot;numeric_value&quot;: 7890.53,
+    &quot;data_status&quot;: &quot;available&quot;,
+    &quot;updated_at&quot;: &quot;2026-09-02 13:29:47&quot;,
+    &quot;resolved_indicator_codes&quot;: [
+      &quot;source_stock_600519&quot;,
+      &quot;source_shanghai_index&quot;,
+      &quot;source_sector_01&quot;
+    ],
+    &quot;selected_indicators&quot;: [
+      {
+        &quot;indicator_code&quot;: &quot;source_stock_600519&quot;,
+        &quot;indicator_name&quot;: &quot;贵州茅台&quot;
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_shanghai_index&quot;,
+        &quot;indicator_name&quot;: &quot;上证指数&quot;
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_sector_01&quot;,
+        &quot;indicator_name&quot;: &quot;申万一级行业指数:农林牧渔&quot;
+      }
+    ],
+    &quot;unavailable_indicators&quot;: [],
+    &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_stock_600519\&quot;] || 0)+Number(inputs[\&quot;source_shanghai_index\&quot;] || 0)+Number(inputs[\&quot;source_sector_01\&quot;] || 0);&quot;,
+    &quot;formula_meta&quot;: {
+      &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_stock_600519\&quot;] || 0)+Number(inputs[\&quot;source_shanghai_index\&quot;] || 0)+Number(inputs[\&quot;source_sector_01\&quot;] || 0);&quot;,
+      &quot;generator&quot;: &quot;arithmetic_expression&quot;,
+      &quot;llm_used&quot;: false
+    },
+    &quot;source_snapshots&quot;: [
+      {
+        &quot;indicator_code&quot;: &quot;source_stock_600519&quot;,
+        &quot;indicator_name&quot;: &quot;贵州茅台&quot;,
+        &quot;latest_value&quot;: &quot;1299.56&quot;,
+        &quot;updated_at&quot;: &quot;2026-09-01&quot;,
+        &quot;source_code&quot;: &quot;watchlist_market_cache&quot;,
+        &quot;is_simulated&quot;: 0
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_shanghai_index&quot;,
+        &quot;indicator_name&quot;: &quot;上证指数&quot;,
+        &quot;latest_value&quot;: &quot;3979.89&quot;,
+        &quot;updated_at&quot;: &quot;2026-09-01&quot;,
+        &quot;source_code&quot;: &quot;market_snapshot&quot;,
+        &quot;is_simulated&quot;: 0
+      },
+      {
+        &quot;indicator_code&quot;: &quot;source_sector_01&quot;,
+        &quot;indicator_name&quot;: &quot;申万一级行业指数:农林牧渔&quot;,
+        &quot;latest_value&quot;: &quot;2611.08&quot;,
+        &quot;updated_at&quot;: &quot;2026-09-02 13:24:47&quot;,
+        &quot;source_code&quot;: &quot;market_sector_snapshot&quot;,
+        &quot;is_simulated&quot;: 0
+      }
+    ]
+  }
+}</pre></details>
+        </article></section></main></body></html>
