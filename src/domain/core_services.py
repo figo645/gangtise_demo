@@ -2850,6 +2850,18 @@ def resolve_smart_indicator_selected_refs(tenant, payload):
     }
     # Keep formula references structural. A label typed in the textarea may be
     # normalized by the client, but the token code is the authoritative link.
+    # When the browser sends reference tokens, they are the complete formula
+    # dependency list. Do not let stale selected_tag_codes (for example a tag
+    # from the previous formula) silently add another input to this formula.
+    has_structured_formula_refs = any(
+        isinstance(token, dict)
+        and str(token.get("type") or "").strip().lower() == "reference"
+        and (
+            str(token.get("tagCode") or token.get("tag_code") or "").strip()
+            or str(token.get("indicatorCode") or token.get("indicator_code") or "").strip()
+        )
+        for token in (body.get("formula_tokens") or [])
+    )
     for token in body.get("formula_tokens") or []:
         if not isinstance(token, dict) or str(token.get("type") or "").strip().lower() != "reference":
             continue
@@ -2869,10 +2881,11 @@ def resolve_smart_indicator_selected_refs(tenant, payload):
             for source in (tag.get("selected_indicators") or [])
         ):
             selected.append({"indicator_code": indicator_code, "indicator_name": token.get("label") or ""})
-    for tag in normalize_selected_tag_refs(body.get("selected_tags") or body.get("selected_tag_codes") or []):
-        tag_item = tag_catalog.get(tag["tag_code"])
-        if tag_item:
-            selected.extend(tag_item.get("selected_indicators") or [])
+    if not has_structured_formula_refs:
+        for tag in normalize_selected_tag_refs(body.get("selected_tags") or body.get("selected_tag_codes") or []):
+            tag_item = tag_catalog.get(tag["tag_code"])
+            if tag_item:
+                selected.extend(tag_item.get("selected_indicators") or [])
     indicator_name_map = {
         item.get("id"): item.get("name")
         for item in (build_indicator_hub(tenant=tenant, admin_view=False).get("items") or [])
@@ -2889,6 +2902,15 @@ def resolve_smart_indicator_selected_refs(tenant, payload):
             indicator_name_map,
         )
         if item.get("indicator_code") not in suppressed_indicator_codes
+        and (
+            not has_structured_formula_refs
+            or item.get("indicator_code") in {
+                str(token.get("indicatorCode") or token.get("indicator_code") or "").strip()
+                for token in (body.get("formula_tokens") or [])
+                if isinstance(token, dict)
+                and str(token.get("type") or "").strip().lower() == "reference"
+            }
+        )
     )
     selected = [
         item for item in normalize_selected_indicator_refs(selected)
@@ -2992,7 +3014,14 @@ def resolve_smart_indicator_prompt_refs(prompt_text, tag_catalog, indicator_name
     for indicator_code, entry in registry.items():
         if indicator_code in getattr(market, "MACRO_ECONOMIC_INDICATOR_CODES", ()) and indicator_code not in getattr(market, "MACRO_ECONOMIC_VISIBLE_CODES", ()):
             continue
-        for candidate in (entry.get("indicator_name"), entry.get("search_keyword"), entry.get("security_code"), entry.get("tencent_symbol")):
+        prompt_aliases = getattr(market, "SMART_INDICATOR_PROMPT_ALIASES", {}).get(indicator_code, ())
+        for candidate in (
+            entry.get("indicator_name"),
+            entry.get("search_keyword"),
+            entry.get("security_code"),
+            entry.get("tencent_symbol"),
+            *prompt_aliases,
+        ):
             if _matches(candidate):
                 _append(indicator_code)
                 break
@@ -3712,8 +3741,29 @@ def save_smart_indicator_latest_snapshot(definition):
     if not selected_indicators:
         return None
     db = get_db()
-    latest_map = build_smart_indicator_latest_value_map(selected_indicators)
     market = _market_services_module()
+    formula_js = str(normalized.get("formula_js") or "").strip()
+    try:
+        formula_js = market.validate_smart_indicator_js(formula_js, selected_indicators)
+    except ValueError:
+        # Repair definitions written by the pre-placeholder compiler. The
+        # prompt and resolved references are the durable source of truth; the
+        # generated formula is derived state and can be safely rebuilt.
+        formula_js = market.build_smart_indicator_js_fallback(
+            normalized.get("prompt_text") or "",
+            selected_indicators,
+        )
+        formula_js = market.validate_smart_indicator_js(formula_js, selected_indicators)
+        indicator_code = str(normalized.get("indicator_code") or "").strip()
+        if indicator_code:
+            db.execute(
+                "UPDATE indicator_definitions SET formula_js = ?, updated_at = ? WHERE indicator_code = ?",
+                (formula_js, now_ts(), indicator_code),
+            )
+            db.commit()
+            normalized = dict(normalized)
+            normalized["formula_js"] = formula_js
+    latest_map = build_smart_indicator_latest_value_map(selected_indicators)
     parse_numeric_value = getattr(market, "parse_numeric_indicator_value")
     unavailable_indicators = [
         item

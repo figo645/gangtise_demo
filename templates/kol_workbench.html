@@ -4600,7 +4600,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
                 <div class="kw-dashboard-workbench-head">
                   <div>
                     <div class="kw-dashboard-workbench-title">我定义的智能指标</div>
-                    <div class="kw-dashboard-workbench-desc">这里列的是当前租户已经生成并落库的智能指标。点击可查看算法详情和解读；也可加入 Dashboard 或删除。</div>
+                    <div class="kw-dashboard-workbench-desc">这里列的是当前租户已经生成并落库的智能指标。点击可查看算法详情和解读；也可加入 Dashboard 草稿或删除指标定义。</div>
                   </div>
                 </div>
                 <div id="kw-smart-indicator-library" class="kw-dashboard-strategy-list"></div>
@@ -13059,7 +13059,7 @@ function kwRenderSmartIndicatorLibrary() {
     return;
   }
   host.innerHTML = `
-    <div class="kw-dashboard-panel-note" style="margin-bottom:8px">${items.length} 个智能指标 · 点击编辑可调整定义、算法、解读和提示词。</div>
+    <div class="kw-dashboard-panel-note" style="margin-bottom:8px">${items.length} 个智能指标 · 指标库可编辑或删除定义，也可加入当前 Dashboard 草稿。</div>
     <div class="kw-smart-indicator-list">
       ${items.map((item) => `
         <div class="kw-smart-indicator-row">
@@ -13075,7 +13075,7 @@ function kwRenderSmartIndicatorLibrary() {
           <div class="kw-smart-indicator-row-actions">
             <button type="button" onclick="kwOpenSmartIndicatorLibraryDetail('${escapeHtml(item.indicator_code)}')">编辑</button>
             <button type="button" onclick="kwAddExistingIndicatorToDraft('${escapeHtml(item.indicator_code)}')">加入草稿</button>
-            <button class="kw-smart-indicator-danger" type="button" onclick="kwDeleteSmartIndicator('${escapeHtml(item.indicator_code)}')">删除</button>
+            <button class="kw-smart-indicator-danger" type="button" onclick="kwDeleteSmartIndicator('${escapeHtml(item.indicator_code)}')">删除定义</button>
           </div>
         </div>
       `).join('')}
@@ -13114,7 +13114,7 @@ function kwRenderSmartDashboardPreviewCards(cards) {
       <div class="kw-dashboard-public-meta">数据日期：${escapeHtml(formatDashboardDataDate(item.dataAt))}</div>
       <div class="kw-smart-card-actions">
         <button class="kw-smart-card-action" type="button" onclick="event.stopPropagation();kwOpenSmartIndicatorDetail(${index})">编辑指标</button>
-        <button class="kw-smart-card-action danger" type="button" onclick="event.stopPropagation();kwDeleteSmartIndicator('${escapeAttr(item.indicatorCode || item.indicator_code || '')}')">删除指标</button>
+        <button class="kw-smart-card-action" type="button" onclick="event.stopPropagation();kwRemoveSmartDashboardCard(${index})">从看板移除</button>
       </div>
     </div>
   ` : `
@@ -13562,11 +13562,12 @@ function kwOpenSmartIndicatorDetailModal(card) {
   const modal = document.getElementById('kw-dashboard-cell-modal');
   if (!host || !modal || !card) return;
   const selectedIndicators = Array.isArray(card.selectedIndicators) ? card.selectedIndicators : [];
+  const isDashboardProjection = Number.isInteger(card.slotIndex) && card.slotIndex >= 0;
   const isSaving = card.isSaving === true;
   const isDeleting = card.isDeleting === true;
   host.innerHTML = `
-    <div class="kw-review-modal-title">编辑智能指标</div>
-    <div class="kw-dashboard-panel-note" style="margin-top:8px">这是当前租户的真实指标定义。保存后会重新编译提示词并重算结果。</div>
+    <div class="kw-review-modal-title">${isDashboardProjection ? 'Dashboard 草稿指标' : '指标库 · 编辑智能指标'}</div>
+    <div class="kw-dashboard-panel-note" style="margin-top:8px">${isDashboardProjection ? '这是指标定义在当前 Dashboard 草稿中的投影。移除只改变看板，不删除指标定义、快照或历史数据。' : '这是当前租户的真实指标定义。删除定义会同步清理其看板引用、快照和历史数据。'}</div>
     <div class="kw-dashboard-cell-modal-grid">
       <div class="kw-dashboard-cell-summary">
         <div class="kw-dashboard-cell-summary-title">${escapeHtml(card.name || '智能指标详情')}</div>
@@ -13603,7 +13604,9 @@ function kwOpenSmartIndicatorDetailModal(card) {
       ${(isSaving || isDeleting) ? `<div class="kw-dashboard-panel-note" style="color:#2F74C0;font-weight:700"><span class="kw-publish-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span> ${isDeleting ? '正在删除指标并同步看板' : '正在保存并重算指标'}</div>` : ''}
       <div class="modal-actions">
         <button class="btn-outline" type="button" onclick="kwCloseSmartIndicatorDetailModal()" ${isSaving || isDeleting ? 'disabled' : ''}>取消</button>
-        ${card.indicatorCode ? `<button class="btn-outline kw-smart-indicator-danger" type="button" onclick="kwDeleteSmartIndicator('${escapeHtml(card.indicatorCode)}', true)" ${isSaving || isDeleting ? 'disabled' : ''}>删除指标</button><button class="btn-gold" type="button" onclick="kwSaveSmartIndicatorDefinitionFromDetail('${escapeHtml(card.indicatorCode)}')" ${isSaving || isDeleting ? 'disabled' : ''}>${isSaving ? '保存中...' : '保存并更新'}</button>` : ''}
+        ${card.indicatorCode && isDashboardProjection ? `<button class="btn-outline" type="button" onclick="kwRemoveSmartDashboardCard(${card.slotIndex})" ${isSaving || isDeleting ? 'disabled' : ''}>从看板移除</button>` : ''}
+        ${card.indicatorCode && !isDashboardProjection ? `<button class="btn-outline kw-smart-indicator-danger" type="button" onclick="kwDeleteSmartIndicator('${escapeHtml(card.indicatorCode)}', true)" ${isSaving || isDeleting ? 'disabled' : ''}>删除指标定义</button>` : ''}
+        ${card.indicatorCode ? `<button class="btn-gold" type="button" onclick="kwSaveSmartIndicatorDefinitionFromDetail('${escapeHtml(card.indicatorCode)}')" ${isSaving || isDeleting ? 'disabled' : ''}>${isSaving ? '保存中...' : '保存并更新'}</button>` : ''}
       </div>
     </div>
   `;
@@ -13738,6 +13741,7 @@ async function kwAddExistingIndicatorToDraft(indicatorCode) {
 }
 
 async function kwRemoveSmartDashboardCard(index) {
+  if (!window.confirm('确认只从当前 Dashboard 草稿移除这个指标吗？指标定义、快照和历史数据会保留。')) return;
   const active = kwGetActiveDashboardConfig();
   const target = kwGetDashboardCardTarget(active.layout || '2x2');
   const nextCards = Array.from({ length: target }, (_, slotIndex) => {
@@ -13747,12 +13751,12 @@ async function kwRemoveSmartDashboardCard(index) {
     return indicatorCode ? { indicatorCode } : {};
   });
   active.cards = nextCards;
-  await kwSyncFundDashboard('save_draft', active, '已从草稿移除');
+  await kwSyncFundDashboard('save_draft', active, '已从草稿移除，指标定义仍保留');
 }
 
 async function kwDeleteSmartIndicator(indicatorCode, fromDetail = false) {
   const tenantSlug = (window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '';
-  if (!window.confirm('确认删除这个智能指标吗？删除后会从当前租户指标库和 Dashboard 配置中移除，且无法撤销。')) return;
+  if (!window.confirm('确认删除这个指标定义吗？删除后会从指标库、草稿和已发布看板移除，并清理快照与历史数据，且无法撤销。')) return;
   const item = kwFindSmartIndicatorCatalogItem(indicatorCode);
   if (fromDetail && item) kwOpenSmartIndicatorDetailModal({...cardFromSmartIndicatorItem(item), isDeleting: true});
   try {

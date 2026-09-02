@@ -2489,126 +2489,6 @@ body { background: var(--surface-2); color: var(--text-main); }
   padding:4px 8px;
 }
 .fund-news-why { font-size:11px; color:var(--gray-400); line-height:1.7; margin-top:10px; }
-.fund-news-algo-trigger {
-  flex-shrink:0;
-  font-size:11px;
-  padding:6px 10px;
-  border-radius:10px;
-}
-.fund-news-algo-stepper {
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  margin-bottom:12px;
-}
-.fund-news-algo-step {
-  font-size:11px;
-  color:var(--gray-400);
-  background:rgba(47,116,192,0.06);
-  border:1px solid rgba(47,116,192,0.12);
-  border-radius:999px;
-  padding:5px 10px;
-}
-.fund-news-algo-step.active {
-  color:var(--gold);
-  background:rgba(47,116,192,0.10);
-  border-color:rgba(200,169,110,0.32);
-}
-.fund-news-algo-block {
-  background:#FFFFFF;
-  border:1px solid rgba(47,116,192,0.10);
-  border-radius:14px;
-  padding:12px;
-  box-shadow:0 8px 22px rgba(31,73,125,0.06);
-  margin-bottom:12px;
-}
-.fund-news-algo-title {
-  font-size:13px;
-  font-weight:700;
-  color:var(--white);
-  margin-bottom:6px;
-}
-.fund-news-algo-desc {
-  font-size:12px;
-  color:var(--gray-400);
-  line-height:1.7;
-}
-.fund-news-rule-atoms {
-  display:flex;
-  flex-wrap:wrap;
-  gap:7px;
-  margin-top:10px;
-}
-.fund-news-rule-atom {
-  display:inline-flex;
-  align-items:center;
-  gap:4px;
-  max-width:100%;
-  box-sizing:border-box;
-  padding:5px 8px;
-  border:1px solid rgba(47,116,192,0.16);
-  border-radius:999px;
-  background:#F4F8FD;
-  color:#1F497D;
-  font-size:10px;
-  font-weight:700;
-  white-space:nowrap;
-}
-.fund-news-rule-atom-group { color:var(--gray-400); font-weight:500; }
-.fund-news-algo-textarea {
-  width:100%;
-  min-height:92px;
-  resize:vertical;
-  box-sizing:border-box;
-  border:1px solid rgba(47,116,192,0.14);
-  border-radius:12px;
-  padding:10px 12px;
-  font-size:12px;
-  line-height:1.7;
-  color:var(--white);
-  background:var(--navy-mid);
-  outline:none;
-}
-.fund-news-algo-preview-grid {
-  display:grid;
-  gap:10px;
-}
-.fund-news-algo-preview-card {
-  background:var(--navy-mid);
-  border-radius:12px;
-  padding:10px;
-  border:1px solid rgba(47,116,192,0.10);
-}
-.fund-news-algo-preview-card.is-watchlist-sector {
-  border-left:3px solid #1F497D;
-  border-color:rgba(31,73,125,0.28);
-  padding-left:9px;
-}
-.fund-news-algo-preview-card .fund-news-relevance { margin:0 0 8px; }
-.fund-news-algo-preview-head {
-  display:flex;
-  justify-content:space-between;
-  gap:8px;
-  flex-wrap:wrap;
-  margin-bottom:8px;
-}
-.fund-news-algo-preview-title {
-  font-size:12px;
-  font-weight:700;
-  color:var(--white);
-  line-height:1.5;
-}
-.fund-news-algo-preview-meta {
-  font-size:10px;
-  color:var(--gray-400);
-  line-height:1.5;
-}
-.fund-news-algo-preview-reason {
-  font-size:11px;
-  color:var(--gray-400);
-  line-height:1.7;
-  margin-top:6px;
-}
 .wb-dashboard-card {
   background:#FFFFFF;
   border:1px solid rgba(47,116,192,0.10);
@@ -4519,12 +4399,9 @@ body,
     <div class="h5-section">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px">
         <div class="h5-section-title" style="margin-bottom:0">综合归纳要闻</div>
-        <div style="display:flex;gap:8px;flex-shrink:0">
-          <button class="btn-outline fund-news-algo-trigger" id="fund-news-algo-trigger" type="button" onclick="openFundNewsAlgorithmWizard()">查看规则</button>
-          <button class="btn-outline" type="button" style="padding:6px 12px;font-size:11px;flex-shrink:0" onclick="openFundNewsModal()">更多</button>
-        </div>
+        <button class="btn-outline" type="button" style="padding:6px 12px;font-size:11px;flex-shrink:0" onclick="openFundNewsModal()">更多</button>
       </div>
-      <div class="fund-news-hint">内容来自已通过清洗和数量门槛的国内公开信息源。每个来源少于 5 条有效信息时不会进入这里。</div>
+      <div class="fund-news-hint">内容来自真实公开信息源，按发布时间展示当日最新 Top5；点击“更多”查看完整新闻列表。</div>
       {% if not news %}<div class="fund-news-hint">当前没有达到纳入标准的真实新闻，暂不展示演示内容。</div>{% endif %}
       {% for item in news %}
       <div class="news-item fund-news-item {% if item.aggregation_bucket == 'watchlist_sector' %}is-watchlist-sector{% endif %}" style="cursor:pointer" onclick='showFundNewsDetail({{ item | tojson }})'>
@@ -5396,14 +5273,6 @@ body,
     <div class="modal-handle"></div>
     <div class="modal-close-row"><button class="modal-close-btn" type="button" onclick="closeFundNewsModal()">关闭</button></div>
     <div id="fund-news-modal-content"></div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="fund-news-algorithm-modal" onclick="if(event.target===this)closeFundNewsAlgorithmModal()">
-  <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
-    <div class="modal-handle"></div>
-    <div class="modal-close-row"><button class="modal-close-btn" type="button" onclick="closeFundNewsAlgorithmModal()">关闭</button></div>
-    <div id="fund-news-algorithm-modal-content"></div>
   </div>
 </div>
 
@@ -12475,7 +12344,6 @@ function renderDemoProfile(user) {
   }
   if (el('knowledge-dav-intake-card')) el('knowledge-dav-intake-card').style.display = user.role === 'dav' ? 'block' : 'none';
   if (el('knowledge-dav-graph-card')) el('knowledge-dav-graph-card').style.display = user.role === 'dav' ? 'block' : 'none';
-  if (el('fund-news-algo-trigger')) el('fund-news-algo-trigger').textContent = user.role === 'dav' ? '修改算法' : '查看规则';
   const badgesWrap = el('profile-badges-wrap');
   if (badgesWrap) {
     badgesWrap.innerHTML = (user.systemBadges || user.badges || []).map(badge => `<div class="badge-chip">${badge}</div>`).join('');
@@ -15222,7 +15090,7 @@ function showFundNewsDetail(item) {
 }
 
 function getFundNewsTabs() {
-  const tabs = Array.isArray(FUND_NEWS_TABS) && FUND_NEWS_TABS.length ? FUND_NEWS_TABS : [{ key: 'summary', label: '归纳聚合', count: 0, items: [] }];
+  const tabs = Array.isArray(FUND_NEWS_TABS) && FUND_NEWS_TABS.length ? FUND_NEWS_TABS : [{ key: 'summary', label: '今日 Top5', count: 0, items: [] }];
   return tabs.map((tab) => ({
     key: String(tab.key || 'all').trim() || 'all',
     label: String(tab.label || '全部').trim() || '全部',
@@ -15251,7 +15119,7 @@ function renderFundNewsModal(activeTabKey) {
   host.innerHTML = `
     <div style="padding:0 4px 6px">
       <div style="font-size:16px;font-weight:700;color:var(--white);margin-bottom:8px">新闻列表</div>
-      <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:12px">“归纳聚合”展示规则筛选后的首页候选；“全部”汇总所有已入湖新闻，其他 tab 可按来源查看。</div>
+      <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:12px">“今日 Top5”展示当日最新新闻；“全部”汇总所有已入湖新闻，其他 tab 可按来源查看。</div>
       <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px;scrollbar-width:none">
         ${tabs.map((tab) => `<button type="button" class="watch-detail-tab ${tab.key === nextKey ? 'active' : ''}" style="white-space:nowrap;flex-shrink:0" onclick="renderFundNewsModal('${escapeAttr(tab.key)}')">${escapeHtml(tab.label)} <span style="opacity:.75">(${tab.count})</span></button>`).join('')}
       </div>
@@ -15286,282 +15154,6 @@ function openFundNewsModal() {
 
 function closeFundNewsModal() {
   document.getElementById('fund-news-modal')?.classList.remove('show');
-}
-
-function getFundNewsAlgorithmDefaultPrompt() {
-  return '先按自选股行业板块聚合，再看社会性重大利好/利空消息。首页只展示 10 条，与自选股板块无关且非重大消息的内容不进入首页。';
-}
-
-function getActiveTenantSlugForNewsAlgorithm() {
-  const activeUser = getActiveDemoUser() || {};
-  return String((((activeUser || {}).tenant || {}).slug) || ((window.ACTIVE_TENANT || {}).slug) || '').trim().toLowerCase();
-}
-
-function getActiveTenantNewsAlgorithm() {
-  const tenantSlug = getActiveTenantSlugForNewsAlgorithm();
-  const tenants = (window.SITE_CONFIG && Array.isArray(window.SITE_CONFIG.tenants)) ? window.SITE_CONFIG.tenants : [];
-  const tenant = tenants.find(item => String(item.slug || '').trim().toLowerCase() === tenantSlug) || window.ACTIVE_TENANT || {};
-  const algorithm = (tenant && tenant.news_aggregation_algorithm && typeof tenant.news_aggregation_algorithm === 'object')
-    ? tenant.news_aggregation_algorithm
-    : {};
-  const defaults = (window.SITE_CONFIG && window.SITE_CONFIG.news_aggregation_algorithm_defaults) || {};
-  return {
-    version: String(algorithm.version || defaults.version || 'v3'),
-    strategy: String(algorithm.strategy || defaults.strategy || 'watchlist_sector_first'),
-    source_prompt: String(algorithm.source_prompt || '').trim(),
-    script_js: String(algorithm.script_js || defaults.script_js || '').trim(),
-    rule_plan: algorithm.rule_plan && typeof algorithm.rule_plan === 'object' ? algorithm.rule_plan : (defaults.rule_plan || {}),
-    rule_atoms: Array.isArray(algorithm.rule_atoms) ? algorithm.rule_atoms : (Array.isArray(defaults.rule_atoms) ? defaults.rule_atoms : []),
-    updated_at: String(algorithm.updated_at || '').trim(),
-    updated_by: String(algorithm.updated_by || 'system').trim(),
-  };
-}
-
-function renderFundNewsRuleAtoms(atoms) {
-  const list = Array.isArray(atoms) ? atoms.filter(item => item && item.label) : [];
-  if (!list.length) return '<div class="fund-news-algo-desc">系统会先把提示词识别为受控规则原子，再执行新闻筛选。</div>';
-  return `<div class="fund-news-rule-atoms">${list.map((atom) => `<span class="fund-news-rule-atom"><span class="fund-news-rule-atom-group">${escapeHtml(atom.group || '规则')}</span>${escapeHtml(atom.label || '')}</span>`).join('')}</div>`;
-}
-
-function updateLocalTenantNewsAlgorithm(algorithm, siteConfig) {
-  if (siteConfig && typeof siteConfig === 'object') {
-    window.SITE_CONFIG = siteConfig;
-  }
-  const tenantSlug = getActiveTenantSlugForNewsAlgorithm();
-  if (window.SITE_CONFIG && Array.isArray(window.SITE_CONFIG.tenants)) {
-    window.SITE_CONFIG.tenants = window.SITE_CONFIG.tenants.map((tenant) => {
-      if (String(tenant.slug || '').trim().toLowerCase() !== tenantSlug) return tenant;
-      return { ...tenant, news_aggregation_algorithm: { ...(algorithm || {}) } };
-    });
-  }
-  if (window.ACTIVE_TENANT && String(window.ACTIVE_TENANT.slug || '').trim().toLowerCase() === tenantSlug) {
-    window.ACTIVE_TENANT = { ...window.ACTIVE_TENANT, news_aggregation_algorithm: { ...(algorithm || {}) } };
-  }
-}
-
-function openFundNewsAlgorithmWizard() {
-  const algorithm = getActiveTenantNewsAlgorithm();
-  const prompt = algorithm.source_prompt || getFundNewsAlgorithmDefaultPrompt();
-  fundNewsAlgorithmWizard = {
-    step: 'view',
-    sourcePrompt: prompt,
-    originalSourcePrompt: algorithm.source_prompt || '',
-    scriptJs: algorithm.script_js || '',
-    originalScriptJs: algorithm.script_js || '',
-    rulePlan: algorithm.rule_plan || {},
-    originalRulePlan: algorithm.rule_plan || {},
-    ruleAtoms: algorithm.rule_atoms || [],
-    previewPayload: null,
-    previewing: false,
-    saving: false,
-    error: '',
-  };
-  renderFundNewsAlgorithmModal();
-  document.getElementById('fund-news-algorithm-modal')?.classList.add('show');
-}
-
-function closeFundNewsAlgorithmModal() {
-  document.getElementById('fund-news-algorithm-modal')?.classList.remove('show');
-}
-
-function setFundNewsAlgorithmStep(step) {
-  syncFundNewsAlgorithmDraftFromModal();
-  fundNewsAlgorithmWizard.step = step;
-  fundNewsAlgorithmWizard.error = '';
-  renderFundNewsAlgorithmModal();
-}
-
-function syncFundNewsAlgorithmDraftFromModal() {
-  const promptInput = document.getElementById('fund-news-algorithm-prompt-input');
-  if (promptInput) fundNewsAlgorithmWizard.sourcePrompt = String(promptInput.value || '').trim();
-}
-
-function renderFundNewsAlgorithmStepper(step, isDav) {
-  const steps = isDav
-    ? [['view', '1 查看规则'], ['edit', '2 修改提示词'], ['preview', '3 预览效果'], ['confirm', '4 确认保存']]
-    : [['view', '查看聚合规则']];
-  return `<div class="fund-news-algo-stepper">${steps.map(([key, label]) => `<span class="fund-news-algo-step ${key === step ? 'active' : ''}">${escapeHtml(label)}</span>`).join('')}</div>`;
-}
-
-function renderFundNewsAlgorithmView(isDav) {
-  const algorithm = getActiveTenantNewsAlgorithm();
-  const prompt = fundNewsAlgorithmWizard.sourcePrompt || algorithm.source_prompt || getFundNewsAlgorithmDefaultPrompt();
-  return `
-    <div class="fund-news-algo-block">
-      <div class="fund-news-algo-title">当前聚合逻辑</div>
-      <div class="fund-news-algo-desc">
-        先用当前租户自选股的行业和板块做匹配，再补充社会性重大利好 / 利空。首页最多展示 10 条，未达到 5 条有效信息门槛的来源不会进入新闻池。
-      </div>
-    </div>
-    <div class="fund-news-algo-block">
-      <div class="fund-news-algo-title">当前提示词</div>
-      <div class="fund-news-algo-desc" style="white-space:pre-wrap">${escapeHtml(prompt)}</div>
-      ${renderFundNewsRuleAtoms(fundNewsAlgorithmWizard.ruleAtoms || algorithm.rule_atoms)}
-      ${algorithm.source_prompt ? '' : '<div class="fund-news-algo-desc" style="margin-top:8px">当前租户没有单独保存提示词，下面展示的是系统默认说明。</div>'}
-    </div>
-    <div class="fund-news-algo-block">
-      <div class="fund-news-algo-title">更新记录</div>
-      <div class="fund-news-algo-desc">
-        版本：${escapeHtml(algorithm.version || 'v1')} · 最近更新：${escapeHtml(algorithm.updated_at || '未记录')} · 操作人：${escapeHtml(algorithm.updated_by || 'system')}
-      </div>
-    </div>
-    ${!isDav ? `<div class="fund-news-algo-desc">你当前是普通用户视角，只能查看聚合规则，不能修改租户算法。</div>` : ''}
-  `;
-}
-
-function renderFundNewsAlgorithmEdit() {
-  return `
-    <div class="fund-news-algo-block">
-      <div class="fund-news-algo-title">修改算法提示词</div>
-      <div class="fund-news-algo-desc" style="margin-bottom:10px">
-        用自然语言描述你希望新闻如何进入首页。预览时，系统会先识别为候选范围、排序、过滤、数量和配额等规则原子，再用真实新闻池重排。
-      </div>
-      <textarea id="fund-news-algorithm-prompt-input" class="fund-news-algo-textarea" placeholder="例如：先保留和自选股行业板块相关的消息，再补充最近重大利好和重大利空，一共只展示10条。">${escapeHtml(fundNewsAlgorithmWizard.sourcePrompt || getFundNewsAlgorithmDefaultPrompt())}</textarea>
-    </div>
-    <div class="fund-news-algo-block">
-      <div class="fund-news-algo-title">可识别的修改方向</div>
-      <div class="fund-news-algo-desc">可识别：行业/重大事件优先、只看关联或只看重大、首页条数、单一来源上限、单一类型上限。未识别的表达不会被自由拼接成执行逻辑。</div>
-    </div>
-  `;
-}
-
-function renderFundNewsAlgorithmPreviewItems(items) {
-  const list = Array.isArray(items) ? items.slice(0, 10) : [];
-  if (!list.length) {
-    return '<div class="fund-news-hint">当前候选规则下没有筛选出可展示新闻。</div>';
-  }
-  return `
-    <div class="fund-news-algo-preview-grid">
-      ${list.map((item, index) => `
-        <div class="fund-news-algo-preview-card ${String(item.aggregation_bucket || '') === 'watchlist_sector' ? 'is-watchlist-sector' : ''}">
-          <div class="fund-news-algo-preview-head">
-            <div class="fund-news-algo-preview-title">${index + 1}. ${escapeHtml(item.title || '综合归纳要闻')}</div>
-            <span class="fund-news-source">${escapeHtml(item.source_group || item.tag || '综合要闻')}</span>
-          </div>
-          ${renderFundNewsRelevance(item)}
-          <div class="fund-news-algo-preview-meta">得分 ${escapeHtml(item.relevance_score || 0)} · ${escapeHtml(item.time || item.published_at || '来源未提供时间')}</div>
-          <div class="fund-news-algo-preview-reason">${escapeHtml(item.priority_reason || item.why || '当前没有补充说明。')}</div>
-        </div>
-      `).join('')}
-    </div>
-  `;
-}
-
-function renderFundNewsAlgorithmPreview() {
-  const payload = fundNewsAlgorithmWizard.previewPayload || {};
-  const items = Array.isArray(payload.items) ? payload.items : [];
-  if (fundNewsAlgorithmWizard.previewing) {
-    return '<div class="fund-news-algo-block"><div class="fund-news-algo-title">正在生成预览</div><div class="fund-news-algo-desc">正在用候选提示词重排真实新闻池，请稍候。</div></div>';
-  }
-  return `
-    <div class="fund-news-algo-block">
-      <div class="fund-news-algo-title">候选规则预览</div>
-      <div class="fund-news-algo-desc" style="margin-bottom:10px">以下是本次提示词被识别出的受控原子及其真实新闻预览。确认后会保存为当前租户规则。</div>
-      ${renderFundNewsRuleAtoms(payload.rule_atoms || fundNewsAlgorithmWizard.ruleAtoms)}
-      ${renderFundNewsAlgorithmPreviewItems(items)}
-    </div>
-  `;
-}
-
-function renderFundNewsAlgorithmModal() {
-  const host = document.getElementById('fund-news-algorithm-modal-content');
-  if (!host) return;
-  const activeUser = getActiveDemoUser() || {};
-  const isDav = activeUser.role === 'dav';
-  const step = isDav ? (fundNewsAlgorithmWizard.step || 'view') : 'view';
-  const title = isDav ? '新闻聚合算法修改' : '新闻聚合规则';
-  let body = renderFundNewsAlgorithmView(isDav);
-  if (isDav && step === 'edit') body = renderFundNewsAlgorithmEdit();
-  if (isDav && (step === 'preview' || step === 'confirm')) body = renderFundNewsAlgorithmPreview();
-  const actions = !isDav
-    ? '<button class="btn-gold" type="button" onclick="closeFundNewsAlgorithmModal()">关闭</button>'
-    : step === 'view'
-      ? '<button class="btn-outline" type="button" onclick="closeFundNewsAlgorithmModal()">取消</button><button class="btn-gold" type="button" onclick="setFundNewsAlgorithmStep(\'edit\')">修改规则</button>'
-      : step === 'edit'
-        ? '<button class="btn-outline" type="button" onclick="setFundNewsAlgorithmStep(\'view\')">上一步</button><button class="btn-gold" type="button" onclick="previewFundNewsAlgorithm()">生成预览</button>'
-        : step === 'preview'
-          ? '<button class="btn-outline" type="button" onclick="setFundNewsAlgorithmStep(\'edit\')">回到修改</button><button class="btn-gold" type="button" onclick="setFundNewsAlgorithmStep(\'confirm\')">确认这版</button>'
-          : `<button class="btn-outline" type="button" onclick="setFundNewsAlgorithmStep('preview')">返回预览</button><button class="btn-gold" type="button" onclick="saveFundNewsAlgorithm()" ${fundNewsAlgorithmWizard.saving ? 'disabled' : ''}>${fundNewsAlgorithmWizard.saving ? '保存中...' : '保存算法'}</button>`;
-  host.innerHTML = `
-    <div class="modal-title" style="margin-bottom:8px">${escapeHtml(title)}</div>
-    <div class="fund-news-algo-desc" style="margin-bottom:12px">${isDav ? '这个 wizard 只修改当前租户的新闻聚合算法。普通用户仍然只能看到规则说明。' : '这里说明基本面首页的综合归纳要闻是如何被筛选出来的。'}</div>
-    ${renderFundNewsAlgorithmStepper(step, isDav)}
-    ${fundNewsAlgorithmWizard.error ? `<div class="fund-news-hint" style="color:#E74C3C">${escapeHtml(fundNewsAlgorithmWizard.error)}</div>` : ''}
-    ${body}
-    <div class="modal-actions">${actions}</div>
-  `;
-}
-
-function buildFundNewsAlgorithmRequestPayload() {
-  const activeUser = getActiveDemoUser() || {};
-  const sourcePrompt = String(fundNewsAlgorithmWizard.sourcePrompt || getFundNewsAlgorithmDefaultPrompt()).trim();
-  const originalPrompt = String(fundNewsAlgorithmWizard.originalSourcePrompt || '').trim();
-  const defaultPrompt = getFundNewsAlgorithmDefaultPrompt().trim();
-  const promptUnchanged = sourcePrompt === originalPrompt || (!originalPrompt && sourcePrompt === defaultPrompt);
-  return {
-    tenant_slug: getActiveTenantSlugForNewsAlgorithm(),
-    strategy: 'watchlist_sector_first',
-    source_prompt: sourcePrompt,
-    rule_plan: promptUnchanged ? (fundNewsAlgorithmWizard.originalRulePlan || {}) : {},
-    updated_by: activeUser.username || activeUser.name || 'h5_workbench',
-    limit: 10,
-  };
-}
-
-async function previewFundNewsAlgorithm() {
-  syncFundNewsAlgorithmDraftFromModal();
-  fundNewsAlgorithmWizard.previewing = true;
-  fundNewsAlgorithmWizard.error = '';
-  fundNewsAlgorithmWizard.step = 'preview';
-  renderFundNewsAlgorithmModal();
-  try {
-    const res = await fetch('/api/admin/news-aggregation/preview', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(buildFundNewsAlgorithmRequestPayload()),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) throw new Error((data && data.error) || 'preview_failed');
-    fundNewsAlgorithmWizard.previewPayload = data.news_payload || {};
-    fundNewsAlgorithmWizard.scriptJs = String((data.algorithm || {}).script_js || '');
-    fundNewsAlgorithmWizard.rulePlan = (data.algorithm || {}).rule_plan || {};
-    fundNewsAlgorithmWizard.ruleAtoms = (data.algorithm || {}).rule_atoms || (data.news_payload || {}).rule_atoms || [];
-  } catch (error) {
-    fundNewsAlgorithmWizard.error = '预览失败，请检查提示词后重试。';
-  } finally {
-    fundNewsAlgorithmWizard.previewing = false;
-    renderFundNewsAlgorithmModal();
-  }
-}
-
-async function saveFundNewsAlgorithm() {
-  if (!fundNewsAlgorithmWizard.previewPayload) {
-    await previewFundNewsAlgorithm();
-    if (!fundNewsAlgorithmWizard.previewPayload) return;
-  }
-  fundNewsAlgorithmWizard.saving = true;
-  fundNewsAlgorithmWizard.error = '';
-  renderFundNewsAlgorithmModal();
-  const payload = buildFundNewsAlgorithmRequestPayload();
-  payload.rule_plan = fundNewsAlgorithmWizard.rulePlan || payload.rule_plan || {};
-  try {
-    const res = await fetch('/api/admin/news-aggregation/save', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) throw new Error((data && data.error) || 'save_failed');
-    updateLocalTenantNewsAlgorithm(data.algorithm || {}, data.site_config);
-    fundNewsAlgorithmWizard.saving = false;
-    showToast('新闻聚合算法已保存');
-    closeFundNewsAlgorithmModal();
-    setTimeout(() => window.location.reload(), 350);
-  } catch (error) {
-    fundNewsAlgorithmWizard.saving = false;
-    fundNewsAlgorithmWizard.error = '保存失败，请稍后重试。';
-    renderFundNewsAlgorithmModal();
-  }
 }
 
 function likePost(postId, btn) {
@@ -15612,15 +15204,6 @@ let hermesSessionActorKey = '';
 let hermesSessionListLoadedKey = '';
 let hermesSessionListLoading = false;
 let fundNewsModalActiveTab = 'summary';
-let fundNewsAlgorithmWizard = {
-  step: 'view',
-  sourcePrompt: '',
-  scriptJs: '',
-  previewPayload: null,
-  previewing: false,
-  saving: false,
-  error: '',
-};
 
 function getHermesSettings() {
   return (window.SITE_CONFIG && window.SITE_CONFIG.hermes_settings) || {};
@@ -18830,16 +18413,17 @@ function renderWorkbenchSmartIndicatorLibrary() {
     return;
   }
   host.innerHTML = `
-    <div class="feature-note" style="margin-bottom:8px">${items.length} 个已保存指标 · 可编辑定义、加入草稿或删除</div>
+    <div class="feature-note" style="margin-bottom:8px">${items.length} 个已保存指标 · 可编辑定义、加入草稿或删除指标定义</div>
     <div style="display:grid;gap:8px">
       ${items.map((item) => `
-        <div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;border:1px solid rgba(47,116,192,0.14);border-radius:10px;padding:10px 12px;background:rgba(47,116,192,0.035)">
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:10px;align-items:center;border:1px solid rgba(47,116,192,0.14);border-radius:10px;padding:10px 12px;background:rgba(47,116,192,0.035)">
           <div style="min-width:0">
             <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(item.indicator_name || '未命名指标')}</div>
             <div style="font-size:11px;color:var(--gray-400);margin-top:3px">${escapeHtml(item.category || '智能指标')} · ${escapeHtml(formatWorkbenchDashboardValue(item))}${escapeHtml(item.unit || '')} · ${escapeHtml(item.last_updated || '未记录')}</div>
           </div>
           <button class="btn-outline" type="button" style="padding:6px 9px;font-size:11px" onclick="openWorkbenchSmartIndicatorLibraryDetail('${escapeAttr(item.indicator_code)}')">编辑</button>
           <button class="btn-outline" type="button" style="padding:6px 9px;font-size:11px" onclick="addExistingWorkbenchSmartIndicatorToDraft('${escapeAttr(item.indicator_code)}')">加入草稿</button>
+          <button class="btn-outline" type="button" style="padding:6px 9px;font-size:11px;color:#B42318;border-color:rgba(180,35,24,0.20)" onclick="requestWorkbenchSmartIndicatorDelete('${escapeAttr(item.indicator_code)}')">删除定义</button>
         </div>
       `).join('')}
     </div>
@@ -19233,6 +18817,10 @@ function handleWorkbenchSmartIndicatorPromptInput(value) {
   wbSmartIndicatorDraft.directIndicatorCode = '';
   wbSmartIndicatorDraft.preview = null;
   const matchedCodes = collectWorkbenchPromptMatchedTagCodes(wbSmartIndicatorDraft.promptText, getTenantSmartTagCatalog());
+  // A formula reference is the source of truth. Drop tags left over from the
+  // previous formula instead of sending unrelated dependencies downstream.
+  wbSmartIndicatorDraft.selectedTagCodes = (wbSmartIndicatorDraft.selectedTagCodes || [])
+    .filter((code) => matchedCodes.includes(code));
   wbSmartIndicatorDraft.suppressedTagCodes = (wbSmartIndicatorDraft.suppressedTagCodes || []).filter((code) => matchedCodes.includes(code));
   renderWorkbenchSmartTagSelection();
 }
@@ -19686,7 +19274,7 @@ function openWorkbenchSmartIndicatorDetailModal(card) {
     <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">提示词</label>
       <textarea id="wb-smart-indicator-detail-prompt" class="knowledge-modal-textarea" ${canEdit && !(isSaving || isDeleting) ? '' : 'disabled'}>${escapeHtml(card.prompt || '')}</textarea>
-      <div style="font-size:11px;color:var(--gray-400);margin-top:8px">${canEdit ? '保存后系统会自动重算该智能指标，不直接展示内部公式。' : '基础指标由统一数据源维护，不在租户侧修改计算口径。'}</div>
+      <div style="font-size:11px;color:var(--gray-400);margin-top:8px">${canEdit ? '保存后系统会自动重算该智能指标，不直接展示内部公式。' : '基础指标由统一数据源和指标库维护，不在租户侧修改计算口径。'}</div>
     </div>
     ` : ''}
     ${(isSaving || isDeleting) ? `<div style="font-size:12px;color:var(--gold);margin:8px 0">正在${isDeleting ? '删除指标并同步看板' : '保存并重算指标'}<span class="dot-anim" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span></div>` : ''}
@@ -19955,7 +19543,7 @@ function renderWorkbenchFundDashboard() {
   const cards = buildWorkbenchSmartSlotCards(active.layout || '2x2', active.cards || []);
   const filledCount = cards.filter((item) => item && !item.isEmpty).length;
   metaHost.textContent = getDraftFundDashboard()
-    ? `当前是草稿版 · ${filledCount} 个智能指标 · ${active.layout || '2x2'}`
+    ? `当前是草稿版 · ${filledCount} 个智能指标 · ${active.layout || '2x2'} · 粉丝端仍展示已发布版，发布后才同步`
     : `当前展示已发布版本 · ${filledCount} 个智能指标`;
   previewHost.innerHTML = `
     <div class="wb-dashboard-summary-grid cols-3">

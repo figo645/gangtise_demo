@@ -2792,10 +2792,16 @@ def build_smart_indicator_expression_fallback(prompt_text, selected_indicators):
     expression = prompt.replace("（", "(").replace("）", ")").replace("【", "[[").replace("】", "]]")
     expression = expression.replace("×", "*").replace("÷", "/")
     replaced = False
-    for item in sorted(items, key=lambda current: len(current["indicator_name"]), reverse=True):
+    placeholder_tokens = {}
+    for index, item in enumerate(sorted(items, key=lambda current: len(current["indicator_name"]), reverse=True)):
         code = item["indicator_code"]
         name = item["indicator_name"]
         token = f'Number(inputs["{code}"] || 0)'
+        # Use a code-free placeholder while replacing aliases. Otherwise a
+        # short alias such as CPI can match inside a token generated for the
+        # canonical name "中国CPI同比指数" on a later pass.
+        placeholder = f"__SMART_REF_{index}__"
+        placeholder_tokens[placeholder] = token
         source_entry = GANGTISE_INDICATOR_REGISTRY.get(code) or {}
         aliases = [
             name,
@@ -2804,6 +2810,12 @@ def build_smart_indicator_expression_fallback(prompt_text, selected_indicators):
             source_entry.get("security_code"),
             source_entry.get("tencent_symbol"),
         ]
+        # Industry references are displayed as "申万一级行业指数:机械设备",
+        # while users naturally type only "机械设备". Both forms must point
+        # to the same registered source before compiling arithmetic.
+        if ":" in name:
+            aliases.append(name.rsplit(":", 1)[-1])
+        aliases.extend(SMART_INDICATOR_PROMPT_ALIASES.get(code, ()))
         aliases.extend(
             alias
             for alias, target in WATCHLIST_QUERY_ALIAS_MAP.items()
@@ -2823,12 +2835,14 @@ def build_smart_indicator_expression_fallback(prompt_text, selected_indicators):
         for alias in aliases:
             bracket_token = f"[[{alias}]]"
             if bracket_token in expression:
-                expression = expression.replace(bracket_token, token)
+                expression = expression.replace(bracket_token, placeholder)
                 replaced = True
             plain_pattern = re.compile(re.escape(alias), re.IGNORECASE)
             if plain_pattern.search(expression):
-                expression = plain_pattern.sub(token, expression)
+                expression = plain_pattern.sub(placeholder, expression)
                 replaced = True
+    for placeholder, token in placeholder_tokens.items():
+        expression = expression.replace(placeholder, token)
     if not replaced:
         first_token = f'Number(inputs["{items[0]["indicator_code"]}"] || 0)'
         if re.match(r"^[\+\-\*\/]", expression):
@@ -2863,6 +2877,18 @@ def validate_smart_indicator_js(js_code, selected_indicators):
         code = f"{code};"
     normalized = code.replace("\n", " ").strip()
     allowed_codes = {item["indicator_code"] for item in normalize_selected_indicator_refs(selected_indicators)}
+    # A malformed historical formula can contain a nested inputs[...] token,
+    # for example inputs["source_Number(inputs["source_cpi"] || 0)"]. The
+    # loose token scan below would only see the inner reference and allow the
+    # malformed outer expression through to the evaluator. Reject any inputs[
+    # occurrence that is not a complete, simple quoted indicator reference.
+    input_occurrences = normalized.count("inputs[")
+    valid_input_references = re.findall(
+        r"inputs\[\s*(?:\"([A-Za-z0-9_]+)\"|'([A-Za-z0-9_]+)')\s*\]",
+        normalized,
+    )
+    if input_occurrences != len(valid_input_references):
+        raise ValueError("smart_indicator_js_unsafe")
     for token in re.findall(r'inputs\[(?:"|\')([^"\']+)(?:"|\')\]', normalized):
         if slugify_code(token, "indicator") not in allowed_codes:
             raise ValueError("smart_indicator_js_contains_unknown_indicator")
@@ -6080,6 +6106,19 @@ MACRO_ECONOMIC_INDICATOR_CODES = (
     "source_urban_unemployment",
     "source_real_estate_investment_yoy",
 )
+
+# Accept short prompt forms at the formula boundary while retaining the
+# registered indicator name as the canonical display value.
+SMART_INDICATOR_PROMPT_ALIASES = {
+    "source_cpi": ("CPI", "中国CPI", "中国CPI同比", "中国CPI同比指数", "居民消费价格指数"),
+    "source_ppi": ("PPI", "中国PPI", "中国PPI同比", "中国PPI同比指数", "工业生产者出厂价格指数"),
+    "source_manufacturing_pmi": ("PMI", "制造业PMI", "中国制造业采购经理指数"),
+    "source_industrial_production_yoy": ("工业增加值", "工业增加值同比", "规模以上工业增加值同比"),
+    "source_retail_sales_yoy": ("社零", "社会消费品零售", "社会消费品零售总额同比"),
+    "source_fixed_asset_investment_yoy": ("固定资产投资", "固定资产投资同比", "固定资产投资累计同比"),
+    "source_urban_unemployment": ("失业率", "城镇调查失业率", "全国城镇调查失业率"),
+    "source_real_estate_investment_yoy": ("房地产开发投资", "房地产开发投资同比", "房地产开发投资累计同比"),
+}
 
 # Keep the two definitions registered for future source adapters, but do not
 # expose them while no precise public series is available.
@@ -9908,6 +9947,30 @@ def _filter_news_to_time_window(items, window_days=NEWS_AGGREGATION_WINDOW_DAYS,
     return filtered
 
 
+def _select_latest_news(items, limit=5, now=None):
+    """Select the newest available real news for the homepage summary."""
+    current = now or datetime.now()
+    target_date = current.date()
+    requested = max(1, int(limit or 5))
+    timestamped = []
+    untimestamped = []
+    for position, item in enumerate(items or []):
+        if not isinstance(item, dict):
+            continue
+        timestamp = _parse_news_timestamp(item.get("published_at") or item.get("fetched_at"))
+        if timestamp is None:
+            untimestamped.append((position, item))
+        else:
+            timestamped.append((timestamp, position, item))
+    today = [row for row in timestamped if row[0].date() == target_date]
+    candidates = today or timestamped
+    candidates.sort(key=lambda row: (row[0], -row[1]), reverse=True)
+    selected = [row[2] for row in candidates[:requested]]
+    if len(selected) < requested:
+        selected.extend(item for _, item in untimestamped[: requested - len(selected)])
+    return selected
+
+
 class _NewsAnchorCollector(HTMLParser):
     def __init__(self):
         super().__init__(convert_charrefs=True)
@@ -10167,7 +10230,7 @@ def build_admin_news_source_payload(force_refresh=False):
     }
 
 
-def gen_news_feed(tenant=None, watchlist_details=None, algorithm_payload=None):
+def gen_news_feed(tenant=None, watchlist_details=None, algorithm_payload=None, rank=True):
     try:
         payload = _aggregate_real_news_sources()
         items = _filter_news_to_time_window(payload.get("items") or [])
@@ -10180,6 +10243,8 @@ def gen_news_feed(tenant=None, watchlist_details=None, algorithm_payload=None):
         if not items and payload is not None:
             refreshed = _aggregate_real_news_sources(force_refresh=True)
             items = _filter_news_to_time_window(refreshed.get("items") or [])
+        if not rank:
+            return items
         return _rank_news_for_tenant(
             items,
             tenant=tenant,
@@ -10251,12 +10316,12 @@ def _select_fundamental_homepage_news(ranked_items, limit, rule_plan=None, watch
 
 
 def build_fundamental_news_payload(tenant=None, watchlist_details=None, limit=10, algorithm_payload=None):
-    algorithm = _normalize_news_aggregation_algorithm(algorithm_payload) if isinstance(algorithm_payload, dict) else load_tenant_news_aggregation_algorithm(str((tenant or {}).get("slug") or ""))
-    ranked_items = gen_news_feed(tenant=tenant, watchlist_details=watchlist_details, algorithm_payload=algorithm)
-    rule_plan = algorithm.get("rule_plan") or {}
-    requested_limit = max(1, int(limit or 10))
-    effective_limit = min(requested_limit, int((rule_plan.get("presentation") or {}).get("home_limit") or requested_limit))
-    selected_items = _select_fundamental_homepage_news(ranked_items, effective_limit, rule_plan=rule_plan, watchlist_details=watchlist_details)
+    # The homepage summary reads the real news lake directly. It must not run
+    # the retired tenant-editable ranking algorithm.
+    ranked_items = gen_news_feed(tenant=tenant, watchlist_details=watchlist_details, rank=False)
+    # The homepage summary is a fixed product rule, not a tenant-editable
+    # algorithm: show the newest five admitted real news items.
+    selected_items = _select_latest_news(ranked_items, limit=5)
     source_buckets = {}
     for item in ranked_items:
         if not isinstance(item, dict):
@@ -10267,7 +10332,7 @@ def build_fundamental_news_payload(tenant=None, watchlist_details=None, limit=10
     tabs = [
         {
             "key": "summary",
-            "label": "归纳聚合",
+            "label": "今日 Top5",
             "count": len(selected_items),
             "items": selected_items,
         },
@@ -10292,8 +10357,9 @@ def build_fundamental_news_payload(tenant=None, watchlist_details=None, limit=10
         "items": selected_items,
         "tabs": tabs,
         "total": len(selected_items),
-        "rule_plan": rule_plan,
-        "rule_atoms": algorithm.get("rule_atoms") or _news_rule_plan_atoms(rule_plan),
+        "selection_mode": "latest_five",
+        "rule_plan": {},
+        "rule_atoms": [],
     }
 
 def gen_revenue_trend():

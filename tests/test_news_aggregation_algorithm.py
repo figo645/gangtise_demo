@@ -70,13 +70,36 @@ function rankNews(input) {
             })
         with patch.object(market_services, "gen_news_feed", return_value=items):
             payload = market_services.build_fundamental_news_payload(tenant={"slug": "laowang"}, watchlist_details={})
-        self.assertEqual(len(payload["items"]), 10)
-        self.assertEqual(payload["total"], 10)
+        self.assertEqual(len(payload["items"]), 5)
+        self.assertEqual(payload["total"], 5)
         self.assertGreaterEqual(len(payload["tabs"]), 3)
         self.assertEqual(payload["tabs"][0]["key"], "summary")
-        self.assertEqual(payload["tabs"][0]["count"], 10)
+        self.assertEqual(payload["tabs"][0]["label"], "今日 Top5")
+        self.assertEqual(payload["tabs"][0]["count"], 5)
         self.assertEqual(payload["tabs"][1]["key"], "all")
         self.assertEqual(payload["tabs"][1]["count"], len(items))
+
+    def test_fundamental_homepage_prefers_today_latest_five_news(self):
+        items = [
+            {"title": "昨日较新", "published_at": "2026-09-01 23:59:00"},
+            {"title": "今日最早", "published_at": "2026-09-02 09:00:00"},
+            {"title": "今日最新", "published_at": "2026-09-02 15:00:00"},
+            {"title": "今日中间", "published_at": "2026-09-02 12:00:00"},
+            {"title": "今日第二", "published_at": "2026-09-02 14:00:00"},
+            {"title": "今日第三", "published_at": "2026-09-02 13:00:00"},
+            {"title": "今日第四", "published_at": "2026-09-02 10:00:00"},
+        ]
+        with patch.object(market_services, "gen_news_feed", return_value=items), patch.object(
+            market_services, "datetime"
+        ) as datetime_mock:
+            datetime_mock.now.return_value = datetime(2026, 9, 2, 16, 0, 0)
+            datetime_mock.fromisoformat.side_effect = datetime.fromisoformat
+            payload = market_services.build_fundamental_news_payload(tenant={"slug": "laowang"}, watchlist_details={})
+        self.assertEqual(
+            [item["title"] for item in payload["items"]],
+            ["今日最新", "今日第二", "今日第三", "今日中间", "今日第四"],
+        )
+        self.assertEqual(payload["selection_mode"], "latest_five")
 
     def test_prompt_only_algorithm_generates_executable_script(self):
         algorithm = market_services.normalize_news_aggregation_algorithm_payload({

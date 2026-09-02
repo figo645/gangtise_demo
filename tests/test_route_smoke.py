@@ -146,6 +146,16 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("canonicalizeWorkbenchSmartPrompt", html)
         self.assertIn("formula_tokens", html)
 
+    def test_smart_indicator_dashboard_removal_is_not_definition_deletion(self):
+        web_html = self.client.get("/kol-workbench?tenant=laowang").get_data(as_text=True)
+        h5_html = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}").get_data(as_text=True)
+
+        self.assertIn("从看板移除", web_html)
+        self.assertIn("删除指标定义", web_html)
+        self.assertIn("删除定义", h5_html)
+        self.assertIn("指标定义、快照和历史数据会保留", web_html)
+        self.assertNotIn("kwDeleteSmartIndicator('${escapeAttr(item.indicatorCode || item.indicator_code || '')}')", web_html)
+
     def test_investor_cannot_mutate_smart_indicator_dashboard(self):
         import src.web.api_kol as api_kol
 

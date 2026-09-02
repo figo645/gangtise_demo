@@ -6,6 +6,22 @@ from src.domain import market_services
 
 
 class ChinaCpiMappingTest(unittest.TestCase):
+    def _assert_arithmetic_case(self, prompt, selected, latest_values, expected):
+        with patch.object(
+            market_services,
+            "get_default_llm_config",
+            side_effect=AssertionError("explicit arithmetic must not call LLM"),
+        ):
+            generated = market_services.generate_smart_indicator_js(
+                "组合测试指标", prompt, selected, tenant_slug="laowang"
+            )
+        self.assertEqual(generated["generator"], "arithmetic_expression")
+        self.assertFalse(generated["llm_used"])
+        actual = market_services.evaluate_smart_indicator_formula_js(
+            generated["formula_js"], selected, latest_values
+        )
+        self.assertAlmostEqual(actual, expected, places=4)
+
     def test_structured_formula_token_resolves_ppi_reference(self):
         tag = {
             "tag_code": "indicator:source_ppi",
@@ -277,12 +293,115 @@ class ChinaCpiMappingTest(unittest.TestCase):
         self.assertFalse(result["llm_used"])
         self.assertEqual(result["formula_js"], 'return Number(inputs["source_cpi"] || 0)/2;')
 
+    def test_cpi_plus_ppi_resolves_both_macro_sources_and_compiles_deterministically(self):
+        resolved = core_services.resolve_smart_indicator_prompt_refs("CPI + PPI", [], {})
+        self.assertEqual(
+            [item["indicator_code"] for item in resolved],
+            ["source_cpi", "source_ppi"],
+        )
+        with patch.object(market_services, "get_default_llm_config", side_effect=AssertionError("explicit arithmetic must not call LLM")):
+            result = market_services.generate_smart_indicator_js(
+                "CPI + PPI", "CPI + PPI", resolved, tenant_slug="laowang"
+            )
+        self.assertEqual(result["generator"], "arithmetic_expression")
+        self.assertFalse(result["llm_used"])
+        self.assertEqual(
+            result["formula_js"],
+            'return Number(inputs["source_cpi"] || 0) + Number(inputs["source_ppi"] || 0);',
+        )
+
+    def test_market_two_indicator_add_subtract_multiply_divide(self):
+        selected = [
+            {"indicator_code": "source_shanghai_index", "indicator_name": "上证指数"},
+            {"indicator_code": "source_shenzhen_index", "indicator_name": "深证指数"},
+        ]
+        values = {
+            "source_shanghai_index": {"latest_value": "300"},
+            "source_shenzhen_index": {"latest_value": "120"},
+        }
+        cases = [("上证指数 + 深证指数", 420), ("上证指数 - 深证指数", 180), ("上证指数 * 深证指数", 36000), ("上证指数 / 深证指数", 2.5)]
+        for prompt, expected in cases:
+            with self.subTest(prompt=prompt):
+                self._assert_arithmetic_case(prompt, selected, values, expected)
+
+    def test_industry_two_indicator_add_subtract_multiply_divide(self):
+        selected = [
+            {"indicator_code": "source_sector_15", "indicator_name": "申万一级行业指数:商贸零售"},
+            {"indicator_code": "source_sector_27", "indicator_name": "申万一级行业指数:机械设备"},
+        ]
+        values = {
+            "source_sector_15": {"latest_value": "80"},
+            "source_sector_27": {"latest_value": "20"},
+        }
+        cases = [("商贸零售 + 机械设备", 100), ("商贸零售 - 机械设备", 60), ("商贸零售 * 机械设备", 1600), ("商贸零售 / 机械设备", 4)]
+        for prompt, expected in cases:
+            with self.subTest(prompt=prompt):
+                self._assert_arithmetic_case(prompt, selected, values, expected)
+
+    def test_market_three_indicator_add_subtract_multiply_divide(self):
+        selected = [
+            {"indicator_code": "source_shanghai_index", "indicator_name": "上证指数"},
+            {"indicator_code": "source_shenzhen_index", "indicator_name": "深证指数"},
+            {"indicator_code": "source_hs300", "indicator_name": "沪深300"},
+        ]
+        values = {
+            "source_shanghai_index": {"latest_value": "300"},
+            "source_shenzhen_index": {"latest_value": "120"},
+            "source_hs300": {"latest_value": "60"},
+        }
+        cases = [("上证指数 + 深证指数 + 沪深300", 480), ("上证指数 - 深证指数 - 沪深300", 120), ("上证指数 * 深证指数 * 沪深300", 2160000), ("上证指数 / 深证指数 / 沪深300", 1 / 24)]
+        for prompt, expected in cases:
+            with self.subTest(prompt=prompt):
+                self._assert_arithmetic_case(prompt, selected, values, expected)
+
+    def test_industry_three_indicator_add_subtract_multiply_divide(self):
+        selected = [
+            {"indicator_code": "source_sector_15", "indicator_name": "申万一级行业指数:商贸零售"},
+            {"indicator_code": "source_sector_27", "indicator_name": "申万一级行业指数:机械设备"},
+            {"indicator_code": "source_sector_05", "indicator_name": "申万一级行业指数:电子"},
+        ]
+        values = {
+            "source_sector_15": {"latest_value": "80"},
+            "source_sector_27": {"latest_value": "20"},
+            "source_sector_05": {"latest_value": "10"},
+        }
+        cases = [("商贸零售 + 机械设备 + 电子", 110), ("商贸零售 - 机械设备 - 电子", 50), ("商贸零售 * 机械设备 * 电子", 16000), ("商贸零售 / 机械设备 / 电子", 0.4)]
+        for prompt, expected in cases:
+            with self.subTest(prompt=prompt):
+                self._assert_arithmetic_case(prompt, selected, values, expected)
+
+    def test_canonical_macro_names_with_suffix_resolve_and_compile(self):
+        resolved = core_services.resolve_smart_indicator_prompt_refs(
+            "中国CPI同比指数 + 中国PPI同比指数", [], {}
+        )
+        self.assertEqual(
+            [item["indicator_code"] for item in resolved],
+            ["source_cpi", "source_ppi"],
+        )
+        result = market_services.generate_smart_indicator_js(
+            "宏观组合", "中国CPI同比指数 + 中国PPI同比指数", resolved, tenant_slug="laowang"
+        )
+        self.assertEqual(
+            result["formula_js"],
+            'return Number(inputs["source_cpi"] || 0) + Number(inputs["source_ppi"] || 0);',
+        )
+
     def test_indicator_formula_never_converts_a_missing_source_to_zero(self):
         with self.assertRaisesRegex(ValueError, "smart_indicator_source_unavailable:source_cpi"):
             market_services.evaluate_smart_indicator_formula_js(
                 'return Number(inputs["source_cpi"] || 0);',
                 [{"indicator_code": "source_cpi", "indicator_name": "中国CPI同比指数"}],
                 {},
+            )
+
+    def test_malformed_nested_input_formula_is_rejected_before_evaluation(self):
+        with self.assertRaisesRegex(ValueError, "smart_indicator_js_unsafe"):
+            market_services.validate_smart_indicator_js(
+                'return Number(inputs["source_Number(inputs["source_cpi"] || 0)"] || 0) + Number(inputs["source_ppi"] || 0);',
+                [
+                    {"indicator_code": "source_cpi", "indicator_name": "中国CPI同比指数"},
+                    {"indicator_code": "source_ppi", "indicator_name": "中国PPI同比"},
+                ],
             )
 
     def test_indicator_formula_preserves_a_real_zero_source_value(self):
@@ -399,6 +518,56 @@ class ChinaCpiMappingTest(unittest.TestCase):
             )
 
         self.assertEqual(refs, [])
+
+    def test_structured_formula_tokens_ignore_stale_selected_tags(self):
+        tags = [
+            {
+                "tag_code": "indicator:source_ppi",
+                "label": "中国PPI同比",
+                "selected_indicators": [{"indicator_code": "source_ppi", "indicator_name": "中国PPI同比"}],
+            },
+            {
+                "tag_code": "indicator:source_cpi",
+                "label": "中国CPI同比指数",
+                "selected_indicators": [{"indicator_code": "source_cpi", "indicator_name": "中国CPI同比指数"}],
+            },
+            {
+                "tag_code": "watchlist:600519",
+                "label": "贵州茅台",
+                "selected_indicators": [{"indicator_code": "source_shanghai_index", "indicator_name": "上证指数"}],
+            },
+        ]
+        with patch.object(core_services, "build_tenant_smart_indicator_tag_catalog", return_value=tags), patch.object(
+            core_services,
+            "build_indicator_hub",
+            return_value={"items": [
+                {"id": "source_ppi", "name": "中国PPI同比"},
+                {"id": "source_cpi", "name": "中国CPI同比指数"},
+                {"id": "source_shanghai_index", "name": "上证指数"},
+            ]},
+        ):
+            refs = core_services.resolve_smart_indicator_selected_refs(
+                {"slug": "laowang"},
+                {
+                    "prompt_text": "【中国PPI同比】*5+【中国CPI同比指数】",
+                    "selected_tag_codes": ["indicator:source_ppi", "indicator:source_cpi", "watchlist:600519"],
+                    "formula_tokens": [
+                        {"type": "reference", "tagCode": "indicator:source_ppi", "label": "中国PPI同比"},
+                        {"type": "operator", "text": "*"},
+                        {"type": "number", "text": "5"},
+                        {"type": "operator", "text": "+"},
+                        {"type": "reference", "tagCode": "indicator:source_cpi", "label": "中国CPI同比指数"},
+                    ],
+                },
+            )
+
+        self.assertEqual(
+            refs,
+            [
+                {"indicator_code": "source_ppi", "indicator_name": "中国PPI同比"},
+                {"indicator_code": "source_cpi", "indicator_name": "中国CPI同比指数"},
+            ],
+        )
 
     def test_cpi_alias_keeps_the_registered_display_name_after_resolution(self):
         selected = market_services.normalize_selected_indicator_refs(
