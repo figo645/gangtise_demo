@@ -4091,6 +4091,16 @@
             <tbody id="admin-hermes-mode-tbody"></tbody>
           </table>
         </div>
+        <div class="table-wrap" style="margin-top:20px">
+          <div class="table-header">
+            <div class="table-title">Hermes 用户新需求</div>
+            <span class="tag tag-gold">按用户真实提问沉淀</span>
+          </div>
+          <table id="admin-hermes-missing-capability-table">
+            <thead><tr><th>需求主题</th><th>分类</th><th>提及次数</th><th>影响用户</th><th>最近提交时间</th><th>最近原始问题</th></tr></thead>
+            <tbody id="admin-hermes-missing-capability-tbody"></tbody>
+          </table>
+        </div>
       </div>
       <div data-hermes-pane="compute">
         <div id="admin-hermes-pool-cards" class="pool-cards">
@@ -4118,16 +4128,6 @@
           <table id="admin-hermes-ranking-table">
             <thead><tr><th>排名</th><th>用户</th><th>等级</th><th>本月调用</th><th>消耗算力</th><th>最常用模式</th></tr></thead>
             <tbody id="admin-hermes-ranking-tbody"></tbody>
-          </table>
-        </div>
-        <div class="table-wrap" style="margin-top:20px">
-          <div class="table-header">
-            <div class="table-title">Hermes 缺失能力需求</div>
-            <span class="tag tag-gold">按用户真实提问沉淀</span>
-          </div>
-          <table id="admin-hermes-missing-capability-table">
-            <thead><tr><th>能力名称</th><th>分类</th><th>提及次数</th><th>影响用户</th><th>最近对象 / 日期</th><th>最近问题</th></tr></thead>
-            <tbody id="admin-hermes-missing-capability-tbody"></tbody>
           </table>
         </div>
       </div>
@@ -9938,7 +9938,7 @@ function renderAdminHermesUsageStats() {
       { label: '今日调用', icon: '&#9881;', value: Number(summary.today_calls || 0), change: `今日 token ${Number(summary.today_tokens || 0).toLocaleString('zh-CN')}` },
       { label: '本月调用', icon: '&#9654;', value: Number(summary.month_calls || 0), change: `本月 token ${Number(summary.month_tokens || 0).toLocaleString('zh-CN')}` },
       { label: '人均调用', icon: '&#9786;', value: `${Number(summary.avg_calls_per_user || 0).toFixed(2)}次`, change: `平均延迟 ${Number(summary.avg_latency_ms || 0).toFixed(0)}ms` },
-      { label: '算力消耗', icon: '&#9733;', value: Number(summary.compute_consumed || 0).toLocaleString('zh-CN'), change: `缺失能力 ${Number(summary.missing_capability_turns || 0)} 次` },
+      { label: '算力消耗', icon: '&#9733;', value: Number(summary.compute_consumed || 0).toLocaleString('zh-CN'), change: `研发中需求 ${Number(summary.missing_capability_turns || 0)} 次` },
     ].map((item) => `
       <div class="stat-card">
         <div class="stat-label">${escapeHtml(item.label)}</div>
@@ -9999,13 +9999,13 @@ function renderAdminHermesUsageStats() {
     missingBody.innerHTML = rows.length ? rows.map((row) => `
       <tr>
         <td style="color:#F8F6F0;font-weight:500">${escapeHtml(row.label || '')}</td>
-        <td><span class="tag tag-gold">${escapeHtml(row.category || '能力缺口')}</span></td>
+        <td><span class="tag tag-gold">${escapeHtml(row.category || '研发中能力')}</span></td>
         <td>${escapeHtml(String(row.mentions || 0))}</td>
         <td>${escapeHtml(String(row.user_count || 0))}</td>
-        <td>${escapeHtml([row.object_name || '', row.target_date || ''].filter(Boolean).join(' / ') || '--')}</td>
+        <td>${escapeHtml(row.latest_created_at || '--')}</td>
         <td style="max-width:360px;white-space:normal;line-height:1.6">${escapeHtml(row.latest_question || '--')}</td>
       </tr>
-    `).join('') : '<tr><td colspan="6" style="color:#9A9590">当前还没有沉淀出缺失能力需求</td></tr>';
+    `).join('') : '<tr><td colspan="6" style="color:#9A9590">当前还没有沉淀出用户新需求</td></tr>';
   }
 }
 

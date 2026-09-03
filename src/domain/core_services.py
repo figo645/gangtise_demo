@@ -2742,6 +2742,7 @@ def build_tenant_smart_indicator_tag_catalog(tenant=None):
         indicator_code = str(item.get("indicator_code") or "").strip()
         if not indicator_code:
             continue
+        source_type = str(item.get("source_type") or "").strip().lower()
         tag_code = f"indicator:{indicator_code}"
         seen.add(tag_code)
         tags.append(
@@ -2749,6 +2750,12 @@ def build_tenant_smart_indicator_tag_catalog(tenant=None):
                 "tag_code": tag_code,
                 "label": item.get("indicator_name") or indicator_code,
                 "tag_type": "indicator",
+                # Saved smart indicators are valid explicit formula inputs,
+                # but must not participate in free-text fuzzy matching. Their
+                # display names often contain a base indicator name (such as
+                # "中国CPI同比指数组合指标"), which otherwise turns one CPI
+                # query into every historical derived definition.
+                "auto_match": source_type != "smart",
                 "category": item.get("category") or "指标",
                 "subtitle": item.get("source_type_label") or item.get("source_type") or "基础指标",
                 "value": item.get("value") or "--",
@@ -3038,6 +3045,8 @@ def resolve_smart_indicator_prompt_refs(prompt_text, tag_catalog, indicator_name
     # Existing tenant/base tags are checked first, including stock tags whose
     # selected_indicators already encode the verified research signal bundle.
     for tag in tag_catalog if isinstance(tag_catalog, list) else []:
+        if (tag or {}).get("auto_match") is False:
+            continue
         labels = [
             str((tag or {}).get("label") or "").replace("【", "").replace("】", "").strip(),
             *[

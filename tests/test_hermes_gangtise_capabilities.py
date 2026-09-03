@@ -772,6 +772,99 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
         self.assertIn("做详细的综合分析", prompt)
         self.assertIn("投资有什么建议", prompt)
 
+    def test_contextual_market_followup_is_routed_with_context_and_synthesized_by_llm(self):
+        model = {"key": "router", "provider": "mock", "model_name": "router", "enabled": True}
+        router_json = (
+            '{"disposition":"execute","intent":"market_today_observation",'
+            '"tools":["gangtise.market_today_observation"],"target_type":"index",'
+            '"securities":[],"time_scope":"today","use_context_entities":true,'
+            '"answer_with_context":true,"display_mode":"structured","reason":"延续上一轮A股大盘分析"}'
+        )
+        messages = [
+            {"role": "user", "content": "分析今天A股市场整体走势"},
+            {"role": "assistant", "content": "上证和深证今天均需结合资金与情绪观察。"},
+        ]
+        with patch.object(ai_services, "get_default_llm_config", return_value=model), patch.object(
+            ai_services, "call_openai_compatible_llm", return_value=router_json
+        ):
+            plan, _router_model, route_mode = ai_services.route_hermes_query_intent(
+                "继续分析A股市场走向，请基于上下文，来分析回答。",
+                messages=messages,
+                memory_state={"session": {"last_intent": "market_today_observation"}},
+            )
+
+        self.assertEqual(route_mode, "llm_router")
+        self.assertEqual(plan["intent"], "market_today_observation")
+        self.assertTrue(plan["use_context_entities"])
+        self.assertTrue(plan["answer_with_context"])
+
+        answer_json = '{"answer":"结合上轮走势，当前仍应优先观察量能与风险偏好。","summary":"A股续问分析","bullets":[],"analysis_sections":[],"next_steps":[],"citations":[]}'
+        with patch.object(ai_services, "get_default_llm_config", return_value=model), patch.object(
+            ai_services, "call_openai_compatible_llm", return_value=answer_json
+        ) as answer_call, patch.object(
+            ai_services, "get_tenant_by_slug", return_value={"name": "财经老王"}
+        ):
+            synthesis, answer_model, answer_mode = ai_services.synthesize_hermes_answer(
+                "继续分析A股市场走向，请基于上下文，来分析回答。",
+                plan,
+                {"gangtise_market_observation": {"text": "上证量能改善，市场情绪中性偏强。", "provider": "Gangtise"}},
+                tenant_slug="laowang",
+                messages=messages,
+            )
+
+        self.assertEqual(answer_mode, "llm_contextual_research")
+        self.assertIs(answer_model, model)
+        self.assertIn("量能", synthesis["answer"])
+        self.assertIn("上证量能改善", answer_call.call_args.args[2])
+
+    def test_unavailable_capability_returns_polite_notice_without_tools_or_answer_llm(self):
+        model = {"key": "router", "provider": "mock", "model_name": "router", "enabled": True}
+        router_json = '{"disposition":"unavailable","intent":"capability_unavailable","tools":[],"reason":"该功能尚未上线","capability_request":"自动下单与仓位管理"}'
+        with patch.object(ai_services, "get_default_llm_config", return_value=model), patch.object(
+            ai_services, "call_openai_compatible_llm", return_value=router_json
+        ):
+            plan, _router_model, route_mode = ai_services.route_hermes_query_intent("请帮我自动下单并管理仓位")
+
+        outputs, trace = ai_services.execute_hermes_tool_plan(plan, "laowang", "请帮我自动下单并管理仓位")
+        with patch.object(ai_services, "get_default_llm_config") as answer_model:
+            synthesis, model_used, answer_mode = ai_services.synthesize_hermes_answer(
+                "请帮我自动下单并管理仓位", plan, outputs
+            )
+
+        self.assertEqual(route_mode, "llm_router")
+        self.assertEqual(plan["intent"], "capability_unavailable")
+        self.assertEqual(plan["tools"], [])
+        self.assertEqual(plan["capability_request"], "自动下单与仓位管理")
+        self.assertEqual(trace, [])
+        self.assertEqual(answer_mode, "capability_unavailable")
+        self.assertIsNone(model_used)
+        self.assertIn("还在开发中", synthesis["answer"])
+        self.assertIn("已经记录下来", synthesis["answer"])
+        self.assertIn("近期推出", synthesis["answer"])
+        answer_model.assert_not_called()
+
+    def test_unavailable_capability_is_persisted_as_an_admin_demand_metric(self):
+        plan = {
+            "intent": "capability_unavailable",
+            "tools": [],
+            "target_type": "none",
+            "time_scope": "conversation",
+        }
+        synthesis = ai_services.build_hermes_capability_unavailable_synthesis("请提供税务筹划服务", plan)
+        payload = ai_services.extract_hermes_memory_payload(
+            "请提供税务筹划服务",
+            plan,
+            synthesis,
+            actor_context={"tenant_slug": "laowang", "profile_id": "财经老王", "user_role": "dav"},
+        )
+        missing = payload["turn_record"]["memory_summary"]["missing_capability"]
+
+        self.assertEqual(missing["code"], "capability_unavailable:请提供税务筹划服务")
+        self.assertEqual(missing["label"], "请提供税务筹划服务")
+        self.assertEqual(missing["category"], "产品能力")
+        self.assertIn("请提供税务筹划服务", payload["turn_record"]["tags"]["missing_capability_tags"])
+        self.assertEqual(ai_services._normalize_hermes_mode_label("capability_unavailable"), "能力开发中")
+
     def test_stock_highlights_accepts_multiple_confirmed_securities(self):
         candidates = {
             "601988": {"name": "中国银行", "code": "601988", "security_code": "601988.SH", "market": "CN"},

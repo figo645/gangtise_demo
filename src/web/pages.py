@@ -111,6 +111,7 @@ def login_entry():
         return redirect(next_target)
     tenant_slug = str(user.get("tenant_slug") or "").strip().lower()
     h5_target = f"/h5?tenant={tenant_slug}" if tenant_slug else "/h5"
+    web_target = f"/web?tenant={tenant_slug}" if tenant_slug else "/web"
     workbench_target = next_target if next_target.startswith("/kol-workbench") else url_for("kol_workbench", tenant=tenant_slug, section="overview")
     admin_target = url_for("admin")
     return render_template(
@@ -118,6 +119,7 @@ def login_entry():
         user=user,
         is_admin=is_admin,
         h5_target=h5_target,
+        web_target=web_target,
         workbench_target=workbench_target,
         admin_target=admin_target,
     )
@@ -161,6 +163,7 @@ def h5():
     if not current_authenticated_user:
         return redirect(url_for("login", next=safe_next_target(request.full_path.rstrip("?"))))
     site_config = get_site_config()
+    desktop_mode = request.path.rstrip("/") == "/web"
     h5_fallback_mode = False
     demo_profiles = []
     current_demo_profile = None
@@ -255,7 +258,14 @@ def h5():
         demo_profiles=demo_profiles,
         current_demo_profile=current_demo_profile,
         h5_fallback_mode=h5_fallback_mode,
+        desktop_mode=desktop_mode,
     )
+
+
+@app.route("/web", endpoint="web_user_app")
+def web_user_app():
+    """Desktop user surface backed by the same H5 implementation and APIs."""
+    return h5()
 
 @app.route("/admin")
 def admin():

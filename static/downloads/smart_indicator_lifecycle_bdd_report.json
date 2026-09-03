@@ -1,272 +1,39 @@
 {
-  "generated_at": "2026-09-02 01:30:28",
+  "generated_at": "2026-09-03 19:24:27",
   "tenant_slug": "laowang",
-  "scenarios": [
-    {
-      "name": "1. 建立 2×2 看板",
-      "given": "用户进入智能指标看板编辑器。",
-      "when": "通过真实 Dashboard API 保存 2×2 空白草稿。",
-      "then": "服务端返回 200 且草稿保留 4 个槽位。",
-      "passed": true,
-      "detail": "HTTP 200",
-      "evidence": {
-        "status": 200,
-        "draft_codes": [
-          "",
-          "",
-          "",
-          ""
-        ]
-      }
-    },
-    {
-      "name": "2. 添加第一个指标 CPI",
-      "given": "2×2 看板已建立，CPI 是已注册基础指标。",
-      "when": "通过智能指标真实保存 API 创建 CPI，并写入第一个看板槽位。",
-      "then": "CPI 卡片与指标定义、最新快照均已持久化。",
-      "passed": true,
-      "detail": "HTTP 200；看板 HTTP 200",
-      "evidence": {
-        "indicator_code": "laowang_smart_20260902_013053400",
-        "indicator": {
-          "definition_exists": true,
-          "definition": {
-            "indicator_code": "laowang_smart_20260902_013053400",
-            "indicator_name": "BDD-CPI",
-            "tenant_slug": "laowang",
-            "source_type": "smart",
-            "provider": "LLM / Prompt Formula",
-            "prompt_text": "CPI",
-            "formula_js": "return Number(inputs[\"source_cpi\"] || 0);",
-            "selected_indicators_json": "[{\"indicator_code\": \"source_cpi\", \"indicator_name\": \"中国CPI同比指数\"}, {\"indicator_code\": \"laowang_smart_20260902_010043483\", \"indicator_name\": \"中国CPI同比指数组合指标\"}, {\"indicator_code\": \"laowang_cpi\", \"indicator_name\": \"CPI智能指标\"}]"
-          },
-          "latest_exists": true,
-          "latest": {
-            "latest_value": "0.5",
-            "updated_at": "2026-09-02 01:30:53",
-            "is_simulated": 0,
-            "source_code": "tenant_smart_formula"
-          },
-          "series": {
-            "total": 1,
-            "real_count": 1
-          }
-        },
-        "formula_meta": {
-          "formula_js": "return Number(inputs[\"source_cpi\"] || 0);",
-          "generator": "preview_confirmed",
-          "llm_used": false
-        }
-      }
-    },
-    {
-      "name": "3. 添加第二个指标 深证指数",
-      "given": "CPI 已在第一个槽位。",
-      "when": "创建深证指数指标并写入第二个看板槽位。",
-      "then": "第二个卡片可见，且定义与快照已保存。",
-      "passed": true,
-      "detail": "HTTP 200；看板 HTTP 200",
-      "evidence": {
-        "indicator_code": "laowang_smart_20260902_013100979",
-        "indicator": {
-          "definition_exists": true,
-          "definition": {
-            "indicator_code": "laowang_smart_20260902_013100979",
-            "indicator_name": "BDD-深证指数",
-            "tenant_slug": "laowang",
-            "source_type": "smart",
-            "provider": "LLM / Prompt Formula",
-            "prompt_text": "深证指数",
-            "formula_js": "return Number(inputs[\"source_shenzhen_index\"] || 0);",
-            "selected_indicators_json": "[{\"indicator_code\": \"source_shenzhen_index\", \"indicator_name\": \"深证指数\"}, {\"indicator_code\": \"laowang_smart_20260814_202231136\", \"indicator_name\": \"深证指数80\"}]"
-          },
-          "latest_exists": true,
-          "latest": {
-            "latest_value": "13872.38",
-            "updated_at": "2026-09-02 01:31:00",
-            "is_simulated": 0,
-            "source_code": "tenant_smart_formula"
-          },
-          "series": {
-            "total": 1,
-            "real_count": 1
-          }
-        },
-        "formula_meta": {
-          "formula_js": "return Number(inputs[\"source_shenzhen_index\"] || 0);",
-          "generator": "preview_confirmed",
-          "llm_used": false
-        }
-      }
-    },
-    {
-      "name": "4. 添加第三个指标 黄金 / 白银",
-      "given": "CPI、深证指数已经占用前两个槽位。",
-      "when": "创建黄金/白银比值指标并写入第三个槽位。",
-      "then": "复合计算卡片成功保存，两个底层引用和计算公式均可审计。",
-      "passed": true,
-      "detail": "HTTP 200；看板 HTTP 200",
-      "evidence": {
-        "indicator_code": "laowang_smart_20260902_013108717",
-        "indicator": {
-          "definition_exists": true,
-          "definition": {
-            "indicator_code": "laowang_smart_20260902_013108717",
-            "indicator_name": "BDD-黄金白银",
-            "tenant_slug": "laowang",
-            "source_type": "smart",
-            "provider": "LLM / Prompt Formula",
-            "prompt_text": "黄金/白银",
-            "formula_js": "return Number(inputs[\"source_gold\"] || 0) / Number(inputs[\"source_silver\"] || 0);",
-            "selected_indicators_json": "[{\"indicator_code\": \"source_gold\", \"indicator_name\": \"黄金\"}, {\"indicator_code\": \"source_silver\", \"indicator_name\": \"白银\"}]"
-          },
-          "latest_exists": true,
-          "latest": {
-            "latest_value": "50.1359",
-            "updated_at": "2026-09-02 01:31:08",
-            "is_simulated": 0,
-            "source_code": "tenant_smart_formula"
-          },
-          "series": {
-            "total": 1,
-            "real_count": 1
-          }
-        },
-        "formula_meta": {
-          "formula_js": "return Number(inputs[\"source_gold\"] || 0) / Number(inputs[\"source_silver\"] || 0);",
-          "generator": "preview_confirmed",
-          "llm_used": false
-        }
-      }
-    },
-    {
-      "name": "5. 删除第一个指标 CPI",
-      "given": "CPI 已发布，且当前操作是从看板移除。",
-      "when": "调用真实 remove_indicator 接口移除 CPI 卡片。",
-      "then": "草稿不再展示 CPI，但数据库定义、最新值和历史序列仍保留。",
-      "passed": true,
-      "detail": "HTTP 200",
-      "evidence": {
-        "draft_codes": [
-          "",
-          "laowang_smart_20260902_013100979",
-          "laowang_smart_20260902_013108717",
-          ""
-        ],
-        "cpi_db_after_remove": {
-          "definition_exists": true,
-          "definition": {
-            "indicator_code": "laowang_smart_20260902_013053400",
-            "indicator_name": "BDD-CPI",
-            "tenant_slug": "laowang",
-            "source_type": "smart",
-            "provider": "LLM / Prompt Formula",
-            "prompt_text": "CPI",
-            "formula_js": "return Number(inputs[\"source_cpi\"] || 0);",
-            "selected_indicators_json": "[{\"indicator_code\": \"source_cpi\", \"indicator_name\": \"中国CPI同比指数\"}, {\"indicator_code\": \"laowang_smart_20260902_010043483\", \"indicator_name\": \"中国CPI同比指数组合指标\"}, {\"indicator_code\": \"laowang_cpi\", \"indicator_name\": \"CPI智能指标\"}]"
-          },
-          "latest_exists": true,
-          "latest": {
-            "latest_value": "0.5",
-            "updated_at": "2026-09-02 01:30:53",
-            "is_simulated": 0,
-            "source_code": "tenant_smart_formula"
-          },
-          "series": {
-            "total": 1,
-            "real_count": 1
-          }
-        },
-        "published_codes": [
-          "laowang_smart_20260902_013053400",
-          "laowang_smart_20260902_013100979",
-          "laowang_smart_20260902_013108717",
-          ""
-        ]
-      }
-    },
-    {
-      "name": "6. 恢复",
-      "given": "CPI 仅从草稿看板移除，发布版未改写。",
-      "when": "调用真实 reset_draft 接口恢复当前发布版。",
-      "then": "CPI 卡片恢复，草稿清空，之前保存的数据仍可读取。",
-      "passed": true,
-      "detail": "HTTP 200",
-      "evidence": {
-        "published_codes": [
-          "laowang_smart_20260902_013053400",
-          "laowang_smart_20260902_013100979",
-          "laowang_smart_20260902_013108717",
-          ""
-        ],
-        "draft": null,
-        "cpi_db_after_restore": {
-          "definition_exists": true,
-          "definition": {
-            "indicator_code": "laowang_smart_20260902_013053400",
-            "indicator_name": "BDD-CPI",
-            "tenant_slug": "laowang",
-            "source_type": "smart",
-            "provider": "LLM / Prompt Formula",
-            "prompt_text": "CPI",
-            "formula_js": "return Number(inputs[\"source_cpi\"] || 0);",
-            "selected_indicators_json": "[{\"indicator_code\": \"source_cpi\", \"indicator_name\": \"中国CPI同比指数\"}, {\"indicator_code\": \"laowang_smart_20260902_010043483\", \"indicator_name\": \"中国CPI同比指数组合指标\"}, {\"indicator_code\": \"laowang_cpi\", \"indicator_name\": \"CPI智能指标\"}]"
-          },
-          "latest_exists": true,
-          "latest": {
-            "latest_value": "0.5",
-            "updated_at": "2026-09-02 01:30:53",
-            "is_simulated": 0,
-            "source_code": "tenant_smart_formula"
-          },
-          "series": {
-            "total": 1,
-            "real_count": 1
-          }
-        }
-      }
-    },
-    {
-      "name": "7. 再添加一个指标 上证指数",
-      "given": "恢复后 CPI、深证指数和黄金/白银数据仍可复用。",
-      "when": "将注册指标 source_shanghai_index 写入第四个槽位。",
-      "then": "2×2 草稿包含 CPI、深证指数、黄金/白银和上证指数四个卡片引用。",
-      "passed": true,
-      "detail": "HTTP 200",
-      "evidence": {
-        "draft_codes": [
-          "laowang_smart_20260902_013053400",
-          "laowang_smart_20260902_013100979",
-          "laowang_smart_20260902_013108717",
-          "source_shanghai_index"
-        ],
-        "shanghai_code": "source_shanghai_index"
-      }
-    }
-  ],
+  "scenarios": [],
   "refresh": {
     "market_snapshot": {
-      "ok": true,
-      "updated": 46,
-      "overview_count": 9,
-      "sector_count": 31,
-      "macro_count": 6,
+      "ok": false,
+      "updated": 0,
+      "overview_count": 0,
+      "sector_count": 0,
+      "macro_count": 0,
       "macro_refreshed": true,
       "intraday_count": 0,
-      "updated_at": "2026-09-02 01:30:32",
+      "updated_at": "2026-09-03 19:24:27",
       "errors": [
+        "上证指数：AKShare 行情获取失败：HTTPSConnectionPool(host='finance.sina.com.cn', port=443): Max retries exceeded with url: /realstock/company/sh000001/hisdata/klc_kl.js?d=2020_2_4 (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x17a86c0d0>: Failed to resolve 'finance.sina.com.cn' ([Errno 8] nodename nor servname provided, or not known)\"))",
+        "深证指数：AKShare 行情获取失败：HTTPSConnectionPool(host='finance.sina.com.cn', port=443): Max retries exceeded with url: /realstock/company/sz399001/hisdata/klc_kl.js?d=2020_2_4 (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x17a86ceb0>: Failed to resolve 'finance.sina.com.cn' ([Errno 8] nodename nor servname provided, or not known)\"))",
+        "恒生指数：AKShare 行情获取失败：HTTPSConnectionPool(host='finance.sina.com.cn', port=443): Max retries exceeded with url: /stock/hkstock/HSI/klc2_kl.js?d=2023_5_01 (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x17a86d780>: Failed to resolve 'finance.sina.com.cn' ([Errno 8] nodename nor servname provided, or not known)\"))",
+        "国企指数：AKShare 行情获取失败：HTTPSConnectionPool(host='finance.sina.com.cn', port=443): Max retries exceeded with url: /stock/hkstock/HSCEI/klc2_kl.js?d=2023_5_01 (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x17a86e050>: Failed to resolve 'finance.sina.com.cn' ([Errno 8] nodename nor servname provided, or not known)\"))",
+        "红筹指数：AKShare 行情获取失败：HTTPSConnectionPool(host='finance.sina.com.cn', port=443): Max retries exceeded with url: /stock/hkstock/HSCCI/klc2_kl.js?d=2023_5_01 (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x17a57e9e0>: Failed to resolve 'finance.sina.com.cn' ([Errno 8] nodename nor servname provided, or not known)\"))",
+        "道琼斯：AKShare 行情获取失败：HTTPSConnectionPool(host='finance.sina.com.cn', port=443): Max retries exceeded with url: /staticdata/us/.DJI (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x17a86dbd0>: Failed to resolve 'finance.sina.com.cn' ([Errno 8] nodename nor servname provided, or not known)\"))",
+        "纳斯达克：AKShare 行情获取失败：HTTPSConnectionPool(host='finance.sina.com.cn', port=443): Max retries exceeded with url: /staticdata/us/.IXIC (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x17a86d300>: Failed to resolve 'finance.sina.com.cn' ([Errno 8] nodename nor servname provided, or not known)\"))",
+        "标普500：AKShare 行情获取失败：HTTPSConnectionPool(host='finance.sina.com.cn', port=443): Max retries exceeded with url: /staticdata/us/.INX (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x17a86ca00>: Failed to resolve 'finance.sina.com.cn' ([Errno 8] nodename nor servname provided, or not known)\"))",
+        "日经225：AKShare 行情获取失败：HTTPSConnectionPool(host='gi.finance.sina.com.cn', port=443): Max retries exceeded with url: /hq/daily?symbol=NKY&num=10000 (Caused by NameResolutionError(\"<urllib3.connection.HTTPSConnection object at 0x17a86e920>: Failed to resolve 'gi.finance.sina.com.cn' ([Errno 8] nodename nor servname provided, or not known)\"))",
+        "AKShare 申万一级行业行情未返回有效数据",
+        "中国CPI同比指数：AKShare 宏观数据暂不可用",
+        "中国PPI同比：AKShare 宏观数据暂不可用",
+        "中国制造业PMI：AKShare 宏观数据暂不可用",
+        "规模以上工业增加值同比：AKShare 宏观数据暂不可用",
+        "社会消费品零售总额同比：AKShare 宏观数据暂不可用",
+        "固定资产投资累计同比：AKShare 宏观数据暂不可用",
         "全国城镇调查失业率：AKShare 宏观数据暂不可用",
         "房地产开发投资累计同比：当前 AKShare 未提供房地产开发投资累计同比的精确序列"
       ]
     },
-    "indicator_history": {
-      "synced": true,
-      "updated": 12,
-      "total_points": 1359,
-      "eligible": 14,
-      "skipped_disabled": 18,
-      "batch_code": "gangtise_openapi_sync_20260902013034045337"
-    }
+    "indicator_history_error": "connection to server at \"127.0.0.1\", port 5432 failed: Operation not permitted\n\tIs the server running on that host and accepting TCP/IP connections?\n"
   },
   "llm_model": {
     "key": "volcengine-deepseek-v4-flash",
@@ -277,21 +44,8 @@
     "expected_base_url": "https://ark.cn-beijing.volces.com/api/v3",
     "matches_v4": true
   },
-  "temporary_codes": [
-    "laowang_smart_20260902_013053400",
-    "laowang_smart_20260902_013100979",
-    "laowang_smart_20260902_013108717"
-  ],
-  "exception": "",
-  "publish": {
-    "status": 200,
-    "published_codes": [
-      "laowang_smart_20260902_013053400",
-      "laowang_smart_20260902_013100979",
-      "laowang_smart_20260902_013108717",
-      ""
-    ],
-    "ok": true
-  },
-  "conclusion": "通过标准：所有场景必须由真实接口返回成功，且删除 CPI 后数据库仍存在定义、最新快照和历史序列。模型配置必须解析到 DeepSeek-V4-Flash 正式版。"
+  "temporary_codes": [],
+  "exception": "OperationalError: connection to server at \"127.0.0.1\", port 5432 failed: Operation not permitted\n\tIs the server running on that host and accepting TCP/IP connections?\n",
+  "traceback": "Traceback (most recent call last):\n  File \"/Users/xuchenfei/PycharmProjects/gangtise_demo/tests/run_smart_indicator_lifecycle_bdd.py\", line 186, in main\n    response, body = _post(client, f\"/api/tenant/{TENANT_SLUG}/dashboard\", {\"action\": \"save_draft\", \"dashboard\": empty_dashboard})\n  File \"/Users/xuchenfei/PycharmProjects/gangtise_demo/tests/run_smart_indicator_lifecycle_bdd.py\", line 58, in _post\n    response = client.post(path, json=payload)\n  File \"/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/werkzeug/test.py\", line 1167, in post\n    return self.open(*args, **kw)\n  File \"/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/flask/testing.py\", line 232, in open\n    response = super().open(\n  File \"/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/werkzeug/test.py\", line 1116, in open\n    response_parts = self.run_wsgi_app(request.environ, buffered=buffered)\n  File \"/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/werkzeug/test.py\", line 988, in run_wsgi_app\n    rv = run_wsgi_app(self.application, environ, buffered=buffered)\n  File \"/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/werkzeug/test.py\", line 1264, in run_wsgi_app\n    app_rv = app(environ, start_response)\n  File \"/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/flask/app.py\", line 1478, in __call__\n    return self.wsgi_app(environ, start_response)\n  File \"/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/flask/app.py\", line 1458, in wsgi_app\n    response = self.handle_exception(e)\n  File \"/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/flask/app.py\", line 1455, in wsgi_app\n    response = self.full_dispatch_request()\n  File \"/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/flask/app.py\", line 869, in full_dispatch_request\n    rv = self.handle_user_exception(e)\n  File \"/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/flask/app.py\", line 867, in full_dispatch_request\n    rv = self.dispatch_request()\npsycopg2.OperationalError: connection to server at \"127.0.0.1\", port 5432 failed: Operation not permitted\n\tIs the server running on that host and accepting TCP/IP connections?\n\n",
+  "cleanup_error": "OperationalError: connection to server at \"127.0.0.1\", port 5432 failed: Operation not permitted\n\tIs the server running on that host and accepting TCP/IP connections?\n"
 }

@@ -3471,6 +3471,7 @@ HERMES_ALLOWED_INTENTS = {
     "stock_one_pager",
     "stock_highlights",
     "multi_watchlist_analysis",
+    "capability_unavailable",
     "out_of_scope_redirect",
 }
 
@@ -3650,6 +3651,16 @@ HERMES_CAPABILITY_REGISTRY = {
         "output_mode": "llm_synthesis",
         "constraints": ["通用闲聊和投资教育问题", "不调用 Gangtise 或本地数据工具", "不提供直接买卖或仓位指令"],
     },
+    "capability_unavailable": {
+        "tool": None,
+        "endpoint": "platform.capability_notice",
+        "provider": "platform",
+        "cost_credits": 0,
+        "target_type": "none",
+        "time_scope": "conversation",
+        "output_mode": "capability_notice",
+        "constraints": ["仅用于当前产品尚未提供的功能请求", "不调用研究接口", "不得与安全拒绝或人工审核混用"],
+    },
     "out_of_scope_redirect": {
         "tool": None,
         "endpoint": "local.llm",
@@ -3697,6 +3708,7 @@ HERMES_INTENT_ROUTE_GROUPS = {
     "multi_watchlist_analysis": "gangtise_multi_stock_research",
     "product_help": "product_help_or_smalltalk",
     "small_talk": "product_help_or_smalltalk",
+    "capability_unavailable": "product_help_or_smalltalk",
     "out_of_scope_redirect": "product_help_or_smalltalk",
 }
 
@@ -3788,6 +3800,7 @@ HERMES_TASK_FAMILY_LABELS = {
     "product_help": "产品帮助",
     "research_qa": "研究问答",
     "out_of_scope_redirect": "范围收口",
+    "capability_unavailable": "能力开发中",
 }
 
 HERMES_CONTENT_GENERATION_KEYWORDS = [
@@ -3838,6 +3851,8 @@ def infer_hermes_task_family(question_text="", preferred_mode="", attachments=No
     preferred_key = str(preferred_mode or "").strip().lower()
     if intent_key == "out_of_scope_redirect":
         return "out_of_scope_redirect"
+    if intent_key == "capability_unavailable":
+        return "capability_unavailable"
     if intent_key == "small_talk":
         return "small_talk"
     if visual_mode:
@@ -3995,6 +4010,7 @@ HERMES_FUNCTION_TAG_MAP = {
     "stock_one_pager": ["个股", "深化研究"],
     "stock_highlights": ["个股", "看点摘要"],
     "multi_watchlist_analysis": ["自选股", "组合分析"],
+    "capability_unavailable": ["能力开发中"],
     "out_of_scope_redirect": ["超范围收口"],
 }
 
@@ -5679,6 +5695,8 @@ def _normalize_hermes_mode_label(intent, answer_mode="", preferred_mode="", entr
         return "产品帮助"
     if intent_key == "multi_tool_research":
         return "多工具研究"
+    if intent_key == "capability_unavailable":
+        return "能力开发中"
     if intent_key == "small_talk":
         return "轻度闲聊"
     if "review" in entry:
@@ -6109,6 +6127,7 @@ HERMES_SESSION_INTENT_LABELS = {
     "smart_indicator_explain": "指标解读",
     "dashboard_interpretation": "Dashboard解读",
     "multi_tool_research": "综合研究",
+    "capability_unavailable": "能力开发中",
     "out_of_scope_redirect": "范围收口",
 }
 
@@ -6459,7 +6478,7 @@ def build_hermes_intent_router_prompt(question_text, has_attachments=False, sele
         if value and value not in entity_candidates:
             entity_candidates.append(value)
     context_state_section = (
-        "可继承上下文实体（只有用户明确使用代词或省略主语时才能继承）：\n"
+        "可继承上下文实体（用户使用代词、延续表达或省略必要对象时才能继承）：\n"
         f"{json.dumps(entity_candidates[:6], ensure_ascii=False)}\n"
         f"上一轮意图：{str(memory_session.get('last_intent') or '').strip() or '无'}\n\n"
         if entity_candidates or memory_session.get("last_intent")
@@ -6494,12 +6513,14 @@ def build_hermes_intent_router_prompt(question_text, has_attachments=False, sele
         "12. 如果只是寒暄、通用闲聊、投资入门、选股方法、投资建议或未指向具体证券的泛投资问题，使用 small_talk，tools 必须为空数组。回答交给本地 LLM，不调用 Gangtise。\n"
         "13. 如果问题明显超范围但仍可温和收口，使用 out_of_scope_redirect，tools 必须为空数组。\n"
         "14. 如果有附件，工具里可以包含 attachment.context。\n"
-        "15. 输出 securities 数组，证券可以填 name、code 或 security_code；如果用户使用‘它/这只/上一只’等代词，优先从会话记忆继承并将 use_context_entities 设为 true。\n"
+        "15. 如果用户请求的是产品当前尚未提供的功能或数据能力，使用 capability_unavailable，tools 必须为空数组；这不是安全拒绝，也不是泛泛闲聊。\n"
+        "15a. 当 disposition=unavailable 时，必须填写 capability_request：用不超过 32 个汉字概括用户想要但当前未上线的具体能力，不要写‘能力开发中’、‘暂不支持’等状态描述。\n"
+        "16. 如果用户使用‘它/这只/上一只’等代词，或使用‘继续/进一步/再分析/基于上文/延续刚才’等续问表达且上文存在唯一的对象或研究主题，必须继承该上下文并将 use_context_entities 设为 true。对明确要求基于上下文分析回答的续问，同时将 answer_with_context 设为 true。\n"
         "16. target_type 只能是 stock、index、multi_stock 或 none；market_today_observation 必须是 index，stock_one_pager 不得是 index。\n"
         "17. display_mode 只能是 text 或 structured。\n"
         "18. 如果用户问‘你是谁’或‘你的功能有哪些’，优先使用 product_help 或 small_talk，直接说明小金智能体当前能力。\n"
         "19. 研究能力只能使用注册表中对应的唯一 tool；本地 LLM 能力 tools 必须为空数组或仅包含明确需要的上下文工具。\n"
-        "20. 先决定 disposition：execute（信息充分，执行任务）、clarify（对象、时间或需求不明确，先反问）、chat（通用闲聊）、refuse（仅安全拒绝）。\n"
+        "20. 先决定 disposition：execute（信息充分，执行任务）、clarify（对象、时间或需求不明确，先反问）、chat（通用闲聊）、unavailable（产品能力尚未上线）、refuse（仅安全拒绝）。\n"
         "21. 用户一句话包含多个独立目标时，使用 tasks 数组逐项拆解；每个 task 都必须是能力注册表中的一个 intent。不要为了凑任务重复调用同一能力。\n"
         "22. 证券名称或代码无法唯一确定，或用户只说‘这只/帮我分析一下’但会话记忆也不能唯一补全时，必须返回 clarify，不得调用 Gangtise 或猜测标的。\n"
         "23. tasks 只用于独立研究请求的组合；寒暄、产品帮助或泛投资建议不要与研究任务混在 tasks 中。\n"
@@ -6510,7 +6531,8 @@ def build_hermes_intent_router_prompt(question_text, has_attachments=False, sele
         "- ‘中国银行、建设银行、招商银行，帮我简单介绍分析下’ => stock_highlights / gangtise.stock_highlights / multi_stock / latest。\n"
         "- ‘中国银行、建设银行、招商银行，做详细的综合分析’ => multi_watchlist_analysis / gangtise.multi_watchlist_analysis / multi_stock / today。\n"
         "- ‘你好’、‘我该怎么选股’、‘投资有什么建议’ => small_talk / [] / none / conversation。\n"
-        "23. 禁止返回 knowledge.search、evidence.search 或任何未列出的工具。\n\n"
+        "25. ‘继续分析 A 股市场走向，请基于上下文分析回答’且上文正在讨论 A 股大盘 => market_today_observation / gangtise.market_today_observation / index / today / use_context_entities=true / answer_with_context=true。\n"
+        "26. 禁止返回 knowledge.search、evidence.search 或任何未列出的工具。\n\n"
         f"{memory_section}"
         f"{context_state_section}"
         f"{conversation_section}"
@@ -6522,9 +6544,9 @@ def build_hermes_intent_router_prompt(question_text, has_attachments=False, sele
         f"指定知识条目 ID：{json.dumps(selected_ids, ensure_ascii=False)}\n\n"
         "输出 JSON 结构（旧版单 intent 结构也可被兼容，但优先 tasks）：\n"
         '{'
-        '"disposition":"execute|clarify|chat|refuse",'
+        '"disposition":"execute|clarify|chat|unavailable|refuse",'
         '"clarifying_question":"仅 clarify 时填写",'
-        '"tasks":[{"intent":"...","tools":["..."],"target_type":"stock|index|multi_stock|none","securities":[{"name":"","code":"","security_code":"","market":""}],"target":"","time_scope":"today|latest|conversation","use_context_entities":false,"stock_code":"","display_mode":"text","reason":"简短中文说明"}],'
+        '"tasks":[{"intent":"...","tools":["..."],"target_type":"stock|index|multi_stock|none","securities":[{"name":"","code":"","security_code":"","market":""}],"target":"","time_scope":"today|latest|conversation","use_context_entities":false,"answer_with_context":false,"stock_code":"","display_mode":"text","reason":"简短中文说明"}],'
         '"intent":"...",'
         '"tools":["..."],'
         '"target_type":"stock|index|multi_stock|none",'
@@ -6532,9 +6554,11 @@ def build_hermes_intent_router_prompt(question_text, has_attachments=False, sele
         '"target":"",'
         '"time_scope":"today|latest|conversation",'
         '"use_context_entities":false,'
+        '"answer_with_context":false,'
         '"stock_code":"",'
         '"display_mode":"text",'
-        '"reason":"简短中文说明"'
+        '"reason":"简短中文说明",'
+        '"capability_request":"仅 disposition=unavailable 时填写，用户需要的具体能力"'
         '}'
     )
 
@@ -6855,6 +6879,17 @@ def validate_hermes_intent_plan(plan, question_text="", memory_state=None):
             or "请补充你要分析的股票名称或代码，并说明希望看今日行情、深化研究、简要看点，还是多股综合分析。"
         )
         return normalized
+    if intent == "capability_unavailable":
+        normalized["tools"] = []
+        normalized["target_type"] = "none"
+        normalized["securities"] = []
+        normalized["time_scope"] = "conversation"
+        normalized["display_mode"] = "text"
+        normalized["capability_request"] = _hermes_trim_text(
+            normalized.get("capability_request") or question_text,
+            limit=72,
+        )
+        return normalized
     if intent == "composite_research":
         tasks = normalized.get("tasks") if isinstance(normalized.get("tasks"), list) else []
         if not tasks or len(tasks) > 8 or not all(isinstance(item, dict) for item in tasks):
@@ -6876,7 +6911,7 @@ def validate_hermes_intent_plan(plan, question_text="", memory_state=None):
             raise RuntimeError(f"hermes_intent_tool_mismatch:{intent}")
         if intent not in HERMES_GANGTISE_DIRECT_INTENTS and expected_tool not in requested_tools:
             raise RuntimeError(f"hermes_intent_tool_mismatch:{intent}")
-    elif requested_tools and intent in {"small_talk", "out_of_scope_redirect"}:
+    elif requested_tools and intent in {"small_talk", "capability_unavailable", "out_of_scope_redirect"}:
         raise RuntimeError(f"hermes_intent_tool_mismatch:{intent}")
 
     allowed_context_tools = {
@@ -6885,7 +6920,7 @@ def validate_hermes_intent_plan(plan, question_text="", memory_state=None):
         "watchlist.detail",
         "indicator.detail",
     }
-    if intent in {"small_talk", "product_help", "knowledge_lookup", "evidence_chain_analysis", "out_of_scope_redirect"}:
+    if intent in {"small_talk", "product_help", "knowledge_lookup", "evidence_chain_analysis", "capability_unavailable", "out_of_scope_redirect"}:
         if any(item not in allowed_context_tools for item in requested_tools):
             raise RuntimeError(f"hermes_intent_tool_mismatch:{intent}")
 
@@ -6941,8 +6976,8 @@ def _normalize_hermes_planner_plan(parsed, question_text="", memory_state=None):
     source = parsed if isinstance(parsed, dict) else {}
     disposition = str(source.get("disposition") or "").strip().lower()
     raw_tasks = source.get("tasks") if isinstance(source.get("tasks"), list) else []
-    if disposition in {"clarify", "refuse", "chat"} and not raw_tasks:
-        intent = "clarify" if disposition == "clarify" else ("out_of_scope_redirect" if disposition == "refuse" else "small_talk")
+    if disposition in {"clarify", "refuse", "chat", "unavailable"} and not raw_tasks:
+        intent = "clarify" if disposition == "clarify" else ("capability_unavailable" if disposition == "unavailable" else ("out_of_scope_redirect" if disposition == "refuse" else "small_talk"))
         plan = {
             "intent": intent,
             "tools": [],
@@ -6951,18 +6986,19 @@ def _normalize_hermes_planner_plan(parsed, question_text="", memory_state=None):
             "time_scope": "conversation",
             "display_mode": "text",
             "reason": str(source.get("reason") or disposition).strip()[:200],
+            "capability_request": str(source.get("capability_request") or "").strip()[:72],
             "clarifying_question": str(source.get("clarifying_question") or source.get("message") or "").strip()[:500],
             "disposition": disposition,
         }
-        if intent == "small_talk":
+        if intent in {"small_talk", "capability_unavailable"}:
             plan = finalize_hermes_intent_plan(plan, question_text=question_text)
         return plan
     # A disposition is the planner's top-level control decision. If a model
     # accidentally emits research tasks alongside chat/refuse/clarify, never
     # execute those tasks silently. Preserve the safe control decision and ask
     # or answer at the top level instead.
-    if disposition in {"clarify", "refuse", "chat"}:
-        intent = "clarify" if disposition == "clarify" else ("out_of_scope_redirect" if disposition == "refuse" else "small_talk")
+    if disposition in {"clarify", "refuse", "chat", "unavailable"}:
+        intent = "clarify" if disposition == "clarify" else ("capability_unavailable" if disposition == "unavailable" else ("out_of_scope_redirect" if disposition == "refuse" else "small_talk"))
         plan = {
             "intent": intent,
             "tools": [],
@@ -6971,6 +7007,7 @@ def _normalize_hermes_planner_plan(parsed, question_text="", memory_state=None):
             "time_scope": "conversation",
             "display_mode": "text",
             "reason": str(source.get("reason") or disposition).strip()[:200],
+            "capability_request": str(source.get("capability_request") or "").strip()[:72],
             "clarifying_question": str(source.get("clarifying_question") or source.get("message") or "").strip()[:500],
             "disposition": disposition,
         }
@@ -6991,6 +7028,7 @@ def _normalize_hermes_planner_plan(parsed, question_text="", memory_state=None):
             "target": task.get("target") or source.get("target") or "",
             "time_scope": task.get("time_scope") or source.get("time_scope") or "",
             "use_context_entities": task.get("use_context_entities") is True or source.get("use_context_entities") is True,
+            "answer_with_context": task.get("answer_with_context") is True or source.get("answer_with_context") is True,
             "stock_code": task.get("stock_code") or source.get("stock_code") or "",
             "display_mode": task.get("display_mode") or source.get("display_mode") or "text",
             "reason": str(task.get("reason") or source.get("reason") or "LLM 路由").strip()[:200],
@@ -7932,6 +7970,18 @@ def detect_hermes_missing_capability(question_text, plan=None, tool_outputs=None
     plan = plan if isinstance(plan, dict) else {}
     tool_outputs = tool_outputs if isinstance(tool_outputs, dict) else {}
     intent = str(plan.get("intent") or "").strip()
+    if intent == "capability_unavailable":
+        capability_request = _hermes_trim_text(plan.get("capability_request") or question, limit=72)
+        return {
+            # The model provides the semantic grouping. The original question
+            # remains in the turn record for audit and product review.
+            "code": f"capability_unavailable:{capability_request}",
+            "label": capability_request or "研发中能力需求",
+            "category": "产品能力",
+            "intent": intent,
+            "capability_request": capability_request,
+            "user_message": "这项能力目前还在开发中，但你的问题我们已经记录下来了。",
+        }
     target_date = extract_hermes_explicit_date(question)
     if not target_date:
         return None
@@ -7959,6 +8009,15 @@ def build_hermes_missing_capability_synthesis(question_text, plan, missing_capab
             for item in (missing_capability.get("suggestions") if isinstance(missing_capability.get("suggestions"), list) else [])
             if str(item).strip()
         ][:4],
+        "citations": [],
+    }
+
+
+def build_hermes_capability_unavailable_synthesis(question_text, plan):
+    return {
+        "answer": "这项能力目前还在开发中，但你的问题我们已经记录下来了。我们会在近期推出，感谢你的耐心等待和对小金智能体的期待。",
+        "summary": "能力开发中",
+        "bullets": [],
         "citations": [],
     }
 
@@ -8742,6 +8801,7 @@ HERMES_INTENT_LABELS = {
     "stock_highlights": "个股看点摘要",
     "multi_watchlist_analysis": "多支自选股综合分析",
     "small_talk": "轻度闲聊",
+    "capability_unavailable": "能力开发中",
     "out_of_scope_redirect": "超范围收口",
 }
 
@@ -8777,6 +8837,7 @@ def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode
         "信息澄清" if answer_mode == "clarification" else
         "多任务结果直出" if answer_mode == "composite_direct" else
         "混合任务：LLM + Gangtise 原文" if answer_mode == "composite_mixed_llm" else
+        "基于上下文的模型研究回答" if answer_mode == "llm_contextual_research" else
         "模型整合回答" if answer_mode == "llm_synthesized" else
         "Gangtise AI 直接返回" if answer_mode == "gangtise_direct" else
         "平台安全收口"
@@ -8861,7 +8922,7 @@ def build_hermes_agent_trace(intent_plan, tool_trace, route_mode="", answer_mode
         {
             "key": "answer",
             "title": "结论整合",
-            "status": "ok" if answer_mode in {"llm_synthesized", "gangtise_direct", "composite_direct", "composite_mixed_llm"} else "skipped",
+            "status": "ok" if answer_mode in {"llm_synthesized", "llm_contextual_research", "gangtise_direct", "composite_direct", "composite_mixed_llm"} else "skipped",
             "detail": answer_label + "，输出面向用户的结论、依据和下一步建议。",
         },
     ]
@@ -9039,7 +9100,7 @@ def build_hermes_text_artifact(question_text, plan, synthesis, tool_outputs, cit
             "summary": str(item.get("algorithm_detail") or item.get("interpretation") or "").strip()[:160],
         })
     web_matches = ((tool_outputs.get("web_search") or {}).get("matches") or []) if isinstance(tool_outputs, dict) else []
-    direct_gangtise = intent in HERMES_GANGTISE_DIRECT_INTENTS
+    direct_gangtise = intent in HERMES_GANGTISE_DIRECT_INTENTS and not bool((plan or {}).get("answer_with_context"))
     footer_suffix = (
         "内容由 Gangtise AI 直接提供，未经过本地大模型改写。"
         if direct_gangtise else
@@ -10236,6 +10297,8 @@ def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", 
         return build_hermes_clarification_synthesis(plan), None, "clarification"
     if intent == "human_review":
         return build_hermes_human_review_synthesis(plan), None, "human_review"
+    if intent == "capability_unavailable":
+        return build_hermes_capability_unavailable_synthesis(question_text, plan), None, "capability_unavailable"
     if intent == "composite_research":
         return build_hermes_composite_synthesis(
             question_text=question_text,
@@ -10249,7 +10312,8 @@ def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", 
             memory_state=memory_state,
             response_style=response_style,
         )
-    if intent in HERMES_GANGTISE_DIRECT_INTENTS:
+    contextual_research = intent in HERMES_GANGTISE_DIRECT_INTENTS and bool((plan or {}).get("answer_with_context"))
+    if intent in HERMES_GANGTISE_DIRECT_INTENTS and not contextual_research:
         return build_hermes_gangtise_direct_synthesis(plan, tool_outputs), None, "gangtise_direct"
     llm_model = get_hermes_llm_config("hermes_answer_synthesis")
     if not llm_model:
@@ -10303,7 +10367,7 @@ def synthesize_hermes_answer(question_text, plan, tool_outputs, tenant_slug="", 
             "next_steps": [str(item).strip() for item in (parsed.get("next_steps") if isinstance(parsed.get("next_steps"), list) else []) if str(item).strip()][:6],
             "confidence": str(parsed.get("confidence") or "").strip()[:20],
             "citations": citations,
-        }, llm_model, "llm_synthesized"
+        }, llm_model, "llm_contextual_research" if contextual_research else "llm_synthesized"
     except RuntimeError:
         raise
     except Exception as exc:
@@ -10536,7 +10600,7 @@ def build_hermes_query_response(body):
 
     def _hermes_tool_executor(state, runtime, node, upstream):
         intent_plan = state.get("intent_plan") or {}
-        if str(intent_plan.get("intent") or "").strip() in {"out_of_scope_redirect", "clarify", "human_review"}:
+        if str(intent_plan.get("intent") or "").strip() in {"out_of_scope_redirect", "clarify", "human_review", "capability_unavailable"}:
             return {
                 "status": "skipped",
                 "detail": "当前计划无需调用平台工具。",
@@ -10613,6 +10677,29 @@ def build_hermes_query_response(body):
                 "context_preview": {
                     "answer_chars": len(str((synthesis or {}).get("answer") or "")),
                     "bullet_count": len((synthesis or {}).get("bullets") or []),
+                },
+            }
+        if plan_intent == "capability_unavailable":
+            missing_capability = detect_hermes_missing_capability(
+                runtime.get("question_text") or "",
+                plan=state.get("intent_plan") or {},
+            ) or {}
+            synthesis = build_hermes_capability_unavailable_synthesis(
+                runtime.get("question_text") or "",
+                state.get("intent_plan") or {},
+            )
+            return {
+                "status": "skipped",
+                "detail": "当前能力尚未上线，已生成产品能力提示。",
+                "state_updates": {
+                    "synthesis": synthesis,
+                    "answer_model": None,
+                    "answer_mode": "capability_unavailable",
+                    "missing_capability": missing_capability,
+                },
+                "context_preview": {
+                    "answer_chars": len(str((synthesis or {}).get("answer") or "")),
+                    "bullet_count": 0,
                 },
             }
         missing_capability = detect_hermes_missing_capability(

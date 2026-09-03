@@ -56,7 +56,9 @@ class AccountNavigationBddTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
         self.assertIn("进入 H5", html)
+        self.assertIn("进入 Web 用户端", html)
         self.assertIn("进入大V工作台", html)
+        self.assertIn("/web?tenant=", html)
         self.assertIn("进入 Admin 后台", html)
 
     def test_given_investor_switching_from_admin_when_login_completes_then_investor_returns_to_h5(self):

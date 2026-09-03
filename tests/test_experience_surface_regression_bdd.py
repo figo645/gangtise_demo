@@ -82,6 +82,15 @@ BDD_SCENARIOS = (
         ('openFundamentalDashboardIndicatorDetail', '这里仅供查看详情；指标的新增、修改和移除请前往大V工作台'),
     ),
     _scenario(
+        "h5-fundamental-no-ops-alerts", "H5", "基本面不展示运维预警", "用户查看按板块归纳的自选股。", "页面渲染初始内容或刷新自选股。", "只展示行情与研究摘要，不展示数据源连通性预警或预警计数。",
+        ('查看最新行情与研究摘要',), ('fund-stock-alert-row', 'fund-board-tab-count', '需关注数据源刷新与连通状态'),
+    ),
+    _scenario(
+        "h5-fundamental-news-list", "H5", "基本面新闻查询页", "用户在基本面查看综合归纳要闻。", "点击更多、按来源筛选或搜索关键词。", "进入独立新闻列表页，条目复用统一详情弹窗，不叠加新闻列表弹窗。",
+        ('id="page-fund-news-list"', 'function openFundNewsList', 'function updateFundNewsListQuery', 'function showFundNewsDetail'),
+        ('id="fund-news-modal"', 'function openFundNewsModal'),
+    ),
+    _scenario(
         "h5-watermark", "H5", "水印功能开关", "管理员启用 H5 水印。", "用户进入 H5。", "页面具备用户名与日期水印容器。",
         ('id="h5-watermark-layer"', 'renderH5Watermark', 'h5_watermark'),
     ),

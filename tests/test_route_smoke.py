@@ -45,6 +45,25 @@ class RouteSmokeTest(unittest.TestCase):
                 self.assertIn("text/html", response.content_type)
                 self.assertIn("Hermes", response.get_data(as_text=True))
 
+    def test_web_user_app_reuses_h5_capabilities_with_desktop_shell(self):
+        response = self.client.get(f"/web?tenant={self.tenant_slugs[0]}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/html", response.content_type)
+        html = response.get_data(as_text=True)
+        self.assertIn('class="desktop-user-app"', html)
+        self.assertIn('window.USER_APP_SURFACE = "web"', html)
+        self.assertIn('id="page-feed"', html)
+        self.assertIn('id="page-market"', html)
+        self.assertIn('id="page-review"', html)
+        self.assertIn('id="page-hermes"', html)
+        self.assertIn('id="page-workbench"', html)
+        self.assertIn('/api/hermes/query', html)
+        self.assertIn('/api/watchlist/items', html)
+        self.assertIn('width:calc(100vw - 280px)', html)
+        self.assertIn('width:calc(100vw - 280px)', html)
+        self.assertIn('.desktop-user-app #page-hermes .hermes-shell', html)
+
     def test_dav_admin_page_access_uses_friendly_permission_denied_view(self):
         dav_user = {
             "id": "route-smoke-dav",
@@ -1397,7 +1416,7 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("/api/admin/hermes/memory-summary", html)
         self.assertIn("/api/admin/hermes/memory-backup", html)
         self.assertIn("/api/admin/hermes/memory-clear", html)
-        self.assertIn("Hermes 缺失能力需求", html)
+        self.assertIn("Hermes 用户新需求", html)
 
     def test_admin_page_contains_knowledge_center_graph(self):
         response = self.client.get("/admin")

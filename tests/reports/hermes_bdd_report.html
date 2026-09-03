@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Hermes BDD 测试报告</title>
+  <style>
+    :root {
+      --bg: #f6f2ea;
+      --panel: #fffdf8;
+      --ink: #1d2a38;
+      --muted: #66778a;
+      --line: #dfd7ca;
+      --gold: #b5833a;
+      --green: #26734d;
+      --red: #b14432;
+      --blue: #2f74c0;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: linear-gradient(180deg, #f8f3ea 0%, #eef5fb 100%); color: var(--ink); font: 14px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
+    main { max-width: 1280px; margin: 0 auto; padding: 28px 20px 56px; }
+    .hero { background: var(--panel); border: 1px solid var(--line); border-radius: 24px; padding: 24px 26px; box-shadow: 0 14px 48px rgba(22,34,48,0.08); }
+    h1 { margin: 0 0 8px; font-size: 34px; line-height: 1.08; }
+    .sub { color: var(--muted); margin: 0; }
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin-top: 18px; }
+    .metric { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px; }
+    .metric .name { color: var(--muted); font-size: 12px; }
+    .metric .value { font-size: 28px; font-weight: 800; margin-top: 6px; }
+    .section { margin-top: 20px; background: var(--panel); border: 1px solid var(--line); border-radius: 24px; padding: 20px; box-shadow: 0 10px 36px rgba(22,34,48,0.06); }
+    .scenario-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .scenario { border: 1px solid var(--line); border-left: 5px solid var(--blue); border-radius: 18px; background: #fff; padding: 16px; }
+    .scenario.pass { border-left-color: var(--green); }
+    .scenario.fail { border-left-color: var(--red); }
+    .scenario-head { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
+    .scenario-head h3 { margin: 0; font-size: 17px; }
+    .pill { display: inline-flex; align-items: center; justify-content: center; min-width: 58px; padding: 5px 10px; border-radius: 999px; background: rgba(47,116,192,0.10); color: var(--blue); font-size: 12px; font-weight: 700; }
+    .scenario.pass .pill { background: rgba(38,115,77,0.12); color: var(--green); }
+    .scenario.fail .pill { background: rgba(177,68,50,0.12); color: var(--red); }
+    .bdd-line { margin-top: 8px; }
+    .detail { margin: 10px 0 0; color: var(--muted); }
+    details { margin-top: 10px; }
+    summary { cursor: pointer; color: var(--blue); font-weight: 700; }
+    pre { margin: 10px 0 0; padding: 12px; border-radius: 12px; background: #13202d; color: #ecf3fb; overflow: auto; white-space: pre-wrap; word-break: break-word; }
+    @media (max-width: 900px) { .metrics, .scenario-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <h1>Hermes BDD 测试报告</h1>
+      <p class="sub">生成时间：2026-09-03 19:24:27 · 租户：laowang · 覆盖路由、工具、结构化 artifact、图表数据与前台渲染入口</p>
+      <div class="metrics">
+        <div class="metric"><div class="name">Scenario</div><div class="value">7</div></div>
+        <div class="metric"><div class="name">Pass</div><div class="value">6</div></div>
+        <div class="metric"><div class="name">Fail</div><div class="value">1</div></div>
+        <div class="metric"><div class="name">LLM</div><div class="value">Strict</div></div>
+      </div>
+    </section>
+    <section class="section">
+      <div class="scenario-grid">
+        <article class="scenario pass">
+          <div class="scenario-head">
+            <h3>个股 K 线 + 分析</h3>
+            <span class="pill">PASS</span>
+          </div>
+          <div class="bdd-line"><strong>Given</strong> 用户明确输入中国银行这只股票，并要求看 K 线图和分析。</div>
+          <div class="bdd-line"><strong>When</strong> 调用 /api/hermes/query，且 LLM 未配置时执行严格失败策略。</div>
+          <div class="bdd-line"><strong>Then</strong> Hermes 必须返回明确错误，不得返回规则或模板答案。</div>
+          <p class="detail">模型未配置时已返回 503 和明确错误，未生成规则或模板答案。</p>
+          <details>
+            <summary>查看证据</summary>
+            <pre>{
+  &quot;question&quot;: &quot;我想看看中国银行这支股票的K线图以及分析&quot;,
+  &quot;http_status&quot;: 503,
+  &quot;ok&quot;: false,
+  &quot;intent&quot;: null,
+  &quot;task_family&quot;: null,
+  &quot;capability_label&quot;: null,
+  &quot;display_mode&quot;: null,
+  &quot;preferred_mode&quot;: null,
+  &quot;router&quot;: null,
+  &quot;tool_trace&quot;: null,
+  &quot;artifact&quot;: {
+    &quot;type&quot;: null,
+    &quot;title&quot;: null,
+    &quot;headline&quot;: null,
+    &quot;summary&quot;: null,
+    &quot;body&quot;: null,
+    &quot;symbol&quot;: null,
+    &quot;chart&quot;: null,
+    &quot;chart_html_present&quot;: false
+  },
+  &quot;settings_snapshot&quot;: null
+}</pre>
+          </details>
+        </article>
+        
+        <article class="scenario pass">
+          <div class="scenario-head">
+            <h3>指数 K 线 + 解读</h3>
+            <span class="pill">PASS</span>
+          </div>
+          <div class="bdd-line"><strong>Given</strong> 用户明确要求查看上证综合指数最近 3 个月 K 线图并解读。</div>
+          <div class="bdd-line"><strong>When</strong> 调用 Hermes 查询接口。</div>
+          <div class="bdd-line"><strong>Then</strong> 模型未配置时必须直接返回错误，不得生成指标 artifact。</div>
+          <p class="detail">模型未配置时已返回 503 和明确错误，未生成规则或模板答案。</p>
+          <details>
+            <summary>查看证据</summary>
+            <pre>{
+  &quot;question&quot;: &quot;给我展示下到现在为止3个月的上证综合指数的K线图并做一下解读分析&quot;,
+  &quot;http_status&quot;: 503,
+  &quot;ok&quot;: false,
+  &quot;intent&quot;: null,
+  &quot;task_family&quot;: null,
+  &quot;capability_label&quot;: null,
+  &quot;display_mode&quot;: null,
+  &quot;preferred_mode&quot;: null,
+  &quot;router&quot;: null,
+  &quot;tool_trace&quot;: null,
+  &quot;artifact&quot;: {
+    &quot;type&quot;: null,
+    &quot;title&quot;: null,
+    &quot;headline&quot;: null,
+    &quot;summary&quot;: null,
+    &quot;body&quot;: null,
+    &quot;symbol&quot;: null,
+    &quot;chart&quot;: null,
+    &quot;chart_html_present&quot;: false
+  },
+  &quot;settings_snapshot&quot;: null
+}</pre>
+          </details>
+        </article>
+        
+        <article class="scenario pass">
+          <div class="scenario-head">
+            <h3>指数线性趋势图</h3>
+            <span class="pill">PASS</span>
+          </div>
+          <div class="bdd-line"><strong>Given</strong> 用户明确要求线图，不要 K 线。</div>
+          <div class="bdd-line"><strong>When</strong> 调用 Hermes 查询接口。</div>
+          <div class="bdd-line"><strong>Then</strong> 模型未配置时必须直接返回错误，不得生成趋势图 artifact。</div>
+          <p class="detail">模型未配置时已返回 503 和明确错误，未生成规则或模板答案。</p>
+          <details>
+            <summary>查看证据</summary>
+            <pre>{
+  &quot;question&quot;: &quot;请展示最近3个月的上证指数的历史数据线图（单纯的线性趋势图）&quot;,
+  &quot;http_status&quot;: 503,
+  &quot;ok&quot;: false,
+  &quot;intent&quot;: null,
+  &quot;task_family&quot;: null,
+  &quot;capability_label&quot;: null,
+  &quot;display_mode&quot;: null,
+  &quot;preferred_mode&quot;: null,
+  &quot;router&quot;: null,
+  &quot;tool_trace&quot;: null,
+  &quot;artifact&quot;: {
+    &quot;type&quot;: null,
+    &quot;title&quot;: null,
+    &quot;headline&quot;: null,
+    &quot;summary&quot;: null,
+    &quot;body&quot;: null,
+    &quot;symbol&quot;: null,
+    &quot;chart&quot;: null,
+    &quot;chart_html_present&quot;: false
+  },
+  &quot;settings_snapshot&quot;: null
+}</pre>
+          </details>
+        </article>
+        
+        <article class="scenario pass">
+          <div class="scenario-head">
+            <h3>知识库问答</h3>
+            <span class="pill">PASS</span>
+          </div>
+          <div class="bdd-line"><strong>Given</strong> 用户围绕租户知识库提问。</div>
+          <div class="bdd-line"><strong>When</strong> 调用 Hermes 查询接口。</div>
+          <div class="bdd-line"><strong>Then</strong> 模型未配置时必须直接返回错误，不得用纯检索结果回答。</div>
+          <p class="detail">模型未配置时已返回 503 和明确错误，未生成规则或模板答案。</p>
+          <details>
+            <summary>查看证据</summary>
+            <pre>{
+  &quot;question&quot;: &quot;知识库里关于固态电池的研究框架是什么？&quot;,
+  &quot;http_status&quot;: 503,
+  &quot;ok&quot;: false,
+  &quot;intent&quot;: null,
+  &quot;task_family&quot;: null,
+  &quot;capability_label&quot;: null,
+  &quot;display_mode&quot;: null,
+  &quot;preferred_mode&quot;: null,
+  &quot;router&quot;: null,
+  &quot;tool_trace&quot;: null,
+  &quot;artifact&quot;: {
+    &quot;type&quot;: null,
+    &quot;title&quot;: null,
+    &quot;headline&quot;: null,
+    &quot;summary&quot;: null,
+    &quot;body&quot;: null,
+    &quot;symbol&quot;: null,
+    &quot;chart&quot;: null,
+    &quot;chart_html_present&quot;: false
+  },
+  &quot;settings_snapshot&quot;: null
+}</pre>
+          </details>
+        </article>
+        
+        <article class="scenario pass">
+          <div class="scenario-head">
+            <h3>报告解读</h3>
+            <span class="pill">PASS</span>
+          </div>
+          <div class="bdd-line"><strong>Given</strong> 用户上传文件后要求 Hermes 解读报告。</div>
+          <div class="bdd-line"><strong>When</strong> 带附件调用 Hermes 查询接口。</div>
+          <div class="bdd-line"><strong>Then</strong> 模型未配置时必须直接返回错误，不得用附件原文或模板回答。</div>
+          <p class="detail">模型未配置时已返回 503 和明确错误，未生成规则或模板答案。</p>
+          <details>
+            <summary>查看证据</summary>
+            <pre>{
+  &quot;question&quot;: &quot;帮我解读一下刚上传的研报，提炼三条核心观点&quot;,
+  &quot;http_status&quot;: 503,
+  &quot;ok&quot;: false,
+  &quot;intent&quot;: null,
+  &quot;task_family&quot;: null,
+  &quot;capability_label&quot;: null,
+  &quot;display_mode&quot;: null,
+  &quot;preferred_mode&quot;: null,
+  &quot;router&quot;: null,
+  &quot;tool_trace&quot;: null,
+  &quot;artifact&quot;: {
+    &quot;type&quot;: null,
+    &quot;title&quot;: null,
+    &quot;headline&quot;: null,
+    &quot;summary&quot;: null,
+    &quot;body&quot;: null,
+    &quot;symbol&quot;: null,
+    &quot;chart&quot;: null,
+    &quot;chart_html_present&quot;: false
+  },
+  &quot;settings_snapshot&quot;: null
+}</pre>
+          </details>
+        </article>
+        
+        <article class="scenario pass">
+          <div class="scenario-head">
+            <h3>产品帮助</h3>
+            <span class="pill">PASS</span>
+          </div>
+          <div class="bdd-line"><strong>Given</strong> 用户询问平台功能使用。</div>
+          <div class="bdd-line"><strong>When</strong> 调用 Hermes 查询接口。</div>
+          <div class="bdd-line"><strong>Then</strong> 模型未配置时必须直接返回错误，不得返回产品帮助模板。</div>
+          <p class="detail">模型未配置时已返回 503 和明确错误，未生成规则或模板答案。</p>
+          <details>
+            <summary>查看证据</summary>
+            <pre>{
+  &quot;question&quot;: &quot;H5 里的智能指标怎么创建和发布？&quot;,
+  &quot;http_status&quot;: 503,
+  &quot;ok&quot;: false,
+  &quot;intent&quot;: null,
+  &quot;task_family&quot;: null,
+  &quot;capability_label&quot;: null,
+  &quot;display_mode&quot;: null,
+  &quot;preferred_mode&quot;: null,
+  &quot;router&quot;: null,
+  &quot;tool_trace&quot;: null,
+  &quot;artifact&quot;: {
+    &quot;type&quot;: null,
+    &quot;title&quot;: null,
+    &quot;headline&quot;: null,
+    &quot;summary&quot;: null,
+    &quot;body&quot;: null,
+    &quot;symbol&quot;: null,
+    &quot;chart&quot;: null,
+    &quot;chart_html_present&quot;: false
+  },
+  &quot;settings_snapshot&quot;: null
+}</pre>
+          </details>
+        </article>
+        
+        <article class="scenario fail">
+          <div class="scenario-head">
+            <h3>报告执行完整性</h3>
+            <span class="pill">FAIL</span>
+          </div>
+          <div class="bdd-line"><strong>Given</strong> BDD 报告脚本需要完整执行 Hermes 核心场景。</div>
+          <div class="bdd-line"><strong>When</strong> 运行整个报告流程。</div>
+          <div class="bdd-line"><strong>Then</strong> 脚本不应抛出未处理异常。</div>
+          <p class="detail">hermes_intent_router_llm_not_configured</p>
+          <details>
+            <summary>查看证据</summary>
+            <pre>{
+  &quot;traceback&quot;: &quot;Traceback (most recent call last):\n  File \&quot;/Users/xuchenfei/PycharmProjects/gangtise_demo/tests/run_hermes_bdd_report.py\&quot;, line 321, in main\n    plan, _, route_mode = ai_services.route_hermes_query_intent(\n  File \&quot;/Users/xuchenfei/PycharmProjects/gangtise_demo/src/domain/ai_services.py\&quot;, line 7069, in route_hermes_query_intent\n    raise RuntimeError(\&quot;hermes_intent_router_llm_not_configured\&quot;)\nRuntimeError: hermes_intent_router_llm_not_configured\n&quot;
+}</pre>
+          </details>
+        </article>
+        </div>
+    </section>
+  </main>
+</body>
+</html>

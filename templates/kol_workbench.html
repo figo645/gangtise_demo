@@ -3580,6 +3580,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
       <div class="platform-topbar-actions">
         <button class="release-notes-trigger" type="button" data-release-notes-trigger aria-label="查看最新版本更新" title="版本更新"><span class="release-notes-trigger-icon" aria-hidden="true">↑</span><span class="release-notes-trigger-dot" aria-hidden="true"></span></button>
         {% if tenant_portal_enabled %}<a href="/tenant/{{ active_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">租户门户</a>{% endif %}
+        <a href="/web?tenant={{ active_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">Web 用户端</a>
         <a href="/h5?tenant={{ active_tenant.slug }}" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">前往 H5</a>
         {% if current_user.role == 'admin' %}<a href="/admin" class="btn-outline" style="padding:8px 16px;font-size:12px;text-decoration:none">纯 Admin 后台</a>{% endif %}
         <a href="/" class="btn-gold" style="padding:8px 16px;font-size:12px;text-decoration:none">返回首页</a>
@@ -13214,7 +13215,18 @@ function kwCollectPromptMatchedTagCodes(promptText, tagCatalog) {
   if (!prompt) return [];
   const normalize = (value) => String(value || '').replace(/[\s_\-.\/：:，,。.!！?？【】\[\]()（）]/g, '').toLowerCase();
   const normalizedPrompt = normalize(prompt);
-  return (Array.isArray(tagCatalog) ? tagCatalog.slice() : [])
+  const catalog = Array.isArray(tagCatalog) ? tagCatalog.slice() : [];
+  const explicitLabels = Array.from(prompt.matchAll(/【([^】]+)】/g)).map((match) => kwNormalizeSmartTagLabel(match[1]));
+  // A bracketed label is an explicit formula reference. Do not widen it with
+  // fuzzy matching to similarly named historical smart-indicator definitions.
+  if (explicitLabels.length) {
+    return Array.from(new Set(explicitLabels.map((label) => {
+      const tag = catalog.find((item) => kwNormalizeSmartTagLabel(item && item.label) === label);
+      return tag && tag.tag_code;
+    }).filter(Boolean)));
+  }
+  return catalog
+    .filter((tag) => tag && tag.auto_match !== false)
     .sort((left, right) => kwNormalizeSmartTagLabel(right.label).length - kwNormalizeSmartTagLabel(left.label).length)
     .filter((tag) => {
       const candidates = [tag && tag.label].concat(Array.isArray(tag && tag.prompt_aliases) ? tag.prompt_aliases : []);
@@ -13238,7 +13250,7 @@ function kwCanonicalizeSmartPrompt(promptText, tagCatalog) {
   const source = String(promptText || '');
   const candidates = [];
   const seen = new Set();
-  (Array.isArray(tagCatalog) ? tagCatalog : []).forEach((tag) => {
+  (Array.isArray(tagCatalog) ? tagCatalog : []).filter((tag) => tag && tag.auto_match !== false).forEach((tag) => {
     const label = kwNormalizeSmartTagLabel(tag && tag.label);
     if (!label) return;
     [label].concat(Array.isArray(tag && tag.prompt_aliases) ? tag.prompt_aliases : []).forEach((value) => {

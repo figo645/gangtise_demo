@@ -19,16 +19,16 @@
   <main>
     <header class="top">
       <h1>H5 与大V工作台全量体验回归 BDD 报告</h1>
-      <p class="sub">执行时间：2026-09-02 13:02:57 · 结果：<strong class="pass-text">通过</strong></p>
+      <p class="sub">执行时间：2026-09-03 19:24:02 · 结果：<strong class="pass-text">通过</strong></p>
       <div class="notice">Flask 测试客户端渲染真实路由、真实模板和实际鉴权钩子；不写入业务数据、不提交 LLM 生成任务。页面启动按当前运行环境执行既有的只读数据库和市场数据探测，数据不可用时验证其回退渲染路径。</div>
     </header>
     <div class="metrics">
-      <div class="metric"><div class="metric-label">BDD 场景</div><div class="metric-value">47</div></div>
-      <div class="metric"><div class="metric-label">通过</div><div class="metric-value pass">47</div></div>
+      <div class="metric"><div class="metric-label">BDD 场景</div><div class="metric-value">49</div></div>
+      <div class="metric"><div class="metric-label">通过</div><div class="metric-value pass">49</div></div>
       <div class="metric"><div class="metric-label">失败</div><div class="metric-value pass">0</div></div>
       <div class="metric"><div class="metric-label">覆盖范围</div><div class="metric-value" style="font-size:17px">三端 + 同源 + 权限</div></div>
     </div>
-    <section><h2>覆盖汇总</h2><table class="summary-table"><thead><tr><th>端</th><th>场景</th><th>通过</th><th>失败</th></tr></thead><tbody><tr><td>H5</td><td>19</td><td class='pass-text'>19</td><td class='muted'>0</td></tr><tr><td>H5 大V工作台</td><td>6</td><td class='pass-text'>6</td><td class='muted'>0</td></tr><tr><td>Web 大V工作台</td><td>15</td><td class='pass-text'>15</td><td class='muted'>0</td></tr><tr><td>权限边界</td><td>2</td><td class='pass-text'>2</td><td class='muted'>0</td></tr><tr><td>跨端一致性</td><td>5</td><td class='pass-text'>5</td><td class='muted'>0</td></tr></tbody></table></section>
+    <section><h2>覆盖汇总</h2><table class="summary-table"><thead><tr><th>端</th><th>场景</th><th>通过</th><th>失败</th></tr></thead><tbody><tr><td>H5</td><td>21</td><td class='pass-text'>21</td><td class='muted'>0</td></tr><tr><td>H5 大V工作台</td><td>6</td><td class='pass-text'>6</td><td class='muted'>0</td></tr><tr><td>Web 大V工作台</td><td>15</td><td class='pass-text'>15</td><td class='muted'>0</td></tr><tr><td>权限边界</td><td>2</td><td class='pass-text'>2</td><td class='muted'>0</td></tr><tr><td>跨端一致性</td><td>5</td><td class='pass-text'>5</td><td class='muted'>0</td></tr></tbody></table></section>
     <section><h2>BDD 场景</h2><div class="filters"><button type="button" class="filter active" data-filter="全部">全部</button><button type="button" class="filter" data-filter="H5">H5</button><button type="button" class="filter" data-filter="H5 大V工作台">H5 大V工作台</button><button type="button" class="filter" data-filter="Web 大V工作台">Web 大V工作台</button><button type="button" class="filter" data-filter="权限边界">权限边界</button><button type="button" class="filter" data-filter="跨端一致性">跨端一致性</button><button type="button" class="filter" data-filter="失败">仅失败</button></div><div class="table-wrap"><table class="scenario-table"><thead><tr><th>结果</th><th>场景</th><th>端</th><th>行为</th><th>执行证据</th></tr></thead><tbody id="scenario-body">
         <tr class="scenario-row pass" data-surface="H5" data-status="pass">
           <td class="status"><span>PASS</span></td>
@@ -179,6 +179,44 @@
     &quot;这里仅供查看详情；指标的新增、修改和移除请前往大V工作台&quot;
   ],
   &quot;forbidden_contracts&quot;: []
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">基本面不展示运维预警</div><div class="scenario-id">h5-fundamental-no-ops-alerts</div></td>
+          <td>H5</td>
+          <td><b>Given</b> 用户查看按板块归纳的自选股。<br><b>When</b> 页面渲染初始内容或刷新自选股。<br><b>Then</b> 只展示行情与研究摘要，不展示数据源连通性预警或预警计数。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;查看最新行情与研究摘要&quot;
+  ],
+  &quot;forbidden_contracts&quot;: [
+    &quot;fund-stock-alert-row&quot;,
+    &quot;fund-board-tab-count&quot;,
+    &quot;需关注数据源刷新与连通状态&quot;
+  ]
+}</pre></details></td>
+        </tr>
+        
+        <tr class="scenario-row pass" data-surface="H5" data-status="pass">
+          <td class="status"><span>PASS</span></td>
+          <td><div class="scenario-name">基本面新闻查询页</div><div class="scenario-id">h5-fundamental-news-list</div></td>
+          <td>H5</td>
+          <td><b>Given</b> 用户在基本面查看综合归纳要闻。<br><b>When</b> 点击更多、按来源筛选或搜索关键词。<br><b>Then</b> 进入独立新闻列表页，条目复用统一详情弹窗，不叠加新闻列表弹窗。</td>
+          <td>真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。<details><summary>断言证据</summary><pre>{
+  &quot;check&quot;: &quot;html_contract&quot;,
+  &quot;required_contracts&quot;: [
+    &quot;id=\&quot;page-fund-news-list\&quot;&quot;,
+    &quot;function openFundNewsList&quot;,
+    &quot;function updateFundNewsListQuery&quot;,
+    &quot;function showFundNewsDetail&quot;
+  ],
+  &quot;forbidden_contracts&quot;: [
+    &quot;id=\&quot;fund-news-modal\&quot;&quot;,
+    &quot;function openFundNewsModal&quot;
+  ]
 }</pre></details></td>
         </tr>
         

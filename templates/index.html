@@ -1029,7 +1029,7 @@ body.theme-dark .tech-layer {
       <a href="/prd" style="color:var(--gold);text-decoration:none;font-weight:600;border:1px solid rgba(200,169,110,0.4);padding:4px 12px;border-radius:4px;transition:all 0.2s" onmouseover="this.style.background='rgba(200,169,110,0.15)'" onmouseout="this.style.background='transparent'">PRD文档</a>
       <a href="/intern-handbook" style="color:var(--gold);text-decoration:none;font-weight:600;border:1px solid rgba(200,169,110,0.4);padding:4px 12px;border-radius:4px;transition:all 0.2s" onmouseover="this.style.background='rgba(200,169,110,0.15)'" onmouseout="this.style.background='transparent'">学习手册</a>
     </div>
-    <div style="display:flex;align-items:center;gap:8px"><button class="release-notes-trigger" type="button" data-release-notes-trigger aria-label="查看最新版本更新" title="版本更新"><span class="release-notes-trigger-icon" aria-hidden="true">↑</span><span class="release-notes-trigger-dot" aria-hidden="true"></span></button><a href="/h5" class="btn-gold" style="font-size:12px;padding:8px 18px;text-decoration:none">体验原型</a></div>
+    <div style="display:flex;align-items:center;gap:8px"><button class="release-notes-trigger" type="button" data-release-notes-trigger aria-label="查看最新版本更新" title="版本更新"><span class="release-notes-trigger-icon" aria-hidden="true">↑</span><span class="release-notes-trigger-dot" aria-hidden="true"></span></button><a href="/web" class="btn-gold" style="font-size:12px;padding:8px 18px;text-decoration:none">Web 用户端</a></div>
   </div>
 </nav>
 
@@ -1056,7 +1056,7 @@ body.theme-dark .tech-layer {
 
   <div class="hero-kpi-row">
     <div class="hero-kpi-item">
-      <div class="hero-kpi-num">4</div>
+      <div class="hero-kpi-num">5</div>
       <div class="hero-kpi-label">系统主入口</div>
     </div>
     <div class="hero-kpi-item">
@@ -1074,7 +1074,8 @@ body.theme-dark .tech-layer {
   </div>
 
   <div class="hero-cta-row">
-    <a href="/h5" class="btn-gold" style="text-decoration:none;font-size:14px;padding:12px 32px">体验产品原型</a>
+    <a href="/web" class="btn-gold" style="text-decoration:none;font-size:14px;padding:12px 32px">进入 Web 用户端</a>
+    <a href="/h5" class="btn-outline" style="text-decoration:none;font-size:14px;padding:12px 32px">进入 H5 用户端</a>
     <a href="#modules" class="btn-outline" style="text-decoration:none;font-size:14px;padding:12px 32px">查看系统入口</a>
     <a href="/intern-handbook" class="btn-outline" style="text-decoration:none;font-size:14px;padding:12px 32px">打开学习手册</a>
   </div>
@@ -1121,12 +1122,12 @@ body.theme-dark .tech-layer {
     <div class="ix-section-label">Front / Back Summary</div>
     <div class="ix-section-title">前后台归案总结</div>
     <div class="ix-divider"></div>
-    <div class="ix-section-desc">首页现在直接说明“租户门户 CMS + H5 前台 + 大V工作台 + 平台 Admin”怎么分工，确保演示时一眼能看懂产品结构，不再把角色和能力混在一起。</div>
+    <div class="ix-section-desc">首页现在直接说明五个真实入口和它们的分工：租户门户 CMS、Web 用户端、H5 用户端、大V工作台 Web 与平台 Admin，确保演示时一眼能看懂产品结构，不再把角色和能力混在一起。</div>
 
     <div class="summary-grid">
       <div class="summary-main-card">
-        <div class="summary-main-title">统一口径：门户负责对外编排，H5 负责互动工具，工作台负责生产经营，Admin 负责控开治理</div>
-        <div class="summary-main-desc">前台不再只有一个入口，而是分成两层。租户门户是大V自己装修的 CMS 首页，可以拖拽指标卡、复盘模块、研究框架、服务入口和自写内容；H5 承接普通投资者后续的基本面分析、自选股、复盘阅读与 Hermes 互动。大V 工作台 Web 承接粉丝管理、消息、群发、复盘生产、知识库微调、Hermes 维护、智能 Dashboard 定义和门户 CMS 编排。纯 Admin 后台只做平台级租户管理、能力控开、审计、结算、一致性巡检与分析配置。</div>
+        <div class="summary-main-title">统一口径：门户负责对外编排，H5 / Web 负责用户工具，工作台负责生产经营，Admin 负责控开治理</div>
+        <div class="summary-main-desc">租户门户是大V自己装修的 CMS 首页，可以拖拽指标卡、复盘模块、研究框架、服务入口和自写内容；H5 与 Web 用户端是同一套用户能力的移动与桌面呈现，均承接基本面分析、自选股、复盘阅读、消息与 Hermes 互动，不维护两套业务逻辑。大V 工作台 Web 承接粉丝管理、消息、复盘生产、知识维护、Hermes 维护、智能 Dashboard 定义和门户 CMS 编排。纯 Admin 后台只做平台级租户管理、能力控开、审计、结算、一致性巡检与分析配置。</div>
 
         <div class="summary-flow">
           <div class="summary-flow-item">
@@ -1135,9 +1136,9 @@ body.theme-dark .tech-layer {
             <div class="summary-flow-desc">大V像维护内容站一样拖拽模块、插入指标卡、编排复盘与研究框架，也可以直接写自定义内容，形成自己的对外主页。</div>
           </div>
           <div class="summary-flow-item">
-            <div class="summary-flow-step">02 / H5 前台</div>
+            <div class="summary-flow-step">02 / H5 + Web 用户端</div>
             <div class="summary-flow-title">普通用户继续使用工具</div>
-            <div class="summary-flow-desc">用户先从租户门户理解内容，再进入 H5 做基本面分析、自选股跟踪、复盘阅读和 Hermes 对话；对话自动承接当前租户上下文。</div>
+            <div class="summary-flow-desc">用户先从租户门户理解内容，再按设备进入 H5 或 Web 用户端做基本面分析、自选股跟踪、复盘阅读和 Hermes 对话；两端自动承接当前租户上下文。</div>
           </div>
           <div class="summary-flow-item">
             <div class="summary-flow-step">03 / 工作台 + Admin</div>
@@ -1149,14 +1150,15 @@ body.theme-dark .tech-layer {
         <div class="summary-badges">
           <span class="summary-badge">租户门户 = 拖拽式 CMS</span>
           <span class="summary-badge">支持指标卡 + 自写内容</span>
-          <span class="summary-badge">Hermes 双版本演示</span>
-          <span class="summary-badge">知识库内容支持微调</span>
-          <span class="summary-badge">Skills 可新增并绑定知识库</span>
+          <span class="summary-badge">Hermes H5 / Web 同源</span>
+          <span class="summary-badge">知识资产可治理复用</span>
+          <span class="summary-badge">Skills 规则与审计</span>
           <span class="summary-badge">智能 Dashboard 独立定义</span>
           <span class="summary-badge">前后台能力一一映射</span>
         </div>
 
         <div class="summary-link-row">
+          <a href="/web" class="summary-link">查看 Web 用户端</a>
           <a href="/h5" class="summary-link">查看 H5 用户端</a>
           {% if tenant_portal_enabled %}<a href="/tenant/{{ default_tenant.slug }}" class="summary-link">查看默认租户门户</a>{% endif %}
           <a href="/kol-workbench?tenant={{ default_tenant.slug }}" class="summary-link">查看大V工作台 Web</a>
@@ -1187,9 +1189,9 @@ body.theme-dark .tech-layer {
       <div class="summary-role-card">
         <div class="summary-role-top">
           <div class="summary-role-icon">📱</div>
-          <div class="summary-role-title">H5 用户端</div>
+          <div class="summary-role-title">H5 / Web 用户端</div>
         </div>
-        <div class="summary-role-desc">浅色、低门槛、直接承接分析和阅读。普通用户看到的是研究框架、K线图表、复盘内容、自选股和 Hermes 对话结果。</div>
+        <div class="summary-role-desc">H5 适合移动端，Web 适合桌面端；两端共用同一套 API、权限和数据契约，普通用户看到的是研究框架、K线图表、复盘内容、自选股和 Hermes 对话结果。</div>
       </div>
       <div class="summary-role-card">
         <div class="summary-role-top">
@@ -1258,7 +1260,7 @@ body.theme-dark .tech-layer {
     <div class="ix-section-label">System Modules</div>
     <div class="ix-section-title">系统模块导航</div>
     <div class="ix-divider"></div>
-    <div class="ix-section-desc">现在拆成四个真实入口：租户门户 CMS、H5 用户端、大V 工作台 Web 和平台 Admin 后台。分析能力仍属于 Admin，不再单独包装成一个新产品入口。</div>
+    <div class="ix-section-desc">现在拆成五个真实入口：租户门户 CMS、Web 用户端、H5 用户端、大V 工作台 Web 和平台 Admin 后台。Web 与 H5 用户端完全同源，按设备选择更适合的操作界面。</div>
 
     <div class="nav-cards-grid">
       {% if tenant_portal_enabled %}<a href="/tenant/{{ default_tenant.slug }}" class="ix-nav-card">
@@ -1267,6 +1269,12 @@ body.theme-dark .tech-layer {
         <div class="ix-nav-card-desc">每个大V对应一个租户门户。门户支持模块拖拽、指标卡编排、复盘内容露出、CTA 配置和自定义文案编辑。</div>
         <div class="ix-nav-card-arrow">进入门户 →</div>
       </a>{% endif %}
+      <a href="/web" class="ix-nav-card">
+        <div class="ix-nav-card-icon">🖥️</div>
+        <div class="ix-nav-card-title">Web 用户端</div>
+        <div class="ix-nav-card-desc">电脑用户可直接使用基本面、自选股、复盘、消息与小金智能体；功能和数据与 H5 用户端保持完全同源。</div>
+        <div class="ix-nav-card-arrow">进入体验 →</div>
+      </a>
       <a href="/h5" class="ix-nav-card">
         <div class="ix-nav-card-icon">📱</div>
         <div class="ix-nav-card-title">H5 用户端</div>
@@ -1298,7 +1306,7 @@ body.theme-dark .tech-layer {
     <div class="ix-section-label">C-Side Core Capabilities</div>
     <div class="ix-section-title">当前对外承接的 C 端能力</div>
     <div class="ix-divider"></div>
-    <div class="ix-section-desc">当前对外承接分成两部分：租户门户 CMS 负责把指标卡、复盘、研究框架和自定义内容编排成主页；H5 负责后续的基本面分析、自选股、每日复盘和 Hermes 互动。</div>
+    <div class="ix-section-desc">当前对外承接分成两部分：租户门户 CMS 负责把指标卡、复盘、研究框架和自定义内容编排成主页；H5 与 Web 用户端负责后续的基本面分析、自选股、每日复盘、消息和 Hermes 互动。</div>
 
     <div style="margin-bottom:24px;background:rgba(47,116,192,0.05);border:1px solid rgba(47,116,192,0.16);border-radius:16px;padding:22px 24px">
       <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:10px">租户门户 CMS 的定义</div>
@@ -1945,7 +1953,7 @@ body.theme-dark .tech-layer {
       <!-- Frontend -->
       <div class="tech-layer">
         <div class="tech-layer-label">📱 前端层</div>
-        <div class="tech-item"><div class="tech-item-icon">📱</div><div>H5端 (原生JS / Vue)</div></div>
+        <div class="tech-item"><div class="tech-item-icon">📱</div><div>H5 / Web 用户端 (同源模板与 API)</div></div>
         <div class="tech-item"><div class="tech-item-icon">⚙️</div><div>Admin端 (Flask Templates)</div></div>
         <div class="tech-item"><div class="tech-item-icon">📊</div><div>Dashboard (ECharts)</div></div>
         <div style="margin-top:12px;font-size:11px;color:var(--gray-600);line-height:1.5">轻量化前端，响应式设计，PWA支持</div>
@@ -1986,7 +1994,7 @@ body.theme-dark .tech-layer {
     <div style="margin-top:28px;background:rgba(200,169,110,0.04);border:1px solid rgba(200,169,110,0.1);border-radius:10px;padding:20px 24px">
       <div style="font-size:13px;color:var(--gray-400);line-height:1.8">
         <strong style="color:var(--gold)">数据流向：</strong>
-        用户在 H5 提交原始问题 → 后端保留原文并做基础技术校验 → Admin 配置的 LLM 首轮拆解意图与多个任务 → Skills 做可配置的语义拦截与审计 → Gangtise 研究任务原文直出、闲聊与组合说明由 LLM 回答 → 记忆与调用轨迹写入数据库并返回前端
+        用户在 H5 或 Web 提交原始问题 → 后端保留原文并做基础技术校验 → Admin 配置的 LLM 首轮拆解意图与多个任务 → Skills 做可配置的语义拦截与审计 → Gangtise 研究任务原文直出、闲聊与组合说明由 LLM 回答 → 记忆与调用轨迹写入数据库并返回前端
       </div>
     </div>
   </div>
@@ -2139,7 +2147,7 @@ body.theme-dark .tech-layer {
             <span style="position:absolute;left:0;color:var(--gold)">•</span>围绕复盘、自选股、纪要等高频动作预设模式
           </div>
           <div style="font-size:13px;color:var(--white);padding-left:16px;position:relative">
-            <span style="position:absolute;left:0;color:var(--gold)">•</span>每个 Skill 可绑定租户知识库、提示词和研究表达方式
+            <span style="position:absolute;left:0;color:var(--gold)">•</span>每个 Skill 可配置规则、提示词、研究表达方式和审计动作
           </div>
           <div style="font-size:13px;color:var(--white);padding-left:16px;position:relative">
             <span style="position:absolute;left:0;color:var(--gold)">•</span>点击式与对话式双交互并存，兼容原有习惯
@@ -2260,6 +2268,7 @@ body.theme-dark .tech-layer {
       <div>
         <div class="footer-col-title">产品</div>
         {% if tenant_portal_enabled %}<a href="/tenant/{{ default_tenant.slug }}" class="footer-col-link">租户门户 CMS</a>{% endif %}
+        <a href="/web" class="footer-col-link">Web 用户端</a>
         <a href="/h5" class="footer-col-link">H5 用户端</a>
         <a href="/kol-workbench?tenant={{ default_tenant.slug }}" class="footer-col-link">大V 工作台 Web</a>
         <a href="/admin" class="footer-col-link">纯 Admin 后台</a>

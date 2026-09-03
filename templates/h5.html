@@ -13,6 +13,7 @@
   window.ACTIVE_TENANT = {{ active_tenant | tojson if active_tenant else 'null' }};
   window.DEMO_PROFILES = {{ demo_profiles | tojson }};
   window.CURRENT_DEMO_PROFILE = {{ current_demo_profile | tojson if current_demo_profile else 'null' }};
+  window.USER_APP_SURFACE = {{ ('web' if desktop_mode else 'h5') | tojson }};
   window.SITE_CONFIG.default_theme = 'light';
   try { localStorage.setItem('gangtise_theme_mode', 'light'); } catch (e) {}
 </script>
@@ -1962,6 +1963,78 @@ body { background: var(--surface-2); color: var(--text-main); }
   border:1px solid rgba(47,116,192,0.10);
   background:#F8FBFF;
 }
+
+/* Desktop user app: reuse the H5 product and API contract, but replace the
+   mobile bottom navigation with a persistent desktop sidebar. */
+@media (min-width: 960px) {
+  body.desktop-user-app { min-width: 1024px; background:#F4F8FC; overflow-x:hidden; }
+  .desktop-user-app .h5-wrap {
+    width:calc(100vw - 280px);
+    max-width:none;
+    min-height:100vh;
+    margin:0 0 0 260px;
+    padding:20px 32px 44px;
+  }
+  .desktop-user-app .h5-header {
+    position:sticky;
+    top:16px;
+    z-index:80;
+    margin-bottom:18px;
+    border:1px solid rgba(47,116,192,0.12);
+    border-radius:14px;
+    padding:14px 18px;
+    box-shadow:0 12px 28px rgba(31,73,125,0.08);
+  }
+  .desktop-user-app .h5-bottom-nav {
+    top:20px;
+    bottom:20px;
+    left:20px;
+    transform:none;
+    width:220px;
+    padding:14px 10px;
+    flex-direction:column;
+    align-items:stretch;
+    justify-content:flex-start;
+    gap:3px;
+    border:1px solid rgba(47,116,192,0.12);
+    border-radius:14px;
+    box-shadow:0 16px 36px rgba(31,73,125,0.10);
+  }
+  .desktop-user-app .h5-nav-item {
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    min-height:42px;
+    padding:8px 10px;
+    border-radius:8px;
+    text-align:left;
+  }
+  .desktop-user-app .h5-nav-item:hover,
+  .desktop-user-app .h5-nav-item.active { background:rgba(47,116,192,0.08); }
+  .desktop-user-app .h5-nav-icon { width:24px; text-align:center; line-height:1; }
+  .desktop-user-app .h5-nav-label { margin:0; font-size:13px; white-space:nowrap; }
+  .desktop-user-app .pixel-gold-ingot--nav { width:19px; height:19px; }
+  .desktop-user-app .h5-section { max-width:none; }
+  .desktop-user-app #page-hermes .hermes-shell {
+    width:100%;
+    max-width:none;
+    margin:0;
+    padding:20px 0 28px;
+  }
+  .desktop-user-app #page-hermes .hermes-composer-shell {
+    left:260px;
+    width:calc(100vw - 280px);
+    max-width:none;
+    transform:none;
+    padding:12px 32px 16px;
+  }
+  .desktop-user-app #page-hermes .hermes-lobster-composer { width:100%; max-width:none; }
+  .desktop-user-app .modal-overlay { align-items:center; padding:28px; }
+  .desktop-user-app .modal-sheet,
+  .desktop-user-app .h5-onboarding-sheet { width:min(720px, 100%); max-width:720px; border-radius:16px; }
+  .desktop-user-app .review-production-page { max-width:1120px; margin:0 auto; }
+}
 .h5-onboarding-section + .h5-onboarding-section { margin-top:12px; }
 .h5-onboarding-section-title {
   font-size:13px;
@@ -2418,7 +2491,6 @@ body { background: var(--surface-2); color: var(--text-main); }
   cursor:pointer;
 }
 .fund-board-tab.active { border-color:var(--gold); color:var(--gold); background:rgba(47,116,192,0.08); }
-.fund-board-tab-count { margin-left:6px; font-size:10px; opacity:0.86; }
 .fund-board-panel { display:none; }
 .fund-board-panel.active { display:block; }
 .fund-board-empty { padding:16px 12px; border:1px dashed rgba(47,116,192,0.22); border-radius:10px; color:var(--gray-400); font-size:12px; line-height:1.6; text-align:center; }
@@ -2446,17 +2518,6 @@ body { background: var(--surface-2); color: var(--text-main); }
 .fund-stock-price { font-size:18px; font-weight:700; color:var(--white); }
 .fund-stock-change { font-size:11px; margin-top:4px; }
 .fund-stock-signal { font-size:12px; color:var(--white); line-height:1.7; margin-top:10px; }
-.fund-stock-alert-row { display:flex; align-items:flex-start; gap:8px; margin-top:10px; }
-.fund-stock-alert-tag {
-  flex-shrink:0;
-  font-size:10px;
-  border-radius:999px;
-  padding:3px 8px;
-}
-.fund-stock-alert-tag.normal { color:var(--green); background:rgba(46,204,113,0.12); }
-.fund-stock-alert-tag.attention { color:#3498DB; background:rgba(52,152,219,0.12); }
-.fund-stock-alert-tag.warning { color:#E74C3C; background:rgba(231,76,60,0.12); }
-.fund-stock-alert-text { font-size:11px; color:var(--gray-400); line-height:1.6; }
 .fund-news-item { box-shadow:0 8px 22px rgba(31,73,125,0.06); }
 .fund-news-item.is-watchlist-sector {
   border-color:rgba(31,73,125,0.30);
@@ -2489,6 +2550,32 @@ body { background: var(--surface-2); color: var(--text-main); }
   padding:4px 8px;
 }
 .fund-news-why { font-size:11px; color:var(--gray-400); line-height:1.7; margin-top:10px; }
+.fund-news-page-head { display:flex; align-items:flex-start; gap:10px; margin-bottom:14px; }
+.fund-news-search {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:0 12px;
+  min-height:42px;
+  border:1px solid rgba(47,116,192,0.16);
+  border-radius:10px;
+  background:#FFFFFF;
+  color:var(--gray-400);
+}
+.fund-news-search input {
+  min-width:0;
+  flex:1;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:var(--text-main);
+  font:inherit;
+  font-size:12px;
+}
+.fund-news-search:focus-within { border-color:#2F74C0; box-shadow:0 0 0 3px rgba(47,116,192,0.08); }
+.fund-news-list-tabs { display:flex; gap:8px; overflow-x:auto; padding:12px 0 8px; scrollbar-width:none; }
+.fund-news-list-tabs::-webkit-scrollbar { display:none; }
+.fund-news-list-tab { flex:0 0 auto; white-space:nowrap; }
 .wb-dashboard-card {
   background:#FFFFFF;
   border:1px solid rgba(47,116,192,0.10);
@@ -4258,7 +4345,7 @@ body,
 }
 </style>
 </head>
-<body onload="initGangtiseTheme()">
+<body class="{% if desktop_mode %}desktop-user-app{% endif %}" onload="initGangtiseTheme()">
 <div id="h5-splash-screen" class="h5-splash-screen" role="status" aria-live="polite" aria-label="正在加载">
   <svg class="h5-splash-art" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
     <defs><pattern id="h5-splash-grid-pattern" width="72" height="72" patternUnits="userSpaceOnUse"><path class="h5-splash-art-grid" d="M72 0H0V72" /></pattern></defs>
@@ -4298,7 +4385,7 @@ body,
     <div id="h5-login-quick-section"></div>
   </div>
 </div>
-<div class="h5-wrap">
+<div class="h5-wrap{% if desktop_mode %} h5-wrap-desktop{% endif %}">
   <div id="h5-watermark-layer" class="h5-watermark-layer" aria-hidden="true"></div>
 
   <!-- ===== HEADER ===== -->
@@ -4309,7 +4396,7 @@ body,
         <div class="h5-tagline">{{ brand_config.tagline }} · 专业投资研究界面</div>
       </div>
       <div style="display:flex;gap:10px;align-items:center">
-        <div class="tag tag-gold">H5 固定浅色</div>
+        <div class="tag tag-gold">{% if desktop_mode %}Web 用户端{% else %}H5 固定浅色{% endif %}</div>
         <div id="global-profile-avatar" onclick="switchTab('profile')" style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--gold-dark),var(--gold));display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer">👤</div>
       </div>
     </div>
@@ -4329,7 +4416,7 @@ body,
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
           <div>
             <div class="fund-overview-title">今日基本面首页</div>
-            <div class="fund-overview-desc">先看宏观核心指标有没有报警，再看自选股板块预警，最后只保留真正值得看的综合要闻。</div>
+            <div class="fund-overview-desc">先看宏观核心指标，再看自选股板块行情与研究摘要，最后阅读真正值得看的综合要闻。</div>
           </div>
           <span class="tag tag-gold">决策首页</span>
         </div>
@@ -4343,12 +4430,11 @@ body,
 
     <div class="h5-section" id="fundamental-watchlist-boards">
       <div class="h5-section-title">板块</div>
-      <div class="fund-board-hint">这里展示当前登录用户的自选股。按行业板块分组后，可以直接看到哪些标的正在预警。</div>
+      <div class="fund-board-hint">这里展示当前登录用户的自选股，并按行业板块归纳行情与研究摘要。</div>
       <div class="fund-board-tabs" id="fund-board-tabs">
         {% for board in feed_boards %}
         <button class="fund-board-tab {% if loop.first %}active{% endif %}" id="fund-board-tab-{{ loop.index0 }}" onclick="switchFeedBoardTab({{ loop.index0 }})">
           {{ board.name }}
-          <span class="fund-board-tab-count">{{ board.warning_count }}预警</span>
         </button>
         {% endfor %}
       </div>
@@ -4357,7 +4443,7 @@ body,
       <div class="fund-board-panel {% if loop.first %}active{% endif %}" id="fund-board-panel-{{ loop.index0 }}">
         <div class="fund-board-summary">
           <span>{{ board['name'] }} · 共 {{ board['items']|length }} 只自选股</span>
-          <span>{% if board['warning_count'] %}当前有 {{ board['warning_count'] }} 条需要关注{% else %}当前无明显预警{% endif %}</span>
+          <span>查看最新行情与研究摘要</span>
         </div>
         <div class="fund-stock-list">
           {% for item in board['items'] %}
@@ -4381,12 +4467,6 @@ body,
               </div>
             </div>
             <div class="fund-stock-signal">{{ item.signal_summary }}</div>
-            <div class="fund-stock-alert-row">
-              <span class="fund-stock-alert-tag {{ item.alert_level }}">
-                {% if item.alert_level == 'warning' %}预警{% elif item.alert_level == 'attention' %}关注{% else %}正常{% endif %}
-              </span>
-              <span class="fund-stock-alert-text">{{ item.alert_text }}</span>
-            </div>
           </div>
           {% endfor %}
         </div>
@@ -4399,7 +4479,7 @@ body,
     <div class="h5-section">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px">
         <div class="h5-section-title" style="margin-bottom:0">综合归纳要闻</div>
-        <button class="btn-outline" type="button" style="padding:6px 12px;font-size:11px;flex-shrink:0" onclick="openFundNewsModal()">更多</button>
+        <button class="btn-outline" type="button" style="padding:6px 12px;font-size:11px;flex-shrink:0" onclick="openFundNewsList()">更多</button>
       </div>
       <div class="fund-news-hint">内容来自真实公开信息源，按发布时间展示当日最新 Top5；点击“更多”查看完整新闻列表。</div>
       {% if not news %}<div class="fund-news-hint">当前没有达到纳入标准的真实新闻，暂不展示演示内容。</div>{% endif %}
@@ -4424,6 +4504,25 @@ body,
       {% endfor %}
     </div>
 
+  </div>
+
+  <!-- ===== FUNDAMENTAL NEWS LIST ===== -->
+  <div id="page-fund-news-list" class="page" data-feature="fundamental_analysis">
+    <div class="h5-section">
+      <div class="fund-news-page-head">
+        <button class="btn-outline" type="button" style="padding:6px 10px;font-size:12px" onclick="closeFundNewsList()">返回</button>
+        <div style="min-width:0">
+          <div class="h5-section-title" style="margin:0">新闻列表</div>
+          <div class="fund-news-hint" style="margin:4px 0 0">按来源筛选或搜索标题、内容和关联主题；点击任意新闻查看详情。</div>
+        </div>
+      </div>
+      <label class="fund-news-search" for="fund-news-query-input">
+        <span aria-hidden="true">⌕</span>
+        <input id="fund-news-query-input" type="search" placeholder="搜索新闻标题、内容或关联主题" oninput="updateFundNewsListQuery(this.value)" autocomplete="off">
+      </label>
+      <div id="fund-news-list-tabs" class="fund-news-list-tabs" aria-label="新闻来源筛选"></div>
+      <div id="fund-news-list-results"></div>
+    </div>
   </div>
 
   <!-- ===== TAB 2: 社区 ===== -->
@@ -5265,14 +5364,6 @@ body,
     <div class="modal-handle"></div>
     <div class="modal-close-row"><button class="modal-close-btn" type="button" onclick="closeH5ModalById('event-detail-modal')">关闭</button></div>
     <div id="event-detail-content"></div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="fund-news-modal" onclick="if(event.target===this)closeFundNewsModal()">
-  <div class="modal-sheet" style="max-height:88vh;overflow-y:auto">
-    <div class="modal-handle"></div>
-    <div class="modal-close-row"><button class="modal-close-btn" type="button" onclick="closeFundNewsModal()">关闭</button></div>
-    <div id="fund-news-modal-content"></div>
   </div>
 </div>
 
@@ -12843,6 +12934,7 @@ function switchTab(tab) {
     const pageEl = document.getElementById('page-' + t);
     if (pageEl) pageEl.classList.remove('active');
   });
+  document.getElementById('page-fund-news-list')?.classList.remove('active');
 
   // Remove active from all bottom nav items
   document.querySelectorAll('.h5-nav-item').forEach(el => el.classList.remove('active'));
@@ -13861,20 +13953,18 @@ function renderFundamentalWatchlistBoards() {
     panelsHost.innerHTML = '<div class="fund-board-empty">当前没有可展示的自选股行情。请先在自选股中添加标的。</div>';
     return;
   }
-  tabsHost.innerHTML = entries.map(([name, items], index) => {
-    const warnings = items.filter((item) => ['warning', 'attention'].includes(item.alert_level)).length;
-    return `<button class="fund-board-tab ${index === 0 ? 'active' : ''}" onclick="switchFeedBoardTab(${index})">${escapeHtml(name)}<span class="fund-board-tab-count">${warnings}预警</span></button>`;
-  }).join('');
+  tabsHost.innerHTML = entries.map(([name], index) => (
+    `<button class="fund-board-tab ${index === 0 ? 'active' : ''}" onclick="switchFeedBoardTab(${index})">${escapeHtml(name)}</button>`
+  )).join('');
   panelsHost.innerHTML = entries.map(([name, items], index) => {
-    const warnings = items.filter((item) => ['warning', 'attention'].includes(item.alert_level)).length;
     return `<div class="fund-board-panel ${index === 0 ? 'active' : ''}">
-      <div class="fund-board-summary"><span>${escapeHtml(name)} · 共 ${items.length} 只自选股</span><span>${warnings ? `当前有 ${warnings} 条需要关注` : '当前无明显预警'}</span></div>
+      <div class="fund-board-summary"><span>${escapeHtml(name)} · 共 ${items.length} 只自选股</span><span>查看最新行情与研究摘要</span></div>
       <div class="fund-stock-list">${items.map((item) => {
         const change = Number(item.change);
         const positive = change >= 0;
         return `<div class="fund-stock-card" onclick="openWatchlistDetail('${escapeAttr(item.code)}','overview'); switchTab('market');">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px"><div><div class="fund-stock-name">${escapeHtml(item.name || item.code)}</div><div class="fund-stock-meta">${escapeHtml(item.code)} · ${escapeHtml(item.market || '--')} · ${escapeHtml(item.industry || item.focus || '--')}</div></div><div class="fund-stock-price-wrap"><div class="fund-stock-price">${Number(item.price).toFixed(2)}</div><div class="fund-stock-change ${positive ? 'up' : 'down'}">${positive ? '▲' : '▼'} ${Math.abs(Number(item.change_pct)).toFixed(2)}%</div></div></div>
-          <div class="fund-stock-signal">${escapeHtml(item.signal_summary || '当前无明显预警')}</div><div class="fund-stock-alert-row"><span class="fund-stock-alert-tag ${escapeAttr(item.alert_level || 'normal')}">${item.alert_level === 'warning' ? '预警' : item.alert_level === 'attention' ? '关注' : '正常'}</span><span class="fund-stock-alert-text">${escapeHtml(item.alert_text || '当前无明显预警')}</span></div>
+          <div class="fund-stock-signal">${escapeHtml(item.signal_summary || '继续关注行情与研究进展')}</div>
         </div>`;
       }).join('')}</div>
     </div>`;
@@ -15140,52 +15230,99 @@ function renderFundNewsRelevance(item) {
   return `<span class="fund-news-relevance">${escapeHtml(label)}</span>`;
 }
 
-function renderFundNewsModal(activeTabKey) {
+function buildFundNewsListRouteUrl(activeTabKey) {
+  const url = new URL(window.location.href);
+  url.searchParams.set('news_view', 'list');
+  if (activeTabKey && activeTabKey !== 'summary') url.searchParams.set('news_tab', activeTabKey);
+  else url.searchParams.delete('news_tab');
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+function renderFundNewsList() {
   const tabs = getFundNewsTabs();
-  const nextKey = tabs.some((tab) => tab.key === activeTabKey) ? activeTabKey : 'summary';
-  fundNewsModalActiveTab = nextKey;
+  const nextKey = tabs.some((tab) => tab.key === fundNewsListState.activeTabKey) ? fundNewsListState.activeTabKey : 'summary';
+  fundNewsListState.activeTabKey = nextKey;
   const currentTab = tabs.find((tab) => tab.key === nextKey) || tabs[0];
-  const host = document.getElementById('fund-news-modal-content');
-  if (!host || !currentTab) return;
-  window.FUND_NEWS_MODAL_ITEMS = currentTab.items || [];
-  host.innerHTML = `
-    <div style="padding:0 4px 6px">
-      <div style="font-size:16px;font-weight:700;color:var(--white);margin-bottom:8px">新闻列表</div>
-      <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:12px">“今日 Top5”展示当日最新新闻；“全部”汇总所有已入湖新闻，其他 tab 可按来源查看。</div>
-      <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px;scrollbar-width:none">
-        ${tabs.map((tab) => `<button type="button" class="watch-detail-tab ${tab.key === nextKey ? 'active' : ''}" style="white-space:nowrap;flex-shrink:0" onclick="renderFundNewsModal('${escapeAttr(tab.key)}')">${escapeHtml(tab.label)} <span style="opacity:.75">(${tab.count})</span></button>`).join('')}
-      </div>
-      ${currentTab.items.length ? `
-        <div style="display:grid;gap:10px">
-          ${currentTab.items.map((newsItem, index) => `
-            <div class="news-item fund-news-item ${String(newsItem.aggregation_bucket || '') === 'watchlist_sector' ? 'is-watchlist-sector' : ''}" style="cursor:pointer" onclick="showFundNewsDetail(window.FUND_NEWS_MODAL_ITEMS[${index}])">
-              <div class="news-item-header">
-                <div class="news-title">${escapeHtml(newsItem.title || '综合归纳要闻')}</div>
-                <span class="fund-news-source">${escapeHtml(newsItem.source_group || newsItem.tag || '综合要闻')}</span>
-              </div>
-              <div class="news-meta">
-                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                  <span class="tag tag-gold">${escapeHtml(newsItem.tag || newsItem.source_group || '综合要闻')}</span>
-                  ${renderFundNewsRelevance(newsItem)}
-                  <span class="news-time">${escapeHtml(newsItem.time || '刚刚')}</span>
-                </div>
-              </div>
-              <div class="fund-news-why">为什么是要闻：${escapeHtml(newsItem.why || '当前没有补充说明。')}</div>
-            </div>
-          `).join('')}
+  const query = String(fundNewsListState.query || '').trim().toLowerCase();
+  const rows = (currentTab?.items || []).filter((item) => {
+    if (!query) return true;
+    return [item.title, item.content, item.summary, item.why, item.tag, item.source_group, ...(item.matched_topics || [])]
+      .join(' ')
+      .toLowerCase()
+      .includes(query);
+  });
+  window.FUND_NEWS_LIST_ITEMS = rows;
+  const tabsHost = document.getElementById('fund-news-list-tabs');
+  const resultsHost = document.getElementById('fund-news-list-results');
+  if (tabsHost) {
+    tabsHost.innerHTML = tabs.map((tab) => (
+      `<button type="button" class="watch-detail-tab fund-news-list-tab ${tab.key === nextKey ? 'active' : ''}" onclick="selectFundNewsListTab('${escapeAttr(tab.key)}')">${escapeHtml(tab.label)} <span style="opacity:.75">(${tab.count})</span></button>`
+    )).join('');
+  }
+  if (!resultsHost) return;
+  resultsHost.innerHTML = rows.length ? `
+    <div style="display:grid;gap:10px">
+      ${rows.map((newsItem, index) => `
+        <div class="news-item fund-news-item ${String(newsItem.aggregation_bucket || '') === 'watchlist_sector' ? 'is-watchlist-sector' : ''}" style="cursor:pointer" onclick="showFundNewsDetail(window.FUND_NEWS_LIST_ITEMS[${index}])">
+          <div class="news-item-header">
+            <div class="news-title">${escapeHtml(newsItem.title || '综合归纳要闻')}</div>
+            <span class="fund-news-source">${escapeHtml(newsItem.source_group || newsItem.tag || '综合要闻')}</span>
+          </div>
+          <div class="news-meta"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="tag tag-gold">${escapeHtml(newsItem.tag || newsItem.source_group || '综合要闻')}</span>${renderFundNewsRelevance(newsItem)}<span class="news-time">${escapeHtml(newsItem.time || '刚刚')}</span></div></div>
+          <div class="fund-news-why">为什么是要闻：${escapeHtml(newsItem.why || '当前没有补充说明。')}</div>
         </div>
-      ` : `<div class="fund-news-hint">当前这个新闻源下没有可展示的精选内容。</div>`}
+      `).join('')}
     </div>
-  `;
+  ` : `<div class="fund-board-empty">当前筛选条件下没有可展示的新闻。</div>`;
 }
 
-function openFundNewsModal() {
-  renderFundNewsModal(fundNewsModalActiveTab || 'summary');
-  document.getElementById('fund-news-modal')?.classList.add('show');
+function openFundNewsList(options = {}) {
+  const feedPage = document.getElementById('page-feed');
+  const listPage = document.getElementById('page-fund-news-list');
+  if (!feedPage || !listPage) return;
+  const tabs = getFundNewsTabs();
+  const requestedTab = String(options.activeTabKey || fundNewsListState.activeTabKey || 'summary').trim();
+  fundNewsListState.activeTabKey = tabs.some((tab) => tab.key === requestedTab) ? requestedTab : 'summary';
+  if (!options.keepQuery) fundNewsListState.query = '';
+  feedPage.classList.remove('active');
+  listPage.classList.add('active');
+  document.querySelectorAll('.h5-nav-item').forEach((item) => item.classList.remove('active'));
+  document.getElementById('nav-feed')?.classList.add('active');
+  if (!options.skipHistory) window.history.pushState({}, '', buildFundNewsListRouteUrl(fundNewsListState.activeTabKey));
+  renderFundNewsList();
+  window.scrollTo({ top: 0, behavior: options.skipScroll ? 'auto' : 'smooth' });
 }
 
-function closeFundNewsModal() {
-  document.getElementById('fund-news-modal')?.classList.remove('show');
+function closeFundNewsList(options = {}) {
+  document.getElementById('page-fund-news-list')?.classList.remove('active');
+  document.getElementById('page-feed')?.classList.add('active');
+  document.querySelectorAll('.h5-nav-item').forEach((item) => item.classList.remove('active'));
+  document.getElementById('nav-feed')?.classList.add('active');
+  if (!options.skipHistory) {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('news_view');
+    url.searchParams.delete('news_tab');
+    window.history.pushState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  }
+  window.scrollTo({ top: 0, behavior: options.skipScroll ? 'auto' : 'smooth' });
+}
+
+function selectFundNewsListTab(tabKey) {
+  fundNewsListState.activeTabKey = String(tabKey || 'summary').trim() || 'summary';
+  fundNewsListState.query = '';
+  window.history.replaceState({}, '', buildFundNewsListRouteUrl(fundNewsListState.activeTabKey));
+  renderFundNewsList();
+}
+
+function updateFundNewsListQuery(value) {
+  fundNewsListState.query = String(value || '');
+  renderFundNewsList();
+  const input = document.getElementById('fund-news-query-input');
+  if (input) {
+    input.value = fundNewsListState.query;
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  }
 }
 
 function likePost(postId, btn) {
@@ -15234,7 +15371,7 @@ let hermesSessionSearchKeyword = '';
 let hermesSessionActorKey = '';
 let hermesSessionListLoadedKey = '';
 let hermesSessionListLoading = false;
-let fundNewsModalActiveTab = 'summary';
+const fundNewsListState = { activeTabKey: 'summary', query: '' };
 
 function getHermesSettings() {
   return (window.SITE_CONFIG && window.SITE_CONFIG.hermes_settings) || {};
@@ -18497,7 +18634,18 @@ function collectWorkbenchPromptMatchedTagCodes(promptText, tagCatalog) {
   if (!prompt) return [];
   const normalize = (value) => String(value || '').replace(/[\s_\-.\/：:，,。.!！?？【】\[\]()（）]/g, '').toLowerCase();
   const normalizedPrompt = normalize(prompt);
-  return (Array.isArray(tagCatalog) ? tagCatalog.slice() : [])
+  const catalog = Array.isArray(tagCatalog) ? tagCatalog.slice() : [];
+  const explicitLabels = Array.from(prompt.matchAll(/【([^】]+)】/g)).map((match) => normalizeWorkbenchSmartTagLabel(match[1]));
+  // Bracketed values are structural formula references produced by the
+  // editor. Resolve only their exact tag, never every label sharing a prefix.
+  if (explicitLabels.length) {
+    return Array.from(new Set(explicitLabels.map((label) => {
+      const tag = catalog.find((item) => normalizeWorkbenchSmartTagLabel(item && item.label) === label);
+      return tag && tag.tag_code;
+    }).filter(Boolean)));
+  }
+  return catalog
+    .filter((tag) => tag && tag.auto_match !== false)
     .sort((left, right) => normalizeWorkbenchSmartTagLabel(right.label).length - normalizeWorkbenchSmartTagLabel(left.label).length)
     .filter((tag) => {
       const candidates = [tag && tag.label].concat(Array.isArray(tag && tag.prompt_aliases) ? tag.prompt_aliases : []);
@@ -18620,7 +18768,7 @@ function canonicalizeWorkbenchSmartPrompt(promptText, tagCatalog) {
   const source = String(promptText || '');
   const candidates = [];
   const seen = new Set();
-  (Array.isArray(tagCatalog) ? tagCatalog : []).forEach((tag) => {
+  (Array.isArray(tagCatalog) ? tagCatalog : []).filter((tag) => tag && tag.auto_match !== false).forEach((tag) => {
     const label = normalizeWorkbenchSmartTagLabel(tag && tag.label);
     if (!label) return;
     [label].concat(Array.isArray(tag && tag.prompt_aliases) ? tag.prompt_aliases : []).forEach((value) => {
@@ -19641,6 +19789,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasReviewRoute = initialParams.get('review') === 'compose'
       || ['home', 'list', 'detail'].includes(String(initialParams.get('review_view') || '').trim().toLowerCase());
     switchTab(hasReviewRoute ? 'review' : getFirstEnabledTab());
+    if (!hasReviewRoute && initialParams.get('news_view') === 'list') {
+      openFundNewsList({ activeTabKey: initialParams.get('news_tab') || 'summary', skipHistory: true, skipScroll: true });
+    }
   } else {
     setH5ShellLoggedOut(true);
   }
@@ -19662,6 +19813,14 @@ window.addEventListener('popstate', () => {
     return;
   }
   if (document.getElementById('page-review')?.classList.contains('active')) renderReviewExperience();
+  if (!shouldShowReviewPage && routeParams.get('news_view') === 'list') {
+    switchTab('feed');
+    openFundNewsList({ activeTabKey: routeParams.get('news_tab') || 'summary', skipHistory: true, skipScroll: true });
+    return;
+  }
+  if (document.getElementById('page-fund-news-list')?.classList.contains('active')) {
+    closeFundNewsList({ skipHistory: true, skipScroll: true });
+  }
 });
 
 document.addEventListener('visibilitychange', () => {

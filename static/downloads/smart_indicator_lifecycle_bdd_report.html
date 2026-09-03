@@ -12,31 +12,40 @@ h1{margin:0 0 8px;font-size:30px} h2{margin:0;font-size:18px} .muted{color:#6878
 @media(max-width:760px){.grid{grid-template-columns:1fr}}
 </style></head><body><main>
 <section class="hero"><h1>智能指标生命周期 BDD 测试报告</h1>
-<div class="muted">真实执行时间：2026-09-02 01:30:28 · 租户：laowang · 真实 PostgreSQL + 真实应用接口，不使用 mock</div>
-<div class="summary"><span class="pill">通过 <b class="good">7/7</b></span><span class="pill">失败 <b class="bad">0</b></span><span class="pill">看板布局 <b>2×2</b></span><span class="pill">模型 <code>deepseek-v4-flash-ga-260731</code></span></div></section>
+<div class="muted">真实执行时间：2026-09-03 19:24:27 · 租户：laowang · 真实 PostgreSQL + 真实应用接口，不使用 mock</div>
+<div class="summary"><span class="pill">通过 <b class="good">0/0</b></span><span class="pill">失败 <b class="bad">0</b></span><span class="pill">看板布局 <b>2×2</b></span><span class="pill">模型 <code>deepseek-v4-flash-ga-260731</code></span></div></section>
 <section class="section"><h2>执行前提与模型</h2><div class="grid"><div class="box"><b>上游真实刷新</b><pre>{
   &quot;market_snapshot&quot;: {
-    &quot;ok&quot;: true,
-    &quot;updated&quot;: 46,
-    &quot;overview_count&quot;: 9,
-    &quot;sector_count&quot;: 31,
-    &quot;macro_count&quot;: 6,
+    &quot;ok&quot;: false,
+    &quot;updated&quot;: 0,
+    &quot;overview_count&quot;: 0,
+    &quot;sector_count&quot;: 0,
+    &quot;macro_count&quot;: 0,
     &quot;macro_refreshed&quot;: true,
     &quot;intraday_count&quot;: 0,
-    &quot;updated_at&quot;: &quot;2026-09-02 01:30:32&quot;,
+    &quot;updated_at&quot;: &quot;2026-09-03 19:24:27&quot;,
     &quot;errors&quot;: [
+      &quot;上证指数：AKShare 行情获取失败：HTTPSConnectionPool(host=&#x27;finance.sina.com.cn&#x27;, port=443): Max retries exceeded with url: /realstock/company/sh000001/hisdata/klc_kl.js?d=2020_2_4 (Caused by NameResolutionError(\&quot;&lt;urllib3.connection.HTTPSConnection object at 0x17a86c0d0&gt;: Failed to resolve &#x27;finance.sina.com.cn&#x27; ([Errno 8] nodename nor servname provided, or not known)\&quot;))&quot;,
+      &quot;深证指数：AKShare 行情获取失败：HTTPSConnectionPool(host=&#x27;finance.sina.com.cn&#x27;, port=443): Max retries exceeded with url: /realstock/company/sz399001/hisdata/klc_kl.js?d=2020_2_4 (Caused by NameResolutionError(\&quot;&lt;urllib3.connection.HTTPSConnection object at 0x17a86ceb0&gt;: Failed to resolve &#x27;finance.sina.com.cn&#x27; ([Errno 8] nodename nor servname provided, or not known)\&quot;))&quot;,
+      &quot;恒生指数：AKShare 行情获取失败：HTTPSConnectionPool(host=&#x27;finance.sina.com.cn&#x27;, port=443): Max retries exceeded with url: /stock/hkstock/HSI/klc2_kl.js?d=2023_5_01 (Caused by NameResolutionError(\&quot;&lt;urllib3.connection.HTTPSConnection object at 0x17a86d780&gt;: Failed to resolve &#x27;finance.sina.com.cn&#x27; ([Errno 8] nodename nor servname provided, or not known)\&quot;))&quot;,
+      &quot;国企指数：AKShare 行情获取失败：HTTPSConnectionPool(host=&#x27;finance.sina.com.cn&#x27;, port=443): Max retries exceeded with url: /stock/hkstock/HSCEI/klc2_kl.js?d=2023_5_01 (Caused by NameResolutionError(\&quot;&lt;urllib3.connection.HTTPSConnection object at 0x17a86e050&gt;: Failed to resolve &#x27;finance.sina.com.cn&#x27; ([Errno 8] nodename nor servname provided, or not known)\&quot;))&quot;,
+      &quot;红筹指数：AKShare 行情获取失败：HTTPSConnectionPool(host=&#x27;finance.sina.com.cn&#x27;, port=443): Max retries exceeded with url: /stock/hkstock/HSCCI/klc2_kl.js?d=2023_5_01 (Caused by NameResolutionError(\&quot;&lt;urllib3.connection.HTTPSConnection object at 0x17a57e9e0&gt;: Failed to resolve &#x27;finance.sina.com.cn&#x27; ([Errno 8] nodename nor servname provided, or not known)\&quot;))&quot;,
+      &quot;道琼斯：AKShare 行情获取失败：HTTPSConnectionPool(host=&#x27;finance.sina.com.cn&#x27;, port=443): Max retries exceeded with url: /staticdata/us/.DJI (Caused by NameResolutionError(\&quot;&lt;urllib3.connection.HTTPSConnection object at 0x17a86dbd0&gt;: Failed to resolve &#x27;finance.sina.com.cn&#x27; ([Errno 8] nodename nor servname provided, or not known)\&quot;))&quot;,
+      &quot;纳斯达克：AKShare 行情获取失败：HTTPSConnectionPool(host=&#x27;finance.sina.com.cn&#x27;, port=443): Max retries exceeded with url: /staticdata/us/.IXIC (Caused by NameResolutionError(\&quot;&lt;urllib3.connection.HTTPSConnection object at 0x17a86d300&gt;: Failed to resolve &#x27;finance.sina.com.cn&#x27; ([Errno 8] nodename nor servname provided, or not known)\&quot;))&quot;,
+      &quot;标普500：AKShare 行情获取失败：HTTPSConnectionPool(host=&#x27;finance.sina.com.cn&#x27;, port=443): Max retries exceeded with url: /staticdata/us/.INX (Caused by NameResolutionError(\&quot;&lt;urllib3.connection.HTTPSConnection object at 0x17a86ca00&gt;: Failed to resolve &#x27;finance.sina.com.cn&#x27; ([Errno 8] nodename nor servname provided, or not known)\&quot;))&quot;,
+      &quot;日经225：AKShare 行情获取失败：HTTPSConnectionPool(host=&#x27;gi.finance.sina.com.cn&#x27;, port=443): Max retries exceeded with url: /hq/daily?symbol=NKY&amp;num=10000 (Caused by NameResolutionError(\&quot;&lt;urllib3.connection.HTTPSConnection object at 0x17a86e920&gt;: Failed to resolve &#x27;gi.finance.sina.com.cn&#x27; ([Errno 8] nodename nor servname provided, or not known)\&quot;))&quot;,
+      &quot;AKShare 申万一级行业行情未返回有效数据&quot;,
+      &quot;中国CPI同比指数：AKShare 宏观数据暂不可用&quot;,
+      &quot;中国PPI同比：AKShare 宏观数据暂不可用&quot;,
+      &quot;中国制造业PMI：AKShare 宏观数据暂不可用&quot;,
+      &quot;规模以上工业增加值同比：AKShare 宏观数据暂不可用&quot;,
+      &quot;社会消费品零售总额同比：AKShare 宏观数据暂不可用&quot;,
+      &quot;固定资产投资累计同比：AKShare 宏观数据暂不可用&quot;,
       &quot;全国城镇调查失业率：AKShare 宏观数据暂不可用&quot;,
       &quot;房地产开发投资累计同比：当前 AKShare 未提供房地产开发投资累计同比的精确序列&quot;
     ]
   },
-  &quot;indicator_history&quot;: {
-    &quot;synced&quot;: true,
-    &quot;updated&quot;: 12,
-    &quot;total_points&quot;: 1359,
-    &quot;eligible&quot;: 14,
-    &quot;skipped_disabled&quot;: 18,
-    &quot;batch_code&quot;: &quot;gangtise_openapi_sync_20260902013034045337&quot;
-  }
+  &quot;indicator_history_error&quot;: &quot;connection to server at \&quot;127.0.0.1\&quot;, port 5432 failed: Operation not permitted\n\tIs the server running on that host and accepting TCP/IP connections?\n&quot;
 }</pre></div><div class="box"><b>智能指标公式模型</b><pre>{
   &quot;key&quot;: &quot;volcengine-deepseek-v4-flash&quot;,
   &quot;model_name&quot;: &quot;deepseek-v4-flash-ga-260731&quot;,
@@ -46,247 +55,6 @@ h1{margin:0 0 8px;font-size:30px} h2{margin:0;font-size:18px} .muted{color:#6878
   &quot;expected_base_url&quot;: &quot;https://ark.cn-beijing.volces.com/api/v3&quot;,
   &quot;matches_v4&quot;: true
 }</pre></div></div></section>
-<section class="section"><h2>BDD 场景</h2>
-            <article class="scenario pass">
-              <header><h2>1. 建立 2×2 看板</h2><strong>PASS</strong></header>
-              <p><b>Given</b> 用户进入智能指标看板编辑器。</p>
-              <p><b>When</b> 通过真实 Dashboard API 保存 2×2 空白草稿。</p>
-              <p><b>Then</b> 服务端返回 200 且草稿保留 4 个槽位。</p>
-              <div class="detail">HTTP 200</div>
-              <details><summary>查看真实证据</summary><pre>{
-  &quot;status&quot;: 200,
-  &quot;draft_codes&quot;: [
-    &quot;&quot;,
-    &quot;&quot;,
-    &quot;&quot;,
-    &quot;&quot;
-  ]
-}</pre></details>
-            </article>
-            
-            <article class="scenario pass">
-              <header><h2>2. 添加第一个指标 CPI</h2><strong>PASS</strong></header>
-              <p><b>Given</b> 2×2 看板已建立，CPI 是已注册基础指标。</p>
-              <p><b>When</b> 通过智能指标真实保存 API 创建 CPI，并写入第一个看板槽位。</p>
-              <p><b>Then</b> CPI 卡片与指标定义、最新快照均已持久化。</p>
-              <div class="detail">HTTP 200；看板 HTTP 200</div>
-              <details><summary>查看真实证据</summary><pre>{
-  &quot;indicator_code&quot;: &quot;laowang_smart_20260902_013053400&quot;,
-  &quot;indicator&quot;: {
-    &quot;definition_exists&quot;: true,
-    &quot;definition&quot;: {
-      &quot;indicator_code&quot;: &quot;laowang_smart_20260902_013053400&quot;,
-      &quot;indicator_name&quot;: &quot;BDD-CPI&quot;,
-      &quot;tenant_slug&quot;: &quot;laowang&quot;,
-      &quot;source_type&quot;: &quot;smart&quot;,
-      &quot;provider&quot;: &quot;LLM / Prompt Formula&quot;,
-      &quot;prompt_text&quot;: &quot;CPI&quot;,
-      &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_cpi\&quot;] || 0);&quot;,
-      &quot;selected_indicators_json&quot;: &quot;[{\&quot;indicator_code\&quot;: \&quot;source_cpi\&quot;, \&quot;indicator_name\&quot;: \&quot;中国CPI同比指数\&quot;}, {\&quot;indicator_code\&quot;: \&quot;laowang_smart_20260902_010043483\&quot;, \&quot;indicator_name\&quot;: \&quot;中国CPI同比指数组合指标\&quot;}, {\&quot;indicator_code\&quot;: \&quot;laowang_cpi\&quot;, \&quot;indicator_name\&quot;: \&quot;CPI智能指标\&quot;}]&quot;
-    },
-    &quot;latest_exists&quot;: true,
-    &quot;latest&quot;: {
-      &quot;latest_value&quot;: &quot;0.5&quot;,
-      &quot;updated_at&quot;: &quot;2026-09-02 01:30:53&quot;,
-      &quot;is_simulated&quot;: 0,
-      &quot;source_code&quot;: &quot;tenant_smart_formula&quot;
-    },
-    &quot;series&quot;: {
-      &quot;total&quot;: 1,
-      &quot;real_count&quot;: 1
-    }
-  },
-  &quot;formula_meta&quot;: {
-    &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_cpi\&quot;] || 0);&quot;,
-    &quot;generator&quot;: &quot;preview_confirmed&quot;,
-    &quot;llm_used&quot;: false
-  }
-}</pre></details>
-            </article>
-            
-            <article class="scenario pass">
-              <header><h2>3. 添加第二个指标 深证指数</h2><strong>PASS</strong></header>
-              <p><b>Given</b> CPI 已在第一个槽位。</p>
-              <p><b>When</b> 创建深证指数指标并写入第二个看板槽位。</p>
-              <p><b>Then</b> 第二个卡片可见，且定义与快照已保存。</p>
-              <div class="detail">HTTP 200；看板 HTTP 200</div>
-              <details><summary>查看真实证据</summary><pre>{
-  &quot;indicator_code&quot;: &quot;laowang_smart_20260902_013100979&quot;,
-  &quot;indicator&quot;: {
-    &quot;definition_exists&quot;: true,
-    &quot;definition&quot;: {
-      &quot;indicator_code&quot;: &quot;laowang_smart_20260902_013100979&quot;,
-      &quot;indicator_name&quot;: &quot;BDD-深证指数&quot;,
-      &quot;tenant_slug&quot;: &quot;laowang&quot;,
-      &quot;source_type&quot;: &quot;smart&quot;,
-      &quot;provider&quot;: &quot;LLM / Prompt Formula&quot;,
-      &quot;prompt_text&quot;: &quot;深证指数&quot;,
-      &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_shenzhen_index\&quot;] || 0);&quot;,
-      &quot;selected_indicators_json&quot;: &quot;[{\&quot;indicator_code\&quot;: \&quot;source_shenzhen_index\&quot;, \&quot;indicator_name\&quot;: \&quot;深证指数\&quot;}, {\&quot;indicator_code\&quot;: \&quot;laowang_smart_20260814_202231136\&quot;, \&quot;indicator_name\&quot;: \&quot;深证指数80\&quot;}]&quot;
-    },
-    &quot;latest_exists&quot;: true,
-    &quot;latest&quot;: {
-      &quot;latest_value&quot;: &quot;13872.38&quot;,
-      &quot;updated_at&quot;: &quot;2026-09-02 01:31:00&quot;,
-      &quot;is_simulated&quot;: 0,
-      &quot;source_code&quot;: &quot;tenant_smart_formula&quot;
-    },
-    &quot;series&quot;: {
-      &quot;total&quot;: 1,
-      &quot;real_count&quot;: 1
-    }
-  },
-  &quot;formula_meta&quot;: {
-    &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_shenzhen_index\&quot;] || 0);&quot;,
-    &quot;generator&quot;: &quot;preview_confirmed&quot;,
-    &quot;llm_used&quot;: false
-  }
-}</pre></details>
-            </article>
-            
-            <article class="scenario pass">
-              <header><h2>4. 添加第三个指标 黄金 / 白银</h2><strong>PASS</strong></header>
-              <p><b>Given</b> CPI、深证指数已经占用前两个槽位。</p>
-              <p><b>When</b> 创建黄金/白银比值指标并写入第三个槽位。</p>
-              <p><b>Then</b> 复合计算卡片成功保存，两个底层引用和计算公式均可审计。</p>
-              <div class="detail">HTTP 200；看板 HTTP 200</div>
-              <details><summary>查看真实证据</summary><pre>{
-  &quot;indicator_code&quot;: &quot;laowang_smart_20260902_013108717&quot;,
-  &quot;indicator&quot;: {
-    &quot;definition_exists&quot;: true,
-    &quot;definition&quot;: {
-      &quot;indicator_code&quot;: &quot;laowang_smart_20260902_013108717&quot;,
-      &quot;indicator_name&quot;: &quot;BDD-黄金白银&quot;,
-      &quot;tenant_slug&quot;: &quot;laowang&quot;,
-      &quot;source_type&quot;: &quot;smart&quot;,
-      &quot;provider&quot;: &quot;LLM / Prompt Formula&quot;,
-      &quot;prompt_text&quot;: &quot;黄金/白银&quot;,
-      &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_gold\&quot;] || 0) / Number(inputs[\&quot;source_silver\&quot;] || 0);&quot;,
-      &quot;selected_indicators_json&quot;: &quot;[{\&quot;indicator_code\&quot;: \&quot;source_gold\&quot;, \&quot;indicator_name\&quot;: \&quot;黄金\&quot;}, {\&quot;indicator_code\&quot;: \&quot;source_silver\&quot;, \&quot;indicator_name\&quot;: \&quot;白银\&quot;}]&quot;
-    },
-    &quot;latest_exists&quot;: true,
-    &quot;latest&quot;: {
-      &quot;latest_value&quot;: &quot;50.1359&quot;,
-      &quot;updated_at&quot;: &quot;2026-09-02 01:31:08&quot;,
-      &quot;is_simulated&quot;: 0,
-      &quot;source_code&quot;: &quot;tenant_smart_formula&quot;
-    },
-    &quot;series&quot;: {
-      &quot;total&quot;: 1,
-      &quot;real_count&quot;: 1
-    }
-  },
-  &quot;formula_meta&quot;: {
-    &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_gold\&quot;] || 0) / Number(inputs[\&quot;source_silver\&quot;] || 0);&quot;,
-    &quot;generator&quot;: &quot;preview_confirmed&quot;,
-    &quot;llm_used&quot;: false
-  }
-}</pre></details>
-            </article>
-            
-            <article class="scenario pass">
-              <header><h2>5. 删除第一个指标 CPI</h2><strong>PASS</strong></header>
-              <p><b>Given</b> CPI 已发布，且当前操作是从看板移除。</p>
-              <p><b>When</b> 调用真实 remove_indicator 接口移除 CPI 卡片。</p>
-              <p><b>Then</b> 草稿不再展示 CPI，但数据库定义、最新值和历史序列仍保留。</p>
-              <div class="detail">HTTP 200</div>
-              <details><summary>查看真实证据</summary><pre>{
-  &quot;draft_codes&quot;: [
-    &quot;&quot;,
-    &quot;laowang_smart_20260902_013100979&quot;,
-    &quot;laowang_smart_20260902_013108717&quot;,
-    &quot;&quot;
-  ],
-  &quot;cpi_db_after_remove&quot;: {
-    &quot;definition_exists&quot;: true,
-    &quot;definition&quot;: {
-      &quot;indicator_code&quot;: &quot;laowang_smart_20260902_013053400&quot;,
-      &quot;indicator_name&quot;: &quot;BDD-CPI&quot;,
-      &quot;tenant_slug&quot;: &quot;laowang&quot;,
-      &quot;source_type&quot;: &quot;smart&quot;,
-      &quot;provider&quot;: &quot;LLM / Prompt Formula&quot;,
-      &quot;prompt_text&quot;: &quot;CPI&quot;,
-      &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_cpi\&quot;] || 0);&quot;,
-      &quot;selected_indicators_json&quot;: &quot;[{\&quot;indicator_code\&quot;: \&quot;source_cpi\&quot;, \&quot;indicator_name\&quot;: \&quot;中国CPI同比指数\&quot;}, {\&quot;indicator_code\&quot;: \&quot;laowang_smart_20260902_010043483\&quot;, \&quot;indicator_name\&quot;: \&quot;中国CPI同比指数组合指标\&quot;}, {\&quot;indicator_code\&quot;: \&quot;laowang_cpi\&quot;, \&quot;indicator_name\&quot;: \&quot;CPI智能指标\&quot;}]&quot;
-    },
-    &quot;latest_exists&quot;: true,
-    &quot;latest&quot;: {
-      &quot;latest_value&quot;: &quot;0.5&quot;,
-      &quot;updated_at&quot;: &quot;2026-09-02 01:30:53&quot;,
-      &quot;is_simulated&quot;: 0,
-      &quot;source_code&quot;: &quot;tenant_smart_formula&quot;
-    },
-    &quot;series&quot;: {
-      &quot;total&quot;: 1,
-      &quot;real_count&quot;: 1
-    }
-  },
-  &quot;published_codes&quot;: [
-    &quot;laowang_smart_20260902_013053400&quot;,
-    &quot;laowang_smart_20260902_013100979&quot;,
-    &quot;laowang_smart_20260902_013108717&quot;,
-    &quot;&quot;
-  ]
-}</pre></details>
-            </article>
-            
-            <article class="scenario pass">
-              <header><h2>6. 恢复</h2><strong>PASS</strong></header>
-              <p><b>Given</b> CPI 仅从草稿看板移除，发布版未改写。</p>
-              <p><b>When</b> 调用真实 reset_draft 接口恢复当前发布版。</p>
-              <p><b>Then</b> CPI 卡片恢复，草稿清空，之前保存的数据仍可读取。</p>
-              <div class="detail">HTTP 200</div>
-              <details><summary>查看真实证据</summary><pre>{
-  &quot;published_codes&quot;: [
-    &quot;laowang_smart_20260902_013053400&quot;,
-    &quot;laowang_smart_20260902_013100979&quot;,
-    &quot;laowang_smart_20260902_013108717&quot;,
-    &quot;&quot;
-  ],
-  &quot;draft&quot;: null,
-  &quot;cpi_db_after_restore&quot;: {
-    &quot;definition_exists&quot;: true,
-    &quot;definition&quot;: {
-      &quot;indicator_code&quot;: &quot;laowang_smart_20260902_013053400&quot;,
-      &quot;indicator_name&quot;: &quot;BDD-CPI&quot;,
-      &quot;tenant_slug&quot;: &quot;laowang&quot;,
-      &quot;source_type&quot;: &quot;smart&quot;,
-      &quot;provider&quot;: &quot;LLM / Prompt Formula&quot;,
-      &quot;prompt_text&quot;: &quot;CPI&quot;,
-      &quot;formula_js&quot;: &quot;return Number(inputs[\&quot;source_cpi\&quot;] || 0);&quot;,
-      &quot;selected_indicators_json&quot;: &quot;[{\&quot;indicator_code\&quot;: \&quot;source_cpi\&quot;, \&quot;indicator_name\&quot;: \&quot;中国CPI同比指数\&quot;}, {\&quot;indicator_code\&quot;: \&quot;laowang_smart_20260902_010043483\&quot;, \&quot;indicator_name\&quot;: \&quot;中国CPI同比指数组合指标\&quot;}, {\&quot;indicator_code\&quot;: \&quot;laowang_cpi\&quot;, \&quot;indicator_name\&quot;: \&quot;CPI智能指标\&quot;}]&quot;
-    },
-    &quot;latest_exists&quot;: true,
-    &quot;latest&quot;: {
-      &quot;latest_value&quot;: &quot;0.5&quot;,
-      &quot;updated_at&quot;: &quot;2026-09-02 01:30:53&quot;,
-      &quot;is_simulated&quot;: 0,
-      &quot;source_code&quot;: &quot;tenant_smart_formula&quot;
-    },
-    &quot;series&quot;: {
-      &quot;total&quot;: 1,
-      &quot;real_count&quot;: 1
-    }
-  }
-}</pre></details>
-            </article>
-            
-            <article class="scenario pass">
-              <header><h2>7. 再添加一个指标 上证指数</h2><strong>PASS</strong></header>
-              <p><b>Given</b> 恢复后 CPI、深证指数和黄金/白银数据仍可复用。</p>
-              <p><b>When</b> 将注册指标 source_shanghai_index 写入第四个槽位。</p>
-              <p><b>Then</b> 2×2 草稿包含 CPI、深证指数、黄金/白银和上证指数四个卡片引用。</p>
-              <div class="detail">HTTP 200</div>
-              <details><summary>查看真实证据</summary><pre>{
-  &quot;draft_codes&quot;: [
-    &quot;laowang_smart_20260902_013053400&quot;,
-    &quot;laowang_smart_20260902_013100979&quot;,
-    &quot;laowang_smart_20260902_013108717&quot;,
-    &quot;source_shanghai_index&quot;
-  ],
-  &quot;shanghai_code&quot;: &quot;source_shanghai_index&quot;
-}</pre></details>
-            </article>
-            </section>
-<section class="section"><h2>结论</h2><p>通过标准：所有场景必须由真实接口返回成功，且删除 CPI 后数据库仍存在定义、最新快照和历史序列。模型配置必须解析到 DeepSeek-V4-Flash 正式版。</p><p class="muted">测试结束后已清理本次创建的临时指标定义，并恢复原租户 Dashboard 配置。</p></section>
+<section class="section"><h2>BDD 场景</h2></section>
+<section class="section"><h2>结论</h2><p></p><p class="muted">测试结束后已清理本次创建的临时指标定义，并恢复原租户 Dashboard 配置。</p></section>
 </main></body></html>

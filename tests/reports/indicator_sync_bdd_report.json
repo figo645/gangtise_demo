@@ -1,0 +1,32 @@
+{
+  "generated_at": "2026-09-03 19:24:27",
+  "tenant_slug": "laowang",
+  "env_path": "/Users/xuchenfei/PycharmProjects/gangtise_demo/.gangtise_openapi_credentials",
+  "loaded_env_keys": [
+    "GANGTISE_ACCESS_KEY",
+    "GANGTISE_API_BASE_URL",
+    "GANGTISE_SECRET_KEY"
+  ],
+  "scenarios": [
+    {
+      "name": "Given 报告执行 When 运行同步与测试 Then 不应抛出未处理异常",
+      "given": "报告脚本需要完整执行同步和测试。",
+      "when": "运行整个 BDD 报告流程。",
+      "then": "脚本不应中途抛出未处理异常。",
+      "passed": false,
+      "detail": "connection to server at \"127.0.0.1\", port 5432 failed: Operation not permitted\n\tIs the server running on that host and accepting TCP/IP connections?",
+      "evidence": {
+        "traceback": "Traceback (most recent call last):\n  File \"/Users/xuchenfei/PycharmProjects/gangtise_demo/tests/run_indicator_sync_bdd_report.py\", line 480, in main\n    ensure_default_indicator_sources()\n  File \"/Users/xuchenfei/PycharmProjects/gangtise_demo/src/domain/market_services.py\", line 3898, in ensure_default_indicator_sources\n    existing = {item[\"source_code\"] for item in list_indicator_source_defs()}\n  File \"/Users/xuchenfei/PycharmProjects/gangtise_demo/src/domain/market_services.py\", line 3204, in list_indicator_source_defs\n    db = get_db()\n  File \"/Users/xuchenfei/PycharmProjects/gangtise_demo/src/domain/core_services.py\", line 7562, in get_db\n    g.db = PgCompatConnection(get_app_db_connection())\n  File \"/Users/xuchenfei/PycharmProjects/gangtise_demo/src/domain/core_services.py\", line 7121, in get_app_db_connection\n    pool = _get_app_db_pool()\n  File \"/Users/xuchenfei/PycharmProjects/gangtise_demo/src/domain/core_services.py\", line 7100, in _get_app_db_pool\n    _app_db_pool = ThreadedConnectionPool(\n  File \"/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/psycopg2/pool.py\", line 161, in __init__\n    AbstractConnectionPool.__init__(\n  File \"/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/psycopg2/pool.py\", line 59, in __init__\n    self._connect()\n  File \"/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/psycopg2/pool.py\", line 63, in _connect\n    conn = psycopg2.connect(*self._args, **self._kwargs)\n  File \"/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/psycopg2/__init__.py\", line 122, in connect\n    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)\npsycopg2.OperationalError: connection to server at \"127.0.0.1\", port 5432 failed: Operation not permitted\n\tIs the server running on that host and accepting TCP/IP connections?\n\n"
+      }
+    }
+  ],
+  "indicator_matrix": [],
+  "derived_matrix": [],
+  "source_probes": [],
+  "api_checks": [],
+  "auth": {},
+  "real_sync": {},
+  "derived_sync": {},
+  "hub_summary": {},
+  "exception": "connection to server at \"127.0.0.1\", port 5432 failed: Operation not permitted\n\tIs the server running on that host and accepting TCP/IP connections?\n\nTraceback (most recent call last):\n  File \"/Users/xuchenfei/PycharmProjects/gangtise_demo/tests/run_indicator_sync_bdd_report.py\", line 480, in main\n    ensure_default_indicator_sources()\n  File \"/Users/xuchenfei/PycharmProjects/gangtise_demo/src/domain/market_services.py\", line 3898, in ensure_default_indicator_sources\n    existing = {item[\"source_code\"] for item in list_indicator_source_defs()}\n  File \"/Users/xuchenfei/PycharmProjects/gangtise_demo/src/domain/market_services.py\", line 3204, in list_indicator_source_defs\n    db = get_db()\n  File \"/Users/xuchenfei/PycharmProjects/gangtise_demo/src/domain/core_services.py\", line 7562, in get_db\n    g.db = PgCompatConnection(get_app_db_connection())\n  File \"/Users/xuchenfei/PycharmProjects/gangtise_demo/src/domain/core_services.py\", line 7121, in get_app_db_connection\n    pool = _get_app_db_pool()\n  File \"/Users/xuchenfei/PycharmProjects/gangtise_demo/src/domain/core_services.py\", line 7100, in _get_app_db_pool\n    _app_db_pool = ThreadedConnectionPool(\n  File \"/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/psycopg2/pool.py\", line 161, in __init__\n    AbstractConnectionPool.__init__(\n  File \"/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/psycopg2/pool.py\", line 59, in __init__\n    self._connect()\n  File \"/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/psycopg2/pool.py\", line 63, in _connect\n    conn = psycopg2.connect(*self._args, **self._kwargs)\n  File \"/Library/Frameworks/Python.framework/Versions/3.10/lib/python3.10/site-packages/psycopg2/__init__.py\", line 122, in connect\n    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)\npsycopg2.OperationalError: connection to server at \"127.0.0.1\", port 5432 failed: Operation not permitted\n\tIs the server running on that host and accepting TCP/IP connections?\n\n"
+}

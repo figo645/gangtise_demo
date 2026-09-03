@@ -1,15 +1,15 @@
 (function () {
   const currentRelease = {
-    id: 'v1.6-20260831',
-    version: 'v1.6',
-    date: '2026-08-31',
+    id: 'v1.7-20260903',
+    version: 'v1.7',
+    date: '2026-09-03',
     isMajor: true,
-    title: '小金智能体统一编排',
-    summary: '本次更新把小金智能体收敛为可审计的六类投研场景，由 Admin 配置的 LLM 先理解任务，再分发到 Gangtise 研究能力或通用对话能力。',
+    title: 'H5 / Web 用户端统一体验',
+    summary: '本次更新补齐桌面端用户入口，并明确 H5 与 Web 共用同一套业务能力、API、权限和数据契约；同时同步当前小金智能体与研究工作流文档。',
     features: [
-      { tag: 'SIX SCENARIOS', title: '六类能力统一入口', copy: '支持今日个股观察、今日大盘观察、个股深化研究、个股看点摘要、多支自选股综合分析和多轮闲聊。' },
-      { tag: 'LLM PLANNER', title: '先理解，再执行', copy: '用户原始问题先交给 Admin 配置的 LLM；一句话包含多个目的时拆成独立任务，信息不足时先澄清。' },
-      { tag: 'TRACEABLE AI', title: '研究结果可追溯', copy: '研究任务按场景调用 Gangtise API 并直出原文；会话记忆、模型、工具、Skills 规则与审计轨迹统一留存。' }
+      { tag: 'H5 / WEB', title: '移动与桌面同源', copy: 'Web 用户端提供更宽的桌面布局，但与 H5 共用路由能力、API、权限和数据契约，不维护第二套业务逻辑。' },
+      { tag: 'SMART INDICATORS', title: '指标统一注册与刷新', copy: '个股、市场、行业和宏观经济指标通过统一目录识别，支持单指标和多指标公式组合，并由定时任务刷新。' },
+      { tag: 'REGRESSION', title: '文档与回归口径同步', copy: '主页、PRD、学习手册和 BDD 回归范围统一更新，重点覆盖跨端一致性、Hermes 六类场景、复盘和权限边界。' }
     ]
   };
   const history = [

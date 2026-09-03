@@ -1,16 +1,16 @@
 {
   "title": "H5 与大V工作台全量体验回归 BDD 报告",
-  "generated_at": "2026-09-02 13:02:57",
+  "generated_at": "2026-09-03 19:24:02",
   "execution_mode": "Flask 测试客户端渲染真实路由、真实模板和实际鉴权钩子；不写入业务数据、不提交 LLM 生成任务。页面启动按当前运行环境执行既有的只读数据库和市场数据探测，数据不可用时验证其回退渲染路径。",
   "scope": "H5、H5 大V工作台、Web 大V工作台、跨端 API 同源性与权限边界。",
-  "scenario_count": 47,
-  "passed_count": 47,
+  "scenario_count": 49,
+  "passed_count": 49,
   "failed_count": 0,
   "surface_summary": [
     {
       "surface": "H5",
-      "total": 19,
-      "passed": 19,
+      "total": 21,
+      "passed": 21,
       "failed": 0
     },
     {
@@ -296,6 +296,72 @@
           "这里仅供查看详情；指标的新增、修改和移除请前往大V工作台"
         ],
         "forbidden_contracts": []
+      }
+    },
+    {
+      "id": "h5-fundamental-no-ops-alerts",
+      "surface": "H5",
+      "name": "基本面不展示运维预警",
+      "given": "用户查看按板块归纳的自选股。",
+      "when": "页面渲染初始内容或刷新自选股。",
+      "then": "只展示行情与研究摘要，不展示数据源连通性预警或预警计数。",
+      "required": [
+        "查看最新行情与研究摘要"
+      ],
+      "forbidden": [
+        "fund-stock-alert-row",
+        "fund-board-tab-count",
+        "需关注数据源刷新与连通状态"
+      ],
+      "check": "html_contract",
+      "method": "test_bdd_h5_fundamental_no_ops_alerts",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "查看最新行情与研究摘要"
+        ],
+        "forbidden_contracts": [
+          "fund-stock-alert-row",
+          "fund-board-tab-count",
+          "需关注数据源刷新与连通状态"
+        ]
+      }
+    },
+    {
+      "id": "h5-fundamental-news-list",
+      "surface": "H5",
+      "name": "基本面新闻查询页",
+      "given": "用户在基本面查看综合归纳要闻。",
+      "when": "点击更多、按来源筛选或搜索关键词。",
+      "then": "进入独立新闻列表页，条目复用统一详情弹窗，不叠加新闻列表弹窗。",
+      "required": [
+        "id=\"page-fund-news-list\"",
+        "function openFundNewsList",
+        "function updateFundNewsListQuery",
+        "function showFundNewsDetail"
+      ],
+      "forbidden": [
+        "id=\"fund-news-modal\"",
+        "function openFundNewsModal"
+      ],
+      "check": "html_contract",
+      "method": "test_bdd_h5_fundamental_news_list",
+      "passed": true,
+      "detail": "真实 Flask 页面/鉴权链路与客户端 API 契约断言通过。",
+      "evidence": {
+        "check": "html_contract",
+        "required_contracts": [
+          "id=\"page-fund-news-list\"",
+          "function openFundNewsList",
+          "function updateFundNewsListQuery",
+          "function showFundNewsDetail"
+        ],
+        "forbidden_contracts": [
+          "id=\"fund-news-modal\"",
+          "function openFundNewsModal"
+        ]
       }
     },
     {

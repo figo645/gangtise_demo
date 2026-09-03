@@ -67,6 +67,28 @@ class ChinaCpiMappingTest(unittest.TestCase):
 
         ppi_tag = next(item for item in tags if item.get("tag_code") == "indicator:source_ppi")
         self.assertIn("PPI", ppi_tag.get("prompt_aliases") or [])
+
+    def test_saved_smart_indicator_tags_are_explicit_only(self):
+        with patch.object(core_services, "build_dashboard_base_indicator_options", return_value=[
+            {
+                "indicator_code": "source_cpi",
+                "indicator_name": "中国CPI同比指数",
+                "source_type": "macro_economic",
+            },
+            {
+                "indicator_code": "laowang_smart_cpi_combo",
+                "indicator_name": "中国CPI同比指数组合指标",
+                "source_type": "smart",
+            },
+        ]), patch.object(core_services, "gen_watchlist_details", return_value={}), patch.object(
+            core_services, "build_hot_industry_indicator_catalog", return_value=[]
+        ):
+            tags = core_services.build_tenant_smart_indicator_tag_catalog({"slug": "laowang"})
+
+        tag_map = {item["tag_code"]: item for item in tags}
+        self.assertTrue(tag_map["indicator:source_cpi"]["auto_match"])
+        self.assertFalse(tag_map["indicator:laowang_smart_cpi_combo"]["auto_match"])
+
     def test_registered_market_index_snapshot_is_a_smart_indicator_input(self):
         class Result:
             def fetchall(self):
@@ -453,6 +475,29 @@ class ChinaCpiMappingTest(unittest.TestCase):
             with self.subTest(prompt=prompt):
                 resolved = core_services.resolve_smart_indicator_prompt_refs(prompt, [], {})
                 self.assertEqual([item["indicator_code"] for item in resolved], expected_codes)
+
+    def test_cpi_fuzzy_resolution_excludes_derived_smart_indicator_labels(self):
+        tags = [
+            {
+                "tag_code": "indicator:source_cpi",
+                "label": "中国CPI同比指数",
+                "auto_match": True,
+                "selected_indicators": [{"indicator_code": "source_cpi", "indicator_name": "中国CPI同比指数"}],
+            },
+            {
+                "tag_code": "indicator:laowang_smart_cpi_combo",
+                "label": "中国CPI同比指数组合指标",
+                "auto_match": False,
+                "selected_indicators": [{"indicator_code": "laowang_smart_cpi_combo", "indicator_name": "中国CPI同比指数组合指标"}],
+            },
+        ]
+
+        resolved = core_services.resolve_smart_indicator_prompt_refs("中国CPI", tags, {})
+
+        self.assertEqual(
+            resolved,
+            [{"indicator_code": "source_cpi", "indicator_name": "中国CPI同比指数"}],
+        )
 
     def test_hot_industry_partial_query_resolves_to_registered_sector_snapshot(self):
         industry_item = {

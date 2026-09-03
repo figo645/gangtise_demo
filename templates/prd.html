@@ -131,7 +131,7 @@ body.theme-light .lv1{color:var(--text-sub)}
 <header class="prd-header">
   <div class="prd-header-left">
     <span class="prd-header-title">洞见智研 PRD</span>
-    <span class="prd-header-version">v1.6 · 2026-08-31</span>
+    <span class="prd-header-version">v1.7 · 2026-09-03</span>
   </div>
   <div class="prd-header-right">
     <a href="/" class="btn-back">← 返回首页</a>
@@ -147,7 +147,7 @@ body.theme-light .lv1{color:var(--text-sub)}
   <div class="prd-toc-item active" onclick="scrollToSection('s1')"><span class="prd-toc-num">01</span>产品概述</div>
   <div class="prd-toc-item" onclick="scrollToSection('s2')"><span class="prd-toc-num">02</span>用户角色与权限</div>
   <div class="prd-toc-item" onclick="scrollToSection('s3')"><span class="prd-toc-num">03</span>页面架构与跳转流程</div>
-  <div class="prd-toc-item" onclick="scrollToSection('s4')"><span class="prd-toc-num">04</span>H5用户端功能规格</div>
+  <div class="prd-toc-item" onclick="scrollToSection('s4')"><span class="prd-toc-num">04</span>H5 / Web用户端功能规格</div>
   <div class="prd-toc-item" onclick="scrollToSection('s5')"><span class="prd-toc-num">05</span>社区扩展功能规格</div>
   <div class="prd-toc-item" onclick="scrollToSection('s6')"><span class="prd-toc-num">06</span>Hermes扩展引擎规格</div>
   <div class="prd-toc-item" onclick="scrollToSection('s7')"><span class="prd-toc-num">07</span>中后台管理规格</div>
@@ -174,8 +174,8 @@ body.theme-light .lv1{color:var(--text-sub)}
     <table class="prd-table">
       <tr><th style="width:140px">项目</th><th>内容</th></tr>
       <tr><td>产品名称</td><td>洞见智研金融科技 · 投研数据平台</td></tr>
-      <tr><td>当前版本</td><td>v1.6</td></tr>
-      <tr><td>文档日期</td><td>2026-08-31</td></tr>
+      <tr><td>当前版本</td><td>v1.7</td></tr>
+      <tr><td>文档日期</td><td>2026-09-03</td></tr>
       <tr><td>产品定位</td><td>以租户隔离的市场数据、知识资产和证据链为基础，支持投资者跟踪、大V研究生产与平台治理</td></tr>
       <tr><td>技术栈</td><td>Flask · Python · PostgreSQL / pgvector · HTML5 · CSS3 · JavaScript · ECharts</td></tr>
     </table>
@@ -193,7 +193,7 @@ body.theme-light .lv1{color:var(--text-sub)}
     </div>
     <div class="info-card">
       <div class="info-card-title">③ 多租户、权限与能力开关</div>
-      <div class="info-card-body">普通用户、大V与 Admin 使用独立权限边界。H5 和工作台按所属租户读取内容；Admin 才可配置功能开关、Hermes 访问范围、互动权限和登录策略。会员、社区和机构 API 尚未作为已交付功能。</div>
+      <div class="info-card-body">普通用户、大V与 Admin 使用独立权限边界。H5 与 Web 用户端共用同一套业务能力，按所属租户读取内容；Admin 才可配置功能开关、Hermes 访问范围、互动权限和登录策略。会员、社区和机构 API 尚未作为已交付功能。</div>
     </div>
     <div class="info-card">
       <div class="info-card-title">④ 模型按功能精细路由</div>
@@ -361,7 +361,7 @@ body.theme-light .lv1{color:var(--text-sub)}
   <div class="prd-section-num">SECTION 03</div>
   <h2 class="prd-section-title">页面架构与跳转流程</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">本节只描述已经存在的入口与权限边界。首页用于产品与文档导航；H5 面向普通用户和大V；大V Web 工作台与 Admin 是两条独立后台路径。</p>
+  <p class="prd-section-desc">本节只描述已经存在的入口与权限边界。首页用于产品与文档导航；租户门户负责对外编排；H5 与 Web 用户端是同一套用户能力的移动/桌面呈现；大V工作台 Web 与 Admin 是两条独立后台路径。</p>
 
   <!-- 3.1 整体架构图 -->
   <div class="prd-sub">
@@ -370,9 +370,10 @@ body.theme-light .lv1{color:var(--text-sub)}
       <div class="arch-node"><span class="arch-indent"></span><span class="arch-box root">洞见智研平台</span><span class="arch-route">品牌域名待配置</span></div>
       <div class="arch-node"><span class="arch-indent">├─ </span><span class="arch-box page">首页</span><span class="arch-route">/</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">H5用户端</span><span class="arch-route">/h5</span></div>
+      <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">Web用户端</span><span class="arch-route">/web · 与 H5 共用业务能力</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">中后台管理</span><span class="arch-route">/admin</span></div>
       <div class="arch-node"><span class="arch-indent">│  └─ </span><span class="arch-box sub">PRD / 学习手册</span><span class="arch-route">/prd · /intern-handbook</span></div>
-      <div class="arch-node" style="margin-top:8px"><span class="arch-indent">├─ </span><span class="arch-box page">H5用户端</span><span class="arch-route">/h5 · 按角色展示能力</span></div>
+      <div class="arch-node" style="margin-top:8px"><span class="arch-indent">├─ </span><span class="arch-box page">H5 / Web 用户端</span><span class="arch-route">/h5 · /web · 同一能力，按设备呈现</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">基本面分析</span><span class="arch-route">默认开放</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">自选股</span><span class="arch-route">默认开放</span></div>
       <div class="arch-node"><span class="arch-indent">│  ├─ </span><span class="arch-box sub">复盘专区</span><span class="arch-route">默认开放</span></div>
@@ -400,15 +401,17 @@ body.theme-light .lv1{color:var(--text-sub)}
     </div>
   </div>
 
-  <!-- 3.2 H5跳转流程图 -->
+  <!-- 3.2 H5 / Web 跳转流程图 -->
   <div class="prd-sub">
-    <div class="prd-sub-title">3.2 H5端页面跳转流程图</div>
+    <div class="prd-sub-title">3.2 H5 / Web 用户端页面跳转流程图</div>
     <div class="flow-grid">
       <!-- Row 1: Entry -->
       <div class="flow-row" style="justify-content:flex-start;margin-bottom:4px">
         <span class="flow-box entry">启动 App</span>
         <span class="flow-arrow">→</span>
         <span class="flow-box entry">登录 / 注册</span>
+        <span class="flow-arrow">→</span>
+        <span class="flow-box action">选择 H5 / Web / 工作台 / Admin</span>
         <span class="flow-arrow">→</span>
         <span class="flow-box action">首页 · 基本面分析</span>
       </div>
@@ -581,9 +584,9 @@ body.theme-light .lv1{color:var(--text-sub)}
 <!-- ===== SECTION 4 ===== -->
 <section class="prd-section" id="s4">
   <div class="prd-section-num">SECTION 04</div>
-  <h2 class="prd-section-title">H5用户端功能规格</h2>
+  <h2 class="prd-section-title">H5 / Web用户端功能规格</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">H5 是投资者与大V的移动入口，覆盖研究、行情跟踪、自选股、复盘、知识、消息和账户。Hermes 是否对普通投资者展示由 Admin 控制；大V可使用完整的研究与生产能力。</p>
+  <p class="prd-section-desc">H5 是移动入口，Web 是桌面入口；二者不分叉业务逻辑，共用页面能力、API、权限和数据契约。两端覆盖研究、行情跟踪、自选股、复盘、知识、消息和账户。Hermes 是否对普通投资者展示由 Admin 控制；大V可使用完整的研究与生产能力。</p>
 
   <div class="prd-sub">
     <div class="prd-sub-title">Tab 1 · 基本面分析</div>
@@ -592,7 +595,7 @@ body.theme-light .lv1{color:var(--text-sub)}
       <tr><td>研究结论卡片</td><td>按固定结构展示核心观点、估值判断、风险提示与证据链来源</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
       <tr><td>市场摘要</td><td>顶部展示核心指数、板块温度和当日主线，帮助快速进入上下文</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
       <tr><td>证据链摘要</td><td>围绕估值、盈利预期、资金流给出简明研究框架，不输出明确买卖指令</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>Hermes 研究入口</td><td>大V可发起新会话、续问历史会话；支持个股、指数、指标图表、知识、报告和 URL 解读</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>Hermes 研究入口</td><td>H5 与 Web 均可发起新会话、续问历史会话；支持个股、指数、指标图表、知识、报告和 URL 解读，桌面端使用更宽的阅读与输入布局</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
     </table>
   </div>
 
@@ -822,7 +825,7 @@ body.theme-light .lv1{color:var(--text-sub)}
   <div class="prd-section-num">SECTION 07</div>
   <h2 class="prd-section-title">中后台管理规格</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">Admin 是独立的平台治理后台，仅具备 `admin` 能力的角色可访问。角色能力可配置；当前 Admin 同时可以进入 H5、大V工作台和 Admin 后台，但不改变财经老王的大V独立权限与租户边界。Admin 负责租户、用户、开关、模型、知识/记忆、数据、任务、审计和发布控制。</p>
+  <p class="prd-section-desc">Admin 是独立的平台治理后台，仅具备 `admin` 能力的角色可访问。角色能力可配置；当前 Admin 同时可以进入 H5、Web 用户端、大V工作台和 Admin 后台，但不改变财经老王的大V独立权限与租户边界。Admin 负责租户、用户、开关、模型、知识/记忆、数据、任务、审计和发布控制。</p>
 
   <div class="prd-sub">
     <div class="prd-sub-title">后台模块结构</div>
@@ -1255,6 +1258,7 @@ body.theme-light .lv1{color:var(--text-sub)}
       <tr><td>v1.4</td><td>2026-08-13</td><td>清理旧路线图，按实际功能重写角色、H5、Hermes、Admin 与版本历史</td><td>当前代码、BDD 和系统学习手册</td></tr>
       <tr><td>v1.5</td><td>2026-08-18</td><td>补充 Staging → Production 受控全量同步，明确日常增量发布策略，并上线四端版本中心与历史版本查看</td><td>数据库发布控制台、环境同步脚本、版本中心与 BDD</td></tr>
       <tr><td>v1.6</td><td>2026-08-31</td><td>按最新实现重写小金智能体六类场景、LLM 首轮任务拆解、组合任务、记忆、Skills 拦截审计与 Gangtise 原文直出边界</td><td>智能体真实调用链、Admin 配置、H5 帮助中心与 BDD</td></tr>
+      <tr><td>v1.7</td><td>2026-09-03</td><td>新增 Web 用户端并与 H5 统一能力口径；补充智能指标目录、公式组合、定时刷新及跨端验收要求</td><td>同源模板/API、登录入口、主页/PRD/学习手册与 BDD 回归</td></tr>
     </table>
   </div>
 </section>
@@ -1270,10 +1274,11 @@ body.theme-light .lv1{color:var(--text-sub)}
     <div class="prd-sub-title">当前功能范围</div>
     <table class="prd-table">
       <tr><th>功能域</th><th>当前验收口径</th><th>数据与边界</th></tr>
-      <tr><td>H5 用户端</td><td>注册登录、合规确认与渠道、行情查看、自选股、评论、消息、复盘阅读、知识查看和 Hermes 对话</td><td>普通用户仅访问所属租户内容；跨租户访问必须拒绝</td></tr>
+      <tr><td>H5 / Web 用户端</td><td>注册登录、合规确认与渠道、行情查看、自选股、评论、消息、复盘阅读、知识查看和 Hermes 对话；两端业务/API 结果一致，布局按设备适配</td><td>普通用户仅访问所属租户内容；跨租户访问必须拒绝</td></tr>
       <tr><td>大V 工作台</td><td>复盘向导、用户输入编辑、可选自选股归纳、知识录入、粉丝经营、评论统计和门户维护</td><td>复盘发布后应立即在所属租户前台可见；自选股为可选项</td></tr>
       <tr><td>小金智能体</td><td>今日个股观察、今日大盘观察、个股深化研究、个股看点摘要、多支自选股综合分析、多轮闲聊；支持组合任务、会话与长期记忆</td><td>原始问题先由 Admin 配置 LLM 拆解；研究类按 Gangtise API 原文直出；真实数据不可用时清晰说明，禁止伪造行情</td></tr>
       <tr><td>知识与证据链</td><td>文本、语音、文件、URL、复盘内容和标注可进入知识源；面向大V展示词条和知识结构</td><td>知识资产与记忆均按租户隔离；小金智能体不使用 embedding 做首轮意图识别；Admin 处理治理与备份</td></tr>
+      <tr><td>智能指标与市场数据</td><td>注册目录统一管理个股、市场、行业和宏观经济指标；支持单指标或多指标公式组合，按定时任务刷新并在 H5/Web 与大V工作台展示一致结果</td><td>识别不到真实指标或数据不可用时显示明确空态，不生成模拟值</td></tr>
       <tr><td>Admin</td><td>租户/用户/开关/模型映射/记忆治理/知识治理/指标/任务/审计与运营分析</td><td>配置变更应同步影响前台可见性与行为，并保留可审计记录</td></tr>
     </table>
   </div>
@@ -1281,7 +1286,7 @@ body.theme-light .lv1{color:var(--text-sub)}
   <div class="prd-sub">
     <div class="prd-sub-title">BDD 与探索性测试策略</div>
     <div class="highlight-box">
-      <strong style="color:#C8A96E">BDD 自动化</strong>：覆盖路由、权限、业务规则、API 合约、复盘发布、登录会话、Hermes 路由、指标与市场数据等可重复场景。<br><br>
+      <strong style="color:#C8A96E">BDD 自动化</strong>：覆盖路由、权限、业务规则、API 合约、复盘发布、登录会话、H5/Web 同源能力、Hermes 路由、智能指标公式与市场数据等可重复场景。<br><br>
       <strong style="color:#C8A96E">探索性测试</strong>：重点验证租户隔离、角色越权、微信/移动浏览器限制、异步发布即时性、真实行情缺失、图表交互、六类场景路由、多任务拆解、LLM 超时、Gangtise 空响应，以及 Admin 开关与前台行为的一致性。每个问题需保留角色、租户、步骤、截图或日志和影响级别。<br><br>
       <strong style="color:#C8A96E">学习入口</strong>：Admin 顶部的“系统学习手册”提供系统地图、阶段式学习路径、核心功能流程图与角色测试矩阵；首页同步当前功能地图。
     </div>
