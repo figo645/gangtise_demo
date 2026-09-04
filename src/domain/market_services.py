@@ -8503,45 +8503,31 @@ def delete_watchlist_kline_annotation(tenant_slug="", stock_code="", stock_name=
     owner_clause = " AND created_by_user_id = ?" if actor_id else ""
     owner_params = (actor_id,) if actor_id else ()
     if annotation_id:
+        target = db.execute(
+            f"SELECT id FROM watchlist_kline_annotations WHERE tenant_slug = ? AND id = ?{owner_clause}",
+            (normalized_tenant, int(annotation_id), *owner_params),
+        ).fetchone()
+        if not target:
+            return False
         db.execute(
             f"DELETE FROM watchlist_kline_annotations WHERE tenant_slug = ? AND id = ?{owner_clause}",
             (normalized_tenant, int(annotation_id), *owner_params),
         )
         db.commit()
-        remaining = db.execute(
-            f"SELECT id FROM watchlist_kline_annotations WHERE tenant_slug = ? AND id = ?{owner_clause}",
-            (normalized_tenant, int(annotation_id), *owner_params),
-        ).fetchone()
-        if remaining and normalized_code and candle_index is not None:
-            db.execute(
-                f"DELETE FROM watchlist_kline_annotations WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ?{owner_clause}",
-                (normalized_tenant, normalized_code, int(candle_index or 0), *owner_params),
-            )
-            db.commit()
-            remaining = db.execute(
-                """
-                SELECT id
-                FROM watchlist_kline_annotations
-                WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ?{owner_clause}
-                """,
-                (normalized_tenant, normalized_code, int(candle_index or 0), *owner_params),
-            ).fetchone()
-        return remaining is None
+        return True
     if normalized_code and candle_index is not None:
+        target = db.execute(
+            f"SELECT id FROM watchlist_kline_annotations WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ?{owner_clause}",
+            (normalized_tenant, normalized_code, int(candle_index or 0), *owner_params),
+        ).fetchone()
+        if not target:
+            return False
         db.execute(
             f"DELETE FROM watchlist_kline_annotations WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ?{owner_clause}",
             (normalized_tenant, normalized_code, int(candle_index or 0), *owner_params),
         )
         db.commit()
-        remaining = db.execute(
-            """
-            SELECT id
-            FROM watchlist_kline_annotations
-            WHERE tenant_slug = ? AND stock_code = ? AND candle_index = ?{owner_clause}
-            """,
-            (normalized_tenant, normalized_code, int(candle_index or 0), *owner_params),
-        ).fetchone()
-        return remaining is None
+        return True
     raise ValueError("watchlist_annotation_target_required")
 
 

@@ -9533,7 +9533,9 @@ function kwRegisterActiveReviewJob(jobCode, jobType, payload) {
 }
 
 async function kwCancelReviewAsyncJob() {
-  const isPreview = !!(kwReviewPreviewGenerating || kwReviewPreviewJobState || kwReviewDraft.flowStage === 'preview_generating');
+  // Keep the prior preview result available for review, but do not mistake it
+  // for a newly running Draft task when the user presses stop.
+  const isPreview = kwReviewPreviewGenerating || kwReviewDraft.flowStage === 'preview_generating';
   const job = isPreview ? kwReviewPreviewJobState : kwReviewDraftJobState;
   const jobCode = String((job || {}).job_code || '').trim();
   kwReviewCancellationRequested = true;
@@ -13264,8 +13266,10 @@ function kwCanonicalizeSmartPrompt(promptText, tagCatalog) {
   candidates.sort((left, right) => right.alias.length - left.alias.length);
   if (!candidates.length) return source;
   const pattern = new RegExp(candidates.map((item) => kwEscapeSmartRegExp(item.alias)).join('|'), 'gi');
-  return source.split(/(【[^】]*】)/g).map((part) => {
-    if (/^【[^】]*】$/.test(part)) return part;
+  // Preserve an unclosed reference while the user is editing it. Otherwise
+  // Backspace can turn "【指标" into "【【指标】" on every input event.
+  return source.split(/(【[^】]*(?:】|$))/g).map((part) => {
+    if (/^【/.test(part)) return part;
     return part.replace(pattern, (match) => {
       const normalized = kwNormalizeSmartTagLabel(match).toLowerCase();
       const found = candidates.find((item) => item.alias.toLowerCase() === normalized);

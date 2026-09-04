@@ -74,6 +74,10 @@ BDD_SCENARIOS = (
         (), ('gangtise_demo_added_watchlist_codes', 'gangtise_demo_removed_watchlist_codes', 'gangtise_demo_watchlist_annotations'),
     ),
     _scenario(
+        "h5-watchlist-annotation-edit-delete", "H5", "K线标注编辑与删除", "用户已有一条自己创建的 K线标注。", "点击标注图标或对应 K线。", "可编辑内容、保存修改或仅删除自己的标注。",
+        ('created_by_user_id: item.created_by_user_id || \'\'', "编辑 K线标注", '保存修改', 'function deleteWatchlistAnnotation()', 'annotationCandleIndex'),
+    ),
+    _scenario(
         "h5-watchlist-comments", "H5", "个股评论与身份展示", "用户查看个股详情。", "打开评论区。", "评论区使用当前登录账户身份，不信任页面提交的昵称。",
         ('/api/watchlist/${encodeURIComponent(stockCode)}/comments', 'user_name: String(user.name || user.username || \'\').trim()'),
     ),
@@ -104,7 +108,7 @@ BDD_SCENARIOS = (
     ),
     _scenario(
         "h5-review-jobs", "H5", "复盘任务恢复与停止", "复盘异步任务正在运行。", "用户重新进入页面或点击停止生成。", "页面可恢复任务状态，并调用同一取消接口。",
-        ('function loadActiveReviewJobs()', 'cancelReviewAsyncJob()', '/api/review/jobs/${encodeURIComponent(jobCode)}/cancel'),
+        ('function loadActiveReviewJobs()', 'cancelReviewAsyncJob()', "reviewTriggerDraft.flowStage === 'preview_generating'", '/api/review/jobs/${encodeURIComponent(jobCode)}/cancel'),
     ),
     _scenario(
         "h5-review-api", "H5", "复盘 API 编排", "大V提交复盘。", "执行 Draft、结构化预览和发布。", "三个阶段必须调用统一服务端 API。",
@@ -140,7 +144,7 @@ BDD_SCENARIOS = (
     ),
     _scenario(
         "h5-dav-formula", "H5 大V工作台", "指标标签与公式编辑", "大V输入 CPI、PPI、行业或市场指标。", "构造加减乘除公式。", "系统使用标签、公式 token 和可移除的误匹配标签。",
-        ('canonicalizeWorkbenchSmartPrompt', 'tokenizeWorkbenchSmartPrompt', 'formula_tokens', 'toggleWorkbenchSmartTag'),
+        ('canonicalizeWorkbenchSmartPrompt', 'tokenizeWorkbenchSmartPrompt', 'source.split(/(【[^】]*(?:】|$))/g)', 'formula_tokens', 'toggleWorkbenchSmartTag'),
     ),
     _scenario(
         "h5-dav-direct-reference", "H5 大V工作台", "单一已注册指标直接引用", "大V输入一个已注册指标名称。", "生成预览并确认展示。", "系统复用指标定义而不是创建重复智能指标。",
@@ -184,7 +188,7 @@ BDD_SCENARIOS = (
     ),
     _scenario(
         "web-indicator-formula", "Web 大V工作台", "桌面标签公式计算", "大V输入市场、行业、宏观或个股标签。", "生成预览。", "前端发送标签、抑制标签和公式 token 给统一 API。",
-        ('kwCanonicalizeSmartPrompt', 'kwTokenizeSmartPrompt', 'selected_tag_codes', 'suppressed_tag_codes', 'formula_tokens'),
+        ('kwCanonicalizeSmartPrompt', 'kwTokenizeSmartPrompt', 'source.split(/(【[^】]*(?:】|$))/g)', 'selected_tag_codes', 'suppressed_tag_codes', 'formula_tokens'),
     ),
     _scenario(
         "web-indicator-direct-reference", "Web 大V工作台", "桌面直接引用不重复建指标", "大V仅引用一个已注册指标。", "确认展示。", "直接将已有 indicator_code 加入草稿。",

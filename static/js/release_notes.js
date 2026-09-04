@@ -13,7 +13,7 @@
     ]
   };
   const history = [
-    { version: 'v1.5', title: '受控交付与环境同步', copy: 'Staging 验证、增量发布、环境全量同步与可回滚交付。' },
+    { version: 'v1.5', title: '受控交付与环境同步', copy: 'Staging 验证、Staging 到 Production 全量发布、增量发布、环境同步与可回滚交付。' },
     { version: 'v1.4', title: '治理、交付与质量闭环', copy: '账号合规、渠道归因、模型映射、BDD 与系统学习手册。' },
     { version: 'v1.3', title: '知识、复盘与真实数据闭环', copy: 'Gangtise 数据接入、复盘向导、知识分层与共用证据链。' },
     { version: 'v1.2', title: 'Hermes 研究 Agent', copy: '意图路由、知识优先召回、图表、会话记忆和使用治理。' },

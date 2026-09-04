@@ -864,6 +864,8 @@ def api_delete_watchlist_annotation(stock_code, annotation_ref):
             return jsonify({"ok": False, "error": "database_unavailable"}), 503
         app.logger.exception("Failed to delete watchlist annotation")
         return jsonify({"ok": False, "error": "watchlist_annotation_delete_failed"}), 500
+    if not deleted:
+        return jsonify({"ok": False, "error": "watchlist_annotation_not_found_or_forbidden"}), 404
     return jsonify({"ok": True, "deleted": bool(deleted)})
 
 

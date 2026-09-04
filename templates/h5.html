@@ -9634,7 +9634,9 @@ function renderReviewFlowActions() {
 }
 
 async function cancelReviewAsyncJob() {
-  const isPreview = !!(reviewPreviewGenerating || reviewPreviewJobState);
+  // A completed/failed preview keeps its state for error display. It is not
+  // the task currently on screen and must never receive a later Draft cancel.
+  const isPreview = reviewPreviewGenerating || reviewTriggerDraft.flowStage === 'preview_generating';
   const job = isPreview ? reviewPreviewJobState : reviewDraftJobState;
   const jobCode = String((job || {}).job_code || '').trim();
   // Close the current task from the user's perspective immediately. When the
@@ -13470,9 +13472,14 @@ function replaceWatchlistAnnotations(tenantId, stockCode, items) {
     id: item.id,
     candleIndex: Number(item.candleIndex ?? item.candle_index ?? 0),
     dateLabel: item.dateLabel || item.candle_date || '',
+    content: item.content || item.note || '',
     title: item.title || '',
     note: item.note || '',
     trigger: item.trigger || '',
+    created_by_user_id: item.created_by_user_id || '',
+    created_by_name: item.created_by_name || '',
+    created_by_role: item.created_by_role || '',
+    source_client: item.source_client || '',
     updatedAt: item.updatedAt || item.updated_at || item.createdAt || item.created_at || '刚刚',
   }))));
 }
@@ -14293,9 +14300,13 @@ function buildWatchlistKlineSvg(series, options) {
       annotations: Array.isArray(config.annotations) ? config.annotations : [],
     }), {
       onClick: (params) => {
-        if (params && params.seriesType === 'candlestick' && Number.isInteger(params.dataIndex)) {
-          openWatchlistAnnotationModal(params.dataIndex);
-        }
+        const annotationCandleIndex = params && params.seriesName === '复盘标注'
+          ? Number(params.data && params.data.candleIndex)
+          : NaN;
+        const candleIndex = Number.isInteger(annotationCandleIndex)
+          ? annotationCandleIndex
+          : (params && params.seriesType === 'candlestick' ? params.dataIndex : NaN);
+        if (Number.isInteger(candleIndex)) openWatchlistAnnotationModal(candleIndex);
       },
     });
   });
@@ -14397,12 +14408,12 @@ function renderWatchlistDetail(data, section) {
   const allowFanToFan = commentSettings.allow_fan_to_fan !== false;
   const annotationKey = data.annotation_key || data.indicator_code || data.code;
   const hasRealMarketPrice = data.data_unavailable !== true && Number.isFinite(Number(data.price)) && Number(data.price) > 0;
-  const annotations = (Array.isArray(data.annotations)
-    ? data.annotations
-    : getWatchlistAnnotations(activeUser.tenant.id, annotationKey)).map((item) => ({
+  // The session cache is hydrated from the server on open and is updated after
+  // each write. Rendering from it avoids stale markers after an edit or delete.
+  const annotations = getWatchlistAnnotations(activeUser.tenant.id, annotationKey).map((item) => ({
       ...item,
       candleIndex: Number(item.candleIndex ?? item.candle_index ?? 0),
-    }));
+  }));
   const klineChart = buildWatchlistKlineSvg(data.kline || [], {
     candleLabel: `${data.name || '标的'} 日K线`,
     annotations,
@@ -14622,9 +14633,9 @@ function openWatchlistAnnotationModal(candleIndex) {
   const modal = document.getElementById('watchlist-annotation-modal');
   if (!host || !modal) return;
   host.innerHTML = `
-    <div class="modal-title" style="margin-bottom:10px">K线标注 · ${escapeHtml(currentWatchlistDetail.name)}</div>
+    <div class="modal-title" style="margin-bottom:10px">${existing ? '编辑 K线标注' : '新增 K线标注'} · ${escapeHtml(currentWatchlistDetail.name)}</div>
     <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">
-      你正在标注 ${escapeHtml(candle.date || '--')} 这根 K 线。保存后，这条标注会显示在图上，并自动参与后续复盘。
+      你正在${existing ? '编辑' : '标注'} ${escapeHtml(candle.date || '--')} 这根 K 线。保存后，这条标注会显示在图上，并自动参与后续复盘。
     </div>
     <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">K线节点</label>
@@ -14643,7 +14654,7 @@ function openWatchlistAnnotationModal(candleIndex) {
     <div class="modal-actions">
       <button class="btn-outline" onclick="closeWatchlistAnnotationModal()">取消</button>
       ${existing ? '<button class="btn-outline" style="color:#E74C3C;border-color:rgba(231,76,60,0.22)" onclick="deleteWatchlistAnnotation()">删除标注</button>' : ''}
-      <button class="btn-gold" onclick="saveWatchlistAnnotation()">保存标注</button>
+      <button class="btn-gold" onclick="saveWatchlistAnnotation()">${existing ? '保存修改' : '保存标注'}</button>
     </div>
   `;
   modal.classList.add('show');
@@ -14720,11 +14731,15 @@ function saveWatchlistAnnotation() {
 function deleteWatchlistAnnotation() {
   const target = currentWatchlistAnnotationTarget;
   if (!target) return;
+  if (!target.existing || !target.existing.id) {
+    showToast('只能删除你自己创建的标注');
+    return;
+  }
   const previousItems = getWatchlistAnnotationBucket(target.tenantId, target.stockCode).slice();
   watchlistAnnotationStore[target.tenantId][normalizeStockLookupValue(target.stockCode)] =
-    getWatchlistAnnotationBucket(target.tenantId, target.stockCode).filter(item => Number(item.candleIndex) !== Number(target.candleIndex));
+    getWatchlistAnnotationBucket(target.tenantId, target.stockCode).filter(item => String(item.id || '') !== String(target.existing.id));
   const userPayload = getActiveWatchlistUserPayload();
-  const existingId = target.existing && target.existing.id ? target.existing.id : target.candleIndex;
+  const existingId = target.existing.id;
   fetch(`/api/watchlist/${encodeURIComponent(target.stockCode)}/annotations/${encodeURIComponent(existingId)}` + `?tenant_slug=${encodeURIComponent(userPayload.tenant_slug)}&user_role=${encodeURIComponent(userPayload.user_role)}&user_profile_id=${encodeURIComponent(userPayload.user_profile_id)}`, {
     method: 'DELETE',
   }).then(async (resp) => {
@@ -18764,6 +18779,8 @@ function escapeWorkbenchSmartRegExp(value) {
 }
 
 // Convert a recognized alias into a canonical reference token immediately.
+// An unclosed reference is user input in progress (especially after Backspace),
+// so it must not be matched again and wrapped in another pair of brackets.
 function canonicalizeWorkbenchSmartPrompt(promptText, tagCatalog) {
   const source = String(promptText || '');
   const candidates = [];
@@ -18782,8 +18799,8 @@ function canonicalizeWorkbenchSmartPrompt(promptText, tagCatalog) {
   candidates.sort((left, right) => right.alias.length - left.alias.length);
   if (!candidates.length) return source;
   const pattern = new RegExp(candidates.map((item) => escapeWorkbenchSmartRegExp(item.alias)).join('|'), 'gi');
-  return source.split(/(【[^】]*】)/g).map((part) => {
-    if (/^【[^】]*】$/.test(part)) return part;
+  return source.split(/(【[^】]*(?:】|$))/g).map((part) => {
+    if (/^【/.test(part)) return part;
     return part.replace(pattern, (match) => {
       const normalized = normalizeWorkbenchSmartTagLabel(match).toLowerCase();
       const found = candidates.find((item) => item.alias.toLowerCase() === normalized);

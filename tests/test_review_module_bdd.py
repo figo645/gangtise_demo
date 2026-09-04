@@ -244,6 +244,16 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn('onclick="cancelReviewAsyncJob()">停止生成', html)
         self.assertIn("job.status === 'cancelled'", html)
         self.assertIn('/api/review/jobs/${encodeURIComponent(jobCode)}/cancel', html)
+        self.assertIn("const isPreview = reviewPreviewGenerating || reviewTriggerDraft.flowStage === 'preview_generating';", html)
+        self.assertNotIn("const isPreview = !!(reviewPreviewGenerating || reviewPreviewJobState);", html)
+
+    def test_given_previous_preview_when_stopping_a_new_draft_then_current_draft_is_selected(self):
+        response = self.client.get(f"/kol-workbench?tenant={self.tenant_slug}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("const isPreview = kwReviewPreviewGenerating || kwReviewDraft.flowStage === 'preview_generating';", html)
+        self.assertNotIn("kwReviewPreviewGenerating || kwReviewPreviewJobState || kwReviewDraft.flowStage", html)
 
     def test_given_simulated_review_job_when_worker_claims_next_then_it_is_not_excluded_from_execution(self):
         class _FakeCursor:
@@ -2017,6 +2027,8 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("公式编辑器", html)
         self.assertIn("function insertWorkbenchSmartTagReference(tagCode)", html)
         self.assertIn("function insertWorkbenchSmartOperator(operator)", html)
+        self.assertIn("An unclosed reference is user input in progress", html)
+        self.assertIn("source.split(/(【[^】]*(?:】|$))/g)", html)
         self.assertIn("id=\"wb-smart-indicator-formula-tools\"", html)
         self.assertIn("id=\"wb-smart-indicator-formula-hint\"", html)
         self.assertIn("点击指标会直接插入下方公式编辑器", html)
@@ -2971,14 +2983,15 @@ class ReviewModuleBddTest(unittest.TestCase):
             }
         }
 
-        with patch("src.domain.market_services.get_db", return_value=fake_db), patch(
-            "src.domain.market_services.gen_watchlist_details",
-            return_value=details_map,
-        ):
-            items = market_services.list_watchlist_kline_annotations(
-                tenant_slug=self.tenant_slug,
-                stock_code="688981",
-            )
+        with app_entry.app.app_context():
+            with patch("src.domain.market_services.get_db", return_value=fake_db), patch(
+                "src.domain.market_services.gen_watchlist_details",
+                return_value=details_map,
+            ):
+                items = market_services.list_watchlist_kline_annotations(
+                    tenant_slug=self.tenant_slug,
+                    stock_code="688981",
+                )
 
         self.assertEqual(len(items), 1)
         self.assertEqual(fake_db.last_params, (self.tenant_slug, "688981"))
@@ -3004,7 +3017,7 @@ class ReviewModuleBddTest(unittest.TestCase):
             def execute(self, sql, params):
                 self.calls.append((sql, params))
                 if "SELECT id FROM watchlist_kline_annotations WHERE tenant_slug = ? AND id = ?" in sql:
-                    return _FakeCursor(None)
+                    return _FakeCursor({"id": 11})
                 return _FakeCursor(None)
 
             def commit(self):
@@ -3033,6 +3046,37 @@ class ReviewModuleBddTest(unittest.TestCase):
             fake_db.calls,
         )
         self.assertIn(("COMMIT", None), fake_db.calls)
+
+    def test_given_annotation_owned_by_another_user_when_deleting_then_no_row_is_deleted(self):
+        class _FakeCursor:
+            def fetchone(self):
+                return None
+
+        class _FakeDb:
+            def __init__(self):
+                self.calls = []
+
+            def execute(self, sql, params):
+                self.calls.append((sql, params))
+                return _FakeCursor()
+
+            def commit(self):
+                self.calls.append(("COMMIT", None))
+
+        fake_db = _FakeDb()
+        with patch("src.domain.market_services.get_db", return_value=fake_db), patch(
+            "src.domain.market_services.gen_watchlist_details",
+            return_value={"688981": {"code": "688981", "name": "中芯国际"}},
+        ):
+            deleted = market_services.delete_watchlist_kline_annotation(
+                tenant_slug=self.tenant_slug,
+                stock_code="688981",
+                annotation_id=11,
+                actor_profile_id="another-user",
+            )
+
+        self.assertFalse(deleted)
+        self.assertFalse(any("DELETE FROM watchlist_kline_annotations" in sql for sql, _ in fake_db.calls))
 
     def test_given_watchlist_annotations_when_composing_review_preview_then_annotation_evidence_is_preserved(self):
         summary_result = {

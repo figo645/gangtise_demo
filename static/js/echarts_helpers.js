@@ -277,6 +277,8 @@
       const candle = candles[index];
       return candle ? {
         value: [index, Number(candle.high || candle.close || 0)],
+        candleIndex: index,
+        annotationId: item.id || '',
         title: item.content || item.title || '复盘标注',
         note: item.content || item.note || '',
         trigger: '',

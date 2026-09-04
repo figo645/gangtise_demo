@@ -8603,14 +8603,16 @@ def _complete_user_async_job(job_code, success, summary="", result=None, error_m
         )
 
 
-def _user_async_job_loop():
+def _user_async_job_loop(worker_name="user-async-jobs-1"):
     while True:
+        job = None
         try:
             job = _claim_next_user_async_job()
             if not job:
                 with _user_async_job_lock:
                     _user_async_job_runtime["last_poll_at"] = now_ts()
-                    _user_async_job_runtime["queue_state"] = "idle"
+                    active_jobs = _user_async_job_runtime.get("active_jobs") or {}
+                    _user_async_job_runtime["queue_state"] = "running" if active_jobs else "idle"
                 time.sleep(USER_ASYNC_JOB_POLL_INTERVAL_SECONDS)
                 continue
             with _user_async_job_lock:
@@ -8618,6 +8620,12 @@ def _user_async_job_loop():
                 _user_async_job_runtime["queue_state"] = "running"
                 _user_async_job_runtime["current_job_code"] = job.get("job_code")
                 _user_async_job_runtime["current_job_type"] = job.get("job_type")
+                active_jobs = dict(_user_async_job_runtime.get("active_jobs") or {})
+                active_jobs[str(job.get("job_code") or "")] = {
+                    "job_type": str(job.get("job_type") or ""),
+                    "worker": worker_name,
+                }
+                _user_async_job_runtime["active_jobs"] = active_jobs
             with app.app_context():
                 if is_user_async_job_cancelled(job["job_code"]):
                     continue
@@ -8626,9 +8634,8 @@ def _user_async_job_loop():
                 summary = _summarize_user_async_job_result(job.get("job_type"), result)
                 _complete_user_async_job(job["job_code"], True, summary=summary, result=result)
         except Exception as exc:
-            current_job_code = ""
+            current_job_code = str((job or {}).get("job_code") or "")
             with _user_async_job_lock:
-                current_job_code = str(_user_async_job_runtime.get("current_job_code") or "")
                 _user_async_job_runtime["last_error_at"] = now_ts()
                 _user_async_job_runtime["last_error_message"] = str(exc)
             if current_job_code:
@@ -8648,8 +8655,13 @@ def _user_async_job_loop():
         finally:
             with _user_async_job_lock:
                 _user_async_job_runtime["last_poll_at"] = now_ts()
-                _user_async_job_runtime["current_job_code"] = ""
-                _user_async_job_runtime["current_job_type"] = ""
+                active_jobs = dict(_user_async_job_runtime.get("active_jobs") or {})
+                active_jobs.pop(str((job or {}).get("job_code") or ""), None)
+                _user_async_job_runtime["active_jobs"] = active_jobs
+                if not active_jobs:
+                    _user_async_job_runtime["current_job_code"] = ""
+                    _user_async_job_runtime["current_job_type"] = ""
+                    _user_async_job_runtime["queue_state"] = "idle"
 
 
 def ensure_user_async_job_worker_started():
@@ -8661,7 +8673,7 @@ def ensure_user_async_job_worker_started():
     with _user_async_job_lock:
         if _user_async_job_started:
             return
-        _user_async_job_thread = threading.Thread(target=_user_async_job_loop, name="user-async-jobs", daemon=True)
+        _user_async_job_thread = threading.Thread(target=run_user_async_job_worker_forever, name="user-async-jobs-supervisor", daemon=True)
         _user_async_job_thread.start()
         _user_async_job_started = True
         _user_async_job_runtime["started_at"] = now_ts()
@@ -8669,8 +8681,16 @@ def ensure_user_async_job_worker_started():
 
 
 def run_user_async_job_worker_forever():
-    """Run the queue consumer as a dedicated process entry point."""
-    _user_async_job_loop()
+    """Run bounded concurrent queue consumers in the dedicated Worker role."""
+    worker_count = USER_ASYNC_JOB_WORKER_CONCURRENCY
+    for index in range(1, worker_count):
+        threading.Thread(
+            target=_user_async_job_loop,
+            args=(f"user-async-jobs-{index + 1}",),
+            name=f"user-async-jobs-{index + 1}",
+            daemon=True,
+        ).start()
+    _user_async_job_loop("user-async-jobs-1")
 
 
 SCHEDULER_ADVISORY_LOCK_ID = 72951002
