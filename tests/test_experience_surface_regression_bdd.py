@@ -75,7 +75,15 @@ BDD_SCENARIOS = (
     ),
     _scenario(
         "h5-watchlist-annotation-edit-delete", "H5", "K线标注编辑与删除", "用户已有一条自己创建的 K线标注。", "点击标注图标或对应 K线。", "可编辑内容、保存修改或仅删除自己的标注。",
-        ('created_by_user_id: item.created_by_user_id || \'\'', "编辑 K线标注", '保存修改', 'function deleteWatchlistAnnotation()', 'annotationCandleIndex'),
+        ('created_by_user_id: item.created_by_user_id || \'\'', "编辑 K线标注", '保存修改', 'function deleteWatchlistAnnotation()', 'annotationCandleIndex', "params.seriesName === '标注'"),
+    ),
+    _scenario(
+        "h5-watchlist-annotation-immediate-render", "H5", "K线标注即时显示", "用户在个股详情中保存一条 K线标注。", "服务端返回规范化标注。", "当前详情缓存同步并立即重绘K线，无需退出并重新打开详情。",
+        ('function syncCurrentWatchlistAnnotationState', 'function redrawCurrentWatchlistDetail', 'currentWatchlistDetail.annotations = getWatchlistAnnotations', 'window.GangtiseEcharts.flush(chartHost)'),
+    ),
+    _scenario(
+        "h5-watchlist-detail-quote-colors", "H5", "个股涨跌颜色", "用户打开有真实行情的个股详情。", "行情上涨或下跌。", "上涨显示红色，下跌显示绿色；仅无真实行情时显示灰色。",
+        ("hasRealMarketPrice ? (Number(data.change || 0) >= 0 ? 'var(--red)' : 'var(--green)') : 'var(--gray-400)'",),
     ),
     _scenario(
         "h5-watchlist-comments", "H5", "个股评论与身份展示", "用户查看个股详情。", "打开评论区。", "评论区使用当前登录账户身份，不信任页面提交的昵称。",

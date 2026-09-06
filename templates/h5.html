@@ -13538,6 +13538,11 @@ function getRenderedWatchlistCodes() {
 function normalizeStockLookupValue(value) {
   const raw = String(value || '').trim();
   if (/^source_/i.test(raw)) return raw.toLowerCase();
+  // Annotation APIs normalize listed securities to their exchange-neutral
+  // numeric code. Keep the browser cache on that same key so a save response
+  // can immediately update the currently open chart.
+  const securityCode = raw.match(/^(\d{5,6})(?:\.(?:SH|SZ|HK))?$/i);
+  if (securityCode) return securityCode[1];
   return raw.toUpperCase();
 }
 
@@ -14300,7 +14305,7 @@ function buildWatchlistKlineSvg(series, options) {
       annotations: Array.isArray(config.annotations) ? config.annotations : [],
     }), {
       onClick: (params) => {
-        const annotationCandleIndex = params && params.seriesName === '复盘标注'
+        const annotationCandleIndex = params && params.seriesName === '标注'
           ? Number(params.data && params.data.candleIndex)
           : NaN;
         const candleIndex = Number.isInteger(annotationCandleIndex)
@@ -14496,7 +14501,7 @@ function renderWatchlistDetail(data, section) {
         </div>
         <div style="text-align:right">
           <div style="font-size:20px;font-weight:700;color:var(--text-main)">${hasRealMarketPrice ? Number(data.price).toFixed(2) : '--'}</div>
-          <div style="font-size:12px;color:${hasRealMarketPrice && Number(data.change || 0) >= 0 ? 'var(--red)' : 'var(--gray-400)'}">${hasRealMarketPrice && Number.isFinite(Number(data.change)) && Number.isFinite(Number(data.change_pct)) ? `${Number(data.change) >= 0 ? '▲' : '▼'} ${Math.abs(Number(data.change)).toFixed(2)} (${Number(data.change_pct).toFixed(2)}%)` : '暂无真实行情'}</div>
+          <div style="font-size:12px;color:${hasRealMarketPrice ? (Number(data.change || 0) >= 0 ? 'var(--red)' : 'var(--green)') : 'var(--gray-400)'}">${hasRealMarketPrice && Number.isFinite(Number(data.change)) && Number.isFinite(Number(data.change_pct)) ? `${Number(data.change) >= 0 ? '▲' : '▼'} ${Math.abs(Number(data.change)).toFixed(2)} (${Number(data.change_pct).toFixed(2)}%)` : '暂无真实行情'}</div>
         </div>
       </div>
 
@@ -14666,6 +14671,34 @@ function closeWatchlistAnnotationModal() {
   currentWatchlistAnnotationTarget = null;
 }
 
+function syncCurrentWatchlistAnnotationState(target, items) {
+  if (!target || !currentWatchlistDetail) return;
+  const activeUser = getActiveDemoUser() || {};
+  const tenantId = ((activeUser || {}).tenant || {}).id || target.tenantId;
+  const annotationKey = currentWatchlistDetail.annotation_key
+    || currentWatchlistDetail.indicator_code
+    || currentWatchlistDetail.code
+    || target.stockCode;
+  const normalizedItems = Array.isArray(items) ? items : [];
+
+  // Store under both values during the transition from exchange-suffixed
+  // client codes to canonical database codes. The chart always reads the
+  // current detail key, while subsequent views can use the API return value.
+  [annotationKey, target.stockCode].forEach((key) => {
+    if (key) replaceWatchlistAnnotations(tenantId, key, normalizedItems);
+  });
+  currentWatchlistDetail.annotations = getWatchlistAnnotations(tenantId, annotationKey);
+}
+
+function redrawCurrentWatchlistDetail() {
+  if (!currentWatchlistDetail) return;
+  renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
+  const chartHost = document.getElementById('watchlist-detail-content');
+  if (chartHost && window.GangtiseEcharts && typeof window.GangtiseEcharts.flush === 'function') {
+    window.GangtiseEcharts.flush(chartHost);
+  }
+}
+
 function saveWatchlistAnnotation() {
   const target = currentWatchlistAnnotationTarget;
   if (!target) return;
@@ -14711,18 +14744,20 @@ function saveWatchlistAnnotation() {
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'watchlist_annotation_save_failed');
     const currentUser = getActiveDemoUser() || {};
-    replaceWatchlistAnnotations(((currentUser || {}).tenant || {}).id, target.stockCode, [
-      ...getWatchlistAnnotations(((currentUser || {}).tenant || {}).id, target.stockCode).filter((item) => Number(item.candleIndex) !== Number(target.candleIndex) || String(item.created_by_user_id || '') !== String(userPayload.user_profile_id || '')),
+    const tenantId = ((currentUser || {}).tenant || {}).id || target.tenantId;
+    const nextItems = [
+      ...getWatchlistAnnotations(tenantId, target.stockCode).filter((item) => Number(item.candleIndex) !== Number(target.candleIndex) || String(item.created_by_user_id || '') !== String(userPayload.user_profile_id || '')),
       data.item,
-    ]);
+    ];
+    syncCurrentWatchlistAnnotationState(target, nextItems);
     closeWatchlistAnnotationModal();
-    renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
+    redrawCurrentWatchlistDetail();
     renderReviewExperience();
     showToast('K线标注已保存，复盘会自动引用');
   }).catch((error) => {
     watchlistAnnotationStore[target.tenantId][normalizeStockLookupValue(target.stockCode)] = previousItems;
     closeWatchlistAnnotationModal();
-    renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
+    redrawCurrentWatchlistDetail();
     renderReviewExperience();
     showToast(error.message || '标注保存失败');
   });
@@ -14745,14 +14780,15 @@ function deleteWatchlistAnnotation() {
   }).then(async (resp) => {
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok || !data.ok) throw new Error((data && data.error) || 'watchlist_annotation_delete_failed');
+    syncCurrentWatchlistAnnotationState(target, previousItems.filter(item => String(item.id || '') !== String(existingId)));
     closeWatchlistAnnotationModal();
-    renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
+    redrawCurrentWatchlistDetail();
     renderReviewExperience();
     showToast('已删除该处 K 线标注');
   }).catch((error) => {
     watchlistAnnotationStore[target.tenantId][normalizeStockLookupValue(target.stockCode)] = previousItems;
     closeWatchlistAnnotationModal();
-    renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
+    redrawCurrentWatchlistDetail();
     renderReviewExperience();
     showToast(error.message || '删除标注失败');
   });
