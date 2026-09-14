@@ -212,7 +212,6 @@ DEFAULT_LLM_FEATURE_CATALOG = [
     {"feature_code": "review_draft_generation", "feature_label": "复盘草稿生成", "default_purpose": "general"},
     {"feature_code": "review_compose_generation", "feature_label": "复盘完整成稿", "default_purpose": "general"},
     {"feature_code": "review_user_input_summary", "feature_label": "复盘用户输入摘要", "default_purpose": "general"},
-    {"feature_code": "review_watchlist_analysis", "feature_label": "复盘自选股归纳", "default_purpose": "general"},
     {"feature_code": "watchlist_comment_labeling", "feature_label": "自选股评论标注", "default_purpose": "general"},
     {"feature_code": "knowledge_query_filter", "feature_label": "知识检索过滤", "default_purpose": "general"},
     {"feature_code": "knowledge_query_answer", "feature_label": "知识问答生成", "default_purpose": "general"},
@@ -221,6 +220,8 @@ DEFAULT_LLM_FEATURE_CATALOG = [
     {"feature_code": "hermes_intent_router", "feature_label": "Hermes 意图路由", "default_purpose": "general"},
     {"feature_code": "hermes_interception_skill", "feature_label": "Hermes 语义拦截 Skill", "default_purpose": "general"},
     {"feature_code": "hermes_answer_synthesis", "feature_label": "Hermes 回答合成", "default_purpose": "general"},
+    {"feature_code": "hermes_today_user_interaction_task_intent", "feature_label": "Hermes 互动归纳任务意图解析", "default_purpose": "general"},
+    {"feature_code": "hermes_today_user_interaction_task", "feature_label": "Hermes 今日用户互动总结任务", "default_purpose": "general"},
     {"feature_code": "smart_indicator_formula_generation", "feature_label": "智能指标公式生成", "default_purpose": "general"},
 ]
 DEFAULT_LLM_MODELS = [
@@ -784,14 +785,14 @@ DEFAULT_SITE_CONFIG = {
     },
     "review_generation": {
         "polish_system_prompt": (
-            "你是中文投研复盘助手。"
+            "你是中文洞见编辑助手。"
             "你的任务是先对大V输入的原始材料做轻量整理和润色，删除明显重复、口语噪音和无效赘述，"
             "但必须保留原有事实、判断、风险提示和不确定性。"
             "不要新增原文没有出现的观点、数据和投资建议。"
             "输出纯文本，按自然段组织，保持便于后续继续组合成完整复盘。"
         ),
         "polish_user_template": (
-            "复盘周期：{period_label}\n"
+            "内容类型：洞见\n"
             "输入来源：{source_mode}\n"
             "作者：{speaker_label}\n"
             "触发入口：{entry_point}\n\n"
@@ -800,21 +801,20 @@ DEFAULT_SITE_CONFIG = {
             "原始输入：\n{source_text}"
         ),
         "compose_system_prompt": (
-            "你是中文投研复盘编辑助手。"
-            "你要基于大V自己的输入，以及已选中的智能仪表盘卡片，生成一版完整复盘草稿。"
+            "你是中文洞见编辑助手。"
+            "你要基于大V自己的输入，以及已选中的智能仪表盘卡片，生成一版完整洞见草稿。"
             "必须优先保留大V自己的核心判断和风险表达，智能仪表盘只用于补充证据、结构和验证节点。"
             "不要编造事实、数字、新闻或结论。"
             "输出纯文本，语言专业、克制、可直接给大V继续人工修改。"
             "尽量压缩表达，草稿长度默认应少于原始输入长度。"
         ),
         "compose_user_template": (
-            "复盘周期：{period_label}\n"
+            "内容类型：洞见\n"
             "作者：{speaker_label}\n"
             "触发入口：{entry_point}\n"
-            "纳入样本：{watchlist_text}\n"
             "附加标签：{tag_text}\n"
             "额外要求：{prompt_text}\n\n"
-            "这是大V最终确认前的复盘草稿，请基于以下两部分内容生成：\n"
+            "这是大V最终确认前的洞见草稿，请基于以下三部分内容生成：\n"
             "1. 大V输入/润色稿\n"
             "2. 智能仪表盘卡片摘要（每张卡片都附有数据来源和新闻来源）\n"
             "3. 大V已选择的知识材料\n\n"
@@ -843,6 +843,7 @@ DEFAULT_SITE_CONFIG = {
         "watchlist": True,
         "stock_forecast": False,
         "daily_review": True,
+        "core_indicators": False,
         "knowledge": False,
         # Knowledge is held back while the knowledge-base redesign is in
         # progress. The separate gate also keeps legacy site_config rows with
@@ -861,6 +862,10 @@ DEFAULT_SITE_CONFIG = {
         "fan_interaction": False,
         "watchlist_fan_comment_interaction": True,
         "paid_reply": False,
+        # Commercial access remains explicitly off until an administrator
+        # enables it and the tenant has configured a payment collection flow.
+        "fan_commerce": False,
+        "fan_qr_import": False,
         "workbench": True,
         "tenant_portal": True,
     },

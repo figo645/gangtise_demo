@@ -99,6 +99,11 @@ for file in "${FILES[@]}"; do
     0??)
       scope="schema"
       ;;
+    114)
+      # Tenant insight drafts are application schema, even though the
+      # migration numbering is in the post-100 data batch.
+      scope="schema"
+      ;;
     *)
       scope="master_data"
       [[ "$INCLUDE_MASTER_DATA" -eq 0 ]] && continue

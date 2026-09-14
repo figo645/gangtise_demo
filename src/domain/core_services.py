@@ -11,6 +11,38 @@ except Exception:  # pragma: no cover - deployment dependency validation
 from src.domain.agent_workflows import *
 
 
+_insight_drafts_table_ready = False
+
+
+def _ensure_insight_drafts_table():
+    """Keep draft persistence self-healing when deploy migrations lag behind."""
+    global _insight_drafts_table_ready
+    if _insight_drafts_table_ready:
+        return
+    db = get_db()
+    db.execute(
+        """
+        CREATE TABLE IF NOT EXISTS tenant_insight_drafts (
+            id BIGSERIAL PRIMARY KEY,
+            tenant_slug TEXT NOT NULL,
+            draft_id TEXT NOT NULL,
+            title TEXT NOT NULL DEFAULT '',
+            content_text TEXT NOT NULL,
+            source_mode TEXT NOT NULL DEFAULT 'manual',
+            access_mode TEXT NOT NULL DEFAULT 'public',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE (tenant_slug, draft_id)
+        )
+        """
+    )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tenant_insight_drafts_updated ON tenant_insight_drafts(tenant_slug, updated_at DESC)"
+    )
+    db.commit()
+    _insight_drafts_table_ready = True
+
+
 def _market_services_module():
     from src.domain import market_services
 
@@ -183,7 +215,7 @@ def compose_review_draft_with_llm(*args, **kwargs):
 
 
 def analyze_review_watchlist_with_llm(*args, **kwargs):
-    return _ai_services_module().analyze_review_watchlist_with_llm(*args, **kwargs)
+    raise RuntimeError("review_watchlist_analysis_disabled")
 
 
 def compose_review_structured_preview(*args, **kwargs):
@@ -915,7 +947,7 @@ def build_review_smart_cards(tenant, fund_dashboard, watchlist_details_map=None,
                 "summary": assessment or str(item.get("value") or "继续跟踪").strip() or "继续跟踪",
                 "value": str(item.get("value") or "").strip(),
                 "status": str(item.get("status") or "attention").strip() or "attention",
-                "prompt": str(item.get("prompt") or f"请围绕 {title} 生成复盘中的指标说明。").strip(),
+                "prompt": str(item.get("prompt") or f"请围绕 {title} 生成洞见中的指标说明。").strip(),
                 "data_sources": sanitize_user_facing_source_list(
                     [
                         f"租户智能指标面板：{title}",
@@ -950,7 +982,7 @@ def build_review_smart_cards(tenant, fund_dashboard, watchlist_details_map=None,
                 "summary": str(detail.get("signal_summary") or fundamental.get("summary") or "继续跟踪").strip() or "继续跟踪",
                 "value": f"{float(raw_change_pct):+.1f}%" if has_real_quote else "行情待同步",
                 "status": str(detail.get("alert_level") or "normal").strip() or "normal",
-                "prompt": f"围绕 {name} 生成重点个股复盘卡，包含当前判断、验证节点、风险边界和下一步观察。",
+                "prompt": f"围绕 {name} 生成重点个股洞见卡，包含当前判断、验证节点、风险边界和下一步观察。",
                 "data_sources": sanitize_user_facing_source_list(
                     [f"自选股详情：{name}"] + [f"关联指标：{item}" for item in related_indicator_names[:2]]
                 ),
@@ -967,13 +999,13 @@ def build_review_smart_cards(tenant, fund_dashboard, watchlist_details_map=None,
                     "kind": "news",
                     "title": "相关新闻归纳",
                     "category": "新闻卡",
-                    "summary": "从当前最相关的宏观、行业和自选股新闻中提炼复盘证据。",
+                    "summary": "从当前最相关的宏观、行业和自选股新闻中提炼洞见证据。",
                     "value": f"{len(top_news)} 条",
                     "status": "attention",
-                    "prompt": "归纳相关新闻，只保留真正能支撑本次复盘判断的背景材料、催化和验证信息。",
+                    "prompt": "归纳相关新闻，只保留真正能支撑本次洞见判断的背景材料、催化和验证信息。",
                     "data_sources": sanitize_user_facing_source_list(["平台新闻流 / 指标库关联资讯"]),
                     "news_sources": [str(item.get("title") or "").strip() for item in top_news if str(item.get("title") or "").strip()],
-                    "evidence_note": "用于给复盘补充事件背景和催化说明，不能替代大V自己的判断。",
+                    "evidence_note": "用于给洞见补充事件背景和催化说明，不能替代大V自己的判断。",
                 }
             )
     return cards[:8]
@@ -1008,8 +1040,20 @@ def default_portal_workspace(tenant):
             ],
         },
         "cta": {
-            "primary_label": "进入 H5 继续查看",
-            "secondary_label": "先看最新复盘",
+            "primary_label": "查看订阅权益",
+            "secondary_label": "先看最新洞见",
+        },
+        # The public portal is a conversion page, not a second workbench.
+        # Keep the subscription copy with the existing portal CMS so a tenant
+        # does not need a parallel page model or a new persistence table.
+        "subscription_promo": {
+            "enabled": False,
+            "headline": "订阅后，持续获得更完整的研究洞见",
+            "positioning": "",
+            "benefits": ["", "", ""],
+            "product_id": 0,
+            "rich_html": "",
+            "primary_cta_label": "立即订阅",
         },
         "modules": [
             {"id": "hero", "title": "门户介绍区", "type": "固定首屏", "desc": "介绍大V是谁、价值主张是什么、门户适合谁看。", "enabled": True},
@@ -1030,12 +1074,12 @@ def default_portal_workspace(tenant):
             },
             {
                 "title": "我会持续更新什么",
-                "body": "这里会持续更新复盘摘要、重点样本、价值主张和阶段判断。粉丝进入门户后，不需要先理解复杂功能，就能先看懂我当前在研究什么。",
+                "body": "这里会持续更新洞见摘要、重点样本、价值主张和阶段判断。粉丝进入门户后，不需要先理解复杂功能，就能先看懂我当前在研究什么。",
             },
         ],
         "contact": {
             "qr_title": is_lisa and "扫码加入 Lisa 研究社" or "扫码加入老王研究群",
-            "qr_hint": "扫码后可进入所属租户粉丝群或添加助手，后续接收复盘分享和互动提醒。",
+            "qr_hint": "扫码后可进入所属租户粉丝群或添加助手，后续接收洞见分享和互动提醒。",
             "wechat": is_lisa and "Lisa-Research-Assistant" or "Laowang-Research-Assistant",
             "phone": "400-889-6608",
             "email": is_lisa and "lisa@gangtise.demo" or "laowang@gangtise.demo",
@@ -1084,6 +1128,7 @@ def resolve_tenant_portal_workspace(tenant, cms=None):
             "presets": merged.get("presets", base["presets"]),
             "custom_sections": merged.get("custom_sections", base["custom_sections"]),
             "contact": merged.get("contact", base["contact"]),
+            "subscription_promo": merged.get("subscription_promo", base["subscription_promo"]),
             "page_blocks": merged.get("page_blocks", base["page_blocks"]),
         })
     return base
@@ -1095,8 +1140,8 @@ def default_tenant_review_snapshots(tenant):
     return [
         {
             "id": f"{tenant['slug']}-review-day-default",
-            "title": "收盘复盘：AI 算力强主线未变，港股互联网继续看回购与财报兑现",
-            "period": "日复盘",
+            "title": "洞见：AI 算力强主线未变，港股互联网继续看回购与财报兑现",
+            "period": "洞见",
             "period_key": "day",
             "time": "2026-06-07 18:40",
             "tags": ["行业板块", "个股跟踪", "可直接分发"],
@@ -1111,8 +1156,8 @@ def default_tenant_review_snapshots(tenant):
         },
         {
             "id": f"{tenant['slug']}-review-week-default",
-            "title": "周度复盘：科技成长维持主线，消费与新能源需要继续等景气验证",
-            "period": "周复盘",
+            "title": "洞见：科技成长维持主线，消费与新能源需要继续等景气验证",
+            "period": "洞见",
             "period_key": "week",
             "time": "2026-06-06 20:10",
             "tags": ["周度框架", "板块归纳"],
@@ -1136,6 +1181,10 @@ def normalize_review_snapshot_item(item, tenant, index=0):
     title = str(raw.get("title") or fallback.get("title") or "").strip() or fallback["title"]
     content_text = str(raw.get("content_text") or raw.get("content") or raw.get("body_text") or fallback.get("content_text") or "").strip()
     summary = str(raw.get("summary") or fallback.get("summary") or content_text[:180]).strip() or fallback["summary"]
+    access_mode = str(raw.get("access_mode") or "public").strip().lower()
+    if access_mode not in {"public", "subscriber"}:
+        access_mode = "public"
+    access_label = "订阅专享" if access_mode == "subscriber" else "常规笔记"
     published_at = normalize_datetime_text(raw.get("published_at") or raw.get("time") or fallback.get("published_at") or fallback.get("time"))
     try:
         view_count = max(0, int(raw.get("view_count") if raw.get("view_count") is not None else raw.get("views") or 0))
@@ -1274,7 +1323,7 @@ def normalize_review_snapshot_item(item, tenant, index=0):
     return {
         "id": str(raw.get("id") or f"{tenant['slug']}-review-{index + 1}").strip() or f"{tenant['slug']}-review-{index + 1}",
         "title": title,
-        "period": str(raw.get("period") or fallback.get("period") or "日复盘").strip() or "日复盘",
+        "period": "洞见",
         "period_key": str(raw.get("period_key") or fallback.get("period_key") or "day").strip().lower() or "day",
         "time": published_at or fallback.get("time") or now_ts(),
         "published_at": published_at or fallback.get("published_at") or now_ts(),
@@ -1282,6 +1331,8 @@ def normalize_review_snapshot_item(item, tenant, index=0):
         "watchlist": watchlist or copy.deepcopy(fallback.get("watchlist") or []),
         "summary": summary,
         "content_text": content_text or summary,
+        "access_mode": access_mode,
+        "access_label": access_label,
         "view_count": view_count,
         "source_mode": str(raw.get("source_mode") or fallback.get("source_mode") or "manual").strip().lower() or "manual",
         "paragraph_mode": str(raw.get("paragraph_mode") or fallback.get("paragraph_mode") or "manual").strip().lower() or "manual",
@@ -1316,7 +1367,7 @@ def resolve_tenant_review_snapshots(tenant, snapshots=None, include_simulated=Fa
 def default_tenant_message_center_state(tenant):
     is_lisa = tenant["slug"] == "lisa"
     return {
-        "summary": "消息板块不仅包含粉丝给大V的提问，也包含大V回复粉丝后的追问，以及复盘发布后需要第一时间触达的粉丝提醒。",
+        "summary": "消息板块不仅包含粉丝给大V的提问，也包含大V回复粉丝后的追问，以及洞见发布后需要第一时间触达的粉丝提醒。",
         "threads": [
             {
                 "id": f"{tenant['slug']}-thread-fan-1",
@@ -1338,18 +1389,18 @@ def default_tenant_message_center_state(tenant):
             {
                 "id": f"{tenant['slug']}-thread-review-1",
                 "type": "review_notification",
-                "name": "复盘发布提醒",
+                "name": "洞见发布提醒",
                 "time": "12分钟前",
-                "content": "你刚发布的日复盘已经推送给 92 位高频粉丝，首批打开率 41%。",
+                "content": "你刚发布的洞见已经推送给 92 位高频粉丝，首批打开率 41%。",
                 "status": "已送达",
-                "user_name": "复盘发布提醒",
+                "user_name": "洞见发布提醒",
                 "user_avatar": "📝",
                 "tier": "系统消息",
-                "last_msg": "你刚发布的日复盘已经推送给 92 位高频粉丝",
+                "last_msg": "你刚发布的洞见已经推送给 92 位高频粉丝",
                 "unread": 0,
                 "vip_only": False,
                 "messages": [
-                    {"id": 1, "sender": "kol", "content": "【最新复盘已发布】你刚发布的日复盘已经推送给高频粉丝，点击可查看送达情况。", "time": "2026-06-07 18:28", "type": "review"},
+                    {"id": 1, "sender": "kol", "content": "【最新洞见已发布】你刚发布的洞见已经推送给高频粉丝，点击可查看送达情况。", "time": "2026-06-07 18:28", "type": "review"},
                 ],
             },
             {
@@ -1408,7 +1459,7 @@ def build_thread_last_message(thread, messages):
     latest = messages[-1] if messages else {}
     latest_type = str((latest or {}).get("type") or "").strip()
     if latest_type == "review":
-        return summarize_message_preview((latest or {}).get("content") or thread.get("last_msg") or "【最新复盘已发布】", limit=72)
+        return summarize_message_preview((latest or {}).get("content") or thread.get("last_msg") or "【最新洞见已发布】", limit=72)
     if latest_type == "broadcast":
         content = (latest or {}).get("content") or thread.get("last_msg") or "群发消息已发送"
         return f"【群发】{summarize_message_preview(content, limit=60)}"
@@ -1588,6 +1639,107 @@ def append_review_snapshot(tenant_slug, snapshot):
     saved = update_tenant_review_snapshots(tenant_slug, deduped[:20])
     latest_tenant = get_tenant_by_slug(tenant_slug, saved) if saved else tenant
     return resolve_tenant_review_snapshots(latest_tenant, snapshots=latest_tenant.get("review_snapshots"))
+
+
+def _normalize_insight_draft_item(item, tenant, index=0):
+    raw = item if isinstance(item, dict) else {}
+    title = str(raw.get("title") or "未命名洞见草稿").strip()[:120] or "未命名洞见草稿"
+    content_text = str(raw.get("content_text") or raw.get("text") or "").strip()[:20000]
+    if not content_text:
+        raise ValueError("insight_draft_content_required")
+    draft_id = str(raw.get("id") or "").strip()
+    if not draft_id:
+        digest = hashlib.sha1(f"{tenant['slug']}:{title}:{content_text}:{now_ts()}".encode("utf-8")).hexdigest()[:16]
+        draft_id = f"{tenant['slug']}-insight-draft-{digest}"
+    return {
+        "id": draft_id[:160],
+        "title": title,
+        "content_text": content_text,
+        "source_mode": str(raw.get("source_mode") or "manual").strip().lower()[:40] or "manual",
+        "access_mode": "subscriber" if str(raw.get("access_mode") or "public").strip().lower() == "subscriber" else "public",
+        "updated_at": normalize_datetime_text(raw.get("updated_at") or now_ts()) or now_ts(),
+        "created_at": normalize_datetime_text(raw.get("created_at") or raw.get("updated_at") or now_ts()) or now_ts(),
+    }
+
+
+def list_tenant_insight_drafts(tenant_slug):
+    normalized_tenant_slug = str(tenant_slug or "").strip().lower()
+    if not get_tenant_by_slug(normalized_tenant_slug):
+        raise ValueError("tenant_not_found")
+    _ensure_insight_drafts_table()
+    rows = get_db().execute(
+        """
+        SELECT draft_id, title, content_text, source_mode, access_mode, created_at, updated_at
+        FROM tenant_insight_drafts
+        WHERE tenant_slug = ?
+        ORDER BY updated_at DESC, id DESC
+        LIMIT 50
+        """,
+        (normalized_tenant_slug,),
+    ).fetchall()
+    return [
+        {
+            "id": str(row["draft_id"]),
+            "title": str(row["title"] or "未命名洞见草稿"),
+            "content_text": str(row["content_text"] or ""),
+            "source_mode": str(row["source_mode"] or "manual"),
+            "access_mode": "subscriber" if str(row["access_mode"] or "") == "subscriber" else "public",
+            "created_at": normalize_datetime_text(row["created_at"]) or now_ts(),
+            "updated_at": normalize_datetime_text(row["updated_at"]) or now_ts(),
+        }
+        for row in rows
+    ]
+
+
+def save_tenant_insight_draft(tenant_slug, draft):
+    normalized_tenant_slug = str(tenant_slug or "").strip().lower()
+    tenant = get_tenant_by_slug(normalized_tenant_slug)
+    if not tenant:
+        raise ValueError("tenant_not_found")
+    normalized = _normalize_insight_draft_item(draft, tenant)
+    _ensure_insight_drafts_table()
+    now = now_ts()
+    db = get_db()
+    existing = db.execute(
+        "SELECT created_at FROM tenant_insight_drafts WHERE tenant_slug = ? AND draft_id = ?",
+        (normalized_tenant_slug, normalized["id"]),
+    ).fetchone()
+    created_at = str((existing or {}).get("created_at") or normalized["created_at"]) if existing else normalized["created_at"]
+    db.execute(
+        """
+        INSERT INTO tenant_insight_drafts
+          (tenant_slug, draft_id, title, content_text, source_mode, access_mode, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (tenant_slug, draft_id) DO UPDATE SET
+          title = EXCLUDED.title,
+          content_text = EXCLUDED.content_text,
+          source_mode = EXCLUDED.source_mode,
+          access_mode = EXCLUDED.access_mode,
+          updated_at = EXCLUDED.updated_at
+        """,
+        (normalized_tenant_slug, normalized["id"], normalized["title"], normalized["content_text"],
+         normalized["source_mode"], normalized["access_mode"], created_at, now),
+    )
+    db.commit()
+    normalized["created_at"] = normalize_datetime_text(created_at) or created_at
+    normalized["updated_at"] = normalize_datetime_text(now) or now
+    return normalized, list_tenant_insight_drafts(normalized_tenant_slug)
+
+
+def delete_tenant_insight_draft(tenant_slug, draft_id):
+    normalized_tenant_slug = str(tenant_slug or "").strip().lower()
+    normalized_id = str(draft_id or "").strip()
+    if not normalized_id:
+        raise ValueError("insight_draft_id_required")
+    _ensure_insight_drafts_table()
+    result = get_db().execute(
+        "DELETE FROM tenant_insight_drafts WHERE tenant_slug = ? AND draft_id = ? RETURNING draft_id",
+        (normalized_tenant_slug, normalized_id),
+    ).fetchone()
+    if not result:
+        raise ValueError("insight_draft_not_found")
+    get_db().commit()
+    return list_tenant_insight_drafts(normalized_tenant_slug)
 
 
 def increment_tenant_review_snapshot_view_count(tenant_slug, review_id):
@@ -1959,6 +2111,7 @@ def normalize_portal_cms_config(source, tenant):
     hero = merged.get("hero") if isinstance(merged.get("hero"), dict) else {}
     cta = merged.get("cta") if isinstance(merged.get("cta"), dict) else {}
     contact = merged.get("contact") if isinstance(merged.get("contact"), dict) else {}
+    raw_subscription_promo = raw.get("subscription_promo") if isinstance(raw.get("subscription_promo"), dict) else {}
     custom_sections = merged.get("custom_sections") if isinstance(merged.get("custom_sections"), list) else []
     merged["hero"] = {
         "headline": str(hero.get("headline") or defaults["hero"]["headline"]).strip() or defaults["hero"]["headline"],
@@ -1996,6 +2149,28 @@ def normalize_portal_cms_config(source, tenant):
         "phone": str(contact.get("phone") or defaults["contact"]["phone"]).strip() or defaults["contact"]["phone"],
         "email": str(contact.get("email") or defaults["contact"]["email"]).strip() or defaults["contact"]["email"],
     }
+    # Do not fill mandatory conversion fields with placeholder defaults. This
+    # makes the publication validation meaningful while legacy portals remain
+    # valid until the tenant explicitly enables subscription promotion.
+    raw_benefits = raw_subscription_promo.get("benefits")
+    benefits = raw_benefits if isinstance(raw_benefits, list) else []
+    try:
+        product_id = int(raw_subscription_promo.get("product_id") or 0)
+    except (TypeError, ValueError):
+        product_id = 0
+    enabled_value = raw_subscription_promo.get("enabled", False)
+    promo_enabled = enabled_value is True or str(enabled_value).strip().lower() in {"1", "true", "yes", "on"}
+    merged["subscription_promo"] = {
+        "enabled": promo_enabled,
+        "headline": str(raw_subscription_promo.get("headline") or "").strip()[:120],
+        "positioning": str(raw_subscription_promo.get("positioning") or "").strip()[:300],
+        "benefits": [str(item or "").strip()[:160] for item in benefits[:3]],
+        "product_id": max(0, product_id),
+        "rich_html": sanitize_portal_html(raw_subscription_promo.get("rich_html")),
+        "primary_cta_label": str(raw_subscription_promo.get("primary_cta_label") or "立即订阅").strip()[:32] or "立即订阅",
+    }
+    while len(merged["subscription_promo"]["benefits"]) < 3:
+        merged["subscription_promo"]["benefits"].append("")
     blocks = raw.get("page_blocks") if isinstance(raw.get("page_blocks"), list) else []
     normalized_blocks = []
     allowed_types = {"hero", "dashboard", "rich_text", "contact"}
@@ -2049,6 +2224,33 @@ def normalize_portal_cms_config(source, tenant):
     return merged
 
 
+def validate_tenant_portal_subscription_promo(tenant_slug, portal_cms):
+    """Reject incomplete paid-promotion pages before they become public."""
+    promo = (portal_cms or {}).get("subscription_promo") if isinstance(portal_cms, dict) else {}
+    if not isinstance(promo, dict) or not promo.get("enabled"):
+        return
+    required_fields = {
+        "headline": "subscription_promo_headline_required",
+        "positioning": "subscription_promo_positioning_required",
+        "rich_html": "subscription_promo_rich_content_required",
+    }
+    for field, error in required_fields.items():
+        if not str(promo.get(field) or "").strip():
+            raise ValueError(error)
+    benefits = [str(item or "").strip() for item in promo.get("benefits", [])]
+    if len([item for item in benefits if item]) < 3:
+        raise ValueError("subscription_promo_benefits_required")
+    product_id = int(promo.get("product_id") or 0)
+    if product_id < 1:
+        raise ValueError("subscription_promo_product_required")
+    product = get_db().execute(
+        "SELECT id FROM tenant_subscription_products WHERE id = ? AND tenant_slug = ? AND status = 'active'",
+        (product_id, str(tenant_slug or "").strip().lower()),
+    ).fetchone()
+    if not product:
+        raise ValueError("subscription_promo_product_not_active")
+
+
 def update_tenant_portal_cms(tenant_slug, portal_cms):
     site_config = get_site_config()
     tenants = get_tenant_configs(site_config)
@@ -2056,8 +2258,10 @@ def update_tenant_portal_cms(tenant_slug, portal_cms):
     for index, tenant in enumerate(tenants):
         if tenant.get("slug") != tenant_slug:
             continue
+        normalized = normalize_portal_cms_config(portal_cms, tenant)
+        validate_tenant_portal_subscription_promo(tenant_slug, normalized)
         tenants[index] = dict(tenant)
-        tenants[index]["portal_cms"] = normalize_portal_cms_config(portal_cms, tenant)
+        tenants[index]["portal_cms"] = normalized
         updated = True
         break
     if not updated:
@@ -4103,6 +4307,9 @@ def normalize_tenant_configs(source=None):
 def normalize_site_config(source=None):
     merged = _merge_site_config(copy.deepcopy(DEFAULT_SITE_CONFIG), source or {})
     feature_flags = merged.get("feature_flags") if isinstance(merged.get("feature_flags"), dict) else {}
+    # Core indicators are intentionally archived until the product is ready;
+    # an older database row must not reopen the surfaces by omission.
+    feature_flags.setdefault("core_indicators", False)
     if feature_flags.get("knowledge_module_enabled") is not True:
         feature_flags["knowledge"] = False
     merged["feature_flags"] = feature_flags
@@ -4956,7 +5163,7 @@ def build_h5_help_center_payload(role="investor"):
             "bullets": [
                 "投资者默认只和所属大V租户互动。",
                 "大V会在消息板块查看粉丝私信和系统提醒。",
-                "复盘发布、私信回复和关键互动都会沉淀到消息链路。",
+                "洞见发布、私信回复和关键互动都会沉淀到消息链路。",
             ],
             "action_label": "打开消息板块",
             "action_type": "switch_tab",
@@ -4978,15 +5185,15 @@ def build_h5_help_center_payload(role="investor"):
         },
         {
             "id": "review",
-            "category": "复盘",
-            "title": "复盘内容怎么生成",
-            "summary": "先形成用户复盘 Draft，再审核确认，最后生成摘要；如果选择了自选股，再追加归纳总结。",
+            "category": "洞见",
+            "title": "洞见内容怎么生成",
+            "summary": "先形成用户洞见草稿，再审核确认，最后生成摘要；如果选择了自选股，再追加归纳总结。",
             "bullets": [
                 "手写、语音、文件都先进入用户输入整理阶段。",
                 "确认 Draft 后一定会生成摘要；如果选择了自选股，再追加归纳总结。",
-                "预览无误再发布，前后台展示同一篇正式复盘。",
+                "预览无误再发布，前后台展示同一篇正式洞见。",
             ],
-            "action_label": "打开复盘",
+            "action_label": "打开洞见",
             "action_type": "switch_tab",
             "action_value": "review",
         },
@@ -7490,6 +7697,7 @@ def init_db():
         execute_sql_file(conn, sql_dir / "109_add_smart_indicator_refresh_task.sql")
         execute_sql_file(conn, sql_dir / "111_finalize_unused_admin_task_cleanup.sql")
         execute_sql_file(conn, sql_dir / "112_remove_recreated_unused_admin_tasks.sql")
+        execute_sql_file(conn, sql_dir / "113_fan_commerce_and_qr_import.sql")
 
 
 def init_db_safe():
@@ -8028,17 +8236,17 @@ def _summarize_user_async_job_result(job_type, result):
     if job_type == "review_voice_transcribe":
         return "语音转写完成"
     if job_type == "review_polish_input":
-        return "复盘输入润色完成"
+        return "洞见内容润色完成"
     if job_type == "review_compose_draft":
-        return "复盘完整成稿完成"
+        return "洞见完整成稿完成"
     if job_type == "review_generate_draft":
-        return "复盘草稿生成完成"
+        return "洞见草稿生成完成"
     if job_type == "review_prepare_preview":
-        return "复盘结构化预览完成"
+        return "洞见预览完成"
     if job_type == "review_sector_summary_constraint":
         return "自选股总结规则约束完成"
     if job_type == "review_publish_embed":
-        return "复盘发布入向量完成"
+        return "洞见发布入向量完成"
     if job_type == "knowledge_manual_sync":
         return "知识入库同步完成"
     return "任务执行完成"

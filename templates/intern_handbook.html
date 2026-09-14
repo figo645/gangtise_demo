@@ -51,7 +51,7 @@
         <div class="col-md-6 col-xl-3"><div class="hb-node"><span class="hb-node-tag">PUBLIC</span><div class="hb-node-title">首页与产品文档</div><div class="hb-node-copy">产品总览、PRD、学习手册与各系统入口。</div></div></div>
         <div class="col-md-6 col-xl-3"><div class="hb-node"><span class="hb-node-tag">MOBILE</span><div class="hb-node-title">H5 用户端</div><div class="hb-node-copy">移动端用户入口；与 Web 用户端共用 API、权限和数据契约，提供注册、行情、自选、复盘、知识、消息及按配置开放的小金智能体。</div></div></div>
         <div class="col-md-6 col-xl-3"><div class="hb-node"><span class="hb-node-tag">DESKTOP</span><div class="hb-node-title">Web 用户端</div><div class="hb-node-copy">桌面端用户入口；不新增业务逻辑，只用更宽布局呈现与 H5 相同的基本面、自选、复盘、消息和小金智能体能力。</div></div></div>
-        <div class="col-md-6 col-xl-3"><div class="hb-node"><span class="hb-node-tag">DAV</span><div class="hb-node-title">大V 工作台</div><div class="hb-node-copy">复盘生产、知识录入、粉丝经营、评论统计、租户定价与门户维护。</div></div></div>
+        <div class="col-md-6 col-xl-3"><div class="hb-node"><span class="hb-node-tag">DAV</span><div class="hb-node-title">大V 工作台</div><div class="hb-node-copy">洞见生产、知识录入、粉丝经营、评论统计、租户定价与门户维护。</div></div></div>
         <div class="col-md-6 col-xl-3"><div class="hb-node"><span class="hb-node-tag">ADMIN</span><div class="hb-node-title">平台 Admin</div><div class="hb-node-copy">用户租户、开关、模型、知识/记忆、市场数据、审计与发布治理。</div></div></div>
       </div>
       <div class="hb-arch-line mt-3"></div>
@@ -84,11 +84,11 @@
         </div></div>
       </article>
       <article class="accordion-item">
-        <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#flowReview">03 · 大V复盘生产、确认与发布</button></h3>
+        <h3 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#flowReview">03 · 大V洞见生产、确认与发布</button></h3>
         <div id="flowReview" class="accordion-collapse collapse" data-bs-parent="#coreFlowAccordion"><div class="accordion-body">
-          <div class="hb-flow-lane"><div class="hb-flow-role">研究型大V</div><div class="hb-flow-cells"><div class="hb-flow-cell is-input"><b>输入</b>用户自定义主题和手动内容；也可录音、上传文件或 URL</div><div class="hb-flow-cell is-input"><b>选择</b>可选自选股；不选择也可继续</div><div class="hb-flow-cell is-input"><b>确认</b>编辑用户复盘 Draft 后确认发布</div><div class="hb-flow-cell is-output"><b>输出</b>已发布复盘与发布反馈</div></div></div>
-          <div class="hb-flow-lane"><div class="hb-flow-role">复盘工作流</div><div class="hb-flow-cells"><div class="hb-flow-cell is-process"><b>归集</b>语音/文件/URL 回填到同一可编辑用户输入</div><div class="hb-flow-cell is-process"><b>生成</b>先形成用户复盘 Draft，不替换原始输入</div><div class="hb-flow-cell is-process"><b>确认后处理</b>发布时生成150字内摘要；选择自选股才做归纳</div><div class="hb-flow-cell is-output"><b>落库</b>复盘正文、摘要、来源与关联关系写入租户内容</div></div></div>
-          <div class="hb-flow-lane"><div class="hb-flow-role">普通用户 / Hermes</div><div class="hb-flow-cells"><div class="hb-flow-cell is-output"><b>普通用户</b>复盘列表和详情立即看到新内容</div><div class="hb-flow-cell is-output"><b>普通用户</b>消息可收到对应更新</div><div class="hb-flow-cell is-output"><b>Hermes</b>可在租户知识与复盘证据链中继续回答</div><div class="hb-flow-cell is-control"><b>边界</b>没有选自选股时，不能显示虚构的自选股归纳</div></div></div>
+          <div class="hb-flow-lane"><div class="hb-flow-role">研究型大V</div><div class="hb-flow-cells"><div class="hb-flow-cell is-input"><b>输入</b>用户自定义主题和手动内容；也可录音、上传文件或 URL</div><div class="hb-flow-cell is-input"><b>选择</b>可选智能卡片和知识材料</div><div class="hb-flow-cell is-input"><b>确认</b>编辑洞见 Draft 后确认发布范围与正文</div><div class="hb-flow-cell is-output"><b>输出</b>已发布洞见与发布反馈</div></div></div>
+          <div class="hb-flow-lane"><div class="hb-flow-role">洞见工作流</div><div class="hb-flow-cells"><div class="hb-flow-cell is-process"><b>归集</b>语音/文件/URL 回填到同一可编辑用户输入</div><div class="hb-flow-cell is-process"><b>生成</b>先形成洞见 Draft，不替换原始输入</div><div class="hb-flow-cell is-process"><b>确认后处理</b>由大模型基于已确认内容生成摘要并进入发布预览</div><div class="hb-flow-cell is-output"><b>落库</b>洞见正文、摘要、来源与访问范围写入租户内容</div></div></div>
+          <div class="hb-flow-lane"><div class="hb-flow-role">普通用户 / Hermes</div><div class="hb-flow-cells"><div class="hb-flow-cell is-output"><b>普通用户</b>洞见列表和详情立即看到新内容</div><div class="hb-flow-cell is-output"><b>普通用户</b>消息可收到对应更新</div><div class="hb-flow-cell is-output"><b>Hermes</b>可在授权的租户内容与证据链中继续回答</div><div class="hb-flow-cell is-control"><b>边界</b>订阅专享洞见仅向有效订阅用户展示详细正文</div></div></div>
           <div class="hb-flow-result"><strong>用户关系：</strong>大V拥有内容的输入、编辑与发布主导权；普通用户只阅读所属租户发布内容；小金智能体使用已沉淀内容进行研究辅助，不应越过用户确认步骤自动发布。</div>
         </div></div>
       </article>
@@ -128,7 +128,7 @@
     <div class="hb-stage-track" id="learningStages">
       <button class="hb-stage active text-start" type="button" data-stage="stage-one"><span class="hb-stage-number">1</span><div class="hb-stage-title">建立全局认知</div><div class="hb-stage-desc">入口、角色、租户、数据与配置。</div></button>
       <button class="hb-stage text-start" type="button" data-stage="stage-two"><span class="hb-stage-number">2</span><div class="hb-stage-title">体验核心业务</div><div class="hb-stage-desc">行情、自选、复盘、知识和消息。</div></button>
-      <button class="hb-stage text-start" type="button" data-stage="stage-three"><span class="hb-stage-number">3</span><div class="hb-stage-title">理解研究与生产</div><div class="hb-stage-desc">Hermes、证据链、复盘向导和知识沉淀。</div></button>
+      <button class="hb-stage text-start" type="button" data-stage="stage-three"><span class="hb-stage-number">3</span><div class="hb-stage-title">理解研究与生产</div><div class="hb-stage-desc">Hermes、证据链、洞见生产和知识沉淀。</div></button>
       <button class="hb-stage text-start" type="button" data-stage="stage-four"><span class="hb-stage-number">4</span><div class="hb-stage-title">掌握平台治理</div><div class="hb-stage-desc">开关、模型、数据、记忆和权限。</div></button>
     </div>
     <div class="hb-stage-panel active" id="stage-one"><strong>阶段目标：能说清“谁在什么入口、看什么数据、能做什么”。</strong><ul class="mb-0 mt-2"><li>从系统地图进入 H5、Web 用户端、大V工作台与 Admin，比较角色可见菜单，并确认 H5/Web 的 API 和业务结果一致。</li><li>理解“租户”是内容、知识、互动和数据隔离边界，不是单纯展示筛选条件。</li><li>确认市场与指标请求必须展示真实来源，数据不可用时不得以模拟内容替代。</li></ul></div>
@@ -147,7 +147,7 @@
       <tr data-role="investor"><td>普通用户</td><td>互动与内容</td><td>评论、消息、复盘阅读、知识查看、账户设置</td><td>租户隔离，保存即时可见，分类清楚</td><td class="risk-high">高</td></tr>
       <tr data-role="investor"><td>普通用户</td><td>Hermes</td><td>可见性、会话、图表、知识问答、缺失能力提示</td><td>按 Admin 策略开放，不输出虚构市场结论</td><td class="risk-high">高</td></tr>
       <tr data-role="investor"><td>普通用户</td><td>版本中心</td><td>“我的 → 关于版本”、当前版本说明与历史版本</td><td>重大版本首次进入可展示更新弹窗；日常版本不应强制打断使用</td><td class="risk-medium">中</td></tr>
-      <tr data-role="dav"><td>研究型大V</td><td>复盘生产</td><td>主题、手动/语音/文件/URL、Draft 编辑、自选股可选、发布</td><td>用户输入可编辑，发布反馈明确且前台立即可见</td><td class="risk-high">高</td></tr>
+      <tr data-role="dav"><td>研究型大V</td><td>洞见生产</td><td>主题、手动/语音/文件/URL、可选 LLM 优化、Draft 审核、公开/订阅发布</td><td>用户输入可编辑，订阅内容明确标识并按权限展示，发布反馈明确且前台立即可见</td><td class="risk-high">高</td></tr>
       <tr data-role="dav"><td>研究型大V</td><td>版本中心</td><td>顶部版本图标、最新版本介绍与历史版本</td><td>重大版本每端首次展示，关闭后可通过图标再次查看</td><td class="risk-medium">中</td></tr>
       <tr data-role="dav"><td>研究型大V</td><td>知识与证据链</td><td>知识录入、百科、结构层级、图谱、Hermes 召回</td><td>面向大V展示可读知识，不暴露 Admin 治理字段</td><td class="risk-high">高</td></tr>
       <tr data-role="dav"><td>研究型大V</td><td>粉丝经营</td><td>粉丝、定价、浏览、付费样本、评论统计、行业分布图</td><td>统计与图表仅使用本租户数据</td><td class="risk-medium">中</td></tr>

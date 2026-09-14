@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>加入{{ tenant.name if tenant else '研究空间' }}</title>
+  <link rel="stylesheet" href="/static/vendor/bootstrap.min.css"><link rel="stylesheet" href="/static/css/style.css">
+  <style>body{min-height:100vh;background:linear-gradient(145deg,#071a2c,#123c61 55%,#d0a85c);display:grid;place-items:center}.join-card{width:min(460px,calc(100% - 32px));padding:30px;border:1px solid rgba(255,255,255,.2);border-radius:22px;background:rgba(8,25,44,.9);color:#fff;box-shadow:0 24px 70px rgba(0,0,0,.25)}.join-kicker{font-size:11px;letter-spacing:.16em;color:#d6b978}.join-title{font-size:28px;font-weight:800;margin-top:10px}.join-copy{color:#c7d2df;line-height:1.8;margin:12px 0 22px}.join-meta{padding:14px;border-radius:12px;background:rgba(255,255,255,.07);color:#dbe4ed;font-size:13px;line-height:1.8}</style>
+</head><body><main class="join-card">
+  {% if invite %}<div class="join-kicker">FAN ACCESS</div><div class="join-title">加入{{ tenant.name }}</div>
+  <div class="join-copy">{{ tenant.advisor }}邀请你进入研究空间。登录或注册后，账号会自动归属当前租户并记录扫码来源。</div>
+  <div class="join-meta">来源：{{ invite.source_label }}{% if invite.note %}<br>说明：{{ invite.note }}{% endif %}</div>
+  <a class="btn btn-warning w-100 mt-4" href="{{ login_url }}">登录 / 注册后加入</a>
+  {% else %}<div class="join-title">入口已失效</div><div class="join-copy">二维码已停用、过期或达到使用上限，请联系大V获取新的入口。</div><a class="btn btn-outline-light w-100" href="/">返回首页</a>{% endif %}
+</main></body></html>

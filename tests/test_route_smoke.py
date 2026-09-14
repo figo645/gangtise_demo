@@ -45,6 +45,18 @@ class RouteSmokeTest(unittest.TestCase):
                 self.assertIn("text/html", response.content_type)
                 self.assertIn("Hermes", response.get_data(as_text=True))
 
+    def test_h5_home_promotes_latest_insight_only(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn('id="feed-featured-insight"', html)
+        self.assertIn("function renderFeaturedInsightCard()", html)
+        self.assertIn("最新洞见", html)
+        self.assertIn("const cards = [{ article: latest, label: '最新洞见', variant: 'latest' }]", html)
+        self.assertNotIn("本周热门", html)
+        self.assertNotIn("今日基本面首页", html)
+
     def test_web_user_app_reuses_h5_capabilities_with_desktop_shell(self):
         response = self.client.get(f"/web?tenant={self.tenant_slugs[0]}")
 
@@ -220,6 +232,41 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("deletePublishedReviewArticle", h5_response.get_data(as_text=True))
         self.assertIn("kwDeletePublishedReview", workbench_response.get_data(as_text=True))
 
+    def test_insight_publish_scope_uses_selectable_tags_on_h5_and_workbench(self):
+        h5_response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
+        workbench_response = self.client.get(f"/kol-workbench?tenant={self.tenant_slugs[0]}")
+
+        h5_html = h5_response.get_data(as_text=True)
+        workbench_html = workbench_response.get_data(as_text=True)
+        self.assertIn('role="radiogroup" aria-label="选择洞见发布范围"', h5_html)
+        self.assertIn('class="review-access-scope-tags"', h5_html)
+        self.assertIn('所有粉丝可查看完整正文', h5_html)
+        self.assertIn("setReviewAccessMode('subscriber')", h5_html)
+        self.assertIn("accessModeInput.dataset.accessMode", h5_html)
+        self.assertIn('.review-rich-editor:focus-within .ql-editor.ql-blank::before', h5_html)
+        self.assertIn('min-height:400px', h5_html)
+        self.assertIn('role="radiogroup" aria-label="选择洞见发布范围"', workbench_html)
+        self.assertIn('class="kw-review-access-scope-tags"', workbench_html)
+        self.assertIn('仅有效订阅用户查看正文', workbench_html)
+        self.assertIn("kwSetReviewAccessMode('subscriber')", workbench_html)
+        self.assertIn("accessModeInput.dataset.accessMode", workbench_html)
+        self.assertIn('.kw-review-rich-editor:focus-within .ql-editor.ql-blank::before', workbench_html)
+
+    def test_insight_home_and_list_cards_show_access_scope_badges(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("function renderReviewArticleAccessBadge(article)", html)
+        self.assertIn("review-article-access-badge subscriber", html)
+        self.assertIn("🔒 订阅专享", html)
+        self.assertIn("常规内容", html)
+        self.assertIn("renderReviewArticleCards(articles)", html)
+        self.assertIn("renderReviewArticleCards(buildAllPublishedReviewArticles())", html)
+        self.assertIn("review-access-legend", html)
+        self.assertIn("function renderReviewArticleAccessLabel(article)", html)
+        self.assertIn("review-detail-page", html)
+
     def test_h5_smart_indicator_workbench_has_library_and_fan_view_is_read_only(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
 
@@ -236,13 +283,12 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("canonicalizeWorkbenchSmartPrompt", html)
         self.assertIn("formula_tokens", html)
 
-    def test_web_workbench_smart_indicator_and_review_api_contract_matches_h5(self):
+    def test_web_workbench_smart_indicator_and_insight_api_contract_matches_h5(self):
         web_html = self.client.get("/kol-workbench?tenant=laowang").get_data(as_text=True)
         h5_html = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}").get_data(as_text=True)
 
         for html in (h5_html, web_html):
             self.assertIn("/api/review/generate-draft", html)
-            self.assertIn("/api/review/prepare-preview", html)
             self.assertIn("/api/review/publish", html)
             self.assertIn("/api/tenant/${encodeURIComponent(tenantSlug)}/smart-indicators", html)
 
@@ -644,11 +690,10 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertNotIn("function buildHermesKnowledgePayload(entry, artifact)", html)
         self.assertNotIn("加入知识源", html)
         self.assertNotIn("加入上下文", html)
-        self.assertIn("function requestReviewStructuredPreview()", html)
-        self.assertIn("function confirmStructuredReviewToPreview()", html)
         self.assertIn("Draft 审核与详细修改", html)
-        self.assertIn("用户复盘", html)
-        self.assertIn("自选股归纳总结", html)
+        self.assertIn("洞见", html)
+        self.assertNotIn("需要自选股 AI 分析", html)
+        self.assertNotIn("第二阶段：选择需要 AI 分析的自选股", html)
         self.assertIn("系统标签", html)
         self.assertIn("openAccountSettingsModal()", html)
         self.assertIn("openProfileNotificationCenter()", html)
@@ -764,6 +809,46 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertEqual(denied.status_code, 403)
         self.assertEqual(denied.get_json().get("error"), "tenant_scope_forbidden")
 
+    def test_insight_drafts_are_persisted_and_mutable_only_by_their_dav(self):
+        import src.web.api_kol as api_kol
+
+        tenant_slug = self.tenant_slugs[0]
+        draft = {
+            "id": f"{tenant_slug}-draft-1",
+            "title": "测试洞见",
+            "content_text": "这是数据库保存的洞见草稿。",
+            "source_mode": "manual",
+        }
+        saved = []
+        original_current_user = api_kol.get_current_authenticated_user
+        original_list = api_kol.list_tenant_insight_drafts
+        original_save = api_kol.save_tenant_insight_draft
+        original_delete = api_kol.delete_tenant_insight_draft
+        try:
+            api_kol.get_current_authenticated_user = lambda: {"role": "dav", "tenant_slug": tenant_slug}
+            api_kol.list_tenant_insight_drafts = lambda slug: [draft] if slug == tenant_slug else []
+            api_kol.save_tenant_insight_draft = lambda slug, payload: (saved.append((slug, payload)) or draft, [draft])
+            api_kol.delete_tenant_insight_draft = lambda slug, draft_id: []
+
+            listed = self.client.get(f"/api/tenant/{tenant_slug}/insight-drafts")
+            created = self.client.post(f"/api/tenant/{tenant_slug}/insight-drafts", json={"title": draft["title"], "content_text": draft["content_text"]})
+            deleted = self.client.delete(f"/api/tenant/{tenant_slug}/insight-drafts/{draft['id']}")
+            denied = self.client.get("/api/tenant/another_tenant/insight-drafts")
+        finally:
+            api_kol.get_current_authenticated_user = original_current_user
+            api_kol.list_tenant_insight_drafts = original_list
+            api_kol.save_tenant_insight_draft = original_save
+            api_kol.delete_tenant_insight_draft = original_delete
+
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual(listed.get_json()["drafts"], [draft])
+        self.assertEqual(created.status_code, 200)
+        self.assertEqual(saved[0][0], tenant_slug)
+        self.assertEqual(saved[0][1]["content_text"], draft["content_text"])
+        self.assertEqual(deleted.status_code, 200)
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(denied.get_json()["error"], "tenant_scope_forbidden")
+
     def test_h5_hermes_history_and_send_scroll_to_bottom(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
 
@@ -862,7 +947,7 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("登录与访问策略", html)
         self.assertIn("知识输入源", html)
         self.assertIn("证据链配置", html)
-        self.assertIn("复盘生成配置", html)
+        self.assertIn("洞见生成配置", html)
         self.assertIn("功能级模型映射", html)
         self.assertIn('data-settings-panel="knowledge-source"', html)
         self.assertIn('data-settings-panel="llm-feature-map"', html)
@@ -880,7 +965,7 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("系统地图与功能介绍", handbook_html)
         self.assertIn("核心功能使用流程图", handbook_html)
         self.assertIn("账户注册、合规确认与渠道归因", handbook_html)
-        self.assertIn("大V复盘生产、确认与发布", handbook_html)
+        self.assertIn("大V洞见生产、确认与发布", handbook_html)
         self.assertIn("Hermes 研究问答、图表与长期记忆", handbook_html)
         self.assertIn("Admin 配置、数据治理与受控数据库发布", handbook_html)
         self.assertIn("建议学习路径", handbook_html)
@@ -981,6 +1066,74 @@ class RouteSmokeTest(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertIn("text/html", response.content_type)
                 self.assertIn("Dashboard", response.get_data(as_text=True))
+
+    def test_tenant_portal_is_public_subscription_entry(self):
+        tenant_slug = self.tenant_slugs[0]
+        original_is_authenticated = web_hooks.is_authenticated
+        original_current_user = web_pages.get_current_authenticated_user
+        try:
+            web_hooks.is_authenticated = lambda: False
+            web_pages.get_current_authenticated_user = lambda: None
+            response = self.client.get(f"/tenant/{tenant_slug}")
+        finally:
+            web_hooks.is_authenticated = original_is_authenticated
+            web_pages.get_current_authenticated_user = original_current_user
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("/login?next=%2Ftenant", response.location or "")
+
+    def test_portal_subscription_promotion_uses_existing_products_and_rich_text(self):
+        from src.domain.core_services import normalize_portal_cms_config
+
+        tenant_slug = self.tenant_slugs[0]
+        tenant = {"slug": tenant_slug, "portal_headline": "测试门户", "portal_description": "测试介绍"}
+        normalized = normalize_portal_cms_config({
+            "subscription_promo": {
+                "enabled": True,
+                "headline": "订阅研究服务",
+                "positioning": "适合希望持续跟踪研究判断的投资者。",
+                "benefits": ["完整洞见", "个股跟踪", "风险边界"],
+                "product_id": 7,
+                "rich_html": '<p>可粘贴海报</p><script>alert(1)</script><img src="data:image/png;base64,AA==">',
+            },
+        }, tenant)
+        promo = normalized["subscription_promo"]
+        self.assertTrue(promo["enabled"])
+        self.assertEqual(promo["product_id"], 7)
+        self.assertEqual(promo["benefits"], ["完整洞见", "个股跟踪", "风险边界"])
+        self.assertIn("可粘贴海报", promo["rich_html"])
+        self.assertIn("data:image/png", promo["rich_html"])
+        self.assertNotIn("script", promo["rich_html"])
+
+        workbench = self.client.get(f"/kol-workbench?tenant={tenant_slug}")
+        portal = self.client.get(f"/tenant/{tenant_slug}")
+        self.assertIn("订阅宣传配置", workbench.get_data(as_text=True))
+        self.assertIn("kwPortalHandleSubscriptionPaste", workbench.get_data(as_text=True))
+        self.assertIn("tp-subscription-section", portal.get_data(as_text=True))
+
+    def test_portal_cms_rejects_incomplete_enabled_subscription_promotion(self):
+        import src.web.api_kol as api_kol
+
+        tenant_slug = self.tenant_slugs[0]
+        tenant = {"slug": tenant_slug, "portal_headline": "测试门户", "portal_description": "测试介绍"}
+        original_current_user = api_kol.get_current_authenticated_user
+        original_tenant = api_kol.get_tenant_by_slug
+        original_update = api_kol.update_tenant_portal_cms
+        try:
+            api_kol.get_current_authenticated_user = lambda: {"id": 1, "role": "dav", "tenant_slug": tenant_slug}
+            api_kol.get_tenant_by_slug = lambda slug: tenant if slug == tenant_slug else None
+            api_kol.update_tenant_portal_cms = lambda _slug, _cms: (_ for _ in ()).throw(ValueError("subscription_promo_benefits_required"))
+            response = self.client.post(
+                f"/api/kol/portal-cms?tenant={tenant_slug}",
+                json={"portal_cms": {"subscription_promo": {"enabled": True}}},
+            )
+        finally:
+            api_kol.get_current_authenticated_user = original_current_user
+            api_kol.get_tenant_by_slug = original_tenant
+            api_kol.update_tenant_portal_cms = original_update
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()["error"], "subscription_promo_benefits_required")
 
     def test_tenant_portal_feature_flag_hides_entries_and_rejects_portal_routes(self):
         from src.runtime import DEFAULT_SITE_CONFIG
@@ -1236,7 +1389,7 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("hermes_agent", workflow_ids)
         self.assertIn("smart_indicator_agent", workflow_ids)
         self.assertIn("review_voice_enhancement", workflow_ids)
-        self.assertIn("review_watchlist_analysis", workflow_ids)
+        self.assertNotIn("review_watchlist_analysis", workflow_ids)
         self.assertIn("knowledge_query_agent", workflow_ids)
         self.assertIn("evidence_chain_agent", workflow_ids)
         self.assertIn("knowledge_processing_agent", workflow_ids)
@@ -1255,7 +1408,7 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("workflow_meta", payload)
         self.assertEqual(payload["workflow_meta"]["id"], "knowledge_asset_agent")
 
-    def test_review_prepare_preview_endpoint_queues_job(self):
+    def test_review_prepare_preview_endpoint_is_disabled(self):
         response = self.client.post(
             "/api/review/prepare-preview",
             json={
@@ -1269,15 +1422,11 @@ class RouteSmokeTest(unittest.TestCase):
             },
         )
 
-        self.assertIn(response.status_code, {200, 503})
+        self.assertEqual(response.status_code, 410)
         payload = response.get_json()
-        self.assertIsInstance(payload, dict)
-        if response.status_code == 200:
-            self.assertTrue(payload["ok"])
-            self.assertTrue(payload["async"])
-            self.assertIn("job_code", payload)
+        self.assertEqual(payload, {"ok": False, "error": "insight_stock_analysis_removed"})
 
-    def test_review_prepare_preview_endpoint_allows_empty_watchlist(self):
+    def test_review_prepare_preview_endpoint_remains_disabled_with_empty_watchlist(self):
         response = self.client.post(
             "/api/review/prepare-preview",
             json={
@@ -1291,16 +1440,9 @@ class RouteSmokeTest(unittest.TestCase):
             },
         )
 
-        self.assertIn(response.status_code, {200, 503})
+        self.assertEqual(response.status_code, 410)
         payload = response.get_json()
-        self.assertIsInstance(payload, dict)
-        if response.status_code == 200:
-            self.assertTrue(payload["ok"])
-            self.assertTrue(payload["async"])
-            self.assertIn("job_code", payload)
-        else:
-            self.assertFalse(payload["ok"])
-            self.assertIn("error", payload)
+        self.assertEqual(payload, {"ok": False, "error": "insight_stock_analysis_removed"})
 
     def test_knowledge_query_api_returns_workflow_meta(self):
         from src.runtime import DEFAULT_SITE_CONFIG

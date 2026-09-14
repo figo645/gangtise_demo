@@ -60,8 +60,8 @@ body{margin:0;min-height:100dvh;background:var(--surface-2);color:var(--text-mai
   <div class="login-desc">{% if mode == 'register' %}注册后即可进入系统。{% else %}请输入账号密码登录。{% endif %}</div>
   {% if error %}<div class="login-error">{{ error }}</div>{% endif %}
   <nav class="login-mode-tabs">
-    <a class="login-mode-tab{% if mode != 'register' %} active{% endif %}" href="/login?next={{ next_target | urlencode }}">登录</a>
-    <a class="login-mode-tab{% if mode == 'register' %} active{% endif %}" href="/login?mode=register&amp;next={{ next_target | urlencode }}">注册</a>
+    <a class="login-mode-tab{% if mode != 'register' %} active{% endif %}" href="/login?next={{ next_target | urlencode }}{% if request.args.get('invite') %}&amp;invite={{ request.args.get('invite') | urlencode }}{% endif %}">登录</a>
+    <a class="login-mode-tab{% if mode == 'register' %} active{% endif %}" href="/login?mode=register&amp;next={{ next_target | urlencode }}{% if request.args.get('invite') %}&amp;invite={{ request.args.get('invite') | urlencode }}{% endif %}">注册</a>
   </nav>
   <form class="login-form" method="post" action="/login" onsubmit="submitUnifiedLogin(event)">
     <input type="hidden" name="mode" value="{{ mode }}"><input type="hidden" name="next" value="{{ next_target }}">
@@ -71,13 +71,14 @@ body{margin:0;min-height:100dvh;background:var(--surface-2);color:var(--text-mai
     {% if mode == 'register' %}<input class="login-input" type="password" name="confirm_password" autocomplete="new-password" placeholder="确认密码" required>{% else %}<label class="login-check"><input type="checkbox" id="remember-login"><span>记住密码。勾选后，下次可直接选择这个账号进入。</span></label>{% endif %}
     <button class="login-btn" type="submit">{% if mode == 'register' %}注册并进入系统{% else %}账号登录{% endif %}</button>
   </form>
-  <div class="login-switch">{% if mode == 'register' %}已经有账号？ <a href="/login?next={{ next_target | urlencode }}">去登录</a>{% else %}还没有账号？ <a href="/login?mode=register&amp;next={{ next_target | urlencode }}">去注册</a>{% endif %}</div>
+  <div class="login-switch">{% if mode == 'register' %}已经有账号？ <a href="/login?next={{ next_target | urlencode }}{% if request.args.get('invite') %}&amp;invite={{ request.args.get('invite') | urlencode }}{% endif %}">去登录</a>{% else %}还没有账号？ <a href="/login?mode=register&amp;next={{ next_target | urlencode }}{% if request.args.get('invite') %}&amp;invite={{ request.args.get('invite') | urlencode }}{% endif %}">去注册</a>{% endif %}</div>
   <div id="login-status" class="login-status"></div>
   <div class="login-divider">最近登录账号</div><div class="login-section-title">选择账号进入</div>
   <div id="recent-accounts" class="account-list"><div class="account-empty">正在加载最近登录账号...</div></div>
 </section></main>
 <script>
 const nextTarget={{ next_target|tojson }};
+const inviteToken=new URLSearchParams(window.location.search||'').get('invite')||'';
 const historyKey='gangtise_h5_login_history_v1';
 function loadRecentAccounts(){
   const host=document.getElementById('recent-accounts'); if(!host)return;
@@ -106,6 +107,7 @@ async function submitUnifiedLogin(event){
     payload.display_name=String(form.elements.display_name.value||'').trim();
     payload.tenant_slug=String(target.searchParams.get('tenant')||'').trim().toLowerCase();
     payload.confirm_password=String(form.elements.confirm_password.value||'');
+    payload.invite_token=inviteToken;
   }
   try{
     if(mode==='register'&&payload.password!==payload.confirm_password)throw new Error('password_mismatch');

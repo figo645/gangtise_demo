@@ -64,7 +64,9 @@ def login():
         if len(password) < 6:
             return render_template("login.html", next_target=next_target, mode=mode, error="密码至少需要 6 位", site_config=site_config)
         try:
-            tenant = get_tenant_by_slug(get_default_tenant_slug(site_config), site_config)
+            invite_token = str(request.args.get("invite") or request.form.get("invite") or "").strip()
+            invite = get_tenant_fan_qr_invite(invite_token) if invite_token and is_feature_enabled("fan_qr_import", site_config) else None
+            tenant = get_tenant_by_slug((invite or {}).get("tenant_slug") or get_default_tenant_slug(site_config), site_config)
             suffix = int(time.time() * 1000) % 100000000
             user = create_user({
                 "username": username,
@@ -74,8 +76,10 @@ def login():
                 "tenant_slug": tenant.get("slug") or get_default_tenant_slug(site_config),
                 "advisor_name": tenant.get("advisor") or "",
                 "status": "active",
-                "source_label": "Web账号注册",
+                "source_label": f"扫码导入：{invite.get('source_label')}" if invite else "Web账号注册",
             })
+            if invite:
+                claim_tenant_fan_qr_invite(invite_token, user)
             save_h5_profile_settings(user, {"display_name": display_name})
             save_current_demo_profile_id(user["username"])
             return redirect(resolve_login_destination(user, next_target))
@@ -157,6 +161,28 @@ def index():
         tenant_portal_enabled=is_feature_enabled("tenant_portal", config),
     )
 
+
+@app.route("/fan-join/<token>")
+def fan_join(token):
+    site_config = get_site_config()
+    invite = get_tenant_fan_qr_invite(token) if is_feature_enabled("fan_qr_import", site_config) else None
+    if not invite:
+        return render_template("fan_join.html", invite=None, tenant=None), 404
+    user = get_current_authenticated_user()
+    if user and str(user.get("role") or "").strip().lower() == "investor":
+        try:
+            claim_tenant_fan_qr_invite(token, user)
+            return redirect(url_for("h5", tenant=invite["tenant_slug"]))
+        except ValueError:
+            pass
+    tenant = get_tenant_by_slug(invite["tenant_slug"])
+    return render_template(
+        "fan_join.html",
+        invite=invite,
+        tenant=tenant,
+        login_url=url_for("login", next=request.path, invite=token),
+    )
+
 @app.route("/h5")
 def h5():
     current_authenticated_user = get_current_authenticated_user()
@@ -185,7 +211,7 @@ def h5():
         indicator_hub = build_indicator_hub(tenant=tenant, admin_view=False)
         fundamental_column = build_fundamental_column_payload(tenant)
         dashboard_seed_cards = build_indicator_dashboard_seed_cards(tenant, count=8)
-        tenant_dashboard_payload = build_tenant_dashboard_payload(tenant)
+        tenant_dashboard_payload = build_tenant_dashboard_payload(tenant, viewer=current_authenticated_user)
         auth_settings = get_auth_settings(site_config)
         demo_profiles = get_h5_login_users(site_config) if auth_settings.get("quick_select_enabled") else []
     except Exception as exc:
@@ -209,7 +235,10 @@ def h5():
     # H5 uses the persisted owner-scoped watchlist. An explicit empty map is
     # intentional: it prevents the legacy demo catalog from reappearing after
     # the user removes their last stock.
-    owner = current_demo_profile or current_authenticated_user or {}
+    # Keep page bootstrap on the same authenticated owner as the watchlist
+    # API. The requested tenant only selects the presentation scope; it must
+    # not switch the persisted user relation or fall back to a demo profile.
+    owner = current_authenticated_user or {}
     owner_tenant_slug = str(owner.get("tenant_slug") or ((owner.get("tenant") or {}).get("slug") if isinstance(owner.get("tenant"), dict) else "") or effective_tenant_slug or "").strip().lower()
     owner_profile_id = str(owner.get("username") or owner.get("id") or "").strip()
     try:
@@ -242,8 +271,14 @@ def h5():
         for item in (indicator_hub.get("smart_items") or [])[:4]
     ]
     feed_boards = gen_feed_boards_from_watchlist_details(watchlist_details)
+    h5_site_config = build_fan_safe_site_config(site_config, current_authenticated_user)
+    active_tenant_payload = next(
+        (item for item in h5_site_config.get("tenants", []) if item.get("slug") == tenant.get("slug")),
+        tenant,
+    )
     return render_template(
         "h5.html",
+        site_config=h5_site_config,
         market=market,
         news=news,
         news_tabs=news_tabs,
@@ -254,7 +289,7 @@ def h5():
         fundamental_column=fundamental_column,
         dashboard_seed_cards=dashboard_seed_cards,
         tenant_dashboard_payload=tenant_dashboard_payload,
-        active_tenant=tenant,
+        active_tenant=active_tenant_payload,
         demo_profiles=demo_profiles,
         current_demo_profile=current_demo_profile,
         h5_fallback_mode=h5_fallback_mode,
@@ -352,12 +387,12 @@ def tenant_portal(tenant_slug):
     if not tenant or tenant["slug"] != tenant_slug:
         abort(404)
     try:
-        portal = build_tenant_portal_payload(tenant)
+        portal = build_tenant_portal_payload(tenant, viewer=get_current_authenticated_user())
     except Exception as exc:
         if not is_db_unavailable_error(exc):
             raise
         app.logger.warning("Database unavailable while building tenant portal, using fallback data")
-        portal = build_tenant_portal_payload(tenant, fallback_mode=True)
+        portal = build_tenant_portal_payload(tenant, fallback_mode=True, viewer=get_current_authenticated_user())
     return render_template("tenant_portal.html", portal=portal, brand=get_platform_brand(site_config), active_tenant=tenant)
 
 @app.route("/dashboard")

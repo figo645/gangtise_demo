@@ -294,7 +294,7 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
             {
                 "label": "H5 前台演示",
                 "url": f"/h5?tenant={tenant['slug']}",
-                "desc": f"查看普通投资者和大V在 H5 里实际看到的 {tenant['name']} Hermes、复盘、知识和自选股路径。"
+                "desc": f"查看普通投资者和大V在 H5 里实际看到的 {tenant['name']} Hermes、洞见、知识和自选股路径。"
             },
             {
                 "label": "纯 Admin 后台",
@@ -320,7 +320,7 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
             {
                 "name": user["username"],
                 "time": "刚刚",
-                "msg": f"{kol_name} 老师，想看最新复盘和核心指标版。",
+                "msg": f"{kol_name} 老师，想看最新洞见和核心指标版。",
                 "tier": user["membership"],
             }
             for user in investor_users[:5]
@@ -367,7 +367,7 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
             ],
             "message_distribution": [
                 {"label": "粉丝提问", "value": 42},
-                {"label": "复盘提醒反馈", "value": 28},
+                {"label": "洞见提醒反馈", "value": 28},
                 {"label": "大V回复追问", "value": 19},
                 {"label": "系统触达回执", "value": 11},
             ],
@@ -381,8 +381,7 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
                 {"day": "06-07", "count": 52},
             ],
             "publish_distribution": [
-                {"label": "日复盘", "value": 18},
-                {"label": "周复盘", "value": 4},
+                {"label": "洞见发布", "value": 22},
                 {"label": "基本面解读", "value": 12},
                 {"label": "群发提醒", "value": 9},
             ],
@@ -397,7 +396,7 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
             ],
             "analytics_sections": {
                 "funnel": {
-                    "summary": "从内容触达到高频留存，观察当前租户粉丝在复盘、问答和 H5 内的转化路径。",
+                    "summary": "从内容触达到高频留存，观察当前租户粉丝在洞见、问答和 H5 内的转化路径。",
                     "kpis": [
                         {"label": "内容触达", "value": "12,800", "sub": "近30日门户/H5 内容触达"},
                         {"label": "私域留资", "value": "1,460", "sub": "留资率 11.4%"},
@@ -413,14 +412,14 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
                         {"label": "高频留存", "count": 36, "rate": 0.3},
                     ],
                     "channel_mix": [
-                        {"label": "复盘阅读", "value": 42},
+                        {"label": "洞见阅读", "value": 42},
                         {"label": "小金智能体问答", "value": 24},
                         {"label": "消息追问", "value": 18},
                         {"label": "自选股跟踪", "value": 16},
                     ],
                     "heatmap_columns": ["内容触达", "私域留资", "激活试用", "首次付费", "高频留存"],
                     "heatmap_rows": [
-                        {"label": "复盘专区", "values": [100, 18.2, 8.4, 2.2, 0.8]},
+                        {"label": "洞见", "values": [100, 18.2, 8.4, 2.2, 0.8]},
                         {"label": "小金智能体", "values": [100, 14.8, 9.6, 3.4, 1.2]},
                         {"label": "消息区", "values": [100, 22.1, 11.2, 3.8, 1.5]},
                         {"label": "自选股", "values": [100, 12.4, 6.7, 2.1, 0.9]},
@@ -429,13 +428,13 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
                 "channel": {
                     "summary": "看当前租户各获客和互动来源的质量，而不是平台总渠道。",
                     "cards": [
-                        {"label": "复盘转化", "users": "620", "conv": "8.4%", "revenue": "¥26,800", "score": 88},
+                        {"label": "洞见转化", "users": "620", "conv": "8.4%", "revenue": "¥26,800", "score": 88},
                         {"label": "小金智能体转化", "users": "410", "conv": "11.2%", "revenue": "¥24,300", "score": 92},
                         {"label": "消息追问", "users": "260", "conv": "15.6%", "revenue": "¥18,600", "score": 95},
                         {"label": "社群转介绍", "users": "170", "conv": "18.1%", "revenue": "¥16,200", "score": 97},
                     ],
                     "quality_rows": [
-                        {"label": "复盘转化", "users": 620, "cac": 32, "ltv": 620, "conv": "8.4%", "score": 88, "trend": "上升"},
+                        {"label": "洞见转化", "users": 620, "cac": 32, "ltv": 620, "conv": "8.4%", "score": 88, "trend": "上升"},
                         {"label": "小金智能体转化", "users": 410, "cac": 24, "ltv": 760, "conv": "11.2%", "score": 92, "trend": "上升"},
                         {"label": "消息追问", "users": 260, "cac": 18, "ltv": 880, "conv": "15.6%", "score": 95, "trend": "稳定"},
                         {"label": "社群转介绍", "users": 170, "cac": 12, "ltv": 960, "conv": "18.1%", "score": 97, "trend": "上升"},
@@ -446,8 +445,8 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
                     "kpis": [
                         {"label": "本月协同收入", "value": is_lisa and "¥69,800" or "¥86,400", "sub": "当前租户口径"},
                         {"label": "高价值线索", "value": "18", "sub": "近30日重点粉丝"},
-                        {"label": "复盘带动付费", "value": "42%", "sub": "主要转化来源"},
-                        {"label": "私域追问率", "value": "31%", "sub": "复盘后继续追问"},
+                        {"label": "洞见带动付费", "value": "42%", "sub": "主要转化来源"},
+                        {"label": "私域追问率", "value": "31%", "sub": "洞见后继续追问"},
                     ],
                     "stage_cards": [
                         {"label": "种子线索", "value": 42},
@@ -510,18 +509,18 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
         },
         "review_studio": {
             "sources": [
-                {"icon": "🎙️", "label": "语音口述", "desc": "收盘后直接口述行业主线、关键公司和操作复盘，智能体自动转写并抽取段落。"},
+                {"icon": "🎙️", "label": "语音口述", "desc": "收盘后直接口述行业主线、关键公司和操作洞见，智能体自动转写并抽取段落。"},
                 {"icon": "✍️", "label": "手动撰写", "desc": "提供富文本手写区域，大V自己决定文章段落、标题和表达顺序。"},
-                {"icon": "📎", "label": "文件上传", "desc": "上传研报、纪要、Excel 和 PDF，由智能体统一抽取要点并转成复盘文案。"},
-                {"icon": "🔗", "label": "URL 资料", "desc": "抓取网页资料并抽取正文，适合作为复盘证据链和背景补充。"},
+                {"icon": "📎", "label": "文件上传", "desc": "上传研报、纪要、Excel 和 PDF，由智能体统一抽取要点并转成洞见文案。"},
+                {"icon": "🔗", "label": "URL 资料", "desc": "抓取网页资料并抽取正文，适合作为洞见证据链和背景补充。"},
             ],
             "paragraph_modes": [
                 {"label": "大V自定段落", "desc": "适合自己写主框架，只让智能体补摘要、证据链和风险提示。"},
                 {"label": "智能文案", "desc": "适合先交信息给智能体，并补充修改规则或常用提示词标签后生成草稿。"},
             ],
-            "default_flow": ["选择复盘周期", "确认本次自选股", "补充语音/手输/文件", "设置智能文案规则", "生成草稿预览", "确认后发布给粉丝"],
+            "default_flow": ["确认本次自选股", "补充语音/手输/文件", "设置智能文案规则", "生成草稿预览", "确认后发布给粉丝"],
             "watchlist_focus": watchlist_focus,
-            "periods": ["日复盘", "周复盘", "月复盘"],
+            "periods": ["洞见"],
             "smart_cards": review_smart_cards,
             "flow_nodes": [
                 {"id": "cards", "label": "选择智能仪表盘卡片"},

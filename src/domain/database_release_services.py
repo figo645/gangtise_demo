@@ -28,8 +28,11 @@ ROLLBACK_SCRIPT = ROOT / "scripts" / "rollback_database_release.sh"
 PRODUCTION_TO_STAGING_SCRIPT = ROOT / "scripts" / "sync_production_to_staging.sh"
 STAGING_TO_PRODUCTION_SCRIPT = ROOT / "scripts" / "sync_staging_to_production.sh"
 CLEAR_DATABASE_SCRIPT = ROOT / "scripts" / "clear_database_release.sh"
+USER_DATA_CLEANUP_SCRIPT = ROOT / "scripts" / "cleanup_user_runtime_data.sh"
 PACKAGES_DIR = ROOT / "database_release_packages"
 RELEASE_STATE_FILE = ROOT / ".deploy" / "database_release_last_job.json"
+USER_DATA_BACKUPS_DIR = ROOT / ".deploy" / "user_data_backups"
+USER_DATA_CLEANUP_MODES = {"account_runtime_data", "all_non_admin_accounts"}
 CONFIG_FILE = Path(os.environ.get("DATABASE_RELEASE_CONFIG", str(ROOT / ".database_release.env")))
 _config_loaded = False
 _release_lock = threading.Lock()
@@ -875,6 +878,127 @@ def start_database_clear(target_name, confirmation="", confirm_production=False)
     if target["name"] == "production" and confirm_production is not True:
         raise ValueError("production_confirmation_required")
     return _start_job(target, [str(CLEAR_DATABASE_SCRIPT)], "clear_database")
+
+
+def normalize_user_data_cleanup_usernames(value):
+    """Normalize account names without allowing an accidental broad delete."""
+    if isinstance(value, str):
+        values = value.split(",")
+    elif isinstance(value, (list, tuple, set)):
+        values = list(value)
+    else:
+        values = []
+    normalized = []
+    for item in values:
+        username = str(item or "").strip()
+        if not username or username in normalized:
+            continue
+        if "," in username or "\n" in username or "\r" in username:
+            raise ValueError("user_data_cleanup_username_invalid")
+        normalized.append(username)
+    return normalized
+
+
+def start_user_data_cleanup(target_name, mode, usernames=None, confirmation="", confirm_production=False):
+    """Create a backup-first, account-scoped cleanup task for 5051."""
+    target = get_database_release_target(target_name)
+    if not target or target["name"] not in {"local", "staging", "production"}:
+        raise ValueError("user_data_cleanup_target_invalid")
+    normalized_mode = str(mode or "").strip()
+    if normalized_mode not in USER_DATA_CLEANUP_MODES:
+        raise ValueError("user_data_cleanup_mode_invalid")
+    normalized_usernames = normalize_user_data_cleanup_usernames(usernames)
+    if normalized_mode == "account_runtime_data":
+        if not normalized_usernames:
+            raise ValueError("user_data_cleanup_usernames_required")
+        if any(username.casefold() == "admin" for username in normalized_usernames):
+            raise ValueError("user_data_cleanup_admin_forbidden")
+        expected = "CLEAR ACCOUNT DATA " + ",".join(normalized_usernames)
+    else:
+        if normalized_usernames:
+            raise ValueError("user_data_cleanup_usernames_must_be_empty")
+        expected = "DELETE ALL NON-ADMIN ACCOUNTS"
+    if str(confirmation or "").strip() != expected:
+        raise ValueError("user_data_cleanup_confirmation_required")
+    if target["name"] == "production" and confirm_production is not True:
+        raise ValueError("production_confirmation_required")
+    backup_id = "user_cleanup_{}_{}".format(target["name"], datetime.utcnow().strftime("%Y%m%d_%H%M%S_%f"))
+    return _start_job(
+        target,
+        [str(USER_DATA_CLEANUP_SCRIPT)],
+        "user_data_cleanup",
+        extra_env={
+            "USER_DATA_CLEANUP_MODE": normalized_mode,
+            "USER_DATA_CLEANUP_USERNAMES": ",".join(normalized_usernames),
+            "USER_DATA_BACKUP_ID": backup_id,
+            "USER_DATA_BACKUP_ROOT": str(USER_DATA_BACKUPS_DIR),
+        },
+    )
+
+
+def _user_data_backup_target(target_name):
+    normalized = str(target_name or "").strip().lower()
+    if normalized not in {"local", "staging", "production"}:
+        raise ValueError("user_data_cleanup_target_invalid")
+    return normalized
+
+
+def list_user_data_cleanup_backups(target_name):
+    target = _user_data_backup_target(target_name)
+    root = USER_DATA_BACKUPS_DIR / target
+    rows = []
+    if not root.is_dir():
+        return rows
+    for manifest_path in root.glob("user_cleanup_*/manifest.json"):
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            continue
+        if manifest.get("status") != "cleanup_completed":
+            continue
+        backup_id = str(manifest.get("backup_id") or "")
+        if not re.fullmatch(rf"user_cleanup_{re.escape(target)}_[0-9]{{8}}_[0-9]{{6}}_[0-9]{{6}}", backup_id):
+            continue
+        rows.append({
+            "backup_id": backup_id,
+            "target": target,
+            "mode": str(manifest.get("mode") or ""),
+            "usernames": list(manifest.get("usernames") or []),
+            "database": str(manifest.get("database") or ""),
+            "created_at": str(manifest.get("created_at") or ""),
+            "cleanup_completed_at": str(manifest.get("cleanup_completed_at") or ""),
+            "dump_bytes": manifest.get("dump_bytes"),
+            "sql_bytes": manifest.get("sql_bytes"),
+            "dump_sha256": str(manifest.get("dump_sha256") or ""),
+            "sql_sha256": str(manifest.get("sql_sha256") or ""),
+            "sql_available": (manifest_path.parent / str(manifest.get("sql_file") or "")).is_file(),
+        })
+    return sorted(rows, key=lambda item: (item.get("created_at") or "", item["backup_id"]), reverse=True)
+
+
+def get_user_data_cleanup_backup_sql_path(target_name, backup_id):
+    target = _user_data_backup_target(target_name)
+    normalized_id = str(backup_id or "").strip()
+    if not re.fullmatch(rf"user_cleanup_{re.escape(target)}_[0-9]{{8}}_[0-9]{{6}}_[0-9]{{6}}", normalized_id):
+        raise ValueError("user_data_cleanup_backup_invalid")
+    directory = (USER_DATA_BACKUPS_DIR / target / normalized_id).resolve()
+    root = (USER_DATA_BACKUPS_DIR / target).resolve()
+    if root not in directory.parents:
+        raise ValueError("user_data_cleanup_backup_invalid")
+    manifest_path = directory / "manifest.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError) as exc:
+        raise ValueError("user_data_cleanup_backup_unavailable") from exc
+    if manifest.get("status") != "cleanup_completed" or manifest.get("backup_id") != normalized_id:
+        raise ValueError("user_data_cleanup_backup_unavailable")
+    sql_name = str(manifest.get("sql_file") or "")
+    if not re.fullmatch(rf"user_cleanup_{re.escape(target)}_[0-9]{{8}}_[0-9]{{6}}_[0-9]{{6}}\.sql", sql_name):
+        raise ValueError("user_data_cleanup_backup_invalid")
+    sql_path = (directory / sql_name).resolve()
+    if directory not in sql_path.parents or not sql_path.is_file():
+        raise ValueError("user_data_cleanup_backup_unavailable")
+    return sql_path
 
 
 def start_database_release_packages(target_name, package_ids, confirm_production=False):

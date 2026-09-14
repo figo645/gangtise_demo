@@ -467,16 +467,44 @@ def list_user_watchlist_items(tenant_slug="", user_profile_id=""):
         code = str(row.get("stock_code") or "").strip().upper()
         if not code:
             continue
-        detail = get_watchlist_detail_by_code(
-            stock_code=code,
-            stock_name=str(row.get("stock_name") or code),
-            details_map={},
-        ) or {}
-        if detail:
-            detail["watchlist_item_id"] = row.get("id")
-            detail["watchlist_created_at"] = row.get("created_at")
-            detail["watchlist_updated_at"] = row.get("updated_at")
-            result.append(detail)
+        try:
+            detail = get_watchlist_detail_by_code(
+                stock_code=code,
+                stock_name=str(row.get("stock_name") or code),
+                details_map={},
+            ) or {}
+        except Exception as exc:
+            # Keep a persisted row visible even when a single provider call
+            # raises instead of returning its normal unavailable marker.
+            app.logger.warning(
+                "Watchlist detail unavailable while listing owner=%s/%s code=%s: %s",
+                tenant,
+                profile,
+                code,
+                exc,
+            )
+            detail = {}
+        # A quote/detail provider outage must not make a persisted relation
+        # disappear from the user's watchlist. Keep the database row visible
+        # with its last known metadata and let the UI show an unavailable quote.
+        if not detail:
+            detail = {
+                "code": code,
+                "name": str(row.get("stock_name") or code),
+                "market": str(row.get("market") or _infer_watchlist_market(code)),
+                "industry": str(row.get("industry") or "个股跟踪"),
+                "price": None,
+                "change": None,
+                "change_pct": None,
+                "data_unavailable": True,
+                "data_source": "watchlist_persistence",
+                "data_unavailable_message": "行情详情暂时不可用，已保留自选股记录。",
+            }
+        detail["code"] = code
+        detail["watchlist_item_id"] = row.get("id")
+        detail["watchlist_created_at"] = row.get("created_at")
+        detail["watchlist_updated_at"] = row.get("updated_at")
+        result.append(detail)
     return result
 
 
@@ -517,7 +545,14 @@ def add_user_watchlist_item(tenant_slug="", user_profile_id="", stock_code="", s
         ),
     )
     db.commit()
-    return next((item for item in list_user_watchlist_items(tenant, profile) if item.get("code") == normalized_code), detail)
+    # The INSERT is the source of truth. Do not perform a second full-list
+    # quote/detail load after commit: a provider timeout must not turn a
+    # successful write into a failed API response.
+    saved_detail = copy.deepcopy(detail)
+    saved_detail["code"] = normalized_code
+    saved_detail["watchlist_owner_tenant"] = tenant
+    saved_detail["watchlist_owner_profile"] = profile
+    return saved_detail
 
 
 def remove_user_watchlist_item(tenant_slug="", user_profile_id="", stock_code=""):
@@ -8559,6 +8594,183 @@ def build_watchlist_annotation_context(tenant_slug="", selected_watchlist=None, 
         detail["annotation_contents"] = [str(item.get("content") or item.get("note") or "").strip() for item in annotations if str(item.get("content") or item.get("note") or "").strip()][:6]
         items.append(detail)
     return items
+
+
+def build_today_user_interaction_digest(
+    tenant_slug="",
+    timezone_name="Asia/Shanghai",
+    target_date="",
+    range_key="today",
+    start_date="",
+    end_date="",
+    limit_comments=200,
+    limit_annotations=200,
+):
+    """Read tenant interactions for a bounded China-local date range.
+
+    This is intentionally a database-only read model for the Hermes task mode.
+    Names and prices come from the saved rows; no market provider is consulted.
+    """
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    if not normalized_tenant:
+        raise ValueError("tenant_slug_required")
+    try:
+        zone = ZoneInfo(str(timezone_name or "Asia/Shanghai").strip() or "Asia/Shanghai")
+    except Exception:
+        zone = ZoneInfo("Asia/Shanghai")
+    today = datetime.now(zone).date()
+    normalized_range_key = str(range_key or "today").strip().lower().replace(" ", "")
+    range_aliases = {
+        "today": "today", "今日": "today", "当天": "today",
+        "yesterday": "yesterday", "昨日": "yesterday",
+        "week": "week", "this_week": "week", "本周": "week",
+        "month": "month", "this_month": "month", "本月": "month",
+        "year": "year", "this_year": "year", "今年": "year",
+        "all": "all", "所有": "all", "全部": "all", "历史": "all",
+    }
+    normalized_range_key = range_aliases.get(normalized_range_key, normalized_range_key)
+    if target_date:
+        date_text = str(target_date).strip()[:10]
+        try:
+            start_value = end_value = datetime.strptime(date_text, "%Y-%m-%d").date()
+        except ValueError as exc:
+            raise ValueError("interaction_digest_date_invalid") from exc
+        start_text = end_text = date_text
+        normalized_range_key = "custom"
+    elif start_date or end_date:
+        start_text = str(start_date or end_date).strip()[:10]
+        end_text = str(end_date or start_date).strip()[:10]
+        try:
+            start_value = datetime.strptime(start_text, "%Y-%m-%d").date()
+            end_value = datetime.strptime(end_text, "%Y-%m-%d").date()
+        except ValueError as exc:
+            raise ValueError("interaction_digest_date_invalid") from exc
+        if start_value > end_value:
+            raise ValueError("interaction_digest_date_range_invalid")
+        date_text = start_text if start_text == end_text else f"{start_text}至{end_text}"
+    else:
+        if normalized_range_key not in {"today", "yesterday", "week", "month", "year", "all"}:
+            raise ValueError("interaction_digest_range_invalid")
+        if normalized_range_key == "today":
+            start_value = end_value = today
+        elif normalized_range_key == "yesterday":
+            start_value = end_value = today - timedelta(days=1)
+        elif normalized_range_key == "week":
+            start_value, end_value = today - timedelta(days=today.weekday()), today
+        elif normalized_range_key == "month":
+            start_value, end_value = today.replace(day=1), today
+        elif normalized_range_key == "year":
+            start_value, end_value = today.replace(month=1, day=1), today
+        else:
+            start_value = end_value = None
+        start_text = start_value.isoformat() if start_value else ""
+        end_text = end_value.isoformat() if end_value else ""
+        date_text = {
+            "today": "今日", "yesterday": "昨日", "week": "本周",
+            "month": "本月", "year": "今年", "all": "所有历史",
+        }[normalized_range_key]
+
+    def _is_target_day(value):
+        parsed = _parse_market_datetime(value)
+        if parsed is None:
+            return False
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=zone)
+        value_date = parsed.astimezone(zone).date()
+        return start_value is None or start_value <= value_date <= end_value
+
+    def _is_target_date(value):
+        if not value:
+            return False
+        try:
+            value_date = datetime.strptime(str(value)[:10], "%Y-%m-%d").date()
+        except ValueError:
+            return False
+        return start_value is None or start_value <= value_date <= end_value
+
+    db = get_db()
+    connection = getattr(db, "_connection", None)
+    if connection is not None:
+        _ensure_watchlist_comments_table(connection)
+    comment_rows = db.execute(
+        """
+        SELECT * FROM watchlist_comments
+        WHERE tenant_slug = ?
+        ORDER BY created_at DESC, id DESC
+        LIMIT ?
+        """,
+        (normalized_tenant, max(1, min(int(limit_comments or 200) * 3, 1000))),
+    ).fetchall()
+    annotation_rows = db.execute(
+        """
+        SELECT * FROM watchlist_kline_annotations
+        WHERE tenant_slug = ?
+        ORDER BY updated_at DESC, id DESC
+        LIMIT ?
+        """,
+        (normalized_tenant, max(1, min(int(limit_annotations or 200) * 3, 1000))),
+    ).fetchall()
+    comments = []
+    for row in comment_rows:
+        raw = dict(row or {})
+        if not _is_target_day(raw.get("created_at") or raw.get("updated_at")):
+            continue
+        comments.append({
+            "id": raw.get("id"),
+            "stock_code": str(raw.get("stock_code") or "").strip().upper(),
+            "stock_name": str(raw.get("stock_name") or raw.get("stock_code") or "").strip(),
+            "content": str(raw.get("comment_text") or "").strip()[:2000],
+            "author": str(raw.get("created_by_name") or raw.get("created_by_user_id") or "用户").strip(),
+            "author_role": str(raw.get("created_by_role") or "investor").strip().lower(),
+            "created_at": str(raw.get("created_at") or "").strip(),
+            "labels": [str(item).strip() for item in safe_json_loads(raw.get("label_tags_json"), []) if str(item).strip()][:6],
+        })
+        if len(comments) >= max(1, min(int(limit_comments or 200), 500)):
+            break
+    annotations = []
+    for row in annotation_rows:
+        raw = dict(row or {})
+        # A K-line annotation belongs to its candle date. A user may also
+        # update an older candle today, which should appear in today's task.
+        candle_date = str(raw.get("candle_date") or "").strip()[:10]
+        if not _is_target_date(candle_date) and not _is_target_day(raw.get("updated_at") or raw.get("created_at")):
+            continue
+        content = str(raw.get("note") or "").strip()
+        if not content:
+            content = "；".join(
+                part for part in [str(raw.get("title") or "").strip(), str(raw.get("trigger") or "").strip()] if part
+            )
+        annotations.append({
+            "id": raw.get("id"),
+            "stock_code": str(raw.get("stock_code") or "").strip().upper(),
+            "stock_name": str(raw.get("stock_name") or raw.get("stock_code") or "").strip(),
+            "content": content[:2000],
+            "candle_date": str(raw.get("candle_date") or "").strip(),
+            "updated_at": str(raw.get("updated_at") or raw.get("created_at") or "").strip(),
+            "author": str(raw.get("created_by_name") or raw.get("created_by_user_id") or "用户").strip(),
+        })
+        if len(annotations) >= max(1, min(int(limit_annotations or 200), 500)):
+            break
+    stocks = []
+    for item in comments + annotations:
+        name = str(item.get("stock_name") or "").strip()
+        code = str(item.get("stock_code") or "").strip()
+        key = (code, name)
+        if key not in [(row.get("stock_code"), row.get("stock_name")) for row in stocks]:
+            stocks.append({"stock_code": code, "stock_name": name})
+    return {
+        "date": date_text,
+        "range_key": normalized_range_key,
+        "start_date": start_text,
+        "end_date": end_text,
+        "range_label": date_text,
+        "timezone": str(timezone_name or "Asia/Shanghai"),
+        "comments": comments,
+        "annotations": annotations,
+        "comment_count": len(comments),
+        "annotation_count": len(annotations),
+        "stocks": stocks,
+    }
 
 
 def _normalize_watchlist_comment_row(row, detail=None, viewer_role="", viewer_profile_id=""):

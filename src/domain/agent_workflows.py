@@ -6,11 +6,11 @@ DECLARED_AGENT_WORKFLOW_CATALOG = {
     "hermes_agent": {
         "id": "hermes_agent",
         "title": "小金智能体",
-        "summary": "小金智能体的真实非线性主链路：先读取会话记忆，再由 Admin 默认 LLM 拆解任务并按安全、澄清、闲聊、单场景研究或组合研究分支路由；Gangtise 研究正文原样返回，最后写回会话与用户记忆。",
+        "summary": "小金智能体的真实非线性主链路：咨询模式由 Admin 默认 LLM 拆解任务，Gangtise 研究正文原样返回；任务模式按指定时间范围读取租户互动并由 DeepSeek-V4-Flash 总结。两种模式共享会话与用户记忆，任务模式不调用 Gangtise API。",
         "category": "对话智能体",
         "feature_key": "hermes",
         "execution_mode": "declared_agent_workflow",
-        "tags": ["H5", "Admin 默认 LLM", "六类场景", "多任务拆解", "Gangtise 直出", "会话记忆"],
+        "tags": ["H5", "咨询", "任务", "六类场景", "多任务拆解", "DeepSeek-V4", "会话记忆"],
         "nodes": [
             {"id": "question_input", "label": "问题输入校验", "processor": "input", "kind": "source", "x": 650, "y": 32, "description": "接收 H5 当前轮问题、附件、知识范围和消息快照。空值直接拒绝；当前问题优先于旧消息，避免前端清空输入后丢失文本。"},
             {"id": "session_load", "label": "会话记忆装载", "processor": "session_load", "kind": "context", "x": 650, "y": 176, "description": "读取当前会话最近轮次、摘要、意图和证券对象。"},
@@ -24,6 +24,9 @@ DECLARED_AGENT_WORKFLOW_CATALOG = {
             {"id": "single_branch", "label": "单场景研究", "processor": "branch", "kind": "decision", "visual_only": True, "x": 930, "y": 800, "description": "条件：disposition = execute 且 tasks 数量为 1。进入对应研究能力。"},
             {"id": "composite_branch", "label": "组合研究", "processor": "branch", "kind": "decision", "visual_only": True, "x": 1230, "y": 800, "description": "条件：disposition = execute 且 tasks 数量大于等于 2。任务拆解后串行执行，保留部分成功结果。"},
             {"id": "human_review_branch", "label": "人工审核", "processor": "branch", "kind": "decision", "visual_only": True, "x": 1530, "y": 800, "description": "条件：语义拦截 Skill = human_review。停止研究工具调用，返回人工审核提示并保留审计记录。"},
+            {"id": "assistant_mode_branch", "label": "咨询 / 任务", "processor": "branch", "kind": "decision", "visual_only": True, "x": 1830, "y": 800, "description": "条件：assistant_mode = consultation 或 task。两种模式共享同一个 session_id 和记忆链路。"},
+            {"id": "today_interaction_read", "label": "读取指定范围互动", "processor": "database_read", "kind": "tooling", "visual_only": True, "x": 1830, "y": 980, "description": "任务模式：先由模型识别今日、昨日、本周、本月、今年或所有，再按当前租户读取用户评论与个股K线标注。"},
+            {"id": "today_interaction_llm", "label": "DeepSeek-V4 总结", "processor": "llm_generation", "kind": "llm", "visual_only": True, "x": 1830, "y": 1160, "description": "任务模式：使用 deepseek-v4-flash-ga-260731 解析任务意图并生成大V可读的互动总结；当前仅开放互动归纳能力。"},
             {"id": "chat_answer_branch", "label": "闲聊回答生成", "processor": "llm_generation", "kind": "llm", "visual_only": True, "x": 630, "y": 980, "description": "场景 6：多轮闲聊由 Admin 默认 LLM 生成回答，并承接会话记忆。"},
             {"id": "contract_validation", "label": "任务契约校验", "processor": "contract_validation", "kind": "guardrail", "visual_only": True, "x": 930, "y": 980, "description": "检查证券、时间范围、任务参数和付费能力约束，空值或模糊条件返回澄清。"},
             {"id": "task_decomposition", "label": "组合任务拆解", "processor": "task_decomposition", "kind": "planner", "visual_only": True, "x": 1230, "y": 980, "description": "将用户一句话拆成多个独立任务，保留每个任务的场景、证券和时间范围。"},
@@ -56,6 +59,10 @@ DECLARED_AGENT_WORKFLOW_CATALOG = {
             {"id": "edge_hermes_single", "from": "semantic_interception", "to": "single_branch", "label": "单任务", "condition": "execute + 1 task"},
             {"id": "edge_hermes_composite", "from": "semantic_interception", "to": "composite_branch", "label": "多任务", "condition": "execute + 2+ tasks"},
             {"id": "edge_hermes_human_review", "from": "semantic_interception", "to": "human_review_branch", "label": "人工审核", "condition": "Skill = human_review"},
+            {"id": "edge_hermes_mode", "from": "semantic_interception", "to": "assistant_mode_branch", "label": "模式", "condition": "assistant_mode"},
+            {"id": "edge_hermes_task_read", "from": "assistant_mode_branch", "to": "today_interaction_read", "label": "任务", "condition": "assistant_mode = task"},
+            {"id": "edge_hermes_task_llm", "from": "today_interaction_read", "to": "today_interaction_llm", "label": "仅 V4", "condition": "deepseek-v4-flash-ga-260731"},
+            {"id": "edge_hermes_task_answer", "from": "today_interaction_llm", "to": "answer_synthesis", "label": "任务结果"},
             {"id": "edge_hermes_single_contract", "from": "single_branch", "to": "contract_validation"},
             {"id": "edge_hermes_stock", "from": "contract_validation", "to": "stock_today_capability", "label": "今日个股", "condition": "stock_today_observation"},
             {"id": "edge_hermes_market", "from": "contract_validation", "to": "market_today_capability", "label": "今日大盘", "condition": "market_today_observation"},
@@ -146,28 +153,6 @@ DECLARED_AGENT_WORKFLOW_CATALOG = {
             {"id": "edge_review_compose_1", "from": "review_compose_input", "to": "review_compose_context"},
             {"id": "edge_review_compose_2", "from": "review_compose_context", "to": "review_compose_llm"},
             {"id": "edge_review_compose_3", "from": "review_compose_llm", "to": "review_compose_output"},
-        ],
-    },
-    "review_watchlist_analysis": {
-        "id": "review_watchlist_analysis",
-        "title": "复盘多股综合分析",
-        "summary": "围绕本次选中的自选股，装载本地上下文后调用 Gangtise Agent SSE 输出个股与组合综合分析。",
-        "category": "复盘智能体",
-        "feature_key": "daily_review",
-        "execution_mode": "declared_agent_workflow",
-        "tags": ["大V", "自选股", "组合分析", "Gangtise Agent SSE"],
-        "nodes": [
-            {"id": "review_watchlist_input", "label": "自选股输入", "processor": "input", "kind": "source", "x": 36, "y": 88, "description": "接收本次复盘已选中的股票列表、用户输入正文和复盘周期。"},
-            {"id": "review_watchlist_context", "label": "股票上下文装载", "processor": "context_load", "kind": "context", "x": 324, "y": 88, "description": "加载个股基础信息、行业归属、信号摘要和基本面判断。"},
-            {"id": "review_watchlist_sector_merge", "label": "板块上下文归并", "processor": "sector_merge", "kind": "planner", "x": 632, "y": 88, "description": "按行业或板块归并自选股，为 Gangtise 多股分析准备上下文。"},
-            {"id": "review_watchlist_llm", "label": "Gangtise 多股分析", "processor": "gangtise_agent_sse", "kind": "tooling", "x": 946, "y": 88, "description": "调用 /application/open-ai/ai/chat/sse，以 deep_research 模式生成个股与组合综合分析。"},
-            {"id": "review_watchlist_output", "label": "分析结果封装", "processor": "output", "kind": "output", "x": 1260, "y": 88, "description": "保留 Gangtise 完整分析正文和调用元数据，供审核、编辑和发布复用。"},
-        ],
-        "edges": [
-            {"id": "edge_review_watchlist_1", "from": "review_watchlist_input", "to": "review_watchlist_context"},
-            {"id": "edge_review_watchlist_2", "from": "review_watchlist_context", "to": "review_watchlist_sector_merge"},
-            {"id": "edge_review_watchlist_3", "from": "review_watchlist_sector_merge", "to": "review_watchlist_llm"},
-            {"id": "edge_review_watchlist_4", "from": "review_watchlist_llm", "to": "review_watchlist_output"},
         ],
     },
     "review_voice_enhancement": {
@@ -526,10 +511,6 @@ def build_default_review_polish_workflow_definition():
 
 def build_default_review_compose_workflow_definition():
     return copy.deepcopy(DECLARED_AGENT_WORKFLOW_CATALOG["review_compose_draft"])
-
-
-def build_default_review_watchlist_analysis_workflow_definition():
-    return copy.deepcopy(DECLARED_AGENT_WORKFLOW_CATALOG["review_watchlist_analysis"])
 
 
 def build_default_review_voice_enhancement_workflow_definition():

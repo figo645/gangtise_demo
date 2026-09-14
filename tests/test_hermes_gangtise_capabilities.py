@@ -148,8 +148,10 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
         interception_edges = [item for item in edges if item["from"] == "semantic_interception"]
         self.assertEqual(
             {item["label"] for item in interception_edges},
-            {"拒绝", "需补充", "闲聊", "单任务", "多任务", "人工审核"},
+            {"拒绝", "需补充", "闲聊", "单任务", "多任务", "人工审核", "模式"},
         )
+        self.assertIn("读取指定范围互动", labels)
+        self.assertIn("DeepSeek-V4 总结", labels)
         self.assertIn("语义拦截 Skill", labels)
         self.assertIn("基础技术校验", labels)
         self.assertTrue(any(item.get("visual_only") for item in workflow["nodes"]))

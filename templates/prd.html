@@ -167,7 +167,7 @@ body.theme-light .lv1{color:var(--text-sub)}
   <div class="prd-section-num">SECTION 01</div>
   <h2 class="prd-section-title">产品概述</h2>
   <div class="prd-divider"></div>
-  <p class="prd-section-desc">洞见智研是面向投资者与研究型大V的多租户投研平台。当前交付以真实市场数据、租户知识、复盘生产与 Hermes 研究问答为主线，并由独立 Admin 管理功能开关、模型、数据治理和审计。</p>
+  <p class="prd-section-desc">洞见智研是面向投资者与研究型大V的多租户投研平台。当前交付以真实市场数据、租户知识、洞见生产与 Hermes 研究问答为主线，并由独立 Admin 管理功能开关、模型、数据治理和审计。</p>
 
   <div class="prd-sub">
     <div class="prd-sub-title">基本信息</div>
@@ -611,12 +611,12 @@ body.theme-light .lv1{color:var(--text-sub)}
   </div>
 
   <div class="prd-sub">
-    <div class="prd-sub-title">Tab 3 · 复盘专区</div>
+    <div class="prd-sub-title">Tab 3 · 洞见专区</div>
     <table class="prd-table">
       <tr><th>功能点</th><th>描述</th><th>优先级</th><th>状态</th></tr>
-      <tr><td>复盘阅读与即时发布</td><td>普通用户阅读所属租户的已发布内容；大V发布后立即刷新到前台列表</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>大V复盘生产</td><td>手动、语音、文件与 URL 内容先进入可编辑用户复盘；自选股为可选项，确认后才生成摘要和自选股归纳</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
-      <tr><td>摘要与证据链</td><td>发布时生成不超过150字摘要；用用户提及内容和知识/公开资料匹配证据，缺失时明确说明暂无匹配</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>洞见阅读与即时发布</td><td>普通用户阅读所属租户已发布的公开或订阅洞见；大V发布后立即刷新到前台列表</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>大V洞见生产</td><td>手动、语音、文件与 URL 内容进入统一洞见草稿；可选智能优化，经过 Draft 审核、最终预览后发布</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
+      <tr><td>摘要与内容权限</td><td>发布时形成摘要；普通用户可阅读公开洞见，订阅用户解锁订阅专享的详细正文、个股分析依据和风险说明</td><td><span class="p0">P0</span></td><td><span class="done">已实现</span></td></tr>
       <tr><td>导出/分享</td><td>后续可开放导出、分享或关联社区分发能力</td><td><span class="p1">P1</span></td><td><span class="planned">后台控制</span></td></tr>
     </table>
   </div>
@@ -1223,7 +1223,7 @@ body.theme-light .lv1{color:var(--text-sub)}
         <div class="roadmap-date">2026年8月 · 知识、复盘与真实数据闭环</div>
         <div class="roadmap-line"><div class="roadmap-dot"></div></div>
         <div class="roadmap-feature">Gangtise 市场与指标 API 统一接入，缺失数据不模拟</div>
-        <div class="roadmap-feature">复盘向导：用户输入可编辑，自选股可选，发布时生成摘要</div>
+        <div class="roadmap-feature">洞见生产：用户输入可编辑，可选 LLM 优化，Draft 审核后发布</div>
         <div class="roadmap-feature">知识源、百科词条、分层结构、图谱和共用证据链</div>
       </div>
       <div class="roadmap-item">
@@ -1275,7 +1275,7 @@ body.theme-light .lv1{color:var(--text-sub)}
     <table class="prd-table">
       <tr><th>功能域</th><th>当前验收口径</th><th>数据与边界</th></tr>
       <tr><td>H5 / Web 用户端</td><td>注册登录、合规确认与渠道、行情查看、自选股、评论、消息、复盘阅读、知识查看和 Hermes 对话；两端业务/API 结果一致，布局按设备适配</td><td>普通用户仅访问所属租户内容；跨租户访问必须拒绝</td></tr>
-      <tr><td>大V 工作台</td><td>复盘向导、用户输入编辑、可选自选股归纳、知识录入、粉丝经营、评论统计和门户维护</td><td>复盘发布后应立即在所属租户前台可见；自选股为可选项</td></tr>
+      <tr><td>大V 工作台</td><td>洞见输入、可选智能优化、Draft 审核、最终预览、公开/订阅发布、知识录入、粉丝经营、评论统计和门户维护</td><td>洞见发布后应立即在所属租户前台可见；不再包含旧 A/B 自选股复盘阶段</td></tr>
       <tr><td>小金智能体</td><td>今日个股观察、今日大盘观察、个股深化研究、个股看点摘要、多支自选股综合分析、多轮闲聊；支持组合任务、会话与长期记忆</td><td>原始问题先由 Admin 配置 LLM 拆解；研究类按 Gangtise API 原文直出；真实数据不可用时清晰说明，禁止伪造行情</td></tr>
       <tr><td>知识与证据链</td><td>文本、语音、文件、URL、复盘内容和标注可进入知识源；面向大V展示词条和知识结构</td><td>知识资产与记忆均按租户隔离；小金智能体不使用 embedding 做首轮意图识别；Admin 处理治理与备份</td></tr>
       <tr><td>智能指标与市场数据</td><td>注册目录统一管理个股、市场、行业和宏观经济指标；支持单指标或多指标公式组合，按定时任务刷新并在 H5/Web 与大V工作台展示一致结果</td><td>识别不到真实指标或数据不可用时显示明确空态，不生成模拟值</td></tr>
@@ -1298,7 +1298,7 @@ body.theme-light .lv1{color:var(--text-sub)}
       <tr><th>风险点</th><th>通过标准</th></tr>
       <tr><td>租户与权限</td><td>任意用户不可经 URL、API 参数或会话切换读取其他租户数据；角色不可进入无权限操作。</td></tr>
       <tr><td>真实行情与图表</td><td>个股、指数和指标均展示来源与时间；K 线、线图和分布图可正确渲染，缺数时显示明确不可用状态。</td></tr>
-      <tr><td>复盘生产</td><td>大V可仅使用用户输入发布；选择自选股时才生成对应归纳；发布成功/失败均有明确反馈并立即刷新列表。</td></tr>
+      <tr><td>洞见生产</td><td>大V可使用用户输入直接发布，也可让 LLM 生成 Draft 后人工审核；发布成功/失败均有明确反馈并立即刷新列表。</td></tr>
       <tr><td>知识与小金智能体</td><td>原始问题完整传递给配置的 LLM；任务进入正确 Gangtise API 或 LLM 路径；研究原文不被二次改写；模型或外部服务失败时不产生虚构结论。</td></tr>
       <tr><td>配置生效</td><td>Admin 开关、模型映射、登录限制和互动权限在保存后前后台一致，且关闭能力时接口同样受限。</td></tr>
     </table>

@@ -31,6 +31,56 @@ def _tenant_smart_indicator_write_guard(tenant_slug):
         return jsonify({"success": False, "error": "tenant_scope_forbidden"}), 403
     return None
 
+
+def _insight_draft_guard(tenant_slug):
+    current_user = get_current_authenticated_user() or {}
+    role = str(current_user.get("role") or "").strip().lower()
+    requested_tenant = str(tenant_slug or "").strip().lower()
+    current_tenant = str(current_user.get("tenant_slug") or "").strip().lower()
+    if not has_role_capability(role, "dav"):
+        return jsonify({"ok": False, "error": "dav_required"}), 403
+    if not has_role_capability(role, "admin") and current_tenant != requested_tenant:
+        return jsonify({"ok": False, "error": "tenant_scope_forbidden"}), 403
+    return None
+
+
+@app.route("/api/tenant/<tenant_slug>/insight-drafts", methods=["GET", "POST"])
+def api_tenant_insight_drafts(tenant_slug):
+    denied = _insight_draft_guard(tenant_slug)
+    if denied:
+        return denied
+    try:
+        if request.method == "GET":
+            return jsonify({"ok": True, "drafts": list_tenant_insight_drafts(tenant_slug)})
+        body = request.get_json(silent=True) or {}
+        draft, drafts = save_tenant_insight_draft(tenant_slug, {
+            "id": body.get("id"),
+            "title": body.get("title"),
+            "content_text": body.get("content_text"),
+            "source_mode": body.get("source_mode"),
+            "access_mode": body.get("access_mode"),
+        })
+        return jsonify({"ok": True, "draft": draft, "drafts": drafts})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception:
+        app.logger.exception("Failed to persist insight draft")
+        return jsonify({"ok": False, "error": "insight_draft_storage_failed"}), 500
+
+
+@app.route("/api/tenant/<tenant_slug>/insight-drafts/<draft_id>", methods=["DELETE"])
+def api_delete_tenant_insight_draft(tenant_slug, draft_id):
+    denied = _insight_draft_guard(tenant_slug)
+    if denied:
+        return denied
+    try:
+        return jsonify({"ok": True, "drafts": delete_tenant_insight_draft(tenant_slug, draft_id)})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    except Exception:
+        app.logger.exception("Failed to delete insight draft")
+        return jsonify({"ok": False, "error": "insight_draft_delete_failed"}), 500
+
 @app.route("/api/kol/workbench")
 def api_kol_workbench():
     tenant = get_tenant_by_slug(request.args.get("tenant"))
@@ -42,6 +92,71 @@ def api_kol_workbench():
         app.logger.warning("Database unavailable while building workbench API, using fallback data")
         payload = gen_kol_workbench(tenant, fallback_mode=True)
     return jsonify(payload)
+
+
+def _kol_commerce_guard(tenant_slug):
+    user = get_current_authenticated_user() or {}
+    role = str(user.get("role") or "").strip().lower()
+    if not (has_role_capability(role, "dav") or has_role_capability(role, "admin")):
+        return None, (jsonify({"ok": False, "error": "dav_required"}), 403)
+    current_tenant = str(user.get("tenant_slug") or "").strip().lower()
+    if not has_role_capability(role, "admin") and current_tenant != str(tenant_slug or "").strip().lower():
+        return None, (jsonify({"ok": False, "error": "tenant_scope_forbidden"}), 403)
+    return user, None
+
+
+@app.route("/api/kol/commerce", methods=["GET", "POST"])
+def api_kol_commerce():
+    tenant = get_active_tenant_from_request()
+    user, denied = _kol_commerce_guard(tenant["slug"])
+    if denied:
+        return denied
+    if request.method == "POST":
+        body = request.get_json(silent=True) or {}
+        action = str(body.get("action") or "settings").strip().lower()
+        try:
+            if action == "settings":
+                save_tenant_commerce_settings(tenant["slug"], body)
+            elif action == "product":
+                save_tenant_subscription_product(tenant["slug"], body, actor_user_id=user.get("id"))
+            else:
+                raise ValueError("commerce_action_invalid")
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "commerce": build_fan_commerce_payload(tenant["slug"], user), "qr_invites": list_tenant_fan_qr_invites(tenant["slug"])})
+
+
+@app.route("/api/kol/commerce/qr-invites", methods=["POST"])
+def api_create_kol_qr_invite():
+    tenant = get_active_tenant_from_request()
+    user, denied = _kol_commerce_guard(tenant["slug"])
+    if denied:
+        return denied
+    if not is_feature_enabled("fan_qr_import"):
+        return jsonify({"ok": False, "error": "fan_qr_import_disabled"}), 403
+    try:
+        invite = create_tenant_fan_qr_invite(tenant["slug"], request.get_json(silent=True) or {}, actor_user_id=user.get("id"))
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    invite["join_url"] = url_for("fan_join", token=invite["invite_token"], _external=True)
+    try:
+        invite["qr_data_uri"] = build_qr_png_data_uri(invite["join_url"])
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    return jsonify({"ok": True, "invite": invite, "qr_invites": list_tenant_fan_qr_invites(tenant["slug"])})
+
+
+@app.route("/api/kol/commerce/orders/<order_no>/confirm", methods=["POST"])
+def api_confirm_kol_payment(order_no):
+    tenant = get_active_tenant_from_request()
+    user, denied = _kol_commerce_guard(tenant["slug"])
+    if denied:
+        return denied
+    try:
+        order = confirm_fan_payment_order(tenant["slug"], order_no, user)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "order": order, "commerce": build_fan_commerce_payload(tenant["slug"], user)})
 
 
 @app.route("/api/review/jobs")
@@ -131,15 +246,21 @@ def api_save_kol_portal_cms():
     tenant = get_tenant_by_slug(request.args.get("tenant"))
     if not tenant:
         return jsonify({"ok": False, "error": "tenant_not_found"}), 404
+    _, denied = _kol_commerce_guard(tenant["slug"])
+    if denied:
+        return denied
     body = request.get_json(silent=True) or {}
-    saved = update_tenant_portal_cms(tenant["slug"], body.get("portal_cms", {}))
+    try:
+        saved = update_tenant_portal_cms(tenant["slug"], body.get("portal_cms", {}))
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
     if not saved:
         return jsonify({"ok": False, "error": "tenant_not_found"}), 404
     latest_tenant = get_tenant_by_slug(tenant["slug"], saved)
     return jsonify({
         "ok": True,
         "portal_workspace": gen_kol_workbench(latest_tenant).get("portal_workspace"),
-        "portal": build_tenant_portal_payload(latest_tenant),
+        "portal": build_tenant_portal_payload(latest_tenant, viewer=get_current_authenticated_user()),
     })
 
 
@@ -615,7 +736,7 @@ def api_generate_review_draft():
         "async": True,
         "job_code": job["job_code"],
         "job_status": job["status"],
-        "message": "复盘草稿已提交生成，正在后台调用大模型",
+        "message": "洞见草稿已提交生成，正在后台调用大模型",
     })
 
 
@@ -656,7 +777,7 @@ def api_polish_review_input():
         "async": True,
         "job_code": job["job_code"],
         "job_status": job["status"],
-        "message": "复盘输入已提交润色，正在后台调用大模型",
+        "message": "洞见内容已提交润色，正在后台调用大模型",
     })
 
 
@@ -704,7 +825,7 @@ def api_compose_review_draft():
         "async": True,
         "job_code": job["job_code"],
         "job_status": job["status"],
-        "message": "复盘完整草稿已提交生成，正在后台调用大模型",
+        "message": "洞见完整草稿已提交生成，正在后台调用大模型",
     })
 
 
@@ -714,7 +835,7 @@ def api_tenant_dashboard(tenant_slug):
     if not tenant or tenant["slug"] != tenant_slug:
         return jsonify({"success": False, "error": "tenant_not_found"}), 404
     try:
-        payload = build_tenant_dashboard_payload(tenant)
+        payload = build_tenant_dashboard_payload(tenant, viewer=get_current_authenticated_user())
     except Exception as exc:
         if not is_db_unavailable_error(exc):
             raise
@@ -762,7 +883,7 @@ def api_delete_tenant_review(tenant_slug, review_id):
         return jsonify({"ok": False, "error": "review_delete_failed"}), 500
     return jsonify({
         "ok": True,
-        "message": "复盘已删除",
+        "message": "洞见已删除",
         "review_id": result["review_id"],
         "snapshots": result["snapshots"],
     })
@@ -787,7 +908,7 @@ def api_save_tenant_dashboard(tenant_slug):
     if not saved:
         return jsonify({"success": False, "error": "invalid_action"}), 400
     latest_tenant = get_tenant_by_slug(tenant_slug, saved)
-    payload = build_tenant_dashboard_payload(latest_tenant)
+    payload = build_tenant_dashboard_payload(latest_tenant, viewer=get_current_authenticated_user())
     return jsonify({"success": True, "dashboard": payload, "fund_dashboard_state": payload.get("fund_dashboard_state")})
 
 
@@ -838,7 +959,7 @@ def api_tenant_smart_indicators(tenant_slug):
         return jsonify({"success": False, "error": "tenant_not_found"}), 404
     if request.method == "GET":
         try:
-            payload = build_tenant_dashboard_payload(tenant)
+            payload = build_tenant_dashboard_payload(tenant, viewer=get_current_authenticated_user())
         except Exception as exc:
             if not is_db_unavailable_error(exc):
                 raise
@@ -893,7 +1014,7 @@ def api_tenant_smart_indicators(tenant_slug):
         if not saved:
             return jsonify({"success": False, "error": "indicator_delete_failed"}), 409
         latest_tenant = get_tenant_by_slug(tenant_slug, saved)
-        payload = build_tenant_dashboard_payload(latest_tenant)
+        payload = build_tenant_dashboard_payload(latest_tenant, viewer=get_current_authenticated_user())
         return jsonify({"success": True, "dashboard": payload, "smart_indicator_catalog": payload.get("smart_indicator_catalog")})
     try:
         result = create_or_update_tenant_smart_indicator(tenant_slug, body)
@@ -902,7 +1023,7 @@ def api_tenant_smart_indicators(tenant_slug):
     except Exception as exc:
         app.logger.exception("Failed to save tenant smart indicator")
         return jsonify({"success": False, "error": str(exc)}), 500
-    payload = build_tenant_dashboard_payload(result["tenant"])
+    payload = build_tenant_dashboard_payload(result["tenant"], viewer=get_current_authenticated_user())
     return jsonify(
         {
             "success": True,

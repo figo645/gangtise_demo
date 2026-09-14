@@ -29,6 +29,46 @@ body { background: var(--surface-2); color: var(--text-main); }
 .page { display: none; }
 .page.active { display: block; }
 
+/* Product story: make the next useful action visible before secondary tools. */
+.featured-insight-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:10px; margin:0 0 14px; }
+.featured-insight-card { width:100%; box-sizing:border-box; padding:16px; border:1px solid rgba(200,169,110,.24); border-radius:14px; background:var(--navy-mid); box-shadow:0 8px 20px rgba(13,27,42,.10); cursor:pointer; }
+.featured-insight-card:active { transform:scale(.99); }
+.featured-insight-card.popular:only-child { grid-column:1 / -1; }
+.featured-insight-card.latest { border-color:rgba(47,116,192,.30); }
+.featured-insight-kicker { font-size:10px; color:var(--gold); letter-spacing:.08em; }
+.featured-insight-title { margin-top:6px; color:var(--white); font-size:19px; line-height:1.4; font-weight:750; }
+.featured-insight-summary { margin-top:8px; color:var(--gray-300); font-size:12px; line-height:1.75; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.featured-insight-meta { display:flex; justify-content:space-between; gap:8px; align-items:center; margin-top:12px; color:var(--gray-400); font-size:10px; }
+.featured-insight-cta { color:var(--gold); font-weight:700; white-space:nowrap; }
+.feed-market-economy { margin:0 0 14px; }
+.feed-market-economy-title { font-size:15px; font-weight:750; color:var(--white); }
+.feed-market-economy-desc { margin-top:4px; font-size:11px; color:var(--gray-400); line-height:1.6; }
+.feed-market-economy-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; margin-top:10px; }
+.feed-market-chart { min-width:0; overflow:hidden; padding:12px; border:1px solid rgba(200,169,110,.12); border-radius:12px; background:var(--navy-mid); }
+.feed-market-chart-title { font-size:12px; font-weight:700; color:var(--white); }
+.feed-market-chart-canvas { width:100%; height:230px; min-height:230px; }
+.feed-market-bars { display:grid; align-items:stretch; gap:3px; height:190px; margin-top:12px; padding:8px 2px 0; overflow:hidden; border-bottom:1px solid rgba(200,169,110,.18); }
+.feed-market-bar-item { display:grid; grid-template-rows:minmax(0,1fr) 22px; align-items:end; min-width:0; height:100%; }
+.feed-market-bar-area { position:relative; min-width:0; min-height:0; height:100%; }
+.feed-market-bar-area::after { content:''; position:absolute; left:0; right:0; top:50%; height:1px; background:rgba(200,169,110,.28); }
+.feed-market-bar-value { position:absolute; z-index:2; top:2px; left:50%; max-width:100%; transform:translateX(-50%); min-width:0; font-size:8px; line-height:1.2; color:var(--gray-300); white-space:nowrap; text-align:center; overflow:hidden; text-overflow:ellipsis; }
+.feed-market-bar-value.up { color:var(--red); }
+.feed-market-bar-value.down { color:var(--green); }
+.feed-market-bar { position:absolute; z-index:1; left:50%; width:min(28px,80%); max-height:50%; min-height:4px; transform:translateX(-50%); }
+.feed-market-bar.up { bottom:50%; border-radius:4px 4px 0 0; }
+.feed-market-bar.down { top:50%; border-radius:0 0 4px 4px; }
+.feed-market-bar.up { background:var(--red); }
+.feed-market-bar.down { background:var(--green); }
+.feed-market-bar-label { width:100%; min-width:0; align-self:end; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center; font-size:8px; line-height:1.4; color:var(--gray-400); }
+.review-draft-library-page { padding:2px 0 18px; }
+.review-draft-library-card { padding:14px; background:#FFFFFF; border:1px solid rgba(47,116,192,.13); border-radius:14px; box-shadow:0 5px 16px rgba(13,27,42,.05); }
+.review-draft-library-card-title { color:var(--text-main); font-size:14px; font-weight:750; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.review-draft-library-card-meta { margin-top:5px; color:var(--gray-400); font-size:10px; }
+.review-draft-library-card-summary { margin-top:11px; color:var(--gray-500); font-size:12px; line-height:1.7; }
+.review-draft-library-status { flex-shrink:0; padding:3px 7px; border-radius:999px; background:rgba(200,169,110,.14); color:#8A6A2F; font-size:10px; }
+.review-draft-library-empty { padding:34px 18px; text-align:center; border:1px dashed rgba(47,116,192,.22); border-radius:14px; background:#F8FBFF; }
+.review-draft-library-empty-icon { width:34px; height:34px; margin:0 auto; border-radius:50%; background:rgba(47,116,192,.10); color:#2F74C0; font-size:25px; line-height:32px; }
+
 
 /* ===== BOTTOM NAV (6 items) ===== */
 .h5-bottom-nav {
@@ -1348,6 +1388,41 @@ body { background: var(--surface-2); color: var(--text-main); }
 #page-hermes .hermes-session-strip {
   display:block;
   margin:0 0 10px;
+}
+#page-hermes .hermes-assistant-mode-tabs {
+  display:flex;
+  gap:6px;
+  margin:2px 0 12px;
+  padding:4px;
+  border:1px solid #E1E7EE;
+  border-radius:12px;
+  background:#EEF3F8;
+}
+#page-hermes .hermes-assistant-mode-tab {
+  flex:1;
+  min-height:36px;
+  border:0;
+  border-radius:9px;
+  background:transparent;
+  color:#687587;
+  font-size:12px;
+  font-weight:700;
+  cursor:pointer;
+}
+#page-hermes .hermes-assistant-mode-tab.active {
+  background:#FFFFFF;
+  color:#245B96;
+  box-shadow:0 3px 10px rgba(31,73,125,0.08);
+}
+#page-hermes .hermes-task-mode-note {
+  margin:0 4px 8px;
+  padding:9px 11px;
+  border:1px solid #DCE8F4;
+  border-radius:10px;
+  background:#F5FAFF;
+  color:#526276;
+  font-size:11px;
+  line-height:1.6;
 }
 #page-hermes .hermes-session-entry {
   min-height:48px;
@@ -3589,6 +3664,26 @@ body { background: var(--surface-2); color: var(--text-main); }
   background:var(--gold);
   border-color:var(--gold);
 }
+.review-access-scope-tags { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:0; }
+.review-access-scope-tag {
+  min-width:0;
+  min-height:66px;
+  padding:10px 11px;
+  text-align:left;
+  cursor:pointer;
+  color:var(--text-main);
+  background:rgba(47,116,192,0.035);
+  border:1px solid rgba(47,116,192,0.14);
+  border-radius:12px;
+  transition:border-color .18s ease, background .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+.review-access-scope-tag:hover { border-color:rgba(47,116,192,0.34); transform:translateY(-1px); }
+.review-access-scope-tag.active { color:var(--text-main); background:rgba(200,169,110,0.12); border-color:rgba(200,169,110,0.68); box-shadow:0 5px 14px rgba(142,106,30,0.10); }
+.review-access-scope-tag-title { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:800; line-height:1.3; }
+.review-access-scope-tag.active .review-access-scope-tag-title::before { content:'✓'; display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; border-radius:50%; color:var(--navy); background:var(--gold); font-size:10px; }
+.review-access-scope-tag-desc { margin-top:5px; font-size:10px; line-height:1.45; color:var(--gray-400); }
+.review-access-scope-tag.active .review-access-scope-tag-desc { color:var(--text-sub); }
+@media (max-width: 390px) { .review-access-scope-tags { grid-template-columns:1fr; } }
 .review-article-list { display:grid; gap:12px; }
 .review-article-card {
   background:#FFFFFF;
@@ -3599,6 +3694,7 @@ body { background: var(--surface-2); color: var(--text-main); }
   cursor:pointer;
 }
 .review-article-cover {
+  position:relative;
   border-radius:14px;
   padding:14px;
   background:
@@ -3606,8 +3702,41 @@ body { background: var(--surface-2); color: var(--text-main); }
     linear-gradient(135deg, #102846 0%, #17365A 100%);
   color:#F8F6F0;
 }
-.review-article-cover-kicker { font-size:10px; font-weight:700; color:rgba(248,246,240,0.72); letter-spacing:.08em; }
-.review-article-cover-title { font-size:18px; line-height:1.45; font-weight:800; margin-top:10px; }
+.review-article-cover-kicker { font-size:10px; font-weight:700; color:rgba(248,246,240,0.72); letter-spacing:.08em; padding-right:94px; }
+.review-article-access-badge {
+  position:absolute;
+  top:12px;
+  right:12px;
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  min-height:24px;
+  padding:0 8px;
+  border-radius:999px;
+  font-size:10px;
+  line-height:1;
+  font-weight:800;
+  letter-spacing:.02em;
+}
+.review-article-access-badge.public { color:#DCEBFA; background:rgba(220,235,250,0.14); border:1px solid rgba(220,235,250,0.26); }
+.review-article-access-badge.subscriber { color:#FFF3CF; background:rgba(200,169,110,0.25); border:1px solid rgba(235,207,132,0.56); }
+.review-access-legend { display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-top:10px; }
+.review-access-legend-label { font-size:11px; color:var(--gray-400); }
+.review-access-label {
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  min-height:24px;
+  padding:0 8px;
+  border-radius:999px;
+  font-size:10px;
+  line-height:1;
+  font-weight:800;
+  letter-spacing:.02em;
+}
+.review-access-label.public { color:#1F497D; background:#EAF3FF; border:1px solid rgba(47,116,192,0.18); }
+.review-access-label.subscriber { color:#8E6A1E; background:rgba(200,169,110,0.16); border:1px solid rgba(200,169,110,0.38); }
+.review-article-cover-title { font-size:15px; line-height:1.45; font-weight:800; margin-top:10px; }
 .review-article-cover-meta { font-size:11px; color:rgba(248,246,240,0.72); line-height:1.7; margin-top:8px; }
 .review-article-card-summary { font-size:12px; color:var(--gray-400); line-height:1.8; margin-top:8px; }
 .review-article-card-meta { display:flex; flex-wrap:wrap; gap:8px 14px; margin-top:9px; font-size:11px; color:var(--gray-400); line-height:1.6; }
@@ -3636,6 +3765,26 @@ body { background: var(--surface-2); color: var(--text-main); }
 }
 .review-directory-view-title { font-size:17px; color:var(--text-main); font-weight:800; line-height:1.5; }
 .review-directory-view-desc { font-size:12px; color:var(--gray-400); line-height:1.8; margin-top:5px; }
+.review-directory-search { margin:0 0 14px; }
+.review-directory-search-label { display:block; font-size:11px; color:var(--gray-400); margin-bottom:6px; }
+.review-directory-search-box { position:relative; display:flex; align-items:center; min-width:0; }
+.review-directory-search-input {
+  width:100%;
+  min-height:40px;
+  box-sizing:border-box;
+  border:1px solid rgba(47,116,192,0.18);
+  border-radius:999px;
+  padding:0 38px 0 38px;
+  color:var(--text-main);
+  background:#F7FBFF;
+  outline:none;
+  font-size:12px;
+  transition:border-color .18s ease, box-shadow .18s ease;
+}
+.review-directory-search-input:focus { border-color:#2F74C0; box-shadow:0 0 0 3px rgba(47,116,192,0.10); }
+.review-directory-search-icon { position:absolute; left:14px; color:#2F74C0; font-size:15px; line-height:1; pointer-events:none; }
+.review-directory-search-clear { position:absolute; right:8px; width:26px; height:26px; border:0; border-radius:50%; background:rgba(47,116,192,0.08); color:#2F74C0; cursor:pointer; font-size:16px; line-height:1; }
+.review-directory-search-meta { margin-top:6px; font-size:10px; color:var(--gray-400); line-height:1.5; }
 .review-detail-page {
   background:#FFFFFF;
   border:1px solid rgba(47,116,192,0.10);
@@ -3774,7 +3923,7 @@ body { background: var(--surface-2); color: var(--text-main); }
   cursor:pointer;
 }
 .review-rich-editor {
-  min-height:180px;
+  min-height:400px;
   overflow:hidden;
 }
 .review-prompt-tag {
@@ -3902,15 +4051,23 @@ body { background: var(--surface-2); color: var(--text-main); }
 }
 .knowledge-rich-editor .ql-editor,
 .review-rich-editor .ql-editor {
-  min-height:180px;
+  min-height:400px;
   font-size:13px;
   line-height:1.8;
   color:var(--text-main);
 }
 .knowledge-rich-editor .ql-editor.ql-blank::before,
 .review-rich-editor .ql-editor.ql-blank::before {
-  color:var(--gray-400);
+  /* Empty-state copy must never be mistaken for a saved article body. */
+  color:#9AA6B2;
   font-style:normal;
+  opacity:1;
+  pointer-events:none;
+}
+.review-rich-editor:focus-within .ql-editor.ql-blank::before {
+  /* Start an empty draft at index 0 instead of visually placing the caret
+     inside the placeholder sentence. */
+  display:none;
 }
 .knowledge-rich-editor .ql-editor img,
 .review-rich-editor .ql-editor img {
@@ -4412,25 +4569,18 @@ body,
   <!-- ===== TAB 1: 信息流 ===== -->
   <div id="page-feed" class="page active" data-feature="fundamental_analysis">
     <div class="h5-section" style="padding-bottom:8px">
-      <div class="fund-overview-card">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-          <div>
-            <div class="fund-overview-title">今日基本面首页</div>
-            <div class="fund-overview-desc">先看宏观核心指标，再看自选股板块行情与研究摘要，最后阅读真正值得看的综合要闻。</div>
-          </div>
-          <span class="tag tag-gold">决策首页</span>
-        </div>
-      </div>
+      <div id="feed-featured-insight"></div>
+      <div id="feed-market-economy"></div>
     </div>
 
-    <div class="h5-section" style="padding-top:6px">
+    <div class="h5-section core-indicators-surface" id="feed-core-indicators" style="padding-top:6px">
       <div class="h5-section-title">核心指标</div>
       <div id="feed-macro-dashboard"></div>
     </div>
 
     <div class="h5-section" id="fundamental-watchlist-boards">
-      <div class="h5-section-title">板块</div>
-      <div class="fund-board-hint">这里展示当前登录用户的自选股，并按行业板块归纳行情与研究摘要。</div>
+      <div class="h5-section-title">我的自选股</div>
+      <div class="fund-board-hint">按行业板块查看你关注的股票行情与研究摘要。</div>
       <div class="fund-board-tabs" id="fund-board-tabs">
         {% for board in feed_boards %}
         <button class="fund-board-tab {% if loop.first %}active{% endif %}" id="fund-board-tab-{{ loop.index0 }}" onclick="switchFeedBoardTab({{ loop.index0 }})">
@@ -4566,7 +4716,7 @@ body,
             <button class="btn-outline" style="padding:5px 14px;font-size:12px">关注</button>
             <button class="btn-gold" style="padding:5px 14px;font-size:12px" onclick="openDmChat(1,'财经老王','👑','种子投顾')">私信</button>
           </div>
-          <div class="kol-preview">"我现在最常用的是收盘复盘 + 自选股诊断组合，先把全天信号压缩，再挑需要深挖的公司。"</div>
+          <div class="kol-preview">"我现在最常用的是洞见 + 自选股诊断组合，先把全天信号压缩，再挑需要深挖的公司。"</div>
           <div class="kol-footer">
             <div class="kol-stats">
               <div class="kol-stat">本月观点 <span>18条</span></div>
@@ -4688,6 +4838,7 @@ body,
         </button>
         <button type="button" class="hermes-session-new-btn" onclick="startHermesNewSession()">新会话</button>
       </div>
+      <div class="hermes-assistant-mode-tabs" id="hermes-assistant-mode-tabs" role="tablist" aria-label="小金智能体工作方式"></div>
 
       <div class="hermes-workspace">
         <div class="hermes-assistant-card">
@@ -4790,7 +4941,6 @@ body,
         <div style="font-size:12px;color:var(--gray-400);line-height:1.6">用户不需要先点“添加”。直接输入股票代码后进入个股详情页，再决定是否加入自选股。</div>
         <div style="font-size:11px;color:var(--gold);margin-top:8px;line-height:1.7">租户隔离规则：普通投资者只可与所属大V投顾互动；跨租户投顾内容不开放。通过 Hermes 发起的个股分析会同步为租户分析记录，供主理投顾查看。</div>
       </div>
-      <div id="market-review-selection-banner" style="display:none"></div>
       <div id="market-watchlist-list">
       {% for item in market %}
       <div
@@ -4820,7 +4970,6 @@ body,
             {% endif %}
           </div>
         </div>
-        <div data-review-selection-slot="true" style="display:none"></div>
         <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn-outline" type="button" style="padding:5px 9px;font-size:11px;color:#B42318;border-color:rgba(180,35,24,0.28)" onclick="event.stopPropagation();requestWatchlistRemoval('{{ item.code }}')">移除</button></div>
       </div>
       {% endfor %}
@@ -4833,11 +4982,11 @@ body,
         <div style="font-size:13px;color:var(--gold);font-weight:600;margin-bottom:8px">当日跟踪重点</div>
         <div style="font-size:13px;color:var(--white);line-height:1.8">
           1. 从自选股、热门行业和市场一览确认当天的关注范围。<br>
-          2. 在日 K 线上记录关键判断，保留后续复盘可追溯的依据。<br>
+          2. 在日 K 线上记录关键判断，保留后续洞见可追溯的依据。<br>
           3. 汇总粉丝留言与 Hermes 研究结果，补齐需要验证的证据。<br>
-          4. 在复盘中确认用户输入和自选股归纳后，再发布给粉丝。
+          4. 在洞见中确认用户输入和草稿内容后，再发布给粉丝。
         </div>
-        <div style="font-size:11px;color:var(--gray-400);margin-top:6px">标注、评论、研究和复盘在同一租户内沉淀，便于持续追踪。</div>
+        <div style="font-size:11px;color:var(--gray-400);margin-top:6px">标注、评论、研究和洞见在同一租户内沉淀，便于持续追踪。</div>
       </div>
     </div>
   </div>
@@ -4854,29 +5003,29 @@ body,
 
   <div id="page-review" class="page" data-feature="daily_review">
     <div class="h5-section">
-      <div class="h5-section-title">复盘专区</div>
-      <div class="card" id="review-overview-card" style="padding:16px;margin-bottom:12px">
+      <div class="h5-section-title">洞见</div>
+      <div class="card" id="review-overview-card" style="display:none;padding:16px;margin-bottom:12px" aria-hidden="true">
         <div class="review-role-toolbar">
           <div>
-            <div class="review-role-title">复盘专区</div>
-            <div class="review-role-desc">这里统一展示已发布的复盘分析报告。普通用户和大V看到的是同一份前台文章内容，只是大V额外保留生产和发布入口。</div>
+            <div class="review-role-title">洞见</div>
+            <div class="review-role-desc">这里统一展示大V已发布的洞见。普通用户和大V看到的是同一篇内容，大V额外保留编辑和发布入口。</div>
           </div>
-          <span class="tag tag-gold" id="review-role-badge">租户复盘</span>
+          <span class="tag tag-gold" id="review-role-badge">租户洞见</span>
         </div>
         <div class="review-period-row" id="review-period-row"></div>
         <div style="display:flex;gap:8px;margin-top:12px" id="review-action-row">
-          <button class="btn-gold" style="flex:1;padding:10px;font-size:12px" id="review-trigger-button" onclick="openReviewTriggerModal()">发起复盘</button>
-          <button class="btn-outline" style="flex:1;padding:10px;font-size:12px" onclick="openReviewWatchlistSelector()">查看自选股</button>
+          <button class="btn-gold" style="flex:1;padding:10px;font-size:12px" id="review-trigger-button" onclick="openReviewTriggerModal()">发布洞见</button>
         </div>
+        <div id="review-insight-drafts-overview-host"></div>
         <div id="review-active-jobs-overview-host" class="review-active-jobs" aria-live="polite"></div>
       </div>
       <div id="review-production-page" class="review-production-page" style="display:none">
         <div class="review-production-page-head">
           <div>
-            <div class="review-production-page-title">新建复盘</div>
-            <div class="review-production-page-desc">这是一个独立的复盘工作区。离开后任务仍会继续，重新进入时会恢复当前生成状态。</div>
+            <div class="review-production-page-title">新建洞见</div>
+            <div class="review-production-page-desc">这是一个独立的洞见编辑区。离开后任务仍会继续，重新进入时会恢复当前生成状态。</div>
           </div>
-          <button class="btn-outline" type="button" style="padding:7px 11px;font-size:11px" onclick="closeReviewTriggerModal()">返回复盘列表</button>
+          <button class="btn-outline" type="button" style="padding:7px 11px;font-size:11px" onclick="closeReviewTriggerModal()">返回洞见列表</button>
         </div>
         <div id="review-active-jobs-host" class="review-active-jobs" aria-live="polite"></div>
         <div id="review-production-page-content"></div>
@@ -4922,7 +5071,7 @@ body,
       <div class="card" style="padding:16px;margin-bottom:12px">
         <div style="font-size:15px;font-weight:700;color:var(--white);margin-bottom:8px">知识专区沉淀长期可复用的信息</div>
         <div style="font-size:12px;color:var(--gray-400);line-height:1.8">
-          它和复盘专区一样都来自消息流，但复盘专区偏“阶段性整理”，知识专区偏“长期沉淀”。对大V来说，知识通过语音输入、文件上传、网页 URL 或纯文本编写进入系统，再沉淀成可复用的方法、框架和资料；手机端更适合直接查看结构化知识。
+          它和洞见一样都来自消息流，但洞见偏“阶段性整理”，知识专区偏“长期沉淀”。对大V来说，知识通过语音输入、文件上传、网页 URL 或纯文本编写进入系统，再沉淀成可复用的方法、框架和资料；手机端更适合直接查看结构化知识。
         </div>
       </div>
       <div class="card" style="padding:16px;margin-bottom:12px">
@@ -5072,7 +5221,7 @@ body,
         <div>
           <div style="font-size:12px;color:var(--gold);font-weight:700;margin-bottom:4px" id="tenant-card-title">所属大V租户</div>
           <div style="font-size:16px;font-weight:700;color:var(--white)" id="tenant-name">财经老王租户</div>
-          <div style="font-size:12px;color:var(--gray-400);margin-top:6px;line-height:1.6" id="tenant-desc">面向 A 股科技、复盘专区与知识专区粉丝用户的独立租户空间。</div>
+      <div style="font-size:12px;color:var(--gray-400);margin-top:6px;line-height:1.6" id="tenant-desc">面向 A 股科技、洞见与智能研究粉丝用户的独立租户空间。</div>
         </div>
         <div class="demo-switch-tag" id="tenant-tier-tag">投资者视角</div>
       </div>
@@ -5083,11 +5232,11 @@ body,
         </div>
         <div class="tenant-cell">
           <div class="tenant-label">研究方向</div>
-          <div class="tenant-value" id="tenant-focus">A股科技 · 复盘专区 · 知识专区</div>
+      <div class="tenant-value" id="tenant-focus">A股科技 · 洞见 · 智能研究</div>
         </div>
         <div class="tenant-cell">
           <div class="tenant-label">租户权益</div>
-          <div class="tenant-value" id="tenant-rights">复盘专区 · 知识专区 · Hermes 摘要 · 社群问答</div>
+      <div class="tenant-value" id="tenant-rights">洞见 · Hermes 摘要 · 社群问答</div>
         </div>
         <div class="tenant-cell">
           <div class="tenant-label">当前关系</div>
@@ -5096,7 +5245,7 @@ body,
       </div>
     </div>
 
-    <div class="profile-workbench-entry" id="profile-workbench-entry" style="display:none" onclick="switchTab('workbench')">
+      <div class="profile-workbench-entry" id="profile-workbench-entry" style="display:none" onclick="switchTab('workbench')">
       <div class="profile-workbench-entry-icon">👑</div>
       <div class="profile-workbench-entry-main">
         <div class="profile-workbench-entry-top">
@@ -5127,13 +5276,21 @@ body,
         </div>
         <div class="profile-overview-item">
           <div class="profile-overview-label">租户服务</div>
-          <div class="profile-overview-value" id="profile-service-brief">复盘专区 · 知识专区 · Hermes 摘要</div>
+          <div class="profile-overview-value" id="profile-service-brief">洞见 · Hermes 摘要</div>
         </div>
         <div class="profile-overview-item" id="profile-workbench-overview-item">
           <div class="profile-overview-label">工作台入口</div>
           <div class="profile-overview-value">统一从“我的”进入</div>
         </div>
       </div>
+    </div>
+
+    <div class="profile-overview-card" id="profile-commerce-card" style="display:none">
+      <div class="profile-overview-head">
+        <div><div class="profile-overview-title">订阅与内容权益</div><div class="profile-overview-desc">订阅状态以服务端真实订单和有效期为准，待支付订单不会解锁内容。</div></div>
+        <div class="demo-switch-tag" id="profile-commerce-status">未订阅</div>
+      </div>
+      <div id="profile-commerce-content" class="profile-overview-desc">正在加载订阅产品…</div>
     </div>
 
     <div class="h5-section" id="profile-switch-section" style="padding-bottom:8px;display:none">
@@ -5268,7 +5425,7 @@ body,
           <div class="help-center-subtitle" id="help-center-subtitle">按功能快速查找，不堆砌说明文字。</div>
         </div>
       </div>
-      <input id="help-center-search-input" class="help-center-search" style="margin-top:12px" placeholder="搜索账号、消息、小金智能体、复盘、指标、知识..." oninput="handleHelpCenterSearch(this.value)">
+      <input id="help-center-search-input" class="help-center-search" style="margin-top:12px" placeholder="搜索账号、消息、小金智能体、洞见、指标、知识..." oninput="handleHelpCenterSearch(this.value)">
       <div class="help-center-categories" id="help-center-categories"></div>
       <div class="help-center-list" id="help-center-list"></div>
       <div class="modal-actions">
@@ -5312,7 +5469,7 @@ body,
     </div>
     <div class="h5-nav-item" id="nav-review" data-feature="daily_review" onclick="switchTab('review')">
       <div class="h5-nav-icon">📝</div>
-      <div class="h5-nav-label">复盘</div>
+      <div class="h5-nav-label">洞见</div>
     </div>
     <div class="h5-nav-item" id="nav-knowledge" data-feature="knowledge" onclick="switchTab('knowledge')">
       <div class="h5-nav-icon">📚</div>
@@ -5436,7 +5593,7 @@ const ALL_TABS = ['feed', 'community', 'hermes', 'market', 'review', 'knowledge'
 const TAB_LABELS = {
   feed: '基本面分析',
   market: '自选股',
-  review: '复盘专区',
+  review: '洞见',
   knowledge: '知识专区',
   community: '社区',
   hermes: 'Hermes',
@@ -5445,9 +5602,9 @@ const TAB_LABELS = {
   workbench: '大V投顾工作台',
 };
 const TAB_HINTS = {
-  feed: '优先承接复盘、知识、基本面和自选股诊断四类高频动作',
+  feed: '优先承接洞见、知识、基本面和自选股诊断四类高频动作',
   market: '仅保留首发阶段的自选股跟踪能力',
-  review: '大V发布复盘，系统再按自选股和阶段行情补充智能复盘',
+  review: '大V发布洞见，系统再按自选股和阶段行情补充智能解读',
   knowledge: '把可复用的方法、框架和资料沉淀为长期知识资产',
   community: '社区功能默认可由后台按需开放',
   hermes: '以证据链、来源条目和置信度输出研究结论',
@@ -5491,6 +5648,7 @@ function isFeatureEnabled(featureName) {
   if (featureName === 'knowledge') {
     return siteFeatures.knowledge === true && siteFeatures.knowledge_module_enabled === true;
   }
+  if (featureName === 'core_indicators') return siteFeatures.core_indicators === true;
   return siteFeatures[featureName] !== false;
 }
 
@@ -5670,7 +5828,8 @@ const DEFAULT_MACRO_INDICATORS = {{ macro_indicators | tojson }};
 const H5_INDICATOR_HUB = {{ indicator_hub | tojson }};
 const FUNDAMENTAL_COLUMN_DATA = {{ fundamental_column | tojson }};
 const DASHBOARD_SEED_CARDS = {{ dashboard_seed_cards | tojson }};
-let WATCHLIST_DETAILS_MAP = {{ watchlist_details | tojson }};
+const INITIAL_WATCHLIST_DETAILS_MAP = {{ watchlist_details | tojson }};
+let WATCHLIST_DETAILS_MAP = {...INITIAL_WATCHLIST_DETAILS_MAP};
 const FUND_DASHBOARD_STORAGE_KEY = 'gangtise_fund_dashboard_state';
 const INITIAL_TENANT_DASHBOARD = {{ tenant_dashboard_payload | tojson }};
 let currentTenantDashboardPayload = INITIAL_TENANT_DASHBOARD || {};
@@ -5806,14 +5965,13 @@ let dashboardCellDraftMode = 'market';
 let currentFundMetricDetail = null;
 let workbenchDashboardAction = '';
 let workbenchDashboardActionTimer = null;
+// `day` remains the internal compatibility key for existing review records.
 const REVIEW_PERIOD_CONFIG = {
-  day: { label: '日复盘', shortLabel: '今日', prompt: '今天收盘后', marketFocus: '当天行情', aiLabel: '自选股 + 当日行情' },
-  week: { label: '周复盘', shortLabel: '本周', prompt: '本周结束后', marketFocus: '阶段行情', aiLabel: '自选股 + 周度主线' },
-  month: { label: '月复盘', shortLabel: '本月', prompt: '本月阶段内', marketFocus: '月度趋势', aiLabel: '自选股 + 月度行情' },
+  day: { label: '洞见', shortLabel: '洞见', prompt: '', marketFocus: '', aiLabel: '自选股 + 市场行情' },
 };
 const REVIEW_SOURCE_OPTIONS = [
   { value: 'voice', icon: '🎙️', label: '语音口述', desc: '收盘后直接口述盘面、行业和个股判断。' },
-  { value: 'manual', icon: '✍️', label: '手写正文', desc: '直接写完整复盘正文，再统一发布为前台文章。' },
+  { value: 'manual', icon: '✍️', label: '手写正文', desc: '直接写完整洞见正文，再统一发布为前台文章。' },
   { value: 'file', icon: '📎', label: '文件上传', desc: '上传纪要、研报或 PDF 统一抽取重点。' },
   { value: 'url', icon: '🔗', label: '网页 URL', desc: '抓取公开网页资料，提炼后继续编辑。' },
 ];
@@ -5824,15 +5982,20 @@ function getAvailableReviewSourceOptions() {
   ));
 }
 const REVIEW_PARAGRAPH_OPTIONS = [
-  { value: 'manual', label: '沿用手写正文', desc: '直接沿用你已经写好的完整复盘正文。' },
-  { value: 'ai', label: '智能整理正文', desc: '只提供资料和判断，再补一句修改规则，由系统先生成完整复盘草稿。' },
+  { value: 'manual', label: '沿用手写正文', desc: '直接沿用你已经写好的完整洞见正文。' },
+  { value: 'ai', label: '智能整理正文', desc: '只提供资料和判断，再补一句修改规则，由系统先生成完整洞见草稿。' },
 ];
 let currentReviewPeriod = 'day';
 let reviewView = 'home';
 let reviewDetailArticleId = '';
+let reviewSearchKeyword = '';
+let reviewSearchResolvedAliases = [];
+let reviewSearchRequestSeq = 0;
+let reviewSearchTimer = null;
 let reviewTriggerDraft = {
   period: 'day',
   reviewTitle: '',
+  accessMode: 'public',
   sourceMode: 'manual',
   paragraphMode: 'manual',
   skipAiProcessing: true,
@@ -5856,8 +6019,8 @@ let reviewTriggerDraft = {
   previewReady: false,
 };
 const reviewRuntimeStore = {};
-let reviewWatchlistSelectionMode = false;
 let reviewProductionPage = false;
+let insightDraftLibraryView = false;
 let reviewActiveJobs = [];
 let reviewActiveJobsTimer = null;
 let reviewActiveJobsLoading = false;
@@ -5865,14 +6028,6 @@ const REVIEW_PROMPT_TAGS = ['更口语化', '保留原文不改写', '强调风�
 let reviewStructuredPreview = null;
 let reviewPreviewGenerating = false;
 let reviewPreviewJobState = null;
-let reviewSectorSummaryConstraintGenerating = false;
-let reviewSectorSummaryConstraintJobState = null;
-let reviewSectorSummaryRuleApplied = '';
-let reviewWatchlistSearchItems = [];
-let reviewWatchlistSearchQuery = '';
-let reviewWatchlistSearchTimer = null;
-let reviewWatchlistSearchRequestSeq = 0;
-let reviewWatchlistAddedItems = [];
 
 function normalizeReviewStructuredPreview(payload) {
   const source = payload && typeof payload === 'object' ? payload : {};
@@ -5938,8 +6093,7 @@ function buildReviewStructuredFinalText(payload) {
   const normalized = normalizeReviewStructuredPreview(payload);
   return [
     normalized.review_summary ? `【摘要】\n${normalized.review_summary}` : '',
-    normalized.user_input_section.display_text ? `【用户复盘】\n${normalized.user_input_section.display_text}` : '',
-    buildReviewWatchlistAnalysisText(normalized.watchlist_analysis_section) ? `【自选股归纳总结】\n${buildReviewWatchlistAnalysisText(normalized.watchlist_analysis_section)}` : '',
+    normalized.user_input_section.display_text ? `【用户洞见】\n${normalized.user_input_section.display_text}` : '',
   ].filter(Boolean).join('\n\n').trim();
 }
 const KNOWLEDGE_INPUT_TYPES = {
@@ -7512,7 +7666,7 @@ function bootH5Experience() {
   h5ExperienceBooted = true;
   loadCommunityPosts();
   loadCommunityEvents();
-  selectHermesMode('复盘速写');
+  selectHermesMode('洞见速写');
   refreshTenantDashboardRemoteState({ rerenderFeed: true, rerenderWorkbench: true });
   refreshHermesCredits({ silent: true });
 }
@@ -7565,33 +7719,6 @@ function getReviewPeriodMeta(period) {
   return REVIEW_PERIOD_CONFIG[period] || REVIEW_PERIOD_CONFIG.day;
 }
 
-function getTenantWatchlistFocus(tenantId) {
-  // Review selection must use the same owner-scoped list rendered by the
-  // watchlist section; never fall back to the tenant demo list.
-  if (!userWatchlistLoaded) return [];
-  return Object.values(WATCHLIST_DETAILS_MAP || {})
-    .map((item) => String(item && item.name || '').trim())
-    .filter(Boolean);
-}
-
-function getCurrentUserWatchlistItems() {
-  if (!userWatchlistLoaded) return [];
-  return Object.values(WATCHLIST_DETAILS_MAP || {})
-    .filter((item) => item && String(item.name || '').trim())
-    .map((item) => ({
-      name: String(item.name || '').trim(),
-      code: String(item.code || '').trim(),
-      market: String(item.market || '').trim(),
-    }));
-}
-
-function getDavReviewSelectedWatchlist(tenantId) {
-  const fullList = getTenantWatchlistFocus(tenantId);
-  const runtime = ensureTenantReviewRuntime(tenantId);
-  const selected = (runtime.kolSelectedWatchlist || []).filter(name => fullList.includes(name));
-  return selected;
-}
-
 function ensureTenantReviewRuntime(tenantId) {
   if (!reviewRuntimeStore[tenantId]) {
     reviewRuntimeStore[tenantId] = {
@@ -7600,7 +7727,6 @@ function ensureTenantReviewRuntime(tenantId) {
       aiGeneratedAt: '2026-06-07 19:00',
       kolSourceMode: 'voice',
       paragraphMode: 'manual',
-      kolSelectedWatchlist: [],
       lastReviewPeriod: 'day',
       latestVoiceTranscript: '系统已转写语音口述：今天先保留 AI 算力和港股互联网两条主线，个股上继续盯中芯国际订单兑现、腾讯回购节奏和贵州茅台稳健配置逻辑。',
       latestManualHtml: '<p><strong>市场主线</strong></p><p>今天先讲主线，不把所有盘面噪音都写进去。</p><p><strong>重点个股</strong></p><p>中芯国际看订单兑现，腾讯看回购与财报，茅台继续偏稳健配置。</p>',
@@ -7618,25 +7744,17 @@ function ensureTenantReviewRuntime(tenantId) {
 function buildKolReviewData(user, period) {
   const periodMeta = getReviewPeriodMeta(period);
   const runtime = ensureTenantReviewRuntime(user.tenant.id);
-  const focusNames = getDavReviewSelectedWatchlist(user.tenant.id);
-  const displayFocusNames = focusNames.length ? focusNames : getTenantWatchlistFocus(user.tenant.id).slice(0, 3);
-  const annotationEntries = getReviewAnnotationEntries(user.tenant.id, displayFocusNames);
-  const annotationSummary = annotationEntries.map(entry => `${entry.stockName}：${entry.summary}`).join('；');
-  const firstFocus = displayFocusNames[0] || '重点样本';
-  const secondFocus = displayFocusNames[1] || firstFocus;
-  const thirdFocus = displayFocusNames[2] || secondFocus;
-  const focusSummary = displayFocusNames.join('、');
   const sourceCfg = REVIEW_SOURCE_OPTIONS.find(item => item.value === runtime.kolSourceMode) || REVIEW_SOURCE_OPTIONS[0];
   const paragraphCfg = REVIEW_PARAGRAPH_OPTIONS.find(item => item.value === runtime.paragraphMode) || REVIEW_PARAGRAPH_OPTIONS[0];
   const titleMap = {
-    day: '收盘复盘：AI 算力主线未变，港股互联网继续看回购与财报兑现',
-    week: '周度复盘：科技成长维持主线，消费与新能源继续等景气验证',
-    month: '月度复盘：先保留主线框架，再按行业和重点个股做阶段归纳',
+    day: '今日市场洞见：主线与验证节点',
+    week: '本周市场洞见：主线与验证节点',
+    month: '本月市场洞见：主线与验证节点',
   };
   const summaryMap = {
-    day: `这版${periodMeta.label}先由 ${user.tenant.advisor} 压缩全天资料，再从 ${displayFocusNames.slice(0, 2).join('、')} 等样本里挑重点公司深挖。${annotationSummary ? `其中已直接引用 K 线标注：${annotationSummary}。` : ''}`,
-    week: `这版${periodMeta.label}把一周内的大V语音、手写观点和会议资料统一归纳成行业主线 + 个股复盘，方便普通投资者直接查看。${annotationSummary ? `本周重点样本的 K 线标注也已一并纳入。` : ''}`,
-    month: `这版${periodMeta.label}强调阶段框架，先看主线是否延续，再筛出最值得继续跟踪的行业板块和个股。${annotationSummary ? `月内关键 K 线节点也被带入复盘判断。` : ''}`,
+    day: `这版${periodMeta.label}围绕市场主线、关键数据和风险边界组织内容，便于读者快速理解大V的判断。`,
+    week: `这版${periodMeta.label}把一周内的重要观点整理为主线、验证节点和风险边界，方便读者持续跟踪。`,
+    month: `这版${periodMeta.label}强调阶段框架与验证节点，帮助读者理解观点如何随数据变化。`,
   };
   const manualParagraphs = runtime.paragraphMode === 'manual'
     ? (() => {
@@ -7644,41 +7762,41 @@ function buildKolReviewData(user, period) {
         temp.innerHTML = runtime.latestManualHtml || '';
         const chunks = temp.textContent.split('\n').map(item => item.trim()).filter(Boolean);
         return chunks.length ? chunks.map((text, idx) => ({
-          title: idx === 0 ? '完整复盘正文' : `正文段落 ${idx}`,
+          title: idx === 0 ? '完整洞见正文' : `正文段落 ${idx}`,
           text,
         })) : null;
       })()
     : null;
   const paragraphMap = {
     day: [
-      { title: '市场主线', text: '今天讨论度最高的仍是 AI 算力、半导体和港股互联网。大V先保留真正影响判断的验证节点，不重复堆原始消息。' },
-      { title: '行业板块复盘', text: '行业层面更像结构性活跃，适合先压出短版提纲，再决定哪些板块值得继续投入时间。消费和新能源目前更适合放在观察队列。' },
-      { title: '个股投资复盘', text: `${firstFocus} 看订单和景气兑现，${secondFocus} 看回购和财报验证，${thirdFocus} 更偏稳健配置，不建议把短期波动直接当成结论。${annotationSummary ? `本次补充的 K 线标注要点：${annotationSummary}` : ''}` },
+      { title: '市场主线', text: '内容优先保留真正影响判断的市场主线、数据变化和验证节点，不重复堆砌原始消息。' },
+      { title: '关键观察', text: '行业、公司和宏观信息按事实、判断与不确定性分层表达，避免把短期波动直接当成结论。' },
+      { title: '风险边界', text: '洞见用于研究分享，不构成交易指令；后续观点应随着新数据和验证结果持续修正。' },
     ],
     week: [
-      { title: '阶段行情复盘', text: '本周市场仍由少数高景气方向驱动，强主线集中但广度一般，说明更需要复盘结构而不是只看指数涨跌。' },
-      { title: '行业板块归纳', text: '科技成长仍是最值得保留的主线，消费和新能源还要继续回到景气、订单和利润率三个验证节点。' },
-      { title: '重点样本回顾', text: `${focusSummary} 仍留在重点跟踪池里，但对应结论要继续挂来源和置信度，避免情绪化表达。${annotationSummary ? `本周样本的 K 线标注摘要：${annotationSummary}` : ''}` },
+      { title: '阶段主线', text: '阶段性观点应围绕高频变化和重要催化组织，而不是只罗列指数涨跌。' },
+      { title: '验证节点', text: '行业与公司判断继续回到景气、订单、利润率和估值等可验证条件。' },
+      { title: '后续跟踪', text: '对每个判断保留来源和置信度，并根据新数据及时修正。' },
     ],
     month: [
-      { title: '月度框架', text: '月度复盘更看阶段性框架是否成立，而不是单日波动。先保留主线，再决定哪些样本值得继续深挖。' },
-      { title: '行业与个股拆分', text: '行业板块用于解释大方向，个股复盘用于解释具体投资逻辑，两层内容拆开后更便于普通投资者阅读。' },
-      { title: '下阶段动作', text: `后续继续沿着科技成长、港股互联网和稳健配置三条线做复盘更新，必要时再补充新的重点个股。${annotationSummary ? `月内已沉淀的 K 线标注会继续作为后续判断的起点。` : ''}` },
+      { title: '阶段框架', text: '月度洞见更关注阶段性框架是否成立，而不是单日波动。' },
+      { title: '数据与判断', text: '把事实、解释和不确定性拆开表达，方便读者复核判断依据。' },
+      { title: '后续观察', text: '后续沿着已提出的验证节点持续更新，必要时明确修正原有观点。' },
     ],
   };
   return {
     id: `${user.tenant.id}-${period}`,
     author: user.tenant.advisor,
     avatar: user.tenant.advisor === '财经老王' ? '👑' : '🧭',
-    periodLabel: periodMeta.label,
+    periodLabel: '洞见',
     generatedAt: runtime.kolGeneratedAt,
     title: titleMap[period] || titleMap.day,
     summary: summaryMap[period] || summaryMap.day,
     sourceLabel: sourceCfg.label,
     paragraphLabel: paragraphCfg.label,
-    tags: [periodMeta.label, '行业板块', '个股投资复盘'],
-    watchlist: displayFocusNames,
-    annotations: annotationEntries,
+    tags: ['洞见', sourceCfg.label],
+    watchlist: [],
+    annotations: [],
     paragraphs: manualParagraphs || paragraphMap[period] || paragraphMap.day,
   };
 }
@@ -7749,7 +7867,7 @@ function buildReviewArticleData(review) {
   const bodySections = [];
   if (review.summary) {
     bodySections.push({
-      title: '复盘核心摘要',
+      title: '洞见核心摘要',
       text: review.summary,
     });
   }
@@ -7768,6 +7886,10 @@ function buildReviewArticleData(review) {
   const publishedAt = String(review.publishedAt || review.generatedAt || '').trim() || '日期未提供';
   return {
     id: review.id,
+    accessRequired: !!review.access_required,
+    accessNotice: String(review.access_notice || '订阅后查看完整洞见内容'),
+    accessMode: review.access_mode === 'subscriber' ? 'subscriber' : 'public',
+    accessLabel: String(review.access_label || (review.access_mode === 'subscriber' ? '订阅专享' : '常规笔记')),
     title: review.title,
     kicker: `${review.author} ${review.periodLabel}`,
     meta: `发布日期 ${publishedAt} · 阅读量 ${formatReviewViewCount(viewCount)}`,
@@ -7780,7 +7902,9 @@ function buildReviewArticleData(review) {
     watchlist: review.watchlist || [],
     tags: review.tags || [],
     coverTitle: deriveReviewCoverTitle(review),
-    coverDesc: '这是一份已经面向前台发布的复盘分析报告，普通用户和大V看到的是同一份正文内容。',
+    coverDesc: review.access_mode === 'subscriber'
+      ? '这是一份订阅专享洞见，只有有效订阅用户和内容管理者可以查看完整正文。'
+      : '这是一份常规洞见，所有粉丝和内容管理者都可以查看完整正文。',
     bodySections,
     userInputSection,
     watchlistAnalysisSection,
@@ -7792,24 +7916,15 @@ function buildReviewArticleData(review) {
     llmModels,
     evidenceChainSection,
     quote: evidenceItems.length
-      ? `本次复盘明确引用了 ${evidenceItems.length} 处 K 线标注，这些标注就是复盘智能化总结的依据之一。`
-      : '本次复盘重点承接行业主线、关键个股和已验证资料，不做交易指令，只保留研究判断。',
+      ? `本次洞见明确引用了 ${evidenceItems.length} 处 K 线标注，这些标注就是洞见智能化总结的依据之一。`
+      : '本次洞见重点承接行业主线、关键个股和已验证资料，不做交易指令，只保留研究判断。',
   };
 }
 
 function renderReviewWatchlistAnalysisSection(article) {
-  const section = article && article.watchlistAnalysisSection && typeof article.watchlistAnalysisSection === 'object'
-    ? article.watchlistAnalysisSection
-    : {};
-  const combinedText = String(section.combined_text || '').trim();
-  if (!combinedText) return '';
-  return `
-    <div class="review-article-section">
-      <div class="review-article-section-title">自选股归纳总结</div>
-      ${renderGangtiseMarkdown(combinedText)}
-      <div class="review-gangtise-source">归纳来源：Gangtise AI</div>
-    </div>
-  `;
+  // Historical snapshots may still contain the legacy field, but new readers
+  // must never expose the retired stock-analysis section.
+  return '';
 }
 
 function buildPublishedReviewArticleFromSnapshot(davUser, snapshot, period) {
@@ -7824,11 +7939,11 @@ function buildPublishedReviewArticleFromSnapshot(davUser, snapshot, period) {
     id: matched.id || `${davUser.id || davUser.tenant.slug}-${matched.time || nowTs()}`,
     author: davUser.tenant.advisor,
     avatar: davUser.tenant.advisor === '财经老王' ? '👑' : '🧭',
-    periodLabel: matched.period || getReviewPeriodMeta(period).label,
+    periodLabel: '洞见',
     generatedAt: matched.time || matched.published_at || nowTs(),
     publishedAt: matched.published_at || matched.time || nowTs(),
     viewCount: matched.view_count,
-    title: matched.title || '复盘分析报告',
+    title: matched.title || '洞见分析报告',
     summary: matched.summary || matched.content_text || '',
     tags: matched.tags || [],
     watchlist,
@@ -7843,17 +7958,16 @@ function buildPublishedReviewArticleFromSnapshot(davUser, snapshot, period) {
     watchlistAnalysisSection,
     evidenceChainSection: matched.evidence_chain_section || {},
     paragraphs: matched.user_input_section && matched.user_input_section.display_text ? [] : [
-      { title: '完整复盘正文', text: matched.content_text || matched.summary || '' },
+      { title: '完整洞见正文', text: matched.content_text || matched.summary || '' },
     ],
   });
 }
 
 function buildPublishedReviewArticles(period) {
-  const periodMap = { day: '日复盘', week: '周复盘', month: '月复盘' };
-  const targetPeriod = periodMap[period] || '';
+  const targetPeriod = '洞见';
   return getAllDavUsersForReviews().flatMap(davUser => {
     const snapshots = Array.isArray(davUser.tenant.review_snapshots) ? davUser.tenant.review_snapshots : [];
-    const matched = snapshots.find(item => !targetPeriod || item.period === targetPeriod || item.period_key === period);
+    const matched = snapshots.find(item => item.period === targetPeriod || item.period_key === period || item.period);
     return matched ? [buildPublishedReviewArticleFromSnapshot(davUser, matched, period)] : [];
   });
 }
@@ -7894,7 +8008,7 @@ function getAllDavUsersForReviews() {
 
 function renderReviewArticleCards(articles) {
   if (!articles.length) {
-    return '<div class="card" style="padding:16px;font-size:12px;color:var(--gray-400)">当前还没有可展示的复盘分析报告。</div>';
+    return '<div class="card" style="padding:16px;font-size:12px;color:var(--gray-400)">当前还没有可展示的洞见。</div>';
   }
   const canDelete = isDavCapableUser(getActiveDemoUser());
   return `
@@ -7902,6 +8016,7 @@ function renderReviewArticleCards(articles) {
       ${articles.map(article => `
         <div class="review-article-card" role="button" tabindex="0" onclick="openReviewArticleDetail('${escapeAttr(article.id)}')" onkeydown="if(event.key==='Enter'||event.key===' ')openReviewArticleDetail('${escapeAttr(article.id)}')">
           <div class="review-article-cover">
+            ${renderReviewArticleAccessBadge(article)}
             <div class="review-article-cover-kicker">${escapeHtml(article.kicker)}</div>
             <div class="review-article-cover-title">${escapeHtml(article.title)}</div>
             <div class="review-article-cover-meta">发布日期 ${escapeHtml(article.publishedAt || article.generatedAt || '日期未提供')} · 阅读量 ${escapeHtml(formatReviewViewCount(article.viewCount))}</div>
@@ -7925,15 +8040,158 @@ function renderReviewArticleCards(articles) {
   `;
 }
 
+function renderFeaturedInsightCard() {
+  const host = document.getElementById('feed-featured-insight');
+  if (!host) return;
+  const articles = buildAllPublishedReviewArticles();
+  if (!articles.length) {
+    host.innerHTML = '';
+    return;
+  }
+  const latest = articles.slice().sort((left, right) => {
+    return (Date.parse(right.publishedAt || right.generatedAt || '') || 0)
+      - (Date.parse(left.publishedAt || left.generatedAt || '') || 0);
+  })[0];
+  const cards = [{ article: latest, label: '最新洞见', variant: 'latest' }];
+  host.innerHTML = `
+    <div class="featured-insight-section">
+      <div style="display:flex;justify-content:space-between;align-items:end;gap:10px;margin-bottom:10px">
+        <div><div class="h5-section-title" style="margin-bottom:3px">最新洞见</div><div style="font-size:11px;color:var(--gray-400)">按发布时间展示大V最新发布的洞见。</div></div>
+        <button class="btn-outline" type="button" style="padding:5px 8px;font-size:10px" onclick="switchTab('review'); openReviewArticleList()">全部洞见</button>
+      </div>
+      <div class="featured-insight-grid" aria-label="精选洞见">
+      ${cards.map(({article, label, variant}) => `
+        <div class="featured-insight-card ${variant}" role="button" tabindex="0"
+          onclick="switchTab('review'); openReviewArticleDetail('${escapeAttr(article.id)}')"
+          onkeydown="if(event.key==='Enter'||event.key===' ') { event.preventDefault(); switchTab('review'); openReviewArticleDetail('${escapeAttr(article.id)}'); }">
+          <div class="featured-insight-kicker">${escapeHtml(label)} · ${escapeHtml(article.accessLabel || '常规内容')}</div>
+          <div class="featured-insight-title">${escapeHtml(article.title || '最新研究洞见')}</div>
+          <div class="featured-insight-summary">${escapeHtml(article.summary || '查看大V最新研究判断与观察重点。')}</div>
+          <div class="featured-insight-meta">
+            <span>${escapeHtml(article.publishedAt || '最新发布')} · 阅读 ${escapeHtml(formatReviewViewCount(article.viewCount))}</span>
+            <span class="featured-insight-cta">点击阅读全文 ›</span>
+          </div>
+        </div>
+      `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderFeedMarketEconomy(items, title, chartId) {
+  const rows = (Array.isArray(items) ? items : []).filter((item) => item && item.available !== false);
+  if (!rows.length) return `<div class="feed-market-chart"><div class="feed-market-chart-title">${escapeHtml(title)}</div><div class="feed-market-economy-desc">暂无可用的最新数据</div></div>`;
+  const chartRows = rows.slice().sort((left, right) => {
+    return Number(right.change_pct || 0) - Number(left.change_pct || 0);
+  }).slice(0, 12).map((item) => ({
+    label: item.sector || item.name || item.code || '--',
+    value: Number(item.change_pct || 0),
+  }));
+  const safeChartId = chartId || `feed-market-chart-${Math.random().toString(36).slice(2, 8)}`;
+  window.setTimeout(() => renderFeedMarketEconomyChart(safeChartId, chartRows), 0);
+  return `<div class="feed-market-chart"><div class="feed-market-chart-title">${escapeHtml(title)}</div><div id="${escapeAttr(safeChartId)}" class="feed-market-chart-canvas" role="img" aria-label="${escapeAttr(title)}涨跌幅柱状图"></div><div class="feed-market-economy-desc">正增长红柱 · 负增长绿柱 · 数据来自 AKShare 快照</div></div>`;
+}
+
+function renderFeedMarketEconomyChart(chartId, rows) {
+  const host = document.getElementById(chartId);
+  if (!host || !window.GangtiseEcharts) return;
+  const labels = rows.map((item) => item.label);
+  const values = rows.map((item) => Number.isFinite(item.value) ? item.value : 0);
+  const maxAbs = Math.max(...values.map((value) => Math.abs(value)), 1);
+  const option = {
+    animation: true,
+    animationDuration: 280,
+    grid: { top: 24, right: 8, bottom: 54, left: 38 },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      formatter(params) {
+        const item = Array.isArray(params) ? params.find((entry) => entry.value !== null && entry.value !== '-') : params;
+        const value = item ? Number(item.value || 0) : 0;
+        return `<strong>${escapeHtml(item ? item.axisValue : '--')}</strong><br>${value >= 0 ? '上涨' : '下跌'} ${Math.abs(value).toFixed(2)}%`;
+      },
+    },
+    xAxis: {
+      type: 'category',
+      data: labels,
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: 'rgba(200,169,110,.28)' } },
+      axisLabel: { color: '#A9B4C0', fontSize: 9, interval: 0, rotate: labels.length > 7 ? 32 : 0, margin: 12 },
+    },
+    yAxis: {
+      type: 'value',
+      min: -maxAbs,
+      max: maxAbs,
+      axisLabel: { color: '#A9B4C0', fontSize: 9, formatter: (value) => `${value}%` },
+      axisLine: { show: false },
+      axisTick: { show: false },
+      splitLine: { lineStyle: { color: 'rgba(200,169,110,.10)' } },
+    },
+    series: [
+      {
+        name: '上涨', type: 'bar', barMaxWidth: 24, barGap: '-100%',
+        data: values.map((value) => value >= 0 ? value : null),
+        itemStyle: { color: '#E74C3C', borderRadius: [4, 4, 0, 0] },
+        label: { show: true, position: 'top', color: '#E74C3C', fontSize: 9, formatter: (params) => params.value == null ? '' : `+${Number(params.value).toFixed(2)}%` },
+      },
+      {
+        name: '下跌', type: 'bar', barMaxWidth: 24, barGap: '-100%',
+        data: values.map((value) => value < 0 ? value : null),
+        itemStyle: { color: '#2ECC71', borderRadius: [0, 0, 4, 4] },
+        label: { show: true, position: 'bottom', color: '#2ECC71', fontSize: 9, formatter: (params) => params.value == null ? '' : `${Number(params.value).toFixed(2)}%` },
+      },
+    ],
+  };
+  window.GangtiseEcharts.render(host, option);
+}
+
+function renderFeedMarketEconomyPanel(overviewItems, sectorItems) {
+  const host = document.getElementById('feed-market-economy');
+  if (!host) return;
+  host.innerHTML = `<div class="feed-market-economy"><div class="feed-market-economy-title">行业经济指标</div><div class="feed-market-economy-desc">以零轴为基线展示热门行业与市场一览的日涨跌幅。</div><div class="feed-market-economy-grid">${renderFeedMarketEconomy(sectorItems, '热门行业', 'feed-market-sector-chart')}${renderFeedMarketEconomy(overviewItems, '市场一览', 'feed-market-overview-chart')}</div></div>`;
+}
+
+async function loadFeedMarketEconomy() {
+  const host = document.getElementById('feed-market-economy');
+  if (!host) return;
+  try {
+    const [sectorResponse, overviewResponse] = await Promise.all([fetch('/api/market-sectors', {cache: 'no-store'}), fetch('/api/market-overview', {cache: 'no-store'})]);
+    const sectors = await sectorResponse.json().catch(() => ({}));
+    const overview = await overviewResponse.json().catch(() => ({}));
+    renderFeedMarketEconomyPanel(overview.items || [], sectors.items || []);
+  } catch (error) {
+    host.innerHTML = '';
+  }
+}
+
+function renderCoreIndicatorVisibility() {
+  const visible = isFeatureEnabled('core_indicators');
+  document.querySelectorAll('.core-indicators-surface').forEach((node) => { node.style.display = visible ? '' : 'none'; });
+}
+
+function renderReviewArticleAccessBadge(article) {
+  const isSubscriberOnly = article && article.accessMode === 'subscriber';
+  return isSubscriberOnly
+    ? '<span class="review-article-access-badge subscriber" aria-label="订阅专享内容">🔒 订阅专享</span>'
+    : '<span class="review-article-access-badge public" aria-label="常规内容，所有粉丝可查看">常规内容</span>';
+}
+
+function renderReviewArticleAccessLabel(article) {
+  const isSubscriberOnly = article && article.accessMode === 'subscriber';
+  return isSubscriberOnly
+    ? '<span class="review-access-label subscriber" aria-label="订阅专享内容">🔒 订阅专享</span>'
+    : '<span class="review-access-label public" aria-label="常规内容，所有粉丝可查看">常规内容</span>';
+}
+
 async function deletePublishedReviewArticle(articleId) {
   const reviewId = String(articleId || '').trim();
   const user = getActiveDemoUser();
   const tenantSlug = String((((user || {}).tenant || {}).slug) || ((window.ACTIVE_TENANT || {}).slug) || '').trim().toLowerCase();
   if (!isDavCapableUser(user) || !reviewId || !tenantSlug) {
-    showToast('当前账号无权删除复盘');
+    showToast('当前账号无权删除洞见');
     return;
   }
-  if (!window.confirm('确认删除这篇已发布复盘吗？删除后将不再对前台用户展示，且无法撤销。')) return;
+  if (!window.confirm('确认删除这篇已发布洞见吗？删除后将不再对前台用户展示，且无法撤销。')) return;
   try {
     const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/reviews/${encodeURIComponent(reviewId)}`, {
       method: 'DELETE',
@@ -7947,9 +8205,9 @@ async function deletePublishedReviewArticle(articleId) {
       reviewView = 'list';
     }
     renderReviewExperience();
-    showToast(payload.message || '复盘已删除');
+    showToast(payload.message || '洞见已删除');
   } catch (error) {
-    showToast(error.message || '复盘删除失败');
+    showToast(error.message || '洞见删除失败');
   }
 }
 
@@ -7985,6 +8243,93 @@ function renderReviewArticleList(period) {
   return renderReviewArticleCards(buildPublishedReviewArticles(period));
 }
 
+function getReviewArticleSearchText(article) {
+  const payload = article && typeof article === 'object' ? article : {};
+  return [
+    payload.title,
+    payload.summary,
+    payload.author,
+    payload.periodLabel,
+    payload.publishedAt,
+    payload.userInputSection && payload.userInputSection.display_text,
+    ...(Array.isArray(payload.bodySections) ? payload.bodySections.flatMap((item) => [item && item.title, item && item.text]) : []),
+    ...(Array.isArray(payload.selectedCards) ? payload.selectedCards.flatMap((item) => [item && item.name, item && item.code, item && item.security_code, item && item.industry]) : []),
+    ...(Array.isArray(payload.watchlist) ? payload.watchlist : []),
+    ...(Array.isArray(payload.tags) ? payload.tags : []),
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function filterReviewArticles(articles, keyword) {
+  const query = String(keyword || '').trim().toLowerCase();
+  if (!query) return Array.isArray(articles) ? articles : [];
+  const searchTerms = [query].concat((reviewSearchResolvedAliases || []).map((item) => String(item || '').trim().toLowerCase()).filter(Boolean));
+  return (Array.isArray(articles) ? articles : []).filter((article) => {
+    const searchText = getReviewArticleSearchText(article);
+    return searchTerms.some((term) => searchText.includes(term));
+  });
+}
+
+function renderReviewSearchBox(scope) {
+  const keyword = String(reviewSearchKeyword || '').trim();
+  const placeholder = scope === 'home' ? '搜索洞见标题、摘要、个股或标签' : '在全部洞见中搜索标题、摘要、个股或标签';
+  return `
+    <div class="review-directory-search">
+      <label class="review-directory-search-label" for="review-directory-search-input">查询洞见</label>
+      <div class="review-directory-search-box">
+        <span class="review-directory-search-icon" aria-hidden="true">⌕</span>
+        <input id="review-directory-search-input" class="review-directory-search-input" type="search" value="${escapeAttr(keyword)}" placeholder="${escapeAttr(placeholder)}" autocomplete="off" oninput="handleReviewSearchInput(this.value)">
+        ${keyword ? '<button class="review-directory-search-clear" type="button" aria-label="清空查询" onclick="clearReviewSearch()">×</button>' : ''}
+      </div>
+      <div class="review-directory-search-meta">支持输入洞见主题、个股名称、股票代码或内容标签；不输入则显示全部内容。</div>
+    </div>
+  `;
+}
+
+function handleReviewSearchInput(value) {
+  reviewSearchKeyword = String(value || '').trim();
+  reviewSearchResolvedAliases = [];
+  const requestSeq = ++reviewSearchRequestSeq;
+  if (reviewSearchTimer) window.clearTimeout(reviewSearchTimer);
+  renderReviewExperience();
+  window.requestAnimationFrame(() => {
+    const input = document.getElementById('review-directory-search-input');
+    if (!input) return;
+    input.focus();
+    const end = input.value.length;
+    try { input.setSelectionRange(end, end); } catch (error) {}
+  });
+  if (!reviewSearchKeyword) return;
+  // Reuse the same security lookup used by the watchlist input so pinyin and
+  // code searches can resolve to an article's canonical stock name/code.
+  reviewSearchTimer = window.setTimeout(async () => {
+    try {
+      const response = await fetch(`/api/watchlist/search?q=${encodeURIComponent(reviewSearchKeyword)}&limit=8`);
+      const data = await response.json().catch(() => ({}));
+      if (requestSeq !== reviewSearchRequestSeq || !response.ok || data.ok === false) return;
+      reviewSearchResolvedAliases = (Array.isArray(data.items) ? data.items : []).flatMap((item) => [
+        item && item.name,
+        item && item.code,
+        item && item.security_code,
+      ]).filter(Boolean);
+      if (reviewSearchResolvedAliases.length) renderReviewExperience();
+    } catch (error) {
+      // Local article fields remain searchable when security lookup is unavailable.
+    }
+  }, 160);
+}
+
+function clearReviewSearch() {
+  reviewSearchKeyword = '';
+  reviewSearchResolvedAliases = [];
+  reviewSearchRequestSeq += 1;
+  if (reviewSearchTimer) {
+    window.clearTimeout(reviewSearchTimer);
+    reviewSearchTimer = null;
+  }
+  renderReviewExperience();
+  window.requestAnimationFrame(() => document.getElementById('review-directory-search-input')?.focus());
+}
+
 function getReviewArticleById(articleId) {
   return buildAllPublishedReviewArticles().find(item => String(item.id || '') === String(articleId || '')) || null;
 }
@@ -8015,7 +8360,7 @@ function openReviewArticleList(options = {}) {
 function openReviewArticleDetail(articleId, options = {}) {
   const article = getReviewArticleById(articleId);
   if (!article) {
-    showToast('复盘文章不存在或已下线');
+    showToast('洞见文章不存在或已下线');
     return;
   }
   reviewView = 'detail';
@@ -8036,7 +8381,10 @@ function renderReviewArticleDetailContent(article, options = {}) {
   const metaSuffix = previewMode ? ' · 预览态' : ` · 作者 ${escapeHtml(article.author)}`;
   return `
     <div class="review-article-detail-head">
-      <div class="review-article-detail-kicker">${escapeHtml(article.kicker)}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div class="review-article-detail-kicker">${escapeHtml(article.kicker)}</div>
+        ${renderReviewArticleAccessLabel(article)}
+      </div>
       <div class="review-article-detail-title">${escapeHtml(article.title)}</div>
       <div class="review-article-detail-meta">${escapeHtml(article.meta)}${metaSuffix}</div>
       <div class="review-watchlist-row">
@@ -8051,9 +8399,15 @@ function renderReviewArticleDetailContent(article, options = {}) {
         </div>
         <div style="padding:12px 14px 14px">${buildReviewArticleHeroVisual(article)}</div>
       </div>
+      ${article.accessRequired ? `
+        <div class="review-article-section" style="text-align:center;padding:24px 16px">
+          <div class="review-article-section-title">订阅后查看完整内容</div>
+          <div class="review-article-section-text">${escapeHtml(article.accessNotice || '订阅后查看完整洞见内容')}。请前往个人中心查看订阅产品。</div>
+        </div>
+      ` : `
       ${article.userInputSection && article.userInputSection.display_text ? `
         <div class="review-article-section">
-          <div class="review-article-section-title">用户复盘</div>
+          <div class="review-article-section-title">用户洞见</div>
           <div class="review-article-section-text">${escapeHtml(article.userInputSection.display_text).replace(/\n/g, '<br>')}</div>
         </div>
       ` : ''}
@@ -8100,7 +8454,7 @@ function renderReviewArticleDetailContent(article, options = {}) {
       ` : ''}
       ${false && article.evidenceItems.length ? `
         <div class="review-article-section">
-          <div class="review-article-section-title">复盘依据 · K线标注</div>
+          <div class="review-article-section-title">洞见依据 · K线标注</div>
           <div class="review-article-evidence-list">
             ${article.evidenceItems.map(item => `
               <div class="review-article-evidence-item">
@@ -8111,6 +8465,7 @@ function renderReviewArticleDetailContent(article, options = {}) {
           </div>
         </div>
       ` : ''}
+      `}
     </div>
   `;
 }
@@ -8144,11 +8499,11 @@ function buildReviewPreviewArticle() {
     id: `preview-${user.tenant.id}-${reviewTriggerDraft.period || currentReviewPeriod || 'day'}`,
     author: user.tenant.advisor,
     avatar: user.tenant.advisor === '财经老王' ? '👑' : '🧭',
-    periodLabel: periodMeta.label,
+    periodLabel: '洞见',
     generatedAt: runtime.kolGeneratedAt || '刚刚生成',
-    title: String(reviewTriggerDraft.reviewTitle || '').trim() || `${periodMeta.label}预览：${focusNames[0] || '重点样本'}等重点样本复盘`,
+    title: String(reviewTriggerDraft.reviewTitle || '').trim() || `${focusNames[0] || '重点样本'}等重点样本洞见`,
     summary: structured.review_summary || previewBody.slice(0, 150) || '当前预览还没有生成正文。',
-    tags: [periodMeta.label, sourceCfg.label, paragraphLabel],
+    tags: ['洞见', sourceCfg.label, paragraphLabel],
     watchlist: focusNames,
     annotations: [],
     selectedCards: [],
@@ -8165,38 +8520,55 @@ function buildReviewPreviewArticle() {
     },
     watchlistAnalysisSection: structured.watchlist_analysis_section || {},
     paragraphs: structured.user_input_section ? [] : [
-      { title: '完整复盘正文', text: previewBody || '暂无正文' },
+      { title: '完整洞见正文', text: previewBody || '暂无正文' },
     ],
   });
 }
 
 function renderReviewHome() {
-  const articles = buildAllPublishedReviewArticles().slice(0, 3);
+  const allArticles = buildAllPublishedReviewArticles();
+  const filteredArticles = filterReviewArticles(allArticles, reviewSearchKeyword);
+  const articles = String(reviewSearchKeyword || '').trim() ? filteredArticles : allArticles.slice(0, 3);
   return `
     <div class="review-directory-view">
       <div class="review-directory-view-head">
         <div>
-          <div class="review-directory-view-title">最近复盘</div>
-          <div class="review-directory-view-desc">按最新发布时间展示最近 3 篇复盘文章，点击后进入独立详情页。</div>
+          <div class="review-directory-view-title">最新洞见</div>
+          <div class="review-directory-view-desc">按最新发布时间展示最近 3 篇洞见文章，点击后进入独立详情页。</div>
+          <div class="review-access-legend" aria-label="洞见内容权限说明">
+            <span class="review-access-legend-label">内容范围</span>
+            <span class="review-access-label public">常规内容</span>
+            <span class="review-access-label subscriber">🔒 订阅专享</span>
+          </div>
         </div>
         <button class="btn-outline" type="button" style="padding:7px 11px;font-size:11px" onclick="openReviewArticleList()">查看全部</button>
       </div>
+      ${renderReviewSearchBox('home')}
+      ${String(reviewSearchKeyword || '').trim() ? `<div class="review-directory-search-meta" style="margin:-5px 0 10px">找到 ${articles.length} 篇匹配洞见</div>` : ''}
       ${renderReviewArticleCards(articles)}
     </div>
   `;
 }
 
 function renderReviewListPage() {
+  const articles = filterReviewArticles(buildAllPublishedReviewArticles(), reviewSearchKeyword);
   return `
     <div class="review-directory-view">
       <div class="review-directory-view-head">
         <div>
-          <div class="review-directory-view-title">全部复盘</div>
-          <div class="review-directory-view-desc">查看当前租户可见的全部已发布复盘文章。</div>
+          <div class="review-directory-view-title">全部洞见</div>
+          <div class="review-directory-view-desc">查看当前租户可见的全部已发布洞见文章。</div>
+          <div class="review-access-legend" aria-label="洞见内容权限说明">
+            <span class="review-access-legend-label">内容范围</span>
+            <span class="review-access-label public">常规内容</span>
+            <span class="review-access-label subscriber">🔒 订阅专享</span>
+          </div>
         </div>
-        <button class="btn-outline" type="button" style="padding:7px 11px;font-size:11px" onclick="openReviewHome()">返回复盘专区</button>
+        <button class="btn-outline" type="button" style="padding:7px 11px;font-size:11px" onclick="openReviewHome()">返回洞见</button>
       </div>
-      ${renderReviewArticleCards(buildAllPublishedReviewArticles())}
+      ${renderReviewSearchBox('list')}
+      ${String(reviewSearchKeyword || '').trim() ? `<div class="review-directory-search-meta" style="margin:-5px 0 10px">找到 ${articles.length} 篇匹配洞见</div>` : ''}
+      ${renderReviewArticleCards(articles)}
     </div>
   `;
 }
@@ -8207,8 +8579,11 @@ function renderReviewDetailPage() {
   return `
     <div class="review-detail-page">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px">
-        <button class="btn-outline" type="button" style="padding:7px 11px;font-size:11px" onclick="openReviewArticleList()">返回复盘列表</button>
-        <span class="tag tag-gold">复盘详情</span>
+        <button class="btn-outline" type="button" style="padding:7px 11px;font-size:11px" onclick="openReviewArticleList()">返回洞见列表</button>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+          <span class="tag tag-gold">洞见详情</span>
+          ${renderReviewArticleAccessLabel(article)}
+        </div>
       </div>
       ${renderReviewArticleDetailContent(article)}
     </div>
@@ -8218,116 +8593,7 @@ function renderReviewDetailPage() {
 function renderReviewPeriodRow() {
   const row = document.getElementById('review-period-row');
   if (!row) return;
-  row.innerHTML = Object.entries(REVIEW_PERIOD_CONFIG).map(([value, meta]) => `
-    <button class="review-period-pill ${value === currentReviewPeriod ? 'active' : ''}" onclick="selectReviewPeriod('${value}')">${meta.label}</button>
-  `).join('');
-}
-
-function openReviewWatchlistSelector() {
-  const user = getActiveDemoUser();
-  if (!isDavCapableUser(user)) {
-    switchTab('market');
-    return;
-  }
-  reviewWatchlistSelectionMode = true;
-  reviewTriggerDraft.period = currentReviewPeriod;
-  // The selector belongs to the current review draft; previous review
-  // selections must not be submitted unless the user selects them again.
-  reviewTriggerDraft.selectedWatchlist = [];
-  switchTab('market');
-  renderReviewWatchlistSelectionMode();
-  showToast('请选择本次复盘要纳入的自选股');
-}
-
-function closeReviewWatchlistSelector() {
-  reviewWatchlistSelectionMode = false;
-  renderReviewWatchlistSelectionMode();
-}
-
-function returnFromReviewWatchlistSelector() {
-  const user = getActiveDemoUser();
-  if (!isDavCapableUser(user)) {
-    switchTab('review');
-    return;
-  }
-  reviewWatchlistSelectionMode = false;
-  renderReviewWatchlistSelectionMode();
-  switchTab('review');
-  openReviewTriggerModal('stocks');
-}
-
-function isReviewWatchlistSelectedByCode(stockCode) {
-  const normalized = normalizeStockLookupValue(stockCode);
-  return (reviewTriggerDraft.selectedWatchlist || []).some(name => {
-    const card = document.querySelector(`[data-watchlist-card="true"][data-stock-code="${normalized}"]`);
-    if (!card) return false;
-    return normalizeStockLookupValue(card.dataset.stockName || '') === normalizeStockLookupValue(name);
-  });
-}
-
-function toggleReviewWatchlistByCode(stockCode) {
-  const normalized = normalizeStockLookupValue(stockCode);
-  const card = document.querySelector(`[data-watchlist-card="true"][data-stock-code="${normalized}"]`);
-  if (!card) return;
-  const stockName = String(card.dataset.stockName || '').trim();
-  if (!stockName) return;
-  const selected = new Set(reviewTriggerDraft.selectedWatchlist || []);
-  if (selected.has(stockName)) {
-    selected.delete(stockName);
-  } else {
-    selected.add(stockName);
-  }
-  reviewTriggerDraft.selectedWatchlist = getTenantWatchlistFocus(getActiveDemoUser().tenant.id).filter(name => selected.has(name));
-  renderReviewWatchlistSelectionMode();
-}
-
-function renderReviewWatchlistSelectionMode() {
-  const banner = document.getElementById('market-review-selection-banner');
-  const user = getActiveDemoUser();
-  const selectedCount = (reviewTriggerDraft.selectedWatchlist || []).length;
-  if (banner) {
-    if (reviewWatchlistSelectionMode && isDavCapableUser(user)) {
-      banner.style.display = 'block';
-      banner.innerHTML = `
-        <div class="card" style="padding:14px;margin-bottom:12px;border:1px solid rgba(200,169,110,0.24);background:linear-gradient(135deg,rgba(200,169,110,0.10),rgba(47,116,192,0.08))">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
-            <div>
-              <div style="font-size:14px;font-weight:700;color:var(--white)">本次复盘选股模式</div>
-              <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-top:6px">从你的自选股里挑出本次真正要进入复盘智能总结的样本。选完后返回复盘页继续生成草稿。</div>
-            </div>
-            <span class="tag tag-gold">${selectedCount} 只已选</span>
-          </div>
-          <div class="review-watchlist-row" style="margin-top:10px">
-            ${(reviewTriggerDraft.selectedWatchlist || []).map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('') || '<span style="font-size:11px;color:var(--gray-400)">当前还没选择股票</span>'}
-          </div>
-          <div style="display:flex;gap:8px;margin-top:12px">
-            <button class="btn-gold" style="flex:1;padding:10px;font-size:12px" onclick="returnFromReviewWatchlistSelector()">带着已选股票返回复盘</button>
-            <button class="btn-outline" style="padding:10px 14px;font-size:12px" onclick="closeReviewWatchlistSelector()">退出选股模式</button>
-          </div>
-        </div>
-      `;
-    } else {
-      banner.style.display = 'none';
-      banner.innerHTML = '';
-    }
-  }
-  document.querySelectorAll('[data-review-selection-slot="true"]').forEach(slot => {
-    const card = slot.closest('[data-watchlist-card="true"]');
-    const stockCode = card ? String(card.dataset.stockCode || '') : '';
-    if (!slot || !stockCode) return;
-    if (reviewWatchlistSelectionMode && isDavCapableUser(user)) {
-      slot.style.display = 'block';
-      const selected = isReviewWatchlistSelectedByCode(stockCode);
-      slot.innerHTML = `
-        <button class="${selected ? 'btn-gold' : 'btn-outline'}" style="width:100%;padding:8px 10px;font-size:11px;margin-top:8px" onclick="event.stopPropagation();toggleReviewWatchlistByCode('${stockCode}')">
-          ${selected ? '移出本次复盘' : '纳入本次复盘'}
-        </button>
-      `;
-    } else {
-      slot.style.display = 'none';
-      slot.innerHTML = '';
-    }
-  });
+  row.innerHTML = '';
 }
 
 function renderDavReviewStudio(user) {
@@ -8349,7 +8615,13 @@ function renderReviewExperience() {
   if (!host) return;
   const reviewParams = new URLSearchParams(window.location.search);
   const requestedProductionPage = reviewParams.get('review') === 'compose';
+  const requestedDraftLibrary = reviewParams.get('review') === 'drafts';
   const requestedView = String(reviewParams.get('review_view') || 'home').trim().toLowerCase();
+  if (!requestedProductionPage && requestedDraftLibrary && hasDavCapabilities) {
+    insightDraftLibraryView = true;
+    reviewProductionPage = false;
+  }
+  if (!requestedDraftLibrary && !requestedProductionPage) insightDraftLibraryView = false;
   if (!requestedProductionPage && ['home', 'list', 'detail'].includes(requestedView)) {
     reviewView = requestedView;
     reviewDetailArticleId = String(reviewParams.get('review_id') || '').trim();
@@ -8357,6 +8629,15 @@ function renderReviewExperience() {
   if (hasDavCapabilities && requestedProductionPage) reviewProductionPage = true;
   const productionPage = document.getElementById('review-production-page');
   const overviewCard = document.getElementById('review-overview-card');
+  if (insightDraftLibraryView && hasDavCapabilities) {
+    if (overviewCard) overviewCard.style.display = 'none';
+    if (productionPage) productionPage.style.display = 'none';
+    host.style.display = 'block';
+    host.innerHTML = renderInsightDraftLibraryPage();
+    if (hasDavCapabilities && !reviewActiveJobsLoading && !reviewActiveJobsTimer) loadActiveReviewJobs();
+    if (hasDavCapabilities) loadInsightDrafts();
+    return;
+  }
   if (reviewProductionPage && hasDavCapabilities && productionPage) {
     if (overviewCard) overviewCard.style.display = 'none';
     host.style.display = 'none';
@@ -8368,22 +8649,32 @@ function renderReviewExperience() {
     if (!reviewActiveJobsLoading && !reviewActiveJobsTimer) loadActiveReviewJobs();
     return;
   }
-  if (overviewCard) overviewCard.style.display = reviewView === 'home' ? '' : 'none';
+  if (overviewCard) {
+    const showDavWorkspace = reviewView === 'home' && hasDavCapabilities;
+    overviewCard.style.display = showDavWorkspace ? '' : 'none';
+    overviewCard.setAttribute('aria-hidden', String(!showDavWorkspace));
+  }
   if (productionPage) productionPage.style.display = 'none';
   host.style.display = '';
-  if (badge) badge.textContent = hasDavCapabilities ? '复盘发布中枢' : '复盘分析报告';
-  if (pageHeaderTitle) pageHeaderTitle.textContent = hasDavCapabilities ? '复盘专区' : '复盘分析报告';
+  if (badge) badge.textContent = hasDavCapabilities ? '洞见发布中心' : '洞见';
+  if (pageHeaderTitle) pageHeaderTitle.textContent = '洞见';
   if (pageHeaderDesc) {
     pageHeaderDesc.textContent = hasDavCapabilities
-      ? '大V 视角保留复盘供稿、草稿生成和发布流程，前台展示统一为已发布复盘文章。'
-      : '这里默认展示所有大V已经发布的复盘分析报告。';
+      ? '大V可编辑、生成草稿并发布洞见；前台统一展示已发布内容。'
+      : '这里默认展示所有大V已经发布的洞见。';
   }
   if (triggerBtn) {
-    triggerBtn.textContent = hasDavCapabilities ? '发起新复盘' : '查看复盘报告';
+    triggerBtn.textContent = hasDavCapabilities ? '发布新洞见' : '查看洞见';
     triggerBtn.style.display = hasDavCapabilities ? '' : 'none';
   }
   if (actionRow) actionRow.style.display = reviewView === 'home' && hasDavCapabilities ? 'flex' : 'none';
-  if (reviewView === 'home') renderReviewPeriodRow();
+  if (hasDavCapabilities && reviewView === 'home') renderReviewPeriodRow();
+  const draftsOverviewHost = document.getElementById('review-insight-drafts-overview-host');
+  if (draftsOverviewHost) {
+    draftsOverviewHost.innerHTML = reviewView === 'home' && hasDavCapabilities
+      ? renderReviewDraftLibraryOverview()
+      : '';
+  }
   renderDavReviewStudio(user);
   if (reviewView === 'detail' && !getReviewArticleById(reviewDetailArticleId)) {
     reviewView = 'list';
@@ -8394,8 +8685,9 @@ function renderReviewExperience() {
     ? renderReviewDetailPage()
     : (reviewView === 'list' ? renderReviewListPage() : renderReviewHome());
   if (reviewView === 'detail') recordReviewArticleView(reviewDetailArticleId);
-  renderReviewActiveJobs();
+  if (hasDavCapabilities) renderReviewActiveJobs();
   if (hasDavCapabilities && !reviewActiveJobsLoading && !reviewActiveJobsTimer) loadActiveReviewJobs();
+  if (hasDavCapabilities) loadInsightDrafts();
 }
 
 function selectReviewPeriod(period) {
@@ -8407,6 +8699,10 @@ function selectReviewPeriod(period) {
 
 function openReviewTriggerModal(sourceMode) {
   const user = getActiveDemoUser();
+  // This entry point always starts a new note. Loading an existing draft goes
+  // through editInsightDraft(), which intentionally retains its database ID.
+  activeInsightDraftId = '';
+  insightDraftLibraryView = false;
   reviewTriggerDraft.period = currentReviewPeriod;
   if (sourceMode && getAvailableReviewSourceOptions().some(item => item.value === sourceMode)) {
     reviewTriggerDraft.sourceMode = sourceMode;
@@ -8414,13 +8710,10 @@ function openReviewTriggerModal(sourceMode) {
   if (!getAvailableReviewSourceOptions().some(item => item.value === reviewTriggerDraft.sourceMode)) {
     reviewTriggerDraft.sourceMode = 'manual';
   }
-  // "New review" starts a clean draft. Previous content remains available in
-  // published history, but must never become hidden input to the next run.
+  // A new insight starts clean. Existing drafts are opened from the draft list.
   reviewTriggerDraft.paragraphMode = 'manual';
-  reviewTriggerDraft.selectedWatchlist = isDavCapableUser(user)
-    ? []
-    : getTenantWatchlistFocus(user.tenant.id).slice(0);
-  reviewTriggerDraft.watchlistDecision = '';
+  reviewTriggerDraft.selectedWatchlist = [];
+  reviewTriggerDraft.watchlistDecision = 'not_applicable';
   reviewTriggerDraft.voiceTranscript = '';
   reviewTriggerDraft.manualHtml = '';
   reviewTriggerDraft.fileText = '';
@@ -8429,12 +8722,10 @@ function openReviewTriggerModal(sourceMode) {
   reviewTriggerDraft.urlTitle = '';
   reviewTriggerDraft.urlText = '';
   reviewTriggerDraft.reviewTitle = '';
+  reviewTriggerDraft.accessMode = 'public';
   reviewTriggerDraft.aiPrompt = '';
   reviewTriggerDraft.promptTags = [];
   reviewTriggerDraft.sectorSummaryRule = '';
-  reviewSectorSummaryConstraintGenerating = false;
-  reviewSectorSummaryConstraintJobState = null;
-  reviewSectorSummaryRuleApplied = '';
   reviewTriggerDraft.generatedPreviewText = '';
   reviewTriggerDraft.draftReviewText = '';
   reviewTriggerDraft.flowStage = 'intake';
@@ -8506,6 +8797,12 @@ let reviewDraftJobState = null;
 let reviewDraftCancellationRequested = false;
 const reviewDraftCancelResolvers = {};
 let reviewPublishSubmitting = false;
+let activeInsightDraftId = '';
+let insightDrafts = [];
+let insightDraftsLoading = false;
+let insightDraftsLoaded = false;
+let insightDraftSearchKeyword = '';
+let insightDraftAccessFilter = 'all';
 let knowledgeVoiceRecorder = null;
 let knowledgeVoiceChunks = [];
 let knowledgeVoiceUploading = false;
@@ -8594,13 +8891,13 @@ function getReviewDraftGenerationErrorMessage(error) {
     return '当前还没有配置可用的大模型。请先到 Admin 的系统专区 · 大模型专区配置一个通用模型。';
   }
   if (raw.includes('review_prepare_preview_failed')) {
-    return '复盘归纳预览生成失败，请稍后重试。';
+    return '洞见归纳预览生成失败，请稍后重试。';
   }
   if (raw.includes('review_sector_summary_llm_not_configured')) {
-    return '当前没有配置可用的大模型，无法按规则重新生成自选股归纳。';
+    return '当前没有配置可用的大模型，无法生成洞见草稿。';
   }
   if (raw.includes('review_sector_summary_empty_llm_response')) {
-    return '大模型未返回有效的自选股归纳，请重试。';
+    return '大模型未返回有效的洞见草稿，请重试。';
   }
   return raw;
 }
@@ -8625,7 +8922,7 @@ function renderReviewDraftProgressPanel() {
         <div class="review-progress-head">
           <div>
             <div class="review-progress-title">正在确认发布</div>
-            <div class="review-progress-subtitle">系统正在同步前台复盘内容、消息触达和后台入库任务，请稍候。</div>
+            <div class="review-progress-subtitle">系统正在同步前台洞见内容、消息触达和后台入库任务，请稍候。</div>
           </div>
           <div class="review-progress-percent">发布中</div>
         </div>
@@ -8646,14 +8943,14 @@ function renderReviewDraftProgressPanel() {
   const failed = String(job.status || '').toLowerCase() === 'failed';
   const cancelled = String(job.status || '').toLowerCase() === 'cancelled';
   const progressMarkup = failed
-    ? `<div class="review-progress-error">${escapeHtml(job.error_message || job.summary || 'Gangtise 多股分析失败')}<br><span>已保留当前任务的阶段日志和部分返回内容，请检查后重试或继续使用已生成内容。</span></div>`
+    ? `<div class="review-progress-error">${escapeHtml(job.error_message || job.summary || '洞见任务失败')}<br><span>已保留当前任务的阶段日志和部分返回内容，请检查后重试或继续使用已生成内容。</span></div>`
     : `<div class="review-progress-track"><div class="review-progress-fill" style="width:${Math.min(100, percent)}%"></div></div>`;
   const statusMarkup = cancelled
     ? `<div class="review-progress-error" style="color:var(--gray-400)">已停止生成。原始输入已保留，本次未生成内容。</div>`
     : progressMarkup;
   const title = cancelled
-    ? (previewMode ? '自选股分析已停止' : '复盘草稿生成已停止')
-    : (failed ? (previewMode ? '自选股分析未完成' : '复盘草稿生成失败') : (previewMode ? '大模型正在生成自选股归纳预览' : '大模型正在生成复盘草稿'));
+    ? (previewMode ? '洞见预览已停止' : '洞见草稿生成已停止')
+    : (failed ? (previewMode ? '洞见预览未完成' : '洞见草稿生成失败') : (previewMode ? '正在生成洞见预览' : '大模型正在生成洞见草稿'));
   const percentLabel = cancelled ? '已停止' : (failed ? '失败' : `${escapeHtml(String(percent))}%`);
   return `
     <div class="review-progress-panel">
@@ -8868,7 +9165,7 @@ function ensureReviewEditors() {
   }
   reviewEditors.manual = createSharedQuill(
     'review-manual-editor',
-    '在这里直接完善完整复盘正文，发布后会按文章形式展示给前台用户。',
+    '在这里直接完善完整洞见正文，发布后会按文章形式展示给前台用户。',
     reviewTriggerDraft.manualHtml || '',
     () => syncReviewDraftFromEditors(),
   );
@@ -8960,6 +9257,7 @@ async function publishReviewContent(text, transcriptionEngine, transcriptModel, 
       tenant_slug: ((user || {}).tenant || {}).slug || '',
       period: reviewTriggerDraft.period || currentReviewPeriod || 'day',
       review_title: String(reviewTriggerDraft.reviewTitle || '').trim(),
+      access_mode: reviewTriggerDraft.accessMode === 'subscriber' ? 'subscriber' : 'public',
       entry_point: 'h5_publish',
       speaker_name: (user && (user.advisor_name || user.username)) || '',
       transcription_engine: transcriptionEngine || 'manual',
@@ -9034,14 +9332,24 @@ function clearKnowledgeVoiceDraft() {
 function renderReviewInputPanel() {
   const titleField = `
     <div style="margin-bottom:12px">
-      <label class="knowledge-modal-label" style="display:block;margin-bottom:6px">复盘主题</label>
-    <input id="review-title-input" class="knowledge-modal-input" placeholder="输入本次复盘主题，发布后会直接作为文章标题" value="${escapeAttr(reviewTriggerDraft.reviewTitle || '')}" oninput="reviewTriggerDraft.reviewTitle = this.value" />
+      <label class="knowledge-modal-label" style="display:block;margin-bottom:6px">洞见主题</label>
+    <input id="review-title-input" class="knowledge-modal-input" placeholder="输入本次洞见主题，发布后会直接作为文章标题" value="${escapeAttr(reviewTriggerDraft.reviewTitle || '')}" oninput="reviewTriggerDraft.reviewTitle = this.value" />
     </div>
   `;
+  const accessModeField = isDavCapableUser(getActiveDemoUser()) ? `
+    <div style="margin-bottom:12px">
+      <label class="knowledge-modal-label" style="display:block;margin-bottom:6px">发布范围</label>
+      <div id="review-access-mode" class="review-access-scope-tags" role="radiogroup" aria-label="选择洞见发布范围" data-access-mode="${reviewTriggerDraft.accessMode === 'subscriber' ? 'subscriber' : 'public'}">
+        <button type="button" class="review-access-scope-tag ${reviewTriggerDraft.accessMode === 'public' ? 'active' : ''}" role="radio" aria-checked="${reviewTriggerDraft.accessMode === 'public'}" aria-label="常规笔记，所有粉丝可查看" onclick="setReviewAccessMode('public')"><span class="review-access-scope-tag-title">常规笔记</span><span class="review-access-scope-tag-desc">所有粉丝可查看完整正文</span></button>
+        <button type="button" class="review-access-scope-tag ${reviewTriggerDraft.accessMode === 'subscriber' ? 'active' : ''}" role="radio" aria-checked="${reviewTriggerDraft.accessMode === 'subscriber'}" aria-label="订阅专享，仅有效订阅用户查看正文" onclick="setReviewAccessMode('subscriber')"><span class="review-access-scope-tag-title">订阅专享</span><span class="review-access-scope-tag-desc">仅有效订阅用户查看正文</span></button>
+      </div>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-top:6px">访问范围按每篇洞见单独生效，不会影响其他已发布笔记。</div>
+    </div>
+  ` : '';
   if (reviewTriggerDraft.sourceMode === 'voice') {
     return `
       <div class="review-intake-panel">
-        ${titleField}
+        ${titleField}${accessModeField}
         <div class="review-intake-toolbar">
           <div class="knowledge-record-status">
             <span class="knowledge-live-dot" style="opacity:${reviewVoiceRecording ? '1' : '0.35'}"></span>
@@ -9061,7 +9369,7 @@ function renderReviewInputPanel() {
         </div>
         <div class="review-intake-result">
           <div class="review-intake-result-title">转写文案</div>
-          <div class="review-intake-result-text">${escapeHtml(reviewTriggerDraft.voiceTranscript || '录音结束后，这里会立即展示转写后的复盘文案；支持多次录制并按顺序追加。')}</div>
+          <div class="review-intake-result-text">${escapeHtml(reviewTriggerDraft.voiceTranscript || '录音结束后，这里会立即展示转写后的洞见文案；支持多次录制并按顺序追加。')}</div>
         </div>
       </div>
     `;
@@ -9069,14 +9377,14 @@ function renderReviewInputPanel() {
   if (reviewTriggerDraft.sourceMode === 'file') {
     return `
       <div class="review-intake-panel">
-        ${titleField}
+        ${titleField}${accessModeField}
         <div class="review-intake-toolbar">
           <div class="knowledge-record-status">${reviewFileUploading ? '正在解析文件...' : '支持 PDF、Word、Excel，解析后可继续编辑'}</div>
           <button class="review-input-button" ${reviewFileUploading ? 'disabled' : ''} onclick="captureReviewFileInput()">${reviewFileUploading ? '解析中...' : '点击上传文件'}</button>
         </div>
         <div class="review-intake-result">
           <div class="review-intake-result-title">${reviewTriggerDraft.fileName ? `已解析：${escapeHtml(reviewTriggerDraft.fileName)}` : '解析文案'}</div>
-          <div class="review-intake-result-text">${escapeHtml(reviewTriggerDraft.fileText || '完成文件上传后，这里会展示抽取后的复盘文案。')}</div>
+          <div class="review-intake-result-text">${escapeHtml(reviewTriggerDraft.fileText || '完成文件上传后，这里会展示抽取后的洞见文案。')}</div>
         </div>
       </div>
     `;
@@ -9084,10 +9392,10 @@ function renderReviewInputPanel() {
   if (reviewTriggerDraft.sourceMode === 'url') {
     return `
       <div class="review-intake-panel">
-        ${titleField}
+        ${titleField}${accessModeField}
         <div class="review-intake-toolbar" style="align-items:flex-end">
           <div style="flex:1;display:grid;gap:10px">
-            <input id="review-url-input" class="knowledge-modal-input" placeholder="输入网页 URL 作为本次复盘补充素材" value="${escapeAttr(reviewTriggerDraft.urlValue || '')}" />
+            <input id="review-url-input" class="knowledge-modal-input" placeholder="输入网页 URL 作为本次洞见补充素材" value="${escapeAttr(reviewTriggerDraft.urlValue || '')}" />
             <input id="review-url-title" class="knowledge-modal-input" placeholder="可选：自定义这份 URL 材料标题" value="${escapeAttr(reviewTriggerDraft.urlTitle || '')}" />
           </div>
           <button class="review-input-button" type="button" onclick="previewReviewUrl()">抓取网页</button>
@@ -9097,16 +9405,16 @@ function renderReviewInputPanel() {
         </div>
         <div class="review-intake-result">
           <div class="review-intake-result-title">网页提炼结果</div>
-          <div class="review-intake-result-text">${escapeHtml(reviewTriggerDraft.urlText || '抓取网页后，这里会展示正文摘要，可作为复盘素材。')}</div>
+          <div class="review-intake-result-text">${escapeHtml(reviewTriggerDraft.urlText || '抓取网页后，这里会展示正文摘要，可作为洞见素材。')}</div>
         </div>
       </div>
     `;
   }
   return `
     <div class="review-intake-panel">
-      ${titleField}
+      ${titleField}${accessModeField}
       <div class="knowledge-rich-shell">
-        <div class="knowledge-editor-loading">支持加粗、列表、引用、链接、贴图，适合作为大V复盘正文编辑。</div>
+        <div class="knowledge-editor-loading">支持加粗、列表、引用、链接、贴图，适合作为大V洞见正文编辑。</div>
         <div id="review-manual-editor" class="review-rich-editor"></div>
         <div class="knowledge-rich-help">这里和 web 后台使用同一套富文本编辑器 Quill。</div>
       </div>
@@ -9143,60 +9451,15 @@ function renderReviewDraftReviewPanel() {
     <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">Draft 审核与详细修改</label>
       <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">这是智能优化后的草稿。你可以继续详细修改，确认无误后再进入最终预览。</div>
-      <textarea id="review-draft-review-input" class="knowledge-modal-textarea" style="min-height:220px" placeholder="在这里继续修改优化后的复盘草稿。">${escapeHtml(reviewTriggerDraft.draftReviewText || reviewTriggerDraft.generatedPreviewText || getReviewDraftContentText())}</textarea>
+      <textarea id="review-draft-review-input" class="knowledge-modal-textarea" style="min-height:220px" placeholder="在这里继续修改优化后的洞见草稿。">${escapeHtml(reviewTriggerDraft.draftReviewText || reviewTriggerDraft.generatedPreviewText || getReviewDraftContentText())}</textarea>
     </div>
   `;
 }
 
 function renderReviewStructuredReviewPanel() {
-  if (reviewTriggerDraft.flowStage !== 'structured_review') return '';
-  const structured = normalizeReviewStructuredPreview(reviewStructuredPreview || {});
-  const watchlistSection = structured.watchlist_analysis_section || {};
-  const combinedText = String(watchlistSection.combined_text || '').trim();
-  const items = Array.isArray(watchlistSection.items) ? watchlistSection.items : [];
-  const hasWatchlistAnalysis = !!buildReviewWatchlistAnalysisText(watchlistSection);
-  return `
-    <div class="knowledge-modal-block">
-      <label class="knowledge-modal-label">${hasWatchlistAnalysis ? '自选股归纳审核和详细修改' : '归纳审核和详细修改'}</label>
-      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">${hasWatchlistAnalysis ? '这里会把用户复盘和自选股归纳总结一起展示。摘要不再在这一步生成，会在最终发布时自动补齐。' : '当前没有可审核的自选股归纳内容。摘要不再在这一步生成，会在最终发布时自动补齐。'}</div>
-      <div style="display:grid;gap:12px">
-        <div>
-          <div style="font-size:12px;font-weight:700;color:var(--white);margin-bottom:6px">用户复盘</div>
-          <textarea id="review-structured-user-input" class="knowledge-modal-textarea" style="min-height:220px" placeholder="在这里继续修改用户复盘内容。">${escapeHtml(((structured.user_input_section || {}).display_text) || '')}</textarea>
-        </div>
-        ${combinedText ? `
-          <div>
-            <div style="font-size:12px;font-weight:700;color:var(--white);margin-bottom:6px">Gangtise 多股分析（已返回部分）</div>
-            <textarea id="review-structured-combined-text" class="knowledge-modal-textarea" style="min-height:180px" placeholder="这里是 Gangtise 已返回的分析内容，可继续修改。">${escapeHtml(combinedText)}</textarea>
-          </div>
-        ` : ''}
-        ${hasWatchlistAnalysis ? `
-          <div>
-            <div style="font-size:12px;font-weight:700;color:var(--white);margin-bottom:6px">自选股归纳总结</div>
-            <textarea id="review-structured-sector-summary" maxlength="1000" class="knowledge-modal-textarea" style="min-height:110px" placeholder="这里是板块代表性归纳，可继续修改。">${escapeHtml(watchlistSection.sector_summary || '')}</textarea>
-            <div style="font-size:12px;font-weight:700;color:var(--white);margin:12px 0 6px">自选股总结规则约束</div>
-            <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:6px">输入本次总结的写作要求，点击应用后由大模型重新整理上面的自选股归纳。只改写总结，不新增事实，最多1000字。</div>
-            <textarea id="review-structured-sector-summary-rule" class="knowledge-modal-textarea" style="min-height:92px" placeholder="例如：按板块现状、代表个股、主要风险三段输出，语言简洁，突出差异，不要写买卖建议。">${escapeHtml(watchlistSection.sector_summary_rule || reviewTriggerDraft.sectorSummaryRule || '')}</textarea>
-            <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">
-              <button class="btn-outline" type="button" onclick="applyReviewSectorSummaryRule()" ${reviewSectorSummaryConstraintGenerating ? 'disabled' : ''}>${reviewSectorSummaryConstraintGenerating ? '大模型处理中...' : '应用规则并重新生成'}</button>
-              ${reviewSectorSummaryConstraintJobState && reviewSectorSummaryConstraintJobState.status === 'failed' ? `<span style="font-size:11px;color:#B42318">${escapeHtml(reviewSectorSummaryConstraintJobState.error_message || reviewSectorSummaryConstraintJobState.summary || '规则应用失败')}</span>` : ''}
-            </div>
-          </div>
-        ` : ''}
-        ${items.length ? `
-          <div style="display:grid;gap:10px">
-            ${items.map((item, index) => `
-              <div style="padding:12px;border:1px solid rgba(200,169,110,0.12);border-radius:12px;background:rgba(255,255,255,0.02)">
-                <div style="font-size:12px;font-weight:700;color:var(--white)">${escapeHtml(item.stock_name || '股票')} · ${escapeHtml(item.board_role || item.sector || '归纳样本')}</div>
-                <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-top:4px">${escapeHtml(item.sector || '自选股')}${Array.isArray(item.evidence) && item.evidence.length ? ` · 依据：${escapeHtml(item.evidence.join(' / '))}` : ''}</div>
-                <textarea id="review-structured-analysis-${index}" data-review-watchlist-analysis-index="${index}" class="knowledge-modal-textarea" style="min-height:120px;margin-top:8px" placeholder="在这里继续修改这只股票的归纳内容。">${escapeHtml(item.analysis_text || '')}</textarea>
-              </div>
-            `).join('')}
-          </div>
-        ` : (hasWatchlistAnalysis ? '<div style="font-size:11px;color:var(--gray-400);line-height:1.7">当前还没有可编辑的自选股归纳内容。</div>' : '')}
-      </div>
-    </div>
-  `;
+  // The former stock-analysis review stage is intentionally unreachable for
+  // new Insight notes. Historical snapshots are rendered by the reader only.
+  return '';
 }
 
 function isReviewInputStage() {
@@ -9204,120 +9467,11 @@ function isReviewInputStage() {
 }
 
 function isReviewDraftProcessingStage() {
-  return reviewTriggerDraft.flowStage === 'draft_generating' || reviewTriggerDraft.flowStage === 'preview_generating';
+  return reviewTriggerDraft.flowStage === 'draft_generating';
 }
 
 function renderReviewWatchlistSelectionPanel() {
-  if (reviewTriggerDraft.flowStage !== 'watchlist_select') return '';
-  const user = getActiveDemoUser();
-  const personalItems = getCurrentUserWatchlistItems();
-  const personalNames = new Set(personalItems.map((item) => item.name));
-  reviewTriggerDraft.selectedWatchlist = (reviewTriggerDraft.selectedWatchlist || []).filter((name) => personalNames.has(name));
-  const selected = new Set(reviewTriggerDraft.selectedWatchlist);
-  const addedItems = Array.isArray(reviewWatchlistAddedItems) ? reviewWatchlistAddedItems : [];
-  const displayItems = [
-    ...personalItems,
-    ...addedItems.filter((item) => personalNames.has(String(item && item.name || '').trim())),
-  ].filter((item, index, items) => item.name && items.findIndex((candidate) => candidate.name === item.name) === index);
-  const candidates = Array.isArray(reviewWatchlistSearchItems) ? reviewWatchlistSearchItems : [];
-  return `
-    <div class="knowledge-modal-block">
-      <label class="knowledge-modal-label">第二阶段：选择需要 AI 分析的自选股</label>
-      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:10px">这里只显示当前用户在自选股板块中已保存的股票。选择仅决定本次复盘分析范围，不会新增或修改自选股。</div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <input id="review-watchlist-search-input" class="knowledge-modal-input" style="flex:1" value="${escapeAttr(reviewWatchlistSearchQuery)}" placeholder="输入股票代码或名称，例如 600519 / 贵州茅台" oninput="searchReviewWatchlistCandidates(this.value)" />
-      </div>
-      ${candidates.length ? `
-        <div style="margin-top:8px;border:1px solid rgba(47,116,192,0.12);border-radius:10px;overflow:hidden;background:#fff">
-          ${candidates.map((item, index) => `
-            <button type="button" style="display:flex;width:100%;justify-content:space-between;align-items:center;padding:9px 10px;border:0;border-bottom:${index === candidates.length - 1 ? '0' : '1px solid rgba(47,116,192,0.08)'};background:#fff;text-align:left;cursor:pointer" onclick="addReviewWatchlistCandidate(${index})">
-              <span><strong style="color:var(--text-main)">${escapeHtml(item.name || item.code || '')}</strong><span style="display:block;color:var(--gray-400);font-size:11px;margin-top:2px">${escapeHtml(item.code || '')} · ${escapeHtml(item.market || '')}</span></span>
-              <span style="font-size:11px;color:#2F74C0">${selected.has(item.name || item.code) ? '已选择' : '选择'}</span>
-            </button>
-          `).join('')}
-        </div>
-      ` : ''}
-      <div style="font-size:12px;font-weight:700;color:var(--text-main);margin-top:14px">本次复盘已选（${Array.from(selected).length}）</div>
-      <div style="display:grid;gap:7px;margin-top:8px;max-height:180px;overflow-y:auto;padding-right:4px">
-        ${displayItems.filter((item) => selected.has(item.name)).map((item) => `
-          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid rgba(47,116,192,0.10);border-radius:9px;background:#F8FBFF;color:var(--text-main);font-size:12px;cursor:pointer">
-            <input type="checkbox" ${selected.has(item.name) ? 'checked' : ''} onchange="toggleReviewWatchlistOption('${escapeAttr(item.name)}', this.checked)" />
-            <span>${escapeHtml(item.name)}${item.code ? `<small style="display:block;color:var(--gray-400);margin-top:2px">${escapeHtml(item.code)}</small>` : ''}</span>
-          </label>
-        `).join('') || '<div style="font-size:11px;color:var(--gray-400)">尚未选择股票，请搜索或从下方个人自选股中选择。</div>'}
-      </div>
-      <div style="font-size:12px;font-weight:700;color:var(--text-main);margin-top:14px">当前个人自选股</div>
-      <div style="display:grid;gap:7px;margin-top:8px;max-height:260px;overflow-y:auto;padding-right:4px">
-        ${displayItems.filter((item) => !selected.has(item.name)).map((item) => `
-          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid rgba(47,116,192,0.10);border-radius:9px;background:#F8FBFF;color:var(--text-main);font-size:12px;cursor:pointer">
-            <input type="checkbox" onchange="toggleReviewWatchlistOption('${escapeAttr(item.name)}', this.checked)" />
-            <span>${escapeHtml(item.name)}${item.code ? `<small style="display:block;color:var(--gray-400);margin-top:2px">${escapeHtml(item.code)}</small>` : ''}</span>
-          </label>
-        `).join('') || `<div style="font-size:11px;color:var(--gray-400)">${userWatchlistLoaded ? '当前没有个人自选股，请先在自选股板块添加。' : '正在读取当前个人自选股...'}</div>`}
-      </div>
-      <div style="margin-top:12px;padding:10px;border-radius:9px;background:rgba(200,169,110,0.10);color:var(--text-main);font-size:12px">待分析：${Array.from(selected).map((name) => escapeHtml(name)).join('、') || '尚未选择'}</div>
-    </div>
-  `;
-}
-
-function toggleReviewWatchlistOption(name, checked) {
-  const normalized = String(name || '').trim();
-  if (!normalized) return;
-  const next = new Set(reviewTriggerDraft.selectedWatchlist || []);
-  if (checked) next.add(normalized); else next.delete(normalized);
-  reviewTriggerDraft.selectedWatchlist = Array.from(next);
-  renderReviewTriggerModal(getActiveDemoUser());
-}
-
-function addReviewWatchlistCandidate(index) {
-  const item = reviewWatchlistSearchItems[index];
-  if (!item) return;
-  const name = String(item.name || item.code || '').trim();
-  if (!name) return;
-  const actualItem = getCurrentUserWatchlistItems().find((candidate) => (
-    normalizeStockLookupValue(candidate.code) === normalizeStockLookupValue(item.code)
-    || normalizeStockLookupValue(candidate.name) === normalizeStockLookupValue(item.name)
-  ));
-  if (!actualItem) {
-    showToast('只能选择当前个人自选股，请先在自选股板块添加');
-    return;
-  }
-  const actualName = actualItem.name;
-  const next = new Set(reviewTriggerDraft.selectedWatchlist || []);
-  next.add(actualName);
-  reviewTriggerDraft.selectedWatchlist = Array.from(next);
-  renderReviewTriggerModal(getActiveDemoUser());
-}
-
-function searchReviewWatchlistCandidates(value) {
-  if (reviewWatchlistSearchTimer) clearTimeout(reviewWatchlistSearchTimer);
-  const query = String(value || '').trim();
-  reviewWatchlistSearchQuery = query;
-  reviewWatchlistSearchItems = [];
-  if (!query) {
-    renderReviewTriggerModal(getActiveDemoUser());
-    return;
-  }
-  const requestSeq = ++reviewWatchlistSearchRequestSeq;
-  reviewWatchlistSearchTimer = setTimeout(async () => {
-    try {
-      if (requestSeq !== reviewWatchlistSearchRequestSeq) return;
-      const normalizedQuery = normalizeStockLookupValue(query);
-      reviewWatchlistSearchItems = getCurrentUserWatchlistItems().filter((item) => (
-        normalizeStockLookupValue(item.name).includes(normalizedQuery)
-        || normalizeStockLookupValue(item.code).includes(normalizedQuery)
-      ));
-      const exact = reviewWatchlistSearchItems.find((item) => {
-        const itemName = String(item && item.name || '').trim().toLowerCase();
-        const itemCode = String(item && item.code || '').trim().toLowerCase();
-        return itemName === query.toLowerCase() || itemCode === query.toLowerCase();
-      });
-      if (exact) addReviewWatchlistCandidate(reviewWatchlistSearchItems.indexOf(exact));
-      renderReviewTriggerModal(getActiveDemoUser());
-    } catch (error) {
-      if (requestSeq === reviewWatchlistSearchRequestSeq) renderReviewTriggerModal(getActiveDemoUser());
-    }
-  }, 180);
+  return '';
 }
 
 function renderReviewPreviewPanel() {
@@ -9331,23 +9485,174 @@ function renderReviewPreviewPanel() {
 }
 
 function renderReviewStageOnePreviewPanel() {
-  if (reviewTriggerDraft.flowStage !== 'stage1_preview') return '';
+  return '';
+}
+
+function renderInsightDraftLibrary() {
+  if (!isDavCapableUser(getActiveDemoUser())) return '';
+  if (insightDraftsLoading) {
+    return '<div class="knowledge-modal-block"><div style="font-size:12px;color:var(--gray-400)">正在加载洞见草稿...</div></div>';
+  }
+  if (!insightDrafts.length) return '';
   return `
-    <div class="review-preview-panel" style="margin-top:12px">
-      <div class="review-preview-head">
-        <div>
-          <div class="review-preview-title">第一阶段预览</div>
-          <div class="review-progress-subtitle">人工输入和 AI 优化内容已整理完成，请决定是否追加自选股 AI 总结分析。</div>
-        </div>
-        <span class="review-draft-status">待决定</span>
-      </div>
-      <div class="review-preview-copy" style="white-space:pre-wrap">${escapeHtml(String(reviewTriggerDraft.draftReviewText || reviewTriggerDraft.generatedPreviewText || getReviewDraftContentText()).trim())}</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
-        <button class="btn-gold" type="button" onclick="chooseReviewWatchlistAnalysis('yes')">需要自选股 AI 分析</button>
-        <button class="btn-outline" type="button" onclick="chooseReviewWatchlistAnalysis('no')">暂不需要，直接发布</button>
+    <div class="knowledge-modal-block">
+      <label class="knowledge-modal-label">已保存草稿</label>
+      <div style="display:grid;gap:8px">
+        ${insightDrafts.map((draft) => `
+          <div style="padding:10px;border:1px solid rgba(47,116,192,0.12);border-radius:10px;background:#F8FBFF">
+            <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+              <div style="min-width:0">
+                <div style="font-size:12px;font-weight:700;color:var(--text-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(draft.title || '未命名洞见草稿')}</div>
+                <div style="font-size:10px;color:var(--gray-400);margin-top:4px">更新于 ${escapeHtml(draft.updated_at || '--')}</div>
+              </div>
+              <div style="display:flex;gap:6px;flex-shrink:0">
+                <button class="btn-outline" type="button" style="padding:5px 8px;font-size:11px" onclick="editInsightDraft('${escapeAttr(draft.id)}')">编辑</button>
+                <button class="btn-outline" type="button" style="padding:5px 8px;font-size:11px;color:#B42318;border-color:rgba(180,35,24,0.24)" onclick="deleteInsightDraft('${escapeAttr(draft.id)}')">删除</button>
+              </div>
+            </div>
+          </div>
+        `).join('')}
       </div>
     </div>
   `;
+}
+
+function renderReviewDraftLibraryOverview() {
+  const user = getActiveDemoUser();
+  if (!isDavCapableUser(user)) return '';
+  if (insightDraftsLoading && !insightDraftsLoaded) {
+    return '<div class="knowledge-modal-block" style="margin-top:12px;margin-bottom:0;padding:12px;background:#F8FBFF;border:1px solid rgba(47,116,192,0.12);border-radius:12px"><div style="font-size:12px;font-weight:800;color:var(--text-main)">洞见草稿箱</div><div style="font-size:11px;color:var(--gray-400);margin-top:5px">正在加载草稿...</div></div>';
+  }
+  // The overview is a compact preview. Full draft management belongs on the
+  // database-backed draft library page.
+  const drafts = Array.isArray(insightDrafts) ? insightDrafts : [];
+  const previewDrafts = drafts
+    .slice()
+    .sort((left, right) => String(right.updated_at || right.created_at || '').localeCompare(String(left.updated_at || left.created_at || '')))
+    .slice(0, 3);
+  return `
+    <div class="knowledge-modal-block" style="margin-top:12px;margin-bottom:0;padding:12px;background:#F8FBFF;border:1px solid rgba(47,116,192,0.12);border-radius:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div>
+          <div style="font-size:12px;font-weight:800;color:var(--text-main)">洞见草稿箱</div>
+          <div style="font-size:11px;color:var(--gray-400);margin-top:4px">小金智能体加入的内容和手动保存的洞见都会在这里。</div>
+        </div>
+        <span class="review-access-label public">${previewDrafts.length} 篇</span>
+      </div>
+      ${previewDrafts.length ? `<div style="display:grid;gap:7px;margin-top:10px">${previewDrafts.map((draft) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 10px;background:#FFFFFF;border:1px solid rgba(47,116,192,0.10);border-radius:9px">
+          <div style="min-width:0"><div style="font-size:12px;color:var(--text-main);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(draft.title || '未命名洞见草稿')}</div><div style="font-size:10px;color:var(--gray-400);margin-top:3px">更新于 ${escapeHtml(draft.updated_at || '--')}</div></div>
+        </div>
+      `).join('')}</div>` : '<div style="font-size:11px;color:var(--gray-400);margin-top:10px">当前还没有草稿。可以在小金智能体回答下方点击“加入洞见笔记草稿”，或在编辑器中保存。</div>'}
+      <button class="btn-outline" type="button" style="width:100%;margin-top:10px;padding:7px 10px;font-size:11px" onclick="openInsightDraftLibrary()">${drafts.length ? '查看全部草稿' : '打开草稿箱'}</button>
+    </div>
+  `;
+}
+
+function renderInsightDraftLibraryPage() {
+  const allDrafts = Array.isArray(insightDrafts) ? insightDrafts : [];
+  const query = String(insightDraftSearchKeyword || '').trim().toLowerCase();
+  const accessFilter = String(insightDraftAccessFilter || 'all');
+  const drafts = allDrafts.filter((draft) => {
+    const searchText = [
+      draft.title,
+      draft.content_text,
+      draft.source_mode,
+      draft.access_mode === 'subscriber' ? '订阅专享' : '免费内容',
+    ].filter(Boolean).join(' ').toLowerCase();
+    const matchesQuery = !query || searchText.includes(query);
+    const matchesAccess = accessFilter === 'all'
+      || (accessFilter === 'subscriber' && draft.access_mode === 'subscriber')
+      || (accessFilter === 'public' && draft.access_mode !== 'subscriber');
+    return matchesQuery && matchesAccess;
+  });
+  const formatDraftDate = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '更新时间未记录';
+    const date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? raw : date.toLocaleString('zh-CN', {hour12: false});
+  };
+  return `
+    <div class="review-draft-library-page">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px">
+        <div><div class="modal-title" style="margin-bottom:5px">洞见草稿箱</div><div style="font-size:12px;color:var(--gray-400);line-height:1.7">集中管理尚未发布的洞见。选择一篇进入编辑，保存后仍会保留在这里。</div></div>
+        <span class="review-access-label public">${drafts.length} 篇</span>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:14px"><button class="btn-outline" type="button" style="padding:8px 11px;font-size:11px" onclick="closeInsightDraftLibrary()">返回洞见</button><button class="btn-gold" type="button" style="padding:8px 11px;font-size:11px" onclick="openReviewTriggerModal()">新建洞见</button></div>
+      <div class="review-directory-search" style="margin-bottom:12px">
+        <label class="review-directory-search-label" for="insight-draft-search-input">查询草稿</label>
+        <div class="review-directory-search-box">
+          <span class="review-directory-search-icon" aria-hidden="true">⌕</span>
+          <input id="insight-draft-search-input" class="review-directory-search-input" type="search" value="${escapeAttr(insightDraftSearchKeyword)}" placeholder="搜索草稿标题或正文" autocomplete="off" oninput="handleInsightDraftSearchInput(this.value)">
+          ${insightDraftSearchKeyword ? '<button class="review-directory-search-clear" type="button" aria-label="清空查询" onclick="clearInsightDraftSearch()">×</button>' : ''}
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px">
+          <div style="font-size:11px;color:var(--gray-400)">共 ${allDrafts.length} 篇，当前显示 ${drafts.length} 篇</div>
+          <select class="review-directory-search-input" style="width:auto;min-width:104px;padding:7px 25px 7px 9px" aria-label="按内容类型筛选" onchange="handleInsightDraftAccessFilter(this.value)">
+            <option value="all" ${accessFilter === 'all' ? 'selected' : ''}>全部内容</option>
+            <option value="public" ${accessFilter === 'public' ? 'selected' : ''}>免费内容</option>
+            <option value="subscriber" ${accessFilter === 'subscriber' ? 'selected' : ''}>订阅专享</option>
+          </select>
+        </div>
+      </div>
+      ${drafts.length ? `<div style="display:grid;gap:10px">${drafts.map((draft) => {
+        const content = String(draft.content_text || '').trim();
+        const summary = content.replace(/\s+/g, ' ').slice(0, 110) || '尚未填写正文';
+        return `<article class="review-draft-library-card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px"><div style="min-width:0"><div class="review-draft-library-card-title">${escapeHtml(draft.title || '未命名洞见')}</div><div class="review-draft-library-card-meta">${escapeHtml(formatDraftDate(draft.updated_at))} · ${draft.access_mode === 'subscriber' ? '订阅专享' : '公开内容'}</div></div><span class="review-draft-library-status">草稿</span></div><div class="review-draft-library-card-summary">${escapeHtml(summary)}${content.length > 110 ? '...' : ''}</div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button class="btn-outline" type="button" style="padding:6px 10px;font-size:11px;color:#B42318;border-color:rgba(180,35,24,.24)" onclick="deleteInsightDraft('${escapeAttr(draft.id)}')">删除</button><button class="btn-gold" type="button" style="padding:6px 10px;font-size:11px" onclick="editInsightDraft('${escapeAttr(draft.id)}')">编辑</button></div></article>`;
+      }).join('')}</div>` : `<div class="review-draft-library-empty"><div class="review-draft-library-empty-icon">${allDrafts.length ? '⌕' : '+'}</div><div style="font-size:14px;font-weight:700;color:var(--text-main);margin-top:8px">${allDrafts.length ? '没有匹配的草稿' : '还没有洞见草稿'}</div><div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-top:5px">${allDrafts.length ? '请调整搜索关键词或内容类型筛选。' : '可以新建一篇洞见，或在小金智能体回答下方加入洞见笔记草稿。'}</div></div>`}
+    </div>
+  `;
+}
+
+function handleInsightDraftSearchInput(value) {
+  insightDraftSearchKeyword = String(value || '').trim();
+  renderReviewExperience();
+  window.requestAnimationFrame(() => {
+    const input = document.getElementById('insight-draft-search-input');
+    if (!input) return;
+    input.focus();
+    const end = input.value.length;
+    try { input.setSelectionRange(end, end); } catch (error) {}
+  });
+}
+
+function clearInsightDraftSearch() {
+  insightDraftSearchKeyword = '';
+  renderReviewExperience();
+  window.requestAnimationFrame(() => document.getElementById('insight-draft-search-input')?.focus());
+}
+
+function handleInsightDraftAccessFilter(value) {
+  insightDraftAccessFilter = ['all', 'public', 'subscriber'].includes(String(value || '')) ? String(value) : 'all';
+  renderReviewExperience();
+}
+
+function openInsightDraftLibrary() {
+  const user = getActiveDemoUser();
+  if (!isDavCapableUser(user)) return;
+  reviewProductionPage = false;
+  insightDraftLibraryView = true;
+  // The inbox is a database-backed view. Always refresh it so drafts created
+  // from Hermes or another browser are visible immediately.
+  insightDrafts = [];
+  insightDraftsLoaded = false;
+  insightDraftsLoading = false;
+  const url = new URL(window.location.href);
+  url.searchParams.set('review', 'drafts');
+  url.searchParams.delete('review_view');
+  url.searchParams.delete('review_id');
+  window.history.pushState({}, '', url);
+  switchTab('review');
+  renderReviewExperience();
+  loadInsightDrafts();
+}
+
+function closeInsightDraftLibrary() {
+  insightDraftLibraryView = false;
+  const url = new URL(window.location.href);
+  url.searchParams.delete('review');
+  window.history.pushState({}, '', url);
+  renderReviewExperience();
 }
 
 function getModalSheetByContentId(contentId) {
@@ -9377,47 +9682,39 @@ function renderReviewTriggerModal(user) {
   const host = document.getElementById(reviewProductionPage ? 'review-production-page-content' : 'review-trigger-modal-content');
   if (!host) return;
   const scrollSnapshot = captureModalSheetScroll('review-trigger-modal-content');
-  const focusNames = getTenantWatchlistFocus(user.tenant.id);
   const hasDavCapabilities = isDavCapableUser(user);
-  const reviewStage = String(reviewTriggerDraft.flowStage || 'intake').trim().toLowerCase();
+  let reviewStage = String(reviewTriggerDraft.flowStage || 'intake').trim().toLowerCase();
+  if (reviewStage === 'watchlist_select' || reviewStage === 'structured_review') {
+    // Migrate stale browser state into the current Insight draft flow.
+    reviewTriggerDraft.selectedWatchlist = [];
+    reviewTriggerDraft.watchlistDecision = 'none';
+    reviewTriggerDraft.flowStage = reviewTriggerDraft.previewReady ? 'preview' : 'intake';
+    reviewStage = reviewTriggerDraft.flowStage;
+  }
   const isReviewSetupStage = reviewStage === 'intake' || reviewStage === 'optimize_rule';
   const isReviewFinalPreview = reviewStage === 'preview' || reviewTriggerDraft.previewReady === true;
   const stageLabelMap = {
-    intake: '1/4 输入稿件',
-    optimize_rule: '1/4 选择优化规则',
-    draft_generating: '2/4 Draft 生成中',
-    draft_review: '2/4 Draft 审核',
-    preview_generating: '2/2 自选股 AI 分析生成中',
-    structured_review: '2/2 自选股 AI 分析审核',
-    watchlist_select: '2/2 选择自选股',
-    stage1_preview: '第一阶段预览',
-    preview: '第一阶段预览',
+    intake: '编辑洞见',
+    optimize_rule: '设置智能优化',
+    draft_generating: '正在生成草稿',
+    draft_review: '审核草稿',
+    preview: '发布预览',
   };
   const stageLabel = stageLabelMap[reviewTriggerDraft.flowStage] || stageLabelMap.intake;
-  const modalTitle = isReviewFinalPreview
-    ? '发布前确认'
-    : (reviewStage === 'stage1_preview' ? '第一阶段预览' : (reviewStage === 'watchlist_select' ? '选择自选股' : (hasDavCapabilities ? '发起大V复盘' : '发起智能复盘')));
+  const modalTitle = isReviewFinalPreview ? '发布前确认' : (hasDavCapabilities ? '发布大V洞见' : '生成智能洞见');
   host.innerHTML = `
     <div class="modal-title" style="margin-bottom:${isReviewFinalPreview ? '4px' : '10px'}">${modalTitle}</div>
     ${isReviewFinalPreview ? `
-      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:12px">${escapeHtml(getReviewPeriodMeta(reviewTriggerDraft.period).label)} · 正文和自选股分析已合并，确认后发布。</div>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:12px">请确认正文内容，发布后将向粉丝展示。</div>
     ` : (isReviewSetupStage ? `
       <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">
         ${hasDavCapabilities
-          ? '先提交手写或文件内容，再决定是否进行 AI 优化和自选股分析。'
-          : '生成复盘前必须先选择复盘周期。'}
+          ? '先提交手写或文件内容，再决定是否进行智能优化。'
+          : '提交内容后，系统会生成一篇可编辑的洞见草稿。'}
       </div>
       ${hasDavCapabilities ? `<div class="review-flow-row" style="margin-bottom:12px"><span class="review-flow-step">${escapeHtml(stageLabel)}</span><span class="review-flow-step">智能优化可选</span><span class="review-flow-step">人工确认发布</span></div>` : ''}
-      <div class="knowledge-modal-block">
-        <label class="knowledge-modal-label">复盘周期</label>
-        <div class="review-period-row">
-          ${Object.entries(REVIEW_PERIOD_CONFIG).map(([value, meta]) => `
-            <button class="review-period-pill ${value === reviewTriggerDraft.period ? 'active' : ''}" onclick="setReviewTriggerPeriod('${value}')">${meta.label}</button>
-          `).join('')}
-        </div>
-      </div>
     ` : `
-      <div class="review-stage-compact-meta">${escapeHtml(getReviewPeriodMeta(reviewTriggerDraft.period).label)} · ${escapeHtml(stageLabel)}</div>
+      <div class="review-stage-compact-meta">${escapeHtml(stageLabel)}</div>
     `)}
     ${hasDavCapabilities ? `
       ${isReviewSetupStage ? `
@@ -9437,32 +9734,22 @@ function renderReviewTriggerModal(user) {
           ${renderReviewPromptPanel()}
         ` : ''}
       ` : ''}
-      ${hasDavCapabilities ? renderReviewWatchlistSelectionPanel() : ''}
       ${isReviewDraftProcessingStage() ? `
         <div class="knowledge-modal-block">
-          <label class="knowledge-modal-label">${reviewTriggerDraft.flowStage === 'preview_generating' ? '正在生成自选股归纳总结' : '正在生成 Draft'}</label>
-          <div style="font-size:11px;color:var(--gray-400);line-height:1.7">${reviewTriggerDraft.flowStage === 'preview_generating' ? '系统正在根据已确认的用户复盘和已选自选股，生成可审核的板块归纳与逐股总结。摘要不会在这一步生成。' : '原始输入已经提交给大模型处理。当前先进入 Draft 审核流程，待草稿生成完成后，会自动切换到可审核、可详细修改的页面。'}</div>
+          <label class="knowledge-modal-label">正在生成洞见草稿</label>
+          <div style="font-size:11px;color:var(--gray-400);line-height:1.7">原始输入已经提交给大模型处理。草稿生成完成后，可继续编辑、保存或发布。</div>
         </div>
       ` : ''}
       ${renderReviewDraftReviewPanel()}
-      ${renderReviewStructuredReviewPanel()}
-    ` : ''}
-    ${isReviewSetupStage && reviewTriggerDraft.flowStage !== 'watchlist_select' ? `
-      <div class="knowledge-modal-block">
-        <label class="knowledge-modal-label">${hasDavCapabilities ? '本次复盘覆盖' : '本次智能复盘输入'}</label>
-        <div class="review-watchlist-row">
-          ${(hasDavCapabilities ? reviewTriggerDraft.selectedWatchlist : focusNames).map(name => `<span class="review-watchlist-chip">${escapeHtml(name)}</span>`).join('')}
-        </div>
-      </div>
+      ${renderInsightDraftLibrary()}
     ` : ''}
     ${hasDavCapabilities ? renderReviewDraftProgressPanel() : ''}
-    ${hasDavCapabilities ? renderReviewStageOnePreviewPanel() : ''}
     ${hasDavCapabilities ? renderReviewPreviewPanel() : ''}
     <div class="modal-actions">
       <button class="btn-outline" onclick="closeReviewTriggerModal()">取消</button>
       ${hasDavCapabilities
         ? renderReviewFlowActions()
-        : '<button class="btn-gold" onclick="submitReviewTrigger()">生成智能复盘</button>'}
+        : '<button class="btn-gold" onclick="submitReviewTrigger()">生成智能洞见</button>'}
     </div>
   `;
   ensureReviewEditors();
@@ -9471,14 +9758,14 @@ function renderReviewTriggerModal(user) {
 
 function reviewActiveJobLabel(job) {
   const labels = {
-    review_generate_draft: '复盘 Draft 生成',
-    review_prepare_preview: '自选股综合分析',
-    review_sector_summary_constraint: '自选股总结规则约束',
+    review_generate_draft: '洞见草稿生成',
+    review_prepare_preview: '洞见预览',
+    review_sector_summary_constraint: '洞见规则约束',
     review_voice_transcribe: '语音转写',
-    review_polish_input: '复盘输入润色',
-    review_compose_draft: '复盘完整成稿',
+    review_polish_input: '洞见输入润色',
+    review_compose_draft: '洞见完整成稿',
   };
-  return labels[String((job || {}).job_type || '').trim()] || '复盘任务';
+  return labels[String((job || {}).job_type || '').trim()] || '洞见任务';
 }
 
 function reviewActiveJobStatusLabel(status) {
@@ -9552,7 +9839,7 @@ function resumeActiveReviewDraftJob(job) {
       reviewActiveJobs = reviewActiveJobs.filter((item) => item.job_code !== job.job_code);
       renderReviewTriggerModal(getActiveDemoUser());
       renderReviewActiveJobs();
-      showToast(nextJob.error_message || nextJob.summary || '复盘草稿生成失败');
+      showToast(nextJob.error_message || nextJob.summary || '洞见草稿生成失败');
     },
     onCancelled(nextJob) {
       reviewDraftGenerating = false;
@@ -9613,24 +9900,12 @@ function renderReviewFlowActions() {
     return '<button class="btn-outline" onclick="backToReviewIntake()">返回输入</button><button class="btn-gold" onclick="submitReviewSmartOptimize()">开始优化</button>';
   }
   if (reviewTriggerDraft.flowStage === 'draft_review') {
-    return '<button class="btn-outline" onclick="backToReviewIntake()">回退修改</button><button class="btn-gold" onclick="confirmReviewDraftToPreview()">确认第一阶段预览</button>';
-  }
-  if (reviewTriggerDraft.flowStage === 'stage1_preview') {
-    return '<button class="btn-outline" onclick="backToReviewDraftEdit()">返回修改</button>';
-  }
-  if (reviewTriggerDraft.flowStage === 'watchlist_select') {
-    return '<button class="btn-outline" onclick="backToReviewDraftEdit()">返回第一阶段</button><button class="btn-gold" onclick="confirmReviewWatchlistSelection()">确认列表并开始分析</button>';
-  }
-  if (reviewTriggerDraft.flowStage === 'preview_failed') {
-    return '<button class="btn-outline" onclick="backToReviewDraftEdit()">回退修改</button><button class="btn-gold" onclick="prepareReviewStructuredPreview()">重新生成自选股分析</button>';
-  }
-  if (reviewTriggerDraft.flowStage === 'structured_review') {
-    return '<button class="btn-outline" onclick="backToReviewDraftEdit()">回退修改</button><button class="btn-gold" onclick="confirmStructuredReviewToPreview()">进入预览</button>';
+    return '<button class="btn-outline" onclick="backToReviewIntake()">回退修改</button><button class="btn-outline" onclick="saveReviewDraft()">保存草稿</button><button class="btn-gold" onclick="confirmReviewDraftToPreview()">进入发布预览</button>';
   }
   if (reviewTriggerDraft.flowStage === 'preview' || reviewTriggerDraft.previewReady) {
-    return '<button class="btn-outline" onclick="backToReviewDraftEdit()">回退修改</button><button class="btn-gold" onclick="publishReviewDraft()">确认发布</button>';
+    return '<button class="btn-outline" onclick="backToReviewDraftEdit()">回退修改</button><button class="btn-outline" onclick="saveReviewDraft()">保存草稿</button><button class="btn-gold" onclick="publishReviewDraft()">确认发布</button>';
   }
-  return `<button class="btn-outline" onclick="prepareReviewDirectPreview()">直接预览</button><button class="btn-gold" onclick="openReviewOptimizeRuleStep()">优化成稿</button>`;
+  return `<button class="btn-outline" onclick="saveReviewDraft()">保存草稿</button><button class="btn-outline" onclick="prepareReviewDirectPreview()">直接预览</button><button class="btn-gold" onclick="openReviewOptimizeRuleStep()">智能优化</button>`;
 }
 
 async function cancelReviewAsyncJob() {
@@ -9707,28 +9982,8 @@ function setReviewTriggerSourceMode(mode) {
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
-function toggleReviewTriggerWatchlist(name) {
-  const fullList = getTenantWatchlistFocus(getActiveDemoUser().tenant.id);
-  if (!fullList.includes(name)) return;
-  const current = new Set(reviewTriggerDraft.selectedWatchlist || []);
-  if (current.has(name)) {
-    current.delete(name);
-  } else {
-    current.add(name);
-  }
-  reviewTriggerDraft.selectedWatchlist = fullList.filter(item => current.has(item));
-  reviewTriggerDraft.previewReady = false;
-  reviewStructuredPreview = null;
-  renderReviewTriggerModal(getActiveDemoUser());
-}
-
 function confirmReviewWatchlistSelection() {
-  syncReviewDraftFromModal();
-  if (!(reviewTriggerDraft.selectedWatchlist || []).length) {
-    showToast('请至少选择一只股票');
-    return;
-  }
-  prepareReviewStructuredPreview();
+  showToast('洞见发布不再包含独立的股票分析阶段，请直接审核洞见草稿。');
 }
 
 function setReviewOptimizeRuleMode(mode) {
@@ -9746,9 +10001,23 @@ function toggleReviewVoiceLlmEnhancement(checked) {
   reviewTriggerDraft.useVoiceLlmEnhancement = !!checked;
 }
 
+function setReviewAccessMode(accessMode) {
+  const normalized = accessMode === 'subscriber' ? 'subscriber' : 'public';
+  reviewTriggerDraft.accessMode = normalized;
+  const group = document.getElementById('review-access-mode');
+  if (!group) return;
+  group.dataset.accessMode = normalized;
+  group.querySelectorAll('[role="radio"]').forEach((item) => {
+    const selected = item.getAttribute('onclick').includes(`'${normalized}'`);
+    item.classList.toggle('active', selected);
+    item.setAttribute('aria-checked', selected ? 'true' : 'false');
+  });
+}
+
 function syncReviewDraftFromModal() {
   const reviewHostSelector = reviewProductionPage ? '#review-production-page-content' : '#review-trigger-modal-content';
   const titleInput = document.querySelector(`${reviewHostSelector} #review-title-input`) || document.getElementById('review-title-input');
+  const accessModeInput = document.querySelector(`${reviewHostSelector} #review-access-mode`) || document.getElementById('review-access-mode');
   const urlInput = document.getElementById('review-url-input');
   const urlTitleInput = document.getElementById('review-url-title');
   const promptInput = document.getElementById('review-ai-prompt-input');
@@ -9759,6 +10028,7 @@ function syncReviewDraftFromModal() {
   const structuredSectorSummaryRule = document.getElementById('review-structured-sector-summary-rule');
   syncReviewDraftFromEditors();
   if (titleInput) reviewTriggerDraft.reviewTitle = String(titleInput.value || '').trim();
+  if (accessModeInput) reviewTriggerDraft.accessMode = accessModeInput.dataset.accessMode === 'subscriber' ? 'subscriber' : 'public';
   if (urlInput) reviewTriggerDraft.urlValue = String(urlInput.value || '').trim();
   if (urlTitleInput) reviewTriggerDraft.urlTitle = String(urlTitleInput.value || '').trim();
   if (promptInput) reviewTriggerDraft.aiPrompt = promptInput.value;
@@ -9794,92 +10064,13 @@ function syncReviewDraftFromModal() {
 }
 
 async function applyReviewSectorSummaryRule() {
-  syncReviewDraftFromModal();
-  const user = getActiveDemoUser();
-  const section = reviewStructuredPreview && reviewStructuredPreview.watchlist_analysis_section;
-  const ruleText = String(reviewTriggerDraft.sectorSummaryRule || '').trim();
-  const sectorSummary = String((section || {}).sector_summary || '').trim();
-  if (!sectorSummary) {
-    showToast('当前没有可约束的自选股归纳总结');
-    return;
-  }
-  if (!ruleText) {
-    showToast('请先输入自选股总结规则');
-    return;
-  }
-  if (reviewSectorSummaryConstraintGenerating) return;
-  reviewSectorSummaryConstraintGenerating = true;
-  reviewSectorSummaryConstraintJobState = {
-    status: 'running',
-    progress_stage: 'queued',
-    progress_percent: 8,
-    summary: '已提交总结规则，正在调用大模型',
-    result: { live_log: [] },
-  };
-  renderReviewTriggerModal(user);
-  try {
-    const response = await fetch('/api/review/refine-sector-summary', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        tenant_slug: ((user || {}).tenant || {}).slug || '',
-        period: reviewTriggerDraft.period || currentReviewPeriod || 'day',
-        sector_summary: sectorSummary,
-        sector_profiles: (section || {}).sector_profiles || [],
-        watchlist_items: reviewTriggerDraft.selectedWatchlist || [],
-        rule_text: ruleText,
-        speaker_name: (user && (user.advisor_name || user.username)) || '',
-        entry_point: 'h5_review_sector_summary_constraint',
-      }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || !payload.ok || !payload.job_code) throw new Error(payload.error || 'review_sector_summary_constraint_failed');
-    await new Promise((resolve, reject) => {
-      startAsyncJobPolling(payload.job_code, {
-        onProgress(job) {
-          reviewSectorSummaryConstraintJobState = job || reviewSectorSummaryConstraintJobState;
-          renderReviewTriggerModal(user);
-        },
-        onSuccess(job) {
-          const result = job.result || {};
-          reviewStructuredPreview = normalizeReviewStructuredPreview(reviewStructuredPreview || {});
-          reviewStructuredPreview.watchlist_analysis_section = reviewStructuredPreview.watchlist_analysis_section || {};
-          reviewStructuredPreview.watchlist_analysis_section.sector_summary = String(result.sector_summary || '').trim();
-          reviewStructuredPreview.watchlist_analysis_section.sector_summary_rule = ruleText;
-          reviewStructuredPreview.llm_models = Array.isArray(reviewStructuredPreview.llm_models) ? reviewStructuredPreview.llm_models : [];
-          if (result.llm_model && !reviewStructuredPreview.llm_models.some((item) => item && item.stage === 'sector_summary_constraint')) {
-            reviewStructuredPreview.llm_models.push(result.llm_model);
-          }
-          reviewTriggerDraft.sectorSummaryRule = ruleText;
-          reviewSectorSummaryRuleApplied = ruleText;
-          reviewSectorSummaryConstraintJobState = job;
-          reviewSectorSummaryConstraintGenerating = false;
-          resolve();
-        },
-        onFailed(job) {
-          reviewSectorSummaryConstraintJobState = job || reviewSectorSummaryConstraintJobState;
-          reviewSectorSummaryConstraintGenerating = false;
-          reject(new Error(job.error_message || job.summary || 'review_sector_summary_constraint_failed'));
-        },
-        onError(error) {
-          reviewSectorSummaryConstraintGenerating = false;
-          reject(error);
-        },
-      });
-    });
-    renderReviewTriggerModal(user);
-    showToast('自选股归纳总结已按规则重新生成');
-  } catch (error) {
-    reviewSectorSummaryConstraintGenerating = false;
-    renderReviewTriggerModal(user);
-    showToast(getReviewDraftGenerationErrorMessage(error));
-  }
+  showToast('洞见发布不再支持独立的股票归纳约束，请直接修改洞见草稿。');
 }
 
 function validateReviewIntakeReady() {
   syncReviewDraftFromModal();
   if (!String(reviewTriggerDraft.reviewTitle || '').trim()) {
-    showToast('请先填写复盘主题');
+    showToast('请先填写洞见主题');
     return false;
   }
   if (!getReviewDraftContentText()) {
@@ -9900,6 +10091,10 @@ function openReviewOptimizeRuleStep() {
 }
 
 async function prepareReviewStructuredPreview() {
+  // Keep old bookmarks and in-flight client state from re-entering the
+  // removed stock-analysis endpoint.
+  prepareReviewDirectPreview();
+  return;
   const user = getActiveDemoUser();
   const runtime = ensureTenantReviewRuntime(user.tenant.id);
   if (!validateReviewIntakeReady()) return;
@@ -9914,7 +10109,7 @@ async function prepareReviewStructuredPreview() {
     status: 'running',
     progress_stage: 'queued',
     progress_percent: 8,
-    summary: '已提交预览任务，正在准备自选股归纳',
+    summary: '已提交预览任务，正在准备洞见预览',
     result: { live_log: [] },
   };
   reviewTriggerDraft.flowStage = 'preview_generating';
@@ -9952,7 +10147,7 @@ async function prepareReviewStructuredPreview() {
               sector_profiles: failedResult.sector_profiles || [],
             },
           });
-          reject(new Error(job.error_message || job.summary || '复盘预览生成失败'));
+          reject(new Error(job.error_message || job.summary || '洞见预览生成失败'));
         },
         onError(error) {
           reject(error);
@@ -9967,8 +10162,8 @@ async function prepareReviewStructuredPreview() {
         status: 'failed',
         progress_stage: 'failed',
         progress_percent: 100,
-        summary: '自选股综合分析未完成',
-        error_message: String((error && error.message) || '复盘预览生成失败'),
+        summary: '洞见预览未完成',
+        error_message: String((error && error.message) || '洞见预览生成失败'),
         result: (reviewPreviewJobState && reviewPreviewJobState.result) || { live_log: [] },
       };
     }
@@ -9984,7 +10179,7 @@ async function prepareReviewStructuredPreview() {
     }
   }
   renderReviewTriggerModal(user);
-  showToast('自选股归纳总结已生成，请审核后预览');
+  showToast('洞见预览已生成，请审核后发布');
 }
 
 function prepareReviewDirectPreview() {
@@ -9992,13 +10187,13 @@ function prepareReviewDirectPreview() {
   reviewTriggerDraft.skipAiProcessing = true;
   reviewTriggerDraft.generatedPreviewText = '';
   reviewTriggerDraft.draftReviewText = getReviewDraftContentText();
-  reviewTriggerDraft.watchlistDecision = '';
+  reviewTriggerDraft.watchlistDecision = 'none';
   reviewTriggerDraft.selectedWatchlist = [];
   reviewStructuredPreview = null;
-  reviewTriggerDraft.previewReady = false;
-  reviewTriggerDraft.flowStage = 'stage1_preview';
+  reviewTriggerDraft.previewReady = true;
+  reviewTriggerDraft.flowStage = 'preview';
   renderReviewTriggerModal(getActiveDemoUser());
-  showToast('已进入第一阶段预览，请决定是否需要自选股 AI 分析');
+  showToast('已进入发布预览');
 }
 
 function backToReviewIntake() {
@@ -10012,16 +10207,8 @@ function backToReviewIntake() {
 function backToReviewDraftEdit() {
   syncReviewDraftFromModal();
   reviewTriggerDraft.previewReady = false;
-  if (reviewTriggerDraft.flowStage === 'preview' && reviewStructuredPreview) {
-    reviewTriggerDraft.flowStage = 'structured_review';
-  } else if (reviewTriggerDraft.flowStage === 'watchlist_select') {
-    reviewTriggerDraft.flowStage = 'stage1_preview';
-  } else if (reviewTriggerDraft.flowStage === 'stage1_preview') {
-    reviewTriggerDraft.flowStage = 'draft_review';
-  } else {
-    reviewStructuredPreview = null;
-    reviewTriggerDraft.flowStage = reviewTriggerDraft.generatedPreviewText ? 'draft_review' : 'intake';
-  }
+  reviewStructuredPreview = null;
+  reviewTriggerDraft.flowStage = reviewTriggerDraft.generatedPreviewText ? 'draft_review' : 'intake';
   renderReviewTriggerModal(getActiveDemoUser());
 }
 
@@ -10033,41 +10220,20 @@ function confirmReviewDraftToPreview() {
   }
   reviewTriggerDraft.paragraphMode = 'ai';
   reviewTriggerDraft.skipAiProcessing = false;
-  reviewTriggerDraft.watchlistDecision = '';
+  reviewTriggerDraft.watchlistDecision = 'none';
   reviewTriggerDraft.selectedWatchlist = [];
   reviewStructuredPreview = null;
-  reviewTriggerDraft.previewReady = false;
-  reviewTriggerDraft.flowStage = 'stage1_preview';
+  reviewTriggerDraft.previewReady = true;
+  reviewTriggerDraft.flowStage = 'preview';
   renderReviewTriggerModal(getActiveDemoUser());
-  showToast('第一阶段已完成，请决定是否需要自选股 AI 分析');
-}
-
-function chooseReviewWatchlistAnalysis(decision) {
-  syncReviewDraftFromModal();
-  if (decision === 'no') {
-    reviewTriggerDraft.watchlistDecision = 'no';
-    reviewTriggerDraft.selectedWatchlist = [];
-    reviewTriggerDraft.previewReady = true;
-    reviewTriggerDraft.flowStage = 'preview';
-    renderReviewTriggerModal(getActiveDemoUser());
-    showToast('已跳过自选股分析，可直接发布');
-    return;
-  }
-  reviewTriggerDraft.watchlistDecision = 'yes';
-  reviewTriggerDraft.selectedWatchlist = [];
-  reviewTriggerDraft.previewReady = false;
-  reviewTriggerDraft.flowStage = 'watchlist_select';
-  reviewWatchlistSearchItems = [];
-  reviewWatchlistSearchQuery = '';
-  reviewWatchlistAddedItems = [];
-  renderReviewTriggerModal(getActiveDemoUser());
+  showToast('洞见草稿已确认，可预览或发布');
 }
 
 function confirmStructuredReviewToPreview() {
   syncReviewDraftFromModal();
   reviewStructuredPreview = normalizeReviewStructuredPreview(reviewStructuredPreview || {});
   if (!String((((reviewStructuredPreview.user_input_section || {}).display_text) || '')).trim()) {
-    showToast('请先确认或填写用户复盘');
+    showToast('请先确认或填写用户洞见');
     return;
   }
   reviewTriggerDraft.previewReady = true;
@@ -10080,7 +10246,6 @@ function persistReviewDraftRuntime(runtime) {
   runtime.kolGeneratedAt = '刚刚生成';
   runtime.kolSourceMode = reviewTriggerDraft.sourceMode;
   runtime.paragraphMode = reviewTriggerDraft.paragraphMode;
-  runtime.kolSelectedWatchlist = reviewTriggerDraft.selectedWatchlist.slice(0);
   runtime.lastReviewPeriod = currentReviewPeriod;
   runtime.latestVoiceTranscript = reviewTriggerDraft.voiceTranscript;
   runtime.latestManualHtml = reviewTriggerDraft.manualHtml;
@@ -10092,6 +10257,200 @@ function persistReviewDraftRuntime(runtime) {
   runtime.latestGeneratedPreviewText = reviewTriggerDraft.generatedPreviewText || '';
   runtime.latestDraftReviewText = reviewTriggerDraft.draftReviewText || '';
   runtime.draftReady = true;
+}
+
+async function saveReviewDraft() {
+  const user = getActiveDemoUser();
+  if (!isDavCapableUser(user)) return;
+  syncReviewDraftFromModal();
+  const text = getReviewPreviewText() || getReviewDraftContentText();
+  if (!String(text || '').trim()) {
+    showToast('请先填写洞见内容');
+    return;
+  }
+  reviewTriggerDraft.draftReviewText = text;
+  const runtime = ensureTenantReviewRuntime(user.tenant.id);
+  persistReviewDraftRuntime(runtime);
+  const payload = {
+    id: activeInsightDraftId || undefined,
+    title: String(reviewTriggerDraft.reviewTitle || '').trim(),
+    content_text: String(text).trim(),
+    source_mode: reviewTriggerDraft.sourceMode || 'manual',
+    access_mode: reviewTriggerDraft.accessMode === 'subscriber' ? 'subscriber' : 'public',
+  };
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(user.tenant.slug)}/insight-drafts`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || 'insight_draft_storage_failed');
+    activeInsightDraftId = String((data.draft || {}).id || activeInsightDraftId || '');
+    insightDrafts = Array.isArray(data.drafts) ? data.drafts : insightDrafts;
+    insightDraftsLoaded = true;
+    showToast('洞见草稿已保存，可随时继续编辑或发布');
+    if (reviewProductionPage) {
+      renderReviewTriggerModal(user);
+    } else if (insightDraftLibraryView) {
+      const libraryHost = document.getElementById('review-report-feed');
+      if (libraryHost) libraryHost.innerHTML = renderInsightDraftLibraryPage();
+    } else {
+      const overviewHost = document.getElementById('review-insight-drafts-overview-host');
+      if (overviewHost) overviewHost.innerHTML = renderReviewDraftLibraryOverview();
+    }
+  } catch (error) {
+    showToast(error.message || '洞见草稿保存失败');
+  }
+}
+
+async function loadInsightDrafts() {
+  const user = getActiveDemoUser();
+  if (!isDavCapableUser(user) || insightDraftsLoading || insightDraftsLoaded) return;
+  insightDraftsLoading = true;
+  const loadingOverviewHost = document.getElementById('review-insight-drafts-overview-host');
+  if (loadingOverviewHost && !reviewProductionPage) loadingOverviewHost.innerHTML = renderReviewDraftLibraryOverview();
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(user.tenant.slug)}/insight-drafts`);
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || 'insight_drafts_unavailable');
+    insightDrafts = Array.isArray(data.drafts) ? data.drafts : [];
+    insightDraftsLoaded = true;
+    if (reviewProductionPage) {
+      renderReviewTriggerModal(user);
+    } else if (insightDraftLibraryView) {
+      const libraryHost = document.getElementById('review-report-feed');
+      if (libraryHost) libraryHost.innerHTML = renderInsightDraftLibraryPage();
+    } else {
+      const overviewHost = document.getElementById('review-insight-drafts-overview-host');
+      if (overviewHost) overviewHost.innerHTML = renderReviewDraftLibraryOverview();
+    }
+  } catch (error) {
+    console.warn('Insight drafts unavailable', error);
+    const target = insightDraftLibraryView
+      ? document.getElementById('review-report-feed')
+      : document.getElementById('review-insight-drafts-overview-host');
+    if (target) {
+      target.innerHTML = '<div class="knowledge-modal-block" style="margin-top:12px;color:#B42318">草稿箱暂时无法连接数据库，请稍后重试。</div>';
+    }
+  } finally {
+    insightDraftsLoading = false;
+  }
+}
+
+function editInsightDraft(draftId) {
+  const draft = insightDrafts.find((item) => String((item || {}).id || '') === String(draftId || ''));
+  if (!draft) return;
+  insightDraftLibraryView = false;
+  activeInsightDraftId = String(draft.id || '');
+  reviewTriggerDraft.period = 'day';
+  reviewTriggerDraft.reviewTitle = String(draft.title || '').trim();
+  reviewTriggerDraft.accessMode = draft.access_mode === 'subscriber' ? 'subscriber' : 'public';
+  reviewTriggerDraft.sourceMode = String(draft.source_mode || 'manual').trim() || 'manual';
+  reviewTriggerDraft.manualHtml = mergePlainTextIntoRichHtml('', String(draft.content_text || '').trim());
+  reviewTriggerDraft.draftReviewText = String(draft.content_text || '').trim();
+  reviewTriggerDraft.generatedPreviewText = '';
+  reviewTriggerDraft.previewReady = false;
+  reviewTriggerDraft.flowStage = 'intake';
+  if (!reviewProductionPage) {
+    reviewProductionPage = true;
+    const url = new URL(window.location.href);
+    url.searchParams.set('review', 'compose');
+    window.history.pushState({}, '', url);
+    switchTab('review');
+  }
+  renderReviewTriggerModal(getActiveDemoUser());
+}
+
+async function deleteInsightDraft(draftId) {
+  const user = getActiveDemoUser();
+  if (!draftId || !isDavCapableUser(user)) return;
+  if (!window.confirm('确认删除这篇洞见草稿吗？删除后无法恢复。')) return;
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(user.tenant.slug)}/insight-drafts/${encodeURIComponent(draftId)}`, {method: 'DELETE'});
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || 'insight_draft_delete_failed');
+    insightDrafts = Array.isArray(data.drafts) ? data.drafts : [];
+    insightDraftsLoaded = true;
+    if (activeInsightDraftId === draftId) activeInsightDraftId = '';
+    if (insightDraftLibraryView) {
+      const libraryHost = document.getElementById('review-report-feed');
+      if (libraryHost) libraryHost.innerHTML = renderInsightDraftLibraryPage();
+    } else {
+      renderReviewTriggerModal(user);
+    }
+    showToast('洞见草稿已删除');
+  } catch (error) {
+    showToast(error.message || '洞见草稿删除失败');
+  }
+}
+
+async function openInsightDraftFromHermes(entryId) {
+  const user = getActiveDemoUser();
+  if (!isDavCapableUser(user)) {
+    showToast('洞见草稿仅支持大V在工作区内编辑和发布');
+    return;
+  }
+  const entry = hermesConversation.find((item) => String((item || {}).id || '') === String(entryId || ''));
+  const artifact = normalizeHermesArtifact((entry || {}).artifact || (entry || {}).result, (entry || {}).question || '');
+  const isInteractionSummary = isHermesInteractionSummaryEntry(entry);
+  const parts = (isInteractionSummary
+    ? [artifact.body, artifact.summary, artifact.headline]
+    : [artifact.headline, artifact.summary, artifact.body]
+  )
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+  if (!parts.length) {
+    showToast('当前回答没有可加入洞见草稿的内容');
+    return;
+  }
+  const question = String((entry || {}).question || (entry || {}).text || '').trim();
+  const interactionTitle = buildHermesInteractionInsightDraftTitle(question);
+  const text = isInteractionSummary
+    ? [
+        `# ${interactionTitle}`,
+        question ? `归纳范围：${question}` : '',
+        '以下内容来自当前租户的粉丝评论与个股 K 线标注归纳。粉丝观点与盘面记录请继续保持区分，并在发布前完成编辑审核。',
+        parts[0] || '',
+      ].filter(Boolean).join('\n\n')
+    : `${question ? `问题：${question}\n\n` : ''}${parts.join('\n\n')}`;
+  const title = isInteractionSummary
+    ? interactionTitle
+    : (String(artifact.headline || '').trim().slice(0, 60) || '小金智能体洞见');
+  // Save directly to the draft library. Do not replace the active Hermes view
+  // with a newly initialized editor: the user can continue the conversation
+  // and open this draft later from the Insight draft list.
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(user.tenant.slug)}/insight-drafts`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        title,
+        content_text: text,
+        source_mode: isInteractionSummary ? 'hermes_interaction_task' : 'manual',
+        access_mode: reviewTriggerDraft.accessMode === 'subscriber' ? 'subscriber' : 'public',
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || 'insight_draft_storage_failed');
+    insightDrafts = Array.isArray(data.drafts) ? data.drafts : insightDrafts;
+    insightDraftsLoaded = true;
+  } catch (error) {
+    showToast(error.message || '洞见草稿保存失败');
+    return;
+  }
+  showToast(isInteractionSummary
+    ? '互动归纳已加入洞见草稿，可稍后在草稿列表中查看'
+    : '已加入洞见笔记草稿，可稍后在草稿列表中查看');
+}
+
+function buildHermesInteractionInsightDraftTitle(question) {
+  const text = String(question || '').trim();
+  const range = [
+    ['本周', '本周'], ['今日', '今日'], ['今天', '今日'], ['昨日', '昨日'], ['昨天', '昨日'],
+    ['本月', '本月'], ['今年', '今年'], ['所有', '全部历史'], ['全部', '全部历史'],
+  ].find(([keyword]) => text.includes(keyword));
+  return `粉丝互动归纳${range ? ` · ${range[1]}` : ''}`;
 }
 
 function captureReviewVoiceInput() {
@@ -10275,7 +10634,7 @@ async function submitReviewSmartOptimize() {
   const existingDraftJob = reviewActiveJobs.find((job) => job.job_type === 'review_generate_draft' && ['pending', 'running'].includes(job.status));
   if (existingDraftJob && (!reviewDraftJobState || reviewDraftJobState.job_code !== existingDraftJob.job_code)) {
     resumeActiveReviewDraftJob(existingDraftJob);
-    showToast('已有复盘草稿正在生成，请勿重复提交');
+    showToast('已有洞见草稿正在生成，请勿重复提交');
     return;
   }
   if (!hasConfiguredGeneralLlm()) {
@@ -10335,7 +10694,7 @@ async function submitReviewSmartOptimize() {
         },
         onFailed(job) {
           delete reviewDraftCancelResolvers[draftResult.job_code];
-          reject(new Error(job.error_message || job.summary || '大模型复盘草稿生成失败'));
+          reject(new Error(job.error_message || job.summary || '大模型洞见草稿生成失败'));
         },
         onCancelled(job) {
           delete reviewDraftCancelResolvers[draftResult.job_code];
@@ -10378,7 +10737,7 @@ async function submitReviewTrigger() {
     return;
   } else {
     runtime.aiGeneratedAt = '刚刚生成';
-    showToast(`${getReviewPeriodMeta(currentReviewPeriod).label}智能复盘已生成`);
+    showToast(`${getReviewPeriodMeta(currentReviewPeriod).label}智能洞见已生成`);
   }
   closeReviewTriggerModal();
   renderReviewExperience();
@@ -10420,7 +10779,7 @@ function publishReviewDraft() {
   });
   reviewPublishSubmitting = true;
   renderReviewTriggerModal(user);
-  showToast('正在发布复盘，请稍候');
+  showToast('正在发布洞见，请稍候');
   publishReviewContent(finalText, transcriptionEngine, transcriptModel, {
     review_summary: previewPayload.review_summary || '',
     user_input_section: previewPayload.user_input_section || {
@@ -10449,7 +10808,7 @@ function publishReviewDraft() {
     loadDmConversations();
     if (currentDmKol) loadDmMessages(currentDmKol.id);
     renderReviewExperience();
-    showToast((publishResult && publishResult.message) || '复盘已发布');
+    showToast((publishResult && publishResult.message) || '洞见已发布');
   }).catch((error) => {
     reviewPublishSubmitting = false;
     renderReviewTriggerModal(user);
@@ -11765,12 +12124,39 @@ function renderHermesWorkspace() {
   ensureHermesSessionBootstrap();
   renderHermesCredits();
   renderHermesSessionBar();
+  renderHermesAssistantModeTabs();
   renderHermesCapabilityChips();
   renderHermesSuggestionChips();
   renderHermesComposerContext();
   renderHermesComposerSubmit();
   renderHermesThread();
   syncHermesComposerClearance();
+}
+
+function renderHermesAssistantModeTabs() {
+  const host = document.getElementById('hermes-assistant-mode-tabs');
+  if (!host) return;
+  const modes = [
+    { id: 'consultation', label: '咨询', desc: '研究问答，可参考关联K线标注' },
+    { id: 'task', label: '任务', desc: '用户互动归纳' },
+  ].filter((mode) => mode.id !== 'task' || isDavCapableUser(getActiveDemoUser()));
+  if (hermesAssistantMode === 'task' && !modes.some((mode) => mode.id === 'task')) {
+    hermesAssistantMode = 'consultation';
+  }
+  host.innerHTML = modes.map((mode) => `
+    <button type="button" role="tab" aria-selected="${hermesAssistantMode === mode.id}"
+      class="hermes-assistant-mode-tab ${hermesAssistantMode === mode.id ? 'active' : ''}"
+      onclick="selectHermesAssistantMode('${mode.id}')" title="${escapeAttr(mode.desc)}">${escapeHtml(mode.label)}</button>
+  `).join('');
+}
+
+function selectHermesAssistantMode(mode) {
+  if (mode === 'task' && !isDavCapableUser(getActiveDemoUser())) {
+    showToast('任务能力仅向当前租户的大V开放');
+    return;
+  }
+  hermesAssistantMode = mode === 'task' ? 'task' : 'consultation';
+  renderHermesWorkspace();
 }
 
 function switchFeedBoardTab(index) {
@@ -12420,6 +12806,26 @@ function renderDemoProfile(user) {
     renderH5LoginScreen();
     return;
   }
+  const nextOwnerKey = getWatchlistOwnerKey(user);
+  const isSameWatchlistOwner = Boolean(userWatchlistOwnerKey && userWatchlistOwnerKey === nextOwnerKey);
+  const canReuseInitialWatchlist = userWatchlistBootstrapAvailable
+    && (!userWatchlistOwnerKey || userWatchlistOwnerKey === nextOwnerKey);
+  const canReuseCurrentWatchlist = isSameWatchlistOwner && userWatchlistLoaded;
+  if (userWatchlistOwnerKey && userWatchlistOwnerKey !== nextOwnerKey) {
+    // Invalidate in-flight responses when the signed-in profile changes.
+    userWatchlistRequestSeq += 1;
+    userWatchlistLoadPromise = null;
+    userWatchlistLoadPromiseOwnerKey = '';
+    userWatchlistLoadError = '';
+    userWatchlistLoaded = false;
+    WATCHLIST_DETAILS_MAP = {};
+  }
+  userWatchlistOwnerKey = nextOwnerKey;
+  if (canReuseInitialWatchlist) {
+    WATCHLIST_DETAILS_MAP = {...INITIAL_WATCHLIST_DETAILS_MAP};
+    userWatchlistLoaded = true;
+    userWatchlistBootstrapAvailable = false;
+  }
   currentDemoUser = user;
   bootH5Experience();
   document.body.dataset.demoRole = user.role || '';
@@ -12456,8 +12862,11 @@ function renderDemoProfile(user) {
   if (el('profile-role-value')) el('profile-role-value').textContent = user.role === 'dav' ? '大V投顾用户' : '投资者用户';
   if (el('profile-compute')) el('profile-compute').textContent = `⚡ ${formatInt(user.computeCredits)} 次可用`;
   if (el('profile-service-brief')) el('profile-service-brief').textContent = user.role === 'dav'
-    ? '工作台管理 · 知识供稿 · Hermes 模板'
-    : '复盘专区 · 知识专区 · Hermes 摘要';
+    ? '工作台管理 · 洞见发布 · Hermes 模板'
+    : '洞见 · Hermes 摘要';
+  renderFeaturedInsightCard();
+  renderCoreIndicatorVisibility();
+  loadFeedMarketEconomy();
   if (el('profile-overview-card')) el('profile-overview-card').style.display = user.role === 'dav' ? 'none' : '';
   if (el('profile-workbench-entry')) el('profile-workbench-entry').style.display = user.role === 'dav' || user.role === 'admin' ? 'flex' : 'none';
   if (el('profile-workbench-overview-item')) el('profile-workbench-overview-item').style.display = user.role === 'dav' || user.role === 'admin' ? '' : 'none';
@@ -12477,8 +12886,10 @@ function renderDemoProfile(user) {
   syncTenantScopedAdvisorViews();
   renderFundMacroDashboard();
   refreshTenantDashboardRemoteState({ rerenderFeed: true, rerenderWorkbench: true });
-  userWatchlistLoaded = false;
-  WATCHLIST_DETAILS_MAP = {};
+  renderH5Commerce(user);
+  userWatchlistLoaded = canReuseInitialWatchlist || canReuseCurrentWatchlist;
+  userWatchlistLoadError = '';
+  if (!canReuseInitialWatchlist && !canReuseCurrentWatchlist) WATCHLIST_DETAILS_MAP = {};
   try {
     renderWatchlist();
   } catch (error) {
@@ -12525,13 +12936,13 @@ function buildFallbackHelpCenterPayload(role) {
     title: '帮助中心',
     subtitle: '按功能快速查找，不堆砌说明文字。',
     role: normalizedRole,
-    categories: ['全部', '账号', '消息', '小金智能体', '复盘', '指标', '知识'],
+    categories: ['全部', '账号', '消息', '小金智能体', '洞见', '指标', '知识'],
     articles: [
       { id: 'account', category: '账号', title: '账号设置怎么修改', summary: '修改昵称、头像、简介和自定义关注标签。', bullets: ['租户关系和权益不在这里改。', '系统标签自动生成。', '自定义关注标签由自己维护。'], action_label: '打开账号设置', action_type: 'account_settings' },
       { id: 'dm', category: '消息', title: '消息通知在哪里看', summary: '消息通知会直接进入消息板块。', bullets: ['投资者默认只和所属大V互动。', '大V可在消息板块处理私信和提醒。'], action_label: '打开消息板块', action_type: 'switch_tab', action_value: 'dm' },
       { id: 'hermes', category: '小金智能体', title: '小金智能体能做什么', summary: '先由配置的 LLM 识别意图，再按六类场景分发。', bullets: ['支持今日个股观察、今日大盘观察、个股深化研究、个股看点、多支自选股综合分析和多轮闲聊。', '研究类内容由 Gangtise 返回，闲聊和产品帮助由 LLM 处理。', '会话保留上下文；对象或时间不明确时先追问，不盲猜。'], action_label: '打开小金智能体', action_type: 'switch_tab', action_value: 'hermes' },
       { id: 'hermes-scenarios', category: '小金智能体', title: '六类场景怎么区分', summary: '简单介绍与详细综合分析是不同任务，系统会按用户目的选择能力。', bullets: ['“今天某只股票怎么样”是今日个股观察；“今天上证怎么样”是今日大盘观察。', '“深入研究”是最近一期公司一页通，不是当日报告；“简单介绍”是看点摘要，最多 6000 个证券。', '明确要求多支股票详细综合分析时，调用复盘使用的 Gangtise 多股分析能力。'], action_label: '打开小金智能体', action_type: 'switch_tab', action_value: 'hermes' },
-      { id: 'review', category: '复盘', title: '复盘怎么生成', summary: '先形成 Draft，再审核确认，最后预览发布。', bullets: ['用户输入先整理。', '没有自选股时可直接预览发布。', '如果选择了自选股，会先追加归纳总结，摘要则在发布时自动生成。'], action_label: '打开复盘', action_type: 'switch_tab', action_value: 'review' },
+      { id: 'review', category: '洞见', title: '洞见怎么生成', summary: '先输入或导入素材，再选择直接编辑或智能优化，保存草稿后随时发布。', bullets: ['小金智能体回答可一键加入洞见笔记草稿。', '智能优化只处理用户提供的正文，不分析自选股。', '草稿可以反复修改，确认后再发布给粉丝。'], action_label: '打开洞见', action_type: 'switch_tab', action_value: 'review' },
       { id: 'indicator', category: '指标', title: '智能指标怎么理解', summary: '提示词先约束逻辑，再由系统生成可确认结果。', bullets: ['已有原始指标可直接预览。', '新逻辑先临时生成再确认。'], action_label: '打开 Dashboard', action_type: 'switch_tab', action_value: 'feed' },
       { id: 'knowledge', category: '知识', title: '知识专区怎么用', summary: '统一管理知识内容、来源和图谱关系。', bullets: ['大V看租户图谱。', 'Admin 看平台总图和单租户细图。', '小金智能体首轮意图判断直接由配置的 LLM 完成，不使用 embedding 做场景初筛。'], action_label: '打开知识', action_type: 'switch_tab', action_value: 'knowledge' },
     ],
@@ -12750,7 +13161,7 @@ function renderHelpCenterArticles() {
     return haystack.includes(query);
   });
   if (!filtered.length) {
-    host.innerHTML = '<div class="help-center-empty">没有找到匹配内容。可以换个关键词，或直接去 Hermes / 复盘 / 知识专区查看对应功能。</div>';
+    host.innerHTML = '<div class="help-center-empty">没有找到匹配内容。可以换个关键词，或直接去 Hermes / 洞见 / 知识专区查看对应功能。</div>';
     return;
   }
   host.innerHTML = filtered.map((item) => `
@@ -13450,6 +13861,11 @@ let watchlistSuggestionTimer = null;
 const watchlistAnnotationSyncTasks = {};
 let userWatchlistLoaded = false;
 let userWatchlistLoadPromise = null;
+let userWatchlistLoadPromiseOwnerKey = '';
+let userWatchlistOwnerKey = '';
+let userWatchlistLoadError = '';
+let userWatchlistRequestSeq = 0;
+let userWatchlistBootstrapAvailable = Object.keys(INITIAL_WATCHLIST_DETAILS_MAP || {}).length > 0;
 
 function getWatchlistAnnotationBucket(tenantId, stockCode) {
   const normalizedCode = normalizeStockLookupValue(stockCode);
@@ -13497,6 +13913,13 @@ function getActiveWatchlistUserPayload() {
     user_profile_id: String(user.username || user.id || '').trim(),
     user_name: String(user.name || user.username || '').trim(),
   };
+}
+
+function getWatchlistOwnerKey(user) {
+  const active = user || getActiveDemoUser() || {};
+  const tenant = String((((active || {}).tenant || {}).slug) || '').trim().toLowerCase();
+  const profile = String(active.username || '').trim();
+  return tenant && profile ? `${tenant}::${profile}` : '';
 }
 
 async function syncLocalWatchlistAnnotationsToServer(stockRefs) {
@@ -13875,6 +14298,8 @@ async function addCurrentStockToWatchlist() {
     if (!response.ok || payload.ok === false) throw new Error(payload.error || 'watchlist_item_add_failed');
     const saved = payload.item && typeof payload.item === 'object' ? payload.item : currentWatchlistDetail;
     WATCHLIST_DETAILS_MAP = {...(WATCHLIST_DETAILS_MAP || {}), [stockCode]: saved};
+    userWatchlistOwnerKey = getWatchlistOwnerKey();
+    userWatchlistLoadError = '';
     userWatchlistLoaded = true;
     trackFanStockObservation(stockCode, 'watchlist_add', {
       entryPoint: 'watchlist_add',
@@ -13937,7 +14362,10 @@ function renderWatchlist() {
       ? details.map((detail) => buildWatchlistCardHtml(detail)).join('')
       : '<div style="padding:28px 14px;border:1px dashed rgba(200,169,110,0.18);border-radius:12px;color:var(--gray-400);font-size:12px;text-align:center">当前没有自选股。输入股票代码后可在详情页加入。</div>';
   } else if (listHost) {
-    listHost.innerHTML = '<div style="padding:28px 14px;border:1px dashed rgba(200,169,110,0.18);border-radius:12px;color:var(--gray-400);font-size:12px;text-align:center">正在加载当前用户的自选股...</div>';
+    const retry = userWatchlistLoadError
+      ? `<button type="button" class="btn-outline" style="margin-top:10px;padding:6px 12px;font-size:11px" onclick="loadPersistedUserWatchlist()">重试</button>`
+      : '';
+    listHost.innerHTML = `<div style="padding:28px 14px;border:1px dashed rgba(200,169,110,0.18);border-radius:12px;color:var(--gray-400);font-size:12px;text-align:center">${userWatchlistLoadError || '正在加载当前用户的自选股...'}${retry}</div>`;
   }
   renderFundamentalWatchlistBoards();
   renderReviewWatchlistSelectionMode();
@@ -13984,28 +14412,53 @@ function renderFundamentalWatchlistBoards() {
 }
 
 async function loadPersistedUserWatchlist() {
-  if (userWatchlistLoadPromise) return userWatchlistLoadPromise;
+  const ownerKey = getWatchlistOwnerKey();
+  if (!ownerKey) return;
+  if (userWatchlistLoadPromise && userWatchlistLoadPromiseOwnerKey === ownerKey) return userWatchlistLoadPromise;
+  const requestSeq = ++userWatchlistRequestSeq;
+  userWatchlistLoadPromiseOwnerKey = ownerKey;
   userWatchlistLoadPromise = (async () => {
     try {
       const response = await fetch('/api/watchlist/items');
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload.ok === false) throw new Error(payload.error || 'watchlist_items_load_failed');
+      if (requestSeq !== userWatchlistRequestSeq || ownerKey !== getWatchlistOwnerKey()) return;
       WATCHLIST_DETAILS_MAP = (Array.isArray(payload.items) ? payload.items : []).reduce((map, item) => {
         const code = normalizeStockLookupValue(item && item.code);
         if (code) map[code] = item;
         return map;
       }, {});
+      userWatchlistOwnerKey = ownerKey;
+      userWatchlistLoadError = '';
       userWatchlistLoaded = true;
       renderWatchlist();
       if (reviewTriggerDraft.flowStage === 'watchlist_select') renderReviewTriggerModal(getActiveDemoUser());
     } catch (error) {
+      if (requestSeq !== userWatchlistRequestSeq || ownerKey !== getWatchlistOwnerKey()) return;
       console.warn('load persisted watchlist failed', error);
-      userWatchlistLoaded = true;
-      WATCHLIST_DETAILS_MAP = {};
+      // Keep the server-rendered owner snapshot visible when the background
+      // refresh is transiently unavailable. A refresh failure must not erase
+      // a list the user was already able to see on first paint.
+      if (Object.keys(WATCHLIST_DETAILS_MAP || {}).length) {
+        userWatchlistLoadError = '';
+        userWatchlistLoaded = true;
+        showToast('自选股已保留页面快照，实时刷新暂不可用。');
+      } else {
+        const reason = String((error && error.message) || '').trim();
+        userWatchlistLoadError = reason === 'database_unavailable'
+          ? '自选股服务暂不可用，请稍后重试。'
+          : (reason === 'auth_required' || reason === 'watchlist_auth_required'
+            ? '登录状态已失效，请重新登录后查看自选股。'
+            : '自选股暂时加载失败，请点击重试。');
+        userWatchlistLoaded = false;
+      }
       renderWatchlist();
       if (reviewTriggerDraft.flowStage === 'watchlist_select') renderReviewTriggerModal(getActiveDemoUser());
     } finally {
-      userWatchlistLoadPromise = null;
+      if (requestSeq === userWatchlistRequestSeq && ownerKey === getWatchlistOwnerKey()) {
+        userWatchlistLoadPromise = null;
+        userWatchlistLoadPromiseOwnerKey = '';
+      }
     }
   })();
   return userWatchlistLoadPromise;
@@ -14640,7 +15093,7 @@ function openWatchlistAnnotationModal(candleIndex) {
   host.innerHTML = `
     <div class="modal-title" style="margin-bottom:10px">${existing ? '编辑 K线标注' : '新增 K线标注'} · ${escapeHtml(currentWatchlistDetail.name)}</div>
     <div style="font-size:12px;color:var(--gray-400);line-height:1.7;margin-bottom:14px">
-      你正在${existing ? '编辑' : '标注'} ${escapeHtml(candle.date || '--')} 这根 K 线。保存后，这条标注会显示在图上，并自动参与后续复盘。
+      你正在${existing ? '编辑' : '标注'} ${escapeHtml(candle.date || '--')} 这根 K 线。保存后，这条标注会显示在图上，并自动参与后续洞见。
     </div>
     <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">K线节点</label>
@@ -14653,8 +15106,8 @@ function openWatchlistAnnotationModal(candleIndex) {
       </div>
     </div>
     <div class="knowledge-modal-block">
-      <label class="knowledge-modal-label">复盘内容</label>
-      <textarea id="watchlist-annotation-content" class="knowledge-modal-textarea" placeholder="写下你对这根 K 线的判断、观察点和后续复盘。">${escapeHtml(existing && (existing.content || [existing.title, existing.note, existing.trigger].filter(Boolean).join('；')) || '')}</textarea>
+      <label class="knowledge-modal-label">洞见内容</label>
+      <textarea id="watchlist-annotation-content" class="knowledge-modal-textarea" placeholder="写下你对这根 K 线的判断、观察点和后续洞见。">${escapeHtml(existing && (existing.content || [existing.title, existing.note, existing.trigger].filter(Boolean).join('；')) || '')}</textarea>
     </div>
     <div class="modal-actions">
       <button class="btn-outline" onclick="closeWatchlistAnnotationModal()">取消</button>
@@ -14704,7 +15157,7 @@ function saveWatchlistAnnotation() {
   if (!target) return;
   const content = (document.getElementById('watchlist-annotation-content') || {}).value?.trim() || '';
   if (!content) {
-    showToast('请填写复盘内容');
+    showToast('请填写洞见内容');
     return;
   }
   const bucket = getWatchlistAnnotationBucket(target.tenantId, target.stockCode);
@@ -14753,7 +15206,7 @@ function saveWatchlistAnnotation() {
     closeWatchlistAnnotationModal();
     redrawCurrentWatchlistDetail();
     renderReviewExperience();
-    showToast('K线标注已保存，复盘会自动引用');
+    showToast('K线标注已保存，洞见会自动引用');
   }).catch((error) => {
     watchlistAnnotationStore[target.tenantId][normalizeStockLookupValue(target.stockCode)] = previousItems;
     closeWatchlistAnnotationModal();
@@ -15409,6 +15862,7 @@ function submitPost() {
 // ===== HERMES =====
 const HERMES_CUSTOM_SKILL_STORAGE_KEY = 'gangtise_demo_hermes_custom_skills';
 let hermesSelectedSkill = 'basic';
+let hermesAssistantMode = 'consultation';
 let hermesConversation = [];
 let hermesCredits = 0;
 let hermesUsageSnapshot = null;
@@ -15817,6 +16271,9 @@ function buildHermesConversationFromSessionTurns(turns) {
         displayMode: 'text',
         capabilityLabel: (turn || {}).intent_label || '',
         intentLabel: (turn || {}).intent_label || '',
+        // Keep the machine-readable intent: the localized label is not stable enough
+        // to restore task-specific actions after a session reload.
+        intent: (turn || {}).intent || '',
       });
     }
   });
@@ -15926,7 +16383,7 @@ const DEFAULT_HERMES_SKILLS = {
       '请给出阶段性结论和置信度。',
       '请说明短期和中期分别该看什么。'
     ],
-    knowledgeKeywords: ['判断', '复盘', '跟踪', '结论']
+    knowledgeKeywords: ['判断', '洞见', '跟踪', '结论']
   },
   evidence: {
     id: 'evidence',
@@ -15937,7 +16394,7 @@ const DEFAULT_HERMES_SKILLS = {
     suggestions: [
       '请把当前结论拆成证据链。',
       '请区分已验证和未验证部分。',
-      '请输出适合复盘引用的依据卡片。'
+      '请输出适合洞见引用的依据卡片。'
     ],
     knowledgeKeywords: ['纪要', '证据', '来源', '方法']
   },
@@ -16035,7 +16492,7 @@ async function selectHermesMode(mode) {
     '内容生成': 'content_generation',
     '轻度闲聊': 'small_talk',
     '线索追踪': 'evidence',
-    '复盘速写': 'basic',
+    '洞见速写': 'basic',
     '研报精读': 'evidence',
     '专家纪要速读': 'evidence',
     '方法模板': 'judgement'
@@ -16091,10 +16548,10 @@ function renderHermesComposerSubmit() {
     syncHermesComposerClearance();
     return;
   }
-  button.textContent = '发送';
+  button.textContent = hermesAssistantMode === 'task' && !hasText ? '执行任务' : '发送';
   button.removeAttribute('aria-label');
   button.title = '发送';
-  button.disabled = !hasText;
+  button.disabled = !hasText && hermesAssistantMode !== 'task';
   syncHermesComposerClearance();
 }
 
@@ -16193,6 +16650,9 @@ function renderHermesComposerContext() {
   ].filter(Boolean);
   if (!hosts.length) return;
   const chips = [];
+  const taskNote = hermesAssistantMode === 'task'
+    ? '<div class="hermes-task-mode-note">当前任务模式支持归纳当前租户的用户评论与个股 K 线标注。可直接输入今日、昨日、本周、本月、今年或所有。</div>'
+    : '<div class="hermes-task-mode-note">咨询模式用于研究型问答：支持今日个股观察、今日大盘与指数分析、个股看点摘要、个股深度研究、自选股组合分析、智能指标与看板解读。</div>';
   if (hermesSelectedSkill && hermesSelectedSkill !== 'basic') {
     const skill = getHermesSkillById(hermesSelectedSkill);
     if (skill) {
@@ -16221,11 +16681,15 @@ function renderHermesComposerContext() {
     `);
   });
   const html = chips.join('');
-  hosts.forEach(host => { host.innerHTML = html; });
+  hosts.forEach(host => { host.innerHTML = taskNote + html; });
+  const input = document.getElementById('hermes-question-input');
+  if (input) input.placeholder = hermesAssistantMode === 'task'
+    ? '例如：总结本周用户评论和 K 线标注...'
+    : '问小金智能体...';
 }
 
 function handleHermesComposerSubmit() {
-  if (!String(getHermesActiveQuestion() || '').trim()) return;
+  if (!String(getHermesActiveQuestion() || '').trim() && hermesAssistantMode !== 'task') return;
   runHermesAnalysis();
 }
 
@@ -17126,8 +17590,28 @@ function renderHermesTextArtifact(artifact, agentTrace) {
       ${knowledgeHtml}
       ${evidenceHtml}
       ${artifact.footer ? `<div class="hermes-transcript-meta">${escapeHtml(artifact.footer)}</div>` : ''}
+      ${renderHermesInsightDraftAction(entry)}
     </div>
   `;
+}
+
+function renderHermesInsightDraftAction(entry) {
+  const user = getActiveDemoUser();
+  const entryId = String((entry || {}).id || '').trim();
+  if (!entryId || !isDavCapableUser(user)) return '';
+  const isInteractionSummary = isHermesInteractionSummaryEntry(entry);
+  return `
+    <button class="btn-gold" type="button" style="width:100%;margin-top:14px;padding:11px 12px;font-size:12px;box-shadow:0 8px 18px rgba(200,169,110,0.22)" onclick="openInsightDraftFromHermes('${escapeAttr(entryId)}')">
+      ${isInteractionSummary ? '将互动归纳加入洞见草稿' : '加入洞见笔记草稿'}
+    </button>
+  `;
+}
+
+function isHermesInteractionSummaryEntry(entry) {
+  const payload = entry && typeof entry === 'object' ? entry : {};
+  const intent = String(payload.intent || payload.intentLabel || '').trim().toLowerCase();
+  const capability = String(payload.capabilityLabel || '').trim();
+  return intent === 'today_user_interaction_task' || capability === '用户互动归纳';
 }
 
 function isHermesSmallTalkEntry(entry, artifact) {
@@ -17148,7 +17632,7 @@ function renderHermesThread() {
   if (!hermesConversation.length) {
     const emptyHtml = `
       <div class="hermes-chat-empty">
-        <div class="hermes-prompt-guide">从个股、复盘、指标或功能开始</div>
+        <div class="hermes-prompt-guide">从个股、洞见、指标或功能开始</div>
       </div>
     `;
     hosts.forEach(host => {
@@ -17214,6 +17698,7 @@ function renderHermesThreadEntry(entry) {
         ${entry.capabilityLabel ? `<div class="hermes-transcript-meta" style="margin-top:6px">本次按：${escapeHtml(entry.capabilityLabel)}</div>` : ''}
         <div class="hermes-transcript-text">${escapeHtml(artifact.headline)}</div>
         <div class="hermes-chat-analysis">${renderHermesAnalysisCards(artifact, entry.agentTrace, entry)}</div>
+        ${renderHermesInsightDraftAction(entry)}
       </div>
     `;
 }
@@ -17233,6 +17718,7 @@ function renderHermesEntryFallback(entry, error, index) {
       ${question ? `<div class="hermes-transcript-meta">问题：${escapeHtml(question)}</div>` : ''}
       <div class="hermes-text-article"><div class="hermes-text-paragraph" style="white-space:pre-wrap">${escapeHtml(answer || '该条历史结果无法格式化展示。')}</div></div>
       <div class="hermes-transcript-meta">第 ${Number(index || 0) + 1} 条内容展示失败，未影响其他会话内容。</div>
+      ${renderHermesInsightDraftAction(payload)}
     </div>
   `;
 }
@@ -17292,7 +17778,7 @@ function renderHermesAnalysisCards(artifact, agentTrace) {
       </div>
     `
     : '';
-  const metricBlock = metricsHtml
+  const metricBlock = metricsHtml && isFeatureEnabled('core_indicators')
     ? `
       <div style="margin-top:10px">
         <div class="hermes-section-label">核心指标</div>
@@ -17371,7 +17857,8 @@ async function runHermesAnalysis(options) {
     return;
   }
   ensureHermesSessionBootstrap();
-  const question = String(getHermesActiveQuestion() || '').trim();
+  const question = String(getHermesActiveQuestion() || '').trim()
+    || (hermesAssistantMode === 'task' ? '请归纳今日用户评论与个股K线标注，给我一份运营简报。' : '');
   const skill = getHermesSkillById(hermesSelectedSkill) || DEFAULT_HERMES_SKILLS.basic;
   if (!question) {
     showToast('请先输入你想让 Hermes 回答的问题');
@@ -17398,14 +17885,16 @@ async function runHermesAnalysis(options) {
     type: 'user',
     text: question,
     stockCode,
-    skillLabel: skill.label,
+    skillLabel: hermesAssistantMode === 'task' ? '用户互动归纳任务' : skill.label,
     displayMode: 'text',
   });
   hermesConversation.push({
     id: createHermesEntryId('loading'),
     type: 'loading',
     startedAt: Date.now(),
-    thoughts: buildHermesLoadingThoughtTemplates(question, skill, stockCode),
+    thoughts: hermesAssistantMode === 'task'
+      ? ['理解任务要求与时间范围', '读取指定范围的用户互动', '归纳关注点与后续建议']
+      : buildHermesLoadingThoughtTemplates(question, skill, stockCode),
   });
   syncHermesSessionCache({ skipEmpty: false });
   clearHermesQuestionInputs({ focus: true });
@@ -17422,13 +17911,14 @@ async function runHermesAnalysis(options) {
         user_profile_id: activeUser && activeUser.username ? activeUser.username : '',
         user_name: activeUser && (activeUser.name || activeUser.username) ? (activeUser.name || activeUser.username) : '',
         user_membership: activeUser && activeUser.membership ? activeUser.membership : '',
-        entry_point: options.fromWatchlist ? 'watchlist_detail' : 'hermes_chat',
+        entry_point: options.fromWatchlist ? 'watchlist_detail' : (hermesAssistantMode === 'task' ? 'hermes_task' : 'hermes_chat'),
+        assistant_mode: hermesAssistantMode,
         session_id: sessionId,
         question,
         messages: messagesSnapshot,
         selected_knowledge_ids: hermesScopedKnowledgeId ? [hermesScopedKnowledgeId] : [],
         attachments: hermesUploadedFiles.slice(0),
-        preferred_mode: hermesSelectedSkill || 'basic',
+        preferred_mode: hermesAssistantMode === 'task' ? 'today_user_interaction_task' : (hermesSelectedSkill || 'basic'),
         web_answer: false,
       }),
     });
@@ -17478,8 +17968,9 @@ async function runHermesAnalysis(options) {
       artifact: normalizedArtifact,
       displayMode,
       agentTrace: data.agent_trace || null,
-      capabilityLabel: data.capability_label || data.intent || skill.label,
+      capabilityLabel: data.capability_label || data.intent || (hermesAssistantMode === 'task' ? '用户互动归纳任务' : skill.label),
       intentLabel: data.intent || '',
+      intent: data.intent || '',
     });
     try {
       syncHermesSessionCache({ skipEmpty: false });
@@ -18063,7 +18554,7 @@ async function openDmChat(kolId, name, avatar, tier) {
       : (isDavDmMode()
       ? '⚠️ 回复粉丝时请保持研究表达克制，避免直接给出买卖建议，所有结论建议附上依据和风险边界。'
       : (isSystemThread
-        ? '⚠️ 这里展示的是当前租户推送给你的系统消息与复盘提醒，可直接查看，无需回复。'
+        ? '⚠️ 这里展示的是当前租户推送给你的系统消息与洞见提醒，可直接查看，无需回复。'
         : '⚠️ 大V投顾分享为个人研究观点，仅供参考，不构成投资建议。投资有风险，决策需谨慎。'));
     syncDmComposerState();
     loadDmMessages(kolId);
@@ -18222,6 +18713,74 @@ function unlockPaidMsg(price) {
 function dmQuickAsk(text) {
   document.getElementById('dm-input').value = text;
   document.getElementById('dm-input').focus();
+}
+
+let h5CommerceState = null;
+
+async function loadH5Commerce() {
+  const user = getActiveDemoUser() || {};
+  if (!user || user.role !== 'investor' || !user.tenant) return null;
+  const response = await fetch(`/api/h5/tenant/${encodeURIComponent(user.tenant.slug)}/commerce`, {cache: 'no-store'});
+  const data = await response.json();
+  if (!response.ok || !data.ok) throw new Error(data.error || 'commerce_load_failed');
+  h5CommerceState = data.commerce || {};
+  return h5CommerceState;
+}
+
+function renderH5Commerce(user) {
+  const card = document.getElementById('profile-commerce-card');
+  const content = document.getElementById('profile-commerce-content');
+  if (!card || !content) return;
+  card.style.display = user && user.role === 'investor' ? '' : 'none';
+  if (!user || user.role !== 'investor') return;
+  loadH5Commerce().then((commerce) => {
+    if (!commerce || !commerce.enabled) {
+      card.style.display = 'none';
+      return;
+    }
+    const subscribed = !!commerce.has_subscription;
+    const products = Array.isArray(commerce.products) ? commerce.products : [];
+    document.getElementById('profile-commerce-status').textContent = subscribed ? '已订阅' : '未订阅';
+    content.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:12px 0 4px">
+        <div style="padding:12px;border:1px solid rgba(47,116,192,.12);border-radius:10px;background:#F8FBFF">
+          <strong style="color:var(--text-main)">常规用户权益</strong>
+          <div class="profile-overview-desc" style="margin-top:6px">阅读公开洞见、查看公开市场观点和基础内容。</div>
+        </div>
+        <div style="padding:12px;border:1px solid rgba(200,169,110,.28);border-radius:10px;background:rgba(200,169,110,.08)">
+          <strong style="color:var(--text-main)">订阅用户权益</strong>
+          <div class="profile-overview-desc" style="margin-top:6px">包含常规权益，并解锁订阅专享的高质量详细洞见，例如个股详细复盘信息、完整判断依据与风险说明。</div>
+        </div>
+      </div>
+      ${products.length ? products.map((product) => `
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 0;border-top:1px solid rgba(47,116,192,.1)">
+        <div><strong style="color:var(--text-main)">${escapeHtml(product.name)}</strong><div class="profile-overview-desc">${escapeHtml(product.description || '订阅租户研究内容')} · ${product.billing_period_days}天</div></div>
+        <button class="btn-gold" type="button" style="white-space:nowrap;padding:8px 10px;font-size:11px" onclick="createH5CommerceOrder(${Number(product.id)})">¥${Number(product.price_yuan).toFixed(2)} 订阅</button>
+      </div>`).join('') : '<div class="profile-overview-desc" style="padding-top:10px">当前暂无可购买的订阅产品。</div>'}`;
+  }).catch(() => { content.textContent = '订阅服务暂不可用，请稍后重试。'; });
+}
+
+async function createH5CommerceOrder(productId) {
+  const user = getActiveDemoUser() || {};
+  const tenantSlug = user.tenant && user.tenant.slug;
+  if (!tenantSlug) return;
+  try {
+    const response = await fetch(`/api/h5/tenant/${encodeURIComponent(tenantSlug)}/commerce/orders`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({product_id: productId})});
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || 'commerce_order_failed');
+    const order = data.order || {};
+    const qr = order.collection_qr_url ? `<img src="${escapeAttr(order.collection_qr_url)}" alt="收款二维码" style="width:180px;height:180px;object-fit:contain;margin:12px auto;display:block">` : '';
+    openH5CommerceModal('完成订阅支付', `<div style="line-height:1.8;font-size:13px">订单号：${escapeHtml(order.order_no)}<br>应付：<strong>¥${Number(order.amount_yuan).toFixed(2)}</strong><br>${escapeHtml(order.payment_instructions || '')}${qr}<div style="font-size:11px;color:var(--gray-400)">支付完成后请等待大V核验到账。当前订单状态：待支付。</div></div>`);
+    showToast('订单已创建，请按说明完成支付');
+  } catch (error) { showToast(error.message || '订阅下单失败'); }
+}
+
+function openH5CommerceModal(title, html) {
+  const host = document.getElementById('workbench-ops-modal-content');
+  const modal = document.getElementById('workbench-ops-modal');
+  if (!host || !modal) return;
+  host.innerHTML = `<div class="modal-title" style="margin-bottom:12px">${escapeHtml(title)}</div>${html}`;
+  modal.classList.add('show');
 }
 
 // ===== KOL WORKBENCH =====
@@ -19839,7 +20398,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderDemoProfile(getDefaultDemoUser());
     refreshH5OnboardingStatus({ silent: true });
     const initialParams = new URLSearchParams(window.location.search);
-    const hasReviewRoute = initialParams.get('review') === 'compose'
+    const hasReviewRoute = ['compose', 'drafts'].includes(initialParams.get('review'))
       || ['home', 'list', 'detail'].includes(String(initialParams.get('review_view') || '').trim().toLowerCase());
     switchTab(hasReviewRoute ? 'review' : getFirstEnabledTab());
     if (!hasReviewRoute && initialParams.get('news_view') === 'list') {
@@ -19858,9 +20417,12 @@ window.addEventListener('popstate', () => {
   const user = getActiveDemoUser();
   const routeParams = new URLSearchParams(window.location.search);
   const shouldShowProductionPage = routeParams.get('review') === 'compose';
+  const shouldShowDraftLibrary = routeParams.get('review') === 'drafts';
   const shouldShowReviewPage = shouldShowProductionPage
+    || shouldShowDraftLibrary
     || ['home', 'list', 'detail'].includes(String(routeParams.get('review_view') || '').trim().toLowerCase());
   reviewProductionPage = shouldShowProductionPage && user && isDavCapableUser(user);
+  insightDraftLibraryView = shouldShowDraftLibrary && user && isDavCapableUser(user);
   if (shouldShowReviewPage && !document.getElementById('page-review')?.classList.contains('active')) {
     switchTab('review');
     return;

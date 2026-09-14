@@ -17,7 +17,7 @@ from functools import wraps
 from hmac import compare_digest
 from pathlib import Path
 
-from flask import Flask, jsonify, request, session
+from flask import Flask, jsonify, request, session, send_file
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,6 +38,9 @@ from src.domain.database_release_services import (  # noqa: E402
     list_simulation_batches,
     start_database_release,
     start_database_clear,
+    start_user_data_cleanup,
+    list_user_data_cleanup_backups,
+    get_user_data_cleanup_backup_sql_path,
     start_database_release_packages,
     start_database_rollback,
     start_production_to_staging_sync,
@@ -282,6 +285,45 @@ def clear_target():
     try:
         job = start_database_clear(
             target,
+            confirmation=payload.get("confirmation"),
+            confirm_production=target == "production" and payload.get("confirm_production") is True,
+        )
+    except ValueError as exc:
+        error = str(exc)
+        return jsonify({"ok": False, "error": error}), 409 if error == "database_release_job_running" else 400
+    return jsonify({"ok": True, "job": job}), 202
+
+
+@app.get("/api/user-data-backups")
+def user_data_backups():
+    try:
+        return jsonify({"ok": True, "backups": list_user_data_cleanup_backups(request.args.get("target") or "local")})
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+
+
+@app.get("/api/user-data-backups/<backup_id>/sql")
+def user_data_backup_sql(backup_id):
+    try:
+        path = get_user_data_cleanup_backup_sql_path(request.args.get("target") or "local", backup_id)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    response = send_file(path, as_attachment=True, download_name=path.name, mimetype="application/sql")
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.post("/api/user-data-cleanup")
+@_require_csrf
+@_require_unlock
+def user_data_cleanup():
+    payload = request.get_json(silent=True) or {}
+    target = str(payload.get("target") or "").strip().lower()
+    try:
+        job = start_user_data_cleanup(
+            target,
+            payload.get("mode"),
+            usernames=payload.get("usernames"),
             confirmation=payload.get("confirmation"),
             confirm_production=target == "production" and payload.get("confirm_production") is True,
         )
@@ -578,6 +620,22 @@ PAGE = r"""<!doctype html>
         </div>
       </div>
 
+      <div class="col-12">
+        <div class="card ops-panel ops-danger-panel">
+          <div class="card-header"><h2 class="ops-section-title text-danger-emphasis">账户运行数据清理与备份</h2><p class="ops-section-copy">清理前自动生成完整 PostgreSQL 恢复快照和可下载 SQL；清理只处理明确归属账户的数据，不删除租户共享洞见、指标、市场数据或其他平台主数据。</p></div>
+          <div class="card-body">
+            <div class="row g-2 align-items-end">
+              <div class="col-sm-4"><label class="form-label small text-secondary" for="userDataCleanupTarget">目标数据库</label><select id="userDataCleanupTarget" class="form-select" onchange="loadUserDataBackups()"></select></div>
+              <div class="col-sm-5"><label class="form-label small text-secondary" for="userDataCleanupMode">清理方式</label><select id="userDataCleanupMode" class="form-select" onchange="toggleUserDataCleanupUsernames()"><option value="account_runtime_data">保留账户，仅清除其生成数据</option><option value="all_non_admin_accounts">删除所有非 admin 账户及其数据</option></select></div>
+              <div class="col-sm-3"><button id="userDataCleanupAction" class="btn btn-danger w-100" type="button" onclick="startUserDataCleanup()">备份并执行清理</button></div>
+            </div>
+            <div id="userDataCleanupUsernamesWrap" class="mt-3"><label class="form-label small text-secondary" for="userDataCleanupUsernames">要保留的账户用户名</label><input id="userDataCleanupUsernames" class="form-control" placeholder="多个用户名用英文逗号分隔，例如：财经老王" autocomplete="off"><div class="form-text">账户行会保留，只删除该账户产生的运行数据。不能填写 admin。</div></div>
+            <div class="alert alert-danger py-2 px-3 mt-3 mb-0 small">这是高风险操作。所有非 admin 账户模式会保留 role=admin 的账户，但不会删除租户配置、洞见/门户、指标定义、市场快照、知识库等共享或平台数据。每次清理前必须同时成功生成 .dump 和 .sql，清理失败会回滚事务。</div>
+            <hr class="my-3"><div class="d-flex justify-content-between align-items-center gap-2 flex-wrap"><h3 class="fs-6 fw-bold mb-0">清理前完整备份</h3><span class="small text-secondary">每个目标仅保留最近 2 次</span></div><div id="userDataBackups" class="mt-3"><div class="ops-empty">正在读取备份记录...</div></div>
+          </div>
+        </div>
+      </div>
+
       <div class="col-12 col-xl-5">
         <div class="card ops-panel h-100">
           <div class="card-header"><h2 class="ops-section-title">实时执行进度</h2><p class="ops-section-copy" id="progressText">等待任务创建</p></div>
@@ -608,6 +666,8 @@ PAGE = r"""<!doctype html>
     let selectGeneratedDelta = false;
     let generatedPackageIds = [];
     let submitting = false;
+    let userDataBackups = [];
+    let userDataCleanupPhrase = '';
     let poll = null;
     let pendingAction = null;
 
@@ -620,7 +680,7 @@ PAGE = r"""<!doctype html>
       return payload;
     }
     function isBusy() { return submitting || ['queued','running','cancelling'].includes(String((overview.job || {}).status || '')); }
-    function operationName(value) { return ({release:'数据库导入', rollback:'数据库回滚', clear_database:'清空目标数据库', production_to_staging:'Production 到 Staging 同步', staging_to_production:'Staging 到 Production 同步'})[value] || (value || '等待任务'); }
+    function operationName(value) { return ({release:'数据库导入', rollback:'数据库回滚', clear_database:'清空目标数据库', production_to_staging:'Production 到 Staging 同步', staging_to_production:'Staging 到 Production 同步', user_data_cleanup:'账户数据清理与备份'})[value] || (value || '等待任务'); }
     function statusClass(value) { return ({succeeded:'text-bg-success', failed:'text-bg-danger', cancelled:'text-bg-warning', running:'text-bg-primary', queued:'text-bg-primary', cancelling:'text-bg-warning'})[value] || 'text-bg-secondary'; }
     function renderSelect(select, rows, selected) { select.innerHTML = rows.map((item) => `<option value="${esc(item.name)}" ${item.name === selected ? 'selected' : ''}>${esc(item.label)} (${esc(item.host)}/${esc(item.database)})</option>`).join(''); }
     function currentReleasePlan(target) { return releasePlan && releasePlan.target === target ? releasePlan : null; }
@@ -651,6 +711,8 @@ PAGE = r"""<!doctype html>
       const selectedPackage = selectGeneratedDelta ? '__pending__' : ($('package').value || '__pending__');
       renderSelect($('simulationTarget'), targets, selectedSimulation);
       renderSelect($('releaseTarget'), releaseTargets, selectedRelease);
+      const selectedCleanup = $('userDataCleanupTarget').value || 'local';
+      renderSelect($('userDataCleanupTarget'), targets, selectedCleanup);
       const targetPlan = currentReleasePlan(selectedRelease);
       const typeLabels = {schema:'表结构增量', master_data:'主数据增量', data:'业务数据增量'};
       const packageRows = targetPlan ? (targetPlan.packages || []) : (overview.packages || []).map((item) => ({...item, status:'pending'}));
@@ -681,6 +743,7 @@ PAGE = r"""<!doctype html>
       $('productionStagingSync').disabled = isBusy();
       $('stagingProductionSync').disabled = isBusy();
       $('clearTarget').disabled = isBusy();
+      $('userDataCleanupAction').disabled = isBusy();
       $('scanDelta').disabled = isBusy();
       $('generateDelta').disabled = isBusy();
       $('cancel').hidden = !['queued','running'].includes(job.status);
@@ -814,7 +877,37 @@ PAGE = r"""<!doctype html>
       try { releasePlan = await api('/api/release-plan?target=' + encodeURIComponent(target), {headers:{}}); render(); }
       catch (error) { releasePlan = {target, error:error.message, packages:[], summary:{}}; render(); }
     }
-    async function load(showToast) { try { overview = await api('/api/overview', {headers:{}}); render(); await Promise.all([loadReleasePlan(), loadLog(), loadRollbacks(), loadBatches()]); if (showToast) toast('状态已刷新'); } catch (error) { toast('读取状态失败：' + error.message); } }
+    function toggleUserDataCleanupUsernames() { const visible = $('userDataCleanupMode').value === 'account_runtime_data'; $('userDataCleanupUsernamesWrap').classList.toggle('d-none', !visible); }
+    function renderUserDataBackups() {
+      const host = $('userDataBackups');
+      host.innerHTML = userDataBackups.length ? userDataBackups.map((item) => {
+        const scope = item.mode === 'all_non_admin_accounts' ? '所有非 admin 账户' : `账户：${(item.usernames || []).join('、')}`;
+        const sqlLink = `/api/user-data-backups/${encodeURIComponent(item.backup_id)}/sql?target=${encodeURIComponent(item.target)}`;
+        return `<div class="ops-list-row"><div><div class="ops-code">${esc(item.backup_id)}</div><div class="small text-secondary mt-1">${esc(item.created_at || '--')} · ${esc(scope)} · SQL ${item.sql_available ? '可下载' : '不可用'}</div><div class="ops-code mt-1">SQL SHA256: ${esc(item.sql_sha256 || '--')}</div></div><a class="btn btn-sm btn-outline-primary" href="${sqlLink}">下载 SQL</a></div>`;
+      }).join('') : '<div class="ops-empty">当前目标暂无已完成的账户清理备份。</div>';
+    }
+    async function loadUserDataBackups() { const target = $('userDataCleanupTarget').value || 'local'; try { const result = await api('/api/user-data-backups?target=' + encodeURIComponent(target), {headers:{}}); userDataBackups = result.backups || []; renderUserDataBackups(); } catch (error) { $('userDataBackups').innerHTML = `<div class="ops-empty text-danger">读取备份失败：${esc(error.message)}</div>`; } }
+    function startUserDataCleanup() {
+      if (isBusy()) return toast('已有数据库任务正在执行');
+      const target = $('userDataCleanupTarget').value || 'local';
+      const mode = $('userDataCleanupMode').value;
+      const usernames = mode === 'account_runtime_data' ? Array.from(new Set($('userDataCleanupUsernames').value.split(',').map((item) => item.trim()).filter(Boolean))).join(',') : '';
+      if (mode === 'account_runtime_data' && !usernames) return toast('请输入要保留的账户用户名');
+      if (usernames) $('userDataCleanupUsernames').value = usernames;
+      const phrase = mode === 'account_runtime_data' ? 'CLEAR ACCOUNT DATA ' + usernames : 'DELETE ALL NON-ADMIN ACCOUNTS';
+      userDataCleanupPhrase = phrase;
+      const targetWarning = target === 'production' ? '<div class="alert alert-danger py-2 px-3 small mt-3 mb-0">这是 Production 操作。请先确认备份文件已可用，再执行清理。</div><label class="form-check small mt-3 mb-0"><input id="userDataCleanupProductionAcknowledged" class="form-check-input" type="checkbox" onchange="validateUserDataCleanupConfirmation()"> <span class="form-check-label">我确认这是 Production，并同意在完整备份后执行清理。</span></label>' : '';
+      showModal('确认账户数据清理', `<div class="alert alert-danger py-2 px-3 small mb-3"><strong>备份优先，高风险操作</strong><div class="mt-1">系统会先导出完整 .dump 和 .sql；两份备份都成功后才开始事务清理。共享租户内容不会删除。</div></div><div class="small mb-2">请输入确认短语：<code>${esc(phrase)}</code></div><input id="userDataCleanupConfirmation" class="form-control" autocomplete="off" placeholder="${esc(phrase)}" oninput="validateUserDataCleanupConfirmation()">${targetWarning}`, `<button type="button" class="btn btn-light border" onclick="closeModal()">取消</button><button id="confirmUserDataCleanup" type="button" class="btn btn-danger" disabled onclick="confirmModalAction()">确认备份并清理</button>`);
+      pendingAction = async () => {
+        submitting = true; render();
+        try { await api('/api/user-data-cleanup', {method:'POST', body:JSON.stringify({target, mode, usernames, confirmation:$('userDataCleanupConfirmation')?.value || '', confirm_production:target !== 'production' || $('userDataCleanupProductionAcknowledged')?.checked === true})}); toast('账户数据清理任务已创建'); await load(); }
+        catch (error) { toast('清理未启动：' + error.message); }
+        finally { submitting = false; render(); }
+      };
+      setTimeout(() => $('userDataCleanupConfirmation')?.focus(), 150);
+    }
+    function validateUserDataCleanupConfirmation() { const input = $('userDataCleanupConfirmation'); const button = $('confirmUserDataCleanup'); const productionConfirmed = !$('userDataCleanupProductionAcknowledged') || $('userDataCleanupProductionAcknowledged').checked; if (input && button) button.disabled = input.value.trim() !== userDataCleanupPhrase || !productionConfirmed; }
+    async function load(showToast) { try { overview = await api('/api/overview', {headers:{}}); render(); toggleUserDataCleanupUsernames(); await Promise.all([loadReleasePlan(), loadLog(), loadRollbacks(), loadBatches(), loadUserDataBackups()]); if (showToast) toast('状态已刷新'); } catch (error) { toast('读取状态失败：' + error.message); } }
     function showModal(title, body, actions) { $('modalTitle').textContent = title; $('modalBody').innerHTML = `${body}<div class="modal-footer px-0 pb-0 mt-4">${actions}</div>`; operationModal.show(); }
     function closeModal() { operationModal.hide(); pendingAction = null; }
     function confirmAction(title, description, action, confirmClass = 'btn-primary', confirmLabel = '确认执行') { showModal(title, `<p class="small text-secondary mb-0">${description}</p>`, `<button type="button" class="btn btn-light border" onclick="closeModal()">取消</button><button type="button" class="btn ${confirmClass}" onclick="confirmModalAction()">${confirmLabel}</button>`); pendingAction = action; }

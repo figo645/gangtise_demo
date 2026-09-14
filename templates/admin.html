@@ -2137,7 +2137,7 @@
         <div class="admin-nav-item" data-section="indicator-overview" data-feature="analytics_module" onclick="showSection('indicator-overview', this)">
           <span class="admin-nav-icon">&#128202;</span> 总览控制台
         </div>
-        <div class="admin-nav-item" data-section="indicator-smart" data-feature="analytics_module" onclick="showSection('indicator-smart', this)">
+        <div class="admin-nav-item" data-section="indicator-smart" data-feature="core_indicators" onclick="showSection('indicator-smart', this)">
           <span class="admin-nav-icon">&#129504;</span> 智能指标
         </div>
         <div class="admin-nav-item" data-section="indicator-lake" data-feature="analytics_module" onclick="showSection('indicator-lake', this)">
@@ -2272,6 +2272,20 @@
 
       <!-- ===== OVERVIEW ===== -->
       <div id="section-overview">
+        <div class="sync-note-grid" style="margin-bottom:20px">
+          <div class="sync-note-card">
+            <div class="sync-note-title">平台经营主线</div>
+            <div class="sync-note-desc">大V生产洞见，粉丝阅读并订阅，平台只负责看健康度、经营结果和风险，不把 Admin 做成业务操作入口。</div>
+          </div>
+          <div class="sync-note-card">
+            <div class="sync-note-title">今日优先检查</div>
+            <div class="sync-note-desc">数据新鲜度、后台任务成功率、订阅收入和错误率。出现异常时先处理系统健康，再看单个功能配置。</div>
+          </div>
+          <div class="sync-note-card">
+            <div class="sync-note-title">当前能力边界</div>
+            <div class="sync-note-desc">知识库当前关闭，不纳入对外能力承诺；平台重点关注洞见发布、Hermes调用、粉丝运营和订阅权益。</div>
+          </div>
+        </div>
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-label">推进中合作线索</div>
@@ -2280,10 +2294,10 @@
             <div class="stat-change up">&#9650; +3 本周</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">已确认工具场景</div>
+            <div class="stat-label">已确认核心路径</div>
             <span class="stat-icon">&#9830;</span>
             <div class="stat-value">4</div>
-            <div class="stat-change up">复盘 / 自选股 / 基本面 / Hermes</div>
+            <div class="stat-change up">洞见 / 自选股 / 基本面 / Hermes</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">待确认价格方案</div>
@@ -2306,11 +2320,11 @@
           </div>
           <div class="sync-note-card">
             <div class="sync-note-title">H5 能力是后台单一事实源</div>
-            <div class="sync-note-desc">Hermes、复盘、知识、自选股、消息和智能 Dashboard，都按同一套产品口径映射到前后台；租户门户则作为独立的粉丝内容入口维护。</div>
+            <div class="sync-note-desc">Hermes、洞见、自选股、消息和智能 Dashboard，都按同一套产品口径映射到前后台；租户门户则作为独立的粉丝内容入口维护。</div>
           </div>
           <div class="sync-note-card">
             <div class="sync-note-title">平台只做平台职责</div>
-            <div class="sync-note-desc">Admin 负责审计、控开、租户管理和一致性巡检，不替代大V自己的消息、复盘和 Hermes 工作台。</div>
+            <div class="sync-note-desc">Admin 负责审计、控开、租户管理和一致性巡检，不替代大V自己的消息、洞见和 Hermes 工作台。</div>
           </div>
         </div>
 
@@ -2386,8 +2400,8 @@
             </thead>
             <tbody>
               <tr><td style="color:#F8F6F0;font-weight:500">消息链路</td><td>粉丝消息 + 大V回复 + 复盘提醒</td><td>处理消息、回复、推送复盘提醒</td><td>管理 DM 开关与审计，不直接代替回复</td></tr>
-              <tr><td style="color:#F8F6F0;font-weight:500">复盘</td><td>展示大V复盘 + 智能复盘</td><td>发起复盘、选周期、挑自选股、决定段落方式</td><td>管理租户是否开通复盘工作流</td></tr>
-              <tr><td style="color:#F8F6F0;font-weight:500">知识库</td><td>知识专区展示沉淀结果</td><td>语音/文件/URL 入库，历史内容继续微调</td><td>管理知识功能开关和租户能力边界</td></tr>
+              <tr><td style="color:#F8F6F0;font-weight:500">洞见</td><td>阅读大V已发布洞见</td><td>从Hermes或手工输入生成草稿，编辑后选择免费/订阅专享并发布</td><td>监控发布成功率、内容访问和订阅转化</td></tr>
+              <tr><td style="color:#F8F6F0;font-weight:500">知识库</td><td>当前关闭</td><td>当前关闭，不作为生产路径</td><td>只保留能力开关和边界记录</td></tr>
               <tr><td style="color:#F8F6F0;font-weight:500">小金智能体</td><td>工作区版 + 小金纯对话版</td><td>维护 skill、知识绑定、查看使用动作</td><td>监控调用、算力、双版本使用与知识命中</td></tr>
               <tr><td style="color:#F8F6F0;font-weight:500">自选股</td><td>顶部输代码，进详情后添加自选</td><td>按复盘和 Hermes 工作流挑选重点样本</td><td>不直接管理个股内容，只管理功能可用性</td></tr>
               <tr><td style="color:#F8F6F0;font-weight:500">智能 Dashboard</td><td>默认总结态，单格提示词生成</td><td>配置单格提示词和发布面板</td><td>管理该能力的租户开关和一致性说明</td></tr>
@@ -4738,8 +4752,8 @@
                       <div class="admin-settings-menu-copy">知识召回过滤、回答超时和共用证据链白盒提示词。</div>
                     </button>
                     <button class="admin-settings-menu-btn" type="button" data-settings-panel-trigger="review-flow" onclick="openAdminSettingsSubmenu('review-flow')">
-                      <div class="admin-settings-menu-title">复盘生成配置</div>
-                      <div class="admin-settings-menu-copy">用户复盘生成、摘要与自选股归纳总结的两阶段模板。</div>
+                      <div class="admin-settings-menu-title">洞见生成配置</div>
+                      <div class="admin-settings-menu-copy">用户洞见生成、摘要与发布预览的统一模板。</div>
                     </button>
                   </div>
                 </div>
@@ -4812,7 +4826,8 @@
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">基本面分析</div><div class="feature-toggle-desc">位置：H5 基本面页和大V工作台基本面看板。控制新闻聚合、综合归纳要闻与基本面研究入口。</div></div><label class="toggle"><input id="feature-fundamental_analysis" type="checkbox" checked><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">自选股</div><div class="feature-toggle-desc">位置：H5 自选股、大V工作台自选股详情。控制标的查询、K线、指标、标注、观察记录及详情页入口。</div></div><label class="toggle"><input id="feature-watchlist" type="checkbox" checked><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">股票 K 线预测</div><div class="feature-toggle-desc">位置：自选股预测能力和大V工作台预测模型页。控制预测结果展示及预测工作流配置入口。</div></div><label class="toggle"><input id="feature-stock_forecast" type="checkbox"><span class="toggle-slider"></span></label></div>
-                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">每日复盘</div><div class="feature-toggle-desc">位置：H5 复盘专区、大V工作台复盘生产台和已发布复盘。控制复盘输入、优化成稿、摘要、自选股归纳与发布浏览。</div></div><label class="toggle"><input id="feature-daily_review" type="checkbox" checked><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">每日洞见</div><div class="feature-toggle-desc">位置：H5 洞见、大V工作台洞见发布台和已发布洞见。控制洞见输入、优化成稿、摘要与发布浏览。</div></div><label class="toggle"><input id="feature-daily_review" type="checkbox" checked><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">核心指标</div><div class="feature-toggle-desc">封存开关。关闭后隐藏 H5 核心指标面板、大V智能 Dashboard 与智能指标入口；热门行业和市场一览不受影响。</div></div><label class="toggle"><input id="feature-core_indicators" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">知识专区</div><div class="feature-toggle-desc">位置：H5、大V工作台和 Admin 知识专区。当前因知识库重构暂不开放；重新勾选并保存后，才会恢复知识入口和接口。</div></div><label class="toggle"><input id="feature-knowledge" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">复盘语音供稿</div><div class="feature-toggle-desc">位置：H5 与大V工作台复盘供稿方式。当前关闭，恢复后才允许录音和语音转写。</div></div><label class="toggle"><input id="feature-review_voice_input" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">复盘网页供稿</div><div class="feature-toggle-desc">位置：H5 与大V工作台复盘供稿方式。当前关闭，恢复后才允许抓取网页 URL。</div></div><label class="toggle"><input id="feature-review_url_input" type="checkbox"><span class="toggle-slider"></span></label></div>
@@ -4836,6 +4851,8 @@
                         <label class="toggle"><input id="auth-wechat-runtime-test-enabled" type="checkbox" checked><span class="toggle-slider"></span></label>
                       </div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">付费回复</div><div class="feature-toggle-desc">位置：消息/私信的商业化回复场景。控制需要付费或权益校验后才可发起的回复能力，不影响已开放的普通消息浏览。</div></div><label class="toggle"><input id="feature-paid_reply" type="checkbox"><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">粉丝订阅与收款</div><div class="feature-toggle-desc">开启后，租户可配置订阅产品、创建待支付订单并按真实到账状态开通权益。未配置支付渠道时不会伪造支付成功。</div></div><label class="toggle"><input id="feature-fan_commerce" type="checkbox"><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">粉丝扫码导入</div><div class="feature-toggle-desc">开启后，大V可生成租户专属二维码。粉丝扫码登录或注册后自动归属当前租户，并记录来源和批次。</div></div><label class="toggle"><input id="feature-fan_qr_import" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">大V 工作台 Web</div><div class="feature-toggle-desc">位置：Web 端大V工作台及租户经营页面。控制工作台、数据分析、粉丝管理和复盘生产台入口。</div></div><label class="toggle"><input id="feature-workbench" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="feature-note">平台统一使用用户表中的用户名和密码登录，不再使用共享访问密码或“系统锁定”门禁。账号状态由用户管理维护。</div>
                       <div class="feature-note" style="margin-top:8px">MVP 默认优先开放：基本面、自选股、复盘、消息互动、知识归档、大V工作台和租户门户；预测分析放到第二阶段，会员收费能力按层级逐步开放。</div>
@@ -4925,7 +4942,7 @@
                       </div>
                       <div class="config-field">
                         <label>资料用途</label>
-                        <input type="text" value="形成租户研究资料底座，并同步到基本面、自选股分析、Hermes 与工作台研究记录" readonly>
+                        <input type="text" value="形成租户研究资料底座，并同步到基本面、洞见、Hermes 与工作台研究记录" readonly>
                       </div>
                       <div class="config-field">
                         <label>语音转写引擎</label>
@@ -5048,14 +5065,14 @@
                   <div class="admin-settings-panel-head">
                     <div>
                       <div class="admin-settings-panel-kicker">Knowledge</div>
-                      <div class="admin-settings-panel-title">复盘生成配置</div>
-                      <div class="admin-settings-panel-desc">这里配置复盘的生成链路：先生成用户复盘，再基于用户确认内容生成摘要和自选股归纳总结。工作台和 H5 共用这一套白盒模板。</div>
+                      <div class="admin-settings-panel-title">洞见生成配置</div>
+                      <div class="admin-settings-panel-desc">这里配置洞见的生成链路：先生成用户洞见，再基于用户确认内容生成摘要和发布预览。工作台和 H5 共用这一套白盒模板。</div>
                     </div>
-                    <div class="admin-settings-panel-note">复盘参数属于系统级生产配置，前台页面只消费结果，不直接暴露这些模板。</div>
+                    <div class="admin-settings-panel-note">洞见参数属于系统级生产配置，前台页面只消费结果，不直接暴露这些模板。</div>
                   </div>
                   <div class="config-grid single-column">
                     <div class="config-card">
-                      <div class="config-card-title">复盘生成白盒配置</div>
+                      <div class="config-card-title">洞见生成白盒配置</div>
                       <div class="config-field">
                         <label>阶段1：输入润色系统提示词</label>
                         <textarea id="review-polish-system-prompt" rows="8" placeholder="输入润色系统提示词"></textarea>
@@ -5070,7 +5087,7 @@
                       </div>
                       <div class="config-field">
                         <label>阶段2：完整成稿用户模板</label>
-                        <textarea id="review-compose-user-template" rows="10" placeholder="可使用 {period_label} / {speaker_label} / {entry_point} / {watchlist_text} / {tag_text} / {prompt_text} / {source_text} / {dashboard_blocks}"></textarea>
+                        <textarea id="review-compose-user-template" rows="10" placeholder="可使用 {period_label} / {speaker_label} / {entry_point} / {tag_text} / {prompt_text} / {source_text} / {dashboard_blocks} / {knowledge_blocks}"></textarea>
                       </div>
                       <div class="config-grid two-column" style="margin-top:12px">
                         <div class="config-field">
@@ -5083,7 +5100,7 @@
                         </div>
                       </div>
                       <div class="feature-note">
-                        这里是复盘两阶段生成的白盒配置。工作台中的“开始优化”和后续的摘要、自选股归纳总结都会读取这里的提示词与超时设置。
+                        这里是洞见生成的白盒配置。工作台中的“开始优化”和后续的摘要、发布预览都会读取这里的提示词与超时设置。
                       </div>
                     </div>
                   </div>
@@ -5202,8 +5219,8 @@
               <input type="text" value="仅可与所属大V投顾互动，跨租户投顾内容默认关闭" readonly>
             </div>
             <div class="config-field">
-              <label>自选股分析回流</label>
-              <input type="text" value="普通投资者通过 Hermes 发起的个股分析记录同步主理投顾" readonly>
+              <label>研究需求回流</label>
+              <input type="text" value="普通投资者通过 Hermes 提交的未覆盖需求进入租户研究需求统计" readonly>
             </div>
             <div class="feature-note">
               Admin 负责统一租户隔离策略，保证前台自选股、私信、活动与工作台使用同一套权限边界。
@@ -6481,6 +6498,11 @@ function showSection(name, navEl) {
   const normalized = normalizeAdminSection(name);
   name = normalized.section || name;
   mountUnifiedSystemSettings();
+  if (name === 'indicator-smart' && !isAdminFeatureEnabled('core_indicators')) {
+    showToast('核心指标当前已封存');
+    name = 'overview';
+    navEl = document.querySelector('.admin-nav-item[data-section="overview"]');
+  }
   if (name.indexOf('knowledge-') === 0 && !isAdminFeatureEnabled('knowledge')) {
     showToast('知识专区当前暂不开放');
     name = 'overview';
@@ -11129,6 +11151,7 @@ const SITE_CONFIG_BROADCAST_KEY = 'gangtise-site-config-updated-at';
 function isAdminFeatureEnabled(featureName) {
   const flags = (adminSiteConfig && adminSiteConfig.feature_flags) || {};
   if (featureName === 'knowledge' && flags.knowledge_module_enabled !== true) return false;
+  if (featureName === 'core_indicators') return flags.core_indicators === true;
   return flags[featureName] !== false;
 }
 
@@ -11944,7 +11967,7 @@ function renderSiteConfigForm() {
   if (document.getElementById('brand-hero-tagline')) document.getElementById('brand-hero-tagline').value = brand.hero_tagline || '';
   if (document.getElementById('brand-hero-description')) document.getElementById('brand-hero-description').value = brand.hero_description || '';
   if (document.getElementById('brand-footer-description')) document.getElementById('brand-footer-description').value = brand.footer_description || '';
-  ['user_module', 'kol_module', 'tenant_portal', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'review_voice_input', 'review_url_input', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'h5_watermark', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'paid_reply', 'workbench'].forEach(key => {
+  ['user_module', 'kol_module', 'tenant_portal', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'core_indicators', 'knowledge', 'review_voice_input', 'review_url_input', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'h5_watermark', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'paid_reply', 'fan_commerce', 'fan_qr_import', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     if (checkbox) {
       checkbox.checked = key === 'knowledge'
@@ -11994,7 +12017,13 @@ function renderSiteConfigForm() {
   if (channelsSection && !isAdminFeatureEnabled('channel_module') && channelsSection.style.display !== 'none') {
     showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
   }
-  ['section-indicator-overview', 'section-indicator-smart', 'section-indicator-lake', 'section-indicator-anomalies', 'section-indicator-sources', 'section-news-sources', 'section-indicator-definitions', 'section-indicator-pipeline'].forEach((id) => {
+  ['section-indicator-smart'].forEach((id) => {
+    const section = document.getElementById(id);
+    if (section && !isAdminFeatureEnabled('core_indicators') && section.style.display !== 'none') {
+      showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
+    }
+  });
+  ['section-indicator-overview', 'section-indicator-lake', 'section-indicator-anomalies', 'section-indicator-sources', 'section-news-sources', 'section-indicator-definitions', 'section-indicator-pipeline'].forEach((id) => {
     const section = document.getElementById(id);
     if (section && !isAdminFeatureEnabled('analytics_module') && section.style.display !== 'none') {
       showSection('overview', document.querySelector('.admin-nav-item[data-section="overview"]'));
@@ -12276,7 +12305,7 @@ async function saveSiteConfig() {
     showToast('Hermes 配置格式有误');
     return;
   }
-  ['user_module', 'kol_module', 'tenant_portal', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'h5_watermark', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'paid_reply', 'workbench'].forEach(key => {
+  ['user_module', 'kol_module', 'tenant_portal', 'fundamental_analysis', 'watchlist', 'stock_forecast', 'daily_review', 'knowledge', 'community', 'hermes', 'channel_module', 'analytics_module', 'system_module', 'h5_watermark', 'vip', 'dm', 'fan_interaction', 'watchlist_fan_comment_interaction', 'paid_reply', 'fan_commerce', 'fan_qr_import', 'workbench'].forEach(key => {
     const checkbox = document.getElementById('feature-' + key);
     featureFlags[key] = Boolean(checkbox && checkbox.checked);
   });

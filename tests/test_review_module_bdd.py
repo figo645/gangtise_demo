@@ -87,7 +87,7 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("function setReviewOptimizeRuleMode(mode)", html)
         self.assertIn("async function submitReviewSmartOptimize()", html)
         self.assertIn("draft_generating", html)
-        self.assertIn("正在生成 Draft", html)
+        self.assertIn("正在生成洞见草稿", html)
         self.assertIn("function renderReviewDraftReviewPanel()", html)
         self.assertIn("function confirmReviewDraftToPreview()", html)
         self.assertIn("function prepareReviewDirectPreview()", html)
@@ -112,22 +112,22 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("onclick=\"publishReviewDraft()\"", html)
         self.assertIn("url.searchParams.set('review', 'compose')", html)
         self.assertIn("function loadActiveReviewJobs()", html)
-        self.assertIn("已有复盘草稿正在生成，请勿重复提交", html)
+        self.assertIn("已有洞见草稿正在生成，请勿重复提交", html)
         self.assertIn('oninput="reviewTriggerDraft.reviewTitle = this.value"', html)
         self.assertIn("reviewHostSelector = reviewProductionPage ? '#review-production-page-content' : '#review-trigger-modal-content'", html)
-        self.assertIn("reviewTriggerDraft.flowStage = partialAnalysis ? 'structured_review' : 'preview_failed'", html)
-        self.assertIn("已保留当前任务的阶段日志和部分返回内容", html)
-        self.assertIn("重新生成自选股分析", html)
-        self.assertIn("const combinedText = String(watchlistSection.combined_text || '').trim()", html)
-        self.assertIn("function renderGangtiseMarkdown(value)", html)
-        self.assertIn("const recoverCompressedTable = (rawText) =>", html)
-        self.assertIn("review-gangtise-table-wrap", html)
-        self.assertIn("const headers = tableCells(line)", html)
-        self.assertIn('placeholder="这里是 Gangtise 已返回的分析内容，可继续修改。"', html)
-        self.assertIn('id="review-structured-combined-text"', html)
-        self.assertIn("reviewStructuredPreview.watchlist_analysis_section.combined_text = structuredCombinedText.value", html)
-        self.assertIn("const progressMarkup = failed", html)
-        self.assertIn("watchlist_gangtise_sse_streaming')", html)
+        self.assertIn("function saveReviewDraft()", html)
+        self.assertIn("function renderReviewDraftLibraryOverview()", html)
+        self.assertIn("${drafts.map((draft) => `", html)
+        self.assertNotIn("const previewDrafts = drafts.slice(0, 3)", html)
+        self.assertIn("洞见草稿已保存，可随时继续编辑或发布", html)
+        self.assertIn("function renderReviewDraftLibraryOverview()", html)
+        self.assertIn("function openInsightDraftLibrary()", html)
+        self.assertIn("id=\"review-insight-drafts-overview-host\"", html)
+        self.assertIn("洞见草稿箱", html)
+        self.assertIn("小金智能体加入的内容和手动保存的洞见都会在这里", html)
+        self.assertIn("function openInsightDraftFromHermes(entryId)", html)
+        self.assertIn("加入洞见笔记草稿", html)
+        self.assertNotIn("需要自选股 AI 分析", html)
         self.assertNotIn("id=\"review-skip-ai-processing\"", html)
         self.assertNotIn("function toggleReviewSkipAiProcessing", html)
         self.assertNotIn("不使用大模型处理", html)
@@ -401,7 +401,7 @@ class ReviewModuleBddTest(unittest.TestCase):
         html = response.get_data(as_text=True)
         self.assertIn('id="kw-review-title-input"', html)
         self.assertIn("review_title: String(kwReviewDraft.reviewTitle || '').trim()", html)
-        self.assertIn("showToast('请先填写复盘主题')", html)
+        self.assertIn("showToast('请先填写洞见主题')", html)
 
     def test_given_h5_publish_success_when_page_renders_then_publish_no_longer_opens_test_modal(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slug}")
@@ -410,46 +410,36 @@ class ReviewModuleBddTest(unittest.TestCase):
         html = response.get_data(as_text=True)
         self.assertNotIn("openReviewIngestResultModal('确认发布成功，已写入向量库'", html)
 
-    def test_given_h5_review_when_page_renders_then_optional_watchlist_is_not_preselected(self):
+    def test_given_h5_review_when_page_renders_then_legacy_watchlist_stage_is_not_exposed(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slug}")
 
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
-        self.assertIn("kolSelectedWatchlist: []", html)
-        self.assertIn("function hasReviewWatchlistAnalysisContent(section)", html)
+        self.assertNotIn("第二阶段：选择需要 AI 分析的自选股", html)
+        self.assertNotIn("kolSelectedWatchlist: []", html)
         self.assertIn("coverTitle: deriveReviewCoverTitle(review)", html)
         self.assertIn("证据链总结", html)
         self.assertNotIn("模型记录", html)
         self.assertIn("syncPublishedReviewStateToH5((user && user.tenant && user.tenant.slug) || '', publishResult);", html)
 
-    def test_given_exact_stock_search_in_review_stage_two_then_candidate_is_added_and_selected(self):
-        """A precise name/code lookup must become a checked analysis item without another click."""
+    def test_given_legacy_review_stage_two_then_stock_analysis_controls_are_removed(self):
+        """The old stock-analysis stage must not be part of Insight publishing."""
         h5 = (PROJECT_ROOT / "templates" / "h5.html").read_text(encoding="utf-8")
         workbench = (PROJECT_ROOT / "templates" / "kol_workbench.html").read_text(encoding="utf-8")
 
-        for html, state_name, add_function in (
-            (h5, "reviewWatchlistAddedItems", "addReviewWatchlistCandidate"),
-            (workbench, "kwReviewWatchlistAddedItems", "kwAddReviewWatchlistCandidate"),
-        ):
-            with self.subTest(state_name=state_name):
-                self.assertIn(f"let {state_name} = [];", html)
-                self.assertIn("const displayItems = [", html)
-                self.assertIn("...addedItems.filter", html)
-                self.assertIn(f"if (exact) {add_function}(", html)
-                self.assertIn("next.add(actualName);", html)
-                self.assertIn("type=\"checkbox\" ${selected", html)
+        self.assertNotIn("第二阶段：选择需要 AI 分析的自选股", h5)
+        self.assertNotIn("第二阶段：选择需要 AI 分析的自选股", workbench)
+        self.assertNotIn("需要自选股 AI 分析", h5)
+        self.assertNotIn("需要自选股 AI 分析", workbench)
 
-    def test_given_h5_review_stage_two_then_candidates_are_read_from_the_current_user_watchlist(self):
+    def test_given_h5_review_then_legacy_watchlist_selector_is_not_rendered(self):
         html = (PROJECT_ROOT / "templates" / "h5.html").read_text(encoding="utf-8")
-        self.assertIn("getCurrentUserWatchlistItems()", html)
-        self.assertIn("这里只显示当前用户在自选股板块中已保存的股票", html)
-        self.assertIn("if (!userWatchlistLoaded) return [];", html)
+        self.assertNotIn("这里只显示当前用户在自选股板块中已保存的股票", html)
+        self.assertNotIn("确认列表并开始分析", html)
         self.assertNotIn("tenant_lw: ['中芯国际', '腾讯控股', '贵州茅台', '宁德时代', '招商银行', '寒武纪', '比亚迪']", html)
 
         workbench = (PROJECT_ROOT / "templates" / "kol_workbench.html").read_text(encoding="utf-8")
-        self.assertIn("getKwTenantWatchlistItems()", workbench)
-        self.assertIn("这里只显示当前大V在自选股板块中已保存的股票", workbench)
-        self.assertIn('"watchlist_items": watchlist_items', (PROJECT_ROOT / "src/domain/workbench_services.py").read_text(encoding="utf-8"))
+        self.assertNotIn("这里只显示当前大V在自选股板块中已保存的股票", workbench)
 
     def test_given_sector_summary_rule_when_refining_then_llm_receives_rule_and_output_is_limited(self):
         captured = {}
@@ -493,21 +483,24 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("Gangtise 多股综合分析正文", rendered)
         self.assertIn("板块归纳：按规则生成的板块归纳总结", rendered)
 
-    def test_given_h5_structured_review_then_sector_summary_rule_control_is_rendered(self):
+    def test_given_h5_insight_then_sector_summary_rule_control_is_not_reachable(self):
         html = (PROJECT_ROOT / "templates" / "h5.html").read_text(encoding="utf-8")
-        self.assertIn('id="review-structured-sector-summary-rule"', html)
-        self.assertIn("应用规则并重新生成", html)
-        self.assertIn("async function applyReviewSectorSummaryRule()", html)
-        self.assertIn("/api/review/refine-sector-summary", html)
-        self.assertIn('maxlength="1000"', html)
+        self.assertNotIn("需要自选股 AI 分析", html)
+        self.assertNotIn("确认列表并开始分析", html)
+        self.assertIn("function saveReviewDraft()", html)
+        self.assertIn("function openInsightDraftFromHermes(entryId)", html)
 
     def test_given_h5_review_when_page_renders_then_published_articles_use_current_tenant_pages(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slug}")
 
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
-        self.assertIn("const articles = buildAllPublishedReviewArticles().slice(0, 3);", html)
+        self.assertIn("const articles = String(reviewSearchKeyword || '').trim() ? filteredArticles : allArticles.slice(0, 3);", html)
         self.assertIn("onclick=\"openReviewArticleList()\">查看全部</button>", html)
+        self.assertIn("function getReviewArticleSearchText(article)", html)
+        self.assertIn("function handleReviewSearchInput(value)", html)
+        self.assertIn("/api/watchlist/search?q=", html)
+        self.assertIn("支持输入洞见主题、个股名称、股票代码或内容标签", html)
         self.assertIn("onclick=\"openReviewArticleDetail('${escapeAttr(article.id)}')\"", html)
         self.assertIn("reviewParams.get('review_view')", html)
         self.assertIn("reviewParams.get('review_id')", html)
@@ -2486,6 +2479,70 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertIn("CREATE TABLE IF NOT EXISTS user_watchlist_items", connection.statements[0])
         self.assertIn("uq_user_watchlist_items_owner_stock", connection.statements[1])
 
+    def test_given_watchlist_detail_provider_failure_when_listing_then_persisted_item_remains_visible(self):
+        tenant_slug = self.tenant_slug
+
+        class _Cursor:
+            def fetchall(self):
+                return [{
+                    "id": 11,
+                    "tenant_slug": tenant_slug,
+                    "user_profile_id": "财经老王",
+                    "stock_code": "600519",
+                    "stock_name": "贵州茅台",
+                    "market": "SH",
+                    "industry": "高端白酒",
+                    "created_at": "2026-09-14 09:00:00",
+                    "updated_at": "2026-09-14 09:00:00",
+                }]
+
+        class _Db:
+            def execute(self, sql, params=()):
+                return _Cursor()
+
+        with patch("src.domain.market_services.get_db", return_value=_Db()), patch(
+            "src.domain.market_services.get_watchlist_detail_by_code",
+            side_effect=RuntimeError("provider_timeout"),
+        ):
+            items = market_services.list_user_watchlist_items(tenant_slug, "财经老王")
+
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["code"], "600519")
+        self.assertEqual(items[0]["name"], "贵州茅台")
+        self.assertTrue(items[0]["data_unavailable"])
+
+    def test_given_watchlist_insert_success_when_detail_reload_fails_then_add_returns_success(self):
+        tenant_slug = self.tenant_slug
+        inserted = []
+
+        class _Cursor:
+            def fetchall(self):
+                return []
+
+        class _Db:
+            def execute(self, sql, params=()):
+                if sql.strip().startswith("INSERT INTO user_watchlist_items"):
+                    inserted.append(params)
+                return _Cursor()
+
+            def commit(self):
+                return None
+
+        detail = {"code": "600519", "name": "贵州茅台", "market": "SH", "industry": "高端白酒"}
+        with patch("src.domain.market_services.get_db", return_value=_Db()), patch(
+            "src.domain.market_services.get_watchlist_detail_by_code", return_value=detail
+        ), patch(
+            "src.domain.market_services.list_user_watchlist_items",
+            side_effect=AssertionError("add must not reload the full list"),
+        ):
+            item = market_services.add_user_watchlist_item(
+                tenant_slug, "财经老王", "600519", "贵州茅台"
+            )
+
+        self.assertEqual(len(inserted), 1)
+        self.assertEqual(item["code"], "600519")
+        self.assertEqual(item["name"], "贵州茅台")
+
     def test_given_missing_gangtise_credentials_when_admin_diagnoses_market_data_then_the_reason_is_explicit(self):
         with patch("src.domain.market_services.get_gangtise_openapi_config", return_value={"base_url": "https://openapi.gangtise.com", "access_key": "", "secret_key": "", "long_token": ""}):
             diagnostic = market_services.build_gangtise_market_runtime_diagnostic()
@@ -3118,7 +3175,7 @@ class ReviewModuleBddTest(unittest.TestCase):
         with patch("src.domain.ai_services.summarize_review_user_input_with_llm", return_value=summary_result), patch(
             "src.domain.ai_services.analyze_review_watchlist_with_llm",
             return_value=watchlist_result,
-        ):
+        ) as watchlist_mock:
             preview = ai_services.compose_review_structured_preview(
                 source_text="今天先聚焦半导体主线，重点观察景气兑现和市场确认。",
                 review_period="day",
@@ -3129,12 +3186,12 @@ class ReviewModuleBddTest(unittest.TestCase):
                 tenant_slug=self.tenant_slug,
             )
 
+        watchlist_mock.assert_not_called()
         watchlist_section = preview["watchlist_analysis_section"]
         self.assertEqual(preview["review_summary"], summary_result["summary"])
-        self.assertEqual(len(watchlist_section["annotation_evidence"]), 1)
-        self.assertEqual(watchlist_section["annotation_evidence"][0]["title"], "放量确认")
-        self.assertIn("优先根据 K 线标注判断量价确认", watchlist_section["items"][0]["analysis_text"])
-        self.assertIn("板块归纳：半导体板块以中芯国际为代表", preview["final_text"])
+        self.assertEqual(watchlist_section["annotation_evidence"], [])
+        self.assertEqual(watchlist_section["items"], [])
+        self.assertNotIn("半导体板块以中芯国际为代表", preview["final_text"])
 
     def test_given_no_watchlist_when_composing_review_preview_then_summary_still_returns(self):
         summary_result = {
@@ -3159,10 +3216,10 @@ class ReviewModuleBddTest(unittest.TestCase):
         self.assertEqual(preview["review_summary"], summary_result["summary"])
         self.assertEqual(preview["watchlist_analysis_section"]["sector_summary"], "")
         self.assertEqual(preview["watchlist_analysis_section"]["items"], [])
-        self.assertIn("【复盘摘要】", preview["final_text"])
+        self.assertIn("【洞见摘要】", preview["final_text"])
         self.assertNotIn("【自选股归纳分析】", preview["final_text"])
 
-    def test_given_skip_summary_when_composing_review_preview_then_only_watchlist_analysis_returns(self):
+    def test_given_skip_summary_when_composing_review_preview_then_legacy_watchlist_analysis_is_ignored(self):
         watchlist_result = {
             "sector_summary": "半导体板块继续作为核心观察样本。",
             "sector_profiles": [
@@ -3190,7 +3247,7 @@ class ReviewModuleBddTest(unittest.TestCase):
         with patch("src.domain.ai_services.summarize_review_user_input_with_llm") as summary_mock, patch(
             "src.domain.ai_services.analyze_review_watchlist_with_llm",
             return_value=watchlist_result,
-        ):
+        ) as watchlist_mock:
             preview = ai_services.compose_review_structured_preview(
                 source_text="今天先聚焦半导体主线，重点观察景气兑现和市场确认。",
                 review_period="day",
@@ -3203,10 +3260,11 @@ class ReviewModuleBddTest(unittest.TestCase):
             )
 
         summary_mock.assert_not_called()
+        watchlist_mock.assert_not_called()
         self.assertEqual(preview["review_summary"], "")
-        self.assertEqual(preview["watchlist_analysis_section"]["sector_summary"], "半导体板块继续作为核心观察样本。")
-        self.assertNotIn("【复盘摘要】", preview["final_text"])
-        self.assertIn("【自选股归纳分析】", preview["final_text"])
+        self.assertEqual(preview["watchlist_analysis_section"]["sector_summary"], "")
+        self.assertEqual(preview["watchlist_analysis_section"]["items"], [])
+        self.assertNotIn("【自选股归纳分析】", preview["final_text"])
 
     def test_given_review_text_when_building_evidence_chain_then_knowledge_and_web_matches_are_combined(self):
         knowledge_result = {

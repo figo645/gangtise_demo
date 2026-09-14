@@ -293,6 +293,7 @@ def api_review_publish_embed():
             "review_summary": body.get("review_summary"),
             "user_input_section": body.get("user_input_section") if isinstance(body.get("user_input_section"), dict) else {},
             "watchlist_analysis_section": body.get("watchlist_analysis_section") if isinstance(body.get("watchlist_analysis_section"), dict) else {},
+            "access_mode": str(body.get("access_mode") or "public").strip().lower() or "public",
         }
         if not is_feature_enabled("knowledge"):
             payload["knowledge_attachments"] = []
@@ -324,6 +325,7 @@ def api_review_publish_embed():
             review_summary=payload.get("review_summary"),
             user_input_section=payload.get("user_input_section"),
             watchlist_analysis_section=payload.get("watchlist_analysis_section"),
+            access_mode=payload.get("access_mode"),
         )
         payload["snapshot_sync_applied"] = True
         payload["snapshot_id"] = str(((snapshot_result.get("snapshot") or {}).get("id")) or "").strip()
@@ -335,7 +337,7 @@ def api_review_publish_embed():
     response_payload = {
         "success": True,
         "async": False,
-        "message": "复盘已发布",
+        "message": "洞见已发布",
         "publish_processing": "snapshot_only",
         "embedding_generated": False,
         **snapshot_result,
@@ -345,100 +347,14 @@ def api_review_publish_embed():
 
 @app.route("/api/review/prepare-preview", methods=["POST"])
 def api_review_prepare_preview():
-    body = request.get_json(silent=True) or {}
-    try:
-        tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
-        entry_point = str(body.get("entry_point") or "").strip().lower() or "review_preview"
-        speaker_name = str(body.get("speaker_name") or "").strip()
-        payload = {
-            "tenant_slug": tenant_slug,
-            "period": str(body.get("period") or "").strip().lower(),
-            "review_title": str(body.get("review_title") or "").strip(),
-            "source_mode": str(body.get("source_mode") or "").strip().lower(),
-            "source_text": body.get("source_text"),
-            "selected_watchlist": body.get("selected_watchlist") if isinstance(body.get("selected_watchlist"), list) else [],
-            "speaker_name": speaker_name,
-            "entry_point": entry_point,
-            "include_summary": _is_truthy_flag(body.get("include_summary")) if "include_summary" in body else True,
-        }
-        source_mode = payload.get("source_mode")
-        if source_mode == "voice" and not is_feature_enabled("review_voice_input"):
-            raise ValueError("review_voice_input_disabled")
-        if source_mode == "url" and not is_feature_enabled("review_url_input"):
-            raise ValueError("review_url_input_disabled")
-        if not str(payload.get("source_text") or "").strip():
-            raise ValueError("review_source_text_required")
-        job = create_user_async_job(
-            "review_prepare_preview",
-            payload=payload,
-            tenant_slug=tenant_slug,
-            entry_point=entry_point,
-            owner_label=speaker_name,
-        )
-    except ValueError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 400
-    except RuntimeError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 503
-    except Exception as exc:
-        if is_db_unavailable_error(exc):
-            return jsonify({"ok": False, "error": "database_unavailable"}), 503
-        app.logger.exception("Failed to prepare review preview")
-        return jsonify({"ok": False, "error": "review_prepare_preview_failed"}), 500
-    return jsonify(
-        {
-            "ok": True,
-            "async": True,
-            "job_code": job["job_code"],
-            "job_status": job["status"],
-            "message": "复盘结构化预览已提交生成，正在后台整理摘要和可选归纳内容",
-        }
-    )
+    # The former second-stage stock analysis called Gangtise. Insight notes
+    # now only support author editing and optional whole-note optimization.
+    return jsonify({"ok": False, "error": "insight_stock_analysis_removed"}), 410
 
 
 @app.route("/api/review/refine-sector-summary", methods=["POST"])
 def api_review_refine_sector_summary():
-    body = request.get_json(silent=True) or {}
-    try:
-        tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
-        entry_point = str(body.get("entry_point") or "").strip().lower() or "review_sector_summary_constraint"
-        speaker_name = str(body.get("speaker_name") or "").strip()
-        sector_summary = str(body.get("sector_summary") or "").strip()
-        rule_text = str(body.get("rule_text") or "").strip()
-        if not sector_summary:
-            raise ValueError("review_sector_summary_required")
-        if not rule_text:
-            raise ValueError("review_sector_summary_rule_required")
-        payload = {
-            "tenant_slug": tenant_slug,
-            "period": str(body.get("period") or "").strip().lower(),
-            "sector_summary": sector_summary,
-            "sector_profiles": body.get("sector_profiles") if isinstance(body.get("sector_profiles"), list) else [],
-            "watchlist_items": body.get("watchlist_items") if isinstance(body.get("watchlist_items"), list) else [],
-            "rule_text": rule_text,
-            "speaker_name": speaker_name,
-            "entry_point": entry_point,
-        }
-        job = create_user_async_job(
-            "review_sector_summary_constraint",
-            payload=payload,
-            tenant_slug=tenant_slug,
-            entry_point=entry_point,
-            owner_label=speaker_name,
-        )
-    except ValueError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 400
-    except RuntimeError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 503
-    except Exception:
-        app.logger.exception("Failed to refine review sector summary")
-        return jsonify({"ok": False, "error": "review_sector_summary_constraint_failed"}), 500
-    return jsonify({
-        "ok": True,
-        "async": True,
-        "job_code": job["job_code"],
-        "job_status": job["status"],
-        "message": "自选股总结规则已提交，正在后台调用大模型",
-    })
+    return jsonify({"ok": False, "error": "insight_stock_analysis_removed"}), 410
 
 
 @app.route("/api/market")
@@ -1427,12 +1343,12 @@ def api_admin_indicator_trace(indicator_code):
 @app.route("/api/site-config")
 def api_site_config():
     try:
-        return jsonify(get_site_config())
+        return jsonify(build_fan_safe_site_config(get_site_config(), get_current_authenticated_user()))
     except Exception as exc:
         if not is_db_unavailable_error(exc):
             raise
         app.logger.warning("Database unavailable while serving site config API, using defaults")
-        return jsonify(normalize_site_config(DEFAULT_SITE_CONFIG))
+        return jsonify(build_fan_safe_site_config(normalize_site_config(DEFAULT_SITE_CONFIG), get_current_authenticated_user()))
 
 
 @app.route("/api/h5/auth-options")
@@ -1451,6 +1367,57 @@ def api_h5_auth_options():
             current_profile=fallback_current,
         )
         return jsonify({"ok": True, **payload})
+
+
+@app.route("/api/h5/tenant/<tenant_slug>/commerce")
+def api_h5_commerce(tenant_slug):
+    tenant = get_tenant_by_slug(tenant_slug)
+    if not tenant or tenant.get("slug") != str(tenant_slug or "").strip().lower():
+        return jsonify({"ok": False, "error": "tenant_not_found"}), 404
+    user = get_current_authenticated_user() or {}
+    if str(user.get("role") or "").strip().lower() != "investor" or str(user.get("tenant_slug") or "").strip().lower() != tenant["slug"]:
+        return jsonify({"ok": False, "error": "investor_required"}), 403
+    return jsonify({"ok": True, "commerce": build_fan_commerce_payload(tenant["slug"], user)})
+
+
+@app.route("/api/h5/tenant/<tenant_slug>/commerce/orders", methods=["POST"])
+def api_h5_create_commerce_order(tenant_slug):
+    tenant = get_tenant_by_slug(tenant_slug)
+    user = get_current_authenticated_user() or {}
+    if not tenant or tenant.get("slug") != str(tenant_slug or "").strip().lower():
+        return jsonify({"ok": False, "error": "tenant_not_found"}), 404
+    try:
+        body = request.get_json(silent=True) or {}
+        order = create_fan_payment_order(tenant["slug"], user, body.get("product_id"))
+    except (TypeError, ValueError) as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "order": order, "commerce": build_fan_commerce_payload(tenant["slug"], user)})
+
+
+@app.route("/api/h5/tenant/<tenant_slug>/commerce/orders")
+def api_h5_list_commerce_orders(tenant_slug):
+    tenant = get_tenant_by_slug(tenant_slug)
+    user = get_current_authenticated_user() or {}
+    if not tenant or tenant.get("slug") != str(tenant_slug or "").strip().lower():
+        return jsonify({"ok": False, "error": "tenant_not_found"}), 404
+    if str(user.get("role") or "").strip().lower() != "investor" or str(user.get("tenant_slug") or "").strip().lower() != tenant["slug"]:
+        return jsonify({"ok": False, "error": "investor_required"}), 403
+    return jsonify({"ok": True, "orders": list_fan_payment_orders(tenant["slug"], user)})
+
+
+@app.route("/api/h5/tenant/<tenant_slug>/commerce/qr/<token>/claim", methods=["POST"])
+def api_h5_claim_qr_invite(tenant_slug, token):
+    tenant = get_tenant_by_slug(tenant_slug)
+    user = get_current_authenticated_user() or {}
+    if not tenant or tenant.get("slug") != str(tenant_slug or "").strip().lower():
+        return jsonify({"ok": False, "error": "tenant_not_found"}), 404
+    if not is_feature_enabled("fan_qr_import"):
+        return jsonify({"ok": False, "error": "fan_qr_import_disabled"}), 403
+    try:
+        result = claim_tenant_fan_qr_invite(token, user)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "claim": result})
 
 
 @app.route("/api/demo-profiles")
@@ -1540,6 +1507,7 @@ def api_h5_register_password():
     password = str(body.get("password") or "").strip()
     display_name = str(body.get("display_name") or "").strip()
     requested_tenant_slug = str(body.get("tenant_slug") or "").strip().lower()
+    invite_token = str(body.get("invite_token") or "").strip()
     if not username or not password:
         return jsonify({"ok": False, "error": "username_password_required"}), 400
     if not display_name:
@@ -1551,7 +1519,8 @@ def api_h5_register_password():
         auth_settings = get_auth_settings(site_config)
         if auth_settings.get("password_login_enabled") is not True:
             return jsonify({"ok": False, "error": "password_login_disabled"}), 403
-        tenant = get_tenant_by_slug(requested_tenant_slug or get_default_tenant_slug(site_config), site_config)
+        invite = get_tenant_fan_qr_invite(invite_token) if invite_token and is_feature_enabled("fan_qr_import", site_config) else None
+        tenant = get_tenant_by_slug((invite or {}).get("tenant_slug") or requested_tenant_slug or get_default_tenant_slug(site_config), site_config)
         suffix = int(time.time() * 1000) % 100000000
         payload = {
             "username": username,
@@ -1561,9 +1530,11 @@ def api_h5_register_password():
             "tenant_slug": tenant.get("slug") or get_default_tenant_slug(site_config),
             "advisor_name": tenant.get("advisor") or "",
             "status": "active",
-            "source_label": "H5账号注册",
+            "source_label": f"扫码导入：{invite.get('source_label')}" if invite else "H5账号注册",
         }
         user = create_user(payload)
+        if invite:
+            claim_tenant_fan_qr_invite(invite_token, user)
         save_h5_profile_settings(user, {"display_name": display_name})
         save_current_demo_profile_id(user["username"])
         payload = _build_h5_auth_options_payload(site_config)

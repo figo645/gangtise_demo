@@ -19,8 +19,8 @@ body{margin:0;min-height:100vh;font-family:var(--font-main);color:var(--text-mai
   <div class="entry-title">选择进入方式</div>
   <div class="entry-desc">{{ user.get('display_name') or user.get('username') }}，请选择要进入的工作区域。</div>
   <div class="entry-options{{ ' admin' if is_admin else '' }}">
-    <a class="entry-option" href="{{ h5_target }}"><div class="entry-option-title">进入 H5</div><div class="entry-option-desc">查看基本面、自选股、复盘、消息和小金智能体。</div></a>
-    <a class="entry-option" href="{{ web_target }}"><div class="entry-option-title">进入 Web 用户端</div><div class="entry-option-desc">在电脑上使用同一套基本面、自选股、复盘、消息和小金智能体。</div></a>
+    <a class="entry-option" href="{{ h5_target }}"><div class="entry-option-title">进入 H5</div><div class="entry-option-desc">查看基本面、自选股、洞见、消息和小金智能体。</div></a>
+    <a class="entry-option" href="{{ web_target }}"><div class="entry-option-title">进入 Web 用户端</div><div class="entry-option-desc">在电脑上使用同一套基本面、自选股、洞见、消息和小金智能体。</div></a>
     <a class="entry-option primary" href="{{ workbench_target }}"><div class="entry-option-title">进入大V工作台</div><div class="entry-option-desc">管理粉丝、内容、协同收入与运营数据。</div></a>
     {% if is_admin %}<a class="entry-option" href="{{ admin_target }}"><div class="entry-option-title">进入 Admin 后台</div><div class="entry-option-desc">管理平台用户、租户、系统配置和运营数据。</div></a>{% endif %}
   </div>

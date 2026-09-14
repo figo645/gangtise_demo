@@ -30,6 +30,27 @@ body { background:linear-gradient(180deg,#F7FAFD 0%,#EFF5FB 42%,#FFFFFF 100%); c
 .tp-chip-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:20px; }
 .tp-chip { font-size:11px; color:#8E6A1E; background:rgba(200,169,110,0.12); border:1px solid rgba(200,169,110,0.16); border-radius:999px; padding:6px 10px; }
 .tp-cta-row { display:flex; gap:12px; margin-top:26px; flex-wrap:wrap; }
+.tp-subscription-card { margin-top:20px; padding:20px; border-radius:18px; color:#FFF9ED; background:linear-gradient(135deg,#172D4A,#285D96); border:1px solid rgba(219,185,102,0.42); box-shadow:0 16px 34px rgba(22,58,99,0.16); }
+.tp-subscription-eyebrow { color:#E7C878; font-size:11px; font-weight:800; letter-spacing:.1em; }
+.tp-subscription-title { margin-top:8px; font-size:20px; line-height:1.4; font-weight:800; }
+.tp-subscription-product { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin-top:15px; padding-top:14px; border-top:1px solid rgba(255,255,255,.16); }
+.tp-subscription-price { font-size:26px; font-weight:800; color:#F5D17F; }
+.tp-subscription-price small { font-size:12px; color:#E5EDF7; font-weight:500; }
+.tp-subscription-section { margin-top:28px; padding:28px; border-radius:24px; color:#EEF5FC; background:linear-gradient(125deg,#13253D 0%,#1A426D 58%,#2F74C0 135%); box-shadow:0 20px 46px rgba(23,45,74,.16); overflow:hidden; position:relative; }
+.tp-subscription-section::after { content:''; position:absolute; width:360px; height:360px; right:-130px; top:-180px; border-radius:50%; border:1px solid rgba(231,200,120,.25); box-shadow:0 0 0 52px rgba(231,200,120,.05), 0 0 0 105px rgba(231,200,120,.03); pointer-events:none; }
+.tp-subscription-grid { position:relative; z-index:1; display:grid; grid-template-columns:1fr minmax(280px,.8fr); gap:28px; align-items:start; }
+.tp-subscription-section h2 { margin:0; color:#FFF9ED; font-size:28px; line-height:1.35; }
+.tp-subscription-section p { color:#D7E5F4; line-height:1.85; margin:12px 0 0; }
+.tp-benefit-list { display:grid; gap:10px; margin-top:18px; }
+.tp-benefit { display:flex; gap:10px; align-items:flex-start; color:#FFF; font-size:14px; line-height:1.6; }
+.tp-benefit::before { content:'✓'; color:#F5D17F; font-weight:800; }
+.tp-subscription-offer { padding:20px; background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.20); border-radius:20px; backdrop-filter:blur(8px); }
+.tp-offer-name { color:#FFF; font-size:18px; font-weight:800; }
+.tp-offer-price { margin-top:10px; color:#F5D17F; font-size:34px; font-weight:800; }
+.tp-offer-price span { font-size:13px; color:#D7E5F4; font-weight:500; }
+.tp-promo-rich { margin-top:20px; padding:18px; border-radius:18px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); color:#F5F9FD; }
+.tp-promo-rich h2, .tp-promo-rich h3 { color:#F5D17F; }
+.tp-promo-rich img { display:block; width:100%; max-width:600px; height:auto; margin:10px auto; border-radius:12px; }
 .tp-side-panel { padding:24px; display:grid; gap:14px; }
 .tp-side-block { background:#F8FBFF; border:1px solid rgba(47,116,192,0.10); border-radius:18px; padding:16px; }
 .tp-side-label { font-size:11px; color:var(--text-sub); margin-bottom:8px; }
@@ -145,7 +166,7 @@ body { background:linear-gradient(180deg,#F7FAFD 0%,#EFF5FB 42%,#FFFFFF 100%); c
 .tp-modal-bullets { margin:10px 0 0; padding-left:18px; color:var(--text-sub); }
 .tp-modal-bullets li { margin:6px 0; line-height:1.7; }
 @media (max-width: 960px) {
-  .tp-hero, .tp-grid-3, .tp-grid-2, .tp-value-grid, .tp-dashboard-kpi-row, .tp-parent-copy-grid, .tp-contact-grid, .tp-dashboard-shell { grid-template-columns:1fr; }
+  .tp-hero, .tp-grid-3, .tp-grid-2, .tp-value-grid, .tp-dashboard-kpi-row, .tp-parent-copy-grid, .tp-contact-grid, .tp-dashboard-shell, .tp-subscription-grid { grid-template-columns:1fr; }
   .tp-title { font-size:30px; }
   .tp-dashboard-cell-grid { grid-template-columns:1fr; }
 }
@@ -182,7 +203,11 @@ body { background:linear-gradient(180deg,#F7FAFD 0%,#EFF5FB 42%,#FFFFFF 100%); c
           <span class="tp-chip">{{ portal.tenant.rights }}</span>
         </div>
         <div class="tp-cta-row">
+          {% if portal.subscription.enabled %}
+          <a href="{{ portal.subscription.purchase_href }}" class="btn-gold" style="text-decoration:none">{{ portal.portal_workspace.subscription_promo.primary_cta_label }}</a>
+          {% else %}
           <a href="{{ portal.cta.primary_href }}" class="btn-gold" style="text-decoration:none">{{ portal.cta.primary_label }}</a>
+          {% endif %}
           <a href="{{ portal.cta.secondary_href }}" class="btn-outline" style="text-decoration:none">{{ portal.cta.secondary_label }}</a>
         </div>
       </div>
@@ -198,8 +223,44 @@ body { background:linear-gradient(180deg,#F7FAFD 0%,#EFF5FB 42%,#FFFFFF 100%); c
           <div class="tp-side-value">{{ portal.portal_workspace.hero.audience }}</div>
           <div class="tp-side-copy">先看内容，再去 H5 做自选股跟踪、小金智能体对话和专属提问，路径会更顺。</div>
         </div>
+        {% if portal.subscription.enabled %}
+        <div class="tp-subscription-card">
+          <div class="tp-subscription-eyebrow">SUBSCRIPTION</div>
+          <div class="tp-subscription-title">{{ portal.subscription.product.name }}</div>
+          <div class="tp-subscription-product">
+            <div class="tp-subscription-price">¥{{ '%.2f' | format(portal.subscription.product.price_yuan) }} <small>/ {{ portal.subscription.product.billing_period_days }} 天</small></div>
+            <a href="{{ portal.subscription.purchase_href }}" class="btn-gold" style="text-decoration:none">{{ portal.portal_workspace.subscription_promo.primary_cta_label }}</a>
+          </div>
+        </div>
+        {% endif %}
       </div>
     </section>
+
+    {% if portal.subscription.enabled %}
+    <section class="tp-subscription-section" id="subscription">
+      <div class="tp-subscription-grid">
+        <div>
+          <div class="tp-subscription-eyebrow">MEMBER RESEARCH</div>
+          <h2>{{ portal.portal_workspace.subscription_promo.headline }}</h2>
+          <p>{{ portal.portal_workspace.subscription_promo.positioning }}</p>
+          <div class="tp-benefit-list">
+            {% for benefit in portal.portal_workspace.subscription_promo.benefits if benefit %}
+            <div class="tp-benefit">{{ benefit }}</div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="tp-subscription-offer">
+          <div class="tp-offer-name">{{ portal.subscription.product.name }}</div>
+          <div class="tp-offer-price">¥{{ '%.2f' | format(portal.subscription.product.price_yuan) }} <span>/ {{ portal.subscription.product.billing_period_days }} 天</span></div>
+          {% if portal.subscription.product.description %}<p>{{ portal.subscription.product.description }}</p>{% endif %}
+          <a href="{{ portal.subscription.purchase_href }}" class="btn-gold" style="display:inline-block;margin-top:20px;text-decoration:none">{{ portal.portal_workspace.subscription_promo.primary_cta_label }}</a>
+        </div>
+      </div>
+      {% if portal.portal_workspace.subscription_promo.rich_html %}
+      <div class="tp-promo-rich">{{ portal.portal_workspace.subscription_promo.rich_html | safe }}</div>
+      {% endif %}
+    </section>
+    {% endif %}
 
     <section class="tp-section">
       <div class="tp-section-head">
@@ -277,7 +338,7 @@ body { background:linear-gradient(180deg,#F7FAFD 0%,#EFF5FB 42%,#FFFFFF 100%); c
         </div>
         <div class="tp-dashboard-side">
           <strong style="display:block;font-size:16px;color:#172132">当前代表性内容</strong>
-          <div class="tp-dashboard-summary" style="margin-top:10px">Dashboard 固定展示在门户中段，帮助粉丝先快速理解当前核心方向，再决定是否继续查看复盘、样本或进入 H5。</div>
+          <div class="tp-dashboard-summary" style="margin-top:10px">Dashboard 固定展示在门户中段，帮助粉丝先快速理解当前核心方向，再决定是否继续查看洞见、样本或进入 H5。</div>
           <div class="tp-review-list" style="margin-top:16px">
             {% for item in portal.featured_reviews[:2] %}
             <div class="tp-review-row tp-clickable" onclick='openPortalDetail({{ item | tojson }}, "review")'>
@@ -337,7 +398,7 @@ body { background:linear-gradient(180deg,#F7FAFD 0%,#EFF5FB 42%,#FFFFFF 100%); c
   {% endfor %}
 
   <div class="tp-footer-note">
-    这里是面向粉丝的内容门户，不是大V自己的后台。大V自己的复盘生产、粉丝消息、知识经营和工作流协同，仍然只放在工作台里，不暴露给粉丝。所有研究内容仅供参考，不构成投资建议。
+    这里是面向粉丝的内容门户，不是大V自己的后台。大V自己的洞见发布、粉丝消息、知识经营和工作流协同，仍然只放在工作台里，不暴露给粉丝。所有研究内容仅供参考，不构成投资建议。
   </div>
 </div>
 <div class="tp-modal-overlay" id="portal-detail-modal" onclick="if(event.target===this)closePortalDetail()">

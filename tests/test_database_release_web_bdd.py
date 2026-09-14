@@ -98,6 +98,117 @@ class DatabaseReleaseWebBddTest(unittest.TestCase):
         self.assertEqual(response.status_code, 202)
         start_sync.assert_called_once_with()
 
+    def test_given_account_runtime_cleanup_when_confirmed_then_it_starts_backup_first_cleanup_task(self):
+        target = self._target("local", "127.0.0.1")
+        with patch.object(database_release_services, "get_database_release_target", return_value=target), patch.object(
+            database_release_services, "_start_job", return_value={"id": "cleanup_1", "status": "queued", "target": "local"}
+        ) as start_job:
+            result = database_release_services.start_user_data_cleanup(
+                "local", "account_runtime_data", ["财经老王"], "CLEAR ACCOUNT DATA 财经老王"
+            )
+        self.assertEqual(result["id"], "cleanup_1")
+        self.assertEqual(start_job.call_args.args[0], target)
+        self.assertEqual(start_job.call_args.args[1], [str(database_release_services.USER_DATA_CLEANUP_SCRIPT)])
+        self.assertEqual(start_job.call_args.args[2], "user_data_cleanup")
+        self.assertEqual(start_job.call_args.kwargs["extra_env"]["USER_DATA_CLEANUP_MODE"], "account_runtime_data")
+        self.assertEqual(start_job.call_args.kwargs["extra_env"]["USER_DATA_CLEANUP_USERNAMES"], "财经老王")
+        self.assertTrue(start_job.call_args.kwargs["extra_env"]["USER_DATA_BACKUP_ID"].startswith("user_cleanup_local_"))
+
+    def test_given_invalid_account_cleanup_scope_when_started_then_it_is_rejected(self):
+        target = self._target("local", "127.0.0.1")
+        with patch.object(database_release_services, "get_database_release_target", return_value=target):
+            with self.assertRaisesRegex(ValueError, "user_data_cleanup_usernames_required"):
+                database_release_services.start_user_data_cleanup("local", "account_runtime_data", [], "")
+            with self.assertRaisesRegex(ValueError, "user_data_cleanup_admin_forbidden"):
+                database_release_services.start_user_data_cleanup("local", "account_runtime_data", ["admin"], "CLEAR ACCOUNT DATA admin")
+            with self.assertRaisesRegex(ValueError, "user_data_cleanup_mode_invalid"):
+                database_release_services.start_user_data_cleanup("local", "unknown", [], "")
+
+    def test_given_all_non_admin_cleanup_when_confirmed_then_it_does_not_accept_a_username_override(self):
+        target = self._target("staging", "staging.example")
+        with patch.object(database_release_services, "get_database_release_target", return_value=target), patch.object(
+            database_release_services, "_start_job", return_value={"id": "cleanup_2", "status": "queued", "target": "staging"}
+        ) as start_job:
+            result = database_release_services.start_user_data_cleanup(
+                "staging", "all_non_admin_accounts", [], "DELETE ALL NON-ADMIN ACCOUNTS"
+            )
+        self.assertEqual(result["target"], "staging")
+        self.assertEqual(start_job.call_args.kwargs["extra_env"]["USER_DATA_CLEANUP_USERNAMES"], "")
+        with patch.object(database_release_services, "get_database_release_target", return_value=target):
+            with self.assertRaisesRegex(ValueError, "user_data_cleanup_usernames_must_be_empty"):
+                database_release_services.start_user_data_cleanup(
+                    "staging", "all_non_admin_accounts", ["财经老王"], "DELETE ALL NON-ADMIN ACCOUNTS"
+                )
+
+    def test_given_production_account_cleanup_without_explicit_confirmation_then_it_is_rejected(self):
+        target = self._target("production", "production.example")
+        with patch.object(database_release_services, "get_database_release_target", return_value=target):
+            with self.assertRaisesRegex(ValueError, "production_confirmation_required"):
+                database_release_services.start_user_data_cleanup(
+                    "production", "account_runtime_data", ["财经老王"], "CLEAR ACCOUNT DATA 财经老王"
+                )
+
+    def test_given_5051_console_when_account_cleanup_is_requested_then_route_passes_scope_and_confirmation(self):
+        csrf = self._csrf_token()
+        with patch.object(
+            database_release_web,
+            "start_user_data_cleanup",
+            return_value={"id": "cleanup_route", "status": "queued", "target": "local"},
+        ) as start_cleanup:
+            response = self.client.post(
+                "/api/user-data-cleanup",
+                json={
+                    "target": "local",
+                    "mode": "account_runtime_data",
+                    "usernames": "财经老王",
+                    "confirmation": "CLEAR ACCOUNT DATA 财经老王",
+                },
+                headers={"X-Data-Import-CSRF-Token": csrf},
+            )
+        self.assertEqual(response.status_code, 202)
+        start_cleanup.assert_called_once_with(
+            "local",
+            "account_runtime_data",
+            usernames="财经老王",
+            confirmation="CLEAR ACCOUNT DATA 财经老王",
+            confirm_production=False,
+        )
+
+    def test_given_a_valid_user_data_backup_when_sql_is_requested_then_only_manifest_bound_file_is_downloaded(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            sql_path = Path(temp_dir) / "user_cleanup_local_20260914_010203_123456.sql"
+            sql_path.write_text("-- backup\n", encoding="utf-8")
+            with patch.object(database_release_web, "get_user_data_cleanup_backup_sql_path", return_value=sql_path):
+                response = self.client.get("/api/user-data-backups/user_cleanup_local_20260914_010203_123456/sql?target=local")
+            try:
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data, b"-- backup\n")
+                self.assertEqual(response.headers["Cache-Control"], "no-store")
+            finally:
+                response.close()
+
+    def test_given_5051_console_page_when_rendered_then_account_cleanup_and_sql_export_are_visible(self):
+        response = self.client.get("/")
+        html = response.get_data(as_text=True)
+        self.assertIn("账户运行数据清理与备份", html)
+        self.assertIn("/api/user-data-cleanup", html)
+        self.assertIn("/api/user-data-backups", html)
+        self.assertIn("下载 SQL", html)
+        self.assertIn("DELETE ALL NON-ADMIN ACCOUNTS", html)
+        self.assertIn("保留账户，仅清除其生成数据", html)
+
+    def test_given_cleanup_script_when_inspected_then_it_exports_both_backup_formats_before_transactional_deletion(self):
+        content = database_release_services.USER_DATA_CLEANUP_SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("--format=custom", content)
+        self.assertIn("--format=plain", content)
+        self.assertLess(content.index("pg_dump -w"), content.index('"${PSQL[@]}" -v cleanup_mode'))
+        self.assertIn("BEGIN;", content)
+        self.assertIn("COMMIT;", content)
+        self.assertIn("DELETE FROM fan_subscriptions", content)
+        self.assertIn("DELETE FROM fan_payment_orders", content)
+        self.assertIn("DELETE FROM users", content)
+        self.assertIn("RETAIN_COUNT", content)
+
     def test_given_unlocked_5051_console_when_production_to_staging_is_requested_then_a_background_job_is_created(self):
         csrf = self._csrf_token()
         with patch.object(

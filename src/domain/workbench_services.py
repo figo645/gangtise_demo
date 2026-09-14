@@ -4,6 +4,7 @@ from src.runtime import *
 from src.domain.core_services import *
 from src.domain.market_services import *
 from src.domain.ai_services import *
+from src.domain.commerce_services import *
 
 FAN_STOCK_OBSERVATION_WINDOW_DAYS = 7
 FAN_STOCK_OBSERVATION_EVENT_TYPES = {"watchlist_detail_view", "watchlist_add"}
@@ -871,7 +872,7 @@ def build_workbench_data_lake_payload(tenant, watchlist_details=None, news_items
     }
 
 
-def build_tenant_dashboard_payload(tenant=None):
+def build_tenant_dashboard_payload(tenant=None, viewer=None):
     tenant = tenant or get_tenant_by_slug()
     workbench = gen_kol_workbench(tenant)
     dashboard_metrics = workbench["dashboard_metrics"]
@@ -894,19 +895,45 @@ def build_tenant_dashboard_payload(tenant=None):
         "fan_stock_observation": workbench.get("fan_stock_observation") or {},
         "watchlist_comment_analytics": workbench.get("watchlist_comment_analytics") or {},
         "fan_management": workbench.get("fan_management") or {},
-        "reviews": workbench["published_reviews"],
+        # The same dashboard feeds the H5/Web fan experience. Paid bodies are
+        # removed here before serializing the initial page payload.
+        "reviews": protect_tenant_review_snapshots(tenant["slug"], workbench["published_reviews"], viewer),
+        "reviews_access_required": any(
+            bool(item.get("access_required"))
+            for item in protect_tenant_review_snapshots(tenant["slug"], workbench["published_reviews"], viewer)
+        ),
         "stats": workbench["stats"],
     }
 
 
-def build_tenant_portal_payload(tenant=None, fallback_mode=False):
+def build_tenant_portal_payload(tenant=None, fallback_mode=False, viewer=None):
     tenant = tenant or get_tenant_by_slug()
     workbench = gen_kol_workbench(tenant, fallback_mode=fallback_mode)
     portal_workspace = copy.deepcopy(workbench.get("portal_workspace") or {})
+    subscription_promo = copy.deepcopy(portal_workspace.get("subscription_promo") or {})
+    # Products are already tenant-scoped and are the single source of truth for
+    # price and billing period. The CMS only selects which active product this
+    # public page promotes.
+    if fallback_mode:
+        active_products = []
+    else:
+        try:
+            active_products = list_tenant_subscription_products(tenant["slug"])
+        except Exception as exc:
+            if not is_db_unavailable_error(exc):
+                raise
+            active_products = []
+    selected_product_id = int(subscription_promo.get("product_id") or 0)
+    subscription_product = next(
+        (item for item in active_products if int(item.get("id") or 0) == selected_product_id),
+        None,
+    )
+    subscription_promo["product"] = subscription_product
+    portal_workspace["subscription_promo"] = subscription_promo
     dashboard_metrics = copy.deepcopy(workbench.get("dashboard_metrics") or {})
     fund_dashboard = copy.deepcopy(workbench.get("fund_dashboard") or {})
     watchlist_items = copy.deepcopy(workbench["watchlist_hub"]["items"])
-    reviews = copy.deepcopy(workbench["published_reviews"])
+    reviews = protect_tenant_review_snapshots(tenant["slug"], workbench["published_reviews"], viewer)
     knowledge_items = copy.deepcopy(workbench["knowledge_hub"]["items"])
     is_lisa = tenant["slug"] == "lisa"
     for review in reviews:
@@ -990,7 +1017,7 @@ def build_tenant_portal_payload(tenant=None, fallback_mode=False):
     service_cards = [
         {
             "title": "复盘专区",
-            "desc": "查看已发布的日复盘、周复盘和阶段主线整理。",
+            "desc": "查看已发布洞见和阶段主线整理。",
             "detail_sections": [
                 {"title": "你会看到什么", "bullets": ["已发布复盘", "阶段主线", "重点样本和下一步观察"]},
                 {"title": "适合什么时候用", "body": "适合先快速理解最近判断，再决定是否继续深挖。"},
@@ -1032,12 +1059,32 @@ def build_tenant_portal_payload(tenant=None, fallback_mode=False):
                 "bullets": ["Hermes 对话", "后续复盘", "研究框架表达"],
             },
         ]
+    # Public portals must not leak the DAv's operating metrics such as revenue,
+    # paid-fan counts, or message volume. Keep this middle section focused on
+    # research content and let the workbench retain the full operating view.
+    public_dashboard_metrics = {
+        "summary": "公开研究看板：展示当前已发布的研究内容与指标，不展示大V后台经营数据。",
+        "kpis": [
+            {"label": "公开洞见", "value": str(len(reviews)), "sub": "已发布、可直接阅读的内容"},
+            {"label": "重点跟踪", "value": str(len(watchlist_items)), "sub": "当前公开展示的代表性样本"},
+            {"label": "研究指标", "value": str(len([item for item in fund_dashboard.get('cells', []) if not item.get('isEmpty')])), "sub": "已发布智能指标"},
+        ],
+    }
+    viewer = viewer or {}
+    viewer_role = str(viewer.get("role") or "").strip().lower()
+    viewer_tenant = str(viewer.get("tenant_slug") or "").strip().lower()
+    can_start_purchase = viewer_role == "investor" and viewer_tenant == tenant["slug"]
+    subscription_href = (
+        f"/h5?tenant={tenant['slug']}&page=profile"
+        if can_start_purchase
+        else f"/login?next=/h5?tenant={tenant['slug']}%26page=profile"
+    )
     return {
         "tenant": tenant,
         "brand": get_platform_brand(),
         "fallback_mode": fallback_mode,
         "portal_workspace": portal_workspace,
-        "dashboard_metrics": dashboard_metrics,
+        "dashboard_metrics": public_dashboard_metrics,
         "fund_dashboard": fund_dashboard,
         "hero_stats": [
             {"label": "代表性方向", "value": tenant["focus"]},
@@ -1063,7 +1110,7 @@ def build_tenant_portal_payload(tenant=None, fallback_mode=False):
                 "title": "你在这里先得到什么",
                 "desc": "不是把功能全摊开，而是先把粉丝最需要的内容入口收拢起来。",
                 "items": [
-                    {"title": "最新复盘", "desc": "先看已经发布的日复盘 / 周复盘，快速理解当前判断主线。"},
+                    {"title": "最新洞见", "desc": "先看已经发布的洞见，快速理解当前判断主线。"},
                     {"title": "重点样本", "desc": "直接看到当前最值得继续跟踪的几只样本，不用自己先筛一遍。"},
                     {"title": "研究框架", "desc": "知道这位大V平时怎么看估值、验证节点和风险边界。"},
                 ],
@@ -1089,7 +1136,23 @@ def build_tenant_portal_payload(tenant=None, fallback_mode=False):
             "secondary_label": portal_workspace.get("cta", {}).get("secondary_label") or "直接看最新复盘",
             "secondary_href": "#latest-review",
         },
+        "subscription": {
+            "enabled": bool(subscription_promo.get("enabled") and subscription_product),
+            "product": subscription_product,
+            "purchase_href": subscription_href,
+            "viewer_can_start_purchase": can_start_purchase,
+        },
     }
+
+
+def _list_tenant_subscription_products_for_workbench(tenant_slug):
+    """Keep public/workbench fallback rendering independent from commerce DB availability."""
+    try:
+        return list_tenant_subscription_products(tenant_slug)
+    except Exception as exc:
+        if not is_db_unavailable_error(exc):
+            raise
+        return []
 
 
 
@@ -1258,6 +1321,9 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
         ],
         "broadcast_history": broadcast_history,
         "portal_workspace": resolve_tenant_portal_workspace(tenant, tenant.get("portal_cms")) if tenant_portal_enabled else {},
+        "subscription_products": (
+            [] if fallback_mode or not tenant_portal_enabled else _list_tenant_subscription_products_for_workbench(tenant["slug"])
+        ),
         "message_center": {
             "summary": message_center_state["summary"],
             "items": build_message_center_items((fan_threads + review_notice_threads)[:6], limit=6),
@@ -1311,8 +1377,7 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
             ],
             "message_trend": ops_stats["today_view_trend_7d"],
             "publish_distribution": [
-                {"label": "日复盘", "value": 18},
-                {"label": "周复盘", "value": 4},
+                {"label": "洞见发布", "value": 22},
                 {"label": "基本面解读", "value": 12},
                 {"label": "群发提醒", "value": 9},
             ],
@@ -1449,10 +1514,10 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
                 {"label": "大V自定段落", "desc": "适合自己写主框架，只让智能体补摘要、证据链和风险提示。"},
                 {"label": "智能文案", "desc": "适合先交信息给智能体，并补充修改规则或常用提示词标签后生成草稿。"},
             ],
-            "default_flow": ["选择复盘周期", "确认本次自选股", "补充手输/文件", "设置智能文案规则", "生成草稿预览", "确认后发布给粉丝"],
+            "default_flow": ["确认本次自选股", "补充手输/文件", "设置智能文案规则", "生成草稿预览", "确认后发布给粉丝"],
             "watchlist_focus": watchlist_focus,
             "watchlist_items": watchlist_items,
-            "periods": ["日复盘", "周复盘", "月复盘"],
+            "periods": ["洞见"],
             "smart_cards": review_smart_cards,
             "flow_nodes": [
                 {"id": "cards", "label": "选择智能仪表盘卡片"},
