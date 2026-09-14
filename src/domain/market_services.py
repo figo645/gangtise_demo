@@ -9592,6 +9592,104 @@ NEWS_SOURCE_WHITELIST = [
     {"code": "szse_disclosure", "name": "深圳证券交易所", "category": "公司公告", "source_group": "公司公告", "url": "https://www.szse.cn/disclosure/listed/notice/", "indicator_code": "company_event_count", "validated_item_count": 20},
 ]
 
+NEWS_IMPACT_POSITIVE_RULES = (
+    ("重大利好", 4), ("业绩预增", 4), ("业绩增长", 3), ("净利润增长", 3),
+    ("重大订单", 3), ("中标", 3), ("回购", 3), ("增持", 3), ("降准", 2),
+    ("降息", 2), ("政策支持", 2), ("获批", 2), ("扩产", 2), ("创新高", 2),
+)
+NEWS_IMPACT_NEGATIVE_RULES = (
+    ("重大利空", 4), ("重大风险", 4), ("业绩预亏", 4), ("业绩下降", 3), ("净利润下降", 3),
+    ("立案调查", 4), ("行政处罚", 4), ("处罚", 3), ("退市", 4), ("暴雷", 4), ("违约", 4),
+    ("减持", 3), ("被罚", 3), ("诉讼", 2), ("关税上调", 2), ("出口管制", 2),
+    ("停产", 2), ("下调", 2),
+)
+NEWS_INDUSTRY_RULES = (
+    ("半导体", ("半导体", "芯片", "集成电路", "晶圆", "光刻", "存储")),
+    ("电子", ("电子", "消费电子", "面板", "显示")),
+    ("医药生物", ("医药", "医疗", "药品", "创新药", "生物")),
+    ("电力设备", ("电力设备", "新能源", "动力电池", "锂电", "储能", "光伏")),
+    ("汽车", ("汽车", "新能源车", "智能驾驶", "整车")),
+    ("银行", ("银行", "信贷", "息差", "存款", "贷款")),
+    ("非银金融", ("证券", "保险", "券商", "基金", "资本市场")),
+    ("食品饮料", ("白酒", "食品饮料", "乳业", "贵州茅台", "五粮液")),
+    ("房地产", ("房地产", "地产", "住房", "楼市")),
+    ("有色金属", ("有色", "黄金", "铜", "铝", "稀土", "锂")),
+    ("化工", ("化工", "化学品", "材料")),
+    ("机械设备", ("机械", "设备", "机器人", "工业母机")),
+)
+
+
+def annotate_news_impact(item):
+    """Add explainable non-LLM impact and industry labels to one news item."""
+    normalized = dict(item or {})
+    text = " ".join(str(normalized.get(key) or "") for key in ("title", "content", "summary", "tag", "source_group"))
+    positive_hits = [(term, weight) for term, weight in NEWS_IMPACT_POSITIVE_RULES if term in text]
+    negative_hits = [(term, weight) for term, weight in NEWS_IMPACT_NEGATIVE_RULES if term in text]
+    positive_score = sum(weight for _, weight in positive_hits)
+    negative_score = sum(weight for _, weight in negative_hits)
+    if positive_score and negative_score:
+        impact, label = "mixed", "影响分化"
+    elif positive_score:
+        impact, label = "positive", "利好"
+    elif negative_score:
+        impact, label = "negative", "利空"
+    else:
+        impact, label = "neutral", "中性/待确认"
+    evidence = [term for term, _ in positive_hits + negative_hits]
+    confidence = min(0.96, 0.55 + 0.10 * min(4, max(positive_score, negative_score))) if evidence else 0.35
+    industry = str(normalized.get("industry") or normalized.get("sector") or "").strip()
+    if not industry:
+        for candidate, terms in NEWS_INDUSTRY_RULES:
+            if any(term in text for term in terms):
+                industry = candidate
+                break
+    industry = industry or "综合/未分类"
+    normalized.update({
+        "impact": impact,
+        "impact_label": label,
+        "impact_score": positive_score - negative_score,
+        "impact_confidence": round(confidence, 2),
+        "impact_evidence": evidence[:6],
+        "industry": industry,
+        "impact_method": "keyword_rules_v1",
+    })
+    return normalized
+
+
+def build_news_impact_analysis(items, now=None):
+    current_date = (now or datetime.now()).date()
+    annotated = [annotate_news_impact(item) for item in (items or []) if isinstance(item, dict)]
+    today = []
+    for item in annotated:
+        timestamp = _parse_news_timestamp(item.get("published_at") or item.get("fetched_at"))
+        if timestamp is not None and timestamp.date() == current_date:
+            today.append(item)
+    counts = {"positive": 0, "negative": 0, "neutral": 0, "mixed": 0}
+    for item in today:
+        counts[item.get("impact") if item.get("impact") in counts else "neutral"] += 1
+    industry_map = {}
+    for item in today:
+        industry = item.get("industry") or "综合/未分类"
+        row = industry_map.setdefault(industry, {"industry": industry, "positive": 0, "negative": 0, "neutral": 0, "mixed": 0, "total": 0})
+        impact = item.get("impact") if item.get("impact") in row else "neutral"
+        row[impact] += 1
+        row["total"] += 1
+    for row in industry_map.values():
+        total = row["total"] or 1
+        for impact in ("positive", "negative", "neutral", "mixed"):
+            row[f"{impact}_pct"] = round(row[impact] * 100 / total, 1)
+    industries = sorted(industry_map.values(), key=lambda row: (-row["total"], row["industry"]))
+    return {
+        "date": current_date.isoformat(),
+        "available": bool(today),
+        "total": len(today),
+        "counts": counts,
+        "industries": industries,
+        "items": today,
+        "method": "keyword_rules_v1",
+        "method_note": "基于可解释事件关键词；未命中明确事件的新闻标记为中性/待确认。",
+    }
+
 
 def _extract_news_rule_plan_from_prompt(source_prompt):
     prompt = str(source_prompt or "").strip()
@@ -10410,7 +10508,7 @@ def _select_fundamental_homepage_news(ranked_items, limit, rule_plan=None, watch
 def build_fundamental_news_payload(tenant=None, watchlist_details=None, limit=10, algorithm_payload=None):
     # The homepage summary reads the real news lake directly. It must not run
     # the retired tenant-editable ranking algorithm.
-    ranked_items = gen_news_feed(tenant=tenant, watchlist_details=watchlist_details, rank=False)
+    ranked_items = [annotate_news_impact(item) for item in gen_news_feed(tenant=tenant, watchlist_details=watchlist_details, rank=False)]
     # The homepage summary is a fixed product rule, not a tenant-editable
     # algorithm: show the newest five admitted real news items.
     selected_items = _select_latest_news(ranked_items, limit=5)
@@ -10452,6 +10550,7 @@ def build_fundamental_news_payload(tenant=None, watchlist_details=None, limit=10
         "selection_mode": "latest_five",
         "rule_plan": {},
         "rule_atoms": [],
+        "impact_analysis": build_news_impact_analysis(ranked_items),
     }
 
 def gen_revenue_trend():

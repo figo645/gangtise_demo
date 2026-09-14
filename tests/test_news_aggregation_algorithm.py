@@ -7,6 +7,42 @@ from src.domain import market_services
 
 
 class NewsAggregationAlgorithmTest(unittest.TestCase):
+    def test_news_impact_annotation_is_explainable(self):
+        positive = market_services.annotate_news_impact({
+            "title": "半导体公司获批扩产并取得重大订单",
+        })
+        negative = market_services.annotate_news_impact({
+            "title": "医药公司被立案调查并遭行政处罚",
+        })
+        mixed = market_services.annotate_news_impact({
+            "title": "银行回购但同时面临息差下调压力",
+        })
+        self.assertEqual(positive["impact"], "positive")
+        self.assertEqual(positive["impact_label"], "利好")
+        self.assertEqual(positive["industry"], "半导体")
+        self.assertEqual(negative["impact"], "negative")
+        self.assertEqual(negative["impact_label"], "利空")
+        self.assertEqual(negative["industry"], "医药生物")
+        self.assertEqual(mixed["impact"], "mixed")
+        self.assertEqual(mixed["impact_label"], "影响分化")
+
+    def test_news_impact_analysis_only_uses_today_and_returns_percentages(self):
+        items = [
+            {"title": "半导体扩产获批", "published_at": "2026-09-15 09:00:00"},
+            {"title": "半导体公司被处罚", "published_at": "2026-09-15 10:00:00"},
+            {"title": "昨日半导体扩产获批", "published_at": "2026-09-14 10:00:00"},
+        ]
+        analysis = market_services.build_news_impact_analysis(items, now=datetime(2026, 9, 15, 12, 0, 0))
+        self.assertEqual(analysis["total"], 2)
+        self.assertEqual(analysis["counts"]["positive"], 1)
+        self.assertEqual(analysis["counts"]["negative"], 1)
+        self.assertEqual(len(analysis["industries"]), 1)
+        industry = analysis["industries"][0]
+        self.assertEqual(industry["total"], 2)
+        self.assertEqual(industry["positive_pct"], 50.0)
+        self.assertEqual(industry["negative_pct"], 50.0)
+        self.assertEqual(sum(industry[f"{key}_pct"] for key in ("positive", "negative", "neutral", "mixed")), 100.0)
+
     def test_normalize_tenant_config_preserves_news_algorithm(self):
         payload = {
             "slug": "laowang",

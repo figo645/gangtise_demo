@@ -2625,6 +2625,21 @@ body { background: var(--surface-2); color: var(--text-main); }
   padding:4px 8px;
 }
 .fund-news-why { font-size:11px; color:var(--gray-400); line-height:1.7; margin-top:10px; }
+.fund-news-analysis { background:#F8FBFF; border:1px solid rgba(47,116,192,0.12); border-radius:12px; padding:12px; margin:10px 0 14px; }
+.fund-news-analysis-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px; }
+.fund-news-analysis-title { font-size:12px; font-weight:800; color:var(--text-main); }
+.fund-news-analysis-note { font-size:10px; color:var(--gray-400); line-height:1.6; margin-top:3px; }
+.fund-news-analysis-grid { display:grid; grid-template-columns:1fr; gap:10px; align-items:stretch; }
+.fund-news-chart-block { min-width:0; }
+.fund-news-chart { min-width:0; height:190px; background:#FFFFFF; border:1px solid rgba(47,116,192,0.10); border-radius:10px; }
+.fund-news-chart-caption { font-size:11px; font-weight:800; color:var(--text-main); text-align:center; padding-top:6px; }
+.fund-news-analysis-empty { display:flex; align-items:center; justify-content:center; min-height:120px; color:var(--gray-400); font-size:11px; text-align:center; line-height:1.7; padding:12px; }
+.fund-news-impact-tag { display:inline-flex; align-items:center; border-radius:999px; padding:3px 7px; font-size:10px; font-weight:700; }
+.fund-news-impact-positive { color:#B42318; background:#FDECEC; }
+.fund-news-impact-negative { color:#18794E; background:#EAF7F0; }
+.fund-news-impact-neutral,.fund-news-impact-mixed { color:#667085; background:#F0F2F5; }
+.fund-news-filter-row { display:flex; gap:7px; flex-wrap:wrap; align-items:center; margin:10px 0 2px; }
+@media(max-width:680px){.fund-news-chart{height:180px}}
 .fund-news-page-head { display:flex; align-items:flex-start; gap:10px; margin-bottom:14px; }
 .fund-news-search {
   display:flex;
@@ -4586,29 +4601,24 @@ body,
     <div class="h5-section">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px">
         <div class="h5-section-title" style="margin-bottom:0">综合归纳要闻</div>
-        <button class="btn-outline" type="button" style="padding:6px 12px;font-size:11px;flex-shrink:0" onclick="openFundNewsList()">更多</button>
+        <button class="btn-gold" type="button" style="padding:7px 14px;font-size:11px;flex-shrink:0;box-shadow:0 4px 12px rgba(200,169,110,0.22)" onclick="openFundNewsList()">查看更多新闻</button>
       </div>
-      <div class="fund-news-hint">内容来自真实公开信息源，按发布时间展示当日最新 Top5；点击“更多”查看完整新闻列表。</div>
-      {% if not news %}<div class="fund-news-hint">当前没有达到纳入标准的真实新闻，暂不展示演示内容。</div>{% endif %}
-      {% for item in news %}
-      <div class="news-item fund-news-item {% if item.aggregation_bucket == 'watchlist_sector' %}is-watchlist-sector{% endif %}" style="cursor:pointer" onclick='showFundNewsDetail({{ item | tojson }})'>
-        <div class="news-item-header">
-          <div class="news-title">{{ item.title }}</div>
-          <span class="fund-news-source">{{ item.source_group }}</span>
+      <div class="fund-news-analysis" id="fund-news-analysis" data-analysis='{{ news_analysis | tojson }}'>
+        <div class="fund-news-analysis-head">
+          <div><div class="fund-news-analysis-title">今日新闻影响分布</div><div class="fund-news-analysis-note">基于可解释事件关键词标注；红色为利好，绿色为利空，未命中明确事件的内容列为中性/待确认。</div></div>
+          <span class="tag tag-gold">{{ news_analysis.date or '今日' }}</span>
         </div>
-        <div class="news-meta">
-          <div style="display:flex;gap:8px;align-items:center">
-            <span class="tag tag-gold">{{ item.tag }}</span>
-            {% if item.aggregation_bucket == 'watchlist_sector' %}
-            <span class="fund-news-relevance">关联{{ (item.matched_topics or ['自选板块']) | join('、') }}</span>
-            {% endif %}
-            <span class="news-time">{{ item.time }}</span>
+        <div class="fund-news-analysis-grid">
+          <div class="fund-news-chart-block">
+            <div id="fund-news-impact-pie" class="fund-news-chart" aria-label="今日新闻利好利空比例饼图"></div>
+            <div class="fund-news-chart-caption">今日新闻利好 / 利空比例</div>
           </div>
-          {% if item.hot %}<span class="hot-badge">🔥 热门</span>{% endif %}
+          <div class="fund-news-chart-block">
+            <div id="fund-news-industry-bar" class="fund-news-chart" aria-label="按行业分类的利好利空比例柱状图"></div>
+            <div class="fund-news-chart-caption">行业利好 / 利空分类占比</div>
+          </div>
         </div>
-        <div class="fund-news-why">为什么是要闻：{{ item.why }}</div>
       </div>
-      {% endfor %}
     </div>
 
   </div>
@@ -15648,6 +15658,8 @@ function showFundNewsDetail(item) {
   const title = String(news.title || '综合归纳要闻').trim() || '综合归纳要闻';
   const sourceGroup = String(news.source_group || news.tag || '综合要闻').trim() || '综合要闻';
   const tag = String(news.tag || sourceGroup).trim() || sourceGroup;
+  const impactLabel = String(news.impact_label || '中性/待确认').trim() || '中性/待确认';
+  const industry = String(news.industry || '综合/未分类').trim() || '综合/未分类';
   const time = String(news.time || '刚刚').trim() || '刚刚';
   const content = String(news.content || news.summary || '').trim();
   const sourceName = String(news.source_name || news.source || '').trim();
@@ -15663,6 +15675,7 @@ function showFundNewsDetail(item) {
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <span class="event-type-badge event-activity">${escapeHtml(sourceGroup)}</span>
         <span class="tag tag-gold">${escapeHtml(tag)}</span>
+        <span class="fund-news-impact-tag fund-news-impact-${['positive','negative','neutral','mixed'].includes(String(news.impact || '')) ? String(news.impact) : 'neutral'}">${escapeHtml(impactLabel)}</span>
         <span style="font-size:11px;color:var(--gray-400)">${escapeHtml(time)}</span>
       </div>
       <div style="font-size:17px;font-weight:700;color:var(--white);line-height:1.5;margin-bottom:14px">${escapeHtml(title)}</div>
@@ -15682,7 +15695,7 @@ function showFundNewsDetail(item) {
         </div>
         <div style="background:var(--navy-mid);border-radius:8px;padding:10px">
           <div style="font-size:11px;color:var(--gray-400)">内容归类</div>
-          <div style="font-size:12px;color:var(--white);margin-top:4px">${escapeHtml(sourceGroup)} · ${escapeHtml(tag)}</div>
+          <div style="font-size:12px;color:var(--white);margin-top:4px">${escapeHtml(sourceGroup)} · ${escapeHtml(tag)} · 行业：${escapeHtml(industry)}</div>
         </div>
         <div style="background:var(--navy-mid);border-radius:8px;padding:10px">
           <div style="font-size:11px;color:var(--gray-400)">阅读建议</div>
@@ -15712,6 +15725,12 @@ function renderFundNewsRelevance(item) {
   return `<span class="fund-news-relevance">${escapeHtml(label)}</span>`;
 }
 
+function renderFundNewsImpact(item) {
+  const impact = ['positive', 'negative', 'neutral', 'mixed'].includes(String(item?.impact || '')) ? String(item.impact) : 'neutral';
+  const label = String(item?.impact_label || (impact === 'positive' ? '利好' : impact === 'negative' ? '利空' : impact === 'mixed' ? '影响分化' : '中性/待确认'));
+  return `<span class="fund-news-impact-tag fund-news-impact-${impact}">${escapeHtml(label)}</span>`;
+}
+
 function buildFundNewsListRouteUrl(activeTabKey) {
   const url = new URL(window.location.href);
   url.searchParams.set('news_view', 'list');
@@ -15722,11 +15741,12 @@ function buildFundNewsListRouteUrl(activeTabKey) {
 
 function renderFundNewsList() {
   const tabs = getFundNewsTabs();
-  const nextKey = tabs.some((tab) => tab.key === fundNewsListState.activeTabKey) ? fundNewsListState.activeTabKey : 'summary';
+  const nextKey = tabs.some((tab) => tab.key === fundNewsListState.activeTabKey) ? fundNewsListState.activeTabKey : 'all';
   fundNewsListState.activeTabKey = nextKey;
   const currentTab = tabs.find((tab) => tab.key === nextKey) || tabs[0];
   const query = String(fundNewsListState.query || '').trim().toLowerCase();
   const rows = (currentTab?.items || []).filter((item) => {
+    if (fundNewsListState.activeImpact !== 'all' && String(item.impact || 'neutral') !== fundNewsListState.activeImpact) return false;
     if (!query) return true;
     return [item.title, item.content, item.summary, item.why, item.tag, item.source_group, ...(item.matched_topics || [])]
       .join(' ')
@@ -15737,8 +15757,9 @@ function renderFundNewsList() {
   const tabsHost = document.getElementById('fund-news-list-tabs');
   const resultsHost = document.getElementById('fund-news-list-results');
   if (tabsHost) {
-    tabsHost.innerHTML = tabs.map((tab) => (
-      `<button type="button" class="watch-detail-tab fund-news-list-tab ${tab.key === nextKey ? 'active' : ''}" onclick="selectFundNewsListTab('${escapeAttr(tab.key)}')">${escapeHtml(tab.label)} <span style="opacity:.75">(${tab.count})</span></button>`
+    const impactTabs = [['all', '全部新闻'], ['positive', '利好'], ['negative', '利空']];
+    tabsHost.innerHTML = impactTabs.map(([key, label]) => (
+      `<button type="button" class="watch-detail-tab fund-news-list-tab ${fundNewsListState.activeImpact === key ? 'active' : ''}" onclick="selectFundNewsImpact('${key}')">${label}</button>`
     )).join('');
   }
   if (!resultsHost) return;
@@ -15750,7 +15771,7 @@ function renderFundNewsList() {
             <div class="news-title">${escapeHtml(newsItem.title || '综合归纳要闻')}</div>
             <span class="fund-news-source">${escapeHtml(newsItem.source_group || newsItem.tag || '综合要闻')}</span>
           </div>
-          <div class="news-meta"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="tag tag-gold">${escapeHtml(newsItem.tag || newsItem.source_group || '综合要闻')}</span>${renderFundNewsRelevance(newsItem)}<span class="news-time">${escapeHtml(newsItem.time || '刚刚')}</span></div></div>
+          <div class="news-meta"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="tag tag-gold">${escapeHtml(newsItem.tag || newsItem.source_group || '综合要闻')}</span>${renderFundNewsImpact(newsItem)}${renderFundNewsRelevance(newsItem)}<span class="news-time">${escapeHtml(newsItem.time || '刚刚')}</span></div></div>
           <div class="fund-news-why">为什么是要闻：${escapeHtml(newsItem.why || '当前没有补充说明。')}</div>
         </div>
       `).join('')}
@@ -15763,8 +15784,9 @@ function openFundNewsList(options = {}) {
   const listPage = document.getElementById('page-fund-news-list');
   if (!feedPage || !listPage) return;
   const tabs = getFundNewsTabs();
-  const requestedTab = String(options.activeTabKey || fundNewsListState.activeTabKey || 'summary').trim();
-  fundNewsListState.activeTabKey = tabs.some((tab) => tab.key === requestedTab) ? requestedTab : 'summary';
+  const requestedTab = String(options.activeTabKey || 'all').trim();
+  fundNewsListState.activeTabKey = tabs.some((tab) => tab.key === requestedTab) ? requestedTab : 'all';
+  if (options.activeImpact) fundNewsListState.activeImpact = String(options.activeImpact || 'all');
   if (!options.keepQuery) fundNewsListState.query = '';
   feedPage.classList.remove('active');
   listPage.classList.add('active');
@@ -15793,6 +15815,11 @@ function selectFundNewsListTab(tabKey) {
   fundNewsListState.activeTabKey = String(tabKey || 'summary').trim() || 'summary';
   fundNewsListState.query = '';
   window.history.replaceState({}, '', buildFundNewsListRouteUrl(fundNewsListState.activeTabKey));
+  renderFundNewsList();
+}
+
+function selectFundNewsImpact(value) {
+  fundNewsListState.activeImpact = String(value || 'all');
   renderFundNewsList();
 }
 
@@ -15854,7 +15881,37 @@ let hermesSessionSearchKeyword = '';
 let hermesSessionActorKey = '';
 let hermesSessionListLoadedKey = '';
 let hermesSessionListLoading = false;
-const fundNewsListState = { activeTabKey: 'summary', query: '' };
+const fundNewsListState = { activeTabKey: 'all', query: '', activeImpact: 'all' };
+
+let fundNewsAnalysisCharts = [];
+let fundNewsAnalysisResizeHandler = null;
+function renderFundNewsAnalysisCharts() {
+  const host = document.getElementById('fund-news-analysis');
+  if (!host || !window.echarts) return;
+  let analysis = {};
+  try { analysis = JSON.parse(host.dataset.analysis || '{}'); } catch (error) { analysis = {}; }
+  const counts = analysis.counts || {};
+  const total = Number(analysis.total || 0);
+  const pieHost = document.getElementById('fund-news-impact-pie');
+  const barHost = document.getElementById('fund-news-industry-bar');
+  if (!analysis.available || !total) {
+    [pieHost, barHost].forEach((target) => { if (target) target.innerHTML = '<div class="fund-news-analysis-empty">今日暂无带有效发布时间的新闻标注<br>暂不计算利好/利空比例</div>'; });
+    return;
+  }
+  const positive = Number(counts.positive || 0);
+  const negative = Number(counts.negative || 0);
+  fundNewsAnalysisCharts.forEach((chart) => chart?.dispose?.());
+  const pie = window.echarts.init(pieHost);
+  pie.setOption({ animation: false, tooltip: { trigger: 'item', formatter: '{b}: {c} 条 ({d}%)' }, legend: { bottom: 5, left: 'center', textStyle: { fontSize: 10 } }, series: [{ type: 'pie', radius: ['42%', '70%'], center: ['50%', '45%'], avoidLabelOverlap: true, label: { fontSize: 10, formatter: '{b} {d}%' }, data: [{ name: '利好', value: positive, itemStyle: { color: '#D64545' } }, { name: '利空', value: negative, itemStyle: { color: '#2E9B65' } }, { name: '中性/待确认', value: Number(counts.neutral || 0), itemStyle: { color: '#AAB4C0' } }, { name: '影响分化', value: Number(counts.mixed || 0), itemStyle: { color: '#D69E2E' } }] }]
+  });
+  const industries = Array.isArray(analysis.industries) ? analysis.industries.slice(0, 8) : [];
+  const bar = window.echarts.init(barHost);
+  bar.setOption({ animation: false, grid: { left: 72, right: 12, top: 32, bottom: 24 }, tooltip: { trigger: 'axis', valueFormatter: value => `${value}%` }, legend: { top: 8, right: 8, textStyle: { fontSize: 9 } }, xAxis: { type: 'value', max: 100, axisLabel: { fontSize: 9, formatter: '{value}%' }, splitLine: { lineStyle: { color: '#EEF2F6' } } }, yAxis: { type: 'category', inverse: true, data: industries.map(item => item.industry), axisLabel: { fontSize: 9, width: 62, overflow: 'truncate' } }, series: [{ name: '利好', type: 'bar', stack: 'impact', data: industries.map(item => item.positive_pct), itemStyle: { color: '#D64545' }, barMaxWidth: 16 }, { name: '利空', type: 'bar', stack: 'impact', data: industries.map(item => item.negative_pct), itemStyle: { color: '#2E9B65' }, barMaxWidth: 16 }, { name: '中性/待确认', type: 'bar', stack: 'impact', data: industries.map(item => item.neutral_pct), itemStyle: { color: '#AAB4C0' }, barMaxWidth: 16 }, { name: '影响分化', type: 'bar', stack: 'impact', data: industries.map(item => item.mixed_pct), itemStyle: { color: '#D69E2E' }, barMaxWidth: 16 }] });
+  fundNewsAnalysisCharts = [pie, bar];
+  if (fundNewsAnalysisResizeHandler) window.removeEventListener('resize', fundNewsAnalysisResizeHandler);
+  fundNewsAnalysisResizeHandler = () => fundNewsAnalysisCharts.forEach((chart) => chart.resize());
+  window.addEventListener('resize', fundNewsAnalysisResizeHandler);
+}
 
 function getHermesSettings() {
   return (window.SITE_CONFIG && window.SITE_CONFIG.hermes_settings) || {};
@@ -20321,6 +20378,7 @@ function initH5SplashScreen() {
 
 document.addEventListener('DOMContentLoaded', () => {
   initH5SplashScreen();
+  renderFundNewsAnalysisCharts();
   window.GangtiseReleaseNotes?.init({ surface: 'h5', autoShow: false });
   syncDemoUsersWithActiveTenant();
   applySiteFeatureFlags();

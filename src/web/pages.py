@@ -259,6 +259,7 @@ def h5():
     news_payload = build_fundamental_news_payload(tenant=tenant, watchlist_details=watchlist_details, limit=10)
     news = news_payload.get("items") or []
     news_tabs = news_payload.get("tabs") or []
+    news_analysis = news_payload.get("impact_analysis") or {}
     macro_indicators = [
         {
             "name": item.get("name") or "",
@@ -282,6 +283,7 @@ def h5():
         market=market,
         news=news,
         news_tabs=news_tabs,
+        news_analysis=news_analysis,
         macro_indicators=macro_indicators,
         feed_boards=feed_boards,
         watchlist_details=watchlist_details,
