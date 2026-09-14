@@ -463,10 +463,18 @@ def build_incremental_delta(local_target, target, include_schema=True, include_m
             result["master_data"] = _data_incremental_sql(
                 local_connection, target_connection, master_tables,
             )
-        runtime_tables = report["data"]["runtime_data_difference_tables"] + report["data"]["manual_business_data_candidates"]
+        runtime_tables = report["data"]["manual_business_data_candidates"]
         if include_runtime_data and runtime_tables:
             result["runtime_data"] = _data_incremental_sql(
                 local_connection, target_connection, runtime_tables,
+            )
+        if include_runtime_data and report["data"]["runtime_data_difference_tables"]:
+            result["runtime_data"]["blockers"].extend(
+                {
+                    "table": table_name,
+                    "reason": "target_user_runtime_data_is_protected",
+                }
+                for table_name in report["data"]["runtime_data_difference_tables"]
             )
     return result
 

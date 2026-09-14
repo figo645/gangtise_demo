@@ -10,12 +10,6 @@ import subprocess
 import threading
 from zoneinfo import ZoneInfo
 
-_watchlist_comments_schema_lock = threading.Lock()
-_watchlist_comments_schema_ready = False
-_user_watchlist_schema_lock = threading.Lock()
-_user_watchlist_schema_targets = set()
-
-
 def _parse_market_datetime(value):
     text = str(value or "").strip()
     if not text:
@@ -402,59 +396,25 @@ def _normalize_user_watchlist_owner(tenant_slug="", user_profile_id=""):
     return tenant, profile
 
 
-def _ensure_user_watchlist_items_table(db=None):
-    """Create the relation for databases deployed before migration 033."""
-    global _user_watchlist_schema_targets
-    database = db or get_db()
-    connection = getattr(database, "_connection", None)
-    # Test doubles and alternate adapters may not expose psycopg2's
-    # connection. The normal query remains responsible for those adapters.
-    if connection is None:
-        return
-    connection_info = getattr(connection, "info", None)
-    target_key = str(getattr(connection_info, "dsn", "") or "").strip() or str(id(connection))
-    with _user_watchlist_schema_lock:
-        if target_key in _user_watchlist_schema_targets:
-            return
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS user_watchlist_items (
-                    id BIGSERIAL PRIMARY KEY,
-                    tenant_slug TEXT NOT NULL DEFAULT '',
-                    user_profile_id TEXT NOT NULL DEFAULT '',
-                    stock_code TEXT NOT NULL DEFAULT '',
-                    stock_name TEXT NOT NULL DEFAULT '',
-                    market TEXT NOT NULL DEFAULT '',
-                    industry TEXT NOT NULL DEFAULT '',
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                )
-                """
-            )
-            cursor.execute(
-                """
-                CREATE UNIQUE INDEX IF NOT EXISTS uq_user_watchlist_items_owner_stock
-                ON user_watchlist_items(tenant_slug, user_profile_id, stock_code)
-                """
-            )
-            cursor.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_user_watchlist_items_owner_updated
-                ON user_watchlist_items(tenant_slug, user_profile_id, updated_at DESC, id DESC)
-                """
-            )
-        connection.commit()
-        _user_watchlist_schema_targets.add(target_key)
+def _resolve_user_pk(tenant_slug="", profile_id=""):
+    """Resolve the canonical users.id while retaining legacy profile text."""
+    tenant = str(tenant_slug or "").strip().lower()
+    profile = str(profile_id or "").strip()
+    if not tenant or not profile:
+        return None
+    row = get_db().execute(
+        "SELECT id FROM users WHERE lower(tenant_slug) = ? AND (username = ? OR CAST(id AS TEXT) = ?) LIMIT 1",
+        (tenant, profile, profile),
+    ).fetchone()
+    return int(row["id"] if isinstance(row, dict) else row[0]) if row else None
 
 
 def list_user_watchlist_items(tenant_slug="", user_profile_id=""):
     tenant, profile = _normalize_user_watchlist_owner(tenant_slug, user_profile_id)
     db = get_db()
-    _ensure_user_watchlist_items_table(db)
     rows = db.execute(
         """
-        SELECT id, tenant_slug, user_profile_id, stock_code, stock_name, market, industry,
+        SELECT id, tenant_slug, user_profile_id, user_id, stock_code, stock_name, market, industry,
                created_at, updated_at
         FROM user_watchlist_items
         WHERE tenant_slug = ? AND user_profile_id = ?
@@ -502,6 +462,7 @@ def list_user_watchlist_items(tenant_slug="", user_profile_id=""):
             }
         detail["code"] = code
         detail["watchlist_item_id"] = row.get("id")
+        detail["watchlist_user_id"] = row.get("user_id")
         detail["watchlist_created_at"] = row.get("created_at")
         detail["watchlist_updated_at"] = row.get("updated_at")
         result.append(detail)
@@ -523,19 +484,20 @@ def add_user_watchlist_item(tenant_slug="", user_profile_id="", stock_code="", s
         raise ValueError("watchlist_stock_not_found")
     now = now_ts()
     db = get_db()
-    _ensure_user_watchlist_items_table(db)
+    canonical_user_id = _resolve_user_pk(tenant, profile)
     db.execute(
         """
         INSERT INTO user_watchlist_items
-            (tenant_slug, user_profile_id, stock_code, stock_name, market, industry, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (tenant_slug, user_profile_id, user_id, stock_code, stock_name, market, industry, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (tenant_slug, user_profile_id, stock_code)
-        DO UPDATE SET stock_name = EXCLUDED.stock_name, market = EXCLUDED.market,
+        DO UPDATE SET user_id = EXCLUDED.user_id, stock_name = EXCLUDED.stock_name, market = EXCLUDED.market,
                       industry = EXCLUDED.industry, updated_at = EXCLUDED.updated_at
         """,
         (
             tenant,
             profile,
+            canonical_user_id,
             normalized_code,
             str(detail.get("name") or stock_name or normalized_code).strip(),
             str(detail.get("market") or _infer_watchlist_market(normalized_code)).strip(),
@@ -561,7 +523,6 @@ def remove_user_watchlist_item(tenant_slug="", user_profile_id="", stock_code=""
     if not normalized_code:
         raise ValueError("stock_code_required")
     db = get_db()
-    _ensure_user_watchlist_items_table(db)
     deleted = db.execute(
         "DELETE FROM user_watchlist_items WHERE tenant_slug = ? AND user_profile_id = ? AND stock_code = ?",
         (tenant, profile, normalized_code),
@@ -6819,8 +6780,10 @@ def normalize_watchlist_detail_from_indicator(detail, indicator_code):
 
 
 def build_market_overview_index_detail(indicator_code):
-    """Build an index detail from the same persisted market snapshot as H5."""
+    """Build an index detail only from the verified AKShare history snapshot."""
     history = _load_watchlist_cache("market_index_history", indicator_code, MARKET_SNAPSHOT_CACHE_TTL_SECONDS)
+    if str((history or {}).get("provider") or "").strip().lower() != "akshare":
+        return None
     points = list((history or {}).get("points") or []) if isinstance(history, dict) else []
     if len(points) < 2:
         return None
@@ -6840,7 +6803,7 @@ def build_market_overview_index_detail(indicator_code):
         for index, point in enumerate(points)
         if numeric_value(point.get("close")) is not None
     ]
-    provider = str((history or {}).get("provider") or "市场快照").strip()
+    provider = "AKShare"
     return {
         "id": indicator_code,
         "indicator_code": indicator_code,
@@ -6905,7 +6868,7 @@ def build_watchlist_indicator_detail(indicator_code, stock_name=""):
                 if str((item or {}).get("id") or "").strip() != normalized_code:
                     continue
                 fallback = normalize_watchlist_detail_from_indicator(item, normalized_code)
-                if fallback and (fallback.get("kline") or fallback.get("history_series")):
+                if fallback and str(fallback.get("data_source") or "").strip().lower() == "akshare" and (fallback.get("kline") or fallback.get("history_series")):
                     return fallback
         except Exception as exc:
             if not is_db_unavailable_error(exc):
@@ -8427,6 +8390,7 @@ def save_watchlist_kline_annotation(
     kline = detail.get("kline") if isinstance(detail.get("kline"), list) else []
     candle = kline[normalized_index] if normalized_index < len(kline) else {}
     now_text = now_ts()
+    canonical_user_id = _resolve_user_pk(normalized_tenant, created_by_user_id)
     payload = {
         "tenant_slug": normalized_tenant,
         "stock_code": normalized_code,
@@ -8441,6 +8405,7 @@ def save_watchlist_kline_annotation(
         "note": content_text[:2000],
         "trigger": "",
         "created_by_user_id": str(created_by_user_id or "").strip()[:120],
+        "created_by_user_pk": canonical_user_id,
         "created_by_name": str(created_by_name or "").strip()[:120],
         "created_by_role": str(created_by_role or "investor").strip().lower() or "investor",
         "source_client": str(source_client or "h5").strip()[:40] or "h5",
@@ -8463,7 +8428,7 @@ def save_watchlist_kline_annotation(
             """
             UPDATE watchlist_kline_annotations
             SET stock_name = ?, candle_date = ?, open_price = ?, high_price = ?, low_price = ?, close_price = ?,
-                title = ?, note = ?, trigger = ?, created_by_user_id = ?, created_by_name = ?, created_by_role = ?, source_client = ?, updated_at = ?
+                title = ?, note = ?, trigger = ?, created_by_user_id = ?, created_by_user_pk = ?, created_by_name = ?, created_by_role = ?, source_client = ?, updated_at = ?
             WHERE id = ?
             """,
             (
@@ -8477,6 +8442,7 @@ def save_watchlist_kline_annotation(
                 payload["note"],
                 payload["trigger"],
                 payload["created_by_user_id"],
+                payload["created_by_user_pk"],
                 payload["created_by_name"],
                 payload["created_by_role"],
                 payload["source_client"],
@@ -8490,9 +8456,9 @@ def save_watchlist_kline_annotation(
             INSERT INTO watchlist_kline_annotations (
                 tenant_slug, stock_code, stock_name, candle_index, candle_date,
                 open_price, high_price, low_price, close_price,
-                title, note, trigger, created_by_user_id, created_by_name, created_by_role,
+                title, note, trigger, created_by_user_id, created_by_user_pk, created_by_name, created_by_role,
                 source_client, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 payload["tenant_slug"],
@@ -8508,6 +8474,7 @@ def save_watchlist_kline_annotation(
                 payload["note"],
                 payload["trigger"],
                 payload["created_by_user_id"],
+                payload["created_by_user_pk"],
                 payload["created_by_name"],
                 payload["created_by_role"],
                 payload["source_client"],
@@ -8689,9 +8656,6 @@ def build_today_user_interaction_digest(
         return start_value is None or start_value <= value_date <= end_value
 
     db = get_db()
-    connection = getattr(db, "_connection", None)
-    if connection is not None:
-        _ensure_watchlist_comments_table(connection)
     comment_rows = db.execute(
         """
         SELECT * FROM watchlist_comments
@@ -8813,73 +8777,6 @@ def _normalize_watchlist_comment_row(row, detail=None, viewer_role="", viewer_pr
     }
 
 
-def _ensure_watchlist_comments_table(conn):
-    global _watchlist_comments_schema_ready
-    if _watchlist_comments_schema_ready:
-        return
-    with _watchlist_comments_schema_lock:
-        if _watchlist_comments_schema_ready:
-            return
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS watchlist_comments (
-                    id BIGSERIAL PRIMARY KEY,
-                    tenant_slug TEXT NOT NULL DEFAULT '',
-                    stock_code TEXT NOT NULL DEFAULT '',
-                    stock_name TEXT NOT NULL DEFAULT '',
-                    comment_text TEXT NOT NULL DEFAULT '',
-                    label_tags_json TEXT NOT NULL DEFAULT '[]',
-                    keyword_tags_json TEXT NOT NULL DEFAULT '[]',
-                    sentiment_label TEXT NOT NULL DEFAULT '',
-                    topic_label TEXT NOT NULL DEFAULT '',
-                    comment_summary TEXT NOT NULL DEFAULT '',
-                    labeling_source TEXT NOT NULL DEFAULT '',
-                    labeling_model_key TEXT NOT NULL DEFAULT '',
-                    labeling_model_name TEXT NOT NULL DEFAULT '',
-                    created_by_user_id TEXT NOT NULL DEFAULT '',
-                    created_by_name TEXT NOT NULL DEFAULT '',
-                    created_by_role TEXT NOT NULL DEFAULT 'investor',
-                    source_client TEXT NOT NULL DEFAULT 'h5',
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                )
-                """
-            )
-            cur.execute(
-                "ALTER TABLE watchlist_comments ADD COLUMN IF NOT EXISTS label_tags_json TEXT NOT NULL DEFAULT '[]'"
-            )
-            cur.execute(
-                "ALTER TABLE watchlist_comments ADD COLUMN IF NOT EXISTS keyword_tags_json TEXT NOT NULL DEFAULT '[]'"
-            )
-            cur.execute(
-                "ALTER TABLE watchlist_comments ADD COLUMN IF NOT EXISTS sentiment_label TEXT NOT NULL DEFAULT ''"
-            )
-            cur.execute(
-                "ALTER TABLE watchlist_comments ADD COLUMN IF NOT EXISTS topic_label TEXT NOT NULL DEFAULT ''"
-            )
-            cur.execute(
-                "ALTER TABLE watchlist_comments ADD COLUMN IF NOT EXISTS comment_summary TEXT NOT NULL DEFAULT ''"
-            )
-            cur.execute(
-                "ALTER TABLE watchlist_comments ADD COLUMN IF NOT EXISTS labeling_source TEXT NOT NULL DEFAULT ''"
-            )
-            cur.execute(
-                "ALTER TABLE watchlist_comments ADD COLUMN IF NOT EXISTS labeling_model_key TEXT NOT NULL DEFAULT ''"
-            )
-            cur.execute(
-                "ALTER TABLE watchlist_comments ADD COLUMN IF NOT EXISTS labeling_model_name TEXT NOT NULL DEFAULT ''"
-            )
-            cur.execute(
-                "CREATE INDEX IF NOT EXISTS idx_watchlist_comments_tenant_stock_updated ON watchlist_comments(tenant_slug, stock_code, updated_at DESC, id DESC)"
-            )
-            cur.execute(
-                "CREATE INDEX IF NOT EXISTS idx_watchlist_comments_tenant_user ON watchlist_comments(tenant_slug, created_by_user_id, updated_at DESC)"
-            )
-        conn.commit()
-        _watchlist_comments_schema_ready = True
-
-
 def _extract_watchlist_comment_keywords_by_rule(comment_text, stock_detail=None, limit=6):
     normalized = re.sub(r"\s+", " ", str(comment_text or "").strip())
     if not normalized:
@@ -8986,9 +8883,6 @@ def list_watchlist_comments(
     normalized_viewer_role = str(viewer_role or "").strip().lower()
     normalized_viewer_profile_id = str(viewer_profile_id or "").strip()
     db = get_db()
-    connection = getattr(db, "_connection", None)
-    if connection is not None:
-        _ensure_watchlist_comments_table(connection)
     rows = db.execute(
         """
         SELECT *
@@ -9054,12 +8948,14 @@ def save_watchlist_comment(
     if normalized_role not in {"investor", "dav"}:
         normalized_role = "investor"
     now_text = now_ts()
+    canonical_user_id = _resolve_user_pk(normalized_tenant, created_by_user_id)
     payload = {
         "tenant_slug": normalized_tenant,
         "stock_code": normalized_code,
         "stock_name": str(stock_name or detail.get("name") or normalized_code).strip() or normalized_code,
         "comment_text": content[:1000],
         "created_by_user_id": created_by_user_id[:120],
+        "created_by_user_pk": canonical_user_id,
         "created_by_name": str(created_by_name or created_by_user_id or "租户用户").strip()[:120] or "租户用户",
         "created_by_role": normalized_role,
         "source_client": str(source_client or "h5").strip()[:40] or "h5",
@@ -9076,16 +8972,15 @@ def save_watchlist_comment(
     payload["labeling_model_key"] = ""
     payload["labeling_model_name"] = ""
     db = get_db()
-    _ensure_watchlist_comments_table(db._connection)
     db.execute(
         """
         INSERT INTO watchlist_comments (
             tenant_slug, stock_code, stock_name, comment_text,
             label_tags_json, keyword_tags_json, sentiment_label, topic_label, comment_summary,
             labeling_source, labeling_model_key, labeling_model_name,
-            created_by_user_id, created_by_name, created_by_role, source_client,
+            created_by_user_id, created_by_user_pk, created_by_name, created_by_role, source_client,
             created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             payload["tenant_slug"],
@@ -9101,6 +8996,7 @@ def save_watchlist_comment(
             payload["labeling_model_key"],
             payload["labeling_model_name"],
             payload["created_by_user_id"],
+            payload["created_by_user_pk"],
             payload["created_by_name"],
             payload["created_by_role"],
             payload["source_client"],
@@ -9147,7 +9043,6 @@ def build_watchlist_comment_analytics(tenant_slug="", limit=240):
         }
     try:
         db = get_db()
-        _ensure_watchlist_comments_table(db._connection)
         rows = db.execute(
             """
             SELECT *
@@ -9350,7 +9245,6 @@ def delete_watchlist_comment(
     normalized_role = str(actor_role or "").strip().lower()
     normalized_profile_id = str(actor_profile_id or "").strip()
     db = get_db()
-    _ensure_watchlist_comments_table(db._connection)
     row = db.execute(
         """
         SELECT *

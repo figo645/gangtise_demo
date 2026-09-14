@@ -1875,136 +1875,23 @@ def _load_local_embedding_model(embedding_cfg=None):
     return model
 
 
-_vector_origin_schema_lock = threading.Lock()
-_vector_origin_schema_targets = set()
-
-
 def _ensure_vector_origin_columns(conn, table_name):
-    """Keep compatibility origin columns on vector tables without environment rules."""
+    """Validate migration-managed provenance columns without changing schema."""
     if table_name not in {"knowledge_embeddings", "review_voice_embeddings"}:
         raise ValueError("unsupported_vector_provenance_table")
-    target_key = (str(getattr(getattr(conn, "info", None), "dsn", "") or id(conn)), table_name)
-    if target_key in _vector_origin_schema_targets:
-        return
-    with _vector_origin_schema_lock:
-        if target_key in _vector_origin_schema_targets:
-            return
-        with conn.cursor() as cur:
-            cur.execute(f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS is_simulated INTEGER NOT NULL DEFAULT 0")
-            cur.execute(f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS simulation_label TEXT NOT NULL DEFAULT ''")
-        conn.commit()
-        _vector_origin_schema_targets.add(target_key)
+    with conn.cursor() as cur:
+        cur.execute("SELECT to_regclass(%s)", (table_name,))
+        if not cur.fetchone()[0]:
+            raise RuntimeError(f"database_schema_missing:{table_name}")
 
 
 def _ensure_review_voice_vector_table(conn):
-    has_pgvector = False
     with conn.cursor() as cur:
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS review_voice_embeddings (
-                id BIGSERIAL PRIMARY KEY,
-                tenant_slug TEXT NOT NULL DEFAULT '',
-                review_period TEXT NOT NULL DEFAULT '',
-                entry_point TEXT NOT NULL DEFAULT '',
-                vector_namespace TEXT NOT NULL DEFAULT '',
-                speaker_name TEXT NOT NULL DEFAULT '',
-                original_filename TEXT NOT NULL DEFAULT '',
-                mime_type TEXT NOT NULL DEFAULT '',
-                audio_size_bytes INTEGER NOT NULL DEFAULT 0,
-                transcript_text TEXT NOT NULL,
-                transcript_hash TEXT NOT NULL,
-                transcription_engine TEXT NOT NULL DEFAULT '',
-                transcript_model TEXT NOT NULL DEFAULT '',
-                embedding_engine TEXT NOT NULL DEFAULT '',
-                embedding_model TEXT NOT NULL DEFAULT '',
-                embedding_json JSONB NOT NULL DEFAULT '[]'::jsonb,
-                metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            """
-        )
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_review_voice_embeddings_tenant_created ON review_voice_embeddings(tenant_slug, created_at DESC)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_review_voice_embeddings_hash ON review_voice_embeddings(transcript_hash)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_review_voice_embeddings_namespace ON review_voice_embeddings(vector_namespace, created_at DESC)")
-        try:
-            cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
-        except Exception:
-            conn.rollback()
-            with conn.cursor() as retry_cur:
-                retry_cur.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS review_voice_embeddings (
-                        id BIGSERIAL PRIMARY KEY,
-                        tenant_slug TEXT NOT NULL DEFAULT '',
-                        review_period TEXT NOT NULL DEFAULT '',
-                        entry_point TEXT NOT NULL DEFAULT '',
-                        vector_namespace TEXT NOT NULL DEFAULT '',
-                        speaker_name TEXT NOT NULL DEFAULT '',
-                        original_filename TEXT NOT NULL DEFAULT '',
-                        mime_type TEXT NOT NULL DEFAULT '',
-                        audio_size_bytes INTEGER NOT NULL DEFAULT 0,
-                        transcript_text TEXT NOT NULL,
-                        transcript_hash TEXT NOT NULL,
-                        transcription_engine TEXT NOT NULL DEFAULT '',
-                        transcript_model TEXT NOT NULL DEFAULT '',
-                        embedding_engine TEXT NOT NULL DEFAULT '',
-                        embedding_model TEXT NOT NULL DEFAULT '',
-                        embedding_json JSONB NOT NULL DEFAULT '[]'::jsonb,
-                        metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                    )
-                    """
-                )
-                retry_cur.execute("CREATE INDEX IF NOT EXISTS idx_review_voice_embeddings_tenant_created ON review_voice_embeddings(tenant_slug, created_at DESC)")
-                retry_cur.execute("CREATE INDEX IF NOT EXISTS idx_review_voice_embeddings_hash ON review_voice_embeddings(transcript_hash)")
-                retry_cur.execute("CREATE INDEX IF NOT EXISTS idx_review_voice_embeddings_namespace ON review_voice_embeddings(vector_namespace, created_at DESC)")
-            conn.commit()
-        with conn.cursor() as check_cur:
-            check_cur.execute("ALTER TABLE review_voice_embeddings ADD COLUMN IF NOT EXISTS vector_namespace TEXT NOT NULL DEFAULT ''")
-            check_cur.execute("ALTER TABLE review_voice_embeddings ADD COLUMN IF NOT EXISTS transcription_engine TEXT NOT NULL DEFAULT ''")
-            check_cur.execute("ALTER TABLE review_voice_embeddings ADD COLUMN IF NOT EXISTS embedding_engine TEXT NOT NULL DEFAULT ''")
-            check_cur.execute("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')")
-            has_pgvector = bool(check_cur.fetchone()[0])
-            if has_pgvector:
-                check_cur.execute(
-                    f"ALTER TABLE review_voice_embeddings ADD COLUMN IF NOT EXISTS embedding_vector vector({PGVECTOR_TARGET_DIM})"
-                )
-                try:
-                    check_cur.execute(
-                        """
-                        CREATE INDEX IF NOT EXISTS idx_review_voice_embeddings_vector
-                        ON review_voice_embeddings
-                        USING ivfflat (embedding_vector vector_cosine_ops)
-                        """
-                    )
-                except Exception:
-                    conn.rollback()
-                    with conn.cursor() as recovery_cur:
-                        recovery_cur.execute(
-                            """
-                            CREATE TABLE IF NOT EXISTS review_voice_embeddings (
-                                id BIGSERIAL PRIMARY KEY,
-                                tenant_slug TEXT NOT NULL DEFAULT '',
-                                review_period TEXT NOT NULL DEFAULT '',
-                                entry_point TEXT NOT NULL DEFAULT '',
-                                speaker_name TEXT NOT NULL DEFAULT '',
-                                original_filename TEXT NOT NULL DEFAULT '',
-                                mime_type TEXT NOT NULL DEFAULT '',
-                                audio_size_bytes INTEGER NOT NULL DEFAULT 0,
-                                transcript_text TEXT NOT NULL,
-                                transcript_hash TEXT NOT NULL,
-                                transcript_model TEXT NOT NULL DEFAULT '',
-                                embedding_model TEXT NOT NULL DEFAULT '',
-                                embedding_json JSONB NOT NULL DEFAULT '[]'::jsonb,
-                                metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-                                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                            )
-                            """
-                        )
-                        recovery_cur.execute(
-                            f"ALTER TABLE review_voice_embeddings ADD COLUMN IF NOT EXISTS embedding_vector vector({PGVECTOR_TARGET_DIM})"
-                        )
-    conn.commit()
+        cur.execute("SELECT to_regclass('review_voice_embeddings')")
+        if not cur.fetchone()[0]:
+            raise RuntimeError("database_schema_missing:review_voice_embeddings")
+        cur.execute("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')")
+        has_pgvector = bool(cur.fetchone()[0])
     _ensure_vector_origin_columns(conn, "review_voice_embeddings")
     return has_pgvector
 
@@ -2265,68 +2152,12 @@ def _store_review_voice_embedding_record(
 
 
 def _ensure_knowledge_embedding_table(conn):
-    has_pgvector = False
     with conn.cursor() as cur:
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS knowledge_embeddings (
-                id BIGSERIAL PRIMARY KEY,
-                tenant_slug TEXT NOT NULL DEFAULT '',
-                knowledge_id TEXT NOT NULL DEFAULT '',
-                knowledge_type TEXT NOT NULL DEFAULT '',
-                title TEXT NOT NULL DEFAULT '',
-                summary TEXT NOT NULL DEFAULT '',
-                body_text TEXT NOT NULL DEFAULT '',
-                source_detail TEXT NOT NULL DEFAULT '',
-                vector_namespace TEXT NOT NULL DEFAULT '',
-                embedding_engine TEXT NOT NULL DEFAULT '',
-                embedding_model TEXT NOT NULL DEFAULT '',
-                embedding_json JSONB NOT NULL DEFAULT '[]'::jsonb,
-                metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            """
-        )
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_embeddings_tenant_created ON knowledge_embeddings(tenant_slug, created_at DESC)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_embeddings_knowledge_id ON knowledge_embeddings(knowledge_id)")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_embeddings_namespace ON knowledge_embeddings(vector_namespace, created_at DESC)")
-        try:
-            cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
-        except Exception:
-            conn.rollback()
-            with conn.cursor() as retry_cur:
-                retry_cur.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS knowledge_embeddings (
-                        id BIGSERIAL PRIMARY KEY,
-                        tenant_slug TEXT NOT NULL DEFAULT '',
-                        knowledge_id TEXT NOT NULL DEFAULT '',
-                        knowledge_type TEXT NOT NULL DEFAULT '',
-                        title TEXT NOT NULL DEFAULT '',
-                        summary TEXT NOT NULL DEFAULT '',
-                        body_text TEXT NOT NULL DEFAULT '',
-                        source_detail TEXT NOT NULL DEFAULT '',
-                        vector_namespace TEXT NOT NULL DEFAULT '',
-                        embedding_engine TEXT NOT NULL DEFAULT '',
-                        embedding_model TEXT NOT NULL DEFAULT '',
-                        embedding_json JSONB NOT NULL DEFAULT '[]'::jsonb,
-                        metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-                        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                    )
-                    """
-                )
-                retry_cur.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_embeddings_tenant_created ON knowledge_embeddings(tenant_slug, created_at DESC)")
-                retry_cur.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_embeddings_knowledge_id ON knowledge_embeddings(knowledge_id)")
-                retry_cur.execute("CREATE INDEX IF NOT EXISTS idx_knowledge_embeddings_namespace ON knowledge_embeddings(vector_namespace, created_at DESC)")
-            conn.commit()
-        with conn.cursor() as check_cur:
-            check_cur.execute("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')")
-            has_pgvector = bool(check_cur.fetchone()[0])
-            if has_pgvector:
-                check_cur.execute(
-                    f"ALTER TABLE knowledge_embeddings ADD COLUMN IF NOT EXISTS embedding_vector vector({PGVECTOR_TARGET_DIM})"
-                )
-    conn.commit()
+        cur.execute("SELECT to_regclass('knowledge_embeddings')")
+        if not cur.fetchone()[0]:
+            raise RuntimeError("database_schema_missing:knowledge_embeddings")
+        cur.execute("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')")
+        has_pgvector = bool(cur.fetchone()[0])
     _ensure_vector_origin_columns(conn, "knowledge_embeddings")
     return has_pgvector
 
@@ -7111,36 +6942,10 @@ def route_hermes_query_intent(question_text, tenant_slug="", selected_knowledge_
 
 def ensure_hermes_interception_audit_table():
     db = get_db()
-    db.execute(
-        """
-        CREATE TABLE IF NOT EXISTS hermes_interception_audits (
-            id BIGSERIAL PRIMARY KEY,
-            audit_id TEXT NOT NULL UNIQUE,
-            tenant_slug TEXT NOT NULL DEFAULT '',
-            user_profile_id TEXT NOT NULL DEFAULT '',
-            user_role TEXT NOT NULL DEFAULT '',
-            session_id TEXT NOT NULL DEFAULT '',
-            question_text TEXT NOT NULL DEFAULT '',
-            router_plan_json TEXT NOT NULL DEFAULT '{}',
-            skill_results_json TEXT NOT NULL DEFAULT '[]',
-            matched_skill_ids_json TEXT NOT NULL DEFAULT '[]',
-            action TEXT NOT NULL DEFAULT 'allow',
-            decision_status TEXT NOT NULL DEFAULT 'disabled',
-            final_reason TEXT NOT NULL DEFAULT '',
-            tool_called INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL
-        )
-        """
-    )
-    db.execute(
-        "CREATE INDEX IF NOT EXISTS idx_hermes_interception_audits_tenant_created "
-        "ON hermes_interception_audits(tenant_slug, created_at DESC)"
-    )
-    db.execute(
-        "CREATE INDEX IF NOT EXISTS idx_hermes_interception_audits_action_created "
-        "ON hermes_interception_audits(action, created_at DESC)"
-    )
-    db.commit()
+    row = db.execute("SELECT to_regclass('hermes_interception_audits') AS relation").fetchone()
+    relation = row.get("relation") if isinstance(row, dict) else row[0]
+    if not relation:
+        raise RuntimeError("database_schema_missing:hermes_interception_audits")
 
 
 def record_hermes_interception_audit(

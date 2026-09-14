@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>洞见智研 | 架构与数据完整性审计报告</title>
+  <style>
+    :root{--ink:#1f2933;--muted:#667085;--line:#d8e1ea;--paper:#fff;--bg:#f3f6f9;--blue:#245b8f;--blue2:#eaf2f8;--gold:#9a6b19;--green:#19734a;--red:#a33a32;--orange:#a45a16}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+    .page{max-width:1220px;margin:auto;padding:30px 22px 70px}.cover{background:linear-gradient(135deg,#173b5e,#34708f);color:#fff;padding:38px 42px;border-radius:14px;box-shadow:0 12px 30px #173b5e22}.eyebrow{font-size:12px;letter-spacing:.08em;opacity:.78}.cover h1{font-size:32px;line-height:1.25;margin:8px 0}.meta{font-size:13px;color:#d9e7ef}.notice,.callout{padding:15px 18px;margin:18px 0;border-radius:9px}.notice{background:#fff8df;border:1px solid #e5cf8a;color:#614d18}.callout{background:#fff;border-left:4px solid var(--blue);border-top:1px solid var(--line);border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+    h2{margin:38px 0 14px;border-left:4px solid var(--blue);padding-left:11px;font-size:23px;line-height:1.3}h3{font-size:17px;margin:22px 0 8px}p{margin:7px 0 11px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}.card{background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:16px}.card strong{display:block;font-size:15px;margin-bottom:4px}.score{font-size:28px;font-weight:750;color:var(--blue)}.sub{color:var(--muted);font-size:12px}.small{font-size:12px;color:var(--muted)}
+    table{width:100%;border-collapse:collapse;background:var(--paper);border:1px solid var(--line);font-size:13px}th,td{text-align:left;vertical-align:top;padding:10px 11px;border-bottom:1px solid var(--line)}th{background:#eaf1f6;color:#29465e;font-weight:700}tr:last-child td{border-bottom:0}.num{text-align:right;white-space:nowrap;font-weight:700}.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;white-space:nowrap}.high{color:var(--red);background:#fbe9e7}.medium{color:var(--orange);background:#fff2db}.low{color:var(--green);background:#e7f5ed}.blue{color:var(--blue);background:var(--blue2)}
+    .bar{height:10px;background:#e7edf2;border-radius:99px;overflow:hidden;margin-top:7px}.bar i{display:block;height:100%;background:var(--blue);border-radius:99px}.score-table td:first-child{font-weight:700}.formula{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#f0f3f5;border-radius:4px;padding:2px 5px;font-size:12px}.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}.list{margin:7px 0;padding-left:20px}.list li{margin:5px 0}.footer{margin-top:42px;padding-top:15px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+    @media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}@media(max-width:620px){.page{padding:14px 10px 45px}.cover{padding:27px 22px}.cover h1{font-size:26px}.grid{grid-template-columns:1fr}table{display:block;overflow:auto}th,td{min-width:130px}}
+  </style>
+</head>
+<body>
+<main class="page">
+  <header class="cover">
+    <div class="eyebrow">ARCHITECTURE AUDIT · 2026-09-15 · READ-ONLY REVIEW</div>
+    <h1>洞见智研架构、数据与跨端一致性分析报告</h1>
+    <div class="meta">审计对象：H5、大V Web、Web、Admin、5051 数据迁移工具、PostgreSQL、定时任务与 AI 编排层</div>
+    <div class="meta">审计方法：代码静态扫描、路由清单、迁移文件、模板 API 调用、Domain Service 调用链、现有测试结果</div>
+  </header>
+
+  <div class="notice"><strong>总体结论：</strong>当前系统已经具备“大V洞见生产 + 粉丝消费 + 订阅商业化”的产品骨架，但仍处于工程收敛期。市场指标域已强制使用 AKShare 快照，5051 已成为唯一数据库发布控制面，运行时建表已清除；本次日志证明代码与目标数据库结构发生了真实漂移：应用查询已读取 <code>user_watchlist_items.user_id</code>，数据库尚未完成 115 迁移，导致 H5 直接返回 500。当前工程审计综合评分下调为 <strong>5.1 / 10</strong>。这个分数不是用户价值评分，也不是压测结果，而是对当前工程状态的风险调整评分。</div>
+
+  <section>
+    <h2>一、评分总览</h2>
+    <div class="grid">
+      <div class="card"><strong>架构合理性</strong><span class="score">5.5</span><div class="bar"><i style="width:55%"></i></div><p class="sub">已有页面/API/Domain/迁移分层，但核心服务过度集中。</p></div>
+      <div class="card"><strong>数据结构完整性</strong><span class="score">4.5</span><div class="bar"><i style="width:45%"></i></div><p class="sub">代码已读取 115 迁移新增列，但当前数据库缺列并已造成 H5 500。</p></div>
+      <div class="card"><strong>数据来源治理</strong><span class="score">5.5</span><div class="bar"><i style="width:55%"></i></div><p class="sub">市场概览、行业、宏观和指数卡片只读 AKShare 快照；个股研究域仍独立使用 Gangtise。</p></div>
+      <div class="card"><strong>跨端一致性</strong><span class="score">4.5</span><div class="bar"><i style="width:45%"></i></div><p class="sub">发布控制面已收敛，但代码与运行库结构不一致，H5 主路径被阻断。</p></div>
+      <div class="card"><strong>持久化一致性</strong><span class="score">6.0</span><div class="bar"><i style="width:60%"></i></div><p class="sub">看板和 Hermes 会话不再以 localStorage 为事实源；自定义技能仍待数据库化。</p></div>
+      <div class="card"><strong>术语一致性</strong><span class="score">5.5</span><div class="bar"><i style="width:55%"></i></div><p class="sub">用户界面已逐步统一为洞见，review API、任务和字段仍需兼容期治理。</p></div>
+      <div class="card"><strong>安全与权限</strong><span class="score">6.0</span><div class="bar"><i style="width:60%"></i></div><p class="sub">角色、租户和操作口令已有保护，但旧接口面过大。</p></div>
+      <div class="card"><strong>任务与可观测性</strong><span class="score">4.5</span><div class="bar"><i style="width:45%"></i></div><p class="sub">有任务中心和运行日志，但任务幂等、状态契约和来源审计仍需加强。</p></div>
+      <div class="card"><strong>性能与扩展性</strong><span class="score">4.0</span><div class="bar"><i style="width:40%"></i></div><p class="sub">单体 Flask、进程内异步和大型模板结构，尚无有效压测证据。</p></div>
+      <div class="card"><strong>测试与发布治理</strong><span class="score">4.5</span><div class="bar"><i style="width:45%"></i></div><p class="sub">5051 和市场来源新契约已覆盖，但全量仍有 42 个失败，真实数据库未实测。</p></div>
+    </div>
+    <p class="small">综合分计算：各维度分数 × 权重之和。权重总计 100%，其中数据来源治理、数据完整性、跨端一致性和架构合理性占比最高。</p>
+  </section>
+
+  <section>
+    <h2>二、评分模型与量化口径</h2>
+    <table class="score-table">
+      <thead><tr><th>分数</th><th>定性含义</th><th>可量化判定</th></tr></thead>
+      <tbody>
+        <tr><td class="num">0–2</td><td>不可控</td><td>核心路径缺失、数据可能丢失或存在明显安全阻断。</td></tr>
+        <tr><td class="num">3–4</td><td>高风险可运行</td><td>功能可以演示，但存在来源冲突、重复实现、迁移不确定或无回滚证据。</td></tr>
+        <tr><td class="num">5–6</td><td>可运行但未收敛</td><td>主路径可用，仍有较多兼容代码、边界缺口或测试覆盖不足。</td></tr>
+        <tr><td class="num">7–8</td><td>生产可控</td><td>关键事实源唯一，跨端契约稳定，核心异常有告警和自动化回归。</td></tr>
+        <tr><td class="num">9–10</td><td>成熟平台</td><td>具备压测容量证据、灾备演练、完整数据治理和持续交付门禁。</td></tr>
+      </tbody>
+    </table>
+    <div class="callout"><strong>重要限制：</strong>本次扫描没有连接可用的本地 PostgreSQL，因此“数据库中实际表、外键、孤儿记录、迁移执行状态”的结论属于静态风险判断，不是线上数据事实。性能分数也不能替代 100 人并发压测。</div>
+  </section>
+
+  <section>
+    <h2>三、扫描基线</h2>
+    <table>
+      <thead><tr><th>扫描对象</th><th>结果</th><th>判读</th></tr></thead>
+      <tbody>
+        <tr><td>Python 源文件</td><td class="num">22</td><td>页面、API、Domain Service 和任务逻辑仍集中在单体 Flask 进程内。</td></tr>
+        <tr><td>模板文件</td><td class="num">12</td><td>H5、Web、大V工作台和 Admin 入口均存在，跨端契约需要持续维护。</td></tr>
+        <tr><td>编号 SQL 迁移</td><td class="num">50</td><td>最高迁移为 115；关系治理迁移文件存在，但目标数据库是否执行必须通过 <code>schema_migrations</code> 实查。</td></tr>
+        <tr><td>Web/API 路由声明</td><td class="num">203</td><td>能力面较宽；需要保持同一 Domain Service 和数据表事实源，避免页面能力分叉。</td></tr>
+        <tr><td>浏览器存储引用</td><td class="num">27</td><td>主题、导航和广播属于客户端偏好；Hermes 自定义技能仍需迁移到数据库事实源。</td></tr>
+        <tr><td>运行时 DDL 引用</td><td class="num">0</td><td>当前扫描未发现 Python 业务代码执行 <code>CREATE TABLE</code>、<code>ALTER TABLE</code> 或 <code>CREATE INDEX</code>；结构变更应继续只通过编号迁移完成。</td></tr>
+        <tr><td>全量测试</td><td class="num">482 / 42 / 2</td><td>分别为 passed / failed / skipped；当前不能作为生产发布通过信号。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>四、核心问题与证据</h2>
+    <table>
+      <thead><tr><th>优先级</th><th>问题</th><th>证据与影响</th><th>当前分值影响</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tag medium">已整改待验收</span></td><td>市场数据来源边界</td><td>市场概览、行业板块、宏观指标和指数卡片只接受 PostgreSQL 中的 AKShare 快照；个股详情仍是独立研究域，可使用 Gangtise，不得复用到市场指标域。</td><td>数据来源治理已提升<br>仍需生产日志验证扣费为 0</td></tr>
+        <tr><td><span class="tag low">已整改</span></td><td>数据库发布控制面重复</td><td>主应用数据库发布、回滚、模拟导入路由已移除；5051 保留 staging/production 目标选择、全量迁移、取消和回滚。</td><td>发布治理已提升</td></tr>
+        <tr><td><span class="tag low">已整改</span></td><td>业务请求动态建表</td><td>核心服务不再执行运行时 <code>CREATE/ALTER TABLE</code>；缺表改为显式 schema 缺失错误，结构变更由编号迁移负责。</td><td>数据完整性已提升</td></tr>
+        <tr><td><span class="tag high">P0</span></td><td>代码与数据库结构漂移导致 H5 500</td><td><code>list_user_watchlist_items()</code> 查询 <code>user_watchlist_items.user_id</code>，但当前数据库没有该列；调用链为 <code>/h5 → build_tenant_dashboard_payload → gen_kol_workbench → list_user_watchlist_items</code>，错误为 <code>psycopg2.errors.UndefinedColumn</code>。115 迁移文件存在，但不能据此证明目标库已执行。</td><td>数据完整性与跨端一致性直接降级；发布阻断</td></tr>
+        <tr><td><span class="tag high">P1</span></td><td>关系数据缺少统一主键关系</td><td>tenant、user_profile、indicator 等大量通过 TEXT 关联，评论、标注、自选股等存在孤儿数据风险。115 只完成迁移定义，当前库尚未完成真实验收。</td><td>数据完整性 -1.5</td></tr>
+        <tr><td><span class="tag medium">部分整改</span></td><td>浏览器本地事实源</td><td>看板和 Hermes 会话已取消 localStorage 事实源，改为数据库 API；Hermes 自定义技能仍在 localStorage，尚未具备后端表、权限和版本控制。</td><td>持久化一致性仍扣分</td></tr>
+        <tr><td><span class="tag medium">P2</span></td><td>洞见与复盘命名并存</td><td>用户文案已逐步改为洞见，但 review API、任务、字段和快照命名仍广泛存在。</td><td>术语一致性 -1.5</td></tr>
+        <tr><td><span class="tag medium">P2</span></td><td>测试契约滞后</td><td>本次全量执行为 <strong>482 passed、42 failed、2 skipped</strong>。数据库发布和市场来源新契约测试已通过；剩余失败集中在旧复盘/知识库/Hermes 预期及数据库不可用条件，且缺少“代码版本与实际数据库迁移版本一致”的启动门禁。</td><td>测试治理仍扣分</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>五、改进方案与可量化目标</h2>
+    <table>
+      <thead><tr><th>阶段</th><th>改进动作</th><th>验收指标</th><th>预计评分提升</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tag medium">已完成待生产验收</span></td><td>冻结市场数据契约：市场概览、行业板块、宏观指标和指数卡片只读 AKShare 快照；个股研究数据单独标识 Gangtise。</td><td>市场相关回归测试 provider 断言通过；市场读路径不调用 Gangtise。仍需生产日志证明行业指标扣积分调用为 0。</td><td>数据来源治理 5.5 → 7.5</td></tr>
+        <tr><td><span class="tag medium">已完成</span></td><td>主应用移除数据库发布页面和 API，5051 成为唯一发布控制面；Staging/Production 只是两个目标环境。</td><td>主应用旧 release 路由返回 404；5051 全量迁移通过 smoke、CSRF、重复提交和生产确认测试。</td><td>发布治理 6.5</td></tr>
+        <tr><td><span class="tag high">P0 立即完成</span></td><td>在启动或切流前校验迁移版本，执行 115 关系治理迁移。</td><td>目标库存在 <code>user_watchlist_items.user_id</code>、相关索引和外键；<code>schema_migrations</code> 登记 115；H5、工作台和 watchlist API smoke 全部通过。禁止“代码先上线、迁移后补”。</td><td>数据完整性 4.5 → 6.5</td></tr>
+        <tr><td><span class="tag high">2–5 周</span></td><td>建立 tenants、users、indicator_definitions 的规范关系；为评论、标注、自选股和草稿增加外键或明确的软删除约束。</td><td>核心业务表外键覆盖率 ≥90%；孤儿记录扫描为 0；tenant/user/indicator 关联统一使用 ID。</td><td>数据完整性 6.5 → 8.0</td></tr>
+        <tr><td><span class="tag medium">1–3 周</span></td><td>数据库成为 Hermes 会话、看板草稿、技能和洞见草稿的唯一事实源；localStorage 仅保留主题、导航和短期缓存。</td><td>看板与 Hermes 会话已移除 localStorage 事实源；剩余自定义技能需新增表、租户权限、版本号和 API 后，业务 localStorage key 才能降为 0。</td><td>持久化一致性 6.0 → 8.0</td></tr>
+        <tr><td><span class="tag medium">3–6 周</span></td><td>统一洞见 API 和命名，建立旧 review API 的兼容截止日期。</td><td>用户可见“复盘”文案为 0；新增代码 review 命名为 0；同一能力只保留一个正式 API。</td><td>术语一致性 5.5 → 8.5</td></tr>
+        <tr><td><span class="tag medium">持续</span></td><td>建立跨端契约测试和生产容量测试。</td><td>H5/大V/Admin 核心能力 API 契约覆盖率 ≥90%；100 并发下 P95 页面响应 <2s、API P95 <500ms；错误率 <1%。</td><td>跨端 4.5 → 8.0<br>性能 4.0 → 7.0</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>六、改进后的目标评分</h2>
+    <table>
+      <thead><tr><th>维度</th><th>权重</th><th>当前</th><th>目标</th><th>目标差距</th><th>达标条件</th></tr></thead>
+      <tbody>
+        <tr><td>架构合理性</td><td class="num">15%</td><td class="num">5.5</td><td class="num">7.5</td><td class="num">+2.0</td><td>Domain 服务按业务边界拆分，控制面与业务面分离。</td></tr>
+        <tr><td>数据结构完整性</td><td class="num">15%</td><td class="num">4.5</td><td class="num">8.0</td><td class="num">+3.5</td><td>115 迁移执行完成，核心表外键覆盖 ≥90%、孤儿数据为 0。</td></tr>
+        <tr><td>数据来源治理</td><td class="num">12%</td><td class="num">5.5</td><td class="num">8.0</td><td class="num">+2.5</td><td>市场展示和任务链路只有 AKShare，个股研究域边界可追溯。</td></tr>
+        <tr><td>跨端一致性</td><td class="num">12%</td><td class="num">4.5</td><td class="num">8.0</td><td class="num">+3.5</td><td>核心能力共享 API 和 Domain Service，契约测试 ≥90%。</td></tr>
+        <tr><td>持久化一致性</td><td class="num">10%</td><td class="num">6.0</td><td class="num">8.0</td><td class="num">+2.0</td><td>自定义技能也进入 PostgreSQL，完成多设备和并发编辑验证。</td></tr>
+        <tr><td>术语一致性</td><td class="num">6%</td><td class="num">5.5</td><td class="num">8.5</td><td class="num">+3.0</td><td>用户文案和新 API 统一使用洞见。</td></tr>
+        <tr><td>安全与权限</td><td class="num">10%</td><td class="num">6.0</td><td class="num">8.0</td><td class="num">+2.0</td><td>旧控制面关闭，租户越权和重复提交测试通过。</td></tr>
+        <tr><td>任务与可观测性</td><td class="num">8%</td><td class="num">4.5</td><td class="num">7.5</td><td class="num">+3.0</td><td>任务幂等、状态机、失败告警和来源审计完整。</td></tr>
+        <tr><td>性能与扩展性</td><td class="num">7%</td><td class="num">4.0</td><td class="num">7.0</td><td class="num">+3.0</td><td>100 并发压测达到 P95 和错误率目标。</td></tr>
+        <tr><td>测试与发布治理</td><td class="num">5%</td><td class="num">4.5</td><td class="num">8.0</td><td class="num">+3.5</td><td>历史契约完成迁移，真实数据库迁移、回滚和备份演练通过。</td></tr>
+        <tr><td><strong>加权综合评分</strong></td><td class="num">100%</td><td class="num"><strong>5.1</strong></td><td class="num"><strong>7.8</strong></td><td class="num"><strong>+2.7</strong></td><td>完成 115 实库迁移、启动版本门禁、历史契约清理和压测后，才建议扩大生产流量和商业化范围。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>七、架构设计判断</h2>
+    <div class="two">
+      <div class="card"><h3>合理且应保留</h3><ul class="list"><li>以 PostgreSQL 保存用户、租户、草稿、评论、标注和任务记录。</li><li>页面层通过 API 访问 Domain Service，而不是直接拼接数据库逻辑。</li><li>AKShare 快照由定时任务统一刷新，H5 只读缓存。</li><li>洞见形成“智能体回答 → 数据库草稿 → 编辑 → 发布 → 订阅权益”的主链路。</li><li>Admin 使用功能开关控制封存能力。</li></ul></div>
+      <div class="card"><h3>必须继续收敛</h3><ul class="list"><li>保持市场指标域 AKShare 与个股研究域 Gangtise 的显式边界，禁止来源旁路。</li><li>保持 5051 为唯一数据库发布控制面，主应用只提供业务 API。</li><li>禁止业务请求承担 DDL 和迁移补救，执行 115 迁移并做孤儿数据审计。</li><li>把 Hermes 自定义技能从 localStorage 迁移到数据库并加入版本控制。</li><li>拆分过大的 core_services 和 market_services，按领域边界组织。</li></ul></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>八、发布前必须完成的门禁</h2>
+    <table>
+      <thead><tr><th>门禁</th><th>未通过时的后果</th><th>通过标准</th></tr></thead>
+      <tbody>
+        <tr><td>数据源门禁</td><td>同一指标不同页面显示不同值，用户无法判断可信来源。</td><td>AKShare provider 断言、快照时间、任务运行记录三者一致。</td></tr>
+        <tr><td>数据库门禁</td><td>生产可能因缺表、缺列、缺触发器而在运行时失败；本次已出现 H5 500。</td><td>代码要求的 schema 与 <code>schema_migrations</code> 一致；115 已执行；新库初始化、升级库迁移、回滚库恢复和 H5 smoke 全部通过。</td></tr>
+        <tr><td>跨端门禁</td><td>H5 看得到的能力，Web 或 Admin 可能使用另一套逻辑。</td><td>同一功能 API、Domain Service、数据表映射唯一。</td></tr>
+        <tr><td>任务门禁</td><td>重复调度造成重复扣费、重复写入或任务长期排队。</td><td>唯一任务锁、幂等键、失败重试和停止状态测试通过。</td></tr>
+        <tr><td>性能门禁</td><td>100 人同时访问时页面卡顿、数据库连接耗尽。</td><td>100 并发压测达到 P95/API 错误率/连接池目标。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>报告文件：docs/architecture_audit_report.html · 本报告基于 2026-09-15 工作区代码静态扫描、全量测试及 H5 500 日志更新。115 迁移文件存在不等于目标数据库已执行；由于当前环境无法完成 PostgreSQL 实连验收，线上迁移状态仍需在目标库执行 SQL 核验。</footer>
+</main>
+</body>
+</html>

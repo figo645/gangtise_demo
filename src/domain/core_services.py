@@ -11,38 +11,6 @@ except Exception:  # pragma: no cover - deployment dependency validation
 from src.domain.agent_workflows import *
 
 
-_insight_drafts_table_ready = False
-
-
-def _ensure_insight_drafts_table():
-    """Keep draft persistence self-healing when deploy migrations lag behind."""
-    global _insight_drafts_table_ready
-    if _insight_drafts_table_ready:
-        return
-    db = get_db()
-    db.execute(
-        """
-        CREATE TABLE IF NOT EXISTS tenant_insight_drafts (
-            id BIGSERIAL PRIMARY KEY,
-            tenant_slug TEXT NOT NULL,
-            draft_id TEXT NOT NULL,
-            title TEXT NOT NULL DEFAULT '',
-            content_text TEXT NOT NULL,
-            source_mode TEXT NOT NULL DEFAULT 'manual',
-            access_mode TEXT NOT NULL DEFAULT 'public',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            UNIQUE (tenant_slug, draft_id)
-        )
-        """
-    )
-    db.execute(
-        "CREATE INDEX IF NOT EXISTS idx_tenant_insight_drafts_updated ON tenant_insight_drafts(tenant_slug, updated_at DESC)"
-    )
-    db.commit()
-    _insight_drafts_table_ready = True
-
-
 def _market_services_module():
     from src.domain import market_services
 
@@ -1666,7 +1634,6 @@ def list_tenant_insight_drafts(tenant_slug):
     normalized_tenant_slug = str(tenant_slug or "").strip().lower()
     if not get_tenant_by_slug(normalized_tenant_slug):
         raise ValueError("tenant_not_found")
-    _ensure_insight_drafts_table()
     rows = get_db().execute(
         """
         SELECT draft_id, title, content_text, source_mode, access_mode, created_at, updated_at
@@ -1697,7 +1664,6 @@ def save_tenant_insight_draft(tenant_slug, draft):
     if not tenant:
         raise ValueError("tenant_not_found")
     normalized = _normalize_insight_draft_item(draft, tenant)
-    _ensure_insight_drafts_table()
     now = now_ts()
     db = get_db()
     existing = db.execute(
@@ -1731,7 +1697,6 @@ def delete_tenant_insight_draft(tenant_slug, draft_id):
     normalized_id = str(draft_id or "").strip()
     if not normalized_id:
         raise ValueError("insight_draft_id_required")
-    _ensure_insight_drafts_table()
     result = get_db().execute(
         "DELETE FROM tenant_insight_drafts WHERE tenant_slug = ? AND draft_id = ? RETURNING draft_id",
         (normalized_tenant_slug, normalized_id),
@@ -7489,7 +7454,7 @@ def build_tenant_dashboard_payload_fallback(tenant=None):
         "tenant": tenant,
         "kpis": [
             {"label": "今日互动", "value": "128", "delta": "+12%"},
-            {"label": "重点复盘", "value": "3", "delta": "待发布"},
+            {"label": "重点洞见", "value": "3", "delta": "待发布"},
             {"label": "关注信号", "value": "2", "delta": "优先跟踪"},
             {"label": "粉丝提问", "value": "19", "delta": "待回应"},
         ],

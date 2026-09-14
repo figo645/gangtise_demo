@@ -45,6 +45,46 @@ def test_market_snapshot_source_definition_has_no_external_gangtise_endpoint():
     assert source["response_mapping"]["connector_type"] == "akshare_snapshot"
 
 
+def test_market_overview_payload_rejects_non_akshare_snapshot(monkeypatch):
+    from src.domain import market_services
+
+    payload = {"ok": True, "snapshot_version": 7, "source": "Gangtise", "items": [{"value": 1}]}
+    monkeypatch.setattr(market_services, "_load_market_snapshot_payload", lambda *args, **kwargs: payload)
+    monkeypatch.setattr(market_services, "_load_watchlist_cache", lambda *args, **kwargs: None)
+
+    result = market_services.build_market_overview_payload()
+
+    assert result["items"] == []
+    assert result["source"] == "AKShare"
+    assert result["refreshing"] is True
+
+
+def test_market_sector_payload_rejects_non_akshare_snapshot(monkeypatch):
+    from src.domain import market_services
+
+    payload = {"ok": True, "snapshot_version": 7, "source": "Gangtise", "items": [{"sector": "银行"}]}
+    monkeypatch.setattr(market_services, "_load_market_snapshot_payload", lambda *args, **kwargs: payload)
+    monkeypatch.setattr(market_services, "_load_watchlist_cache", lambda *args, **kwargs: None)
+
+    result = market_services.build_market_sector_overview_payload()
+
+    assert result["items"] == []
+    assert result["source"] == "AKShare"
+    assert result["refreshing"] is True
+
+
+def test_market_index_detail_rejects_gangtise_history(monkeypatch):
+    from src.domain import market_services
+
+    monkeypatch.setattr(
+        market_services,
+        "_load_watchlist_cache",
+        lambda *args, **kwargs: {"provider": "Gangtise OpenAPI", "points": [{"close": 1}, {"close": 2}]},
+    )
+
+    assert market_services.build_market_overview_index_detail("source_shanghai_index") is None
+
+
 def test_akshare_sector_sync_returns_only_shenwan_level_one_rows():
     from src.domain import market_services
 

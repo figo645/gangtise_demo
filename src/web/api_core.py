@@ -920,11 +920,6 @@ def api_admin_user_jobs():
     return jsonify({"ok": True, **build_user_async_jobs_payload(tenant_slug=tenant_slug, status=status, job_type=job_type, limit=limit)})
 
 
-@app.route("/api/admin/database-release/overview")
-def api_admin_database_release_overview():
-    return jsonify({"ok": True, "operation_unlocked": _database_release_is_unlocked(), **build_database_release_overview()})
-
-
 @app.route("/api/admin/market-data-diagnostic")
 def api_admin_market_data_diagnostic():
     """Admin-only live Gangtise diagnosis for production incident handling."""
@@ -969,127 +964,6 @@ def api_admin_gangtise_credentials_diagnose():
     except Exception:
         app.logger.exception("Unable to diagnose Gangtise OpenAPI credentials")
         return jsonify({"ok": False, "error": "gangtise_credentials_diagnostic_failed"}), 502
-
-
-@app.route("/api/admin/database-release/unlock", methods=["POST"])
-def api_admin_unlock_database_release():
-    payload = request.get_json(silent=True) or {}
-    password = str(payload.get("password") or "")
-    if not compare_digest(password, _database_release_operation_password()):
-        return jsonify({"ok": False, "error": "database_release_password_invalid"}), 403
-    session[DATABASE_RELEASE_UNLOCK_SESSION_KEY] = time.time() + DATABASE_RELEASE_UNLOCK_TTL_SECONDS
-    session.modified = True
-    return jsonify({"ok": True, "operation_unlocked": True, "ttl_seconds": DATABASE_RELEASE_UNLOCK_TTL_SECONDS})
-
-
-@app.route("/api/admin/database-release", methods=["POST"])
-def api_admin_start_database_release():
-    if not _database_release_is_unlocked():
-        return _database_release_unlock_required_response()
-    payload = request.get_json(silent=True) or {}
-    try:
-        job = start_database_release(
-            payload.get("target"),
-            package_id=payload.get("package_id"),
-            confirm_production=payload.get("confirm_production") is True,
-        )
-    except ValueError as exc:
-        error_code = str(exc)
-        status_code = 409 if error_code == "database_release_job_running" else 400
-        return jsonify({"ok": False, "error": error_code}), status_code
-    except Exception as exc:
-        # Match the former standalone 5051 controller's fast task hand-off,
-        # while keeping unexpected local filesystem/thread errors observable
-        # as JSON instead of letting a debug reload drop the browser request.
-        app.logger.exception("Unable to create Admin database release task")
-        return jsonify({"ok": False, "error": "database_release_task_create_failed", "detail": str(exc)}), 500
-    return jsonify({"ok": True, "job": job}), 202
-
-
-@app.route("/api/admin/database-release/cancel", methods=["POST"])
-def api_admin_cancel_database_release():
-    if not _database_release_is_unlocked():
-        return _database_release_unlock_required_response()
-    payload = request.get_json(silent=True) or {}
-    try:
-        job = cancel_database_release(payload.get("job_id"))
-    except ValueError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 409
-    return jsonify({"ok": True, "job": job}), 202
-
-
-@app.route("/api/admin/database-release/rollbacks")
-def api_admin_database_release_rollbacks():
-    try:
-        return jsonify({"ok": True, "records": list_database_release_rollbacks(request.args.get("target") or "staging")})
-    except ValueError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 400
-    except RuntimeError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 503
-
-
-@app.route("/api/admin/database-release/rollback", methods=["POST"])
-def api_admin_start_database_rollback():
-    if not _database_release_is_unlocked():
-        return _database_release_unlock_required_response()
-    payload = request.get_json(silent=True) or {}
-    try:
-        job = start_database_rollback(
-            payload.get("target"),
-            payload.get("backup_name"),
-            confirm_production=payload.get("confirm_production") is True,
-        )
-    except ValueError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 400
-    except RuntimeError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 503
-    return jsonify({"ok": True, "job": job}), 202
-
-
-@app.route("/api/admin/database-release/log")
-def api_admin_database_release_log():
-    return app.response_class(get_database_release_log(), mimetype="text/plain; charset=utf-8")
-
-
-@app.route("/api/admin/database-release/simulations")
-def api_admin_database_release_simulations():
-    try:
-        return jsonify({"ok": True, "batches": list_simulation_batches(request.args.get("target") or "local")})
-    except ValueError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 400
-    except Exception as exc:
-        app.logger.exception("Failed to list simulated data batches")
-        return jsonify({"ok": False, "error": str(exc)}), 503
-
-
-@app.route("/api/admin/database-release/simulations", methods=["POST"])
-def api_admin_create_database_release_simulation():
-    if not _database_release_is_unlocked():
-        return _database_release_unlock_required_response()
-    payload = request.get_json(silent=True) or {}
-    try:
-        batch_code = create_simulation_batch(payload.get("target") or "local", payload.get("tenant_slug") or "laowang")
-    except ValueError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 400
-    except Exception as exc:
-        app.logger.exception("Failed to create simulated data batch")
-        return jsonify({"ok": False, "error": str(exc)}), 503
-    return jsonify({"ok": True, "batch_code": batch_code}), 201
-
-
-@app.route("/api/admin/database-release/simulations/<batch_code>", methods=["DELETE"])
-def api_admin_delete_database_release_simulation(batch_code):
-    if not _database_release_is_unlocked():
-        return _database_release_unlock_required_response()
-    payload = request.get_json(silent=True) or {}
-    try:
-        delete_simulation_batch(payload.get("target") or "local", batch_code)
-    except ValueError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 404
-    except Exception as exc:
-        app.logger.exception("Failed to delete simulated data batch")
-        return jsonify({"ok": False, "error": str(exc)}), 503
-    return jsonify({"ok": True})
 
 
 @app.route("/api/admin/token-usage")

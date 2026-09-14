@@ -157,7 +157,7 @@ DECLARED_AGENT_WORKFLOW_CATALOG = {
     },
     "review_voice_enhancement": {
         "id": "review_voice_enhancement",
-        "title": "复盘语音增强",
+        "title": "洞见语音增强",
         "summary": "把基础转写结果整理成更适合审核、编辑和入库的文本。",
         "category": "复盘智能体",
         "feature_key": "daily_review",

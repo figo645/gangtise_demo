@@ -2,7 +2,8 @@
 set -euo pipefail
 
 # Full local-to-remote PostgreSQL release. Uses database TCP connections only.
-# No SSH, no remote shell, and no server filesystem dependency.
+# The target's users and user-generated records are overlaid after the local
+# database is restored, so a code/schema release cannot erase live accounts.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STAMP="$(date +%Y%m%d_%H%M%S)"
@@ -24,6 +25,9 @@ REMOTE_DB_PASSWORD="${REMOTE_DB_PASSWORD:-${REMOTE_POSTGRES_PASSWORD:-your_passw
 REMOTE_MAINTENANCE_DB="${REMOTE_MAINTENANCE_DB:-postgres}"
 CONNECT_TIMEOUT_SECONDS="${DATABASE_RELEASE_CONNECT_TIMEOUT_SECONDS:-8}"
 PROTECTED_APP_SETTING_KEYS="'gangtise_openapi_credentials:v1','gangtise_openapi_token:v1','llm_api_credentials:v1','auth_credentials:wechat:v1'"
+USER_DATA_DUMP="${WORK_DIR}/target_user_data_${STAMP}.sql"
+USER_DATA_TABLE_LIST="${WORK_DIR}/target_user_data_${STAMP}.tables"
+USER_DATA_COUNTS="${WORK_DIR}/target_user_data_${STAMP}.counts"
 
 [[ "${1:-}" != "--help" && "${1:-}" != "-h" ]] || { echo "Usage: $0"; exit 0; }
 [[ "$TARGET" == staging || "$TARGET" == production ]] || { echo "Invalid target: $TARGET" >&2; exit 2; }
@@ -65,6 +69,45 @@ TEMP_DB="${REMOTE_DB_NAME}_pre_release_${STAMP}"
 BACKUP_DB="${REMOTE_DB_NAME}_backup_${STAMP}"
 CURRENT_TARGET_QUERY=(psql -w -h "$REMOTE_DB_HOST" -p "$REMOTE_DB_PORT" -U "$REMOTE_DB_USER" -d "$REMOTE_DB_NAME" -Atq)
 TEMP_TARGET_EXEC=(psql -w -h "$REMOTE_DB_HOST" -p "$REMOTE_DB_PORT" -U "$REMOTE_DB_USER" -d "$TEMP_DB" -v ON_ERROR_STOP=1)
+echo "==> Discovering target user data tables"
+"${CURRENT_TARGET_QUERY[@]}" <<'SQL' > "$USER_DATA_TABLE_LIST"
+WITH RECURSIVE user_tables AS (
+  SELECT 'public.users'::text AS table_name
+  UNION
+  SELECT format('%I.%I', child_ns.nspname, child.relname)
+  FROM user_tables parent
+  JOIN pg_class parent_rel ON format('%I.%I',
+      (SELECT nspname FROM pg_namespace WHERE oid = parent_rel.relnamespace), parent_rel.relname) = parent.table_name
+  JOIN pg_constraint con ON con.confrelid = parent_rel.oid AND con.contype = 'f'
+  JOIN pg_class child ON child.oid = con.conrelid
+  JOIN pg_namespace child_ns ON child_ns.oid = child.relnamespace
+  WHERE child.relnamespace = 'public'::regnamespace
+), identity_tables AS (
+  SELECT format('%I.%I', table_schema, table_name) AS table_name
+  FROM information_schema.columns
+  WHERE table_schema = 'public'
+    AND column_name IN ('tenant_slug', 'user_profile_id', 'created_by_user_id', 'user_id', 'created_by')
+)
+SELECT DISTINCT table_name FROM (
+  SELECT table_name FROM user_tables
+  UNION ALL SELECT table_name FROM identity_tables
+) discovered
+JOIN information_schema.tables t ON format('%I.%I', t.table_schema, t.table_name) = discovered.table_name
+WHERE t.table_type = 'BASE TABLE' AND t.table_name <> 'app_settings'
+ORDER BY table_name;
+SQL
+grep -qx 'public.users' "$USER_DATA_TABLE_LIST" || { echo "Target users table was not discovered." >&2; exit 1; }
+echo "==> Target user data tables: $(wc -l < "$USER_DATA_TABLE_LIST" | tr -d ' ')"
+while IFS= read -r table_name; do
+  count="$(${CURRENT_TARGET_QUERY[@]} "SELECT count(*) FROM ${table_name}")"
+  printf '%s\t%s\n' "$table_name" "$count"
+done < "$USER_DATA_TABLE_LIST" > "$USER_DATA_COUNTS"
+echo "==> Exporting target users and user-generated records"
+USER_TABLE_ARGS=()
+while IFS= read -r table_name; do USER_TABLE_ARGS+=(--table="$table_name"); done < "$USER_DATA_TABLE_LIST"
+pg_dump -w -h "$REMOTE_DB_HOST" -p "$REMOTE_DB_PORT" -U "$REMOTE_DB_USER" -d "$REMOTE_DB_NAME" --data-only --column-inserts --disable-triggers --no-owner --no-acl "${USER_TABLE_ARGS[@]}" --file "$USER_DATA_DUMP"
+USER_DATA_SHA256="$(shasum -a 256 "$USER_DATA_DUMP" | awk '{print $1}')"
+echo "==> Target user data export complete: $(wc -c < "$USER_DATA_DUMP" | tr -d ' ') bytes · SHA256 ${USER_DATA_SHA256}"
 preserve_target_environment_credentials() {
   local count
   count="$("${CURRENT_TARGET_QUERY[@]}" "SELECT count(*) FROM app_settings WHERE setting_key IN (${PROTECTED_APP_SETTING_KEYS})")"
@@ -85,6 +128,33 @@ trap cleanup_temp ERR
 trap cancel_release INT TERM
 PGPASSWORD="$REMOTE_DB_PASSWORD" pg_restore -w -h "$REMOTE_DB_HOST" -p "$REMOTE_DB_PORT" -U "$REMOTE_DB_USER" -d "$TEMP_DB" --format=custom --no-owner --no-acl --exit-on-error "$DUMP_FILE"
 echo "==> Restore completed: ${TEMP_DB}"
+echo "==> Overlaying target users and user-generated records"
+TRUNCATE_SQL="TRUNCATE TABLE $(paste -sd, "$USER_DATA_TABLE_LIST") CASCADE;"
+"${TEMP_TARGET_EXEC[@]}" -c "$TRUNCATE_SQL"
+"${TEMP_TARGET_EXEC[@]}" < "$USER_DATA_DUMP"
+while IFS=$'\t' read -r table_name expected_count; do
+  actual_count="$(${TEMP_TARGET_EXEC[@]} "SELECT count(*) FROM ${table_name}")"
+  [[ "$actual_count" == "$expected_count" ]] || { echo "User data validation failed for ${table_name}: expected=${expected_count} actual=${actual_count}" >&2; exit 1; }
+done < "$USER_DATA_COUNTS"
+"${TEMP_TARGET_EXEC[@]}" <<'SQL'
+DO $$
+DECLARE item record; next_value bigint;
+BEGIN
+  FOR item IN
+    SELECT n.nspname AS schema_name, c.relname AS table_name,
+           a.attname AS column_name, pg_get_serial_sequence(format('%I.%I', n.nspname, c.relname), a.attname) AS sequence_name
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+    WHERE n.nspname = 'public' AND c.relkind = 'r'
+      AND a.attname = 'id' AND pg_get_serial_sequence(format('%I.%I', n.nspname, c.relname), a.attname) IS NOT NULL
+  LOOP
+    EXECUTE format('SELECT COALESCE(max(%I), 0) + 1 FROM %I.%I', item.column_name, item.schema_name, item.table_name) INTO next_value;
+    EXECUTE format('SELECT setval(%L, %s, false)', item.sequence_name, next_value);
+  END LOOP;
+END $$;
+SQL
+echo "==> Target user data overlay and sequence repair validated"
 preserve_target_environment_credentials
 echo "==> Applying schema updates to temporary database"
 PGHOST="$REMOTE_DB_HOST" PGPORT="$REMOTE_DB_PORT" PGDATABASE="$TEMP_DB" PGUSER="$REMOTE_DB_USER" PGPASSWORD="$REMOTE_DB_PASSWORD" "$ROOT_DIR/scripts/apply_postgres_updates.sh"
@@ -119,6 +189,6 @@ rollback_database=${BACKUP_DB}
 dump_sha256=${LOCAL_SHA256}
 dump_bytes=${LOCAL_SIZE}
 EOF
-rm -f "$DUMP_FILE"
+rm -f "$DUMP_FILE" "$USER_DATA_DUMP" "$USER_DATA_TABLE_LIST" "$USER_DATA_COUNTS"
 echo "==> Local export file removed after successful release"
 echo "Database preparation complete. Rollback database: ${BACKUP_DB}"

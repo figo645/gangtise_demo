@@ -14511,7 +14511,7 @@ function renderWorkbenchHermesCapabilityGrowth() {
       <div>
         <div class="kw-capability-kicker">AUDITABLE CAPABILITY GROWTH</div>
         <div class="kw-capability-title">${escapeHtml(summary.stage || '能力沉淀')}</div>
-        <div class="kw-capability-copy">能力来自大V持续的知识治理、复盘发布和研究交互。当前先观察哪些资产已经结构化、哪些复盘形成验证闭环，为后续的评估、蒸馏和受控使用建立基线。</div>
+        <div class="kw-capability-copy">能力来自大V持续的知识治理、洞见发布和研究交互。当前先观察哪些资产已经结构化、哪些洞见形成验证闭环，为后续的评估、蒸馏和受控使用建立基线。</div>
       </div>
       <div class="kw-capability-score">
         <div class="kw-capability-score-value">${escapeHtml(String(summary.readiness_score || 0))}</div>
@@ -14525,12 +14525,12 @@ function renderWorkbenchHermesCapabilityGrowth() {
     <div class="kw-capability-grid">
       <div class="kw-capability-card">
         <div class="kw-capability-card-title">资产增长轨迹</div>
-        <div class="kw-capability-card-desc">按月记录新增入库知识、发布复盘与 Hermes 研究对话。</div>
+        <div class="kw-capability-card-desc">按月记录新增入库知识、发布洞见与 Hermes 研究对话。</div>
         ${trend.length ? trend.map((item) => `<div class="kw-capability-trend-row"><span>${escapeHtml(item.month || '--')}</span><span class="kw-capability-trend-value">知识 ${escapeHtml(String(item.knowledge || 0))}</span><span class="kw-capability-trend-value">复盘 ${escapeHtml(String(item.reviews || 0))}</span><span class="kw-capability-trend-value">对话 ${escapeHtml(String(item.research_turns || 0))}</span></div>`).join('') : '<div class="kw-capability-card-desc">暂无月度沉淀记录。</div>'}
       </div>
       <div class="kw-capability-card">
         <div class="kw-capability-card-title">已沉淀研究方法</div>
-        <div class="kw-capability-card-desc">来自 Hermes 已记录研究意图与发布复盘的研究方式聚合。</div>
+        <div class="kw-capability-card-desc">来自 Hermes 已记录研究意图与发布洞见的研究方式聚合。</div>
         ${renderChips(growth.methods, '尚无可归类的研究方法。')}
         <div class="kw-capability-card-title" style="margin-top:18px">重点主题与标的</div>
         ${renderChips(growth.topics, '尚无主题标签。')}

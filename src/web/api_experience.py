@@ -585,13 +585,13 @@ def gen_kol_workbench(tenant=None, fallback_mode=False):
         "published_reviews": published_reviews,
         "consistency_notes": [
             {"title": "前后台分离", "desc": "首页同时展示纯 Admin 后台和大V web 工作台两个入口，角色职责分开。"},
-            {"title": "消息口径一致", "desc": "H5、工作台和 Admin 都把“粉丝消息 + 大V回复 + 复盘提醒”视为同一消息链路。"},
+            {"title": "消息口径一致", "desc": "H5、工作台和 Admin 都把“粉丝消息 + 大V回复 + 洞见提醒”视为同一消息链路。"},
             {"title": "小金智能体口径一致", "desc": "前台支持工作区版和小金纯对话版，后台也按同样两种产品模式管理。"},
             {"title": "知识库口径一致", "desc": "历史知识内容允许继续微调，修改后会重新同步到知识专区和 Hermes。"},
         ],
         "role_split": [
             {"side": "平台 Admin 保留", "items": ["功能控开", "访问审计", "活动管理", "平台级用户与渠道管理"]},
-            {"side": "大V工作台保留", "items": ["粉丝消息", "群发助手", "复盘生产", "Hermes 研究与租户知识经营"]},
+            {"side": "大V工作台保留", "items": ["粉丝消息", "群发助手", "洞见生产", "Hermes 研究与租户知识经营"]},
         ],
     }
 

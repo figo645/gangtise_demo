@@ -2399,7 +2399,7 @@
               <tr><th>能力</th><th>H5 前台</th><th>大V工作台 Web</th><th>纯 Admin 后台</th></tr>
             </thead>
             <tbody>
-              <tr><td style="color:#F8F6F0;font-weight:500">消息链路</td><td>粉丝消息 + 大V回复 + 复盘提醒</td><td>处理消息、回复、推送复盘提醒</td><td>管理 DM 开关与审计，不直接代替回复</td></tr>
+              <tr><td style="color:#F8F6F0;font-weight:500">消息链路</td><td>粉丝消息 + 大V回复 + 洞见提醒</td><td>处理消息、回复、推送洞见提醒</td><td>管理 DM 开关与审计，不直接代替回复</td></tr>
               <tr><td style="color:#F8F6F0;font-weight:500">洞见</td><td>阅读大V已发布洞见</td><td>从Hermes或手工输入生成草稿，编辑后选择免费/订阅专享并发布</td><td>监控发布成功率、内容访问和订阅转化</td></tr>
               <tr><td style="color:#F8F6F0;font-weight:500">知识库</td><td>当前关闭</td><td>当前关闭，不作为生产路径</td><td>只保留能力开关和边界记录</td></tr>
               <tr><td style="color:#F8F6F0;font-weight:500">小金智能体</td><td>工作区版 + 小金纯对话版</td><td>维护 skill、知识绑定、查看使用动作</td><td>监控调用、算力、双版本使用与知识命中</td></tr>
@@ -4829,8 +4829,8 @@
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">每日洞见</div><div class="feature-toggle-desc">位置：H5 洞见、大V工作台洞见发布台和已发布洞见。控制洞见输入、优化成稿、摘要与发布浏览。</div></div><label class="toggle"><input id="feature-daily_review" type="checkbox" checked><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">核心指标</div><div class="feature-toggle-desc">封存开关。关闭后隐藏 H5 核心指标面板、大V智能 Dashboard 与智能指标入口；热门行业和市场一览不受影响。</div></div><label class="toggle"><input id="feature-core_indicators" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">知识专区</div><div class="feature-toggle-desc">位置：H5、大V工作台和 Admin 知识专区。当前因知识库重构暂不开放；重新勾选并保存后，才会恢复知识入口和接口。</div></div><label class="toggle"><input id="feature-knowledge" type="checkbox"><span class="toggle-slider"></span></label></div>
-                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">复盘语音供稿</div><div class="feature-toggle-desc">位置：H5 与大V工作台复盘供稿方式。当前关闭，恢复后才允许录音和语音转写。</div></div><label class="toggle"><input id="feature-review_voice_input" type="checkbox"><span class="toggle-slider"></span></label></div>
-                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">复盘网页供稿</div><div class="feature-toggle-desc">位置：H5 与大V工作台复盘供稿方式。当前关闭，恢复后才允许抓取网页 URL。</div></div><label class="toggle"><input id="feature-review_url_input" type="checkbox"><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">洞见语音供稿</div><div class="feature-toggle-desc">位置：H5 与大V工作台洞见供稿方式。当前关闭，恢复后才允许录音和语音转写。</div></div><label class="toggle"><input id="feature-review_voice_input" type="checkbox"><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">洞见网页供稿</div><div class="feature-toggle-desc">位置：H5 与大V工作台洞见供稿方式。当前关闭，恢复后才允许抓取网页 URL。</div></div><label class="toggle"><input id="feature-review_url_input" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">社区</div><div class="feature-toggle-desc">位置：H5 社区与 Admin 社区运营页。控制社区内容流、活动和互动运营相关入口。</div></div><label class="toggle"><input id="feature-community" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">Hermes</div><div class="feature-toggle-desc">位置：H5 Hermes 问答、大V工作台 Hermes 管理和 Admin Hermes 运营区。关闭后不展示问答、会话、记忆及使用统计入口。</div></div><label class="toggle"><input id="feature-hermes" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">渠道模块</div><div class="feature-toggle-desc">位置：Admin 渠道运营与渠道数据页。控制渠道来源、投放归因和渠道运营配置入口。</div></div><label class="toggle"><input id="feature-channel_module" type="checkbox" checked><span class="toggle-slider"></span></label></div>
@@ -4853,7 +4853,7 @@
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">付费回复</div><div class="feature-toggle-desc">位置：消息/私信的商业化回复场景。控制需要付费或权益校验后才可发起的回复能力，不影响已开放的普通消息浏览。</div></div><label class="toggle"><input id="feature-paid_reply" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">粉丝订阅与收款</div><div class="feature-toggle-desc">开启后，租户可配置订阅产品、创建待支付订单并按真实到账状态开通权益。未配置支付渠道时不会伪造支付成功。</div></div><label class="toggle"><input id="feature-fan_commerce" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">粉丝扫码导入</div><div class="feature-toggle-desc">开启后，大V可生成租户专属二维码。粉丝扫码登录或注册后自动归属当前租户，并记录来源和批次。</div></div><label class="toggle"><input id="feature-fan_qr_import" type="checkbox"><span class="toggle-slider"></span></label></div>
-                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">大V 工作台 Web</div><div class="feature-toggle-desc">位置：Web 端大V工作台及租户经营页面。控制工作台、数据分析、粉丝管理和复盘生产台入口。</div></div><label class="toggle"><input id="feature-workbench" type="checkbox"><span class="toggle-slider"></span></label></div>
+                      <div class="toggle-wrap"><div class="toggle-label"><div class="feature-toggle-title">大V 工作台 Web</div><div class="feature-toggle-desc">位置：Web 端大V工作台及租户经营页面。控制工作台、数据分析、粉丝管理和洞见生产台入口。</div></div><label class="toggle"><input id="feature-workbench" type="checkbox"><span class="toggle-slider"></span></label></div>
                       <div class="feature-note">平台统一使用用户表中的用户名和密码登录，不再使用共享访问密码或“系统锁定”门禁。账号状态由用户管理维护。</div>
                       <div class="feature-note" style="margin-top:8px">MVP 默认优先开放：基本面、自选股、复盘、消息互动、知识归档、大V工作台和租户门户；预测分析放到第二阶段，会员收费能力按层级逐步开放。</div>
                       <div class="feature-note" style="margin-top:8px">Hermes 范围约束开启后，只接受固定研究范围内的提示词；关闭后，Hermes 会按更开放的问答模式继续承接。普通用户开放开关关闭时，H5 中只有大V用户能看到和使用 Hermes。</div>
@@ -5329,7 +5329,7 @@
           <div style="display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap">
             <div>
               <div class="section-title" style="margin-bottom:6px">治理配置已拆分</div>
-              <div class="feature-note">知识输入源、证据链配置和复盘生成配置已经迁到“系统配置中心”独立子菜单中。这里现在只保留录入链路和原始素材治理。</div>
+              <div class="feature-note">知识输入源、证据链配置和洞见生成配置已经迁到“系统配置中心”独立子菜单中。这里现在只保留录入链路和原始素材治理。</div>
             </div>
             <button class="btn-outline" type="button" style="padding:8px 14px;font-size:12px" onclick="showSection('settings-features', document.querySelector('.admin-nav-item[data-section=&quot;settings-features&quot;]'));window.requestAnimationFrame(() => openAdminSettingsSubmenu('knowledge-source'));">去系统配置查看</button>
           </div>
@@ -5788,7 +5788,7 @@
           <div class="table-header">
             <div>
               <div class="table-title">用户异步任务</div>
-              <div style="font-size:12px;color:#8899aa;margin-top:6px">语音转写、复盘发布、知识入库这类用户触发重任务统一在这里追踪与重试。</div>
+                <div style="font-size:12px;color:#8899aa;margin-top:6px">语音转写、洞见发布、知识入库这类用户触发重任务统一在这里追踪与重试。</div>
             </div>
             <span class="tag tag-gold">即时异步</span>
           </div>
@@ -9817,7 +9817,7 @@ function renderAgentWorkflowInspector() {
     {id: 'market_today_capability', number: '2', title: '大盘综合分析', route: '指数表现、板块资金、情绪展望 · Gangtise Agent SSE'},
     {id: 'one_pager_capability', number: '3', title: '个股结构化分析报告', route: '深化研究，非当日 · /application/open-ai/agent/one-pager'},
     {id: 'highlights_capability', number: '4', title: '个股看点摘要', route: '最多 6000 个证券 · /application/open-ai/stock-summary/getList'},
-    {id: 'multi_watchlist_capability', number: '5', title: '多支自选股综合分析', route: '复盘同源的多股综合分析 · Gangtise 多股票 SSE'},
+    {id: 'multi_watchlist_capability', number: '5', title: '多支自选股综合分析', route: '洞见同源的多股综合分析 · Gangtise 多股票 SSE'},
     {id: 'chat_answer_branch', number: '6', title: '多轮闲聊能力', route: '通用问题与投资交流 · Admin 默认 LLM'},
   ];
   const previewLines = preview.result && typeof preview.result === 'object'

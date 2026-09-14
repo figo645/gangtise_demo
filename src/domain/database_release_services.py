@@ -15,6 +15,7 @@ import subprocess
 import threading
 import time
 from datetime import datetime, timedelta
+from hmac import compare_digest
 from pathlib import Path
 
 import psycopg2
@@ -39,6 +40,57 @@ _release_lock = threading.Lock()
 _delta_generation_lock = threading.Lock()
 _release_job = {"status": "idle", "id": "", "target": "", "operation": "", "log": "", "started_at": "", "finished_at": "", "returncode": None, "pid": None, "package_plan": [], "progress": {}, "events": [], "cancel_requested": False, "cancel_requested_at": "", "cancellable": False}
 _release_job_loaded = False
+
+FULL_RELEASE_WORKFLOW = (
+    ("preflight", "迁移前检查"),
+    ("exporting", "导出源数据库"),
+    ("preserving", "保留目标用户数据"),
+    ("restoring", "恢复临时数据库"),
+    ("migrating", "应用结构与主数据迁移"),
+    ("validating", "迁移后校验"),
+    ("switching", "切换目标数据库"),
+    ("completed", "健康检查与完成"),
+)
+DIFF_RELEASE_WORKFLOW = (
+    ("preflight", "迁移前检查"),
+    ("auditing", "核对差异与指纹"),
+    ("applying", "执行差异包"),
+    ("validating", "迁移后校验"),
+    ("completed", "完成与记录"),
+)
+
+
+def _release_workflow(operation):
+    return DIFF_RELEASE_WORKFLOW if str(operation or "") == "release" else FULL_RELEASE_WORKFLOW
+
+
+def _build_release_workflow(operation, state="queued"):
+    current = str(state or "queued")
+    if current in {"starting", "running", "queued"}:
+        current = "preflight"
+    elif current in {"running_step", "completed_step"}:
+        current = "applying" if str(operation or "") == "release" else "migrating"
+    elif current == "snapshotting" or current == "snapshot_ready" or current == "retention":
+        current = "preserving" if str(operation or "") == "full_release" else "preflight"
+    elif current == "execution":
+        current = "applying" if str(operation or "") == "release" else "migrating"
+    keys = [key for key, _ in _release_workflow(operation)]
+    current_index = keys.index(current) if current in keys else (0 if current in {"queued", "starting"} else -1)
+    nodes = []
+    for index, (key, label) in enumerate(_release_workflow(operation)):
+        if current in {"failed", "cancelled"} and index < max(current_index, 0):
+            status = "succeeded"
+        elif current == "succeeded":
+            status = "succeeded"
+        elif index < current_index:
+            status = "succeeded"
+        elif index == current_index:
+            status = "active" if current not in {"completed_step"} else "succeeded"
+        else:
+            status = "pending"
+        nodes.append({"key": key, "label": label, "order": index + 1, "status": status})
+    completed = sum(1 for item in nodes if item["status"] == "succeeded")
+    return nodes, completed, len(nodes)
 
 SIMULATION_LABEL = "模拟数据"
 SIMULATED_FAN_SEED = [
@@ -227,6 +279,15 @@ def _database_release_diff_report_path(target_name):
     return ROOT / ".deploy" / f"database_diff_local_to_{target_name}_{stamp}.json"
 
 
+def _database_release_diff_fingerprint(report):
+    """Hash the reviewed diff while excluding its generation timestamp."""
+    payload = dict(report or {})
+    payload.pop("generated_at", None)
+    return hashlib.sha256(
+        json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
 def _load_database_release_diff_tools():
     # Loaded lazily because the CLI audit tool obtains release targets from this
     # module. The late import keeps the Web controller and the CLI reusable.
@@ -404,7 +465,7 @@ def generate_database_release_delta(target_name, include_schema=True, include_ma
         )
         report_path = _database_release_diff_report_path(target["name"])
         report_path.parent.mkdir(parents=True, exist_ok=True)
-        report_path.write_text(json.dumps(delta["report"], ensure_ascii=False, indent=2), encoding="utf-8")
+        diff_fingerprint = _database_release_diff_fingerprint(delta["report"])
         generated, blockers = [], []
         sections = (
             ("schema", "表结构增量", delta["schema"]),
@@ -430,9 +491,19 @@ def generate_database_release_delta(target_name, include_schema=True, include_ma
             _database_release_review_section("master_data", delta["master_data"]),
             _database_release_review_section("data", delta["runtime_data"]),
         ]
+        manifest = {
+            **delta["report"],
+            "diff_fingerprint": diff_fingerprint,
+            "generated_packages": generated,
+            "include_schema": bool(include_schema),
+            "include_master_data": bool(include_master_data),
+            "include_runtime_data": bool(include_runtime_data),
+        }
+        report_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
         return {
             "target": target["name"],
             "report_path": str(report_path.relative_to(ROOT)),
+            "diff_fingerprint": diff_fingerprint,
             "generated_packages": generated,
             "blockers": blockers,
             "safe_release_delta": delta["report"]["safe_release_delta"],
@@ -447,6 +518,48 @@ def generate_database_release_delta(target_name, include_schema=True, include_ma
                 "requires_manual_review": bool(any(section["risk_level"] in {"medium", "high"} for section in review_sections)),
             },
         }
+
+
+def start_database_release_delta(target_name, report_path, diff_fingerprint, package_ids, confirm_production=False):
+    """Execute only a reviewed, freshly generated local-to-target diff.
+
+    The saved report and a fresh audit must match before any package is
+    started. This prevents a reviewed plan from being applied after either
+    database has changed.
+    """
+    target = get_database_release_target(target_name)
+    if not target or target["name"] not in {"staging", "production"}:
+        raise ValueError("database_release_target_invalid")
+    if target["name"] == "production" and confirm_production is not True:
+        raise ValueError("production_confirmation_required")
+    normalized_path = str(report_path or "").strip()
+    report_file = (ROOT / normalized_path).resolve()
+    deploy_root = (ROOT / ".deploy").resolve()
+    if deploy_root not in report_file.parents or not report_file.is_file():
+        raise ValueError("database_release_diff_report_invalid")
+    try:
+        manifest = json.loads(report_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError) as exc:
+        raise ValueError("database_release_diff_report_invalid") from exc
+    manifest_target = manifest.get("target") if isinstance(manifest, dict) else None
+    if not isinstance(manifest_target, dict) or str(manifest_target.get("label") or "").strip().lower() != target["name"]:
+        raise ValueError("database_release_diff_report_invalid")
+    saved_fingerprint = str(manifest.get("diff_fingerprint") or "")
+    if not saved_fingerprint or not compare_digest(saved_fingerprint, str(diff_fingerprint or "")):
+        raise ValueError("database_release_diff_fingerprint_invalid")
+    audit, _, get_local_app_db_target = _load_database_release_diff_tools()
+    fresh_report = audit(get_local_app_db_target(), target)
+    if not compare_digest(saved_fingerprint, _database_release_diff_fingerprint(fresh_report)):
+        raise ValueError("database_release_diff_stale")
+    requested = []
+    for package_id in package_ids or []:
+        normalized = str(package_id or "").strip()
+        if normalized and normalized not in requested:
+            requested.append(normalized)
+    generated_ids = {str(item.get("id") or "") for item in (manifest.get("generated_packages") or [])}
+    if not requested or any(item not in generated_ids for item in requested):
+        raise ValueError("database_release_diff_package_invalid")
+    return start_database_release_packages(target["name"], requested, confirm_production=confirm_production)
 
 
 def _release_job_snapshot():
@@ -524,6 +637,15 @@ def get_database_release_job():
 def _set_job(**values):
     with _release_lock:
         _load_persisted_release_job()
+        if isinstance(values.get("progress"), dict):
+            progress = dict(values["progress"])
+            nodes, completed, total = _build_release_workflow(
+                _release_job.get("operation"), progress.get("state") or "queued",
+            )
+            progress["workflow"] = nodes
+            progress["workflow_completed_steps"] = completed
+            progress["workflow_total_steps"] = total
+            values["progress"] = progress
         _release_job.update(values)
         _persist_release_job()
 
@@ -558,17 +680,24 @@ def _mark_job_cancelled(job_id, returncode=-15):
         _load_persisted_release_job()
         if _release_job.get("id") != job_id:
             return
+        cancelled_progress = {
+            **dict(_release_job.get("progress") or {}),
+            "state": "cancelled",
+            "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        nodes, completed, total = _build_release_workflow(_release_job.get("operation"), "cancelled")
+        cancelled_progress.update({
+            "workflow": nodes,
+            "workflow_completed_steps": completed,
+            "workflow_total_steps": total,
+        })
         _release_job.update({
             "status": "cancelled",
             "returncode": returncode,
             "finished_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             "pid": None,
             "cancellable": False,
-            "progress": {
-                **dict(_release_job.get("progress") or {}),
-                "state": "cancelled",
-                "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-            },
+            "progress": cancelled_progress,
         })
         _persist_release_job()
     _record_release_event("cancelled", "任务已取消", f"发布进程已停止，返回码：{returncode}", "cancelled")
@@ -659,7 +788,20 @@ def _run_process(command, target, job_id, operation, extra_env=None):
         if _is_cancel_requested(job_id):
             _mark_job_cancelled(job_id, returncode=return_code if return_code else -15)
         else:
-            _set_job(status="succeeded" if return_code == 0 else "failed", returncode=return_code, finished_at=time.strftime("%Y-%m-%d %H:%M:%S"), pid=None, cancellable=False)
+            final_state = "succeeded" if return_code == 0 else "failed"
+            _set_job(
+                status=final_state,
+                returncode=return_code,
+                finished_at=time.strftime("%Y-%m-%d %H:%M:%S"),
+                pid=None,
+                cancellable=False,
+                progress={
+                    **dict(_release_job.get("progress") or {}),
+                    "state": final_state,
+                    "message": "数据库任务执行完成" if return_code == 0 else "数据库任务执行失败",
+                    "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                },
+            )
             if return_code == 0:
                 _record_release_event("completed", "数据库任务执行完成", "所有命令已完成，结果校验通过。", "succeeded")
             else:
@@ -705,7 +847,11 @@ def _update_release_progress_from_log(line):
         ("==> [preflight] Creating complete Production rollback snapshot", "snapshotting", "正在创建 Production 全量回滚快照"),
         ("==> Complete Production rollback snapshot ready:", "snapshot_ready", "Production 全量回滚快照已校验完成"),
         ("==> Rollback snapshot retention complete:", "retention", "已清理过期回滚快照，仅保留最近两份"),
+        ("==> Discovering target user data tables", "preserving", "正在识别并保留目标用户数据"),
+        ("==> Exporting target users and user-generated records", "preserving", "正在导出目标用户及业务数据"),
         ("==> Restoring ", "restoring", "正在恢复至目标临时数据库"),
+        ("==> Applying schema updates", "migrating", "正在应用结构与主数据迁移"),
+        ("Postgres updates completed:", "migrating", "结构与主数据迁移已完成"),
         ("Validated:", "validating", "正在校验临时数据库"),
         ("==> Validating Production and Staging temporary database equivalence", "validating", "正在校验 Production 与 Staging 临时库一致性"),
         ("==> Validating Staging and Production temporary database equivalence", "validating", "正在校验 Staging 与 Production 临时库一致性"),
@@ -777,6 +923,12 @@ def _start_job(target, command, operation, package_plan=None, extra_env=None):
             {"sequence": 1, "at": time.strftime("%Y-%m-%d %H:%M:%S"), "stage": "created", "title": "任务已创建并持久化", "detail": f"目标：{target['name']} · {target['db_host']}:{target['db_port']}/{target['db_name']}", "status": "succeeded"},
             {"sequence": 2, "at": time.strftime("%Y-%m-%d %H:%M:%S"), "stage": "queued", "title": "等待后台发布线程", "detail": "任务已交给主应用后台执行，页面会每秒刷新状态。", "status": "active"},
         ]})
+        nodes, completed, total = _build_release_workflow(operation, "queued")
+        _release_job["progress"].update({
+            "workflow": nodes,
+            "workflow_completed_steps": completed,
+            "workflow_total_steps": total,
+        })
         _persist_release_job()
         snapshot = _release_job_snapshot()
     threading.Thread(target=_run_process, args=(command, target, job_id, operation, extra_env), daemon=True).start()
@@ -827,44 +979,20 @@ def cancel_database_release(job_id=""):
 
 
 def start_database_release(target_name, package_id="", confirm_production=False):
+    """Create the only supported 5051 data operation: a full release.
+
+    Incremental packages remain readable for historical audit purposes, but
+    they are no longer executable through the standalone import console.
+    """
     target = get_database_release_target(target_name)
     if not target or target["name"] not in {"staging", "production"}:
         raise ValueError("database_release_target_invalid")
     if target["name"] == "production" and confirm_production is not True:
         raise ValueError("production_confirmation_required")
-    packages = list_database_release_packages()
-    package_ids = {item["id"] for item in packages}
     normalized_package = str(package_id or "").strip()
-    if normalized_package == "__full__":
-        normalized_package = ""
-    if normalized_package and normalized_package != "__pending__" and normalized_package not in package_ids:
-        raise ValueError("database_release_package_invalid")
-    if normalized_package == "__pending__":
-        release_plan = get_database_release_package_plan(target["name"])
-        if release_plan["summary"].get("checksum_mismatch_total"):
-            raise ValueError("database_release_package_checksum_mismatch")
-        # Historical packages without a target ledger are archived for this
-        # workflow. They remain protected from explicit replay, but they must
-        # not prevent a normal "remaining delta" request from becoming the
-        # clear no-op it is when no target-specific package is pending.
-        package_plan = sorted(
-            (item for item in release_plan["packages"] if item.get("status") == "pending"),
-            key=lambda item: (item.get("date") or "", item.get("version") or "", item.get("id") or ""),
-        )
-        if not package_plan:
-            raise ValueError("database_release_no_pending_packages")
-        command = [str(PACKAGE_BATCH_SCRIPT), *[str(ROOT / item["id"]) for item in package_plan]]
-        return _start_job(target, command, "release", package_plan=package_plan)
-    package_plan = [item for item in packages if item["id"] == normalized_package]
-    if normalized_package:
-        release_plan = get_database_release_package_plan(target["name"])
-        selected_status = next((item.get("status") for item in release_plan["packages"] if item.get("id") == normalized_package), "")
-        if selected_status == "unverified":
-            raise ValueError("database_release_baseline_verification_required")
-        if selected_status == "checksum_mismatch":
-            raise ValueError("database_release_package_checksum_mismatch")
-    command = [str(PACKAGE_SCRIPT), str(ROOT / normalized_package)] if normalized_package else [str(PREPARE_SCRIPT)]
-    return _start_job(target, command, "release", package_plan=package_plan)
+    if normalized_package not in {"", "__full__"}:
+        raise ValueError("database_release_incremental_disabled")
+    return _start_job(target, [str(PREPARE_SCRIPT)], "full_release", package_plan=[])
 
 
 def start_database_clear(target_name, confirmation="", confirm_production=False):

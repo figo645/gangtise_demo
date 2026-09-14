@@ -2587,12 +2587,12 @@ body { background: var(--surface-2); color: var(--text-main); }
   box-shadow:0 8px 22px rgba(31,73,125,0.06);
   cursor:pointer;
 }
-.fund-stock-name { font-size:13px; font-weight:700; color:var(--white); }
+.fund-stock-name { font-size:13px; font-weight:700; color:var(--text-main); }
 .fund-stock-meta { font-size:10px; color:var(--gray-400); margin-top:4px; line-height:1.5; }
 .fund-stock-price-wrap { text-align:right; flex-shrink:0; }
-.fund-stock-price { font-size:18px; font-weight:700; color:var(--white); }
+.fund-stock-price { font-size:18px; font-weight:700; color:var(--text-main); }
 .fund-stock-change { font-size:11px; margin-top:4px; }
-.fund-stock-signal { font-size:12px; color:var(--white); line-height:1.7; margin-top:10px; }
+.fund-stock-signal { font-size:12px; color:var(--text-sub); line-height:1.7; margin-top:10px; }
 .fund-news-item { box-shadow:0 8px 22px rgba(31,73,125,0.06); }
 .fund-news-item.is-watchlist-sector {
   border-color:rgba(31,73,125,0.30);
@@ -4579,51 +4579,8 @@ body,
     </div>
 
     <div class="h5-section" id="fundamental-watchlist-boards">
-      <div class="h5-section-title">我的自选股</div>
-      <div class="fund-board-hint">按行业板块查看你关注的股票行情与研究摘要。</div>
-      <div class="fund-board-tabs" id="fund-board-tabs">
-        {% for board in feed_boards %}
-        <button class="fund-board-tab {% if loop.first %}active{% endif %}" id="fund-board-tab-{{ loop.index0 }}" onclick="switchFeedBoardTab({{ loop.index0 }})">
-          {{ board.name }}
-        </button>
-        {% endfor %}
-      </div>
-      <div id="fund-board-panels">
-      {% for board in feed_boards %}
-      <div class="fund-board-panel {% if loop.first %}active{% endif %}" id="fund-board-panel-{{ loop.index0 }}">
-        <div class="fund-board-summary">
-          <span>{{ board['name'] }} · 共 {{ board['items']|length }} 只自选股</span>
-          <span>查看最新行情与研究摘要</span>
-        </div>
-        <div class="fund-stock-list">
-          {% for item in board['items'] %}
-          <div class="fund-stock-card" onclick="openWatchlistDetail('{{ item.code }}','overview'); switchTab('market');">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-              <div>
-                <div class="fund-stock-name">{{ item.name }}</div>
-                <div class="fund-stock-meta">{{ item.code }} · {{ item.market }} · {{ item.focus }}</div>
-              </div>
-              <div class="fund-stock-price-wrap">
-                {% if item.value is not none and item.change is not none and item.change_pct is not none %}
-                  <div class="fund-stock-price">{{ "%.2f"|format(item.value) }}</div>
-                  <div class="fund-stock-change {% if item.change >= 0 %}up{% else %}down{% endif %}">
-                    {% if item.change >= 0 %}▲{% else %}▼{% endif %}
-                    {{ "%.2f%%"|format(item.change_pct|abs) }}
-                  </div>
-                {% else %}
-                  <div class="fund-stock-price">--</div>
-                  <div class="fund-stock-change" style="color:var(--gray-400)">暂无真实行情</div>
-                {% endif %}
-              </div>
-            </div>
-            <div class="fund-stock-signal">{{ item.signal_summary }}</div>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-      {% endfor %}
-      {% if not feed_boards %}<div class="fund-board-empty">当前没有可展示的自选股行情。请先在自选股中添加标的。</div>{% endif %}
-      </div>
+      <div class="h5-section-title">我的所有自选股涨跌Top10</div>
+      <div id="fundamental-watchlist-chart"></div>
     </div>
 
     <div class="h5-section">
@@ -4941,6 +4898,9 @@ body,
         <div style="font-size:12px;color:var(--gray-400);line-height:1.6">用户不需要先点“添加”。直接输入股票代码后进入个股详情页，再决定是否加入自选股。</div>
         <div style="font-size:11px;color:var(--gold);margin-top:8px;line-height:1.7">租户隔离规则：普通投资者只可与所属大V投顾互动；跨租户投顾内容不开放。通过 Hermes 发起的个股分析会同步为租户分析记录，供主理投顾查看。</div>
       </div>
+      <div class="fund-board-hint" style="margin:0 0 8px">按行业板块查看全部自选股行情与研究摘要。</div>
+      <div class="fund-board-tabs" id="market-fund-board-tabs"></div>
+      <div id="market-fund-board-panels"></div>
       <div id="market-watchlist-list">
       {% for item in market %}
       <div
@@ -6191,18 +6151,14 @@ let knowledgeEntryStore = [
     url: 'https://example.com/semiconductor-cycle',
   },
 ];
-let tenantFundDashboardState = loadTenantFundDashboardState();
+// Dashboard state is owned by PostgreSQL through the tenant dashboard API.
+// Keep this object only as an in-memory render state; browser storage is not a
+// fallback fact source because it can drift across devices and tabs.
+let tenantFundDashboardState = {};
 let tenantFundDashboardRemoteState = normalizeInitialRemoteDashboardState(INITIAL_TENANT_DASHBOARD);
 
 function loadTenantFundDashboardState() {
-  try {
-    const raw = window.localStorage ? window.localStorage.getItem(FUND_DASHBOARD_STORAGE_KEY) : '';
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch (e) {
-    return {};
-  }
+  return {};
 }
 
 function normalizeInitialRemoteDashboardState(payload) {
@@ -6228,9 +6184,8 @@ async function refreshTenantDashboardRemoteState(options) {
     currentTenantDashboardPayload = payload.dashboard || {};
     tenantFundDashboardRemoteState = normalizeInitialRemoteDashboardState(payload.dashboard || {});
     const tenantState = ensureTenantFundDashboardState(activeUser.tenant.id);
-    tenantState.published = tenantFundDashboardRemoteState.published || tenantState.published;
-    tenantState.draft = tenantFundDashboardRemoteState.draft !== null ? tenantFundDashboardRemoteState.draft : tenantState.draft;
-    persistTenantFundDashboardState();
+    tenantState.published = tenantFundDashboardRemoteState.published;
+    tenantState.draft = tenantFundDashboardRemoteState.draft;
     if (opts.rerenderFeed) renderFundMacroDashboard();
     if (opts.rerenderWorkbench) renderWorkbenchFundDashboard();
     renderWorkbenchOpsStats();
@@ -6242,11 +6197,8 @@ async function refreshTenantDashboardRemoteState(options) {
 }
 
 function persistTenantFundDashboardState() {
-  try {
-    if (window.localStorage) {
-      window.localStorage.setItem(FUND_DASHBOARD_STORAGE_KEY, JSON.stringify(tenantFundDashboardState));
-    }
-  } catch (e) {}
+  // Deliberately empty: dashboard drafts and published state are persisted by
+  // the tenant dashboard API, not by the browser.
 }
 
 function cloneDashboardConfig(config) {
@@ -8078,18 +8030,18 @@ function renderFeaturedInsightCard() {
   `;
 }
 
-function renderFeedMarketEconomy(items, title, chartId) {
+function renderFeedMarketEconomy(items, title, chartId, limit = 10, description = '正增长红柱 · 负增长绿柱 · 数据来自 AKShare 快照') {
   const rows = (Array.isArray(items) ? items : []).filter((item) => item && item.available !== false);
   if (!rows.length) return `<div class="feed-market-chart"><div class="feed-market-chart-title">${escapeHtml(title)}</div><div class="feed-market-economy-desc">暂无可用的最新数据</div></div>`;
   const chartRows = rows.slice().sort((left, right) => {
     return Number(right.change_pct || 0) - Number(left.change_pct || 0);
-  }).slice(0, 12).map((item) => ({
+  }).slice(0, Math.max(1, Number(limit) || rows.length)).map((item) => ({
     label: item.sector || item.name || item.code || '--',
     value: Number(item.change_pct || 0),
   }));
   const safeChartId = chartId || `feed-market-chart-${Math.random().toString(36).slice(2, 8)}`;
   window.setTimeout(() => renderFeedMarketEconomyChart(safeChartId, chartRows), 0);
-  return `<div class="feed-market-chart"><div class="feed-market-chart-title">${escapeHtml(title)}</div><div id="${escapeAttr(safeChartId)}" class="feed-market-chart-canvas" role="img" aria-label="${escapeAttr(title)}涨跌幅柱状图"></div><div class="feed-market-economy-desc">正增长红柱 · 负增长绿柱 · 数据来自 AKShare 快照</div></div>`;
+  return `<div class="feed-market-chart"><div class="feed-market-chart-title">${escapeHtml(title)}</div><div id="${escapeAttr(safeChartId)}" class="feed-market-chart-canvas" role="img" aria-label="${escapeAttr(title)}涨跌幅柱状图"></div><div class="feed-market-economy-desc">${escapeHtml(description)}</div></div>`;
 }
 
 function renderFeedMarketEconomyChart(chartId, rows) {
@@ -8148,7 +8100,26 @@ function renderFeedMarketEconomyChart(chartId, rows) {
 function renderFeedMarketEconomyPanel(overviewItems, sectorItems) {
   const host = document.getElementById('feed-market-economy');
   if (!host) return;
-  host.innerHTML = `<div class="feed-market-economy"><div class="feed-market-economy-title">行业经济指标</div><div class="feed-market-economy-desc">以零轴为基线展示热门行业与市场一览的日涨跌幅。</div><div class="feed-market-economy-grid">${renderFeedMarketEconomy(sectorItems, '热门行业', 'feed-market-sector-chart')}${renderFeedMarketEconomy(overviewItems, '市场一览', 'feed-market-overview-chart')}</div></div>`;
+  host.innerHTML = `<div class="feed-market-economy"><div class="feed-market-economy-title">行业经济指标</div><div class="feed-market-economy-desc">以零轴为基线展示热门行业与市场一览涨跌 Top10。</div><div class="feed-market-economy-grid">${renderFeedMarketEconomy(sectorItems, '热门行业涨跌Top10', 'feed-market-sector-chart', 10)}${renderFeedMarketEconomy(overviewItems, '市场一览涨跌Top10', 'feed-market-overview-chart', 10)}</div></div>`;
+}
+
+function renderFundamentalWatchlistChart() {
+  const host = document.getElementById('fundamental-watchlist-chart');
+  if (!host) return;
+  const rows = Object.values(WATCHLIST_DETAILS_MAP || {})
+    .filter((item) => item && item.data_unavailable !== true && Number.isFinite(Number(item.change_pct)))
+    .map((item) => ({
+      name: item.name || item.code || '--',
+      change_pct: Number(item.change_pct),
+      available: true,
+    }));
+  host.innerHTML = renderFeedMarketEconomy(
+    rows,
+    '我的所有自选股涨跌Top10',
+    'feed-watchlist-chart',
+    10,
+    '按今日涨跌幅从高到低排列 · 仅展示涨跌幅 Top10 · 正增长红柱 · 负增长绿柱',
+  );
 }
 
 async function loadFeedMarketEconomy() {
@@ -12159,11 +12130,12 @@ function selectHermesAssistantMode(mode) {
   renderHermesWorkspace();
 }
 
-function switchFeedBoardTab(index) {
-  document.querySelectorAll('.fund-board-tab').forEach((tab, idx) => {
+function switchFeedBoardTab(index, group = 'feed') {
+  const selector = group === 'market' ? '[data-board-group="market"]' : '[data-board-group="feed"]';
+  document.querySelectorAll(selector + '.fund-board-tab').forEach((tab, idx) => {
     tab.classList.toggle('active', idx === index);
   });
-  document.querySelectorAll('.fund-board-panel').forEach((panel, idx) => {
+  document.querySelectorAll(selector + '.fund-board-panel').forEach((panel, idx) => {
     panel.classList.toggle('active', idx === index);
   });
 }
@@ -14367,14 +14339,17 @@ function renderWatchlist() {
       : '';
     listHost.innerHTML = `<div style="padding:28px 14px;border:1px dashed rgba(200,169,110,0.18);border-radius:12px;color:var(--gray-400);font-size:12px;text-align:center">${userWatchlistLoadError || '正在加载当前用户的自选股...'}${retry}</div>`;
   }
+  renderFundamentalWatchlistChart();
   renderFundamentalWatchlistBoards();
+  renderFundamentalWatchlistBoards('market');
   renderReviewWatchlistSelectionMode();
   renderHermesWorkspace();
 }
 
-function renderFundamentalWatchlistBoards() {
-  const tabsHost = document.getElementById('fund-board-tabs');
-  const panelsHost = document.getElementById('fund-board-panels');
+function renderFundamentalWatchlistBoards(group = 'feed') {
+  const marketGroup = group === 'market';
+  const tabsHost = document.getElementById(marketGroup ? 'market-fund-board-tabs' : 'fund-board-tabs');
+  const panelsHost = document.getElementById(marketGroup ? 'market-fund-board-panels' : 'fund-board-panels');
   if (!tabsHost || !panelsHost) return;
   const boards = {};
   Object.values(WATCHLIST_DETAILS_MAP || {}).forEach((detail) => {
@@ -14388,16 +14363,19 @@ function renderFundamentalWatchlistBoards() {
     boards[boardName].push(detail);
   });
   const entries = Object.entries(boards);
+  const legacyList = marketGroup ? document.getElementById('market-watchlist-list') : null;
   if (!entries.length) {
     tabsHost.innerHTML = '';
     panelsHost.innerHTML = '<div class="fund-board-empty">当前没有可展示的自选股行情。请先在自选股中添加标的。</div>';
+    if (legacyList) legacyList.style.display = '';
     return;
   }
+  if (legacyList) legacyList.style.display = 'none';
   tabsHost.innerHTML = entries.map(([name], index) => (
-    `<button class="fund-board-tab ${index === 0 ? 'active' : ''}" onclick="switchFeedBoardTab(${index})">${escapeHtml(name)}</button>`
+    `<button class="fund-board-tab ${index === 0 ? 'active' : ''}" data-board-group="${marketGroup ? 'market' : 'feed'}" onclick="switchFeedBoardTab(${index}, '${marketGroup ? 'market' : 'feed'}')">${escapeHtml(name)}</button>`
   )).join('');
   panelsHost.innerHTML = entries.map(([name, items], index) => {
-    return `<div class="fund-board-panel ${index === 0 ? 'active' : ''}">
+    return `<div class="fund-board-panel ${index === 0 ? 'active' : ''}" data-board-group="${marketGroup ? 'market' : 'feed'}">
       <div class="fund-board-summary"><span>${escapeHtml(name)} · 共 ${items.length} 只自选股</span><span>查看最新行情与研究摘要</span></div>
       <div class="fund-stock-list">${items.map((item) => {
         const change = Number(item.change);
@@ -15921,41 +15899,20 @@ function createHermesSessionId() {
 }
 
 function readHermesSessionIndex() {
-  try {
-    const raw = window.localStorage ? window.localStorage.getItem(getHermesSessionIndexStorageKey()) : '';
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    return [];
-  }
+  return [];
 }
 
 function writeHermesSessionIndex(records) {
-  try {
-    if (!window.localStorage) return;
-    window.localStorage.setItem(getHermesSessionIndexStorageKey(), JSON.stringify(Array.isArray(records) ? records : []));
-  } catch (e) {}
+  // Session index is returned by /api/hermes/sessions and is never a browser
+  // database.
 }
 
 function readHermesSessionCache(sessionId) {
-  const normalizedId = String(sessionId || '').trim();
-  if (!normalizedId) return null;
-  try {
-    const raw = window.localStorage ? window.localStorage.getItem(getHermesSessionCacheStorageKey(normalizedId)) : '';
-    const parsed = raw ? JSON.parse(raw) : null;
-    return parsed && typeof parsed === 'object' ? parsed : null;
-  } catch (e) {
-    return null;
-  }
+  return null;
 }
 
 function writeHermesSessionCache(sessionId, payload) {
-  const normalizedId = String(sessionId || '').trim();
-  if (!normalizedId) return;
-  try {
-    if (!window.localStorage) return;
-    window.localStorage.setItem(getHermesSessionCacheStorageKey(normalizedId), JSON.stringify(payload || {}));
-  } catch (e) {}
+  // The database-backed Hermes session API is the source of truth.
 }
 
 function formatHermesSessionTime(value) {
@@ -16041,21 +15998,8 @@ function closeH5ModalById(modalId) {
 
 function ensureHermesSessionId() {
   if (String(hermesActiveSessionId || '').trim()) return hermesActiveSessionId;
-  const storageKey = getHermesSessionStorageKey();
-  try {
-    const current = localStorage.getItem(storageKey);
-    if (current) {
-      hermesActiveSessionId = current;
-      return current;
-    }
-    const next = createHermesSessionId();
-    localStorage.setItem(storageKey, next);
-    hermesActiveSessionId = next;
-    return next;
-  } catch (e) {
-    hermesActiveSessionId = createHermesSessionId();
-    return hermesActiveSessionId;
-  }
+  hermesActiveSessionId = createHermesSessionId();
+  return hermesActiveSessionId;
 }
 
 function getHermesCurrentSessionRecord() {
@@ -16285,11 +16229,6 @@ async function switchHermesSession(sessionId, options = {}) {
   if (!normalizedId) return;
   const cache = readHermesSessionCache(normalizedId);
   hermesActiveSessionId = normalizedId;
-  try {
-    if (window.localStorage) {
-      window.localStorage.setItem(getHermesSessionStorageKey(), normalizedId);
-    }
-  } catch (e) {}
   if (cache && Array.isArray(cache.conversation) && cache.conversation.length) {
     hermesConversation = cache.conversation.slice(0);
     clearHermesQuestionInputs();
@@ -16324,11 +16263,6 @@ function startHermesNewSession(options = {}) {
   hermesConversation = [];
   hermesUploadedFiles = [];
   hermesScopedKnowledgeId = '';
-  try {
-    if (window.localStorage) {
-      window.localStorage.setItem(getHermesSessionStorageKey(), hermesActiveSessionId);
-    }
-  } catch (e) {}
   clearHermesQuestionInputs({ focus: options.focus !== false });
   renderHermesWorkspace();
   resetHermesScrollPosition();
