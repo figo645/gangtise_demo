@@ -70,13 +70,13 @@ CURRENT_TARGET_QUERY=(psql -w -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_US
 TEMP_TARGET_EXEC=(psql -w -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" -d "$TEMP_DB" -v ON_ERROR_STOP=1)
 preserve_target_environment_credentials() {
   local count
-  count="$("${CURRENT_TARGET_QUERY[@]}" "SELECT count(*) FROM app_settings WHERE setting_key IN (${PROTECTED_APP_SETTING_KEYS})")"
+  count="$("${CURRENT_TARGET_QUERY[@]}" -c "SELECT count(*) FROM app_settings WHERE setting_key IN (${PROTECTED_APP_SETTING_KEYS})")"
   if [[ "${count:-0}" -eq 0 ]]; then
     echo "==> No Staging environment credential records to preserve"
     return
   fi
   echo "==> Preserving ${count} Staging environment credential record(s)"
-  "${CURRENT_TARGET_QUERY[@]}" "SELECT format('INSERT INTO app_settings (setting_key, setting_value, updated_at) VALUES (%L, %L, %L) ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = EXCLUDED.updated_at;', setting_key, setting_value, updated_at) FROM app_settings WHERE setting_key IN (${PROTECTED_APP_SETTING_KEYS}) ORDER BY setting_key" | "${TEMP_TARGET_EXEC[@]}"
+  "${CURRENT_TARGET_QUERY[@]}" -c "SELECT format('INSERT INTO app_settings (setting_key, setting_value, updated_at) VALUES (%L, %L, %L) ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = EXCLUDED.updated_at;', setting_key, setting_value, updated_at) FROM app_settings WHERE setting_key IN (${PROTECTED_APP_SETTING_KEYS}) ORDER BY setting_key" | "${TEMP_TARGET_EXEC[@]}"
 }
 cleanup_temp() {
   "${ADMIN[@]}" -c "DROP DATABASE IF EXISTS \"${TEMP_DB}\" WITH (FORCE);" >/dev/null 2>&1 || true
@@ -87,7 +87,7 @@ cancel_sync() {
   cleanup_temp
   exit 130
 }
-trap cleanup_temp ERR
+trap cleanup_temp EXIT
 trap cancel_sync INT TERM
 
 echo "==> Restoring ${SOURCE_SIZE} bytes into temporary Staging database"
@@ -116,7 +116,7 @@ echo "==> Existing Staging database connections terminated"
 echo "==> Current Staging database retained for rollback: ${BACKUP_DB}"
 echo "==> Production snapshot promoted as Staging database"
 DATABASE_RELEASE_TARGET=staging REMOTE_DB_HOST="$TARGET_HOST" REMOTE_DB_PORT="$TARGET_PORT" REMOTE_DB_NAME="$TARGET_DB" REMOTE_DB_USER="$TARGET_USER" REMOTE_DB_PASSWORD="$TARGET_PASSWORD" REMOTE_MAINTENANCE_DB="$TARGET_MAINTENANCE_DB" DATABASE_RELEASE_WORK_DIR="$WORK_DIR" "$ROOT_DIR/scripts/prune_database_release_backups.sh"
-trap - ERR INT TERM
+trap - EXIT INT TERM
 rm -f "$DUMP_FILE"
-echo "==> Temporary Production export file removed"
+echo "==> Temporary Production dump file removed"
 echo "Production-to-Staging sync complete. Rollback database: ${BACKUP_DB}"

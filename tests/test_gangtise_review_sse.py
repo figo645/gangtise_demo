@@ -192,6 +192,29 @@ class GangtiseReviewSseTest(unittest.TestCase):
         self.assertNotIn("内部推理", result["text"])
         self.assertNotIn("内部用量", result["text"])
 
+    def test_sse_client_accepts_current_round_result_envelope_when_answer_phase_is_omitted(self):
+        def fake_urlopen(request, timeout):
+            return _FakeSseResponse(
+                [
+                    'data: {"phase":"round","round":1,"title":"检索","result":{"data":{"markdown":"## 上证综合指数\\n市场表现"}}}\n', "\n",
+                    'data: {"phase":"round","round":2,"title":"结论","result":{"data":{"markdown":"成交与情绪保持稳定。"}}}\n', "\n",
+                    'data: {"phase":"usage","round":2,"title":"","result":{"summary":"内部用量"}}\n', "\n",
+                ]
+            )
+
+        with patch(
+            "src.domain.market_services.get_gangtise_openapi_config",
+            return_value={"base_url": "https://openapi.gangtise.com"},
+        ), patch("src.domain.market_services.urlopen", side_effect=fake_urlopen):
+            result = market_services.post_gangtise_openapi_sse(
+                "/application/open-ai/ai/chat/sse", {"text": "请分析上证指数"}, token="test-token"
+            )
+
+        self.assertTrue(result["ok"])
+        self.assertIn("上证综合指数", result["text"])
+        self.assertIn("成交与情绪保持稳定", result["text"])
+        self.assertNotIn("内部用量", result["text"])
+
     def test_sse_client_supports_terminal_formal_answer_phase_alias(self):
         def fake_urlopen(request, timeout):
             return _FakeSseResponse(

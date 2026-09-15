@@ -18,7 +18,7 @@ BACKUP_ROOT="${USER_DATA_BACKUP_ROOT:-${ROOT_DIR}/.deploy/user_data_backups}"
 RETAIN_COUNT="${USER_DATA_BACKUP_RETAIN_COUNT:-2}"
 
 [[ "$TARGET" =~ ^(local|staging|production)$ ]] || { echo "Invalid cleanup target: ${TARGET}" >&2; exit 2; }
-[[ "$MODE" =~ ^(account_runtime_data|all_non_admin_accounts)$ ]] || { echo "Invalid cleanup mode: ${MODE}" >&2; exit 2; }
+[[ "$MODE" =~ ^(account_runtime_data|all_non_admin_accounts|all_user_business_data)$ ]] || { echo "Invalid cleanup mode: ${MODE}" >&2; exit 2; }
 [[ "$BACKUP_ID" =~ ^user_cleanup_${TARGET}_[0-9]{8}_[0-9]{6}_[0-9]{6}$ ]] || { echo "Invalid cleanup backup id: ${BACKUP_ID}" >&2; exit 2; }
 [[ -n "$DB_HOST" ]] || { echo "REMOTE_DB_HOST is required." >&2; exit 2; }
 [[ "$RETAIN_COUNT" =~ ^[1-9][0-9]*$ ]] || { echo "Invalid backup retention: ${RETAIN_COUNT}" >&2; exit 2; }
@@ -28,6 +28,8 @@ done
 if [[ "$MODE" == "account_runtime_data" ]]; then
   [[ -n "$USERNAMES" ]] || { echo "USER_DATA_CLEANUP_USERNAMES is required." >&2; exit 2; }
   [[ ",$USERNAMES," != *,admin,* ]] || { echo "The admin account cannot be included in an account cleanup." >&2; exit 2; }
+elif [[ "$MODE" == "all_non_admin_accounts" || "$MODE" == "all_user_business_data" ]]; then
+  [[ -z "$USERNAMES" ]] || { echo "USER_DATA_CLEANUP_USERNAMES must be empty for ${MODE}." >&2; exit 2; }
 fi
 command -v psql >/dev/null 2>&1 || { echo "psql is not installed." >&2; exit 1; }
 command -v pg_dump >/dev/null 2>&1 || { echo "pg_dump is not installed." >&2; exit 1; }
@@ -96,9 +98,9 @@ PY
 chmod 600 "$MANIFEST_FILE"
 echo "==> Complete backup ready: ${BACKUP_ID}"
 
-# All cleanup statements use the selected user set and run in one transaction.
-# Shared tenant content and platform/market master data are intentionally out
-# of scope because they do not have a reliable per-account ownership key.
+# All cleanup statements run in one transaction. The all_user_business_data
+# mode deliberately retains users and platform configuration while removing
+# user-generated content, conversations, messages, analytics, and commerce.
 "${PSQL[@]}" -v cleanup_mode="$MODE" -v cleanup_usernames="$USERNAMES" <<'SQL'
 BEGIN;
 CREATE TEMP TABLE cleanup_users (id BIGINT PRIMARY KEY, username TEXT NOT NULL UNIQUE) ON COMMIT DROP;
@@ -121,6 +123,8 @@ BEGIN
     IF requested_count = 0 OR selected_count <> requested_count THEN
       RAISE EXCEPTION 'Requested account was not found; requested=% found=%', requested_count, selected_count;
     END IF;
+  ELSIF current_setting('app.cleanup_mode', true) = 'all_user_business_data' THEN
+    NULL;
   ELSIF current_setting('app.cleanup_mode', true) = 'all_non_admin_accounts' THEN
     INSERT INTO cleanup_users (id, username)
       SELECT id, username FROM users WHERE role <> 'admin';
@@ -137,23 +141,75 @@ END $$;
 DO $$
 DECLARE removed INTEGER;
 BEGIN
-  IF to_regclass('public.user_watchlist_items') IS NOT NULL THEN DELETE FROM user_watchlist_items WHERE user_profile_id IN (SELECT username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=user_watchlist_items rows=%', removed; END IF;
-  IF to_regclass('public.fan_stock_observation_events') IS NOT NULL THEN DELETE FROM fan_stock_observation_events WHERE user_profile_id IN (SELECT username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=fan_stock_observation_events rows=%', removed; END IF;
-  IF to_regclass('public.watchlist_kline_annotations') IS NOT NULL THEN DELETE FROM watchlist_kline_annotations WHERE created_by_user_id IN (SELECT username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=watchlist_kline_annotations rows=%', removed; END IF;
-  IF to_regclass('public.watchlist_comments') IS NOT NULL THEN DELETE FROM watchlist_comments WHERE created_by_user_id IN (SELECT username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=watchlist_comments rows=%', removed; END IF;
-  IF to_regclass('public.hermes_conversation_turns') IS NOT NULL THEN DELETE FROM hermes_conversation_turns WHERE user_profile_id IN (SELECT username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=hermes_conversation_turns rows=%', removed; END IF;
-  IF to_regclass('public.hermes_session_memory') IS NOT NULL THEN DELETE FROM hermes_session_memory WHERE user_profile_id IN (SELECT username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=hermes_session_memory rows=%', removed; END IF;
-  IF to_regclass('public.hermes_user_memory') IS NOT NULL THEN DELETE FROM hermes_user_memory WHERE user_profile_id IN (SELECT username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=hermes_user_memory rows=%', removed; END IF;
-  IF to_regclass('public.hermes_user_profiles') IS NOT NULL THEN DELETE FROM hermes_user_profiles WHERE user_profile_id IN (SELECT username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=hermes_user_profiles rows=%', removed; END IF;
-  IF to_regclass('public.hermes_interception_audits') IS NOT NULL THEN DELETE FROM hermes_interception_audits WHERE user_profile_id IN (SELECT username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=hermes_interception_audits rows=%', removed; END IF;
-  IF to_regclass('public.user_async_jobs') IS NOT NULL THEN DELETE FROM user_async_jobs WHERE owner_label IN (SELECT username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=user_async_jobs rows=%', removed; END IF;
-  IF to_regclass('public.app_settings') IS NOT NULL THEN DELETE FROM app_settings WHERE setting_key IN (SELECT 'h5_profile_settings:' || username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=app_settings_profile rows=%', removed; END IF;
-  IF to_regclass('public.tenant_fan_qr_invite_claims') IS NOT NULL THEN DELETE FROM tenant_fan_qr_invite_claims WHERE user_id IN (SELECT id FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=tenant_fan_qr_invite_claims rows=%', removed; END IF;
-  IF to_regclass('public.fan_subscriptions') IS NOT NULL THEN DELETE FROM fan_subscriptions WHERE user_id IN (SELECT id FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=fan_subscriptions rows=%', removed; END IF;
-  IF to_regclass('public.fan_payment_orders') IS NOT NULL THEN UPDATE fan_payment_orders SET confirmed_by_user_id = NULL WHERE confirmed_by_user_id IN (SELECT id FROM cleanup_users); DELETE FROM fan_payment_orders WHERE user_id IN (SELECT id FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=fan_payment_orders rows=%', removed; END IF;
-  IF to_regclass('public.tenant_subscription_products') IS NOT NULL THEN UPDATE tenant_subscription_products SET created_by_user_id = NULL WHERE created_by_user_id IN (SELECT id FROM cleanup_users); END IF;
-  IF to_regclass('public.tenant_fan_qr_invites') IS NOT NULL THEN UPDATE tenant_fan_qr_invites SET created_by_user_id = NULL WHERE created_by_user_id IN (SELECT id FROM cleanup_users); END IF;
-  IF current_setting('app.cleanup_mode', true) = 'all_non_admin_accounts' THEN DELETE FROM users WHERE id IN (SELECT id FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=users rows=%', removed; END IF;
+  IF current_setting('app.cleanup_mode', true) = 'all_user_business_data' THEN
+    IF to_regclass('public.access_logs') IS NOT NULL THEN DELETE FROM access_logs; GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=access_logs rows=%', removed; END IF;
+    IF to_regclass('public.user_async_jobs') IS NOT NULL THEN DELETE FROM user_async_jobs; GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=user_async_jobs rows=%', removed; END IF;
+    IF to_regclass('public.token_usage_logs') IS NOT NULL THEN DELETE FROM token_usage_logs; GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=token_usage_logs rows=%', removed; END IF;
+    IF to_regclass('public.hermes_conversation_turns') IS NOT NULL THEN DELETE FROM hermes_conversation_turns; GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=hermes_conversation_turns rows=%', removed; END IF;
+    IF to_regclass('public.hermes_session_memory') IS NOT NULL THEN DELETE FROM hermes_session_memory; GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=hermes_session_memory rows=%', removed; END IF;
+    IF to_regclass('public.hermes_user_memory') IS NOT NULL THEN DELETE FROM hermes_user_memory; GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=hermes_user_memory rows=%', removed; END IF;
+    IF to_regclass('public.hermes_user_profiles') IS NOT NULL THEN DELETE FROM hermes_user_profiles; GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=hermes_user_profiles rows=%', removed; END IF;
+    IF to_regclass('public.hermes_interception_audits') IS NOT NULL THEN DELETE FROM hermes_interception_audits; GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=hermes_interception_audits rows=%', removed; END IF;
+    IF to_regclass('public.user_watchlist_items') IS NOT NULL THEN DELETE FROM user_watchlist_items; GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=user_watchlist_items rows=%', removed; END IF;
+    IF to_regclass('public.fan_stock_observation_events') IS NOT NULL THEN DELETE FROM fan_stock_observation_events; GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=fan_stock_observation_events rows=%', removed; END IF;
+    IF to_regclass('public.watchlist_kline_annotations') IS NOT NULL THEN DELETE FROM watchlist_kline_annotations; GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=watchlist_kline_annotations rows=%', removed; END IF;
+    IF to_regclass('public.watchlist_comments') IS NOT NULL THEN DELETE FROM watchlist_comments; GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=watchlist_comments rows=%', removed; END IF;
+    IF to_regclass('public.review_voice_embeddings') IS NOT NULL THEN DELETE FROM review_voice_embeddings; GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=review_voice_embeddings rows=%', removed; END IF;
+    IF to_regclass('public.tenant_insight_drafts') IS NOT NULL THEN DELETE FROM tenant_insight_drafts; GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=tenant_insight_drafts rows=%', removed; END IF;
+    IF to_regclass('public.tenant_fan_qr_invite_claims') IS NOT NULL THEN DELETE FROM tenant_fan_qr_invite_claims; GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=tenant_fan_qr_invite_claims rows=%', removed; END IF;
+    IF to_regclass('public.fan_subscriptions') IS NOT NULL THEN DELETE FROM fan_subscriptions; GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=fan_subscriptions rows=%', removed; END IF;
+    IF to_regclass('public.fan_payment_orders') IS NOT NULL THEN DELETE FROM fan_payment_orders; GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=fan_payment_orders rows=%', removed; END IF;
+    IF to_regclass('public.app_settings') IS NOT NULL THEN
+      DELETE FROM app_settings WHERE setting_key LIKE 'h5_profile_settings:%';
+      GET DIAGNOSTICS removed = ROW_COUNT;
+      RAISE NOTICE 'cleanup_deleted table=app_settings_profile rows=%', removed;
+      UPDATE app_settings
+      SET setting_value = jsonb_set(
+        setting_value::jsonb,
+        '{tenants}',
+        COALESCE((
+          SELECT jsonb_agg(
+            tenant || jsonb_build_object(
+              'message_center_state', jsonb_build_object(
+                'summary', '暂无消息',
+                'threads', '[]'::jsonb,
+                'broadcasts', '[]'::jsonb
+              ),
+              'review_snapshots', '[]'::jsonb,
+              'insight_drafts', '[]'::jsonb
+            )
+          )
+          FROM jsonb_array_elements(
+            CASE
+              WHEN jsonb_typeof(setting_value::jsonb -> 'tenants') = 'array'
+              THEN setting_value::jsonb -> 'tenants'
+              ELSE '[]'::jsonb
+            END
+          ) AS tenant
+        ), '[]'::jsonb), true
+      )::text,
+      updated_at = CURRENT_TIMESTAMP::text
+      WHERE setting_key = 'site_config';
+    END IF;
+  ELSE
+    IF to_regclass('public.user_watchlist_items') IS NOT NULL THEN DELETE FROM user_watchlist_items WHERE user_profile_id IN (SELECT username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=user_watchlist_items rows=%', removed; END IF;
+    IF to_regclass('public.fan_stock_observation_events') IS NOT NULL THEN DELETE FROM fan_stock_observation_events WHERE user_profile_id IN (SELECT username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=fan_stock_observation_events rows=%', removed; END IF;
+    IF to_regclass('public.watchlist_kline_annotations') IS NOT NULL THEN DELETE FROM watchlist_kline_annotations WHERE created_by_user_id IN (SELECT username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=watchlist_kline_annotations rows=%', removed; END IF;
+    IF to_regclass('public.watchlist_comments') IS NOT NULL THEN DELETE FROM watchlist_comments WHERE created_by_user_id IN (SELECT username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=watchlist_comments rows=%', removed; END IF;
+    IF to_regclass('public.hermes_conversation_turns') IS NOT NULL THEN DELETE FROM hermes_conversation_turns WHERE user_profile_id IN (SELECT username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=hermes_conversation_turns rows=%', removed; END IF;
+    IF to_regclass('public.hermes_session_memory') IS NOT NULL THEN DELETE FROM hermes_session_memory WHERE user_profile_id IN (SELECT username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=hermes_session_memory rows=%', removed; END IF;
+    IF to_regclass('public.hermes_user_memory') IS NOT NULL THEN DELETE FROM hermes_user_memory WHERE user_profile_id IN (SELECT username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=hermes_user_memory rows=%', removed; END IF;
+    IF to_regclass('public.hermes_user_profiles') IS NOT NULL THEN DELETE FROM hermes_user_profiles WHERE user_profile_id IN (SELECT username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=hermes_user_profiles rows=%', removed; END IF;
+    IF to_regclass('public.hermes_interception_audits') IS NOT NULL THEN DELETE FROM hermes_interception_audits WHERE user_profile_id IN (SELECT username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=hermes_interception_audits rows=%', removed; END IF;
+    IF to_regclass('public.user_async_jobs') IS NOT NULL THEN DELETE FROM user_async_jobs WHERE owner_label IN (SELECT username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=user_async_jobs rows=%', removed; END IF;
+    IF to_regclass('public.app_settings') IS NOT NULL THEN DELETE FROM app_settings WHERE setting_key IN (SELECT 'h5_profile_settings:' || username FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=app_settings_profile rows=%', removed; END IF;
+    IF to_regclass('public.tenant_fan_qr_invite_claims') IS NOT NULL THEN DELETE FROM tenant_fan_qr_invite_claims WHERE user_id IN (SELECT id FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=tenant_fan_qr_invite_claims rows=%', removed; END IF;
+    IF to_regclass('public.fan_subscriptions') IS NOT NULL THEN DELETE FROM fan_subscriptions WHERE user_id IN (SELECT id FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=fan_subscriptions rows=%', removed; END IF;
+    IF to_regclass('public.fan_payment_orders') IS NOT NULL THEN UPDATE fan_payment_orders SET confirmed_by_user_id = NULL WHERE confirmed_by_user_id IN (SELECT id FROM cleanup_users); DELETE FROM fan_payment_orders WHERE user_id IN (SELECT id FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=fan_payment_orders rows=%', removed; END IF;
+    IF to_regclass('public.tenant_subscription_products') IS NOT NULL THEN UPDATE tenant_subscription_products SET created_by_user_id = NULL WHERE created_by_user_id IN (SELECT id FROM cleanup_users); END IF;
+    IF to_regclass('public.tenant_fan_qr_invites') IS NOT NULL THEN UPDATE tenant_fan_qr_invites SET created_by_user_id = NULL WHERE created_by_user_id IN (SELECT id FROM cleanup_users); END IF;
+    IF current_setting('app.cleanup_mode', true) = 'all_non_admin_accounts' THEN DELETE FROM users WHERE id IN (SELECT id FROM cleanup_users); GET DIAGNOSTICS removed = ROW_COUNT; RAISE NOTICE 'cleanup_deleted table=users rows=%', removed; END IF;
+  END IF;
 END $$;
 COMMIT;
 SQL

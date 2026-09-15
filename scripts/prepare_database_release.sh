@@ -72,34 +72,34 @@ TEMP_TARGET_EXEC=(psql -w -h "$REMOTE_DB_HOST" -p "$REMOTE_DB_PORT" -U "$REMOTE_
 echo "==> Discovering target user data tables"
 "${CURRENT_TARGET_QUERY[@]}" <<'SQL' > "$USER_DATA_TABLE_LIST"
 WITH RECURSIVE user_tables AS (
-  SELECT 'public.users'::text AS table_name
+  SELECT 'public.users'::text COLLATE "C" AS table_name
   UNION
-  SELECT format('%I.%I', child_ns.nspname, child.relname)
+  SELECT format('%I.%I', child_ns.nspname, child.relname)::text COLLATE "C"
   FROM user_tables parent
   JOIN pg_class parent_rel ON format('%I.%I',
-      (SELECT nspname FROM pg_namespace WHERE oid = parent_rel.relnamespace), parent_rel.relname) = parent.table_name
+      (SELECT nspname FROM pg_namespace WHERE oid = parent_rel.relnamespace), parent_rel.relname)::text COLLATE "C" = parent.table_name COLLATE "C"
   JOIN pg_constraint con ON con.confrelid = parent_rel.oid AND con.contype = 'f'
   JOIN pg_class child ON child.oid = con.conrelid
   JOIN pg_namespace child_ns ON child_ns.oid = child.relnamespace
   WHERE child.relnamespace = 'public'::regnamespace
 ), identity_tables AS (
-  SELECT format('%I.%I', table_schema, table_name) AS table_name
+  SELECT format('%I.%I', table_schema, table_name)::text COLLATE "C" AS table_name
   FROM information_schema.columns
   WHERE table_schema = 'public'
     AND column_name IN ('tenant_slug', 'user_profile_id', 'created_by_user_id', 'user_id', 'created_by')
 )
-SELECT DISTINCT table_name FROM (
+SELECT DISTINCT discovered.table_name COLLATE "C" FROM (
   SELECT table_name FROM user_tables
   UNION ALL SELECT table_name FROM identity_tables
 ) discovered
-JOIN information_schema.tables t ON format('%I.%I', t.table_schema, t.table_name) = discovered.table_name
+JOIN information_schema.tables t ON format('%I.%I', t.table_schema, t.table_name)::text COLLATE "C" = discovered.table_name COLLATE "C"
 WHERE t.table_type = 'BASE TABLE' AND t.table_name <> 'app_settings'
-ORDER BY table_name;
+ORDER BY discovered.table_name COLLATE "C";
 SQL
 grep -qx 'public.users' "$USER_DATA_TABLE_LIST" || { echo "Target users table was not discovered." >&2; exit 1; }
 echo "==> Target user data tables: $(wc -l < "$USER_DATA_TABLE_LIST" | tr -d ' ')"
 while IFS= read -r table_name; do
-  count="$(${CURRENT_TARGET_QUERY[@]} "SELECT count(*) FROM ${table_name}")"
+  count="$(${CURRENT_TARGET_QUERY[@]} -c "SELECT count(*) FROM ${table_name}")"
   printf '%s\t%s\n' "$table_name" "$count"
 done < "$USER_DATA_TABLE_LIST" > "$USER_DATA_COUNTS"
 echo "==> Exporting target users and user-generated records"
@@ -110,13 +110,13 @@ USER_DATA_SHA256="$(shasum -a 256 "$USER_DATA_DUMP" | awk '{print $1}')"
 echo "==> Target user data export complete: $(wc -c < "$USER_DATA_DUMP" | tr -d ' ') bytes · SHA256 ${USER_DATA_SHA256}"
 preserve_target_environment_credentials() {
   local count
-  count="$("${CURRENT_TARGET_QUERY[@]}" "SELECT count(*) FROM app_settings WHERE setting_key IN (${PROTECTED_APP_SETTING_KEYS})")"
+  count="$("${CURRENT_TARGET_QUERY[@]}" -c "SELECT count(*) FROM app_settings WHERE setting_key IN (${PROTECTED_APP_SETTING_KEYS})")"
   if [[ "${count:-0}" -eq 0 ]]; then
     echo "==> No target environment credential records to preserve"
     return
   fi
   echo "==> Preserving ${count} target environment credential record(s)"
-  "${CURRENT_TARGET_QUERY[@]}" "SELECT format('INSERT INTO app_settings (setting_key, setting_value, updated_at) VALUES (%L, %L, %L) ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = EXCLUDED.updated_at;', setting_key, setting_value, updated_at) FROM app_settings WHERE setting_key IN (${PROTECTED_APP_SETTING_KEYS}) ORDER BY setting_key" | "${TEMP_TARGET_EXEC[@]}"
+  "${CURRENT_TARGET_QUERY[@]}" -c "SELECT format('INSERT INTO app_settings (setting_key, setting_value, updated_at) VALUES (%L, %L, %L) ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = EXCLUDED.updated_at;', setting_key, setting_value, updated_at) FROM app_settings WHERE setting_key IN (${PROTECTED_APP_SETTING_KEYS}) ORDER BY setting_key" | "${TEMP_TARGET_EXEC[@]}"
 }
 echo "==> Restoring ${LOCAL_SIZE} bytes into temporary ${TARGET} database"
 echo "==> Creating temporary database: ${TEMP_DB}"
@@ -124,7 +124,7 @@ echo "==> Creating temporary database: ${TEMP_DB}"
 echo "==> Temporary database created: ${TEMP_DB}"
 cleanup_temp() { "${ADMIN[@]}" -c "DROP DATABASE IF EXISTS \"${TEMP_DB}\" WITH (FORCE);" >/dev/null 2>&1 || true; }
 cancel_release() { echo "==> Release cancelled before completion; cleaning temporary ${TARGET} database"; cleanup_temp; exit 130; }
-trap cleanup_temp ERR
+trap cleanup_temp EXIT
 trap cancel_release INT TERM
 PGPASSWORD="$REMOTE_DB_PASSWORD" pg_restore -w -h "$REMOTE_DB_HOST" -p "$REMOTE_DB_PORT" -U "$REMOTE_DB_USER" -d "$TEMP_DB" --format=custom --no-owner --no-acl --exit-on-error "$DUMP_FILE"
 echo "==> Restore completed: ${TEMP_DB}"
@@ -133,7 +133,7 @@ TRUNCATE_SQL="TRUNCATE TABLE $(paste -sd, "$USER_DATA_TABLE_LIST") CASCADE;"
 "${TEMP_TARGET_EXEC[@]}" -c "$TRUNCATE_SQL"
 "${TEMP_TARGET_EXEC[@]}" < "$USER_DATA_DUMP"
 while IFS=$'\t' read -r table_name expected_count; do
-  actual_count="$(${TEMP_TARGET_EXEC[@]} "SELECT count(*) FROM ${table_name}")"
+  actual_count="$(${TEMP_TARGET_EXEC[@]} -Atqc "SELECT count(*) FROM ${table_name}")"
   [[ "$actual_count" == "$expected_count" ]] || { echo "User data validation failed for ${table_name}: expected=${expected_count} actual=${actual_count}" >&2; exit 1; }
 done < "$USER_DATA_COUNTS"
 "${TEMP_TARGET_EXEC[@]}" <<'SQL'
@@ -179,7 +179,7 @@ echo "==> Current database retained for rollback: ${BACKUP_DB}"
 "${ADMIN[@]}" -c "ALTER DATABASE \"${TEMP_DB}\" RENAME TO \"${REMOTE_DB_NAME}\";"
 echo "==> Temporary database promoted as ${REMOTE_DB_NAME}"
 DATABASE_RELEASE_TARGET="$TARGET" REMOTE_DB_HOST="$REMOTE_DB_HOST" REMOTE_DB_PORT="$REMOTE_DB_PORT" REMOTE_DB_NAME="$REMOTE_DB_NAME" REMOTE_DB_USER="$REMOTE_DB_USER" REMOTE_DB_PASSWORD="$REMOTE_DB_PASSWORD" REMOTE_MAINTENANCE_DB="$REMOTE_MAINTENANCE_DB" DATABASE_RELEASE_WORK_DIR="$WORK_DIR" "$ROOT_DIR/scripts/prune_database_release_backups.sh"
-trap - ERR INT TERM
+trap - EXIT INT TERM
 cat > "$MANIFEST_FILE" <<EOF
 target=${TARGET}
 completed_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')

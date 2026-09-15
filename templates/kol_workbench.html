@@ -225,9 +225,10 @@ body { background: var(--surface-2); color: var(--text-main); }
 .kw-watchlist-comment-empty { padding:22px 0; color:#6B7785; font-size:12px; text-align:center; }
 .kw-watch-signal-list { display:flex; flex-wrap:wrap; gap:6px; }
 .kw-watch-signal { padding:4px 7px; border-radius:4px; background:#F1F6FB; border:1px solid rgba(47,116,192,.10); color:#355C83; font-size:11px; }
-.kw-watch-insight-shell { display:grid; grid-template-columns:minmax(0,1.22fr) minmax(310px,.78fr); gap:14px; }
+.kw-watch-insight-shell { display:grid; gap:14px; }
 .kw-watch-insight-main, .kw-watch-insight-side { display:grid; gap:14px; align-content:start; }
-.kw-watch-kpi-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border:1px solid rgba(47,116,192,.13); border-radius:8px; overflow:hidden; background:#FFF; }
+.kw-watch-overview-grid { display:grid; grid-template-columns:minmax(0,1.55fr) minmax(260px,.75fr); gap:14px; align-items:stretch; }
+.kw-watch-kpi-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); border:1px solid rgba(47,116,192,.13); border-radius:8px; overflow:hidden; background:#FFF; }
 .kw-watch-kpi { padding:15px; border-right:1px solid rgba(47,116,192,.10); }
 .kw-watch-kpi:last-child { border-right:none; }
 .kw-watch-kpi-label { color:#718194; font-size:11px; }
@@ -236,9 +237,19 @@ body { background: var(--surface-2); color: var(--text-main); }
 .kw-watch-insight-panel { padding:15px; border:1px solid rgba(47,116,192,.13); border-radius:8px; background:#FFF; }
 .kw-watch-insight-panel-title { color:#163B64; font-size:13px; font-weight:700; }
 .kw-watch-insight-panel-desc { margin-top:4px; color:#6B7785; font-size:11px; line-height:1.6; }
+.kw-watch-chart-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.kw-watch-chart-panel { min-width:0; }
+.kw-watch-chart-host { width:100%; height:245px; margin-top:12px; }
+.kw-watch-activity-panel { min-width:0; }
+.kw-watch-quiz-panel { border-color:rgba(200,169,110,.30); background:linear-gradient(180deg,#FFFDF8 0%,#FFF 100%); }
+.kw-watch-quiz-charts { display:grid; grid-template-columns:minmax(240px,.8fr) minmax(0,1.2fr); gap:14px; align-items:start; }
+.kw-watch-quiz-chart-host { width:100%; height:240px; margin-top:12px; }
+.kw-watch-keywords-panel { height:100%; }
+.kw-watch-keywords-panel .kw-watch-signal-list { align-content:flex-start; }
 .kw-watch-comment-row { padding:12px 0; border-bottom:1px solid rgba(47,116,192,.09); }
 .kw-watch-comment-row:last-child { border-bottom:none; }
-@media (max-width:900px) { .kw-watch-insight-shell { grid-template-columns:1fr; } .kw-watch-kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .kw-watch-kpi:nth-child(2) { border-right:none; } .kw-watch-kpi:nth-child(n+3) { border-top:1px solid rgba(47,116,192,.10); } }
+@media (max-width:1100px) { .kw-watch-overview-grid, .kw-watch-quiz-charts { grid-template-columns:1fr; } }
+@media (max-width:900px) { .kw-watch-chart-grid { grid-template-columns:1fr; } .kw-watch-kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .kw-watch-kpi:nth-child(2n) { border-right:none; } .kw-watch-kpi:nth-child(n+3) { border-top:1px solid rgba(47,116,192,.10); } }
 @media (max-width:620px) { .kw-watch-terminal-head { align-items:flex-start; flex-direction:column; } .kw-watch-terminal-stat { text-align:left; } }
 .kw-side-title { font-size:13px; font-weight:700; color:var(--gold); margin-bottom:10px; }
 .kw-side-item {
@@ -3533,6 +3544,9 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         <div class="admin-nav-item" data-section="review" data-feature="daily_review" onclick="showWorkbenchSection('review', this)">
           <span class="admin-nav-icon">&#9998;</span> 洞见发布台
         </div>
+        <div class="admin-nav-item" data-section="daily-broadcast" data-feature="daily_review" onclick="showWorkbenchSection('daily-broadcast', this)">
+          <span class="admin-nav-icon">&#128227;</span> 午晚财经播报
+        </div>
         <div class="admin-nav-item" data-section="knowledge-overview" data-feature="knowledge" onclick="showWorkbenchSection('knowledge-overview', this)">
           <span class="admin-nav-icon">&#128214;</span> 知识总览
         </div>
@@ -3573,9 +3587,6 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <div class="admin-nav-item" data-section="watchlist-insights" data-feature="watchlist" onclick="showWorkbenchSection('watchlist-insights', this)">
             <span class="admin-nav-icon">&#128172;</span> 互动洞察
           </div>
-        </div>
-        <div class="admin-nav-item" data-section="dashboard" data-feature="core_indicators" onclick="showWorkbenchSection('dashboard', this)">
-          <span class="admin-nav-icon">&#9638;</span> 智能 Dashboard
         </div>
         <div class="kw-nav-subgroup">
           <div class="kw-nav-subtitle">指标专区</div>
@@ -3663,13 +3674,29 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           <div class="stat-card" style="cursor:pointer" onclick="openKwOpsMetricModal('comments')"><div class="stat-label">个股留言数量</div><div class="stat-value" id="kw-stat-comments-value">{{ workbench.stats.stock_comment_count }}</div><div class="stat-change up" id="kw-stat-comments-meta">覆盖 {{ workbench.stats.stock_comment_stock_count }} 只股票</div></div>
           <div class="stat-card" style="cursor:pointer" onclick="openKwOpsMetricModal('views')"><div class="stat-label">今日浏览</div><div class="stat-value" id="kw-stat-views-value">{{ workbench.stats.today_views }}</div><div class="stat-change up" id="kw-stat-views-meta">活跃粉丝 {{ workbench.stats.today_active_viewers }} 位</div></div>
         </div>
+        <div class="kw-card" id="kw-quiz-stats-card" style="margin-bottom:20px">
+          <div class="kw-card-head">
+            <div>
+              <div class="kw-card-title">今日问答盲盒统计</div>
+              <div class="kw-card-desc">统计粉丝和大V打开盲盒、参与答题及完成情况，不展示题目入口。</div>
+            </div>
+            <span class="kw-tag">近30天</span>
+          </div>
+          <div class="stats-grid" id="kw-quiz-stats-grid" style="margin:0">
+            <div class="stat-card"><div class="stat-label">盲盒打开</div><div class="stat-value" id="kw-quiz-opens">--</div><div class="stat-change">打开后即记录</div></div>
+            <div class="stat-card"><div class="stat-label">完成答题</div><div class="stat-value" id="kw-quiz-completed">--</div><div class="stat-change">已提交成绩</div></div>
+            <div class="stat-card"><div class="stat-label">完成率</div><div class="stat-value" id="kw-quiz-completion-rate">--</div><div class="stat-change">完成 / 打开</div></div>
+            <div class="stat-card"><div class="stat-label">平均分</div><div class="stat-value" id="kw-quiz-average-score">--</div><div class="stat-change">满分 100</div></div>
+          </div>
+          <div class="kw-card-desc" id="kw-quiz-stats-status" style="margin-top:10px">正在加载答题统计...</div>
+        </div>
         <div class="kw-section-grid">
           <div class="kw-section-stack">
             <div class="kw-card">
               <div class="kw-card-head">
                 <div>
                   <div class="kw-card-title">工作台定位</div>
-              <div class="kw-card-desc">这里承接 H5 里已成型的大V动作，并统一成桌面 web 工作流：洞见发布、Hermes 双版本、自选股跟踪、粉丝经营和智能 Dashboard 都在同一套后台里。</div>
+              <div class="kw-card-desc">这里承接 H5 里已成型的大V动作，并统一成桌面 web 工作流：洞见发布、Hermes 双版本、自选股跟踪、粉丝经营和研究数据分析都在同一套后台里。</div>
                 </div>
                 <span class="kw-tag">Web Workbench</span>
               </div>
@@ -3678,7 +3705,7 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
                 <span class="kw-chip">Hermes 双版本</span>
                 <span class="kw-chip">自选股/K线</span>
                 <span class="kw-chip">洞见发布</span>
-                <span class="kw-chip">智能 Dashboard</span>
+                <span class="kw-chip">研究数据分析</span>
               </div>
             </div>
             <div class="kw-card">
@@ -3751,7 +3778,9 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
             <input id="kw-commerce-product-price" class="kw-dashboard-input" type="number" min="0.01" step="0.01" placeholder="价格（元）">
             <input id="kw-commerce-product-days" class="kw-dashboard-input" type="number" min="1" value="30" placeholder="有效天数">
             <button class="btn-gold" type="button" style="padding:8px 12px;font-size:12px" onclick="createKwCommerceProduct()">新增订阅产品</button>
-            <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="createKwFanQrInvite()">生成粉丝二维码</button>
+            <input id="kw-fan-registration-qr-input" type="file" accept="image/*" style="display:none">
+            <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="document.getElementById('kw-fan-registration-qr-input').click()">上传已有二维码</button>
+            <button class="btn-gold" type="button" style="padding:8px 12px;font-size:12px" onclick="createKwFanQrInvite('free')">生成普通用户二维码</button>
           </div>
           <div id="kw-commerce-summary" class="kw-card-desc" style="margin-top:10px">正在加载商业化配置…</div>
           <div class="kw-card-desc" style="margin-top:6px">洞见访问范围按每篇笔记发布时选择“常规笔记”或“订阅专享”；这里不再用全局开关覆盖所有笔记。</div>
@@ -4564,8 +4593,8 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
           </div>
           <div class="table-wrap">
             <div class="table-header">
-              <div class="table-title">工具动作</div>
-              <span class="tag tag-gold">本月</span>
+              <div class="table-title">全部工具动作</div>
+              <span class="tag tag-gold" id="kw-hermes-action-count">本月</span>
             </div>
             <table id="kw-hermes-action-table">
               <thead><tr><th>工具</th><th>今日调用</th><th>本月调用</th><th>成功率</th><th>状态</th></tr></thead>
@@ -4637,85 +4666,6 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
 
       <div id="workbench-section-watchlist-insights" style="display:none">
         <div class="kw-watch-terminal"><div class="kw-watch-terminal-head"><div><div class="kw-watch-terminal-kicker">AUDIENCE SIGNALS</div><div class="kw-watch-terminal-title">互动洞察</div><div class="kw-watch-terminal-copy">将自选股评论转为标签、情绪与行业关注分布，帮助判断粉丝真正关注的研究问题。</div></div><div class="kw-watch-terminal-stat"><div class="kw-watch-terminal-stat-label">分析范围</div><div class="kw-watch-terminal-stat-value">评论</div></div></div><div id="kw-watchlist-comment-analytics"></div></div>
-      </div>
-
-      <div id="workbench-section-dashboard" style="display:none">
-        <div class="kw-card">
-          <div class="kw-card-head">
-            <div>
-              <div class="kw-card-title">智能 Dashboard</div>
-              <div class="kw-card-desc">旧的三段信号白盒配置已下线。现在改成通过标签和自然语言描述计算规则，由系统生成内部计算逻辑并存成大V自己的智能指标。</div>
-            </div>
-            <span class="kw-tag" id="kw-dashboard-layout-tag">{{ workbench.fund_dashboard.layout }}</span>
-          </div>
-          <div class="kw-dashboard-studio">
-            <div class="kw-dashboard-main">
-              <div class="kw-dashboard-hero">
-                <div class="kw-dashboard-hero-copy">
-                  <div class="kw-dashboard-hero-title">先选标签，再用自然语言定义你的智能指标</div>
-                  <div class="kw-dashboard-hero-desc">例如输入 `【上证50指数】*80/100`，或者 `【上证50】/ 纳斯达克指数`。系统会按这段描述自动更新内部计算逻辑，后续 H5 / Web / 门户都按这条自定义指标复用。</div>
-                </div>
-                <div class="kw-dashboard-hero-stats">
-                  <div class="kw-dashboard-hero-stat">
-                    <div class="kw-dashboard-hero-stat-label">指标来源</div>
-                    <div class="kw-dashboard-hero-stat-value">指标湖 / 智能指标</div>
-                  </div>
-                  <div class="kw-dashboard-hero-stat">
-                    <div class="kw-dashboard-hero-stat-label">生成结果</div>
-                    <div class="kw-dashboard-hero-stat-value">智能指标入库</div>
-                  </div>
-                  <div class="kw-dashboard-hero-stat">
-                    <div class="kw-dashboard-hero-stat-label">粉丝端口径</div>
-                    <div class="kw-dashboard-hero-stat-value">只展示已发布指标</div>
-                  </div>
-                </div>
-              </div>
-              <div class="kw-dashboard-workbench-card">
-                <div class="kw-dashboard-workbench-head">
-                  <div>
-                    <div class="kw-dashboard-workbench-title">智能指标生成器</div>
-                    <div class="kw-dashboard-workbench-desc">先选布局，再点击加号弹框。你可以用标签和提示词组合描述计算逻辑，系统先生成一版临时结果给你确认，确认后才正式保存成智能指标。</div>
-                  </div>
-                </div>
-                <div class="kw-dashboard-panel-note" style="margin-top:14px">标签来源于自选股和平台指标库，不再单独维护“可选底层指标”面板。</div>
-              </div>
-              <div class="kw-dashboard-workbench-card">
-                <div class="kw-dashboard-workbench-head">
-                  <div>
-                    <div class="kw-dashboard-workbench-title">Dashboard 草稿 / 已发布</div>
-                    <div id="kw-dashboard-meta" class="kw-dashboard-workbench-desc">当前展示已发布版本。</div>
-                  </div>
-                  <div class="kw-dashboard-layout-row" id="kw-smart-dashboard-layout-row"></div>
-                </div>
-                <div id="kw-dashboard-preview" style="margin-top:14px"></div>
-              </div>
-            </div>
-            <div class="kw-dashboard-side">
-              <div class="kw-dashboard-workbench-card">
-                <div class="kw-dashboard-workbench-head">
-                  <div>
-                    <div class="kw-dashboard-workbench-title">我定义的智能指标</div>
-                    <div class="kw-dashboard-workbench-desc">这里列的是当前租户已经生成并落库的智能指标。点击可查看算法详情和解读；也可加入 Dashboard 草稿或删除指标定义。</div>
-                  </div>
-                </div>
-                <div id="kw-smart-indicator-library" class="kw-dashboard-strategy-list"></div>
-              </div>
-              <div class="kw-dashboard-workbench-card">
-                <div class="kw-dashboard-workbench-head">
-                  <div>
-                    <div class="kw-dashboard-workbench-title">发布动作</div>
-                    <div class="kw-dashboard-workbench-desc">草稿确认后发布到 H5 顶部和门户固定 Dashboard 区；恢复发布版只会回滚当前草稿，不删除已定义指标。</div>
-                  </div>
-                </div>
-                <div style="display:grid;gap:10px">
-                  <button id="kw-dashboard-publish-button" class="btn-gold" style="padding:10px 14px;font-size:12px" type="button" onclick="kwPublishFundDashboard()">发布到前台</button>
-                  <button id="kw-dashboard-reset-button" class="btn-outline" style="padding:10px 14px;font-size:12px" type="button" onclick="kwResetFundDashboardDraft()">恢复发布版</button>
-                  <div id="kw-smart-dashboard-publish-note" class="kw-dashboard-panel-note">前台只展示已发布版本。</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       <div id="workbench-section-indicator-overview" style="display:none">
@@ -4934,6 +4884,41 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         </div>
       </div>
 
+      <div id="workbench-section-daily-broadcast" style="display:none">
+        <div class="kw-card">
+          <div class="kw-card-head">
+            <div>
+              <div class="kw-card-title">午间与晚间财经播报</div>
+              <div class="kw-card-desc">每天 12:30 推送午间播报，19:00 推送晚间播报。内容由 Gangtise 热点日报生成洞见，并推送给当前租户的全部粉丝。</div>
+            </div>
+            <span class="kw-tag">智能体推送</span>
+          </div>
+          <div id="kw-daily-broadcast-status" class="kw-dashboard-panel-note" style="margin-top:14px">正在加载播报配置...</div>
+          <div class="kw-dashboard-workbench-card" style="margin-top:14px">
+            <div class="kw-dashboard-workbench-head">
+              <div>
+                <div class="kw-dashboard-workbench-title">播报控制</div>
+                <div class="kw-dashboard-workbench-desc">执行会启动当前租户并推送当前时段播报；暂停只停止当前租户的自动接收，不会删除已经发布的午报或晚报。</div>
+              </div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:14px">
+              <button id="kw-daily-broadcast-run" class="btn-gold" type="button" onclick="kwRunDailyBroadcast()">执行播报</button>
+              <button id="kw-daily-broadcast-pause" class="btn-outline" type="button" onclick="kwPauseDailyBroadcast()">暂停播报</button>
+              <span class="kw-dashboard-panel-note" style="display:flex;align-items:center">凌晨至 08:00 手动执行归属前一天晚间播报。</span>
+            </div>
+          </div>
+          <div class="kw-dashboard-workbench-card" style="margin-top:14px">
+            <div class="kw-dashboard-workbench-head">
+              <div>
+                <div class="kw-dashboard-workbench-title">执行计划与记录</div>
+                <div class="kw-dashboard-workbench-desc">自动任务由平台统一调度，一次取数后按租户开关推送；这里展示平台任务最近执行情况。</div>
+              </div>
+            </div>
+            <div id="kw-daily-broadcast-runs" style="margin-top:12px">暂无执行记录。</div>
+          </div>
+        </div>
+      </div>
+
       <div id="workbench-section-published" style="display:none">
         <div class="kw-card">
           <div class="kw-card-head">
@@ -5080,6 +5065,7 @@ const workbenchSectionMeta = {
   'biz-dashboard': { title: '数据分析', summary: '基于当前租户粉丝、用户标签和付费单价生成转化漏斗、来源分布与预计收入。' },
   'forecast-model': { title: '预测模型', summary: '展示目标价是怎么计算出来的，并允许在后台调整自动收敛参数。' },
   review: { title: '洞见发布台', summary: '按周期、输入方式、智能文案规则和预览发布流程组织洞见发布。' },
+  'daily-broadcast': { title: '午晚财经播报', summary: '管理当前租户的午间与晚间智能体财经播报，查看统一任务计划和执行记录。' },
   knowledge: { title: '知识总览', summary: '统一查看当前租户的知识沉淀规模、录入入口、百科结构与百科词条。' },
   'knowledge-overview': { title: '知识总览', summary: '知识专区拆成独立页面后，这里只负责看整体结构、成熟度和后续入口。' },
   'knowledge-intake': { title: '知识治理', summary: '按语音、文件、网页和手动输入管理知识入库、修改、清洗队列与同步状态。' },
@@ -5092,7 +5078,6 @@ const workbenchSectionMeta = {
   watchlist: { title: '自选股池', summary: '查看当前租户的跟踪标的、行业定位和风险状态。' },
   'watchlist-pool': { title: '自选股池', summary: '在大V自选股和粉丝自选股之间切换查看；两类清单字段一致，并可下钻查看标的评论。' },
   'watchlist-insights': { title: '互动洞察', summary: '汇总自选股评论中的标签、情绪、行业分布和近期关注问题。' },
-  dashboard: { title: '智能 Dashboard', summary: 'Dashboard 是智能化定义模式：通过提示词、布局和指标规则生成面板，再发布到前台，不等同于门户装修。' },
   'indicator-overview': { title: '指标专区 · 总览控制台', summary: '先看总体状态、风险分布和跟踪优先级，再进入更细的指标分组。' },
   'indicator-smart': { title: '指标专区 · 智能指标', summary: '聚焦大V输入与智能分析相关的指标，辅助洞见内容判断。' },
   'indicator-lake': { title: '数据湖 · 市场一览指标', summary: '查看后台入库的标准市场指数，和 H5 市场一览保持一致。' },
@@ -5318,12 +5303,18 @@ function refreshWorkbenchNavVisibility() {
   }
 }
 
-function renderWorkbenchBarChart(hostId, items) {
+function renderWorkbenchBarChart(hostId, items, options = {}) {
   const host = document.getElementById(hostId);
   const list = Array.isArray(items) ? items : [];
   if (!host || !list.length) return;
+  const semanticColor = (label) => {
+    const value = String(label || '').toLowerCase();
+    if (/(利好|积极|乐观|看多|正面|支持|增长)/.test(value)) return '#C73E3A';
+    if (/(利空|消极|悲观|看空|负面|风险|下降)/.test(value)) return '#278A63';
+    return options.semantic ? '#C8A96E' : '#2F74C0';
+  };
   window.GangtiseEcharts.render(host, {
-    color: ['#2F74C0'],
+    color: options.semantic ? ['#C73E3A', '#278A63', '#C8A96E'] : ['#2F74C0'],
     tooltip: window.GangtiseEcharts.tooltipBase((params) => `${params.name}<br>数量：${params.value}`),
     grid: window.GangtiseEcharts.gridBase({ top: 22, left: 18, right: 18, bottom: 34 }),
     xAxis: {
@@ -5339,7 +5330,7 @@ function renderWorkbenchBarChart(hostId, items) {
       name: '数量',
       type: 'bar',
       barWidth: '46%',
-      itemStyle: { color: 'rgba(47,116,192,0.78)', borderRadius: [8, 8, 0, 0] },
+      itemStyle: { color: (params) => semanticColor(list[params.dataIndex]?.label), borderRadius: [8, 8, 0, 0] },
       label: { show: true, position: 'top', color: '#2F74C0', fontSize: 11 },
       data: list.map((item) => Number(item.value || 0)),
     }],
@@ -5444,27 +5435,93 @@ function renderWorkbenchWatchlistCommentAnalytics() {
   const labelDistribution = Array.isArray(analytics.label_distribution) ? analytics.label_distribution : [];
   const sentimentDistribution = Array.isArray(analytics.sentiment_distribution) ? analytics.sentiment_distribution : [];
   host.innerHTML = `
-    <div class="kw-watch-kpi-grid">
+    <div class="kw-watch-overview-grid">
+      <div class="kw-watch-insight-panel">
+        <div class="kw-watch-insight-panel-title">互动总览</div>
+        <div class="kw-watch-insight-panel-desc">先看讨论规模，再判断用户关注的标的和互动方式。</div>
+        <div class="kw-watch-kpi-grid" style="margin-top:12px">
       <div class="kw-watch-kpi"><div class="kw-watch-kpi-label">评论总量</div><div class="kw-watch-kpi-value">${Number(summary.total_comments || 0)}</div><div class="kw-watch-kpi-note">租户内累计</div></div>
       <div class="kw-watch-kpi"><div class="kw-watch-kpi-label">粉丝评论</div><div class="kw-watch-kpi-value">${Number(summary.investor_comments || 0)}</div><div class="kw-watch-kpi-note">普通用户表达</div></div>
       <div class="kw-watch-kpi"><div class="kw-watch-kpi-label">大V评论</div><div class="kw-watch-kpi-value">${Number(summary.dav_comments || 0)}</div><div class="kw-watch-kpi-note">投顾侧观点</div></div>
       <div class="kw-watch-kpi"><div class="kw-watch-kpi-label">涉及标的</div><div class="kw-watch-kpi-value">${Number(summary.stock_count || 0)}</div><div class="kw-watch-kpi-note">有讨论的个股</div></div>
       <div class="kw-watch-kpi"><div class="kw-watch-kpi-label">K线标注</div><div class="kw-watch-kpi-value">${Number(summary.total_annotations || 0)}</div><div class="kw-watch-kpi-note">粉丝标注 ${Number(summary.investor_annotations || 0)} 条</div></div>
-    </div>
-    <div class="kw-watch-insight-shell">
-      <div class="kw-watch-insight-main">
-        <div class="kw-watch-insight-panel"><div class="kw-watch-insight-panel-title">关注结构</div><div class="kw-watch-insight-panel-desc">标签与情绪用于比较讨论重心，不替代对具体评论的阅读。</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px"><div id="kw-watchlist-comment-label-chart" style="width:100%;height:220px"></div><div id="kw-watchlist-comment-sentiment-chart" style="width:100%;height:220px"></div></div></div>
-        <div class="kw-watch-insight-panel"><div class="kw-watch-insight-panel-title">用户活动分布</div><div class="kw-watch-insight-panel-desc">点击柱子查看该范围内的具体评论或 K 线标注。行业按评论与标注合并统计，日期按发生时间统计。</div><div class="kw-watch-activity-tabs" style="display:flex;gap:6px;margin-top:12px"><button class="btn-outline active" type="button" style="padding:7px 10px;font-size:11px" onclick="switchWorkbenchActivityTab('sector')">行业板块</button><button class="btn-outline" type="button" style="padding:7px 10px;font-size:11px" onclick="switchWorkbenchActivityTab('date')">日期趋势</button></div><div id="kw-watchlist-activity-sector" style="width:100%;height:280px;margin-top:10px"></div><div id="kw-watchlist-activity-date" style="width:100%;height:280px;margin-top:10px;display:none"></div></div>
+        </div>
       </div>
-      <div class="kw-watch-insight-side">
-        <div class="kw-watch-insight-panel"><div class="kw-watch-insight-panel-title">高频关键词</div><div class="kw-watch-insight-panel-desc">仅基于已有评论标注汇总。</div><div class="kw-watch-signal-list" style="margin-top:12px">${keywordCloud.length ? keywordCloud.map((item) => `<span class="kw-watch-signal">${escapeHtml(item.keyword || '')} ${Number(item.value || 0)}</span>`).join('') : '<span class="kw-watch-insight-panel-desc">暂无评论关键词</span>'}</div></div>
+      <div class="kw-watch-insight-panel kw-watch-keywords-panel">
+        <div class="kw-watch-insight-panel-title">高频关键词</div>
+        <div class="kw-watch-insight-panel-desc">仅基于已有评论标注汇总，用于快速发现潜在直播和研究主题。</div>
+        <div class="kw-watch-signal-list" style="margin-top:12px">${keywordCloud.length ? keywordCloud.map((item) => `<span class="kw-watch-signal">${escapeHtml(item.keyword || '')} ${Number(item.value || 0)}</span>`).join('') : '<span class="kw-watch-insight-panel-desc">暂无评论关键词</span>'}</div>
+      </div>
+    </div>
+    <div class="kw-watch-chart-grid">
+      <div class="kw-watch-insight-panel kw-watch-chart-panel"><div class="kw-watch-insight-panel-title">讨论标签</div><div class="kw-watch-insight-panel-desc">用户讨论集中在哪些研究主题。</div><div id="kw-watchlist-comment-label-chart" class="kw-watch-chart-host"></div></div>
+      <div class="kw-watch-insight-panel kw-watch-chart-panel"><div class="kw-watch-insight-panel-title">讨论情绪</div><div class="kw-watch-insight-panel-desc">用于观察讨论氛围，不等同于交易信号。</div><div id="kw-watchlist-comment-sentiment-chart" class="kw-watch-chart-host"></div></div>
+      <div class="kw-watch-insight-panel kw-watch-activity-panel" style="grid-column:1 / -1"><div class="kw-watch-insight-panel-title">用户活动分布</div><div class="kw-watch-insight-panel-desc">点击柱子查看具体评论或 K 线标注；行业按评论与标注合并统计。</div><div class="kw-watch-activity-tabs" style="display:flex;gap:6px;margin-top:12px"><button class="btn-outline active" type="button" style="padding:7px 10px;font-size:11px" onclick="switchWorkbenchActivityTab('sector')">行业板块</button><button class="btn-outline" type="button" style="padding:7px 10px;font-size:11px" onclick="switchWorkbenchActivityTab('date')">日期趋势</button></div><div id="kw-watchlist-activity-sector" class="kw-watch-chart-host" style="height:280px"></div><div id="kw-watchlist-activity-date" class="kw-watch-chart-host" style="height:280px;display:none"></div></div>
+    </div>
+    <div class="kw-watch-insight-panel kw-watch-quiz-panel">
+      <div class="kw-watch-insight-panel-title">答题盲盒互动</div>
+      <div class="kw-watch-insight-panel-desc">查看用户参与度和题型得失分，为后续直播课选题提供依据。</div>
+      <div id="kw-watch-quiz-stats" class="kw-watch-kpi-grid" style="margin-top:12px"><div class="kw-watch-insight-panel-desc">正在加载答题统计...</div></div>
+      <div class="kw-watch-quiz-charts">
+        <div><div class="kw-watch-insight-panel-title" style="margin-top:16px">参与漏斗</div><div id="kw-watch-quiz-chart" class="kw-watch-quiz-chart-host"></div></div>
+        <div><div class="kw-watch-insight-panel-title" style="margin-top:16px">题型得分与失分</div><div id="kw-watch-quiz-category-chart" class="kw-watch-quiz-chart-host"></div></div>
       </div>
     </div>
   `;
   renderWorkbenchBarChart('kw-watchlist-comment-label-chart', labelDistribution.map((item) => ({ label: item.label, value: item.value })));
-  renderWorkbenchBarChart('kw-watchlist-comment-sentiment-chart', sentimentDistribution.map((item) => ({ label: item.label, value: item.value })));
+  renderWorkbenchBarChart('kw-watchlist-comment-sentiment-chart', sentimentDistribution.map((item) => ({ label: item.label, value: item.value })), { semantic: true });
   renderWorkbenchActivityBarChart('kw-watchlist-activity-sector', analytics.sector_activity_distribution || [], (label) => openWorkbenchActivityBucketModal('sector', label));
   renderWorkbenchActivityBarChart('kw-watchlist-activity-date', analytics.date_activity_distribution || [], (label) => openWorkbenchActivityBucketModal('date', label));
+  loadKwInteractionQuizStats();
+}
+
+async function loadKwInteractionQuizStats() {
+  const host = document.getElementById('kw-watch-quiz-stats');
+  const tenantSlug = String(((window.ACTIVE_TENANT || {}).slug) || '').trim();
+  if (!host || !tenantSlug) return;
+  try {
+    const response = await fetch(`/api/kol/quiz/stats?tenant=${encodeURIComponent(tenantSlug)}`, { credentials: 'same-origin' });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'quiz_stats_failed');
+    const stats = payload.stats || {};
+    host.innerHTML = `
+      <div class="kw-watch-kpi"><div class="kw-watch-kpi-label">盲盒打开</div><div class="kw-watch-kpi-value">${Number(stats.opens || 0)}</div><div class="kw-watch-kpi-note">包含重复打开</div></div>
+      <div class="kw-watch-kpi"><div class="kw-watch-kpi-label">完成答题</div><div class="kw-watch-kpi-value">${Number(stats.completed || 0)}</div><div class="kw-watch-kpi-note">已提交成绩</div></div>
+      <div class="kw-watch-kpi"><div class="kw-watch-kpi-label">完成率</div><div class="kw-watch-kpi-value">${Number(stats.completion_rate || 0).toFixed(1)}%</div><div class="kw-watch-kpi-note">完成 / 打开</div></div>
+      <div class="kw-watch-kpi"><div class="kw-watch-kpi-label">平均分</div><div class="kw-watch-kpi-value">${stats.average_score == null ? '--' : Number(stats.average_score).toFixed(1)}</div><div class="kw-watch-kpi-note">满分 100</div></div>
+    `;
+    const chart = document.getElementById('kw-watch-quiz-chart');
+    if (chart && window.GangtiseEcharts) {
+      const opens = Number(stats.opens || 0);
+      const completed = Number(stats.completed || 0);
+      window.GangtiseEcharts.render(chart, {
+        color: ['#2F74C0'],
+        tooltip: window.GangtiseEcharts.tooltipBase((params) => `${params[0].name}：${params[0].value}`),
+        grid: window.GangtiseEcharts.gridBase({ top: 18, left: 18, right: 18, bottom: 28 }),
+        xAxis: { type: 'category', data: ['打开盲盒', '完成答题', '未完成'], ...window.GangtiseEcharts.axisBase({ axisLabel: { color: '#445468', fontSize: 11 } }) },
+        yAxis: { type: 'value', minInterval: 1, ...window.GangtiseEcharts.axisBase({ axisLabel: { color: '#445468', fontSize: 10 } }) },
+        series: [{ name: '答题互动', type: 'bar', barWidth: '34%', itemStyle: { color: '#2F74C0', borderRadius: [7, 7, 0, 0] }, label: { show: true, position: 'top', color: '#2F74C0', fontSize: 11 }, data: [opens, completed, Math.max(opens - completed, 0)] }],
+      });
+    }
+    const categoryChart = document.getElementById('kw-watch-quiz-category-chart');
+    const categoryRows = Array.isArray(stats.category_breakdown) ? stats.category_breakdown : [];
+    if (categoryChart && window.GangtiseEcharts && categoryRows.length) {
+      window.GangtiseEcharts.render(categoryChart, {
+        color: ['#2F74C0', '#D95D4F'],
+        tooltip: window.GangtiseEcharts.tooltipBase((params) => `${params[0].name}<br>${params.map((item) => `${item.seriesName}：${item.value}`).join('<br>')}`),
+        legend: { top: 0, right: 8, textStyle: { color: '#64748B', fontSize: 11 } },
+        grid: window.GangtiseEcharts.gridBase({ top: 30, left: 108, right: 20, bottom: 22 }),
+        xAxis: { type: 'value', minInterval: 1, ...window.GangtiseEcharts.axisBase({ axisLabel: { color: '#445468', fontSize: 10 } }) },
+        yAxis: { type: 'category', data: categoryRows.map((item) => item.category).reverse(), ...window.GangtiseEcharts.axisBase({ axisLabel: { color: '#445468', fontSize: 10 } }) },
+        series: [
+          { name: '答对', type: 'bar', stack: 'total', barMaxWidth: 22, itemStyle: { color: '#2F74C0' }, data: categoryRows.map((item) => Number(item.correct || 0)).reverse() },
+          { name: '失分', type: 'bar', stack: 'total', barMaxWidth: 22, itemStyle: { color: '#D95D4F' }, data: categoryRows.map((item) => Number(item.wrong || 0)).reverse() },
+        ],
+      });
+    }
+  } catch (error) {
+    host.innerHTML = '<div class="kw-watch-insight-panel-desc">答题统计暂时不可用，请稍后刷新。</div>';
+  }
 }
 
 function switchWorkbenchActivityTab(tab) {
@@ -6661,7 +6718,7 @@ function kwPortalRenderDashboardBlock(block) {
     </div>
     <div class="kw-portal-dashboard-shell">
       <div class="kw-portal-dashboard-panel">
-        <strong>智能 Dashboard 面板</strong>
+        <strong>核心研究数据面板</strong>
         <div class="kw-portal-dashboard-copy">${escapeHtml(fundDashboard.summary || '')}</div>
         <div class="kw-portal-dashboard-grid">
           ${cells.map((cell) => `
@@ -12262,7 +12319,112 @@ function initWorkbenchForecastEditorEvents() {
   });
 }
 
+let kwDailyBroadcastLoading = false;
+let kwDailyBroadcastRunning = false;
+
+function kwDailyBroadcastTenantSlug() {
+  return String(((window.ACTIVE_TENANT || {}).slug) || '').trim().toLowerCase();
+}
+
+function kwRenderDailyBroadcastPanel(payload) {
+  const settings = payload && payload.settings ? payload.settings : { enabled: true };
+  const task = payload && payload.task ? payload.task : {};
+  const runs = Array.isArray(payload && payload.runs) ? payload.runs : [];
+  const runButton = document.getElementById('kw-daily-broadcast-run');
+  const pauseButton = document.getElementById('kw-daily-broadcast-pause');
+  const status = document.getElementById('kw-daily-broadcast-status');
+  const runsHost = document.getElementById('kw-daily-broadcast-runs');
+  if (runButton) runButton.disabled = false;
+  if (pauseButton) {
+    pauseButton.disabled = settings.enabled === false;
+    pauseButton.textContent = settings.enabled === false ? '已暂停' : '暂停播报';
+  }
+  if (status) {
+    const schedule = String(task.schedule_value || '12:30,19:00').replace(',', ' / ');
+    const platformStatus = task.enabled ? '<strong style="color:#18794E">平台任务已启用</strong>' : '<strong style="color:#B42318">平台任务已暂停</strong>';
+    status.innerHTML = `${settings.enabled !== false ? '<strong style="color:#18794E">当前租户已启动</strong>' : '<strong style="color:#B42318">当前租户已暂停</strong>'} · ${platformStatus} · 自动计划：北京时间 ${escapeHtml(schedule)} · 最近配置更新：${escapeHtml(settings.updated_at || '--')}`;
+  }
+  if (runsHost) {
+    runsHost.innerHTML = runs.length ? runs.slice(0, 5).map((run) => {
+      const state = String(run.run_status || '').toLowerCase();
+      const color = state === 'success' ? '#18794E' : (state === 'failed' ? '#B42318' : '#8A6D1D');
+      const detail = state === 'failed' && run.error_message ? ` · ${run.error_message}` : '';
+      return `<div style="display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid rgba(47,116,192,0.10);font-size:12px"><span>${escapeHtml(run.started_at || '--')} · ${escapeHtml(run.trigger_mode || 'scheduler')}</span><strong style="color:${color};text-align:right">${escapeHtml(run.summary || run.run_status || '--')}${escapeHtml(detail)}</strong></div>`;
+    }).join('') : '<div class="kw-dashboard-panel-note">暂无平台执行记录。</div>';
+  }
+}
+
+async function kwLoadDailyBroadcastPanel() {
+  const tenantSlug = kwDailyBroadcastTenantSlug();
+  if (!tenantSlug || kwDailyBroadcastLoading) return;
+  kwDailyBroadcastLoading = true;
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/daily-finance-broadcast`, { credentials: 'same-origin', cache: 'no-store' });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'daily_finance_broadcast_settings_failed');
+    kwRenderDailyBroadcastPanel(payload);
+  } catch (error) {
+    const status = document.getElementById('kw-daily-broadcast-status');
+    if (status) status.textContent = error.message || '播报配置加载失败';
+  } finally {
+    kwDailyBroadcastLoading = false;
+  }
+}
+
+async function kwPauseDailyBroadcast() {
+  const tenantSlug = kwDailyBroadcastTenantSlug();
+  const button = document.getElementById('kw-daily-broadcast-pause');
+  if (!tenantSlug || kwDailyBroadcastRunning) return;
+  if (button) { button.disabled = true; button.textContent = '正在暂停...'; }
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/daily-finance-broadcast`, {
+      method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: false }),
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'daily_finance_broadcast_settings_failed');
+    kwRenderDailyBroadcastPanel(payload);
+    showToast('当前租户午晚播报已暂停');
+  } catch (error) {
+    if (button) { button.disabled = false; button.textContent = '暂停播报'; }
+    showToast(error.message || '播报暂停失败');
+  }
+}
+
+async function kwRunDailyBroadcast() {
+  const tenantSlug = kwDailyBroadcastTenantSlug();
+  const button = document.getElementById('kw-daily-broadcast-run');
+  if (!tenantSlug || kwDailyBroadcastRunning) return;
+  kwDailyBroadcastRunning = true;
+  if (button) { button.disabled = true; button.textContent = '正在获取并推送播报...'; }
+  try {
+    // “执行”也是恢复入口，确保暂停后仍有明确的操作可以重新启用播报。
+    const enableResponse = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/daily-finance-broadcast`, {
+      method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: true }),
+    });
+    const enablePayload = await enableResponse.json();
+    if (!enableResponse.ok || !enablePayload.ok) throw new Error(enablePayload.error || 'daily_finance_broadcast_settings_failed');
+    const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/daily-finance-broadcast/run`, { method: 'POST', credentials: 'same-origin' });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'daily_finance_broadcast_failed');
+    const result = payload.result || {};
+    showToast(`${result.report_label || '财经播报'}完成，已向当前租户发布 ${Number(result.published_count || 0)} 篇`);
+    kwLoadDailyBroadcastPanel();
+  } catch (error) {
+    showToast(error.message || '播报执行失败');
+  } finally {
+    kwDailyBroadcastRunning = false;
+    if (button) { button.disabled = false; button.textContent = '执行播报'; }
+    kwLoadDailyBroadcastPanel();
+  }
+}
+
 function showWorkbenchSection(name, navEl) {
+  if (name === 'dashboard') {
+    name = 'overview';
+    navEl = document.querySelector('.admin-nav-item[data-section="overview"]');
+  }
   if (name === 'indicator-hub') {
     name = 'indicator-overview';
   }
@@ -12320,9 +12482,6 @@ function showWorkbenchSection(name, navEl) {
     renderKwBizDashboard();
     refreshKwBusinessAnalytics();
   }
-  if (name === 'dashboard') {
-    kwRenderDashboardPreview();
-  }
   if (name === 'watchlist-pool' || name === 'published' || name === 'review') {
     renderWorkbenchAnnotationViews();
   }
@@ -12332,6 +12491,9 @@ function showWorkbenchSection(name, navEl) {
   if (name === 'review') {
     kwRenderReviewStudio();
     kwLoadActiveReviewJobs();
+  }
+  if (name === 'daily-broadcast') {
+    kwLoadDailyBroadcastPanel();
   }
   if (name === 'knowledge-overview') {
     loadWorkbenchKnowledgeAssets(false).then(() => {
@@ -12669,16 +12831,17 @@ function renderKwFans() {
       <td>${escapeHtml(fan.source || '用户导入')}</td>
       <td>${escapeHtml(String(fan.created_at || '--').slice(0, 10))}</td>
       <td>${escapeHtml(fan.paid_sample_note || fan.phone_masked || '--')}</td>
-      <td><span class="tag tag-gold">${escapeHtml(fan.status === 'disabled' ? '已禁用' : '活跃')}</span></td>
+      <td><span class="tag ${fan.status === 'pending_approval' ? 'tag-blue' : 'tag-gold'}">${escapeHtml(fan.status === 'disabled' ? '已禁用' : (fan.status === 'pending_approval' ? '待审批' : '活跃'))}</span></td>
       <td><div style="display:flex;gap:5px;flex-wrap:wrap">${labels.length ? labels.map((label) => `<span class="tag ${label === '付费用户' ? 'tag-gold' : 'tag-blue'}">${escapeHtml(label)}</span>`).join('') : '<span style="color:#8899aa">--</span>'}</div></td>
-      <td><button class="btn-outline" type="button" style="padding:4px 9px;font-size:11px;color:${fan.status === 'disabled' ? '#9DE0BE' : '#F2B8B5'};border-color:${fan.status === 'disabled' ? 'rgba(22,112,74,0.28)' : 'rgba(180,35,24,0.28)'}" onclick="requestKwFanStatusChange(${userId})">${fan.status === 'disabled' ? '启用' : '停用'}</button></td>
+      <td><button class="btn-outline" type="button" style="padding:4px 9px;font-size:11px;color:${fan.status === 'disabled' ? '#9DE0BE' : '#F2B8B5'};border-color:${fan.status === 'disabled' ? 'rgba(22,112,74,0.28)' : 'rgba(180,35,24,0.28)'}" onclick="requestKwFanStatusChange(${userId})">${fan.status === 'disabled' ? '启用' : (fan.status === 'pending_approval' ? '审批通过' : '停用')}</button></td>
     </tr>
   `;
   }).join('') : '<tr><td colspan="9" style="text-align:center;color:#8899aa;padding:20px 0">暂无粉丝用户</td></tr>';
   const selectedCount = kwSelectedFanIds.size;
   if (meta) {
-    const activeCount = kwFans.filter((fan) => fan.status !== 'disabled').length;
-    meta.innerHTML = `<span>共 ${kwFans.length} 位粉丝 · 正常 ${activeCount} · 已停用 ${kwFans.length - activeCount}</span><span>已选 ${selectedCount} 位 · 停用后该粉丝无法登录当前租户</span>`;
+    const activeCount = kwFans.filter((fan) => fan.status === 'active').length;
+    const pendingCount = kwFans.filter((fan) => fan.status === 'pending_approval').length;
+    meta.innerHTML = `<span>共 ${kwFans.length} 位粉丝 · 正常 ${activeCount} · 待审批 ${pendingCount} · 已停用 ${kwFans.length - activeCount - pendingCount}</span><span>待审批账号通过后才能登录当前租户</span>`;
   }
   const selectAll = document.getElementById('kw-fans-select-all');
   if (selectAll) selectAll.checked = kwFans.length > 0 && kwFans.every((fan) => kwSelectedFanIds.has(Number(fan.id || 0)));
@@ -12696,8 +12859,8 @@ function requestKwFanStatusChange(userId) {
   const modal = document.getElementById('kw-fan-status-modal');
   const host = document.getElementById('kw-fan-status-modal-content');
   if (!fan || !modal || !host) return;
-  const nextStatus = fan.status === 'disabled' ? 'active' : 'disabled';
-  const action = nextStatus === 'disabled' ? '停用' : '启用';
+  const nextStatus = fan.status === 'disabled' || fan.status === 'pending_approval' ? 'active' : 'disabled';
+  const action = fan.status === 'pending_approval' ? '审批通过' : (nextStatus === 'disabled' ? '停用' : '启用');
   host.innerHTML = `
     <div class="kw-review-modal-head">
       <div>
@@ -12707,7 +12870,7 @@ function requestKwFanStatusChange(userId) {
     </div>
     <div class="kw-card" style="margin-top:12px">
       <div class="kw-card-title">确认${action}“${escapeHtml(fan.username || '该粉丝')}”吗？</div>
-      <div class="kw-card-desc" style="margin-top:8px">${nextStatus === 'disabled' ? '停用后该粉丝将无法登录 H5、使用 Hermes 或访问当前租户服务，但其自选股、评论、标注和历史数据都会保留。' : '启用后该粉丝可以重新登录当前租户，原有自选股、评论、标注和历史数据会恢复可用。'}</div>
+      <div class="kw-card-desc" style="margin-top:8px">${fan.status === 'pending_approval' ? '审批通过后，该粉丝才能登录 H5、使用 Hermes 和访问当前租户服务。' : (nextStatus === 'disabled' ? '停用后该粉丝将无法登录 H5、使用 Hermes 或访问当前租户服务，但其自选股、评论、标注和历史数据都会保留。' : '启用后该粉丝可以重新登录当前租户，原有自选股、评论、标注和历史数据会恢复可用。')}</div>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
         <button class="btn-outline" type="button" style="padding:8px 12px;font-size:12px" onclick="closeKwFanStatusModal()">取消</button>
         <button class="btn-gold" type="button" style="padding:8px 12px;font-size:12px" onclick="confirmKwFanStatusChange(${Number(fan.id || 0)}, '${nextStatus}')">确认${action}</button>
@@ -13013,12 +13176,18 @@ async function createKwCommerceProduct() {
   } catch (error) { showToast(error.message || '创建订阅产品失败'); }
 }
 
-async function createKwFanQrInvite() {
+async function createKwFanQrInvite(registrationType = 'free') {
   try {
-    const response = await fetch(`/api/kol/commerce/qr-invites?tenant=${encodeURIComponent(kwCommerceTenantSlug())}`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source_label:'大V二维码', expiry_days:0})});
+    const selected = document.getElementById('kw-fan-registration-qr-input')?.files?.[0];
+    const body = new FormData();
+    body.append('source_label', registrationType === 'subscriber' ? '订阅用户二维码' : '普通用户二维码');
+    body.append('expiry_days', '0');
+    body.append('registration_type', registrationType);
+    if (selected) body.append('file', selected);
+    const response = await fetch(`/api/kol/commerce/qr-invites?tenant=${encodeURIComponent(kwCommerceTenantSlug())}`, {method:'POST', body});
     const data = await response.json(); if (!response.ok || !data.ok) throw new Error(data.error || 'qr_create_failed');
     const invite = data.invite || {};
-    document.getElementById('kw-commerce-qr-result').innerHTML = `<div class="kw-side-card"><strong>二维码已生成</strong><div class="kw-card-desc" style="margin-top:6px">${escapeHtml(invite.join_url || '')}</div><img src="${escapeAttr(invite.qr_data_uri || '')}" alt="粉丝扫码导入" style="width:180px;height:180px;background:#fff;padding:8px;margin-top:10px"><div class="kw-card-desc">扫码后登录或注册，系统会自动归属当前租户。</div></div>`;
+    document.getElementById('kw-commerce-qr-result').innerHTML = `<div class="kw-side-card"><strong>${registrationType === 'subscriber' ? '订阅用户二维码已保存' : '普通用户二维码已保存'}</strong><div class="kw-card-desc" style="margin-top:6px">注册地址：${escapeHtml(invite.registration_url || '')}</div><button class="btn-outline" type="button" style="margin-top:8px;padding:6px 10px;font-size:11px" onclick="navigator.clipboard?.writeText(${JSON.stringify(invite.registration_url || '')})">复制注册地址</button><img src="${escapeAttr(invite.qr_data_uri || '')}" alt="粉丝扫码注册" style="display:block;width:180px;height:180px;object-fit:contain;background:#fff;padding:8px;margin-top:10px"><div class="kw-card-desc">扫码后提交注册申请，审批通过后才能登录。</div></div>`;
     loadKwCommerce();
   } catch (error) { showToast(error.message || '生成二维码失败'); }
 }
@@ -14213,6 +14382,7 @@ function renderWorkbenchHermesUsageOverview() {
   const summaryHost = document.getElementById('kw-hermes-usage-summary');
   const modeBody = document.getElementById('kw-hermes-mode-tbody');
   const actionBody = document.getElementById('kw-hermes-action-tbody');
+  const actionCount = document.getElementById('kw-hermes-action-count');
   if (summaryHost) {
     const cards = [
       ['今日调用', Number(summary.today_calls || 0), todayTokenNote],
@@ -14232,8 +14402,9 @@ function renderWorkbenchHermesUsageOverview() {
   }
   if (actionBody) {
     const rows = Array.isArray(stats.tool_actions) ? stats.tool_actions : [];
+    if (actionCount) actionCount.textContent = `${rows.length} 项能力`;
     actionBody.innerHTML = rows.length ? rows.map((row) => `
-      <tr><td style="color:var(--text-main);font-weight:500">${escapeHtml(row.tool_name || '')}</td><td>${escapeHtml(String(row.today_calls || 0))}</td><td>${escapeHtml(String(row.month_calls || 0))}</td><td>${escapeHtml(`${Number(row.success_ratio || 0).toFixed(1)}%`)}</td><td><span class="tag ${escapeAttr(row.status_class || 'tag-green')}">${escapeHtml(row.status_label || '正常')}</span></td></tr>
+      <tr><td style="color:var(--text-main);font-weight:500">${escapeHtml(row.tool_label || row.tool_name || '')}<div style="font-size:10px;color:var(--gray-400);font-weight:400;margin-top:3px">${escapeHtml(row.tool_name || '')}</div></td><td>${escapeHtml(String(row.today_calls || 0))}</td><td>${escapeHtml(String(row.month_calls || 0))}</td><td>${escapeHtml(`${Number(row.success_ratio || 0).toFixed(1)}%`)}</td><td><span class="tag ${escapeAttr(row.status_class || 'tag-green')}">${escapeHtml(row.status_label || '正常')}</span></td></tr>
     `).join('') : '<tr><td colspan="5" style="color:#9A9590">当前没有可展示的真实工具动作。</td></tr>';
   }
 }
@@ -14642,7 +14813,6 @@ document.addEventListener('DOMContentLoaded', () => {
   refreshWorkbenchNavVisibility();
   refreshWorkbenchSiteConfig({silent: true});
   if (document.getElementById('workbench-section-portal')) kwRenderPortalWorkspace();
-  kwRenderDashboardPreview();
   kwRenderReviewStudio();
   kwRenderPublishedReviewList();
   kwRenderKnowledgeList();
@@ -14675,7 +14845,7 @@ document.addEventListener('DOMContentLoaded', () => {
     showWorkbenchSection('overview');
     return;
   }
-  if ((section === 'review' || section === 'published') && !isWorkbenchFeatureEnabled('daily_review')) {
+  if ((section === 'review' || section === 'daily-broadcast' || section === 'published') && !isWorkbenchFeatureEnabled('daily_review')) {
     showWorkbenchSection('overview');
     return;
   }
@@ -14688,10 +14858,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
   if (['watchlist', 'watchlist-pool', 'watchlist-insights'].includes(section) && !isWorkbenchFeatureEnabled('watchlist')) {
-    showWorkbenchSection('overview');
-    return;
-  }
-  if (section === 'dashboard' && !isWorkbenchFeatureEnabled('core_indicators')) {
     showWorkbenchSection('overview');
     return;
   }
@@ -14713,7 +14879,28 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   initWorkbenchForecastEditorEvents();
   renderWorkbenchAnnotationViews();
+  loadKwQuizStats();
 });
+
+async function loadKwQuizStats() {
+  const tenantSlug = String(((window.ACTIVE_TENANT || {}).slug) || '').trim();
+  const status = document.getElementById('kw-quiz-stats-status');
+  if (!tenantSlug || !status) return;
+  try {
+    const response = await fetch(`/api/kol/quiz/stats?tenant=${encodeURIComponent(tenantSlug)}`, { credentials: 'same-origin' });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'quiz_stats_failed');
+    const stats = payload.stats || {};
+    const setText = (id, value) => { const node = document.getElementById(id); if (node) node.textContent = value; };
+    setText('kw-quiz-opens', String(stats.opens || 0));
+    setText('kw-quiz-completed', String(stats.completed || 0));
+    setText('kw-quiz-completion-rate', `${Number(stats.completion_rate || 0).toFixed(1)}%`);
+    setText('kw-quiz-average-score', stats.average_score == null ? '--' : Number(stats.average_score).toFixed(1));
+    status.textContent = '数据来自当前租户的数据库答题记录。';
+  } catch (error) {
+    status.textContent = '答题统计暂时不可用，请稍后刷新。';
+  }
+}
 
 window.addEventListener('focus', () => {
   refreshWorkbenchSiteConfig({silent: true});

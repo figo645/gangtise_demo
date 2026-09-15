@@ -26,6 +26,80 @@ class NewsAggregationAlgorithmTest(unittest.TestCase):
         self.assertEqual(mixed["impact"], "mixed")
         self.assertEqual(mixed["impact_label"], "影响分化")
 
+    def test_news_event_rules_cover_policy_industry_and_negation(self):
+        aerospace = market_services.annotate_news_impact({
+            "title": "中共中央 国务院 中央军委关于给张陆颁发航天功勋奖章的决定",
+            "source_group": "政策要闻",
+        })
+        auto_policy = market_services.annotate_news_impact({
+            "title": "我国提出到2030年进入世界汽车强国行列",
+            "source_group": "政策要闻",
+        })
+        negated = market_services.annotate_news_impact({
+            "title": "公司尚未获批扩产项目，市场等待进一步消息",
+        })
+        self.assertEqual(aerospace["impact"], "positive")
+        self.assertEqual(aerospace["impact_label"], "间接利好")
+        self.assertEqual(aerospace["industry"], "航天军工")
+        self.assertEqual(aerospace["impact_scope"], "industry")
+        self.assertEqual(aerospace["impact_directness"], "indirect")
+        self.assertEqual(aerospace["impact_strength"], "weak")
+        self.assertEqual(auto_policy["impact"], "positive")
+        self.assertEqual(auto_policy["impact_label"], "行业利好")
+        self.assertEqual(auto_policy["industry"], "汽车")
+        self.assertEqual(auto_policy["impact_strength"], "strong")
+        self.assertEqual(negated["impact"], "neutral")
+        self.assertEqual(negated["impact_evidence"], [])
+        self.assertEqual(negated["impact_method"], "event_rules_v2")
+
+    def test_title_classifier_contract_is_compact_and_rejects_fabricated_rows(self):
+        items = [{"event_id": "n1", "title": "我国提出进入世界汽车强国行列"}]
+        prompt = market_services.build_news_title_classifier_prompt(items)
+        self.assertIn('"news_id":"n1"', prompt)
+        self.assertNotIn("url", prompt)
+        result = market_services._parse_news_title_classifier_result(
+            '[{"news_id":"n1","impact":"positive","industry_code":"automotive"},'
+            '{"news_id":"fake","impact":"negative","industry_code":"banking"},'
+            '{"news_id":"n1","impact":"bad","industry_code":"automotive"}]',
+            {"n1"},
+        )
+        self.assertEqual(result, {"n1": {"impact": "positive", "industry": "汽车", "industry_code": "automotive"}})
+
+    def test_title_classifier_merge_preserves_rules_when_model_has_no_result(self):
+        items = [{"event_id": "n1", "title": "医药公司被行政处罚"}, {"event_id": "n2", "title": "普通新闻"}]
+        merged = market_services.apply_news_title_classifications(items, {
+            "classified": {"n1": {"impact": "negative", "industry": "医药生物", "industry_code": "pharma_biotech"}},
+        })
+        self.assertEqual(merged[0]["impact_method"], "v4_title_classification_v1")
+        self.assertEqual(merged[0]["industry"], "医药生物")
+        self.assertEqual(merged[1]["impact_method"], "event_rules_v2")
+
+    def test_news_event_mapping_covers_major_financial_events(self):
+        cases = [
+            ({"title": "人工智能发展规划发布，算力支持力度加大"}, "positive", "计算机"),
+            ({"title": "创新药获得纳入医保资格"}, "positive", "医药生物"),
+            ({"title": "上市公司财务造假并被监管立案"}, "negative", "综合/未分类"),
+            ({"title": "汽车销量下降，需求疲软"}, "negative", "汽车"),
+            ({"title": "铜产品涨价且库存下降"}, "positive", "有色金属"),
+        ]
+        for item, expected_impact, expected_industry in cases:
+            with self.subTest(title=item["title"]):
+                annotated = market_services.annotate_news_impact(item)
+                self.assertEqual(annotated["impact"], expected_impact)
+                self.assertEqual(annotated["industry"], expected_industry)
+                self.assertTrue(annotated["impact_event_types"])
+
+    def test_industry_catalog_covers_all_primary_industries(self):
+        expected = {
+            "农林牧渔", "基础化工", "钢铁", "有色金属", "电子", "家用电器", "食品饮料",
+            "纺织服饰", "轻工制造", "医药生物", "公用事业", "交通运输", "房地产", "商贸零售",
+            "社会服务", "综合", "建筑材料", "建筑装饰", "电力设备", "国防军工", "计算机",
+            "通信", "银行", "非银金融", "汽车", "机械设备", "煤炭", "石油石化", "环保",
+            "美容护理", "传媒",
+        }
+        self.assertEqual(set(market_services.NEWS_INDUSTRY_COVERAGE), expected)
+        self.assertEqual(len(market_services.NEWS_INDUSTRY_COVERAGE), 31)
+
     def test_news_impact_analysis_only_uses_today_and_returns_percentages(self):
         items = [
             {"title": "半导体扩产获批", "published_at": "2026-09-15 09:00:00"},
@@ -42,6 +116,35 @@ class NewsAggregationAlgorithmTest(unittest.TestCase):
         self.assertEqual(industry["positive_pct"], 50.0)
         self.assertEqual(industry["negative_pct"], 50.0)
         self.assertEqual(sum(industry[f"{key}_pct"] for key in ("positive", "negative", "neutral", "mixed")), 100.0)
+
+    def test_news_impact_analysis_reports_annotation_coverage_for_each_source(self):
+        items = [
+            {"title": "汽车强国规划发布", "source_code": "gov_cn_policy", "source_name": "中国政府网", "published_at": "2026-09-15 09:00:00"},
+            {"title": "公司被行政处罚", "source_code": "cninfo_announcements", "source_name": "巨潮资讯", "published_at": "2026-09-15 10:00:00"},
+            {"title": "政策新闻待确认", "source_code": "stats_macro", "source_name": "国家统计局", "published_at": "2026-09-15 11:00:00"},
+        ]
+        analysis = market_services.build_news_impact_analysis(items, now=datetime(2026, 9, 15, 12, 0, 0))
+        coverage = analysis["annotation"]
+        self.assertEqual(coverage["input_count"], 3)
+        self.assertEqual(coverage["annotated_count"], 3)
+        self.assertTrue(coverage["annotation_complete"])
+        self.assertEqual(coverage["source_count"], 3)
+        self.assertEqual({row["source_code"] for row in coverage["sources"]}, {
+            "gov_cn_policy", "cninfo_announcements", "stats_macro",
+        })
+
+    def test_news_impact_analysis_provides_today_three_day_and_ten_day_windows(self):
+        items = [
+            {"title": "今日汽车强国政策", "published_at": "2026-09-15 09:00:00"},
+            {"title": "昨日汽车销量下降", "published_at": "2026-09-14 09:00:00"},
+            {"title": "前日汽车公司中标", "published_at": "2026-09-12 09:00:00"},
+            {"title": "上周汽车公司被行政处罚", "published_at": "2026-09-05 09:00:00"},
+        ]
+        analysis = market_services.build_news_impact_analysis(items, now=datetime(2026, 9, 15, 12, 0, 0))
+        self.assertEqual(analysis["windows"]["today"]["total"], 1)
+        self.assertEqual(analysis["windows"]["recent_3d"]["total"], 3)
+        self.assertEqual(analysis["windows"]["recent_10d"]["total"], 4)
+        self.assertEqual(analysis["total"], analysis["windows"]["today"]["total"])
 
     def test_normalize_tenant_config_preserves_news_algorithm(self):
         payload = {
@@ -91,7 +194,7 @@ function rankNews(input) {
         self.assertEqual(ranked[0]["aggregation_algorithm_version"], "v3")
         self.assertEqual(ranked[1]["aggregation_bucket"], "major_market")
 
-    def test_build_fundamental_news_payload_limits_to_ten_and_groups_tabs(self):
+    def test_build_fundamental_news_payload_uses_recent_three_day_source_tabs(self):
         items = []
         for index in range(12):
             items.append({
@@ -106,24 +209,23 @@ function rankNews(input) {
             })
         with patch.object(market_services, "gen_news_feed", return_value=items):
             payload = market_services.build_fundamental_news_payload(tenant={"slug": "laowang"}, watchlist_details={})
-        self.assertEqual(len(payload["items"]), 5)
-        self.assertEqual(payload["total"], 5)
-        self.assertGreaterEqual(len(payload["tabs"]), 3)
-        self.assertEqual(payload["tabs"][0]["key"], "summary")
-        self.assertEqual(payload["tabs"][0]["label"], "今日 Top5")
-        self.assertEqual(payload["tabs"][0]["count"], 5)
-        self.assertEqual(payload["tabs"][1]["key"], "all")
-        self.assertEqual(payload["tabs"][1]["count"], len(items))
+        self.assertEqual(len(payload["items"]), 0)
+        self.assertEqual(payload["total"], 0)
+        self.assertEqual(len(payload["tabs"]), 1)
+        self.assertEqual(payload["tabs"][0]["key"], "all")
+        self.assertEqual(payload["tabs"][0]["label"], "全部新闻")
+        self.assertEqual(payload["tabs"][0]["count"], 0)
+        self.assertEqual(payload["selection_mode"], "recent_3d_source_tabs")
 
-    def test_fundamental_homepage_prefers_today_latest_five_news(self):
+    def test_fundamental_homepage_keeps_only_recent_three_day_news(self):
         items = [
-            {"title": "昨日较新", "published_at": "2026-09-01 23:59:00"},
-            {"title": "今日最早", "published_at": "2026-09-02 09:00:00"},
-            {"title": "今日最新", "published_at": "2026-09-02 15:00:00"},
-            {"title": "今日中间", "published_at": "2026-09-02 12:00:00"},
-            {"title": "今日第二", "published_at": "2026-09-02 14:00:00"},
-            {"title": "今日第三", "published_at": "2026-09-02 13:00:00"},
-            {"title": "今日第四", "published_at": "2026-09-02 10:00:00"},
+            {"title": "昨日较新", "source_code": "policy", "published_at": "2026-09-01 23:59:00"},
+            {"title": "今日最早", "source_code": "policy", "published_at": "2026-09-02 09:00:00"},
+            {"title": "今日最新", "source_code": "policy", "published_at": "2026-09-02 15:00:00"},
+            {"title": "今日中间", "source_code": "macro", "published_at": "2026-09-02 12:00:00"},
+            {"title": "今日第二", "source_code": "company", "published_at": "2026-09-02 14:00:00"},
+            {"title": "今日第三", "source_code": "regulation", "published_at": "2026-09-02 13:00:00"},
+            {"title": "今日第四", "source_code": "industry", "published_at": "2026-09-02 10:00:00"},
         ]
         with patch.object(market_services, "gen_news_feed", return_value=items), patch.object(
             market_services, "datetime"
@@ -135,7 +237,23 @@ function rankNews(input) {
             [item["title"] for item in payload["items"]],
             ["今日最新", "今日第二", "今日第三", "今日中间", "今日第四"],
         )
-        self.assertEqual(payload["selection_mode"], "latest_five")
+        self.assertEqual(payload["selection_mode"], "recent_3d_source_tabs")
+
+    def test_fundamental_homepage_shows_only_latest_item_per_source(self):
+        items = [
+            {"title": "政策旧闻", "source_code": "policy", "source_name": "中国政府网", "published_at": "2026-09-02 09:00:00"},
+            {"title": "政策最新", "source_code": "policy", "source_name": "中国政府网", "published_at": "2026-09-03 09:00:00"},
+            {"title": "宏观最新", "source_code": "macro", "source_name": "国家统计局", "published_at": "2026-09-03 08:00:00"},
+        ]
+        with patch.object(market_services, "gen_news_feed", return_value=items), patch.object(
+            market_services, "datetime"
+        ) as datetime_mock:
+            datetime_mock.now.return_value = datetime(2026, 9, 3, 12, 0, 0)
+            datetime_mock.fromisoformat.side_effect = datetime.fromisoformat
+            payload = market_services.build_fundamental_news_payload(tenant={"slug": "laowang"}, watchlist_details={})
+        self.assertEqual([item["title"] for item in payload["items"]], ["政策最新", "宏观最新"])
+        self.assertEqual(payload["tabs"][0]["count"], 2)
+        self.assertEqual(payload["list_tabs"][0]["count"], 3)
 
     def test_prompt_only_algorithm_generates_executable_script(self):
         algorithm = market_services.normalize_news_aggregation_algorithm_payload({
@@ -256,35 +374,20 @@ function rankNews(input) {
             ])
         self.assertEqual(saved, [])
 
-    def test_news_lake_preserves_previous_real_cache_when_refresh_fails(self):
-        stale_cache = {
-            "cached_at": "2026-08-01T10:00:00",
-            "items": [{"title": "旧的真实新闻", "published_at": "2026-08-01T09:00:00"}],
-            "indicators": [{"indicator_code": "news_event_count", "value": 1}],
-            "sources": [{"code": "gov_cn_policy", "included": True, "count": 12, "reason": "已达到来源纳入门槛"}],
-        }
-        with patch.object(market_services, "_load_json_app_setting", return_value=stale_cache), patch.object(
-            market_services,
-            "_load_active_news_source_whitelist",
-            return_value=[{"code": "gov_cn_policy", "url": "http://example.invalid", "name": "政策要闻", "category": "政策", "source_group": "政策要闻", "validated_item_count": 12}],
+    def test_news_lake_refreshes_from_active_sources_when_forced(self):
+        source = {"code": "gov_cn_policy", "name": "中国政府网", "category": "政策", "source_group": "政策要闻"}
+        source_item = {"event_id": "n1", "title": "来源新闻", "url": "https://example.com/n1", "published_at": "2026-09-15"}
+        with patch.object(market_services, "_load_news_lake_cache", return_value=None), patch.object(
+            market_services, "_load_active_news_source_whitelist", return_value=[source]
         ), patch.object(
-            market_services,
-            "_fetch_news_source",
-            return_value={
-                "source": {"code": "gov_cn_policy", "name": "政策要闻", "category": "政策"},
-                "included": False,
-                "count": 0,
-                "reason": "<urlopen error [Errno 8] nodename nor servname provided, or not known>",
-                "items": [],
-            },
-        ), patch.object(
-            market_services, "_persist_news_source_exclusions"
-        ) as persist_mock, patch.object(market_services, "_save_json_app_setting") as save_mock:
+            market_services, "_fetch_news_source", return_value={"source": source, "included": True, "count": 1, "reason": "ok", "items": [source_item]}
+        ), patch.object(market_services, "_persist_news_source_exclusions"), patch.object(
+            market_services, "_save_json_app_setting"
+        ):
             payload = market_services._aggregate_real_news_sources(force_refresh=True)
 
-        self.assertEqual(payload["items"][0]["title"], "旧的真实新闻")
-        persist_mock.assert_called_once()
-        save_mock.assert_not_called()
+        self.assertEqual(payload["items"][0]["title"], "来源新闻")
+        self.assertEqual(payload["items"][0]["url"], "https://example.com/n1")
 
     def test_admin_news_source_payload_exposes_governed_runtime_status(self):
         aggregate_payload = {

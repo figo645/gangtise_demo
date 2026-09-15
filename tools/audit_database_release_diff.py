@@ -10,6 +10,7 @@ package for a target environment.
 import argparse
 import hashlib
 import json
+import os
 import re
 import sys
 from datetime import datetime
@@ -94,6 +95,11 @@ def _quote_identifier(value):
 
 
 def _connect(target):
+    try:
+        statement_timeout_ms = int(os.environ.get("DATABASE_RELEASE_SCAN_STATEMENT_TIMEOUT_MS", "120000"))
+    except (TypeError, ValueError):
+        statement_timeout_ms = 120000
+    statement_timeout_ms = max(1000, min(statement_timeout_ms, 600000))
     return psycopg2.connect(
         host=target["host"] if "host" in target else target["db_host"],
         port=target["port"] if "port" in target else target["db_port"],
@@ -101,6 +107,7 @@ def _connect(target):
         user=target["user"] if "user" in target else target["db_user"],
         password=target["password"] if "password" in target else target["db_password"],
         connect_timeout=8,
+        options=f"-c statement_timeout={statement_timeout_ms} -c lock_timeout=5000 -c application_name=database_release_diff",
     )
 
 

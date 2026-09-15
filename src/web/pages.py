@@ -50,7 +50,9 @@ def login():
         return redirect(resolve_login_destination(current_user, next_target))
     mode = "register" if request.args.get("mode") == "register" or request.form.get("mode") == "register" else "login"
     if request.method == "GET":
-        return render_template("login.html", next_target=next_target, mode=mode, error=None, site_config=get_site_config())
+        site_config = get_site_config()
+        registration_allowed = True
+        return render_template("login.html", next_target=next_target, mode=mode, error=None, site_config=site_config, registration_allowed=registration_allowed)
     username = str(request.form.get("username") or "").strip()
     password = str(request.form.get("password") or "").strip()
     site_config = get_site_config()
@@ -58,15 +60,16 @@ def login():
         display_name = str(request.form.get("display_name") or "").strip()
         confirm_password = str(request.form.get("confirm_password") or "").strip()
         if not display_name or not username or not password or not confirm_password:
-            return render_template("login.html", next_target=next_target, mode=mode, error="请完整填写注册信息", site_config=site_config)
+            return render_template("login.html", next_target=next_target, mode=mode, error="请完整填写注册信息", site_config=site_config, registration_allowed=True)
         if password != confirm_password:
-            return render_template("login.html", next_target=next_target, mode=mode, error="两次输入的密码不一致", site_config=site_config)
+            return render_template("login.html", next_target=next_target, mode=mode, error="两次输入的密码不一致", site_config=site_config, registration_allowed=True)
         if len(password) < 6:
-            return render_template("login.html", next_target=next_target, mode=mode, error="密码至少需要 6 位", site_config=site_config)
+            return render_template("login.html", next_target=next_target, mode=mode, error="密码至少需要 6 位", site_config=site_config, registration_allowed=True)
         try:
             invite_token = str(request.args.get("invite") or request.form.get("invite") or "").strip()
             invite = get_tenant_fan_qr_invite(invite_token) if invite_token and is_feature_enabled("fan_qr_import", site_config) else None
-            tenant = get_tenant_by_slug((invite or {}).get("tenant_slug") or get_default_tenant_slug(site_config), site_config)
+            tenant_slug = (invite.get("tenant_slug") if invite else "") or get_default_tenant_slug(site_config)
+            tenant = get_tenant_by_slug(tenant_slug, site_config)
             suffix = int(time.time() * 1000) % 100000000
             user = create_user({
                 "username": username,
@@ -75,27 +78,27 @@ def login():
                 "role": "investor",
                 "tenant_slug": tenant.get("slug") or get_default_tenant_slug(site_config),
                 "advisor_name": tenant.get("advisor") or "",
-                "status": "active",
-                "source_label": f"扫码导入：{invite.get('source_label')}" if invite else "Web账号注册",
+                "status": "pending_approval",
+                "source_label": f"扫码注册：{invite.get('source_label')}" if invite else "自主注册",
             })
             if invite:
                 claim_tenant_fan_qr_invite(invite_token, user)
             save_h5_profile_settings(user, {"display_name": display_name})
-            save_current_demo_profile_id(user["username"])
-            return redirect(resolve_login_destination(user, next_target))
+            return render_template("login.html", next_target=next_target, mode=mode, error="注册申请已提交，请等待大V审批后再登录。", site_config=site_config, registration_allowed=True)
         except ValueError as exc:
-            messages = {"username_exists": "用户名已存在，请更换一个", "invalid_user_payload": "注册信息无效，请检查填写内容"}
-            return render_template("login.html", next_target=next_target, mode=mode, error=messages.get(str(exc), "注册失败，请稍后重试"), site_config=site_config)
+            messages = {"username_exists": "用户名已存在，请更换一个", "invalid_user_payload": "注册信息无效，请检查填写内容", "fan_qr_invite_unavailable": "二维码已失效，请联系大V获取新的二维码"}
+            return render_template("login.html", next_target=next_target, mode=mode, error=messages.get(str(exc), "注册失败，请稍后重试"), site_config=site_config, registration_allowed=True)
         except Exception as exc:
             if is_db_unavailable_error(exc):
-                return render_template("login.html", next_target=next_target, mode=mode, error="账户服务暂不可用，请稍后重试", site_config=site_config)
+                return render_template("login.html", next_target=next_target, mode=mode, error="账户服务暂不可用，请稍后重试", site_config=site_config, registration_allowed=True)
             raise
     if not username or not password:
         return render_template("login.html", next_target=next_target, mode=mode, error="请输入用户名和密码", site_config=site_config)
     try:
         user = verify_platform_password_login(username, password)
-    except ValueError:
-        return render_template("login.html", next_target=next_target, mode=mode, error="用户名或密码错误，或账号已停用", site_config=site_config)
+    except ValueError as exc:
+        message = "账号已注册，等待大V审批后才能登录" if str(exc) == "account_pending_approval" else "用户名或密码错误，或账号已停用"
+        return render_template("login.html", next_target=next_target, mode=mode, error=message, site_config=site_config)
     except Exception as exc:
         if is_db_unavailable_error(exc):
             return render_template("login.html", next_target=next_target, mode=mode, error="账户服务暂不可用，请稍后重试", site_config=site_config)
@@ -259,6 +262,7 @@ def h5():
     news_payload = build_fundamental_news_payload(tenant=tenant, watchlist_details=watchlist_details, limit=10)
     news = news_payload.get("items") or []
     news_tabs = news_payload.get("tabs") or []
+    news_list_tabs = news_payload.get("list_tabs") or news_tabs
     news_analysis = news_payload.get("impact_analysis") or {}
     macro_indicators = [
         {
@@ -283,6 +287,7 @@ def h5():
         market=market,
         news=news,
         news_tabs=news_tabs,
+        news_list_tabs=news_list_tabs,
         news_analysis=news_analysis,
         macro_indicators=macro_indicators,
         feed_boards=feed_boards,

@@ -261,7 +261,7 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "llm_loopback_url_not_allowed"):
                 ai_services.get_hermes_llm_config("hermes_intent_router", site_config=site_config)
 
-    def test_all_features_ignore_stale_feature_binding_and_use_admin_default(self):
+    def test_feature_binding_selects_agent_model_and_unbound_features_use_admin_default(self):
         config = {
             "llm_registry": {
                 "default_model_key": "admin-default",
@@ -292,11 +292,18 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
             }
         }
 
-        for feature_code in ("hermes_intent_router", "review_draft_generation", "embedding_api"):
-            with self.subTest(feature_code=feature_code):
-                selected = ai_services.get_default_llm_config(site_config=config, feature_code=feature_code)
-                self.assertEqual(selected["key"], "admin-default")
-                self.assertEqual(selected["base_url"], "http://8.155.160.194:6031/api")
+        self.assertEqual(
+            ai_services.get_default_llm_config(site_config=config, feature_code="hermes_intent_router")["key"],
+            "old-local-model",
+        )
+        self.assertEqual(
+            ai_services.get_default_llm_config(site_config=config, feature_code="review_draft_generation")["key"],
+            "other-model",
+        )
+        self.assertEqual(
+            ai_services.get_default_llm_config(site_config=config, feature_code="embedding_api")["key"],
+            "admin-default",
+        )
 
     def test_llm_network_boundary_rejects_loopback_before_http(self):
         with patch.object(ai_services.requests, "Session") as session_factory:
@@ -405,7 +412,7 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
             ["stock_today_observation", "market_today_observation"],
         )
 
-    def test_hermes_ignores_feature_binding_and_uses_admin_default(self):
+    def test_hermes_resolves_its_feature_binding(self):
         admin_default_model = {
             "key": "configured-admin-default",
             "base_url": "https://llm.example.com/v1",
@@ -420,7 +427,7 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
             result = ai_services.get_hermes_llm_config("hermes_intent_router")
 
         self.assertEqual(result["key"], "configured-admin-default")
-        get_config.assert_called_once_with(site_config=None, purpose="general", feature_code="")
+        get_config.assert_called_once_with(site_config=None, purpose="general", feature_code="hermes_intent_router")
 
     def test_hermes_does_not_replace_loopback_admin_default(self):
         loopback_default = {
@@ -459,7 +466,7 @@ class HermesGangtiseCapabilitiesTest(unittest.TestCase):
             result = ai_services.get_hermes_llm_config("hermes_intent_router")
 
         self.assertIs(result, admin_default_model)
-        get_config.assert_called_once_with(site_config=None, purpose="general", feature_code="")
+        get_config.assert_called_once_with(site_config=None, purpose="general", feature_code="hermes_intent_router")
 
     def test_hermes_rejects_loopback_model_when_only_old_local_model_remains(self):
         loopback_model = {

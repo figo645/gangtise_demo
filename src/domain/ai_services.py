@@ -49,20 +49,36 @@ def get_review_generation_config(site_config=None):
 
 
 def get_default_llm_config(site_config=None, purpose="general", feature_code=""):
-    """Return the single Admin-selected model used by every LLM capability."""
+    """Resolve the Admin-selected model for one LLM feature.
+
+    A feature-specific model binding is preferred when configured. Otherwise
+    the registry default is used. Both paths return the same normalized model
+    contract consumed by the shared LLM adapter.
+    """
     config = site_config or get_site_config()
     registry = normalize_llm_registry_config((config or {}).get("llm_registry"))
     purpose_key = str(purpose or "general").strip().lower() or "general"
     default_key = str(registry.get("default_model_key") or "").strip()
     models = registry.get("models") if isinstance(registry.get("models"), list) else []
     selected = None
-    if default_key:
+    feature_key = str((registry.get("feature_model_keys") or {}).get(str(feature_code or "").strip()) or "").strip()
+    if feature_key:
         for item in models:
             if not isinstance(item, dict):
                 continue
-            if str(item.get("key") or "").strip() == default_key:
+            if str(item.get("key") or "").strip() != feature_key:
+                continue
+            if item.get("enabled", True) is not False and str(item.get("purpose") or "general").strip().lower() == purpose_key:
                 selected = item
                 break
+    if default_key:
+        if not selected:
+            for item in models:
+                if not isinstance(item, dict):
+                    continue
+                if str(item.get("key") or "").strip() == default_key:
+                    selected = item
+                    break
     if not selected:
         for item in models:
             if not isinstance(item, dict):
@@ -98,19 +114,40 @@ def _validate_llm_model_endpoint(model_config, feature_code=""):
     return config
 
 
+def resolve_llm_config(feature_code="", purpose="general", site_config=None):
+    """Resolve and validate a model for any explicit prompt workflow.
+
+    This is the shared configuration boundary for model ID, endpoint and the
+    PostgreSQL-backed encrypted API key. It deliberately has no Hermes
+    semantics; callers own their feature code and prompt contract.
+    """
+    code = str(feature_code or "").strip()
+    purpose_key = str(purpose or "general").strip().lower() or "general"
+    if not code:
+        raise RuntimeError("llm_feature_code_required")
+    config = site_config or get_site_config()
+    registry = normalize_llm_registry_config((config or {}).get("llm_registry"))
+    model_key = str((registry.get("feature_model_keys") or {}).get(code) or "").strip()
+    if not model_key:
+        raise RuntimeError(f"llm_feature_model_binding_missing:{code}")
+    model = next(
+        (item for item in (registry.get("models") or []) if str(item.get("key") or "").strip() == model_key),
+        None,
+    )
+    if not model:
+        raise RuntimeError(f"llm_feature_model_not_found:{code}:{model_key}")
+    if model.get("enabled", True) is False:
+        raise RuntimeError(f"llm_feature_model_disabled:{code}:{model_key}")
+    if str(model.get("purpose") or "general").strip().lower() != purpose_key:
+        raise RuntimeError(f"llm_feature_model_purpose_mismatch:{code}:{model_key}:{purpose_key}")
+    return _validate_llm_model_endpoint(model, feature_code=code)
+
+
 def get_hermes_llm_config(feature_code, site_config=None):
     """Resolve Hermes through the same Admin-selected model as all LLM work."""
-    model = get_default_llm_config(
-        site_config=site_config,
-        purpose="general",
-        feature_code="",
-    )
-    # Keep configuration lookup usable for isolated callers that provide a
-    # lightweight model stub; the real network boundary below still rejects a
-    # missing endpoint. A configured loopback endpoint is never acceptable.
-    if model and str(model.get("base_url") or "").strip():
-        _validate_llm_model_endpoint(model, feature_code=feature_code)
-    return model
+    # Compatibility wrapper for existing Hermes callers. New workflows should
+    # use resolve_llm_config() with their own feature code.
+    return resolve_llm_config(site_config=site_config, purpose="general", feature_code=feature_code)
 
 
 def _normalize_openai_compatible_base_url(base_url):
@@ -226,10 +263,10 @@ def call_openai_compatible_llm(
     config = normalize_llm_model_config(model_config)
     model_name = str(config.get("model_name") or "").strip()
     if not model_name:
-        raise RuntimeError("llm_model_name_missing")
+        raise RuntimeError(f"llm_model_name_missing:{str(feature_code or 'general').strip()}")
     api_key = str(config.get("api_key") or "").strip() or get_llm_api_key(config.get("key"))
     if not api_key:
-        raise RuntimeError("llm_api_key_missing")
+        raise RuntimeError(f"llm_api_key_missing:{str(feature_code or 'general').strip()}:{str(config.get('key') or '').strip()}")
     endpoint_base = _normalize_openai_compatible_base_url(config.get("base_url"))
     _validate_llm_model_endpoint(config, feature_code=feature_code or "general")
     request_started = time.perf_counter()
@@ -392,7 +429,7 @@ def enhance_review_voice_transcript_with_llm(transcript, entry_point="", speaker
         }
 
     def _voice_llm_executor(state, runtime, node, upstream):
-        llm_model = get_default_llm_config(purpose="general", feature_code="review_voice_enhancement")
+        llm_model = resolve_llm_config(feature_code="review_voice_enhancement", purpose="general")
         if not llm_model:
             raise RuntimeError("llm_model_unavailable")
         enhanced_text = call_openai_compatible_llm(
@@ -547,7 +584,7 @@ def generate_review_draft_with_llm(
 
     def _review_draft_llm_executor(state, runtime, node, upstream):
         _ensure_not_cancelled(runtime)
-        llm_model = get_default_llm_config(purpose="general", feature_code="review_draft_generation")
+        llm_model = resolve_llm_config(feature_code="review_draft_generation", purpose="general")
         if not llm_model:
             raise RuntimeError("review_draft_llm_not_configured")
         rendered_text = call_openai_compatible_llm(
@@ -758,7 +795,7 @@ def polish_review_input_with_llm(
         }
 
     def _polish_llm_executor(state, runtime, node, upstream):
-        llm_model = get_default_llm_config(purpose="general", feature_code="review_input_polish")
+        llm_model = resolve_llm_config(feature_code="review_input_polish", purpose="general")
         if not llm_model:
             raise RuntimeError("review_polish_llm_not_configured")
         review_cfg = state.get("review_cfg") if isinstance(state.get("review_cfg"), dict) else get_review_generation_config()
@@ -922,7 +959,7 @@ def compose_review_draft_with_llm(
         }
 
     def _compose_llm_executor(state, runtime, node, upstream):
-        llm_model = get_default_llm_config(purpose="general", feature_code="review_compose_generation")
+        llm_model = resolve_llm_config(feature_code="review_compose_generation", purpose="general")
         if not llm_model:
             raise RuntimeError("review_compose_llm_not_configured")
         review_cfg = state.get("review_cfg") if isinstance(state.get("review_cfg"), dict) else get_review_generation_config()
@@ -1365,7 +1402,7 @@ def summarize_review_user_input_with_llm(
     normalized_source = str(source_text or "").strip()
     if not normalized_source:
         raise ValueError("review_source_text_required")
-    llm_model = get_default_llm_config(purpose="general", feature_code="review_user_input_summary")
+    llm_model = resolve_llm_config(feature_code="review_user_input_summary", purpose="general")
     if not llm_model:
         raise RuntimeError("review_summary_llm_not_configured")
     raw = call_openai_compatible_llm(
@@ -1431,10 +1468,7 @@ def refine_review_sector_summary_with_llm(
         raise ValueError("review_sector_summary_required")
     if not normalized_rule:
         raise ValueError("review_sector_summary_rule_required")
-    llm_model = get_default_llm_config(
-        purpose="general",
-        feature_code="review_sector_summary_constraint",
-    )
+    llm_model = resolve_llm_config(feature_code="review_sector_summary_constraint", purpose="general")
     if not llm_model:
         raise RuntimeError("review_sector_summary_llm_not_configured")
     profiles = sector_profiles if isinstance(sector_profiles, list) else []
@@ -1576,7 +1610,7 @@ def label_watchlist_comment_with_llm(comment_text, stock_detail=None, tenant_slu
     fallback = _build_watchlist_comment_labeling_fallback(normalized, stock_detail=stock_detail)
     if not normalized:
         return fallback
-    llm_model = get_default_llm_config(purpose="general", feature_code="watchlist_comment_labeling")
+    llm_model = resolve_llm_config(feature_code="watchlist_comment_labeling", purpose="general")
     if not llm_model:
         return fallback
     detail = stock_detail if isinstance(stock_detail, dict) else {}
@@ -1897,9 +1931,7 @@ def _ensure_review_voice_vector_table(conn):
 
 
 def _get_external_feature_model(feature_code):
-    model = get_default_llm_config(purpose="general", feature_code=feature_code)
-    if not model:
-        raise RuntimeError(f"feature_model_not_configured:{feature_code}")
+    model = resolve_llm_config(feature_code=feature_code, purpose="general")
     api_key = get_llm_api_key(model.get("key"))
     if not api_key:
         raise RuntimeError(f"feature_model_api_key_missing:{feature_code}")
@@ -2907,14 +2939,7 @@ def filter_knowledge_matches_with_llm(query_text, matches, tenant_slug=""):
             "dropped_count": 0,
             "reason": "no_matches_or_query",
         }, None
-    llm_model = get_default_llm_config(purpose="general", feature_code="knowledge_query_filter")
-    if not llm_model:
-        return normalized_matches, {
-            "filtered": False,
-            "kept_count": len(normalized_matches),
-            "dropped_count": 0,
-            "reason": "llm_unavailable",
-        }, None
+    llm_model = resolve_llm_config(feature_code="knowledge_query_filter", purpose="general")
     candidate_blocks = []
     for index, item in enumerate(normalized_matches, start=1):
         candidate_blocks.append(
@@ -3074,14 +3099,10 @@ def _build_retrieval_agent_response(
                 },
                 "context_preview": {"filtered": False, "kept_count": len(result.get("evidence_items") or [])},
             }
-        llm_model = get_default_llm_config(
-            purpose="general",
+        llm_model = resolve_llm_config(
             feature_code=f"{runtime.get('feature_namespace')}_answer",
+            purpose="general",
         )
-        if not llm_model:
-            raise RuntimeError(
-                f"{runtime.get('feature_namespace')}_answer_llm_not_configured"
-            )
         original_matches = result.get("evidence_items") or []
         if not original_matches:
             return {
@@ -5756,21 +5777,46 @@ def build_admin_hermes_usage_stats(tenant_slug=""):
             "compute_units": int(item["compute_units"] or 0),
         })
 
+    # The action table is an inventory as well as a usage report.  Build it
+    # from the executable allow-list first so capabilities with no calls are
+    # still visible; then retain historical trace names that are no longer
+    # registered so a deployment change cannot hide old activity.
+    tool_catalog = {str(tool).strip() for tool in HERMES_ALLOWED_TOOLS if str(tool).strip()}
+    tool_catalog.update(str(tool).strip() for tool in mode_today if str(tool).strip())
     tool_rows = []
-    for item in sorted(mode_today.values(), key=lambda row: (-row["month_calls"], row["tool_name"])):
+    for tool_name in sorted(tool_catalog, key=lambda name: (-int(mode_today.get(name, {}).get("month_calls") or 0), name)):
+        item = mode_today.get(tool_name) or {
+            "tool_name": tool_name,
+            "today_calls": 0,
+            "month_calls": 0,
+            "ok_count": 0,
+            "error_count": 0,
+        }
         month_calls = int(item["month_calls"] or 0)
         ok_count = int(item["ok_count"] or 0)
         error_count = int(item["error_count"] or 0)
         success_ratio = round((ok_count / month_calls) * 100, 1) if month_calls else 0
+        is_registered = tool_name in HERMES_ALLOWED_TOOLS
         tool_rows.append({
-            "tool_name": item["tool_name"],
+            "tool_name": tool_name,
+            "tool_label": HERMES_TOOL_LABELS.get(tool_name, tool_name),
+            "registered": is_registered,
             "today_calls": int(item["today_calls"] or 0),
             "month_calls": month_calls,
             "ok_count": ok_count,
             "error_count": error_count,
             "success_ratio": success_ratio,
-            "status_label": "正常" if error_count == 0 else "有报错",
-            "status_class": "tag-green" if error_count == 0 else "tag-gold",
+            "status_label": (
+                "正常" if error_count else
+                "已注册，暂无调用" if is_registered and month_calls == 0 else
+                "历史工具，当前未注册" if not is_registered else
+                "有报错"
+            ),
+            "status_class": (
+                "tag-blue" if month_calls == 0 else
+                "tag-green" if error_count == 0 and is_registered else
+                "tag-gold"
+            ),
         })
 
     rank_rows = []
@@ -5834,7 +5880,7 @@ def build_admin_hermes_usage_stats(tenant_slug=""):
             "generated_at": now_ts(),
         },
         "tool_modes": mode_rows[:8],
-        "tool_actions": tool_rows[:12],
+        "tool_actions": tool_rows,
         "user_ranking": rank_rows,
         "missing_capabilities": missing_rows,
         "compute_pool": {
@@ -10118,19 +10164,10 @@ def build_hermes_composite_synthesis(
 
 
 def _get_hermes_today_interaction_task_model():
-    registry = normalize_llm_registry_config((get_site_config() or {}).get("llm_registry"))
-    llm_model = next(
-        (
-            normalize_llm_model_config(item)
-            for item in (registry.get("models") or [])
-            if isinstance(item, dict)
-            and str(item.get("key") or "").strip() == "volcengine-deepseek-v4-flash"
-            and item.get("enabled", True) is not False
-        ),
-        None,
+    llm_model = resolve_llm_config(
+        feature_code="hermes_today_user_interaction_task",
+        purpose="general",
     )
-    if not llm_model:
-        raise RuntimeError("hermes_today_user_interaction_task_llm_not_configured")
     if str(llm_model.get("model_name") or "").strip() != "deepseek-v4-flash-ga-260731":
         raise RuntimeError("hermes_today_user_interaction_task_requires_deepseek_v4")
     return llm_model
@@ -11343,9 +11380,7 @@ def build_review_evidence_chain_section(review_text="", tenant_slug="", review_t
         })
 
     summary = _summarize_review_evidence_chain_fallback(knowledge_items, web_matches)
-    synthesis_model = get_default_llm_config(purpose="general", feature_code="review_evidence_chain_synthesis")
-    if not synthesis_model:
-        raise RuntimeError("review_evidence_chain_synthesis_llm_not_configured")
+    synthesis_model = resolve_llm_config(feature_code="review_evidence_chain_synthesis", purpose="general")
     if items:
         evidence_blocks = []
         for idx, item in enumerate(items[:6], start=1):

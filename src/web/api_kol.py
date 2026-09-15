@@ -1,3 +1,5 @@
+import base64
+
 from src.runtime import *
 from src.services import *
 
@@ -42,6 +44,56 @@ def _insight_draft_guard(tenant_slug):
     if not has_role_capability(role, "admin") and current_tenant != requested_tenant:
         return jsonify({"ok": False, "error": "tenant_scope_forbidden"}), 403
     return None
+
+
+def _daily_broadcast_guard(tenant_slug):
+    return _insight_draft_guard(tenant_slug)
+
+
+@app.route("/api/tenant/<tenant_slug>/daily-finance-broadcast", methods=["GET", "POST"])
+def api_tenant_daily_finance_broadcast(tenant_slug):
+    denied = _daily_broadcast_guard(tenant_slug)
+    if denied:
+        return denied
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    try:
+        if request.method == "POST":
+            body = request.get_json(silent=True) or {}
+            settings = save_tenant_daily_finance_broadcast_settings(normalized_tenant, {
+                "enabled": body.get("enabled", True),
+            })
+        else:
+            settings = load_tenant_daily_finance_broadcast_settings(normalized_tenant)
+        task = get_admin_task_config("daily_finance_broadcast") or {}
+        runs = list_admin_task_runs(task_code="daily_finance_broadcast", limit=10)
+        return jsonify({"ok": True, "settings": settings, "task": task, "runs": runs})
+    except Exception:
+        app.logger.exception("Failed to load daily finance broadcast settings")
+        return jsonify({"ok": False, "error": "daily_finance_broadcast_settings_failed"}), 500
+
+
+@app.route("/api/tenant/<tenant_slug>/daily-finance-broadcast/run", methods=["POST"])
+def api_run_tenant_daily_finance_broadcast(tenant_slug):
+    denied = _daily_broadcast_guard(tenant_slug)
+    if denied:
+        return denied
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    try:
+        settings = load_tenant_daily_finance_broadcast_settings(normalized_tenant)
+        if not settings.get("enabled", True):
+            return jsonify({"ok": False, "error": "daily_finance_broadcast_disabled"}), 409
+        execution = run_admin_task(
+            "daily_finance_broadcast",
+            trigger_mode="tenant_manual",
+            force=True,
+            tenant_slug=normalized_tenant,
+        )
+        return jsonify({"ok": True, "result": execution.get("result") or {}, "run_code": execution.get("run_code") or ""})
+    except Exception as exc:
+        app.logger.exception("Failed to run tenant daily finance broadcast")
+        if str(exc).strip() == "admin_task_already_running":
+            return jsonify({"ok": False, "error": str(exc)}), 409
+        return jsonify({"ok": False, "error": str(exc) or "daily_finance_broadcast_failed"}), 500
 
 
 @app.route("/api/tenant/<tenant_slug>/insight-drafts", methods=["GET", "POST"])
@@ -135,12 +187,23 @@ def api_create_kol_qr_invite():
     if not is_feature_enabled("fan_qr_import"):
         return jsonify({"ok": False, "error": "fan_qr_import_disabled"}), 403
     try:
-        invite = create_tenant_fan_qr_invite(tenant["slug"], request.get_json(silent=True) or {}, actor_user_id=user.get("id"))
+        if request.files.get("file"):
+            image = request.files["file"]
+            content_type = str(image.mimetype or "").lower()
+            raw_image = image.read()
+            if not content_type.startswith("image/") or len(raw_image) > 2 * 1024 * 1024:
+                raise ValueError("fan_qr_image_invalid")
+            body = request.form.to_dict()
+            body["qr_image_data"] = f"data:{content_type};base64,{base64.b64encode(raw_image).decode('ascii')}"
+        else:
+            body = request.get_json(silent=True) or {}
+        invite = create_tenant_fan_qr_invite(tenant["slug"], body, actor_user_id=user.get("id"))
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     invite["join_url"] = url_for("fan_join", token=invite["invite_token"], _external=True)
+    invite["registration_url"] = url_for("login", mode="register", next="/h5", invite=invite["invite_token"], _external=True)
     try:
-        invite["qr_data_uri"] = build_qr_png_data_uri(invite["join_url"])
+        invite["qr_data_uri"] = invite.get("qr_image_data") or build_qr_png_data_uri(invite["registration_url"])
     except RuntimeError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 503
     return jsonify({"ok": True, "invite": invite, "qr_invites": list_tenant_fan_qr_invites(tenant["slug"])})

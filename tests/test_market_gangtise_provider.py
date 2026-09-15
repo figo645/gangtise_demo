@@ -130,23 +130,26 @@ def test_market_snapshot_task_is_registered_with_admin_task_dispatcher():
     assert result == expected
 
 
-def test_smart_indicator_refresh_task_runs_every_five_minutes_without_llm():
+def test_smart_indicator_refresh_task_is_removed_from_admin_schedule():
+    from src.domain import market_services
+
+    assert not any(item["task_code"] == "smart_indicator_refresh" for item in market_services.DEFAULT_ADMIN_TASKS)
+
+
+def test_news_title_impact_task_has_two_daily_slots_and_manual_dispatch():
     from src.domain import core_services, market_services
 
-    task = next(item for item in market_services.DEFAULT_ADMIN_TASKS if item["task_code"] == "smart_indicator_refresh")
-    assert task["task_type"] == "smart_indicator_refresh"
-    assert task["schedule_type"] == "interval"
-    assert task["schedule_value"] == "300"
-    assert task["enabled"] == 1
+    task = next(item for item in market_services.DEFAULT_ADMIN_TASKS if item["task_code"] == "news_title_impact_sync")
+    assert task["schedule_type"] == "daily"
+    assert task["schedule_value"] == "10:15,14:15"
+    assert market_services.parse_task_daily_times(task) == ["10:15", "14:15"]
 
-    expected = {"tenants": 1, "checked": 2, "refreshed": 1}
-    with patch.object(core_services, "refresh_all_tenant_smart_indicator_snapshots", return_value=expected) as refresh, patch.object(
-        market_services, "invalidate_indicator_hub_cache"
-    ) as invalidate:
-        result = core_services.execute_admin_task_by_type("smart_indicator_refresh")
+    assert task["task_type"] == "sync_news_title_classifications"
+    expected = {"method": "v4_title_classification_v1", "input_count": 120, "classified_count": 120}
+    with patch.object(market_services, "sync_news_title_classifications", return_value=expected) as sync:
+        result = core_services.execute_admin_task_by_type("sync_news_title_classifications", force=True)
 
-    refresh.assert_called_once_with()
-    invalidate.assert_called_once_with()
+    sync.assert_called_once_with(force=True)
     assert result == expected
 
 

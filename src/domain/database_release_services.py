@@ -33,7 +33,7 @@ USER_DATA_CLEANUP_SCRIPT = ROOT / "scripts" / "cleanup_user_runtime_data.sh"
 PACKAGES_DIR = ROOT / "database_release_packages"
 RELEASE_STATE_FILE = ROOT / ".deploy" / "database_release_last_job.json"
 USER_DATA_BACKUPS_DIR = ROOT / ".deploy" / "user_data_backups"
-USER_DATA_CLEANUP_MODES = {"account_runtime_data", "all_non_admin_accounts"}
+USER_DATA_CLEANUP_MODES = {"account_runtime_data", "all_non_admin_accounts", "all_user_business_data"}
 CONFIG_FILE = Path(os.environ.get("DATABASE_RELEASE_CONFIG", str(ROOT / ".database_release.env")))
 _config_loaded = False
 _release_lock = threading.Lock()
@@ -302,7 +302,11 @@ def scan_database_release_delta(target_name):
     if not target or target["name"] not in {"staging", "production"}:
         raise ValueError("database_release_target_invalid")
     audit, _, get_local_app_db_target = _load_database_release_diff_tools()
-    report = audit(get_local_app_db_target(), target)
+    try:
+        report = audit(get_local_app_db_target(), target)
+    except psycopg2.Error as exc:
+        detail = str(exc).strip().splitlines()[0] if str(exc).strip() else exc.__class__.__name__
+        raise RuntimeError(f"database_release_scan_failed: {detail}") from exc
     output = _database_release_diff_report_path(target["name"])
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -1028,7 +1032,7 @@ def normalize_user_data_cleanup_usernames(value):
 
 
 def start_user_data_cleanup(target_name, mode, usernames=None, confirmation="", confirm_production=False):
-    """Create a backup-first, account-scoped cleanup task for 5051."""
+    """Create a backup-first cleanup task for 5051."""
     target = get_database_release_target(target_name)
     if not target or target["name"] not in {"local", "staging", "production"}:
         raise ValueError("user_data_cleanup_target_invalid")
@@ -1042,10 +1046,14 @@ def start_user_data_cleanup(target_name, mode, usernames=None, confirmation="", 
         if any(username.casefold() == "admin" for username in normalized_usernames):
             raise ValueError("user_data_cleanup_admin_forbidden")
         expected = "CLEAR ACCOUNT DATA " + ",".join(normalized_usernames)
-    else:
+    elif normalized_mode == "all_non_admin_accounts":
         if normalized_usernames:
             raise ValueError("user_data_cleanup_usernames_must_be_empty")
         expected = "DELETE ALL NON-ADMIN ACCOUNTS"
+    else:
+        if normalized_usernames:
+            raise ValueError("user_data_cleanup_usernames_must_be_empty")
+        expected = "CLEAR ALL USER BUSINESS DATA"
     if str(confirmation or "").strip() != expected:
         raise ValueError("user_data_cleanup_confirmation_required")
     if target["name"] == "production" and confirm_production is not True:
@@ -1188,13 +1196,15 @@ def start_database_rollback(target_name, backup_name, confirm_production=False):
     return _start_job(target, [str(ROLLBACK_SCRIPT), normalized_backup], "rollback")
 
 
-def start_production_to_staging_sync():
+def start_production_to_staging_sync(confirm=False):
     """Create a single-flight task which makes Staging a Production copy.
 
     The task only accepts this fixed direction. The source credentials are
     passed to the worker as private process environment, never persisted in
     release state or task logs.
     """
+    if confirm is not True:
+        raise ValueError("production_to_staging_confirmation_required")
     production = get_database_release_target("production")
     staging = get_database_release_target("staging")
     if not production or production["name"] != "production":
@@ -1223,8 +1233,10 @@ def start_production_to_staging_sync():
     )
 
 
-def start_staging_to_production_sync():
+def start_staging_to_production_sync(confirm=False):
     """Create the fixed-direction full publish from Staging to Production."""
+    if confirm is not True:
+        raise ValueError("staging_to_production_confirmation_required")
     staging = get_database_release_target("staging")
     production = get_database_release_target("production")
     if not staging or staging["name"] != "staging":

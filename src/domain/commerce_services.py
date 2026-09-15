@@ -20,6 +20,7 @@ from src.domain.core_services import (
 
 FAN_COMMERCE_SETTINGS_PREFIX = "tenant_fan_commerce_settings:"
 _ORDER_TTL_MINUTES = 30
+QR_REGISTRATION_TYPES_ENABLED = {"free"}
 
 
 def _now():
@@ -302,6 +303,8 @@ def _invite_dict(row, include_token=True):
         "source_label": str(item.get("source_label") or "扫码导入"), "note": str(item.get("note") or ""),
         "status": str(item.get("status") or "active"), "max_uses": int(item.get("max_uses") or 0),
         "used_count": int(item.get("used_count") or 0), "expires_at": str(item.get("expires_at") or ""),
+        "qr_image_data": str(item.get("qr_image_data") or ""),
+        "registration_type": str(item.get("registration_type") or "free"),
         "created_at": str(item.get("created_at") or ""),
     }
     if include_token:
@@ -323,6 +326,12 @@ def create_tenant_fan_qr_invite(tenant_slug, payload, actor_user_id=None):
     raw = payload if isinstance(payload, dict) else {}
     source = str(raw.get("source_label") or "扫码导入").strip()[:80] or "扫码导入"
     note = str(raw.get("note") or "").strip()[:240]
+    qr_image_data = str(raw.get("qr_image_data") or "").strip()
+    registration_type = str(raw.get("registration_type") or "free").strip().lower()
+    if registration_type not in QR_REGISTRATION_TYPES_ENABLED:
+        raise ValueError("fan_qr_registration_type_invalid")
+    if qr_image_data and (not qr_image_data.startswith("data:image/") or len(qr_image_data) > 3 * 1024 * 1024):
+        raise ValueError("fan_qr_image_invalid")
     try:
         max_uses = max(0, int(raw.get("max_uses") or 0))
         expiry_days = max(0, min(3650, int(raw.get("expiry_days") or 0)))
@@ -332,9 +341,9 @@ def create_tenant_fan_qr_invite(tenant_slug, payload, actor_user_id=None):
     expires = _format_time(now + timedelta(days=expiry_days)) if expiry_days else ""
     token = secrets.token_urlsafe(18).replace("-", "").replace("_", "")
     row = get_db().execute(
-        """INSERT INTO tenant_fan_qr_invites (invite_token, tenant_slug, source_label, note, status, max_uses, expires_at, created_by_user_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?) RETURNING *""",
-        (token, slug, source, note, max_uses, expires, actor_user_id, _format_time(now), _format_time(now)),
+        """INSERT INTO tenant_fan_qr_invites (invite_token, tenant_slug, source_label, note, status, max_uses, expires_at, qr_image_data, registration_type, created_by_user_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?) RETURNING *""",
+        (token, slug, source, note, max_uses, expires, qr_image_data, registration_type, actor_user_id, _format_time(now), _format_time(now)),
     ).fetchone()
     get_db().commit()
     return _invite_dict(row)

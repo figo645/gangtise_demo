@@ -12,6 +12,8 @@ import base64
 import csv
 import io
 import zipfile
+import logging
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from html import escape as html_escape
 from html.parser import HTMLParser
@@ -148,6 +150,82 @@ app = Flask(
     template_folder=str(PROJECT_ROOT / "templates"),
     static_folder=str(PROJECT_ROOT / "static"),
 )
+
+
+class _AgentLogFilter(logging.Filter):
+    """Route Agent workflow records by source file, not message text."""
+
+    _PATH_MARKERS = (
+        "/src/domain/ai_services.py",
+        "/src/domain/agent_workflows.py",
+        "/src/domain/agent_",
+        "/src/web/api_experience.py",
+    )
+
+    def filter(self, record):
+        pathname = str(getattr(record, "pathname", "") or "").replace("\\", "/")
+        return any(marker in pathname for marker in self._PATH_MARKERS)
+
+
+class _NonAgentLogFilter(logging.Filter):
+    def filter(self, record):
+        return not _AgentLogFilter().filter(record)
+
+
+class _BelowErrorFilter(logging.Filter):
+    def filter(self, record):
+        return record.levelno < logging.ERROR
+
+
+def _configure_application_logging():
+    """Create auditable app/Agent logs while retaining console visibility."""
+    log_dir = Path(os.environ.get("APP_LOG_DIR") or PROJECT_ROOT / "logs")
+    try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        # Read-only deployments still get console/Gunicorn logs.
+        return
+
+    logger = app.logger
+    logger.setLevel(getattr(logging, str(os.environ.get("APP_LOG_LEVEL") or "INFO").upper(), logging.INFO))
+    logger.propagate = False
+    existing_marker = "gangtise_file_logging"
+    if any(getattr(handler, existing_marker, False) for handler in logger.handlers):
+        return
+
+    formatter = logging.Formatter(
+        "[%(asctime)s,%(msecs)03d] %(levelname)s %(name)s %(filename)s:%(lineno)d %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    # Keep each stream below 20 MiB and retain five rotations.
+    definitions = (
+        ("app.log", logging.INFO, (_NonAgentLogFilter(), _BelowErrorFilter())),
+        ("app.err.log", logging.ERROR, (_NonAgentLogFilter(),)),
+        ("agent.log", logging.INFO, (_AgentLogFilter(), _BelowErrorFilter())),
+        ("agent.err.log", logging.ERROR, (_AgentLogFilter(),)),
+    )
+    for filename, level, route_filter in definitions:
+        handler = RotatingFileHandler(
+            log_dir / filename,
+            maxBytes=20 * 1024 * 1024,
+            backupCount=5,
+            encoding="utf-8",
+        )
+        handler.setLevel(level)
+        for item_filter in route_filter:
+            handler.addFilter(item_filter)
+        handler.setFormatter(formatter)
+        setattr(handler, existing_marker, True)
+        logger.addHandler(handler)
+
+    console = logging.StreamHandler()
+    console.setLevel(logger.level)
+    console.setFormatter(formatter)
+    setattr(console, existing_marker, True)
+    logger.addHandler(console)
+
+
+_configure_application_logging()
 app.config.update(
     SECRET_KEY=_resolve_session_secret_key(),
     PERMANENT_SESSION_LIFETIME=timedelta(minutes=_resolve_session_ttl_minutes()),
@@ -223,6 +301,9 @@ DEFAULT_LLM_FEATURE_CATALOG = [
     {"feature_code": "hermes_today_user_interaction_task_intent", "feature_label": "Hermes 互动归纳任务意图解析", "default_purpose": "general"},
     {"feature_code": "hermes_today_user_interaction_task", "feature_label": "Hermes 今日用户互动总结任务", "default_purpose": "general"},
     {"feature_code": "smart_indicator_formula_generation", "feature_label": "智能指标公式生成", "default_purpose": "general"},
+    {"feature_code": "review_sector_summary_constraint", "feature_label": "洞见板块总结约束", "default_purpose": "general"},
+    {"feature_code": "review_evidence_chain_synthesis", "feature_label": "洞见证据链总结", "default_purpose": "general"},
+    {"feature_code": "news_title_impact_classification", "feature_label": "新闻标题分类", "default_purpose": "general"},
 ]
 DEFAULT_LLM_MODELS = [
     {
@@ -230,6 +311,16 @@ DEFAULT_LLM_MODELS = [
         "label": "DeepSeek-V4-Flash正式版",
         "provider": "volcengine",
         "model_name": "deepseek-v4-flash-ga-260731",
+        "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+        "api_key": "",
+        "purpose": "general",
+        "enabled": True,
+    },
+    {
+        "key": "volcengine-doubao-lite-4k",
+        "label": "Doubao-lite-4k 新闻标题分类",
+        "provider": "volcengine",
+        "model_name": "doubao-lite-4k-character-240828",
         "base_url": "https://ark.cn-beijing.volces.com/api/v3",
         "api_key": "",
         "purpose": "general",
@@ -827,10 +918,13 @@ DEFAULT_SITE_CONFIG = {
         "compose_timeout_seconds": 60,
     },
     "llm_registry": {
-        "default_model_key": "volcengine-deepseek-v4-flash",
+        "default_model_key": "",
         "models": copy.deepcopy(DEFAULT_LLM_MODELS),
+        # These are initial explicit allocations, not runtime fallbacks.
         "feature_model_keys": {
+            **{item["feature_code"]: "volcengine-deepseek-v4-flash" for item in DEFAULT_LLM_FEATURE_CATALOG},
             "review_voice_enhancement": "gangtise-gemma4-12b-bf16",
+            "news_title_impact_classification": "volcengine-deepseek-v4-flash",
         },
     },
     "brand": DEFAULT_BRAND_CONFIG,
@@ -865,7 +959,7 @@ DEFAULT_SITE_CONFIG = {
         # Commercial access remains explicitly off until an administrator
         # enables it and the tenant has configured a payment collection flow.
         "fan_commerce": False,
-        "fan_qr_import": False,
+        "fan_qr_import": True,
         "workbench": True,
         "tenant_portal": True,
     },

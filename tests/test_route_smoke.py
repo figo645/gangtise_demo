@@ -300,6 +300,16 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertNotIn("knowledge_attachments: kwGetReviewSelectedKnowledge()", web_html)
         self.assertNotIn("selected_cards: kwGetReviewSelectedCards()", web_html)
 
+    def test_smart_indicator_dashboard_is_removed_from_h5_and_web_workbenches(self):
+        h5_html = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}").get_data(as_text=True)
+        web_html = self.client.get(f"/kol-workbench?tenant={self.tenant_slugs[0]}").get_data(as_text=True)
+
+        self.assertNotIn('class="wb-dashboard-card"', h5_html)
+        self.assertNotIn('id="workbench-section-dashboard"', web_html)
+        self.assertNotIn('data-section="dashboard"', web_html)
+        self.assertNotIn('智能 Dashboard', web_html)
+        self.assertIn('id="workbench-section-indicator-overview"', web_html)
+
     def test_smart_indicator_dashboard_removal_is_not_definition_deletion(self):
         web_html = self.client.get("/kol-workbench?tenant=laowang").get_data(as_text=True)
         h5_html = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}").get_data(as_text=True)

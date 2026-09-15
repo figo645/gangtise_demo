@@ -2,6 +2,7 @@ from src.runtime import *
 import base64
 import hashlib
 import re
+from zoneinfo import ZoneInfo
 
 try:
     from cryptography.fernet import Fernet, InvalidToken
@@ -166,6 +167,10 @@ def call_openai_compatible_llm(*args, **kwargs):
     return _ai_services_module().call_openai_compatible_llm(*args, **kwargs)
 
 
+def resolve_llm_config(*args, **kwargs):
+    return _ai_services_module().resolve_llm_config(*args, **kwargs)
+
+
 def build_knowledge_query_response(*args, **kwargs):
     return _ai_services_module().build_knowledge_query_response(*args, **kwargs)
 
@@ -213,11 +218,14 @@ def normalize_llm_model_config(source, index=0):
     raw = source if isinstance(source, dict) else {}
     key = str(raw.get("key") or f"model_{index + 1}").strip() or f"model_{index + 1}"
     purpose = str(raw.get("purpose") or "general").strip().lower() or "general"
+    model_name = str(raw.get("model_name") or "").strip()
+    if key == "volcengine-doubao-lite-4k" and model_name == "doubao-lite-4k":
+        model_name = "doubao-lite-4k-character-240828"
     return {
         "key": key,
         "label": str(raw.get("label") or key).strip() or key,
         "provider": str(raw.get("provider") or "openai").strip() or "openai",
-        "model_name": str(raw.get("model_name") or "").strip(),
+        "model_name": model_name,
         "base_url": str(raw.get("base_url") or "").strip(),
         "api_key": str(raw.get("api_key") or "").strip(),
         "purpose": purpose,
@@ -588,9 +596,7 @@ def build_llm_knowledge_processing(raw_text, source_type="", title="", source_de
         }
 
     def _knowledge_processing_llm_executor(state, runtime, node, upstream):
-        llm_model = get_default_llm_config(purpose="general", feature_code="knowledge_processing_llm")
-        if not llm_model:
-            raise RuntimeError("knowledge_processing_llm_not_configured")
+        llm_model = resolve_llm_config(feature_code="knowledge_processing_llm", purpose="general")
         rendered_text = call_openai_compatible_llm(
             llm_model,
             state.get("system_prompt") or "",
@@ -1306,6 +1312,14 @@ def normalize_review_snapshot_item(item, tenant, index=0):
         "paragraph_mode": str(raw.get("paragraph_mode") or fallback.get("paragraph_mode") or "manual").strip().lower() or "manual",
         "publisher": str(raw.get("publisher") or tenant.get("advisor") or "").strip() or tenant.get("advisor") or "",
         "snapshot_type": str(raw.get("snapshot_type") or "published_review").strip() or "published_review",
+        "content_kind": str(raw.get("content_kind") or "insight").strip().lower()[:40] or "insight",
+        "broadcast_kind": str(raw.get("broadcast_kind") or "").strip().lower()[:40],
+        "broadcast_label": str(raw.get("broadcast_label") or "").strip()[:80],
+        "visual_theme": str(raw.get("visual_theme") or "").strip().lower()[:40],
+        "source_provider": str(raw.get("source_provider") or "").strip()[:120],
+        "source_endpoint": str(raw.get("source_endpoint") or "").strip()[:240],
+        "report_date": str(raw.get("report_date") or "").strip()[:20],
+        "source_payload_json": copy.deepcopy(raw.get("source_payload_json")) if isinstance(raw.get("source_payload_json"), dict) else {},
         "knowledge_attachments": attachments,
         "selected_cards": selected_cards,
         "data_sources": sanitize_user_facing_source_list(raw.get("data_sources") if isinstance(raw.get("data_sources"), list) else [])[:12],
@@ -1404,8 +1418,66 @@ def summarize_message_preview(content, limit=72):
     return f"{text[:max(0, limit - 1)]}…"
 
 
-def normalize_message_thread_message_item(msg, msg_index=0):
+def _broadcast_snapshot_lookup(tenant):
+    """Index published AI broadcasts for repairing legacy DM messages."""
+    snapshots = resolve_tenant_review_snapshots(
+        tenant or {},
+        (tenant or {}).get("review_snapshots"),
+        include_simulated=True,
+    )
+    lookup = {}
+    for snapshot in snapshots:
+        if str(snapshot.get("content_kind") or "").strip().lower() != "ai_broadcast":
+            continue
+        kind = str(snapshot.get("broadcast_kind") or "").strip().lower()
+        report_date = str(snapshot.get("report_date") or "").strip()[:10]
+        snapshot_id = str(snapshot.get("id") or "").strip()
+        if kind and report_date and snapshot_id:
+            lookup.setdefault((kind, report_date), []).append(snapshot)
+    return lookup
+
+
+def _repair_legacy_broadcast_message(raw, tenant, lookup):
+    """Attach a deterministic insight link to pre-link broadcast messages."""
+    if not isinstance(raw, dict) or str(raw.get("type") or "").strip() != "agent_broadcast":
+        return raw
+    if str(raw.get("insight_id") or "").strip():
+        return raw
+
+    content = str(raw.get("content") or "").strip()
+    kind = str(raw.get("broadcast_kind") or "").strip().lower()
+    if not kind:
+        if any(marker in content for marker in ("晚间播报", "晚报", "eveningbriefing", "nightbriefing")):
+            kind = "night"
+        elif any(marker in content for marker in ("午间播报", "午报", "noonbriefing", "afternoonflash")):
+            kind = "noon"
+        elif any(marker in content for marker in ("早间播报", "早报", "morningbriefing", "morningflash")):
+            kind = "morning"
+    if kind not in {"morning", "noon", "night"}:
+        return raw
+
+    dates = re.findall(r"20\d{2}-\d{2}-\d{2}", content)
+    if not dates:
+        dates = re.findall(r"20\d{2}-\d{2}-\d{2}", str(raw.get("time") or ""))
+    candidate_dates = list(dict.fromkeys(date[:10] for date in dates))
+    candidates = []
+    for report_date in candidate_dates:
+        candidates.extend(lookup.get((kind, report_date), []))
+    if len(candidates) != 1:
+        return raw
+    snapshot = candidates[0]
+    repaired = dict(raw)
+    repaired["insight_id"] = str(snapshot.get("id") or "").strip()[:160]
+    repaired["broadcast_kind"] = kind
+    repaired["visual_theme"] = str(snapshot.get("visual_theme") or "").strip()[:40]
+    return repaired
+
+
+def normalize_message_thread_message_item(msg, msg_index=0, tenant=None, broadcast_lookup=None):
     raw = msg if isinstance(msg, dict) else {}
+    if broadcast_lookup is None and tenant:
+        broadcast_lookup = _broadcast_snapshot_lookup(tenant)
+    raw = _repair_legacy_broadcast_message(raw, tenant, broadcast_lookup or {})
     message_type = str(raw.get("type") or "text").strip() or "text"
     content = str(raw.get("content") or "").strip()
     preview = str(raw.get("preview") or "").strip()
@@ -1418,6 +1490,9 @@ def normalize_message_thread_message_item(msg, msg_index=0):
         "content": content,
         "time": normalize_datetime_text(raw.get("time") or now_ts()) or now_ts(),
         "type": message_type,
+        "broadcast_kind": str(raw.get("broadcast_kind") or "").strip()[:40],
+        "visual_theme": str(raw.get("visual_theme") or "").strip()[:40],
+        "insight_id": str(raw.get("insight_id") or "").strip()[:160],
         "price": price,
         "preview": preview,
     }
@@ -1437,12 +1512,22 @@ def build_thread_last_message(thread, messages):
     return summarize_message_preview((latest or {}).get("content") or thread.get("last_msg") or thread.get("content") or "", limit=72)
 
 
-def normalize_message_thread_item(item, tenant, index=0):
+def normalize_message_thread_item(item, tenant, index=0, broadcast_lookup=None):
     raw = item if isinstance(item, dict) else {}
     defaults = default_tenant_message_center_state(tenant)["threads"]
     fallback = defaults[min(index, len(defaults) - 1)]
     raw_messages = raw.get("messages") if isinstance(raw.get("messages"), list) else fallback.get("messages", [])
-    messages = [normalize_message_thread_message_item(msg, msg_index=msg_index) for msg_index, msg in enumerate(raw_messages) if isinstance(msg, dict)]
+    broadcast_lookup = broadcast_lookup if broadcast_lookup is not None else _broadcast_snapshot_lookup(tenant)
+    messages = [
+        normalize_message_thread_message_item(
+            msg,
+            msg_index=msg_index,
+            tenant=tenant,
+            broadcast_lookup=broadcast_lookup,
+        )
+        for msg_index, msg in enumerate(raw_messages)
+        if isinstance(msg, dict)
+    ]
     last_sender = str(
         raw.get("last_sender")
         or ((messages[-1] or {}).get("sender") if messages else "")
@@ -1508,6 +1593,9 @@ def normalize_message_broadcast_item(item, tenant, index=0):
         "open_rate": max(0, int(raw.get("open_rate") or fallback.get("open_rate") or 0)),
         "target": str(raw.get("target") or fallback.get("target") or "all").strip() or "all",
         "type": str(raw.get("type") or fallback.get("type") or "broadcast").strip() or "broadcast",
+        "broadcast_kind": str(raw.get("broadcast_kind") or "").strip()[:40],
+        "visual_theme": str(raw.get("visual_theme") or "").strip()[:40],
+        "insight_id": str(raw.get("insight_id") or "").strip()[:160],
         "is_simulated": bool(raw.get("is_simulated")),
         "simulation_label": str(raw.get("simulation_label") or "").strip()[:80],
     }
@@ -1520,7 +1608,11 @@ def resolve_tenant_message_center_state(tenant, state=None, include_simulated=Fa
     source = raw if isinstance(raw, dict) else {}
     threads_source = source.get("threads") if isinstance(source.get("threads"), list) else defaults["threads"]
     broadcasts_source = source.get("broadcasts") if isinstance(source.get("broadcasts"), list) else defaults["broadcasts"]
-    threads = [normalize_message_thread_item(item, tenant, index=index) for index, item in enumerate(threads_source[:60])]
+    broadcast_lookup = _broadcast_snapshot_lookup(tenant)
+    threads = [
+        normalize_message_thread_item(item, tenant, index=index, broadcast_lookup=broadcast_lookup)
+        for index, item in enumerate(threads_source[:60])
+    ]
     broadcasts = [normalize_message_broadcast_item(item, tenant, index=index) for index, item in enumerate(broadcasts_source[:60])]
     summary = str(source.get("summary") or defaults["summary"]).strip() or defaults["summary"]
     return {
@@ -1893,7 +1985,10 @@ def build_broadcast_thread_for_user(tenant, user_profile, broadcast_item):
         "sender": "kol",
         "content": content,
         "time": now_ts(),
-        "type": "broadcast",
+        "type": str((broadcast_item or {}).get("type") or "broadcast").strip() or "broadcast",
+        "broadcast_kind": str((broadcast_item or {}).get("broadcast_kind") or "").strip(),
+        "visual_theme": str((broadcast_item or {}).get("visual_theme") or "").strip(),
+        "insight_id": str((broadcast_item or {}).get("insight_id") or "").strip()[:160],
     }
     return normalize_message_thread_item({
         "id": build_fan_thread_id(tenant.get("slug"), username),
@@ -1923,11 +2018,12 @@ def push_broadcast_to_fan_threads(tenant_slug, broadcast_item):
     tenant = get_tenant_by_slug(resolved_slug)
     state = resolve_tenant_message_center_state(tenant, tenant.get("message_center_state"))
     threads = copy.deepcopy(state["threads"] or [])
-    investor_users = list_users(role="investor", tenant_slug=resolved_slug)
+    recipient_users = list_users(role="investor", tenant_slug=resolved_slug) + list_users(role="dav", tenant_slug=resolved_slug)
     user_map = {
         str(item.get("username") or "").strip(): item
-        for item in investor_users
+        for item in recipient_users
         if str(item.get("username") or "").strip()
+        and str(item.get("status") or "active").strip().lower() == "active"
     }
     now_text = now_ts()
     message_content = str((broadcast_item or {}).get("content") or "").strip()
@@ -1948,7 +2044,10 @@ def push_broadcast_to_fan_threads(tenant_slug, broadcast_item):
                 "sender": "kol",
                 "content": message_content,
                 "time": now_text,
-                "type": "broadcast",
+                "type": str((broadcast_item or {}).get("type") or "broadcast").strip() or "broadcast",
+                "broadcast_kind": str((broadcast_item or {}).get("broadcast_kind") or "").strip(),
+                "visual_theme": str((broadcast_item or {}).get("visual_theme") or "").strip(),
+                "insight_id": str((broadcast_item or {}).get("insight_id") or "").strip()[:160],
             })
             thread["messages"] = messages[-120:]
             thread["content"] = message_content
@@ -4429,6 +4528,7 @@ def build_h5_user_onboarding_payload(user=None):
 
 H5_PROFILE_SETTINGS_PREFIX = "h5_profile_settings:"
 TENANT_FAN_OPS_SETTINGS_PREFIX = "tenant_fan_ops_settings:"
+TENANT_DAILY_FINANCE_BROADCAST_SETTINGS_PREFIX = "tenant_daily_finance_broadcast_settings:"
 AUTH_WECHAT_CREDENTIAL_SETTING_KEY = "auth_credentials:wechat:v1"
 GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY = "gangtise_openapi_credentials:v1"
 GANGTISE_OPENAPI_TOKEN_SETTING_KEY = "gangtise_openapi_token:v1"
@@ -5033,6 +5133,45 @@ def save_tenant_fan_ops_settings(tenant_slug, payload=None):
     normalized["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     _save_json_app_setting(get_tenant_fan_ops_settings_key(normalized_tenant), normalized)
     return normalized
+
+
+def _normalize_tenant_daily_finance_broadcast_settings(payload=None):
+    source = payload if isinstance(payload, dict) else {}
+    enabled_value = source.get("enabled", True)
+    if isinstance(enabled_value, str):
+        enabled_value = enabled_value.strip().lower() in {"1", "true", "yes", "on", "enabled"}
+    return {
+        "enabled": bool(enabled_value),
+        "updated_at": str(source.get("updated_at") or "").strip(),
+    }
+
+
+def get_tenant_daily_finance_broadcast_settings_key(tenant_slug):
+    normalized = str(tenant_slug or "").strip().lower()
+    return f"{TENANT_DAILY_FINANCE_BROADCAST_SETTINGS_PREFIX}{normalized}" if normalized else TENANT_DAILY_FINANCE_BROADCAST_SETTINGS_PREFIX
+
+
+def load_tenant_daily_finance_broadcast_settings(tenant_slug):
+    normalized = str(tenant_slug or "").strip().lower()
+    if not normalized:
+        return _normalize_tenant_daily_finance_broadcast_settings({})
+    payload = _load_json_app_setting(get_tenant_daily_finance_broadcast_settings_key(normalized), {})
+    return _normalize_tenant_daily_finance_broadcast_settings(payload)
+
+
+def save_tenant_daily_finance_broadcast_settings(tenant_slug, payload=None):
+    normalized = str(tenant_slug or "").strip().lower()
+    if not normalized:
+        raise ValueError("tenant_slug_required")
+    current = load_tenant_daily_finance_broadcast_settings(normalized)
+    incoming = payload if isinstance(payload, dict) else {}
+    merged = dict(current)
+    if "enabled" in incoming:
+        merged["enabled"] = incoming.get("enabled")
+    normalized_payload = _normalize_tenant_daily_finance_broadcast_settings(merged)
+    normalized_payload["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    _save_json_app_setting(get_tenant_daily_finance_broadcast_settings_key(normalized), normalized_payload)
+    return normalized_payload
 
 
 def get_h5_profile_settings_key(profile_id):
@@ -7663,6 +7802,18 @@ def init_db():
         execute_sql_file(conn, sql_dir / "111_finalize_unused_admin_task_cleanup.sql")
         execute_sql_file(conn, sql_dir / "112_remove_recreated_unused_admin_tasks.sql")
         execute_sql_file(conn, sql_dir / "113_fan_commerce_and_qr_import.sql")
+        execute_sql_file(conn, sql_dir / "116_disable_unused_admin_tasks.sql")
+        execute_sql_file(conn, sql_dir / "117_remove_smart_indicator_refresh_task.sql")
+        execute_sql_file(conn, sql_dir / "118_rename_akshare_market_task.sql")
+        execute_sql_file(conn, sql_dir / "119_replace_news_source_with_v4_search.sql")
+        execute_sql_file(conn, sql_dir / "120_strict_llm_feature_bindings.sql")
+        execute_sql_file(conn, sql_dir / "121_restore_news_source_v4_title_classification.sql")
+        execute_sql_file(conn, sql_dir / "125_daily_quiz_blind_box.sql")
+        execute_sql_file(conn, sql_dir / "126_seed_quiz_question_bank.sql")
+        execute_sql_file(conn, sql_dir / "127_register_daily_quiz_task.sql")
+        execute_sql_file(conn, sql_dir / "128_refresh_quiz_question_options.sql")
+        execute_sql_file(conn, sql_dir / "129_allow_quiz_retries.sql")
+        execute_sql_file(conn, sql_dir / "130_register_daily_finance_broadcast.sql")
 
 
 def init_db_safe():
@@ -7741,13 +7892,44 @@ def ensure_default_admin_tasks():
 
     db = get_db()
     timestamp = now_ts()
+    # Retired task cleanup is idempotent and also covers databases that were
+    # upgraded without running the full startup migration path.
+    db.execute("DELETE FROM admin_task_runs WHERE task_code = ?", ("smart_indicator_refresh",))
+    db.execute("DELETE FROM admin_task_configs WHERE task_code = ?", ("smart_indicator_refresh",))
     for raw in DEFAULT_ADMIN_TASKS:
         item = normalize_admin_task_config(raw)
         existing = db.execute(
-            "SELECT task_code FROM admin_task_configs WHERE task_code = ?",
+            "SELECT task_code, task_type, schedule_type, schedule_value FROM admin_task_configs WHERE task_code = ?",
             (item["task_code"],),
         ).fetchone()
         if existing:
+            if item["task_code"] in {
+                "indicator_prepare",
+                "indicator_gangtise_openapi_sync",
+            }:
+                db.execute(
+                    "UPDATE admin_task_configs SET schedule_type = ?, schedule_value = ?, enabled = ?, updated_at = ? WHERE task_code = ?",
+                    ("manual", "", 0, timestamp, item["task_code"]),
+                )
+            if (
+                item["task_code"] == "market_snapshot_sync"
+                and str(existing.get("task_type") or "") == "sync_market_snapshot"
+            ):
+                db.execute(
+                    "UPDATE admin_task_configs SET task_name = ?, description = ?, updated_at = ? WHERE task_code = ?",
+                    (item["task_name"], item["description"], timestamp, item["task_code"]),
+                )
+            # This task was initially shipped as a 15-minute interval. Move
+            # that original default to the two fixed daily slots without
+            # overwriting later Admin customizations.
+            if (
+                item["task_code"] == "news_title_impact_sync"
+                and str(existing.get("task_type") or "") in {"sync_news_title_classifications", "sync_v4_news_top20"}
+            ):
+                db.execute(
+                    "UPDATE admin_task_configs SET task_name = ?, task_type = ?, description = ?, schedule_type = ?, schedule_value = ?, enabled = ?, updated_at = ? WHERE task_code = ?",
+                    (item["task_name"], item["task_type"], item["description"], item["schedule_type"], item["schedule_value"], item["enabled"], timestamp, item["task_code"]),
+                )
             continue
         db.execute(
             """
@@ -8399,6 +8581,14 @@ def assert_admin_task_not_stopped(task_code):
 
 def create_admin_task_run(task, trigger_mode="scheduler"):
     db = get_db()
+    task_row = db.execute(
+        "SELECT task_code, last_run_status FROM admin_task_configs WHERE task_code = ? FOR UPDATE",
+        (task["task_code"],),
+    ).fetchone()
+    if not task_row:
+        raise ValueError("task_not_found")
+    if str(task_row.get("last_run_status") or "").strip().lower() == "running":
+        raise RuntimeError("admin_task_already_running")
     run_code = f"{task['task_code']}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
     timestamp = now_ts()
     db.execute(
@@ -8470,47 +8660,57 @@ def finish_admin_task_run(run_code, task_code, success, started_at_perf, summary
     update_admin_task_status(task_code, **updates)
 
 
-def execute_admin_task_by_type(task_type, force=False):
+def execute_admin_task_by_type(task_type, force=False, tenant_slug=""):
     from src.domain.market_services import (
         invalidate_indicator_hub_cache,
         prepare_indicator_hub_store,
         sync_market_snapshot,
+        sync_daily_finance_broadcast,
+        sync_news_title_classifications,
+        sync_v4_news_top20,
         seed_mock_indicator_lake,
         sync_real_indicator_history_from_market_cache,
     )
 
     if task_type == "prepare_indicator_hub":
-        result = prepare_indicator_hub_store(force=force)
-        result["tenant_smart_refresh"] = refresh_all_tenant_smart_indicator_snapshots()
-        return result
+        return prepare_indicator_hub_store(force=force)
     if task_type == "sync_real_indicator_history":
         result = sync_real_indicator_history_from_market_cache(force=force)
-        result["tenant_smart_refresh"] = refresh_all_tenant_smart_indicator_snapshots()
         invalidate_indicator_hub_cache()
         return result
     if task_type == "sync_market_snapshot":
         return sync_market_snapshot(force=force)
-    if task_type == "smart_indicator_refresh":
-        result = refresh_all_tenant_smart_indicator_snapshots()
-        invalidate_indicator_hub_cache()
-        return result
+    if task_type == "sync_daily_finance_broadcast":
+        return sync_daily_finance_broadcast(force=force, tenant_slug=tenant_slug)
+    if task_type == "sync_v4_news_top20":
+        return sync_v4_news_top20(force=force)
+    if task_type == "sync_news_title_classifications":
+        return sync_news_title_classifications(force=force)
     if task_type == "seed_mock_indicator_lake":
         result = seed_mock_indicator_lake(force=force)
         invalidate_indicator_hub_cache()
         return result
+    if task_type == "prepare_daily_quiz_set":
+        from src.domain.quiz_services import prepare_daily_quiz_set
+        return prepare_daily_quiz_set(force=force)
     raise ValueError(f"unsupported_task_type:{task_type}")
 
 
-def execute_admin_task(task, force=False):
+def execute_admin_task(task, force=False, tenant_slug=""):
     task_type = task["task_type"]
     params = task.get("task_params") if isinstance(task.get("task_params"), dict) else {}
     if task_type in {
         "prepare_indicator_hub",
         "sync_real_indicator_history",
         "sync_market_snapshot",
-        "smart_indicator_refresh",
+        "sync_daily_finance_broadcast",
+        "sync_v4_news_top20",
+        "sync_news_title_classifications",
         "seed_mock_indicator_lake",
+        "prepare_daily_quiz_set",
     }:
+        if tenant_slug:
+            return execute_admin_task_by_type(task_type, force=force, tenant_slug=tenant_slug)
         return execute_admin_task_by_type(task_type, force=force)
     if task_type == "indicator_source_landing":
         source_code = str(params.get("source_code") or "").strip()
@@ -8587,7 +8787,7 @@ def execute_admin_task(task, force=False):
     raise ValueError(f"unsupported_task_type:{task_type}")
 
 
-def run_admin_task(task_code, trigger_mode="manual", force=False):
+def run_admin_task(task_code, trigger_mode="manual", force=False, tenant_slug=""):
     task = get_admin_task_config(task_code)
     if not task:
         raise ValueError("task_not_found")
@@ -8595,7 +8795,7 @@ def run_admin_task(task_code, trigger_mode="manual", force=False):
     start_perf = time.perf_counter()
     run_code = create_admin_task_run(task, trigger_mode=trigger_mode)
     try:
-        result = execute_admin_task(task, force=force)
+        result = execute_admin_task(task, force=force, tenant_slug=tenant_slug)
         summary = "任务执行完成"
         if task["task_type"] == "prepare_indicator_hub":
             summary = "指标中心预处理完成"
@@ -8603,10 +8803,24 @@ def run_admin_task(task_code, trigger_mode="manual", force=False):
             summary = "真实历史同步完成"
         elif task["task_type"] == "sync_market_snapshot":
             summary = "AKShare 市场与行业快照同步完成"
-        elif task["task_type"] == "smart_indicator_refresh":
-            summary = "智能指标定时刷新完成"
+        elif task["task_type"] == "sync_daily_finance_broadcast":
+            summary = (
+                f"{str((result or {}).get('report_label') or '财经播报')}完成："
+                f"{int((result or {}).get('published_count') or 0)} 个租户已发布，"
+                f"{int((result or {}).get('skipped_count') or 0)} 个租户已跳过"
+            )
+        elif task["task_type"] == "sync_v4_news_top20":
+            summary = f"V4 新闻 Top20 检索完成：{int((result or {}).get('count') or 0)} 条，模型 {str((result or {}).get('model_name') or '未配置')}"
+        elif task["task_type"] == "sync_news_title_classifications":
+            summary = (
+                f"新闻源采集与 V4 标题标注完成：{int((result or {}).get('classified_count') or 0)}/"
+                f"{int((result or {}).get('input_count') or 0)} 条，模型 "
+                f"{str((result or {}).get('model_name') or '未配置')}"
+            )
         elif task["task_type"] == "seed_mock_indicator_lake":
             summary = "模拟指标入口已关闭"
+        elif task["task_type"] == "prepare_daily_quiz_set":
+            summary = f"每日问答盲盒题集准备完成：{int((result or {}).get('daily_count') or 0)} 道"
         elif task["task_type"] == "indicator_source_landing":
             summary = "指标原始数据落地完成"
         elif task["task_type"] == "indicator_clean_pipeline":
@@ -8674,13 +8888,30 @@ def build_admin_task_center_payload():
 
 
 def _task_should_run(task, now_epoch):
-    from src.domain.market_services import parse_task_interval_seconds
+    from src.domain.market_services import parse_task_daily_times, parse_task_interval_seconds
 
     if not task.get("enabled"):
         return False, None
     interval_seconds = parse_task_interval_seconds(task)
     if not interval_seconds:
-        return False, None
+        daily_times = parse_task_daily_times(task)
+        if not daily_times:
+            return False, None
+        current = datetime.now(ZoneInfo("Asia/Shanghai"))
+        current_slot = current.strftime("%H:%M")
+        last_started = str(task.get("last_run_started_at") or "").strip()
+        last_dt = None
+        if last_started:
+            try:
+                last_dt = datetime.strptime(last_started, "%Y-%m-%d %H:%M:%S").replace(tzinfo=ZoneInfo("Asia/Shanghai"))
+            except Exception:
+                last_dt = None
+        due_slots = [slot for slot in daily_times if slot <= current_slot]
+        if not due_slots:
+            return False, None
+        due_slot = due_slots[-1]
+        scheduled = datetime.combine(current.date(), datetime.strptime(due_slot, "%H:%M").time(), tzinfo=ZoneInfo("Asia/Shanghai"))
+        return scheduled.timestamp() <= now_epoch and (last_dt is None or last_dt < scheduled), None
     last_started = str(task.get("last_run_started_at") or "").strip()
     if not last_started:
         return True, interval_seconds
@@ -8917,6 +9148,19 @@ def _task_center_loop_iteration():
                 else:
                     next_run_map[task["task_code"]] = now_ts()
                 update_admin_task_status(task["task_code"], last_next_run_at=next_run_map[task["task_code"]])
+            else:
+                from src.domain.market_services import parse_task_daily_times
+                daily_times = parse_task_daily_times(task)
+                if daily_times:
+                    current = datetime.now(ZoneInfo("Asia/Shanghai"))
+                    future_slots = [slot for slot in daily_times if slot > current.strftime("%H:%M")]
+                    if future_slots:
+                        slot = future_slots[0]
+                        next_dt = datetime.combine(current.date(), datetime.strptime(slot, "%H:%M").time(), tzinfo=ZoneInfo("Asia/Shanghai"))
+                    else:
+                        slot = daily_times[0]
+                        next_dt = datetime.combine(current.date() + timedelta(days=1), datetime.strptime(slot, "%H:%M").time(), tzinfo=ZoneInfo("Asia/Shanghai"))
+                    update_admin_task_status(task["task_code"], last_next_run_at=next_dt.strftime("%Y-%m-%d %H:%M:%S"))
             if should_run:
                 run_admin_task(task["task_code"], trigger_mode="scheduler", force=False)
         with _task_center_lock:
@@ -8955,6 +9199,15 @@ def get_site_config():
                 stored = json.loads(row["setting_value"])
                 if isinstance(stored, dict):
                     config = _merge_site_config(config, stored)
+                    # Feature bindings are an explicit deployment contract.
+                    # Do not silently reintroduce DEFAULT_SITE_CONFIG bindings
+                    # when an older stored registry omits them; the migration
+                    # or Admin must make every binding intentional.
+                    stored_registry = stored.get("llm_registry")
+                    if isinstance(stored_registry, dict):
+                        config.setdefault("llm_registry", {})["feature_model_keys"] = copy.deepcopy(
+                            stored_registry.get("feature_model_keys") or {}
+                        )
             except Exception:
                 app.logger.exception("Failed to parse site config")
     except Exception as exc:

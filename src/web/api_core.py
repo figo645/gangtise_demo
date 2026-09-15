@@ -9,6 +9,32 @@ DATABASE_RELEASE_UNLOCK_SESSION_KEY = "database_release_unlock_until"
 DATABASE_RELEASE_UNLOCK_TTL_SECONDS = 10 * 60
 
 
+@app.route("/api/public/registration-options")
+def api_public_registration_options():
+    """Expose only active QR entry points; registration itself remains invite-gated."""
+    site_config = get_site_config()
+    tenant_slug = str(request.args.get("tenant") or get_default_tenant_slug(site_config) or "").strip().lower()
+    if not tenant_slug or not is_feature_enabled("fan_qr_import", site_config):
+        return jsonify({"ok": True, "options": []})
+    options = []
+    rows = list_tenant_fan_qr_invites(tenant_slug, limit=100)
+    for registration_type in ("free",):
+        invite = next((item for item in rows if item.get("registration_type") == registration_type and item.get("status") == "active"), None)
+        if not invite:
+            continue
+        invite["registration_url"] = url_for("login", mode="register", next="/h5", invite=invite["invite_token"], _external=True)
+        try:
+            invite["qr_data_uri"] = invite.get("qr_image_data") or build_qr_png_data_uri(invite["registration_url"])
+        except RuntimeError:
+            invite["qr_data_uri"] = ""
+        options.append({
+            "registration_type": registration_type,
+            "registration_url": invite["registration_url"],
+            "qr_data_uri": invite["qr_data_uri"],
+        })
+    return jsonify({"ok": True, "tenant_slug": tenant_slug, "options": options})
+
+
 def _resolve_authenticated_watchlist_comment_actor(requested_tenant_slug=""):
     """Use the signed-in account as the sole authority for comment identity."""
     current_user = get_current_authenticated_user() or {}
@@ -20,7 +46,9 @@ def _resolve_authenticated_watchlist_comment_actor(requested_tenant_slug=""):
         return None, (jsonify({"ok": False, "error": "auth_required"}), 401)
     if not has_role_capability(role, "h5"):
         return None, (jsonify({"ok": False, "error": "watchlist_comment_role_invalid"}), 403)
-    tenant_slug = requested_tenant or account_tenant
+    # Only an administrator may select the tenant shown by the H5 preview.
+    # Regular users always remain bound to their authenticated tenant.
+    tenant_slug = requested_tenant if role == "admin" and requested_tenant else account_tenant
     if not tenant_slug:
         return None, (jsonify({"ok": False, "error": "tenant_slug_required"}), 400)
     if role != "admin" and tenant_slug != account_tenant:
@@ -419,10 +447,14 @@ def api_watchlist():
     return jsonify(gen_market_data())
 
 
-def _current_watchlist_owner():
+def _current_watchlist_owner(requested_tenant_slug=""):
     current = get_current_authenticated_user() or {}
     role = str(current.get("role") or "").strip().lower()
-    tenant_slug = str(current.get("tenant_slug") or ((current.get("tenant") or {}).get("slug") if isinstance(current.get("tenant"), dict) else "") or "").strip().lower()
+    account_tenant = str(current.get("tenant_slug") or ((current.get("tenant") or {}).get("slug") if isinstance(current.get("tenant"), dict) else "") or "").strip().lower()
+    requested_tenant = str(requested_tenant_slug or "").strip().lower()
+    # Admin H5 preview may select the tenant in the URL; regular users stay
+    # bound to the tenant attached to their authenticated account.
+    tenant_slug = requested_tenant if role == "admin" and requested_tenant else account_tenant
     profile_id = str(current.get("username") or current.get("id") or "").strip()
     if not has_role_capability(role, "h5") or not tenant_slug or not profile_id:
         return None
@@ -431,7 +463,7 @@ def _current_watchlist_owner():
 
 @app.route("/api/watchlist/items", methods=["GET"])
 def api_user_watchlist_items():
-    owner = _current_watchlist_owner()
+    owner = _current_watchlist_owner(request.args.get("tenant_slug"))
     if not owner:
         return jsonify({"ok": False, "error": "watchlist_auth_required"}), 403
     _, tenant_slug, profile_id = owner
@@ -447,10 +479,10 @@ def api_user_watchlist_items():
 
 @app.route("/api/watchlist/items", methods=["POST"])
 def api_add_user_watchlist_item():
-    owner = _current_watchlist_owner()
+    body = request.get_json(silent=True) or {}
+    owner = _current_watchlist_owner(body.get("tenant_slug") or request.args.get("tenant_slug"))
     if not owner:
         return jsonify({"ok": False, "error": "watchlist_auth_required"}), 403
-    body = request.get_json(silent=True) or {}
     _, tenant_slug, profile_id = owner
     try:
         item = add_user_watchlist_item(
@@ -471,7 +503,7 @@ def api_add_user_watchlist_item():
 
 @app.route("/api/watchlist/items/<stock_code>", methods=["DELETE"])
 def api_remove_user_watchlist_item(stock_code):
-    owner = _current_watchlist_owner()
+    owner = _current_watchlist_owner(request.args.get("tenant_slug"))
     if not owner:
         return jsonify({"ok": False, "error": "watchlist_auth_required"}), 403
     _, tenant_slug, profile_id = owner
@@ -888,6 +920,8 @@ def api_run_admin_task(task_code):
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 404
     except Exception as exc:
+        if str(exc).strip() == "admin_task_already_running":
+            return jsonify({"ok": False, "error": str(exc)}), 409
         return jsonify({"ok": False, "error": str(exc)}), 500
     return jsonify({"ok": True, "result": result, **build_admin_task_center_payload()})
 
@@ -1394,7 +1428,10 @@ def api_h5_register_password():
         if auth_settings.get("password_login_enabled") is not True:
             return jsonify({"ok": False, "error": "password_login_disabled"}), 403
         invite = get_tenant_fan_qr_invite(invite_token) if invite_token and is_feature_enabled("fan_qr_import", site_config) else None
-        tenant = get_tenant_by_slug((invite or {}).get("tenant_slug") or requested_tenant_slug or get_default_tenant_slug(site_config), site_config)
+        tenant_slug = (invite.get("tenant_slug") if invite else "") or requested_tenant_slug or get_default_tenant_slug(site_config)
+        tenant = get_tenant_by_slug(tenant_slug, site_config)
+        if not tenant:
+            return jsonify({"ok": False, "error": "tenant_not_found"}), 400
         suffix = int(time.time() * 1000) % 100000000
         payload = {
             "username": username,
@@ -1403,17 +1440,14 @@ def api_h5_register_password():
             "role": "investor",
             "tenant_slug": tenant.get("slug") or get_default_tenant_slug(site_config),
             "advisor_name": tenant.get("advisor") or "",
-            "status": "active",
-            "source_label": f"扫码导入：{invite.get('source_label')}" if invite else "H5账号注册",
+            "status": "pending_approval",
+            "source_label": f"扫码注册：{invite.get('source_label')}" if invite else "自主注册",
         }
         user = create_user(payload)
         if invite:
             claim_tenant_fan_qr_invite(invite_token, user)
         save_h5_profile_settings(user, {"display_name": display_name})
-        save_current_demo_profile_id(user["username"])
-        payload = _build_h5_auth_options_payload(site_config)
-        payload["current_profile"] = get_current_demo_profile(site_config)
-        return jsonify({"ok": True, **payload})
+        return jsonify({"ok": True, "status": "pending_approval", "message": "注册申请已提交，请等待大V审批后再登录。"})
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception as exc:

@@ -35,6 +35,8 @@ body{margin:0;min-height:100dvh;background:var(--surface-2);color:var(--text-mai
 .login-status{min-height:18px;margin-top:10px;color:var(--gray-400);font-size:13px;line-height:1.6}
 .login-error{padding:10px 12px;border:1px solid rgba(231,76,60,.25);border-radius:10px;background:rgba(231,76,60,.12);color:#C0392B;font-size:13px}
 .login-switch{text-align:center;margin-top:10px;color:var(--gray-400);font-size:14px}.login-switch a{color:#2F74C0;font-weight:800;text-decoration:none}
+.login-register-button{border:0;background:none;color:#2F74C0;font-size:14px;font-weight:800;cursor:pointer;padding:0}
+.registration-modal{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(19,43,70,.42)}.registration-modal.show{display:flex}.registration-panel{width:min(100%,760px);max-height:92dvh;overflow:auto;padding:22px;border-radius:20px;background:#fff;box-shadow:0 24px 70px rgba(16,42,72,.28)}.registration-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.registration-title{font-size:22px;font-weight:800;color:#163b64}.registration-desc{margin-top:5px;color:var(--gray-400);font-size:13px;line-height:1.7}.registration-close{border:0;background:#F1F5FA;color:#52677d;border-radius:50%;width:34px;height:34px;font-size:20px;cursor:pointer}.registration-compare,.registration-qr-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}.registration-card,.registration-qr-card{padding:15px;border-radius:14px;border:1px solid rgba(47,116,192,.14);background:#F8FBFF}.registration-card.subscriber{border-color:rgba(184,138,59,.32);background:#FFFBF3}.registration-card-title,.registration-qr-label{font-weight:800;color:#163b64}.registration-card-subtitle{margin-top:4px;color:var(--gray-400);font-size:12px}.registration-card ul{margin:10px 0 0;padding-left:18px;color:#52677d;font-size:12px;line-height:1.9}.registration-qr-card{text-align:center;background:#fff}.registration-qr-card img{display:block;width:170px;height:170px;object-fit:contain;margin:12px auto 8px}.registration-qr-note,.registration-qr-empty{color:var(--gray-400);font-size:12px;line-height:1.7}.registration-qr-empty{padding:34px 12px;text-align:center;grid-column:1/-1}@media (max-width:575.98px){.registration-panel{padding:17px}.registration-compare,.registration-qr-grid{grid-template-columns:1fr}.registration-qr-card img{width:150px;height:150px}}
 .login-divider{display:flex;align-items:center;gap:10px;margin:18px 0 10px;color:var(--gray-400);font-size:14px}.login-divider:before,.login-divider:after{content:'';flex:1;height:1px;background:rgba(47,116,192,.1)}
 .login-section-title{margin:18px 0 10px;color:#2F74C0;font-size:16px;font-weight:800}
 .account-list{display:grid;gap:12px}.account-card{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid rgba(47,116,192,.1);border-radius:18px;background:#fff}.account-avatar{width:48px;height:48px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:16px;background:linear-gradient(135deg,var(--gold-dark),var(--gold));font-size:22px}.account-main{min-width:0;flex:1}.account-name{font-size:15px;font-weight:700}.account-meta{margin-top:4px;color:var(--gray-400);font-size:12px;line-height:1.7}.account-badge{display:inline-flex;margin-top:6px;padding:4px 8px;border:1px solid rgba(47,116,192,.12);border-radius:999px;background:rgba(47,116,192,.08);color:#2F74C0;font-size:10px}.account-enter{padding:7px 10px;border-radius:999px;background:#2F74C0;color:#fff;font-size:11px;font-weight:800;cursor:pointer}.account-empty{padding:18px 12px;border:1px dashed rgba(200,169,110,.18);border-radius:16px;color:var(--gray-400);font-size:12px;line-height:1.8;text-align:center}
@@ -57,21 +59,23 @@ body{margin:0;min-height:100dvh;background:var(--surface-2);color:var(--text-mai
   <div class="login-brand-mark" aria-hidden="true">研</div>
   <div class="login-kicker" style="margin-top:16px">RESEARCH SPACE</div>
   <div class="login-title">洞见智研</div>
-  <div class="login-desc">{% if mode == 'register' %}注册后即可进入系统。{% else %}请输入账号密码登录。{% endif %}</div>
+  <div class="login-desc">{% if mode == 'register' %}请填写信息，提交后等待大V审批。{% else %}请输入账号密码登录。{% endif %}</div>
   {% if error %}<div class="login-error">{{ error }}</div>{% endif %}
   <nav class="login-mode-tabs">
     <a class="login-mode-tab{% if mode != 'register' %} active{% endif %}" href="/login?next={{ next_target | urlencode }}{% if request.args.get('invite') %}&amp;invite={{ request.args.get('invite') | urlencode }}{% endif %}">登录</a>
-    <a class="login-mode-tab{% if mode == 'register' %} active{% endif %}" href="/login?mode=register&amp;next={{ next_target | urlencode }}{% if request.args.get('invite') %}&amp;invite={{ request.args.get('invite') | urlencode }}{% endif %}">注册</a>
+    {% if registration_allowed %}<a class="login-mode-tab{% if mode == 'register' %} active{% endif %}" href="/login?mode=register&amp;next={{ next_target | urlencode }}&amp;invite={{ request.args.get('invite') | urlencode }}">注册</a>{% endif %}
   </nav>
+  {% if mode != 'register' or registration_allowed %}
   <form class="login-form" method="post" action="/login" onsubmit="submitUnifiedLogin(event)">
-    <input type="hidden" name="mode" value="{{ mode }}"><input type="hidden" name="next" value="{{ next_target }}">
+    <input type="hidden" name="mode" value="{{ mode }}"><input type="hidden" name="next" value="{{ next_target }}"><input type="hidden" name="invite" value="{{ request.args.get('invite') or '' }}">
     {% if mode == 'register' %}<input class="login-input" type="text" name="display_name" autocomplete="nickname" placeholder="昵称" required>{% endif %}
     <input class="login-input" type="text" name="username" autocomplete="username" placeholder="用户名" autofocus required>
     <input class="login-input" type="password" name="password" autocomplete="{% if mode == 'register' %}new-password{% else %}current-password{% endif %}" placeholder="密码" required>
     {% if mode == 'register' %}<input class="login-input" type="password" name="confirm_password" autocomplete="new-password" placeholder="确认密码" required>{% else %}<label class="login-check"><input type="checkbox" id="remember-login"><span>记住密码。勾选后，下次可直接选择这个账号进入。</span></label>{% endif %}
     <button class="login-btn" type="submit">{% if mode == 'register' %}注册并进入系统{% else %}账号登录{% endif %}</button>
   </form>
-  <div class="login-switch">{% if mode == 'register' %}已经有账号？ <a href="/login?next={{ next_target | urlencode }}{% if request.args.get('invite') %}&amp;invite={{ request.args.get('invite') | urlencode }}{% endif %}">去登录</a>{% else %}还没有账号？ <a href="/login?mode=register&amp;next={{ next_target | urlencode }}{% if request.args.get('invite') %}&amp;invite={{ request.args.get('invite') | urlencode }}{% endif %}">去注册</a>{% endif %}</div>
+  <div class="login-switch">{% if mode == 'register' %}已经有账号？ <a href="/login?next={{ next_target | urlencode }}{% if request.args.get('invite') %}&amp;invite={{ request.args.get('invite') | urlencode }}{% endif %}">去登录</a>{% else %}<a class="login-register-button" href="/login?mode=register&amp;next={{ next_target | urlencode }}{% if request.args.get('invite') %}&amp;invite={{ request.args.get('invite') | urlencode }}{% endif %}">注册</a>{% endif %}</div>
+  {% endif %}
   <div id="login-status" class="login-status"></div>
   <div class="login-divider">最近登录账号</div><div class="login-section-title">选择账号进入</div>
   <div id="recent-accounts" class="account-list"><div class="account-empty">正在加载最近登录账号...</div></div>
@@ -114,6 +118,10 @@ async function submitUnifiedLogin(event){
     const resp=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     const data=await resp.json();
     if(!resp.ok||data.ok===false)throw new Error(data.error||'login_failed');
+    if(mode==='register'&&data.status==='pending_approval'){
+      if(status)status.textContent=data.message||'注册申请已提交，请等待大V审批后再登录。';
+      return;
+    }
     const profile=data.current_profile||{};
     const tenant=profile.tenant||{};
     const accounts=(window.recentAccounts||[]).filter(a=>a.username!==username);

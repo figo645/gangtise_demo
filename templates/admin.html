@@ -5715,7 +5715,7 @@
           <div class="table-header">
             <div>
               <div class="table-title">任务配置与状态</div>
-              <div style="font-size:12px;color:#8899aa;margin-top:6px">所有重任务都应该从页面请求链路移到这里执行。支持 interval 与 manual 两种模式。</div>
+              <div style="font-size:12px;color:#8899aa;margin-top:6px">所有重任务都从这里执行。支持 interval、daily 与 manual；每个任务都可以手工执行并查看运行记录。</div>
             </div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
               <select id="task-center-group-filter" onchange="renderAdminTaskCenter()" style="background:#0D1B2A;border:1px solid rgba(200,169,110,0.2);color:#F8F6F0;padding:6px 10px;border-radius:6px;font-size:12px">
@@ -8413,8 +8413,8 @@ function openAdminTaskEditor(taskCode) {
       </div>
       <div class="admin-modal-card">
         <div class="admin-modal-card-title">调度与参数</div>
-        <div class="config-field"><label>调度类型</label><select id="task-edit-schedule-type"><option value="manual" ${task.schedule_type === 'manual' ? 'selected' : ''}>manual</option><option value="interval" ${task.schedule_type === 'interval' ? 'selected' : ''}>interval</option></select></div>
-        <div class="config-field"><label>调度值</label><input id="task-edit-schedule-value" value="${escapeAttr(task.schedule_value || '')}" placeholder="interval 填秒数"></div>
+        <div class="config-field"><label>调度类型</label><select id="task-edit-schedule-type"><option value="manual" ${task.schedule_type === 'manual' ? 'selected' : ''}>manual</option><option value="interval" ${task.schedule_type === 'interval' ? 'selected' : ''}>interval</option><option value="daily" ${task.schedule_type === 'daily' ? 'selected' : ''}>daily</option></select></div>
+        <div class="config-field"><label>调度值</label><input id="task-edit-schedule-value" value="${escapeAttr(task.schedule_value || '')}" placeholder="interval 填秒数；daily 填 10:15,14:15"></div>
         <div class="config-field"><label>超时秒数</label><input id="task-edit-timeout" type="number" value="${escapeAttr(String(task.timeout_seconds || 600))}"></div>
         ${structuredFields}
         <div class="config-field"><label>任务参数 JSON</label><textarea id="task-edit-params" rows="8">${escapeHtml(paramsJson)}</textarea></div>

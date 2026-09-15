@@ -1,0 +1,73 @@
+{
+  "title": "午间与晚间财经播报 BDD 真实测试报告",
+  "generated_at": "2026-09-15T18:44:18+00:00",
+  "result": "FAIL",
+  "bdd_pass": 9,
+  "bdd_fail": 0,
+  "bdd_cases": [
+    {
+      "name": "test_given_actual_gangtise_topic_shape_when_fetching_then_nested_close_reading_content_is_extracted",
+      "status": "PASS",
+      "duration": 0.001,
+      "detail": "BDD 断言通过"
+    },
+    {
+      "name": "test_given_beijing_time_when_slot_is_resolved_then_manual_runs_use_expected_report",
+      "status": "PASS",
+      "duration": 0.001,
+      "detail": "BDD 断言通过"
+    },
+    {
+      "name": "test_given_broadcast_text_when_formatted_then_article_is_readable_and_traceable",
+      "status": "PASS",
+      "duration": 0.001,
+      "detail": "BDD 断言通过"
+    },
+    {
+      "name": "test_given_gangtise_english_report_types_when_fetching_night_then_evening_briefing_is_selected",
+      "status": "PASS",
+      "duration": 0.001,
+      "detail": "BDD 断言通过"
+    },
+    {
+      "name": "test_given_malformed_provider_payload_when_fetching_then_no_partial_publication_is_possible",
+      "status": "PASS",
+      "duration": 0.002,
+      "detail": "BDD 断言通过"
+    },
+    {
+      "name": "test_given_night_has_no_readable_text_when_fetching_then_noon_is_used_as_provider_fallback",
+      "status": "PASS",
+      "duration": 0.001,
+      "detail": "BDD 断言通过"
+    },
+    {
+      "name": "test_given_noon_missing_when_fetching_then_morning_is_used_as_provider_fallback",
+      "status": "PASS",
+      "duration": 0.0,
+      "detail": "BDD 断言通过"
+    },
+    {
+      "name": "test_given_recorded_success_json_when_fetching_noon_then_matching_text_is_returned",
+      "status": "PASS",
+      "duration": 0.0,
+      "detail": "BDD 断言通过"
+    },
+    {
+      "name": "test_given_topic_digest_is_in_title_when_fetching_then_title_is_used_as_readable_fallback",
+      "status": "PASS",
+      "duration": 0.001,
+      "detail": "BDD 断言通过"
+    }
+  ],
+  "live_probe": {
+    "status": "FAIL",
+    "classification": "环境/真实服务阻断",
+    "slot": "night",
+    "report_date": "2026-09-15",
+    "checked_at": "2026-09-16T02:44:18.203315+08:00",
+    "error": "gangtise_daily_broadcast_failed:http_status=0:kind=night:Gangtise OpenAPI token login failed: Network error: [Errno 8] nodename nor servname provided, or not known",
+    "endpoint": "/application/open-ai/hot-topic/getList"
+  },
+  "pytest_output": ".........                                                                [100%]\n=============================== warnings summary ===============================\n<frozen importlib._bootstrap>:241\n<frozen importlib._bootstrap>:241\n  <frozen importlib._bootstrap>:241: DeprecationWarning: builtin type SwigPyPacked has no __module__ attribute\n\n<frozen importlib._bootstrap>:241\n<frozen importlib._bootstrap>:241\n  <frozen importlib._bootstrap>:241: DeprecationWarning: builtin type SwigPyObject has no __module__ attribute\n\n<frozen importlib._bootstrap>:241\n  <frozen importlib._bootstrap>:241: DeprecationWarning: builtin type swigvarlink has no __module__ attribute\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n- generated xml file: /Users/xuchenfei/PycharmProjects/gangtise_demo/tests/reports/daily_finance_broadcast_bdd.junit.xml -\n9 passed, 5 warnings in 3.71s\nsys:1: DeprecationWarning: builtin type swigvarlink has no __module__ attribute\n"
+}

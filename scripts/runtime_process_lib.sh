@@ -79,7 +79,7 @@ PY
     echo "Warning: unrelated Python dependency conflicts detected for $python_bin." >&2
     "$python_bin" -m pip check >&2 || true
   fi
-  "$python_bin" -c 'import flask, requests, psycopg2; import gunicorn; from cryptography.fernet import Fernet' >/dev/null 2>&1 || {
+  "$python_bin" -c 'import flask, requests, psycopg2, qrcode; import gunicorn; from cryptography.fernet import Fernet' >/dev/null 2>&1 || {
     echo "Core Python runtime dependencies are not importable for $python_bin." >&2
     return 1
   }

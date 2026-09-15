@@ -10,6 +10,8 @@
   window.TENANT_PORTAL = {{ portal | tojson }};
 </script>
 <script src="/static/js/theme.js"></script>
+<link rel="stylesheet" href="/static/css/quiz_blind_box.css?v=20260916-3">
+<script defer src="/static/js/quiz_blind_box.js?v=20260916-3"></script>
 <script defer src="/static/js/brand.js?v=20260825-1"></script>
 <style>
 body { background:linear-gradient(180deg,#F7FAFD 0%,#EFF5FB 42%,#FFFFFF 100%); color:var(--text-main); }
@@ -400,6 +402,10 @@ body { background:linear-gradient(180deg,#F7FAFD 0%,#EFF5FB 42%,#FFFFFF 100%); c
   <div class="tp-footer-note">
     这里是面向粉丝的内容门户，不是大V自己的后台。大V自己的洞见发布、粉丝消息、知识经营和工作流协同，仍然只放在工作台里，不暴露给粉丝。所有研究内容仅供参考，不构成投资建议。
   </div>
+</div>
+<button class="quiz-blind-box" type="button" data-quiz-open aria-label="打开答题盲盒" title="答题盲盒"><span class="quiz-blind-box-mark" aria-hidden="true">🎁</span><span class="quiz-blind-box-label">盲盒</span></button>
+<div class="quiz-modal" id="quiz-blind-box-modal" role="dialog" aria-modal="true" aria-label="今日股市问答盲盒">
+  <div class="quiz-card" id="quiz-blind-box-content"><div class="quiz-muted">正在准备盲盒...</div></div>
 </div>
 <div class="tp-modal-overlay" id="portal-detail-modal" onclick="if(event.target===this)closePortalDetail()">
   <div class="tp-modal-card">

@@ -18,6 +18,8 @@
   try { localStorage.setItem('gangtise_theme_mode', 'light'); } catch (e) {}
 </script>
 <script src="/static/js/theme.js"></script>
+<link rel="stylesheet" href="/static/css/quiz_blind_box.css?v=20260916-3">
+<script defer src="/static/js/quiz_blind_box.js?v=20260916-3"></script>
 <script defer src="/static/js/brand.js?v=20260825-1"></script>
 <script defer src="/static/js/release_notes.js?v=20260831-1"></script>
 <script src="/static/echarts.min.js"></script>
@@ -28,6 +30,8 @@
 body { background: var(--surface-2); color: var(--text-main); }
 .page { display: none; }
 .page.active { display: block; }
+#page-fund-news-list.page { width:100%; min-width:0; box-sizing:border-box; }
+#page-fund-news-list.page.active { display:block; }
 
 /* Product story: make the next useful action visible before secondary tools. */
 .featured-insight-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:10px; margin:0 0 14px; }
@@ -45,6 +49,7 @@ body { background: var(--surface-2); color: var(--text-main); }
 .feed-market-economy-desc { margin-top:4px; font-size:11px; color:var(--gray-400); line-height:1.6; }
 .feed-market-economy-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; margin-top:10px; }
 .feed-market-chart { min-width:0; overflow:hidden; padding:12px; border:1px solid rgba(200,169,110,.12); border-radius:12px; background:var(--navy-mid); }
+.feed-market-sync-time { margin-top:8px; color:var(--gray-400); font-size:10px; line-height:1.5; }
 .feed-market-chart-title { font-size:12px; font-weight:700; color:var(--white); }
 .feed-market-chart-canvas { width:100%; height:230px; min-height:230px; }
 .feed-market-bars { display:grid; align-items:stretch; gap:3px; height:190px; margin-top:12px; padding:8px 2px 0; overflow:hidden; border-bottom:1px solid rgba(200,169,110,.18); }
@@ -2629,6 +2634,7 @@ body { background: var(--surface-2); color: var(--text-main); }
 .fund-news-analysis-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px; }
 .fund-news-analysis-title { font-size:12px; font-weight:800; color:var(--text-main); }
 .fund-news-analysis-note { font-size:10px; color:var(--gray-400); line-height:1.6; margin-top:3px; }
+.fund-news-window-tabs { display:flex; gap:6px; margin:8px 0 10px; }
 .fund-news-analysis-grid { display:grid; grid-template-columns:1fr; gap:10px; align-items:stretch; }
 .fund-news-chart-block { min-width:0; }
 .fund-news-chart { min-width:0; height:190px; background:#FFFFFF; border:1px solid rgba(47,116,192,0.10); border-radius:10px; }
@@ -2666,13 +2672,6 @@ body { background: var(--surface-2); color: var(--text-main); }
 .fund-news-list-tabs { display:flex; gap:8px; overflow-x:auto; padding:12px 0 8px; scrollbar-width:none; }
 .fund-news-list-tabs::-webkit-scrollbar { display:none; }
 .fund-news-list-tab { flex:0 0 auto; white-space:nowrap; }
-.wb-dashboard-card {
-  background:#FFFFFF;
-  border:1px solid rgba(47,116,192,0.10);
-  border-radius:14px;
-  padding:12px;
-  box-shadow:0 8px 22px rgba(31,73,125,0.06);
-}
 .wb-dashboard-label { font-size:12px; color:var(--gold); font-weight:600; margin-bottom:8px; display:block; }
 .wb-dashboard-textarea {
   width:100%;
@@ -2810,19 +2809,6 @@ body { background: var(--surface-2); color: var(--text-main); }
   line-height:1.7;
   color:var(--gray-400);
 }
-.wb-dashboard-actions {
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:8px;
-  margin-top:10px;
-}
-.wb-dashboard-meta {
-  font-size:11px;
-  color:var(--gray-400);
-  line-height:1.7;
-  margin-top:10px;
-}
-
 /* ===== POINTS RULES ===== */
 .points-rules { margin:0 16px 16px; background:var(--navy-mid); border-radius:12px; overflow:hidden; }
 .points-rule-item { display:flex; justify-content:space-between; align-items:center; padding:11px 14px; border-bottom:1px solid rgba(200,169,110,0.06); }
@@ -3708,6 +3694,10 @@ body { background: var(--surface-2); color: var(--text-main); }
   box-shadow:0 12px 28px rgba(31,73,125,0.08);
   cursor:pointer;
 }
+.review-article-card.ai-broadcast .review-article-cover { border:1px solid rgba(77,196,190,0.36); background:linear-gradient(135deg,#123A51 0%,#176B72 58%,#2B9A91 100%); }
+.review-article-card.ai-broadcast.night .review-article-cover { border-color:rgba(200,169,110,0.42); background:linear-gradient(135deg,#171B3D 0%,#30244F 58%,#6A4A66 100%); }
+.review-article-broadcast-mark { display:inline-flex; align-items:center; gap:5px; color:#D6FFFA; background:rgba(255,255,255,0.12); border:1px solid rgba(214,255,250,0.28); border-radius:999px; padding:4px 8px; font-size:10px; font-weight:800; }
+.review-article-card.ai-broadcast.night .review-article-broadcast-mark { color:#FFF1C8; border-color:rgba(255,241,200,0.30); }
 .review-article-cover {
   position:relative;
   border-radius:14px;
@@ -3813,6 +3803,10 @@ body { background: var(--surface-2); color: var(--text-main); }
   padding:4px 0 16px;
   border-bottom:1px solid rgba(47,116,192,0.10);
 }
+.review-article-detail-head.ai-broadcast { padding:12px; margin:-4px -4px 16px; border:1px solid rgba(77,196,190,0.24); border-radius:14px; background:#F0FBFA; }
+.review-article-detail-head.ai-broadcast.night { border-color:rgba(200,169,110,0.30); background:#FBF8F1; }
+.review-article-broadcast-label { display:inline-flex; align-items:center; gap:6px; color:#16706D; font-size:11px; font-weight:800; }
+.review-article-detail-head.night .review-article-broadcast-label { color:#896A26; }
 .review-article-detail-kicker { font-size:11px; color:var(--gold); font-weight:800; letter-spacing:.08em; }
 .review-article-detail-title { font-size:24px; line-height:1.45; color:var(--text-main); font-weight:800; margin-top:10px; }
 .review-article-detail-meta { font-size:12px; color:var(--gray-400); line-height:1.8; margin-top:10px; }
@@ -3823,6 +3817,8 @@ body { background: var(--surface-2); color: var(--text-main); }
   background:linear-gradient(180deg, #F7FBFF 0%, #FFFFFF 100%);
   border:1px solid rgba(47,116,192,0.10);
 }
+.review-article-hero.ai-broadcast { border-color:rgba(77,196,190,0.25); background:linear-gradient(180deg,#F0FBFA 0%,#FFFFFF 100%); }
+.review-article-hero.ai-broadcast.night { border-color:rgba(200,169,110,0.28); background:linear-gradient(180deg,#FBF8F1 0%,#FFFFFF 100%); }
 .review-article-hero-copy { padding:14px 14px 0; }
 .review-article-hero-title { font-size:15px; color:var(--text-main); font-weight:800; }
 .review-article-hero-desc { font-size:12px; color:var(--gray-400); line-height:1.8; margin-top:8px; }
@@ -4269,6 +4265,13 @@ body,
 .dm-messages { padding:16px; min-height:300px; display:flex; flex-direction:column; gap:10px; }
 .dm-msg { max-width:80%; border-radius:12px; padding:10px 14px; font-size:13px; line-height:1.6; }
 .dm-msg.from-kol { align-self:flex-start; background:var(--navy-mid); border:1px solid rgba(200,169,110,0.15); color:var(--white); border-bottom-left-radius:4px; }
+.dm-msg.agent-broadcast { border-color:rgba(77,196,190,0.45); background:linear-gradient(135deg,rgba(18,58,81,.98),rgba(23,107,114,.96)); }
+.dm-msg.agent-broadcast.night-broadcast { border-color:rgba(200,169,110,0.46); background:linear-gradient(135deg,rgba(23,27,61,.98),rgba(79,53,82,.96)); }
+.dm-agent-broadcast-label { display:flex; align-items:center; gap:6px; color:#D6FFFA; font-size:11px; font-weight:800; margin-bottom:6px; }
+.night-broadcast .dm-agent-broadcast-label { color:#FFF1C8; }
+.dm-broadcast-insight-link { display:block; width:100%; margin-top:10px; padding:8px 10px; box-sizing:border-box; border:1px solid rgba(214,255,250,.38); border-radius:8px; background:rgba(255,255,255,.12); color:#D6FFFA; font-size:11px; font-weight:800; text-align:center; cursor:pointer; }
+.dm-broadcast-insight-link:hover { background:rgba(255,255,255,.20); }
+.night-broadcast .dm-broadcast-insight-link { border-color:rgba(255,241,200,.38); color:#FFF1C8; }
 .dm-msg.from-user { align-self:flex-end; background:linear-gradient(135deg,var(--gold-dark),var(--gold)); color:var(--navy); font-weight:500; border-bottom-right-radius:4px; }
 .dm-msg.paid-msg { border:1px solid rgba(200,169,110,0.4); background:rgba(200,169,110,0.08); }
 .dm-msg-time { font-size:10px; color:var(--gray-400); margin-top:4px; }
@@ -4539,6 +4542,9 @@ body,
     <div id="h5-splash-quote-wrap" class="h5-splash-quote-wrap"><div class="h5-splash-quote-label">今日投资箴言</div><div id="h5-splash-quote" class="h5-splash-quote">投资的第一原则是不要亏损。——本杰明·格雷厄姆</div></div>
   </div>
 </div>
+<div class="quiz-modal" id="quiz-blind-box-modal" role="dialog" aria-modal="true" aria-label="今日股市问答盲盒">
+  <div class="quiz-card" id="quiz-blind-box-content"><div class="quiz-muted">正在准备盲盒...</div></div>
+</div>
 <div class="h5-login-shell hidden" id="h5-login-shell">
   <svg class="h5-login-art" viewBox="0 0 1440 900" preserveAspectRatio="none" aria-hidden="true">
     <defs><pattern id="h5-login-grid-pattern" width="72" height="72" patternUnits="userSpaceOnUse"><path class="h5-login-art-grid" d="M72 0H0V72" /></pattern></defs>
@@ -4603,22 +4609,10 @@ body,
         <div class="h5-section-title" style="margin-bottom:0">综合归纳要闻</div>
         <button class="btn-gold" type="button" style="padding:7px 14px;font-size:11px;flex-shrink:0;box-shadow:0 4px 12px rgba(200,169,110,0.22)" onclick="openFundNewsList()">查看更多新闻</button>
       </div>
-      <div class="fund-news-analysis" id="fund-news-analysis" data-analysis='{{ news_analysis | tojson }}'>
-        <div class="fund-news-analysis-head">
-          <div><div class="fund-news-analysis-title">今日新闻影响分布</div><div class="fund-news-analysis-note">基于可解释事件关键词标注；红色为利好，绿色为利空，未命中明确事件的内容列为中性/待确认。</div></div>
-          <span class="tag tag-gold">{{ news_analysis.date or '今日' }}</span>
-        </div>
-        <div class="fund-news-analysis-grid">
-          <div class="fund-news-chart-block">
-            <div id="fund-news-impact-pie" class="fund-news-chart" aria-label="今日新闻利好利空比例饼图"></div>
-            <div class="fund-news-chart-caption">今日新闻利好 / 利空比例</div>
-          </div>
-          <div class="fund-news-chart-block">
-            <div id="fund-news-industry-bar" class="fund-news-chart" aria-label="按行业分类的利好利空比例柱状图"></div>
-            <div class="fund-news-chart-caption">行业利好 / 利空分类占比</div>
-          </div>
-        </div>
-      </div>
+      <div class="fund-news-hint">展示最近 5 天新闻，按新闻来源筛选；点击新闻可查看原文。</div>
+      <div id="fund-news-home-tabs" class="fund-news-list-tabs" aria-label="首页新闻来源筛选"></div>
+      <div id="fund-news-home-results"></div>
+      <div style="margin-top:10px;text-align:right"><button class="btn-outline" type="button" style="padding:6px 12px;font-size:11px" onclick="openFundNewsList()">查看全部新闻</button></div>
     </div>
 
   </div>
@@ -4630,7 +4624,7 @@ body,
         <button class="btn-outline" type="button" style="padding:6px 10px;font-size:12px" onclick="closeFundNewsList()">返回</button>
         <div style="min-width:0">
           <div class="h5-section-title" style="margin:0">新闻列表</div>
-          <div class="fund-news-hint" style="margin:4px 0 0">按来源筛选或搜索标题、内容和关联主题；点击任意新闻查看详情。</div>
+        <div class="fund-news-hint" style="margin:4px 0 0">展示最近 5 天新闻，可按新闻源筛选或搜索标题、内容和关联主题。</div>
         </div>
       </div>
       <label class="fund-news-search" for="fund-news-query-input">
@@ -5124,27 +5118,6 @@ body,
         <div class="wb-stat-change" id="wb-stat-views-meta">点击查看浏览分布</div>
       </div>
     </div>
-    <div style="padding:0 16px 12px">
-      <div class="wb-dashboard-card">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
-          <div>
-            <div id="wb-dashboard-section-title" style="font-size:14px;font-weight:700;color:var(--white)">智能指标 Dashboard</div>
-            <div id="wb-dashboard-section-desc" style="font-size:11px;color:var(--gray-400);line-height:1.6;margin-top:4px">先选布局，再点击加号弹框。你可以用标签和提示词组合描述计算逻辑，系统先生成一版临时结果给你确认，确认后才会正式保存成智能指标。</div>
-          </div>
-          <span class="tag tag-gold">工作台生成</span>
-        </div>
-        <div class="wb-dashboard-meta" style="margin-top:10px">标签来源于自选股和平台指标库，不再单独维护“可选底层指标”面板。</div>
-        <div id="wb-smart-layout-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"></div>
-        <div class="wb-dashboard-actions">
-          <button id="wb-dashboard-publish-button" class="btn-outline" style="padding:9px 10px;font-size:12px" onclick="publishFundDashboard()">发布到基本面首页</button>
-          <button id="wb-dashboard-reset-button" class="btn-outline" style="padding:9px 10px;font-size:12px" onclick="resetFundDashboardDraft()">恢复当前发布版</button>
-        </div>
-        <div class="wb-dashboard-meta" id="wb-dashboard-meta">当前未生成新的指标面板，发布后会同步到前台“基本面”页顶部。</div>
-        <div class="wb-dashboard-meta" style="margin-top:10px">系统会根据提示词自动更新内部计算逻辑，不向用户直接展示实现细节。</div>
-        <div id="wb-dashboard-preview" style="margin-top:12px"></div>
-        <div id="wb-smart-indicator-library" style="margin-top:12px"></div>
-      </div>
-    </div>
     <div style="padding:12px 16px 8px;display:flex;justify-content:space-between;align-items:center">
       <div style="font-size:14px;font-weight:600;color:var(--white)">粉丝个股观察</div>
       <div style="font-size:11px;color:var(--gold)">按评论看行业板块分布</div>
@@ -5463,6 +5436,7 @@ body,
       <div class="h5-nav-label">我的</div>
     </div>
   </div>
+  <button class="quiz-blind-box h5-quiz-blind-box" type="button" data-quiz-open aria-label="打开答题盲盒" title="答题盲盒"><span class="quiz-blind-box-mark" aria-hidden="true">🎁</span><span class="quiz-blind-box-label">盲盒</span></button>
 </div>
 
 <!-- ===== COMPOSE MODAL ===== -->
@@ -5559,6 +5533,7 @@ const SITE_CONFIG_BROADCAST_KEY = 'gangtise-site-config-updated-at';
 const KNOWLEDGE_INGESTION_CONFIG = (window.SITE_CONFIG && window.SITE_CONFIG.knowledge_ingestion) || {};
 const KNOWLEDGE_USER_PREVIEW_ENABLED = KNOWLEDGE_INGESTION_CONFIG.user_preview_enabled === true;
 const FUND_NEWS_TABS = {{ news_tabs | tojson }};
+const FUND_NEWS_LIST_TABS = {{ news_list_tabs | tojson }};
 const ALL_TABS = ['feed', 'community', 'hermes', 'market', 'review', 'knowledge', 'profile', 'dm', 'workbench'];
 const TAB_LABELS = {
   feed: '基本面分析',
@@ -7029,8 +7004,7 @@ function getH5AuthSettings() {
 }
 
 function switchH5LoginMode(mode) {
-  const nextMode = String(mode || '').trim().toLowerCase() === 'register' ? 'register' : 'login';
-  h5LoginMode = nextMode;
+  h5LoginMode = 'login';
   setH5LoginStatus('', 'normal');
   renderH5LoginScreen();
 }
@@ -7396,7 +7370,7 @@ function renderH5LoginScreen() {
   const quickHost = document.getElementById('h5-login-quick-section');
   const descHost = document.getElementById('h5-login-desc');
   if (!formHost || !quickHost) return;
-  const isRegisterMode = h5LoginMode === 'register';
+  const isRegisterMode = false;
   if (descHost) {
     if (isRegisterMode) {
       descHost.textContent = '注册后需要完成首次进入确认，并选择你获取这个 H5 的渠道。';
@@ -7417,7 +7391,6 @@ function renderH5LoginScreen() {
     ${settings.password_login_enabled ? `
       <div class="h5-login-mode-tabs">
         <button class="h5-login-mode-tab ${!isRegisterMode ? 'active' : ''}" type="button" onclick="switchH5LoginMode('login')">登录</button>
-        <button class="h5-login-mode-tab ${isRegisterMode ? 'active' : ''}" type="button" onclick="switchH5LoginMode('register')">注册</button>
       </div>
     ` : ''}
     <form class="h5-login-form" onsubmit="event.preventDefault();${isRegisterMode ? 'registerH5Password()' : 'loginH5Password()'}">
@@ -7438,18 +7411,10 @@ function renderH5LoginScreen() {
         ${!isRegisterMode && settings.wechat_login_enabled ? `<button class="h5-login-btn secondary" type="button" onclick="startH5WeChatLogin()" ${settings.wechat_ready ? '' : 'disabled'}><span class="h5-login-btn-icon wechat">微</span><span>${settings.wechat_ready ? '微信登录' : '微信未配置'}</span></button>` : ''}
       </div>
     </form>
-    ${isRegisterMode
-      ? `<div class="h5-login-tip">注册成功后会立即要求你完成合规确认，并选择渠道来源，渠道口径与后台分析保持一致。</div>`
-      : settings.wechat_login_enabled
+    ${settings.wechat_login_enabled
         ? `<div class="h5-login-tip">微信登录会在成功授权后自动绑定或登录当前平台账号。</div>`
         : ''
     }
-    ${settings.password_login_enabled ? `
-      <div class="h5-login-inline-switch">
-        <span>${isRegisterMode ? '已经有账号？' : '还没有账号？'}</span>
-        <button type="button" onclick="switchH5LoginMode('${isRegisterMode ? 'login' : 'register'}')">${isRegisterMode ? '去登录' : '去注册'}</button>
-      </div>
-    ` : ''}
   `;
   if (!isRegisterMode && settings.quick_select_enabled) {
     const recentAccounts = getH5LoginHistoryAccounts();
@@ -7848,6 +7813,10 @@ function buildReviewArticleData(review) {
   const publishedAt = String(review.publishedAt || review.generatedAt || '').trim() || '日期未提供';
   return {
     id: review.id,
+    contentKind: review.content_kind || review.contentKind || 'insight',
+    broadcastKind: review.broadcast_kind || review.broadcastKind || '',
+    broadcastLabel: review.broadcast_label || review.broadcastLabel || '',
+    visualTheme: review.visual_theme || review.visualTheme || '',
     accessRequired: !!review.access_required,
     accessNotice: String(review.access_notice || '订阅后查看完整洞见内容'),
     accessMode: review.access_mode === 'subscriber' ? 'subscriber' : 'public',
@@ -7858,6 +7827,7 @@ function buildReviewArticleData(review) {
     publishedAt,
     viewCount,
     summary: review.summary,
+    contentText: String(review.content_text || review.contentText || '').trim(),
     author: review.author,
     avatar: review.avatar,
     periodLabel: review.periodLabel,
@@ -7906,7 +7876,12 @@ function buildPublishedReviewArticleFromSnapshot(davUser, snapshot, period) {
     publishedAt: matched.published_at || matched.time || nowTs(),
     viewCount: matched.view_count,
     title: matched.title || '洞见分析报告',
+    content_kind: matched.content_kind || 'insight',
+    broadcast_kind: matched.broadcast_kind || '',
+    broadcast_label: matched.broadcast_label || '',
+    visual_theme: matched.visual_theme || '',
     summary: matched.summary || matched.content_text || '',
+    content_text: matched.content_text || matched.summary || '',
     tags: matched.tags || [],
     watchlist,
     annotations: [],
@@ -7976,8 +7951,9 @@ function renderReviewArticleCards(articles) {
   return `
     <div class="review-article-list">
       ${articles.map(article => `
-        <div class="review-article-card" role="button" tabindex="0" onclick="openReviewArticleDetail('${escapeAttr(article.id)}')" onkeydown="if(event.key==='Enter'||event.key===' ')openReviewArticleDetail('${escapeAttr(article.id)}')">
+        <div class="review-article-card ${article.contentKind === 'ai_broadcast' ? `ai-broadcast ${article.broadcastKind === 'night' ? 'night' : 'noon'}` : ''}" role="button" tabindex="0" onclick="openReviewArticleDetail('${escapeAttr(article.id)}')" onkeydown="if(event.key==='Enter'||event.key===' ')openReviewArticleDetail('${escapeAttr(article.id)}')">
           <div class="review-article-cover">
+            ${article.contentKind === 'ai_broadcast' ? `<div class="review-article-broadcast-mark">${article.broadcastKind === 'night' ? '☾' : '☀'} 小金智能体 · ${escapeHtml(article.broadcastLabel || '财经播报')}</div>` : ''}
             ${renderReviewArticleAccessBadge(article)}
             <div class="review-article-cover-kicker">${escapeHtml(article.kicker)}</div>
             <div class="review-article-cover-title">${escapeHtml(article.title)}</div>
@@ -8035,23 +8011,23 @@ function renderFeaturedInsightCard() {
           </div>
         </div>
       `).join('')}
-      </div>
     </div>
   `;
 }
 
-function renderFeedMarketEconomy(items, title, chartId, limit = 10, description = '正增长红柱 · 负增长绿柱 · 数据来自 AKShare 快照') {
+function renderFeedMarketEconomy(items, title, chartId, limit = 10, description = '正增长红柱 · 负增长绿柱 · 数据来自 AKShare 快照', syncTime = '', stale = false) {
   const rows = (Array.isArray(items) ? items : []).filter((item) => item && item.available !== false);
-  if (!rows.length) return `<div class="feed-market-chart"><div class="feed-market-chart-title">${escapeHtml(title)}</div><div class="feed-market-economy-desc">暂无可用的最新数据</div></div>`;
+  const syncLabel = syncTime ? `${stale ? '最近一次成功同步' : '数据同步时间'}：${syncTime}` : '数据同步时间：暂无同步记录';
+  if (!rows.length) return `<div class="feed-market-chart"><div class="feed-market-chart-title">${escapeHtml(title)}</div><div class="feed-market-economy-desc">暂无可用的最新数据</div><div class="feed-market-sync-time">${escapeHtml(syncLabel)}</div></div>`;
   const chartRows = rows.slice().sort((left, right) => {
     return Number(right.change_pct || 0) - Number(left.change_pct || 0);
   }).slice(0, Math.max(1, Number(limit) || rows.length)).map((item) => ({
-    label: item.sector || item.name || item.code || '--',
+    label: item.code && item.name ? `${item.name}\n${item.code}` : (item.sector || item.name || item.code || '--'),
     value: Number(item.change_pct || 0),
   }));
   const safeChartId = chartId || `feed-market-chart-${Math.random().toString(36).slice(2, 8)}`;
   window.setTimeout(() => renderFeedMarketEconomyChart(safeChartId, chartRows), 0);
-  return `<div class="feed-market-chart"><div class="feed-market-chart-title">${escapeHtml(title)}</div><div id="${escapeAttr(safeChartId)}" class="feed-market-chart-canvas" role="img" aria-label="${escapeAttr(title)}涨跌幅柱状图"></div><div class="feed-market-economy-desc">${escapeHtml(description)}</div></div>`;
+  return `<div class="feed-market-chart"><div class="feed-market-chart-title">${escapeHtml(title)}</div><div id="${escapeAttr(safeChartId)}" class="feed-market-chart-canvas" role="img" aria-label="${escapeAttr(title)}涨跌幅柱状图"></div><div class="feed-market-economy-desc">${escapeHtml(description)}</div><div class="feed-market-sync-time">${escapeHtml(syncLabel)}</div></div>`;
 }
 
 function renderFeedMarketEconomyChart(chartId, rows) {
@@ -8107,10 +8083,12 @@ function renderFeedMarketEconomyChart(chartId, rows) {
   window.GangtiseEcharts.render(host, option);
 }
 
-function renderFeedMarketEconomyPanel(overviewItems, sectorItems) {
+function renderFeedMarketEconomyPanel(overviewPayload, sectorPayload) {
   const host = document.getElementById('feed-market-economy');
   if (!host) return;
-  host.innerHTML = `<div class="feed-market-economy"><div class="feed-market-economy-title">行业经济指标</div><div class="feed-market-economy-desc">以零轴为基线展示热门行业与市场一览涨跌 Top10。</div><div class="feed-market-economy-grid">${renderFeedMarketEconomy(sectorItems, '热门行业涨跌Top10', 'feed-market-sector-chart', 10)}${renderFeedMarketEconomy(overviewItems, '市场一览涨跌Top10', 'feed-market-overview-chart', 10)}</div></div>`;
+  const overview = overviewPayload && typeof overviewPayload === 'object' ? overviewPayload : {};
+  const sectors = sectorPayload && typeof sectorPayload === 'object' ? sectorPayload : {};
+  host.innerHTML = `<div class="feed-market-economy"><div class="feed-market-economy-title">行业经济指标</div><div class="feed-market-economy-desc">以零轴为基线展示热门行业与市场一览涨跌 Top10。</div><div class="feed-market-economy-grid">${renderFeedMarketEconomy(sectors.items || [], '热门行业涨跌Top10', 'feed-market-sector-chart', 10, '正增长红柱 · 负增长绿柱 · 数据来自 AKShare 快照', sectors.updated_at, sectors.stale)}${renderFeedMarketEconomy(overview.items || [], '市场一览涨跌Top10', 'feed-market-overview-chart', 10, '正增长红柱 · 负增长绿柱 · 数据来自 AKShare 快照', overview.updated_at, overview.stale)}</div></div>`;
 }
 
 function renderFundamentalWatchlistChart() {
@@ -8120,6 +8098,7 @@ function renderFundamentalWatchlistChart() {
     .filter((item) => item && item.data_unavailable !== true && Number.isFinite(Number(item.change_pct)))
     .map((item) => ({
       name: item.name || item.code || '--',
+      code: item.code || item.security_code || '',
       change_pct: Number(item.change_pct),
       available: true,
     }));
@@ -8139,7 +8118,7 @@ async function loadFeedMarketEconomy() {
     const [sectorResponse, overviewResponse] = await Promise.all([fetch('/api/market-sectors', {cache: 'no-store'}), fetch('/api/market-overview', {cache: 'no-store'})]);
     const sectors = await sectorResponse.json().catch(() => ({}));
     const overview = await overviewResponse.json().catch(() => ({}));
-    renderFeedMarketEconomyPanel(overview.items || [], sectors.items || []);
+    renderFeedMarketEconomyPanel(overview, sectors);
   } catch (error) {
     host.innerHTML = '';
   }
@@ -8360,10 +8339,13 @@ function renderReviewArticleDetailContent(article, options = {}) {
     ? '这是发布前的最终预览。当前阅读态会尽量贴近普通用户和大V最终看到的详情展示。'
     : article.coverDesc;
   const metaSuffix = previewMode ? ' · 预览态' : ` · 作者 ${escapeHtml(article.author)}`;
+  const isAgentBroadcast = article.contentKind === 'ai_broadcast';
+  const broadcastClass = isAgentBroadcast ? `ai-broadcast ${article.broadcastKind === 'night' ? 'night' : 'noon'}` : '';
+  const broadcastLabel = article.broadcastLabel || (article.broadcastKind === 'night' ? '晚间播报' : '午间播报');
   return `
-    <div class="review-article-detail-head">
+    <div class="review-article-detail-head ${broadcastClass}">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-        <div class="review-article-detail-kicker">${escapeHtml(article.kicker)}</div>
+        <div class="review-article-detail-kicker">${isAgentBroadcast ? `<span class="review-article-broadcast-label">${article.broadcastKind === 'night' ? '☾' : '☀'} 小金智能体 · ${escapeHtml(broadcastLabel)}</span>` : escapeHtml(article.kicker)}</div>
         ${renderReviewArticleAccessLabel(article)}
       </div>
       <div class="review-article-detail-title">${escapeHtml(article.title)}</div>
@@ -8373,7 +8355,7 @@ function renderReviewArticleDetailContent(article, options = {}) {
       </div>
     </div>
     <div class="review-article-detail-body">
-      <div class="review-article-hero">
+      <div class="review-article-hero ${broadcastClass}">
         <div class="review-article-hero-copy">
           <div class="review-article-hero-title">${escapeHtml(article.coverTitle)}</div>
           <div class="review-article-hero-desc">${escapeHtml(heroDesc)}</div>
@@ -8392,6 +8374,17 @@ function renderReviewArticleDetailContent(article, options = {}) {
           <div class="review-article-section-text">${escapeHtml(article.userInputSection.display_text).replace(/\n/g, '<br>')}</div>
         </div>
       ` : ''}
+      ${article.contentKind === 'ai_broadcast' && article.contentText ? `
+        <div class="review-article-section review-article-broadcast-content">
+          <div class="review-article-section-title">${escapeHtml(article.broadcastLabel || '财经播报')}</div>
+          ${renderGangtiseMarkdown(article.contentText)}
+        </div>
+      ` : (!article.userInputSection?.display_text && article.contentText ? `
+        <div class="review-article-section">
+          <div class="review-article-section-title">完整洞见正文</div>
+          ${renderGangtiseMarkdown(article.contentText)}
+        </div>
+      ` : '')}
       ${renderReviewWatchlistAnalysisSection(article)}
       ${false && article.knowledgeAttachments.length ? `
         <div class="review-article-section">
@@ -11906,7 +11899,22 @@ function renderFundMacroDashboard() {
   `;
 }
 
+function removeLegacyWorkbenchDashboardMarkup() {
+  const selectors = [
+    '.wb-dashboard-card',
+    '#wb-dashboard-section-title',
+    '#wb-dashboard-section-desc',
+    '#wb-smart-layout-row',
+    '#wb-dashboard-preview',
+    '#wb-smart-indicator-library',
+    '.wb-dashboard-actions',
+    '.wb-dashboard-meta',
+  ];
+  document.querySelectorAll(selectors.join(',')).forEach((node) => node.remove());
+}
+
 function renderWorkbenchFundDashboard() {
+  return;
   const previewHost = document.getElementById('wb-dashboard-preview');
   const metaHost = document.getElementById('wb-dashboard-meta');
   if (!previewHost || !metaHost) return;
@@ -12094,7 +12102,6 @@ function renderKnowledgeExperience() {
   renderKnowledgeWorkbench();
   renderKnowledgeStructure();
   renderKnowledgeZone();
-  renderWorkbenchFundDashboard();
   const activeUser = getActiveDemoUser() || {};
   if (activeUser.role === 'dav') {
     loadKnowledgeStructure({ silent: true }).catch(() => {});
@@ -14270,29 +14277,38 @@ async function addCurrentStockToWatchlist() {
   if (!currentWatchlistDetail) return;
   const stockCode = normalizeStockLookupValue(currentWatchlistDetail.code);
   if (!stockCode) return;
+  let saved;
   try {
+    const tenantSlug = String((getActiveDemoUser()?.tenant || {}).slug || '').trim().toLowerCase();
     const response = await fetch('/api/watchlist/items', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({stock_code: stockCode, stock_name: currentWatchlistDetail.name || ''}),
+      body: JSON.stringify({stock_code: stockCode, stock_name: currentWatchlistDetail.name || '', tenant_slug: tenantSlug}),
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok || payload.ok === false) throw new Error(payload.error || 'watchlist_item_add_failed');
-    const saved = payload.item && typeof payload.item === 'object' ? payload.item : currentWatchlistDetail;
+    saved = payload.item && typeof payload.item === 'object' ? payload.item : currentWatchlistDetail;
     WATCHLIST_DETAILS_MAP = {...(WATCHLIST_DETAILS_MAP || {}), [stockCode]: saved};
     userWatchlistOwnerKey = getWatchlistOwnerKey();
     userWatchlistLoadError = '';
     userWatchlistLoaded = true;
+  } catch (error) {
+    showToast(error.message === 'database_unavailable' ? '自选股服务暂不可用，请稍后重试' : '加入自选股失败，请稍后重试');
+    return;
+  }
+  // Persistence succeeded. A rendering/analytics failure must not be reported
+  // as a failed write because the database is already the source of truth.
+  try {
     trackFanStockObservation(stockCode, 'watchlist_add', {
       entryPoint: 'watchlist_add',
       sourceDetail: 'h5_watchlist',
     });
     renderWatchlist();
     renderWatchlistDetail(saved, currentWatchlistSection);
-    showToast('已加入自选股');
   } catch (error) {
-    showToast(error.message === 'database_unavailable' ? '自选股服务暂不可用，请稍后重试' : '加入自选股失败，请稍后重试');
+    console.error('watchlist persisted but UI refresh failed', error);
   }
+  showToast('已加入自选股');
 }
 
 function requestWatchlistRemoval(stockCode) {
@@ -14407,7 +14423,8 @@ async function loadPersistedUserWatchlist() {
   userWatchlistLoadPromiseOwnerKey = ownerKey;
   userWatchlistLoadPromise = (async () => {
     try {
-      const response = await fetch('/api/watchlist/items');
+      const tenantSlug = encodeURIComponent(String((getActiveDemoUser()?.tenant || {}).slug || '').trim().toLowerCase());
+      const response = await fetch(`/api/watchlist/items${tenantSlug ? `?tenant_slug=${tenantSlug}` : ''}`);
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload.ok === false) throw new Error(payload.error || 'watchlist_items_load_failed');
       if (requestSeq !== userWatchlistRequestSeq || ownerKey !== getWatchlistOwnerKey()) return;
@@ -14804,7 +14821,7 @@ function buildWatchlistIntradaySvg(series, unavailableMessage, source, tradeDate
         <div style="font-size:12px;font-weight:700;color:var(--text-main)">分时曲线</div>
         <div style="font-size:11px;color:var(--gray-400)">当前涨跌 ${changePct >= 0 ? '+' : ''}${Number(changePct || 0).toFixed(2)}%</div>
       </div>
-      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">${escapeHtml(tradeDate || String(rows[0].date || '').slice(0, 10))} · ${escapeHtml(source === 'gangtise_openapi_cache' ? 'Gangtise 分钟K（缓存）' : 'Gangtise 分钟K')} · ${rows.length} 个分钟点</div>
+      <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">${escapeHtml(tradeDate || String(rows[0].date || '').slice(0, 10))} · AKShare 分钟K · ${rows.length} 个分钟点</div>
       ${shell.chartHtml}
     </div>
   `;
@@ -15658,7 +15675,6 @@ function showFundNewsDetail(item) {
   const title = String(news.title || '综合归纳要闻').trim() || '综合归纳要闻';
   const sourceGroup = String(news.source_group || news.tag || '综合要闻').trim() || '综合要闻';
   const tag = String(news.tag || sourceGroup).trim() || sourceGroup;
-  const impactLabel = String(news.impact_label || '中性/待确认').trim() || '中性/待确认';
   const industry = String(news.industry || '综合/未分类').trim() || '综合/未分类';
   const time = String(news.time || '刚刚').trim() || '刚刚';
   const content = String(news.content || news.summary || '').trim();
@@ -15675,7 +15691,6 @@ function showFundNewsDetail(item) {
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <span class="event-type-badge event-activity">${escapeHtml(sourceGroup)}</span>
         <span class="tag tag-gold">${escapeHtml(tag)}</span>
-        <span class="fund-news-impact-tag fund-news-impact-${['positive','negative','neutral','mixed'].includes(String(news.impact || '')) ? String(news.impact) : 'neutral'}">${escapeHtml(impactLabel)}</span>
         <span style="font-size:11px;color:var(--gray-400)">${escapeHtml(time)}</span>
       </div>
       <div style="font-size:17px;font-weight:700;color:var(--white);line-height:1.5;margin-bottom:14px">${escapeHtml(title)}</div>
@@ -15695,7 +15710,7 @@ function showFundNewsDetail(item) {
         </div>
         <div style="background:var(--navy-mid);border-radius:8px;padding:10px">
           <div style="font-size:11px;color:var(--gray-400)">内容归类</div>
-          <div style="font-size:12px;color:var(--white);margin-top:4px">${escapeHtml(sourceGroup)} · ${escapeHtml(tag)} · 行业：${escapeHtml(industry)}</div>
+          <div style="font-size:12px;color:var(--white);margin-top:4px">${escapeHtml(sourceGroup)} · ${escapeHtml(tag)}</div>
         </div>
         <div style="background:var(--navy-mid);border-radius:8px;padding:10px">
           <div style="font-size:11px;color:var(--gray-400)">阅读建议</div>
@@ -15707,13 +15722,50 @@ function showFundNewsDetail(item) {
 }
 
 function getFundNewsTabs() {
-  const tabs = Array.isArray(FUND_NEWS_TABS) && FUND_NEWS_TABS.length ? FUND_NEWS_TABS : [{ key: 'summary', label: '今日 Top5', count: 0, items: [] }];
+  const tabs = Array.isArray(FUND_NEWS_TABS) && FUND_NEWS_TABS.length ? FUND_NEWS_TABS : [{ key: 'all', label: '全部新闻', count: 0, items: [] }];
   return tabs.map((tab) => ({
     key: String(tab.key || 'all').trim() || 'all',
     label: String(tab.label || '全部').trim() || '全部',
     count: Number(tab.count || 0),
     items: Array.isArray(tab.items) ? tab.items : [],
   }));
+}
+
+function getFundNewsListTabs() {
+  const tabs = Array.isArray(FUND_NEWS_LIST_TABS) && FUND_NEWS_LIST_TABS.length ? FUND_NEWS_LIST_TABS : getFundNewsTabs();
+  return tabs.map((tab) => ({
+    key: String(tab.key || 'all').trim() || 'all',
+    label: String(tab.label || '全部').trim() || '全部',
+    count: Number(tab.count || 0),
+    items: Array.isArray(tab.items) ? tab.items : [],
+  }));
+}
+
+function renderFundNewsHome() {
+  const tabs = getFundNewsTabs();
+  const activeKey = window.fundNewsHomeTabKey && tabs.some((tab) => tab.key === window.fundNewsHomeTabKey)
+    ? window.fundNewsHomeTabKey
+    : (tabs[0]?.key || 'all');
+  window.fundNewsHomeTabKey = activeKey;
+  const activeTab = tabs.find((tab) => tab.key === activeKey) || tabs[0] || { items: [] };
+  const tabsHost = document.getElementById('fund-news-home-tabs');
+  const resultsHost = document.getElementById('fund-news-home-results');
+  if (!tabsHost || !resultsHost) return;
+  tabsHost.innerHTML = tabs.map((tab) => (
+    `<button type="button" class="watch-detail-tab fund-news-list-tab ${tab.key === activeKey ? 'active' : ''}" onclick="selectFundNewsHomeTab('${escapeAttr(tab.key)}')">${escapeHtml(tab.label)} (${tab.count})</button>`
+  )).join('');
+  const rows = Array.isArray(activeTab.items) ? activeTab.items : [];
+  window.FUND_NEWS_HOME_ITEMS = rows;
+  resultsHost.innerHTML = rows.length ? `<div style="display:grid;gap:10px">${rows.map((item, index) => `
+    <div class="news-item fund-news-item" style="cursor:pointer" onclick="showFundNewsDetail(window.FUND_NEWS_HOME_ITEMS[${index}])">
+      <div class="news-item-header"><div class="news-title">${escapeHtml(item.title || '综合归纳要闻')}</div><span class="fund-news-source">${escapeHtml(item.source_name || item.source_group || '新闻源')}</span></div>
+      <div class="news-meta"><span class="tag tag-gold">${escapeHtml(item.source_group || item.tag || '综合要闻')}</span><span class="news-time">${escapeHtml(item.time || '来源未提供发布时间')}</span></div>
+    </div>`).join('')}</div>` : '<div class="fund-board-empty">最近 3 天暂无新闻。</div>';
+}
+
+function selectFundNewsHomeTab(tabKey) {
+  window.fundNewsHomeTabKey = String(tabKey || 'all');
+  renderFundNewsHome();
 }
 
 function renderFundNewsRelevance(item) {
@@ -15740,13 +15792,26 @@ function buildFundNewsListRouteUrl(activeTabKey) {
 }
 
 function renderFundNewsList() {
-  const tabs = getFundNewsTabs();
+  const tabs = getFundNewsListTabs();
   const nextKey = tabs.some((tab) => tab.key === fundNewsListState.activeTabKey) ? fundNewsListState.activeTabKey : 'all';
   fundNewsListState.activeTabKey = nextKey;
   const currentTab = tabs.find((tab) => tab.key === nextKey) || tabs[0];
   const query = String(fundNewsListState.query || '').trim().toLowerCase();
+  const analysisHost = document.getElementById('fund-news-analysis');
+  let analysis = {};
+  try { analysis = JSON.parse(analysisHost?.dataset.analysis || '{}'); } catch (error) { analysis = {}; }
+  const analysisDate = String(analysis.date || new Date().toISOString().slice(0, 10));
+  const allNewsItems = (tabs.find((tab) => tab.key === 'all')?.items || tabs.flatMap((tab) => tab.items || []));
+  const availableDates = [...new Set(allNewsItems.map((item) => String(item.published_at || item.fetched_at || '').slice(0, 10)).filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date) && date <= analysisDate))].sort().reverse();
+  const timeWindowDates = {
+    today: new Set([analysisDate]),
+    recent_3d: new Set(availableDates.slice(0, 3)),
+    recent_10d: new Set(availableDates.slice(0, 10)),
+  };
+  const selectedTimeDates = timeWindowDates[fundNewsListState.activeTimeWindow];
   const rows = (currentTab?.items || []).filter((item) => {
     if (fundNewsListState.activeImpact !== 'all' && String(item.impact || 'neutral') !== fundNewsListState.activeImpact) return false;
+    if (selectedTimeDates && !selectedTimeDates.has(String(item.published_at || item.fetched_at || '').slice(0, 10))) return false;
     if (!query) return true;
     return [item.title, item.content, item.summary, item.why, item.tag, item.source_group, ...(item.matched_topics || [])]
       .join(' ')
@@ -15757,9 +15822,8 @@ function renderFundNewsList() {
   const tabsHost = document.getElementById('fund-news-list-tabs');
   const resultsHost = document.getElementById('fund-news-list-results');
   if (tabsHost) {
-    const impactTabs = [['all', '全部新闻'], ['positive', '利好'], ['negative', '利空']];
-    tabsHost.innerHTML = impactTabs.map(([key, label]) => (
-      `<button type="button" class="watch-detail-tab fund-news-list-tab ${fundNewsListState.activeImpact === key ? 'active' : ''}" onclick="selectFundNewsImpact('${key}')">${label}</button>`
+    tabsHost.innerHTML = tabs.map((tab) => (
+      `<button type="button" class="watch-detail-tab fund-news-list-tab ${fundNewsListState.activeTabKey === tab.key ? 'active' : ''}" onclick="selectFundNewsListTab('${escapeAttr(tab.key)}')">${escapeHtml(tab.label)} (${tab.count})</button>`
     )).join('');
   }
   if (!resultsHost) return;
@@ -15771,8 +15835,7 @@ function renderFundNewsList() {
             <div class="news-title">${escapeHtml(newsItem.title || '综合归纳要闻')}</div>
             <span class="fund-news-source">${escapeHtml(newsItem.source_group || newsItem.tag || '综合要闻')}</span>
           </div>
-          <div class="news-meta"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="tag tag-gold">${escapeHtml(newsItem.tag || newsItem.source_group || '综合要闻')}</span>${renderFundNewsImpact(newsItem)}${renderFundNewsRelevance(newsItem)}<span class="news-time">${escapeHtml(newsItem.time || '刚刚')}</span></div></div>
-          <div class="fund-news-why">为什么是要闻：${escapeHtml(newsItem.why || '当前没有补充说明。')}</div>
+          <div class="news-meta"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="tag tag-gold">${escapeHtml(newsItem.source_group || newsItem.tag || '综合要闻')}</span><span class="news-time">${escapeHtml(newsItem.time || '来源未提供发布时间')}</span></div></div>
         </div>
       `).join('')}
     </div>
@@ -15780,16 +15843,17 @@ function renderFundNewsList() {
 }
 
 function openFundNewsList(options = {}) {
-  const feedPage = document.getElementById('page-feed');
   const listPage = document.getElementById('page-fund-news-list');
-  if (!feedPage || !listPage) return;
-  const tabs = getFundNewsTabs();
+  if (!listPage) return;
+  const tabs = getFundNewsListTabs();
   const requestedTab = String(options.activeTabKey || 'all').trim();
   fundNewsListState.activeTabKey = tabs.some((tab) => tab.key === requestedTab) ? requestedTab : 'all';
   if (options.activeImpact) fundNewsListState.activeImpact = String(options.activeImpact || 'all');
   if (!options.keepQuery) fundNewsListState.query = '';
-  feedPage.classList.remove('active');
+  ALL_TABS.forEach((tab) => document.getElementById('page-' + tab)?.classList.remove('active'));
+  document.querySelectorAll('.page').forEach((page) => page.classList.remove('active'));
   listPage.classList.add('active');
+  listPage.setAttribute('aria-hidden', 'false');
   document.querySelectorAll('.h5-nav-item').forEach((item) => item.classList.remove('active'));
   document.getElementById('nav-feed')?.classList.add('active');
   if (!options.skipHistory) window.history.pushState({}, '', buildFundNewsListRouteUrl(fundNewsListState.activeTabKey));
@@ -15798,7 +15862,10 @@ function openFundNewsList(options = {}) {
 }
 
 function closeFundNewsList(options = {}) {
-  document.getElementById('page-fund-news-list')?.classList.remove('active');
+  const listPage = document.getElementById('page-fund-news-list');
+  listPage?.classList.remove('active');
+  listPage?.setAttribute('aria-hidden', 'true');
+  ALL_TABS.forEach((tab) => document.getElementById('page-' + tab)?.classList.remove('active'));
   document.getElementById('page-feed')?.classList.add('active');
   document.querySelectorAll('.h5-nav-item').forEach((item) => item.classList.remove('active'));
   document.getElementById('nav-feed')?.classList.add('active');
@@ -15820,6 +15887,11 @@ function selectFundNewsListTab(tabKey) {
 
 function selectFundNewsImpact(value) {
   fundNewsListState.activeImpact = String(value || 'all');
+  renderFundNewsList();
+}
+
+function selectFundNewsTimeWindow(value) {
+  fundNewsListState.activeTimeWindow = ['all', 'today', 'recent_3d', 'recent_10d'].includes(String(value || '')) ? String(value) : 'all';
   renderFundNewsList();
 }
 
@@ -15881,21 +15953,40 @@ let hermesSessionSearchKeyword = '';
 let hermesSessionActorKey = '';
 let hermesSessionListLoadedKey = '';
 let hermesSessionListLoading = false;
-const fundNewsListState = { activeTabKey: 'all', query: '', activeImpact: 'all' };
+const fundNewsListState = { activeTabKey: 'all', query: '', activeImpact: 'all', activeTimeWindow: 'all' };
 
 let fundNewsAnalysisCharts = [];
 let fundNewsAnalysisResizeHandler = null;
+let fundNewsAnalysisWindow = 'today';
+const fundNewsAnalysisWindowLabels = { today: '今日', recent_3d: '近3个交易日', recent_10d: '近10个交易日' };
+function selectFundNewsAnalysisWindow(windowKey) {
+  const nextKey = Object.prototype.hasOwnProperty.call(fundNewsAnalysisWindowLabels, String(windowKey)) ? String(windowKey) : 'today';
+  fundNewsAnalysisWindow = nextKey;
+  document.querySelectorAll('[data-news-window]').forEach((button) => {
+    button.classList.toggle('active', button.dataset.newsWindow === nextKey);
+  });
+  renderFundNewsAnalysisCharts();
+}
 function renderFundNewsAnalysisCharts() {
   const host = document.getElementById('fund-news-analysis');
   if (!host || !window.echarts) return;
   let analysis = {};
   try { analysis = JSON.parse(host.dataset.analysis || '{}'); } catch (error) { analysis = {}; }
-  const counts = analysis.counts || {};
-  const total = Number(analysis.total || 0);
+  const selected = (analysis.windows && analysis.windows[fundNewsAnalysisWindow]) || analysis;
+  const counts = selected.counts || {};
+  const total = Number(selected.total || 0);
+  const windowLabel = fundNewsAnalysisWindowLabels[fundNewsAnalysisWindow] || '今日';
+  const dates = Array.isArray(selected.dates) ? selected.dates : [];
   const pieHost = document.getElementById('fund-news-impact-pie');
   const barHost = document.getElementById('fund-news-industry-bar');
-  if (!analysis.available || !total) {
-    [pieHost, barHost].forEach((target) => { if (target) target.innerHTML = '<div class="fund-news-analysis-empty">今日暂无带有效发布时间的新闻标注<br>暂不计算利好/利空比例</div>'; });
+  const dateHost = document.getElementById('fund-news-analysis-date');
+  const pieCaption = document.getElementById('fund-news-impact-caption');
+  const industryCaption = document.getElementById('fund-news-industry-caption');
+  if (dateHost) dateHost.textContent = dates.length ? `${dates[0]}${dates.length > 1 ? ` 至 ${dates[dates.length - 1]}` : ''}` : windowLabel;
+  if (pieCaption) pieCaption.textContent = `${windowLabel}新闻利好 / 利空比例`;
+  if (industryCaption) industryCaption.textContent = `${windowLabel}行业利好 / 利空分类占比`;
+  if (!selected.available || !total) {
+    [pieHost, barHost].forEach((target) => { if (target) target.innerHTML = `<div class="fund-news-analysis-empty">${windowLabel}暂无带有效发布时间的新闻标注<br>暂不计算利好/利空比例</div>`; });
     return;
   }
   const positive = Number(counts.positive || 0);
@@ -15904,7 +15995,7 @@ function renderFundNewsAnalysisCharts() {
   const pie = window.echarts.init(pieHost);
   pie.setOption({ animation: false, tooltip: { trigger: 'item', formatter: '{b}: {c} 条 ({d}%)' }, legend: { bottom: 5, left: 'center', textStyle: { fontSize: 10 } }, series: [{ type: 'pie', radius: ['42%', '70%'], center: ['50%', '45%'], avoidLabelOverlap: true, label: { fontSize: 10, formatter: '{b} {d}%' }, data: [{ name: '利好', value: positive, itemStyle: { color: '#D64545' } }, { name: '利空', value: negative, itemStyle: { color: '#2E9B65' } }, { name: '中性/待确认', value: Number(counts.neutral || 0), itemStyle: { color: '#AAB4C0' } }, { name: '影响分化', value: Number(counts.mixed || 0), itemStyle: { color: '#D69E2E' } }] }]
   });
-  const industries = Array.isArray(analysis.industries) ? analysis.industries.slice(0, 8) : [];
+  const industries = Array.isArray(selected.industries) ? selected.industries.slice(0, 8) : [];
   const bar = window.echarts.init(barHost);
   bar.setOption({ animation: false, grid: { left: 72, right: 12, top: 32, bottom: 24 }, tooltip: { trigger: 'axis', valueFormatter: value => `${value}%` }, legend: { top: 8, right: 8, textStyle: { fontSize: 9 } }, xAxis: { type: 'value', max: 100, axisLabel: { fontSize: 9, formatter: '{value}%' }, splitLine: { lineStyle: { color: '#EEF2F6' } } }, yAxis: { type: 'category', inverse: true, data: industries.map(item => item.industry), axisLabel: { fontSize: 9, width: 62, overflow: 'truncate' } }, series: [{ name: '利好', type: 'bar', stack: 'impact', data: industries.map(item => item.positive_pct), itemStyle: { color: '#D64545' }, barMaxWidth: 16 }, { name: '利空', type: 'bar', stack: 'impact', data: industries.map(item => item.negative_pct), itemStyle: { color: '#2E9B65' }, barMaxWidth: 16 }, { name: '中性/待确认', type: 'bar', stack: 'impact', data: industries.map(item => item.neutral_pct), itemStyle: { color: '#AAB4C0' }, barMaxWidth: 16 }, { name: '影响分化', type: 'bar', stack: 'impact', data: industries.map(item => item.mixed_pct), itemStyle: { color: '#D69E2E' }, barMaxWidth: 16 }] });
   fundNewsAnalysisCharts = [pie, bar];
@@ -18371,7 +18462,7 @@ function getDmConversationDisplayMeta(item) {
     return {
       name: '系统消息',
       avatar: '📝',
-      tier: recordType === 'broadcast_notification' ? '群发通知' : '系统通知',
+      tier: recordType === 'agent_broadcast' ? '小金播报' : (recordType === 'broadcast_notification' ? '群发通知' : '系统通知'),
       isSystem: true,
     };
   }
@@ -18636,14 +18727,29 @@ function renderDmMessages(messages) {
           <div class="dm-msg-time" style="color:${timeColor}">${m.time}</div>
         </div>`;
     }
+    const isAgentBroadcast = m.type === 'agent_broadcast';
+    const broadcastKind = String(m.broadcast_kind || '').toLowerCase();
+    const broadcastClass = isAgentBroadcast ? ` agent-broadcast ${broadcastKind === 'night' ? 'night-broadcast' : 'noon-broadcast'}` : '';
+    const broadcastLabel = broadcastKind === 'night' ? '晚间播报' : (broadcastKind === 'morning' ? '早间播报' : '午间播报');
+    const broadcastIcon = broadcastKind === 'night' ? '☾' : (broadcastKind === 'morning' ? '◷' : '☀');
+    const insightId = String(m.insight_id || '').trim();
     return `
-      <div class="dm-msg from-${bubbleSide}">
+      <div class="dm-msg from-${bubbleSide}${broadcastClass}">
+        ${isAgentBroadcast ? `<div class="dm-agent-broadcast-label">${broadcastIcon} 小金智能体 · ${broadcastLabel}</div>` : ''}
         ${escapeHtml(m.content || '').replace(/\n/g, '<br>')}
+        ${isAgentBroadcast && insightId ? `<button class="dm-broadcast-insight-link" type="button" onclick="openBroadcastInsight('${escapeAttr(insightId)}')">查看对应洞见笔记</button>` : ''}
         <div class="dm-msg-time" style="color:${timeColor}">${m.time}</div>
       </div>`;
   }).join('');
   // Scroll to bottom
   setTimeout(() => { container.scrollTop = container.scrollHeight; }, 50);
+}
+
+function openBroadcastInsight(insightId) {
+  const id = String(insightId || '').trim();
+  if (!id) return;
+  switchTab('review');
+  window.setTimeout(() => openReviewArticleDetail(id), 0);
 }
 
 async function sendDm() {
@@ -20168,6 +20274,7 @@ function renderFundMacroDashboard() {
 }
 
 function renderWorkbenchFundDashboard() {
+  return;
   const previewHost = document.getElementById('wb-dashboard-preview');
   const metaHost = document.getElementById('wb-dashboard-meta');
   if (!previewHost || !metaHost) return;
@@ -20377,8 +20484,9 @@ function initH5SplashScreen() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  removeLegacyWorkbenchDashboardMarkup();
   initH5SplashScreen();
-  renderFundNewsAnalysisCharts();
+  renderFundNewsHome();
   window.GangtiseReleaseNotes?.init({ surface: 'h5', autoShow: false });
   syncDemoUsersWithActiveTenant();
   applySiteFeatureFlags();
@@ -20442,6 +20550,12 @@ window.addEventListener('storage', (event) => {
     refreshTenantDashboardRemoteState({rerenderFeed: true, rerenderWorkbench: true});
   }
 });
+
+removeLegacyWorkbenchDashboardMarkup();
+const legacyWorkbenchDashboardObserver = new MutationObserver(() => {
+  removeLegacyWorkbenchDashboardMarkup();
+});
+legacyWorkbenchDashboardObserver.observe(document.body, { childList: true, subtree: true });
 </script>
 </body>
 </html>
