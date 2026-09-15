@@ -1155,6 +1155,39 @@ def normalize_review_snapshot_item(item, tenant, index=0):
     title = str(raw.get("title") or fallback.get("title") or "").strip() or fallback["title"]
     content_text = str(raw.get("content_text") or raw.get("content") or raw.get("body_text") or fallback.get("content_text") or "").strip()
     summary = str(raw.get("summary") or fallback.get("summary") or content_text[:180]).strip() or fallback["summary"]
+    # Older production snapshots may predate the broadcast metadata fields.
+    # Recover the presentation contract from the persisted broadcast source
+    # and text so published noon/night reports keep their visual identity.
+    broadcast_kind = str(raw.get("broadcast_kind") or "").strip().lower()
+    visual_theme = str(raw.get("visual_theme") or "").strip().lower()
+    broadcast_text = " ".join(
+        str(value or "")
+        for value in (
+            raw.get("title"),
+            raw.get("summary"),
+            raw.get("content_text"),
+            raw.get("content"),
+            raw.get("source_mode"),
+            raw.get("source_endpoint"),
+            raw.get("broadcast_label"),
+        )
+    ).lower()
+    if broadcast_kind not in {"morning", "noon", "night"}:
+        if visual_theme.endswith("_night") or any(marker in broadcast_text for marker in ("晚间播报", "晚报", "eveningbriefing", "nightbriefing")):
+            broadcast_kind = "night"
+        elif visual_theme.endswith("_morning") or any(marker in broadcast_text for marker in ("早间播报", "早报", "morningbriefing", "morningflash")):
+            broadcast_kind = "morning"
+        elif visual_theme.endswith("_noon") or any(marker in broadcast_text for marker in ("午间播报", "午报", "noonbriefing", "afternoonflash", "afternoonbriefing")):
+            broadcast_kind = "noon"
+    source_mode = str(raw.get("source_mode") or fallback.get("source_mode") or "manual").strip().lower() or "manual"
+    content_kind = str(raw.get("content_kind") or "insight").strip().lower()[:40] or "insight"
+    if broadcast_kind in {"morning", "noon", "night"} or source_mode == "gangtise_daily_broadcast":
+        content_kind = "ai_broadcast"
+    if broadcast_kind in {"morning", "noon", "night"}:
+        visual_theme = f"agent_{broadcast_kind}"
+    broadcast_label = str(raw.get("broadcast_label") or "").strip()[:80]
+    if not broadcast_label and broadcast_kind in {"morning", "noon", "night"}:
+        broadcast_label = {"morning": "早间播报", "noon": "午间播报", "night": "晚间播报"}[broadcast_kind]
     access_mode = str(raw.get("access_mode") or "public").strip().lower()
     if access_mode not in {"public", "subscriber"}:
         access_mode = "public"
@@ -1308,14 +1341,14 @@ def normalize_review_snapshot_item(item, tenant, index=0):
         "access_mode": access_mode,
         "access_label": access_label,
         "view_count": view_count,
-        "source_mode": str(raw.get("source_mode") or fallback.get("source_mode") or "manual").strip().lower() or "manual",
+        "source_mode": source_mode,
         "paragraph_mode": str(raw.get("paragraph_mode") or fallback.get("paragraph_mode") or "manual").strip().lower() or "manual",
         "publisher": str(raw.get("publisher") or tenant.get("advisor") or "").strip() or tenant.get("advisor") or "",
         "snapshot_type": str(raw.get("snapshot_type") or "published_review").strip() or "published_review",
-        "content_kind": str(raw.get("content_kind") or "insight").strip().lower()[:40] or "insight",
-        "broadcast_kind": str(raw.get("broadcast_kind") or "").strip().lower()[:40],
-        "broadcast_label": str(raw.get("broadcast_label") or "").strip()[:80],
-        "visual_theme": str(raw.get("visual_theme") or "").strip().lower()[:40],
+        "content_kind": content_kind,
+        "broadcast_kind": broadcast_kind[:40],
+        "broadcast_label": broadcast_label,
+        "visual_theme": visual_theme[:40],
         "source_provider": str(raw.get("source_provider") or "").strip()[:120],
         "source_endpoint": str(raw.get("source_endpoint") or "").strip()[:240],
         "report_date": str(raw.get("report_date") or "").strip()[:20],

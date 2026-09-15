@@ -531,6 +531,23 @@ class ReviewModuleBddTest(unittest.TestCase):
         )
         self.assertEqual(normalized["view_count"], 12)
 
+    def test_given_legacy_broadcast_snapshot_when_normalized_then_night_theme_is_recovered(self):
+        tenant = {"slug": "bdd", "advisor": "测试大V"}
+        normalized = core_services.normalize_review_snapshot_item(
+            {
+                "id": "bdd-night-1",
+                "title": "2026-09-16 晚间播报 · 市场要闻与行业脉络",
+                "source_mode": "gangtise_daily_broadcast",
+                "content_text": "今日晚报内容",
+            },
+            tenant,
+            index=0,
+        )
+        self.assertEqual(normalized["content_kind"], "ai_broadcast")
+        self.assertEqual(normalized["broadcast_kind"], "night")
+        self.assertEqual(normalized["visual_theme"], "agent_night")
+        self.assertEqual(normalized["broadcast_label"], "晚间播报")
+
     def test_given_workbench_publish_success_when_page_renders_then_publish_no_longer_opens_test_modal(self):
         response = self.client.get(f"/kol-workbench?tenant={self.tenant_slug}")
 
