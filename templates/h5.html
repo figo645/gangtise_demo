@@ -20552,10 +20552,6 @@ window.addEventListener('storage', (event) => {
 });
 
 removeLegacyWorkbenchDashboardMarkup();
-const legacyWorkbenchDashboardObserver = new MutationObserver(() => {
-  removeLegacyWorkbenchDashboardMarkup();
-});
-legacyWorkbenchDashboardObserver.observe(document.body, { childList: true, subtree: true });
 </script>
 </body>
 </html>
