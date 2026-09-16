@@ -3146,6 +3146,14 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
   line-height:1.8;
   color:var(--text-main);
 }
+.kw-review-rich-editor img,
+.kw-review-final-editor img {
+  display:block;
+  max-width:100%;
+  height:auto;
+  margin:12px auto;
+  border-radius:10px;
+}
 .kw-review-rich-editor .ql-editor.ql-blank::before {
   color:#9AA6B2;
   font-style:normal;
@@ -4256,7 +4264,8 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
                     <div class="kw-review-preview-stage">
                       <div class="kw-review-studio-panel-title">发布前编辑</div>
                       <div class="kw-review-studio-panel-desc">这里是最终发布正文，你仍可以继续微调。正式发布动作统一放在向导底部。</div>
-                      <textarea id="kw-review-final-editor" class="kw-review-final-editor" placeholder="完成最终预览后，这里会出现可继续微调的发布正文。"></textarea>
+                      <div id="kw-review-final-editor" class="kw-review-rich-editor kw-review-final-editor" contenteditable="true" data-placeholder="完成最终预览后，这里会出现可继续微调的发布正文。"></div>
+                      <button class="kw-review-input-button" type="button" style="margin-top:8px" onclick="kwInsertReviewImageIntoEditor('kw-review-final-editor')">上传图片</button>
                       <div class="kw-review-stage-actions" style="margin-top:12px">
                         <button class="btn-outline" type="button" onclick="kwUseCurrentReviewDraftAsFinal()">同步当前预览</button>
                       </div>
@@ -7404,7 +7413,9 @@ let kwReviewDraft = {
   sectorSummaryRule: '',
   generatedPreviewText: '',
   draftReviewText: '',
+  draftReviewHtml: '',
   finalDraftText: '',
+  finalDraftHtml: '',
   previewReady: false,
 };
 let kwInsightDrafts = [];
@@ -7504,6 +7515,31 @@ function kwNormalizeKnowledgeHtml(html) {
   return String(html || '')
     .replace(/<p><br><\/p>/gi, '<p></p>')
     .trim();
+}
+
+function kwSafeReviewHtml(html) {
+  return kwNormalizeKnowledgeHtml(html).replace(/\s(on\w+|style)="[^"]*"/gi, '');
+}
+
+function kwReviewImagesHtml(html) {
+  const host = document.createElement('div');
+  host.innerHTML = String(html || '');
+  return Array.from(host.querySelectorAll('img')).map((image) => {
+    const src = String(image.getAttribute('src') || '').trim();
+    if (!/^data:image\//i.test(src) && !/^https?:\/\//i.test(src)) return '';
+    const alt = escapeAttr(image.getAttribute('alt') || '复盘图片');
+    return `<p><img src="${escapeAttr(src)}" alt="${alt}"></p>`;
+  }).filter(Boolean).join('');
+}
+
+function kwBuildReviewHtmlFromText(text) {
+  return kwPlainTextToKnowledgeHtml(text);
+}
+
+function kwBuildReviewGeneratedHtml(text, sourceHtml) {
+  const generated = kwBuildReviewHtmlFromText(text);
+  const images = kwReviewImagesHtml(sourceHtml);
+  return [generated, images].filter(Boolean).join('');
 }
 
 function kwKnowledgeHtmlToPlainText(html) {
@@ -7645,6 +7681,8 @@ function kwCreateKnowledgeQuill(containerId, placeholder, html) {
   quill.on('text-change', () => {
     kwSyncKnowledgeDraftFromEditors();
   });
+  const toolbar = quill.getModule('toolbar');
+  if (toolbar) toolbar.addHandler('image', () => kwSelectReviewImageFile(quill));
   kwInstallKnowledgeImagePaste(quill);
   return quill;
 }
@@ -7653,6 +7691,57 @@ function kwSyncReviewDraftFromEditors() {
   if (kwReviewEditors.manual) {
     kwReviewDraft.manualHtml = kwNormalizeKnowledgeHtml(kwReviewEditors.manual.root.innerHTML);
   }
+}
+
+function kwSelectReviewImageFile(quill) {
+  if (!quill) return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+  input.onchange = () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('图片不能超过 2MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const range = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
+      quill.insertEmbed(range.index, 'image', reader.result, 'user');
+      quill.setSelection(range.index + 1, 0, 'silent');
+      kwSyncReviewDraftFromEditors();
+      showToast('图片已插入复盘正文');
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+function kwInsertReviewImageIntoEditor(editorId) {
+  const editor = document.getElementById(editorId);
+  if (!editor) return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+  input.onchange = () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('图片不能超过 2MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      editor.focus();
+      document.execCommand('insertHTML', false, `<p><img src="${escapeAttr(reader.result)}" alt="复盘图片"></p>`);
+      if (editorId === 'kw-review-draft-review-input') kwSyncReviewDraftFromModal();
+      else kwSyncReviewTextInputs();
+      showToast('图片已插入复盘正文');
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
 }
 
 function kwEnsureReviewEditors() {
@@ -9372,6 +9461,12 @@ function kwGetReviewPreviewText() {
     || kwGetReviewDraftContentText();
 }
 
+function kwGetReviewPreviewHtml() {
+  if (String(kwReviewDraft.finalDraftHtml || '').trim()) return kwSafeReviewHtml(kwReviewDraft.finalDraftHtml);
+  if (String(kwReviewDraft.draftReviewHtml || '').trim()) return kwSafeReviewHtml(kwReviewDraft.draftReviewHtml);
+  return kwBuildReviewGeneratedHtml(kwGetReviewPreviewText(), kwReviewDraft.manualHtml);
+}
+
 function kwGetReviewUserInputDisplayText() {
   return String(kwReviewDraft.draftReviewText || '').trim() || kwGetReviewDraftContentText();
 }
@@ -9882,6 +9977,7 @@ async function kwEmbedManualReviewText(text) {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
       text,
+      content_html: kwGetReviewPreviewHtml(),
       tenant_slug: tenant.slug || '',
       period: kwReviewDraft.period || 'day',
       entry_point: 'web',
@@ -9973,7 +10069,10 @@ function kwSyncReviewTextInputs() {
   if (accessModeInput) kwReviewDraft.accessMode = accessModeInput.dataset.accessMode === 'subscriber' ? 'subscriber' : 'public';
   if (urlInput) kwReviewDraft.urlValue = String(urlInput.value || '').trim();
   if (urlTitleInput) kwReviewDraft.urlTitle = String(urlTitleInput.value || '').trim();
-  if (finalEditor) kwReviewDraft.finalDraftText = String(finalEditor.value || '').trim();
+  if (finalEditor) {
+    kwReviewDraft.finalDraftHtml = kwSafeReviewHtml(finalEditor.innerHTML || '');
+    kwReviewDraft.finalDraftText = kwKnowledgeHtmlToPlainText(kwReviewDraft.finalDraftHtml);
+  }
 }
 
 function kwOpenReviewCardPicker() {
@@ -10019,8 +10118,12 @@ function kwApplyReviewCardPicker() {
 function kwUseCurrentReviewDraftAsFinal() {
   kwSyncReviewTextInputs();
   kwReviewDraft.finalDraftText = String(kwGetReviewPreviewText() || kwReviewDraft.generatedPreviewText || kwGetReviewDraftContentText() || '').trim();
+  kwReviewDraft.finalDraftHtml = kwBuildReviewGeneratedHtml(
+    kwReviewDraft.finalDraftText,
+    kwReviewDraft.draftReviewHtml || kwReviewDraft.manualHtml,
+  );
   const editor = document.getElementById('kw-review-final-editor');
-  if (editor) editor.value = kwReviewDraft.finalDraftText;
+  if (editor) editor.innerHTML = kwReviewDraft.finalDraftHtml;
 }
 
 async function kwPreviewReviewUrl() {
@@ -10109,7 +10212,10 @@ function kwSyncReviewDraftFromModal() {
   kwSyncReviewTextInputs();
   if (promptInput) kwReviewDraft.aiPrompt = promptInput.value;
   if (skipAiInput) kwReviewDraft.skipAiProcessing = !!skipAiInput.checked;
-  if (draftReviewInput) kwReviewDraft.draftReviewText = draftReviewInput.value;
+    if (draftReviewInput) {
+      kwReviewDraft.draftReviewHtml = kwSafeReviewHtml(draftReviewInput.innerHTML || '');
+      kwReviewDraft.draftReviewText = kwKnowledgeHtmlToPlainText(kwReviewDraft.draftReviewHtml);
+    }
   if (structuredUserInput || structuredSectorSummary) {
     kwReviewStructuredPreview = kwNormalizeReviewStructuredPreview(kwReviewStructuredPreview || {});
     if (structuredUserInput) {
@@ -10451,6 +10557,10 @@ async function kwSubmitReviewSmartOptimize() {
           const result = job.result || {};
           kwReviewDraft.generatedPreviewText = result.text || '';
           kwReviewDraft.draftReviewText = result.text || kwGetReviewDraftContentText();
+          kwReviewDraft.draftReviewHtml = kwBuildReviewGeneratedHtml(
+            kwReviewDraft.draftReviewText,
+            kwReviewDraft.manualHtml,
+          );
           kwReviewIngestResult = {
             ...(kwReviewIngestResult || {}),
             review_draft_llm: result.llm_model || null,
@@ -10523,6 +10633,8 @@ function kwClearReviewVoiceTranscript() {
   kwReviewDraft.previewReady = false;
   kwReviewDraft.generatedPreviewText = '';
   kwReviewDraft.draftReviewText = '';
+  kwReviewDraft.draftReviewHtml = '';
+  kwReviewDraft.finalDraftHtml = '';
   kwReviewIngestResult = null;
   kwRenderReviewStudio();
   showToast('已清空口述文案');
@@ -11195,7 +11307,9 @@ function kwRenderReviewStageResults() {
     ${showDraftReview && (kwReviewDraft.generatedPreviewText || kwReviewDraft.draftReviewText) ? `
       <div class="kw-review-runtime-item" style="margin-top:12px">
         <strong>用户洞见草稿</strong>
-        <textarea id="kw-review-draft-review-input" class="kw-knowledge-modal-textarea" style="margin-top:10px;min-height:180px">${escapeHtml(kwReviewDraft.draftReviewText || kwReviewDraft.generatedPreviewText || '')}</textarea>
+        <div id="kw-review-draft-review-input" class="kw-review-rich-editor" contenteditable="true" style="margin-top:10px;min-height:180px">${kwSafeReviewHtml(kwReviewDraft.draftReviewHtml || kwBuildReviewGeneratedHtml(kwReviewDraft.draftReviewText || kwReviewDraft.generatedPreviewText || '', kwReviewDraft.manualHtml))}</div>
+        <button class="kw-review-input-button" type="button" style="margin-top:8px" onclick="kwInsertReviewImageIntoEditor('kw-review-draft-review-input')">上传图片</button>
+        <div class="kw-knowledge-rich-help">可直接粘贴图片，或使用上传按钮添加图片；图片会保留到最终发布。</div>
       </div>
     ` : ''}
     ${false && stage === 'preview_failed' ? `
@@ -11261,6 +11375,8 @@ function kwOpenReviewTriggerModal(sourceMode) {
   kwReviewDraft.promptTags = [];
   kwReviewDraft.generatedPreviewText = '';
   kwReviewDraft.draftReviewText = '';
+  kwReviewDraft.draftReviewHtml = '';
+  kwReviewDraft.finalDraftHtml = '';
   kwReviewDraft.finalDraftText = '';
   kwReviewDraft.previewReady = false;
   kwReviewDraft.flowStage = 'intake';
@@ -11700,8 +11816,8 @@ function kwRenderReviewStudio() {
   }
   const finalEditor = document.getElementById('kw-review-final-editor');
   if (finalEditor) {
-    const nextValue = String(kwReviewDraft.finalDraftText || kwGetReviewPreviewText() || kwReviewDraft.generatedPreviewText || kwGetReviewDraftContentText() || '').trim();
-    if (finalEditor.value !== nextValue) finalEditor.value = nextValue;
+    const nextHtml = kwSafeReviewHtml(kwReviewDraft.finalDraftHtml || kwGetReviewPreviewHtml());
+    if (finalEditor.innerHTML !== nextHtml) finalEditor.innerHTML = nextHtml;
   }
   kwApplyReviewWorkspacePanelState();
   kwEnsureReviewEditors();

@@ -4087,6 +4087,14 @@ body { background: var(--surface-2); color: var(--text-main); }
   display:block;
   margin:10px 0;
 }
+.review-rich-editor[contenteditable="true"] img,
+.review-article-detail-body img {
+  max-width:100%;
+  height:auto;
+  border-radius:10px;
+  display:block;
+  margin:12px auto;
+}
 .knowledge-rich-editor .ql-editor blockquote,
 .review-rich-editor .ql-editor blockquote {
   border-left:3px solid rgba(47,116,192,0.18);
@@ -5961,6 +5969,7 @@ let reviewTriggerDraft = {
   sectorSummaryRule: '',
   generatedPreviewText: '',
   draftReviewText: '',
+  draftReviewHtml: '',
   previewReady: false,
 };
 const reviewRuntimeStore = {};
@@ -7828,6 +7837,7 @@ function buildReviewArticleData(review) {
     viewCount,
     summary: review.summary,
     contentText: String(review.content_text || review.contentText || '').trim(),
+    contentHtml: String(review.content_html || review.contentHtml || '').trim(),
     author: review.author,
     avatar: review.avatar,
     periodLabel: review.periodLabel,
@@ -8116,11 +8126,24 @@ async function loadFeedMarketEconomy() {
   if (!host) return;
   try {
     const [sectorResponse, overviewResponse] = await Promise.all([fetch('/api/market-sectors', {cache: 'no-store'}), fetch('/api/market-overview', {cache: 'no-store'})]);
+    if (!sectorResponse.ok || !overviewResponse.ok) throw new Error('market_snapshot_unavailable');
     const sectors = await sectorResponse.json().catch(() => ({}));
     const overview = await overviewResponse.json().catch(() => ({}));
     renderFeedMarketEconomyPanel(overview, sectors);
+    const hasRows = (Array.isArray(sectors.items) && sectors.items.some((item) => item && item.available !== false))
+      || (Array.isArray(overview.items) && overview.items.some((item) => item && item.available !== false));
+    if (hasRows) marketEconomyRetryCount = 0;
+    if (!hasRows && marketEconomyRetryCount < 10) {
+      marketEconomyRetryCount += 1;
+      window.setTimeout(loadFeedMarketEconomy, 2500);
+    }
   } catch (error) {
-    host.innerHTML = '';
+    if (marketEconomyRetryCount < 10) {
+      marketEconomyRetryCount += 1;
+      window.setTimeout(loadFeedMarketEconomy, 2500);
+      return;
+    }
+    host.innerHTML = '<div class="feed-market-economy"><div class="feed-market-economy-title">行业经济指标</div><div class="feed-market-economy-desc">后台行情快照暂不可用，请稍后刷新。H5 不会直接请求外部行情源。</div></div>';
   }
 }
 
@@ -8368,7 +8391,7 @@ function renderReviewArticleDetailContent(article, options = {}) {
           <div class="review-article-section-text">${escapeHtml(article.accessNotice || '订阅后查看完整洞见内容')}。请前往个人中心查看订阅产品。</div>
         </div>
       ` : `
-      ${article.userInputSection && article.userInputSection.display_text ? `
+      ${!article.contentHtml && article.userInputSection && article.userInputSection.display_text ? `
         <div class="review-article-section">
           <div class="review-article-section-title">用户洞见</div>
           <div class="review-article-section-text">${escapeHtml(article.userInputSection.display_text).replace(/\n/g, '<br>')}</div>
@@ -8377,12 +8400,12 @@ function renderReviewArticleDetailContent(article, options = {}) {
       ${article.contentKind === 'ai_broadcast' && article.contentText ? `
         <div class="review-article-section review-article-broadcast-content">
           <div class="review-article-section-title">${escapeHtml(article.broadcastLabel || '财经播报')}</div>
-          ${renderGangtiseMarkdown(article.contentText)}
+          ${article.contentHtml ? article.contentHtml : renderGangtiseMarkdown(article.contentText)}
         </div>
-      ` : (!article.userInputSection?.display_text && article.contentText ? `
+      ` : ((article.contentHtml || !article.userInputSection?.display_text) && article.contentText ? `
         <div class="review-article-section">
           <div class="review-article-section-title">完整洞见正文</div>
-          ${renderGangtiseMarkdown(article.contentText)}
+          ${article.contentHtml ? article.contentHtml : renderGangtiseMarkdown(article.contentText)}
         </div>
       ` : '')}
       ${renderReviewWatchlistAnalysisSection(article)}
@@ -9037,6 +9060,22 @@ function plainTextToRichHtml(text) {
     .join('');
 }
 
+function buildReviewGeneratedHtml(text, sourceHtml) {
+  const generated = plainTextToRichHtml(text);
+  const host = document.createElement('div');
+  host.innerHTML = String(sourceHtml || '');
+  const images = Array.from(host.querySelectorAll('img')).map((image) => {
+    const src = String(image.getAttribute('src') || '').trim();
+    if (!/^data:image\//i.test(src) && !/^https?:\/\//i.test(src)) return '';
+    return `<p><img src="${escapeAttr(src)}" alt="复盘图片"></p>`;
+  }).filter(Boolean).join('');
+  return [generated, images].filter(Boolean).join('');
+}
+
+function getReviewPreviewHtml() {
+  return buildReviewGeneratedHtml(getReviewPreviewText(), reviewTriggerDraft.draftReviewHtml || reviewTriggerDraft.manualHtml);
+}
+
 function mergePlainTextIntoRichHtml(existingHtml, incomingText) {
   const existingText = richHtmlToPlainText(existingHtml || '');
   const mergedText = appendTranscribedText(existingText, incomingText || '');
@@ -9088,8 +9127,52 @@ function createSharedQuill(containerId, placeholder, html, onChange) {
   quill.on('text-change', () => {
     if (onChange) onChange();
   });
+  const toolbar = quill.getModule('toolbar');
+  if (toolbar) toolbar.addHandler('image', () => selectReviewImageFileH5(quill, onChange));
   installSharedQuillImagePaste(quill, onChange);
   return quill;
+}
+
+function selectReviewImageFileH5(quill, onChange) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+  input.onchange = () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) return showToast('图片不能超过 2MB');
+    const reader = new FileReader();
+    reader.onload = () => {
+      const range = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
+      quill.insertEmbed(range.index, 'image', reader.result, 'user');
+      quill.setSelection(range.index + 1, 0, 'silent');
+      if (onChange) onChange();
+      showToast('图片已插入复盘正文');
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+function insertReviewImageH5Editor(editor) {
+  if (!editor) return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+  input.onchange = () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) return showToast('图片不能超过 2MB');
+    const reader = new FileReader();
+    reader.onload = () => {
+      editor.focus();
+      document.execCommand('insertHTML', false, `<p><img src="${escapeAttr(reader.result)}" alt="复盘图片"></p>`);
+      syncReviewDraftFromModal();
+      showToast('图片已插入复盘正文');
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
 }
 
 function destroyKnowledgeEditors() {
@@ -9206,6 +9289,7 @@ async function embedManualReviewText(text) {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
       text,
+      content_html: getReviewPreviewHtml(),
       tenant_slug: ((user || {}).tenant || {}).slug || '',
       period: reviewTriggerDraft.period || currentReviewPeriod || 'day',
       entry_point: 'h5',
@@ -9425,7 +9509,8 @@ function renderReviewDraftReviewPanel() {
     <div class="knowledge-modal-block">
       <label class="knowledge-modal-label">Draft 审核与详细修改</label>
       <div style="font-size:11px;color:var(--gray-400);line-height:1.7;margin-bottom:8px">这是智能优化后的草稿。你可以继续详细修改，确认无误后再进入最终预览。</div>
-      <textarea id="review-draft-review-input" class="knowledge-modal-textarea" style="min-height:220px" placeholder="在这里继续修改优化后的洞见草稿。">${escapeHtml(reviewTriggerDraft.draftReviewText || reviewTriggerDraft.generatedPreviewText || getReviewDraftContentText())}</textarea>
+      <div id="review-draft-review-input" class="review-rich-editor" contenteditable="true" style="min-height:220px">${reviewTriggerDraft.draftReviewHtml || buildReviewGeneratedHtml(reviewTriggerDraft.draftReviewText || reviewTriggerDraft.generatedPreviewText || getReviewDraftContentText(), reviewTriggerDraft.manualHtml)}</div>
+      <button class="review-input-button" type="button" style="margin-top:8px" onclick="insertReviewImageH5Editor(document.getElementById('review-draft-review-input'))">上传图片</button>
     </div>
   `;
 }
@@ -10006,7 +10091,12 @@ function syncReviewDraftFromModal() {
   if (urlInput) reviewTriggerDraft.urlValue = String(urlInput.value || '').trim();
   if (urlTitleInput) reviewTriggerDraft.urlTitle = String(urlTitleInput.value || '').trim();
   if (promptInput) reviewTriggerDraft.aiPrompt = promptInput.value;
-  if (draftReviewInput) reviewTriggerDraft.draftReviewText = draftReviewInput.value;
+  if (draftReviewInput) {
+    reviewTriggerDraft.draftReviewHtml = String(draftReviewInput.innerHTML || '').trim();
+    const textNode = document.createElement('div');
+    textNode.innerHTML = reviewTriggerDraft.draftReviewHtml;
+    reviewTriggerDraft.draftReviewText = String(textNode.textContent || '').trim();
+  }
   if (structuredUserInput || structuredCombinedText || structuredSectorSummary) {
     reviewStructuredPreview = normalizeReviewStructuredPreview(reviewStructuredPreview || {});
     if (structuredUserInput) {
@@ -10249,6 +10339,7 @@ async function saveReviewDraft() {
     id: activeInsightDraftId || undefined,
     title: String(reviewTriggerDraft.reviewTitle || '').trim(),
     content_text: String(text).trim(),
+    content_html: getReviewPreviewHtml(),
     source_mode: reviewTriggerDraft.sourceMode || 'manual',
     access_mode: reviewTriggerDraft.accessMode === 'subscriber' ? 'subscriber' : 'public',
   };
@@ -10321,7 +10412,8 @@ function editInsightDraft(draftId) {
   reviewTriggerDraft.reviewTitle = String(draft.title || '').trim();
   reviewTriggerDraft.accessMode = draft.access_mode === 'subscriber' ? 'subscriber' : 'public';
   reviewTriggerDraft.sourceMode = String(draft.source_mode || 'manual').trim() || 'manual';
-  reviewTriggerDraft.manualHtml = mergePlainTextIntoRichHtml('', String(draft.content_text || '').trim());
+  reviewTriggerDraft.manualHtml = String(draft.content_html || '') || mergePlainTextIntoRichHtml('', String(draft.content_text || '').trim());
+  reviewTriggerDraft.draftReviewHtml = String(draft.content_html || '');
   reviewTriggerDraft.draftReviewText = String(draft.content_text || '').trim();
   reviewTriggerDraft.generatedPreviewText = '';
   reviewTriggerDraft.previewReady = false;
@@ -13907,7 +13999,9 @@ function getActiveWatchlistUserPayload() {
 function getWatchlistOwnerKey(user) {
   const active = user || getActiveDemoUser() || {};
   const tenant = String((((active || {}).tenant || {}).slug) || '').trim().toLowerCase();
-  const profile = String(active.username || '').trim();
+  // Registered accounts can be represented by a database id before the
+  // profile payload has been hydrated with its username.
+  const profile = String(active.username || active.id || '').trim();
   return tenant && profile ? `${tenant}::${profile}` : '';
 }
 
@@ -14344,12 +14438,19 @@ async function removeCurrentStockFromWatchlist() {
       reviewTriggerDraft.selectedWatchlist = (reviewTriggerDraft.selectedWatchlist || []).filter((name) => name !== stockName);
     }
     pendingWatchlistRemovalCode = '';
-    renderWatchlist();
-    if (currentWatchlistDetail) renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
-    showToast(`已从自选股移除${stockName ? `：${stockName}` : ''}`);
   } catch (error) {
     showToast(error.message === 'database_unavailable' ? '自选股服务暂不可用，请稍后重试' : '移除自选股失败，请稍后重试');
+    return;
   }
+
+  // 数据库删除已成功，后续界面刷新异常不能再被当作删除失败。
+  try {
+    renderWatchlist();
+    if (currentWatchlistDetail) renderWatchlistDetail(currentWatchlistDetail, currentWatchlistSection);
+  } catch (error) {
+    console.error('watchlist removed but UI refresh failed', error);
+  }
+  showToast(`已从自选股移除${stockName ? `：${stockName}` : ''}`);
 }
 
 function renderWatchlist() {
@@ -14417,7 +14518,15 @@ function renderFundamentalWatchlistBoards(group = 'feed') {
 
 async function loadPersistedUserWatchlist() {
   const ownerKey = getWatchlistOwnerKey();
-  if (!ownerKey) return;
+  if (!ownerKey) {
+    // A newly registered account can briefly lack profile metadata. Treat the
+    // absence of an owner key as an empty watchlist, not a failed request.
+    userWatchlistLoadError = '';
+    userWatchlistLoaded = true;
+    WATCHLIST_DETAILS_MAP = {};
+    renderWatchlist();
+    return;
+  }
   if (userWatchlistLoadPromise && userWatchlistLoadPromiseOwnerKey === ownerKey) return userWatchlistLoadPromise;
   const requestSeq = ++userWatchlistRequestSeq;
   userWatchlistLoadPromiseOwnerKey = ownerKey;
@@ -14475,6 +14584,7 @@ let marketMacroLoaded = false;
 let marketOverviewRetryCount = 0;
 let marketSectorRetryCount = 0;
 let marketMacroRetryCount = 0;
+let marketEconomyRetryCount = 0;
 
 function switchMarketView(view) {
   const overview = view === 'overview';

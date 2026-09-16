@@ -301,6 +301,7 @@ def api_review_publish_embed():
         review_title = str(body.get("review_title") or "").strip()
         payload = {
             "text": body.get("text"),
+            "content_html": body.get("content_html"),
             "tenant_slug": tenant_slug,
             "period": str(body.get("period") or "").strip().lower(),
             "review_title": review_title,
@@ -337,6 +338,7 @@ def api_review_publish_embed():
         snapshot_result = persist_review_publish_snapshot(
             tenant_slug=tenant_slug,
             text=payload.get("text"),
+            content_html=payload.get("content_html"),
             review_period=payload.get("period"),
             review_title=review_title,
             speaker_name=speaker_name,

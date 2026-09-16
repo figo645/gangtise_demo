@@ -109,6 +109,7 @@ def api_tenant_insight_drafts(tenant_slug):
             "id": body.get("id"),
             "title": body.get("title"),
             "content_text": body.get("content_text"),
+            "content_html": body.get("content_html"),
             "source_mode": body.get("source_mode"),
             "access_mode": body.get("access_mode"),
         })

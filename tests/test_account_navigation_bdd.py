@@ -67,6 +67,16 @@ class AccountNavigationBddTest(unittest.TestCase):
 
         self.assertEqual(destination, "/h5?tenant=laowang")
 
+    def test_given_new_investor_after_dav_session_when_capabilities_are_not_yet_refreshed_then_workbench_target_is_forced_to_h5(self):
+        with app.test_request_context("/login"):
+            with patch("src.web.pages.has_role_capability", return_value=False):
+                destination = resolve_login_destination(
+                    {"role": "investor", "tenant_slug": "laowang"},
+                    "/kol-workbench?tenant=laowang&section=overview",
+                )
+
+        self.assertEqual(destination, "/h5?tenant=laowang")
+
     def test_given_signed_in_user_when_switching_account_then_session_is_cleared_and_next_page_is_preserved(self):
         client = app.test_client()
         with client.session_transaction() as stored_session:

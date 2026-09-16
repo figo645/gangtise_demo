@@ -74,7 +74,10 @@ if __name__ == "__main__":
         # from silently using a different Python environment.
         startup_bootstrap(start_background=False)
         close_app_db_pool()
-        workers = max(1, int(os.environ.get("WEB_WORKERS", "3")))
+        # A worker loads the complete domain/application graph. Two workers
+        # are a better default for the 16 GB single-host deployment; operators
+        # can raise WEB_WORKERS after measuring real traffic and RSS.
+        workers = max(1, int(os.environ.get("WEB_WORKERS", "2")))
         threads = max(1, int(os.environ.get("WEB_THREADS", "4")))
         bind = f"{server_options['host']}:{server_options['port']}"
         gunicorn_args = [

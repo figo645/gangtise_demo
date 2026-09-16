@@ -1154,6 +1154,7 @@ def normalize_review_snapshot_item(item, tenant, index=0):
     tags = [str(name).strip() for name in (raw.get("tags") if isinstance(raw.get("tags"), list) else fallback.get("tags", [])) if str(name).strip()][:8]
     title = str(raw.get("title") or fallback.get("title") or "").strip() or fallback["title"]
     content_text = str(raw.get("content_text") or raw.get("content") or raw.get("body_text") or fallback.get("content_text") or "").strip()
+    content_html = sanitize_portal_html(str(raw.get("content_html") or fallback.get("content_html") or "").strip())
     summary = str(raw.get("summary") or fallback.get("summary") or content_text[:180]).strip() or fallback["summary"]
     # Older production snapshots may predate the broadcast metadata fields.
     # Recover the presentation contract from the persisted broadcast source
@@ -1338,6 +1339,7 @@ def normalize_review_snapshot_item(item, tenant, index=0):
         "watchlist": watchlist or copy.deepcopy(fallback.get("watchlist") or []),
         "summary": summary,
         "content_text": content_text or summary,
+        "content_html": content_html,
         "access_mode": access_mode,
         "access_label": access_label,
         "view_count": view_count,
@@ -1738,6 +1740,7 @@ def _normalize_insight_draft_item(item, tenant, index=0):
     raw = item if isinstance(item, dict) else {}
     title = str(raw.get("title") or "未命名洞见草稿").strip()[:120] or "未命名洞见草稿"
     content_text = str(raw.get("content_text") or raw.get("text") or "").strip()[:20000]
+    content_html = sanitize_portal_html(str(raw.get("content_html") or "").strip())
     if not content_text:
         raise ValueError("insight_draft_content_required")
     draft_id = str(raw.get("id") or "").strip()
@@ -1748,6 +1751,7 @@ def _normalize_insight_draft_item(item, tenant, index=0):
         "id": draft_id[:160],
         "title": title,
         "content_text": content_text,
+        "content_html": content_html,
         "source_mode": str(raw.get("source_mode") or "manual").strip().lower()[:40] or "manual",
         "access_mode": "subscriber" if str(raw.get("access_mode") or "public").strip().lower() == "subscriber" else "public",
         "updated_at": normalize_datetime_text(raw.get("updated_at") or now_ts()) or now_ts(),
@@ -1761,7 +1765,7 @@ def list_tenant_insight_drafts(tenant_slug):
         raise ValueError("tenant_not_found")
     rows = get_db().execute(
         """
-        SELECT draft_id, title, content_text, source_mode, access_mode, created_at, updated_at
+        SELECT draft_id, title, content_text, content_html, source_mode, access_mode, created_at, updated_at
         FROM tenant_insight_drafts
         WHERE tenant_slug = ?
         ORDER BY updated_at DESC, id DESC
@@ -1774,6 +1778,7 @@ def list_tenant_insight_drafts(tenant_slug):
             "id": str(row["draft_id"]),
             "title": str(row["title"] or "未命名洞见草稿"),
             "content_text": str(row["content_text"] or ""),
+            "content_html": str(row["content_html"] or ""),
             "source_mode": str(row["source_mode"] or "manual"),
             "access_mode": "subscriber" if str(row["access_mode"] or "") == "subscriber" else "public",
             "created_at": normalize_datetime_text(row["created_at"]) or now_ts(),
@@ -1799,16 +1804,17 @@ def save_tenant_insight_draft(tenant_slug, draft):
     db.execute(
         """
         INSERT INTO tenant_insight_drafts
-          (tenant_slug, draft_id, title, content_text, source_mode, access_mode, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          (tenant_slug, draft_id, title, content_text, content_html, source_mode, access_mode, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT (tenant_slug, draft_id) DO UPDATE SET
           title = EXCLUDED.title,
           content_text = EXCLUDED.content_text,
+          content_html = EXCLUDED.content_html,
           source_mode = EXCLUDED.source_mode,
           access_mode = EXCLUDED.access_mode,
           updated_at = EXCLUDED.updated_at
         """,
-        (normalized_tenant_slug, normalized["id"], normalized["title"], normalized["content_text"],
+        (normalized_tenant_slug, normalized["id"], normalized["title"], normalized["content_text"], normalized["content_html"],
          normalized["source_mode"], normalized["access_mode"], created_at, now),
     )
     db.commit()

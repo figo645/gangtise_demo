@@ -1,8 +1,12 @@
 """Dedicated user async-job worker entry point."""
 
-from src.domain.core_services import run_user_async_job_worker_forever, startup_bootstrap
+from src.runtime_role_lock import acquire_runtime_role_lock
 
 
 if __name__ == "__main__":
+    if not acquire_runtime_role_lock("worker"):
+        raise SystemExit(0)
+    from src.domain.core_services import run_user_async_job_worker_forever, startup_bootstrap
+
     startup_bootstrap(start_background=False)
     run_user_async_job_worker_forever()

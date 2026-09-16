@@ -15,7 +15,11 @@ def resolve_login_destination(user, next_target):
         return url_for("login_entry", next=target)
     if has_role_capability(role, "dav"):
         return url_for("login_entry", next=target)
-    if has_role_capability(role, "h5") and (target == "/admin" or target.startswith("/admin?") or target == "/intern-handbook" or target.startswith("/kol-workbench")):
+    # Investor accounts must never inherit a DAv/Admin destination from the
+    # previous session or from a stale `next` parameter. This is especially
+    # important immediately after a new account is approved, when role
+    # capability configuration may still be catching up with the user row.
+    if target == "/admin" or target.startswith("/admin?") or target == "/intern-handbook" or target.startswith("/kol-workbench"):
         return url_for("h5", tenant=str((user or {}).get("tenant_slug") or "").strip().lower() or None)
     return target
 

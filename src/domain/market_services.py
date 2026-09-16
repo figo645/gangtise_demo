@@ -415,7 +415,7 @@ def list_user_watchlist_items(tenant_slug="", user_profile_id=""):
     db = get_db()
     rows = db.execute(
         """
-        SELECT id, tenant_slug, user_profile_id, user_id, stock_code, stock_name, market, industry,
+        SELECT id, tenant_slug, user_profile_id, stock_code, stock_name, market, industry,
                created_at, updated_at
         FROM user_watchlist_items
         WHERE tenant_slug = ? AND user_profile_id = ?

@@ -1,6 +1,7 @@
 import copy
 import os
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import app as app_entry
@@ -56,6 +57,22 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn("const cards = [{ article: latest, label: '最新洞见', variant: 'latest' }]", html)
         self.assertNotIn("本周热门", html)
         self.assertNotIn("今日基本面首页", html)
+
+    def test_watchlist_delete_does_not_report_ui_refresh_failure_as_delete_failure(self):
+        source = (Path(__file__).resolve().parents[1] / "templates/h5.html").read_text(encoding="utf-8")
+        delete_start = source.index("async function removeCurrentStockFromWatchlist()")
+        delete_end = source.index("\nfunction renderWatchlist()", delete_start)
+        function_source = source[delete_start:delete_end]
+
+        self.assertIn("method: 'DELETE'", function_source)
+        self.assertIn("if (!response.ok || payload.ok === false)", function_source)
+        self.assertIn("return;", function_source)
+        self.assertIn("watchlist removed but UI refresh failed", function_source)
+        self.assertIn("已从自选股移除", function_source)
+        self.assertLess(
+            function_source.index("watchlist removed but UI refresh failed"),
+            function_source.index("已从自选股移除"),
+        )
 
     def test_web_user_app_reuses_h5_capabilities_with_desktop_shell(self):
         response = self.client.get(f"/web?tenant={self.tenant_slugs[0]}")
@@ -367,6 +384,15 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertIn('大V研究节奏', html)
         self.assertIn('在日 K 线上记录关键判断', html)
         self.assertNotIn('建议使用路径', html)
+
+    def test_h5_watchlist_treats_a_new_account_without_profile_metadata_as_empty(self):
+        response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("const profile = String(active.username || active.id || '').trim();", html)
+        self.assertIn("userWatchlistLoaded = true;", html)
+        self.assertIn("当前没有自选股。输入股票代码后可在详情页加入。", html)
 
     def test_market_overview_returns_standard_index_rows_without_fake_values(self):
         from src.domain import market_services

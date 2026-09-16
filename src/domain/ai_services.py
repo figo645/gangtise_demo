@@ -11443,6 +11443,7 @@ def build_review_evidence_chain_section(review_text="", tenant_slug="", review_t
 def persist_review_publish_snapshot(
     tenant_slug,
     text,
+    content_html="",
     review_period="",
     review_title="",
     speaker_name="",
@@ -11467,6 +11468,9 @@ def persist_review_publish_snapshot(
     period_key = str(review_period or "day").strip().lower() or "day"
     period_label = "洞见"
     cleaned_text = str(text or "").strip()
+    cleaned_html = sanitize_portal_html(str(content_html or "").strip())
+    if len(cleaned_html) > 5 * 1024 * 1024:
+        raise ValueError("review_content_html_too_large")
     normalized_access_mode = str(access_mode or "public").strip().lower()
     if normalized_access_mode not in {"public", "subscriber"}:
         raise ValueError("invalid_review_access_mode")
@@ -11515,6 +11519,7 @@ def persist_review_publish_snapshot(
         "watchlist": [],
         "summary": summary or title[:80],
         "content_text": cleaned_text,
+        "content_html": cleaned_html,
         "access_mode": normalized_access_mode,
         "access_label": "订阅专享" if normalized_access_mode == "subscriber" else "常规笔记",
         "view_count": 0,

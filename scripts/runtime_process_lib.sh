@@ -168,3 +168,70 @@ stop_runtime_sidecar() {
   rm -f "$pid_file"
   echo "Stopped ${label} (PID: ${pid})."
 }
+
+runtime_descendant_pids() {
+  local parent_pid="$1"
+  local child_pid
+  for child_pid in $(pgrep -P "$parent_pid" 2>/dev/null || true); do
+    printf '%s\n' "$child_pid"
+    runtime_descendant_pids "$child_pid"
+  done
+}
+
+runtime_project_pids() {
+  local root_dir="$1"
+  local current_pid="$$"
+  ps -axo pid=,command= 2>/dev/null | awk -v root="$root_dir" -v self="$current_pid" '
+    $1 != self && index($0, root) && (
+      index($0, "/app.py") ||
+      index($0, "process_scheduler.py") ||
+      index($0, "process_worker.py") ||
+      index($0, "gunicorn")
+    ) { print $1 }
+  '
+}
+
+stop_all_runtime_processes() {
+  local root_dir="$1"
+  local pid_file pid pid_list child_pid
+  pid_list=""
+
+  # Include tracked processes first, then their descendants (Gunicorn workers
+  # are not always represented by a PID file).
+  for pid_file in "$root_dir"/.app.daemon.pid "$root_dir"/.app.foreground.pid \
+                  "$root_dir"/.app.daemon.worker.pid "$root_dir"/.app.daemon.scheduler.pid \
+                  "$root_dir"/.app.foreground.worker.pid "$root_dir"/.app.foreground.scheduler.pid; do
+    if [[ -f "$pid_file" ]]; then
+      pid="$(cat "$pid_file" 2>/dev/null || true)"
+      if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
+        pid_list+=" $pid"
+        for child_pid in $(runtime_descendant_pids "$pid"); do
+          pid_list+=" $child_pid"
+        done
+      fi
+    fi
+  done
+  pid_list+=" $(runtime_project_pids "$root_dir")"
+
+  for pid in $(printf '%s\n' "$pid_list" | tr ' ' '\n' | awk '/^[0-9]+$/ && !seen[$1]++ { print $1 }'); do
+    kill "$pid" 2>/dev/null || true
+  done
+  for _ in 1 2 3 4 5; do
+    local remaining=0
+    for pid in $(printf '%s\n' "$pid_list" | tr ' ' '\n' | awk '/^[0-9]+$/ && !seen[$1]++ { print $1 }'); do
+      if kill -0 "$pid" 2>/dev/null; then
+        remaining=1
+        break
+      fi
+    done
+    [[ "$remaining" == 0 ]] && break
+    sleep 1
+  done
+  for pid in $(printf '%s\n' "$pid_list" | tr ' ' '\n' | awk '/^[0-9]+$/ && !seen[$1]++ { print $1 }'); do
+    kill -9 "$pid" 2>/dev/null || true
+  done
+
+  rm -f "$root_dir"/.app.daemon.pid "$root_dir"/.app.foreground.pid \
+    "$root_dir"/.app.daemon.worker.pid "$root_dir"/.app.daemon.scheduler.pid \
+    "$root_dir"/.app.foreground.worker.pid "$root_dir"/.app.foreground.scheduler.pid
+}

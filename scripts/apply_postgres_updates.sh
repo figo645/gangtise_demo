@@ -99,7 +99,7 @@ for file in "${FILES[@]}"; do
     0??)
       scope="schema"
       ;;
-    114|115|122|123|124|125|126|127|128|129)
+    114|115|122|123|124|125|126|127|128|129|131)
       # Tenant insight drafts and canonical user relations are application
       # schema, even though their numbering is in the post-100 batch.
       scope="schema"
