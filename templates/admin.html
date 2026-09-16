@@ -14,6 +14,7 @@
   window.AUTO_INIT_DASHBOARD = false;
 </script>
 <script src="/static/js/theme.js"></script>
+<script defer src="/static/js/analytics_tracker.js?v=20260916-1"></script>
 <script defer src="/static/js/brand.js?v=20260825-1"></script>
 <script defer src="/static/js/release_notes.js?v=20260831-1"></script>
 <script src="/static/echarts.min.js"></script>
@@ -164,6 +165,39 @@
   .audit-table th { color:var(--text-sub); background:rgba(200,169,110,0.06); text-align:left; }
   .audit-table td { color:var(--text-main); }
   .audit-chart-wrap { height:280px; }
+  .event-analytics-shell { color:var(--text-main); }
+  .event-analytics-filters { display:flex; flex-wrap:wrap; gap:10px; align-items:end; padding:16px; margin-bottom:18px; background:var(--surface-2); border:1px solid rgba(200,169,110,0.14); border-radius:10px; }
+  .event-analytics-filter { display:flex; flex-direction:column; gap:6px; min-width:132px; flex:1 1 132px; }
+  .event-analytics-filter label { font-size:11px; color:var(--text-sub); }
+  .event-analytics-filter select, .event-analytics-filter input { width:100%; box-sizing:border-box; background:var(--surface); border:1px solid rgba(200,169,110,0.2); border-radius:6px; padding:9px 10px; color:var(--text-main); font-size:12px; }
+  .event-analytics-filter select:focus, .event-analytics-filter input:focus { outline:none; border-color:rgba(200,169,110,0.6); }
+  .event-analytics-filter-actions { display:flex; gap:8px; flex:0 0 auto; }
+  .event-analytics-kpi { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; margin-bottom:18px; }
+  .event-analytics-kpi .stat-card { min-height:104px; }
+  .event-analytics-kpi-note { margin-top:6px; font-size:11px; color:var(--text-sub); }
+  .event-analytics-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-bottom:16px; }
+  .event-analytics-panel { min-width:0; background:var(--surface-2); border:1px solid rgba(200,169,110,0.14); border-radius:10px; padding:16px; }
+  .event-analytics-panel-wide { grid-column:1 / -1; }
+  .event-analytics-panel-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; margin-bottom:12px; }
+  .event-analytics-panel-title { color:var(--gold); font-size:14px; font-weight:700; }
+  .event-analytics-panel-desc { margin-top:5px; color:var(--text-sub); font-size:11px; line-height:1.6; }
+  .event-analytics-bars { display:flex; flex-direction:column; gap:9px; }
+  .event-analytics-bar-row { display:grid; grid-template-columns:minmax(130px,1.1fr) minmax(100px,2fr) 68px; gap:10px; align-items:center; font-size:11px; }
+  .event-analytics-bar-label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-main); }
+  .event-analytics-bar-track { height:8px; background:rgba(200,169,110,0.10); border-radius:99px; overflow:hidden; }
+  .event-analytics-bar-fill { height:100%; background:linear-gradient(90deg,#C8A96E,#e6cb91); border-radius:99px; min-width:2px; }
+  .event-analytics-bar-value { text-align:right; color:var(--text-sub); }
+  .event-analytics-table-wrap { overflow:auto; max-height:360px; }
+  .event-analytics-table { width:100%; border-collapse:collapse; min-width:620px; }
+  .event-analytics-table th, .event-analytics-table td { padding:9px 8px; border-bottom:1px solid rgba(200,169,110,0.08); font-size:11px; text-align:left; vertical-align:top; }
+  .event-analytics-table th { color:var(--text-sub); font-weight:600; position:sticky; top:0; background:var(--surface-2); }
+  .event-analytics-table td { color:var(--text-main); }
+  .event-analytics-code { display:block; margin-top:3px; color:var(--text-sub); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10px; word-break:break-all; }
+  .event-analytics-muted { color:var(--text-sub); font-size:11px; line-height:1.7; padding:12px 0; }
+  .event-analytics-note { padding:10px 12px; background:rgba(47,116,192,0.07); border:1px solid rgba(47,116,192,0.12); border-radius:8px; color:var(--text-sub); font-size:11px; line-height:1.7; }
+  .event-analytics-chip { display:inline-flex; padding:4px 8px; border-radius:999px; background:rgba(200,169,110,0.10); border:1px solid rgba(200,169,110,0.18); color:var(--gold); font-size:10px; margin:0 5px 5px 0; }
+  @media (max-width: 1000px) { .event-analytics-kpi { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+  @media (max-width: 700px) { .event-analytics-grid { grid-template-columns:1fr; } .event-analytics-panel-wide { grid-column:auto; } .event-analytics-kpi { grid-template-columns:repeat(2,minmax(0,1fr)); } .event-analytics-bar-row { grid-template-columns:110px minmax(80px,1fr) 54px; } }
   .sync-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
   .sync-card { background:var(--surface-2); border:1px solid rgba(200,169,110,0.15); border-radius:12px; padding:18px; }
   .sync-title { font-size:14px; color:var(--gold); font-weight:600; margin-bottom:8px; }
@@ -2177,7 +2211,10 @@
         <div class="admin-nav-item" id="nav-revenue" data-feature="analytics_module" onclick="showAnalyticsSection('revenue')">
           <span class="admin-nav-icon">&#128176;</span> 营收趋势
         </div>
+        <div class="admin-nav-item" data-section="event-analytics" data-feature="analytics_module" onclick="showSection('event-analytics', this)">
+          <span class="admin-nav-icon">&#128200;</span> 埋点分析
         </div>
+      </div>
       </div>
       <div class="admin-nav-group" data-nav-group="system">
         <button type="button" class="admin-nav-group-toggle" onclick="toggleAdminNavGroup(this)">
@@ -5841,6 +5878,32 @@
         </div>
       </div><!-- end section-access -->
 
+      <!-- ===== PRODUCT EVENT ANALYTICS ===== -->
+      <div id="section-event-analytics" class="event-analytics-shell" style="display:none">
+        <div class="section-header">
+          <div><div class="section-title">埋点分析</div><div class="section-subtitle">按功能事件观察访问分布、使用习惯与行为推断画像。原始事件可追溯，统计不替代用户真实身份信息。</div></div>
+          <span class="tag tag-gold">产品行为数据</span>
+        </div>
+        <div class="event-analytics-filters">
+          <div class="event-analytics-filter"><label for="analytics-days">时间范围</label><select id="analytics-days"><option value="1">今日</option><option value="7">近 7 天</option><option value="30" selected>近 30 天</option><option value="90">近 90 天</option><option value="365">近 365 天</option></select></div>
+          <div class="event-analytics-filter"><label for="analytics-surface">使用端</label><select id="analytics-surface"><option value="">全部使用端</option><option value="h5">H5</option><option value="web">Web</option><option value="tenant_portal">租户门户</option><option value="admin">Admin</option></select></div>
+          <div class="event-analytics-filter"><label for="analytics-role">用户角色</label><select id="analytics-role"><option value="">全部角色</option><option value="investor">投资者</option><option value="dav">大V</option><option value="admin">管理员</option></select></div>
+          <div class="event-analytics-filter"><label for="analytics-tenant">租户</label><input id="analytics-tenant" type="text" placeholder="例如 laowang"></div>
+          <div class="event-analytics-filter-actions"><button class="btn-gold" type="button" onclick="loadEventAnalytics(true)">刷新分析</button></div>
+        </div>
+        <div id="event-analytics-status" class="event-analytics-note" style="margin-bottom:16px">选择筛选条件后加载统计。</div>
+        <div id="event-analytics-kpi" class="event-analytics-kpi"></div>
+        <div class="event-analytics-grid">
+          <section class="event-analytics-panel event-analytics-panel-wide"><div class="event-analytics-panel-head"><div><div class="event-analytics-panel-title">功能使用排行</div><div class="event-analytics-panel-desc">按事件次数排序，同时展示去重用户数与可测事件成功率。</div></div><span class="tag tag-blue">访问分布</span></div><div id="event-analytics-features"></div></section>
+          <section class="event-analytics-panel"><div class="event-analytics-panel-head"><div><div class="event-analytics-panel-title">活跃时段</div><div class="event-analytics-panel-desc">按本地时间小时统计事件量，帮助判断用户使用习惯。</div></div></div><div id="event-analytics-hourly"></div></section>
+          <section class="event-analytics-panel"><div class="event-analytics-panel-head"><div><div class="event-analytics-panel-title">日活跃趋势</div><div class="event-analytics-panel-desc">按日期观察活跃用户和事件量变化。</div></div></div><div id="event-analytics-daily"></div></section>
+          <section class="event-analytics-panel"><div class="event-analytics-panel-head"><div><div class="event-analytics-panel-title">功能流转</div><div class="event-analytics-panel-desc">同一匿名用户或账号在事件之间的常见下一步。</div></div></div><div id="event-analytics-transitions"></div></section>
+          <section class="event-analytics-panel"><div class="event-analytics-panel-head"><div><div class="event-analytics-panel-title">行为推断画像</div><div class="event-analytics-panel-desc">只根据主要使用功能归纳，低于 5 个用户的细分不展示。</div></div><span class="tag tag-gold">非真实身份</span></div><div id="event-analytics-personas"></div></section>
+          <section class="event-analytics-panel"><div class="event-analytics-panel-head"><div><div class="event-analytics-panel-title">活跃度分层</div><div class="event-analytics-panel-desc">按筛选期内的事件次数分层。</div></div></div><div id="event-analytics-activity"></div></section>
+          <section class="event-analytics-panel event-analytics-panel-wide"><div class="event-analytics-panel-head"><div><div class="event-analytics-panel-title">事件明细</div><div class="event-analytics-panel-desc">用于审计采集结果与统计口径，属性字段仅保留结构化非敏感信息。</div></div></div><div id="event-analytics-events"></div></section>
+        </div>
+      </div><!-- end section-event-analytics -->
+
     </div><!-- end admin-content -->
   </div><!-- end admin-main -->
 </div><!-- end admin-layout -->
@@ -5900,7 +5963,8 @@ const sectionTitles = {
   'settings-llm-features':'系统专区 · 功能级模型映射',
   'token-usage':'系统专区 · Token 监控',
   'task-center':'系统专区 · 定时任务专区',
-  access:'访问审计'
+  access:'访问审计',
+  'event-analytics':'数据分析 · 埋点分析'
 };
 const analyticsTitles = {
   funnel: '数据分析 · 转化漏斗',
@@ -6530,6 +6594,9 @@ function showSection(name, navEl) {
   }
   if (name === 'access') {
     renderAccessAudit();
+  }
+  if (name === 'event-analytics') {
+    loadEventAnalytics(false);
   }
   if (name === 'settings-features' || name.startsWith('settings-')) {
     loadSiteConfig().catch((error) => showToast(error.message || '配置加载失败'));
@@ -12522,6 +12589,89 @@ async function renderAccessAudit() {
   });
   if (logBody) {
     logBody.innerHTML = data.recent_logs.map(r => `<tr><td>${r.created_at}</td><td>${r.ip}</td><td>${r.path}</td><td>${r.method}</td><td>${r.status_code}</td></tr>`).join('');
+  }
+}
+
+let eventAnalyticsLoading = false;
+
+function eventAnalyticsFilters() {
+  return new URLSearchParams({
+    days: document.getElementById('analytics-days')?.value || '30',
+    surface: document.getElementById('analytics-surface')?.value || '',
+    user_role: document.getElementById('analytics-role')?.value || '',
+    tenant_slug: document.getElementById('analytics-tenant')?.value.trim() || '',
+  });
+}
+
+function renderEventAnalyticsBars(items, labelKey, valueKey, formatter) {
+  const rows = Array.isArray(items) ? items : [];
+  if (!rows.length) return '<div class="event-analytics-muted">当前筛选条件下暂无数据。</div>';
+  const max = Math.max(...rows.map((item) => Number(item[valueKey] || 0)), 1);
+  return `<div class="event-analytics-bars">${rows.map((item) => {
+    const value = Number(item[valueKey] || 0);
+    return `<div class="event-analytics-bar-row"><div class="event-analytics-bar-label" title="${escapeHtml(item[labelKey] || '')}">${escapeHtml(item[labelKey] || '--')}</div><div class="event-analytics-bar-track"><div class="event-analytics-bar-fill" style="width:${Math.max(2, value / max * 100)}%"></div></div><div class="event-analytics-bar-value">${escapeHtml(formatter ? formatter(item) : String(value))}</div></div>`;
+  }).join('')}</div>`;
+}
+
+function renderEventAnalyticsReport(data) {
+  const summary = data.summary || {};
+  const kpi = document.getElementById('event-analytics-kpi');
+  if (kpi) {
+    kpi.innerHTML = [
+      ['事件总数', formatAdminNumber(summary.event_count), '筛选期内全部事件'],
+      ['活跃用户', formatAdminNumber(summary.active_users), '账号或匿名访客去重'],
+      ['活跃会话', formatAdminNumber(summary.active_sessions), '有会话标识的访问'],
+      ['覆盖功能', formatAdminNumber(summary.feature_count), '已产生事件的功能'],
+      ['人均事件数', Number(summary.avg_events_per_user || 0).toFixed(2), '事件次数 / 活跃用户'],
+    ].map(([label, value, note]) => `<div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value">${value}</div><div class="event-analytics-kpi-note">${note}</div></div>`).join('');
+  }
+  const features = data.features || [];
+  const featureHost = document.getElementById('event-analytics-features');
+  if (featureHost) {
+    featureHost.innerHTML = features.length ? `<div class="event-analytics-table-wrap"><table class="event-analytics-table"><thead><tr><th>功能名称</th><th>技术标识</th><th>使用端</th><th>事件数</th><th>活跃用户</th><th>成功率</th><th>最近使用</th></tr></thead><tbody>${features.map((item) => `<tr><td>${escapeHtml(item.feature_label || '--')}</td><td><code class="event-analytics-code">${escapeHtml(item.feature_key || '--')}</code></td><td>${escapeHtml(item.surface_label || '--')}<code class="event-analytics-code">${escapeHtml(item.surface || '--')}</code></td><td>${formatAdminNumber(item.event_count)}</td><td>${formatAdminNumber(item.active_users)}</td><td>${item.success_rate == null ? '--' : `${item.success_rate}%`}</td><td>${escapeHtml(item.last_used_at || '--')}</td></tr>`).join('')}</tbody></table></div>` : '<div class="event-analytics-muted">当前筛选条件下暂无功能事件。</div>';
+  }
+  const habits = data.habits || {};
+  const hourlyHost = document.getElementById('event-analytics-hourly');
+  if (hourlyHost) hourlyHost.innerHTML = renderEventAnalyticsBars((habits.hourly || []).map((item) => ({...item, label: `${String(item.hour).padStart(2, '0')}:00`})), 'label', 'event_count', (item) => `${formatAdminNumber(item.event_count)} 次`);
+  const dailyHost = document.getElementById('event-analytics-daily');
+  if (dailyHost) dailyHost.innerHTML = renderEventAnalyticsBars((habits.daily || []).slice(-14).map((item) => ({...item, label: String(item.day || '').slice(5)})), 'label', 'active_users', (item) => `${formatAdminNumber(item.active_users)} 人`);
+  const transitionHost = document.getElementById('event-analytics-transitions');
+  if (transitionHost) {
+    const transitions = habits.transitions || [];
+    transitionHost.innerHTML = transitions.length ? `<div class="event-analytics-table-wrap"><table class="event-analytics-table"><thead><tr><th>来源功能</th><th>下一步功能</th><th>流转次数</th></tr></thead><tbody>${transitions.map((item) => `<tr><td>${escapeHtml(item.from_feature_label || '--')}<code class="event-analytics-code">${escapeHtml(item.from_feature || '--')}</code></td><td>${escapeHtml(item.to_feature_label || '--')}<code class="event-analytics-code">${escapeHtml(item.to_feature || '--')}</code></td><td>${formatAdminNumber(item.transition_count)} 次</td></tr>`).join('')}</tbody></table></div>` : '<div class="event-analytics-muted">当前筛选条件下暂无功能流转。</div>';
+  }
+  const personas = data.personas || {};
+  const personaHost = document.getElementById('event-analytics-personas');
+  if (personaHost) {
+    const roleLabels = { investor: '投资者', dav: '大V', admin: '管理员', anonymous: '匿名访客' };
+    const distributionHtml = (title, items) => items?.length ? `<div style="margin-top:10px"><div style="font-size:11px;color:var(--text-sub);margin-bottom:5px">${title}</div>${items.map((item) => `<span class="event-analytics-chip">${escapeHtml(roleLabels[item.role] || item.role || item.surface || '--')} ${formatAdminNumber(item.user_count)} 人</span>`).join('')}</div>` : '';
+    personaHost.innerHTML = personas.preferences?.length ? personas.preferences.map((item) => `<div style="padding:10px 0;border-bottom:1px solid rgba(200,169,110,0.08)"><div style="display:flex;justify-content:space-between;gap:8px"><strong>${escapeHtml(item.persona)}</strong><span style="color:var(--gold)">${formatAdminNumber(item.user_count)} 人</span></div><div style="margin-top:5px">${(item.leading_features || []).slice(0, 3).map((feature) => `<span class="event-analytics-chip">${escapeHtml(feature)}</span>`).join('')}</div><div class="event-analytics-muted" style="padding:3px 0 0">${escapeHtml(item.inference || '')}</div></div>`).join('') + distributionHtml('角色构成', personas.role_distribution || []) + distributionHtml('入口构成', personas.surface_distribution || []) + (personas.hidden_small_sample_users ? `<div class="event-analytics-muted">另有 ${formatAdminNumber(personas.hidden_small_sample_users)} 个小样本用户未展示细分画像。</div>` : '') : '<div class="event-analytics-muted">样本不足，暂不展示行为画像。</div>';
+  }
+  const activityHost = document.getElementById('event-analytics-activity');
+  if (activityHost) activityHost.innerHTML = renderEventAnalyticsBars(personas.activity_levels || [], 'activity_level', 'user_count', (item) => `${formatAdminNumber(item.user_count)} 人`);
+  const eventHost = document.getElementById('event-analytics-events');
+  if (eventHost) {
+    const events = data.events || [];
+    eventHost.innerHTML = events.length ? `<div class="event-analytics-table-wrap"><table class="event-analytics-table"><thead><tr><th>时间</th><th>事件名称</th><th>事件标识</th><th>功能名称</th><th>功能标识</th><th>使用端</th><th>用户角色</th><th>对象</th><th>成功</th></tr></thead><tbody>${events.map((item) => `<tr><td>${escapeHtml(item.event_at || '--')}</td><td>${escapeHtml(item.event_label || '--')}</td><td><code class="event-analytics-code">${escapeHtml(item.event_name || '--')}</code></td><td>${escapeHtml(item.feature_label || '--')}</td><td><code class="event-analytics-code">${escapeHtml(item.feature_key || '--')}</code></td><td>${escapeHtml(item.surface_label || '--')}<code class="event-analytics-code">${escapeHtml(item.surface || '--')}</code></td><td>${escapeHtml(item.user_role_label || '未标记角色')}<code class="event-analytics-code">${escapeHtml(item.user_role || 'anonymous')}</code></td><td>${escapeHtml([item.object_type, item.object_id].filter(Boolean).join(':') || '--')}</td><td>${item.success == null ? '--' : (item.success ? '是' : '否')}</td></tr>`).join('')}</tbody></table></div>` : '<div class="event-analytics-muted">当前筛选条件下暂无原始事件。</div>';
+  }
+}
+
+async function loadEventAnalytics(showMessage) {
+  if (eventAnalyticsLoading) return;
+  const status = document.getElementById('event-analytics-status');
+  eventAnalyticsLoading = true;
+  if (status) status.textContent = '正在读取事件数据并计算统计结果...';
+  try {
+    const response = await fetch(`/api/admin/analytics?${eventAnalyticsFilters().toString()}`, { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || 'analytics_unavailable');
+    renderEventAnalyticsReport(data);
+    if (status) status.textContent = `已更新：近 ${data.filters?.days || 30} 天。画像仅为行为推断，小于最小样本量的细分不会展示。`;
+    if (showMessage) showToast('埋点分析已刷新');
+  } catch (error) {
+    if (status) status.textContent = `埋点分析加载失败：${error.message || '请稍后重试'}`;
+  } finally {
+    eventAnalyticsLoading = false;
   }
 }
 

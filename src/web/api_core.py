@@ -525,10 +525,11 @@ def api_remove_user_watchlist_item(stock_code):
 def api_watchlist_search():
     query = str(request.args.get("q") or "").strip()
     limit = max(1, min(int(request.args.get("limit") or 8), 12))
+    raw_categories = request.args.getlist("category") or request.args.get("categories") or None
     if not query:
         return jsonify({"ok": True, "items": []})
     try:
-        items = search_watchlist_candidates(query, top=limit, include_remote=True)
+        items = search_watchlist_candidates(query, top=limit, include_remote=True, categories=raw_categories)
     except Exception as exc:
         if is_db_unavailable_error(exc):
             return jsonify({"ok": False, "error": "database_unavailable"}), 503
@@ -896,6 +897,119 @@ def api_admin_access_logs():
         (limit,),
     ).fetchall()
     return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/analytics/events", methods=["POST"])
+def api_analytics_events():
+    """Collect a small, allow-listed product event from a page or client."""
+    body = request.get_json(silent=True) or {}
+    current_user = get_current_authenticated_user() or {}
+    role = str(current_user.get("role") or "").strip().lower()
+    account_tenant = str(
+        current_user.get("tenant_slug")
+        or ((current_user.get("tenant") or {}).get("slug") or "")
+    ).strip().lower()
+    requested_tenant = str(body.get("tenant_slug") or "").strip().lower()
+    tenant_slug = requested_tenant if role == "admin" and requested_tenant else account_tenant
+    try:
+        event_id = record_analytics_event(
+            body.get("event_name"),
+            body.get("feature_key"),
+            event_category=body.get("event_category"),
+            surface=body.get("surface"),
+            tenant_slug=tenant_slug,
+            user_id=str(current_user.get("id") or ""),
+            user_profile_id=str(current_user.get("username") or ""),
+            user_role=role,
+            session_id=body.get("session_id"),
+            anonymous_id=body.get("anonymous_id"),
+            object_type=body.get("object_type"),
+            object_id=body.get("object_id"),
+            path=body.get("path") or request.path,
+            referrer=body.get("referrer") or request.referrer,
+            duration_ms=body.get("duration_ms"),
+            success=body.get("success"),
+            error_code=body.get("error_code"),
+            properties=body.get("properties"),
+        )
+        get_db().commit()
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception as exc:
+        if is_db_unavailable_error(exc):
+            return jsonify({"ok": False, "error": "database_unavailable"}), 503
+        app.logger.exception("Failed to record analytics event")
+        return jsonify({"ok": False, "error": "analytics_event_failed"}), 500
+    return jsonify({"ok": True, "event_id": event_id})
+
+
+def _admin_analytics_filters_from_request():
+    return {
+        "days": request.args.get("days") or 30,
+        "surface": request.args.get("surface") or "",
+        "tenant_slug": request.args.get("tenant_slug") or "",
+        "user_role": request.args.get("user_role") or "",
+        "feature_key": request.args.get("feature_key") or "",
+    }
+
+
+@app.route("/api/admin/analytics/summary")
+def api_admin_analytics_summary():
+    try:
+        filters = _admin_analytics_filters_from_request()
+        return jsonify({"ok": True, "filters": filters, "summary": build_analytics_summary(filters)})
+    except Exception:
+        app.logger.exception("Failed to build analytics summary")
+        return jsonify({"ok": False, "error": "analytics_summary_unavailable"}), 503
+
+
+@app.route("/api/admin/analytics")
+def api_admin_analytics():
+    try:
+        return jsonify(build_admin_analytics_payload(_admin_analytics_filters_from_request()))
+    except Exception:
+        app.logger.exception("Failed to build admin analytics payload")
+        return jsonify({"ok": False, "error": "analytics_unavailable"}), 503
+
+
+@app.route("/api/admin/analytics/features")
+def api_admin_analytics_features():
+    try:
+        filters = _admin_analytics_filters_from_request()
+        return jsonify({"ok": True, "features": build_analytics_features(filters)})
+    except Exception:
+        app.logger.exception("Failed to build analytics feature ranking")
+        return jsonify({"ok": False, "error": "analytics_features_unavailable"}), 503
+
+
+@app.route("/api/admin/analytics/habits")
+def api_admin_analytics_habits():
+    try:
+        filters = _admin_analytics_filters_from_request()
+        return jsonify({"ok": True, "habits": build_analytics_habits(filters)})
+    except Exception:
+        app.logger.exception("Failed to build analytics habits")
+        return jsonify({"ok": False, "error": "analytics_habits_unavailable"}), 503
+
+
+@app.route("/api/admin/analytics/personas")
+def api_admin_analytics_personas():
+    try:
+        filters = _admin_analytics_filters_from_request()
+        return jsonify({"ok": True, "personas": build_analytics_personas(filters)})
+    except Exception:
+        app.logger.exception("Failed to build analytics personas")
+        return jsonify({"ok": False, "error": "analytics_personas_unavailable"}), 503
+
+
+@app.route("/api/admin/analytics/events")
+def api_admin_analytics_events():
+    try:
+        filters = _admin_analytics_filters_from_request()
+        return jsonify({"ok": True, "events": list_analytics_events(filters, limit=request.args.get("limit", 100))})
+    except Exception:
+        app.logger.exception("Failed to list analytics events")
+        return jsonify({"ok": False, "error": "analytics_events_unavailable"}), 503
 
 
 @app.route("/api/admin/tasks")

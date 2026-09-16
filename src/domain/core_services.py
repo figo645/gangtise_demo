@@ -1966,6 +1966,14 @@ def build_dm_center_payload(tenant_slug="", actor_role="", actor_profile_id="", 
     normalized_role = str(actor_role or "").strip().lower()
     normalized_profile_id = str(actor_profile_id or "").strip()
     for thread in state["threads"]:
+        # These three records were legacy browser-demo fixtures. They must not
+        # appear as real fan conversations when the tenant has no messages.
+        if str(thread.get("id") or "") in {
+            f"{resolved_slug}-thread-fan-1",
+            f"{resolved_slug}-thread-review-1",
+            f"{resolved_slug}-thread-fan-2",
+        }:
+            continue
         thread_type = str(thread.get("type") or "").strip()
         if thread_type == "fan_interaction" and not include_fan_threads:
             continue
@@ -7853,6 +7861,7 @@ def init_db():
         execute_sql_file(conn, sql_dir / "128_refresh_quiz_question_options.sql")
         execute_sql_file(conn, sql_dir / "129_allow_quiz_retries.sql")
         execute_sql_file(conn, sql_dir / "130_register_daily_finance_broadcast.sql")
+        execute_sql_file(conn, sql_dir / "132_analytics_events.sql")
 
 
 def init_db_safe():

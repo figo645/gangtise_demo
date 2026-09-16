@@ -4417,7 +4417,7 @@ DEFAULT_ADMIN_TASKS = [
         "task_name": "AKShare 市场与行业指标同步",
         "task_group": "indicator",
         "task_type": "sync_market_snapshot",
-        "description": "每 5 分钟统一从 AKShare 采集市场一览与热门行业指标，写入 PostgreSQL 快照供 H5 展示；前台不直接访问外部行情源。",
+        "description": "每 5 分钟统一从 AKShare 采集热门行业涨跌 Top10、市场一览涨跌 Top10 与我的所有自选股涨跌 Top10 所需行情，写入 PostgreSQL 快照供 H5 展示；前台不直接访问外部行情源。",
         "schedule_type": "interval",
         "schedule_value": "300",
         "enabled": 1,
@@ -8091,16 +8091,34 @@ def _search_local_watchlist_candidates(query, top=8):
     return [copy.deepcopy(item[3]) for item in scored[: max(1, int(top or 8))]]
 
 
-def _search_remote_watchlist_candidates(query, top=8):
+SUPPORTED_SECURITY_SEARCH_CATEGORIES = ("stock", "dr", "index", "fund")
+
+
+def _normalize_security_search_categories(categories=None):
+    if categories is None:
+        return ("stock",)
+    if isinstance(categories, str):
+        categories = re.split(r"[,\s]+", categories)
+    normalized = []
+    for category in categories if isinstance(categories, (list, tuple, set)) else []:
+        value = str(category or "").strip().lower()
+        if value in SUPPORTED_SECURITY_SEARCH_CATEGORIES and value not in normalized:
+            normalized.append(value)
+    return tuple(normalized or ("stock",))
+
+
+def _search_remote_watchlist_candidates(query, top=8, categories=None):
     normalized = _normalize_watchlist_query_text(query)
     if not normalized:
         return []
-    cached = _load_watchlist_cache("watchlist_search_cache", normalized, WATCHLIST_SEARCH_CACHE_TTL_SECONDS)
+    search_categories = _normalize_security_search_categories(categories)
+    cache_key = f"{','.join(search_categories)}:{normalized}"
+    cached = _load_watchlist_cache("watchlist_search_cache", cache_key, WATCHLIST_SEARCH_CACHE_TTL_SECONDS)
     if isinstance(cached, list) and cached:
         return cached[: max(1, int(top or 8))]
     payload = {
         "keyword": normalized,
-        "category": ["stock"],
+        "category": list(search_categories),
         "top": max(1, min(int(top or 8), 12)),
     }
     status, response, _ = post_gangtise_openapi_json(
@@ -8112,20 +8130,25 @@ def _search_remote_watchlist_candidates(query, top=8):
     items = [_normalize_watchlist_security_candidate(item) for item in rows if isinstance(item, dict)]
     if items:
         _save_security_master_candidates(items)
-        _save_watchlist_cache("watchlist_search_cache", normalized, items)
+        _save_watchlist_cache("watchlist_search_cache", cache_key, items)
     return items
 
 
-def search_watchlist_candidates(query, top=8, include_remote=True):
+def search_watchlist_candidates(query, top=8, include_remote=True, categories=None):
     normalized = str(query or "").strip()
     if not normalized:
         return []
+    search_categories = _normalize_security_search_categories(categories)
     merged = []
     seen = set()
     # Identity lookup is remote-first so a newly searched security gets the
     # latest Gangtise symbol/name mapping before the database fallback.
     if include_remote:
-        for item in _search_remote_watchlist_candidates(normalized, top=top):
+        if search_categories == ("stock",):
+            remote_items = _search_remote_watchlist_candidates(normalized, top=top)
+        else:
+            remote_items = _search_remote_watchlist_candidates(normalized, top=top, categories=search_categories)
+        for item in remote_items:
             code = str(item.get("code") or "").strip().upper()
             if not code or code in seen:
                 continue

@@ -23,6 +23,23 @@ def should_log_request():
     return not request.path.startswith("/static/") and not request.path.startswith("/api/")
 
 
+def _page_analytics_feature(path):
+    normalized = str(path or "").rstrip("/") or "/"
+    mapping = {
+        "/h5": ("h5", "h5.home"),
+        "/web": ("web", "web.home"),
+        "/kol-workbench": ("web", "kol_workbench.overview"),
+        "/admin": ("admin", "admin.overview"),
+        "/intern-handbook": ("admin", "admin.intern_handbook"),
+    }
+    for prefix, value in mapping.items():
+        if normalized == prefix or normalized.startswith(prefix + "/"):
+            return value
+    if normalized.startswith("/tenant/"):
+        return "tenant_portal", "tenant_portal.home"
+    return "unknown", "page.other"
+
+
 def is_admin_only_request(path):
     normalized_path = str(path or "").rstrip("/") or "/"
     return normalized_path in {"/admin", "/intern-handbook"} or normalized_path.startswith("/api/admin/")
@@ -73,6 +90,7 @@ def record_access(response):
             tenant_slug = str(request.args.get("tenant") or "").strip().lower()
         path_value = request.full_path.rstrip("?") if getattr(request, "full_path", "") else request.path
         db = get_db()
+        surface, feature_key = _page_analytics_feature(request.path)
         db.execute(
             """
             INSERT INTO access_logs (ip, path, method, status_code, created_at, user_agent, referrer, tenant_slug, user_profile_id, user_role)
@@ -90,6 +108,20 @@ def record_access(response):
                 user_profile_id,
                 user_role,
             ),
+        )
+        record_analytics_event(
+            "page_view",
+            feature_key,
+            event_category="page_view",
+            surface=surface,
+            tenant_slug=tenant_slug,
+            user_profile_id=user_profile_id,
+            user_role=user_role,
+            path=path_value,
+            referrer=request.headers.get("Referer", ""),
+            success=response.status_code < 400,
+            properties={"status_code": response.status_code},
+            db=db,
         )
         db.commit()
     except Exception as exc:
@@ -113,6 +145,7 @@ def require_user_login():
         "/api/h5/wechat/start",
         "/api/h5/wechat/callback",
         "/api/h5/logout",
+        "/api/analytics/events",
     }
     # Tenant portals are public acquisition pages. Their protected content is
     # still stripped in the payload builder for anonymous visitors.

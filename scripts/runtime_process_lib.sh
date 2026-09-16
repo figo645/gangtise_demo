@@ -181,14 +181,8 @@ runtime_descendant_pids() {
 runtime_project_pids() {
   local root_dir="$1"
   local current_pid="$$"
-  ps -axo pid=,command= 2>/dev/null | awk -v root="$root_dir" -v self="$current_pid" '
-    $1 != self && index($0, root) && (
-      index($0, "/app.py") ||
-      index($0, "process_scheduler.py") ||
-      index($0, "process_worker.py") ||
-      index($0, "gunicorn")
-    ) { print $1 }
-  '
+  # Keep the predicate on one logical line for the BSD awk shipped with macOS.
+  ps -axo pid=,command= 2>/dev/null | awk -v root="$root_dir" -v self="$current_pid" '$1 != self && index($0, root) && (index($0, "/app.py") || index($0, "process_scheduler.py") || index($0, "process_worker.py") || index($0, "gunicorn")) { print $1 }'
 }
 
 stop_all_runtime_processes() {

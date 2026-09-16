@@ -18,6 +18,7 @@
   try { localStorage.setItem('gangtise_theme_mode', 'light'); } catch (e) {}
 </script>
 <script src="/static/js/theme.js"></script>
+<script defer src="/static/js/analytics_tracker.js?v=20260916-1"></script>
 <link rel="stylesheet" href="/static/css/quiz_blind_box.css?v=20260916-3">
 <script defer src="/static/js/quiz_blind_box.js?v=20260916-3"></script>
 <script defer src="/static/js/brand.js?v=20260825-1"></script>
@@ -18592,7 +18593,7 @@ async function loadDmConversations() {
   } catch (e) {}
   const activeUser = getSafeActiveDemoUser();
   const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
-  dmConversationsCache = getMockDmConversations();
+  dmConversationsCache = isDavDmMode() ? [] : [getInvestorDmConversation()];
   dmCenterState = dmCenterState || { stats: {} };
   try {
     renderDmConversations(dmConversationsCache);
@@ -18607,9 +18608,9 @@ async function loadDmConversations() {
     const data = await resp.json();
     if (!resp.ok || data.success === false) throw new Error(data.error || 'dm_center_load_failed');
     applyDmCenterPayload(data);
-    dmConversationsCache = Array.isArray(data.threads) && data.threads.length
+    dmConversationsCache = Array.isArray(data.threads)
       ? data.threads
-      : (isDavDmMode() ? DAV_DM_CONVERSATIONS.slice() : [getInvestorDmConversation()]);
+      : (isDavDmMode() ? [] : [getInvestorDmConversation()]);
     try {
       renderDmConversations(dmConversationsCache);
     } catch (error) {
