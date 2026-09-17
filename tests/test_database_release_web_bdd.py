@@ -358,73 +358,20 @@ class DatabaseReleaseWebBddTest(unittest.TestCase):
             confirm_production=False, schema_only=True,
         )
 
-    def test_local_migration_ledger_repair_requires_confirmation_and_never_targets_production(self):
-        csrf = self._csrf_token()
-        response = self.client.post(
+    def test_schema_upgrade_never_exposes_reverse_local_repair_or_ledger_writes(self):
+        for path in (
             "/api/local-migration-ledger/repair",
-            json={"confirm": False},
-            headers={"X-Data-Import-CSRF-Token": csrf},
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.get_json()["error"], "database_release_local_migration_repair_confirmation_required")
-        with patch.object(
-            database_release_web,
-            "start_local_migration_ledger_repair",
-            return_value={"id": "local_migrations_1", "status": "queued", "target": "local"},
-        ) as repair:
-            response = self.client.post(
-                "/api/local-migration-ledger/repair",
-                json={"confirm": True},
-                headers={"X-Data-Import-CSRF-Token": csrf},
-            )
-        self.assertEqual(response.status_code, 202)
-        self.assertEqual(response.get_json()["job"]["target"], "local")
-        repair.assert_called_once_with()
+            "/api/schema-migration-ledger/generate",
+            "/api/schema-migration-ledger/apply",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.post(path, json={}).status_code, 404)
 
-    def test_local_migration_repair_uses_the_canonical_local_updater(self):
-        source = inspect.getsource(database_release_services.start_local_migration_ledger_repair)
-        self.assertIn('get_database_release_target("local")', source)
-        self.assertIn("POSTGRES_UPDATES_SCRIPT", source)
-        self.assertIn('"local_migration_repair"', source)
-        updater = (database_release_web.ROOT / "scripts" / "apply_postgres_updates.sh").read_text(encoding="utf-8")
-        self.assertIn("113|114|115|122|123|124|125|126|127|128|129|131|132", updater)
-
-    def test_migration_ledger_reconciliation_requires_review_and_has_a_separate_contract(self):
-        csrf = self._csrf_token()
-        plan = {
-            "target": "staging", "mode": "migration_ledger_reconciliation",
-            "report_path": ".deploy/ledger-plan.json", "fingerprint": "ledger-fingerprint",
-            "target_insertions": [{"migration_name": "131_review.sql"}], "local_insertions": [], "blockers": [],
-        }
-        with patch.object(
-            database_release_web, "generate_database_release_migration_ledger_reconciliation", return_value=plan,
-        ) as generate:
-            response = self.client.post(
-                "/api/schema-migration-ledger/generate", json={"target": "staging"},
-                headers={"X-Data-Import-CSRF-Token": csrf},
-            )
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.get_json()["plan"]["mode"], "migration_ledger_reconciliation")
-        generate.assert_called_once_with("staging")
-
-        response = self.client.post(
-            "/api/schema-migration-ledger/apply", json={"target": "staging"},
-            headers={"X-Data-Import-CSRF-Token": csrf},
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.get_json()["error"], "database_release_migration_ledger_review_confirmation_required")
-
-        with patch.object(
-            database_release_web, "apply_database_release_migration_ledger_reconciliation",
-            return_value={"target": "staging", "target_inserted": 1, "local_inserted": 0, "verification": {"ok": True}},
-        ) as apply:
-            response = self.client.post(
-                "/api/schema-migration-ledger/apply",
-                json={"target": "staging", "report_path": ".deploy/ledger-plan.json", "fingerprint": "ledger-fingerprint", "review_confirmed": True},
-                headers={"X-Data-Import-CSRF-Token": csrf},
-            )
-        self.assertEqual(response.status_code, 200)
-        apply.assert_called_once_with("staging", ".deploy/ledger-plan.json", "ledger-fingerprint", confirm_production=False)
+        html = self.client.get("/").get_data(as_text=True)
+        self.assertNotIn("生成迁移账本对齐计划", html)
+        self.assertNotIn("修复本地缺失迁移记录", html)
+        self.assertNotIn("/api/local-migration-ledger/repair", html)
+        self.assertNotIn("/api/schema-migration-ledger/", html)
 
     def test_schema_upgrade_console_and_final_runner_have_safety_guards(self):
         html = self.client.get("/").get_data(as_text=True)
@@ -448,25 +395,10 @@ class DatabaseReleaseWebBddTest(unittest.TestCase):
         self.assertIn("review_confirmed:true", html)
         self.assertIn("确认审核后应用", html)
         self.assertIn("无需应用结构包，全部步骤已核验通过。", html)
-        self.assertIn("没有新增结构包，但迁移账本尚未等价", html)
         self.assertIn("无需用户确认", html)
         self.assertIn("无需应用", html)
-        self.assertIn("生成迁移账本对齐计划", html)
-        self.assertIn("迁移账本对齐计划", html)
-        self.assertIn("需人工核验的非结构迁移", html)
-        self.assertIn("/api/schema-migration-ledger/generate", html)
-        self.assertIn("/api/schema-migration-ledger/apply", html)
-        self.assertIn("function hasBlockingMigrationLedgerDrift()", html)
-        self.assertIn("const strict=migration.strict_schema||migration", html)
-        self.assertIn("存在需要处理的结构迁移账本差异", html)
-        self.assertIn("仅向 schema_migrations 插入缺失账本记录", inspect.getsource(database_release_services._build_migration_ledger_reconciliation))
-        ledger_writer = inspect.getsource(database_release_services._insert_migration_ledger_baseline_rows)
-        self.assertIn("ON CONFLICT (migration_name) DO NOTHING", ledger_writer)
-        self.assertNotIn("DELETE FROM", ledger_writer)
-        self.assertNotIn("UPDATE schema_migrations", ledger_writer)
-        reconciliation = inspect.getsource(database_release_services._build_migration_ledger_reconciliation)
-        self.assertIn('row["migration_scope"] == "schema"', reconciliation)
-        self.assertIn("non_schema_migration_ledger_requires_manual_verification", reconciliation)
+        self.assertIn("历史主数据迁移账本观察项", html)
+        self.assertIn("不会由结构安全升级自动补写", html)
         script = (database_release_web.ROOT / "scripts" / "apply_database_release_package.sh").read_text(encoding="utf-8")
         self.assertIn("Refusing non-additive SQL in schema release package", script)
         self.assertIn("pg_advisory_xact_lock", script)
