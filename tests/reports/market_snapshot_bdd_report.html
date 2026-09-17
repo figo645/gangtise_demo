@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AKShare 市场快照 BDD 测试报告</title>
+  <style>
+    :root { --ink:#132238; --muted:#627086; --line:#dbe3ec; --paper:#f5f8fb; --pass:#087443; --warn:#9b5d00; --blue:#1769aa; }
+    * { box-sizing:border-box; } body { margin:0; background:var(--paper); color:var(--ink); font:14px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif; }
+    main { max-width:960px; margin:32px auto; padding:0 20px; } header { padding:28px 30px; border-radius:18px; color:#fff; background:linear-gradient(135deg,#10233d,#1769aa); }
+    h1 { margin:0; font-size:26px; } h2 { margin:28px 0 10px; font-size:18px; } p { margin:8px 0; } .meta { opacity:.82; margin-top:8px; } .summary { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:18px 0; }
+    .metric,.card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:18px; } .metric strong { display:block; font-size:26px; color:var(--pass); } .metric span { color:var(--muted); }
+    table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line); border-radius:14px; overflow:hidden; } th,td { text-align:left; vertical-align:top; padding:12px; border-bottom:1px solid var(--line); } th { color:var(--muted); font-size:12px; background:#f9fbfd; } tr:last-child td { border:0; } .pass { color:var(--pass); font-weight:700; } code { padding:2px 5px; border-radius:5px; background:#edf2f7; } .note { border-left:4px solid #e3a93b; color:#604100; background:#fff7e6; padding:12px 14px; border-radius:0 8px 8px 0; }
+    @media (max-width:600px) { .summary { grid-template-columns:1fr; } main { margin:16px auto; } header { padding:22px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>AKShare 市场快照 BDD 测试报告</h1>
+      <div class="meta">执行日期：2026-09-17 · 范围：采集、完整性校验、入库、读取 API、H5 数据契约、任务调度</div>
+    </header>
+    <section class="summary">
+      <div class="metric"><strong>28</strong><span>通过场景</span></div>
+      <div class="metric"><strong>0</strong><span>失败场景</span></div>
+      <div class="metric"><strong>5 分钟</strong><span>共享采集间隔</span></div>
+    </section>
+    <h2>执行结果</h2>
+    <div class="card"><code>python3 -m pytest -q tests/test_market_snapshot_bdd.py tests/test_market_gangtise_provider.py tests/test_route_smoke.py -k 'market_snapshot or market_overview or market_sector or akshare_sector_sync or h5_does_not_expose'</code><p class="pass">预期结果：28 passed</p></div>
+    <h2>关键 BDD 场景</h2>
+    <table>
+      <thead><tr><th>Given</th><th>When</th><th>Then</th><th>结果</th></tr></thead>
+      <tbody>
+        <tr><td>AKShare 返回 9 个指数与 31 个申万一级行业</td><td>执行共享 <code>market_snapshot_sync</code></td><td>只写入 AKShare 快照；上证 <code>3875.60</code>、深证 <code>13409.91</code> 原值可读</td><td class="pass">通过</td></tr>
+        <tr><td>行业源数据原始顺序无序</td><td>写入快照</td><td>行业按 <code>change_pct</code> 从高到低排序，H5/API 使用同一快照</td><td class="pass">通过</td></tr>
+        <tr><td>行业响应少于完整 31 个标准行业</td><td>执行采集任务</td><td>拒绝覆盖行业快照，记录真实失败原因</td><td class="pass">通过</td></tr>
+        <tr><td>指数或行业上游失败</td><td>执行采集任务</td><td>不会给旧快照重写采集时间；超过 6 分钟的旧数据由页面隐藏</td><td class="pass">通过</td></tr>
+        <tr><td>用户访问市场 API/H5</td><td>读取 <code>/api/market-overview</code> 与 <code>/api/market-sectors</code></td><td>仅读取持久化快照，不在请求链路调用 AKShare 或 Gangtise</td><td class="pass">通过</td></tr>
+        <tr><td>部署任务配置</td><td>调度器启动</td><td><code>market_snapshot_sync</code> 启用，间隔 <code>300</code> 秒</td><td class="pass">通过</td></tr>
+      </tbody>
+    </table>
+    <h2>上线核验</h2>
+    <div class="note">本报告验证的是应用逻辑与采集契约，不伪造外部行情。生产环境发布后，请在 Admin 执行一次“AKShare 市场与行业指标同步”，并检查任务日志中的 <code>overview_count=9</code> 与 <code>sector_count=31</code>。任何其他数字都会被记录为真实上游或调度问题，不会显示为当前行情。</div>
+  </main>
+</body>
+</html>

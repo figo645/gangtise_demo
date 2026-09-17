@@ -91,6 +91,12 @@ pipeline {
                         fi
 
                         chmod +x ./start_daemon_app.sh
+                        chmod +x ./scripts/apply_postgres_updates.sh
+
+                        # Apply operational/schema migrations before startup.
+                        # This never imports master data and keeps task-center
+                        # schedules consistent with the deployed code.
+                        ./scripts/apply_postgres_updates.sh --schema-only
 
                         # 防止 Jenkins 结束后杀掉进程
                         export BUILD_ID=dontKillMe

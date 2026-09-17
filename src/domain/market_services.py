@@ -410,7 +410,7 @@ def _resolve_user_pk(tenant_slug="", profile_id=""):
     return int(row["id"] if isinstance(row, dict) else row[0]) if row else None
 
 
-def list_user_watchlist_items(tenant_slug="", user_profile_id=""):
+def list_user_watchlist_items(tenant_slug="", user_profile_id="", allow_provider_fetch=False):
     tenant, profile = _normalize_user_watchlist_owner(tenant_slug, user_profile_id)
     db = get_db()
     rows = db.execute(
@@ -433,6 +433,7 @@ def list_user_watchlist_items(tenant_slug="", user_profile_id=""):
                 stock_code=code,
                 stock_name=str(row.get("stock_name") or code),
                 details_map={},
+                allow_provider_fetch=allow_provider_fetch,
             ) or {}
         except Exception as exc:
             # Keep a persisted row visible even when a single provider call
@@ -571,6 +572,9 @@ def gen_macro_indicators():
 
 GANGTISE_OPENAPI_SUCCESS_CODE = "000000"
 GANGTISE_OPENAPI_LOGIN_PATH = "/application/auth/oauth/open/loginV2"
+GANGTISE_EDB_SEARCH_PATH = "/application/open-indicator/EDB/search"
+GANGTISE_EDB_DATA_PATH = "/application/open-indicator/EDB/getData"
+GANGTISE_MARKET_INDICATOR_MAPPING_KEY = "gangtise_market_snapshot_indicator_mapping_v1"
 _gangtise_env_loaded = False
 _gangtise_token_lock = threading.Lock()
 _gangtise_token_cache = {"token": "", "fetched_at": 0.0}
@@ -2224,15 +2228,15 @@ def build_gangtise_source_seed_payload(indicator_code, existing=None):
 
 
 def build_akshare_market_snapshot_source_seed_payload(indicator_code):
-    """Describe a presentation indicator backed only by the AKShare snapshot."""
+    """Describe a presentation indicator backed by the Gangtise EDB snapshot."""
     entry = GANGTISE_INDICATOR_REGISTRY.get(slugify_code(indicator_code, "indicator")) or {}
     indicator_name = str(entry.get("indicator_name") or indicator_code).strip()
     return {
         "source_code": slugify_code(indicator_code, "source"),
         "indicator_code": slugify_code(indicator_code, "indicator"),
-        "provider": "AKShare",
+        "provider": "Gangtise OpenAPI",
         "base_url": "",
-        "path": "akshare://market_snapshot",
+        "path": "gangtise://open-indicator/EDB/getData",
         "method": "SNAPSHOT",
         "auth_type": "none",
         "headers": {},
@@ -2242,26 +2246,26 @@ def build_akshare_market_snapshot_source_seed_payload(indicator_code):
             "value_path": "value",
             "time_path": "updated_at",
             "status_path": "available",
-            "connector_type": "akshare_snapshot",
+            "connector_type": "gangtise_edb_snapshot",
             "extractor_type": "market_snapshot",
-            "request_blueprint": {"snapshot_type": "market_overview", "provider": "AKShare"},
+            "request_blueprint": {"snapshot_type": "market_overview", "provider": "Gangtise OpenAPI"},
         },
         "response_sample": {
             "indicator": indicator_name,
-            "provider": "AKShare",
-            "connector_type": "akshare_snapshot",
+            "provider": "Gangtise OpenAPI",
+            "connector_type": "gangtise_edb_snapshot",
             "extractor_type": "market_snapshot",
             "status": "configured",
             "timestamp": now_ts(),
             "value": None,
-            "record_summary": "由 market_snapshot_sync 写入 PostgreSQL 快照，不调用 Gangtise。",
+            "record_summary": "由 market_snapshot_sync 通过 Gangtise EDB 写入 PostgreSQL 共享快照。",
         },
         "source_status": "configured",
         "enabled": True,
         "last_test_status": "",
         "last_http_status": None,
         "last_tested_at": "",
-        "last_test_detail": "AKShare 市场快照源",
+        "last_test_detail": "Gangtise EDB 市场快照源",
     }
 
 
@@ -3932,16 +3936,16 @@ def ensure_default_indicator_sources():
                         "indicator_code": indicator_code,
                         "indicator_name": indicator_name,
                         "category": str(entry.get("category") or "数据湖指标").strip(),
-                        "description": "由 AKShare 市场快照统一采集，用于市场一览展示。",
+                        "description": "由 Gangtise EDB 市场快照统一采集，用于市场一览展示。",
                         "unit": "",
-                        "owner": "AKShare 市场快照",
+                        "owner": "Gangtise EDB 市场快照",
                         "source_type": "lake",
                         "source_type_label": "数据湖指标",
-                        "provider": "AKShare",
+                        "provider": "Gangtise OpenAPI",
                         "status_hint": "attention",
-                        "assessment_template": f"{indicator_name} 由 AKShare 市场快照更新。",
-                        "alert_template": "需关注 AKShare 快照刷新与连通状态",
-                        "watchers": ["AKShare", "市场一览", "大V 工作台"],
+                        "assessment_template": f"{indicator_name} 由 Gangtise EDB 市场快照更新。",
+                        "alert_template": "需关注 Gangtise EDB 快照刷新与连通状态",
+                        "watchers": ["Gangtise EDB", "市场一览", "大V 工作台"],
                         "display_config": {"show_in_admin": True, "show_in_h5": False},
                         "enabled": True,
                     }
@@ -4414,23 +4418,23 @@ DEFAULT_ADMIN_TASKS = [
     },
     {
         "task_code": "market_snapshot_sync",
-        "task_name": "AKShare 市场与行业指标同步",
+        "task_name": "Gangtise 市场与行业指标同步",
         "task_group": "indicator",
         "task_type": "sync_market_snapshot",
-        "description": "每 5 分钟统一从 AKShare 采集热门行业涨跌 Top10、市场一览涨跌 Top10 与我的所有自选股涨跌 Top10 所需行情，写入 PostgreSQL 快照供 H5 展示；前台不直接访问外部行情源。",
-        "schedule_type": "interval",
-        "schedule_value": "300",
+        "description": "每日 09:30、12:00、14:00、15:30 统一从 Gangtise EDB 采集标准市场指数与申万一级行业，写入 PostgreSQL 共享快照供全部租户展示；个股 K 线与分时仅在用户查看标的详情时按需获取。",
+        "schedule_type": "daily",
+        "schedule_value": "09:30,12:00,14:00,15:30",
         "enabled": 1,
         "timeout_seconds": 900,
     },
     {
         "task_code": "news_title_impact_sync",
-        "task_name": "新闻源采集与 V4 标题标注",
+        "task_name": "新闻源采集同步",
         "task_group": "news",
-        "task_type": "sync_news_title_classifications",
-        "description": "每天两次采集全部合格新闻源记录，按批调用 V4 仅依据标题标注利好/利空/中性和行业；原始新闻链接与结果写入 PostgreSQL，供所有用户共享。",
-        "schedule_type": "daily",
-        "schedule_value": "10:15,14:15",
+        "task_type": "sync_news_sources",
+        "description": "每小时采集全部合格新闻源并写入 PostgreSQL 共享快照；不调用 V4，首页与列表仅读取新闻源数据。",
+        "schedule_type": "interval",
+        "schedule_value": "3600",
         "enabled": 1,
         "timeout_seconds": 300,
     },
@@ -6497,7 +6501,7 @@ WATCHLIST_NAME_ALIAS_MAP = {
     "source_nasdaq": "纳斯达克指数",
 }
 WATCHLIST_SEARCH_CACHE_TTL_SECONDS = 6 * 60 * 60
-WATCHLIST_DETAIL_CACHE_TTL_SECONDS = 30 * 60
+WATCHLIST_DETAIL_CACHE_TTL_SECONDS = 10 * 60
 WATCHLIST_INDEX_DETAIL_CACHE_TTL_SECONDS = 5 * 60
 
 MARKET_OVERVIEW_INDEX_CODES = (
@@ -6510,6 +6514,18 @@ MARKET_OVERVIEW_INDEX_CODES = (
     "source_nasdaq",
     "source_sp500",
     "source_nikkei",
+)
+
+GANGTISE_MARKET_OVERVIEW_SPECS = (
+    ("source_shanghai_index", "上证指数", ("上证指数",), ("上证",)),
+    ("source_shenzhen_index", "深证指数", ("深证成指", "深证指数"), ("深证",)),
+    ("source_hsi", "恒生指数", ("恒生指数",), ("恒生",)),
+    ("source_hscei", "国企指数", ("恒生中国企业指数", "国企指数"), ("恒生", "企业")),
+    ("source_hscci", "红筹指数", ("恒生红筹指数", "红筹指数"), ("红筹",)),
+    ("source_dji", "道琼斯", ("道琼斯工业平均指数", "道琼斯"), ("道琼斯",)),
+    ("source_nasdaq", "纳斯达克指数", ("纳斯达克综合指数", "纳斯达克指数"), ("纳斯达克",)),
+    ("source_sp500", "标普500", ("标普500指数", "标普500"), ("标普", "500")),
+    ("source_nikkei", "日经225", ("日经225指数", "日经225"), ("日经", "225")),
 )
 
 MACRO_ECONOMIC_INDICATOR_CODES = (
@@ -6968,78 +6984,222 @@ _market_snapshot_refresh_lock = threading.Lock()
 _market_snapshot_refresh_running = False
 
 
-def sync_market_snapshot(force=False):
-    """Collect AKShare market snapshots and persist them for presentation reads."""
-    assert_admin_task_not_stopped("market_snapshot_sync")
-    start_date, end_date = resolve_gangtise_market_date_window(days=30)
-    overview_items = []
-    errors = []
-    intraday_count = 0
-    ak = _load_akshare()
-    previous_overview = _load_market_snapshot_payload("market_overview", "standard_indices", 0) or _load_watchlist_cache("market_overview", "standard_indices", 0)
-    previous_items = {
-        str(item.get("indicator_code") or ""): item
-        for item in ((previous_overview or {}).get("items") or [])
-        if isinstance(item, dict) and item.get("available") and str(item.get("data_source") or "").lower() == "akshare"
-    }
-    for indicator_code in MARKET_OVERVIEW_INDEX_CODES:
-        assert_admin_task_not_stopped("market_snapshot_sync")
-        result = fetch_akshare_market_index_history(indicator_code, start_date, end_date, ak=ak)
-        item = _build_market_index_snapshot_item(indicator_code, result)
-        if not item.get("available") and indicator_code in previous_items:
-            # Preserve the last verified AKShare point during a transient outage.
-            item = {**copy.deepcopy(previous_items[indicator_code]), "stale": True}
-        overview_items.append(item)
-        if not item.get("available"):
-            errors.append(f"{item.get('name') or indicator_code}：{item.get('message') or '暂无数据'}")
+def _gangtise_market_snapshot_specs():
+    specs = [
+        {"key": key, "name": name, "keywords": keywords, "required_terms": terms, "kind": "market"}
+        for key, name, keywords, terms in GANGTISE_MARKET_OVERVIEW_SPECS
+    ]
+    for sector in SHENWAN_LEVEL1_INDUSTRIES:
+        specs.append({
+            "key": f"sector:{sector}",
+            "name": sector,
+            "keywords": (f"申万一级行业指数:{sector}", f"申万一级行业:{sector}", f"申万{sector}行业指数"),
+            "required_terms": ("申万", sector),
+            "kind": "sector",
+        })
+    return specs
+
+
+def _gangtise_normalized_indicator_name(value):
+    return re.sub(r"[\s:：_\-()（）]", "", str(value or "").strip().lower())
+
+
+def _choose_gangtise_market_snapshot_candidate(rows, spec):
+    required_terms = tuple(_gangtise_normalized_indicator_name(item) for item in (spec.get("required_terms") or ()) if item)
+    candidates = []
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict) or not str(row.get("indicatorId") or "").strip():
             continue
-        _save_watchlist_cache(
-            "market_index_history",
-            indicator_code,
-            {
-                "ok": True,
-                "provider": result.get("provider") or "未知来源",
-                "source_meta": result.get("source_meta") or {},
-                "indicator_code": indicator_code,
-                "points": result["points"],
-                "updated_at": item.get("updated_at"),
-            },
+        normalized_name = _gangtise_normalized_indicator_name(row.get("indicatorName"))
+        if required_terms and not all(term in normalized_name for term in required_terms):
+            continue
+        candidates.append(row)
+    if not candidates:
+        return None
+    exact_names = {
+        _gangtise_normalized_indicator_name(name)
+        for name in (spec.get("keywords") or ())
+        if name
+    }
+    candidates.sort(key=lambda row: (
+        0 if _gangtise_normalized_indicator_name(row.get("indicatorName")) in exact_names else 1,
+        len(_gangtise_normalized_indicator_name(row.get("indicatorName"))),
+        str(row.get("indicatorId") or ""),
+    ))
+    return candidates[0]
+
+
+def _resolve_gangtise_market_snapshot_indicators(specs):
+    cached = _load_json_app_setting(GANGTISE_MARKET_INDICATOR_MAPPING_KEY, {})
+    cached_items = cached.get("items") if isinstance(cached, dict) else {}
+    cached_items = cached_items if isinstance(cached_items, dict) else {}
+    resolved = {}
+    unresolved = []
+    for spec in specs:
+        item = cached_items.get(spec["key"])
+        if isinstance(item, dict) and str(item.get("indicator_id") or "").strip():
+            resolved[spec["key"]] = {**spec, **item}
+        else:
+            unresolved.append(spec)
+    errors = []
+    for spec in unresolved:
+        selected = None
+        last_message = ""
+        for keyword in spec["keywords"]:
+            status, response, _duration = post_gangtise_openapi_json(
+                GANGTISE_EDB_SEARCH_PATH, {"keyword": keyword, "limit": 100}, timeout=30
+            )
+            if not is_gangtise_openapi_success(status, response):
+                last_message = str((response or {}).get("msg") or (response or {}).get("message") or f"http_status={status}")
+                continue
+            selected = _choose_gangtise_market_snapshot_candidate((response or {}).get("data") or [], spec)
+            if selected:
+                break
+        if not selected:
+            errors.append(f"{spec['name']}：未找到经过名称校验的 Gangtise 指标{(' (' + last_message[:120] + ')') if last_message else ''}")
+            continue
+        resolved[spec["key"]] = {
+            **spec,
+            "indicator_id": str(selected.get("indicatorId") or "").strip(),
+            "indicator_name": str(selected.get("indicatorName") or "").strip(),
+            "data_source": str(selected.get("dataSource") or "").strip(),
+            "unit": str(selected.get("unit") or "").strip(),
+        }
+    _save_json_app_setting(GANGTISE_MARKET_INDICATOR_MAPPING_KEY, {
+        "version": 1,
+        "updated_at": now_ts(),
+        "items": {
+            key: {field: value for field, value in item.items() if field in {"indicator_id", "indicator_name", "data_source", "unit"}}
+            for key, item in resolved.items()
+        },
+    })
+    return resolved, errors
+
+
+def _normalize_gangtise_edb_batch(response, indicator_ids):
+    data = (response or {}).get("data") if isinstance(response, dict) else {}
+    fields = data.get("fieldList") if isinstance(data, dict) else []
+    rows = data.get("dataList") if isinstance(data, dict) else []
+    if not isinstance(fields, list) or not isinstance(rows, list) or not fields:
+        return {}
+    date_index = next((index for index, value in enumerate(fields) if str(value).strip().lower() == "date"), -1)
+    if date_index < 0:
+        return {}
+    positions = {str(indicator_id): fields.index(indicator_id) for indicator_id in indicator_ids if indicator_id in fields}
+    result = {indicator_id: [] for indicator_id in indicator_ids}
+    for row in rows:
+        if not isinstance(row, list) or len(row) <= date_index:
+            continue
+        date_value = str(row[date_index] or "").strip()
+        if not date_value:
+            continue
+        for indicator_id, position in positions.items():
+            if len(row) <= position:
+                continue
+            value = numeric_value(row[position])
+            if value is not None:
+                result[indicator_id].append({"date": date_value, "close": value})
+    for points in result.values():
+        points.sort(key=lambda item: item["date"])
+    return result
+
+
+def _fetch_gangtise_market_snapshot_series(resolved):
+    series_by_id = {}
+    errors = []
+    end_date = _current_cn_market_date().strftime("%Y-%m-%d")
+    start_date = (_current_cn_market_date() - timedelta(days=14)).strftime("%Y-%m-%d")
+    ids = [item["indicator_id"] for item in resolved.values() if item.get("indicator_id")]
+    for offset in range(0, len(ids), 10):
+        batch = ids[offset:offset + 10]
+        status, response, _duration = post_gangtise_openapi_json(
+            GANGTISE_EDB_DATA_PATH,
+            {"indicatorIdList": batch, "startDate": start_date, "endDate": end_date},
+            timeout=45,
         )
+        if not is_gangtise_openapi_success(status, response):
+            errors.append(str((response or {}).get("msg") or (response or {}).get("message") or f"EDB/getData http_status={status}"))
+            continue
+        series_by_id.update(_normalize_gangtise_edb_batch(response, batch))
+    return series_by_id, errors
+
+
+def _build_gangtise_market_snapshot_item(spec, points):
+    rows = points if isinstance(points, list) else []
+    latest = rows[-1] if rows else {}
+    previous = rows[-2] if len(rows) >= 2 else {}
+    price = numeric_value(latest.get("close"))
+    previous_price = numeric_value(previous.get("close"))
+    available = price is not None and previous_price is not None
+    change = round(price - previous_price, 4) if available else None
+    return {
+        "indicator_code": spec["key"], "name": spec["name"], "code": spec.get("indicator_id") or "",
+        "market": (GANGTISE_INDICATOR_REGISTRY.get(spec["key"]) or {}).get("market") or "CN",
+        "price": round(price, 4) if price is not None else None, "change": change,
+        "change_pct": round(change / previous_price * 100, 4) if available and previous_price else None,
+        "updated_at": str(latest.get("date") or ""), "available": available,
+        "data_source": "Gangtise OpenAPI", "message": "" if available else "Gangtise EDB 未返回至少两个有效时点",
+        "source_meta": {"indicator_id": spec.get("indicator_id"), "indicator_name": spec.get("indicator_name"), "data_source": spec.get("data_source"), "unit": spec.get("unit")},
+    }
+
+
+def sync_market_snapshot(force=False):
+    """Collect shared Gangtise EDB market and Shenwan snapshots for all tenants."""
     assert_admin_task_not_stopped("market_snapshot_sync")
-    sector_items = _fetch_akshare_sector_overview(ak=ak)
-    if not sector_items:
-        errors.append("AKShare 申万一级行业行情未返回有效数据")
+    errors = []
+    resolved, discovery_errors = _resolve_gangtise_market_snapshot_indicators(_gangtise_market_snapshot_specs())
+    errors.extend(discovery_errors)
+    assert_admin_task_not_stopped("market_snapshot_sync")
+    series_by_id, data_errors = _fetch_gangtise_market_snapshot_series(resolved)
+    errors.extend(data_errors)
+    overview_items = []
+    sector_items = []
+    for spec in resolved.values():
+        assert_admin_task_not_stopped("market_snapshot_sync")
+        item = _build_gangtise_market_snapshot_item(spec, series_by_id.get(spec.get("indicator_id"), []))
+        if spec["kind"] == "market":
+            overview_items.append(item)
+            if item["available"]:
+                _save_watchlist_cache("market_index_history", spec["key"], {
+                    "ok": True, "provider": "Gangtise OpenAPI", "source_meta": item["source_meta"],
+                    "indicator_code": spec["key"], "points": series_by_id.get(spec.get("indicator_id"), []),
+                    "updated_at": item["updated_at"],
+                })
+        else:
+            sector_items.append({
+                "sector": spec["name"], "code": spec.get("indicator_id") or "", "indicator_name": spec.get("indicator_name") or spec["name"],
+                "value": item["price"], "change": item["change"], "change_pct": item["change_pct"], "updated_at": item["updated_at"],
+                "data_source": "Gangtise OpenAPI", "available": item["available"], "source_meta": item["source_meta"],
+            })
+    fresh_overview_items = [item for item in overview_items if item.get("available")]
+    sector_items = [item for item in sector_items if item.get("available")]
+    if len(fresh_overview_items) != len(MARKET_OVERVIEW_INDEX_CODES):
+        errors.append(f"Gangtise 市场指数不完整：{len(fresh_overview_items)}/{len(MARKET_OVERVIEW_INDEX_CODES)}")
+    if not _has_complete_shenwan_level1_sector_snapshot(sector_items):
+        errors.append(f"Gangtise 申万一级行业不完整：{len(sector_items)}/{len(SHENWAN_LEVEL1_INDUSTRIES)}")
+        sector_items = []
+    else:
+        sector_items.sort(key=lambda item: (-float(item["change_pct"]), str(item["sector"])))
     updated_at = now_ts()
-    overview_payload = {"ok": True, "snapshot_version": 7, "items": overview_items, "source": "AKShare", "updated_at": updated_at}
-    sector_payload = {"ok": True, "snapshot_version": 7, "items": sector_items, "total": len(sector_items), "catalog_size": len(SHENWAN_LEVEL1_INDUSTRIES), "source": "AKShare", "updated_at": updated_at}
-    if any(item.get("available") for item in overview_items):
+    overview_payload = {"ok": True, "snapshot_version": 8, "items": fresh_overview_items, "source": "Gangtise OpenAPI", "updated_at": updated_at}
+    sector_payload = {"ok": True, "snapshot_version": 8, "items": sector_items, "total": len(sector_items), "catalog_size": len(SHENWAN_LEVEL1_INDUSTRIES), "source": "Gangtise OpenAPI", "updated_at": updated_at}
+    if fresh_overview_items:
         _save_market_snapshot_payload("market_overview", "standard_indices", overview_payload)
     if sector_items:
         _save_market_snapshot_payload("market_sector_overview", "shenwan_level1", sector_payload)
-    previous_macro = _load_market_snapshot_payload("macro_economic", "china_macro", 0) or {}
-    macro_refresh_due = force or _load_market_snapshot_payload(
-        "macro_economic", "china_macro", MACRO_SNAPSHOT_REFRESH_TTL_SECONDS
-    ) is None
-    previous_macro_items = {
-        str(item.get("indicator_code") or ""): item
-        for item in (previous_macro.get("items") or [])
-        if isinstance(item, dict) and item.get("available")
-    }
-    macro_items = list((previous_macro or {}).get("items") or []) if not macro_refresh_due else []
-    if macro_refresh_due:
-        for indicator_code in MACRO_ECONOMIC_INDICATOR_CODES:
-            assert_admin_task_not_stopped("market_snapshot_sync")
-            result = fetch_akshare_macro_indicator_series(indicator_code, ak=ak)
-            item = _build_macro_snapshot_item(indicator_code, result)
-            if not item.get("available") and indicator_code in previous_macro_items and (AKSHARE_MACRO_CATALOG.get(indicator_code) or {}).get("preserve_on_failure", True):
-                item = {**copy.deepcopy(previous_macro_items[indicator_code]), "stale": True}
-            macro_items.append(item)
-            if not item.get("available"):
-                errors.append(f"{item.get('name') or indicator_code}：{item.get('message') or '暂无数据'}")
-        macro_payload = {"ok": True, "snapshot_version": 1, "items": macro_items, "source": "AKShare", "updated_at": updated_at}
-        if any(item.get("available") for item in macro_items):
-            _save_market_snapshot_payload("macro_economic", "china_macro", macro_payload)
-    return {"ok": bool(any(item.get("available") for item in overview_items) or sector_items or any(item.get("available") for item in macro_items)), "updated": sum(1 for item in overview_items if item.get("available")) + len(sector_items) + (sum(1 for item in macro_items if item.get("available")) if macro_refresh_due else 0) + intraday_count, "overview_count": sum(1 for item in overview_items if item.get("available")), "sector_count": len(sector_items), "macro_count": sum(1 for item in macro_items if item.get("available")), "macro_refreshed": macro_refresh_due, "intraday_count": intraday_count, "updated_at": updated_at, "errors": errors[:20]}
+    app.logger.info(
+        "Gangtise market snapshot collected overview_count=%s expected_overview=%s "
+        "sector_count=%s expected_sector=%s errors=%s",
+        len(fresh_overview_items),
+        len(MARKET_OVERVIEW_INDEX_CODES),
+        len(sector_items),
+        len(SHENWAN_LEVEL1_INDUSTRIES),
+        len(errors),
+    )
+    overview_complete = len(fresh_overview_items) == len(MARKET_OVERVIEW_INDEX_CODES)
+    sector_complete = len(sector_items) == len(SHENWAN_LEVEL1_INDUSTRIES)
+    complete = overview_complete and sector_complete
+    return {"ok": complete, "complete": complete, "updated": len(fresh_overview_items) + len(sector_items), "overview_count": len(fresh_overview_items), "expected_overview_count": len(MARKET_OVERVIEW_INDEX_CODES), "sector_count": len(sector_items), "expected_sector_count": len(SHENWAN_LEVEL1_INDUSTRIES), "updated_at": updated_at, "errors": errors[:20]}
 
 
 def request_market_snapshot_refresh():
@@ -7065,7 +7225,30 @@ def request_market_snapshot_refresh():
     return True
 
 
-def build_market_overview_payload():
+def _apply_tenant_market_display_selection(payload, tenant_slug, kind):
+    """Project the shared snapshot into one tenant's published 4/10 selection."""
+    result = copy.deepcopy(payload) if isinstance(payload, dict) else {"ok": True, "items": []}
+    items = result.get("items") if isinstance(result.get("items"), list) else []
+    if not tenant_slug:
+        return result
+    from src.domain.core_services import load_tenant_market_display_settings
+
+    settings = load_tenant_market_display_settings(tenant_slug)
+    selected = settings["market_overview_codes"] if kind == "market" else settings["sector_names"]
+    item_key = "indicator_code" if kind == "market" else "sector"
+    if settings.get("configured"):
+        by_key = {str(item.get(item_key) or "").strip(): item for item in items if isinstance(item, dict)}
+        result["items"] = [by_key[key] for key in selected if key in by_key]
+    else:
+        # A newly created tenant gets useful live data before its DaV makes a
+        # selection; the first explicit save turns this into a fixed list.
+        result["items"] = items[:4 if kind == "market" else 10]
+    result["tenant_display_config"] = settings
+    result["display_limit"] = 4 if kind == "market" else 10
+    return result
+
+
+def build_market_overview_payload(tenant_slug=""):
     """Read persisted real market data; never call a provider from an H5 GET."""
     cache_key = "standard_indices"
     cached = _load_market_snapshot_payload("market_overview", cache_key, MARKET_SNAPSHOT_CACHE_TTL_SECONDS)
@@ -7075,10 +7258,10 @@ def build_market_overview_payload():
         isinstance(cached, dict)
         and isinstance(cached.get("items"), list)
         and cached.get("items")
-        and str(cached.get("source") or "").lower() == "akshare"
-        and cached.get("snapshot_version") == 7
+        and str(cached.get("source") or "").lower() == "gangtise openapi"
+        and cached.get("snapshot_version") == 8
     ):
-        return cached
+        return _apply_tenant_market_display_selection(cached, tenant_slug, "market")
     stale = _load_market_snapshot_payload("market_overview", cache_key, 0)
     if stale is None:
         stale = _load_watchlist_cache("market_overview", cache_key, 0)
@@ -7086,15 +7269,16 @@ def build_market_overview_payload():
         isinstance(stale, dict)
         and isinstance(stale.get("items"), list)
         and stale.get("items")
-        and str(stale.get("source") or "").lower() == "akshare"
-        and stale.get("snapshot_version") == 7
+        and str(stale.get("source") or "").lower() == "gangtise openapi"
+        and stale.get("snapshot_version") == 8
     ):
         preserved = copy.deepcopy(stale)
         preserved["stale"] = True
-        preserved["items"] = [{**item, "stale": True} if isinstance(item, dict) else item for item in preserved["items"]]
-        preserved["message"] = "市场快照正在同步，当前展示最近一次已验证行情"
-        return preserved
-    return {"ok": True, "items": [], "source": "AKShare", "refreshing": True, "message": "后台正在同步 AKShare 市场快照"}
+        preserved["items"] = []
+        preserved["message"] = "市场快照已超过一个交易日未同步，请检查 Gangtise 市场与行业指标同步任务。"
+        preserved["last_success_at"] = str(stale.get("updated_at") or "")
+        return _apply_tenant_market_display_selection(preserved, tenant_slug, "market")
+    return _apply_tenant_market_display_selection({"ok": True, "items": [], "source": "Gangtise OpenAPI", "refreshing": True, "message": "后台正在同步 Gangtise 市场快照"}, tenant_slug, "market")
 
 
 SHENWAN_LEVEL1_INDUSTRIES = (
@@ -7105,11 +7289,12 @@ SHENWAN_LEVEL1_INDUSTRIES = (
     "煤炭", "石油石化", "环保", "美容护理",
 )
 
-MARKET_SECTOR_OVERVIEW_CACHE_TTL_SECONDS = 5 * 60
-# The scheduler refreshes these PostgreSQL snapshots every five minutes. H5
-# reads are slightly more tolerant so a slow run cannot blank the page.
-MARKET_SECTOR_SNAPSHOT_REFRESH_TTL_SECONDS = 6 * 60
-MARKET_SNAPSHOT_CACHE_TTL_SECONDS = 6 * 60
+# Gangtise snapshots are scheduled four times per trading day. They must stay
+# readable between slots and through the overnight close; the UI carries the
+# exact source timestamp so users can judge freshness without losing data.
+MARKET_SECTOR_OVERVIEW_CACHE_TTL_SECONDS = 20 * 60 * 60
+MARKET_SECTOR_SNAPSHOT_REFRESH_TTL_SECONDS = 20 * 60 * 60
+MARKET_SNAPSHOT_CACHE_TTL_SECONDS = 20 * 60 * 60
 MACRO_SNAPSHOT_REFRESH_TTL_SECONDS = 12 * 60 * 60
 
 
@@ -7157,16 +7342,34 @@ def _build_market_demo_sector_payload():
             "catalog_size": len(SHENWAN_LEVEL1_INDUSTRIES), "source": "演示数据", "demo": True, "updated_at": now_ts()}
 
 
+def _has_complete_shenwan_level1_sector_snapshot(items):
+    """Require one valid quote for each official Shenwan level-one industry."""
+    if not isinstance(items, list) or len(items) != len(SHENWAN_LEVEL1_INDUSTRIES):
+        return False
+    expected = set(SHENWAN_LEVEL1_INDUSTRIES)
+    actual = {str((item or {}).get("sector") or "").strip() for item in items if isinstance(item, dict)}
+    return actual == expected
+
+
 def _fetch_akshare_sector_overview(ak=None):
     """Read the 31 official Shenwan level-one index quotes from AKShare."""
     try:
         ak = ak or _load_akshare()
         frame = ak.index_realtime_sw(symbol="一级行业")
+        # Pandas Index deliberately has no boolean value. Materialize it once
+        # so diagnostics cannot turn an otherwise valid provider response into
+        # a failed industry snapshot.
+        raw_columns = getattr(frame, "columns", None)
+        columns = list(raw_columns) if raw_columns is not None else []
         name_column = _akshare_column(frame, ("指数名称", "行业名称", "名称", "name", "Name"))
         code_column = _akshare_column(frame, ("指数代码", "行业代码", "代码", "code", "Code"))
         value_column = _akshare_column(frame, ("最新价", "最新", "close", "Close"))
         previous_column = _akshare_column(frame, ("昨收盘", "昨收", "previous_close", "Previous Close"))
         if not name_column or not code_column or not value_column or not previous_column:
+            app.logger.warning(
+                "AKShare Shenwan level-one response missing required columns columns=%s",
+                columns,
+            )
             return []
         items = []
         for _, row in frame.iterrows():
@@ -7186,32 +7389,52 @@ def _fetch_akshare_sector_overview(ak=None):
                 "updated_at": now_ts(),
                 "data_source": "AKShare",
             })
+        found_sectors = {item["sector"] for item in items}
+        missing_sectors = [sector for sector in SHENWAN_LEVEL1_INDUSTRIES if sector not in found_sectors]
+        if not _has_complete_shenwan_level1_sector_snapshot(items):
+            # The industry board is a like-for-like ranking. Partial vendor
+            # responses must not replace the last complete shared snapshot.
+            app.logger.warning(
+                "AKShare Shenwan level-one response incomplete rows=%s expected=%s missing=%s",
+                len(items),
+                len(SHENWAN_LEVEL1_INDUSTRIES),
+                ",".join(missing_sectors),
+            )
+            return []
+        items.sort(key=lambda item: (-float(item["change_pct"]), str(item["sector"])))
+        app.logger.info(
+            "AKShare Shenwan level-one snapshot accepted rows=%s columns=%s",
+            len(items),
+            columns,
+        )
         return items
     except Exception as exc:
         app.logger.warning("AKShare Shenwan level-one industry quote unavailable: %s", exc)
         return []
 
 
-def build_market_sector_overview_payload(force_refresh=False):
+def build_market_sector_overview_payload(force_refresh=False, tenant_slug=""):
     cache_key = "shenwan_level1"
     if not force_refresh:
         cached = _load_market_snapshot_payload("market_sector_overview", cache_key, MARKET_SNAPSHOT_CACHE_TTL_SECONDS)
         if cached is None:
             cached = _load_watchlist_cache("market_sector_overview", cache_key, MARKET_SNAPSHOT_CACHE_TTL_SECONDS)
         if isinstance(cached, dict) and isinstance(cached.get("items"), list) and cached["items"]:
-            if cached.get("snapshot_version") == 7 and str(cached.get("source") or "").lower() == "akshare":
-                return cached
+            if cached.get("snapshot_version") == 8 and str(cached.get("source") or "").lower() == "gangtise openapi":
+                return _apply_tenant_market_display_selection(cached, tenant_slug, "sector")
     stale = _load_market_snapshot_payload("market_sector_overview", cache_key, 0)
     if stale is None:
         stale = _load_watchlist_cache("market_sector_overview", cache_key, 0)
     if isinstance(stale, dict) and isinstance(stale.get("items"), list) and stale.get("items"):
         source = str(stale.get("source") or "").lower()
-        if source == "akshare" and stale.get("snapshot_version") == 7:
+        if source == "gangtise openapi" and stale.get("snapshot_version") == 8:
             preserved = copy.deepcopy(stale)
             preserved["stale"] = True
-            preserved["message"] = "行业行情同步暂时失败，当前展示最近一次真实快照"
-            return preserved
-    return {"ok": True, "items": [], "total": 0, "catalog_size": len(SHENWAN_LEVEL1_INDUSTRIES), "source": "AKShare", "refreshing": True, "message": "后台正在同步 AKShare 申万行业快照"}
+            preserved["items"] = []
+            preserved["message"] = "行业快照已超过一个交易日未同步，请检查 Gangtise 市场与行业指标同步任务。"
+            preserved["last_success_at"] = str(stale.get("updated_at") or "")
+            return _apply_tenant_market_display_selection(preserved, tenant_slug, "sector")
+    return _apply_tenant_market_display_selection({"ok": True, "items": [], "total": 0, "catalog_size": len(SHENWAN_LEVEL1_INDUSTRIES), "source": "Gangtise OpenAPI", "refreshing": True, "message": "后台正在同步 Gangtise 申万行业快照"}, tenant_slug, "sector")
 
 
 def normalize_watchlist_indicator_code(value):
@@ -7323,9 +7546,9 @@ def normalize_watchlist_detail_from_indicator(detail, indicator_code):
 
 
 def build_market_overview_index_detail(indicator_code):
-    """Build an index detail only from the verified AKShare history snapshot."""
+    """Build an index detail only from the verified Gangtise history snapshot."""
     history = _load_watchlist_cache("market_index_history", indicator_code, MARKET_SNAPSHOT_CACHE_TTL_SECONDS)
-    if str((history or {}).get("provider") or "").strip().lower() != "akshare":
+    if str((history or {}).get("provider") or "").strip().lower() != "gangtise openapi":
         return None
     points = list((history or {}).get("points") or []) if isinstance(history, dict) else []
     if len(points) < 2:
@@ -7346,7 +7569,7 @@ def build_market_overview_index_detail(indicator_code):
         for index, point in enumerate(points)
         if numeric_value(point.get("close")) is not None
     ]
-    provider = "AKShare"
+    provider = "Gangtise OpenAPI"
     return {
         "id": indicator_code,
         "indicator_code": indicator_code,
@@ -8218,13 +8441,32 @@ def _watchlist_detail_cache_is_usable(detail):
     return not _watchlist_detail_has_future_kline(detail)
 
 
-def _build_watchlist_realtime_detail_from_candidate(candidate, stock_name=""):
+def _load_cached_watchlist_detail(candidate, include_stale=False):
+    """Read a persisted quote only; this helper must never contact a provider."""
     normalized = candidate if isinstance(candidate, dict) else {}
     security_code = str(normalized.get("security_code") or "").strip().upper()
     if not security_code:
+        return None
+    ttl = 0 if include_stale else WATCHLIST_DETAIL_CACHE_TTL_SECONDS
+    cached = _load_watchlist_cache("watchlist_detail_cache", security_code, ttl)
+    if not _watchlist_detail_cache_is_usable(cached):
+        return None
+    detail = copy.deepcopy(cached)
+    if include_stale and _load_watchlist_cache("watchlist_detail_cache", security_code, WATCHLIST_DETAIL_CACHE_TTL_SECONDS) is None:
+        detail["stale"] = True
+        detail["data_stale_message"] = "行情缓存超过 30 分钟，等待后台行情任务刷新。"
+    return detail
+
+
+def _build_watchlist_realtime_detail_from_candidate(candidate, stock_name="", allow_provider_fetch=True):
+    normalized = candidate if isinstance(candidate, dict) else {}
+    security_code = str(normalized.get("security_code") or "").strip().upper()
+    if not security_code:
+        if not allow_provider_fetch:
+            return None
         return _fetch_watchlist_realtime_detail_from_candidate(candidate, stock_name=stock_name)
-    cached = _load_watchlist_cache("watchlist_detail_cache", security_code, WATCHLIST_DETAIL_CACHE_TTL_SECONDS)
-    if _watchlist_detail_cache_is_usable(cached):
+    cached = _load_cached_watchlist_detail(normalized)
+    if cached:
         app.logger.warning(
             "Watchlist detail cache hit security_code=%s code=%s kline_points=%s cache_source=%s",
             security_code,
@@ -8232,19 +8474,21 @@ def _build_watchlist_realtime_detail_from_candidate(candidate, stock_name=""):
             len(cached.get("kline") or []),
             str(cached.get("data_source") or cached.get("source") or "--")[:80],
         )
-        return attach_watchlist_intraday(cached)
+        return attach_watchlist_intraday(cached, allow_provider_fetch=allow_provider_fetch)
+    if not allow_provider_fetch:
+        return _load_cached_watchlist_detail(normalized, include_stale=True)
     with _watchlist_detail_fetch_locks_guard:
         fetch_lock = _watchlist_detail_fetch_locks.setdefault(security_code, threading.Lock())
     with fetch_lock:
-        cached = _load_watchlist_cache("watchlist_detail_cache", security_code, WATCHLIST_DETAIL_CACHE_TTL_SECONDS)
-        if _watchlist_detail_cache_is_usable(cached):
+        cached = _load_cached_watchlist_detail(normalized)
+        if cached:
             app.logger.warning(
                 "Watchlist detail cache hit after wait security_code=%s code=%s kline_points=%s",
                 security_code,
                 str(cached.get("code") or normalized.get("code") or "--").strip().upper(),
                 len(cached.get("kline") or []),
             )
-            return attach_watchlist_intraday(cached)
+            return attach_watchlist_intraday(cached, allow_provider_fetch=True)
         return _fetch_watchlist_realtime_detail_from_candidate(candidate, stock_name=stock_name)
 
 
@@ -8476,7 +8720,7 @@ def fetch_watchlist_intraday_series(detail, allow_provider_fetch=True):
         return result
 
 
-def attach_watchlist_intraday(detail):
+def attach_watchlist_intraday(detail, allow_provider_fetch=True):
     if not isinstance(detail, dict) or not detail:
         return detail
     indicator_code = str(detail.get("indicator_code") or detail.get("id") or "").strip()
@@ -8489,9 +8733,9 @@ def attach_watchlist_intraday(detail):
         detail["intraday_message"] = "market_overview_intraday_disabled"
         return detail
     detail["intraday_supported"] = bool(_resolve_watchlist_intraday_symbol(detail))
-    # The browser only reads our detail API. A missing PostgreSQL snapshot is
-    # replenished from AKShare and reused for the next fifteen minutes.
-    result = fetch_watchlist_intraday_series(detail, allow_provider_fetch=True)
+    # Page composition is cache-only. Provider access is reserved for a
+    # focused detail request or a scheduler collection run.
+    result = fetch_watchlist_intraday_series(detail, allow_provider_fetch=allow_provider_fetch)
     detail["intraday_available"] = bool(result.get("available"))
     detail["intraday_series"] = copy.deepcopy(result.get("points") or [])
     detail["intraday_source"] = str(result.get("source") or "Sina").strip() or "Sina"
@@ -8729,8 +8973,8 @@ def _enrich_watchlist_details(details):
     return normalized_details
 
 
-def get_watchlist_detail_by_code(stock_code="", stock_name="", details_map=None, enrich=True):
-    details = details_map if isinstance(details_map, dict) else gen_watchlist_details()
+def get_watchlist_detail_by_code(stock_code="", stock_name="", details_map=None, enrich=True, allow_provider_fetch=False):
+    details = details_map if isinstance(details_map, dict) else gen_watchlist_details(allow_provider_fetch=allow_provider_fetch)
     raw_code = str(stock_code or "").strip()
     indicator_code = normalize_watchlist_indicator_code(raw_code)
     normalized_code = indicator_code or raw_code.upper()
@@ -8745,6 +8989,13 @@ def get_watchlist_detail_by_code(stock_code="", stock_name="", details_map=None,
         normalized_code = _find_watchlist_code_from_text_local(stock_name)
     if not normalized_code:
         return None
+    if not allow_provider_fetch:
+        cached = _load_cached_watchlist_detail(
+            _resolve_watchlist_candidate(stock_code=normalized_code, stock_name=stock_name),
+            include_stale=True,
+        )
+        if cached:
+            return copy.deepcopy((_enrich_watchlist_details({normalized_code: cached}).get(normalized_code)) or cached)
     detail = copy.deepcopy((details or {}).get(normalized_code) or {})
     if detail:
         if not enrich:
@@ -8766,7 +9017,11 @@ def get_watchlist_detail_by_code(stock_code="", stock_name="", details_map=None,
             )
             return detail
         resolved_candidate = _resolve_watchlist_candidate(stock_code=normalized_code, stock_name=stock_name or detail.get("name") or normalized_code)
-        realtime_detail = _build_watchlist_realtime_detail_from_candidate(resolved_candidate, stock_name=stock_name or detail.get("name") or normalized_code)
+        realtime_detail = _build_watchlist_realtime_detail_from_candidate(
+            resolved_candidate,
+            stock_name=stock_name or detail.get("name") or normalized_code,
+            allow_provider_fetch=allow_provider_fetch,
+        )
         merged = _merge_watchlist_detail_with_seed(
             detail,
             realtime_detail=realtime_detail,
@@ -8783,6 +9038,8 @@ def get_watchlist_detail_by_code(stock_code="", stock_name="", details_map=None,
             str(result.get("data_unavailable_message") or "")[:160],
         )
         return result
+    if not allow_provider_fetch:
+        return _build_watchlist_unavailable_detail(detail, stock_code=normalized_code, stock_name=stock_name or normalized_code)
     fallback = _build_dynamic_watchlist_detail(normalized_code, stock_name=stock_name)
     if not fallback:
         return None
@@ -9828,7 +10085,7 @@ def delete_watchlist_comment(
     return remaining is None
 
 
-def gen_watchlist_details():
+def gen_watchlist_details(allow_provider_fetch=False):
     def build_kline_series(stock_code, base_price):
         rng = random.Random(f"kline:{stock_code}")
         close = float(base_price) * (0.9 + rng.random() * 0.2)
@@ -10052,7 +10309,11 @@ def gen_watchlist_details():
     hydrated = {}
     for code, seed_detail in details.items():
         resolved_candidate = _resolve_watchlist_candidate(stock_code=code, stock_name=seed_detail.get("name") or code)
-        realtime_detail = _build_watchlist_realtime_detail_from_candidate(resolved_candidate, stock_name=seed_detail.get("name") or code)
+        realtime_detail = _build_watchlist_realtime_detail_from_candidate(
+            resolved_candidate,
+            stock_name=seed_detail.get("name") or code,
+            allow_provider_fetch=allow_provider_fetch,
+        )
         if realtime_detail:
             hydrated[code] = _merge_watchlist_detail_with_seed(seed_detail, realtime_detail=realtime_detail, stock_code=code, stock_name=seed_detail.get("name") or code)
         else:
@@ -10694,6 +10955,38 @@ def parse_v4_news_search_result(raw_text):
 def sync_v4_news_top20(force=False):
     """Compatibility entry point for databases retaining the old task type."""
     return sync_news_title_classifications(force=force)
+
+
+def sync_news_sources(force=False):
+    """Refresh the shared news-source snapshot without a model invocation."""
+    lake = _aggregate_real_news_sources(force_refresh=force)
+    items = _filter_news_to_time_window(
+        [item for item in (lake.get("items") or []) if isinstance(item, dict)],
+        window_days=NEWS_AGGREGATION_WINDOW_DAYS,
+    )
+    # Preserve deterministic display labels without sending titles to a model
+    # or overwriting separately audited historical classification records.
+    annotated_items = [annotate_news_impact(item) for item in items]
+    payload = dict(lake)
+    payload.update({
+        "cached_at": now_ts(),
+        "items": annotated_items,
+        "indicators": _build_news_lake_indicators(annotated_items),
+        "provider": "新闻源聚合",
+        "model_name": "",
+        "method": "news_source_fetch_v1",
+    })
+    _save_json_app_setting(NEWS_LAKE_CACHE_KEY, payload)
+    app.logger.info(
+        "News source sync finished input_count=%d source_count=%d force=%s",
+        len(annotated_items), len(payload.get("sources") or []), bool(force),
+    )
+    return {
+        "method": "news_source_fetch_v1",
+        "input_count": len(annotated_items),
+        "source_count": len(payload.get("sources") or []),
+        "updated_at": payload["cached_at"],
+    }
 
 
 def _sync_v4_news_top20_legacy_removed(force=False):

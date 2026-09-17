@@ -93,8 +93,14 @@ def test_akshare_sector_sync_returns_only_shenwan_level_one_rows():
         columns = ["指数名称", "指数代码", "最新价", "昨收盘"]
 
         def iterrows(self):
-            yield 0, {"指数名称": "银行", "指数代码": "801780", "最新价": "102", "昨收盘": "100"}
-            yield 1, {"指数名称": "非行业", "指数代码": "000001", "最新价": "100", "昨收盘": "99"}
+            for index, sector in enumerate(reversed(market_services.SHENWAN_LEVEL1_INDUSTRIES), start=1):
+                yield index, {
+                    "指数名称": sector,
+                    "指数代码": f"801{index:03d}",
+                    "最新价": str(100 + index),
+                    "昨收盘": "100",
+                }
+            yield 99, {"指数名称": "非行业", "指数代码": "000001", "最新价": "100", "昨收盘": "99"}
 
     class AkShare:
         def index_realtime_sw(self, symbol):
@@ -103,18 +109,68 @@ def test_akshare_sector_sync_returns_only_shenwan_level_one_rows():
 
     rows = market_services._fetch_akshare_sector_overview(ak=AkShare())
 
-    assert len(rows) == 1
-    assert rows[0]["sector"] == "银行"
-    assert rows[0]["data_source"] == "AKShare"
+    assert len(rows) == len(market_services.SHENWAN_LEVEL1_INDUSTRIES)
+    assert rows[0]["sector"] == market_services.SHENWAN_LEVEL1_INDUSTRIES[0]
+    assert rows[0]["change_pct"] > rows[-1]["change_pct"]
+    assert all(row["data_source"] == "AKShare" for row in rows)
 
 
-def test_market_snapshot_task_runs_every_five_minutes():
+def test_akshare_sector_sync_rejects_incomplete_shenwan_level_one_response():
+    from src.domain import market_services
+
+    class Frame:
+        empty = False
+        columns = ["指数名称", "指数代码", "最新价", "昨收盘"]
+
+        def iterrows(self):
+            yield 0, {"指数名称": "银行", "指数代码": "801780", "最新价": "102", "昨收盘": "100"}
+
+    class AkShare:
+        def index_realtime_sw(self, symbol):
+            return Frame()
+
+    assert market_services._fetch_akshare_sector_overview(ak=AkShare()) == []
+
+
+def test_akshare_sector_sync_accepts_pandas_style_ambiguous_columns_index():
+    """A valid provider frame must not fail only because Index has no truth value."""
+    from src.domain import market_services
+
+    class AmbiguousColumns(list):
+        def __bool__(self):
+            raise ValueError("The truth value of a Index is ambiguous")
+
+    class Frame:
+        empty = False
+        columns = AmbiguousColumns(["指数名称", "指数代码", "最新价", "昨收盘"])
+
+        def iterrows(self):
+            for index, sector in enumerate(market_services.SHENWAN_LEVEL1_INDUSTRIES, start=1):
+                yield index, {
+                    "指数名称": sector,
+                    "指数代码": f"801{index:03d}",
+                    "最新价": str(100 + index),
+                    "昨收盘": "100",
+                }
+
+    class AkShare:
+        def index_realtime_sw(self, symbol):
+            assert symbol == "一级行业"
+            return Frame()
+
+    rows = market_services._fetch_akshare_sector_overview(ak=AkShare())
+
+    assert len(rows) == len(market_services.SHENWAN_LEVEL1_INDUSTRIES)
+    assert {row["sector"] for row in rows} == set(market_services.SHENWAN_LEVEL1_INDUSTRIES)
+
+
+def test_market_snapshot_task_runs_each_trading_hour_only():
     from src.domain import market_services
 
     task = next(item for item in market_services.DEFAULT_ADMIN_TASKS if item["task_code"] == "market_snapshot_sync")
 
-    assert task["schedule_type"] == "interval"
-    assert task["schedule_value"] == "300"
+    assert task["schedule_type"] == "daily"
+    assert task["schedule_value"] == "09:30,10:30,11:30,13:30,14:30,15:30"
     assert task["enabled"] == 1
 
 
@@ -136,18 +192,17 @@ def test_smart_indicator_refresh_task_is_removed_from_admin_schedule():
     assert not any(item["task_code"] == "smart_indicator_refresh" for item in market_services.DEFAULT_ADMIN_TASKS)
 
 
-def test_news_title_impact_task_has_two_daily_slots_and_manual_dispatch():
+def test_news_source_task_runs_hourly_without_model_dispatch():
     from src.domain import core_services, market_services
 
     task = next(item for item in market_services.DEFAULT_ADMIN_TASKS if item["task_code"] == "news_title_impact_sync")
-    assert task["schedule_type"] == "daily"
-    assert task["schedule_value"] == "10:15,14:15"
-    assert market_services.parse_task_daily_times(task) == ["10:15", "14:15"]
+    assert task["schedule_type"] == "interval"
+    assert task["schedule_value"] == "3600"
 
-    assert task["task_type"] == "sync_news_title_classifications"
-    expected = {"method": "v4_title_classification_v1", "input_count": 120, "classified_count": 120}
-    with patch.object(market_services, "sync_news_title_classifications", return_value=expected) as sync:
-        result = core_services.execute_admin_task_by_type("sync_news_title_classifications", force=True)
+    assert task["task_type"] == "sync_news_sources"
+    expected = {"method": "news_source_fetch_v1", "input_count": 120, "source_count": 4}
+    with patch.object(market_services, "sync_news_sources", return_value=expected) as sync:
+        result = core_services.execute_admin_task_by_type("sync_news_sources", force=True)
 
     sync.assert_called_once_with(force=True)
     assert result == expected
@@ -220,12 +275,11 @@ def test_market_snapshot_uses_akshare_and_never_calls_gangtise():
     assert not hasattr(market_services, "_load_gangtise_sector_catalog")
     assert index_fetch.call_count == len(market_services.MARKET_OVERVIEW_INDEX_CODES)
     assert result["overview_count"] == len(market_services.MARKET_OVERVIEW_INDEX_CODES)
-    assert result["sector_count"] == 1
+    assert result["sector_count"] == 0
     overview = next(call.args[2] for call in save_snapshot.call_args_list if call.args[:2] == ("market_overview", "standard_indices"))
-    sectors = next(call.args[2] for call in save_snapshot.call_args_list if call.args[:2] == ("market_sector_overview", "shenwan_level1"))
     assert overview["source"] == "AKShare"
     assert overview["snapshot_version"] == 7
-    assert sectors["source"] == "AKShare"
+    assert not any(call.args[:2] == ("market_sector_overview", "shenwan_level1") for call in save_snapshot.call_args_list)
 
 
 def test_market_snapshot_refreshes_industry_snapshot_on_every_run():
@@ -248,7 +302,7 @@ def test_market_snapshot_refreshes_industry_snapshot_on_every_run():
         patch.object(market_services, "_save_market_snapshot_payload"):
         result = market_services.sync_market_snapshot(force=False)
 
-    assert result["sector_count"] == 1
+    assert result["sector_count"] == 0
     sector_fetch.assert_called_once()
 
 
@@ -270,3 +324,20 @@ def test_market_payload_rejects_old_gangtise_snapshot():
     assert overview["source"] == "AKShare"
     assert sectors["items"] == []
     assert sectors["source"] == "AKShare"
+
+
+def test_page_watchlist_catalog_never_fetches_a_provider_when_cache_is_missing(monkeypatch):
+    from src.domain import market_services
+
+    monkeypatch.setattr(market_services, "_load_watchlist_cache", lambda *args, **kwargs: None)
+    monkeypatch.setattr(market_services, "_enrich_watchlist_details", lambda details: details)
+    monkeypatch.setattr(
+        market_services,
+        "_fetch_watchlist_realtime_detail_from_candidate",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("page composition must not fetch quotes")),
+    )
+
+    details = market_services.gen_watchlist_details()
+
+    assert details
+    assert all(item.get("data_unavailable") for item in details.values())

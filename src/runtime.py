@@ -28,7 +28,7 @@ import requests
 import psycopg2
 from psycopg2.extras import Json, RealDictCursor
 from psycopg2 import OperationalError
-from psycopg2.pool import ThreadedConnectionPool
+from psycopg2.pool import PoolError, ThreadedConnectionPool
 try:
     from faster_whisper import WhisperModel
 except Exception:
@@ -270,10 +270,18 @@ TASK_CENTER_LOG_LIMIT = 80
 USER_ASYNC_JOB_POLL_INTERVAL_SECONDS = max(1, int(os.environ.get("USER_ASYNC_JOB_POLL_INTERVAL_SECONDS", "2")))
 USER_ASYNC_JOB_LOG_LIMIT = 80
 USER_ASYNC_JOB_WORKER_CONCURRENCY = max(1, min(4, int(os.environ.get("USER_ASYNC_JOB_WORKER_CONCURRENCY", "2"))))
+
+
+def _default_database_pool_max_connections():
+    """Bound each runtime role so sidecars cannot exhaust PostgreSQL together."""
+    role = str(os.environ.get("GANGTISE_RUNTIME_ROLE") or "web").strip().lower()
+    return {"web": 8, "worker": 4, "scheduler": 4}.get(role, 4)
+
+
 DATABASE_POOL_MIN_CONNECTIONS = max(1, int(os.environ.get("DATABASE_POOL_MIN_CONNECTIONS", "1")))
 DATABASE_POOL_MAX_CONNECTIONS = max(
     DATABASE_POOL_MIN_CONNECTIONS,
-    int(os.environ.get("DATABASE_POOL_MAX_CONNECTIONS", "12")),
+    int(os.environ.get("DATABASE_POOL_MAX_CONNECTIONS", str(_default_database_pool_max_connections()))),
 )
 # Protect the database from application paths that leave a transaction open.
 # This is deliberately not an idle-session timeout: pooled, healthy idle

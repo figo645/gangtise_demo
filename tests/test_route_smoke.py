@@ -430,7 +430,7 @@ class RouteSmokeTest(unittest.TestCase):
 
         self.assertEqual(payload, snapshot)
 
-    def test_market_overview_keeps_the_last_real_snapshot_while_refreshing(self):
+    def test_market_overview_hides_expired_snapshot_instead_of_rendering_it_as_current(self):
         from src.domain import market_services
 
         snapshot = {
@@ -445,8 +445,8 @@ class RouteSmokeTest(unittest.TestCase):
             payload = market_services.build_market_overview_payload()
 
         self.assertTrue(payload["stale"])
-        self.assertEqual(payload["items"][0]["price"], snapshot["items"][0]["price"])
-        self.assertTrue(payload["items"][0]["stale"])
+        self.assertEqual(payload["items"], [])
+        self.assertIn("超过 6 分钟", payload["message"])
 
     def test_market_overview_does_not_use_the_legacy_gangtise_indicator_lake(self):
         from src.domain import market_services
@@ -516,7 +516,7 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertEqual(save_cache.call_count, 9)
         self.assertEqual(save_market_snapshot.call_count, 2)
 
-    def test_market_snapshot_keeps_last_akshare_index_when_sync_fails(self):
+    def test_market_snapshot_does_not_retimestamp_last_index_when_sync_fails(self):
         from src.domain import market_services
 
         previous = {
@@ -536,12 +536,9 @@ class RouteSmokeTest(unittest.TestCase):
         ) as save_market_snapshot:
             result = market_services.sync_market_snapshot(force=True)
 
-        overview_payload = next(call.args[2] for call in save_market_snapshot.call_args_list if call.args[:2] == ("market_overview", "standard_indices"))
-        hsi = next(item for item in overview_payload["items"] if item["indicator_code"] == "source_hsi")
-        self.assertTrue(result["overview_count"])
-        self.assertTrue(hsi["available"])
-        self.assertTrue(hsi["stale"])
-        self.assertEqual(hsi["price"], 24500.0)
+        self.assertEqual(result["overview_count"], 0)
+        self.assertFalse(result["ok"])
+        self.assertFalse(any(call.args[:2] == ("market_overview", "standard_indices") for call in save_market_snapshot.call_args_list))
 
     def test_market_sector_sync_continues_when_akshare_index_is_unavailable(self):
         from src.domain import market_services
@@ -567,10 +564,11 @@ class RouteSmokeTest(unittest.TestCase):
         ) as save_market_snapshot:
             result = market_services.sync_market_snapshot(force=True)
 
-        self.assertEqual(result["sector_count"], 1)
-        sector_payload = next(call.args[2] for call in save_market_snapshot.call_args_list if call.args[:2] == ("market_sector_overview", "shenwan_level1"))
-        self.assertEqual(sector_payload["source"], "AKShare")
-        self.assertEqual(sector_payload["snapshot_version"], 7)
+        self.assertEqual(result["sector_count"], 0)
+        self.assertFalse(any(
+            call.args[:2] == ("market_sector_overview", "shenwan_level1")
+            for call in save_market_snapshot.call_args_list
+        ))
 
     def test_h5_does_not_expose_market_snapshot_refresh_to_frontend_users(self):
         response = self.client.get(f"/h5?tenant={self.tenant_slugs[0]}")
@@ -644,14 +642,14 @@ class RouteSmokeTest(unittest.TestCase):
         self.assertEqual(payload["items"], [])
         save_cache.assert_not_called()
 
-    def test_market_sector_keeps_the_last_real_snapshot_when_refresh_is_stale(self):
+    def test_market_sector_hides_expired_snapshot_instead_of_rendering_it_as_current(self):
         from src.domain import market_services
 
         snapshot = {"ok": True, "snapshot_version": 7, "source": "AKShare", "items": [{"sector": "银行", "value": 1020, "change_pct": 2.0}]}
         with patch.object(market_services, "_load_market_snapshot_payload", side_effect=[None, snapshot]):
             payload = market_services.build_market_sector_overview_payload()
 
-        self.assertEqual(payload["items"], snapshot["items"])
+        self.assertEqual(payload["items"], [])
         self.assertTrue(payload["stale"])
 
     def test_market_payloads_do_not_create_fake_values_when_snapshot_is_missing(self):

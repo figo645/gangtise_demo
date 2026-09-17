@@ -2799,10 +2799,10 @@ def build_dashboard_base_indicator_options(tenant=None):
                 "unit": "",
                 "source_type": "market_index",
                 "source_type_label": (detail.get("source_type_label") if isinstance(detail, dict) else None) or "大盘指数",
-                "provider": "AKShare",
+                "provider": "Gangtise OpenAPI",
                 "source_defs": [],
-                "algorithm_detail": "由后台 AKShare 市场快照统一采集，用于市场一览展示。",
-                "interpretation": f"已读取 {indicator_name} AKShare 市场快照。",
+                "algorithm_detail": "由后台 Gangtise EDB 市场快照统一采集，用于市场一览展示。",
+                "interpretation": f"已读取 {indicator_name} Gangtise EDB 市场快照。",
                 "prompt_text": indicator_name,
                 "updated_at": (detail.get("updated_at") if isinstance(detail, dict) else None) or overview_item.get("updated_at") or "",
                 "data_at": (detail.get("updated_at") if isinstance(detail, dict) else None) or overview_item.get("updated_at") or "",
@@ -2890,7 +2890,7 @@ def build_hot_industry_indicator_catalog():
                 "source_type_label": "热门行业",
                 "provider": row.get("data_source") or "AKShare",
                 "source_defs": [],
-                "algorithm_detail": "与热门行业页面使用同一份 AKShare 申万一级行业快照。",
+                "algorithm_detail": "与热门行业页面使用同一份 Gangtise EDB 申万一级行业快照。",
                 "interpretation": f"已读取 {sector_name} 的热门行业快照。" if numeric_value is not None else f"{sector_name} 尚无可用的最新行业快照。",
                 "prompt_text": sector_name,
                 "selected_indicators": [{"indicator_code": indicator_code, "indicator_name": f"申万一级行业指数:{sector_name}"}],
@@ -4578,6 +4578,7 @@ def build_h5_user_onboarding_payload(user=None):
 H5_PROFILE_SETTINGS_PREFIX = "h5_profile_settings:"
 TENANT_FAN_OPS_SETTINGS_PREFIX = "tenant_fan_ops_settings:"
 TENANT_DAILY_FINANCE_BROADCAST_SETTINGS_PREFIX = "tenant_daily_finance_broadcast_settings:"
+TENANT_MARKET_DISPLAY_SETTINGS_PREFIX = "tenant_market_display_settings:"
 AUTH_WECHAT_CREDENTIAL_SETTING_KEY = "auth_credentials:wechat:v1"
 GANGTISE_OPENAPI_CREDENTIAL_SETTING_KEY = "gangtise_openapi_credentials:v1"
 GANGTISE_OPENAPI_TOKEN_SETTING_KEY = "gangtise_openapi_token:v1"
@@ -5221,6 +5222,93 @@ def save_tenant_daily_finance_broadcast_settings(tenant_slug, payload=None):
     normalized_payload["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     _save_json_app_setting(get_tenant_daily_finance_broadcast_settings_key(normalized), normalized_payload)
     return normalized_payload
+
+
+def get_tenant_market_display_settings_key(tenant_slug):
+    normalized = str(tenant_slug or "").strip().lower()
+    return f"{TENANT_MARKET_DISPLAY_SETTINGS_PREFIX}{normalized}:v1" if normalized else ""
+
+
+def _market_display_catalog():
+    # Keep the selection catalog tied to the same definitions the collector
+    # uses, rather than maintaining a second, drifting list in the web layer.
+    from src.domain.market_services import (
+        GANGTISE_MARKET_OVERVIEW_SPECS,
+        MARKET_OVERVIEW_INDEX_CODES,
+        SHENWAN_LEVEL1_INDUSTRIES,
+    )
+
+    market_names = {item[0]: item[1] for item in GANGTISE_MARKET_OVERVIEW_SPECS}
+    return tuple(MARKET_OVERVIEW_INDEX_CODES), market_names, tuple(SHENWAN_LEVEL1_INDUSTRIES)
+
+
+def _normalize_tenant_market_display_settings(payload=None):
+    source = payload if isinstance(payload, dict) else {}
+    market_codes, _market_names, sector_names = _market_display_catalog()
+    allowed_market = set(market_codes)
+    allowed_sectors = set(sector_names)
+
+    def unique_allowed(values, allowed, limit):
+        result = []
+        for value in values if isinstance(values, list) else []:
+            normalized = str(value or "").strip()
+            if normalized in allowed and normalized not in result:
+                result.append(normalized)
+            if len(result) >= limit:
+                break
+        return result
+
+    return {
+        "version": 1,
+        "configured": bool(source.get("configured", False)),
+        "market_overview_codes": unique_allowed(source.get("market_overview_codes"), allowed_market, 4),
+        "sector_names": unique_allowed(source.get("sector_names"), allowed_sectors, 10),
+        "updated_at": str(source.get("updated_at") or "").strip(),
+        "updated_by": str(source.get("updated_by") or "").strip(),
+    }
+
+
+def load_tenant_market_display_settings(tenant_slug):
+    normalized = str(tenant_slug or "").strip().lower()
+    if not normalized:
+        return _normalize_tenant_market_display_settings({})
+    stored = _load_json_app_setting(get_tenant_market_display_settings_key(normalized), {})
+    normalized_settings = _normalize_tenant_market_display_settings(stored)
+    normalized_settings["configured"] = bool(stored)
+    return normalized_settings
+
+
+def save_tenant_market_display_settings(tenant_slug, payload=None, updated_by=""):
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    if not normalized_tenant:
+        raise ValueError("tenant_slug_required")
+    source = payload if isinstance(payload, dict) else {}
+    raw_market = source.get("market_overview_codes")
+    raw_sectors = source.get("sector_names")
+    if not isinstance(raw_market, list) or not isinstance(raw_sectors, list):
+        raise ValueError("market_display_selection_required")
+    if len(raw_market) > 4:
+        raise ValueError("market_overview_limit_exceeded")
+    if len(raw_sectors) > 10:
+        raise ValueError("hot_industry_limit_exceeded")
+    clean_market = [str(item or "").strip() for item in raw_market if str(item or "").strip()]
+    clean_sectors = [str(item or "").strip() for item in raw_sectors if str(item or "").strip()]
+    if len(clean_market) != len(set(clean_market)):
+        raise ValueError("market_overview_indicator_duplicated")
+    if len(clean_sectors) != len(set(clean_sectors)):
+        raise ValueError("hot_industry_indicator_duplicated")
+    normalized = _normalize_tenant_market_display_settings(source)
+    # Reject unknown values explicitly. Silent deletion would make a DaV think
+    # an item was published while followers cannot see it.
+    if len(normalized["market_overview_codes"]) != len(clean_market):
+        raise ValueError("market_overview_indicator_invalid")
+    if len(normalized["sector_names"]) != len(clean_sectors):
+        raise ValueError("hot_industry_indicator_invalid")
+    normalized["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    normalized["updated_by"] = str(updated_by or "").strip()
+    normalized["configured"] = True
+    _save_json_app_setting(get_tenant_market_display_settings_key(normalized_tenant), normalized)
+    return normalized
 
 
 def get_h5_profile_settings_key(profile_id):
@@ -7787,7 +7875,15 @@ atexit.register(close_app_db_pool)
 
 def get_app_db_connection():
     pool = _get_app_db_pool()
-    connection = pool.getconn()
+    try:
+        connection = pool.getconn()
+    except PoolError:
+        app.logger.error(
+            "PostgreSQL connection pool exhausted role=%s max_connections=%s",
+            os.environ.get("GANGTISE_RUNTIME_ROLE", "web"),
+            DATABASE_POOL_MAX_CONNECTIONS,
+        )
+        raise
     return _PooledRawConnection(connection, _release_app_db_connection)
 
 
@@ -8173,6 +8269,9 @@ def init_db():
         execute_sql_file(conn, sql_dir / "129_allow_quiz_retries.sql")
         execute_sql_file(conn, sql_dir / "130_register_daily_finance_broadcast.sql")
         execute_sql_file(conn, sql_dir / "132_analytics_events.sql")
+        execute_sql_file(conn, sql_dir / "133_repair_market_snapshot_schedule.sql")
+        execute_sql_file(conn, sql_dir / "134_hourly_shared_market_and_news_sync.sql")
+        execute_sql_file(conn, sql_dir / "135_use_gangtise_market_snapshots.sql")
 
 
 def init_db_safe():
@@ -8275,15 +8374,12 @@ def ensure_default_admin_tasks():
                 and str(existing.get("task_type") or "") == "sync_market_snapshot"
             ):
                 db.execute(
-                    "UPDATE admin_task_configs SET task_name = ?, description = ?, updated_at = ? WHERE task_code = ?",
-                    (item["task_name"], item["description"], timestamp, item["task_code"]),
+                    "UPDATE admin_task_configs SET task_name = ?, description = ?, schedule_type = ?, schedule_value = ?, enabled = ?, updated_at = ? WHERE task_code = ?",
+                    (item["task_name"], item["description"], item["schedule_type"], item["schedule_value"], item["enabled"], timestamp, item["task_code"]),
                 )
-            # This task was initially shipped as a 15-minute interval. Move
-            # that original default to the two fixed daily slots without
-            # overwriting later Admin customizations.
             if (
                 item["task_code"] == "news_title_impact_sync"
-                and str(existing.get("task_type") or "") in {"sync_news_title_classifications", "sync_v4_news_top20"}
+                and str(existing.get("task_type") or "") in {"sync_news_sources", "sync_news_title_classifications", "sync_v4_news_top20"}
             ):
                 db.execute(
                     "UPDATE admin_task_configs SET task_name = ?, task_type = ?, description = ?, schedule_type = ?, schedule_value = ?, enabled = ?, updated_at = ? WHERE task_code = ?",
@@ -9025,6 +9121,7 @@ def execute_admin_task_by_type(task_type, force=False, tenant_slug=""):
         prepare_indicator_hub_store,
         sync_market_snapshot,
         sync_daily_finance_broadcast,
+        sync_news_sources,
         sync_news_title_classifications,
         sync_v4_news_top20,
         seed_mock_indicator_lake,
@@ -9043,6 +9140,8 @@ def execute_admin_task_by_type(task_type, force=False, tenant_slug=""):
         return sync_daily_finance_broadcast(force=force, tenant_slug=tenant_slug)
     if task_type == "sync_v4_news_top20":
         return sync_v4_news_top20(force=force)
+    if task_type == "sync_news_sources":
+        return sync_news_sources(force=force)
     if task_type == "sync_news_title_classifications":
         return sync_news_title_classifications(force=force)
     if task_type == "seed_mock_indicator_lake":
@@ -9064,6 +9163,7 @@ def execute_admin_task(task, force=False, tenant_slug=""):
         "sync_market_snapshot",
         "sync_daily_finance_broadcast",
         "sync_v4_news_top20",
+        "sync_news_sources",
         "sync_news_title_classifications",
         "seed_mock_indicator_lake",
         "prepare_daily_quiz_set",
@@ -9161,7 +9261,22 @@ def run_admin_task(task_code, trigger_mode="manual", force=False, tenant_slug=""
         elif task["task_type"] == "sync_real_indicator_history":
             summary = "真实历史同步完成"
         elif task["task_type"] == "sync_market_snapshot":
-            summary = "AKShare 市场与行业快照同步完成"
+            overview_count = int((result or {}).get("overview_count") or 0)
+            expected_overview_count = int((result or {}).get("expected_overview_count") or 0)
+            sector_count = int((result or {}).get("sector_count") or 0)
+            expected_sector_count = int((result or {}).get("expected_sector_count") or 0)
+            if (result or {}).get("complete") is False:
+                details = "; ".join(str(item) for item in ((result or {}).get("errors") or [])[:3])
+                raise RuntimeError(
+                    "market_snapshot_incomplete:"
+                    f"overview={overview_count}/{expected_overview_count}:"
+                    f"sectors={sector_count}/{expected_sector_count}:"
+                    f"{details or 'provider_response_incomplete'}"
+                )
+            summary = (
+                f"Gangtise 市场与行业快照同步完成：市场 {overview_count}/{expected_overview_count}，"
+                f"行业 {sector_count}/{expected_sector_count}"
+            )
         elif task["task_type"] == "sync_daily_finance_broadcast":
             summary = (
                 f"{str((result or {}).get('report_label') or '财经播报')}完成："
@@ -9170,6 +9285,11 @@ def run_admin_task(task_code, trigger_mode="manual", force=False, tenant_slug=""
             )
         elif task["task_type"] == "sync_v4_news_top20":
             summary = f"V4 新闻 Top20 检索完成：{int((result or {}).get('count') or 0)} 条，模型 {str((result or {}).get('model_name') or '未配置')}"
+        elif task["task_type"] == "sync_news_sources":
+            summary = (
+                f"新闻源采集完成：{int((result or {}).get('input_count') or 0)} 条，"
+                f"覆盖 {int((result or {}).get('source_count') or 0)} 个来源"
+            )
         elif task["task_type"] == "sync_news_title_classifications":
             summary = (
                 f"新闻源采集与 V4 标题标注完成：{int((result or {}).get('classified_count') or 0)}/"
@@ -9459,6 +9579,18 @@ def run_user_async_job_worker_forever():
 SCHEDULER_ADVISORY_LOCK_ID = 72951002
 
 
+def run_scheduler_startup_sync():
+    """Refresh shared snapshots once after the Scheduler owns the DB lock."""
+    for task_code in ("market_snapshot_sync", "news_title_impact_sync"):
+        try:
+            result = run_admin_task(task_code, trigger_mode="scheduler_startup", force=True)
+            app.logger.info("Scheduler startup sync completed task=%s run=%s", task_code, result.get("run_code"))
+        except Exception as exc:
+            # Keep the scheduler alive so its configured hourly/daily retry is
+            # still available after a transient upstream or DNS failure.
+            app.logger.exception("Scheduler startup sync failed task=%s error=%s", task_code, exc)
+
+
 def run_scheduler_forever():
     """Run one scheduler instance, guarded by a PostgreSQL advisory lock."""
     while True:
@@ -9477,6 +9609,8 @@ def run_scheduler_forever():
                 continue
             # Keep this connection open for the lifetime of the scheduler. The
             # advisory lock is released automatically if the process dies.
+            with app.app_context():
+                run_scheduler_startup_sync()
             while True:
                 with app.app_context():
                     _task_center_loop_iteration()

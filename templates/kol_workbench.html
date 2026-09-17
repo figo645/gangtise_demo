@@ -3560,6 +3560,9 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         <div class="admin-nav-item" data-section="daily-broadcast" data-feature="daily_review" onclick="showWorkbenchSection('daily-broadcast', this)">
           <span class="admin-nav-icon">&#128227;</span> 午晚财经播报
         </div>
+        <div class="admin-nav-item" data-section="shared-data-sync" data-feature="analytics_module" onclick="showWorkbenchSection('shared-data-sync', this)">
+          <span class="admin-nav-icon">&#8635;</span> 数据同步任务
+        </div>
         <div class="admin-nav-item" data-section="knowledge-overview" data-feature="knowledge" onclick="showWorkbenchSection('knowledge-overview', this)">
           <span class="admin-nav-icon">&#128214;</span> 知识总览
         </div>
@@ -4933,6 +4936,35 @@ details[open] > .kw-forecast-advanced-toggle::before { content:"-"; }
         </div>
       </div>
 
+      <div id="workbench-section-shared-data-sync" style="display:none">
+        <div class="kw-card">
+          <div class="kw-card-head">
+            <div>
+              <div class="kw-card-title">市场与新闻数据同步</div>
+              <div class="kw-card-desc">平台共享任务。Admin 与全部大V查看同一配置、同一计划和同一执行记录；任一大V手动同步后，结果对所有租户共享。</div>
+            </div>
+            <span class="kw-tag">平台共享</span>
+          </div>
+          <div id="kw-shared-data-sync-status" class="kw-dashboard-panel-note">正在加载平台任务...</div>
+          <div id="kw-shared-data-sync-tasks" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:14px;margin-top:14px"></div>
+        </div>
+        <div class="kw-card" style="margin-top:14px">
+          <div class="kw-card-head">
+            <div>
+              <div class="kw-card-title">本租户行情展示</div>
+              <div class="kw-card-desc">平台统一采集全部市场与行业数据；保存后，本大V及其全部粉丝只展示这里选定的指标。热门行业最多 10 个，市场一览最多 4 个。</div>
+            </div>
+            <span class="kw-tag">租户发布</span>
+          </div>
+          <div id="kw-market-display-config-status" class="kw-dashboard-panel-note">正在加载可选指标...</div>
+          <div id="kw-market-display-config-editor" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:14px"></div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px">
+            <button id="kw-market-display-config-save" class="btn-gold" type="button" onclick="kwSaveMarketDisplayConfig()">保存并发布给粉丝</button>
+            <span class="kw-dashboard-panel-note">清空席位后发布即可；不会删除平台共享快照。</span>
+          </div>
+        </div>
+      </div>
+
       <div id="workbench-section-published" style="display:none">
         <div class="kw-card">
           <div class="kw-card-head">
@@ -5080,6 +5112,7 @@ const workbenchSectionMeta = {
   'forecast-model': { title: '预测模型', summary: '展示目标价是怎么计算出来的，并允许在后台调整自动收敛参数。' },
   review: { title: '洞见发布台', summary: '按周期、输入方式、智能文案规则和预览发布流程组织洞见发布。' },
   'daily-broadcast': { title: '午晚财经播报', summary: '管理当前租户的午间与晚间智能体财经播报，查看统一任务计划和执行记录。' },
+  'shared-data-sync': { title: '数据同步任务', summary: '与 Admin 任务中心共享市场、行业与新闻源同步的配置和执行记录；大V可手动触发同步。' },
   knowledge: { title: '知识总览', summary: '统一查看当前租户的知识沉淀规模、录入入口、百科结构与百科词条。' },
   'knowledge-overview': { title: '知识总览', summary: '知识专区拆成独立页面后，这里只负责看整体结构、成熟度和后续入口。' },
   'knowledge-intake': { title: '知识治理', summary: '按语音、文件、网页和手动输入管理知识入库、修改、清洗队列与同步状态。' },
@@ -12455,6 +12488,11 @@ function initWorkbenchForecastEditorEvents() {
 
 let kwDailyBroadcastLoading = false;
 let kwDailyBroadcastRunning = false;
+let kwSharedDataSyncLoading = false;
+let kwSharedDataSyncRunning = false;
+let kwMarketDisplayConfigLoading = false;
+let kwMarketDisplayConfig = { settings: {}, catalog: {} };
+let kwMarketDisplayEditing = false;
 
 function kwDailyBroadcastTenantSlug() {
   return String(((window.ACTIVE_TENANT || {}).slug) || '').trim().toLowerCase();
@@ -12554,6 +12592,166 @@ async function kwRunDailyBroadcast() {
   }
 }
 
+function kwSharedDataTaskLabel(taskCode) {
+  return taskCode === 'market_snapshot_sync' ? '市场与行业指标同步' : '新闻源采集同步';
+}
+
+function kwSharedDataTaskSchedule(task) {
+  const type = String(task.schedule_type || '').toLowerCase();
+  const value = String(task.schedule_value || '--');
+  if (type === 'interval') return `每 ${escapeHtml(value)} 秒`;
+  if (type === 'daily') return `每日 ${escapeHtml(value.replace(/,/g, ' / '))}`;
+  return escapeHtml(value);
+}
+
+function kwRenderSharedDataSyncPanel(payload) {
+  const tasks = Array.isArray(payload && payload.tasks) ? payload.tasks : [];
+  const status = document.getElementById('kw-shared-data-sync-status');
+  const host = document.getElementById('kw-shared-data-sync-tasks');
+  if (status) {
+    status.innerHTML = tasks.length
+      ? `<strong style="color:#18794E">已连接 Admin 平台任务中心</strong> · ${tasks.length} 个共享任务 · 大V仅可手动执行，计划由平台统一管理。`
+      : '<strong style="color:#B42318">未找到可用的平台共享任务</strong>';
+  }
+  if (!host) return;
+  host.innerHTML = tasks.map((entry) => {
+    const task = entry && entry.task ? entry.task : {};
+    const runs = Array.isArray(entry && entry.runs) ? entry.runs : [];
+    const taskCode = String(task.task_code || '');
+    const isRunning = String(task.last_run_status || '').toLowerCase() === 'running';
+    const enabled = task.enabled !== false;
+    const lastRun = runs[0] || {};
+    const records = runs.slice(0, 4).map((run) => {
+      const state = String(run.run_status || '').toLowerCase();
+      const color = state === 'success' ? '#18794E' : (state === 'failed' ? '#B42318' : '#8A6D1D');
+      const detail = state === 'failed' && run.error_message ? ` · ${escapeHtml(run.error_message)}` : '';
+      return `<div style="padding:8px 0;border-bottom:1px solid rgba(47,116,192,.10);font-size:12px"><div style="display:flex;justify-content:space-between;gap:8px"><span>${escapeHtml(run.started_at || '--')}</span><strong style="color:${color}">${escapeHtml(run.run_status || '--')}</strong></div><div style="margin-top:3px;color:#738095">${escapeHtml(run.summary || run.trigger_mode || '--')}${detail}</div></div>`;
+    }).join('');
+    const taskStatus = isRunning ? '<strong style="color:#8A6D1D">正在执行</strong>' : (enabled ? '<strong style="color:#18794E">平台已启用</strong>' : '<strong style="color:#B42318">平台已暂停</strong>');
+    return `<div class="kw-dashboard-workbench-card">
+      <div class="kw-dashboard-workbench-head"><div><div class="kw-dashboard-workbench-title">${escapeHtml(task.task_name || kwSharedDataTaskLabel(taskCode))}</div><div class="kw-dashboard-workbench-desc">${escapeHtml(task.description || '')}</div></div><span class="kw-tag">共享任务</span></div>
+      <div class="kw-dashboard-panel-note" style="margin-top:12px">${taskStatus} · 自动计划：${kwSharedDataTaskSchedule(task)}<br>下次计划：${escapeHtml(task.last_next_run_at || '--')}<br>最近执行：${escapeHtml(lastRun.started_at || task.last_run_started_at || '--')}</div>
+      <div style="display:flex;gap:10px;margin-top:14px"><button class="btn-gold" type="button" onclick="kwRunSharedDataSync('${escapeHtml(taskCode)}')" ${(!enabled || isRunning) ? 'disabled' : ''}>${isRunning ? '同步中...' : '立即同步'}</button></div>
+      <div style="margin-top:14px"><div class="kw-dashboard-workbench-title" style="font-size:13px">平台最近执行记录</div>${records || '<div class="kw-dashboard-panel-note" style="margin-top:8px">暂无执行记录。</div>'}</div>
+    </div>`;
+  }).join('') || '<div class="kw-dashboard-panel-note">暂无共享任务。</div>';
+}
+
+async function kwLoadSharedDataSyncPanel() {
+  const tenantSlug = kwDailyBroadcastTenantSlug();
+  if (!tenantSlug || kwSharedDataSyncLoading) return;
+  kwSharedDataSyncLoading = true;
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/shared-data-tasks`, { credentials: 'same-origin', cache: 'no-store' });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'shared_data_tasks_load_failed');
+    kwRenderSharedDataSyncPanel(payload);
+  } catch (error) {
+    const status = document.getElementById('kw-shared-data-sync-status');
+    if (status) status.textContent = error.message || '平台任务加载失败';
+  } finally {
+    kwSharedDataSyncLoading = false;
+  }
+}
+
+async function kwRunSharedDataSync(taskCode) {
+  const tenantSlug = kwDailyBroadcastTenantSlug();
+  if (!tenantSlug || kwSharedDataSyncRunning) return;
+  kwSharedDataSyncRunning = true;
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/shared-data-tasks/${encodeURIComponent(taskCode)}/run`, {
+      method: 'POST', credentials: 'same-origin', cache: 'no-store',
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'shared_data_task_failed');
+    showToast(payload.summary || `${kwSharedDataTaskLabel(taskCode)}完成`);
+  } catch (error) {
+    showToast(error.message || '同步执行失败');
+  } finally {
+    kwSharedDataSyncRunning = false;
+    kwLoadSharedDataSyncPanel();
+  }
+}
+
+function kwMarketDisplayTenantSlug() {
+  return kwDailyBroadcastTenantSlug();
+}
+
+function kwRenderMarketDisplayConfig(payload) {
+  kwMarketDisplayConfig = payload || { settings: {}, catalog: {} };
+  const settings = kwMarketDisplayConfig.settings || {};
+  const catalog = kwMarketDisplayConfig.catalog || {};
+  const limits = catalog.limits || { market_overview: 4, hot_industries: 10 };
+  const selectedMarket = new Set(Array.isArray(settings.market_overview_codes) ? settings.market_overview_codes : []);
+  const selectedSectors = new Set(Array.isArray(settings.sector_names) ? settings.sector_names : []);
+  const status = document.getElementById('kw-market-display-config-status');
+  const host = document.getElementById('kw-market-display-config-editor');
+  if (status) status.innerHTML = `市场一览已选 <strong>${selectedMarket.size}/${Number(limits.market_overview || 4)}</strong> · 热门行业已选 <strong>${selectedSectors.size}/${Number(limits.hot_industries || 10)}</strong> · ${settings.configured ? `已发布 ${escapeHtml(settings.updated_at || '')}` : '尚未发布，当前前台使用平台推荐项'}`;
+  if (!host) return;
+  const slots = (items, selectedValues, field, getValue, getLabel, limit) => Array.from({length: Number(limit)}, (_, index) => {
+    const selected = String(selectedValues[index] || '');
+    return `<label style="display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;align-items:center;padding:5px 0;font-size:12px"><span style="color:#738095">${index + 1}</span><select data-market-display-slot="${field}" style="width:100%;min-width:0;padding:7px 8px;border:1px solid rgba(47,116,192,.16);border-radius:7px;background:#fff;color:#183A62"><option value="">空置</option>${items.map((item) => { const value = getValue(item); return `<option value="${escapeHtml(value)}" ${value === selected ? 'selected' : ''}>${escapeHtml(getLabel(item))}</option>`; }).join('')}</select></label>`;
+  }).join('');
+  const chipList = (values, labelOf, emptyText) => values.length ? values.map((value) => `<span style="display:inline-flex;align-items:center;padding:4px 8px;border:1px solid rgba(47,116,192,.14);border-radius:5px;background:#fff;color:#183A62;font-size:12px">${escapeHtml(labelOf(value))}</span>`).join('') : `<span class="kw-dashboard-panel-note">${emptyText}</span>`;
+  const marketName = (code) => ((catalog.market_overview || []).find((item) => String(item.code || '') === String(code)) || {}).name || code;
+  const summaryCard = (title, count, limit, chips) => `<div class="kw-dashboard-workbench-card" style="min-height:144px"><div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline"><div class="kw-dashboard-workbench-title">${title}</div><strong style="color:#2F74C0;font-size:14px;font-variant-numeric:tabular-nums">${count}/${limit}</strong></div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:14px">${chips}</div></div>`;
+  const summary = summaryCard('市场一览', selectedMarket.size, Number(limits.market_overview || 4), chipList(Array.from(selectedMarket), marketName, '尚未选择展示指数')) + summaryCard('热门行业', selectedSectors.size, Number(limits.hot_industries || 10), chipList(Array.from(selectedSectors), (value) => value, '尚未选择行业'));
+  const editor = kwMarketDisplayEditing ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid rgba(47,116,192,.12)"><div><div class="kw-dashboard-workbench-title">编辑市场一览席位</div><div class="kw-dashboard-panel-note" style="margin:5px 0 10px">最多 ${Number(limits.market_overview || 4)} 个</div><div style="display:grid;gap:4px">${slots(catalog.market_overview || [], Array.from(selectedMarket), 'market_overview_codes', (item) => String(item.code || ''), (item) => `${item.name || '--'} (${item.code || '--'})`, limits.market_overview || 4)}</div></div><div><div class="kw-dashboard-workbench-title">编辑热门行业席位</div><div class="kw-dashboard-panel-note" style="margin:5px 0 10px">最多 ${Number(limits.hot_industries || 10)} 个</div><div style="display:grid;gap:4px">${slots(catalog.hot_industries || [], Array.from(selectedSectors), 'sector_names', (item) => String(item || ''), (item) => String(item || ''), limits.hot_industries || 10)}</div></div></div>` : '';
+  host.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;grid-column:1/-1"><div class="kw-dashboard-panel-note">${settings.configured ? `已发布给本租户粉丝 · ${escapeHtml(settings.updated_at || '--')}` : '未发布时，前台展示平台推荐项。'}</div><button class="btn-outline" type="button" onclick="kwToggleMarketDisplayEditor()">${kwMarketDisplayEditing ? '收起编辑' : '编辑版面'}</button></div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;grid-column:1/-1">${summary}</div>${editor}`;
+}
+
+function kwToggleMarketDisplayEditor() {
+  kwMarketDisplayEditing = !kwMarketDisplayEditing;
+  kwRenderMarketDisplayConfig(kwMarketDisplayConfig);
+}
+
+async function kwLoadMarketDisplayConfig() {
+  const tenantSlug = kwMarketDisplayTenantSlug();
+  if (!tenantSlug || kwMarketDisplayConfigLoading) return;
+  kwMarketDisplayConfigLoading = true;
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/market-display-config`, { credentials: 'same-origin', cache: 'no-store' });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'market_display_config_load_failed');
+    kwRenderMarketDisplayConfig(payload);
+  } catch (error) {
+    const status = document.getElementById('kw-market-display-config-status');
+    if (status) status.textContent = error.message || '租户行情展示配置加载失败';
+  } finally {
+    kwMarketDisplayConfigLoading = false;
+  }
+}
+
+async function kwSaveMarketDisplayConfig() {
+  const tenantSlug = kwMarketDisplayTenantSlug();
+  if (!tenantSlug) return;
+  const button = document.getElementById('kw-market-display-config-save');
+  const valueOf = (field) => Array.from(document.querySelectorAll(`select[data-market-display-slot="${field}"]`)).map((input) => input.value).filter(Boolean);
+  const marketValues = valueOf('market_overview_codes');
+  const sectorValues = valueOf('sector_names');
+  if (new Set(marketValues).size !== marketValues.length || new Set(sectorValues).size !== sectorValues.length) {
+    showToast('同一指标不能重复占用多个展示格');
+    return;
+  }
+  if (button) { button.disabled = true; button.textContent = '正在发布...'; }
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/market-display-config`, {
+      method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ market_overview_codes: marketValues, sector_names: sectorValues }),
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'market_display_config_save_failed');
+    kwMarketDisplayConfig.settings = payload.settings || {};
+    kwMarketDisplayEditing = false;
+    kwRenderMarketDisplayConfig(kwMarketDisplayConfig);
+    showToast('租户行情展示已发布，粉丝前台即时生效');
+  } catch (error) {
+    showToast(error.message || '行情展示配置发布失败');
+  } finally {
+    if (button) { button.disabled = false; button.textContent = '保存并发布给粉丝'; }
+  }
+}
+
 function showWorkbenchSection(name, navEl) {
   if (name === 'dashboard') {
     name = 'overview';
@@ -12628,6 +12826,10 @@ function showWorkbenchSection(name, navEl) {
   }
   if (name === 'daily-broadcast') {
     kwLoadDailyBroadcastPanel();
+  }
+  if (name === 'shared-data-sync') {
+    kwLoadSharedDataSyncPanel();
+    kwLoadMarketDisplayConfig();
   }
   if (name === 'knowledge-overview') {
     loadWorkbenchKnowledgeAssets(false).then(() => {

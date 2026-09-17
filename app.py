@@ -74,11 +74,11 @@ if __name__ == "__main__":
         # from silently using a different Python environment.
         startup_bootstrap(start_background=False)
         close_app_db_pool()
-        # A worker loads the complete domain/application graph. Two workers
-        # are a better default for the 16 GB single-host deployment; operators
-        # can raise WEB_WORKERS after measuring real traffic and RSS.
-        workers = max(1, int(os.environ.get("WEB_WORKERS", "2")))
-        threads = max(1, int(os.environ.get("WEB_THREADS", "4")))
+        # Every worker imports the complete research domain and keeps sizeable
+        # in-process caches. Use one threaded worker by default on 16 GB hosts;
+        # increase it only after measuring production RSS and latency.
+        workers = max(1, int(os.environ.get("WEB_WORKERS", "1")))
+        threads = max(1, int(os.environ.get("WEB_THREADS", "8")))
         bind = f"{server_options['host']}:{server_options['port']}"
         gunicorn_args = [
             sys.executable,
@@ -96,6 +96,10 @@ if __name__ == "__main__":
             "--error-logfile", "-",
             "wsgi:app",
         ]
+        # Share immutable imports copy-on-write rather than loading them in
+        # every worker independently.
+        if _is_enabled(os.environ.get("WEB_PRELOAD"), default=True):
+            gunicorn_args.insert(-1, "--preload")
         os.execv(sys.executable, gunicorn_args)
     startup_bootstrap(start_background=True)
     app.run(**server_options)

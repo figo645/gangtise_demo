@@ -2,6 +2,7 @@ import base64
 
 from src.runtime import *
 from src.services import *
+from src.domain.core_services import _market_display_catalog
 
 
 def _knowledge_feature_disabled_response():
@@ -48,6 +49,91 @@ def _insight_draft_guard(tenant_slug):
 
 def _daily_broadcast_guard(tenant_slug):
     return _insight_draft_guard(tenant_slug)
+
+
+_DAV_SHARED_DATA_TASK_CODES = (
+    "market_snapshot_sync",
+    "news_title_impact_sync",
+)
+
+
+@app.route("/api/tenant/<tenant_slug>/shared-data-tasks", methods=["GET"])
+def api_tenant_shared_data_tasks(tenant_slug):
+    """Expose the platform-owned task records without creating tenant task copies."""
+    denied = _daily_broadcast_guard(tenant_slug)
+    if denied:
+        return denied
+    try:
+        tasks = []
+        for task_code in _DAV_SHARED_DATA_TASK_CODES:
+            task = get_admin_task_config(task_code)
+            if task:
+                tasks.append({
+                    "task": task,
+                    "runs": list_admin_task_runs(task_code=task_code, limit=10),
+                })
+        return jsonify({"ok": True, "tasks": tasks})
+    except Exception:
+        app.logger.exception("Failed to load shared data task status for DaV workbench")
+        return jsonify({"ok": False, "error": "shared_data_tasks_load_failed"}), 500
+
+
+@app.route("/api/tenant/<tenant_slug>/shared-data-tasks/<task_code>/run", methods=["POST"])
+def api_run_tenant_shared_data_task(tenant_slug, task_code):
+    denied = _daily_broadcast_guard(tenant_slug)
+    if denied:
+        return denied
+    normalized_task_code = str(task_code or "").strip().lower()
+    if normalized_task_code not in _DAV_SHARED_DATA_TASK_CODES:
+        return jsonify({"ok": False, "error": "shared_data_task_not_allowed"}), 404
+    try:
+        # This is the same platform task and lock used by Admin, never a tenant-local copy.
+        execution = run_admin_task(normalized_task_code, trigger_mode="tenant_manual", force=True)
+        return jsonify({
+            "ok": True,
+            "run_code": execution.get("run_code") or "",
+            "summary": execution.get("summary") or "",
+            "result": execution.get("result") or {},
+        })
+    except Exception as exc:
+        app.logger.exception("Failed to run shared data task from DaV workbench task_code=%s", normalized_task_code)
+        if str(exc).strip() == "admin_task_already_running":
+            return jsonify({"ok": False, "error": "admin_task_already_running"}), 409
+        return jsonify({"ok": False, "error": str(exc) or "shared_data_task_failed"}), 500
+
+
+@app.route("/api/tenant/<tenant_slug>/market-display-config", methods=["GET", "POST"])
+def api_tenant_market_display_config(tenant_slug):
+    """DaV-owned presentation selection over the platform shared snapshot."""
+    denied = _insight_draft_guard(tenant_slug)
+    if denied:
+        return denied
+    normalized_tenant = str(tenant_slug or "").strip().lower()
+    try:
+        market_codes, market_names, sector_names = _market_display_catalog()
+        if request.method == "POST":
+            current_user = get_current_authenticated_user() or {}
+            settings = save_tenant_market_display_settings(
+                normalized_tenant,
+                request.get_json(silent=True) or {},
+                updated_by=current_user.get("username") or current_user.get("id") or "",
+            )
+        else:
+            settings = load_tenant_market_display_settings(normalized_tenant)
+        return jsonify({
+            "ok": True,
+            "settings": settings,
+            "catalog": {
+                "market_overview": [{"code": code, "name": market_names.get(code) or code} for code in market_codes],
+                "hot_industries": list(sector_names),
+                "limits": {"market_overview": 4, "hot_industries": 10},
+            },
+        })
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except Exception:
+        app.logger.exception("Failed to manage tenant market display configuration")
+        return jsonify({"ok": False, "error": "tenant_market_display_config_failed"}), 500
 
 
 @app.route("/api/tenant/<tenant_slug>/daily-finance-broadcast", methods=["GET", "POST"])

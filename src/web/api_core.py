@@ -64,6 +64,19 @@ def _resolve_authenticated_watchlist_comment_actor(requested_tenant_slug=""):
     }, None
 
 
+def _resolve_market_snapshot_tenant():
+    """Resolve the display tenant without allowing followers to cross tenants."""
+    current_user = get_current_authenticated_user() or {}
+    role = str(current_user.get("role") or "").strip().lower()
+    requested = str(request.args.get("tenant") or "").strip().lower()
+    account_tenant = str(current_user.get("tenant_slug") or "").strip().lower()
+    if role == "admin":
+        return requested or account_tenant
+    if role in {"dav", "investor"}:
+        return account_tenant
+    return requested
+
+
 def _resolve_kol_tenant_access():
     """Resolve the tenant for KOL fan operations from the signed-in account.
 
@@ -419,7 +432,7 @@ def api_market():
 @app.route("/api/market-overview")
 def api_market_overview():
     try:
-        payload = build_market_overview_payload()
+        payload = build_market_overview_payload(tenant_slug=_resolve_market_snapshot_tenant())
         return jsonify(payload)
     except Exception as exc:
         if is_db_unavailable_error(exc):
@@ -443,7 +456,10 @@ def api_macro_overview():
 def api_market_sectors():
     try:
         force_refresh = str(request.args.get("refresh") or "").strip().lower() in {"1", "true", "yes"}
-        payload = build_market_sector_overview_payload(force_refresh=force_refresh)
+        payload = build_market_sector_overview_payload(
+            force_refresh=force_refresh,
+            tenant_slug=_resolve_market_snapshot_tenant(),
+        )
         return jsonify(payload)
     except Exception as exc:
         if is_db_unavailable_error(exc):

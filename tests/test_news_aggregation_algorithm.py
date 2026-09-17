@@ -303,13 +303,13 @@ function rankNews(input) {
         self.assertEqual(major_rank["bucket"], "major_market")
         self.assertEqual(sector_rank["bucket"], "watchlist_sector")
 
-    def test_news_feed_uses_the_inclusive_three_day_window(self):
+    def test_news_feed_uses_the_inclusive_five_day_window(self):
         now = datetime(2026, 8, 8, 12, 0, 0)
         items = [
-            {"title": "窗口内新闻", "published_at": (now - timedelta(days=3)).isoformat()},
-            {"title": "窗口外旧新闻", "published_at": (now - timedelta(days=3, seconds=1)).isoformat()},
-            {"title": "窗口内未来校验", "published_at": (now + timedelta(days=3)).isoformat()},
-            {"title": "窗口外未来新闻", "published_at": (now + timedelta(days=3, seconds=1)).isoformat()},
+            {"title": "窗口内新闻", "published_at": (now - timedelta(days=5)).isoformat()},
+            {"title": "窗口外旧新闻", "published_at": (now - timedelta(days=5, seconds=1)).isoformat()},
+            {"title": "窗口内未来校验", "published_at": (now + timedelta(days=5)).isoformat()},
+            {"title": "窗口外未来新闻", "published_at": (now + timedelta(days=5, seconds=1)).isoformat()},
         ]
         with patch.object(market_services, "_aggregate_real_news_sources", return_value={"items": items}), patch.object(
             market_services, "datetime"

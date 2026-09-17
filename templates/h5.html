@@ -4875,13 +4875,13 @@ body,
         <button id="market-macro-tab" type="button" role="tab" aria-selected="false" class="h5-segmented-tab" style="flex:1;border:0;border-radius:8px;padding:9px 6px;background:transparent;color:var(--gray-400);font-size:12px;font-weight:700;cursor:pointer" onclick="switchMarketView('macro')">宏观经济</button>
       </div>
       <div id="market-overview-panel" role="tabpanel">
-        <div id="market-overview-source-note" style="font-size:12px;color:var(--gray-400);line-height:1.6;margin:0 2px 10px">标准指数与热门行业均由后台 AKShare 采集后入库，页面只读取数据库快照。</div>
+        <div id="market-overview-source-note" style="font-size:12px;color:var(--gray-400);line-height:1.6;margin:0 2px 10px">市场一览由大V选择，Gangtise OpenAPI 统一采集后写入共享快照。</div>
         <div id="market-overview-list" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
           <div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">正在读取真实行情...</div>
         </div>
       </div>
       <div id="market-sector-panel" role="tabpanel" style="display:none">
-        <div id="market-sector-source-note" style="font-size:12px;color:var(--gray-400);line-height:1.6;margin:0 2px 10px">申万一级行业指数行情，按涨跌幅从高到低排列。数据由后台 AKShare 采集任务入库。</div>
+        <div id="market-sector-source-note" style="font-size:12px;color:var(--gray-400);line-height:1.6;margin:0 2px 10px">热门行业由大V选择，Gangtise OpenAPI 统一采集申万一级行业快照。</div>
         <div id="market-sector-list" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
           <div style="grid-column:1/-1;text-align:center;padding:28px 12px;color:var(--gray-400);font-size:12px">正在读取真实行业行情...</div>
         </div>
@@ -6172,6 +6172,14 @@ async function refreshTenantDashboardRemoteState(options) {
   const tenantSlug = activeUser && activeUser.tenant ? activeUser.tenant.slug : ((window.ACTIVE_TENANT && window.ACTIVE_TENANT.slug) || '');
   if (!tenantSlug) return null;
   const opts = options || {};
+  const loadedTenantSlug = String(((currentTenantDashboardPayload || {}).tenant || {}).slug || '').trim();
+  // The full dashboard is already serialized into the first H5 response.
+  // Re-fetch only after a tenant change or an explicit caller request.
+  if (!opts.force && loadedTenantSlug === String(tenantSlug).trim()) {
+    if (opts.rerenderFeed) renderFundMacroDashboard();
+    if (opts.rerenderWorkbench) renderWorkbenchFundDashboard();
+    return { dashboard: currentTenantDashboardPayload, cached: true };
+  }
   try {
     const resp = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/dashboard`);
     const payload = await resp.json();
@@ -8026,7 +8034,7 @@ function renderFeaturedInsightCard() {
   `;
 }
 
-function renderFeedMarketEconomy(items, title, chartId, limit = 10, description = '正增长红柱 · 负增长绿柱 · 数据来自 AKShare 快照', syncTime = '', stale = false) {
+function renderFeedMarketEconomy(items, title, chartId, limit = 10, description = '正增长红柱 · 负增长绿柱 · 数据来自 Gangtise OpenAPI 共享快照', syncTime = '', stale = false) {
   const rows = (Array.isArray(items) ? items : []).filter((item) => item && item.available !== false);
   const syncLabel = syncTime ? `${stale ? '最近一次成功同步' : '数据同步时间'}：${syncTime}` : '数据同步时间：暂无同步记录';
   if (!rows.length) return `<div class="feed-market-chart"><div class="feed-market-chart-title">${escapeHtml(title)}</div><div class="feed-market-economy-desc">暂无可用的最新数据</div><div class="feed-market-sync-time">${escapeHtml(syncLabel)}</div></div>`;
@@ -8099,7 +8107,91 @@ function renderFeedMarketEconomyPanel(overviewPayload, sectorPayload) {
   if (!host) return;
   const overview = overviewPayload && typeof overviewPayload === 'object' ? overviewPayload : {};
   const sectors = sectorPayload && typeof sectorPayload === 'object' ? sectorPayload : {};
-  host.innerHTML = `<div class="feed-market-economy"><div class="feed-market-economy-title">行业经济指标</div><div class="feed-market-economy-desc">以零轴为基线展示热门行业与市场一览涨跌 Top10。</div><div class="feed-market-economy-grid">${renderFeedMarketEconomy(sectors.items || [], '热门行业涨跌Top10', 'feed-market-sector-chart', 10, '正增长红柱 · 负增长绿柱 · 数据来自 AKShare 快照', sectors.updated_at, sectors.stale)}${renderFeedMarketEconomy(overview.items || [], '市场一览涨跌Top10', 'feed-market-overview-chart', 10, '正增长红柱 · 负增长绿柱 · 数据来自 AKShare 快照', overview.updated_at, overview.stale)}</div></div>`;
+  const canConfigure = String((currentDemoUser || {}).role || '').toLowerCase() === 'dav';
+  host.innerHTML = `<div class="feed-market-economy"><div class="feed-market-economy-title">行业经济指标</div><div class="feed-market-economy-desc">由大V发布本租户展示指标，Gangtise OpenAPI 统一采集共享快照。</div>${canConfigure ? '<div id="h5-market-display-config" style="margin:12px 0"></div>' : ''}<div class="feed-market-economy-grid">${renderFeedMarketEconomy(sectors.items || [], '热门行业涨跌', 'feed-market-sector-chart', 10, '正增长红柱 · 负增长绿柱 · Gangtise OpenAPI 共享快照', sectors.updated_at, sectors.stale)}${renderFeedMarketEconomy(overview.items || [], '市场一览涨跌', 'feed-market-overview-chart', 4, '正增长红柱 · 负增长绿柱 · Gangtise OpenAPI 共享快照', overview.updated_at, overview.stale)}</div></div>`;
+  if (canConfigure) window.setTimeout(loadH5MarketDisplayConfig, 0);
+}
+
+function marketSnapshotTenantQuery() {
+  const tenant = String((currentDemoUser && currentDemoUser.tenant && currentDemoUser.tenant.slug) || new URLSearchParams(window.location.search).get('tenant') || '').trim();
+  return tenant ? `?tenant=${encodeURIComponent(tenant)}` : '';
+}
+
+let h5MarketDisplayConfigLoading = false;
+let h5MarketDisplayConfig = { settings: {}, catalog: {} };
+let h5MarketDisplayEditing = false;
+
+function h5MarketDisplayTenantSlug() {
+  return String((currentDemoUser && currentDemoUser.tenant && currentDemoUser.tenant.slug) || '').trim().toLowerCase();
+}
+
+function renderH5MarketDisplayConfig(payload) {
+  h5MarketDisplayConfig = payload || { settings: {}, catalog: {} };
+  const host = document.getElementById('h5-market-display-config');
+  if (!host) return;
+  const settings = h5MarketDisplayConfig.settings || {};
+  const catalog = h5MarketDisplayConfig.catalog || {};
+  const marketRows = Array.isArray(catalog.market_overview) ? catalog.market_overview : [];
+  const sectorRows = Array.isArray(catalog.hot_industries) ? catalog.hot_industries : [];
+  const makeSlots = (field, values, options, count, optionValue, optionLabel) => Array.from({length: count}, (_, index) => {
+    const selected = String(values[index] || '');
+    return `<label style="display:grid;grid-template-columns:26px minmax(0,1fr);gap:7px;align-items:center;font-size:11px;color:var(--gray-400)"><span>${index + 1}</span><select data-h5-market-slot="${field}" style="width:100%;min-width:0;padding:7px 8px;border:1px solid rgba(47,116,192,.18);border-radius:7px;background:var(--white);color:var(--navy);font-size:12px"><option value="">空置</option>${options.map((item) => { const value = optionValue(item); return `<option value="${escapeAttr(value)}" ${value === selected ? 'selected' : ''}>${escapeHtml(optionLabel(item))}</option>`; }).join('')}</select></label>`;
+  }).join('');
+  const chips = (values, labelOf, emptyText) => values.length
+    ? values.map((value) => `<span style="display:inline-flex;align-items:center;min-height:24px;padding:2px 8px;border:1px solid rgba(47,116,192,.14);border-radius:5px;background:#fff;color:#183A62;font-size:11px;font-weight:600">${escapeHtml(labelOf(value))}</span>`).join('')
+    : `<span style="font-size:11px;color:var(--gray-400)">${emptyText}</span>`;
+  const marketName = (code) => ((marketRows.find((item) => String(item.code || '') === String(code)) || {}).name || code);
+  const summary = `<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px"><div style="padding:10px;border:1px solid rgba(47,116,192,.12);border-radius:7px;background:#fff"><div style="display:flex;justify-content:space-between;gap:6px;align-items:center"><strong style="font-size:12px;color:var(--navy)">热门行业</strong><span style="font-size:11px;color:#2F74C0;font-variant-numeric:tabular-nums">${(settings.sector_names || []).length}/10</span></div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">${chips(settings.sector_names || [], (value) => value, '尚未选择')}</div></div><div style="padding:10px;border:1px solid rgba(47,116,192,.12);border-radius:7px;background:#fff"><div style="display:flex;justify-content:space-between;gap:6px;align-items:center"><strong style="font-size:12px;color:var(--navy)">市场一览</strong><span style="font-size:11px;color:#2F74C0;font-variant-numeric:tabular-nums">${(settings.market_overview_codes || []).length}/4</span></div><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">${chips(settings.market_overview_codes || [], marketName, '尚未选择')}</div></div></div>`;
+  const editor = h5MarketDisplayEditing ? `<div style="display:grid;gap:14px;margin-top:14px;padding-top:14px;border-top:1px solid rgba(47,116,192,.12)"><div><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px"><strong style="font-size:13px;color:var(--navy)">热门行业席位</strong><span style="font-size:11px;color:var(--gray-400)">最多 10 个</span></div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px">${makeSlots('sector_names', settings.sector_names || [], sectorRows, 10, (item) => String(item || ''), (item) => String(item || ''))}</div></div><div><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px"><strong style="font-size:13px;color:var(--navy)">市场一览席位</strong><span style="font-size:11px;color:var(--gray-400)">最多 4 个</span></div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px">${makeSlots('market_overview_codes', settings.market_overview_codes || [], marketRows, 4, (item) => String(item.code || ''), (item) => item.name || item.code || '--')}</div></div><div style="display:flex;gap:8px"><button type="button" class="btn-gold" style="min-height:38px;padding:7px 12px;font-size:12px" onclick="saveH5MarketDisplayConfig()">发布版面</button><button type="button" class="btn-outline" style="min-height:38px;padding:7px 12px;font-size:12px" onclick="toggleH5MarketDisplayEditor(false)">取消</button></div></div>` : '';
+  host.innerHTML = `<section style="border:1px solid rgba(47,116,192,.16);border-radius:8px;background:#F7FAFE;padding:12px"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div><div style="font-size:12px;font-weight:700;color:var(--navy)">粉丝端行情版面</div><div style="font-size:11px;color:var(--gray-400);margin-top:3px">${settings.configured ? `已发布 · ${escapeHtml(settings.updated_at || '--')}` : '未发布时显示平台推荐项'}</div></div>${h5MarketDisplayEditing ? '' : '<button type="button" class="btn-outline" style="min-height:34px;padding:6px 9px;font-size:12px" onclick="toggleH5MarketDisplayEditor(true)">编辑版面</button>'}</div><div style="margin-top:10px">${summary}</div>${editor}</section>`;
+}
+
+function toggleH5MarketDisplayEditor(open) {
+  h5MarketDisplayEditing = Boolean(open);
+  renderH5MarketDisplayConfig(h5MarketDisplayConfig);
+}
+
+async function loadH5MarketDisplayConfig() {
+  const tenantSlug = h5MarketDisplayTenantSlug();
+  if (!tenantSlug || h5MarketDisplayConfigLoading) return;
+  h5MarketDisplayConfigLoading = true;
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/market-display-config`, {credentials: 'same-origin', cache: 'no-store'});
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'market_display_config_load_failed');
+    renderH5MarketDisplayConfig(payload);
+  } catch (error) {
+    const host = document.getElementById('h5-market-display-config');
+    if (host) host.innerHTML = `<div style="font-size:12px;color:var(--red)">${escapeHtml(error.message || '展示指标配置加载失败')}</div>`;
+  } finally {
+    h5MarketDisplayConfigLoading = false;
+  }
+}
+
+async function saveH5MarketDisplayConfig() {
+  const tenantSlug = h5MarketDisplayTenantSlug();
+  if (!tenantSlug) return;
+  const selected = (field) => Array.from(document.querySelectorAll(`select[data-h5-market-slot="${field}"]`)).map((node) => node.value).filter(Boolean);
+  const market = selected('market_overview_codes');
+  const sectors = selected('sector_names');
+  if (new Set(market).size !== market.length || new Set(sectors).size !== sectors.length) {
+    showToast('同一指标不能重复占用多个格子');
+    return;
+  }
+  try {
+    const response = await fetch(`/api/tenant/${encodeURIComponent(tenantSlug)}/market-display-config`, {
+      method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({market_overview_codes: market, sector_names: sectors}),
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'market_display_config_save_failed');
+    h5MarketDisplayConfig.settings = payload.settings || {};
+    h5MarketDisplayEditing = false;
+    showToast('已发布给本租户全部粉丝');
+    await loadFeedMarketEconomy();
+  } catch (error) {
+    showToast(error.message || '展示指标保存失败');
+  }
 }
 
 function renderFundamentalWatchlistChart() {
@@ -8126,7 +8218,8 @@ async function loadFeedMarketEconomy() {
   const host = document.getElementById('feed-market-economy');
   if (!host) return;
   try {
-    const [sectorResponse, overviewResponse] = await Promise.all([fetch('/api/market-sectors', {cache: 'no-store'}), fetch('/api/market-overview', {cache: 'no-store'})]);
+    const query = marketSnapshotTenantQuery();
+    const [sectorResponse, overviewResponse] = await Promise.all([fetch(`/api/market-sectors${query}`, {cache: 'no-store'}), fetch(`/api/market-overview${query}`, {cache: 'no-store'})]);
     if (!sectorResponse.ok || !overviewResponse.ok) throw new Error('market_snapshot_unavailable');
     const sectors = await sectorResponse.json().catch(() => ({}));
     const overview = await overviewResponse.json().catch(() => ({}));
@@ -14638,7 +14731,7 @@ function renderMarketOverview(items) {
   const rows = (Array.isArray(items) ? items : []).filter((item) => item && item.available);
   const sourceNote = document.getElementById('market-overview-source-note');
   if (sourceNote && rows.some((item) => item && item.demo)) sourceNote.textContent = '当前为演示数据，仅用于页面演示；真实市场快照入库后自动替换。';
-  if (sourceNote && !rows.some((item) => item && item.demo) && rows.some((item) => item && item.stale)) sourceNote.textContent = '市场快照正在同步，当前保留最近一次 AKShare 真实数据。';
+  if (sourceNote && !rows.some((item) => item && item.demo) && rows.some((item) => item && item.stale)) sourceNote.textContent = 'Gangtise 市场快照正在同步，当前停止展示过期数据。';
   if (!rows.length && host.querySelector('[data-market-index-code]')) return;
   host.innerHTML = rows.map((item) => {
     const available = item && item.available;
@@ -14660,7 +14753,7 @@ async function loadMarketOverview() {
   const host = document.getElementById('market-overview-list');
   if (!host) return;
   try {
-    const response = await fetch('/api/market-overview');
+    const response = await fetch(`/api/market-overview${marketSnapshotTenantQuery()}`);
     const payload = await response.json().catch(() => ({}));
     if (!response.ok || payload.ok === false) throw new Error(payload.error || 'market_overview_failed');
     const items = Array.isArray(payload.items) ? payload.items : [];
@@ -14767,7 +14860,7 @@ async function loadMarketSectors() {
   const host = document.getElementById('market-sector-list');
   if (!host) return;
   try {
-    const response = await fetch('/api/market-sectors');
+    const response = await fetch(`/api/market-sectors${marketSnapshotTenantQuery()}`);
     const payload = await response.json().catch(() => ({}));
     if (!response.ok || payload.ok === false) throw new Error(payload.error || 'market_sector_overview_failed');
     const items = Array.isArray(payload.items) ? payload.items : [];
